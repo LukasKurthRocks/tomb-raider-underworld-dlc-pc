@@ -31,6 +31,21 @@ Welches Paket welches Kostüm-DLC ist: noch offen.
 eigenes Git-Repo, im Projekt-Repo ignoriert. Lizenz MIT („Copyright (c) 2026 trudlcport contributors“) –
 bei Veröffentlichung als eigener Klon LICENSE behalten und auf das Original verweisen (kein PR).
 
+## Entwicklungsumgebung (`data\`, nicht in Git)
+
+Die Python-Werkzeuge von trudlcport laufen mit `bin\venv\Scripts\python.exe` (Python 3.14, numpy, Pillow, capstone).
+Im Klon liegt der Branch `windows`: die Platzhalter `/path/to/…` in `tools\` zeigen auf `../data/`.
+
+| `data\…` | Verknüpfung (Junction) auf |
+|---|---|
+| `pc` | Spielordner `<Spielordner>` (nur lesen) |
+| `trudlcport` | den Klon `trudlcport` |
+| `Xenia-SteveRepack\Content\534307EC\00000002` | `input\xbox-dlc` |
+| `TombRaiderUnderworld_Patched` | Xbox-Hauptspiel + Title Update (`layer1.000`, `layer2.000`, `TitleUpdate.000`) – folgt |
+
+**Achtung:** `data\` nie rekursiv löschen (`Remove-Item -Recurse`, Explorer) – das kann durch die Junctions die
+Spieldateien bzw. den Klon löschen. Junctions einzeln entfernen: `cmd /c rmdir data\pc`.
+
 ## Werkzeuge (`bin\`, nicht in Git)
 
 | Werkzeug | Version | Quelle | SHA-256 |
