@@ -24,7 +24,8 @@ Kostüm-Pakete (27.10.2026 gelesen): je 13 Einträge, Namen `dlc_costume_a`…`_
 `co_lara_backpack`; `pack20.000` zusätzlich `co_dlc_lara_f`, `dlc_costumes4`, `dlc_doppel_costume_a`.
 trudlcport (Stand B138) erwähnt die Kostüm-Pakete nirgends (STATUS/FINDINGS/INVESTIGATION); nur
 `tools/costume_cmp.py` vergleicht DLC-Kostüm-Objekte mit den Lara-Objekten der Xbox-Version.
-Welches Paket welches Kostüm-DLC ist: noch offen.
+Zuordnung (27.10.2026, aus den Daten): `pack1` = Wetsuit (Kostüme k, p), `pack2` = Classic (a, h),
+`pack20` = Designer (l, m) – Details und Vorschaubilder in `Referenzen\README.md`.
 
 ## Upstream-Klon
 
