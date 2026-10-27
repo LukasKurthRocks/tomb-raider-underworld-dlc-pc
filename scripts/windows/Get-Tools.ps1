@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Downloads the portable reverse engineering tools (Ghidra, Temurin JDK 25) into .\bin and verifies SHA-256.
+    Downloads the portable tools (Ghidra, Temurin JDK 25, Xenia Canary) into .\bin and verifies SHA-256.
 
 .DESCRIPTION
     Zips go to .\bin\_download, are checked against the official SHA-256 and only then unpacked into .\bin.
@@ -39,6 +39,15 @@ $tools = @(
         File   = 'OpenJDK25U-jdk_x64_windows_hotspot_25.0.5_8.zip'
         Sha256 = '636bdc13dc649ddc7d5921c5c7d23cca6e44fd19d662b45cc9c02135a6c96c42'
         Folder = 'jdk-25.0.5+8'
+    },
+    @{
+        # Xbox 360 emulator, used to look at the original DLC screens; the zip has no top folder
+        Name      = 'Xenia Canary 02d2cb5'
+        Url       = 'https://github.com/xenia-canary/xenia-canary-releases/releases/download/02d2cb5/xenia_canary_windows_.zip'
+        File      = 'xenia_canary_windows_02d2cb5.zip'
+        Sha256    = '1adbb2c1c69cbd5fabadb43d03b4c407db3b245de922e11aba699867c68d0796'
+        Folder    = 'xenia-canary'
+        OwnFolder = $true
     }
 )
 
@@ -99,8 +108,9 @@ try {
         if ($hash -ne $tool.Sha256) { throw "SHA-256 mismatch for $($tool.File): $hash" }
         Write-Log "$($tool.Name): SHA-256 ok"
 
-        Write-Log "Unpacking to $binDir ..." -Level VERBOSE
-        Expand-Archive -LiteralPath $zip -DestinationPath $binDir
+        $destination = if ($tool.OwnFolder) { $target } else { $binDir }
+        Write-Log "Unpacking to $destination ..." -Level VERBOSE
+        Expand-Archive -LiteralPath $zip -DestinationPath $destination
         if (!(Test-Path -LiteralPath $target)) { throw "Expected folder not found after unpacking: $target" }
         $count = @(Get-ChildItem -LiteralPath $target -Recurse -File).Count
         Write-Log "$($tool.Name): unpacked to $target ($count files)"

@@ -55,6 +55,13 @@ Spieldateien bzw. den Klon löschen. Junctions einzeln entfernen: `cmd /c rmdir 
 | Ghidra | 12.2 (22.10.2026) | [NationalSecurityAgency/ghidra](https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.2_build), `ghidra_12.2_PUBLIC_20261016.zip` | `2c2cd776…7be67` |
 | JDK (Temurin) | 25.0.5+8 (Ghidra 12.2 braucht Java ≥ 25) | [adoptium/temurin25-binaries](https://github.com/adoptium/temurin25-binaries/releases), `OpenJDK25U-jdk_x64_windows_hotspot_25.0.5_8.zip` | `636bdc13…96c42` |
 
+| Xenia Canary | 02d2cb5 (24.03.2026) | [xenia-canary/xenia-canary-releases](https://github.com/xenia-canary/xenia-canary-releases/releases/tag/02d2cb5), `xenia_canary_windows_.zip` | `1adbb2c1…d0796` |
+
+Xenia (zum Vergleich mit der Xbox-Fassung): `bin\xenia-canary\` mit `portable.txt`; Inhalte unter
+`content\0000000000000000\534307EC\` – `00000002` ist eine Verknüpfung auf `input\xbox-dlc`, `000B0000\<TU>\` enthält
+eine Kopie von `default.xexp` + `TitleUpdate.000`. Start: `.\bin\xenia-canary\xenia_canary.exe .\input\xbox-game\default.xex`.
+`bin\` wegen der Verknüpfung ebenfalls nie rekursiv löschen.
+
 Neu einrichten: `.\Get-Tools.ps1 -Verbose` – lädt die Zips nach `bin\_download\`, prüft SHA-256, entpackt nach `bin\`.
 Schon vorhanden auf dem PC: cdb x86 (Windows Kits 10), x32dbg (x64dbg-Snapshot 2019-11-05),
 Cheat Engine 7.5, Python 3.14 mit capstone/pefile/bsdiff4. REA (morluto/rea) folgt später (ändert die
