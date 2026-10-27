@@ -22,6 +22,10 @@
                dlc_generic again (final dlc_idmap.json on the final base id map)
       Prep     generic_type0 save07 (type 0/7 tables), pc_vers_build (our reconstruction)
                -> type0_table.pkl, type7_table.pkl, pc_vers.json, pc_vers_content.json
+      Convert  dlc_convert_all --media --write -> work\generic\out\pack10|pack11\*.drm
+      Names    dlc_names (file names of unnamed DLC records) -> work\generic\dlc_names.txt (can run any time after Ids)
+      Media    dlc_media_build (our reconstruction: DLC 1 tree in the B138 layout), locals build, padshock build,
+               compare_b138 -> work\rebuild\stage1\mods + work\rebuild\compare_stage1.json
       Convert  dlc_convert_all --media --write   -> work\generic\out\ (first converted DLC DRMs + self checks)
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
@@ -41,7 +45,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [switch]$Trace
 )
@@ -97,6 +101,15 @@ $steps = @{
     Convert = @(
         , @('tools\dlc_convert_all.py', '--media', '--write')
     )
+    Names = @(
+        , @('tools\dlc_names.py')
+    )
+    Media = @(
+        @('tools\dlc_media_build.py', 'work/rebuild/stage1/mods', 'pack10'),
+        @('tools\locals.py', 'build', 'work/rebuild/stage1'),
+        @('tools\padshock_convert.py', 'build', 'work/rebuild/stage1/mods'),
+        @('tools\compare_b138.py', 'work/rebuild/stage1/mods', 'stage1')
+    )
 }
 $outputDirs = @{
     Index   = @('work')
@@ -106,6 +119,8 @@ $outputDirs = @{
     Tables  = @('work\generic', 'work\script')
     Prep    = @('work\generic')
     Convert = @('work\generic\out')
+    Names   = @('work\generic')
+    Media   = @('work\rebuild')
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{
