@@ -124,6 +124,8 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   false "B138 is broken" result) [17, 18].
 
 **Environment**
+- Do not run heavy analyses in parallel to pipeline steps that load `dlc_drms.pkl` (~3 GB) or the generic store:
+  a 4-second `dlc_generic.py` took 90 minutes that way [29].
 - Run Python tools with `-I -X utf8` (cp1252 pipes break on non-Latin-1 output) [19].
 - Menu: the PC DLC menu lists only installed DLC; DLC 2's description (locals index 457) has the same hard line
   breaks as DLC 1 -> `dlc_text_unwrap.py` already covers it [DLC_MENU].

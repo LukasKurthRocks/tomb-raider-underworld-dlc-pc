@@ -355,8 +355,10 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Tables took 6 977 s this time (last `dlc_generic.py` call 5 392 s, the first call of the same step 5 s; the
      first Tables run took 824 s in total). Not the cause: `generic_type0.space_maps()` (checked - it only loads the
      small `unit_idmaps.json`). Suspected: memory pressure - `dlc_generic.py` loads `dlc_drms.pkl` (~3 GB) and the
-     generic store while my parallel analysis jobs (all cores) ran between 20:12 and 22:09. To verify with a timed
-     run of `dlc_generic.py` alone.
+     generic store while my parallel analysis jobs (all cores) ran between 20:12 and 22:09. **Verified 2026-10-28
+     00:22:** `dlc_generic.py` alone takes **4 s** (log `logs/Manual_Timing-dlc_generic_20261028_002212.log`), with an
+     identical `new` id table (sym_info now records shift 480). Rule: no heavy parallel jobs while a pipeline step
+     that loads `dlc_drms.pkl` / the store runs.
    * After the 2b fixes (`analog` still 33/33 = B138): script words differing from B138 unchanged in number (9 580),
      but `script_diff.py` (now with a delta histogram of the differing u16 halves) shows why: **8 552 of 10 810
      differing halves (79.1 %) are exactly +1**, 8 006 of them with a B138 value >= 16828 (the DLC-new symbol range) -
