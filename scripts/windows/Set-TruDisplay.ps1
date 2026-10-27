@@ -6,6 +6,8 @@
     -Windowed   Fullscreen=0, LockWindowSize=1, LockedWindowWidth/Height = -Width/-Height (default 1600x900).
     -Fullscreen Fullscreen=1 (window values are left as they are).
     -Restore    Re-imports the first backup .reg from .\backup (state before this script ever ran).
+    -Language   Additionally sets the game language (registry value Language one level up):
+                English=0, French=1, German=2, Italian=3, Spanish=4 (cdc engine order, not yet verified in game).
 
     Before any change the key is exported to .\backup\TRU-Graphics_<time>.reg.
     Every run writes .\logs\Set-TruDisplay_<time>.log. -Verbose shows steps, -Debug the values before/after,
@@ -21,6 +23,8 @@ param(
     [Parameter(ParameterSetName = 'Windowed')][int]$Height = 900,
     [Parameter(ParameterSetName = 'Fullscreen', Mandatory)][switch]$Fullscreen,
     [Parameter(ParameterSetName = 'Restore', Mandatory)][switch]$Restore,
+    [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
+    [ValidateSet('English', 'French', 'German', 'Italian', 'Spanish')][string]$Language,
     [switch]$Trace
 )
 
@@ -30,6 +34,9 @@ if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
 $root      = $PSScriptRoot
 $regPath   = 'HKCU:\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics'
 $regNative = 'HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics'
+$rootPath  = 'HKCU:\Software\Crystal Dynamics\Tomb Raider: Underworld'
+$rootNative = 'HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld'
+$languageIds = @{ English = 0; French = 1; German = 2; Italian = 3; Spanish = 4 }
 $backupDir = Join-Path $root 'backup'
 $logDir    = Join-Path $root 'logs'
 $stamp     = Get-Date -Format 'yyyyMMdd_HHmmss'
@@ -61,6 +68,16 @@ function Write-Values {
     foreach ($name in $valueNames) {
         Write-Log ('  {0,-22} = {1}' -f $name, $props.$name) -Level DEBUG
     }
+    $rootProps = Get-ItemProperty -LiteralPath $rootPath
+    Write-Log ('  {0,-22} = {1}' -f 'Language', $rootProps.Language) -Level DEBUG
+    Write-Log ('  {0,-22} = {1}' -f 'SubtitleLanguage', $rootProps.SubtitleLanguage) -Level DEBUG
+}
+
+function Set-GameLanguage {
+    if (-not $Language) { return }
+    $id = $languageIds[$Language]
+    Set-ItemProperty -LiteralPath $rootPath -Name 'Language' -Value $id -Type DWord
+    Write-Log "Language set to $Language ($id)."
 }
 
 function Invoke-Reg {
@@ -89,6 +106,11 @@ try {
         $first = Get-ChildItem -LiteralPath $backupDir -Filter 'TRU-Graphics_*.reg' | Sort-Object Name | Select-Object -First 1
         if (-not $first) { throw "No TRU-Graphics_*.reg backup in $backupDir." }
         Write-Values 'before restore'
+        $firstRoot = Get-ChildItem -LiteralPath $backupDir -Filter 'TRU-Root_*.reg' | Sort-Object Name | Select-Object -First 1
+        if ($firstRoot) {
+            Invoke-Reg @('import', $firstRoot.FullName)
+            Write-Log "Restored language values from $($firstRoot.Name)."
+        }
         Invoke-Reg @('import', $first.FullName)
         Write-Values 'after restore'
         Write-Log "Restored from $($first.Name)."
@@ -99,6 +121,12 @@ try {
     $backupFile = Join-Path $backupDir "TRU-Graphics_$stamp.reg"
     Invoke-Reg @('export', $regNative, $backupFile, '/y')
     Write-Log "Backup: $backupFile" -Level VERBOSE
+    if ($Language) {
+        $rootBackup = Join-Path $backupDir "TRU-Root_$stamp.reg"
+        Invoke-Reg @('export', $rootNative, $rootBackup, '/y')
+        Write-Log "Backup: $rootBackup" -Level VERBOSE
+    }
+    Set-GameLanguage
 
     if ($Fullscreen) {
         Set-ItemProperty -LiteralPath $regPath -Name 'Fullscreen' -Value 1 -Type DWord
