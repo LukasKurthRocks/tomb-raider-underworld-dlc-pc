@@ -15,11 +15,13 @@ Screenshots in the TRU-DLC project, `Referenzen/DLC2/` (not in this repository).
   is held."** - a DLC-2-only mechanic (shadow meter in the HUD, shoulder buttons). To check early whether the PC
   exe (retail-based, without the Xbox title-update code) has everything this needs (scripts, HUD widget, input
   bindings for the shoulder buttons on PC).
+* HUD: top left a green Lara silhouette = **shadow meter** next to the weapon/ammo widget; holding RB triggers a
+  blurred "shadow" ability effect (screen-wide motion blur). Needs a HUD widget, an effect and input handling on PC.
 * Pause ring menu in the DLC as on the base game (Resume Game in the centre).
 * Xenia renders level geometry and cutscenes with heavy hatching artefacts (emulator issue, title bar shows
   "Direct3D 12 - RTV/DSV"); menus, loading screen and text render cleanly. Known for this title
   (xenia-canary/game-compatibility #418): it needs `render_target_path_d3d12 = "rov"` (or FSI on Vulkan); set
-  2026-10-27, to be checked.
+  2026-10-27 - confirmed: with ROV cutscenes and levels render correctly (slower).
 * Outfit selection appears when a level is **loaded** (level start screen), not on the story transition from the
   prologue into the first level of a new game. Community guides: reload a level via PDA -> Revisit Location; some
   outfits (wetsuits, swimsuit) only in Treasure Hunt mode, which needs a finished game. Needed to identify which
