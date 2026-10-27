@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Downloads the portable reverse engineering tools (Ghidra, Temurin JDK 21) into .\bin and verifies SHA-256.
+    Downloads the portable reverse engineering tools (Ghidra, Temurin JDK 25) into .\bin and verifies SHA-256.
 
 .DESCRIPTION
     Zips go to .\bin\_download, are checked against the official SHA-256 and only then unpacked into .\bin.
@@ -33,11 +33,12 @@ $tools = @(
         Folder = 'ghidra_12.2_PUBLIC'
     },
     @{
-        Name   = 'Temurin JDK 21.0.12.1+1'
-        Url    = 'https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip'
-        File   = 'OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip'
-        Sha256 = 'f9d6e191ab098c0d416e7d588a24420a8621cd2f4720dab2459b8b7b2d2d8b4e'
-        Folder = 'jdk-21.0.12.1+1'
+        # Ghidra 12.2 requires Java 25 (application.java.min=25)
+        Name   = 'Temurin JDK 25.0.5+8'
+        Url    = 'https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.5%2B8/OpenJDK25U-jdk_x64_windows_hotspot_25.0.5_8.zip'
+        File   = 'OpenJDK25U-jdk_x64_windows_hotspot_25.0.5_8.zip'
+        Sha256 = '636bdc13dc649ddc7d5921c5c7d23cca6e44fd19d662b45cc9c02135a6c96c42'
+        Folder = 'jdk-25.0.5+8'
     }
 )
 

@@ -36,7 +36,7 @@ bei Veröffentlichung als eigener Klon LICENSE behalten und auf das Original ver
 | Werkzeug | Version | Quelle | SHA-256 |
 |---|---|---|---|
 | Ghidra | 12.2 (22.10.2026) | [NationalSecurityAgency/ghidra](https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.2_build), `ghidra_12.2_PUBLIC_20261016.zip` | `2c2cd776…7be67` |
-| JDK (Temurin) | 21.0.12.1+1 | [adoptium/temurin21-binaries](https://github.com/adoptium/temurin21-binaries/releases), `OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip` | `f9d6e191…d8b4e` |
+| JDK (Temurin) | 25.0.5+8 (Ghidra 12.2 braucht Java ≥ 25) | [adoptium/temurin25-binaries](https://github.com/adoptium/temurin25-binaries/releases), `OpenJDK25U-jdk_x64_windows_hotspot_25.0.5_8.zip` | `636bdc13…96c42` |
 
 Neu einrichten: `.\Get-Tools.ps1 -Verbose` – lädt die Zips nach `bin\_download\`, prüft SHA-256, entpackt nach `bin\`.
 Schon vorhanden auf dem PC: cdb x86 (Windows Kits 10), x32dbg (`x64dbg-Snapshot 2019-11-05`),
