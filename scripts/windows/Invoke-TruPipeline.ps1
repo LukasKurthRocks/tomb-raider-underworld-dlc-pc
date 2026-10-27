@@ -13,7 +13,7 @@
                -> work\idx_pc.json (bigfile + patch.000), idx_xbox_base.json (layers + TU), idx_dlc.json (pack10/11)
       Cache    tools\generic_cache.py        pair the base-game DRMs Xbox <-> PC  -> work\generic\pairs.pkl
                tools\generic_cache.py patch   runtime pairs (Xbox TU / PC patch.000) -> work\generic\pairs_patch.pkl
-      Ids      generic_store, generic_ids, objlist_merge, unit_ids
+      Ids      generic_store, generic_ids, objlists_extract (our reconstruction), objlist_merge, unit_ids
                -> store.pkl, idmap.json, merged\ (object lists + remap), unit_idmaps.json
       Learn    generic_learn save, generic_symbols seed, script_pairs, script_learn save, generic_type0 save,
                script_name_match, tex_idmap   -> mask_table.pkl, symbols in idmap.json, script\, type0 table
@@ -56,6 +56,7 @@ $steps = @{
     Ids = @(
         @('tools\generic_store.py'),
         @('tools\generic_ids.py'),
+        @('tools\objlists_extract.py'),
         @('tools\objlist_merge.py'),
         @('tools\unit_ids.py')
     )
