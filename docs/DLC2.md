@@ -32,6 +32,22 @@ Screenshots in the TRU-DLC project, `Referenzen/DLC2/` (not in this repository).
 `dlc_drms_build.py` reads pack11 (`600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000`) together with pack10;
 `index_all` found 620 files in pack10 + pack11 (`work/idx_dlc.json`).
 
+## First DLC 2 tree (stage 1, 2026-10-27)
+
+`tools/dlc_media_build.py work/rebuild/dlc2_stage1/mods pack11` (log `logs/Manual_DLC2-Media_20261027_195120.log`
+in the workspace): 167 DRMs (12 level units with their `_map` DRMs - ceremony room, goo room, machine room,
+hall_ceremony_goo, hall_goo_machine, hall_machine_ceremony, level2_start, treasure_room_cine, yggdrasil_end,
+yggdrasil_hall01/02 - plus 10 streamgroups), 19 music tracks, 6 cinstream `.mul`, 23 audio streams (all still
+silent), 38 images, the merged object lists. Exit 0.
+
+* **`player_tru_dlc2_extension.drm`** - a DLC-2-only extension of the player object, next to
+  `viking_thrall_dlc2_extension` and `yeti_thrall_dlc2_extension`. The doppelganger / shadow-meter mechanics are
+  therefore at least partly data (scripts in these DRMs), not only code in `tru.exe` - the first place to look for
+  what the PC exe has to support.
+* `g_pda.drm` is in the tree again (upstream leaves it out on purpose for DLC 1, see `docs/WS_MAP.md`).
+* Not done yet: audio (`dlc_audio_build.py`; reference = the decoded Xbox source, `compare_audio.py` needs a mode
+  without a reference tree), locals/padshock, the 2b fixes, shaders.
+
 ## What the DLC 1 rebuild taught us for DLC 2 (checklist, kept up to date)
 
 Collected while rebuilding DLC 1 step by step (`docs/WINDOWS_REBUILD.md`, findings in brackets). The big
@@ -66,6 +82,11 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   is DLC-1-only and not public anyway.
 - Most fix tools run inside `Convert` already (`dlc_generic.py`: dtpid, align, model points, tag 0x403, portals,
   link ratio, descriptors, aidata, soundplex) and therefore apply to pack11 too [24].
+- `analog` (`tools/analog_word_fix.py`): generic rule from the base game (DLC DTPs that are near-clones of a base
+  DTP take the base PC bytes where the Xbox bytes agree; re-authored analogs skipped) - 33 words on DLC 1, all = B138
+  [26]. Use it as is on DLC 2; `dlc_fixes_build.py` notes '= B138' only when a reference exists.
+- Tools that read overlay folders: `load_overlay` paths are relative to the current folder, `dtp_audit.overlay`
+  relative to `work/` - a wrong path silently scans 0 files [25].
 - Watch the save game: a broken streamgroup name made "Create new savegame" hang in DLC 1 (`streamname_fix`);
   test saving early in DLC 2 [24].
 - Upstream's `work/ws/` scripts still carry the author's local paths (407 of 578); fix each one when it is used [21].

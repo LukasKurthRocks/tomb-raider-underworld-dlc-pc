@@ -71,6 +71,27 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
 | - | 40 `vm_mods_expected`/`vm_extra` files | check after 1c; else take from B138 | - |
 | - | patched `tru.exe`, `movies/credits_DLC1.bik` | from the B138 kit (rebuild via Steamless + guards optional) | - |
 
+### Stage 3 plan (shaders and materials, drafted 2026-10-27, not started)
+
+Source: `docs/PIPELINE.md` "Stage 3", `work/ws/shader4/`, `work/ws/contratti/`, `work/ws/codefirst/`,
+`work/ws/giro5/`, `work/ws/giro6/`. State before stage 3: 2409 shader-lib sections in our DLC 1 DRMs, 1929 paired
+with B138, **0 identical**; materials 83 %, meshes 32 % (they reference shader ids).
+
+| Build | What | Upstream script | Reads |
+|---|---|---|---|
+| B72 | first translated lib (Xbox lib 2173 -> SM3, adapted to the PC MaterialParams layout) | `shader4/f4_build.py` (+ `xenos2sm3.py`, `sm3asm.py`) | previous baseline |
+| B73-B83 | light transplant (Xbox lit shader + PC light block from a donor, `f9_transplant.py`), all DLC libs (`f10_build_dlc.py`, `f12_build_all.py`), unlit libs translated directly (`f13_unlit.py`) | `shader4/f9*`, `f10`, `f12`, `f13` | previous baseline |
+| B86 `contratti` | sampler contract: Xbox sampler register -> PC slot of the canonical material | `contratti/f14_slotmap.py`, `test_contract.py` (16 tests) | B83/B84 |
+| B87 `materiali19` | 19 materials re-translated (ids 2756-2774) | `codefirst/build_B87.py` | B86 |
+| B88b `acqua` | 7 unlit water libs (2775-2781) | `giro5/build_unlit.py` | B87 |
+| B89 / L-layers | textures 259/2224, libs 975/976/2782 (`giro6/build_20323.py`), stage 4 `layers.py` | `giro6/` | B88b |
+
+Approach: run each builder against our stage tree instead of `work/baseline/B<n>` (paths to adapt per script; only 2
+of the shader4/contratti/B87 scripts carry the author's local paths), measure shader-lib and material sections with
+`compare_sections.py` after each build, keep the gate `shader4/gate_stesso_id.py` (same material => same lib bytes in
+every DRM). Pixel shaders can be validated on this Windows PC directly with Direct3D 9 (`CreatePixelShader`, as
+upstream's `tools/vm_ps_validate.ps1` did inside its VM) - no VM needed.
+
 Goal for DLC 1: as many files MD5-identical to B138 as possible and every remaining difference explained - the
 basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
 
@@ -291,6 +312,13 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `load_overlay(dirs)` (`dtpid_sweep.py`, `soundplex_fix.py`, used by `analog_word_fix.py` and others) against the
      current folder. A first `analog_word_fix.py scan rebuild/stage2b/mods` therefore saw **0 files** and printed an
      empty result (`TOTAL {}`) - not a finding. Pass `work/rebuild/...` to `load_overlay` tools.
+26. **Stage 2b, fix 5: near-clone DTPs (`tools/analog_word_fix.py`)**. Scan on stage2b (with the correct path): 33
+   words in 18 DRMs, all `fix` (no re-authored analog skipped) - mostly u8/u16 fields converted as one u32 in effect
+   DRMs (glare, waterfall, bugs, water spout), `knight_thrall` (8), `knight_thrall_chunkdoll` (2), `wp_dlc_gold_shotgun`
+   (2). Fix `analog` in `dlc_fixes_build.py` (fix mode as a library; every changed word is compared with B138 and
+   noted): **33 of 33 = B138**. All five fixes together (stage2a -> stage2b): DTP sections identical 11 131 -> 11 157
+   (97.6 %); `rebuild_status`: `cinstream/pdlc1_030_finale.drm` (origin `derived:B45`) is now fully identical, 10 of
+   133 DRMs in total.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
@@ -360,4 +388,6 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-27 | Fixes (2b) | fixes `cine` + `float`: float_fix s16 12 words, raw 44 words; `compare_sections` stage2b: DTP 11 131 identical (stage2a 11 126), script 4917, general 230 (unchanged) |
 | 2026-10-27 | Fixes (2b) | `tag_records.py` on stage2b: 329 record words, 0 defects; `tag404_check`: 16 of 23 `0x404` +4 words differ; fixes `cine` + `float` + `tag404`: `tag404_check` 23 of 23 = B138, DTP sections 11 131 identical |
 | 2026-10-27 | Fixes (2b) | all four fixes `cine`, `float`, `tag404`, `postfix` (stage2a -> stage2b): `compare_sections` stage2b: general 246/259 (95.0 %), 2 100 %, tex 99.6 %, wave 86.5 %, DTP 11 131 (97.4 %), script 4917 (79.5 %), shader 0 %, mat 83.2 %, Obj 100 %, mesh 31.7 %, 13 95.2 %; `rebuild_status`: `derived:B43` general 112/115 (was 109), still 9 of 133 DRMs fully identical (all `vm_mods_expected`) |
+| 2026-10-27 | Fixes (2b) | `analog_word_fix.py scan`: first run with `rebuild/...` saw 0 files (path relative to CWD), rerun with `work/rebuild/...`: 33 words; five fixes (`cine`, `float`, `tag404`, `postfix`, `analog`): DTP 11 157 identical (97.6 %), 10 DRMs fully identical |
+| 2026-10-27 | DLC 2 Media | `dlc_media_build.py work/rebuild/dlc2_stage1/mods pack11` (parallel to the DLC 1 run): 167 DRMs, 19 music tracks, 6 cinstream `.mul`, exit 0 (see `docs/DLC2.md`) |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |

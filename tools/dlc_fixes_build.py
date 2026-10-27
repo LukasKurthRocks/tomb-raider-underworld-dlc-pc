@@ -10,6 +10,7 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          (top folder only, as upstream's script)
   tag404 B33: raft/grapple ring records (tag 0x404), word at +4 raw in the new DLC DTPs (learned from B138)
   postfix upstream's tools/dlc1_postfix.py steps 1-2: streamgroup name tables (save hang) and type-0 name strings
+  analog upstream's tools/analog_word_fix.py: near-clone DTPs get the base PC bytes (each word checked against B138)
 
 Report: <OUT>/../fixes_report.json (per fix: files, log lines).
 
@@ -117,7 +118,41 @@ def fix_postfix(out):
     return {'files': files, 'log': log}
 
 
-FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('postfix', fix_postfix)]
+REF = os.path.join(HERE, '..', '..', 'data', 'pc', 'mods')   # installed B138 tree, only for the '= B138' notes
+
+
+def ref_word(rel, sid, off):
+    """the 4 bytes of B138 at (DTP sid, off) or None (no reference, e.g. for DLC 2)"""
+    import drm_write as DW
+    p = os.path.join(REF, rel)
+    if not os.path.exists(p): return None
+    D = DW.read(open(p, 'rb').read(), 'le')
+    s = next((s for s in D.sections if s.type == 7 and s.id == sid), None)
+    return bytes(s.data[off:off + 4]) if s is not None else None
+
+
+def fix_analog(out):
+    """upstream's tools/analog_word_fix.py (fix mode as a library): words of DLC DTPs that are near-clones of a base
+    Xbox DTP must get the base PC bytes where the Xbox bytes are equal (byte-class errors of the learned table);
+    re-authored analogs are skipped. Each changed word is noted with '= B138' / '!= B138' when the reference exists."""
+    sys.path.insert(0, HERE)
+    import analog_word_fix as AW, dtpid_sweep as DS
+    st, ids = DS.ctx(); ids.local = {}
+    files, log = [], []
+    for rel, path in sorted(DS.load_overlay([out]).items()):
+        new, logs = AW.process(rel, path, st, ids)
+        for l in logs:
+            sid, ax, pid, k, old, pcw, what = l
+            ref = ref_word(rel, sid, k) if what == 'fix' else None
+            note = '' if ref is None else (' = B138' if ref.hex() == pcw else ' != B138 (%s)' % ref.hex())
+            log.append('%s DTP %d +%#x: %s -> %s %s (analog xbox %d / pc %d)%s' % (rel, sid, k, old, pcw, what, ax, pid, note))
+        if new is not None:
+            open(path, 'wb').write(new); files.append(rel)
+    return {'files': files, 'log': log}
+
+
+FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('postfix', fix_postfix),
+         ('analog', fix_analog)]
 
 
 def main(argv):
