@@ -4,6 +4,8 @@ Running log of what it takes to reproduce the stage 0-1 pipeline (docs/PIPELINE.
 own files. Goal: rebuild DLC 1 (*Beneath the Ashes*) step by step, compare every produced file with the B138 kit
 manifest, and then use the same pipeline for DLC 2 (*Lara's Shadow*) and the costume packs.
 
+Where the fixes of stage 2b come from (upstream's `work/ws/` folders, builds, overlay layers): `docs/WS_MAP.md`.
+
 ## Environment
 
 * Python 3.14 in a venv **outside** the repository (`..\bin\venv`), packages from `requirements.txt`
