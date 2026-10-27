@@ -17,8 +17,13 @@ Screenshots in the TRU-DLC project, `Referenzen/DLC2/` (not in this repository).
   bindings for the shoulder buttons on PC).
 * Pause ring menu in the DLC as on the base game (Resume Game in the centre).
 * Xenia renders level geometry and cutscenes with heavy hatching artefacts (emulator issue, title bar shows
-  "Direct3D 12 - RTV/DSV"); menus, loading screen and text render cleanly. Not usable as a graphics reference
-  without other GPU settings.
+  "Direct3D 12 - RTV/DSV"); menus, loading screen and text render cleanly. Known for this title
+  (xenia-canary/game-compatibility #418): it needs `render_target_path_d3d12 = "rov"` (or FSI on Vulkan); set
+  2026-10-27, to be checked.
+* Outfit selection appears when a level is **loaded** (level start screen), not on the story transition from the
+  prologue into the first level of a new game. Community guides: reload a level via PDA -> Revisit Location; some
+  outfits (wetsuits, swimsuit) only in Treasure Hunt mode, which needs a finished game. Needed to identify which
+  costume pack (pack1/pack2/pack20) is which.
 
 ## Inputs
 
