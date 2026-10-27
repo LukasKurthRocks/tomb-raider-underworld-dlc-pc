@@ -38,7 +38,8 @@ Kein `mods\`-Ordner, original `binkw32.dll` (356.104 Bytes) – vor dem ModLoade
    `install_dlc.py` (MD5 `225308d2126aed0b53746c3c2e934dab`) durchgelesen: kein Netz, `--check` schreibt nichts
 3. [x] Backups in `backup\` (`binkw32.dll.steam_original` MD5 `2f912c88…f320`, `tru.exe.steam_original`),
    ModLoader entpackt nach `staging\ModLoader-v1.2\`
-4. [ ] Trockenlauf: `.\Install-TruDlc.ps1 -Check` (schreibt nichts)
+4. [x] Trockenlauf: `.\Install-TruDlc.ps1 -Check` (schreibt nichts) – 27.10.2026: Build `B138_audio`,
+   pack10.000 + pack11.000 gefunden, „All inputs OK (277 files verified, 0 optional skipped)“, Exit 0
 5. [ ] Installation: `.\Install-TruDlc.ps1` – prüft Backups + Trockenlauf, kopiert `ModLoader.asi` und
    `binkw32.dll` in den Spielordner, startet dann `install_dlc.py` (legt `mods\` an, patcht `tru.exe`,
    schreibt `movies\credits_DLC1.bik`)
