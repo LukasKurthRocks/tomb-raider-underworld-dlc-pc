@@ -110,11 +110,13 @@ $steps = @{
         @('tools\dlc_media_build.py', 'work/rebuild/stage1/mods', 'pack10'),
         @('tools\locals.py', 'build', 'work/rebuild/stage1'),
         @('tools\padshock_convert.py', 'build', 'work/rebuild/stage1/mods'),
-        @('tools\compare_b138.py', 'work/rebuild/stage1/mods', 'stage1')
+        @('tools\compare_b138.py', 'work/rebuild/stage1/mods', 'stage1'),
+        @('tools\compare_sections.py', 'work/rebuild/stage1/mods', 'stage1')
     )
     Audio = @(
         @('tools\dlc_audio_build.py', 'work/rebuild/stage1/mods', 'work/rebuild/stage2a/mods'),
-        @('tools\compare_b138.py', 'work/rebuild/stage2a/mods', 'stage2a')
+        @('tools\compare_b138.py', 'work/rebuild/stage2a/mods', 'stage2a'),
+        @('tools\compare_sections.py', 'work/rebuild/stage2a/mods', 'stage2a')
     )
 }
 $outputDirs = @{
@@ -266,8 +268,9 @@ finally {
     foreach ($r in $results) { Write-Log ('{0,-40} exit {1}  {2} s' -f $r.Tool, $r.ExitCode, $r.Seconds) }
     foreach ($dir in $outputDirs[$Step]) {
         Get-ChildItem -LiteralPath (Join-Path $clone $dir) -File -ErrorAction SilentlyContinue |
-            ForEach-Object { Write-Log ('{0,-40} {1,14:N0} bytes' -f "$dir\$($_.Name)", $_.Length) }
+            ForEach-Object { Write-Log ('{0,-40} {1,14} bytes' -f "$dir\$($_.Name)", $_.Length) }
     }
-    Write-Log ('total {0:N0} s' -f ((Get-Date) - $started).TotalSeconds)
+    # plain integers: N0 uses the culture's group separator ("3.097 s" on German systems)
+    Write-Log ('total {0} s' -f [int]((Get-Date) - $started).TotalSeconds)
     Write-Host "Log: $logFile"
 }
