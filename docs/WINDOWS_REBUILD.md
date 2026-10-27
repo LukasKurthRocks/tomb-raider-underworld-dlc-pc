@@ -43,6 +43,8 @@ manifest, and then use the same pipeline for DLC 2 (*Lara's Shadow*) and the cos
 | Tables | `dlc_drms_build.py` (**new**), `dlc_generic.py` (provisional), `script_learn.py save`, `generic_type0.py save07`, `script_name_match.py`, `tex_idmap.py`, `dlc_generic.py` (final) | `dlc_drms.pkl`, `dlc_idmap.json`, `work/script/script_table.pkl`, refined `idmap.json` |
 | Prep | `generic_type0.py save07`, `pc_vers_build.py` (**new**) | `type0_table.pkl`, `type7_table.pkl`, `pc_vers.json`, `pc_vers_content.json` |
 | Convert | `tools/dlc_convert_all.py --media --write` | `work/generic/out/` |
+| Names | `tools/dlc_names.py` | `work/generic/dlc_names.txt` (names of unnamed DLC records) |
+| Media | `dlc_media_build.py work/rebuild/stage1/mods pack10` (**new**), `locals.py build work/rebuild/stage1`, `padshock_convert.py build work/rebuild/stage1/mods`, `compare_b138.py work/rebuild/stage1/mods stage1` (**new**) | DLC 1 stage-1 tree in the B138 layout + per-file comparison |
 
 The order of Ids/Learn follows the inputs each tool opens; it is not documented upstream and may still change.
 
@@ -88,12 +90,19 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
    full Convert) and stayed unconverted - silently, the tool still exits with 0. Now `$TRUDLC_FFMPEG`, else PATH,
    else the macOS path. The ffmpeg needs the `xma1`/`xma2` decoders (gyan.dev 9.0.2 essentials has them; fetched by
    `Get-Tools.ps1`, the runner sets `TRUDLC_FFMPEG`). Even the silent placeholder decodes the XMA to get its length.
-9. The converter prefers `work/generic/mask_best.npz` (+ `mask_best_vocab.pkl`, from `slim_table.py` ->
+9. **No glue assembles the non-DRM files.** B138 = 275 files: 138 DRMs (root, `streamgroups/`, `cinstream/`), 14
+   `.mul` streams (`audio/streams/...`, `cinstream/`), 25 music tracks x `.mus/.sam/.mul`, 38 `image/*.raw`, 6
+   `local/locals.bin_*`, `padshock/padshocklib.tfb`, 3 `tr8/` lists. The converters exist (`mul_convert`,
+   `music_convert` incl. `convert_streams`, `raw_image_convert dlc`, `locals build`, `padshock_convert build`) but
+   partly without a command line, and `dlc_convert_all --write` puts every DRM flat into `out/<pack>/` (unnamed records
+   as `0x<hash>_<spec>.drm`). `tools/dlc_media_build.py` assembles the tree; `tools/compare_b138.py` compares any tree
+   with the B138 manifest file by file. Audio stays silent at this stage (`wave_swap.py`, `mul_audio_batch.py` next).
+10. The converter prefers `work/generic/mask_best.npz` (+ `mask_best_vocab.pkl`, from `slim_table.py` ->
    `slim2np.py`) and falls back to the full `mask_table.pkl` - same result, more memory. Not built yet.
-10. **First MD5 match with B138:** the merged `tr8/pc-w/objectlist.txt`, `unitlist.txt`, `objlist.dat` written by
+11. **First MD5 match with B138:** the merged `tr8/pc-w/objectlist.txt`, `unitlist.txt`, `objlist.dat` written by
    `objlist_merge.py` are byte-identical to the files of the installed B138 `mods/` tree (md5 45dc3b4c…,
    2203e9bd…, e4f12246…). 1045 objects (821 base keep their PC ids, 224 DLC), 119 units, 0 dangling object refs.
-11. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
+12. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
    26 s with 8 processes, `pairs.pkl` 1 449 582 409 bytes, `pairs_patch.pkl` 14 782 788 bytes (patch pairs:
    g_pda, generalbank, globalsoundinfo, l2_puzzleroom).
 
