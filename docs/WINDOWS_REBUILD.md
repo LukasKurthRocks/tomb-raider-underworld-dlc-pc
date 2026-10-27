@@ -347,6 +347,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `script_pairs`, `unit_ids`), Tables, Prep, Convert, Names, Media, Audio, then the 2b fixes - about 1.5 h.
      Expected: `dlc_idmap.json` sym_info with xbox_max 16347 and shift > 0, Convert's `guess_collision_new` far
      below 24386, and most of the 8277 shifted script words equal to B138.
+29. **Symbol fix applied: the rerun confirms the cause of finding 27, and B138's shift is 480, not 481.**
+   * Rerun with the guarded `generic_symbols.py seed` (Learn from tool 2, Tables, Prep, Convert, Names, Media,
+     Audio, 2026-10-27 20:02-23:09): symbol map 7498 entries (was 7531 incl. 0xBEEB), `dlc_idmap.json` sym_info
+     xbox_max **16347**, pc_max 16828, shift **481** (was 0). Convert symbol stats: `guess_collision_new`
+     24 386 -> **1 219**, `dlc_new_shift` 2 700 -> **43 215**, `interpolated` 48 290, `guess_lower` 7 467.
+   * Tables took 6 977 s this time (last `dlc_generic.py` call 5 392 s; the first Tables run took 824 s in total) -
+     cause still to check.
+   * After the 2b fixes (`analog` still 33/33 = B138): script words differing from B138 unchanged in number (9 580),
+     but `script_diff.py` (now with a delta histogram of the differing u16 halves) shows why: **8 552 of 10 810
+     differing halves (79.1 %) are exactly +1**, 8 006 of them with a B138 value >= 16828 (the DLC-new symbol range) -
+     e.g. ours `4341` / B138 `4340`, `c161` / `c160`. B138 shifts DLC-new symbols by 480.
+   * The rule `pc_max - xs_max` = 16828 - 16347 = 481 (`PC_SYM_MAX = 16828`, "largest PC symbol seen anywhere");
+     the highest PC symbol in our map is 16799, so 16828 itself is not used by a mapped symbol. To match the played
+     B138, `dlc_generic.DlcIds` now has `DLC_SYM_SHIFT = 480` (measured; `None` restores the rule). Only Convert
+     uses `sym()`, so the rerun starts at Convert.
+   * Smaller remaining deltas (+83, -39939, -334, -337, -1, -12 ...) are other id kinds, to look at after this run.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

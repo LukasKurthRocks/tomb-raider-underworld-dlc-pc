@@ -54,13 +54,18 @@ class DlcIds:
                        'sym_info': self.sym_info}, open(table_path, 'w'))
 
     PC_SYM_MAX = 16828       # largest PC symbol seen anywhere (patch.000 generalbank script names)
+    # Shift for DLC-new symbols. The rule pc_max - xs_max gives 16828 - 16347 = 481, but every DLC-new symbol in
+    # B138 is shifted by 480 (8006 script words differ by exactly +1 with 481; docs/WINDOWS_REBUILD.md finding 29).
+    # None = use the rule.
+    DLC_SYM_SHIFT = 480
 
     def _sym_setup(self):
         m = self.base.get(SYM, {})
         self.sks = sorted(m)
         self.sused = set(m.values())
         self.xs_max = max(m); self.ps_max = max(max(m.values()), self.PC_SYM_MAX)
-        self.sym_info = dict(mapped=len(m), xbox_max=self.xs_max, pc_max=self.ps_max, shift=self.ps_max - self.xs_max,
+        self.sym_shift = self.DLC_SYM_SHIFT if self.DLC_SYM_SHIFT is not None else self.ps_max - self.xs_max
+        self.sym_info = dict(mapped=len(m), xbox_max=self.xs_max, pc_max=self.ps_max, shift=self.sym_shift,
                              collision_base=40000)
         self.sym_stats = collections.Counter()
 
@@ -71,7 +76,7 @@ class DlcIds:
         m = self.base[SYM]
         if xs in m: self.sym_stats['mapped'] += 1; return m[xs]
         if xs == 0 or xs == 0xffff: self.sym_stats['null'] += 1; return xs
-        if xs > self.xs_max: self.sym_stats['dlc_new_shift'] += 1; return xs + self.ps_max - self.xs_max
+        if xs > self.xs_max: self.sym_stats['dlc_new_shift'] += 1; return xs + self.sym_shift
         k = bisect.bisect_left(self.sks, xs)
         if 0 < k < len(self.sks):
             a, b = self.sks[k - 1], self.sks[k]
