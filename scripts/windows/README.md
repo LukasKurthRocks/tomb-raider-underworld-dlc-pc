@@ -48,6 +48,10 @@ Kein `mods\`-Ordner, original `binkw32.dll` (356.104 Bytes) – vor dem ModLoade
 7. [ ] Kostüm-Issue posten (Entwurf: `docs\Issue-Kostueme.md`)
 8. [ ] Steam Machine (SteamOS/Proton): geänderte Dateien übertragen, testen – erst wenn Schritt 6 auf dem PC läuft
 
+Fenstermodus: `.\Set-TruDisplay.ps1 -Windowed` (1600×900; Registry `HKCU\Software\Crystal Dynamics\Tomb Raider:
+Underworld\Graphics`, vorher Export nach `backup\TRU-Graphics_<Zeit>.reg`), zurück mit `-Fullscreen` oder `-Restore`.
+Alle 6 Monitore 1920×1080 @ 60 Hz → im Fenster mit `EnableVSync=1` automatisch 60 fps.
+
 Ausgaben: `-Verbose` (Schritte), `-Debug` (Pfade, Hashes, Aufrufe), `-Trace` (PowerShell-Zeilentrace).
 Jeder Lauf schreibt `logs\Install-TruDlc_<Zeit>_<Modus>.log` mit kompletter Python-Ausgabe.
 
