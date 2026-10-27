@@ -18,8 +18,10 @@
       Learn    generic_learn save, generic_symbols seed, script_pairs, unit_ids (needs script\pairs_8.pkl)
                -> mask_table.pkl, symbols in idmap.json, script\pairs_*.pkl, unit_idmaps.json   (about 26 min)
       Tables   dlc_drms_build (our reconstruction), dlc_generic (provisional dlc_idmap.json, script_learn needs it),
-               script_learn save, generic_type0 save, script_name_match, tex_idmap (both rewrite idmap.json),
+               script_learn save, generic_type0 save07, script_name_match, tex_idmap (both rewrite idmap.json),
                dlc_generic again (final dlc_idmap.json on the final base id map)
+      Prep     generic_type0 save07 (type 0/7 tables), pc_vers_build (our reconstruction)
+               -> type0_table.pkl, type7_table.pkl, pc_vers.json, pc_vers_content.json
       Convert  dlc_convert_all --media --write   -> work\generic\out\ (first converted DLC DRMs + self checks)
 
     -Verbose shows steps, -Debug the command lines, -Trace adds a PowerShell line trace.
@@ -29,7 +31,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Convert')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert')][string]$Step,
     [switch]$Trace
 )
 
@@ -71,10 +73,14 @@ $steps = @{
         @('tools\dlc_drms_build.py'),
         @('tools\dlc_generic.py'),
         @('tools\script_learn.py', 'save'),
-        @('tools\generic_type0.py', 'save'),
+        @('tools\generic_type0.py', 'save07'),
         @('tools\script_name_match.py'),
         @('tools\tex_idmap.py'),
         @('tools\dlc_generic.py')
+    )
+    Prep = @(
+        @('tools\generic_type0.py', 'save07'),
+        @('tools\pc_vers_build.py')
     )
     Convert = @(
         @('tools\dlc_convert_all.py', '--media', '--write')
@@ -86,6 +92,7 @@ $outputDirs = @{
     Ids     = @('work\generic', 'work\generic\merged')
     Learn   = @('work\generic', 'work\script')
     Tables  = @('work\generic', 'work\script')
+    Prep    = @('work\generic')
     Convert = @('work\generic\out')
 }
 
