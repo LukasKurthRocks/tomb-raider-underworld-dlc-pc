@@ -150,6 +150,21 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
 16. **The morning's per-type table was an inline one-off** (`python -c`, pairing by type + id with `drm_write.read`) and
    could not be rerun. Replaced by `tools/compare_sections.py` (pairing by `compare_drm.section_matches`); its numbers
    differ slightly from the earlier table because it pairs differently and now covers 133 named files instead of 104.
+17. **Decoded audio vs B138** (`tools/compare_audio.py work/rebuild/stage2a/mods stage2a`, report
+   `work/rebuild/audio_stage2a.json`):
+   * **Wave sections are effectively equal.** 1085 differing sections, all mono, same length; 72 213 of 65 153 664
+     samples differ (0.11 %), max |diff| median 25, SNR median 90.7 dB, minimum 35.9 dB (wave id 1140, shared by four
+     unit DRMs). The differences sit at single IMA block boundaries: rounding of the decoded XMA, not a missing fix.
+     7 sections also differ in the FSB header.
+   * **`.mul`: B138 is encoded for the game's decoder** (nibble 0 ignored): decoding B138 with that convention and ours
+     with the FSB convention gives 34-47 dB for 22 of 39 files. Our `mul_audio_batch.py` (B43) still writes the FSB
+     convention, i.e. the crackling version; the B138 re-encoder is not in the repository.
+   * **17 `.mul` differ in the right channel only** (left channel correlation 0.994-1.000, right ~0): B138 maps other
+     Xbox streams to the right channel. Two-stream music (`l3_caverns_mus_01`): same as ours (L = 0, R = 1). Six-stream
+     music (`dlc_dungeon_mus_01`, three stereo layers): ours L = 0, R = 1, B138 L = 0, **R = 3**. Mono voice
+     (`c_zip_1_pdlc1_invasion_01`): ours L = R = stream 0, B138 R uncorrelated with the only Xbox stream. Whether this
+     is intended (how the PC music system reads layers) or a bug is not documented; to check against PC base-game
+     `.mul`/`.mus` files with several layers. Probes: `mul_audio.xb_channels` + correlation per stream.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
