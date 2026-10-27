@@ -8,8 +8,8 @@ C = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pairs.pkl')
 def secs(d, e): return drm.sections_with_data(drm.cdrm_decode(d, e), e)[1]
 def load():
     if os.path.exists(C): return pickle.load(open(C, 'rb'))
-    pcb = Archive(os.path.join(T, '..', 'pc', 'bigfile.000'), 'le')
-    XB = [Archive('/path/to/TombRaiderUnderworld_Patched/layer%d.000' % i, 'be') for i in (1, 2)]
+    pcb = Archive(os.path.join(T, '..', '..', 'data', 'pc', 'bigfile.000'), 'le')
+    XB = [Archive(os.path.join(T, '..', '..', 'data', 'TombRaiderUnderworld_Patched', 'layer%d.000' % i), 'be') for i in (1, 2)]
     names = [l.strip() for l in open(os.path.join(T, '..', 'ref', 'yura-release', 'FileLists', 'Tomb Raider Underworld (PC).txt'), errors='ignore')
              if 'cinstream' in l.lower() and l.strip().lower().endswith('.drm')]
     out = []

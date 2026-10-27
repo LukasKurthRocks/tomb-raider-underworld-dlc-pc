@@ -235,6 +235,18 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    (B43, B47, L4): word-level data fixes = stage 2b. Wave differences are the decoder rounding of finding 17.
    Order chosen for 2b: cutscene command lists (B44/B45, `work/ws/cine/`), float words (B46/B47, `float_fix.py`),
    raft rings (B33, `work/ws/raftring/`), then the remaining overlay layers of `docs/WS_MAP.md`.
+21. **Stage 2b, fix 1: cutscenes (B44/B45)** - `tools/dlc_fixes_build.py work/rebuild/stage2a/mods
+   work/rebuild/stage2b/mods` (new; applies the fixes in order, report `work/rebuild/fixes_report.json`) calls
+   `work/ws/cine/build_cine.py` for `pdlc1_010_intro` and `pdlc1_030_finale`: command DTPs 22643 / 23766 / 22604
+   (40 + 16 + 10 words changed) and the effect DTP 23767 (420 words).
+   * Result (`compare_sections.py ... stage2b`): the three command DTPs now equal B138 (DTP total 11 126 -> 11 129
+     identical). Effect DTP 23767: 417 -> **9** differing words of 2908; all 9 are u16 halves in the other order.
+     `fx_apply.py` keeps the value of the author's B44 tree for words without a learned rule - that tree is not
+     public, so these 9 stay open (candidate: the u16-pair float fix of B46/B47).
+   * `work/ws/` scripts still carry the author's local paths: 407 of 578 contain `/path/to/`, `~/Downloads/tru-port`
+     or `expanduser('~...')`. They are fixed one by one when a script is used, with the same rule as `tools/`
+     (game = `../data/pc`, Xbox files = `../data/...`). Done: `work/ws/cine/cinepairs.py` (PC bigfile, Xbox layers).
+   * `cinepairs.load()` caches the base-game cutscene pairs in `work/ws/cine/pairs.pkl` (first run only).
 
 ## The "VM" in upstream (what it was, what we do instead)
 
