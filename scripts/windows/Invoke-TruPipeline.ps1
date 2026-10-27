@@ -13,10 +13,11 @@
                -> work\idx_pc.json (bigfile + patch.000), idx_xbox_base.json (layers + TU), idx_dlc.json (pack10/11)
       Cache    tools\generic_cache.py        pair the base-game DRMs Xbox <-> PC  -> work\generic\pairs.pkl
                tools\generic_cache.py patch   runtime pairs (Xbox TU / PC patch.000) -> work\generic\pairs_patch.pkl
-      Ids      generic_store, generic_ids, objlists_extract (our reconstruction), objlist_merge, unit_ids
-               -> store.pkl, idmap.json, merged\ (object lists + remap), unit_idmaps.json
-      Learn    generic_learn save, generic_symbols seed, script_pairs, script_learn save, generic_type0 save,
-               script_name_match, tex_idmap   -> mask_table.pkl, symbols in idmap.json, script\, type0 table
+      Ids      generic_store, generic_ids, objlists_extract (our reconstruction), objlist_merge
+               -> store.pkl, idmap.json, merged\ (object lists + remap)
+      Learn    generic_learn save, generic_symbols seed, script_pairs, unit_ids (needs script\pairs_8.pkl),
+               script_learn save, generic_type0 save, script_name_match, tex_idmap
+               -> mask_table.pkl, symbols in idmap.json, script\, unit_idmaps.json, type0 table
       DlcDrms  dlc_drms_build (our reconstruction), dlc_generic   -> dlc_drms.pkl, dlc_idmap.json
       Convert  dlc_convert_all --media --write   -> work\generic\out\ (first converted DLC DRMs + self checks)
 
@@ -57,13 +58,13 @@ $steps = @{
         @('tools\generic_store.py'),
         @('tools\generic_ids.py'),
         @('tools\objlists_extract.py'),
-        @('tools\objlist_merge.py'),
-        @('tools\unit_ids.py')
+        @('tools\objlist_merge.py')
     )
     Learn = @(
         @('tools\generic_learn.py', 'save'),
         @('tools\generic_symbols.py', 'seed'),
         @('tools\script_pairs.py'),
+        @('tools\unit_ids.py'),
         @('tools\script_learn.py', 'save'),
         @('tools\generic_type0.py', 'save'),
         @('tools\script_name_match.py'),
