@@ -396,10 +396,13 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * The one script word is at +0x68 (once +0xa8) of the DRM's DLC-new script (ids 20357, 21263, 21411, 23524,
      23764, 24021, 24073, 24114, 24248; 20590 at +0xa8) and has only two value pairs: ours 4075 / B138 4022
      (`0feb` / `0fb6`, 7 files) and ours 5829 / B138 5841 (`16c5` / `16d1`, 3 files) - the "Xbox half = 0" group of
-     finding 30. Most likely the script's super-class reference (a PC script id): we pick another PC script id than
-     the author for the same parent. Candidates: the version choice between bigfile and `patch.000`
-     (`pc_vers_build.py`, step Prep) or `dlc_generic.script_rebase`. Fixing it would make these 9 DRMs identical up
-     to stage 3.
+     finding 30. ~~Most likely the script's super-class reference (a PC script id)~~ - checked against
+     `work/generic/pc_vers.json` and `idmap.json`: there is no PC script with id 4022, 4075, 5829 or 5841. **The B138
+     values are PC DTP ids** (type 7: PC 4022 = Xbox DTP 3625, PC 5841 = Xbox DTP 5478); ours (4075, 5829) are not DTP
+     ids at all (4075 exists as type 2/5/6/10, 5829 as type 5/12). So the word is a DTP reference that is 0 on the
+     Xbox and filled on PC from a base-game script used as template - we take another template than the author
+     (Convert's script routes: `template` 112, `pc_reauthored` 168, `pc_copy` 12 445). To trace in
+     `dlc_generic.py` (template choice for type 8). Fixing it would make these 9 DRMs identical up to stage 3.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
