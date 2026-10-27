@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Each -Step runs one or more tools from the trudlcport clone root with the project venv
-    (..\bin\venv\Scripts\python.exe -u -I tools\<tool>.py ...). Output is shown live and written to
+    (..\bin\venv\Scripts\python.exe -u -I -X utf8 tools\<tool>.py ...). Output is shown live and written to
     <workspace>\logs\Invoke-TruPipeline_<step>_<time>.log; at the end a summary with duration and exit codes is printed.
     The tools only read the game / Xbox data (via <workspace>\data junctions) and write below work\ of the repository.
 
@@ -173,7 +173,9 @@ function Get-ProgressCount {
 
 function Invoke-Tool {
     param([string[]]$ToolArgs, [string]$Label)
-    $allArgs = @('-u', '-I') + $ToolArgs
+    # -X utf8: with -I Python ignores PYTHONIOENCODING and would write cp1252 to the pipe; any character outside
+    # cp1252 in a tool's output (e.g. game text, an arrow) would then raise UnicodeEncodeError
+    $allArgs = @('-u', '-I', '-X', 'utf8') + $ToolArgs
     $argLine = ($allArgs | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
     Write-Log "python $argLine" -Level DEBUG
 
@@ -185,6 +187,8 @@ function Invoke-Tool {
     $psi.CreateNoWindow = $true
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
+    $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
     $process = [System.Diagnostics.Process]::Start($psi)
 
     # read stdout and stderr line by line without blocking; heartbeat every 30 s

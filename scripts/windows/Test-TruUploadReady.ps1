@@ -71,7 +71,14 @@ function Write-Log {
 
 function Invoke-Git {
     param([string[]]$GitArgs)
-    $out = & git -C $repo -c core.quotepath=off @GitArgs 2>&1
+    # git writes UTF-8; the console code page would turn umlauts and dashes into mojibake (and break non-ASCII patterns)
+    $savedEncoding = [Console]::OutputEncoding
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        $out = & git -C $repo -c core.quotepath=off @GitArgs 2>&1
+    } finally {
+        [Console]::OutputEncoding = $savedEncoding
+    }
     if ($LASTEXITCODE -ne 0) { throw ("git {0} failed in {1}: {2}" -f ($GitArgs -join ' '), $repo, ($out -join ' ')) }
     return , @($out | ForEach-Object { [string]$_ })
 }
@@ -136,8 +143,9 @@ foreach ($line in (Invoke-Git -GitArgs @('log', '--format=%h %s%n%b', $range))) 
     Test-Line -Scope 'messages' -Where 'log' -Text $line
 }
 Write-Log 'Identities of the commits to publish:'
-Invoke-Git -GitArgs @('log', '--format=%an <%ae> / %cn <%ce>', $range) | Group-Object |
-    ForEach-Object { Write-Log ('  {0,4} x {1}' -f $_.Count, $_.Name) }
+# Invoke-Git returns one wrapped array: assign it first, piping the call directly would group the whole array as one item
+$ids = Invoke-Git -GitArgs @('log', '--format=%an <%ae> / %cn <%ce>', $range)
+$ids | Group-Object | ForEach-Object { Write-Log ('  {0,4} x {1}' -f $_.Count, $_.Name) }
 
 # --- report -------------------------------------------------------------------------------------------------------
 Write-Log '--- findings ---'

@@ -201,6 +201,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `dlc2_ceremony_room_amb_02` 15.0, `dlc2_machine_room_amb_03` 15.2, `pdlc1_030_finale` 16.0 - so B138 changed
      these beyond re-encoding (perhaps its anti-click work: CHANGELOG "≈432 clicks/min, now ≈9 in the offline
      emulation"). Open: what B138 did there, and whether our version clicks in game (needs a listening test).
+19. **Text encodings on Windows (pipes, code pages).**
+   * Python started with `-I` ignores `PYTHONIOENCODING`; writing to a pipe it then uses cp1252, and any character
+     outside cp1252 (e.g. `→`, game text) raises `UnicodeEncodeError` - reproduced 2026-10-27 with a print of `→`.
+     `Invoke-TruPipeline.ps1` therefore runs the tools with `-u -I -X utf8` and reads stdout/stderr as UTF-8
+     (`ProcessStartInfo.StandardOutputEncoding`).
+   * PowerShell decodes the output of native programs (git) with the console code page: UTF-8 umlauts and dashes
+     come out as mojibake (`├╝`, `ΓÇô`). `Test-TruUploadReady.ps1` switches `[Console]::OutputEncoding` to UTF-8
+     around its git calls.
+   * Our `.ps1` files are ASCII only (plus UTF-8 BOM): Windows PowerShell 5.1 reads a file without BOM as ANSI, where
+     the UTF-8 bytes of typographic quotes and dashes turn into characters PowerShell treats as quotes (strings
+     break). Markdown keeps its dashes and arrows (UTF-8, rendered by GitHub).
+   * A double BOM (`EF BB BF EF BB BF`) makes PowerShell parse the `<#` help block as code (ParserError on the first
+     `-` in the help text). Check the first bytes after rewriting a script.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
