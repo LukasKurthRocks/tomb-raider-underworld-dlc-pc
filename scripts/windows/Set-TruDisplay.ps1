@@ -74,7 +74,7 @@ function Write-Values {
 }
 
 function Set-GameLanguage {
-    if (-not $Language) { return }
+    if (!$Language) { return }
     $id = $languageIds[$Language]
     Set-ItemProperty -LiteralPath $rootPath -Name 'Language' -Value $id -Type DWord
     Write-Log "Language set to $Language ($id)."
@@ -100,11 +100,11 @@ try {
     if (Get-Process -Name 'tru' -ErrorAction SilentlyContinue) {
         throw 'Tomb Raider: Underworld is running; it would overwrite the settings on exit. Please close it first.'
     }
-    if (-not (Test-Path -LiteralPath $regPath)) { throw "Registry key not found: $regNative (start the game once first)." }
+    if (!(Test-Path -LiteralPath $regPath)) { throw "Registry key not found: $regNative (start the game once first)." }
 
     if ($Restore) {
         $first = Get-ChildItem -LiteralPath $backupDir -Filter 'TRU-Graphics_*.reg' | Sort-Object Name | Select-Object -First 1
-        if (-not $first) { throw "No TRU-Graphics_*.reg backup in $backupDir." }
+        if (!$first) { throw "No TRU-Graphics_*.reg backup in $backupDir." }
         Write-Values 'before restore'
         $firstRoot = Get-ChildItem -LiteralPath $backupDir -Filter 'TRU-Root_*.reg' | Sort-Object Name | Select-Object -First 1
         if ($firstRoot) {

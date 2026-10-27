@@ -35,12 +35,13 @@ bei Veröffentlichung als eigener Klon LICENSE behalten und auf das Original ver
 ## Entwicklungsumgebung (`data\`, nicht in Git)
 
 Die Python-Werkzeuge von trudlcport laufen mit `bin\venv\Scripts\python.exe` (Python 3.14, numpy, Pillow, capstone).
-Im Klon liegt der Branch `windows`: die Platzhalter `/path/to/…` in `tools\` zeigen auf `../data/`.
+Im Klon liegt der Branch `windows`: die Platzhalter `/path/to/…` in `tools\` zeigen relativ auf `../data/` –
+die Werkzeuge deshalb immer aus dem Klon-Ordner starten (`cd trudlcport`, dann `..\bin\venv\Scripts\python.exe -I tools\…`).
 
 | `data\…` | Verknüpfung (Junction) auf |
 |---|---|
-| `pc` | Spielordner `<Spielordner>` (nur lesen) |
-| `trudlcport` | den Klon `trudlcport` |
+| `pc` | Spielordner (siehe „Spiel“, nur lesen) |
+| `trudlcport` | den Klon `trudlcport\` |
 | `Xenia-SteveRepack\Content\534307EC\00000002` | `input\xbox-dlc` |
 | `TombRaiderUnderworld_Patched` | `input\xbox-game` (Xbox-Hauptspiel + Title Update) |
 
@@ -55,13 +56,17 @@ Spieldateien bzw. den Klon löschen. Junctions einzeln entfernen: `cmd /c rmdir 
 | JDK (Temurin) | 25.0.5+8 (Ghidra 12.2 braucht Java ≥ 25) | [adoptium/temurin25-binaries](https://github.com/adoptium/temurin25-binaries/releases), `OpenJDK25U-jdk_x64_windows_hotspot_25.0.5_8.zip` | `636bdc13…96c42` |
 
 Neu einrichten: `.\Get-Tools.ps1 -Verbose` – lädt die Zips nach `bin\_download\`, prüft SHA-256, entpackt nach `bin\`.
-Schon vorhanden auf dem PC: cdb x86 (Windows Kits 10), x32dbg (`x64dbg-Snapshot 2019-11-05`),
+Schon vorhanden auf dem PC: cdb x86 (Windows Kits 10), x32dbg (x64dbg-Snapshot 2019-11-05),
 Cheat Engine 7.5, Python 3.14 mit capstone/pefile/bsdiff4. REA (morluto/rea) folgt später (ändert die
 Claude-Code-Konfiguration, braucht Ghidra).
 
 ## Spiel (geprüft 27.10.2026)
 
-`<Spielordner>` – `tru.exe` v1.1; `tru.exe`, `bigfile.000`–`003`
+Spielordner = `<Steam-Bibliothek>\steamapps\common\Tomb Raider Underworld` (Steam-App 8140). `Install-TruDlc.ps1`
+findet ihn selbst: `SteamPath` aus der Registry `HKCU\Software\Valve\Steam`, dazu alle Bibliotheken aus
+`<SteamPath>\steamapps\libraryfolders.vdf`; liegt das Spiel woanders, `-GamePath` angeben.
+
+`tru.exe` v1.1; `tru.exe`, `bigfile.000`–`003`
 und `patch.000` stimmen in Größe und MD5 mit `docs/data/pc_game_files.tsv` des Projekts überein.
 Kein `mods\`-Ordner, original `binkw32.dll` (356.104 Bytes) – vor dem ModLoader sichern.
 

@@ -24,7 +24,7 @@ param(
     [switch]$Check,
     [switch]$Restore,
     [switch]$Trace,
-    [string]$GamePath = '<Spielordner>',
+    [string]$GamePath,
     [string]$Build = 'B138'
 )
 
@@ -61,6 +61,25 @@ function Write-Log {
         'WARN'    { Write-Warning $Message }
         'ERROR'   { Write-Host $Message -ForegroundColor Red }
     }
+}
+
+function Find-TruGamePath {
+    # Steam library folders from the registry + libraryfolders.vdf; Tomb Raider: Underworld is app 8140.
+    $steam = (Get-ItemProperty -LiteralPath 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+    if (!$steam) { return $null }
+    $libraries = @($steam)
+    $vdf = Join-Path $steam 'steamapps\libraryfolders.vdf'
+    if (Test-Path -LiteralPath $vdf) {
+        foreach ($match in [regex]::Matches((Get-Content -LiteralPath $vdf -Raw), '"path"\s+"([^"]+)"')) {
+            $libraries += $match.Groups[1].Value -replace '\\\\', '\'
+        }
+    }
+    foreach ($library in ($libraries | Select-Object -Unique)) {
+        $candidate = Join-Path $library 'steamapps\common\Tomb Raider Underworld'
+        Write-Log "Steam library candidate: $candidate" -Level DEBUG
+        if (Test-Path -LiteralPath (Join-Path $candidate 'tru.exe')) { return $candidate }
+    }
+    return $null
 }
 
 function Get-Md5 {
@@ -117,9 +136,14 @@ if ($Trace) { Set-PSDebug -Trace 1 }
 try {
     Write-Log "Install-TruDlc mode=$mode build=$Build log=$logFile" -Level VERBOSE
     Write-Log "PowerShell $($PSVersionTable.PSVersion) on $([Environment]::OSVersion.VersionString)" -Level DEBUG
+    if (!$GamePath) {
+        $GamePath = Find-TruGamePath
+        if (!$GamePath) { throw 'Game folder not found in the Steam libraries; pass -GamePath.' }
+        Write-Log "Game folder found via Steam: $GamePath" -Level VERBOSE
+    }
     Write-Log "Game: $GamePath | DLC: $dlcPath | Kit: $kitPath" -Level DEBUG
 
-    if (-not (Test-Path -LiteralPath (Join-Path $GamePath 'tru.exe'))) {
+    if (!(Test-Path -LiteralPath (Join-Path $GamePath 'tru.exe'))) {
         throw "No tru.exe in game folder: $GamePath"
     }
 

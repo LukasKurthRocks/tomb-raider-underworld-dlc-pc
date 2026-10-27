@@ -81,7 +81,7 @@ try {
         }
 
         $haveValidZip = (Test-Path -LiteralPath $zip) -and ((Get-Sha256 $zip) -eq $tool.Sha256)
-        if (-not $haveValidZip) {
+        if (!$haveValidZip) {
             Write-Log "Downloading $($tool.File) ..." -Level VERBOSE
             $previous = $ErrorActionPreference
             $ErrorActionPreference = 'Continue'
@@ -101,7 +101,7 @@ try {
 
         Write-Log "Unpacking to $binDir ..." -Level VERBOSE
         Expand-Archive -LiteralPath $zip -DestinationPath $binDir
-        if (-not (Test-Path -LiteralPath $target)) { throw "Expected folder not found after unpacking: $target" }
+        if (!(Test-Path -LiteralPath $target)) { throw "Expected folder not found after unpacking: $target" }
         $count = @(Get-ChildItem -LiteralPath $target -Recurse -File).Count
         Write-Log "$($tool.Name): unpacked to $target ($count files)"
     }
