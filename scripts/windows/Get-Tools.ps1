@@ -48,6 +48,15 @@ $tools = @(
         Sha256    = '1adbb2c1c69cbd5fabadb43d03b4c407db3b245de922e11aba699867c68d0796'
         Folder    = 'xenia-canary'
         OwnFolder = $true
+    },
+    @{
+        # bigfile browser; its FileLists map name hashes to file names (trudlcport expects ref/yura-release/FileLists)
+        Name      = 'Yura 1.7.2'
+        Url       = 'https://github.com/TheIndra55/Yura/releases/download/v1.7.2/Yura.zip'
+        File      = 'Yura-1.7.2.zip'
+        Sha256    = '4e482042b9be526de02216145458816145dda10c8a09a56c45871f652458df07'
+        Folder    = 'yura-1.7.2'
+        OwnFolder = $true
     }
 )
 
