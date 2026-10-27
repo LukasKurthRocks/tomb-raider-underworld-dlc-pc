@@ -82,8 +82,9 @@ $steps = @{
         @('tools\generic_type0.py', 'save07'),
         @('tools\pc_vers_build.py')
     )
+    # leading comma: a step with a single tool must stay a list of argument lists (PowerShell unrolls @(@(...)))
     Convert = @(
-        @('tools\dlc_convert_all.py', '--media', '--write')
+        , @('tools\dlc_convert_all.py', '--media', '--write')
     )
 }
 $outputDirs = @{
