@@ -11,6 +11,40 @@ mit dem Fan-Port [trudlcport](https://github.com/andrearicci93/trudlcport) (andr
 | `input\xbox-game\` | eigenes Xbox-360-Hauptspiel (`layer1.000/.001`, `layer2.000/.001`, `default.xex`) + Title Update (`TitleUpdate.000`, `default.xexp`) |
 | `input\ModLoader-v1.2.zip` | [TombRaiderModding/ModLoader](https://github.com/TombRaiderModding/ModLoader/releases) v1.2 (20.07.2024) |
 | `release\B138\` | `install_dlc.py` + `trudlcport-kit-B138.zip` (Release 21.10.2026) |
+| `trudlcport\` | Klon von trudlcport, Branch `windows` (eigenes Git-Repo, siehe „Upstream-Klon“) |
+| `bin\` | Werkzeuge (Python-venv, Ghidra, JDK, Xenia, Yura, ffmpeg) – `Get-Tools.ps1` |
+| `data\` | Verknüpfungen auf Spiel, Xbox-Daten und Klon – siehe „Entwicklungsumgebung“ |
+| `backup\` | Sicherungen (Original-`tru.exe`/`binkw32.dll`, ersetzte Mod-Dateien, Registry-Exporte) |
+| `logs\` | Protokolle aller Skriptläufe |
+| `Referenzen\` | Vergleichsbilder (Xbox/Xenia, PC) und Kostüm-Vorschauen – `Referenzen\README.md` |
+
+Alle Ordner außer den Skripten, `docs\`, `Referenzen\` und den Markdown-Dateien sind in `.gitignore`.
+
+## Skripte (PowerShell, Verbose/Debug/Trace + Protokoll in `logs\`)
+
+| Skript | Zweck |
+|---|---|
+| `Install-TruDlc.ps1` | B138-Kit + ModLoader installieren (`-Check` Trockenlauf, `-Restore`), Spielordner über Steam |
+| `Install-TruModFile.ps1` | eine Datei in `mods\` austauschen (mit MD5-benannter Sicherung) oder zurücksetzen |
+| `Set-TruDisplay.ps1` | Fenstermodus/Vollbild und Sprache (Registry, mit Sicherung) |
+| `Get-Tools.ps1` | Werkzeuge nach `bin\` laden, SHA-256 prüfen |
+| `Invoke-TruPipeline.ps1` | trudlcport-Pipeline Schritt für Schritt (`-Step Index/Cache/Ids/Learn/Tables/Prep/Convert`, `-FromTool`), mit Fortschritt |
+
+## Doku im Klon (englisch)
+
+| Datei | Inhalt |
+|---|---|
+| `trudlcport\docs\WINDOWS_REBUILD.md` | Nachbau der Pipeline unter Windows: Reihenfolge, Lücken/Funde, Laufprotokoll, Vergleich mit B138 |
+| `trudlcport\docs\DLC_MENU.md` | DLC-Missionsmenü: Ursache und Fix (Titel über der Beschreibung) |
+| `trudlcport\docs\DLC2.md` | *Lara's Shadow*: Xbox-Referenz, Shadow-Meter-Mechanik |
+| `trudlcport\docs\COSTUMES.md` | Kostüm-Pakete: welches Paket welche Kostüme enthält |
+
+## Stand Pipeline-Nachbau (27.10.2026)
+
+Stufe 0 (Index, Paare, Id-Tabellen, gelernte Regeln) und Stufe 1 (Grundumwandlung) laufen unter Windows; dafür
+fehlende Bausteine wurden nachgebaut (`dlc_drms_build.py`, `objlists_extract.py`, `pc_vers_build.py`). Vergleich
+mit B138 für DLC 1: Objektlisten byte-identisch; Abschnitte vom Typ 2/11 zu 100 %, Texturen 99,7 %, DTP 97,7 %
+identisch; Audio, Shader und Level-Daten fehlen noch (Stufen 2–4). Details: `WINDOWS_REBUILD.md`.
 
 Xbox-Ordner (Titel-ID `534307EC`):
 
@@ -56,6 +90,8 @@ Spieldateien bzw. den Klon löschen. Junctions einzeln entfernen: `cmd /c rmdir 
 | Ghidra | 12.2 (22.10.2026) | [NationalSecurityAgency/ghidra](https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.2_build), `ghidra_12.2_PUBLIC_20261016.zip` | `2c2cd776…7be67` |
 | JDK (Temurin) | 25.0.5+8 (Ghidra 12.2 braucht Java ≥ 25) | [adoptium/temurin25-binaries](https://github.com/adoptium/temurin25-binaries/releases), `OpenJDK25U-jdk_x64_windows_hotspot_25.0.5_8.zip` | `636bdc13…96c42` |
 
+| Yura | 1.7.2 (03.04.2026) | [TheIndra55/Yura](https://github.com/TheIndra55/Yura/releases/tag/v1.7.2), `Yura.zip` – Dateilisten (`ref\yura-release` im Klon) | `4e482042…8df07` |
+| ffmpeg (gyan.dev essentials) | 9.0.2 (20.09.2026) | [GyanD/codexffmpeg](https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2) – XMA-Decoder für die Audio-Umwandlung | `60f46726…047ba` |
 | Xenia Canary | 02d2cb5 (24.03.2026) | [xenia-canary/xenia-canary-releases](https://github.com/xenia-canary/xenia-canary-releases/releases/tag/02d2cb5), `xenia_canary_windows_.zip` | `1adbb2c1…d0796` |
 
 Xenia (zum Vergleich mit der Xbox-Fassung): `bin\xenia-canary\` mit `portable.txt`; Inhalte unter
