@@ -403,6 +403,10 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      Xbox and filled on PC from a base-game script used as template - we take another template than the author
      (Convert's script routes: `template` 112, `pc_reauthored` 168, `pc_copy` 12 445). To trace in
      `dlc_generic.py` (template choice for type 8). Fixing it would make these 9 DRMs identical up to stage 3.
+   * The affected scripts are DLC-new (ids >= 20000), so their route is `convert` (learned table), not `template`;
+     post-passes that write type-8 words: `script_rebase` (super chain grown on PC, `REBASE_STATS`), the SArray count
+     fix (`script_conv.Walk`), `cine_nowait`. Next: convert one of these DRMs (e.g. `dlc_fx_haze.drm`) with
+     `dlc_convert_all.py --media <name>` and switch the post-passes off one by one to see which writes +0x68.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
