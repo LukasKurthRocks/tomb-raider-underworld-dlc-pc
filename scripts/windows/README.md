@@ -48,6 +48,18 @@ Kein `mods\`-Ordner, original `binkw32.dll` (356.104 Bytes) – vor dem ModLoade
 7. [ ] Kostüm-Issue posten (Entwurf: `docs\Issue-Kostueme.md`)
 8. [ ] Steam Machine (SteamOS/Proton): geänderte Dateien übertragen, testen – erst wenn Schritt 6 auf dem PC läuft
 
+## Stand 27.10.2026 nach erstem Spielstart
+
+- DLC1 erscheint im Menü „Downloadable content“ und startet (mit `/affinity FFFF`).
+- Deutsch: `.\Set-TruDisplay.ps1 -Language German` (Registry `Language = 2`) – im Spiel bestätigt, DLC-Texte deutsch.
+- Fenstermodus: das Spiel setzt `Fullscreen` beim Start wieder auf 1 (registry nach dem Start geprüft) –
+  `LockWindowSize`/`LockedWindow*` bleiben stehen, werden aber nicht benutzt. Offen: Alt+Enter, Ursache.
+- **Menüfehler (offen):** Im DLC-Missionsmenü liegt der Titel („UNTER DER ASCHE“ / „BENEATH THE ASHES“)
+  mitten über dem Beschreibungstext oben rechts – in Englisch und Deutsch, bei 1600×900 und 1920×1080.
+  Upstream nicht dokumentiert (STATUS/CHANGELOG). Kandidat für den eigenen Klon: Layout des DLC-Menüs;
+  upstream ändert per `tools/menu_dlc_patch.py` das Ring-Menü-Skript (Section 7 UIPause in `generalbank.drm`).
+- Steam-Startoption mit Spielzeit-Erfassung: `cmd /c start "" /wait /affinity FFFF %command%`.
+
 Fenstermodus: `.\Set-TruDisplay.ps1 -Windowed` (1600×900; Registry `HKCU\Software\Crystal Dynamics\Tomb Raider:
 Underworld\Graphics`, vorher Export nach `backup\TRU-Graphics_<Zeit>.reg`), zurück mit `-Fullscreen` oder `-Restore`.
 Alle 6 Monitore 1920×1080 @ 60 Hz → im Fenster mit `EnableVSync=1` automatisch 60 fps.

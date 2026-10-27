@@ -7,7 +7,7 @@
     -Fullscreen Fullscreen=1 (window values are left as they are).
     -Restore    Re-imports the first backup .reg from .\backup (state before this script ever ran).
     -Language   Additionally sets the game language (registry value Language one level up):
-                English=0, French=1, German=2, Italian=3, Spanish=4 (cdc engine order, not yet verified in game).
+                English=0, French=1, German=2, Italian=3, Spanish=4 (cdc engine order; German=2 verified in game).
 
     Before any change the key is exported to .\backup\TRU-Graphics_<time>.reg.
     Every run writes .\logs\Set-TruDisplay_<time>.log. -Verbose shows steps, -Debug the values before/after,
