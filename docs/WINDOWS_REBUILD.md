@@ -63,9 +63,9 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
 | 1a | Convert (DRMs, silent audio placeholders) | done | 52 min |
 | 1b | Names (`dlc_names.py`, + kit manifest names) | done; pack10: 1 record unnamed | 3 min |
 | 1c | Media (`dlc_media_build.py`, locals, padshock) + `compare_b138.py` + `compare_sections.py` | done | 30 s |
-| 2a | Audio: `wave_swap.py` (Wave sections in place), `mul_audio_batch.py` (`.mul` streams) = B43 | done; wave sections 86.5 % = B138, `.mul` not yet MD5-equal | 2.5 min |
-| 2a+ | Explain the remaining wave differences (spread over 61 of 63 files) and the `.mul` differences (B138 re-encoded 39 `.mul`; compare decoded audio, not MD5) | open | - |
-| 2b | Data fixes B1-B47 (LINEAGE.md): crashes, raft/physics words, cutscene command lists, MaterialParams | scripts partly only in `work/ws/`; order to reconstruct | small; much work |
+| 2a | Audio: `wave_swap.py` (Wave sections in place), `mul_audio_nch.py` (`.mul` streams, one channel per Xbox stream, game convention; B43's `mul_audio_batch.py` with `--mul b43`) | done; wave sections 86.5 % = B138, `.mul` vs Xbox source median 44.4 dB (findings 17, 18) | 2.5 min |
+| 2a+ | Remaining audio differences: wave = decoder rounding (explained, finding 17); `.mul`: what B138 changed on 6 files beyond re-encoding, listening test in game | partly open | - |
+| 2b | Data fixes B1-B47 (LINEAGE.md) in `tools/dlc_fixes_build.py`: `cine` (B44/B45) done, `float` (B46/B47) done, next raft rings (B33), then the remaining layers of `docs/WS_MAP.md` | in progress (findings 20-22) | minutes per fix; much work |
 | 3 | Shaders B72-B89 (`work/ws/shader4/`) | open | largest block |
 | 4 | Last layers to B90_gold_L4 (Giro 5-7), then CHANGELOG changes up to B138 | open | - |
 | - | 40 `vm_mods_expected`/`vm_extra` files | check after 1c; else take from B138 | - |
@@ -320,4 +320,9 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-27 | Audio | ok, 117 s: 8061 waves in 64 DRMs, 10 `.mul`; no MD5 change against B138 (B138 re-encoded the `.mul`; B90's B43 MD5s also differ) |
 | 2026-10-27 | Names | `dlc_names.py` + kit manifest names: 260 names, 127 matching unknown records, 56 more by dictionary; 38 records newly named, 0 changed; pack10 1 unnamed (0x753ecefd, 983 168 B), pack11 63 |
 | 2026-10-27 | Media + Audio | rerun (tools called directly, log `logs/Manual_Media-Audio_20261027_162633.log`): music pack10 6 + pack11 19 tracks; **92 identical / 178 different / 5 missing / 1 extra of 275**; `.mul` 39 of 39 swapped. `compare_sections` stage2a: 2 / 11 100 %, 5 99.6 %, 7 97.4 %, 13 95.2 %, 0 88.8 %, **6 wave 86.5 %** (stage1: 0 %), 10 83.2 %, 8 79.5 %, 12 31.7 %, 9 0 % |
+| 2026-10-27 | Audio | `compare_audio.py` (decoded audio): waves 0.11 % of samples differ, SNR median 90.7 dB; `.mul` 19 non-stereo files ~0 dB -> layout learned from the base game (finding 18) |
+| 2026-10-27 | Audio | rerun with `mul_audio_nch.py` (tools called directly): `MUL OK 39 of 39 (mode nch)`; `compare_audio`: ours vs Xbox source min 25.1 / median 44.4 dB, ours vs B138 median 39.9 dB |
+| 2026-10-27 | Media | from the new place `scripts/windows/` (after the move into the repository): 92 identical of 275, 36 s; then with `-X utf8`: same result, 35 s |
+| 2026-10-27 | Fixes (2b) | `dlc_fixes_build.py` stage2a -> stage2b, fix `cine`: 3 command DTPs = B138, effect DTP 23767 417 -> 9 words; first run of `build_cine.py` failed on the author's local paths in `cinepairs.py` (fixed) |
+| 2026-10-27 | Fixes (2b) | fixes `cine` + `float`: float_fix s16 12 words, raw 44 words; `compare_sections` stage2b: DTP 11 131 identical (stage2a 11 126), script 4917, general 230 (unchanged) |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |
