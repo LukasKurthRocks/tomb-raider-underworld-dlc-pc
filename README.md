@@ -25,12 +25,15 @@
 
 **What is new here** (details on branch `windows`)
 
+- [scripts/windows/](scripts/windows/README.md) – PowerShell scripts: install the kit, swap single mod files, display
+  mode and language, tools, the pipeline step by step, a pre-upload check
 - [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) – running the pipeline on Windows: missing glue scripts rebuilt,
   stage-by-stage comparison with B138, run log and findings
 - [docs/WS_MAP.md](docs/WS_MAP.md) – map of the author's `work/ws/` scripts, builds and overlay layers
 - [docs/DLC_MENU.md](docs/DLC_MENU.md), [docs/DLC2.md](docs/DLC2.md), [docs/COSTUMES.md](docs/COSTUMES.md) – DLC menu
   text fix (all six languages), notes on DLC 2 and the costume packs
-- New tools in `tools/` (e.g. `compare_b138.py`, `compare_sections.py`, `dlc_media_build.py`, `dlc_audio_build.py`)
+- New tools in `tools/` (e.g. `compare_b138.py`, `compare_sections.py`, `compare_audio.py`, `dlc_media_build.py`,
+  `dlc_audio_build.py`, `mul_audio_nch.py` - the audio fix for non-stereo `.mul`)
 
 Versions of this fork are named `<date>[.<n>]-B<upstream build>`, e.g. `20261027-B138`: the B number is always the
 original's build it is based on.
