@@ -24,14 +24,25 @@
                -> type0_table.pkl, type7_table.pkl, pc_vers.json, pc_vers_content.json
       Convert  dlc_convert_all --media --write   -> work\generic\out\ (first converted DLC DRMs + self checks)
 
+    Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
+    a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
+    progress bar, "tool N/M").
+
+    Progress: a progress bar (Write-Progress) shows the running tool and its time; steps with a known number of
+    output files (Convert: 307 DRMs) also show percent and an estimate. Every 30 s a "still running" line is
+    written to the console and the log.
+
     -Verbose shows steps, -Debug the command lines, -Trace adds a PowerShell line trace.
 
 .EXAMPLE
     .\Invoke-TruPipeline.ps1 -Step Cache -Verbose
+.EXAMPLE
+    .\Invoke-TruPipeline.ps1 -Step Tables -FromTool 5 -Verbose
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert')][string]$Step,
+    [ValidateRange(1, 99)][int]$FromTool = 1,
     [switch]$Trace
 )
 
@@ -96,6 +107,10 @@ $outputDirs = @{
     Prep    = @('work\generic')
     Convert = @('work\generic\out')
 }
+# steps whose progress can be measured by counting output files
+$progressHints = @{
+    Convert = @{ Dir = 'work\generic\out'; Filter = '*.drm'; Total = 307 }
+}
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $logFile = Join-Path $logDir ('Invoke-TruPipeline_{0}_{1}.log' -f $Step, (Get-Date -Format 'yyyyMMdd_HHmmss'))
@@ -116,21 +131,70 @@ function Write-Log {
     }
 }
 
+function Get-ProgressCount {
+    # number of finished output files for steps with a known total (see $progressHints)
+    $hint = $progressHints[$Step]
+    if (!$hint) { return $null }
+    $dir = Join-Path $clone $hint.Dir
+    if (!(Test-Path -LiteralPath $dir)) { return 0 }
+    return @(Get-ChildItem -LiteralPath $dir -Recurse -File -Filter $hint.Filter -ErrorAction SilentlyContinue).Count
+}
+
 function Invoke-Tool {
-    param([string[]]$ToolArgs)
-    Write-Log ('python -u -I ' + ($ToolArgs -join ' ')) -Level DEBUG
-    $previous = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        & $python -u -I @ToolArgs 2>&1 | ForEach-Object {
-            $text = if ($_ -is [System.Management.Automation.ErrorRecord]) { 'stderr: ' + $_.Exception.Message } else { [string]$_ }
-            Write-Log $text
+    param([string[]]$ToolArgs, [string]$Label)
+    $allArgs = @('-u', '-I') + $ToolArgs
+    $argLine = ($allArgs | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
+    Write-Log "python $argLine" -Level DEBUG
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $python
+    $psi.Arguments = $argLine
+    $psi.WorkingDirectory = $clone
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $process = [System.Diagnostics.Process]::Start($psi)
+
+    # read stdout and stderr line by line without blocking; heartbeat every 30 s
+    $outTask = $process.StandardOutput.ReadLineAsync()
+    $errTask = $process.StandardError.ReadLineAsync()
+    $t0 = Get-Date
+    $nextBeat = $t0.AddSeconds(30)
+    $nextCount = $t0
+    $count = $null
+    $hint = $progressHints[$Step]
+    while ($outTask -or $errTask) {
+        $idle = $true
+        if ($outTask -and $outTask.IsCompleted) {
+            $line = $outTask.Result
+            if ($null -eq $line) { $outTask = $null } else { Write-Log $line; $outTask = $process.StandardOutput.ReadLineAsync(); $idle = $false }
         }
-        $code = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $previous
+        if ($errTask -and $errTask.IsCompleted) {
+            $line = $errTask.Result
+            if ($null -eq $line) { $errTask = $null } else { Write-Log ('stderr: ' + $line); $errTask = $process.StandardError.ReadLineAsync(); $idle = $false }
+        }
+        $now = Get-Date
+        $elapsed = $now - $t0
+        $status = '{0}  running {1:hh\:mm\:ss}' -f $Label, $elapsed
+        if ($now -ge $nextCount) { $count = Get-ProgressCount; $nextCount = $now.AddSeconds(5) }
+        if ($null -ne $count -and $hint.Total -gt 0) {
+            $percent = [Math]::Min(99, [int](100 * $count / $hint.Total))
+            $remaining = if ($count -gt 0) { [int]($elapsed.TotalSeconds * ($hint.Total - $count) / $count) } else { -1 }
+            Write-Progress -Activity "Invoke-TruPipeline $Step" -Status ('{0}  {1}/{2} files' -f $status, $count, $hint.Total) -PercentComplete $percent -SecondsRemaining $remaining
+        } else {
+            Write-Progress -Activity "Invoke-TruPipeline $Step" -Status $status
+        }
+        if ($now -ge $nextBeat) {
+            $beat = if ($null -ne $count) { '{0} / {1} files' -f $count, $hint.Total } else { 'no output yet' }
+            Write-Log ('... still running: {0}, {1:hh\:mm\:ss}, {2}' -f $Label, $elapsed, $beat)
+            $nextBeat = $now.AddSeconds(30)
+        }
+        if ($idle) { Start-Sleep -Milliseconds 250 }
     }
-    return $code
+    $process.WaitForExit()
+    Write-Progress -Activity "Invoke-TruPipeline $Step" -Completed
+    return $process.ExitCode
 }
 
 if ($Trace) { Set-PSDebug -Trace 1 }
@@ -143,10 +207,18 @@ try {
     Write-Log "Python: $((& $python --version 2>&1) -join ' ')" -Level DEBUG
     foreach ($dir in $outputDirs[$Step]) { New-Item -ItemType Directory -Force -Path (Join-Path $clone $dir) | Out-Null }
 
+    $toolCount = @($steps[$Step]).Count
+    $toolIndex = 0
     foreach ($toolArgs in $steps[$Step]) {
+        $toolIndex++
+        if ($toolIndex -lt $FromTool) {
+            Write-Log ('== skipped (FromTool {0}): {1}' -f $FromTool, ($toolArgs -join ' ')) -Level VERBOSE
+            continue
+        }
         $t0 = Get-Date
+        $label = 'tool {0}/{1} {2}' -f $toolIndex, $toolCount, (Split-Path -Leaf $toolArgs[0])
         Write-Log ('== ' + ($toolArgs -join ' ')) -Level VERBOSE
-        $code = Invoke-Tool $toolArgs
+        $code = Invoke-Tool -ToolArgs $toolArgs -Label $label
         $seconds = [int]((Get-Date) - $t0).TotalSeconds
         $results += [pscustomobject]@{ Tool = ($toolArgs -join ' '); ExitCode = $code; Seconds = $seconds }
         if ($code -ne 0) { throw "Tool failed (exit code $code): $($toolArgs -join ' ')" }
