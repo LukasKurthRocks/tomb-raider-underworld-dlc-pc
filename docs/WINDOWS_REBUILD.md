@@ -347,6 +347,27 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `script_pairs`, `unit_ids`), Tables, Prep, Convert, Names, Media, Audio, then the 2b fixes - about 1.5 h.
      Expected: `dlc_idmap.json` sym_info with xbox_max 16347 and shift > 0, Convert's `guess_collision_new` far
      below 24386, and most of the 8277 shifted script words equal to B138.
+28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
+   * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
+     `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
+     meshes `mesh_convert.py`, terrain `terrain_convert.py`); the author's own rebuild check
+     (`work/ws/rebuild/convert_fresh.py`) also calls `assemble_dlc.assemble(..., material='dlc')`.
+     `tools/dlc_convert_all.py --media` (our step Convert) uses `dlc_generic.default_media` instead - "converts and
+     self-checks", but without the DLC material route. Likely part of why materials (83 %) and meshes (32 %) differ
+     from B138, not only the missing shaders.
+   * `assemble_dlc` / `material_dlc` / `material_reslot` / `shader_map` / `mesh_convert` read tables from
+     **`work/render/`, which is not in the repository** and is not created by any documented step:
+     `material_x2p.pkl` (read by `material_dlc.py`, `material_reslot.py`; **no generator found in the repository**),
+     `pc_shader_sections.pkl` (`tools/pc_shader_sections.py`), `dlc_shader_map.json` + `dlc_material_shaders.json`
+     (`tools/shader_map.py`), `param_rules.pkl` (`tools/material_rules.py`), `terrain_yhash.pkl`
+     (`tools/terrain_validate.py`).
+   * Stage-3 builders also read data files that are not in the repository: `work/ws/shader4/` holds only `.py`
+     files - `pc_ctab_by_pos.json` (written by `shader4/learn_names.py`), `illuminati.tsv` (`shader4/f4_tables.py`),
+     validation outputs of upstream's VM runs (`valid_all/`, `draw_result.txt`) - and the baselines
+     `work/baseline/B45|B73|B86_contratti|B87_materiali19/mods`.
+   * Next (after the symbol rerun): generate the render tables that have a generator, find or rebuild
+     `material_x2p.pkl` (Xbox material id -> PC material id for the 252 base materials, per `material_dlc.py`), then
+     convert with `convert_dlc.py` / `assemble_dlc` and compare materials and meshes again.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
