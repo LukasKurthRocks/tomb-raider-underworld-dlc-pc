@@ -214,6 +214,27 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      break). Markdown keeps its dashes and arrows (UTF-8, rendered by GitHub).
    * A double BOM (`EF BB BF EF BB BF`) makes PowerShell parse the `<#` help block as code (ParserError on the first
      `-` in the help text). Check the first bytes after rewriting a script.
+20. **Stage 2b map: what still differs, by upstream origin** (`tools/rebuild_status.py stage2a`, joins
+   `sections_stage2a.json` with the origin column of the B90 manifest; 133 DRMs, 2026-10-27, after the audio fix):
+
+   | Origin (B90 manifest) | Files | Fully identical | Differing section types (identical / total) |
+   |---|---|---|---|
+   | `derived:B43` | 31 | 0 | general 109/115, wave 2122/2476, DTP 561/597, script 1215/1781, mat 131/136, mesh 2/41 |
+   | `vm_mods_expected` | 30 | 9 | script 737/753, mat 49/50, mesh 4/20, 13 20/21 |
+   | `derived:B90_gold` | 13 | 0 | tex 1724/1732, wave 2724/2982, DTP 9532/9660, script 471/480, mat 418/505, mesh 32/48 |
+   | `derived:B87_materiali19` | 12 | 0 | wave 190/346, DTP 285/343, script 603/616, mat 89/125, mesh 1/19 |
+   | `mods_fix18_awf_extra` | 11 | 0 | DTP 53/66, script 475/488, mesh 0/11 |
+   | `derived:B86_contratti` | 9 | 0 | tex 534/538, wave 76/113, DTP 56/82, script 204/208, mat 103/134, mesh 13/28 |
+   | `derived:B90_gold_L4` | 6 | 0 | general 35/37, tex 773/782, wave 587/655, DTP 132/139, script 251/451, mat 167/230, mesh 8/12 |
+   | `derived:B45` | 2 | 0 | DTP 0/4 (`pdlc1_030_finale` 0 %, `pdlc1_010_intro` 79 %) |
+   | `derived:B47` | 2 | 0 | general 56/76, wave 992/1171, DTP 210/215, script 267/682, mat 24/26, mesh 0/21 |
+   | others (B41, B44, B46, B83, B88b, fix14, glitchfix, current) | 16 | 0 | small rests |
+
+   Shader libs (type 9) are 0 % everywhere (stage 3); materials and meshes partly reference shader ids, so some of
+   their differences may only close after stage 3. Script (type 8) differences concentrate in the big level DRMs
+   (B43, B47, L4): word-level data fixes = stage 2b. Wave differences are the decoder rounding of finding 17.
+   Order chosen for 2b: cutscene command lists (B44/B45, `work/ws/cine/`), float words (B46/B47, `float_fix.py`),
+   raft rings (B33, `work/ws/raftring/`), then the remaining overlay layers of `docs/WS_MAP.md`.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
