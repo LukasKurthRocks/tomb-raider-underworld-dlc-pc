@@ -294,6 +294,9 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
 24. **Stage 2b, fix 4: upstream's DLC 1 post-step (`tools/dlc1_postfix.py`, steps 1-2)**.
    * Which fix tools are already part of `Convert`: `dlc_generic.py` imports `dtpid_sweep`, `dtp_align_fix`,
      `model_point_fix`, `tag403_fix`, `portal_fix`, `link_ratio_fix`, `dtp_descfix`, `aidata_fix`, `soundplex_fix`.
+     **Correction (2026-10-28, finding 32): imported is not applied** - most of these run only with
+     `convert_drm(..., extra_fixes=True)`, which `assemble_dlc` sets and our step Convert (`dlc_convert_all.py`)
+     does not.
      Not wired: `dlc1_postfix` (uses `streamname_fix`, `refs_scan`), `name_string_fix` (targeted, raft chain
      'chain_free'), `analog_word_fix` (scan/fix of near-clone DTPs), `unbound_fix` (shader samplers -> stage 3).
    * `dlc1_postfix.py` is upstream's own post-step for DLC 1: (1) streamgroup name tables of unit DRMs (a broken name
@@ -407,6 +410,21 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      post-passes that write type-8 words: `script_rebase` (super chain grown on PC, `REBASE_STATS`), the SArray count
      fix (`script_conv.Walk`), `cine_nowait`. Next: convert one of these DRMs (e.g. `dlc_fx_haze.drm`) with
      `dlc_convert_all.py --media <name>` and switch the post-passes off one by one to see which writes +0x68.
+32. **Our Convert ran without upstream's DLC post-passes (`extra_fixes`).**
+   * `dlc_generic.convert_drm(..., extra_fixes=False)` is the default; `assemble_dlc.assemble()` passes
+     `extra_fixes=(material == 'dlc')`, `dlc_convert_all.py` passed nothing. Gated by it (`dlc_generic.py`): model
+     'point' arrays (`model_point_fix`), DTP id lists / align (`dtp_align_fix`), SoundPlex float/u32 fields, script
+     SArray counts, tag-0x403 object-id records, cell portal words, uberobject graph descriptors, link-joint ratios,
+     and the analog id-coincidence guard (`analog_idcoin`). So finding 24's "these run inside Convert" was wrong for
+     most of them (corrected there).
+   * New option `dlc_convert_all.py --extra-fixes`. First test on `dlc_fx_haze.drm` failed: `model_point_fix` needs
+     `work/chain_aim/model_point_rules.pkl` (not in the repository). Generated with `tools/model_point_fix.py learn`:
+     1055 base model pairs, 38 rules, 2-fold held-out 0 words changed; `selftest` on the real PC bytes of all base
+     pairs: 0 words changed - exactly upstream's numbers (log `logs/Manual_ModelPointRules_20261028_002755.log`).
+     `work/chain_aim/` added to `.gitignore` (derived from game data).
+   * Retest with the rules: exit 0, no error. The script word of finding 31 (+0x68 of script 24073) stays 4075 - it
+     comes from the learned script table (route `convert`, `script_learn.py save` in Tables), not from a post-pass.
+   * Step Convert in `Invoke-TruPipeline.ps1` now passes `--extra-fixes`; a full run follows.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

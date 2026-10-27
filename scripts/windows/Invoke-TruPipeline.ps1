@@ -22,13 +22,13 @@
                dlc_generic again (final dlc_idmap.json on the final base id map)
       Prep     generic_type0 save07 (type 0/7 tables), pc_vers_build (our reconstruction)
                -> type0_table.pkl, type7_table.pkl, pc_vers.json, pc_vers_content.json
-      Convert  dlc_convert_all --media --write -> work\generic\out\pack10|pack11\*.drm
+      Convert  dlc_convert_all --media --write --extra-fixes -> work\generic\out\pack10|pack11\*.drm
       Names    dlc_names (file names of unnamed DLC records) -> work\generic\dlc_names.txt (can run any time after Ids)
       Media    dlc_media_build (our reconstruction: DLC 1 tree in the B138 layout), locals build, padshock build,
                compare_b138 -> work\rebuild\stage1\mods + work\rebuild\compare_stage1.json
       Audio    dlc_audio_build (our glue: wave_swap for all DRMs incl. sub folders, mul_audio_batch), compare_b138
                -> work\rebuild\stage2a\mods (replaced on every run) + compare_stage2a.json
-      Convert  dlc_convert_all --media --write   -> work\generic\out\ (first converted DLC DRMs + self checks)
+      Convert  dlc_convert_all --media --write --extra-fixes   -> work\generic\out\ (first converted DLC DRMs + self checks)
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
@@ -104,7 +104,7 @@ $steps = @{
     )
     # leading comma: a step with a single tool must stay a list of argument lists (PowerShell unrolls @(@(...)))
     Convert = @(
-        , @('tools\dlc_convert_all.py', '--media', '--write')
+        , @('tools\dlc_convert_all.py', '--media', '--write', '--extra-fixes')
     )
     Names = @(
         , @('tools\dlc_names.py')

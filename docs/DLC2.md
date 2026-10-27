@@ -99,8 +99,10 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - `postfix` (`tools/dlc1_postfix.py` steps 1-2): generic rules from the Xbox data (streamgroup name tables, type-0
   name strings) - run it on DLC 2 as is; it fixed 20 strings on DLC 1, all matching B138 [24]. Its step 3 (word log)
   is DLC-1-only and not public anyway.
-- Most fix tools run inside `Convert` already (`dlc_generic.py`: dtpid, align, model points, tag 0x403, portals,
-  link ratio, descriptors, aidata, soundplex) and therefore apply to pack11 too [24].
+- The fix tools imported by `dlc_generic.py` (dtpid, align, model points, tag 0x403, portals, link ratio,
+  descriptors, aidata, soundplex) mostly run **only with `extra_fixes=True`** (`assemble_dlc` / material 'dlc'), not
+  in a plain `dlc_convert_all.py` run - an earlier version of this list said otherwise [24, corrected in 32].
+  Convert DLC 2 with the extra fixes on.
 - `analog` (`tools/analog_word_fix.py`): generic rule from the base game (DLC DTPs that are near-clones of a base
   DTP take the base PC bytes where the Xbox bytes agree; re-authored analogs skipped) - 33 words on DLC 1, all = B138
   [26]. Use it as is on DLC 2; `dlc_fixes_build.py` notes '= B138' only when a reference exists.

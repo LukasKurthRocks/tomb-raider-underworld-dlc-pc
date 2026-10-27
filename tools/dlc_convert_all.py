@@ -6,6 +6,9 @@ in the merged objectlist, route statistics per section type.
 Usage: python3 -I tools/dlc_convert_all.py [--media] [--write] [name-substring ...]
   --media : use dlc_generic.default_media (textures/terrain/mesh/material/silent waves; shaders pass through)
   --write : write <out>/<name>.drm (CDRM, LE) to work/generic/out/
+  --extra-fixes : convert_drm(..., extra_fixes=True) - the DLC post-passes that assemble_dlc enables with
+                  material 'dlc' (model points, DTP lists/align, SoundPlex fields, script SArray counts, tag 0x403,
+                  portals, uberobject descriptors, link ratios, analog id guard); off by default as before
 """
 import sys, os, pickle, struct, collections, json, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -58,7 +61,7 @@ def main(argv):
             raw = cdrm_decode(f, 'be')
             X = DW.read(raw, 'be')
             h, xsecs = sections_with_data(raw, 'be')
-            secs, rep = DG.convert_drm(xsecs, ids, store, media=media, T=T)
+            secs, rep = DG.convert_drm(xsecs, ids, store, media=media, T=T, extra_fixes='--extra-fixes' in argv)
             for k, t, xid, nid, route in rep: routes[t, route] += 1
             D = DW.Drm(secs, X.names, X.pad, X.ver, X.u0, X.u1)
             praw = D.write('le')
