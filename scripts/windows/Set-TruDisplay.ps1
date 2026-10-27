@@ -8,7 +8,7 @@
     -Restore    Re-imports the first backup .reg from .\backup (state before this script ever ran).
     -Language   Additionally sets the game language (registry value Language one level up):
                 English=0, French=1, German=2, Italian=3, Spanish=4, Dutch=5 (order of the locals.bin_001..032
-                language bits; German=2 verified in game, Dutch=5 not yet).
+                language bits; all six verified in game).
 
     Before any change the key is exported to .\backup\TRU-Graphics_<time>.reg.
     Every run writes .\logs\Set-TruDisplay_<time>.log. -Verbose shows steps, -Debug the values before/after,
