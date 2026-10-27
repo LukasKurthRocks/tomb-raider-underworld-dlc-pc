@@ -29,7 +29,7 @@
     progress bar, "tool N/M").
 
     Progress: a progress bar (Write-Progress) shows the running tool and its time; steps with a known number of
-    output files (Convert: 307 DRMs) also show percent and an estimate. Every 30 s a "still running" line is
+    output files (Convert: 300 DRM files) also show percent and an estimate. Every 30 s a "still running" line is
     written to the console and the log.
 
     -Verbose shows steps, -Debug the command lines, -Trace adds a PowerShell line trace.
@@ -109,7 +109,8 @@ $outputDirs = @{
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{
-    Convert = @{ Dir = 'work\generic\out'; Filter = '*.drm'; Total = 307 }
+    # 307 pack records, 300 distinct file names (7 duplicate records write the same file again)
+    Convert = @{ Dir = 'work\generic\out'; Filter = '*.drm'; Total = 300 }
 }
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
@@ -132,12 +133,15 @@ function Write-Log {
 }
 
 function Get-ProgressCount {
-    # number of finished output files for steps with a known total (see $progressHints)
+    # number of output files written since the tool started (older files from a previous run do not count),
+    # for steps with a known total (see $progressHints)
+    param([datetime]$Since)
     $hint = $progressHints[$Step]
     if (!$hint) { return $null }
     $dir = Join-Path $clone $hint.Dir
     if (!(Test-Path -LiteralPath $dir)) { return 0 }
-    return @(Get-ChildItem -LiteralPath $dir -Recurse -File -Filter $hint.Filter -ErrorAction SilentlyContinue).Count
+    return @(Get-ChildItem -LiteralPath $dir -Recurse -File -Filter $hint.Filter -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since }).Count
 }
 
 function Invoke-Tool {
@@ -177,7 +181,7 @@ function Invoke-Tool {
         $now = Get-Date
         $elapsed = $now - $t0
         $status = '{0}  running {1:hh\:mm\:ss}' -f $Label, $elapsed
-        if ($now -ge $nextCount) { $count = Get-ProgressCount; $nextCount = $now.AddSeconds(5) }
+        if ($now -ge $nextCount) { $count = Get-ProgressCount -Since $t0; $nextCount = $now.AddSeconds(5) }
         if ($null -ne $count -and $hint.Total -gt 0) {
             $percent = [Math]::Min(99, [int](100 * $count / $hint.Total))
             $remaining = if ($count -gt 0) { [int]($elapsed.TotalSeconds * ($hint.Total - $count) / $count) } else { -1 }
