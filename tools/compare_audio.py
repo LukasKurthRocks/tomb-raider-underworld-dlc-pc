@@ -2,9 +2,10 @@
 
 Wave sections (type 6) of every DRM: sections paired as in compare_sections.py; both payloads are decoded with
 audio_parse.ima_decode_fsb (FSB convention, what FMOD plays) and compared sample by sample.
-.mul streams (cinstream/, music/, audio/streams/): decoded with mul_audio.pc_pcm-style block parsing under two IMA
-conventions - 'fsb' (block header sample, then nibbles 0..62) and 'game' (header sample, nibble 0 ignored, nibbles
-1..63; CHANGELOG B138: the game's own decoder ignores nibble 0) - to see which convention a file was encoded for.
+.mul streams (cinstream/, music/, audio/streams/): decoded with the channel count of the header (finding 18) under two
+IMA conventions - 'fsb' (block header sample, then nibbles 0..62) and 'game' (header sample, nibble 0 ignored, nibbles
+1..63; the game's own decoder) - and compared with the reference and with the decoded Xbox source (ground truth;
+per channel, the worst channel is reported).
 
 Per item: samples, differing samples, max |diff|, SNR in dB (reference RMS / difference RMS; inf = identical).
 Totals on the console, every item in work/rebuild/audio_<label>.json.
@@ -75,27 +76,43 @@ def wave_file(args):
 
 
 def mul_pcm(pd, skip_first):
+    """PC .mul -> [samples, channels]; channel count from the header (word 3), each audio block holds the channels
+    one after another (finding 18). An earlier version split every block into two halves (L/R), which is wrong
+    for the 1-, 4- and 6-channel files."""
     import mul_convert as M
+    nch = max(1, struct.unpack_from('<I', pd, 12)[0])
     seg = []
     for t, a, b, p in M.blocks(pd, '<'):
         if t != 0: continue
         nbytes = struct.unpack_from('<I', p, 0)[0]
-        d = p[16:16 + nbytes]; h = len(d) // 2
-        seg.append((a, np.stack([ima_decode(d[:h], skip_first), ima_decode(d[h:], skip_first)], 1)))
-    if not seg: return np.zeros((0, 2), dtype=np.int16)
+        d = p[16:16 + nbytes]; per = len(d) // nch
+        seg.append((a, np.stack([ima_decode(d[k * per:(k + 1) * per], skip_first) for k in range(nch)], 1)))
+    if not seg: return np.zeros((0, nch), dtype=np.int16)
     n = max(a + len(s) for a, s in seg)
-    out = np.zeros((n, 2), dtype=np.int16)
+    out = np.zeros((n, nch), dtype=np.int16)
     for a, s in seg: out[a:a + len(s)] = s
     return out
 
 
 def mul_file(args):
+    """ours vs reference (both conventions) and, as ground truth, ours/reference (game convention) vs the decoded
+    Xbox source, per channel (worst channel reported)"""
     rel, ours, ref = args
     po, pr = open(ours, 'rb').read(), open(ref, 'rb').read()
-    r = {'file': rel, 'bytes_equal': po == pr}
+    r = {'file': rel, 'bytes_equal': po == pr, 'channels': struct.unpack_from('<I', po, 12)[0]}
     for conv_o, conv_r in (('fsb', 'fsb'), ('fsb', 'game'), ('game', 'game')):
         a = mul_pcm(po, conv_o == 'game').reshape(-1); b = mul_pcm(pr, conv_r == 'game').reshape(-1)
         r['ours_%s_vs_ref_%s' % (conv_o, conv_r)] = stats(a, b)
+    try:
+        import mul_audio as MA, mul_audio_batch as MAB
+        xd = MAB.find_xb(rel)[0]
+        rate, total, xb = MA.xb_pcm(xd)
+        for name, pd in (('ours', po), ('ref', pr)):
+            pc = mul_pcm(pd, True)
+            per = [stats(pc[:, k], xb[:, k]) for k in range(min(pc.shape[1], xb.shape[1]))]
+            r['%s_game_vs_xbox' % name] = min(per, key=lambda s: s['snr_db']) if per else None
+    except Exception as e:
+        r['xbox_error'] = '%s: %s' % (type(e).__name__, e)
     return r
 
 
@@ -130,9 +147,13 @@ def main(argv):
     print('   not decoded:', sum(1 for w in waves if 'skipped' in w))
 
     print('== .mul streams: %d (bytes equal %d)' % (len(mres), sum(1 for r in mres if r['bytes_equal'])))
-    for key in ('ours_fsb_vs_ref_fsb', 'ours_fsb_vs_ref_game', 'ours_game_vs_ref_game'):
-        s = [r[key]['snr_db'] for r in mres]
-        if s: print('   %-24s SNR dB min %.1f  median %.1f  max %.1f' % (key, min(s), float(np.median(s)), max(s)))
+    for key in ('ours_fsb_vs_ref_fsb', 'ours_fsb_vs_ref_game', 'ours_game_vs_ref_game', 'ours_game_vs_xbox', 'ref_game_vs_xbox'):
+        for chans, tag in ((None, 'all'), ((2,), 'stereo'), ((1, 4, 6), 'other')):
+            s = [r[key]['snr_db'] for r in mres if r.get(key) and (chans is None or r['channels'] in chans)]
+            if s: print('   %-24s %-6s n %2d  SNR dB (worst channel) min %.1f  median %.1f  max %.1f' % (
+                key, tag, len(s), min(s), float(np.median(s)), max(s)))
+    errs = [r for r in mres if 'xbox_error' in r]
+    if errs: print('   Xbox source errors:', [(r['file'], r['xbox_error']) for r in errs])
     os.makedirs(W, exist_ok=True)
     rep = os.path.join(W, 'audio_%s.json' % label)
     json.dump({'ref': ref, 'waves': waves, 'mul': mres}, open(rep, 'w'), indent=1)

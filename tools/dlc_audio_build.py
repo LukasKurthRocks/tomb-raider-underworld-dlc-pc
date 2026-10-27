@@ -3,12 +3,14 @@
   DRMs  wave_swap.swap_file for every .drm, also in sub folders (streamgroups/, cinstream/). wave_swap's own main only
         takes the top folder and looks the Xbox source up by the bare file name (convert_dlc.raw_dlc('x.drm')), which
         misses sub folders; here each worker maps the file name back to its path relative to xenon-w\\.
-  .mul  mul_audio_batch.job for every .mul (cinstream, music, audio\\streams) - it already walks sub folders.
+  .mul  every .mul (cinstream, music, audio\\streams), default mul_audio_nch.job: one channel slot per Xbox stream,
+        game IMA convention (finding 18); --mul b43 uses upstream's mul_audio_batch.job instead (always stereo, FSB
+        convention - scrambles the 19 non-stereo files; only for reproducing B43).
 Both tools only replace audio payloads of the same length; everything else stays byte-identical (they check it).
 Files they skip keep the stage-1 copy. Reports: <OUT>/../wave_swap_report.json, mul_audio_report.json.
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_audio_build.py SRC_MODS_DIR OUT_MODS_DIR
+  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_audio_build.py SRC_MODS_DIR OUT_MODS_DIR [--mul nch|b43]
   e.g. work/rebuild/stage1/mods work/rebuild/stage2a/mods
 """
 import sys, os, json, shutil, collections
@@ -31,12 +33,20 @@ def _wave_job(args):
     return WS.swap_file(args)
 
 
-def _mul_job(args):
-    import mul_audio_batch as MAB
-    return MAB.job(args)
+def _mul_job(mode_args):
+    mode, args = mode_args
+    if mode == 'b43':
+        import mul_audio_batch as MAB
+        return MAB.job(args)
+    import mul_audio_nch as MN
+    return MN.job(args)
 
 
 def main(argv):
+    mode = 'nch'
+    if '--mul' in argv:
+        k = argv.index('--mul'); mode = argv[k + 1]; del argv[k:k + 2]
+        if mode not in ('nch', 'b43'): sys.exit('--mul must be nch or b43')
     src, out = argv[0], argv[1]
     if os.path.exists(out):
         rebuild = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'rebuild')
@@ -74,10 +84,10 @@ def main(argv):
                 muls.append((os.path.join(dp, f), os.path.join(out, rel), rel))
     mreps = []
     with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
-        for r in ex.map(_mul_job, sorted(muls)):
-            mreps.append(r); print('mul  %-70s %s' % (r['file'], r['status']), flush=True)
+        for r in ex.map(_mul_job, [(mode, m) for m in sorted(muls)]):
+            mreps.append(r); print('mul  %-70s ch %s  %s' % (r['file'], r.get('channels', '-'), r['status']), flush=True)
     json.dump(mreps, open(os.path.join(rep_dir, 'mul_audio_report.json'), 'w'), indent=1)
-    print('MUL OK', sum(r['status'] == 'OK' for r in mreps), 'of', len(mreps))
+    print('MUL OK', sum(r['status'] == 'OK' for r in mreps), 'of', len(mreps), '(mode %s)' % mode)
 
 
 if __name__ == '__main__':

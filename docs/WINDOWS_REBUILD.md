@@ -165,6 +165,42 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      (`c_zip_1_pdlc1_invasion_01`): ours L = R = stream 0, B138 R uncorrelated with the only Xbox stream. Whether this
      is intended (how the PC music system reads layers) or a bug is not documented; to check against PC base-game
      `.mul`/`.mus` files with several layers. Probes: `mul_audio.xb_channels` + correlation per stream.
+   * **Caution - this right-channel result may be a measurement artefact.** `compare_audio.py` (like
+     `mul_audio.pc_pcm`) splits every PC audio block into two halves = L/R. But `music_convert.convert_mul` keeps the
+     Xbox channel count in the PC header and sizes each block for *all* channels (6 for `dlc_dungeon_mus_01`), while
+     `mul_audio.swap` assumes 2 channels (`nbytes // 72`) and fills the 6-channel space with a continuous L stream in
+     the first half and R in the second. So for files with more than 2 Xbox streams "left/right" above means "first
+     half / second half of the block", and for mono sources the layout question is the same. Do not draw conclusions
+     from the L/R numbers of multi-stream files until the PC base-game layout is known (being checked against the
+     32 base-game music pairs, `music_convert.base_pairs`). -> resolved in finding 18; the count is 19, not 17, and
+     the whole right-channel observation was this artefact (the files are not stereo).
+18. **PC `.mul` layout and convention, learned from the base game - B43's `mul_audio.swap` is wrong for every `.mul`
+   that is not stereo; B138 is right** (see the correction at the end of this finding).
+   * Base game (32 music pairs Xbox layer1/2 vs PC bigfile): PC channel count = Xbox stream count (7 x 2, 20 x 4,
+     5 x 6). Every PC audio block holds the channels one after another (`nbytes / 36` = channels x blocks of 64
+     samples); **PC channel k = Xbox stream k** (correlation 0.99-1.00, no reordering).
+   * **Nibble convention: the game's** (header sample, nibble 0 ignored, nibbles 1..63): base tracks
+     `l2_cliffclimb_mus_01` / `_02` decode against the Xbox source at 38.7 / 45.4 dB, lag 0; with the FSB
+     convention only 24.6 / 26.0 dB at lag 1-2 (`l1_intro` matches neither: a different PC mix). B138's re-encode
+     follows this convention; `mul_audio_batch.py` (B43) does not.
+   * The 39 DLC `.mul`: 20 x 2 channels, 5 x 1 (voice), 13 x 4, 1 x 6 (Xbox header = stream count = PC header in ours
+     and in B138). `mul_audio.swap` always encodes stereo (`nbytes // 72`, first half L, second half R), so for the
+     **19 non-stereo files** the B43 audio is time-scrambled across the channel slots. These are the 19 files at
+     ~0 dB in finding 17: all 5 DLC voice lines and the layered ambient music.
+   * Fix (stage 2a): `tools/mul_audio_nch.py` encodes every Xbox stream into its own channel slot with the game
+     convention; `dlc_audio_build.py` uses it by default (`--mul b43` keeps upstream's B43 behaviour).
+   * **Correction (same day): B138 is NOT scrambled.** An earlier version of this finding said B138 had the same
+     defect ("left half identical to ours, second half stream 3"). That was an artefact of the half/half decoder of
+     finding 17 (caution there). Decoded per channel (`compare_audio.py`, header channel count), B138 matches the Xbox
+     source for the 19 non-stereo files at median 45.1 dB (worst channel). The B138 re-encoder (not in the
+     repository) handles channels correctly; only B43 / `mul_audio.swap` is wrong. Not an upstream bug report.
+   * Result after the fix (`compare_audio.py work/rebuild/stage2a/mods stage2a`, worst channel per file):
+     ours vs Xbox source min 25.1 / median 44.4 / max 54.8 dB (stereo 27.6 / 44.0, other 25.1 / 44.5);
+     ours vs B138 median 39.9 dB (non-stereo 43.7). B138 vs Xbox source is lower than ours on some files -
+     `light_flash_huge_a_07` 7.5 dB, `pdlc1_010_intro` 12.8, `c_zip_2_pdlc1_water_01` 14.2,
+     `dlc2_ceremony_room_amb_02` 15.0, `dlc2_machine_room_amb_03` 15.2, `pdlc1_030_finale` 16.0 - so B138 changed
+     these beyond re-encoding (perhaps its anti-click work: CHANGELOG "≈432 clicks/min, now ≈9 in the offline
+     emulation"). Open: what B138 did there, and whether our version clicks in game (needs a listening test).
 
 ## The "VM" in upstream (what it was, what we do instead)
 
