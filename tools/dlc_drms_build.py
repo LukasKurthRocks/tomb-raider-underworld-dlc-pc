@@ -24,7 +24,7 @@ W = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'gene
 
 def main():
     xn = load(L + 'Tomb Raider Underworld (Xenon).txt')
-    out, st = {}, collections.Counter()
+    out, raw_of, st = {}, {}, collections.Counter()
     for path in PACKS:
         A = Archive(path, 'be')
         for r in A.idx:
@@ -34,7 +34,12 @@ def main():
                 continue
             name = xn.get(r['hash'], '0x%08x' % r['hash'])
             key = (path[-9:], name, r['spec'])
-            assert key not in out, key
+            if key in out:
+                # the packs list some files 2-3 times, every time with the same offset: identical content is fine
+                assert raw_of[key] == f, 'different contents for %s' % (key,)
+                st[path[-9:], 'duplicate_record'] += 1
+                continue
+            raw_of[key] = f
             out[key] = sections_with_data(cdrm_decode(f, 'be'), 'be')
             st[path[-9:], 'drm'] += 1
             st[path[-9:], 'named' if r['hash'] in xn else 'unnamed'] += 1
