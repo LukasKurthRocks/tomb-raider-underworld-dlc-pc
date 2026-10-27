@@ -26,6 +26,8 @@
       Names    dlc_names (file names of unnamed DLC records) -> work\generic\dlc_names.txt (can run any time after Ids)
       Media    dlc_media_build (our reconstruction: DLC 1 tree in the B138 layout), locals build, padshock build,
                compare_b138 -> work\rebuild\stage1\mods + work\rebuild\compare_stage1.json
+      Audio    dlc_audio_build (our glue: wave_swap for all DRMs incl. sub folders, mul_audio_batch), compare_b138
+               -> work\rebuild\stage2a\mods (replaced on every run) + compare_stage2a.json
       Convert  dlc_convert_all --media --write   -> work\generic\out\ (first converted DLC DRMs + self checks)
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
@@ -45,7 +47,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [switch]$Trace
 )
@@ -110,6 +112,10 @@ $steps = @{
         @('tools\padshock_convert.py', 'build', 'work/rebuild/stage1/mods'),
         @('tools\compare_b138.py', 'work/rebuild/stage1/mods', 'stage1')
     )
+    Audio = @(
+        @('tools\dlc_audio_build.py', 'work/rebuild/stage1/mods', 'work/rebuild/stage2a/mods'),
+        @('tools\compare_b138.py', 'work/rebuild/stage2a/mods', 'stage2a')
+    )
 }
 $outputDirs = @{
     Index   = @('work')
@@ -121,6 +127,7 @@ $outputDirs = @{
     Convert = @('work\generic\out')
     Names   = @('work\generic')
     Media   = @('work\rebuild')
+    Audio   = @('work\rebuild')
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{
