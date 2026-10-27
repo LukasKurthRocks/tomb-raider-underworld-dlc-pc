@@ -9,6 +9,7 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
   float  B46/B47: float words of the new DLC DTPs (id >= 20000) - work/ws/cine/float_fix.py, mode s16 then raw
          (top folder only, as upstream's script)
   tag404 B33: raft/grapple ring records (tag 0x404), word at +4 raw in the new DLC DTPs (learned from B138)
+  postfix upstream's tools/dlc1_postfix.py steps 1-2: streamgroup name tables (save hang) and type-0 name strings
 
 Report: <OUT>/../fixes_report.json (per fix: files, log lines).
 
@@ -91,7 +92,32 @@ def fix_tag404(out):
     return {'files': files, 'log': log}
 
 
-FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404)]
+def fix_postfix(out):
+    """upstream's DLC 1 post-step tools/dlc1_postfix.py, steps 1 and 2 per DRM (called directly, so nothing is
+    written to its fixed folder work/ws/converge/): streamname_fix (streamgroup name table of unit DRMs; a broken
+    name made 'Create new savegame' hang) and the R12 string fixes of refs_scan (name-like strings in type-0
+    sections). Step 3 (single words from work/ws/dtpkeys/out/min/log_words.tsv) is skipped: that log is not in the
+    repository."""
+    import collections
+    sys.path.insert(0, HERE)
+    import dlc1_postfix as PF
+    files, log, tot = [], [], collections.Counter()
+    for dp, dn, fn in os.walk(out):
+        for f in sorted(fn):
+            if not f.lower().endswith('.drm'): continue
+            path = os.path.join(dp, f); rel = os.path.relpath(path, out).replace(os.sep, '/')
+            raw0 = open(path, 'rb').read()
+            r1, n1 = PF.step_streamname(rel, raw0)
+            r2, nf, nm = PF.step_strings(rel, r1)
+            tot.update({'streamname_sections': n1, 'r12_fixed': nf, 'r12_manual': nm})
+            if n1 or nf or nm: log.append('%s: streamname sections %d, strings fixed %d, manual %d' % (rel, n1, nf, nm))
+            if r2 != raw0:
+                open(path, 'wb').write(r2); files.append(rel)
+    log.append('total %s' % dict(tot))
+    return {'files': files, 'log': log}
+
+
+FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('postfix', fix_postfix)]
 
 
 def main(argv):

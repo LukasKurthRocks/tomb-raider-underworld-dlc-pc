@@ -61,6 +61,13 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   (no B138 values).
 - `tag_records.py` (rules per record tag learned from the base game) is a reference that works without B138: 0
   defects on DLC 1 [23].
+- `postfix` (`tools/dlc1_postfix.py` steps 1-2): generic rules from the Xbox data (streamgroup name tables, type-0
+  name strings) - run it on DLC 2 as is; it fixed 20 strings on DLC 1, all matching B138 [24]. Its step 3 (word log)
+  is DLC-1-only and not public anyway.
+- Most fix tools run inside `Convert` already (`dlc_generic.py`: dtpid, align, model points, tag 0x403, portals,
+  link ratio, descriptors, aidata, soundplex) and therefore apply to pack11 too [24].
+- Watch the save game: a broken streamgroup name made "Create new savegame" hang in DLC 1 (`streamname_fix`);
+  test saving early in DLC 2 [24].
 - Upstream's `work/ws/` scripts still carry the author's local paths (407 of 578); fix each one when it is used [21].
 
 **Measuring**

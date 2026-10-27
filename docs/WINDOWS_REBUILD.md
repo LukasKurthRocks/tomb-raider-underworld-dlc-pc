@@ -270,6 +270,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `tag404_check`: **23 of 23 = B138**. The DTPs still differ elsewhere (e.g. `dlc_dungeon` 20258 873 -> 868
      differing words, `dlc_water_wheel` 20661 20 -> 17, `dlc_treasureroom` 21153 6 -> 3), so the identical-section
      count stays 11 131.
+24. **Stage 2b, fix 4: upstream's DLC 1 post-step (`tools/dlc1_postfix.py`, steps 1-2)**.
+   * Which fix tools are already part of `Convert`: `dlc_generic.py` imports `dtpid_sweep`, `dtp_align_fix`,
+     `model_point_fix`, `tag403_fix`, `portal_fix`, `link_ratio_fix`, `dtp_descfix`, `aidata_fix`, `soundplex_fix`.
+     Not wired: `dlc1_postfix` (uses `streamname_fix`, `refs_scan`), `name_string_fix` (targeted, raft chain
+     'chain_free'), `analog_word_fix` (scan/fix of near-clone DTPs), `unbound_fix` (shader samplers -> stage 3).
+   * `dlc1_postfix.py` is upstream's own post-step for DLC 1: (1) streamgroup name tables of unit DRMs (a broken name
+     made "Create new savegame" hang), (2) R12 name strings of type-0 sections (`refs_scan.string_fixes`), (3) single
+     words from `work/ws/dtpkeys/out/min/log_words.tsv` - **that log is not in the repository**, so step 3 is skipped.
+     Its `main()` only writes below `work/ws/converge/`; fix `postfix` calls steps 1-2 per DRM directly.
+   * Tried alone on a copy of stage2b (`stage2c`): streamname 0 sections (ours already right, e.g.
+     `dlc_watertunnel` type 0 17/17 = B138), R12 20 strings fixed (`dlc_dungeon` 17, `dlc_treasureroom` 2,
+     `dlc_pillory` 1), 0 manual. Type-0 sections identical **230 -> 246 of 259 (88.8 -> 95.0 %)**:
+     `dlc_treasureroom` 17 -> 19 of 19, `dlc_dungeon` 31 -> 44 of 50, `dlc_pillory` 27 -> 28 of 29.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
@@ -338,4 +351,5 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-27 | Fixes (2b) | `dlc_fixes_build.py` stage2a -> stage2b, fix `cine`: 3 command DTPs = B138, effect DTP 23767 417 -> 9 words; first run of `build_cine.py` failed on the author's local paths in `cinepairs.py` (fixed) |
 | 2026-10-27 | Fixes (2b) | fixes `cine` + `float`: float_fix s16 12 words, raw 44 words; `compare_sections` stage2b: DTP 11 131 identical (stage2a 11 126), script 4917, general 230 (unchanged) |
 | 2026-10-27 | Fixes (2b) | `tag_records.py` on stage2b: 329 record words, 0 defects; `tag404_check`: 16 of 23 `0x404` +4 words differ; fixes `cine` + `float` + `tag404`: `tag404_check` 23 of 23 = B138, DTP sections 11 131 identical |
+| 2026-10-27 | Fixes (2b) | all four fixes `cine`, `float`, `tag404`, `postfix` (stage2a -> stage2b): `compare_sections` stage2b: general 246/259 (95.0 %), 2 100 %, tex 99.6 %, wave 86.5 %, DTP 11 131 (97.4 %), script 4917 (79.5 %), shader 0 %, mat 83.2 %, Obj 100 %, mesh 31.7 %, 13 95.2 %; `rebuild_status`: `derived:B43` general 112/115 (was 109), still 9 of 133 DRMs fully identical (all `vm_mods_expected`) |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |
