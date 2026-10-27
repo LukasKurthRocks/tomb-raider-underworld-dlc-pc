@@ -6,6 +6,8 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
   cine   B44/B45: cutscene command lists and effect DTPs of cinstream/pdlc1_010_intro.drm and pdlc1_030_finale.drm
          (work/ws/cine/build_cine.py; command rules validated 106/106 on the base game, effect rules learned from
          the base pairs)
+  float  B46/B47: float words of the new DLC DTPs (id >= 20000) - work/ws/cine/float_fix.py, mode s16 then raw
+         (top folder only, as upstream's script)
 
 Report: <OUT>/../fixes_report.json (per fix: files, log lines).
 
@@ -32,7 +34,32 @@ def fix_cine(out):
     return {'files': ['cinstream/pdlc1_010_intro.drm', 'cinstream/pdlc1_030_finale.drm'], 'log': log}
 
 
-FIXES = [('cine', fix_cine)]
+def fix_float(out):
+    """B46/B47: work/ws/cine/float_fix.py in its two modes - 's16' (float words whose u16 halves are swapped, certain)
+    then 'raw' (floats still in Xbox byte order, probable). It only looks at DRMs in the top folder of the tree and
+    writes changed files to a separate folder; they are copied back here."""
+    sys.path.insert(0, os.path.join(WS, 'cine'))
+    import float_fix as FF
+    files, log = [], []
+    for mode in ('s16', 'raw'):
+        tmp = os.path.join(os.path.dirname(os.path.abspath(out)), 'float_%s' % mode)
+        if os.path.isdir(tmp): shutil.rmtree(tmp)
+        saved = sys.argv
+        try:
+            sys.argv = ['float_fix.py', out, tmp, mode]
+            FF.main()
+        finally:
+            sys.argv = saved
+        for e in json.load(open(os.path.join(tmp, 'float_fix_log.json'))):
+            log.append('%s %s DTP %s %s: %s -> %s (%s)' % (mode, e['file'], e['dtp'], e['off'], e['prima'], e['dopo'], e['valore']))
+        for f in sorted(os.listdir(tmp)):
+            if f.endswith('.drm'):
+                shutil.copyfile(os.path.join(tmp, f), os.path.join(out, f)); files.append(f)
+        shutil.rmtree(tmp)
+    return {'files': sorted(set(files)), 'log': log}
+
+
+FIXES = [('cine', fix_cine), ('float', fix_float)]
 
 
 def main(argv):

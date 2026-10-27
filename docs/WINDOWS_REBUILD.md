@@ -247,6 +247,17 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      or `expanduser('~...')`. They are fixed one by one when a script is used, with the same rule as `tools/`
      (game = `../data/pc`, Xbox files = `../data/...`). Done: `work/ws/cine/cinepairs.py` (PC bigfile, Xbox layers).
    * `cinepairs.load()` caches the base-game cutscene pairs in `work/ws/cine/pairs.pkl` (first run only).
+22. **Stage 2b, fix 2: float words (B46/B47)** - fix `float` in `dlc_fixes_build.py` runs
+   `work/ws/cine/float_fix.py` in mode `s16` (u16 halves swapped; 12 words: `dlc1_uo_water_wheel` DTP 20790 x 8,
+   `dlc1_uo_pillory` 20630 x 3, `dlc1_uo_bend_switches` 20651 x 1) and then `raw` (still Xbox byte order; 44 words in
+   `dlc_dungeon` DTP 20256). LINEAGE.md mentions "69 verified raw floats" for B46/B47; on our tree the script finds
+   56 in total - the rest may come from steps not public or from a different input state.
+   * Every one of the 56 changes moves the word to the B138 value (none made a word wrong): `dlc_dungeon` 20256
+     65 -> 21 differing words, `dlc1_uo_pillory` 20630 3 -> 0, `dlc1_uo_bend_switches` 20651 4 -> 3; DTP sections
+     identical 11 129 -> 11 131.
+   * `float_fix.py` only reads the top folder of the tree, so `cinstream/` (the 9 open words of finding 21) and
+     `streamgroups/` are not covered.
+   * The fix report is `work/rebuild/stage2b/fixes_report.json` (= `<OUT>/../`).
 
 ## The "VM" in upstream (what it was, what we do instead)
 
