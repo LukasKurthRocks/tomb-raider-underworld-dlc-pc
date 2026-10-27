@@ -41,7 +41,7 @@ Im Klon liegt der Branch `windows`: die Platzhalter `/path/to/…` in `tools\` z
 | `pc` | Spielordner `<Spielordner>` (nur lesen) |
 | `trudlcport` | den Klon `trudlcport` |
 | `Xenia-SteveRepack\Content\534307EC\00000002` | `input\xbox-dlc` |
-| `TombRaiderUnderworld_Patched` | Xbox-Hauptspiel + Title Update (`layer1.000`, `layer2.000`, `TitleUpdate.000`) – folgt |
+| `TombRaiderUnderworld_Patched` | `input\xbox-game` = Xbox-Hauptspiel (`layer1.000/.001`, `layer2.000/.001`, `default.xex`) + Title Update (`TitleUpdate.000`, `default.xexp`), verschoben 27.10.2026 |
 
 **Achtung:** `data\` nie rekursiv löschen (`Remove-Item -Recurse`, Explorer) – das kann durch die Junctions die
 Spieldateien bzw. den Klon löschen. Junctions einzeln entfernen: `cmd /c rmdir data\pc`.
