@@ -9,7 +9,9 @@
     The tools only read the game / Xbox data (via .\data junctions) and write below trudlcport\work\.
 
     Steps (in order):
-      Cache    tools\generic_cache.py         pair the base-game DRMs Xbox <-> PC  -> work\generic\pairs.pkl
+      Index    tools\index_all.py (3x)        which DRM sits where, with section lists
+               -> work\idx_pc.json (bigfile + patch.000), idx_xbox_base.json (layers + TU), idx_dlc.json (pack10/11)
+      Cache    tools\generic_cache.py        pair the base-game DRMs Xbox <-> PC  -> work\generic\pairs.pkl
                tools\generic_cache.py patch   runtime pairs (Xbox TU / PC patch.000) -> work\generic\pairs_patch.pkl
       Ids      generic_store, generic_ids, objlist_merge, unit_ids
                -> store.pkl, idmap.json, merged\ (object lists + remap), unit_idmaps.json
@@ -25,7 +27,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Cache', 'Ids', 'Learn', 'DlcDrms', 'Convert')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'DlcDrms', 'Convert')][string]$Step,
     [switch]$Trace
 )
 
@@ -37,7 +39,16 @@ $clone  = Join-Path $root 'trudlcport'
 $python = Join-Path $root 'bin\venv\Scripts\python.exe'
 $logDir = Join-Path $root 'logs'
 
+$align = '@7ff00000'          # bigfile part size (tools/archive.py ALIGN)
+$dlc   = '../data/Xenia-SteveRepack/Content/534307EC/00000002'
 $steps = @{
+    Index = @(
+        @('tools\index_all.py', 'work/idx_pc.json', 'le', "../data/pc/bigfile.000$align", "../data/pc/patch.000$align"),
+        @('tools\index_all.py', 'work/idx_xbox_base.json', 'be', "../data/TombRaiderUnderworld_Patched/layer1.000$align",
+          "../data/TombRaiderUnderworld_Patched/layer2.000$align", "../data/TombRaiderUnderworld_Patched/TitleUpdate.000$align"),
+        @('tools\index_all.py', 'work/idx_dlc.json', 'be', "$dlc/9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000$align",
+          "$dlc/600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000$align")
+    )
     Cache = @(
         @('tools\generic_cache.py'),
         @('tools\generic_cache.py', 'patch')
@@ -66,6 +77,7 @@ $steps = @{
     )
 }
 $outputDirs = @{
+    Index   = @('work')
     Cache   = @('work\generic')
     Ids     = @('work\generic', 'work\generic\merged')
     Learn   = @('work\generic', 'work\script')
