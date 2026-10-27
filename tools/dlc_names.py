@@ -2,13 +2,15 @@
 
 Hash = CRC-32/BZIP2 (poly 0x04C11DB7 MSB-first, init/xorout 0xffffffff) of the lower-case path (names.crc); a table-driven
 version with prefix-state caching is used here (names.crc is bit-serial and slow).
+Known names: the Xbox filelist, work/generic/dlc_names_recovered.txt and the Xbox source names of the release kit
+manifests (docs/data/*.kit_manifest.json; only taken when the hash matches).
 Candidates: identifier strings found in all DLC files (DRM section data, raw .mul/.raw/other payloads), base filelist
 basenames, DLC unit/object list names; combined with templates learned from the Xbox filelist (directories x extensions,
 '<unit>_map', streamgroups '<unit>_<group>', music '<dir>\\<file>', image '<name>_preview' ...).
 Output: work/generic/dlc_names.txt  (hash, pack, size, kind, name) for every DLC record, names resolved or '?'.
 Usage: python3 -I tools/dlc_names.py
 """
-import sys, os, re, json, struct, collections, itertools
+import sys, os, re, json, glob, struct, collections, itertools
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from archive import Archive
 from names import load, L
@@ -69,6 +71,16 @@ def main():
                     if re.search('[a-z]{2}', m): strings.add(m)
     unk = {h for h, *_ in recs if h not in known}
     sys.stdout.flush(); print('records', len(recs), 'unknown hashes', len(unk), 'strings', len(strings))
+    # Xbox source names recorded by the release kits (docs/data/*.kit_manifest.json); a name is taken only when its
+    # hash matches an unknown DLC record
+    kit = {}
+    for p in sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'data', '*.kit_manifest.json'))):
+        for e in json.load(open(p)).get('files', []):
+            s = e.get('source') or {}
+            if s.get('kind') == 'xbox' and s.get('name'): kit[fcrc(s['name'])] = s['name']
+    kit_found = {h: n for h, n in kit.items() if h in unk}
+    print('kit manifest names', len(kit), 'matching unknown records', len(kit_found))
+    known.update(kit_found); unk -= set(kit_found)
     # name stems
     stems = set()
     for s in strings:

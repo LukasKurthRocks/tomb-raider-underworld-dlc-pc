@@ -43,9 +43,13 @@ manifest, and then use the same pipeline for DLC 2 (*Lara's Shadow*) and the cos
 | Tables | `dlc_drms_build.py` (**new**), `dlc_generic.py` (provisional), `script_learn.py save`, `generic_type0.py save07`, `script_name_match.py`, `tex_idmap.py`, `dlc_generic.py` (final) | `dlc_drms.pkl`, `dlc_idmap.json`, `work/script/script_table.pkl`, refined `idmap.json` |
 | Prep | `generic_type0.py save07`, `pc_vers_build.py` (**new**) | `type0_table.pkl`, `type7_table.pkl`, `pc_vers.json`, `pc_vers_content.json` |
 | Convert | `tools/dlc_convert_all.py --media --write` | `work/generic/out/` |
-| Names | `tools/dlc_names.py` | `work/generic/dlc_names.txt` (names of unnamed DLC records) |
-| Audio | `dlc_audio_build.py work/rebuild/stage1/mods work/rebuild/stage2a/mods` (**new**: `wave_swap` for every DRM incl. sub folders + `mul_audio_batch`), `compare_b138.py work/rebuild/stage2a/mods stage2a` | DLC 1 tree with real audio (B43) |
-| Media | `dlc_media_build.py work/rebuild/stage1/mods pack10` (**new**), `locals.py build work/rebuild/stage1`, `padshock_convert.py build work/rebuild/stage1/mods`, `compare_b138.py work/rebuild/stage1/mods stage1` (**new**) | DLC 1 stage-1 tree in the B138 layout + per-file comparison |
+| Names | `tools/dlc_names.py` (also takes the Xbox source names of `docs/data/*.kit_manifest.json` when the hash matches) | `work/generic/dlc_names.txt` (names of unnamed DLC records) |
+| Media | `dlc_media_build.py work/rebuild/stage1/mods pack10` (**new**; music of pack10 + pack11), `locals.py build work/rebuild/stage1`, `padshock_convert.py build work/rebuild/stage1/mods`, `compare_b138.py work/rebuild/stage1/mods stage1` (**new**), `compare_sections.py work/rebuild/stage1/mods stage1` (**new**) | DLC 1 stage-1 tree in the B138 layout + per-file and per-section-type comparison |
+| Audio | `dlc_audio_build.py work/rebuild/stage1/mods work/rebuild/stage2a/mods` (**new**: `wave_swap` for every DRM incl. sub folders + `mul_audio_batch`), `compare_b138.py work/rebuild/stage2a/mods stage2a`, `compare_sections.py work/rebuild/stage2a/mods stage2a` | DLC 1 tree with real audio (B43) |
+
+Comparisons: `compare_b138.py` = per file (MD5) against the B138 kit manifest; `compare_sections.py` = per DRM section
+type against the installed B138 `mods/` tree (data + normalised relocations; report `work/rebuild/sections_<label>.json`).
+Every number quoted in this document comes from one of these tools or another script in `tools/`.
 
 The order of Ids/Learn follows the inputs each tool opens; it is not documented upstream and may still change.
 
@@ -54,10 +58,11 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
 | Step | What | Status | Compute time (estimate) |
 |---|---|---|---|
 | 0 | Index, Cache, Ids, Learn, Tables, Prep | done | - |
-| 1a | Convert (DRMs, silent audio placeholders) | rerun after the ffmpeg fix | ~70 min |
-| 1b | Names (`dlc_names.py`) | running | 5-15 min |
-| 1c | Media (`dlc_media_build.py`, locals, padshock) + `compare_b138.py` | ready | 10-20 min |
-| 2a | Audio: `wave_swap.py` (Wave sections in place), `mul_audio_batch.py` (`.mul` streams) = B43, 71 files | to add as a step | 30-60 min |
+| 1a | Convert (DRMs, silent audio placeholders) | done | 52 min |
+| 1b | Names (`dlc_names.py`, + kit manifest names) | done; pack10: 1 record unnamed | 3 min |
+| 1c | Media (`dlc_media_build.py`, locals, padshock) + `compare_b138.py` + `compare_sections.py` | done | 30 s |
+| 2a | Audio: `wave_swap.py` (Wave sections in place), `mul_audio_batch.py` (`.mul` streams) = B43 | done; wave sections 86.5 % = B138, `.mul` not yet MD5-equal | 2.5 min |
+| 2a+ | Explain the remaining wave differences (spread over 61 of 63 files) and the `.mul` differences (B138 re-encoded 39 `.mul`; compare decoded audio, not MD5) | open | - |
 | 2b | Data fixes B1-B47 (LINEAGE.md): crashes, raft/physics words, cutscene command lists, MaterialParams | scripts partly only in `work/ws/`; order to reconstruct | small; much work |
 | 3 | Shaders B72-B89 (`work/ws/shader4/`) | open | largest block |
 | 4 | Last layers to B90_gold_L4 (Giro 5-7), then CHANGELOG changes up to B138 | open | - |
@@ -128,6 +133,21 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
 12. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
    26 s with 8 processes, `pairs.pkl` 1 449 582 409 bytes, `pairs_patch.pkl` 14 782 788 bytes (patch pairs:
    g_pda, generalbank, globalsoundinfo, l2_puzzleroom).
+13. **The B138 kit ships DLC 2 music.** 19 `music/dlc2_*` tracks (57 files) come from `pack11.000` (*Lara's Shadow*),
+   as `docs/INSTALL.md` says (DLC 2 menu images and music). `dlc_media_build.py` writes the pack11 tracks for pack10
+   (`MUSIC_PACKS`); their `.mus`/`.sam` are then MD5-equal to B138.
+14. **Names from the kit manifests.** `docs/data/B132/B138.kit_manifest.json` record the Xbox source name of every kit
+   file; 127 of them match records the dictionary search had not named (CRC-32/BZIP2 of the name = record hash, so a
+   name is only taken when it is provably right). Among them 4 pack10 music tracks and 6 audio streams the stage-1 tree
+   was missing.
+15. **Audio (B43) is not reproducible to the byte.** After `wave_swap.py` 86.5 % of the wave sections equal B138; the
+   rest is spread over 61 of 63 files (systematic, not single files). `.mul`: B138 re-encoded 39 files (CHANGELOG,
+   nibble 0 convention) and our output also differs from the B43 MD5s in the B90 manifest; ffmpeg's XMA decoder
+   version is a likely factor (upstream used Homebrew ffmpeg on macOS, here ffmpeg 9.0.2). Next: compare decoded
+   audio instead of MD5.
+16. **The morning's per-type table was an inline one-off** (`python -c`, pairing by type + id with `drm_write.read`) and
+   could not be rerun. Replaced by `tools/compare_sections.py` (pairing by `compare_drm.section_matches`); its numbers
+   differ slightly from the earlier table because it pairs differently and now covers 133 named files instead of 104.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
@@ -185,4 +205,9 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-27 | Convert | runner bug (single-tool step unrolled, so `dlc_convert_all.py` ran **without** options = check only, 360 s): 307 DRMs (300 + 7 duplicate records), readback_ok 307, reloc_bounds_bad 0, obj_ok 228, idref_local 357 653, idref_pc_base 158, idref_DANGLING 29 542 - only types 5/9/10 (media, expected without `--media`); routes e.g. 2 pc_copy 12 670 / convert 2267, 7 pc_copy 8023 / template 5693 / convert 2603 / analog 1286, 8 pc_copy 12 445 / convert 5055; unmapped ids {11: 119, 2: 1211, 7: 911, 8: 9, 110: 124, 111: 451, 112: 313, 114: 1200, 6: 37} |
 | 2026-10-27 | Names | ok, 160 s: 646 DLC records, 210 unknown hashes, 165 recovered (76 822 strings, 1158 templates); every DRM named now (pack10 140, pack11 167, pack1/pack2 2 each); still unnamed: non-DRM records pack10 39, pack11 63 |
 | 2026-10-27 | Convert | `--media --write`, 1612 s: 307 DRMs written, readback_ok 307, reloc_bounds_bad 0, **no dangling id refs** (local 384 972, PC base 2381), obj_ok 228; routes 5/10/12 media ok; **6 media_error:FileNotFoundError 16 534** (ffmpeg path, see finding 8), 9 media_error:NotImplementedError 4839 (shaders, by design) -> rerun after the ffmpeg fix |
+| 2026-10-27 | Convert | rerun with ffmpeg, 3097 s: 300 DRMs, exit 0; only `9 media_error:NotImplementedError 4839` (shaders, stage 3) |
+| 2026-10-27 | Media | ok, 31 s; `compare_b138` stage1: 46 identical / 149 different / 80 missing / 1 extra of 275. Missing: 19 DLC 2 music tracks (pack11, shipped by the kit), 4 music tracks + 6 audio streams of pack10 without a known name, 5 PC files (later builds / test VM); extra `g_pda.drm` |
+| 2026-10-27 | Audio | ok, 117 s: 8061 waves in 64 DRMs, 10 `.mul`; no MD5 change against B138 (B138 re-encoded the `.mul`; B90's B43 MD5s also differ) |
+| 2026-10-27 | Names | `dlc_names.py` + kit manifest names: 260 names, 127 matching unknown records, 56 more by dictionary; 38 records newly named, 0 changed; pack10 1 unnamed (0x753ecefd, 983 168 B), pack11 63 |
+| 2026-10-27 | Media + Audio | rerun (tools called directly, log `logs/Manual_Media-Audio_20261027_162633.log`): music pack10 6 + pack11 19 tracks; **92 identical / 178 different / 5 missing / 1 extra of 275**; `.mul` 39 of 39 swapped. `compare_sections` stage2a: 2 / 11 100 %, 5 99.6 %, 7 97.4 %, 13 95.2 %, 0 88.8 %, **6 wave 86.5 %** (stage1: 0 %), 10 83.2 %, 8 79.5 %, 12 31.7 %, 9 0 % |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |

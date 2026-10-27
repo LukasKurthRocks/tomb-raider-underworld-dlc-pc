@@ -8,7 +8,8 @@ first baselines is not in the repository. This script does it for one pack:
               (streamgroups/, cinstream/, root); unnamed records get their name from work/generic/dlc_names.txt
   cinstream   xenon-w\\cinstream\\*.mul       -> mul_convert.convert (silent audio)
   audio       xenon-w\\audio\\streams\\**.mul  -> music_convert.convert_streams (silent audio)
-  music       xenon-w\\music\\<d>\\<d>.mus/.sam/.mul -> music_convert (as its main loop; silent audio)
+  music       xenon-w\\music\\<d>\\<d>.mus/.sam/.mul -> music_convert (as its main loop; silent audio); for pack10
+              also the pack11 tracks (DLC 2), as the release kit ships them (docs/INSTALL.md: DLC 2 menu music)
   image       raw_image_convert.dlc_gen (all packs; files of other packs show up as 'extra' in compare_b138)
   tr8         work/generic/merged/tr8/pc-w/* (objlist_merge.py)
 locals.bin_* and padshock are written by their own tools (locals.py build, padshock_convert.py build).
@@ -25,6 +26,8 @@ from convert_dlc import R as ROOT, PACKS
 
 W = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'generic')
 PACK_INDEX = {'pack10': 0, 'pack11': 1, 'pack1': 2, 'pack2': 3}
+# music written for a pack: the B138 kit ships the DLC 2 (pack11) tracks with DLC 1
+MUSIC_PACKS = {'pack10': ('pack10', 'pack11')}
 
 
 def dlc_names(pack):
@@ -79,22 +82,25 @@ def main(argv):
     import music_convert as MC
     MC.convert_streams(out, packs=(pack,)); st['audio_streams'] = 'done'
 
-    # music tracks (as music_convert's main loop)
-    tracks = sorted({n.split('\\')[2] for n in names.values() if n.lower().startswith('xenon-w\\music\\') and n.count('\\') == 3})
-    if tracks:
-        pairs = MC.base_pairs(); MC.template(pairs)
-        pc_sam = pairs['l3_chapel_mus_01']['sam'][1]
+    # music tracks (as music_convert's main loop); tracks named in the base filelist but not in the pack are skipped
+    pairs = MC.base_pairs(); MC.template(pairs)
+    pc_sam = pairs['l3_chapel_mus_01']['sam'][1]
+    for mp in MUSIC_PACKS.get(pack, (pack,)):
+        mnames = dict(dlc_names(mp)); mnames.update(xn)
+        MA = A if mp == pack else Archive(ROOT + PACKS[PACK_INDEX[mp]], 'be')
+        tracks = sorted({n.split('\\')[2] for n in mnames.values() if n.lower().startswith('xenon-w\\music\\') and n.count('\\') == 3})
         for d in tracks:
             files = {}
             for e in ('mus', 'sam', 'mul'):
-                rr = A.find(crc('xenon-w\\music\\%s\\%s.%s' % (d, d, e)))
-                if rr: files[e] = A.read(rr[0])
-            if len(files) != 3: st['music_incomplete'] += 1; continue
+                rr = MA.find(crc('xenon-w\\music\\%s\\%s.%s' % (d, d, e)))
+                if rr: files[e] = MA.read(rr[0])
+            if not files: continue
+            if len(files) != 3: st['music_incomplete_' + mp] += 1; continue
             ol, T = MC.convert_mul(files['mul'])
             om, bad = MC.convert_mus(files['mus'], T)
             dd = os.path.join(out, 'music', d); os.makedirs(dd, exist_ok=True)
             for e, b in (('mus', om), ('sam', pc_sam), ('mul', ol)): open(os.path.join(dd, '%s.%s' % (d, e)), 'wb').write(b)
-            st['music_track'] += 1
+            st['music_track_' + mp] += 1
 
     # images (all packs), then only the image/ subtree goes into the mods tree
     import raw_image_convert as RI
