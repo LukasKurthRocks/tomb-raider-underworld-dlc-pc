@@ -169,6 +169,9 @@ if __name__ == '__main__' and sys.argv[1:2] == ['seed']:   # DESTRUCTIVE: rebuil
     T = G.train(P, names, idm, types=(7, 8))
     hv = harvest(P, idm, T)
     for k, c in sv.items(): hv[k].update({kk: vv * 10 for kk, vv in c.items()})
-    s1 = resolve(hv)
+    # same symbol range guard as bootstrap/raw_votes: without it the harvest round (types 7 + 8) let the effect-DTP
+    # marker word BE EB BE EB in as symbol 0xBEEB -> 0xBEEB, which set the Xbox symbol maximum to 48875 and disabled
+    # the DLC-new symbol shift in dlc_generic.DlcIds.sym() (docs/WINDOWS_REBUILD.md finding 27)
+    s1 = {k: v for k, v in resolve(hv).items() if 0 < k < XS_MAX and 0 < v < PS_MAX}
     print('after harvest', len(s1), 'symbols; seed entries changed:', sum(1 for k in s0 if s1.get(k) != s0[k]))
     save(s1)

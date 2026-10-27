@@ -92,6 +92,9 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   [26]. Use it as is on DLC 2; `dlc_fixes_build.py` notes '= B138' only when a reference exists.
 - Tools that read overlay folders: `load_overlay` paths are relative to the current folder, `dtp_audit.overlay`
   relative to `work/` - a wrong path silently scans 0 files [25].
+- Symbol ids: check `work/generic/dlc_idmap.json` sym_info before converting - `xbox_max` must be the real
+  Xbox maximum (base 16347, TU 19634), `shift` > 0. A bogus learned symbol (0xBEEB from the effect-DTP marker)
+  once set the maximum to 48875 and shifted thousands of script words in DLC 1 [27]; fixed in `generic_symbols.py`.
 - Watch the save game: a broken streamgroup name made "Create new savegame" hang in DLC 1 (`streamname_fix`);
   test saving early in DLC 2 [24].
 - Upstream's `work/ws/` scripts still carry the author's local paths (407 of 578); fix each one when it is used [21].

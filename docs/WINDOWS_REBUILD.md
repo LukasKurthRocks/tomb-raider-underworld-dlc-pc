@@ -336,9 +336,17 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      outlier `xs_max` = 16347 (all other 7530 entries are <= 16347), `pc_max` = 16828 (`PC_SYM_MAX`), shift 481 -
      one off B138's 480, still to explain. Convert's symbol stats agree: `guess_collision_new` 24386, `dlc_new_shift`
      2700.
-   * Which learn step writes 48875 is open: key 100 is written by `generic_symbols.py seed`, `script_name_match.py`
-     and `script_learn.py save`. Fix = drop the entry (or keep `0xBEEB` out of the symbol learning), then rerun from
-     Tables (`dlc_idmap.json` is built once and never changes ids afterwards) through Convert, Media, Audio, 2b.
+   * **Cause (confirmed):** the entry is already in `work/generic/idmap_pre_snm.json` (backup taken before
+     `script_name_match`, 13:07), so it comes from `generic_symbols.py seed` (step Learn). Its harvest round collects
+     votes from words whose learned class is a symbol field in **types 7 and 8**; the effect-DTP marker
+     `BE EB BE EB` was classed as a symbol field and voted 0xBEEB -> 0xBEEB. `generic_symbols.py` has a range guard
+     (`XS_MAX, PS_MAX = 20000, 17000`, "Xbox base 16347 / TU 19634, PC 16828") and applies it in `raw_votes` and
+     `bootstrap` - but not on the `seed` result. 48875 is the only entry outside the guard.
+   * **Fix:** the `seed` path now applies the same guard to its result (one line in `tools/generic_symbols.py`).
+     Rerun needed because the symbol map feeds everything after it: Learn from tool 2 (`generic_symbols seed`,
+     `script_pairs`, `unit_ids`), Tables, Prep, Convert, Names, Media, Audio, then the 2b fixes - about 1.5 h.
+     Expected: `dlc_idmap.json` sym_info with xbox_max 16347 and shift > 0, Convert's `guess_collision_new` far
+     below 24386, and most of the 8277 shifted script words equal to B138.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
