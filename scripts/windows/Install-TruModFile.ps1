@@ -96,7 +96,8 @@ try {
     Write-Log "current mods\$Name md5 $current" -Level DEBUG
     # files in sub folders (e.g. local\locals.bin_004) keep their sub folder below backup\mods
     $leaf = Split-Path -Leaf $Name
-    $backupSub = Join-Path $backupDir (Split-Path -Parent $Name)
+    $parent = Split-Path -Parent $Name
+    $backupSub = if ($parent) { Join-Path $backupDir $parent } else { $backupDir }
     New-Item -ItemType Directory -Force -Path $backupSub | Out-Null
 
     if ($Restore) {
