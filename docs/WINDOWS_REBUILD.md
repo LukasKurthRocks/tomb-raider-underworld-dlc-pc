@@ -352,8 +352,11 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      Audio, 2026-10-27 20:02-23:09): symbol map 7498 entries (was 7531 incl. 0xBEEB), `dlc_idmap.json` sym_info
      xbox_max **16347**, pc_max 16828, shift **481** (was 0). Convert symbol stats: `guess_collision_new`
      24 386 -> **1 219**, `dlc_new_shift` 2 700 -> **43 215**, `interpolated` 48 290, `guess_lower` 7 467.
-   * Tables took 6 977 s this time (last `dlc_generic.py` call 5 392 s; the first Tables run took 824 s in total) -
-     cause still to check.
+   * Tables took 6 977 s this time (last `dlc_generic.py` call 5 392 s, the first call of the same step 5 s; the
+     first Tables run took 824 s in total). Not the cause: `generic_type0.space_maps()` (checked - it only loads the
+     small `unit_idmaps.json`). Suspected: memory pressure - `dlc_generic.py` loads `dlc_drms.pkl` (~3 GB) and the
+     generic store while my parallel analysis jobs (all cores) ran between 20:12 and 22:09. To verify with a timed
+     run of `dlc_generic.py` alone.
    * After the 2b fixes (`analog` still 33/33 = B138): script words differing from B138 unchanged in number (9 580),
      but `script_diff.py` (now with a delta histogram of the differing u16 halves) shows why: **8 552 of 10 810
      differing halves (79.1 %) are exactly +1**, 8 006 of them with a B138 value >= 16828 (the DLC-new symbol range) -
