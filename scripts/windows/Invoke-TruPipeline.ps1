@@ -15,10 +15,11 @@
                tools\generic_cache.py patch   runtime pairs (Xbox TU / PC patch.000) -> work\generic\pairs_patch.pkl
       Ids      generic_store, generic_ids, objlists_extract (our reconstruction), objlist_merge
                -> store.pkl, idmap.json, merged\ (object lists + remap)
-      Learn    generic_learn save, generic_symbols seed, script_pairs, unit_ids (needs script\pairs_8.pkl),
-               script_learn save, generic_type0 save, script_name_match, tex_idmap
-               -> mask_table.pkl, symbols in idmap.json, script\, unit_idmaps.json, type0 table
-      DlcDrms  dlc_drms_build (our reconstruction), dlc_generic   -> dlc_drms.pkl, dlc_idmap.json
+      Learn    generic_learn save, generic_symbols seed, script_pairs, unit_ids (needs script\pairs_8.pkl)
+               -> mask_table.pkl, symbols in idmap.json, script\pairs_*.pkl, unit_idmaps.json   (about 26 min)
+      Tables   dlc_drms_build (our reconstruction), dlc_generic (provisional dlc_idmap.json, script_learn needs it),
+               script_learn save, generic_type0 save, script_name_match, tex_idmap (both rewrite idmap.json),
+               dlc_generic again (final dlc_idmap.json on the final base id map)
       Convert  dlc_convert_all --media --write   -> work\generic\out\ (first converted DLC DRMs + self checks)
 
     -Verbose shows steps, -Debug the command lines, -Trace adds a PowerShell line trace.
@@ -28,7 +29,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'DlcDrms', 'Convert')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Convert')][string]$Step,
     [switch]$Trace
 )
 
@@ -64,14 +65,15 @@ $steps = @{
         @('tools\generic_learn.py', 'save'),
         @('tools\generic_symbols.py', 'seed'),
         @('tools\script_pairs.py'),
-        @('tools\unit_ids.py'),
+        @('tools\unit_ids.py')
+    )
+    Tables = @(
+        @('tools\dlc_drms_build.py'),
+        @('tools\dlc_generic.py'),
         @('tools\script_learn.py', 'save'),
         @('tools\generic_type0.py', 'save'),
         @('tools\script_name_match.py'),
-        @('tools\tex_idmap.py')
-    )
-    DlcDrms = @(
-        @('tools\dlc_drms_build.py'),
+        @('tools\tex_idmap.py'),
         @('tools\dlc_generic.py')
     )
     Convert = @(
@@ -83,7 +85,7 @@ $outputDirs = @{
     Cache   = @('work\generic')
     Ids     = @('work\generic', 'work\generic\merged')
     Learn   = @('work\generic', 'work\script')
-    DlcDrms = @('work\generic')
+    Tables  = @('work\generic', 'work\script')
     Convert = @('work\generic\out')
 }
 
