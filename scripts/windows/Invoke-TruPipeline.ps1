@@ -1,0 +1,276 @@
+﻿<#
+.SYNOPSIS
+    Runs one stage of the trudlcport conversion pipeline (Python tools in the clone) with full logging.
+
+.DESCRIPTION
+    Each -Step runs one or more tools from the trudlcport clone root with the project venv
+    (..\bin\venv\Scripts\python.exe -u -I tools\<tool>.py ...). Output is shown live and written to
+    .\logs\Invoke-TruPipeline_<step>_<time>.log; at the end a summary with duration and exit codes is printed.
+    The tools only read the game / Xbox data (via .\data junctions) and write below trudlcport\work\.
+
+    Steps (in order):
+      Index    tools\index_all.py (3x)        which DRM sits where, with section lists
+               -> work\idx_pc.json (bigfile + patch.000), idx_xbox_base.json (layers + TU), idx_dlc.json (pack10/11)
+      Cache    tools\generic_cache.py        pair the base-game DRMs Xbox <-> PC  -> work\generic\pairs.pkl
+               tools\generic_cache.py patch   runtime pairs (Xbox TU / PC patch.000) -> work\generic\pairs_patch.pkl
+      Ids      generic_store, generic_ids, objlists_extract (our reconstruction), objlist_merge
+               -> store.pkl, idmap.json, merged\ (object lists + remap)
+      Learn    generic_learn save, generic_symbols seed, script_pairs, unit_ids (needs script\pairs_8.pkl)
+               -> mask_table.pkl, symbols in idmap.json, script\pairs_*.pkl, unit_idmaps.json   (about 26 min)
+      Tables   dlc_drms_build (our reconstruction), dlc_generic (provisional dlc_idmap.json, script_learn needs it),
+               script_learn save, generic_type0 save07, script_name_match, tex_idmap (both rewrite idmap.json),
+               dlc_generic again (final dlc_idmap.json on the final base id map)
+      Prep     generic_type0 save07 (type 0/7 tables), pc_vers_build (our reconstruction)
+               -> type0_table.pkl, type7_table.pkl, pc_vers.json, pc_vers_content.json
+      Convert  dlc_convert_all --media --write -> work\generic\out\pack10|pack11\*.drm
+      Names    dlc_names (file names of unnamed DLC records) -> work\generic\dlc_names.txt (can run any time after Ids)
+      Media    dlc_media_build (our reconstruction: DLC 1 tree in the B138 layout), locals build, padshock build,
+               compare_b138 -> work\rebuild\stage1\mods + work\rebuild\compare_stage1.json
+      Audio    dlc_audio_build (our glue: wave_swap for all DRMs incl. sub folders, mul_audio_batch), compare_b138
+               -> work\rebuild\stage2a\mods (replaced on every run) + compare_stage2a.json
+      Convert  dlc_convert_all --media --write   -> work\generic\out\ (first converted DLC DRMs + self checks)
+
+    Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
+    a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
+    progress bar, "tool N/M").
+
+    Progress: a progress bar (Write-Progress) shows the running tool and its time; steps with a known number of
+    output files (Convert: 300 DRM files) also show percent and an estimate. Every 30 s a "still running" line is
+    written to the console and the log.
+
+    -Verbose shows steps, -Debug the command lines, -Trace adds a PowerShell line trace.
+
+.EXAMPLE
+    .\Invoke-TruPipeline.ps1 -Step Cache -Verbose
+.EXAMPLE
+    .\Invoke-TruPipeline.ps1 -Step Tables -FromTool 5 -Verbose
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio')][string]$Step,
+    [ValidateRange(1, 99)][int]$FromTool = 1,
+    [switch]$Trace
+)
+
+$ErrorActionPreference = 'Stop'
+if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
+
+$root   = $PSScriptRoot
+$clone  = Join-Path $root 'trudlcport'
+$python = Join-Path $root 'bin\venv\Scripts\python.exe'
+$logDir = Join-Path $root 'logs'
+
+$align = '@7ff00000'          # bigfile part size (tools/archive.py ALIGN)
+$dlc   = '../data/Xenia-SteveRepack/Content/534307EC/00000002'
+$steps = @{
+    Index = @(
+        @('tools\index_all.py', 'work/idx_pc.json', 'le', "../data/pc/bigfile.000$align", "../data/pc/patch.000$align"),
+        @('tools\index_all.py', 'work/idx_xbox_base.json', 'be', "../data/TombRaiderUnderworld_Patched/layer1.000$align",
+          "../data/TombRaiderUnderworld_Patched/layer2.000$align", "../data/TombRaiderUnderworld_Patched/TitleUpdate.000$align"),
+        @('tools\index_all.py', 'work/idx_dlc.json', 'be', "$dlc/9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000$align",
+          "$dlc/600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000$align")
+    )
+    Cache = @(
+        @('tools\generic_cache.py'),
+        @('tools\generic_cache.py', 'patch')
+    )
+    Ids = @(
+        @('tools\generic_store.py'),
+        @('tools\generic_ids.py'),
+        @('tools\objlists_extract.py'),
+        @('tools\objlist_merge.py')
+    )
+    Learn = @(
+        @('tools\generic_learn.py', 'save'),
+        @('tools\generic_symbols.py', 'seed'),
+        @('tools\script_pairs.py'),
+        @('tools\unit_ids.py')
+    )
+    Tables = @(
+        @('tools\dlc_drms_build.py'),
+        @('tools\dlc_generic.py'),
+        @('tools\script_learn.py', 'save'),
+        @('tools\generic_type0.py', 'save07'),
+        @('tools\script_name_match.py'),
+        @('tools\tex_idmap.py'),
+        @('tools\dlc_generic.py')
+    )
+    Prep = @(
+        @('tools\generic_type0.py', 'save07'),
+        @('tools\pc_vers_build.py')
+    )
+    # leading comma: a step with a single tool must stay a list of argument lists (PowerShell unrolls @(@(...)))
+    Convert = @(
+        , @('tools\dlc_convert_all.py', '--media', '--write')
+    )
+    Names = @(
+        , @('tools\dlc_names.py')
+    )
+    Media = @(
+        @('tools\dlc_media_build.py', 'work/rebuild/stage1/mods', 'pack10'),
+        @('tools\locals.py', 'build', 'work/rebuild/stage1'),
+        @('tools\padshock_convert.py', 'build', 'work/rebuild/stage1/mods'),
+        @('tools\compare_b138.py', 'work/rebuild/stage1/mods', 'stage1'),
+        @('tools\compare_sections.py', 'work/rebuild/stage1/mods', 'stage1')
+    )
+    Audio = @(
+        @('tools\dlc_audio_build.py', 'work/rebuild/stage1/mods', 'work/rebuild/stage2a/mods'),
+        @('tools\compare_b138.py', 'work/rebuild/stage2a/mods', 'stage2a'),
+        @('tools\compare_sections.py', 'work/rebuild/stage2a/mods', 'stage2a')
+    )
+}
+$outputDirs = @{
+    Index   = @('work')
+    Cache   = @('work\generic')
+    Ids     = @('work\generic', 'work\generic\merged')
+    Learn   = @('work\generic', 'work\script')
+    Tables  = @('work\generic', 'work\script')
+    Prep    = @('work\generic')
+    Convert = @('work\generic\out')
+    Names   = @('work\generic')
+    Media   = @('work\rebuild')
+    Audio   = @('work\rebuild')
+}
+# steps whose progress can be measured by counting output files
+$progressHints = @{
+    # 307 pack records, 300 distinct file names (7 duplicate records write the same file again)
+    Convert = @{ Dir = 'work\generic\out'; Filter = '*.drm'; Total = 300 }
+}
+
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+$logFile = Join-Path $logDir ('Invoke-TruPipeline_{0}_{1}.log' -f $Step, (Get-Date -Format 'yyyyMMdd_HHmmss'))
+
+function Write-Log {
+    param(
+        [string]$Message,
+        [ValidateSet('INFO', 'VERBOSE', 'DEBUG', 'WARN', 'ERROR')][string]$Level = 'INFO'
+    )
+    $line = '{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'), $Level, $Message
+    Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8
+    switch ($Level) {
+        'INFO'    { Write-Host $Message }
+        'VERBOSE' { Write-Verbose $Message }
+        'DEBUG'   { Write-Debug $Message }
+        'WARN'    { Write-Warning $Message }
+        'ERROR'   { Write-Host $Message -ForegroundColor Red }
+    }
+}
+
+function Get-ProgressCount {
+    # number of output files written since the tool started (older files from a previous run do not count),
+    # for steps with a known total (see $progressHints)
+    param([datetime]$Since)
+    $hint = $progressHints[$Step]
+    if (!$hint) { return $null }
+    $dir = Join-Path $clone $hint.Dir
+    if (!(Test-Path -LiteralPath $dir)) { return 0 }
+    return @(Get-ChildItem -LiteralPath $dir -Recurse -File -Filter $hint.Filter -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $Since }).Count
+}
+
+function Invoke-Tool {
+    param([string[]]$ToolArgs, [string]$Label)
+    $allArgs = @('-u', '-I') + $ToolArgs
+    $argLine = ($allArgs | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
+    Write-Log "python $argLine" -Level DEBUG
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $python
+    $psi.Arguments = $argLine
+    $psi.WorkingDirectory = $clone
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $process = [System.Diagnostics.Process]::Start($psi)
+
+    # read stdout and stderr line by line without blocking; heartbeat every 30 s
+    $outTask = $process.StandardOutput.ReadLineAsync()
+    $errTask = $process.StandardError.ReadLineAsync()
+    $t0 = Get-Date
+    $nextBeat = $t0.AddSeconds(30)
+    $nextCount = $t0
+    $count = $null
+    $hint = $progressHints[$Step]
+    while ($outTask -or $errTask) {
+        $idle = $true
+        if ($outTask -and $outTask.IsCompleted) {
+            $line = $outTask.Result
+            if ($null -eq $line) { $outTask = $null } else { Write-Log $line; $outTask = $process.StandardOutput.ReadLineAsync(); $idle = $false }
+        }
+        if ($errTask -and $errTask.IsCompleted) {
+            $line = $errTask.Result
+            if ($null -eq $line) { $errTask = $null } else { Write-Log ('stderr: ' + $line); $errTask = $process.StandardError.ReadLineAsync(); $idle = $false }
+        }
+        $now = Get-Date
+        $elapsed = $now - $t0
+        $status = '{0}  running {1:hh\:mm\:ss}' -f $Label, $elapsed
+        if ($now -ge $nextCount) { $count = Get-ProgressCount -Since $t0; $nextCount = $now.AddSeconds(5) }
+        if ($null -ne $count -and $hint.Total -gt 0) {
+            $percent = [Math]::Min(99, [int](100 * $count / $hint.Total))
+            $remaining = if ($count -gt 0) { [int]($elapsed.TotalSeconds * ($hint.Total - $count) / $count) } else { -1 }
+            Write-Progress -Activity "Invoke-TruPipeline $Step" -Status ('{0}  {1}/{2} files' -f $status, $count, $hint.Total) -PercentComplete $percent -SecondsRemaining $remaining
+        } else {
+            Write-Progress -Activity "Invoke-TruPipeline $Step" -Status $status
+        }
+        if ($now -ge $nextBeat) {
+            $beat = if ($null -ne $count) { '{0} / {1} files' -f $count, $hint.Total } else { 'no output yet' }
+            Write-Log ('... still running: {0}, {1:hh\:mm\:ss}, {2}' -f $Label, $elapsed, $beat)
+            $nextBeat = $now.AddSeconds(30)
+        }
+        if ($idle) { Start-Sleep -Milliseconds 250 }
+    }
+    $process.WaitForExit()
+    Write-Progress -Activity "Invoke-TruPipeline $Step" -Completed
+    return $process.ExitCode
+}
+
+if ($Trace) { Set-PSDebug -Trace 1 }
+$results = @()
+$started = Get-Date
+Push-Location $clone
+try {
+    Write-Log "Invoke-TruPipeline step=$Step log=$logFile" -Level VERBOSE
+    if (!(Test-Path -LiteralPath $python)) { throw "Python venv not found: $python (see README, Entwicklungsumgebung)." }
+    Write-Log "Python: $((& $python --version 2>&1) -join ' ')" -Level DEBUG
+    # audio conversion: prefer the ffmpeg from .\bin (Get-Tools.ps1), else the tools find one on PATH
+    $ffmpeg = Join-Path $root 'bin\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe'
+    if (Test-Path -LiteralPath $ffmpeg) { $env:TRUDLC_FFMPEG = $ffmpeg }
+    Write-Log "ffmpeg: $(if ($env:TRUDLC_FFMPEG) { $env:TRUDLC_FFMPEG } else { 'from PATH' })" -Level DEBUG
+    foreach ($dir in $outputDirs[$Step]) { New-Item -ItemType Directory -Force -Path (Join-Path $clone $dir) | Out-Null }
+
+    $toolCount = @($steps[$Step]).Count
+    $toolIndex = 0
+    foreach ($toolArgs in $steps[$Step]) {
+        $toolIndex++
+        if ($toolIndex -lt $FromTool) {
+            Write-Log ('== skipped (FromTool {0}): {1}' -f $FromTool, ($toolArgs -join ' ')) -Level VERBOSE
+            continue
+        }
+        $t0 = Get-Date
+        $label = 'tool {0}/{1} {2}' -f $toolIndex, $toolCount, (Split-Path -Leaf $toolArgs[0])
+        Write-Log ('== ' + ($toolArgs -join ' ')) -Level VERBOSE
+        $code = Invoke-Tool -ToolArgs $toolArgs -Label $label
+        $seconds = [int]((Get-Date) - $t0).TotalSeconds
+        $results += [pscustomobject]@{ Tool = ($toolArgs -join ' '); ExitCode = $code; Seconds = $seconds }
+        if ($code -ne 0) { throw "Tool failed (exit code $code): $($toolArgs -join ' ')" }
+    }
+}
+catch {
+    Write-Log "FAILED: $($_.Exception.Message)" -Level ERROR
+    Write-Log ($_.ScriptStackTrace) -Level DEBUG
+    throw
+}
+finally {
+    Pop-Location
+    if ($Trace) { Set-PSDebug -Off }
+    Write-Log '--- summary ---'
+    foreach ($r in $results) { Write-Log ('{0,-40} exit {1}  {2} s' -f $r.Tool, $r.ExitCode, $r.Seconds) }
+    foreach ($dir in $outputDirs[$Step]) {
+        Get-ChildItem -LiteralPath (Join-Path $clone $dir) -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Log ('{0,-40} {1,14} bytes' -f "$dir\$($_.Name)", $_.Length) }
+    }
+    # plain integers: N0 uses the culture's group separator ("3.097 s" on German systems)
+    Write-Log ('total {0} s' -f [int]((Get-Date) - $started).TotalSeconds)
+    Write-Host "Log: $logFile"
+}
