@@ -25,6 +25,24 @@ trudlcport (Stand B138) erwähnt die Kostüm-Pakete nirgends (STATUS/FINDINGS/IN
 `tools/costume_cmp.py` vergleicht DLC-Kostüm-Objekte mit den Lara-Objekten der Xbox-Version.
 Welches Paket welches Kostüm-DLC ist: noch offen.
 
+## Upstream-Klon
+
+`trudlcport\` = `git clone https://github.com/andrearicci93/trudlcport.git` (27.10.2026, Stand `72b4ceb`),
+eigenes Git-Repo, im Projekt-Repo ignoriert. Lizenz MIT („Copyright (c) 2026 trudlcport contributors“) –
+bei Veröffentlichung als eigener Klon LICENSE behalten und auf das Original verweisen (kein PR).
+
+## Werkzeuge (`bin\`, nicht in Git)
+
+| Werkzeug | Version | Quelle | SHA-256 |
+|---|---|---|---|
+| Ghidra | 12.2 (22.10.2026) | [NationalSecurityAgency/ghidra](https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.2_build), `ghidra_12.2_PUBLIC_20261016.zip` | `2c2cd776…7be67` |
+| JDK (Temurin) | 21.0.12.1+1 | [adoptium/temurin21-binaries](https://github.com/adoptium/temurin21-binaries/releases), `OpenJDK21U-jdk_x64_windows_hotspot_21.0.12.1_1.zip` | `f9d6e191…d8b4e` |
+
+Neu einrichten: Zips von den Links laden, SHA-256 prüfen, nach `bin\` entpacken (`bin\_download\` = Zips).
+Schon vorhanden auf dem PC: cdb x86 (Windows Kits 10), x32dbg (`x64dbg-Snapshot 2019-11-05`),
+Cheat Engine 7.5, Python 3.14 mit capstone/pefile/bsdiff4. REA (morluto/rea) folgt später (ändert die
+Claude-Code-Konfiguration, braucht Ghidra).
+
 ## Spiel (geprüft 27.10.2026)
 
 `<Spielordner>` – `tru.exe` v1.1; `tru.exe`, `bigfile.000`–`003`
