@@ -8,6 +8,7 @@ mit dem Fan-Port [trudlcport](https://github.com/andrearicci93/trudlcport) (andr
 | Pfad | Inhalt |
 |---|---|
 | `input\xbox-dlc\` | eigene Xbox-360-DLC-Daten |
+| `input\xbox-game\` | eigenes Xbox-360-Hauptspiel (`layer1.000/.001`, `layer2.000/.001`, `default.xex`) + Title Update (`TitleUpdate.000`, `default.xexp`) |
 | `input\ModLoader-v1.2.zip` | [TombRaiderModding/ModLoader](https://github.com/TombRaiderModding/ModLoader/releases) v1.2 (20.07.2024) |
 | `release\B138\` | `install_dlc.py` + `trudlcport-kit-B138.zip` (Release 21.10.2026) |
 
@@ -41,7 +42,7 @@ Im Klon liegt der Branch `windows`: die Platzhalter `/path/to/…` in `tools\` z
 | `pc` | Spielordner `<Spielordner>` (nur lesen) |
 | `trudlcport` | den Klon `trudlcport` |
 | `Xenia-SteveRepack\Content\534307EC\00000002` | `input\xbox-dlc` |
-| `TombRaiderUnderworld_Patched` | `input\xbox-game` = Xbox-Hauptspiel (`layer1.000/.001`, `layer2.000/.001`, `default.xex`) + Title Update (`TitleUpdate.000`, `default.xexp`), verschoben 27.10.2026 |
+| `TombRaiderUnderworld_Patched` | `input\xbox-game` (Xbox-Hauptspiel + Title Update) |
 
 **Achtung:** `data\` nie rekursiv löschen (`Remove-Item -Recurse`, Explorer) – das kann durch die Junctions die
 Spieldateien bzw. den Klon löschen. Junctions einzeln entfernen: `cmd /c rmdir data\pc`.
