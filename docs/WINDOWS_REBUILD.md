@@ -106,6 +106,23 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
    26 s with 8 processes, `pairs.pkl` 1 449 582 409 bytes, `pairs_patch.pkl` 14 782 788 bytes (patch pairs:
    g_pda, generalbank, globalsoundinfo, l2_puzzleroom).
 
+## The "VM" in upstream (what it was, what we do instead)
+
+Upstream was developed on macOS (homebrew paths, `/path/to/` placeholders); the game ran in a **Windows 11 VM** with
+the repository shared as `Z:\tru-port`. The VM was used for (1) game tests - `vm_baseline_sync.ps1` copies a baseline
+into the VM's `mods/`, `vm_run.ps1` + `runner_scenarios/*.json` start the game, load a level through the
+TRLAU-menu-hook F8 menu, watch for crashes, read memory, take screenshots - and (2) shader validation on a real D3D9
+device (`vm_ps_validate.ps1`, `vm_ps_draw.ps1`, through dgVoodoo2's `d3d9.dll`; FINDINGS marks a boot crash as
+"infrastructure (driver/VM)"). It is not a conversion step.
+
+Manifest origins `vm_mods_expected` (30) and `vm_extra` (10) are files that were already in the VM's `mods/` and
+were kept without a recorded script: e.g. the level `*_map.drm`, `co_dlc_earphonecam.drm`, `co_lights.drm`,
+`dlc1_uo_pillory_collision_helper.drm` - and a log `convert_costumes.log` (costumes were converted at some point).
+
+Here: native Windows with a real GPU replaces the VM (manual game tests by the user; the shader validation scripts
+can run natively). Automated game runs are not used on the user's desktop (they take focus and send keys). Files
+that cannot be reproduced by a script are taken from B138.
+
 ## Stage 1 output vs B138 (DLC 1, 2026-10-27)
 
 `dlc_convert_all.py --media --write`, pack10: 134 DRMs; 104 have a B138 counterpart by name (30 not: unnamed

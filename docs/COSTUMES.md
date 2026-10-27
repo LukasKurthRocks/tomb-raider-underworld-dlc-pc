@@ -30,6 +30,11 @@ Open: which string index belongs to which costume object (l/m, name of h) - to b
 (the loading screen script, Script id 6, loads "all DLC Costume images" and lists `dlc_costume_a..p.drm` and
 `dlc_doppel_costume_a..d.drm`).
 
+## Upstream trace
+
+The B90_gold_L4 manifest lists `convert_costumes.log` with origin `vm_extra` (a file that was in the test VM's
+`mods/`): the author converted costumes at some point; no script or notes for it in the repository.
+
 ## In game (Xbox, Xenia)
 
 Outfits are chosen on the level start screen; in a first playthrough PDA -> Revisit Location is greyed out, so the
