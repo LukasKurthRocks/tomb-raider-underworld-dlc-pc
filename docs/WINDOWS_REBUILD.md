@@ -92,6 +92,30 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
    26 s with 8 processes, `pairs.pkl` 1 449 582 409 bytes, `pairs_patch.pkl` 14 782 788 bytes (patch pairs:
    g_pda, generalbank, globalsoundinfo, l2_puzzleroom).
 
+## Stage 1 output vs B138 (DLC 1, 2026-10-27)
+
+`dlc_convert_all.py --media --write`, pack10: 134 DRMs; 104 have a B138 counterpart by name (30 not: unnamed
+`0x...` records or other names), **0 MD5-identical** (expected: stage 2-4 still missing). Section-level comparison
+(sections paired by type + id; "identical" = data, reloc and ver equal):
+
+| Type | identical | different |
+|---|---|---|
+| 2 | 10 752 (100 %) | - |
+| 11 Obj | 94 (100 %) | - |
+| 5 texture | 3965 (99.7 %) | 2 size differs, 9 not in B138 |
+| 7 DTP | 11 127 (97.7 %) | 264 same size |
+| 10 material | 846 (84 %) | 87 size differs, 76 same size |
+| 8 Script | 4220 (68 %) | 1964 same size |
+| 12 mesh | 26 (15 %) | 153 same size |
+| 0 general | 10 (4 %) | 249 size differs |
+| 6 wave | 0 | 8053 size differs - stage 1 writes silence; real audio = `wave_swap.py` / `mul_audio_batch.py` |
+| 9 shader lib | 0 | 1427 differ, 255 not in B138 - shader translation = stage 3 |
+
+30 of the 104 files have a different section count. Closest files: small fx DRMs (93-98 % of sections
+identical); furthest: the big units (`dlc_dungeon` 17 %, `dlc_dungeonhalla` 20 %, `dlc_pillory` 22 %).
+Conclusion: the reconstructed stage 0/1 reproduces what stage 1 is supposed to produce; the differences sit in
+the later stages (audio, shaders, data fixes listed in LINEAGE.md).
+
 ## Run log
 
 | Date | Step | Result |
