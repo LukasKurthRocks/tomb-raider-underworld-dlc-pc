@@ -48,6 +48,24 @@ manifest, and then use the same pipeline for DLC 2 (*Lara's Shadow*) and the cos
 
 The order of Ids/Learn follows the inputs each tool opens; it is not documented upstream and may still change.
 
+## Plan (remaining work for DLC 1, as of 2026-10-27)
+
+| Step | What | Status | Compute time (estimate) |
+|---|---|---|---|
+| 0 | Index, Cache, Ids, Learn, Tables, Prep | done | - |
+| 1a | Convert (DRMs, silent audio placeholders) | rerun after the ffmpeg fix | ~70 min |
+| 1b | Names (`dlc_names.py`) | running | 5-15 min |
+| 1c | Media (`dlc_media_build.py`, locals, padshock) + `compare_b138.py` | ready | 10-20 min |
+| 2a | Audio: `wave_swap.py` (Wave sections in place), `mul_audio_batch.py` (`.mul` streams) = B43, 71 files | to add as a step | 30-60 min |
+| 2b | Data fixes B1-B47 (LINEAGE.md): crashes, raft/physics words, cutscene command lists, MaterialParams | scripts partly only in `work/ws/`; order to reconstruct | small; much work |
+| 3 | Shaders B72-B89 (`work/ws/shader4/`) | open | largest block |
+| 4 | Last layers to B90_gold_L4 (Giro 5-7), then CHANGELOG changes up to B138 | open | - |
+| - | 40 `vm_mods_expected`/`vm_extra` files | check after 1c; else take from B138 | - |
+| - | patched `tru.exe`, `movies/credits_DLC1.bik` | from the B138 kit (rebuild via Steamless + guards optional) | - |
+
+Goal for DLC 1: as many files MD5-identical to B138 as possible and every remaining difference explained - the
+basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
+
 ## Findings / missing glue
 
 1. **`work/idx_*.json` must exist before `generic_store.py`.** `generic_store.build()` reads
