@@ -109,6 +109,10 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - Symbol ids: check `work/generic/dlc_idmap.json` sym_info before converting - `xbox_max` must be the real
   Xbox maximum (base 16347, TU 19634), `shift` > 0. A bogus learned symbol (0xBEEB from the effect-DTP marker)
   once set the maximum to 48875 and shifted thousands of script words in DLC 1 [27]; fixed in `generic_symbols.py`.
+  DLC-new symbols are shifted by `DLC_SYM_SHIFT = 480` (measured on B138; the rule gives 481) [29] - with both
+  fixes DLC 1 scripts went from 79.5 % to 95.4 % = B138. For DLC 2 the same shift applies (one symbol space); a
+  wrong shift shows up as a constant delta in `script_diff.py`'s histogram, but DLC 2 has no B138 to compare - so
+  this DLC 1 calibration is what DLC 2 relies on.
 - Watch the save game: a broken streamgroup name made "Create new savegame" hang in DLC 1 (`streamname_fix`);
   test saving early in DLC 2 [24].
 - Upstream's `work/ws/` scripts still carry the author's local paths (407 of 578); fix each one when it is used [21].

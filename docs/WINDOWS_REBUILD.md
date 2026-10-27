@@ -366,6 +366,14 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      B138, `dlc_generic.DlcIds` now has `DLC_SYM_SHIFT = 480` (measured; `None` restores the rule). Only Convert
      uses `sym()`, so the rerun starts at Convert.
    * Smaller remaining deltas (+83, -39939, -334, -337, -1, -12 ...) are other id kinds, to look at after this run.
+   * **Result with shift 480** (chain Convert -> Media -> Audio -> 2b fixes -> comparisons, tools called directly,
+     log `logs/Manual_SymShift480_20261027_233600.log`, 23:36-00:20): **script sections identical 4 917 -> 5 899 of
+     6 184 (79.5 % -> 95.4 %)**; differing script words 9 580 in 86 DRMs -> **2 593 in 49 DRMs**; +1 deltas in the
+     DLC-new symbol range 8 006 -> 0; fully identical DRMs 10 -> 11 (`vm_mods_expected` 9 -> 10). `analog` fix still
+     33/33 = B138. Other section types unchanged.
+   * Remaining differing u16 halves (2 570): +83 504, -39939 432 (ours = a `40000 + xs` collision value where B138
+     has a small symbol), +1 312 (mostly `0229` / `0228` - a base-range symbol, not the DLC shift), -334 192,
+     -337 144, -1 94, -12 92, -338 72, -329 60, +38667 56. Next step of the script analysis.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
@@ -475,5 +483,7 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-27 | Fixes (2b) | `tag_records.py` on stage2b: 329 record words, 0 defects; `tag404_check`: 16 of 23 `0x404` +4 words differ; fixes `cine` + `float` + `tag404`: `tag404_check` 23 of 23 = B138, DTP sections 11 131 identical |
 | 2026-10-27 | Fixes (2b) | all four fixes `cine`, `float`, `tag404`, `postfix` (stage2a -> stage2b): `compare_sections` stage2b: general 246/259 (95.0 %), 2 100 %, tex 99.6 %, wave 86.5 %, DTP 11 131 (97.4 %), script 4917 (79.5 %), shader 0 %, mat 83.2 %, Obj 100 %, mesh 31.7 %, 13 95.2 %; `rebuild_status`: `derived:B43` general 112/115 (was 109), still 9 of 133 DRMs fully identical (all `vm_mods_expected`) |
 | 2026-10-27 | Fixes (2b) | `analog_word_fix.py scan`: first run with `rebuild/...` saw 0 files (path relative to CWD), rerun with `work/rebuild/...`: 33 words; five fixes (`cine`, `float`, `tag404`, `postfix`, `analog`): DTP 11 157 identical (97.6 %), 10 DRMs fully identical |
+| 2026-10-27 | Learn..Audio | rerun after the symbol-guard fix (Learn from tool 2, Tables 6 977 s, Prep 865 s, Convert 2 509 s, Names, Media, Audio; all exit 0): sym_info xbox_max 16347 / shift 481; collisions 24 386 -> 1 219 |
+| 2026-10-28 | Convert..2b | with `DLC_SYM_SHIFT = 480` (tools directly, `logs/Manual_SymShift480_20261027_233600.log`): script sections 95.4 % = B138 (was 79.5 %), 2 593 differing script words (was 9 580), 11 DRMs fully identical |
 | 2026-10-27 | DLC 2 Media | `dlc_media_build.py work/rebuild/dlc2_stage1/mods pack11` (parallel to the DLC 1 run): 167 DRMs, 19 music tracks, 6 cinstream `.mul`, exit 0 (see `docs/DLC2.md`) |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |
