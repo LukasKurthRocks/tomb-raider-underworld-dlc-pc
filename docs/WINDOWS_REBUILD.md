@@ -258,6 +258,18 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * `float_fix.py` only reads the top folder of the tree, so `cinstream/` (the 9 open words of finding 21) and
      `streamgroups/` are not covered.
    * The fix report is `work/rebuild/stage2b/fixes_report.json` (= `<OUT>/../`).
+23. **Stage 2b, fix 3: raft/grapple rings (B33, record tag `0x404`)**.
+   * Upstream's `work/ws/progress/tag_records.py` (read-only; rules per (tag, offset) learned from the base pairs) on
+     stage2b: 22 rules, 329 record words of the DLC checked, **0 defects** - its rules for `0x404` (+0xc, +0x10,
+     +0x20) already hold. It learns no rule for +4, the word FINDINGS.md says must stay raw.
+   * `tools/tag404_check.py` (new, read-only) compares the +4 word of every `0x404` record with B138: 23 records;
+     B138 keeps the raw Xbox bytes in all 17 records of the new DLC DTPs (id >= 20000), and the converted s32 value
+     in the 6 records of the base-game DTP 2154 in the costume DRMs. Ours had 16 of the 17 swapped.
+   * Fix `tag404` in `dlc_fixes_build.py`: +4 word raw in `0x404` records of DTPs with id >= 20000, all DRMs incl.
+     sub folders -> 16 words in 6 DRMs (caverns, dungeon, dungeonhallb, pillory, treasureroom, water_wheel);
+     `tag404_check`: **23 of 23 = B138**. The DTPs still differ elsewhere (e.g. `dlc_dungeon` 20258 873 -> 868
+     differing words, `dlc_water_wheel` 20661 20 -> 17, `dlc_treasureroom` 21153 6 -> 3), so the identical-section
+     count stays 11 131.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
@@ -325,4 +337,5 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-27 | Media | from the new place `scripts/windows/` (after the move into the repository): 92 identical of 275, 36 s; then with `-X utf8`: same result, 35 s |
 | 2026-10-27 | Fixes (2b) | `dlc_fixes_build.py` stage2a -> stage2b, fix `cine`: 3 command DTPs = B138, effect DTP 23767 417 -> 9 words; first run of `build_cine.py` failed on the author's local paths in `cinepairs.py` (fixed) |
 | 2026-10-27 | Fixes (2b) | fixes `cine` + `float`: float_fix s16 12 words, raw 44 words; `compare_sections` stage2b: DTP 11 131 identical (stage2a 11 126), script 4917, general 230 (unchanged) |
+| 2026-10-27 | Fixes (2b) | `tag_records.py` on stage2b: 329 record words, 0 defects; `tag404_check`: 16 of 23 `0x404` +4 words differ; fixes `cine` + `float` + `tag404`: `tag404_check` 23 of 23 = B138, DTP sections 11 131 identical |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |

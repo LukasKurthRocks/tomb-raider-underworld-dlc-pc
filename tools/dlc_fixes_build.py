@@ -8,6 +8,7 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          the base pairs)
   float  B46/B47: float words of the new DLC DTPs (id >= 20000) - work/ws/cine/float_fix.py, mode s16 then raw
          (top folder only, as upstream's script)
+  tag404 B33: raft/grapple ring records (tag 0x404), word at +4 raw in the new DLC DTPs (learned from B138)
 
 Report: <OUT>/../fixes_report.json (per fix: files, log lines).
 
@@ -59,7 +60,38 @@ def fix_float(out):
     return {'files': sorted(set(files)), 'log': log}
 
 
-FIXES = [('cine', fix_cine), ('float', fix_float)]
+def fix_tag404(out):
+    """B33: raft/grapple ring records (DTP record tag 0x404): the word at +4 keeps the raw Xbox bytes - only in the
+    new DLC DTPs (id >= 20000); in the base-game DTP 2154 of the costume DRMs B138 keeps the converted (s32) value.
+    Learned from B138 with tools/tag404_check.py (finding 23); upstream FINDINGS.md: 'the enable byte at +4 must stay
+    raw'. Every DRM of the tree, sub folders included."""
+    import struct
+    sys.path.insert(0, HERE)
+    import dtp_audit as DA, drm_write as DW, drm_reloc as R
+    tag = struct.pack('>I', 0x404)
+    files, log = [], []
+    for rel, path in sorted(DA.overlay([os.path.abspath(out)], None).items()):
+        xs = DA.xsecs(rel)
+        if xs is None: continue
+        D = DW.read(open(path, 'rb').read(), 'le')
+        changed = False
+        for x, i in DA.section_pairs(xs, D):
+            sec = D.sections[i]
+            if x['type'] != 7 or sec.id < 20000 or len(sec.data) != len(x['data']): continue
+            xd = x['data']; xr = R.parse(x['reloc'], 'be'); sl = set(xr.pointer_offsets()) | set(xr.id_offsets())
+            pd = bytearray(sec.data)
+            for o in range(0, len(xd) - 8, 4):
+                if xd[o:o + 4] != tag or o in sl or o + 4 in sl: continue
+                if pd[o + 4:o + 8] != xd[o + 4:o + 8]:
+                    log.append('%s DTP %d +%#x: %s -> %s' % (rel, sec.id, o + 4, pd[o + 4:o + 8].hex(), xd[o + 4:o + 8].hex()))
+                    pd[o + 4:o + 8] = xd[o + 4:o + 8]; changed = True
+            sec.data = bytes(pd)
+        if changed:
+            open(path, 'wb').write(DW.cdrm_encode(D.write('le'), 'le')); files.append(rel)
+    return {'files': files, 'log': log}
+
+
+FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404)]
 
 
 def main(argv):
