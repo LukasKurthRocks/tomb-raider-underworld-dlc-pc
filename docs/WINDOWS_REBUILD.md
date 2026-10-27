@@ -387,6 +387,24 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Next (after the symbol rerun): generate the render tables that have a generator, find or rebuild
      `material_x2p.pkl` (Xbox material id -> PC material id for the 252 base materials, per `material_dlc.py`), then
      convert with `convert_dlc.py` / `assemble_dlc` and compare materials and meshes again.
+   * Dependency chain of `work/render/` (read from the code, 2026-10-27 night; nothing generated yet):
+
+     | File | Written by | Reads |
+     |---|---|---|
+     | `pairnames.json` | **no generator** | - (list of base DRM names that exist on Xbox and PC) |
+     | `pairs_render.pkl` | `tools/rend_extract.py pairs` | `pairnames.json`, `pairs.py` (base archives) |
+     | `dlc_render.pkl` | `tools/rend_extract.py dlc` | `work/idx_dlc.json`, DLC packs |
+     | `material_x2p.pkl`, `shader_x2p.pkl` | **no generator** | - (Xbox -> PC material / shader id maps) |
+     | `dlc_shader_map.json`, `dlc_material_shaders.json` | `tools/shader_map.py` | `pairs_render.pkl`, `dlc_render.pkl` |
+     | `param_rules.pkl` | `tools/material_rules.py` | `pairs_render.pkl`, `material_x2p.pkl`, `shader_x2p.pkl`, idmap |
+     | `dlc_materials_pc.pkl` | `tools/material_dlc.py` | `material_x2p.pkl`, `shader_x2p.pkl`, ... |
+     | `pc_shader_sections.pkl` | `tools/pc_shader_sections.py` | `dlc_shader_map.json`, `dlc_materials_pc.pkl`, `pairs_render.pkl` |
+     | `terrain_yhash.pkl` | `tools/terrain_validate.py` | `pairs_render.pkl`, `material_x2p.pkl`, idmap |
+
+   * Reconstruction ideas, **not verified yet**: `pairnames.json` = the names of the 1054 base pairs of
+     `generic_cache` (`work/generic/pairs.pkl`); `material_x2p.pkl` / `shader_x2p.pkl` = the type 10 / type 9 maps that
+     `generic_ids.py` already writes into `work/generic/idmap.json` (2244 / 2046 entries) - to check against
+     `material_dlc.py`'s statement "252 byte-identical base materials" and the B138 materials before use.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
