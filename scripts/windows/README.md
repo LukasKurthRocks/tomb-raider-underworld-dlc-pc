@@ -40,11 +40,16 @@ Kein `mods\`-Ordner, original `binkw32.dll` (356.104 Bytes) – vor dem ModLoade
    ModLoader entpackt nach `staging\ModLoader-v1.2\`
 4. [x] Trockenlauf: `.\Install-TruDlc.ps1 -Check` (schreibt nichts) – 27.10.2026: Build `B138_audio`,
    pack10.000 + pack11.000 gefunden, „All inputs OK (277 files verified, 0 optional skipped)“, Exit 0
-5. [ ] Installation: `.\Install-TruDlc.ps1` – prüft Backups + Trockenlauf, kopiert `ModLoader.asi` und
+5. [x] Installation: `.\Install-TruDlc.ps1` – prüft Backups + Trockenlauf, kopiert `ModLoader.asi` und
    `binkw32.dll` in den Spielordner, startet dann `install_dlc.py` (legt `mods\` an, patcht `tru.exe`,
-   schreibt `movies\credits_DLC1.bik`)
+   schreibt `movies\credits_DLC1.bik`) – 27.10.2026: „Installed: 277 files“, Exit 0; nachgeprüft:
+   275 Dateien in `mods\` + `tru.exe` + `credits_DLC1.bik`, alle MD5 = Manifest
 6. [ ] Steam: neues Spiel über „Downloadable content“ → Beneath the Ashes, 60 fps begrenzen
 7. [ ] Kostüm-Issue posten (Entwurf: `docs\Issue-Kostueme.md`)
+8. [ ] Steam Machine (SteamOS/Proton): geänderte Dateien übertragen, testen – erst wenn Schritt 6 auf dem PC läuft
+
+Ausgaben: `-Verbose` (Schritte), `-Debug` (Pfade, Hashes, Aufrufe), `-Trace` (PowerShell-Zeilentrace).
+Jeder Lauf schreibt `logs\Install-TruDlc_<Zeit>_<Modus>.log` mit kompletter Python-Ausgabe.
 
 Zurück zum Original: `.\Install-TruDlc.ps1 -Restore` (binkw32.dll + tru.exe aus `backup\`, `mods\` →
 `mods_disabled_<Zeit>`, `ModLoader.asi` → `.disabled`).
