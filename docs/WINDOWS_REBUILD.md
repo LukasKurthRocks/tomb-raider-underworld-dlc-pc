@@ -38,7 +38,7 @@ manifest, and then use the same pipeline for DLC 2 (*Lara's Shadow*) and the cos
 |---|---|---|
 | Index | `tools/index_all.py work/idx_pc.json le ../data/pc/bigfile.000@7ff00000 ../data/pc/patch.000@7ff00000`<br>`tools/index_all.py work/idx_xbox_base.json be <layer1>@7ff00000 <layer2>@7ff00000 <TitleUpdate.000>@7ff00000`<br>`tools/index_all.py work/idx_dlc.json be <pack10>@7ff00000 <pack11>@7ff00000` | `work/idx_*.json` |
 | Cache | `tools/generic_cache.py`, `tools/generic_cache.py patch` | `work/generic/pairs.pkl`, `pairs_patch.pkl` |
-| Ids | `tools/generic_store.py`, `generic_ids.py`, `objlist_merge.py`, `unit_ids.py` | `store.pkl`, `idmap.json`, `merged/`, `unit_idmaps.json` |
+| Ids | `tools/generic_store.py`, `generic_ids.py`, `objlists_extract.py` (**new**), `objlist_merge.py`, `unit_ids.py` | `store.pkl`, `idmap.json`, `merged/`, `unit_idmaps.json` |
 | Learn | `generic_learn.py save`, `generic_symbols.py seed`, `script_pairs.py`, `script_learn.py save`, `generic_type0.py save`, `script_name_match.py`, `tex_idmap.py` | `mask_table.pkl`, symbols (key 100) in `idmap.json`, `work/script/`, type-0 table |
 | DlcDrms | `tools/dlc_drms_build.py` (**new**, see below), `tools/dlc_generic.py` | `dlc_drms.pkl`, `dlc_idmap.json` |
 | Convert | `tools/dlc_convert_all.py --media --write` | `work/generic/out/` |
@@ -57,7 +57,12 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
    (`'ack10.000'`, as `param_auto.py` filters it), `name` = Yura Xenon file-list name (or `0x%08x`), sections from
    `drm.sections_with_data(raw, 'be')`. Rebuilt by `tools/dlc_drms_build.py` from pack10 + pack11 (the two packs
    `dlc_convert_all.py` converts; `verify_ids.py extend` adds the costume packs to the id table later).
-3. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
+3. **No script writes `work/generic/lists/`.** `objlists.py` loads `<prefix>_objectlist.txt / _unitlist.txt /
+   _objlist.dat` for the prefixes `pc, xbox, xboxtu, dlc_pack10, dlc_pack11, dlc_pack1` (round-trip test + merge).
+   Archive names (Yura lists): `\tr8\pc-w\<file>` on PC, `\tr8\xenon-w\<file>` on Xbox - with the leading
+   backslash, `names.crc` hashes the line exactly as listed. Rebuilt by `tools/objlists_extract.py` (first archive
+   wins: PC patch.000 before bigfile, Xbox TU separately as `xboxtu`).
+4. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
    26 s with 8 processes, `pairs.pkl` 1 449 582 409 bytes, `pairs_patch.pkl` 14 782 788 bytes (patch pairs:
    g_pda, generalbank, globalsoundinfo, l2_puzzleroom).
 
@@ -67,3 +72,5 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
 |---|---|---|
 | 2026-10-27 | Cache | ok, 1054 pairs, 0 errors, 27 s |
 | 2026-10-27 | Ids | failed in `generic_store.py`: `work/idx_pc.json` missing -> step Index added |
+| 2026-10-27 | Index | ok: idx_pc 7348 files, idx_xbox_base 10252, idx_dlc 620, 0 errors, 45 s |
+| 2026-10-27 | Ids | `generic_store` ok (pc_store 21327, xb 21301, multi-content PC ids 257); `generic_ids` ok (coverage: unmapped only type 5 345/36516, 7 24, 8 195, 10 8); `objlist_merge` failed: `work/generic/lists/` missing -> `objlists_extract.py` added |
