@@ -389,6 +389,17 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      lacks (7 498 entries here; his count unknown). Candidates: `script_name_match.py` (adds symbols from matched
      script names) and the harvest/bootstrap rounds of `generic_symbols.py`. A B138-derived check is possible: every
      (Xbox, B138) pair of this list is a known mapping.
+31. **The 30 files from the author's test VM (`vm_mods_expected`), after findings 27/29** (`tools/rebuild_status.py
+   stage2b --detail vm_mods_expected`, new option): 10 fully identical (the `_map` DRMs and `co_lights`), 10 differ
+   only in shader / material / mesh sections (stage 3), 9 effect DRMs differ in **exactly one script word** plus
+   render sections, 1 (`dlc_watertunnel_map`) in one type-13 section.
+   * The one script word is at +0x68 (once +0xa8) of the DRM's DLC-new script (ids 20357, 21263, 21411, 23524,
+     23764, 24021, 24073, 24114, 24248; 20590 at +0xa8) and has only two value pairs: ours 4075 / B138 4022
+     (`0feb` / `0fb6`, 7 files) and ours 5829 / B138 5841 (`16c5` / `16d1`, 3 files) - the "Xbox half = 0" group of
+     finding 30. Most likely the script's super-class reference (a PC script id): we pick another PC script id than
+     the author for the same parent. Candidates: the version choice between bigfile and `patch.000`
+     (`pc_vers_build.py`, step Prep) or `dlc_generic.script_rebase`. Fixing it would make these 9 DRMs identical up
+     to stage 3.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

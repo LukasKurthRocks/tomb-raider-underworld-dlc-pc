@@ -6,7 +6,9 @@ files, files fully identical, and identical / total sections per section type. F
 listed under 'after B90' (added between B90 and B138).
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/rebuild_status.py [LABEL]      default label: stage2a
+  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/rebuild_status.py [LABEL] [--detail ORIGIN,ORIGIN]
+  default label: stage2a; --detail lists every file of those origins with its differing section types
+  ('[render only]' = only shader/material/mesh differ, i.e. stage 3)
 """
 import sys, os, json, collections
 
@@ -17,6 +19,9 @@ TYPES = {0: 'general', 2: '2', 5: 'tex', 6: 'wave', 7: 'DTP', 8: 'script', 9: 's
 
 
 def main(argv):
+    detail = set()
+    if '--detail' in argv:
+        k = argv.index('--detail'); detail = set(argv[k + 1].split(',')); del argv[k:k + 2]
     label = argv[0] if argv else 'stage2a'
     rep = json.load(open(os.path.join(W, 'sections_%s.json' % label)))
     origin = {}
@@ -44,6 +49,15 @@ def main(argv):
         print('   differing types:', ', '.join(cells) or '-')
         worst = sorted(g['worst'])[:3]
         print('   furthest files:', ', '.join('%s %.0f%%' % (r, 100 * s) for s, r in worst))
+        if name in detail:
+            # per file: which section types still differ (identical / total); render types = shader-dependent
+            for rel in sorted(r for r in rep['files'] if origin.get(r, 'after B90') == name):
+                st = rep['files'][rel]
+                cells = ['%s %d/%d' % (TYPES.get(t, t), st.get('%d identical' % t, 0), st['%d total' % t])
+                         for t in sorted({int(k.split()[0]) for k in st if k.endswith(' total')})
+                         if st.get('%d identical' % t, 0) < st['%d total' % t]]
+                render_only = all(c.split()[0] in ('shader', 'mat', 'mesh') for c in cells)
+                print('      %-52s %s%s' % (rel, ', '.join(cells) or 'identical', '  [render only]' if cells and render_only else ''))
 
 
 if __name__ == '__main__':
