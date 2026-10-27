@@ -45,6 +45,20 @@ silent), 38 images, the merged object lists. Exit 0.
   therefore at least partly data (scripts in these DRMs), not only code in `tru.exe` - the first place to look for
   what the PC exe has to support.
 * `g_pda.drm` is in the tree again (upstream leaves it out on purpose for DLC 1, see `docs/WS_MAP.md`).
+* What the doppelganger / shadow mechanic brings as data (`tools/drm_strings.py`, new: sections + strings of a DRM,
+  `--diff` against another version):
+  * `player_tru_dlc2_extension.drm`: 57 sections, 44 scripts - mostly copies of base classes (`gamebase`, cameras,
+    sensors); new for DLC 2 only script 22498, DTPs 22496/22497/22499/22864, mesh 22500, Obj 858.
+  * Strings with "shadow" in nearly every DRM are render constants (`ShadowMapSampler`, `p_ShadowEnabled`, ...), not
+    the mechanic. The level units reference the doppelganger's voice lines (`vo\dlc2\doppelganger\I_DG_PDLC2_...`).
+  * `g_pda.drm` of pack11 vs the DLC 1 one: 19 sections new or changed - new script 26427 (DLC journal / objectives
+    menu listing the DLC 1 and DLC 2 levels, `pda_dlc2_bg_1280/960`), new script 26428 (DLC 2 controls pages per
+    language, `controls_dlc2_e/f/g/i/s/d` - most likely the LB/RB shadow-ability help), 3 new textures
+    (7491, 7563, 7582), 14 grown PDA scripts (revisit-level list etc.). `uimeter` (script 204, an HUD meter class)
+    is in the DLC 1 `g_pda` too, so it is generic.
+  * Consequence: DLC 2 needs these `g_pda` parts, but the PC game has its own patched `g_pda.drm` (`patch.000`);
+    replacing it would drop the PC patch. Plan: merge the 19 sections into the PC version instead (probably also
+    why upstream leaves `g_pda` out for DLC 1). Where the shadow meter's HUD widget itself lives is still open.
 * Audio (`dlc_audio_build.py work/rebuild/dlc2_stage1/mods work/rebuild/dlc2_stage2a/mods`, log
   `logs/Manual_DLC2-Audio_20261027_195456.log`): 8473 waves in 71 DRMs, 48 of 48 `.mul` (one channel per Xbox
   stream). Measured with `compare_audio.py ... dlc2_stage2a --xbox-only` (new mode, no reference tree): worst channel
