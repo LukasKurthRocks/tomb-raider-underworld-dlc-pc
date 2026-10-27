@@ -45,8 +45,13 @@ silent), 38 images, the merged object lists. Exit 0.
   therefore at least partly data (scripts in these DRMs), not only code in `tru.exe` - the first place to look for
   what the PC exe has to support.
 * `g_pda.drm` is in the tree again (upstream leaves it out on purpose for DLC 1, see `docs/WS_MAP.md`).
-* Not done yet: audio (`dlc_audio_build.py`; reference = the decoded Xbox source, `compare_audio.py` needs a mode
-  without a reference tree), locals/padshock, the 2b fixes, shaders.
+* Audio (`dlc_audio_build.py work/rebuild/dlc2_stage1/mods work/rebuild/dlc2_stage2a/mods`, log
+  `logs/Manual_DLC2-Audio_20261027_195456.log`): 8473 waves in 71 DRMs, 48 of 48 `.mul` (one channel per Xbox
+  stream). Measured with `compare_audio.py ... dlc2_stage2a --xbox-only` (new mode, no reference tree): worst channel
+  vs the decoded Xbox source min 25.1 / median 41.0 / max 53.8 dB (39 stereo median 38.1, 9 other median 44.8) -
+  the same quality as DLC 1.
+* Not done yet: locals/padshock, the 2b fixes, shaders. The symbol-map outlier of `docs/WINDOWS_REBUILD.md` finding
+  27 affects DLC 2 scripts the same way (fix it before converting DLC 2 for real).
 
 ## What the DLC 1 rebuild taught us for DLC 2 (checklist, kept up to date)
 

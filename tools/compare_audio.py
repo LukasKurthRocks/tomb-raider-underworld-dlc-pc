@@ -11,8 +11,9 @@ Per item: samples, differing samples, max |diff|, SNR in dB (reference RMS / dif
 Totals on the console, every item in work/rebuild/audio_<label>.json.
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -I tools/compare_audio.py MODS_DIR [LABEL] [--ref REF_MODS_DIR]
+  ..\\bin\\venv\\Scripts\\python.exe -I tools/compare_audio.py MODS_DIR [LABEL] [--ref REF_MODS_DIR] [--xbox-only]
   default REF_MODS_DIR: ../data/pc/mods (the installed B138 tree)
+  --xbox-only: no reference tree (DLC 2): only the .mul streams against the decoded Xbox source, waves skipped
 """
 import sys, os, json, struct, collections
 import numpy as np
@@ -98,16 +99,18 @@ def mul_file(args):
     """ours vs reference (both conventions) and, as ground truth, ours/reference (game convention) vs the decoded
     Xbox source, per channel (worst channel reported)"""
     rel, ours, ref = args
-    po, pr = open(ours, 'rb').read(), open(ref, 'rb').read()
+    po = open(ours, 'rb').read(); pr = open(ref, 'rb').read() if ref else None
     r = {'file': rel, 'bytes_equal': po == pr, 'channels': struct.unpack_from('<I', po, 12)[0]}
-    for conv_o, conv_r in (('fsb', 'fsb'), ('fsb', 'game'), ('game', 'game')):
-        a = mul_pcm(po, conv_o == 'game').reshape(-1); b = mul_pcm(pr, conv_r == 'game').reshape(-1)
-        r['ours_%s_vs_ref_%s' % (conv_o, conv_r)] = stats(a, b)
+    if pr is not None:
+        for conv_o, conv_r in (('fsb', 'fsb'), ('fsb', 'game'), ('game', 'game')):
+            a = mul_pcm(po, conv_o == 'game').reshape(-1); b = mul_pcm(pr, conv_r == 'game').reshape(-1)
+            r['ours_%s_vs_ref_%s' % (conv_o, conv_r)] = stats(a, b)
     try:
         import mul_audio as MA, mul_audio_batch as MAB
         xd = MAB.find_xb(rel)[0]
         rate, total, xb = MA.xb_pcm(xd)
         for name, pd in (('ours', po), ('ref', pr)):
+            if pd is None: continue
             pc = mul_pcm(pd, True)
             per = [stats(pc[:, k], xb[:, k]) for k in range(min(pc.shape[1], xb.shape[1]))]
             r['%s_game_vs_xbox' % name] = min(per, key=lambda s: s['snr_db']) if per else None
@@ -120,12 +123,17 @@ def main(argv):
     ref = '../data/pc/mods'
     if '--ref' in argv:
         k = argv.index('--ref'); ref = argv[k + 1]; del argv[k:k + 2]
+    xbox_only = '--xbox-only' in argv
+    if xbox_only: argv.remove('--xbox-only')
     mods = argv[0]
     label = argv[1] if len(argv) > 1 else os.path.basename(os.path.dirname(os.path.abspath(mods)))
     drms, muls = [], []
     for dp, dn, fn in os.walk(mods):
         for f in fn:
             p = os.path.join(dp, f); rel = os.path.relpath(p, mods).replace(os.sep, '/'); r = os.path.join(ref, rel)
+            if xbox_only:
+                if f.endswith('.mul'): muls.append((rel, p, None))
+                continue
             if not os.path.exists(r): continue
             if f.endswith('.drm'): drms.append((rel, p, r))
             elif f.endswith('.mul'): muls.append((rel, p, r))

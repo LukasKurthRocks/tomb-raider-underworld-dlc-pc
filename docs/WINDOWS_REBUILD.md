@@ -319,6 +319,26 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    noted): **33 of 33 = B138**. All five fixes together (stage2a -> stage2b): DTP sections identical 11 131 -> 11 157
    (97.6 %); `rebuild_status`: `cinstream/pdlc1_030_finale.drm` (origin `derived:B45`) is now fully identical, 10 of
    133 DRMs in total.
+27. **Script sections: most differences are shifted Symbol ids, caused by one bogus entry in our symbol map.**
+   * `tools/script_diff.py work/rebuild/stage2b/mods stage2b` (new, read-only; classifies each differing word by how
+     it came from the Xbox word, in ours and in B138): 9580 differing words in 86 DRMs (most in the big units:
+     `dlc_dungeon` 1880, `dlc_water_wheel` 1457, `dlc_watertunnel` 854). 8277 are "other / other" (neither side is a
+     byte permutation of the Xbox word) - different values, not byte order; 1092 are s16 in ours / other in B138.
+   * The "other" words are u16 Symbol ids (often the high half of a word): 1644 distinct (ours, B138) pairs, and they
+     follow fixed offsets - ours `dc30 dda0 e26d dcc7 dd03 dd88` = B138 `41d0 4340 480d 4267 42a3 4328` + `0x9a60`;
+     ours `2a7a 2b29` = B138 `4258 4307` - `0x17de`; ours `0229` vs `0228`.
+   * Cause: `dlc_generic.DlcIds.sym()` maps an Xbox Symbol by the learned map (idmap key 100); Xbox symbols above the
+     base maximum `xs_max` are DLC-new and shifted by `pc_max - xs_max`; others are interpolated / guessed, and a guess
+     that collides becomes `40000 + xs`. Our map has **one outlier, Xbox 48875 -> 48875 = `0xBEEB`** (the marker of the
+     effect DTPs, `BE EB BE EB`), learned as a symbol. It makes `xs_max` = 48875 (`dlc_idmap.json` sym_info:
+     xbox_max 48875, pc_max 48875, **shift 0**), so no DLC symbol counts as new: they are guessed and collide, e.g.
+     Xbox 16368 -> ours 56368 = `0xdc30` (40000 + 16368) where B138 has 16848 = `0x41d0` (16368 + 480). Without the
+     outlier `xs_max` = 16347 (all other 7530 entries are <= 16347), `pc_max` = 16828 (`PC_SYM_MAX`), shift 481 -
+     one off B138's 480, still to explain. Convert's symbol stats agree: `guess_collision_new` 24386, `dlc_new_shift`
+     2700.
+   * Which learn step writes 48875 is open: key 100 is written by `generic_symbols.py seed`, `script_name_match.py`
+     and `script_learn.py save`. Fix = drop the entry (or keep `0xBEEB` out of the symbol learning), then rerun from
+     Tables (`dlc_idmap.json` is built once and never changes ids afterwards) through Convert, Media, Audio, 2b.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
