@@ -18,8 +18,9 @@ def parse_xb(d):
     assert r[:4] == b'RIFF'
     return dict(pre=pre, riff=r)
 
-import subprocess
-FFMPEG = '/opt/homebrew/bin/ffmpeg'
+import os, subprocess, shutil
+# ffmpeg with the xma1/xma2 decoders: $TRUDLC_FFMPEG, else the one on PATH, else the original macOS location
+FFMPEG = os.environ.get('TRUDLC_FFMPEG') or shutil.which('ffmpeg') or '/opt/homebrew/bin/ffmpeg'
 def xma_decode(riff, rate=None):
     """Decode an Xbox RIFF/XMA blob via ffmpeg -> (int16 numpy array [n,ch], rate, ch)."""
     import numpy as np

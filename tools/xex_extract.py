@@ -15,6 +15,7 @@ Produce OUTDIR/<nome>.pe e stampa header, sezioni, entry, base, import.
 """
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -34,7 +35,8 @@ def aes_cbc_decrypt(key_hex, data):
     """AES-128-CBC decrypt, IV=0, nessun padding. Usa openssl CLI."""
     if len(data) % 16:
         raise ValueError("lunghezza dati non multipla di 16")
-    cmd = ["/opt/homebrew/bin/openssl", "enc", "-d", "-aes-128-cbc", "-nopad",
+    openssl = os.environ.get("TRUDLC_OPENSSL") or shutil.which("openssl") or "/opt/homebrew/bin/openssl"
+    cmd = [openssl, "enc", "-d", "-aes-128-cbc", "-nopad",
            "-K", key_hex, "-iv", "00" * 16]
     r = subprocess.run(cmd, input=data, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
     return r.stdout

@@ -83,12 +83,17 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
    `'type:pcid'` -> runtime ver (most frequent, patch.000 wins) and `'type:pcid:md5(data)[:16]'`, for Scripts also
    `'8:pcid:n' + md5(script_conv.deps_normalized(data, reloc))[:16]`. Rebuilt by `tools/pc_vers_build.py` from
    `work/idx_pc.json` and the PC side of the pair caches.
-8. The converter prefers `work/generic/mask_best.npz` (+ `mask_best_vocab.pkl`, from `slim_table.py` ->
+8. **ffmpeg was hard-coded to `/opt/homebrew/bin/ffmpeg`** (`tools/audio_parse.py`; `xex_extract.py` likewise for
+   openssl). On Windows every Wave section (type 6) failed with `media_error:FileNotFoundError` (16 534 in the first
+   full Convert) and stayed unconverted - silently, the tool still exits with 0. Now `$TRUDLC_FFMPEG`, else PATH,
+   else the macOS path. The ffmpeg needs the `xma1`/`xma2` decoders (gyan.dev 9.0.2 essentials has them; fetched by
+   `Get-Tools.ps1`, the runner sets `TRUDLC_FFMPEG`). Even the silent placeholder decodes the XMA to get its length.
+9. The converter prefers `work/generic/mask_best.npz` (+ `mask_best_vocab.pkl`, from `slim_table.py` ->
    `slim2np.py`) and falls back to the full `mask_table.pkl` - same result, more memory. Not built yet.
-9. **First MD5 match with B138:** the merged `tr8/pc-w/objectlist.txt`, `unitlist.txt`, `objlist.dat` written by
+10. **First MD5 match with B138:** the merged `tr8/pc-w/objectlist.txt`, `unitlist.txt`, `objlist.dat` written by
    `objlist_merge.py` are byte-identical to the files of the installed B138 `mods/` tree (md5 45dc3b4c…,
    2203e9bd…, e4f12246…). 1045 objects (821 base keep their PC ids, 224 DLC), 119 units, 0 dangling object refs.
-10. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
+11. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
    26 s with 8 processes, `pairs.pkl` 1 449 582 409 bytes, `pairs_patch.pkl` 14 782 788 bytes (patch pairs:
    g_pda, generalbank, globalsoundinfo, l2_puzzleroom).
 
@@ -129,4 +134,5 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-27 | Tables | `dlc_drms_build` failed on duplicate pack records -> fixed (identical content) |
 | 2026-10-27 | Tables | ok, 824 s: 300 DLC DRMs (pack10 134, pack11 166; 57 unnamed), dlc_drms.pkl 2.98 GB; DLC new ids 2:2041 5:1393 6:301 7:2908 8:2370 9:539 10:565 12:357, few collisions; `script_learn` in-sample 17039 pairs, exact-mod-deps 52.3 % (100 % of the convertible rest); `script_name_match` +111 script ids, +105 symbols; `tex_idmap` 5751 content-voted (309 changed); **`generic_type0 save` wrote nothing** (wrong mode) -> step Prep with `save07` + `pc_vers_build` |
 | 2026-10-27 | Convert | runner bug (single-tool step unrolled, so `dlc_convert_all.py` ran **without** options = check only, 360 s): 307 DRMs (300 + 7 duplicate records), readback_ok 307, reloc_bounds_bad 0, obj_ok 228, idref_local 357 653, idref_pc_base 158, idref_DANGLING 29 542 - only types 5/9/10 (media, expected without `--media`); routes e.g. 2 pc_copy 12 670 / convert 2267, 7 pc_copy 8023 / template 5693 / convert 2603 / analog 1286, 8 pc_copy 12 445 / convert 5055; unmapped ids {11: 119, 2: 1211, 7: 911, 8: 9, 110: 124, 111: 451, 112: 313, 114: 1200, 6: 37} |
+| 2026-10-27 | Convert | `--media --write`, 1612 s: 307 DRMs written, readback_ok 307, reloc_bounds_bad 0, **no dangling id refs** (local 384 972, PC base 2381), obj_ok 228; routes 5/10/12 media ok; **6 media_error:FileNotFoundError 16 534** (ffmpeg path, see finding 8), 9 media_error:NotImplementedError 4839 (shaders, by design) -> rerun after the ffmpeg fix |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |
