@@ -105,6 +105,18 @@ def main(argv):
         for d, c in delta.most_common(10): print('   %+6d  %5d  (%.1f %%)' % (d, c, 100.0 * c / dsum))
         big = sum(c for (h, a, b), c in halves.items() if a - b == 1 and b >= 16828)
         print('delta +1 with B138 value >= 16828 (DLC-new symbol range): %d' % big)
+        # which Xbox values (BE u16 halves) are behind the most frequent differing pairs?
+        src = collections.defaultdict(collections.Counter)
+        for words in out.values():
+            for sid, k, xw, o, r, co, cr in words:
+                if co != 'other' or cr != 'other': continue
+                xb = bytes.fromhex(xw); ob = bytes.fromhex(o); rb = bytes.fromhex(r)
+                for h in (0, 1):
+                    a = struct.unpack_from('<H', ob, 2 * h)[0]; b = struct.unpack_from('<H', rb, 2 * h)[0]
+                    if a != b: src[(a, b)][struct.unpack_from('>H', xb, 2 - 2 * h)[0]] += 1
+        print('Xbox u16 behind the most frequent differing halves (ours / B138 <- Xbox: count):')
+        for (a, b), c in sorted(src.items(), key=lambda kv: -sum(kv[1].values()))[:12]:
+            print('   ours %5d  B138 %5d  <- %s' % (a, b, ', '.join('%d: %d' % kv for kv in c.most_common(3))))
     os.makedirs(W, exist_ok=True)
     rep = os.path.join(W, 'script_diff_%s.json' % label)
     json.dump(out, open(rep, 'w'), indent=0)

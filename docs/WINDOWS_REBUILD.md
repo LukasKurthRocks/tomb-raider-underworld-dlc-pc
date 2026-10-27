@@ -374,6 +374,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Remaining differing u16 halves (2 570): +83 504, -39939 432 (ours = a `40000 + xs` collision value where B138
      has a small symbol), +1 312 (mostly `0229` / `0228` - a base-range symbol, not the DLC shift), -334 192,
      -337 144, -1 94, -12 92, -338 72, -329 60, +38667 56. Next step of the script analysis.
+30. **The remaining 2 593 script words (after findings 27/29) fall into two groups** (`script_diff.py`, now also
+   listing the Xbox u16 behind the most frequent differing pairs):
+   * **Xbox half = 0, PC value non-zero** - not derived from the Xbox word but a PC-side field filled while
+     assembling: ours 553 / B138 552 (312 halves), ours 552 / B138 553 (73), ours 5829 / B138 5841 (92), ours 44441 /
+     B138 5823 (51), ours 4075 / B138 4022 (29), ours 1205 / B138 41178 (24). Probably counters or ids assigned to
+     DLC-new scripts/types in a different order - to trace in `dlc_generic.py` (script routes `pc_copy` / `template`
+     / `convert`).
+   * **Collisions in ours where B138 has a mapping** - e.g. Xbox 4479: ours 44479 (= 40000 + 4479, guess collided),
+     B138 5812; Xbox 4710: ours 44710, B138 6038; Xbox 4709: ours 6160, B138 6037; Xbox 4447: ours 5841, B138 5827;
+     Xbox 515: ours 517, B138 333; Xbox 1974: ours 2035, B138 1952. The author's learned symbol map knew entries ours
+     lacks (7 498 entries here; his count unknown). Candidates: `script_name_match.py` (adds symbols from matched
+     script names) and the harvest/bootstrap rounds of `generic_symbols.py`. A B138-derived check is possible: every
+     (Xbox, B138) pair of this list is a known mapping.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
