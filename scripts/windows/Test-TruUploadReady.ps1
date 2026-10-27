@@ -145,8 +145,12 @@ if (Test-Path -LiteralPath $clone) {
 
 # --- identities ---------------------------------------------------------------------------------------------------
 Write-Log 'Identities of the commits to publish:'
-$ids = @(Invoke-Git -Repo $root -GitArgs @('log', '--format=%an <%ae> / %cn <%ce>'))
-if (Test-Path -LiteralPath $clone) { $ids += Invoke-Git -Repo $clone -GitArgs @('log', '--format=%an <%ae> / %cn <%ce>', ('{0}..{1}' -f $UpstreamRef, $Branch)) }
+# Invoke-Git returns one wrapped array: assign it directly (wrapping it in @() again would nest it)
+$ids = Invoke-Git -Repo $root -GitArgs @('log', '--format=project  %an <%ae> / %cn <%ce>')
+if (Test-Path -LiteralPath $clone) {
+    $cloneIds = Invoke-Git -Repo $clone -GitArgs @('log', '--format=clone    %an <%ae> / %cn <%ce>', ('{0}..{1}' -f $UpstreamRef, $Branch))
+    $ids = @($ids) + @($cloneIds)
+}
 $ids | Group-Object | ForEach-Object { Write-Log ('  {0,4} x {1}' -f $_.Count, $_.Name) }
 
 # --- report -------------------------------------------------------------------------------------------------------
