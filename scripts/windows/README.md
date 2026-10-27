@@ -61,6 +61,10 @@ Xenia (zum Vergleich mit der Xbox-Fassung): `bin\xenia-canary\` mit `portable.tx
 `content\0000000000000000\534307EC\` – `00000002` ist eine Verknüpfung auf `input\xbox-dlc`, `000B0000\<TU>\` enthält
 eine Kopie von `default.xexp` + `TitleUpdate.000`. Start: `.\bin\xenia-canary\xenia_canary.exe .\input\xbox-game\default.xex`.
 `bin\` wegen der Verknüpfung ebenfalls nie rekursiv löschen.
+Xenia-Konfiguration (`xenia-canary.config.toml`, Sicherungen `.bak`–`.bak3`): Tastatur an (`keyboard_mode = 1`;
+A = Enter/Leertaste, B = Rücktaste, Steuerkreuz = Pfeiltasten, rechter Stick = Ziffernblock 8/4/2/6),
+`license_mask = -1` (DLC lizenziert), `render_target_path_d3d12 = "rov"` (gegen die Grafikfehler in Underworld,
+laut xenia-canary game-compatibility #418).
 
 Neu einrichten: `.\Get-Tools.ps1 -Verbose` – lädt die Zips nach `bin\_download\`, prüft SHA-256, entpackt nach `bin\`.
 Schon vorhanden auf dem PC: cdb x86 (Windows Kits 10), x32dbg (x64dbg-Snapshot 2019-11-05),
