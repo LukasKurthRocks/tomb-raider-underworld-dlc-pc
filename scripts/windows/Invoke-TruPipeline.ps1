@@ -205,6 +205,10 @@ try {
     Write-Log "Invoke-TruPipeline step=$Step log=$logFile" -Level VERBOSE
     if (!(Test-Path -LiteralPath $python)) { throw "Python venv not found: $python (see README, Entwicklungsumgebung)." }
     Write-Log "Python: $((& $python --version 2>&1) -join ' ')" -Level DEBUG
+    # audio conversion: prefer the ffmpeg from .\bin (Get-Tools.ps1), else the tools find one on PATH
+    $ffmpeg = Join-Path $root 'bin\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe'
+    if (Test-Path -LiteralPath $ffmpeg) { $env:TRUDLC_FFMPEG = $ffmpeg }
+    Write-Log "ffmpeg: $(if ($env:TRUDLC_FFMPEG) { $env:TRUDLC_FFMPEG } else { 'from PATH' })" -Level DEBUG
     foreach ($dir in $outputDirs[$Step]) { New-Item -ItemType Directory -Force -Path (Join-Path $clone $dir) | Out-Null }
 
     $toolCount = @($steps[$Step]).Count

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    Downloads the portable tools (Ghidra, Temurin JDK 25, Xenia Canary) into .\bin and verifies SHA-256.
+    Downloads the portable tools (Ghidra, Temurin JDK 25, Xenia Canary, Yura, ffmpeg) into .\bin and verifies SHA-256.
 
 .DESCRIPTION
     Zips go to .\bin\_download, are checked against the official SHA-256 and only then unpacked into .\bin.
@@ -57,6 +57,14 @@ $tools = @(
         Sha256    = '4e482042b9be526de02216145458816145dda10c8a09a56c45871f652458df07'
         Folder    = 'yura-1.7.2'
         OwnFolder = $true
+    },
+    @{
+        # XMA1/XMA2 decoding for the audio conversion (tools/audio_parse.py via TRUDLC_FFMPEG)
+        Name   = 'ffmpeg 9.0.2 essentials (gyan.dev)'
+        Url    = 'https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip'
+        File   = 'ffmpeg-9.0.2-essentials_build.zip'
+        Sha256 = '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba'
+        Folder = 'ffmpeg-9.0.2-essentials_build'
     }
 )
 
