@@ -1,11 +1,11 @@
 ﻿<#
 .SYNOPSIS
-    Downloads the portable tools (Ghidra, Temurin JDK 25, Xenia Canary, Yura, ffmpeg) into .\bin and verifies SHA-256.
+    Downloads the portable tools (Ghidra, Temurin JDK 25, Xenia Canary, Yura, ffmpeg) into <workspace>\bin and verifies SHA-256.
 
 .DESCRIPTION
-    Zips go to .\bin\_download, are checked against the official SHA-256 and only then unpacked into .\bin.
+    Zips go to <workspace>\bin\_download, are checked against the official SHA-256 and only then unpacked into <workspace>\bin.
     Existing verified zips are not downloaded again; already unpacked tools are left alone.
-    Every run writes .\logs\Get-Tools_<time>.log. -Verbose shows steps, -Debug URLs/paths/hashes,
+    Every run writes <workspace>\logs\Get-Tools_<time>.log. -Verbose shows steps, -Debug URLs/paths/hashes,
     -Trace adds a PowerShell line trace.
 
 .EXAMPLE
@@ -19,7 +19,10 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
 
-$root   = $PSScriptRoot
+# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
+# the repository); this script lives in <repository>\scripts\windows
+$repo   = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$root   = Split-Path -Parent $repo
 $binDir = Join-Path $root 'bin'
 $dlDir  = Join-Path $binDir '_download'
 $logDir = Join-Path $root 'logs'

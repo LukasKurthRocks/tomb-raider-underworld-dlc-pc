@@ -5,13 +5,13 @@
 .DESCRIPTION
     -Windowed   Fullscreen=0, LockWindowSize=1, LockedWindowWidth/Height = -Width/-Height (default 1600x900).
     -Fullscreen Fullscreen=1 (window values are left as they are).
-    -Restore    Re-imports the first backup .reg from .\backup (state before this script ever ran).
+    -Restore    Re-imports the first backup .reg from <workspace>\backup (state before this script ever ran).
     -Language   Additionally sets the game language (registry value Language one level up):
                 English=0, French=1, German=2, Italian=3, Spanish=4, Dutch=5 (order of the locals.bin_001..032
                 language bits; all six verified in game).
 
-    Before any change the key is exported to .\backup\TRU-Graphics_<time>.reg.
-    Every run writes .\logs\Set-TruDisplay_<time>.log. -Verbose shows steps, -Debug the values before/after,
+    Before any change the key is exported to <workspace>\backup\TRU-Graphics_<time>.reg.
+    Every run writes <workspace>\logs\Set-TruDisplay_<time>.log. -Verbose shows steps, -Debug the values before/after,
     -Trace adds a PowerShell line trace.
 
 .EXAMPLE
@@ -32,7 +32,10 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
 
-$root      = $PSScriptRoot
+# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
+# the repository); this script lives in <repository>\scripts\windows
+$repo      = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$root      = Split-Path -Parent $repo
 $regPath   = 'HKCU:\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics'
 $regNative = 'HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics'
 $rootPath  = 'HKCU:\Software\Crystal Dynamics\Tomb Raider: Underworld'

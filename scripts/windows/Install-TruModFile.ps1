@@ -4,19 +4,19 @@
 
 .DESCRIPTION
     Install: copies -Source to <game>\mods\<Name>. The file it replaces is saved first as
-             .\backup\mods\<Name>.<md5> (kept if it already exists). Source and result are MD5-checked.
+             <workspace>\backup\mods\<Name>.<md5> (kept if it already exists). Source and result are MD5-checked.
     -Restore copies the backup given by -BackupMd5 (or the only backup for <Name>) back to <game>\mods\<Name>.
 
     The game folder is taken from the Steam libraries (app 8140) unless -GamePath is given.
-    Every run writes .\logs\Install-TruModFile_<time>.log. -Verbose shows steps, -Debug paths/hashes,
+    Every run writes <workspace>\logs\Install-TruModFile_<time>.log. -Verbose shows steps, -Debug paths/hashes,
     -Trace adds a PowerShell line trace. The script never stops a running game; it aborts instead.
 
 .EXAMPLE
-    .\Install-TruModFile.ps1 -Source .\trudlcport\work\dlc_screen\generalbank.drm -Name generalbank.drm -Verbose
+    .\scripts\windows\Install-TruModFile.ps1 -Source .\work\dlc_screen\generalbank.drm -Name generalbank.drm -Verbose
 .EXAMPLE
     .\Install-TruModFile.ps1 -Name generalbank.drm -Restore -Verbose
 .EXAMPLE
-    .\Install-TruModFile.ps1 -Source .\trudlcport\work\dlc_text\local\locals.bin_004 -Name local\locals.bin_004
+    .\scripts\windows\Install-TruModFile.ps1 -Source .\work\dlc_text\local\locals.bin_004 -Name local\locals.bin_004
 #>
 [CmdletBinding()]
 param(
@@ -31,7 +31,10 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
 
-$root      = $PSScriptRoot
+# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
+# the repository); this script lives in <repository>\scripts\windows
+$repo      = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$root      = Split-Path -Parent $repo
 $backupDir = Join-Path $root 'backup\mods'
 $logDir    = Join-Path $root 'logs'
 $mode      = if ($Restore) { 'Restore' } else { 'Install' }

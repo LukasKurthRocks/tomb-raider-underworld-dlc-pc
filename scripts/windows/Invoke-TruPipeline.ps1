@@ -5,8 +5,8 @@
 .DESCRIPTION
     Each -Step runs one or more tools from the trudlcport clone root with the project venv
     (..\bin\venv\Scripts\python.exe -u -I tools\<tool>.py ...). Output is shown live and written to
-    .\logs\Invoke-TruPipeline_<step>_<time>.log; at the end a summary with duration and exit codes is printed.
-    The tools only read the game / Xbox data (via .\data junctions) and write below trudlcport\work\.
+    <workspace>\logs\Invoke-TruPipeline_<step>_<time>.log; at the end a summary with duration and exit codes is printed.
+    The tools only read the game / Xbox data (via <workspace>\data junctions) and write below work\ of the repository.
 
     Steps (in order):
       Index    tools\index_all.py (3x)        which DRM sits where, with section lists
@@ -55,8 +55,11 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
 
-$root   = $PSScriptRoot
-$clone  = Join-Path $root 'trudlcport'
+# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
+# the repository); this script lives in <repository>\scripts\windows
+$repo   = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$root   = Split-Path -Parent $repo
+$clone  = $repo
 $python = Join-Path $root 'bin\venv\Scripts\python.exe'
 $logDir = Join-Path $root 'logs'
 
@@ -233,7 +236,7 @@ try {
     Write-Log "Invoke-TruPipeline step=$Step log=$logFile" -Level VERBOSE
     if (!(Test-Path -LiteralPath $python)) { throw "Python venv not found: $python (see README, Entwicklungsumgebung)." }
     Write-Log "Python: $((& $python --version 2>&1) -join ' ')" -Level DEBUG
-    # audio conversion: prefer the ffmpeg from .\bin (Get-Tools.ps1), else the tools find one on PATH
+    # audio conversion: prefer the ffmpeg from <workspace>\bin (Get-Tools.ps1), else the tools find one on PATH
     $ffmpeg = Join-Path $root 'bin\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe'
     if (Test-Path -LiteralPath $ffmpeg) { $env:TRUDLC_FFMPEG = $ffmpeg }
     Write-Log "ffmpeg: $(if ($env:TRUDLC_FFMPEG) { $env:TRUDLC_FFMPEG } else { 'from PATH' })" -Level DEBUG

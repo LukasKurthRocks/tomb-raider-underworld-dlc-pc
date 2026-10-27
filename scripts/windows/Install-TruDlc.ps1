@@ -6,12 +6,12 @@
     -Check    Dry run of install_dlc.py: verifies game and DLC inputs, writes nothing to the game folder.
     (default) Copies ModLoader.asi + binkw32.dll into the game folder, then runs install_dlc.py.
               install_dlc.py itself keeps tru.exe as tru.exe.steam_original and an old mods\ as mods_backup_<time>.
-    -Restore  Puts back the original binkw32.dll and tru.exe from .\backup and renames mods\ to mods_disabled_<time>.
+    -Restore  Puts back the original binkw32.dll and tru.exe from <workspace>\backup and renames mods\ to mods_disabled_<time>.
 
-    Every run writes a log to .\logs\Install-TruDlc_<time>.log (environment, hashes, full python output).
+    Every run writes a log to <workspace>\logs\Install-TruDlc_<time>.log (environment, hashes, full python output).
     -Verbose shows each step, -Debug adds paths, hashes and command lines, -Trace adds a PowerShell line trace.
 
-    Original files are backed up in .\backup (binkw32.dll.steam_original, tru.exe.steam_original).
+    Original files are backed up in <workspace>\backup (binkw32.dll.steam_original, tru.exe.steam_original).
     The script never stops a running game; it aborts instead.
 
 .EXAMPLE
@@ -31,7 +31,10 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
 
-$root      = $PSScriptRoot
+# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
+# the repository); this script lives in <repository>\scripts\windows
+$repo      = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$root      = Split-Path -Parent $repo
 $dlcPath   = Join-Path $root 'input\xbox-dlc'
 $release   = Join-Path $root "release\$Build"
 $kitPath   = Join-Path $release 'kit'
