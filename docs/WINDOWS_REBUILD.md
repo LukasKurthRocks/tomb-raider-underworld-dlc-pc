@@ -38,8 +38,8 @@ manifest, and then use the same pipeline for DLC 2 (*Lara's Shadow*) and the cos
 |---|---|---|
 | Index | `tools/index_all.py work/idx_pc.json le ../data/pc/bigfile.000@7ff00000 ../data/pc/patch.000@7ff00000`<br>`tools/index_all.py work/idx_xbox_base.json be <layer1>@7ff00000 <layer2>@7ff00000 <TitleUpdate.000>@7ff00000`<br>`tools/index_all.py work/idx_dlc.json be <pack10>@7ff00000 <pack11>@7ff00000` | `work/idx_*.json` |
 | Cache | `tools/generic_cache.py`, `tools/generic_cache.py patch` | `work/generic/pairs.pkl`, `pairs_patch.pkl` |
-| Ids | `tools/generic_store.py`, `generic_ids.py`, `objlists_extract.py` (**new**), `objlist_merge.py`, `unit_ids.py` | `store.pkl`, `idmap.json`, `merged/`, `unit_idmaps.json` |
-| Learn | `generic_learn.py save`, `generic_symbols.py seed`, `script_pairs.py`, `script_learn.py save`, `generic_type0.py save`, `script_name_match.py`, `tex_idmap.py` | `mask_table.pkl`, symbols (key 100) in `idmap.json`, `work/script/`, type-0 table |
+| Ids | `tools/generic_store.py`, `generic_ids.py`, `objlists_extract.py` (**new**), `objlist_merge.py` | `store.pkl`, `idmap.json`, `merged/` |
+| Learn | `generic_learn.py save`, `generic_symbols.py seed`, `script_pairs.py`, `unit_ids.py`, `script_learn.py save`, `generic_type0.py save`, `script_name_match.py`, `tex_idmap.py` | `mask_table.pkl`, symbols (key 100) in `idmap.json`, `work/script/`, `unit_idmaps.json`, type-0 table |
 | DlcDrms | `tools/dlc_drms_build.py` (**new**, see below), `tools/dlc_generic.py` | `dlc_drms.pkl`, `dlc_idmap.json` |
 | Convert | `tools/dlc_convert_all.py --media --write` | `work/generic/out/` |
 
@@ -62,7 +62,13 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
    Archive names (Yura lists): `\tr8\pc-w\<file>` on PC, `\tr8\xenon-w\<file>` on Xbox - with the leading
    backslash, `names.crc` hashes the line exactly as listed. Rebuilt by `tools/objlists_extract.py` (first archive
    wins: PC patch.000 before bigfile, Xbox TU separately as `xboxtu`).
-4. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
+4. **`unit_ids.py` must run after `script_pairs.py`**: its `intro_from_scripts` pass reads `work/script/pairs_8.pkl`
+   (intro ids referenced from Script init blocks). Before that it silently records a `FileNotFoundError` in its
+   statistics and writes a smaller intro map.
+5. **First MD5 match with B138:** the merged `tr8/pc-w/objectlist.txt`, `unitlist.txt`, `objlist.dat` written by
+   `objlist_merge.py` are byte-identical to the files of the installed B138 `mods/` tree (md5 45dc3b4c…,
+   2203e9bd…, e4f12246…). 1045 objects (821 base keep their PC ids, 224 DLC), 119 units, 0 dangling object refs.
+6. `generic_cache.py` pairs **1054** base DRMs (its docstring says 975; `drm_reloc.py` mentions 1054). 0 errors,
    26 s with 8 processes, `pairs.pkl` 1 449 582 409 bytes, `pairs_patch.pkl` 14 782 788 bytes (patch pairs:
    g_pda, generalbank, globalsoundinfo, l2_puzzleroom).
 
@@ -74,3 +80,4 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
 | 2026-10-27 | Ids | failed in `generic_store.py`: `work/idx_pc.json` missing -> step Index added |
 | 2026-10-27 | Index | ok: idx_pc 7348 files, idx_xbox_base 10252, idx_dlc 620, 0 errors, 45 s |
 | 2026-10-27 | Ids | `generic_store` ok (pc_store 21327, xb 21301, multi-content PC ids 257); `generic_ids` ok (coverage: unmapped only type 5 345/36516, 7 24, 8 195, 10 8); `objlist_merge` failed: `work/generic/lists/` missing -> `objlists_extract.py` added |
+| 2026-10-27 | Ids | ok, 43 s: lists extracted (PC from bigfile, no list in patch.000), all round trips ok, merged lists = B138 (MD5); `unit_ids`: unit 81, tguid 545, intro 7988, portal 161, rec 1779, all uncontested; intro_from_scripts missing input -> moved to Learn |
