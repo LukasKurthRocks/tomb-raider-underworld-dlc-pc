@@ -7,7 +7,8 @@
     -Fullscreen Fullscreen=1 (window values are left as they are).
     -Restore    Re-imports the first backup .reg from .\backup (state before this script ever ran).
     -Language   Additionally sets the game language (registry value Language one level up):
-                English=0, French=1, German=2, Italian=3, Spanish=4 (cdc engine order; German=2 verified in game).
+                English=0, French=1, German=2, Italian=3, Spanish=4, Dutch=5 (order of the locals.bin_001..032
+                language bits; German=2 verified in game, Dutch=5 not yet).
 
     Before any change the key is exported to .\backup\TRU-Graphics_<time>.reg.
     Every run writes .\logs\Set-TruDisplay_<time>.log. -Verbose shows steps, -Debug the values before/after,
@@ -24,7 +25,7 @@ param(
     [Parameter(ParameterSetName = 'Fullscreen', Mandatory)][switch]$Fullscreen,
     [Parameter(ParameterSetName = 'Restore', Mandatory)][switch]$Restore,
     [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
-    [ValidateSet('English', 'French', 'German', 'Italian', 'Spanish')][string]$Language,
+    [ValidateSet('English', 'French', 'German', 'Italian', 'Spanish', 'Dutch')][string]$Language,
     [switch]$Trace
 )
 
@@ -36,7 +37,7 @@ $regPath   = 'HKCU:\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics'
 $regNative = 'HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics'
 $rootPath  = 'HKCU:\Software\Crystal Dynamics\Tomb Raider: Underworld'
 $rootNative = 'HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld'
-$languageIds = @{ English = 0; French = 1; German = 2; Italian = 3; Spanish = 4 }
+$languageIds = @{ English = 0; French = 1; German = 2; Italian = 3; Spanish = 4; Dutch = 5 }
 $backupDir = Join-Path $root 'backup'
 $logDir    = Join-Path $root 'logs'
 $stamp     = Get-Date -Format 'yyyyMMdd_HHmmss'
