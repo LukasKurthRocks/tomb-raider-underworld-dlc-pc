@@ -1,10 +1,10 @@
-"""Remove the hard line breaks from the DLC mission descriptions in the non-English locals.bin files.
+"""Remove the hard line breaks from the DLC mission descriptions in all locals.bin files.
 
 The DLC 1 / DLC 2 descriptions (string index 456 / 457) carry hard line breaks every 47-52 characters in every
 language. With the Xbox title-update text style (tools/dlc_screen_text_style.py) the description box auto-wraps;
-English fits the hard breaks exactly as on the Xbox, the longer lines of the other languages overflow and leave a
-single word on its own line ("meinem", "Geheimkammer"). Replacing each '\\n' of these two strings by a space lets the
-game wrap them itself. Same length, so offsets do not change; English (locals.bin_001) is left as it is.
+English happens to fit the hard breaks, the longer lines of the other languages overflow and leave a single word on
+its own line ("meinem", "Geheimkammer"). Replacing each '\\n' of these two strings by a space lets the game wrap
+them itself - one rule for every language. Same length, so offsets do not change.
 
 Usage (from the repository root):  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_text_unwrap.py [src dir]
   src dir defaults to ../data/pc/mods/local/ (the installed build)
@@ -17,7 +17,7 @@ import locals as L
 SRC = sys.argv[1] if len(sys.argv) > 1 else '../data/pc/mods/local/'
 OUT = 'work/dlc_text/local/'
 INDICES = (456, 457)
-LANGS = ('002', '004', '008', '016', '032')      # all but English (001)
+LANGS = ('001', '002', '004', '008', '016', '032')
 
 
 def main():
