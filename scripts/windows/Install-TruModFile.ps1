@@ -15,6 +15,8 @@
     .\Install-TruModFile.ps1 -Source .\trudlcport\work\dlc_screen\generalbank.drm -Name generalbank.drm -Verbose
 .EXAMPLE
     .\Install-TruModFile.ps1 -Name generalbank.drm -Restore -Verbose
+.EXAMPLE
+    .\Install-TruModFile.ps1 -Source .\trudlcport\work\dlc_text\local\locals.bin_004 -Name local\locals.bin_004
 #>
 [CmdletBinding()]
 param(
@@ -92,12 +94,16 @@ try {
     if (!(Test-Path -LiteralPath $target)) { throw "Not found in the game's mods folder: $Name" }
     $current = Get-Md5 $target
     Write-Log "current mods\$Name md5 $current" -Level DEBUG
+    # files in sub folders (e.g. local\locals.bin_004) keep their sub folder below backup\mods
+    $leaf = Split-Path -Leaf $Name
+    $backupSub = Join-Path $backupDir (Split-Path -Parent $Name)
+    New-Item -ItemType Directory -Force -Path $backupSub | Out-Null
 
     if ($Restore) {
-        $pattern = if ($BackupMd5) { "$Name.$BackupMd5" } else { "$Name.*" }
-        $backups = @(Get-ChildItem -LiteralPath $backupDir -Filter $pattern -File)
-        if ($backups.Count -ne 1) { throw "Expected exactly one backup matching $pattern in $backupDir, found $($backups.Count); pass -BackupMd5." }
-        $wanted = $backups[0].Name.Substring($Name.Length + 1)
+        $pattern = if ($BackupMd5) { "$leaf.$BackupMd5" } else { "$leaf.*" }
+        $backups = @(Get-ChildItem -LiteralPath $backupSub -Filter $pattern -File)
+        if ($backups.Count -ne 1) { throw "Expected exactly one backup matching $pattern in $backupSub, found $($backups.Count); pass -BackupMd5." }
+        $wanted = $backups[0].Name.Substring($leaf.Length + 1)
         if ((Get-Md5 $backups[0].FullName) -ne $wanted) { throw "Backup $($backups[0].Name) does not match its MD5 name." }
         Copy-Item -LiteralPath $backups[0].FullName -Destination $target -Force
         if ((Get-Md5 $target) -ne $wanted) { throw "Restored mods\$Name does not match the backup." }
@@ -110,7 +116,7 @@ try {
     Write-Log "source $Source md5 $sourceMd5" -Level DEBUG
     if ($sourceMd5 -eq $current) { Write-Log "mods\$Name is already this build (md5 $current)."; return }
 
-    $backup = Join-Path $backupDir "$Name.$current"
+    $backup = Join-Path $backupSub "$leaf.$current"
     if (!(Test-Path -LiteralPath $backup)) {
         Copy-Item -LiteralPath $target -Destination $backup
         Write-Log "backup: backup\mods\$Name.$current"
