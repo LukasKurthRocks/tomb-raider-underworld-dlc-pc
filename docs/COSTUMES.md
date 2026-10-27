@@ -14,6 +14,12 @@ Each pack has 13 records: two costume DRMs, their outfit preview images, the obj
 | `pack2.000` | `9FDDD06617D1016DE468ACF53AC663E8BA2AD41853` | `dlc_costume_a`, `dlc_costume_h` | classic Lara (teal top, shorts) / olive top + shorts | Classic Costumes |
 | `pack20.000` | `AC0089F81B621CD0E0C156B6176EFCC6C844705D53` | `dlc_costume_l`, `dlc_costume_m` | white/grey outfit / black catsuit with blue belt | Designer Costume Pack |
 
+Community outfit chart (r/TombRaider, "Underworld enjoyers, what's your favorite outfit?", fan names) matches the
+previews: k = "Drysuit Red", p = "Wetsuit Blue", a = "Classic", h = "Legend" (the *Tomb Raider: Legend* outfit),
+l = "Snowsuit" (white), m = "Bodysuit" (black, blue belt). The official names of the Designer pack are
+"Fashion Winner" and "People's Choice" (outfits by fashion designers, chosen by a fan vote); which is l and which
+is m is not documented anywhere found so far.
+
 Previews are `xenon-w\image\dlc_outfit_costume_<x>.raw` ('!WAR' images), converted with
 `raw_image_convert.xbox_to_pc` + `to_png`. Each costume DRM is ~31-32 MB.
 
