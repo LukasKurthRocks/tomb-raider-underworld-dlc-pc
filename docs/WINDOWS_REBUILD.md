@@ -283,6 +283,14 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `dlc_watertunnel` type 0 17/17 = B138), R12 20 strings fixed (`dlc_dungeon` 17, `dlc_treasureroom` 2,
      `dlc_pillory` 1), 0 manual. Type-0 sections identical **230 -> 246 of 259 (88.8 -> 95.0 %)**:
      `dlc_treasureroom` 17 -> 19 of 19, `dlc_dungeon` 31 -> 44 of 50, `dlc_pillory` 27 -> 28 of 29.
+25. **Checks without a fix needed, and a path pitfall.**
+   * Raft chain name (`tools/name_string_fix.py`, the author's case `chain_free` -> `hcian_free` that kept the
+     underwater chain from being released): `dlc1_uo_raft_bridge` DTP 20765 +1312 is `chain_free` in stage2b, B138
+     and on the Xbox - the current converter already gets it right, the fix is not needed.
+   * Two conventions for "overlay" folders: `dtp_audit.overlay(dirs)` resolves relative paths against `work/`,
+     `load_overlay(dirs)` (`dtpid_sweep.py`, `soundplex_fix.py`, used by `analog_word_fix.py` and others) against the
+     current folder. A first `analog_word_fix.py scan rebuild/stage2b/mods` therefore saw **0 files** and printed an
+     empty result (`TOTAL {}`) - not a finding. Pass `work/rebuild/...` to `load_overlay` tools.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
