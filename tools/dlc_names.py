@@ -32,7 +32,7 @@ def fcrc(s, h0=None):
     return rev32(zlib.crc32(s.lower().encode('latin1').translate(REV8)))
 assert fcrc('pc-w\\g_pda.drm') == (~upd(0xffffffff, 'pc-w\\g_pda.drm') & 0xffffffff)
 
-C = '/path/to/Xenia-SteveRepack/Content/534307EC/00000002/'
+C = '../data/Xenia-SteveRepack/Content/534307EC/00000002/'
 PACKS = {'pack10': C + '9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', 'pack11': C + '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000',
          'pack1': C + 'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', 'pack2': C + '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000'}
 W = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'generic')

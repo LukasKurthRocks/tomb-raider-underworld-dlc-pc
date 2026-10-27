@@ -80,7 +80,7 @@ if __name__ == '__main__':
     from archive import Archive
     from names import load, L, crc
     lim = int(sys.argv[1]) if len(sys.argv) > 1 else None
-    pc = Archive('/path/to/trudlcport/pc/bigfile.000', 'le')
+    pc = Archive('../data/pc/bigfile.000', 'le')
     pcn = load(L + 'Tomb Raider Underworld (PC).txt')
     names = sorted(n for n in pcn.values() if n.lower().startswith('pc-w\\') and n.lower().endswith('.drm'))[:lim]
     st = {'drm': 0, 'raw_ok': 0, 'cdrm_files': 0, 'cdrm_ok': 0, 'sections': 0}

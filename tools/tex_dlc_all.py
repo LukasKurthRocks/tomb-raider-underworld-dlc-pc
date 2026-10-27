@@ -4,7 +4,7 @@ python -I tex_dlc_all.py"""
 import sys, os, json, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from multiprocessing import Pool
-W = '/path/to/trudlcport/work/'
+W = './work/'
 
 
 def do(args):

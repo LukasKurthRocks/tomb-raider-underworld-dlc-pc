@@ -5,7 +5,7 @@ Usage: tools/venv/bin/python -I tools/menu_dlc_x86.py dis VA [N]       disassemb
 """
 import sys, struct, re
 import capstone
-EXE = '/path/to/trudlcport/work/laa/tru_steam.exe.unpacked.exe'
+EXE = './work/laa/tru_steam.exe.unpacked.exe'
 B = open(EXE, 'rb').read()
 BASE = 0x400000
 md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)

@@ -28,11 +28,11 @@ from archive import Archive
 from names import crc
 from drm import cdrm_decode, sections_with_data
 
-B = '/path/to/'
+B = '../data/'
 C = B + 'Xenia-SteveRepack/Content/534307EC/00000002/'
 SRC = {'xl1': (B + 'TombRaiderUnderworld_Patched/layer1.000', 'be'), 'xl2': (B + 'TombRaiderUnderworld_Patched/layer2.000', 'be'),
        'tu': (B + 'TombRaiderUnderworld_Patched/TitleUpdate.000', 'be'),
-       'pcpatch': (B + 'tru-port/pc/patch.000', 'le'), 'pcbig': (B + 'tru-port/pc/bigfile.000', 'le'),
+       'pcpatch': (B + 'pc/patch.000', 'le'), 'pcbig': (B + 'pc/bigfile.000', 'le'),
        'pack10': (C + '9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', 'be'),
        'pack11': (C + '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000', 'be')}
 _A = {}

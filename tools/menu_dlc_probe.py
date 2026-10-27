@@ -12,13 +12,13 @@ from archive import Archive
 from drm import cdrm_decode, sections_with_data
 from names import crc
 import drm_reloc as R
-B = '/path/to/'
-OUT = B + 'tru-port/work/menu_dlc/'
+B = '../data/'
+OUT = B + 'trudlcport/work/menu_dlc/'
 CACHE = OUT + 'gb_cache.pkl'
 SRC = {'xl': ([B + 'TombRaiderUnderworld_Patched/layer1.000', B + 'TombRaiderUnderworld_Patched/layer2.000'], 'be', 'xenon-w'),
        'xt': ([B + 'TombRaiderUnderworld_Patched/TitleUpdate.000'], 'be', 'xenon-w'),
-       'pb': ([B + 'tru-port/pc/bigfile.000'], 'le', 'pc-w'),
-       'pp': ([B + 'tru-port/pc/patch.000'], 'le', 'pc-w')}
+       'pb': ([B + 'pc/bigfile.000'], 'le', 'pc-w'),
+       'pp': ([B + 'pc/patch.000'], 'le', 'pc-w')}
 
 def load_drm(var, name):
     paths, e, pre = SRC[var]

@@ -2,7 +2,7 @@
 import sys, os, json, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from multiprocessing import Pool
-W = '/path/to/trudlcport/work/textures/'
+W = './work/textures/'
 
 
 def do(item):

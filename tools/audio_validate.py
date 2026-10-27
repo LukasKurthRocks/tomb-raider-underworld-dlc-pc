@@ -5,9 +5,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pairs import *
 from audio_parse import *
 from wave_convert import *
-found = json.load(open('/path/to/trudlcport/work/audio/wavepairs.json'))
+found = json.load(open('./work/audio/wavepairs.json'))
 lo, hi = int(sys.argv[1]), int(sys.argv[2])
-out = open(f'/path/to/trudlcport/work/audio/validate_{lo}.jsonl', 'w')
+out = open(f'./work/audio/validate_{lo}.jsonl', 'w')
 def corr(a, b):
     m = min(len(a), len(b))
     if m < 64: return None

@@ -4,13 +4,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import assemble_dlc as A, drm_write as DW, dlc_generic as DG, generic_store
 from archive import Archive
 from names import crc
-B = '/path/to/'
+B = '../data/'
 def raw_xbox(name):
     for f in ('layer1.000', 'layer2.000'):
         a = Archive(B + 'TombRaiderUnderworld_Patched/' + f, 'be'); r = a.find(crc('xenon-w\\' + name))
         if r: return a.read(r[0])
 def raw_pc(name):
-    a = Archive(B + 'tru-port/pc/bigfile.000', 'le'); return a.read(a.find(crc('pc-w\\' + name))[0])
+    a = Archive(B + 'pc/bigfile.000', 'le'); return a.read(a.find(crc('pc-w\\' + name))[0])
 if __name__ == '__main__':
     name = sys.argv[1]
     store = generic_store.load(); ids = DG.DlcIds(store, None)
@@ -28,4 +28,4 @@ if __name__ == '__main__':
         st[(s.type, 'reloc exact' if q.reloc == s.reloc else 'reloc differs')] += 1
     for k, v in sorted(st.items()): print(k, v)
     print('pc sections not produced', [(t, i) for (t, i) in pm if (t, i) not in {(s.type, s.id) for s in O.sections}][:10])
-    open('/path/to/trudlcport/work/rung1_%s' % name, 'wb').write(out)
+    open('./work/rung1_%s' % name, 'wb').write(out)

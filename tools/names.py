@@ -11,4 +11,4 @@ def load(path):
         l = l.rstrip('\r\n')
         if l: d[crc(l)] = l
     return d
-L = '/path/to/trudlcport/ref/yura-release/FileLists/'
+L = './ref/yura-release/FileLists/'

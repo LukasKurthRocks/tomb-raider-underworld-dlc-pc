@@ -9,8 +9,8 @@ Relocation block layout (verified on Xbox+PC base pairs, sizes add up for every 
                          (type 5 texture, 9 shader, 10 material ...) resolved by id at load time.
 """
 import sys, json, struct, pickle, os
-sys.path.insert(0, '/path/to/trudlcport/tools')
-ROOT = '/path/to/trudlcport/'
+sys.path.insert(0, './tools')
+ROOT = './'
 WORK = ROOT + 'work/render/'
 
 def parse_reloc(r, endian):

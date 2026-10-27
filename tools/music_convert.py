@@ -17,16 +17,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from archive import Archive
 from names import crc
 import mul_convert as M
-B = '/path/to/'
+B = '../data/'
 XB = [B + 'TombRaiderUnderworld_Patched/' + f for f in ('layer1.000', 'layer2.000')]
-PCB = B + 'tru-port/pc/bigfile.000'
+PCB = B + 'pc/bigfile.000'
 _A = {}
 def arc(p, e):
     if p not in _A: _A[p] = Archive(p, e)
     return _A[p]
 
 def base_pairs():
-    names = sorted({l.strip().split('\\')[2] for l in open(B + 'tru-port/ref/yura-release/FileLists/Tomb Raider Underworld (Xenon).txt')
+    names = sorted({l.strip().split('\\')[2] for l in open(B + 'trudlcport/ref/yura-release/FileLists/Tomb Raider Underworld (Xenon).txt')
                     if l.lower().startswith('xenon-w\\music\\')})
     out = {}
     for d in names:

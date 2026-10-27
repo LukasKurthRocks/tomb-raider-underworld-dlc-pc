@@ -46,7 +46,7 @@ def main(argv):
     from names import load, L
     from drm import cdrm_decode, sections_with_data
     xn = load(L + 'Tomb Raider Underworld (Xenon).txt')
-    C = '/path/to/Xenia-SteveRepack/Content/534307EC/00000002/'
+    C = '../data/Xenia-SteveRepack/Content/534307EC/00000002/'
     packs = [C + '9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', C + '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000']
     for pk in packs:
         A = Archive(pk, 'be')

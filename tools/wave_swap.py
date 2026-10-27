@@ -18,7 +18,7 @@ import drm, drm_write as DW, wave_convert as WC
 from convert_dlc import raw_dlc as _raw_dlc
 from archive import Archive
 from names import crc
-XB_BASE = ['/path/to/TombRaiderUnderworld_Patched/' + f for f in ('layer1.000', 'layer2.000')]
+XB_BASE = ['../data/TombRaiderUnderworld_Patched/' + f for f in ('layer1.000', 'layer2.000')]
 
 def raw_dlc(name):
     """sorgente Xbox: pacchetti DLC, poi (per i file del gioco base presenti nell'overlay) i layer Xbox base"""

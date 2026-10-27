@@ -3,7 +3,7 @@ same DRM? (sections are not always position-parallel). python -I tex_match.py ->
 import sys, os, json, hashlib, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from multiprocessing import Pool
-W = '/path/to/trudlcport/work/textures/'
+W = './work/textures/'
 
 
 def do(name):

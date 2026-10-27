@@ -7,7 +7,7 @@ Output: work/dlc_images/local/mods/local/locals.bin_{001,002,004,008,016,032} + 
 import sys, os, json, hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import locals as L, dlc_text_cov as C
-B = '/path/to/trudlcport/'
+B = './'
 SRCDIR = B + 'work/generic/locals/mods/local/'
 OUT = B + 'work/dlc_images/local/mods/local/'
 FIX = {0xfffff7f0: [(450, 453), (93, 71), (98, 76)]}     # spec -> [(pc id, Xbox TU index)]

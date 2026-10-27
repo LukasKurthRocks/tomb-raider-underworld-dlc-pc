@@ -4,7 +4,7 @@ import sys, os, json, collections, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 from multiprocessing import Pool
-W = '/path/to/trudlcport/work/textures/'
+W = './work/textures/'
 
 
 def psnr(a, b):

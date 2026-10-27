@@ -3,7 +3,7 @@ usage: tools/venv/bin/python -I tools/dlc_text_cov.py show SRC LANGIDX id[,id|a-
 import sys, os, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import locals as L
-B = '/path/to/trudlcport/'
+B = './'
 SPECS = L.SPECS
 LANGNAME = {0xfffff7e1: 'en?', 0xfffff7e2: 'l1', 0xfffff7e4: 'l3', 0xfffff7e8: 'l2', 0xfffff7f0: 'l4', 0xffffffe0: 'l5'}
 _cache = {}

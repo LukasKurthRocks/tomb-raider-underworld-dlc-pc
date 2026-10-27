@@ -1,5 +1,5 @@
 import sys, json, struct
-sys.path.insert(0, '/path/to/trudlcport/tools')
+sys.path.insert(0, './tools')
 from archive import Archive
 from drm import cdrm_decode, parse_drm
 from names import load, L, crc

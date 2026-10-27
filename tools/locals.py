@@ -16,11 +16,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from archive import Archive
 from names import crc
 
-B = '/path/to/'
+B = '../data/'
 C = B + 'Xenia-SteveRepack/Content/534307EC/00000002/'
 SRC = {'xbase': (B + 'TombRaiderUnderworld_Patched/layer1.000', 'be', 'xenon-w'), 'xbase2': (B + 'TombRaiderUnderworld_Patched/layer2.000', 'be', 'xenon-w'),
        'tu': (B + 'TombRaiderUnderworld_Patched/TitleUpdate.000', 'be', 'xenon-w'),
-       'pcbig': (B + 'tru-port/pc/bigfile.000', 'le', 'pc-w'), 'pcpatch': (B + 'tru-port/pc/patch.000', 'le', 'pc-w'),
+       'pcbig': (B + 'pc/bigfile.000', 'le', 'pc-w'), 'pcpatch': (B + 'pc/patch.000', 'le', 'pc-w'),
        'pack10': (C + '9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', 'be', 'xenon-w'),
        'pack11': (C + '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000', 'be', 'xenon-w'),
        'pack1': (C + 'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', 'be', 'xenon-w'),
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     V = survey()
     compare(V)
     if sys.argv[1:2] == ['build']:
-        out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(B, 'tru-port/work/generic/locals')
+        out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(B, 'trudlcport/work/generic/locals')
         m, info = build_map(V)
         print('map', info)
         os.makedirs(out, exist_ok=True)

@@ -2,7 +2,7 @@
 into pickles under work/render/ (one file per set) for fast analysis.
 usage: python3 -I tools/rend_extract.py pairs|dlc"""
 import sys, json, pickle, os
-sys.path.insert(0, '/path/to/trudlcport/tools')
+sys.path.insert(0, './tools')
 from multiprocessing import Pool
 from rend_common import WORK, ROOT
 TYPES = (9, 10, 12)

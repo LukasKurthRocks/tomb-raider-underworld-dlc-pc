@@ -7,13 +7,13 @@ from archive import Archive
 from drm import cdrm_decode, sections_with_data
 from names import load, L, crc
 from multiprocessing import Pool
-BASE = '/path/to/'
+BASE = '../data/'
 KEEP = {0, 1, 2, 3, 4, 7, 8, 10, 11, 13}   # data kept for these types (reloc kept for all)
-OUT = BASE + 'tru-port/work/generic/pairs.pkl'
+OUT = BASE + 'trudlcport/work/generic/pairs.pkl'
 
 def names():
     pcn = load(L + 'Tomb Raider Underworld (PC).txt')
-    pc = Archive(BASE + 'tru-port/pc/bigfile.000', 'le')
+    pc = Archive(BASE + 'pc/bigfile.000', 'le')
     xl = [Archive(BASE + 'TombRaiderUnderworld_Patched/layer1.000', 'be'), Archive(BASE + 'TombRaiderUnderworld_Patched/layer2.000', 'be')]
     pch = {r['hash'] for r in pc.idx}
     xh = {r['hash'] for a in xl for r in a.idx}
@@ -37,7 +37,7 @@ def work(nm):
     except Exception as e:
         return nm, None, repr(e)
 
-PATCH_OUT = BASE + 'tru-port/work/generic/pairs_patch.pkl'
+PATCH_OUT = BASE + 'trudlcport/work/generic/pairs_patch.pkl'
 # Runtime-authoritative pairs: PC patch.000 overrides bigfile; Xbox TitleUpdate.000 overrides layers
 # (the DLC object/unit lists and script ids were built on top of the TU).
 PATCH_PAIRS = [('generalbank.drm', 'tu', 'patch'), ('globalsoundinfo.drm', 'tu', 'base'),
@@ -45,7 +45,7 @@ PATCH_PAIRS = [('generalbank.drm', 'tu', 'patch'), ('globalsoundinfo.drm', 'tu',
 
 def build_patch_pairs():
     import pairs
-    pp = Archive(BASE + 'tru-port/pc/patch.000', 'le')
+    pp = Archive(BASE + 'pc/patch.000', 'le')
     tu = Archive(BASE + 'TombRaiderUnderworld_Patched/TitleUpdate.000', 'be')
     def get(a, nm, e):
         r = a.find(crc(nm)); return sections_with_data(cdrm_decode(a.read(r[0]), e), e)

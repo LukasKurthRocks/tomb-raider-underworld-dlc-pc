@@ -16,7 +16,7 @@ import drm_reloc as R, dlc_generic as DG, generic_store, objlists as O
 from archive import Archive
 from names import load, L
 from drm import cdrm_decode, sections_with_data
-C = '/path/to/Xenia-SteveRepack/Content/534307EC/00000002/'
+C = '../data/Xenia-SteveRepack/Content/534307EC/00000002/'
 PACKS = {'pack10': C + '9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', 'pack11': C + '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000',
          'pack1': C + 'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', 'pack2': C + '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000'}
 MERGED = os.path.join(DG.W, 'merged', 'tr8', 'pc-w')

@@ -28,7 +28,7 @@ from drm import cdrm_decode, parse_drm
 import drm_reloc as R
 import drm_write as DW
 
-B = '/path/to/trudlcport/'
+B = './'
 OUT = B + 'work/menu_dlc/'
 F15, F17 = 0x218, 0x250
 CALLS = {'P1': 0x6294, 'P2': 0x9694, 'P4': 0x188e8}

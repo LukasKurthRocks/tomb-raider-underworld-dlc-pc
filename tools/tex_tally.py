@@ -3,7 +3,7 @@ python -I tex_tally.py pairs|dlc  -> work/textures/hdr_pairs.json / hdr_dlc.json
 import sys, os, json, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from multiprocessing import Pool
-W = '/path/to/trudlcport/work/'
+W = './work/'
 
 def xinfo(d):
     from tex_convert import parse_xbox

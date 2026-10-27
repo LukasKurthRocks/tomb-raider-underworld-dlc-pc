@@ -21,8 +21,8 @@ are converted.
 import struct, sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-B = '/path/to/'
-PC_BIG = B + 'tru-port/pc/bigfile.000'
+B = '../data/'
+PC_BIG = B + 'pc/bigfile.000'
 XB = {'l1': B + 'TombRaiderUnderworld_Patched/layer1.000', 'tu': B + 'TombRaiderUnderworld_Patched/TitleUpdate.000'}
 NAME_PC = 'pc-w\\padshock\\padshocklib.tfb'
 NAME_XB = 'xenon-w\\padshock\\padshocklib.tfb'

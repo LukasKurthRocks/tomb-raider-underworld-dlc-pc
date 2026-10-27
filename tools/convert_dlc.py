@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import assemble_dlc as A, dlc_generic as DG, generic_store, drm_write as DW
 from archive import Archive
 from names import crc
-R = '/path/to/Xenia-SteveRepack/Content/534307EC/00000002/'
+R = '../data/Xenia-SteveRepack/Content/534307EC/00000002/'
 PACKS = ['9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000',
          'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000']
 def raw_dlc(name):
