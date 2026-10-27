@@ -52,6 +52,17 @@ Fenstermodus: `.\Set-TruDisplay.ps1 -Windowed` (1600×900; Registry `HKCU\Softwa
 Underworld\Graphics`, vorher Export nach `backup\TRU-Graphics_<Zeit>.reg`), zurück mit `-Fullscreen` oder `-Restore`.
 Alle 6 Monitore 1920×1080 @ 60 Hz → im Fenster mit `EnableVSync=1` automatisch 60 fps.
 
+## Absturz beim Start (27.10.2026) – CPU mit mehr als 31 Threads
+
+Erster Start nach der Installation: Absturz nach 24 s, `tru.exe` `0xc0000409` (FAST_FAIL_INVALID_EXCEPTION_CHAIN) an
+`tru+0xa235d`, Folgeabsturz in `windows.storage.dll`. Dump-Auswertung mit cdb (x86): Die CPU-Erkennung des Spiels
+(`cpuid`/`bsr`) schiebt eine Affinitätsmaske Kern für Kern weiter; bei 32 Bit läuft sie über, die Schleife endet nie
+und schreibt über den Stack hinaus (Index `edi = 0x4d0`). Ursache ist der i9-9980XE mit **36 Threads** – bekannter Fehler
+des Originalspiels bei mehr als 31 Threads (PCGamingWiki), nicht der DLC-Port.
+
+Lösung: Spiel mit höchstens 31 Threads starten – Steam → Eigenschaften → Startoptionen:
+`cmd /c start "" /affinity FFFF %command%` (16 Threads).
+
 Ausgaben: `-Verbose` (Schritte), `-Debug` (Pfade, Hashes, Aufrufe), `-Trace` (PowerShell-Zeilentrace).
 Jeder Lauf schreibt `logs\Install-TruDlc_<Zeit>_<Modus>.log` mit kompletter Python-Ausgabe.
 
