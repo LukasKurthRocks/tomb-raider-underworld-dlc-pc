@@ -44,6 +44,7 @@ manifest, and then use the same pipeline for DLC 2 (*Lara's Shadow*) and the cos
 | Prep | `generic_type0.py save07`, `pc_vers_build.py` (**new**) | `type0_table.pkl`, `type7_table.pkl`, `pc_vers.json`, `pc_vers_content.json` |
 | Convert | `tools/dlc_convert_all.py --media --write` | `work/generic/out/` |
 | Names | `tools/dlc_names.py` | `work/generic/dlc_names.txt` (names of unnamed DLC records) |
+| Audio | `dlc_audio_build.py work/rebuild/stage1/mods work/rebuild/stage2a/mods` (**new**: `wave_swap` for every DRM incl. sub folders + `mul_audio_batch`), `compare_b138.py work/rebuild/stage2a/mods stage2a` | DLC 1 tree with real audio (B43) |
 | Media | `dlc_media_build.py work/rebuild/stage1/mods pack10` (**new**), `locals.py build work/rebuild/stage1`, `padshock_convert.py build work/rebuild/stage1/mods`, `compare_b138.py work/rebuild/stage1/mods stage1` (**new**) | DLC 1 stage-1 tree in the B138 layout + per-file comparison |
 
 The order of Ids/Learn follows the inputs each tool opens; it is not documented upstream and may still change.
@@ -115,6 +116,10 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    partly without a command line, and `dlc_convert_all --write` puts every DRM flat into `out/<pack>/` (unnamed records
    as `0x<hash>_<spec>.drm`). `tools/dlc_media_build.py` assembles the tree; `tools/compare_b138.py` compares any tree
    with the B138 manifest file by file. Audio stays silent at this stage (`wave_swap.py`, `mul_audio_batch.py` next).
+   `wave_swap.py`'s main only processes the `.drm` files directly in its source folder and looks the Xbox source up by
+   the bare file name (`convert_dlc.raw_dlc(basename)` -> `xenon-w\<basename>`), so the 17 `streamgroups/` and 2
+   `cinstream/` DRMs would be skipped; `tools/dlc_audio_build.py` runs `swap_file` for every DRM with the path below
+   `xenon-w\` (worker initializer), then `mul_audio_batch.job` for every `.mul`.
 10. The converter prefers `work/generic/mask_best.npz` (+ `mask_best_vocab.pkl`, from `slim_table.py` ->
    `slim2np.py`) and falls back to the full `mask_table.pkl` - same result, more memory. Not built yet.
 11. **First MD5 match with B138:** the merged `tr8/pc-w/objectlist.txt`, `unitlist.txt`, `objlist.dat` written by
