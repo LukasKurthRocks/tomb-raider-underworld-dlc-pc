@@ -424,7 +424,17 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `work/chain_aim/` added to `.gitignore` (derived from game data).
    * Retest with the rules: exit 0, no error. The script word of finding 31 (+0x68 of script 24073) stays 4075 - it
      comes from the learned script table (route `convert`, `script_learn.py save` in Tables), not from a post-pass.
-   * Step Convert in `Invoke-TruPipeline.ps1` now passes `--extra-fixes`; a full run follows.
+   * Step Convert in `Invoke-TruPipeline.ps1` now passes `--extra-fixes`.
+   * First full run stopped at the second missing input: `dtpid_sweep.classify` needs
+     `work/generic/dtpid_evidence.pkl` (not in the repository) - generated with `tools/dtpid_evidence.py` (base-pair
+     evidence; "rule precision on base pairs: 418 707 words, 405 577 remapped, 96.86 %, 4 319 values", 10 s).
+   * **Full run with extra fixes** (log `logs/Manual_ExtraFixes-full_20261028_003451.log`, Convert 42 min,
+     readback 307/307, `reloc_bounds_bad` 0; then Media, Audio, the five 2b fixes, comparisons): DTP sections
+     identical 11 157 -> **11 274 (98.7 %)**, type 0 246 -> 248 (95.8 %), other types unchanged; differing script
+     words 2 593 -> 2 581; `analog` fix still 33/33 = B138; files MD5-identical still 92 of 275, DRMs fully
+     identical still 11.
+   * DLC 2 note: run `model_point_fix.py learn` and `dtpid_evidence.py` before converting with extra fixes (both
+     learn from base pairs only).
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
@@ -536,5 +546,6 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-27 | Fixes (2b) | `analog_word_fix.py scan`: first run with `rebuild/...` saw 0 files (path relative to CWD), rerun with `work/rebuild/...`: 33 words; five fixes (`cine`, `float`, `tag404`, `postfix`, `analog`): DTP 11 157 identical (97.6 %), 10 DRMs fully identical |
 | 2026-10-27 | Learn..Audio | rerun after the symbol-guard fix (Learn from tool 2, Tables 6 977 s, Prep 865 s, Convert 2 509 s, Names, Media, Audio; all exit 0): sym_info xbox_max 16347 / shift 481; collisions 24 386 -> 1 219 |
 | 2026-10-28 | Convert..2b | with `DLC_SYM_SHIFT = 480` (tools directly, `logs/Manual_SymShift480_20261027_233600.log`): script sections 95.4 % = B138 (was 79.5 %), 2 593 differing script words (was 9 580), 11 DRMs fully identical |
+| 2026-10-28 | Convert..2b | with `--extra-fixes` (after generating `model_point_rules.pkl` and `dtpid_evidence.pkl`): DTP 98.7 % = B138 (was 97.6 %), type 0 95.8 %, script words 2 581 |
 | 2026-10-27 | DLC 2 Media | `dlc_media_build.py work/rebuild/dlc2_stage1/mods pack11` (parallel to the DLC 1 run): 167 DRMs, 19 music tracks, 6 cinstream `.mul`, exit 0 (see `docs/DLC2.md`) |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |

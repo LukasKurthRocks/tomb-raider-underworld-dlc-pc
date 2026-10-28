@@ -102,7 +102,8 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - The fix tools imported by `dlc_generic.py` (dtpid, align, model points, tag 0x403, portals, link ratio,
   descriptors, aidata, soundplex) mostly run **only with `extra_fixes=True`** (`assemble_dlc` / material 'dlc'), not
   in a plain `dlc_convert_all.py` run - an earlier version of this list said otherwise [24, corrected in 32].
-  Convert DLC 2 with the extra fixes on.
+  Convert DLC 2 with the extra fixes on (`--extra-fixes`; needs `model_point_fix.py learn` and
+  `dtpid_evidence.py` first). On DLC 1 they brought DTP sections from 97.6 % to 98.7 % = B138 [32].
 - `analog` (`tools/analog_word_fix.py`): generic rule from the base game (DLC DTPs that are near-clones of a base
   DTP take the base PC bytes where the Xbox bytes agree; re-authored analogs skipped) - 33 words on DLC 1, all = B138
   [26]. Use it as is on DLC 2; `dlc_fixes_build.py` notes '= B138' only when a reference exists.
