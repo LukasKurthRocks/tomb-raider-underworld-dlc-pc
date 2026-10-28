@@ -435,6 +435,8 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      identical still 11.
    * DLC 2 note: run `model_point_fix.py learn` and `dtpid_evidence.py` before converting with extra fixes (both
      learn from base pairs only).
+   * Since 2026-10-29 both are tools of step Prep (`model_point_fix.py learn`, `model_point_fix.py selftest` - aborts
+     the step if a rule changes a real PC word - and `dtpid_evidence.py`), so a fresh run needs no manual step.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
