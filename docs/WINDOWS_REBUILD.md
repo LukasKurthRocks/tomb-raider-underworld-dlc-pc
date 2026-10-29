@@ -800,7 +800,8 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      211 members) - the template route does not touch this script. The vtable has to be brought to the PC layout
      another way (next: what the 53rd PC slot points to). Before that: check in game how B138 shows DLC 1's loading
      screen and intro - if the author solved it for DLC 1 without TU script 6, the same way may serve DLC 2.
-   * **B138 DLC 1 in game (2026-10-29 19:13, Steam PC, RTX 3080 Ti, native Direct3D 9, no dgVoodoo2)**: the loading
+   * **B138 DLC 1 in game (2026-10-29 19:13, Steam PC, game on a monitor of an RTX 3080 Ti; the PC has a second GPU,
+     a GTX 1070, and 6 monitors over both cards; native Direct3D 9, no dgVoodoo2)**: the loading
      screen is the generic Croft Manor background **without DLC image and text** - the author did not solve the DLC
      loading screen either, so this work serves both DLCs. Right after it the game showed **"A problem has occurred
      with your display driver"** (twice, after the setup dialog), i.e. the case `docs/TROUBLESHOOTING.md` describes
@@ -808,6 +809,9 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      suspect are the 113 pixel shaders longer than 512 instructions in DLC files. Our DLC 2 test tree did not show the
      box (other shader route; a hint, not proof). The author's `tools/native_test` (read-only, creates every shader /
      vertex layout / texture format of the installed `mods\` on the GPU) can name the failing objects.
+     Open variable (not checked): two GPUs and several monitors - a Direct3D 9 game creates its device on one adapter,
+     normally the one of the primary display; whether the second card plays a part in the error box is unknown. To
+     rule it out: the native test, and if possible one run with only the RTX's monitors active.
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
