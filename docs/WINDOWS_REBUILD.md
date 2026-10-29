@@ -1003,6 +1003,17 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      in **B138's DLC 1 files** (38 files, e.g. `dlc1_ei_grapple_wall.drm`); our DLC 1 / DLC 2 trees have none (stage 3
      not rebuilt; their shaders all pass). So this explains B138's "A problem has occurred with your display driver"
      when entering DLC 1 on a real GPU, **not** the slow DLC 2 intro.
+   * **Slow intro, sampled (2026-10-29 23:15-23:25, test tree 13)**: a background watcher took a stack sample of the
+     main thread every few seconds while the game ran in the foreground (`cdb -pv -pn tru.exe -c "~0 kv; qd"`,
+     nothing ended; 49 samples; the same crash at +0x1a8616 at the end). **42 of 49 samples** are in one path: game
+     update (+0x1e01ba -> +0x1e0005) -> +0xa1fb0 (calls a function pointer stored at +0x1d4 of an object) -> +0x601c0
+     -> +0x5fab0 / +0x5ffa0 -> vector maths (+0x5e..., +0x5f...). +0x601c0 runs `n = [obj+0x40] * [obj+0x3c]` steps of
+     `[obj+0x24] / n` each - a sub-stepped simulation whose step count comes from data. Wrong counts (e.g. a byte
+     order mistake) would explain one frame per two seconds. The object no longer exists in the crash dump.
+   * Lead (not checked yet): the intro shows the Doppelganger and Natla, the level so far only Lara; a hair / cloth
+     simulation of a DLC 2 character model fits "steps x sub-steps" - and finding 39 kept `float_fix` away from the
+     DLC 2 character-model DTPs. Next: read the two counts in a running game (snapshot or breakpoint at +0x601ca
+     while the intro is slow), then find the DTP field they come from.
    * Author's history (found only now - a forgotten jump point): `tools/generalbank_dlc.py` (2026-10-09) already put
      the converted TU script 6 into the PC generalbank (same native-93 neutralisation at 0x7928); his note in
      `tools/dlc_generic.py` says "replacing it crashes the base game (gb1.dmp)", so he patched DLC 1's start script
