@@ -4,7 +4,8 @@ Per section: type, id, size; then every ASCII string of at least MINLEN characte
 (identifiers, script/member names, file names). Works on PC (LE) DRMs of a rebuilt tree.
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/drm_strings.py PATH.drm [--min N] [--grep REGEX] [--diff OTHER.drm]
+  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/drm_strings.py PATH.drm|xbox:NAME [--min N] [--grep REGEX] [--diff OTHER.drm]
+  xbox:NAME reads the Xbox base-game file (title update first, then the layers), e.g. xbox:generalbank.drm
   --diff: only sections that are new in PATH or differ in size from OTHER (e.g. DLC 2 vs DLC 1 version of a DRM)
 """
 import sys, os, re, collections
@@ -24,7 +25,13 @@ def main(argv):
     other = None
     if '--diff' in argv:
         k = argv.index('--diff'); other = argv[k + 1]; del argv[k:k + 2]
-    D = DW.read(open(argv[0], 'rb').read(), 'le')
+    if argv[0].startswith('xbox:'):        # xbox:NAME = the Xbox base-game file (title update first), e.g. xbox:generalbank.drm
+        import dtp_word_classes as C
+        secs = C.find(C.BASE, 'be', 'xenon-w' + chr(92) + argv[0][5:])
+        if secs is None: sys.exit('not in the Xbox base game: ' + argv[0][5:])
+        D = DW.Drm([DW.Section(s['type'], s['id'], s['data'] or b'', s['reloc'] or b'') for s in secs])
+    else:
+        D = DW.read(open(argv[0], 'rb').read(), 'le')
     print('sections', len(D.sections), dict(collections.Counter(TYPES.get(s.type, s.type) for s in D.sections)))
     if other:
         # only the sections that are new in this DRM or differ in size from the other one

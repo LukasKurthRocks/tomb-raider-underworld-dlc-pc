@@ -682,6 +682,28 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * `tools/dlc_finish_build.py` (new) finishes a tree for testing: copy a stage-2b tree, replace/drop files (merged
      `g_pda`), string tables (`locals.py build`: one table for both DLCs, from the title update) and padshock, then
      `tree_check.py`. DLC 2: `work/rebuild/dlc2_test/mods`, 166 DRMs, 0 out-of-bounds relocations.
+   * Confirmed in game (2026-10-29, `docs/DLC2.md`): *Lara's Shadow* appears as the second entry.
+42. **The DLC mission flow lives in title-update scripts of `generalbank.drm` that the PC game does not have.**
+   * First in-game test of DLC 2 (`docs/DLC2.md`): loading screen without the DLC image and text, Lara's costume and
+     weapon choice instead of the doppelganger, no intro cutscene.
+   * `tools/tu_script_changes.py` (new, read-only; and `drm_strings.py xbox:NAME`): the Xbox title update (TU) changed
+     48 scripts of `generalbank.drm` and added 2; the PC version keeps the retail state for nearly all of them:
+
+     | Xbox script | retail -> TU (bytes) | PC | strings in the TU script |
+     |---|---|---|---|
+     | 6 (loading screen, "uiloading") | 66 660 -> 75 124 | 66 900 (retail + PC changes) | "Loading DLC 1 background render image", "Loading DLC 2 background render image", **"DLC CINE: About to broadcast message from loading screen"** |
+     | 21239 (new in the TU) | - -> 297 | missing | "dlc2data" |
+     | 7 (pause / main menu ring) | 186 784 -> 195 744 | own PC version (+ B138 menu patch) | "DLC", LoadMenu entries |
+     | 38 | 75 908 -> 81 732 | retail | golden shotgun (upstream: "needs title-update scripts the PC exe lacks") |
+     | 134 (mission screen) | 20 068 -> 20 900 | retail (`docs/DLC_MENU.md`) | `dlc_level1/2_start` |
+     | 10, 110, 40, 255, 66, 39, 211, ... | grown | retail | - |
+
+   * Reading: the loading screen script chooses the DLC background and **triggers the DLC intro cutscene** - both
+     missing on PC because script 6 is the retail one. The costume choice / doppelganger part is not located yet
+     (candidates: 21239 "dlc2data", the grown scripts without strings).
+   * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
+     nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
+     merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
