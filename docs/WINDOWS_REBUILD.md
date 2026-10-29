@@ -536,8 +536,12 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      read by `dlc_convert_all.py`, `dlc_assemble_build.py` (heavy) and `dlc_audio_build.py`, `compare_sections.py`,
      `compare_audio.py`, `script_diff.py` (light; unset = all CPUs as before). Upstream's `rend_extract.py` /
      `generic_cache.py` keep their fixed 8 processes.
-   * `dlc_assemble_build.py` got the same `--jobs` (per-DRM tasks, report rows in task order); equivalence test
-     against the sequential `asm_stage1` running.
+   * `dlc_assemble_build.py` got the same `--jobs` (per-DRM tasks, report rows in task order). Equivalence test
+     with 2 processes (~15.3 GB each, free RAM stayed > 17 GB): **271 of 271 files of the tree byte-identical** to
+     the sequential `asm_stage1`, 134/134 DRMs, **1 439 s instead of 2 266 s** (log
+     `logs/Manual_ParallelAssemble-test_20261029_111058.log`).
+   * Note on the memory sampler: run it with an outer timeout longer than `-DurationMinutes`; the first run was
+     cut by an equal timeout right before its summary (the CSV with all samples is complete).
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
