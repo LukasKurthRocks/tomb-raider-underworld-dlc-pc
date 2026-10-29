@@ -467,6 +467,11 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * **Adopted 2026-10-29:** the 167 values are `docs/data/b138_symbol_calibration.json` and `dlc_generic.DlcIds`
      loads them by default (exact lookups only; `TRUDLC_SYM_EXTRA` = another file or `off`). They are global
      Symbols, so DLC 2 uses them too.
+   * Pipeline rerun with the calibration (Convert, Media, Audio, Assemble through `Invoke-TruPipeline.ps1`, then the
+     2b fixes and comparisons, log `logs/Manual_2b-compare_20261029_095957.log`): Convert symbol stats `extra` 8 729,
+     `guess_collision_new` 1 219 -> 100; **script sections 99.2 %** in both trees, 95 differing words; assemble tree
+     (asm_stage2b): shader libs 97.7 %, materials 90.4 %, **15 DRMs fully identical**, `analog` 33/33 = B138 -
+     the same as experiment run 3.
 32. **Our Convert ran without upstream's DLC post-passes (`extra_fixes`).**
    * `dlc_generic.convert_drm(..., extra_fixes=False)` is the default; `assemble_dlc.assemble()` passes
      `extra_fixes=(material == 'dlc')`, `dlc_convert_all.py` passed nothing. Gated by it (`dlc_generic.py`): model
@@ -508,6 +513,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      (free RAM / 15 GB) processes, i.e. **3 on a 64 GB PC with nothing else running**; never next to another Convert.
    * Still to do: equivalence test (1 process vs N processes must give byte-identical files), then the same for
      `dlc_assemble_build.py`.
+   * **Measured** (`scripts/windows/Measure-TruProcessMemory.ps1`, new, read-only, 10 s samples during the rerun
+     Convert..2b of 2026-10-29; peak private memory of one process):
+
+     | Tool | Peak per process | Processes |
+     |---|---|---|
+     | `dlc_convert_all.py` (Convert) | **18.2 GB** | 1 |
+     | `dlc_assemble_build.py` (Assemble) | **15.6 GB** | 1 |
+     | `dlc_fixes_build.py` (2b) | 2.8 GB | 1 |
+     | `dlc_media_build.py`, `rend_extract.py`, `terrain_validate.py` | ~1.4 GB | 1 (+ 8 rend_extract workers up to 1.3 GB each) |
+     | `shader_map.py` | 0.25 GB | 1 |
+     | `dlc_audio_build.py`, `compare_*.py`, `script_diff.py` | < 20 MB | up to 36 |
+
+     Pool workers show up as "(no script)" in the sampler (their command line does not name the tool).
+     Consequence for a shared limit (`TRUDLC_JOBS`, to build): light tools may keep many processes (cap ~24 to leave
+     cores for the user); Convert / Assemble at most floor(free RAM / 18 GB) - on this 64 GB PC 2, with nothing else
+     running 3.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
@@ -660,5 +681,6 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-29 | Assemble route | `dlc_assemble_build.py` -> asm_stage1, Audio, 2b fixes, comparisons: 134/134 DRMs, shader libs 97.7 %, materials 90.4 % = B138 (finding 34) |
 | 2026-10-29 | Assemble (step) | new optional pipeline step `Assemble` through `Invoke-TruPipeline.ps1` (PowerShell 5.1): all 13 tools exit 0, 2 934 s (terrain_validate 596 s, dlc_assemble_build 2 184 s); asm_stage2a: shader libs 97.7 %, materials 90.4 %, script 95.4 % - same as the manual run |
 | 2026-10-29 | Symbol experiment | runs 1-3 (finding 35): run 3 (167 candidates, exact-only) scripts 99.2 %, 95 words left, 0 new differences |
+| 2026-10-29 | Convert..Assemble + 2b | with the adopted symbol calibration through the PowerShell script (Convert 4 880 s, Media 64 s, Audio 93 s, Assemble 3 036 s, all exit 0): scripts 99.2 %, asm tree shader 97.7 % / material 90.4 %, 15 DRMs identical; memory sampled (finding 36) |
 | 2026-10-27 | DLC 2 Media | `dlc_media_build.py work/rebuild/dlc2_stage1/mods pack11` (parallel to the DLC 1 run): 167 DRMs, 19 music tracks, 6 cinstream `.mul`, exit 0 (see `docs/DLC2.md`) |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |
