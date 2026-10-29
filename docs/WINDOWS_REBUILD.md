@@ -437,6 +437,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `script_diff.py` now pairs the Script sections by their order when the counts agree: 2 581 in both trees.
    * So the assemble route is the better stage 1: same data results, real shaders and better materials. Meshes
      (type 12) are the largest open render type next to the remaining materials.
+35. **Experiment: the 168 Symbol candidates of finding 33 as extra map entries** (environment variable
+   `TRUDLC_SYM_EXTRA`, default off; assemble route into `work/rebuild/exp_sym_*`, log
+   `logs/Manual_SymExtra-exp_20261029_035718.log`; regression check with the new `tools/script_diff_compare.py`).
+   * Run 1 (candidates inserted into the symbol map): script sections 95.4 % -> 99.1 %, differing script words
+     2 581 -> 157, fully identical DRMs 13 -> 15, all other types unchanged, `analog` 33/33. But the regression check
+     shows **2 510 words fixed, 71 left, 86 NEW differences** (words that were = B138 before). Cause: as map
+     entries the candidates also became neighbours for guessing *other* unmapped symbols and shifted those guesses
+     (e.g. script 72 +0x3ba0 in nine DRMs: Xbox 0x0185, B138 0x0187 = the old guess, now 0x0293). Pruning the
+     candidates whose own Xbox value appears in a new difference removes only 1 of 168 - confirms the cause.
+   * Caution on the method: the candidates come from B138 itself, so "fixed" words are partly circular; the
+     regression count is the meaningful number. The first comparison of this run reported "24 -> 157" - the base
+     report was stale (a `| head -1` had killed `script_diff.py` before it saved its report).
+   * Run 2: candidates used for exact lookups only (`DlcIds.sym_extra`, not neighbours) - result below.
 32. **Our Convert ran without upstream's DLC post-passes (`extra_fixes`).**
    * `dlc_generic.convert_drm(..., extra_fixes=False)` is the default; `assemble_dlc.assemble()` passes
      `extra_fixes=(material == 'dlc')`, `dlc_convert_all.py` passed nothing. Gated by it (`dlc_generic.py`): model
