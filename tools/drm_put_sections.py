@@ -14,15 +14,46 @@ external relocations of the converted title-update loading screen -> the game ju
 Safe only when every target section is laid out the same in donor and base.
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/drm_put_sections.py BASE_DRM DONOR_DRM OUT_DRM 8:6,8:21239 [--add-missing]
+  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/drm_put_sections.py BASE_DRM DONOR_DRM OUT_DRM 8:6,8:21239 [--add-missing] [--xbox NAME]
+  --xbox NAME (e.g. generalbank.drm): remap call offsets into scripts whose base version has another layout, with
+  script_conv.offset_map (Xbox title-update script -> base script, elements matched by name); unmatched offsets are
+  reported as UNRESOLVED (the donor calls something the base script does not have)
 """
 import sys, os, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW, drm_reloc as R
 
 
+def put_keys(put):
+    return {(n.type, n.id) for n in put}
+
+
+def offset_maps(xbox_name, dsec, bsec):
+    """{(8, PC id): {donor (Xbox-layout) offset -> base (PC-layout) offset}} for every script of the donor that the base
+    has in another version - script_conv.offset_map on the Xbox source script (title update, then retail layers) and
+    the base script; elements are matched by name Symbol through the learned base symbol map"""
+    import dtp_word_classes as C, dlc_generic as DG, script_conv as SC
+    ids = DG.DlcIds()
+    xsecs = C.find(C.BASE, 'be', 'xenon-w' + chr(92) + xbox_name)
+    by_pc = {}
+    for s in xsecs:
+        if s['type'] == 8 and s['data']: by_pc[(8, ids(8, s['id']))] = s
+    symmap = ids.base.get(DG.SYM, {})
+    out = {}
+    for k, b in bsec.items():
+        if k[0] != 8 or k not in by_pc or k not in dsec or dsec[k].data == b.data: continue
+        x = by_pc[k]
+        try:
+            out[k] = SC.offset_map(x['data'], R.parse(x['reloc'], 'be'), b.data, R.parse(b.reloc, 'le'), symmap)
+        except Exception as e:
+            print('offset map failed for %d:%d: %s' % (k[0], k[1], e))
+    return out
+
+
 def main(argv):
     add_missing = '--add-missing' in argv; argv = [a for a in argv if a != '--add-missing']
+    xbox_name = None
+    if '--xbox' in argv: k = argv.index('--xbox'); xbox_name = argv[k + 1]; del argv[k:k + 2]
     base, donor, out = argv[0], argv[1], argv[2]
     want = [tuple(int(v) for v in x.split(':')) for x in argv[3].split(',')]
     B = DW.read(open(base, 'rb').read(), 'le'); Dn = DW.read(open(donor, 'rb').read(), 'le')
@@ -46,11 +77,29 @@ def main(argv):
             if add_missing: todo.append(tk); st['missing target added'] += 1
             else: st['missing target %d:%d' % tk] += 1
     idx = {(b.type, b.id): n for n, b in enumerate(B.sections)}
+    bsec = {(b.type, b.id): b for b in B.sections}
+    omap = offset_maps(xbox_name, dsec, bsec) if xbox_name else None
+    unresolved = collections.Counter()
     for n in put:
         r = R.parse(n.reloc, 'le')
         if r.external:
-            r.external = [(idx.get(dkey[si], si), a, d) for si, a, d in r.external]
+            ext = []
+            for si, a, d in r.external:
+                tk = dkey[si]; tb = bsec.get(tk); td = dsec.get(tk)
+                if omap is not None and tb is not None and td is not None and tb.data != td.data and tk not in put_keys(put):
+                    m = omap.get(tk)
+                    if m is None: st['offset kept: target %d:%d not a mappable script' % tk] += 1
+                    elif d in m:
+                        if m[d] != d: st['call offsets remapped'] += 1
+                        d = m[d]
+                    else: unresolved[tk] += 1
+                ext.append((idx.get(tk, si), a, d))
+            r.external = ext
             n.reloc = R.write(r, 'le'); st['relocations remapped'] += 1
+    if unresolved:
+        st['UNRESOLVED call offsets'] = sum(unresolved.values())
+        print('unresolved call offsets per target script (no matching function/member on PC):',
+              ', '.join('%d:%d x%d' % (k[0], k[1], v) for k, v in unresolved.most_common()))
     raw = B.write('le')
     E = DW.read(DW.cdrm_encode(raw, 'le'), 'le')
     infos = [dict(size=len(x.data)) for x in E.sections]

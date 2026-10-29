@@ -759,6 +759,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      so they are not Symbol ids. Consequence: a converted Xbox script is internally consistent in Xbox numbering;
      mixing it word by word with the PC script would need renumbering. For a first test, the converted TU script is
      used **as a whole** (losing the PC's own small additions to script 6, purpose not known yet).
+43. **The title-update loading screen calls an engine function that only the Xbox title update's exe patch has.**
+   * DLC 2 test 2 (converted TU script 6 in the PC `generalbank`) froze and crashed before the loading screen (jump to
+     address 2, `docs/DLC2.md`). Cause 1: of the 1 020 external relocations of script 6, 213 point into scripts whose
+     PC version has another layout, and `drm_put_sections.py` had remapped only the target section, not the offset.
+   * `drm_put_sections.py --xbox generalbank.drm` (new option) remaps those offsets with upstream's
+     `script_conv.offset_map` (Xbox TU script -> PC script, functions/prototypes matched by name Symbol): **176 call
+     offsets remapped, 1 unresolved**, 0 out-of-bounds relocations (`work/rebuild/dlc2_gb3/generalbank.drm`).
+   * The unresolved one (scratch analysis): script 6 +0x7934 calls **function 93 of script 63 = `uigamedata`**
+     (native package `game/script/ui/ui`), name Symbol 19315. Script 63 has 93 functions in the Xbox retail, **95
+     in the TU** (93: Symbol 19315, 94: Symbol 19316, both new), 117 on PC (own PC additions, not these two). Both new
+     functions have **no script code** (0 code words) - they are **natives**: their code is in the exe, i.e. in the
+     title update's exe patch `default.xexp`, which the PC never got.
+   * So the DLC branch of the loading screen needs an engine function the PC exe does not have. Options: (a) change
+     the call site in script 6 - find out what native 93 returns (probably "which DLC is loading") and get that value
+     another way; (b) add the native to `tru.exe` (Ghidra, exe patch) - the "program part" of the title update
+     (finding 42 table). Both also matter for the later "PC loads DLC itself" idea.
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
