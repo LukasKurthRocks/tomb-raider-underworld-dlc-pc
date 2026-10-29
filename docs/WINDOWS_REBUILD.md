@@ -733,6 +733,25 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      the difference converted-retail -> converted-TU (same converter, its errors cancel out) applied to the real PC
      script, so PC-only parts and correct PC bytes stay. TU-only scripts (21239 "dlc2data" 297 bytes, 20082 196 bytes)
      have no PC version and must come from the conversion.
+   * Where converted retail script 6 and PC script 6 differ (difflib on words, scratch analysis): 14 554 words equal,
+     ~1 400 small same-length replacements, only ~90 small insertions/deletions (mostly 3 words); **1 217 replaced
+     words differ by exactly +3**, others by +2, +22, -257 - a systematic value offset (likely Symbol ids, cf. the +480
+     shift of finding 29), not random errors. Internal relocations: retail-converted 1 630, PC 1 631, TU-converted 1 806.
+   * Value-map test (scratch, leave-one-out): learn "converter value -> PC value" (only values that always map to
+     the same other value, relocation pointers excluded) from the other scripts and apply it to one retail script:
+
+     | Script -> PC | aligned before | after (map from the other scripts) |
+     |---|---|---|
+     | 6 | 87.0 % | 87.9 % |
+     | 134 -> 104 | 92.4 % | 94.8 % |
+     | 9 | 96.2 % | 97.0 % |
+     | 122 | 91.7 % | 95.2 % |
+     | 39 | 93.4 % | 95.5 % |
+
+     The map generalises (every script improves without having been used to learn it), but it is only part of the
+     answer (+1 to +3.5 points); script 6 gains least because most of its differing values occur only in it. The rest
+     are structural (small PC insertions, shifted pointers). Next: find what the +3 values are (which field / symbol
+     range), so the converter itself can be corrected instead of patching its output.
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
