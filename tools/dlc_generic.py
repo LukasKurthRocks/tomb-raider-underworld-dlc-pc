@@ -58,17 +58,23 @@ class DlcIds:
     # B138 is shifted by 480 (8006 script words differ by exactly +1 with 481; docs/WINDOWS_REBUILD.md finding 29).
     # None = use the rule.
     DLC_SYM_SHIFT = 480
+    SYM_CALIBRATION = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'data',
+                                   'b138_symbol_calibration.json')
 
     def _sym_setup(self):
         m = self.base.get(SYM, {})
-        # experiment only (finding 35): TRUDLC_SYM_EXTRA = JSON {xbox symbol: pc symbol} for symbols not in the learned
-        # map, used for exact lookups only - NOT as neighbours for guessing other symbols (as map entries they shifted
-        # the guesses of further unmapped symbols: 86 new differences). Unset (the default) = no change.
+        # Symbols missing from the learned map, calibrated on B138 (docs/data/b138_symbol_calibration.json, findings 33,
+        # 35): used for exact lookups only - NOT as neighbours for guessing other symbols (as map entries they shifted
+        # the guesses of further unmapped symbols: 86 new differences). TRUDLC_SYM_EXTRA = another JSON
+        # {xbox symbol: pc symbol} file, or 'off' for none.
         self.sym_extra = {}
-        extra = os.environ.get('TRUDLC_SYM_EXTRA')
-        if extra:
-            self.sym_extra = {int(a): b for a, b in json.load(open(extra)).items() if int(a) not in m}
-            print('symbol map: %d extra exact-only entries from %s' % (len(self.sym_extra), extra), flush=True)
+        extra = os.environ.get('TRUDLC_SYM_EXTRA') or self.SYM_CALIBRATION
+        if extra != 'off' and os.path.exists(extra):
+            d = json.load(open(extra))
+            d = d.get('symbols', d)
+            self.sym_extra = {int(a): b for a, b in d.items() if int(a) not in m}
+            if os.environ.get('TRUDLC_SYM_EXTRA'):
+                print('symbol map: %d extra exact-only entries from %s' % (len(self.sym_extra), extra), flush=True)
         self.sks = sorted(m)
         self.sused = set(m.values())
         self.xs_max = max(m); self.ps_max = max(max(m.values()), self.PC_SYM_MAX)

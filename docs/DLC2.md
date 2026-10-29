@@ -115,7 +115,9 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   DLC-new symbols are shifted by `DLC_SYM_SHIFT = 480` (measured on B138; the rule gives 481) [29] - with both
   fixes DLC 1 scripts went from 79.5 % to 95.4 % = B138. For DLC 2 the same shift applies (one symbol space); a
   wrong shift shows up as a constant delta in `script_diff.py`'s histogram, but DLC 2 has no B138 to compare - so
-  this DLC 1 calibration is what DLC 2 relies on.
+  this DLC 1 calibration is what DLC 2 relies on. Since 2026-10-29 also 167 Symbol values missing from the learned
+  map, calibrated on B138 (`docs/data/b138_symbol_calibration.json`, exact lookups only) [35]; DLC 2 symbols that
+  are in neither table are still guessed from the lower neighbour.
 - Watch the save game: a broken streamgroup name made "Create new savegame" hang in DLC 1 (`streamname_fix`);
   test saving early in DLC 2 [24].
 - Upstream's `work/ws/` scripts still carry the author's local paths (407 of 578); fix each one when it is used [21].
