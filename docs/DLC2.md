@@ -141,6 +141,12 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   | Stability | - | **no crash**; the level loads, Lara can move | - |
 
   Undo the test with `Install-TruTree.ps1 -Restore`.
+* Test tree 2 (`work/rebuild/dlc2_test2/mods`, finding 42): as test tree 1 plus a `generalbank.drm` built with
+  `tools/drm_put_sections.py` from the installed one (B138 + menu text fix): script 6 replaced by the converted
+  **title-update loading screen** (DLC backgrounds, intro trigger), TU-only scripts 21239 ("dlc2data") and 20082
+  added; 1 263 sections, 0 out-of-bounds relocations. Against the installed test tree 1 only `generalbank.drm`
+  changes. To check: loading screen of DLC 2 (image + text), intro cutscene, costume choice / doppelganger, and that
+  the base game and DLC 1 still load (script 6 serves every loading screen).
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the

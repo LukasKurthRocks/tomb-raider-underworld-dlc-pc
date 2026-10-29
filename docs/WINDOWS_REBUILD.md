@@ -752,6 +752,13 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      answer (+1 to +3.5 points); script 6 gains least because most of its differing values occur only in it. The rest
      are structural (small PC insertions, shifted pointers). Next: find what the +3 values are (which field / symbol
      range), so the converter itself can be corrected instead of patching its output.
+   * The +3 words are **not converter errors** (scratch analysis of script 6): all 1 217 are passed through unchanged
+     (Xbox word = converted word), small and consecutive (0x25d, 0x25e, 0x25f, ... at a 4-16-byte stride) - running
+     indices into a table; on PC every one is 3 higher, consistent with the PC script having **three more entries**
+     in that table before them (the small 3-word PC insertions). Only 45 of the values are in the learned symbol map,
+     so they are not Symbol ids. Consequence: a converted Xbox script is internally consistent in Xbox numbering;
+     mixing it word by word with the PC script would need renumbering. For a first test, the converted TU script is
+     used **as a whole** (losing the PC's own small additions to script 6, purpose not known yet).
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
