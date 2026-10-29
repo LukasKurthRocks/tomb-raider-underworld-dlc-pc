@@ -16,7 +16,7 @@ locals.bin_* and padshock are written by their own tools (locals.py build, padsh
 
 Usage (from the repository root):
   ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_media_build.py [OUT_MODS_DIR] [pack10]
-  default OUT_MODS_DIR: work/rebuild/stage1/mods
+  default OUT_MODS_DIR: work/rebuild/stage1/mods (replaced on every run; must be below work/rebuild)
 """
 import sys, os, shutil, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -48,6 +48,10 @@ def main(argv):
     out = argv[0] if argv else 'work/rebuild/stage1/mods'
     pack = argv[1] if len(argv) > 1 else 'pack10'
     st = collections.Counter()
+    # build into a fresh tree: files of earlier runs (renamed DRMs, old tracks) would flow into every later stage
+    from build_util import check_out
+    check_out(out, must_be_below=True)
+    if os.path.exists(out): print('replacing previous output', out, flush=True); shutil.rmtree(out)
     os.makedirs(out, exist_ok=True)
     xn = load(L + 'Tomb Raider Underworld (Xenon).txt')
     names = dict(dlc_names(pack)); names.update({h: n for h, n in xn.items()})
@@ -105,9 +109,11 @@ def main(argv):
     # images (all packs), then only the image/ subtree goes into the mods tree
     import raw_image_convert as RI
     tmp = os.path.join(os.path.dirname(os.path.abspath(out)), 'images_tmp')
+    if os.path.isdir(tmp): shutil.rmtree(tmp)
     RI.dlc_gen(os.path.abspath(tmp))
     if os.path.isdir(os.path.join(tmp, 'image')):
         shutil.copytree(os.path.join(tmp, 'image'), os.path.join(out, 'image'), dirs_exist_ok=True); st['images'] = 'done'
+    if os.path.isdir(tmp): shutil.rmtree(tmp)
 
     # merged object/unit lists
     shutil.copytree(os.path.join(W, 'merged', 'tr8'), os.path.join(out, 'tr8'), dirs_exist_ok=True); st['tr8'] = 'done'

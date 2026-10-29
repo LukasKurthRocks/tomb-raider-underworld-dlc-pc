@@ -208,6 +208,7 @@ function Invoke-Tool {
     $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
     $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
     $process = [System.Diagnostics.Process]::Start($psi)
+    $script:runningProcess = $process    # for the finally block: report it if the run is aborted while it runs
 
     # read stdout and stderr line by line without blocking; heartbeat every 30 s
     $outTask = $process.StandardOutput.ReadLineAsync()
@@ -246,6 +247,7 @@ function Invoke-Tool {
         if ($idle) { Start-Sleep -Milliseconds 250 }
     }
     $process.WaitForExit()
+    $script:runningProcess = $null
     Write-Progress -Activity "Invoke-TruPipeline $Step" -Completed
     return $process.ExitCode
 }
@@ -253,6 +255,7 @@ function Invoke-Tool {
 if ($Trace) { Set-PSDebug -Trace 1 }
 $results = @()
 $started = Get-Date
+$script:runningProcess = $null
 Push-Location $clone
 try {
     Write-Log "Invoke-TruPipeline step=$Step log=$logFile" -Level VERBOSE
@@ -297,6 +300,15 @@ catch {
 finally {
     Pop-Location
     if ($Trace) { Set-PSDebug -Off }
+    # aborted (Ctrl+C, error) while a tool was running: the tool and its worker processes keep running (they were
+    # started without a console). Nothing is ended automatically - the PIDs are logged so the user can decide.
+    if ($script:runningProcess -and !$script:runningProcess.HasExited) {
+        $toolPid = $script:runningProcess.Id
+        $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$toolPid" -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.ProcessId })
+        Write-Log ('Tool still running after the abort: PID {0}, worker PIDs: {1}. Not ended - end them yourself if needed.' -f
+            $toolPid, $(if ($children.Count) { $children -join ', ' } else { 'none' })) -Level WARN
+    }
     Write-Log '--- summary ---'
     foreach ($r in $results) { Write-Log ('{0,-40} exit {1}  {2} s' -f $r.Tool, $r.ExitCode, $r.Seconds) }
     foreach ($dir in $outputDirs[$Step]) {

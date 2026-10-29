@@ -75,7 +75,9 @@ function Write-Log {
     }
     if (!$script:LogFile) { throw 'Write-Log: no log file set; call Set-TruLogFile first.' }
     $line = '{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'), $Level, $Message
-    Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8
+    # a locked log file (reader, scanner) must not abort a long tool run: warn on the console and go on
+    try { Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8 -ErrorAction Stop }
+    catch { Write-Host ('(log write failed: {0})' -f $_.Exception.Message) -ForegroundColor Yellow }
     switch ($Level) {
         'INFO'    { Write-Host $Message }
         'VERBOSE' { Write-Verbose $Message }

@@ -69,7 +69,10 @@ class DlcIds:
         # {xbox symbol: pc symbol} file, or 'off' for none.
         self.sym_extra = {}
         extra = os.environ.get('TRUDLC_SYM_EXTRA') or self.SYM_CALIBRATION
-        if extra != 'off' and os.path.exists(extra):
+        if extra != 'off' and not os.path.exists(extra):    # a typo must not silently convert with another symbol map
+            raise SystemExit('symbol calibration not found: %s (TRUDLC_SYM_EXTRA=%s; "off" disables it)'
+                             % (extra, os.environ.get('TRUDLC_SYM_EXTRA', '')))
+        if extra != 'off':
             d = json.load(open(extra))
             d = d.get('symbols', d)
             self.sym_extra = {int(a): b for a, b in d.items() if int(a) not in m}
@@ -80,7 +83,7 @@ class DlcIds:
         self.xs_max = max(m); self.ps_max = max(max(m.values()), self.PC_SYM_MAX)
         self.sym_shift = self.DLC_SYM_SHIFT if self.DLC_SYM_SHIFT is not None else self.ps_max - self.xs_max
         self.sym_info = dict(mapped=len(m), xbox_max=self.xs_max, pc_max=self.ps_max, shift=self.sym_shift,
-                             collision_base=40000)
+                             collision_base=40000, extra_entries=len(self.sym_extra))
         self.sym_stats = collections.Counter()
 
     def sym(self, xs):

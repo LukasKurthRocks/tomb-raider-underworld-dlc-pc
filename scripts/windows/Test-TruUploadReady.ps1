@@ -59,14 +59,22 @@ function Invoke-Git {
     param([string[]]$GitArgs)
     # git writes UTF-8; the console code page would turn umlauts and dashes into mojibake (and break non-ASCII patterns)
     $savedEncoding = [Console]::OutputEncoding
+    # PowerShell 5.1 turns every stderr line of a native command into an error record, which 'Stop' makes fatal -
+    # a harmless git warning (CRLF, rename detection) would abort the scan; the exit code decides instead
+    $savedPreference = $ErrorActionPreference
     try {
         [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        $ErrorActionPreference = 'Continue'
         $out = & git -C $repo -c core.quotepath=off @GitArgs 2>&1
     } finally {
+        $ErrorActionPreference = $savedPreference
         [Console]::OutputEncoding = $savedEncoding
     }
-    if ($LASTEXITCODE -ne 0) { throw ("git {0} failed in {1}: {2}" -f ($GitArgs -join ' '), $repo, ($out -join ' ')) }
-    return , @($out | ForEach-Object { [string]$_ })
+    $stdout = @($out | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { [string]$_ })
+    $stderr = @($out | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { [string]$_ })
+    if ($LASTEXITCODE -ne 0) { throw ("git {0} failed in {1}: {2}" -f ($GitArgs -join ' '), $repo, (($stdout + $stderr) -join ' ')) }
+    foreach ($line in $stderr) { Write-Log ('git: ' + $line) -Level VERBOSE }
+    return , $stdout
 }
 
 # --- patterns; personal values are read at run time -------------------------------------------------------------
