@@ -214,6 +214,9 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - **Compare init blocks, not only structures.** Member default values (init blocks) are converted with byte orders
   per label, not per field type; u32 / u8 / u16 / UTF-16 fields come out wrong, and the PC uses other button glyph
   codes. For base-game scripts take the init values from the PC version (`script_init_from_pc.py`) [43].
+- **Validate generated shaders against Direct3D 9 rules before a test** (`shader_disasm.py` + `shader_validate.py`):
+  Xbox shaders may read two constant registers in one instruction, shader model 3 on PC may not (B138 DLC 1: 272
+  rejected shaders, error X5584) [43].
 - **Every converted BASE-game script needs the PC port, wherever it ends up** - not only `generalbank` script 6:
   the merged `g_pda` replaced 12 PDA scripts by converted DLC versions with Xbox vtables (one slot short),
   Xbox init blocks and glyphs; the DLC level ran, a new base game crashed [40, 43]. Test the base game (new game,
