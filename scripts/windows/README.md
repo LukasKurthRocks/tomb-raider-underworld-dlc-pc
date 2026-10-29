@@ -86,7 +86,8 @@ and the Xbox files through junctions in `<workspace>\data\`:
 **Never delete `data\` or `bin\` recursively** (Explorer, `Remove-Item -Recurse`): through the junctions that can
 delete the game files or the repository. Remove a junction on its own: `cmd /c rmdir <workspace>\data\pc`.
 
-Steps in order: `Index`, `Cache`, `Ids`, `Learn`, `Tables`, `Prep`, `Convert`, `Names`, `Media`, `Audio`. What each
+Steps in order: `Index`, `Cache`, `Ids`, `Learn`, `Tables`, `Prep`, `Convert`, `Names`, `Media`, `Audio`, and
+optionally `Assemble` (upstream's full stage-1 route with the rebuilt render tables; better shaders and materials). What each
 step runs, how long it takes and how the result compares with B138:
 [docs/WINDOWS_REBUILD.md](../../docs/WINDOWS_REBUILD.md); upstream's own scripts and layers:
 [docs/WS_MAP.md](../../docs/WS_MAP.md).

@@ -30,6 +30,11 @@
                compare_b138 -> work\rebuild\stage1\mods + work\rebuild\compare_stage1.json
       Audio    dlc_audio_build (our glue: wave_swap for all DRMs incl. sub folders, mul_audio_batch), compare_b138
                -> work\rebuild\stage2a\mods (replaced on every run) + compare_stage2a.json
+      Assemble upstream's full stage-1 route (optional, after Media): render tables (render_tables_build build,
+               rend_extract pairs/dlc, shader_map, material_rules, material_dlc, pc_shader_sections,
+               terrain_validate), dlc_assemble_build (assemble_dlc, material 'dlc', PC shader sections),
+               dlc_audio_build, compare_b138, compare_sections
+               -> work\render\*, work\rebuild\asm_stage1\mods, asm_stage2a\mods (+ compare_asm_stage2a.json)
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
@@ -48,7 +53,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [switch]$Trace
 )
@@ -125,6 +130,21 @@ $steps = @{
         @('tools\compare_b138.py', 'work/rebuild/stage2a/mods', 'stage2a'),
         @('tools\compare_sections.py', 'work/rebuild/stage2a/mods', 'stage2a')
     )
+    Assemble = @(
+        @('tools\render_tables_build.py', 'build'),
+        @('tools\rend_extract.py', 'pairs'),
+        @('tools\render_tables_build.py', 'check'),
+        @('tools\rend_extract.py', 'dlc'),
+        @('tools\shader_map.py'),
+        @('tools\material_rules.py'),
+        @('tools\material_dlc.py'),
+        @('tools\pc_shader_sections.py'),
+        @('tools\terrain_validate.py'),
+        @('tools\dlc_assemble_build.py', 'work/rebuild/stage1/mods', 'work/rebuild/asm_stage1/mods'),
+        @('tools\dlc_audio_build.py', 'work/rebuild/asm_stage1/mods', 'work/rebuild/asm_stage2a/mods'),
+        @('tools\compare_b138.py', 'work/rebuild/asm_stage2a/mods', 'asm_stage2a'),
+        @('tools\compare_sections.py', 'work/rebuild/asm_stage2a/mods', 'asm_stage2a')
+    )
 }
 $outputDirs = @{
     Index   = @('work')
@@ -137,6 +157,7 @@ $outputDirs = @{
     Names   = @('work\generic')
     Media   = @('work\rebuild')
     Audio   = @('work\rebuild')
+    Assemble = @('work\render', 'work\rebuild')
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{
