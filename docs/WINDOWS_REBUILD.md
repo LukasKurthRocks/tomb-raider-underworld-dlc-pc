@@ -10,7 +10,8 @@ Where the fixes of stage 2b come from (upstream's `work/ws/` folders, builds, ov
 
 * Python 3.14 in a venv **outside** the repository (`..\bin\venv`), packages from `requirements.txt`
   (numpy, Pillow, capstone).
-* All tools are run **from the repository root**: `..\bin\venv\Scripts\python.exe -u -I tools\<tool>.py`.
+* All tools are run **from the repository root**: `..\bin\venv\Scripts\python.exe -u -I -X utf8 tools\<tool>.py`
+  (`-X utf8`: finding 19).
   The branch replaces the `/path/to/` placeholders in `tools/*.py` with relative paths:
   `/path/to/trudlcport/` -> `./`, `/path/to/trudlcport/pc/` -> `../data/pc/`, `/path/to/` -> `../data/`,
   and `'tru-port/pc/'` -> `'pc/'`, `'tru-port/'` -> `'trudlcport/'` (two names for the same checkout upstream).
@@ -31,8 +32,8 @@ Where the fixes of stage 2b come from (upstream's `work/ws/` folders, builds, ov
   Not mentioned in SETUP.md.
 * `.gitignore` additions: `ref/`, `work/generic/`, our tool outputs (`work/dlc_screen*/`, `work/dlc_text/`,
   `work/menu_dlc/`) - they contain game data.
-* The stages are driven by `Invoke-TruPipeline.ps1 -Step <name>` in the parent project (logs every tool's output);
-  the commands below are what it runs.
+* The stages are driven by `scripts/windows/Invoke-TruPipeline.ps1 -Step <name>` (logs every tool's output; overview
+  in `docs/ARCHITECTURE.md`); the commands below are what it runs.
 
 ## Stage order (as reconstructed)
 
@@ -43,12 +44,12 @@ Where the fixes of stage 2b come from (upstream's `work/ws/` folders, builds, ov
 | Ids | `tools/generic_store.py`, `generic_ids.py`, `objlists_extract.py` (**new**), `objlist_merge.py` | `store.pkl`, `idmap.json`, `merged/` |
 | Learn | `generic_learn.py save`, `generic_symbols.py seed`, `script_pairs.py`, `unit_ids.py` | `mask_table.pkl`, symbols (key 100) in `idmap.json`, `work/script/pairs_*.pkl`, `unit_idmaps.json` |
 | Tables | `dlc_drms_build.py` (**new**), `dlc_generic.py` (provisional), `script_learn.py save`, `generic_type0.py save07`, `script_name_match.py`, `tex_idmap.py`, `dlc_generic.py` (final) | `dlc_drms.pkl`, `dlc_idmap.json`, `work/script/script_table.pkl`, refined `idmap.json` |
-| Prep | `generic_type0.py save07`, `pc_vers_build.py` (**new**) | `type0_table.pkl`, `type7_table.pkl`, `pc_vers.json`, `pc_vers_content.json` |
-| Convert | `tools/dlc_convert_all.py --media --write` | `work/generic/out/` |
+| Prep | `generic_type0.py save07`, `pc_vers_build.py` (**new**), `model_point_fix.py learn`, `model_point_fix.py selftest`, `dtpid_evidence.py` (finding 32) | `type0_table.pkl`, `type7_table.pkl`, `pc_vers.json`, `pc_vers_content.json`, `work/chain_aim/model_point_rules.pkl`, `work/generic/dtpid_evidence.pkl` |
+| Convert | `tools/dlc_convert_all.py --media --write --extra-fixes` (findings 32, 36: `--jobs`) | `work/generic/out/` |
 | Names | `tools/dlc_names.py` (also takes the Xbox source names of `docs/data/*.kit_manifest.json` when the hash matches) | `work/generic/dlc_names.txt` (names of unnamed DLC records) |
 | Media | `dlc_media_build.py work/rebuild/stage1/mods pack10` (**new**; music of pack10 + pack11), `locals.py build work/rebuild/stage1`, `padshock_convert.py build work/rebuild/stage1/mods`, `compare_b138.py work/rebuild/stage1/mods stage1` (**new**), `compare_sections.py work/rebuild/stage1/mods stage1` (**new**) | DLC 1 stage-1 tree in the B138 layout + per-file and per-section-type comparison |
 | Audio | `dlc_audio_build.py work/rebuild/stage1/mods work/rebuild/stage2a/mods` (**new**: `wave_swap` for every DRM incl. sub folders + `mul_audio_batch`), `compare_b138.py work/rebuild/stage2a/mods stage2a`, `compare_sections.py work/rebuild/stage2a/mods stage2a` | DLC 1 tree with real audio (B43) |
-| Assemble (optional, after Media) | `render_tables_build.py build`, `rend_extract.py pairs`, `render_tables_build.py check`, `rend_extract.py dlc`, `shader_map.py`, `material_rules.py`, `material_dlc.py`, `pc_shader_sections.py`, `terrain_validate.py`, `dlc_assemble_build.py work/rebuild/stage1/mods work/rebuild/asm_stage1/mods` (**new**), `dlc_audio_build.py` into `asm_stage2a`, `compare_b138.py`, `compare_sections.py` | upstream's full stage-1 route (findings 28, 34): render tables in `work/render/`, DLC 1 tree with PC shader sections and DLC materials |
+| Assemble (optional, after Media) | `render_tables_build.py build`, `rend_extract.py pairs`, `render_tables_build.py check`, `rend_extract.py dlc`, `shader_map.py`, `material_rules.py`, `material_dlc.py`, `pc_shader_sections.py`, `terrain_validate.py`, `mesh_tables_build.py` (**new**, finding 37), `dlc_assemble_build.py work/rebuild/stage1/mods work/rebuild/asm_stage1/mods` (**new**; `--pack pack11` for DLC 2), `dlc_audio_build.py` into `asm_stage2a`, `compare_b138.py`, `compare_sections.py` | upstream's full stage-1 route (findings 28, 34, 37): render and mesh tables in `work/render/`, DLC 1 tree with PC shader sections and DLC materials |
 
 Comparisons: `compare_b138.py` = per file (MD5) against the B138 kit manifest; `compare_sections.py` = per DRM section
 type against the installed B138 `mods/` tree (data + normalised relocations; report `work/rebuild/sections_<label>.json`).
@@ -66,7 +67,7 @@ The order of Ids/Learn follows the inputs each tool opens; it is not documented 
 | 1c | Media (`dlc_media_build.py`, locals, padshock) + `compare_b138.py` + `compare_sections.py` | done | 30 s |
 | 2a | Audio: `wave_swap.py` (Wave sections in place), `mul_audio_nch.py` (`.mul` streams, one channel per Xbox stream, game convention; B43's `mul_audio_batch.py` with `--mul b43`) | done; wave sections 86.5 % = B138, `.mul` vs Xbox source median 44.4 dB (findings 17, 18) | 2.5 min |
 | 2a+ | Remaining audio differences: wave = decoder rounding (explained, finding 17); `.mul`: what B138 changed on 6 files beyond re-encoding, listening test in game | partly open | - |
-| 2b | Data fixes B1-B47 (LINEAGE.md) in `tools/dlc_fixes_build.py`: `cine` (B44/B45) done, `float` (B46/B47) done, next raft rings (B33), then the remaining layers of `docs/WS_MAP.md` | in progress (findings 20-22) | minutes per fix; much work |
+| 2b | Data fixes B1-B47 (LINEAGE.md) in `tools/dlc_fixes_build.py`: `cine` (B44/B45), `float` (B46/B47), `tag404` raft rings (B33), `postfix`, `analog` done; next the remaining layers of `docs/WS_MAP.md` | in progress (findings 20-26) | minutes per fix; much work |
 | 3 | Shaders B72-B89 (`work/ws/shader4/`) | open | largest block |
 | 4 | Last layers to B90_gold_L4 (Giro 5-7), then CHANGELOG changes up to B138 | open | - |
 | - | 40 `vm_mods_expected`/`vm_extra` files | check after 1c; else take from B138 | - |
@@ -511,6 +512,7 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      Convert 18 GB), not the 2-3 GB its working set suggested. 6 processes next to a running Convert used all 64 GB
      (free RAM 0, paging). Test stopped; the orphaned worker processes had to be ended by hand. Rule: at most
      (free RAM / 15 GB) processes, i.e. **3 on a 64 GB PC with nothing else running**; never next to another Convert.
+     (First estimate; the measured rule below is (free RAM - 8 GB) / 18 GB.)
    * Still to do: equivalence test (1 process vs N processes must give byte-identical files), then the same for
      `dlc_assemble_build.py`.
    * **Measured** (`scripts/windows/Measure-TruProcessMemory.ps1`, new, read-only, 10 s samples during the rerun
@@ -542,6 +544,54 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `logs/Manual_ParallelAssemble-test_20261029_111058.log`).
    * Note on the memory sampler: run it with an outer timeout longer than `-DurationMinutes`; the first run was
      cut by an equal timeout right before its summary (the CSV with all samples is complete).
+   * Where step Assemble spends its time besides `dlc_assemble_build`: `terrain_validate.py` ran 596 s on one core
+     (learning its table takes seconds, the check of 335 terrain pairs the rest). The pair checks now run in
+     `TRUDLC_JOBS_LIGHT` processes with results merged in order: **72 s instead of 596 s**, `terrain_validate.txt`
+     and `terrain_yhash.pkl` byte-identical to the sequential run (16 processes; log
+     `logs/Manual_TerrainParallel-test_20261029_135232.log`). `mesh_tables_build.py` (finding 37) takes 34 s and
+     stays sequential (an estimate of several minutes was wrong).
+37. **Meshes: two learnt tables of `mesh_convert.py` were missing - one rule (each Xbox mesh counted once) makes
+    them match B138.**
+   * Where the meshes differ (`tools/mesh_diff.py`, new, read-only: type-12 sections paired by (type, id), parsed
+     with `mesh_convert.parse`, compared region by region): on the assemble tree with symbol calibration
+     (2026-10-29) Mesh 31.7 % identical; all 153 differing same-size meshes differ in the vertex declaration, 120 of
+     them also in the vertex data - nothing else (header, bone map, mesh info, palettes, faces, groups, lists, tail,
+     relocations all equal). The declarations had the same elements and differed only in their 8-byte hash; the
+     vertex data by +-1 in the bytes of NORMAL / TANGENT / BINORMAL.
+   * Cause: `mesh_convert.pc_decl_hash()` reads `work/render/pc_vdecl_hash.pkl` and `dec3n_lut()` reads
+     `work/render/dec3n_lut.pkl`; neither file is in the repository and **no tool writes them**. Without them the
+     converter uses a synthetic md5 hash and the formula `trunc(127.5 + s/4)` ("89 % agreement" in its docstring).
+   * `tools/mesh_tables_build.py` (new) learns both from the base pairs (`work/render/pairs_render.pkl`; Mesh
+     sections paired by position as `mesh_validate.py` does): the hash of every PC vertex format (18 formats, no
+     format with two hashes), and for DEC3N (Xbox type 0x11 -> PC UBYTE4N type 5 at the same offset, batches with
+     the same vertex count) the majority PC byte of each of the 1 024 10-bit values (1 value never seen: formula).
+   * First version counted every pair (15.3 M components, majority agreement 95.5 %): vertex declarations 153 -> 0
+     differences, Mesh 31.7 % -> **73.1 %**; 59 meshes still differed in vertex data only.
+   * `tools/dec3n_check.py` (new, read-only) pairs the Xbox DLC meshes (`dlc_render.pkl`, ids mapped with
+     `DlcIds`) with the B138 tree: B138 maps every DEC3N value to exactly one byte (1 023 values seen, none
+     ambiguous) and differs from our table in only **3 values** (242, -254, -242), each a near tie in the base
+     votes (e.g. 5 089 : 4 913). `--variants` tries subsets of the base votes (semantics, components, same-size
+     pairs, first pair per Xbox id): **counting each Xbox mesh id once (its first pair) gives 0 differing values**
+     (11.65 M components); every other subset gives 1 or more. That is the rule `mesh_validate.py` already uses
+     ("unique Xbox ids"), so it is a rule, not values copied from B138. Upstream's docstring says "8.2M base-pair
+     components" - our count is 11.65 M; the difference is not explained (perhaps a smaller pair set), but the
+     resulting table matches B138 on every value the DLC uses.
+   * Pitfall on the way: the first `dec3n_check` run paired nothing - the B138 Mesh sections carry the magic as
+     `Mesh` or `hseM` and DLC ids are remapped on PC; check the printed section counts before reading results.
+   * `mesh_tables_build.py` is now a tool of pipeline step Assemble (after `terrain_validate.py`).
+   * Note (code review): the "first pair" rule counts an Xbox id after a successful parse and a non-empty check,
+     while `mesh_validate.py` marks ids as seen before; with B138 as the judge our variant gives 0 differing values,
+     so it stays.
+   * **Result with the final tables** (step Assemble through `Invoke-TruPipeline.ps1`, then 2b and the comparisons;
+     log `logs/Manual_MeshTables2-assemble_20261029_131838.log`): `dlc_assemble_build` 134/134 DRMs OK (1 320 s,
+     2 processes); **all 174 Mesh sections byte-identical to B138** (`mesh_diff.py`: no differing region; the 2
+     remaining type-12 differences are terrain sections); type 12 overall 31.7 % -> **99.1 %** (225 of 227); other
+     section types unchanged (script 99.2 %, DTP 98.7 %, shader 97.7 %, material 90.4 %); **DRMs fully identical
+     15 -> 46 of 133** (`rebuild_status.py asm_stage2b`: e.g. 29 of 30 `vm_mods_expected` files, 11 of 11
+     `mods_fix18_awf_extra`); files MD5-identical still 92 of 275 (the DRMs that changed still differ elsewhere).
+   * `mesh_dlc.py` (upstream) with the tables: all 285 DLC meshes of both packs valid, geometry equal to the Xbox
+     source, 1 mesh (DLC 2) with a vertex format unknown on PC - see `docs/DLC2.md`.
+   * DLC 2 note: the tables are learnt from the base game only, so they apply to DLC 2 unchanged.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

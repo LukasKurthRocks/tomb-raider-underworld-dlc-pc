@@ -74,7 +74,7 @@ difference: **for DLC 2 there is no finished build to compare with** (B138 only 
 Every step needs another reference - the Xbox source, rules learned from the base game, or a test in game.
 
 **Pipeline steps**
-- Stages 0-1 already cover pack11: `dlc_drms_build`, `Convert` (307 DRMs = pack10 134 + pack11 166 + costumes) [7, 185].
+- Stages 0-1 already cover pack11: `dlc_drms_build`, `Convert` (307 DRMs = pack10 134 + pack11 166 + costumes) [run log 2026-10-27].
 - Names first: `dlc_names.py` also takes the Xbox names of the kit manifests (hash-checked) [14]; pack11 still has
   63 unnamed non-DRM records - check which of them a DLC 2 tree needs before `Media`.
 - `Media`: `dlc_media_build.py OUT pack11`; for pack11 itself `MUSIC_PACKS` falls back to pack11 only [13];
@@ -123,11 +123,21 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - Upstream's `work/ws/` scripts still carry the author's local paths (407 of 578); fix each one when it is used [21].
 
 **Stage 1 route**
-- Use upstream's full route (`assemble_dlc`, material 'dlc'; `tools/dlc_assemble_build.py`, today pack10 only -
-  needs a pack11 variant): on DLC 1 it gave real PC shader sections (97.7 % = B138) and better materials (90.4 %)
+- Use upstream's full route (`assemble_dlc`, material 'dlc'; `tools/dlc_assemble_build.py --pack pack11`,
+  source tree = the DLC 2 Media tree): on DLC 1 it gave real PC shader sections (97.7 % = B138) and better materials (90.4 %)
   at the same data results [34]. It needs the `work/render/` tables: `render_tables_build.py build`, then
   `rend_extract.py pairs` / `dlc`, `shader_map`, `material_rules`, `material_dlc`, `pc_shader_sections`,
   `terrain_validate` [28]. `rend_extract.py dlc` and `shader_map` already cover pack11.
+- Meshes need `mesh_tables_build.py` (vertex-declaration hashes + DEC3N table, learnt from the base pairs, each
+  Xbox mesh id counted once; part of step Assemble) - without it every DLC mesh gets a synthetic declaration hash
+  and +-1 normals [37]. Upstream's `mesh_dlc.py` (all 285 DLC meshes of both packs): 285 valid, geometry equal to
+  the Xbox, **1 mesh with a vertex format the PC base game does not have: pack11 record 156, mesh 22994**
+  (position, normal, blend indices, three UV sets, tangent, binormal) - it keeps the synthetic hash. What we know
+  about the PC hash (18 formats, 14 hashes): it ignores BLENDWEIGHT (4 pairs of formats that differ only by it
+  share a hash), so it describes the semantics a shader reads rather than the byte layout; FNV-1/1a 64, MD5, SHA-1
+  and CRC32 over the semantic ids (with/without BLENDWEIGHT, sorted or not, with types/offsets) reproduce none of
+  them (scratch test, 2026-10-29). Open: look for this semantic set in PC-only base meshes (outside the 1 054
+  pairs), else test in game whether the engine accepts an unknown hash.
 
 **Measuring**
 - `compare_sections.py` / `rebuild_status.py` need a reference tree - for DLC 2 only the base-game rules and the

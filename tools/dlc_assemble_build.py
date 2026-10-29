@@ -1,4 +1,5 @@
-"""Stage-1 tree of DLC 1 converted with upstream's full stage-1 route (assemble_dlc, material 'dlc').
+"""Stage-1 tree of DLC 1 (pack10) or DLC 2 (pack11) converted with upstream's full stage-1 route (assemble_dlc,
+material 'dlc').
 
 Same calls as tools/convert_dlc.py and the author's work/ws/rebuild/convert_fresh.py:
   assemble_dlc.assemble(raw, ids, store, assemble_dlc.dlc_shader_src, wave='silence', pc_copy=True, template=True,
@@ -9,7 +10,8 @@ fixes. The non-DRM files (music, audio streams, images, locals, padshock, tr8) a
 tree (dlc_media_build.py output); only the DRMs are replaced, at the rel path of their Xbox name.
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -u -I -X utf8 tools/dlc_assemble_build.py SRC_MODS_DIR OUT_MODS_DIR [--only SUBSTR] [--jobs N]
+  ..\\bin\\venv\\Scripts\\python.exe -u -I -X utf8 tools/dlc_assemble_build.py SRC_MODS_DIR OUT_MODS_DIR [--pack pack10|pack11] [--only SUBSTR] [--jobs N]
+  --pack: which DLC (default pack10 = DLC 1; pack11 = DLC 2, SRC = its Media tree, e.g. work/rebuild/dlc2_stage1/mods)
   --jobs N: N processes (default: environment TRUDLC_JOBS, else 1); ~16 GB RAM each (finding 36)
   e.g. work/rebuild/stage1/mods work/rebuild/asm_stage1/mods   (OUT is replaced, must be below work/rebuild)
 Report: <OUT>/../assemble_report.tsv (per DRM: status, bytes, seconds, bad, missing shaders, routes).
@@ -21,20 +23,26 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WG = os.path.join(HERE, '..', 'work', 'generic')
 
 
-def pack10_drms():
-    """xenon-w\\... names of the pack10 DRMs from work/generic/dlc_names.txt (columns: hash pack spec size kind name)"""
+PACK_INDEX = {'pack10': 0, 'pack11': 1}     # index into convert_dlc.PACKS
+
+
+def pack_drms(pack):
+    """xenon-w\\... names of the DRMs of a pack from work/generic/dlc_names.txt (columns: hash pack spec size kind name)"""
     seen = collections.OrderedDict()
     for line in open(os.path.join(WG, 'dlc_names.txt'), encoding='latin1'):
         f = line.split()
-        if len(f) >= 6 and f[1] == 'pack10' and f[-1].lower().endswith('.drm') and f[-1].lower().startswith('xenon-w\\'):
+        if len(f) >= 6 and f[1] == pack and f[-1].lower().endswith('.drm') and f[-1].lower().startswith('xenon-w\\'):
             seen.setdefault(f[-1], f[0])
     return seen
 
 
 def main(argv):
-    only = None
+    only = None; pack = 'pack10'
     if '--only' in argv:
         k = argv.index('--only'); only = argv[k + 1]; del argv[k:k + 2]
+    if '--pack' in argv:
+        k = argv.index('--pack'); pack = argv[k + 1]; del argv[k:k + 2]
+        if pack not in PACK_INDEX: sys.exit('--pack must be one of ' + ', '.join(PACK_INDEX))
     src, out = argv[0], argv[1]
     rebuild = os.path.realpath(os.path.join(HERE, '..', 'work', 'rebuild'))
     if os.path.commonpath([os.path.realpath(out), rebuild]) != rebuild: sys.exit('OUT must be below work/rebuild: ' + out)
@@ -45,24 +53,24 @@ def main(argv):
     from convert_dlc import R as ROOT, PACKS
     jobs = int(os.environ.get('TRUDLC_JOBS') or 1)
     if '--jobs' in argv: jobs = int(argv[argv.index('--jobs') + 1])
-    arc = Archive(ROOT + PACKS[0], 'be')
+    arc = Archive(ROOT + PACKS[PACK_INDEX[pack]], 'be')
     rep = open(os.path.join(os.path.dirname(os.path.abspath(out)), 'assemble_report.tsv'), 'w')
     rep.write('relpath\tstatus\tbytes\tsec\tbad\tmissing_sh\troutes\n')
-    names = pack10_drms(); st = collections.Counter(); t00 = time.time()
-    print('pack10 DRM names', len(names), 'jobs', jobs, flush=True)
+    names = pack_drms(pack); st = collections.Counter(); t00 = time.time()
+    print('%s DRM names' % pack, len(names), 'jobs', jobs, flush=True)
     tasks = []
     for name in names:
         rel = name[len('xenon-w\\'):].replace('\\', '/')
         if only and only not in rel: continue
         h = crc(name)
         recs = [i for i, r in enumerate(arc.idx) if r['hash'] == h and r['spec'] == 0xffffffff]
-        if not recs: rep.write('%s\tNOT_IN_PACK10\n' % rel); st['not_in_pack'] += 1; continue
+        if not recs: rep.write('%s\tNOT_IN_%s\n' % (rel, pack.upper())); st['not_in_pack'] += 1; continue
         tasks.append((rel, recs[0], out))
     if jobs <= 1:
-        _init(); results = map(assemble_one, tasks)
+        _init(pack); results = map(assemble_one, tasks)
     else:
         from concurrent.futures import ProcessPoolExecutor
-        ex = ProcessPoolExecutor(max_workers=jobs, initializer=_init)
+        ex = ProcessPoolExecutor(max_workers=jobs, initializer=_init, initargs=(pack,))
         results = ex.map(assemble_one, tasks, chunksize=1)
     for rel, row, status in results:              # in task order, whatever the number of processes
         rep.write(row); st[status] += 1
@@ -75,13 +83,13 @@ def main(argv):
 _CTX = {}
 
 
-def _init():
+def _init(pack='pack10'):
     """per process: store and id map (the assemble route needs ~16 GB per process, finding 36)"""
     import dlc_generic as DG, generic_store
     from archive import Archive
     from convert_dlc import R as ROOT, PACKS
     store = generic_store.load()
-    _CTX.update(store=store, ids=DG.DlcIds(store, None), arc=Archive(ROOT + PACKS[0], 'be'))
+    _CTX.update(store=store, ids=DG.DlcIds(store, None), arc=Archive(ROOT + PACKS[PACK_INDEX[pack]], 'be'))
 
 
 def assemble_one(task):

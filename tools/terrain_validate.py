@@ -49,7 +49,37 @@ def IDS(t, x):
     gm, mx2p = _ids
     return mx2p.get(x, x) if t == 10 else gm.get(t, {}).get(x, x)
 
+def _init(m):
+    TC._YHASH = m
+
+def check_one(job):
+    """one terrain pair -> (counter deltas, bad entry or None); the loop body of the sequential version"""
+    nm, a, b = job
+    st = collections.Counter(); bad = None
+    st['n'] += 1
+    s = {}
+    pd, pr = TC.convert(a['data'], a['reloc'], IDS, s)
+    st['valid'] += valid(pd, '<'); st['PC valid'] += valid(b['data'], '<')
+    if a['size'] != b['size']: st['size differs'] += 1; return st, (nm, a['i'], 'size')
+    st['exact'] += pd == b['data']; st['reloc_exact'] += pr == b['reloc']
+    T = TC.parse(a['data']); H = T['H']
+    skip = [(H + T['offIdx'], H + T['offIdx'] + 2 * T['nIdx'])] + [(H + v[0], H + v[0] + v[2] * T['vfs'][v[3]]['stride']) for v in T['vbs']]
+    inskip = lambda o: any(x <= o < y for x, y in skip)
+    nbs = sum(1 for o in range(0, len(pd), 4) if pd[o:o + 4] != b['data'][o:o + 4] and not inskip(o))
+    st['struct_exact'] += nbs == 0
+    sem = tri_set(pd, '<') == tri_set(b['data'], '<')
+    st['semantic'] += sem
+    if not sem:
+        A = tri_set(pd, '<'); B = tri_set(b['data'], '<')
+        # looser: ignore slot (PC may re-partition the BVH) and Y fields
+        la = collections.Counter(k[2] for k in A.elements()); lb = collections.Counter(k[2] for k in B.elements())
+        st['semantic-ignoring-slot/Y'] += la == lb
+        bad = (nm, a['i'], 'tris %d/%d common %d' % (sum(A.values()), sum(B.values()), sum((A & B).values())), 'loose-eq' if la == lb else 'loose-common %d' % sum((la & lb).values()))
+    if s.get('yhash_unknown'): st['yhash_unknown_records'] += s['yhash_unknown']
+    return st, bad
+
 if __name__ == '__main__':
+    from concurrent.futures import ProcessPoolExecutor
     res = pickle.load(open(W + '/render/pairs_render.pkl', 'rb'))
     seen = set(); pairs = []
     for nm, X, P in res:
@@ -68,27 +98,12 @@ if __name__ == '__main__':
     m = {k: v.most_common(1)[0][0] for k, v in ym.items()}
     pickle.dump(m, open(W + '/render/terrain_yhash.pkl', 'wb')); TC._YHASH = m
     st = collections.Counter(); bad = []
-    for nm, a, b in pairs:
-        st['n'] += 1
-        s = {}
-        pd, pr = TC.convert(a['data'], a['reloc'], IDS, s)
-        st['valid'] += valid(pd, '<'); st['PC valid'] += valid(b['data'], '<')
-        if a['size'] != b['size']: st['size differs'] += 1; bad.append((nm, a['i'], 'size')); continue
-        st['exact'] += pd == b['data']; st['reloc_exact'] += pr == b['reloc']
-        T = TC.parse(a['data']); H = T['H']
-        skip = [(H + T['offIdx'], H + T['offIdx'] + 2 * T['nIdx'])] + [(H + v[0], H + v[0] + v[2] * T['vfs'][v[3]]['stride']) for v in T['vbs']]
-        inskip = lambda o: any(x <= o < y for x, y in skip)
-        nbs = sum(1 for o in range(0, len(pd), 4) if pd[o:o + 4] != b['data'][o:o + 4] and not inskip(o))
-        st['struct_exact'] += nbs == 0
-        sem = tri_set(pd, '<') == tri_set(b['data'], '<')
-        st['semantic'] += sem
-        if not sem:
-            A = tri_set(pd, '<'); B = tri_set(b['data'], '<')
-            # looser: ignore slot (PC may re-partition the BVH) and Y fields
-            la = collections.Counter(k[2] for k in A.elements()); lb = collections.Counter(k[2] for k in B.elements())
-            st['semantic-ignoring-slot/Y'] += la == lb
-            bad.append((nm, a['i'], 'tris %d/%d common %d' % (sum(A.values()), sum(B.values()), sum((A & B).values())), 'loose-eq' if la == lb else 'loose-common %d' % sum((la & lb).values())))
-        if s.get('yhash_unknown'): st['yhash_unknown_records'] += s['yhash_unknown']
+    # the pair checks are independent and CPU-bound: TRUDLC_JOBS_LIGHT processes (unset = all CPUs), results in order
+    with ProcessPoolExecutor(max_workers=int(os.environ.get('TRUDLC_JOBS_LIGHT') or os.cpu_count()),
+                             initializer=_init, initargs=(m,)) as ex:
+        for d, bd in ex.map(check_one, pairs, chunksize=4):
+            st.update(d)
+            if bd: bad.append(bd)
     lines = ['terrain pairs (unique Xbox ids): %d' % len(pairs)] + ['  %-34s %d' % kv for kv in sorted(st.items())]
     lines += ['non-semantic: %d' % len(bad)] + ['  ' + repr(x) for x in bad]
     txt = '\n'.join(lines); print(txt); open(W + '/render/terrain_validate.txt', 'w').write(txt + '\n')
