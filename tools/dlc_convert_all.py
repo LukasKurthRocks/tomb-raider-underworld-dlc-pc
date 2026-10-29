@@ -9,6 +9,7 @@ Usage: python3 -I tools/dlc_convert_all.py [--media] [--write] [name-substring .
   --extra-fixes : convert_drm(..., extra_fixes=True) - the DLC post-passes that assemble_dlc enables with
                   material 'dlc' (model points, DTP lists/align, SoundPlex fields, script SArray counts, tag 0x403,
                   portals, uberobject descriptors, link ratios, analog id guard); off by default as before
+  --out DIR : write to DIR instead of work/generic/out/ (experiments; subfolders pack10/pack11 as usual)
 """
 import sys, os, pickle, struct, collections, json, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -36,14 +37,17 @@ def check(secs, pc_ids, dlc_defined, objids):
 def main(argv):
     media = DG.default_media if '--media' in argv else None
     write = '--write' in argv
-    pats = [a for a in argv if not a.startswith('--')]
+    out_arg = argv[argv.index('--out') + 1] if '--out' in argv else None
+    pats = [a for a in argv if not a.startswith('--') and a != out_arg]
     store = generic_store.load()
     dlc = pickle.load(open(os.path.join(W, 'dlc_drms.pkl'), 'rb'))
     ids = DG.DlcIds()
     T = DG.table()
     objids = set(json.load(open(os.path.join(W, 'merged', 'object_id_remap_xbox_to_pc.json'))).values())
     dlc_defined = {(s['type'], ids(s['type'], s['id'])) for _, (h, secs) in dlc.items() for s in secs}
-    out = os.path.join(W, 'out'); os.makedirs(out, exist_ok=True)
+    out = os.path.join(W, 'out')
+    if '--out' in argv: out = argv[argv.index('--out') + 1]      # e.g. an experiment folder below work/rebuild
+    os.makedirs(out, exist_ok=True)
     tot = collections.Counter(); routes = collections.Counter(); t0 = time.time()
     from archive import Archive
     from names import load, L

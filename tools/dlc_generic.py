@@ -61,6 +61,13 @@ class DlcIds:
 
     def _sym_setup(self):
         m = self.base.get(SYM, {})
+        # experiment only (finding 34): TRUDLC_SYM_EXTRA = JSON {xbox symbol: pc symbol} added for symbols not in the
+        # learned map; unset (the default) = no change
+        extra = os.environ.get('TRUDLC_SYM_EXTRA')
+        if extra:
+            add = {int(a): b for a, b in json.load(open(extra)).items() if int(a) not in m}
+            m.update(add)
+            print('symbol map: %d extra entries from %s' % (len(add), extra), flush=True)
         self.sks = sorted(m)
         self.sused = set(m.values())
         self.xs_max = max(m); self.ps_max = max(max(m.values()), self.PC_SYM_MAX)
