@@ -1014,6 +1014,13 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      simulation of a DLC 2 character model fits "steps x sub-steps" - and finding 39 kept `float_fix` away from the
      DLC 2 character-model DTPs. Next: read the two counts in a running game (snapshot or breakpoint at +0x601ca
      while the intro is slow), then find the DTP field they come from.
+   * **It is the cloth simulation** (static, `tools/exe_xref.py` = capstone cross-references over `tru.exe`, plus RTTI
+     in the dump): +0x60200 is slot 0 of the vtable of `JobHarness_JobClothSimulate` (vtable +0x443ce8, set at
+     +0x60291 in the job entry +0x60260); it copies positions into the simulation object (`[job+0xdc]`) and tail-calls
+     the stepper +0x601c0 (`n = [sim+0x40] * [sim+0x3c]` sub-steps). The job is started at +0x57b75 after DMA-style
+     buffers sized from the cloth object: `[+0x18]` x 64 bytes, `[+0x1c]` x 48, `[+0x20]` x 128 (particles,
+     constraints, ...). The data source of +0x3c / +0x40 is not traced yet. Candidates in the intro: the
+     Doppelganger's and Lara's hair / clothes (Lara wore the camo-bikini costume - a B138 costume conversion).
    * Author's history (found only now - a forgotten jump point): `tools/generalbank_dlc.py` (2026-10-09) already put
      the converted TU script 6 into the PC generalbank (same native-93 neutralisation at 0x7928); his note in
      `tools/dlc_generic.py` says "replacing it crashes the base game (gb1.dmp)", so he patched DLC 1's start script
