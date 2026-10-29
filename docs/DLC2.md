@@ -183,6 +183,9 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   screen (DLC background + the trigger of the DLC intro cutscene), golden shotgun and a new "dlc2data" script are
   title-update scripts of `generalbank.drm` that the PC lacks [42]. When something DLC-specific is missing on PC,
   check `tools/tu_script_changes.py` for the file first.
+- **Moving a script between files: remap the call offsets, not only the sections.** External relocations name
+  (section, offset); the offset points to a function/member inside the target script and moves when the target
+  script's layout differs. Forgetting it crashed the game (DLC 2 test 2, jump to address 2) [42].
 - **Rules proven on DLC 1 can meet data DLC 1 does not have.** Upstream's `float_fix` (every change = B138 on DLC 1)
   would have rewritten 16 105 words of the DLC 2 doppelganger models; measuring against the closest base-game
   structure (`lara.drm` on PC, `tools/dtp_word_classes.py`) showed the converter was right [39]. Treat a large count

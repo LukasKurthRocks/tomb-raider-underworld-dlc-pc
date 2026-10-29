@@ -7,6 +7,12 @@ index of the same (type, id) in the result - a donor section that refers to a se
 reported (use --add-missing to append those too). The result is read back and every section's relocations are
 bounds-checked.
 
+LIMIT (learned the hard way, DLC 2 test 2): only the target SECTION of an external relocation is remapped, not the
+OFFSET inside it. Calls from a script into another script address a function/member at an offset of that script; if
+the base's version of the target script has another layout than the donor's, the offset is wrong (213 of the 1 020
+external relocations of the converted title-update loading screen -> the game jumped to address 2 and crashed).
+Safe only when every target section is laid out the same in donor and base.
+
 Usage (from the repository root):
   ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/drm_put_sections.py BASE_DRM DONOR_DRM OUT_DRM 8:6,8:21239 [--add-missing]
 """
