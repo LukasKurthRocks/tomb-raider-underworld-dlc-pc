@@ -7,7 +7,10 @@ description text, in every language, and the title is grey instead of light blue
 ## Reference
 
 Xbox 360 game + title update 0.0.2.3 + DLC in Xenia Canary 02d2cb5 (16:9, 1280x720): title light blue, centred above
-the description column; description starts below it. Measured as fractions of the screen:
+the description column; description starts below it (an independent screenshot of the same screen, posted on Tomb
+Raider Forums in 2020 from another Xenia build, shows the same layout:
+[Xbox DLC mission screen](https://i.imgur.com/od0lwMJ.png); see `docs/RELATED_WORK.md`). Measured as fractions of
+the screen:
 
 | Element | Xbox TU | PC B138 |
 |---|---|---|

@@ -103,7 +103,19 @@ that comes only from a search snippet or secondary summary, or that could not be
   * **[PC] TRU DLC Menu** (t=178907, 2011-02-27), Gh0stBlade: "the DLC menus are existant and fully functional ...
     At the moment, it's unknown how to force the executable to load a fake DLC package and run the contents
     inside." Another member: Microsoft paid for the levels in exchange for 360 exclusivity. (trudlcport solved the
-    loading part with a mod loader overlay and a patched `tru.exe`.)
+    loading part with a mod loader overlay and a patched `tru.exe`.) The thread (175 posts, 2011-2021) goes on:
+    - 2011-03: adding fake pack files to the game folder is not detected as DLC. A member who disassembled `tru.exe`
+      1.1: "There is no function which searches for DLC packs, BUT ... there is one interesting file patch.000! We
+      could add the DLC files into it!" Also found then: XMA vs. PC ADPCM `.mul` audio (the game's ADPCM routine
+      was posted), Xenos texture swizzling, CRC-32 file-name hashes (a name grabber hooked the game's hash
+      function). 2011-04, Gh0stBlade's list of what a port needs: a bigfile tool that can inject files, "all file
+      formats must be known ... for each platform", and locating animations, collision and spawn data.
+    - 2020-06: Gh0stBlade, "First X360 Model ported from X360 to PC"; the first screenshot "shows bad bi normals
+      normals and tangents" - the same symptom our DEC3N table fixed (finding 37).
+    - 2021: another member put a costume (`dlc_costume_n.drm` + its `.raw` image) **into `patch.000`** and the PC
+      game used it in the DLC costume slot - the costume slots load from `patch.000` without a mod loader. Their
+      progress on the Xbox costumes: materials, animations, objects done; textures unswizzled; audio XMA1 ->
+      FSB4; "mesh files => 0% / shader => 0% / DtpData => 0% / script files => 0%".
   * **Beta and Cut Content + Costumes List** (t=204503, 2014-03 to 2019-07): the PC demo data lists costume slots
     `dlc_costume_a` .. `_p` (16) and `dlc_doppel_costume_a` .. `_d`; another member says these are placeholder
     slots, from which he had extracted the 360 DLC costumes. Gh0stBlade (2014-03-16, with his Noesis `.RAW` image
@@ -113,9 +125,37 @@ that comes only from a search snippet or secondary summary, or that could not be
     mesh files... The game just won't have any of it. Until I can find a way of swapping individual meshes without
     the game freezing, I won't be porting the DLC costumes." **Why it stopped** (2019-05-29, another member): "He did
     start, but I think he eventually gave up on it. IIRC shaders were proving to be too much of a hassle".
-- Not read (login and archive both unavailable): the 2013 thread t=198260 itself. Per search snippets only
-  (unverified): Gh0stBlade had a CDRM decompressor/recompressor and a DRM splitter/repacker ("there's a lot more to
-  the DRM format than what it looks like"), and an earlier group attempt was abandoned.
+  * **[PC] Beneath the Ashes and Lara's Shadow DLC Pack** (t=198260, 2013-03 to 2023-01, 234 posts), Gh0stBlade:
+    2013-03: the 2011 group never really formed, the unpacker/injector of another member was not finished, and "there
+    are no injection/repack tools for the game so sadly, it's not possible at this time". 2014-08-17: "I have made
+    out enough of the mesh/drm formats to be able to edit/re-inject files", but swapping the mesh of one costume DRM
+    into another still froze the game; "I cannot see the stages being possible on PC ... too much hard-coded";
+    "The shaders/material formats are so unknown though, it's making this project hell"; idea: "re-use existing
+    shaders that match" (what upstream's `pc_copy` shader route does). His tool set then: Gibbed's bigfile
+    extractor, his CDRM decompressor and DRM section extractor, and a Noesis mesh importer (with Chrrox) that
+    decodes "Xbox Normals" - an independent check for our DEC3N table (finding 37).
+  * **CD trying to bring the DLC to PC** (t=225774, 2021-02 to 2026-10, 169 posts): the 2021 statements of Crystal
+    Dynamics (legal progress, resources to be decided), then years of waiting; 2025-03 members point to
+    XenonRecomp / XenosRecomp (hedge-dev) as a possible native route; 2026-10 members report fan ports of other
+    360-exclusive DLCs to PC (Overlord II "Battle Rock Nemesis", Prince of Persia 2008 "Epilogue"), and one member
+    shows an own work-in-progress TRU DLC port ("I'm in-game", 2026-10-12; video 2026-10-17 - whether this is the
+    trudlcport author is not stated).
+  * Screenshots posted in these threads (linked to the forum members' original uploads, not copied into this
+    repository; checked online 2026-10-29):
+
+    | Screenshot | What it shows | Useful for |
+    |---|---|---|
+    | [Xbox DLC mission screen in Xenia](https://i.imgur.com/od0lwMJ.png) (t=198260, 2020) | "Beneath the Ashes" selected, title light blue centred above the description, PLAY MISSION / RETURN TO MAIN MENU | independent check of the Xbox reference in `docs/DLC_MENU.md` |
+    | [First Xbox model on PC](https://i.imgur.com/y98Qy2j.png) (t=178907, 2020-06) | Gh0stBlade's converted Lara model in the PC game | the state of the earlier attempt |
+    | [Noesis "trumesh" viewer](https://i.imgur.com/XsAcHPW.png) (t=198260) | a TRU mesh with skeleton in Noesis | an independent mesh reader to cross-check converted meshes |
+    | [Xbox Marketplace entries](https://i.imgur.com/T5WGw3I.png) (t=198260) | Beneath the Ashes released 2009-02-24, Lara's Shadow 2009-03-10 | background |
+
+    Two 2021 screenshots of a costume loaded from `patch.000` in the PC game (white heavy snow outfit in a DLC
+    costume slot) are forum album pictures visible to logged-in users only; they are described above, not linked.
+    One shows the level costume menu of Jan Mayen Island on PC listing "Snow Heavy", "Snow Light" and **"Extra
+    Costume 14"** (the `patch.000` costume, selected, with its preview image) - the DLC costume slots are already
+    wired into the PC game's per-level costume menu; for the costume packs (`docs/COSTUMES.md`) only the converted
+    files are missing.
 - Why earlier attempts stalled: whole-file or whole-mesh swaps without id remapping, relocation rewriting and
   section-level conversion froze the PC game, and the shaders were the wall. trudlcport's generic converter solved
   the first part; the shaders are our open stage 3 - the same wall.
