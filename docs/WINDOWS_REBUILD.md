@@ -669,6 +669,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      PC file, 24 relocation lists remapped, 7 sections appended).
    * Open: test in game (PDA journal lists DLC 1 + DLC 2, DLC 2 control pages); which `g_pda` to install when only DLC 1
      or both are installed (finding 38).
+41. **The DLC mission screen has six slots; DLC 1 is level 1, DLC 2 is level 2 - an entry most likely appears when
+    its start file exists.**
+   * `generalbank.drm` script PC id 104 (the mission screen, `docs/DLC_MENU.md`) names `dlc_level1_start.drm` ..
+     `dlc_level6_start.drm` and `dlc_level1_preview` .. `dlc_level6_preview` (`tools/drm_strings.py`).
+   * DLC 1 ships `dlc_level1_start.drm`, DLC 2 `dlc_level2_start.drm` (+ `_map`). The installed B138 tree has
+     `dlc_level1_start` only but the preview images of levels 1 and 2 (and the DLC 2 control pages) - and the PC menu
+     lists only *Beneath the Ashes*. So the entry most likely depends on the start DRM, not on the image (not read
+     from the script code yet - an in-game test decides).
+   * The menu item itself ("Downloadable content" in the main menu) is the `generalbank.drm` patch of the B138 kit
+     (`tools/menu_dlc_patch.py`, variant B); it is not pack-specific, so DLC 2 should not need another menu patch.
+   * `tools/dlc_finish_build.py` (new) finishes a tree for testing: copy a stage-2b tree, replace/drop files (merged
+     `g_pda`), string tables (`locals.py build`: one table for both DLCs, from the title update) and padshock, then
+     `tree_check.py`. DLC 2: `work/rebuild/dlc2_test/mods`, 166 DRMs, 0 out-of-bounds relocations.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
