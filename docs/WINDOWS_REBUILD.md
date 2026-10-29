@@ -787,6 +787,14 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      relocations; test tree 3 `work/rebuild/dlc2_test3/mods` (only `generalbank.drm` differs from test tree 1).
    * Note for DLC 2: the intro trigger compares with `dlc_level1_start` only in the part read so far - whether the TU
      handles `dlc_level2_start` the same way is not checked yet (the test will tell).
+   * **Test 3 (2026-10-29 19:05): same freeze + crash, same signature** (Windows log: exception 0xc0000005, module
+     unknown, offset 0x00000002). So the native call was not the (only) cause - kept as a ruled-out lead.
+   * Next lead - script 6 layout (scratch): functions 34 / prototypes 30 / states 5 in retail, TU and PC; members
+     retail 198, **TU 211**, PC 198; **vtable size retail 52, TU 52, PC 53** (one more virtual slot on PC, presumably
+     a PC-only virtual function of the parent class); prototype name Symbols PC = Xbox + 2. A converted TU script 6
+     with 52 vtable entries lets the engine read slot 53 beyond the table -> garbage pointer -> jump to a small
+     address. The probe converted without the PC template (`template=False`); next: convert with the template
+     (`base_convert_check.py --template`) and check vtable size and members.
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
