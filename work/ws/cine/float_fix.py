@@ -29,6 +29,10 @@ def main():
             xd = x['data']; pd = bytearray(p.data)
             if len(xd) != len(pd): continue
             r = R.parse(x['reloc'], 'be'); sl = {a for a, _ in r.internal} | {o for _, o in r.idref}
+            # Windows rebuild (finding 39): skip character-model DTPs - header 04c20453 with array pointers at +0x24 and
+            # +0x34 (Lara and costume models: mostly 16-bit arrays, PC lara.drm 96.8 % s16), the reason upstream skips
+            # 'costume' files; the DLC 2 doppelganger models have this layout without 'costume' in their name
+            if xd[:4] == b'\x04\xc2\x04\x53' and {0x24, 0x34} <= {a for a, _ in r.internal}: continue
             ok = lambda o: 0 <= o and o + 4 <= len(xd) and o not in sl and plaus(xd[o:o + 4], '>', False) and pd[o:o + 4] == xd[o:o + 4][::-1]
             for o in range(0, len(xd) - 3, 4):
                 w = xd[o:o + 4]; cur = bytes(pd[o:o + 4])

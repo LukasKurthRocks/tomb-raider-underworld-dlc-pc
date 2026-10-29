@@ -619,6 +619,38 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      versions, only DLC 2 -> pack11 versions, both -> most likely the pack11 versions (newer; `g_pda` is a superset),
      but the goo effects are not a superset, and which copy the Xbox loads when both packages are installed is not
      known yet. Test in Xenia/in game before the installer offers "both".
+39. **`float_fix` would have damaged the DLC 2 doppelganger models - they are Lara-type character models.**
+   * First DLC 2 stage 2b: `float` changed 16 243 words, 16 105 of them in DTP 22493 of `doppelganger_casual.drm` and
+     DTP 25050 of `lara_doppelganger.drm` (DLC 1: 60 words). New read-only tools to check it without a reference:
+     `tools/dtp_word_classes.py` (how a PC DTP encodes each word of its Xbox source: s32 / s16 / raw / same) and
+     `tools/dtp_format_scan.py` (all DTPs of one header format in the Xbox base game and the packs).
+   * The two DTPs have header `04c20453` and relocated array pointers at +0x24 and +0x34, like the character-model
+     DTPs of every Lara costume of the base game (`lara.drm` 535 252 bytes, `lara_bikini.drm`, the wetsuits, ...)
+     and of the DLC costume files. Their PC versions are almost entirely 16-bit data:
+
+     | DTP | s32 | s16 |
+     |---|---|---|
+     | base `lara.drm` 12649 vs PC | 2.5 % | 96.8 % |
+     | base `lara_bikini.drm` 12601 vs PC | 2.5 % | 96.9 % |
+     | DLC 1 `dlc_costume_o.drm` 21090 vs B138 | 2.5 % | 96.8 % |
+     | DLC 2 `doppelganger_casual.drm` 22493, our conversion | 3.1 % | 96.1 % |
+     | the same after upstream's `float_fix` | 12.5 % | 86.7 % |
+
+     The converter was right; `float_fix` turned 16-bit pairs that look like floats into s32. Upstream avoids this by
+     name: `float_fix.py` skips files with 'costume' in the name - the doppelganger models have no such name. The
+     changes also cascaded: the fix checks the neighbours in the buffer it is changing, so each fixed word vouched
+     for the next (all 10 136 changes of DTP 22493 lie in its 16-bit array at 0x322ec-0x6947c).
+   * Three attempts, each checked against B138 on DLC 1 (dead ends kept on purpose):
+     1. neighbours from the unmodified DTP (no cascade): DLC 1 lost 11 correct changes (`dlc_dungeon.drm` float
+        pairs/triples need the cascade) - rejected;
+     2. skip every DTP with header `04c20453`: DLC 1 lost 11 correct changes (`dlc1_uo_water_wheel` 8,
+        `dlc1_uo_pillory` 3) - this header is a general DTP header (1 484 DTPs, `dtp_format_scan.py`) - rejected;
+     3. **skip DTPs with header `04c20453` AND array pointers at +0x24 and +0x34** (character models only; the small
+        object DTPs and `co_doppelganger` / DLC 1 `doppelganger` have neither): DLC 1 stage 2b **271 of 271 files
+        byte-identical, float 60 = B138**; DLC 2 float 138 words in 17 files, the doppelganger DTPs keep the
+        base-game pattern (96.1 / 96.2 % s16). Applied in `work/ws/cine/float_fix.py` (one marked condition).
+   * DLC 2 note: any rule that worked on DLC 1 can meet data DLC 1 does not have - check its changes against the
+     closest base-game structure (here `lara.drm`) before trusting a large count.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
