@@ -29,6 +29,11 @@
   mode and language, tools, the pipeline step by step, a pre-upload check
 - [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) – running the pipeline on Windows: missing glue scripts rebuilt,
   stage-by-stage comparison with B138, run log and findings
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) – overview of the Windows rebuild: data flow, steps, learned tables,
+  how results are verified
+- [docs/RELATED_WORK.md](docs/RELATED_WORK.md) – what we researched and found: earlier attempts to bring the TRU DLC
+  to PC (Tomb Raider Forums 2011-2026), cdcEngine tools, other porting/decomp/recomp projects, techniques worth
+  adopting
 - [docs/WS_MAP.md](docs/WS_MAP.md) – map of the author's `work/ws/` scripts, builds and overlay layers
 - [docs/DLC_MENU.md](docs/DLC_MENU.md), [docs/DLC2.md](docs/DLC2.md), [docs/COSTUMES.md](docs/COSTUMES.md) – DLC menu
   text fix (all six languages), notes on DLC 2 and the costume packs
