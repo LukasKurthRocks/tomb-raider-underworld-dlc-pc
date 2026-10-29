@@ -514,6 +514,14 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      shader tuples of those: **9 145 equal** to the PC material's tuple after mapping, 10 different, 0 with an
      unmapped shader (4 588 empty slots 0 / 0xffffffff kept). The idmap-derived maps reproduce the PC data - good
      enough to run the render tools. `work/render/` is ignored (derived from game data).
+   * **Render tools run on them** (log `logs/Manual_RenderTools_20261029_025732.log`, all exit 0):
+     `rend_extract.py dlc` (`dlc_render.pkl`); `shader_map.py`: 1 028 DLC shader libs, classes A 489 / B 234 /
+     C1 120 / C2 47 / C3 81 / D 57, **0 unmapped**, VS coverage violations 0, 391 of 565 new materials use only
+     (VS, PS) pairs that ship on PC; `material_rules.py`: 34 rule keys, in-sample exact 2 154 / leave-one-out exact
+     2 142; `material_dlc.py`: **804 DLC materials, 804 converted, 0 failed** (239 base materials, 231 of them
+     convert == PC; flags: 152 param count differs from the surrogate, 59 fewer textures, 11 tuple unseen);
+     `pc_shader_sections.py`; `terrain_validate.py`: 335 terrain pairs, all valid, 333 reloc-exact, 83 exact,
+     245 semantic. Next: convert with `assemble_dlc` (material 'dlc') and compare materials/meshes with B138.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
