@@ -153,7 +153,16 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   title-update script 6 calls something the PC exe does not have (most likely an engine native the TU's exe patch
   `default.xexp` added, or a script function/member that only the TU versions of other scripts define). The
   converted script on its own is not enough; next: list the calls (natives, prototypes, members) the TU script 6 makes
-  that the retail one does not, and check which exist on PC. Back to test tree 1 with one `-Restore`.
+  that the retail one does not, and check which exist on PC. Back to test tree 1 with one `-Restore` (done; "freeze,
+  then crash, no message").
+* Likely cause (scratch analysis of the 1 020 external relocations of the converted TU script 6): calls into other
+  scripts are external relocations **(section, offset inside that section)**; `drm_put_sections.py` remapped the
+  section, not the offset. 504 point to scripts identical on PC, 303 to same-size scripts with other contents, **213
+  to scripts whose PC version has another layout** (e.g. 63: 7 083 -> 8 619 bytes, 87: 5 223 -> 5 735, 93, 82 - UI
+  classes) - those offsets land in the wrong place on PC. The author solved the same thing by hand for his widescreen
+  port of the mission screen (`tools/dlc_screen_widescreen.py`: "call targets mapped by prototype name order",
+  e.g. uiscreen +0xa0c -> +0xa7c). Next: map every external target (section, offset) to the function / member it
+  names in the converted TU script and to the same one in the PC script.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
