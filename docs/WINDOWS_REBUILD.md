@@ -651,6 +651,24 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
         base-game pattern (96.1 / 96.2 % s16). Applied in `work/ws/cine/float_fix.py` (one marked condition).
    * DLC 2 note: any rule that worked on DLC 1 can meet data DLC 1 does not have - check its changes against the
      closest base-game structure (here `lara.drm`) before trusting a large count.
+40. **`g_pda.drm` (PDA): merge the DLC sections into the PC version instead of replacing it.**
+   * Every DLC pack ships a complete replacement `g_pda.drm`; the PC game has its own in `patch.000`. Upstream leaves
+     `g_pda` out of the DLC 1 kit (B138 has none) - our DLC 1 tree still contains it (the one "extra" file of
+     `compare_b138`), to be dropped there the same way.
+   * `tools/gpda_compare.py` (new, read-only), sections against the Xbox base `g_pda`: Xbox base 425, PC base 426;
+     pack10 366 unchanged / 53 changed / 4 new; **pack11 373 unchanged / 46 changed (28 scripts, 13 textures, 5 DTPs)
+     / 9 new (4 scripts, 4 textures, 1 DTP)**; 6 base sections are not in pack11. Of the 373 unchanged sections our
+     conversion already gives the PC bytes for 347; the other 26 are 17 textures, 8 waves, 1 mesh (converter
+     differences, no scripts or DTPs).
+   * `tools/drm_merge_pc.py` (new): start from the converted pack11 file; unchanged base sections take the PC section
+     (data + relocations); changed and new sections stay converted; PC sections the converted file lacks (PC-only and
+     the 6 dropped ones) are appended. First attempt: 23 sections with out-of-bounds relocations - **external
+     relocations address sections by their index in the file**, so the relocations of every section taken from the PC
+     file are remapped (PC index -> (type, id) -> index in the merged file). Result `work/rebuild/dlc2_merge/g_pda.drm`:
+     435 sections, read back, 0 out-of-bounds relocations, all 373 unchanged sections = PC bytes (50 taken from the
+     PC file, 24 relocation lists remapped, 7 sections appended).
+   * Open: test in game (PDA journal lists DLC 1 + DLC 2, DLC 2 control pages); which `g_pda` to install when only DLC 1
+     or both are installed (finding 38).
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

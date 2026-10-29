@@ -112,7 +112,10 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   records (+0xc, +0x1c, +0x2c, ... in many DTPs, ~38-42 each) - one field type the learned table split wrongly,
   corrected from real base-game PC bytes of >= 90 % identical DTPs. Same kinds of byte permutation as on DLC 1.
   Judged trustworthy (unlike `float` on these files).
-* Next: the `g_pda` merge, locals/padshock for pack11, then a first test in the game.
+* `g_pda.drm` merged into the PC version (`tools/drm_merge_pc.py`, finding 40): 55 DLC 2 sections (changed + new)
+  from our conversion, all 373 unchanged base sections = PC bytes, 7 PC sections appended, relocations remapped;
+  0 out-of-bounds relocations. Output `work/rebuild/dlc2_merge/g_pda.drm` (not yet placed into a tree).
+* Next: locals/padshock for pack11, a DLC 2 install tree (with the merged `g_pda`), then a first test in the game.
 
 ## What the DLC 1 rebuild taught us for DLC 2 (checklist, kept up to date)
 
