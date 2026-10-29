@@ -44,6 +44,10 @@
     output files (Convert: 300 DRM files) also show percent and an estimate. Every 30 s a "still running" line is
     written to the console and the log.
 
+    Processes: the heavy converters (dlc_convert_all, ~18 GB RAM each) run -Jobs processes, the light tools
+    (audio, comparisons) -LightJobs. 0 = automatic: Jobs = (free RAM - 8 GB) / 18 GB, between 1 and 3;
+    LightJobs = logical CPUs - 4, at most 24 (cores left for other work). Passed as TRUDLC_JOBS / TRUDLC_JOBS_LIGHT.
+
     -Verbose shows steps, -Debug the command lines, -Trace adds a PowerShell line trace.
 
 .EXAMPLE
@@ -55,6 +59,8 @@
 param(
     [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
+    [ValidateRange(0, 16)][int]$Jobs = 0,
+    [ValidateRange(0, 64)][int]$LightJobs = 0,
     [switch]$Trace
 )
 
@@ -269,6 +275,14 @@ try {
     $ffmpeg = Join-Path $root 'bin\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe'
     if (Test-Path -LiteralPath $ffmpeg) { $env:TRUDLC_FFMPEG = $ffmpeg }
     Write-Log "ffmpeg: $(if ($env:TRUDLC_FFMPEG) { $env:TRUDLC_FFMPEG } else { 'from PATH' })" -Level DEBUG
+    # process counts (docs/WINDOWS_REBUILD.md finding 36: one converter process needs ~18 GB, light tools < 20 MB)
+    $freeGb = [int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB)
+    $cpus = [int](Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
+    if ($Jobs -eq 0) { $Jobs = [Math]::Max(1, [Math]::Min(3, [int][Math]::Floor(($freeGb - 8) / 18))) }
+    if ($LightJobs -eq 0) { $LightJobs = [Math]::Max(1, [Math]::Min(24, $cpus - 4)) }
+    $env:TRUDLC_JOBS = $Jobs
+    $env:TRUDLC_JOBS_LIGHT = $LightJobs
+    Write-Log ('processes: heavy {0}, light {1} (free RAM {2} GB, {3} logical CPUs)' -f $Jobs, $LightJobs, $freeGb, $cpus) -Level VERBOSE
     foreach ($dir in $outputDirs[$Step]) { New-Item -ItemType Directory -Force -Path (Join-Path $clone $dir) | Out-Null }
 
     $toolCount = @($steps[$Step]).Count

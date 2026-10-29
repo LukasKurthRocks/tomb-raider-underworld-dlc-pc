@@ -49,7 +49,7 @@ def main(argv):
             if os.path.exists(r): jobs.append((rel, p, r))
             else: no_ref.append(rel)
     per_file, tot, errors = {}, collections.Counter(), []
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
+    with ProcessPoolExecutor(max_workers=int(os.environ.get('TRUDLC_JOBS_LIGHT') or os.cpu_count())) as ex:
         for rel, st in ex.map(compare_file, sorted(jobs)):
             per_file[rel] = st
             if 'error' in st: errors.append((rel, st['error'])); continue

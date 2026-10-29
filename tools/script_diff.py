@@ -72,7 +72,7 @@ def main(argv):
             if os.path.exists(os.path.join(ref, rel)): jobs.append((rel, p, os.path.join(ref, rel)))
     from concurrent.futures import ProcessPoolExecutor
     tot, per_file, out = collections.Counter(), collections.Counter(), {}
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
+    with ProcessPoolExecutor(max_workers=int(os.environ.get('TRUDLC_JOBS_LIGHT') or os.cpu_count())) as ex:
         for rel, words in ex.map(scan_file, sorted(jobs)):
             if not words: continue
             out[rel] = words

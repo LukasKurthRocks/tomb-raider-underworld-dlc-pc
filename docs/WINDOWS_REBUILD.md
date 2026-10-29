@@ -526,9 +526,18 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      | `dlc_audio_build.py`, `compare_*.py`, `script_diff.py` | < 20 MB | up to 36 |
 
      Pool workers show up as "(no script)" in the sampler (their command line does not name the tool).
-     Consequence for a shared limit (`TRUDLC_JOBS`, to build): light tools may keep many processes (cap ~24 to leave
-     cores for the user); Convert / Assemble at most floor(free RAM / 18 GB) - on this 64 GB PC 2, with nothing else
-     running 3.
+     Consequence for a shared limit: light tools may keep many processes (cap ~24 to leave cores for the user);
+     Convert / Assemble at most floor(free RAM / 18 GB) - on this 64 GB PC 2, with nothing else running 3.
+   * **Equivalence test passed:** `dlc_convert_all.py --jobs 2` (free RAM stayed > 4 GB, watched every 30 s) wrote
+     the same **300 of 300 files byte for byte** as the sequential run (`tools/tree_compare.py`, new), same symbol
+     and route statistics; **2 824 s instead of 4 683 s**.
+   * Settings now: `Invoke-TruPipeline.ps1 -Jobs N -LightJobs N` (0 = automatic: Jobs = (free RAM - 8 GB) / 18 GB
+     between 1 and 3, LightJobs = logical CPUs - 4, at most 24), passed as `TRUDLC_JOBS` / `TRUDLC_JOBS_LIGHT`;
+     read by `dlc_convert_all.py`, `dlc_assemble_build.py` (heavy) and `dlc_audio_build.py`, `compare_sections.py`,
+     `compare_audio.py`, `script_diff.py` (light; unset = all CPUs as before). Upstream's `rend_extract.py` /
+     `generic_cache.py` keep their fixed 8 processes.
+   * `dlc_assemble_build.py` got the same `--jobs` (per-DRM tasks, report rows in task order); equivalence test
+     against the sequential `asm_stage1` running.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

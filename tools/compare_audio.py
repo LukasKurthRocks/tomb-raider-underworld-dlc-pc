@@ -138,7 +138,7 @@ def main(argv):
             if f.endswith('.drm'): drms.append((rel, p, r))
             elif f.endswith('.mul'): muls.append((rel, p, r))
     waves, mres = [], []
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
+    with ProcessPoolExecutor(max_workers=int(os.environ.get('TRUDLC_JOBS_LIGHT') or os.cpu_count())) as ex:
         for res in ex.map(wave_file, sorted(drms)): waves.extend(res)
         mres = list(ex.map(mul_file, sorted(muls)))
 

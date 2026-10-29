@@ -10,8 +10,9 @@ Usage: python3 -I tools/dlc_convert_all.py [--media] [--write] [name-substring .
                   material 'dlc' (model points, DTP lists/align, SoundPlex fields, script SArray counts, tag 0x403,
                   portals, uberobject descriptors, link ratios, analog id guard); off by default as before
   --out DIR : write to DIR instead of work/generic/out/ (experiments; subfolders pack10/pack11 as usual)
-  --jobs N  : N processes (default 1). Each loads the store and the learned tables once; a file written by two
-              records is written only by the last one, as before
+  --jobs N  : N processes (default: environment TRUDLC_JOBS, else 1). Each loads the store and the learned tables
+              once and needs ~18 GB RAM; a file written by two records is written only by the last one, as before.
+              Verified: --jobs 2 writes the same 300 files byte for byte as --jobs 1 (finding 36)
 """
 import sys, os, pickle, struct, collections, json, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -77,7 +78,8 @@ def convert_one(task):
 def main(argv):
     write = '--write' in argv
     out_arg = argv[argv.index('--out') + 1] if '--out' in argv else None
-    jobs = int(argv[argv.index('--jobs') + 1]) if '--jobs' in argv else 1
+    # --jobs N, else TRUDLC_JOBS (set by Invoke-TruPipeline.ps1 from the free memory), else 1
+    jobs = int(argv[argv.index('--jobs') + 1]) if '--jobs' in argv else int(os.environ.get('TRUDLC_JOBS') or 1)
     jobs_arg = argv[argv.index('--jobs') + 1] if '--jobs' in argv else None
     pats = [a for a in argv if not a.startswith('--') and a not in (out_arg, jobs_arg)]
     dlc = pickle.load(open(os.path.join(W, 'dlc_drms.pkl'), 'rb'))

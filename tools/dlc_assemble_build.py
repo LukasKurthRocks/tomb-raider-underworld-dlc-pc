@@ -9,7 +9,8 @@ fixes. The non-DRM files (music, audio streams, images, locals, padshock, tr8) a
 tree (dlc_media_build.py output); only the DRMs are replaced, at the rel path of their Xbox name.
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -u -I -X utf8 tools/dlc_assemble_build.py SRC_MODS_DIR OUT_MODS_DIR [--only SUBSTR]
+  ..\\bin\\venv\\Scripts\\python.exe -u -I -X utf8 tools/dlc_assemble_build.py SRC_MODS_DIR OUT_MODS_DIR [--only SUBSTR] [--jobs N]
+  --jobs N: N processes (default: environment TRUDLC_JOBS, else 1); ~16 GB RAM each (finding 36)
   e.g. work/rebuild/stage1/mods work/rebuild/asm_stage1/mods   (OUT is replaced, must be below work/rebuild)
 Report: <OUT>/../assemble_report.tsv (per DRM: status, bytes, seconds, bad, missing shaders, routes).
 """
@@ -39,35 +40,64 @@ def main(argv):
     if os.path.commonpath([os.path.realpath(out), rebuild]) != rebuild: sys.exit('OUT must be below work/rebuild: ' + out)
     if os.path.exists(out): shutil.rmtree(out)
     shutil.copytree(src, out)
-    import assemble_dlc as A, dlc_generic as DG, generic_store
     from archive import Archive
     from names import crc
     from convert_dlc import R as ROOT, PACKS
-    store = generic_store.load(); ids = DG.DlcIds(store, None)
+    jobs = int(os.environ.get('TRUDLC_JOBS') or 1)
+    if '--jobs' in argv: jobs = int(argv[argv.index('--jobs') + 1])
     arc = Archive(ROOT + PACKS[0], 'be')
     rep = open(os.path.join(os.path.dirname(os.path.abspath(out)), 'assemble_report.tsv'), 'w')
     rep.write('relpath\tstatus\tbytes\tsec\tbad\tmissing_sh\troutes\n')
     names = pack10_drms(); st = collections.Counter(); t00 = time.time()
-    print('pack10 DRM names', len(names), flush=True)
+    print('pack10 DRM names', len(names), 'jobs', jobs, flush=True)
+    tasks = []
     for name in names:
         rel = name[len('xenon-w\\'):].replace('\\', '/')
         if only and only not in rel: continue
-        recs = [r for r in arc.find(crc(name)) if r['spec'] == 0xffffffff]
+        h = crc(name)
+        recs = [i for i, r in enumerate(arc.idx) if r['hash'] == h and r['spec'] == 0xffffffff]
         if not recs: rep.write('%s\tNOT_IN_PACK10\n' % rel); st['not_in_pack'] += 1; continue
-        t0 = time.time()
-        try:
-            data, r = A.assemble(arc.read(recs[0]), ids, store, A.dlc_shader_src, wave='silence', pc_copy=True,
-                                 template=True, material='dlc')
-        except Exception as e:
-            rep.write('%s\tERROR %s: %s\n' % (rel, type(e).__name__, str(e)[:150])); st['error'] += 1
-            print(rel, 'ERROR', type(e).__name__, str(e)[:150], flush=True); continue
-        p = os.path.join(out, rel); os.makedirs(os.path.dirname(p), exist_ok=True)
-        open(p, 'wb').write(data); st['ok'] += 1
-        rep.write('%s\tOK\t%d\t%.1f\t%s\t%s\t%s\n' % (rel, len(data), time.time() - t0, r['bad'], r['missing_shaders'],
-                                                     dict(r['routes'])))
-        print('%-55s %6.1f s  bad %s  missing_sh %s' % (rel, time.time() - t0, r['bad'], r['missing_shaders']), flush=True)
+        tasks.append((rel, recs[0], out))
+    if jobs <= 1:
+        _init(); results = map(assemble_one, tasks)
+    else:
+        from concurrent.futures import ProcessPoolExecutor
+        ex = ProcessPoolExecutor(max_workers=jobs, initializer=_init)
+        results = ex.map(assemble_one, tasks, chunksize=1)
+    for rel, row, status in results:              # in task order, whatever the number of processes
+        rep.write(row); st[status] += 1
+        print(row.rstrip('\n').replace('\t', '  ')[:150], flush=True)
+    if jobs > 1: ex.shutdown()
     rep.close()
     print('DRMs', dict(st), 'total %.0f s' % (time.time() - t00))
+
+
+_CTX = {}
+
+
+def _init():
+    """per process: store and id map (the assemble route needs ~16 GB per process, finding 36)"""
+    import dlc_generic as DG, generic_store
+    from archive import Archive
+    from convert_dlc import R as ROOT, PACKS
+    store = generic_store.load()
+    _CTX.update(store=store, ids=DG.DlcIds(store, None), arc=Archive(ROOT + PACKS[0], 'be'))
+
+
+def assemble_one(task):
+    """(rel, record index, out dir) -> (rel, report row, status); writes <out>/<rel>"""
+    import assemble_dlc as A
+    rel, ri, out = task
+    t0 = time.time()
+    try:
+        data, r = A.assemble(_CTX['arc'].read(_CTX['arc'].idx[ri]), _CTX['ids'], _CTX['store'], A.dlc_shader_src,
+                             wave='silence', pc_copy=True, template=True, material='dlc')
+    except Exception as e:
+        return rel, '%s\tERROR %s: %s\n' % (rel, type(e).__name__, str(e)[:150]), 'error'
+    p = os.path.join(out, rel); os.makedirs(os.path.dirname(p), exist_ok=True)
+    open(p, 'wb').write(data)
+    return rel, '%s\tOK\t%d\t%.1f\t%s\t%s\t%s\n' % (rel, len(data), time.time() - t0, r['bad'], r['missing_shaders'],
+                                                   dict(r['routes'])), 'ok'
 
 
 if __name__ == '__main__':

@@ -68,7 +68,7 @@ def main(argv):
     rel_by_name = {os.path.basename(r): r.replace('/', '\\').replace(os.sep, '\\') for _, _, r in drms}
 
     reps = []
-    with ProcessPoolExecutor(max_workers=os.cpu_count(), initializer=_init, initargs=(rel_by_name,)) as ex:
+    with ProcessPoolExecutor(max_workers=int(os.environ.get('TRUDLC_JOBS_LIGHT') or os.cpu_count()), initializer=_init, initargs=(rel_by_name,)) as ex:
         for r in ex.map(_wave_job, [(s, o) for s, o, _ in drms]):
             reps.append(r)
             if r['waves']: print('wave %-50s waves=%4d swapped=%4d  %s' % (r['file'], r['waves'], r['swapped'], r['status']), flush=True)
@@ -83,7 +83,7 @@ def main(argv):
                 rel = os.path.relpath(os.path.join(dp, f), src)
                 muls.append((os.path.join(dp, f), os.path.join(out, rel), rel))
     mreps = []
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:
+    with ProcessPoolExecutor(max_workers=int(os.environ.get('TRUDLC_JOBS_LIGHT') or os.cpu_count())) as ex:
         for r in ex.map(_mul_job, [(mode, m) for m in sorted(muls)]):
             mreps.append(r); print('mul  %-70s ch %s  %s' % (r['file'], r.get('channels', '-'), r['status']), flush=True)
     json.dump(mreps, open(os.path.join(rep_dir, 'mul_audio_report.json'), 'w'), indent=1)
