@@ -942,6 +942,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      which lacks these two names, so they stayed `UNNAMED_*` (not installable). Converted with
      `raw_image_convert.py file` (1280x720, checked as PNG) into `work/rebuild/dlc2_loading_bg/`; test tree 12 = 11 +
      both images (plain name and the `_004` name the game asked for).
+   * **Test 12 (2026-10-29 22:23): the DLC 2 intro cinematic plays** (`pdlc2_000_fight`: the Doppelganger fights
+     Lara, Natla lifts her - screenshots in the workspace) - first time on PC. Problems: (1) about one frame every
+     two seconds with looping sound; (2) Lara wears the costume chosen before the level (camo bikini) - the
+     costume/Doppelganger choice is still the open "dlc2data" point; (3) after the intro a crash (22:32:52,
+     `tru.exe` +0x1a8616): a `cdc::UIVec3TimeLine` (UI animation of a vec3 property) walks its target list (+0x28),
+     one target points into the stack (0x0019fae4 - an object that no longer exists) and the list ends early.
+   * Slowness samples (the running game, `cdb -pv` stack of the main thread, six samples): out of focus the game
+     sleeps (`Sleep(100)`); in focus one sample in Direct3D re-uploading a managed 512x512 mip-mapped texture during a
+     draw (`d3d9 UpdateTextures -> CreateSurface`), three in a float loop (`tru.exe` +0x45f0xx, called from the
+     game update +0x5b8254). Not conclusive yet.
+   * Checked and ruled out for the TU-only members: their struct types (320, 306, 301, 361, 223) have the same init
+     shapes on Xbox and PC (unlike 351). `.mus` files of the DLC 2 music are installed (25). The DLC 2 cine fix ran
+     (6 command DTPs, e.g. `pdlc2_000_fight` 100 of 227 words changed).
+   * Last file names in the crash dump's memory: `cinstream\pdlc2_000_fight.mul`, `music\dlc2_level2_start_mus_01.mus`
+     / `.mul`, `..._amb_01`, `wp_dlc_handgun.drm`, `co_cine000_impact.drm`, `co_dlc_lara.drm`, `dlc_fx_goo_*`,
+     `camerashake*`, `dlc_costume*` (all present).
    * Author's history (found only now - a forgotten jump point): `tools/generalbank_dlc.py` (2026-10-09) already put
      the converted TU script 6 into the PC generalbank (same native-93 neutralisation at 0x7928); his note in
      `tools/dlc_generic.py` says "replacing it crashes the base game (gb1.dmp)", so he patched DLC 1's start script
