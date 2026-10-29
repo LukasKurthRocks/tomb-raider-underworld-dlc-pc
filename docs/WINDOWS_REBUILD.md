@@ -1034,6 +1034,18 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      spielen" reliably failed twice; the run was stopped there to avoid a trial-and-error loop. A gamepad (or a
      keyboard path for the ring) would make this deterministic. After an error box TRU opens its Setup dialog;
      "Abbrechen" ends the game by itself.
+   * **Code review of this session's tools (2026-10-30 night, 10 findings, all fixed in 01d9bea)**:
+     `script_init_from_pc.py` moved relocations one by one (two pointers that move by one word could overwrite each
+     other), learned field rules after the re-layout (wrong Xbox/PC pairs for re-laid-out nodes) and wrote output
+     with out-of-bounds relocations; `shader_const_fix.py` found the END token with an unaligned byte search and kept
+     its own copy of the port's library list; `script_vtable_insert.py` did not check that IN and REF have the same
+     section at the copied VTE's external indices, crashed on null / external vtable slots and wrote output with
+     out-of-bounds relocations; `exe_xref.py --write` used a mnemonic list (missed `inc` / `or` ..., counted `cmp`)
+     - now capstone's operand access flags; `sym_calibration_check.py` could write a non-injective map (two
+     calibration entries for one PC Symbol). Documented as a limit instead of changed: arguments / locals are paired
+     by name across functions, not per function (surplus is counted). Re-run after the fixes: shader fix, retail and
+     TU init outputs and `sym_base_evidence.json` are **byte-identical** to before - the findings did not affect the
+     results so far.
    * **Slow intro, sampled (2026-10-29 23:15-23:25, test tree 13)**: a background watcher took a stack sample of the
      main thread every few seconds while the game ran in the foreground (`cdb -pv -pn tru.exe -c "~0 kv; qd"`,
      nothing ended; 49 samples; the same crash at +0x1a8616 at the end). **42 of 49 samples** are in one path: game
