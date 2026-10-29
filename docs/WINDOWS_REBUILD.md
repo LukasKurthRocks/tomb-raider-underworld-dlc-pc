@@ -494,6 +494,20 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      learn from base pairs only).
    * Since 2026-10-29 both are tools of step Prep (`model_point_fix.py learn`, `model_point_fix.py selftest` - aborts
      the step if a rule changes a real PC word - and `dtpid_evidence.py`), so a fresh run needs no manual step.
+36. **Convert and the assemble route are single-process - and one process needs a lot of memory.**
+   * Why a Convert run takes 42-80 min (2026-10-29, measured while it ran): `python` used ~1.3 of 36 logical
+     CPUs, total CPU load 5 %, disks idle, 41 of 64 GB RAM free. `dlc_convert_all.py` (and `dlc_assemble_build.py`)
+     convert the DRMs one after another in one process, so the run time follows the speed of one core and
+     whatever else runs on the PC.
+   * `dlc_convert_all.py --jobs N` (new, default 1 = unchanged): tasks per pack record, each process loads the
+     store, the id map and the learned tables once; a file written by two records (7 duplicate records) is written
+     only by its last record, as the sequential version did by overwriting.
+   * **First test failed on memory:** one converting process holds **11-15 GB private memory** (the sequential
+     Convert 18 GB), not the 2-3 GB its working set suggested. 6 processes next to a running Convert used all 64 GB
+     (free RAM 0, paging). Test stopped; the orphaned worker processes had to be ended by hand. Rule: at most
+     (free RAM / 15 GB) processes, i.e. **3 on a 64 GB PC with nothing else running**; never next to another Convert.
+   * Still to do: equivalence test (1 process vs N processes must give byte-identical files), then the same for
+     `dlc_assemble_build.py`.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
