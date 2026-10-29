@@ -9,6 +9,11 @@ All scripts run in Windows PowerShell 5.1 and PowerShell 7, are read-only unless
 write a log per run. `-Verbose` shows the steps, `-Debug` paths, hashes and command lines, `-Trace` adds a
 PowerShell line trace. Help: `Get-Help .\scripts\windows\<script>.ps1 -Full`.
 
+Shared helpers live in `TruCommon.psm1` next to the scripts; every script imports it at the top. It holds the run
+log writer (`Set-TruLogFile`, `Write-Log`), the workspace paths (`Get-TruWorkspacePath`), the Steam game folder search
+(`Find-TruGamePath`) and `Get-Md5`. Its functions take over the calling script's `-Verbose`/`-Debug` and
+`ErrorActionPreference`, so they behave like the former per-script copies. Keep the module in this folder.
+
 ## Workspace
 
 The repository sits inside a work folder (`<workspace>`) that also holds everything that must never be committed.

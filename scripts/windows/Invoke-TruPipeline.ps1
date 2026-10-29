@@ -32,7 +32,7 @@
                -> work\rebuild\stage2a\mods (replaced on every run) + compare_stage2a.json
       Assemble upstream's full stage-1 route (optional, after Media): render tables (render_tables_build build,
                rend_extract pairs/dlc, shader_map, material_rules, material_dlc, pc_shader_sections,
-               terrain_validate), dlc_assemble_build (assemble_dlc, material 'dlc', PC shader sections),
+               terrain_validate, mesh_tables_build), dlc_assemble_build (assemble_dlc, material 'dlc', PC shader sections),
                dlc_audio_build, compare_b138, compare_sections
                -> work\render\*, work\rebuild\asm_stage1\mods, asm_stage2a\mods (+ compare_asm_stage2a.json)
 
@@ -66,14 +66,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
+# shared helpers: Write-Log, Set-TruLogFile, Get-TruWorkspacePath, ...
+Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
 
-# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
-# the repository); this script lives in <repository>\scripts\windows
-$repo   = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$root   = Split-Path -Parent $repo
-$clone  = $repo
+# <workspace> = the folder that holds the repository (see Get-TruWorkspacePath)
+$paths  = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
+$root   = $paths.Workspace
+$clone  = $paths.Repository
 $python = Join-Path $root 'bin\venv\Scripts\python.exe'
-$logDir = Join-Path $root 'logs'
+$logDir = $paths.Logs
 
 $align = '@7ff00000'          # bigfile part size (tools/archive.py ALIGN)
 $dlc   = '../data/Xenia-SteveRepack/Content/534307EC/00000002'
@@ -146,6 +147,7 @@ $steps = @{
         @('tools\material_dlc.py'),
         @('tools\pc_shader_sections.py'),
         @('tools\terrain_validate.py'),
+        @('tools\mesh_tables_build.py'),
         @('tools\dlc_assemble_build.py', 'work/rebuild/stage1/mods', 'work/rebuild/asm_stage1/mods'),
         @('tools\dlc_audio_build.py', 'work/rebuild/asm_stage1/mods', 'work/rebuild/asm_stage2a/mods'),
         @('tools\compare_b138.py', 'work/rebuild/asm_stage2a/mods', 'asm_stage2a'),
@@ -173,22 +175,7 @@ $progressHints = @{
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $logFile = Join-Path $logDir ('Invoke-TruPipeline_{0}_{1}.log' -f $Step, (Get-Date -Format 'yyyyMMdd_HHmmss'))
-
-function Write-Log {
-    param(
-        [string]$Message,
-        [ValidateSet('INFO', 'VERBOSE', 'DEBUG', 'WARN', 'ERROR')][string]$Level = 'INFO'
-    )
-    $line = '{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'), $Level, $Message
-    Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8
-    switch ($Level) {
-        'INFO'    { Write-Host $Message }
-        'VERBOSE' { Write-Verbose $Message }
-        'DEBUG'   { Write-Debug $Message }
-        'WARN'    { Write-Warning $Message }
-        'ERROR'   { Write-Host $Message -ForegroundColor Red }
-    }
-}
+Set-TruLogFile -Path $logFile
 
 function Get-ProgressCount {
     # number of output files written since the tool started (older files from a previous run do not count),

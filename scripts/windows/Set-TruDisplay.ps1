@@ -31,39 +31,25 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
+# shared helpers: Write-Log, Set-TruLogFile, Get-TruWorkspacePath, ...
+Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
 
-# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
-# the repository); this script lives in <repository>\scripts\windows
-$repo      = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$root      = Split-Path -Parent $repo
+# <workspace> = the folder that holds the repository (see Get-TruWorkspacePath)
+$paths     = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
+$root      = $paths.Workspace
 $regPath   = 'HKCU:\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics'
 $regNative = 'HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics'
 $rootPath  = 'HKCU:\Software\Crystal Dynamics\Tomb Raider: Underworld'
 $rootNative = 'HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld'
 $languageIds = @{ English = 0; French = 1; German = 2; Italian = 3; Spanish = 4; Dutch = 5 }
 $backupDir = Join-Path $root 'backup'
-$logDir    = Join-Path $root 'logs'
-$stamp     = Get-Date -Format 'yyyyMMdd_HHmmss'
+$logDir    = $paths.Logs
+$stamp    = Get-Date -Format 'yyyyMMdd_HHmmss'
 $valueNames = 'Fullscreen', 'LockWindowSize', 'LockWindowResolution', 'LockWindowAspect', 'LockedWindowWidth', 'LockedWindowHeight', 'EnableVSync', 'AdapterID'
 
 New-Item -ItemType Directory -Force -Path $logDir, $backupDir | Out-Null
 $logFile = Join-Path $logDir ('Set-TruDisplay_{0}_{1}.log' -f $stamp, $PSCmdlet.ParameterSetName)
-
-function Write-Log {
-    param(
-        [string]$Message,
-        [ValidateSet('INFO', 'VERBOSE', 'DEBUG', 'WARN', 'ERROR')][string]$Level = 'INFO'
-    )
-    $line = '{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'), $Level, $Message
-    Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8
-    switch ($Level) {
-        'INFO'    { Write-Host $Message }
-        'VERBOSE' { Write-Verbose $Message }
-        'DEBUG'   { Write-Debug $Message }
-        'WARN'    { Write-Warning $Message }
-        'ERROR'   { Write-Host $Message -ForegroundColor Red }
-    }
-}
+Set-TruLogFile -Path $logFile
 
 function Write-Values {
     param([string]$Label)

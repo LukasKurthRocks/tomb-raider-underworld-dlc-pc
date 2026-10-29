@@ -30,57 +30,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
+# shared helpers: Write-Log, Set-TruLogFile, Find-TruGamePath, Get-Md5, Get-TruWorkspacePath
+Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
 
-# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
-# the repository); this script lives in <repository>\scripts\windows
-$repo      = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$root      = Split-Path -Parent $repo
+# <workspace> = the folder that holds the repository (see Get-TruWorkspacePath)
+$paths     = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
+$root      = $paths.Workspace
 $backupDir = Join-Path $root 'backup\mods'
-$logDir    = Join-Path $root 'logs'
+$logDir    = $paths.Logs
 $mode      = if ($Restore) { 'Restore' } else { 'Install' }
 
 New-Item -ItemType Directory -Force -Path $logDir, $backupDir | Out-Null
 $logFile = Join-Path $logDir ('Install-TruModFile_{0}_{1}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'), $mode)
-
-function Write-Log {
-    param(
-        [string]$Message,
-        [ValidateSet('INFO', 'VERBOSE', 'DEBUG', 'WARN', 'ERROR')][string]$Level = 'INFO'
-    )
-    $line = '{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'), $Level, $Message
-    Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8
-    switch ($Level) {
-        'INFO'    { Write-Host $Message }
-        'VERBOSE' { Write-Verbose $Message }
-        'DEBUG'   { Write-Debug $Message }
-        'WARN'    { Write-Warning $Message }
-        'ERROR'   { Write-Host $Message -ForegroundColor Red }
-    }
-}
-
-function Find-TruGamePath {
-    # Steam library folders from the registry + libraryfolders.vdf; Tomb Raider: Underworld is app 8140.
-    $steam = (Get-ItemProperty -LiteralPath 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
-    if (!$steam) { return $null }
-    $libraries = @($steam)
-    $vdf = Join-Path $steam 'steamapps\libraryfolders.vdf'
-    if (Test-Path -LiteralPath $vdf) {
-        foreach ($match in [regex]::Matches((Get-Content -LiteralPath $vdf -Raw), '"path"\s+"([^"]+)"')) {
-            $libraries += $match.Groups[1].Value -replace '\\\\', '\'
-        }
-    }
-    foreach ($library in ($libraries | Select-Object -Unique)) {
-        $candidate = Join-Path $library 'steamapps\common\Tomb Raider Underworld'
-        Write-Log "Steam library candidate: $candidate" -Level DEBUG
-        if (Test-Path -LiteralPath (Join-Path $candidate 'tru.exe')) { return $candidate }
-    }
-    return $null
-}
-
-function Get-Md5 {
-    param([string]$Path)
-    (Get-FileHash -LiteralPath $Path -Algorithm MD5).Hash.ToLower()
-}
+Set-TruLogFile -Path $logFile
 
 if ($Trace) { Set-PSDebug -Trace 1 }
 try {

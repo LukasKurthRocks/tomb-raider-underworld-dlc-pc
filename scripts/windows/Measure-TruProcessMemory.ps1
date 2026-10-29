@@ -26,33 +26,18 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
+# shared helpers: Write-Log, Set-TruLogFile, Get-TruWorkspacePath, ...
+Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
 if ($Trace) { Set-PSDebug -Trace 1 }
 
-# <workspace> = the folder that holds the repository (bin, data, input, logs, backup, release - never in
-# the repository); this script lives in <repository>\scripts\windows
-$repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$root    = Split-Path -Parent $repo
-$logDir  = Join-Path $root 'logs'
+# <workspace> = the folder that holds the repository (see Get-TruWorkspacePath)
+$paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
+$logDir  = $paths.Logs
 $stamp   = Get-Date -Format 'yyyyMMdd_HHmmss'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $logFile = Join-Path $logDir ('Measure-TruProcessMemory_{0}.log' -f $stamp)
 $csvFile = Join-Path $logDir ('Measure-TruProcessMemory_{0}.csv' -f $stamp)
-
-function Write-Log {
-    param(
-        [string]$Message,
-        [ValidateSet('INFO', 'VERBOSE', 'DEBUG', 'WARN', 'ERROR')][string]$Level = 'INFO'
-    )
-    $line = '{0} [{1}] {2}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'), $Level, $Message
-    Add-Content -LiteralPath $logFile -Value $line -Encoding UTF8
-    switch ($Level) {
-        'INFO'    { Write-Host $Message }
-        'VERBOSE' { Write-Verbose $Message }
-        'DEBUG'   { Write-Debug $Message }
-        'WARN'    { Write-Warning $Message }
-        'ERROR'   { Write-Host $Message -ForegroundColor Red }
-    }
-}
+Set-TruLogFile -Path $logFile
 
 function Get-ToolName {
     # the first argument that ends in .py (tools\x.py), else the executable name
