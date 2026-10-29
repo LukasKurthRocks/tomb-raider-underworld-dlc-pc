@@ -1028,6 +1028,12 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      highlighted item follows the direction from the ring centre; click without moving the cursor); list menus
      (outfit, weapon) and dialogs take arrow keys / Enter (scan-code input). Path: ring -> "Inhalte zum
      Herunterladen" -> "Mission spielen" -> mission screen -> Enter -> outfit -> weapon.
+   * Limits of driving the ring menu by injected mouse motion (second run 00:26-00:28): the gain of the relative
+     motion varies (about 1.8x-2.1x), the highlight sticks to the LAST item the cursor crossed, so an item is reached
+     only when the path crosses no other item (worked: approach the DLC icon from the bottom right). Hitting "Mission
+     spielen" reliably failed twice; the run was stopped there to avoid a trial-and-error loop. A gamepad (or a
+     keyboard path for the ring) would make this deterministic. After an error box TRU opens its Setup dialog;
+     "Abbrechen" ends the game by itself.
    * **Slow intro, sampled (2026-10-29 23:15-23:25, test tree 13)**: a background watcher took a stack sample of the
      main thread every few seconds while the game ran in the foreground (`cdb -pv -pn tru.exe -c "~0 kv; qd"`,
      nothing ended; 49 samples; the same crash at +0x1a8616 at the end). **42 of 49 samples** are in one path: game
