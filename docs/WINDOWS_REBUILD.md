@@ -669,6 +669,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      PC file, 24 relocation lists remapped, 7 sections appended).
    * Open: test in game (PDA journal lists DLC 1 + DLC 2, DLC 2 control pages); which `g_pda` to install when only DLC 1
      or both are installed (finding 38).
+   * **Not safe as built (2026-10-29 22:40, test 12): a NEW BASE GAME crashed** after the opening (explosion and text
+     shown) at `tru.exe` +0xca260 - the `cdc::UIMenuWdgt` null-list crash of finding 43, its "count" field holding a
+     pointer to glyph-string init data next to the strings `pda_bg_1280` / `pda_bg_960`, i.e. a PDA script. The merged
+     file replaces **12 PC scripts** with their converted DLC versions (3347, 3360-3362, 3365, 3367, 3368, 213, 3248,
+     66, 3257, 3384) and adds 4 (26427, 26428, 24318, 90). Those converted base scripts have every problem script 6
+     had (finding 43): member init blocks in Xbox byte order and the Xbox layout of struct 351, Xbox glyph codes,
+     and **vtables one slot short** (3347: 55 vs PC 57, 3360: 40 vs 41, 3361: 49 vs 50, 3362: 37 vs 38, 3365, 3368,
+     3384: -1; they inherit from script 93, which has the PC-only slot 31); 3367, 213 and 66 also have more functions
+     than the PC version (DLC additions). In the DLC 2 level (tests 1, 5a-5f) the PDA was not opened, so it did not
+     show.
+   * Consequence: the merged `g_pda` needs the same port as script 6 (vtable slot, init from PC, struct re-layout,
+     names, call offsets) per replaced script, with extra care where the DLC version adds functions (vtable slots by
+     name). Until then test trees use the PC `g_pda` (test tree 13: `dlc_finish_build.py --drop g_pda.drm`).
 41. **The DLC mission screen has six slots; DLC 1 is level 1, DLC 2 is level 2 - an entry most likely appears when
     its start file exists.**
    * `generalbank.drm` script PC id 104 (the mission screen, `docs/DLC_MENU.md`) names `dlc_level1_start.drm` ..

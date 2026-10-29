@@ -177,6 +177,11 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   6 without its PC-only calls) runs. A full crash dump then showed the cause: wrongly converted member init values in
   script 6 (finding 43). Test trees 5e (retail script 6 + PC init values) and 9 (TU script 6 with every fix) built;
   results below once tested.
+* Tests 5e-13 (2026-10-29 evening, details in `docs/WINDOWS_REBUILD.md` findings 40 and 43): 5f (retail script 6,
+  all init fixes) runs; 11 freezes looking for `image\loading_bg_dlc2.raw` (never installed: name missing from our
+  name list); **12 (with the image): the DLC 2 intro cinematic plays** - at about one frame per two seconds with
+  looping sound, Lara in the chosen costume - and the game crashes after it in a UI timeline; a new base game crashed
+  as well (merged `g_pda`). Test tree 13 = 12 with the PC `g_pda`.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
@@ -209,6 +214,10 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - **Compare init blocks, not only structures.** Member default values (init blocks) are converted with byte orders
   per label, not per field type; u32 / u8 / u16 / UTF-16 fields come out wrong, and the PC uses other button glyph
   codes. For base-game scripts take the init values from the PC version (`script_init_from_pc.py`) [43].
+- **Every converted BASE-game script needs the PC port, wherever it ends up** - not only `generalbank` script 6:
+  the merged `g_pda` replaced 12 PDA scripts by converted DLC versions with Xbox vtables (one slot short),
+  Xbox init blocks and glyphs; the DLC level ran, a new base game crashed [40, 43]. Test the base game (new game,
+  load a save, PDA) after every change to a shared file.
 - **Pair unknown function names by call sites, not by position.** Look-alike natives (same arguments) get paired
   with the neighbour where the PC inserted functions (`sym_calibration_check.py` call-site votes,
   `drm_put_sections.py --symbols`) [43].
