@@ -463,8 +463,8 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      (log `logs/Manual_SymExtra-exp3_20261029_062211.log`): script sections **99.2 %** = B138, differing script words
      2 581 -> **95**, regression check **2 486 fixed, 95 left, 0 new**; fully identical DRMs 15; other types
      unchanged, `analog` 33/33. So 167 Symbol values from B138 explain 96 % of the remaining script differences
-     without breaking anything else - still a decision for Lukas whether B138-calibrated Symbols go into the
-     pipeline (they are global and would also apply to DLC 2). Not applied; switch stays off by default.
+     without breaking anything else. Open: whether B138-calibrated Symbols go into the pipeline (they are global
+     and would also apply to DLC 2). Not applied; switch stays off by default.
 32. **Our Convert ran without upstream's DLC post-passes (`extra_fixes`).**
    * `dlc_generic.convert_drm(..., extra_fixes=False)` is the default; `assemble_dlc.assemble()` passes
      `extra_fixes=(material == 'dlc')`, `dlc_convert_all.py` passed nothing. Gated by it (`dlc_generic.py`): model
