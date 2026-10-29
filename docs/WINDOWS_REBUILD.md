@@ -487,6 +487,25 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `generic_cache` (`work/generic/pairs.pkl`); `material_x2p.pkl` / `shader_x2p.pkl` = the type 10 / type 9 maps that
      `generic_ids.py` already writes into `work/generic/idmap.json` (2244 / 2046 entries) - to check against
      `material_dlc.py`'s statement "252 byte-identical base materials" and the B138 materials before use.
+   * Code survey (2026-10-29, read-only):
+     * No code in `tools/` or `work/ws/` (scratch folders included) writes any of the three files; the only `x2p` dict
+       built anywhere (`override_merge.py:61`) is local.
+     * Expected structures: `material_x2p` and `shader_x2p` are plain `{int xbox_id: int pc_id}` dicts (`material_dlc.py:47,51,83`,
+       `material_rules.py:13-14,36`, `shader_map.py:101,127,130,134`, `material_reslot.py:257,289`,
+       `terrain_validate.py:50`, `mesh_validate.py:151`). `material_rules.py` zips Xbox and PC type-10 sections of a
+       pair by position and keeps a pair only if `mx2p[x.id] == p.id`, so the map must agree with the positional
+       section order.
+     * `generic_ids.py` matches types 9/10 the same way (media types: fingerprint `(type,)`, matched by position when
+       the per-type counts agree, then known-id pass and id-reference votes; non-injective ids dropped). Size check:
+       `material_convert.py` "verified on 2247 paired material ids", `shader_map.py` "2233/2247 base material pairs"
+       vs idmap type 10 = 2244. "252" / "505/505" count DLC ids that also exist in the Xbox base, not map sizes.
+     * `pairnames.json` = JSON list of base DRM names without platform prefix (e.g. `alister.drm`), exactly what
+       `generic_cache.names()` builds (PC `pc-w\` names that also exist as `xenon-w\`) = the keys of
+       `work/generic/pairs.pkl` without the `patch:*` keys of `pairs_patch.pkl`.
+     * Plan: `pairnames.json` from `generic_cache.names()` (high confidence); `material_x2p` / `shader_x2p` from idmap
+       types 10 / 9 (medium-high / medium), then check: number of type-10 pairs that pass `material_rules`'s zip +
+       id test, `material_validate.py`, and for shaders: every Xbox shader id of a base material's tuple (offset 0x28)
+       maps to the PC material's shader at the same tuple position (PC re-slots pixel shaders, `shader_map.py:108-110`).
 
 ## The "VM" in upstream (what it was, what we do instead)
 
