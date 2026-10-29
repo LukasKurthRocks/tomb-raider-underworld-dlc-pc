@@ -9,7 +9,9 @@
     Every copied file is MD5-checked.
     -Check   dry run: lists what would be added / replaced / is already equal; changes nothing.
     -Restore undoes an install: replaced files come back from the backup, added files are removed (only those
-             listed in the manifest). Uses the newest backup\tree_* unless -BackupName is given.
+             listed in the manifest). Uses the newest backup\tree_* that is not undone yet unless -BackupName is
+             given, and renames it to *.restored afterwards - installs stack, one -Restore undoes one install.
+             Simplest: -Restore before installing a newer build of the same tree.
 
     -Exclude defaults to 'local','padshock': the installed string tables carry the DLC menu text fix
     (docs/DLC_MENU.md) and would be overwritten by tables without it; padshock is the same file.
@@ -66,7 +68,9 @@ try {
     if (!(Test-Path -LiteralPath $mods)) { throw "No mods folder in $GamePath (is the B138 kit / ModLoader installed?)" }
 
     if ($Restore) {
-        $candidates = @(Get-ChildItem -LiteralPath $backupDir -Directory -Filter 'tree_*' | Sort-Object Name)
+        # installs stack: each -Restore undoes the newest install that is not undone yet (done ones end in .restored)
+        $candidates = @(Get-ChildItem -LiteralPath $backupDir -Directory -Filter 'tree_*' |
+            Where-Object { $_.Name -notlike '*.restored' } | Sort-Object Name)
         if ($BackupName) { $candidates = @($candidates | Where-Object { $_.Name -eq $BackupName }) }
         if (!$candidates.Count) { throw "No backup\tree_* found$(if ($BackupName) { " named $BackupName" })." }
         $bk = $candidates[-1].FullName
@@ -93,6 +97,8 @@ try {
             }
         }
         Write-Log ('Restore done: {0} files restored, {1} added files removed.' -f @($manifest.replaced).Count, @($manifest.added).Count)
+        Rename-Item -LiteralPath $bk -NewName ((Split-Path -Leaf $bk) + '.restored')
+        Write-Log "Backup marked as undone: $bk.restored (the next -Restore undoes the install before it, if any)" -Level VERBOSE
         return
     }
 
@@ -124,6 +130,11 @@ try {
     foreach ($p in ($plan | Where-Object { $_.Action -eq 'add' })) { Write-Log "add       mods\$($p.Rel)" -Level VERBOSE }
     if ($Check) { Write-Log 'Check only - nothing changed.'; return }
     if (!$plan.Count) { Write-Log 'Nothing to install.'; return }
+    $open = @(Get-ChildItem -LiteralPath $backupDir -Directory -Filter 'tree_*' | Where-Object { $_.Name -notlike '*.restored' })
+    if ($open.Count) {
+        Write-Log ('{0} earlier install(s) not undone yet ({1}); this one stacks on top - undo needs one -Restore per install.' -f
+            $open.Count, (($open | Sort-Object Name | ForEach-Object { $_.Name }) -join ', ')) -Level WARN
+    }
 
     $bk = Join-Path $backupDir "tree_$stamp"
     New-Item -ItemType Directory -Force -Path (Join-Path $bk 'files') | Out-Null
