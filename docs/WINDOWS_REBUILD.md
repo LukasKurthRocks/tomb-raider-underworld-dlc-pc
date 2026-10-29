@@ -1034,6 +1034,15 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      spielen" reliably failed twice; the run was stopped there to avoid a trial-and-error loop. A gamepad (or a
      keyboard path for the ring) would make this deterministic. After an error box TRU opens its Setup dialog;
      "Abbrechen" ends the game by itself.
+   * **The DLC 1 "display driver" box, traced (2026-10-30 00:45, B138 + fixed shaders, unattended run with a
+     debugger)**: a hardware write breakpoint on the flag (`ba w1`, condition value != 0, then `.dump` and detach)
+     fired at `tru.exe` +0x7ad5d in the main loop: the flag = "device status `[[+0x6d75e4]+0x10]` != 0"; the status
+     was **-4**. The only code writing -4 there is +0x122750, right after **`IDirect3D9::CreateDevice`** (vtable
+     offset 0x40, call at +0x122736) returned a failure; the engine logs "PCDeviceManager: CreateDevice() failed.
+     Could not create Direct3D device." So entering the DLC 1 level makes the engine create its Direct3D device
+     again, and that fails - the box text ("Grafikkartentreiber") is the engine's generic message for status -4 /
+     -3. No GPU reset in the System log (no nvlddmkm / display event), i.e. not a TDR. Open: the HRESULT and why
+     the device is re-created at that point (next: breakpoints at +0x122736 / +0x122738 with the call stack).
    * **Code review of this session's tools (2026-10-30 night, 10 findings, all fixed in 01d9bea)**:
      `script_init_from_pc.py` moved relocations one by one (two pointers that move by one word could overwrite each
      other), learned field rules after the re-layout (wrong Xbox/PC pairs for re-laid-out nodes) and wrote output
