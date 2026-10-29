@@ -775,6 +775,18 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      the call site in script 6 - find out what native 93 returns (probably "which DLC is loading") and get that value
      another way; (b) add the native to `tru.exe` (Ghidra, exe patch) - the "program part" of the title update
      (finding 42 table). Both also matter for the later "PC loads DLC itself" idea.
+   * Option (a) chosen. Disassembly of TU script 6 (`menu_dlc_probe.dis`, variants `xt`/`xl`): native 93 is called
+     once, as the first statement of function 3 (`local0 = uigamedata.f93()`, then `print("*** CURRENT LEVEL = ",
+     local0)`); in the retail version of function 3 `local0` is the parameter and there is no call - the TU only
+     overwrites it. The DLC branches do **not** use it: the background image compares a level number from script 86
+     function 22 with **101 (DLC 1) / 102 (DLC 2)**; the intro trigger compares the level name (uigamedata function 33,
+     present on PC) with `"dlc_level1_start"` and then broadcasts "DLC CINE".
+   * `tools/script_nop_call.py` (new) replaces the 4 call words (op04 0, op0f 1024, op65, operand) with the preceding
+     debug line marker (op00) and drops their relocation - function 3 behaves like the retail one for that value.
+     Result `work/rebuild/dlc2_gb4/generalbank.drm`: 176 call offsets remapped, **0 unresolved**, 0 out-of-bounds
+     relocations; test tree 3 `work/rebuild/dlc2_test3/mods` (only `generalbank.drm` differs from test tree 1).
+   * Note for DLC 2: the intro trigger compares with `dlc_level1_start` only in the part read so far - whether the TU
+     handles `dlc_level2_start` the same way is not checked yet (the test will tell).
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
