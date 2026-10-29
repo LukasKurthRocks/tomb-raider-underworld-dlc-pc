@@ -911,8 +911,20 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      from the PC (nodes of another shape are reported and kept). Retail script 6: 184 members + 65 locals paired, **521
      words changed**, 3 nodes of other shape. TU script 6: 526 words changed, 7 nodes of other shape, **19 TU-only
      data members / locals with init keep their converted values** (open risk; need field-type rules).
+   * TU-only members (no PC counterpart): `script_init_from_pc.py --xbox generalbank.drm` learns per (type tag,
+     userType, path in the init tree) the byte order that turns the Xbox word into the PC word in every paired member
+     (134 field rules), or a u16 value map where values differ (glyphs), and re-derives the TU-only words from the
+     Xbox data: 44 words changed (e.g. the count `1` of three menu-entry structs), 100 already right, 248 without a
+     rule (mostly zeros and floats, already right as converted), 7 glyph words with a value the map does not know
+     (`0x4021`; byte order fixed, value kept).
+   * **Loading-screen texts**: three TU-only members hold locals string ids (native init type of the locals table):
+     Xbox 1285 / 1288 / 1292, converted to 1314 / 1317 / 1321 = tutorial hints on PC. `locals.py build` appends the
+     title update's strings after the PC table; its `locmap_xbox_to_pc.json` maps them to **5170** ("Recently I have
+     come across an old file of my father's ...", DLC 1), **5173** ("The Doppelganger is a dark and deadly reflection
+     of Lara ...", DLC 2) and **5177** ("Natla created the Doppelganger ...", DLC 2). `--locmap FILE` applies it.
    * Test trees: 5e (`dlc2_test5e`, retail script 6 + PC init values) and 9 (`dlc2_test9`, TU script 6 with all fixes:
-     base-evidence names, `--symbols` call remap, vtable slot 31, f93 call neutralised, PC init values).
+     base-evidence names, `--symbols` call remap, vtable slot 31, f93 call neutralised, PC init values, TU-only init
+     rules, locals ids). Script 6 of test 9: 53/53 vtable slots = PC, 0 out-of-bounds relocations, 167/167 DRMs clean.
    * Consequence beyond script 6 (to check): DLC scripts are converted with the same init rules. B138 DLC 1 runs, so
      the common cases work there, but any DLC script whose init blocks carry u8 / u16 / glyph fields may be wrong the
      same way.
