@@ -925,6 +925,28 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Test trees: 5e (`dlc2_test5e`, retail script 6 + PC init values) and 9 (`dlc2_test9`, TU script 6 with all fixes:
      base-evidence names, `--symbols` call remap, vtable slot 31, f93 call neutralised, PC init values, TU-only init
      rules, locals ids). Script 6 of test 9: 53/53 vtable slots = PC, 0 out-of-bounds relocations, 167/167 DRMs clean.
+   * **Results 2026-10-29 evening.** 5e (retail + PC init values): crash at a NEW place - `tru.exe` +0xca260 reads a
+     null list of a `cdc::UIMenuWdgt` (+0x264 count held a pointer into script 6, +0x268 list = 0). Cause: the PC
+     re-authored native struct 351 (menu widget parameters): same size, but three packed u8 fields became u32 and the
+     array pointer moved one word; `script_init_from_pc.py` now re-lays such nodes out to the PC layout (relocations
+     moved; 2 nodes). Test 9 (TU before that fix): same new place. **5f (retail, fixed): no crash** - level loads,
+     costume and weapon choice, no loading-screen texts (expected: the retail script has no DLC branch). Test 10 (TU,
+     fixed): the old glyph crash again, now with count 1: the one TU-only glyph member holds `0x4021`, a value the
+     learned Xbox -> PC glyph map does not know; test 11 empties that glyph list (count 0).
+   * **Test 11: freeze, no crash** (`tru.exe` not responding, one core busy). Snapshot of the running process without
+     ending it: `cdb -pv -p PID -c ".dump /ma FILE; qd"` (non-invasive attach, detach). The main thread loops in
+     `NtCreateFile` -> `STATUS_OBJECT_NAME_NOT_FOUND` for **`mods\image\loading_bg_dlc2.raw_004`** - the title-update
+     loading screen now runs on PC, recognises DLC 2 and asks for its background image.
+   * The image exists in pack11 (`image\loading_bg_dlc2.raw`, 3 768 448 bytes; `loading_bg_dlc1.raw` in pack10/11)
+     but our media step never wrote it: `raw_image_convert.dlc_gen` names files from `work/generic/dlc_names.txt`,
+     which lacks these two names, so they stayed `UNNAMED_*` (not installable). Converted with
+     `raw_image_convert.py file` (1280x720, checked as PNG) into `work/rebuild/dlc2_loading_bg/`; test tree 12 = 11 +
+     both images (plain name and the `_004` name the game asked for).
+   * Author's history (found only now - a forgotten jump point): `tools/generalbank_dlc.py` (2026-10-09) already put
+     the converted TU script 6 into the PC generalbank (same native-93 neutralisation at 0x7928); his note in
+     `tools/dlc_generic.py` says "replacing it crashes the base game (gb1.dmp)", so he patched DLC 1's start script
+     instead (`cine_nowait`: 20068 no longer waits for the loading screen's broadcast). DLC 2's start script needs the
+     same if the loading screen route fails; with the TU script working, the broadcast may come from script 6 itself.
    * Consequence beyond script 6 (to check): DLC scripts are converted with the same init rules. B138 DLC 1 runs, so
      the common cases work there, but any DLC script whose init blocks carry u8 / u16 / glyph fields may be wrong the
      same way.

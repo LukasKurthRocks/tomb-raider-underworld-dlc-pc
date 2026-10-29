@@ -46,11 +46,18 @@ def copy_tree(d, wa, ita, pd, wb, itb, a, b, st, seen, shapes):
     if (a, b) in seen: return
     seen.add((a, b))
     na, nb = node(wa, ita, a), node(wb, itb, b)
-    if not na or len(na) != len(nb) or [o in ita for o in na] != [o in itb for o in nb]:
+    pa, pb = [o for o in na if o in ita], [o for o in nb if o in itb]
+    if not na or len(na) != len(nb) or len(pa) != len(pb):
         st['node shape differs (kept converted)'] += 1; shapes.append((a, len(na), b, len(nb)))
         return
+    if [o - a for o in pa] != [o - b for o in pb]:
+        # same size, pointers elsewhere: the PC re-authored this native struct (type 351 of generalbank script 6:
+        # three u8 fields widened to u32, the array pointer one word later) - take the PC layout, move the relocations
+        for oa, ob in zip(pa, pb):
+            t = ita.pop(oa); ita[a + (ob - b)] = t
+        st['nodes re-laid out to the PC struct layout'] += 1
     for oa, ob in zip(na, nb):
-        if oa in ita: copy_tree(d, wa, ita, pd, wb, itb, ita[oa], itb[ob], st, seen, shapes)
+        if oa in ita: d[oa:oa + 4] = pd[ob:ob + 4]; copy_tree(d, wa, ita, pd, wb, itb, ita[oa], itb[ob], st, seen, shapes)
         elif d[oa:oa + 4] != pd[ob:ob + 4]:
             d[oa:oa + 4] = pd[ob:ob + 4]; st['words changed'] += 1
         else: st['words already equal'] += 1
@@ -98,6 +105,8 @@ def learn_rules(wa, ita, xd, pd, wb, itb, pairs):
 
 
 def apply_rules(d, w, it, xd, ia, tag, ut, rules, st):
+    """re-derive the words of one TU-only member; True when a glyph value is not in the learned map"""
+    unknown = False
     for path, o in leaves(w, it, ia):
         r = rules.get((tag, ut, path))
         if r is None or o + 4 > len(xd): st['TU-only init words without a rule (kept)'] += 1; continue
@@ -106,10 +115,11 @@ def apply_rules(d, w, it, xd, ia, tag, ut, rules, st):
         else:
             hv = [struct.unpack_from('>H', x, h)[0] for h in (0, 2)]
             if any(v not in r[1] for v in hv if v):       # byte order still per 16-bit half; unknown value kept
-                st['TU-only glyph values not in the learned map (Xbox value kept)'] += 1
+                st['TU-only glyph values not in the learned map (Xbox value kept)'] += 1; unknown = True
             new = b''.join(struct.pack('<H', r[1].get(v, v)) for v in hv)
         if bytes(d[o:o + 4]) != new: d[o:o + 4] = new; st['TU-only init words changed by rule'] += 1
         else: st['TU-only init words already right'] += 1
+    return unknown
 
 
 def members(w, d, e):
@@ -159,7 +169,11 @@ def main(argv):
             for a in ma[key]:
                 ia = ita.get(a + 16)
                 if ia is None: continue
-                apply_rules(d, wa, ita, x['data'], ia, key[2], key[3], rules, st)
+                if apply_rules(d, wa, ita, x['data'], ia, key[2], key[3], rules, st):
+                    # a glyph the PC font map does not know (title update: 0x4021) crashed the engine's menu-entry
+                    # text code (DLC 2 test 10) - empty the glyph list: count (word 0 of the struct) = 0
+                    for path, o in leaves(wa, ita, ia):
+                        if path == (0, 0): d[o:o + 4] = b'\0\0\0\0'; st['TU-only glyph lists emptied (unknown glyph)'] += 1
                 if locmap is not None and key[3] == LOC_UT:     # locals string id (u16, first half of word 0)
                     for path, o in leaves(wa, ita, ia):
                         if path != (0, 0): continue          # depth 1, offset 0 (label ('init', 10, 1, 0, ut))
@@ -168,8 +182,9 @@ def main(argv):
                         if xv and pv is None: st['TU-only locals string ids not in the map (kept)'] += 1
                         elif xv and struct.unpack_from('<H', d, o)[0] != pv:
                             struct.pack_into('<H', d, o, pv); st['TU-only locals string ids mapped'] += 1
-    s.data = bytes(d)
-    raw = D.write('le')
+    s.data = bytes(d); ra.internal = list(ita.items()); s.reloc = R.write(ra, 'le')
+    raw = D.write('le'); E = DW.read(DW.cdrm_encode(raw, 'le'), 'le'); infos = [dict(size=len(x.data)) for x in E.sections]
+    st['sections with relocations out of bounds'] = sum(bool(R.check(R.parse(x.reloc, 'le'), len(x.data), infos)) for x in E.sections)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     open(out, 'wb').write(DW.cdrm_encode(raw, 'le'))
     print('script %d: %s' % (sid, dict(st)))
