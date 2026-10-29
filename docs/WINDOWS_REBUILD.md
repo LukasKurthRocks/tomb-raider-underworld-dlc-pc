@@ -1003,6 +1003,18 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      in **B138's DLC 1 files** (38 files, e.g. `dlc1_ei_grapple_wall.drm`); our DLC 1 / DLC 2 trees have none (stage 3
      not rebuilt; their shaders all pass). So this explains B138's "A problem has occurred with your display driver"
      when entering DLC 1 on a real GPU, **not** the slow DLC 2 intro.
+   * **Fixed offline (2026-10-29 night)**: `tools/shader_const_fix.py` inserts `mov rT, c#` before every instruction
+     that reads more than one constant register (rT = a temp the shader never uses; the same free temps serve every
+     instruction because the copy is read right away) and rebuilds the ShaderLib sections (format checked: a rebuild
+     without changes is byte-identical for all 107 libraries; slots may share an entry, e.g. lib 2776). Every changed
+     shader must disassemble and reassemble without error before it is written. `tools/shader_lib_check.py`
+     validates all unique pixel shaders of a folder offline and reproduces the GPU result exactly: B138 **272
+     rejected / 124 valid** (= native test) -> after the fix **396 valid, 0 rejected** (392 shader instances fixed,
+     1 176 `mov` inserted). 22 of the 38 B138 DLC 1 files change (`dlc1_*` objects, `dlc_costume_f`,
+     `knight_thrall`, `knight_thrall_chunkdoll`, `wp_dlc_gold_shotgun`); `tree_check` 22/22 clean
+     (`work/rebuild/b138_shaderfix/out`). First attempt left 30 shaders unfixed (temps given out once per shader) -
+     corrected. Not yet tested in game: install the 22 files over B138 and enter DLC 1 (the display-driver box
+     should be gone).
    * **Slow intro, sampled (2026-10-29 23:15-23:25, test tree 13)**: a background watcher took a stack sample of the
      main thread every few seconds while the game ran in the foreground (`cdb -pv -pn tru.exe -c "~0 kv; qd"`,
      nothing ended; 49 samples; the same crash at +0x1a8616 at the end). **42 of 49 samples** are in one path: game
