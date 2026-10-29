@@ -847,6 +847,75 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      relocations (`work/rebuild/dlc2_gb5/generalbank.drm`, log `logs/Manual_DLC2-gb5_*.log`).
      `work/rebuild/dlc2_test4/mods`: 301 files, `tree_check` 167/167 DRMs clean; only `generalbank.drm` differs from
      test tree 3.
+   * **Test 4 (2026-10-29 19:45): same crash** (0xc0000005, offset 0x00000002).
+   * Forgotten jump point: `data/pc` is a junction to the game folder, so after a test install
+     `data/pc/mods/generalbank.drm` IS the test file - two comparisons right after the install compared our file with
+     itself. The vtable check above ran before the install and stays valid. Since then the base is a saved copy of
+     B138's file (`work/rebuild/base_b138/`, from the `Install-TruTree` backup); `drm_put_sections.py` notes it.
+   * `tools/script_ext_check.py` (new): classifies every external relocation of a script by its target (start of a
+     function / prototype / member, inside an element, nowhere). Converted TU script 6: 1 020 relocations, all on
+     element starts (1 017 functions, 3 prototypes), like the PC's own script 6 (917: 915 / 2). No suspects. Also equal
+     to the PC: no natives in script 6, the parent chain (6 -> 93 -> 228/230; parent 93 has 31 vtable slots on Xbox,
+     **32 on PC** - the source of the extra slot), no script inherits from 6. Instance size TU 2 092 vs PC 1 973 (13
+     more members). Id references: TU +45 (scripts that exist, textures 111/112, the TU-only script 20082).
+   * **Control tests** to separate "TU content" from "our procedure":
+     * Test 5a (`work/rebuild/dlc2_test5a`): B138 `generalbank` + only the TU-only scripts 21239 / 20082 -
+       **no crash**, plays like test 1 (no loading-screen text, costume and weapon choice, level playable, waterfall
+       shader wrong). The two extra scripts are harmless.
+     * Test 5b (`work/rebuild/dlc2_test5b`): the **retail** script 6 through the same procedure (our converter,
+       `drm_put_sections --xbox --retail` (new option): 168 call offsets remapped, vtable insert) - **crash, same
+       signature** (2026-10-29 20:19). A script that should behave like the PC's own crashes: the error is in the
+       procedure, not in the title-update content. Good news: the PC script is now an exact reference.
+   * Retail-converted vs PC script 6, structure by structure (scratch compare): 34 functions, 30 prototypes, 198
+     members, 182 SFI, 5 states, 53 vtable slots on both sides. Code of the 31 functions with equal length differs
+     only in debug line markers (op00); 3 functions are re-authored on PC (359 -> 389, 114 -> 117, 127 -> 130 words).
+     Dependencies: same 26 scripts, other order. **51 of 198 member names differ** (e.g. 706 instead of 368) - names
+     the learned symbol map does not know and the converter guessed.
+   * `sym_calibration_check.py` now also pairs DataMember names (members, function arguments, locals; by position
+     and equal data offset): **1 846** name Symbols outside the learned map have base evidence in `generalbank`, the
+     converter gets **451 wrong**, the B138 calibration disagrees with the base game on **131**. The learned map itself
+     agrees on 1 151 member/argument/local names and disagrees on 18 (arguments - probably pairing errors of the check).
+   * Test 5c (member names fixed, `work/rebuild/dlc2_test5c`): **same crash** - names ruled out as the cause (kept as
+     a correction). Test 6 (TU script with the same fixes): same crash.
+   * **Crash dumps.** Windows writes a dump per crash (`%LOCALAPPDATA%\CrashDumps\tru.exe.*.dmp`); read with `cdb`
+     (Windows SDK debugger, `cdb -z DUMP -y "" -i GAME_DIR -c ".ecxr; kv"`). Every crash of tests 2-6 is the same
+     call: `tru.exe` +0x1a4d4b `call edx` with `edx = [[esi]+4] = 2` (return address +0x1a4d4d), called from
+     +0xca30e. The caller (+0xca2a0) walks a list at +0x21c (count) / +0x220 (records) of an object, a routine at
+     +0xd08e0 reads UTF-16 text.
+   * Lead "PC-only calls" (ruled out): the PC version of script 6 calls four parent-class functions the Xbox scripts
+     do not have (script 93 functions 84 / 85 in function 2, 109 at the end of function 3, 110 at the end of function
+     32). Test 7 = the PC's own script 6 with only these calls neutralised (`script_nop_call.py`): **no crash** - they
+     are not required.
+   * Found on the way (a real error, not the crash): the call-offset remap paired unknown function names by position;
+     where the PC inserted functions into a script it picked the neighbour - 10 calls of the retail script 6 went to
+     the wrong native (script 63 function 17 is PC function 18; script 87 function 31 is PC 35, not 33).
+     `sym_calibration_check.py` now also votes from **call sites** (functions paired by index, equal-length code
+     compared word by word: both sides call something at the same word -> same function; weight 10, 2 194 votes) and
+     assigns PC Symbols injectively (strongest first). `drm_put_sections.py --symbols FILE` uses those names. Retail
+     script 6 then calls exactly the PC's targets (apart from the four PC-only calls). Test 5d: **still the same crash**.
+   * **Full dump** (Lukas enabled `LocalDumps\tru.exe` DumpType 2; to be removed after the tests): the object with the
+     list is a `cdc::UIMenuEntry` (RTTI); its count at +0x21c is **0x00010000** and its record pointer points **into
+     our script 6**, at a member init block (`{-1, 2, ptr, two UTF-16 characters}` = a static wide string with a
+     button glyph pair). Script 6 found in memory by a code pattern of function 2.
+   * **Cause: the converter's byte order for member init blocks.** Init blocks hold mixed fields (u32 numbers, u8
+     flags, u16 pairs, UTF-16 characters); `script_conv` labels their words `('init', base type, depth, offset,
+     userType of the top-level member)`, so one label covers different field types of nested structs, and the
+     learned permutation is wrong for many of them. Examples in script 6: u32 `1` came out as `0x00010000` (should be
+     `01 00 00 00`), a word of four u8 flags got its halves swapped (should stay raw), the glyph pair `U+018C U+0169`
+     came out in reverse order (should be swapped per 16-bit character). The earlier structure comparison skipped
+     pointer fields and so never looked into init blocks.
+   * The PC's glyph codes differ as well: the PC build shifted the button glyphs by 2 (`U+018E U+016B` where the
+     Xbox has `U+018C U+0169`) - Xbox values are wrong on PC even with the right byte order.
+   * `tools/script_init_from_pc.py` (new): for a base-game script, pairs data members (members, args, locals) with
+     the PC version by name / type tag / userType, walks both init trees in parallel and copies every non-pointer word
+     from the PC (nodes of another shape are reported and kept). Retail script 6: 184 members + 65 locals paired, **521
+     words changed**, 3 nodes of other shape. TU script 6: 526 words changed, 7 nodes of other shape, **19 TU-only
+     data members / locals with init keep their converted values** (open risk; need field-type rules).
+   * Test trees: 5e (`dlc2_test5e`, retail script 6 + PC init values) and 9 (`dlc2_test9`, TU script 6 with all fixes:
+     base-evidence names, `--symbols` call remap, vtable slot 31, f93 call neutralised, PC init values).
+   * Consequence beyond script 6 (to check): DLC scripts are converted with the same init rules. B138 DLC 1 runs, so
+     the common cases work there, but any DLC script whose init blocks carry u8 / u16 / glyph fields may be wrong the
+     same way.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

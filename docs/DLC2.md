@@ -172,6 +172,11 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   Script 6: 53/53 vtable slots and all prototype names equal to the PC. Only `generalbank.drm` differs from test 3.
   To check: no crash when choosing *Lara's Shadow*; loading screen with DLC 2 image/text; intro; base game and DLC 1
   loading screens still work.
+* **Test 4 (19:45): same crash.** Control tests: 5a (B138 `generalbank` + only the TU-only scripts 21239 / 20082) runs;
+  5b-5d (retail script 6 through our procedure; names, call targets fixed step by step) crash; 7 (the PC's own script
+  6 without its PC-only calls) runs. A full crash dump then showed the cause: wrongly converted member init values in
+  script 6 (finding 43). Test trees 5e (retail script 6 + PC init values) and 9 (TU script 6 with every fix) built;
+  results below once tested.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
@@ -198,6 +203,15 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - **A converted base-game script must also match the PC's class layout**: vtable size and slot order (the PC may
   have inherited slots the Xbox lacks; prototype vtIndex shifts with them) and function name Symbols. Compare slot
   by slot with the PC version before a test [43].
+- **Crash dumps first.** Every crash leaves `%LOCALAPPDATA%\CrashDumps\tru.exe.*.dmp`; `cdb` shows the call site in
+  seconds, a full dump (WER `LocalDumps`, DumpType 2) shows which object holds the bad data. Four static leads were
+  checked before that; the dump named the cause directly [43].
+- **Compare init blocks, not only structures.** Member default values (init blocks) are converted with byte orders
+  per label, not per field type; u32 / u8 / u16 / UTF-16 fields come out wrong, and the PC uses other button glyph
+  codes. For base-game scripts take the init values from the PC version (`script_init_from_pc.py`) [43].
+- **Pair unknown function names by call sites, not by position.** Look-alike natives (same arguments) get paired
+  with the neighbour where the PC inserted functions (`sym_calibration_check.py` call-site votes,
+  `drm_put_sections.py --symbols`) [43].
 - **The symbol calibration is not ground truth for base-game names.** 5 of its entries contradict the base game;
   the converter's guesses for 218 of 965 unmapped function names in `generalbank` are wrong
   (`tools/sym_calibration_check.py`) [43].

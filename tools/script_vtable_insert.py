@@ -45,8 +45,8 @@ def main(argv):
     slots = slots[:slot] + [vte] + slots[slot:]
     d += b'\0' * (4 * (size + 1))
     r.internal = [(a, b) for a, b in r.internal if a != 0x44] + [(0x44, table)] + [(table + 4 * k, t) for k, t in enumerate(slots)]
-    for k, t in enumerate(slots): struct.pack_into('<I', d, table + 4 * k, t)
-    struct.pack_into('<I', d, 0x44, table)
+    for k in range(size + 1): struct.pack_into('<I', d, table + 4 * k, 0xBEEBBEEB)   # pointer slots: the PC files
+    struct.pack_into('<I', d, 0x44, 0xBEEBBEEB)                                       # hold this placeholder
     r.external += [(si, vte + o, dd) for si, o, dd in pext]
     struct.pack_into('<H', d, 0x3c, size + 1)
     # prototypes: vtIndex >= slot -> +1 (u16 at prototype + 6)

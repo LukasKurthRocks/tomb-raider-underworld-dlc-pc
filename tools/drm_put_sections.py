@@ -18,6 +18,13 @@ Usage (from the repository root):
   --xbox NAME (e.g. generalbank.drm): remap call offsets into scripts whose base version has another layout, with
   script_conv.offset_map (Xbox title-update script -> base script, elements matched by name); unmatched offsets are
   reported as UNRESOLVED (the donor calls something the base script does not have)
+  --retail: with --xbox, take the Xbox scripts from the retail layers instead of the title update (for a donor
+  converted from retail, e.g. as a control test)
+  --symbols JSON: names the learned symbol map lacks ({"symbols": {xbox: pc}}, tools/sym_calibration_check.py) - without
+  it unknown names are paired by position, which picked the neighbour of look-alike natives (DLC 2 test 5c:
+  10 calls into scripts 63 / 87 went to the wrong engine function -> crash)
+NOTE: data/pc is a junction to the game folder - after a test install, data/pc/mods/<name> is the TEST file. Use a
+saved copy of the installed file as BASE (e.g. the Install-TruTree backup).
 """
 import sys, os, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -28,17 +35,21 @@ def put_keys(put):
     return {(n.type, n.id) for n in put}
 
 
-def offset_maps(xbox_name, dsec, bsec):
+def offset_maps(xbox_name, dsec, bsec, retail=False, symbols=None):
     """{(8, PC id): {donor (Xbox-layout) offset -> base (PC-layout) offset}} for every script of the donor that the base
     has in another version - script_conv.offset_map on the Xbox source script (title update, then retail layers) and
-    the base script; elements are matched by name Symbol through the learned base symbol map"""
-    import dtp_word_classes as C, dlc_generic as DG, script_conv as SC
+    the base script; elements are matched by name Symbol through the learned base symbol map, extended by `symbols`
+    (JSON {"symbols": {xbox: pc}}, e.g. work/rebuild/sym_base_evidence.json) for names the map does not know"""
+    import json, dtp_word_classes as C, dlc_generic as DG, script_conv as SC
     ids = DG.DlcIds()
-    xsecs = C.find(C.BASE, 'be', 'xenon-w' + chr(92) + xbox_name)
+    xsecs = C.find(C.BASE[1:] if retail else C.BASE, 'be', 'xenon-w' + chr(92) + xbox_name)
     by_pc = {}
     for s in xsecs:
         if s['type'] == 8 and s['data']: by_pc[(8, ids(8, s['id']))] = s
-    symmap = ids.base.get(DG.SYM, {})
+    symmap = dict(ids.base.get(DG.SYM, {}))
+    if symbols:
+        extra = {int(a): b for a, b in json.load(open(symbols))['symbols'].items() if int(a) not in symmap}
+        symmap.update(extra); print('symbol map for offset matching: +%d names from %s' % (len(extra), symbols))
     out = {}
     for k, b in bsec.items():
         if k[0] != 8 or k not in by_pc or k not in dsec or dsec[k].data == b.data: continue
@@ -54,6 +65,9 @@ def main(argv):
     add_missing = '--add-missing' in argv; argv = [a for a in argv if a != '--add-missing']
     xbox_name = None
     if '--xbox' in argv: k = argv.index('--xbox'); xbox_name = argv[k + 1]; del argv[k:k + 2]
+    retail = '--retail' in argv; argv = [a for a in argv if a != '--retail']   # donor converted from the retail layers
+    symbols = None
+    if '--symbols' in argv: k = argv.index('--symbols'); symbols = argv[k + 1]; del argv[k:k + 2]
     base, donor, out = argv[0], argv[1], argv[2]
     want = [tuple(int(v) for v in x.split(':')) for x in argv[3].split(',')]
     B = DW.read(open(base, 'rb').read(), 'le'); Dn = DW.read(open(donor, 'rb').read(), 'le')
@@ -78,7 +92,7 @@ def main(argv):
             else: st['missing target %d:%d' % tk] += 1
     idx = {(b.type, b.id): n for n, b in enumerate(B.sections)}
     bsec = {(b.type, b.id): b for b in B.sections}
-    omap = offset_maps(xbox_name, dsec, bsec) if xbox_name else None
+    omap = offset_maps(xbox_name, dsec, bsec, retail, symbols) if xbox_name else None
     unresolved = collections.Counter()
     for n in put:
         r = R.parse(n.reloc, 'le')
