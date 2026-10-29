@@ -4,6 +4,7 @@ dump (finding 43).
 
 Usage (from the repository root):
   ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/exe_xref.py EXE disp 0x1d4 [--write] [--range LO HI]
+  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/exe_xref.py EXE abs 0x9eee30 [--write]   (global variable)
   ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/exe_xref.py EXE imm 0x4601c0
   ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/exe_xref.py EXE call 0x45fab0
   ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/exe_xref.py EXE func 0x4601c0      (disassemble until ret/int3 run)
@@ -44,6 +45,10 @@ def main(argv):
             for i, op in enumerate(ins.operands):
                 if op.type == capstone.x86.X86_OP_MEM and op.mem.disp == val and op.mem.base != 0:
                     if not write or (i == 0 and ins.mnemonic.startswith(('mov', 'fst', 'movss'))): hit = True
+        elif mode == 'abs':         # absolute memory operand [val] (global variable)
+            for i, op in enumerate(ins.operands):
+                if op.type == capstone.x86.X86_OP_MEM and (op.mem.disp & 0xffffffff) == val and op.mem.base == 0 and op.mem.index == 0:
+                    if not write or i == 0: hit = True
         elif mode == 'imm':
             hit = any(op.type == capstone.x86.X86_OP_IMM and (op.imm & 0xffffffff) == val for op in ins.operands)
         elif mode == 'call':

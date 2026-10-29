@@ -1015,6 +1015,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      (`work/rebuild/b138_shaderfix/out`). First attempt left 30 shaders unfixed (temps given out once per shader) -
      corrected. Not yet tested in game: install the 22 files over B138 and enter DLC 1 (the display-driver box
      should be gone).
+   * **In-game test of the shader fix (2026-10-30 00:15, unattended run, B138 + the 22 fixed files): the
+     display-driver box still appears** when entering DLC 1 (after loading screen, outfit and weapon choice; text
+     "Es ist ein Problem mit Ihrem Grafikkartentreiber aufgetreten ..."). The 272 invalid shaders were real, but not
+     (only) what triggers the box. Engine side: the box is shown by the main loop (`tru.exe` +0x7ad50) when a global
+     flag (+0x5eee30) is set and a device status at `[[+0x6d75e4]+0x10]` is -4 / -3; message id 0x1397 / 0x1388.
+     The code that SETS the flag is not found by a direct memory-operand search (only the read/clear at +0x7ad52 /
+     +0x7ad5d) - it is written through a pointer. Next: a write breakpoint on the flag (`ba w1`) in a debugger run.
+   * How the unattended test was driven (for the next runs): TRU in windowed mode (registry `Fullscreen` 0, saved
+     before in the workspace backup); screenshots of the TRU window (GDI copy works); the main ring menu ignores
+     arrow keys but follows the RELATIVE mouse motion (the game cursor moves by about twice the injected delta; the
+     highlighted item follows the direction from the ring centre; click without moving the cursor); list menus
+     (outfit, weapon) and dialogs take arrow keys / Enter (scan-code input). Path: ring -> "Inhalte zum
+     Herunterladen" -> "Mission spielen" -> mission screen -> Enter -> outfit -> weapon.
    * **Slow intro, sampled (2026-10-29 23:15-23:25, test tree 13)**: a background watcher took a stack sample of the
      main thread every few seconds while the game ran in the foreground (`cdb -pv -pn tru.exe -c "~0 kv; qd"`,
      nothing ended; 49 samples; the same crash at +0x1a8616 at the end). **42 of 49 samples** are in one path: game
