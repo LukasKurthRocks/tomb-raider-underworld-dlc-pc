@@ -592,6 +592,33 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * `mesh_dlc.py` (upstream) with the tables: all 285 DLC meshes of both packs valid, geometry equal to the Xbox
      source, 1 mesh (DLC 2) with a vertex format unknown on PC - see `docs/DLC2.md`.
    * DLC 2 note: the tables are learnt from the base game only, so they apply to DLC 2 unchanged.
+38. **Ten DRM names exist in pack10 and pack11 with different content - lookups by name took the pack10 one.**
+   * `tools/pack_overlap.py` (new, read-only): 10 names are in both DLC packs, none byte-identical - each DLC was sold
+     separately and ships its own copy of shared files. `--sections` (Xbox sections, pack10 vs pack11):
+
+     | Files | pack10 -> pack11 | Reading |
+     |---|---|---|
+     | `co_dlc_earphonecam`, `co_dlc_eitr_stone`, `co_dlc_knight_thrall`, `co_dlc_knight_thrall_pieces`, `co_lights` | only script 56 changed (same size); knight_thrall also DTP 21046 | pack11 carries a newer version of the same object |
+     | `g_pda` | 0 sections only in pack10, 5 only in pack11, 27 changed (mission list with DLC 1 and DLC 2) | pack11 is a superset |
+     | `dlc_fx_goo_dun_ist`, `dlc_fx_goo_tres_ist`, `dlc_fx_goo_tres_line_ist`, `dlc_fx_cine_thrall_death` | effect DTPs re-authored; pack10 has texture 2824 (goo) / a type-2 section (thrall death) that pack11 lacks | not a superset |
+
+   * The conversion itself is not affected (`dlc_media_build` and `dlc_assemble_build` read the record of their own
+     pack). But every tool that looks up "the Xbox source" of a file by name goes through upstream's
+     `convert_dlc.raw_dlc()`, which returns the first pack (pack10): `wave_swap` (audio step) and all stage-2b fixes
+     except `cine` (which reads pack10 only). In the first DLC 2 audio run the waves of `g_pda` and the three goo
+     effects were taken from the pack10 records. Upstream knew of one case: `engine_walk_check.py` has
+     `XBOX_PACK = {('dlc2', 'g_pda.drm'): 'pack11'}`.
+   * Fix: `convert_dlc.raw_dlc()` honours `TRUDLC_PACK_FIRST` (the named pack is searched first; unset = upstream
+     order); `dlc_audio_build.py` and `dlc_fixes_build.py` take `--pack pack11` and set it for their workers;
+     `fix_cine` now processes every `cinstream/*.drm` of the tree and reads its Xbox source from that pack. DLC 1 is
+     unchanged (pack10 is first anyway) - checked: stage 2b rebuilt from `asm_stage2a` = the previous `asm_stage2b`,
+     **271 of 271 files byte-identical** (`tree_compare.py`). DLC 2 audio rebuilt with `--pack pack11`: **293 of 293
+     files identical** to the first run - the wave data of the four affected files is the same in both packs, so that
+     lookup did no harm; the fix matters for the stage-2b fixes (log `logs/Manual_DLC2-fixes_20261029_154941.log`).
+   * Open for installing both DLCs: the PC `mods/` folder can hold only one file per name. Only DLC 1 -> pack10
+     versions, only DLC 2 -> pack11 versions, both -> most likely the pack11 versions (newer; `g_pda` is a superset),
+     but the goo effects are not a superset, and which copy the Xbox loads when both packages are installed is not
+     known yet. Test in Xenia/in game before the installer offers "both".
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

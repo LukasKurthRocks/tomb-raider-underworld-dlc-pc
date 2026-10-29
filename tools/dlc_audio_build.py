@@ -10,8 +10,9 @@ Both tools only replace audio payloads of the same length; everything else stays
 Files they skip keep the stage-1 copy. Reports: <OUT>/../wave_swap_report.json, mul_audio_report.json.
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_audio_build.py SRC_MODS_DIR OUT_MODS_DIR [--mul nch|b43]
+  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_audio_build.py SRC_MODS_DIR OUT_MODS_DIR [--mul nch|b43] [--pack pack11]
   e.g. work/rebuild/stage1/mods work/rebuild/stage2a/mods
+  --pack pack11 for a DLC 2 tree: Xbox sources of names that exist in several packs come from pack11 (finding 38)
 """
 import sys, os, json, collections
 from concurrent.futures import ProcessPoolExecutor
@@ -47,6 +48,8 @@ def main(argv):
     if '--mul' in argv:
         k = argv.index('--mul'); mode = argv[k + 1]; del argv[k:k + 2]
         if mode not in ('nch', 'b43'): sys.exit('--mul must be nch or b43')
+    if '--pack' in argv:     # set before any worker starts: the workers inherit it (convert_dlc.raw_dlc reads it)
+        k = argv.index('--pack'); os.environ['TRUDLC_PACK_FIRST'] = argv[k + 1]; del argv[k:k + 2]
     src, out = argv[0], argv[1]
     from build_util import replace_tree
     replace_tree(src, out)

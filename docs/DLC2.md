@@ -90,8 +90,25 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   mesh (record 156, mesh 22994) has a vertex format unknown on PC (synthetic declaration hash, see below).
 * Audio vs the decoded Xbox source (`compare_audio.py ... dlc2_asm_stage2a --xbox-only`): worst channel min 25.1 /
   median 41.0 / max 53.8 dB, 48 of 48 streams above the 25 dB target - unchanged from stage 2a.
-* Next: the stage 2b fixes for pack11 (generic ones as they are, `cine` needs the pack11 names), the `g_pda` merge,
-  then a first test in the game.
+* Stage 2b (`dlc_fixes_build.py dlc2_asm_stage2a_p11 -> dlc2_asm_stage2b --pack pack11`, finding 38; same log):
+  all five fixes ran; tree still structurally clean (`tree_check.py`: 166/166 read back, 0 out-of-bounds
+  relocations, 0 broken references).
+
+  | Fix | DLC 1 (files / changes) | DLC 2 (files / changes) |
+  |---|---|---|
+  | `cine` | 2 / 4 command DTPs | 6 / 6 command DTPs (pdlc2_000_fight .. 050_crush; 17-100 words each) |
+  | `float` | 4 / 60 | 18 / 16 243 - **16 105 of them in two DTPs**: 22493 of `doppelganger_casual.drm` (10 136) and 25050 of `lara_doppelganger.drm` (5 969), mode s16 |
+  | `tag404` | 6 / 16 | 1 / 14 (`doppelganger_casual.drm`) |
+  | `postfix` | 3 / 20 strings | 3 / 5 strings |
+  | `analog` | 18 / 33 (all = B138) | 17 / 1 088 (no reference) |
+
+  The `float` rule is strict (new DTP, plausible Xbox float with a non-round mantissa, the PC word equals the
+  half-swapped variant, at least two neighbours already converted as floats) and every change was right on DLC 1.
+  But the two doppelganger DTPs are long float blocks the learned tables never saw - **to verify**: the doppelganger
+  also exists in the PC base game, so its PC data can show whether these offsets hold s32 floats. `analog` changed
+  far more than on DLC 1 (1 088 vs 33) - also to be checked against the base analogs it names.
+* Next: verify `float`/`analog` on DLC 2 as above, the `g_pda` merge, locals/padshock for pack11, then a first test
+  in the game.
 
 ## What the DLC 1 rebuild taught us for DLC 2 (checklist, kept up to date)
 
@@ -101,6 +118,9 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 
 **Pipeline steps**
 - Stages 0-1 already cover pack11: `dlc_drms_build`, `Convert` (307 DRMs = pack10 134 + pack11 166 + costumes) [run log 2026-10-27].
+- **Run the DLC 2 audio and fix steps with `--pack pack11`** (`dlc_audio_build.py`, `dlc_fixes_build.py`; sets
+  `TRUDLC_PACK_FIRST`): 10 file names exist in both packs with different content, and name lookups otherwise take
+  the pack10 copy as the Xbox source [38]. Installing both DLCs needs one copy per name - see [38] for which.
 - Names first: `dlc_names.py` also takes the Xbox names of the kit manifests (hash-checked) [14]; pack11 still has
   63 unnamed non-DRM records - check which of them a DLC 2 tree needs before `Media`.
 - `Media`: `dlc_media_build.py OUT pack11`; for pack11 itself `MUSIC_PACKS` falls back to pack11 only [13];
