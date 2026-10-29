@@ -124,6 +124,23 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   28 replaced (the 9 shared DRMs + 19 DLC 2 music tracks that B138 already ships in its own encoding), 79 already
   equal, `local\` and `padshock\` excluded (the installed string tables carry the DLC menu text fix and already hold
   the DLC 2 strings).
+* **First test in the game (2026-10-29, Steam PC, German, test tree over the installed B138 kit)** - screenshots in
+  the workspace's local `references/DLC2/` (`PC-Test-20261029_DLC2_*`), compared with the Xbox/Xenia references
+  there (`Xbox-TU_DLC2_*`):
+
+  | | Xbox (Xenia) | PC test | Reading / next step |
+  |---|---|---|---|
+  | DLC menu | *Lara's Shadow* with text | **works**: "Laras Schatten", preview image, full description, light-blue title (finding 41 confirmed: slot 2 appears with its start file) | - |
+  | Loading screen | DLC 2 image, title and description | Croft Manor background, **no text** | the loading script does not know mission slot 2 (`generalbank` has "Invalid level id num passed in uiloading script!"); compare the Xbox TU `generalbank` loading script |
+  | Costume / weapon choice | none, the mission starts | **Lara's costumes and weapons offered** | the PC flow treats DLC 2 like a normal Lara level |
+  | Player character | **the doppelganger** (red hair, black outfit) | Lara in the chosen costume | follows from the costume choice; DLC 2 is played as the doppelganger - find where the Xbox flow forces her (TU `generalbank` / `player_tru_dlc2_extension`) |
+  | Intro cutscene | doppelganger jumps, strangles Lara | **missing** | open (`cinstream/pdlc2_000_fight`; maybe tied to the same mission flow) |
+  | Waterfall | bright, glowing | **rock-wall texture inside the water** | material / shader of the DLC 2 water - the DLC 2 shaders are not translated yet (stage 3) |
+  | Hint box (top) | "The shadow meter drains when LB or RB is held ..." with icon | **grey box, no content** | the strings are present (TU index 1321/1323 -> PC 5206/5208, same in the installed and our tables) - suspects: the button-glyph characters (U+1800/1804/1806) or a wrongly mapped id in the hint data |
+  | Camera pan to the wall | part of the tutorial | happens | - |
+  | Stability | - | **no crash**; the level loads, Lara can move | - |
+
+  Undo the test with `Install-TruTree.ps1 -Restore`.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
