@@ -119,7 +119,15 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   string tables (one table for both DLCs; DLC 2 description = locals index 457) + padshock; 166 DRMs, structurally
   clean. DLC 2 is mission-screen slot 2 (`dlc_level2_start.drm`); the menu patch of the B138 kit should cover it.
 * Next: first test in the game - DLC 2 files on top of an installed B138 (= "both DLCs installed": the 10 shared
-  files come from pack11, finding 38), backup of `mods\` first.
+  files come from pack11, finding 38) with `scripts/windows/Install-TruTree.ps1 -Source work/rebuild/dlc2_test/mods`
+  (dry run with `-Check`; undo with `-Restore`). Dry run against the installed B138 (2026-10-29): 186 files added,
+  28 replaced (the 9 shared DRMs + 19 DLC 2 music tracks that B138 already ships in its own encoding), 79 already
+  equal, `local\` and `padshock\` excluded (the installed string tables carry the DLC menu text fix and already hold
+  the DLC 2 strings).
+* Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
+  cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
+  finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
+  pack11 versions).
 
 ## What the DLC 1 rebuild taught us for DLC 2 (checklist, kept up to date)
 
