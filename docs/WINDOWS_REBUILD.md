@@ -420,7 +420,23 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      Candidate list: `work/rebuild/symbol_candidates_stage2b.json` (`--write`).
    * Not applied to the pipeline: taking values from B138 is calibration; for real Symbols it would also help DLC 2
      (one Symbol space), for non-Symbol words it would be wrong. Next: an experiment run with these candidates as
-     extra map entries on the 49 affected DRMs only, measured separately (finding 34).
+     extra map entries, measured separately (finding 35).
+34. **Upstream's full stage-1 route (`assemble_dlc`, material 'dlc') on the rebuilt render tables.**
+   * `tools/dlc_assemble_build.py work/rebuild/stage1/mods work/rebuild/asm_stage1/mods` (new; same calls as
+     `convert_dlc.py` / the author's `work/ws/rebuild/convert_fresh.py`, non-DRM files taken from the stage-1 tree),
+     then Audio, the five 2b fixes and the comparisons into `asm_stage2a` / `asm_stage2b` (log
+     `logs/Manual_Assemble_20261029_030905.log`): **134 of 134 pack10 DRMs, 0 errors**, 2 164 s.
+   * Against B138 (stage2b = our previous route -> asm_stage2b): **shader libs 0 % -> 97.7 %** (2 238 of 2 291;
+     the route puts the PC shader sections in place of the Xbox ones), **materials 83.2 % -> 90.4 %** (1 311 of
+     1 450), meshes unchanged 31.7 %, all other types unchanged (DTP 98.7 %, script 95.4 %, type 0 95.8 %,
+     wave 86.5 %); fully identical DRMs 11 -> 13 (`vm_mods_expected` 11, one `derived:B90_gold`, one `derived:B45`);
+     files MD5-identical still 92 of 275.
+   * Measurement artefact found and fixed: `script_diff.py` first reported only 24 differing script words for
+     `asm_stage2b`. `dtp_audit.section_pairs` pairs sections by index only when the whole layout matches the Xbox
+     DRM, else only DTPs - the assemble route changes the shader sections, so the scripts were not paired at all.
+     `script_diff.py` now pairs the Script sections by their order when the counts agree: 2 581 in both trees.
+   * So the assemble route is the better stage 1: same data results, real shaders and better materials. Meshes
+     (type 12) are the largest open render type next to the remaining materials.
 32. **Our Convert ran without upstream's DLC post-passes (`extra_fixes`).**
    * `dlc_generic.convert_drm(..., extra_fixes=False)` is the default; `assemble_dlc.assemble()` passes
      `extra_fixes=(material == 'dlc')`, `dlc_convert_all.py` passed nothing. Gated by it (`dlc_generic.py`): model
@@ -596,5 +612,7 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-28 | Convert..2b | with `DLC_SYM_SHIFT = 480` (tools directly, `logs/Manual_SymShift480_20261027_233600.log`): script sections 95.4 % = B138 (was 79.5 %), 2 593 differing script words (was 9 580), 11 DRMs fully identical |
 | 2026-10-28 | Convert..2b | with `--extra-fixes` (after generating `model_point_rules.pkl` and `dtpid_evidence.pkl`): DTP 98.7 % = B138 (was 97.6 %), type 0 95.8 %, script words 2 581 |
 | 2026-10-29 | Prep..Audio | **reproducibility run through `scripts/windows/Invoke-TruPipeline.ps1`** (Windows PowerShell 5.1, `powershell.exe -NoProfile -NonInteractive -File`): Prep 1 755 s (incl. model_point learn/selftest 0 changes, dtpid_evidence 96.86 %), Convert 4 449 s (`--extra-fixes`, readback 307/307), Media 61 s, Audio 93 s, all exit 0; then 2b fixes + comparisons (`logs/Manual_2b-compare_20261029_024654.log`): **same numbers as 2026-10-28** - DTP 98.7 %, script 95.4 %, type 0 95.8 %, 2 581 script words, 11 DRMs identical, `analog` 33/33 = B138 |
+| 2026-10-29 | Render tables + tools | `render_tables_build.py build/check`, `rend_extract.py pairs/dlc`, `shader_map`, `material_rules`, `material_dlc`, `pc_shader_sections`, `terrain_validate` - all exit 0 (finding 28) |
+| 2026-10-29 | Assemble route | `dlc_assemble_build.py` -> asm_stage1, Audio, 2b fixes, comparisons: 134/134 DRMs, shader libs 97.7 %, materials 90.4 % = B138 (finding 34) |
 | 2026-10-27 | DLC 2 Media | `dlc_media_build.py work/rebuild/dlc2_stage1/mods pack11` (parallel to the DLC 1 run): 167 DRMs, 19 music tracks, 6 cinstream `.mul`, exit 0 (see `docs/DLC2.md`) |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |

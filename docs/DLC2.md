@@ -120,6 +120,13 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   test saving early in DLC 2 [24].
 - Upstream's `work/ws/` scripts still carry the author's local paths (407 of 578); fix each one when it is used [21].
 
+**Stage 1 route**
+- Use upstream's full route (`assemble_dlc`, material 'dlc'; `tools/dlc_assemble_build.py`, today pack10 only -
+  needs a pack11 variant): on DLC 1 it gave real PC shader sections (97.7 % = B138) and better materials (90.4 %)
+  at the same data results [34]. It needs the `work/render/` tables: `render_tables_build.py build`, then
+  `rend_extract.py pairs` / `dlc`, `shader_map`, `material_rules`, `material_dlc`, `pc_shader_sections`,
+  `terrain_validate` [28]. `rend_extract.py dlc` and `shader_map` already cover pack11.
+
 **Measuring**
 - `compare_sections.py` / `rebuild_status.py` need a reference tree - for DLC 2 only the base-game rules and the
   Xbox source exist; plan in-game tests per level (crashes, physics, cutscenes) earlier than for DLC 1.

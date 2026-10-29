@@ -35,9 +35,15 @@ def scan_file(args):
     D = DW.read(open(path, 'rb').read(), 'le'); B = DW.read(open(ref, 'rb').read(), 'le')
     bmap = {(s.type, s.id): s for s in B.sections}
     words = []
-    for x, i in DA.section_pairs(xs, D):
+    pairs = [(x, i) for x, i in DA.section_pairs(xs, D) if x['type'] == 8]
+    x8 = [x for x in xs if x['type'] == 8]; p8 = [i for i, s in enumerate(D.sections) if s.type == 8]
+    if len(pairs) < len(x8) and len(x8) == len(p8):
+        # section_pairs pairs by index only when the whole layout matches, else only DTPs; the assemble route replaces
+        # shader sections, so pair the Script sections by their order (it is kept) - finding 34
+        pairs = list(zip(x8, p8))
+    for x, i in pairs:
         sec = D.sections[i]
-        if x['type'] != 8 or x['data'] is None: continue
+        if x['data'] is None: continue
         b = bmap.get((8, sec.id))
         if b is None or len(b.data) != len(sec.data) or len(x['data']) != len(sec.data) or b.data == sec.data: continue
         xr = R.parse(x['reloc'], 'be'); slots = set(xr.pointer_offsets()) | set(xr.id_offsets())
