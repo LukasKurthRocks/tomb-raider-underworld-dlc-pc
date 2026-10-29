@@ -701,6 +701,20 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Reading: the loading screen script chooses the DLC background and **triggers the DLC intro cutscene** - both
      missing on PC because script 6 is the retail one. The costume choice / doppelganger part is not located yet
      (candidates: 21239 "dlc2data", the grown scripts without strings).
+   * What the Xbox title update consists of (`TitleUpdate.000`, 12 records, 1.9 MB, plus the exe patch
+     `default.xexp`, 0.96 MB) and where the PC stands:
+
+     | TU part | What it adds | On PC (B138 kit + this branch) |
+     |---|---|---|
+     | `generalbank.drm` | 48 scripts changed + 2 new, 65 textures, 11 DTPs: mission screen, loading screen with DLC background and intro trigger, golden shotgun, pause menu, "dlc2data" | partly: menu item + mission screen (B138 patch, our text style fix); loading screen, intro trigger, "dlc2data", golden shotgun missing |
+     | `local/locals.bin` x 6 languages | 1 284 -> 1 407 strings: real DLC names/descriptions instead of retail placeholders ("DLC TEST MISSION 2", "Extra Costume 1"), hint texts | merged into the PC tables (`tools/locals.py`) |
+     | `tr8/objectlist.txt`, `objlist.dat`, `unitlist.txt` | registers DLC objects and level units | merged (`work/generic/merged/tr8`, in B138) |
+     | `globalsoundinfo.drm` | 1 script + 1 sound DTP grown | in B138 |
+     | `padshock/padshocklib.tfb` | 1 rumble entry (`dlc1_adren_bridge`; missing = crash) | `tools/padshock_convert.py` |
+     | `default.xexp` (exe patch) | engine code - presumably mounting DLC packages and the licence check | none on PC: the mod loader replaces it; the related engine natives are stubs on PC (finding 41, `tools/menu_dlc_patch.py`) |
+
+     The retail game - and so the PC version - already had the DLC skeleton (six mission slots, 16 costume slots,
+     placeholder strings); the title update filled it in. The PC never received it.
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
