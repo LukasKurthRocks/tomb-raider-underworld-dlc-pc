@@ -22,3 +22,4 @@ work/rebuild/
 work/idx_*.json
 scripts/windows/*.local.txt
 work/chain_aim/
+work/render/
