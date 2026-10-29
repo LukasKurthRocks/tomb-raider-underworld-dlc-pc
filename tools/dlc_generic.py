@@ -61,13 +61,14 @@ class DlcIds:
 
     def _sym_setup(self):
         m = self.base.get(SYM, {})
-        # experiment only (finding 34): TRUDLC_SYM_EXTRA = JSON {xbox symbol: pc symbol} added for symbols not in the
-        # learned map; unset (the default) = no change
+        # experiment only (finding 35): TRUDLC_SYM_EXTRA = JSON {xbox symbol: pc symbol} for symbols not in the learned
+        # map, used for exact lookups only - NOT as neighbours for guessing other symbols (as map entries they shifted
+        # the guesses of further unmapped symbols: 86 new differences). Unset (the default) = no change.
+        self.sym_extra = {}
         extra = os.environ.get('TRUDLC_SYM_EXTRA')
         if extra:
-            add = {int(a): b for a, b in json.load(open(extra)).items() if int(a) not in m}
-            m.update(add)
-            print('symbol map: %d extra entries from %s' % (len(add), extra), flush=True)
+            self.sym_extra = {int(a): b for a, b in json.load(open(extra)).items() if int(a) not in m}
+            print('symbol map: %d extra exact-only entries from %s' % (len(self.sym_extra), extra), flush=True)
         self.sks = sorted(m)
         self.sused = set(m.values())
         self.xs_max = max(m); self.ps_max = max(max(m.values()), self.PC_SYM_MAX)
@@ -82,6 +83,7 @@ class DlcIds:
         guessed from the lower neighbour's offset; a guess that would hit an existing PC symbol -> 40000+xs."""
         m = self.base[SYM]
         if xs in m: self.sym_stats['mapped'] += 1; return m[xs]
+        if xs in self.sym_extra: self.sym_stats['extra'] += 1; return self.sym_extra[xs]
         if xs == 0 or xs == 0xffff: self.sym_stats['null'] += 1; return xs
         if xs > self.xs_max: self.sym_stats['dlc_new_shift'] += 1; return xs + self.sym_shift
         k = bisect.bisect_left(self.sks, xs)
