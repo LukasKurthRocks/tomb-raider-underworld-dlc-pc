@@ -41,7 +41,7 @@ def check():
     mx2p = pickle.load(open(os.path.join(OUT, 'material_x2p.pkl'), 'rb'))
     sx2p = pickle.load(open(os.path.join(OUT, 'shader_x2p.pkl'), 'rb'))
     pairs = pickle.load(open(os.path.join(OUT, 'pairs_render.pkl'), 'rb'))
-    st = collections.Counter()
+    st = collections.Counter(); unmapped = collections.Counter()
     for nm, X, P in pairs:
         if X is None or not isinstance(P, list): st['pair_failed'] += 1; continue
         xm = [s for s in X if s['type'] == 10]; pm = [s for s in P if s['type'] == 10]
@@ -51,13 +51,20 @@ def check():
             if mx2p.get(a['id']) != b['id']: st['zip_id_mismatch'] += 1; continue
             st['material_pairs_ok'] += 1
             if len(a['data']) < 0x38 or len(b['data']) < 0x38: st['short_material'] += 1; continue
-            xt = [sx2p.get(v, None) for v in struct.unpack_from('>4I', a['data'], 0x28)]
+            xr = struct.unpack_from('>4I', a['data'], 0x28)
+            # empty slots (0 / 0xffffffff) stay as they are
+            xt = [v if v in (0, 0xffffffff) else sx2p.get(v, None) for v in xr]
             pt = list(struct.unpack_from('<4I', b['data'], 0x28))
-            if None in xt: st['tuple_unmapped_shader'] += 1
+            st['slots_empty'] += sum(1 for v in xr if v in (0, 0xffffffff))
+            if None in xt:
+                st['tuple_unmapped_shader'] += 1
+                for v, w in zip(xr, xt):
+                    if w is None: unmapped[v] += 1
             elif xt == pt: st['tuple_equal'] += 1
             elif sorted(xt) == sorted(pt): st['tuple_equal_as_set'] += 1
             else: st['tuple_different'] += 1
     for k in sorted(st): print('  %-26s %d' % (k, st[k]))
+    print('  unmapped Xbox shader ids: %d distinct, top: %s' % (len(unmapped), unmapped.most_common(8)))
 
 
 if __name__ == '__main__':

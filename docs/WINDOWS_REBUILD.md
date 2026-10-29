@@ -506,6 +506,14 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        types 10 / 9 (medium-high / medium), then check: number of type-10 pairs that pass `material_rules`'s zip +
        id test, `material_validate.py`, and for shaders: every Xbox shader id of a base material's tuple (offset 0x28)
        maps to the PC material's shader at the same tuple position (PC re-slots pixel shaders, `shader_map.py:108-110`).
+   * **Built and checked (2026-10-29)** with `tools/render_tables_build.py build|check` (new; log
+     `logs/Manual_RenderTables_20261029_025611.log`): `pairnames.json` 1 054 names (= the 1 054 pairs of
+     `generic_cache`), `material_x2p.pkl` 2 244 and `shader_x2p.pkl` 2 046 entries, both injective;
+     `tools/rend_extract.py pairs`: 1 054 pairs, 0 failures (`pairs_render.pkl`). Check over all base pairs:
+     9 273 Xbox material sections, **9 155 pass `material_rules`'s positional zip + id test** (118 do not);
+     shader tuples of those: **9 145 equal** to the PC material's tuple after mapping, 10 different, 0 with an
+     unmapped shader (4 588 empty slots 0 / 0xffffffff kept). The idmap-derived maps reproduce the PC data - good
+     enough to run the render tools. `work/render/` is ignored (derived from game data).
 
 ## The "VM" in upstream (what it was, what we do instead)
 
