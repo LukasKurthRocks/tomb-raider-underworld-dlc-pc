@@ -157,6 +157,10 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - **Run the DLC 2 audio and fix steps with `--pack pack11`** (`dlc_audio_build.py`, `dlc_fixes_build.py`; sets
   `TRUDLC_PACK_FIRST`): 10 file names exist in both packs with different content, and name lookups otherwise take
   the pack10 copy as the Xbox source [38]. Installing both DLCs needs one copy per name - see [38] for which.
+- **The PC game is the Xbox retail state; DLC support came with the Xbox title update.** Mission screen, loading
+  screen (DLC background + the trigger of the DLC intro cutscene), golden shotgun and a new "dlc2data" script are
+  title-update scripts of `generalbank.drm` that the PC lacks [42]. When something DLC-specific is missing on PC,
+  check `tools/tu_script_changes.py` for the file first.
 - **Rules proven on DLC 1 can meet data DLC 1 does not have.** Upstream's `float_fix` (every change = B138 on DLC 1)
   would have rewritten 16 105 words of the DLC 2 doppelganger models; measuring against the closest base-game
   structure (`lara.drm` on PC, `tools/dtp_word_classes.py`) showed the converter was right [39]. Treat a large count
