@@ -15,8 +15,9 @@ Usage (from the repository root):
   --jobs N: N processes (default: environment TRUDLC_JOBS, else 1); ~16 GB RAM each (finding 36)
   e.g. work/rebuild/stage1/mods work/rebuild/asm_stage1/mods   (OUT is replaced, must be below work/rebuild)
 Report: <OUT>/../assemble_report.tsv (per DRM: status, bytes, seconds, bad, missing shaders, routes).
+A DRM that fails is removed from OUT (not left as the SRC copy) and the tool exits non-zero.
 """
-import sys, os, time, shutil, collections
+import sys, os, time, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,10 +45,8 @@ def main(argv):
         k = argv.index('--pack'); pack = argv[k + 1]; del argv[k:k + 2]
         if pack not in PACK_INDEX: sys.exit('--pack must be one of ' + ', '.join(PACK_INDEX))
     src, out = argv[0], argv[1]
-    rebuild = os.path.realpath(os.path.join(HERE, '..', 'work', 'rebuild'))
-    if os.path.commonpath([os.path.realpath(out), rebuild]) != rebuild: sys.exit('OUT must be below work/rebuild: ' + out)
-    if os.path.exists(out): shutil.rmtree(out)
-    shutil.copytree(src, out)
+    from build_util import replace_tree
+    replace_tree(src, out, must_be_below=True)
     from archive import Archive
     from names import crc
     from convert_dlc import R as ROOT, PACKS
@@ -75,9 +74,12 @@ def main(argv):
     for rel, row, status in results:              # in task order, whatever the number of processes
         rep.write(row); st[status] += 1
         print(row.rstrip('\n').replace('\t', '  ')[:150], flush=True)
+        # a failed DRM must not stay in OUT as the SRC (generic route) copy - that would mix both routes silently
+        if status == 'error' and os.path.exists(os.path.join(out, rel)): os.remove(os.path.join(out, rel))
     if jobs > 1: ex.shutdown()
     rep.close()
     print('DRMs', dict(st), 'total %.0f s' % (time.time() - t00))
+    if st['error']: sys.exit('%d DRMs failed and were removed from OUT (see assemble_report.tsv)' % st['error'])
 
 
 _CTX = {}

@@ -22,6 +22,8 @@ W = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'rend
 def main(argv):
     variants = '--variants' in argv; argv = [a for a in argv if a != '--variants']
     mods = argv[0] if argv else '../data/pc/mods'
+    from build_util import require_dir
+    require_dir(mods, 'MODS_DIR')
     pc = {}
     for dp, dn, fn in os.walk(mods):
         for f in fn:

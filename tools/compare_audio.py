@@ -52,9 +52,22 @@ def stats(a, b):
     d = a - b
     rd = float(np.sqrt(np.mean(d * d))) if n else 0.0
     rs = float(np.sqrt(np.mean(b * b))) if n else 0.0
-    snr = float('inf') if rd == 0 else (20 * np.log10(rs / rd) if rs > 0 else 0.0)
+    # nothing to compare (one side decoded to 0 samples) is not "identical": snr_db None, counted as the worst case
+    snr = None if not n else float('inf') if rd == 0 else (20 * np.log10(rs / rd) if rs > 0 else 0.0)
     return {'samples': int(n), 'len_ours': int(len(a)), 'len_ref': int(len(b)), 'differ': int(np.count_nonzero(d)),
             'max_abs': int(np.abs(d).max()) if n else 0, 'snr_db': snr}
+
+
+def _snr_key(s):
+    return float('-inf') if s['snr_db'] is None else s['snr_db']
+
+
+def _json_safe(o):
+    """inf -> "inf" (json.dump would write Infinity, which strict JSON readers reject)"""
+    if isinstance(o, float) and o in (float('inf'), float('-inf')): return 'inf' if o > 0 else '-inf'
+    if isinstance(o, dict): return {k: _json_safe(v) for k, v in o.items()}
+    if isinstance(o, list): return [_json_safe(v) for v in o]
+    return o
 
 
 def wave_file(args):
@@ -113,7 +126,7 @@ def mul_file(args):
             if pd is None: continue
             pc = mul_pcm(pd, True)
             per = [stats(pc[:, k], xb[:, k]) for k in range(min(pc.shape[1], xb.shape[1]))]
-            r['%s_game_vs_xbox' % name] = min(per, key=lambda s: s['snr_db']) if per else None
+            r['%s_game_vs_xbox' % name] = min(per, key=_snr_key) if per else None
     except Exception as e:
         r['xbox_error'] = '%s: %s' % (type(e).__name__, e)
     return r
@@ -126,6 +139,9 @@ def main(argv):
     xbox_only = '--xbox-only' in argv
     if xbox_only: argv.remove('--xbox-only')
     mods = argv[0]
+    from build_util import require_dir
+    require_dir(mods, 'MODS_DIR')
+    if not xbox_only: require_dir(ref, 'REF_MODS_DIR')
     label = argv[1] if len(argv) > 1 else os.path.basename(os.path.dirname(os.path.abspath(mods)))
     drms, muls = [], []
     for dp, dn, fn in os.walk(mods):
@@ -143,7 +159,9 @@ def main(argv):
         mres = list(ex.map(mul_file, sorted(muls)))
 
     print('== wave sections that differ: %d (DRMs compared: %d)' % (len(waves), len(drms)))
-    mono = [w for w in waves if 'snr_db' in w]
+    empty = [w for w in waves if 'snr_db' in w and w['snr_db'] is None]
+    if empty: print('   EMPTY decode on one side (not compared): %d, e.g. %s' % (len(empty), empty[0].get('file', '?')))
+    mono = [w for w in waves if 'snr_db' in w and w['snr_db'] is not None]
     if mono:
         snr = np.array([w['snr_db'] for w in mono]); mx = np.array([w['max_abs'] for w in mono])
         dif = sum(w['differ'] for w in mono); tot = sum(w['samples'] for w in mono)
@@ -157,14 +175,18 @@ def main(argv):
     print('== .mul streams: %d (bytes equal %d)' % (len(mres), sum(1 for r in mres if r['bytes_equal'])))
     for key in ('ours_fsb_vs_ref_fsb', 'ours_fsb_vs_ref_game', 'ours_game_vs_ref_game', 'ours_game_vs_xbox', 'ref_game_vs_xbox'):
         for chans, tag in ((None, 'all'), ((2,), 'stereo'), ((1, 4, 6), 'other')):
-            s = [r[key]['snr_db'] for r in mres if r.get(key) and (chans is None or r['channels'] in chans)]
-            if s: print('   %-24s %-6s n %2d  SNR dB (worst channel) min %.1f  median %.1f  max %.1f' % (
-                key, tag, len(s), min(s), float(np.median(s)), max(s)))
+            rows = [r[key] for r in mres if r.get(key) and (chans is None or r['channels'] in chans)]
+            s = [x['snr_db'] for x in rows if x['snr_db'] is not None]
+            empty = len(rows) - len(s); lenx = sum(1 for x in rows if x['len_ours'] != x['len_ref'])
+            if s: print('   %-24s %-6s n %2d  SNR dB (worst channel) min %.1f  median %.1f  max %.1f%s%s' % (
+                key, tag, len(s), min(s), float(np.median(s)), max(s),
+                '  EMPTY %d' % empty if empty else '', '  length differs %d' % lenx if lenx else ''))
+            elif empty: print('   %-24s %-6s EMPTY %d (nothing decoded on one side)' % (key, tag, empty))
     errs = [r for r in mres if 'xbox_error' in r]
     if errs: print('   Xbox source errors:', [(r['file'], r['xbox_error']) for r in errs])
     os.makedirs(W, exist_ok=True)
     rep = os.path.join(W, 'audio_%s.json' % label)
-    json.dump({'ref': ref, 'waves': waves, 'mul': mres}, open(rep, 'w'), indent=1)
+    json.dump(_json_safe({'ref': ref, 'waves': waves, 'mul': mres}), open(rep, 'w'), indent=1)
     print('report', os.path.abspath(rep))
 
 

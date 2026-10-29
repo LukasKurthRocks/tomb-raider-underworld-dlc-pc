@@ -160,13 +160,9 @@ def main(argv):
     if '--only' in argv:
         k = argv.index('--only'); only = set(argv[k + 1].split(',')); del argv[k:k + 2]
     src, out = argv[0], argv[1]
-    if os.path.exists(out):
-        rebuild = os.path.realpath(os.path.join(HERE, '..', 'work', 'rebuild'))
-        if os.path.commonpath([os.path.realpath(out), rebuild]) != rebuild:
-            sys.exit('output exists and is not below work/rebuild, remove it yourself: ' + out)
-        print('replacing previous output', out, flush=True)
-        shutil.rmtree(out)
-    shutil.copytree(src, out)
+    sys.path.insert(0, HERE)
+    from build_util import replace_tree
+    replace_tree(src, out)
     report = {}
     for name, fn in FIXES:
         if only and name not in only: continue

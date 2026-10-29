@@ -13,7 +13,7 @@ Usage (from the repository root):
   ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_audio_build.py SRC_MODS_DIR OUT_MODS_DIR [--mul nch|b43]
   e.g. work/rebuild/stage1/mods work/rebuild/stage2a/mods
 """
-import sys, os, json, shutil, collections
+import sys, os, json, collections
 from concurrent.futures import ProcessPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -48,13 +48,8 @@ def main(argv):
         k = argv.index('--mul'); mode = argv[k + 1]; del argv[k:k + 2]
         if mode not in ('nch', 'b43'): sys.exit('--mul must be nch or b43')
     src, out = argv[0], argv[1]
-    if os.path.exists(out):
-        rebuild = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'rebuild')
-        if os.path.commonpath([os.path.realpath(out), os.path.realpath(rebuild)]) != os.path.realpath(rebuild):
-            sys.exit('output exists and is not below work/rebuild, remove it yourself: ' + out)
-        print('replacing previous output', out, flush=True)
-        shutil.rmtree(out)
-    shutil.copytree(src, out)
+    from build_util import replace_tree
+    replace_tree(src, out)
     rep_dir = os.path.dirname(os.path.abspath(out))
 
     drms = []

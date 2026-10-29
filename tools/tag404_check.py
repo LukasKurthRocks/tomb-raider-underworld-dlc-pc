@@ -20,7 +20,10 @@ def main(argv):
     ref = '../data/pc/mods'
     if '--ref' in argv:
         k = argv.index('--ref'); ref = argv[k + 1]; del argv[k:k + 2]
+    show_all = '--all' in argv; argv = [a for a in argv if a != '--all']
     mods = argv[0] if argv else 'work/rebuild/stage2b/mods'
+    from build_util import require_dir
+    require_dir(mods, 'MODS_DIR'); require_dir(ref, 'REF_MODS_DIR')
     st = collections.Counter(); rows = []
     for rel, path in sorted(DA.overlay([os.path.abspath(mods)], None).items()):
         xs = DA.xsecs(rel)
@@ -41,11 +44,11 @@ def main(argv):
                 st['ours == B138'] += ours == b138
                 st['ours raw'] += ours == w
                 st['B138 raw'] += b138 == w
-                if ours != b138 or '--all' in sys.argv:
+                if ours != b138 or show_all:
                     rows.append('%s DTP %d +%#x xbox %s ours %s B138 %s' % (rel, sec.id, o + 4, w.hex(), ours.hex(),
                                                                          b138.hex() if b138 else '-'))
     print(dict(st))
-    for r in rows: print('  ' + ('record:' if '--all' in sys.argv else 'differs:'), r)
+    for r in rows: print('  ' + ('record:' if show_all else 'differs:'), r)
 
 
 if __name__ == '__main__':

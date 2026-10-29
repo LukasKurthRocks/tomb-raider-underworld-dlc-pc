@@ -39,6 +39,8 @@ def main(argv):
     if '--ref' in argv:
         k = argv.index('--ref'); ref = argv[k + 1]; del argv[k:k + 2]
     mods = argv[0]
+    from build_util import require_dir
+    require_dir(mods, 'MODS_DIR'); require_dir(ref, 'REF_MODS_DIR')
     label = argv[1] if len(argv) > 1 else os.path.basename(os.path.dirname(os.path.abspath(mods)))
     jobs, no_ref = [], []
     for dp, dn, fn in os.walk(mods):

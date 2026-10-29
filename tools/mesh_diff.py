@@ -68,6 +68,8 @@ def main(argv):
     if '--ref' in argv:
         k = argv.index('--ref'); ref = argv[k + 1]; del argv[k:k + 2]
     mods, label = argv[0], argv[1]
+    from build_util import require_dir
+    require_dir(mods, 'MODS_DIR'); require_dir(ref, 'REF_MODS_DIR')
     jobs = []
     for dp, dn, fn in os.walk(mods):
         for f in fn:
