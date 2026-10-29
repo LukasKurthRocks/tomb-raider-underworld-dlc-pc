@@ -38,7 +38,10 @@
 - [docs/DLC_MENU.md](docs/DLC_MENU.md), [docs/DLC2.md](docs/DLC2.md), [docs/COSTUMES.md](docs/COSTUMES.md) – DLC menu
   text fix (all six languages), notes on DLC 2 and the costume packs
 - New tools in `tools/` (e.g. `compare_b138.py`, `compare_sections.py`, `compare_audio.py`, `dlc_media_build.py`,
-  `dlc_audio_build.py`, `mul_audio_nch.py` - the audio fix for non-stereo `.mul`)
+  `dlc_audio_build.py`, `mul_audio_nch.py` - the audio fix for non-stereo `.mul`, `dlc_assemble_build.py` (also DLC 2),
+  `mesh_tables_build.py`, `tree_check.py`)
+- [CHANGELOG.md](CHANGELOG.md) – section "Fork branch `windows`" at the top: what this fork changed, by date (no
+  release of the port)
 
 Versions of this fork are named `<date>[.<n>]-B<upstream build>`, e.g. `20261027-B138`: the B number is always the
 original's build it is based on.

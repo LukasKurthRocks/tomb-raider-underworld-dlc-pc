@@ -3,6 +3,28 @@
 "Played" = the project owner ran it in the game (Windows 11 VM). "Offline" = checked with static gates and data comparisons against the
 Xbox/PC originals only, **not yet seen in game**.
 
+## Fork branch `windows` — unreleased (no kit; personal Windows rebuild, see the notice in the README)
+
+Not a release of the port. This section lists what the fork's branch `windows` adds on top of B138; everything below
+it is the original project's changelog, unchanged. Details and numbers: [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md)
+(findings 1-39), [docs/DLC2.md](docs/DLC2.md), overview [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+| Date | Change |
+|---|---|
+| 2026-10-27 | Windows scripts (`scripts/windows/`): install the kit, swap single mod files, display mode/language, tools, the pipeline step by step (`Invoke-TruPipeline.ps1`), pre-upload scan |
+| 2026-10-27 | DLC mission screen: Xbox text style and unwrapped descriptions in all six languages (`docs/DLC_MENU.md`) - played |
+| 2026-10-27 | Pipeline rebuilt on Windows: missing glue tools (`dlc_drms_build`, `dlc_media_build`, `dlc_audio_build`, `pc_vers_build`, ...), comparisons with B138 per file and per section type |
+| 2026-10-27 | `.mul` audio: one channel per Xbox stream with the game's IMA convention (`mul_audio_nch.py`; upstream's B43 tool scrambled non-stereo streams) - offline |
+| 2026-10-28 | Symbol ids: bogus learned entry removed, DLC-new symbols shifted by 480 (findings 27, 29); stage-2b fixes rebuilt (`dlc_fixes_build.py`) |
+| 2026-10-29 | Upstream's full stage-1 route as pipeline step `Assemble` (render tables derived, findings 28, 34); 167 B138-calibrated symbol values (finding 35): DLC 1 scripts 99.2 % = B138 |
+| 2026-10-29 | Parallel Convert/Assemble/terrain checks, byte-identical to sequential runs (finding 36) |
+| 2026-10-29 | Meshes: vertex-declaration hashes and DEC3N table learned from the base game - all 174 DLC 1 meshes = B138 (finding 37) |
+| 2026-10-29 | DLC 2 through the full route: 166/166 DRMs, audio, stage-2b fixes - offline, structurally checked only (no reference exists); pack10/pack11 shared file names (finding 38); `float_fix` no longer touches character models (finding 39) |
+| 2026-10-29 | Code review fixes (output-tree guard, failed DRMs, empty audio, missing inputs, ...), shared PowerShell module, docs `ARCHITECTURE.md`, `RELATED_WORK.md` |
+
+State of DLC 1 against B138 (offline): 46 of 133 DRMs fully identical, sections script 99.2 %, DTP 98.7 %, shader
+97.7 %, mesh 99.1 %, material 90.4 %. Not done: shader translator (B72-B89), later layers up to B138.
+
 ## B138 — 21 Oct 2026 (kit `trudlcport-kit-B138.zip`)
 
 Update of B132. Re-run `install_dlc.py` with the new kit: the previous `mods\` is kept as `mods_backup_<date>`. Start a **new DLC game** and remember to **lock the game to 60 fps**.
