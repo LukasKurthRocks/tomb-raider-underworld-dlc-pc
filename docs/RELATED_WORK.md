@@ -156,6 +156,26 @@ that comes only from a search snippet or secondary summary, or that could not be
     Costume 14"** (the `patch.000` costume, selected, with its preview image) - the DLC costume slots are already
     wired into the PC game's per-level costume menu; for the costume packs (`docs/COSTUMES.md`) only the converted
     files are missing.
+  * External links in these threads (27, checked 2026-10-29; 3 YouTube videos gone, 2 file-host links not opened,
+    3 pages unreachable). Worth keeping:
+    - [Gh0stBlade/NoesisPlugins](https://github.com/Gh0stBlade/NoesisPlugins), `fmt_TR8_mesh_2_4.py` (TRU and
+      Guardian of Light, PC/X360; successor of the 2014 plugin linked in the forum): reads the vertex declaration at
+      `meshInfo[9] + 8` after skipping 8 bytes (the 8-byte hash of finding 37, which the plugin ignores), elements of
+      8 bytes (u32 semantic hash, u16 offset, u8 type, u8 pad), and names 14 semantic hashes - Position `D2F7D823`,
+      Normal `36F5E414`, Tangent `F1ED11C3`, Binormal `64A86F01`, PackedNTB `09B1D4EA`, SkinWeights `48E691C0`,
+      SkinIndices `5156D8D3`, Color1 `7E7DD623`, Color2 `733EF0FA`, Texcoord1-4 `8317902A` / `8E54B6F3` /
+      `8A95AB44` / `94D2FB41`, InstanceID `E7623ECF`; 360 normals via `decodeNormals32(..., -10, -10, -10)`.
+      [Gh0stBlade/cdcEngineTools](https://github.com/Gh0stBlade/cdcEngineTools): CDRM / DRM / PCD2DDS / WAVE2WAV.
+    - The trudlcport author's video "Tomb Raider: Underworld DLCs PC Port - Beneath the Ashes intro"
+      (https://youtu.be/fsVqw8lTrt0, 2026-10-17) - posted in the thread by a member who calls the port their own
+      project (that both are the same person is likely, not stated).
+    - Nexus Mods ports of TRU costumes through the `mods/` folder, each adding an extra costume slot (e.g. a Wetsuit
+      Costume Pack, https://www.nexusmods.com/tombraiderunderworld/mods/78; pages not readable, search results
+      only) and TheIndra55/TRLAU-menu-hook's outfit switch (F9) - check before porting pack1/2/20 ourselves.
+    - Xenia (game-compatibility issue #541, 2021): full game and DLC work with `render_target_path_d3d12 = "rov"`;
+      a 2021 config uses `license_mask = 1` for the DLC - useful for our Xbox reference runs.
+    - Other 360-exclusive DLCs ported to the Steam versions in 2026: Prince of Persia (2008) "Epilogue" and Overlord
+      II "Battle Rock Nemesis" (methods not public).
 - Why earlier attempts stalled: whole-file or whole-mesh swaps without id remapping, relocation rewriting and
   section-level conversion froze the PC game, and the shaders were the wall. trudlcport's generic converter solved
   the first part; the shaders are our open stage 3 - the same wall.
