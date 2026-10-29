@@ -25,6 +25,12 @@ def text(path):
     raise SystemExit('no .text')
 
 
+def writes(op):
+    """capstone's operand access flags (detail mode): True for any instruction that writes the operand (mov, add,
+    or, inc, xchg, fistp, setcc, ...), False for cmp / test / push and other reads"""
+    return bool(op.access & capstone.CS_AC_WRITE)
+
+
 def main(argv):
     path, mode, val = argv[0], argv[1], int(argv[2], 16)
     write = '--write' in argv
@@ -44,11 +50,11 @@ def main(argv):
         if mode == 'disp':
             for i, op in enumerate(ins.operands):
                 if op.type == capstone.x86.X86_OP_MEM and op.mem.disp == val and op.mem.base != 0:
-                    if not write or (i == 0 and ins.mnemonic.startswith(('mov', 'fst', 'movss'))): hit = True
+                    if not write or writes(op): hit = True
         elif mode == 'abs':         # absolute memory operand [val] (global variable)
             for i, op in enumerate(ins.operands):
                 if op.type == capstone.x86.X86_OP_MEM and (op.mem.disp & 0xffffffff) == val and op.mem.base == 0 and op.mem.index == 0:
-                    if not write or i == 0: hit = True
+                    if not write or writes(op): hit = True
         elif mode == 'imm':
             hit = any(op.type == capstone.x86.X86_OP_IMM and (op.imm & 0xffffffff) == val for op in ins.operands)
         elif mode == 'call':

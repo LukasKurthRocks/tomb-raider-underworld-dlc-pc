@@ -37,6 +37,13 @@ def main(argv):
     pv = pit[pold + 4 * slot]; n = struct.unpack_from('<I', pd, pv)[0]; vlen = 4 + 4 * n
     if any(pv <= a < pv + vlen for a, _ in pr.internal): sys.exit('reference VTE has internal relocations - not copied')
     pext = [(si, a - pv, dd) for si, a, dd in pr.external if pv <= a < pv + vlen]
+    for si, _, _ in pext:       # REF's section indices are reused: IN must hold the same section at that index
+        if si >= len(D.sections) or (D.sections[si].type, D.sections[si].id) != (P.sections[si].type, P.sections[si].id):
+            sys.exit('section %d is %s in the reference but %s here - the inputs are not laid out alike' % (
+                si, (P.sections[si].type, P.sections[si].id),
+                (D.sections[si].type, D.sections[si].id) if si < len(D.sections) else 'missing'))
+    missing = [k for k in range(size) if old + 4 * k not in it]
+    if missing: sys.exit('vtable slots %s have no internal relocation (null or external) - not handled' % missing)
     # append: [VTE copy][count][new table]
     while len(d) % 4: d.append(0)
     vte = len(d); d += pd[pv:pv + vlen]
@@ -59,6 +66,7 @@ def main(argv):
     raw = D.write('le'); E = DW.read(DW.cdrm_encode(raw, 'le'), 'le')
     infos = [dict(size=len(x.data)) for x in E.sections]
     bad = sum(bool(R.check(R.parse(x.reloc, 'le'), len(x.data), infos)) for x in E.sections)
+    if bad: sys.exit('%d sections with relocations out of bounds - %s NOT written' % (bad, out))
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     open(out, 'wb').write(DW.cdrm_encode(raw, 'le'))
     print('script %d: vtable %d -> %d slots (slot %d copied from the reference, VTE n=%d, %d external relocations), '

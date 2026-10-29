@@ -123,13 +123,20 @@ def main(argv):
     print('  votes by kind: %s' % dict(kinds))
     for xsym, c, p, n, k in bad:
         print('  xbox %d: calibration %d, base %d (%d votes%s)' % (xsym, c, p, n, '' if k == 1 else ', %d candidates' % k))
-    merged = {a: b for a, b in cal.items() if a not in best and b not in taken}
-    dropped = sum(1 for a, b in cal.items() if a not in best and b in taken)
-    merged.update(best)
+    # calibration entries keep their place only while the merged map stays injective: skip the ones whose PC Symbol
+    # the base evidence took, the learned map uses, or an earlier calibration entry already holds
+    learned_pc = set(symmap.values()); evidence_pc = set(best.values())
+    merged = dict(best); used = set(learned_pc) | evidence_pc; drop = collections.Counter()
+    for a, b in sorted(cal.items()):
+        if a in best or a in symmap: continue
+        if b in evidence_pc: drop['PC Symbol taken by base evidence'] += 1
+        elif b in learned_pc: drop['PC Symbol used by the learned map'] += 1
+        elif b in used: drop['PC Symbol held by another calibration entry'] += 1
+        else: merged[a] = b; used.add(b)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump({'symbols': {str(k): v for k, v in sorted(merged.items())}}, open(OUT, 'w'), indent=0)
-    print('-> %s (%d entries: %d from base evidence, calibration without the %d entries whose PC Symbol base evidence '
-          'took)' % (os.path.normpath(OUT), len(merged), len(best), dropped))
+    print('-> %s (%d entries: %d from base evidence + calibration; calibration entries skipped: %s)' % (
+        os.path.normpath(OUT), len(merged), len(best), dict(drop)))
 
 
 if __name__ == '__main__':

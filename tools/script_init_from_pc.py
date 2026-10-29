@@ -10,8 +10,10 @@ What it does in script SCRIPT_ID of IN: members are paired with the REF (PC) scr
 tag / userType); their init trees are walked in parallel - a word that is a pointer on both sides is followed, any
 other word is copied from REF. A node is copied only when both nodes have the same length and the same pointer
 positions; anything else is reported and left as converted. Members without a PC counterpart (title-update additions)
-keep their converted values - listed at the end. Arguments and locals are done the same way (paired by function and
-position, names equal).
+keep their converted values - listed at the end. Arguments and locals are done the same way, paired by name / type
+tag / userType in walk order across all functions (LIMIT: not per function - a function the PC added or removed can
+shift the pairing; surplus entries are counted in the report). The output is not written if any relocation ends up
+out of bounds.
 
 With --xbox NAME (the Xbox file IN was converted from; title update first, --retail for the retail layers) the members
 WITHOUT a PC counterpart get their init words re-derived from the Xbox words: per (type tag, userType, path in the
@@ -53,8 +55,8 @@ def copy_tree(d, wa, ita, pd, wb, itb, a, b, st, seen, shapes):
     if [o - a for o in pa] != [o - b for o in pb]:
         # same size, pointers elsewhere: the PC re-authored this native struct (type 351 of generalbank script 6:
         # three u8 fields widened to u32, the array pointer one word later) - take the PC layout, move the relocations
-        for oa, ob in zip(pa, pb):
-            t = ita.pop(oa); ita[a + (ob - b)] = t
+        moved = [(ob, ita.pop(oa)) for oa, ob in zip(pa, pb)]     # pop all first: old and new slots may overlap
+        for ob, t in moved: ita[a + (ob - b)] = t
         st['nodes re-laid out to the PC struct layout'] += 1
     for oa, ob in zip(na, nb):
         if oa in ita: d[oa:oa + 4] = pd[ob:ob + 4]; copy_tree(d, wa, ita, pd, wb, itb, ita[oa], itb[ob], st, seen, shapes)
@@ -148,11 +150,15 @@ def main(argv):
     ra, rb = R.parse(s.reloc, 'le'), R.parse(p.reloc, 'le')
     wa = SC.Walk(s.data, ra, 'le'); wa.run(); wb = SC.Walk(p.data, rb, 'le'); wb.run()
     ita, itb = dict(ra.internal), dict(rb.internal)
+    ita0 = dict(ita)        # relocations before any re-layout: field rules are learned in the Xbox layout
     d = bytearray(s.data); st = collections.Counter(); seen = set(); only = []; shapes = []; pairs = []
     ma, mb = members(wa, s.data, 'le'), members(wb, p.data, 'le')
     for key, la in ma.items():
         lb = mb.get(key)
         if not lb: only.append(key); continue
+        # args / locals of the same name and type are paired in walk order across functions (LIMIT: a function the
+        # PC added or removed shifts the pairing); surplus entries on either side are counted, not copied
+        if len(la) != len(lb): st['%s: unequal counts per name (surplus not paired)' % key[0]] += abs(len(la) - len(lb))
         for a, b in zip(la, lb):
             ia, ib = ita.get(a + 16), itb.get(b + 16)
             if ia is None and ib is None: continue
@@ -163,7 +169,7 @@ def main(argv):
         import dtp_word_classes as C
         x = next(q for q in C.find(C.BASE[1:] if retail else C.BASE, 'be', 'xenon-w' + chr(92) + xname)
                  if q['type'] == 8 and q['id'] == sid)
-        rules = learn_rules(wa, ita, x['data'], p.data, wb, itb, pairs)
+        rules = learn_rules(wa, ita0, x['data'], p.data, wb, itb, pairs)
         st['field rules learned'] = len(rules)
         for key in only:
             for a in ma[key]:
@@ -184,7 +190,8 @@ def main(argv):
                             struct.pack_into('<H', d, o, pv); st['TU-only locals string ids mapped'] += 1
     s.data = bytes(d); ra.internal = list(ita.items()); s.reloc = R.write(ra, 'le')
     raw = D.write('le'); E = DW.read(DW.cdrm_encode(raw, 'le'), 'le'); infos = [dict(size=len(x.data)) for x in E.sections]
-    st['sections with relocations out of bounds'] = sum(bool(R.check(R.parse(x.reloc, 'le'), len(x.data), infos)) for x in E.sections)
+    st['sections with relocations out of bounds'] = bad = sum(bool(R.check(R.parse(x.reloc, 'le'), len(x.data), infos)) for x in E.sections)
+    if bad: print('script %d: %s' % (sid, dict(st))); sys.exit('relocations out of bounds - %s NOT written' % out)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     open(out, 'wb').write(DW.cdrm_encode(raw, 'le'))
     print('script %d: %s' % (sid, dict(st)))

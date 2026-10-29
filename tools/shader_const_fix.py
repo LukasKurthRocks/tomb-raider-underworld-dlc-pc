@@ -21,8 +21,8 @@ import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW
 import shader_disasm as SD, shader_validate as SV
-
-NEW_LIBS = {2173} | set(range(2720, 2784))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'native_test'))
+from native_extract import NEW_LIBS            # one list for the check (shader_lib_check) and the fix
 DCL, DEF, DEFI, DEFB, END, COMMENT, MOV = 0x1F, 0x51, 0x30, 0x2F, 0xFFFF, 0xFFFE, 0x01
 # instructions without a destination token: call, callnz, loop, ret, endloop, label, rep, endrep, if, ifc, else,
 # endif, break, breakc, breakp (D3DSIO_* 25-30, 38-45, 96)
@@ -44,6 +44,15 @@ def parse(w):
         n = (t >> 24) & 0xF
         out.append((i, op, w[i:i + 1 + n])); i += 1 + n
     return out, i
+
+
+def split_end(code):
+    """-> (bytecode up to and including the END token, trailing bytes of the entry); END found by walking the token
+    stream (aligned; comment blocks and def data skipped), not by a byte search"""
+    w = struct.unpack('<%dI' % (len(code) // 4), code[:len(code) // 4 * 4])
+    _, i = parse(w)
+    if i >= len(w) or w[i] & 0xFFFF != END: return code, b''
+    return code[:4 * (i + 1)], code[4 * (i + 1):]
 
 
 def fix_shader(code):
@@ -124,8 +133,7 @@ def fix_lib(d, st, sid, fname):
     for k in order:
         a, h, code, at = ents[k]
         if code[2:4] != b'\xff\xff': continue                     # pixel shaders only (vs_3_0 = 0xfffe)
-        endp = code.find(b'\xff\xff\x00\x00')
-        body, tail = (code[:endp + 4], code[endp + 4:]) if endp >= 0 else (code, b'')
+        body, tail = split_end(code)
         new, n, prob = fix_shader(body)
         if prob: st['shaders not fixable (%s)' % prob] += 1; continue
         if new is None: st['shaders already valid'] += 1; continue
