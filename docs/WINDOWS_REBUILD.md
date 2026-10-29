@@ -450,7 +450,15 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Caution on the method: the candidates come from B138 itself, so "fixed" words are partly circular; the
      regression count is the meaningful number. The first comparison of this run reported "24 -> 157" - the base
      report was stale (a `| head -1` had killed `script_diff.py` before it saved its report).
-   * Run 2: candidates used for exact lookups only (`DlcIds.sym_extra`, not neighbours) - result below.
+   * Run 2: candidates used for exact lookups only (`DlcIds.sym_extra`, not neighbours; log
+     `logs/Manual_SymExtra-exp2_20261029_044532.log`): script sections **99.2 %** = B138 (6 137 of 6 184), differing
+     script words 2 581 -> **95**; regression check: 2 498 fixed, 83 left, **12 new**; fully identical DRMs 13 -> 15;
+     other types unchanged, `analog` 33/33. The 12 new differences are one word in 12 unit DRMs (script +0xe80 of
+     22899 / 22901 / 22902 / 24261 / 24363 / 24710 / 26109 / 26178 / 26179): Xbox 0x050a, ours 0x1437 (the candidate
+     value), B138 0x0527 - so Xbox 1290 is a Symbol in one field and something else here; that candidate must go.
+   * Open decision (not applied): taking Symbol values from B138 is calibration on the finished build; it is only
+     useful for DLC 2 if these are real Symbols (one Symbol space for the whole game). Run 3 = run 2 without the
+     candidates that cause new differences (`script_diff_compare.py --prune`).
 32. **Our Convert ran without upstream's DLC post-passes (`extra_fixes`).**
    * `dlc_generic.convert_drm(..., extra_fixes=False)` is the default; `assemble_dlc.assemble()` passes
      `extra_fixes=(material == 'dlc')`, `dlc_convert_all.py` passed nothing. Gated by it (`dlc_generic.py`): model
