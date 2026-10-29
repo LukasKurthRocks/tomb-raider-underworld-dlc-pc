@@ -65,7 +65,33 @@ silent), 38 images, the merged object lists. Exit 0.
   vs the decoded Xbox source min 25.1 / median 41.0 / max 53.8 dB (39 stereo median 38.1, 9 other median 44.8) -
   the same quality as DLC 1.
 * Not done yet: locals/padshock, the 2b fixes, shaders. The symbol-map outlier of `docs/WINDOWS_REBUILD.md` finding
-  27 affects DLC 2 scripts the same way (fix it before converting DLC 2 for real).
+  27 affects DLC 2 scripts the same way (fixed since; finding 27).
+
+## First DLC 2 tree through the full stage-1 route (assemble, 2026-10-29)
+
+`tools/dlc_assemble_build.py work/rebuild/dlc2_stage1/mods work/rebuild/dlc2_asm_stage1/mods --pack pack11` (1
+process, 3 008 s; with the symbol calibration and the mesh tables of finding 37), then `dlc_audio_build.py` into
+`dlc2_asm_stage2a` (log `logs/Manual_DLC2-assemble_20261029_142625.log` in the workspace):
+
+* **166 of 166 DRMs OK**; `assemble_report.tsv`: 0 DRMs with unresolved values (`bad`), 0 with missing PC shaders
+  (DLC 1: also 0 / 0). Waves: 8 473 in 71 DRMs swapped, 0 skipped; `.mul` 48 of 48.
+* No reference exists, so the checks are self-checks (`tools/tree_check.py`, new; same numbers for DLC 1 and B138
+  as a yardstick):
+
+  | Check | DLC 1 (asm_stage2b) | B138 | DLC 2 (dlc2_asm_stage2a) |
+  |---|---|---|---|
+  | DRMs read back as PC DRMs | 134 / 134 | 138 / 138 | **166 / 166** |
+  | sections with relocations out of bounds | 0 | 0 | **0** |
+  | id references outside their section | 0 | 0 | **0** |
+  | id references to the same DRM / elsewhere | 145 366 / 1 443 | 163 493 / 1 334 | 234 127 / 935 |
+  | sections | 46 793 | 49 093 | 39 411 |
+
+* Meshes (`mesh_dlc.py`, finding 37): all DLC meshes valid and geometrically equal to the Xbox source; one DLC 2
+  mesh (record 156, mesh 22994) has a vertex format unknown on PC (synthetic declaration hash, see below).
+* Audio vs the decoded Xbox source (`compare_audio.py ... dlc2_asm_stage2a --xbox-only`): worst channel min 25.1 /
+  median 41.0 / max 53.8 dB, 48 of 48 streams above the 25 dB target - unchanged from stage 2a.
+* Next: the stage 2b fixes for pack11 (generic ones as they are, `cine` needs the pack11 names), the `g_pda` merge,
+  then a first test in the game.
 
 ## What the DLC 1 rebuild taught us for DLC 2 (checklist, kept up to date)
 
