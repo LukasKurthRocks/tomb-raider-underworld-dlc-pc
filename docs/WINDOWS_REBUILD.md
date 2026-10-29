@@ -398,18 +398,29 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    render sections, 1 (`dlc_watertunnel_map`) in one type-13 section.
    * The one script word is at +0x68 (once +0xa8) of the DRM's DLC-new script (ids 20357, 21263, 21411, 23524,
      23764, 24021, 24073, 24114, 24248; 20590 at +0xa8) and has only two value pairs: ours 4075 / B138 4022
-     (`0feb` / `0fb6`, 7 files) and ours 5829 / B138 5841 (`16c5` / `16d1`, 3 files) - the "Xbox half = 0" group of
-     finding 30. ~~Most likely the script's super-class reference (a PC script id)~~ - checked against
-     `work/generic/pc_vers.json` and `idmap.json`: there is no PC script with id 4022, 4075, 5829 or 5841. **The B138
-     values are PC DTP ids** (type 7: PC 4022 = Xbox DTP 3625, PC 5841 = Xbox DTP 5478); ours (4075, 5829) are not DTP
-     ids at all (4075 exists as type 2/5/6/10, 5829 as type 5/12). So the word is a DTP reference that is 0 on the
-     Xbox and filled on PC from a base-game script used as template - we take another template than the author
-     (Convert's script routes: `template` 112, `pc_reauthored` 168, `pc_copy` 12 445). To trace in
-     `dlc_generic.py` (template choice for type 8). Fixing it would make these 9 DRMs identical up to stage 3.
-   * The affected scripts are DLC-new (ids >= 20000), so their route is `convert` (learned table), not `template`;
-     post-passes that write type-8 words: `script_rebase` (super chain grown on PC, `REBASE_STATS`), the SArray count
-     fix (`script_conv.Walk`), `cine_nowait`. Next: convert one of these DRMs (e.g. `dlc_fx_haze.drm`) with
-     `dlc_convert_all.py --media <name>` and switch the post-passes off one by one to see which writes +0x68.
+     (`0feb` / `0fb6`, 7 files) and ours 5829 / B138 5841 (`16c5` / `16d1`, 3 files).
+     ~~Most likely the script's super-class reference (a PC script id)~~ ~~So the word is a DTP reference that is 0 on
+     the Xbox and filled on PC from a base-game script used as template~~ - **both wrong, see finding 33**: the Xbox
+     word is not 0 (the "Xbox half = 0" reading came from comparing the wrong half) and the word is a Symbol.
+     (Kept for the record: there is no PC script with id 4022/4075/5829/5841; 4022 and 5841 happen to be PC DTP ids
+     too - a coincidence.) The trace plan below (post-passes) is obsolete: finding 32 showed the word does not
+     come from a post-pass.
+33. **The remaining script words are mostly unmapped Xbox Symbols guessed from the wrong neighbour.**
+   * The +0x68 word of finding 31 is Xbox `0f10 0000` / `1161 0000` (BE): Symbol 3856 / 4449 in the first u16. Both
+     are **not in our symbol map**. `dlc_generic.DlcIds.sym()` guesses from the lower mapped neighbour
+     (3855 -> 4074 gives 4075; 4448 -> 5828 gives 5829); B138 has the value from the **upper** neighbour
+     (3857 -> 4023 gives 4022; 4450 -> 5842 gives 5841).
+   * `tools/symbol_guess_check.py stage2b` (new, read-only; every differing script half whose Xbox u16 is an
+     unmapped base-range Symbol): 2 842 halves, 172 distinct Xbox values. B138 = upper-neighbour guess in 545 halves
+     (493 where ours = lower guess, 52 where ours collided to 40000 + xs); 2 142 halves have another B138 value; 155
+     collide in ours and match neither guess in B138.
+   * Per Xbox value, B138 uses **one** value everywhere for all 172 (0 with several values); 168 of those values are
+     free in our map, but only 19 lie between the two mapped neighbours. So either many of these words are not
+     Symbol fields (only in the Symbol range by chance), or the author's symbol map was larger / not monotone there.
+     Candidate list: `work/rebuild/symbol_candidates_stage2b.json` (`--write`).
+   * Not applied to the pipeline: taking values from B138 is calibration; for real Symbols it would also help DLC 2
+     (one Symbol space), for non-Symbol words it would be wrong. Next: an experiment run with these candidates as
+     extra map entries on the 49 affected DRMs only, measured separately (finding 34).
 32. **Our Convert ran without upstream's DLC post-passes (`extra_fixes`).**
    * `dlc_generic.convert_drm(..., extra_fixes=False)` is the default; `assemble_dlc.assemble()` passes
      `extra_fixes=(material == 'dlc')`, `dlc_convert_all.py` passed nothing. Gated by it (`dlc_generic.py`): model
