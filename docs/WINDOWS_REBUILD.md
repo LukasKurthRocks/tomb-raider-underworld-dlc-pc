@@ -715,6 +715,24 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
 
      The retail game - and so the PC version - already had the DLC skeleton (six mission slots, 16 costume slots,
      placeholder strings); the title update filled it in. The PC never received it.
+   * Probe (`tools/base_convert_check.py`, new; whole `generalbank.drm` converted without PC copies, then compared
+     per script; log `logs/Manual_BaseConvert-generalbank_20261029_181930.log`). Word-by-word at the same offset is
+     misleading where the PC inserted bytes (script 6: +240), so the tool also gives an **aligned** score (difflib on
+     32-bit words):
+
+     | Xbox script -> PC | retail converted vs PC, aligned | TU converted vs PC, aligned |
+     |---|---|---|
+     | 6 (loading screen) | 87.0 % | 67.5 % |
+     | 134 -> PC 104 (mission screen; the id map wrongly gives 134, `--pc 8:134=104`) | 92.4 % | 75.9 % |
+     | 10 -> PC 9 | 96.2 % | 90.2 % |
+     | 110 -> PC 122 | 91.7 % | 85.1 % |
+     | 40 -> PC 39 | 93.4 % | 87.4 % |
+
+     The converter reproduces the PC versions of base `generalbank` scripts to 87-96 % - good, but a TU script
+     dropped in as converted would carry 4-13 % wrong words. Dead end for direct use; instead a **three-way merge**:
+     the difference converted-retail -> converted-TU (same converter, its errors cancel out) applied to the real PC
+     script, so PC-only parts and correct PC bytes stay. TU-only scripts (21239 "dlc2data" 297 bytes, 20082 196 bytes)
+     have no PC version and must come from the conversion.
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
