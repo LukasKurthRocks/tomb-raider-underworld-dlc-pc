@@ -106,9 +106,13 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   against base `lara.drm` on PC, our conversion matches (96.1 % s16 vs 96.8 %) and upstream's `float_fix` would have
   broken them - it now skips character-model DTPs (finding 39). `analog` changed far more than on DLC 1 (1 088 vs 33,
   920 of them in `doppelganger_casual.drm`): it copies the real PC bytes of near-identical base-game DTPs where the
-  Xbox bytes agree (33 of 33 = B138 on DLC 1); the doppelganger reuses many Lara DTPs, hence the count - spot checks
-  against the named base analogs still to do.
-* Next: spot-check `analog`, the `g_pda` merge, locals/padshock for pack11, then a first test in the game.
+  Xbox bytes agree (33 of 33 = B138 on DLC 1); the doppelganger reuses many Lara DTPs, hence the count.
+  Spot check (`tools/analog_report.py`, new): 1 066 fixes + **22 skipped as re-authored** (the guard works) in 157
+  DTPs with 122 distinct base analogs; in `doppelganger_casual.drm` the fixes sit at the same field of 16-byte
+  records (+0xc, +0x1c, +0x2c, ... in many DTPs, ~38-42 each) - one field type the learned table split wrongly,
+  corrected from real base-game PC bytes of >= 90 % identical DTPs. Same kinds of byte permutation as on DLC 1.
+  Judged trustworthy (unlike `float` on these files).
+* Next: the `g_pda` merge, locals/padshock for pack11, then a first test in the game.
 
 ## What the DLC 1 rebuild taught us for DLC 2 (checklist, kept up to date)
 
