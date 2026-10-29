@@ -795,6 +795,11 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      with 52 vtable entries lets the engine read slot 53 beyond the table -> garbage pointer -> jump to a small
      address. The probe converted without the PC template (`template=False`); next: convert with the template
      (`base_convert_check.py --template`) and check vtable size and members.
+   * With the template (`work/rebuild/base_convert/tu_tpl_generalbank.drm`, log
+     `logs/Manual_BaseConvert-tpl_20261029_190612.log`): script 6 comes out the same (75 124 bytes, vtable size 52,
+     211 members) - the template route does not touch this script. The vtable has to be brought to the PC layout
+     another way (next: what the 53rd PC slot points to). Before that: check in game how B138 shows DLC 1's loading
+     screen and intro - if the author solved it for DLC 1 without TU script 6, the same way may serve DLC 2.
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
