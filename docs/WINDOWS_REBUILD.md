@@ -811,6 +811,38 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Plan (checkable): (1) convert the Xbox **retail** script 6 with our converter and compare it with PC script 6 - if
      nearly equal, the converter can be trusted on `generalbank`; (2) convert the **TU** script 6 (and 21239, ...) and
      merge them into the PC `generalbank` with `tools/drm_merge_pc.py`; (3) test in game.
+   * **vtable layout (2026-10-29 evening).** Slot-by-slot comparison of script 6 (VTE -> function index + name):
+     retail and TU have 52 slots, the PC 53 - the PC **inserts one slot at 31** (a VTE with one external pointer into
+     another script, i.e. inherited), and every Xbox slot from 31 on sits one higher on PC (Xbox 31 = function 6 ->
+     PC 32 = function 6, ..., Xbox 51 -> PC 52). The prototypes agree: of the 30 TU prototypes, the **21 with vtIndex
+     >= 31 have vtIndex + 1 on PC**, the 8 below 31 are equal, 1 has none. A converted TU script 6 therefore dispatches
+     every virtual call from slot 31 on to the wrong function, and slot 52 reads past its table.
+   * `tools/script_vtable_insert.py` (new): appends a new table to the converted section (old slots 0-30, the PC
+     reference's slot-31 VTE copied with its external relocation, old slots 31-51), sets vtableSize 53, retargets the
+     root pointer, adds 1 to prototype vtIndex >= 31. Nothing else in the section moves.
+   * Checking the result against the PC showed 51 of 53 slots equal - slots 14 and 28 pointed to the right functions,
+     but with other **name Symbols** (333 / 340 instead of PC 517 / 523). Cause: the learned symbol map does not know
+     Xbox 515 / 521, and the B138 calibration (finding 35, learned from DLC 1 words) maps them to 333 / 340; the base
+     game says 517 / 523 (same function, same slot, same code length on retail Xbox and PC).
+   * `tools/sym_calibration_check.py` (new) collects that base evidence: `script_conv.offset_map` pairs the functions
+     and prototypes of every script that exists on retail Xbox and PC; pairs whose Xbox name the learned map does not
+     know vote Xbox -> PC Symbol. On `generalbank.drm`: **161 scripts paired, 965 name Symbols outside the learned
+     map with evidence; the converter (`DlcIds.sym`) gets 747 right and 218 wrong**; the calibration agrees with the
+     base on 2, **disagrees on 5** (515 -> 333 vs 517, 521 -> 340 vs 523, 986 -> 1287 vs 1005, 2047 / 2048 ->
+     42047 / 42048 vs 2108 / 2109) and has no entry for 958. It writes `work/rebuild/sym_base_evidence.json`
+     (calibration + base evidence, base wins).
+   * Open question (recorded, not decided): the calibration was learned from B138's DLC 1 words, the evidence from
+     base-game function names. Either the 5 calibration entries are wrong (B138 would then carry the same wrong
+     names, harmless for DLC 1 so far) or the same Xbox Symbol means something else in DLC files. For **base-game
+     scripts** (the TU `generalbank`) the base evidence is the right source. Whether the 218 wrong guesses matter for
+     DLC scripts is the next check (which DLC 1 / DLC 2 scripts use those names).
+   * Test tree 4: TU `generalbank` reconverted with `TRUDLC_SYM_EXTRA=work/rebuild/sym_base_evidence.json` (script 6
+     aligned 67.6 % of the PC words), then the same steps as test 3 (`script_nop_call.py`, `drm_put_sections.py
+     --xbox`: 176 call offsets remapped, 0 unresolved) plus `script_vtable_insert.py ... 6 31`; script 6 now has
+     **53 of 53 vtable slots and all 30 prototype names and vtIndex values equal to the PC**, 0 out-of-bounds
+     relocations (`work/rebuild/dlc2_gb5/generalbank.drm`, log `logs/Manual_DLC2-gb5_*.log`).
+     `work/rebuild/dlc2_test4/mods`: 301 files, `tree_check` 167/167 DRMs clean; only `generalbank.drm` differs from
+     test tree 3.
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

@@ -7,7 +7,7 @@ Xbox/PC originals only, **not yet seen in game**.
 
 Not a release of the port. This section lists what the fork's branch `windows` adds on top of B138; everything below
 it is the original project's changelog, unchanged. Details and numbers: [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md)
-(findings 1-39), [docs/DLC2.md](docs/DLC2.md), overview [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+(findings 1-43), [docs/DLC2.md](docs/DLC2.md), overview [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 | Date | Change |
 |---|---|
@@ -21,6 +21,7 @@ it is the original project's changelog, unchanged. Details and numbers: [docs/WI
 | 2026-10-29 | Meshes: vertex-declaration hashes and DEC3N table learned from the base game - all 174 DLC 1 meshes = B138 (finding 37) |
 | 2026-10-29 | DLC 2 through the full route: 166/166 DRMs, audio, stage-2b fixes - offline, structurally checked only (no reference exists); pack10/pack11 shared file names (finding 38); `float_fix` no longer touches character models (finding 39) |
 | 2026-10-29 | Code review fixes (output-tree guard, failed DRMs, empty audio, missing inputs, ...), shared PowerShell module, docs `ARCHITECTURE.md`, `RELATED_WORK.md` |
+| 2026-10-29 | DLC 2 in game (test trees, `Install-TruTree.ps1`): menu entry and level load work; `g_pda` merged (finding 40); loading screen/intro need the Xbox title-update scripts (findings 42, 43): call offsets remapped, TU-only native neutralised, vtable brought to the PC layout, base-game name check of the symbol calibration (`sym_calibration_check.py`) - test 4 pending |
 
 State of DLC 1 against B138 (offline): 46 of 133 DRMs fully identical, sections script 99.2 %, DTP 98.7 %, shader
 97.7 %, mesh 99.1 %, material 90.4 %. Not done: shader translator (B72-B89), later layers up to B138.

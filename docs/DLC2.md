@@ -163,6 +163,15 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   port of the mission screen (`tools/dlc_screen_widescreen.py`: "call targets mapped by prototype name order",
   e.g. uiscreen +0xa0c -> +0xa7c). Next: map every external target (section, offset) to the function / member it
   names in the converted TU script and to the same one in the PC script.
+* Test tree 3 (`work/rebuild/dlc2_test3/mods`): call offsets remapped (`drm_put_sections.py --xbox`, 176) and the
+  TU-only native call `uigamedata` f93 neutralised (`script_nop_call.py`) - **same freeze + crash** (2026-10-29
+  19:05, offset 0x00000002). Ruled out as the only cause (`docs/WINDOWS_REBUILD.md` finding 43).
+* Test tree 4 (`work/rebuild/dlc2_test4/mods`, finding 43): additionally the **vtable of script 6 in PC layout**
+  (PC has one inherited slot more at 31; `script_vtable_insert.py`) and the TU `generalbank` reconverted with
+  base-game function names (`sym_calibration_check.py`; the B138 calibration gave two names of script 6 wrongly).
+  Script 6: 53/53 vtable slots and all prototype names equal to the PC. Only `generalbank.drm` differs from test 3.
+  To check: no crash when choosing *Lara's Shadow*; loading screen with DLC 2 image/text; intro; base game and DLC 1
+  loading screens still work.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
@@ -186,6 +195,12 @@ Every step needs another reference - the Xbox source, rules learned from the bas
 - **Moving a script between files: remap the call offsets, not only the sections.** External relocations name
   (section, offset); the offset points to a function/member inside the target script and moves when the target
   script's layout differs. Forgetting it crashed the game (DLC 2 test 2, jump to address 2) [42].
+- **A converted base-game script must also match the PC's class layout**: vtable size and slot order (the PC may
+  have inherited slots the Xbox lacks; prototype vtIndex shifts with them) and function name Symbols. Compare slot
+  by slot with the PC version before a test [43].
+- **The symbol calibration is not ground truth for base-game names.** 5 of its entries contradict the base game;
+  the converter's guesses for 218 of 965 unmapped function names in `generalbank` are wrong
+  (`tools/sym_calibration_check.py`) [43].
 - **Rules proven on DLC 1 can meet data DLC 1 does not have.** Upstream's `float_fix` (every change = B138 on DLC 1)
   would have rewritten 16 105 words of the DLC 2 doppelganger models; measuring against the closest base-game
   structure (`lara.drm` on PC, `tools/dtp_word_classes.py`) showed the converter was right [39]. Treat a large count
