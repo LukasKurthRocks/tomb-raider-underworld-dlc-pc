@@ -459,6 +459,12 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Open decision (not applied): taking Symbol values from B138 is calibration on the finished build; it is only
      useful for DLC 2 if these are real Symbols (one Symbol space for the whole game). Run 3 = run 2 without the
      candidates that cause new differences (`script_diff_compare.py --prune`).
+   * Run 3: 167 candidates (`work/rebuild/symbol_candidates_pruned2.json`, the one for Xbox 1290 dropped), exact-only
+     (log `logs/Manual_SymExtra-exp3_20261029_062211.log`): script sections **99.2 %** = B138, differing script words
+     2 581 -> **95**, regression check **2 486 fixed, 95 left, 0 new**; fully identical DRMs 15; other types
+     unchanged, `analog` 33/33. So 167 Symbol values from B138 explain 96 % of the remaining script differences
+     without breaking anything else - still a decision for Lukas whether B138-calibrated Symbols go into the
+     pipeline (they are global and would also apply to DLC 2). Not applied; switch stays off by default.
 32. **Our Convert ran without upstream's DLC post-passes (`extra_fixes`).**
    * `dlc_generic.convert_drm(..., extra_fixes=False)` is the default; `assemble_dlc.assemble()` passes
      `extra_fixes=(material == 'dlc')`, `dlc_convert_all.py` passed nothing. Gated by it (`dlc_generic.py`): model
@@ -637,5 +643,6 @@ the later stages (audio, shaders, data fixes listed in LINEAGE.md).
 | 2026-10-29 | Render tables + tools | `render_tables_build.py build/check`, `rend_extract.py pairs/dlc`, `shader_map`, `material_rules`, `material_dlc`, `pc_shader_sections`, `terrain_validate` - all exit 0 (finding 28) |
 | 2026-10-29 | Assemble route | `dlc_assemble_build.py` -> asm_stage1, Audio, 2b fixes, comparisons: 134/134 DRMs, shader libs 97.7 %, materials 90.4 % = B138 (finding 34) |
 | 2026-10-29 | Assemble (step) | new optional pipeline step `Assemble` through `Invoke-TruPipeline.ps1` (PowerShell 5.1): all 13 tools exit 0, 2 934 s (terrain_validate 596 s, dlc_assemble_build 2 184 s); asm_stage2a: shader libs 97.7 %, materials 90.4 %, script 95.4 % - same as the manual run |
+| 2026-10-29 | Symbol experiment | runs 1-3 (finding 35): run 3 (167 candidates, exact-only) scripts 99.2 %, 95 words left, 0 new differences |
 | 2026-10-27 | DLC 2 Media | `dlc_media_build.py work/rebuild/dlc2_stage1/mods pack11` (parallel to the DLC 1 run): 167 DRMs, 19 music tracks, 6 cinstream `.mul`, exit 0 (see `docs/DLC2.md`) |
 | 2026-10-27 | Prep | ok, 818 s: `generic_type0 save07` 796 s (type0_table 9 827 722 keys, type7_table 4 084 298 keys, + slim npz); `pc_vers_build` 21 s: 1060 PC DRMs indexed, pc_vers 37 813 (1818 with several versions, 2481 from patch.000), pc_vers_content 28 928 (856 multi) |
