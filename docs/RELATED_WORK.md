@@ -140,15 +140,15 @@ that comes only from a search snippet or secondary summary, or that could not be
     360-exclusive DLCs to PC (Overlord II "Battle Rock Nemesis", Prince of Persia 2008 "Epilogue"), and one member
     shows an own work-in-progress TRU DLC port ("I'm in-game", 2026-10-12; video 2026-10-17 - whether this is the
     trudlcport author is not stated).
-  * Screenshots posted in these threads (linked to the forum members' original uploads, not copied into this
-    repository; checked online 2026-10-29):
+  * Screenshots posted in these threads (shown from the forum members' original uploads on imgur, not copied into
+    this repository; checked online 2026-10-29; click for full size):
 
     | Screenshot | What it shows | Useful for |
     |---|---|---|
-    | [Xbox DLC mission screen in Xenia](https://i.imgur.com/od0lwMJ.png) (t=198260, 2020) | "Beneath the Ashes" selected, title light blue centred above the description, PLAY MISSION / RETURN TO MAIN MENU | independent check of the Xbox reference in `docs/DLC_MENU.md` |
-    | [First Xbox model on PC](https://i.imgur.com/y98Qy2j.png) (t=178907, 2020-06) | Gh0stBlade's converted Lara model in the PC game | the state of the earlier attempt |
-    | [Noesis "trumesh" viewer](https://i.imgur.com/XsAcHPW.png) (t=198260) | a TRU mesh with skeleton in Noesis | an independent mesh reader to cross-check converted meshes |
-    | [Xbox Marketplace entries](https://i.imgur.com/T5WGw3I.png) (t=198260) | Beneath the Ashes released 2009-02-24, Lara's Shadow 2009-03-10 | background |
+    | <a href="https://i.imgur.com/od0lwMJ.png"><img src="https://i.imgur.com/od0lwMJ.png" width="320" alt="Xbox DLC mission screen in Xenia"></a><br>t=198260, 2020 | Xbox DLC mission screen in Xenia: "Beneath the Ashes" selected, title light blue centred above the description, PLAY MISSION / RETURN TO MAIN MENU | independent check of the Xbox reference in `docs/DLC_MENU.md` |
+    | <a href="https://i.imgur.com/y98Qy2j.png"><img src="https://i.imgur.com/y98Qy2j.png" width="320" alt="First Xbox model on PC"></a><br>t=178907, 2020-06 | Gh0stBlade's first Lara model converted from Xbox, in the PC game | the state of the earlier attempt |
+    | <a href="https://i.imgur.com/XsAcHPW.png"><img src="https://i.imgur.com/XsAcHPW.png" width="320" alt="Noesis trumesh viewer"></a><br>t=198260 | a TRU mesh with skeleton in Noesis ("trumesh") | an independent mesh reader to cross-check converted meshes |
+    | <a href="https://i.imgur.com/T5WGw3I.png"><img src="https://i.imgur.com/T5WGw3I.png" width="320" alt="Xbox Marketplace entries"></a><br>t=198260 | Xbox Marketplace: Beneath the Ashes released 2009-02-24, Lara's Shadow 2009-03-10 | background |
 
     Two 2021 screenshots of a costume loaded from `patch.000` in the PC game (white heavy snow outfit in a DLC
     costume slot) are forum album pictures visible to logged-in users only; they are described above, not linked.

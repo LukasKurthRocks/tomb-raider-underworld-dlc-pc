@@ -8,7 +8,7 @@ Finding (Xbox title update Script id 134 vs PC Script id 104, member init blocks
                                                              +0x74         Xbox 0 / PC 8        (vertical alignment?)
 All other differences of these blocks are platform symbol / text ids. Levels 3-6 are unused and identical.
 The patch writes the Xbox values in place (same size, no relocation changes) and checks the old values first.
-Reference screenshots: TRU-DLC project, Referenzen/.
+Reference screenshots: kept outside the repository (local references folder).
 
 Usage (from the repository root):  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_screen_text_style.py [src]
   src defaults to ../data/pc/mods/generalbank.drm (the installed menu_dlc build).

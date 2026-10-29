@@ -6,7 +6,7 @@ installer only takes DLC 2 menu images and music from `pack11.000`; the PC DLC m
 
 ## Xbox reference (Xenia Canary 02d2cb5, game + TU 0.0.2.3 + DLC, 16:9)
 
-Screenshots in the TRU-DLC project, `Referenzen/DLC2/` (not in this repository).
+Reference screenshots are kept outside this repository (local `references/` folder of the workspace).
 
 * DLC menu: title light blue, description = locals index 457, 5 lines with hard breaks.
 * Loading screen: title "LARA'S SHADOW" in a ring, description text types itself in
