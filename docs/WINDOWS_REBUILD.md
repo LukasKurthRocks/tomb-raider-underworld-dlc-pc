@@ -1805,6 +1805,20 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        bool-setter trace (`tru+0x19c920`) costs too much in menus (the pause menu stalled, the game had to be ended):
        the DLC 2 title element (432) never had its visibility set; text visibility is set by the native at
        `tru+0x3a6886`, called from the interpreter at `tru+0x17b051` - next: identify that native and trace only it.
+     * **Loading-screen titles fixed (test 38, played 21:19 without any debugger forcing)**: `tru+0x3a6870` is slot 6 of
+       the `uitext` native type object (vtable at `0x864984`), and its caller `tru+0x17b051` is not an opcode but the
+       routine that applies a new script object's **member init values** (a list of {u16 offset, value} -> `+0x179770`)
+       - the visibility comes from the init block, not from script code. `tools/script_init_dump.py` on script 6:
+       the base titles 51-58 (init blocks 0xe060 .. 0xe7d0) have word 0 = 1, the TU-only DLC title members 16894
+       (0xe8e0) and 16908 (0xe9f0) had **0** (Xbox: 1) - the same converter defect as the hint box's word 0 in test 36.
+       `script_word_set.py ... 6 e8e4=00000000:00000001,e9f4=00000000:00000001` on test 37b = test 38 (md5 57f52266):
+       the debugger now reads the bool +0x88 = 1 by itself for both titles, and "UNTER DER ASCHE" / "LARAS SCHATTEN"
+       stand above the line (`references\DLC1\PC-Test38-*_21_*`, `references\DLC2\PC-Test38-*_38_*`). The record words
+       of test 32 were not the switch. Open: the DLC 1 text still starts one line too high; TU-only member 16896
+       (userType 361, init 0xeda0) has the same word 0 = 0 vs Xbox 1 - untested. Also: the Xbox exe's `dlc2data` f0
+       reads a byte of the central game-state object that only `DoppelgangerInit` sets ("playing with the shadow
+       power"), so the unit-name check of test 37b is equivalent in practice (first pass of option A,
+       `docs\Befund-Schattenkraft.md`: ~235 functions / <= 163 KB PowerPC code depend on that byte, >= 64 KB new).
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
