@@ -35,11 +35,16 @@
                terrain_validate, mesh_tables_build), dlc_assemble_build (assemble_dlc, material 'dlc', PC shader sections),
                dlc_audio_build, compare_b138, compare_sections
                -> work\render\*, work\rebuild\asm_stage1\mods, asm_stage2a\mods (+ compare_asm_stage2a.json)
+      Dlc2     DLC 2 (pack11) stage 1 + 2a, after Assemble (needs its render tables): dlc_media_build pack11,
+               dlc_assemble_build --pack pack11, dlc_audio_build --pack pack11, tree_check (no reference build)
+               -> work\rebuild\dlc2_stage1\mods, dlc2_asm_stage1\mods, dlc2_asm_stage2a\mods (the input of Fixes)
       Fixes    stage 2b: dlc_fixes_build for DLC 1 (asm_stage2a -> asm_stage2b, compare_b138) and DLC 2
-               (dlc2_asm_stage2a -> dlc2_asm_stage2b, --pack pack11; the DLC-2-only fixes cloth / uipath / uitext)
+               (dlc2_asm_stage2a -> dlc2_asm_stage2b, --pack pack11); cloth / uipath / uitext were found in DLC 2,
+               uipath / uitext also change 10 DLC 1 level files (since 2026-10-30)
       Repair   the repair tree for an installed B138 (finding 43, tested in game 2026-10-30): b138_snapshot (pristine
                B138 mods, verified against the kit manifest, from the game folder and the Install-TruTree backups),
-               b138_fix_tree (shader constant fix, grapple ring shaders, cinematic languages of both DLCs)
+               b138_fix_tree (shader constant fix, grapple ring shaders, DLC 1 UI paths / texts, cinematic languages
+               of both DLCs)
                -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
@@ -63,7 +68,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Fixes', 'Repair')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Repair')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(0, 16)][int]$Jobs = 0,
     [ValidateRange(0, 64)][int]$LightJobs = 0,
@@ -159,6 +164,12 @@ $steps = @{
         @('tools\compare_b138.py', 'work/rebuild/asm_stage2a/mods', 'asm_stage2a'),
         @('tools\compare_sections.py', 'work/rebuild/asm_stage2a/mods', 'asm_stage2a')
     )
+    Dlc2 = @(
+        @('tools\dlc_media_build.py', 'work/rebuild/dlc2_stage1/mods', 'pack11'),
+        @('tools\dlc_assemble_build.py', 'work/rebuild/dlc2_stage1/mods', 'work/rebuild/dlc2_asm_stage1/mods', '--pack', 'pack11'),
+        @('tools\dlc_audio_build.py', 'work/rebuild/dlc2_asm_stage1/mods', 'work/rebuild/dlc2_asm_stage2a/mods', '--pack', 'pack11'),
+        @('tools\tree_check.py', 'work/rebuild/dlc2_asm_stage2a/mods', 'dlc2_asm_stage2a')
+    )
     Fixes = @(
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', 'work/rebuild/asm_stage2b/mods'),
         @('tools\compare_b138.py', 'work/rebuild/asm_stage2b/mods', 'asm_stage2b'),
@@ -181,6 +192,7 @@ $outputDirs = @{
     Media   = @('work\rebuild')
     Audio   = @('work\rebuild')
     Assemble = @('work\render', 'work\rebuild')
+    Dlc2    = @('work\rebuild')
     Fixes   = @('work\rebuild')
     Repair  = @('work\rebuild')
 }

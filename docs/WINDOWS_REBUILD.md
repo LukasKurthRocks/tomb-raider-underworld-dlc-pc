@@ -1489,7 +1489,23 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        input, all 10 equal to the installed files): `uipath` with pack10 = **25 arrays in 10 files** (as counted
        before); `uitext` = 26 text elements + 12 hint entries matched (ids 1286 / 1289 / 1290 x24 / 1374 x12), but
        **only the 26 elements change - B138's 12 hint entries already hold PC ids** (correction of the "38 unmapped
-       records" above: 26).
+       records" above: 26). What they are (`tools/locals_find.py`): 24 elements are Xbox 1290 "Warning: You do not
+       have an update required to play this level ... Xbox Dashboard" - B138 maps it as Symbol 1319, so the PC would
+       show "Press [Y] to pull on the grapple line"; one each 1286 "Continue" and 1289 "TEST WEAPON". The message
+       never appears on PC (the engine's DLC / update queries are stubs, `menu_dlc_patch.py`), which is why the 25
+       unmapped timeline paths of the same UI never crashed DLC 1. **Owner's decision (2026-10-30): apply both fixes
+       to DLC 1 too** - the stubs stay (wanted: there is no Xbox update on PC), only the latent crash and the wrong
+       text go. `dlc_fixes_build` runs `uipath` / `uitext` for both DLCs now (`srcs` = read folders, so
+       `b138_fix_tree` reuses them as its new step `ui`); the repair tree has **69 files** (59 + these 10), the 10 are
+       byte-identical to test tree 28, the other 59 unchanged. `Fixes` re-run (log
+       `Invoke-TruPipeline_Fixes_20261030_145413`, 1 724 s, all exit 0): DLC 1 `uipath` 25 arrays, `uitext` 26 elements
+       **and 12 hint entries** - our rebuild had the hint entries as Symbols too, B138 not, so the author had the
+       string id map at least for those; DLC 2 still **292 / 292 identical** to the tested state.
+     * New pipeline step `Dlc2` (`dlc_media_build pack11`, `dlc_assemble_build --pack pack11`, `dlc_audio_build
+       --pack pack11`, `tree_check`): the DLC 2 input of `Fixes`, until now built by hand (review 2, finding 7). The
+       hand-built `dlc2_asm_stage2a` and `dlc2_asm_stage2a_p11` (`--pack pack11` audio) are identical (293 / 293).
+     * `work\rebuild\exp_sym*` (the intermediate trees of finding 35's three runs, 9.7 GB) deleted - the result is
+       adopted (`docs/data/b138_symbol_calibration.json`), logs and `sections_exp_sym*.json` stay.
      * **Pipeline step `Fixes` re-run with all stage-2b fixes** (log `Invoke-TruPipeline_Fixes_20261030_140516`,
        1 645 s, all exit 0; DLC 2: `uipath` 125 arrays, `uitext` 120 + 150): `tools/tree_compare.py
        work/rebuild/dlc2_asm_stage2b/mods work/rebuild/play_20261030/mods` = **292 identical, 0 different**; only

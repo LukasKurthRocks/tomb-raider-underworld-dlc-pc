@@ -94,9 +94,9 @@ delete the game files or the repository. Remove a junction on its own: `cmd /c r
 
 Steps in order: `Index`, `Cache`, `Ids`, `Learn`, `Tables`, `Prep`, `Convert`, `Names`, `Media`, `Audio`, and
 optionally `Assemble` (upstream's full stage-1 route with the rebuilt render tables; better shaders and materials), then
-`Fixes` (stage 2b for DLC 1 and DLC 2; the DLC 2 input `work\rebuild\dlc2_asm_stage2a` is still built by hand, see
-[docs/DLC2.md](../../docs/DLC2.md)) and `Repair` (the tested repair tree for an installed B138: shader constant fix,
-grapple ring shaders, cinematics in all five languages -> `work\rebuild\b138_fixes\mods`, install it with
+`Dlc2` (DLC 2 through the same route, `--pack pack11`; see [docs/DLC2.md](../../docs/DLC2.md)), `Fixes` (stage 2b for
+DLC 1 and DLC 2) and `Repair` (the tested repair tree for an installed B138: shader constant fix,
+grapple ring shaders, UI paths and texts of DLC 1, cinematics in all five languages -> `work\rebuild\b138_fixes\mods`, install it with
 `Install-TruTree.ps1 -Source .\work\rebuild\b138_fixes\mods`). What each
 step runs, how long it takes and how the result compares with B138:
 [docs/WINDOWS_REBUILD.md](../../docs/WINDOWS_REBUILD.md); upstream's own scripts and layers:

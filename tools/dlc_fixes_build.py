@@ -147,45 +147,48 @@ def fix_cloth(out):
     return {'files': files, 'log': log}
 
 
-def fix_uipath(out):
+def _write(out, rel, data):
+    q = os.path.join(out, rel); os.makedirs(os.path.dirname(q), exist_ok=True); open(q, 'wb').write(data)
+
+
+def fix_uipath(out, srcs=None):
     """UI timeline target paths of the new DLC scripts (finding 43): inline u16 arrays of member Symbols that the
     converter swapped as s32 with Xbox values; the engine's path lookup then returned a stack address as the target
     (crash one second after the DLC 2 intro). tools/script_u16array_fix.process, every DRM of the tree in place.
-    DLC 2 trees only (--pack pack11): B138 has the same 25 unmapped paths in DLC 1 scripts (no crash seen there) and
-    DLC 1 stays byte-identical to B138 until that is decided."""
+    Both DLCs since 2026-10-30 (owner's decision): B138 has the same 25 unmapped paths in 10 DLC 1 level DRMs (the
+    never-shown Xbox "update required" message, so no crash seen) - fixed so that they cannot crash either.
+    srcs: read from these folders (later wins, e.g. B138 originals + repair tree) and write changed files to out."""
     import collections
-    if os.environ.get('TRUDLC_PACK_FIRST') != 'pack11':
-        return {'files': [], 'log': ['skipped: DLC 1 tree (B138 keeps these words; finding 43)']}
     sys.path.insert(0, HERE)
     import dtp_audit as DA, dlc_generic as DG, script_u16array_fix as UF
     ids = DG.DlcIds(); st = collections.Counter(); files, log = [], []
-    for rel, path in sorted(DA.overlay([os.path.abspath(out)], None).items()):
+    for rel, path in sorted(DA.overlay([os.path.abspath(s) for s in (srcs or [out])], None).items()):
         new = UF.process(rel, path, ids, st, log)
         if new is not None:
-            open(path, 'wb').write(new); files.append(rel)
+            _write(out, rel, new); files.append(rel)
     log.append('total %s, symbol routes %s' % (dict(st), dict(ids.sym_stats)))
     return {'files': files, 'log': log}
 
 
-def fix_uitext(out):
+def fix_uitext(out, srcs=None):
     """String ids of UI text elements / hint lists in the new DLC scripts (finding 43, empty DLC 2 hint box): the
     Xbox keeps them in a high u16, the converter mapped them as Symbols; they become the PC string id
-    (locmap_xbox_to_pc.json of `tools/locals.py build`: environment TRUDLC_LOCMAP, else work/rebuild/stage1/). DLC 2
-    trees only (--pack pack11): B138 has 26 such unmapped text elements in DLC 1 (system messages, no visible defect
-    reported) and DLC 1 stays byte-identical to B138 until that is decided."""
+    (locmap_xbox_to_pc.json of `tools/locals.py build`: environment TRUDLC_LOCMAP, else work/rebuild/stage1/).
+    Both DLCs since 2026-10-30: B138 has 26 such text elements in DLC 1 (24 x the Xbox "update required" warning,
+    shown on PC as "Press [Y] to pull on the grapple line", plus "Continue" and "TEST WEAPON").
+    srcs: as in fix_uipath (out is read too and wins, so uipath's output is the input here)."""
     import collections, json
-    if os.environ.get('TRUDLC_PACK_FIRST') != 'pack11':
-        return {'files': [], 'log': ['skipped: DLC 1 tree (B138 keeps these words; finding 43)']}
     sys.path.insert(0, HERE)
     import dtp_audit as DA, dlc_generic as DG, script_uitext_fix as TF
     lm = os.environ.get('TRUDLC_LOCMAP') or os.path.join(HERE, '..', 'work', 'rebuild', 'stage1', 'locmap_xbox_to_pc.json')
     if not os.path.exists(lm): raise SystemExit('uitext: no string id map %s (run tools/locals.py build first)' % lm)
     ids = DG.DlcIds(); ids._loc = {int(k): v for k, v in json.load(open(lm))['map'].items()}
     st = collections.Counter(); files, log = [], []
-    for rel, path in sorted(DA.overlay([os.path.abspath(out)], None).items()):
+    dirs = [os.path.abspath(s) for s in (srcs or [])] + [os.path.abspath(out)]
+    for rel, path in sorted(DA.overlay(dirs, None).items()):
         new = TF.process(rel, path, ids, st, log)
         if new is not None:
-            open(path, 'wb').write(new); files.append(rel)
+            _write(out, rel, new); files.append(rel)
     log.append('total %s (map %s)' % (dict(st), os.path.relpath(lm, os.path.join(HERE, '..'))))
     return {'files': files, 'log': log}
 

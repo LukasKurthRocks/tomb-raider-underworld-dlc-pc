@@ -7,11 +7,14 @@ folder with only the changed / added files, to install with scripts/windows/Inst
   2. ring      dlc1_ei_grapple_wall / _ceiling: the far-LOD materials 21164 / 20345 get the base game's own PC ring
                shaders 1704-1707 (copied from the PC `ar_ei_grapple_wall.drm`), the near-LOD materials 21093 / 20344
                become copies of them (surrogate / translated shaders showed the normal map as colour; test 24)
-  3. language  tools/mul_lang_build.py: the cinematic streams in all five languages as `<name>_NNN` (the ModLoader
+  3. ui        stage-2b fixes `uipath` + `uitext` (tools/dlc_fixes_build.py) over the B138 files: 25 UI timeline paths
+               and 26 text elements in 10 DLC 1 level DRMs (the never-shown Xbox "update required" message; owner's
+               decision 2026-10-30, same fixes as DLC 2; test 28)
+  4. language  tools/mul_lang_build.py: the cinematic streams in all five languages as `<name>_NNN` (the ModLoader
                loads the game's language, the plain name stays as fallback); pack10, with --dlc2 also pack11
 
 Usage (from the repository root):
-  ../bin/pyt -t 3600 tools/b138_fix_tree.py PRISTINE_MODS OUT_MODS [--dlc2] [--replace] [--skip shaders,ring,language]
+  ../bin/pyt -t 3600 tools/b138_fix_tree.py PRISTINE_MODS OUT_MODS [--dlc2] [--replace] [--skip shaders,ring,ui,language]
   OUT_MODS must lie below work/rebuild and apart from PRISTINE_MODS (build_util.check_out)
   --replace: remove an existing OUT_MODS (a '...\mods' folder) and its OUT_MODS_tmp first
 """
@@ -62,6 +65,12 @@ def main(argv):
                 print(run(MSS, [cur, nxt, str(far), str(slot), str(lib)] + extra).strip().splitlines()[-1])
                 cur = nxt
             print(run(MC, [cur, os.path.join(out, name), str(near), str(far)]).strip())
+    if 'ui' not in skip:
+        import dlc_fixes_build as FB
+        print('== ui')
+        os.environ['TRUDLC_PACK_FIRST'] = 'pack10'        # B138 = DLC 1: Xbox sources from pack10
+        for fx in (FB.fix_uipath, FB.fix_uitext):
+            r = fx(out, srcs=[src, out]); print('%s: %d files, %s' % (fx.__name__, len(r['files']), r['log'][-1]))
     if 'language' not in skip:
         import mul_lang_build as MLB
         print('== language')

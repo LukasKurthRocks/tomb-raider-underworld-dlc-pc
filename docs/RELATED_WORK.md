@@ -257,6 +257,47 @@ that comes only from a search snippet or secondary summary, or that could not be
 - PS3 static recompilation runtime (MIT); lifter tests and C unit tests in CI on three OSes; RPCS3 used as behavioural reference; "five ports are checked against recorded golden outputs before shared-runtime changes land"; no Sony code, keys or game data.
 - Useful for us: golden-output gate before any change to shared converter code.
 
+#### Tomb Raider: Underworld on PS3 - research 2026-10-30 (idea: the DLCs for the PS3 version, after PC works)
+
+Reference disc: BLUS30718 "The Tomb Raider Trilogy" (Underworld + Legend HD + Anniversary HD). Web research only,
+nothing downloaded. [V] = read on the page / in the source, [S] = search snippet only (tombraiderforums.com and the
+RPCS3 wiki blocked fetching), [I] = inference.
+
+- **Bigfiles / DRM**
+  - TheIndra55/Yura (GPL-3.0, https://github.com/TheIndra55/Yura): browse/extract cdcEngine bigfiles of TRL/TRA/TRU,
+    "all platforms", RAW viewer incl. PS3, CLI `-platform pc|wii|ps3`, `-endianness` since 1.4 [V]; extract only, no
+    repack. (Version 1.7.2 is already in `<workspace>\bin`.)
+  - sephiroth99/gibbedtr (https://github.com/sephiroth99/gibbedtr, abandoned -> LazyBui/gibbedtr): Unpack / **Pack** /
+    DRMEdit / RebuildFileLists [V]; a "Tomb Raider 8 (PS3)" project is mentioned only in a forum snippet [S].
+  - Gh0stBlade/cdcEngineTools (https://github.com/Gh0stBlade/cdcEngineTools): CDRM / DRM split, PCD2DDS, WAVE2WAV [V];
+    issue #9: PS3 TR8 textures, 32-bit type 0x85 looks Morton-swizzled ARGB, open since 2017 [V].
+  - Raq1/cdcEditor (MIT, https://github.com/Raq1/cdcEditor): Blender tools; PS3 TRU: animations / cutscenes [V].
+  - Raq's TRLAU Modding Tools (Noesis, v1.2, https://tombraidermodding.com/tool/trulau-mod-tools): `.pcd` textures PC
+    and PS3 [V].
+  - TheIndra55/TRLAU-menu-hook: PC only [V/I]. TRUBigEd / BigFileTool threads on tombraiderforums.com: old, "reads
+    PS3" per snippets [S].
+- **Formats**
+  - Audio: vgmstream `src/meta/mul.c` says "FSB4 w/ mono MP3 [Tomb Raider 8 (PS3)]" - PS3 `.mul` = FSB4 + MP3 [V]
+    (an XMA -> PS3 conversion would encode MP3 into FSB4 [I]).
+  - Textures: RSX layout, power-of-two textures Morton-swizzled (psdevwiki multimedia formats) [S]; TRU keeps its own
+    `.pcd` sections with PS3 pixel types rather than GTF files [I].
+  - Shaders: RSX (NV40 family, Cg `.vpo` / `.fpo`); RPCS3/rsx_program_decompiler, PS3DK `rsx-cg-compiler` [S]; no
+    cdcEngine-specific PS3 shader tool found - Xenos -> RSX would be new work [I].
+- **RPCS3**
+  - Folder dumps (`PS3_GAME/USRDIR`) can be edited in place [S]; `patch.yml` `move_file` / `hide_file` redirect loose
+    files, folders or partitions, not files inside a bigfile (PR #13483, merged 2023-03-03) [V].
+  - Encrypted Redump / 3k3y ISO with a same-named `.dkey` next to it loads directly (PR #18498, merged 2026-04-10) [V].
+  - Underworld (BLES00409 / BLUS30224) and the Trilogy (BLES01195 / BLUS30718) rated "Playable", update 01.01 [S].
+  - The PS3 game never had DLC, so its executable may have no DLC mount code: content would go into the base data or
+    need a PPU patch [I].
+- **Disc dumps**: `.ird` (3k3y format: data1 -> disc key, MD5 of every file) and `.dkey` (disc key, 32 hex chars)
+  (psdevwiki IRD) [S]; 13xforever/ps3-disc-dumper (decrypted dumps, maintained) [S]; PS3Dec forks al3xtjames/PS3Dec,
+  tonyp7/PS3Dec, Rust Redrrx/ps3dec [S].
+- **Earlier attempts**: no PS3 port of "Beneath the Ashes" / "Lara's Shadow" found; only wishlist threads [S].
+- **PS2 (bonus idea)**: cdcEditor imports PS2 TRU models / cutscenes [V]; nothing found on restoring cut PS2 levels
+  (tcrf.net not searched yet).
+- Gaps: repacking PS3 bigfiles (only gibbedtr, PS3 unconfirmed), PS3 TR8 mesh / level tools, RSX shader conversion.
+
 ### GameCube / Wii / N64
 
 **encounter/decomp-toolkit (dtk)** - https://github.com/encounter/decomp-toolkit and **objdiff** - https://github.com/encounter/objdiff/releases
