@@ -58,6 +58,10 @@ that comes only from a search snippet or secondary summary, or that could not be
 
 **TombRaiderModding/ModLoader** - https://github.com/TombRaiderModding/ModLoader
 - Loads files from a `mods` folder without modifying bigfiles; Legend, Anniversary, Underworld, Guardian of Light (GPL-3.0). Already a dependency of trudlcport.
+
+**chreden/trawindowed (TRAWindowed)** - https://github.com/chreden/trawindowed
+- Windowed / borderless mode for Legend, Anniversary, Underworld (MIT, v1.9.0 of 2025-12-17): a proxy `d3d9.dll` next to the exe that sets `Windowed = TRUE` in `CreateDevice`, restyles the game window, detours `GetCursorPos` / `SetCursorPos` / `ClipCursor`, and for `tru.exe` writes the aspect ratio from the window size (`*0x00ad75e4 + 0x170`, ratio x 10000).
+- Useful for us: the Steam game has no windowed mode of its own (registry `Fullscreen = 0` is written back, no command line switch, the `-setup` dialog has no option; an old forum thread says the same and used the global hook D3DWindower). `Get-Tools.ps1` downloads it, `Set-TruDisplay.ps1 -Windowed` installs it - screenshots and debugger sessions without the game losing focus.
 - Useful for us: keep the mods-overlay model; no bigfile rewriting needed.
 
 **Gh0stBlade/cdcEngineTools** - https://github.com/Gh0stBlade/cdcEngineTools

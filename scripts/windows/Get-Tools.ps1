@@ -1,9 +1,11 @@
 ﻿<#
 .SYNOPSIS
-    Downloads the portable tools (Ghidra, Temurin JDK 25, Xenia Canary, Yura, ffmpeg) into <workspace>\bin and verifies SHA-256.
+    Downloads the portable tools (Ghidra, Temurin JDK 25, Xenia Canary, Yura, ffmpeg, TRAWindowed) into <workspace>\bin
+    and verifies SHA-256.
 
 .DESCRIPTION
     Zips go to <workspace>\bin\_download, are checked against the official SHA-256 and only then unpacked into <workspace>\bin.
+    Single files (TRAWindowed's d3d9.dll) are copied into their folder instead of unpacked.
     Existing verified zips are not downloaded again; already unpacked tools are left alone.
     Every run writes <workspace>\logs\Get-Tools_<time>.log. -Verbose shows steps, -Debug URLs/paths/hashes,
     -Trace adds a PowerShell line trace.
@@ -69,6 +71,16 @@ $tools = @(
         File   = 'ffmpeg-9.0.2-essentials_build.zip'
         Sha256 = '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba'
         Folder = 'ffmpeg-9.0.2-essentials_build'
+    },
+    @{
+        # windowed mode for the game (d3d9.dll proxy by chreden, MIT); a single dll, no zip.
+        # Set-TruDisplay.ps1 -Windowed copies it next to tru.exe, -Fullscreen removes it again.
+        Name       = 'TRAWindowed 1.9.0'
+        Url        = 'https://github.com/chreden/trawindowed/releases/download/v1.9.0/d3d9.dll'
+        File       = 'trawindowed-1.9.0-d3d9.dll'
+        Sha256     = '437476c61915675952686fcf72cad6607431a0389e62ae44b80383c7d84fc0ad'
+        Folder     = 'trawindowed-1.9.0'
+        PlainFile  = 'd3d9.dll'
     }
 )
 
@@ -114,6 +126,12 @@ try {
         if ($hash -ne $tool.Sha256) { throw "SHA-256 mismatch for $($tool.File): $hash" }
         Write-Log "$($tool.Name): SHA-256 ok"
 
+        if ($tool.PlainFile) {
+            New-Item -ItemType Directory -Force -Path $target | Out-Null
+            Copy-Item -LiteralPath $zip -Destination (Join-Path $target $tool.PlainFile)
+            Write-Log "$($tool.Name): copied to $(Join-Path $target $tool.PlainFile)"
+            continue
+        }
         $destination = if ($tool.OwnFolder) { $target } else { $binDir }
         Write-Log "Unpacking to $destination ..." -Level VERBOSE
         Expand-Archive -LiteralPath $zip -DestinationPath $destination
