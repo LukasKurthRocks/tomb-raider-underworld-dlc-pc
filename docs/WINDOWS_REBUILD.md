@@ -1204,6 +1204,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        7 records (hash of the cinstream names), convert each language variant and install it as `<name>_NNN`,
        then check in game that German is played; the same for the DLC 2 cinematics. (Confirmed in
        `tools/locals.py`: the ModLoader name is `'%s_%03d' % (path, language)` for any language-specific file.)
+     * **Language variants, worked out (2026-10-30 noon)**: `tools/pack_records.py --hash` names the big records:
+       `xenon-w\cinstream\pdlc1_010_intro.mul` (0xb7ee05e0) and `pdlc1_030_finale.mul` (0x5ce06f1d); pack11 has the
+       same for 5 of its 6 cinematics (`pdlc2_000_fight` is language-neutral). The PC base game does it alike
+       (`pack_records.py pcbig cinstream`: 38 cinematic `.mul` in specs ffffffe1 / ffffe002 / 004 / 008 / 010, 15
+       neutral). The `.mul` carries the speech AND the subtitles (text tails of the cine blocks). Our stage 1
+       (`dlc_media_build` -> `mul_convert`) and stage 2a (`mul_audio_nch` via `mul_audio_batch.find_xb`) take the
+       English record (spec ffffffe1) only - hence the English intro on a German game.
+     * ModLoader (v1.2, private PDB symbols load in `cdb -z ModLoader.asi`): `HookFileSystem::SetSpecialisationMask`
+       stores `mask & 0x7fffffff` at +0xc; `HookFileSystem::FindFile` formats `"%s_%03d"` with path and that value,
+       uses `<path>_NNN` when it exists in `mods\`, **else the plain path**. So each language goes in as
+       `cinstream\<name>_NNN` (001 EN, 002 FR, 004 DE, 008 IT, 016 ES) and the plain name stays as the fallback
+       (Dutch has no speech variant on Xbox either). New `tools/mul_lang_build.py`: per variant `mul_convert.convert`
+       + `mul_audio_nch.swap`, as stages 1 / 2a do for the English file.
      * **Empty DLC 2 hint box, first look (2026-10-30 morning)**: new `tools/locals_find.py` (search / index /
        `--glyphs` over string tables): the hint "The shadow meter drains when LB or RB is held" is pack11 index 1403
        = PC index 5288 in all six installed tables (German "Die Schatten-Anzeige leert sich ..."); the Xbox table is
