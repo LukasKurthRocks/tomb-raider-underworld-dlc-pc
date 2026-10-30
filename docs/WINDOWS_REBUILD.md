@@ -1644,6 +1644,28 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        all with w2 = 0 **and w1 / w3 in swapped halves** (`00040000`, `000c0000`), the defect of the TU hint box
        before `script_record_template.py`. Harmless for the never-shown update message; a general stage-2b fix
        (records of new DLC scripts converted with the retail template rules) is the clean follow-up.
+     * **Which generalbank carries the loading screen**: B138's own `generalbank` keeps the PC **retail** script 6
+       (66 900 bytes, no DLC branch - B138 starts DLC 1 through its start-script patch `cine_nowait`), which is why
+       B138's DLC 1 loading screen shows no text at all (`references\DLC1\PC-B138-Test-20261029_*`). The installed
+       file is OUR port of TU script 6 (75 348 bytes, DLC 2 tests 2-13, then test 18's id mapping) - the only one with
+       the DLC description and title records. So the title fix (test 32) belongs to the build of our generalbank,
+       which is **not a pipeline step yet** (DLC 2 tests 2-13 built it by hand: `generalbank_dlc.py`, vtable insert,
+       PC init values, `drm_put_sections.py`) - to be made a step, with `script_uitext_fix.py --ported` and the
+       record words.
+     * **General record fix, measured and prepared (test 34)**: new `tools/script_records_dlc.py` (every UI text
+       element record of the new DLC scripts against the retail template rules `s32 s32 s32 s32 s32 s32 pc s32
+       bytes s32 ...`, Xbox section and PC section have one layout; string id and relocation words untouched):
+       DLC 1 **38 records / 234 words in 10 DRMs** (the update-warning records, incl. -1.0f stored as `0000c160`),
+       DLC 2 **104 records / 645 words in 15 DRMs** (the same shared scripts, a runtime-filled record at +0x10a0,
+       and in our merged `g_pda` script 26427 the PDA buttons Xbox 353 "BACK" / 98 "SELECT" = PC 375 / 5138 - the
+       merged g_pda is not in use yet). Test tree `work\rebuild\dlc_test34_records` (24 DRMs of both DLCs, from the
+       installed play tree; the pack10 and pack11 runs give byte-identical DLC 1 files). Mostly never-shown text, so
+       the test is "both DLCs still run"; then a stage-2b fix `uirecord`.
+     * **Menu wait (stage C of the multi-step test)**: the session-1 timeline log shows, per menu screen (outfit,
+       weapon, ...), 13 UI timelines created at once; each group has one with keys `0 4 4 0` (most likely a 4-second
+       timeline) and one with `0 0.5 0.5 -20`; the loading screen's group has `0 7 4.5 50` and several `0.5`. Lead
+       for the owner's idea (make the choice usable at once): the 4-second timeline - shorten its key time in the
+       script descriptor and see whether input is enabled earlier. Not tried.
      * Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
