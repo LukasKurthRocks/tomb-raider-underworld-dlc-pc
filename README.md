@@ -28,8 +28,21 @@
 - DLC 1 (B138): fixes found while testing - the "display driver" box on entering the DLC (shader constants), the
   grapple ring's look, cinematic speech in all five languages. Rebuilt reproducibly by the pipeline step `Repair`.
 - DLC 2 (*Lara's Shadow*): converted with the original's pipeline plus new stage-2b fixes - intro at normal speed,
-  no crash after it, the level is playable, hint texts in the game's language. Open: shaders (waterfall, walls),
-  hint box graphics, loading-screen title.
+  no crash after it, the first level loads and runs, loading-screen titles and the title-update hint box like on the
+  Xbox. Open: shaders (waterfall, walls).
+- Both DLC: our `generalbank` (the title update's loading-screen and hint-box scripts ported to PC) is built by the
+  pipeline step `Generalbank`.
+
+> [!IMPORTANT]
+> **DLC 2 cannot be finished on PC yet - the PC game lacks the Doppelgänger / shadow power.** On the Xbox, *Lara's
+> Shadow* lets Lara use the Doppelgänger's power (hold LB/RB: world slows to 0.3, Lara moves at 1.2, a shadow meter
+> drains; attach to and climb "rock veins"; shadow combat moves). That mechanic is **program code of the Xbox title
+> update** (its exe patch), not data - the PC `tru.exe` never received it, so no data conversion can bring it back.
+> The first rock vein comes right after the start, and several puzzles require the slow motion. Measured: the title
+> update adds ~390 functions (<= ~157 KB PowerPC code); the slow motion itself turned out to use an engine time-scale
+> system the PC exe already has (script natives `gamebase` #23 / #24), so a script-based slow motion is being tried;
+> rock veins and the combat moves would need a re-implementation (e.g. an ASI). Details:
+> [docs/DLC2.md](docs/DLC2.md#doppelgänger--shadow-power-missing-on-pc) and WINDOWS_REBUILD.md finding 43.
 - What was found and why, for anyone (including the original author) who wants to pick it up:
   [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) finding 43, [docs/DLC2.md](docs/DLC2.md).
 

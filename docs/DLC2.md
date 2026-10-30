@@ -4,6 +4,30 @@ Status upstream: "the converter handles generic parts, nothing was tested" (INVE
 installer only takes DLC 2 menu images and music from `pack11.000`; the PC DLC menu lists only installed DLC, so
 *Lara's Shadow* does not appear there yet.
 
+## Doppelgänger / shadow power: missing on PC
+
+**Blocking for a playable DLC 2.** On the Xbox (title update 0.0.2.3) the player gets the Doppelgänger's power:
+holding LB or RB blurs and brightens the screen, the world runs at **0.3** and Lara at **1.2** of normal speed, and
+the yellow silhouette in the HUD (shadow meter) drains; with LB/RB + A Lara jumps to and climbs **rock veins**
+(the meter drains while she hangs there, she falls when it is empty, it refills); further shadow moves (strike, blast,
+fire, turning objects). Without it the first rock vein right after the start cannot be climbed, and five puzzles
+explicitly need the slow motion (grinders, vents, eitr serpent heads, floating blocks, deadly rain).
+
+What we know (WINDOWS_REBUILD.md finding 43; workspace notes on the shadow power):
+* It is **exe code of the title update** (`default.xexp`), not data: all 166 DLC 2 files are present, the markup
+  loader disables nothing ("Bad Markup Type" is never hit), the HUD meter is drawn - but LB only makes Lara sprint
+  and RB + A at a rock vein does nothing on PC. Function-level diff of the Xbox exe without vs with the title update
+  (memory images from Xenia): **391 new functions (~157 KB)**, 937 changed (partly relinking).
+* The title-update native `dlc2data` f0 reads a game-state byte that only `DoppelgangerInit` sets ("playing with
+  the shadow power"); the PC exe does not know the native at all (calls crash on a null pointer - our ported
+  scripts avoid them).
+* **The slow motion is an existing engine feature**: the Xbox exe's world / player time scales exist in the retail
+  exe too, and the PC `tru.exe` has the same system with script natives `gamebase` #23 / #24 (world / player time
+  scale with ramp). A script-only slow motion on LB/RB is therefore possible; meter, blur, rock veins and combat
+  moves are not covered by that.
+* Options: script slow motion (days) - slow motion + meter + blur as an ASI (about a week) - full re-implementation
+  incl. rock veins and combat (weeks to months).
+
 ## Xbox reference (Xenia Canary 02d2cb5, game + TU 0.0.2.3 + DLC, 16:9)
 
 Reference screenshots are kept outside this repository (local `references/` folder of the workspace).
