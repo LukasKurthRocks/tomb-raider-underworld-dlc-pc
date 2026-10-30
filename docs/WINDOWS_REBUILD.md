@@ -1794,6 +1794,15 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        pointer word was executed as `op03` and pushed its low 24 bits as a "string" (AV in `op4f`, `tru+0x17dbf3`).
        37b in game: base game hints top right in a dark box, no pause, no crash; DLC 1 medipack hint top right, no
        pause; DLC 2 shadow and rock vein hints modal with pause - all as in Xenia (`references\*\PC-Test37b-*`).
+     * **Waterfall test 42 (prepared 2026-10-30 22:40, not played)**: test 25a had transplanted the base game's eitr
+       fall material (`ca_ani_goo_falls.drm`, PC material 14299, scrolling-texture shaders 201-204, one soft cyan
+       gradient texture 4996) onto the WRONG material (26812); now onto **24920** in `dlc_level2_start.drm` (the fall
+       and the pool below it, terrain batch Y 64): `material_transplant.py` (vertex inputs of 14299 covered by
+       24920's mesh; ShaderLibs 201-204 and texture 4996 copied in). Base: the installed `dlc_level2_start.drm`
+       (md5 b67e513e, test 34 state). `work\rebuild\dlc_test42_waterfall` (base texture 4996, md5 9bca8c87) and
+       `dlc_test42b_waterfall_bluewater` (texture remapped to the DLC's blue water 6957, md5 40c250fb); tree_check
+       0 errors. Expected: the grey additive column replaced by Crystal's PC eitr-fall look (scrolling, translucent);
+       risk: the pool uses the same material and will scroll like a fall. Workspace note `docs\Befund-Wasserfall.md`.
      * **Direct start into DLC 2 for tests (test 41e, played 22:28, works)** - test-only generalbank, never for the
        install; `tools/script_directstart_stub.py`, details in the workspace note `docs\Befund-Direktstart.md`. The
        mission screen (script 104) starts a DLC by writing the unit name to a member and calling `uigamedata` f22, then

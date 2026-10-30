@@ -40,11 +40,35 @@
 > update** (its exe patch), not data - the PC `tru.exe` never received it, so no data conversion can bring it back.
 > The first rock vein comes right after the start, and several puzzles require the slow motion. Measured: the title
 > update adds ~390 functions (<= ~157 KB PowerPC code); the slow motion itself turned out to use an engine time-scale
-> system the PC exe already has (script natives `gamebase` #23 / #24), so a script-based slow motion is being tried;
-> rock veins and the combat moves would need a re-implementation (e.g. an ASI). Details:
+> system the PC exe already has (`SetWorldTimeScale` / `SetPlayerTimeScale`): calling them on LB/RB with the Xbox's
+> values already works in a debugger prototype (camera and water slow down, Lara keeps her speed), an ASI is in
+> progress; the meter, rock veins and the combat moves still need a re-implementation. Details:
 > [docs/DLC2.md](docs/DLC2.md#doppelgänger--shadow-power-missing-on-pc) and WINDOWS_REBUILD.md finding 43.
 - What was found and why, for anyone (including the original author) who wants to pick it up:
   [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) finding 43, [docs/DLC2.md](docs/DLC2.md).
+
+**How the Xbox title update is brought to PC (approach)**
+
+The PC game is close to the Xbox retail game; the DLC need the Xbox **title update** on top. So the missing PC piece
+is the title update's *difference*, translated: PC + (TU - Xbox retail) = what the PC needs.
+
+```mermaid
+flowchart LR
+    XR["Xbox retail<br/>(game + scripts)"] -- "title update" --> XT["Xbox + TU<br/>(DLC support)"]
+    XR -. "1: match functions / data<br/>(same engine)" .- PC["PC tru.exe +<br/>PC bigfile"]
+    XT -- "2: difference<br/>(scripts, data, code)" --> D["TU delta"]
+    D -- "3a: scripts / data:<br/>convert words" --> PCS["PC generalbank<br/>(loading screen, hint box)"]
+    D -- "3b: exe code:<br/>re-implement as ASI" --> PCA["PC plugin<br/>(shadow power ...)"]
+    PC --> PCS
+    PC --> PCA
+```
+
+| Step | What | State (2026-10-30) |
+|---|---|---|
+| 1 | Match Xbox retail and PC: functions, natives, globals (`tools/xbox_pc_funcmap.py`) | first pass: 4 155 pairs, ~1 000 confirmed |
+| 2 | Difference Xbox retail -> Xbox + TU (`tools/xbox_func_diff.py`, Xenia memory images) | done: 391 new, 937 changed functions; scripts / sections listed |
+| 3a | Scripts and data of the TU on PC (converted, repaired where PC differs) | loading screen with DLC titles and the hint box done (pipeline step `Generalbank`) |
+| 3b | Exe code of the TU on PC (shadow power) | slow motion proven with the PC's own engine functions; ASI in progress; meter, rock veins, combat open |
 
 **What is new here** (details on branch `windows`)
 
