@@ -1681,7 +1681,34 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        part of the generalbank build). The DLC 1 text still starts on the line with the title shown.
        Side note: in the first session the game sat in the outfit list after a long pause (preview did not change);
        two read-only snapshots (`cdb -pv`) showed the main thread drawing at 60 fps and no loader thread busy - the
-       game waited, no deadlock; not reproduced, not investigated further.
+       game waited, no deadlock; not reproduced, not investigated further. (A second "endless loading" in the
+       outfit list later the same evening was no hang: the level only goes on loading after the choice is
+       confirmed - the owner's wording, not a defect. The first case, where the preview did not react, stays open.)
+     * **Windowed mode and a live debugger with a command channel (evening)**: with TRAWindowed (`Set-TruDisplay.ps1
+       -Windowed`) the game runs in a window and keeps taking controller input while another window has the focus.
+       The installed `tru.exe` (no Steam stub, `steam_appid.txt`) starts directly while Steam runs, so the game can
+       be started UNDER `cdb` with the owner's Steam option reproduced: `cmd /c start "" /b /wait /affinity FFFF cdb
+       -hd -cf session_live2.cdb tru.exe` (module name then `tr8_win32_gm` instead of `tru`). Pitfalls: right after
+       the start the GetLocalString breakpoint sees `esi = 0` - a failing `poi(@esi)` aborts the breakpoint command
+       before `gc` and cdb, reading EOF from stdin, quits and takes the game with it (guard: test the string id first,
+       then `esi > 0x10000`); inside a quoted breakpoint command paths need `\\`; an EMPTY command file fails with
+       Win32 error 87. The command channel: every 30th GetLocalString call runs `cmd.cdb`, which can be rewritten while
+       the game runs (no text fetches in the main menu, so it acts from the loading screen on) - e.g. to set new
+       breakpoints live.
+     * **UI timeline keys are (time, ?, ?, value) rows**: a timeline created at level start (the loading spinner) has
+       keys `0 0 0 0 / 0.4 0 0 360 / 0.8 0 0 0` - first column time in seconds, last column the value (degrees). So the
+       menu timeline `0 4 4 0 / 0.5 4.5 4.5 0` is NOT a 4-second timeline (about 0.5 s; the 4 / 4.5 are other key
+       fields): the "menu wait" lead above is most likely wrong. A live patch (4 -> 0.5) did not apply anyway - the
+       weapon menu's timelines were created before the breakpoint was set (with the outfit menu). Next try: set the
+       timeline breakpoint at the loading screen and log all menu timelines with their times.
+     * **Test 33 (title bits + ported TU script 10, hint box) crashes at the DLC 2 level load** (2026-10-30 19:33,
+       under cdb): access violation at address 0 - the script interpreter's native call at `tru+0x17deae`
+       (`mov ecx,[ecx+14h]` - `call ecx`; the function pointer of the called native's descriptor is 0). The same
+       class as finding 42's TU-only native `uigamedata` 93: the ported script 10 most likely calls a function the PC
+       exe does not implement (call offsets were remapped without UNRESOLVED, so a vtable slot / inherited native is
+       the likely path). Test 27 (the same script 10 on top of test 18) was never played, so this is its first run.
+       Next: breakpoint at `tru+0x17dea3` with `poi(@ecx+14) == 0` to dump the descriptor (name Symbol) and the
+       caller; then NOP or redirect that call like `script_nop_call.py` did for script 6. Test 33 uninstalled again.
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
