@@ -1794,6 +1794,18 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        pointer word was executed as `op03` and pushed its low 24 bits as a "string" (AV in `op4f`, `tru+0x17dbf3`).
        37b in game: base game hints top right in a dark box, no pause, no crash; DLC 1 medipack hint top right, no
        pause; DLC 2 shadow and rock vein hints modal with pause - all as in Xenia (`references\*\PC-Test37b-*`).
+     * **Shadow-power slow motion reproduced on PC (test 39b, played 22:08-22:12, debugger prototype)**: live snapshots
+       in Xenia (25 snapshots while LB was toggled, `tools/snapshot_toggle_words.py`) showed the TU switching two time
+       scales, world 1.0 -> 0.3 and player 1.0 -> 1.2; the TU's selector (0x823d7520) calls the engine's world / player
+       time-scale setters with a 33 ms ramp - the same engine system exists in the retail Xbox exe and in the PC exe
+       (`SetWorldTimeScale` tru+0x376030, `SetPlayerTimeScale` tru+0x376090, script natives `gamebase` #23 / #24,
+       ramps 0x8abeb4 / 0x8abe94, applied in the frame update tru+0x1da4ab). Writing the ramps or the current factor
+       directly had no visible effect; injecting the CALLS from a breakpoint right after the per-frame
+       `XInputGetState` (tru+0x84b88, LB 0x100 / RB 0x200) did: with RB held the camera turns slower, water and the
+       waterfall run slower, Lara keeps her speed (world factor 0.3, player 1.2 in the log); jump height unchanged
+       (the longer shadow jump is separate TU code). Next: the same as an ASI, then meter / blur; rock veins and
+       combat moves remain TU code to re-implement. Function-level diff of the Xbox exe without vs with the TU
+       (`tools/xbox_func_diff.py`): 391 new (~157 KB), 937 changed functions.
      * **Rock vein / shadow power (offline `docs\Befund-Felsrinne.md`, live 20:43 and 20:53)**: all 166 DLC 2 files
        present, terrain materials and textures complete; the markup loader's "Bad Markup Type, disabling markup"
        path (`tru+0x1ce569`) is NOT hit while DLC 2 loads; the HUD shows the shadow meter (green and yellow
