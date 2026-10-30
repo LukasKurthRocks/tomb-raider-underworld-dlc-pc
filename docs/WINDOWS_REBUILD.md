@@ -1561,6 +1561,20 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        parameters. Mesh 22994 (the one unknown vertex format) is a switch object, not the fall. Next: find the fall's
        geometry in `dlc_level2_start.drm` and compare its vertex colours / alpha with the Xbox; check a base PC eitr
        surface with this tuple in game.
+     * **Geometry checked, cause found (most likely)**: new `tools/terrain_batches.py` (draw batches of a terrain
+       section per material, vertex format, D3DCOLOR statistics, Xbox / PC): the fall is batch Y 64 of terrain
+       20085 (31 360 vertices, stride 32: position, normal, two UV sets, **vertex colour** - alpha mean 117, range
+       0..255); format and colours are identical on Xbox and PC. The base water surface with the same material tuple
+       (`l7_yggdrasil_hall02`, terrain 11740 / 19280) has no vertex colour and one UV set. The Y record holds
+       `cccccccc 4 cc cc` (uninitialised build-tool bytes) on both platforms - the Xbox renders with them, so not the
+       cause. New `tools/shader_slots_compare.py`: Xbox vertex-shader library 822 has 72 permutation slots, Crystal's
+       PC 1595 only 60 - **missing 40-42, 104-106, 168-170, 232-234** (bits 8 + 32: most likely second UV set +
+       vertex colour, exactly the fall's format; the base game never needed it, so the PC library was built
+       without it). The PC therefore draws the fall with a variant that ignores the vertex alpha: opaque. Test 25f
+       (`tools/shader_slot_fill.py`, new: empty slots point at an existing entry, only the slot table changes):
+       1595 in `dlc_level2_start.drm` (the first loaded copy) with 40 <- 32, 104 <- 96, 168 <- 160, 232 <- 224 (and
+       +1 / +2) - vertex colour kept, the second UV set's effect lost (`work\rebuild\dlc2_test25f_vslots`).
+       Pixel libraries 1593 / 1594 have more slots on PC than on Xbox (no gap).
      * Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
