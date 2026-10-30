@@ -189,6 +189,11 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
 * **Test 16 (02:40): test 14 + UI timeline paths as PC Symbols (`work/rebuild/dlc2_test16_sym/mods`, 14 files;
   stage-2b fix `uipath`): no crash - the DLC 2 level is playable.** The player character (the Doppelganger in her
   suit) stands in the first room and walks. Open: Esc opens no pause menu; the rest of the checklist below.
+* Test 16 played by the owner (2026-10-30, controller): intro, loading-screen text, weapons and outfits fine; Start
+  opens the pause menu (only the injected Esc did not). Defects (screenshots in the workspace `references\DLC2`):
+  **the waterfall is a flat, grey, opaque surface** (Xbox: bright, translucent - a material / shader of the
+  waterfall); **the hint box appears but stays empty** (Xbox: "The shadow meter drains when LB or RB is held" -
+  the hint text id or its locals entry); the camera pan to the wall therefore explains nothing.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the

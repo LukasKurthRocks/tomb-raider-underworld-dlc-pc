@@ -1193,6 +1193,16 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        event in the log) - ending the game ends cdb cleanly instead.
      * Control (03:00): DLC 1 still starts with the DLC 2 test files installed on top (shared names, finding 38) -
        Lara in the level, quit through the pause menu.
+     * DLC 1 played by the owner (2026-10-30 morning, controller): runs through the intro, the bridge, a spider
+       fight; the grapple points show **two yellow rings** - whether that is the intended look is open (no
+       reference yet). **The intro speaks English on a German game.**
+     * Language lead (read-only, new `tools/pack_records.py` = records of a pack with their `spec` word): pack10 has
+       **7 records in five languages each** (spec `ffffffe1` and `ffffe002 / 004 / 008 / 010`, names not in the
+       name list; two of them 4.4 / 5.4 MB = most likely the speech of the intro and the finale), so the German
+       speech exists on Xbox. The kit installs one `cinstream\pdlc1_0x0_*.mul`. The ModLoader binary contains the
+       name format `%s_%03d` - the same suffix the language files `local\locals.bin_001 .. _032` use. Next: name the
+       7 records (hash of the cinstream names), convert each language variant and install it as `<name>_NNN`,
+       then check in game that German is played; the same for the DLC 2 cinematics.
    * **Code review of the tools since b142a18 (2026-10-30 03:05, 10 findings)** - fixed: `fix_cloth` changed any
      word of a matching block (now only the s16 defect itself, so a raw word kept by `tag404` can't be undone) and
      skipped a block ending at the section end (off by one); `script_u16array_fix` took every `{n, ptr->next}`
