@@ -205,6 +205,12 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   file each (`work/rebuild/dlc2_test25a_fall`, `_25b_fall`); **test 27** - the hint box: TU generalbank script 10
   ported as PC script 9 with its text element records repaired from the retail template
   (`work/rebuild/dlc2_test27_hintbox`, generalbank only; script 9 is global, so also look at a base-game hint).
+* Owner's waterfall tests (2026-10-30 evening): 25a unchanged (26812 is not the fall); marker tests with
+  `tools/material_paint.py` - 25c (four candidates) and 25d (whole room streamgroup + all eitr effects) showed no
+  colour on the fall (the streamgroup's material ids were already loaded from `dlc_level2_start.drm`), **25e: the
+  fall is material 24920 in `dlc_level2_start.drm`** - the base eitr water-surface material on a vertical mesh,
+  converted exactly like the base (WINDOWS_REBUILD.md finding 43). Rule for marker / material fixes: change the
+  first loaded copy of a material id.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
