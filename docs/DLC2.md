@@ -182,6 +182,9 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   name list); **12 (with the image): the DLC 2 intro cinematic plays** - at about one frame per two seconds with
   looping sound, Lara in the chosen costume - and the game crashes after it in a UI timeline; a new base game crashed
   as well (merged `g_pda`). Test tree 13 = 12 with the PC `g_pda`.
+* **Test 14 (2026-10-30 02:05, unattended): test tree 13 + `co_dlc_lara.drm` / `co_dlc_lara_f.drm` with the cloth
+  fix (`work/rebuild/dlc2_test14_cloth/mods`, stage-2b fix `cloth`): the intro plays at normal speed** (about one
+  minute; before 7-8 minutes); the crash after it remains (dump 02:06).
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
@@ -232,6 +235,14 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   structure (`lara.drm` on PC, `tools/dtp_word_classes.py`) showed the converter was right [39]. Treat a large count
   from a fix as a question, and check every rule change on DLC 1 against B138 first (two of three attempts failed
   that check).
+- **A slow frame: time the calls per object before reading counts.** The slow DLC 2 intro was ONE cloth object of 7
+  (~1 s per call, the others 1-2 ms); its pass count was 4 encoded as two s16 halves = 262 144 in the new DTPs of
+  `co_dlc_lara*` (learned type-7 table). Breakpoints at entry / return with `.time`
+  (`tools/cdb_time_summary.py`), then compare the word with its sibling blocks in the same DTP and in the matching
+  base / B138 model (`drm_find_bytes.py`, `dlc_section_compare.py`). Fixed by stage-2b fix `cloth` (DLC 1: 0
+  changes) [43].
+- **A breakpoint debugger ends the game with it.** `cdb -p` keeps "kill on exit": when `timeout` ends cdb, TRU ends
+  too. Put `sxe -c "qd" bpe` in the script (then `DebugBreakProcess` detaches it) or a `qd` in a breakpoint [43].
 - Names first: `dlc_names.py` also takes the Xbox names of the kit manifests (hash-checked) [14]; pack11 still has
   63 unnamed non-DRM records - check which of them a DLC 2 tree needs before `Media`.
 - `Media`: `dlc_media_build.py OUT pack11`; for pack11 itself `MUSIC_PACKS` falls back to pack11 only [13];

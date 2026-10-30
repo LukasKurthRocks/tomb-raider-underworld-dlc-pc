@@ -11,6 +11,8 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
   float  B46/B47: float words of the new DLC DTPs (id >= 20000) - work/ws/cine/float_fix.py, mode s16 then raw
          (top folder only, as upstream's script)
   tag404 B33: raft/grapple ring records (tag 0x404), word at +4 raw in the new DLC DTPs (learned from B138)
+  cloth  (ours, finding 43) cloth iteration counts of the new DLC DTPs back to s32 (DLC 2 `co_dlc_lara*`: 262 144
+         instead of 4 passes made the intro run at about one frame per second)
   postfix upstream's tools/dlc1_postfix.py steps 1-2: streamgroup name tables (save hang) and type-0 name strings
   analog upstream's tools/analog_word_fix.py: near-clone DTPs get the base PC bytes (each word checked against B138)
 
@@ -102,6 +104,43 @@ def fix_tag404(out):
     return {'files': files, 'log': log}
 
 
+def fix_cloth(out):
+    """Cloth parameter blocks of the character-model DTPs (finding 43, DLC 2 slow intro): Xbox layout
+    {u32, ptr, u32, ptr, f32, f32, u32 iterations, u32, u32, u32, f32, ...}; the engine copies the iteration count to
+    the simulation object (+0x30) and repeats its constraint / collision pass that often. The learned type-7 table
+    encoded the count of the third block of `co_dlc_lara` / `co_dlc_lara_f` (DTPs 24717 / 25808) as two s16 halves
+    (4 -> 0x00040000 = 262 144 passes, about 1 s per frame); every other block of the same DTP and the B138 / base
+    blocks use s32. A word is set to s32 only when the whole block matches: pointer slots at -20 and -12, small
+    integers (< 0x100) at the count and at +4 / +8 / +12, and the converted word differs from the s32 encoding.
+    New DLC DTPs (id >= 20000) only; every DRM of the tree, sub folders included."""
+    import struct
+    sys.path.insert(0, HERE)
+    import dtp_audit as DA, drm_write as DW, drm_reloc as R
+    files, log = [], []
+    for rel, path in sorted(DA.overlay([os.path.abspath(out)], None).items()):
+        xs = DA.xsecs(rel)
+        if xs is None: continue
+        D = DW.read(open(path, 'rb').read(), 'le')
+        changed = False
+        for x, i in DA.section_pairs(xs, D):
+            sec = D.sections[i]
+            if x['type'] != 7 or sec.id < 20000 or len(sec.data) != len(x['data']): continue
+            xd = x['data']; xr = R.parse(x['reloc'], 'be'); ptrs = set(xr.pointer_offsets()); sl = ptrs | set(xr.id_offsets())
+            pd = bytearray(sec.data)
+            for o in range(20, len(xd) - 16, 4):
+                if o - 20 not in ptrs or o - 12 not in ptrs or any(k in sl for k in (o - 8, o - 4, o, o + 4, o + 8, o + 12)): continue
+                v = [struct.unpack_from('>I', xd, o + d)[0] for d in (0, 4, 8, 12)]
+                if not all(0 < w < 0x100 for w in v): continue
+                want = struct.pack('<I', v[0])
+                if pd[o:o + 4] != want:
+                    log.append('%s DTP %d +%#x: %s -> %s (cloth iterations %d)' % (rel, sec.id, o, pd[o:o + 4].hex(), want.hex(), v[0]))
+                    pd[o:o + 4] = want; changed = True
+            sec.data = bytes(pd)
+        if changed:
+            open(path, 'wb').write(DW.cdrm_encode(D.write('le'), 'le')); files.append(rel)
+    return {'files': files, 'log': log}
+
+
 def fix_postfix(out):
     """upstream's DLC 1 post-step tools/dlc1_postfix.py, steps 1 and 2 per DRM (called directly, so nothing is
     written to its fixed folder work/ws/converge/): streamname_fix (streamgroup name table of unit DRMs; a broken
@@ -160,7 +199,7 @@ def fix_analog(out):
     return {'files': files, 'log': log}
 
 
-FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('postfix', fix_postfix),
+FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('postfix', fix_postfix),
          ('analog', fix_analog)]
 
 

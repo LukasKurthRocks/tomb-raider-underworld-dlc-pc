@@ -1106,6 +1106,43 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      buffers sized from the cloth object: `[+0x18]` x 64 bytes, `[+0x1c]` x 48, `[+0x20]` x 128 (particles,
      constraints, ...). The data source of +0x3c / +0x40 is not traced yet. Candidates in the intro: the
      Doppelganger's and Lara's hair / clothes (Lara wore the camo-bikini costume - a B138 costume conversion).
+   * **Counts read in the running game (2026-10-30 01:26 / 01:40, breakpoint at +0x601ca, `esi` = simulation
+     object; new `tools/cdb_cloth_summary.py` sums the cdb log)**: DLC 1 (B138, fast): 3 objects, sizes
+     (+0x18 particles, +0x1c constraints, +0x20 collision shapes) = (7, 6, 9) and (15, 36, 4); DLC 2 intro (test tree
+     13, slow): 7 objects - the same Lara types plus (32, 84, 3), 2 x (9, 16, 3) and (7, 6, 4). `[+0x3c]` = 3 always.
+     **`[+0x40]` is not data**: it follows the elapsed time `[+0x24]` (first frame 15.0 -> 15, then 2.0 -> 2; DLC 1
+     settles at ~0.6 -> still 2). So a call runs 6 sub-steps (45 after a long frame). In DLC 2 `[+0x24]` stays at
+     the cap 1.99998 for the whole intro = every frame is slow; 2 580 stepper calls in about 8 minutes = ~0.8 frames
+     per second (7 objects per frame).
+   * The step code is bounded by those small counts (static, `cdb -z ... uf / u`): +0x5fab0 loops over `[+0x18]`
+     and `[+0x1c]`; +0x5ffa0 repeats `[+0x30]` (= 4) times: constraints `[+0x1c]`, then every collision shape
+     (`[+0x20]`, 0x80 bytes each at `[+0x14]`, type byte +0x70 / mode +0x71) -> +0x5ed20 or +0x5f600, whose loops
+     all run over `[+0x18]` or `[+0x1c]`; +0x414170 there is a `memset` of a per-particle buffer. **The cloth counts
+     do not explain the slow intro** - the earlier stack samples (42 of 49 in this path) need another explanation
+     (per-call cost, e.g. invalid floats, or a caller that repeats the job). Next: time one stepper call directly.
+   * **Timed (01:54, breakpoints at entry +0x601c0 and return +0x601f8 with `.time`; new
+     `tools/cdb_time_summary.py`)**: six objects take 1-3 ms per call, **one takes 962-1 187 ms** - that object alone
+     is the slow intro. Its dump (breakpoint with `.if (@ecx == <object>)`): sizes (7, 6, 4) and **`[+0x30]` =
+     0x00040000 = 262 144** where every other object has 4 - the outer pass count of +0x5ffa0 (constraints +
+     collision), i.e. 65 536 times the work. The earlier "+0x30 = 4" reading above was right for the other objects
+     only.
+   * **Source of the value** (new read-only `tools/drm_find_bytes.py` over the test tree, then
+     `tools/dlc_section_compare.py` = Xbox section from the pack archive next to the converted one): every Lara-type
+     model DTP carries three cloth parameter blocks `{u32, ptr, u32, ptr, f32, f32, u32 iterations, u32 2, u32 5,
+     u32 3, f32 0.5, ...}`. In `co_dlc_lara.drm` (DTP 24717) and `co_dlc_lara_f.drm` (DTP 25808) - new DLC 2 DTPs,
+     route `convert` with the learned type-7 table - the third block's count (Xbox `00000004` at +0x204) was encoded
+     as two s16 halves (`00000400`); its neighbours and the first two blocks of the same DTP are s32, and all three
+     blocks of `lara_doppelganger`, `doppelganger_casual` and B138's `dlc_costume_f` hold `04000000`. A per-label
+     class error of the learned table, not a data error. (`co_dlc_lara*` exist only in DLC 2; B138 has no such file.)
+   * **Fix: stage-2b fix `cloth` in `tools/dlc_fixes_build.py`** - on the Xbox source, a word becomes s32 only when
+     the whole block matches (pointer slots at -20 / -12, small integers at the count and at +4 / +8 / +12) and the
+     converted word differs. DLC 2 stage 2b: exactly the 2 words above; DLC 1 stage 2b: **0 changes** (stays
+     byte-identical to B138). In game (test tree 13 + the 2 files, 02:05): all 7 objects 1-2 ms per call, **the
+     DLC 2 intro plays at normal speed (about 1 minute instead of 7-8)**. The crash after the intro remains (dump
+     02:06).
+   * Lesson for the checklist: when one frame is slow, time the calls per object before reading counts - an
+     average over all objects hid the one bad object; and compare a suspicious word with its sibling blocks in the
+     same DTP and in the matching base / B138 model.
    * Author's history (found only now - a forgotten jump point): `tools/generalbank_dlc.py` (2026-10-09) already put
      the converted TU script 6 into the PC generalbank (same native-93 neutralisation at 0x7928); his note in
      `tools/dlc_generic.py` says "replacing it crashes the base game (gb1.dmp)", so he patched DLC 1's start script
