@@ -25,6 +25,9 @@ def main(argv):
         extra = ''
         if s.type == 5 and len(s.data) >= 32: extra = 'hdr ' + ' '.join('%08x' % w for w in struct.unpack_from(e + '8I', s.data, 0))
         if s.type == 9 and len(s.data) >= 12: extra = 'slots %d' % (struct.unpack_from(e + 'I', s.data, 4)[0] // 4)
+        if s.type == 10:       # material: the ids it references (type:id@offset), e.g. shader libs (9) and textures (5)
+            refs = sorted((o, t) for t, o in r.idref)
+            extra = 'refs ' + ' '.join('%s:%d@%x' % (TYPES.get(t, t), struct.unpack_from(e + 'I', s.data, o)[0], o) for o, t in refs)
         print('%4d  %-10s id %6d  size %8d  reloc int %d ext %d id %d  %s' % (
             i, TYPES.get(s.type, str(s.type)), s.id, len(s.data), len(r.internal), len(r.external), len(r.idref), extra))
 
