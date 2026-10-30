@@ -23,6 +23,16 @@
 - **It does not replace the original** and is not a competing release. No support, no guarantees, no game data: like
   the original, everything needs your own files.
 
+**Current state (2026-10-30, tested on one PC, not a release)**
+
+- DLC 1 (B138): fixes found while testing - the "display driver" box on entering the DLC (shader constants), the
+  grapple ring's look, cinematic speech in all five languages. Rebuilt reproducibly by the pipeline step `Repair`.
+- DLC 2 (*Lara's Shadow*): converted with the original's pipeline plus new stage-2b fixes - intro at normal speed,
+  no crash after it, the level is playable, hint texts in the game's language. Open: shaders (waterfall, walls),
+  hint box graphics, loading-screen title.
+- What was found and why, for anyone (including the original author) who wants to pick it up:
+  [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) finding 43, [docs/DLC2.md](docs/DLC2.md).
+
 **What is new here** (details on branch `windows`)
 
 - [scripts/windows/](scripts/windows/README.md) – PowerShell scripts: install the kit, swap single mod files, display
