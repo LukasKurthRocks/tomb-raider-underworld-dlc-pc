@@ -15,7 +15,8 @@
                 script ever ran).
     A d3d9.dll in the game folder that is not TRAWindowed's is never overwritten or removed.
     -GamePath   game folder; default: found through the Steam libraries.
-    -Language   Additionally sets the game language (registry value Language one level up):
+    -Language   Additionally sets the game language (registry value Language one level up); given alone (without
+                -Windowed / -Fullscreen) only the language changes, the display mode and d3d9.dll stay as they are:
                 English=0, French=1, German=2, Italian=3, Spanish=4, Dutch=5 (order of the locals.bin_001..032
                 language bits; all six verified in game).
 
@@ -172,6 +173,12 @@ try {
         Set-ItemProperty -LiteralPath $regPath -Name 'Fullscreen' -Value 1 -Type DWord
         Write-Values 'after'
         Write-Log 'Fullscreen mode set.'
+        return
+    }
+    if (!$Windowed -and $Language) {
+        # only -Language given (default parameter set): change the language, leave the display mode and d3d9.dll alone
+        Write-Values 'after'
+        Write-Log 'Display mode unchanged (no -Windowed / -Fullscreen).'
         return
     }
 

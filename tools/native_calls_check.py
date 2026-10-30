@@ -4,9 +4,12 @@ name, e.g. game/script/game/game instance): does the target offset land on a fun
 (taken from REF.drm, normally the installed generalbank, which the engine loads first), and is that function a
 native? An offset that hits no function entry, or a function whose name Symbol the PC version lacks, is a call
 the PC exe cannot serve (the TU-only natives of finding 42/43). Finding 43 follow-up (DLC 2 rock vein).
+Only relocations that are the operand of a call instruction (the word before is op65 native call / op66 static call)
+count as calls; other references (type / vtable / header data, op67 operands) are listed only with --all - without
+that filter the 2026-10-30 run reported thousands of "+0x44"-style references that are no calls.
 
 Usage (from the repository root):
-  ../bin/pyt -t 900 tools/native_calls_check.py MODS_DIR REF.drm [--glob PREFIX] [--verbose]
+  ../bin/pyt -t 900 tools/native_calls_check.py MODS_DIR REF.drm [--glob PREFIX] [--verbose] [--all]
 """
 import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -33,8 +36,8 @@ def func_table(d, rl):
 
 
 def main(argv):
-    pre = ''; verbose = '--verbose' in argv
-    argv = [a for a in argv if a != '--verbose']
+    pre = ''; verbose = '--verbose' in argv; show_all = '--all' in argv
+    argv = [a for a in argv if a not in ('--verbose', '--all')]
     if '--glob' in argv:
         k = argv.index('--glob'); pre = argv[k + 1]; argv = argv[:k] + argv[k + 2:]
     mods, ref = argv
@@ -55,13 +58,15 @@ def main(argv):
                     t = D.sections[si]
                     if t.type != 8 or t.id not in native: continue
                     info, ft = native[t.id]
+                    is_call = so >= 4 and struct.unpack_from('<I', s.data, so - 4)[0] >> 24 in (0x65, 0x66)
+                    if not is_call and not show_all: continue
                     calls[t.id] += 1
                     if do in ft: continue
                     # offsets into a function entry's fields (+4 .. +0x18) are data reads, not calls
                     base = max((a for a in ft if a <= do), default=None)
                     if base is not None and do - base < 0x1c and do != base: continue
                     if do < min(ft, default=0): continue          # root fields / header
-                    bad[(t.id, info[1], do)].add('%s:%d+0x%x' % (f, s.id, so))
+                    bad[(t.id, info[1], do)].add('%s:%d+0x%x%s' % (f, s.id, so, '' if is_call else ' (no call)'))
     print('calls into %d native types (PC versions from %s): %d' % (len(calls), os.path.basename(ref), sum(calls.values())))
     for (tid, name, do), where in sorted(bad.items()):
         print('  NO FUNCTION ENTRY  script %5d %-26s +0x%04x  from %d places, e.g. %s' % (

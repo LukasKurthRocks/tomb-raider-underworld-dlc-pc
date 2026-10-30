@@ -107,6 +107,8 @@ def main(argv):
         k = argv.index('--types'); v = argv[k + 1]; del argv[k:k + 2]
         types = 'all' if v == 'all' else set(v.split(','))
     mods, ref, out = argv
+    if not check and os.path.realpath(out) == os.path.realpath(mods):
+        sys.exit('OUT_DIR is MODS_DIR - would overwrite the input tree in place; use a separate test tree')
     nat = native_types(ref)
     report = []; files = 0; total = 0
     for f in sorted(os.listdir(mods)):
