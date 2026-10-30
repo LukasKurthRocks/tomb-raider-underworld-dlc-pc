@@ -1836,6 +1836,24 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        Restricted to the glyph-list struct (userType 361), the learned s32 rule gives exactly test 38's two words.
        The one member it still empties is 16896 (userType 361, init 0xeda0): the TU-only button-glyph entry whose
        glyph `0x4021` the PC does not know - word 0 is its glyph count, 0 on purpose since test 11 (untested with 1).
+     * **Calls into the TU-only `achievement` natives neutralised (test 40, structurally checked, not played)**: new
+       `tools/script_missing_native_fix.py MODS_DIR REF.drm OUT_DIR [--types ...] [--check]` decodes every function's
+       code and finds each `op65` (native call) whose operand points into a native type script of REF (the installed
+       generalbank) at an offset that is no PC function entry - a call through a null native pointer like
+       `dlc2data`. In the installed tree exactly **11 such calls, all `achievement`** (PC 16 natives, TU 21): +0x214
+       `dlc_treasureroom` 23210 (DLC 1), +0x230 the shared script 26418 in `dlc2_ceremony_room` /
+       `dlc2_hall_ceremony_goo` / `dlc2_hall_machine_ceremony` / `dlc2_treasure_room_cine`, +0x24c `dlc2_goo_room`
+       24994 / 25086 and `dlc2_hall_ceremony_goo` 24994, +0x268 `dlc2_hall_machine_ceremony` 26335, +0x284
+       `dlc_yggdrasil_end` / `dlc_yggdrasil_hall02` 23101. Each is `op0f <member> / op65 / operand` (object only, no
+       argument, no out parameter), so the three words become the preceding line marker and the relocation is dropped
+       (tools/script_nop_call.py pattern; sequences with `op09` out parameters or non-push ops would be reported and
+       left alone - none). The other "NO FUNCTION ENTRY" lines of `native_calls_check.py` are no calls: 42 `op67`
+       operands -> +0x3c of `dispatcherbase` / `checkpointbase` / `uiscreen` (a header field; Crystal's own
+       generalbank scripts 7 / 33 / 268 / 269 do the same) and header / vtable references from data (+0x44 etc.).
+       Test tree `work\rebuild\dlc_test40_achievements\mods` (8 DRMs): re-check 0 calls, walker problems [] for all
+       changed scripts, `script_ext_check` unchanged (the one suspect of 26418, root +0x40 -> 3523, is in the
+       installed file too), `tree_check` 0 errors, `native_calls_check` no `achievement` line. Not yet in the
+       pipeline's `Fixes` step - after a play test. Details: workspace `docs\Befund-Erfolge.md`.
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
