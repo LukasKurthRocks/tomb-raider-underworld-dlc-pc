@@ -257,6 +257,24 @@ that comes only from a search snippet or secondary summary, or that could not be
 - PS3 static recompilation runtime (MIT); lifter tests and C unit tests in CI on three OSes; RPCS3 used as behavioural reference; "five ports are checked against recorded golden outputs before shared-runtime changes land"; no Sony code, keys or game data.
 - Useful for us: golden-output gate before any change to shared converter code.
 
+#### Official status of the DLC on PC and of an LAU remaster - news check 2026-10-30
+
+- Tomb Raider Chronicles, 26 April 2024 (https://www.tombraiderchronicles.com/headlines4873.html): the last official
+  word is from the Tomb Raider 25 livestream in September 2021 - Meagan Marie (Director of Community) said progress
+  had been made on "the legal challenges faced" for a PC release of *Beneath the Ashes* / *Lara's Shadow*, and the
+  studio still had to decide whether it could commit resources; "radio silence since then". The 2021 report:
+  https://www.tombraiderchronicles.com/headlines4307.html. Both DLCs are still sold on the Xbox Store.
+- No later official statement found (searches 2026-10-30). Older fan view: Microsoft paid for Xbox exclusivity and may
+  still hold the rights (Steam discussion https://steamcommunity.com/app/8140/discussions/0/619568708420375163/ -
+  speculation, not verified).
+- LAU remaster: only rumours - Crystal Dynamics teased a 30th-anniversary project with Aspyr (who did Tomb Raider
+  I-III and IV-VI Remastered); the leaker "Society of Raiders" suggested an LAU remaster (April 2026:
+  https://www.gamingbible.com/news/tomb-raider-legend-trilogy-remaster-collection-463613-20260412,
+  https://twistedvoxel.com/tomb-raider-lau-remaster-in-development/,
+  https://www.nme.com/news/gaming-news/tomb-raider-30th-anniversary-collaboration-legend-remaster-rumours-3926200).
+  No announcement found up to 2026-10-30 (search results reach to about April 2026, so a very recent announcement
+  could be missing). Wikipedia lists Legacy of Atlantis (2027) and Catalyst (2028) as upcoming.
+
 #### Tomb Raider: Underworld on PS3 - research 2026-10-30 (idea: the DLCs for the PS3 version, after PC works)
 
 Reference disc: BLUS30718 "The Tomb Raider Trilogy" (Underworld + Legend HD + Anniversary HD). Web research only,

@@ -1594,6 +1594,25 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      * Loading-screen layout (owner's screenshots): base and DLC 2 text start below the line; **the DLC 1 text starts
        one line higher, on the line** - most likely the text block is centred vertically and the German DLC 1
        description has 4-5 lines (DLC 2 / base 3); to confirm with a shortened test string.
+     * **Xenia snapshots (owner, 17:31 / 17:35)**: `cdb -pv` on `xenia_canary.exe` (frozen, read-only,
+       `xenia_snapshot.cdb`); the emulated Xbox memory sits in Xenia's process at host 0x1_00000000 .. 0x3_00000000,
+       mirrored several times (virtual and physical views). Found: the title texts and the TU script 6 title record
+       (one place, four mirrors, the same in both snapshots) - static script data, not the live UI object. The dumps
+       around the hits failed (loop variable `a` read as the hex number 0xA - renamed). In Xenia the outfit / weapon
+       choice waits for its fade-in animation too: original behaviour, not a port defect.
+     * **Waterfall, test 25h (`tools/texture_digits.py`, new: numbered A8R8G8B8 textures 1-8 with a grid per material
+       slot; ids from unused gaps below the highest DLC texture id, 7669 / 7683-7685 / 7895-7898; the base game uses
+       up to 6438)**: the opaque column shows **slot 2** (originally 6999, grey noise) at full strength; where the
+       digit is black the column is see-through - the column is drawn **additively**, so the mid-grey noise looks like
+       an opaque wall. The pool turned too: it is the same material 24920 (the "rust" in 25e was the block marker at
+       a grazing angle). The translucent blue sheets are another material and look right. So on the vertical column
+       slot 2 comes through unattenuated; on the Xbox reference the fall is a soft bright glow - the attenuation
+       (most likely the vertex alpha, mean 117 / 255, or a term the PC port of the shader handles differently) is
+       missing. Pragmatic test next: slot 2 of 24920 only, darkened (~0.45) as a new texture; proper fix: translate
+       the shader (stage 3).
+     * **"Skip cinematic" bar**: PC "(A) JA - Zwischensequenz überspringen? - (B) NEIN" spread over the width, Xbox TU
+       "SKIP CINEMATIC? (A) YES (B) NO" grouped on the right (`references\DLC1\Xenia-TU_DLC1_10_*`) - a layout
+       difference, most likely another title-update UI script like the hint box (not checked yet).
      * Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
