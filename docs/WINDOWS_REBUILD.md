@@ -1785,6 +1785,26 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        object at element+0x84 with the owner at -4) with the value, the script code pointer (`[ebp+0xc]`, read inside
        `.catch` so a bad frame cannot abort the breakpoint) and the stack - load a base game save once (title 51) and
        start a DLC (5169 / 432) to see which code switches 51 on and whether the DLC titles are ever touched.
+     * **Test 37b: hints like on the Xbox in all three parts (played 20:51-20:54)** - `tools/script_dlc2_flag_stub.py`
+       appends a stub to the hint script 9 (82 code words + the 10 unit names): fetch the current unit name
+       (`uigamedata` f34 + `corebase` f14, as TU script 6 f9 does), compare it with the DLC 2 unit names (`op08 12,
+       op05 <string>, op4f, op64, op63`), store the result in local 1 and in the embedded `dlc2data` member (+0x50)
+       that now serves as the flag; f9 reads that member, the three f1 calls write it. Test 37 crashed in the base
+       game (Lara diving into the sea, the first hint): the stub lacked the `op05` before each string pointer, so a
+       pointer word was executed as `op03` and pushed its low 24 bits as a "string" (AV in `op4f`, `tru+0x17dbf3`).
+       37b in game: base game hints top right in a dark box, no pause, no crash; DLC 1 medipack hint top right, no
+       pause; DLC 2 shadow and rock vein hints modal with pause - all as in Xenia (`references\*\PC-Test37b-*`).
+     * **Rock vein / shadow power (offline `docs\Befund-Felsrinne.md`, live 20:43 and 20:53)**: all 166 DLC 2 files
+       present, terrain materials and textures complete; the markup loader's "Bad Markup Type, disabling markup"
+       path (`tru+0x1ce569`) is NOT hit while DLC 2 loads; the HUD shows the shadow meter (green and yellow
+       silhouettes), but LB only makes Lara sprint and RB + A at the rock vein does nothing. Most likely the player's
+       shadow power (meter drain, long jump, rock vein attach) is code of the title update's exe patch
+       (`default.xexp`, 958 KB) that the PC exe never got - the largest missing piece so far. Side finding: the TU
+       `achievement` native type has 21 natives, the PC one 16; DLC 1 / DLC 2 scripts reference offsets +0x214..+0x284
+       beyond the PC table (B138 too) - a call into the void like `dlc2data` if an achievement fires. The live
+       bool-setter trace (`tru+0x19c920`) costs too much in menus (the pause menu stalled, the game had to be ended):
+       the DLC 2 title element (432) never had its visibility set; text visibility is set by the native at
+       `tru+0x3a6886`, called from the interpreter at `tru+0x17b051` - next: identify that native and trace only it.
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
