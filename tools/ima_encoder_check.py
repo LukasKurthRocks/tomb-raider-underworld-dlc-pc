@@ -8,7 +8,8 @@ nibbles 1..63; decoded with tools/compare_audio.ima_decode):
 Per channel: SNR in dB, the largest single error, and the share of blocks whose worst error exceeds 4096.
 
 Usage (from the repository root):
-  ../bin/pyt -t 1800 tools/ima_encoder_check.py pack10|pack11 NAME.mul [SPEC_HEX]   (default spec ffffe004 = German)
+  ../bin/pyt -t 1800 tools/ima_encoder_check.py pack10|pack11 NAME.mul [SPEC_HEX] [--write OUT]  (default spec ffffe004 = German)
+  --write OUT: no measurement, write the PC .mul (as mul_lang_build) with the lookahead encoder - a listening test
 """
 import sys, os
 import numpy as np
@@ -97,9 +98,19 @@ def main(argv):
     from archive import Archive
     from names import crc
     from convert_dlc import R, PACKS
+    out = None
+    if '--write' in argv: k = argv.index('--write'); out = argv[k + 1]; del argv[k:k + 2]
     pack, name = argv[0], argv[1]; spec = int(argv[2], 16) if len(argv) > 2 else 0xffffe004
     A = Archive(R + [p for p in PACKS if p.endswith('/%s.000' % pack)][0], 'be')
     rec = next(r for r in A.find(crc('xenon-w\\cinstream\\' + name)) if r['spec'] == spec)
+    if out:       # listening test: the PC .mul as tools/mul_lang_build.py writes it, but with the lookahead encoder
+        import mul_convert as M, dlc_generic as DG
+        xd = A.read(rec); pd = M.convert(xd, DG.DlcIds(None, None))
+        MN.ima_encode_game = encode_lookahead          # swap() looks the encoder up at call time
+        o, info = MN.swap(xd, pd)
+        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True); open(out, 'wb').write(o)
+        print('written %s (%d bytes, %s)' % (out, len(o), info))
+        return
     rate, total, pcm = MA.xb_pcm(A.read(rec))
     print('%s spec %08x: %d Hz, %d samples, %d channel(s)' % (name, spec, rate, len(pcm), pcm.shape[1]))
     for k in range(pcm.shape[1]):

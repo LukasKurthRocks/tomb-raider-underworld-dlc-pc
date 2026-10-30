@@ -1450,6 +1450,13 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        textures = exactly the base ring) and `dlc1_test26b_ring` (base material, DLC textures by role: normal 6463,
        colour 6770, specular 6770; dummy 255 and mask 5570 copied). Same rule as before, extended: **with base
        shaders, take the base MATERIAL (texture slot roles + params), not only the shader ids**.
+     * Toward automating it: new `tools/dlc_base_twins.py` (DLC DRM names without `dlc1_` / `dlc2_` / `dlc_` against
+       base PC names without a level prefix): **16 of 277 DLC DRMs have a base twin by name** (grapple ceiling /
+       wall, `dlc1_ei_hpole_a`, dispatcher, doppelganger, checkpoint, `dlc_fx_cine_snow`, the reused Yggdrasil halls,
+       `g_pda`, camerashakes). The swing pole `dlc1_ei_hpole_a` needs nothing: its 4 materials are class A (exact base
+       shaders); the ring's two are D / C2 / C3 with no base material of the same tuple. Rule for a pipeline step:
+       DLC material with a class C / D library AND a base twin -> base material via `material_transplant.py`
+       (vertex-input check), texture roles kept from the base.
      * **Hint box: TU generalbank script 10 ported (test 27 prepared)**. `tools/generalbank_dlc.py --scripts 6,10`
        converts TU script 10 -> PC script 9 (5 636 bytes; plus TU script 21239, identical to the one already in
        B138); a fresh build of script 6 alone is NOT byte-identical to B138's generalbank, so only the two sections
@@ -1483,6 +1490,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        before); `uitext` = 26 text elements + 12 hint entries matched (ids 1286 / 1289 / 1290 x24 / 1374 x12), but
        **only the 26 elements change - B138's 12 hint entries already hold PC ids** (correction of the "38 unmapped
        records" above: 26).
+     * **Pipeline step `Fixes` re-run with all stage-2b fixes** (log `Invoke-TruPipeline_Fixes_20261030_140516`,
+       1 645 s, all exit 0; DLC 2: `uipath` 125 arrays, `uitext` 120 + 150): `tools/tree_compare.py
+       work/rebuild/dlc2_asm_stage2b/mods work/rebuild/play_20261030/mods` = **292 identical, 0 different**; only
+       `g_pda.drm` differs in presence (the stage-2b tree has the merged one, the tested trees keep the PC `g_pda`,
+       finding 40). So the tested DLC 2 state is reproducible from the pipeline.
+     * **Noisy speech (DLC cinematics)** measured with new `tools/ima_encoder_check.py` (decoded Xbox source vs our
+       IMA re-encode, game decoder). German DLC 1 intro (spec ffffe004, 44.1 kHz stereo): our encoder **25.4 / 25.0
+       dB**, largest single error 16 941 / 19 652, 0.76 / 0.93 % of the 64-sample blocks with an error > 4096.
+       (For comparison, finding 18: Crystal's own encoder on base music 38.7 / 45.4 dB; English intro, ours 31.0 dB,
+       B138 12.8 dB.) The encoder takes each block's start index from a warm-up over the previous block and picks
+       nibbles greedily - after a quiet block the step is too small for a sudden onset. Variants: start index searched
+       per block (all 89) = 26.6 / 26.3 dB, 0.32 / 0.36 %; **plus one sample of lookahead per nibble = 26.6 / 26.2 dB,
+       largest error 9 799 / 8 860, 0.11 / 0.16 % bad blocks** - the mean barely moves, the audible spikes become
+       6-7x rarer. Listening test 29: `work\rebuild\dlc1_test29_audio` (German intro `_004` with the lookahead
+       encoder, same size as the installed one, only audio bytes differ). If it sounds cleaner: make it the encoder of
+       `mul_audio_nch` (all DLC `.mul`, ~1 min per stream).
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,
