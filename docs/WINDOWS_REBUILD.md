@@ -1070,8 +1070,9 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      no failed `CreatePixelShader`, no error flag; the DLC 1 intro (journal page with the hammer fragment) plays
      and **Lara stands in the DLC 1 level** ("Beneath the Ashes") - the display-driver box is gone. B138 + 24
      fixed files = **first DLC 1 level start on this PC**.
-   * Seen in that first level start (to check): with "Legeres Outfit" Lara looks bare-skinned (clothes missing or
-     untextured?) - compare another outfit next run.
+   * Outfit in that run: the first list entry is "Bikini Schwarz-Weiss" (B/W bikini; list: B/W bikini, camo
+     bikini, Freizeitforscher, gold bikini, grey jungle shorts), so the bare skin in the level is correct, not a
+     missing texture.
    * Debugger limit: `cdb -p` keeps "kill on exit" - when `timeout` ends cdb, Windows ends the game too. Unattended
      runs need a clean detach: `sxe -c "qd" bpe` in the cdb script, then `DebugBreakProcess` from outside detaches
      on demand; or a hard stop with `qd` in a breakpoint.
