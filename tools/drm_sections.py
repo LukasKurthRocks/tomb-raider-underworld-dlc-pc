@@ -1,0 +1,33 @@
+"""List the sections of a DRM file (read-only): index, type (with name), id, size, relocation counts; for textures
+(type 5) the header words, for shader libraries (type 9) the slot count. Finding 43 follow-up (grapple ring and
+waterfall drawn wrongly: which textures / materials / shaders an object brings).
+
+Usage (from the repository root):
+  ../bin/pyt -t 120 tools/drm_sections.py FILE.drm [--type N] [--endian le|be]
+"""
+import sys, os, struct
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import drm_write as DW, drm_reloc as R
+
+TYPES = {0: 'general', 2: 'empty/anim', 5: 'texture', 6: 'wave', 7: 'dtp', 8: 'script', 9: 'shaderlib', 10: 'material',
+         11: 'object', 12: 'mesh', 13: 'unit'}
+
+
+def main(argv):
+    only = None; endian = 'le'
+    if '--type' in argv: k = argv.index('--type'); only = int(argv[k + 1]); del argv[k:k + 2]
+    if '--endian' in argv: k = argv.index('--endian'); endian = argv[k + 1]; del argv[k:k + 2]
+    D = DW.read(open(argv[0], 'rb').read(), endian)
+    e = '<' if endian == 'le' else '>'
+    for i, s in enumerate(D.sections):
+        if only is not None and s.type != only: continue
+        r = R.parse(s.reloc, endian)
+        extra = ''
+        if s.type == 5 and len(s.data) >= 32: extra = 'hdr ' + ' '.join('%08x' % w for w in struct.unpack_from(e + '8I', s.data, 0))
+        if s.type == 9 and len(s.data) >= 12: extra = 'slots %d' % (struct.unpack_from(e + 'I', s.data, 4)[0] // 4)
+        print('%4d  %-10s id %6d  size %8d  reloc int %d ext %d id %d  %s' % (
+            i, TYPES.get(s.type, str(s.type)), s.id, len(s.data), len(r.internal), len(r.external), len(r.idref), extra))
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

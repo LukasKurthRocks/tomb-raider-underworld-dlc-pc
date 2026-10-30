@@ -1196,6 +1196,18 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      * DLC 1 played by the owner (2026-10-30 morning, controller): runs through the intro, the bridge, a spider
        fight; the grapple points show **two yellow rings** - whether that is the intended look is open (no
        reference yet). **The intro speaks English on a German game.**
+     * Grapple ring, checked (2026-10-30 noon): the owner's Xbox reference shows a **rusty metal ring** with a round
+       Y-button prompt below it -> the flat yellow ring on PC is a rendering defect. New read-only tools:
+       `tools/drm_sections.py` (sections of a DRM), `tools/drm_textures_png.py` (PCD9 textures -> PNG + contact
+       sheet), `tools/shader_lib_dump.py` (disassembly per ShaderLib entry). `dlc1_ei_grapple_wall.drm`: textures
+       decode correctly (rusty metal 6650 / 6852 / 4294 / 6770, normal map 6463), materials 21093 / 21164, port
+       library 2762 with 8 lit pixel shaders (12-13 samplers, 440-580 instructions). **Not caused by the shader fix**:
+       the diff B138 vs fixed per shader is exactly the inserted `mov r23, c222` before the three `cmp ..., c167.zzzy,
+       ..., c222.y` (r23 unused before) - same result bit for bit. So the yellow comes from B138's own translated
+       shaders or material (stage 3, the shader translator B72-B89, not rebuilt yet). Lead: the port shaders read
+       material constants at Xbox register numbers (e.g. `c167.zzzy` as a select); if the PC engine fills other
+       registers, a highlight / tint term can win - compare which constant registers material 21093 sets on PC with
+       the ones the shaders read.
      * Language lead (read-only, new `tools/pack_records.py` = records of a pack with their `spec` word): pack10 has
        **7 records in five languages each** (spec `ffffffe1` and `ffffe002 / 004 / 008 / 010`, names not in the
        name list; two of them 4.4 / 5.4 MB = most likely the speech of the intro and the finale), so the German
@@ -1217,6 +1229,10 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        `cinstream\<name>_NNN` (001 EN, 002 FR, 004 DE, 008 IT, 016 ES) and the plain name stays as the fallback
        (Dutch has no speech variant on Xbox either). New `tools/mul_lang_build.py`: per variant `mul_convert.convert`
        + `mul_audio_nch.swap`, as stages 1 / 2a do for the English file.
+     * **Tested by the owner (2026-10-30 ~11:50, all 35 variants installed as one tree): the DLC 1 intro speaks
+       German** on the German game. Each variant carries all subtitle languages (only the speech differs). Noted:
+       the speech sounds a little noisy in places - the XMA -> IMA re-encoding (finding 18: >= 25 dB against the
+       decoded Xbox source); to compare with the base game's own German cinematics later.
      * **Empty DLC 2 hint box, first look (2026-10-30 morning)**: new `tools/locals_find.py` (search / index /
        `--glyphs` over string tables): the hint "The shadow meter drains when LB or RB is held" is pack11 index 1403
        = PC index 5288 in all six installed tables (German "Die Schatten-Anzeige leert sich ..."); the Xbox table is
