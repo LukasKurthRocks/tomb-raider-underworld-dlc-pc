@@ -1803,6 +1803,25 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        `dlc_test42b_waterfall_bluewater` (texture remapped to the DLC's blue water 6957, md5 40c250fb); tree_check
        0 errors. Expected: the grey additive column replaced by Crystal's PC eitr-fall look (scrolling, translucent);
        risk: the pool uses the same material and will scroll like a fall. Workspace note `docs\Befund-Wasserfall.md`.
+     * **Hint-box background: no texture is missing (test 43, offline)**: a userType-320 bitmap member names its
+       texture by section id, made absolute by a kind-A id relocation (new `tools/drm_idrefs.py`): our script 9 =
+       TU script 10 references texture 56 (the box, retail member 1274) and 76 (the Lara icon, TU member 17479);
+       none of the 14 TU-only generalbank textures (those belong to TU scripts 7 / 38). Texture 56 is identical in
+       TU and retail; texture 76 differs between them, but converting the TU section (new
+       `tools/generalbank_tu_textures.py`, `tools/drm_section_head.py`) gives exactly the texture 76 Crystal's PC
+       generalbank already has. All init words of the three bitmaps equal the Xbox values. So the faint modal box
+       on PC is not a data defect of our generalbank - next: compare the box's colour / alpha / scale at draw time
+       (PC cdb vs Xenia snapshot). `generalbank_build.py` unchanged (md5 57f52266...).
+     * **ASI step 3.1: `TruShadowPower.asi` (built, not yet played)** - the first piece of the title update rebuilt as
+       PC code: `src/asi/TruShadowPower/` (C++, no external libraries, `/MT`, imports only KERNEL32), built by
+       `scripts/windows/Build-TruAsi.ps1` (VS 2022 x86 toolchain -> `work\asi\`), installed / removed by
+       `Set-TruShadowPower.ps1`. Loaded by the Ultimate ASI Loader the installed game ships as `binkw32.dll` (it lists
+       binkw32Hooked.dll / *.asi; `tru.exe` itself imports no loader - `ModLoader.asi` is loaded the same way). It
+       swaps the stored XInputGetState pointer (0x00a02b8c, called per frame at tru+0x84b82) for a wrapper that, on the
+       LB/RB edge, calls the engine's `SetWorldTimeScale` / `SetPlayerTimeScale` with the Xbox values (0.3 / 1.2,
+       33 ms; 1.0 on release) - what the debugger prototype of test 39b did. Byte checks at all addresses before
+       hooking; `TruShadowPower.ini` / `.log` next to the exe. Active in every level (no DLC 2 check yet); meter, blur,
+       rock veins, shadow jump and combat are not covered.
      * **Direct start into DLC 2 for tests (test 41e, played 22:28, works)** - test-only generalbank, never for the
        install; `tools/script_directstart_stub.py`, details in the workspace note `docs\Befund-Direktstart.md`. The
        mission screen (script 104) starts a DLC by writing the unit name to a member and calling `uigamedata` f22, then

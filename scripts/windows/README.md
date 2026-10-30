@@ -48,6 +48,8 @@ Xbox 360 content folders (title id `534307EC`, content type `00000002`):
 | `Install-TruTree.ps1` | lay a whole converted tree over `mods\` (e.g. the DLC 2 test tree): `-Check` dry run; install saves every replaced file and a manifest (added files, replaced files, created folders) in `backup\tree_<time>\`; `-Restore` undoes exactly that, newest install first - installs stack, one `-Restore` per install (tested on copies of `mods\`: install + restore 275/275 files, two stacked installs + two restores 461/461, folder lists identical). `local\` and `padshock\` are excluded by default (the installed string tables carry the DLC menu text fix) |
 | `Set-TruDisplay.ps1` | `-Windowed` (installs TRAWindowed's `d3d9.dll` in the game folder; in game F6 border, Shift+F6 centre) / `-Fullscreen` / `-Restore` (remove it again; a foreign `d3d9.dll` is never touched) and `-Language English\|French\|German\|Italian\|Spanish\|Dutch` (registry, exported to `backup\` first) |
 | `Get-Tools.ps1` | download the portable tools into `<workspace>\bin`, SHA-256 checked before unpacking |
+| `Build-TruAsi.ps1` | build the ASI plugins in `src\asi\` (today `TruShadowPower`, DLC 2 shadow-power slow motion) with the installed Visual Studio x86 toolchain -> `work\asi\` |
+| `Set-TruShadowPower.ps1` | `-Install` / `-Remove` `TruShadowPower.asi` + `.ini` next to `tru.exe` (loaded by the game's ASI loader `binkw32.dll`; foreign files are never touched) |
 | `Invoke-TruPipeline.ps1` | run the conversion pipeline one step at a time (`-Step`, `-FromTool` to resume), with progress and a summary |
 | `Test-TruUploadReady.ps1` | read-only check of our commits before an upload (paths, machine name, identity, e-mails, secrets, hardware, local patterns) |
 

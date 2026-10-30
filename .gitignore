@@ -26,3 +26,5 @@ work/render/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report
 tools/native_test/shaders/
 tools/native_test/native_report.txt
+# built ASI plugins (binaries)
+work/asi/
