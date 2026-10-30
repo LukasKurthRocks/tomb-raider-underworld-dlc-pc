@@ -194,6 +194,9 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   **the waterfall is a flat, grey, opaque surface** (Xbox: bright, translucent - a material / shader of the
   waterfall); **the hint box appears but stays empty** (Xbox: "The shadow meter drains when LB or RB is held" -
   the hint text id or its locals entry); the camera pan to the wall therefore explains nothing.
+* **Test 17 (2026-10-30 11:26): test 16 + UI text / hint string ids as PC ids (`work/rebuild/dlc2_test17_uitext/mods`,
+  14 files; stage-2b fix `uitext`): the hint box shows German text with the right button glyphs.** Missing against the
+  Xbox: box background, Lara icon, "Press [A] to continue"; text top right instead of top centre.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
@@ -255,6 +258,10 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   engine's path lookup then handed a stack address to the timeline (crash one second after the DLC 2 intro). Check
   any u16 data a script hands to a native that looks things up by name (`script_u16array_check.py`,
   `sym_lookup.py`); B138 carries the same defect in DLC 1 without visible effect [43].
+- **String ids hide in script data as well, and an empty text means "wrong id", not "missing string".** The new
+  DLC scripts keep string ids in high u16 halves that the converter mapped as Symbols, and the pipeline never had
+  the string id map where the converter looks for it. Fastest proof: a breakpoint on `GetLocalString` (+0x9a7a0)
+  logging the ids while the text is on screen, then `locals_find.py` for the texts [43].
 - **A breakpoint debugger ends the game with it.** `cdb -p` keeps "kill on exit": when `timeout` ends cdb, TRU ends
   too. End each cdb script with a hard stop (`qd` in a breakpoint after N hits, or on the expected event); an
   injected `DebugBreakProcess` with `sxe -c "qd" bpe` did not detach in the one try. Ending the game normally

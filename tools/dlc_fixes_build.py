@@ -15,6 +15,8 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          instead of 4 passes made the intro run at about one frame per second)
   uipath (ours, finding 43) UI timeline target paths in new DLC scripts = member Symbols in inline u16 arrays:
          PC Symbols in Xbox element order (tools/script_u16array_fix.py; DLC 2 crashed after the intro)
+  uitext (ours, finding 43) UI text elements and the hint list of new DLC scripts: string ids (Xbox high u16, taken
+         for Symbols by the converter) -> PC string ids, colour s32 (tools/script_uitext_fix.py; empty hint box)
   postfix upstream's tools/dlc1_postfix.py steps 1-2: streamgroup name tables (save hang) and type-0 name strings
   analog upstream's tools/analog_word_fix.py: near-clone DTPs get the base PC bytes (each word checked against B138)
 
@@ -165,6 +167,29 @@ def fix_uipath(out):
     return {'files': files, 'log': log}
 
 
+def fix_uitext(out):
+    """String ids of UI text elements / hint lists in the new DLC scripts (finding 43, empty DLC 2 hint box): the
+    Xbox keeps them in a high u16, the converter mapped them as Symbols; they become the PC string id
+    (locmap_xbox_to_pc.json of `tools/locals.py build`: environment TRUDLC_LOCMAP, else work/rebuild/stage1/). DLC 2
+    trees only (--pack pack11): B138 has the same 38 unmapped records in DLC 1 (system messages, no visible defect
+    reported) and DLC 1 stays byte-identical to B138 until that is decided."""
+    import collections, json
+    if os.environ.get('TRUDLC_PACK_FIRST') != 'pack11':
+        return {'files': [], 'log': ['skipped: DLC 1 tree (B138 keeps these words; finding 43)']}
+    sys.path.insert(0, HERE)
+    import dtp_audit as DA, dlc_generic as DG, script_uitext_fix as TF
+    lm = os.environ.get('TRUDLC_LOCMAP') or os.path.join(HERE, '..', 'work', 'rebuild', 'stage1', 'locmap_xbox_to_pc.json')
+    if not os.path.exists(lm): raise SystemExit('uitext: no string id map %s (run tools/locals.py build first)' % lm)
+    ids = DG.DlcIds(); ids._loc = {int(k): v for k, v in json.load(open(lm))['map'].items()}
+    st = collections.Counter(); files, log = [], []
+    for rel, path in sorted(DA.overlay([os.path.abspath(out)], None).items()):
+        new = TF.process(rel, path, ids, st, log)
+        if new is not None:
+            open(path, 'wb').write(new); files.append(rel)
+    log.append('total %s (map %s)' % (dict(st), os.path.relpath(lm, os.path.join(HERE, '..'))))
+    return {'files': files, 'log': log}
+
+
 def fix_postfix(out):
     """upstream's DLC 1 post-step tools/dlc1_postfix.py, steps 1 and 2 per DRM (called directly, so nothing is
     written to its fixed folder work/ws/converge/): streamname_fix (streamgroup name table of unit DRMs; a broken
@@ -223,7 +248,7 @@ def fix_analog(out):
     return {'files': files, 'log': log}
 
 
-FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('uipath', fix_uipath), ('postfix', fix_postfix),
+FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('uipath', fix_uipath), ('uitext', fix_uitext), ('postfix', fix_postfix),
          ('analog', fix_analog)]
 
 

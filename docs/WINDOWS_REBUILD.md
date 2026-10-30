@@ -1202,7 +1202,59 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        speech exists on Xbox. The kit installs one `cinstream\pdlc1_0x0_*.mul`. The ModLoader binary contains the
        name format `%s_%03d` - the same suffix the language files `local\locals.bin_001 .. _032` use. Next: name the
        7 records (hash of the cinstream names), convert each language variant and install it as `<name>_NNN`,
-       then check in game that German is played; the same for the DLC 2 cinematics.
+       then check in game that German is played; the same for the DLC 2 cinematics. (Confirmed in
+       `tools/locals.py`: the ModLoader name is `'%s_%03d' % (path, language)` for any language-specific file.)
+     * **Empty DLC 2 hint box, first look (2026-10-30 morning)**: new `tools/locals_find.py` (search / index /
+       `--glyphs` over string tables): the hint "The shadow meter drains when LB or RB is held" is pack11 index 1403
+       = PC index 5288 in all six installed tables (German "Die Schatten-Anzeige leert sich ..."); the Xbox table is
+       base 0-1283 + DLC 1284-1406, the PC table is larger, so DLC strings sit at 5169-5291
+       (`locmap_xbox_to_pc.json`); PC indices 1401-1406 are EMPTY strings. The button glyphs of the DLC strings use
+       the same code points as the base strings. B138's `generalbank` script 7 (the author's port of the TU hint
+       code) already holds the PC ids 5286-5289. String lookup in `tru.exe`: +0x9a7a0 `GetLocalString(id)` (table
+       pointer [+0x603854], count at +4; out of range -> a default string). A breakpoint there (ids >= 5136 or out of
+       range) saw only id 5173 in four minutes, while the box was shown once - so the box does not ask for 5288.
+       Dead ends (kept): the ids 1401-1403 found in script 74 / DTP 4748 are byte-identical to the PC base game (not
+       string ids); in the new scripts 26655 / 25657 / 26635 the word `7b050000` after `ffffffff 40016060` is a
+       Symbol (Xbox 1374 -> PC 1403 interpolated), not the hint string. Next: log every lookup of ids 1280-1420 and
+       >= 5136 with the caller while the box is on screen (`locals2.cdb`), the owner triggers the hint.
+     * **Found (11:15, `locals2.cdb`, already on the DLC 2 mission screen; 400 hits in seconds)**: the game keeps
+       asking for the **Xbox ids 1287 / 1326 / 1345** (pack11: "GOLDENE SCHROTFLINTE", "KEIN TEXT", "Raffinerie-Tipp
+       2.1"; PC entries 1287-1345 are empty, the right PC ids are 5172 / 5211 / 5230). Every call comes from the script
+       VM (+0x1c5a3a) through one native (+0x1a7a42) into `GetLocalString`. First reading "constants in the
+       bytecode" was wrong (kept): new `tools/script_const_calls.py` (pushes `op0f N` before calls) found none of
+       these ids as constants - the values pushed in range are sizes / offsets (multiples of 4). Also a dead end:
+       the "hint ids" 5286-5289 in B138's script 7 and 1401-1406 in the TU script 7 are **line markers** (`op00 N`,
+       script words = opcode in the top byte, operand in the low 24 bits), not string ids.
+     * **Cause: string ids in script DATA of the new DLC scripts, encoded as Symbols.** Two record kinds (Xbox source
+       vs our PC file with `tools/dlc_section_compare.py`, PC base layout from `tools/bigfile_find.py` on the PC
+       `generalbank` script 7):
+       * UI text element `{u32 0xffffffff, u32 colour ARGB, u32 string id, u32 flags, ...}` - in the base game all
+         32-bit (Xbox `ffffffff ff606060 0000000c 00000001` = PC `ffffffff 606060ff 0c000000 01000000`); in the new
+         DLC 2 scripts the Xbox word holds the id in its HIGH u16 (`0511 0000` = 1297 "OBJECTIVE REVEALED - Press
+         [Back] to view"); the converter's learned table took colour and id for Symbol pairs (colour -> `40016060`,
+         id 1297 -> Symbol 1326). The engine reads the word as u32 -> `GetLocalString(1326)` -> empty.
+       * hint list `{ptr, u32 id << 16, 0, 0}` (script 20089 in `dlc_level2_start`: 1402 "Press [Back] to access
+         the Information screen", 1403 "The shadow meter drains ..."; script 25393: 1404 / 1405) - same Symbol
+         mapping (1403 -> 1432). The same field also holds larger values (0x1ba2), so only ids inside the Xbox DLC
+         string range 1284-1406 are taken as strings.
+     * Pipeline gap found on the way: `dlc_generic.DlcIds.loc` reads `work/generic/locals/locmap_xbox_to_pc.json`,
+       which no step writes (`locals.py build` writes `work/rebuild/stage1/locmap_xbox_to_pc.json`, after Convert) -
+       so the converter never mapped ANY string id (every LOC word kept its Xbox number). To check what else that
+       affects once the map is in place before Convert.
+     * **Fix `uitext`** (`tools/script_uitext_fix.py`, stage-2b fix in `dlc_fixes_build.py`, map from
+       `TRUDLC_LOCMAP` or `work/rebuild/stage1/`): colour s32, string id -> PC id as u32, only on exactly these
+       Xbox patterns. **Test 17 (11:26, test 16 + 14 files: 118 text elements, 88 hint entries): the hint box shows
+       German text with the right button glyphs** ("Die Schatten-Anzeige leert sich, wenn Sie [LB] oder [RB]
+       gedrückt halten.", "Halten Sie [LB] oder [RB] gedrückt und springen Sie mit [A] auf eine Felsrinne zu."); the
+       lookups of empty ids stopped, the game now asks 5182 / 5201 (the HUD notices). Still missing against the Xbox:
+       the box background, the Lara icon on its left and "Press [A] to continue"; the text sits top right instead of
+       top centre. DLC 2 stage 2b: 120 elements + 150 hint entries (incl. the merged `g_pda`). **DLC 1 / B138 has the
+       same 38 unmapped records** (26 elements + 12 entries: system messages 1286 / 1289 / 1290 "update required" /
+       1374 "returning to main menu") - `uitext` runs for DLC 2 only, like `uipath`, until the owner decides.
+     * Debugger technique used here (for the next string problem): breakpoint on `GetLocalString` (+0x9a7a0) with a
+       condition on the id range and `kv 4` for the caller, a hit cap with `qd` (the log fills in seconds when a HUD
+       asks every frame); the owner plays to the spot while the log runs. Found in minutes what four static
+       searches missed.
    * **Code review of the tools since b142a18 (2026-10-30 03:05, 10 findings)** - fixed: `fix_cloth` changed any
      word of a matching block (now only the s16 defect itself, so a raw word kept by `tag404` can't be undone) and
      skipped a block ending at the section end (off by one); `script_u16array_fix` took every `{n, ptr->next}`
