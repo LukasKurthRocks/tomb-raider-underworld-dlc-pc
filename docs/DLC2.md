@@ -199,6 +199,10 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
   Xbox: box background, Lara icon, "Press [A] to continue"; text top right instead of top centre.
 * Test 18 (2026-10-30 noon): loading-screen title id mapped in the ported TU script 6 - the game asks 5169 every
   frame, the title stays invisible (open).
+* Test 32 + 34 (2026-10-30 evening): the DLC 2 title record had the unmapped Xbox id 410 (= PC 432) and w2 = 0;
+  fixed in test 32, still invisible. **Live debugger: forcing the title element's boolean property (+0x88) to 1
+  shows "LARAS SCHATTEN" above the line**, the text below it as on the Xbox - the element is complete, only the
+  switch is off (WINDOWS_REBUILD.md finding 43). Open: the script code that sets it.
 * Prepared offline (2026-10-30 afternoon, not run yet; WINDOWS_REBUILD.md finding 43 "Offline afternoon"):
   **test 25a / 25b** - the waterfall material 26812 replaced by the base eitr fall material (`ca_ani_goo_falls`,
   scrolling-texture shaders 201-204) with the DLC's blue water texture (25a) or the base gradient texture (25b), one

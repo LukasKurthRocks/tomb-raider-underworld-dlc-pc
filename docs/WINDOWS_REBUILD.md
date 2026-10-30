@@ -1666,7 +1666,23 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        timeline) and one with `0 0.5 0.5 -20`; the loading screen's group has `0 7 4.5 50` and several `0.5`. Lead
        for the owner's idea (make the choice usable at once): the 4-second timeline - shorten its key time in the
        script descriptor and see whether input is enabled earlier. Not tried.
-     * Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
+     * **Test 32 + 34 in the game (owner, 2026-10-30 evening; installed: play tree + test 32 generalbank + test 34
+       records)**: both DLCs and the base game run; **the record words alone do not show the titles** (DLC 1 / DLC 2
+       loading screens as before, `references\DLC1\PC-Test32u34-*_17_*`, `references\DLC2\PC-Test32u34-*_26_*`;
+       base loading screen unchanged). The hint box still has no frame (`..._27_*`). So the boolean at element +0x88
+       is set at run time, not copied from the record's w2.
+     * **Live debugger: the visibility switch confirmed (18:41 DLC 1, 18:51 DLC 2)**: `session_live.cdb` (workbench)
+       breaks at GetLocalString +0x9a7a0, and for id 5169 / 432 on an element with vtable `008533ac` runs
+       `knobs.cdb` - a one-line file that can be edited while the game runs - and logs the element's property blocks
+       every 120th frame. With `ed @esi+0x88 1` (the boolean property found in debugger run 2) **"UNTER DER ASCHE"
+       and "LARAS SCHATTEN" appear above the line** like the base title 51 (`references\DLC1\PC-Test32u34-Live-*_18_*`,
+       `references\DLC2\PC-Test32u34-Live-*_28_*`). The title elements are complete (text, font, position); only
+       the boolean +0x88 = 0 hides them. Open: which script code sets it for the base title (the permanent fix,
+       part of the generalbank build). The DLC 1 text still starts on the line with the title shown.
+       Side note: in the first session the game sat in the outfit list after a long pause (preview did not change);
+       two read-only snapshots (`cdb -pv`) showed the main thread drawing at 60 fps and no loader thread busy - the
+       game waited, no deadlock; not reproduced, not investigated further.
+     * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
        (base start) and 5169 (DLC) with the caller (`kv`) to compare the two elements.
