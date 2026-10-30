@@ -1529,7 +1529,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        **test 30** = German intro at -6 dB (if the crackle goes: the game's mixer clips), **test 31** = the same with
        the FSB nibble convention (if the crackle goes: cinematics are decoded as FSB) -
        `work\rebuild\dlc1_test30_audio`, `dlc1_test31_audio` (`ima_encoder_check.py --write ... --gain -6`,
-       `--convention fsb`).
+       `--convention fsb`). **Owner's results (~16:15)**: 31 (FSB) is worse, even Zip - **the game convention is
+       right** for cinematics too; 30 (-6 dB) a little better, the high-frequency crackle stays - clipping is at most a
+       small part. Crystal did not cut the highs for PC either (`mul_convention_check.py`: power above 8 kHz, PC vs
+       Xbox, 0.10 / 0.14 %, 1.08 / 1.09 %, 8.39 / 5.07 % on three German base cinematics). Base-game check by the
+       owner: Lara's German "s" sounds in the prologue / boat cinematics are **cleaner** than in our DLC intro - so
+       Crystal's PC encodes handle sibilants better than ours (they also differ from the Xbox audio by 3-16 dB, a
+       different master or encoder). Open.
+     * Waterfall, owner's test 25a: unchanged (blue-white, opaque) - material 26812 is most likely NOT the fall
+       (screenshot `references\DLC2\PC-Test25a-*_08`). Marker test 25c (`tools/material_paint.py`, new: all texture
+       references of a material -> one marker texture): 26812 -> green normal map 7001, `co_dlc2_goo` -> black /
+       white blocks 7386, `dlc2_uo_goo_upcolumn` -> rust 7390, `dlc2_goo_spout` -> flat lime 7388
+       (`work\rebuild\dlc2_test25c_paint`, 4 files equal to the installed ones before painting).
+     * Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
+       (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
+       description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
+       (base start) and 5169 (DLC) with the caller (`kv`) to compare the two elements.
      * `work\rebuild\exp_sym*` (the intermediate trees of finding 35's three runs, 9.7 GB) deleted - the result is
        adopted (`docs/data/b138_symbol_calibration.json`), logs and `sections_exp_sym*.json` stay.
      * **Pipeline step `Fixes` re-run with all stage-2b fixes** (log `Invoke-TruPipeline_Fixes_20261030_140516`,

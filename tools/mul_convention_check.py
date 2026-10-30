@@ -3,7 +3,8 @@ game Lara's "s" sounds crackle in the German DLC 1 intro, while our decoded WAVs
 Finding 18 fixed the convention ('game': header sample, nibbles 1..63) on base-game MUSIC; this checks base-game
 cinematics (Crystal's own PC encodes): the PC .mul decoded with both conventions against the decoded Xbox record
 of the same name and language, per channel (coarse lag by cross-correlation, then +-3 samples); plus the same on the first difference of the
-signal (high frequencies - where a convention mismatch hurts most, e.g. sibilants).
+signal (high frequencies - where a convention mismatch hurts most, e.g. sibilants), and the share of the power
+above 4 / 8 / 12 kHz in the PC and the Xbox stream (did the PC master lose its highs?).
 
 Usage (from the repository root):
   ../bin/pyt -t 900 tools/mul_convention_check.py NAME.mul [SPEC_HEX]     (default ffffe004 = German)
@@ -44,6 +45,11 @@ def main(argv):
     lags = np.r_[0:rate + 1, -rate:0]
     coarse = int(lags[np.argmax(cc[lags])])
     print('  coarse lag (PC vs Xbox): %+d samples' % coarse)
+    # share of the signal power above 4 / 8 / 12 kHz, PC (game decode) vs Xbox: did the PC master lose its highs?
+    def hf(sig):
+        s = np.abs(np.fft.rfft(sig[:n] * np.hanning(min(n, len(sig))))) ** 2; f = np.fft.rfftfreq(min(n, len(sig)), 1.0 / rate)
+        return ' '.join('>%dk %5.2f%%' % (c // 1000, 100 * s[f > c].sum() / s.sum()) for c in (4000, 8000, 12000))
+    print('  power above   PC   %s\n                Xbox %s' % (hf(pc0), hf(x0)))
     for conv in ('game', 'fsb'):
         pc = mul_pcm(pd, conv == 'game')
         for k in range(min(pc.shape[1], xb.shape[1])):
