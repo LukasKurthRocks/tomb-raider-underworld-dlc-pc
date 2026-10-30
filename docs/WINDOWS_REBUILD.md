@@ -1759,6 +1759,32 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        index in vtable slot 3 of its type object (`uigamedata` binder `tru+0x3af0c0`). Lead for a direct test start
        (owner's idea: skip the menu clicks): which earlier call names the DLC level - then a test-only script patch
        can make the main menu start it at once.
+     * **Hints: the modal box is DLC 2 only (Xenia reference, 20:21-20:25)**: on the Xbox with the title update the
+       DLC 1 hint "Press up to use a health pack" is shown top right in a faint box, without "press A" and without a
+       pause (`references\DLC1\Xenia-TU_DLC1_11_*`); in DLC 2 every hint is the modal box - the shadow meter one with
+       Lara icon and a clearly dark rounded box, the rock vein one without icon (`references\DLC2\Xenia-TU_DLC2_15..19`;
+       after A the shadow text stays on screen for a while). Test 36 fixed `dlc2data` f0 to 1, so on PC the DLC 1
+       hints became modal too (`references\DLC1\PC-Test36-*_19_*`) - wrong. Offline (new `tools/drm_script_refs.py`,
+       details in `docs\Befund-Test33-Native.md` "Test 37 build"): no script of pack10 / pack11 / the TU / the PC tree
+       calls `dlc2data` or the hint script - the TU exe decides f0 itself ("DLC 2 level active"); f1 only mirrors it.
+       Interpreter opcodes read from `tru.exe` in addition: `op0f` pushes a member ADDRESS, `op0c` / `op0d` / `op0e`
+       a member byte / u16 / u32, `op2e` / `op2f` store a byte / u32 through an address, `op31` assigns a string,
+       `op4f` compares two strings, `op63` relative jump (24-bit signed), `op64` jump if 0. `dlcsystem` f0 is a stub
+       returning false on PC. Plan for test 37: append a code stub to section (8,9) - fetch the current unit name with
+       `uigamedata` f34 (`tru+0x3a0e10`, as TU script 6 f9 does), compare it with the 10 DLC 2 unit names
+       (`dlc_level2_start`, `dlc_yggdrasil_end`, `dlc_yggdrasil_hall01/02`, six `dlc2_*`), store the result in the
+       local f0 used to fill, and jump back.
+     * **TU loading screen script 6 (disassembly `menu_dlc_probe.py dis xt 6`)**: function 9 is "current level
+       number": it gets the unit name (`uigamedata` f33), maps `l1`..`l8` to 1..8, the DLC 1 unit names to **101**
+       ("Loading DLC1 level starting unit!") and the DLC 2 names to **102** ("Loading DLC2 unit..."), else -1 ("ERROR
+       in uiloading script. Could not get current..."); it is called from the state function 32. The script holds
+       **10 title text elements** with identical record layout - ids 51-58 (base game levels) plus the TU's 5169 (DLC 1)
+       and 432 (DLC 2); 101 / 102 appear nowhere else in the script, so the title is most likely picked by an index
+       derived from that number - the next question for the title fix. Live trace prepared (`session_titlefix.cdb`):
+       logs every bool property set on a text element (setters `tru+0x1ab5e0` / `+0x19c920` / `+0x1ab5f0`, property
+       object at element+0x84 with the owner at -4) with the value, the script code pointer (`[ebp+0xc]`, read inside
+       `.catch` so a bad frame cannot abort the breakpoint) and the stack - load a base game save once (title 51) and
+       start a DLC (5169 / 432) to see which code switches 51 on and whether the DLC titles are ever touched.
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
