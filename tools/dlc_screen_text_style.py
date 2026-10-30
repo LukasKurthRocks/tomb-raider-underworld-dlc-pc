@@ -10,9 +10,9 @@ All other differences of these blocks are platform symbol / text ids. Levels 3-6
 The patch writes the Xbox values in place (same size, no relocation changes) and checks the old values first.
 Reference screenshots: kept outside the repository (local references folder).
 
-Usage (from the repository root):  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_screen_text_style.py [src]
+Usage (from the repository root):  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_screen_text_style.py [src [outdir]]
   src defaults to ../data/pc/mods/generalbank.drm (the installed menu_dlc build).
-  -> work/dlc_screen_text/generalbank.drm (+ md5.txt, patch_log.txt)
+  -> work/dlc_screen_text/generalbank.drm (+ md5.txt, patch_log.txt), or OUTDIR/ (tools/generalbank_build.py)
 """
 import sys, os, struct, hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -21,7 +21,7 @@ import drm_write as DW
 import script_conv as SC
 
 SRC = sys.argv[1] if len(sys.argv) > 1 else '../data/pc/mods/generalbank.drm'
-OUT = 'work/dlc_screen_text/'
+OUT = sys.argv[2].rstrip('/\\') + '/' if len(sys.argv) > 2 else 'work/dlc_screen_text/'   # optional output folder
 PC_ID = 104
 F = lambda x: struct.unpack('<I', struct.pack('<f', x))[0]
 # member offset -> [(field offset, PC value, Xbox TU value)]

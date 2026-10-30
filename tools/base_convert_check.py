@@ -8,7 +8,7 @@ Compared per section: size equal, 32-bit words equal (% of the PC section), and 
 
 Usage (from the repository root; loads the generic store, ~16 GB RAM, finding 36):
   ..\\bin\\venv\\Scripts\\python.exe -u -I -X utf8 tools/base_convert_check.py NAME retail|tu [--ids 8:6,8:21239] [--pc 8:134=104] [--compare-only]
-  Output DRM: work/rebuild/base_convert/<retail|tu>[_tpl]_<NAME>; --compare-only reuses it (no store, seconds)
+  Output DRM: work/rebuild/base_convert/<retail|tu>[_tpl]_<NAME> or --out FILE; --compare-only reuses it (no store, seconds)
   --template: let the converter use the PC section as layout template (as the normal DLC route does)
   Two scores: words equal at the same offset (shifted by any inserted bytes) and aligned (difflib on 32-bit words).
 """
@@ -37,10 +37,12 @@ def main(argv):
                                          for x in argv[k + 1].split(',')}; del argv[k:k + 2]
     compare_only = '--compare-only' in argv; argv = [x for x in argv if x != '--compare-only']
     template = '--template' in argv; argv = [x for x in argv if x != '--template']   # PC section as layout template
+    out = None      # --out FILE: write the converted DRM there instead of work/rebuild/base_convert (generalbank_build.py)
+    if '--out' in argv: k = argv.index('--out'); out = argv[k + 1]; del argv[k:k + 2]
     name, source = argv[0], argv[1]
     if source not in ('retail', 'tu'): sys.exit('source must be retail or tu')
     import dlc_generic as DG, drm_write as DW
-    out = os.path.join(OUT, '%s%s_%s' % (source, '_tpl' if template else '', name))
+    out = out or os.path.join(OUT, '%s%s_%s' % (source, '_tpl' if template else '', name))
     if compare_only:
         ids = DG.DlcIds()
         data = open(out, 'rb').read()
@@ -55,7 +57,7 @@ def main(argv):
         print('store loaded %.0f s' % (time.time() - t0), flush=True)
         data, rep = A.assemble(a.read(recs[0]), ids, store, A.dlc_shader_src, wave='silence', pc_copy=False, template=template,
                                reauthored=False)
-        os.makedirs(OUT, exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
         open(out, 'wb').write(data)
         print('converted %s (%s): %d bytes, routes %s, bad %s -> %s' % (name, source, len(data), dict(rep['routes']), rep['bad'][:5], out))
     D = DW.read(data, 'le')

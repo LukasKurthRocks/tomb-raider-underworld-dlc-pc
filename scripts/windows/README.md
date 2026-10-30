@@ -96,8 +96,11 @@ Steps in order: `Index`, `Cache`, `Ids`, `Learn`, `Tables`, `Prep`, `Convert`, `
 optionally `Assemble` (upstream's full stage-1 route with the rebuilt render tables; better shaders and materials), then
 `Dlc2` (DLC 2 through the same route, `--pack pack11`; see [docs/DLC2.md](../../docs/DLC2.md)), `Fixes` (stage 2b for
 DLC 1 and DLC 2) and `Repair` (the tested repair tree for an installed B138: shader constant fix,
-grapple ring shaders, UI paths and texts of DLC 1, cinematics in all five languages -> `work\rebuild\b138_fixes\mods`, install it with
-`Install-TruTree.ps1 -Source .\work\rebuild\b138_fixes\mods`). What each
+grapple ring shaders, UI paths and texts of DLC 1, cinematics in all five languages, our `generalbank.drm` ->
+`work\rebuild\b138_fixes\mods`, install it with `Install-TruTree.ps1 -Source .\work\rebuild\b138_fixes\mods`).
+`Generalbank` rebuilds only our `generalbank.drm` (`tools/generalbank_build.py`, 21 steps: mission screen style, the
+title update's loading screen with the DLC titles and its hint box, ~8 min, two steps need ~16 GB RAM) and checks it
+against the MD5 of the file played in game -> `work\rebuild\generalbank_build\mods`; `Repair` runs it too. What each
 step runs, how long it takes and how the result compares with B138:
 [docs/WINDOWS_REBUILD.md](../../docs/WINDOWS_REBUILD.md); upstream's own scripts and layers:
 [docs/WS_MAP.md](../../docs/WS_MAP.md).

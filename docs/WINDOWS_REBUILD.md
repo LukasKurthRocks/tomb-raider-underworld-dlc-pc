@@ -1819,6 +1819,23 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        reads a byte of the central game-state object that only `DoppelgangerInit` sets ("playing with the shadow
        power"), so the unit-name check of test 37b is equivalent in practice (first pass of option A,
        `docs\Befund-Schattenkraft.md`: ~235 functions / <= 163 KB PowerPC code depend on that byte, >= 64 KB new).
+     * **Our generalbank is a pipeline step now** (`tools/generalbank_build.py OUT_DIR`, step `Generalbank`, also run by
+       `Repair`; `b138_fix_tree.py --generalbank FILE` puts it into the repair tree): 21 steps with the existing
+       tools, each checking the words it replaces - B138's generalbank + mission screen style, the TU conversion
+       (`base_convert_check.py ... --out`, new option), script 6 (nop of `uigamedata` 93, put with `--symbols`,
+       vtable slot 31, init values, text record ids), script 10 -> 9 (`generalbank_dlc.py --scripts 6,10`, put,
+       record template), the title words of test 32 and the hint-box steps of tests 35-37b. Run 2026-10-30 21:28-21:36
+       (`logs\Manual_GeneralbankBuild_20261030-212847.log`, ~8 min, the two converter steps 265 s / 182 s): the
+       result is **byte-identical to the played test 38 file (md5 `57f52266...`)**. Every intermediate of the hand
+       builds (gb6 / gb8 / gb11 / tests 18, 27, 32, 33, 35, 36, 36b, 37b) was reproduced on the way; today's TU
+       conversion differs from the 2026-10-29 one in 7 sections the build does not take (8:7, 63, 72, 87, 93, 3383,
+       3000007), the taken 8:6 / 21239 / 20082 are identical. The two title words of test 38 now come from
+       `script_init_from_pc.py` itself: its "empty the glyph list" step (a TU glyph the PC font map lacks crashed the
+       menu-entry code, DLC 2 test 10) zeroed word 0 of **every** TU-only member in which a learned u16 glyph map
+       met an unknown value - also the two userType-301 title texts, so their flag stayed 0 instead of the Xbox's 1.
+       Restricted to the glyph-list struct (userType 361), the learned s32 rule gives exactly test 38's two words.
+       The one member it still empties is 16896 (userType 361, init 0xeda0): the TU-only button-glyph entry whose
+       glyph `0x4021` the PC does not know - word 0 is its glyph count, 0 on purpose since test 11 (untested with 1).
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59

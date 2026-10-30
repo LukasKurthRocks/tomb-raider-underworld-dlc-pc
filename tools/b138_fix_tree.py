@@ -14,9 +14,12 @@ folder with only the changed / added files, to install with scripts/windows/Inst
                decision 2026-10-30, same fixes as DLC 2; test 28)
   4. language  tools/mul_lang_build.py: the cinematic streams in all five languages as `<name>_NNN` (the ModLoader
                loads the game's language, the plain name stays as fallback); pack10, with --dlc2 also pack11
+  5. generalbank (with --generalbank FILE) our generalbank.drm from tools/generalbank_build.py (title-update loading
+               screen with the DLC titles, hint box, mission screen style) copied into the tree
 
 Usage (from the repository root):
   ../bin/pyt -t 3600 tools/b138_fix_tree.py PRISTINE_MODS OUT_MODS [--dlc2] [--replace] [--skip shaders,ring,ui,language]
+                                            [--generalbank FILE]
   OUT_MODS must lie below work/rebuild and apart from PRISTINE_MODS (build_util.check_out)
   --replace: remove an existing OUT_MODS (a '...\mods' folder) and its OUT_MODS_tmp first
 """
@@ -40,6 +43,9 @@ def run(mod, args):
 def main(argv):
     skip = set()
     if '--skip' in argv: k = argv.index('--skip'); skip = set(argv[k + 1].split(',')); del argv[k:k + 2]
+    gbank = None
+    if '--generalbank' in argv: k = argv.index('--generalbank'); gbank = argv[k + 1]; del argv[k:k + 2]
+    if gbank and not os.path.isfile(gbank): raise SystemExit('--generalbank: file not found: %s (tools/generalbank_build.py)' % gbank)
     dlc2 = '--dlc2' in argv; replace = '--replace' in argv
     argv = [a for a in argv if a not in ('--dlc2', '--replace')]
     src, out = os.path.abspath(argv[0]), os.path.abspath(argv[1])
@@ -84,6 +90,11 @@ def main(argv):
         print('== language')
         for pack in (['pack10', 'pack11'] if dlc2 else ['pack10']):
             print(run(MLB, [out, pack]).strip().splitlines()[-1])
+    if gbank:
+        import hashlib
+        print('== generalbank')
+        shutil.copyfile(gbank, os.path.join(out, 'generalbank.drm'))
+        print('generalbank.drm from %s (md5 %s)' % (gbank, hashlib.md5(open(gbank, 'rb').read()).hexdigest()))
     shutil.rmtree(tmp)
     n = sum(len(fn) for _, _, fn in os.walk(out))
     print('repair tree: %s (%d files)' % (out, n))

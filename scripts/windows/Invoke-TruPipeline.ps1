@@ -43,9 +43,13 @@
                uipath / uitext also change 10 DLC 1 level files (since 2026-10-30)
       Repair   the repair tree for an installed B138 (finding 43, tested in game 2026-10-30): b138_snapshot (pristine
                B138 mods, verified against the kit manifest, from the game folder and the Install-TruTree backups),
-               b138_fix_tree (shader constant fix, grapple ring shaders, DLC 1 UI paths / texts, cinematic languages
-               of both DLCs)
+               generalbank_build (see Generalbank), b138_fix_tree (shader constant fix, grapple ring shaders, DLC 1 UI
+               paths / texts, cinematic languages of both DLCs, our generalbank.drm)
                -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
+      Generalbank  our generalbank.drm alone (after Repair's snapshot): B138's + mission screen style + the title
+               update's loading screen (script 6, DLC titles) and hint box (script 10 -> 9), 21 steps with the
+               existing tools, two of them load the generic store (~16 GB RAM, one after the other); the result is
+               compared with the played test 38 file (MD5) -> work\rebuild\generalbank_build\mods\generalbank.drm
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
@@ -68,7 +72,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Repair')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Repair', 'Generalbank')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(0, 16)][int]$Jobs = 0,
     [ValidateRange(0, 64)][int]$LightJobs = 0,
@@ -177,7 +181,11 @@ $steps = @{
     )
     Repair = @(
         @('tools\b138_snapshot.py', '../release/B138/kit/manifest.json', '../data/pc/mods', '../backup', 'work/rebuild/b138_pristine/mods', '../backup/mods', 'work/rebuild/base_b138'),
-        @('tools\b138_fix_tree.py', 'work/rebuild/b138_pristine/mods', 'work/rebuild/b138_fixes/mods', '--dlc2', '--replace')
+        @('tools\generalbank_build.py', 'work/rebuild/generalbank_build'),
+        @('tools\b138_fix_tree.py', 'work/rebuild/b138_pristine/mods', 'work/rebuild/b138_fixes/mods', '--dlc2', '--replace', '--generalbank', 'work/rebuild/generalbank_build/mods/generalbank.drm')
+    )
+    Generalbank = @(
+        @('tools\generalbank_build.py', 'work/rebuild/generalbank_build')
     )
 }
 $outputDirs = @{
@@ -195,6 +203,7 @@ $outputDirs = @{
     Dlc2    = @('work\rebuild')
     Fixes   = @('work\rebuild')
     Repair  = @('work\rebuild')
+    Generalbank = @('work\rebuild')
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{

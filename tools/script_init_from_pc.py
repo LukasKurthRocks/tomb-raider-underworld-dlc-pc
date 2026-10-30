@@ -68,6 +68,7 @@ def copy_tree(d, wa, ita, pd, wb, itb, a, b, st, seen, shapes):
 
 
 LOC_UT = 223        # userType (PC Symbol) of the native init type that holds a locals string id (engine_walk_check UT_LOC)
+GLYPH_UT = 361      # userType of the menu-entry struct whose word 0 counts its button-glyph list (DLC 2 tests 10 / 11)
 PERMS = {'raw': (0, 1, 2, 3), 's32': (3, 2, 1, 0), 's16': (1, 0, 3, 2), 'u8u8u16': (0, 1, 3, 2), 'u16u8u8': (1, 0, 2, 3)}
 
 
@@ -179,9 +180,11 @@ def main(argv):
             for a in ma[key]:
                 ia = ita.get(a + 16)
                 if ia is None: continue
-                if apply_rules(d, wa, ita, x['data'], ia, key[2], key[3], rules, st):
+                if apply_rules(d, wa, ita, x['data'], ia, key[2], key[3], rules, st) and key[3] == GLYPH_UT:
                     # a glyph the PC font map does not know (title update: 0x4021) crashed the engine's menu-entry
-                    # text code (DLC 2 test 10) - empty the glyph list: count (word 0 of the struct) = 0
+                    # text code (DLC 2 test 10) - empty the glyph list: count (word 0 of the struct) = 0. Only for the
+                    # glyph-list struct: in the loading-screen title texts (userType 301) word 0 is a flag the DLC
+                    # titles need (= 1 as on the Xbox; zeroed, the titles stayed invisible - test 38)
                     for path, o in leaves(wa, ita, ia):
                         if path == (0, 0): d[o:o + 4] = b'\0\0\0\0'; st['TU-only glyph lists emptied (unknown glyph)'] += 1
                 if locmap is not None and key[3] == LOC_UT:     # locals string id (u16, first half of word 0)
