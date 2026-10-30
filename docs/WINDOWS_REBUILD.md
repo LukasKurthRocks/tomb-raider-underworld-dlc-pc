@@ -1725,6 +1725,40 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        the vtable is still in the Xbox layout (script 9 inherits from 93; vtableSize 35 with Xbox vtIndex 31-34,
        Crystal's PC script 9 has f1 at 32 and f4 at 33 - needs `script_vtable_insert.py ... 9 31` and vtIndex + 1
        like script 6). Test 35 = test 33 with these fixes and the `dlc2data` calls replaced.
+     * **Tests 35 / 35b / 36: the hint box works (2026-10-30 evening)** - details and every changed word in the
+       workspace note `docs\Befund-Test33-Native.md` ("Test 35 build", "Test 36 build"). Script interpreter opcodes
+       checked in `tru.exe` (jump table `tru+0x17e52c`): `op04 N` pushes byte N, `op06 N` a local, `op09 N` the
+       ADDRESS of local N, `op0f N` an object member, `op64 N` jumps on 0, a native call (`op65`) pushes no result -
+       `dlc2data` f0 writes its result through a pointer into a local, so the live "eax = 0 / 1" skips never reached
+       the script. Test 35: prototype count +0x1020 `000b0000` -> 11, vtable 35 -> 36 entries (entry 31 inserted from
+       Crystal's PC script 9, vtIndex f1/f4/f8/f10 + 1), the 3 f1 calls NOPed, the 2 f0 calls -> line markers and the
+       consuming `op06` -> `op04 0` (35) / `op04 1` (35b). In game: 35 = white screen ~10 s after the level start, no
+       hint at all; **35b (f0 = 1): the hint LOGIC works** - the game pauses at the wall, plays the box sound and
+       waits for A - but nothing is visible; a live probe forcing every drawn text element with bool +0x88 = 0 found
+       none (the box texts were not drawn at all). Test 36 (`tools/script_init_dump.py`, `script_init_from_pc.py
+       --xbox-id`): the converter had broken the element init blocks of script 9, old and TU-only elements alike
+       (the leading 1 -> 65 536 as in script 6, both size floats converted like Symbol numbers - the TU image element
+       17480 had -1.1e8 x 5.8e35 instead of 0.8 x 1.66 = the full-screen white quad -, colours); 10 words set to
+       Crystal's PC values, 6 from learned rules, element 17478 by hand, f9's name 333 -> 517. **Played (f0 = 1, md5
+       685bf6d5..., kept as `work\rebuild\dlc_test36_played_685bf6`): the hint box shows like on the Xbox** - Lara
+       icon, German text with LB/RB glyphs, "Drücken Sie A, um fortzufahren.", top centre, the game waits for A
+       (`references\DLC2\PC-Test36-*_30/31_*`); only the dark translucent box background is much fainter than on
+       the Xbox. A later revision of the build set a shared cell (+0x12e0, probably a font number) from the TU's 8
+       back to the PC's 3 (md5 4e4579e5...) - not played; the played 8 works, so it stays. Also found offline
+       (`tools/drm_section_ids_diff.py`): the TU generalbank carries sections the PC one lacks - 14 textures (7036,
+       7171, 7215-7219, 7350, 7669, 7895-7899), section 37 (probably a font), 21237 / 21238 / 22194, 267-269; not
+       needed for the box as played, but note that test 25h's "free" digit texture ids 7669 / 7895-7898 collide with
+       them.
+     * **How the mission screen starts a DLC (traced live, `session_trace.cdb` / `session_test35.cdb`)**: the
+       `dlcsystem` natives (bound in `tru+0x3b3f20`: f0 `7a40a0`, f1 `7973c0`, f2 `7973e0`, f3 `797400`, f4/f5
+       `797420`, f6 `797430`, f7 `796620`) run only at the main menu (f7 once, f1 28 times - probably the DLC
+       availability check), not at the start. On "start" the mission screen script 104 calls `uigamedata` f22
+       (`7a0d00` -> `tru+0x37bc90`, no arguments) and right after it f27 (`7a0d40`, three bools from the argument
+       block: true, false, true -> `tru+0x37e170`); its third `uigamedata` native f37 (`7a0e90`, returns a bool)
+       runs every frame in the level. Found through the native type objects: each type registers its natives by
+       index in vtable slot 3 of its type object (`uigamedata` binder `tru+0x3af0c0`). Lead for a direct test start
+       (owner's idea: skip the menu clicks): which earlier call names the DLC level - then a test-only script patch
+       can make the main menu start it at once.
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59

@@ -13,9 +13,12 @@ drm_put_sections.py on the installed generalbank):
   * root 0x3c (vtableSize) +1, root 0x44 -> the new table;
   * every prototype with vtIndex >= SLOT (and != 0xffff): vtIndex + 1.
 Checks: the REF section must have exactly SIZE+1 slots; the copied VTE may not contain internal relocations.
+--ref-any: the REF section may have any number of slots above SLOT (test 35: the ported title-update hint-box script
+9 has 4 own virtual functions and 35 slots, Crystal's PC script 9 only 2 and 34 - its slot 31 is still the parent's
+extra PC slot).
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/script_vtable_insert.py IN_DRM REF_DRM OUT_DRM SCRIPT_ID SLOT
+  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/script_vtable_insert.py IN_DRM REF_DRM OUT_DRM SCRIPT_ID SLOT [--ref-any]
   e.g. work/rebuild/dlc2_gb4/generalbank.drm ../data/pc/mods/generalbank.drm work/rebuild/dlc2_gb5/generalbank.drm 6 31
 """
 import sys, os, struct
@@ -24,6 +27,8 @@ import drm_write as DW, drm_reloc as R, script_conv as SC
 
 
 def main(argv):
+    ref_any = '--ref-any' in argv
+    argv = [a for a in argv if a != '--ref-any']
     src, ref, out, sid, slot = argv[0], argv[1], argv[2], int(argv[3]), int(argv[4])
     D = DW.read(open(src, 'rb').read(), 'le'); P = DW.read(open(ref, 'rb').read(), 'le')
     s = next(x for x in D.sections if x.type == 8 and x.id == sid)
@@ -31,7 +36,9 @@ def main(argv):
     d = bytearray(s.data); r = R.parse(s.reloc, 'le'); it = dict(r.internal)
     pd = p.data; pr = R.parse(p.reloc, 'le'); pit = dict(pr.internal)
     size = struct.unpack_from('<H', d, 0x3c)[0]; psize = struct.unpack_from('<H', pd, 0x3c)[0]
-    if psize != size + 1: sys.exit('reference has %d slots, this section %d - expected exactly one more' % (psize, size))
+    if ref_any:
+        if psize <= slot: sys.exit('reference has %d slots - no slot %d to copy' % (psize, slot))
+    elif psize != size + 1: sys.exit('reference has %d slots, this section %d - expected exactly one more' % (psize, size))
     old = it[0x44]; pold = pit[0x44]
     # the reference VTE of the extra slot: u32 n + n pointers
     pv = pit[pold + 4 * slot]; n = struct.unpack_from('<I', pd, pv)[0]; vlen = 4 + 4 * n

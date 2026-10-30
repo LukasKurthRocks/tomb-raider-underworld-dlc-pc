@@ -23,7 +23,9 @@ locals string ids in those members (userType LOC_UT) are mapped to the PC ids of
 update's loading-screen texts (Xbox 1285 / 1288 / 1292) are appended there (5170 / 5173 / 5177).
 
 Usage (from the repository root):
-  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/script_init_from_pc.py IN_DRM REF_DRM OUT_DRM SCRIPT_ID [--xbox NAME [--retail]] [--locmap FILE]
+  ..\\bin\\venv\\Scripts\\python.exe -I -X utf8 tools/script_init_from_pc.py IN_DRM REF_DRM OUT_DRM SCRIPT_ID [--xbox NAME [--retail] [--xbox-id N]] [--locmap FILE]
+  --xbox-id N: the Xbox script id when it differs from SCRIPT_ID (the hint box: title update script 10 = PC script 9;
+  the port keeps the Xbox offsets, so the Xbox words are read at the same offsets)
 """
 import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -140,6 +142,8 @@ def members(w, d, e):
 def main(argv):
     xname = None; retail = '--retail' in argv; argv = [a for a in argv if a != '--retail']
     if '--xbox' in argv: k = argv.index('--xbox'); xname = argv[k + 1]; del argv[k:k + 2]
+    xid = None      # Xbox script id when it differs from the PC one (title update script 10 = PC script 9)
+    if '--xbox-id' in argv: k = argv.index('--xbox-id'); xid = int(argv[k + 1]); del argv[k:k + 2]
     locmap = None
     if '--locmap' in argv:
         import json
@@ -168,7 +172,7 @@ def main(argv):
     if xname:       # members without a PC counterpart: byte order per field learned from the paired members
         import dtp_word_classes as C
         x = next(q for q in C.find(C.BASE[1:] if retail else C.BASE, 'be', 'xenon-w' + chr(92) + xname)
-                 if q['type'] == 8 and q['id'] == sid)
+                 if q['type'] == 8 and q['id'] == (sid if xid is None else xid))
         rules = learn_rules(wa, ita0, x['data'], p.data, wb, itb, pairs)
         st['field rules learned'] = len(rules)
         for key in only:
