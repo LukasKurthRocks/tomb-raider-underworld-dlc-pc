@@ -1827,6 +1827,11 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        33 ms; 1.0 on release) - what the debugger prototype of test 39b did. Byte checks at all addresses before
        hooking; `TruShadowPower.ini` / `.log` next to the exe. Active in every level (no DLC 2 check yet); meter, blur,
        rock veins, shadow jump and combat are not covered.
+     * **DLC 1 loading-screen text "one line too high" is original behaviour (22:57)**: with the game in English the
+       4-line description starts at ~573 px (1080p), the same as the Xbox in Xenia (~572); the German text has 5 lines
+       and the block is centred vertically, so it starts higher (~557). No fix needed
+       (`references\DLC1\PC-Test41e-*_23_*`). The screenshot was taken automatically: a watcher on the cdb log
+       fired a capture burst (`Capture-TruWindow.ps1`, workbench) when the DLC title was drawn.
      * **Direct start into DLC 2 for tests (test 41e, played 22:28, works)** - test-only generalbank, never for the
        install; `tools/script_directstart_stub.py`, details in the workspace note `docs\Befund-Direktstart.md`. The
        mission screen (script 104) starts a DLC by writing the unit name to a member and calling `uigamedata` f22, then
