@@ -1541,6 +1541,26 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        references of a material -> one marker texture): 26812 -> green normal map 7001, `co_dlc2_goo` -> black /
        white blocks 7386, `dlc2_uo_goo_upcolumn` -> rust 7390, `dlc2_goo_spout` -> flat lime 7388
        (`work\rebuild\dlc2_test25c_paint`, 4 files equal to the installed ones before painting).
+       **25c: no colour anywhere** - none of the four. **25d** (every material of the room's streamgroup -> 7001, the
+       pool surface DRM -> 7386, all 44 eitr effect / object DRMs -> 7390): only the splashes changed (effect
+       particles) - the streamgroup's materials are **ignored because the same material ids were already loaded
+       from `dlc_level2_start.drm`** (e.g. 24299 sits in 8 DRMs; the engine keeps the first section of an id - a rule
+       for any later paint or material fix: change the FIRST loaded copy). **25e** (`dlc_level2_start.drm`: 24691 ->
+       7001, 24920 -> 7386, its other 23 materials -> 7390): **the fall shows the block marker = material 24920**;
+       with the marker (DXT5 with alpha) it even turns partly blue-translucent. Screenshots
+       `references\DLC2\PC-Test25c..e-*`.
+     * **What 24920 is**: the base game's eitr water-surface material on a vertical mesh. Its tuple 820-822 is class A
+       (exact base shaders -> PC 1593-1595, the tuple of base 7990 `l5_valaskjalf` / `l7_helheim01` /
+       `l7_yggdrasil_hall02` and 11578 `ar_goo_watersurface`); the render-state words convert like the base pair
+       (`7f060008 -> 0803037f`, `01070700 -> 00070701`); the texture entries have the same roles / registers as base
+       14311; the textures are the same images as the base pool's (`tools/texture_channels.py`, new: RGBA mean /
+       std per channel - 7001 = 4975, 6999 = 4972, 6957 = 4973, 7000 = 4974, also after DXN -> DXT5); only the
+       material parameters differ (e.g. 30.0 vs 4.0 at +0x564) and are copied 1:1 like Crystal's base conversion.
+       So the material conversion is right; what differs from the Xbox must be the geometry / vertex data of the
+       fall (e.g. vertex colour or alpha) or how the PC port of the shader treats a vertical surface with these
+       parameters. Mesh 22994 (the one unknown vertex format) is a switch object, not the fall. Next: find the fall's
+       geometry in `dlc_level2_start.drm` and compare its vertex colours / alpha with the Xbox; check a base PC eitr
+       surface with this tuple in game.
      * Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
