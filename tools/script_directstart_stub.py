@@ -25,15 +25,29 @@ audio while the pause screen is open"), used as main AND pause menu; its functio
 (state 0) runs once, function 1 (vtable 2, name 521) is the screen's OnOpen (it sets member 8 = 1 at its end,
 function 2 / vtable 3 / name 522 sets it to 0), 15 and 18 are input / timer handlers whose calls are not proven.
 --site 3f64 --no-active (test 41c): hook the first debug line marker of function 1 = OnOpen instead (runs when the
-main menu opens; member 8 is only set at its end, so no active gate), back to +0x3f68.
+main menu opens; member 8 is only set at its end, so no active gate), back to +0x3f68. Played: the stub ran fully
+(f27 called), but the game hung on the menu background - too early, the opening screen was closed again.
+--site 3478 --no-active (test 41d): hook function 18's attract-video branch (+0x3478, reached when the idle menu is
+about to start the intro video), so the start happens with the menu fully up; first time the video is skipped.
 
 --debug-prints (test 41c): the stub also calls the script print native `corebase` f7 ((8,230)+0x138, static call,
 exe tru+0x395e30) with markers "DIRECTSTART 0 enter", "1 active", "2 first", "3 after f22", "4 after f27" - a cdb
 breakpoint on tru+0x395e30 logging the string shows how far the stub gets.
 
+Test 41d played: no print at all - script 7 does not start the attract video. The video comes from the AttractTimer
+script (PC script 60, "AttractTimer()::Run()"): its function 2 (vtable 1, name 981, the timer update), when the timer
+has elapsed and the stdscreenmgr checks pass, broadcasts "stopTitleMusic", then calls uigamedata f22 (+0x52c,
+member 12) and **uigamedata f26** (+0x540, the attract mode / intro video), then returns. The live code pointer of
+the f22 (0x0ab6abc8 in both attract runs) is that call: section base = code pointer - 0x538.
+--script 60 --ugd 12 --scr 8 --site 538 --no-active --no-f22 (test 41e): hook the debug line marker right after that
+f22 (+0x538); first time per launch: f27(UNIT, 1, 0, 1), stdscreenmgr f19 + f7 (member 8), return - instead of f26;
+later: continue at +0x53c (f26, the video). f22 is not repeated (`--no-f22`), it already ran.
+
 Usage (from the repository root):
   ../bin/pyt tools/script_directstart_stub.py IN_DRM OUT_DRM [UNIT] [--debug-prints] [--site HEX] [--no-active]
-  UNIT default dlc_level2_start; --site default 33b4 (function 18 entry, test 41b)
+                                              [--script ID --ugd MEMBER --scr MEMBER] [--no-f22]
+  UNIT default dlc_level2_start; --site default 33b4 (function 18 entry, test 41b); --script default 7 (members
+  2764 / 2612)
 """
 import sys, os, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -54,11 +68,16 @@ def op(o, n=0):
 
 
 def main(argv):
-    global SITE
-    prints = '--debug-prints' in argv; gate = '--no-active' not in argv
-    if '--site' in argv:
-        k = argv.index('--site'); SITE = int(argv[k + 1], 16); del argv[k:k + 2]
-    argv = [a for a in argv if a not in ('--debug-prints', '--no-active')]
+    global SITE, SID, UGD, SCR
+    prints = '--debug-prints' in argv; gate = '--no-active' not in argv; f22 = '--no-f22' not in argv
+    for opt in ('--site', '--script', '--ugd', '--scr'):
+        if opt in argv:
+            k = argv.index(opt); v = argv[k + 1]; del argv[k:k + 2]
+            if opt == '--site': SITE = int(v, 16)
+            elif opt == '--script': SID = int(v)
+            elif opt == '--ugd': UGD = int(v)
+            else: SCR = int(v)
+    argv = [a for a in argv if a not in ('--debug-prints', '--no-active', '--no-f22')]
     src, out = argv[0], argv[1]
     unit = argv[2] if len(argv) > 2 else 'dlc_level2_start'
     D = DW.read(open(src, 'rb').read(), 'le')
@@ -91,8 +110,9 @@ def main(argv):
     skips.append(len(code)); E(None)                                   # op64 -> continue (flag != "N")
     E(op(0x05)); E(PLACEHOLDER, ('int', 'flag')); E(op(0x04, 0x59)); E(op(0x2e))          # flag[0] = 'Y'
     P(2, 'first')
-    E(op(0x0f, UGD)); E(op(0x65)); E(PLACEHOLDER, ('ext', 63, F22[1]))                     # uigamedata.f22()
-    P(3, 'after f22')
+    if f22:
+        E(op(0x0f, UGD)); E(op(0x65)); E(PLACEHOLDER, ('ext', 63, F22[1]))                 # uigamedata.f22()
+        P(3, 'after f22')
     E(op(0x05)); E(PLACEHOLDER, ('int', 'unit')); E(op(0x04, 1)); E(op(0x04, 0)); E(op(0x04, 1))
     E(op(0x0f, UGD)); E(op(0x65)); E(PLACEHOLDER, ('ext', 63, F27[1]))                     # uigamedata.f27(unit,1,0,1)
     P(4, 'after f27')
