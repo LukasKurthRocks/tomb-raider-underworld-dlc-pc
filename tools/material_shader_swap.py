@@ -6,6 +6,7 @@ shader or a pass shader causes it. Refuses a target library that is not in the f
 
 Usage (from the repository root):
   ../bin/pyt -t 120 tools/material_shader_swap.py IN.drm OUT.drm MATERIAL_ID SLOT(0-3) NEW_LIB_ID
+      [--add-libs-from BASE_PC.drm ID,ID]   (copy PC ShaderLib sections, e.g. the base grapple ring's 1704-1707)
 """
 import sys, os, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -13,8 +14,17 @@ import drm_write as DW, drm_reloc as R
 
 
 def main(argv):
+    add = None
+    if '--add-libs-from' in argv:      # --add-libs-from BASE.drm ID[,ID]: copy PC ShaderLib sections into the file first
+        k = argv.index('--add-libs-from'); add = (argv[k + 1], [int(x) for x in argv[k + 2].split(',')]); del argv[k:k + 3]
     src, out, mid, slot, new = argv[0], argv[1], int(argv[2]), int(argv[3]), int(argv[4])
     raw = open(src, 'rb').read(); D = DW.read(raw, 'le')
+    if add:
+        B = DW.read(open(add[0], 'rb').read(), 'le')
+        have = {s.id for s in D.sections if s.type == 9}
+        for s in B.sections:
+            if s.type == 9 and s.id in add[1] and s.id not in have:
+                D.sections.append(s); print('added ShaderLib %d (%d bytes) from %s' % (s.id, len(s.data), os.path.basename(add[0])))
     libs = {s.id for s in D.sections if s.type == 9}
     if new not in libs: raise SystemExit('library %d is not in %s' % (new, src))
     m = next(s for s in D.sections if s.type == 10 and s.id == mid)

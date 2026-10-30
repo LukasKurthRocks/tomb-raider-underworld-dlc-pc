@@ -3,7 +3,7 @@
 waterfall drawn wrongly: which textures / materials / shaders an object brings).
 
 Usage (from the repository root):
-  ../bin/pyt -t 120 tools/drm_sections.py FILE.drm [--type N] [--endian le|be]
+  ../bin/pyt -t 120 tools/drm_sections.py FILE.drm [--type N] [--endian le|be] [--dump SECTION_ID FROM_HEX LEN_HEX]
 """
 import sys, os, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -17,8 +17,15 @@ def main(argv):
     only = None; endian = 'le'
     if '--type' in argv: k = argv.index('--type'); only = int(argv[k + 1]); del argv[k:k + 2]
     if '--endian' in argv: k = argv.index('--endian'); endian = argv[k + 1]; del argv[k:k + 2]
+    dump = None
+    if '--dump' in argv: k = argv.index('--dump'); dump = (int(argv[k + 1]), int(argv[k + 2], 16), int(argv[k + 3], 16)); del argv[k:k + 4]
     D = DW.read(open(argv[0], 'rb').read(), endian)
     e = '<' if endian == 'le' else '>'
+    if dump:      # --dump SECTION_ID FROM_HEX LEN_HEX: 32-bit words of one section (first section with that id)
+        s = next(x for x in D.sections if x.id == dump[0] and (only is None or x.type == only))
+        for o in range(dump[1], min(len(s.data), dump[1] + dump[2]), 16):
+            print('  +%04x  %s' % (o, ' '.join('%08x' % w for w in struct.unpack_from(e + '%dI' % (min(16, len(s.data) - o) // 4), s.data, o))))
+        return
     for i, s in enumerate(D.sections):
         if only is not None and s.type != only: continue
         r = R.parse(s.reloc, endian)

@@ -1208,6 +1208,38 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        material constants at Xbox register numbers (e.g. `c167.zzzy` as a select); if the PC engine fills other
        registers, a highlight / tint term can win - compare which constant registers material 21093 sets on PC with
        the ones the shaders read.
+     * Ring materials compared (2026-10-30 12:30; new `tools/bigfile_extract.py`, material references in
+       `drm_sections.py`): the DLC object is a re-textured variant of the base `ar_ei_grapple_wall` (2 materials,
+       3 meshes, same texture formats). DLC material 21093 (wall) / 20344 (ceiling) on Xbox: shaders 2116 / 2117 /
+       2118 / 2119; shader_map: 2116 class D -> 1016 (score 0.108), 2117 C2 -> 1017 (0.45), 2118 C3 -> 1018 (0.246),
+       2119 B -> 211; B138 uses 1016 / 1017 / **its translated 2762 (2756)** / 211. The other material (21164 /
+       20345) uses PC shaders only (205 / 206 / 207 / 233). Base PC ring: 1704-1707 / 1775-1778.
+     * Test 19 (`tools/material_shader_swap.py`: main pass 2762 / 2756 -> PC surrogate 1018, owner at the bridge):
+       **the ring stays yellow** (with a small green arc) - not the translated main-pass shader. Test 20: all three
+       pixel passes of 21093 / 20344 -> 205 / 206 / 207, to see whether the ring belongs to this material at all.
+     * **Test 20, zoomed with the in-game camera (owner)**: the ring mesh itself is flat yellow and its bracket
+       green - the colours of the object's NORMAL MAP (6463, green-yellow in `drm_textures_png.py`). So a shader
+       samples the normal map where it expects the colour texture. Material texture entries are `{u32 texture id,
+       0, u32 slot, u32 flags}` (`drm_sections.py --dump`); DLC 21164 has slot 1 = rust colour 6770, slot 3 =
+       normal map 6463 - the same roles as the base ring material 16637 (slot 1 colour 5257, slot 3 normal map
+       5258), Xbox and PC consistent. The material is right; the SURROGATE shaders 205 / 206 / 207 (class D / B / C3
+       for Xbox 2224 / 2253 / 2254) read the slots in other roles. Since tests 19 / 20 on 21093 changed nothing,
+       the ring is most likely material 21164 (ceiling 20345).
+     * Test 21: the base game's own PC ring shaders 1704-1707 copied into the DLC files and assigned to 21164 /
+       20345 (`material_shader_swap.py --add-libs-from`; 21093 / 20344 stay as in test 20). **Result (owner, zoomed):
+       the ring is dark metal now** - the base PC shaders read the slots in the intended roles. The bracket (and
+       some ring edges) are still lime green = material 21093, still on the surrogates 205-207 (normal map as
+       colour). Test 22: 21093 / 20344 -> the base ring's second shader set 1775-1778.
+     * **Test 22 result (owner, 2026-10-30 12:50): in the normal game view both rings and their brackets are dark,
+       rusty metal - fixed.** In the in-game camera the brackets glow flat yellow (green in test 21): the camera
+       draws a highlight pass on interactive objects (like Legend's RAD, owner); the highlight colour followed the
+       shader swap, so whether yellow is the intended look is open (no Xbox camera reference yet).
+     * **Rule learned**: a DLC object that is a re-textured variant of a base object (same materials / meshes /
+       texture slot roles) renders correctly with the BASE object's own PC shader libraries; the similarity-voted
+       surrogates (`shader_map.py`, 1016-1018 / 205-207 here) can read the texture slots in other roles (normal map
+       as colour) and B138's translated shader did not cure it either. Next: find such pairs automatically (DLC
+       material <-> base material with the same texture slot set and Xbox vertex shader) and assign the base PC
+       tuple in the pipeline; then check the DLC 2 "waterfall" the same way.
      * DLC 2 "waterfall" (a flat, grey, opaque surface where the Xbox shows a bright translucent fall of the blue
        liquid): DLC 2 has no translated shaders (stage 3 not rebuilt, finding 43 native test); every NEW DLC shader
        (`shader_map.py` classes C1-C3 / D) is mapped to a SURROGATE base PC shader chosen by constant / sampler
