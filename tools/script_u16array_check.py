@@ -24,7 +24,7 @@ def arrays(xd, xr):
     """-> [(count offset, n, first data offset, data words)] for the Xbox section data / relocations"""
     out = []
     for o, t in xr.internal:
-        if t != o + 4 or o < 4: continue
+        if t != o + 4 or o < 4 or o > len(xd): continue      # data cut to a shorter PC section: skip, don't read past
         n = struct.unpack_from('>I', xd, o - 4)[0]
         if not 1 <= n <= 64: continue
         words = (2 * n + 3) // 4

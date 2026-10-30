@@ -15,6 +15,8 @@ to OUT (same relative paths); IN is not modified.
 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/script_u16array_fix.py IN_MODS_DIR OUT_DIR [--pack pack11] [--mode sym|s16]
+  ../bin/pyt -t 900 tools/script_u16array_fix.py --tu-ported IN.drm OUT.drm 6[,9=10]
+      (title-update scripts ported into a PC DRM; PC=TU when the ids differ, e.g. PC script 9 from TU script 10)
 """
 import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -45,11 +47,13 @@ def process(rel, path, ids, st, log, xs=None, only_ids=None):
     raw = open(path, 'rb').read(); D = DW.read(raw, 'le')
     pc8 = {s.id: s for s in D.sections if s.type == 8}
     changed = False
+    if only_ids and not isinstance(only_ids, dict): only_ids = {i: i for i in only_ids}     # Xbox id -> PC id
     for x in xs:
         want_id = (x['id'] in only_ids) if only_ids else x['id'] >= 20000
-        sec = pc8.get(x['id']) if x['type'] == 8 and x['data'] is not None and want_id else None
+        sec = pc8.get(only_ids[x['id']] if only_ids else x['id']) if x['type'] == 8 and x['data'] is not None and want_id else None
         if sec is None or (not only_ids and len(sec.data) != len(x['data'])): continue
         if len(sec.data) < len(x['data']): x = dict(x, data=x['data'][:len(sec.data)])
+        st['sections paired'] += 1
         xd = x['data']; xr = R.parse(x['reloc'], 'be'); ptrs = set(xr.pointer_offsets())
         targets = {t for _, t in xr.internal}
         pd = bytearray(sec.data)
@@ -78,11 +82,13 @@ def process(rel, path, ids, st, log, xs=None, only_ids=None):
 
 
 def main(argv):
-    if '--tu-ported' in argv:      # --tu-ported IN.drm OUT.drm SCRIPT_ID[,ID]: TU scripts ported into a PC DRM
+    if '--tu-ported' in argv:      # --tu-ported IN.drm OUT.drm SCRIPT_ID[,PC=TU]: TU scripts ported into a PC DRM
         import dlc_generic as DG
         a = argv[argv.index('--tu-ported') + 1:]
         ids = DG.DlcIds(); st = collections.Counter(); log = []
-        new = process(os.path.basename(a[0]), a[0], ids, st, log, xs=tu_xsecs(), only_ids={int(x) for x in a[2].split(',')})
+        pairs = [x.split('=') for x in a[2].split(',')]          # '6' (same id) or '9=10' (PC script 9 from TU 10)
+        only = {int(p[-1]): int(p[0]) for p in pairs}
+        new = process(os.path.basename(a[0]), a[0], ids, st, log, xs=tu_xsecs(), only_ids=only)
         for l in log[:40]: print(' ', l)
         if new is not None:
             os.makedirs(os.path.dirname(os.path.abspath(a[1])), exist_ok=True); open(a[1], 'wb').write(new)

@@ -12,10 +12,12 @@ folder with only the changed / added files, to install with scripts/windows/Inst
 
 Usage (from the repository root):
   ../bin/pyt -t 3600 tools/b138_fix_tree.py PRISTINE_MODS OUT_MODS [--dlc2] [--replace] [--skip shaders,ring,language]
-  --replace: remove an existing OUT_MODS first (only a '...\rebuild\...\mods' folder of this repository)
+  OUT_MODS must lie below work/rebuild and apart from PRISTINE_MODS (build_util.check_out)
+  --replace: remove an existing OUT_MODS (a '...\mods' folder) and its OUT_MODS_tmp first
 """
 import sys, os, shutil, contextlib, io
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_util as BU
 
 RING = {'dlc1_ei_grapple_wall.drm': (21164, 21093), 'dlc1_ei_grapple_ceiling.drm': (20345, 20344)}
 BASE_RING, BASE_LIBS = 'ar_ei_grapple_wall.drm', [1704, 1705, 1706, 1707]
@@ -37,7 +39,9 @@ def main(argv):
     argv = [a for a in argv if a not in ('--dlc2', '--replace')]
     src, out = os.path.abspath(argv[0]), os.path.abspath(argv[1])
     tmp = out + '_tmp'
-    if replace and os.path.basename(out) == 'mods' and os.sep + 'rebuild' + os.sep in out:     # own output only
+    BU.require_dir(src, 'PRISTINE_MODS')
+    for d in (out, tmp): BU.check_out(d, src, must_be_below=True)     # below work/rebuild, apart from PRISTINE
+    if replace and os.path.basename(out) == 'mods':                     # own output only
         for d in (out, tmp):
             if os.path.isdir(d): shutil.rmtree(d)
     if os.path.isdir(out) or os.path.isdir(tmp): raise SystemExit('output exists: %s (or %s) - remove it first' % (out, tmp))

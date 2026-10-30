@@ -197,6 +197,14 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
 * **Test 17 (2026-10-30 11:26): test 16 + UI text / hint string ids as PC ids (`work/rebuild/dlc2_test17_uitext/mods`,
   14 files; stage-2b fix `uitext`): the hint box shows German text with the right button glyphs.** Missing against the
   Xbox: box background, Lara icon, "Press [A] to continue"; text top right instead of top centre.
+* Test 18 (2026-10-30 noon): loading-screen title id mapped in the ported TU script 6 - the game asks 5169 every
+  frame, the title stays invisible (open).
+* Prepared offline (2026-10-30 afternoon, not run yet; WINDOWS_REBUILD.md finding 43 "Offline afternoon"):
+  **test 25a / 25b** - the waterfall material 26812 replaced by the base eitr fall material (`ca_ani_goo_falls`,
+  scrolling-texture shaders 201-204) with the DLC's blue water texture (25a) or the base gradient texture (25b), one
+  file each (`work/rebuild/dlc2_test25a_fall`, `_25b_fall`); **test 27** - the hint box: TU generalbank script 10
+  ported as PC script 9 with its text element records repaired from the retail template
+  (`work/rebuild/dlc2_test27_hintbox`, generalbank only; script 9 is global, so also look at a base-game hint).
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the

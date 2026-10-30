@@ -171,7 +171,7 @@ def fix_uitext(out):
     """String ids of UI text elements / hint lists in the new DLC scripts (finding 43, empty DLC 2 hint box): the
     Xbox keeps them in a high u16, the converter mapped them as Symbols; they become the PC string id
     (locmap_xbox_to_pc.json of `tools/locals.py build`: environment TRUDLC_LOCMAP, else work/rebuild/stage1/). DLC 2
-    trees only (--pack pack11): B138 has the same 38 unmapped records in DLC 1 (system messages, no visible defect
+    trees only (--pack pack11): B138 has 26 such unmapped text elements in DLC 1 (system messages, no visible defect
     reported) and DLC 1 stays byte-identical to B138 until that is decided."""
     import collections, json
     if os.environ.get('TRUDLC_PACK_FIRST') != 'pack11':

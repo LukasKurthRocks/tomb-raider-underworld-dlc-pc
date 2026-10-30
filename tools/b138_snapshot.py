@@ -9,8 +9,11 @@ Usage (from the repository root):
   e.g. ../release/B138/kit/manifest.json "<game>/mods" ../backup work/rebuild/b138_pristine/mods
        ../backup/mods work/rebuild/base_b138
   EXTRA_DIR: searched recursively by file name, also Install-TruModFile backups named '<name>.<md5>'
+  OUT_MODS_DIR must lie below work/rebuild; an existing one is replaced. Exit 1 when a non-optional file is missing.
 """
 import sys, os, json, glob, hashlib, shutil, collections
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_util as BU
 
 
 def md5(p):
@@ -23,6 +26,9 @@ def md5(p):
 def main(argv):
     man, game, backups, out = argv[:4]
     extra = argv[4:]          # more folders, searched recursively by file name (also 'name.<md5>' backups)
+    BU.require_dir(game, 'GAME_MODS_DIR')
+    BU.check_out(out, game, must_be_below=True)           # own output below work/rebuild: replaced, never merged
+    if os.path.exists(out): print('replacing previous output', out); shutil.rmtree(out)
     by_name = collections.defaultdict(list)
     for d in extra:
         for dp, dn, fn in os.walk(d):
@@ -40,6 +46,8 @@ def main(argv):
         st['from game' if hit == cands[0] else 'from backup'] += 1
     for m in missing[:20]: print('  missing:', m)
     print(dict(st), 'of', len(files))
+    need = [f['rel'] for f in files if f['rel'] in missing and not f.get('optional')]
+    if need: raise SystemExit('%d B138 files not found with the manifest MD5 - the snapshot is incomplete' % len(need))
 
 
 if __name__ == '__main__':

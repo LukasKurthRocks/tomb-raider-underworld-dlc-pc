@@ -273,6 +273,7 @@ if ($Trace) { Set-PSDebug -Trace 1 }
 $results = @()
 $started = Get-Date
 $script:runningProcess = $null
+$savedEnv = @{}
 Push-Location $clone
 try {
     Write-Log "Invoke-TruPipeline step=$Step log=$logFile" -Level VERBOSE
@@ -289,6 +290,16 @@ try {
     if ($LightJobs -eq 0) { $LightJobs = [Math]::Max(1, [Math]::Min(24, $cpus - 4)) }
     $env:TRUDLC_JOBS = $Jobs
     $env:TRUDLC_JOBS_LIGHT = $LightJobs
+    # DLC selection and string id map come from the step's own arguments (--pack pack11), never from the calling
+    # shell: a TRUDLC_PACK_FIRST left over from a manual DLC 2 run would switch DLC 1 to DLC-2-only fixes
+    foreach ($name in 'TRUDLC_PACK_FIRST', 'TRUDLC_LOCMAP') {
+        $value = [Environment]::GetEnvironmentVariable($name, 'Process')
+        if ($value) {
+            $savedEnv[$name] = $value
+            Write-Log "ignoring $name=$value from the calling shell for this run" -Level VERBOSE
+            [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+        }
+    }
     Write-Log ('processes: heavy {0}, light {1} (free RAM {2} GB, {3} logical CPUs)' -f $Jobs, $LightJobs, $freeGb, $cpus) -Level VERBOSE
     foreach ($dir in $outputDirs[$Step]) { New-Item -ItemType Directory -Force -Path (Join-Path $clone $dir) | Out-Null }
 
@@ -317,6 +328,7 @@ catch {
 finally {
     Pop-Location
     if ($Trace) { Set-PSDebug -Off }
+    foreach ($name in $savedEnv.Keys) { [Environment]::SetEnvironmentVariable($name, $savedEnv[$name], 'Process') }
     # aborted (Ctrl+C, error) while a tool was running: the tool and its worker processes keep running (they were
     # started without a console). Nothing is ended automatically - the PIDs are logged so the user can decide.
     if ($script:runningProcess -and !$script:runningProcess.HasExited) {

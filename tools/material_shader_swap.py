@@ -24,6 +24,7 @@ def main(argv):
         have = {s.id for s in D.sections if s.type == 9}
         for s in B.sections:
             if s.type == 9 and s.id in add[1] and s.id not in have:
+                if R.parse(s.reloc, 'le').external: raise SystemExit('ShaderLib %d has external relocations - not copyable' % s.id)
                 D.sections.append(s); print('added ShaderLib %d (%d bytes) from %s' % (s.id, len(s.data), os.path.basename(add[0])))
     libs = {s.id for s in D.sections if s.type == 9}
     if new not in libs: raise SystemExit('library %d is not in %s' % (new, src))

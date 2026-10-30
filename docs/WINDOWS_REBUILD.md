@@ -1364,7 +1364,7 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        lookups of empty ids stopped, the game now asks 5182 / 5201 (the HUD notices). Still missing against the Xbox:
        the box background, the Lara icon on its left and "Press [A] to continue"; the text sits top right instead of
        top centre. DLC 2 stage 2b: 120 elements + 150 hint entries (incl. the merged `g_pda`). **DLC 1 / B138 has the
-       same 38 unmapped records** (26 elements + 12 entries: system messages 1286 / 1289 / 1290 "update required" /
+       same unmapped records** (26 elements; the 12 entries turned out to be PC ids already, test 28: system messages 1286 / 1289 / 1290 "update required" /
        1374 "returning to main menu") - `uitext` runs for DLC 2 only, like `uipath`, until the owner decides.
      * **The hint box itself (box, Lara icon, "Press [A] to continue", centred) is title-update code** (2026-10-30
        noon; Xbox reference from the owner in `references\DLC2`): "Press [A] to continue" is DLC string 1293 (PC 5178);
@@ -1409,6 +1409,80 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Consequence beyond script 6 (to check): DLC scripts are converted with the same init rules. B138 DLC 1 runs, so
      the common cases work there, but any DLC script whose init blocks carry u8 / u16 / glyph fields may be wrong the
      same way.
+   * **Offline afternoon 2026-10-30 (no game runs; test trees prepared for the owner)**:
+     * **DLC 2 waterfall = material 26812** of `streamgroups\dlc2_goo_room_goo_room_all.drm`. New
+       `tools/shader_peer_report.py` (per material of an Xbox DLC DRM: shader tuple, `shader_map` class per library,
+       constant / sampler names, most similar base libraries with the base objects that use them, `--summary`,
+       `--words` = render-state words Xbox -> PC of the base materials with the same tuple). The spout object
+       `dlc2_goo_spout` is NOT the cause: its scrolling material 25265 uses the base libraries 158-161 exactly
+       (class A) and its render-state word `+0x4c` converts `7f060001 -> 0103037f` like all 29 base materials with
+       that tuple; its other two materials are lit rock (normal maps, lights). In the room's streamgroup 26 materials
+       have no base twin; 26812 is the only animated, unlit one (`TimeVector` in vertex AND pixel shader, "Setup"
+       param textures, no light constants) - a new DLC 2 shader (pixel pass 0 class D, pass 2 C3, even the vertex
+       shader C1) whose surrogates have similarity **0.073 / 0.128** (practically random). Its textures: eitr worms
+       (7000), a green normal / distortion map (7001), blue water (6957), grey noise (6999) - the blue-white /
+       grey-streaked sheet seen on PC. Base counterpart: the eitr falls `ca_ani_goo_falls.drm` (Xbox material 18506
+       = PC 14299) use the plain scrolling-texture tuple 158-161 -> PC 201-204 with one soft cyan gradient texture
+       (4996). Material 24299 / 24690 (11 textures, cracked mud) is a blended rock surface, not the fall. The walls'
+       dark streaks: the 16 materials of the tuple 2344-2347 (e.g. 25124) are new multi-layer blend shaders (a
+       "Setup" blend map, five colour + three normal layers); their surrogates score 0.23 (best pass-0 peer
+       `co_zip_laptop`, best pass-2 peers base terrain blends at 0.355) - the layers get mixed by an unrelated
+       shader. No base object shares them, so a material transplant cannot help: stage 3 (translation) work.
+     * New `tools/material_transplant.py`: material from ANOTHER PC DRM into a DLC material (section id kept), copies
+       the ShaderLibs / textures it references when missing (refuses sections with external relocations), remaps
+       texture ids (`--tex OLD=NEW`), and checks first that the source's per-pass vertex-input lists are covered by
+       the destination's. Test trees: `work\rebuild\dlc2_test25a_fall` (26812 := base 14299 with the DLC's blue water
+       6957) and `dlc2_test25b_fall` (base texture 4996 copied in); vertex inputs covered, 201-204 already in the
+       file; the input file equals the installed one (MD5).
+     * **Grapple ring hue (olive / matte) explained**: the base PC shaders 1704-1707 read their samplers in the BASE
+       material's roles, the DLC material keeps the DLC register layout (entries `{tex, 0, role, 0x0002RR00}`):
+
+       | register | base 16637 expects (role, texture) | DLC 21164 / 20345 binds |
+       |---|---|---|
+       | s0 | 3, 5258 normal map (DXT5 512) | 7, 6580 (64 x 64 mask) |
+       | s1 | 1, 5257 colour | 1, 6770 colour |
+       | s2 | 7, 255 white dummy | 2, 6770 colour again |
+       | s3 | 5, 5570 red mask | 4, 4796 black |
+       | s4 | 2, 5254 dark specular | 3, 6463 **green normal map** |
+
+       So the specular term is tinted by the normal map (olive) and the surface normals come from a mask (matte).
+       Test trees: `dlc1_test26a_ring` (far + near LOD of wall and ceiling := base material 16637 with its own
+       textures = exactly the base ring) and `dlc1_test26b_ring` (base material, DLC textures by role: normal 6463,
+       colour 6770, specular 6770; dummy 255 and mask 5570 copied). Same rule as before, extended: **with base
+       shaders, take the base MATERIAL (texture slot roles + params), not only the shader ids**.
+     * **Hint box: TU generalbank script 10 ported (test 27 prepared)**. `tools/generalbank_dlc.py --scripts 6,10`
+       converts TU script 10 -> PC script 9 (5 636 bytes; plus TU script 21239, identical to the one already in
+       B138); a fresh build of script 6 alone is NOT byte-identical to B138's generalbank, so only the two sections
+       were put into the installed file (`drm_put_sections.py ... 8:9,8:21239 --add-missing --xbox generalbank.drm`:
+       1 call offset remapped, no UNRESOLVED). New `tools/script_word_classes.py` (same-layout script pair, word
+       classes): script 10 -> 9 = 928 same / 50 swapped halves / 106 other / 325 relocations. The swapped halves are
+       right in the header (u16 pairs, the retail PC script has them too) but **wrong in the TU-only text elements**:
+       colours `ff606060 -> 60600140`, `4 -> 0x40000`, `-1.0f -> 0000c160`, string id 1293 as Symbol 1322. The
+       retail Xbox script 10 holds one of these records byte for byte (+0x670 = TU +0xd40), so Crystal's own PC
+       conversion of it is the template: new `tools/script_record_template.py` (per position u32 / bytes / PC
+       constant, string id via the locmap): 19 words in 4 records, "Press [A] to continue" -> PC 5178. TU script 10
+       has no inline u16 path arrays (`script_u16array_fix.py --tu-ported ... 9=10`: 1 section paired, 0 arrays).
+       Tree `dlc2_test27_hintbox` (generalbank only, on top of test 18). Risk: the other converted words of the
+       TU-only part are unverified (no template), and script 9 is global - base-game hints use it too.
+     * **Code review of the tools since 2afc5f1 (11 findings)**, checked one by one: fixed - `uitext` pattern B could
+       hit a one-element u16 path array (now skipped and counted), pattern A had no upper id bound (now 1284-1406),
+       loop bounds one word short (3 places); `b138_fix_tree` rmtree guard (now `build_util.check_out`: below
+       work/rebuild, apart from PRISTINE); `b138_snapshot` exited 0 with missing files and merged into an old OUT
+       (now exit 1 and a fresh OUT); `tree_merge` ignored a missing input folder, could write its manifest outside
+       OUT and failed on another drive (all fixed); inherited `TRUDLC_PACK_FIRST` / `TRUDLC_LOCMAP` could switch the
+       pipeline's DLC 1 fixes (now cleared for the run and restored afterwards); `material_shader_swap
+       --add-libs-from` copied sections with external relocations (now refused); `pack_records` matched `pack1`
+       to pack10 (exact name now). Documented, not changed: `uitext --ported` has no Xbox section to compare with
+       (prints every rewrite; script 6: 1 record); the DLC 2 input of `Fixes` (`dlc2_asm_stage2a`) is still built
+       by hand (no DLC 2 Convert step in the pipeline yet). Found on the way: `script_u16array_check.arrays()` read
+       past a truncated Xbox section (crash, not a silent skip as assumed) - fixed. Checks: `uitext` on the DLC 2
+       input with the new guards = **120 elements + 150 hint entries, 0 skipped** (the guards change nothing in the
+       data); the Repair step re-run after the fixes is **byte-identical, 334 / 334 files** (275 pristine + 59).
+     * **DLC 1 decision prepared as test 28** (`work\rebuild\dlc1_test28_ui`, 10 DLC 1 DRMs, B138 + repair tree as
+       input, all 10 equal to the installed files): `uipath` with pack10 = **25 arrays in 10 files** (as counted
+       before); `uitext` = 26 text elements + 12 hint entries matched (ids 1286 / 1289 / 1290 x24 / 1374 x12), but
+       **only the 26 elements change - B138's 12 hint entries already hold PC ids** (correction of the "38 unmapped
+       records" above: 26).
 28. **Our Convert used the generic media route, not upstream's stage-1 route - and its render tables do not exist.**
    * `docs/PIPELINE.md` stage 1: `tools/convert_dlc.py OUTDIR name.drm ...` -> `assemble_dlc.assemble()` ->
      `dlc_generic.convert_drm()` with media callbacks (materials via `material_dlc.py` / `material_convert.py`,

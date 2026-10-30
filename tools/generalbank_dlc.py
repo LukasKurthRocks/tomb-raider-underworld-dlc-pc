@@ -8,7 +8,7 @@ waits for before playing cine_dlc1_start_spangs.  Without it Lara stands in the 
 
 Output = every PC runtime section unchanged, PC script 6 replaced by convert(TU script 6) (Script walker; external relocs into
 PC re-authored scripts translated by dlc_generic), plus converted TU sections that script 6 references and the PC file lacks
-(script 20082).  usage: generalbank_dlc.py OUTDIR"""
+(script 20082).  usage: generalbank_dlc.py OUTDIR [--scripts 6,10]  (TU script ids; default 6)"""
 import sys, os, collections, copy, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import override_merge as OM, dlc_generic as DG, generic_store, drm_write as DW, drm_reloc as R
@@ -76,8 +76,11 @@ def build(want=((8, 6),)):
                      nsec=len(out), npc=len(P), xlate=dict(DG.XLATE_STATS))
 
 if __name__ == '__main__':
-    out = sys.argv[1]; os.makedirs(out, exist_ok=True)
-    drm, info = build()
+    argv = sys.argv[1:]; want = ((8, 6),)
+    if '--scripts' in argv:      # e.g. --scripts 6,10: also port TU script 10 (hint box, finding 43); default 6 only
+        k = argv.index('--scripts'); want = tuple((8, int(x)) for x in argv[k + 1].split(',')); del argv[k:k + 2]
+    out = argv[0]; os.makedirs(out, exist_ok=True)
+    drm, info = build(want)
     raw_pc = OM.raw('pcpatch', 'generalbank.drm') or OM.raw('pcbig', 'generalbank.drm')
     data = drm.write('le')
     if raw_pc[:4] == b'CDRM': data = DW.cdrm_encode(data, 'le')

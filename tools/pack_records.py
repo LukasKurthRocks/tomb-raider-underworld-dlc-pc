@@ -25,7 +25,7 @@ def main(argv):
         A = Archive(path, e)
         xn = load(L + ('Tomb Raider Underworld (PC).txt' if pre == 'pc-w' else 'Tomb Raider Underworld (Xenon).txt'))
     else:
-        pi = [i for i, p in enumerate(PACK_PATHS) if pack in os.path.basename(p)][0]
+        pi = [i for i, p in enumerate(PACK_PATHS) if os.path.basename(p).lower() == pack + '.000'][0]
         A = Archive(PACK_PATHS[pi], 'be'); xn = load(L + 'Tomb Raider Underworld (Xenon).txt')
     n = 0
     for r in A.idx:

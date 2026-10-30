@@ -9,8 +9,11 @@ empty PC entry (runtime trace, tools/script_const_calls.py did not find them as 
 
 Fix (EXPERIMENT until tested in game): colour = s32 of the Xbox word; string id = the converter's PC string id
 (dlc_generic.DlcIds.loc, locmap_xbox_to_pc.json) of the high u16, written as u32. Only records whose Xbox words match:
-0xffffffff, colour with alpha 0xff, id word with low u16 = 0 and high u16 a DLC string index (1284 .. 0xffff).
---check lists them without writing.
+0xffffffff, colour with alpha 0xff, id word with low u16 = 0 and high u16 a DLC string index (1284 .. 1406); words
+inside inline u16 path arrays (fix uipath) are skipped and counted. --check lists them without writing.
+--ported has no Xbox section to compare with: it rewrites every `ffffffff, colour, id` with id 1284 .. 1406 in the
+NAMED scripts and prints each one - PC ids 1284 .. 1406 are base strings too, so check its log (generalbank
+script 6: exactly 1 record, the DLC title).
 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/script_uitext_fix.py IN_DIR[,IN_DIR2] OUT_DIR --locmap MAP.json [--pack pack11] [--check]
@@ -26,7 +29,7 @@ DLC_LAST = 1406           # last index of the pack10 / pack11 tables (1407 strin
 
 
 def process(rel, path, ids, st, log, write=True):
-    import dtp_audit as DA, drm_write as DW, drm_reloc as R
+    import dtp_audit as DA, drm_write as DW, drm_reloc as R, script_u16array_check as U16
     xs = DA.xsecs(rel)
     if xs is None: return None
     raw = open(path, 'rb').read(); D = DW.read(raw, 'le')
@@ -36,11 +39,15 @@ def process(rel, path, ids, st, log, write=True):
         sec = pc8.get(x['id']) if x['type'] == 8 and x['data'] is not None and x['id'] >= 20000 else None
         if sec is None or len(sec.data) != len(x['data']): continue
         xd = x['data']; xr = R.parse(x['reloc'], 'be'); sl = set(xr.pointer_offsets()) | set(xr.id_offsets())
+        # inline u16 arrays {n, ptr -> next, u16[n]} are member Symbol paths (fix uipath): a one-element array
+        # `1, ptr, sym << 16` has the hint-list shape of pattern B, so their words are never string ids here
+        arr = set(k for c, n, t, words in U16.arrays(xd, xr) for k in range(c, t + 4 * words, 4))
         pd = bytearray(sec.data)
-        for o in range(0, len(xd) - 12, 4):
+        for o in range(0, len(xd) - 11, 4):
             a, col, w = struct.unpack_from('>III', xd, o)
-            if a != 0xffffffff or col >> 24 != 0xff or w & 0xffff or (w >> 16) < DLC_FIRST: continue
+            if a != 0xffffffff or col >> 24 != 0xff or w & 0xffff or not DLC_FIRST <= (w >> 16) <= DLC_LAST: continue
             if any(k in sl for k in (o, o + 4, o + 8)): continue
+            if o + 8 in arr: st['records in u16 arrays (skipped)'] += 1; continue
             xid = w >> 16; pid = ids.loc(xid) if ids else xid
             want = struct.pack('<II', col, pid)
             st['records'] += 1
@@ -52,10 +59,11 @@ def process(rel, path, ids, st, log, write=True):
         # Information screen", 1403 "The shadow meter drains ..."): only ids inside the Xbox DLC string range, because
         # the same field also holds larger values (0x1ba2) that are no string ids
         ptrs = set(xr.pointer_offsets())
-        for o in range(4, len(xd) - 4, 4):
+        for o in range(4, len(xd) - 3, 4):
             if o - 4 not in ptrs or o in sl: continue
             w = struct.unpack_from('>I', xd, o)[0]
             if w & 0xffff or not DLC_FIRST <= (w >> 16) <= DLC_LAST: continue
+            if o in arr: st['hint records in u16 arrays (skipped)'] += 1; continue
             xid = w >> 16; pid = ids.loc(xid) if ids else xid
             want = struct.pack('<I', pid)
             st['hint records'] += 1
@@ -78,7 +86,7 @@ def process_ported(path, script_ids, ids, st, log):
     for sec in D.sections:
         if sec.type != 8 or sec.id not in script_ids: continue
         pd = bytearray(sec.data)
-        for o in range(0, len(pd) - 12, 4):
+        for o in range(0, len(pd) - 11, 4):
             a, col, v = struct.unpack_from('<III', pd, o)
             if a != 0xffffffff or col >> 24 != 0xff or not DLC_FIRST <= v <= DLC_LAST: continue
             pid = ids.loc(v); st['ported records'] += 1
