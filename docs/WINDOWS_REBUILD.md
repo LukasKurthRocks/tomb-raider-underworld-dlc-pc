@@ -1260,6 +1260,10 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        the ring is darker; candidate: the material's parameter block before the texture entries (e.g. 21164
        `3e851d69 447a0000 3f333333 3f800000`) read differently by the base shader than by the Xbox one. Current
        state for the ring: test 24 (`tree_20261030_131100`).
+     * Xenia at the same spot (owner, 13:27): the ring is GLOSSY copper (strong specular highlights) - ours is
+       olive and matte, so the specular / material parameters are the next suspect, not the colour textures; a
+       Y-button prompt appears next to Lara; the camera has depth of field (focus on the background when looking
+       through the ring). Left for later (stage 3 may cover part of it).
      * **Rule learned**: a DLC object that is a re-textured variant of a base object (same materials / meshes /
        texture slot roles) renders correctly with the BASE object's own PC shader libraries; the similarity-voted
        surrogates (`shader_map.py`, 1016-1018 / 205-207 here) can read the texture slots in other roles (normal map
