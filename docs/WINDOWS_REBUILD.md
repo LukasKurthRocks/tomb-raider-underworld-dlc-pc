@@ -1074,8 +1074,9 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      bikini, Freizeitforscher, gold bikini, grey jungle shorts), so the bare skin in the level is correct, not a
      missing texture.
    * Debugger limit: `cdb -p` keeps "kill on exit" - when `timeout` ends cdb, Windows ends the game too. Unattended
-     runs need a clean detach: `sxe -c "qd" bpe` in the cdb script, then `DebugBreakProcess` from outside detaches
-     on demand; or a hard stop with `qd` in a breakpoint.
+     runs need a clean detach: a hard stop with `qd` in a breakpoint (after N hits / on the awaited event), or end
+     the game normally (cdb ends with it). The idea "`sxe -c "qd" bpe` + `DebugBreakProcess` from outside" did not
+     detach in its one try (02:43, no break event logged).
    * **Code review of this session's tools (2026-10-30 night, 10 findings, all fixed in 01d9bea)**:
      `script_init_from_pc.py` moved relocations one by one (two pointers that move by one word could overwrite each
      other), learned field rules after the re-layout (wrong Xbox/PC pairs for re-laid-out nodes) and wrote output
@@ -1143,6 +1144,53 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * Lesson for the checklist: when one frame is slow, time the calls per object before reading counts - an
      average over all objects hid the one bad object; and compare a suspicious word with its sibling blocks in the
      same DTP and in the matching base / B138 model.
+   * **The crash after the intro, traced further (2026-10-30 02:13-02:23, test tree 13 + cloth fix; the intro now
+     ends after about a minute, so each run takes ~5 minutes)**:
+     * RTTI in the dump: `cdc::UIVec3TimeLine` vtable +0x451fa4, constructor +0x1ace80, update +0x1a85b0 (crash at
+       +0x1a8616). Its target list (+0x28) holds nodes {next, ..., +0x10 start vec4, +0x20 target object}; the update
+       calls `target->vtable[0x1c/4](value)` for every node.
+     * A breakpoint after each constructor call plus a hardware write breakpoint on the list head of the last ones
+       (`ba w4`): the crashing timeline (13th of the level) gets its node from +0x1a9214 (list insert) <- +0xcca87
+       <- native thunk +0x3a77e3 <- script VM (+0x17c238), **with target = 0x0019fae4 = a stack address**.
+     * How a stack address gets there: a timeline is built from a data descriptor (+0xcfbd0: `{u32, u8 +4, u8 +5,
+       u8 +6, u32 n_targets +8, targets +0xc, u32 n_keys +0x10, keys +0x14}`; keys 16 bytes = time + vec3). The
+       script native +0xcca00.. resolves each target path for a widget: +0xd08e0 walks the path (u16 ids, entries
+       `{u32 n, u16 *ids}` with inline data) - child lookup +0xc8420, else property lookup +0xd0850; **when an
+       element is not found it returns `&local` (`lea eax,[esp+1Ch]`) instead of null**, and the caller inserts that
+       stack address as the target. One second later (end of the transition) the update calls through it.
+     * The crashing descriptor sits in a new DLC 2 script (id 26449 in `dlc_level2_start.drm` +0xbc0, the same
+       script in 26 level files): one target, path `{2, ->[0x0266, 0x07b9]}` (PC bytes `6602b907`, Xbox
+       `07b90266`), keys (0, 38, 0, 0) -> (1, 38, 1, 0).
+     * Dead end (kept): "the converter swapped the u16 path as s32, so the ids trade places". New read-only
+       `tools/script_u16array_check.py` (inline u16 arrays `{n, ptr -> next word, u16[n]}` in scripts, PC vs Xbox):
+       DLC 2 122 arrays, all s32-encoded - but **B138 / the PC base game encode them the same way** (base script 72
+       in `dlc1_health_pack.drm` = PC copy: Xbox `07b90266` -> PC `6602b907`, 171 arrays incl. DLC 2 files, all
+       s32). So the path bytes match the PC convention; the failing element must be found differently (which
+       widget, which id). Next run: log every path element (+0xd0930), child / property results and the widget
+       when the resolver returns a stack address.
+     * **What the path elements are** (02:30, breakpoints in the resolver): the widget is a `NsUIScreen` (RTTI);
+       +0xc8420 searches the **data members of the script class** (`[class+0x2c]`, 0x14-byte entries, u16 name
+       Symbol at +0xe, offset at +0xc - the DataMember layout known from script 6), +0xd0850 the prototypes up the
+       parent chain. The path elements are **member name Symbols**. Elements 0x012f / 0x0266 were not found
+       (child 0, property 0) -> stack address; 0x0131 on another object was found.
+     * Experiment 1 (test 15, kept as a dead end): Xbox element order with the Xbox values (`script_u16array_fix.py
+       --mode s16`): the first element 0x07b9 is not found either - order alone is not it.
+     * **Cause: the converter maps Symbols in the script class tables but not in these u16 arrays** - they keep
+       the Xbox numbers. `tools/sym_lookup.py` (new, the converter's own `DlcIds.sym`): Xbox 0x07b9 -> PC 0x07a3,
+       0x0266 -> 0x0268, 0x012f -> 0x0131 (the one id that WAS found in the trace is the PC id of 0x012f).
+     * **Fix (test 16, 02:40): every element -> the converter's PC Symbol, Xbox element order, u16 LE**
+       (`tools/script_u16array_fix.py`, default mode; 122 arrays in 14 DLC 2 files, symbol routes extra 52 /
+       mapped 26 / interpolated 96 / guess 66 / DLC-new shift 4). In game: **no stack target, no crash - the DLC 2
+       level is playable** (the player character - the Doppelganger in her suit - stands in the level, walks with
+       W). Built into stage 2b as fix `uipath` (`dlc_fixes_build.py`; DLC 2 stage 2b: 127 arrays incl. 5 in
+       `g_pda`).
+     * **B138 has the same defect in DLC 1** (25 arrays in new DLC 1 scripts, e.g. `dlc_watertunnel.drm` script
+       22902: Xbox `064d019a` -> B138 `9a014d06`); DLC 1 shows no crash, so those UI animations probably just do
+       nothing (target = a dead stack slot that happens to be harmless, or never updated). `uipath` therefore runs
+       for DLC 2 trees only (`--pack pack11`) - DLC 1 stays byte-identical to B138 until the owner decides.
+     * Still open in DLC 2 (test 16): **Esc opens no pause menu** (in DLC 1 it does; input itself works). The game
+       was closed with `WM_CLOSE` (no dump). `TruDetach.ps1` (`DebugBreakProcess`) did NOT detach cdb (no break
+       event in the log) - ending the game ends cdb cleanly instead.
    * Author's history (found only now - a forgotten jump point): `tools/generalbank_dlc.py` (2026-10-09) already put
      the converted TU script 6 into the PC generalbank (same native-93 neutralisation at 0x7928); his note in
      `tools/dlc_generic.py` says "replacing it crashes the base game (gb1.dmp)", so he patched DLC 1's start script

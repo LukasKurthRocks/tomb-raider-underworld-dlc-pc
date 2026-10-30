@@ -13,6 +13,8 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
   tag404 B33: raft/grapple ring records (tag 0x404), word at +4 raw in the new DLC DTPs (learned from B138)
   cloth  (ours, finding 43) cloth iteration counts of the new DLC DTPs back to s32 (DLC 2 `co_dlc_lara*`: 262 144
          instead of 4 passes made the intro run at about one frame per second)
+  uipath (ours, finding 43) UI timeline target paths in new DLC scripts = member Symbols in inline u16 arrays:
+         PC Symbols in Xbox element order (tools/script_u16array_fix.py; DLC 2 crashed after the intro)
   postfix upstream's tools/dlc1_postfix.py steps 1-2: streamgroup name tables (save hang) and type-0 name strings
   analog upstream's tools/analog_word_fix.py: near-clone DTPs get the base PC bytes (each word checked against B138)
 
@@ -141,6 +143,26 @@ def fix_cloth(out):
     return {'files': files, 'log': log}
 
 
+def fix_uipath(out):
+    """UI timeline target paths of the new DLC scripts (finding 43): inline u16 arrays of member Symbols that the
+    converter swapped as s32 with Xbox values; the engine's path lookup then returned a stack address as the target
+    (crash one second after the DLC 2 intro). tools/script_u16array_fix.process, every DRM of the tree in place.
+    DLC 2 trees only (--pack pack11): B138 has the same 25 unmapped paths in DLC 1 scripts (no crash seen there) and
+    DLC 1 stays byte-identical to B138 until that is decided."""
+    import collections
+    if os.environ.get('TRUDLC_PACK_FIRST') != 'pack11':
+        return {'files': [], 'log': ['skipped: DLC 1 tree (B138 keeps these words; finding 43)']}
+    sys.path.insert(0, HERE)
+    import dtp_audit as DA, dlc_generic as DG, script_u16array_fix as UF
+    ids = DG.DlcIds(); st = collections.Counter(); files, log = [], []
+    for rel, path in sorted(DA.overlay([os.path.abspath(out)], None).items()):
+        new = UF.process(rel, path, ids, st, log)
+        if new is not None:
+            open(path, 'wb').write(new); files.append(rel)
+    log.append('total %s, symbol routes %s' % (dict(st), dict(ids.sym_stats)))
+    return {'files': files, 'log': log}
+
+
 def fix_postfix(out):
     """upstream's DLC 1 post-step tools/dlc1_postfix.py, steps 1 and 2 per DRM (called directly, so nothing is
     written to its fixed folder work/ws/converge/): streamname_fix (streamgroup name table of unit DRMs; a broken
@@ -199,7 +221,7 @@ def fix_analog(out):
     return {'files': files, 'log': log}
 
 
-FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('postfix', fix_postfix),
+FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('uipath', fix_uipath), ('postfix', fix_postfix),
          ('analog', fix_analog)]
 
 

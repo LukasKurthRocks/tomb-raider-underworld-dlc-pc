@@ -34,7 +34,9 @@ def main(argv):
     P = DW.read(open(pcf, 'rb').read(), 'le')
     k = [i for i, s in enumerate(P.sections) if s.id == sid]
     if not k: raise SystemExit('section %d not in %s' % (sid, pcf))
-    k = k[0]; xs, ps = X.sections[k], P.sections[k]
+    k = k[0]; ps = P.sections[k]
+    same = [s for s in X.sections if s.type == ps.type and s.id == sid]     # same id first (B138 reorders sections)
+    xs = same[0] if same else X.sections[k]
     print('section %d: PC type %d id %d len %d | Xbox type %d id %d len %d' % (
         k, ps.type, ps.id, len(ps.data), xs.type, xs.id, len(xs.data)))
     a = max(0, off - words * 2) & ~3

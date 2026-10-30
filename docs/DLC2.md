@@ -185,6 +185,10 @@ process, 3 008 s; with the symbol calibration and the mesh tables of finding 37)
 * **Test 14 (2026-10-30 02:05, unattended): test tree 13 + `co_dlc_lara.drm` / `co_dlc_lara_f.drm` with the cloth
   fix (`work/rebuild/dlc2_test14_cloth/mods`, stage-2b fix `cloth`): the intro plays at normal speed** (about one
   minute; before 7-8 minutes); the crash after it remains (dump 02:06).
+* Test 15 (02:35): + UI timeline paths in Xbox element order, Xbox values - same crash (dead end).
+* **Test 16 (02:40): test 14 + UI timeline paths as PC Symbols (`work/rebuild/dlc2_test16_sym/mods`, 14 files;
+  stage-2b fix `uipath`): no crash - the DLC 2 level is playable.** The player character (the Doppelganger in her
+  suit) stands in the first room and walks. Open: Esc opens no pause menu; the rest of the checklist below.
 * Test checklist: DLC menu lists *Lara's Shadow* (slot 2) with its description (locals 457); the level starts; first
   cutscene; the doppelganger (model and shading - finding 39); the PDA (journal with both DLCs, DLC 2 control pages -
   finding 40); the shadow ability (LB/RB) and its HUD meter; afterwards DLC 1 still starts (shared files are now the
@@ -241,8 +245,15 @@ Every step needs another reference - the Xbox source, rules learned from the bas
   (`tools/cdb_time_summary.py`), then compare the word with its sibling blocks in the same DTP and in the matching
   base / B138 model (`drm_find_bytes.py`, `dlc_section_compare.py`). Fixed by stage-2b fix `cloth` (DLC 1: 0
   changes) [43].
+- **Symbols hide in plain u16 arrays too.** UI timeline target paths in script init data are member name Symbols
+  (`{u32 n, u16 *ids}` inline); the converter maps Symbols in class tables but left these as Xbox numbers, and the
+  engine's path lookup then handed a stack address to the timeline (crash one second after the DLC 2 intro). Check
+  any u16 data a script hands to a native that looks things up by name (`script_u16array_check.py`,
+  `sym_lookup.py`); B138 carries the same defect in DLC 1 without visible effect [43].
 - **A breakpoint debugger ends the game with it.** `cdb -p` keeps "kill on exit": when `timeout` ends cdb, TRU ends
-  too. Put `sxe -c "qd" bpe` in the script (then `DebugBreakProcess` detaches it) or a `qd` in a breakpoint [43].
+  too. End each cdb script with a hard stop (`qd` in a breakpoint after N hits, or on the expected event); an
+  injected `DebugBreakProcess` with `sxe -c "qd" bpe` did not detach in the one try. Ending the game normally
+  (in-game quit, or `WM_CLOSE`) ends cdb cleanly [43].
 - Names first: `dlc_names.py` also takes the Xbox names of the kit manifests (hash-checked) [14]; pack11 still has
   63 unnamed non-DRM records - check which of them a DLC 2 tree needs before `Media`.
 - `Media`: `dlc_media_build.py OUT pack11`; for pack11 itself `MUSIC_PACKS` falls back to pack11 only [13];
