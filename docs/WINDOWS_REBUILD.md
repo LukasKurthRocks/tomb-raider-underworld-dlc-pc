@@ -1575,6 +1575,25 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        1595 in `dlc_level2_start.drm` (the first loaded copy) with 40 <- 32, 104 <- 96, 168 <- 160, 232 <- 224 (and
        +1 / +2) - vertex colour kept, the second UV set's effect lost (`work\rebuild\dlc2_test25f_vslots`).
        Pixel libraries 1593 / 1594 have more slots on PC than on Xbox (no gap).
+       **Result: 25f and 25g (the same slot fill in all 22 DRMs that carry 1595) change nothing** - the grey column
+       stays opaque, the translucent blue sheets were there before as well. The missing variants are not the cause
+       (or not the only one); kept as a dead end. Next: number textures on the 8 slots of 24920 (which texture lands
+       on the column), and which shader variant is really bound (debugger).
+     * **Debugger session with the owner (2026-10-30 17:14-17:23)**: `cdb` attached to the running game
+       (`session_titles.cdb` in the workbench: GetLocalString +0x9a7a0 for ids 59 / 5169-5170 / 5173 / 432 / 450 /
+       451 with caller, max 15 each, and every new UI timeline +0xcfc00 with a time stamp, max 300; caps disable the
+       breakpoints instead of quitting - the game ran on and was quit normally). Note: in a `cdb` script a `;` also
+       ends a `$$` comment. Results: base text 59 ("Was bisher bei Tomb Raider geschah...") and the DLC descriptions
+       5170 / 5173 are fetched ONCE through `tru+0x19e289` (set the text of an element); the DLC 1 title 5169 first
+       through `tru+0x1a0580` and then **every frame through `tru+0x1a7a42`**, called from the UI draw loop
+       (`+0x1c5a3a` -> `+0x1e0146`) - the same path the visible menu names 450 / 451 take. So **the title element is
+       drawn, only invisibly** (alpha, position or scale). The base loading screen's title "TOMB RAIDER: UNDERWORLD" is
+       a separate element above the line (screenshot `references\Basisspiel\PC-20261030_Basis_Ladebildschirm_*`) and
+       visible - next session: log its id and compare its element data with the DLC title's (first argument of the
+       draw-path call). 171 UI timelines were created in the session (9 at the DLC 1 loading screen, 17:19:32).
+     * Loading-screen layout (owner's screenshots): base and DLC 2 text start below the line; **the DLC 1 text starts
+       one line higher, on the line** - most likely the text block is centred vertically and the German DLC 1
+       description has 4-5 lines (DLC 2 / base 3); to confirm with a shortened test string.
      * Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
