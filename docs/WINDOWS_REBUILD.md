@@ -1794,6 +1794,17 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        pointer word was executed as `op03` and pushed its low 24 bits as a "string" (AV in `op4f`, `tru+0x17dbf3`).
        37b in game: base game hints top right in a dark box, no pause, no crash; DLC 1 medipack hint top right, no
        pause; DLC 2 shadow and rock vein hints modal with pause - all as in Xenia (`references\*\PC-Test37b-*`).
+     * **Direct start into DLC 2 for tests (test 41e, played 22:28, works)** - test-only generalbank, never for the
+       install; `tools/script_directstart_stub.py`, details in the workspace note `docs\Befund-Direktstart.md`. The
+       mission screen (script 104) starts a DLC by writing the unit name to a member and calling `uigamedata` f22, then
+       **f27(unit name, 1, 0, 1)**, then closing its screens (`stdscreenmgr` f19 / f7); `dlcsystem` only checks that
+       the DRM exists. Hosting the same sequence in the main menu failed three times: script 7 is `uipause` (main AND
+       pause menu) whose functions run on events only (41, 41b: never reached); from its OnOpen (41c) f27 ran but the
+       frontend was not ready - stuck on the menu background; 41d hooked a branch that is not the attract path. The
+       attract (intro) video is started by script 60 `AttractTimer` (f2: "stopTitleMusic", f22, f26 = attract mode);
+       41e jumps right after its f22 (+0x538) into the stub: once per game start f27('dlc_level2_start', 1, 0, 1) +
+       f19 / f7 instead of f26. Played: start the game, skip the intros, wait in the main menu - instead of the video
+       the DLC 2 level loads, outfit / weapon choice works (log: DIRECTSTART 0..4, f27 with `dlc_level2_start`).
      * **Shadow-power slow motion reproduced on PC (test 39b, played 22:08-22:12, debugger prototype)**: live snapshots
        in Xenia (25 snapshots while LB was toggled, `tools/snapshot_toggle_words.py`) showed the TU switching two time
        scales, world 1.0 -> 0.3 and player 1.0 -> 1.2; the TU's selector (0x823d7520) calls the engine's world / player
