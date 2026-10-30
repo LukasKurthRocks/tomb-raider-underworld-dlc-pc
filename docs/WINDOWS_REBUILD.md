@@ -1709,6 +1709,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        the likely path). Test 27 (the same script 10 on top of test 18) was never played, so this is its first run.
        Next: breakpoint at `tru+0x17dea3` with `poi(@ecx+14) == 0` to dump the descriptor (name Symbol) and the
        caller; then NOP or redirect that call like `script_nop_call.py` did for script 6. Test 33 uninstalled again.
+     * **The null native is `dlc2data` f0 (offline + live, 19:42-19:47)**: offline (new `tools/script_func_list.py`,
+       details in the workspace note `docs\Befund-Test33-Native.md`): the TU-only native type `dlc2data` (script
+       21239, package `game/script/game/game`, f0 +0x54 name Symbol 3955 / PC 4124, f1 +0x70 19728 / 20208, no script
+       code) is unknown to `tru.exe` (no name string), so its descriptors keep a null function pointer; our ported
+       script 9 calls it 5 times (f0 at +0x43c / +0x960, f1 at +0x754 / +0x864 / +0x9b8), Crystal's PC script 9 never.
+       A conditional breakpoint before the call (`tru+0x17dea3`) is far too expensive - it fires on every script
+       native call and stalled the level load; instead the AV handler reads the descriptor from the script operand
+       (`[[ebp+0xc]-4]`), logs it and skips the call (`eip = [esp]`, `esp += 4`, `eax = 0` or `1`, `gh`). Live: 5
+       calls, all f0 at the same site, name Symbol 0x101c = 4124 - confirmed. With the calls skipped the level runs,
+       but **no hint at all** appears at the wall (not even the text that showed without test 33) and the screen is
+       white for ~10 s after the level start (`references\DLC2\PC-Test33-Live-*_29_*`), with f0 = 0 and with f0 = 1.
+       So `dlc2data` explains the crash, not the missing box; the other defects of the port the offline check found
+       are the next suspects: the prototype count at +0x1020 is `0x000b0000` (u16 halves swapped, should be 11) and
+       the vtable is still in the Xbox layout (script 9 inherits from 93; vtableSize 35 with Xbox vtIndex 31-34,
+       Crystal's PC script 9 has f1 at 32 and f4 at 33 - needs `script_vtable_insert.py ... 9 31` and vtIndex + 1
+       like script 6). Test 35 = test 33 with these fixes and the `dlc2data` calls replaced.
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
