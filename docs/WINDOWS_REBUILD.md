@@ -1504,6 +1504,32 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      * New pipeline step `Dlc2` (`dlc_media_build pack11`, `dlc_assemble_build --pack pack11`, `dlc_audio_build
        --pack pack11`, `tree_check`): the DLC 2 input of `Fixes`, until now built by hand (review 2, finding 7). The
        hand-built `dlc2_asm_stage2a` and `dlc2_asm_stage2a_p11` (`--pack pack11` audio) are identical (293 / 293).
+       **First run** (log `Invoke-TruPipeline_Dlc2_20261030_*`, 2 431 s, all exit 0, 166 / 166 DRMs ok): its
+       `dlc2_asm_stage2a` is **identical to the hand-built one, 293 / 293** - DLC 2 is now reproducible from the
+       pipeline end to end (Convert ... Assemble, Dlc2, Fixes).
+     * **Owner's tests 2026-10-30 ~15:45** (screenshots `references\DLC1\PC-Test26a-*`): **26a ring = rusty copper with
+       highlights, holder without highlight** - close to the Xenia reference; adopted: `b138_fix_tree`'s ring step
+       now also transplants the base material 16637 into both LODs (the two files are byte-identical to test tree
+       26a). **28**: DLC 1 runs as before (nothing visible expected); the loading-screen title is still missing
+       (separate point). **29** (lookahead encoder): Lara's "s" sounds still crackle in game, Zip (a radio voice,
+       band-limited) sounds fine.
+     * **Voice lines have language variants too**: the five DLC 1 radio / voice streams
+       (`audio\streams\vo\dlc1\lara|zip\*.mul`) exist in five languages in pack10 (specs as the cinematics);
+       `music_convert.convert_streams` and B138 write only the English record. `mul_lang_build.py` now also writes
+       every localised `audio\streams` .mul as `<path>_NNN` (B138's English voice lines measure 14-33 dB against the
+       decoded Xbox source, ours 32-36 dB, so the plain name gets our English conversion); pack11 has no localised
+       voice streams. Repair tree: **99 files** (24 shader + 10 ui + 35 cinematic + 30 voice).
+     * **The crackling "s" (Lara, intro)**: WAVs of the Xbox source, our current encode and the lookahead encode
+       (`ima_encoder_check.py --wav`, decoded with our model of the game's decoder) sound **identical** to the owner -
+       so our encode is fine as we decode it, and the game must play it differently. Lara speaks "live" with full
+       high frequencies, Zip over a radio filter - a decoder mismatch grows with frequency, which fits. The nibble
+       convention was measured on base MUSIC (finding 18), never on cinematics; measuring it on Crystal's base
+       cinematics (`tools/mul_convention_check.py`, cross-correlated lag) is inconclusive - their PC streams match
+       the Xbox ones only to 3-16 dB (a different mix / edit), whatever the convention. Listening tests instead:
+       **test 30** = German intro at -6 dB (if the crackle goes: the game's mixer clips), **test 31** = the same with
+       the FSB nibble convention (if the crackle goes: cinematics are decoded as FSB) -
+       `work\rebuild\dlc1_test30_audio`, `dlc1_test31_audio` (`ima_encoder_check.py --write ... --gain -6`,
+       `--convention fsb`).
      * `work\rebuild\exp_sym*` (the intermediate trees of finding 35's three runs, 9.7 GB) deleted - the result is
        adopted (`docs/data/b138_symbol_calibration.json`), logs and `sections_exp_sym*.json` stay.
      * **Pipeline step `Fixes` re-run with all stage-2b fixes** (log `Invoke-TruPipeline_Fixes_20261030_140516`,

@@ -10,6 +10,9 @@ Per channel: SNR in dB, the largest single error, and the share of blocks whose 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/ima_encoder_check.py pack10|pack11 NAME.mul [SPEC_HEX] [--write OUT]  (default spec ffffe004 = German)
   --write OUT: no measurement, write the PC .mul (as mul_lang_build) with the lookahead encoder - a listening test
+  --write extras: --gain DB (scale before encoding, e.g. -6) and --convention fsb (nibbles 0..62, FSB encoder)
+  --wav DIR: no measurement, write <name>_<lang>_xbox / _current / _lookahead .wav (listening outside the game);
+             NAME may also be a voice stream path, e.g. audiostreamsodlc1aralara_1_pdlc1_invasion_01.mul
 """
 import sys, os
 import numpy as np
@@ -98,15 +101,41 @@ def main(argv):
     from archive import Archive
     from names import crc
     from convert_dlc import R, PACKS
-    out = None
+    out = wav = None
     if '--write' in argv: k = argv.index('--write'); out = argv[k + 1]; del argv[k:k + 2]
+    if '--wav' in argv: k = argv.index('--wav'); wav = argv[k + 1]; del argv[k:k + 2]
+    gain, conv = 0.0, 'game'
+    if '--gain' in argv: k = argv.index('--gain'); gain = float(argv[k + 1]); del argv[k:k + 2]
+    if '--convention' in argv: k = argv.index('--convention'); conv = argv[k + 1]; del argv[k:k + 2]
     pack, name = argv[0], argv[1]; spec = int(argv[2], 16) if len(argv) > 2 else 0xffffe004
     A = Archive(R + [p for p in PACKS if p.endswith('/%s.000' % pack)][0], 'be')
-    rec = next(r for r in A.find(crc('xenon-w\\cinstream\\' + name)) if r['spec'] == spec)
+    full = 'xenon-w\\' + name if '\\' in name else 'xenon-w\\cinstream\\' + name       # voice: audio\streams\...
+    rec = next(r for r in A.find(crc(full)) if r['spec'] == spec)
+    if wav:       # listening test outside the game: Xbox source, current encoder, lookahead encoder as WAV files
+        import wave
+        rate, total, pcm = MA.xb_pcm(A.read(rec))
+        base = os.path.join(wav, '%s_%03x' % (os.path.splitext(name.split('\\')[-1])[0], spec & 0xfff))
+        os.makedirs(wav, exist_ok=True)
+        for label, enc in (('xbox', None), ('current', MN.ima_encode_game), ('lookahead', encode_lookahead)):
+            chans = []
+            for k in range(pcm.shape[1]):
+                ch = np.clip(pcm[:, k], -32768, 32767)
+                chans.append(ch if enc is None else ima_decode(enc(ch).tobytes(), True)[:len(ch)])
+            data = np.stack(chans, axis=1).astype('<i2')
+            with wave.open('%s_%s.wav' % (base, label), 'wb') as w:
+                w.setnchannels(data.shape[1]); w.setsampwidth(2); w.setframerate(rate); w.writeframes(data.tobytes())
+            print('written %s_%s.wav (%d channel(s), %.1f s)' % (base, label, data.shape[1], len(data) / rate))
+        return
     if out:       # listening test: the PC .mul as tools/mul_lang_build.py writes it, but with the lookahead encoder
         import mul_convert as M, dlc_generic as DG
         xd = A.read(rec); pd = M.convert(xd, DG.DlcIds(None, None))
-        MN.ima_encode_game = encode_lookahead          # swap() looks the encoder up at call time
+        enc = encode_lookahead
+        if conv == 'fsb':        # FSB nibble convention (nibbles 0..62) instead of the game's (finding 18)
+            import wave_convert as WC
+            enc = lambda p: np.frombuffer(WC.ima_encode_fsb(p)[0], dtype=np.uint8).reshape(-1, 36)
+        g = 10 ** (gain / 20.0); base_enc = enc
+        enc = (lambda p: base_enc(np.clip(np.round(np.asarray(p) * g), -32768, 32767).astype(np.int32))) if gain else base_enc
+        MN.ima_encode_game = enc          # swap() looks the encoder up at call time
         o, info = MN.swap(xd, pd)
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True); open(out, 'wb').write(o)
         print('written %s (%d bytes, %s)' % (out, len(o), info))

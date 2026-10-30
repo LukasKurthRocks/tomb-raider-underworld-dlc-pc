@@ -6,7 +6,9 @@ folder with only the changed / added files, to install with scripts/windows/Inst
                instruction (the "display driver" box when entering DLC 1; 24 files)
   2. ring      dlc1_ei_grapple_wall / _ceiling: the far-LOD materials 21164 / 20345 get the base game's own PC ring
                shaders 1704-1707 (copied from the PC `ar_ei_grapple_wall.drm`), the near-LOD materials 21093 / 20344
-               become copies of them (surrogate / translated shaders showed the normal map as colour; test 24)
+               become copies of them (surrogate / translated shaders showed the normal map as colour; test 24); then
+               both LODs get the base ring MATERIAL 16637 with its textures (tools/material_transplant.py: the base
+               shaders read the slots in the base roles - specular from the DLC normal map looked olive; test 26a)
   3. ui        stage-2b fixes `uipath` + `uitext` (tools/dlc_fixes_build.py) over the B138 files: 25 UI timeline paths
                and 26 text elements in 10 DLC 1 level DRMs (the never-shown Xbox "update required" message; owner's
                decision 2026-10-30, same fixes as DLC 2; test 28)
@@ -23,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_util as BU
 
 RING = {'dlc1_ei_grapple_wall.drm': (21164, 21093), 'dlc1_ei_grapple_ceiling.drm': (20345, 20344)}
-BASE_RING, BASE_LIBS = 'ar_ei_grapple_wall.drm', [1704, 1705, 1706, 1707]
+BASE_RING, BASE_LIBS, BASE_MATERIAL = 'ar_ei_grapple_wall.drm', [1704, 1705, 1706, 1707], 16637
 
 
 def run(mod, args):
@@ -53,7 +55,7 @@ def main(argv):
         import shader_const_fix as SCF
         print('== shaders'); print(run(SCF, [src, out]).strip())
     if 'ring' not in skip:
-        import bigfile_extract as BE, material_shader_swap as MSS, material_copy as MC
+        import bigfile_extract as BE, material_shader_swap as MSS, material_copy as MC, material_transplant as MT
         print('== ring')
         base = os.path.join(tmp, BASE_RING)
         run(BE, ['pcbig', BASE_RING, base])
@@ -64,7 +66,13 @@ def main(argv):
                 extra = ['--add-libs-from', base, ','.join(map(str, BASE_LIBS))] if slot == 0 else []
                 print(run(MSS, [cur, nxt, str(far), str(slot), str(lib)] + extra).strip().splitlines()[-1])
                 cur = nxt
-            print(run(MC, [cur, os.path.join(out, name), str(near), str(far)]).strip())
+            nxt = os.path.join(tmp, '%s.copy' % name)
+            print(run(MC, [cur, nxt, str(near), str(far)]).strip())
+            # base MATERIAL, not only its shaders: the base shaders read the texture slots in the base roles (test 26a)
+            for i, mid in enumerate((far, near)):
+                dst = os.path.join(out, name) if i == 1 else os.path.join(tmp, '%s.far' % name)
+                print(run(MT, [nxt, dst, str(mid), base, str(BASE_MATERIAL)]).strip().splitlines()[-1])
+                nxt = dst
     if 'ui' not in skip:
         import dlc_fixes_build as FB
         print('== ui')
