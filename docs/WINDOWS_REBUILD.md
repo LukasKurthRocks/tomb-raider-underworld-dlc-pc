@@ -1812,6 +1812,11 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        generalbank already has. All init words of the three bitmaps equal the Xbox values. So the faint modal box
        on PC is not a data defect of our generalbank - next: compare the box's colour / alpha / scale at draw time
        (PC cdb vs Xenia snapshot). `generalbank_build.py` unchanged (md5 57f52266...).
+     * **ASI step 3.1 played (22:47-22:52): the shadow-power slow motion works as a plugin** - no debugger; holding RB / LB
+       slows the waterfall (world time) like on the Xbox; rock veins (LB/RB + A) still do nothing (next TU part).
+       Test 42 / 42b (base eitr-fall material on 24920): the column turns translucent (42: green eitr colour, 42b:
+       blue, with a green stripe left), but the pool shares the material and looks frozen (static) - the transplant
+       alone is no fix; fall and pool need separate materials (`references\DLC2\PC-Test42*`).
      * **ASI step 3.1: `TruShadowPower.asi` (built, not yet played)** - the first piece of the title update rebuilt as
        PC code: `src/asi/TruShadowPower/` (C++, no external libraries, `/MT`, imports only KERNEL32), built by
        `scripts/windows/Build-TruAsi.ps1` (VS 2022 x86 toolchain -> `work\asi\`), installed / removed by
