@@ -1234,6 +1234,32 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        rusty metal - fixed.** In the in-game camera the brackets glow flat yellow (green in test 21): the camera
        draws a highlight pass on interactive objects (like Legend's RAD, owner); the highlight colour followed the
        shader swap, so whether yellow is the intended look is open (no Xbox camera reference yet).
+     * **Xenia reference (owner, 13:00, `references\DLC1\Xenia-TU_DLC1_*`)**: the ring is rusty brown / copper with
+       light edges; the bracket is a short rod; **the in-game camera shows NO highlight** on Xbox - so our yellow
+       camera glow on the bracket is a defect. Also captured: the DLC 1 loading screen title "BENEATH THE ASHES"
+       centred above the line (the PC lacks it) and the outfit list.
+     * Material texture entries decoded further: `{u32 texture id, 0, u32 role, u32 0x0002RR00}` with RR = the
+       SAMPLER REGISTER (base 16638: registers 0-4; DLC bracket material 21093: registers 0-7, normal map 6463 on
+       register 2, where the base shader 1777 expects a white helper texture). 21093 is a richer 8-texture material
+       without an exact base counterpart (why B138 translated its shader); the camera's highlight / flash pass reads
+       register 2 and shows the normal-map colour. Open, cosmetic (camera only): a better shader for 21093, or remap
+       its registers to what 1775-1778 expect.
+     * Better reading (owner's idea: LOD): the object has two detail levels - far = mesh with material 21164, near
+       (camera zoom, or Lara close / hanging) = material 21093. That explains tests 19 / 20 (21093 changed, far view
+       unchanged) and the bracket colour following 21093 only when zoomed - so the near-LOD defect shows in normal
+       play too, not only in the camera. B138's translated near-LOD shader 2762 was never looked at from close by.
+       Test 23: far 21164 / 20345 -> base PC shaders 1704-1707 (as test 21), near 21093 / 20344 back to B138's state
+       (1016 / 1017 / translated 2762 / 2756 / 211). **Result (owner, same spot as an Xbox gameplay video, 13:08):
+       at mid distance the ring is dark with yellow-green patches** (Xbox: bright copper rust) - the near LOD is
+       already in use there, and B138's translated shader shows the normal-map colour as well. Far LOD fine, near
+       LOD wrong with every shader tried (2762, 1018, 205-207, 1775-1778).
+     * Test 24 (`tools/material_copy.py`): the near-LOD material 21093 / 20344 becomes a copy of the far-LOD material
+       21164 / 20345 (base PC shaders 1704-1707) - less detail close up, but the colours of the far LOD.
+       **Result (owner, 13:16): no flat yellow / green any more at any distance** - dark metal with rust patches,
+       the bracket matches. Remaining difference to the Xbox: the hue is olive-yellow instead of copper-brown and
+       the ring is darker; candidate: the material's parameter block before the texture entries (e.g. 21164
+       `3e851d69 447a0000 3f333333 3f800000`) read differently by the base shader than by the Xbox one. Current
+       state for the ring: test 24 (`tree_20261030_131100`).
      * **Rule learned**: a DLC object that is a re-textured variant of a base object (same materials / meshes /
        texture slot roles) renders correctly with the BASE object's own PC shader libraries; the similarity-voted
        surrogates (`shader_map.py`, 1016-1018 / 205-207 here) can read the texture slots in other roles (normal map
