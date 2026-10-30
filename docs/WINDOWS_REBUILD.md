@@ -1208,6 +1208,14 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        material constants at Xbox register numbers (e.g. `c167.zzzy` as a select); if the PC engine fills other
        registers, a highlight / tint term can win - compare which constant registers material 21093 sets on PC with
        the ones the shaders read.
+     * DLC 2 "waterfall" (a flat, grey, opaque surface where the Xbox shows a bright translucent fall of the blue
+       liquid): DLC 2 has no translated shaders (stage 3 not rebuilt, finding 43 native test); every NEW DLC shader
+       (`shader_map.py` classes C1-C3 / D) is mapped to a SURROGATE base PC shader chosen by constant / sampler
+       similarity. For additive / refracting effects such a surrogate draws the right textures with the wrong
+       blend or pass - the expected look of an untranslated shader. Candidates: `dlc_fx_goo_column_displace*` (a
+       displacement effect: material 7111 / 3693, base libs 19-22 / 145-148) and the level materials of the first
+       room. Both visual defects (ring, fall) therefore belong to stage 3 (shader translation), the largest open
+       block: DLC 1's translator outputs exist in B138 (library 2762 etc.), DLC 2 needs the translator itself.
      * Language lead (read-only, new `tools/pack_records.py` = records of a pack with their `spec` word): pack10 has
        **7 records in five languages each** (spec `ffffffe1` and `ffffe002 / 004 / 008 / 010`, names not in the
        name list; two of them 4.4 / 5.4 MB = most likely the speech of the intro and the finale), so the German
