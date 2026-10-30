@@ -1612,7 +1612,38 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        the shader (stage 3).
      * **"Skip cinematic" bar**: PC "(A) JA - Zwischensequenz überspringen? - (B) NEIN" spread over the width, Xbox TU
        "SKIP CINEMATIC? (A) YES (B) NO" grouped on the right (`references\DLC1\Xenia-TU_DLC1_10_*`) - a layout
-       difference, most likely another title-update UI script like the hint box (not checked yet).
+       difference, most likely another title-update UI script like the hint box. Lead: the question (TU 982, PC
+       1283) is pushed by TU generalbank scripts 7 / 38 / 74 / 199 and by PC scripts 7 / 37 / 74 / 201
+       (`bigfile_find.py`); which of them lays out the bar is open.
+     * **Waterfall, test 25i** (`tools/texture_scale.py`, new: one slot of one material gets a scaled copy of its
+       texture under a new id; slot 2 of 24920 at 0.45, mean 97 -> 43): the column now shows the **green-yellow
+       normal map** (slots 1 / 5) and, from afar, the worm / mud textures - on the vertical column the shader adds
+       several textures as raw colour, the normal map included (which should only distort), while the pool with the
+       same material looks right. Darkening is no fix; the vertical case of this shader is the problem (stage 3), or
+       a separate material for the column (it shares terrain batch Y 64 with the pool, so splitting needs a new
+       material index - not done).
+     * **Debugger run 2 (17:54-17:58, `session_titles2.cdb`: at GetLocalString for 51 / 5169 / 59 / 5170 registers,
+       stack and 0xC0 bytes at each register via `titles2_dump.cdb`, called with `$$><` inside the branch so nothing
+       runs for other ids)**: the visible base title is string **51 "TOMB RAIDER: UNDERWORLD"**; both titles are
+       fetched every frame through `+0x1a7a42` with the text element object in `esi` (same class, vtable
+       `008533ac`). The objects differ in their property blocks ({owner, type, value, 0} from +0x50): base +0x80
+       (another type, a boolean) = **1**, DLC = **0**; base +0x60 = a pointer, DLC 0; +0x70 0x100 vs 0xdc6800.
+     * **Cause of the invisible loading-screen title found**: `tools/script_text_records.py` (new: every UI text
+       element record `ffffffff|00ffffff 0 colour colour | id w1 w2 w3` of a script, `all` = scripts with w2 = 0)
+       on PC script 6: Crystal's retail script 6 has 10 records, all with **w2 = 0x00010000**; the ported TU script 6
+       keeps that for its 10 retail-part records, but its two **TU-only records have w2 = 0**: the DLC 1 title
+       (5169, +0xe930) and - newly found - **the DLC 2 title (+0xea40) with the unmapped Xbox id 410 "LARA'S SHADOW"
+       (= PC 432 "LARAS SCHATTEN")**, which `uitext --ported` skipped because 410 lies in the base range. w2 is the
+       word whose PC value we already met as a "PC constant" in the retail hint record (finding: TU script 10), and
+       it matches the boolean property 1 / 0. **Test 32** (`work\rebuild\dlc_test32_title`, generalbank only, new
+       `tools/script_word_set.py`: set words only when the old value matches): +0xe948 0 -> 0x10000, +0xea50 410 ->
+       432, +0xea58 0 -> 0x10000. After it no record in generalbank has w2 = 0.
+     * Same pattern in the DLC level scripts (`script_text_records.py ...:all` over the play tree): one shared new
+       script in most DLC 1 and DLC 2 levels has two records (+0xe70 / +0xf80: 5175 the Xbox "update required"
+       warning, 5259 "returning to main menu in...") and DLC 1 `dlc_dungeon` script 23339 one ("Continue", 5171) -
+       all with w2 = 0 **and w1 / w3 in swapped halves** (`00040000`, `000c0000`), the defect of the TU hint box
+       before `script_record_template.py`. Harmless for the never-shown update message; a general stage-2b fix
+       (records of new DLC scripts converted with the retail template rules) is the clean follow-up.
      * Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59
