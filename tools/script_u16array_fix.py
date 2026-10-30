@@ -1,6 +1,8 @@
 """Inline u16 arrays of NEW DLC scripts (type 8, id >= 20000) - the target paths of UI timeline descriptors, whose
 elements are script member Symbols (finding 43, crash after the DLC 2 intro). Pattern as in
-tools/script_u16array_check.py ({u32 n, internal pointer to the next word, u16[n]}). The converter swapped these
+tools/script_u16array_check.py ({u32 n, internal pointer to the next word, u16[n]}), narrowed to entry lists (the
+first entry is the target of an internal pointer, the next ones follow it directly), PC words that are exactly the
+whole-word swap of the Xbox ones, non-zero elements and mapped values that fit u16. The converter swapped these
 words as s32 and kept the Xbox Symbol values, so the engine's path lookup (tru.exe +0xd08e0) found no member and
 returned a stack address as the timeline target. Base-game scripts are left alone (PC copies).
 
@@ -31,11 +33,20 @@ def process(rel, path, ids, st, log):
         sec = pc8.get(x['id']) if x['type'] == 8 and x['data'] is not None and x['id'] >= 20000 else None
         if sec is None or len(sec.data) != len(x['data']): continue
         xd = x['data']; xr = R.parse(x['reloc'], 'be'); ptrs = set(xr.pointer_offsets())
+        targets = {t for _, t in xr.internal}
         pd = bytearray(sec.data)
-        for co, n, t, words in arrays(xd, xr):
+        ends = set()          # entry lists: the first entry is pointed to, the next ones follow it directly
+        for co, n, t, words in sorted(arrays(xd, xr)):
             if any(t + 4 * k in ptrs for k in range(words)): continue
+            if co not in targets and co not in ends: st['skipped: not an entry list'] += 1; continue
+            xw = xd[t:t + 4 * words]
+            if pd[t:t + 4 * words] != b''.join(xw[k:k + 4][::-1] for k in range(0, len(xw), 4)):
+                st['skipped: PC words not the whole-word swap'] += 1; continue
             xv = list(struct.unpack_from('>%dH' % (2 * words), xd, t))
+            if not all(xv[:n]): st['skipped: zero element'] += 1; continue
             pv = [ids.sym(v) if (ids and k < n) else v for k, v in enumerate(xv)]
+            if max(pv) > 0xFFFF: st['skipped: mapped Symbol above 0xffff'] += 1; continue
+            ends.add(t + 4 * words)
             want = struct.pack('<%dH' % len(pv), *pv)
             st['arrays'] += 1
             if pd[t:t + 4 * words] != want:

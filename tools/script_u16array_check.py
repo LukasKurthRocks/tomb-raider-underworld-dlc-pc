@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 def classify(x, p):
     if x == p: return 'same'
+    if x[::-1] == p and x[1::-1] + x[:1:-1] == p: return 's32=s16'     # equal u16 halves: both swaps agree
     if x[::-1] == p: return 's32'
     if x[1::-1] + x[:1:-1] == p: return 's16'
     return 'other'

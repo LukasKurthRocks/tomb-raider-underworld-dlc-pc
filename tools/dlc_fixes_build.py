@@ -113,7 +113,7 @@ def fix_cloth(out):
     encoded the count of the third block of `co_dlc_lara` / `co_dlc_lara_f` (DTPs 24717 / 25808) as two s16 halves
     (4 -> 0x00040000 = 262 144 passes, about 1 s per frame); every other block of the same DTP and the B138 / base
     blocks use s32. A word is set to s32 only when the whole block matches: pointer slots at -20 and -12, small
-    integers (< 0x100) at the count and at +4 / +8 / +12, and the converted word differs from the s32 encoding.
+    integers (< 0x100) at the count and at +4 / +8 / +12, and the converted word is exactly the s16 encoding.
     New DLC DTPs (id >= 20000) only; every DRM of the tree, sub folders included."""
     import struct
     sys.path.insert(0, HERE)
@@ -129,12 +129,14 @@ def fix_cloth(out):
             if x['type'] != 7 or sec.id < 20000 or len(sec.data) != len(x['data']): continue
             xd = x['data']; xr = R.parse(x['reloc'], 'be'); ptrs = set(xr.pointer_offsets()); sl = ptrs | set(xr.id_offsets())
             pd = bytearray(sec.data)
-            for o in range(20, len(xd) - 16, 4):
+            for o in range(20, len(xd) - 15, 4):          # the block needs o + 16 <= len
                 if o - 20 not in ptrs or o - 12 not in ptrs or any(k in sl for k in (o - 8, o - 4, o, o + 4, o + 8, o + 12)): continue
                 v = [struct.unpack_from('>I', xd, o + d)[0] for d in (0, 4, 8, 12)]
                 if not all(0 < w < 0x100 for w in v): continue
-                want = struct.pack('<I', v[0])
-                if pd[o:o + 4] != want:
+                want = struct.pack('<I', v[0]); xw = xd[o:o + 4]
+                # only the defect itself: the word as two swapped u16 halves (e.g. 00000400) - any other encoding
+                # (raw bytes kept on purpose, e.g. by fix tag404) stays
+                if pd[o:o + 4] == xw[1::-1] + xw[:1:-1] and pd[o:o + 4] != want:
                     log.append('%s DTP %d +%#x: %s -> %s (cloth iterations %d)' % (rel, sec.id, o, pd[o:o + 4].hex(), want.hex(), v[0]))
                     pd[o:o + 4] = want; changed = True
             sec.data = bytes(pd)

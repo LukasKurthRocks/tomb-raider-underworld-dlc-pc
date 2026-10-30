@@ -2,6 +2,8 @@
 stepper tru.exe +0x601c0 / +0x601f8): the entry prints TIN, the hit number, the object (ecx) and `.time`; the
 return prints TOUT and `.time`. Reports the duration of every call per object (ms, from the "Debug session time"
 lines, 1 ms resolution; breakpoint overhead of about 1-2 ms included). Read-only.
+Limit: TIN / TOUT are paired in log order without the thread id - valid when the timed function runs on one thread
+(the cloth stepper ran on the main thread in every captured stack); a TIN without its TOUT is dropped.
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/cdb_time_summary.py LOG [LOG ...]
@@ -24,6 +26,7 @@ def main(argv):
         for i, l in enumerate(lines):
             s = l.strip()
             if s == 'TIN':
+                if i + 2 >= len(lines): break                  # log cut off (game ended while the breakpoint fired)
                 hit = EVAL.match(lines[i + 1]); obj = EVAL.match(lines[i + 2])
                 t = next((stamp(x) for x in lines[i + 3:i + 8] if stamp(x)), None)
                 cur = (int(obj.group(2), 16), t) if hit and obj and t else None

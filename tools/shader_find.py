@@ -28,7 +28,8 @@ def main(argv):
                 except Exception as e: print('  skipped %s: %s' % (p, e)); continue
                 for s in D.sections:
                     if s.type != 9: continue
-                    _, _, offs, ents, _ = lib_parse(s.data)
+                    try: _, _, offs, ents, _ = lib_parse(s.data)
+                    except Exception as e: print('  skipped %s lib %d: %s' % (p, s.id, e)); continue
                     for o, (a, h, code, at) in sorted(ents.items()):
                         body, _ = split_end(code)
                         if body == want:

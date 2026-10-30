@@ -1191,6 +1191,20 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      * Still open in DLC 2 (test 16): **Esc opens no pause menu** (in DLC 1 it does; input itself works). The game
        was closed with `WM_CLOSE` (no dump). `TruDetach.ps1` (`DebugBreakProcess`) did NOT detach cdb (no break
        event in the log) - ending the game ends cdb cleanly instead.
+     * Control (03:00): DLC 1 still starts with the DLC 2 test files installed on top (shared names, finding 38) -
+       Lara in the level, quit through the pause menu.
+   * **Code review of the tools since b142a18 (2026-10-30 03:05, 10 findings)** - fixed: `fix_cloth` changed any
+     word of a matching block (now only the s16 defect itself, so a raw word kept by `tag404` can't be undone) and
+     skipped a block ending at the section end (off by one); `script_u16array_fix` took every `{n, ptr->next}`
+     array (now entry lists only - the first entry is a pointer target, the next ones follow it -, PC words that
+     are exactly the whole-word swap, non-zero elements, mapped values <= 0xffff; DLC 2 stage 2b 127 -> 125 arrays,
+     the 2 left out are not entry lists; the test-16 tree rebuilt byte-identical); equal u16 halves are reported
+     as `s32=s16` instead of a defect; `cdb_time_summary` survives a cut-off log; `dlc_section_compare` refuses a
+     section of another type; `shader_find` skips a malformed ShaderLib instead of aborting. Documented, not
+     changed: TIN/TOUT pairing ignores the thread (the stepper ran on the main thread); **`cloth` and `uipath` are
+     post-passes - the root causes sit in the converter** (the learned type-7 word class; Symbols mapped in class
+     tables but not in inline u16 arrays) and belong there in a later converter change; `fix_cloth` repeats
+     `fix_tag404`'s loop (one shared helper later).
    * Author's history (found only now - a forgotten jump point): `tools/generalbank_dlc.py` (2026-10-09) already put
      the converted TU script 6 into the PC generalbank (same native-93 neutralisation at 0x7928); his note in
      `tools/dlc_generic.py` says "replacing it crashes the base game (gb1.dmp)", so he patched DLC 1's start script

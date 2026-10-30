@@ -18,6 +18,7 @@ from drm import cdrm_decode
 def classify(x, p):
     """how the PC word p encodes the Xbox word x"""
     if x == p: return 'same'
+    if x[::-1] == p and x[1::-1] + x[:1:-1] == p: return 's32=s16'     # equal u16 halves: both swaps agree
     if struct.unpack('>I', x)[0] == struct.unpack('<I', p)[0]: return 's32'
     if x[1::-1] + x[:1:-1] == p: return 's16'
     return 'other'
@@ -36,7 +37,9 @@ def main(argv):
     if not k: raise SystemExit('section %d not in %s' % (sid, pcf))
     k = k[0]; ps = P.sections[k]
     same = [s for s in X.sections if s.type == ps.type and s.id == sid]     # same id first (B138 reorders sections)
-    xs = same[0] if same else X.sections[k]
+    if same: xs = same[0]
+    elif k < len(X.sections) and X.sections[k].type == ps.type: xs = X.sections[k]   # id remapped: same index
+    else: raise SystemExit('no Xbox section of type %d with id %d or at index %d' % (ps.type, sid, k))
     print('section %d: PC type %d id %d len %d | Xbox type %d id %d len %d' % (
         k, ps.type, ps.id, len(ps.data), xs.type, xs.id, len(xs.data)))
     a = max(0, off - words * 2) & ~3
