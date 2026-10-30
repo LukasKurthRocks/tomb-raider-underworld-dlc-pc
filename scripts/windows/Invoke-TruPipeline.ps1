@@ -35,6 +35,12 @@
                terrain_validate, mesh_tables_build), dlc_assemble_build (assemble_dlc, material 'dlc', PC shader sections),
                dlc_audio_build, compare_b138, compare_sections
                -> work\render\*, work\rebuild\asm_stage1\mods, asm_stage2a\mods (+ compare_asm_stage2a.json)
+      Fixes    stage 2b: dlc_fixes_build for DLC 1 (asm_stage2a -> asm_stage2b, compare_b138) and DLC 2
+               (dlc2_asm_stage2a -> dlc2_asm_stage2b, --pack pack11; the DLC-2-only fixes cloth / uipath / uitext)
+      Repair   the repair tree for an installed B138 (finding 43, tested in game 2026-10-30): b138_snapshot (pristine
+               B138 mods, verified against the kit manifest, from the game folder and the Install-TruTree backups),
+               b138_fix_tree (shader constant fix, grapple ring shaders, cinematic languages of both DLCs)
+               -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
@@ -57,7 +63,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Fixes', 'Repair')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(0, 16)][int]$Jobs = 0,
     [ValidateRange(0, 64)][int]$LightJobs = 0,
@@ -153,6 +159,15 @@ $steps = @{
         @('tools\compare_b138.py', 'work/rebuild/asm_stage2a/mods', 'asm_stage2a'),
         @('tools\compare_sections.py', 'work/rebuild/asm_stage2a/mods', 'asm_stage2a')
     )
+    Fixes = @(
+        @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', 'work/rebuild/asm_stage2b/mods'),
+        @('tools\compare_b138.py', 'work/rebuild/asm_stage2b/mods', 'asm_stage2b'),
+        @('tools\dlc_fixes_build.py', 'work/rebuild/dlc2_asm_stage2a/mods', 'work/rebuild/dlc2_asm_stage2b/mods', '--pack', 'pack11')
+    )
+    Repair = @(
+        @('tools\b138_snapshot.py', '../release/B138/kit/manifest.json', '../data/pc/mods', '../backup', 'work/rebuild/b138_pristine/mods', '../backup/mods', 'work/rebuild/base_b138'),
+        @('tools\b138_fix_tree.py', 'work/rebuild/b138_pristine/mods', 'work/rebuild/b138_fixes/mods', '--dlc2', '--replace')
+    )
 }
 $outputDirs = @{
     Index   = @('work')
@@ -166,6 +181,8 @@ $outputDirs = @{
     Media   = @('work\rebuild')
     Audio   = @('work\rebuild')
     Assemble = @('work\render', 'work\rebuild')
+    Fixes   = @('work\rebuild')
+    Repair  = @('work\rebuild')
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{

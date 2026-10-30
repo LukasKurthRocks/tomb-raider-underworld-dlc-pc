@@ -1264,6 +1264,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        olive and matte, so the specular / material parameters are the next suspect, not the colour textures; a
        Y-button prompt appears next to Lara; the camera has depth of field (focus on the background when looking
        through the ring). Left for later (stage 3 may cover part of it).
+   * **Pipeline integration of the tested fixes (2026-10-30 afternoon)**:
+     * `tools/b138_snapshot.py`: a pristine B138 `mods` tree rebuilt from the game folder and the Install-TruTree
+       backups (plus `backup\mods` / `work\rebuild\base_b138` for the locals and generalbank changed outside it),
+       every file checked against the kit manifest MD5 - **275 / 275** (`work\rebuild\b138_pristine\mods`), so the
+       stacked test trees do not have to be undone.
+     * `tools/b138_fix_tree.py`: the repair tree from that copy - shader constant fix (24 files, 472 shaders, 1 416
+       `mov`), grapple ring (base PC shaders 1704-1707 for the far LOD, near LOD = copy of it), cinematic languages
+       (10 for DLC 1, 35 with `--dlc2`). **All 34 files of the DLC 1 run are byte-identical to the files tested in
+       game today** (shader fix `out` + `out3`, ring test 24, `lang_mul`).
+     * `tools/tree_merge.py`: one tree from an ordered stack (later wins) with a source manifest and
+       `--check-against` the installed game. `work\rebuild\play_20261030\mods` = repair tree + DLC 2 test trees 13 /
+       14 / 16 / 17 / 18 + all languages: **355 of 361 files equal to the installed, tested state**, the other 6 are
+       `local\locals.bin_*`, which Install-TruTree skips by default (DLC menu text fix) - so one install of this tree
+       over B138 reproduces today's state.
+     * `Invoke-TruPipeline.ps1`: new steps `Fixes` (dlc_fixes_build for DLC 1 and DLC 2) and `Repair`
+       (b138_snapshot + b138_fix_tree --dlc2).
      * **Rule learned**: a DLC object that is a re-textured variant of a base object (same materials / meshes /
        texture slot roles) renders correctly with the BASE object's own PC shader libraries; the similarity-voted
        surrogates (`shader_map.py`, 1016-1018 / 205-207 here) can read the texture slots in other roles (normal map
