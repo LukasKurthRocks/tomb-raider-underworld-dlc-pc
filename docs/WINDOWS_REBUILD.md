@@ -1281,13 +1281,32 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      * **Fix `uitext`** (`tools/script_uitext_fix.py`, stage-2b fix in `dlc_fixes_build.py`, map from
        `TRUDLC_LOCMAP` or `work/rebuild/stage1/`): colour s32, string id -> PC id as u32, only on exactly these
        Xbox patterns. **Test 17 (11:26, test 16 + 14 files: 118 text elements, 88 hint entries): the hint box shows
-       German text with the right button glyphs** ("Die Schatten-Anzeige leert sich, wenn Sie [LB] oder [RB]
+       German text with the right button glyphs** (see the next point for the box itself; "Die Schatten-Anzeige leert sich, wenn Sie [LB] oder [RB]
        gedrückt halten.", "Halten Sie [LB] oder [RB] gedrückt und springen Sie mit [A] auf eine Felsrinne zu."); the
        lookups of empty ids stopped, the game now asks 5182 / 5201 (the HUD notices). Still missing against the Xbox:
        the box background, the Lara icon on its left and "Press [A] to continue"; the text sits top right instead of
        top centre. DLC 2 stage 2b: 120 elements + 150 hint entries (incl. the merged `g_pda`). **DLC 1 / B138 has the
        same 38 unmapped records** (26 elements + 12 entries: system messages 1286 / 1289 / 1290 "update required" /
        1374 "returning to main menu") - `uitext` runs for DLC 2 only, like `uipath`, until the owner decides.
+     * **The hint box itself (box, Lara icon, "Press [A] to continue", centred) is title-update code** (2026-10-30
+       noon; Xbox reference from the owner in `references\DLC2`): "Press [A] to continue" is DLC string 1293 (PC 5178);
+       its only text element (`ffffffff ff606060 050d0000`) is in the **TU `generalbank` script 10** (`bigfile_find.py
+       tu`), absent from the retail Xbox script 10 (`xbase`: 0 hits). The TU grew script 10 from 3 012 to 5 636 bytes
+       (`tu_script_changes.py`); the PC game ships the retail version (PC script 9, 3 028 bytes, installed
+       unchanged), which shows a hint as plain text top right - exactly what test 17 shows. To get the Xbox look:
+       port TU script 10 to PC like script 6 (vtable layout, call-site names, init values from PC, glyphs, string
+       ids) and check that the icon image exists on PC. Not started.
+     * **Loading screen title (both DLCs)**: the Xbox shows the title above the line ("LARA'S SHADOW", owner's
+       reference), on PC only the description types in (`references\DLC1` / `DLC2`: `*_Ladebildschirm_ohneTitel`).
+       DLC 1 asked `GetLocalString(1284)` 1 499 times while loading = Xbox "BENEATH THE ASHES" unmapped (PC 1284 is
+       "[A] JA"). Its text element sits in the PORTED TU script 6 (`ffffffff ff606060 0504 0000` at +0xe940, same
+       offset on PC); `uitext` skips base scripts. New `script_uitext_fix.py --ported IN OUT 6 --locmap MAP` (PC-side,
+       named ported scripts only): 1 record, 1284 -> 5169 (test 18, `work/rebuild/dlc2_test18_gbtitle`). Now the game
+       asks 5169 "UNTER DER ASCHE" every frame - **but the title is still not visible**. Checked and ruled out: the
+       element's other words equal the Xbox ones (floats, colours, flags); the 46 inline path arrays of script 6 are
+       no longer in the unmapped form (the port took them from PC; new `script_u16array_fix.py --tu-ported`); the 10
+       timelines created while loading (timeline logger) have sane keys and PC Symbol paths. Open: why the element
+       stays invisible (draw order / parent widget / a visibility member of the TU-only part).
      * Debugger technique used here (for the next string problem): breakpoint on `GetLocalString` (+0x9a7a0) with a
        condition on the id range and `kv 4` for the caller, a hit cap with `qd` (the log fills in seconds when a HUD
        asks every frame); the owner plays to the spot while the log runs. Found in minutes what four static

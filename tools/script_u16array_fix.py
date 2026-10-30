@@ -21,17 +21,35 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from script_u16array_check import arrays
 
 
-def process(rel, path, ids, st, log):
-    """-> new file bytes or None; ids = DlcIds (mode sym) or None (mode s16)"""
+def tu_xsecs(name='generalbank.drm'):
+    """Xbox sections of a title-update DRM (scripts the port moved into a PC file, e.g. generalbank script 6)"""
+    import locals as LC, drm_write as DW, drm_reloc as R
+    from archive import Archive
+    from names import crc
+    from drm import cdrm_decode
+    path, e, pre = LC.SRC['tu']
+    A = Archive(path, e)
+    D = DW.read(cdrm_decode(A.read(A.find(crc(pre + '\\' + name))[-1]), e), e)
+    return [dict(type=s.type, id=s.id, data=s.data, reloc=R.write(R.parse(s.reloc, 'be'), 'be')) for s in D.sections]
+
+
+def process(rel, path, ids, st, log, xs=None, only_ids=None):
+    """-> new file bytes or None; ids = DlcIds (mode sym) or None (mode s16).
+    xs / only_ids: Xbox sections given by the caller (title-update scripts ported into a PC DRM, e.g. generalbank
+    script 6) and the script ids to look at; their PC layout may differ in places, so the section lengths may
+    differ - an array is only changed where the PC words are exactly the whole-word swap of the Xbox ones at the
+    same offset (the converter's unmapped form), which a shifted layout does not match."""
     import dtp_audit as DA, drm_write as DW, drm_reloc as R
-    xs = DA.xsecs(rel)
+    if xs is None: xs = DA.xsecs(rel)
     if xs is None: return None
     raw = open(path, 'rb').read(); D = DW.read(raw, 'le')
     pc8 = {s.id: s for s in D.sections if s.type == 8}
     changed = False
     for x in xs:
-        sec = pc8.get(x['id']) if x['type'] == 8 and x['data'] is not None and x['id'] >= 20000 else None
-        if sec is None or len(sec.data) != len(x['data']): continue
+        want_id = (x['id'] in only_ids) if only_ids else x['id'] >= 20000
+        sec = pc8.get(x['id']) if x['type'] == 8 and x['data'] is not None and want_id else None
+        if sec is None or (not only_ids and len(sec.data) != len(x['data'])): continue
+        if len(sec.data) < len(x['data']): x = dict(x, data=x['data'][:len(sec.data)])
         xd = x['data']; xr = R.parse(x['reloc'], 'be'); ptrs = set(xr.pointer_offsets())
         targets = {t for _, t in xr.internal}
         pd = bytearray(sec.data)
@@ -60,6 +78,16 @@ def process(rel, path, ids, st, log):
 
 
 def main(argv):
+    if '--tu-ported' in argv:      # --tu-ported IN.drm OUT.drm SCRIPT_ID[,ID]: TU scripts ported into a PC DRM
+        import dlc_generic as DG
+        a = argv[argv.index('--tu-ported') + 1:]
+        ids = DG.DlcIds(); st = collections.Counter(); log = []
+        new = process(os.path.basename(a[0]), a[0], ids, st, log, xs=tu_xsecs(), only_ids={int(x) for x in a[2].split(',')})
+        for l in log[:40]: print(' ', l)
+        if new is not None:
+            os.makedirs(os.path.dirname(os.path.abspath(a[1])), exist_ok=True); open(a[1], 'wb').write(new)
+        print(dict(st), 'symbol routes:', dict(ids.sym_stats))
+        return
     mode = 'sym'
     if '--mode' in argv: k = argv.index('--mode'); mode = argv[k + 1]; del argv[k:k + 2]
     if '--pack' in argv: k = argv.index('--pack'); os.environ['TRUDLC_PACK_FIRST'] = argv[k + 1]; del argv[k:k + 2]

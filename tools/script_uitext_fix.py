@@ -15,6 +15,8 @@ Fix (EXPERIMENT until tested in game): colour = s32 of the Xbox word; string id 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/script_uitext_fix.py IN_DIR[,IN_DIR2] OUT_DIR --locmap MAP.json [--pack pack11] [--check]
   MAP.json = locmap_xbox_to_pc.json of tools/locals.py build (e.g. work/rebuild/dlc2_test13/locmap_xbox_to_pc.json)
+  ../bin/pyt -t 300 tools/script_uitext_fix.py --ported IN.drm OUT.drm 6 --locmap MAP.json
+      (title-update scripts ported into a PC DRM, e.g. generalbank script 6 - the DLC 1 loading screen title)
 """
 import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -66,7 +68,41 @@ def process(rel, path, ids, st, log, write=True):
     return DW.cdrm_encode(out, 'le') if raw[:4] in (b'CDRM', b'MRDC') else out
 
 
+def process_ported(path, script_ids, ids, st, log):
+    """PC-side variant for title-update scripts PORTED into a PC DRM (generalbank script 6, whose layout no longer
+    matches the Xbox one): text elements `ffffffff, colour (alpha 0xff), u32 id` whose id is still an Xbox DLC
+    string index (1284 .. 1406) get the PC id. Only the named scripts - PC originals use PC numbering."""
+    import drm_write as DW
+    raw = open(path, 'rb').read(); D = DW.read(raw, 'le')
+    changed = False
+    for sec in D.sections:
+        if sec.type != 8 or sec.id not in script_ids: continue
+        pd = bytearray(sec.data)
+        for o in range(0, len(pd) - 12, 4):
+            a, col, v = struct.unpack_from('<III', pd, o)
+            if a != 0xffffffff or col >> 24 != 0xff or not DLC_FIRST <= v <= DLC_LAST: continue
+            pid = ids.loc(v); st['ported records'] += 1
+            log.append('%s script %d +%#x: string %d -> %d' % (os.path.basename(path), sec.id, o + 8, v, pid))
+            if pid != v: struct.pack_into('<I', pd, o + 8, pid); changed = True; st['ported records changed'] += 1
+        sec.data = bytes(pd)
+    if not changed: return None
+    out = D.write('le')
+    return DW.cdrm_encode(out, 'le') if raw[:4] in (b'CDRM', b'MRDC') else out
+
+
 def main(argv):
+    if '--ported' in argv:      # --ported IN.drm OUT.drm SCRIPT_ID[,ID] --locmap MAP.json
+        import json, dlc_generic as DG
+        k = argv.index('--locmap'); lm = argv[k + 1]
+        a = argv[argv.index('--ported') + 1:]
+        ids = DG.DlcIds(); ids._loc = {int(x): y for x, y in json.load(open(lm))['map'].items()}
+        st = collections.Counter(); log = []
+        new = process_ported(a[0], {int(x) for x in a[2].split(',')}, ids, st, log)
+        for l in log: print(' ', l)
+        if new is not None:
+            os.makedirs(os.path.dirname(os.path.abspath(a[1])), exist_ok=True); open(a[1], 'wb').write(new)
+        print(dict(st))
+        return
     check = '--check' in argv
     argv = [a for a in argv if a != '--check']
     if '--pack' in argv: k = argv.index('--pack'); os.environ['TRUDLC_PACK_FIRST'] = argv[k + 1]; del argv[k:k + 2]
