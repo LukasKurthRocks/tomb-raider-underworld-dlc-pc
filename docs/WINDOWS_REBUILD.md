@@ -1010,7 +1010,7 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      shader must disassemble and reassemble without error before it is written. `tools/shader_lib_check.py`
      validates all unique pixel shaders of a folder offline and reproduces the GPU result exactly: B138 **272
      rejected / 124 valid** (= native test) -> after the fix **396 valid, 0 rejected** (392 shader instances fixed,
-     1 176 `mov` inserted). 22 of the 38 B138 DLC 1 files change (`dlc1_*` objects, `dlc_costume_f`,
+     1 176 `mov` inserted). 22 of the 38 B138 DLC 1 files change (2 more were missed - see 2026-10-30 01:00 below) (`dlc1_*` objects, `dlc_costume_f`,
      `knight_thrall`, `knight_thrall_chunkdoll`, `wp_dlc_gold_shotgun`); `tree_check` 22/22 clean
      (`work/rebuild/b138_shaderfix/out`). First attempt left 30 shaders unfixed (temps given out once per shader) -
      corrected. Not yet tested in game: install the 22 files over B138 and enter DLC 1 (the display-driver box
@@ -1037,12 +1037,44 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
    * **The DLC 1 "display driver" box, traced (2026-10-30 00:45, B138 + fixed shaders, unattended run with a
      debugger)**: a hardware write breakpoint on the flag (`ba w1`, condition value != 0, then `.dump` and detach)
      fired at `tru.exe` +0x7ad5d in the main loop: the flag = "device status `[[+0x6d75e4]+0x10]` != 0"; the status
-     was **-4**. The only code writing -4 there is +0x122750, right after **`IDirect3D9::CreateDevice`** (vtable
-     offset 0x40, call at +0x122736) returned a failure; the engine logs "PCDeviceManager: CreateDevice() failed.
-     Could not create Direct3D device." So entering the DLC 1 level makes the engine create its Direct3D device
-     again, and that fails - the box text ("Grafikkartentreiber") is the engine's generic message for status -4 /
-     -3. No GPU reset in the System log (no nvlddmkm / display event), i.e. not a TDR. Open: the HRESULT and why
-     the device is re-created at that point (next: breakpoints at +0x122736 / +0x122738 with the call stack).
+     was **-4**. No GPU reset in the System log (no nvlddmkm / display event), i.e. not a TDR; the box text
+     ("Grafikkartentreiber") is the engine's generic message for status -4 / -3.
+   * First reading, **wrong** (kept as a dead end): -4 is also written at +0x122750 after a failed
+     `IDirect3D9::CreateDevice` (call at +0x122736, log text "PCDeviceManager: CreateDevice() failed"), so the box
+     was first blamed on a device re-creation (commit e498ca6). A breakpoint run at +0x122736 / +0x122738 never fired
+     - CreateDevice is not called when entering the level.
+   * **Actual path (write breakpoint `ba w4` on the status field itself, 00:50)**: -4 is set by the status setter
+     +0x1223f0 (`push -4` at +0x122570) called from +0x124d68, the failure branch of the shader object's create
+     function +0x124d40: `call [device+0x1a8]` = **`IDirect3DDevice9::CreatePixelShader`** (vtable index 106) with
+     the bytecode pointer at `[obj+0x14]`; on a negative HRESULT it calls +0x124c50 -> +0x122570. Stack: render
+     path (+0x126113 <- +0x106b05, inside `d3d9!SetPixelShaderConstantF`) - the shaders are created lazily at their
+     first draw, so one invalid pixel shader anywhere in the level is enough.
+   * **The failing shader, captured (01:00, `bp` at +0x124d68 with `.writemem` of the bytecode)**: one call failed,
+     HRESULT **0x8876086C = `D3DERR_INVALIDCALL`**, a ps_3_0 shader of 8 340 bytes, library hash
+     0x06515d8171980288. `tools/shader_validate.py`: `X5584 ... 2 different constant registers` at
+     `cmp r0, c219.xxxy, r3.zxyy, c221.y` - the same defect as above, **not fixed in the installed tree**. New
+     read-only tool `tools/shader_find.py DUMP DIR...` (finds a dumped shader in the ShaderLib sections of DRM
+     files): it sits in **`co_dlc_knight_thrall.drm` and `co_dlc_knight_thrall_pieces.drm`** (libs 2726 / 2723,
+     slot 7) - two B138 DLC 1 files the shader fix never saw. `shader_lib_check.py` over the installed `mods`
+     folder: **24 unique pixel shaders still rejected** (396 valid).
+   * Why they were missed (forgotten jump point): the fix input (`b138_shaderfix/in`) was copied from the game
+     folder by a filter "files with a port shader library" while the DLC 2 test tree 13 was still installed; test
+     13's `co_dlc_knight_thrall*.drm` have **no** port shader library (the filter finds 0 files in
+     `dlc2_test13/mods`), so they were skipped (38 instead of 40 files), and the later `-Restore` brought back
+     B138's unfixed versions. Rule: copy fix inputs only from a clean, known tree (or from the release folder),
+     never from the game folder while a test tree may be installed; and validate the INSTALLED folder after every
+     install (`shader_lib_check.py <game>/mods`).
+   * **Fixed and tested (01:05-01:17)**: `shader_const_fix.py` over the whole installed `mods` folder writes exactly
+     these 2 files (80 shader instances, 240 `mov`; `b138_shaderfix/out3`), installed with `Install-TruTree`
+     (stacked on the 22-file tree). Installed folder: **396 unique pixel shaders valid, 0 rejected**. In game:
+     no failed `CreatePixelShader`, no error flag; the DLC 1 intro (journal page with the hammer fragment) plays
+     and **Lara stands in the DLC 1 level** ("Beneath the Ashes") - the display-driver box is gone. B138 + 24
+     fixed files = **first DLC 1 level start on this PC**.
+   * Seen in that first level start (to check): with "Legeres Outfit" Lara looks bare-skinned (clothes missing or
+     untextured?) - compare another outfit next run.
+   * Debugger limit: `cdb -p` keeps "kill on exit" - when `timeout` ends cdb, Windows ends the game too. Unattended
+     runs need a clean detach: `sxe -c "qd" bpe` in the cdb script, then `DebugBreakProcess` from outside detaches
+     on demand; or a hard stop with `qd` in a breakpoint.
    * **Code review of this session's tools (2026-10-30 night, 10 findings, all fixed in 01d9bea)**:
      `script_init_from_pc.py` moved relocations one by one (two pointers that move by one word could overwrite each
      other), learned field rules after the re-layout (wrong Xbox/PC pairs for re-laid-out nodes) and wrote output
