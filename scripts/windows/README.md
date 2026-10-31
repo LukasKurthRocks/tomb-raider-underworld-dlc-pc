@@ -51,6 +51,9 @@ Xbox 360 content folders (title id `534307EC`, content type `00000002`):
 | `Build-TruAsi.ps1` | build the ASI plugins in `src\asi\` (today `TruShadowPower`, DLC 2 shadow-power slow motion) with the installed Visual Studio x86 toolchain -> `work\asi\` |
 | `Set-TruShadowPower.ps1` | `-Install` / `-Remove` `TruShadowPower.asi` + `.ini` next to `tru.exe` (loaded by the game's ASI loader `binkw32.dll`; foreign files are never touched) |
 | `Set-TruRockVein.ps1` | `-Install` / `-Remove` `TruRockVein.asi` + `.ini` (DLC 2 rock veins: markup conditions 607 / 608) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1` |
+| `Set-TruLink.ps1` | `-Install` / `-Remove` `TruLink.asi` + `.ini` (test tool: live read / write channel on 127.0.0.1:9265, `src\asi\TruLink\README.md`) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1` |
+| `Invoke-TruLink.ps1` | client for `TruLink.asi`: `-Command 'read32 cheat'`, `-Script file.txt` or `-Interactive`; prints the answers (`-PassThru` returns them) |
+| `Set-TruMenu.ps1` | `-Install` / `-Remove` `TruMenu.asi` + `.ini` (in-game debug menu, L3 + R3, Dear ImGui; `src\asi\TruMenu\README.md`) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1`. Build with `Build-TruAsi.ps1 -Name TruMenu` (compiles the ImGui sources from `src\asi\third_party\imgui` as well) |
 | `Invoke-TruPipeline.ps1` | run the conversion pipeline one step at a time (`-Step`, `-FromTool` to resume), with progress and a summary |
 | `Test-TruUploadReady.ps1` | read-only check of our commits before an upload (paths, machine name, identity, e-mails, secrets, hardware, local patterns) |
 

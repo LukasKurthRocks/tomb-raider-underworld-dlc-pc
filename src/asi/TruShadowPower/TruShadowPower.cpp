@@ -493,8 +493,16 @@ void MeterTick(bool held) {
     }
 }
 
+XInputGetStateFn g_realXInput = nullptr;    // the real XInputGetState (xinput* module), for the re-entry guard
+__declspec(thread) int g_inPadHook = 0;
+
 DWORD WINAPI PadHook(DWORD index, PadState *state) {
+    if (g_inPadHook) {                          // another plugin's hook called back into us: break the loop
+        return g_realXInput ? g_realXInput(index, state) : ERROR_DEVICE_NOT_CONNECTED;
+    }
+    g_inPadHook = 1;
     DWORD result = g_original ? g_original(index, state) : ERROR_DEVICE_NOT_CONNECTED;
+    g_inPadHook = 0;
     if (index > 3) return result;
     WORD before = g_lastButtons[index];
     g_lastButtons[index] = (result == ERROR_SUCCESS && state) ? static_cast<WORD>(state->wButtons & g_buttons) : 0;
@@ -509,17 +517,45 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     return result;
 }
 
-// The game fills the pad pointer itself (GetProcAddress) - wait for it, swap it, and re-swap if the game ever
-// writes the original back (e.g. after a device change).
+// true when the address lies in an xinput*.dll (the real XInputGetState, not another plugin's hook)
+bool InXInputModule(LONG address) {
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            reinterpret_cast<LPCSTR>(static_cast<LONG_PTR>(address)), &module))
+        return false;
+    char path[MAX_PATH] = {0};
+    if (!GetModuleFileNameA(module, path, MAX_PATH)) return false;
+    const char *name = strrchr(path, '\\');
+    name = name ? name + 1 : path;
+    return _strnicmp(name, "xinput", 6) == 0;
+}
+
+// The game fills the pad pointer itself (GetProcAddress) - wait for it and chain in front of whatever is there
+// (the real XInputGetState or another of our plugins: TruLink, TruMenu). Re-hook later only when the slot holds the
+// real XInputGetState again (the game rewrote it, e.g. after a device change) - never just because it is "not ours",
+// or two plugins would keep re-hooking each other.
 DWORD WINAPI HookThread(LPVOID) {
     volatile LONG *slot = reinterpret_cast<volatile LONG *>(kPadPointer);
+    bool hookedOnce = false;
     for (int waited = 0; !g_stop; ++waited) {
+        if (!g_realXInput) {                    // resolve the real one for the re-entry guard
+            const char *dlls[] = {"xinput1_3.dll", "xinput9_1_0.dll", "xinput1_4.dll"};
+            for (int d = 0; d < 3 && !g_realXInput; ++d) {
+                HMODULE xinput = GetModuleHandleA(dlls[d]);
+                if (xinput)
+                    g_realXInput = reinterpret_cast<XInputGetStateFn>(GetProcAddress(xinput, "XInputGetState"));
+            }
+        }
         LONG current = *slot;
         LONG ours = static_cast<LONG>(reinterpret_cast<LONG_PTR>(&PadHook));
-        if (current != 0 && current != ours) {
+        if (current != 0 && current != ours && (!hookedOnce || InXInputModule(current))) {
+            if (InXInputModule(current)) g_realXInput = reinterpret_cast<XInputGetStateFn>(static_cast<LONG_PTR>(current));
             g_original = reinterpret_cast<XInputGetStateFn>(static_cast<LONG_PTR>(current));
-            if (InterlockedCompareExchange(slot, ours, current) == current)
-                Log(1, "pad pointer 0x%08lx hooked (original XInputGetState 0x%08lx)", kPadPointer, current);
+            if (InterlockedCompareExchange(slot, ours, current) == current) {
+                hookedOnce = true;
+                Log(1, "pad pointer 0x%08lx hooked (previous 0x%08lx%s)", kPadPointer, current,
+                    g_realXInput && current == reinterpret_cast<LONG>(g_realXInput) ? ", XInputGetState" : ", another hook");
+            }
         } else if (current == 0 && waited == 600) {
             Log(1, "pad pointer still empty after 60 s - still waiting");
         }
@@ -1106,7 +1142,7 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.5 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d)",
+    Log(1, "TruShadowPower 0.5.1 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d)",
         g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
@@ -1166,6 +1202,6 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.5 (translated TU meter, Lara conditions 1048-1054 / 1056 / 2401, states 243 / 245 / 1018, "
+    return "TruShadowPower 0.5.1 (translated TU meter, Lara conditions 1048-1054 / 1056 / 2401, states 243 / 245 / 1018, "
            "activities 1009 / 1039)";
 }
