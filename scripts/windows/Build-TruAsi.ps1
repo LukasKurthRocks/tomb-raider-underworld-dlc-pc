@@ -16,6 +16,10 @@
 .PARAMETER VsPath
     Visual Studio installation (default: C:\Program Files\Microsoft Visual Studio\2022\Community).
 
+.PARAMETER OutDir
+    Output folder (default <repository>\work\asi). A separate folder (e.g. work\asi\v05) keeps an earlier build of the
+    same plugin untouched.
+
 .EXAMPLE
     .\Build-TruAsi.ps1 -Verbose
 #>
@@ -23,6 +27,7 @@
 param(
     [string]$Name = 'TruShadowPower',
     [string]$VsPath = 'C:\Program Files\Microsoft Visual Studio\2022\Community',
+    [string]$OutDir,
     [switch]$Trace
 )
 
@@ -35,7 +40,7 @@ Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
 $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $srcDir  = Join-Path $repo "src\asi\$Name"
-$outDir  = Join-Path $repo 'work\asi'
+$outDir  = if ($OutDir) { $OutDir } else { Join-Path $repo 'work\asi' }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $outDir, $logDir | Out-Null
 $logFile = Join-Path $logDir ('Build-TruAsi_{0}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'))

@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <math.h>
 
 namespace {
 
@@ -128,11 +129,16 @@ const float kOne = 1.0f;                // [0x8207d544] ramp target without a re
 const float kMeterStart = 1000.0f;      // [0x8206af78] meter value at init, start value after a stop (+0xc)
 const float kPerSecond = 1.0f / 30.0f;  // [0x82052c58] 0.0333333 - frame units -> seconds
 const float kRampSeconds = 0.033f;      // [0x8207db70] 33.0 ms, the selector's ramp duration
+const float kNoRequest = -1.0f;         // [0x82052664] empty request slot
+const float kPercent = 0.01f;           // [0x820536ec]
+const float kHundred = 100.0f;          // [0x8207d53c]
+const float kShortMove = 200.0f;        // [0x8206af90] frames value of a move of <= 2 steps (state 245)
 
 // tuning struct offsets (floats) as the TU reads them
 enum {
     kTuneMax = 0x10, kTuneDrain = 0x14, kTuneRefill = 0x18, kTuneRefillAlt = 0x1c, kTuneRefillDelayed = 0x20,
-    kTuneRestart = 0x28, kTuneHigh = 0x2c, kTuneWorld = 0x3c, kTunePlayer = 0x40, kTuneSize = 0x74
+    kTuneRestart = 0x28, kTuneHigh = 0x2c, kTuneWorld = 0x3c, kTunePlayer = 0x40, kTuneDelay1018 = 0x24,
+    kTuneTimedWorld = 0x54, kTuneTimedPlayer = 0x58, kTuneMoveSpeed = 0x68, kTuneMoveDistance = 0x6c, kTuneSize = 0x78
 };
 
 // copy of the same struct from the converted file (player_tru_dlc2_extension.drm, DTP 22497 +0xf0), used only when
@@ -143,11 +149,18 @@ void InitFileTuning() {
     struct { int offset; float value; } const values[] = {
         {kTuneMax, 1000.0f}, {kTuneDrain, 200.0f}, {kTuneRefill, 200.0f}, {kTuneRefillAlt, 400.0f},
         {kTuneRefillDelayed, 75.0f}, {0x24, 6.0f}, {kTuneRestart, 150.0f}, {kTuneHigh, 300.0f}, {0x30, 200.0f},
-        {0x34, 500.0f}, {0x38, 0.1f}, {kTuneWorld, 0.3f}, {kTunePlayer, 1.2f}, {0x70, 75.0f}};
+        {0x34, 500.0f}, {0x38, 0.1f}, {kTuneWorld, 0.3f}, {kTunePlayer, 1.2f}, {0x44, 0.075f}, {0x48, 1.0f},
+        {0x4c, 0.075f}, {0x50, 0.075f}, {kTuneTimedWorld, 1.0f}, {kTuneTimedPlayer, 0.02f}, {0x60, 25.0f},
+        {0x64, 25.0f}, {kTuneMoveSpeed, 410.87f}, {kTuneMoveDistance, 1896.3f}, {0x70, 75.0f}, {0x74, 1.0f}};
+    // (+0x5c is a pointer in the file - the sound / effect handle data, not used here)
     memset(g_fileTuning, 0, sizeof(g_fileTuning));
     g_fileTuning[0] = 1;                                     // u16 1, u16 type 60 as in the file
     g_fileTuning[2] = static_cast<BYTE>(kTuningType);
     for (const auto &v : values) memcpy(g_fileTuning + v.offset, &v.value, sizeof(float));
+    // exact bit patterns of the two non-round values of the file (410.87 / 1896.3 are rounded above)
+    const DWORD speed = 0x43cd6fa8, distance = 0x44ed0aaf;
+    memcpy(g_fileTuning + kTuneMoveSpeed, &speed, sizeof(DWORD));
+    memcpy(g_fileTuning + kTuneMoveDistance, &distance, sizeof(DWORD));
 }
 
 // the TU's meter object (allocated with the player data; the fields used here, with their Xbox offsets)
@@ -158,7 +171,12 @@ struct Meter {
     float startValue;                   // +0x0c value when the power started (1000 after a stop)
     float delay;                        // +0x10 refill delay timer (no writer found in the TU besides the refill)
     BYTE latch;                         // +0x14 buttons seen held
+    float requestTimer;                 // +0x38 frames until request slot 4 (condition 2401) is cleared
     DWORD startTime;                    // +0x3c game clock at the last start / stop
+    // +0x40..+0x77: time-scale request list of 0x823d7520, 7 slots {player, world}; a value <= 0 = no request
+    // (-1.0 [0x82052664] clears a slot). Slot 0 = the power (Start / Stop), 2 = shadow look (0x823d8a80, not ported),
+    // 4 = timed request of condition 2401, 5 = state 1018.
+    float request[7][2];
 };
 
 // options (TruShadowPower.ini)
@@ -184,6 +202,8 @@ Meter g_meter;
 volatile LONG g_stop = 0;
 const BYTE *volatile g_tuning = nullptr;  // tuning of the last tick (Xbox 0x82415518's result), read by the conditions
 int g_condEnabled = 1;                    // [Conditions] Enabled: register 1049-1054 / 1056 in Lara's link array
+int g_statesEnabled = 1;                  // [States] Enabled (0.5): TU states 243 / 245 / 1018, conditions 1048 / 2401,
+                                          // activities 1009 / 1039
 volatile LONG g_condCalls[8];             // first-call log per handler (1049..1054, 1056)
 volatile LONG g_condLast[8];              // last result per handler (+1, 0 = none yet) for LogLevel 2
 
@@ -323,13 +343,33 @@ void ShowMeter(float fraction) {
     g_hudUpdate();
 }
 
-// 0x823d7700: flags 0, value / start value 1000, latch 0 (the HUD fraction is written once the tuning is known)
+// 0x823d7700: flags 0, value / start value 1000, latch 0 (the HUD fraction is written once the tuning is known).
+// 0.5: the request slots and the timer are not set by 0x823d7700 (the meter object is allocated elsewhere, not
+// inspected); they start empty here (-1.0, the TU's "no request" value) and 0.
 void MeterInit() {
     g_meter.flags = 0;
     g_meter.startValue = kMeterStart;
     g_meter.latch = 0;
     g_meter.value = kMeterStart;
     g_meter.delay = kZero;
+    g_meter.requestTimer = kZero;
+    for (int i = 0; i < 7; ++i) g_meter.request[i][0] = g_meter.request[i][1] = kNoRequest;
+}
+
+// 0x823d7520 (request selector, argument meter +0x40): the highest slot with a player value > 0 sets the player
+// ramp, the highest with a world value > 0 the world ramp; none -> 1.0. The TU writes the ramp structs directly
+// (target, 33 ms, current value, clock) - the PC setters write the same ramps (0.3).
+void Selector() {
+    bool player = false, world = false;
+    float playerTarget = kOne, worldTarget = kOne;
+    for (int i = 6; i >= 0; --i) {
+        if (!player && kZero < g_meter.request[i][0]) { player = true; playerTarget = g_meter.request[i][0]; }
+        if (!world && kZero < g_meter.request[i][1]) { world = true; worldTarget = g_meter.request[i][1]; }
+        if (player && world) break;
+    }
+    g_setPlayer(playerTarget, kRampSeconds);
+    g_setWorld(worldTarget, kRampSeconds);
+    Log(3, "selector: player %.3f, world %.3f", playerTarget, worldTarget);
 }
 
 // 0x823d8120
@@ -346,8 +386,9 @@ void StartPower(const BYTE *tuning) {
     // not ported: cinematic (0x82efb590) / 0x829ca6da / game state +0x628 > 0 checks, sounds 0x89 0x32 0x83 0x81
     // 0x87 0x88, the effect call (*0x82efc780)->vtbl[0xa4], message 0x1f4 to all instances
     if (!tuning) return;
-    g_setPlayer(Tune(tuning, kTunePlayer), kRampSeconds);
-    g_setWorld(Tune(tuning, kTuneWorld), kRampSeconds);
+    g_meter.request[0][0] = Tune(tuning, kTunePlayer);          // +0x40 = tuning +0x40
+    g_meter.request[0][1] = Tune(tuning, kTuneWorld);           // +0x44 = tuning +0x3c
+    Selector();
     g_meter.startValue = g_meter.value;
     g_meter.flags |= 1;
     g_meter.startTime = *kGameClock;
@@ -358,8 +399,8 @@ void StartPower(const BYTE *tuning) {
 void StopPower(const char *why) {
     if (!(g_meter.flags & 1)) return;
     // not ported: effect off 0x823d9438 (flag 0x40), 0x823d9050 (flag 2), sounds 0x33 0x7e 0x82, message 0x1f5
-    g_setPlayer(kOne, kRampSeconds);
-    g_setWorld(kOne, kRampSeconds);
+    g_meter.request[0][0] = g_meter.request[0][1] = kNoRequest;
+    Selector();
     if (!(kZero < g_meter.value)) g_meter.flags |= 0x200;
     g_meter.flags &= ~1u;
     g_meter.startValue = kMeterStart;
@@ -437,6 +478,17 @@ void MeterTick(bool held) {
                 g_meter.flags |= 0x200;
                 StopPower("meter empty");
             }
+        }
+    }
+    // 0x823d7cf8.. (outside the 0x90 test): the timed request of condition 2401 counts down in unscaled frames;
+    // at 0 slot 4 is cleared and the selector runs
+    if (kZero < g_meter.requestTimer) {
+        g_meter.requestTimer = g_meter.requestTimer - frames;
+        if (g_meter.requestTimer <= kZero) {
+            g_meter.request[4][0] = g_meter.request[4][1] = kNoRequest;
+            Selector();
+            g_meter.requestTimer = kZero;
+            Log(2, "timed request (2401) ended");
         }
     }
 }
@@ -545,6 +597,293 @@ char __cdecl CondMeter(void *agent, void *cache, const BYTE *record) {
     return r;
 }
 
+// ---- 0.5: title-update states / conditions / activities of Lara (docs Befund-Schattenkraft "TU states for Lara") ----
+// PC building blocks, each verified by its bytes at load (kTuBlocks below). thiscall functions are called through
+// __fastcall pointers (ecx = this, edx unused, the rest on the stack, callee cleans - the thiscall layout).
+typedef void *(__fastcall *ParamNodeFn)(void *agent, int, int id);              // 0x783f50 = TU 0x82482d28
+typedef void *(__fastcall *ParamFindFn)(void *node, int, int id);               // 0x784b30 = TU 0x82488680
+typedef float(__cdecl *ParamFloatFn)(const void *record);                       // 0x783680 = TU 0x82484a08
+typedef char(__fastcall *ParamBoolFn)(void *node, int, int id, char *out);      // 0x784c20 = TU 0x823d7230 tail
+typedef void *(__cdecl *AnimFramesFn)(int *out, void *agent);                   // 0x75f3e0 = TU 0x82463af8 (flag 0)
+typedef void(__fastcall *ChanMoveFn)(void *chan, int, const float *vec, float frames);   // 0x438d70 mode 1 /
+                                                                                          // 0x438d00 mode 2
+typedef void(__fastcall *ChanMoveAnimFn)(void *chan, int, const float *vec);    // 0x43e400 mode 1, frames of the anim
+
+const DWORD kParamNode = 0x00783f50, kParamFind = 0x00784b30, kParamFloat = 0x00783680, kParamBool = 0x00784c20;
+const DWORD kAnimFrames = 0x0075f3e0, kChanMode1 = 0x00438d70, kChanMode1Anim = 0x0043e400, kChanMode2 = 0x00438d00;
+const DWORD kGameTrackerPtr = 0x00fadb58;   // TU 0x829892b0
+const DWORD kPlayerPtr = 0x00e7f094;        // TU 0x82efb464 (player instance; frame-time block + 0xc)
+
+struct CodeCheck { DWORD address; const char *bytes; };   // hex string, spaces ignored
+const CodeCheck kTuBlocks[] = {
+    {0x00783f50, "56 8bf1 8b8620050000 85c0"},                          // param node, cache agent +0x520
+    {0x00784b30, "0fb701 53 56 57 8b7c2410 33db"},                       // param find
+    {0x00783680, "51 8b442408 d9ee 0fbf4802"},                           // float value (switch on type +2)
+    {0x00783770, "8b542404 0fbf4a02 32c0 83e902"},                       // bool value (types 2 / 0x10 / 0x29)
+    {0x00784c20, "8b442404 50 e806ffffff 85c0"},                         // bool param of a node
+    {0x0075f3e0, "56 57 8b7c2410 681b010000 681b010000"},                // anim frame count (param 0x11b)
+    {0x0075f470, "83ec08 56 57 8b7c241c 8b4704 0fb77002 8b4f08 69f620030000 8b9180020000 037214"},  // channel
+    {0x00438970, "0fb681f8000000 6bc070 038180000000"},                  // anim entry: chan +0x80 + 0x70 x +0xf8
+    {0x00438d70, "55 8bec 83e4f0 83ec10 d9450c 8bc1 8b4d08 0f2801 0f294010"}, {0x00438db1, "c7402401000000"},
+    {0x0043e400, "55 8bec 83e4f0 83ec20 8bc1 8b8880000000"}, {0x0043e464, "c7402401000000"},
+    {0x00438d00, "55 8bec 83e4f0 83ec10 f30f100534118400 d9450c"}, {0x00438d59, "c7402402000000"},
+    {0x00741764, "8b0d94f0e700 0f8599010000 8b8190000000"},               // player +0x90 matrix (row +0x10)
+    {0x00764e79, "8b0d58dbfa00"}, {0x00764e85, "39b11c030000"}, {0x00764e99, "80b92003000000"},  // gt +0x31c/+0x320
+    {0x0075e0e0, "a158dbfa00 8b8804050000"},                             // gt +0x504 = player instance
+    {0x006457a0, "c3"},                                                  // print stub (activity 1039)
+};
+
+bool HexBytesAt(DWORD address, const char *hex) {
+    BYTE buf[64];
+    size_t n = 0;
+    for (const char *p = hex; *p && n < sizeof(buf);) {
+        if (*p == ' ') { ++p; continue; }
+        char two[3] = {p[0], p[1], 0};
+        buf[n++] = static_cast<BYTE>(strtoul(two, nullptr, 16));
+        p += 2;
+    }
+    return BytesAt(address, buf, n);
+}
+
+bool g_tuStatesOk = false;          // all kTuBlocks verified
+int g_gt1280 = 0;                   // TU-only gameTracker+0x1280 (move step count of 244 / 245, read by 1048) - the
+                                    // PC uses +0x1280 for other data, so the translation keeps it here
+
+BYTE *GameTracker() { return *reinterpret_cast<BYTE *const *>(kGameTrackerPtr); }
+
+// agent motion channel: (agent+8)->+0x280->+0x14 + 0x320 x (agent+4)->+2 (TU and PC tru+0x35f470)
+BYTE *Channel(const BYTE *agent) {
+    const BYTE *instance = *reinterpret_cast<const BYTE *const *>(agent + 8);
+    const BYTE *anim = *reinterpret_cast<const BYTE *const *>(instance + 0x280);
+    WORD index = *reinterpret_cast<const WORD *>(*reinterpret_cast<const BYTE *const *>(agent + 4) + 2);
+    return *reinterpret_cast<BYTE *const *>(anim + 0x14) + 0x320 * index;
+}
+
+// animation entry of a channel: chan->+0x80 + 0x70 x chan->+0xf8 (u8) - TU inline, PC tru+0x38970
+const BYTE *AnimEntry(const BYTE *chan) {
+    return *reinterpret_cast<const BYTE *const *>(chan + 0x80) + 0x70 * chan[0xf8];
+}
+
+// TU 0x82482d28 + 0x82488680 + 0x82484a08. The TU does not test the record for null before reading its type (a
+// missing parameter would read guest address 2); a missing record answers 0.0 here - the getter's default value.
+float ParamFloat(void *agent, int id) {
+    void *node = reinterpret_cast<ParamNodeFn>(kParamNode)(agent, 0, id);
+    if (!node) return kZero;
+    void *record = reinterpret_cast<ParamFindFn>(kParamFind)(node, 0, id);
+    if (!record) {
+        static volatile LONG missing = 0;
+        if (InterlockedIncrement(&missing) <= 5) Log(1, "state parameter 0x%x not in the current state (0.0 used)", id);
+        return kZero;
+    }
+    return reinterpret_cast<ParamFloatFn>(kParamFloat)(record);
+}
+
+// TU 0x823d7230(agent, id, &out) = 0x82482d28 + 0x82488680 + (record ? out = 0x82484b88(record))
+void ParamBool(void *agent, int id, char *out) {
+    void *node = reinterpret_cast<ParamNodeFn>(kParamNode)(agent, 0, id);
+    if (node) reinterpret_cast<ParamBoolFn>(kParamBool)(node, 0, id, out);
+}
+
+// first-call / rate-limited logging of the new handlers (proves in a test that a state / condition is entered)
+struct Probe { const char *name; volatile LONG calls; DWORD lastTick; LONG lastLogged; };
+Probe g_probes[] = {
+    {"state 243 slot 0 (move to gameTracker+0x1270)"}, {"state 245 slot 0 (move tuning +0x6c along player row)"},
+    {"state 245 slot 3 (stop at the current position)"}, {"state 1018 slot 0 (meter cost / world request)"},
+    {"state 1018 slot 1 (meter cost / world request)"}, {"state 1018 slot 2 (clear request 5)"},
+    {"condition 1048 (step count x 100 <= animation time)"}, {"condition 2401 (timed time-scale request)"},
+    {"activity 1009 (player +0xc8 = record +4)"}, {"activity 1039 (print stub)"}};
+enum { kP243, kP245a, kP245d, kP1018a, kP1018b, kP1018c, kP1048, kP2401, kP1009, kP1039 };
+
+void Hit(int probe, const char *fmt = nullptr, double a = 0.0, double b = 0.0, double c = 0.0) {
+    Probe &p = g_probes[probe];
+    LONG n = InterlockedIncrement(&p.calls);
+    char detail[160] = "";
+    if (fmt) _snprintf_s(detail, sizeof(detail), _TRUNCATE, fmt, a, b, c);
+    if (n == 1) {
+        Log(1, "%s is now entered%s%s", p.name, detail[0] ? ": " : "", detail);
+        p.lastTick = GetTickCount();
+        p.lastLogged = 1;
+        return;
+    }
+    DWORD now = GetTickCount();
+    if (g_logLevel >= 3 || (g_logLevel >= 2 && now - p.lastTick >= 500)) {
+        Log(2, "%s (call %ld, %ld since last line)%s%s", p.name, n, n - p.lastLogged, detail[0] ? ": " : "", detail);
+        p.lastTick = now;
+        p.lastLogged = n;
+    }
+}
+
+// state 243, slot 0 = TU 0x82464180: v1 = gameTracker+0x1270; b 0x82463eb8 (TU-new). 0x82463eb8: unless the bool
+// parameter 0x11d is set: n = 0x82463af8(agent, flag 0) (= PC 0x75f3e0, parameter 0x11b); n > 0 -> channel +0x10 =
+// v1, +0x00 = 0 vector [0x8207db30], +0x20 = n, +0x24 = 1 (= PC 0x438d70); else the same with the animation's frame
+// count (+0x80 -> +0x24: s16 +0x34 x +0x32) (= PC 0x43e400).
+void __cdecl State243(BYTE *agent) {
+    __try {
+        float *target = reinterpret_cast<float *>(GameTracker() + 0x1270);
+        BYTE *chan = Channel(agent);
+        char keep = 0;
+        ParamBool(agent, 0x11d, &keep);
+        if (keep) { Hit(kP243, "parameter 0x11d set - nothing done"); return; }
+        int n = 0;
+        reinterpret_cast<AnimFramesFn>(kAnimFrames)(&n, agent);
+        if (n > 0)
+            reinterpret_cast<ChanMoveFn>(kChanMode1)(chan, 0, target, static_cast<float>(n));
+        else
+            reinterpret_cast<ChanMoveAnimFn>(kChanMode1Anim)(chan, 0, target);
+        Hit(kP243, "frames %.0f, target %.1f %.1f", n, target[0], target[1]);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 243: access fault - skipped");
+    }
+}
+
+// TU "busy" test of 245 (both slots): gameTracker+0x31c set, byte +0x320 set and (+0x31c)->u16 +0x40 == 2 or
+// u16 +0x32 == 3
+bool Busy245(const BYTE *gt) {
+    if (!gt) return false;
+    const BYTE *p = *reinterpret_cast<const BYTE *const *>(gt + 0x31c);
+    if (!p || !gt[0x320]) return false;
+    return *reinterpret_cast<const WORD *>(p + 0x40) == 2 || *reinterpret_cast<const WORD *>(p + 0x32) == 3;
+}
+
+// state 245, slot 0 = TU 0x824645d8: unless busy: target = player position (+0x20) + (row +0x10 of the player's
+// matrix (+0x90) x -1.0) x tuning +0x6c; length = |target - position| (vrsqrtefp + one Newton step on the Xbox, 0
+// for 0); n = (int)floor(length / tuning +0x68); n > 2: gameTracker+0x1280 = n, frames = n x 100.0; else +0x1280 = 2,
+// frames = 200.0; channel +0x00 = target, +0x10 = (0, 0, 0, 1), +0x20 = frames, +0x24 = 2 (= PC 0x438d00).
+void __cdecl State245(BYTE *agent) {
+    __try {
+        BYTE *gt = GameTracker();
+        if (Busy245(gt)) { Hit(kP245a, "busy (gameTracker+0x31c) - nothing done"); return; }
+        BYTE *chan = Channel(agent);
+        const BYTE *tuning = gt ? g_tuning : nullptr;
+        if (!tuning) { Log(1, "state 245: no tuning - skipped (the Xbox would read address 0x68)"); return; }
+        float speed = Tune(tuning, kTuneMoveSpeed);
+        float distance = Tune(tuning, kTuneMoveDistance);
+        const BYTE *player = *reinterpret_cast<const BYTE *const *>(kPlayerPtr);
+        const float *row = reinterpret_cast<const float *>(*reinterpret_cast<const BYTE *const *>(player + 0x90) + 0x10);
+        const float *position = reinterpret_cast<const float *>(player + 0x20);
+        __declspec(align(16)) float target[4];
+        for (int i = 0; i < 4; ++i) target[i] = (row[i] * kNoRequest) * distance + position[i];   // [0x82052664]
+        float d[3] = {target[0] - position[0], target[1] - position[1], target[2] - position[2]};
+        float squared = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+        float length = squared == kZero ? squared : sqrtf(squared);
+        int n = static_cast<int>(static_cast<float>(floor(static_cast<double>(length / speed))));
+        float frames;
+        if (n > 2) {
+            g_gt1280 = n;
+            frames = static_cast<float>(n) * kHundred;
+        } else {
+            g_gt1280 = 2;
+            frames = kShortMove;
+        }
+        reinterpret_cast<ChanMoveFn>(kChanMode2)(chan, 0, target, frames);
+        // direction of the move (-row): (0, 0, +-1) = vertical (wall run), otherwise horizontal
+        Hit(kP245a, "direction %.2f %.2f %.2f", -row[0], -row[1], -row[2]);
+        Log(2, "state 245: steps %d, length %.1f, frames %.0f, from %.1f %.1f %.1f to %.1f %.1f %.1f", g_gt1280, length,
+            frames, position[0], position[1], position[2], target[0], target[1], target[2]);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 245: access fault - skipped");
+    }
+}
+
+// state 245, slot 3 = TU 0x824647d0: only when busy: channel +0x00 = instance (agent+8) position +0x20, +0x10 =
+// (0, 0, 0, 1), +0x20 = animation entry +0x28 - 1.0, +0x24 = 2 (= PC 0x438d00)
+void __cdecl State245Slot3(BYTE *agent) {
+    __try {
+        if (!Busy245(GameTracker())) return;
+        BYTE *chan = Channel(agent);
+        const BYTE *instance = *reinterpret_cast<const BYTE *const *>(agent + 8);
+        float frames = *reinterpret_cast<const float *>(AnimEntry(chan) + 0x28) - kOne;
+        reinterpret_cast<ChanMoveFn>(kChanMode2)(chan, 0, reinterpret_cast<const float *>(instance + 0x20), frames);
+        Hit(kP245d, "frames %.2f", frames);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 245 slot 3: access fault - skipped");
+    }
+}
+
+// state 1018, slots 0 and 1 = TU 0x82465078 (gameTracker+0x1244 / +0x508 taken as present, see 0.4): parameters
+// 0x410 (amount), 0x411 (percent), bool 0x414; amount > 0 -> Drain(amount) (0x823d8380), else percent > 0 ->
+// Drain(max x percent x 0.01) (0x823d84d0); 0x414 set -> refill delay = tuning +0x24; parameter 0x413 > 0 -> world
+// request slot 5 = it, else slot 5 cleared; selector.
+void State1018(BYTE *agent, int probe) {
+    __try {
+        float amount = ParamFloat(agent, 0x410);
+        float percent = ParamFloat(agent, 0x411);
+        char delay = 0;
+        ParamBool(agent, 0x414, &delay);
+        const BYTE *tuning = g_tuning;
+        if (kZero < amount) {
+            Drain(tuning, amount);
+        } else if (kZero < percent) {
+            if (tuning) Drain(tuning, Tune(tuning, kTuneMax) * (percent * kPercent));
+        }
+        if (delay && tuning) g_meter.delay = Tune(tuning, kTuneDelay1018);
+        float world = ParamFloat(agent, 0x413);
+        if (kZero < world) {
+            g_meter.request[5][1] = world;
+        } else {
+            g_meter.request[5][0] = g_meter.request[5][1] = kNoRequest;
+        }
+        Selector();
+        Hit(probe, "cost %.1f / %.1f %%, world request %.3f", amount, percent, world);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 1018: access fault - skipped");
+    }
+}
+void __cdecl State1018Slot0(BYTE *agent) { State1018(agent, kP1018a); }
+void __cdecl State1018Slot1(BYTE *agent) { State1018(agent, kP1018b); }
+
+// state 1018, slot 2 = TU 0x824651c8: slot 5 cleared, selector
+void __cdecl State1018Slot2(BYTE *) {
+    g_meter.request[5][0] = g_meter.request[5][1] = kNoRequest;
+    Selector();
+    Hit(kP1018c);
+}
+
+// condition 1048 = TU 0x8246ece0 (agent; no record test, no NOT flag): true unless gameTracker+0x1280 x 100.0 >
+// animation entry +0x28 of the agent's channel
+char __cdecl Cond1048(BYTE *agent, void *, const BYTE *) {
+    char r = 0;
+    __try {
+        float steps = static_cast<float>(g_gt1280) * kHundred;
+        float time = *reinterpret_cast<const float *>(AnimEntry(Channel(agent)) + 0x28);
+        r = steps > time ? 0 : 1;
+        Hit(kP1048, "steps x 100 = %.0f, animation %.1f -> %.0f", steps, time, r);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        r = 0;
+    }
+    return r;
+}
+
+// condition 2401 = TU 0x824702b0 (always false): with the tuning: meter +0x38 = record value (s16 -> float, frames),
+// slot 4 = {tuning +0x58 player, tuning +0x54 world}, selector
+char __cdecl Cond2401(void *, void *, const BYTE *record) {
+    __try {
+        float value = static_cast<float>(*reinterpret_cast<const SHORT *>(record + 4));
+        const BYTE *tuning = g_tuning;
+        if (!tuning) return 0;
+        g_meter.requestTimer = value;
+        g_meter.request[4][0] = Tune(tuning, kTuneTimedPlayer);
+        g_meter.request[4][1] = Tune(tuning, kTuneTimedWorld);
+        Selector();
+        Hit(kP2401, "%.0f frames, player %.3f, world %.3f", value, g_meter.request[4][0], g_meter.request[4][1]);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return 0;
+}
+
+// activity 1009 = TU 0x82472788: (gameTracker+0x504 = player instance)->+0xc8 = record +4
+void __cdecl Act1009(void *, const BYTE *record) {
+    __try {
+        BYTE *player = *reinterpret_cast<BYTE *const *>(GameTracker() + 0x504);
+        *reinterpret_cast<DWORD *>(player + 0xc8) = *reinterpret_cast<const DWORD *>(record + 4);
+        Hit(kP1009, "value %.0f", static_cast<double>(*reinterpret_cast<const DWORD *>(record + 4)));
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+}
+
+// activity 1039 = TU 0x82455a38 = PC 0x6457a0 (an empty print function - `ret`)
+void __cdecl Act1039(void *, const BYTE *) { Hit(kP1039); }
+
 // copy of Lara's table with the TU records before the closing record; the builder's push operand points at the copy
 DWORD g_laraConds[(kLaraCondCount + 16) * 3];
 
@@ -563,13 +902,20 @@ void RegisterLaraConditions() {
             kLaraCondTable, static_cast<DWORD>(kLaraCondCount));
         return;
     }
-    struct { DWORD id; DWORD group; const void *fn; } const add[] = {
+    // 0.5: + 1048 and 2401 (only when the 0.5 building blocks are verified; group 2000 / 2400 as in the TU table)
+    struct AddRec { DWORD id; DWORD group; const void *fn; };
+    AddRec add[9] = {
         {1049, 2000, &CondMeter}, {1050, 2000, &CondMeter}, {1051, 2000, &CondMeter}, {1052, 2000, &CondMeter},
-        {1053, 2000, &CondMeter}, {1054, 2000, &CondMeter}, {1056, 2000, &Cond1056}};
+        {1053, 2000, &CondMeter}, {1054, 2000, &CondMeter}, {1056, 2000, &Cond1056}, {0, 0, nullptr}, {0, 0, nullptr}};
+    int addCount = 7;
+    if (g_tuStatesOk && g_statesEnabled) {
+        add[addCount++] = {1048, 2000, &Cond1048};
+        add[addCount++] = {2401, 2400, &Cond2401};
+    }
     for (int i = 0; i < kLaraCondCount; ++i)
-        for (const auto &a : add)
-            if (table[i * 3] == a.id) {
-                Log(0, "Lara conditions: id %lu already in the table - not registered", a.id);
+        for (int k = 0; k < addCount; ++k)
+            if (table[i * 3] == add[k].id) {
+                Log(0, "Lara conditions: id %lu already in the table - not registered", add[k].id);
                 return;
             }
     // Precondition: every id must be in the generic registry. For an id found neither in Lara's tree nor in the
@@ -586,11 +932,11 @@ void RegisterLaraConditions() {
         const DWORD *g = reinterpret_cast<const DWORD *>(generic);
         int found = 0;
         for (int i = 0; i < 1000 && g[i * 3] != 0; ++i)
-            for (const auto &a : add)
-                if (g[i * 3] == a.id) ++found;
-        if (found != static_cast<int>(sizeof(add) / sizeof(add[0]))) {
+            for (int k = 0; k < addCount; ++k)
+                if (g[i * 3] == add[k].id) ++found;
+        if (found != addCount) {
             Log(0, "Lara conditions: the generic table 0x%08lx holds %d of our %d ids - not registered", generic, found,
-                static_cast<int>(sizeof(add) / sizeof(add[0])));
+                addCount);
             return;
         }
     } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -599,10 +945,10 @@ void RegisterLaraConditions() {
     }
     memcpy(g_laraConds, table, kLaraCondCount * 3 * sizeof(DWORD));
     int n = kLaraCondCount;
-    for (const auto &a : add) {
-        g_laraConds[n * 3] = a.id;
-        g_laraConds[n * 3 + 1] = a.group;
-        g_laraConds[n * 3 + 2] = reinterpret_cast<DWORD>(a.fn);
+    for (int k = 0; k < addCount; ++k) {
+        g_laraConds[n * 3] = add[k].id;
+        g_laraConds[n * 3 + 1] = add[k].group;
+        g_laraConds[n * 3 + 2] = reinterpret_cast<DWORD>(add[k].fn);
         ++n;
     }
     memcpy(g_laraConds + n * 3, end, 3 * sizeof(DWORD));   // closing {0, 0, default}
@@ -616,15 +962,135 @@ void RegisterLaraConditions() {
     DWORD dummy = 0;
     VirtualProtect(operand, 4, old, &dummy);
     FlushInstructionCache(GetCurrentProcess(), operand, 4);
-    Log(1, "Lara conditions: 1049-1054 (meter compare), 1056 (meter >= tuning +0x70 while active) added to the link "
+    Log(1, "Lara conditions: 1049-1054 (meter compare), 1056 (meter >= tuning +0x70 while active)%s added to the link "
            "array (copy 0x%08lx, %d records; generic registry has them via TruDoppelganger)",
+        addCount > 7 ? ", 1048 (move steps vs animation), 2401 (timed time-scale request)" : "",
         reinterpret_cast<DWORD>(g_laraConds), n);
+}
+
+// 0.5: Lara's activity and state tables get the translated TU records the same way (push operands tru+0x368b8d /
+// tru+0x368b99, loops tru+0x385390 / tru+0x385600 - the state loop has the same null-node crash path for an id the
+// generic registry lacks, tru+0x3856e4 -> 0x385742). Generic tables: TruDoppelganger's copies (push operands
+// tru+0x38735a / tru+0x38736a). TU slot positions kept: 243 {f, 0, 0, 0, 0, 0}, 245 {f, 0, 0, g, 0, 0}, 1018 {f, f,
+// g, 0, 0, 0} (TU table 0x82757948).
+const DWORD kLaraActPush = 0x00768b8d, kLaraStatePush = 0x00768b99;
+const BYTE kLaraActStateBytes[] = {0x68, 0x80, 0x22, 0x8b, 0x00, 0x8b, 0xce, 0xe8, 0xf7, 0xc7, 0x01, 0x00,
+                                   0x68, 0x50, 0x0a, 0x8b, 0x00, 0x8b, 0xce, 0xe8, 0x5b, 0xca, 0x01, 0x00};
+const DWORD kLaraActTable = 0x008b2280, kLaraStateTable = 0x008b0a50;
+const int kLaraActCount = 139, kLaraStateCount = 179;
+const DWORD kActClosingFn = 0x00784cf0, kStateDefaultFn = 0x00781d10;
+const DWORD kGenericActPush = 0x0078735a, kGenericStatePush = 0x0078736a;
+const DWORD kGenericActTable = 0x008b6650, kGenericStateTable = 0x008b4200;
+DWORD g_laraActs[(kLaraActCount + 4) * 2];
+DWORD g_laraStates[(kLaraStateCount + 6) * 7];
+
+// count of `ids` present in a generic {id, n-1 words} table that is not the original; -1 if it is the original / bad
+int GenericHolds(DWORD pushOperand, DWORD original, int stride, const DWORD *ids, int count) {
+    __try {
+        DWORD table = *reinterpret_cast<const DWORD *>(pushOperand);
+        if (table == original) return -1;
+        const DWORD *t = reinterpret_cast<const DWORD *>(table);
+        int found = 0;
+        for (int i = 0; i < 2000 && t[i * stride] != 0; ++i)
+            for (int k = 0; k < count; ++k)
+                if (t[i * stride] == ids[k]) ++found;
+        return found;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return -1;
+    }
+}
+
+bool PatchPush(DWORD operandAddress, DWORD value) {
+    DWORD *operand = reinterpret_cast<DWORD *>(operandAddress);
+    DWORD old = 0;
+    if (!VirtualProtect(operand, 4, PAGE_EXECUTE_READWRITE, &old)) return false;
+    *operand = value;
+    DWORD dummy = 0;
+    VirtualProtect(operand, 4, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), operand, 4);
+    return true;
+}
+
+void RegisterLaraStates() {
+    if (!g_statesEnabled) { Log(1, "Lara states / activities: off ([States] Enabled=0)"); return; }
+    if (!g_tuStatesOk) { Log(0, "Lara states / activities: building blocks not verified - not registered"); return; }
+    // RegisterLaraConditions runs first and may already have pointed the condition push (inside kLaraRegBytes) at
+    // our copy - accept the original operand or that copy, all other bytes must match
+    const size_t condOff = kLaraCondPush + 1 - kLaraReg;
+    const DWORD condCopy = reinterpret_cast<DWORD>(g_laraConds);
+    const bool regOk = BytesAt(kLaraReg, kLaraRegBytes, condOff) &&
+                       BytesAt(kLaraCondPush + 5, kLaraRegBytes + condOff + 4, sizeof(kLaraRegBytes) - condOff - 4) &&
+                       (BytesAt(kLaraCondPush + 1, kLaraRegBytes + condOff, 4) ||
+                        BytesAt(kLaraCondPush + 1, reinterpret_cast<const BYTE *>(&condCopy), 4));
+    if (!regOk || !BytesAt(kLaraActPush, kLaraActStateBytes, sizeof(kLaraActStateBytes))) {
+        Log(0, "Lara states / activities: registration code does not match - not registered");
+        return;
+    }
+    // activities
+    const DWORD *acts = reinterpret_cast<const DWORD *>(kLaraActTable);
+    const DWORD *actEnd = acts + kLaraActCount * 2;
+    const DWORD actIds[] = {1009, 1039};
+    const DWORD actFns[] = {reinterpret_cast<DWORD>(&Act1009), reinterpret_cast<DWORD>(&Act1039)};
+    bool actsOk = actEnd[0] == 0 && actEnd[1] == kActClosingFn && acts[0] == 203;
+    for (int i = 0; actsOk && i < kLaraActCount; ++i)
+        if (acts[i * 2] == 1009 || acts[i * 2] == 1039) actsOk = false;
+    int actGeneric = GenericHolds(kGenericActPush, kGenericActTable, 2, actIds, 2);
+    if (!actsOk) {
+        Log(0, "Lara activities: table 0x%08lx is not the expected one - not registered", kLaraActTable);
+    } else if (actGeneric != 2) {
+        Log(0, "Lara activities: generic table lacks the ids (%d of 2; TruDoppelganger.asi active?) - not registered",
+            actGeneric);
+    } else {
+        memcpy(g_laraActs, acts, kLaraActCount * 2 * sizeof(DWORD));
+        int n = kLaraActCount;
+        for (int k = 0; k < 2; ++k, ++n) { g_laraActs[n * 2] = actIds[k]; g_laraActs[n * 2 + 1] = actFns[k]; }
+        memcpy(g_laraActs + n * 2, actEnd, 2 * sizeof(DWORD));
+        if (PatchPush(kLaraActPush + 1, reinterpret_cast<DWORD>(g_laraActs)))
+            Log(1, "Lara activities: 1009 (player +0xc8 = record +4), 1039 (print stub) added (copy 0x%08lx, %d "
+                   "records)", reinterpret_cast<DWORD>(g_laraActs), n);
+        else
+            Log(0, "Lara activities: VirtualProtect failed (%lu) - not registered", GetLastError());
+    }
+    // states
+    const DWORD *states = reinterpret_cast<const DWORD *>(kLaraStateTable);
+    const DWORD *stateEnd = states + kLaraStateCount * 7;
+    bool statesOk = stateEnd[0] == 0 && states[0] == 2;
+    for (int k = 1; statesOk && k < 7; ++k) statesOk = stateEnd[k] == kStateDefaultFn;
+    for (int i = 0; statesOk && i < kLaraStateCount; ++i)
+        if (states[i * 7] == 243 || states[i * 7] == 245 || states[i * 7] == 1018) statesOk = false;
+    const DWORD stateIds[] = {243, 245, 1018};
+    int stateGeneric = GenericHolds(kGenericStatePush, kGenericStateTable, 7, stateIds, 3);
+    if (!statesOk) {
+        Log(0, "Lara states: table 0x%08lx is not the expected one - not registered", kLaraStateTable);
+        return;
+    }
+    if (stateGeneric != 3) {
+        Log(0, "Lara states: generic table lacks the ids (%d of 3; TruDoppelganger.asi active?) - not registered",
+            stateGeneric);
+        return;
+    }
+    const DWORD rec[3][7] = {
+        {243, reinterpret_cast<DWORD>(&State243), 0, 0, 0, 0, 0},
+        {245, reinterpret_cast<DWORD>(&State245), 0, 0, reinterpret_cast<DWORD>(&State245Slot3), 0, 0},
+        {1018, reinterpret_cast<DWORD>(&State1018Slot0), reinterpret_cast<DWORD>(&State1018Slot1),
+         reinterpret_cast<DWORD>(&State1018Slot2), 0, 0, 0}};
+    memcpy(g_laraStates, states, kLaraStateCount * 7 * sizeof(DWORD));
+    int n = kLaraStateCount;
+    for (int k = 0; k < 3; ++k, ++n) memcpy(g_laraStates + n * 7, rec[k], 7 * sizeof(DWORD));
+    memcpy(g_laraStates + n * 7, stateEnd, 7 * sizeof(DWORD));
+    if (PatchPush(kLaraStatePush + 1, reinterpret_cast<DWORD>(g_laraStates)))
+        Log(1, "Lara states: 243 (move to gameTracker+0x1270), 245 (move tuning +0x6c along the player), 1018 (meter "
+               "cost / world request) added (copy 0x%08lx, %d records); not translated: 244, 1017, 1019, 1020, 2102",
+            reinterpret_cast<DWORD>(g_laraStates), n);
+    else
+        Log(0, "Lara states: VirtualProtect failed (%lu) - not registered", GetLastError());
 }
 
 void ReadOptions(const char *dir) {
     char ini[MAX_PATH];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruShadowPower.ini", dir);
     g_condEnabled = GetPrivateProfileIntA("Conditions", "Enabled", 1, ini);
+    g_statesEnabled = GetPrivateProfileIntA("States", "Enabled", 1, ini);
     g_enabled = GetPrivateProfileIntA("ShadowPower", "Enabled", 1, ini);
     g_logLevel = GetPrivateProfileIntA("ShadowPower", "LogLevel", 1, ini);
     g_buttons = static_cast<WORD>(GetPrivateProfileIntA("ShadowPower", "Buttons", 0x0300, ini));
@@ -640,8 +1106,8 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.4 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d)",
-        g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled);
+    Log(1, "TruShadowPower 0.5 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d)",
+        g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -670,7 +1136,16 @@ void Start(HMODULE self) {
                       kHudValueGetter, kHudGroup, kHudUpdate);
     Log(3, "code checks passed (call site, setters, frame time, object table %d, HUD %d)", g_tableOk, g_hudOk);
     MeterInit();
+    g_tuStatesOk = true;
+    for (const auto &c : kTuBlocks)
+        if (!HexBytesAt(c.address, c.bytes)) {
+            Log(0, "0.5 building block at 0x%08lx does not match - TU states / 1048 / 2401 / activities not registered",
+                c.address);
+            g_tuStatesOk = false;
+            break;
+        }
     RegisterLaraConditions();
+    RegisterLaraStates();
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -691,5 +1166,6 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.4 (translated TU meter, lookup diagnostics, Lara conditions 1049-1054 / 1056)";
+    return "TruShadowPower 0.5 (translated TU meter, Lara conditions 1048-1054 / 1056 / 2401, states 243 / 245 / 1018, "
+           "activities 1009 / 1039)";
 }

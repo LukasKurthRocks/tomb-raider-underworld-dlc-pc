@@ -14,8 +14,30 @@ values. The translation table, the data sources and every left-out part are docu
 
 **Status: 3.1 (slow motion) played; 3.2 (meter with estimated rates) played - meter OK, HUD silhouette not shown;
 3.3 (translated meter + HUD trigger) played 2026-10-30 - drain / refill 200/s as in the data, tuning from the
-fallback copy; 0.3.1 / 0.4 (lookup diagnostics, Lara conditions) built 2026-10-31, not yet played.** Not covered:
-sounds, the blur / bloom look, rock veins (TruRockVein.asi), the shadow jump and the combat moves.
+fallback copy; 0.4 (lookup diagnostics, Lara conditions) played 2026-10-31 (test A); 0.5 (TU states) built
+2026-10-31, not yet played.** Not covered: sounds, the blur / bloom look, rock veins (TruRockVein.asi), the shadow
+strike target states and the combat conditions (0.5 gaps below).
+
+## 0.5: title-update states, conditions and activities of Lara
+
+Translated from the TU (project docs `Befund-Schattenkraft.md`, "TU states for Lara"), registered in copies of Lara's
+condition / activity / state tables (push operands tru+0x368b82 / +0x368b8e / +0x368b9a) after byte checks of 20 PC
+building blocks, the registration code, the table sizes and TruDoppelganger's generic copies (`[States] Enabled`):
+
+| id | Xbox TU | translation (PC parts) |
+|---|---|---|
+| state 243 | 0x82464180 -> 0x82463eb8 | move Lara to gameTracker+0x1270 in motion mode 1 (state parameters tru+0x383f50 / 0x384c20, frame count tru+0x35f3e0, channel setters tru+0x38d70 / 0x3e400) |
+| state 245 | 0x824645d8 / 0x824647d0 | move tuning +0x6c (1896.3) along -(player matrix row +0x10), steps = length / tuning +0x68 (410.87), mode 2 (player 0xe7f094, setter tru+0x38d00); step count kept in the plugin (TU gameTracker+0x1280) |
+| state 1018 | 0x82465078 / 0x824651c8 | meter cost from parameters 0x410 / 0x411, refill delay 0x414, world time-scale request 0x413 (slot 5) |
+| condition 1048 | 0x8246ece0 | step count x 100 <= animation time of the agent's channel |
+| condition 2401 | 0x824702b0 | timed request slot 4 (tuning +0x58 player, +0x54 world) for record-value frames; always false |
+| activity 1009 / 1039 | 0x82472788 / 0x82455a38 | player instance +0xc8 = record +4 / empty print stub |
+| selector | 0x823d7520 | the 7-slot time-scale request list; Start / Stop use slot 0 |
+
+Not translated (named gaps): states 244, 1017, 1019, 1020, 2102; conditions 1055, 2005, 2006, 2013. Each new handler
+logs its first call (LogLevel 1) and, at LogLevel 2, further calls at most twice per second. Build into a separate
+folder with `Build-TruAsi.ps1 -OutDir work\asi\v05`, install with `Set-TruShadowPower.ps1 -Install -SourceDir
+work\asi\v05`.
 
 ## 0.4: the meter conditions of Lara's link array
 

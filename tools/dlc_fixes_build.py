@@ -24,9 +24,13 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          such DTP word by word from the base game's Xbox/PC pairs (tools/statechart_fix_tree.py /
          statechart_twins.py; the rock vein's conditions 607 / 608 were unreachable)
   uirecord (ours, finding 43) UI text element records of the new DLC scripts by Crystal's PC conversion rules (w1/w3
-         as u32 instead of swapped halves, the PC word 0x00010000, -1.0f) - tools/script_records_dlc.py; last, so it
-         sees the final scripts (it only touches type-8 records; test 34, played 2026-10-30). The merged g_pda.drm of
-         the DLC 2 tree is left out (not installed, finding 40)
+         as u32 instead of swapped halves, the PC word 0x00010000, -1.0f) - tools/script_records_dlc.py; after the
+         other script fixes, so it sees the final scripts (it only touches type-8 records; test 34, played
+         2026-10-30). The merged g_pda.drm of the DLC 2 tree is left out (not installed, finding 40)
+  achievement (ours, finding 43, test 40) script calls into the title update's achievement natives f16-f20, which
+         the PC exe lacks (16 natives instead of 21): call sequence -> its line marker, relocation dropped
+         (tools/script_missing_native_fix.py; DLC 1 treasure room, DLC 2 halls and Yggdrasil end; 1 + 10 calls).
+         Last: it only touches script code words and their relocations
 
 Report: <OUT>/../fixes_report.json (per fix: files, log lines).
 
@@ -310,8 +314,33 @@ def fix_uirecord(out, srcs=None):
     return {'files': files, 'log': log}
 
 
+ACHIEVEMENT_TYPES = {'achievement'}
+
+
+def fix_achievement(out, srcs=None):
+    """Calls into the title update's `achievement` natives f16-f20 (finding 43, test 40; workspace docs
+    Befund-Erfolge.md): the TU binds 21 achievement natives, the PC exe 16, so a DLC script's `op65` into entry 16-20
+    lands behind the PC function table (a call through a null native pointer, like `dlc2data` in test 33).
+    tools/script_missing_native_fix.process per DRM with the original PC generalbank as the reference of the native
+    tables (read-only, the same in every run; the installed / our generalbank give the same 11 calls): each such call
+    sequence (object push + call + operand) becomes the preceding line marker and its relocation is dropped;
+    sequences with out parameters or other ops are reported and left alone. srcs: as in fix_uitext (out is read
+    too and wins)."""
+    sys.path.insert(0, HERE)
+    import dtp_audit as DA, script_missing_native_fix as MN
+    nat = MN.native_types('pc'); files, log = [], []
+    dirs = [os.path.abspath(s) for s in (srcs or [])] + [os.path.abspath(out)]
+    for rel, path in sorted(DA.overlay(dirs, None).items()):
+        new = MN.process(rel, path, nat, ACHIEVEMENT_TYPES, log)
+        if new is not None:
+            _write(out, rel, new); files.append(rel)
+    log.append('total %d call(s) neutralised in %d file(s) (types %s, reference: original PC generalbank)' % (
+        sum(l.startswith('FIX') for l in log), len(files), ','.join(sorted(ACHIEVEMENT_TYPES))))
+    return {'files': files, 'log': log}
+
+
 FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('uipath', fix_uipath), ('uitext', fix_uitext), ('postfix', fix_postfix),
-         ('analog', fix_analog), ('statechart', fix_statechart), ('uirecord', fix_uirecord)]
+         ('analog', fix_analog), ('statechart', fix_statechart), ('uirecord', fix_uirecord), ('achievement', fix_achievement)]
 
 
 def main(argv):

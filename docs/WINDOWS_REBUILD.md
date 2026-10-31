@@ -2051,6 +2051,19 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        changed scripts, `script_ext_check` unchanged (the one suspect of 26418, root +0x40 -> 3523, is in the
        installed file too), `tree_check` 0 errors, `native_calls_check` no `achievement` line. Not yet in the
        pipeline's `Fixes` step - after a play test. Details: workspace `docs\Befund-Erfolge.md`.
+     * **Achievement fix in the pipeline (2026-10-31, = test 40, not played)**: what the five TU natives do, from the
+       TU memory image: the binder `0x8249e990` puts `0x8249f230` / `f298` / `f300` / `f368` / `f3d0` into slots
+       16-20; each is the same stub as the retail natives - no signed-in profile: return; else tail-call
+       `0x8248c370(profile, id)` with id 47 / 54 / 55 / 56 / 57, which logs "[UserProfile] Award Achievement", skips
+       an id already in the profile's mask and queues the Xbox Live write. No result, no game state; the PC exe has
+       no achievement system, so dropping the call is the TU's own no-profile path (nothing guessed). New last fix
+       `achievement` of `tools/dlc_fixes_build.py` (after `uirecord`; `Fixes`, DLC 1 + DLC 2) and step 3c of
+       `tools/b138_fix_tree.py` (`Repair`): `script_missing_native_fix.process` per DRM, reference = the original
+       PC generalbank (`REF` `pc`, read from patch.000 / bigfile.000; the installed one gives the same 11 calls).
+       Runs into `*_ach` folders: the 8 test-40 DRMs come out MD5-identical (7 DLC 2 + B138 `dlc_treasureroom`; the
+       pipeline's own DLC 1 `dlc_treasureroom` has script 23210 identical to test 40); against the `_sc` outputs only
+       the achievement files differ (DLC 2 286 / 293 identical, the 7 achievement files differ; DLC 1 270 / 271, only
+       section 8:23210; Repair 104 / 105).
      * (Superseded by debugger run 2: the base title is a separate string 51.) Loading-screen title: the base game's start screen text "Was bisher bei Tomb Raider geschah..." is ONE string
        (PC 59: heading line + body), while the DLC loading screen has a separate title element (5169) next to the
        description - the description shows, the title element stays invisible. Next: GetLocalString breakpoint on 59

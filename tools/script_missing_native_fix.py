@@ -16,6 +16,8 @@ the call would have written a result the script reads later). Anything else is r
 Usage (from the repository root):
   ../bin/pyt -t 900 tools/script_missing_native_fix.py MODS_DIR REF.drm OUT_DIR [--types achievement,...] [--check]
   MODS_DIR  a mods tree (PC DRMs); only changed DRMs are written to OUT_DIR (same file names)
+  REF.drm   a generalbank.drm, or 'pc' for the original PC game's generalbank (what the pipeline fix `achievement` of
+            tools/dlc_fixes_build.py uses)
   --types   native type names to fix (default: achievement); 'all' = every native type
   --check   report only, write nothing
 """
@@ -31,12 +33,27 @@ SAFE = {0x02, 0x03, 0x04, 0x05, 0x06, 0x08, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}
 
 
 def native_types(ref):
+    """{script id: (native type name, PC function table)} of the native type scripts of REF: a generalbank.drm, or
+    'pc' = the original PC game's generalbank (patch.000 / bigfile.000; read-only, the same in every run - the
+    pipeline's choice)"""
+    if ref == 'pc':
+        import dtp_word_classes as C
+        secs = [(s['type'], s['id'], s['data'], s['reloc']) for s in C.find(C.PC, 'le', 'pc-w' + chr(92) + 'generalbank.drm')]
+    else:
+        secs = [(s.type, s.id, s.data, s.reloc) for s in DW.read(open(ref, 'rb').read(), 'le').sections]
     out = {}
-    for s in DW.read(open(ref, 'rb').read(), 'le').sections:
-        if s.type != 8 or not s.data: continue
-        info = P.script_info({'data': s.data, 'reloc': s.reloc}, 'le')[:2]
-        if info[0]: out[s.id] = (info[1], func_table(s.data, s.reloc))
+    for typ, sid, data, reloc in secs:
+        if typ != 8 or not data: continue
+        info = P.script_info({'data': data, 'reloc': reloc}, 'le')[:2]
+        if info[0]: out[sid] = (info[1], func_table(data, reloc))
     return out
+
+
+def process(rel, path, nat, types, report):
+    """the fixed DRM bytes of one file, or None when it has no such call (report gets the FIX / SKIP / NOTE lines)"""
+    D = DW.read(open(path, 'rb').read(), 'le')
+    n = sum(fix_section(D, s, nat, types, True, rel, report) for s in D.sections if s.type == 8 and s.data)
+    return DW.cdrm_encode(D.write('le'), 'le') if n else None
 
 
 def instructions(d, rel):

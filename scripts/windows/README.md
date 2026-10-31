@@ -101,9 +101,12 @@ optionally `Assemble` (upstream's full stage-1 route with the rebuilt render tab
 DLC 1 and DLC 2; `statechart`: state charts, record tables and id lists of the new DLC objects re-converted from the
 base game's Xbox/PC pairs, the DLC 2 player chart first by its typed steps - this one needs the title-update memory
 image `work\xenia_dump\tu_image_82000000.bin` or `TRUDLC_TU_IMAGE`, without it the player chart gets the base-pair
-part only; last fix `uirecord`: the UI text element records of the new DLC scripts by Crystal's PC rules) and
+part only; `uirecord`: the UI text element records of the new DLC scripts by Crystal's PC rules; last fix
+`achievement`: the 11 script calls into the title update's achievement natives f16-f20, which the PC exe lacks, are
+dropped - on the Xbox they only queue an Xbox Live achievement) and
 `Repair` (the tested repair tree for an installed B138: shader constant fix, grapple ring shaders, UI paths, texts and
-text element records of DLC 1, state charts of DLC 1, cinematics in all five languages, our `generalbank.drm` ->
+text element records of DLC 1, state charts of DLC 1, the DLC 1 achievement call, cinematics in all five languages,
+our `generalbank.drm` ->
 `work\rebuild\b138_fixes\mods`, install it with `Install-TruTree.ps1 -Source .\work\rebuild\b138_fixes\mods`).
 `Generalbank` rebuilds only our `generalbank.drm` (`tools/generalbank_build.py`, 21 steps: mission screen style, the
 title update's loading screen with the DLC titles and its hint box, ~8 min, two steps need ~16 GB RAM) and checks it

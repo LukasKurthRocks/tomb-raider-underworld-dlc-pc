@@ -16,8 +16,13 @@
 .PARAMETER GamePath
     Game folder; default: found through the Steam libraries.
 
+.PARAMETER SourceDir
+    Folder with the built .asi / .ini (default <repository>\work\asi; e.g. work\asi\v05 for a build made with
+    Build-TruAsi.ps1 -OutDir).
+
 .EXAMPLE
     .\Set-TruShadowPower.ps1 -Install -Verbose
+    .\Set-TruShadowPower.ps1 -Install -SourceDir .\work\asi\v05
     .\Set-TruShadowPower.ps1 -Remove
 #>
 [CmdletBinding(DefaultParameterSetName = 'Install')]
@@ -25,6 +30,7 @@ param(
     [Parameter(ParameterSetName = 'Install', Mandatory)][switch]$Install,
     [Parameter(ParameterSetName = 'Remove', Mandatory)][switch]$Remove,
     [string]$GamePath,
+    [string]$SourceDir,
     [switch]$Trace
 )
 
@@ -35,17 +41,19 @@ Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
 
 $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$built   = Join-Path $repo 'work\asi'
+$built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # SHA-256 of earlier builds of ours (0.1 = slow motion only, 0.2 = estimated meter, 0.3 = translated meter, all
-# 2026-10-30) - recognised as ours for update / removal
+# 2026-10-30; 0.4 = Lara meter conditions, 2026-10-31) - recognised as ours for update / removal
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
-                             '5d638bae7c41c888dac8d328ec8ef5c5aaac85c0c3100f3fe071409ebc247b7c')
+                             '5d638bae7c41c888dac8d328ec8ef5c5aaac85c0c3100f3fe071409ebc247b7c',
+                             '31cea1102d986789d656c73472cd410cd560ea890c6e27f17e583b230183c9e0')
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
-                             '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a')
+                             '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
+                             '4924bfb8cac427467517c10c543f9c6eadc1f7503cf755ff54a5ef99671e29d9')
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
