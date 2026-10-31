@@ -9,16 +9,20 @@ folder with only the changed / added files, to install with scripts/windows/Inst
                become copies of them (surrogate / translated shaders showed the normal map as colour; test 24); then
                both LODs get the base ring MATERIAL 16637 with its textures (tools/material_transplant.py: the base
                shaders read the slots in the base roles - specular from the DLC normal map looked olive; test 26a)
-  3. ui        stage-2b fixes `uipath` + `uitext` (tools/dlc_fixes_build.py) over the B138 files: 25 UI timeline paths
-               and 26 text elements in 10 DLC 1 level DRMs (the never-shown Xbox "update required" message; owner's
-               decision 2026-10-30, same fixes as DLC 2; test 28)
+  3. ui        stage-2b fixes `uipath` + `uitext` + `uirecord` (tools/dlc_fixes_build.py) over the B138 files: 25 UI
+               timeline paths and 26 text elements in 10 DLC 1 level DRMs (the never-shown Xbox "update required"
+               message; owner's decision 2026-10-30, same fixes as DLC 2; test 28), then the 38 text element records of
+               those DRMs by Crystal's PC rules (test 34)
+  3b. statechart stage-2b fix `statechart` (tools/dlc_fixes_build.fix_statechart) over the B138 files: state
+               charts, record tables and id lists of the new DLC objects word by word from the base game's Xbox/PC
+               pairs (finding 43, state chart conversion; docs: Befund-Felsrinne.md in the workspace)
   4. language  tools/mul_lang_build.py: the cinematic streams in all five languages as `<name>_NNN` (the ModLoader
                loads the game's language, the plain name stays as fallback); pack10, with --dlc2 also pack11
   5. generalbank (with --generalbank FILE) our generalbank.drm from tools/generalbank_build.py (title-update loading
                screen with the DLC titles, hint box, mission screen style) copied into the tree
 
 Usage (from the repository root):
-  ../bin/pyt -t 3600 tools/b138_fix_tree.py PRISTINE_MODS OUT_MODS [--dlc2] [--replace] [--skip shaders,ring,ui,language]
+  ../bin/pyt -t 3600 tools/b138_fix_tree.py PRISTINE_MODS OUT_MODS [--dlc2] [--replace] [--skip shaders,ring,ui,statechart,language]
                                             [--generalbank FILE]
   OUT_MODS must lie below work/rebuild and apart from PRISTINE_MODS (build_util.check_out)
   --replace: remove an existing OUT_MODS (a '...\mods' folder) and its OUT_MODS_tmp first
@@ -83,8 +87,16 @@ def main(argv):
         import dlc_fixes_build as FB
         print('== ui')
         os.environ['TRUDLC_PACK_FIRST'] = 'pack10'        # B138 = DLC 1: Xbox sources from pack10
-        for fx in (FB.fix_uipath, FB.fix_uitext):
+        for fx in (FB.fix_uipath, FB.fix_uitext, FB.fix_uirecord):
             r = fx(out, srcs=[src, out]); print('%s: %d files, %s' % (fx.__name__, len(r['files']), r['log'][-1]))
+    if 'statechart' not in skip:
+        import dlc_fixes_build as FB
+        print('== statechart')
+        os.environ['TRUDLC_PACK_FIRST'] = 'pack10'
+        r = FB.fix_statechart(out, srcs=[src, out])
+        for l in r['log']:
+            if ' 0 changed' not in l: print(l)
+        print('fix_statechart: %d files' % len(r['files']))
     if 'language' not in skip:
         import mul_lang_build as MLB
         print('== language')

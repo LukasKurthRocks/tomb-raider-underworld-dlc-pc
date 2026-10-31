@@ -50,6 +50,7 @@ Xbox 360 content folders (title id `534307EC`, content type `00000002`):
 | `Get-Tools.ps1` | download the portable tools into `<workspace>\bin`, SHA-256 checked before unpacking |
 | `Build-TruAsi.ps1` | build the ASI plugins in `src\asi\` (today `TruShadowPower`, DLC 2 shadow-power slow motion) with the installed Visual Studio x86 toolchain -> `work\asi\` |
 | `Set-TruShadowPower.ps1` | `-Install` / `-Remove` `TruShadowPower.asi` + `.ini` next to `tru.exe` (loaded by the game's ASI loader `binkw32.dll`; foreign files are never touched) |
+| `Set-TruRockVein.ps1` | `-Install` / `-Remove` `TruRockVein.asi` + `.ini` (DLC 2 rock veins: markup conditions 607 / 608) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1` |
 | `Invoke-TruPipeline.ps1` | run the conversion pipeline one step at a time (`-Step`, `-FromTool` to resume), with progress and a summary |
 | `Test-TruUploadReady.ps1` | read-only check of our commits before an upload (paths, machine name, identity, e-mails, secrets, hardware, local patterns) |
 
@@ -97,8 +98,12 @@ delete the game files or the repository. Remove a junction on its own: `cmd /c r
 Steps in order: `Index`, `Cache`, `Ids`, `Learn`, `Tables`, `Prep`, `Convert`, `Names`, `Media`, `Audio`, and
 optionally `Assemble` (upstream's full stage-1 route with the rebuilt render tables; better shaders and materials), then
 `Dlc2` (DLC 2 through the same route, `--pack pack11`; see [docs/DLC2.md](../../docs/DLC2.md)), `Fixes` (stage 2b for
-DLC 1 and DLC 2) and `Repair` (the tested repair tree for an installed B138: shader constant fix,
-grapple ring shaders, UI paths and texts of DLC 1, cinematics in all five languages, our `generalbank.drm` ->
+DLC 1 and DLC 2; `statechart`: state charts, record tables and id lists of the new DLC objects re-converted from the
+base game's Xbox/PC pairs, the DLC 2 player chart first by its typed steps - this one needs the title-update memory
+image `work\xenia_dump\tu_image_82000000.bin` or `TRUDLC_TU_IMAGE`, without it the player chart gets the base-pair
+part only; last fix `uirecord`: the UI text element records of the new DLC scripts by Crystal's PC rules) and
+`Repair` (the tested repair tree for an installed B138: shader constant fix, grapple ring shaders, UI paths, texts and
+text element records of DLC 1, state charts of DLC 1, cinematics in all five languages, our `generalbank.drm` ->
 `work\rebuild\b138_fixes\mods`, install it with `Install-TruTree.ps1 -Source .\work\rebuild\b138_fixes\mods`).
 `Generalbank` rebuilds only our `generalbank.drm` (`tools/generalbank_build.py`, 21 steps: mission screen style, the
 title update's loading screen with the DLC titles and its hint box, ~8 min, two steps need ~16 GB RAM) and checks it

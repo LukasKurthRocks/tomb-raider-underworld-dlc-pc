@@ -16,8 +16,9 @@ def main(argv):
     if ka != kb: print('section lists differ: %d vs %d sections, order equal: %s' % (len(ka), len(kb), ka == kb))
     bb = {(s.type, s.id): s for s in B.sections}
     n = 0
-    for s in A.sections:
-        t = bb.get((s.type, s.id))
+    for i, s in enumerate(A.sections):
+        # same section list: pair by position (several generic sections share (0, 0)); else by (type, id)
+        t = B.sections[i] if ka == kb else bb.get((s.type, s.id))
         if t is None: print('  %s only in A' % ((s.type, s.id),)); n += 1; continue
         if s.data == t.data and s.reloc == t.reloc: continue
         m = min(len(s.data), len(t.data))

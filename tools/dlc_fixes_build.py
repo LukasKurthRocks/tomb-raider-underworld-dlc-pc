@@ -19,6 +19,14 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          for Symbols by the converter) -> PC string ids, colour s32 (tools/script_uitext_fix.py; empty hint box)
   postfix upstream's tools/dlc1_postfix.py steps 1-2: streamgroup name tables (save hang) and type-0 name strings
   analog upstream's tools/analog_word_fix.py: near-clone DTPs get the base PC bytes (each word checked against B138)
+  statechart (ours, finding 43) state charts, record tables and id lists of the new DLC objects: the DLC 2 player
+         chart (doppelganger_casual DTP 20212) by the typed five steps of tools/statechart_fix_all.py, then every
+         such DTP word by word from the base game's Xbox/PC pairs (tools/statechart_fix_tree.py /
+         statechart_twins.py; the rock vein's conditions 607 / 608 were unreachable)
+  uirecord (ours, finding 43) UI text element records of the new DLC scripts by Crystal's PC conversion rules (w1/w3
+         as u32 instead of swapped halves, the PC word 0x00010000, -1.0f) - tools/script_records_dlc.py; last, so it
+         sees the final scripts (it only touches type-8 records; test 34, played 2026-10-30). The merged g_pda.drm of
+         the DLC 2 tree is left out (not installed, finding 40)
 
 Report: <OUT>/../fixes_report.json (per fix: files, log lines).
 
@@ -251,8 +259,59 @@ def fix_analog(out):
     return {'files': files, 'log': log}
 
 
+def fix_statechart(out, srcs=None):
+    """State-chart-like DTPs of the new DLC objects (finding 43, rock vein / state chart conversion): state charts,
+    their record tables and id lists (tools/statechart_corpus.family; id >= 20000, PC section of the same size).
+    tools/statechart_fix_tree: player charts (DLC 2 doppelganger_casual.drm DTP 20212: condition records of Lara's ids
+    in Xbox byte order, the rock vein's markup tests 607 / 608 unreachable) get the five typed steps of
+    tools/statechart_fix_all.py; then every such DTP gets the base game's own PC bytes where a base Xbox/PC pair
+    proves them (tools/statechart_twins.py, levels exact + value, leave-one-pair-out precision 99.99 %); the proven
+    condition-record / transition layouts of player charts are applied last. Needs work/statechart/corpus.pkl (built
+    when missing) and the title-update image for player charts (TRUDLC_TU_IMAGE).
+    srcs: as in fix_uitext (out is read too and wins)."""
+    import collections, tempfile
+    sys.path.insert(0, HERE)
+    import dtp_audit as DA, statechart_fix_tree as SF
+    dirs = [os.path.abspath(s) for s in (srcs or [])] + [os.path.abspath(out)]
+    tmpdir = os.path.join(HERE, '..', 'work', 'statechart'); os.makedirs(tmpdir, exist_ok=True)
+    tmp = tempfile.mkdtemp(prefix='fix_', dir=tmpdir)
+    st = collections.Counter(); files, log = [], []
+    try:
+        F = SF.Fixer(tmp)
+        for rel, path in sorted(DA.overlay(dirs, None).items()):
+            new = F.process(rel, path, log, st)
+            if new is not None:
+                _write(out, rel, new); files.append(rel)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    log.append('total %s' % dict(st))
+    return {'files': files, 'log': log}
+
+
+UIRECORD_SKIP = {'g_pda.drm'}      # merged g_pda of the DLC 2 tree: not installed (finding 40), left as built
+
+
+def fix_uirecord(out, srcs=None):
+    """UI text element records of the new DLC scripts (type 8, id >= 20000) by the retail Xbox / PC template of
+    generalbank script 10 / 9 (finding 43, test 34): words the converter turned into swapped halves or left at the
+    Xbox value where every PC record has the PC constant. tools/script_records_dlc.process per DRM; relocation words
+    and the string id (uitext) stay. srcs: as in fix_uitext (out is read too and wins). g_pda.drm is skipped."""
+    import collections
+    sys.path.insert(0, HERE)
+    import dtp_audit as DA, script_records_dlc as RD
+    tpl = RD.template(); st = collections.Counter(); files, log = [], []
+    dirs = [os.path.abspath(s) for s in (srcs or [])] + [os.path.abspath(out)]
+    for rel, path in sorted(DA.overlay(dirs, None).items()):
+        if rel.lower() in UIRECORD_SKIP: continue
+        new = RD.process(rel, path, tpl, st, log)
+        if new is not None:
+            _write(out, rel, new); files.append(rel)
+    log.append('total %s (template %s)' % (dict(st), ' '.join(tpl[2])))
+    return {'files': files, 'log': log}
+
+
 FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('uipath', fix_uipath), ('uitext', fix_uitext), ('postfix', fix_postfix),
-         ('analog', fix_analog)]
+         ('analog', fix_analog), ('statechart', fix_statechart), ('uirecord', fix_uirecord)]
 
 
 def main(argv):

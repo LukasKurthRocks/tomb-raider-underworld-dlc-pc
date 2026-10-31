@@ -1803,6 +1803,40 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        `dlc_test42b_waterfall_bluewater` (texture remapped to the DLC's blue water 6957, md5 40c250fb); tree_check
        0 errors. Expected: the grey additive column replaced by Crystal's PC eitr-fall look (scrolling, translucent);
        risk: the pool uses the same material and will scroll like a fall. Workspace note `docs\Befund-Wasserfall.md`.
+     * **Waterfall test 44 (prepared 2026-10-30 ~23:10, not played): fall and pool separated by material, not by
+       geometry.** New `tools/terrain_material_split.py` (report / around / coverage / split / retarget): terrain
+       20085 batch Y 64 - the only terrain batch with material 24920 - holds **only the flat pool** (1 266 triangles,
+       all at z = -7468, identical on the Xbox; every index of the buffer is drawn by some entry), so the "column" does
+       not come from that batch; `tools/drm_idref_users.py` / `tools/drm_raw_u32_find.py`: no other section of the
+       installed mods names 24920. Hence the fix gives the POOL a copy of the original material: `tools/
+       drm_section_clone.py` copies 24920 as **30000** (free id, `tools/section_id_free.py`: highest material id in
+       use 26854), `terrain_material_split.py retarget` points Y 64 at 30000 (material list 20 -> 21 entries, appended
+       at the section end, pointer +0x0C moved, id references added; 24920 stays in the list so it is still loaded),
+       then 24920 itself gets the base eitr-fall material with the DLC blue water texture as in 42b. Base: test 34
+       state (md5 b67e513e) -> `work\rebuild\dlc_test44_waterfall_split\mods\dlc_level2_start.drm` (md5 ca2b3325);
+       tree_check 0 errors, terrain draw coverage unchanged (989 entries). Expected: the pool exactly as before (its
+       old material, now id 30000), the column as in 42b. If the column goes back to grey, it was drawn through the
+       pool's batch after all (then a geometry split is needed - `split` mode is prepared).
+     * **Waterfall test 44 played, tests 44b / 44c (prepared 2026-10-30 ~23:25, not played): the column is its own
+       batch and only borrows the pool's textures.** 44 played: pool normal again, the column grey noise again. The
+       column is terrain 20085 batch **Y 61, material 24691** (160 vertical triangles, x -925 .. 925, y -7246 ..
+       -5396, z -8864 .. 8586, vertex buffer 3; the only user of 24691) - not Y 64. New
+       `tools/material_slots_dump.py --detail` (shader slots, render flags, texture records with sampler slot):
+       24691 uses PC surrogate shaders 1909 / - / 1910 / 1911 (Xbox 2457 / 2458 / 2459, class C1 / D, score 0.6 /
+       0.11) and binds textures only to samplers 0, 1, 4, 5, 6, 7. The surrogate pixel shaders sample **s2 and s3 in
+       screen space** (`vPos * c51`: s3 decoded as depth via `c3` / `c77`, s2 as the refracted colour;
+       `tools/shader_lib_dump.py`). The pool material 24920 (and its copy 30000) binds **6999 (grey noise) to s2**
+       and 6957 to s3. So the column reads whatever s2 / s3 the previous draw left bound: the pool's grey noise in
+       the original and in 44, a different leftover after the eitr pool of 42 / 42b (green / bluish). This explains
+       all four results; that the engine really leaves the pool's samplers bound is inferred, not traced. Empty
+       pass-1 shader slots are normal (hundreds of base materials have them) and not the cause. Fix: the column's own
+       material gets the eitr fall (shaders 201-204 sample s0 only), the pool stays untouched: `material_transplant.py
+       <test 34 state, b67e513e> OUT 24691 ca_ani_goo_falls.pcbig.drm 14299 [--tex 4996=6957]` -> 44b
+       (`work\rebuild\dlc_test44b_column_material`, DLC blue water 6957, md5 8b407598) and 44c
+       (`dlc_test44c_column_material_cyan`, base cyan 4996, md5 bf50a3f1); vertex inputs covered, tree_check 0
+       errors. The 44 retarget (pool on 30000) is not needed. Alternative not built: keep the column's own shaders and
+       give 24691 texture records for s2 / s3 (or find the material flag that makes the PC engine bind its
+       refraction / depth targets there).
      * **Hint-box background: no texture is missing (test 43, offline)**: a userType-320 bitmap member names its
        texture by section id, made absolute by a kind-A id relocation (new `tools/drm_idrefs.py`): our script 9 =
        TU script 10 references texture 56 (the box, retail member 1274) and 76 (the Lara icon, TU member 17479);
@@ -1812,6 +1846,69 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        generalbank already has. All init words of the three bitmaps equal the Xbox values. So the faint modal box
        on PC is not a data defect of our generalbank - next: compare the box's colour / alpha / scale at draw time
        (PC cdb vs Xenia snapshot). `generalbank_build.py` unchanged (md5 57f52266...).
+     * **Rock vein, step 3.4 first pass (offline, Xbox images retail vs TU)**: the player state machine's markup
+       condition test `SCCondTest_MarkupType` (Xbox retail 0x82480e78 -> TU 0x82486dd8) gained two condition ids:
+       **607** = the attached / jump-target markup has type **23**, **608** = type **22** (first switch base 610 ->
+       607; the second switch also starts one id earlier). The PC counterpart (string tru+0x460960, jump table
+       tru+0x382a54 for ids 601-628) sends **604-609 to the unhandled default**, so every DLC 2 state transition that
+       asks for markup type 22 / 23 is false on PC - no rock-vein attach. Cheapest fix: ASI step 3.2 adds handlers for
+       607 / 608 to that table (then look for the next unhandled ids via the "unhandled condition (%d)" log line).
+       New read-only tools `xbox_func_strings.py`, `pe_callers.py`, `markup_scan.py` (heuristic, did not locate the
+       level's markup arrays reliably yet), `drm_find_values.py`; details in the workspace note `docs\Befund-Felsrinne.md`.
+     * **ASI step 3.4a: `TruRockVein.asi` (built, not yet played)** - a separate plugin (`src/asi/TruRockVein/`, built
+       with `Build-TruAsi.ps1 -Name TruRockVein`, installed / removed with `Set-TruRockVein.ps1`) points the jump-table
+       entries for ids 607 / 608 at stubs with the TU logic. The PC exe already has the TU's markup-type getter
+       (tru+0x1be340: `[ctx+0x24]` -> byte +0x4d, else `[ctx+0x20]` -> byte +0x33), and the PC condition test gets
+       the same context as its 5th argument; the stubs call that getter, compare with 23 / 22 (INI `Type607` /
+       `Type608`), put the result in `bl` and jump to the common exit tru+0x382a3f (negation flag still applied). The
+       plugin verifies dispatch, default, exit, getter and all 28 original table entries before writing and refuses on
+       any mismatch; the remaining default ids (604-606, 609, 619, 621, 622, 627) are logged once each in
+       `TruRockVein.log` and then run the original default. Checked with dumpbin (x86 DLL, KERNEL32 only, export
+       `TruRockVeinVersion`) and a disassembly of the stubs; test: DLC 2, first rock vein, LB / RB + A.
+     * **DoppelgangerInit and the TU state-machine ids (offline; `TruDoppelganger.asi` built, not played)** - in play
+       TruRockVein patched 607 / 608, but they were never asked for. `DoppelgangerInit` (Xbox TU 0x82412c48) is the
+       init of the TU-only player object type "doppelganger_casual" (TU type-table record 35; the PC table has no
+       such record, PC index 35 = "lara_untextured"): base init, then gameTracker+0x1244 = 1 unless bit 0x20000 at
+       +0x14 is set. Only the `dlc2data` native and TU-only code read that byte, so it is not ported yet. The real gap:
+       the state-machine builder (TU 0x82489500 = PC tru+0x3872f0, code and handlers equal to retail) registers ids
+       from three tables, and the TU added **13 conditions** (1048-1056, 2005, 2006, 2013, 2401 ->
+       `SCCondFunction_Default`, returns true), **9 activities** (286, 1009, 1039-1045) and **8 states** (243-245,
+       1017-1020, 2102); the PC tables equal retail. `player_tru_dlc2_extension.drm` references 1018, 1020, 1050 and
+       245 (next to 608). New plugin `src/asi/TruDoppelganger/` copies the PC tables, appends the TU records with the
+       PC handlers paired by shared ids (tru+0x382140 / +0x386f30 / +0x384cf0 / +0x381d10) and points the builder's
+       three `push table` operands at the copies (checks builder bytes, empty registry, table sizes, handlers, absent
+       ids; refuses on mismatch); `Set-TruDoppelganger.ps1` installs / removes it. New read-only tools
+       `xbox_find_word.py`, `xbox_cond_table.py`; details in the workspace note `docs\Befund-Felsrinne.md`
+       ("DoppelgangerInit").
+     * **ASI step 3.3: translated shadow meter + HUD trigger (TruShadowPower 0.3, built, not played)** - 0.2 played
+       (meter drains, power ends when empty) but the silhouette only showed while aiming. Owner's rule: translate, do
+       not estimate. The TU meter functions were decompiled (Ghidra 12.2 headless on the raw TU image, new script
+       `tools/ghidra/TruDecompileAt.java`) and ported 1:1: init `0x823d7700` (value 1000), tick `0x823d7a10` (button
+       latch, `0x823d8120` restart only above tuning +0x28 after "empty"), start `0x823d7d40` (request player = tuning
+       +0x40, world = tuning +0x3c, 33 ms), stop `0x823d7fb8`, refill `0x823d81a0` (+0x18 per s, +0x20 while a delay
+       timer runs, +0x1c when game state +0xc94 != 0), drain `0x823d8380` (frame time x 1/30 x tuning +0x14). Frame
+       time = PC `0xe7f190` (unscaled, us / 33333.33 - the Xbox `0x82efb560`). Tuning = the data (u16 type 60) of
+       object 858 `player_tru_dlc2_extension` (TU `0x82412ab0` spawns it into game state +0x1314, a TU-only field);
+       the plugin finds the loaded object in the PC object table `0xdb7400` (= Xbox `0x82979280`, 0xcc x 0x24 bytes,
+       verified via the PC lookup tru+0x14e930) with the TU's checks; file values 1000 / 200 / 200 / 400 / 75 / 150 /
+       300 / 0.3 / 1.2, logged fallback if not loaded. **HUD trigger:** after writing the fraction the TU does
+       `0x829ca724 |= 2; (*0x829ca720)->vtbl[0xc]()` = request HUD display group 1 - on PC exactly what the breath code
+       does (`tru+0x37d9d0(1)` sets bit 1 of `0xfae924`, `tru+0x37da70` calls `(*0xfae920)->vtbl[3]`); the HUD script
+       polls the bit (hudscreenmgr native 7, clear = native 8). 0.2 wrote only the value and the breath-style flag
+       `0xfae8af` (which the TU never sets) - fixed. Not ported (named in the code): sounds, blur effect, instance
+       messages 0x1f4 / 0x1f5, cinematic / zone (0x412) / health (+0x628) checks, the +0xc94 player state (PC offset
+       unknown). Built: 124 416 bytes, sha256 `5d638bae...7b7c`, no warnings; `tools/drm_floats.py` also prints
+       relocations. Details: workspace note `docs\Befund-Schattenkraft.md` "ASI step 3.3".
+     * **ASI step 3.2: shadow meter (TruShadowPower 0.2, built, not played)** - the HUD's second silhouette (PC HUD
+       script 37, "adrenaline bar as breathbar") is a `uimeter` fed by `hudscreenmgr` native 36 = `fld [0x00fae8d4]`
+       (shown flag native 38 = `0x00fae8af`; binder `tru+0x3ada00`); on PC only the breath code writes it. On the Xbox
+       TU the same native reads `0x829ca6cc`, written by the shadow meter code (`0x823d7700` init, `0x823d81a0` refill
+       with a delay timer, `0x823d8380` drain by frame time x const x tuning +0x14, from the shadow tick `0x823d7a10`);
+       max / rates come from the player instance's tuning data at run time, not from exe constants. The plugin now
+       keeps a meter (drain while held, power off at 0 until released, refill after a delay) and writes it into the PC
+       bar globals while not full; rates are INI estimates (5 s drain, 8 s refill, 1 s delay) until measured in Xenia
+       (sample 0x829ca6cc while holding LB). `Set-TruShadowPower.ps1` updates our earlier build in place. New read-only
+       `tools/drm_floats.py`. Details: workspace note `docs\Befund-Schattenkraft.md` "ASI step 3.2".
      * **ASI step 3.1 played (22:47-22:52): the shadow-power slow motion works as a plugin** - no debugger; holding RB / LB
        slows the waterfall (world time) like on the Xbox; rock veins (LB/RB + A) still do nothing (next TU part).
        Test 42 / 42b (base eitr-fall material on 24920): the column turns translucent (42: green eitr colour, 42b:
@@ -1832,6 +1929,16 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        and the block is centred vertically, so it starts higher (~557). No fix needed
        (`references\DLC1\PC-Test41e-*_23_*`). The screenshot was taken automatically: a watcher on the cdb log
        fired a capture burst (`Capture-TruWindow.ps1`, workbench) when the DLC title was drawn.
+     * **Stage-2b fix `uirecord` adopted (test 34, played since 2026-10-30 afternoon)** - `tools/dlc_fixes_build.py`
+       `fix_uirecord` (last fix, after `analog`, so it sees the final scripts; it only touches type-8 records):
+       `tools/script_records_dlc.process` over the tree, the merged `g_pda.drm` of the DLC 2 tree skipped (not installed,
+       finding 40); `tools/b138_fix_tree.py` step `ui` runs it after `uipath` / `uitext` over the B138 files. Pipeline
+       runs 2026-10-30 23:00-23:41: `-Step Fixes` 1 804 s (DLC 1 637 s: 38 records / 234 words; DLC 2 1 162 s: 99
+       records / 627 words - test 34's 104 / 645 minus the 5 g_pda records), `-Step Repair` 724 s (repair tree 100
+       files, `uirecord` 10 files, 38 records / 234 words, generalbank still md5 57f52266). md5 check: the 14 DLC 2
+       files of `dlc2_asm_stage2b` and the 10 DLC 1 files of `b138_fixes` are identical to `work\rebuild\dlc_test34_records`
+       and to the installed game files (24/24; the installed `dlc_level2_start.drm` currently holds a later waterfall
+       test, the stage-2b one equals test 34). So `Fixes` + `Repair` now produce the installed test-34 state.
      * **Direct start into DLC 2 for tests (test 41e, played 22:28, works)** - test-only generalbank, never for the
        install; `tools/script_directstart_stub.py`, details in the workspace note `docs\Befund-Direktstart.md`. The
        mission screen (script 104) starts a DLC by writing the unit name to a member and calling `uigamedata` f22, then
@@ -1866,6 +1973,35 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        bool-setter trace (`tru+0x19c920`) costs too much in menus (the pause menu stalled, the game had to be ended):
        the DLC 2 title element (432) never had its visibility set; text visibility is set by the native at
        `tru+0x3a6886`, called from the interpreter at `tru+0x17b051` - next: identify that native and trace only it.
+     * **State charts: the DLC 2 player chart was mis-converted; new fix `statechart` (2026-10-31, offline, not
+       played)**: the DLC 2 player's state chart (`doppelganger_casual.drm` DTP 20212, a TU-only object) kept many
+       u16 fields in Xbox byte order (4 816 of 6 668 condition records `{u16 key, u16 id, u16 value, u8 flags, u8}`,
+       e.g. the rock vein's markup tests 607 / 608 read 24578 / 24322, so they could never fire). Every object with
+       behaviour has such a chart (DLC 2: 79 chart DTPs, DLC 1: 50), so the scope was measured against a ground truth
+       from the base game: `tools/statechart_corpus.py` (940 base DRMs in both the Xbox and the PC archives: 615 chart,
+       20 record-table, 836 id-list pairs) + `tools/statechart_twins.py` (a block whose Xbox bytes equal a base block
+       of the same shape takes that block's PC bytes; else (shape, offset, Xbox word) when all base observations agree;
+       only byte permutations, never re-authored values; per array element too; leave-one-pair-out over 3.1 M
+       words: 2 896 268 right / 27 wrong). Wrong truth words in the converted trees: DLC 2 **16 947** in 49 DTPs
+       (16 214 in DTP 20212, the rest 1-88 per DTP: thrall charts and extensions, shared id lists, `co_dlc_lara`, uo
+       objects), DLC 1 B138 19 in 9 DTPs, our DLC 1 pipeline 57 in 9. `tools/statechart_fix_tree.py` re-converts
+       them (player chart first by the typed five steps of `tools/statechart_fix_all.py`, which on their own still
+       left 608 known words wrong, 7 of them right before); wired in as fix `statechart` of `dlc_fixes_build.py` and
+       step 3b of `b138_fix_tree.py`; the player chart part needs the TU memory image. Runs into `_sc` folders
+       (nothing installed): Fixes DLC 2 / DLC 1 and the repair tree differ from the current outputs in exactly the
+       34 / 9 / 9 files the fix wrote, 0 wrong truth words left; ~9 800 words of DTP 20212 stay unprovable.
+       Details and the per-DTP table: workspace `docs\Befund-Felsrinne.md`, section "State chart conversion: scope
+       and pipeline".
+     * **Title update coverage audit (2026-10-31, read-only)**: Lara registers her states / conditions / activities in a
+       second, player-specific pass (Xbox TU `0x82473b50`, PC around `tru+0x368b60`; PC tables conditions `0x8b2ce8`,
+       activities `0x8b2280`, states `0x8b0a50`) that fetches new ids from the generic tables (builder `tru+0x3872f0`)
+       - an id missing there is read from address 0. TU-only in Lara's tables: states 243-245, 1017-1020, 2102;
+       conditions 1048-1056, 2005, 2006, 2013, 2401; activities 1009, 1039 (~4.3 KB PPC). State 1018 drives the slow
+       motion selector and the shadow meter. Textures: 50 of 51 changed TU textures are already byte-equal on PC; 12
+       new pause-menu (script 7) and 2 new HUD (script 38) textures and the DTPs 21237 / 21238 / 22194 are missing;
+       the HUD's shadow display reads TU-only `larabase` natives f71-f73. Priorities and tables: workspace
+       `docs\TU-Abdeckung.md`; tools `tu_native_coverage.py`, `tu_section_users.py`, `tu_texture_state.py`,
+       `tu_script_word_diff.py`, `cond_tables_scan.py`, `pe_imm_list.py`.
      * **Loading-screen titles fixed (test 38, played 21:19 without any debugger forcing)**: `tru+0x3a6870` is slot 6 of
        the `uitext` native type object (vtable at `0x864984`), and its caller `tru+0x17b051` is not an opcode but the
        routine that applies a new script object's **member init values** (a list of {u16 offset, value} -> `+0x179770`)
