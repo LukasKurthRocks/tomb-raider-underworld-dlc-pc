@@ -13,7 +13,7 @@
       -Interactive  a prompt (REPL); 'quit' or an empty line followed by Ctrl+C ends it
     Every run writes <workspace>\logs\Invoke-TruLink_<time>.log with every command and answer. -Verbose shows the
     connection steps, -Debug every line sent / received, -Trace adds a PowerShell line trace.
-    The script changes nothing by itself - only the commands you send do (write*, camera, post).
+    The script changes nothing by itself - only the commands you send do (write*, camera, post, menu).
 
 .PARAMETER Command
     Command line(s) to send, in order.
@@ -30,6 +30,10 @@
 .PARAMETER TimeoutSeconds
     Connect / answer timeout (default 10; game-thread commands wait up to 5 s inside the game).
 
+.PARAMETER ScanTimeoutSeconds
+    Answer timeout for the memory search commands 'scan <type> ...', 'scan next ...' and 'scan regions' of TruLink 0.3
+    (default 120; TruLink stops a scan itself after ScanMaxSeconds, default 60).
+
 .PARAMETER PassThru
     Also return the answer lines (strings) to the pipeline.
 
@@ -41,6 +45,8 @@
     .\scripts\windows\Invoke-TruLink.ps1 -Interactive -Verbose
 .EXAMPLE
     .\scripts\windows\Invoke-TruLink.ps1 -Script .\my-checks.txt
+.EXAMPLE
+    .\scripts\windows\Invoke-TruLink.ps1 -Command 'scan float range 1 1000', 'scan status'
 #>
 [CmdletBinding(DefaultParameterSetName = 'Command')]
 param(
@@ -49,6 +55,7 @@ param(
     [Parameter(ParameterSetName = 'Interactive', Mandatory)][switch]$Interactive,
     [ValidateRange(1, 65535)][int]$Port = 9265,
     [ValidateRange(1, 600)][int]$TimeoutSeconds = 10,
+    [ValidateRange(1, 3600)][int]$ScanTimeoutSeconds = 120,
     [switch]$PassThru,
     [switch]$Trace
 )
@@ -77,10 +84,15 @@ function Send-TruLinkLine {
     $text = $Line.Trim()
     if (!$text -or $text.StartsWith('#')) { return ,@() }
     Write-Log ('> {0}' -f $text) -Level DEBUG
+    # TruLink 0.3 memory scans can take longer than a normal answer (ScanMaxSeconds, default 60): wait at least
+    # $ScanTimeoutSeconds for them
+    $isScan = $text -match '^scan\s+' -and $text -notmatch '^scan\s+(list|status|clear)\b'
+    if ($isScan -and $client) { $client.ReceiveTimeout = [Math]::Max($TimeoutSeconds, $ScanTimeoutSeconds) * 1000 }
     $Writer.Write($text + "`n")
     $Writer.Flush()
     $answer = New-Object System.Collections.Generic.List[string]
-    $first = $Reader.ReadLine()
+    try { $first = $Reader.ReadLine() }
+    finally { if ($isScan -and $client) { $client.ReceiveTimeout = $TimeoutSeconds * 1000 } }
     if ($null -eq $first) { throw 'TruLink closed the connection.' }
     $answer.Add($first)
     if ($first.StartsWith('ok+')) {

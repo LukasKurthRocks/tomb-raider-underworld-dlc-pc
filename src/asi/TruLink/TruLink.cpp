@@ -10,6 +10,9 @@
 // the per-frame pad poll (tru+0x84b82, call dword ptr [0x00a02b8c] = XInputGetState), which TruShadowPower.asi and
 // TruMenu.asi hook as well - the chaining rules below keep the order of the plugins irrelevant.
 //
+// 0.3 adds a Cheat-Engine-style value search (scan / scan next), polled watches with a change log, and struct
+// snapshots with a diff - all on the server thread, so the game keeps running while they work.
+//
 // Every game address is checked against the expected bytes at load; on a mismatch the affected command answers
 // "err" and the reason is logged. Loaded by the Ultimate ASI Loader (binkw32.dll of the installed game).
 
@@ -22,12 +25,13 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <math.h>
 
 #pragma comment(lib, "ws2_32.lib")
 
 namespace {
 
-const char kVersion[] = "0.2";
+const char kVersion[] = "0.3";
 
 typedef DWORD(WINAPI *XInputGetStateFn)(DWORD, void *);
 typedef void(__cdecl *CameraSetModeFn)(int mode);
@@ -148,11 +152,24 @@ const char *CheckRange(DWORD address, DWORD length, bool write, bool force) {
     return nullptr;
 }
 
+// a guard page touched by a read (it became one after our VirtualQuery, e.g. another thread's stack) loses its guard
+// flag on the fault - put it back, so that thread's stack can still grow
+int ReadFaultFilter(DWORD code, EXCEPTION_POINTERS *info) {
+    if (code == STATUS_GUARD_PAGE_VIOLATION && info->ExceptionRecord->NumberParameters >= 2) {
+        void *page = reinterpret_cast<void *>(info->ExceptionRecord->ExceptionInformation[1]);
+        MEMORY_BASIC_INFORMATION mbi;
+        DWORD old = 0;
+        if (VirtualQuery(page, &mbi, sizeof(mbi)) && !(mbi.Protect & PAGE_GUARD))
+            VirtualProtect(page, 1, mbi.Protect | PAGE_GUARD, &old);
+    }
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
 bool ReadBytes(DWORD address, BYTE *out, DWORD length) {
     __try {
         memcpy(out, reinterpret_cast<const void *>(address), length);
         return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    } __except (ReadFaultFilter(GetExceptionCode(), GetExceptionInformation())) {
         return false;
     }
 }
@@ -477,6 +494,14 @@ void CmdHelp() {
               "objects                       object table 0xdb7400: index id state object (block)\n"
               "modules                       loaded .asi plugins + versions (block)\n"
               "menu list | menu <id> [arg]   TruMenu items: list (block) | run one by id (ok / err line)\n"
+              "scan <type> eq|ne|gt|lt <v> | range <lo> <hi> | unknown [tol x] [align 1|2|4] [at <addr> <len>]\n"
+              "                              first scan of writable memory; types u8 s8 u16 s16 u32 s32 float\n"
+              "scan next eq|ne|gt|lt <v> | range <lo> <hi> | changed | unchanged | increased | decreased |\n"
+              "          inc_by <v> | dec_by <v> [tol x]   refine the candidate set\n"
+              "scan list [n] | scan status | scan clear | scan regions [n]\n"
+              "watch add <addr> <type> [name] | watch del <name|#i|addr|all> | watch list | watch log [n]\n"
+              "snapshot <name> <addr> <len> | snapshot <name> (again) | snapshot list | snapshot del <name>\n"
+              "diff <name> [update]          changed dwords since the snapshot (block)\n"
               "log <0-3>                    TruLink.log level\n"
               "quit                          close the connection\n"
               "addr: hex or player | gametracker | cheat | camera | cameramgr | playerstate, optional +hexoffset\n"
@@ -746,6 +771,761 @@ void CmdModules() {
     g_out.Add(".\n");
 }
 
+// ---- 0.3: memory search (scan), watches, snapshots - all on the server thread ----
+//
+// scan: a Cheat-Engine-style value search. The first scan walks the game's writable memory with VirtualQuery
+// (MEM_COMMIT, writable protection, no guard / no-access pages; MEM_PRIVATE plus the writable sections of the
+// tru.exe image = .data / .bss) and keeps the matching addresses with their values (candidate set, two VirtualAlloc
+// arrays committed on demand, at most ScanMaxCandidates). Every read is guarded (__try, 64 KB chunks); the server
+// thread yields every 4 MB and keeps polling the watches, so the game thread is never blocked. Our own module, the
+// candidate arrays and the server thread's stack are skipped.
+
+enum ValueType { kTypeU8, kTypeS8, kTypeU16, kTypeS16, kTypeU32, kTypeS32, kTypeFloat, kTypeCount };
+const char *const kTypeNames[kTypeCount] = {"u8", "s8", "u16", "s16", "u32", "s32", "float"};
+const DWORD kTypeSizes[kTypeCount] = {1, 1, 2, 2, 4, 4, 4};
+
+enum ScanOp { kOpEq, kOpNe, kOpGt, kOpLt, kOpRange, kOpUnknown, kOpChanged, kOpUnchanged, kOpIncreased, kOpDecreased,
+              kOpIncBy, kOpDecBy };
+const char *const kOpNames[] = {"eq", "ne", "gt", "lt", "range", "unknown", "changed", "unchanged", "increased",
+                                "decreased", "inc_by", "dec_by"};
+
+// options (TruLink.ini)
+DWORD g_scanMaxCandidates = 4u * 1024 * 1024;
+int g_scanMaxSeconds = 60;
+int g_watchIntervalMs = 100;
+
+const double kDefaultFloatTolerance = 0.001;
+
+bool ParseType(const char *s, int *type) {
+    for (int t = 0; t < kTypeCount; ++t)
+        if (!_stricmp(s, kTypeNames[t])) { *type = t; return true; }
+    if (!_stricmp(s, "f32")) { *type = kTypeFloat; return true; }
+    return false;
+}
+
+// raw value (the low bytes of a dword) -> number
+double ToNumber(int type, DWORD raw) {
+    switch (type) {
+    case kTypeU8: return static_cast<double>(static_cast<BYTE>(raw));
+    case kTypeS8: return static_cast<double>(static_cast<signed char>(static_cast<BYTE>(raw)));
+    case kTypeU16: return static_cast<double>(static_cast<WORD>(raw));
+    case kTypeS16: return static_cast<double>(static_cast<SHORT>(static_cast<WORD>(raw)));
+    case kTypeU32: return static_cast<double>(raw);
+    case kTypeS32: return static_cast<double>(static_cast<LONG>(raw));
+    default: {
+        float f;
+        memcpy(&f, &raw, 4);
+        return static_cast<double>(f);
+    }
+    }
+}
+
+void FormatValue(int type, DWORD raw, char *s, size_t size) {
+    if (type == kTypeFloat) _snprintf_s(s, size, _TRUNCATE, "%.7g", ToNumber(type, raw));
+    else if (type == kTypeU32) _snprintf_s(s, size, _TRUNCATE, "%lu", raw);
+    else _snprintf_s(s, size, _TRUNCATE, "%.0f", ToNumber(type, raw));
+}
+
+// value argument of a type: float = decimal, integers = ParseNumber (hex 0x.., negative allowed) cut to the type
+bool ParseValue(int type, const char *s, double *value) {
+    if (type == kTypeFloat) {
+        char *end = nullptr;
+        double d = strtod(s, &end);
+        if (end == s || *end) return false;
+        *value = d;
+        return true;
+    }
+    DWORD raw = 0;
+    if (!ParseNumber(s, &raw)) return false;
+    *value = ToNumber(type, raw);
+    return true;
+}
+
+// difference argument (inc_by / dec_by): any number, hex allowed
+bool ParseDelta(const char *s, double *value) {
+    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+        DWORD raw = 0;
+        if (!ParseHex(s, &raw)) return false;
+        *value = static_cast<double>(raw);
+        return true;
+    }
+    char *end = nullptr;
+    double d = strtod(s, &end);
+    if (end == s || *end) return false;
+    *value = d;
+    return true;
+}
+
+struct Filter {
+    int op;
+    double a, b, tol;
+    bool isFloat;
+};
+
+inline bool Match(const Filter &f, double cur, double prev) {
+    switch (f.op) {
+    case kOpEq: return fabs(cur - f.a) <= f.tol;
+    case kOpNe: return !(fabs(cur - f.a) <= f.tol);
+    case kOpGt: return cur > f.a + f.tol;
+    case kOpLt: return cur < f.a - f.tol;
+    case kOpRange: return cur >= f.a - f.tol && cur <= f.b + f.tol;
+    case kOpUnknown: return !f.isFloat || (cur - cur == 0.0);      // floats: finite values only (no NaN / inf)
+    case kOpChanged: return !(fabs(cur - prev) <= f.tol);
+    case kOpUnchanged: return fabs(cur - prev) <= f.tol;
+    case kOpIncreased: return cur > prev + f.tol;
+    case kOpDecreased: return cur < prev - f.tol;
+    case kOpIncBy: return fabs((cur - prev) - f.a) <= f.tol;
+    case kOpDecBy: return fabs((prev - cur) - f.a) <= f.tol;
+    }
+    return false;
+}
+
+double NowMs() {
+    static LARGE_INTEGER frequency = {};
+    if (!frequency.QuadPart) QueryPerformanceFrequency(&frequency);
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+    return static_cast<double>(t.QuadPart) * 1000.0 / static_cast<double>(frequency.QuadPart);
+}
+
+// committed, readable, no guard / no-access page for [address, address + length)
+bool ReadableRange(DWORD address, DWORD length, DWORD *regionStart, DWORD *regionEnd) {
+    MEMORY_BASIC_INFORMATION mbi;
+    if (!VirtualQuery(reinterpret_cast<void *>(address), &mbi, sizeof(mbi))) return false;
+    DWORD start = reinterpret_cast<DWORD>(mbi.BaseAddress);
+    DWORD end = start + static_cast<DWORD>(mbi.RegionSize);
+    if (regionStart) *regionStart = start;
+    if (regionEnd) *regionEnd = end;
+    if (mbi.State != MEM_COMMIT || (mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) || !(mbi.Protect & kReadable))
+        return false;
+    return address + length > address && address + length <= end;   // values across a region end are skipped
+}
+
+void PollWatches();
+
+// candidate set
+struct ScanSet {
+    bool active;
+    int type;
+    DWORD step;                         // alignment of the first scan
+    double tol;
+    DWORD *addr, *val;                  // reserved for cap entries each, committed in steps
+    DWORD count, cap, committed;
+    bool truncated, timedOut;
+    int passes;
+    double lastMs;
+    char lastOp[16];
+};
+ScanSet g_scan;
+const DWORD kCommitStep = 256 * 1024;   // entries per commit (1 MB per array)
+
+void ScanFree() {
+    if (g_scan.addr) VirtualFree(g_scan.addr, 0, MEM_RELEASE);
+    if (g_scan.val) VirtualFree(g_scan.val, 0, MEM_RELEASE);
+    memset(&g_scan, 0, sizeof(g_scan));
+}
+
+bool ScanReserve() {
+    ScanFree();
+    g_scan.cap = g_scanMaxCandidates;
+    g_scan.addr = static_cast<DWORD *>(VirtualAlloc(nullptr, g_scan.cap * 4, MEM_RESERVE, PAGE_READWRITE));
+    g_scan.val = static_cast<DWORD *>(VirtualAlloc(nullptr, g_scan.cap * 4, MEM_RESERVE, PAGE_READWRITE));
+    if (!g_scan.addr || !g_scan.val) { ScanFree(); return false; }
+    return true;
+}
+
+bool ScanGrow() {
+    if (g_scan.committed >= g_scan.cap) return false;
+    DWORD n = g_scan.cap - g_scan.committed;
+    if (n > kCommitStep) n = kCommitStep;
+    if (!VirtualAlloc(g_scan.addr + g_scan.committed, n * 4, MEM_COMMIT, PAGE_READWRITE) ||
+        !VirtualAlloc(g_scan.val + g_scan.committed, n * 4, MEM_COMMIT, PAGE_READWRITE))
+        return false;
+    g_scan.committed += n;
+    return true;
+}
+
+inline bool ScanAdd(DWORD address, DWORD raw) {
+    if (g_scan.count == g_scan.committed && !ScanGrow()) {
+        g_scan.truncated = true;
+        return false;
+    }
+    g_scan.addr[g_scan.count] = address;
+    g_scan.val[g_scan.count] = raw;
+    ++g_scan.count;
+    return true;
+}
+
+// is this region part of the searched memory?
+bool ScanWanted(const MEMORY_BASIC_INFORMATION &mbi) {
+    if (mbi.State != MEM_COMMIT) return false;
+    if ((mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) || !(mbi.Protect & kWritable)) return false;
+    DWORD base = reinterpret_cast<DWORD>(mbi.BaseAddress);
+    bool inImage = base >= g_imageStart && base < g_imageEnd;   // tru.exe .data / .bss (writable sections)
+    if (!inImage && mbi.Type != MEM_PRIVATE) return false;      // other modules (incl. TruLink), mapped files
+    if (mbi.AllocationBase == g_scan.addr || mbi.AllocationBase == g_scan.val) return false;
+    const NT_TIB *tib = reinterpret_cast<const NT_TIB *>(NtCurrentTeb());
+    DWORD end = base + static_cast<DWORD>(mbi.RegionSize);
+    if (base < reinterpret_cast<DWORD>(tib->StackBase) && end > reinterpret_cast<DWORD>(tib->StackLimit))
+        return false;                                            // the server thread's own stack
+    return true;
+}
+
+const DWORD kChunk = 0x10000;
+BYTE g_chunk[kChunk + 8];
+
+// matches in one chunk; positions = number of start offsets that belong to this chunk; false = candidate set full
+template <typename T>
+bool ScanChunk(const BYTE *data, DWORD positions, DWORD length, DWORD address, DWORD step, const Filter &f) {
+    for (DWORD off = 0; off < positions && off + sizeof(T) <= length; off += step) {
+        T v;
+        memcpy(&v, data + off, sizeof(T));
+        if (!Match(f, static_cast<double>(v), 0.0)) continue;
+        DWORD raw = 0;
+        memcpy(&raw, &v, sizeof(T));
+        if (!ScanAdd(address + off, raw)) return false;
+    }
+    return true;
+}
+
+bool ScanChunkTyped(int type, const BYTE *data, DWORD positions, DWORD length, DWORD address, DWORD step,
+                    const Filter &f) {
+    switch (type) {
+    case kTypeU8: return ScanChunk<BYTE>(data, positions, length, address, step, f);
+    case kTypeS8: return ScanChunk<signed char>(data, positions, length, address, step, f);
+    case kTypeU16: return ScanChunk<WORD>(data, positions, length, address, step, f);
+    case kTypeS16: return ScanChunk<SHORT>(data, positions, length, address, step, f);
+    case kTypeU32: return ScanChunk<DWORD>(data, positions, length, address, step, f);
+    case kTypeS32: return ScanChunk<LONG>(data, positions, length, address, step, f);
+    default: return ScanChunk<float>(data, positions, length, address, step, f);
+    }
+}
+
+struct ScanStats {
+    DWORD regions, faults;
+    double megabytes;
+};
+
+// walks [areaStart, areaEnd) region by region; listOnly = count / list the regions without reading them
+void WalkRegions(DWORD areaStart, DWORD areaEnd, ScanStats *stats, int type, DWORD step, const Filter *f,
+                 int listMax) {
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    DWORD lo = reinterpret_cast<DWORD>(si.lpMinimumApplicationAddress);
+    DWORD hi = reinterpret_cast<DWORD>(si.lpMaximumApplicationAddress);
+    DWORD p = areaStart > lo ? areaStart : lo;
+    DWORD limit = areaEnd && areaEnd - 1 < hi ? areaEnd : hi + 1;
+    DWORD size = kTypeSizes[type];
+    double started = NowMs(), lastYield = 0.0;
+    int listed = 0;
+    while (p < limit) {
+        MEMORY_BASIC_INFORMATION mbi;
+        if (!VirtualQuery(reinterpret_cast<void *>(p), &mbi, sizeof(mbi))) break;
+        DWORD base = reinterpret_cast<DWORD>(mbi.BaseAddress);
+        DWORD end = base + static_cast<DWORD>(mbi.RegionSize);
+        if (end <= p) break;
+        if (ScanWanted(mbi)) {
+            DWORD s = p > base ? p : base;
+            DWORD e = end < limit ? end : limit;
+            s = (s + step - 1) & ~(step - 1);
+            if (s < e) {
+                ++stats->regions;
+                stats->megabytes += static_cast<double>(e - s) / (1024.0 * 1024.0);
+                if (!f) {
+                    if (listed < listMax) {
+                        bool inImage = base >= g_imageStart && base < g_imageEnd;
+                        g_out.Add("0x%08lx %8lu KB %s %s\n", s, (e - s) / 1024, inImage ? "image" : "private",
+                                  (mbi.Protect & PAGE_WRITECOPY) ? "writecopy" : "readwrite");
+                        ++listed;
+                    }
+                } else {
+                    for (DWORD c = s; c < e; c += kChunk) {
+                        DWORD positions = e - c < kChunk ? e - c : kChunk;
+                        DWORD length = e - c < kChunk + size - 1 ? e - c : kChunk + size - 1;
+                        if (!ReadBytes(c, g_chunk, length)) { ++stats->faults; continue; }
+                        if (!ScanChunkTyped(type, g_chunk, positions, length, c, step, *f)) return;
+                        if (((c - s) & 0x3fffff) == 0) {           // every 4 MB: yield, poll the watches, time limit
+                            double now = NowMs();
+                            if (now - lastYield > 20.0) { Sleep(0); PollWatches(); lastYield = now; }
+                            if (now - started > g_scanMaxSeconds * 1000.0) { g_scan.timedOut = true; return; }
+                        }
+                        if (c + kChunk < c) break;                 // top of the address space
+                    }
+                }
+            }
+        }
+        if (end >= limit || end == 0) break;
+        p = end;
+    }
+}
+
+// options after the values: tol <x>, align <1|2|4>, at <addr> <len>
+bool ParseScanOptions(char **tok, int count, int i, double *tol, DWORD *step, DWORD *areaStart, DWORD *areaEnd,
+                      bool firstScan, char *err, size_t errSize) {
+    for (; i < count; ++i) {
+        if (!_stricmp(tok[i], "tol") && i + 1 < count) {
+            if (!ParseDelta(tok[++i], tol) || *tol < 0) { _snprintf_s(err, errSize, _TRUNCATE, "bad tol '%s'", tok[i]); return false; }
+        } else if (firstScan && !_stricmp(tok[i], "align") && i + 1 < count) {
+            DWORD a = 0;
+            if (!ParseNumber(tok[++i], &a) || (a != 1 && a != 2 && a != 4)) { _snprintf_s(err, errSize, _TRUNCATE, "align 1 | 2 | 4"); return false; }
+            *step = a;
+        } else if (firstScan && !_stricmp(tok[i], "at") && i + 2 < count) {
+            DWORD start = 0, length = 0;
+            if (!ParseAddress(tok[i + 1], &start, err, errSize)) return false;
+            if (!ParseNumber(tok[i + 2], &length) || !length || start + length < start) {
+                _snprintf_s(err, errSize, _TRUNCATE, "bad length '%s'", tok[i + 2]);
+                return false;
+            }
+            *areaStart = start;
+            *areaEnd = start + length;
+            i += 2;
+        } else {
+            _snprintf_s(err, errSize, _TRUNCATE, "unknown option '%s' (tol <x>%s)", tok[i],
+                        firstScan ? ", align <1|2|4>, at <addr> <len>" : "");
+            return false;
+        }
+    }
+    return true;
+}
+
+// op and its values from tok[i]; returns the index after them or -1
+int ParseScanOp(char **tok, int count, int i, int type, bool firstScan, Filter *f, char *err, size_t errSize) {
+    if (i >= count) { _snprintf_s(err, errSize, _TRUNCATE, "missing op"); return -1; }
+    int op = -1;
+    for (int k = 0; k < static_cast<int>(sizeof(kOpNames) / sizeof(kOpNames[0])); ++k)
+        if (!_stricmp(tok[i], kOpNames[k])) op = k;
+    if (!_stricmp(tok[i], "inc")) op = kOpIncreased;
+    if (!_stricmp(tok[i], "dec")) op = kOpDecreased;
+    if (op < 0) { _snprintf_s(err, errSize, _TRUNCATE, "unknown op '%s'", tok[i]); return -1; }
+    bool compares = op == kOpChanged || op == kOpUnchanged || op == kOpIncreased || op == kOpDecreased ||
+                    op == kOpIncBy || op == kOpDecBy;
+    if (firstScan && compares) {
+        _snprintf_s(err, errSize, _TRUNCATE, "'%s' needs a previous scan (scan next ...)", kOpNames[op]);
+        return -1;
+    }
+    if (!firstScan && op == kOpUnknown) { _snprintf_s(err, errSize, _TRUNCATE, "'unknown' is a first scan only"); return -1; }
+    f->op = op;
+    f->a = f->b = 0.0;
+    ++i;
+    int values = (op == kOpRange) ? 2 : (op <= kOpLt || op == kOpIncBy || op == kOpDecBy) ? 1 : 0;
+    if (i + values > count) { _snprintf_s(err, errSize, _TRUNCATE, "'%s' needs %d value(s)", kOpNames[op], values); return -1; }
+    for (int v = 0; v < values; ++v) {
+        double *target = v ? &f->b : &f->a;
+        bool ok = (op == kOpIncBy || op == kOpDecBy) ? ParseDelta(tok[i + v], target) : ParseValue(type, tok[i + v], target);
+        if (!ok) { _snprintf_s(err, errSize, _TRUNCATE, "bad %s value '%s'", kTypeNames[type], tok[i + v]); return -1; }
+    }
+    if (op == kOpRange && f->b < f->a) { double t = f->a; f->a = f->b; f->b = t; }
+    return i + values;
+}
+
+void AddScanSummary(const char *what, const ScanStats *stats) {
+    g_out.Add("ok scan %s %s: %lu candidates", kTypeNames[g_scan.type], what, g_scan.count);
+    if (stats) g_out.Add(" in %lu regions %.1f MB", stats->regions, stats->megabytes);
+    g_out.Add(", %.0f ms", g_scan.lastMs);
+    if (stats && stats->faults) g_out.Add(", %lu chunks faulted (skipped)", stats->faults);
+    if (g_scan.truncated)
+        g_out.Add(", TRUNCATED at %lu (ScanMaxCandidates) - narrow it: a value op instead of unknown, or 'at <addr> <len>'",
+                  g_scan.cap);
+    if (g_scan.timedOut) g_out.Add(", STOPPED after ScanMaxSeconds %d - partial set", g_scanMaxSeconds);
+    g_out.Add("\n");
+}
+
+void ScanFirst(char **tok, int count) {
+    char err[160];
+    int type = 0;
+    if (!ParseType(tok[1], &type)) { g_out.Add("err unknown type '%s' (u8 s8 u16 s16 u32 s32 float)\n", tok[1]); return; }
+    Filter f;
+    f.isFloat = type == kTypeFloat;
+    int i = ParseScanOp(tok, count, 2, type, true, &f, err, sizeof(err));
+    if (i < 0) { g_out.Add("err %s - usage: scan <type> eq|ne|gt|lt <v> | range <lo> <hi> | unknown [tol x] [align n] [at <addr> <len>]\n", err); return; }
+    double tol = f.isFloat ? kDefaultFloatTolerance : 0.0;
+    DWORD step = kTypeSizes[type], areaStart = 0, areaEnd = 0;
+    if (!ParseScanOptions(tok, count, i, &tol, &step, &areaStart, &areaEnd, true, err, sizeof(err))) { g_out.Add("err %s\n", err); return; }
+    f.tol = tol;
+    if (!ScanReserve()) { g_out.Add("err VirtualAlloc of the candidate set (%lu entries) failed\n", g_scanMaxCandidates); return; }
+    g_scan.type = type;
+    g_scan.step = step;
+    g_scan.tol = tol;
+    double started = NowMs();
+    ScanStats stats = {0, 0, 0.0};
+    WalkRegions(areaStart, areaEnd, &stats, type, step, &f, 0);
+    g_scan.lastMs = NowMs() - started;
+    g_scan.active = true;
+    g_scan.passes = 1;
+    strncpy_s(g_scan.lastOp, sizeof(g_scan.lastOp), kOpNames[f.op], _TRUNCATE);
+    char what[96];
+    if (areaEnd)
+        _snprintf_s(what, sizeof(what), _TRUNCATE, "%s at 0x%08lx-0x%08lx align %lu", kOpNames[f.op], areaStart,
+                    areaEnd, step);
+    else
+        _snprintf_s(what, sizeof(what), _TRUNCATE, "%s align %lu", kOpNames[f.op], step);
+    AddScanSummary(what, &stats);
+    Log(1, "scan %s %s: %lu candidates, %lu regions %.1f MB, %.0f ms%s%s", kTypeNames[type], kOpNames[f.op],
+        g_scan.count, stats.regions, stats.megabytes, g_scan.lastMs, g_scan.truncated ? " TRUNCATED" : "",
+        g_scan.timedOut ? " TIMEOUT" : "");
+}
+
+void ScanNext(char **tok, int count) {
+    char err[160];
+    if (!g_scan.active) { g_out.Add("err no scan yet (scan <type> <op> ...)\n"); return; }
+    Filter f;
+    f.isFloat = g_scan.type == kTypeFloat;
+    int i = ParseScanOp(tok, count, 2, g_scan.type, false, &f, err, sizeof(err));
+    if (i < 0) {
+        g_out.Add("err %s - usage: scan next eq|ne|gt|lt <v> | range <lo> <hi> | changed | unchanged | increased | "
+                  "decreased | inc_by <v> | dec_by <v> [tol x]\n", err);
+        return;
+    }
+    double tol = g_scan.tol;
+    DWORD unusedStep = 0, unusedStart = 0, unusedEnd = 0;
+    if (!ParseScanOptions(tok, count, i, &tol, &unusedStep, &unusedStart, &unusedEnd, false, err, sizeof(err))) { g_out.Add("err %s\n", err); return; }
+    f.tol = tol;
+    DWORD size = kTypeSizes[g_scan.type];
+    double started = NowMs(), lastYield = started;
+    DWORD before = g_scan.count, kept = 0, lost = 0, regionStart = 1, regionEnd = 0;
+    bool regionOk = false;
+    for (DWORD k = 0; k < g_scan.count; ++k) {
+        if ((k & 0xffff) == 0xffff) {                          // every 64 K candidates: yield, poll the watches
+            double now = NowMs();
+            if (now - lastYield > 20.0) { Sleep(0); PollWatches(); lastYield = now; }
+        }
+        DWORD a = g_scan.addr[k];
+        if (a < regionStart || a + size > regionEnd) regionOk = ReadableRange(a, size, &regionStart, &regionEnd);
+        DWORD raw = 0;
+        if (!regionOk || a + size > regionEnd || !ReadBytes(a, reinterpret_cast<BYTE *>(&raw), size)) { ++lost; continue; }
+        if (!Match(f, ToNumber(g_scan.type, raw), ToNumber(g_scan.type, g_scan.val[k]))) continue;
+        g_scan.addr[kept] = a;
+        g_scan.val[kept] = raw;
+        ++kept;
+    }
+    g_scan.count = kept;
+    g_scan.lastMs = NowMs() - started;
+    ++g_scan.passes;
+    strncpy_s(g_scan.lastOp, sizeof(g_scan.lastOp), kOpNames[f.op], _TRUNCATE);
+    char what[96];
+    _snprintf_s(what, sizeof(what), _TRUNCATE, "next %s (pass %d, from %lu, %lu unreadable dropped)", kOpNames[f.op],
+                g_scan.passes, before, lost);
+    AddScanSummary(what, nullptr);
+    Log(1, "scan next %s: %lu -> %lu candidates, %.0f ms", kOpNames[f.op], before, kept, g_scan.lastMs);
+}
+
+void ScanList(char **tok, int count) {
+    if (!g_scan.active) { g_out.Add("err no scan yet\n"); return; }
+    DWORD n = 20;
+    if (count > 2 && (!ParseNumber(tok[2], &n) || !n)) { g_out.Add("err usage: scan list [n]\n"); return; }
+    if (n > 500) n = 500;
+    if (n > g_scan.count) n = g_scan.count;
+    g_out.Add("ok+ scan list %lu of %lu %s candidates (address current previous-scan)\n", n, g_scan.count,
+              kTypeNames[g_scan.type]);
+    DWORD size = kTypeSizes[g_scan.type];
+    for (DWORD k = 0; k < n; ++k) {
+        DWORD a = g_scan.addr[k], raw = 0;
+        char cur[40], prev[40];
+        FormatValue(g_scan.type, g_scan.val[k], prev, sizeof(prev));
+        if (ReadableRange(a, size, nullptr, nullptr) && ReadBytes(a, reinterpret_cast<BYTE *>(&raw), size))
+            FormatValue(g_scan.type, raw, cur, sizeof(cur));
+        else
+            strncpy_s(cur, sizeof(cur), "unreadable", _TRUNCATE);
+        g_out.Add("0x%08lx %s %s\n", a, cur, prev);
+    }
+    g_out.Add(".\n");
+}
+
+void CmdScan(char **tok, int count) {
+    if (count < 2 || !_stricmp(tok[1], "status")) {
+        if (!g_scan.active) { g_out.Add("ok scan none (cap %lu)\n", g_scanMaxCandidates); return; }
+        g_out.Add("ok scan %s align %lu tol %g: %lu candidates, pass %d (last %s, %.0f ms)%s%s\n",
+                  kTypeNames[g_scan.type], g_scan.step, g_scan.tol, g_scan.count, g_scan.passes, g_scan.lastOp,
+                  g_scan.lastMs, g_scan.truncated ? " TRUNCATED" : "", g_scan.timedOut ? " PARTIAL" : "");
+        return;
+    }
+    if (!_stricmp(tok[1], "next")) ScanNext(tok, count);
+    else if (!_stricmp(tok[1], "list")) ScanList(tok, count);
+    else if (!_stricmp(tok[1], "clear")) { ScanFree(); g_out.Add("ok scan cleared\n"); }
+    else if (!_stricmp(tok[1], "regions")) {
+        DWORD n = 40;
+        if (count > 2 && !ParseNumber(tok[2], &n)) { g_out.Add("err usage: scan regions [n]\n"); return; }
+        if (n > 1000) n = 1000;
+        g_out.Add("ok+ scan regions (start size kind protection; first %lu)\n", n);
+        ScanStats stats = {0, 0, 0.0};
+        WalkRegions(0, 0, &stats, kTypeU8, 1, nullptr, static_cast<int>(n));
+        g_out.Add("total %lu regions %.1f MB\n.\n", stats.regions, stats.megabytes);
+    } else ScanFirst(tok, count);
+}
+
+// ---- watches ----
+
+const int kMaxWatches = 32;
+struct Watch {
+    bool used, readable;
+    char name[32];
+    DWORD address;
+    int type;
+    DWORD value, changes;
+};
+Watch g_watches[kMaxWatches];
+
+const DWORD kRingSize = 1024;
+struct WatchEvent {
+    DWORD tick, clock;
+    char name[32];                      // copied: the watch may be deleted later
+    DWORD address;
+    int type;
+    DWORD oldValue, newValue;
+    char kind;                          // 'c' change, 'u' became unreadable, 'r' readable again
+};
+WatchEvent g_ring[kRingSize];
+DWORD g_ringTotal = 0;
+DWORD g_lastWatchPoll = 0;
+
+bool ReadWatchValue(const Watch &w, DWORD *raw) {
+    *raw = 0;
+    DWORD size = kTypeSizes[w.type];
+    return ReadableRange(w.address, size, nullptr, nullptr) && ReadBytes(w.address, reinterpret_cast<BYTE *>(raw), size);
+}
+
+void AddEvent(int index, char kind, DWORD oldValue, DWORD newValue) {
+    WatchEvent &e = g_ring[g_ringTotal % kRingSize];
+    e.tick = GetTickCount();
+    e.clock = 0;
+    ReadBytes(kGameClock, reinterpret_cast<BYTE *>(&e.clock), 4);
+    const Watch &w = g_watches[index];
+    strncpy_s(e.name, sizeof(e.name), w.name, _TRUNCATE);
+    e.address = w.address;
+    e.type = w.type;
+    e.kind = kind;
+    e.oldValue = oldValue;
+    e.newValue = newValue;
+    ++g_ringTotal;
+}
+
+void PollWatches() {
+    DWORD now = GetTickCount();
+    if (now - g_lastWatchPoll < static_cast<DWORD>(g_watchIntervalMs)) return;
+    g_lastWatchPoll = now;
+    for (int i = 0; i < kMaxWatches; ++i) {
+        Watch &w = g_watches[i];
+        if (!w.used) continue;
+        DWORD raw = 0;
+        bool ok = ReadWatchValue(w, &raw);
+        if (!ok) {
+            if (w.readable) {
+                w.readable = false;
+                AddEvent(i, 'u', w.value, 0);
+                Log(1, "watch %s 0x%08lx unreadable", w.name, w.address);
+            }
+            continue;
+        }
+        if (!w.readable) {
+            w.readable = true;
+            AddEvent(i, 'r', w.value, raw);
+            Log(1, "watch %s 0x%08lx readable again", w.name, w.address);
+        } else if (raw == w.value) {
+            continue;
+        } else {
+            char a[40], b[40];
+            FormatValue(w.type, w.value, a, sizeof(a));
+            FormatValue(w.type, raw, b, sizeof(b));
+            AddEvent(i, 'c', w.value, raw);
+            Log(1, "watch %s 0x%08lx %s %s -> %s", w.name, w.address, kTypeNames[w.type], a, b);
+            ++w.changes;
+        }
+        w.value = raw;
+    }
+}
+
+int FindWatch(const char *key) {
+    for (int i = 0; i < kMaxWatches; ++i)
+        if (g_watches[i].used && !_stricmp(g_watches[i].name, key)) return i;
+    DWORD a = 0;
+    if (key[0] == '#' && ParseNumber(key + 1, &a) && a < static_cast<DWORD>(kMaxWatches) && g_watches[a].used)
+        return static_cast<int>(a);
+    if (ParseHex(key, &a))
+        for (int i = 0; i < kMaxWatches; ++i)
+            if (g_watches[i].used && g_watches[i].address == a) return i;
+    return -1;
+}
+
+void CmdWatch(char **tok, int count, bool force) {
+    char err[128];
+    if (count < 2) { g_out.Add("err usage: watch add <addr> <type> [name] | del <name|#i|addr|all> | list | log [n]\n"); return; }
+    if (!_stricmp(tok[1], "add")) {
+        DWORD address = 0;
+        int type = 0;
+        if (count < 4 || !ParseAddress(tok[2], &address, err, sizeof(err))) {
+            g_out.Add("err %s\n", count < 4 ? "usage: watch add <addr> <type> [name] [force]" : err);
+            return;
+        }
+        if (!ParseType(tok[3], &type)) { g_out.Add("err unknown type '%s'\n", tok[3]); return; }
+        const char *why = CheckRange(address, kTypeSizes[type], false, force);
+        if (why) { g_out.Add("err 0x%08lx: %s\n", address, why); return; }
+        int slot = -1;
+        for (int i = 0; i < kMaxWatches && slot < 0; ++i)
+            if (!g_watches[i].used) slot = i;
+        if (slot < 0) { g_out.Add("err all %d watches in use (watch del)\n", kMaxWatches); return; }
+        Watch &w = g_watches[slot];
+        memset(&w, 0, sizeof(w));
+        if (count > 4) strncpy_s(w.name, sizeof(w.name), tok[4], _TRUNCATE);
+        else _snprintf_s(w.name, sizeof(w.name), _TRUNCATE, "w%d", slot);
+        if (FindWatch(w.name) >= 0) { g_out.Add("err watch name '%s' already used\n", w.name); return; }
+        w.address = address;
+        w.type = type;
+        w.readable = ReadWatchValue(w, &w.value);
+        w.used = true;
+        char v[40];
+        FormatValue(type, w.value, v, sizeof(v));
+        g_out.Add("ok watch #%d %s 0x%08lx %s = %s (polled every %d ms)\n", slot, w.name, address, kTypeNames[type],
+                  w.readable ? v : "unreadable", g_watchIntervalMs);
+        Log(1, "watch add #%d %s 0x%08lx %s = %s", slot, w.name, address, kTypeNames[type], v);
+    } else if (!_stricmp(tok[1], "del")) {
+        if (count < 3) { g_out.Add("err usage: watch del <name|#i|addr|all>\n"); return; }
+        if (!_stricmp(tok[2], "all")) {
+            int n = 0;
+            for (int i = 0; i < kMaxWatches; ++i)
+                if (g_watches[i].used) { g_watches[i].used = false; ++n; }
+            g_out.Add("ok %d watches removed\n", n);
+            return;
+        }
+        int i = FindWatch(tok[2]);
+        if (i < 0) { g_out.Add("err no watch '%s'\n", tok[2]); return; }
+        g_watches[i].used = false;
+        g_out.Add("ok watch #%d %s removed\n", i, g_watches[i].name);
+    } else if (!_stricmp(tok[1], "list")) {
+        g_out.Add("ok+ watches (#index name address type value changes)\n");
+        for (int i = 0; i < kMaxWatches; ++i) {
+            const Watch &w = g_watches[i];
+            if (!w.used) continue;
+            char v[40];
+            FormatValue(w.type, w.value, v, sizeof(v));
+            g_out.Add("#%d %s 0x%08lx %s %s %lu\n", i, w.name, w.address, kTypeNames[w.type], w.readable ? v : "unreadable",
+                      w.changes);
+        }
+        g_out.Add(".\n");
+    } else if (!_stricmp(tok[1], "log")) {
+        DWORD n = 50;
+        if (count > 2 && (!ParseNumber(tok[2], &n) || !n)) { g_out.Add("err usage: watch log [n]\n"); return; }
+        if (n > kRingSize) n = kRingSize;
+        DWORD available = g_ringTotal < kRingSize ? g_ringTotal : kRingSize;
+        if (n > available) n = available;
+        DWORD now = GetTickCount();
+        g_out.Add("ok+ watch log %lu of %lu events (ms-ago game-clock name address old -> new)\n", n, g_ringTotal);
+        for (DWORD k = g_ringTotal - n; k < g_ringTotal; ++k) {
+            const WatchEvent &e = g_ring[k % kRingSize];
+            char a[40], b[40];
+            FormatValue(e.type, e.oldValue, a, sizeof(a));
+            FormatValue(e.type, e.newValue, b, sizeof(b));
+            const char *kind = e.kind == 'u' ? " (unreadable)" : e.kind == 'r' ? " (readable again)" : "";
+            g_out.Add("%lu %lu %s 0x%08lx %s -> %s%s\n", now - e.tick, e.clock, e.name, e.address, a,
+                      e.kind == 'u' ? "-" : b, kind);
+        }
+        g_out.Add(".\n");
+    } else {
+        g_out.Add("err usage: watch add <addr> <type> [name] | del <name|#i|addr|all> | list | log [n]\n");
+    }
+}
+
+// ---- snapshots ----
+
+const int kMaxSnapshots = 16;
+const DWORD kMaxSnapshot = 4096;
+struct Snapshot {
+    bool used;
+    char name[32];
+    DWORD address, length, tick;
+    BYTE data[kMaxSnapshot];
+};
+Snapshot g_snaps[kMaxSnapshots];
+BYTE g_snapNow[kMaxSnapshot];
+
+int FindSnapshot(const char *name) {
+    for (int i = 0; i < kMaxSnapshots; ++i)
+        if (g_snaps[i].used && !_stricmp(g_snaps[i].name, name)) return i;
+    return -1;
+}
+
+// snapshot <name> <addr> <len> [force] | snapshot <name> (take again) | snapshot list | snapshot del <name>
+void CmdSnapshot(char **tok, int count, bool force) {
+    char err[128];
+    if (count < 2) { g_out.Add("err usage: snapshot <name> <addr> <len> | snapshot <name> | list | del <name>\n"); return; }
+    if (!_stricmp(tok[1], "list")) {
+        g_out.Add("ok+ snapshots (name address length age-ms)\n");
+        DWORD now = GetTickCount();
+        for (int i = 0; i < kMaxSnapshots; ++i)
+            if (g_snaps[i].used)
+                g_out.Add("%s 0x%08lx %lu %lu\n", g_snaps[i].name, g_snaps[i].address, g_snaps[i].length, now - g_snaps[i].tick);
+        g_out.Add(".\n");
+        return;
+    }
+    if (!_stricmp(tok[1], "del")) {
+        int i = count > 2 ? FindSnapshot(tok[2]) : -1;
+        if (i < 0) { g_out.Add("err no snapshot '%s'\n", count > 2 ? tok[2] : ""); return; }
+        g_snaps[i].used = false;
+        g_out.Add("ok snapshot %s removed\n", tok[2]);
+        return;
+    }
+    int slot = FindSnapshot(tok[1]);
+    DWORD address = 0, length = 0;
+    if (count >= 4) {
+        if (!ParseAddress(tok[2], &address, err, sizeof(err))) { g_out.Add("err %s\n", err); return; }
+        if (!ParseNumber(tok[3], &length) || !length || length > kMaxSnapshot) { g_out.Add("err len 1..%lu\n", kMaxSnapshot); return; }
+    } else if (slot >= 0) {
+        address = g_snaps[slot].address;
+        length = g_snaps[slot].length;
+    } else {
+        g_out.Add("err no snapshot '%s' yet - usage: snapshot <name> <addr> <len>\n", tok[1]);
+        return;
+    }
+    const char *why = CheckRange(address, length, false, force);
+    if (why) { g_out.Add("err 0x%08lx: %s\n", address, why); return; }
+    for (int i = 0; i < kMaxSnapshots && slot < 0; ++i)
+        if (!g_snaps[i].used) slot = i;
+    if (slot < 0) { g_out.Add("err all %d snapshots in use (snapshot del)\n", kMaxSnapshots); return; }
+    Snapshot &s = g_snaps[slot];
+    if (!ReadBytes(address, s.data, length)) { g_out.Add("err 0x%08lx: access fault (caught)\n", address); return; }
+    strncpy_s(s.name, sizeof(s.name), tok[1], _TRUNCATE);
+    s.address = address;
+    s.length = length;
+    s.tick = GetTickCount();
+    s.used = true;
+    g_out.Add("ok snapshot %s 0x%08lx %lu bytes\n", s.name, address, length);
+}
+
+// diff <name> [update]: changed dwords (offsets relative to the snapshot start) as hex, float and signed int
+void CmdDiff(char **tok, int count, bool force) {
+    if (count < 2) { g_out.Add("err usage: diff <name> [update]\n"); return; }
+    int slot = FindSnapshot(tok[1]);
+    if (slot < 0) { g_out.Add("err no snapshot '%s'\n", tok[1]); return; }
+    Snapshot &s = g_snaps[slot];
+    const char *why = CheckRange(s.address, s.length, false, force);
+    if (why) { g_out.Add("err 0x%08lx: %s\n", s.address, why); return; }
+    if (!ReadBytes(s.address, g_snapNow, s.length)) { g_out.Add("err 0x%08lx: access fault (caught)\n", s.address); return; }
+    DWORD words = 0, bytes = 0;
+    for (DWORD k = 0; k < s.length; ++k)
+        if (s.data[k] != g_snapNow[k]) ++bytes;
+    for (DWORD off = 0; off < s.length; off += 4) {
+        DWORD n = s.length - off < 4 ? s.length - off : 4;
+        if (memcmp(s.data + off, g_snapNow + off, n)) ++words;
+    }
+    g_out.Add("ok+ diff %s 0x%08lx %lu bytes: %lu dwords / %lu bytes changed after %lu ms (+offset address old new "
+              "f:old f:new i:old i:new)\n", s.name, s.address, s.length, words, bytes, GetTickCount() - s.tick);
+    DWORD shown = 0;
+    for (DWORD off = 0; off < s.length; off += 4) {
+        DWORD n = s.length - off < 4 ? s.length - off : 4;
+        if (!memcmp(s.data + off, g_snapNow + off, n)) continue;
+        if (++shown > 400) { g_out.Add("... more (only 400 shown)\n"); break; }
+        DWORD a = 0, b = 0;
+        memcpy(&a, s.data + off, n);
+        memcpy(&b, g_snapNow + off, n);
+        g_out.Add("+0x%04lx 0x%08lx %08lx %08lx f:%.6g f:%.6g i:%ld i:%ld\n", off, s.address + off, a, b,
+                  ToNumber(kTypeFloat, a), ToNumber(kTypeFloat, b), static_cast<long>(a), static_cast<long>(b));
+    }
+    g_out.Add(".\n");
+    if (count > 2 && !_stricmp(tok[2], "update")) {
+        memcpy(s.data, g_snapNow, s.length);
+        s.tick = GetTickCount();
+    }
+}
+
 // one line in, answer in g_out; returns false to close the connection
 bool HandleLine(char *line) {
     g_out.Reset();
@@ -774,6 +1554,10 @@ bool HandleLine(char *line) {
     else if (!_stricmp(cmd, "objects")) CmdObjects();
     else if (!_stricmp(cmd, "modules")) CmdModules();
     else if (!_stricmp(cmd, "menu")) CmdMenu(tok, count);
+    else if (!_stricmp(cmd, "scan")) CmdScan(tok, count);
+    else if (!_stricmp(cmd, "watch")) CmdWatch(tok, count, force);
+    else if (!_stricmp(cmd, "snapshot")) CmdSnapshot(tok, count, force);
+    else if (!_stricmp(cmd, "diff")) CmdDiff(tok, count, force);
     else if (!_stricmp(cmd, "log")) {
         DWORD level = 0;
         if (count < 2 || !ParseNumber(tok[1], &level) || level > 3) g_out.Add("err usage: log <0-3>\n");
@@ -828,8 +1612,9 @@ DWORD WINAPI ServerThread(LPVOID) {
         FD_ZERO(&readable);
         FD_SET(listener, &readable);
         if (client != INVALID_SOCKET) FD_SET(client, &readable);
-        timeval tv = {0, 250000};
+        timeval tv = {0, static_cast<long>(g_watchIntervalMs < 250 ? g_watchIntervalMs : 250) * 1000};
         int n = select(0, &readable, nullptr, nullptr, &tv);
+        PollWatches();                                         // 0.3: watches, every WatchIntervalMs
         if (n == SOCKET_ERROR) { Sleep(250); continue; }
         if (n == 0) continue;
         if (FD_ISSET(listener, &readable)) {
@@ -905,6 +1690,14 @@ void ReadOptions(const char *dir) {
     g_allowForce = GetPrivateProfileIntA("TruLink", "AllowForce", 1, ini);
     g_timeoutMs = GetPrivateProfileIntA("TruLink", "GameThreadTimeoutMs", 5000, ini);
     if (g_timeoutMs < 500) g_timeoutMs = 500;
+    int maxCandidates = GetPrivateProfileIntA("TruLink", "ScanMaxCandidates", 4 * 1024 * 1024, ini);
+    if (maxCandidates < 1024) maxCandidates = 1024;
+    if (maxCandidates > 16 * 1024 * 1024) maxCandidates = 16 * 1024 * 1024;   // 128 MB at most (32-bit game)
+    g_scanMaxCandidates = static_cast<DWORD>(maxCandidates);
+    g_scanMaxSeconds = GetPrivateProfileIntA("TruLink", "ScanMaxSeconds", 60, ini);
+    if (g_scanMaxSeconds < 1) g_scanMaxSeconds = 1;
+    g_watchIntervalMs = GetPrivateProfileIntA("TruLink", "WatchIntervalMs", 100, ini);
+    if (g_watchIntervalMs < 20) g_watchIntervalMs = 20;
 }
 
 void Start(HMODULE self) {
@@ -965,5 +1758,5 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so TruLink's own "modules" command and other tools can identify the plugin
 extern "C" __declspec(dllexport) const char *TruLinkVersion() {
-    return "TruLink 0.2 (127.0.0.1 text channel: read / write / camera / post / objects / modules / menu)";
+    return "TruLink 0.3 (127.0.0.1 text channel: read / write / camera / post / objects / modules / menu / scan / watch / snapshot)";
 }
