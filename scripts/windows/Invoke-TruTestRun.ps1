@@ -24,8 +24,15 @@
          STACKOVERFLOW, EXITPROCESS, TERMINATEPROCESS, MESSAGEBOX_A/W), dump file names / sizes newer than the start,
          the installed md5s; writes summary.md and summary.json (status table: ok / fail / open per row, first crash
          marker).
-    -Compare <run folder> prints the differences (md5s, markers, test states) between two runs: after a run against
-    the new run, without -RunProfile against -CompareTo (default: the newest other run folder).
+     10. evaluates the profile's "expects" (automatic checks: a regex counted in one collected file) and writes the
+         section "Automatic checks" plus an overall verdict: PASS = every automatic check ok + no crash marker + every
+         owner check (TO TEST check row) ok; FAIL = a failed automatic check, a crash marker or a failed owner check;
+         INCOMPLETE = otherwise (file missing, owner checks open / skipped, timeout).
+    -Compare <run folder> prints the differences (md5s, markers, test states, automatic checks, verdict) between two
+    runs: after a run against the new run, without -RunProfile against -CompareTo (default: the newest other run).
+    -Evaluate <run folder> only evaluates an existing run folder again (offline, the game is not needed): markers from
+    its cdb.log, rows from its TruMenu.tests.txt, the expects of -RunProfile (default: the folder's profile.json);
+    summary.md / summary.json of that folder are rewritten.
     -Undo only undoes the previous run's installs (ASIs stay). -InstallOnly installs and records, then stops.
 
     Profile (JSON, every path relative to <workspace>, i.e. the folder that holds trudlcport):
@@ -45,6 +52,13 @@
       }
     "md5" may be null / missing (then only recorded). A toggle's "initial" ("on" / "off") is written to the INI before
     the start (INI toggles take effect at the next start); item toggles ("target": "<menu item id>") are not touched.
+    Automatic checks (optional):
+        "expects": [ { "id": "sp-on", "file": "TruShadowPower.log", "pattern": "shadow power ON \\(meter",
+                       "mode": "present", "min": 1, "text": "...", "optional": false } ]
+    "file" is relative to the run folder (TruShadowPower.log, cdb.log, TruMenu.tests.txt, ini-after\x.ini, ...);
+    "pattern" is a .NET regex matched per line (case-sensitive); "present" needs at least "min" (default 1) matching
+    lines, "absent" needs none. A missing file is shown as a warning. "optional": true = a target that may still fail:
+    shown, but not counted in the verdict.
 
     Every run writes <workspace>\logs\Invoke-TruTestRun_<time>_<mode>.log. -Verbose shows the steps, -Debug paths,
     hashes, command lines and TruLink traffic, -Trace adds a PowerShell line trace.
@@ -66,6 +80,9 @@
     A run folder (path or name below <workspace>\runs) to compare with.
 .PARAMETER CompareTo
     Second run folder for -Compare without -RunProfile (default: the newest other run).
+.PARAMETER Evaluate
+    A run folder (path or name below <workspace>\runs) to evaluate again offline (expects, markers, verdict); the
+    expects come from -RunProfile or, without it, from the folder's profile.json.
 .PARAMETER AllowMd5Mismatch
     Install even if a profile md5 does not match (the mismatch is noted in the summary).
 .PARAMETER Undo
@@ -81,6 +98,8 @@
     .\scripts\windows\Invoke-TruTestRun.ps1 -RunProfile dlc2_doppelganger -Debugger -Session ..\session_exit.cdb
 .EXAMPLE
     .\scripts\windows\Invoke-TruTestRun.ps1 -Compare 20261031_220000_dlc2_doppelganger
+.EXAMPLE
+    .\scripts\windows\Invoke-TruTestRun.ps1 -Evaluate 20261031_223710_dlc2_48g -RunProfile regress_shadowlara
 #>
 [CmdletBinding()]
 param(
@@ -92,6 +111,7 @@ param(
     [ValidateRange(10, 3600)][int]$LinkWaitSeconds = 300,
     [string]$Compare,
     [string]$CompareTo,
+    [string]$Evaluate,
     [switch]$AllowMd5Mismatch,
     [switch]$Undo,
     [switch]$InstallOnly,
@@ -112,13 +132,13 @@ $runsDir   = Join-Path $workspace 'runs'
 $stateFile = Join-Path $runsDir 'installed-state.json'
 $backupDir = Join-Path $workspace 'backup'
 $stamp     = Get-Date -Format 'yyyyMMdd_HHmmss'
-$mode      = if ($Undo) { 'Undo' } elseif ($RunProfile) { if ($InstallOnly) { 'Install' } else { 'Run' } } elseif ($Compare) { 'Compare' } else { 'None' }
+$mode      = if ($Undo) { 'Undo' } elseif ($Evaluate) { 'Evaluate' } elseif ($RunProfile) { if ($InstallOnly) { 'Install' } else { 'Run' } } elseif ($Compare) { 'Compare' } else { 'None' }
 New-Item -ItemType Directory -Force -Path $paths.Logs, $runsDir | Out-Null
 $logFile = Join-Path $paths.Logs ('Invoke-TruTestRun_{0}_{1}.log' -f $stamp, $mode)
 Set-TruLogFile -Path $logFile
 
 # our plugins: name -> install script; every one has -Install / -Remove / -SourceDir / -GamePath
-$knownAsis = 'TruDlc2Player', 'TruDoppelganger', 'TruRockVein', 'TruShadowPower', 'TruLink', 'TruMenu'
+$knownAsis = 'TruDlc2Player', 'TruDoppelganger', 'TruRockVein', 'TruShadowPower', 'TruLink', 'TruGuard', 'TruMenu'
 # cdb markers (the session file echoes them on a line of their own)
 $markerNames = 'D3DFAIL', 'AV2NDCHANCE', 'FASTFAIL', 'STACKOVERFLOW', 'EXITPROCESS', 'TERMINATEPROCESS', 'MESSAGEBOX_A',
                'MESSAGEBOX_W'
@@ -127,6 +147,7 @@ $iconOk   = [string][char]0x2705   # check mark
 $iconFail = [string][char]0x274C   # cross
 $iconOpen = [string][char]0x23F3   # hourglass
 $iconSkip = [string][char]0x2796   # minus
+$iconWarn = [string][char]0x26A0 + [string][char]0xFE0F   # warning sign
 
 function Resolve-WorkspacePath {
     # profile paths are relative to <workspace>; absolute paths are refused (no personal paths in profiles)
@@ -269,6 +290,14 @@ function Read-TestFile {
     return ,$rows
 }
 
+function ConvertTo-RunTests {
+    # Read-TestFile rows -> summary rows (with icon); the unary comma keeps a one-row list a list
+    param($Rows)
+    return ,@(@($Rows) | Where-Object { $_ } | ForEach-Object {
+        [ordered]@{ kind = $_.kind; id = $_.id; n = $_.n; target = $_.target; text = $_.text; state = $_.state; note = $_.note; time = $_.time; icon = (Get-RowIcon $_) }
+    })
+}
+
 function Get-RowIcon {
     param($Row)
     switch ($Row.kind) {
@@ -321,6 +350,117 @@ function Resolve-RunFolder {
     throw "Run folder not found: $Name"
 }
 
+function Read-TruProfile {
+    # profile name (tests\profiles\<name>.json) or path -> @{ Path; Data; Name }; checks the expects definitions
+    param([string]$NameOrPath)
+    $path = if ($NameOrPath -match '[\\/]' -or $NameOrPath -like '*.json') { $NameOrPath } else { Join-Path $repo "tests\profiles\$NameOrPath.json" }
+    if (!(Test-Path -LiteralPath $path)) { throw "Profile not found: $path" }
+    $data = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+    $name = if ($data.name) { [string]$data.name } else { [IO.Path]::GetFileNameWithoutExtension($path) }
+    if ($name -notmatch '^[A-Za-z0-9_.-]+$') { throw "Profile name '$name' must be letters, digits, _ . - only." }
+    Test-ExpectDefinition -Expects $data.expects -Source $path
+    return @{ Path = (Resolve-Path -LiteralPath $path).Path; Data = $data; Name = $name }
+}
+
+function Test-ExpectDefinition {
+    # throws on a bad "expects" list (before anything is installed): unique id, relative file, valid regex and mode
+    param($Expects, [string]$Source)
+    $ids = @{}
+    foreach ($e in @($Expects)) {
+        if (!$e) { continue }
+        $id = [string]$e.id
+        if (!$id) { throw "$Source : an expect without id" }
+        if ($ids[$id]) { throw "$Source : expect id '$id' twice" }
+        $ids[$id] = $true
+        $file = [string]$e.file
+        if (!$file -or [IO.Path]::IsPathRooted($file) -or $file -match '(^|[\\/])\.\.([\\/]|$)') { throw "$Source : expect '$id' needs a file relative to the run folder (got '$file')" }
+        if ($e.mode -and @('present', 'absent') -notcontains [string]$e.mode) { throw "$Source : expect '$id' mode must be present or absent (got '$($e.mode)')" }
+        if ($null -ne $e.min -and [int]$e.min -lt 1) { throw "$Source : expect '$id' min must be 1 or more" }
+        try { $null = New-Object System.Text.RegularExpressions.Regex ([string]$e.pattern) }
+        catch { throw "$Source : expect '$id' pattern is not a valid regex: $($_.Exception.Message)" }
+        if (![string]$e.pattern) { throw "$Source : expect '$id' has an empty pattern" }
+    }
+}
+
+function Test-TruExpects {
+    # evaluates the expects against the files of a run folder -> list of results (one per expect, profile order)
+    param($Expects, [string]$Folder)
+    $results = @()
+    $cache = @{}
+    foreach ($e in @($Expects)) {
+        if (!$e) { continue }
+        $mode = if ($e.mode) { [string]$e.mode } else { 'present' }
+        $min = if ($null -ne $e.min) { [int]$e.min } else { 1 }
+        $path = Join-Path $Folder ([string]$e.file -replace '/', '\')
+        $r = [ordered]@{
+            id = [string]$e.id; file = [string]$e.file; pattern = [string]$e.pattern; mode = $mode; min = $min
+            text = [string]$e.text; optional = [bool]$e.optional; result = 'missing'; icon = $iconWarn; hits = 0
+            line = $null; evidence = ''
+        }
+        if (Test-Path -LiteralPath $path -PathType Leaf) {
+            if (!$cache.ContainsKey($path)) { $cache[$path] = [IO.File]::ReadAllLines($path) }
+            $lines = $cache[$path]
+            $rx = New-Object System.Text.RegularExpressions.Regex ([string]$e.pattern)
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+                if (!$rx.IsMatch($lines[$i])) { continue }
+                $r['hits'] = $r['hits'] + 1
+                if ($null -eq $r.line) {
+                    $r.line = $i + 1
+                    $t = $lines[$i].Trim()
+                    $r.evidence = if ($t.Length -gt 140) { $t.Substring(0, 140) + '...' } else { $t }
+                }
+            }
+            $ok = if ($mode -eq 'absent') { $r.hits -eq 0 } else { $r.hits -ge $min }
+            $r.result = if ($ok) { 'ok' } else { 'fail' }
+            $r.icon = if ($ok) { $iconOk } else { $iconFail }
+        }
+        Write-Log ('check {0}: {1} ({2} matching lines in {4}, wanted {3})' -f $r.id, $r.result, $r.hits, $mode, $r.file) -Level VERBOSE
+        $results += $r
+    }
+    return ,$results
+}
+
+function Get-FirstCrash {
+    # first crash marker of the cdb log, else a crash exit code; $null = none
+    param($Markers, $ExitCode)
+    $first = @($Markers) | Where-Object { $_ -and $crashMarkers -contains $_.name } | Select-Object -First 1
+    if ($first) { return ('{0} (line {1}) {2}' -f $first.name, $first.line, $first.detail) }
+    if ($null -ne $ExitCode -and [long]$ExitCode -ne 0) {
+        $hex = '0x{0:x8}' -f ([long]$ExitCode -band 0xffffffffL)
+        $named = switch ($hex) { '0xc0000005' { 'AV (exit code)' } '0xc0000409' { 'FASTFAIL (exit code)' } '0xc00000fd' { 'STACKOVERFLOW (exit code)' } default { $null } }
+        if ($named) { return "$named $hex" }
+    }
+    return $null
+}
+
+function Set-RunVerdict {
+    # automatic checks + crash marker + owner checks -> $Run.expects / verdict / verdictIcon / verdictNotes
+    param([hashtable]$Run, $Expects, [string]$Folder)
+    $results = @(Test-TruExpects -Expects $Expects -Folder $Folder | ForEach-Object { $_ })
+    $Run.expects = $results
+    $required = @($results | Where-Object { !$_.optional })
+    $failed   = @($required | Where-Object { $_.result -eq 'fail' }).Count
+    $missing  = @($required | Where-Object { $_.result -eq 'missing' }).Count
+    $optOpen  = @($results | Where-Object { $_.optional -and $_.result -ne 'ok' }).Count
+    $checks   = @(@($Run.tests) | Where-Object { $_ -and $_.kind -eq 'check' })
+    $cFail    = @($checks | Where-Object { $_.state -eq 'fail' }).Count
+    $cOk      = @($checks | Where-Object { $_.state -eq 'ok' }).Count
+    $cOther   = $checks.Count - $cFail - $cOk
+    $notes = New-Object System.Collections.Generic.List[string]
+    if ($Run.firstCrash) { $notes.Add("crash marker $($Run.firstCrash)") }
+    $notes.Add(('automatic checks {0}/{1} ok{2}{3}' -f @($required | Where-Object { $_.result -eq 'ok' }).Count, $required.Count,
+        $(if ($failed) { ", $failed failed" }), $(if ($missing) { ", $missing without their file" })))
+    if (!$checks.Count) { $notes.Add('no owner checks collected') }
+    else { $notes.Add(('owner checks {0}/{1} ok{2}{3}' -f $cOk, $checks.Count, $(if ($cFail) { ", $cFail failed" }), $(if ($cOther) { ", $cOther open / skipped" }))) }
+    if ($Run.timedOut) { $notes.Add('timeout - game still running') }
+    if ($optOpen) { $notes.Add("$optOpen optional target(s) not met (not counted)") }
+    if ($Run.firstCrash -or $failed -or $cFail) { $Run.verdict = 'FAIL'; $Run.verdictIcon = $iconFail }
+    elseif ($missing -or !$checks.Count -or $cOther -or $Run.timedOut) { $Run.verdict = 'INCOMPLETE'; $Run.verdictIcon = $iconWarn }
+    else { $Run.verdict = 'PASS'; $Run.verdictIcon = $iconOk }
+    $Run.verdictNotes = $notes -join '; '
+    Write-Log "Verdict: $($Run.verdict) - $($Run.verdictNotes)"
+}
+
 function Compare-TruRun {
     # prints (and returns) the differences between two runs' summary.json
     param([string]$Old, [string]$New)
@@ -348,7 +488,16 @@ function Compare-TruRun {
         $sb = if ($tb[$k]) { $tb[$k].state } else { '-' }
         if ($sa -ne $sb) { $out.Add(('  test    {0}: {1} -> {2}' -f $k, $sa, $sb)) }
     }
-    if ($out.Count -eq 1) { $out.Add('  no differences in md5s, markers, exit code and test states') }
+    # automatic checks (runs before the expects feature have none: shown as '-')
+    $ea = @{}; foreach ($e in @($a.expects)) { if ($e) { $ea[$e.id] = $e } }
+    $eb = @{}; foreach ($e in @($b.expects)) { if ($e) { $eb[$e.id] = $e } }
+    foreach ($k in (@($ea.Keys) + @($eb.Keys) | Sort-Object -Unique)) {
+        $sa = if ($ea[$k]) { '{0} ({1} lines)' -f $ea[$k].result, $ea[$k].hits } else { '-' }
+        $sb = if ($eb[$k]) { '{0} ({1} lines)' -f $eb[$k].result, $eb[$k].hits } else { '-' }
+        if ($sa -ne $sb) { $out.Add(('  check   {0}: {1} -> {2}' -f $k, $sa, $sb)) }
+    }
+    if ($a.verdict -ne $b.verdict) { $out.Add(('  verdict: {0} -> {1}' -f $(if ($a.verdict) { $a.verdict } else { '-' }), $(if ($b.verdict) { $b.verdict } else { '-' }))) }
+    if ($out.Count -eq 1) { $out.Add('  no differences in md5s, markers, exit code, test states, automatic checks and verdict') }
     foreach ($l in $out) { Write-Log $l }
     return ,$out.ToArray()
 }
@@ -362,11 +511,11 @@ function Undo-PreviousInstall {
     if ($ours.Count) {
         $open = @(Get-ChildItem -LiteralPath $backupDir -Directory -Filter 'tree_*' -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -notlike '*.restored' } | Sort-Object Name)
-        $newest = ($ours | Sort-Object)[-1]
+        $newest = [string](@($ours | Sort-Object)[-1])      # @() - with one tree [-1] would index the last character
         $foreign = @($open | Where-Object { $_.Name -gt $newest -and $ours -notcontains $_.Name })
         if ($foreign.Count) {
-            throw ("A newer tree install ({0}) sits on top of the previous harness run - undo it first " +
-                   "(Install-TruTree.ps1 -Restore) or delete {1} if that state is wanted." -f ($foreign.Name -join ', '), $stateFile)
+            throw (("A newer tree install ({0}) sits on top of the previous harness run - undo it first " +
+                    "(Install-TruTree.ps1 -Restore) or delete {1} if that state is wanted.") -f ($foreign.Name -join ', '), $stateFile)
         }
     }
     foreach ($ini in @($state.inis)) {
@@ -401,6 +550,10 @@ function Write-RunSummary {
     $md = New-Object System.Collections.Generic.List[string]
     $md.Add("# Test run $($Run.profile) - $($Run.start)")
     $md.Add('')
+    if ($Run.verdict) {
+        $md.Add("**Verdict: $($Run.verdictIcon) $($Run.verdict)** - $($Run.verdictNotes)")
+        $md.Add('')
+    }
     $md.Add('| Item | Value |')
     $md.Add('|---|---|')
     $md.Add("| Status | $($Run.statusIcon) $($Run.status) |")
@@ -410,7 +563,26 @@ function Write-RunSummary {
     $md.Add("| Exit code | $($Run.exitCode) |")
     $md.Add("| TruLink preload | $($Run.preload) |")
     $md.Add("| md5 notes | $(if ($Run.md5Notes.Count) { $Run.md5Notes -join '; ' } else { 'all as in the profile' }) |")
+    if ($Run.expectsFrom) { $md.Add("| Automatic checks from | $($Run.expectsFrom) |") }
     $md.Add('')
+    if ($Run.verdict) {
+        $md.Add('## Automatic checks')
+        $md.Add('')
+        $md.Add('| # | Result | Id | Check | File | Expected | Lines | First match |')
+        $md.Add('|---|---|---|---|---|---|---|---|')
+        $i = 0
+        foreach ($e in @($Run.expects)) {
+            if (!$e) { continue }
+            $i++
+            $want = if ($e.mode -eq 'absent') { 'absent' } else { "present, at least $($e.min)" }
+            $res = '{0} {1}{2}' -f $e.icon, $(if ($e.result -eq 'missing') { 'file missing' } else { $e.result }), $(if ($e.optional) { ' (optional target)' } else { '' })
+            $first = if ($e.line) { 'line {0}: `{1}`' -f $e.line, ($e.evidence -replace '`', "'" -replace '\|', '\|') } else { '-' }
+            $md.Add(('| {0} | {1} | {2} | {3} | {4} | {5} `{6}` | {7} | {8} |' -f $i, $res, $e.id, ($e.text -replace '\|', '/'), $e.file,
+                $want, ($e.pattern -replace '\|', '\|'), $e.hits, $first))
+        }
+        if (!$i) { $md.Add('| - | - | - | the profile has no expects | - | - | - | - |') }
+        $md.Add('')
+    }
     $md.Add('## TO TEST rows (after the run)')
     $md.Add('')
     $md.Add('| # | Kind | Id | Text | State | Note | Time |')
@@ -453,6 +625,43 @@ if ($Trace) { Set-PSDebug -Trace 1 }
 try {
     Write-Log "Invoke-TruTestRun mode=$mode profile=$RunProfile debugger=$Debugger log=$logFile" -Level VERBOSE
 
+    if ($Evaluate) {
+        # offline: evaluate an existing run folder again (no game, nothing installed)
+        $folder = Resolve-RunFolder $Evaluate
+        $p = if ($RunProfile) { Read-TruProfile $RunProfile } else {
+            $pj = Join-Path $folder 'profile.json'
+            if (!(Test-Path -LiteralPath $pj)) { throw "$folder has no profile.json - pass -RunProfile." }
+            Read-TruProfile $pj
+        }
+        $run = @{}
+        $sj = Join-Path $folder 'summary.json'
+        if (Test-Path -LiteralPath $sj) {
+            $old = Get-Content -LiteralPath $sj -Raw -Encoding UTF8 | ConvertFrom-Json
+            foreach ($prop in $old.PSObject.Properties) { $run[$prop.Name] = $prop.Value }
+        }
+        else {
+            $run = @{ profile = $p.Name; start = '?'; end = '?'; status = 'unknown (no summary.json)'; statusIcon = $iconOpen; mode = 'unknown'
+                      exitCode = $null; preload = 'unknown'; firstCrash = $null; markers = @(); tests = @(); dumps = @(); collected = @()
+                      installed = @(); md5Notes = @() }
+        }
+        $cdb = Join-Path $folder 'cdb.log'
+        if (Test-Path -LiteralPath $cdb) {
+            $run.markers = @(Find-Markers $cdb | ForEach-Object { $_ })
+            $run.firstCrash = Get-FirstCrash -Markers $run.markers -ExitCode $run.exitCode
+        }
+        $testRows = Read-TestFile (Join-Path $folder 'TruMenu.tests.txt')
+        if ($testRows.Count) { $run.tests = ConvertTo-RunTests $testRows }
+        $run.expectsFrom = '{0} (evaluated offline {1})' -f $p.Name, (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+        Set-RunVerdict -Run $run -Expects $p.Data.expects -Folder $folder
+        Write-RunSummary -Run $run -Folder $folder
+        Write-Log "Run folder evaluated: $folder (summary.md, summary.json)"
+        if ($Compare) {
+            $diff = Compare-TruRun -Old (Resolve-RunFolder $Compare) -New $folder
+            Set-Content -LiteralPath (Join-Path $folder 'compare.txt') -Value $diff -Encoding UTF8
+        }
+        return
+    }
+
     if (!$RunProfile -and !$Undo) {
         if (!$Compare) { throw 'Pass -RunProfile <name> (a run), -Undo, or -Compare <run folder>.' }
         $old = Resolve-RunFolder $Compare
@@ -475,11 +684,10 @@ try {
     if ($Undo) { Undo-PreviousInstall; return }
 
     # ---- profile ----
-    $profilePath = if ($RunProfile -match '[\\/]' -or $RunProfile -like '*.json') { $RunProfile } else { Join-Path $repo "tests\profiles\$RunProfile.json" }
-    if (!(Test-Path -LiteralPath $profilePath)) { throw "Profile not found: $profilePath" }
-    $prof = Get-Content -LiteralPath $profilePath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $profName = if ($prof.name) { [string]$prof.name } else { [IO.Path]::GetFileNameWithoutExtension($profilePath) }
-    if ($profName -notmatch '^[A-Za-z0-9_.-]+$') { throw "Profile name '$profName' must be letters, digits, _ . - only." }
+    $profInfo = Read-TruProfile $RunProfile
+    $profilePath = $profInfo.Path
+    $prof = $profInfo.Data
+    $profName = $profInfo.Name
     Write-Log "Profile $profName from $profilePath" -Level VERBOSE
     if ($Debugger) {
         if (!$Session -or !(Test-Path -LiteralPath $Session)) { throw "-Debugger needs -Session <cdb command file> (not found: $Session)" }
@@ -744,16 +952,10 @@ try {
     # Find-Markers returns its list with the unary comma (one object); @() around the call nested it, so several
     # markers became ONE row with joined names and the crash-marker test below missed D3DFAIL / MESSAGEBOX
     $run.markers = @(Find-Markers $cdbLog | ForEach-Object { $_ })
-    $first = $run.markers | Where-Object { $crashMarkers -contains $_.name } | Select-Object -First 1
-    if ($first) { $run.firstCrash = '{0} (line {1}) {2}' -f $first.name, $first.line, $first.detail }
-    elseif ($null -ne $run.exitCode -and $run.exitCode -ne 0) {
-        $hex = '0x{0:x8}' -f $run.exitCode
-        $named = switch ($hex) { '0xc0000005' { 'AV (exit code)' } '0xc0000409' { 'FASTFAIL (exit code)' } '0xc00000fd' { 'STACKOVERFLOW (exit code)' } default { $null } }
-        if ($named) { $run.firstCrash = "$named $hex" }
-    }
+    $run.firstCrash = Get-FirstCrash -Markers $run.markers -ExitCode $run.exitCode
 
-    # dumps: paths named in the session file, the WER folder, the game folder, the run folder
-    $dumpDirs = @((Join-Path $env:LOCALAPPDATA 'CrashDumps'), $GamePath, $runFolder)
+    # dumps: paths named in the session file, the WER folder, the game folder, TruGuard's own folder, the run folder
+    $dumpDirs = @((Join-Path $env:LOCALAPPDATA 'CrashDumps'), $GamePath, (Join-Path $GamePath 'TruGuardDumps'), $runFolder)
     if ($Debugger) {
         foreach ($m in [regex]::Matches((Get-Content -LiteralPath $Session -Raw), '([A-Za-z]:\\[^\s"'';]+\.dmp)')) {
             $dumpDirs += (Split-Path -Parent ($m.Groups[1].Value -replace '\\\\', '\'))
@@ -770,17 +972,18 @@ try {
     }
 
     $testRows = Read-TestFile (Join-Path $runFolder 'TruMenu.tests.txt')
-    $run.tests = @($testRows | ForEach-Object {
-        [ordered]@{ kind = $_.kind; id = $_.id; n = $_.n; target = $_.target; text = $_.text; state = $_.state; note = $_.note; time = $_.time; icon = (Get-RowIcon $_) }
-    })
+    $run.tests = ConvertTo-RunTests $testRows
     $fails = @($testRows | Where-Object { $_.kind -eq 'check' -and $_.state -eq 'fail' }).Count
     $open = @($testRows | Where-Object { ($_.kind -eq 'check' -and $_.state -eq 'open') -or ($_.kind -eq 'step' -and $_.state -ne 'done') }).Count
     if ($run.firstCrash -or $fails) { $run.status = "fail ($fails failed checks$(if ($run.firstCrash) { ', crash marker' }))"; $run.statusIcon = $iconFail }
     elseif ($timedOut -or $open -or !$testRows.Count) { $run.status = "open ($open open rows$(if ($timedOut) { ', timeout - game still running' }))"; $run.statusIcon = $iconOpen }
     else { $run.status = 'ok'; $run.statusIcon = $iconOk }
+    $run.timedOut = $timedOut
+    $run.expectsFrom = $profName
+    Set-RunVerdict -Run $run -Expects $prof.expects -Folder $runFolder
 
     Write-RunSummary -Run $run -Folder $runFolder
-    Write-Log "Run $profName finished: $($run.status); first crash marker: $(if ($run.firstCrash) { $run.firstCrash } else { '-' })"
+    Write-Log "Run $profName finished: $($run.status); verdict $($run.verdict); first crash marker: $(if ($run.firstCrash) { $run.firstCrash } else { '-' })"
     Write-Log "Run folder: $runFolder (summary.md, summary.json)"
     if ($Compare) {
         $diff = Compare-TruRun -Old (Resolve-RunFolder $Compare) -New $runFolder

@@ -33,6 +33,30 @@
 //     SCCondFunction_Default 0x82484db0: formats "You must add a condition function ...", returns true) logs each
 //     condition id that reaches it once, with record key / value and the agent's state name - the title-update
 //     conditions Lara's own link array lacks (TU-Abdeckung.md: 1048-1056, 2005, 2006, 2013, 2401) show up here.
+//
+// 0.3 (2026-11-01, docs Befund-Felsrinne "Rock vein: no markup context at the wall") - live 607 / 608 ran with ctx 0:
+// the PC disables every markup of type 22 / 23 when it is added (type -> flag mapper tru+0x5d70a0 = Xbox retail, only
+// types 1..21; the title update 0x822a12e8 maps 22 / 23 to flag class 1). PatchMarkupTypes adds the two cases.
+//
+// 0.4 (2026-11-01, docs Befund-Felsrinne "Wall run: crash on entering the attach state (tru+0x1dba2d)") - with 0.3 the
+// condition 608 was true and the game crashed 237 ms later in TRMarkupManager slot +0x08 (tru+0x1dba20, the wall normal
+// of a box) with box = NULL. A box of flag class 1 carries none of the move bits, so on PC the attach dispatcher
+// tru+0x307b90 (box = gameTracker+0xa64) finds neither slot 0 ("wall", bits 0x04480010) nor slot 1 (bits 0x61870000)
+// nor bit 0x8000 true and never sets the attach box gameTracker+0xc94; the next state code reads +0xc94 = 0. The title
+// update added the new types to exactly these slots (TU vtable 0x8206827c): slot 0 0x822a0bc8 "... || type == 22",
+// slot 1 0x822a0c68 "... || type == 23", slot +0x08 0x822a0d08 takes the edge (cross product) path also for type 22.
+// PatchSlots translates the three 1:1 (type = second markup +0x4d, else record +0x33, as the TU code reads it).
+// NullBoxGuard (diagnostic, not a translation - the TU would read address 0x28 too): slot +0x08 with box 0 logs the
+// return addresses (into the wrapper tru+0x1c3cc0 and its caller) and returns a zero vector instead of crashing.
+//
+// 0.5 (2026-11-01, live test 48j with 0.4: guard fired from tru+0x32ba5b, +0xc94 = 0, then AV in tru+0x1c39e2 with
+// the same box 0) - the attach box is set by PLAYER_AttachToJumpTarget (PC tru+0x307b90 = TU 0x823fd178, unchanged),
+// and the title update calls it for the new markup action 608: the markup-action selector (PC tru+0x372ca0 = TU
+// 0x82463538) switches on the state parameter 0x19a; the TU added case 608 (0x82463a28: if gameTracker+0xa64 != 0 ->
+// PLAYER_AttachToJumpTarget(zero vector, 0.0) and gameTracker+0xca0 = gameTracker+0xd90), every other case of
+// 601..629 has the same target pattern on PC and TU. The PC sends 608 to its default ("unknown", print compiled out),
+// so no attach happens and state 572 (parameter 0x1e1 = 611) reads +0xc94 = 0. PatchSelector adds the case.
+// NullBoxGuard also covers tru+0x32ba40 (attach point on a box, cdecl(out, box)), the second crash site's caller.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -72,10 +96,69 @@ const BYTE kCondDefaultBytes[] = {0x81, 0xec, 0x04, 0x02, 0x00, 0x00, 0xa1, 0xe8
                                   0x89, 0x84, 0x24, 0x00, 0x02, 0x00, 0x00, 0x8b, 0x84, 0x24, 0x10, 0x02, 0x00, 0x00,
                                   0x0f, 0xbf, 0x40, 0x02};   // ... mov eax,[esp+210h] (record); movsx eax,word [eax+2]
 const DWORD kCondDefaultNext = 0x00782146;
+// 0.3: markup type -> flag class, TRMarkupManager vtable 0x855214 slot +0x20 (called by the markup add loop
+// tru+0x5ce55b for every record whose +0x28 is 0). PC = Xbox retail 0x822a42d8: types 1..21 only, any other type
+// returns 0x80000000 = "Bad Markup Type, disabling markup" (the print is compiled out on PC) and the query loops skip
+// a box with a negative flag word (tru+0x5ce459 js). The title update 0x822a12e8 accepts 1..23 and returns 1 for the
+// two new types 22 / 23 (the DLC 2 rock-vein markup of the pistons / machine column / goo converter objects).
+const DWORD kTypeFlagsSlot = 0x00855234;     // vtable 0x855214 + 0x20
+const DWORD kTypeFlags = 0x005d70a0;
+const BYTE kTypeFlagsBytes[] = {0x8b, 0x4c, 0x24, 0x04, 0x83, 0xc1, 0xff, 0x33, 0xc0, 0x83, 0xf9, 0x14, 0x77, 0x17,
+                                0xff, 0x24, 0x8d, 0xd0, 0x70, 0x5d, 0x00, 0xb8, 0x01, 0x00, 0x00, 0x00, 0xc2, 0x04, 0x00};
+const DWORD kTypeFlagsLimit = 0x005d70ab;    // imm8 of cmp ecx,14h (index = type - 1)
+const DWORD kTypeFlagsTable = 0x005d70d0;    // 21 entries, then 12 bytes int3 padding
+const DWORD kTypeFlagsOne = 0x005d70b5;      // mov eax,1; ret 4
+const DWORD kTypeFlagsTableOriginal[21] = {
+    0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70b5,
+    0x005d70ca, 0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70b5, 0x005d70bd, 0x005d70bd, 0x005d70bd,
+    0x005d70bd, 0x005d70bd, 0x005d70ca};
+const BYTE kTypeFlagsPad[8] = {0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};
 const BYTE kFormatPush[] = {0x68, 0xa8, 0x06, 0x86, 0x00};  // tru+0x382182 push "You must add a condition ..." format
 const DWORD kFormatPushAt = 0x00782182;
 
+// 0.4: TRMarkupManager vtable 0x855214 slots 0 / 1 / +0x08 (Xbox TU 0x822a0bc8 / 0x822a0c68 / 0x822a0d08)
+const DWORD kSlot0At = 0x00855214, kSlot0 = 0x005d6e50;   // thiscall(mgr, box): [box+28h] & 4480010h || 0x741720(box)
+const DWORD kSlot1At = 0x00855218, kSlot1 = 0x005d6e80;   // thiscall(mgr, box): [box+28h] & 61870000h || 0x733f60(box)
+const DWORD kSlot8At = 0x0085521c, kSlot8 = 0x005dba20;   // thiscall(mgr, out, box, segment), ret 0Ch
+const BYTE kSlot0Bytes[] = {0x8b, 0x44, 0x24, 0x04, 0xf7, 0x40, 0x28, 0x10, 0x00, 0x48, 0x04, 0x75, 0x10, 0x50, 0xe8,
+                            0xbd, 0xa8, 0x16, 0x00, 0x83, 0xc4, 0x04, 0x84, 0xc0, 0x75, 0x03, 0xc2, 0x04, 0x00, 0xb0,
+                            0x01, 0xc2, 0x04, 0x00};
+const BYTE kSlot1Bytes[] = {0x8b, 0x44, 0x24, 0x04, 0xf7, 0x40, 0x28, 0x00, 0x00, 0x87, 0x61, 0x75, 0x10, 0x50, 0xe8,
+                            0xcd, 0xd0, 0x15, 0x00, 0x83, 0xc4, 0x04, 0x84, 0xc0, 0x75, 0x03, 0xc2, 0x04, 0x00, 0xb0,
+                            0x01, 0xc2, 0x04, 0x00};
+// slot +0x08 entry up to the branch: ... mov ebx,[ebp+0Ch]; test dword [ebx+28h],20408000h; push esi;
+// mov esi,[ebp+8]; push edi; mov edi,[ebx+20h]; je 0x5dbac8 (6 bytes at 0x5dba3c)
+const BYTE kSlot8Bytes[] = {0x55, 0x8b, 0xec, 0x83, 0xe4, 0xf0, 0x83, 0xec, 0x24, 0x53, 0x8b, 0x5d, 0x0c, 0xf7, 0x43,
+                            0x28, 0x00, 0x80, 0x40, 0x20, 0x56, 0x8b, 0x75, 0x08, 0x57, 0x8b, 0x7b, 0x20, 0x0f, 0x84,
+                            0x86, 0x00, 0x00, 0x00};
+const DWORD kSlot8Branch = 0x005dba3c;  // je 0x5dbac8 -> jmp Slot8Branch; nop
+const DWORD kSlot8Edge = 0x005dba42;    // mask bits set: normal of the poly-line edge (cross product)
+const DWORD kSlot8Other = 0x005dbac8;   // no mask bit: the retail fallback (player position based)
+const DWORD kWrapperRet = 0x005c3cda;   // return address inside the wrapper tru+0x1c3cc0 (box in ecx)
+
+// 0.5: markup-action selector tru+0x372ca0, second switch (values 601..629, ebx = state parameter 0x19a, esi = agent)
+const DWORD kSelSwitch = 0x00772f8a;    // lea eax,[ebx-259h]; cmp eax,1Ch; ja default; movzx edx,byte [eax+77316Ch]; jmp
+const BYTE kSelSwitchBytes[] = {0x8d, 0x83, 0xa7, 0xfd, 0xff, 0xff, 0x83, 0xf8, 0x1c, 0x0f, 0x87, 0x01, 0x01, 0x00,
+                                0x00, 0x0f, 0xb6, 0x90, 0x6c, 0x31, 0x77, 0x00, 0xff, 0x24, 0x95, 0x28, 0x31, 0x77, 0x00};
+const DWORD kSelNext = 0x00772f90;      // cmp eax,1Ch (after the 6-byte lea we detour)
+const DWORD kSelIndex608 = 0x00773173;  // byte table entry of 608: 0x10 = the default target
+const DWORD kSelDefaultEntry = 0x00773168;   // jump table entry 16 = 0x77309a (default)
+const DWORD kSelDefault = 0x0077309a;
+const DWORD kSelExit = 0x007730af;      // after the switch: push 191h (state parameter 0x191 ...)
+const BYTE kSelExitBytes[] = {0x68, 0x91, 0x01, 0x00, 0x00};
+const DWORD kAttachToJumpTarget = 0x00707b90;   // cdecl(const vec4 *, float), PC of TU 0x823fd178
+const BYTE kAttachBytes[] = {0xa1, 0x58, 0xdb, 0xfa, 0x00, 0x8b, 0x88, 0x64, 0x0a, 0x00, 0x00, 0x56, 0x8b, 0x71, 0x28,
+                             0xe8, 0xec, 0x67, 0xeb, 0xff};
+const DWORD kGameTracker = 0x00fadb58;
+// tru+0x32ba40: attach point on a box, cdecl(out, box) (e.g. state 572 tru+0x36ddab with box = gameTracker+0xc94)
+const DWORD kPointOnBox = 0x0072ba40;
+const BYTE kPointOnBoxBytes[] = {0x55, 0x8b, 0xec, 0x83, 0xe4, 0xf0, 0x83, 0xec, 0x18, 0x56, 0x8b, 0x75, 0x08, 0x57,
+                                 0x8b, 0x7d, 0x0c};
+const DWORD kPointOnBoxNext = 0x0072ba46;
+
+typedef void(__cdecl *AttachFn)(const float *vec, float value);
 typedef int(__fastcall *GetTypeFn)(void *ctx, void *unused);   // thiscall getter, no stack arguments
+typedef char(__thiscall *BoxPredFn)(void *mgr, void *box);
 
 // options (TruRockVein.ini, section [RockVein])
 int g_enabled = 1;
@@ -84,6 +167,16 @@ int g_logUnhandled = 1;
 int g_type607 = 23, g_type608 = 22;     // Xbox title update values
 int g_logBadValues = 1;                 // 0.2: markup values outside 601..628 (data in the wrong byte order)
 int g_logDefaultConditions = 1;         // 0.2: condition ids answered by the default handler
+int g_markupTypes = 1;                  // 0.3: accept the title-update markup types 22 / 23 (flag class 1)
+int g_markupSlots = 1;                  // 0.4: TU type checks in TRMarkupManager slots 0 / 1 / +0x08
+int g_nullBoxGuard = 1;                 // 0.4: diagnostic guard for slot +0x08 with box 0 (logs the caller)
+DWORD g_slot8Orig = kSlot8, g_slot8Edge = kSlot8Edge, g_slot8Other = kSlot8Other;
+volatile LONG g_slotHits[3] = {0, 0, 0};   // slot 0 / 1 / +0x08 answered by the TU type check
+volatile LONG g_nullBoxCalls = 0;
+DWORD g_nullBoxCallers[16];
+int g_markupAction608 = 1;              // 0.5: TU markup action 608 (attach to the jump target)
+DWORD g_selNext = kSelNext, g_selExit = kSelExit, g_pointOnBoxNext = kPointOnBoxNext;
+volatile LONG g_action608Calls = 0;
 DWORD g_dispatchNext = kDispatchNext;
 DWORD g_condDefaultNext = kCondDefaultNext;
 volatile LONG g_valueSeen[29];          // 601..628 first-call flags (index value - 600)
@@ -348,6 +441,275 @@ void ReadOptions(const char *dir) {
     g_type608 = GetPrivateProfileIntA("RockVein", "Type608", 22, ini);
     g_logBadValues = GetPrivateProfileIntA("RockVein", "LogBadValues", 1, ini);
     g_logDefaultConditions = GetPrivateProfileIntA("RockVein", "LogDefaultConditions", 1, ini);
+    g_markupTypes = GetPrivateProfileIntA("RockVein", "MarkupTypes", 1, ini);
+    g_markupSlots = GetPrivateProfileIntA("RockVein", "MarkupSlots", 1, ini);
+    g_nullBoxGuard = GetPrivateProfileIntA("RockVein", "NullBoxGuard", 1, ini);
+    g_markupAction608 = GetPrivateProfileIntA("RockVein", "MarkupAction608", 1, ini);
+}
+
+// 0.3: the title update's markup types 22 / 23 -> flag class 1 (Xbox TU 0x822a12e8 table entries 21 / 22 = li r3,1).
+// Two new table entries in the int3 padding right after the 21-entry table, then the bound 0x14 -> 0x16.
+bool PatchMarkupTypes() {
+    if (*reinterpret_cast<const DWORD *>(kTypeFlagsSlot) != kTypeFlags || !BytesAt(kTypeFlags, kTypeFlagsBytes,
+            sizeof(kTypeFlagsBytes)) || !BytesAt(kTypeFlagsTable, reinterpret_cast<const BYTE *>(kTypeFlagsTableOriginal),
+            sizeof(kTypeFlagsTableOriginal)) || !BytesAt(kTypeFlagsTable + sizeof(kTypeFlagsTableOriginal),
+            kTypeFlagsPad, sizeof(kTypeFlagsPad))) {
+        Log(0, "markup type mapper at 0x%08lx does not match - markup types 22 / 23 not added", kTypeFlags);
+        return false;
+    }
+    BYTE *from = reinterpret_cast<BYTE *>(kTypeFlags);
+    DWORD length = kTypeFlagsTable + sizeof(kTypeFlagsTableOriginal) + sizeof(kTypeFlagsPad) - kTypeFlags;
+    DWORD old = 0;
+    if (!VirtualProtect(from, length, PAGE_EXECUTE_READWRITE, &old)) {
+        Log(0, "VirtualProtect failed (%lu) - markup types 22 / 23 not added", GetLastError());
+        return false;
+    }
+    DWORD *table = reinterpret_cast<DWORD *>(kTypeFlagsTable);
+    table[21] = kTypeFlagsOne;                 // type 22
+    table[22] = kTypeFlagsOne;                 // type 23
+    *reinterpret_cast<BYTE *>(kTypeFlagsLimit) = 0x16;
+    DWORD dummy = 0;
+    VirtualProtect(from, length, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), from, length);
+    Log(1, "markup types 22 / 23 accepted (flag class 1, as the title update; mapper 0x%08lx)", kTypeFlags);
+    return true;
+}
+
+// ---- 0.4: title-update type checks in TRMarkupManager slots 0 / 1 / +0x08 ----
+
+// TU slot 0 0x822a0bc8 / slot 1 0x822a0c68: (flags & mask) || predicate(box) || type == 22 / 23
+void LogSlotHit(int slot, void *box, int type) {
+    LONG n = InterlockedIncrement(&g_slotHits[slot]);
+    if (n == 1 || (g_logLevel >= 2 && (n & (n - 1)) == 0))
+        Log(1, "markup slot %s true by the title-update type check: box 0x%08lx type %d (call %ld)",
+            slot == 0 ? "0 (wall, type 22)" : slot == 1 ? "1 (type 23)" : "+0x08 (edge normal, type 22)",
+            reinterpret_cast<DWORD>(box), type, n);
+}
+
+char __fastcall Slot0(void *mgr, void *, void *box) {
+    if (reinterpret_cast<BoxPredFn>(kSlot0)(mgr, box)) return 1;
+    int ok = 0, type = SafeType(box, &ok);
+    if (!ok || type != 22) return 0;
+    LogSlotHit(0, box, type);
+    return 1;
+}
+
+char __fastcall Slot1(void *mgr, void *, void *box) {
+    if (reinterpret_cast<BoxPredFn>(kSlot1)(mgr, box)) return 1;
+    int ok = 0, type = SafeType(box, &ok);
+    if (!ok || type != 23) return 0;
+    LogSlotHit(1, box, type);
+    return 1;
+}
+
+void __stdcall LogSlot8Edge(void *box) { LogSlotHit(2, box, 22); }
+
+// replaces `je 0x5dbac8` at tru+0x1dba3c; flags still from `test [ebx+28h],20408000h`, ebx = box, edi = [ebx+20h].
+// TU 0x822a0d40..0x822a0d68: mask bits set or type 22 -> edge path, else the retail fallback.
+__declspec(naked) void Slot8Branch() {
+    __asm {
+        jne edge
+        push eax
+        mov eax, [ebx + 0x24]
+        test eax, eax
+        jz use20
+        movsx eax, byte ptr [eax + 0x4d]
+        jmp compare
+    use20:
+        test edi, edi
+        jz other_pop
+        movsx eax, byte ptr [edi + 0x33]
+    compare:
+        cmp eax, 22
+        jne other_pop
+        pushad
+        push ebx
+        call LogSlot8Edge
+        popad
+        pop eax
+    edge:
+        jmp dword ptr [g_slot8Edge]
+    other_pop:
+        pop eax
+        jmp dword ptr [g_slot8Other]
+    }
+}
+
+// diagnostic: who calls slot +0x08 with box 0 (the crash of test 48i at tru+0x1dba2d)
+void __stdcall LogNullBox(DWORD ret, DWORD outer) {
+    LONG n = InterlockedIncrement(&g_nullBoxCalls);
+    DWORD caller = ret == kWrapperRet ? outer : ret;   // through the wrapper tru+0x1c3cc0: its caller
+    bool known = false;
+    for (int i = 0; i < 16; ++i) {
+        if (g_nullBoxCallers[i] == caller) { known = true; break; }
+        if (!g_nullBoxCallers[i]) { g_nullBoxCallers[i] = caller; break; }
+    }
+    DWORD gt = 0, a64 = 0, c94 = 0;
+    __try {
+        gt = *reinterpret_cast<const DWORD *>(0x00fadb58);
+        if (gt) { a64 = *reinterpret_cast<const DWORD *>(gt + 0xa64); c94 = *reinterpret_cast<const DWORD *>(gt + 0xc94); }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    if (!known || (g_logLevel >= 2 && (n & (n - 1)) == 0))
+        Log(1, "markup slot +0x08 called with box 0 from 0x%08lx (return 0x%08lx, call %ld): gameTracker 0x%08lx "
+               "+0xa64 0x%08lx +0xc94 0x%08lx - zero vector returned instead of the crash", caller, ret, n, gt, a64, c94);
+}
+
+// vtable slot +0x08: [esp+4] out, [esp+8] box, [esp+0Ch] segment; via the wrapper [esp+14h] = the wrapper's caller
+__declspec(naked) void Slot8Guard() {
+    __asm {
+        cmp dword ptr [esp + 8], 0
+        je null_box
+        jmp dword ptr [g_slot8Orig]
+    null_box:
+        pushad
+        push dword ptr [esp + 32 + 0x14]
+        push dword ptr [esp + 32 + 4]
+        call LogNullBox
+        popad
+        mov eax, [esp + 4]
+        mov dword ptr [eax], 0
+        mov dword ptr [eax + 4], 0
+        mov dword ptr [eax + 8], 0
+        mov dword ptr [eax + 12], 0
+        ret 0x0c
+    }
+}
+
+// ---- 0.5: markup action 608 (TU 0x82463a28) and the point-on-box guard ----
+
+void ReadAttachState(DWORD *gt, DWORD *a64, DWORD *c94) {
+    *gt = *a64 = *c94 = 0;
+    __try {
+        *gt = *reinterpret_cast<const DWORD *>(kGameTracker);
+        if (*gt) { *a64 = *reinterpret_cast<const DWORD *>(*gt + 0xa64); *c94 = *reinterpret_cast<const DWORD *>(*gt + 0xc94); }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+}
+
+// TU selector case 608: gameTracker+0xa64 != 0 -> PLAYER_AttachToJumpTarget(zero vector 0x8207db30, 0.0f [0x8207d538]);
+// then gameTracker+0xca0 = gameTracker+0xd90 (16 bytes; both fields are the same on PC: +0xca0 is written by the attach
+// functions tru+0x307530 = TU 0x823fcb28, +0xd90 by the player process tru+0x31ffe0 = retail 0x8240b560)
+void __stdcall Action608(const BYTE *agent) {
+    LONG n = InterlockedIncrement(&g_action608Calls);
+    DWORD gt = *reinterpret_cast<const DWORD *>(kGameTracker);
+    DWORD box = gt ? *reinterpret_cast<const DWORD *>(gt + 0xa64) : 0;
+    if (box) {
+        __declspec(align(16)) float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        reinterpret_cast<AttachFn>(kAttachToJumpTarget)(zero, 0.0f);
+        gt = *reinterpret_cast<const DWORD *>(kGameTracker);
+        memcpy(reinterpret_cast<void *>(gt + 0xca0), reinterpret_cast<const void *>(gt + 0xd90), 16);
+    }
+    if (n == 1 || (g_logLevel >= 2 && (n & (n - 1)) == 0)) {
+        DWORD g = 0, a64 = 0, c94 = 0;
+        ReadAttachState(&g, &a64, &c94);
+        Log(1, "markup action 608 (attach to jump target, title update) call %ld: agent 0x%08lx, box 0x%08lx -> "
+               "gameTracker+0xc94 0x%08lx%s", n, reinterpret_cast<DWORD>(agent), box, c94, box ? "" : " (no box, nothing done)");
+    }
+}
+
+// replaces `lea eax,[ebx-259h]` (6 bytes) at tru+0x372f8a: ebx = action value, esi = agent
+__declspec(naked) void SelectorProbe() {
+    __asm {
+        cmp ebx, 608
+        jne other
+        pushad
+        push esi
+        call Action608
+        popad
+        jmp dword ptr [g_selExit]
+    other:
+        lea eax, [ebx - 0x259]
+        jmp dword ptr [g_selNext]
+    }
+}
+
+void __stdcall LogNullPoint(DWORD ret) {
+    LONG n = InterlockedIncrement(&g_nullBoxCalls);
+    DWORD gt, a64, c94;
+    ReadAttachState(&gt, &a64, &c94);
+    if (n == 1 || (g_logLevel >= 2 && (n & (n - 1)) == 0))
+        Log(1, "attach point tru+0x32ba40 called with box 0 from 0x%08lx (call %ld): gameTracker 0x%08lx +0xa64 0x%08lx "
+               "+0xc94 0x%08lx - zero vector returned instead of the crash", ret, n, gt, a64, c94);
+}
+
+// tru+0x32ba40 cdecl(out, box): [esp+4] out, [esp+8] box; returns out
+__declspec(naked) void PointOnBoxGuard() {
+    __asm {
+        cmp dword ptr [esp + 8], 0
+        je null_box
+        push ebp
+        mov ebp, esp
+        and esp, 0xfffffff0
+        jmp dword ptr [g_pointOnBoxNext]
+    null_box:
+        pushad
+        push dword ptr [esp + 32]
+        call LogNullPoint
+        popad
+        mov eax, [esp + 4]
+        mov dword ptr [eax], 0
+        mov dword ptr [eax + 4], 0
+        mov dword ptr [eax + 8], 0
+        mov dword ptr [eax + 12], 0
+        ret
+    }
+}
+
+void PatchSelector() {
+    if (!BytesAt(kSelSwitch, kSelSwitchBytes, sizeof(kSelSwitchBytes)) || !BytesAt(kSelExit, kSelExitBytes, sizeof(kSelExitBytes)) ||
+        *reinterpret_cast<const BYTE *>(kSelIndex608) != 0x10 || *reinterpret_cast<const DWORD *>(kSelDefaultEntry) != kSelDefault ||
+        !BytesAt(kAttachToJumpTarget, kAttachBytes, sizeof(kAttachBytes))) {
+        Log(0, "markup-action selector at 0x%08lx does not match - markup action 608 not added", kSelSwitch);
+        return;
+    }
+    if (WriteJump(kSelSwitch, &SelectorProbe, 6))
+        Log(1, "markup action 608 added (title-update case: attach to the jump target; selector 0x%08lx)", kSelSwitch);
+    else
+        Log(0, "markup action 608 not written (VirtualProtect %lu)", GetLastError());
+}
+
+void PatchPointOnBox() {
+    if (!BytesAt(kPointOnBox, kPointOnBoxBytes, sizeof(kPointOnBoxBytes))) {
+        Log(0, "attach point function at 0x%08lx does not match - its null-box guard is off", kPointOnBox);
+        return;
+    }
+    if (WriteJump(kPointOnBox, &PointOnBoxGuard, 6))
+        Log(1, "null-box guard on the attach point function 0x%08lx (diagnostic)", kPointOnBox);
+    else
+        Log(0, "null-box guard at 0x%08lx not written (VirtualProtect %lu)", kPointOnBox, GetLastError());
+}
+
+bool WriteDword(DWORD at, DWORD value) {
+    DWORD old = 0, dummy = 0;
+    if (!VirtualProtect(reinterpret_cast<void *>(at), 4, PAGE_READWRITE, &old)) return false;
+    *reinterpret_cast<DWORD *>(at) = value;
+    VirtualProtect(reinterpret_cast<void *>(at), 4, old, &dummy);
+    return true;
+}
+
+void PatchSlots() {
+    const DWORD *vt = reinterpret_cast<const DWORD *>(kSlot0At);
+    if (vt[0] != kSlot0 || vt[1] != kSlot1 || vt[2] != kSlot8 || !BytesAt(kSlot0, kSlot0Bytes, sizeof(kSlot0Bytes)) ||
+        !BytesAt(kSlot1, kSlot1Bytes, sizeof(kSlot1Bytes)) || !BytesAt(kSlot8, kSlot8Bytes, sizeof(kSlot8Bytes))) {
+        Log(0, "TRMarkupManager slots 0 / 1 / +0x08 at 0x%08lx do not match - title-update type checks not added", kSlot0At);
+        return;
+    }
+    if (g_markupSlots) {
+        bool ok = WriteDword(kSlot0At, reinterpret_cast<DWORD>(&Slot0)) && WriteDword(kSlot1At, reinterpret_cast<DWORD>(&Slot1)) &&
+                  WriteJump(kSlot8Branch, &Slot8Branch, 6);
+        if (ok)
+            Log(1, "markup slots: 0 also true for type 22, 1 for type 23, +0x08 edge normal for type 22 (as the title "
+                   "update; vtable 0x%08lx, branch 0x%08lx)", kSlot0At, kSlot8Branch);
+        else
+            Log(0, "markup slots not (fully) written (VirtualProtect %lu)", GetLastError());
+    }
+    if (g_nullBoxGuard) {
+        if (WriteDword(kSlot8At, reinterpret_cast<DWORD>(&Slot8Guard)))
+            Log(1, "null-box guard on markup slot +0x08 (diagnostic; vtable entry 0x%08lx)", kSlot8At);
+        else
+            Log(0, "null-box guard not written (VirtualProtect %lu)", GetLastError());
+    }
 }
 
 bool PatchTable() {
@@ -383,11 +745,16 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruRockVein.log", dir);
     strncpy_s(g_dir, sizeof(g_dir), dir, _TRUNCATE);
     ReadOptions(dir);
-    Log(1, "TruRockVein 0.2 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d)",
-        g_enabled, g_logLevel, g_logUnhandled, g_logBadValues, g_logDefaultConditions);
+    Log(1, "TruRockVein 0.5 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
+        "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d)", g_enabled, g_logLevel, g_logUnhandled,
+        g_logBadValues, g_logDefaultConditions, g_markupTypes, g_markupSlots, g_nullBoxGuard, g_markupAction608);
     if (!g_enabled) { Log(1, "disabled by TruRockVein.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
+    if (g_markupTypes) PatchMarkupTypes();
+    if (g_markupSlots || g_nullBoxGuard) PatchSlots();
+    if (g_markupAction608) PatchSelector();
+    if (g_nullBoxGuard) PatchPointOnBox();
     if (!BytesAt(kDispatch, kDispatchBytes, sizeof(kDispatchBytes)) || !BytesAt(kDefault, kDefaultBytes, sizeof(kDefaultBytes)) ||
         !BytesAt(kExit, kExitBytes, sizeof(kExitBytes)) || !BytesAt(kCtxUse, kCtxUseBytes, sizeof(kCtxUseBytes))) {
         Log(0, "SCCondTest_MarkupType at 0x%08lx does not match (other tru.exe build?) - not patched", kDispatch);
@@ -417,4 +784,4 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
-extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.2 (markup conditions 607 / 608, chart probes)"; }
+extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.5 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608)"; }

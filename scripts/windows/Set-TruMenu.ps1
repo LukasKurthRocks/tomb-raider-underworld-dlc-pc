@@ -43,7 +43,9 @@ $earlierBuilds = @{
     'TruMenu.asi' = @('50ebd28adcf96cef7e1db673ce293b5810bd8d64d0669617d09a1250598491a3',
                       'cd1b8796e40fccb09ab063d7e9f955b9029a230e37b21dce9bb570c1a3cb1892',
                       '9dda37273b5473d560474e7473b82978bfc77d3bd4d4af2ec0ae10e625b0b7ca',
-                      'ae80725d7ad14fcf5a157e5f6b5a1d1190b1dbda17638ebdc875a2a95e0a9304')
+                      'ae80725d7ad14fcf5a157e5f6b5a1d1190b1dbda17638ebdc875a2a95e0a9304',
+                      '557962839d28b19e71ada3a74bb1c50a27fdc5a9f7765b72894758629fa66c51',   # 0.5 (2026-10-31)
+                      '53d4cedb5523a51f2909181a5c9f249e27074ef0ebe6c41d06f2adc0de55f44b')   # 0.5 + TruGuard items (2026-11-01)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

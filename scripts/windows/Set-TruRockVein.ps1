@@ -38,9 +38,13 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruRockVein.asi', 'TruRockVein.ini'
-# SHA-256 of earlier builds of ours - recognised as ours for update / removal (0.1 of 2026-10-30 23:09)
+# SHA-256 of earlier builds of ours - recognised as ours for update / removal (0.1 of 2026-10-30 23:09,
+# 0.2 of 2026-10-31, 0.3 of 2026-11-01 as installed for test 48i, 0.4 of 2026-11-01 as installed for test 48j)
 $earlierBuilds = @{
-    'TruRockVein.asi' = @('7473ddd8580a5d07d14b8c55409520a0fcff3e46e6ed657751fe8fb69ef2b230')
+    'TruRockVein.asi' = @('7473ddd8580a5d07d14b8c55409520a0fcff3e46e6ed657751fe8fb69ef2b230',
+                          '6edc63ca49f69d44fe3fdf7e1fda73c25b53296e2cc32b65cf6b6451dd7e6cb8',
+                          'f875759e392c8c3c502f03752d501688850b8e259a0751b7dc5cd6cdcf3da45f',
+                          'ce7a8712f267c4d2836730edc7013301fce8413fc7186e8dd29bfbdff710b5e6')
     'TruRockVein.ini' = @('89c0283b20a375253d38e6f53e77cfb7df10b0c036650c789564c629d3f227c1')
 }
 $logDir  = $paths.Logs

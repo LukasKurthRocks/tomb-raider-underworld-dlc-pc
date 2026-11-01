@@ -33,8 +33,10 @@
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 #include "imgui.h"
+#include "imgui_internal.h"                 // 0.6: ClearActiveID (command bar -> pad picker)
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
 
@@ -42,7 +44,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.5 (TO TEST steps / checks / toggles + test.export; 0.4: TO TEST checklist over "
+const char *const kVersion = "TruMenu 0.6 (command bar: ids with autocomplete, history, pad picker, cmd.*; 0.5: TO TEST "
+                             "steps / checks / toggles + test.export; 0.4: TO TEST checklist over "
                              "TruLink, log collapse / filters / rate limit, weapon "
                              "slots, ammo fill, gear give; debug menu: Crystal's original developer menu from the exe's "
                              "tables, time / player / HUD, instances, live outfit switch, log page + overlay, videos, "
@@ -176,6 +179,10 @@ const OptDef kOpts[] = {
     {"Favorites", "Ids", "", "item ids on the \"Quick access / Favourites\" page (comma list); empty = default list. Y on an "
                              "item in the menu\npins / unpins it and rewrites this line (TruLink: menu fav.add <id> / "
                              "fav.del <id> / fav.list)"},
+    {"Cmd", "Enabled", "1", "1 = command bar under the menu: type item ids as over TruLink without \"menu\" (\"time.scale 0.5\", "
+                            "\"help\"); the\nkeyboard focus goes to it when the menu opens, D-pad / stick go on into the "
+                            "menu, View / F2 / Tab come back"},
+    {"Cmd", "HistorySize", "32", "commands kept in TruMenu.history.txt next to tru.exe (Up in the empty bar), 1 .. 64"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -203,6 +210,7 @@ volatile LONG g_logCollapse = 1, g_logHideReads = 1;                         // 
 int g_logMinLevel = 0, g_logRate = 40;                                       // 0.4 [Log] MinLevel / MaxLinesPerSecond
 int g_experimental = 1;
 float g_flightSpeed = 20.0f;
+int g_cmdEnabled = 1, g_cmdHistSize = 32;                                    // 0.6 [Cmd] Enabled / HistorySize
 
 // ---- state ----
 char g_logPath[MAX_PATH];
@@ -212,8 +220,15 @@ volatile LONG g_stop = 0;
 volatile LONG g_menuOpen = 0;
 volatile LONG g_menuJustOpened = 0;
 volatile LONG g_overlay = 0;
+volatile LONG g_guardOverlay = 0;        // TruGuard status in the top-right corner (opt-in, plugin is optional)
 volatile LONG g_testFocus = 0;          // 0.4: a TO TEST row had the nav focus last frame (X / Y go to the row)
 volatile LONG g_testX = 0, g_testY = 0; // 0.4: X / Y pressed while a row had the focus (edges, consumed by the page)
+// 0.6 command bar: pad ownership (FeedGamepad, from the bar state of the last frame) and keyboard capture (WndProcHook)
+volatile LONG g_cmdWantText = 0;        // ImGui took text input last frame: WM_KEYDOWN / WM_CHAR stay away from the game
+bool g_cmdOwnPad = false;               // the bar (text field or pad picker) had the focus last frame
+WORD g_cmdPadEdges = 0;                 // bar buttons pressed this frame (left stick folded into the D-pad bits)
+WORD g_cmdPadHeld = 0;                  // bar buttons held (owned by the bar), for the repeat
+bool g_cmdBackEdge = false;             // View / Back pressed this frame (focuses the bar from the menu)
 
 bool g_levelOk = false;
 bool g_baseOk = false, g_padCodeOk = false, g_d3dCodeOk = false, g_playerOk = false, g_postOk = false,
@@ -491,7 +506,13 @@ void PatchVtable(void **vtable, int index, void *hook, void *volatile *original,
 }
 
 LRESULT CALLBACK WndProcHook(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (g_imguiReady && g_menuOpen) ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+    if (g_imguiReady && g_menuOpen) {
+        ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        // 0.6: while ImGui takes text (command bar, filter fields) typed keys do not reach the game's window procedure.
+        // Key-up messages still do, so a key the game saw going down before the focus moved is released there too.
+        if (g_cmdWantText && (msg == WM_KEYDOWN || msg == WM_CHAR || msg == WM_DEADCHAR || msg == WM_SYSCHAR))
+            return 0;
+    }
     return IsWindowUnicode(hwnd) ? CallWindowProcW(g_wndProcOriginal, hwnd, msg, wParam, lParam)
                                  : CallWindowProcA(g_wndProcOriginal, hwnd, msg, wParam, lParam);
 }
@@ -558,6 +579,25 @@ void FeedGamepad(ImGuiIO &io) {
     rowHeld = xy;
     rowOwned &= xy;                          // released buttons go back to ImGui
     pad.wButtons &= static_cast<WORD>(~rowOwned);
+    // 0.6 command bar: while the bar has the focus, D-pad / left stick / A / B / X / Y / LB / RB / View belong to the
+    // bar (edges in g_cmdPadEdges); a button stays the bar's until it is released, so the press that moves the focus
+    // into the menu does not reach ImGui as well
+    static WORD cmdOwned = 0, cmdHeld = 0;
+    WORD dirs = 0;
+    if (pad.sThumbLY > 16000) dirs |= 0x0001;
+    if (pad.sThumbLY < -16000) dirs |= 0x0002;
+    if (pad.sThumbLX < -16000) dirs |= 0x0004;
+    if (pad.sThumbLX > 16000) dirs |= 0x0008;
+    WORD cmdBits = static_cast<WORD>((pad.wButtons & 0xF32F) | dirs);   // A B X Y, LB RB, View, D-pad
+    WORD cmdNew = static_cast<WORD>(cmdBits & ~cmdHeld);
+    g_cmdBackEdge = (cmdNew & 0x0020) != 0;
+    if (g_cmdOwnPad) cmdOwned |= cmdNew;
+    g_cmdPadEdges = static_cast<WORD>(cmdNew & cmdOwned);
+    g_cmdPadHeld = static_cast<WORD>(cmdBits & cmdOwned);
+    cmdHeld = cmdBits;
+    cmdOwned &= cmdBits;
+    pad.wButtons &= static_cast<WORD>(~cmdOwned);
+    if (cmdOwned & 0x000F) pad.sThumbLX = pad.sThumbLY = 0;
     struct { ImGuiKey key; WORD mask; } const buttons[] = {
         {ImGuiKey_GamepadStart, 0x0010}, {ImGuiKey_GamepadBack, 0x0020}, {ImGuiKey_GamepadFaceLeft, 0x4000},
         {ImGuiKey_GamepadFaceRight, 0x2000}, {ImGuiKey_GamepadFaceUp, 0x8000}, {ImGuiKey_GamepadFaceDown, 0x1000},
@@ -1004,7 +1044,8 @@ void PlayerInfo(char *o, size_t n) {
 }
 
 void PluginsInfo(char *o, size_t n) {
-    const char *const names[] = {"TruShadowPower", "TruDoppelganger", "TruDlc2Player", "TruRockVein", "TruLink"};
+    const char *const names[] = {"TruShadowPower", "TruDoppelganger", "TruDlc2Player", "TruRockVein", "TruGuard",
+                                "TruLink"};
     size_t used = 0;
     o[0] = 0;
     for (const char *name : names) {
@@ -1055,6 +1096,64 @@ void ValCostumeCurrent(char *o, size_t n) {
 }
 void ValPlayerObject(char *o, size_t n) { PlayerInfo(o, n); }
 void ValPlugins(char *o, size_t n) { PluginsInfo(o, n); }
+// TruGuard (optional plugin): its exports are only read, the plugin decides what it logs
+typedef int (*GuardIntFn)();
+typedef int (*GuardTextFn)(char *, int);
+GuardIntFn GuardIntExport(const char *name) {
+    HMODULE module = GetModuleHandleA("TruGuard.asi");
+    return module ? reinterpret_cast<GuardIntFn>(GetProcAddress(module, name)) : nullptr;
+}
+GuardTextFn GuardTextExport(const char *name) {
+    HMODULE module = GetModuleHandleA("TruGuard.asi");
+    return module ? reinterpret_cast<GuardTextFn>(GetProcAddress(module, name)) : nullptr;
+}
+void ValGuardStatus(char *o, size_t n) {
+    GuardTextFn fn = GuardTextExport("TruGuardStatus");
+    if (!fn) { Out(o, n, "TruGuard not loaded"); return; }
+    char text[512];
+    fn(text, sizeof(text));
+    Out(o, n, "%s", text);
+}
+void ValGuardCount(char *o, size_t n) {
+    GuardIntFn count = GuardIntExport("TruGuardCount"), distinct = GuardIntExport("TruGuardDistinct");
+    if (!count || !distinct) { Out(o, n, "TruGuard not loaded"); return; }
+    Out(o, n, "%d exception(s) in tru.exe at %d distinct site(s)", count(), distinct());
+}
+void ValGuardLast(char *o, size_t n) {
+    GuardTextFn fn = GuardTextExport("TruGuardLast");
+    if (!fn) { Out(o, n, "TruGuard not loaded"); return; }
+    char text[512];
+    fn(text, sizeof(text));
+    Out(o, n, "%s", text);
+}
+typedef int (*GuardSetModeFn)(int);
+GuardSetModeFn GuardSetModeExport() {
+    HMODULE module = GetModuleHandleA("TruGuard.asi");
+    return module ? reinterpret_cast<GuardSetModeFn>(GetProcAddress(module, "TruGuardSetMode")) : nullptr;
+}
+void ValGuardMode(char *o, size_t n) {
+    GuardIntFn mode = GuardIntExport("TruGuardMode");
+    if (!mode) { Out(o, n, "TruGuard not loaded"); return; }
+    Out(o, n, "%d", mode());
+}
+bool RunGuardMode(const char *arg, char *o, size_t n) {
+    GuardSetModeFn set = GuardSetModeExport();
+    GuardIntFn mode = GuardIntExport("TruGuardMode");
+    if (!set || !mode) { Out(o, n, "TruGuard not loaded"); return false; }
+    if (!arg || !arg[0]) { Out(o, n, "guard.mode %d", mode()); return true; }
+    char *end = nullptr;
+    long v = strtol(arg, &end, 0);
+    if (*end || v < 0 || v > 2) { Out(o, n, "usage: guard.mode <0|1|2>"); return false; }
+    Out(o, n, "guard.mode %d", set(static_cast<int>(v)));
+    return true;
+}
+void ValGuardOverlay(char *o, size_t n) { Out(o, n, "%d", g_guardOverlay ? 1 : 0); }
+bool RunGuardOverlay(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, g_guardOverlay != 0);
+    InterlockedExchange(&g_guardOverlay, on ? 1 : 0);
+    Out(o, n, "guard.overlay %d", on ? 1 : 0);
+    return true;
+}
 // "index name id; ..." for every player record of the type table
 void ValCostumeList(char *o, size_t n) {
     size_t used = 0;
@@ -3458,6 +3557,12 @@ void FavKey(const char *id) {
     if (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp, false)) FavToggle(id);
 }
 
+// 0.6 command bar items, defined with the bar below
+void ValCmdHistory(char *o, size_t n);
+void ValCmdBar(char *o, size_t n);
+bool RunCmdFocus(const char *arg, char *o, size_t n);
+bool RunCmdRun(const char *arg, char *o, size_t n);
+
 struct Item {
     const char *id, *type, *label;
     bool gameThread;                         // runner must run on the game thread (queued)
@@ -3474,6 +3579,14 @@ const Item kItems[] = {
      nullptr},
     {"status.player", "info", "player instance, object id / name, type record", false, ValPlayerObject, nullptr},
     {"status.plugins", "info", "our ASIs (loaded? version)", false, ValPlugins, nullptr},
+    {"guard.status", "info", "TruGuard: mode, fault/dump counters, limits, log path", false, ValGuardStatus, nullptr},
+    {"guard.count", "info", "TruGuard: exceptions seen in tru.exe / distinct sites", false, ValGuardCount, nullptr},
+    {"guard.last", "info", "TruGuard: last fault site (tru offset, access, address, thread)", false, ValGuardLast,
+     nullptr},
+    {"guard.mode", "int", "TruGuard: 0 = log, 1 = log + dump, 2 = log + dump + resume (0..2)", false, ValGuardMode,
+     RunGuardMode},
+    {"guard.overlay", "bool", "TruGuard: counters / last fault in the top-right corner", false, ValGuardOverlay,
+     RunGuardOverlay},
     {"overlay.position", "bool", "Lara position overlay", false, ValOverlay, RunOverlay},
     {"player.position", "info", "Lara position / rotation (needs a level)", false, ValPlayer, nullptr},
     {"camera.current", "info", "current camera object", false, ValCamera, nullptr},
@@ -3589,6 +3702,12 @@ const Item kItems[] = {
      RunAmmoFill},
     {"gear.give", "action", "GiveObject 0x555f60(player, <name>, 0x715e90, 1) -> AddGear, main state 1, experimental", true,
      ValWeaponSlots, RunGearGive},
+    // 0.6
+    {"cmd.focus", "action", "open the menu and put the keyboard focus into the command bar", false, ValCmdBar, RunCmdFocus},
+    {"cmd.run", "action", "<text>: run a command bar line (\"time.scale 0.5\", \"get ui.hide\", \"list cost\", \"help\")",
+     false, ValCmdBar, RunCmdRun},
+    {"cmd.history", "info", "command bar history, newest first (TruMenu.history.txt next to tru.exe)", false,
+     ValCmdHistory, nullptr},
 };
 
 const Item *FindItem(const char *id) {
@@ -3678,7 +3797,11 @@ void QueueItem(const char *id, const char *arg) {
 __declspec(thread) char t_answer[49152];
 __declspec(thread) char t_value[16384];
 
-const char *InvokeItem(const char *id, const char *arg) {
+const char *CmdRunLine(const char *line, bool wait, const char *source);   // 0.6 command bar, below
+
+// the one item path: TruMenuInvoke (TruLink, wait = true) and the command bar (render hook, wait = false: a game-thread
+// item is queued and its result shows up in the bar at the next game frame)
+const char *InvokeCore(const char *id, const char *arg, bool wait) {
     const Item *item = FindItem(id);
     const DevRow *dev = item ? nullptr : DevFind(id);
     if (!item && !dev) { _snprintf_s(t_answer, sizeof(t_answer), _TRUNCATE, "err unknown item '%s'", id ? id : ""); return t_answer; }
@@ -3687,6 +3810,8 @@ const char *InvokeItem(const char *id, const char *arg) {
         TestExportBlock(t_answer, sizeof(t_answer));
         return t_answer;
     }
+    if (item && !_stricmp(item->id, "cmd.run"))                // 0.6: the answer of the line's own item
+        return CmdRunLine(arg ? arg : "", wait, "TruLink");
     if (item && !item->run) {
         char *value = t_value;
         item->value(value, sizeof(t_value));
@@ -3709,6 +3834,12 @@ const char *InvokeItem(const char *id, const char *arg) {
     }
     if (!Enqueue(itemId, arg)) {
         _snprintf_s(t_answer, sizeof(t_answer), _TRUNCATE, "err busy (another request pending)");
+        return t_answer;
+    }
+    if (!wait) {
+        SetLastAction(itemId, true, "queued");
+        _snprintf_s(t_answer, sizeof(t_answer), _TRUNCATE, "ok queued %s (runs on the game thread at the next frame)",
+                    itemId);
         return t_answer;
     }
     if (WaitForSingleObject(g_reqDone, 3000) == WAIT_OBJECT_0 && !g_reqPending) {
@@ -3747,6 +3878,780 @@ const char *ListItems() {
         used += static_cast<size_t>(w);
     }
     return t_answer;
+}
+
+const char *InvokeItem(const char *id, const char *arg) { return InvokeCore(id, arg, true); }
+
+// ======================================================================================================================
+// 0.6 command bar: one input line under the menu window; "<id> [arg]" as TruLink's "menu <id> [arg]", plus help / list
+// / get. Every line runs through InvokeCore (the TruMenuInvoke path) - game-thread items go through the same queue.
+// ======================================================================================================================
+const int kCmdHistMax = 64, kCmdLine = 256;
+CRITICAL_SECTION g_cmdLock;                  // history + last result (render thread, TruLink thread)
+char g_cmdHist[kCmdHistMax][kCmdLine];       // oldest first
+int g_cmdHistCount = 0;
+char g_cmdHistPath[MAX_PATH] = "";
+char g_cmdResult[4096] = "";                 // answer of the last line (bar, cmd.run)
+char g_cmdResultLine[kCmdLine] = "";         // that line
+char g_cmdResultSource[16] = "";             // bar / TruLink / menu
+volatile LONG g_cmdFocusReq = 0;             // cmd.focus, F2, Tab, Enter: keyboard focus into the bar next frame
+__declspec(thread) int t_cmdDepth = 0;       // cmd.run inside a bar line is refused
+
+enum CmdKind { kCkUnknown, kCkBool, kCkInt, kCkFloat, kCkInfo, kCkAction, kCkTodo, kCkBuiltin };
+const char *const kCmdBuiltins[][2] = {
+    {"help", "command bar help"}, {"list", "[filter]: matching ids"}, {"get", "<id>: the value of an item"}};
+const char *const kCmdHelp =
+    "<id> = show the value (bool / int / float / info items) or run an action; <id> <arg> = set / run with arg (time.scale "
+    "0.5, costume.set doppelganger_casual, level.load dlc_level2_start, dev.fog_far 9000); get <id>; list [filter]; help. "
+    "Keyboard: Tab / Down = suggestions, Enter = run, Up in the empty bar = history, Down / Esc = into the menu, F2 / Tab "
+    "= back to the bar. Pad: D-pad / stick / B = into the menu, View = pick mode (D-pad choose, A run / pick, LB / RB "
+    "value, B back, Y pin), View in the menu = back to the bar.";
+
+CmdKind CmdKindOf(const char *id) {
+    for (const auto &b : kCmdBuiltins)
+        if (!_stricmp(b[0], id)) return kCkBuiltin;
+    const Item *item = FindItem(id);
+    if (item) {
+        const char *t = item->type;
+        if (!strcmp(t, "bool")) return kCkBool;
+        if (!strcmp(t, "int")) return kCkInt;
+        if (!strcmp(t, "float")) return kCkFloat;
+        if (!strcmp(t, "info")) return kCkInfo;
+        if (!strcmp(t, "todo")) return kCkTodo;
+        return kCkAction;
+    }
+    const DevRow *dev = DevFind(id);
+    if (!dev) return kCkUnknown;
+    return dev->type == kDevAction ? kCkAction : dev->type == kDevInt ? kCkInt : kCkBool;
+}
+bool CmdIsValue(CmdKind k) { return k == kCkBool || k == kCkInt || k == kCkFloat || k == kCkInfo; }
+
+// value text of an item / developer-menu row (int rows with their range); false = no such id
+bool CmdValue(const char *id, char *o, size_t n) {
+    o[0] = 0;
+    const Item *item = FindItem(id);
+    if (item) { item->value(o, n); return true; }
+    const DevRow *dev = DevFind(id);
+    if (!dev) return false;
+    char v[48];
+    DevValue(*dev, v, sizeof(v));
+    if (dev->type == kDevInt) Out(o, n, "%s (%ld..%ld)", v, static_cast<LONG>(dev->p1), static_cast<LONG>(dev->p2));
+    else Out(o, n, "%s", v);
+    return true;
+}
+const char *CmdLabel(const char *id) {
+    for (const auto &b : kCmdBuiltins)
+        if (!_stricmp(b[0], id)) return b[1];
+    const Item *item = FindItem(id);
+    if (item) return item->label;
+    const DevRow *dev = DevFind(id);
+    return dev ? dev->text : "";
+}
+const char *CmdCanonical(const char *id) {   // the table's spelling of an id
+    const Item *item = FindItem(id);
+    if (item) return item->id;
+    const DevRow *dev = DevFind(id);
+    return dev ? dev->id : id;
+}
+
+// every id the bar knows: built-ins, items (not the todo ones), developer menu rows - pointers stay valid
+template <typename F> void CmdForIds(F fn) {
+    for (const auto &b : kCmdBuiltins) fn(b[0]);
+    for (const Item &item : kItems)
+        if (strcmp(item.type, "todo") != 0) fn(item.id);
+    for (int i = 0; g_devOk && i < g_devCount; ++i)
+        if (g_dev[i].id[0]) fn(static_cast<const char *>(g_dev[i].id));
+}
+
+// case-insensitive: 2 = prefix (or empty part), 1 = inside, 0 = no match
+int CmdMatch(const char *text, const char *part) {
+    if (!part[0]) return 2;
+    size_t lt = strlen(text), lp = strlen(part);
+    for (size_t i = 0; i + lp <= lt; ++i)
+        if (!_strnicmp(text + i, part, lp)) return i == 0 ? 2 : 1;
+    return 0;
+}
+
+char g_cmdVideos[2048] = "";                 // Movies\*.bik names, refreshed at most every 3 s
+DWORD g_cmdVideosTick = 0;
+
+// known argument values of an item: fn(value, note)
+template <typename F> void CmdArgValues(const char *id, F fn) {
+    if (CmdKindOf(id) == kCkBool) { fn("1", "on"); fn("0", "off"); return; }
+    if (!_stricmp(id, "level.load")) {
+        for (int i = 0; i < kUnitCount; ++i) fn(kUnits[i].unit, kUnits[i].group);
+    } else if (!_stricmp(id, "costume.set")) {
+        WORD ids[128];
+        int c = GlobalCostumes(ids, 128);
+        for (int i = 0; i < c; ++i) {
+            char name[64];
+            if (ObjectName(ids[i], name, sizeof(name))) fn(name, "outfit cycle list");
+        }
+    } else if (!_stricmp(id, "costume.choose") || !_stricmp(id, "costume.choosereload") ||
+               !_stricmp(id, "costume.setreload")) {
+        char name[64];
+        bool player = false;
+        for (int i = 0; TypeRecord(i, name, sizeof(name), &player); ++i)
+            if (player) fn(name, "player record (next level load)");
+    } else if (!_stricmp(id, "media.video.play") || !_stricmp(id, "media.video.menuloop")) {
+        DWORD now = GetTickCount();
+        if (!g_cmdVideosTick || now - g_cmdVideosTick > 3000) {
+            ValVideoList(g_cmdVideos, sizeof(g_cmdVideos));
+            g_cmdVideosTick = now;
+        }
+        if (!strncmp(g_cmdVideos, "no ", 3)) return;
+        char copy[sizeof(g_cmdVideos)];
+        strncpy_s(copy, sizeof(copy), g_cmdVideos, _TRUNCATE);
+        char *context = nullptr;
+        for (char *v = strtok_s(copy, " ", &context); v; v = strtok_s(nullptr, " ", &context)) fn(v, "Movies\\*.bik");
+    } else if (!_stricmp(id, "weapon.give") || !_stricmp(id, "weapon.has")) {
+        for (const WeaponName &w : kWeapons) fn(w.name, "weapon object");
+    } else if (!_stricmp(id, "guard.mode")) {
+        fn("0", "log"); fn("1", "log + dump"); fn("2", "log + dump + resume");
+    } else if (!_stricmp(id, "log.level")) {
+        fn("0", "all lines"); fn("1", "warnings + errors"); fn("2", "errors only");
+    } else if (!_stricmp(id, "fav.del")) {
+        ForFavs([&](const char *f) { fn(f, "favourite"); });
+    }
+}
+bool CmdArgsAreIds(const char *id) { return !_stricmp(id, "get") || !_stricmp(id, "fav.add"); }
+bool CmdHasArgValues(const char *id) {
+    if (CmdArgsAreIds(id)) return true;
+    int count = 0;
+    CmdArgValues(id, [&](const char *, const char *) { ++count; });
+    return count > 0;
+}
+
+// ---- history (TruMenu.history.txt next to tru.exe, oldest first) ----
+void CmdClean(const char *in, char *out, size_t size) {   // tabs / line breaks -> spaces, trimmed
+    while (*in == ' ' || *in == '\t' || *in == '\r' || *in == '\n') ++in;
+    size_t i = 0;
+    for (; *in && i + 1 < size; ++in) out[i++] = (*in == '\t' || *in == '\r' || *in == '\n') ? ' ' : *in;
+    while (i && out[i - 1] == ' ') --i;
+    out[i] = 0;
+}
+void CmdHistSaveLocked() {
+    if (!g_cmdHistPath[0]) return;
+    FILE *f = nullptr;
+    if (fopen_s(&f, g_cmdHistPath, "wb") != 0 || !f) return;
+    fputs("# TruMenu command bar history, oldest first ([Cmd] HistorySize in TruMenu.ini)\r\n", f);
+    for (int i = 0; i < g_cmdHistCount; ++i) fprintf(f, "%s\r\n", g_cmdHist[i]);
+    fclose(f);
+}
+void CmdHistAddLocked(const char *text) {
+    if (!text[0]) return;
+    for (int i = 0; i < g_cmdHistCount; ++i) {   // an older identical line moves to the end
+        if (strcmp(g_cmdHist[i], text) != 0) continue;
+        memmove(g_cmdHist[i], g_cmdHist[i + 1], static_cast<size_t>(g_cmdHistCount - i - 1) * kCmdLine);
+        --g_cmdHistCount;
+        break;
+    }
+    while (g_cmdHistCount >= g_cmdHistSize && g_cmdHistCount > 0) {
+        memmove(g_cmdHist[0], g_cmdHist[1], static_cast<size_t>(g_cmdHistCount - 1) * kCmdLine);
+        --g_cmdHistCount;
+    }
+    strncpy_s(g_cmdHist[g_cmdHistCount++], kCmdLine, text, _TRUNCATE);
+}
+void CmdHistLoad() {
+    FILE *f = nullptr;
+    if (fopen_s(&f, g_cmdHistPath, "rb") != 0 || !f) return;
+    char line[512], clean[kCmdLine];
+    EnterCriticalSection(&g_cmdLock);
+    while (fgets(line, sizeof(line), f)) {
+        CmdClean(line, clean, sizeof(clean));
+        if (clean[0] && clean[0] != '#') CmdHistAddLocked(clean);
+    }
+    int count = g_cmdHistCount;
+    LeaveCriticalSection(&g_cmdLock);
+    fclose(f);
+    Log(1, "cmd: %d history lines from %s", count, g_cmdHistPath);
+}
+
+// ---- execution ----
+// one line -> answer in t_answer ("ok ..." / "err ..."); wait = may wait for the game thread (TruLink's thread)
+const char *CmdExecute(const char *line, bool wait) {
+    char word[64] = "", arg[kCmdLine] = "";
+    size_t w = 0;
+    while (line[w] && line[w] != ' ') ++w;
+    if (!w) { Out(t_answer, sizeof(t_answer), "err empty line (help = the commands)"); return t_answer; }
+    if (w >= sizeof(word)) { Out(t_answer, sizeof(t_answer), "err id too long"); return t_answer; }
+    memcpy(word, line, w);
+    word[w] = 0;
+    const char *a = line + w;
+    while (*a == ' ') ++a;
+    strncpy_s(arg, sizeof(arg), a, _TRUNCATE);
+    if (!_stricmp(word, "help")) { Out(t_answer, sizeof(t_answer), "ok %s", kCmdHelp); return t_answer; }
+    if (!_stricmp(word, "list")) {
+        int count = 0, total = 0;
+        size_t used = 0;
+        t_value[0] = 0;
+        CmdForIds([&](const char *id) {
+            ++total;
+            if (!CmdMatch(id, arg)) return;
+            ++count;
+            int n = _snprintf_s(t_value + used, sizeof(t_value) - used, _TRUNCATE, "%s%s", used ? " " : "", id);
+            if (n > 0) used += static_cast<size_t>(n);
+        });
+        Out(t_answer, sizeof(t_answer), "ok list: %d of %d ids%s%s: %s", count, total, arg[0] ? " matching " : "", arg,
+            t_value);
+        return t_answer;
+    }
+    if (!_stricmp(word, "get")) {
+        char id[64];
+        size_t i = 0;
+        for (; arg[i] && arg[i] != ' ' && i + 1 < sizeof(id); ++i) id[i] = arg[i];
+        id[i] = 0;
+        if (!id[0]) { Out(t_answer, sizeof(t_answer), "err get <id>"); return t_answer; }
+        if (!CmdValue(id, t_value, sizeof(t_value))) {
+            Out(t_answer, sizeof(t_answer), "err unknown item '%s'", id);
+            return t_answer;
+        }
+        Out(t_answer, sizeof(t_answer), "ok %s = %s", CmdCanonical(id), t_value);
+        return t_answer;
+    }
+    if (!_stricmp(word, "cmd.run")) {
+        Out(t_answer, sizeof(t_answer), "err cmd.run is for TruLink - type the line itself");
+        return t_answer;
+    }
+    CmdKind kind = CmdKindOf(word);
+    if (kind == kCkUnknown) {
+        const char *near1 = nullptr;
+        for (int pass = 2; pass >= 1 && !near1; --pass)
+            CmdForIds([&](const char *id) { if (!near1 && CmdMatch(id, word) == pass) near1 = id; });
+        Out(t_answer, sizeof(t_answer), "err unknown item '%s'%s%s%s", word, near1 ? " - did you mean " : "",
+            near1 ? near1 : "", near1 ? "?" : "");
+        return t_answer;
+    }
+    if (!arg[0] && CmdIsValue(kind)) {           // "<id>" alone on a value item: its value (owner's rule)
+        CmdValue(word, t_value, sizeof(t_value));
+        Out(t_answer, sizeof(t_answer), "ok %s = %s", CmdCanonical(word), t_value);
+        return t_answer;
+    }
+    return InvokeCore(word, arg, wait);
+}
+
+// cleans the line, runs it, keeps it in the history and as the bar's result line
+const char *CmdRunLine(const char *line, bool wait, const char *source) {
+    char clean[kCmdLine];
+    CmdClean(line ? line : "", clean, sizeof(clean));
+    if (t_cmdDepth) { Out(t_answer, sizeof(t_answer), "err cmd.run inside a command line"); return t_answer; }
+    ++t_cmdDepth;
+    const char *answer = CmdExecute(clean, wait);
+    --t_cmdDepth;
+    EnterCriticalSection(&g_cmdLock);
+    if (clean[0]) {
+        CmdHistAddLocked(clean);
+        CmdHistSaveLocked();
+    }
+    strncpy_s(g_cmdResult, sizeof(g_cmdResult), answer, _TRUNCATE);
+    strncpy_s(g_cmdResultLine, sizeof(g_cmdResultLine), clean, _TRUNCATE);
+    strncpy_s(g_cmdResultSource, sizeof(g_cmdResultSource), source, _TRUNCATE);
+    LeaveCriticalSection(&g_cmdLock);
+    Log(2, "cmd (%s): %s -> %.200s", source, clean, answer);
+    return answer;
+}
+
+void ValCmdHistory(char *o, size_t n) {
+    EnterCriticalSection(&g_cmdLock);
+    int used = _snprintf_s(o, n, _TRUNCATE, "%d:", g_cmdHistCount);
+    for (int i = g_cmdHistCount - 1; i >= 0 && used > 0; --i) {
+        int w = _snprintf_s(o + used, n - static_cast<size_t>(used), _TRUNCATE, "%s %s",
+                            i == g_cmdHistCount - 1 ? "" : ";", g_cmdHist[i]);
+        if (w < 0) break;
+        used += w;
+    }
+    LeaveCriticalSection(&g_cmdLock);
+}
+void ValCmdBar(char *o, size_t n) {
+    EnterCriticalSection(&g_cmdLock);
+    Out(o, n, "bar %s, %d history lines; last (%s): %s -> %.160s", g_cmdEnabled ? "on" : "off ([Cmd] Enabled=0)",
+        g_cmdHistCount, g_cmdResultSource[0] ? g_cmdResultSource : "-", g_cmdResultLine[0] ? g_cmdResultLine : "-",
+        g_cmdResult[0] ? g_cmdResult : "-");
+    LeaveCriticalSection(&g_cmdLock);
+}
+bool RunCmdFocus(const char *, char *o, size_t n) {
+    if (!g_cmdEnabled) { Out(o, n, "command bar off ([Cmd] Enabled=0)"); return false; }
+    if (!g_menuOpen) ToggleMenu("cmd.focus");
+    InterlockedExchange(&g_cmdFocusReq, 1);
+    Out(o, n, "command bar focused");
+    return true;
+}
+// only reached through the menu (a favourite button) - TruLink's cmd.run is answered by InvokeCore itself
+bool RunCmdRun(const char *arg, char *o, size_t n) {
+    const char *answer = CmdRunLine(arg, false, "menu");
+    bool ok = !strncmp(answer, "ok", 2);
+    const char *text = answer + (ok ? 2 : 3);
+    while (*text == ' ' || *text == '+') ++text;
+    Out(o, n, "%s", text);
+    return ok;
+}
+
+// ---- the bar (render thread only below) ----
+struct CmdSug {
+    char text[kCmdLine];                     // id (id token) or the whole line "<id> <value>"
+    char show[72];
+    char note[96];
+    const char *valueId;                     // id whose value is shown, nullptr = none
+    bool idToken;                            // completes the id word
+};
+const int kSugMax = 400;
+CmdSug g_sug[kSugMax];
+int g_sugCount = 0, g_sugSel = -1;
+char g_sugFor[kCmdLine] = "\x01";
+bool g_sugAll = false;
+DWORD g_sugTick = 0;
+
+char g_cmdBuf[kCmdLine] = "";
+char g_cmdSetText[kCmdLine] = "";
+bool g_cmdSetPending = false;                // text for the active field, applied in the callback
+int g_cmdHistPos = -1;                       // browsing the history (index), -1 = typing
+bool g_cmdLeaveReq = false;                  // Up / Down with nothing to choose: focus into the menu
+bool g_cmdPadMode = false;                   // pad picker: D-pad scrolls the suggestions, A runs / picks
+bool g_cmdTextActive = false;                // the text field was active last frame
+int g_pickMode = 0;                          // 0 list, 1 value picker (+/-)
+char g_pickId[64] = "";
+double g_pickValue = 0, g_pickStep = 1, g_pickMin = 0, g_pickMax = 0;
+bool g_pickRange = false, g_pickInt = false;
+char g_cmdWaitId[64] = "";                   // queued game-thread item whose answer is still to come
+DWORD g_cmdWaitTick = 0;
+WORD g_cmdRepeatMask = 0;
+DWORD g_cmdRepeatAt = 0;
+float g_cmdBarHeight = 0.0f;
+ImVec2 g_menuPos, g_menuSize;
+bool g_menuRectOk = false;
+const char *const kMenuTitle = "TruMenu  (L3 + R3 closes)";
+
+void CmdSugAdd(const char *text, const char *show, const char *note, const char *valueId, bool idToken) {
+    if (g_sugCount >= kSugMax) return;
+    CmdSug &s = g_sug[g_sugCount++];
+    strncpy_s(s.text, sizeof(s.text), text, _TRUNCATE);
+    strncpy_s(s.show, sizeof(s.show), show, _TRUNCATE);
+    strncpy_s(s.note, sizeof(s.note), note ? note : "", _TRUNCATE);
+    s.valueId = valueId;
+    s.idToken = idToken;
+}
+
+// suggestions for the line: ids (prefix matches first, then inside), or argument values after "<id> "
+void CmdBuildSuggestions(const char *line, bool all) {
+    DWORD now = GetTickCount();
+    bool changed = strcmp(g_sugFor, line) != 0 || all != g_sugAll;
+    if (!changed && now - g_sugTick < 1000) return;
+    strncpy_s(g_sugFor, sizeof(g_sugFor), line, _TRUNCATE);
+    g_sugAll = all;
+    g_sugTick = now;
+    g_sugCount = 0;
+    while (*line == ' ') ++line;
+    const char *space = strchr(line, ' ');
+    if (!space) {
+        if (line[0] || all)
+            for (int pass = 2; pass >= 1; --pass)
+                CmdForIds([&](const char *id) { if (CmdMatch(id, line) == pass) CmdSugAdd(id, id, CmdLabel(id), id, true); });
+    } else {
+        char word[64];
+        size_t w = static_cast<size_t>(space - line);
+        if (w < sizeof(word)) {
+            memcpy(word, line, w);
+            word[w] = 0;
+            const char *arg = space;
+            while (*arg == ' ') ++arg;
+            if (!strchr(arg, ' ')) {                 // one argument word only
+                for (int pass = 2; pass >= 1; --pass) {
+                    if (CmdArgsAreIds(word)) {
+                        CmdForIds([&](const char *id) {
+                            if (CmdKindOf(id) == kCkBuiltin || CmdMatch(id, arg) != pass) return;
+                            char text[kCmdLine];
+                            Out(text, sizeof(text), "%s %s", word, id);
+                            CmdSugAdd(text, id, CmdLabel(id), id, false);
+                        });
+                    } else {
+                        CmdArgValues(word, [&](const char *v, const char *note) {
+                            if (CmdMatch(v, arg) != pass) return;
+                            char text[kCmdLine];
+                            Out(text, sizeof(text), "%s %s", word, v);
+                            CmdSugAdd(text, v, note, nullptr, false);
+                        });
+                    }
+                }
+            }
+        }
+    }
+    if (changed) g_sugSel = all && g_sugCount ? 0 : -1;
+    if (g_sugSel >= g_sugCount) g_sugSel = g_sugCount - 1;
+}
+
+// the text a suggestion puts into the field (Tab: with a space when the id takes an argument)
+void CmdCompletionText(int i, char *out, size_t size, bool forTab) {
+    const CmdSug &s = g_sug[i];
+    if (!s.idToken) { Out(out, size, "%s", s.text); return; }
+    CmdKind k = CmdKindOf(s.text);
+    bool space = forTab && (k == kCkBuiltin ? _stricmp(s.text, "help") != 0 : (k != kCkInfo && k != kCkTodo));
+    Out(out, size, "%s%s", s.text, space ? " " : "");
+}
+
+// values in the suggestion list: cached for 500 ms (some value functions read files)
+struct CmdValCache { const char *id; DWORD tick; char value[100]; };
+CmdValCache g_valCache[24];
+int g_valNext = 0;
+const char *CmdCachedValue(const char *id) {
+    DWORD now = GetTickCount();
+    CmdValCache *slot = nullptr;
+    for (CmdValCache &c : g_valCache)
+        if (c.id == id) { if (now - c.tick < 500) return c.value; slot = &c; }
+    if (!slot) { slot = &g_valCache[g_valNext]; g_valNext = (g_valNext + 1) % 24; }
+    char v[2048];
+    if (CmdKindOf(id) == kCkBuiltin || !CmdValue(id, v, sizeof(v))) v[0] = 0;
+    CmdClean(v, slot->value, sizeof(slot->value));
+    slot->id = id;
+    slot->tick = now;
+    return slot->value;
+}
+
+void CmdReplace(ImGuiInputTextCallbackData *d, const char *text) {
+    d->DeleteChars(0, d->BufTextLen);
+    d->InsertChars(0, text);
+    d->CursorPos = d->SelectionStart = d->SelectionEnd = d->BufTextLen;
+}
+
+int CmdCallback(ImGuiInputTextCallbackData *d) {
+    switch (d->EventFlag) {
+    case ImGuiInputTextFlags_CallbackAlways:
+        if (g_cmdSetPending) { g_cmdSetPending = false; CmdReplace(d, g_cmdSetText); }
+        break;
+    case ImGuiInputTextFlags_CallbackEdit:
+        g_cmdHistPos = -1;
+        g_sugSel = -1;
+        break;
+    case ImGuiInputTextFlags_CallbackCompletion:
+        if (g_sugCount) {
+            char text[kCmdLine];
+            CmdCompletionText(g_sugSel >= 0 ? g_sugSel : 0, text, sizeof(text), true);
+            CmdReplace(d, text);
+            g_sugSel = -1;
+            g_cmdHistPos = -1;
+        }
+        break;
+    case ImGuiInputTextFlags_CallbackHistory: {
+        bool up = d->EventKey == ImGuiKey_UpArrow;
+        char entry[kCmdLine] = "";
+        bool load = false;
+        int pos = g_cmdHistPos;
+        EnterCriticalSection(&g_cmdLock);
+        int count = g_cmdHistCount;
+        if (pos >= count) pos = count - 1;
+        if (pos >= 0) {                              // browsing: Up older, Down newer / back to an empty line
+            if (up) { if (pos > 0) --pos; }
+            else if (++pos >= count) pos = -1;
+            load = true;
+        } else if (d->BufTextLen == 0) {
+            if (up && count) { pos = count - 1; load = true; }
+            else g_cmdLeaveReq = true;               // Down (or no history): into the menu
+        } else if (g_sugCount) {
+            if (up) { if (g_sugSel >= 0) --g_sugSel; }
+            else if (g_sugSel < g_sugCount - 1) ++g_sugSel;
+        } else {
+            g_cmdLeaveReq = true;                    // nothing to choose: into the menu
+        }
+        if (load && pos >= 0) strncpy_s(entry, sizeof(entry), g_cmdHist[pos], _TRUNCATE);
+        LeaveCriticalSection(&g_cmdLock);
+        if (load) { g_cmdHistPos = pos; CmdReplace(d, entry); }
+        break;
+    }
+    default:
+        break;
+    }
+    return 0;
+}
+
+// a queued game-thread item: its answer shows up in the bar when the game thread has run it
+void CmdNoteQueued(const char *answer, const char *line) {
+    if (strncmp(answer, "ok queued ", 10) != 0) return;
+    char word[64];
+    size_t w = 0;
+    while (line[w] && line[w] != ' ' && w + 1 < sizeof(word)) { word[w] = line[w]; ++w; }
+    word[w] = 0;
+    strncpy_s(g_cmdWaitId, sizeof(g_cmdWaitId), CmdCanonical(word), _TRUNCATE);
+    g_cmdWaitTick = GetTickCount();
+}
+void CmdPollQueued() {
+    if (!g_cmdWaitId[0]) return;
+    if (g_reqPending) {
+        if (GetTickCount() - g_cmdWaitTick > 5000) g_cmdWaitId[0] = 0;
+        return;
+    }
+    char result[sizeof(g_reqResult)] = "";
+    EnterCriticalSection(&g_reqLock);
+    if (!_stricmp(g_reqId, g_cmdWaitId)) strncpy_s(result, sizeof(result), g_reqResult, _TRUNCATE);
+    LeaveCriticalSection(&g_reqLock);
+    g_cmdWaitId[0] = 0;
+    if (!result[0]) return;
+    EnterCriticalSection(&g_cmdLock);
+    strncpy_s(g_cmdResult, sizeof(g_cmdResult), result, _TRUNCATE);
+    LeaveCriticalSection(&g_cmdLock);
+}
+
+void CmdRunFromBar(const char *line) {
+    char copy[kCmdLine];
+    strncpy_s(copy, sizeof(copy), line, _TRUNCATE);
+    const char *answer = CmdRunLine(copy, false, "bar");
+    CmdNoteQueued(answer, copy);
+}
+
+void CmdFocusMenu() {
+    ImGui::SetWindowFocus(kMenuTitle);
+    ImGui::SetNavCursorVisible(true);
+    g_cmdPadMode = false;
+    g_pickMode = 0;
+}
+
+// pad: an edge, or the auto-repeat while the button stays held
+bool CmdPadPress(WORD mask) {
+    DWORD now = GetTickCount();
+    if (g_cmdPadEdges & mask) { g_cmdRepeatMask = mask; g_cmdRepeatAt = now + 350; return true; }
+    if ((g_cmdPadHeld & mask) && g_cmdRepeatMask == mask && static_cast<LONG>(now - g_cmdRepeatAt) >= 0) {
+        g_cmdRepeatAt = now + 60;
+        return true;
+    }
+    return false;
+}
+
+void CmdPickValueStart(const char *id) {
+    CmdKind k = CmdKindOf(id);
+    char v[256];
+    CmdValue(id, v, sizeof(v));
+    strncpy_s(g_pickId, sizeof(g_pickId), CmdCanonical(id), _TRUNCATE);
+    g_pickValue = atof(v);
+    g_pickInt = k == kCkInt;
+    g_pickStep = g_pickInt ? 1.0 : 0.1;
+    g_pickRange = false;
+    struct { const char *id; double step, lo, hi; } const steps[] = {
+        {"time.scale", 0.1, 0.0, 10.0}, {"camera.fov", 0.05, 0.05, 3.1}, {"cheat.speed", 1.0, 1.0, 999.0},
+        {"player.health", 10.0, 0.0, 100000.0}, {"log.lines", 1.0, 1.0, 64.0}, {"log.rate", 5.0, 0.0, 10000.0},
+        {"guard.mode", 1.0, 0.0, 2.0}, {"log.level", 1.0, 0.0, 2.0}};
+    for (const auto &s : steps)
+        if (!_stricmp(s.id, g_pickId)) { g_pickStep = s.step; g_pickMin = s.lo; g_pickMax = s.hi; g_pickRange = true; }
+    const DevRow *dev = FindItem(id) ? nullptr : DevFind(id);
+    if (dev) {
+        g_pickRange = true;
+        g_pickMin = static_cast<double>(static_cast<LONG>(dev->p1));
+        g_pickMax = static_cast<double>(static_cast<LONG>(dev->p2));
+        double range = g_pickMax - g_pickMin;
+        g_pickStep = range > 255.0 ? floor(range / 64.0) : 1.0;
+    }
+    g_pickMode = 1;
+}
+void CmdPickValueText(char *o, size_t n) {
+    if (g_pickInt) Out(o, n, "%d", static_cast<int>(g_pickValue < 0 ? g_pickValue - 0.5 : g_pickValue + 0.5));
+    else Out(o, n, "%.4g", g_pickValue);
+}
+
+// A on suggestion i in the pad picker
+void CmdPadChoose(int i) {
+    const CmdSug &s = g_sug[i];
+    if (!s.idToken) { CmdRunFromBar(s.text); return; }   // an argument value: run "<id> <value>"
+    const char *id = s.text;
+    CmdKind k = CmdKindOf(id);
+    char line[kCmdLine];
+    if (k == kCkBuiltin) {
+        if (!_stricmp(id, "get")) { Out(g_cmdBuf, sizeof(g_cmdBuf), "get "); return; }
+        CmdRunFromBar(id);
+    } else if (k == kCkBool) {                       // a toggle: no argument asked, the other state
+        char v[64];
+        CmdValue(id, v, sizeof(v));
+        Out(line, sizeof(line), "%s %s", id, v[0] == '1' ? "0" : "1");
+        CmdRunFromBar(line);
+    } else if (CmdHasArgValues(id)) {                // a list: the values become the suggestions
+        Out(g_cmdBuf, sizeof(g_cmdBuf), "%s ", id);
+    } else if (k == kCkInt || k == kCkFloat) {
+        CmdPickValueStart(id);
+    } else {
+        CmdRunFromBar(id);                           // action (no argument) / info (value)
+    }
+}
+
+void DrawCmdSuggestions(const ImVec2 &barPos, float width) {
+    if (!g_sugCount || g_pickMode != 0) return;
+    const int shown = 10;
+    int first = g_sugSel - shown / 2;
+    if (first > g_sugCount - shown) first = g_sugCount - shown;
+    if (first < 0) first = 0;
+    ImGui::SetNextWindowPos(ImVec2(barPos.x, barPos.y - 2.0f), ImGuiCond_Always, ImVec2(0.0f, 1.0f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0.0f), ImVec2(width, FLT_MAX));
+    ImGui::SetNextWindowBgAlpha(0.95f);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
+                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
+                             ImGuiWindowFlags_NoSavedSettings;
+    if (ImGui::Begin("##TruCmdSuggestions", nullptr, flags)) {
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        for (int i = first; i < g_sugCount && i < first + shown; ++i) {
+            const CmdSug &s = g_sug[i];
+            bool sel = i == g_sugSel;
+            ImGui::TextColored(sel ? ImVec4(1.0f, 0.85f, 0.2f, 1.0f) : ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s %s",
+                               sel ? ">" : " ", s.show);
+            const char *value = s.valueId ? CmdCachedValue(s.valueId) : "";
+            if (value[0]) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.45f, 0.8f, 1.0f, 1.0f), "= %.48s", value);
+            }
+            if (s.note[0]) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%.80s", s.note);
+            }
+        }
+        ImGui::TextDisabled("%d / %d   %s", g_sugSel >= 0 ? g_sugSel + 1 : 0, g_sugCount,
+                            g_cmdPadMode ? "D-pad = choose, A = run / pick, B = back, Y = pin, View = type"
+                                         : "Tab / Down = choose, Enter = run");
+    }
+    ImGui::End();
+}
+
+// the bar: a window directly under the menu window (always visible, outside the menu's scrolling)
+void DrawCmdBar(bool menuJustOpened) {
+    if (!g_cmdEnabled || !g_menuRectOk) { g_cmdOwnPad = false; return; }
+    ImGuiIO &io = ImGui::GetIO();
+    const ImGuiStyle &style = ImGui::GetStyle();
+    bool barHadFocus = g_cmdOwnPad;
+    bool wantFocus = menuJustOpened || InterlockedExchange(&g_cmdFocusReq, 0) != 0;
+    if (ImGui::IsKeyPressed(ImGuiKey_F2, false)) wantFocus = true;
+    if (!barHadFocus && !io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Tab, false)) wantFocus = true;
+    bool toPicker = !barHadFocus && g_cmdBackEdge;    // View in the menu: the bar's pad picker
+    if (wantFocus) { g_cmdPadMode = false; g_pickMode = 0; }
+    if (toPicker) { g_cmdPadMode = true; g_pickMode = 0; }
+
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    float width = g_menuSize.x;
+    ImVec2 pos(g_menuPos.x, g_menuPos.y + g_menuSize.y + 4.0f);
+    float height = g_cmdBarHeight > 0.0f ? g_cmdBarHeight : ImGui::GetFrameHeightWithSpacing() * 2.5f;
+    float bottom = vp->WorkPos.y + vp->WorkSize.y;
+    if (pos.y + height > bottom) pos.y = bottom - height;
+    ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0.0f), ImVec2(width, FLT_MAX));
+    if (wantFocus || toPicker) ImGui::SetNextWindowFocus();
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
+                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar;
+    bool textActive = false, focused = false;
+    if (ImGui::Begin("TruMenu command bar###TruCmdBar", nullptr, flags)) {
+        CmdPollQueued();
+        CmdBuildSuggestions(g_cmdBuf, g_cmdPadMode);
+        WORD e = g_cmdPadEdges;
+        bool leave = false, runNow = false;
+        if (barHadFocus && !g_cmdPadMode && !toPicker) {  // text field (or idle bar): the pad goes on into the menu
+            if (e & 0x200F) leave = true;                // D-pad / stick / B
+            else if (e & 0x1000) {                       // A: run the typed line, empty = into the menu
+                if (g_cmdTextActive && g_cmdBuf[0]) runNow = true;
+                else if (g_cmdTextActive) leave = true;
+                else wantFocus = true;
+            } else if (e & 0x0020) {                     // View: pad picker
+                ImGui::ClearActiveID();
+                g_cmdPadMode = true;
+                g_pickMode = 0;
+                CmdBuildSuggestions(g_cmdBuf, true);
+                e = 0;                                   // this View press is used up
+            }
+        }
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(">");
+        ImGui::SameLine();
+        float pickWidth = ImGui::CalcTextSize("Pick (View)").x + style.FramePadding.x * 2.0f;
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - pickWidth - style.ItemSpacing.x);
+        if (wantFocus && !g_cmdPadMode) ImGui::SetKeyboardFocusHere();
+        ImGuiInputTextFlags tf = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion |
+                                 ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackEdit |
+                                 ImGuiInputTextFlags_CallbackAlways;
+        bool enter = ImGui::InputTextWithHint("##cmd", "item id [arg] - help, list <filter>, get <id>; Tab / Down = "
+                                              "choose, Up = history", g_cmdBuf, sizeof(g_cmdBuf), tf, CmdCallback);
+        textActive = ImGui::IsItemActive();
+        if (ImGui::IsItemDeactivated() && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) leave = true;
+        ImGui::SameLine();
+        if (ImGui::Button("Pick (View)")) { g_cmdPadMode = true; g_pickMode = 0; }
+        if (enter || runNow) {
+            char line[kCmdLine];
+            if (g_sugSel >= 0 && g_sugSel < g_sugCount) CmdCompletionText(g_sugSel, line, sizeof(line), false);
+            else strncpy_s(line, sizeof(line), g_cmdBuf, _TRUNCATE);
+            CmdRunFromBar(line);
+            if (enter) {                             // Enter left the field: empty it, focus it again next frame
+                g_cmdBuf[0] = 0;
+                InterlockedExchange(&g_cmdFocusReq, 1);
+            } else {
+                g_cmdSetText[0] = 0;
+                g_cmdSetPending = true;
+            }
+            g_cmdHistPos = -1;
+            g_sugSel = -1;
+        }
+        if (g_cmdLeaveReq) { g_cmdLeaveReq = false; leave = true; }
+
+        // pad picker
+        if (g_cmdPadMode && !toPicker) {
+            if (g_pickMode == 1) {
+                double mult = ImGui::IsKeyDown(ImGuiKey_GamepadR2) ? 10.0 : 1.0;
+                if (CmdPadPress(0x0100)) g_pickValue -= g_pickStep * mult;
+                if (CmdPadPress(0x0200)) g_pickValue += g_pickStep * mult;
+                if (g_pickRange) {
+                    if (g_pickValue < g_pickMin) g_pickValue = g_pickMin;
+                    if (g_pickValue > g_pickMax) g_pickValue = g_pickMax;
+                }
+                char value[64], line[kCmdLine];
+                CmdPickValueText(value, sizeof(value));
+                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.2f, 1.0f), "%s = %s", g_pickId, value);
+                ImGui::SameLine();
+                ImGui::TextDisabled("LB - / RB + (hold RT: x10), A = set, B = back");
+                if (e & 0x1000) { Out(line, sizeof(line), "%s %s", g_pickId, value); CmdRunFromBar(line); }
+                if (e & 0x2000) g_pickMode = 0;
+            } else {
+                if (g_sugCount && g_sugSel < 0) g_sugSel = 0;
+                if (CmdPadPress(0x0001) && g_sugSel > 0) --g_sugSel;
+                if (CmdPadPress(0x0002) && g_sugSel < g_sugCount - 1) ++g_sugSel;
+                if (CmdPadPress(0x0004)) g_sugSel = g_sugSel > 8 ? g_sugSel - 8 : 0;
+                if (CmdPadPress(0x0008)) g_sugSel = g_sugSel + 8 < g_sugCount ? g_sugSel + 8 : g_sugCount - 1;
+                if ((e & 0x1000) && g_sugSel >= 0 && g_sugSel < g_sugCount) CmdPadChoose(g_sugSel);
+                else if (e & 0x2000) {                   // B: out of an argument list, else into the menu
+                    if (strchr(g_cmdBuf, ' ')) g_cmdBuf[0] = 0;
+                    else leave = true;
+                } else if ((e & 0x8000) && g_sugSel >= 0 && g_sugSel < g_sugCount && g_sug[g_sugSel].idToken &&
+                           CmdKindOf(g_sug[g_sugSel].text) != kCkBuiltin) {
+                    FavToggle(g_sug[g_sugSel].text);
+                } else if (e & 0x0020) {                 // View: back to typing
+                    g_cmdPadMode = false;
+                    InterlockedExchange(&g_cmdFocusReq, 1);
+                }
+                if (!g_sugCount) ImGui::TextDisabled("pad picker: no matching id - B = back");
+            }
+        }
+
+        // result line
+        char result[sizeof(g_cmdResult)], rline[kCmdLine], source[16];
+        EnterCriticalSection(&g_cmdLock);
+        strncpy_s(result, sizeof(result), g_cmdResult, _TRUNCATE);
+        strncpy_s(rline, sizeof(rline), g_cmdResultLine, _TRUNCATE);
+        strncpy_s(source, sizeof(source), g_cmdResultSource, _TRUNCATE);
+        LeaveCriticalSection(&g_cmdLock);
+        if (result[0]) {
+            bool ok = !strncmp(result, "ok", 2);
+            ImGui::TextDisabled("%s: %s%s", source, rline, g_cmdWaitId[0] ? "   (waiting for the game thread)" : "");
+            ImGui::PushStyleColor(ImGuiCol_Text, ok ? ImVec4(0.45f, 0.95f, 0.45f, 1.0f) : ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+            if (strlen(result) > 240) {
+                ImGui::BeginChild("##cmdresult", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 6.0f),
+                                  ImGuiChildFlags_Borders, ImGuiWindowFlags_NoNav);
+                ImGui::TextWrapped("%s", result);
+                ImGui::EndChild();
+            } else {
+                ImGui::TextWrapped("%s", result);
+            }
+            ImGui::PopStyleColor();
+        } else {
+            ImGui::TextDisabled("help = the commands; D-pad / Down = into the menu, View / F2 / Tab = back to the bar");
+        }
+        if (leave) CmdFocusMenu();
+        focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+        if (!focused) g_cmdPadMode = false;
+    }
+    g_cmdBarHeight = ImGui::GetWindowHeight();
+    ImVec2 barPos = ImGui::GetWindowPos();
+    ImGui::End();
+    if ((textActive || g_cmdPadMode) && focused) DrawCmdSuggestions(barPos, width);
+    g_cmdTextActive = textActive;
+    g_cmdOwnPad = focused;
 }
 
 void PageLevel() {
@@ -4506,9 +5411,14 @@ void DrawMenu() {
     ImGuiViewport *vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + 40.0f, vp->WorkPos.y + 40.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(vp->WorkSize.x * 0.5f, vp->WorkSize.y * 0.7f), ImGuiCond_FirstUseEver);
-    if (InterlockedExchange(&g_menuJustOpened, 0)) ImGui::SetNextWindowFocus();
+    bool justOpened = InterlockedExchange(&g_menuJustOpened, 0) != 0;
+    if (justOpened) ImGui::SetNextWindowFocus();
     bool open = true;
-    if (ImGui::Begin("TruMenu  (L3 + R3 closes)", &open, ImGuiWindowFlags_NoCollapse)) {
+    bool began = ImGui::Begin(kMenuTitle, &open, ImGuiWindowFlags_NoCollapse);
+    g_menuPos = ImGui::GetWindowPos();       // 0.6: the command bar sits directly under this window
+    g_menuSize = ImGui::GetWindowSize();
+    g_menuRectOk = true;
+    if (began) {
         // 0.4: TO TEST first, only while the list holds rows
         int open04, ok04, fail04, skip04, total04;
         TestCounts(&open04, &ok04, &fail04, &skip04, &total04);
@@ -4548,6 +5458,7 @@ void DrawMenu() {
     }
     ImGui::End();
     if (!open && g_menuOpen) ToggleMenu("close button");
+    if (g_menuOpen) DrawCmdBar(justOpened);   // 0.6, a window of its own: the menu window's navigation is unchanged
 }
 
 void DrawOverlay() {
@@ -4568,6 +5479,29 @@ void DrawOverlay() {
     ImGui::End();
 }
 
+// optional plugin TruGuard: counters + last site, independent of the player pointer check
+void DrawGuardOverlay() {
+    GuardIntFn count = GuardIntExport("TruGuardCount"), distinct = GuardIntExport("TruGuardDistinct"),
+                mode = GuardIntExport("TruGuardMode");
+    if (!count || !distinct || !mode) return;
+    GuardTextFn last = GuardTextExport("TruGuardLast");
+    char lastText[512] = "";
+    if (last) last(lastText, sizeof(lastText));
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x - 10.0f, vp->WorkPos.y + 10.0f), ImGuiCond_Always,
+                            ImVec2(1.0f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.4f);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(vp->WorkSize.x * 0.45f, vp->WorkSize.y));
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
+                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
+                             ImGuiWindowFlags_NoSavedSettings;
+    if (ImGui::Begin("##TruGuardOverlay", nullptr, flags)) {
+        Text("TruGuard  mode %d  -  %d exception(s) at %d site(s)", mode(), count(), distinct());
+        if (lastText[0]) ImGui::TextWrapped("%s", lastText);
+    }
+    ImGui::End();
+}
+
 void Render(IDirect3DDevice9 *device) {
     // front end / loading: if the game has not polled the pad slot for 250 ms, read the pad here (toggle +
     // navigation) and run queued requests from this hook (the game's Present call)
@@ -4581,7 +5515,7 @@ void Render(IDirect3DDevice9 *device) {
     if (padIdle && g_reqPending) RunPending();
     if (padIdle) WeaponsTick();
     KeyboardToggle();
-    if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_drawMarkup) return;
+    if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup) return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
         g_imguiReady = InitImGui(device);
@@ -4611,8 +5545,11 @@ void Render(IDirect3DDevice9 *device) {
     if (g_drawMarkup) DrawMarkup();
     if (g_overlay) DrawOverlay();
     if (g_logOverlay) DrawLogOverlay();
+    if (g_guardOverlay) DrawGuardOverlay();
     if (g_menuOpen) DrawMenu();
+    if (!g_menuOpen) { g_cmdOwnPad = false; g_cmdTextActive = false; g_cmdPadMode = false; }
     ImGui::EndFrame();
+    InterlockedExchange(&g_cmdWantText, g_menuOpen && io.WantTextInput ? 1 : 0);
     if (SUCCEEDED(device->BeginScene())) {
         ImGui::Render();
         ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
@@ -4792,6 +5729,10 @@ void ReadOptions(const char *dir) {
     if (g_logMinLevel < 0 || g_logMinLevel > 2) g_logMinLevel = atoi(OptDefault("Log", "MinLevel"));
     g_logRate = OptInt(ini, "Log", "MaxLinesPerSecond");
     if (g_logRate < 0 || g_logRate > 10000) g_logRate = atoi(OptDefault("Log", "MaxLinesPerSecond"));
+    // 0.6
+    g_cmdEnabled = OptInt(ini, "Cmd", "Enabled");
+    g_cmdHistSize = OptInt(ini, "Cmd", "HistorySize");
+    if (g_cmdHistSize < 1 || g_cmdHistSize > 64) g_cmdHistSize = atoi(OptDefault("Cmd", "HistorySize"));
 }
 
 void Start(HMODULE self) {
@@ -4873,6 +5814,8 @@ void Start(HMODULE self) {
                HexBytesAt(0x00715eb2, "a158dbfa00 8b8800050000") && g_mainStateOk && g_playerOk;
     _snprintf_s(g_testPath, sizeof(g_testPath), _TRUNCATE, "%sTruMenu.tests.txt", g_exeDir);
     TestLoad();
+    _snprintf_s(g_cmdHistPath, sizeof(g_cmdHistPath), _TRUNCATE, "%sTruMenu.history.txt", g_exeDir);   // 0.6
+    CmdHistLoad();
     DevRead();
     g_logOverlay = g_logOverlayAtStart ? 1 : 0;
     g_logLines = g_logLinesAtStart;
@@ -4912,6 +5855,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_logRingLock);
         InitializeCriticalSection(&g_favLock);
         InitializeCriticalSection(&g_testLock);
+        InitializeCriticalSection(&g_cmdLock);
         g_reqDone = CreateEventA(nullptr, TRUE, FALSE, nullptr);
         Start(instance);
     } else if (reason == DLL_PROCESS_DETACH) {

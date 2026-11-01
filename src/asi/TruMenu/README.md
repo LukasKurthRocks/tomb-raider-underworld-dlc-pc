@@ -14,7 +14,10 @@ the game. 0.4 (TO TEST checklist filled over TruLink, log page: collapse repeats
 filter / rate limit, `weapon.slots` / `weapon.has`, `ammo.fill`, `gear.give`) built 2026-10-31 into `work\asi\menu04`,
 checked with `dumpbin` only - not yet run in the game. 0.5 (TO TEST row kinds step / check / toggle, `test.step`,
 `test.toggle`, `test.export`; for `scripts\windows\Invoke-TruTestRun.ps1`) built 2026-10-31 into `work\asi\menu05`,
-checked with `dumpbin` only - not yet run in the game. `camera.free` is still a todo (see "0.4 items").**
+checked with `dumpbin` only - not yet run in the game. 0.6 (**command bar**: one input line directly under the menu
+window, autocomplete, history, pad picker, `cmd.focus` / `cmd.run` / `cmd.history`, `[Cmd]` keys; on top of the 0.5
+source with the TruGuard items `guard.*`) built 2026-11-01 into `work\asi\menu06`, checked with `dumpbin` only - not
+yet run in the game. `camera.free` is still a todo (see "0.4 items").**
 
 ## Controls
 
@@ -27,10 +30,15 @@ checked with `dumpbin` only - not yet run in the game. `camera.free` is still a 
 | LB / RB, triggers | ImGui navigation tweaks (sliders) |
 | `[Menu] ToggleKey` (off by default, e.g. 119 = F8) | open / close from the keyboard |
 | mouse / keyboard | work while the menu is open (forwarded from the game window's message loop) |
+| 0.6: typing | goes to the **command bar** under the menu (it has the keyboard focus when the menu opens); see "Command bar (0.6)" |
+| 0.6: D-pad / stick / B while the bar has the focus | the focus goes into the menu window (as before 0.6) |
+| 0.6: View (Back) in the menu, F2, Tab | back to the bar (View: pad picker, F2 / Tab: typing) |
 
 While the menu is open the game gets a **neutral pad** (no buttons, sticks centred, triggers 0; the packet number is
 kept). After a toggle the pad stays neutral until both sticks are released, so the game never sees the L3 / R3 press
-that closed the menu. Keyboard and mouse messages still reach the game. The very first stick pressed (before the
+that closed the menu. Keyboard and mouse messages still reach the game (0.6: except `WM_KEYDOWN` / `WM_CHAR` /
+`WM_DEADCHAR` / `WM_SYSCHAR` while a text field - the command bar, a filter - has the focus; key-up messages always
+pass, so a key the game saw going down is released there too). The very first stick pressed (before the
 second one completes the combo) does reach the game for a frame or two.
 
 ## Pages and items
@@ -56,6 +64,7 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Media: videos | 0.3: `Movies\*.bik`, "Play" (main menu only), "as menu loop" | `media.video.list`, `media.video.play <name>`, `media.video.menuloop [name]` |
 | Level select | current unit name (GameTracker+0x38), one button per unit of `[Levels] List` (default `dlc_level1_start`, `dlc_level2_start`), "Reload current unit", then **all 111 playable units** in tree nodes per group (see below). Any other unit: `menu level.load <unit>` over TruLink | `level.current`, `level.list` (all units: `group: unit unit ...; ...`), `level.presets` (`[Levels] List`; was `level.list` in 0.1), `level.load <unit>`, `level.reload` |
 | Dev channel | there is no developer channel in `tru.exe` (TCP 9264 is FMOD's profiler). **TODO** re-enable the compiled-out log stub 0x6457a0 | `dev.log` (todo) |
+| Command bar (0.6, own window under the menu) | one input line: `<id> [arg]`, `get <id>`, `list [filter]`, `help`; autocomplete, history, pad picker (section "Command bar (0.6)") | `cmd.focus`, `cmd.run <line>`, `cmd.history` |
 
 Items that need a level (camera, cheat) answer / show **"needs a level"** while no player instance exists
 (`[0xe7f094]` = 0, e.g. in the main menu). Level select works from the main menu as well.
@@ -81,10 +90,68 @@ const char *__cdecl TruMenuInvoke(const char *id, const char *arg);   // "ok ...
 - 0.4: the `test.*` items, `log.collapse` / `log.hidereads` / `log.level` / `log.rate`, `weapon.slots` and
   `weapon.has` (read-only, our own reads under `__try`) run at once on the caller's thread; `ammo.fill` and
   `gear.give` are queued for the game thread.
+- 0.6: `cmd.focus`, `cmd.run` and `cmd.history` run at once on the caller's thread; `cmd.run <line>` then runs the
+  line's own item through the same path (a game-thread item waits as usual), see "Command bar (0.6)".
 - The returned text lives in a buffer of the calling thread until that thread's next call.
 - TruLink 0.2: `menu list`, `menu <id> [arg]` (e.g. `Invoke-TruLink.ps1 -Command 'menu level.load dlc_level2_start'`).
 - Values are one line (`; ` between entries) so `level.list` / `costume.list` fit TruLink's one-line answer; the
   per-thread buffers are 48 KB (answer) / 16 KB (one value).
+
+## Command bar (0.6)
+
+One input line in a small window **directly under the menu window** (same width, follows the menu when it is moved;
+pushed up to stay on screen). It is a window of its own, so the menu window and its navigation are unchanged: TO TEST
+/ Quick access still open first in the menu. The bar is drawn whenever the menu is open (`[Cmd] Enabled=1`).
+
+| Line | Effect |
+|---|---|
+| `<id>` on a value item (bool / int / float / info, developer-menu flag / bool / int rows) | shows the value: `ok time.scale = 1.000` (does **not** toggle - unlike `menu <id>` over TruLink) |
+| `<id>` on an action | runs it without argument (`level.reload`, `costume.next`, `player.mark`) |
+| `<id> <arg>` | sets / runs with the argument: `time.scale 0.5`, `ui.hide 1`, `costume.set doppelganger_casual`, `level.load dlc_level2_start`, `dev.fog_far 9000`, `fav.add dev.fog_far` |
+| `get <id>` | the value (alias of `<id>` alone, also for actions: `get level.load` = current unit) |
+| `list [filter]` | ids containing the filter (`list cost`) |
+| `help` | the short help in the result line |
+
+- **Execution:** every line goes through `InvokeCore` - the function behind `TruMenuInvoke`; the bar calls it without
+  waiting: items for the game thread go into the same one-slot queue (`ok queued <id> ...`, `err busy` while another
+  request is pending) and their answer replaces the result line when the game thread has run them (within 5 s).
+- **Result line** under the input: the line, its source (`bar`, `TruLink`, `menu`) and the answer, green for `ok`, red
+  for `err`; long answers (`list`, `help`, `level.list`) in a small scroll box.
+- **Autocomplete** while typing: a list above the bar with the matching ids (prefix matches first, then ids that
+  contain the text), each with its current value (re-read every 0.5 s) and label. After `<id> ` the list holds the
+  known arguments: `0` / `1` for bool items and flag rows, the outfit cycle list for `costume.set`, the player records
+  for `costume.choose` / `costume.choosereload` / `costume.setreload`, the 111 units for `level.load`, `Movies\*.bik`
+  for `media.video.play` / `media.video.menuloop`, the weapon names for `weapon.give` / `weapon.has`, `0..2` for
+  `guard.mode` / `log.level`, the favourites for `fav.del`, all ids for `get` / `fav.add`.
+- **Keyboard:** Tab = take the highlighted (or first) suggestion (with a space when the item takes an argument);
+  Down / Up = move in the list; Enter = run (the highlighted suggestion if one is highlighted, else the line); Up in
+  the **empty** bar = history (Up older, Down newer, Down past the newest = empty line); Down in the empty bar, Up /
+  Down with nothing to choose and Esc = focus into the menu; **F2** (always) or **Tab** (while no text field is
+  active) = back to the bar. Typed keys do not reach the game (see Controls).
+- **History:** the last `[Cmd] HistorySize` (32) lines, a repeated line moves to the end; `TruMenu.history.txt` next to
+  `tru.exe` (a `#` comment line, then one line per command, oldest first), rewritten after every line, read at start.
+  Lines from TruLink's `cmd.run` go into the history as well.
+- **Focus:** when the menu opens the keyboard focus is in the bar (type at once). The pad keeps working as before:
+  the first D-pad / stick / B press moves the focus into the menu window (that press is not passed on, the next ones
+  navigate); A in the empty bar does the same, A with text runs the line.
+- **Pad picker** (View / Back in the menu or in the bar, or the "Pick (View)" button): the list shows every id (or
+  the matches of the typed text); D-pad up / down (hold = repeat), left / right = 8 rows; **A**: a toggle runs with
+  the other state (`<id> 0|1`), an action runs without argument, an info item shows its value, an item with known
+  arguments opens their list (A runs `<id> <value>`, B back to the ids), an int / float item opens the value picker
+  (**LB - / RB +**, hold RT = x10, A = set, B = back; steps: `time.scale` 0.1, `camera.fov` 0.05, `player.health` 10,
+  developer-menu ints 1 or range / 64 within their range); **Y** pins / unpins the id (favourites); **B** = into the
+  menu; View = back to typing.
+
+TruLink:
+
+```text
+menu cmd.run time.scale 0.5          runs the line as typed into the bar (bar rules: "menu cmd.run ui.hide" shows the value)
+menu cmd.run list costume            answer: ok list: <n> of <total> ids matching costume: ...
+menu cmd.focus                       opens the menu (if closed) and puts the keyboard focus into the bar
+menu cmd.history                     <n>: newest; ...; oldest
+```
+
+`cmd.run` waits for the game thread like any `menu <id>` (3 s); `cmd.run cmd.run ...` is refused.
 
 ## TO TEST (0.4)
 
@@ -407,6 +474,8 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Cheat] FlightSpeed` | 20 | units per 30 fps frame at full trigger |
 | `[Levels] List` | `dlc_level1_start,dlc_level2_start` | units offered as buttons on the Level select page |
 | `[Favorites] Ids` | (empty = default list) | favourite item ids, comma list; rewritten by TruMenu when you pin / unpin (`WritePrivateProfileString` on this file) |
+| `[Cmd] Enabled` | 1 | 0.6: 1 = command bar under the menu window (0 = no bar; `cmd.run` still works, `cmd.focus` answers `err`) |
+| `[Cmd] HistorySize` | 32 | 0.6: lines kept in `TruMenu.history.txt` next to `tru.exe`, 1 .. 64 |
 | `[Log] Overlay` | 0 | 1 = log lines in the bottom-left corner from the start |
 | `[Log] Lines` | 12 | lines on the Debug / Log page and in the overlay (1 .. 64) |
 | `[Log] Script` | 0 | 1 = redirect the 8 script print / log natives from the start (patched at load, before any script runs; needs `Experimental=1`) |
@@ -515,6 +584,31 @@ new `[Log]` keys, an old ini works too: missing keys take the defaults). Every s
 31. `menu test.export` -> `ok+ test.export ...`, one tab-separated line per row, `.`; `Invoke-TruLink.ps1 -Command
     'menu test.export'` prints the block. Restart: steps / toggles / checks and their states are back; a 0.4
     `TruMenu.tests.txt` loads as checks.
+
+0.6 additions (built with `-OutDir work\asi\menu06`; install the `.asi` **and** the new `TruMenu.ini` - it has the
+`[Cmd]` section, an old ini works too: `Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu06`). Every step: note the
+result, send `TruMenu.log`, `TruLink.log` and `TruMenu.history.txt`.
+
+32. Main menu, open the menu (L3 + R3): the bar sits directly under the menu window, the text cursor blinks in it;
+    TO TEST / Quick access are still the first pages. Type `time.scale` - the list above the bar shows `time.scale = 1.000`
+    first; Enter -> green `ok time.scale = 1.000`. Type `ui.hide` + Enter -> its value, the HUD does **not** change.
+33. Keys do not leak: type `wasd` and Esc in the bar while in a level - Lara does not move, no pause menu; Esc puts the
+    focus into the menu; F2 brings it back.
+34. Autocomplete: `cost` -> `costume.*` ids first (prefix), Down / Down / Tab takes the third one; `costume.set ` (with
+    space, in a level) lists the outfit cycle names, `doppel` filters them; Enter runs `costume.set doppelganger_casual`
+    -> `ok queued costume.set ...`, then (next game frame) the real answer replaces it. `level.load ` lists the units.
+35. `time.scale 0.5` (world slower), `time.scale 1`; `get level.load`; `list fog`; `help`; `nonsense` -> red
+    `err unknown item 'nonsense'`; `costume.sett` -> `... did you mean costume.set?`.
+36. History: run three lines, empty bar, Up / Up / Down - the lines come back in order; restart the game - Up still
+    shows them (`TruMenu.history.txt` next to `tru.exe`); `menu cmd.history` over TruLink lists them newest first.
+37. Pad with the bar focused (menu just opened): D-pad down -> the focus is in the menu (TO TEST / Quick access header),
+    D-pad again navigates as in 0.5; A / B / X / Y on the pages work as before (TO TEST: A = OK, X = FAIL, Y = SKIP).
+38. Pad picker: in the menu press View - the list shows all ids with values; D-pad to `ui.hide`, A -> the HUD toggles
+    (result line `ok ...`); to `time.scale`, A -> value picker, RB x5 -> 1.5, A -> world faster, B, B -> back in the
+    menu; to `level.load`, A -> unit list, A on `dlc_level1_start` loads it; Y on an id pins it (Quick access).
+39. TruLink: `menu cmd.run time.scale 0.5` -> answer as `menu time.scale 0.5`, the bar shows `TruLink: time.scale 0.5`;
+    `menu cmd.focus` opens the menu with the focus in the bar; with `[Cmd] Enabled=0` there is no bar and
+    `menu cmd.focus` answers `err command bar off`.
 
 ## Credits
 

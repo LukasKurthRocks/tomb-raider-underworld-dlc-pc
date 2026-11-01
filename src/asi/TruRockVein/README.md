@@ -45,6 +45,50 @@ and adds two probes that change no result:
 Both sites are byte-checked first (the default handler with its first 31 bytes and the format-string push at
 tru+0x382182); a mismatch switches only that probe off.
 
+## 0.3: markup types 22 / 23 (source only, not built yet)
+
+The first live run with the fixed chart (2026-11-01 15:47) evaluated 607 / 608 at the rock channel, but with context
+0 (no markup next to Lara). Cause in code, not data: when a markup record is added, its type char is mapped to a flag
+class by TRMarkupManager vtable +0x20 (tru+0x5d70a0). The PC function is the Xbox retail one (types 1-21; anything
+else returns 0x80000000 = "Bad Markup Type, disabling markup", print compiled out on PC), and a box with a negative flag
+word is skipped by the markup queries. The title update's version (0x822a12e8) accepts 1-23 and returns 1 for 22 / 23.
+Every type-22 markup found in the converted DLC 2 files sits on objects (pistons a / c / square, machine column, goo
+converter; `tools/markup_level.py --objects`), and the PC disables all of it. `PatchMarkupTypes` (option `MarkupTypes`, default 1, not in the sample ini so the 0.2 ini stays "ours") checks the
+vtable slot 0x855234, the 29 code bytes, the 21 table entries at 0x5d70d0 and the 8 padding bytes behind them, then
+writes two entries (types 22 / 23 -> `mov eax,1; ret 4` at 0x5d70b5) into the padding and the bound 0x14 -> 0x16
+(tru+0x5d70ab). Log line: "markup types 22 / 23 accepted". Live 2026-11-01 (test 48i): accepted, 608 true at the wall.
+
+## 0.4: title-update type checks in the markup manager (2026-11-01)
+
+With 0.3 the game crashed 237 ms after 608 became true, in TRMarkupManager slot +0x08 (tru+0x1dba20, wall normal of
+a box) with box 0. The title update added the new types to three slots of the manager's vtable (TU 0x8206827c, PC
+0x855214); the PC has the retail bodies: slot 0 (TU 0x822a0bc8: flag bits 0x04480010 or predicate **or type 22**),
+slot 1 (TU 0x822a0c68: bits 0x61870000 or predicate **or type 23**), slot +0x08 (TU 0x822a0d08: edge normal when bits
+0x20408000 **or type 22**). Without them the attach dispatcher tru+0x307b90 never sets the attach box
+gameTracker+0xc94 for a type-22 box and the state code reads it as 0. `PatchSlots` (option `MarkupSlots`, default 1)
+checks the three vtable entries and 34 code bytes of each body, then points slots 0 / 1 at plugin functions (original
+first, then the TU type test) and replaces the `je` at tru+0x1dba3c by a jump to a stub with the TU branch.
+`NullBoxGuard` (default 1, diagnostic, not a translation) points slot +0x08 at a check that logs the caller of a call
+with box 0 and returns a zero vector. Neither option is in the sample ini (it stays the 0.2 / 0.3 one). Log lines:
+"markup slots: 0 also true for type 22 ...", "markup slot 0 (wall, type 22) true by the title-update type check ...",
+"markup slot +0x08 called with box 0 from 0x........". Built 2026-11-01 into `work\asi_rv04`; live test 48j: the
+guard fired (from tru+0x32ba5b, +0xc94 = 0) and the game crashed in the next box function - the slots are needed but
+not enough.
+
+## 0.5: markup action 608 (2026-11-01)
+
+The attach box is set by PLAYER_AttachToJumpTarget (PC tru+0x307b90 = TU 0x823fd178, the same on both). The title
+update calls it from a new case of the markup-action selector (PC tru+0x372ca0 = TU 0x82463538, second switch on the
+state parameter 0x19a, values 601..629): **case 608** (TU 0x82463a28) = if gameTracker+0xa64 != 0:
+`PLAYER_AttachToJumpTarget(zero vector, 0.0f)`, then gameTracker+0xca0 = gameTracker+0xd90. All other cases have the
+same target pattern on PC and TU; the PC sends 608 to its default. `PatchSelector` (option `MarkupAction608`, default
+1) checks the 29 switch bytes, the byte-table entry of 608 (0x10 = default), the default entry, the exit bytes and the
+first 20 bytes of tru+0x307b90, then replaces `lea eax,[ebx-259h]` at tru+0x372f8a by a jump to a stub that runs the
+TU case for 608 and jumps to the selector's exit tru+0x3730af. `NullBoxGuard` also guards tru+0x32ba40 (attach point on
+a box, the caller of the second crash site tru+0x1c39e2). Log lines: "markup action 608 added ...", "markup action 608
+(attach to jump target, title update) call N: ... -> gameTracker+0xc94 0x........", "attach point tru+0x32ba40 called
+with box 0 ...". Built 2026-11-01 into `work\asi_rv05`, not loaded.
+
 ## Build, install, remove
 
 - Build: `scripts\windows\Build-TruAsi.ps1 -Name TruRockVein` (installed Visual Studio, x86, `/MT`, imports only
@@ -52,7 +96,7 @@ tru+0x382182); a mismatch switches only that probe off.
 - Install: `scripts\windows\Set-TruRockVein.ps1 -Install` (game closed); the Ultimate ASI Loader the game ships as
   `binkw32.dll` loads every `*.asi` next to `tru.exe`. Remove: `Set-TruRockVein.ps1 -Remove` (only our own files).
 - Options: `TruRockVein.ini` - `Enabled`, `LogLevel` (0-3), `LogUnhandled`, `Type607` / `Type608`, `LogBadValues`,
-  `LogDefaultConditions`. Log:
+  `LogDefaultConditions`, `MarkupTypes`, `MarkupSlots`, `NullBoxGuard`, `MarkupAction608`. Log:
   `TruRockVein.log` next to `tru.exe`.
 
 ## Test
