@@ -25,6 +25,7 @@ param(
     [Parameter(ParameterSetName = 'Install', Mandatory)][switch]$Install,
     [Parameter(ParameterSetName = 'Remove', Mandatory)][switch]$Remove,
     [string]$GamePath,
+    [string]$SourceDir,
     [switch]$Trace
 )
 
@@ -35,7 +36,7 @@ Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
 
 $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$built   = Join-Path $repo 'work\asi'
+$built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruDlc2Player.asi', 'TruDlc2Player.ini'
 # SHA-256 of earlier builds of ours (none yet) - recognised as ours for update / removal
 $earlierBuilds = @{

@@ -10,7 +10,11 @@ an **item with a stable id** that tools can list and run without the controller 
 the exe's own tables, time / player / HUD, instances, live outfit switch, Debug / Log page + overlay, videos,
 experimental markup drawing, weapons / ammo / health) built 2026-10-31 and checked with `dumpbin` only (x86 DLL,
 imports `KERNEL32.dll` + `USER32.dll`, exports `TruMenuVersion` / `TruMenuList` / `TruMenuInvoke`) - not yet run in
-the game.**
+the game. 0.4 (TO TEST checklist filled over TruLink, log page: collapse repeats / hide TruLink reads / severity
+filter / rate limit, `weapon.slots` / `weapon.has`, `ammo.fill`, `gear.give`) built 2026-10-31 into `work\asi\menu04`,
+checked with `dumpbin` only - not yet run in the game. 0.5 (TO TEST row kinds step / check / toggle, `test.step`,
+`test.toggle`, `test.export`; for `scripts\windows\Invoke-TruTestRun.ps1`) built 2026-10-31 into `work\asi\menu05`,
+checked with `dumpbin` only - not yet run in the game. `camera.free` is still a todo (see "0.4 items").**
 
 ## Controls
 
@@ -35,6 +39,7 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 
 | Page | Content | Items |
 |---|---|---|
+| TO TEST | 0.4, **first page, open, shown only while the list holds rows** (header "TO TEST (n open, n ok, n fail, n skip)"): one row per test - state, hint, id, note; on the selected row **A = OK, X = FAIL, Y = SKIP** (X / Y go to the row, not to ImGui, while a row has the focus), buttons OK / FAIL / SKIP and "Run <id>" when the id is a menu item (`id:arg` runs it with `arg`); "Remove the marked rows", "Remove all rows" (A twice). 0.5: **switches** (toggle rows, a checkbox each) on top, then **numbered steps** (NEXT marks the first open one; A = run its item + done) and checks in list order. Filled by the main session or `Invoke-TruTestRun.ps1` over TruLink; kept in `TruMenu.tests.txt` next to `tru.exe` (sections "TO TEST" below) | `test.add <id> <hint>`, `test.step <n> <id\|id:arg\|-> <text>`, `test.toggle <id> <item\|ini:Plugin:Section:Key> <text>`, `test.mark <id> ok\|fail\|skip\|open\|done\|on\|off [note]`, `test.list`, `test.export`, `test.del <id>`, `test.clear [done]` |
 | Status | TruMenu version, `tru.exe` PE time stamp / image size, all code checks, whether a level is loaded; current unit + stream unit id; game state; costume line (current costume, game-data base, `+0x1f4`, chosen `+0x20c` / `+0x20e` / `+0x210`, unit default); player line (instance, object id / name, type record, object-table entry); our plugins (`TruShadowPower`, `TruDoppelganger`, `TruDlc2Player`, `TruRockVein`, `TruLink`: loaded? `<Name>Version()` string), ModLoader.asi, the pad chain (what the game calls, what PadHook calls, with module names), the `d3d9.dll` in use (game folder = TRAWindowed proxy, else system), device / window | `status.version`, `status.hooks`, `status.unit`, `status.state`, `status.costume`, `status.player`, `status.plugins` |
 | Outfits (next level load) | the same costume facts, then one button per **player record of the game's type table** (index, name, object id; `[chosen]` / `[current]` marked), "Reset chosen costume", checkbox "reload the current unit after choosing" | `costume.records`, `costume.current`, `costume.choose <index\|name> [20c\|210]`, `costume.choosereload <index\|name>`, `costume.choosereset`; the 0.2 ids `costume.setreload` / `costume.reset` still work. **0.3 changed** `costume.list` (now the live cycle list; the 0.2 list = `costume.records`) and `costume.set` (now the live switch; the 0.2 meaning = `costume.choose`) |
 | Overlay: Lara's position | checkbox for a small top-left overlay with Lara's position and heading; position / rotation in the page | `overlay.position`, `player.position` |
@@ -43,10 +48,10 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Markup / collision draw | 0.3: experimental markup drawing (boxes / poly lines of the MarkupManager projected with the game's view matrix into ImGui's background draw list), "ledges only", projected-space size. `draw.debugflag` was **removed** (debugFlags2 0x100 is the TR7 / TRAE path, catalog section 7) | `draw.markup [0/1]`, `draw.ledges [0/1]`, `draw.scale <w> <h>` |
 | Quick access / Favourites | 0.3, **first page, open when the menu opens** (Status is now collapsed): one widget per favourite id (bool = checkbox, info = value, other = button that runs the item with its default argument); **Y** on an item pins / unpins it (on this page, in "Add an item" and on the Developer menu rows - other pages: use "Add an item" or TruLink); saved in `[Favorites] Ids`; default list (empty `Ids`): `player.invincible, player.health, time.scale, time.pause, level.reload, overlay.position, log.overlay, costume.next` (`camera.free` is skipped while it is a todo) | `fav.list`, `fav.add <id>`, `fav.del <id>` |
 | Developer menu (original) | 0.3: Crystal's own debug menu, read at load from the tables in `.data` and drawn row by row: page links switch pages, flags / bools as checkboxes, ints as sliders / inputs with the table's limits, actions as buttons; the table's callbacks / functions run on the game thread. Every row shows its static facts (who reads the target in retail, empty functions) in blue; "All pages" lists every page, also those the retail root no longer links | `dev.list`, `dev.<label slug>` (42 ids, list below) |
-| Time / player / HUD | 0.3: time scale slider, freeze world, hide HUD; player control, ragdoll death, mark / back to mark, camera fov; weapons / ammo / health (experimental, catalog section 17) | `time.scale <f>`, `time.pause [0/1]`, `ui.hide [0/1]`, `player.control [0/1]`, `player.die`, `player.teleport x y z`, `player.mark`, `player.recall`, `player.goto <inst>`, `camera.fov <rad>`, `player.health [n]`, `player.invincible [0/1]`, `weapon.list`, `weapon.give <name>`, `ammo.show`, `ammo.set <type> <n>` |
+| Time / player / HUD | 0.3: time scale slider, freeze world, hide HUD; player control, ragdoll death, mark / back to mark, camera fov; weapons / ammo / health (experimental, catalog section 17) | `time.scale <f>`, `time.pause [0/1]`, `ui.hide [0/1]`, `player.control [0/1]`, `player.die`, `player.teleport x y z`, `player.mark`, `player.recall`, `player.goto <inst>`, `camera.fov <rad>`, `player.health [n]`, `player.invincible [0/1]`, `weapon.list`, `weapon.give <name>`, `ammo.show`, `ammo.set <type> <n>`; 0.4 (TruLink / favourites, no own widgets on this page): `weapon.slots`, `weapon.has <name>`, `ammo.fill`, `gear.give <name>` |
 | Instances | 0.3: the instance list (name filter, max 200 shown), per instance: Lara goes there, bring to Lara, unhide, remove; "Unhide all" | `instance.list [filter]`, `instance.info <inst>`, `instance.bring <inst>`, `instance.unhide <inst>`, `instance.unhideall`, `instance.remove <inst>` (`<inst>` = intro id, `0x<address>` or `#<index>`) |
 | Outfits (live switch) | 0.3: "Next outfit" and one button per id of the game's outfit cycle list; switches at once (needs a level) | `costume.list`, `costume.next`, `costume.set <name\|id>` |
-| Debug / Log | 0.3: the last lines of every `Tru*.log` next to the `.asi` / `tru.exe` (tailed once per second by the worker thread, shared read, only new bytes), the game's script prints (`log.script`), lines mentioning errors / exceptions in red, counters (exception lines, exceptions TruMenu caught in its own game calls); source filter buttons (TruLink.log holds the last TruLink commands); corner overlay bottom left | `log.page`, `log.show`, `log.script [0/1]`, `log.overlay [0/1]`, `log.lines <n>`, `log.filter <source\|all>`, `log.clear` |
+| Debug / Log | 0.3: the last lines of every `Tru*.log` next to the `.asi` / `tru.exe` (tailed once per second by the worker thread, shared read, only new bytes), the game's script prints (`log.script`), lines mentioning errors / exceptions in red, counters (exception lines, exceptions TruMenu caught in its own game calls); source filter buttons (TruLink.log holds the last TruLink commands); corner overlay bottom left. 0.4: repeated lines of a source collapse into one `text x42 (17:09:02-17:09:33)`, TruLink's read-type command lines are dropped, filter all / warnings + errors / errors (warnings yellow, errors red), at most `[Log] MaxLinesPerSecond` new lines per source and second (then one line "(n lines dropped ...)"), counters for all three | `log.page`, `log.show`, `log.script [0/1]`, `log.overlay [0/1]`, `log.lines <n>`, `log.filter <source\|all>`, `log.clear`; 0.4: `log.collapse [0/1]`, `log.hidereads [0/1]`, `log.level 0\|1\|2` (or `all` / `warn` / `error`), `log.rate <n>` |
 | Settings | 0.3: every `TruMenu.ini` key with its current value, changed keys marked `*` (yellow) with their default, missing keys shown with the default; "Favourites back to the default list" and "Reset all settings" - both need **A twice** (the button turns red: "press A again to confirm", 5 s) | `settings.show`, `settings.reset` (backup `TruMenu.ini.bak_<yyyymmdd_hhmmss>`, rewrite from the defaults table, reload the options; Scale / Enabled / Script apply at the next start), `fav.reset` |
 | Media: videos | 0.3: `Movies\*.bik`, "Play" (main menu only), "as menu loop" | `media.video.list`, `media.video.play <name>`, `media.video.menuloop [name]` |
 | Level select | current unit name (GameTracker+0x38), one button per unit of `[Levels] List` (default `dlc_level1_start`, `dlc_level2_start`), "Reload current unit", then **all 111 playable units** in tree nodes per group (see below). Any other unit: `menu level.load <unit>` over TruLink | `level.current`, `level.list` (all units: `group: unit unit ...; ...`), `level.presets` (`[Levels] List`; was `level.list` in 0.1), `level.load <unit>`, `level.reload` |
@@ -73,10 +78,85 @@ const char *__cdecl TruMenuInvoke(const char *id, const char *arg);   // "ok ...
   - inside PadHook, or inside the Present hook while the game does not poll the pad; `TruMenuInvoke` waits up to 3 s
   and returns the result, else `ok queued <id> (...)` and the item runs at the next frame. A second request while one
   is pending answers `err busy`.
+- 0.4: the `test.*` items, `log.collapse` / `log.hidereads` / `log.level` / `log.rate`, `weapon.slots` and
+  `weapon.has` (read-only, our own reads under `__try`) run at once on the caller's thread; `ammo.fill` and
+  `gear.give` are queued for the game thread.
 - The returned text lives in a buffer of the calling thread until that thread's next call.
 - TruLink 0.2: `menu list`, `menu <id> [arg]` (e.g. `Invoke-TruLink.ps1 -Command 'menu level.load dlc_level2_start'`).
 - Values are one line (`; ` between entries) so `level.list` / `costume.list` fit TruLink's one-line answer; the
   per-thread buffers are 48 KB (answer) / 16 KB (one value).
+
+## TO TEST (0.4)
+
+A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
+
+```text
+menu test.add level.reload Reload the current unit - Lara at the same spot?   new row (or new hint: state open again)
+menu test.add level.load:dlc_level2_start Load DLC 2                          "Run" runs level.load dlc_level2_start
+menu test.add look-shadow Shadows at the start look right?                    free key (no item: no Run button)
+menu test.mark look-shadow fail dark band at the left wall                    ok | fail | skip | open, optional note
+menu test.list                                                                 read the states back
+menu test.del <id>      menu test.clear      menu test.clear done                (done = only the marked rows)
+```
+
+- **`test.list`** answers one line: `<n> rows (<o> open, <k> ok, <f> fail, <s> skip): <id> [<state>] <hint> {<note>} |
+  <id> [<state>] <hint> | ...` (`{note}` only when there is one). Tabs / line breaks in hints and notes become
+  spaces, `|` becomes `/`, `{` `}` become `(` `)`, so the answer stays parseable; spaces in an id become `_`.
+- **TruLink limits** (TruLink's tokenizer, not TruMenu): a line has at most 24 words, so a hint gets at most 21 words
+  (`test.mark` notes 20) - more are cut without a message; runs of spaces become one; a last word `force` is taken
+  as TruLink's force flag and dropped; the argument is cut at 511 characters.
+- **File** `TruMenu.tests.txt` next to `tru.exe`, rewritten on every change, read at start (survives a restart):
+  a `#` comment line, then one line per row `id<TAB>state<TAB>hint<TAB>note<TAB>time` (time = `HH:MM:SS` of the last
+  mark). At most 64 rows; `test.add` on a full list answers `err list full`.
+- **In the menu** the page "TO TEST" is the first page (open) and is not drawn while the list is empty. A marks the
+  selected row OK (also a mouse click), X FAIL, Y SKIP; while a row has the nav focus TruMenu keeps X and Y away from
+  ImGui (else X would jump to the title bar layer and Y would activate the row = OK). A mark from the menu keeps the
+  note; `TruMenu.log` gets a line `tests: test.mark <id> <state>` for every change (also visible on the Log page).
+
+## TO TEST 0.5: steps, checks, switches
+
+Goal: go through a test **in order** in the game without the chat, and switch features on / off yourself to find the
+step or feature that crashes (bisecting) instead of one run per step. Three row kinds:
+
+| Kind | Command | Row id | States | In the menu |
+|---|---|---|---|---|
+| `check` | `test.add <id> <hint>` (as 0.4) | `<id>` | open / ok / fail / skip | A = OK, X = FAIL, Y = SKIP, buttons, "Run" for `id` / `id:arg` |
+| `step` | `test.step <n> <id\|id:arg\|-> <text>` (n = 1..999) | `step<n>` | open / done (not checkable) | "NEXT->" on the first open step; A = run the item (if any) + done; "Run <id arg>" only runs, "Done" / "Open again" only marks |
+| `toggle` | `test.toggle <id> <target> <text>` | `<id>` | on / off | a checkbox in "Switches" at the top of the page |
+
+```text
+menu test.step 1 - Wait in the main menu                                       step without an item
+menu test.step 4 level.load:dlc_level2_start Load the DLC 2 start              "Run level.load dlc_level2_start"
+menu test.add d3d-box No D3D error box after the load?                         a check as in 0.4
+menu test.toggle sp-states ini:TruShadowPower:States:Enabled States 243/245    INI switch (next start)
+menu test.toggle flight cheat.flight Flight cheat on                           item switch: runs cheat.flight 1 / 0
+menu test.mark sp-states off      menu test.mark step4 done                    switch / step from TruLink
+menu test.export                                                               the whole list as a block
+```
+
+- **Order:** a new step goes in front of the first step with a higher number, so steps stay in number order; checks
+  and toggles are appended. Sending the rows in the wanted order (step 1, step 2, check, step 3, ...) gives exactly
+  that order; `test.step` with an existing number replaces that step (text / item, open again).
+- **Toggle targets:** a TruMenu item id (bool items: on = `<id> 1`, off = `<id> 0`, run like a menu click; the state
+  shown is the item's value when the row is added: `1` / `on` / `true` = on) or `ini:<Plugin>:<Section>:<Key>` -
+  `<Plugin>.ini` next to the `.asi` files, written **at once** with `1` / `0` (`WritePrivateProfileString`). Our
+  plugins read their `.ini` only at start, so the row carries the note "INI: takes effect at the next start". The
+  plugin name must start with `Tru` (letters / digits), section and key letters / digits / `_`; a missing `.ini` is
+  not created (`err ... not found`). INI toggles show the INI value again when the list is loaded at start.
+- **`test.mark`** takes the state that fits the kind: checks `ok|fail|skip|open`, steps `done|open`, toggles `on|off`
+  (switches the target); a wrong one answers `err <id> is a <kind> row: ...`.
+- **`test.export`** answers a TruLink block: `ok+ test.export <n> rows; checks <o> open <k> ok <f> fail <s> skip;
+  steps <d>/<t> done; toggles <on>/<t> on (...)`, then one line per row `kind<TAB>id<TAB>state<TAB>number<TAB>target
+  <TAB>hint<TAB>note<TAB>time`, then `.`. In `menu list` its value is only the counts line.
+- **`test.list`** stays one line; steps / toggles carry their kind: `step4 (step 4 -> level.load:dlc_level2_start)
+  [open] ...`, `sp-states (toggle ini:TruShadowPower:States:Enabled) [on] ...`. The header counts (`TO TEST (n
+  open, ...)`, `test.list`) count checks only; `test.clear done` removes only marked checks (steps and toggles stay).
+- **TruLink limits** as above: `test.step` / `test.toggle` texts get at most 20 words.
+- **File:** 0.5 writes three more columns, `id<TAB>state<TAB>hint<TAB>note<TAB>time<TAB>kind<TAB>target<TAB>number`;
+  a 0.4 file (5 columns) loads as checks. (0.4 reading a 0.5 file sees steps / toggles as checks with odd states.)
+- **Regression runs:** `scripts\windows\Invoke-TruTestRun.ps1 -RunProfile <name>` preloads the rows of
+  `tests\profiles\<name>.json` (`test.clear`, then the rows in profile order) and collects `TruMenu.tests.txt`
+  after the run ([scripts/windows/README.md](../../../scripts/windows/README.md)).
 
 ## Level list (0.2)
 
@@ -218,6 +298,20 @@ our own disassembly with `tools/pe_dis.py` / `pe_callers.py` on 2026-10-31.
 | `player.health` / `player.invincible` | float `playerstate+0x628` (GetHealth 0x6e7860); MaxHealth 0x6e7990 `() -> float`; invincible = variant A of catalog 17.5 (health = MaxHealth once per game frame in PadHook; state deaths such as falls still kill) | 0x6e7860 and 0x6e7990 prologues |
 | Debug / Log | `Tru*.log` in the `.asi` folder and the `tru.exe` folder, read with `FILE_SHARE_READ \| WRITE \| DELETE`, only the new bytes (at most the last ~6 KB per second, 2 KB at first sight); ring of 512 lines; per frame only a copy of the shown lines | - |
 
+## 0.4 items: facts
+
+Sources: catalog `docs/Menue-Funktionen-Katalog.md` section 17 and our disassembly with `tools/pe_dis.py` on
+2026-10-31 (Steam `tru.exe`); every address checked at load (Status page line "0.4: ...", `TruMenu.log` "0.4
+checks"). Not yet run in the game.
+
+| Item(s) | Fact | Check at load |
+|---|---|---|
+| `weapon.slots`, `weapon.has` | weapon manager `WM = [[0xfadb58]+0x500]`; 15 slots, right hand handle `{instance, id}` at `WM+4+0x10*slot`, left hand at `WM+0xc+0x10*slot` (reader 0x6e7b90: `cmp esi, 0xe`, `[esi+edi+4/8]`, `[esi+edi+0xc/0x10]`); a handle is valid when `[instance+0x44] == id` (the game's check 0x5b39d0 - TruMenu repeats it with its own reads instead of calling it); object name `[[instance+0x10]+0x60]` (as the gear callback reads it at 0x715ea2); selected slot `WM+0x138` | 0x5b39d0 bytes, 0x6e7b98 / 0x6e7bb9 / 0x6e7bde |
+| `ammo.fill` | for type 0..5: `reserve[type]` (u16 `playerstate+0x51c+2*type`) = *MaxAmmo* 0x6eeae0 cdecl `(s8 type) -> u16` (6-entry jump table, `0xffff` for other types; reads the player's object data `[[0xe7f094]+0x50]`, so a level is needed); the clips are **not** refilled (0x6e7ae0 not used) | 0x6eeae0 prologue + jump, 0x6eec67 `or ax, 0xffff; ret` |
+| `gear.give` | *GiveObject* 0x555f60 cdecl `(owner = player instance, objectId, callback 0x715e90, flag 1)`: an existing instance of the object (0x5b3950) goes to the callback at once, else 0x5550a0 loads / births it first; the callback with flag 1 calls *WM::AddGear* (catalog 17.1 step 5). Main state 1 only | 0x555f60 and 0x715e90 bytes, 0x715eb2 `mov eax, [0xfadb58]; mov ecx, [eax+0x500]` |
+| Log collapse / filters | in `PushLine`: a leading `HH:MM:SS[.mmm] ` is the time stamp; the newest line of the same source with the same text is counted and moved to the head; TruLink lines `> read* / scan* / watch* / ping` and `[>] menu <id>` with an info item (or `status.*`, `list`) are dropped when `HideLinkReads=1`; severity by words (errors: fail, error, exception, ` NO `, `err `, crash; warnings: warn, not match, mismatch, busy, refused, unreadable, timeout, missing, skipped, not verified); rate limit counted per source and second, the dropped count is written as one line when the second is over | - |
+| `camera.free` | **still todo**: the free camera needs the offsets of the camera's `transform` / `invTransform` and the per-frame rebuild (catalog section 9). Found on 2026-10-31 only a lead: 0x5edb50 writes a matrix at 0xe8ee30 (via 0x431e10) and its inverse at 0xe8ee70 (`0x49be10(0xe8ee70, src)`), i.e. inverse = transform + 0x40 for that camera object; which camera / base it is and whether mode 11 keeps the game from overwriting it is **not verified** | - |
+
 ## Hooks
 
 Every address below is checked against the expected bytes at load (`Start()`); on a mismatch that part stays off,
@@ -316,6 +410,10 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Log] Overlay` | 0 | 1 = log lines in the bottom-left corner from the start |
 | `[Log] Lines` | 12 | lines on the Debug / Log page and in the overlay (1 .. 64) |
 | `[Log] Script` | 0 | 1 = redirect the 8 script print / log natives from the start (patched at load, before any script runs; needs `Experimental=1`) |
+| `[Log] Collapse` | 1 | 0.4: repeated lines (same source, same text after the time stamp) become one line `text x42 (first-last)` (`log.collapse`) |
+| `[Log] HideLinkReads` | 1 | 0.4: drop TruLink's echo of `read*` / `scan*` / `watch*` / `ping` and its `menu` lines for info items (`status.*`, `test.list`, ...) (`log.hidereads`) |
+| `[Log] MinLevel` | 0 | 0.4: 0 all lines, 1 warnings + errors, 2 errors only (`log.level`) |
+| `[Log] MaxLinesPerSecond` | 40 | 0.4: new lines per source and second, more are dropped and counted; 0 = no limit (`log.rate`) |
 
 ## Build, install, test (Windows)
 
@@ -377,6 +475,46 @@ Static runtime (`/MT`), imports `KERNEL32.dll` and `USER32.dll` only. Test plan 
 21. Settings: pin something (Ids changes, `*` on the Settings page); "Reset all settings" once - nothing happens but
     the red "press A again" - A again: `TruMenu.ini.bak_<time>` appears next to the `.asi`, the ini equals the shipped
     one, favourites are the default list again; `menu settings.show`, `menu fav.reset`.
+
+0.4 additions (built with `-OutDir work\asi\menu04`; install the `.asi` **and** the new `TruMenu.ini` - it has four
+new `[Log]` keys, an old ini works too: missing keys take the defaults). Every step: note the result, send
+`TruMenu.log`, `TruLink.log` and `TruMenu.tests.txt`.
+
+22. Status page: the line `0.4: weapon slots ok, ammo.fill ok, gear.give ok; TO TEST file <tru.exe folder>\TruMenu.tests.txt`;
+    `TruMenu.log` holds "0.4 checks". With no `TruMenu.tests.txt` there is **no** TO TEST page; Quick access is first.
+23. TO TEST over TruLink: `menu test.add level.reload Reload - Lara at the same spot?`, `menu test.add
+    ui.hide:1 HUD gone?`, `menu test.add look-shadow Shadows at the start look right?` - open the menu: "TO TEST (3
+    open, ...)" is the first page, rows with "Run level.reload" / "Run ui.hide 1" and none for `look-shadow`.
+24. Marking with the pad: D-pad to a row, A -> `[OK]` green, X -> `[FAIL]` red (the focus stays on the row, no jump to
+    the title bar), Y -> `[SKIP]` grey (the row is **not** marked OK first); the buttons OK / FAIL / SKIP do the same;
+    "Run ui.hide 1" hides the HUD. `menu test.list` shows the states; `menu test.mark look-shadow fail dark band left`
+    -> the row shows the note.
+25. Restart the game: the rows and states are back (`TruMenu.log` "tests: 3 rows from ..."); "Remove the marked rows"
+    removes the marked ones; "Remove all rows" needs A twice; the page disappears; `menu test.clear` answers `0 left`.
+26. Log page: let TruLink poll (e.g. `watch add` + repeated `read32 player`): no `> read32` lines; a line that repeats
+    shows as `... x<n> (<first>-<last>)`; "warnings + errors" / "errors" hide the info lines; set `menu log.rate 2`,
+    produce many lines - one yellow line "(n lines dropped ...)"; `menu log.page` shows the same; `menu log.collapse 0`
+    / `log.hidereads 0` bring the raw lines back (only new ones). The counter line under the list counts all three.
+27. Weapons in a level: `menu weapon.slots` (slot numbers + names, the selected slot), `menu weapon.has wp_handgun`
+    (yes, slot n), `menu weapon.has wp_uzi` before / after `weapon.give wp_uzi`; `menu ammo.fill` -> `menu ammo.show`
+    gives the MaxAmmo values (HUD reserve full?); `menu gear.give g_binoculars` (note whether the item appears /
+    whether anything breaks - static facts only).
+
+0.5 additions (built with `-OutDir work\asi\menu05`; `TruMenu.ini` unchanged from 0.4;
+`Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu05` replaces 0.1.3 - 0.4 builds as ours):
+
+28. `menu test.clear`, `menu test.step 2 - Second`, `menu test.step 1 - First`, `menu test.add c1 Check one`,
+    `menu test.step 3 ui.hide:1 Hide the HUD` - the page shows "NEXT->  1. First", "2. Second", the check, "3. Hide
+    the HUD" with "Run ui.hide 1"; A on step 1 -> `[DONE]`, NEXT moves to step 2; A on step 3 hides the HUD and marks it
+    done; "Open again" opens it again. `menu test.mark step2 ok` -> `err step2 is a step row: open|done`.
+29. `menu test.toggle sp-states ini:TruShadowPower:States:Enabled States` (TruShadowPower installed): a checkbox under
+    "Switches", state = the INI value, note "INI: takes effect at the next start"; untick it -> `TruShadowPower.ini`
+    holds `Enabled=0` in `[States]` at once (the plugin still runs as before); restart: the row shows off and the
+    plugin log says states 0. `menu test.toggle x ini:Foo:A:B x` -> `err bad ini target`.
+30. `menu test.toggle fly cheat.flight Flight` - tick: flight on (as `menu cheat.flight 1`), untick: off.
+31. `menu test.export` -> `ok+ test.export ...`, one tab-separated line per row, `.`; `Invoke-TruLink.ps1 -Command
+    'menu test.export'` prints the block. Restart: steps / toggles / checks and their states are back; a 0.4
+    `TruMenu.tests.txt` loads as checks.
 
 ## Credits
 

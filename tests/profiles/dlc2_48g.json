@@ -1,0 +1,48 @@
+{
+  "name": "dlc2_48g",
+  "description": "DLC 2 start with Lara as doppelganger_casual: test 48g (own fade shader libs 2494-2526, translated from the title update; doppelganger_casual + player_tru_dlc2_extension), DLC 2 player / doppelganger / rock vein / shadow power 0.5.1 plugins, TruLink + TruMenu 0.5. Checks the look, the D3D error box and the wall run; three switches for bisecting.",
+  "trees": [
+    {
+      "source": "trudlcport/work/rebuild/dlc_test48g/mods",
+      "exclude": ["local", "padshock"],
+      "md5": { "doppelganger_casual.drm": "4a559fd6a5da0cd25c5cdda24de40fe4", "player_tru_dlc2_extension.drm": "023fb985904fc2a0f5900617ac04614d" }
+    }
+  ],
+  "files": [],
+  "asis": [
+    { "name": "TruDlc2Player", "sourceDir": "trudlcport/work/asi",
+      "sha256": "c73c8c6693000e45a1ae60b0b29d69ecb02313796a2820ab65e4546a1267992b" },
+    { "name": "TruDoppelganger", "sourceDir": "trudlcport/work/asi",
+      "sha256": "192a03c1241534a12fadec63cff3e5193c74e9d31b197bef7ded58fa4087dacc" },
+    { "name": "TruRockVein", "sourceDir": "trudlcport/work/asi",
+      "sha256": "6edc63ca49f69d44fe3fdf7e1fda73c25b53296e2cc32b65cf6b6451dd7e6cb8" },
+    { "name": "TruShadowPower", "sourceDir": "trudlcport/work/asi/v05",
+      "sha256": "004e190490b66872c6bc3780681ae45877d25501974a602b28c9d2a9acdedd2e" },
+    { "name": "TruLink", "sourceDir": "trudlcport/work/asi",
+      "sha256": "1b4651857e8b6c6e6d912cd91211269c35a465075df98206edc2502652adc185",
+      "ini": { "TruLink": { "Enabled": "1" } } },
+    { "name": "TruMenu", "sourceDir": "trudlcport/work/asi/menu05",
+      "sha256": "557962839d28b19e71ada3a74bb1c50a27fdc5a9f7765b72894758629fa66c51",
+      "ini": { "Cheat": { "Experimental": "1" } } }
+  ],
+  "removeOtherAsis": true,
+  "trulink": { "port": 9265, "waitSeconds": 300 },
+  "tests": [
+    { "kind": "toggle", "id": "dlc2-costume", "target": "ini:TruDlc2Player:Dlc2Player:Costume", "initial": "on",
+      "text": "TruDlc2Player Costume (lara_doppelganger -> doppelganger_casual at level load)" },
+    { "kind": "toggle", "id": "sp-states", "target": "ini:TruShadowPower:States:Enabled", "initial": "on",
+      "text": "TruShadowPower [States] Enabled (TU states 243 / 245 / 1018)" },
+    { "kind": "toggle", "id": "sp-conditions", "target": "ini:TruShadowPower:Conditions:Enabled", "initial": "on",
+      "text": "TruShadowPower [Conditions] Enabled (meter conditions 1049-1056)" },
+    { "kind": "step", "n": 1, "id": "-", "text": "Wait in the main menu until it is shown completely" },
+    { "kind": "step", "n": 2, "id": "-", "text": "Press L3 + R3: TruMenu opens, TO TEST is the first page" },
+    { "kind": "step", "n": 3, "id": "-", "text": "TO TEST: the three switches above are as wanted (a change needs a restart of the game)" },
+    { "kind": "step", "n": 4, "id": "level.load dlc_level2_start", "text": "Load the DLC 2 start (A = Run + done). Known bug: the first Run can land in dlc_caverns - then Run once more" },
+    { "kind": "step", "n": 5, "id": "-", "text": "Wait until the level has loaded and Lara can be moved, close the menu (L3 + R3)" },
+    { "kind": "check", "id": "doppel-look", "text": "Lara looks like the doppelganger (doppelganger_casual, no grey / wrong textures)" },
+    { "kind": "check", "id": "d3d-box", "text": "No D3D error box (D3DERR_INVALIDCALL 0x8876086C) and no crash after the load" },
+    { "kind": "step", "n": 6, "id": "-", "text": "Go to the first rock channel (Felsrinne) and hold RB, then A at the wall" },
+    { "kind": "check", "id": "wall-run", "text": "Wall run: Lara runs along the wall, no crash, no box" },
+    { "kind": "step", "n": 7, "id": "-", "text": "Mark the checks (A ok, X fail, Y skip), then end the game normally" }
+  ]
+}

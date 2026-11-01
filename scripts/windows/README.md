@@ -56,6 +56,45 @@ Xbox 360 content folders (title id `534307EC`, content type `00000002`):
 | `Set-TruMenu.ps1` | `-Install` / `-Remove` `TruMenu.asi` + `.ini` (in-game debug menu, L3 + R3, Dear ImGui; `src\asi\TruMenu\README.md`) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1`. Build with `Build-TruAsi.ps1 -Name TruMenu` (compiles the ImGui sources from `src\asi\third_party\imgui` as well) |
 | `Invoke-TruPipeline.ps1` | run the conversion pipeline one step at a time (`-Step`, `-FromTool` to resume), with progress and a summary |
 | `Test-TruUploadReady.ps1` | read-only check of our commits before an upload (paths, machine name, identity, e-mails, secrets, hardware, local patterns) |
+| `Invoke-TruTestRun.ps1` | one regression run of the game from a profile `tests\profiles\<name>.json`: installs exactly that state, starts the game (plain or under cdb), preloads the TruMenu TO TEST rows, waits for the end, collects logs / markers / test states into `<workspace>\runs\<time>_<profile>\` with `summary.md` + `summary.json`; `-Compare` (see [Regression runs](#regression-runs)) |
+
+All `Set-Tru<Plugin>.ps1` scripts take `-SourceDir` (default `<repository>\work\asi`) for a build made with
+`Build-TruAsi.ps1 -OutDir`, e.g. `Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu05`.
+
+## Regression runs
+
+`Invoke-TruTestRun.ps1 -RunProfile <name>` (Windows PowerShell 5.1) does one game run from a **profile** in
+`tests\profiles\` (paths in it relative to `<workspace>`; format in the script's help, example
+`tests\profiles\dlc2_doppelganger.json`):
+
+1. aborts while `tru.exe` runs (it never ends a process); undoes what its previous run installed
+   (`<workspace>\runs\installed-state.json`: tree install, single mod files, INI backups - refused while a newer
+   tree install of someone else sits on top); checks the profile's md5 / sha256 values (abort on a mismatch unless
+   `-AllowMd5Mismatch`);
+2. installs with `Install-TruTree.ps1` / `Install-TruModFile.ps1` / `Set-Tru<Plugin>.ps1 -Install -SourceDir`
+   (our ASIs that the profile does not list are removed with `-Remove`), writes the profile's INI overrides and the
+   `initial` state of INI toggles (each edited INI backed up into the run folder first), records the installed md5s;
+3. starts the game: `cmd /c start "" /b /wait /affinity FFFF tru.exe`, or with `-Debugger -Session <file.cdb>`
+   `cdb.exe -G -cf <file.cdb> -logo <run>\cdb.log tru.exe` started the same way (`-CdbPath`, default the x86
+   debugger of the Windows 10 kit);
+4. waits for TruLink, sends `menu test.clear` and the profile's rows (`test.step` / `test.add` / `test.toggle`) and
+   saves `menu test.export`; then waits for the end (`-TimeoutMinutes`, default 90 - on a timeout it only stops
+   waiting);
+5. collects into `<workspace>\runs\<time>_<profile>\`: the part of every `Tru*.log` written during the run, `cdb.log`,
+   `TruMenu.tests.txt`, our INIs before / after, the markers of the cdb log (`D3DFAIL` with the hresult, `AV2NDCHANCE`,
+   `FASTFAIL`, `STACKOVERFLOW`, `EXITPROCESS`, `TERMINATEPROCESS`, `MESSAGEBOX_A/W`), dumps newer than the start
+   (`%LOCALAPPDATA%\CrashDumps`, the game folder, paths named in the session file - names and sizes only), and
+   writes `summary.md` / `summary.json` (status per row: ok / fail / open, the first crash marker).
+
+```powershell
+.\scripts\windows\Invoke-TruTestRun.ps1 -RunProfile dlc2_doppelganger -Debugger -Session ..\session_exit.cdb -Verbose
+.\scripts\windows\Invoke-TruTestRun.ps1 -Compare 20261031_221500_dlc2_doppelganger          # against the newest other run
+.\scripts\windows\Invoke-TruTestRun.ps1 -Undo                                               # only undo the last install
+```
+
+`-Compare <run>` lists what differs between two runs (installed md5s, marker counts, the first crash marker, the exit
+code, the state of every TO TEST row); after a run it compares the new run with `<run>` and saves `compare.txt`.
+`-InstallOnly` installs and records without starting the game.
 
 ## Install (play DLC 1)
 

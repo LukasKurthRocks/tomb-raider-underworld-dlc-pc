@@ -42,9 +42,11 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.3 (debug menu: Crystal's original developer menu from the exe's tables, "
-                             "time / player / HUD, instances, live outfit switch, log page + overlay, videos, status, "
-                             "outfits, level select, Lara position overlay, cheat / camera; items callable by id)";
+const char *const kVersion = "TruMenu 0.5 (TO TEST steps / checks / toggles + test.export; 0.4: TO TEST checklist over "
+                             "TruLink, log collapse / filters / rate limit, weapon "
+                             "slots, ammo fill, gear give; debug menu: Crystal's original developer menu from the exe's "
+                             "tables, time / player / HUD, instances, live outfit switch, log page + overlay, videos, "
+                             "status, outfits, level select, Lara position overlay, cheat / camera; items callable by id)";
 
 struct PadState {                       // XINPUT_STATE without including xinput.h
     DWORD dwPacketNumber;
@@ -164,6 +166,13 @@ const OptDef kOpts[] = {
     {"Log", "Lines", "12", "lines on the Debug / Log page and in the overlay, 1 .. 64"},
     {"Log", "Script", "0", "1 = redirect the game's 8 script print / log natives to the log page from the start (patches 5 "
                            "bytes each)"},
+    {"Log", "Collapse", "1", "1 = repeated lines (same source, same text after the time stamp) become one line \"text x42 "
+                             "(17:09:02-17:09:33)\""},
+    {"Log", "HideLinkReads", "1", "1 = drop TruLink's echo of read / scan / watch / ping commands and of menu reads (info "
+                                  "items such as status.*,\ntest.list) - the lines never enter the log page"},
+    {"Log", "MinLevel", "0", "lines shown on the page / overlay: 0 all, 1 warnings and errors, 2 errors only"},
+    {"Log", "MaxLinesPerSecond", "40", "at most this many new lines per source and second (more are dropped and counted); "
+                                       "0 = no limit"},
     {"Favorites", "Ids", "", "item ids on the \"Quick access / Favourites\" page (comma list); empty = default list. Y on an "
                              "item in the menu\npins / unpins it and rewrites this line (TruLink: menu fav.add <id> / "
                              "fav.del <id> / fav.list)"},
@@ -190,6 +199,8 @@ int g_blockInput = 1;
 float g_scale = 1.5f;
 int g_overlayAtStart = 0;
 int g_logOverlayAtStart = 0, g_logLinesAtStart = 12, g_scriptLogAtStart = 0;   // 0.3 [Log]
+volatile LONG g_logCollapse = 1, g_logHideReads = 1;                         // 0.4 [Log] Collapse / HideLinkReads
+int g_logMinLevel = 0, g_logRate = 40;                                       // 0.4 [Log] MinLevel / MaxLinesPerSecond
 int g_experimental = 1;
 float g_flightSpeed = 20.0f;
 
@@ -201,6 +212,8 @@ volatile LONG g_stop = 0;
 volatile LONG g_menuOpen = 0;
 volatile LONG g_menuJustOpened = 0;
 volatile LONG g_overlay = 0;
+volatile LONG g_testFocus = 0;          // 0.4: a TO TEST row had the nav focus last frame (X / Y go to the row)
+volatile LONG g_testX = 0, g_testY = 0; // 0.4: X / Y pressed while a row had the focus (edges, consumed by the page)
 
 bool g_levelOk = false;
 bool g_baseOk = false, g_padCodeOk = false, g_d3dCodeOk = false, g_playerOk = false, g_postOk = false,
@@ -534,6 +547,17 @@ void FeedGamepad(ImGuiIO &io) {
     if (g_padConnected[g_lastPad]) { pad = g_pad[g_lastPad]; have = true; }
     LeaveCriticalSection(&g_padLock);
     if (!g_menuOpen || !have) memset(&pad, 0, sizeof(pad));
+    // 0.4 TO TEST: while a row has the focus, X and Y belong to the row (fail / skip). ImGui would otherwise toggle its
+    // menu layer on X and activate the row on Y (= OK). Held until released, also if the focus moves meanwhile.
+    static WORD rowOwned = 0, rowHeld = 0;
+    WORD xy = pad.wButtons & 0xC000;
+    if (g_testFocus) rowOwned |= static_cast<WORD>(xy & ~rowHeld);
+    WORD pressed = static_cast<WORD>(xy & ~rowHeld & rowOwned);
+    if (pressed & 0x4000) InterlockedExchange(&g_testX, 1);
+    if (pressed & 0x8000) InterlockedExchange(&g_testY, 1);
+    rowHeld = xy;
+    rowOwned &= xy;                          // released buttons go back to ImGui
+    pad.wButtons &= static_cast<WORD>(~rowOwned);
     struct { ImGuiKey key; WORD mask; } const buttons[] = {
         {ImGuiKey_GamepadStart, 0x0010}, {ImGuiKey_GamepadBack, 0x0020}, {ImGuiKey_GamepadFaceLeft, 0x4000},
         {ImGuiKey_GamepadFaceRight, 0x2000}, {ImGuiKey_GamepadFaceUp, 0x8000}, {ImGuiKey_GamepadFaceDown, 0x1000},
@@ -1929,7 +1953,10 @@ void WeaponsTick() {
 }
 
 // ---- log page: tail of the Tru*.log files (once per second, worker thread) + the game's script prints ----
-struct LogLine { char src[20]; char text[220]; };
+// 0.4: text = the line without its leading time stamp; stamp = "HH:MM:SS.mmm" of the first occurrence (from the line,
+// or the local time for lines without one), last = of the latest repeat, count = repeats collapsed into this entry;
+// src[0] == 0 marks an entry that was moved to the head by a repeat
+struct LogLine { char src[20]; char stamp[16]; char last[16]; char text[220]; int count; BYTE sev; bool hadStamp; };
 const int kLogRing = 512;
 LogLine g_logRing[kLogRing];
 int g_logHead = 0, g_logTotal = 0;
@@ -1945,23 +1972,176 @@ char g_scriptPartial[220];
 size_t g_scriptPartialLen = 0;
 LONG g_scriptCount = 0;
 
-void PushLine(const char *src, const char *text) {
-    if (strstr(text, "exception") || strstr(text, "Exception")) InterlockedIncrement(&g_exceptionLines);
-    EnterCriticalSection(&g_logRingLock);
-    LogLine &l = g_logRing[g_logHead];
-    strncpy_s(l.src, sizeof(l.src), src, _TRUNCATE);
-    strncpy_s(l.text, sizeof(l.text), text, _TRUNCATE);
+// 0.4: per-source rate limit ([Log] MaxLinesPerSecond) and counters
+struct SrcRate { char src[20]; DWORD second; int count; LONG dropped; };
+SrcRate g_rates[24];
+LONG g_logDropped = 0, g_logHidden = 0, g_logCollapsed = 0;
+bool IsInfoItem(const char *id);             // defined after kItems
+
+// 2 error, 1 warning, 0 info - by words in the line (the plugins write no level field)
+BYTE LineSeverity(const char *t) {
+    const char *const errors[] = {"fail", "FAIL", "error", "Error", "ERROR", "exception", "Exception", " NO ", "-> err ",
+                                  "crash"};
+    for (const char *w : errors)
+        if (strstr(t, w)) return 2;
+    if (strncmp(t, "err ", 4) == 0) return 2;
+    const char *const warnings[] = {"warn", "Warn", "WARN", "not match", "mismatch", "busy", "refused", "unreadable",
+                                    "timeout", "timed out", "missing", "skipped", "not verified"};
+    for (const char *w : warnings)
+        if (strstr(t, w)) return 1;
+    return 0;
+}
+
+// "HH:MM:SS" or "HH:MM:SS.mmm" followed by a space at the start; returns its length (0 = none)
+size_t StampLength(const char *t) {
+    for (int i = 0; i < 8; ++i) {
+        bool colon = i == 2 || i == 5;
+        if (colon ? t[i] != ':' : !isdigit(static_cast<unsigned char>(t[i]))) return 0;
+    }
+    size_t len = 8;
+    if (t[8] == '.' && isdigit(static_cast<unsigned char>(t[9])) && isdigit(static_cast<unsigned char>(t[10])) &&
+        isdigit(static_cast<unsigned char>(t[11])))
+        len = 12;
+    return t[len] == ' ' ? len : 0;
+}
+
+// TruLink's echo of a read-type command ("> read32 ...", "> scan ...", "> watch ...", "> ping") and its "menu" lines
+// for info items ("> menu status.state", "menu test.list  -> ok ...")
+bool IsLinkRead(const char *src, const char *body) {
+    if (_stricmp(src, "TruLink") != 0) return false;
+    bool echo = body[0] == '>' && body[1] == ' ';
+    const char *p = echo ? body + 2 : body;
+    char word[24] = "", id[64] = "";
+    sscanf_s(p, "%23s %63s", word, static_cast<unsigned>(sizeof(word)), id, static_cast<unsigned>(sizeof(id)));
+    if (echo && (_strnicmp(word, "read", 4) == 0 || _strnicmp(word, "scan", 4) == 0 || _strnicmp(word, "watch", 5) == 0 ||
+                 _stricmp(word, "ping") == 0))
+        return true;
+    if (_stricmp(word, "menu") != 0) return false;
+    return _strnicmp(id, "status.", 7) == 0 || _stricmp(id, "list") == 0 || IsInfoItem(id);
+}
+
+// g_logRingLock held
+void PutLine(const LogLine &l) {
+    g_logRing[g_logHead] = l;
     g_logHead = (g_logHead + 1) % kLogRing;
     if (g_logTotal < kLogRing) ++g_logTotal;
+}
+
+// g_logRingLock held: a "(n lines dropped)" line for every source whose second is over
+void FlushDropsLocked(DWORD second) {
+    for (SrcRate &r : g_rates) {
+        if (!r.src[0] || r.second == second || !r.dropped) continue;
+        LogLine l = {};
+        strncpy_s(l.src, sizeof(l.src), r.src, _TRUNCATE);
+        SYSTEMTIME t;
+        GetLocalTime(&t);
+        _snprintf_s(l.stamp, sizeof(l.stamp), _TRUNCATE, "%02d:%02d:%02d.%03d", t.wHour, t.wMinute, t.wSecond,
+                    t.wMilliseconds);
+        strncpy_s(l.last, sizeof(l.last), l.stamp, _TRUNCATE);
+        _snprintf_s(l.text, sizeof(l.text), _TRUNCATE, "(%ld lines dropped: more than %d per second, [Log] "
+                    "MaxLinesPerSecond / log.rate)", r.dropped, g_logRate);
+        l.count = 1;
+        l.sev = 1;
+        PutLine(l);
+        r.dropped = 0;
+    }
+}
+
+void PushLine(const char *src, const char *text) {
+    if (strstr(text, "exception") || strstr(text, "Exception")) InterlockedIncrement(&g_exceptionLines);
+    LogLine l = {};
+    strncpy_s(l.src, sizeof(l.src), src, _TRUNCATE);
+    const char *body = text;
+    size_t stamp = StampLength(text);
+    if (stamp) {
+        memcpy(l.stamp, text, stamp);
+        l.stamp[stamp] = 0;
+        l.hadStamp = true;
+        body = text + stamp;
+        while (*body == ' ') ++body;
+    } else {
+        SYSTEMTIME t;
+        GetLocalTime(&t);
+        _snprintf_s(l.stamp, sizeof(l.stamp), _TRUNCATE, "%02d:%02d:%02d.%03d", t.wHour, t.wMinute, t.wSecond,
+                    t.wMilliseconds);
+    }
+    if (g_logHideReads && IsLinkRead(l.src, body)) { InterlockedIncrement(&g_logHidden); return; }
+    strncpy_s(l.text, sizeof(l.text), body, _TRUNCATE);
+    strncpy_s(l.last, sizeof(l.last), l.stamp, _TRUNCATE);
+    l.count = 1;
+    l.sev = LineSeverity(body);
+    DWORD second = GetTickCount() / 1000;
+    EnterCriticalSection(&g_logRingLock);
+    FlushDropsLocked(second);
+    // collapse: the newest line of the same source has the same text -> count it there and move it to the head
+    if (g_logCollapse) {
+        for (int k = 0; k < g_logTotal && k < 64; ++k) {
+            LogLine &o = g_logRing[(g_logHead - 1 - k + kLogRing) % kLogRing];
+            if (!o.src[0] || _stricmp(o.src, l.src) != 0) continue;
+            if (strcmp(o.text, l.text) == 0) {
+                l.count = o.count + 1;
+                strncpy_s(l.stamp, sizeof(l.stamp), o.stamp, _TRUNCATE);
+                l.hadStamp = o.hadStamp;
+                l.sev = o.sev;
+                if (k == 0) {
+                    o = l;
+                } else {
+                    o.src[0] = 0;
+                    PutLine(l);
+                }
+                ++g_logCollapsed;
+                LeaveCriticalSection(&g_logRingLock);
+                return;
+            }
+            break;
+        }
+    }
+    // rate limit per source
+    SrcRate *rate = nullptr;
+    for (SrcRate &r : g_rates)
+        if (r.src[0] && _stricmp(r.src, l.src) == 0) { rate = &r; break; }
+    if (!rate)
+        for (SrcRate &r : g_rates)
+            if (!r.src[0]) { strncpy_s(r.src, sizeof(r.src), l.src, _TRUNCATE); r.second = second; rate = &r; break; }
+    if (rate) {
+        if (rate->second != second) { rate->second = second; rate->count = 0; }
+        if (g_logRate > 0 && rate->count >= g_logRate) {
+            ++rate->dropped;
+            ++g_logDropped;
+            LeaveCriticalSection(&g_logRingLock);
+            return;
+        }
+        ++rate->count;
+    }
+    PutLine(l);
     LeaveCriticalSection(&g_logRingLock);
 }
 
-// the last <max> lines matching the filter, oldest first; returns the count
+// worker thread, once per second: the "(n lines dropped)" line also when the source stays quiet afterwards
+void FlushDrops() {
+    EnterCriticalSection(&g_logRingLock);
+    FlushDropsLocked(GetTickCount() / 1000);
+    LeaveCriticalSection(&g_logRingLock);
+}
+
+// one shown line: "[src] stamp text", collapsed: "[src] text x42 (17:09:02-17:09:33)"
+void FormatLine(const LogLine &l, char *o, size_t n, size_t maxText) {
+    if (l.count > 1)
+        _snprintf_s(o, n, _TRUNCATE, "[%s] %.*s x%d (%.8s-%.8s)", l.src, static_cast<int>(maxText), l.text, l.count,
+                    l.stamp, l.last);
+    else if (l.hadStamp)
+        _snprintf_s(o, n, _TRUNCATE, "[%s] %s %.*s", l.src, l.stamp, static_cast<int>(maxText), l.text);
+    else
+        _snprintf_s(o, n, _TRUNCATE, "[%s] %.*s", l.src, static_cast<int>(maxText), l.text);
+}
+
+// the last <max> lines matching the filter and [Log] MinLevel, oldest first; returns the count
 int CopyLines(LogLine *out, int max, const char *filter) {
     int c = 0;
     EnterCriticalSection(&g_logRingLock);
     for (int k = 0; k < g_logTotal && c < max; ++k) {
         const LogLine &l = g_logRing[(g_logHead - 1 - k + kLogRing) % kLogRing];
+        if (!l.src[0] || l.sev < g_logMinLevel) continue;
         if (filter && filter[0] && _stricmp(l.src, filter) != 0) continue;
         out[c++] = l;
     }
@@ -2041,6 +2221,7 @@ void LogTailTick() {
     if (now - last < 1000) return;
     last = now;
     TailDir(g_asiDir);
+    FlushDrops();
     if (_stricmp(g_asiDir, g_exeDir) != 0) TailDir(g_exeDir);
 }
 
@@ -2155,7 +2336,9 @@ void LinesText(const char *filter, int max, char *o, size_t n) {
     size_t used = 0;
     o[0] = 0;
     for (int i = 0; i < c; ++i) {
-        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s[%s] %s", used ? " | " : "", lines[i].src, lines[i].text);
+        char line[300];
+        FormatLine(lines[i], line, sizeof(line), 220);
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s", used ? " | " : "", line);
         if (w < 0) return;
         used += static_cast<size_t>(w);
     }
@@ -2186,7 +2369,47 @@ bool RunLogFilter(const char *arg, char *o, size_t n) {
     return true;
 }
 void ValLogCount(char *o, size_t n) {
-    Out(o, n, "%d lines, %ld exception lines, %ld caught by TruMenu", g_logTotal, g_exceptionLines, g_ownExceptions);
+    Out(o, n, "%d lines, %ld exception lines, %ld caught by TruMenu; 0.4: %ld repeats collapsed, %ld TruLink reads hidden, "
+        "%ld dropped by the rate limit", g_logTotal, g_exceptionLines, g_ownExceptions, g_logCollapsed, g_logHidden,
+        g_logDropped);
+}
+// 0.4 log options (also [Log] Collapse / HideLinkReads / MinLevel / MaxLinesPerSecond)
+void ValLogCollapse(char *o, size_t n) { Out(o, n, "%d", g_logCollapse ? 1 : 0); }
+bool RunLogCollapse(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, g_logCollapse != 0);
+    InterlockedExchange(&g_logCollapse, on ? 1 : 0);
+    Out(o, n, "log.collapse %d (new lines; %ld repeats collapsed so far)", on ? 1 : 0, g_logCollapsed);
+    return true;
+}
+void ValLogHideReads(char *o, size_t n) { Out(o, n, "%d", g_logHideReads ? 1 : 0); }
+bool RunLogHideReads(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, g_logHideReads != 0);
+    InterlockedExchange(&g_logHideReads, on ? 1 : 0);
+    Out(o, n, "log.hidereads %d (new lines; %ld hidden so far)", on ? 1 : 0, g_logHidden);
+    return true;
+}
+const char *const kLevelNames[] = {"all", "warn", "error"};
+void ValLogLevel(char *o, size_t n) { Out(o, n, "%d (%s)", g_logMinLevel, kLevelNames[g_logMinLevel]); }
+bool RunLogLevel(const char *arg, char *o, size_t n) {
+    int v = -1;
+    if (arg && (_stricmp(arg, "all") == 0 || _stricmp(arg, "info") == 0)) v = 0;
+    else if (arg && _strnicmp(arg, "warn", 4) == 0) v = 1;
+    else if (arg && _strnicmp(arg, "err", 3) == 0) v = 2;
+    else if (arg && isdigit(static_cast<unsigned char>(arg[0]))) v = atoi(arg);
+    if (v < 0 || v > 2) { Out(o, n, "usage: log.level 0|1|2 (all | warn | error)"); return false; }
+    g_logMinLevel = v;
+    Out(o, n, "log.level %d (%s)", v, kLevelNames[v]);
+    return true;
+}
+void ValLogRate(char *o, size_t n) { Out(o, n, "%d (%ld dropped)", g_logRate, g_logDropped); }
+bool RunLogRate(const char *arg, char *o, size_t n) {
+    if (!arg || !isdigit(static_cast<unsigned char>(arg[0])) || atoi(arg) > 10000) {
+        Out(o, n, "usage: log.rate <lines per source and second, 0 = no limit>");
+        return false;
+    }
+    g_logRate = atoi(arg);
+    Out(o, n, "log.rate %d", g_logRate);
+    return true;
 }
 bool RunLogClear(const char *, char *o, size_t n) {
     EnterCriticalSection(&g_logRingLock);
@@ -2490,6 +2713,121 @@ void InvincibleTick() {
     }
 }
 
+// 0.4 (catalog 17.1 / 17.2 / 17.5, static facts, not yet checked live). Weapon slots: WM+4+0x10*slot = handle
+// {instance, id} of the right hand, WM+0xC+0x10*slot the left hand, 15 slots (reader 0x6e7b90); a handle is valid when
+// [instance+0x44] == handle id (the game's check 0x5b39d0, done here with our own reads); the weapon's object name is
+// [[instance+0x10]+0x60] (as the gear callback 0x715ea2 reads it). MaxAmmo 0x6eeae0 cdecl (s8 type) -> u16 (0xffff for
+// type > 5). GiveObject 0x555f60 cdecl (owner, objectId, callback, flag) with the save-restore callback 0x715e90, flag 1
+// = WM::AddGear (17.1 step 5).
+const DWORD kMaxAmmo = 0x006eeae0, kGiveObject = 0x00555f60, kGearCallback = 0x00715e90;
+typedef unsigned short(__cdecl *MaxAmmoFn)(int type);
+typedef void(__cdecl *GiveObjectFn)(DWORD owner, int objectId, DWORD callback, int flag);
+bool g_slotsOk = false, g_maxAmmoOk = false, g_gearOk = false;
+
+DWORD HandleInstance(DWORD handle) {
+    DWORD inst = 0, id = 0, check = 0;
+    if (!ReadDword(handle, &inst) || !inst || !ReadDword(handle + 4, &id) || !ReadDword(inst + 0x44, &check) || check != id)
+        return 0;
+    return inst;
+}
+bool InstanceObjectName(DWORD inst, char *out, size_t size) {
+    DWORD object = 0, name = 0;
+    out[0] = 0;
+    return ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x60, &name) && name &&
+           ReadString(name, out, size);
+}
+DWORD WeaponManager() {
+    DWORD p = PlayerState(), wm = 0;
+    if (!p || !InLevel() || !ReadDword(p + 0x500, &wm)) return 0;
+    return wm;
+}
+// fn(slot, left, name) for every filled slot / hand
+template <typename F> int ForWeaponSlots(DWORD wm, F fn) {
+    int c = 0;
+    for (int slot = 0; slot < 15; ++slot)
+        for (int left = 0; left < 2; ++left) {
+            DWORD inst = HandleInstance(wm + (left ? 0xc : 0x4) + 0x10 * slot);
+            if (!inst) continue;
+            char name[64];
+            if (!InstanceObjectName(inst, name, sizeof(name))) strncpy_s(name, sizeof(name), "?", _TRUNCATE);
+            fn(slot, left != 0, name);
+            ++c;
+        }
+    return c;
+}
+void ValWeaponSlots(char *o, size_t n) {
+    DWORD wm = WeaponManager();
+    if (!g_slotsOk || !wm) { Out(o, n, g_slotsOk ? "needs a level" : "slot code not verified"); return; }
+    DWORD selected = 0;
+    ReadDword(wm + 0x138, &selected);
+    size_t used = 0;
+    o[0] = 0;
+    int c = ForWeaponSlots(wm, [&](int slot, bool left, const char *name) {
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%d%s %s", used ? "; " : "", slot, left ? "L" : "", name);
+        if (w > 0) used += static_cast<size_t>(w);
+    });
+    _snprintf_s(o + used, n - used, _TRUNCATE, "%s(%d filled, selected slot %ld, WM 0x%08lx)", c ? " " : "no weapon ", c,
+                static_cast<LONG>(selected), wm);
+}
+bool RunWeaponHas(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { Out(o, n, "usage: weapon.has <object name> (weapon.list / weapon.slots)"); return false; }
+    DWORD wm = WeaponManager();
+    if (!g_slotsOk || !wm) { Out(o, n, g_slotsOk ? "needs a level" : "slot code not verified"); return false; }
+    int found = -1;
+    bool foundLeft = false;
+    ForWeaponSlots(wm, [&](int slot, bool left, const char *name) {
+        if (found < 0 && _stricmp(name, arg) == 0) { found = slot; foundLeft = left; }
+    });
+    if (found >= 0) Out(o, n, "yes: %s in slot %d%s", arg, found, foundLeft ? " (left hand)" : "");
+    else Out(o, n, "no: %s is in none of the 15 slots", arg);
+    return true;
+}
+// game thread: every reserve = MaxAmmo(type) (the clips are not touched)
+bool RunAmmoFill(const char *, char *o, size_t n) {
+    if (!g_ammoOk || !g_maxAmmoOk || !g_experimental) { Out(o, n, "ammo code not verified / experimental off"); return false; }
+    DWORD p = PlayerState();
+    if (!p || !InLevel()) { Out(o, n, "needs a level"); return false; }
+    WORD v[6] = {};
+    __try {
+        for (int type = 0; type < 6; ++type) {
+            v[type] = reinterpret_cast<MaxAmmoFn>(kMaxAmmo)(type);
+            if (v[type] != 0xffff) *reinterpret_cast<volatile WORD *>(p + 0x51c + 2 * type) = v[type];
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        Out(o, n, "exception in MaxAmmo 0x%08lx", kMaxAmmo);
+        return false;
+    }
+    Out(o, n, "reserve = MaxAmmo per type: %u %u %u %u %u %u (clips unchanged)", v[0], v[1], v[2], v[3], v[4], v[5]);
+    return true;
+}
+// game thread, main state 1: GiveObject(player, id, 0x715e90, 1) -> WM::AddGear (an existing instance of the object
+// is taken at once, else the game loads and births it first)
+bool RunGearGive(const char *arg, char *o, size_t n) {
+    if (!g_gearOk || !g_experimental) { Out(o, n, "gear code not verified / experimental off"); return false; }
+    DWORD state = 0, player = 0;
+    ReadDword(kMainState, &state);
+    if (!InLevel() || state != 1 || !ReadDword(kPlayerPtr, &player) || !player) {
+        Out(o, n, "in a level only (main state %lu, needs 1)", state);
+        return false;
+    }
+    if (!arg || !arg[0]) { Out(o, n, "usage: gear.give <object name> (g_binoculars, g_grapple, g_pda, g_healthpack, ...)"); return false; }
+    char name[64];
+    strncpy_s(name, sizeof(name), arg, _TRUNCATE);
+    int id = ObjectId(name);
+    if (!id) { Out(o, n, "'%s' is not in the object list", name); return false; }
+    __try {
+        reinterpret_cast<GiveObjectFn>(kGiveObject)(player, id, kGearCallback, 1);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        Out(o, n, "exception in GiveObject 0x%08lx", kGiveObject);
+        return false;
+    }
+    Out(o, n, "GiveObject 0x%08lx(player, %d %s, 0x%08lx, 1) done%s", kGiveObject, id, name, kGearCallback,
+        _strnicmp(name, "g_", 2) == 0 ? "" : " (not a g_ gear object - check the result)");
+    return true;
+}
+
 // ---- favourites: [Favorites] Ids in TruMenu.ini (comma list of item ids; empty = kFavDefault) ----
 bool ItemUsable(const char *id);         // defined after kItems: id exists and is not a todo item
 
@@ -2555,6 +2893,489 @@ bool RunFavReset(const char *, char *o, size_t n) {
     if (g_iniPath[0]) WritePrivateProfileStringA("Favorites", "Ids", "", g_iniPath);
     Out(o, n, "favourites back to the default list (%s)", kFavDefault);
     return true;
+}
+
+// ---- 0.4 TO TEST: a checklist the main session fills over TruLink (menu test.add / test.mark / test.list ...),
+// marked in the menu (A ok, X fail, Y skip on the selected row); kept in TruMenu.tests.txt next to tru.exe, one row per
+// line: id TAB state TAB hint TAB note TAB time [TAB kind TAB target TAB number] (lines starting with '#' are
+// comments; 0.4 files without the last three columns load as checks).
+// 0.5 row kinds: "check" (ok / fail / skip / open, as in 0.4), "step" (an ordered instruction, id "step<n>", state
+// open / done, optional item to run: target "id" or "id:arg"), "toggle" (a switch, state on / off; target = a TruMenu
+// item run with 1 / 0, or "ini:<Plugin>:<Section>:<Key>" written to <Plugin>.ini next to the .asi files) ----
+struct TestRow {
+    char id[64]; char state[8]; char hint[240]; char note[160]; char when[16];
+    char kind[8]; char target[128]; int num;
+};
+const int kTestMax = 64;
+TestRow g_tests[kTestMax];
+int g_testCount = 0;
+CRITICAL_SECTION g_testLock;
+char g_testPath[MAX_PATH] = "";
+
+bool ItemUsable(const char *id);                        // defined after kItems
+bool ItemValueText(const char *id, char *o, size_t n);  // defined after kItems: the item's value text
+void QueueItem(const char *id, const char *arg);        // defined after kItems: run from the menu, never waits
+
+// tabs / line breaks would break the file and '|' / '{' / '}' the test.list answer
+void TestClean(char *s) {
+    for (; *s; ++s) {
+        if (*s == '\t' || *s == '\r' || *s == '\n') *s = ' ';
+        else if (*s == '|') *s = '/';
+        else if (*s == '{') *s = '(';
+        else if (*s == '}') *s = ')';
+    }
+}
+bool TestStateOk(const char *s) {
+    return !_stricmp(s, "open") || !_stricmp(s, "ok") || !_stricmp(s, "fail") || !_stricmp(s, "skip");
+}
+bool TestIs(const TestRow &t, const char *kind) { return _stricmp(t.kind, kind) == 0; }
+// valid states per kind: check open|ok|fail|skip, step open|done, toggle on|off
+bool TestStateFits(const char *kind, const char *s) {
+    if (!_stricmp(kind, "step")) return !_stricmp(s, "open") || !_stricmp(s, "done");
+    if (!_stricmp(kind, "toggle")) return !_stricmp(s, "on") || !_stricmp(s, "off");
+    return TestStateOk(s);
+}
+const char *TestDefaultState(const char *kind) { return !_stricmp(kind, "toggle") ? "off" : "open"; }
+
+// "ini:<Plugin>:<Section>:<Key>" -> path of <Plugin>.ini next to the .asi files, section, key; the plugin name must
+// start with "Tru" and hold letters / digits only (no other files are written)
+bool TestIniTarget(const char *target, char *path, size_t pathSize, char *section, size_t secSize, char *key,
+                   size_t keySize) {
+    if (_strnicmp(target, "ini:", 4) != 0) return false;
+    char plugin[40] = "";
+    const char *p = target + 4;
+    const char *c1 = strchr(p, ':');
+    const char *c2 = c1 ? strchr(c1 + 1, ':') : nullptr;
+    if (!c1 || !c2 || c1 - p < 4 || static_cast<size_t>(c1 - p) >= sizeof(plugin) || c2 - c1 < 2 || !c2[1]) return false;
+    memcpy(plugin, p, static_cast<size_t>(c1 - p));
+    plugin[c1 - p] = 0;
+    if (_strnicmp(plugin, "Tru", 3) != 0) return false;
+    for (const char *q = plugin; *q; ++q) if (!isalnum(static_cast<unsigned char>(*q))) return false;
+    if (static_cast<size_t>(c2 - c1 - 1) >= secSize) return false;
+    memcpy(section, c1 + 1, static_cast<size_t>(c2 - c1 - 1));
+    section[c2 - c1 - 1] = 0;
+    strncpy_s(key, keySize, c2 + 1, _TRUNCATE);
+    for (const char *q = section; *q; ++q) if (!isalnum(static_cast<unsigned char>(*q)) && *q != '_') return false;
+    for (const char *q = key; *q; ++q) if (!isalnum(static_cast<unsigned char>(*q)) && *q != '_') return false;
+    _snprintf_s(path, pathSize, _TRUNCATE, "%s%s.ini", g_asiDir, plugin);
+    return true;
+}
+
+// the current state of a toggle: INI value (1 / 0; missing file or key = off) or the item's value text
+// ("1" / "on" / "true" ... = on); false when the target cannot be read (state unchanged)
+bool TestToggleRead(const char *target, bool *on) {
+    char path[MAX_PATH], section[64], key[64];
+    if (TestIniTarget(target, path, sizeof(path), section, sizeof(section), key, sizeof(key))) {
+        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) return false;
+        *on = GetPrivateProfileIntA(section, key, 0, path) != 0;
+        return true;
+    }
+    if (!_strnicmp(target, "ini:", 4)) return false;
+    char value[256] = "";
+    if (!ItemValueText(target, value, sizeof(value))) return false;
+    const char *v = value;
+    while (*v == ' ') ++v;
+    if (*v == '1' || !_strnicmp(v, "on", 2) || !_strnicmp(v, "true", 4) || !_strnicmp(v, "yes", 3)) { *on = true; return true; }
+    if (*v == '0' || !_strnicmp(v, "off", 3) || !_strnicmp(v, "false", 5) || !_strnicmp(v, "no", 2)) { *on = false; return true; }
+    return false;
+}
+
+// g_testLock held
+void TestSaveLocked() {
+    if (!g_testPath[0]) return;
+    FILE *f = nullptr;
+    if (fopen_s(&f, g_testPath, "wb") != 0 || !f) { Log(1, "tests: cannot write %s", g_testPath); return; }
+    fputs("# TruMenu.tests.txt - TO TEST list (TruMenu 0.5): id<TAB>state<TAB>hint<TAB>note<TAB>time<TAB>kind<TAB>target"
+          "<TAB>number\r\n", f);
+    for (int i = 0; i < g_testCount; ++i) {
+        const TestRow &t = g_tests[i];
+        fprintf(f, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\r\n", t.id, t.state, t.hint, t.note, t.when, t.kind, t.target, t.num);
+    }
+    fclose(f);
+}
+
+void TestLoad() {
+    FILE *f = nullptr;
+    if (!g_testPath[0] || fopen_s(&f, g_testPath, "rb") != 0 || !f) return;
+    char line[1024];
+    EnterCriticalSection(&g_testLock);
+    g_testCount = 0;
+    while (g_testCount < kTestMax && fgets(line, sizeof(line), f)) {
+        size_t len = strlen(line);
+        while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = 0;
+        if (!line[0] || line[0] == '#') continue;
+        char *field[8] = {line, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+        for (int k = 1; k < 8; ++k) {
+            char *tab = field[k - 1] ? strchr(field[k - 1], '\t') : nullptr;
+            if (!tab) break;
+            *tab = 0;
+            field[k] = tab + 1;
+        }
+        if (!field[0][0]) continue;
+        TestRow &t = g_tests[g_testCount++];
+        memset(&t, 0, sizeof(t));
+        const char *kind = field[5] && (!_stricmp(field[5], "step") || !_stricmp(field[5], "toggle")) ? field[5] : "check";
+        strncpy_s(t.kind, sizeof(t.kind), kind, _TRUNCATE);
+        _strlwr_s(t.kind, sizeof(t.kind));
+        strncpy_s(t.id, sizeof(t.id), field[0], _TRUNCATE);
+        strncpy_s(t.state, sizeof(t.state), field[1] && TestStateFits(t.kind, field[1]) ? field[1] : TestDefaultState(t.kind),
+                  _TRUNCATE);
+        _strlwr_s(t.state, sizeof(t.state));
+        strncpy_s(t.hint, sizeof(t.hint), field[2] ? field[2] : "", _TRUNCATE);
+        strncpy_s(t.note, sizeof(t.note), field[3] ? field[3] : "", _TRUNCATE);
+        strncpy_s(t.when, sizeof(t.when), field[4] ? field[4] : "", _TRUNCATE);
+        strncpy_s(t.target, sizeof(t.target), field[6] ? field[6] : "", _TRUNCATE);
+        t.num = field[7] ? atoi(field[7]) : 0;
+    }
+    int count = g_testCount;
+    LeaveCriticalSection(&g_testLock);
+    fclose(f);
+    // toggles show the real state of their target (an INI may have been edited between two runs)
+    for (int i = 0; i < count; ++i) {
+        EnterCriticalSection(&g_testLock);
+        char target[128] = "";
+        if (i < g_testCount && TestIs(g_tests[i], "toggle")) strncpy_s(target, sizeof(target), g_tests[i].target, _TRUNCATE);
+        LeaveCriticalSection(&g_testLock);
+        bool on = false;
+        if (target[0] && !_strnicmp(target, "ini:", 4) && TestToggleRead(target, &on)) {
+            EnterCriticalSection(&g_testLock);
+            if (i < g_testCount) strncpy_s(g_tests[i].state, sizeof(g_tests[i].state), on ? "on" : "off", _TRUNCATE);
+            LeaveCriticalSection(&g_testLock);
+        }
+    }
+    Log(1, "tests: %d rows from %s", count, g_testPath);
+}
+
+// g_testLock held
+int TestFindLocked(const char *id) {
+    for (int i = 0; i < g_testCount; ++i)
+        if (_stricmp(g_tests[i].id, id) == 0) return i;
+    return -1;
+}
+
+// open / ok / fail / skip count the checks only; total = every row
+void TestCounts(int *open, int *ok, int *fail, int *skip, int *total) {
+    *open = *ok = *fail = *skip = 0;
+    EnterCriticalSection(&g_testLock);
+    for (int i = 0; i < g_testCount; ++i) {
+        if (!TestIs(g_tests[i], "check")) continue;
+        const char *s = g_tests[i].state;
+        if (!_stricmp(s, "ok")) ++*ok;
+        else if (!_stricmp(s, "fail")) ++*fail;
+        else if (!_stricmp(s, "skip")) ++*skip;
+        else ++*open;
+    }
+    *total = g_testCount;
+    LeaveCriticalSection(&g_testLock);
+}
+
+// splits "<word> <rest>": word (cut to size), rest = after the spaces
+const char *TestWord(const char *arg, char *word, size_t size) {
+    const char *rest = arg ? arg : "";
+    while (*rest == ' ') ++rest;
+    size_t len = 0;
+    while (rest[len] && rest[len] != ' ' && len + 1 < size) { word[len] = rest[len]; ++len; }
+    word[len] = 0;
+    rest += len;
+    while (*rest && *rest != ' ') ++rest;          // an over-long word is cut
+    while (*rest == ' ') ++rest;
+    return rest;
+}
+
+// g_testLock held: a new row at index at (rows behind it move down); false when the list is full
+bool TestInsertLocked(int at) {
+    if (g_testCount >= kTestMax) return false;
+    for (int k = g_testCount; k > at; --k) g_tests[k] = g_tests[k - 1];
+    ++g_testCount;
+    memset(&g_tests[at], 0, sizeof(TestRow));
+    return true;
+}
+
+// "<id> <hint text>": new check row (state open) or new hint for an existing row (state back to open, note cleared)
+bool RunTestAdd(const char *arg, char *o, size_t n) {
+    char id[64] = "";
+    const char *rest = TestWord(arg, id, sizeof(id));
+    if (!id[0]) { Out(o, n, "usage: test.add <id> <hint text> (id = a menu item id, id:arg, or any key)"); return false; }
+    TestClean(id);
+    for (char *p = id; *p; ++p) if (*p == ' ') *p = '_';
+    EnterCriticalSection(&g_testLock);
+    int i = TestFindLocked(id);
+    bool added = i < 0;
+    if (added && !TestInsertLocked(g_testCount)) {
+        LeaveCriticalSection(&g_testLock);
+        Out(o, n, "list full (%d rows) - test.clear or test.del first", kTestMax);
+        return false;
+    }
+    if (added) i = g_testCount - 1;
+    TestRow &t = g_tests[i];
+    memset(&t, 0, sizeof(t));
+    strncpy_s(t.id, sizeof(t.id), id, _TRUNCATE);
+    strncpy_s(t.kind, sizeof(t.kind), "check", _TRUNCATE);
+    strncpy_s(t.state, sizeof(t.state), "open", _TRUNCATE);
+    strncpy_s(t.hint, sizeof(t.hint), rest, _TRUNCATE);
+    TestClean(t.hint);
+    TestSaveLocked();
+    int count = g_testCount;
+    LeaveCriticalSection(&g_testLock);
+    Out(o, n, "test.add %s (%s, %d rows)", id, added ? "new" : "updated, state open again", count);
+    Log(1, "tests: %s", o);
+    return true;
+}
+
+// 0.5 "<n> <id|-> <text>": step n (1..999, row id "step<n>"); id = the item it runs ("id" or "id:arg", "-" = none).
+// A new step goes in front of the first step with a higher number (checks / toggles between steps keep their place);
+// an existing step n gets the new item / text and is open again.
+bool RunTestStep(const char *arg, char *o, size_t n) {
+    char num[16] = "", target[128] = "";
+    const char *rest = TestWord(arg, num, sizeof(num));
+    rest = TestWord(rest, target, sizeof(target));
+    int number = atoi(num);
+    if (number < 1 || number > 999 || !target[0]) {
+        Out(o, n, "usage: test.step <n 1..999> <item id | id:arg | -> <text>");
+        return false;
+    }
+    if (!strcmp(target, "-")) target[0] = 0;
+    TestClean(target);
+    char id[16];
+    _snprintf_s(id, sizeof(id), _TRUNCATE, "step%d", number);
+    EnterCriticalSection(&g_testLock);
+    int i = TestFindLocked(id);
+    bool added = i < 0;
+    if (added) {
+        int at = g_testCount;
+        for (int k = 0; k < g_testCount; ++k)
+            if (TestIs(g_tests[k], "step") && g_tests[k].num > number) { at = k; break; }
+        if (!TestInsertLocked(at)) {
+            LeaveCriticalSection(&g_testLock);
+            Out(o, n, "list full (%d rows) - test.clear or test.del first", kTestMax);
+            return false;
+        }
+        i = at;
+    }
+    TestRow &t = g_tests[i];
+    memset(&t, 0, sizeof(t));
+    strncpy_s(t.id, sizeof(t.id), id, _TRUNCATE);
+    strncpy_s(t.kind, sizeof(t.kind), "step", _TRUNCATE);
+    strncpy_s(t.state, sizeof(t.state), "open", _TRUNCATE);
+    strncpy_s(t.target, sizeof(t.target), target, _TRUNCATE);
+    strncpy_s(t.hint, sizeof(t.hint), rest, _TRUNCATE);
+    TestClean(t.hint);
+    t.num = number;
+    TestSaveLocked();
+    int count = g_testCount;
+    LeaveCriticalSection(&g_testLock);
+    Out(o, n, "test.step %d %s (%s, %d rows)", number, target[0] ? target : "-", added ? "new" : "updated, open again",
+        count);
+    Log(1, "tests: %s", o);
+    return true;
+}
+
+// 0.5 "<id> <target> <text>": a switch row; target = a TruMenu item (run with 1 / 0) or ini:<Plugin>:<Section>:<Key>
+bool RunTestToggle(const char *arg, char *o, size_t n) {
+    char id[64] = "", target[128] = "";
+    const char *rest = TestWord(arg, id, sizeof(id));
+    rest = TestWord(rest, target, sizeof(target));
+    if (!id[0] || !target[0]) {
+        Out(o, n, "usage: test.toggle <id> <item id | ini:<Plugin>:<Section>:<Key>> <text>");
+        return false;
+    }
+    TestClean(id);
+    TestClean(target);
+    char path[MAX_PATH], section[64], key[64];
+    bool isIni = !_strnicmp(target, "ini:", 4);
+    if (isIni && !TestIniTarget(target, path, sizeof(path), section, sizeof(section), key, sizeof(key))) {
+        Out(o, n, "bad ini target '%s' (ini:<TruPlugin>:<Section>:<Key>, letters / digits / _)", target);
+        return false;
+    }
+    if (!isIni && !ItemUsable(target)) { Out(o, n, "unknown or todo item '%s'", target); return false; }
+    bool on = false, known = TestToggleRead(target, &on);
+    EnterCriticalSection(&g_testLock);
+    int i = TestFindLocked(id);
+    bool added = i < 0;
+    if (added && !TestInsertLocked(g_testCount)) {
+        LeaveCriticalSection(&g_testLock);
+        Out(o, n, "list full (%d rows) - test.clear or test.del first", kTestMax);
+        return false;
+    }
+    if (added) i = g_testCount - 1;
+    TestRow &t = g_tests[i];
+    memset(&t, 0, sizeof(t));
+    strncpy_s(t.id, sizeof(t.id), id, _TRUNCATE);
+    strncpy_s(t.kind, sizeof(t.kind), "toggle", _TRUNCATE);
+    strncpy_s(t.state, sizeof(t.state), on ? "on" : "off", _TRUNCATE);
+    strncpy_s(t.target, sizeof(t.target), target, _TRUNCATE);
+    strncpy_s(t.hint, sizeof(t.hint), rest, _TRUNCATE);
+    TestClean(t.hint);
+    if (isIni) strncpy_s(t.note, sizeof(t.note), "INI: takes effect at the next start", _TRUNCATE);
+    TestSaveLocked();
+    int count = g_testCount;
+    LeaveCriticalSection(&g_testLock);
+    Out(o, n, "test.toggle %s %s now %s%s (%s, %d rows)", id, target, on ? "on" : "off", known ? "" : " (not readable)",
+        added ? "new" : "updated", count);
+    Log(1, "tests: %s", o);
+    return true;
+}
+
+// "" = every row; "done" = only the checks that are marked (steps and toggles stay)
+bool RunTestClear(const char *arg, char *o, size_t n) {
+    bool doneOnly = arg && _stricmp(arg, "done") == 0;
+    if (arg && arg[0] && !doneOnly) { Out(o, n, "usage: test.clear [done]"); return false; }
+    EnterCriticalSection(&g_testLock);
+    int before = g_testCount, kept = 0;
+    for (int i = 0; doneOnly && i < g_testCount; ++i)
+        if (!TestIs(g_tests[i], "check") || !_stricmp(g_tests[i].state, "open")) g_tests[kept++] = g_tests[i];
+    g_testCount = kept;
+    TestSaveLocked();
+    LeaveCriticalSection(&g_testLock);
+    Out(o, n, "test.clear%s: %d rows removed, %d left", doneOnly ? " done" : "", before - kept, kept);
+    Log(1, "tests: %s", o);
+    return true;
+}
+
+bool RunTestDel(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { Out(o, n, "usage: test.del <id>"); return false; }
+    EnterCriticalSection(&g_testLock);
+    int i = TestFindLocked(arg);
+    if (i >= 0) {
+        for (int k = i; k + 1 < g_testCount; ++k) g_tests[k] = g_tests[k + 1];
+        --g_testCount;
+        TestSaveLocked();
+    }
+    LeaveCriticalSection(&g_testLock);
+    Out(o, n, i >= 0 ? "test.del %s" : "no test row '%s'", arg);
+    return i >= 0;
+}
+
+// a toggle row switched: INI written at once (the plugins read it at start) or the item run with 1 / 0
+bool TestToggleApply(const char *target, bool on, char *o, size_t n) {
+    char path[MAX_PATH], section[64], key[64];
+    if (TestIniTarget(target, path, sizeof(path), section, sizeof(section), key, sizeof(key))) {
+        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) { Out(o, n, "%s not found - not created", path); return false; }
+        if (!WritePrivateProfileStringA(section, key, on ? "1" : "0", path)) {
+            Out(o, n, "cannot write %s (%lu)", path, GetLastError());
+            return false;
+        }
+        Out(o, n, "[%s] %s=%d written to %s - takes effect at the next start", section, key, on ? 1 : 0, path);
+        return true;
+    }
+    if (!ItemUsable(target)) { Out(o, n, "unknown or todo item '%s'", target); return false; }
+    QueueItem(target, on ? "1" : "0");
+    Out(o, n, "%s %d run (%s)", target, on ? 1 : 0, g_lastAction);
+    return true;
+}
+
+bool TestMark(const char *id, const char *state, const char *note, char *o, size_t n) {
+    EnterCriticalSection(&g_testLock);
+    int i = TestFindLocked(id);
+    if (i < 0) {
+        LeaveCriticalSection(&g_testLock);
+        Out(o, n, "no test row '%s' (test.list)", id);
+        return false;
+    }
+    if (!TestStateFits(g_tests[i].kind, state)) {
+        const char *kind = g_tests[i].kind;
+        LeaveCriticalSection(&g_testLock);
+        Out(o, n, "%s is a %s row: %s", id, kind, !_stricmp(kind, "step") ? "open|done" : !_stricmp(kind, "toggle")
+                                                                            ? "on|off" : "ok|fail|skip|open");
+        return false;
+    }
+    char apply[300] = "";
+    if (TestIs(g_tests[i], "toggle")) {
+        char target[128];
+        strncpy_s(target, sizeof(target), g_tests[i].target, _TRUNCATE);
+        LeaveCriticalSection(&g_testLock);          // the INI write / item run happens without the lock
+        bool ok = TestToggleApply(target, !_stricmp(state, "on"), apply, sizeof(apply));
+        if (!ok) { Out(o, n, "%s", apply); Log(1, "tests: toggle %s: %s", id, apply); return false; }
+        EnterCriticalSection(&g_testLock);
+        i = TestFindLocked(id);
+        if (i < 0) { LeaveCriticalSection(&g_testLock); Out(o, n, "%s (row removed meanwhile)", apply); return true; }
+    }
+    TestRow &t = g_tests[i];
+    strncpy_s(t.state, sizeof(t.state), state, _TRUNCATE);
+    _strlwr_s(t.state, sizeof(t.state));
+    if (note) { strncpy_s(t.note, sizeof(t.note), note, _TRUNCATE); TestClean(t.note); }
+    SYSTEMTIME s;
+    GetLocalTime(&s);
+    _snprintf_s(t.when, sizeof(t.when), _TRUNCATE, "%02d:%02d:%02d", s.wHour, s.wMinute, s.wSecond);
+    TestSaveLocked();
+    Out(o, n, "test.mark %s %s%s%s%s%s", t.id, t.state, t.note[0] ? " - " : "", t.note, apply[0] ? "; " : "", apply);
+    LeaveCriticalSection(&g_testLock);
+    Log(1, "tests: %s", o);
+    return true;
+}
+
+// "<id> <state> [note]": check ok|fail|skip|open, step done|open, toggle on|off (switches the target)
+bool RunTestMark(const char *arg, char *o, size_t n) {
+    char id[64] = "", state[16] = "";
+    int used = 0;
+    if (!arg || sscanf_s(arg, "%63s %15s %n", id, static_cast<unsigned>(sizeof(id)), state,
+                         static_cast<unsigned>(sizeof(state)), &used) < 2 ||
+        !(TestStateOk(state) || !_stricmp(state, "done") || !_stricmp(state, "on") || !_stricmp(state, "off"))) {
+        Out(o, n, "usage: test.mark <id> ok|fail|skip|open [note] (steps: done|open, toggles: on|off)");
+        return false;
+    }
+    const char *note = used > 0 && static_cast<size_t>(used) <= strlen(arg) ? arg + used : "";
+    return TestMark(id, state, note[0] ? note : nullptr, o, n);
+}
+
+// "<n> rows (o open, k ok, f fail, s skip): id [state] hint {note} | ..." - steps / toggles carry their kind:
+// "step3 (step 3 -> level.load:x) [open] text", "sp-states (toggle ini:...) [on] text"
+void ValTestList(char *o, size_t n) {
+    int open, ok, fail, skip, total;
+    TestCounts(&open, &ok, &fail, &skip, &total);
+    int used = _snprintf_s(o, n, _TRUNCATE, "%d rows (%d open, %d ok, %d fail, %d skip)%s", total, open, ok, fail, skip,
+                           total ? ":" : "");
+    if (used < 0) return;
+    EnterCriticalSection(&g_testLock);
+    for (int i = 0; i < g_testCount; ++i) {
+        const TestRow &t = g_tests[i];
+        char kind[180] = "";
+        if (TestIs(t, "step"))
+            _snprintf_s(kind, sizeof(kind), _TRUNCATE, " (step %d%s%s)", t.num, t.target[0] ? " -> " : "", t.target);
+        else if (TestIs(t, "toggle"))
+            _snprintf_s(kind, sizeof(kind), _TRUNCATE, " (toggle %s)", t.target);
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s %s%s [%s] %s%s%s%s", i ? " |" : "", t.id, kind, t.state,
+                            t.hint, t.note[0] ? " {" : "", t.note, t.note[0] ? "}" : "");
+        if (w < 0) break;
+        used += w;
+    }
+    LeaveCriticalSection(&g_testLock);
+}
+
+// 0.5 test.export: the whole list as a TruLink block (InvokeItem answers it directly):
+// "ok+ test.export <n> rows ..." then one line per row "kind<TAB>id<TAB>state<TAB>number<TAB>target<TAB>hint<TAB>note
+// <TAB>time", then ".". As a plain value (menu list / status) only the counts.
+void ValTestExport(char *o, size_t n) {
+    int open, ok, fail, skip, total, steps = 0, done = 0, toggles = 0, on = 0;
+    TestCounts(&open, &ok, &fail, &skip, &total);
+    EnterCriticalSection(&g_testLock);
+    for (int i = 0; i < g_testCount; ++i) {
+        if (TestIs(g_tests[i], "step")) { ++steps; if (!_stricmp(g_tests[i].state, "done")) ++done; }
+        if (TestIs(g_tests[i], "toggle")) { ++toggles; if (!_stricmp(g_tests[i].state, "on")) ++on; }
+    }
+    LeaveCriticalSection(&g_testLock);
+    _snprintf_s(o, n, _TRUNCATE, "%d rows; checks %d open %d ok %d fail %d skip; steps %d/%d done; toggles %d/%d on",
+                total, open, ok, fail, skip, done, steps, on, toggles);
+}
+
+void TestExportBlock(char *o, size_t n) {
+    char head[200];
+    ValTestExport(head, sizeof(head));
+    int used = _snprintf_s(o, n, _TRUNCATE, "ok+ test.export %s (kind id state number target hint note time, tab "
+                           "separated; file %s)\n", head, g_testPath[0] ? g_testPath : "-");
+    if (used < 0) used = 0;
+    EnterCriticalSection(&g_testLock);
+    for (int i = 0; i < g_testCount; ++i) {
+        const TestRow &t = g_tests[i];
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n", t.kind, t.id, t.state,
+                            t.num, t.target, t.hint, t.note, t.when);
+        if (w < 0) break;
+        used += w;
+    }
+    LeaveCriticalSection(&g_testLock);
+    // the block always ends with "." (TruLink adds the final line break); cut rows make room for it
+    if (static_cast<size_t>(used) + 2 >= n) used = static_cast<int>(n) - 3;
+    _snprintf_s(o + used, n - used, _TRUNCATE, ".");
 }
 
 // ---- settings: the kOpts table vs the file ----
@@ -2658,7 +3479,8 @@ const Item kItems[] = {
     {"camera.current", "info", "current camera object", false, ValCamera, nullptr},
     {"camera.mode", "action", "CAMERA_SetMode(arg 0..15), experimental, needs a level", true, ValCamera, RunCameraMode},
     {"camera.restore", "action", "restore the game camera, needs a level", true, ValCamera, RunCameraRestore},
-    {"camera.free", "todo", "own free camera", false, ValTodo, RunTodo},
+    {"camera.free", "todo", "own free camera - todo: offsets of Camera transform / invTransform not verified", false, ValTodo,
+     RunTodo},
     {"cheat.flight", "bool", "cheatMode + message 12 (flight), needs a level", true, ValCheat, RunCheat},
     {"cheat.speed", "float", "flight speed per 30 fps frame (RT up / LT down)", false, ValSpeed, RunSpeed},
     {"draw.markup", "bool", "markup boxes / poly lines projected with the game camera (experimental)", false,
@@ -2738,6 +3560,35 @@ const Item kItems[] = {
     {"media.video.play", "action", "0x4a12b0(<name>, 0), front end only (main state 10)", true, ValVideoList, RunVideoPlay},
     {"media.video.menuloop", "action", "main menu background loop [0x8abf20] = <name> (\"\" = medsea_loop)", false,
      ValMenuLoop, RunMenuLoop},
+    // 0.4
+    {"log.collapse", "bool", "collapse repeated lines (same source + text) into \"text xN (first-last)\"", false,
+     ValLogCollapse, RunLogCollapse},
+    {"log.hidereads", "bool", "drop TruLink's read / scan / watch / ping echo and menu info reads", false,
+     ValLogHideReads, RunLogHideReads},
+    {"log.level", "int", "lines shown: 0 all, 1 warnings + errors, 2 errors (also all / warn / error)", false, ValLogLevel,
+     RunLogLevel},
+    {"log.rate", "int", "max new lines per source and second (0 = no limit)", false, ValLogRate, RunLogRate},
+    {"test.list", "info", "TO TEST rows: id [state] hint {note} | ...", false, ValTestList, nullptr},
+    {"test.add", "action", "<id> <hint text>: add / update a TO TEST row (id = item id, id:arg or any key)", false,
+     ValTestList, RunTestAdd},
+    {"test.mark", "action", "<id> ok|fail|skip|open [note] (steps done|open, toggles on|off)", false, ValTestList,
+     RunTestMark},
+    {"test.del", "action", "<id>: remove one TO TEST row", false, ValTestList, RunTestDel},
+    {"test.clear", "action", "remove every TO TEST row (\"done\" = only the marked checks)", false, ValTestList, RunTestClear},
+    // 0.5
+    {"test.step", "action", "<n> <id|id:arg|-> <text>: numbered step (in order, runs the item with a button)", false,
+     ValTestList, RunTestStep},
+    {"test.toggle", "action", "<id> <item id|ini:Plugin:Section:Key> <text>: switch row (checkbox)", false, ValTestList,
+     RunTestToggle},
+    {"test.export", "info", "the whole TO TEST list as a block (kind id state number target hint note time)", false,
+     ValTestExport, nullptr},
+    {"weapon.slots", "info", "the 15 weapon slots: slot[L] object name (WM+4+0x10*slot), selected slot", false,
+     ValWeaponSlots, nullptr},
+    {"weapon.has", "action", "<object name>: is it in a weapon slot? (read-only)", false, ValWeaponSlots, RunWeaponHas},
+    {"ammo.fill", "action", "every reserve = MaxAmmo(type) 0x6eeae0 (clips unchanged), experimental", true, ValAmmo,
+     RunAmmoFill},
+    {"gear.give", "action", "GiveObject 0x555f60(player, <name>, 0x715e90, 1) -> AddGear, main state 1, experimental", true,
+     ValWeaponSlots, RunGearGive},
 };
 
 const Item *FindItem(const char *id) {
@@ -2747,10 +3598,24 @@ const Item *FindItem(const char *id) {
     return nullptr;
 }
 
+bool IsInfoItem(const char *id) {
+    const Item *item = FindItem(id);
+    return item && strcmp(item->type, "info") == 0;
+}
+
 bool ItemUsable(const char *id) {
     const Item *item = FindItem(id);
     if (item) return strcmp(item->type, "todo") != 0;
     return DevFind(id) != nullptr;
+}
+
+// 0.5 (TO TEST toggles): the value text of an item or developer-menu row; false if there is none
+bool ItemValueText(const char *id, char *o, size_t n) {
+    const Item *item = FindItem(id);
+    if (item) { item->value(o, n); return true; }
+    const DevRow *dev = DevFind(id);
+    if (dev) { DevValue(*dev, o, n); return true; }
+    return false;
 }
 
 void SetLastAction(const char *id, bool ok, const char *text) {
@@ -2818,6 +3683,10 @@ const char *InvokeItem(const char *id, const char *arg) {
     const DevRow *dev = item ? nullptr : DevFind(id);
     if (!item && !dev) { _snprintf_s(t_answer, sizeof(t_answer), _TRUNCATE, "err unknown item '%s'", id ? id : ""); return t_answer; }
     const char *itemId = item ? item->id : dev->id;
+    if (item && !_stricmp(item->id, "test.export")) {          // 0.5: a block answer ("ok+ ...", rows, ".")
+        TestExportBlock(t_answer, sizeof(t_answer));
+        return t_answer;
+    }
     if (item && !item->run) {
         char *value = t_value;
         item->value(value, sizeof(t_value));
@@ -3070,6 +3939,8 @@ void Status03Line() {
                        g_drawOk ? "ok" : "NO");
     ImGui::TextWrapped("     weapon.give %s, ammo %s, health %s", g_weaponOk ? "ok" : "NO", g_ammoOk ? "ok" : "NO",
                        g_healthOk ? "ok" : "NO");
+    ImGui::TextWrapped("0.4: weapon slots %s, ammo.fill %s, gear.give %s; TO TEST file %s", g_slotsOk ? "ok" : "NO",
+                       g_maxAmmoOk && g_ammoOk ? "ok" : "NO", g_gearOk ? "ok" : "NO", g_testPath);
 }
 
 void Note(const char *text) {
@@ -3126,6 +3997,153 @@ void PageFavourites() {
         }
         ImGui::TreePop();
     }
+}
+
+// 0.4 TO TEST page: one row per test (state, hint, id, note), A on the row = OK, X = FAIL, Y = SKIP (X / Y are taken
+// from ImGui in FeedGamepad while a row has the focus), buttons OK / FAIL / SKIP and Run (when the id - or the part
+// before ':' - is a usable item; the part after ':' is its argument)
+void TestMarkFromMenu(const char *id, const char *state) {
+    char o[300];
+    TestMark(id, state, nullptr, o, sizeof(o));
+    _snprintf_s(g_lastAction, sizeof(g_lastAction), _TRUNCATE, "%s", o);
+}
+
+bool ConfirmButton(const char *label, const char *key);
+
+// "id" or "id:arg" -> item id + argument; false when it is not a usable item
+bool TestRunTarget(const char *target, char *itemId, size_t idSize, const char **runArg) {
+    strncpy_s(itemId, idSize, target, _TRUNCATE);
+    char *colon = strchr(itemId, ':');
+    *runArg = "";
+    if (colon) { *colon = 0; *runArg = target + (colon - itemId) + 1; }
+    return itemId[0] && ItemUsable(itemId);
+}
+
+// 0.5: switches first (toggles: a checkbox each; INI targets take effect at the next start), then steps and checks
+// in list order; steps are numbered, the first open step is marked "NEXT"; A on a step runs its item and marks it
+// done, "Run" only runs it, "Done" / "Open" only mark it
+void PageTestToggles(const TestRow *rows, int c) {
+    bool any = false;
+    for (int i = 0; i < c; ++i) if (TestIs(rows[i], "toggle")) { any = true; break; }
+    if (!any) return;
+    ImGui::SeparatorText("Switches (on / off - to find the step or feature that crashes)");
+    for (int i = 0; i < c; ++i) {
+        const TestRow &t = rows[i];
+        if (!TestIs(t, "toggle")) continue;
+        ImGui::PushID(1000 + i);
+        bool on = !_stricmp(t.state, "on");
+        char label[512];
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "%s   [%s -> %s]", t.hint[0] ? t.hint : t.id, t.id, t.target);
+        if (ImGui::Checkbox(label, &on)) TestMarkFromMenu(t.id, on ? "on" : "off");
+        if (t.note[0] || t.when[0]) {
+            ImGui::Indent();
+            ImGui::TextDisabled("%s%s%s", t.note, t.note[0] && t.when[0] ? "  " : "", t.when);
+            ImGui::Unindent();
+        }
+        ImGui::PopID();
+    }
+    ImGui::Separator();
+}
+
+void PageTests() {
+    ImGui::TextWrapped("TO TEST list from the main session or Invoke-TruTestRun.ps1 (TruLink: menu test.step / test.add / "
+                       "test.toggle / test.mark / test.export). Checks: A = OK, X = FAIL, Y = SKIP. Steps: A = run + "
+                       "done. Kept in %s.", g_testPath[0] ? g_testPath : "TruMenu.tests.txt");
+    static TestRow rows[kTestMax];
+    EnterCriticalSection(&g_testLock);
+    int c = g_testCount;
+    memcpy(rows, g_tests, sizeof(TestRow) * static_cast<size_t>(c));
+    LeaveCriticalSection(&g_testLock);
+    bool xPressed = InterlockedExchange(&g_testX, 0) != 0, yPressed = InterlockedExchange(&g_testY, 0) != 0;
+    bool anyFocus = false;
+    PageTestToggles(rows, c);
+    int nextStep = -1;
+    for (int i = 0; i < c && nextStep < 0; ++i)
+        if (TestIs(rows[i], "step") && _stricmp(rows[i].state, "done") != 0) nextStep = i;
+    for (int i = 0; i < c; ++i) {
+        const TestRow &t = rows[i];
+        if (TestIs(t, "toggle")) continue;
+        if (TestIs(t, "step")) {
+            ImGui::PushID(i);
+            bool done = !_stricmp(t.state, "done");
+            char itemId[64];
+            const char *runArg = "";
+            bool runnable = t.target[0] && TestRunTarget(t.target, itemId, sizeof(itemId), &runArg);
+            char label[512];
+            _snprintf_s(label, sizeof(label), _TRUNCATE, "%s %2d. %s", done ? "[DONE]" : i == nextStep ? "NEXT->" : "      ",
+                        t.num, t.hint[0] ? t.hint : "(no text)");
+            ImVec4 colour = done ? ImVec4(0.6f, 0.6f, 0.6f, 1.0f) : i == nextStep ? ImVec4(1.0f, 0.85f, 0.3f, 1.0f)
+                                                                                  : ImVec4(0.75f, 0.85f, 1.0f, 1.0f);
+            ImGui::PushStyleColor(ImGuiCol_Text, colour);
+            bool activated = ImGui::Selectable(label);
+            ImGui::PopStyleColor();
+            if (activated) {
+                if (runnable) QueueItem(itemId, runArg);
+                TestMarkFromMenu(t.id, "done");
+            }
+            ImGui::Indent();
+            if (runnable) {
+                char run[160];
+                _snprintf_s(run, sizeof(run), _TRUNCATE, "Run %s%s%s", itemId, runArg[0] ? " " : "", runArg);
+                if (ImGui::SmallButton(run)) QueueItem(itemId, runArg);
+                ImGui::SameLine();
+            } else if (t.target[0]) {
+                ImGui::TextDisabled("(%s: no such item)", t.target);
+                ImGui::SameLine();
+            }
+            if (ImGui::SmallButton(done ? "Open again" : "Done")) TestMarkFromMenu(t.id, done ? "open" : "done");
+            if (t.when[0]) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s", t.when);
+            }
+            ImGui::Unindent();
+            ImGui::PopID();
+            continue;
+        }
+        ImGui::PushID(i);
+        bool ok = !_stricmp(t.state, "ok"), fail = !_stricmp(t.state, "fail"), skip = !_stricmp(t.state, "skip");
+        ImVec4 colour = ok ? ImVec4(0.45f, 1.0f, 0.45f, 1.0f) : fail ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f)
+                      : skip ? ImVec4(0.65f, 0.65f, 0.65f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        char label[512];
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  %s   [%s]%s%s", ok ? "[OK]  " : fail ? "[FAIL]" : skip ? "[SKIP]" : "[    ]",
+                    t.hint[0] ? t.hint : "(no hint)", t.id, t.note[0] ? "  - " : "", t.note);
+        ImGui::PushStyleColor(ImGuiCol_Text, colour);
+        bool activated = ImGui::Selectable(label);
+        ImGui::PopStyleColor();
+        if (ImGui::IsItemFocused()) {
+            anyFocus = true;
+            if (xPressed) TestMarkFromMenu(t.id, "fail");
+            else if (yPressed) TestMarkFromMenu(t.id, "skip");
+        }
+        if (activated) TestMarkFromMenu(t.id, "ok");
+        ImGui::Indent();
+        if (ImGui::SmallButton("OK")) TestMarkFromMenu(t.id, "ok");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("FAIL")) TestMarkFromMenu(t.id, "fail");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("SKIP")) TestMarkFromMenu(t.id, "skip");
+        char itemId[64];
+        strncpy_s(itemId, sizeof(itemId), t.id, _TRUNCATE);
+        char *colon = strchr(itemId, ':');
+        const char *runArg = "";
+        if (colon) { *colon = 0; runArg = t.id + (colon - itemId) + 1; }
+        if (ItemUsable(itemId)) {
+            ImGui::SameLine();
+            char run[160];
+            _snprintf_s(run, sizeof(run), _TRUNCATE, "Run %s%s%s", itemId, runArg[0] ? " " : "", runArg);
+            if (ImGui::SmallButton(run)) QueueItem(itemId, runArg);
+        }
+        if (t.when[0]) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", t.when);
+        }
+        ImGui::Unindent();
+        ImGui::PopID();
+    }
+    InterlockedExchange(&g_testFocus, anyFocus ? 1 : 0);
+    if (ImGui::Button("Remove the marked rows  [test.clear done]")) { char o[160]; RunTestClear("done", o, sizeof(o)); }
+    ImGui::SameLine();
+    if (ConfirmButton("Remove all rows  [test.clear]", "testclear")) { char o[160]; RunTestClear("", o, sizeof(o)); }
 }
 
 // in-menu confirmation (no dialogs): the first A arms a button for 5 s, the second A runs it
@@ -3396,19 +4414,36 @@ void PageLog() {
         strncpy_s(g_logFilter, sizeof(g_logFilter), "script", _TRUNCATE);
     ImGui::SameLine();
     if (ImGui::Button("clear  [log.clear]")) { char o[64]; RunLogClear("", o, sizeof(o)); }
+    // 0.4: collapse, TruLink reads, severity, rate
+    bool collapse = g_logCollapse != 0, hide = g_logHideReads != 0;
+    if (ImGui::Checkbox("collapse repeats  [log.collapse]", &collapse)) InterlockedExchange(&g_logCollapse, collapse ? 1 : 0);
+    ImGui::SameLine();
+    if (ImGui::Checkbox("hide TruLink reads  [log.hidereads]", &hide)) InterlockedExchange(&g_logHideReads, hide ? 1 : 0);
+    ImGui::TextUnformatted("show  [log.level]:");
+    for (int i = 0; i < 3; ++i) {
+        ImGui::SameLine();
+        char label[32];
+        _snprintf_s(label, sizeof(label), _TRUNCATE, g_logMinLevel == i ? "[%s]##ll%d" : "%s##ll%d",
+                    i == 0 ? "all" : i == 1 ? "warnings + errors" : "errors", i);
+        if (ImGui::Button(label)) g_logMinLevel = i;
+    }
+    ImGui::SliderInt("max lines per source and second (0 = off)  [log.rate]", &g_logRate, 0, 200);
     static LogLine lines[64];
     int c = CopyLines(lines, g_logLines, g_logFilter);
     ImGui::BeginChild("##logchild", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 14.0f), true);
     for (int i = 0; i < c; ++i) {
-        bool err = strstr(lines[i].text, "fail") || strstr(lines[i].text, "error") || strstr(lines[i].text, "exception") ||
-                   strstr(lines[i].text, " NO ");
-        if (err) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.5f, 0.4f, 1.0f));
-        ImGui::TextWrapped("[%s] %s", lines[i].src, lines[i].text);
-        if (err) ImGui::PopStyleColor();
+        BYTE sev = lines[i].sev;
+        if (sev) ImGui::PushStyleColor(ImGuiCol_Text, sev == 2 ? ImVec4(1.0f, 0.5f, 0.4f, 1.0f) : ImVec4(1.0f, 0.85f, 0.4f, 1.0f));
+        char line[300];
+        FormatLine(lines[i], line, sizeof(line), 220);
+        ImGui::TextWrapped("%s", line);
+        if (sev) ImGui::PopStyleColor();
     }
     ImGui::EndChild();
     Text("script prints so far: %ld; lines mentioning an exception: %ld; exceptions caught by TruMenu: %ld", g_scriptCount,
          g_exceptionLines, g_ownExceptions);
+    Text("repeats collapsed: %ld; TruLink reads hidden: %ld; dropped by the rate limit: %ld", g_logCollapsed, g_logHidden,
+         g_logDropped);
 }
 
 void PageMedia() {
@@ -3454,7 +4489,14 @@ void DrawLogOverlay() {
                              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
                              ImGuiWindowFlags_NoSavedSettings;
     if (ImGui::Begin("##TruMenuLog", nullptr, flags)) {
-        for (int i = 0; i < c; ++i) Text("[%s] %.160s", lines[i].src, lines[i].text);
+        for (int i = 0; i < c; ++i) {
+            char line[300];
+            FormatLine(lines[i], line, sizeof(line), 160);
+            BYTE sev = lines[i].sev;
+            if (sev) ImGui::PushStyleColor(ImGuiCol_Text, sev == 2 ? ImVec4(1.0f, 0.5f, 0.4f, 1.0f) : ImVec4(1.0f, 0.85f, 0.4f, 1.0f));
+            ImGui::TextUnformatted(line);
+            if (sev) ImGui::PopStyleColor();
+        }
         if (!c) ImGui::TextUnformatted("(log: no lines)");
     }
     ImGui::End();
@@ -3467,6 +4509,20 @@ void DrawMenu() {
     if (InterlockedExchange(&g_menuJustOpened, 0)) ImGui::SetNextWindowFocus();
     bool open = true;
     if (ImGui::Begin("TruMenu  (L3 + R3 closes)", &open, ImGuiWindowFlags_NoCollapse)) {
+        // 0.4: TO TEST first, only while the list holds rows
+        int open04, ok04, fail04, skip04, total04;
+        TestCounts(&open04, &ok04, &fail04, &skip04, &total04);
+        bool testShown = false;
+        if (total04) {
+            char header[96];
+            _snprintf_s(header, sizeof(header), _TRUNCATE, "TO TEST (%d open, %d ok, %d fail, %d skip)###totest", open04,
+                        ok04, fail04, skip04);
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.55f, 0.35f, 0.05f, 1.0f));
+            bool show = ImGui::CollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen);
+            ImGui::PopStyleColor();
+            if (show) { PageTests(); testShown = true; }
+        }
+        if (!testShown) InterlockedExchange(&g_testFocus, 0);
         if (ImGui::CollapsingHeader("Quick access / Favourites", ImGuiTreeNodeFlags_DefaultOpen)) PageFavourites();
         if (ImGui::CollapsingHeader("Status")) PageStatus();
         if (ImGui::CollapsingHeader("Developer menu (original)")) PageDev();
@@ -3729,6 +4785,13 @@ void ReadOptions(const char *dir) {
     g_logLinesAtStart = OptInt(ini, "Log", "Lines");
     if (g_logLinesAtStart < 1 || g_logLinesAtStart > 64) g_logLinesAtStart = atoi(OptDefault("Log", "Lines"));
     g_scriptLogAtStart = OptInt(ini, "Log", "Script");
+    // 0.4: applied at once (also by settings.reset)
+    InterlockedExchange(&g_logCollapse, OptInt(ini, "Log", "Collapse") ? 1 : 0);
+    InterlockedExchange(&g_logHideReads, OptInt(ini, "Log", "HideLinkReads") ? 1 : 0);
+    g_logMinLevel = OptInt(ini, "Log", "MinLevel");
+    if (g_logMinLevel < 0 || g_logMinLevel > 2) g_logMinLevel = atoi(OptDefault("Log", "MinLevel"));
+    g_logRate = OptInt(ini, "Log", "MaxLinesPerSecond");
+    if (g_logRate < 0 || g_logRate > 10000) g_logRate = atoi(OptDefault("Log", "MaxLinesPerSecond"));
 }
 
 void Start(HMODULE self) {
@@ -3798,6 +4861,18 @@ void Start(HMODULE self) {
                  HexBytesAt(kMaxHealth, "51 a16492c500 8b80a4ef0300 8b1550eee700");
     g_scriptOk = HexBytesAt(0x007b3990, "68305e7900 6a07");            // native 7 registration (NsCoreBase)
     for (int i = 0; i < kNativeCount && g_scriptOk; ++i) g_scriptOk = HexBytesAt(g_natives[i].addr, g_natives[i].bytes);
+    // 0.4: weapon slots (the game's handle check 0x5b39d0 and the slot reader 0x6e7b90: right +4 / +8, left +0xc /
+    // +0x10), MaxAmmo 0x6eeae0 (6-entry jump table), GiveObject 0x555f60 and the save-restore callback 0x715e90
+    g_slotsOk = HexBytesAt(0x005b39d0, "8b4c2404 85c9 740e 8b01 85c0 7408 8b5044 3b5104") &&
+                HexBytesAt(0x006e7bb9, "8b543e10 8b4c3e0c") && HexBytesAt(0x006e7bde, "8b443e04 8b4c3e08") &&
+                HexBytesAt(0x006e7b98, "83fe0e") && g_playerOk;
+    g_maxAmmoOk = HexBytesAt(kMaxAmmo, "0fbe442404 83f805 0f8779010000 ff24856cec6e00") &&
+                  HexBytesAt(0x006eec67, "660dffff c3") && g_playerOk;
+    g_gearOk = HexBytesAt(kGiveObject, "56 8b74240c 56 e8e5d90500 8b54240c 83c404 85c0 7410") &&
+               HexBytesAt(kGearCallback, "8b44240c 83e800 742a 83e801 754b 8b442408 8b4810 8b5160") &&
+               HexBytesAt(0x00715eb2, "a158dbfa00 8b8800050000") && g_mainStateOk && g_playerOk;
+    _snprintf_s(g_testPath, sizeof(g_testPath), _TRUNCATE, "%sTruMenu.tests.txt", g_exeDir);
+    TestLoad();
     DevRead();
     g_logOverlay = g_logOverlayAtStart ? 1 : 0;
     g_logLines = g_logLinesAtStart;
@@ -3810,6 +4885,8 @@ void Start(HMODULE self) {
         g_controlOk, g_uiOk, g_instOk, g_removeOk, g_switchOk, g_movieOk, g_mainStateOk, g_menuLoopOk, g_scriptOk,
         g_drawOk, g_devStatus);
     Log(1, "0.3 checks: weapon.give %d, ammo %d, health %d", g_weaponOk, g_ammoOk, g_healthOk);
+    Log(1, "0.4 checks: weapon slots %d, MaxAmmo %d, gear give %d; TO TEST file %s", g_slotsOk, g_maxAmmoOk, g_gearOk,
+        g_testPath);
     Log(1, "code checks: pad %d, d3d9 %d, player %d, INSTANCE_Post %d, camera %d, frame time %d, level change %d, "
            "costume %d (type table 0x%08lx), unit table %d", g_padCodeOk, g_d3dCodeOk, g_playerOk, g_postOk, g_cameraOk,
         g_frameOk, g_levelOk, g_costumeOk, typeTable, g_unitOk);
@@ -3834,6 +4911,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_reqLock);
         InitializeCriticalSection(&g_logRingLock);
         InitializeCriticalSection(&g_favLock);
+        InitializeCriticalSection(&g_testLock);
         g_reqDone = CreateEventA(nullptr, TRUE, FALSE, nullptr);
         Start(instance);
     } else if (reason == DLL_PROCESS_DETACH) {

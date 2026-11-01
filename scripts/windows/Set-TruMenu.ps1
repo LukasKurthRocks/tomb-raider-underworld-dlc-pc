@@ -25,6 +25,7 @@ param(
     [Parameter(ParameterSetName = 'Install', Mandatory)][switch]$Install,
     [Parameter(ParameterSetName = 'Remove', Mandatory)][switch]$Remove,
     [string]$GamePath,
+    [string]$SourceDir,
     [switch]$Trace
 )
 
@@ -35,12 +36,18 @@ Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
 
 $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$built   = Join-Path $repo 'work\asi'
+$built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruMenu.asi', 'TruMenu.ini'
-# SHA-256 of earlier builds of ours (none yet) - recognised as ours for update / removal
+# SHA-256 of earlier builds of ours (0.1.3, 0.2, 0.3, 0.4, all 2026-10-31) - recognised as ours for update / removal
 $earlierBuilds = @{
-    'TruMenu.asi' = @()
-    'TruMenu.ini' = @()
+    'TruMenu.asi' = @('50ebd28adcf96cef7e1db673ce293b5810bd8d64d0669617d09a1250598491a3',
+                      'cd1b8796e40fccb09ab063d7e9f955b9029a230e37b21dce9bb570c1a3cb1892',
+                      '9dda37273b5473d560474e7473b82978bfc77d3bd4d4af2ec0ae10e625b0b7ca',
+                      'ae80725d7ad14fcf5a157e5f6b5a1d1190b1dbda17638ebdc875a2a95e0a9304')
+    'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
+                      'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
+                      '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
+                      'ae77e5d50799c4d528a5bf8339b7266c3e0c0dd05024247932cf012cdf302e83')
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
