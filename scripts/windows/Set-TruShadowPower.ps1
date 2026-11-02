@@ -44,12 +44,15 @@ $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # SHA-256 of earlier builds of ours (0.1 = slow motion only, 0.2 = estimated meter, 0.3 = translated meter, all
-# 2026-10-30; 0.4 = Lara meter conditions, 2026-10-31) - recognised as ours for update / removal
+# 2026-10-30; 0.4 = Lara meter conditions, 2026-10-31; 0.5 = TU states (work\asi\v05) and 0.5.1 as installed for
+# test 48k, 2026-11-01) - recognised as ours for update / removal
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
                              '5d638bae7c41c888dac8d328ec8ef5c5aaac85c0c3100f3fe071409ebc247b7c',
-                             '31cea1102d986789d656c73472cd410cd560ea890c6e27f17e583b230183c9e0')
+                             '31cea1102d986789d656c73472cd410cd560ea890c6e27f17e583b230183c9e0',
+                             '6887f3dc0436e5125f5b824d5af168a7493dc9afdb4e97572380c381bbb45a31',
+                             '004e190490b66872c6bc3780681ae45877d25501974a602b28c9d2a9acdedd2e')
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',

@@ -18,6 +18,16 @@ fallback copy; 0.4 (lookup diagnostics, Lara conditions) played 2026-10-31 (test
 2026-10-31, not yet played.** Not covered: sounds, the blur / bloom look, rock veins (TruRockVein.asi), the shadow
 strike target states and the combat conditions (0.5 gaps below).
 
+## 0.6: condition 1046 (2026-11-01)
+
+Every loop transition of the wall run (chart DTP 20212, records 1477 / 1488 / 1492 / 1493) needs `{2000,1046,1}`.
+The TU predicate 0x8246e400 answers, in doppelganger mode (gameTracker+0x1244), the meter flags bit 0 (power active;
+no meter object -> 0), else the retail test (player +0x504)->+0x1fc bit 21. PC tru+0x3655c0 has only the retail test.
+`Pred1046` (option `[Conditions] Cond1046`, default 1) replaces it with a 5-byte jump; doppelganger mode =
+`TruDlc2PlayerDoppelganger()` of TruDlc2Player.asi. Log: "condition 1046: title-update predicate ..." at load,
+"condition 1046 (...) is now evaluated: doppelganger 1 -> ..." and at `LogLevel=2` every change. Sample ini unchanged.
+Built 2026-11-01 into `work\asi\v06`, not loaded.
+
 ## 0.5: title-update states, conditions and activities of Lara
 
 Translated from the TU (project docs `Befund-Schattenkraft.md`, "TU states for Lara"), registered in copies of Lara's

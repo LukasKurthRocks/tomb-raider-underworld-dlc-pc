@@ -44,7 +44,9 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.6 (command bar: ids with autocomplete, history, pad picker, cmd.*; 0.5: TO TEST "
+const char *const kVersion = "TruMenu 0.7 (TruGuard action guard.dump: full minidump + thread snapshot on the TruLink "
+                             "thread, also while the game hangs; 0.6: command bar: ids with autocomplete, history, pad "
+                             "picker, cmd.*; 0.5: TO TEST "
                              "steps / checks / toggles + test.export; 0.4: TO TEST checklist over "
                              "TruLink, log collapse / filters / rate limit, weapon "
                              "slots, ammo fill, gear give; debug menu: Crystal's original developer menu from the exe's "
@@ -1110,7 +1112,7 @@ GuardTextFn GuardTextExport(const char *name) {
 void ValGuardStatus(char *o, size_t n) {
     GuardTextFn fn = GuardTextExport("TruGuardStatus");
     if (!fn) { Out(o, n, "TruGuard not loaded"); return; }
-    char text[512];
+    char text[1024];
     fn(text, sizeof(text));
     Out(o, n, "%s", text);
 }
@@ -1153,6 +1155,20 @@ bool RunGuardOverlay(const char *arg, char *o, size_t n) {
     InterlockedExchange(&g_guardOverlay, on ? 1 : 0);
     Out(o, n, "guard.overlay %d", on ? 1 : 0);
     return true;
+}
+
+typedef int (*GuardDumpFn)(const char *);
+GuardDumpFn GuardDumpExport() {
+    HMODULE module = GetModuleHandleA("TruGuard.asi");
+    return module ? reinterpret_cast<GuardDumpFn>(GetProcAddress(module, "TruGuardDump")) : nullptr;
+}
+bool RunGuardDump(const char *arg, char *o, size_t n) {
+    GuardDumpFn dump = GuardDumpExport();
+    if (!dump) { Out(o, n, "TruGuard not loaded"); return false; }
+    const char *reason = (arg && arg[0]) ? arg : "menu";
+    int ok = dump(reason);
+    Out(o, n, ok ? "guard.dump written (see TruGuard.log / TruGuardDumps)" : "guard.dump failed");
+    return ok != 0;
 }
 // "index name id; ..." for every player record of the type table
 void ValCostumeList(char *o, size_t n) {
@@ -3587,6 +3603,8 @@ const Item kItems[] = {
      RunGuardMode},
     {"guard.overlay", "bool", "TruGuard: counters / last fault in the top-right corner", false, ValGuardOverlay,
      RunGuardOverlay},
+    {"guard.dump", "action", "TruGuard: full dump + thread snapshot now (arg = reason; also works while hung)", false,
+     ValGuardOverlay, RunGuardDump},
     {"overlay.position", "bool", "Lara position overlay", false, ValOverlay, RunOverlay},
     {"player.position", "info", "Lara position / rotation (needs a level)", false, ValPlayer, nullptr},
     {"camera.current", "info", "current camera object", false, ValCamera, nullptr},

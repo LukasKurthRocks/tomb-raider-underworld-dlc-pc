@@ -57,6 +57,42 @@
 // 601..629 has the same target pattern on PC and TU. The PC sends 608 to its default ("unknown", print compiled out),
 // so no attach happens and state 572 (parameter 0x1e1 = 611) reads +0xc94 = 0. PatchSelector adds the case.
 // NullBoxGuard also covers tru+0x32ba40 (attach point on a box, cdecl(out, box)), the second crash site's caller.
+//
+// 0.6 (2026-11-01, live test 48k with 0.5: Lara attaches, but faces the wrong way, does not stick to the wall and drops
+// off far too early; docs Befund-Felsrinne "Wall run: orientation, magnet and duration"). Chart DTP 20212: the wall run
+// is chart record 1477 (Lara states 236 / 230 / 2102, parameter 0x19a = 608) under the root 1482 (states 420 / 572 /
+// 1900, parameter 0x19e = 1, 0x1e1 = 611). Three title-update pieces on that path, translated 1:1:
+//   * Facing (TU 0x824006a8 = PC tru+0x2fe7e0, result -> gameTracker+0xcc0 at attach): the TU inserts "type == 22 ->
+//     facing = edge normal of segment 0" before the retail default (direction from the player position). On PC the
+//     default block starts at tru+0x2feb05; FacingDefault sends a type-22 box to the existing flag-0x8000 case
+//     tru+0x2feae4 (the same code the TU branch has: manager slot +0x08(box, 0) -> facing).
+//   * Attached movement (TU 0x8245d6c8 = PC tru+0x370ba0): flag bit 0x10 "or type(gameTracker+0xc94) == 22" -> the wall
+//     handler 0x8244c2c8 = PC tru+0x353d30; else the wall predicate path. MoveDefault (at tru+0x370de1, the predicate
+//     path) sends a type-22 attach box to tru+0x370dd2 (push edi; push ebx; call 0x753d30).
+//   * State 420 slot 1 (TU 0x8245e450, new): besides the callback store, in doppelganger mode (TU gameTracker+0x1244 =
+//     TruDlc2Player's flag) and with the bool parameter 0x19e it runs the attached movement like slot 0 (PC tru+0x3712db:
+//     0x75d8d0(agent); agent+0xf0 &= ~0x3f; 0x770ba0(agent); 0x76d270(+0xc94, +0xc98, agent)). State420Slot1 replaces
+//     the PC slot 1 tru+0x371320 (callback store through the template tru+0x381d80, then the TU part).
+// ChartLog (diagnostic): the machine's per-frame update tru+0x387e60 reads the current chart record [machine+0x510];
+// when it changes for the player's machine and the old or new record index is in the wall-run range (ini), the change
+// is logged with the record's Lara state ids - the test then shows the chart path (entry, loop, exit).
+//
+// 0.7 (2026-11-01, live test 48l: the 0.6 parts fire, Lara runs further; then AV tru+0x448198 on leaving the loop -
+// a data error of doppelganger_casual.drm (VM literal, tools/vm_literal_fix.py), no code change for it): ChartLog keeps
+// the last record per machine (the player has two machines; 0.6 logged "-1 -> N" every frame) and names the machine;
+// the first 608 line also dumps the second markup +0x24 of the box (48l: file record id 2326 type 0, type 22 from +0x24).
+//
+// 0.8 (2026-11-02, docs Fehlliste-2026-11-02 / Befund-Felsrinne "Condition 528 and the missing list"): the remaining
+// title-update type-22 branches of the attach geometry on the jump-off / fall path (option JumpGeometry). Each is the
+// TU's inline type test (second markup +0x4d, else file record +0x33, == 22) inserted where the TU inserted it:
+//   segment range   TU 0x823fe9d0 -> tru+0x2fe040: flag 0x400000 OR type 22 -> last segment index - 1
+//   TNode point     TU 0x823fd890 -> tru+0x307c60: before the print default, type 22 -> position + 47.4075 x
+//                   normalize(facing), z - 474.075 (constants TU 0x82051bc0 / 0x8207e5ac; facing = the function's
+//                   own call of tru+0x2fe7e0 = TU 0x824006a8)
+//   bone point      TU 0x823fe130 -> tru+0x311530: before the print default, type 22 -> position + 47.4075 x
+//                   normalize(tru+0x2fe7e0(box, segment, position))
+//   corner angle    TU 0x82400bc0 -> tru+0x309500, sites 0x7097cb / 0x709894: flag 0x400000 OR type 22 -> skip
+// Hits are counted in the stubs and logged from the chart probe (ChartTick) on the game thread.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -156,7 +192,47 @@ const BYTE kPointOnBoxBytes[] = {0x55, 0x8b, 0xec, 0x83, 0xe4, 0xf0, 0x83, 0xec,
                                  0x8b, 0x7d, 0x0c};
 const DWORD kPointOnBoxNext = 0x0072ba46;
 
+// 0.6: facing function tru+0x2fe7e0 cdecl(out, box, segment, player position) - esi = box, flags class switch at +0x2fe82a
+const DWORD kFacingSwitch = 0x006fe82a;   // mov eax,[esi+28h]; and eax,0FFFFFC10h; test eax,8000h; jne 0x6feae4
+const char *const kFacingSwitchHex = "8b4628 2510fcffff a900800000 0f85a7020000";
+const DWORD kFacingDefault = 0x006feb05;  // retail default: mov eax,[0E7F094h]; mov ecx,[eax+90h]; movaps xmm0,[ecx+10h]
+const char *const kFacingDefaultHex = "a194f0e700 8b8890000000 0f284110";
+const DWORD kFacingNext = 0x006feb0a;
+const DWORD kFacingEdge = 0x006feae4;     // flag 0x8000 case: push 0; lea eax,[esp+104h]; push eax; mov ecx,esi;
+const char *const kFacingEdgeHex = "6a00 8d842404010000 50 8bce e8cb51ecff e958010000";   // call 0x5c3cc0; jmp 0x6fec52
+// 0.6: attached movement tru+0x370ba0 (flags of the attach box in eax / [esp+1Ch], ebx = agent, edi = 2nd argument)
+const DWORD kMoveFlag10 = 0x00770dce;     // test al,10h; je 0x770de1; push edi; push ebx; call 0x753d30; add esp,8; jmp
+const char *const kMoveFlag10Hex = "a810 740f 57 53 e8572ffeff 83c408 e99e000000";
+const DWORD kMoveWall = 0x00770dd2;
+const DWORD kMoveDefault = 0x00770de1;    // mov eax,[0FADB58h]; mov ecx,[eax+0C94h]; push ecx; call 0x741720
+const char *const kMoveDefaultHex = "a158dbfa00 8b88940c0000 51 e82e09fdff";
+const DWORD kMoveNext = 0x00770de6;
+// 0.6: state 420 slot 1 tru+0x371320 (table entry 0x8b0f98) and the building blocks of the TU slot 1 body
+const DWORD kS420Slot1 = 0x00771320, kS420Slot1Entry = 0x008b0f98;
+const char *const kS420Slot1Hex = "8b4c2404 68d00e7700 e8520a0100 c3";
+const DWORD kS420Body = 0x007712db;       // PC slot 0 body = TU slot 0 body (pins the three callees)
+const char *const kS420BodyHex = "56 e8efc5feff 83a6f0000000c0 56 e8b2f8ffff a158dbfa00 d980980c0000 83c408 56 51 "
+                                 "8b88940c0000 d91c24 51 e863bfffff 83c40c";
+const DWORD kTemplate = 0x00781d80;       // thiscall(agent, callback): agent+0x51c = callback, ret 4
+const char *const kTemplateHex = "8b442404 89811c050000 c20400";
+const DWORD kS420Callback = 0x00770ed0;   // PC of TU 0x8245df50
+const DWORD kParamNode = 0x00783f50, kParamBool = 0x00784c20;
+const char *const kParamNodeHex = "56 8bf1 8b8620050000 85c0";
+const char *const kParamBoolHex = "8b442404 50 e806ffffff 85c0";
+const DWORD kPrepare = 0x0075d8d0, kAttachedMove = 0x00770ba0, kAttachedPos = 0x0076d270;
+const DWORD kPlayerPtr = 0x00e7f094;
+// 0.6: chart log - per-frame update of a machine tru+0x387e60: mov eax,[esi+510h]; push eax; call 0x7857d0
+const DWORD kChartTick = 0x00787ebf;
+const char *const kChartTickHex = "8b8610050000 50 e805d9ffff";
+const DWORD kChartTickNext = 0x00787ec5;
+
 typedef void(__cdecl *AttachFn)(const float *vec, float value);
+typedef void(__fastcall *TemplateFn)(void *agent, void *, DWORD callback);
+typedef void *(__fastcall *ParamNodeFn)(void *agent, void *, int id);
+typedef char(__fastcall *ParamBoolFn)(void *node, void *, int id, char *out);
+typedef void(__cdecl *AgentFn)(void *agent);
+typedef void(__cdecl *AttachedPosFn)(void *box, float value, void *agent);
+typedef int(__cdecl *DoppelgangerFn)();
 typedef int(__fastcall *GetTypeFn)(void *ctx, void *unused);   // thiscall getter, no stack arguments
 typedef char(__thiscall *BoxPredFn)(void *mgr, void *box);
 
@@ -177,6 +253,17 @@ DWORD g_nullBoxCallers[16];
 int g_markupAction608 = 1;              // 0.5: TU markup action 608 (attach to the jump target)
 DWORD g_selNext = kSelNext, g_selExit = kSelExit, g_pointOnBoxNext = kPointOnBoxNext;
 volatile LONG g_action608Calls = 0;
+int g_attachGeometry = 1;               // 0.6: TU type-22 facing (0x824006a8) and attached movement (0x8245d6c8)
+int g_state420Slot1 = 1;                // 0.6: TU state 420 slot 1 (0x8245e450)
+int g_chartLog = 1;                     // 0.6: log the player's chart record changes (LogLevel >= 1)
+int g_chartFrom = 1470, g_chartTo = 1510;
+int g_jumpGeometry = 1;                 // 0.8: TU type-22 branches of the jump-off / fall geometry ([RockVein] JumpGeometry)
+DWORD g_facingNext = kFacingNext, g_facingEdge = kFacingEdge, g_moveNext = kMoveNext, g_moveWall = kMoveWall;
+DWORD g_chartTickNext = kChartTickNext;
+volatile LONG g_facingHits = 0, g_moveHits = 0, g_slot1Calls = 0, g_slot1Runs = 0, g_chartLines = 0;
+// (0.7: the per-machine last record is g_chartLasts, next to ChartTick)
+DoppelgangerFn g_doppelganger = nullptr;
+int g_doppelgangerLooked = 0;
 DWORD g_dispatchNext = kDispatchNext;
 DWORD g_condDefaultNext = kCondDefaultNext;
 volatile LONG g_valueSeen[29];          // 601..628 first-call flags (index value - 600)
@@ -445,6 +532,12 @@ void ReadOptions(const char *dir) {
     g_markupSlots = GetPrivateProfileIntA("RockVein", "MarkupSlots", 1, ini);
     g_nullBoxGuard = GetPrivateProfileIntA("RockVein", "NullBoxGuard", 1, ini);
     g_markupAction608 = GetPrivateProfileIntA("RockVein", "MarkupAction608", 1, ini);
+    g_attachGeometry = GetPrivateProfileIntA("RockVein", "AttachGeometry", 1, ini);
+    g_state420Slot1 = GetPrivateProfileIntA("RockVein", "State420Slot1", 1, ini);
+    g_chartLog = GetPrivateProfileIntA("RockVein", "ChartLog", 1, ini);
+    g_chartFrom = GetPrivateProfileIntA("RockVein", "ChartLogFrom", 1470, ini);
+    g_chartTo = GetPrivateProfileIntA("RockVein", "ChartLogTo", 1510, ini);
+    g_jumpGeometry = GetPrivateProfileIntA("RockVein", "JumpGeometry", 1, ini);
 }
 
 // 0.3: the title update's markup types 22 / 23 -> flag class 1 (Xbox TU 0x822a12e8 table entries 21 / 22 = li r3,1).
@@ -603,8 +696,30 @@ void __stdcall Action608(const BYTE *agent) {
     if (n == 1 || (g_logLevel >= 2 && (n & (n - 1)) == 0)) {
         DWORD g = 0, a64 = 0, c94 = 0;
         ReadAttachState(&g, &a64, &c94);
-        Log(1, "markup action 608 (attach to jump target, title update) call %ld: agent 0x%08lx, box 0x%08lx -> "
-               "gameTracker+0xc94 0x%08lx%s", n, reinterpret_cast<DWORD>(agent), box, c94, box ? "" : " (no box, nothing done)");
+        float f[4] = {0, 0, 0, 0}, d[4] = {0, 0, 0, 0};
+        int id = -1, type = -1;
+        DWORD second = 0;
+        char hex[3 * 0x50 + 1] = "";
+        __try {
+            if (g) { memcpy(f, reinterpret_cast<const void *>(g + 0xcc0), 16); memcpy(d, reinterpret_cast<const void *>(g + 0xcb0), 16); }
+            const BYTE *rec = box ? *reinterpret_cast<const BYTE *const *>(box + 0x20) : nullptr;   // file record
+            if (rec) { id = *reinterpret_cast<const WORD *>(rec + 0x2e); type = static_cast<signed char>(rec[0x33]); }
+            // 0.7: in 48l the file record was id 2326 / type 0 and the type 22 came from the second markup +0x24
+            // (type byte +0x4d) - dump its first 0x50 bytes once so the owner can be found
+            second = box ? *reinterpret_cast<const DWORD *>(box + 0x24) : 0;
+            if (second && n == 1)
+                for (int i = 0; i < 0x50; ++i)
+                    _snprintf_s(hex + 3 * i, sizeof(hex) - 3 * i, _TRUNCATE, "%02x ", reinterpret_cast<const BYTE *>(second)[i]);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+        }
+        if (n == 1 && second) Log(1, "markup action 608: box 0x%08lx second markup +0x24 = 0x%08lx: %s", box, second, hex);
+        // 0.6: +0xcc0 = facing from tru+0x2fe7e0 (type 22: edge normal of segment 0), +0xcb0 = box line direction;
+        // record id names the owner object (DLC 2 type-22 ids: gooconverter 2404, machine_column 2682 / 2689 (48i data
+        // fix), piston_square 2690 / 2691, piston_a 2692, piston_c 2693)
+        Log(1, "markup action 608 (attach to jump target, title update) call %ld: agent 0x%08lx, box 0x%08lx (record id "
+               "%d, type %d) -> gameTracker+0xc94 0x%08lx%s; facing +0xcc0 (%.3f %.3f %.3f), line +0xcb0 (%.3f %.3f %.3f)",
+            n, reinterpret_cast<DWORD>(agent), box, id, type, c94, box ? "" : " (no box, nothing done)", f[0], f[1], f[2],
+            d[0], d[1], d[2]);
     }
 }
 
@@ -680,6 +795,509 @@ void PatchPointOnBox() {
         Log(0, "null-box guard at 0x%08lx not written (VirtualProtect %lu)", kPointOnBox, GetLastError());
 }
 
+// ---- 0.6: title-update attach geometry for type 22, state 420 slot 1, chart log ----
+
+bool HexBytesAt(DWORD address, const char *hex) {
+    BYTE buf[96];
+    size_t n = 0;
+    for (const char *p = hex; *p && n < sizeof(buf);) {
+        if (*p == ' ') { ++p; continue; }
+        char two[3] = {p[0], p[1], 0};
+        buf[n++] = static_cast<BYTE>(strtoul(two, nullptr, 16));
+        p += 2;
+    }
+    return BytesAt(address, buf, n);
+}
+
+bool IsType22(void *box) {
+    if (!box) return false;
+    int ok = 0, type = SafeType(box, &ok);
+    return ok && type == 22;
+}
+
+bool LogNow(LONG n) { return n == 1 || (g_logLevel >= 2 && (n & (n - 1)) == 0); }
+
+// TU 0x824009a0..0x82400a04: before the retail default, type == 22 -> facing = manager slot +0x08(box, segment 0)
+int __stdcall FacingType22(void *box) {
+    if (!IsType22(box)) return 0;
+    LONG n = InterlockedIncrement(&g_facingHits);
+    if (LogNow(n))
+        Log(1, "attach facing (tru+0x2fe7e0 = TU 0x824006a8): type-22 box 0x%08lx -> edge normal of segment 0, as the "
+               "title update (call %ld)", reinterpret_cast<DWORD>(box), n);
+    return 1;
+}
+
+// replaces `mov eax,[0E7F094h]` (5 bytes) at tru+0x2feb05, the first instruction of the retail default; esi = box
+__declspec(naked) void FacingDefault() {
+    __asm {
+        pushad
+        push esi
+        call FacingType22
+        test eax, eax
+        popad
+        jnz edge
+        mov eax, dword ptr ds:[0x00e7f094]
+        jmp dword ptr [g_facingNext]
+    edge:
+        jmp dword ptr [g_facingEdge]
+    }
+}
+
+// TU 0x8245d904..0x8245d938: flag bit 0x10 clear -> type([gameTracker+0xc94]) == 22 -> the wall handler 0x8244c2c8
+// (the TU reads the box without a null test; a null attach box here takes the retail path)
+int __stdcall MoveType22() {
+    DWORD gt = 0, a64 = 0, c94 = 0;
+    ReadAttachState(&gt, &a64, &c94);
+    if (!IsType22(reinterpret_cast<void *>(c94))) return 0;
+    LONG n = InterlockedIncrement(&g_moveHits);
+    if (LogNow(n))
+        Log(1, "attached movement (tru+0x370ba0 = TU 0x8245d6c8): attach box 0x%08lx type 22 -> wall handler tru+0x353d30, "
+               "as the title update (call %ld)", c94, n);
+    return 1;
+}
+
+// replaces `mov eax,[0FADB58h]` (5 bytes) at tru+0x370de1 (start of the wall-predicate path); ebx / edi as for +0x370dd2
+__declspec(naked) void MoveDefault() {
+    __asm {
+        pushad
+        call MoveType22
+        test eax, eax
+        popad
+        jnz wall
+        mov eax, dword ptr ds:[0x00fadb58]
+        jmp dword ptr [g_moveNext]
+    wall:
+        jmp dword ptr [g_moveWall]
+    }
+}
+
+int Doppelganger() {
+    if (!g_doppelgangerLooked) {
+        HMODULE m = GetModuleHandleA("TruDlc2Player.asi");
+        if (m) g_doppelganger = reinterpret_cast<DoppelgangerFn>(GetProcAddress(m, "TruDlc2PlayerDoppelganger"));
+        g_doppelgangerLooked = 1;
+        if (!g_doppelganger)
+            Log(0, "TruDlc2Player.asi / TruDlc2PlayerDoppelganger not found - doppelganger mode (TU gameTracker+0x1244) "
+                   "reads 0, state 420 slot 1 keeps the retail behaviour");
+    }
+    return g_doppelganger ? g_doppelganger() : 0;
+}
+
+// state 420 slot 1 = TU 0x8245e450 (cdecl(agent) like every PC state slot)
+void __cdecl State420Slot1(BYTE *agent) {
+    // TU: agent+0x52c = 0x8245df50 - the PC's slot 1 does this through the template (agent+0x51c = tru+0x370ed0)
+    reinterpret_cast<TemplateFn>(kTemplate)(agent, nullptr, kS420Callback);
+    LONG n = InterlockedIncrement(&g_slot1Calls);
+    int dg = Doppelganger();
+    char on = 0;
+    DWORD box = 0;
+    if (dg) {
+        void *node = reinterpret_cast<ParamNodeFn>(kParamNode)(agent, nullptr, 0x19e);   // TU 0x823d7230
+        if (node) reinterpret_cast<ParamBoolFn>(kParamBool)(node, nullptr, 0x19e, &on);
+    }
+    if (dg && on) {
+        reinterpret_cast<AgentFn>(kPrepare)(agent);                                     // TU 0x8245ce48
+        *reinterpret_cast<DWORD *>(agent + 0xf0) &= 0xffffffc0;                         // rlwinm 0, 0, 0x19
+        reinterpret_cast<AgentFn>(kAttachedMove)(agent);                                // TU 0x8245d6c8
+        const BYTE *gt = *reinterpret_cast<const BYTE *const *>(kGameTracker);
+        box = *reinterpret_cast<const DWORD *>(gt + 0xc94);
+        if (box)                                                                         // TU 0x8245d3a8(box, f, agent)
+            reinterpret_cast<AttachedPosFn>(kAttachedPos)(reinterpret_cast<void *>(box),
+                                                          *reinterpret_cast<const float *>(gt + 0xc98), agent);
+        InterlockedIncrement(&g_slot1Runs);
+    }
+    if (LogNow(n))
+        Log(1, "state 420 slot 1 (TU 0x8245e450) call %ld: doppelganger %d, parameter 0x19e %d -> attached movement %s "
+               "(box 0x%08lx, %ld runs)", n, dg, on, dg && on ? (box ? "run" : "run, position skipped: attach box 0") :
+               "not run (retail part only)", box, g_slot1Runs);
+}
+
+// ---- 0.8: title-update type-22 branches of the jump-off / fall geometry (counters reported from ChartTick) ----
+// Hit counters, written by the naked stubs below with `lock inc` (no call inside stubs that run while the x87 stack
+// may hold a value); ChartTick logs them on the game thread: first hit, then at LogLevel 2 every power of two.
+volatile LONG g_geoHits[5] = {0, 0, 0, 0, 0};   // 0 segment range, 1 TNode point, 2 bone point, 3 / 4 tru+0x309500 sites
+LONG g_geoReported[5] = {0, 0, 0, 0, 0};
+const char *const kGeoNames[5] = {
+    "segment range (tru+0x2fe040 = TU 0x823fe9d0): type-22 box -> last segment index - 1, like flag 0x400000",
+    "TNode attach point (tru+0x307c60 = TU 0x823fd890): type-22 box -> position + 47.4075 x facing, z - 474.075",
+    "bone attach point (tru+0x311530 = TU 0x823fe130): type-22 box -> position + 47.4075 x facing",
+    "segment corner 1 (tru+0x309500 site 0x7097cb = TU 0x82400dc0): type-22 box skips the angle, like flag 0x400000",
+    "segment corner 2 (tru+0x309500 site 0x709894 = TU 0x82400ea0): type-22 box skips the angle, like flag 0x400000"};
+
+void ReportGeometryHits() {
+    for (int i = 0; i < 5; ++i) {
+        LONG n = g_geoHits[i], last = g_geoReported[i];
+        if (n == last) continue;
+        g_geoReported[i] = n;
+        bool pow2 = false;                  // did the count cross a power of two since the last report?
+        for (LONG p = 1; p > 0 && p <= n; p <<= 1)
+            if (p > last) { pow2 = true; break; }
+        if (last == 0 || (g_logLevel >= 2 && pow2)) Log(1, "%s (%ld hits)", kGeoNames[i], n);
+    }
+}
+
+// chart log: record index of a chart record pointer in the machine's record array [[machine+4]+0xc]
+int RecordIndex(const BYTE *machine, DWORD rec) {
+    if (!rec) return -1;
+    __try {
+        const DWORD *arr = *reinterpret_cast<const DWORD *const *>(*reinterpret_cast<const BYTE *const *>(machine + 4) + 0xc);
+        for (int i = 0; i < 4096; ++i)
+            if (arr[i] == rec) return i;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return -1;
+}
+
+// 0.7: the player instance has more than one machine (48l: "record -1 -> 1492" every frame = two machines with the
+// player at +8 alternating in one shared "last record"); now one entry per machine
+struct ChartLast { const BYTE *machine; DWORD rec; };
+ChartLast g_chartLasts[8];
+
+void __stdcall ChartTick(const BYTE *machine) {
+    ReportGeometryHits();                   // 0.8
+    __try {
+        const BYTE *inst = *reinterpret_cast<const BYTE *const *>(machine + 8);
+        if (!inst || inst != *reinterpret_cast<const BYTE *const *>(kPlayerPtr)) return;
+        DWORD cur = *reinterpret_cast<const DWORD *>(machine + 0x510);
+        ChartLast *slot = nullptr;
+        for (int i = 0; i < 8 && !slot; ++i)
+            if (g_chartLasts[i].machine == machine) slot = &g_chartLasts[i];
+        for (int i = 0; i < 8 && !slot; ++i)
+            if (!g_chartLasts[i].machine) { slot = &g_chartLasts[i]; slot->machine = machine; slot->rec = 0; }
+        if (!slot || cur == slot->rec) return;
+        DWORD prev = slot->rec;
+        slot->rec = cur;
+        int ci = RecordIndex(machine, cur), pi = RecordIndex(machine, prev);
+        if (!((ci >= g_chartFrom && ci <= g_chartTo) || (pi >= g_chartFrom && pi <= g_chartTo))) return;
+        if (InterlockedIncrement(&g_chartLines) > 5000) return;
+        char sids[96] = "";
+        if (cur) {
+            WORD count = *reinterpret_cast<const WORD *>(cur + 0xc);
+            const WORD *list = *reinterpret_cast<const WORD *const *>(cur + 0x18);
+            int len = 0;
+            for (int i = 0; i < count && i < 8 && len < 80; ++i)
+                len += _snprintf_s(sids + len, sizeof(sids) - len, _TRUNCATE, "%s%u", i ? " " : "", list[i]);
+        }
+        DWORD gt = 0, a64 = 0, c94 = 0;
+        ReadAttachState(&gt, &a64, &c94);
+        Log(1, "chart: player machine 0x%08lx record %d -> %d (Lara states [%s]; +0xa64 0x%08lx, attach box +0xc94 "
+               "0x%08lx)", reinterpret_cast<DWORD>(machine), pi, ci, sids, a64, c94);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+}
+
+// replaces `mov eax,[esi+510h]` (6 bytes) at tru+0x387ebf; esi = machine (= agent)
+__declspec(naked) void ChartTickProbe() {
+    __asm {
+        pushad
+        push esi
+        call ChartTick
+        popad
+        mov eax, [esi + 0x510]
+        jmp dword ptr [g_chartTickNext]
+    }
+}
+
+void PatchAttachGeometry() {
+    if (!HexBytesAt(kFacingSwitch, kFacingSwitchHex) || !HexBytesAt(kFacingDefault, kFacingDefaultHex) ||
+        !HexBytesAt(kFacingEdge, kFacingEdgeHex)) {
+        Log(0, "facing function at 0x%08lx does not match - type-22 facing not added", kFacingDefault);
+    } else if (WriteJump(kFacingDefault, &FacingDefault, 5)) {
+        Log(1, "attach facing: type 22 -> edge normal of segment 0 (title update 0x824006a8; default 0x%08lx -> case 0x%08lx)",
+            kFacingDefault, kFacingEdge);
+    } else {
+        Log(0, "attach facing not written (VirtualProtect %lu)", GetLastError());
+    }
+    if (!HexBytesAt(kMoveFlag10, kMoveFlag10Hex) || !HexBytesAt(kMoveDefault, kMoveDefaultHex)) {
+        Log(0, "attached movement at 0x%08lx does not match - type-22 wall handler not added", kMoveDefault);
+    } else if (WriteJump(kMoveDefault, &MoveDefault, 5)) {
+        Log(1, "attached movement: attach box type 22 -> wall handler (title update 0x8245d6c8; 0x%08lx -> 0x%08lx)",
+            kMoveDefault, kMoveWall);
+    } else {
+        Log(0, "attached movement not written (VirtualProtect %lu)", GetLastError());
+    }
+}
+
+void PatchState420() {
+    if (*reinterpret_cast<const DWORD *>(kS420Slot1Entry) != kS420Slot1 || !HexBytesAt(kS420Slot1, kS420Slot1Hex) ||
+        !HexBytesAt(kS420Body, kS420BodyHex) || !HexBytesAt(kTemplate, kTemplateHex) ||
+        !HexBytesAt(kParamNode, kParamNodeHex) || !HexBytesAt(kParamBool, kParamBoolHex) ||
+        !HexBytesAt(kPrepare, "55 8bec 83e4f0 a158dbfa00 83ec1c") || !HexBytesAt(kAttachedMove, "55 8bec 83e4f0 a158dbfa00") ||
+        !HexBytesAt(kAttachedPos, "55 8bec 83e4f0 81ec94000000")) {
+        Log(0, "state 420 slot 1 at 0x%08lx (or its building blocks) does not match - TU slot 1 not added", kS420Slot1);
+        return;
+    }
+    if (WriteJump(kS420Slot1, &State420Slot1, 5))   // a jump keeps the slot's cdecl frame (return address, agent)
+        Log(1, "state 420 slot 1: title-update body added (0x8245e450: doppelganger mode + parameter 0x19e -> attached "
+               "movement; 0x%08lx)", kS420Slot1);
+    else
+        Log(0, "state 420 slot 1 not written (VirtualProtect %lu)", GetLastError());
+}
+
+void PatchChartLog() {
+    if (!HexBytesAt(kChartTick, kChartTickHex)) {
+        Log(0, "machine update at 0x%08lx does not match - chart log off", kChartTick);
+        return;
+    }
+    if (WriteJump(kChartTick, &ChartTickProbe, 6))
+        Log(1, "chart log: player record changes with an index in %d..%d are logged (diagnostic; 0x%08lx)", g_chartFrom,
+            g_chartTo, kChartTick);
+    else
+        Log(0, "chart log not written (VirtualProtect %lu)", GetLastError());
+}
+
+// ---- 0.8 stubs. The type test is the TU's inline one (0x823feab4..0x823feadc and the same block in the other
+// functions): box +0x24 (second markup) ? its byte +0x4d : (box +0x20 (file record) ? its byte +0x33 : no type),
+// sign-extended, == 22. ebx / esi / edi as at the patched instruction of each PC function.
+const DWORD kSegRangeAt = 0x006fe0e5;     // test dword [esi+28h],400000h; je 0x6fe0f1; sub eax,1 (esi = box, eax = last)
+const DWORD kSegRangeCheck = 0x006fe0d5;
+const char *const kSegRangeHex = "8b4e20 33c0 394158 7406 8b4634 83e801 f7462800004000 7403 83e801 8b4d0c";
+const DWORD kSegRangeNext = 0x006fe0f1;
+const DWORD kTNodeAt = 0x00707fc8;        // retail default: out(esi) = position(edi), print, return (ebx = box)
+const DWORD kTNodeCheck = 0x00707fb6;
+const char *const kTNodeHex = "3d00000020 0f841f020000 3d00000040 7424 8b07 8906 8b4f04 894e04 8b5708 895608 8b470c "
+                              "89460c e8bdd7f3ff 8bc6 5f 5e 5b 8be5 5d c3";
+const DWORD kTNodeFacingCall = 0x00707cc6;   // push ebx; push ecx; movaps [esp+30h]; mov [esp+4Ch],edx; call facing; add esp,10h
+const char *const kTNodeFacingHex = "53 51 0f29442430 8954244c e80a6bffff 83c410";   // -> the facing at [esp+40h]
+const DWORD kTNodeEntry = 0x00707c60;
+const char *const kTNodeEntryHex = "55 8bec 83e4f0 81ec14010000 8b4518 d9ee 8b08 8b5004 f30f10051c118400 53 8b5d14 56 8b7508 "
+                                   "57 8b7d10";
+const DWORD kTNodeNext = 0x00707fcf, kTNodeEnd = 0x00707fe3;
+const DWORD kBoneAt = 0x007117e3;         // retail default, same shape (ebx = box, esi = out, edi = position)
+const DWORD kBoneCheck = 0x007117d5;
+const char *const kBoneHex = "3d00000020 742b 3d00000040 7424 8b07 8906 8b4f04 894e04 8b5708 895608 8b470c 89460c "
+                             "e8a23ff3ff 8bc6 5f 5e 5b 8be5 5d c3";
+const DWORD kBoneEntry = 0x00711530;
+const char *const kBoneEntryHex = "55 8bec 83e4f0 81ecb4000000 f30f10051c118400 8b4d18 53 8b5d14 8b5328 8bc2 56 8b7508";
+const DWORD kBoneNext = 0x007117ea, kBoneEnd = 0x007117fe;
+const DWORD kCorner1At = 0x007097cb, kCorner1Next = 0x007097d6, kCorner1Skip = 0x00709883;
+const char *const kCorner1Hex = "8b4728 a900004000 0f85ad000000 8d5a01 3b5f34";        // at 0x7097c8 (edi = box)
+const DWORD kCorner2At = 0x00709894, kCorner2Next = 0x0070989f, kCorner2Skip = 0x00709953;
+const char *const kCorner2Hex = "8b4728 a900004000 0f85b4000000 8b4c2430";              // at 0x709891
+const DWORD kFacingFn = 0x006fe7e0;       // cdecl(out, box, segment, position) = TU 0x824006a8 (0.6 adds its type-22 case)
+const char *const kFacingFnHex = "55 8bec 83e4f0 81ec24010000";
+// TU constants (read from the TU image; the PC exe has neither value): 0x82051bc0 = 47.4075 (lfs -0xa38(r7) /
+// 0x1bc0(0x82050000)), 0x8207e5ac = 474.075 (lfs -0x1a54(0x82080000))
+const DWORD kTuOffsetBits = 0x423da148, kTuDropBits = 0x43ed099a;
+DWORD g_segNext = kSegRangeNext, g_tnodeNext = kTNodeNext, g_tnodeEnd = kTNodeEnd, g_boneNext = kBoneNext,
+      g_boneEnd = kBoneEnd, g_c1Next = kCorner1Next, g_c1Skip = kCorner1Skip, g_c2Next = kCorner2Next,
+      g_c2Skip = kCorner2Skip;
+typedef float *(__cdecl *FacingFn)(float *out, void *box, int segment, const float *position);
+
+float TuFloat(DWORD bits) { float f; memcpy(&f, &bits, 4); return f; }
+
+// TU vector normalise as in these blocks: vdot3 (x, y, z), reciprocal square root (the TU: vrsqrtefp + one Newton step;
+// here 1 / sqrtf - differs only in the last bits), all four lanes scaled; length 0 -> 0 vector (vcmpeqfp / vsel)
+void TuNormalize(const float *v, float *n) {
+    float d = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+    if (d == 0.0f) { n[0] = n[1] = n[2] = n[3] = 0.0f; return; }
+    float inv = 1.0f / sqrtf(d);
+    for (int i = 0; i < 4; ++i) n[i] = v[i] * inv;
+}
+
+// TU 0x823fdd9c..0x823fde10: v2 = position + normalize(facing v126) x [0x82051bc0]; z -= [0x8207e5ac]; return v2
+int __stdcall TNodeType22(void *box, float *out, const float *position, const float *facing) {
+    if (!IsType22(box)) return 0;
+    __try {
+        float n[4];
+        TuNormalize(facing, n);
+        float k = TuFloat(kTuOffsetBits);
+        for (int i = 0; i < 4; ++i) out[i] = position[i] + n[i] * k;
+        out[2] -= TuFloat(kTuDropBits);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+    InterlockedIncrement(&g_geoHits[1]);
+    return 1;
+}
+
+// TU 0x823fe4f8..0x823fe558: v1 = 0x824006a8(box, segment, position) (facing); return position + normalize(v1) x
+// [0x82051bc0]
+int __stdcall BoneType22(void *box, float *out, int segment, const float *position) {
+    if (!IsType22(box)) return 0;
+    __try {
+        __declspec(align(16)) float face[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        reinterpret_cast<FacingFn>(kFacingFn)(face, box, segment, position);
+        float n[4];
+        TuNormalize(face, n);
+        float k = TuFloat(kTuOffsetBits);
+        for (int i = 0; i < 4; ++i) out[i] = position[i] + n[i] * k;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+    InterlockedIncrement(&g_geoHits[2]);
+    return 1;
+}
+
+// tru+0x2fe0e5: flag 0x400000 or type 22 -> eax (last segment index) - 1 (TU 0x823feaa4..0x823feae0)
+__declspec(naked) void SegRangeStub() {
+    __asm {
+        test dword ptr [esi + 28h], 400000h
+        jnz dec1
+        push ecx
+        push eax
+        mov ecx, [esi + 24h]
+        test ecx, ecx
+        jz rec
+        movsx eax, byte ptr [ecx + 4dh]
+        jmp cmp22
+    rec:
+        mov ecx, [esi + 20h]
+        test ecx, ecx
+        jz no
+        movsx eax, byte ptr [ecx + 33h]
+    cmp22:
+        cmp eax, 16h
+        jne no
+        lock inc dword ptr [g_geoHits]
+        pop eax
+        pop ecx
+    dec1:
+        sub eax, 1
+        jmp dword ptr [g_segNext]
+    no:
+        pop eax
+        pop ecx
+        jmp dword ptr [g_segNext]
+    }
+}
+
+// tru+0x307fc8 (default of the TNode attach point; esp = the frame of the function body, facing at [esp+40h])
+__declspec(naked) void TNodeDefault() {
+    __asm {
+        pushad
+        lea eax, [esp + 60h]
+        push eax
+        push edi
+        push esi
+        push ebx
+        call TNodeType22
+        test eax, eax
+        popad
+        jnz handled
+        mov eax, [edi]
+        mov [esi], eax
+        mov ecx, [edi + 4]
+        jmp dword ptr [g_tnodeNext]
+    handled:
+        jmp dword ptr [g_tnodeEnd]
+    }
+}
+
+// tru+0x3117e3 (default of the bone attach point; segment = [ebp+0Ch])
+__declspec(naked) void BoneDefault() {
+    __asm {
+        pushad
+        push edi
+        push dword ptr [ebp + 0Ch]
+        push esi
+        push ebx
+        call BoneType22
+        test eax, eax
+        popad
+        jnz handled
+        mov eax, [edi]
+        mov [esi], eax
+        mov ecx, [edi + 4]
+        jmp dword ptr [g_boneNext]
+    handled:
+        jmp dword ptr [g_boneEnd]
+    }
+}
+
+// tru+0x3097cb / +0x309894: `test eax,400000h; jne skip` (eax = [edi+28h], edi = box) + the TU's type-22 test
+__declspec(naked) void Corner1Stub() {
+    __asm {
+        test eax, 400000h
+        jnz skip
+        push ecx
+        push eax
+        mov ecx, [edi + 24h]
+        test ecx, ecx
+        jz rec
+        movsx eax, byte ptr [ecx + 4dh]
+        jmp cmp22
+    rec:
+        mov ecx, [edi + 20h]
+        test ecx, ecx
+        jz no
+        movsx eax, byte ptr [ecx + 33h]
+    cmp22:
+        cmp eax, 16h
+        jne no
+        lock inc dword ptr [g_geoHits + 12]
+        pop eax
+        pop ecx
+    skip:
+        jmp dword ptr [g_c1Skip]
+    no:
+        pop eax
+        pop ecx
+        jmp dword ptr [g_c1Next]
+    }
+}
+
+__declspec(naked) void Corner2Stub() {
+    __asm {
+        test eax, 400000h
+        jnz skip
+        push ecx
+        push eax
+        mov ecx, [edi + 24h]
+        test ecx, ecx
+        jz rec
+        movsx eax, byte ptr [ecx + 4dh]
+        jmp cmp22
+    rec:
+        mov ecx, [edi + 20h]
+        test ecx, ecx
+        jz no
+        movsx eax, byte ptr [ecx + 33h]
+    cmp22:
+        cmp eax, 16h
+        jne no
+        lock inc dword ptr [g_geoHits + 16]
+        pop eax
+        pop ecx
+    skip:
+        jmp dword ptr [g_c2Skip]
+    no:
+        pop eax
+        pop ecx
+        jmp dword ptr [g_c2Next]
+    }
+}
+
+void PatchJumpGeometry() {
+    struct Piece { const char *name; DWORD check; const char *hex; DWORD at; const void *stub; int len; };
+    const Piece pieces[5] = {
+        {"segment range", kSegRangeCheck, kSegRangeHex, kSegRangeAt, &SegRangeStub, 5},
+        {"TNode attach point", kTNodeCheck, kTNodeHex, kTNodeAt, &TNodeDefault, 7},
+        {"bone attach point", kBoneCheck, kBoneHex, kBoneAt, &BoneDefault, 7},
+        {"segment corner 1", kCorner1At - 3, kCorner1Hex, kCorner1At, &Corner1Stub, 5},
+        {"segment corner 2", kCorner2At - 3, kCorner2Hex, kCorner2At, &Corner2Stub, 5}};
+    // pins of the registers / frame the stubs rely on
+    const bool tnodeFrame = HexBytesAt(kTNodeEntry, kTNodeEntryHex) && HexBytesAt(kTNodeFacingCall, kTNodeFacingHex);
+    const bool boneFrame = HexBytesAt(kBoneEntry, kBoneEntryHex) && HexBytesAt(0x007115ea, "8b450c") &&
+                           HexBytesAt(0x0071157c, "8b7d10") && HexBytesAt(kFacingFn, kFacingFnHex);
+    int written = 0;
+    for (int i = 0; i < 5; ++i) {
+        const Piece &p = pieces[i];
+        if ((i == 1 && !tnodeFrame) || (i == 2 && !boneFrame) || !HexBytesAt(p.check, p.hex)) {
+            Log(0, "%s at 0x%08lx does not match - its type-22 branch not added", p.name, p.at);
+            continue;
+        }
+        if (WriteJump(p.at, p.stub, p.len)) {
+            ++written;
+            Log(1, "%s: title-update type-22 branch added (0x%08lx)", p.name, p.at);
+        } else {
+            Log(0, "%s not written (VirtualProtect %lu)", p.name, GetLastError());
+        }
+    }
+    Log(1, "jump geometry: %d of 5 type-22 branches added (hits are reported by the chart probe%s)", written,
+        g_chartLog ? "" : " - ChartLog=0, so no hit lines");
+}
+
 bool WriteDword(DWORD at, DWORD value) {
     DWORD old = 0, dummy = 0;
     if (!VirtualProtect(reinterpret_cast<void *>(at), 4, PAGE_READWRITE, &old)) return false;
@@ -745,9 +1363,10 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruRockVein.log", dir);
     strncpy_s(g_dir, sizeof(g_dir), dir, _TRUNCATE);
     ReadOptions(dir);
-    Log(1, "TruRockVein 0.5 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
-        "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d)", g_enabled, g_logLevel, g_logUnhandled,
-        g_logBadValues, g_logDefaultConditions, g_markupTypes, g_markupSlots, g_nullBoxGuard, g_markupAction608);
+    Log(1, "TruRockVein 0.8 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
+        "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d, attach geometry %d, state 420 slot 1 %d, "
+        "chart log %d, jump geometry %d)", g_enabled, g_logLevel, g_logUnhandled, g_logBadValues, g_logDefaultConditions, g_markupTypes,
+        g_markupSlots, g_nullBoxGuard, g_markupAction608, g_attachGeometry, g_state420Slot1, g_chartLog, g_jumpGeometry);
     if (!g_enabled) { Log(1, "disabled by TruRockVein.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -755,6 +1374,10 @@ void Start(HMODULE self) {
     if (g_markupSlots || g_nullBoxGuard) PatchSlots();
     if (g_markupAction608) PatchSelector();
     if (g_nullBoxGuard) PatchPointOnBox();
+    if (g_attachGeometry) PatchAttachGeometry();
+    if (g_state420Slot1) PatchState420();
+    if (g_chartLog) PatchChartLog();
+    if (g_jumpGeometry) PatchJumpGeometry();
     if (!BytesAt(kDispatch, kDispatchBytes, sizeof(kDispatchBytes)) || !BytesAt(kDefault, kDefaultBytes, sizeof(kDefaultBytes)) ||
         !BytesAt(kExit, kExitBytes, sizeof(kExitBytes)) || !BytesAt(kCtxUse, kCtxUseBytes, sizeof(kCtxUseBytes))) {
         Log(0, "SCCondTest_MarkupType at 0x%08lx does not match (other tru.exe build?) - not patched", kDispatch);
@@ -784,4 +1407,4 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
-extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.5 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608)"; }
+extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.8 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry)"; }

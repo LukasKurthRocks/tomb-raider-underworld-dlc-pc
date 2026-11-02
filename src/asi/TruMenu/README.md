@@ -17,7 +17,9 @@ checked with `dumpbin` only - not yet run in the game. 0.5 (TO TEST row kinds st
 checked with `dumpbin` only - not yet run in the game. 0.6 (**command bar**: one input line directly under the menu
 window, autocomplete, history, pad picker, `cmd.focus` / `cmd.run` / `cmd.history`, `[Cmd]` keys; on top of the 0.5
 source with the TruGuard items `guard.*`) built 2026-11-01 into `work\asi\menu06`, checked with `dumpbin` only - not
-yet run in the game. `camera.free` is still a todo (see "0.4 items").**
+yet run in the game. 0.7 (TruGuard action `guard.dump`: full minidump + thread snapshot on the TruLink thread, also
+while the game hangs; longer `guard.status` buffer) built 2026-11-02 into `work\asi`, checked with `dumpbin` only -
+not yet run in the game. `camera.free` is still a todo (see "0.4 items").**
 
 ## Controls
 

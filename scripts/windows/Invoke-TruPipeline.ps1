@@ -42,15 +42,16 @@
                (dlc2_asm_stage2a -> dlc2_asm_stage2b, --pack pack11); cloth / uipath / uitext were found in DLC 2,
                uipath / uitext also change 10 DLC 1 level files (since 2026-10-30); statechart (2026-10-31) re-converts
                the state charts of the new DLC objects (DLC 2 player chart: needs the title-update memory image);
-               childids / translist / actlist / eventlist / reclist / fadeslots / animfx (2026-11-01) apply the
-               structure layouts proven on the base pairs (tools/dlc_struct_fixes.py, tests 47 / 48 / 48c-48h);
+               twins / childids / translist / actlist / eventlist / reclist / fadeslots / animfx / markup /
+               vmliteral (2026-11-01/02) apply the structure layouts proven on the base pairs
+               (tools/dlc_struct_fixes.py, tests 47 / 48 / 48c-48m; twins ~20 min);
                achievement (2026-10-31, last) drops the 11 script calls into the title update's achievement natives
                f16-f20 that the PC exe lacks (1 in DLC 1, 10 in DLC 2)
       Repair   the repair tree for an installed B138 (finding 43, tested in game 2026-10-30): b138_snapshot (pristine
                B138 mods, verified against the kit manifest, from the game folder and the Install-TruTree backups),
                generalbank_build (see Generalbank), b138_fix_tree (shader constant fix, grapple ring shaders, DLC 1 UI
-               paths / texts, DLC 1 state charts, the DLC 1 achievement call, cinematic languages of both DLCs, our
-               generalbank.drm)
+               paths / texts, DLC 1 state charts, DLC 1 structure fixes (anim event lists of the costumes, pillar
+               markup; step struct), the DLC 1 achievement call, cinematic languages of both DLCs, our generalbank.drm)
                -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
       Generalbank  our generalbank.drm alone (after Repair's snapshot): B138's + mission screen style + the title
                update's loading screen (script 6, DLC titles) and hint box (script 10 -> 9), 21 steps with the

@@ -21,9 +21,11 @@
       8. waits for the game to exit (-TimeoutMinutes; on a timeout it stops waiting and collects what is there),
       9. collects into <workspace>\runs\<time>_<profile>\: the new part of every Tru*.log of the game folder, the cdb
          log, TruMenu.tests.txt, our INIs after the run, markers (D3DFAIL + hresult, AV2NDCHANCE, FASTFAIL,
-         STACKOVERFLOW, EXITPROCESS, TERMINATEPROCESS, MESSAGEBOX_A/W), dump file names / sizes newer than the start,
-         the installed md5s; writes summary.md and summary.json (status table: ok / fail / open per row, first crash
-         marker).
+STACKOVERFLOW, EXITPROCESS, TERMINATEPROCESS, MESSAGEBOX_A/W), TruGuard markers (TRUGUARD_FAULT /
+TRUGUARD_DETAIL / TRUGUARD_RESUME / RESUME_STOP / HANDLED / PREV / DUMP; an unhandled DETAIL counts as a crash even
+without a debugger), dump file
+         names / sizes newer than the start, the installed md5s; writes summary.md and summary.json (status table:
+         ok / fail / open per row, first crash marker).
      10. evaluates the profile's "expects" (automatic checks: a regex counted in one collected file) and writes the
          section "Automatic checks" plus an overall verdict: PASS = every automatic check ok + no crash marker + every
          owner check (TO TEST check row) ok; FAIL = a failed automatic check, a crash marker or a failed owner check;
@@ -341,6 +343,57 @@ function Find-Markers {
     return ,$found
 }
 
+function Find-GuardFaults {
+    # TruGuard.log -> marker list in log order (kind, site, code, access, addr, hits, state, dump, line)
+    param([string]$Path)
+    $found = @()
+    if (!$Path -or !(Test-Path -LiteralPath $Path)) { return ,$found }
+    $lines = [IO.File]::ReadAllLines($Path)
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $m = [regex]::Match($lines[$i], 'TRUGUARD_(FAULT|DETAIL|RESUME|HANDLED|PREV|DUMP|RESUME_STOP)\s+(.*)$')
+        if (!$m.Success) { continue }
+        $kind = $m.Groups[1].Value
+        $rest = $m.Groups[2].Value
+        $site = [regex]::Match($rest, 'site=tru\+0x([0-9a-f]+)')
+        $dump = [regex]::Match($rest, '(?:^|\s)dump=(.+)$')   # a path may contain spaces, so it is the last field
+        $pathField = [regex]::Match($rest, '(?:^|\s)path=(.+)$')
+        $newest = [regex]::Match($rest, 'newest=([^\s]+)')
+        $count = [regex]::Match($rest, 'count=([0-9]+)')
+        if (!$count.Success) { $count = [regex]::Match($rest, '^([0-9]+) resumes') }
+        $found += [pscustomobject][ordered]@{
+            kind    = $kind
+            line    = $i + 1
+            site    = $(if ($site.Success) { 'tru+0x' + $site.Groups[1].Value } else { if ($newest.Success) { $newest.Groups[1].Value } else { '?' } })
+            code    = (Get-GuardField $rest 'code')
+            access  = (Get-GuardField $rest 'access')
+            addr    = (Get-GuardField $rest 'addr')
+            hits    = $(if ($kind -eq 'HANDLED') { (Get-GuardField $rest 'hits') } elseif ($kind -eq 'PREV') { $count.Groups[1].Value } else { (Get-GuardField $rest 'hits') })
+            state   = (Get-GuardField $rest 'state')
+            skip    = (Get-GuardField $rest 'skip')
+            target  = (Get-GuardField $rest 'to')
+            dump    = $(if ($pathField.Success) { $pathField.Groups[1].Value.Trim() } elseif ($dump.Success) { $dump.Groups[1].Value.Trim() } else { '' })
+            count   = $(if ($count.Success) { $count.Groups[1].Value } else { '' })
+            newest  = $(if ($newest.Success) { $newest.Groups[1].Value } else { '' })
+        }
+    }
+    return ,$found
+}
+
+function Get-GuardField {
+    param([string]$Text, [string]$Name)
+    $m = [regex]::Match($Text, '(?:^|\s)' + [regex]::Escape($Name) + '=([^\s]+)')
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ''
+}
+
+function Get-GuardCrash {
+    # a DETAIL with state=unhandled is a fatal fault in tru.exe, with or without cdb
+    param($Faults)
+    $f = @($Faults) | Where-Object { $_ -and $_.kind -eq 'DETAIL' -and $_.state -eq 'unhandled' } | Select-Object -First 1
+    if ($f) { return ('TRUGUARD_UNHANDLED (line {0}) {1} {2} {3}' -f $f.line, $f.site, $f.code, $f.addr) }
+    return $null
+}
+
 function Resolve-RunFolder {
     param([string]$Name)
     if (!$Name) { return $null }
@@ -448,6 +501,8 @@ function Set-RunVerdict {
     $cOther   = $checks.Count - $cFail - $cOk
     $notes = New-Object System.Collections.Generic.List[string]
     if ($Run.firstCrash) { $notes.Add("crash marker $($Run.firstCrash)") }
+    $firstChanceSites = @($Run.guard | Where-Object { $_ -and $_.kind -eq 'DETAIL' -and $_.state -eq 'firstchance' })
+    if ($firstChanceSites.Count) { $notes.Add("$($firstChanceSites.Count) first-chance fault site(s) recorded (see TruGuard faults)") }
     $notes.Add(('automatic checks {0}/{1} ok{2}{3}' -f @($required | Where-Object { $_.result -eq 'ok' }).Count, $required.Count,
         $(if ($failed) { ", $failed failed" }), $(if ($missing) { ", $missing without their file" })))
     if (!$checks.Count) { $notes.Add('no owner checks collected') }
@@ -480,6 +535,13 @@ function Compare-TruRun {
         if ([int]$ca[$k] -ne [int]$cb[$k]) { $out.Add(('  marker  {0}: {1} -> {2}' -f $k, [int]$ca[$k], [int]$cb[$k])) }
     }
     if ($a.firstCrash -ne $b.firstCrash) { $out.Add(('  first crash marker: {0} -> {1}' -f $(if ($a.firstCrash) { $a.firstCrash } else { '-' }), $(if ($b.firstCrash) { $b.firstCrash } else { '-' }))) }
+    # TruGuard sites with their state (firstchance / unhandled / resumed) - a site that switches to "unhandled"
+    # is the difference that matters between a run that survived and one that crashed
+    $ga = @{}; foreach ($g in @($a.guard)) { if ($g -and $g.kind -eq 'DETAIL') { $ga["$($g.site) $($g.state)"] = 1 } }
+    $gb = @{}; foreach ($g in @($b.guard)) { if ($g -and $g.kind -eq 'DETAIL') { $gb["$($g.site) $($g.state)"] = 1 } }
+    foreach ($k in (@($ga.Keys) + @($gb.Keys) | Sort-Object -Unique)) {
+        if (!$ga[$k] -or !$gb[$k]) { $out.Add(('  guard   {0}: {1} -> {2}' -f $k, $(if ($ga[$k]) { 'yes' } else { '-' }), $(if ($gb[$k]) { 'yes' } else { '-' }))) }
+    }
     if ($a.exitCode -ne $b.exitCode) { $out.Add(('  exit code: {0} -> {1}' -f $a.exitCode, $b.exitCode)) }
     $ta = @{}; foreach ($r in @($a.tests)) { if ($r) { $ta[$r.id] = $r } }
     $tb = @{}; foreach ($r in @($b.tests)) { if ($r) { $tb[$r.id] = $r } }
@@ -606,6 +668,38 @@ function Write-RunSummary {
     foreach ($m in @($Run.markers)) { if ($m) { $i++; $md.Add("| $i | $($m.name) | $($m.line) | $($m.detail) |") } }
     if (!$i) { $md.Add("| - | none | - | $(if ($Run.mode -like 'debugger*') { 'cdb log without markers' } else { 'plain start: no cdb log' }) |") }
     $md.Add('')
+    if ($Run.ContainsKey('guard')) {
+        $md.Add('## TruGuard faults (TruGuard.log)')
+        $md.Add('')
+        $md.Add('| # | Kind | Site | Code | Access | Address | Hits/Count | State | Dump |')
+        $md.Add('|---|---|---|---|---|---|---|---|---|')
+        $i = 0
+        foreach ($g in @($Run.guard)) {
+            if (!$g) { continue }
+            $i++
+            if ($g.kind -eq 'RESUME') {
+                $md.Add(('| {0} | RESUME | {1} | - | - | skip {2} to {3} | - | - | - |' -f $i, $g.site, $g.skip, $g.target))
+            }
+            elseif ($g.kind -eq 'RESUME_STOP') {
+                $md.Add(('| {0} | STOP | - | - | - | {1} resumes in 1 s | - | - | - |' -f $i, $g.count))
+            }
+            elseif ($g.kind -eq 'HANDLED') {
+                $md.Add(('| {0} | HANDLED | {1} | - | - | - | {2} | - | - |' -f $i, $g.site, $g.hits))
+            }
+            elseif ($g.kind -eq 'PREV') {
+                $md.Add(('| {0} | PREV | {1} | - | - | - | {2} | - | - |' -f $i, $g.site, $g.count))
+            }
+            elseif ($g.kind -eq 'DUMP') {
+                $md.Add(('| {0} | DUMP | - | - | - | - | - | manual | {1} |' -f $i, $(if ($g.dump) { $g.dump } else { '-' })))
+            }
+            else {
+                $md.Add(('| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} |' -f $i, $g.kind, $g.site, $g.code,
+                    $g.access, $g.addr, $g.hits, $g.state, $(if ($g.dump) { $g.dump } else { '-' })))
+            }
+        }
+        if (!$i) { $md.Add('| - | none | - | - | - | - | - | - | no TRUGUARD_* lines |') }
+        $md.Add('')
+    }
     $md.Add('## Installed (md5)')
     $md.Add('')
     $md.Add('| File | md5 | Expected |')
@@ -641,7 +735,7 @@ try {
         }
         else {
             $run = @{ profile = $p.Name; start = '?'; end = '?'; status = 'unknown (no summary.json)'; statusIcon = $iconOpen; mode = 'unknown'
-                      exitCode = $null; preload = 'unknown'; firstCrash = $null; markers = @(); tests = @(); dumps = @(); collected = @()
+                      exitCode = $null; preload = 'unknown'; firstCrash = $null; markers = @(); guard = @(); tests = @(); dumps = @(); collected = @()
                       installed = @(); md5Notes = @() }
         }
         $cdb = Join-Path $folder 'cdb.log'
@@ -649,6 +743,9 @@ try {
             $run.markers = @(Find-Markers $cdb | ForEach-Object { $_ })
             $run.firstCrash = Get-FirstCrash -Markers $run.markers -ExitCode $run.exitCode
         }
+        $run.guard = @(Find-GuardFaults (Join-Path $folder 'TruGuard.log') | ForEach-Object { $_ })
+        $guardCrash = Get-GuardCrash $run.guard
+        if (!$run.firstCrash -and $guardCrash) { $run.firstCrash = $guardCrash }
         $testRows = Read-TestFile (Join-Path $folder 'TruMenu.tests.txt')
         if ($testRows.Count) { $run.tests = ConvertTo-RunTests $testRows }
         $run.expectsFrom = '{0} (evaluated offline {1})' -f $p.Name, (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
@@ -829,7 +926,7 @@ try {
     $run = @{
         profile = $profName; start = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'); end = $null; status = 'installed'; statusIcon = $iconOpen
         mode = $(if ($Debugger) { "debugger ($([IO.Path]::GetFileName($Session)))" } else { 'plain (affinity FFFF)' })
-        exitCode = $null; preload = 'not done'; firstCrash = $null; markers = @(); tests = @(); dumps = @(); collected = @()
+        exitCode = $null; preload = 'not done'; firstCrash = $null; markers = @(); guard = @(); tests = @(); dumps = @(); collected = @()
         installed = $installed; md5Notes = @($md5Notes)
     }
     if ($InstallOnly) {
@@ -953,6 +1050,12 @@ try {
     # markers became ONE row with joined names and the crash-marker test below missed D3DFAIL / MESSAGEBOX
     $run.markers = @(Find-Markers $cdbLog | ForEach-Object { $_ })
     $run.firstCrash = Get-FirstCrash -Markers $run.markers -ExitCode $run.exitCode
+
+    # TruGuard markers are in its own log (plain runs have no cdb log); an unhandled DETAIL is a fatal fault.
+    # Only the copy in the run folder is read - the game folder may still hold a log from an earlier session.
+    $run.guard = @(Find-GuardFaults (Join-Path $runFolder 'TruGuard.log') | ForEach-Object { $_ })
+    $guardCrash = Get-GuardCrash $run.guard
+    if (!$run.firstCrash -and $guardCrash) { $run.firstCrash = $guardCrash }
 
     # dumps: paths named in the session file, the WER folder, the game folder, TruGuard's own folder, the run folder
     $dumpDirs = @((Join-Path $env:LOCALAPPDATA 'CrashDumps'), $GamePath, (Join-Path $GamePath 'TruGuardDumps'), $runFolder)

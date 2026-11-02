@@ -89,6 +89,39 @@ a box, the caller of the second crash site tru+0x1c39e2). Log lines: "markup act
 (attach to jump target, title update) call N: ... -> gameTracker+0xc94 0x........", "attach point tru+0x32ba40 called
 with box 0 ...". Built 2026-11-01 into `work\asi_rv05`, not loaded.
 
+## 0.6: type-22 facing, wall movement, state 420 slot 1, chart log (2026-11-01)
+
+Test 48k with 0.5: Lara attaches but faces the wrong way, does not stick and drops off early. The wall run is chart
+record 1477 (Lara states 236 / 230 / 2102, parameter 0x19a = 608) under the root 1482 (states 420 / 572 / 1900).
+Three title-update pieces on that path, each translated 1:1 (docs `Befund-Felsrinne.md` "Wall run: orientation,
+magnet and duration"):
+
+- **Facing** (option `AttachGeometry`): TU 0x824006a8 = PC tru+0x2fe7e0 (result -> gameTracker+0xcc0 at attach) has a
+  new "type == 22 -> edge normal of segment 0" branch before the retail default. `FacingDefault` (5-byte jump at the
+  default tru+0x2feb05) sends a type-22 box to the existing flag-0x8000 case tru+0x2feae4 (same code as the TU branch).
+- **Wall movement** (`AttachGeometry`): TU 0x8245d6c8 = PC tru+0x370ba0: flag bit 0x10 "or type(gameTracker+0xc94)
+  == 22" -> wall handler PC tru+0x353d30. `MoveDefault` (5-byte jump at tru+0x370de1) adds the type test.
+- **State 420 slot 1** (`State420Slot1`): TU 0x8245e450 runs the attached movement also in slot 1 when doppelganger
+  mode (TU gameTracker+0x1244 = `TruDlc2PlayerDoppelganger()` of TruDlc2Player.asi) and the bool parameter 0x19e are
+  set; replaces PC tru+0x371320 (which keeps its callback store through the template tru+0x381d80).
+- **Chart log** (`ChartLog`, `ChartLogFrom` / `ChartLogTo`, default 1470..1510; diagnostic): logs the player's chart
+  record changes (machine update tru+0x387ebf, `[machine+0x510]`) with the record index and its Lara state ids.
+
+Log lines: "attach facing: type 22 -> edge normal ...", "attached movement: attach box type 22 -> wall handler ...",
+"state 420 slot 1: title-update body added ...", "chart log: ..."; at the wall "attach facing (...) type-22 box ...",
+"attached movement (...) attach box 0x... type 22 ...", "state 420 slot 1 (TU 0x8245e450) call N: doppelganger 1,
+parameter 0x19e 1 -> attached movement run", "chart: player record A -> B (Lara states [...])", and the 608 line now
+with the record id (owner object) and the facing +0xcc0. The sample ini is unchanged (all new options default to 1).
+Built 2026-11-01 into `work\asi_rv06`, not loaded.
+
+## 0.7: chart log per machine, second-markup dump (2026-11-01)
+
+Test 48l: all 0.6 parts fired; the crash after the wall run (AV tru+0x48198) was a data error (a VM literal of
+doppelganger_casual.drm, fixed by `tools/vm_literal_fix.py`, docs `Befund-Felsrinne.md` point 9). 0.7 changes only
+diagnostics: the chart log keeps the last record per machine (the player has two machines; 0.6 logged "-1 -> N" every
+frame) and names the machine; the first 608 line also dumps 0x50 bytes of the box's second markup `[box+0x24]` (the
+type 22 comes from there). Built into `work\asi_rv07`, not loaded.
+
 ## Build, install, remove
 
 - Build: `scripts\windows\Build-TruAsi.ps1 -Name TruRockVein` (installed Visual Studio, x86, `/MT`, imports only

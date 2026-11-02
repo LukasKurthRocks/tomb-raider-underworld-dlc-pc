@@ -25,6 +25,22 @@
 // that runs the tick on the game thread, once per game frame. Every address is checked against the expected bytes
 // first; on a mismatch the affected part stays off and the reason is logged. Loaded by the Ultimate ASI Loader
 // (binkw32.dll of the installed game). Options: TruShadowPower.ini next to the .asi (see README.md).
+//
+// 0.6 (2026-11-01, docs Befund-Felsrinne "Wall run: orientation, magnet and duration"): condition 1046 holds every loop
+// transition of the wall run (chart DTP 20212 records 1477 / 1488 / 1492 / 1493: `{2000,1046,1}`, exits on 0). Its TU
+// predicate 0x8246e400 reads, in doppelganger mode (gameTracker+0x1244), the meter object's flags bit 0 (power active;
+// meter object +0x508 null -> 0), else the retail test (player +0x504)->+0x1fc bit 21. PC tru+0x3655c0 has only the
+// retail test. Pred1046 replaces it (5-byte jump at its entry): doppelganger mode = TruDlc2Player's flag
+// (TruDlc2PlayerDoppelganger, the TU's +0x1244), meter = this plugin's translation of the meter object.
+//
+// 0.7 (2026-11-02, docs Befund-Felsrinne "Condition 528 and the missing list"): condition 1055 was answered TRUE by the
+// PC default handler (the id is in no PC table). Its only chart use is `{2000,1055,1,NOT}` in a transition of the second
+// player machine, so the PC could never take it. TU 0x8246e488 = the template with predicate 0x8246e450: doppelganger
+// mode -> meter flags bit 4, else (player)->+0x1fc bit 0x20000000 (PC writes that bit too: tru+0x315129). Meter flag 4
+// is set only by the shadow look 0x823d8a80 (player anim event 5), and only while flag 2 is set; flag 2 is set only by
+// 0x823d8978, the TU branch of state 1014 slot 0 (shadow strike) - both not ported, so in DLC 2 the translation answers
+// 0, which is the TU's answer outside a shadow strike. Cond1055 joins the copy of Lara's condition table (option
+// [Conditions] Cond1055).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -204,8 +220,8 @@ const BYTE *volatile g_tuning = nullptr;  // tuning of the last tick (Xbox 0x824
 int g_condEnabled = 1;                    // [Conditions] Enabled: register 1049-1054 / 1056 in Lara's link array
 int g_statesEnabled = 1;                  // [States] Enabled (0.5): TU states 243 / 245 / 1018, conditions 1048 / 2401,
                                           // activities 1009 / 1039
-volatile LONG g_condCalls[8];             // first-call log per handler (1049..1054, 1056)
-volatile LONG g_condLast[8];              // last result per handler (+1, 0 = none yet) for LogLevel 2
+volatile LONG g_condCalls[9];             // first-call log per handler (1049..1054, 1056, -, 1055)
+volatile LONG g_condLast[9];              // last result per handler (+1, 0 = none yet) for LogLevel 2
 
 void Log(int level, const char *fmt, ...) {
     if (level > g_logLevel || !g_logPath[0]) return;
@@ -920,6 +936,44 @@ void __cdecl Act1009(void *, const BYTE *record) {
 // activity 1039 = TU 0x82455a38 = PC 0x6457a0 (an empty print function - `ret`)
 void __cdecl Act1039(void *, const BYTE *) { Hit(kP1039); }
 
+// ---- 0.7: condition 1055 = TU 0x8246e488 (r6 = predicate 0x8246e450; b 0x82487718 = PC template tru+0x382d70) ----
+int g_cond1055 = 1;                       // [Conditions] Cond1055
+volatile LONG g_p1055Calls = 0;
+int Doppelganger();                       // 0.6, below: TruDlc2Player's doppelganger flag (TU gameTracker+0x1244)
+
+// TU 0x8246e450: doppelganger mode -> (gameTracker+0x508)->flags bit 4 (rlwinm 0x1e = bit value 4), else
+// (gameTracker+0x504)->+0x1fc bit 0x20000000 (rlwinm 3). The TU reads the meter without a null test; the plugin's meter
+// always exists. Writers of flag 4 on the TU: 0x823d8a80 (set, needs flag 2) and 0x823d9050 (clear) - not ported here.
+char __cdecl Pred1055(const BYTE *) {
+    int dg = Doppelganger();
+    char r = 0;
+    if (dg) {
+        r = (g_meter.flags & 4) ? 1 : 0;
+    } else {
+        __try {
+            const BYTE *player = *reinterpret_cast<const BYTE *const *>(GameTracker() + 0x504);
+            r = static_cast<char>((*reinterpret_cast<const DWORD *>(player + 0x1fc) >> 29) & 1);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            r = 0;
+        }
+    }
+    if (InterlockedIncrement(&g_p1055Calls) == 1)
+        Log(1, "condition 1055 predicate (TU 0x8246e450) first call: doppelganger %d -> %d (meter flags 0x%03lx; flag 4 "
+               "comes only from the shadow look of the shadow strike, not ported)", dg, r, g_meter.flags);
+    return r;
+}
+
+char __cdecl Cond1055(void *agent, void *cache, const BYTE *record) {
+    char r = 0;
+    __try {
+        r = reinterpret_cast<CondTemplateFn>(kCondTemplate)(agent, cache, record, &Pred1055);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        r = 0;
+    }
+    LogCond(8, 1055, record, r ? 1 : 0);
+    return r;
+}
+
 // copy of Lara's table with the TU records before the closing record; the builder's push operand points at the copy
 DWORD g_laraConds[(kLaraCondCount + 16) * 3];
 
@@ -940,14 +994,17 @@ void RegisterLaraConditions() {
     }
     // 0.5: + 1048 and 2401 (only when the 0.5 building blocks are verified; group 2000 / 2400 as in the TU table)
     struct AddRec { DWORD id; DWORD group; const void *fn; };
-    AddRec add[9] = {
+    AddRec add[10] = {
         {1049, 2000, &CondMeter}, {1050, 2000, &CondMeter}, {1051, 2000, &CondMeter}, {1052, 2000, &CondMeter},
-        {1053, 2000, &CondMeter}, {1054, 2000, &CondMeter}, {1056, 2000, &Cond1056}, {0, 0, nullptr}, {0, 0, nullptr}};
+        {1053, 2000, &CondMeter}, {1054, 2000, &CondMeter}, {1056, 2000, &Cond1056}, {0, 0, nullptr}, {0, 0, nullptr},
+        {0, 0, nullptr}};
     int addCount = 7;
     if (g_tuStatesOk && g_statesEnabled) {
         add[addCount++] = {1048, 2000, &Cond1048};
         add[addCount++] = {2401, 2400, &Cond2401};
     }
+    bool with1055 = false;
+    if (g_cond1055) { add[addCount++] = {1055, 2000, &Cond1055}; with1055 = true; }   // 0.7 (group 2000 as the TU)
     for (int i = 0; i < kLaraCondCount; ++i)
         for (int k = 0; k < addCount; ++k)
             if (table[i * 3] == add[k].id) {
@@ -998,9 +1055,10 @@ void RegisterLaraConditions() {
     DWORD dummy = 0;
     VirtualProtect(operand, 4, old, &dummy);
     FlushInstructionCache(GetCurrentProcess(), operand, 4);
-    Log(1, "Lara conditions: 1049-1054 (meter compare), 1056 (meter >= tuning +0x70 while active)%s added to the link "
+    Log(1, "Lara conditions: 1049-1054 (meter compare), 1056 (meter >= tuning +0x70 while active)%s%s added to the link "
            "array (copy 0x%08lx, %d records; generic registry has them via TruDoppelganger)",
-        addCount > 7 ? ", 1048 (move steps vs animation), 2401 (timed time-scale request)" : "",
+        addCount > (with1055 ? 8 : 7) ? ", 1048 (move steps vs animation), 2401 (timed time-scale request)" : "",
+        with1055 ? ", 1055 (TU predicate 0x8246e450: doppelganger -> meter flag 4, else player +0x1fc bit 29)" : "",
         reinterpret_cast<DWORD>(g_laraConds), n);
 }
 
@@ -1034,6 +1092,76 @@ int GenericHolds(DWORD pushOperand, DWORD original, int stride, const DWORD *ids
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         return -1;
     }
+}
+
+// ---- 0.6: condition 1046 (TU predicate 0x8246e400) ----
+const DWORD kPred1046 = 0x007655c0;       // mov eax,[0FADB58h]; mov ecx,[eax+504h]; mov eax,[ecx+1FCh]; shr eax,15h; and al,1
+const char *const kPred1046Hex = "a158dbfa00 8b8804050000 8b81fc010000 c1e815 2401 c3";
+const DWORD kCond1046Push = 0x007655ec;   // condition 1046 tru+0x3655e0: push 0x7655c0 (template tru+0x382d70)
+const char *const kCond1046PushHex = "68c0557600";
+int g_cond1046 = 1;                       // [Conditions] Cond1046
+typedef int(__cdecl *DoppelgangerFn)();
+DoppelgangerFn g_doppelganger = nullptr;
+int g_doppelgangerLooked = 0;
+volatile LONG g_p1046Calls = 0, g_p1046Last = -1;
+
+int Doppelganger() {
+    if (!g_doppelgangerLooked) {
+        HMODULE m = GetModuleHandleA("TruDlc2Player.asi");
+        if (m) g_doppelganger = reinterpret_cast<DoppelgangerFn>(GetProcAddress(m, "TruDlc2PlayerDoppelganger"));
+        g_doppelgangerLooked = 1;
+        if (!g_doppelganger)
+            Log(0, "TruDlc2Player.asi / TruDlc2PlayerDoppelganger not found - condition 1046 uses the retail test only");
+    }
+    return g_doppelganger ? g_doppelganger() : 0;
+}
+
+char __cdecl Pred1046(const BYTE *) {
+    int dg = Doppelganger();
+    char r = 0;
+    if (dg) {
+        r = (g_meter.flags & 1) ? 1 : 0;          // meter object +4 bit 0 (the plugin's meter always exists)
+    } else {
+        __try {                                   // retail: (gameTracker+0x504)->+0x1fc bit 21
+            const BYTE *player = *reinterpret_cast<const BYTE *const *>(GameTracker() + 0x504);
+            r = static_cast<char>((*reinterpret_cast<const DWORD *>(player + 0x1fc) >> 21) & 1);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            r = 0;
+        }
+    }
+    LONG n = InterlockedIncrement(&g_p1046Calls);
+    LONG packed = r | (dg << 1);
+    if (n == 1)
+        Log(1, "condition 1046 (predicate tru+0x3655c0 = TU 0x8246e400) is now evaluated: doppelganger %d -> %d (meter flags "
+               "0x%03lx)", dg, r, g_meter.flags);
+    else if (InterlockedExchange(&g_p1046Last, packed) != packed)
+        Log(2, "condition 1046 -> %d (doppelganger %d, meter %.1f, flags 0x%03lx, call %ld)", r, dg, g_meter.value,
+            g_meter.flags, n);
+    if (n == 1) g_p1046Last = packed;
+    return r;
+}
+
+bool WriteJump5(DWORD at, const void *to) {
+    BYTE code[5] = {0xe9, 0, 0, 0, 0};
+    DWORD rel = reinterpret_cast<DWORD>(to) - (at + 5);
+    memcpy(code + 1, &rel, 4);
+    DWORD old = 0, dummy = 0;
+    if (!VirtualProtect(reinterpret_cast<void *>(at), 5, PAGE_EXECUTE_READWRITE, &old)) return false;
+    memcpy(reinterpret_cast<void *>(at), code, 5);
+    VirtualProtect(reinterpret_cast<void *>(at), 5, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void *>(at), 5);
+    return true;
+}
+
+void Patch1046() {
+    if (!HexBytesAt(kPred1046, kPred1046Hex) || !HexBytesAt(kCond1046Push, kCond1046PushHex)) {
+        Log(0, "condition 1046 predicate at 0x%08lx does not match - not translated", kPred1046);
+        return;
+    }
+    if (WriteJump5(kPred1046, &Pred1046))
+        Log(1, "condition 1046: title-update predicate (doppelganger mode -> meter active, else retail; 0x%08lx)", kPred1046);
+    else
+        Log(0, "condition 1046 not written (VirtualProtect %lu)", GetLastError());
 }
 
 bool PatchPush(DWORD operandAddress, DWORD value) {
@@ -1127,6 +1255,8 @@ void ReadOptions(const char *dir) {
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruShadowPower.ini", dir);
     g_condEnabled = GetPrivateProfileIntA("Conditions", "Enabled", 1, ini);
     g_statesEnabled = GetPrivateProfileIntA("States", "Enabled", 1, ini);
+    g_cond1046 = GetPrivateProfileIntA("Conditions", "Cond1046", 1, ini);
+    g_cond1055 = GetPrivateProfileIntA("Conditions", "Cond1055", 1, ini);
     g_enabled = GetPrivateProfileIntA("ShadowPower", "Enabled", 1, ini);
     g_logLevel = GetPrivateProfileIntA("ShadowPower", "LogLevel", 1, ini);
     g_buttons = static_cast<WORD>(GetPrivateProfileIntA("ShadowPower", "Buttons", 0x0300, ini));
@@ -1142,8 +1272,9 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.5.1 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d)",
-        g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled);
+    Log(1, "TruShadowPower 0.7 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+        "condition 1046 %d, condition 1055 %d)", g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled,
+        g_cond1046, g_cond1055);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -1182,6 +1313,7 @@ void Start(HMODULE self) {
         }
     RegisterLaraConditions();
     RegisterLaraStates();
+    if (g_cond1046) Patch1046();
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -1202,6 +1334,6 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.5.1 (translated TU meter, Lara conditions 1048-1054 / 1056 / 2401, states 243 / 245 / 1018, "
+    return "TruShadowPower 0.7 (translated TU meter, Lara conditions 1046 / 1048-1056 / 2401, states 243 / 245 / 1018, "
            "activities 1009 / 1039)";
 }

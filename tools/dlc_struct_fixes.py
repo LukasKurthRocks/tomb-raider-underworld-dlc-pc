@@ -11,14 +11,23 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
   fadeslots  tools/fade_slots_translate.py  own fade (odd-slot) pixel-shader libraries for the TU-drawn player
              objects FADE_OBJECTS (test 48e-48g): build from the file's libraries with empty odd slots, new ids from
              FADE_FIRST_ID in library order, then apply (materials' PS slots old -> new)
+  markup     tools/markup_fix.py            object markup records (0x5c bytes; DLC 2 machine column ids, 2026-11-01)
+  vmliteral  tools/vm_literal_fix.py        VM literals after opcode 2 = one u32 (test 48l crash, 48m)
+  twins      tools/dlc_structure_audit.py   base-twin truth for every same-size section of TWIN_FILES (the DLC 2
+             player objects): only byte-order errors, re-authored words are left alone; runs first (before the
+             layout steps, so a proven layout always has the last word - e.g. the u16 transition list word +0x4c550
+             of DTP 20212, where the twins' raw block disagrees with state_translist_fix / state_actlist_fix)
+Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, eventlist,
+reclist, fadeslots, animfx, markup, vmliteral. Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material
+25521) are never steps.
 
 translist / actlist run only on player charts (>= statechart_fix_tree.MIN_COND condition records of the title update's
 ids; DLC 2 doppelganger_casual DTP 20212) with the base pair lara.drm (Xbox layer2 12647 / PC 850, extracted on demand).
 The Xbox source of a DRM: convert_dlc.raw_dlc (TRUDLC_PACK_FIRST honoured, as statechart_fix_tree).
 
 Usage (from the repository root; read-only on SRC, writes changed DRMs to OUT):
-  ../bin/pyt -t 3600 tools/dlc_struct_fixes.py SRC_TREE OUT_TREE --steps animfx[,eventlist,...] [--names a.drm,b.drm]
-        [--pack pack11]
+  ../bin/pyt -t 5400 tools/dlc_struct_fixes.py SRC_TREE OUT_TREE --steps animfx[,eventlist,...] [--names a.drm,b.drm]
+        [--pack pack11]          (twins: ~20 min for the corpus pass, the other steps a few minutes per tree)
 Library: Steps(tmp).process(rel, path, steps, log, st) -> new raw bytes or None.
 """
 import sys, os, io, contextlib, collections, shutil, tempfile, struct
@@ -27,7 +36,9 @@ sys.path.insert(0, HERE)
 import drm_write as DW, drm_reloc as R
 
 W = os.path.join(HERE, '..', 'work')
-ALL = ('translist', 'actlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots')
+ALL = ('twins', 'translist', 'actlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup', 'vmliteral')
+TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
+MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (markup_level.py --objects; 23 = TU type)
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 FADE_FIRST_ID = 2494          # section_id_free.py 9 2494 45 ... (test 48g): 2494-2531 free; 2491-2493 = test 46
 XOBJLIST = os.path.join(W, 'generic', 'lists', 'dlc_pack11_objectlist.txt')
@@ -234,6 +245,75 @@ class Steps:
         last = [l for l in t2.splitlines() if l.startswith('readback') or l.startswith('wrote')]
         return new, 'fadeslots %s: libs %s -> own ids from %d; %s' % (rel, libs, FADE_FIRST_ID, ' / '.join(last))
 
+    def s_markup(self, rel, xf, XD, cur):
+        """object markup records (tools/markup_fix.py layout, proven on ar_uo_valgrind_column_floor{a,b}_ringa): only
+        DTPs with a markup array (+0x54 count, +0x58 records) whose Xbox records carry a markup type char seen in the
+        DLC 2 markup scan (MARKUP_TYPES) - the 0xe0-byte look-alike arrays (types 0 / 97 / 112 / 191) are not markup"""
+        import markup_fix as MF
+        PD = DW.read(cur, 'le'); n_all = 0; notes = []
+        xby = collections.defaultdict(list)
+        for x in XD.sections:
+            if x.type == 7: xby[x.id].append(x)
+        for s in PD.sections:
+            d = bytearray(s.data)
+            if s.type != 7 or len(d) < 0x5c: continue
+            r = R.parse(bytes(s.reloc), 'le')
+            relocated = set(o for o, _ in r.internal) | set(o for _, o, _ in r.external)
+            ro = dict(r.internal).get(0x58); n = struct.unpack_from('<I', d, 0x54)[0]
+            if ro is None or not 1 <= n <= 1000 or ro + n * MF.STRIDE > len(d): continue
+            if not all(struct.unpack_from('<I', d, ro + k * MF.STRIDE + 0x28)[0] == 0 for k in range(n)): continue
+            xs = xby.get(s.id, [])
+            if len(xs) != 1 or len(xs[0].data) != len(d): continue
+            xd = bytes(xs[0].data)
+            if struct.unpack_from('>I', xd, 0x54)[0] != n: continue
+            types = {xd[ro + k * MF.STRIDE + 0x33] for k in range(n)}
+            if not types <= MARKUP_TYPES:
+                notes.append('DTP %d skipped (record types %s: not markup)' % (s.id, sorted(types))); continue
+            # every markup record points at its poly line (+0x58 relocated, on both platforms)
+            xin = dict(R.parse(bytes(xs[0].reloc), 'be').internal); pin = dict(r.internal)
+            if not all(ro + k * MF.STRIDE + 0x58 in xin and ro + k * MF.STRIDE + 0x58 in pin for k in range(n)):
+                notes.append('DTP %d skipped (records without a poly-line pointer at +0x58: not markup)' % s.id); continue
+            ch = 0
+            for k in range(n):
+                o = ro + k * MF.STRIDE
+                for w in range(0, 0x58, 4):
+                    if o + w in relocated: continue
+                    new = MF.conv(xd[o + w:o + w + 4], w)
+                    if bytes(d[o + w:o + w + 4]) != new: d[o + w:o + w + 4] = new; ch += 1
+            if ch:
+                s.data = bytes(d); n_all += ch; notes.append('DTP %d: %d records, %d words' % (s.id, n, ch))
+        if not n_all: return None, ('markup %s: %s' % (rel, '; '.join(notes))) if notes else None
+        return encode(PD, cur), 'markup %s: %s' % (rel, '; '.join(notes))
+
+    def s_vmliteral(self, rel, xf, XD, cur):
+        """VM literals after opcode 2 (tools/vm_literal_fix.py, test 48l: one u32 whatever it holds)"""
+        # the check of vm_literal_fix.check, but only byte-order errors are set: a literal whose PC value is no byte
+        # order of the Xbox u32 was re-numbered on purpose (e.g. lara_doppelganger DTP 2242 = the PC base copy)
+        import vm_literal_fix as VL
+        PD = DW.read(cur, 'le')
+        xs = {s.id: s for s in XD.sections if s.type == 7}
+        n = 0; notes = []; kept = 0
+        for ps in PD.sections:
+            if ps.type != 7 or ps.id not in xs: continue
+            x, p = bytes(xs[ps.id].data), bytearray(ps.data)
+            if len(x) != len(p): continue
+            if not any(struct.unpack_from('>I', x, o)[0] == VL.CALL for o in range(0, len(x) - 3, 4)): continue
+            it = VL.rel(ps, 'le'); ch = False
+            for o in range(0, len(x) - 7, 4):
+                if struct.unpack_from('>I', x, o)[0] != VL.PUSH or struct.unpack_from('<I', p, o)[0] != VL.PUSH: continue
+                q = o + 4
+                if q in it: continue
+                want = x[q:q + 4][::-1]; got = bytes(p[q:q + 4])
+                if got == want: continue
+                m = VL.mode(x[q:q + 4], got)
+                if m == 'other': kept += 1; continue
+                p[q:q + 4] = want; n += 1; ch = True
+                notes.append('DTP %d +0x%x %s -> u32 0x%08x' % (ps.id, q, m, struct.unpack('<I', want)[0]))
+            if ch: ps.data = bytes(p)
+        if not n:
+            return None, ('vmliteral %s: %d literals re-numbered on the PC (no byte order) kept' % (rel, kept)) if kept else None
+        return encode(PD, cur), 'vmliteral %s: %d literals set (%s); %d re-numbered kept' % (rel, n, ', '.join(notes[:20]), kept)
+
     def process(self, rel, path, steps, log, st):
         from convert_dlc import raw_dlc
         from drm import cdrm_decode
@@ -258,16 +338,52 @@ def run_tree(srcs, out, steps, names=None, objlist=None, write_in_place=False):
     tmp = tempfile.mkdtemp(prefix='struct_', dir=tmpdir)
     st = collections.Counter(); files, log = [], []
     try:
+        if 'twins' in steps:
+            files, log = run_twins(srcs, out, names, tmp)
+            steps = [s for s in steps if s != 'twins']
+            srcs = list(srcs) + [out]          # the following steps read the twins output
         S = Steps(tmp, objlist)
         for rel, path in sorted(DA.overlay([os.path.abspath(s) for s in srcs], names).items()):
+            if steps == ['fadeslots'] and os.path.basename(rel).lower() not in FADE_OBJECTS: continue
+            if not steps: break
             new = S.process(rel, path, steps, log, st)
             if new is not None:
                 q = os.path.join(out, rel); os.makedirs(os.path.dirname(q), exist_ok=True); open(q, 'wb').write(new)
                 DW.read(open(q, 'rb').read(), 'le')
-                files.append(rel)
+                if rel not in files: files.append(rel)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     log.append('total %s' % dict(st))
+    return files, log
+
+
+def run_twins(srcs, out, names, tmp):
+    """step 'twins': tools/dlc_structure_audit.py check --out over TWIN_FILES (one base-corpus pass for all of them):
+    words of every same-size section whose PC bytes the base twins prove (leave-one-DRM-out precision >= 99.9 % per
+    family / level, every 5th base DRM) and the converter wrote in another byte order; re-authored values stay"""
+    import dtp_audit as DA, dlc_structure_audit as AU
+    from convert_dlc import raw_dlc
+    from drm import cdrm_decode
+    files, log, argv = [], [], ['check']
+    todo = sorted((rel, p) for rel, p in DA.overlay([os.path.abspath(s) for s in srcs], names).items()
+                  if os.path.basename(rel).lower() in TWIN_FILES)
+    for rel, path in todo:
+        raw, _ = raw_dlc(rel.replace('/', '\\'))
+        if raw is None: raw, _ = raw_dlc(os.path.basename(rel))
+        if raw is None: continue
+        xf = os.path.join(tmp, 'twx_' + os.path.basename(rel)); open(xf, 'wb').write(cdrm_decode(raw, 'be'))
+        argv += [xf, path]
+    if len(argv) == 1: return files, ['twins: none of %s in the tree' % (TWIN_FILES,)]
+    od = os.path.join(tmp, 'twins_out'); rep = os.path.join(tmp, 'twins_report.txt')
+    _, txt = quiet(AU.main, argv + ['--out', od, '--report', rep, '--list', '20'])
+    log += [l for l in open(rep, encoding='utf-8').read().splitlines() if l.strip()]
+    for rel, path in todo:
+        p = os.path.join(od, os.path.basename(rel))
+        if not os.path.exists(p): continue
+        new = open(p, 'rb').read()
+        if DW.read(new, 'le').write('le') == DW.read(open(path, 'rb').read(), 'le').write('le'): continue
+        q = os.path.join(out, rel); os.makedirs(os.path.dirname(q), exist_ok=True); open(q, 'wb').write(new)
+        files.append(rel)
     return files, log
 
 

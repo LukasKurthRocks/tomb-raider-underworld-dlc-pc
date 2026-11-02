@@ -18,8 +18,13 @@ Method (generalises tools/statechart_twins.py from the chart families to every s
   element key) also occurs in the target are kept. Truth levels as in statechart_twins (exact / value / eexact /
   evalue): a PC word is known only when every base observation of the key gives the same PC bytes and they are a byte
   permutation of the Xbox word (re-numbered ids are never copied).
-* Leave-one-DRM-out precision over the kept base observations, per family and level ('xval'); 'check' applies only
-  the levels / families whose precision is reported (the numbers go into the report).
+* Leave-one-DRM-out precision over the kept base observations, per family and level ('xval', every 5th base DRM by
+  default); 'check' applies only the levels / families with >= --min-n predictions and >= --min-prec % (table in
+  the report).
+* A PC word that differs from the truth is "wrong" only when it is a byte permutation of the Xbox word (a byte-order
+  error); a PC word that is no byte order of the Xbox word was re-authored by the converter or a later fix (material
+  slot remaps, script strings, ...) and is reported as a "conflict", never changed. Proven record layouts
+  (tools/dlc_struct_fixes.py steps) run after the twins and win where they disagree.
 * Sections whose PC size differs from the Xbox size (media re-encoded by the converter: textures, meshes, shader
   libraries, sounds; or a layout change) are not word-checkable and are listed per type. Size-kept sections whose
   root-block shape has a size change in the base pairs are flagged as layout-shift candidates (the class of the model
@@ -27,9 +32,12 @@ Method (generalises tools/statechart_twins.py from the chart families to every s
 
 Modes (from the repository root; ../bin/pyt only):
   ../bin/pyt -t 5400 tools/dlc_structure_audit.py check XBOX.drm PC.drm [XBOX2.drm PC2.drm ...] [--report R.txt] [--xval-every 5]
-        [--out OUT_DIR] [--list N] [--min-prec 99.9]
-      all target pairs share one corpus pass; --out writes every PC file with the wrong truth words set
-      (OUT_DIR/<basename of PC>), relocated words untouched, then reads them back and re-checks
+        [--out OUT_DIR] [--list N] [--min-prec 99.9] [--min-n 20] [--allowed-from EARLIER_REPORT.txt]
+      all target pairs share one corpus pass (~10 min truth tables + ~10 min precision); --out writes every PC file
+      with the wrong truth words set (OUT_DIR/<basename of PC>), relocated words untouched, read back;
+      --allowed-from takes the precision table of an earlier report of the same targets instead of the xval pass
+  ../bin/pyt -t 600 tools/dlc_structure_audit.py filter XBOX.drm BEFORE.drm AFTER.drm OUT.drm
+      keep only AFTER's byte-order corrections (for --out files of the first 2026-11-01 run, before 'conflict')
 """
 import sys, os, struct, collections, pickle, bisect, time, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

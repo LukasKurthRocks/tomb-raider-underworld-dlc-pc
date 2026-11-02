@@ -23,10 +23,12 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          chart (doppelganger_casual DTP 20212) by the typed five steps of tools/statechart_fix_all.py, then every
          such DTP word by word from the base game's Xbox/PC pairs (tools/statechart_fix_tree.py /
          statechart_twins.py; the rock vein's conditions 607 / 608 were unreachable)
-  childids, translist, actlist, eventlist, reclist, fadeslots, animfx (ours, 2026-11-01, tests 47 / 48 / 48c-48h)
-         the proven structure fixes of tools/dlc_struct_fixes.py, one step each: object child id list by name,
-         player-chart transition lists and state records / activity entries, object event lists, model record
-         list stride 36 -> 40, own fade pixel-shader libraries of the TU-drawn player objects, anim event lists
+  twins, childids, translist, actlist, eventlist, reclist, fadeslots, animfx, markup, vmliteral (ours, 2026-11-01/02,
+         tests 47 / 48 / 48c-48m) the structure fixes of tools/dlc_struct_fixes.py, one step each: base-twin
+         byte-order truth for every same-size section of the DLC 2 player files (tools/dlc_structure_audit.py, ~20
+         min), object child id list by name, player-chart transition lists and state records / activity entries,
+         object event lists, model record list stride 36 -> 40, own fade pixel-shader libraries of the TU-drawn
+         player objects, anim event lists, object markup records, VM literals
   uirecord (ours, finding 43) UI text element records of the new DLC scripts by Crystal's PC conversion rules (w1/w3
          as u32 instead of swapped halves, the PC word 0x00010000, -1.0f) - tools/script_records_dlc.py; after the
          other script fixes, so it sees the final scripts (it only touches type-8 records; test 34, played
@@ -310,9 +312,13 @@ def _struct_fix(step):
     return fn
 
 
-# proven structure fixes after `statechart` (order = the order the test trees 47 / 48c-48h were built in)
-fix_childids, fix_translist, fix_actlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx = (
-    _struct_fix(s) for s in ('childids', 'translist', 'actlist', 'eventlist', 'reclist', 'fadeslots', 'animfx'))
+# proven structure fixes after `statechart`: the base-twin pass first (byte-order errors of every same-size section of
+# the DLC 2 player files), then the record layouts in the order the test trees 47 / 48c-48m were built in - a proven
+# layout always has the last word
+STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'eventlist', 'reclist', 'fadeslots', 'animfx', 'markup',
+                'vmliteral')
+(fix_twins, fix_childids, fix_translist, fix_actlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx, fix_markup,
+ fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 UIRECORD_SKIP = {'g_pda.drm'}      # merged g_pda of the DLC 2 tree: not installed (finding 40), left as built
@@ -364,8 +370,7 @@ def fix_achievement(out, srcs=None):
 
 FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('uipath', fix_uipath), ('uitext', fix_uitext), ('postfix', fix_postfix),
          ('analog', fix_analog), ('statechart', fix_statechart),
-         ('childids', fix_childids), ('translist', fix_translist), ('actlist', fix_actlist), ('eventlist', fix_eventlist),
-         ('reclist', fix_reclist), ('fadeslots', fix_fadeslots), ('animfx', fix_animfx),
+         ] + [(s, globals()['fix_' + s]) for s in STRUCT_STEPS] + [
          ('uirecord', fix_uirecord), ('achievement', fix_achievement)]
 
 
