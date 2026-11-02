@@ -13,7 +13,8 @@ Usage (from the repository root):
   ../bin/pyt -t 600 tools/ps_swatch.py PC.drm MATERIAL OUT.png [--lib ID] [--slot K] [--params Xbox.drm] [--size N]
   ../bin/pyt -t 600 tools/ps_swatch.py consts PC.drm LIB SLOT     constants the entry reads, with PC CTAB names
   ../bin/pyt -t 900 tools/ps_swatch.py sheet OLD.drm NEW.drm MAT[,MAT] OUT.png AMB IRR   old | new | new normalised
-  options: --amb G (g_Ambient), --irr B (IrradianceStateBase), --dump R,R (temps at the end), --nan (first NaN writes)
+  options: --amb G (g_Ambient), --irr B (IrradianceStateBase), --dump R,R (temps at the end), --nan (first NaN writes),
+           --tex REG=r,g,b,a (constant for a sampler without a material record, e.g. the terrain Setup map s0; repeatable)
 """
 import sys, os, struct, collections
 import numpy as np
@@ -102,6 +103,8 @@ def swatch(by, mat, lib, slot, mp, size, light=False, amb=1.0, irr=1.0):
         im = texs.get(num)
         n = coords.shape[0]
         if im is None:
+            if num in CONST_TEX:   # --tex REG=r,g,b,a: constant for a sampler without a material record (test 50c)
+                return np.tile(np.float32(CONST_TEX[num]), (n, 1))
             if num == 15:   # AttenuationSampler: fog lookup (y = HeightFogParams.z = 0) -> 0 = no fog; light attenuation (y = 0.5) -> 1
                 return np.repeat((coords[:, 1:2] > 0.25).astype(np.float32), 4, axis=1)
             return np.full((n, 4), 0.5, np.float32)
@@ -141,12 +144,14 @@ def swatch(by, mat, lib, slot, mp, size, light=False, amb=1.0, irr=1.0):
     return col.reshape(size, size, 4)
 
 
-DUMP = []; NANS = False
+DUMP = []; NANS = False; CONST_TEX = {}
 
 
 def main(a):
     global DUMP, NANS
     NANS = "--nan" in a
+    while '--tex' in a:      # --tex REG=r,g,b,a (repeatable)
+        k = a.index('--tex'); r, v = a[k + 1].split('='); CONST_TEX[int(r)] = [float(x) for x in v.split(',')]; del a[k:k + 2]
     if "--dump" in a: DUMP = [int(x) for x in a[a.index("--dump") + 1].split(",")]
     if a and a[0] == "consts": cmd_consts(a[1], int(a[2]), int(a[3])); return
     if a and a[0] == "sheet": cmd_sheet(a[1], a[2], [int(x) for x in a[3].split(",")], a[4], float(a[5]), float(a[6])); return

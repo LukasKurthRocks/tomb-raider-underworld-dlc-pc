@@ -79,10 +79,13 @@ _patch_assemble()
 # 2. f10.lights_off_check translates X with sampler register = Xbox register, while the build maps the samplers to the
 #    material's PC record registers: with a non-identity map the check compared different textures. Same check with
 #    the build's sampler map:
+EXTRA_OPTS = {}   # translator options of the build (e.g. dxn registers), also used by the lights-off reference
+
+
 def lights_off(progT, xblob, XP, names, seed=11):
     K = F9.Consts([])
     sh = XL.parse(xblob); bn = F9.bool_names(sh)
-    t = xenos2sm3.translate(xblob, K.fn, bools={i: 0 for i in bn}, samp=F9.xsamp(xblob, names), opts={'noopt': True})
+    t = xenos2sm3.translate(xblob, K.fn, bools={i: 0 for i in bn}, samp=F9.xsamp(xblob, names), opts=dict(EXTRA_OPTS, noopt=True))
     progX = sm3asm.parse_text(t.text)
     env = F9.Env(seed, XP)
     a = env.run(progT, F9.body(progT), env.state0(progT), {})

@@ -25,6 +25,16 @@ def main(a):
             print('   int +%#x -> %#x (stored %#x)' % (off, tgt, struct.unpack_from(f + 'I', s.data, off)[0]))
         for t, off in sorted(r.idref, key=lambda x: x[1]):
             print('   id  +%#x type %d = %d' % (off, t, struct.unpack_from(f + 'I', s.data, off)[0]))
+        ip = dict(r.internal)
+        if 0x54 in ip:                                                      # texture records (test 50c)
+            for k in range(s.data[0x52]):
+                tid, u1, typ, b0, slot, filt = struct.unpack_from(f + 'IIIBBH', s.data, ip[0x54] + 16 * k)
+                print('   record %d: texture %d type %d u8 %d sampler s%d filter %#06x' % (k, tid, typ, b0, slot, filt))
+        for lab, cnt, ptr in (('PS', 0x58, 0x5C), ('VS', 0x68, 0x6C)):      # MaterialParams blocks (test 50c)
+            n = struct.unpack_from(f + 'I', s.data, cnt)[0]
+            if not n or ptr not in ip: continue
+            for j in range(n):
+                print('   %s MP[%d] = (%s)' % (lab, j, ', '.join('%.6g' % x for x in struct.unpack_from(f + '4f', s.data, ip[ptr] + 16 * j))))
 
 
 if __name__ == '__main__':
