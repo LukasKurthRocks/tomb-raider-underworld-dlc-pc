@@ -28,6 +28,27 @@ no meter object -> 0), else the retail test (player +0x504)->+0x1fc bit 21. PC t
 "condition 1046 (...) is now evaluated: doppelganger 1 -> ..." and at `LogLevel=2` every change. Sample ini unchanged.
 Built 2026-11-01 into `work\asi\v06`, not loaded.
 
+## 0.8: the shadow-power look (2026-11-02)
+
+The blurry / bright look of the power is not a post-process call in the TU code: Start 0x823d7d40 and Stop
+0x823d7fb8 fire **player events by type** through 0x82418158 (walk of the player object's event list, every record of
+that type -> the player's anim-event callback). Start: 0x89, 0x32, (0x83 while moving - not ported), 0x81 (meter
+full), 0x87 / 0x88 (above / below tuning +0x70 = 75 % of max); Stop: 0x33, then 0x7e (ran empty) or 0x82. The effects
+are data of `doppelganger_casual.drm` (object 857, event list DTP 20172): 0x32 starts instance effects (model +0x18
+effect 2 at two bones, model +0x38 record 14), 0x33 stops all of them. The PC has the same walker (retail):
+tru+0x318780 `cdecl(instance, type, 0xff, channel 0)`; 0.8 calls it at the TU's places, in the TU's order, after a
+byte check of its entry, type compare and callback call (`[Look] Enabled`, default 1). Log: "shadow look: player event
+walker tru+0x318780 verified ..." at load, "shadow look on: first start, player events 0x89 0x32 ..." once, and at
+`LogLevel=2` every "shadow look on / off: player events ...". Start / Stop also send **message 0x1f4 / 0x1f5** to
+every instance whose query function (+0x11c) answers 0x172 (TU 0x823d7f18 / 0x823d8080; PC instance list [0xd98d54],
+wake tru+0x1b2de0 = TU 0x8226fe00; `[Look] Messages`, default 1) - the level objects that react to the power;
+presumably `dlc_fx_bloom` (object 1038, an animated fx mesh with the states fx_on / fx_off, 3 shader libs, colour
+curve tables) is the full-screen look. Not ported: the camera manager call (*0x82efc780)->vtbl[0xa4] (camera +0x7c
+|= 2, a sticky flag; PC camera manager not mapped), event 0x83 (needs gameTracker+0x1f0 on PC). Built 2026-11-02 into
+`work\asi\v08` (sha256 8e276629...04af5, ini 2cdc7d49...1ac9), not loaded. Events and messages only in doppelganger
+mode (`TruDlc2PlayerDoppelganger()` of TruDlc2Player.asi - on the Xbox Start / Stop exist only with the DLC 2 meter
+object).
+
 ## 0.7: condition 1055 (2026-11-02)
 
 1055 is in no PC table, so the default handler answered TRUE; its only chart use is `{2000,1055,1,NOT}` (second

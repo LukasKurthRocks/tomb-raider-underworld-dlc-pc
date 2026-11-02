@@ -45,7 +45,8 @@ $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # SHA-256 of earlier builds of ours (0.1 = slow motion only, 0.2 = estimated meter, 0.3 = translated meter, all
 # 2026-10-30; 0.4 = Lara meter conditions, 2026-10-31; 0.5 = TU states (work\asi\v05) and 0.5.1 as installed for
-# test 48k, 2026-11-01; 0.6 = condition 1046 (work\asi\v06), 2026-11-01) - recognised as ours for update / removal
+# test 48k, 2026-11-01; 0.6 = condition 1046 (work\asi\v06), 2026-11-01; 0.7 = condition 1055 (work\asi\v07) and the
+# sample .ini of 0.5-0.7, 2026-11-02) - recognised as ours for update / removal
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
@@ -53,11 +54,15 @@ $earlierBuilds = @{
                              '31cea1102d986789d656c73472cd410cd560ea890c6e27f17e583b230183c9e0',
                              '6887f3dc0436e5125f5b824d5af168a7493dc9afdb4e97572380c381bbb45a31',
                              '004e190490b66872c6bc3780681ae45877d25501974a602b28c9d2a9acdedd2e',
-                             '68009a611af59f980a6d80053720e791173e32ec93b6ef5a4707e2bd6f5005b9')
+                             '68009a611af59f980a6d80053720e791173e32ec93b6ef5a4707e2bd6f5005b9',
+                             '0a536f3c1f4835640e94259f653638e5983b531d634219240980d23ad3ec5394',
+                             '8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5')   # 0.8 look (work\asi\v08)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
-                             '4924bfb8cac427467517c10c543f9c6eadc1f7503cf755ff54a5ef99671e29d9')
+                             '4924bfb8cac427467517c10c543f9c6eadc1f7503cf755ff54a5ef99671e29d9',
+                             '162111a4586f70f7c19ca9e98f186998f1961a8441a8296a6b9fc34b0296c745',
+                             '2cdc7d4992fdad5449c521370df9b2a786d2a3b5c34673af5f62d42489de1ac9')   # 0.8 sample .ini ([Look])
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

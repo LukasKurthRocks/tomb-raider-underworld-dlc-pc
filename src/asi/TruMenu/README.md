@@ -19,7 +19,16 @@ window, autocomplete, history, pad picker, `cmd.focus` / `cmd.run` / `cmd.histor
 source with the TruGuard items `guard.*`) built 2026-11-01 into `work\asi\menu06`, checked with `dumpbin` only - not
 yet run in the game. 0.7 (TruGuard action `guard.dump`: full minidump + thread snapshot on the TruLink thread, also
 while the game hangs; longer `guard.status` buffer) built 2026-11-02 into `work\asi`, checked with `dumpbin` only -
-not yet run in the game. `camera.free` is still a todo (see "0.4 items").**
+not yet run in the game. 0.7 also got the **command bar without a keyboard** (Steam Machine at the TV): L3 = focus +
+on-screen keyboard, the mouse belongs to the menu while it is open, `[Cmd] UpOpensHistory` /
+`FirstPadPressOnlyFocuses`, `cmd.keyboard`; built 2026-11-02 into `work\asi\menu07` (with guard.dump), checked with
+`dumpbin` only - not yet run in the game (section "Controller and mouse (0.7)"). 0.7 was live-tested 2026-11-02 (mouse,
+L3 keyboard, history, real keyboard, `time.scale` ok; typing moved Lara, Esc opened the pause menu, B closed the menu).
+0.7.1 (**game input frozen while the menu is open**: `[Menu] BlockGameInput` holds the game's DirectInput keyboard and
+the key messages, `[Menu] PauseGame`; B twice = keyboard, then menu; the real-keyboard switch no longer depends on
+hover / focus; `level.start` + `[Test] AutoStart` = the mission menu's DLC start with intro; `[Log] UnitChanges`)
+built 2026-11-02 into `work\asi\menu071`, checked with `dumpbin` and offline byte checks only - not yet run in the
+game (section "Game input frozen (0.7.1)"). `camera.free` is still a todo (see "0.4 items").**
 
 ## Controls
 
@@ -33,15 +42,21 @@ not yet run in the game. `camera.free` is still a todo (see "0.4 items").**
 | `[Menu] ToggleKey` (off by default, e.g. 119 = F8) | open / close from the keyboard |
 | mouse / keyboard | work while the menu is open (forwarded from the game window's message loop) |
 | 0.6: typing | goes to the **command bar** under the menu (it has the keyboard focus when the menu opens); see "Command bar (0.6)" |
-| 0.6: D-pad / stick / B while the bar has the focus | the focus goes into the menu window (as before 0.6) |
+| 0.6: D-pad / stick / B while the bar has the focus | the focus goes into the menu window (as before 0.6; 0.7 `[Cmd] FirstPadPressOnlyFocuses=0`: the press also moves there) |
 | 0.6: View (Back) in the menu, F2, Tab | back to the bar (View: pad picker, F2 / Tab: typing) |
+| 0.7: **L3** alone (press + release, menu open; `[Cmd] FocusButton`) | focus into the bar + **on-screen keyboard** under it; L3 again closes the keyboard (see "Controller and mouse (0.7)") |
+| 0.7: mouse while the menu is open | belongs to the menu (`[Menu] FreeMouse`): ImGui draws a cursor, the game gets no mouse messages (no camera turn, no re-centring), its `SetCursorPos` / `ClipCursor` wait until the menu closes |
+| 0.7.1: keyboard while the menu is open | belongs to the menu (`[Menu] BlockGameInput`): the game's DirectInput keyboard reads no key events, no key message reaches the game - typing does not move Lara, Esc does not open the pause menu |
+| 0.7.1: **B, B** with the on-screen keyboard open | first B closes the keyboard, a second B right after it closes the menu |
 
 While the menu is open the game gets a **neutral pad** (no buttons, sticks centred, triggers 0; the packet number is
 kept). After a toggle the pad stays neutral until both sticks are released, so the game never sees the L3 / R3 press
-that closed the menu. Keyboard and mouse messages still reach the game (0.6: except `WM_KEYDOWN` / `WM_CHAR` /
-`WM_DEADCHAR` / `WM_SYSCHAR` while a text field - the command bar, a filter - has the focus; key-up messages always
-pass, so a key the game saw going down is released there too). The very first stick pressed (before the
-second one completes the combo) does reach the game for a frame or two.
+that closed the menu. 0.7.1 (`[Menu] BlockGameInput=1`, default): the game gets **no keyboard** either - see "Game input
+frozen (0.7.1)". With `BlockGameInput=0` it is as in 0.7: key messages still reach the game except `WM_KEYDOWN` /
+`WM_CHAR` / `WM_DEADCHAR` / `WM_SYSCHAR` while a text field or the on-screen keyboard has the focus (key-up messages
+always pass), and the game's DirectInput keyboard is not touched (that is why typing moved Lara in the 0.7 live test).
+With `[Menu] FreeMouse=1` no mouse message reaches the game while the menu is open. The very first stick pressed
+(before the second one completes the combo) does reach the game for a frame or two.
 
 ## Pages and items
 
@@ -64,9 +79,9 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Debug / Log | 0.3: the last lines of every `Tru*.log` next to the `.asi` / `tru.exe` (tailed once per second by the worker thread, shared read, only new bytes), the game's script prints (`log.script`), lines mentioning errors / exceptions in red, counters (exception lines, exceptions TruMenu caught in its own game calls); source filter buttons (TruLink.log holds the last TruLink commands); corner overlay bottom left. 0.4: repeated lines of a source collapse into one `text x42 (17:09:02-17:09:33)`, TruLink's read-type command lines are dropped, filter all / warnings + errors / errors (warnings yellow, errors red), at most `[Log] MaxLinesPerSecond` new lines per source and second (then one line "(n lines dropped ...)"), counters for all three | `log.page`, `log.show`, `log.script [0/1]`, `log.overlay [0/1]`, `log.lines <n>`, `log.filter <source\|all>`, `log.clear`; 0.4: `log.collapse [0/1]`, `log.hidereads [0/1]`, `log.level 0\|1\|2` (or `all` / `warn` / `error`), `log.rate <n>` |
 | Settings | 0.3: every `TruMenu.ini` key with its current value, changed keys marked `*` (yellow) with their default, missing keys shown with the default; "Favourites back to the default list" and "Reset all settings" - both need **A twice** (the button turns red: "press A again to confirm", 5 s) | `settings.show`, `settings.reset` (backup `TruMenu.ini.bak_<yyyymmdd_hhmmss>`, rewrite from the defaults table, reload the options; Scale / Enabled / Script apply at the next start), `fav.reset` |
 | Media: videos | 0.3: `Movies\*.bik`, "Play" (main menu only), "as menu loop" | `media.video.list`, `media.video.play <name>`, `media.video.menuloop [name]` |
-| Level select | current unit name (GameTracker+0x38), one button per unit of `[Levels] List` (default `dlc_level1_start`, `dlc_level2_start`), "Reload current unit", then **all 111 playable units** in tree nodes per group (see below). Any other unit: `menu level.load <unit>` over TruLink | `level.current`, `level.list` (all units: `group: unit unit ...; ...`), `level.presets` (`[Levels] List`; was `level.list` in 0.1), `level.load <unit>`, `level.reload` |
+| Level select | current unit name (GameTracker+0x38), one button per unit of `[Levels] List` (default `dlc_level1_start`, `dlc_level2_start`), "Reload current unit", 0.7.1: "Start DLC 2 / DLC 1 as the mission menu (intro)", then **all 111 playable units** in tree nodes per group (see below). Any other unit: `menu level.load <unit>` over TruLink | `level.current`, `level.list` (all units: `group: unit unit ...; ...`), `level.presets` (`[Levels] List`; was `level.list` in 0.1), `level.load <unit>`, `level.reload`, 0.7.1 `level.start [dlc2\|dlc1\|<unit>]` (game thread, main menu only; "Game input frozen (0.7.1)") |
 | Dev channel | there is no developer channel in `tru.exe` (TCP 9264 is FMOD's profiler). **TODO** re-enable the compiled-out log stub 0x6457a0 | `dev.log` (todo) |
-| Command bar (0.6, own window under the menu) | one input line: `<id> [arg]`, `get <id>`, `list [filter]`, `help`; autocomplete, history, pad picker (section "Command bar (0.6)") | `cmd.focus`, `cmd.run <line>`, `cmd.history` |
+| Command bar (0.6, own window under the menu) | one input line: `<id> [arg]`, `get <id>`, `list [filter]`, `help`; autocomplete, history, pad picker (section "Command bar (0.6)"); 0.7: on-screen keyboard under the bar (section "Controller and mouse (0.7)") | `cmd.focus`, `cmd.run <line>`, `cmd.history`; 0.7: `cmd.keyboard` |
 
 Items that need a level (camera, cheat) answer / show **"needs a level"** while no player instance exists
 (`[0xe7f094]` = 0, e.g. in the main menu). Level select works from the main menu as well.
@@ -93,7 +108,8 @@ const char *__cdecl TruMenuInvoke(const char *id, const char *arg);   // "ok ...
   `weapon.has` (read-only, our own reads under `__try`) run at once on the caller's thread; `ammo.fill` and
   `gear.give` are queued for the game thread.
 - 0.6: `cmd.focus`, `cmd.run` and `cmd.history` run at once on the caller's thread; `cmd.run <line>` then runs the
-  line's own item through the same path (a game-thread item waits as usual), see "Command bar (0.6)".
+  line's own item through the same path (a game-thread item waits as usual), see "Command bar (0.6)". 0.7:
+  `cmd.keyboard` (open the menu, focus the bar, show the on-screen keyboard) runs at once as well.
 - The returned text lives in a buffer of the calling thread until that thread's next call.
 - TruLink 0.2: `menu list`, `menu <id> [arg]` (e.g. `Invoke-TruLink.ps1 -Command 'menu level.load dlc_level2_start'`).
 - Values are one line (`; ` between entries) so `level.list` / `costume.list` fit TruLink's one-line answer; the
@@ -129,7 +145,8 @@ pushed up to stay on screen). It is a window of its own, so the menu window and 
   Down / Up = move in the list; Enter = run (the highlighted suggestion if one is highlighted, else the line); Up in
   the **empty** bar = history (Up older, Down newer, Down past the newest = empty line); Down in the empty bar, Up /
   Down with nothing to choose and Esc = focus into the menu; **F2** (always) or **Tab** (while no text field is
-  active) = back to the bar. Typed keys do not reach the game (see Controls).
+  active) = back to the bar. Typed keys do not reach the game (see Controls). 0.7: `[Cmd] UpOpensHistory=0` makes Up
+  in the empty bar go into the menu as well (Ctrl + Up = history).
 - **History:** the last `[Cmd] HistorySize` (32) lines, a repeated line moves to the end; `TruMenu.history.txt` next to
   `tru.exe` (a `#` comment line, then one line per command, oldest first), rewritten after every line, read at start.
   Lines from TruLink's `cmd.run` go into the history as well.
@@ -154,6 +171,209 @@ menu cmd.history                     <n>: newest; ...; oldest
 ```
 
 `cmd.run` waits for the game thread like any `menu <id>` (3 s); `cmd.run cmd.run ...` is refused.
+
+## Controller and mouse (0.7)
+
+Goal: the command bar is usable on a Steam Machine at the TV **without a keyboard**, and the mouse can click into the
+menu / bar at any time.
+
+### L3 = focus into the bar
+
+While the menu is open, **L3 pressed and released alone** (`[Cmd] FocusButton`, default 64 = 0x0040 L3) puts the focus
+into the command bar and opens the on-screen keyboard - from anywhere in the menu window, also from the pad picker.
+L3 again closes the keyboard (the bar keeps the focus). A press that becomes part of the open / close combo (L3 + R3)
+does not count: as soon as another button of `[Menu] ToggleButtons` is down while L3 is held, the tap is cancelled, so
+closing the menu never opens the keyboard. With `[Cmd] Keyboard=0` L3 only focuses the text field.
+
+### On-screen keyboard
+
+Drawn inside the bar window **under** the input line and the result line (rounded keys in the menu's button colours,
+the key under the cursor with the yellow frame of the suggestion list, a pressed key lights up shortly). It opens when
+the bar gets the focus **by controller**: L3, A in the idle bar (bar focused, text field not active), View in the pad
+picker ("back to typing"), `menu cmd.keyboard` over TruLink. It does **not** open when the menu opens (the text field
+gets the keyboard focus as in 0.6) nor for F2 / Tab.
+
+| Row | Content |
+|---|---|
+| 0 suggestions | the matching ids / argument values of the line (the same list as the 0.6 autocomplete: `time.` -> `time.scale`, `time.pause`; `level.load ` -> the units); while the line is **empty**: the history, newest first. The highlighted chip (also when the cursor is in another row) is what **Y** takes; its value and label are shown under the keyboard |
+| 1 quick tokens | `time.` `player.` `costume.` `level.` `dev.` `menu.` `0` `1` space `.` |
+| 2..5 keyboard | number row `1 .. 0 -`, then QWERTZ `q w e r t z u i o p _`, `a s d f g h j k l : #`, `y x c v b n m , . /` (lower case: ids and unit / outfit names are lower case, `#` / `:` for `instance.*` and `id:arg`) |
+| 6 | space, backspace (X), clear, close (B), run (Start) |
+
+| Pad | Effect |
+|---|---|
+| D-pad / left stick | move (hold = repeat); up / down go to the nearest key of the next row, the rows wrap |
+| A | type the key / take the suggestion chip under the cursor |
+| X | backspace (hold = repeat) |
+| Y | take the highlighted suggestion (an id that takes an argument gets a space, so row 0 then lists its values) |
+| Start | run the line (as Enter; the result line shows the answer; the line is emptied, the keyboard stays open) |
+| B | close the keyboard (the bar keeps the focus; D-pad then goes into the menu as in 0.6); 0.7.1: **a second B** right after it (no other button between) closes the menu |
+| LB / RB | jump between the rows suggestions -> tokens -> keyboard (letters) |
+| View | pad picker (0.6) |
+| L3 | close the keyboard |
+
+- The text field is not active while the keyboard is open; the keys edit the line directly (the field shows it).
+- **A real keyboard wins:** a typed character (or Backspace) closes the on-screen keyboard and puts the focus into the
+  text field with the line so far (cursor at the end); Esc closes it; a mouse click into the field does the same. While
+  the on-screen keyboard is open, typed keys do not reach the game (as for the text field in 0.6).
+- 0.7.1: the switch no longer depends on the bar focus, the mouse hover or the selected key (live test 2026-11-02:
+  sometimes incomplete with the cursor elsewhere and no key selected yet). Any real key press the window procedure sees
+  (not Esc, modifiers, F2, Tab, the toggle key) switches; the typed characters are taken out of ImGui's queue (no
+  double insert), and for up to 20 frames the focus is requested again and further characters still go into the line
+  until the text field is really active. The open keyboard owns the pad whatever has the focus.
+- 0.7.1: the keyboard comes back with the menu when it was open at the last close (owner decision 2026-11-02; in 0.7
+  this only happened by chance) - B, B or L3 before closing gives a menu without it.
+- Mouse: every key is clickable.
+- The bar window grows by the keyboard; it is pushed up to stay on screen (it can then cover the lower part of the menu
+  window while the keyboard is open).
+
+### Mouse while the menu is open (`[Menu] FreeMouse=1`)
+
+Owner report (0.6): the game keeps the mouse centred and swaps in its own cursor, so clicking into the bar after a focus
+loss failed. Static facts (Steam `tru.exe`, `dumpbin /imports` + `tools/pe_dis.py` / `pe_callers.py`, 2026-11-02):
+
+| Fact | Address | Check at load |
+|---|---|---|
+| USER32 import address table | 0x0083e278; `SetCursorPos` slot **0x0083e308** (entry 36), `ClipCursor` slot **0x0083e2e0** (entry 26), also `GetCursorPos` 0x0083e2a0, `ShowCursor` 0x0083e30c, `SetCursor` 0x0083e2cc | both slots found by name in the import directory at load and compared with these addresses |
+| class window procedure | 0x478bc0 (`WNDCLASS.lpfnWndProc` written at tru+0x790cf), starts with `cmp edi, WM_MOUSEMOVE` | `81ff00020000` at 0x478bda, `c744241cc08b4700` at 0x4790cf |
+| mouse look | `WM_MOUSEMOVE` while captured: `ShowCursor(FALSE)` until hidden, `ClipCursor(client rect)` (0x478e75), delta = position - client centre -> 0x4827d0, `SetCursorPos(centre)` (0x478f15); not captured: `ShowCursor(TRUE)`, absolute position -> 0x482670 (the game's own cursor), `ClipCursor(NULL)` | `ff15e0e28300` at 0x478e75, `ff1508e38300` at 0x478f15 |
+| activation path | `SetCursorPos(centre)` 0x4791b6, `ClipCursor(rect)` 0x4791c1 | both call bytes |
+| other input | no raw input imports; DirectInput8 is created (CoCreateInstance, `EnumDevices` tru+0x865f7, callback 0x486380), `GUID_SysMouse` is not in the file - **not verified live** that no mouse input comes that way. 0.7.1: the callback enumerates devices by type: 0x12 mouse -> wrapper 0x485ae0 at input manager +0x28, 0x13 keyboard -> wrapper 0x485e00 at +0x24 (see "Game input frozen (0.7.1)"); so a DirectInput **mouse** device exists as well - not hooked (the 0.7 live test showed no camera turn while the menu was open) | - |
+
+While the menu is open TruMenu therefore:
+
+1. passes **mouse messages** (`WM_MOUSEMOVE` .. `WM_MOUSEHWHEEL`, `WM_MOUSELEAVE`) and `WM_SETCURSOR` (client area)
+   **to ImGui only** - the game's window procedure never sees them: no camera turn, no re-centring, no `ShowCursor`;
+2. lets ImGui draw its own cursor (`io.MouseDrawCursor`, the system cursor is hidden with `SetCursor(NULL)`);
+3. points the two **import slots** `SetCursorPos` / `ClipCursor` to holders that only remember the game's request (only
+   while the menu is open; the slots are written back on close, only if they still hold ours) and releases the clip
+   (`ClipCursor(NULL)` through TruMenu's own import);
+4. on close (game window in front): the game's last `ClipCursor` / `SetCursorPos` request, or else the clip and the cursor
+   position from before the menu, are applied once - so the game's next mouse delta starts at its centre (no camera jump).
+
+Mouse positions are scaled from client to back-buffer pixels (ImGui draws in back-buffer pixels; with a scaling window
+proxy they differ - in 0.6 the mouse was off then). Status page / `status.hooks`: line `mouse (0.7): ...`; `TruMenu.log`
+"0.7 mouse: SetCursorPos slot ...". `[Menu] FreeMouse=0` = 0.6 behaviour (the game gets the mouse as well).
+
+### The two open owner questions (0.6 log page) as options
+
+| Key | Default (= 0.6 behaviour) | Other value |
+|---|---|---|
+| `[Cmd] UpOpensHistory` | 1: Up in the empty bar opens the history (Up older, Down newer) | 0: Up goes into the menu like Down; **Ctrl + Up** still opens the history |
+| `[Cmd] FirstPadPressOnlyFocuses` | 1: the first D-pad / stick press in the bar only moves the focus into the menu (not passed on) | 0: the same press also moves in the menu at once (the held direction is handed to ImGui in the next frame) |
+
+## Game input frozen (0.7.1)
+
+Live test 2026-11-02 (0.7): typing into the command bar moved Lara, Esc in the menu opened the game's pause menu, B
+with the on-screen keyboard open closed the whole menu, and the real-keyboard switch was sometimes incomplete.
+
+### Keyboard while the menu is open (`[Menu] BlockGameInput=1`)
+
+How `tru.exe` reads the keyboard (Steam exe, `tools/pe_dis.py`, `pe_callers.py`, `pe_abs_uses.py`, `exe_xref.py`,
+`dumpbin /imports`, 2026-11-02):
+
+| Fact | Address |
+|---|---|
+| no `GetAsyncKeyState` / `GetKeyState` / `GetKeyboardState` / raw input imports; DirectInput8 through `CoCreateInstance` | import table |
+| `EnumDevices` callback 0x486380 sorts by `dwDevType & 0xff`: 0x12 mouse -> new 0x890 bytes, wrapper 0x485ae0, stored at input manager `[0xa02b9c]+0x28`; **0x13 keyboard** -> new 0x894 bytes, wrapper **0x485e00**, stored at `[0xa02b9c]+0x24`; 0x14 / 0x15 joystick / gamepad (XInput devices skipped) | 0x486393, 0x4863f3, 0x48641f, 0x48642a |
+| keyboard wrapper 0x485e00: vtable **0x844f5c**, `IDirectInputDevice8` at +4; `CreateDevice`, `SetDataFormat(0x8654dc)`, `SetProperty(DIPROP_BUFFERSIZE, 64)`, `SetCooperativeLevel([0x9eedec], DISCL_NONEXCLUSIVE \| DISCL_FOREGROUND)`, `EnumObjects(0x482420)` | 0x485e3f (`mov [esi], 0x844f5c`) |
+| vtable slot 2 (**0x844f64** = 0x486100) = `Read(events, room, full)` (thiscall, `ret 0xc`): not full and no resync flag (+0x890) -> buffered `GetDeviceData` 0x486020; else buffered + full `GetDeviceState` 0x485f10 (also after `DIERR_INPUTLOST` / `NOTACQUIRED` -> `Acquire`) | 0x486100, 0x486020, 0x485f10 |
+| events: 16 bytes `{1, DIK code, time stamp, value 1.0 / 0.0}` (buffered: `dwOfs`, `dwTimeStamp`, `dwData & 0x80`; full: index, `GetTickCount` via slot 3, state byte & 0x80) | 0x48609d, 0x485fb1 |
+| the input manager's read 0x483db0 (its vtable 0x844c54 slot 2) calls pad (+0x2c), mouse (+0x28), keyboard (+0x24) each through `call [vtable+8]` with `(events, room, full)`; keyboard ids + 0x80; byte +0x1a of the manager zeroes keyboard values (the game's own switch 0x4825b0, used by its UI 0x5ac98c / 0x780060 - not touched by TruMenu) | 0x483eea |
+| window procedure 0x478bc0: `WM_KEYDOWN` not handled; `WM_KEYUP` + `VK_ESCAPE` -> 0x477ae0 (puts 0x1b into the character queue 0x9eeb40, count 0x9eedf8); `WM_CHAR` -> the same queue (128 entries); `WM_SYSKEYDOWN` only filters Alt combinations (not Alt + F4) | 0x478c0e, 0x478c27, 0x478caa, 0x478d7d |
+
+What 0.7.1 does:
+
+1. At load, after the byte checks below, slot 2 of the keyboard wrapper vtable (0x844f64, `.rdata`) points to
+   `KbdReadHook` (only the keyboard wrapper uses this vtable: constructor 0x485e3f, destructor 0x486160). The hook calls
+   the game's own read first (the device buffer is emptied as usual, nothing piles up), tracks which keys are down, and:
+   - menu open: returns **no** events, except once a release event (value 0) for every key the game saw going down -
+     the neutral state (Lara stops if a movement key was held when the menu opened);
+   - menu closed: passes the events on, but a key that was held when the menu closed stays away from the game until its
+     release (the release is dropped too - the game never saw it go down), so no key "arrives" pressed after the close.
+2. While the menu is open `WM_KEYDOWN` / `WM_KEYUP` / `WM_CHAR` / `WM_DEADCHAR` / `WM_SYSCHAR` / `WM_SYSDEADCHAR` go
+   to ImGui only (the Esc key-up no longer reaches the game's character queue); the key-up of a key that went down
+   while the menu was open is kept away after the close as well. `WM_SYSKEYDOWN` / `WM_SYSKEYUP` pass (Alt + Tab,
+   Alt + F4).
+3. Pad (neutral, `[Pad] BlockInput`) and mouse (`[Menu] FreeMouse`) as in 0.7. The DirectInput mouse device is not
+   touched.
+
+A check that fails switches the DirectInput part off with a log line ("0.7.1 keyboard: code 0, slot ... -> code / slot
+NOT matched - DirectInput keyboard not held, only the key messages"); the message part still works. Status page /
+`status.hooks`: `keyboard (0.7.1): ...` with the counters (events held, releases sent, kept after close).
+
+Byte pre-checks (all `ok` against the Steam `tru.exe` 2026-11-02 with `tools/pe_bytes_check.py --file
+work\asi\menu071\precheck_071.txt`, 36 checks, 0 mismatches):
+
+| Address | Bytes | Meaning |
+|---|---|---|
+| 0x844f64 | `00614800` | vtable slot 2 = 0x486100 (dword read, then replaced) |
+| 0x486100 | `56 8bf1 837e0400 7506 33c0 5e c20c00 807c241000 751e 80be9008000000` | Read(events, room, full) |
+| 0x485e3f | `c7065c4f8400` | constructor writes the vtable |
+| 0x4863f3 | `83f813 754a` | enum callback: type 0x13 keyboard |
+| 0x48641f | `e8dcf9ffff 8b0d9c2ba000 894124` | builds the wrapper, stores it at +0x24 |
+| 0x483eea | `8b4f24 8b01 8b4008 52 55 56 ffd0` | input manager calls slot 2 of the keyboard |
+| 0x48609d | `8970f4 8b79fc 8978f8 f60180` | buffered event layout |
+| 0x485fb1 | `f6440c1480 8970f4 8948f8` | full-state event layout |
+| 0x478c0e / 0x478c27 / 0x478caa | `2df1000000 0f850a030000 83bc24800000001b` / `6a1b e8b2eeffff` / `0fb7942484000000` | window procedure Esc key-up / WM_CHAR (documentation; not needed for the hook) |
+
+### `[Menu] PauseGame` (default 0)
+
+1 = the `time.pause` bit (streamFlags 0xe7f0b8 bit 0x1000, checked as for `time.pause`) is set while the menu is open
+(Present, as the menu state changes). On close only what TruMenu set is cleared: a pause from before the menu stays,
+and `time.pause` used while the menu is open takes over (no restore). Status `status.hooks` `pause=...`.
+
+### B twice, keyboard reopen
+
+B with the on-screen keyboard open closes only the keyboard; a **second B** right after it (no other pad button between)
+closes the menu (`TruMenu.log`: "menu closed (B twice: keyboard, then menu)"). B in the idle bar otherwise still moves
+the focus into the menu (0.6). Why 0.7 closed the menu on the first B could **not** be found statically: the 0.7 code
+only closes the keyboard on B, and the live `TruMenu.log` of 2026-11-02 has only "menu closed (pad)" (L3 + R3) and
+"(level change)" lines. 0.7.1 therefore logs every open / close with its reason at `LogLevel` 1 - if a first B still
+closes the menu, the log line says by what. The open keyboard now owns the pad independent of the bar focus.
+
+### `level.start` and `[Test] AutoStart` (the mission menu's DLC start, intro plays)
+
+`level.load` (GAMELOOP_RequestLevelChangeByName) skips the DLC intro. The mission menu (PC generalbank script 104)
+starts a DLC with `uigamedata` f22, `uigamedata` f27(unit, 1, 0, 1), `stdscreenmgr` f19 + f7
+(`docs/Befund-Direktstart.md`; test 41e did the same from the attract timer script and the DLC 2 intro played). The
+natives, read statically:
+
+| Native | Registration | Code | Note |
+|---|---|---|---|
+| `uigamedata` f22 | binder 0x7af0c0, 0x7af201 `push 0x7a0d00; push 0x16` | 0x7a0d00 jmp 0x77bc90 jmp **0x4a0f10** | `byte [0xa039b8] = 1; ret` - no arguments |
+| `uigamedata` f27 | 0x7af247 `push 0x7a0d40; push 0x1b` | 0x7a0d40: the three bools of the argument block, then jmp **0x77e170** | cdecl `(DataValue *args, bool, bool, bool)`, `args[0]` = `char *unit` (copied by 0x5dfb20 into GameTracker+0x38), plain `ret` (0x77e442) |
+| `stdscreenmgr` f7 | binder 0x7adca0, 0x7add0f `push 0x79ea00; push 7` | 0x79ea00 jmp **0x4be580** | ignores the script instance: `[0xa13f58]` (vtable 0x847c7c) slot 4 |
+| `stdscreenmgr` f19 | 0x7addb7 `push 0x79eac0; push 0x13` | 0x79eac0 jmp **0x4be5e0** | `[0xa13f50]` (vtable 0x847cc4) slot 4 |
+| slot 4 of both | 0x847c8c / 0x847cd4 = 0x4c5260 | `push ecx; mov eax, [ecx+4]; ...; call 0x7a5160; pop ecx; ret` | thiscall, no arguments |
+
+So the sequence needs no script frame: `level.start [dlc2|dlc1|<unit>]` (game thread, main state 10 only, experimental)
+calls 0x4a0f10(), 0x77e170({unit, 1, 0, 1}, 1, 0, 1), 0x4be5e0(), 0x4be580() inside `__try`, after checking that no
+level change is pending and that both screen managers exist with the expected vtables (singletons created at 0x4ccd3d /
+0x4ccd96). Not reproduced from script 104 (as in test 41e): the `dlcsystem` existence check, the "game in progress"
+dialog, the `messagechannel` "enableSound" broadcast. Level select page: two buttons "Start DLC 2 / DLC 1 as the
+mission menu (intro)".
+
+`[Test] AutoStart=dlc2` (or `dlc1` or a unit name; default empty = off): once per game start, when the main menu
+(main state 10) has been up for `[Test] AutoStartDelay` seconds (default 3), TruMenu queues `level.start <unit>` -
+the TruMenu replacement for the generalbank test patch 41e, which must never ship. Without the verified path (a check
+failed) it queues `level.load` instead and logs "AutoStart: intro skipped (mission start path not available)". Needs
+`[Cheat] Experimental=1`. Byte checks (all `ok`, same precheck file): 0x7af201, 0x7af247, 0x7a0d00, 0x77bc90,
+0x4a0f10, 0x7a0d40, 0x7a0d69 (`e902d4fdff`), 0x77e170, 0x77e425 (name -> 0x5dfb20, `ret`), 0x7add0f, 0x7addb7,
+0x79ea00, 0x79eac0, 0x4be580, 0x4be5e0, 0x847c8c, 0x847cd4, 0x4c5260, 0x4ccd3d, 0x4ccd96; at the call additionally
+the two singleton pointers and their vtables.
+
+### `[Log] UnitChanges` (default 1): the stream unit Lara is in
+
+`GameTracker+0x38` (`status.unit`, `level.current`) is only the unit the level load started with. The stream unit Lara
+is in: the game loop (0x5dfc88) compares `GameTracker+0xc0` (0xe7f148) with the player instance's +0xe0 and on a
+difference calls `STREAM_MoveIntoNewStreamUnit` 0x5c1bf0, which stores the new id into 0xe7f148 (0x5c1c4e) and prints
+the name at **entry +0xc** of the stream unit table (0xdbab40, 0xd8 per entry, +0 id, +4 state byte 2 = loaded; lookup
+0x5c1b50; format "STREAM_MoveIntoNewStreamUnit(%s)" at 0x5c1c33); the name lookup 0x5c1b90 compares entry +0xc too.
+TruMenu's worker thread reads id + name every 250 ms (read-only) and logs a line only on a change:
+`unit: dlc2_goo_room (was dlc_level2_start; stream unit id 7)` - into `TruMenu.log`, so also onto the log page and the
+log overlay (`log.overlay`). `status.unit` shows the stream unit name too. Checks: 0x5c1bf0, 0x5c1c28, 0x5c1c4e,
+0x5c1b9c, 0x5dfc88 and the 0.2 unit table check; a mismatch switches the option off with a log line.
 
 ## TO TEST (0.4)
 
@@ -386,7 +606,8 @@ checks"). Not yet run in the game.
 Every address below is checked against the expected bytes at load (`Start()`); on a mismatch that part stays off,
 the reason goes to `TruMenu.log` and the Status page shows `NO`. Nothing is patched in the game code itself - with one
 opt-in exception since 0.3: `log.script` writes a 5-byte `jmp` over the start of the 8 script print / log natives
-(restored when it is turned off; see "0.3 items: facts").
+(restored when it is turned off; see "0.3 items: facts"). Import slots: `GetProcAddress` (pad, since 0.1) and, 0.7,
+only while the menu is open, `SetCursorPos` / `ClipCursor` (see "Controller and mouse (0.7)").
 
 ### Pad: import filter on `GetProcAddress`
 
@@ -471,6 +692,9 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Menu] ToggleKey` | 0 | virtual key that also toggles the menu (0 = off) |
 | `[Menu] Scale` | 1.5 | font and spacing scale (0.5 .. 4) |
 | `[Menu] Overlay` | 0 | 1 = position overlay on from the start |
+| `[Menu] FreeMouse` | 1 | 0.7: while the menu is open the mouse belongs to the menu (cursor drawn, no mouse messages to the game, its `SetCursorPos` / `ClipCursor` held until close); 0 = as 0.6 |
+| `[Menu] BlockGameInput` | 1 | 0.7.1: while the menu is open the game gets no keyboard (its DirectInput keyboard reads no key events, a key it saw going down is released once, a key held at the close stays away until released; key messages to the menu only); 0 = as 0.7 |
+| `[Menu] PauseGame` | 0 | 0.7.1: 1 = also set the `time.pause` bit while the menu is open; on close only what TruMenu set is cleared |
 | `[Pad] BlockInput` | 1 | 0 = the game sees the pad while the menu is open |
 | `[Cheat] Experimental` | 1 | 0 = no game-changing actions (pages read-only) |
 | `[Cheat] FlightSpeed` | 20 | units per 30 fps frame at full trigger |
@@ -478,6 +702,10 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Favorites] Ids` | (empty = default list) | favourite item ids, comma list; rewritten by TruMenu when you pin / unpin (`WritePrivateProfileString` on this file) |
 | `[Cmd] Enabled` | 1 | 0.6: 1 = command bar under the menu window (0 = no bar; `cmd.run` still works, `cmd.focus` answers `err`) |
 | `[Cmd] HistorySize` | 32 | 0.6: lines kept in `TruMenu.history.txt` next to `tru.exe`, 1 .. 64 |
+| `[Cmd] FocusButton` | 64 (0x0040 L3) | 0.7: XInput button (pressed and released alone, menu open) = focus into the bar + on-screen keyboard; 0 = off |
+| `[Cmd] Keyboard` | 1 | 0.7: on-screen keyboard when the bar gets the focus by controller; 0 = L3 / A only focus the text field |
+| `[Cmd] UpOpensHistory` | 1 | 0.7: 1 = Up in the empty bar = history; 0 = Up into the menu like Down (Ctrl + Up = history) |
+| `[Cmd] FirstPadPressOnlyFocuses` | 1 | 0.7: 1 = the first D-pad / stick press in the bar only focuses the menu; 0 = it also moves there |
 | `[Log] Overlay` | 0 | 1 = log lines in the bottom-left corner from the start |
 | `[Log] Lines` | 12 | lines on the Debug / Log page and in the overlay (1 .. 64) |
 | `[Log] Script` | 0 | 1 = redirect the 8 script print / log natives from the start (patched at load, before any script runs; needs `Experimental=1`) |
@@ -485,6 +713,9 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Log] HideLinkReads` | 1 | 0.4: drop TruLink's echo of `read*` / `scan*` / `watch*` / `ping` and its `menu` lines for info items (`status.*`, `test.list`, ...) (`log.hidereads`) |
 | `[Log] MinLevel` | 0 | 0.4: 0 all lines, 1 warnings + errors, 2 errors only (`log.level`) |
 | `[Log] MaxLinesPerSecond` | 40 | 0.4: new lines per source and second, more are dropped and counted; 0 = no limit (`log.rate`) |
+| `[Log] UnitChanges` | 1 | 0.7.1: a line `unit: <name> (was <name>; stream unit id N)` in `TruMenu.log` (log page / overlay) when Lara moves into another stream unit |
+| `[Test] AutoStart` | (empty = off) | 0.7.1, test only: `dlc2` / `dlc1` / a unit name - once per game start, when the main menu is up, `level.start` (mission menu path, intro plays); without the verified path `level.load` + log line "intro skipped" |
+| `[Test] AutoStartDelay` | 3 | 0.7.1: seconds the main menu must be up before AutoStart starts, 1 .. 60 |
 
 ## Build, install, test (Windows)
 
@@ -611,6 +842,92 @@ result, send `TruMenu.log`, `TruLink.log` and `TruMenu.history.txt`.
 39. TruLink: `menu cmd.run time.scale 0.5` -> answer as `menu time.scale 0.5`, the bar shows `TruLink: time.scale 0.5`;
     `menu cmd.focus` opens the menu with the focus in the bar; with `[Cmd] Enabled=0` there is no bar and
     `menu cmd.focus` answers `err command bar off`.
+
+0.7 additions (built with `-OutDir work\asi\menu07`; install the `.asi` **and** the new `TruMenu.ini` - five new keys,
+an old ini works too: `Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu07`; the 0.6 builds `work\asi\menu06` /
+`work\asi` and the 0.6 ini are recognised as ours). Every step: note the result, send `TruMenu.log`, `TruLink.log` and
+`TruMenu.history.txt`.
+
+40. Status page: line `mouse (0.7): ready (...)`; `TruMenu.log` holds "0.7 cmd: focus button 0x0040, ..." and "0.7
+    mouse: SetCursorPos slot 0x0083e308, ClipCursor slot 0x0083e2e0 ... game code 1 -> ready". (`slots NOT matched`:
+    send the log - only the mouse messages are held then.)
+41. Controller only, in a level: open the menu (L3 + R3) - **no** keyboard appears and closing with L3 + R3 opens none
+    either. Open, D-pad into the menu, press **L3** alone: the bar gets the focus, the keyboard appears under it with the
+    cursor on `q`; row 0 shows the history (or "(no history yet ...)").
+42. Keyboard: RB -> tokens row, A on `time.` -> the line is `time.`, row 0 lists `time.scale`, `time.pause`; LB -> row 0,
+    A (or Y from any row) takes `time.scale ` (with space); type `0`, `.`, `5` with the D-pad / A; Start -> green
+    `ok ...`, the world runs at half speed; `time.scale 1` back. X deletes (hold = repeat). B closes the keyboard, D-pad
+    then goes into the menu as in 0.6. View with the keyboard open -> pad picker; View there -> keyboard again.
+43. Look: rounded keys, highlighted key with a yellow frame, pressed key lights up; Run key green; nothing cut off at the
+    right edge (also at `[Menu] Scale` 1.0 / 2.0 - note how it looks on the TV).
+44. Keyboard + real keyboard: with the on-screen keyboard open, type `ui` on the real keyboard -> it closes, the field
+    holds the line + `ui` with the cursor at the end (nothing selected), Lara does not move. Esc with the on-screen
+    keyboard open only closes it.
+45. Mouse in a level (camera follows the mouse when the menu is closed): open the menu - an ImGui cursor appears, moving
+    the mouse does **not** turn the camera and the cursor is not pulled back to the centre; click into the bar, type,
+    click a menu button, click a key of the on-screen keyboard (L3 first). Alt + Tab away and back, click into the bar
+    - it takes the focus (0.6 failed here). Close the menu: the camera does not jump, mouse look works as before, the
+    cursor is hidden / clipped again. Windowed (TRAWindowed): the cursor tip matches the clicked widget.
+46. `[Menu] FreeMouse=0` (restart): behaviour as 0.6 (camera turns while the menu is open). Back to 1.
+47. Options: `[Cmd] UpOpensHistory=0` -> Up in the empty bar goes into the menu, Ctrl + Up opens the history;
+    `[Cmd] FirstPadPressOnlyFocuses=0` -> the first D-pad press in the bar moves the focus into the menu **and** one
+    entry further (hold = repeats); `[Cmd] Keyboard=0` -> L3 only focuses the text field; `[Cmd] FocusButton=0` -> L3
+    does nothing.
+48. TruLink: `menu cmd.keyboard` (menu closed) -> menu opens with the bar focused and the keyboard shown;
+    `menu status.hooks` ends with `mouse=...`.
+
+0.7.1 additions (built with `-OutDir work\asi\menu071`; install the `.asi` **and** the new `TruMenu.ini` - five new
+keys, an old ini works too: `Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu071`; the 0.7 build `work\asi\menu07`
+and its ini are recognised as ours). Every step: note the result, send `TruMenu.log`, `TruLink.log` and
+`TruMenu.history.txt`.
+
+49. `TruMenu.log` after the start: "0.7.1 keyboard: wrapper vtable slot 0x00844f64 0x00486100 -> KbdReadHook -> ready
+    ..." and "0.7.1: block game input 1 (keyboard hooked), pause game 0 (...), mission start path 1, stream unit name 1
+    ...". Status page: line `keyboard (0.7.1): ready ...`.
+50. In a level, Lara standing: open the menu, type `wasd` and Enter into the command bar (also hold `w` for a second)
+    - **Lara must not move**; close the menu - she stays standing (also when `w` is still held while closing: she only
+    walks after `w` is released and pressed again). Status line counters: events held > 0.
+51. Hold `w` (Lara runs), open the menu with L3 + R3 while still holding it - Lara **stops** (neutral state, "releases
+    sent" > 0); release `w`, close the menu - she stays standing.
+52. Esc in the menu (bar focused, on-screen keyboard open, and in the menu window): **no pause menu** of the game; with
+    the on-screen keyboard open Esc only closes it. After closing the TruMenu, Esc opens the game's pause menu as usual.
+53. B twice: L3 (keyboard open), **B** -> only the keyboard closes (menu stays, bar focused); **B** again -> the menu
+    closes (`TruMenu.log`: "menu closed (B twice: keyboard, then menu)"). Variant: L3, B, D-pad down -> focus in the
+    menu (no close). If a single B still closes the menu: send the log line "menu closed (...)".
+54. Real keyboard switch with the mouse elsewhere: L3 (keyboard open, cursor on `q`), move the mouse cursor away (over
+    the menu window or outside the game), do **not** touch the pad, type `ui` on the real keyboard -> the keyboard closes,
+    the field holds `ui` with the cursor at the end, typing goes on (`.hide`), Enter runs it. Repeat with the
+    cursor over the bar and after selecting a key with the D-pad.
+55. Keyboard reopen: L3 (keyboard open), close the menu with L3 + R3, open again -> the keyboard is back; B (closes it),
+    L3 + R3, L3 + R3 -> menu without keyboard.
+56. `[Menu] PauseGame=1` (restart): in a level with enemies / moving water, open the menu - the world stands still,
+    close - it moves on. `time.pause 1` before opening -> still paused after closing; `time.pause` used inside the menu
+    -> its state is kept after closing. Back to 0.
+57. `[Menu] BlockGameInput=0` (restart): as 0.7 (typing in the bar can move Lara again) - only to confirm the switch.
+58. Lara's stream unit: `log.overlay 1`, walk through DLC 2 from the start room into the next rooms - the overlay shows
+    lines `unit: <name> (was <name>; stream unit id N)` at each room change; `menu status.unit` shows "Lara's unit".
+    Note the names (catalog of the internal room names).
+59. `level.start dlc2` from the main menu (command bar or Level select button "Start DLC 2 as the mission menu
+    (intro)"): the DLC 2 **intro plays**, then the level (compare `level.load dlc_level2_start`: no intro). Outfit /
+    weapon choice as with the mission menu? Sound on?
+60. `[Test] AutoStart=dlc2` (restart, game data **without** test patch 41e): after the main menu has been up for 3 s the
+    DLC 2 intro starts by itself, once per game start (quit to the main menu: it stays). `TruMenu.log`: "AutoStart:
+    main menu up ..." and "AutoStart: level.start dlc_level2_start queued ...". Back to empty.
+
+## Ideas
+
+- **`[Test] SkipHintBoxes`** (research only, nothing built): the DLC 2 hint boxes come from the ported generalbank script
+  9 (`popUpTitleMessage`, TU script 10; `docs/Befund-Test33-Native.md`): it pauses the game until A (Xenia reference: DLC
+  2 hints modal with pause, DLC 1 top right without). Known from that finding: script 9 inherits from script 93
+  (`uiscreen`); its f7 lies near the "paused" string and calls the replaced `dlc2data` f1(0), f8 calls f1(1), f9 reads
+  f0 and calls f1(0); its external calls include `inputaction` f0 and `uiscreen` f90 / f91 / f99. Not yet found: which
+  native / engine flag the modal box uses to pause the game (candidates, unverified: a `uiscreen` modal flag, a
+  `uigamedata` pause native, streamFlags) and which call closes it on A. Next step: disassemble script 9 f7 / f8 / f9
+  (`tools/menu_dlc_probe.py`, `script_func_list.py`) and map their `op65` calls to exe natives as done for f22 / f27
+  above; an auto-confirm could then run the close path's natives on the game thread while the box is up - only with
+  byte checks and as a test option.
+- The DirectInput mouse device (input manager +0x28, wrapper 0x485ae0) could be held the same way as the keyboard if a
+  live test ever shows mouse clicks reaching the game while the menu is open.
 
 ## Credits
 

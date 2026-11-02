@@ -1,0 +1,293 @@
+{
+    "name":  "regress_dlc1",
+    "description":  "Regression DLC 1 Beneath the Ashes (docs/Regression-DLC1.md) with the current DLC 2 test trees and plugins (as regress_shadowlara_50f): everything that has been seen working in DLC 1, and the DLC 2 plugins must stay inactive there. Start DLC 1 from the mission menu right after the main menu appears (the test generalbank 41e otherwise auto-starts DLC 2 after the attract timer) or with TruMenu level.load dlc_level1_start (no intro).",
+    "trees":  [
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "doppelganger_casual.drm":  "30fdf941c3e2c87f8e8697b452acab73",
+                                  "player_tru_dlc2_extension.drm":  "023fb985904fc2a0f5900617ac04614d"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test48i_markup/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc2_uo_machine_column.drm":  "f4ea1892e5bf0d0bcaa3a51771b492ce"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test50f_vm/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "doppelganger_casual.drm":  "7369f680693b99e939f7a612f9fffede",
+                                  "dlc_fx_goo_machine.drm":  "3379055e833fb4e4496020369ce2f4a0",
+                                  "dlc_fx_goo_machine_a_ist.drm":  "4524551c25cb100b84a83712841c3624",
+                                  "dlc_fx_goo_machine_b_ist.drm":  "a8842c74c4a2f41d070b7d4e8302ed89",
+                                  "dlc_fx_goo_machine_c_ist.drm":  "e54bebcd585725baf45166bb05208b1b"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test50c_vein/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_level2_start.drm":  "9a386d2bedb5c5d43cf63d54382c7a98"
+                              }
+                  }
+              ],
+    "files":  [
+
+              ],
+    "asis":  [
+                 {
+                     "name":  "TruDlc2Player",
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "c73c8c6693000e45a1ae60b0b29d69ecb02313796a2820ab65e4546a1267992b"
+                 },
+                 {
+                     "name":  "TruDoppelganger",
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "192a03c1241534a12fadec63cff3e5193c74e9d31b197bef7ded58fa4087dacc"
+                 },
+                 {
+                     "name":  "TruRockVein",
+                     "sourceDir":  "trudlcport/work/asi_rv08",
+                     "sha256":  "66f80abb20e9ec6a74e2f3f6e933e8be2757ec70a870f03406197999cf55b29c",
+                     "ini":  {
+                                 "RockVein":  {
+                                                  "LogLevel":  "2"
+                                              }
+                             }
+                 },
+                 {
+                     "name":  "TruShadowPower",
+                     "sourceDir":  "trudlcport/work/asi/v08",
+                     "sha256":  "8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5",
+                     "ini":  {
+                                 "ShadowPower":  {
+                                                     "LogLevel":  "2"
+                                                 },
+                                 "Look":  {
+                                              "Enabled":  "0"
+                                          }
+                             }
+                 },
+                 {
+                     "name":  "TruLink",
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "1b4651857e8b6c6e6d912cd91211269c35a465075df98206edc2502652adc185",
+                     "ini":  {
+                                 "TruLink":  {
+                                                 "Enabled":  "1"
+                                             }
+                             }
+                 },
+                 {
+                     "name":  "TruGuard",
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                 },
+                 {
+                     "name":  "TruMenu",
+                     "sourceDir":  "trudlcport/work/asi/menu07",
+                     "sha256":  "6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b",
+                     "ini":  {
+                                 "Cheat":  {
+                                               "Experimental":  "1"
+                                           }
+                             }
+                 }
+             ],
+    "removeOtherAsis":  true,
+    "trulink":  {
+                    "port":  9265,
+                    "waitSeconds":  300
+                },
+    "tests":  [
+                  {
+                      "kind":  "step",
+                      "n":  1,
+                      "id":  "-",
+                      "text":  "Main menu: open the DLC mission menu at once (before the attract timer starts DLC 2)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-menu",
+                      "text":  "Mission menu shows Unter der Asche / Beneath the Ashes, title and text in the game language"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  2,
+                      "id":  "-",
+                      "text":  "Start DLC 1 from the mission menu (not level.load - it skips the intro)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-load-title",
+                      "text":  "Loading screen: title UNTER DER ASCHE above the line, description directly below the line (not on it)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-cutscene",
+                      "text":  "Intro plays to its end in the game language; skip-cinematic bar as on the Xbox"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  3,
+                      "id":  "-",
+                      "text":  "Move Lara; walk to the first health-pack hint and the grapple points"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-lara",
+                      "text":  "Lara in her normal DLC 1 outfit (no doppelganger, no DLC 2 costume swap)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-hint",
+                      "text":  "Health-pack hint top right in a faint dark box, no Press A line, no pause"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-grapple",
+                      "text":  "Grapple ring rusty copper with highlights, holder without yellow / olive highlight; shiny copper in the camera zoom"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  4,
+                      "id":  "-",
+                      "text":  "Hold RB and LB a few seconds each"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-no-shadow",
+                      "text":  "RB / LB: normal DLC 1 behaviour - no slow motion from us, no shadow meter in the HUD"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-bridge",
+                      "text":  "Adrenaline bridge (padshock dlc1_adren_bridge): crossing it does not crash"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  5,
+                      "id":  "-",
+                      "text":  "Take a hit / fall, then jump to death"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-death",
+                      "text":  "Health drops; after the death Lara reappears at the checkpoint, no crash"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-treasure",
+                      "text":  "Treasure room (dlc_treasureroom, achievement fix): entering it and its trigger do not crash (level.load allowed here)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "dlc1-outfits",
+                      "text":  "Outfit list: descriptions as on the Xbox (4 lines); fewer entries = known gap (costume packs)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  6,
+                      "id":  "-",
+                      "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "no-crash",
+                      "text":  "No crash, freeze or box during the whole run"
+                  }
+              ],
+    "expects":  [
+                    {
+                        "id":  "doppel-ids",
+                        "file":  "TruDoppelganger.log",
+                        "mode":  "present",
+                        "pattern":  "title-update ids registered: 13 conditions, 9 activities, 8 states",
+                        "text":  "TruDoppelganger registered all title-update ids (13 conditions, 9 activities, 8 states)"
+                    },
+                    {
+                        "id":  "rv-no-mismatch",
+                        "file":  "TruRockVein.log",
+                        "mode":  "absent",
+                        "pattern":  "does not match",
+                        "text":  "TruRockVein found every code site it patches (no \u0027does not match\u0027)"
+                    },
+                    {
+                        "id":  "sp-no-mismatch",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "absent",
+                        "pattern":  "does not match",
+                        "text":  "TruShadowPower found every code site it patches (no \u0027does not match\u0027)"
+                    },
+                    {
+                        "id":  "cdb-d3dfail",
+                        "file":  "cdb.log",
+                        "mode":  "absent",
+                        "pattern":  "^\\s*D3DFAIL\\s*$",
+                        "text":  "No D3D error handler call (D3DFAIL marker)",
+                        "optional":  false
+                    },
+                    {
+                        "id":  "cdb-av",
+                        "file":  "cdb.log",
+                        "mode":  "absent",
+                        "pattern":  "^\\s*AV2NDCHANCE\\s*$",
+                        "text":  "No second-chance access violation (AV2NDCHANCE marker)",
+                        "optional":  false
+                    },
+                    {
+                        "id":  "cdb-fastfail",
+                        "file":  "cdb.log",
+                        "mode":  "absent",
+                        "pattern":  "^\\s*FASTFAIL\\s*$",
+                        "text":  "No fast fail (FASTFAIL marker)",
+                        "optional":  false
+                    },
+                    {
+                        "id":  "cdb-msgbox",
+                        "file":  "cdb.log",
+                        "mode":  "absent",
+                        "pattern":  "^\\s*MESSAGEBOX_[AW]\\s*$",
+                        "text":  "No message box (MESSAGEBOX_A / MESSAGEBOX_W marker)",
+                        "optional":  false
+                    },
+                    {
+                        "id":  "dlc1-no-swap",
+                        "file":  "TruDlc2Player.log",
+                        "mode":  "absent",
+                        "pattern":  "costume \"lara_doppelganger\" -\u003e doppelganger_casual",
+                        "text":  "No doppelganger costume swap in DLC 1"
+                    },
+                    {
+                        "id":  "sp-no-on",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "absent",
+                        "pattern":  "shadow power ON \\(meter",
+                        "text":  "The shadow power never started (DLC 2 plugins inactive outside DLC 2; LogLevel 2)"
+                    },
+                    {
+                        "id":  "guard-faults",
+                        "file":  "TruGuard.log",
+                        "mode":  "absent",
+                        "pattern":  "TRUGUARD_DETAIL",
+                        "text":  "No first-chance fault in the game code recorded by TruGuard"
+                    }
+                ]
+}

@@ -44,7 +44,13 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.7 (TruGuard action guard.dump: full minidump + thread snapshot on the TruLink "
+const char *const kVersion = "TruMenu 0.7.1 (game input frozen while the menu is open: [Menu] BlockGameInput = the "
+                             "game's DirectInput keyboard and key messages, [Menu] PauseGame; B twice = keyboard, then "
+                             "menu; real keyboard switch without hover; [Test] AutoStart = level.start (mission menu "
+                             "path, intro plays); [Log] UnitChanges; "
+                             "0.7: command bar without a keyboard: L3 = focus + on-screen keyboard, the mouse "
+                             "belongs to the menu while it is open, [Cmd] UpOpensHistory / FirstPadPressOnlyFocuses; "
+                             "TruGuard action guard.dump: full minidump + thread snapshot on the TruLink "
                              "thread, also while the game hangs; 0.6: command bar: ids with autocomplete, history, pad "
                              "picker, cmd.*; 0.5: TO TEST "
                              "steps / checks / toggles + test.export; 0.4: TO TEST checklist over "
@@ -162,6 +168,15 @@ const OptDef kOpts[] = {
     {"Menu", "ToggleKey", "0", "keyboard key that also opens / closes the menu (virtual key code, e.g. 119 = F8); 0 = off"},
     {"Menu", "Scale", "1.5", "size of the menu (font and spacing), 0.5 .. 4"},
     {"Menu", "Overlay", "0", "1 = show the Lara position overlay from the start"},
+    {"Menu", "FreeMouse", "1", "1 = while the menu is open the mouse belongs to the menu: a cursor is drawn, the game gets no "
+                               "mouse messages (no camera\nturn, no re-centring) and its SetCursorPos / ClipCursor calls "
+                               "wait until the menu closes; 0 = as before 0.7"},
+    {"Menu", "BlockGameInput", "1", "1 = while the menu is open the game gets no keyboard: its DirectInput keyboard reads "
+                                    "no key events (a key the game\nsaw going down is released once, a key still held "
+                                    "at the close stays away until released) and key messages go to\nthe menu only; 0 = "
+                                    "as 0.7 (pad: [Pad] BlockInput, mouse: FreeMouse)"},
+    {"Menu", "PauseGame", "0", "1 = also pause the game time while the menu is open (time.pause: streamFlags bit 0x1000); "
+                               "on close the state\nfrom before the menu comes back (unless time.pause was used meanwhile)"},
     {"Pad", "BlockInput", "1", "1 = the game gets a neutral pad while the menu is open; 0 = the game sees the pad as well"},
     {"Cheat", "Experimental", "1", "1 = show the experimental actions (cheat / flight, camera mode, level load, costumes, "
                                    "developer menu rows, time /\nplayer / instance / video items); 0 = read-only"},
@@ -178,6 +193,8 @@ const OptDef kOpts[] = {
     {"Log", "MinLevel", "0", "lines shown on the page / overlay: 0 all, 1 warnings and errors, 2 errors only"},
     {"Log", "MaxLinesPerSecond", "40", "at most this many new lines per source and second (more are dropped and counted); "
                                        "0 = no limit"},
+    {"Log", "UnitChanges", "1", "1 = a line \"unit: <name> (was <name>)\" when Lara moves into another stream unit "
+                                "(TruMenu.log, log page and overlay)"},
     {"Favorites", "Ids", "", "item ids on the \"Quick access / Favourites\" page (comma list); empty = default list. Y on an "
                              "item in the menu\npins / unpins it and rewrites this line (TruLink: menu fav.add <id> / "
                              "fav.del <id> / fav.list)"},
@@ -185,6 +202,18 @@ const OptDef kOpts[] = {
                             "\"help\"); the\nkeyboard focus goes to it when the menu opens, D-pad / stick go on into the "
                             "menu, View / F2 / Tab come back"},
     {"Cmd", "HistorySize", "32", "commands kept in TruMenu.history.txt next to tru.exe (Up in the empty bar), 1 .. 64"},
+    {"Cmd", "FocusButton", "64", "XInput button that puts the focus into the command bar and opens the on-screen keyboard "
+                                 "while the menu is open\n(pressed and released alone, not as part of the open / close "
+                                 "combo): 0x0040 L3 = 64; again = keyboard closed; 0 = off"},
+    {"Cmd", "Keyboard", "1", "1 = on-screen keyboard under the bar when the bar gets the focus by controller (FocusButton, "
+                             "A in the idle bar, View in\nthe pad picker); a key on a real keyboard closes it again"},
+    {"Cmd", "UpOpensHistory", "1", "1 = Up in the empty bar opens the history (Up older, Down newer); 0 = Up goes into the "
+                                   "menu like Down (Ctrl + Up\nstill opens the history)"},
+    {"Cmd", "FirstPadPressOnlyFocuses", "1", "1 = the first D-pad / stick press in the bar only moves the focus into the "
+                                             "menu; 0 = the same press also moves\nin the menu at once"},
+    {"Test", "AutoStart", "", "test only: dlc2 (or dlc1) = once per game start, when the main menu is up, start that DLC "
+                              "the way the mission\nmenu does (level.start, the intro plays); empty = off"},
+    {"Test", "AutoStartDelay", "3", "seconds the main menu must be up before AutoStart starts the level, 1 .. 60"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -213,6 +242,17 @@ int g_logMinLevel = 0, g_logRate = 40;                                       // 
 int g_experimental = 1;
 float g_flightSpeed = 20.0f;
 int g_cmdEnabled = 1, g_cmdHistSize = 32;                                    // 0.6 [Cmd] Enabled / HistorySize
+int g_freeMouse = 1;                                                         // 0.7 [Menu] FreeMouse
+WORD g_cmdFocusButton = 0x0040;                                              // 0.7 [Cmd] FocusButton (L3)
+int g_cmdKeyboard = 1, g_cmdUpHistory = 1, g_cmdFirstPressFocus = 1;         // 0.7 [Cmd] Keyboard / UpOpensHistory /
+                                                                             //     FirstPadPressOnlyFocuses
+int g_blockGameInput = 1, g_pauseGame = 0;                                   // 0.7.1 [Menu] BlockGameInput / PauseGame
+int g_unitChanges = 1;                                                       // 0.7.1 [Log] UnitChanges
+char g_autoStart[24] = "";                                                   // 0.7.1 [Test] AutoStart ("" = off)
+int g_autoStartDelay = 3;                                                    // 0.7.1 [Test] AutoStartDelay (seconds)
+volatile LONG g_menuPaused = 0;                                              // 0.7.1: TruMenu set the pause bit
+const char *g_pauseMode = "off ([Menu] PauseGame=0)";                        // 0.7.1 status texts
+const char *g_autoStartMode = "off ([Test] AutoStart empty)";
 
 // ---- state ----
 char g_logPath[MAX_PATH];
@@ -231,6 +271,11 @@ bool g_cmdOwnPad = false;               // the bar (text field or pad picker) ha
 WORD g_cmdPadEdges = 0;                 // bar buttons pressed this frame (left stick folded into the D-pad bits)
 WORD g_cmdPadHeld = 0;                  // bar buttons held (owned by the bar), for the repeat
 bool g_cmdBackEdge = false;             // View / Back pressed this frame (focuses the bar from the menu)
+// 0.7: controller focus + on-screen keyboard, mouse release
+volatile LONG g_cmdOskReq = 0;          // 1 = FocusButton tapped (toggle the keyboard), 2 = cmd.keyboard (open it)
+bool g_cmdHandOver = false;             // FirstPadPressOnlyFocuses=0: the D-pad press that left the bar goes on to ImGui
+bool g_oskOpen = false;                 // on-screen keyboard shown under the bar (render thread)
+UINT g_bbWidth = 0, g_bbHeight = 0;     // back buffer size of the last frame (mouse coordinates are scaled to it)
 
 bool g_levelOk = false;
 bool g_baseOk = false, g_padCodeOk = false, g_d3dCodeOk = false, g_playerOk = false, g_postOk = false,
@@ -388,7 +433,7 @@ void ToggleMenu(const char *by) {
     LONG open = !InterlockedCompareExchange(&g_menuOpen, 0, 0);
     InterlockedExchange(&g_menuOpen, open);
     if (open) InterlockedExchange(&g_menuJustOpened, 1);
-    Log(2, "menu %s (%s)", open ? "opened" : "closed", by);
+    Log(1, "menu %s (%s)", open ? "opened" : "closed", by);   // 0.7.1: level 1 - the reason of every close in the log
 }
 
 // real pad state in, toggle detection; returns true when the game must get a neutral state
@@ -507,13 +552,330 @@ void PatchVtable(void **vtable, int index, void *hook, void *volatile *original,
         index, reinterpret_cast<DWORD>(*original), owner);
 }
 
+// ---- 0.7 mouse release while the menu is open ----
+// The game turns the camera from WM_MOUSEMOVE in its class window procedure 0x478bc0 (tru+0x78e7b: delta to the client
+// centre -> 0x4827d0, then SetCursorPos(centre) through the import slot 0x0083e308, ShowCursor(FALSE) until hidden,
+// ClipCursor(client rect) through 0x0083e2e0; without capture it shows the cursor and calls ClipCursor(NULL)). The
+// activation path (tru+0x791b6) also centres + clips. tru.exe imports no raw input; it creates DirectInput8 (CoCreate,
+// EnumDevices tru+0x865f7 with callback 0x486380) but GUID_SysMouse is not in the file - not verified live that no
+// mouse comes that way. So while the menu is open: mouse messages go to ImGui only, and the two import slots
+// point to holders that remember the game's request instead of moving / clipping; on close the slots are restored and
+// the game's last request (or the state from before the menu) is applied once.
+typedef BOOL(WINAPI *SetCursorPosFn)(int, int);
+typedef BOOL(WINAPI *ClipCursorFn)(const RECT *);
+const DWORD kSetCursorPosSlot = 0x0083e308, kClipCursorSlot = 0x0083e2e0;   // dumpbin /imports tru.exe (USER32 IAT
+                                                                             // 0x83e278: entries 36 and 26)
+volatile DWORD *g_setCursorPosSlot = nullptr, *g_clipCursorSlot = nullptr;   // found by name in the import directory
+volatile SetCursorPosFn g_setCursorPosGame = nullptr;                        // what the slot held when the menu opened
+volatile ClipCursorFn g_clipCursorGame = nullptr;
+volatile LONG g_mouseHeld = 0;                                               // slots point to the holders
+const char *g_mouseMode = "waiting for the first menu open";
+bool g_mouseSlotsOk = false;
+CRITICAL_SECTION g_mouseLock;
+bool g_heldPosSet = false, g_heldClipSet = false, g_heldClipNull = false;    // the game's requests while held
+POINT g_heldPos = {}, g_openPos = {};
+RECT g_heldClip = {}, g_openClip = {};
+bool g_openPosOk = false, g_openClipOk = false;
+LONG g_heldCalls = 0;
+
+BOOL WINAPI SetCursorPosHold(int x, int y) {
+    if (!g_mouseHeld) {                          // released meanwhile: pass on
+        SetCursorPosFn game = g_setCursorPosGame;
+        return game ? game(x, y) : SetCursorPos(x, y);
+    }
+    EnterCriticalSection(&g_mouseLock);
+    g_heldPos.x = x;
+    g_heldPos.y = y;
+    g_heldPosSet = true;
+    ++g_heldCalls;
+    LeaveCriticalSection(&g_mouseLock);
+    return TRUE;
+}
+
+BOOL WINAPI ClipCursorHold(const RECT *rect) {
+    if (!g_mouseHeld) {
+        ClipCursorFn game = g_clipCursorGame;
+        return game ? game(rect) : ClipCursor(rect);
+    }
+    EnterCriticalSection(&g_mouseLock);
+    g_heldClipSet = true;
+    g_heldClipNull = rect == nullptr;
+    if (rect) g_heldClip = *rect;
+    ++g_heldCalls;
+    LeaveCriticalSection(&g_mouseLock);
+    return TRUE;
+}
+
+// import slot of <dll>!<func> in tru.exe, by name (Import Name Table), or nullptr
+volatile DWORD *FindImportSlot(const char *dll, const char *func) {
+    __try {
+        BYTE *base = reinterpret_cast<BYTE *>(GetModuleHandleA(nullptr));
+        const IMAGE_DOS_HEADER *dos = reinterpret_cast<const IMAGE_DOS_HEADER *>(base);
+        const IMAGE_NT_HEADERS32 *nt = reinterpret_cast<const IMAGE_NT_HEADERS32 *>(base + dos->e_lfanew);
+        const IMAGE_DATA_DIRECTORY &dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+        if (!dir.VirtualAddress) return nullptr;
+        for (const IMAGE_IMPORT_DESCRIPTOR *d = reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR *>(base + dir.VirtualAddress);
+             d->Name; ++d) {
+            if (_stricmp(reinterpret_cast<const char *>(base + d->Name), dll) != 0) continue;
+            const IMAGE_THUNK_DATA32 *names = reinterpret_cast<const IMAGE_THUNK_DATA32 *>(
+                base + (d->OriginalFirstThunk ? d->OriginalFirstThunk : d->FirstThunk));
+            IMAGE_THUNK_DATA32 *slots = reinterpret_cast<IMAGE_THUNK_DATA32 *>(base + d->FirstThunk);
+            for (; names->u1.AddressOfData; ++names, ++slots) {
+                if (IMAGE_SNAP_BY_ORDINAL32(names->u1.Ordinal)) continue;
+                const IMAGE_IMPORT_BY_NAME *ibn = reinterpret_cast<const IMAGE_IMPORT_BY_NAME *>(base + names->u1.AddressOfData);
+                if (strcmp(reinterpret_cast<const char *>(ibn->Name), func) == 0)
+                    return reinterpret_cast<volatile DWORD *>(&slots->u1.Function);
+            }
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return nullptr;
+}
+
+// at load: both slots by name, and they must be the ones the game's code calls (checked addresses, README "Mouse")
+void MouseSetup() {
+    g_setCursorPosSlot = FindImportSlot("USER32.dll", "SetCursorPos");
+    g_clipCursorSlot = FindImportSlot("USER32.dll", "ClipCursor");
+    // the class window procedure 0x478bc0 (WNDCLASS at tru+0x790cf) starts with cmp edi, WM_MOUSEMOVE; its centring
+    // SetCursorPos / ClipCursor calls, and the activation path's pair
+    bool code = HexBytesAt(0x00478bda, "81ff00020000") && HexBytesAt(0x004790cf, "c744241cc08b4700") &&
+                HexBytesAt(0x00478f15, "ff1508e38300") && HexBytesAt(0x00478e75, "ff15e0e28300") &&
+                HexBytesAt(0x004791b6, "ff1508e38300") && HexBytesAt(0x004791c1, "ff15e0e28300");
+    g_mouseSlotsOk = code && reinterpret_cast<DWORD>(g_setCursorPosSlot) == kSetCursorPosSlot &&
+                     reinterpret_cast<DWORD>(g_clipCursorSlot) == kClipCursorSlot;
+    if (!g_freeMouse) g_mouseMode = "off ([Menu] FreeMouse=0) - the game gets the mouse while the menu is open";
+    else if (g_mouseSlotsOk) g_mouseMode = "ready (mouse messages + SetCursorPos / ClipCursor held while the menu is open)";
+    else g_mouseMode = "slots NOT matched - only the mouse messages are held";
+    Log(1, "0.7 mouse: SetCursorPos slot 0x%08lx, ClipCursor slot 0x%08lx (expected 0x%08lx / 0x%08lx), game code %d -> "
+           "%s", reinterpret_cast<DWORD>(g_setCursorPosSlot), reinterpret_cast<DWORD>(g_clipCursorSlot), kSetCursorPosSlot,
+        kClipCursorSlot, code ? 1 : 0, g_mouseMode);
+}
+
+bool FullClip(const RECT &r) {               // GetClipCursor answers the virtual screen when nothing is clipped
+    int x = GetSystemMetrics(SM_XVIRTUALSCREEN), y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    return r.left <= x && r.top <= y && r.right >= x + GetSystemMetrics(SM_CXVIRTUALSCREEN) &&
+           r.bottom >= y + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+}
+
+// render thread, every Present: follow the menu state (hold on open, release on close)
+void MouseTick() {
+    bool want = g_menuOpen && g_freeMouse;
+    if (want == (g_mouseHeld != 0)) return;
+    if (want) {
+        g_openPosOk = GetCursorPos(&g_openPos) != FALSE;
+        RECT clip = {};
+        g_openClipOk = GetClipCursor(&clip) && !FullClip(clip);
+        g_openClip = clip;
+        EnterCriticalSection(&g_mouseLock);
+        g_heldPosSet = g_heldClipSet = false;
+        g_heldCalls = 0;
+        LeaveCriticalSection(&g_mouseLock);
+        InterlockedExchange(&g_mouseHeld, 1);
+        if (g_mouseSlotsOk) {
+            DWORD pos = *g_setCursorPosSlot, clipSlot = *g_clipCursorSlot;
+            if (pos != reinterpret_cast<DWORD>(&SetCursorPosHold)) {
+                g_setCursorPosGame = reinterpret_cast<SetCursorPosFn>(pos);
+                WriteDword(reinterpret_cast<DWORD>(g_setCursorPosSlot), reinterpret_cast<DWORD>(&SetCursorPosHold));
+            }
+            if (clipSlot != reinterpret_cast<DWORD>(&ClipCursorHold)) {
+                g_clipCursorGame = reinterpret_cast<ClipCursorFn>(clipSlot);
+                WriteDword(reinterpret_cast<DWORD>(g_clipCursorSlot), reinterpret_cast<DWORD>(&ClipCursorHold));
+            }
+        }
+        ClipCursor(nullptr);                     // our own import, not the game's slot
+        g_mouseMode = g_mouseSlotsOk ? "held (menu open): mouse messages to the menu only, SetCursorPos / ClipCursor held"
+                                     : "held (menu open): mouse messages to the menu only (slots not matched)";
+        Log(2, "mouse: held (cursor %ld,%ld, clip %s)", g_openPos.x, g_openPos.y, g_openClipOk ? "saved" : "none");
+        return;
+    }
+    // release: slots back (only if they still hold ours), then the game's last wish or the state from before the menu
+    if (g_mouseSlotsOk) {
+        if (*g_setCursorPosSlot == reinterpret_cast<DWORD>(&SetCursorPosHold) && g_setCursorPosGame)
+            WriteDword(reinterpret_cast<DWORD>(g_setCursorPosSlot), reinterpret_cast<DWORD>(g_setCursorPosGame));
+        if (*g_clipCursorSlot == reinterpret_cast<DWORD>(&ClipCursorHold) && g_clipCursorGame)
+            WriteDword(reinterpret_cast<DWORD>(g_clipCursorSlot), reinterpret_cast<DWORD>(g_clipCursorGame));
+    }
+    InterlockedExchange(&g_mouseHeld, 0);
+    EnterCriticalSection(&g_mouseLock);
+    bool posSet = g_heldPosSet, clipSet = g_heldClipSet, clipNull = g_heldClipNull;
+    POINT pos = g_heldPos;
+    RECT clip = g_heldClip;
+    LONG calls = g_heldCalls;
+    LeaveCriticalSection(&g_mouseLock);
+    bool front = !g_hwnd || GetForegroundWindow() == g_hwnd;   // never trap the cursor in a window in the background
+    if (front) {
+        if (clipSet) ClipCursor(clipNull ? nullptr : &clip);
+        else if (g_openClipOk) ClipCursor(&g_openClip);
+        if (posSet) SetCursorPos(pos.x, pos.y);
+        else if (g_openPosOk) SetCursorPos(g_openPos.x, g_openPos.y);   // the game's next delta starts from here
+    }
+    g_mouseMode = g_mouseSlotsOk ? "released (menu closed); held again while the menu is open"
+                                 : "released (menu closed); slots not matched - only the mouse messages are held";
+    Log(2, "mouse: released (%ld held game calls, %s)", calls, front ? "cursor / clip restored" : "game not in front");
+}
+
+bool IsMouseMessage(UINT msg) {
+    return (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) || msg == WM_MOUSELEAVE;   // client area only (no raw input
+                                                                                     // in tru.exe)
+}
+
+// client coordinates -> back-buffer pixels (ImGui draws in back-buffer pixels; a scaling window proxy makes them differ)
+LPARAM ScaleMouse(HWND hwnd, UINT msg, LPARAM lParam) {
+    if (msg == WM_MOUSEWHEEL || msg == WM_MOUSEHWHEEL || msg < WM_MOUSEFIRST || msg > WM_MOUSELAST) return lParam;
+    RECT rc;
+    if (!g_bbWidth || !g_bbHeight || !GetClientRect(hwnd, &rc) || rc.right <= 0 || rc.bottom <= 0) return lParam;
+    if (static_cast<UINT>(rc.right) == g_bbWidth && static_cast<UINT>(rc.bottom) == g_bbHeight) return lParam;
+    int x = static_cast<short>(LOWORD(lParam)), y = static_cast<short>(HIWORD(lParam));
+    x = MulDiv(x, static_cast<int>(g_bbWidth), rc.right);
+    y = MulDiv(y, static_cast<int>(g_bbHeight), rc.bottom);
+    return MAKELPARAM(static_cast<WORD>(static_cast<short>(x)), static_cast<WORD>(static_cast<short>(y)));
+}
+
+// ---- 0.7.1 keyboard while the menu is open ([Menu] BlockGameInput) ----
+// The game reads the keyboard through DirectInput, not through window messages (README "Keyboard while the menu is
+// open", read with tools/pe_dis.py / pe_callers.py / pe_abs_uses.py): the EnumDevices callback 0x486380 builds for a
+// DI8DEVTYPE_KEYBOARD device (cmp 0x13 at 0x4863f3) the wrapper 0x485e00 (vtable 0x844f5c, IDirectInputDevice8 at +4,
+// c_dfDIKeyboard, buffer size 64, DISCL_NONEXCLUSIVE | DISCL_FOREGROUND) and stores it at input manager
+// [0xa02b9c]+0x24. Every frame the input manager's read 0x483db0 calls the wrapper's slot 2 (0x483eea: call
+// [vtable+8] with (events, room, full)) = 0x486100: buffered GetDeviceData (0x486020) or, after an overflow /
+// re-acquire, the full GetDeviceState (0x485f10); both write 16-byte events {1, DIK code, time, value 1.0 / 0.0}.
+// The window procedure 0x478bc0 only puts WM_CHAR and the Escape key-up (WM_KEYUP + VK_ESCAPE -> 0x477ae0) into the
+// game's character queue 0x9eeb40 (the live test 2026-11-02 opened the pause menu with Esc; WM_KEYUP passed in 0.7).
+// TruMenu replaces slot 2 of that vtable (only the keyboard wrapper uses it - constructor 0x485e3f / destructor
+// 0x486160) and, while the menu is open, gives the game no key events - after the device was read, so nothing piles
+// up - but once a release for every key the game saw going down; a key still held when the menu closes stays away
+// from the game until it is released. Key messages go to ImGui only while the menu is open. Mouse / pad: unchanged.
+struct KbdEvent { DWORD type; DWORD key; DWORD time; float value; };   // as written at 0x48609d / 0x485fb1
+typedef int(__fastcall *KbdReadFn)(void *self, void *edx, KbdEvent *events, int room, int full);   // thiscall, ret 0xc
+const DWORD kKbdSlot = 0x00844f64, kKbdRead = 0x00486100;
+const char *const kKbdReadBytes = "56 8bf1 837e0400 7506 33c0 5e c20c00 807c241000 751e 80be9008000000";
+volatile KbdReadFn g_kbdReadOriginal = nullptr;
+bool g_kbdOk = false;
+const char *g_kbdMode = "not set up";
+BYTE g_kbdGameDown[256];                 // keys the game saw going down (game thread)
+BYTE g_kbdRealDown[256];                 // keys down on the device, from the events read (game thread)
+BYTE g_kbdSwallow[256];                  // held at the close: kept from the game until released (game thread)
+LONG g_kbdHeldEvents = 0, g_kbdReleases = 0, g_kbdSwallowed = 0;
+bool g_kbdWasBlocked = false;
+BYTE g_msgKeyHeld[256];                  // WM_KEYDOWN kept from the game: its WM_KEYUP is kept away too (window thread)
+volatile LONG g_oskRealKeys = 0;         // 0.7.1: real key presses while the menu is open (on-screen keyboard switch)
+
+int __fastcall KbdReadHook(void *self, void *edx, KbdEvent *events, int room, int full) {
+    KbdReadFn original = g_kbdReadOriginal;
+    int n = original ? original(self, edx, events, room, full) : 0;
+    if (!events || room <= 0 || n < 0 || n > room) return n;
+    for (int i = 0; i < n; ++i)
+        if (events[i].type == 1 && events[i].key < 256) g_kbdRealDown[events[i].key] = events[i].value > 0.5f ? 1 : 0;
+    if (g_blockGameInput && g_menuOpen) {
+        if (!g_kbdWasBlocked) Log(2, "keyboard: held (menu open)");
+        g_kbdWasBlocked = true;
+        g_kbdHeldEvents += n;
+        int out = 0;
+        DWORD now = GetTickCount();
+        for (DWORD k = 0; k < 256 && out < room; ++k) {   // neutral state once: release what the game holds
+            if (!g_kbdGameDown[k]) continue;
+            KbdEvent &e = events[out++];
+            e.type = 1;
+            e.key = k;
+            e.time = now;
+            e.value = 0.0f;
+            g_kbdGameDown[k] = 0;
+            ++g_kbdReleases;
+        }
+        memcpy(g_kbdSwallow, g_kbdRealDown, sizeof(g_kbdSwallow));
+        return out;
+    }
+    if (g_kbdWasBlocked) {
+        g_kbdWasBlocked = false;
+        Log(2, "keyboard: released (menu closed; %ld events held, %ld releases sent)", g_kbdHeldEvents, g_kbdReleases);
+    }
+    int out = 0;
+    for (int i = 0; i < n; ++i) {
+        KbdEvent e = events[i];
+        if (e.type == 1 && e.key < 256) {
+            bool down = e.value > 0.5f;
+            if (g_kbdSwallow[e.key]) {          // held since the menu was open: the game never saw it go down
+                if (!down) g_kbdSwallow[e.key] = 0;
+                ++g_kbdSwallowed;
+                continue;
+            }
+            g_kbdGameDown[e.key] = down ? 1 : 0;
+        }
+        events[out++] = e;
+    }
+    return out;
+}
+
+// at load: the wrapper vtable slot, after the byte checks (precheck list in README "Keyboard while the menu is open")
+void KbdSetup() {
+    if (!g_blockGameInput) {
+        g_kbdMode = "off ([Menu] BlockGameInput=0) - the game reads the keyboard while the menu is open (as 0.7)";
+        Log(1, "0.7.1 keyboard: %s", g_kbdMode);
+        return;
+    }
+    DWORD slot = 0;
+    bool code = HexBytesAt(kKbdRead, kKbdReadBytes) && HexBytesAt(0x00485e3f, "c7065c4f8400") &&
+                HexBytesAt(0x004863f3, "83f813 754a") && HexBytesAt(0x0048641f, "e8dcf9ffff 8b0d9c2ba000 894124") &&
+                HexBytesAt(0x00483eea, "8b4f24 8b01 8b4008 52 55 56 ffd0") &&
+                HexBytesAt(0x0048609d, "8970f4 8b79fc 8978f8 f60180") &&
+                HexBytesAt(0x00485fb1, "f6440c1480 8970f4 8948f8");
+    bool slotOk = ReadDword(kKbdSlot, &slot) && slot == kKbdRead;
+    if (!code || !slotOk) {
+        g_kbdMode = "code / slot NOT matched - DirectInput keyboard not held, only the key messages";
+        Log(0, "0.7.1 keyboard: code %d, slot 0x%08lx = 0x%08lx (expected 0x%08lx) -> %s", code ? 1 : 0, kKbdSlot, slot,
+            kKbdRead, g_kbdMode);
+        return;
+    }
+    g_kbdReadOriginal = reinterpret_cast<KbdReadFn>(slot);
+    if (!WriteDword(kKbdSlot, reinterpret_cast<DWORD>(&KbdReadHook))) {
+        g_kbdMode = "vtable slot not writable - only the key messages are held";
+        Log(0, "0.7.1 keyboard: VirtualProtect failed (%lu) -> %s", GetLastError(), g_kbdMode);
+        return;
+    }
+    g_kbdOk = true;
+    g_kbdMode = "ready (DirectInput keyboard reads + key messages held while the menu is open)";
+    Log(1, "0.7.1 keyboard: wrapper vtable slot 0x%08lx 0x%08lx -> KbdReadHook -> %s", kKbdSlot, slot, g_kbdMode);
+}
+
+bool IsKeyMessage(UINT msg) {
+    return msg == WM_KEYDOWN || msg == WM_KEYUP || msg == WM_CHAR || msg == WM_DEADCHAR || msg == WM_SYSCHAR ||
+           msg == WM_SYSDEADCHAR;   // WM_SYSKEYDOWN / UP pass: Alt + Tab, Alt + F4 (the game only filters Alt there)
+}
+
 LRESULT CALLBACK WndProcHook(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (g_imguiReady && g_menuOpen && msg == WM_KEYDOWN) {
+        // 0.7.1: a real key for the on-screen keyboard switch (not Esc / modifiers / F2 / Tab / the toggle key)
+        WPARAM vk = wParam;
+        if (vk != VK_ESCAPE && vk != VK_SHIFT && vk != VK_CONTROL && vk != VK_MENU && vk != VK_LWIN && vk != VK_RWIN &&
+            vk != VK_CAPITAL && vk != VK_F2 && vk != VK_TAB && static_cast<int>(vk) != g_toggleKey)
+            InterlockedIncrement(&g_oskRealKeys);
+    }
     if (g_imguiReady && g_menuOpen) {
-        ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        // 0.7: with [Menu] FreeMouse the mouse belongs to the menu - the game's window procedure never sees it (no
+        // camera turn, no SetCursorPos to the centre, no ShowCursor(FALSE)); WM_SETCURSOR stays with ImGui (it draws
+        // its own cursor and hides the system one)
+        if (g_freeMouse && (IsMouseMessage(msg) || msg == WM_SETCURSOR)) {
+            ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, ScaleMouse(hwnd, msg, lParam));
+            if (msg != WM_SETCURSOR) return 0;
+            if (LOWORD(lParam) == HTCLIENT) { SetCursor(nullptr); return TRUE; }   // borders: as before (resize cursor)
+        } else {
+            ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        }
+        // 0.7.1 [Menu] BlockGameInput: no key message reaches the game's window procedure while the menu is open (it
+        // only queues WM_CHAR and the Esc key-up, which opened the pause menu); a key that went down meanwhile keeps
+        // its key-up away from the game after the close as well
+        if (g_blockGameInput && IsKeyMessage(msg)) {
+            if (msg == WM_KEYDOWN && wParam < 256) g_msgKeyHeld[wParam] = 1;
+            if (msg == WM_KEYUP && wParam < 256) g_msgKeyHeld[wParam] = 0;
+            return 0;
+        }
         // 0.6: while ImGui takes text (command bar, filter fields) typed keys do not reach the game's window procedure.
         // Key-up messages still do, so a key the game saw going down before the focus moved is released there too.
         if (g_cmdWantText && (msg == WM_KEYDOWN || msg == WM_CHAR || msg == WM_DEADCHAR || msg == WM_SYSCHAR))
             return 0;
+    } else if (g_blockGameInput && msg == WM_KEYUP && wParam < 256 && g_msgKeyHeld[wParam]) {
+        g_msgKeyHeld[wParam] = 0;               // 0.7.1: went down while the menu was open - the game saw no key-down
+        return 0;
     }
     return IsWindowUnicode(hwnd) ? CallWindowProcW(g_wndProcOriginal, hwnd, msg, wParam, lParam)
                                  : CallWindowProcA(g_wndProcOriginal, hwnd, msg, wParam, lParam);
@@ -570,6 +932,19 @@ void FeedGamepad(ImGuiIO &io) {
     if (g_padConnected[g_lastPad]) { pad = g_pad[g_lastPad]; have = true; }
     LeaveCriticalSection(&g_padLock);
     if (!g_menuOpen || !have) memset(&pad, 0, sizeof(pad));
+    // 0.7: [Cmd] FocusButton (L3) pressed and released alone = focus into the bar + on-screen keyboard. A press that
+    // becomes part of the open / close combo (L3 + R3) is not one: any other combo button down while it is held cancels.
+    {
+        static bool armed = false, wasDown = false;
+        WORD fb = g_cmdFocusButton;
+        WORD others = static_cast<WORD>(g_toggleButtons & ~fb);
+        bool down = fb && (pad.wButtons & fb) == fb;
+        if (down && !wasDown) armed = !(pad.wButtons & others);
+        if (down && (pad.wButtons & others)) armed = false;
+        if (!down && wasDown && armed && g_menuOpen && g_cmdEnabled) InterlockedExchange(&g_cmdOskReq, 1);
+        if (!down) armed = false;
+        wasDown = down;
+    }
     // 0.4 TO TEST: while a row has the focus, X and Y belong to the row (fail / skip). ImGui would otherwise toggle its
     // menu layer on X and activate the row on Y (= OK). Held until released, also if the focus moves meanwhile.
     static WORD rowOwned = 0, rowHeld = 0;
@@ -590,10 +965,14 @@ void FeedGamepad(ImGuiIO &io) {
     if (pad.sThumbLY < -16000) dirs |= 0x0002;
     if (pad.sThumbLX < -16000) dirs |= 0x0004;
     if (pad.sThumbLX > 16000) dirs |= 0x0008;
-    WORD cmdBits = static_cast<WORD>((pad.wButtons & 0xF32F) | dirs);   // A B X Y, LB RB, View, D-pad
+    WORD cmdBits = static_cast<WORD>((pad.wButtons & 0xF33F) | dirs);   // A B X Y, LB RB, View, Start (0.7), D-pad
     WORD cmdNew = static_cast<WORD>(cmdBits & ~cmdHeld);
     g_cmdBackEdge = (cmdNew & 0x0020) != 0;
-    if (g_cmdOwnPad) cmdOwned |= cmdNew;
+    if (g_cmdHandOver) {                     // 0.7 FirstPadPressOnlyFocuses=0: the held direction goes on to ImGui
+        g_cmdHandOver = false;
+        cmdOwned &= static_cast<WORD>(~0x000F);
+    }
+    if (g_cmdOwnPad || g_oskOpen) cmdOwned |= cmdNew;   // 0.7.1: the open on-screen keyboard owns the pad, focus or not
     g_cmdPadEdges = static_cast<WORD>(cmdNew & cmdOwned);
     g_cmdPadHeld = static_cast<WORD>(cmdBits & cmdOwned);
     cmdHeld = cmdBits;
@@ -722,6 +1101,9 @@ void PageStatus() {
     Text("  game calls 0x%08lx (%s), PadHook calls 0x%08lx (%s)", pointer, owner,
          reinterpret_cast<DWORD>(g_padOriginal), inner);
     Text("  last pad %d, input to the game while open: %s", g_lastPad, g_blockInput ? "blocked" : "passed");
+    ImGui::TextWrapped("mouse (0.7): %s", g_mouseMode);
+    ImGui::TextWrapped("keyboard (0.7.1): %s; %ld events held, %ld releases sent, %ld kept after close", g_kbdMode,
+                       g_kbdHeldEvents, g_kbdReleases, g_kbdSwallowed);
     HMODULE d3d9 = GetModuleHandleA("d3d9.dll");
     char d3dPath[MAX_PATH] = "not loaded";
     if (d3d9) GetModuleFileNameA(d3d9, d3dPath, MAX_PATH);
@@ -1078,13 +1460,51 @@ void CostumeInfo(char *o, size_t n) {
         s.mode ? kGdChosen2 : kGdChosen0, c0, s.chosen1, c2, s.unitId, def);
 }
 
+// 0.7.1: the stream unit Lara is in. GameTracker+0x38 (kUnitName) is only the unit the level load started with. The
+// game loop (0x5dfc88) compares GameTracker+0xc0 with the player instance's +0xe0 and on a difference calls
+// STREAM_MoveIntoNewStreamUnit 0x5c1bf0, which stores the player's unit id into GameTracker+0xc0 (0x5c1c4e) and prints
+// the name at entry+0xc of the stream unit table found by 0x5c1b50 (0x5c1c33, "STREAM_MoveIntoNewStreamUnit(%s)");
+// the name lookup 0x5c1b90 compares entry+0xc as well. So: id = [0xe7f148], entry = state byte 2 + same id, name = +0xc.
+bool g_streamNameOk = false;
+
+bool StreamUnitName(DWORD id, char *out, size_t size) {
+    out[0] = 0;
+    if (!g_streamNameOk) return false;
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD eid = 0, state = 0;
+        if (!ReadDword(e, &eid) || !ReadDword(e + 4, &state)) return false;
+        if ((state & 0xff) != 2 || eid != id) continue;
+        if (!ReadString(e + 0xc, out, size)) return false;
+        for (const char *p = out; *p; ++p)
+            if (static_cast<unsigned char>(*p) < 32 || static_cast<unsigned char>(*p) > 126) { out[0] = 0; return false; }
+        return out[0] != 0;
+    }
+    return false;
+}
+
+// 0.7.1 [Log] UnitChanges: worker thread, every 250 ms; a line only when the name changes
+void UnitTick() {
+    static char last[64] = "";
+    static DWORD lastId = 0xffffffff;
+    if (!g_unitChanges || !g_streamNameOk) return;
+    DWORD id = 0;
+    if (!ReadDword(kUnitId, &id) || id == lastId) return;
+    char name[64];
+    if (!StreamUnitName(id, name, sizeof(name))) return;   // not loaded yet: try again next time
+    lastId = id;
+    if (!strcmp(name, last)) return;
+    Log(1, "unit: %s (was %s; stream unit id %lu)", name, last[0] ? last : "-", id);
+    strncpy_s(last, sizeof(last), name, _TRUNCATE);
+}
+
 // value getters (any thread, read-only)
 void ValStatusUnit(char *o, size_t n) {
-    char unit[64];
+    char unit[64], stream[64];
     CurrentUnit(unit, sizeof(unit));
     DWORD id = 0;
     ReadDword(kUnitId, &id);
-    Out(o, n, "%s (stream unit id %lu)", unit[0] ? unit : "-", id);
+    StreamUnitName(id, stream, sizeof(stream));
+    Out(o, n, "%s (stream unit id %lu = Lara's unit %s)", unit[0] ? unit : "-", id, stream[0] ? stream : "?");
 }
 void ValState(char *o, size_t n) { Out(o, n, "%s", GameState()); }
 void ValCostume(char *o, size_t n) {
@@ -1203,7 +1623,8 @@ void ValMenu(char *o, size_t n) { Out(o, n, "%d", g_menuOpen ? 1 : 0); }
 void ValOverlay(char *o, size_t n) { Out(o, n, "%d", g_overlay ? 1 : 0); }
 void ValVersion(char *o, size_t n) { Out(o, n, "%s", kVersion); }
 void ValHooks(char *o, size_t n) {
-    Out(o, n, "pad=%s; d3d9=%s; frontend-pad=%d", g_padMode, g_d3dMode, g_padModeIdle ? 1 : 0);
+    Out(o, n, "pad=%s; d3d9=%s; frontend-pad=%d; mouse=%s; keyboard=%s; pause=%s; autostart=%s", g_padMode, g_d3dMode,
+        g_padModeIdle ? 1 : 0, g_mouseMode, g_kbdMode, g_pauseMode, g_autoStartMode);
 }
 void ValPlayer(char *o, size_t n) {
     float p[3], r[3];
@@ -1760,8 +2181,33 @@ bool RunPause(const char *arg, char *o, size_t n) {
     volatile DWORD *f = reinterpret_cast<volatile DWORD *>(kStreamFlags);
     bool on = BoolArg(arg, (*f & 0x1000) != 0);
     if (on) *f |= 0x1000; else *f &= ~0x1000u;
+    InterlockedExchange(&g_menuPaused, 0);      // 0.7.1: set by hand - the menu close does not undo it
     Out(o, n, "time.pause %d (streamFlags 0x%08lx)", on ? 1 : 0, *f);
     return true;
+}
+
+// 0.7.1 [Menu] PauseGame: the time.pause bit while the menu is open (render thread = the game's Present call). Only
+// what TruMenu set is undone on close: a pause from before the menu stays, and time.pause used while the menu is open
+// takes over (g_menuPaused = 0).
+void PauseTick() {
+    static bool applied = false;
+    bool want = g_pauseGame && g_pauseOk && g_menuOpen;
+    if (want == applied) return;
+    applied = want;
+    volatile LONG *f = reinterpret_cast<volatile LONG *>(kStreamFlags);
+    if (want) {
+        LONG before = InterlockedOr(f, 0x1000);
+        InterlockedExchange(&g_menuPaused, (before & 0x1000) ? 0 : 1);
+        g_pauseMode = (before & 0x1000) ? "menu open - the game was paused already (left as it is on close)"
+                                        : "menu open - game paused by TruMenu (streamFlags bit 0x1000)";
+        Log(2, "pause: %s", g_pauseMode);
+        return;
+    }
+    LONG ours = InterlockedExchange(&g_menuPaused, 0);
+    if (ours) InterlockedAnd(f, ~0x1000L);
+    g_pauseMode = ours ? "menu closed - pause bit cleared again (waits for the next menu open)"
+                       : "menu closed - pause bit left as it was (paused before the menu, or time.pause used)";
+    Log(2, "pause: %s", g_pauseMode);
 }
 void ValControl(char *o, size_t n) {
     BYTE b = 0;
@@ -2597,6 +3043,147 @@ bool RunMenuLoop(const char *arg, char *o, size_t n) {
     *reinterpret_cast<volatile DWORD *>(kMenuLoopPtr) = reinterpret_cast<DWORD>(g_menuLoopName);
     Out(o, n, "menu background loop = %s (0x%08lx; used when the main menu starts its movie again)", name, kMenuLoopPtr);
     return true;
+}
+
+// ---- 0.7.1 level.start: start a unit the way the mission menu does (Befund-Direktstart.md, README "AutoStart") ----
+// PC generalbank script 104 (mission menu) on confirm: uigamedata f22, uigamedata f27(unit, 1, 0, 1), stdscreenmgr
+// f19 + f7 (test 41e did the same from the attract timer script 60 and the DLC 2 intro played). The natives, read with
+// tools/pe_dis.py: uigamedata binder 0x7af0c0 registers f22 = 0x7a0d00 (jmp 0x77bc90 -> jmp 0x4a0f10: byte [0xa039b8]
+// = 1, no arguments) and f27 = 0x7a0d40 (its three bools from the argument block, then jmp 0x77e170 = cdecl
+// (DataValue *args, bool, bool, bool), args[0] = char *unit, copied by 0x5dfb20 into GameTracker+0x38; plain ret);
+// stdscreenmgr binder 0x7adca0 registers f7 = 0x79ea00 (jmp 0x4be580) and f19 = 0x79eac0 (jmp 0x4be5e0): both ignore
+// the script instance and call slot 4 of the screen-manager singletons [0xa13f58] (vtable 0x847c7c) / [0xa13f50]
+// (vtable 0x847cc4), both 0x4c5260 (thiscall, no arguments, plain ret). So the whole sequence is callable from C on
+// the game thread without a script frame. level.load (GAMELOOP_RequestLevelChangeByName) skips the intro; this does not.
+bool Enqueue(const char *id, const char *arg);   // game-thread request slot, defined after kItems
+typedef void(__cdecl *MissionStartFn)(const DWORD *args, int b1, int b2, int b3);
+const DWORD kUgdF22 = 0x004a0f10, kUgdF27 = 0x0077e170, kScrF7 = 0x004be580, kScrF19 = 0x004be5e0;
+const DWORD kScrMgr7 = 0x00a13f58, kScrMgr19 = 0x00a13f50, kScrVt7 = 0x00847c7c, kScrVt19 = 0x00847cc4;
+bool g_missionOk = false;
+
+bool MissionCheck() {
+    return HexBytesAt(0x007af201, "68000d7a00 6a16") && HexBytesAt(0x007af247, "68400d7a00 6a1b") &&
+           HexBytesAt(0x007a0d00, "e98baffdff") && HexBytesAt(0x0077bc90, "e97b52d2ff") &&
+           HexBytesAt(kUgdF22, "c605b839a00001 c3") &&
+           HexBytesAt(0x007a0d40, "8b44240c 80780c00 89442404 0f95c1 80780800 0f95c2 80780400") &&
+           HexBytesAt(0x007a0d69, "e902d4fdff") &&
+           HexBytesAt(kUgdF27, "55 8bec 83e4f8 81ec54020000 807d0c00 8b4508 8b08 53 0f95c2 807d1400") &&
+           HexBytesAt(0x0077e425, "8b4c2448 898290000000 8b4510 50 51 e8e716e6ff 83c408 5f 5e 5b 8be5 5d c3") &&
+           HexBytesAt(0x007add0f, "6800ea7900 6a07") && HexBytesAt(0x007addb7, "68c0ea7900 6a13") &&
+           HexBytesAt(0x0079ea00, "8b4c2404 e977fbd1ff") && HexBytesAt(0x0079eac0, "8b4c2404 e917fbd1ff") &&
+           HexBytesAt(kScrF7, "8b0d583fa100 8b01 8b5010 ffe2") && HexBytesAt(kScrF19, "8b0d503fa100 8b01 8b5010 ffe2") &&
+           HexBytesAt(0x00847c8c, "60524c00") && HexBytesAt(0x00847cd4, "60524c00") &&
+           HexBytesAt(0x004c5260, "51 8b4104 85c0 740b 8d0c24 890424 e8edfe2d00 59 c3") &&
+           HexBytesAt(0x004ccd3d, "c7067c7c8400 8935583fa100") && HexBytesAt(0x004ccd96, "c706c47c8400 8935503fa100");
+}
+
+// "dlc2" / "dlc1" or a unit name -> unit name; false if not usable
+bool StartUnitName(const char *arg, char *unit, size_t size) {
+    const char *u = arg && arg[0] ? arg : "dlc_level2_start";
+    if (!_stricmp(u, "dlc2")) u = "dlc_level2_start";
+    else if (!_stricmp(u, "dlc1")) u = "dlc_level1_start";
+    size_t len = strlen(u);
+    if (!len || len > 63) return false;
+    for (size_t i = 0; i < len; ++i)
+        if (!(isalnum(static_cast<unsigned char>(u[i])) || u[i] == '_' || u[i] == '-')) return false;
+    strncpy_s(unit, size, u, _TRUNCATE);
+    return true;
+}
+
+bool MissionCall(const DWORD *args) {
+    __try {
+        reinterpret_cast<VoidFn>(kUgdF22)();                                   // uigamedata f22
+        reinterpret_cast<MissionStartFn>(kUgdF27)(args, 1, 0, 1);              // uigamedata f27(unit, 1, 0, 1)
+        reinterpret_cast<VoidFn>(kScrF19)();                                   // stdscreenmgr f19
+        reinterpret_cast<VoidFn>(kScrF7)();                                    // stdscreenmgr f7
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+
+// game thread (queued): level.start [dlc2|dlc1|<unit>]
+bool RunLevelStart(const char *arg, char *o, size_t n) {
+    if (!g_missionOk || !g_mainStateOk || !g_experimental) {
+        Out(o, n, "mission start path not verified / experimental off (level.load skips the intro)");
+        return false;
+    }
+    static char unit[64];                        // the game keeps no pointer to it (copied to GameTracker+0x38)
+    static DWORD args[4];                        // DataValue block of f27: unit, 1, 0, 1
+    char name[64];
+    if (!StartUnitName(arg, name, sizeof(name))) { Out(o, n, "usage: level.start [dlc2|dlc1|<unit name a-z 0-9 _ ->]"); return false; }
+    DWORD state = 0;
+    ReadDword(kMainState, &state);
+    if (state != 10) { Out(o, n, "main menu only (main state [0x%08lx] = %lu, needs 10)", kMainState, state); return false; }
+    DWORD busy = 0;
+    ReadDword(kGameTracker + 0xb8, &busy);
+    if ((busy >> 8) & 0xff) { Out(o, n, "a level change is already pending (GameTracker+0xb9)"); return false; }
+    DWORD m7 = 0, m19 = 0, vt7 = 0, vt19 = 0;
+    if (!ReadDword(kScrMgr7, &m7) || !m7 || !ReadDword(m7, &vt7) || vt7 != kScrVt7 || !ReadDword(kScrMgr19, &m19) ||
+        !m19 || !ReadDword(m19, &vt19) || vt19 != kScrVt19) {
+        Out(o, n, "screen managers not ready ([0x%08lx] = 0x%08lx vtable 0x%08lx, [0x%08lx] = 0x%08lx vtable 0x%08lx)",
+            kScrMgr7, m7, vt7, kScrMgr19, m19, vt19);
+        return false;
+    }
+    strncpy_s(unit, sizeof(unit), name, _TRUNCATE);
+    args[0] = reinterpret_cast<DWORD>(unit);
+    args[1] = 1;
+    args[2] = 0;
+    args[3] = 1;
+    if (!MissionCall(args)) { Out(o, n, "exception in the mission start sequence (unit '%s')", unit); return false; }
+    Out(o, n, "mission start '%s': uigamedata f22, f27('%s', 1, 0, 1), stdscreenmgr f19 + f7 called (intro plays)", unit,
+        unit);
+    if (g_menuOpen) ToggleMenu("level start");
+    return true;
+}
+void ValLevelStart(char *o, size_t n) {
+    DWORD state = 0;
+    ReadDword(kMainState, &state);
+    Out(o, n, "path %s, main state %lu (needs 10); AutoStart %s", g_missionOk ? "ok" : "NOT verified", state,
+        g_autoStartMode);
+}
+
+// 0.7.1 [Test] AutoStart: once per game start, when the main menu has been up for AutoStartDelay seconds, queue
+// level.start (or, without the verified path, level.load with a log line). Render thread, every Present.
+void AutoStartTick() {
+    static bool done = false;
+    static DWORD since = 0;
+    if (done || !g_autoStart[0]) return;
+    char unit[64];
+    if (!StartUnitName(g_autoStart, unit, sizeof(unit))) {
+        done = true;
+        g_autoStartMode = "off - [Test] AutoStart is not dlc2 / dlc1 / a unit name";
+        Log(0, "AutoStart: '%s' %s", g_autoStart, g_autoStartMode);
+        return;
+    }
+    if (!g_mainStateOk || !g_experimental) {
+        done = true;
+        g_autoStartMode = "off - main state check failed or [Cheat] Experimental=0";
+        Log(0, "AutoStart: %s", g_autoStartMode);
+        return;
+    }
+    DWORD state = 0;
+    ReadDword(kMainState, &state);
+    DWORD now = GetTickCount();
+    if (state != 10) { since = 0; return; }
+    if (!since) {
+        since = now ? now : 1;
+        g_autoStartMode = "waiting (main menu up)";
+        Log(1, "AutoStart: main menu up (state 10) - %s in %d s", unit, g_autoStartDelay);
+        return;
+    }
+    if (now - since < static_cast<DWORD>(g_autoStartDelay) * 1000) return;
+    const char *id = g_missionOk ? "level.start" : "level.load";
+    if (!Enqueue(id, unit)) return;                     // another request pending: next frame
+    done = true;
+    if (g_missionOk) {
+        g_autoStartMode = "done (level.start queued once for this game start)";
+        Log(1, "AutoStart: level.start %s queued (mission menu path, the intro plays)", unit);
+    } else {
+        g_autoStartMode = "done (fallback level.load - intro skipped)";
+        Log(0, "AutoStart: intro skipped (mission start path not available) - level.load %s queued instead", unit);
+    }
 }
 
 // ---- draw.markup / draw.ledges (experimental, read-only): the markup boxes projected like the game's
@@ -3578,6 +4165,7 @@ void ValCmdHistory(char *o, size_t n);
 void ValCmdBar(char *o, size_t n);
 bool RunCmdFocus(const char *arg, char *o, size_t n);
 bool RunCmdRun(const char *arg, char *o, size_t n);
+bool RunCmdKeyboard(const char *arg, char *o, size_t n);   // 0.7
 
 struct Item {
     const char *id, *type, *label;
@@ -3640,6 +4228,10 @@ const Item kItems[] = {
     {"level.presets", "info", "preset units ([Levels] List)", false, ValLevels, nullptr},
     {"level.load", "action", "load unit (arg = unit name), experimental", true, ValUnit, RunLevel},
     {"level.reload", "action", "reload the current unit, experimental", true, ValUnit, RunReload},
+    // 0.7.1
+    {"level.start", "action", "start dlc2 / dlc1 / <unit> as the mission menu does (uigamedata f22 + f27(unit, 1, 0, 1), "
+                              "stdscreenmgr f19 + f7; the intro plays), main menu only, experimental", true,
+     ValLevelStart, RunLevelStart},
     // 0.3: costume.list / costume.set are the live outfit cycle now; the 0.2 "chosen for the next level load" items
     // are costume.records / costume.choose* (costume.setreload / costume.reset keep their 0.2 meaning)
     {"costume.list", "info", "outfit cycle list GlobalInfo [0xe7ee50]+4: object-id name", false, ValGlobalCostumes, nullptr},
@@ -3726,6 +4318,9 @@ const Item kItems[] = {
      false, ValCmdBar, RunCmdRun},
     {"cmd.history", "info", "command bar history, newest first (TruMenu.history.txt next to tru.exe)", false,
      ValCmdHistory, nullptr},
+    // 0.7
+    {"cmd.keyboard", "action", "open the menu, focus the command bar and show the on-screen keyboard (as L3)", false,
+     ValCmdBar, RunCmdKeyboard},
 };
 
 const Item *FindItem(const char *id) {
@@ -3923,7 +4518,8 @@ const char *const kCmdHelp =
     "0.5, costume.set doppelganger_casual, level.load dlc_level2_start, dev.fog_far 9000); get <id>; list [filter]; help. "
     "Keyboard: Tab / Down = suggestions, Enter = run, Up in the empty bar = history, Down / Esc = into the menu, F2 / Tab "
     "= back to the bar. Pad: D-pad / stick / B = into the menu, View = pick mode (D-pad choose, A run / pick, LB / RB "
-    "value, B back, Y pin), View in the menu = back to the bar.";
+    "value, B back, Y pin), View in the menu = back to the bar. 0.7: L3 = bar + on-screen keyboard (D-pad / stick move, "
+    "A type, X backspace, Y take suggestion, Start run, B close, LB / RB rows).";
 
 CmdKind CmdKindOf(const char *id) {
     for (const auto &b : kCmdBuiltins)
@@ -3998,6 +4594,9 @@ template <typename F> void CmdArgValues(const char *id, F fn) {
     if (CmdKindOf(id) == kCkBool) { fn("1", "on"); fn("0", "off"); return; }
     if (!_stricmp(id, "level.load")) {
         for (int i = 0; i < kUnitCount; ++i) fn(kUnits[i].unit, kUnits[i].group);
+    } else if (!_stricmp(id, "level.start")) {          // 0.7.1
+        fn("dlc2", "dlc_level2_start, intro plays");
+        fn("dlc1", "dlc_level1_start, intro plays");
     } else if (!_stricmp(id, "costume.set")) {
         WORD ids[128];
         int c = GlobalCostumes(ids, 128);
@@ -4194,6 +4793,14 @@ bool RunCmdFocus(const char *, char *o, size_t n) {
     Out(o, n, "command bar focused");
     return true;
 }
+bool RunCmdKeyboard(const char *, char *o, size_t n) {   // 0.7
+    if (!g_cmdEnabled) { Out(o, n, "command bar off ([Cmd] Enabled=0)"); return false; }
+    if (!g_cmdKeyboard) { Out(o, n, "on-screen keyboard off ([Cmd] Keyboard=0)"); return false; }
+    if (!g_menuOpen) ToggleMenu("cmd.keyboard");
+    InterlockedExchange(&g_cmdOskReq, 2);
+    Out(o, n, "command bar focused, on-screen keyboard open");
+    return true;
+}
 // only reached through the menu (a favourite button) - TruLink's cmd.run is answered by InvokeCore itself
 bool RunCmdRun(const char *arg, char *o, size_t n) {
     const char *answer = CmdRunLine(arg, false, "menu");
@@ -4361,7 +4968,9 @@ int CmdCallback(ImGuiInputTextCallbackData *d) {
             else if (++pos >= count) pos = -1;
             load = true;
         } else if (d->BufTextLen == 0) {
-            if (up && count) { pos = count - 1; load = true; }
+            // 0.7 [Cmd] UpOpensHistory=0: Up goes into the menu like Down, Ctrl + Up still opens the history
+            bool history = g_cmdUpHistory || ImGui::GetIO().KeyCtrl;
+            if (up && count && history) { pos = count - 1; load = true; }
             else g_cmdLeaveReq = true;               // Down (or no history): into the menu
         } else if (g_sugCount) {
             if (up) { if (g_sugSel >= 0) --g_sugSel; }
@@ -4522,6 +5131,293 @@ void DrawCmdSuggestions(const ImVec2 &barPos, float width) {
     ImGui::End();
 }
 
+// ======================================================================================================================
+// 0.7 on-screen keyboard: drawn inside the bar window under the result line while the bar has the focus by controller
+// ([Cmd] FocusButton = L3, A in the idle bar, View in the pad picker, cmd.keyboard). Row 0 = suggestions (the ids /
+// argument values of the line; the history, newest first, while the line is empty), row 1 = quick tokens, rows 2..5 =
+// QWERTZ with a number row, row 6 = space / backspace / clear / close / run. The text field is not active meanwhile:
+// the keys edit g_cmdBuf directly; a key on a real keyboard (or a click into the field) switches back to typing.
+// ======================================================================================================================
+enum OskAction { kOskType, kOskBack, kOskClear, kOskClose, kOskRun };
+struct OskKey { const char *label, *text; float units; int action; };
+struct OskRow { const OskKey *keys; int count; float offset; };
+const OskKey kOskTokens[] = {{"time.", "time.", 1, kOskType},   {"player.", "player.", 1, kOskType},
+                             {"costume.", "costume.", 1, kOskType}, {"level.", "level.", 1, kOskType},
+                             {"dev.", "dev.", 1, kOskType},     {"menu.", "menu.", 1, kOskType},
+                             {"0", "0", 1, kOskType},           {"1", "1", 1, kOskType},
+                             {"space", " ", 1, kOskType},       {".", ".", 1, kOskType}};
+const OskKey kOskNum[] = {{"1", "1", 1, 0}, {"2", "2", 1, 0}, {"3", "3", 1, 0}, {"4", "4", 1, 0}, {"5", "5", 1, 0},
+                          {"6", "6", 1, 0}, {"7", "7", 1, 0}, {"8", "8", 1, 0}, {"9", "9", 1, 0}, {"0", "0", 1, 0},
+                          {"-", "-", 1, 0}};
+const OskKey kOskQ[] = {{"q", "q", 1, 0}, {"w", "w", 1, 0}, {"e", "e", 1, 0}, {"r", "r", 1, 0}, {"t", "t", 1, 0},
+                        {"z", "z", 1, 0}, {"u", "u", 1, 0}, {"i", "i", 1, 0}, {"o", "o", 1, 0}, {"p", "p", 1, 0},
+                        {"_", "_", 1, 0}};
+const OskKey kOskA[] = {{"a", "a", 1, 0}, {"s", "s", 1, 0}, {"d", "d", 1, 0}, {"f", "f", 1, 0}, {"g", "g", 1, 0},
+                        {"h", "h", 1, 0}, {"j", "j", 1, 0}, {"k", "k", 1, 0}, {"l", "l", 1, 0}, {":", ":", 1, 0},
+                        {"#", "#", 1, 0}};
+const OskKey kOskY[] = {{"y", "y", 1, 0}, {"x", "x", 1, 0}, {"c", "c", 1, 0}, {"v", "v", 1, 0}, {"b", "b", 1, 0},
+                        {"n", "n", 1, 0}, {"m", "m", 1, 0}, {",", ",", 1, 0}, {".", ".", 1, 0}, {"/", "/", 1, 0}};
+const OskKey kOskBottom[] = {{"space", " ", 4, kOskType}, {"<-  (X)", "", 2, kOskBack}, {"clear", "", 1.5f, kOskClear},
+                             {"close (B)", "", 1.5f, kOskClose}, {"run (Start)", "", 2, kOskRun}};
+const OskRow kOskRows[7] = {{nullptr, 0, 0.0f},      {kOskTokens, 10, 0.0f}, {kOskNum, 11, 0.0f}, {kOskQ, 11, 0.0f},
+                            {kOskA, 11, 0.0f},        {kOskY, 10, 0.5f},     {kOskBottom, 5, 0.0f}};
+const int kOskRowCount = 7, kOskMaxKeys = 16;
+
+int g_oskRow = 3, g_oskCol = 0;              // cursor; row 0: g_oskSug is the chip
+bool g_oskBackClosed = false;                // 0.7.1: B just closed the keyboard - the next B (nothing between) closes
+                                             //        the menu
+int g_typeFocusFrames = 0;                   // 0.7.1: frames left to get the text field active after a real key
+int g_oskSug = 0, g_oskFirst = 0;            // highlighted / first visible suggestion chip
+float g_oskCx[kOskRowCount][kOskMaxKeys];    // key centres (x) of the last frame, for up / down
+int g_oskCxIndex[kOskMaxKeys];               // row 0: suggestion index of each drawn chip
+int g_oskCxCount[kOskRowCount];
+int g_oskFlashRow = -1, g_oskFlashCol = -1;  // key just pressed (lights up shortly)
+DWORD g_oskFlashTick = 0;
+char g_oskHist[16][kCmdLine];                // history, newest first (suggestions of the empty line)
+int g_oskHistCount = 0;
+
+bool OskHistoryMode() { return g_cmdBuf[0] == 0; }
+int OskSugCount() { return OskHistoryMode() ? g_oskHistCount : g_sugCount; }
+const char *OskSugShow(int i) { return OskHistoryMode() ? g_oskHist[i] : g_sug[i].show; }
+
+void OskEdited() {                           // after every change of the line
+    g_sugSel = -1;
+    g_cmdHistPos = -1;
+    g_oskSug = 0;
+    g_oskFirst = 0;
+}
+void OskAppend(const char *text) {
+    size_t used = strlen(g_cmdBuf), add = strlen(text);
+    if (used + add >= sizeof(g_cmdBuf)) return;
+    memcpy(g_cmdBuf + used, text, add + 1);
+    OskEdited();
+}
+void OskBackspace() {
+    size_t used = strlen(g_cmdBuf);
+    if (used) g_cmdBuf[used - 1] = 0;
+    OskEdited();
+}
+void OskTakeSuggestion(int i) {
+    if (i < 0 || i >= OskSugCount()) return;
+    char text[kCmdLine];
+    if (OskHistoryMode()) strncpy_s(text, sizeof(text), g_oskHist[i], _TRUNCATE);
+    else CmdCompletionText(i, text, sizeof(text), true);   // with a space when the id takes an argument
+    strncpy_s(g_cmdBuf, sizeof(g_cmdBuf), text, _TRUNCATE);
+    OskEdited();
+}
+void OskRun() {
+    if (!g_cmdBuf[0]) return;
+    char line[kCmdLine];
+    strncpy_s(line, sizeof(line), g_cmdBuf, _TRUNCATE);
+    CmdRunFromBar(line);
+    g_cmdBuf[0] = 0;
+    OskEdited();
+}
+
+// the key under the cursor (rows 1..6) or the chip (row 0)
+void OskActivate(int row, int col) {
+    g_oskFlashRow = row;
+    g_oskFlashCol = row == 0 ? g_oskSug : col;
+    g_oskFlashTick = GetTickCount();
+    if (row == 0) { OskTakeSuggestion(g_oskSug); return; }
+    const OskKey &k = kOskRows[row].keys[col];
+    switch (k.action) {
+    case kOskType: OskAppend(k.text); break;
+    case kOskBack: OskBackspace(); break;
+    case kOskClear: g_cmdBuf[0] = 0; OskEdited(); break;
+    case kOskClose: g_oskOpen = false; break;
+    case kOskRun: OskRun(); break;
+    default: break;
+    }
+}
+
+// the key of row <row> whose centre is nearest to x (last frame's layout)
+int OskNearest(int row, float x) {
+    int best = 0;
+    float bestDist = FLT_MAX;
+    for (int i = 0; i < g_oskCxCount[row]; ++i) {
+        float d = fabsf(g_oskCx[row][i] - x);
+        if (d < bestDist) { bestDist = d; best = i; }
+    }
+    return best;
+}
+float OskCursorX() {
+    if (g_oskRow == 0) {
+        for (int i = 0; i < g_oskCxCount[0]; ++i)
+            if (g_oskCxIndex[i] == g_oskSug) return g_oskCx[0][i];
+        return g_oskCxCount[0] ? g_oskCx[0][0] : 0.0f;
+    }
+    return g_oskCol < g_oskCxCount[g_oskRow] ? g_oskCx[g_oskRow][g_oskCol] : 0.0f;
+}
+void OskGoRow(int row) {
+    float x = OskCursorX();
+    g_oskRow = row;
+    if (row == 0) {
+        int i = OskNearest(0, x);
+        g_oskSug = g_oskCxCount[0] ? g_oskCxIndex[i] : 0;
+    } else {
+        g_oskCol = g_oskCxCount[row] ? OskNearest(row, x) : 0;
+        if (g_oskCol >= kOskRows[row].count) g_oskCol = kOskRows[row].count - 1;
+    }
+}
+
+// pad input (edges only while the bar owns the pad)
+void OskInput(WORD e) {
+    bool sugs = OskSugCount() > 0;
+    if (g_oskRow == 0 && !sugs) OskGoRow(1);
+    if (CmdPadPress(0x0001)) OskGoRow(g_oskRow == 0 ? kOskRowCount - 1 : g_oskRow == 1 && !sugs ? kOskRowCount - 1
+                                                                                                   : g_oskRow - 1);
+    if (CmdPadPress(0x0002)) OskGoRow(g_oskRow == kOskRowCount - 1 ? (sugs ? 0 : 1) : g_oskRow + 1);
+    bool left = CmdPadPress(0x0004), right = CmdPadPress(0x0008);
+    if (left || right) {
+        if (g_oskRow == 0) {
+            int c = OskSugCount();
+            g_oskSug = (g_oskSug + (right ? 1 : c - 1)) % c;
+        } else {
+            int c = kOskRows[g_oskRow].count;
+            g_oskCol = (g_oskCol + (right ? 1 : c - 1)) % c;
+        }
+    }
+    // LB / RB: jump between the rows suggestions, tokens, keyboard (letters)
+    if (e & 0x0200) OskGoRow(g_oskRow == 0 ? 1 : g_oskRow == 1 ? 3 : (sugs ? 0 : 1));
+    if (e & 0x0100) OskGoRow(g_oskRow >= 2 ? 1 : g_oskRow == 1 ? (sugs ? 0 : 3) : 3);
+    if (e & 0x1000) OskActivate(g_oskRow, g_oskCol);                       // A: type / take
+    if (CmdPadPress(0x4000)) {                                             // X: backspace (repeats while held)
+        OskBackspace();
+        g_oskFlashRow = 6; g_oskFlashCol = 1; g_oskFlashTick = GetTickCount();
+    }
+    if ((e & 0x8000) && sugs) OskTakeSuggestion(g_oskSug);                // Y: the highlighted suggestion
+    if (e & 0x0010) OskRun();                                              // Start: run the line
+    if (e & 0x2000) {                                                      // B: keyboard closed (bar keeps the focus);
+        g_oskOpen = false;                                                 //    0.7.1: a second B closes the menu
+        g_oskBackClosed = true;
+    }
+}
+
+// one key: rounded box in the menu's button colours, highlight = the suggestion yellow; true when clicked
+bool OskDrawKey(const char *id, const char *label, ImVec2 pos, ImVec2 size, bool cursor, bool flash, ImU32 fill,
+                ImU32 textColour) {
+    ImGui::SetCursorScreenPos(pos);
+    bool clicked = ImGui::InvisibleButton(id, size);
+    bool hovered = ImGui::IsItemHovered();
+    ImDrawList *dl = ImGui::GetWindowDrawList();
+    float rounding = 5.0f * g_scale;
+    ImVec2 end(pos.x + size.x, pos.y + size.y);
+    if (cursor) fill = ImGui::GetColorU32(ImGuiCol_ButtonActive);
+    else if (hovered) fill = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
+    dl->AddRectFilled(pos, end, fill, rounding);
+    if (flash) dl->AddRectFilled(pos, end, IM_COL32(255, 255, 255, 70), rounding);
+    if (cursor) dl->AddRect(ImVec2(pos.x - 1.0f, pos.y - 1.0f), ImVec2(end.x + 1.0f, end.y + 1.0f),
+                            IM_COL32(255, 217, 51, 255), rounding, 0, 2.0f * g_scale);
+    ImVec2 ts = ImGui::CalcTextSize(label);
+    ImVec2 tp(pos.x + (size.x - ts.x) * 0.5f, pos.y + (size.y - ts.y) * 0.5f);
+    if (tp.x < pos.x + 4.0f) tp.x = pos.x + 4.0f;
+    dl->PushClipRect(pos, end, true);
+    dl->AddText(tp, textColour, label);
+    dl->PopClipRect();
+    return clicked;
+}
+
+void DrawOsk() {
+    // history for the empty line, newest first
+    EnterCriticalSection(&g_cmdLock);
+    g_oskHistCount = 0;
+    for (int i = g_cmdHistCount - 1; i >= 0 && g_oskHistCount < 16; --i)
+        strncpy_s(g_oskHist[g_oskHistCount++], kCmdLine, g_cmdHist[i], _TRUNCATE);
+    LeaveCriticalSection(&g_cmdLock);
+    int sugCount = OskSugCount();
+    if (g_oskSug >= sugCount) g_oskSug = sugCount ? sugCount - 1 : 0;
+    if (g_oskRow == 0 && !sugCount) g_oskRow = 1;
+
+    const ImGuiStyle &style = ImGui::GetStyle();
+    ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);   // the pad goes to the keyboard, not to ImGui's navigation
+    ImGui::Separator();
+    ImVec2 start = ImGui::GetCursorScreenPos();
+    float avail = ImGui::GetContentRegionAvail().x;
+    float gap = style.ItemSpacing.x * 0.6f;
+    float keyH = ImGui::GetFrameHeight() * 1.15f;
+    float y = start.y;
+    bool flashOn = GetTickCount() - g_oskFlashTick < 150;
+    ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
+
+    // row 0: suggestions (chips sized by their text; the highlighted one is always visible)
+    float pad = style.FramePadding.x * 1.5f;
+    auto chipW = [&](int i) {
+        float w = ImGui::CalcTextSize(OskSugShow(i)).x + pad * 2.0f;
+        return w > avail * 0.6f ? avail * 0.6f : w;
+    };
+    if (g_oskSug < g_oskFirst) g_oskFirst = g_oskSug;
+    float used = 0.0f;
+    for (int i = g_oskFirst; i <= g_oskSug && i < sugCount; ++i) used += chipW(i) + gap;
+    while (g_oskFirst < g_oskSug && used > avail) used -= chipW(g_oskFirst++) + gap;
+    g_oskCxCount[0] = 0;
+    if (sugCount) {
+        float x = start.x;
+        for (int i = g_oskFirst; i < sugCount && g_oskCxCount[0] < kOskMaxKeys; ++i) {
+            float w = chipW(i);
+            if (x + w > start.x + avail + 0.5f && i > g_oskFirst) break;
+            char id[24];
+            Out(id, sizeof(id), "##osks%d", i);
+            bool cur = g_oskRow == 0 && g_oskSug == i;
+            bool sel = g_oskRow != 0 && g_oskSug == i;   // Y takes this one
+            ImU32 fill = sel ? ImGui::GetColorU32(ImGuiCol_HeaderHovered) : ImGui::GetColorU32(ImGuiCol_FrameBg);
+            if (OskDrawKey(id, OskSugShow(i), ImVec2(x, y), ImVec2(w, keyH), cur,
+                           flashOn && g_oskFlashRow == 0 && g_oskFlashCol == i, fill, IM_COL32(115, 204, 255, 255))) {
+                g_oskRow = 0;
+                g_oskSug = i;
+                OskActivate(0, i);
+            }
+            g_oskCx[0][g_oskCxCount[0]] = x + w * 0.5f;
+            g_oskCxIndex[g_oskCxCount[0]++] = i;
+            x += w + gap;
+        }
+    } else {
+        ImGui::SetCursorScreenPos(ImVec2(start.x, y + (keyH - ImGui::GetTextLineHeight()) * 0.5f));
+        ImGui::TextDisabled("%s", OskHistoryMode() ? "(no history yet - type an id)" : "(no matching id / value)");
+    }
+    y += keyH + gap * 2.5f;
+
+    // rows 1..6: tokens (10 equal cells), keyboard (11 units per row)
+    for (int r = 1; r < kOskRowCount; ++r) {
+        const OskRow &row = kOskRows[r];
+        float units = r == 1 ? 10.0f : 11.0f;
+        float unit = (avail - gap * (units - 1.0f)) / units;
+        float x = start.x + row.offset * (unit + gap);
+        g_oskCxCount[r] = 0;
+        for (int c = 0; c < row.count && c < kOskMaxKeys; ++c) {
+            const OskKey &k = row.keys[c];
+            float w = k.units * unit + (k.units - 1.0f) * gap;
+            char id[24];
+            Out(id, sizeof(id), "##osk%d_%d", r, c);
+            ImU32 fill = ImGui::GetColorU32(ImGuiCol_Button);
+            if (r == 1) fill = ImGui::GetColorU32(ImGuiCol_Header);
+            if (k.action == kOskRun) fill = IM_COL32(46, 125, 70, 255);
+            if (k.action == kOskClose || k.action == kOskClear) fill = ImGui::GetColorU32(ImGuiCol_FrameBg);
+            bool cur = g_oskRow == r && g_oskCol == c;
+            if (OskDrawKey(id, k.label, ImVec2(x, y), ImVec2(w, keyH), cur,
+                           flashOn && g_oskFlashRow == r && g_oskFlashCol == c, fill, text)) {
+                g_oskRow = r;
+                g_oskCol = c;
+                OskActivate(r, c);
+            }
+            g_oskCx[r][g_oskCxCount[r]++] = x + w * 0.5f;
+            x += w + gap;
+        }
+        y += keyH + (r == 1 ? gap * 2.5f : gap);
+    }
+    ImGui::SetCursorScreenPos(ImVec2(start.x, y));
+    ImGui::PopItemFlag();
+    // the highlighted suggestion: value and label (what Y / A would take)
+    if (sugCount && !OskHistoryMode()) {
+        const CmdSug &s = g_sug[g_oskSug];
+        const char *value = s.valueId ? CmdCachedValue(s.valueId) : "";
+        ImGui::TextColored(ImVec4(0.45f, 0.8f, 1.0f, 1.0f), "%s%s%.48s", s.show, value[0] ? " = " : "", value);
+        if (s.note[0]) { ImGui::SameLine(); ImGui::TextDisabled("%.80s", s.note); }
+    }
+    ImGui::TextDisabled("A type   X backspace   Y take suggestion   Start run   B close   LB / RB rows   L3 = keyboard "
+                        "off   (a real keyboard works too)");
+}
+
 // the bar: a window directly under the menu window (always visible, outside the menu's scrolling)
 void DrawCmdBar(bool menuJustOpened) {
     if (!g_cmdEnabled || !g_menuRectOk) { g_cmdOwnPad = false; return; }
@@ -4529,11 +5425,67 @@ void DrawCmdBar(bool menuJustOpened) {
     const ImGuiStyle &style = ImGui::GetStyle();
     bool barHadFocus = g_cmdOwnPad;
     bool wantFocus = menuJustOpened || InterlockedExchange(&g_cmdFocusReq, 0) != 0;
-    if (ImGui::IsKeyPressed(ImGuiKey_F2, false)) wantFocus = true;
-    if (!barHadFocus && !io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Tab, false)) wantFocus = true;
+    bool keyFocus = ImGui::IsKeyPressed(ImGuiKey_F2, false) ||
+                    (!barHadFocus && !io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Tab, false));
+    if (keyFocus) { wantFocus = true; g_oskOpen = false; }   // F2 / Tab: typing on the real keyboard
     bool toPicker = !barHadFocus && g_cmdBackEdge;    // View in the menu: the bar's pad picker
     if (wantFocus) { g_cmdPadMode = false; g_pickMode = 0; }
-    if (toPicker) { g_cmdPadMode = true; g_pickMode = 0; }
+    if (toPicker) { g_cmdPadMode = true; g_pickMode = 0; g_oskOpen = false; }
+    // 0.7: FocusButton (L3) / cmd.keyboard - focus + on-screen keyboard; L3 again while it is open closes it
+    LONG oskReq = InterlockedExchange(&g_cmdOskReq, 0);
+    if (oskReq && !toPicker) {
+        g_oskBackClosed = false;
+        if (oskReq == 1 && g_oskOpen) {               // 0.7.1: also without the bar focus (no hover / focus state)
+            g_oskOpen = false;
+        } else if (g_cmdKeyboard) {
+            g_oskOpen = true;
+            g_cmdPadMode = false;
+            g_pickMode = 0;
+            ImGui::ClearActiveID();                   // the field shows g_cmdBuf, the keys edit it
+            wantFocus = true;
+            OskEdited();
+            g_oskRow = 3;
+            g_oskCol = 0;
+        } else {
+            wantFocus = true;                         // [Cmd] Keyboard=0: only the focus (text field)
+        }
+    }
+    // a real keyboard while the on-screen one is open: back to typing (the typed characters are kept).
+    // 0.7.1: independent of the bar focus, mouse hover and the selected key - any real key press seen by the window
+    // procedure (g_oskRealKeys) switches; the characters are taken from ImGui's queue here (and removed from it, so the
+    // field does not get them twice), and until the text field is really active (up to 20 frames) the focus is
+    // requested again and further characters still go into the line
+    LONG realKeys = InterlockedExchange(&g_oskRealKeys, 0);
+    bool catching = g_oskOpen || (g_typeFocusFrames > 0 && !g_cmdTextActive);
+    if (catching) {
+        bool typed = false;
+        for (int i = 0; i < io.InputQueueCharacters.Size; ++i) {
+            ImWchar c = io.InputQueueCharacters[i];
+            if (c >= 32 && c < 127) { char s[2] = {static_cast<char>(c), 0}; OskAppend(s); typed = true; }
+        }
+        if (typed) io.InputQueueCharacters.resize(0);
+        if (ImGui::IsKeyPressed(ImGuiKey_Backspace, false)) { OskBackspace(); typed = true; }
+        if (g_oskOpen && realKeys && !ImGui::IsKeyPressed(ImGuiKey_Escape, false)) typed = true;
+        if (typed) {
+            if (g_oskOpen) {
+                g_oskOpen = false;
+                g_oskBackClosed = false;
+                g_cmdPadMode = false;
+                g_pickMode = 0;
+                g_typeFocusFrames = 20;
+                Log(3, "osk: real keyboard -> typing");
+            }
+            strncpy_s(g_cmdSetText, sizeof(g_cmdSetText), g_cmdBuf, _TRUNCATE);
+            g_cmdSetPending = true;                   // cursor to the end, no "select all" of the focus request
+            wantFocus = true;
+        } else if (g_oskOpen && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            g_oskOpen = false;
+        }
+    }
+    if (g_typeFocusFrames > 0) {                      // 0.7.1: keep asking until the field is active
+        if (g_cmdTextActive || g_oskOpen) g_typeFocusFrames = 0;
+        else { --g_typeFocusFrames; wantFocus = true; }
+    }
 
     ImGuiViewport *vp = ImGui::GetMainViewport();
     float width = g_menuSize.x;
@@ -4553,12 +5505,32 @@ void DrawCmdBar(bool menuJustOpened) {
         CmdBuildSuggestions(g_cmdBuf, g_cmdPadMode);
         WORD e = g_cmdPadEdges;
         bool leave = false, runNow = false;
-        if (barHadFocus && !g_cmdPadMode && !toPicker) {  // text field (or idle bar): the pad goes on into the menu
-            if (e & 0x200F) leave = true;                // D-pad / stick / B
-            else if (e & 0x1000) {                       // A: run the typed line, empty = into the menu
+        if (g_oskOpen && (e & 0x0020)) {                   // 0.7: View with the keyboard open: pad picker
+            g_oskOpen = false;
+            g_cmdPadMode = true;
+            g_pickMode = 0;
+            CmdBuildSuggestions(g_cmdBuf, true);
+            e = 0;
+        }
+        if (e & static_cast<WORD>(~0x2000)) g_oskBackClosed = false;   // 0.7.1: only B right after B counts
+        if (barHadFocus && !g_cmdPadMode && !toPicker && !g_oskOpen) {   // text field (or idle bar): the pad goes on
+            if ((e & 0x2000) && g_oskBackClosed) {       // 0.7.1: B closed the keyboard, this B closes the menu
+                g_oskBackClosed = false;
+                if (g_menuOpen) ToggleMenu("B twice: keyboard, then menu");
+                e = 0;
+            } else if (e & 0x200F) {                     // D-pad / stick / B: into the menu
+                leave = true;
+                // 0.7 FirstPadPressOnlyFocuses=0: the direction also moves in the menu (FeedGamepad hands it over)
+                if (!g_cmdFirstPressFocus && (e & 0x000F)) g_cmdHandOver = true;
+            } else if (e & 0x1000) {                     // A: run the typed line, empty = into the menu
                 if (g_cmdTextActive && g_cmdBuf[0]) runNow = true;
                 else if (g_cmdTextActive) leave = true;
-                else wantFocus = true;
+                else if (g_cmdKeyboard) {                // 0.7: A in the idle bar = the on-screen keyboard
+                    g_oskOpen = true;
+                    OskEdited();
+                    g_oskRow = 3;
+                    g_oskCol = 0;
+                } else wantFocus = true;
             } else if (e & 0x0020) {                     // View: pad picker
                 ImGui::ClearActiveID();
                 g_cmdPadMode = true;
@@ -4572,13 +5544,14 @@ void DrawCmdBar(bool menuJustOpened) {
         ImGui::SameLine();
         float pickWidth = ImGui::CalcTextSize("Pick (View)").x + style.FramePadding.x * 2.0f;
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - pickWidth - style.ItemSpacing.x);
-        if (wantFocus && !g_cmdPadMode) ImGui::SetKeyboardFocusHere();
+        if (wantFocus && !g_cmdPadMode && !g_oskOpen) ImGui::SetKeyboardFocusHere();
         ImGuiInputTextFlags tf = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackCompletion |
                                  ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackEdit |
                                  ImGuiInputTextFlags_CallbackAlways;
         bool enter = ImGui::InputTextWithHint("##cmd", "item id [arg] - help, list <filter>, get <id>; Tab / Down = "
                                               "choose, Up = history", g_cmdBuf, sizeof(g_cmdBuf), tf, CmdCallback);
         textActive = ImGui::IsItemActive();
+        if (textActive && g_oskOpen) g_oskOpen = false;   // 0.7: a click into the field = typing on the real keyboard
         if (ImGui::IsItemDeactivated() && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) leave = true;
         ImGui::SameLine();
         if (ImGui::Button("Pick (View)")) { g_cmdPadMode = true; g_pickMode = 0; }
@@ -4629,9 +5602,16 @@ void DrawCmdBar(bool menuJustOpened) {
                 } else if ((e & 0x8000) && g_sugSel >= 0 && g_sugSel < g_sugCount && g_sug[g_sugSel].idToken &&
                            CmdKindOf(g_sug[g_sugSel].text) != kCkBuiltin) {
                     FavToggle(g_sug[g_sugSel].text);
-                } else if (e & 0x0020) {                 // View: back to typing
+                } else if (e & 0x0020) {                 // View: back to typing (0.7: on the on-screen keyboard)
                     g_cmdPadMode = false;
-                    InterlockedExchange(&g_cmdFocusReq, 1);
+                    if (g_cmdKeyboard) {
+                        g_oskOpen = true;
+                        OskEdited();
+                        g_oskRow = 3;
+                        g_oskCol = 0;
+                    } else {
+                        InterlockedExchange(&g_cmdFocusReq, 1);
+                    }
                 }
                 if (!g_sugCount) ImGui::TextDisabled("pad picker: no matching id - B = back");
             }
@@ -4658,11 +5638,16 @@ void DrawCmdBar(bool menuJustOpened) {
             }
             ImGui::PopStyleColor();
         } else {
-            ImGui::TextDisabled("help = the commands; D-pad / Down = into the menu, View / F2 / Tab = back to the bar");
+            ImGui::TextDisabled("help = the commands; D-pad / Down = into the menu, View / F2 / Tab = back to the bar, "
+                                "L3 = on-screen keyboard");
         }
+        // 0.7 on-screen keyboard (0.7.1: the open keyboard owns the pad - FeedGamepad - whatever the focus / hover)
+        if (g_oskOpen) OskInput(e);
+        if (g_oskOpen) DrawOsk();
         if (leave) CmdFocusMenu();
         focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-        if (!focused) g_cmdPadMode = false;
+        if (!focused) { g_cmdPadMode = false; g_oskOpen = false; g_oskBackClosed = false; }
+        if (textActive) g_oskBackClosed = false;
     }
     g_cmdBarHeight = ImGui::GetWindowHeight();
     ImVec2 barPos = ImGui::GetWindowPos();
@@ -4691,6 +5676,13 @@ void PageLevel() {
         if (ImGui::Button(label)) QueueItem("level.load", name);
     }
     if (unit[0] && ImGui::Button("Reload current unit  [level.reload]")) QueueItem("level.reload", "");
+    // 0.7.1: the mission menu's start (main menu only) - the intro plays, unlike level.load
+    if (g_missionOk) {
+        if (ImGui::Button("Start DLC 2 as the mission menu (intro)  [level.start dlc2]")) QueueItem("level.start", "dlc2");
+        if (ImGui::Button("Start DLC 1 as the mission menu (intro)  [level.start dlc1]")) QueueItem("level.start", "dlc1");
+    } else {
+        ImGui::TextDisabled("level.start: mission start path not verified (see TruMenu.log)");
+    }
     // every playable unit of the PC unit list, one tree node per group
     ImGui::Separator();
     Text("All units (%d, PC tr8/pc-w/unitlist.txt) - [level.load <unit>]", kUnitCount);
@@ -5533,6 +6525,9 @@ void Render(IDirect3DDevice9 *device) {
     if (padIdle && g_reqPending) RunPending();
     if (padIdle) WeaponsTick();
     KeyboardToggle();
+    MouseTick();                                 // 0.7: hold / release the game's cursor calls with the menu
+    PauseTick();                                 // 0.7.1 [Menu] PauseGame
+    AutoStartTick();                             // 0.7.1 [Test] AutoStart
     if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup) return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
@@ -5553,9 +6548,12 @@ void Render(IDirect3DDevice9 *device) {
     IDirect3DSurface9 *back = nullptr;
     if (SUCCEEDED(device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back)) && back) {
         D3DSURFACE_DESC desc = {};
-        // (mouse positions stay in client pixels - with a scaling proxy the mouse is off; the pad is unaffected)
-        if (SUCCEEDED(back->GetDesc(&desc)) && desc.Width && desc.Height)
+        // (0.7: with [Menu] FreeMouse the window procedure scales the mouse messages from client to back-buffer pixels)
+        if (SUCCEEDED(back->GetDesc(&desc)) && desc.Width && desc.Height) {
             io.DisplaySize = ImVec2(static_cast<float>(desc.Width), static_cast<float>(desc.Height));
+            g_bbWidth = desc.Width;
+            g_bbHeight = desc.Height;
+        }
         back->Release();
     }
     FeedGamepad(io);
@@ -5565,9 +6563,18 @@ void Render(IDirect3DDevice9 *device) {
     if (g_logOverlay) DrawLogOverlay();
     if (g_guardOverlay) DrawGuardOverlay();
     if (g_menuOpen) DrawMenu();
-    if (!g_menuOpen) { g_cmdOwnPad = false; g_cmdTextActive = false; g_cmdPadMode = false; }
+    // 0.7.1: g_oskOpen is kept on close (owner decision 2026-11-02: the keyboard comes back with the menu when it was
+    // open at the last close - in 0.7 only by chance, when Render returned before this line)
+    if (!g_menuOpen) {
+        g_cmdOwnPad = false;
+        g_cmdTextActive = false;
+        g_cmdPadMode = false;
+        g_oskBackClosed = false;
+        g_typeFocusFrames = 0;
+    }
     ImGui::EndFrame();
-    InterlockedExchange(&g_cmdWantText, g_menuOpen && io.WantTextInput ? 1 : 0);
+    // 0.7: also while the on-screen keyboard is open - a real key then switches to typing instead of reaching the game
+    InterlockedExchange(&g_cmdWantText, g_menuOpen && (io.WantTextInput || g_oskOpen || g_typeFocusFrames > 0) ? 1 : 0);
     if (SUCCEEDED(device->BeginScene())) {
         ImGui::Render();
         ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
@@ -5707,6 +6714,7 @@ DWORD WINAPI WorkerThread(LPVOID) {
                 device != reinterpret_cast<DWORD>(g_device))
                 HookDevice(reinterpret_cast<IDirect3DDevice9 *>(device));
         }
+        UnitTick();                                  // 0.7.1 [Log] UnitChanges (read-only)
         LogTailTick();
         Sleep(g_device ? 250 : 50);
     }
@@ -5751,6 +6759,19 @@ void ReadOptions(const char *dir) {
     g_cmdEnabled = OptInt(ini, "Cmd", "Enabled");
     g_cmdHistSize = OptInt(ini, "Cmd", "HistorySize");
     if (g_cmdHistSize < 1 || g_cmdHistSize > 64) g_cmdHistSize = atoi(OptDefault("Cmd", "HistorySize"));
+    // 0.7
+    g_freeMouse = OptInt(ini, "Menu", "FreeMouse");
+    g_cmdFocusButton = static_cast<WORD>(OptInt(ini, "Cmd", "FocusButton"));
+    g_cmdKeyboard = OptInt(ini, "Cmd", "Keyboard");
+    g_cmdUpHistory = OptInt(ini, "Cmd", "UpOpensHistory");
+    g_cmdFirstPressFocus = OptInt(ini, "Cmd", "FirstPadPressOnlyFocuses");
+    // 0.7.1
+    g_blockGameInput = OptInt(ini, "Menu", "BlockGameInput");
+    g_pauseGame = OptInt(ini, "Menu", "PauseGame");
+    g_unitChanges = OptInt(ini, "Log", "UnitChanges");
+    OptString(ini, "Test", "AutoStart", g_autoStart, sizeof(g_autoStart));
+    g_autoStartDelay = OptInt(ini, "Test", "AutoStartDelay");
+    if (g_autoStartDelay < 1 || g_autoStartDelay > 60) g_autoStartDelay = atoi(OptDefault("Test", "AutoStartDelay"));
 }
 
 void Start(HMODULE self) {
@@ -5834,6 +6855,29 @@ void Start(HMODULE self) {
     TestLoad();
     _snprintf_s(g_cmdHistPath, sizeof(g_cmdHistPath), _TRUNCATE, "%sTruMenu.history.txt", g_exeDir);   // 0.6
     CmdHistLoad();
+    Log(1, "0.7 cmd: focus button 0x%04x, keyboard %d, Up opens history %d, first pad press only focuses %d; free mouse %d",
+        g_cmdFocusButton, g_cmdKeyboard, g_cmdUpHistory, g_cmdFirstPressFocus, g_freeMouse);
+    MouseSetup();                                                                                       // 0.7
+    // 0.7.1: keyboard (vtable slot), mission start natives, Lara's stream unit, pause option, AutoStart
+    KbdSetup();
+    g_missionOk = MissionCheck();
+    g_streamNameOk = g_unitOk && HexBytesAt(0x005c1bf0, "a148f1e700 53 55 56 8b3594f0e700 57 8bbee0000000") &&
+                     HexBytesAt(0x005c1c28, "e823ffffff 8b0db0a2db00 8d680c 55 6868428500") &&
+                     HexBytesAt(0x005c1c4e, "893d48f1e700") &&
+                     HexBytesAt(0x005c1b9c, "be44abdb00 8a06 84c0 7415 3c04 7411 8d4608") &&
+                     HexBytesAt(0x005dfc88, "8b1548f1e700 3b90e0000000");
+    if (g_pauseGame)
+        g_pauseMode = g_pauseOk ? "ready (time.pause bit set while the menu is open)"
+                                : "NOT verified (streamFlags check failed) - the game runs while the menu is open";
+    if (g_autoStart[0])
+        g_autoStartMode = g_missionOk ? "armed (level.start once the main menu is up)"
+                                      : "armed - mission path NOT verified, fallback level.load (intro skipped)";
+    Log(1, "0.7.1: block game input %d (keyboard %s), pause game %d (%s), mission start path %d, stream unit name %d "
+           "(unit changes %d), AutoStart '%s' delay %d s (%s)", g_blockGameInput, g_kbdOk ? "hooked" : "not hooked",
+        g_pauseGame, g_pauseMode, g_missionOk ? 1 : 0, g_streamNameOk ? 1 : 0, g_unitChanges, g_autoStart,
+        g_autoStartDelay, g_autoStartMode);
+    if (g_unitChanges && !g_streamNameOk)
+        Log(0, "0.7.1: stream unit code did not match - [Log] UnitChanges off (status.unit shows GameTracker+0x38 only)");
     DevRead();
     g_logOverlay = g_logOverlayAtStart ? 1 : 0;
     g_logLines = g_logLinesAtStart;
@@ -5874,6 +6918,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_favLock);
         InitializeCriticalSection(&g_testLock);
         InitializeCriticalSection(&g_cmdLock);
+        InitializeCriticalSection(&g_mouseLock);
         g_reqDone = CreateEventA(nullptr, TRUE, FALSE, nullptr);
         Start(instance);
     } else if (reason == DLL_PROCESS_DETACH) {

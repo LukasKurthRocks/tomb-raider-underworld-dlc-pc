@@ -38,18 +38,23 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruMenu.asi', 'TruMenu.ini'
-# SHA-256 of earlier builds of ours (0.1.3, 0.2, 0.3, 0.4, all 2026-10-31) - recognised as ours for update / removal
+# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6) - recognised as ours for update / removal
 $earlierBuilds = @{
     'TruMenu.asi' = @('50ebd28adcf96cef7e1db673ce293b5810bd8d64d0669617d09a1250598491a3',
                       'cd1b8796e40fccb09ab063d7e9f955b9029a230e37b21dce9bb570c1a3cb1892',
                       '9dda37273b5473d560474e7473b82978bfc77d3bd4d4af2ec0ae10e625b0b7ca',
                       'ae80725d7ad14fcf5a157e5f6b5a1d1190b1dbda17638ebdc875a2a95e0a9304',
                       '557962839d28b19e71ada3a74bb1c50a27fdc5a9f7765b72894758629fa66c51',   # 0.5 (2026-10-31)
-                      '53d4cedb5523a51f2909181a5c9f249e27074ef0ebe6c41d06f2adc0de55f44b')   # 0.5 + TruGuard items (2026-11-01)
+                      '53d4cedb5523a51f2909181a5c9f249e27074ef0ebe6c41d06f2adc0de55f44b',   # 0.5 + TruGuard items (2026-11-01)
+                      '2febe208f812a29a6ad960fb175bfbae5397baaef7ff5e063d2a5e3d09848738',   # 0.6 command bar (2026-11-01, work\asi\menu06)
+                      'f848695482a4440f3d35c44b1a6bbe926bc1cbfdb10d6ee1594c8c5b729486be',   # 0.6 + guard.dump (2026-11-02, work\asi)
+                      '6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b')   # 0.7 keyboard / focus / mouse (work\asi\menu07)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
-                      'ae77e5d50799c4d528a5bf8339b7266c3e0c0dd05024247932cf012cdf302e83')
+                      'ae77e5d50799c4d528a5bf8339b7266c3e0c0dd05024247932cf012cdf302e83',
+                      '73b27b92d0aabe6fb0a33d3232e4c0489efda4ebe816e08dfec2f9e27cb237ee',   # 0.6 ([Cmd] Enabled / HistorySize)
+                      '5d0dd4a902fa9ee41bc2b3635d8ba46ecd34d9ba4992bd31d8e003243d2b38fa')   # 0.7 ([Cmd] keyboard / focus, [Menu] FreeMouse)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

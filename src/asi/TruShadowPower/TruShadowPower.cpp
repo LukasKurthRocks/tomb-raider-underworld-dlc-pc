@@ -41,6 +41,18 @@
 // 0x823d8978, the TU branch of state 1014 slot 0 (shadow strike) - both not ported, so in DLC 2 the translation answers
 // 0, which is the TU's answer outside a shadow strike. Cond1055 joins the copy of Lara's condition table (option
 // [Conditions] Cond1055).
+//
+// 0.8 (2026-11-02, docs Befund-Schattenkraft "Shadow-power look (title update) - translation"): the look of the power.
+// No TU function of the meter group calls a post-process API; Start 0x823d7d40 and Stop 0x823d7fb8 fire PLAYER EVENTS
+// by type through 0x82418158 (walk of the player object's event list, records of that type -> the player's anim-event
+// callback) - on: 0x89, 0x32, (0x83 moving), 0x81 (meter full), 0x87 / 0x88 (above / below tuning +0x70 % of max);
+// off: 0x33, then 0x7e (ran empty) or 0x82. The records are data of doppelganger_casual (object 857, DTP 20172):
+// 0x32 starts the instance effects (model +0x18 effect 2 at two bones, model +0x38 record 14 as instance effect),
+// 0x33 stops all of them. The PC has the walker with the same body: tru+0x318780 cdecl(instance, type, 0xff, channel
+// 0). FireEvent calls it at the TU's places, in the TU's order ([Look] Enabled). Start / Stop also send message
+// 0x1f4 / 0x1f5 to every instance whose query +0x11c answers 0x172 (PC instance list [0xd98d54], wake tru+0x1b2de0)
+// - the level objects that react to the power, e.g. presumably dlc_fx_bloom (object 1038, states fx_on / fx_off)
+// ([Look] Messages).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -388,6 +400,85 @@ void Selector() {
     Log(3, "selector: player %.3f, world %.3f", playerTarget, worldTarget);
 }
 
+// ---- 0.8: player events of Start / Stop (TU 0x82418158 = PC tru+0x318780) ----
+// TU 0x82418158(player 0x82efb464, type, 0xff): every record of the player object's event list (instance +0x10 ->
+// object +4) with that type byte (+4), channel 0 (h & 0xc00), skip bit (h & 4) clear, anim controller +0x5c == 0,
+// kind 0 / 3 only if controller +0x4c & 0x40, kind 1 only if & 0x80 -> anim-event callback (msg 7). PC tru+0x318780
+// (retail, same tests) takes the channel as a 4th argument ((arg ^ h) & 0xc00 == 0) - 0 = the TU's test.
+typedef void(__cdecl *PlayerEventFn)(void *instance, int type, int param, int channel);
+const DWORD kPlayerEvent = 0x00718780;
+const char *const kPlayerEventHex = "51 817c240cff000000 0f84f2000000 8b442408 56 8b7010 8b8080020000 8b4814";
+const DWORD kPlayerEventType = 0x007187d0;      // movzx ecx, byte [esi+4]; cmp ecx, [esp+0x1c] (the type byte)
+const char *const kPlayerEventTypeHex = "0fb64e04 3b4c241c";
+const DWORD kPlayerEventCall = 0x00718858;      // push 7; push ebp x3; push edx; call 0x7181a0 (anim-event callback)
+const char *const kPlayerEventCallHex = "6a07 55 55 55 52 e83df9ffff";
+int g_lookEnabled = 1;                          // [Look] Enabled
+bool g_lookOk = false;                          // walker verified
+volatile LONG g_lookStarts = 0;
+int Doppelganger();                             // TruDlc2Player's flag (TU gameTracker+0x1244), defined below
+
+// fire one TU player event on the player instance (TU 0x82efb464 = PC 0xe7f094); returns false when not fired.
+// On the Xbox Start / Stop exist only with the meter object (gameTracker+0x508), i.e. for the DLC 2 doppelganger
+// player - the look is therefore limited to doppelganger mode (the plugin's slow motion itself stays as in 0.7).
+bool FireEvent(int type) {
+    if (!g_lookOk || !g_lookEnabled || !Doppelganger()) return false;
+    void *player = *reinterpret_cast<void *const *>(0x00e7f094);
+    if (!player) return false;
+    __try {
+        reinterpret_cast<PlayerEventFn>(kPlayerEvent)(player, type, 0xff, 0);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "player event 0x%02x (tru+0x318780): access fault - skipped", type);
+        return false;
+    }
+    return true;
+}
+
+// TU 0x823d7f18..0x823d7fa0 (Start, message 0x1f4) / 0x823d8080.. (Stop, message 0x1f5): every instance of the list
+// 0x828aaf18 (+4 first, +8 next - read before the calls) whose query function +0x11c answers 0x172 gets 0x8226fe00
+// (wake) and then message (+0x120)(instance, msg, 0). PC: list head [0xd98d54] (the walk tru+0x1b53e0, same +8 next,
+// +0x110 / +0x11c / +0x120 layout), wake tru+0x1b2de0 = 0x8226fe00 (same body). All cdecl.
+typedef int(__cdecl *InstQueryFn)(void *instance, int id);
+typedef int(__cdecl *InstMessageFn)(void *instance, int msg, int arg);
+typedef void(__cdecl *InstWakeFn)(void *instance);
+const DWORD kInstanceHead = 0x00d98d54;
+const DWORD kInstWalk = 0x005b53ea;             // mov esi, [0xd98d54] in tru+0x1b53e0
+const char *const kInstWalkHex = "8b35548dd900 85f6";
+const DWORD kInstNext = 0x005b5563;             // mov esi, [esi+8]; test esi, esi
+const char *const kInstNextHex = "8b7608 85f6";
+const DWORD kInstQuery = 0x005b5425;            // mov eax, [esi+0x11c]; test; je; push 0x22; push esi; call eax
+const char *const kInstQueryHex = "8b861c010000 85c0 7410 6a22 56 ffd0 83c408";
+const DWORD kInstWake = 0x005b2de0;             // = TU 0x8226fe00
+const char *const kInstWakeHex = "56 8b742408 8b4618 a801 744e 83e0fe 894618 8d8610010000 85c0 741c 57 8bbe20010000 "
+                                 "85ff 7410 56 e8d3ffffff 6a00 6a13 56 ffd7 83c410";
+int g_lookMessages = 1;                         // [Look] Messages
+bool g_msgOk = false;                           // instance list / query / wake verified
+
+// returns the number of instances that got the message, -1 when not sent
+int BroadcastPowerMessage(int msg) {
+    if (!g_msgOk || !g_lookEnabled || !g_lookMessages || !Doppelganger()) return -1;
+    int sent = 0;
+    __try {
+        BYTE *inst = *reinterpret_cast<BYTE *const *>(kInstanceHead);
+        for (int guard = 0; inst && guard < 4096; ++guard) {
+            BYTE *next = *reinterpret_cast<BYTE *const *>(inst + 8);           // r29 = [r31+8] before the calls
+            InstQueryFn query = *reinterpret_cast<InstQueryFn *>(inst + 0x11c);
+            if (inst + 0x110 && query && query(inst, 0x172)) {
+                InstMessageFn message = *reinterpret_cast<InstMessageFn *>(inst + 0x120);
+                if (message) {
+                    reinterpret_cast<InstWakeFn>(kInstWake)(inst);
+                    message(inst, msg, 0);
+                    ++sent;
+                }
+            }
+            inst = next;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "message 0x%03x to the instances: access fault after %d - skipped", msg, sent);
+        return -1;
+    }
+    return sent;
+}
+
 // 0x823d8120
 bool CanStart(const BYTE *tuning) {
     if (!tuning) return false;
@@ -399,29 +490,64 @@ bool CanStart(const BYTE *tuning) {
 // 0x823d7d40 (the request list 0x823d7520 with only this request = both ramps to the tuning values in 33 ms)
 void StartPower(const BYTE *tuning) {
     if (g_meter.flags & 1) return;
-    // not ported: cinematic (0x82efb590) / 0x829ca6da / game state +0x628 > 0 checks, sounds 0x89 0x32 0x83 0x81
-    // 0x87 0x88, the effect call (*0x82efc780)->vtbl[0xa4], message 0x1f4 to all instances
+    // not ported: cinematic (0x82efb590) / 0x829ca6da / game state +0x628 > 0 checks, the camera manager call
+    // (*0x82efc780)->vtbl[0xa4] (= 0x822a9e58: camera +0x7c |= 2; PC camera manager not mapped)
     if (!tuning) return;
     g_meter.request[0][0] = Tune(tuning, kTunePlayer);          // +0x40 = tuning +0x40
     g_meter.request[0][1] = Tune(tuning, kTuneWorld);           // +0x44 = tuning +0x3c
     Selector();
+    // 0.8: 0x823d7e10..0x823d7efc - the player events of the start, in the TU's order
+    char fired[64] = "";
+    int n = 0;
+    auto fire = [&](int type) {
+        if (FireEvent(type) && n < static_cast<int>(sizeof(fired)) - 6)
+            n += _snprintf_s(fired + n, sizeof(fired) - n, _TRUNCATE, " 0x%02x", type);
+    };
+    fire(0x89);
+    fire(0x32);
+    // 0x83 when the length of gameTracker+0x1f0 > 10.0 [0x8205262c]: not ported (PC gameTracker +0x1f0 not mapped;
+    // its only record in DTP 20172 is sound 0x1cd)
+    float max = Tune(tuning, kTuneMax);
+    if (g_meter.value == max) fire(0x81);                       // [r28+8] == tuning +0x10
+    float high = Tune(tuning, 0x70) * kPercent * max;           // tuning +0x70 x [0x820536ec] x tuning +0x10
+    if (!(g_meter.value < high)) fire(0x87);
+    else fire(0x88);
     g_meter.startValue = g_meter.value;
     g_meter.flags |= 1;
+    int sent = BroadcastPowerMessage(0x1f4);                    // 0x823d7f18..0x823d7fa0
     g_meter.startTime = *kGameClock;
     Log(2, "shadow power ON (meter %.1f)", g_meter.value);
+    if (g_lookOk && g_lookEnabled) {
+        if (InterlockedIncrement(&g_lookStarts) == 1)
+            Log(1, "shadow look on: first start, player events%s fired (TU 0x823d7d40 -> 0x82418158 = tru+0x318780), "
+                   "message 0x1f4 to %d instances", n ? fired : " - none (no player or not doppelganger mode)", sent);
+        else
+            Log(2, "shadow look on: player events%s, message 0x1f4 to %d instances", n ? fired : " - none (no player or not doppelganger mode)",
+                sent);
+    }
 }
 
 // 0x823d7fb8 (request cleared: both ramps back to 1.0 in 33 ms)
 void StopPower(const char *why) {
     if (!(g_meter.flags & 1)) return;
-    // not ported: effect off 0x823d9438 (flag 0x40), 0x823d9050 (flag 2), sounds 0x33 0x7e 0x82, message 0x1f5
+    // not ported: 0x823d9438 (flag 0x40) and 0x823d9050 (flag 2) - both flags are never set here (targeting
+    // slow-down 0x823d94f8 and shadow strike 0x823d8978 not ported)
     g_meter.request[0][0] = g_meter.request[0][1] = kNoRequest;
     Selector();
-    if (!(kZero < g_meter.value)) g_meter.flags |= 0x200;
+    // 0.8: 0x823d7ffc..0x823d8068 - event 0x33, then 0x7e (ran empty, flag 0x200) or 0x82
+    bool fired33 = FireEvent(0x33);
+    bool left = kZero < g_meter.value;
+    if (!left) g_meter.flags |= 0x200;
+    int second = left ? 0x82 : 0x7e;
+    bool fired2 = FireEvent(second);
     g_meter.flags &= ~1u;
     g_meter.startValue = kMeterStart;
+    int sent = BroadcastPowerMessage(0x1f5);                    // 0x823d8080..
     g_meter.startTime = *kGameClock;
     Log(2, "shadow power OFF (%s, meter %.1f)", why, g_meter.value);
+    if (g_lookOk && g_lookEnabled)
+        Log(2, "shadow look off: player events%s%s%s, message 0x1f5 to %d instances", fired33 ? " 0x33" : "",
+            fired2 ? (left ? " 0x82" : " 0x7e") : "", (fired33 || fired2) ? "" : " - none (no player or not doppelganger mode)", sent);
 }
 
 // 0x823d81a0
@@ -1262,6 +1388,8 @@ void ReadOptions(const char *dir) {
     g_buttons = static_cast<WORD>(GetPrivateProfileIntA("ShadowPower", "Buttons", 0x0300, ini));
     g_hudFeed = GetPrivateProfileIntA("Meter", "HudBar", 1, ini);
     g_fallback = GetPrivateProfileIntA("Meter", "Fallback", 1, ini);
+    g_lookEnabled = GetPrivateProfileIntA("Look", "Enabled", 1, ini);
+    g_lookMessages = GetPrivateProfileIntA("Look", "Messages", 1, ini);
 }
 
 void Start(HMODULE self) {
@@ -1272,9 +1400,9 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.7 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
-        "condition 1046 %d, condition 1055 %d)", g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled,
-        g_cond1046, g_cond1055);
+    Log(1, "TruShadowPower 0.8 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+        "condition 1046 %d, condition 1055 %d, look %d)", g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled,
+        g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -1302,6 +1430,25 @@ void Start(HMODULE self) {
     if (!g_hudOk) Log(0, "HUD code at 0x%08lx / 0x%08lx / 0x%08lx does not match - meter runs without the HUD bar",
                       kHudValueGetter, kHudGroup, kHudUpdate);
     Log(3, "code checks passed (call site, setters, frame time, object table %d, HUD %d)", g_tableOk, g_hudOk);
+    // 0.8: player event walker (TU 0x82418158) for the look events of Start / Stop
+    g_lookOk = HexBytesAt(kPlayerEvent, kPlayerEventHex) && HexBytesAt(kPlayerEventType, kPlayerEventTypeHex) &&
+               HexBytesAt(kPlayerEventCall, kPlayerEventCallHex);
+    if (!g_lookEnabled)
+        Log(1, "shadow look: off ([Look] Enabled=0) - no player events at start / stop");
+    else if (!g_lookOk)
+        Log(0, "shadow look: player event walker at 0x%08lx does not match - look not translated", kPlayerEvent);
+    else
+        Log(1, "shadow look: player event walker tru+0x318780 verified - start fires 0x89 0x32 (0x81) 0x87/0x88, stop "
+               "0x33 0x7e/0x82 (TU 0x823d7d40 / 0x823d7fb8)");
+    g_msgOk = HexBytesAt(kInstWalk, kInstWalkHex) && HexBytesAt(kInstNext, kInstNextHex) &&
+              HexBytesAt(kInstQuery, kInstQueryHex) && HexBytesAt(kInstWake, kInstWakeHex);
+    if (g_lookEnabled && g_lookMessages)
+        Log(g_msgOk ? 1 : 0, g_msgOk ? "shadow look: instance list [0x%08lx] / query +0x11c / wake tru+0x1b2de0 verified - "
+                                       "start / stop send 0x1f4 / 0x1f5 to the instances answering 0x172"
+                                     : "shadow look: instance list code at 0x%08lx does not match - messages 0x1f4 / 0x1f5 "
+                                       "not sent", g_msgOk ? kInstanceHead : kInstWalk);
+    else if (g_lookEnabled)
+        Log(1, "shadow look: messages 0x1f4 / 0x1f5 off ([Look] Messages=0)");
     MeterInit();
     g_tuStatesOk = true;
     for (const auto &c : kTuBlocks)
@@ -1334,6 +1481,6 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.7 (translated TU meter, Lara conditions 1046 / 1048-1056 / 2401, states 243 / 245 / 1018, "
-           "activities 1009 / 1039)";
+    return "TruShadowPower 0.8 (translated TU meter, Lara conditions 1046 / 1048-1056 / 2401, states 243 / 245 / 1018, "
+           "activities 1009 / 1039, shadow look = TU player events of start / stop)";
 }

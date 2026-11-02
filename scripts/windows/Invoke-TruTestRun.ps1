@@ -24,7 +24,9 @@
 STACKOVERFLOW, EXITPROCESS, TERMINATEPROCESS, MESSAGEBOX_A/W), TruGuard markers (TRUGUARD_FAULT /
 TRUGUARD_DETAIL / TRUGUARD_RESUME / RESUME_STOP / HANDLED / PREV / DUMP; an unhandled DETAIL counts as a crash even
 without a debugger), dump file
-         names / sizes newer than the start, the installed md5s; writes summary.md and summary.json (status table:
+         names / sizes newer than the start (copied into <run>\dumps\ - the session's fixed .dump path is
+         overwritten by the next run; -NoDumpCopy skips the copy), the installed md5s; writes summary.md and
+         summary.json (status table:
          ok / fail / open per row, first crash marker).
      10. evaluates the profile's "expects" (automatic checks: a regex counted in one collected file) and writes the
          section "Automatic checks" plus an overall verdict: PASS = every automatic check ok + no crash marker + every
@@ -87,6 +89,8 @@ without a debugger), dump file
     expects come from -RunProfile or, without it, from the folder's profile.json.
 .PARAMETER AllowMd5Mismatch
     Install even if a profile md5 does not match (the mismatch is noted in the summary).
+.PARAMETER NoDumpCopy
+    Do not copy the dumps written during the run into <run>\dumps\ (they can be ~600 MB each).
 .PARAMETER Undo
     Only undo the installs of the previous run (state file), then stop.
 .PARAMETER InstallOnly
@@ -115,6 +119,7 @@ param(
     [string]$CompareTo,
     [string]$Evaluate,
     [switch]$AllowMd5Mismatch,
+    [switch]$NoDumpCopy,
     [switch]$Undo,
     [switch]$InstallOnly,
     [string]$GamePath,
@@ -708,7 +713,7 @@ function Write-RunSummary {
     $md.Add('')
     $md.Add('## Dumps and collected files')
     $md.Add('')
-    foreach ($d in @($Run.dumps)) { if ($d) { $md.Add("- dump $($d.path) ($($d.size) bytes, $($d.time))") } }
+    foreach ($d in @($Run.dumps)) { if ($d) { $md.Add("- dump $($d.path) ($($d.size) bytes, $($d.time))$(if ($d.copy) { ", copy $($d.copy)" })") } }
     if (!@($Run.dumps | Where-Object { $_ }).Count) { $md.Add('- no dump newer than the start') }
     foreach ($c in @($Run.collected)) { if ($c) { $md.Add("- $c") } }
     $md.Add('')
@@ -1070,7 +1075,20 @@ try {
         foreach ($f in @(Get-ChildItem -LiteralPath $d -Filter '*.dmp' -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge $startTime })) {
             if ($seen[$f.FullName]) { continue }
             $seen[$f.FullName] = $true
-            $run.dumps += [ordered]@{ path = $f.FullName; size = $f.Length; time = $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') }
+            $entry = [ordered]@{ path = $f.FullName; size = $f.Length; time = $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss') }
+            # keep a copy in the run folder: the session's fixed .dump path (/o) is overwritten by the next run
+            $dumpCopyDir = Join-Path $runFolder 'dumps'
+            if (!$NoDumpCopy -and !$f.FullName.StartsWith($runFolder, [StringComparison]::OrdinalIgnoreCase)) {
+                try {
+                    New-Item -ItemType Directory -Force -Path $dumpCopyDir | Out-Null
+                    $copy = Join-Path $dumpCopyDir $f.Name
+                    Copy-Item -LiteralPath $f.FullName -Destination $copy -Force
+                    $entry.copy = $copy
+                    Write-Log "dump copied: $($f.FullName) -> $copy" -Level VERBOSE
+                }
+                catch { Write-Log "dump copy failed: $($f.FullName): $($_.Exception.Message)" -Level WARN }
+            }
+            $run.dumps += $entry
         }
     }
 
