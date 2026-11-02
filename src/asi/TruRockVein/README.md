@@ -122,6 +122,25 @@ diagnostics: the chart log keeps the last record per machine (the player has two
 frame) and names the machine; the first 608 line also dumps 0x50 bytes of the box's second markup `[box+0x24]` (the
 type 22 comes from there). Built into `work\asi_rv07`, not loaded.
 
+## 0.8: type-22 jump-off / fall geometry (2026-11-02)
+
+The remaining title-update type-22 branches of the attach geometry (docs `Fehlliste-2026-11-02.md`, `Befund-Felsrinne.md`
+"Condition 528 and the missing list"), option `JumpGeometry` (default 1; the sample ini is unchanged). Each piece uses
+the TU's inline type test (second markup `+0x24` -> byte `+0x4d`, else file record `+0x20` -> byte `+0x33`, == 22) and
+checks its bytes first (`work\asi_rv08\prechecks_v08.txt`, 12 checks, 0 mismatches against the Steam `tru.exe`):
+
+| TU function | PC | change |
+|---|---|---|
+| 0x823fe9d0 segment range | tru+0x2fe040, at +0x2fe0e5 | flag 0x400000 **or type 22** -> last segment index - 1 |
+| 0x823fd890 TNode attach point | tru+0x307c60, default +0x307fc8 | type 22 -> position + 47.4075 x normalize(facing), z - 474.075 (TU constants 0x82051bc0 / 0x8207e5ac) |
+| 0x823fe130 bone attach point | tru+0x311530, default +0x3117e3 | type 22 -> position + 47.4075 x normalize(tru+0x2fe7e0(box, segment, position)) |
+| 0x82400bc0 corner angle, 2 sites | tru+0x309500 at +0x3097cb / +0x309894 | flag 0x400000 **or type 22** -> skip the angle |
+
+Not translated: TU 0x8242a7c8 (same "flag 0x400000 or type 22 -> skip" pattern; the PC partner of retail 0x82427750
+is not found). Hits are counted in the stubs and logged by the chart probe (`ChartLog=1`): first hit, then every power
+of two at `LogLevel=2`. Load lines: "<piece>: title-update type-22 branch added (0x...)" x 5 and "jump geometry: 5 of 5
+type-22 branches added". Built 2026-11-02 into `work\asi_rv08`, not loaded.
+
 ## Build, install, remove
 
 - Build: `scripts\windows\Build-TruAsi.ps1 -Name TruRockVein` (installed Visual Studio, x86, `/MT`, imports only

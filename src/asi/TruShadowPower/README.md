@@ -28,6 +28,18 @@ no meter object -> 0), else the retail test (player +0x504)->+0x1fc bit 21. PC t
 "condition 1046 (...) is now evaluated: doppelganger 1 -> ..." and at `LogLevel=2` every change. Sample ini unchanged.
 Built 2026-11-01 into `work\asi\v06`, not loaded.
 
+## 0.7: condition 1055 (2026-11-02)
+
+1055 is in no PC table, so the default handler answered TRUE; its only chart use is `{2000,1055,1,NOT}` (second
+machine), which therefore never fired on PC. TU 0x8246e488 = the condition template with predicate 0x8246e450:
+doppelganger mode -> meter flag 4, else player `+0x1fc` bit 0x20000000. Flag 4 is set only by the shadow look
+0x823d8a80 while flag 2 is set, and flag 2 only by 0x823d8978 = state 1014 slot 0 in doppelganger mode (the shadow
+strike) - both not ported, so in DLC 2 the translation answers 0 (the TU's answer outside a shadow strike). `Cond1055`
+joins the copy of Lara's condition table (option `[Conditions] Cond1055`, default 1; TruDoppelganger.asi must hold 1055
+in the generic table - it does). Log: "... 1055 (TU predicate 0x8246e450 ...) added to the link array", first call
+"condition 1055 predicate (TU 0x8246e450) first call: doppelganger 1 -> 0 ...", result changes at `LogLevel=2`. Built
+2026-11-02 into `work\asi\v07`, not loaded.
+
 ## 0.5: title-update states, conditions and activities of Lara
 
 Translated from the TU (project docs `Befund-Schattenkraft.md`, "TU states for Lara"), registered in copies of Lara's

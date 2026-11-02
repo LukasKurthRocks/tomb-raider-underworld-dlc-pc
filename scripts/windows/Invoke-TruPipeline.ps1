@@ -42,7 +42,7 @@
                (dlc2_asm_stage2a -> dlc2_asm_stage2b, --pack pack11); cloth / uipath / uitext were found in DLC 2,
                uipath / uitext also change 10 DLC 1 level files (since 2026-10-30); statechart (2026-10-31) re-converts
                the state charts of the new DLC objects (DLC 2 player chart: needs the title-update memory image);
-               twins / childids / translist / actlist / eventlist / reclist / fadeslots / animfx / markup /
+               twins / childids / translist / actlist / condlist / eventlist / reclist / fadeslots / animfx / markup /
                vmliteral (2026-11-01/02) apply the structure layouts proven on the base pairs
                (tools/dlc_struct_fixes.py, tests 47 / 48 / 48c-48m; twins ~20 min);
                achievement (2026-10-31, last) drops the 11 script calls into the title update's achievement natives

@@ -17,11 +17,14 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              player objects): only byte-order errors, re-authored words are left alone; runs first (before the
              layout steps, so a proven layout always has the last word - e.g. the u16 transition list word +0x4c550
              of DTP 20212, where the twins' raw block disagrees with state_translist_fix / state_actlist_fix)
-Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, eventlist,
-reclist, fadeslots, animfx, markup, vmliteral. Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material
-25521) are never steps.
+  condlist   tools/chart_condlist_fix.py    every condition record a transition of the player chart lists, by the
+             proven transition / record layouts (2026-11-02: 134 records such as {800,501}, {500,1} left u32-swapped
+             by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
+Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
+eventlist, reclist, fadeslots, animfx, markup, vmliteral. Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of
+material 25521) are never steps.
 
-translist / actlist run only on player charts (>= statechart_fix_tree.MIN_COND condition records of the title update's
+translist / actlist / condlist run only on player charts (>= statechart_fix_tree.MIN_COND condition records of the title update's
 ids; DLC 2 doppelganger_casual DTP 20212) with the base pair lara.drm (Xbox layer2 12647 / PC 850, extracted on demand).
 The Xbox source of a DRM: convert_dlc.raw_dlc (TRUDLC_PACK_FIRST honoured, as statechart_fix_tree).
 
@@ -36,7 +39,8 @@ sys.path.insert(0, HERE)
 import drm_write as DW, drm_reloc as R
 
 W = os.path.join(HERE, '..', 'work')
-ALL = ('twins', 'translist', 'actlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup', 'vmliteral')
+ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
+       'vmliteral')
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (markup_level.py --objects; 23 = TU type)
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -108,6 +112,10 @@ class Steps:
     def s_actlist(self, rel, xf, XD, cur):
         import state_actlist_fix as AL
         return self._chart_step(rel, xf, XD, cur, 'actlist', lambda a: AL.check_main(a))
+
+    def s_condlist(self, rel, xf, XD, cur):
+        import chart_condlist_fix as CL
+        return self._chart_step(rel, xf, XD, cur, 'condlist', lambda a: CL.main(a))
 
     def _chart_step(self, rel, xf, XD, cur, name, fn):
         pcs = self.player_charts(XD)

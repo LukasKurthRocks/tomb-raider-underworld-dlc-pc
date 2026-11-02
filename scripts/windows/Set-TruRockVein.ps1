@@ -40,14 +40,16 @@ $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruRockVein.asi', 'TruRockVein.ini'
 # SHA-256 of earlier builds of ours - recognised as ours for update / removal (0.1 of 2026-10-30 23:09,
 # 0.2 of 2026-10-31, 0.3 of 2026-11-01 as installed for test 48i, 0.4 of 2026-11-01 as installed for test 48j,
-# 0.5 of 2026-11-01 as installed for test 48k, 0.6 of 2026-11-01 as installed for test 48l)
+# 0.5 of 2026-11-01 as installed for test 48k, 0.6 of 2026-11-01 as installed for test 48l, 0.7 of 2026-11-01 for
+# tests 48m / 50a)
 $earlierBuilds = @{
     'TruRockVein.asi' = @('7473ddd8580a5d07d14b8c55409520a0fcff3e46e6ed657751fe8fb69ef2b230',
                           '6edc63ca49f69d44fe3fdf7e1fda73c25b53296e2cc32b65cf6b6451dd7e6cb8',
                           'f875759e392c8c3c502f03752d501688850b8e259a0751b7dc5cd6cdcf3da45f',
                           'ce7a8712f267c4d2836730edc7013301fce8413fc7186e8dd29bfbdff710b5e6',
                           '8d5c97328621be81e1f4d500e1bd2c7781b3a203e914351295eaf57ba4abd4ec',
-                          'f0d3456c9a66ed27b5fc15f51db83646078f1c19b95501868065f6bb1a37b57e')
+                          'f0d3456c9a66ed27b5fc15f51db83646078f1c19b95501868065f6bb1a37b57e',
+                          'c2b626dff712ee579a18ff11eb389333455b9a3a9a289173464243e221e1173b')
     'TruRockVein.ini' = @('89c0283b20a375253d38e6f53e77cfb7df10b0c036650c789564c629d3f227c1')
 }
 $logDir  = $paths.Logs

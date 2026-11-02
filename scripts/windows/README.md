@@ -146,7 +146,8 @@ image `work\xenia_dump\tu_image_82000000.bin` or `TRUDLC_TU_IMAGE`, without it t
 part only; then the proven structure fixes of `tools/dlc_struct_fixes.py`, one step each (2026-11-01/02): `twins`
 (base-twin byte-order truth for every same-size section of the DLC 2 player files, `tools/dlc_structure_audit.py`,
 ~20 min), `childids` (object child id list by name), `translist` / `actlist` (state records and activity entries of
-the DLC 2 player chart), `eventlist` (object event lists), `reclist` (model record list 36 -> 40 bytes), `fadeslots`
+the DLC 2 player chart), `condlist` (the condition records every transition of that chart lists), `eventlist` (object
+event lists), `reclist` (model record list 36 -> 40 bytes), `fadeslots`
 (own fade pixel-shader libraries 2494.. of the TU-drawn DLC 2 player objects), `animfx` (anim event lists), `markup`
 (object markup records), `vmliteral` (VM literals); `uirecord`: the UI text element records of the new DLC scripts by Crystal's PC rules; last fix
 `achievement`: the 11 script calls into the title update's achievement natives f16-f20, which the PC exe lacks, are

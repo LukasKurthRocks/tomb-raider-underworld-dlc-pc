@@ -23,11 +23,11 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          chart (doppelganger_casual DTP 20212) by the typed five steps of tools/statechart_fix_all.py, then every
          such DTP word by word from the base game's Xbox/PC pairs (tools/statechart_fix_tree.py /
          statechart_twins.py; the rock vein's conditions 607 / 608 were unreachable)
-  twins, childids, translist, actlist, eventlist, reclist, fadeslots, animfx, markup, vmliteral (ours, 2026-11-01/02,
-         tests 47 / 48 / 48c-48m) the structure fixes of tools/dlc_struct_fixes.py, one step each: base-twin
-         byte-order truth for every same-size section of the DLC 2 player files (tools/dlc_structure_audit.py, ~20
-         min), object child id list by name, player-chart transition lists and state records / activity entries,
-         object event lists, model record list stride 36 -> 40, own fade pixel-shader libraries of the TU-drawn
+  twins, childids, translist, actlist, condlist, eventlist, reclist, fadeslots, animfx, markup, vmliteral (ours,
+         2026-11-01/02, tests 47 / 48 / 48c-48m / 50a) the structure fixes of tools/dlc_struct_fixes.py, one step each:
+         base-twin byte-order truth for every same-size section of the DLC 2 player files
+         (tools/dlc_structure_audit.py, ~20 min), object child id list by name, player-chart transition lists, state
+         records / activity entries and the condition records every transition lists, object event lists, model record list stride 36 -> 40, own fade pixel-shader libraries of the TU-drawn
          player objects, anim event lists, object markup records, VM literals
   uirecord (ours, finding 43) UI text element records of the new DLC scripts by Crystal's PC conversion rules (w1/w3
          as u32 instead of swapped halves, the PC word 0x00010000, -1.0f) - tools/script_records_dlc.py; after the
@@ -315,10 +315,10 @@ def _struct_fix(step):
 # proven structure fixes after `statechart`: the base-twin pass first (byte-order errors of every same-size section of
 # the DLC 2 player files), then the record layouts in the order the test trees 47 / 48c-48m were built in - a proven
 # layout always has the last word
-STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'eventlist', 'reclist', 'fadeslots', 'animfx', 'markup',
-                'vmliteral')
-(fix_twins, fix_childids, fix_translist, fix_actlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx, fix_markup,
- fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
+                'markup', 'vmliteral')
+(fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
+ fix_markup, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 UIRECORD_SKIP = {'g_pda.drm'}      # merged g_pda of the DLC 2 tree: not installed (finding 40), left as built

@@ -38,8 +38,12 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruGuard.asi', 'TruGuard.ini'
-# SHA-256 of earlier builds of ours - recognised as ours for update / removal
-$earlierBuilds = @{}
+# SHA-256 of earlier builds of ours - recognised as ours for update / removal (0.1 of 2026-11-01, used in the field
+# runs guard / 48i-48l; its shipped .ini)
+$earlierBuilds = @{
+    'TruGuard.asi' = @('0886a0332228dc9f298fcc2e72433fd0ea4d188ad256d5cd845f1935b496510e')
+    'TruGuard.ini' = @('fc7ae32cd19ceb7b1853a9004e84072d2415e55a055ec8aa39419a1558775c6c')
+}
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $logFile = Join-Path $logDir ('Set-TruGuard_{0}_{1}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'), $PSCmdlet.ParameterSetName)
