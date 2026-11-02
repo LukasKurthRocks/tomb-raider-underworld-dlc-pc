@@ -1,0 +1,549 @@
+{
+    "name":  "regress_shadowlara_50h",
+    "description":  "Test 50h: 50g data + the arm / glove per-light libs rebuilt with the fixed tools/tu_perlight.py (hoist_select; 2582 / 2583 / 2584 for 26349 / 26350 / 26352) + TruMenu 0.7.1 (input freeze, B twice, room names in the log overlay, level.start).",
+    "trees":  [
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "doppelganger_casual.drm":  "30fdf941c3e2c87f8e8697b452acab73",
+                                  "player_tru_dlc2_extension.drm":  "023fb985904fc2a0f5900617ac04614d"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test48i_markup/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc2_uo_machine_column.drm":  "f4ea1892e5bf0d0bcaa3a51771b492ce"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test50h_arms/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "doppelganger_casual.drm":  "e6079979051545a76752a6c77f348fe6",
+                                  "dlc_fx_goo_machine.drm":  "3379055e833fb4e4496020369ce2f4a0",
+                                  "dlc_fx_goo_machine_a_ist.drm":  "4524551c25cb100b84a83712841c3624",
+                                  "dlc_fx_goo_machine_b_ist.drm":  "a8842c74c4a2f41d070b7d4e8302ed89",
+                                  "dlc_fx_goo_machine_c_ist.drm":  "e54bebcd585725baf45166bb05208b1b"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test50c_vein/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_level2_start.drm":  "9a386d2bedb5c5d43cf63d54382c7a98"
+                              }
+                  }
+              ],
+    "files":  [
+
+              ],
+    "asis":  [
+                 {
+                     "name":  "TruDlc2Player",
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "c73c8c6693000e45a1ae60b0b29d69ecb02313796a2820ab65e4546a1267992b"
+                 },
+                 {
+                     "name":  "TruDoppelganger",
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "192a03c1241534a12fadec63cff3e5193c74e9d31b197bef7ded58fa4087dacc"
+                 },
+                 {
+                     "name":  "TruRockVein",
+                     "sourceDir":  "trudlcport/work/asi_rv08",
+                     "sha256":  "66f80abb20e9ec6a74e2f3f6e933e8be2757ec70a870f03406197999cf55b29c",
+                     "ini":  {
+                                 "RockVein":  {
+                                                  "LogLevel":  "2"
+                                              }
+                             }
+                 },
+                 {
+                     "name":  "TruShadowPower",
+                     "sourceDir":  "trudlcport/work/asi/v08",
+                     "sha256":  "8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5",
+                     "ini":  {
+                                 "ShadowPower":  {
+                                                     "LogLevel":  "2"
+                                                 },
+                                 "Look":  {
+                                              "Enabled":  "0"
+                                          }
+                             }
+                 },
+                 {
+                     "name":  "TruLink",
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "1b4651857e8b6c6e6d912cd91211269c35a465075df98206edc2502652adc185",
+                     "ini":  {
+                                 "TruLink":  {
+                                                 "Enabled":  "1"
+                                             }
+                             }
+                 },
+                 {
+                     "name":  "TruGuard",
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                 },
+                 {
+                     "name":  "TruMenu",
+                     "sourceDir":  "trudlcport/work/asi/menu071",
+                     "sha256":  "055b1f1e17ca547a19cbdfd90ec374f67ecec3360c357a7109c52a805008baf4",
+                     "ini":  {
+                                 "Cheat":  {
+                                               "Experimental":  "1"
+                                           },
+                                 "Log":  {
+                                             "UnitChanges":  "1"
+                                         }
+                             }
+                 }
+             ],
+    "removeOtherAsis":  true,
+    "trulink":  {
+                    "port":  9265,
+                    "waitSeconds":  300
+                },
+    "tests":  [
+                  {
+                      "kind":  "toggle",
+                      "id":  "dlc2-costume",
+                      "target":  "ini:TruDlc2Player:Dlc2Player:Costume",
+                      "initial":  "on",
+                      "text":  "TruDlc2Player Costume (lara_doppelganger -\u003e doppelganger_casual at level load)"
+                  },
+                  {
+                      "kind":  "toggle",
+                      "id":  "sp-states",
+                      "target":  "ini:TruShadowPower:States:Enabled",
+                      "initial":  "on",
+                      "text":  "TruShadowPower [States] Enabled (TU states 243 / 245 / 1018)"
+                  },
+                  {
+                      "kind":  "toggle",
+                      "id":  "sp-conditions",
+                      "target":  "ini:TruShadowPower:Conditions:Enabled",
+                      "initial":  "on",
+                      "text":  "TruShadowPower [Conditions] Enabled (meter conditions 1049-1056)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  1,
+                      "id":  "-",
+                      "text":  "Wait in the main menu until it is shown completely"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  2,
+                      "id":  "-",
+                      "text":  "Press L3 + R3: TruMenu opens on TO TEST; check the three switches (a change needs a restart)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  3,
+                      "id":  "-",
+                      "text":  "Close the menu and WAIT for the automatic direct start into DLC 2. Do not use level.load"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  4,
+                      "id":  "-",
+                      "text":  "Let the intro cutscene play to its end (do not skip it)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "cutscene",
+                      "text":  "The intro cutscene played (picture and sound, no hang)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  5,
+                      "id":  "-",
+                      "text":  "Move Lara: walk, run, turn the camera"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "doppel-look",
+                      "text":  "Doppelganger outfit as on the Xbox: dark red hair, black top / trousers / gloves, natural face and arm skin (no white, cyan, green or red / white parts)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "arms-gloves",
+                      "text":  "arms: pale skin with faint veins, gloves black (Xbox reference _05)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "d3d-box",
+                      "text":  "No D3D error box (D3DERR_INVALIDCALL 0x8876086C) after the load"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  6,
+                      "id":  "-",
+                      "text":  "Walk to the rock channel (Felsrinne) without the shadow power: jump against it - it should behave like a normal wall (no ledge there)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "wall-normal",
+                      "text":  "Rock channel without shadow power: normal wall behaviour (jump against / off), no fall through, no crash"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "vein-look",
+                      "text":  "Rock vein strip at the first rock channel: bright, raised stone blocks with a dark centre joint (Xbox look), not a dark flat strip; no black / flickering patches on the wall"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  7,
+                      "id":  "-",
+                      "text":  "Hold RB for a few seconds: slow motion, the yellow silhouette drains"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  8,
+                      "id":  "-",
+                      "text":  "Release RB: normal speed again, the yellow silhouette refills"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "shadow-power",
+                      "text":  "Shadow power: slow motion while RB is held, meter drains and refills"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  9,
+                      "id":  "-",
+                      "text":  "Go to the rock channel (Felsrinne) wall, hold RB and press A at the wall"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "wall-run",
+                      "text":  "Wall run: Lara runs along the wall, no crash, no box"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  10,
+                      "id":  "-",
+                      "text":  "Wall run again: once jump off the wall (A with a direction), once release RB, once run until she comes down near the floor"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "wall-exit",
+                      "text":  "Leaving the wall (jump off / RB released / near the floor): Lara lands or falls normally, no crash, no teleport"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  11,
+                      "id":  "-",
+                      "text":  "Take a hit or fall from a small height: the health bar drops"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "no-crash",
+                      "text":  "No crash, freeze or box during the whole run (incl. hit / fall)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  12,
+                      "id":  "-",
+                      "text":  "Rock channel: wall run (RB + A), once jump up from the wall to the ledge above (X); then let Lara die (fall, or time.scale 0.5 + jump to death) and let the game reload. Repeat 3 times"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "death-no-crash",
+                      "text":  "Wall run, jump up, death and reload (3 times): no crash, no freeze (50b / 50d / 50d_nolook / 50d_nojump crashed here in the heap free tru+0x1982b6 / +0x1982ef)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  13,
+                      "id":  "-",
+                      "text":  "Play on for a few minutes after the last reload (walk, wall run, RB slow motion)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  14,
+                      "id":  "-",
+                      "text":  "After the rock channel: the wall-slide section - slide down the wall with LB held (shadow power) several times; play on to the goo machine if possible"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "wallslide-no-crash",
+                      "text":  "Wall slide with LB held: no crash (50e crashed there at tru+0x14df8f, effect node id 0x495f0000)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  15,
+                      "id":  "-",
+                      "text":  "Normal deaths: jump from the upper part of a wall down to the floor (fall death), also a fall death without the power and one after a long shimmy along the wall; let the game reload each time (3 times)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "fall-death-no-crash",
+                      "text":  "Normal death (fall) and reload: no crash (50f crashed at tru+0x14df84 after a fall death, chart parameter 1112 id 0x04900000)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  16,
+                      "id":  "-",
+                      "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  90,
+                      "id":  "-",
+                      "text":  "Menu 0.7.1: open TruMenu in the level, type wasd into the command bar while Lara stands; hold w and open the menu"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-block-input",
+                      "text":  "Lara does not move while the menu is open (typing / held key)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-esc",
+                      "text":  "Esc in the menu does not open the game pause menu"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-b-twice",
+                      "text":  "B with the on-screen keyboard open: first B closes the keyboard, second B the menu"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-unit-log",
+                      "text":  "log.overlay on: room names (unit: ... (was ...)) appear while walking through DLC 2"
+                  }
+              ],
+    "expects":  [
+                    {
+                        "id":  "dlc2-costume",
+                        "file":  "TruDlc2Player.log",
+                        "mode":  "present",
+                        "pattern":  "level load \\d+: costume \"lara_doppelganger\" -\u003e doppelganger_casual",
+                        "text":  "TruDlc2Player swapped the costume at a level load: lara_doppelganger -\u003e doppelganger_casual"
+                    },
+                    {
+                        "id":  "dlc2-init",
+                        "file":  "TruDlc2Player.log",
+                        "mode":  "present",
+                        "pattern":  "DoppelgangerInit finished \\(instance 0x[0-9a-f]{8}\\)",
+                        "text":  "TruDlc2Player: DoppelgangerInit of the type record ran to its end"
+                    },
+                    {
+                        "id":  "doppel-ids",
+                        "file":  "TruDoppelganger.log",
+                        "mode":  "present",
+                        "pattern":  "title-update ids registered: 13 conditions, 9 activities, 8 states",
+                        "text":  "TruDoppelganger registered all title-update ids (13 conditions, 9 activities, 8 states)"
+                    },
+                    {
+                        "id":  "sp-loaded",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "pattern":  "TruShadowPower 0\\.8 loaded \\(en",
+                        "text":  "TruShadowPower 0.8 loaded and enabled"
+                    },
+                    {
+                        "id":  "sp-1055-added",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "pattern":  "1055 \\(TU predicate 0x8246e450.*added to the link",
+                        "text":  "TruShadowPower 0.7 registered condition 1055 (TU predicate)"
+                    },
+                    {
+                        "id":  "sp-1055-run",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "optional":  true,
+                        "pattern":  "condition 1055 predicate \\(TU 0x8246e450\\) first call: doppelganger 1 -\u003e 0",
+                        "text":  "Condition 1055 asked in DLC 2 and answered 0 (no shadow strike look) - was TRUE before"
+                    },
+                    {
+                        "id":  "rv-loaded",
+                        "file":  "TruRockVein.log",
+                        "mode":  "present",
+                        "pattern":  "TruRockVein 0\\.8 loaded \\(enabled 1",
+                        "text":  "TruRockVein 0.8 loaded and enabled"
+                    },
+                    {
+                        "id":  "rv-jumpgeo",
+                        "file":  "TruRockVein.log",
+                        "mode":  "present",
+                        "pattern":  "jump geometry: 5 of 5 type-22 branches added",
+                        "text":  "TruRockVein 0.8 added all five type-22 jump-off / fall branches (byte checks passed)"
+                    },
+                    {
+                        "id":  "rv-no-mismatch",
+                        "file":  "TruRockVein.log",
+                        "mode":  "absent",
+                        "pattern":  "does not match",
+                        "text":  "TruRockVein found every code site it patches (no \u0027does not match\u0027)"
+                    },
+                    {
+                        "id":  "rv-geo-hit",
+                        "file":  "TruRockVein.log",
+                        "mode":  "present",
+                        "optional":  true,
+                        "min":  1,
+                        "pattern":  "\\(tru\\+0x(2fe040|307c60|311530|309500) .*type-22 box.*\\(\\d+ hits\\)",
+                        "text":  "At least one type-22 jump-off / fall branch was used at the wall (segment range / TNode / bone / corner)"
+                    },
+                    {
+                        "id":  "sp-conditions",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "pattern":  "Lara conditions: 1049-1054 \\(meter compare\\).* added to the link array",
+                        "text":  "Lara conditions 1049-1056 added (fails when the sp-conditions switch is off)"
+                    },
+                    {
+                        "id":  "sp-states",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "pattern":  "Lara states: 243 \\(.*\\) added",
+                        "text":  "Lara states 243 / 245 / 1018 added (fails when the sp-states switch is off)"
+                    },
+                    {
+                        "id":  "sp-on",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "min":  1,
+                        "pattern":  "shadow power ON \\(meter",
+                        "text":  "Shadow power started at least once (RB held; needs LogLevel 2)"
+                    },
+                    {
+                        "id":  "sp-off",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "min":  1,
+                        "pattern":  "shadow power OFF \\(",
+                        "text":  "Shadow power stopped at least once (RB released or meter empty; needs LogLevel 2)"
+                    },
+                    {
+                        "id":  "sp-no-mismatch",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "absent",
+                        "pattern":  "does not match",
+                        "text":  "TruShadowPower found every code site it patches (no \u0027does not match\u0027)"
+                    },
+                    {
+                        "id":  "rv-patched",
+                        "file":  "TruRockVein.log",
+                        "mode":  "present",
+                        "pattern":  "jump table patched: 607 -\u003e 0x[0-9a-f]{8} \\(type -?\\d+\\), 608 -\u003e 0x[0-9a-f]{8}",
+                        "text":  "TruRockVein patched the condition jump table for 607 / 608"
+                    },
+                    {
+                        "id":  "rv-607",
+                        "file":  "TruRockVein.log",
+                        "mode":  "present",
+                        "optional":  true,
+                        "pattern":  "condition 607 is now evaluated",
+                        "text":  "Wall-run target: condition 607 evaluated at the rock channel (may still fail)"
+                    },
+                    {
+                        "id":  "rv-608",
+                        "file":  "TruRockVein.log",
+                        "mode":  "present",
+                        "optional":  true,
+                        "pattern":  "condition 608 is now evaluated",
+                        "text":  "Wall-run target: condition 608 evaluated at the rock channel (may still fail)"
+                    },
+                    {
+                        "id":  "cdb-d3dfail",
+                        "file":  "cdb.log",
+                        "mode":  "absent",
+                        "pattern":  "^\\s*D3DFAIL\\s*$",
+                        "text":  "No D3D error handler call (D3DFAIL marker)",
+                        "optional":  false
+                    },
+                    {
+                        "id":  "cdb-av",
+                        "file":  "cdb.log",
+                        "mode":  "absent",
+                        "pattern":  "^\\s*AV2NDCHANCE\\s*$",
+                        "text":  "No second-chance access violation (AV2NDCHANCE marker)",
+                        "optional":  false
+                    },
+                    {
+                        "id":  "cdb-fastfail",
+                        "file":  "cdb.log",
+                        "mode":  "absent",
+                        "pattern":  "^\\s*FASTFAIL\\s*$",
+                        "text":  "No fast fail (FASTFAIL marker)",
+                        "optional":  false
+                    },
+                    {
+                        "id":  "cdb-msgbox",
+                        "file":  "cdb.log",
+                        "mode":  "absent",
+                        "pattern":  "^\\s*MESSAGEBOX_[AW]\\s*$",
+                        "text":  "No message box (MESSAGEBOX_A / MESSAGEBOX_W marker)",
+                        "optional":  false
+                    },
+                    {
+                        "id":  "rv-types",
+                        "file":  "TruRockVein.log",
+                        "pattern":  "markup types 22 / 23 accepted",
+                        "mode":  "present",
+                        "min":  1,
+                        "text":  "TruRockVein 0.3 accepted markup types 22 / 23 (title-update change)"
+                    },
+                    {
+                        "id":  "rv-608-true",
+                        "file":  "TruRockVein.log",
+                        "pattern":  "condition 608: ctx 0x[0-9a-f]{8} type 22 -\u003e 1",
+                        "mode":  "present",
+                        "min":  1,
+                        "optional":  true,
+                        "text":  "Wall-run target: condition 608 true at the rock channel (type 22 markup found)"
+                    },
+                    {
+                        "id":  "rv-slots",
+                        "file":  "TruRockVein.log",
+                        "pattern":  "markup slots: 0 also true for type 22",
+                        "mode":  "present",
+                        "min":  1,
+                        "text":  "TruRockVein 0.4 translated the title-update markup manager type tests"
+                    },
+                    {
+                        "id":  "rv-nullbox",
+                        "file":  "TruRockVein.log",
+                        "pattern":  "called with box 0",
+                        "mode":  "absent",
+                        "min":  1,
+                        "text":  "No markup slot +0x08 call with an empty attach box (NullBoxGuard did not fire)"
+                    },
+                    {
+                        "id":  "rv-action608-added",
+                        "file":  "TruRockVein.log",
+                        "pattern":  "markup action 608 added",
+                        "mode":  "present",
+                        "min":  1,
+                        "text":  "TruRockVein 0.5 added the title-update case 608 (attach to the jump target)"
+                    },
+                    {
+                        "id":  "rv-action608-run",
+                        "file":  "TruRockVein.log",
+                        "pattern":  "markup action 608 \\(attach to jump target",
+                        "mode":  "present",
+                        "min":  1,
+                        "optional":  true,
+                        "text":  "Wall-run target: case 608 ran at the wall and filled the attach box"
+                    }
+                ]
+}

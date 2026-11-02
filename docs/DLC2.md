@@ -6,6 +6,13 @@ installer only takes DLC 2 menu images and music from `pack11.000`; the PC DLC m
 
 ## Doppelgänger / shadow power: missing on PC
 
+> **State 2026-11-02:** being translated into ASI plugins (`src/asi/`): `TruDoppelganger` / `TruDlc2Player`
+> (title-update ids, doppelganger as player, DoppelgangerInit), `TruShadowPower` (slow motion, meter with the TU's
+> rates, the power's states and conditions), `TruRockVein` (rock-vein markup and the wall run). Played: the power and
+> the wall run work up to the first Yggdrasil hall. Open: the screen look (soft / over-bright picture), the combat
+> moves and target selection, the camera state of the wall run, the flag reset after leaving DLC 2. The text below
+> is the original analysis of 2026-10-30.
+
 **Blocking for a playable DLC 2.** On the Xbox (title update 0.0.2.3) the player gets the Doppelgänger's power:
 holding LB or RB blurs and brightens the screen, the world runs at **0.3** and Lara at **1.2** of normal speed, and
 the yellow silhouette in the HUD (shadow meter) drains; with LB/RB + A Lara jumps to and climbs **rock veins**

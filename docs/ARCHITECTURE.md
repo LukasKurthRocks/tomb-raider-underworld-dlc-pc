@@ -218,3 +218,26 @@ holds everything that must never be committed:
 | `../logs/`, `../backup/`, `../staging/` | run logs, backups of replaced files, unpacked ModLoader |
 
 Never delete `../data` or `../bin` recursively: through the junctions that deletes the game files or the repository.
+
+## 8. Title-update code as plugins, and testing in the game (since 2026-10-31)
+
+The DLC need code from the Xbox title update that the PC `tru.exe` never got. It is translated function by function
+into small x86 plugins (`src/asi/`, built with `scripts/windows/Build-TruAsi.ps1`, loaded by the game's ASI loader):
+
+| Plugin | Translates / does |
+|---|---|
+| `TruDoppelganger`, `TruDlc2Player` | the title update's state-machine ids, the doppelganger as player object, DoppelgangerInit |
+| `TruShadowPower` | slow motion, the shadow meter, the power's states and conditions (and the look start / stop, off by default) |
+| `TruRockVein` | rock-vein markup types 22 / 23, the attach and wall-run geometry |
+| `TruMenu`, `TruLink`, `TruGuard` | test tools: in-game controller menu, local read / write channel, fault diagnostics |
+
+Rule: every engine address a plugin uses is checked byte by byte at load; a failed check disables that feature with
+a log line. Every behaviour comes from the title-update code with the PC counterparts (`tools/xbox_pc_funcmap.py`,
+`tools/tu_func_pair.py`, names from an early 2007 build via `tools/proto_*.py`), never from guessed values.
+
+Game tests run from profiles (`tests/profiles/*.json`, `scripts/windows/Invoke-TruTestRun.ps1`): exact trees, plugin
+builds and INI values, a checklist the owner ticks in `TruMenu`, automatic log checks, a verdict per run, dumps kept
+per run. The regression lists are `docs/Regression-Schattenlara.md` (DLC 2) and `docs/Regression-DLC1.md`. Crashes
+found this way led to converter checks for data the original converter mishandles (state-VM code words, section ids
+in event lists / effect nodes / state-chart parameters): `tools/statevm_check.py`, `eventlist_idword_fix.py`,
+`fxnode_id_fix.py`, `chart_idvalue_fix.py` - to become fixed pipeline steps.

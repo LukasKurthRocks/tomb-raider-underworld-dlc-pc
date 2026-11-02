@@ -23,26 +23,35 @@
 - **It does not replace the original** and is not a competing release. No support, no guarantees, no game data: like
   the original, everything needs your own files.
 
-**Current state (2026-10-30, tested on one PC, not a release)**
+**Current state (2026-11-02, tested on one PC, not a release)**
 
 - DLC 1 (B138): fixes found while testing - the "display driver" box on entering the DLC (shader constants), the
   grapple ring's look, cinematic speech in all five languages. Rebuilt reproducibly by the pipeline step `Repair`.
-- DLC 2 (*Lara's Shadow*): converted with the original's pipeline plus new stage-2b fixes - intro at normal speed,
-  no crash after it, the first level loads and runs, loading-screen titles and the title-update hint box like on the
-  Xbox. Open: shaders (waterfall, walls).
+- DLC 2 (*Lara's Shadow*): playable from the start up to the first Yggdrasil hall in our test builds - intro,
+  loading-screen title and hint boxes like on the Xbox; the Doppelgänger's original look (title-update shaders
+  translated); the shadow power (slow motion and meter); the wall run on the rock veins; the waterfall. Several
+  converter faults in the DLC 2 data were found through crash dumps and are fixed by new repair tools.
 - Both DLC: our `generalbank` (the title update's loading-screen and hint-box scripts ported to PC) is built by the
-  pipeline step `Generalbank`.
+  pipeline step `Generalbank`. In-game helpers for testing: a controller menu (`TruMenu`) and a local link for
+  scripted checks (`TruLink`).
+
+**Still missing (short list)**
+
+- DLC 2: a crash on entering the first Yggdrasil hall (data fix in progress); the shadow power's screen look (soft,
+  over-bright picture); the shadow combat moves and target selection; a few title-update states (camera during the
+  wall run); about 290 title-update shaders still drawn with substitutes; the achievement fix is untested in game.
+- Both DLC: most of the new data fixes exist as test builds and repair tools, not yet as pipeline steps; after
+  leaving DLC 2 the shadow power stays active in the same session (fix in progress).
+- Costume packs: not ported yet.
+- What we check after every change: [docs/Regression-Schattenlara.md](docs/Regression-Schattenlara.md) (DLC 2) and
+  [docs/Regression-DLC1.md](docs/Regression-DLC1.md).
 
 > [!IMPORTANT]
-> **DLC 2 cannot be finished on PC yet - the PC game lacks the Doppelgänger / shadow power.** On the Xbox, *Lara's
-> Shadow* lets Lara use the Doppelgänger's power (hold LB/RB: world slows to 0.3, Lara moves at 1.2, a shadow meter
-> drains; attach to and climb "rock veins"; shadow combat moves). That mechanic is **program code of the Xbox title
-> update** (its exe patch), not data - the PC `tru.exe` never received it, so no data conversion can bring it back.
-> The first rock vein comes right after the start, and several puzzles require the slow motion. Measured: the title
-> update adds ~390 functions (<= ~157 KB PowerPC code); the slow motion itself turned out to use an engine time-scale
-> system the PC exe already has (`SetWorldTimeScale` / `SetPlayerTimeScale`): calling them on LB/RB with the Xbox's
-> values already works in a debugger prototype (camera and water slow down, Lara keeps her speed), an ASI is in
-> progress; the meter, rock veins and the combat moves still need a re-implementation. Details:
+> **The shadow power is program code of the Xbox title update, not data.** On the Xbox, *Lara's Shadow* lets Lara use
+> the Doppelgänger's power (hold LB/RB: the world slows down, a shadow meter drains; attach to and climb "rock
+> veins"; shadow combat moves). The PC `tru.exe` never received that exe patch, so no data conversion can bring it
+> back. We translate the title-update functions one by one into small plugins (ASI) that use the PC's own engine
+> functions with the Xbox's values: `TruShadowPower`, `TruRockVein`, `TruDoppelganger`, `TruDlc2Player`. Details:
 > [docs/DLC2.md](docs/DLC2.md#doppelgänger--shadow-power-missing-on-pc) and WINDOWS_REBUILD.md finding 43.
 - What was found and why, for anyone (including the original author) who wants to pick it up:
   [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) finding 43, [docs/DLC2.md](docs/DLC2.md).
@@ -63,12 +72,12 @@ flowchart LR
     PC --> PCA
 ```
 
-| Step | What | State (2026-10-30) |
+| Step | What | State (2026-11-02) |
 |---|---|---|
-| 1 | Match Xbox retail and PC: functions, natives, globals (`tools/xbox_pc_funcmap.py`) | first pass: 4 155 pairs, ~1 000 confirmed |
-| 2 | Difference Xbox retail -> Xbox + TU (`tools/xbox_func_diff.py`, Xenia memory images) | done: 391 new, 937 changed functions; scripts / sections listed |
+| 1 | Match Xbox retail and PC: functions, natives, globals (`tools/xbox_pc_funcmap.py`) | 4 155 pairs, ~1 000 confirmed; names from an early 2007 build help |
+| 2 | Difference Xbox retail -> Xbox + TU (`tools/xbox_func_diff.py`, Xenia memory images) | done: of 937 "changed" functions 528 are real changes; no main-game fix found |
 | 3a | Scripts and data of the TU on PC (converted, repaired where PC differs) | loading screen with DLC titles and the hint box done (pipeline step `Generalbank`) |
-| 3b | Exe code of the TU on PC (shadow power) | slow motion proven with the PC's own engine functions; ASI in progress; meter, rock veins, combat open |
+| 3b | Exe code of the TU on PC (shadow power) | slow motion, meter, power states and the rock-vein wall run translated as plugins; screen look and combat open |
 
 **What is new here** (details on branch `windows`)
 

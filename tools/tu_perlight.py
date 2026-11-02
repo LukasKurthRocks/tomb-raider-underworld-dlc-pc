@@ -256,6 +256,43 @@ def x_tail_map(A, acc):
 
 
 # ------------------------------------------------------------------------------------------------ PC side + build
+def hoist_select(A):
+    """Test 50h fix. The light-free instructions of the Xbox block are executed once before the new block (H). Moving
+    ALL of them there (50a-50c) broke the order for those that stand AFTER light chunk 1 in the Xbox code: the Xbox
+    compiler reuses temps, so a later light-free write (e.g. 2685 `mov r1.w, ps` after the last light chunk) moved before
+    the block overwrote a lane the chunk-1 BRDF reads (r1.w = specular exponent) -> pow(x, wrong exponent) -> inf / 0
+    (the black / white arm blotches). Rule now: hoist the light-free instructions up to the end of chunk 1 (their values
+    are the ones the BRDF sees on the Xbox) plus, from after chunk 1, only those needed for a non-accumulator output of
+    the block (backward slice); refuse if a hoisted instruction would still write a BRDF input lane after its first read."""
+    B, st = A['B'], A['st']
+    pre = [k for k in A['hoist'] if k < A['c1e']]
+    post = [k for k in A['hoist'] if k >= A['c1e']]
+    xin, xout = F9.live_in_out(A['xprog'], A['i0'], A['i1'])
+    need = {l for l in xout if l not in A['lit']}
+    keep = []
+    for k in reversed(post):
+        w = set(writes(B[k]))
+        if not (w & need): continue
+        keep.append(k); need -= w
+        lr = lane_reads(B[k], st)
+        for l in w:
+            for t, n, ls in lr.get(l[1], []):
+                if t == 't': need |= {(n, c) for c in ls}
+    H = sorted(pre + keep)
+    first_read = {}; wr = set(); Lx = set(A['Lx'])
+    for k in A['brdf']:
+        for t, n, ls in reads(B[k], st):
+            if t == 't':
+                for c in ls:
+                    if (n, c) not in wr and (n, c) not in Lx: first_read.setdefault((n, c), k)
+        wr |= set(writes(B[k]))
+    for k in H:
+        for l in writes(B[k]):
+            if l in first_read and k > first_read[l]:
+                raise Fail('hoist hazard: %s writes BRDF input r%d.%s after its read at %d' % (sm3asm.fmt_instr(B[k], 'ps'), l[0], 'xyzw'[l[1]], first_read[l]))
+    return H, len(post) - len(keep)
+
+
 def build(xblob, pdblob, names, log):
     pprog = F9.decode_pc(pdblob); pct = F9.pc_ctab(pdblob)
     preg = {n: ri for n, rs, ri, rc in pct if rs == 3}
@@ -263,7 +300,9 @@ def build(xblob, pdblob, names, log):
     samp = F9.xsamp(xblob, names if names is not None else ('globali', preg))
     A = xbox_analysis(xblob, K, samp, log)
     B, i0, i1 = A['B'], A['i0'], A['i1']
-    H = [B[k] for k in A['hoist']]
+    Hk, ndrop = hoist_select(A)
+    log.append('hoist: %d light-free instructions before the block, %d after chunk 1 dropped (not needed outside the light chain)' % (len(Hk), ndrop))
+    H = [B[k] for k in Hk]
     xprog2 = sm3asm.Program(A['xprog'].kind, A['xprog'].major, A['xprog'].minor, F9.header(A['xprog']) + B[:i0] + H + B[i0:])
     j0, j1 = i0 + len(H), i1 + len(H)
     xin, xout = F9.live_in_out(xprog2, j0, j1)
