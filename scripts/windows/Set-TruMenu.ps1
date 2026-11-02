@@ -48,13 +48,15 @@ $earlierBuilds = @{
                       '53d4cedb5523a51f2909181a5c9f249e27074ef0ebe6c41d06f2adc0de55f44b',   # 0.5 + TruGuard items (2026-11-01)
                       '2febe208f812a29a6ad960fb175bfbae5397baaef7ff5e063d2a5e3d09848738',   # 0.6 command bar (2026-11-01, work\asi\menu06)
                       'f848695482a4440f3d35c44b1a6bbe926bc1cbfdb10d6ee1594c8c5b729486be',   # 0.6 + guard.dump (2026-11-02, work\asi)
-                      '6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b')   # 0.7 keyboard / focus / mouse (work\asi\menu07)
+                      '6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b',   # 0.7 keyboard / focus / mouse (work\asi\menu07)
+                      '055b1f1e17ca547a19cbdfd90ec374f67ecec3360c357a7109c52a805008baf4')   # 0.7.1 game input frozen (work\asi\menu071)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
                       'ae77e5d50799c4d528a5bf8339b7266c3e0c0dd05024247932cf012cdf302e83',
                       '73b27b92d0aabe6fb0a33d3232e4c0489efda4ebe816e08dfec2f9e27cb237ee',   # 0.6 ([Cmd] Enabled / HistorySize)
-                      '5d0dd4a902fa9ee41bc2b3635d8ba46ecd34d9ba4992bd31d8e003243d2b38fa')   # 0.7 ([Cmd] keyboard / focus, [Menu] FreeMouse)
+                      '5d0dd4a902fa9ee41bc2b3635d8ba46ecd34d9ba4992bd31d8e003243d2b38fa',   # 0.7 ([Cmd] keyboard / focus, [Menu] FreeMouse)
+                      '6d7c75e52939955be4fa2cec21410a612a5301a9a5b6433099d955b37804b2ca')   # 0.7.1 ([Menu] BlockGameInput / PauseGame, [Test] AutoStart)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

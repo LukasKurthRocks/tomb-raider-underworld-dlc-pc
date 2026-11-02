@@ -28,7 +28,13 @@ L3 keyboard, history, real keyboard, `time.scale` ok; typing moved Lara, Esc ope
 the key messages, `[Menu] PauseGame`; B twice = keyboard, then menu; the real-keyboard switch no longer depends on
 hover / focus; `level.start` + `[Test] AutoStart` = the mission menu's DLC start with intro; `[Log] UnitChanges`)
 built 2026-11-02 into `work\asi\menu071`, checked with `dumpbin` and offline byte checks only - not yet run in the
-game (section "Game input frozen (0.7.1)"). `camera.free` is still a todo (see "0.4 items").**
+game (section "Game input frozen (0.7.1)"); live test 2026-11-02 20:28: `level.start dlc2` showed the outfit selection,
+a `level.load` during it hung the game. 0.7.2 (**`game.quit`** with a safety step and exit code 0x544D; level.load /
+level.start **refused while a mission start is pending** (main state 2 / 9); `level.start` with the **title update's
+outfit rule** - DLC 2 without the outfit selection, `[Levels] OutfitRule`; Level page DLC 1 first; log overlay filter
+`[Log] OverlaySources` / `OverlayExclude`) built 2026-11-02 into `work\asi\menu072`, checked with `dumpbin` and offline
+byte checks only - not yet run in the game (section "Mission start, outfit rule, game.quit (0.7.2)"). `camera.free` is
+still a todo (see "0.4 items").**
 
 ## Controls
 
@@ -65,7 +71,7 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Page | Content | Items |
 |---|---|---|
 | TO TEST | 0.4, **first page, open, shown only while the list holds rows** (header "TO TEST (n open, n ok, n fail, n skip)"): one row per test - state, hint, id, note; on the selected row **A = OK, X = FAIL, Y = SKIP** (X / Y go to the row, not to ImGui, while a row has the focus), buttons OK / FAIL / SKIP and "Run <id>" when the id is a menu item (`id:arg` runs it with `arg`); "Remove the marked rows", "Remove all rows" (A twice). 0.5: **switches** (toggle rows, a checkbox each) on top, then **numbered steps** (NEXT marks the first open one; A = run its item + done) and checks in list order. Filled by the main session or `Invoke-TruTestRun.ps1` over TruLink; kept in `TruMenu.tests.txt` next to `tru.exe` (sections "TO TEST" below) | `test.add <id> <hint>`, `test.step <n> <id\|id:arg\|-> <text>`, `test.toggle <id> <item\|ini:Plugin:Section:Key> <text>`, `test.mark <id> ok\|fail\|skip\|open\|done\|on\|off [note]`, `test.list`, `test.export`, `test.del <id>`, `test.clear [done]` |
-| Status | TruMenu version, `tru.exe` PE time stamp / image size, all code checks, whether a level is loaded; current unit + stream unit id; game state; costume line (current costume, game-data base, `+0x1f4`, chosen `+0x20c` / `+0x20e` / `+0x210`, unit default); player line (instance, object id / name, type record, object-table entry); our plugins (`TruShadowPower`, `TruDoppelganger`, `TruDlc2Player`, `TruRockVein`, `TruLink`: loaded? `<Name>Version()` string), ModLoader.asi, the pad chain (what the game calls, what PadHook calls, with module names), the `d3d9.dll` in use (game folder = TRAWindowed proxy, else system), device / window | `status.version`, `status.hooks`, `status.unit`, `status.state`, `status.costume`, `status.player`, `status.plugins` |
+| Status | TruMenu version, `tru.exe` PE time stamp / image size, all code checks, whether a level is loaded; current unit + stream unit id; game state; costume line (current costume, game-data base, `+0x1f4`, chosen `+0x20c` / `+0x20e` / `+0x210`, unit default); player line (instance, object id / name, type record, object-table entry); our plugins (`TruShadowPower`, `TruDoppelganger`, `TruDlc2Player`, `TruRockVein`, `TruLink`: loaded? `<Name>Version()` string), ModLoader.asi, the pad chain (what the game calls, what PadHook calls, with module names), the `d3d9.dll` in use (game folder = TRAWindowed proxy, else system), device / window; 0.7.2: button **"Quit game (press twice)"** at the end (section "Mission start, outfit rule, game.quit (0.7.2)") | `status.version`, `status.hooks`, `status.unit`, `status.state`, `status.costume`, `status.player`, `status.plugins`, 0.7.2 `game.quit` |
 | Outfits (next level load) | the same costume facts, then one button per **player record of the game's type table** (index, name, object id; `[chosen]` / `[current]` marked), "Reset chosen costume", checkbox "reload the current unit after choosing" | `costume.records`, `costume.current`, `costume.choose <index\|name> [20c\|210]`, `costume.choosereload <index\|name>`, `costume.choosereset`; the 0.2 ids `costume.setreload` / `costume.reset` still work. **0.3 changed** `costume.list` (now the live cycle list; the 0.2 list = `costume.records`) and `costume.set` (now the live switch; the 0.2 meaning = `costume.choose`) |
 | Overlay: Lara's position | checkbox for a small top-left overlay with Lara's position and heading; position / rotation in the page | `overlay.position`, `player.position` |
 | Free camera | known facts; experimental `CAMERA_SetMode(mode)` with a mode slider (TRLAU enters its free camera with mode 11; TruLink notes that retail switches only for 6, 11, 12) and "Restore game camera". **TODO** own free camera (moving the camera transform with the sticks) | `camera.current`, `camera.mode <n>`, `camera.restore`, `camera.free` (todo) |
@@ -76,10 +82,10 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Time / player / HUD | 0.3: time scale slider, freeze world, hide HUD; player control, ragdoll death, mark / back to mark, camera fov; weapons / ammo / health (experimental, catalog section 17) | `time.scale <f>`, `time.pause [0/1]`, `ui.hide [0/1]`, `player.control [0/1]`, `player.die`, `player.teleport x y z`, `player.mark`, `player.recall`, `player.goto <inst>`, `camera.fov <rad>`, `player.health [n]`, `player.invincible [0/1]`, `weapon.list`, `weapon.give <name>`, `ammo.show`, `ammo.set <type> <n>`; 0.4 (TruLink / favourites, no own widgets on this page): `weapon.slots`, `weapon.has <name>`, `ammo.fill`, `gear.give <name>` |
 | Instances | 0.3: the instance list (name filter, max 200 shown), per instance: Lara goes there, bring to Lara, unhide, remove; "Unhide all" | `instance.list [filter]`, `instance.info <inst>`, `instance.bring <inst>`, `instance.unhide <inst>`, `instance.unhideall`, `instance.remove <inst>` (`<inst>` = intro id, `0x<address>` or `#<index>`) |
 | Outfits (live switch) | 0.3: "Next outfit" and one button per id of the game's outfit cycle list; switches at once (needs a level) | `costume.list`, `costume.next`, `costume.set <name\|id>` |
-| Debug / Log | 0.3: the last lines of every `Tru*.log` next to the `.asi` / `tru.exe` (tailed once per second by the worker thread, shared read, only new bytes), the game's script prints (`log.script`), lines mentioning errors / exceptions in red, counters (exception lines, exceptions TruMenu caught in its own game calls); source filter buttons (TruLink.log holds the last TruLink commands); corner overlay bottom left. 0.4: repeated lines of a source collapse into one `text x42 (17:09:02-17:09:33)`, TruLink's read-type command lines are dropped, filter all / warnings + errors / errors (warnings yellow, errors red), at most `[Log] MaxLinesPerSecond` new lines per source and second (then one line "(n lines dropped ...)"), counters for all three | `log.page`, `log.show`, `log.script [0/1]`, `log.overlay [0/1]`, `log.lines <n>`, `log.filter <source\|all>`, `log.clear`; 0.4: `log.collapse [0/1]`, `log.hidereads [0/1]`, `log.level 0\|1\|2` (or `all` / `warn` / `error`), `log.rate <n>` |
+| Debug / Log | 0.3: the last lines of every `Tru*.log` next to the `.asi` / `tru.exe` (tailed once per second by the worker thread, shared read, only new bytes), the game's script prints (`log.script`), lines mentioning errors / exceptions in red, counters (exception lines, exceptions TruMenu caught in its own game calls); source filter buttons (TruLink.log holds the last TruLink commands); corner overlay bottom left. 0.4: repeated lines of a source collapse into one `text x42 (17:09:02-17:09:33)`, TruLink's read-type command lines are dropped, filter all / warnings + errors / errors (warnings yellow, errors red), at most `[Log] MaxLinesPerSecond` new lines per source and second (then one line "(n lines dropped ...)"), counters for all three | `log.page`, `log.show`, `log.script [0/1]`, `log.overlay [0/1]`, `log.lines <n>`, `log.filter <source\|all>`, `log.clear`; 0.4: `log.collapse [0/1]`, `log.hidereads [0/1]`, `log.level 0\|1\|2` (or `all` / `warn` / `error`), `log.rate <n>`; 0.7.2: `log.overlaysources <list\|*>`, `log.overlayexclude <list\|none>` (overlay only, section "Log overlay filter (0.7.2)") |
 | Settings | 0.3: every `TruMenu.ini` key with its current value, changed keys marked `*` (yellow) with their default, missing keys shown with the default; "Favourites back to the default list" and "Reset all settings" - both need **A twice** (the button turns red: "press A again to confirm", 5 s) | `settings.show`, `settings.reset` (backup `TruMenu.ini.bak_<yyyymmdd_hhmmss>`, rewrite from the defaults table, reload the options; Scale / Enabled / Script apply at the next start), `fav.reset` |
 | Media: videos | 0.3: `Movies\*.bik`, "Play" (main menu only), "as menu loop" | `media.video.list`, `media.video.play <name>`, `media.video.menuloop [name]` |
-| Level select | current unit name (GameTracker+0x38), one button per unit of `[Levels] List` (default `dlc_level1_start`, `dlc_level2_start`), "Reload current unit", 0.7.1: "Start DLC 2 / DLC 1 as the mission menu (intro)", then **all 111 playable units** in tree nodes per group (see below). Any other unit: `menu level.load <unit>` over TruLink | `level.current`, `level.list` (all units: `group: unit unit ...; ...`), `level.presets` (`[Levels] List`; was `level.list` in 0.1), `level.load <unit>`, `level.reload`, 0.7.1 `level.start [dlc2\|dlc1\|<unit>]` (game thread, main menu only; "Game input frozen (0.7.1)") |
+| Level select | current unit name (GameTracker+0x38), one button per unit of `[Levels] List` (default `dlc_level1_start`, `dlc_level2_start`), "Reload current unit", 0.7.1: "Start DLC 1 / DLC 2 as the mission menu (intro)" (0.7.2: DLC 1 first; a grey line says why level.load / level.start are refused right now), then **all 111 playable units** in tree nodes per group (see below). Any other unit: `menu level.load <unit>` over TruLink | `level.current`, `level.list` (all units: `group: unit unit ...; ...`), `level.presets` (`[Levels] List`; was `level.list` in 0.1), `level.load <unit>`, `level.reload`, 0.7.1 `level.start [dlc2\|dlc1\|<unit>]` (game thread, main menu only; "Game input frozen (0.7.1)") |
 | Dev channel | there is no developer channel in `tru.exe` (TCP 9264 is FMOD's profiler). **TODO** re-enable the compiled-out log stub 0x6457a0 | `dev.log` (todo) |
 | Command bar (0.6, own window under the menu) | one input line: `<id> [arg]`, `get <id>`, `list [filter]`, `help`; autocomplete, history, pad picker (section "Command bar (0.6)"); 0.7: on-screen keyboard under the bar (section "Controller and mouse (0.7)") | `cmd.focus`, `cmd.run <line>`, `cmd.history`; 0.7: `cmd.keyboard` |
 
@@ -348,7 +354,8 @@ natives, read statically:
 | slot 4 of both | 0x847c8c / 0x847cd4 = 0x4c5260 | `push ecx; mov eax, [ecx+4]; ...; call 0x7a5160; pop ecx; ret` | thiscall, no arguments |
 
 So the sequence needs no script frame: `level.start [dlc2|dlc1|<unit>]` (game thread, main state 10 only, experimental)
-calls 0x4a0f10(), 0x77e170({unit, 1, 0, 1}, 1, 0, 1), 0x4be5e0(), 0x4be580() inside `__try`, after checking that no
+calls 0x4a0f10(), 0x77e170({unit, 1, 0, 1}, 1, 0, 1) (0.7.2: the 2nd value follows `[Levels] OutfitRule`, section
+"Mission start, outfit rule, game.quit (0.7.2)"), 0x4be5e0(), 0x4be580() inside `__try`, after checking that no
 level change is pending and that both screen managers exist with the expected vtables (singletons created at 0x4ccd3d /
 0x4ccd96). Not reproduced from script 104 (as in test 41e): the `dlcsystem` existence check, the "game in progress"
 dialog, the `messagechannel` "enableSound" broadcast. Level select page: two buttons "Start DLC 2 / DLC 1 as the
@@ -374,6 +381,68 @@ TruMenu's worker thread reads id + name every 250 ms (read-only) and logs a line
 `unit: dlc2_goo_room (was dlc_level2_start; stream unit id 7)` - into `TruMenu.log`, so also onto the log page and the
 log overlay (`log.overlay`). `status.unit` shows the stream unit name too. Checks: 0x5c1bf0, 0x5c1c28, 0x5c1c4e,
 0x5c1b9c, 0x5dfc88 and the 0.2 unit table check; a mismatch switches the option off with a log line.
+
+## Mission start, outfit rule, game.quit (0.7.2)
+
+Live test 2026-11-02 (`TruMenu.log`): 20:28:40 `level.start dlc2` from the open main menu -> outfit selection; 20:29:17
+`level.load dlc_level2_start` during that screen was accepted ("level change ... requested") -> black screen, game hung,
+TruMenu still drawn; 20:32:03 a further `level.load` said "a level change is already pending (GameTracker+0xb9)".
+
+### What a mission start does after f27 (static, `tools/pe_dis.py`, `tools/pe_callers.py`)
+
+| Step | Code | Fact |
+|---|---|---|
+| game loop | 0x5e01ab `push 0xe7f088; push 0xe7ed60; call 0x5e0090` | the main-state dispatcher gets `&mainState` (0xe7ed60) and the GameTracker; jump table 0x5e015c on `state - 1` (states 1 .. 10; 1 = in a level, 10 = main menu) |
+| f27 = 0x77e170 | 0x77e17c `cmp byte [ebp+0xc], 0` ... 0x77e193 `mov [0xfae8d9], dl` | its **2nd argument** is stored as the selection byte 0xfae8d9 ("costume / weapon selection", TU `MainTracker_UILoadLevel`) |
+| 0x5dfb20 (end of f27) | 0x5dfb5c `cmp [0xe7ed60], 1`, 0x5dfb83 `mov [0xe7ed60], 2` | unit name -> GameTracker+0x38; in a level `GAMELOOP_RequestLevelChangeByName`, otherwise **main state = 2** - GameTracker+0xb9 is not set |
+| state 2 | 0x5e0160 -> 0x5e00cd -> 0x5de7e0; 0x5de877 `cmp [0xfae8d9], 0`, 0x5de884 `mov [state], 9` | selection byte set -> **main state 9 = outfit / weapon selection** (0x5e017c -> 0x5e012e); else the level load (0x5de2b0) |
+| selection done | 0x77e450 `mov byte [0xfae8d9], 0; jmp 0x5de9c0` | the byte is cleared, the load goes on |
+
+So during the outfit selection GameTracker+0xb9 is 0 (0.7.1 only tested that), and a `level.load` there sets a request
+the state-9 screen never serves -> hang. **0.7.2:** `level.load`, `level.reload` and `level.start` are refused with
+`refused: level change pending (<reason>)` (in `TruMenu.log` as `item level.load: err refused: ...`) while
+GameTracker+0xb9 is set **or** the main state is 2 (start being set up) or 9 (outfit / weapon selection). `status.state`
+and the Level page show the reason. Byte checks (`work\asi\menu072\precheck_072.txt`, all ok on the Steam exe):
+0x5e01ab, 0x5e0096, 0x5e0160, 0x5e017c, 0x5e00cd, 0x5de877, 0x5dfb5c, 0x5dfb83; a mismatch keeps the 0.7.1 test
+(GameTracker+0xb9 only) with a log line.
+
+### Outfit rule (`[Levels] OutfitRule`, default 1) - translated from the title update
+
+TU generalbank **script 134 function 9** (`tools/menu_dlc_probe.py dis xt 134`, +0x257c .. +0x2608; copy in
+`work\asi\menu072\notes\xt134.dis`): `if unit == dlc_level4_start || dlc_level5_start || dlc_level6_start ||
+dlc_level2_start: uigamedata f26(unit, 0, 0, 1) else f26(unit, 1, 0, 1)`. The PC script 104 function 9 (`dis pp 104`,
++0x23c0 .. +0x2438) tests only levels 4 / 5 / 6, so on PC DLC 2 gets `f27(unit, 1, 0, 1)` = the selection. (The TU exe's
+in-game yes / no path has the same rule, string "Attempting to load DLC2 starting unit without costume/weapon select";
+`docs/Befund-Felsrinne.md` step a.) The installed test generalbank 47 (md5 3a2b9a1d...) already carries the TU test in
+script 104 and a `(0, 0, 1)` direct-start stub - that is why the old direct start showed no outfit screen.
+`level.start` now passes **0** for `dlc_level2_start` (and 4 .. 6) and **1** for every other unit (DLC 1 keeps its
+selection, as on the Xbox: `Xenia-TU_DLC1_13`). Without the selection the level load takes the unit default costume
+(`lara_doppelganger`, which TruDlc2Player maps to `doppelganger_casual`). `OutfitRule=0` = the PC rule (always 1).
+Checks: the mission path, the pending checks, 0x77e17c, 0x77e186, 0x77e193, 0x77e450; a mismatch keeps 1 with a log
+line. Still open: the live Xbox observation (Xenia checklist 12c).
+
+### `game.quit` (owner wish 2026-11-02)
+
+Status page, last button "Quit game (press twice)", and the item `game.quit` (command bar, favourites, TO TEST "Run").
+**Safety step:** the first run arms it (button turns red: "CONFIRM: quit the game now (n s)"), a second run 0.3 .. 5 s
+later quits. Then: `TruMenu.log` line `game.quit by the owner (TruMenu) - logs flushed next, then TerminateProcess(...)`,
+the TO TEST list and the command history are written once more, the CRT streams flushed and `TruMenu.log` committed
+(`FlushFileBuffers`), then `TerminateProcess(GetCurrentProcess(), 0x544D)` - runs on the render / bar thread, so it
+works while the game thread hangs (as long as the menu is still drawn); `TerminateProcess` instead of `ExitProcess` so
+no DLL detach can block. **Never automatic:** over TruLink (`menu game.quit`, `cmd.run game.quit`) it answers `err` and
+logs "game.quit refused"; TO TEST toggles refuse it; nothing in TruMenu queues it. `Invoke-TruTestRun.ps1` shows exit
+code 21581 (0x544D) as "ended via TruMenu game.quit (exit code 0x544D, not a crash)" in the status and the verdict
+notes; owner checks still count.
+
+### Log overlay filter (`[Log] OverlaySources`, `[Log] OverlayExclude`)
+
+In the 0.7.1 live test TruShadowPower's "activity 1009 (player +0xc8 = record +4) ... value 0" lines (several per
+second) flooded the overlay. The corner overlay now shows only the sources of `[Log] OverlaySources` (default
+`TruMenu,TruGuard`; comma list of log names - the file name without `.log`, plus `script`; `*` or empty = all) and
+drops lines holding one of the texts of `[Log] OverlayExclude` (comma list of substrings, default empty). Only the
+overlay: the Debug / Log page and the log files stay complete. At run time: `log.overlaysources TruMenu,TruShadowPower`,
+`log.overlayexclude activity 1009` (`none` = off; no argument = show the value). The overlay says "(log: no lines - n
+kept out by ...)" when the filter hid everything.
 
 ## TO TEST (0.4)
 
@@ -699,6 +768,7 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Cheat] Experimental` | 1 | 0 = no game-changing actions (pages read-only) |
 | `[Cheat] FlightSpeed` | 20 | units per 30 fps frame at full trigger |
 | `[Levels] List` | `dlc_level1_start,dlc_level2_start` | units offered as buttons on the Level select page |
+| `[Levels] OutfitRule` | 1 | 0.7.2: `level.start` as the title update's mission menu - `dlc_level2_start` (and `dlc_level4..6_start`) without the outfit / weapon selection, other units with it; 0 = PC script 104 (always with the selection) |
 | `[Favorites] Ids` | (empty = default list) | favourite item ids, comma list; rewritten by TruMenu when you pin / unpin (`WritePrivateProfileString` on this file) |
 | `[Cmd] Enabled` | 1 | 0.6: 1 = command bar under the menu window (0 = no bar; `cmd.run` still works, `cmd.focus` answers `err`) |
 | `[Cmd] HistorySize` | 32 | 0.6: lines kept in `TruMenu.history.txt` next to `tru.exe`, 1 .. 64 |
@@ -714,6 +784,8 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Log] MinLevel` | 0 | 0.4: 0 all lines, 1 warnings + errors, 2 errors only (`log.level`) |
 | `[Log] MaxLinesPerSecond` | 40 | 0.4: new lines per source and second, more are dropped and counted; 0 = no limit (`log.rate`) |
 | `[Log] UnitChanges` | 1 | 0.7.1: a line `unit: <name> (was <name>; stream unit id N)` in `TruMenu.log` (log page / overlay) when Lara moves into another stream unit |
+| `[Log] OverlaySources` | `TruMenu,TruGuard` | 0.7.2: sources the corner overlay shows (log names without `.log`, plus `script`); `*` or empty = all; overlay only (`log.overlaysources`) |
+| `[Log] OverlayExclude` | (empty) | 0.7.2: overlay only - lines holding one of these texts (comma list) are not shown (`log.overlayexclude`; `none` = off) |
 | `[Test] AutoStart` | (empty = off) | 0.7.1, test only: `dlc2` / `dlc1` / a unit name - once per game start, when the main menu is up, `level.start` (mission menu path, intro plays); without the verified path `level.load` + log line "intro skipped" |
 | `[Test] AutoStartDelay` | 3 | 0.7.1: seconds the main menu must be up before AutoStart starts, 1 .. 60 |
 
@@ -913,6 +985,40 @@ and its ini are recognised as ours). Every step: note the result, send `TruMenu.
 60. `[Test] AutoStart=dlc2` (restart, game data **without** test patch 41e): after the main menu has been up for 3 s the
     DLC 2 intro starts by itself, once per game start (quit to the main menu: it stays). `TruMenu.log`: "AutoStart:
     main menu up ..." and "AutoStart: level.start dlc_level2_start queued ...". Back to empty.
+
+0.7.2 additions (built with `-OutDir work\asi\menu072`; install the `.asi` **and** the new `TruMenu.ini` - three new
+keys, an old ini works too: `Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu072`; the 0.7.1 build
+`work\asi\menu071` and its ini are recognised as ours). Every step: note the result, send `TruMenu.log`.
+
+61. `TruMenu.log` after the start: "0.7.2: pending check 1 (main state 2 / 9 + GameTracker+0xb9), outfit rule 1 (ini 1;
+    ...), game.quit ready (exit code 0x544d, ...)". `menu level.start` (value) shows "outfit rule title update ...;
+    pending check main state 2 / 9 + GameTracker+0xb9".
+62. Level select page: the two mission-menu buttons in the order **DLC 1, DLC 2**.
+63. `level.start dlc2` from the main menu: the DLC 2 intro plays and **no outfit / weapon selection** comes; Lara is the
+    doppelganger (TruDlc2Player log: costume "lara_doppelganger" -> doppelganger_casual). `TruMenu.log`: "mission start
+    'dlc_level2_start': ... f27('dlc_level2_start', 0, 0, 1) ... no outfit / weapon selection". Compare with the Xbox
+    (Xenia checklist 12c).
+64. `level.start dlc1` from the main menu: the outfit / weapon selection **does** come (`f27(..., 1, 0, 1)`). While it is
+    open: open the menu, `level.load dlc_level2_start` and `level.start dlc2` -> both answer `refused: level change
+    pending (main state 9: the outfit / weapon selection of a level start is open)`; the Level page shows the grey
+    reason line; `status.state` says "outfit / weapon selection ...". Close the menu, choose an outfit - DLC 1 loads
+    normally (no hang).
+65. `[Levels] OutfitRule=0` (restart): `level.start dlc2` shows the outfit selection again (as 0.7.1). Back to 1.
+66. `game.quit`: Status page (expand "Status"), last button "Quit game (press twice)" - press once: it turns red
+    "CONFIRM: quit the game now (5 s)"; wait > 5 s: back to normal, nothing happens. Press twice: the game ends at once.
+    `TruMenu.log` ends with "game.quit armed by the owner ..." and "game.quit by the owner (TruMenu) - logs flushed
+    next, then TerminateProcess(...)". Also from the command bar: `game.quit`, Enter, `game.quit`, Enter.
+67. TruLink: `menu game.quit` -> `err game.quit only from the menu, the command bar or a favourite (owner) - never over
+    TruLink`; the game keeps running.
+68. Harness: a run of `Invoke-TruTestRun.ps1` ended with `game.quit` -> `summary.md` status "... - ended via TruMenu
+    game.quit (exit code 0x544D, not a crash)", exit code row `21581 (0x544D: ended via TruMenu game.quit)`, first
+    crash marker `-`, the verdict notes name it and the owner checks still count. Only the exit code is mapped: under
+    `-Debugger` the code is the one cmd / cdb hand back, and a session that echoes `TERMINATEPROCESS` still counts that
+    marker as a crash (not changed in 0.7.2).
+69. Log overlay filter: `log.overlay 1` in DLC 2 with TruShadowPower: the overlay shows only TruMenu / TruGuard lines
+    (unit changes readable, no "activity 1009" lines); the Debug / Log page still shows TruShadowPower.
+    `log.overlaysources *` -> all again; `log.overlayexclude activity 1009` -> those lines gone from the overlay only;
+    `log.overlayexclude none` -> back.
 
 ## Ideas
 

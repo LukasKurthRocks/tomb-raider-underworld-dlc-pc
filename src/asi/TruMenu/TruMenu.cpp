@@ -44,7 +44,11 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.7.1 (game input frozen while the menu is open: [Menu] BlockGameInput = the "
+const char *const kVersion = "TruMenu 0.7.2 (game.quit: TerminateProcess with exit code 0x544D after a safety step; "
+                             "level.load / level.start refused while a level change or a mission start is pending; "
+                             "level.start: the title update's outfit rule ([Levels] OutfitRule, DLC 2 without the outfit "
+                             "selection); log overlay filter [Log] OverlaySources / OverlayExclude; "
+                             "0.7.1: game input frozen while the menu is open: [Menu] BlockGameInput = the "
                              "game's DirectInput keyboard and key messages, [Menu] PauseGame; B twice = keyboard, then "
                              "menu; real keyboard switch without hover; [Test] AutoStart = level.start (mission menu "
                              "path, intro plays); [Log] UnitChanges; "
@@ -182,6 +186,9 @@ const OptDef kOpts[] = {
                                    "developer menu rows, time /\nplayer / instance / video items); 0 = read-only"},
     {"Cheat", "FlightSpeed", "20", "flight: units per 30 fps frame at full trigger (RT up, LT down) while cheat mode is on"},
     {"Levels", "List", "dlc_level1_start,dlc_level2_start", "units offered as buttons on the Level select page (comma list)"},
+    {"Levels", "OutfitRule", "1", "level.start: 1 = as the title update's mission menu: dlc_level2_start (and "
+                                  "dlc_level4..6_start) start without the outfit /\nweapon selection, every other unit "
+                                  "with it; 0 = as the PC mission menu (script 104): always with the selection"},
     {"Log", "Overlay", "0", "1 = log lines (Tru*.log tails, script prints) in the bottom-left corner from the start"},
     {"Log", "Lines", "12", "lines on the Debug / Log page and in the overlay, 1 .. 64"},
     {"Log", "Script", "0", "1 = redirect the game's 8 script print / log natives to the log page from the start (patches 5 "
@@ -195,6 +202,12 @@ const OptDef kOpts[] = {
                                        "0 = no limit"},
     {"Log", "UnitChanges", "1", "1 = a line \"unit: <name> (was <name>)\" when Lara moves into another stream unit "
                                 "(TruMenu.log, log page and overlay)"},
+    {"Log", "OverlaySources", "TruMenu,TruGuard", "sources the corner overlay shows (comma list of log names: TruMenu, "
+                                                  "TruGuard, TruShadowPower, TruRockVein,\nTruLink, TruDlc2Player, "
+                                                  "script, ...); * = all. Overlay only - the log page and the log files "
+                                                  "stay complete"},
+    {"Log", "OverlayExclude", "", "overlay only: lines holding one of these texts are not shown (comma list, e.g. "
+                                  "activity 1009,markup subtest); empty = none"},
     {"Favorites", "Ids", "", "item ids on the \"Quick access / Favourites\" page (comma list); empty = default list. Y on an "
                              "item in the menu\npins / unpins it and rewrites this line (TruLink: menu fav.add <id> / "
                              "fav.del <id> / fav.list)"},
@@ -253,6 +266,9 @@ int g_autoStartDelay = 3;                                                    // 
 volatile LONG g_menuPaused = 0;                                              // 0.7.1: TruMenu set the pause bit
 const char *g_pauseMode = "off ([Menu] PauseGame=0)";                        // 0.7.1 status texts
 const char *g_autoStartMode = "off ([Test] AutoStart empty)";
+int g_outfitRule = 1;                                                        // 0.7.2 [Levels] OutfitRule
+bool g_pendingOk = false;                                                    // 0.7.2: main state 2 / 9 code checks
+bool g_outfitRuleOk = false;                                                 // 0.7.2: f27 arg 2 = selection flag checks
 
 // ---- state ----
 char g_logPath[MAX_PATH];
@@ -1059,6 +1075,8 @@ void ValStatusUnit(char *o, size_t n);  // 0.2 helpers, defined with the items b
 void ValCostume(char *o, size_t n);
 void PlayerInfo(char *o, size_t n);
 const char *GameState();
+void QueueItem(const char *id, const char *arg);   // defined after kItems
+bool QuitArmed(DWORD *leftMs);                     // 0.7.2 game.quit, defined after the command history
 
 void PageStatus() {
     ImGui::TextWrapped("%s", kVersion);
@@ -1110,6 +1128,21 @@ void PageStatus() {
     Text("d3d9: %s", g_d3dMode);
     ImGui::TextWrapped("  d3d9.dll = %s", d3dPath);
     Text("  device 0x%08lx, window 0x%08lx", reinterpret_cast<DWORD>(g_device), reinterpret_cast<DWORD>(g_hwnd));
+    // 0.7.2 game.quit: owner only, two presses within 5 s (the item itself keeps the safety step)
+    ImGui::Separator();
+    DWORD left = 0;
+    bool armed = QuitArmed(&left);
+    char label[128];
+    if (armed)
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "CONFIRM: quit the game now (%lu s)  [game.quit]##quit",
+                    (left + 999) / 1000);
+    else
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "Quit game (press twice)  [game.quit]##quit");
+    if (armed) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.1f, 1.0f));
+    if (ImGui::Button(label)) QueueItem("game.quit", "");
+    if (armed) ImGui::PopStyleColor();
+    ImGui::TextWrapped("game.quit ends tru.exe at once (TerminateProcess, exit code 0x544D = 21581) - also while the game "
+                       "hangs; TruMenu.log, the TO TEST list and the history are written first. Never automatic.");
 }
 
 bool ReadLara(float *position, float *rotation, DWORD *instance) {
@@ -1394,10 +1427,15 @@ void IdName(int id, char *out, size_t size) {
     else Out(out, size, "%d (?)", id);
 }
 
+int PendingMainState();   // 0.7.2: 2 / 9 while a level start is set up / the outfit selection is open, else 0
+
 const char *GameState() {
     DWORD busy = 0;
     ReadDword(kGameTracker + 0xb8, &busy);
     if ((busy >> 8) & 0xff) return "level change pending (GameTracker+0xb9)";
+    int pending = PendingMainState();
+    if (pending == 9) return "outfit / weapon selection of a level start (main state 9) - level.load / level.start refused";
+    if (pending == 2) return "level start being set up (main state 2) - level.load / level.start refused";
     if (InLevel()) return "in a level (player instance present)";
     return "no player instance (front end / loading)";
 }
@@ -1700,6 +1738,7 @@ bool RunSpeed(const char *arg, char *o, size_t n) {
     Out(o, n, "cheat.speed %.1f", v);
     return true;
 }
+bool LevelChangePending(char *why, size_t n);   // 0.7.2, in the level.start section
 bool LoadUnit(const char *unit, char *o, size_t n) {
     if (!g_levelOk || !g_experimental) { Out(o, n, "level change code not verified / experimental off"); return false; }
     size_t len = unit ? strlen(unit) : 0;
@@ -1709,9 +1748,10 @@ bool LoadUnit(const char *unit, char *o, size_t n) {
             Out(o, n, "unit name may hold a-z 0-9 _ - only");
             return false;
         }
-    DWORD busy = 0;
-    ReadDword(kGameTracker + 0xb8, &busy);
-    if ((busy >> 8) & 0xff) { Out(o, n, "a level change is already pending (GameTracker+0xb9)"); return false; }
+    // 0.7.2: also refused during a mission start (main state 2 / 9 - live 2026-11-02 20:29:17: a level.load during the
+    // outfit selection set GameTracker+0xb9, the state-9 screen never served it, the game hung)
+    char why[200];
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: level change pending (%s)", why); return false; }
     static char name[64];                    // the game copies it to GameTracker+0x38; keep ours alive anyway
     strncpy_s(name, sizeof(name), unit, _TRUNCATE);
     // GAMELOOP_RequestLevelChangeByName(name, gameTracker, doneType 4) - TRLAU name / signature, doneType 4 as the
@@ -2527,6 +2567,11 @@ TailFile g_tails[16];
 volatile LONG g_logOverlay = 0;
 int g_logLines = 12;
 char g_logFilter[24] = "";                   // "" = all, else a source name (TruLink, script, ...)
+// 0.7.2 [Log] OverlaySources / OverlayExclude: only the corner overlay (page and log files stay complete); both read
+// and written under g_logRingLock
+char g_ovlSources[256] = "TruMenu,TruGuard"; // comma list of sources, "*" or "" = all
+char g_ovlExclude[512] = "";                 // comma list of substrings; a line holding one is not shown
+LONG g_ovlHidden = 0;                        // lines the overlay filter kept out of the last overlay frame
 volatile LONG g_scriptLog = 0;               // script print natives redirected
 bool g_scriptOk = false;
 char g_scriptPartial[220];
@@ -2696,16 +2741,55 @@ void FormatLine(const LogLine &l, char *o, size_t n, size_t maxText) {
         _snprintf_s(o, n, _TRUNCATE, "[%s] %.*s", l.src, static_cast<int>(maxText), l.text);
 }
 
-// the last <max> lines matching the filter and [Log] MinLevel, oldest first; returns the count
-int CopyLines(LogLine *out, int max, const char *filter) {
+// 0.7.2: is <word> one of the comma separated tokens of <list>? (outer spaces ignored, case-insensitive)
+bool ListHas(const char *list, const char *word) {
+    size_t len = strlen(word);
+    for (const char *p = list; *p;) {
+        while (*p == ',' || *p == ' ') ++p;
+        const char *e = p;
+        while (*e && *e != ',') ++e;
+        const char *t = e;
+        while (t > p && t[-1] == ' ') --t;
+        if (static_cast<size_t>(t - p) == len && len && _strnicmp(p, word, len) == 0) return true;
+        p = e;
+    }
+    return false;
+}
+// 0.7.2, g_logRingLock held: the overlay filter ([Log] OverlaySources / OverlayExclude)
+bool OverlayShowsLocked(const LogLine &l) {
+    bool all = !g_ovlSources[0] || ListHas(g_ovlSources, "*");
+    if (!all && !ListHas(g_ovlSources, l.src)) return false;
+    for (const char *p = g_ovlExclude; *p;) {                  // substrings, comma separated, outer spaces dropped
+        while (*p == ',' || *p == ' ') ++p;
+        const char *e = p;
+        while (*e && *e != ',') ++e;
+        const char *t = e;
+        while (t > p && t[-1] == ' ') --t;
+        size_t len = static_cast<size_t>(t - p);
+        if (len) {
+            char sub[128];
+            strncpy_s(sub, sizeof(sub), p, len < sizeof(sub) ? len : sizeof(sub) - 1);
+            if (strstr(l.text, sub)) return false;
+        }
+        p = e;
+    }
+    return true;
+}
+
+// the last <max> lines matching the filter and [Log] MinLevel, oldest first; returns the count. 0.7.2: overlay = also
+// the overlay filter
+int CopyLines(LogLine *out, int max, const char *filter, bool overlay = false) {
     int c = 0;
+    LONG hidden = 0;
     EnterCriticalSection(&g_logRingLock);
     for (int k = 0; k < g_logTotal && c < max; ++k) {
         const LogLine &l = g_logRing[(g_logHead - 1 - k + kLogRing) % kLogRing];
         if (!l.src[0] || l.sev < g_logMinLevel) continue;
         if (filter && filter[0] && _stricmp(l.src, filter) != 0) continue;
+        if (overlay && !OverlayShowsLocked(l)) { ++hidden; continue; }
         out[c++] = l;
     }
+    if (overlay) g_ovlHidden = hidden;
     LeaveCriticalSection(&g_logRingLock);
     for (int i = 0; i < c / 2; ++i) { LogLine t = out[i]; out[i] = out[c - 1 - i]; out[c - 1 - i] = t; }
     return c;
@@ -2929,6 +3013,40 @@ bool RunLogFilter(const char *arg, char *o, size_t n) {
     Out(o, n, "log.filter %s", g_logFilter[0] ? g_logFilter : "all");
     return true;
 }
+// 0.7.2 overlay filter (runtime; the start values come from [Log] OverlaySources / OverlayExclude)
+void ValOvlSources(char *o, size_t n) {
+    EnterCriticalSection(&g_logRingLock);
+    Out(o, n, "%s", !g_ovlSources[0] || ListHas(g_ovlSources, "*") ? "* (all)" : g_ovlSources);
+    LeaveCriticalSection(&g_logRingLock);
+}
+bool RunOvlSources(const char *arg, char *o, size_t n) {   // no argument: only shows the value
+    if (arg && arg[0]) {
+        EnterCriticalSection(&g_logRingLock);
+        strncpy_s(g_ovlSources, sizeof(g_ovlSources), arg, _TRUNCATE);
+        LeaveCriticalSection(&g_logRingLock);
+    }
+    char v[300];
+    ValOvlSources(v, sizeof(v));
+    Out(o, n, "log.overlaysources %s (overlay only; page and log files unchanged)", v);
+    return true;
+}
+void ValOvlExclude(char *o, size_t n) {
+    EnterCriticalSection(&g_logRingLock);
+    Out(o, n, "%s", g_ovlExclude[0] ? g_ovlExclude : "(none)");
+    LeaveCriticalSection(&g_logRingLock);
+}
+bool RunOvlExclude(const char *arg, char *o, size_t n) {   // no argument: only shows the value; none = off
+    if (arg && arg[0]) {
+        EnterCriticalSection(&g_logRingLock);
+        if (!_stricmp(arg, "none")) g_ovlExclude[0] = 0;
+        else strncpy_s(g_ovlExclude, sizeof(g_ovlExclude), arg, _TRUNCATE);
+        LeaveCriticalSection(&g_logRingLock);
+    }
+    char v[600];
+    ValOvlExclude(v, sizeof(v));
+    Out(o, n, "log.overlayexclude %s (overlay only)", v);
+    return true;
+}
 void ValLogCount(char *o, size_t n) {
     Out(o, n, "%d lines, %ld exception lines, %ld caught by TruMenu; 0.4: %ld repeats collapsed, %ld TruLink reads hidden, "
         "%ld dropped by the rate limit", g_logTotal, g_exceptionLines, g_ownExceptions, g_logCollapsed, g_logHidden,
@@ -3077,6 +3195,59 @@ bool MissionCheck() {
            HexBytesAt(0x004ccd3d, "c7067c7c8400 8935583fa100") && HexBytesAt(0x004ccd96, "c706c47c8400 8935503fa100");
 }
 
+// ---- 0.7.2: what a mission start does after f27, read statically (tools/pe_dis.py, tools/pe_callers.py) ----
+// The game loop 0x5e01ab calls the main-state dispatcher 0x5e0090(&mainState 0xe7ed60, GameTracker 0xe7f088): jump
+// table 0x5e015c on state - 1 (states 1..10). f27 = 0x77e170 stores its 2nd argument as byte [0xfae8d9] (0x77e193,
+// "costume / weapon selection", TU MainTracker_UILoadLevel), then 0x5dfb20 copies the unit to GameTracker+0x38 and,
+// unless the main state is 1 (in a level: GAMELOOP_RequestLevelChangeByName), sets main state = 2 (0x5dfb83).
+// State 2 (table 0x5e0160 -> 0x5e00cd -> 0x5de7e0): byte [0xfae8d9] != 0 -> main state = 9 (0x5de884) = the outfit /
+// weapon selection (state 9 -> 0x5e012e); else the level load itself (0x5de2b0). 0x77e450 clears the byte when the
+// selection is done (then 0x5de9c0). GameTracker+0xb9 (the level.load request byte) stays 0 the whole time - so the
+// 0.7.1 test missed it, and a level.load during state 9 set +0xb9 that the state-9 screen never serves (hang).
+const DWORD kSelectFlag = 0x00fae8d9;
+
+bool PendingCheck() {
+    return HexBytesAt(0x005e01ab, "6888f0e700 6860ede700 e8d6feffff") &&
+           HexBytesAt(0x005e0096, "8b3e 8d47ff 83f809 0f87b0000000 ff24855c015e00") &&
+           HexBytesAt(0x005e0160, "cd005e00") && HexBytesAt(0x005e017c, "2e015e00") &&
+           HexBytesAt(0x005e00cd, "8b442410 50 56 e808e7ffff") &&
+           HexBytesAt(0x005de877, "381dd9e8fa00 740d 8b54240c 5e c70209000000") &&
+           HexBytesAt(0x005dfb5c, "833d60ede70001 881df2f1e700 7517") &&
+           HexBytesAt(0x005dfb83, "c70560ede70002000000");
+}
+
+// main state 2 (level start being set up) or 9 (outfit / weapon selection), else 0; 0 when the checks failed
+int PendingMainState() {
+    if (!g_pendingOk) return 0;
+    DWORD state = 0;
+    if (!ReadDword(kMainState, &state)) return 0;
+    return state == 2 || state == 9 ? static_cast<int>(state) : 0;
+}
+
+// true (with the reason) while a level change or a mission start is pending: level.load / level.start are refused
+bool LevelChangePending(char *why, size_t n) {
+    DWORD busy = 0;
+    ReadDword(kGameTracker + 0xb8, &busy);
+    if ((busy >> 8) & 0xff) { Out(why, n, "GameTracker+0xb9 = %lu: a level change request waits", (busy >> 8) & 0xff); return true; }
+    int state = PendingMainState();
+    if (state == 9) { Out(why, n, "main state 9: the outfit / weapon selection of a level start is open"); return true; }
+    if (state == 2) { Out(why, n, "main state 2: a level start is being set up"); return true; }
+    return false;
+}
+
+// Title update rule (translated): TU generalbank script 134 function 9 (tools/menu_dlc_probe.py dis xt 134,
+// +0x257c..+0x2608): unit == dlc_level4_start || dlc_level5_start || dlc_level6_start || dlc_level2_start ->
+// uigamedata f26(unit, 0, 0, 1), else f26(unit, 1, 0, 1) (the TU's MainTracker_UILoadLevel = PC f27 0x77e170). The PC
+// script 104 function 9 (dis pp 104, +0x23c0..+0x2438) tests only levels 4 / 5 / 6, so DLC 2 gets the selection.
+// Returns f27's 2nd argument: 1 = outfit / weapon selection (main state 9), 0 = none.
+int MissionSelectArg(const char *unit) {
+    if (!g_outfitRule || !g_outfitRuleOk) return 1;
+    static const char *const kNoSelect[] = {"dlc_level4_start", "dlc_level5_start", "dlc_level6_start", "dlc_level2_start"};
+    for (const char *u : kNoSelect)
+        if (!_stricmp(unit, u)) return 0;
+    return 1;
+}
+
 // "dlc2" / "dlc1" or a unit name -> unit name; false if not usable
 bool StartUnitName(const char *arg, char *unit, size_t size) {
     const char *u = arg && arg[0] ? arg : "dlc_level2_start";
@@ -3090,10 +3261,10 @@ bool StartUnitName(const char *arg, char *unit, size_t size) {
     return true;
 }
 
-bool MissionCall(const DWORD *args) {
+bool MissionCall(const DWORD *args, int select) {
     __try {
         reinterpret_cast<VoidFn>(kUgdF22)();                                   // uigamedata f22
-        reinterpret_cast<MissionStartFn>(kUgdF27)(args, 1, 0, 1);              // uigamedata f27(unit, 1, 0, 1)
+        reinterpret_cast<MissionStartFn>(kUgdF27)(args, select, 0, 1);         // uigamedata f27(unit, select, 0, 1)
         reinterpret_cast<VoidFn>(kScrF19)();                                   // stdscreenmgr f19
         reinterpret_cast<VoidFn>(kScrF7)();                                    // stdscreenmgr f7
         return true;
@@ -3113,12 +3284,11 @@ bool RunLevelStart(const char *arg, char *o, size_t n) {
     static DWORD args[4];                        // DataValue block of f27: unit, 1, 0, 1
     char name[64];
     if (!StartUnitName(arg, name, sizeof(name))) { Out(o, n, "usage: level.start [dlc2|dlc1|<unit name a-z 0-9 _ ->]"); return false; }
+    char why[200];                               // 0.7.2: first, so a second start during the first one says why
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: level change pending (%s)", why); return false; }
     DWORD state = 0;
     ReadDword(kMainState, &state);
     if (state != 10) { Out(o, n, "main menu only (main state [0x%08lx] = %lu, needs 10)", kMainState, state); return false; }
-    DWORD busy = 0;
-    ReadDword(kGameTracker + 0xb8, &busy);
-    if ((busy >> 8) & 0xff) { Out(o, n, "a level change is already pending (GameTracker+0xb9)"); return false; }
     DWORD m7 = 0, m19 = 0, vt7 = 0, vt19 = 0;
     if (!ReadDword(kScrMgr7, &m7) || !m7 || !ReadDword(m7, &vt7) || vt7 != kScrVt7 || !ReadDword(kScrMgr19, &m19) ||
         !m19 || !ReadDword(m19, &vt19) || vt19 != kScrVt19) {
@@ -3127,20 +3297,31 @@ bool RunLevelStart(const char *arg, char *o, size_t n) {
         return false;
     }
     strncpy_s(unit, sizeof(unit), name, _TRUNCATE);
+    int select = MissionSelectArg(unit);         // 0.7.2: the TU rule ([Levels] OutfitRule)
     args[0] = reinterpret_cast<DWORD>(unit);
-    args[1] = 1;
+    args[1] = static_cast<DWORD>(select);
     args[2] = 0;
     args[3] = 1;
-    if (!MissionCall(args)) { Out(o, n, "exception in the mission start sequence (unit '%s')", unit); return false; }
-    Out(o, n, "mission start '%s': uigamedata f22, f27('%s', 1, 0, 1), stdscreenmgr f19 + f7 called (intro plays)", unit,
-        unit);
+    if (!MissionCall(args, select)) { Out(o, n, "exception in the mission start sequence (unit '%s')", unit); return false; }
+    Out(o, n, "mission start '%s': uigamedata f22, f27('%s', %d, 0, 1), stdscreenmgr f19 + f7 called (intro plays; %s)",
+        unit, unit, select,
+        select ? (g_outfitRule && g_outfitRuleOk ? "outfit / weapon selection - as the title update for this unit"
+                                                 : "outfit / weapon selection - PC script 104 rule")
+               : "no outfit / weapon selection - title update rule, [Levels] OutfitRule=1");
     if (g_menuOpen) ToggleMenu("level start");
     return true;
 }
 void ValLevelStart(char *o, size_t n) {
     DWORD state = 0;
     ReadDword(kMainState, &state);
-    Out(o, n, "path %s, main state %lu (needs 10); AutoStart %s", g_missionOk ? "ok" : "NOT verified", state,
+    BYTE flag = 0;
+    if (g_outfitRuleOk) ReadByte(kSelectFlag, &flag);
+    Out(o, n, "path %s, main state %lu (needs 10); outfit rule %s (selection byte [0x%08lx] = %u); pending check %s; "
+        "AutoStart %s", g_missionOk ? "ok" : "NOT verified", state,
+        !g_outfitRule ? "off - PC script 104 (always the selection)"
+                      : g_outfitRuleOk ? "title update (dlc_level2 / 4..6_start without the selection)"
+                                       : "NOT verified - PC script 104 (always the selection)",
+        kSelectFlag, flag, g_pendingOk ? "main state 2 / 9 + GameTracker+0xb9" : "NOT verified - GameTracker+0xb9 only",
         g_autoStartMode);
 }
 
@@ -3961,6 +4142,7 @@ bool TestToggleApply(const char *target, bool on, char *o, size_t n) {
         return true;
     }
     if (!ItemUsable(target)) { Out(o, n, "unknown or todo item '%s'", target); return false; }
+    if (!_stricmp(target, "game.quit")) { Out(o, n, "game.quit is no toggle (owner only, menu)"); return false; }   // 0.7.2
     QueueItem(target, on ? "1" : "0");
     Out(o, n, "%s %d run (%s)", target, on ? 1 : 0, g_lastAction);
     return true;
@@ -4166,6 +4348,8 @@ void ValCmdBar(char *o, size_t n);
 bool RunCmdFocus(const char *arg, char *o, size_t n);
 bool RunCmdRun(const char *arg, char *o, size_t n);
 bool RunCmdKeyboard(const char *arg, char *o, size_t n);   // 0.7
+void ValGameQuit(char *o, size_t n);                       // 0.7.2
+bool RunGameQuit(const char *arg, char *o, size_t n);
 
 struct Item {
     const char *id, *type, *label;
@@ -4183,6 +4367,10 @@ const Item kItems[] = {
      nullptr},
     {"status.player", "info", "player instance, object id / name, type record", false, ValPlayerObject, nullptr},
     {"status.plugins", "info", "our ASIs (loaded? version)", false, ValPlugins, nullptr},
+    // 0.7.2: render / bar thread (works while the game thread hangs); refused over TruLink (InvokeCore, wait = true)
+    {"game.quit", "action", "quit the game now: run twice within 5 s; logs written, then TerminateProcess(exit code "
+                            "0x544D); menu / command bar / favourites only, never over TruLink", false, ValGameQuit,
+     RunGameQuit},
     {"guard.status", "info", "TruGuard: mode, fault/dump counters, limits, log path", false, ValGuardStatus, nullptr},
     {"guard.count", "info", "TruGuard: exceptions seen in tru.exe / distinct sites", false, ValGuardCount, nullptr},
     {"guard.last", "info", "TruGuard: last fault site (tru offset, access, address, thread)", false, ValGuardLast,
@@ -4229,8 +4417,9 @@ const Item kItems[] = {
     {"level.load", "action", "load unit (arg = unit name), experimental", true, ValUnit, RunLevel},
     {"level.reload", "action", "reload the current unit, experimental", true, ValUnit, RunReload},
     // 0.7.1
-    {"level.start", "action", "start dlc2 / dlc1 / <unit> as the mission menu does (uigamedata f22 + f27(unit, 1, 0, 1), "
-                              "stdscreenmgr f19 + f7; the intro plays), main menu only, experimental", true,
+    {"level.start", "action", "start dlc2 / dlc1 / <unit> as the mission menu does (uigamedata f22 + f27(unit, select, 0, "
+                              "1), stdscreenmgr f19 + f7; the intro plays; 0.7.2: select 0 for DLC 2 as the title update, "
+                              "[Levels] OutfitRule), main menu only, experimental", true,
      ValLevelStart, RunLevelStart},
     // 0.3: costume.list / costume.set are the live outfit cycle now; the 0.2 "chosen for the next level load" items
     // are costume.records / costume.choose* (costume.setreload / costume.reset keep their 0.2 meaning)
@@ -4279,6 +4468,12 @@ const Item kItems[] = {
     {"log.filter", "action", "only one source (TruLink, TruMenu, script, ...; \"\" / all = every source)", false,
      ValLogFilter, RunLogFilter},
     {"log.clear", "action", "clear the collected lines", false, ValLogCount, RunLogClear},
+    // 0.7.2
+    {"log.overlaysources", "action", "overlay only: sources shown (comma list: TruMenu,TruGuard,TruShadowPower,TruRockVein,"
+                                     "TruLink,script,...; * = all) - [Log] OverlaySources", false, ValOvlSources,
+     RunOvlSources},
+    {"log.overlayexclude", "action", "overlay only: lines holding one of these substrings are not shown (comma list; "
+                                     "none = off) - [Log] OverlayExclude", false, ValOvlExclude, RunOvlExclude},
     {"media.video.list", "info", "Movies\\*.bik next to tru.exe", false, ValVideoList, nullptr},
     {"media.video.play", "action", "0x4a12b0(<name>, 0), front end only (main state 10)", true, ValVideoList, RunVideoPlay},
     {"media.video.menuloop", "action", "main menu background loop [0x8abf20] = <name> (\"\" = medsea_loop)", false,
@@ -4419,6 +4614,12 @@ const char *InvokeCore(const char *id, const char *arg, bool wait) {
     const DevRow *dev = item ? nullptr : DevFind(id);
     if (!item && !dev) { _snprintf_s(t_answer, sizeof(t_answer), _TRUNCATE, "err unknown item '%s'", id ? id : ""); return t_answer; }
     const char *itemId = item ? item->id : dev->id;
+    if (item && wait && !_stricmp(item->id, "game.quit")) {   // 0.7.2: never automatic - not over TruLink / cmd.run
+        Log(1, "game.quit refused: TruLink / cmd.run (only the owner in the menu, the command bar or a favourite)");
+        _snprintf_s(t_answer, sizeof(t_answer), _TRUNCATE, "err game.quit only from the menu, the command bar or a "
+                    "favourite (owner) - never over TruLink");
+        return t_answer;
+    }
     if (item && !_stricmp(item->id, "test.export")) {          // 0.5: a block answer ("ok+ ...", rows, ".")
         TestExportBlock(t_answer, sizeof(t_answer));
         return t_answer;
@@ -4669,6 +4870,65 @@ void CmdHistAddLocked(const char *text) {
     }
     strncpy_s(g_cmdHist[g_cmdHistCount++], kCmdLine, text, _TRUNCATE);
 }
+
+// ---- 0.7.2 game.quit (owner wish 2026-11-02: the game showed only black, TruMenu still worked) ----
+// Safety step: the first run arms it, a second run 0.3 .. 5 s later quits. Runs on the calling thread (render hook /
+// command bar - not the game thread, which may hang). TerminateProcess, not ExitProcess: no DLL detach / atexit that
+// could block on a hung thread. Never automatic: InvokeCore refuses it over TruLink, nothing in TruMenu queues it.
+const UINT kQuitExitCode = 0x544D;          // "TM"; Invoke-TruTestRun.ps1 maps 21581 to "ended via TruMenu game.quit"
+const DWORD kQuitWindowMs = 5000, kQuitMinGapMs = 300;
+volatile LONG g_quitArmedAt = 0;             // GetTickCount of the first run, 0 = not armed
+
+bool QuitArmed(DWORD *leftMs) {
+    DWORD at = static_cast<DWORD>(g_quitArmedAt), age = GetTickCount() - at;
+    bool armed = at != 0 && age <= kQuitWindowMs;
+    if (leftMs) *leftMs = armed ? kQuitWindowMs - age : 0;
+    return armed;
+}
+void ValGameQuit(char *o, size_t n) {
+    DWORD left = 0;
+    if (QuitArmed(&left)) Out(o, n, "ARMED - run again within %lu ms to quit", left);
+    else Out(o, n, "not armed (run twice within 5 s)");
+}
+DWORD QuitNow() {                            // returns only when TerminateProcess failed (its error)
+    Log(0, "game.quit by the owner (TruMenu) - logs flushed next, then TerminateProcess(GetCurrentProcess(), 0x%x)",
+        kQuitExitCode);
+    // TO TEST rows and the history are written on every change already; once more, without waiting for a lock a
+    // hung thread may hold, and only when there is something to write
+    if (g_testCount > 0 && TryEnterCriticalSection(&g_testLock)) { TestSaveLocked(); LeaveCriticalSection(&g_testLock); }
+    if (g_cmdHistCount > 0 && TryEnterCriticalSection(&g_cmdLock)) { CmdHistSaveLocked(); LeaveCriticalSection(&g_cmdLock); }
+    _flushall();
+    // TruMenu.log is opened / closed per line; commit it to the disk as well
+    HANDLE h = CreateFileA(g_logPath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h != INVALID_HANDLE_VALUE) {
+        FlushFileBuffers(h);
+        CloseHandle(h);
+    }
+    // on success TerminateProcess on the own process does not return
+    TerminateProcess(GetCurrentProcess(), kQuitExitCode);
+    DWORD error = GetLastError();
+    Log(0, "game.quit: TerminateProcess failed (%lu) - the game keeps running", error);
+    return error;
+}
+bool RunGameQuit(const char *, char *o, size_t n) {
+    DWORD now = GetTickCount(), at = static_cast<DWORD>(g_quitArmedAt), age = now - at;
+    if (!at || age > kQuitWindowMs) {
+        InterlockedExchange(&g_quitArmedAt, static_cast<LONG>(now ? now : 1));
+        Log(1, "game.quit armed by the owner - run it again within 5 s to end the game");
+        Out(o, n, "armed - run game.quit again within 5 s to end the game (TerminateProcess, exit code 0x544D)");
+        return true;
+    }
+    if (age < kQuitMinGapMs) {
+        Out(o, n, "armed - second press too fast (%lu ms), press again", age);
+        return true;
+    }
+    InterlockedExchange(&g_quitArmedAt, 0);
+    DWORD error = QuitNow();
+    Out(o, n, "TerminateProcess failed (%lu) - see TruMenu.log", error);
+    return false;
+}
+
 void CmdHistLoad() {
     FILE *f = nullptr;
     if (fopen_s(&f, g_cmdHistPath, "rb") != 0 || !f) return;
@@ -5677,9 +5937,11 @@ void PageLevel() {
     }
     if (unit[0] && ImGui::Button("Reload current unit  [level.reload]")) QueueItem("level.reload", "");
     // 0.7.1: the mission menu's start (main menu only) - the intro plays, unlike level.load
-    if (g_missionOk) {
-        if (ImGui::Button("Start DLC 2 as the mission menu (intro)  [level.start dlc2]")) QueueItem("level.start", "dlc2");
+    if (g_missionOk) {                                     // 0.7.2: DLC 1 first
         if (ImGui::Button("Start DLC 1 as the mission menu (intro)  [level.start dlc1]")) QueueItem("level.start", "dlc1");
+        if (ImGui::Button("Start DLC 2 as the mission menu (intro)  [level.start dlc2]")) QueueItem("level.start", "dlc2");
+        char why[200];
+        if (LevelChangePending(why, sizeof(why))) ImGui::TextDisabled("level.load / level.start refused now: %s", why);
     } else {
         ImGui::TextDisabled("level.start: mission start path not verified (see TruMenu.log)");
     }
@@ -6329,6 +6591,13 @@ void PageLog() {
         strncpy_s(g_logFilter, sizeof(g_logFilter), "script", _TRUNCATE);
     ImGui::SameLine();
     if (ImGui::Button("clear  [log.clear]")) { char o[64]; RunLogClear("", o, sizeof(o)); }
+    {                                                                       // 0.7.2 overlay filter
+        char src[300], exc[600];
+        ValOvlSources(src, sizeof(src));
+        ValOvlExclude(exc, sizeof(exc));
+        ImGui::TextWrapped("overlay only: sources %s [log.overlaysources], exclude %s [log.overlayexclude]; the page "
+                           "shows every source", src, exc);
+    }
     // 0.4: collapse, TruLink reads, severity, rate
     bool collapse = g_logCollapse != 0, hide = g_logHideReads != 0;
     if (ImGui::Checkbox("collapse repeats  [log.collapse]", &collapse)) InterlockedExchange(&g_logCollapse, collapse ? 1 : 0);
@@ -6394,7 +6663,7 @@ void PageMedia() {
 
 void DrawLogOverlay() {
     static LogLine lines[64];
-    int c = CopyLines(lines, g_logLines, g_logFilter);
+    int c = CopyLines(lines, g_logLines, g_logFilter, true);   // 0.7.2: + [Log] OverlaySources / OverlayExclude
     ImGuiViewport *vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + 10.0f, vp->WorkPos.y + vp->WorkSize.y - 10.0f), ImGuiCond_Always,
                             ImVec2(0.0f, 1.0f));
@@ -6412,7 +6681,8 @@ void DrawLogOverlay() {
             ImGui::TextUnformatted(line);
             if (sev) ImGui::PopStyleColor();
         }
-        if (!c) ImGui::TextUnformatted("(log: no lines)");
+        if (!c && g_ovlHidden) ImGui::Text("(log: no lines - %ld kept out by [Log] OverlaySources / OverlayExclude)", g_ovlHidden);
+        else if (!c) ImGui::TextUnformatted("(log: no lines)");
     }
     ImGui::End();
 }
@@ -6772,6 +7042,11 @@ void ReadOptions(const char *dir) {
     OptString(ini, "Test", "AutoStart", g_autoStart, sizeof(g_autoStart));
     g_autoStartDelay = OptInt(ini, "Test", "AutoStartDelay");
     if (g_autoStartDelay < 1 || g_autoStartDelay > 60) g_autoStartDelay = atoi(OptDefault("Test", "AutoStartDelay"));
+    g_outfitRule = OptInt(ini, "Levels", "OutfitRule") != 0;                  // 0.7.2
+    EnterCriticalSection(&g_logRingLock);                                    // 0.7.2 overlay filter
+    OptString(ini, "Log", "OverlaySources", g_ovlSources, sizeof(g_ovlSources));
+    OptString(ini, "Log", "OverlayExclude", g_ovlExclude, sizeof(g_ovlExclude));
+    LeaveCriticalSection(&g_logRingLock);
 }
 
 void Start(HMODULE self) {
@@ -6878,6 +7153,20 @@ void Start(HMODULE self) {
         g_autoStartDelay, g_autoStartMode);
     if (g_unitChanges && !g_streamNameOk)
         Log(0, "0.7.1: stream unit code did not match - [Log] UnitChanges off (status.unit shows GameTracker+0x38 only)");
+    // 0.7.2: main state 2 / 9 (mission start pending) and f27's 2nd argument = the selection byte [0xfae8d9]
+    g_pendingOk = PendingCheck();
+    g_outfitRuleOk = g_missionOk && HexBytesAt(0x0077e17c, "807d0c00") && HexBytesAt(0x0077e186, "0f95c2") &&
+                     HexBytesAt(0x0077e193, "8815d9e8fa00") && HexBytesAt(0x0077e450, "c605d9e8fa0000 e96405e6ff") &&
+                     g_pendingOk;
+    if (!g_pendingOk)
+        Log(0, "0.7.2: main state code did not match - level.load / level.start refuse only on GameTracker+0xb9 (as "
+               "0.7.1), a mission start in progress is not seen");
+    if (g_outfitRule && !g_outfitRuleOk)
+        Log(0, "0.7.2: outfit rule off - f27 / selection byte code did not match; level.start keeps f27(unit, 1, 0, 1) "
+               "(PC script 104)");
+    Log(1, "0.7.2: pending check %d (main state 2 / 9 + GameTracker+0xb9), outfit rule %d (ini %d; DLC 2 without the "
+           "outfit selection as the title update), game.quit ready (exit code 0x%x, menu / bar / favourites only)",
+        g_pendingOk ? 1 : 0, g_outfitRuleOk && g_outfitRule ? 1 : 0, g_outfitRule, kQuitExitCode);
     DevRead();
     g_logOverlay = g_logOverlayAtStart ? 1 : 0;
     g_logLines = g_logLinesAtStart;

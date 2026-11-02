@@ -150,6 +150,8 @@ $knownAsis = 'TruDlc2Player', 'TruDoppelganger', 'TruRockVein', 'TruShadowPower'
 $markerNames = 'D3DFAIL', 'AV2NDCHANCE', 'FASTFAIL', 'STACKOVERFLOW', 'EXITPROCESS', 'TERMINATEPROCESS', 'MESSAGEBOX_A',
                'MESSAGEBOX_W'
 $crashMarkers = 'AV2NDCHANCE', 'FASTFAIL', 'STACKOVERFLOW', 'D3DFAIL', 'MESSAGEBOX_A', 'MESSAGEBOX_W', 'TERMINATEPROCESS'
+# TruMenu 0.7.2 game.quit: TerminateProcess(own process, 0x544D) by the owner
+$truMenuQuitCode = 0x544D
 $iconOk   = [string][char]0x2705   # check mark
 $iconFail = [string][char]0x274C   # cross
 $iconOpen = [string][char]0x23F3   # hourglass
@@ -491,6 +493,12 @@ function Get-FirstCrash {
     return $null
 }
 
+function Test-TruMenuQuit {
+    # exit code 0x544D (21581) = the owner ended the game with TruMenu game.quit (TerminateProcess) - not a crash
+    param($ExitCode)
+    return ($null -ne $ExitCode -and "$ExitCode" -ne '' -and ([long]$ExitCode -band 0xffffffffL) -eq $truMenuQuitCode)
+}
+
 function Set-RunVerdict {
     # automatic checks + crash marker + owner checks -> $Run.expects / verdict / verdictIcon / verdictNotes
     param([hashtable]$Run, $Expects, [string]$Folder)
@@ -506,6 +514,7 @@ function Set-RunVerdict {
     $cOther   = $checks.Count - $cFail - $cOk
     $notes = New-Object System.Collections.Generic.List[string]
     if ($Run.firstCrash) { $notes.Add("crash marker $($Run.firstCrash)") }
+    if (Test-TruMenuQuit $Run.exitCode) { $notes.Add('ended via TruMenu game.quit (exit code 0x544D, not a crash)') }
     $firstChanceSites = @($Run.guard | Where-Object { $_ -and $_.kind -eq 'DETAIL' -and $_.state -eq 'firstchance' })
     if ($firstChanceSites.Count) { $notes.Add("$($firstChanceSites.Count) first-chance fault site(s) recorded (see TruGuard faults)") }
     $notes.Add(('automatic checks {0}/{1} ok{2}{3}' -f @($required | Where-Object { $_.result -eq 'ok' }).Count, $required.Count,
@@ -627,7 +636,7 @@ function Write-RunSummary {
     $md.Add("| First crash marker | $(if ($Run.firstCrash) { $Run.firstCrash } else { '-' }) |")
     $md.Add("| Start / end | $($Run.start) / $($Run.end) |")
     $md.Add("| Mode | $($Run.mode) |")
-    $md.Add("| Exit code | $($Run.exitCode) |")
+    $md.Add("| Exit code | $($Run.exitCode)$(if (Test-TruMenuQuit $Run.exitCode) { ' (0x544D: ended via TruMenu game.quit)' }) |")
     $md.Add("| TruLink preload | $($Run.preload) |")
     $md.Add("| md5 notes | $(if ($Run.md5Notes.Count) { $Run.md5Notes -join '; ' } else { 'all as in the profile' }) |")
     if ($Run.expectsFrom) { $md.Add("| Automatic checks from | $($Run.expectsFrom) |") }
@@ -1099,6 +1108,7 @@ try {
     if ($run.firstCrash -or $fails) { $run.status = "fail ($fails failed checks$(if ($run.firstCrash) { ', crash marker' }))"; $run.statusIcon = $iconFail }
     elseif ($timedOut -or $open -or !$testRows.Count) { $run.status = "open ($open open rows$(if ($timedOut) { ', timeout - game still running' }))"; $run.statusIcon = $iconOpen }
     else { $run.status = 'ok'; $run.statusIcon = $iconOk }
+    if (Test-TruMenuQuit $run.exitCode) { $run.status += ' - ended via TruMenu game.quit (exit code 0x544D, not a crash)' }
     $run.timedOut = $timedOut
     $run.expectsFrom = $profName
     Set-RunVerdict -Run $run -Expects $prof.expects -Folder $runFolder
