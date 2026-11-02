@@ -11,6 +11,13 @@ PACKS = ['9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', '600A12643FCDA
 def raw_dlc(name):
     # 10 DRM names exist in pack10 AND pack11 with different content (tools/pack_overlap.py); the first pack wins, so a
     # DLC 2 run sets TRUDLC_PACK_FIRST=pack11 to get the pack11 record as the Xbox source (WINDOWS_REBUILD finding 38)
+    # TRUDLC_EXTRA_XBOX = a folder of extra Xbox DRMs looked up by bare file name before the packs (test 50k: the
+    # prototype-only dlc2_uo_jump_target.drm, extracted to a work/ folder by proto_dlc_compare.py extract), so that the
+    # converter and every fix step that asks for the Xbox source (wave_swap, dtp_audit, statechart, struct fixes) find it
+    extra = os.environ.get('TRUDLC_EXTRA_XBOX')
+    if extra:
+        q = os.path.join(extra, os.path.basename(name.replace('\\', '/')))
+        if os.path.isfile(q): return open(q, 'rb').read(), 'extra/' + os.path.basename(q)
     first = os.environ.get('TRUDLC_PACK_FIRST')
     for p in sorted(PACKS, key=lambda p: 0 if first and p.endswith('/%s.000' % first) else 1) if first else PACKS:
         a = Archive(R + p, 'be'); r = [x for x in a.find(crc('xenon-w\\' + name)) if x['spec'] == 0xffffffff]
