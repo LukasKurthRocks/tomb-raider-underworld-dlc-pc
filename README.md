@@ -1,8 +1,13 @@
 # Tomb Raider: Underworld – DLC for PC
 
-Personal Windows fork of [andrearicci93/trudlcport](https://github.com/andrearicci93/trudlcport) (repository
-`tomb-raider-underworld-dlc-pc`): bringing the Xbox 360 DLC *Beneath the Ashes* and *Lara's Shadow* to the PC
-version - title-update code translated into ASI plugins, data repair tools and in-game test tools.
+**Play the two Xbox 360-only chapters of *Tomb Raider: Underworld* - *Beneath the Ashes* and *Lara's Shadow* - on
+the PC version of the game.**
+
+This is my personal, unofficial fork of [andrearicci93/trudlcport](https://github.com/andrearicci93/trudlcport), the
+project that first converted the DLC for the PC. It goes one step further for *Lara's Shadow*: the Doppelgänger's
+shadow power came to the Xbox with a game update, not with the DLC files, so it is rebuilt here as small add-ons for
+the PC game, together with tools that repair converted data and help testing in the game. You need your own copy of
+the game and your own Xbox DLC files.
 
 ![Unofficial](https://img.shields.io/badge/status-unofficial%20personal%20fork-lightgrey)
 ![AI-assisted](https://img.shields.io/badge/AI--assisted-Claude%20(Anthropic)-8A2BE2)
