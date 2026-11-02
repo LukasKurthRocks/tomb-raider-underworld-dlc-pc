@@ -1,0 +1,32 @@
+# TruMenu regression list DLC 2 (Lara's Shadow) - from docs/Regression-Schattenlara.md; Set-TruMenu.ps1 copies it next to the ASI as TruMenu.regress_dlc2.txt
+# format as TruMenu.tests.txt: id<TAB>state<TAB>hint<TAB>note<TAB>time<TAB>kind<TAB>target<TAB>number (steps: id step<n>, target = item id or id:arg)
+step1	open	Wait until the main menu is shown completely; L3 + R3 opens TruMenu - check the switches (a change needs a restart)			step		1
+step2	open	Close the menu; wait for the direct start into DLC 2 or start it from the DLC mission menu (not level.load - it skips the intro)			step		2
+load-title	open	Loading screen: title LARAS SCHATTEN / LARA'S SHADOW above the line, description below			check		0
+cutscene	open	The intro cutscene plays to its end, picture and sound, no hang			check		0
+step3	open	Move Lara: walk, run, turn the camera			step		3
+doppel-look	open	Doppelganger outfit as on the Xbox: dark red hair, black top / trousers, natural face; no black / white blotches, no white, cyan, green, olive or red / white parts			check		0
+arms-gloves	open	Black fingerless gloves; arm skin with faint veins (reference Xbox-TU_DLC2_05)			check		0
+d3d-box	open	No D3D error box after the load			check		0
+waterfall	open	Waterfall in the first cave: luminous, translucent, moving			check		0
+hud-meter	open	HUD: green health silhouette and the yellow shadow silhouette next to it			check		0
+hint-shadow	open	Shadow meter hint: box at the top centre with the Lara symbol; the game pauses until A			check		0
+hint-vein	open	Rock channel hint (Halten Sie LB oder RB gedrueckt ...): box without symbol, the text stays after A			check		0
+step4	open	Hold RB for a few seconds, then release it			step		4
+shadow-power	open	RB held: slow motion, the yellow silhouette drains; released: normal speed, the silhouette refills			check		0
+shadow-look	open	While RB is held: picture soft and over-bright (cyan-white), glow at Lara's hands; gone after release (missing so far - fail until it works)			check		0
+vein-look	open	Rock vein strip: bright raised stone blocks with a dark centre joint, not a dark flat strip, no black / flickering patches			check		0
+wall-normal	open	Without the power: jump against the rock channel - normal wall behaviour (no ledge, no fall through)			check		0
+wall-run	open	Hold RB and press A at the wall: Lara attaches and runs up			check		0
+wall-to-ledge	open	Hanging in the wall run: X jumps up to the upper edge; Lara grabs it and climbs up			check		0
+wall-top-refill	open	At the top: the yellow silhouette refills			check		0
+wall-meter-empty	open	Wall run until the meter is empty: Lara falls down			check		0
+wall-exit	open	Leave the wall three ways (jump off with A + direction, release RB, run down near the floor): she lands / falls normally, no teleport			check		0
+health	open	Take a hit or fall from a small height: health drops			check		0
+death-after-wall	open	After at least one wall run: jump to death - no crash; Lara reappears at the checkpoint, still as the doppelganger			check		0
+step5	open	time.scale 0.5 (Run), jump to death, then time.scale 1			step	time.scale:0.5	5
+death-timescale	open	Death with time.scale 0.5: no crash (then time.scale 1)			check		0
+step6	open	Quit to the main menu and load a base-game level (level.load, e.g. a level 1 unit)			step		6
+leave-dlc2	open	Base game after DLC 2: Lara looks normal, RB gives no slow motion, no shadow meter (fail = known gap: doppelganger flag reset not ported)			check		0
+step7	open	Mark the checks (A ok, X fail, Y skip), then end the game normally			step		7
+no-crash	open	No crash, freeze or box during the whole run			check		0

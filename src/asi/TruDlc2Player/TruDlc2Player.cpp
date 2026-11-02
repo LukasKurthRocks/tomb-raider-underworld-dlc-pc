@@ -28,6 +28,18 @@
 //     keeps the flag (export TruDlc2PlayerDoppelganger) for later readers (dlc2data f0, TU-only code - not on PC).
 // Every patched byte is compared with the expected code / data first; on a mismatch that part is left alone and the
 // reason is logged. Options: TruDlc2Player.ini, log TruDlc2Player.log.
+//
+// 0.2 (2026-11-02, docs Befund-TU-Funktionen L4): the doppelganger flag is reset like the TU resets it. The TU never
+// stores 0 into gameTracker+0x1244 (its only writer is DoppelgangerInit's `stb 1` at 0x82412c84); the reset is the
+// allocation: every player init that takes the alloc path (TU 0x82412ca0, instance +0x14 bit 0x20000 clear) builds a
+// new tracker with the constructor 0x82413878 = memset(tracker, 0, 0x1320) and publishes it (0x82413354). The PC does
+// the same (constructor tru+0x31c2d0 = memset 0x1310, called only at tru+0x322445, published at tru+0x32247b) - but the
+// PC tracker has no +0x1244, so the flag lives in this plugin (g_doppelganger) and was never cleared: after DLC 2 a
+// DLC 1 / main-game level in the same session still answered 1 (live 2026-11-02). FlagReset redirects the constructor
+// call at tru+0x322445 to TrackerConstructed, which runs the constructor and then clears the plugin's flag - the
+// plugin's copy of the TU memset. DoppelgangerInit runs the base init (which constructs the tracker) before it sets 1,
+// so the DLC 2 player still ends with 1, as on the TU. Export TruDlc2PlayerTrackerGeneration counts the constructed
+// trackers (other plugins re-initialise their copies of tracker-owned TU objects, e.g. the meter +0x508).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -67,8 +79,18 @@ const DWORD kBaseInit = 0x00721f80;        // PC player init (TU 0x82412ca0): pu
 const BYTE kBaseInitBytes[] = {0x55, 0x8b, 0xec, 0x83, 0xe4, 0xf0, 0x83, 0xec, 0x24, 0x8b, 0x45, 0x0c};
 const DWORD kPlayerFn[5] = {0x007228e0, 0x006ee4b0, 0x00709fd0, 0x0071ffe0, 0x0071bfa0};   // f2..f6 of every player record
 
+// ---- 0.2: new game tracker = flag 0 (TU constructor 0x82413878 / publish 0x82413354) ----
+const DWORD kTrackerCtor = 0x0071c2d0;     // thiscall(tracker): push ebx/esi/edi; memset(this, 0, 0x1310); ...; ret
+const char *const kTrackerCtorHex = "53 56 57 6810130000 33ff 8bf1 57 56 e88d7e0f00";
+const DWORD kTrackerCtorCall = 0x00722445; // the only caller: lea ecx,[edi+40h]; call 0x71c2d0; mov [esp+0Ch],edi
+const DWORD kTrackerCtorCallCheck = 0x00722442;
+const char *const kTrackerCtorCallHex = "8d4f40 e8869effff 897c240c";
+const DWORD kTrackerPublish = 0x0072247b;  // add edi,40h (before); mov [0FADB58h],edi
+const char *const kTrackerPublishHex = "83c740 893d58dbfa00";   // [0xfadb58] = TU 0x829892b0
+
 // options (TruDlc2Player.ini, section [Dlc2Player])
-int g_enabled = 1, g_logLevel = 1, g_costume = 1, g_typeRecord = 1;
+int g_enabled = 1, g_logLevel = 1, g_costume = 1, g_typeRecord = 1, g_flagReset = 1;
+volatile LONG g_trackers = 0;              // trackers constructed since load (export TruDlc2PlayerTrackerGeneration)
 
 char g_logPath[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -264,9 +286,65 @@ bool PatchTypeTable() {
     return true;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// 0.2: flag reset with every new game tracker (TU player init alloc path: constructor 0x82413878 = memset 0x1320)
+bool HexBytesAt(DWORD address, const char *hex) {
+    BYTE buf[64];
+    size_t n = 0;
+    for (const char *p = hex; *p && n < sizeof(buf);) {
+        if (*p == ' ') { ++p; continue; }
+        char two[3] = {p[0], p[1], 0};
+        buf[n++] = static_cast<BYTE>(strtoul(two, nullptr, 16));
+        p += 2;
+    }
+    return BytesAt(address, buf, n);
+}
+
+extern "C" void __cdecl TrackerConstructed(void *tracker) {
+    LONG n = InterlockedIncrement(&g_trackers);
+    LONG was = InterlockedExchange(&g_doppelganger, 0);    // the TU's memset clears +0x1244
+    Log(was ? 1 : 2, "new game tracker %ld at 0x%08lx (tru+0x31c2d0 = TU 0x82413878)%s", n,
+        reinterpret_cast<DWORD>(tracker), was ? ": doppelganger flag 1 -> 0" : ", doppelganger flag 0");
+}
+
+DWORD g_trackerCtor = kTrackerCtor;
+
+// replaces `call 0x71c2d0` at tru+0x322445 (thiscall, ecx = block+0x40, no stack arguments, returns this)
+__declspec(naked) void TrackerCtorHook() {
+    __asm {
+        push ecx
+        call dword ptr [g_trackerCtor]
+        pop ecx
+        push eax
+        push ecx
+        call TrackerConstructed
+        add esp, 4
+        pop eax
+        ret
+    }
+}
+
+bool PatchFlagReset() {
+    if (!HexBytesAt(kTrackerCtor, kTrackerCtorHex) || !HexBytesAt(kTrackerCtorCallCheck, kTrackerCtorCallHex) ||
+        !HexBytesAt(kTrackerPublish - 3, kTrackerPublishHex)) {
+        Log(0, "flag reset: tracker constructor 0x%08lx / call 0x%08lx / publish 0x%08lx does not match - not patched "
+               "(the doppelganger flag then stays set for the rest of the session once DLC 2 was played)",
+            kTrackerCtor, kTrackerCtorCall, kTrackerPublish);
+        return false;
+    }
+    BYTE call[5] = {0xe8, 0, 0, 0, 0};
+    DWORD rel = reinterpret_cast<DWORD>(&TrackerCtorHook) - (kTrackerCtorCall + 5);
+    memcpy(call + 1, &rel, 4);
+    if (!WriteCode(kTrackerCtorCall, call, sizeof(call))) return false;
+    Log(1, "flag reset: every new game tracker (call 0x%08lx -> constructor 0x%08lx) clears the doppelganger flag, as the "
+           "TU's memset (0x82413878); DoppelgangerInit sets it again afterwards", kTrackerCtorCall, kTrackerCtor);
+    return true;
+}
+
 void ReadOptions(const char *dir) {
     char ini[MAX_PATH];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruDlc2Player.ini", dir);
+    g_flagReset = GetPrivateProfileIntA("Dlc2Player", "FlagReset", 1, ini);
     g_enabled = GetPrivateProfileIntA("Dlc2Player", "Enabled", 1, ini);
     g_logLevel = GetPrivateProfileIntA("Dlc2Player", "LogLevel", 1, ini);
     g_costume = GetPrivateProfileIntA("Dlc2Player", "Costume", 1, ini);
@@ -280,8 +358,8 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDlc2Player.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDlc2Player 0.1 loaded (enabled %d, log level %d, costume %d, type record %d)", g_enabled, g_logLevel,
-        g_costume, g_typeRecord);
+    Log(1, "TruDlc2Player 0.2 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d)", g_enabled,
+        g_logLevel, g_costume, g_typeRecord, g_flagReset);
     if (!g_enabled) { Log(1, "disabled by TruDlc2Player.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -292,6 +370,8 @@ void Start(HMODULE self) {
         else Log(0, "costume: not patched because the type record \"%s\" is missing (an object of that name would "
                     "get no player functions)", kToName);
     }
+    if (g_flagReset) PatchFlagReset();
+    else Log(1, "flag reset: off ([Dlc2Player] FlagReset=0) - the flag stays set after DLC 2 for the whole session");
 }
 
 }  // namespace
@@ -307,9 +387,14 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported: plugin identification, and the TU's gameTracker+0x1244 for other plugins (1 after DoppelgangerInit)
 extern "C" __declspec(dllexport) const char *TruDlc2PlayerVersion() {
-    return "TruDlc2Player 0.1 (DLC 2 doppelganger player object)";
+    return "TruDlc2Player 0.2 (DLC 2 doppelganger player object, flag reset with every new game tracker)";
 }
 
 extern "C" __declspec(dllexport) int TruDlc2PlayerDoppelganger() {
     return g_doppelganger ? 1 : 0;
+}
+
+// 0.2: number of game trackers constructed since load (changes = the TU would have a new tracker with zeroed fields)
+extern "C" __declspec(dllexport) int TruDlc2PlayerTrackerGeneration() {
+    return static_cast<int>(g_trackers);
 }

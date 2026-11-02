@@ -93,6 +93,14 @@
 //                   normalize(tru+0x2fe7e0(box, segment, position))
 //   corner angle    TU 0x82400bc0 -> tru+0x309500, sites 0x7097cb / 0x709894: flag 0x400000 OR type 22 -> skip
 // Hits are counted in the stubs and logged from the chart probe (ChartTick) on the game thread.
+//
+// 0.9 (2026-11-02, docs Befund-TU-Funktionen L1): the fifth geometry function. Retail 0x82427750 = PC tru+0x34d390
+// (TU 0x8242a7c8). After the flag test `box +0x28 & 0x400000` (TU 0x8242a884..0x8242a894) the TU inserted
+// 0x8242a898..0x8242a8c4: the same inline type test (second markup +0x4d, else file record +0x33, sign-extended) and
+// `type == 22 -> 0x8242abac`, the block the 0x400000 flag takes (vcall through 0x829bffc4 slot +8 = PC tru+0x34d4bf
+// `call 0x5c3cc0`, jmp 0x74d710). SkipGeometryStub replaces `test eax,400000h; je 0x74d4d5` at tru+0x34d4b8 (eax =
+// [esi+28h], esi = box): flag or type 22 -> 0x74d4bf, else 0x74d4d5 with eax kept for the next tests (0x8000 /
+// 0x40000000). Option SkipGeometry; hit counter 5 of the chart probe. With it 11 of 11 TU geometry functions.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -259,6 +267,7 @@ int g_state420Slot1 = 1;                // 0.6: TU state 420 slot 1 (0x8245e450)
 int g_chartLog = 1;                     // 0.6: log the player's chart record changes (LogLevel >= 1)
 int g_chartFrom = 1470, g_chartTo = 1510;
 int g_jumpGeometry = 1;                 // 0.8: TU type-22 branches of the jump-off / fall geometry ([RockVein] JumpGeometry)
+int g_skipGeometry = 1;                 // 0.9: TU type-22 branch of tru+0x34d390 (TU 0x8242a7c8) ([RockVein] SkipGeometry)
 DWORD g_facingNext = kFacingNext, g_facingEdge = kFacingEdge, g_moveNext = kMoveNext, g_moveWall = kMoveWall;
 DWORD g_chartTickNext = kChartTickNext;
 volatile LONG g_facingHits = 0, g_moveHits = 0, g_slot1Calls = 0, g_slot1Runs = 0, g_chartLines = 0;
@@ -539,6 +548,7 @@ void ReadOptions(const char *dir) {
     g_chartFrom = GetPrivateProfileIntA("RockVein", "ChartLogFrom", 1470, ini);
     g_chartTo = GetPrivateProfileIntA("RockVein", "ChartLogTo", 1510, ini);
     g_jumpGeometry = GetPrivateProfileIntA("RockVein", "JumpGeometry", 1, ini);
+    g_skipGeometry = GetPrivateProfileIntA("RockVein", "SkipGeometry", 1, ini);
 }
 
 // 0.3: the title update's markup types 22 / 23 -> flag class 1 (Xbox TU 0x822a12e8 table entries 21 / 22 = li r3,1).
@@ -916,17 +926,20 @@ void __cdecl State420Slot1(BYTE *agent) {
 // ---- 0.8: title-update type-22 branches of the jump-off / fall geometry (counters reported from ChartTick) ----
 // Hit counters, written by the naked stubs below with `lock inc` (no call inside stubs that run while the x87 stack
 // may hold a value); ChartTick logs them on the game thread: first hit, then at LogLevel 2 every power of two.
-volatile LONG g_geoHits[5] = {0, 0, 0, 0, 0};   // 0 segment range, 1 TNode point, 2 bone point, 3 / 4 tru+0x309500 sites
-LONG g_geoReported[5] = {0, 0, 0, 0, 0};
-const char *const kGeoNames[5] = {
+// 0.9: 5 = tru+0x34d390 (TU 0x8242a7c8)
+volatile LONG g_geoHits[6] = {0, 0, 0, 0, 0, 0};   // 0 segment range, 1 TNode point, 2 bone point, 3 / 4 tru+0x309500 sites
+LONG g_geoReported[6] = {0, 0, 0, 0, 0, 0};
+const int kGeoCount = 6;
+const char *const kGeoNames[6] = {
     "segment range (tru+0x2fe040 = TU 0x823fe9d0): type-22 box -> last segment index - 1, like flag 0x400000",
     "TNode attach point (tru+0x307c60 = TU 0x823fd890): type-22 box -> position + 47.4075 x facing, z - 474.075",
     "bone attach point (tru+0x311530 = TU 0x823fe130): type-22 box -> position + 47.4075 x facing",
     "segment corner 1 (tru+0x309500 site 0x7097cb = TU 0x82400dc0): type-22 box skips the angle, like flag 0x400000",
-    "segment corner 2 (tru+0x309500 site 0x709894 = TU 0x82400ea0): type-22 box skips the angle, like flag 0x400000"};
+    "segment corner 2 (tru+0x309500 site 0x709894 = TU 0x82400ea0): type-22 box skips the angle, like flag 0x400000",
+    "fifth geometry function (tru+0x34d390 site 0x74d4b8 = TU 0x8242a8c4): type-22 box takes the flag-0x400000 path"};
 
 void ReportGeometryHits() {
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < kGeoCount; ++i) {
         LONG n = g_geoHits[i], last = g_geoReported[i];
         if (n == last) continue;
         g_geoReported[i] = n;
@@ -1299,6 +1312,60 @@ void PatchJumpGeometry() {
         g_chartLog ? "" : " - ChartLog=0, so no hit lines");
 }
 
+// ---- 0.9: fifth geometry function tru+0x34d390 (TU 0x8242a7c8, inserted block 0x8242a898..0x8242a8c4) ----
+const DWORD kGeo5Entry = 0x0074d390;      // push ebp; mov ebp,esp; and esp,-16; sub esp,0C8h; fldz; mov eax,[ebp+10h]
+const char *const kGeo5EntryHex = "55 8bec 83e4f0 81ecc8000000 d9ee 8b4510 53 d95c2408 56 8b750c";   // esi = box
+const DWORD kGeo5At = 0x0074d4b8;         // test eax,400000h; je 0x74d4d5 (7 bytes), after mov eax,[esi+28h]
+const DWORD kGeo5Check = 0x0074d4b5;
+const char *const kGeo5Hex = "8b4628 a900004000 7416 6a00 8d8424c4000000 50 8bce e8f067e7ff e93b020000 a900800000";
+const DWORD kGeo5Next = 0x0074d4d5, kGeo5Flag = 0x0074d4bf;
+DWORD g_g5Next = kGeo5Next, g_g5Flag = kGeo5Flag;
+
+// tru+0x34d4b8: flag 0x400000 or type(esi) == 22 -> the flag path (TU 0x8242abac), else the 0x8000 test (eax kept)
+__declspec(naked) void SkipGeometryStub() {
+    __asm {
+        test eax, 400000h
+        jnz flag
+        push ecx
+        push eax
+        mov ecx, [esi + 24h]
+        test ecx, ecx
+        jz rec
+        movsx eax, byte ptr [ecx + 4dh]
+        jmp cmp22
+    rec:
+        mov ecx, [esi + 20h]
+        test ecx, ecx
+        jz no
+        movsx eax, byte ptr [ecx + 33h]
+    cmp22:
+        cmp eax, 16h
+        jne no
+        lock inc dword ptr [g_geoHits + 20]
+        pop eax
+        pop ecx
+    flag:
+        jmp dword ptr [g_g5Flag]
+    no:
+        pop eax
+        pop ecx
+        jmp dword ptr [g_g5Next]
+    }
+}
+
+void PatchSkipGeometry() {
+    if (!HexBytesAt(kGeo5Entry, kGeo5EntryHex) || !HexBytesAt(kGeo5Check, kGeo5Hex)) {
+        Log(0, "fifth geometry function at 0x%08lx / 0x%08lx does not match - its type-22 branch not added", kGeo5Entry,
+            kGeo5At);
+        return;
+    }
+    if (WriteJump(kGeo5At, &SkipGeometryStub, 7))
+        Log(1, "fifth geometry function: title-update type-22 branch added (tru+0x34d390 = TU 0x8242a7c8, site 0x%08lx: "
+               "flag 0x400000 or type 22 -> 0x%08lx)", kGeo5At, kGeo5Flag);
+    else
+        Log(0, "fifth geometry function not written (VirtualProtect %lu)", GetLastError());
+}
+
 bool WriteDword(DWORD at, DWORD value) {
     DWORD old = 0, dummy = 0;
     if (!VirtualProtect(reinterpret_cast<void *>(at), 4, PAGE_READWRITE, &old)) return false;
@@ -1364,10 +1431,11 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruRockVein.log", dir);
     strncpy_s(g_dir, sizeof(g_dir), dir, _TRUNCATE);
     ReadOptions(dir);
-    Log(1, "TruRockVein 0.8 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
+    Log(1, "TruRockVein 0.9 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
         "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d, attach geometry %d, state 420 slot 1 %d, "
-        "chart log %d, jump geometry %d)", g_enabled, g_logLevel, g_logUnhandled, g_logBadValues, g_logDefaultConditions, g_markupTypes,
-        g_markupSlots, g_nullBoxGuard, g_markupAction608, g_attachGeometry, g_state420Slot1, g_chartLog, g_jumpGeometry);
+        "chart log %d, jump geometry %d, skip geometry %d)", g_enabled, g_logLevel, g_logUnhandled, g_logBadValues,
+        g_logDefaultConditions, g_markupTypes, g_markupSlots, g_nullBoxGuard, g_markupAction608, g_attachGeometry,
+        g_state420Slot1, g_chartLog, g_jumpGeometry, g_skipGeometry);
     if (!g_enabled) { Log(1, "disabled by TruRockVein.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -1379,6 +1447,7 @@ void Start(HMODULE self) {
     if (g_state420Slot1) PatchState420();
     if (g_chartLog) PatchChartLog();
     if (g_jumpGeometry) PatchJumpGeometry();
+    if (g_skipGeometry) PatchSkipGeometry();
     if (!BytesAt(kDispatch, kDispatchBytes, sizeof(kDispatchBytes)) || !BytesAt(kDefault, kDefaultBytes, sizeof(kDefaultBytes)) ||
         !BytesAt(kExit, kExitBytes, sizeof(kExitBytes)) || !BytesAt(kCtxUse, kCtxUseBytes, sizeof(kCtxUseBytes))) {
         Log(0, "SCCondTest_MarkupType at 0x%08lx does not match (other tru.exe build?) - not patched", kDispatch);
@@ -1408,4 +1477,4 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
-extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.8 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry)"; }
+extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.9 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function)"; }

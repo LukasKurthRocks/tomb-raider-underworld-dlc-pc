@@ -10,6 +10,10 @@
              overwritten or removed. TruMenu.log is left in place.
     -Install over an earlier build of ours replaces it (update); an .ini the owner edited is not ours and is kept
              (the plugin's built-in defaults cover options it lacks).
+    0.8: also the regression lists tests\regress\dlc1.txt / dlc2.txt -> TruMenu.regress_dlc1.txt / _dlc2.txt next to
+             the .asi (taken from the build folder when it holds TruMenu.regress_*.txt, else from tests\regress). A
+             list is ours when its first line starts with "# TruMenu regression list"; a foreign file of that name is
+             kept. TruMenu.regress_results.txt (the owner's results) is never touched.
     The game must not be running. Every run writes <workspace>\logs\Set-TruMenu_<time>.log. -Verbose shows the
     steps, -Debug the hashes, -Trace adds a PowerShell line trace.
 
@@ -49,15 +53,20 @@ $earlierBuilds = @{
                       '2febe208f812a29a6ad960fb175bfbae5397baaef7ff5e063d2a5e3d09848738',   # 0.6 command bar (2026-11-01, work\asi\menu06)
                       'f848695482a4440f3d35c44b1a6bbe926bc1cbfdb10d6ee1594c8c5b729486be',   # 0.6 + guard.dump (2026-11-02, work\asi)
                       '6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b',   # 0.7 keyboard / focus / mouse (work\asi\menu07)
-                      '055b1f1e17ca547a19cbdfd90ec374f67ecec3360c357a7109c52a805008baf4')   # 0.7.1 game input frozen (work\asi\menu071)
+                      '055b1f1e17ca547a19cbdfd90ec374f67ecec3360c357a7109c52a805008baf4',   # 0.7.1 game input frozen (work\asi\menu071)
+                      '71c280778bdd1fd5e61e45741af39124c55fb796b83259847c966fd809f9c006')   # 0.7.2 game.quit / outfit rule (work\asi\menu072)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
                       'ae77e5d50799c4d528a5bf8339b7266c3e0c0dd05024247932cf012cdf302e83',
                       '73b27b92d0aabe6fb0a33d3232e4c0489efda4ebe816e08dfec2f9e27cb237ee',   # 0.6 ([Cmd] Enabled / HistorySize)
                       '5d0dd4a902fa9ee41bc2b3635d8ba46ecd34d9ba4992bd31d8e003243d2b38fa',   # 0.7 ([Cmd] keyboard / focus, [Menu] FreeMouse)
-                      '6d7c75e52939955be4fa2cec21410a612a5301a9a5b6433099d955b37804b2ca')   # 0.7.1 ([Menu] BlockGameInput / PauseGame, [Test] AutoStart)
+                      '6d7c75e52939955be4fa2cec21410a612a5301a9a5b6433099d955b37804b2ca',   # 0.7.1 ([Menu] BlockGameInput / PauseGame, [Test] AutoStart)
+                      '0268d20bdb465ee57e36f4191a1e08fbd7746d8f2d9675c51e30f515fc253faa')   # 0.7.2 ([Levels] OutfitRule, [Log] OverlaySources / OverlayExclude)
 }
+# 0.8 regression lists: target name -> source name in tests\regress (or the same target name in the build folder)
+$regressLists = [ordered]@{ 'TruMenu.regress_dlc1.txt' = 'dlc1.txt'; 'TruMenu.regress_dlc2.txt' = 'dlc2.txt' }
+$regressMarker = '# TruMenu regression list'
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $logFile = Join-Path $logDir ('Set-TruMenu_{0}_{1}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'), $PSCmdlet.ParameterSetName)
@@ -100,6 +109,32 @@ try {
             if ($targetHash -ne $sourceHash -and !$isEarlier) { Write-Log "$target is not a build of ours - left untouched." -Level WARN; continue }
             Remove-Item -LiteralPath $target
             Write-Log "$name removed from $GamePath."
+        }
+    }
+
+    # 0.8 regression lists (plain text, no game data); ours = first line starts with $regressMarker
+    foreach ($entry in $regressLists.GetEnumerator()) {
+        $target = Join-Path $GamePath $entry.Key
+        $isOurs = $false
+        if (Test-Path -LiteralPath $target) {
+            $first = Get-Content -LiteralPath $target -TotalCount 1 -ErrorAction SilentlyContinue
+            $isOurs = [bool]($first -and ([string]$first).StartsWith($regressMarker))
+        }
+        if ($Install) {
+            $source = Join-Path $built $entry.Key
+            if (!(Test-Path -LiteralPath $source)) { $source = Join-Path $repo ('tests\regress\' + $entry.Value) }
+            if (!(Test-Path -LiteralPath $source)) { Write-Log "$source not found - regression list $($entry.Key) not installed." -Level WARN; continue }
+            Write-Log "$($entry.Key) source $source sha256 $(Get-Sha256 $source)" -Level DEBUG
+            if ((Test-Path -LiteralPath $target) -and !$isOurs) { Write-Log "$target is not a list of ours - left untouched." -Level WARN; continue }
+            if ((Test-Path -LiteralPath $target) -and ((Get-Sha256 $target) -eq (Get-Sha256 $source))) { Write-Log "$($entry.Key) already installed."; continue }
+            Copy-Item -LiteralPath $source -Destination $target -Force
+            Write-Log "$($entry.Key) copied to $target."
+        }
+        else {
+            if (!(Test-Path -LiteralPath $target)) { Write-Log "$($entry.Key) not in the game folder." -Level VERBOSE; continue }
+            if (!$isOurs) { Write-Log "$target is not a list of ours - left untouched." -Level WARN; continue }
+            Remove-Item -LiteralPath $target
+            Write-Log "$($entry.Key) removed from $GamePath."
         }
     }
 }

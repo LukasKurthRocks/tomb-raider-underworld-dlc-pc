@@ -53,6 +53,31 @@
 // 0x1f4 / 0x1f5 to every instance whose query +0x11c answers 0x172 (PC instance list [0xd98d54], wake tru+0x1b2de0)
 // - the level objects that react to the power, e.g. presumably dlc_fx_bloom (object 1038, states fx_on / fx_off)
 // ([Look] Messages).
+//
+// 0.9 (2026-11-02, docs Befund-TU-Funktionen "Plugins 0.9"): the power only through the TU path, and the TU's
+// adrenaline look.
+//   * Tick = TU 0x823d7a10 as the TU calls it: the player update 0x824126d8 runs it only when gameTracker+0x1244 is set
+//     (0x824128a4..0x824128b8) - so the tick (and with it every start) now needs TruDlc2Player's flag, which 0.2 clears
+//     with every new tracker. The TU's own gates are translated: a running cinematic (TU inline test of
+//     [0x82efb590] +0xdd / +0x2c = PC tru+0x53f00 on [0xe7f1c0]) or the byte 0x829ca6da (= retail 0x829ca5f1 = PC
+//     0xfae8dd, set by tru+0x37bbf0 from GAMELOOP tru+0x1de480) stop the power and refuse a start; the start also needs
+//     gameTracker+0x628 (health) > 0; the buttons count only while gameTrackerX+0xbc bit 0 (TU 0x82efb514 = PC
+//     0xe7f144, the same test in the adrenaline tick TU 0x823defa8 = tru+0x318bd0) is clear, and that bit also stops
+//     an active power; flag 0x80 = bool parameter 0x412 of Lara's current state (state machine gameTracker+0xf10)
+//     blocks the meter; a refused start fires player event 0x80. A new tracker re-initialises the meter (TU: the meter
+//     object belongs to the player data built by the player init). The TU reads LB / RB from the game's input records
+//     (+0x1a70 / +0x1b30 & 4 of [[0x8286dd90]+0x18]->[0] = PC [[0xa02b68]+0x18]->[0]); no PC code reads these two
+//     records, so the XInput state of the pad poll stays the button source by default ([ShadowPower] GameInput=1 reads
+//     the game records instead; the log shows both while LB / RB is held). [ShadowPower] LegacyPadStart=1 restores the
+//     0.8 tick (no doppelganger / cinematic gates).
+//   * Look = TU adrenaline camera: 0x823d94f8 per tick (power on, meter > tuning +0x28, 0x823df8f8(player) = PC
+//     tru+0x2f2800 with the TU's doppelganger branch, mode [gameTracker+0x500]+0x134 != 3, not flag 2) sets meter flag
+//     0x40 through 0x823d9348 (world request slot 3 = tuning +0x38, HUD 0x9000 when player +0x1fc bit 10, event 0x39)
+//     and clears it through 0x823d9438 (slot 3 empty, HUD &= ~0x9000, event 0x3a; also from Stop). In doppelganger mode
+//     the TU's camera mode chooser (0x822acdd0 = tru+0x1e7fe0, site tru+0x1e80a9) picks mode 0x34 by meter flag 0x40
+//     instead of player +0x1fc bit 27, and the adrenaline start / stop / tick (0x823ded18 / 0x823dee58 / 0x823defa8 =
+//     tru+0x3189c0 / tru+0x318ad0 / tru+0x318bd0) read flag 0x40 for "active" and meter flag 2 for +0x1fc bit 21;
+//     condition 1047 (TU predicate 0x8246e538 = PC tru+0x365600) the same. [Look] AdrenalineMode.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -213,6 +238,9 @@ int g_logLevel = 1;                     // 0 errors, 1 info, 2 every start / sto
 WORD g_buttons = 0x0300;                // LB 0x0100 | RB 0x0200 (Xbox: either); LB also sprints on PC
 int g_hudFeed = 1;                      // [Meter] HudBar
 int g_fallback = 1;                     // [Meter] Fallback: file copy of the tuning when the object is not loaded
+int g_legacyPadStart = 0;               // 0.9 [ShadowPower] LegacyPadStart: 1 = the 0.8 tick (no TU gates)
+int g_gameInput = 0;                    // 0.9 [ShadowPower] GameInput: 1 = LB / RB from the game's input records
+int g_adrenalineMode = 1;               // 0.9 [Look] AdrenalineMode: TU 0x823d94f8 group + mode chooser / adrenaline
 
 char g_logPath[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -479,6 +507,10 @@ int BroadcastPowerMessage(int msg) {
     return sent;
 }
 
+// 0.9, defined below: the TU's start gates (cinematic / 0x829ca6da / health) and the flag-0x40 clear 0x823d9438
+bool TuStartRefused();
+void Clear40();
+
 // 0x823d8120
 bool CanStart(const BYTE *tuning) {
     if (!tuning) return false;
@@ -490,8 +522,10 @@ bool CanStart(const BYTE *tuning) {
 // 0x823d7d40 (the request list 0x823d7520 with only this request = both ramps to the tuning values in 33 ms)
 void StartPower(const BYTE *tuning) {
     if (g_meter.flags & 1) return;
-    // not ported: cinematic (0x82efb590) / 0x829ca6da / game state +0x628 > 0 checks, the camera manager call
-    // (*0x82efc780)->vtbl[0xa4] (= 0x822a9e58: camera +0x7c |= 2; PC camera manager not mapped)
+    // 0.9: no cinematic (0x82efb590 = PC [0xe7f1c0] via tru+0x53f00), 0x829ca6da (PC 0xfae8dd) clear and gameTracker
+    // +0x628 > 0 (0x823d7d68..0x823d7dd4); not with LegacyPadStart=1. Not ported: the camera manager call
+    // (*0x82efc780)->vtbl[0xa4] (= 0x822a9e58: camera +0x7c |= 2, selects other camera curves - docs L9)
+    if (!g_legacyPadStart && TuStartRefused()) return;
     if (!tuning) return;
     g_meter.request[0][0] = Tune(tuning, kTunePlayer);          // +0x40 = tuning +0x40
     g_meter.request[0][1] = Tune(tuning, kTuneWorld);           // +0x44 = tuning +0x3c
@@ -530,8 +564,9 @@ void StartPower(const BYTE *tuning) {
 // 0x823d7fb8 (request cleared: both ramps back to 1.0 in 33 ms)
 void StopPower(const char *why) {
     if (!(g_meter.flags & 1)) return;
-    // not ported: 0x823d9438 (flag 0x40) and 0x823d9050 (flag 2) - both flags are never set here (targeting
-    // slow-down 0x823d94f8 and shadow strike 0x823d8978 not ported)
+    // 0.9: flag 0x40 -> 0x823d9438 (Clear40, translated with [Look] AdrenalineMode); not ported: flag 2 -> 0x823d9050
+    // (flag 2 is set only by the shadow strike 0x823d8978, not ported - never set here)
+    if (g_meter.flags & 0x40) Clear40();
     g_meter.request[0][0] = g_meter.request[0][1] = kNoRequest;
     Selector();
     // 0.8: 0x823d7ffc..0x823d8068 - event 0x33, then 0x7e (ran empty, flag 0x200) or 0x82
@@ -591,9 +626,10 @@ void Drain(const BYTE *tuning, float amount) {
     // not ported: sounds 0x7d (crossing tuning +0x30), 0x85 / 0x86
 }
 
-// 0x823d7a10, the part that runs the meter (on the Xbox called once per frame from the player update 0x824126d8;
-// here from the pad poll, once per advance of the game clock)
-void MeterTick(bool held) {
+// 0x823d7a10 as translated up to 0.8 (kept for [ShadowPower] LegacyPadStart=1): runs in every level, without the
+// TU's doppelganger / cinematic gates (on the Xbox called once per frame from the player update 0x824126d8; here from
+// the pad poll, once per advance of the game clock). 0.9's MeterTick (below) is the TU path.
+void LegacyMeterTick(bool held) {
     const BYTE *tuning = FindTuning();
     g_tuning = tuning;
     // not ported: stop on cinematic / 0x829ca6da, zone query 0x412 (flag 0x80), the looping sound, effects
@@ -634,6 +670,8 @@ void MeterTick(bool held) {
         }
     }
 }
+
+void MeterTick(bool padHeld);                // 0.9: the TU tick (defined below)
 
 XInputGetStateFn g_realXInput = nullptr;    // the real XInputGetState (xinput* module), for the re-entry guard
 __declspec(thread) int g_inPadHook = 0;
@@ -812,7 +850,7 @@ const CodeCheck kTuBlocks[] = {
 };
 
 bool HexBytesAt(DWORD address, const char *hex) {
-    BYTE buf[64];
+    BYTE buf[200];
     size_t n = 0;
     for (const char *p = hex; *p && n < sizeof(buf);) {
         if (*p == ' ') { ++p; continue; }
@@ -1376,9 +1414,582 @@ void RegisterLaraStates() {
         Log(0, "Lara states: VirtualProtect failed (%lu) - not registered", GetLastError());
 }
 
+// ================================================================================================================
+// 0.9: the TU tick 0x823d7a10 with its gates, and the adrenaline look group (0x823d94f8 / 0x823d9348 / 0x823d9438,
+// mode chooser, adrenaline start / stop / tick, condition 1047)
+
+// ---- TU gates (PC partners, each pinned by bytes in Start) ----
+typedef char(__cdecl *CinematicFn)();
+const DWORD kCinematic = 0x00453f00;      // [0xe7f1c0] && +0xdd && +0x2c != -1 (TU 0x823d7a30..0x823d7a6c inline)
+const char *const kCinematicHex = "a1c0f1e700 85c0 7418 80b8dd00000000 740c 83782cff 7406 b801000000 c3 33c0 c3 32c0 c3";
+const DWORD kBlockByte = 0x00fae8dd;      // TU 0x829ca6da = retail 0x829ca5f1
+const DWORD kBlockGetter = 0x0077bc20;    // mov al,[0FAE8DDh]; ret
+const char *const kBlockGetterHex = "a0dde8fa00 c3";
+const DWORD kBlockSetter = 0x0077bbf0;    // mov al,[esp+4]; mov [0FAE8DDh],al; ret
+const char *const kBlockSetterHex = "8a442404 a2dde8fa00 c3";
+const DWORD kBlockSetterCall = 0x005de576;   // GAMELOOP tru+0x1de480 (= retail 0x8229c530, store 0x8229c708)
+const char *const kBlockSetterCallHex = "e875d61900";
+const DWORD kGtxFlags = 0x00e7f144;       // TU 0x82efb514 (gameTrackerX +0xbc), bit 0
+const DWORD kGtxFlagsCheck = 0x00718c1f;  // adrenaline tick tru+0x318bd0 = TU 0x823defa8: test byte [0E7F144h],1
+const char *const kGtxFlagsCheckHex = "f60544f1e70001 0f85c4000000 803d43f1e70004";
+const DWORD kInputPtr = 0x00a02b68;       // TU 0x8286dd90: [[p]+0x18]->[0] = the input records
+const DWORD kInputCheck = 0x00718c39;     // the same chain to +0x6f0 & 0x10 in tru+0x318bd0 (TU: +0x6f0 >> 4 & 1)
+const char *const kInputCheckHex = "8b0d682ba000 8b5118 8b0a 8b91f0060000 80e210";
+bool g_gatesOk = false;                   // cinematic / block byte / 0xe7f144 verified
+bool g_inputOk = false;                   // input chain verified (GameInput / diagnostic)
+
+bool Cinematic() {
+    if (!g_gatesOk) return false;
+    char c = 0;
+    __try {
+        c = reinterpret_cast<CinematicFn>(kCinematic)();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        c = 0;
+    }
+    return c != 0;
+}
+
+bool BlockByte() { return g_gatesOk && *reinterpret_cast<const volatile BYTE *>(kBlockByte) != 0; }
+bool GtxFlag() { return g_gatesOk && (*reinterpret_cast<const volatile BYTE *>(kGtxFlags) & 1) != 0; }
+
+// TU 0x823d7d68..0x823d7dd4: refused while a cinematic runs, 0x829ca6da is set, no tracker or health <= 0.0
+bool TuStartRefused() {
+    if (Cinematic() || BlockByte()) return true;
+    BYTE *gt = GameTracker();
+    if (!gt) return true;
+    float health = 0.0f;
+    __try {
+        health = *reinterpret_cast<const float *>(gt + 0x628);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return true;
+    }
+    return !(kZero < health);
+}
+
+// game input record word (TU 0x823d7b6c..0x823d7b8c reads +0x1a70 / +0x1b30); returns false when not readable
+bool InputWord(DWORD offset, DWORD *value) {
+    if (!g_inputOk) return false;
+    __try {
+        const BYTE *p = *reinterpret_cast<const BYTE *const *>(kInputPtr);
+        if (!p) return false;
+        const BYTE *list = *reinterpret_cast<const BYTE *const *>(p + 0x18);
+        if (!list) return false;
+        const BYTE *rec = *reinterpret_cast<const BYTE *const *>(list);
+        if (!rec) return false;
+        *value = *reinterpret_cast<const DWORD *>(rec + offset);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+// ---- adrenaline look group ----
+const DWORD kTargetCheck = 0x006f2800;    // TU 0x823df8f8 (retail leaf 0x823dd7a8), thiscall(player) -> al
+const char *const kTargetCheckHex =
+    "53 8b1d58dbfa00 8b8300050000 56 8bb034010000 83fe0c 57 8bf9 0f8491000000 83fe07 0f8488000000 83fe03 747d "
+    "83fe04 7478 e898f6ffff 84c0 756f 8b87fc010000 8bc8 c1e91e f6c101 755f 8bd0 c1ea15 f6c201 7555 c1e818 a801 754e "
+    "83feff 744f d9ee d89b88050000 dfe0 f6c405 7b3a 803de6b48a0000 7437 f60544f1e70001 752e 803d43f1e70004 7425 "
+    "a1682ba000 8b4818 8b11 8b8230060000 2404 33c9 3c04 0f94c1 8bc1 85c0 7406 5f 5e b001 5b c3 5f 5e 32c0 5b c3";
+const DWORD kAimHelper = 0x006f1ed0;      // +0x1fc bit 9 or bit 10 (TU inline 0x823df924..0x823df948)
+const char *const kAimHelperHex = "8b81fc010000 8bc8 c1e909 f6c101 750a c1e80a a801 7503 33c0 c3 b801000000 c3";
+const DWORD kHudClear = 0x0077db70;       // clear bit n of the HUD group mask 0xfae924 (PC adrenaline stop)
+const char *const kHudClearHex = "8b4c2404 8d41ff 83f81e 7710 ba01000000 d3e2 f7d2 211524e9fa00 c3";
+typedef void(__cdecl *HudClearFn)(int bit);
+bool g_lookAdrOk = false;                 // check function / HUD clear verified (LookTick, Set40, Clear40)
+volatile LONG g_set40 = 0, g_clear40 = 0;
+
+// TU 0x823df8f8 (gameTracker in r8, player in r3). The TU inserted 0x823df918..0x823df970: in doppelganger mode only
+// +0x1fc bits 9 / 10, 30, 24 answer 1 before the shared tail (no mode 3 / 4, no bit 21). The rest is the PC function's
+// code (tru+0x2f2800, verified byte for byte) written out: mode 0xc / 7 -> 0; tail tru+0x2f285d = TU 0x823df9d8.
+bool TargetCheck(const BYTE *gt, const BYTE *player) {
+    const int mode = *reinterpret_cast<const int *>(*reinterpret_cast<const BYTE *const *>(gt + 0x500) + 0x134);
+    if (mode == 0xc || mode == 7) return false;
+    const DWORD w = *reinterpret_cast<const DWORD *>(player + 0x1fc);
+    if (Doppelganger()) {
+        if (((w >> 9) & 1) || ((w >> 10) & 1)) return true;
+        if ((w >> 30) & 1) return true;
+        if ((w >> 24) & 1) return true;
+    } else {
+        if (mode == 3 || mode == 4) return true;
+        if (((w >> 9) & 1) || ((w >> 10) & 1)) return true;
+        if (((w >> 30) & 1) || ((w >> 21) & 1) || ((w >> 24) & 1)) return true;
+    }
+    if (mode == -1) return false;
+    if (kZero < *reinterpret_cast<const float *>(gt + 0x588)) return true;
+    if (*reinterpret_cast<const volatile BYTE *>(0x008ab4e6) == 0) return false;         // TU 0x8275422a
+    if (*reinterpret_cast<const volatile BYTE *>(kGtxFlags) & 1) return false;          // TU 0x82efb514
+    if (*reinterpret_cast<const volatile BYTE *>(0x00e7f143) == 4) return false;        // TU 0x82efb513
+    DWORD word = 0;
+    if (!InputWord(0x630, &word)) return false;
+    return (word & 4) == 4;
+}
+
+// TU 0x823d9348 (meter flag 0x40 on)
+void Set40(const BYTE *tuning) {
+    if ((g_meter.flags & 0x40) || !(g_meter.flags & 1)) return;
+    BYTE *gt = GameTracker();
+    if (gt && tuning) {
+        g_meter.request[3][1] = Tune(tuning, 0x38);              // +0x5c = tuning +0x38 (world 0.1)
+        g_meter.request[3][0] = kNoRequest;                      // +0x58 = -1.0
+        Selector();
+    }
+    bool hud = false;
+    __try {
+        const BYTE *player = *reinterpret_cast<const BYTE *const *>(gt + 0x504);
+        if ((*reinterpret_cast<const DWORD *>(player + 0x1fc) >> 10) & 1) {
+            if (g_hudOk && *kHudManager) {                       // 0x829ca724 |= 0x9000; vtbl[0xc] - as tru+0x3189d7
+                g_hudGroup(0xf);
+                g_hudGroup(0xc);
+                g_hudUpdate();
+                hud = true;
+            }
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    g_meter.flags |= 0x40;
+    // not ported: 0x82415b50(1) (instance messages; PC partner 0x6f64c0 from the map, unverified)
+    bool fired = FireEvent(0x39);
+    LONG n = InterlockedIncrement(&g_set40);
+    Log(n == 1 ? 1 : 2, "meter flag 0x40 ON (TU 0x823d9348%s): world request 3 = %.3f, HUD 0x9000 %s, event 0x39 %s", n == 1
+        ? ", first time" : "", tuning ? Tune(tuning, 0x38) : 0.0f, hud ? "set" : "not set (player +0x1fc bit 10 clear)",
+        fired ? "fired" : "not fired");
+}
+
+// TU 0x823d9438 (meter flag 0x40 off)
+void Clear40() {
+    if (!(g_meter.flags & 0x40)) return;
+    const BYTE *tuning = g_tuning;
+    if (GameTracker() && tuning) {
+        g_meter.request[3][0] = g_meter.request[3][1] = kNoRequest;
+        Selector();
+    }
+    if (g_hudOk && g_lookAdrOk && *kHudManager) {               // 0x829ca724 &= 0xffff6fff; vtbl[0xc]
+        reinterpret_cast<HudClearFn>(kHudClear)(0xf);
+        reinterpret_cast<HudClearFn>(kHudClear)(0xc);
+        g_hudUpdate();
+    }
+    g_meter.flags &= ~0x40u;
+    bool fired = FireEvent(0x3a);
+    LONG n = InterlockedIncrement(&g_clear40);
+    Log(n == 1 ? 1 : 2, "meter flag 0x40 OFF (TU 0x823d9438): request 3 cleared, HUD 0x9000 cleared, event 0x3a %s",
+        fired ? "fired" : "not fired");
+}
+
+// TU 0x823d94f8, once per tick
+void LookTick(const BYTE *tuning) {
+    if (!g_lookAdrOk || !g_adrenalineMode) return;
+    bool on = false;
+    __try {
+        const BYTE *gt = GameTracker();
+        if (gt && tuning && Tune(tuning, kTuneRestart) < g_meter.value && (g_meter.flags & 1)) {
+            const BYTE *player = *reinterpret_cast<const BYTE *const *>(gt + 0x504);
+            if (player && TargetCheck(gt, player) &&
+                *reinterpret_cast<const int *>(*reinterpret_cast<const BYTE *const *>(gt + 0x500) + 0x134) != 3 &&
+                !(g_meter.flags & 2))
+                on = true;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        on = false;
+    }
+    if (!on) {
+        if (g_meter.flags & 0x40) Clear40();
+    } else if (!(g_meter.flags & 0x40)) {
+        Set40(tuning);
+    }
+}
+
+// ---- the TU's doppelganger branches in the adrenaline code (naked stubs; no logging inside) ----
+// The TU: gameTracker+0x1244 ? (meter +4 >> 6) & 1 : (player +0x1fc >> 27) & 1 (and for bit 21: meter flag 2).
+// The stubs only read the cached export pointer (no lookup, no log) - Doppelganger() resolves it on the first tick.
+volatile LONG g_adrHits[7];               // DG-mode answers 1: 0 chooser (mode 0x34), 1 start, 2 stop, 3 tick bit 21,
+                                          // 4 tick toggle, 5 tick release, 6 condition 1047 (diagnostic counters)
+LONG g_adrReported[7];
+const char *const kAdrNames[7] = {
+    "camera mode chooser tru+0x1e80a9 (TU 0x822acef8): mode 0x34 by meter flag 0x40 (doppelganger mode)",
+    "adrenaline start tru+0x3189c6 (TU 0x823ded18): 'already active' = meter flag 0x40",
+    "adrenaline stop tru+0x318ad6 (TU 0x823dee58): 'active' = meter flag 0x40",
+    "adrenaline tick tru+0x318bf3 (TU 0x823defa8): +0x1fc bit 21 -> meter flag 2",
+    "adrenaline tick tru+0x318c5d (TU 0x823defa8): toggle by meter flag 0x40",
+    "adrenaline tick tru+0x318cda (TU 0x823defa8): release by meter flag 0x40",
+    "condition 1047 (tru+0x365600 = TU 0x8246e538): meter flag 0x40"};
+
+int __cdecl AdrBit(DWORD word, int counter) {
+    if (g_adrenalineMode && g_doppelganger && g_doppelganger()) {
+        int r = (g_meter.flags >> 6) & 1;
+        if (r) InterlockedIncrement(&g_adrHits[counter]);
+        return r;
+    }
+    return (word >> 27) & 1;
+}
+
+int __cdecl AdrBit21(DWORD word) {
+    if (g_adrenalineMode && g_doppelganger && g_doppelganger()) {
+        int r = (g_meter.flags >> 1) & 1;
+        if (r) InterlockedIncrement(&g_adrHits[3]);
+        return r;
+    }
+    return (word >> 21) & 1;
+}
+
+DWORD g_modeYes = 0x005e80b9, g_modeNo = 0x005e80c2;          // mov [esi+58h],34h | shr eax,0Ah
+DWORD g_startActive = 0x00718ac0, g_startGo = 0x007189d7;
+DWORD g_stopIdle = 0x00718bc1, g_stopGo = 0x00718ae7;
+DWORD g_tickBit21Yes = 0x00718c71, g_tickBit21No = 0x00718bfd;
+DWORD g_adrStart = 0x007189c0, g_adrStop = 0x00718ad0;
+DWORD g_tickRelIdle = 0x00718cf0, g_tickRelGo = 0x00718ce8;
+
+// tru+0x1e80a9 (6 bytes `mov eax,[ecx+1FCh]`; ecx = player): bit -> 0x5e80b9 (mode 0x34) else 0x5e80c2
+__declspec(naked) void ModeStub() {
+    __asm {
+        push ecx
+        push edx
+        push 0
+        push dword ptr [ecx + 1fch]
+        call AdrBit
+        add esp, 8
+        pop edx
+        pop ecx
+        test eax, eax
+        mov eax, [ecx + 1fch]
+        mov ecx, eax                  // as the original: ecx = word >> 27
+        jz no34
+        shr ecx, 1bh
+        jmp dword ptr [g_modeYes]
+    no34:
+        shr ecx, 1bh
+        jmp dword ptr [g_modeNo]
+    }
+}
+
+// tru+0x3189c6 (adrenaline start, esi = player): active -> return (0x718ac0), else go on (0x7189d7)
+__declspec(naked) void StartStub() {
+    __asm {
+        push ecx
+        push edx
+        push 1
+        push dword ptr [esi + 1fch]
+        call AdrBit
+        add esp, 8
+        pop edx
+        pop ecx
+        test eax, eax
+        jnz active
+        jmp dword ptr [g_startGo]
+    active:
+        jmp dword ptr [g_startActive]
+    }
+}
+
+// tru+0x318ad6 (adrenaline stop, esi = player): not active -> return (0x718bc1), else go on (0x718ae7)
+__declspec(naked) void StopStub() {
+    __asm {
+        push ecx
+        push edx
+        push 2
+        push dword ptr [esi + 1fch]
+        call AdrBit
+        add esp, 8
+        pop edx
+        pop ecx
+        test eax, eax
+        jz idle
+        jmp dword ptr [g_stopGo]
+    idle:
+        jmp dword ptr [g_stopIdle]
+    }
+}
+
+// tru+0x318bf3 (adrenaline tick, eax = player +0x1fc, kept): bit 21 (meter flag 2) -> 0x718c71, else 0x718bfd
+__declspec(naked) void TickBit21Stub() {
+    __asm {
+        push eax
+        push ecx
+        push eax
+        call AdrBit21
+        add esp, 4
+        mov edx, eax
+        pop ecx
+        pop eax
+        test dl, 1
+        jnz yes
+        jmp dword ptr [g_tickBit21No]
+    yes:
+        jmp dword ptr [g_tickBit21Yes]
+    }
+}
+
+// tru+0x318c5d (adrenaline tick, eax = player +0x1fc; then mov ecx,esi; pop esi; je start; jmp stop)
+__declspec(naked) void TickToggleStub() {
+    __asm {
+        push ecx
+        push edx
+        push 4
+        push eax
+        call AdrBit
+        add esp, 8
+        pop edx
+        pop ecx
+        test eax, eax
+        mov ecx, esi
+        pop esi
+        jz start
+        jmp dword ptr [g_adrStop]
+    start:
+        jmp dword ptr [g_adrStart]
+    }
+}
+
+// tru+0x318cda (6 bytes `mov ecx,[esi+1FCh]`): bit clear -> 0x718cf0 (return), else 0x718ce8 (stop)
+__declspec(naked) void TickReleaseStub() {
+    __asm {
+        push eax
+        push edx
+        push 5
+        push dword ptr [esi + 1fch]
+        call AdrBit
+        add esp, 8
+        mov ecx, eax
+        pop edx
+        pop eax
+        test cl, 1
+        jz idle
+        jmp dword ptr [g_tickRelGo]
+    idle:
+        jmp dword ptr [g_tickRelIdle]
+    }
+}
+
+// condition 1047 predicate (PC tru+0x365600 = retail test; TU 0x8246e538 adds the doppelganger branch)
+char __cdecl Pred1047(const BYTE *) {
+    char r = 0;
+    __try {
+        const BYTE *player = *reinterpret_cast<const BYTE *const *>(GameTracker() + 0x504);
+        r = static_cast<char>(AdrBit(*reinterpret_cast<const DWORD *>(player + 0x1fc), 6));
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        r = 0;
+    }
+    return r;
+}
+
+bool WriteJumpN(DWORD at, const void *to, int length) {
+    BYTE code[8] = {0xe9, 0, 0, 0, 0, 0x90, 0x90, 0x90};
+    DWORD rel = reinterpret_cast<DWORD>(to) - (at + 5);
+    memcpy(code + 1, &rel, 4);
+    DWORD old = 0, dummy = 0;
+    if (!VirtualProtect(reinterpret_cast<void *>(at), length, PAGE_EXECUTE_READWRITE, &old)) return false;
+    memcpy(reinterpret_cast<void *>(at), code, length);
+    VirtualProtect(reinterpret_cast<void *>(at), length, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void *>(at), length);
+    return true;
+}
+
+struct AdrSite { const char *name; DWORD check; const char *hex; DWORD at; const void *stub; int len; };
+const AdrSite kAdrSites[] = {
+    {"camera mode chooser", 0x005e80a9,
+     "8b81fc010000 8bc8 c1e91b f6c101 7409 c7465834000000 eb17 c1e80a a801 7509 c7465830000000", 0x005e80a9, &ModeStub, 6},
+    {"adrenaline start", 0x007189c0, "83ec0c 56 8bf1 8b86fc010000 c1e81b a801 0f85e9000000 6a0f e8f24f0600", 0x007189c6,
+     &StartStub, 6},
+    {"adrenaline stop", 0x00718ad0, "83ec0c 56 8bf1 8b86fc010000 c1e81b a801 0f84da000000 6a0f e882500600", 0x00718ad6,
+     &StopStub, 6},
+    {"adrenaline tick bit 21", 0x00718be3, "8b86fc010000 8bc8 c1e90a f6c101 747e 8bd0 c1ea15 f6c201 7574 8b0d58dbfa00",
+     0x00718bf3, &TickBit21Stub, 5},
+    {"adrenaline tick toggle", 0x00718c5d, "c1e81b a801 8bce 5e 7405 e964feffff e94ffdffff", 0x00718c5d,
+     &TickToggleStub, 5},
+    {"adrenaline tick release", 0x00718cda, "8b8efc010000 c1e91b f6c101 7408 8bce 5e e9e0fdffff 5e c3", 0x00718cda,
+     &TickReleaseStub, 6},
+    {"condition 1047 predicate", 0x00765600, "a158dbfa00 8b8804050000 8b81fc010000 c1e81b 2401 c3", 0x00765600,
+     &Pred1047, 5}};
+const char *const kCond1047PushHex = "8b44240c 8b4c2408 8b542404 6800567600 50 51 52 e837d70100";   // at 0x765620
+
+// all or nothing: a partial set would let start / stop / tick disagree about "active"
+void PatchAdrenalineMode() {
+    if (!g_adrenalineMode) { Log(1, "adrenaline look: off ([Look] AdrenalineMode=0)"); return; }
+    g_lookAdrOk = HexBytesAt(kTargetCheck, kTargetCheckHex) && HexBytesAt(kAimHelper, kAimHelperHex) &&
+                  HexBytesAt(kHudClear, kHudClearHex) && g_gatesOk && g_inputOk;
+    if (!g_lookAdrOk) {
+        Log(0, "adrenaline look: check function 0x%08lx / helper 0x%08lx / HUD clear 0x%08lx / gates / input chain do not "
+               "match - TU 0x823d94f8 group and the doppelganger branches not translated", kTargetCheck, kAimHelper,
+            kHudClear);
+        return;
+    }
+    bool sitesOk = HexBytesAt(0x00765620, kCond1047PushHex);
+    for (const auto &s : kAdrSites)
+        if (!HexBytesAt(s.check, s.hex)) {
+            Log(0, "adrenaline look: %s at 0x%08lx does not match", s.name, s.at);
+            sitesOk = false;
+        }
+    if (!sitesOk) {
+        g_lookAdrOk = false;
+        Log(0, "adrenaline look: not translated (all sites or none)");
+        return;
+    }
+    int written = 0;
+    for (const auto &s : kAdrSites) {
+        if (WriteJumpN(s.at, s.stub, s.len)) ++written;
+        else Log(0, "adrenaline look: %s not written (VirtualProtect %lu)", s.name, GetLastError());
+    }
+    Log(1, "adrenaline look: TU 0x823d94f8 / 0x823d9348 / 0x823d9438 (meter flag 0x40) per tick; doppelganger branches "
+           "of the camera mode chooser (mode 0x34), adrenaline start / stop / tick and condition 1047 - %d of %d sites "
+           "written", written, static_cast<int>(sizeof(kAdrSites) / sizeof(kAdrSites[0])));
+}
+
+void ReportAdrenalineHits() {
+    for (int i = 0; i < 7; ++i) {
+        LONG n = g_adrHits[i], last = g_adrReported[i];
+        if (n == last) continue;
+        g_adrReported[i] = n;
+        bool pow2 = false;
+        for (LONG p = 1; p > 0 && p <= n; p <<= 1)
+            if (p > last) { pow2 = true; break; }
+        if (last == 0 || (g_logLevel >= 2 && pow2)) Log(1, "%s (%ld times)", kAdrNames[i], n);
+    }
+}
+
+// ---- new tracker -> new meter (TU player init 0x82412ca0 -> 0x82409418 -> meter init 0x823d7700) ----
+typedef int(__cdecl *GenerationFn)();
+GenerationFn g_generation = nullptr;
+int g_generationLooked = 0, g_lastGeneration = -1;
+
+void NewTrackerCheck() {
+    if (!g_generationLooked) {
+        HMODULE m = GetModuleHandleA("TruDlc2Player.asi");
+        if (m) g_generation = reinterpret_cast<GenerationFn>(GetProcAddress(m, "TruDlc2PlayerTrackerGeneration"));
+        g_generationLooked = 1;
+        if (!g_generation)
+            Log(0, "TruDlc2PlayerTrackerGeneration not found (TruDlc2Player older than 0.2?) - the meter is not "
+                   "re-initialised with a new game tracker");
+    }
+    if (!g_generation) return;
+    int gen = g_generation();
+    if (gen == g_lastGeneration) return;
+    if (g_lastGeneration >= 0) {
+        bool requests = false;
+        for (int i = 0; i < 7; ++i) requests = requests || kZero < g_meter.request[i][0] || kZero < g_meter.request[i][1];
+        DWORD was = g_meter.flags;
+        if ((was & 0x40) && g_hudOk && g_lookAdrOk && *kHudManager) {
+            reinterpret_cast<HudClearFn>(kHudClear)(0xf);
+            reinterpret_cast<HudClearFn>(kHudClear)(0xc);
+            g_hudUpdate();
+        }
+        MeterInit();
+        if (requests) Selector();       // the plugin's meter outlives the TU object: release its time-scale requests
+        Log(1, "new game tracker (generation %d): meter re-initialised (was flags 0x%03lx%s)", gen, was,
+            requests ? ", time-scale requests released" : "");
+    }
+    g_lastGeneration = gen;
+}
+
+// ---- the TU tick 0x823d7a10 ----
+int g_lastDg = -1;
+bool g_lastPadHeld = false;
+int g_inputDiag = 0;
+
+void MeterTick(bool padHeld) {
+    if (g_legacyPadStart) { LegacyMeterTick(padHeld); return; }
+    NewTrackerCheck();
+    // TU 0x824128a4..0x824128b8: the player update runs the tick only when gameTracker+0x1244 is set
+    int dg = Doppelganger();
+    if (dg != g_lastDg) {
+        if (g_lastDg < 0)
+            Log(1, "doppelganger flag %d at the first tick: shadow-power tick %s (TU 0x824128a8)", dg,
+                dg ? "runs" : "does not run");
+        else
+            Log(1, "doppelganger flag %d -> %d: shadow-power tick %s (TU 0x824128a8)", g_lastDg, dg,
+                dg ? "runs" : "does not run");
+        g_lastDg = dg;
+    }
+    // diagnostic for GameInput: the game's records while the pad's LB / RB change
+    if (padHeld != g_lastPadHeld) {
+        g_lastPadHeld = padHeld;
+        DWORD lb = 0, rb = 0, adr = 0;
+        if (g_inputDiag < 12 && InputWord(0x1a70, &lb) && InputWord(0x1b30, &rb) && InputWord(0x6f0, &adr)) {
+            ++g_inputDiag;
+            Log(1, "input diagnostic: pad LB/RB %s - game records +0x1a70 0x%08lx, +0x1b30 0x%08lx (TU tests & 4), "
+                   "+0x6f0 0x%08lx", padHeld ? "held" : "released", lb, rb, adr);
+        }
+    }
+    ReportAdrenalineHits();
+    if (!dg) return;
+    const BYTE *tuning = FindTuning();
+    g_tuning = tuning;
+    float frames = *kFrameTime;
+    if (!(frames >= 0.0f && frames < 30.0f)) frames = 0.0f;
+    // 0x823d7a30..0x823d7a9c: a running cinematic or 0x829ca6da -> print "ADRENALINE: Process(): stopping
+    // adrenaline!" (0x82455a38 = empty print on PC) and Stop (no-op when not active)
+    bool cine = Cinematic(), block = BlockByte();
+    if ((cine || block) && (g_meter.flags & 1)) StopPower(cine ? "cinematic" : "0x829ca6da (PC 0xfae8dd) set");
+    // 0x823d7aa0..0x823d7adc: flag 0x80 = bool parameter 0x412 of Lara's current state (state machine gt+0xf10)
+    BYTE *gt = GameTracker();
+    if (gt && g_tuStatesOk) {
+        __try {
+            void *machine = *reinterpret_cast<void *const *>(gt + 0xf10);
+            if (machine) {
+                char zone = 0;
+                ParamBool(machine, 0x412, &zone);
+                DWORD before = g_meter.flags;
+                if (zone) g_meter.flags |= 0x80;
+                else g_meter.flags &= ~0x80u;
+                if ((before ^ g_meter.flags) & 0x80)
+                    Log(1, "meter flag 0x80 %s (state parameter 0x412 of the current state; blocks the meter)",
+                        zone ? "set" : "cleared");
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+        }
+    }
+    // not ported: 0x823d7ae0..0x823d7b34 looping sound (+0x0 handle), 0x823d77f0 (shadow-strike look group)
+    LookTick(tuning);                                                       // 0x823d94f8
+    if (!(g_meter.flags & 0x90)) {
+        bool buttons = padHeld;
+        if (g_gameInput) {                                                  // 0x823d7b6c..0x823d7b98
+            DWORD lb = 0, rb = 0;
+            buttons = (InputWord(0x1a70, &lb) && (lb & 4) == 4) || (InputWord(0x1b30, &rb) && (rb & 4) == 4);
+        }
+        if (buttons && !GtxFlag()) {
+            if (!g_meter.latch && CanStart(tuning)) {
+                StartPower(tuning);
+                g_meter.latch = 1;
+            } else {
+                if (!g_meter.latch) {                                       // CanStart false: event 0x80 (refused)
+                    FireEvent(0x80);
+                    Log(2, "start refused (meter %.1f, flags 0x%03lx): event 0x80", g_meter.value, g_meter.flags);
+                }
+                g_meter.latch = 1;
+            }
+        } else if (g_meter.latch == 1) {
+            if (g_meter.flags & 1) StopPower(buttons ? "game flag 0xe7f144" : "released");
+            g_meter.latch = 0;
+        }
+        if (!(g_meter.flags & 1)) {
+            Refill(tuning, frames);
+        } else {
+            if (kZero < g_meter.value && !(g_meter.flags & 0x90) && tuning)
+                Drain(tuning, frames * kPerSecond * Tune(tuning, kTuneDrain));
+            if (kZero < g_meter.value) {
+                if (GtxFlag()) StopPower("game flag 0xe7f144");
+            } else {
+                g_meter.flags |= 0x200;
+                StopPower("meter empty");
+            }
+        }
+    }
+    // 0x823d7cf8..: the timed request of condition 2401
+    if (kZero < g_meter.requestTimer) {
+        g_meter.requestTimer = g_meter.requestTimer - frames;
+        if (g_meter.requestTimer <= kZero) {
+            g_meter.request[4][0] = g_meter.request[4][1] = kNoRequest;
+            Selector();
+            g_meter.requestTimer = kZero;
+            Log(2, "timed request (2401) ended");
+        }
+    }
+}
+
 void ReadOptions(const char *dir) {
     char ini[MAX_PATH];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruShadowPower.ini", dir);
+    g_legacyPadStart = GetPrivateProfileIntA("ShadowPower", "LegacyPadStart", 0, ini);
+    g_gameInput = GetPrivateProfileIntA("ShadowPower", "GameInput", 0, ini);
+    g_adrenalineMode = GetPrivateProfileIntA("Look", "AdrenalineMode", 1, ini);
     g_condEnabled = GetPrivateProfileIntA("Conditions", "Enabled", 1, ini);
     g_statesEnabled = GetPrivateProfileIntA("States", "Enabled", 1, ini);
     g_cond1046 = GetPrivateProfileIntA("Conditions", "Cond1046", 1, ini);
@@ -1400,9 +2011,10 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.8 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
-        "condition 1046 %d, condition 1055 %d, look %d)", g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled,
-        g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled);
+    Log(1, "TruShadowPower 0.9 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+        "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d)", g_enabled,
+        g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled,
+        g_legacyPadStart, g_gameInput, g_adrenalineMode);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -1461,6 +2073,33 @@ void Start(HMODULE self) {
     RegisterLaraConditions();
     RegisterLaraStates();
     if (g_cond1046) Patch1046();
+    // 0.9: TU gates of the tick / start and the game input chain
+    g_gatesOk = HexBytesAt(kCinematic, kCinematicHex) && HexBytesAt(kBlockGetter, kBlockGetterHex) &&
+                HexBytesAt(kBlockSetter, kBlockSetterHex) && HexBytesAt(kBlockSetterCall, kBlockSetterCallHex) &&
+                HexBytesAt(kGtxFlagsCheck, kGtxFlagsCheckHex);
+    g_inputOk = HexBytesAt(kInputCheck, kInputCheckHex);
+    if (g_legacyPadStart)
+        Log(1, "tick: LEGACY 0.8 path ([ShadowPower] LegacyPadStart=1) - power in every level, no cinematic gates");
+    else if (g_gatesOk)
+        Log(1, "tick: TU path - only with the doppelganger flag (TU 0x824128a8); cinematic tru+0x53f00, block byte "
+               "0x%08lx, game flag 0x%08lx bit 0 and health gt+0x628 gate the power as TU 0x823d7a10 / 0x823d7d40",
+            kBlockByte, kGtxFlags);
+    else
+        Log(0, "tick: TU path, but the cinematic / block byte / game flag code does not match - those gates are off "
+               "(the doppelganger gate stays)");
+    if (g_gameInput && !g_inputOk) {
+        Log(0, "GameInput=1 but the input chain at 0x%08lx does not match - buttons from the pad poll", kInputCheck);
+        g_gameInput = 0;
+    } else if (!g_legacyPadStart) {
+        Log(1, "buttons: %s", g_gameInput ? "game input records +0x1a70 / +0x1b30 & 4 (TU 0x823d7b6c, GameInput=1)"
+                                          : "pad poll LB / RB (XInput); the TU reads the game records +0x1a70 / +0x1b30");
+    }
+    if (g_legacyPadStart)
+        Log(1, "adrenaline look: off with LegacyPadStart=1 (meter flag 0x40 comes from the TU tick only)");
+    else if (g_lookEnabled)
+        PatchAdrenalineMode();
+    else
+        Log(1, "adrenaline look: off ([Look] Enabled=0)");
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -1481,6 +2120,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.8 (translated TU meter, Lara conditions 1046 / 1048-1056 / 2401, states 243 / 245 / 1018, "
-           "activities 1009 / 1039, shadow look = TU player events of start / stop)";
+    return "TruShadowPower 0.9 (translated TU meter with the TU tick gates, Lara conditions 1046 / 1047 / 1048-1056 / "
+           "2401, states 243 / 245 / 1018, activities 1009 / 1039, shadow look = TU player events of start / stop, "
+           "adrenaline look = meter flag 0x40 / camera mode 0x34)";
 }

@@ -145,7 +145,8 @@ $logFile = Join-Path $paths.Logs ('Invoke-TruTestRun_{0}_{1}.log' -f $stamp, $mo
 Set-TruLogFile -Path $logFile
 
 # our plugins: name -> install script; every one has -Install / -Remove / -SourceDir / -GamePath
-$knownAsis = 'TruDlc2Player', 'TruDoppelganger', 'TruRockVein', 'TruShadowPower', 'TruLink', 'TruGuard', 'TruMenu'
+$knownAsis = 'TruDlc2Player', 'TruDoppelganger', 'TruRockVein', 'TruShadowPower', 'TruLink', 'TruGuard', 'TruMenu',
+              'TruDataGuard'
 # cdb markers (the session file echoes them on a line of their own)
 $markerNames = 'D3DFAIL', 'AV2NDCHANCE', 'FASTFAIL', 'STACKOVERFLOW', 'EXITPROCESS', 'TERMINATEPROCESS', 'MESSAGEBOX_A',
                'MESSAGEBOX_W'
@@ -480,10 +481,19 @@ function Test-TruExpects {
     return ,$results
 }
 
+function Test-TruMenuQuitLog {
+    # TruMenu.log of a run folder names an owner game.quit -> the cdb TERMINATEPROCESS marker is that quit, not a crash
+    param([string]$Folder)
+    $log = Join-Path $Folder 'TruMenu.log'
+    return [bool]((Test-Path -LiteralPath $log) -and (Select-String -LiteralPath $log -SimpleMatch 'game.quit by the owner' -Quiet))
+}
+
 function Get-FirstCrash {
-    # first crash marker of the cdb log, else a crash exit code; $null = none
-    param($Markers, $ExitCode)
-    $first = @($Markers) | Where-Object { $_ -and $crashMarkers -contains $_.name } | Select-Object -First 1
+    # first crash marker of the cdb log, else a crash exit code; $null = none. -QuitByOwner: TERMINATEPROCESS is the
+    # owner's TruMenu game.quit (under the debugger the exit code comes from cdb, so the marker is the only trace)
+    param($Markers, $ExitCode, [switch]$QuitByOwner)
+    $first = @($Markers) | Where-Object { $_ -and $crashMarkers -contains $_.name -and !($QuitByOwner -and $_.name -eq 'TERMINATEPROCESS') } |
+        Select-Object -First 1
     if ($first) { return ('{0} (line {1}) {2}' -f $first.name, $first.line, $first.detail) }
     if ($null -ne $ExitCode -and [long]$ExitCode -ne 0) {
         $hex = '0x{0:x8}' -f ([long]$ExitCode -band 0xffffffffL)
@@ -755,7 +765,7 @@ try {
         $cdb = Join-Path $folder 'cdb.log'
         if (Test-Path -LiteralPath $cdb) {
             $run.markers = @(Find-Markers $cdb | ForEach-Object { $_ })
-            $run.firstCrash = Get-FirstCrash -Markers $run.markers -ExitCode $run.exitCode
+            $run.firstCrash = Get-FirstCrash -Markers $run.markers -ExitCode $run.exitCode -QuitByOwner:(Test-TruMenuQuitLog $folder)
         }
         $run.guard = @(Find-GuardFaults (Join-Path $folder 'TruGuard.log') | ForEach-Object { $_ })
         $guardCrash = Get-GuardCrash $run.guard
@@ -1063,7 +1073,7 @@ try {
     # Find-Markers returns its list with the unary comma (one object); @() around the call nested it, so several
     # markers became ONE row with joined names and the crash-marker test below missed D3DFAIL / MESSAGEBOX
     $run.markers = @(Find-Markers $cdbLog | ForEach-Object { $_ })
-    $run.firstCrash = Get-FirstCrash -Markers $run.markers -ExitCode $run.exitCode
+    $run.firstCrash = Get-FirstCrash -Markers $run.markers -ExitCode $run.exitCode -QuitByOwner:(Test-TruMenuQuitLog $runFolder)
 
     # TruGuard markers are in its own log (plain runs have no cdb log); an unhandled DETAIL is a fatal fault.
     # Only the copy in the run folder is read - the game folder may still hold a log from an earlier session.

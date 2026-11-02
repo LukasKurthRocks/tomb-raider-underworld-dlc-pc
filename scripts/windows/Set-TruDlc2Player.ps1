@@ -38,10 +38,10 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruDlc2Player.asi', 'TruDlc2Player.ini'
-# SHA-256 of earlier builds of ours (none yet) - recognised as ours for update / removal
+# SHA-256 of earlier builds of ours - recognised as ours for update / removal
 $earlierBuilds = @{
-    'TruDlc2Player.asi' = @()
-    'TruDlc2Player.ini' = @()
+    'TruDlc2Player.asi' = @('c73c8c6693000e45a1ae60b0b29d69ecb02313796a2820ab65e4546a1267992b')   # 0.1 (work\asi)
+    'TruDlc2Player.ini' = @('eeb2fd036a03e4b97c73b46d9a3ed18a17ceab727f9cb058b66cb3246637f8b5')   # 0.1 sample .ini
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

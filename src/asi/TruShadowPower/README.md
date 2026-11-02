@@ -15,8 +15,57 @@ values. The translation table, the data sources and every left-out part are docu
 **Status: 3.1 (slow motion) played; 3.2 (meter with estimated rates) played - meter OK, HUD silhouette not shown;
 3.3 (translated meter + HUD trigger) played 2026-10-30 - drain / refill 200/s as in the data, tuning from the
 fallback copy; 0.4 (lookup diagnostics, Lara conditions) played 2026-10-31 (test A); 0.5 (TU states) built
-2026-10-31, not yet played.** Not covered: sounds, the blur / bloom look, rock veins (TruRockVein.asi), the shadow
+2026-10-31, not yet played; 0.9 (TU tick gates, adrenaline look) built 2026-11-02, not played.** Not covered: sounds,
+the shadow-strike look, rock veins (TruRockVein.asi), the shadow
 strike target states and the combat conditions (0.5 gaps below).
+
+## 0.9: the power only through the TU path, and the adrenaline look (2026-11-02)
+
+**Tick.** On the Xbox the shadow-power tick 0x823d7a10 is called by the player update 0x824126d8 only when
+gameTracker+0x1244 (the doppelganger flag) is set (0x824128a4..0x824128b8). Up to 0.8 the plugin ran it in every level
+from the pad poll and without the TU's gates - so the power could start in DLC 1 / the main game and during a
+cutscene (live 2026-11-02). 0.9 runs the tick only with `TruDlc2PlayerDoppelganger()` (TruDlc2Player 0.2 clears it
+with every new game tracker, as the TU's new tracker does) and translates the gates of 0x823d7a10 / 0x823d7d40:
+
+| TU | PC | effect |
+|---|---|---|
+| cinematic: [0x82efb590] +0xdd set and +0x2c != -1 (inline) | tru+0x53f00 (same test on [0xe7f1c0]) | active power stops; no start |
+| byte 0x829ca6da (= retail 0x829ca5f1) | 0xfae8dd (setter tru+0x37bbf0, called by GAMELOOP tru+0x1de480 = retail 0x8229c530) | active power stops; no start |
+| gameTracker+0x628 > 0.0 (health) | gameTracker+0x628 | no start at 0 health |
+| 0x82efb514 bit 0 | 0xe7f144 bit 0 (same test in the adrenaline tick tru+0x318bd0 = TU 0x823defa8) | buttons ignored, active power stops |
+| bool parameter 0x412 of Lara's current state (gameTracker+0xf10) -> meter flag 0x80 | same (tru+0x383f50 / 0x384c20) | meter blocked while set |
+| refused start -> player event 0x80 | tru+0x318780 | sound / effect record of the doppelganger, if any |
+| new tracker -> new meter object | TruDlc2PlayerTrackerGeneration() | meter re-initialised per tracker |
+
+What is still not the TU: the buttons. The TU reads LB / RB from the game's input records (+0x1a70 / +0x1b30 & 4 of
+[[0x8286dd90]+0x18]->[0], PC [[0xa02b68]+0x18]->[0] - the PC adrenaline tick reads +0x6f0 of the same records as the
+TU). No PC code reads +0x1a70 / +0x1b30, so whether the PC fills them is open: by default the pad poll's XInput LB / RB
+stays the button source and the log prints the two game records whenever LB / RB changes ("input diagnostic", 12
+lines); `[ShadowPower] GameInput=1` reads the game records instead. `[ShadowPower] LegacyPadStart=1` restores the 0.8
+tick (every level, no gates). The ControlFlag word [0xfada74] is not tested by the TU tick and therefore not here.
+
+**Adrenaline look ([Look] AdrenalineMode).** The TU's lead for the soft / bright look (docs Befund-TU-Funktionen L9):
+0x823d94f8 runs per tick and sets **meter flag 0x40** (0x823d9348: world request slot 3 = tuning +0x38 = 0.1, HUD
+0x9000 when player +0x1fc bit 10, event 0x39) while the power is on, the meter is above tuning +0x28, 0x823df8f8(player)
+answers 1 (= PC tru+0x2f2800 with the TU's doppelganger branch: only +0x1fc bits 9 / 10, 30, 24 before the shared tail),
+the mode [gameTracker+0x500]+0x134 is not 3 and flag 2 is clear; 0x823d9438 clears it (slot 3 empty, HUD &= ~0x9000,
+event 0x3a; also from Stop). In doppelganger mode the camera mode chooser (TU 0x822acdd0 = tru+0x1e7fe0, site
+tru+0x1e80a9) picks **camera mode 0x34** by meter flag 0x40 instead of player +0x1fc bit 27, and the adrenaline start /
+stop / tick (tru+0x3189c0 / tru+0x318ad0 / tru+0x318bd0) and condition 1047 (tru+0x365600) read flag 0x40 (and flag 2
+for bit 21) - six naked stubs, all or none. Whether mode 0x34 is the soft / bright look is for the live test. Not
+ported: the instance messages 0x82415b50(1) (PC partner unverified), 0x823d77f0 (shadow-strike look group).
+
+**TO TEST (0.9)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | DLC 2: hold RB / LB | slow motion + yellow bar as in 0.8; log "doppelganger flag 0 -> 1: shadow-power tick runs" |
+| 2 | DLC 2: hold RB during a cutscene / cinematic camera | no slow motion; if it was on: log "shadow power OFF (cinematic)" (LogLevel 2) |
+| 3 | DLC 2 -> main menu -> DLC 1 (same session), hold RB | no slow motion, no bar; log "new game tracker ...: meter re-initialised" and "doppelganger flag 1 -> 0 ... does not run" |
+| 4 | DLC 2: power on, aim at an enemy / target (meter above 15 %) | log "meter flag 0x40 ON (TU 0x823d9348, first time)" and "camera mode chooser ... mode 0x34 ... (n times)"; the screen may turn soft / bright (camera mode 0x34) - say what it looks like; release: "meter flag 0x40 OFF" |
+| 5 | main game: adrenaline dodge (aim + adrenaline button) | unchanged (retail bit 27; no line "adrenaline start ... meter flag 0x40") |
+| 6 | DLC 2: LB / RB a few times, then send TruShadowPower.log | "input diagnostic" lines: whether +0x1a70 / +0x1b30 have bit 4 while held - decides GameInput=1 |
+| 7 | if 1 fails (no power at all in DLC 2) | set `[ShadowPower] LegacyPadStart=1`, retry, send the log |
 
 ## 0.6: condition 1046 (2026-11-01)
 
@@ -150,6 +199,12 @@ every `*.asi` next to `tru.exe`.
 | `[ShadowPower] Buttons` | 768 | XInput mask: 256 LB, 512 RB, 768 either (Xbox) |
 | `[Meter] HudBar` | 1 | feed the HUD silhouette; 0 = no HUD writes |
 | `[Meter] Fallback` | 1 | 1 = file values when object 858 is not loaded; 0 = no power then |
+| `[ShadowPower] LegacyPadStart` | 0 | 0.9: 1 = the 0.8 tick (every level, no doppelganger / cinematic gates) |
+| `[ShadowPower] GameInput` | 0 | 0.9: 1 = LB / RB from the game's input records +0x1a70 / +0x1b30 & 4 (the TU's source; unproven on PC) |
+| `[Conditions] Enabled / Cond1046 / Cond1055` | 1 | see 0.4 / 0.6 / 0.7 |
+| `[States] Enabled` | 1 | see 0.5 |
+| `[Look] Enabled / Messages` | 1 | see 0.8; Enabled=0 also turns AdrenalineMode off |
+| `[Look] AdrenalineMode` | 1 | 0.9: TU meter flag 0x40 (0x823d94f8 group) + doppelganger branches of camera mode chooser (mode 0x34), adrenaline start / stop / tick, condition 1047 |
 
 The 0.2 options `WorldScale`, `PlayerScale`, `RampSeconds`, `[Meter] Enabled`, `DrainSeconds`, `RefillSeconds`,
 `RefillDelay`, `MinStart` are gone - those values now come from the data / the TU constants.

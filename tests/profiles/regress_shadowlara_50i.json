@@ -1,6 +1,6 @@
 {
     "name":  "regress_shadowlara_50i",
-    "description":  "Test 50i: as 50h (50g data + arm fix, TruMenu 0.7.1) plus the anim event list fix: 37 installed DLC files (viking / yeti thralls, pistons, energy pillars, bridges, goo fx, machine column ...) had record words converted against the rules proven on the base pair (tools/animlist_check.py: kind-0 payload word 0 must be u8u8u16, kind-1 word 0 u16, kind-2 word 3 raw ...). The 50h crash 3.7 s after entering dlc_yggdrasil_hall01 (tru+0x14df84, eax 0x00652000) was viking_thrall_dlc2_ DTP 24470: a kind-0 record whose payload byte 0 read 1 instead of 0, so tru+0x1b99c0 took the 7-word path on a 2-word record and passed the next record header as a section id. Tree work/rebuild/dlc_test50i_vm (42 files). CHECK: enter dlc_yggdrasil_hall01 and walk on; fight / watch the thralls. Run WITH -Debugger.",
+    "description":  "Test 50i: as 50h (50g data + arm fix, TruMenu 0.7.1) plus the anim event list fix: 37 installed DLC files (viking / yeti thralls, pistons, energy pillars, bridges, goo fx, machine column ...) had record words converted against the rules proven on the base pair (tools/animlist_check.py: kind-0 payload word 0 must be u8u8u16, kind-1 word 0 u16, kind-2 word 3 raw ...). The 50h crash 3.7 s after entering dlc_yggdrasil_hall01 (tru+0x14df84, eax 0x00652000) was viking_thrall_dlc2_ DTP 24470: a kind-0 record whose payload byte 0 read 1 instead of 0, so tru+0x1b99c0 took the 7-word path on a 2-word record and passed the next record header as a section id. Tree work/rebuild/dlc_test50i_vm (42 files). CHECK: enter dlc_yggdrasil_hall01 and walk on; fight / watch the thralls. Run WITH -Debugger. TruMenu 0.7.2 (game.quit, level-start guard, outfit rule, overlay filter).",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -139,8 +139,8 @@
                  },
                  {
                      "name":  "TruMenu",
-                     "sourceDir":  "trudlcport/work/asi/menu071",
-                     "sha256":  "055b1f1e17ca547a19cbdfd90ec374f67ecec3360c357a7109c52a805008baf4",
+                     "sourceDir":  "trudlcport/work/asi/menu072",
+                     "sha256":  "71c280778bdd1fd5e61e45741af39124c55fb796b83259847c966fd809f9c006",
                      "ini":  {
                                  "Cheat":  {
                                                "Experimental":  "1"
@@ -375,6 +375,17 @@
                       "kind":  "check",
                       "id":  "menu-unit-log",
                       "text":  "log.overlay on: room names (unit: ... (was ...)) appear while walking through DLC 2"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  95,
+                      "id":  "-",
+                      "text":  "Shortcut to the crash spot of 50h: TruMenu level page DLC 2 -\u003e dlc_yggdrasil_hall01 (or level.load dlc_yggdrasil_hall01); walk through the red-rune corridor and on"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-quit",
+                      "text":  "TruMenu game.quit (Status page, press twice) ends the game; the summary says ended via TruMenu game.quit, not a crash"
                   }
               ],
     "expects":  [

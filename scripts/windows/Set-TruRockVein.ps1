@@ -49,8 +49,10 @@ $earlierBuilds = @{
                           'ce7a8712f267c4d2836730edc7013301fce8413fc7186e8dd29bfbdff710b5e6',
                           '8d5c97328621be81e1f4d500e1bd2c7781b3a203e914351295eaf57ba4abd4ec',
                           'f0d3456c9a66ed27b5fc15f51db83646078f1c19b95501868065f6bb1a37b57e',
-                          'c2b626dff712ee579a18ff11eb389333455b9a3a9a289173464243e221e1173b')
-    'TruRockVein.ini' = @('89c0283b20a375253d38e6f53e77cfb7df10b0c036650c789564c629d3f227c1')
+                          'c2b626dff712ee579a18ff11eb389333455b9a3a9a289173464243e221e1173b',
+                          '66f80abb20e9ec6a74e2f3f6e933e8be2757ec70a870f03406197999cf55b29c')   # 0.8 jump geometry (work\asi_rv08)
+    'TruRockVein.ini' = @('89c0283b20a375253d38e6f53e77cfb7df10b0c036650c789564c629d3f227c1',
+                          '1dbfc739c5f0646ba6a791eb1b77504927b74ab7b146d9ae8b71c0621113b19f')   # sample .ini of 0.8 (also 0.9)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

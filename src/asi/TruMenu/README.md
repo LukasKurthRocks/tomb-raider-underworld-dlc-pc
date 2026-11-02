@@ -33,8 +33,12 @@ a `level.load` during it hung the game. 0.7.2 (**`game.quit`** with a safety ste
 level.start **refused while a mission start is pending** (main state 2 / 9); `level.start` with the **title update's
 outfit rule** - DLC 2 without the outfit selection, `[Levels] OutfitRule`; Level page DLC 1 first; log overlay filter
 `[Log] OverlaySources` / `OverlayExclude`) built 2026-11-02 into `work\asi\menu072`, checked with `dumpbin` and offline
-byte checks only - not yet run in the game (section "Mission start, outfit rule, game.quit (0.7.2)"). `camera.free` is
-still a todo (see "0.4 items").**
+byte checks only - not yet run in the game (section "Mission start, outfit rule, game.quit (0.7.2)"). 0.8.0
+(**Regression page** with the fixed DLC 1 / DLC 2 lists and `TruMenu.regress_results.txt`; **Cheats page** from the
+2007 prototype evaluation - god mode, one-hit kill, enemy health, infinite ammo, fill 'er up, cheat codes, each with
+its category and byte pre-check; **camera log** `[Log] CameraChanges`) built 2026-11-02 into `work\asi\menu080`,
+checked with `dumpbin` and offline byte checks only - not yet run in the game (section "Regression, Cheats, camera
+log (0.8)"). `camera.free` is still a todo (see "0.4 items").**
 
 ## Controls
 
@@ -71,6 +75,8 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Page | Content | Items |
 |---|---|---|
 | TO TEST | 0.4, **first page, open, shown only while the list holds rows** (header "TO TEST (n open, n ok, n fail, n skip)"): one row per test - state, hint, id, note; on the selected row **A = OK, X = FAIL, Y = SKIP** (X / Y go to the row, not to ImGui, while a row has the focus), buttons OK / FAIL / SKIP and "Run <id>" when the id is a menu item (`id:arg` runs it with `arg`); "Remove the marked rows", "Remove all rows" (A twice). 0.5: **switches** (toggle rows, a checkbox each) on top, then **numbered steps** (NEXT marks the first open one; A = run its item + done) and checks in list order. Filled by the main session or `Invoke-TruTestRun.ps1` over TruLink; kept in `TruMenu.tests.txt` next to `tru.exe` (sections "TO TEST" below) | `test.add <id> <hint>`, `test.step <n> <id\|id:arg\|-> <text>`, `test.toggle <id> <item\|ini:Plugin:Section:Key> <text>`, `test.mark <id> ok\|fail\|skip\|open\|done\|on\|off [note]`, `test.list`, `test.export`, `test.del <id>`, `test.clear [done]` |
+| Regression | 0.8, under TO TEST, collapsed (header "Regression DLC 1 + DLC 2 (n open, n ok, n fail, n skip)"): selector **DLC 1 / DLC 2 / all**, the rows of `TruMenu.regress_dlc1.txt` / `_dlc2.txt` (next to the `.asi`, copied by `Set-TruMenu.ps1`); checks **A = OK, X = FAIL, Y = SKIP**, buttons OK / FAIL / SKIP / **Note** (puts `regress.note <list>:<id> ` into the command bar and opens the on-screen keyboard; Enter saves); steps: A = run its item + done; "Reload lists" (A twice). Every mark / note is appended to `TruMenu.regress_results.txt` (section "Regression, Cheats, camera log (0.8)") | `regress.list`, `regress.load dlc1\|dlc2\|all`, `regress.mark <dlc1:id\|dlc2:id\|id> ok\|fail\|skip\|open\|done [note]`, `regress.note <list:id> <text>`, `regress.export` |
+| Cheats (2007 prototype evaluation) | 0.8: one row per cheat with its **category** (PC has it / re-attach / cheat-code path / rebuild from prototype); a failed byte pre-check greys the row and names the reason in red; in a level only; the "rebuild" rows are listed read-only as "not built yet" | `cheat.list`, `cheat.god [0/1]`, `cheat.godfull [0/1]`, `cheat.onehitkill [0/1]`, `cheat.enemyhealth [0/1]`, `cheat.ammo [0/1]`, `cheat.fillup`, `cheat.code <1\|2\|9\|10\|11>` |
 | Status | TruMenu version, `tru.exe` PE time stamp / image size, all code checks, whether a level is loaded; current unit + stream unit id; game state; costume line (current costume, game-data base, `+0x1f4`, chosen `+0x20c` / `+0x20e` / `+0x210`, unit default); player line (instance, object id / name, type record, object-table entry); our plugins (`TruShadowPower`, `TruDoppelganger`, `TruDlc2Player`, `TruRockVein`, `TruLink`: loaded? `<Name>Version()` string), ModLoader.asi, the pad chain (what the game calls, what PadHook calls, with module names), the `d3d9.dll` in use (game folder = TRAWindowed proxy, else system), device / window; 0.7.2: button **"Quit game (press twice)"** at the end (section "Mission start, outfit rule, game.quit (0.7.2)") | `status.version`, `status.hooks`, `status.unit`, `status.state`, `status.costume`, `status.player`, `status.plugins`, 0.7.2 `game.quit` |
 | Outfits (next level load) | the same costume facts, then one button per **player record of the game's type table** (index, name, object id; `[chosen]` / `[current]` marked), "Reset chosen costume", checkbox "reload the current unit after choosing" | `costume.records`, `costume.current`, `costume.choose <index\|name> [20c\|210]`, `costume.choosereload <index\|name>`, `costume.choosereset`; the 0.2 ids `costume.setreload` / `costume.reset` still work. **0.3 changed** `costume.list` (now the live cycle list; the 0.2 list = `costume.records`) and `costume.set` (now the live switch; the 0.2 meaning = `costume.choose`) |
 | Overlay: Lara's position | checkbox for a small top-left overlay with Lara's position and heading; position / rotation in the page | `overlay.position`, `player.position` |
@@ -444,6 +450,77 @@ overlay: the Debug / Log page and the log files stay complete. At run time: `log
 `log.overlayexclude activity 1009` (`none` = off; no argument = show the value). The overlay says "(log: no lines - n
 kept out by ...)" when the filter hid everything.
 
+## Regression, Cheats, camera log (0.8)
+
+Spec: `docs\Plan-TruMenu-Medien.md` (workspace) P0, P0c, P0b. Byte pre-checks of every new engine address:
+`work\asi\menu080\precheck_080.txt` (30 checks, `tools/pe_bytes_check.py --file`, all ok on the Steam `tru.exe`
+2026-11-02); at load TruMenu checks the same bytes, a mismatch disables that row with a log line
+(`0.8 cheats: cheat.x disabled - <reason>`) and a grey row with the reason in red.
+
+### Regression page (P0)
+
+- **Lists** `tests\regress\dlc1.txt` (DLC 1: 6 steps + 12 checks, from `docs/Regression-DLC1.md`) and
+  `tests\regress\dlc2.txt` (DLC 2: 7 steps + 23 checks, from `docs/Regression-Schattenlara.md`), the row format of
+  `TruMenu.tests.txt` (`id<TAB>state<TAB>hint<TAB>note<TAB>time<TAB>kind<TAB>target<TAB>number`; check ids = the ids in
+  the docs, steps `step<n>`; step 5 of DLC 2 runs `time.scale 0.5`). ASCII only, no game data.
+  `tools/trumenu_ini_check.py` checks them too (8 columns, unique ids, every check id named in its doc).
+  `Set-TruMenu.ps1 -Install` copies them next to the `.asi` as `TruMenu.regress_dlc1.txt` / `TruMenu.regress_dlc2.txt`
+  (from the build folder if it holds them, else from `tests\regress`; a list is ours when its first line starts with
+  `# TruMenu regression list`; `-Remove` deletes only ours).
+- **Page**: loaded at the menu start without harness / TruLink; every row starts **open** at each game start (the list
+  files are never written). Selector DLC 1 / DLC 2 / all (`[Regress] List`, default `all`); checks A ok / X fail /
+  Y skip (as TO TEST; X / Y go to the focused row), **Note** = command bar `regress.note dlc2:<id> <text>` + on-screen
+  keyboard; steps A = run + done.
+- **Results** `TruMenu.regress_results.txt` next to the `.asi`, appended, CRLF, tab separated:
+  `#session<TAB><session start><TAB><versions><TAB><sha256>` once per game start before its first row (versions = each
+  loaded plugin's `<Name>Version()` up to " (", e.g. `TruMenu=TruMenu 0.8.0; TruShadowPower=...; TruDataGuard=no`;
+  sha256 = the loaded `Tru*.asi` files, computed once by the worker thread), then one line per mark / note
+  `yyyy-mm-dd hh:mm:ss<TAB>dlc2<TAB>hint-vein<TAB>fail<TAB><note><TAB><session start>`.
+- **TruLink**: `menu regress.load dlc2` (re-read, rows open, page selection), `menu regress.export` (block as
+  `test.export`: `ok+ regress.export ...`, then `list kind id state number target hint note time` per row, then `.`),
+  `menu regress.mark dlc2:wall-run ok`, `menu regress.list`.
+- **Harness (not built in 0.8)** - what `scripts\windows\Invoke-TruTestRun.ps1` needs: (1) a profile key
+  `"regression": "dlc1" | "dlc2" | "all"`; after the TO TEST preload send `menu regress.load <value>`; (2) after the run
+  copy `TruMenu.regress_results.txt` from the game folder into the run folder (`$run.collected`) and, optionally, the
+  answer of `menu regress.export` while the game still runs; (3) a reader `Read-RegressResults` that keeps the lines of
+  the **last** `#session` block (the run's game start), the newest state per `list + id`; (4) `summary.md` section
+  "Regression rows" (list, id, state, note, time) and `summary.json.regression`; (5) the verdict counts them like owner
+  checks (fail -> FAIL, open / skip -> INCOMPLETE); (6) `-Compare` lists changed regression states.
+
+### Cheats page (P0c)
+
+Source `docs\Befund-Prototyp-2007.md` 3i (workspace); every address re-read with `tools/pe_dis.py`,
+`tools/pe_abs_uses.py`, `tools/pe_callers.py`. All rows run on the game thread (queued), only in a level, need
+`[Cheats] Enabled=1` and `[Cheat] Experimental=1`, and log on / off (`cheat: god mode ON (...)`). `[Cheats] Persist=0`
+(default): the bytes are `.bss` / weapon data, so after a game start everything is off; `Persist=1` writes the ids that
+are on into `[Cheats] State` and switches them on again in the first level of the next start.
+
+| Item | Category | What it does (PC) | Notes |
+|---|---|---|---|
+| `cheat.god` | PC has it (switchable) | byte `0xfadf60` (`gInvincibleCheat`, cheat code 2 toggles it at 0x5d355a) = 1; `ProcessHealth` 0x6f5160 then keeps the hit-invulnerability timer `P+0x638` = 30.0 and `P+0x63c` = 5 every frame | as the prototype: damage types 8 / 5, `0x6e7930(type)` types and instant deaths still pass |
+| `cheat.godfull` | PC has it (switchable) | `cheat.god` + `GameTracker.cheatMode` 0xe7f144 bit 0 (`PlayerTakeDamage` 0x6f5030 returns at once, 0x6f5031) | the bit is also `cheat.flight`'s switch and has **60 uses** in `tru.exe` (`pe_abs_uses.py`) - side effects likely; off clears only a bit TruMenu set (and not while `cheat.flight` is on) |
+| `cheat.onehitkill` | PC has it (switchable) | byte `0xe91ffd` through **`ENEMY_ToggleOneHitKill` 0x60f670** (the game's own toggle, cheat code 1 jumps there), called only when the state differs | readers 0x62e39f, 0x633eb3, 0x63bb68 |
+| `cheat.enemyhealth` | PC has it (switchable) | byte `0xe91ffc` = 1; reader 0x638ed4 in `EnemyProcessFunc` 0x638d40 prints `[enemy+0x2c64]` through 0x622600 (format 0x858608) | whether retail draws that debug text = live test |
+| `cheat.ammo` | logic present, entry cut (re-attach) | per weapon in the 15 slots (`WM+4/+0xc+0x10*slot`, handle check as 0x5b39d0): `T = INSTANCE_Query(inst, 0x36)` (0x5b36f0 -> `inst+0x11c`), `T+0x88 |= 0x80` -> the reloads 0x69c600 / 0x6e7ae0 refill the clip without the reserve; `ResetAmmo` 0x6f58d1 passes the same slot instances to 0x6e7ae0 (proof of the path) | T is the weapon object's shared data; weapons with ammo type 0xff are skipped; new weapons are picked up every 30 game frames; off clears only bits TruMenu set and only on weapon data a slot still returns |
+| `cheat.fillup` | logic present, entry cut (re-attach) | `GainHealth` 0x6f4ef0 **cdecl `(float amount, bool noClamp)`** (`fld [esp+4]`, `cmp byte [esp+8], 0`, plain `ret`; ecx unused) with `(MaxHealth 0x6e7990(), 0)` -> health = max, HUD trigger 0x77d9d0 inside; then `ammo.fill` (prototype `DEBUG_FillUpAll` = health + ammo) | |
+| `cheat.code <n>` | cheat-code path | `DEBUG_ApplyCheatCode` 0x5d3520 cdecl `(code)`: first `0x6a5dd0(player, 0x71, 0xff, 0, &player.pos)` (hit-reaction effect; `[0xe7f094]` used **without** a null check), then jump table 0x5d358c / index 0x5d35a8: 1 -> 0x60f670, 2 -> toggle 0xfadf60, 9 -> xor 0xe7edb0, 10 -> xor 0xe7edac, 11 -> toggle 0xe91ffc; 3..8, 65, 66 = `ret` | built: the game itself calls it every frame from `GAMELOOP_Process` (0x5dfc5f, unless gameMode `[0xe7f143]` is 6 / 10); TruMenu calls it on the game thread with the same guard + a player; 9 / 10 have no readers on PC (nothing visible expected) |
+| no fall damage, enemies ignore Lara, no AI, infinite grenades, enemies don't attack / no attack damage / no health / don't move / don't investigate / no barks | flag + reader gone (rebuild from prototype) | listed read-only, "not built yet" (`cheat.list`) | the prototype function per row is on the page |
+
+### Camera log (P0b, `[Log] CameraChanges`, default 1)
+
+Read-only poll on the render thread every 200 ms: the camera manager 0xe804f0 is processed by 0x5f3c70 (called at
+0x5f3e0c with `ecx = 0xe804f0`; vtable 0x855ae4 slot 10), which calls the **mode chooser 0x5e7fe0 with `this` = the
+manager**: it writes the requested mode to **manager+0x58** (0x5e80b9 `mov [esi+0x58], 0x34` = adrenaline mode,
+others seen there 1 / 0x13 / 0x30 / 0x33 / 0x36) and at 0x5e80da compares it with the applied mode +0x54 (on a
+difference: current camera `vtbl[0x60](mode)`, +0x54 = +0x58, time in mode +0x5c = 0). Lines in `TruMenu.log` (log
+page / overlay, source TruMenu): `camera: mode 1 -> 52 (0x1 -> 0x34; requested manager+0x58, applied +0x54 = 1)` and,
+for the current camera object (manager+0x44 = 0xe80534), `camera: object 0x00e80610 (manager+0x120, vtable 0x...) ->
+0x... (manager+0x5b90, vtable 0x...)` (the manager's camera objects +0x120 / +0x670 / +0x5b90 / pointer +0xb80 are named).
+**No target instance / object name**: no field of the PC camera struct is proven to hold one (the 2007
+`CAMERA_SetInstanceFocus` offsets do not transfer). `camera.log [0/1]` switches it for the session, its value shows
+the current fields and the change counters. Checks: 0x5f3e0c, 0x5f3d12, 0x5e7feb, 0x5e8041, 0x5e80b9, 0x5e80da,
+0x5e810b, 0x5f3cb0.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
@@ -767,6 +844,9 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Pad] BlockInput` | 1 | 0 = the game sees the pad while the menu is open |
 | `[Cheat] Experimental` | 1 | 0 = no game-changing actions (pages read-only) |
 | `[Cheat] FlightSpeed` | 20 | units per 30 fps frame at full trigger |
+| `[Cheats] Enabled` | 1 | 0.8: 1 = the Cheats page can switch (also needs `[Cheat] Experimental=1`); 0 = list only |
+| `[Cheats] Persist` | 0 | 0.8: 0 = every cheat off at each game start; 1 = the ids that are on are kept in `State` and switched on again in the first level of the next start |
+| `[Cheats] State` | (empty) | 0.8: written by TruMenu when `Persist=1` (comma list of cheat ids) |
 | `[Levels] List` | `dlc_level1_start,dlc_level2_start` | units offered as buttons on the Level select page |
 | `[Levels] OutfitRule` | 1 | 0.7.2: `level.start` as the title update's mission menu - `dlc_level2_start` (and `dlc_level4..6_start`) without the outfit / weapon selection, other units with it; 0 = PC script 104 (always with the selection) |
 | `[Favorites] Ids` | (empty = default list) | favourite item ids, comma list; rewritten by TruMenu when you pin / unpin (`WritePrivateProfileString` on this file) |
@@ -786,8 +866,10 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Log] UnitChanges` | 1 | 0.7.1: a line `unit: <name> (was <name>; stream unit id N)` in `TruMenu.log` (log page / overlay) when Lara moves into another stream unit |
 | `[Log] OverlaySources` | `TruMenu,TruGuard` | 0.7.2: sources the corner overlay shows (log names without `.log`, plus `script`); `*` or empty = all; overlay only (`log.overlaysources`) |
 | `[Log] OverlayExclude` | (empty) | 0.7.2: overlay only - lines holding one of these texts (comma list) are not shown (`log.overlayexclude`; `none` = off) |
+| `[Log] CameraChanges` | 1 | 0.8: `camera: mode A -> B` / `camera: object ...` lines when the camera manager's mode (manager+0x58) or current camera changes (read-only poll, 200 ms; `camera.log`) |
 | `[Test] AutoStart` | (empty = off) | 0.7.1, test only: `dlc2` / `dlc1` / a unit name - once per game start, when the main menu is up, `level.start` (mission menu path, intro plays); without the verified path `level.load` + log line "intro skipped" |
 | `[Test] AutoStartDelay` | 3 | 0.7.1: seconds the main menu must be up before AutoStart starts, 1 .. 60 |
+| `[Regress] List` | `all` | 0.8: list the Regression page shows at start: `dlc1`, `dlc2` or `all` |
 
 ## Build, install, test (Windows)
 
@@ -1019,6 +1101,45 @@ keys, an old ini works too: `Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu
     (unit changes readable, no "activity 1009" lines); the Debug / Log page still shows TruShadowPower.
     `log.overlaysources *` -> all again; `log.overlayexclude activity 1009` -> those lines gone from the overlay only;
     `log.overlayexclude none` -> back.
+
+0.8 additions (built with `-OutDir work\asi\menu080`; install with `Set-TruMenu.ps1 -Install -SourceDir
+.\work\asi\menu080` - it copies the `.asi`, the new `TruMenu.ini` (five new keys; an old ini works too) and the two
+regression lists; the 0.7.2 build `work\asi\menu072` and its ini are recognised as ours). Every step: note the result,
+send `TruMenu.log` and `TruMenu.regress_results.txt`.
+
+70. `TruMenu.log` after the start: "0.8 cheats (enabled 1, persist 0): god 1, god full 1, one-hit kill 1, enemy health
+    1, infinite ammo 1, fill 'er up 1, cheat code 1" (no "disabled" line) and "0.8: camera log 1 (...), regression lists
+    ... (dlc1 18 rows, dlc2 30 rows, page shows all)". Status page: line "0.8: cheats god ok ...".
+71. Regression page (main menu is enough): header "Regression DLC 1 + DLC 2 (35 open, ...)"; DLC 1 / DLC 2 / all switch
+    the rows. On a check: A -> green [OK], X -> red [FAIL], Y -> grey [SKIP] (X / Y must not act on anything else).
+    `TruMenu.regress_results.txt` next to the `.asi`: one `#session` line (plugin versions incl. `TruMenu=TruMenu
+    0.8.0`, sha256 of every loaded `Tru*.asi` - compare TruMenu's with this build), then one line per mark.
+72. Note: "Note" on a row -> the command bar shows `regress.note dlc2:<id> ` with the on-screen keyboard; type a word,
+    Run / Enter -> the row shows "- <word>", a result line with the note. Restart the game: every row open again, the
+    results file keeps the old lines, a new `#session` line comes before the next mark.
+73. TruLink: `menu regress.load dlc2` -> page shows DLC 2, all rows open; `menu regress.mark dlc2:waterfall ok bright`;
+    `menu regress.mark no-crash ok` with "all" selected -> `err 'no-crash' is in both lists - write dlc1:no-crash or
+    dlc2:no-crash`; `menu regress.export` -> block with 48 rows, ends with `.`.
+74. Cheats page in the main menu: every switch greyed out, "needs a level". In a level: `cheat.god` on (log "cheat: god
+    mode ON") - an enemy hit / small fall does not lower health; a deep fall still kills (instant death passes, as in
+    the prototype). Off again.
+75. `cheat.godfull` on: no damage at all (also types 8 / 5)? Watch for side effects of cheatMode bit 0 (no-clip /
+    flight behaviour, camera, controls); then off - `cheat.flight` must still work as before.
+76. `cheat.onehitkill` on: one shot kills an enemy (log "toggle 0x0060f670 called"); off: normal damage.
+77. `cheat.enemyhealth` on: is a hit-point number drawn at enemies? (may draw nothing in retail - mark what you see).
+78. `cheat.ammo` on with pistols + another weapon: shoot past one clip - the reserve (`ammo.show`) does not drop; pick up
+    / give another weapon (`weapon.give wp_shotgun`), wait 1 s - it reloads without reserve as well; off: reserve drops
+    again (the pistols keep their own behaviour).
+79. `cheat.fillup` after taking damage: health back to max (HUD health silhouette flashes), reserves at max
+    (`ammo.show`); log "cheat: fill 'er up - health a -> b".
+80. Cheat codes in a level: `cheat.code 2` -> Lara shows the hit-reaction effect, `cheat.god` reads 1; again -> 0;
+    `cheat.code 1` / `11` toggle `cheat.onehitkill` / `cheat.enemyhealth`; `cheat.code 9` / `10`: nothing visible
+    expected (no readers); `cheat.code 4` -> usage error. No crash.
+81. `[Cheats] Persist=1` (restart): switch `cheat.god` on, quit, start again, load a level -> log "cheats: [Cheats]
+    Persist=1 - cheat.god on again"; `[Cheats] State=cheat.god` in the ini. Back to 0 (and clear State).
+82. Camera log (DLC 2, `log.overlay 1`): walk - "camera: mode ... at the start of the log"; hold RB / aim -> mode lines;
+    the second DLC 2 hint (rock channel) that swings the camera to the wall: which "camera: mode" / "camera: object"
+    lines come (copy them into the report). `camera.log 0` -> no more lines.
 
 ## Ideas
 

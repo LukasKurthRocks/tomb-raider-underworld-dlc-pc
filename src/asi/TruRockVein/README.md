@@ -136,10 +136,29 @@ checks its bytes first (`work\asi_rv08\prechecks_v08.txt`, 12 checks, 0 mismatch
 | 0x823fe130 bone attach point | tru+0x311530, default +0x3117e3 | type 22 -> position + 47.4075 x normalize(tru+0x2fe7e0(box, segment, position)) |
 | 0x82400bc0 corner angle, 2 sites | tru+0x309500 at +0x3097cb / +0x309894 | flag 0x400000 **or type 22** -> skip the angle |
 
-Not translated: TU 0x8242a7c8 (same "flag 0x400000 or type 22 -> skip" pattern; the PC partner of retail 0x82427750
-is not found). Hits are counted in the stubs and logged by the chart probe (`ChartLog=1`): first hit, then every power
-of two at `LogLevel=2`. Load lines: "<piece>: title-update type-22 branch added (0x...)" x 5 and "jump geometry: 5 of 5
-type-22 branches added". Built 2026-11-02 into `work\asi_rv08`, not loaded.
+Not translated in 0.8: TU 0x8242a7c8 (see 0.9). Hits are counted in the stubs and logged by the chart probe
+(`ChartLog=1`): first hit, then every power of two at `LogLevel=2`. Load lines: "<piece>: title-update type-22 branch
+added (0x...)" x 5 and "jump geometry: 5 of 5 type-22 branches added". Built 2026-11-02 into `work\asi_rv08`, not loaded.
+
+## 0.9: the fifth geometry function (2026-11-02)
+
+Docs `Befund-TU-Funktionen.md` L1: retail 0x82427750 = **PC tru+0x34d390** (TU 0x8242a7c8; found by its constants and
+calls). After the flag test `box +0x28 & 0x400000` the TU inserted 0x8242a898..0x8242a8c4: the same inline type test and
+`type == 22 -> 0x8242abac`, the block the 0x400000 flag takes (PC tru+0x34d4bf: `call 0x5c3cc0` on the box, jmp
+0x74d710). The stub replaces `test eax,400000h; je 0x74d4d5` at tru+0x34d4b8 (7 bytes; eax = [esi+28h], esi = box):
+flag or type 22 -> tru+0x34d4bf, else tru+0x34d4d5 with eax kept for the 0x8000 / 0x40000000 tests. Option
+`SkipGeometry` (default 1; sample ini unchanged), byte checks of the function entry and the site
+(`work\asi\v09\prechecks_v09.txt`). With it **11 of 11** TU geometry functions are translated. Load line: "fifth
+geometry function: title-update type-22 branch added (...)"; hit line (chart probe): "fifth geometry function
+(tru+0x34d390 site 0x74d4b8 = TU 0x8242a8c4): type-22 box takes the flag-0x400000 path (n hits)". Built 2026-11-02 into
+`work\asi_rv09`, not loaded.
+
+**TO TEST (0.9)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | DLC 2, first rock vein: jump onto it, run along, jump off / fall off | load line "fifth geometry function: ... added"; at the vein "fifth geometry function (...) (1 hits)" next to the 0.8 hit lines; behaviour as 50h or better (no snap to a wrong edge) |
+| 2 | main game level with ledges | unchanged (type 22 exists only in DLC 2; no hit line) |
 
 ## Build, install, remove
 
@@ -148,7 +167,9 @@ type-22 branches added". Built 2026-11-02 into `work\asi_rv08`, not loaded.
 - Install: `scripts\windows\Set-TruRockVein.ps1 -Install` (game closed); the Ultimate ASI Loader the game ships as
   `binkw32.dll` loads every `*.asi` next to `tru.exe`. Remove: `Set-TruRockVein.ps1 -Remove` (only our own files).
 - Options: `TruRockVein.ini` - `Enabled`, `LogLevel` (0-3), `LogUnhandled`, `Type607` / `Type608`, `LogBadValues`,
-  `LogDefaultConditions`, `MarkupTypes`, `MarkupSlots`, `NullBoxGuard`, `MarkupAction608`. Log:
+  `LogDefaultConditions`, `MarkupTypes`, `MarkupSlots`, `NullBoxGuard`, `MarkupAction608`, `AttachGeometry`,
+  `State420Slot1`, `ChartLog` (`ChartLogFrom` / `ChartLogTo`), `JumpGeometry`, `SkipGeometry` (0.9) - the switches from
+  `MarkupTypes` on default to 1, the chart range to 1470..1510. Log:
   `TruRockVein.log` next to `tru.exe`.
 
 ## Test

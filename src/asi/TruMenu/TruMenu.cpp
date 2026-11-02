@@ -44,7 +44,12 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.7.2 (game.quit: TerminateProcess with exit code 0x544D after a safety step; "
+const char *const kVersion = "TruMenu 0.8.0 (Regression page: lists TruMenu.regress_dlc1 / _dlc2.txt, A ok / X fail / "
+                             "Y skip, notes, TruMenu.regress_results.txt with plugin versions + sha256; Cheats page "
+                             "from the 2007 prototype evaluation: god mode, one-hit kill, enemy health, infinite ammo, "
+                             "fill 'er up, cheat codes, each with its category and a byte pre-check; camera log "
+                             "[Log] CameraChanges; "
+                             "0.7.2: game.quit:TerminateProcess with exit code 0x544D after a safety step; "
                              "level.load / level.start refused while a level change or a mission start is pending; "
                              "level.start: the title update's outfit rule ([Levels] OutfitRule, DLC 2 without the outfit "
                              "selection); log overlay filter [Log] OverlaySources / OverlayExclude; "
@@ -185,6 +190,12 @@ const OptDef kOpts[] = {
     {"Cheat", "Experimental", "1", "1 = show the experimental actions (cheat / flight, camera mode, level load, costumes, "
                                    "developer menu rows, time /\nplayer / instance / video items); 0 = read-only"},
     {"Cheat", "FlightSpeed", "20", "flight: units per 30 fps frame at full trigger (RT up, LT down) while cheat mode is on"},
+    {"Cheats", "Enabled", "1", "0.8: 1 = the Cheats page (god mode, one-hit kill, enemy health, infinite ammo, fill 'er up, "
+                               "cheat codes) can switch;\n0 = the page only lists them (also needs [Cheat] "
+                               "Experimental=1)"},
+    {"Cheats", "Persist", "0", "0.8: 0 = every cheat starts off at each game start; 1 = the cheats switched on are kept "
+                               "in State below and switched\non again in the first level of the next game start"},
+    {"Cheats", "State", "", "0.8: written by TruMenu when Persist=1 (comma list of cheat ids that are on); empty = none"},
     {"Levels", "List", "dlc_level1_start,dlc_level2_start", "units offered as buttons on the Level select page (comma list)"},
     {"Levels", "OutfitRule", "1", "level.start: 1 = as the title update's mission menu: dlc_level2_start (and "
                                   "dlc_level4..6_start) start without the outfit /\nweapon selection, every other unit "
@@ -208,6 +219,9 @@ const OptDef kOpts[] = {
                                                   "stay complete"},
     {"Log", "OverlayExclude", "", "overlay only: lines holding one of these texts are not shown (comma list, e.g. "
                                   "activity 1009,markup subtest); empty = none"},
+    {"Log", "CameraChanges", "1", "0.8: 1 = a line \"camera: mode A -> B\" / \"camera: object ...\" when the camera "
+                                  "manager's mode or current camera\nchanges (polled a few times per second, read-only; "
+                                  "TruMenu.log, log page and overlay)"},
     {"Favorites", "Ids", "", "item ids on the \"Quick access / Favourites\" page (comma list); empty = default list. Y on an "
                              "item in the menu\npins / unpins it and rewrites this line (TruLink: menu fav.add <id> / "
                              "fav.del <id> / fav.list)"},
@@ -227,6 +241,8 @@ const OptDef kOpts[] = {
     {"Test", "AutoStart", "", "test only: dlc2 (or dlc1) = once per game start, when the main menu is up, start that DLC "
                               "the way the mission\nmenu does (level.start, the intro plays); empty = off"},
     {"Test", "AutoStartDelay", "3", "seconds the main menu must be up before AutoStart starts the level, 1 .. 60"},
+    {"Regress", "List", "all", "0.8: list shown on the Regression page at start: dlc1, dlc2 or all (TruMenu.regress_dlc1.txt "
+                               "/ _dlc2.txt next to\nthe .asi; results go to TruMenu.regress_results.txt)"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -269,6 +285,10 @@ const char *g_autoStartMode = "off ([Test] AutoStart empty)";
 int g_outfitRule = 1;                                                        // 0.7.2 [Levels] OutfitRule
 bool g_pendingOk = false;                                                    // 0.7.2: main state 2 / 9 code checks
 bool g_outfitRuleOk = false;                                                 // 0.7.2: f27 arg 2 = selection flag checks
+int g_cheatsEnabled = 1, g_cheatPersist = 0;                                 // 0.8 [Cheats] Enabled / Persist
+char g_cheatState[256] = "";                                                 // 0.8 [Cheats] State (Persist=1)
+volatile LONG g_cameraChanges = 1;                                           // 0.8 [Log] CameraChanges
+char g_regressStart[8] = "all";                                              // 0.8 [Regress] List
 
 // ---- state ----
 char g_logPath[MAX_PATH];
@@ -424,6 +444,7 @@ void RunPending();     // items section below
 bool InLevel();
 void WeaponsTick();    // 0.3 costume switch: player message 35 a frame later
 void InvincibleTick(); // 0.3 player.invincible: health = MaxHealth once per game frame
+void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite ammo re-apply (game thread)
 void LogTailTick();    // 0.3 log page: tail Tru*.log once per second (worker thread)
 
 // flight: while cheat mode is on and the menu is closed, the triggers move Lara up (RT) / down (LT) - TRLAU moves
@@ -528,6 +549,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         if (!g_menuOpen && connected) FlightTick(copy);
         WeaponsTick();
         InvincibleTick();
+        CheatsTick();                         // 0.8: [Cheats] Persist restore, infinite ammo re-apply
     }
     return result;
 }
@@ -1533,6 +1555,82 @@ void UnitTick() {
     if (!strcmp(name, last)) return;
     Log(1, "unit: %s (was %s; stream unit id %lu)", name, last[0] ? last : "-", id);
     strncpy_s(last, sizeof(last), name, _TRUNCATE);
+}
+
+// 0.8 [Log] CameraChanges (read-only). The camera manager 0xe804f0 is processed by 0x5f3c70 (vtable 0x855ae4 slot 10,
+// called at 0x5f3e0c with ecx = 0xe804f0), which calls the mode chooser 0x5e7fe0 (thiscall, this = the manager): it
+// writes the requested mode to manager+0x58 (0x5e80b9 `mov [esi+0x58], 0x34` = adrenaline mode when the player's
+// +0x1fc bit 27 is set; values seen there 1 / 0x13 / 0x30 / 0x33 / 0x34 / 0x36), and at 0x5e80da compares it with the
+// applied mode +0x54; on a difference it calls the current camera's vtbl[0x60](mode), stores +0x54 = +0x58 and
+// zeroes the time in mode +0x5c (float). The current camera object is manager+0x44 (= 0xe80534); the manager holds
+// camera objects at +0x120, +0x670, +0x5b90 and a pointer at +0xb80 (all compared with +0x44 in 0x5f3c70 / 0x5e7fe0).
+// A target instance / object name is NOT logged: no field of the PC camera struct is proven to hold one.
+const DWORD kCamReqMode = 0x00e804f0 + 0x58, kCamAppliedMode = 0x00e804f0 + 0x54, kCamModeTime = 0x00e804f0 + 0x5c;
+bool g_camLogOk = false;
+volatile LONG g_camModeChanges = 0, g_camObjectChanges = 0;
+
+void CameraObjectName(DWORD cam, char *o, size_t n) {
+    const DWORD m = 0x00e804f0;
+    DWORD vtbl = 0, ptrB80 = 0;
+    ReadDword(m + 0xb80, &ptrB80);
+    const char *slot = cam == 0 ? "none" : cam == m + 0x120 ? "manager+0x120" : cam == m + 0x670 ? "manager+0x670"
+                     : cam == m + 0x5b90 ? "manager+0x5b90" : cam == ptrB80 ? "[manager+0xb80]" : "other";
+    if (cam) ReadDword(cam, &vtbl);
+    _snprintf_s(o, n, _TRUNCATE, "0x%08lx (%s, vtable 0x%08lx)", cam, slot, vtbl);
+}
+
+void ValCameraLog(char *o, size_t n) {
+    if (!g_camLogOk) { Out(o, n, "camera manager code check failed - no camera log"); return; }
+    DWORD req = 0, applied = 0, cam = 0;
+    float t = 0.0f;
+    ReadDword(kCamReqMode, &req);
+    ReadDword(kCamAppliedMode, &applied);
+    ReadFloats(kCamModeTime, &t, 1);
+    ReadDword(kCurrentCamera, &cam);
+    char name[96];
+    CameraObjectName(cam, name, sizeof(name));
+    Out(o, n, "%ld (log); mode requested %lu (0x%lx, manager+0x58), applied %lu (+0x54), %.1f in mode (+0x5c); camera %s; "
+        "changes: mode %ld, object %ld", g_cameraChanges, req, req, applied, t, name, g_camModeChanges, g_camObjectChanges);
+}
+
+bool RunCameraLog(const char *arg, char *o, size_t n) {
+    if (!g_camLogOk) { Out(o, n, "camera manager code check failed - no camera log"); return false; }
+    bool on = BoolArg(arg, g_cameraChanges != 0);
+    InterlockedExchange(&g_cameraChanges, on ? 1 : 0);
+    Out(o, n, "camera.log %d ([Log] CameraChanges for this session)", on ? 1 : 0);
+    return true;
+}
+
+// render thread, at most every 200 ms (Render, before its early return)
+void CameraTick() {
+    static DWORD lastTick = 0, lastReq = 0xffffffff, lastCam = 0xffffffff;
+    if (!g_cameraChanges || !g_camLogOk) return;
+    DWORD now = GetTickCount();
+    if (now - lastTick < 200) return;
+    lastTick = now;
+    DWORD req = 0, applied = 0, cam = 0;
+    if (!ReadDword(kCamReqMode, &req) || !ReadDword(kCamAppliedMode, &applied) || !ReadDword(kCurrentCamera, &cam)) return;
+    if (req != lastReq) {
+        if (lastReq == 0xffffffff)
+            Log(1, "camera: mode %lu (0x%lx) at the start of the log (applied %lu)", req, req, applied);
+        else
+            Log(1, "camera: mode %lu -> %lu (0x%lx -> 0x%lx; requested manager+0x58, applied +0x54 = %lu)", lastReq, req,
+                lastReq, req, applied);
+        if (lastReq != 0xffffffff) InterlockedIncrement(&g_camModeChanges);
+        lastReq = req;
+    }
+    if (cam != lastCam) {
+        char a[96], b[96];
+        CameraObjectName(cam, b, sizeof(b));
+        if (lastCam == 0xffffffff) {
+            Log(1, "camera: object %s at the start of the log", b);
+        } else {
+            CameraObjectName(lastCam, a, sizeof(a));
+            Log(1, "camera: object %s -> %s", a, b);
+            InterlockedIncrement(&g_camObjectChanges);
+        }
+        lastCam = cam;
+    }
 }
 
 // value getters (any thread, read-only)
@@ -3711,6 +3809,411 @@ bool RunGearGive(const char *arg, char *o, size_t n) {
     return true;
 }
 
+// ======================================================================================================================
+// 0.8 Cheats page (docs\Befund-Prototyp-2007.md section 3i; names from the 2007 prototype map, PC addresses by code
+// semantics, checked with tools/pe_dis.py / pe_abs_uses.py / pe_callers.py; byte list work\asi\menu080\precheck_080.txt).
+// Every row shows its category; every write runs on the game thread (gameThread items, QueueItem) and only in a level.
+// ======================================================================================================================
+enum CheatCat { kCatSwitch, kCatReattach, kCatCode, kCatRebuild };
+const char *const kCheatCatNames[] = {"PC has it (switchable)", "logic present, entry cut (re-attach)",
+                                      "cheat-code path (DEBUG_ApplyCheatCode)", "flag + reader gone (rebuild from prototype)"};
+// ProcessHealth 0x6f5160: if ([0xfadf63] || [0xfadf60]) { P+0x638 = 30.0 (hit-invulnerability timer); P+0x63c = 5 }
+const DWORD kGodByte = 0x00fadf60;          // PlayerHealth::gInvincibleCheat (cheat code 2 toggles it at 0x5d355a)
+const DWORD kGodByteOld = 0x00fadf63;       // the former option g_invincible (no writer on PC)
+const DWORD kOneHitKill = 0x00e91ffd;       // EnemyHealth::m_oneHitKill, readers 0x62e39f / 0x633eb3 / 0x63bb68
+const DWORD kOhkToggle = 0x0060f670;        // ENEMY_ToggleOneHitKill (cdecl, no args) - what cheat code 1 jumps to
+const DWORD kEnemyHealth = 0x00e91ffc;      // gEnemyDrawHealthCheat, reader 0x638ed4 in EnemyProcessFunc 0x638d40
+const DWORD kInstanceQuery = 0x005b36f0;    // INSTANCE_Query(inst, query) cdecl -> inst->[+0x11c](inst, query)
+const DWORD kGainHealth = 0x006f4ef0;       // GainHealth / AddHealth cdecl (float amount, bool noClamp)
+const DWORD kApplyCheatCode = 0x005d3520;   // DEBUG_ApplyCheatCode(code) cdecl
+const DWORD kGameMode = 0x00e7f143;         // GameTracker+0xbb gameMode; GAMELOOP_Process skips the cheat path at 6 / 10
+typedef void(__cdecl *VoidCdeclFn)();
+typedef DWORD(__cdecl *InstanceQueryFn)(DWORD inst, int query);
+typedef void(__cdecl *GainHealthFn)(float amount, int noClamp);
+typedef void(__cdecl *ApplyCheatCodeFn)(int code);
+
+bool g_godOk = false, g_godFullOk = false, g_ohkOk = false, g_enemyHpOk = false, g_infAmmoOk = false, g_fillOk = false,
+     g_codeOk = false;
+const char *g_godWhy = "not checked", *g_godFullWhy = "not checked", *g_ohkWhy = "not checked",
+           *g_enemyHpWhy = "not checked", *g_infAmmoWhy = "not checked", *g_fillWhy = "not checked",
+           *g_codeWhy = "not checked";
+bool g_godFullBitOurs = false;              // cheat.godfull set cheatMode bit 0 (and clears only that)
+volatile LONG g_infAmmo = 0;                // cheat.ammo on (re-applied every 30 game frames)
+struct AmmoMark { DWORD t; bool ours; bool seen; };
+AmmoMark g_ammoMarks[32];
+int g_ammoMarkCount = 0;                    // game thread only
+bool g_cheatRestored = false;               // [Cheats] Persist=1: State applied once in the first level
+
+bool ByteAt(DWORD address) { BYTE b = 0; return ReadByte(address, &b) && b != 0; }
+bool PutByte(DWORD address, BYTE value) {
+    __try {
+        *reinterpret_cast<volatile BYTE *>(address) = value;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+// common gate of every cheat write: INI, pre-check, level
+bool CheatGate(bool ok, const char *why, char *o, size_t n) {
+    if (!g_cheatsEnabled) { Out(o, n, "cheats off ([Cheats] Enabled=0)"); return false; }
+    if (!g_experimental) { Out(o, n, "experimental actions off ([Cheat] Experimental=0)"); return false; }
+    if (!ok) { Out(o, n, "disabled: pre-check failed (%s)", why); return false; }
+    if (!InLevel()) { Out(o, n, "needs a level (no player instance)"); return false; }
+    return true;
+}
+
+void CheatPersistSave();   // below the runners
+
+void ValCheatGod(char *o, size_t n) { Out(o, n, "%d", ByteAt(kGodByte) ? 1 : 0); }
+bool RunCheatGod(const char *arg, char *o, size_t n) {
+    if (!CheatGate(g_godOk, g_godWhy, o, n)) return false;
+    bool on = BoolArg(arg, ByteAt(kGodByte));
+    if (!PutByte(kGodByte, on ? 1 : 0)) { Out(o, n, "write to 0x%08lx failed", kGodByte); return false; }
+    Log(1, "cheat: god mode %s (byte 0x%08lx = %d; ProcessHealth 0x6f5160 keeps the hit timer full)", on ? "ON" : "OFF",
+        kGodByte, on ? 1 : 0);
+    CheatPersistSave();
+    Out(o, n, "cheat.god %d (gInvincibleCheat 0x%08lx; damage types 8 / 5 and instant deaths still pass - cheat.godfull "
+        "adds cheatMode & 1)", on ? 1 : 0, kGodByte);
+    return true;
+}
+
+// god mode + GameTracker.cheatMode bit 0 (PlayerTakeDamage 0x6f5030 returns at once when it is set). That bit is also
+// cheat.flight's switch and has 60 uses in tru.exe (pe_abs_uses.py) - side effects are expected, live test.
+void ValCheatGodFull(char *o, size_t n) {
+    BYTE mode = 0;
+    ReadByte(kCheatMode, &mode);
+    Out(o, n, "%d", ByteAt(kGodByte) && (mode & 1) && g_godFullBitOurs ? 1 : 0);
+}
+bool RunCheatGodFull(const char *arg, char *o, size_t n) {
+    if (!CheatGate(g_godFullOk, g_godFullWhy, o, n)) return false;
+    BYTE mode = 0;
+    ReadByte(kCheatMode, &mode);
+    char cur[4];
+    ValCheatGodFull(cur, sizeof(cur));
+    bool on = BoolArg(arg, cur[0] == '1');
+    if (on) {
+        if (!(mode & 1)) { g_godFullBitOurs = true; PutByte(kCheatMode, static_cast<BYTE>(mode | 1)); }
+        else if (!g_godFullBitOurs) g_godFullBitOurs = !g_flight;   // set by someone else: keep it at the off
+        PutByte(kGodByte, 1);
+    } else {
+        PutByte(kGodByte, 0);
+        if (g_godFullBitOurs && !g_flight) PutByte(kCheatMode, static_cast<BYTE>(mode & ~1));
+        g_godFullBitOurs = false;
+    }
+    ReadByte(kCheatMode, &mode);
+    Log(1, "cheat: god mode full %s (byte 0x%08lx = %d, cheatMode 0x%08lx = %u)", on ? "ON" : "OFF", kGodByte, on ? 1 : 0,
+        kCheatMode, mode);
+    CheatPersistSave();
+    Out(o, n, "cheat.godfull %d (gInvincibleCheat + cheatMode bit 0 = %u; the bit is also cheat.flight's switch)", on ? 1 : 0,
+        mode & 1);
+    return true;
+}
+
+void ValCheatOhk(char *o, size_t n) { Out(o, n, "%d", ByteAt(kOneHitKill) ? 1 : 0); }
+bool RunCheatOhk(const char *arg, char *o, size_t n) {
+    if (!CheatGate(g_ohkOk, g_ohkWhy, o, n)) return false;
+    bool now = ByteAt(kOneHitKill), on = BoolArg(arg, now);
+    if (on != now) {
+        __try {
+            reinterpret_cast<VoidCdeclFn>(kOhkToggle)();       // the game's own toggle (cheat code 1)
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            InterlockedIncrement(&g_ownExceptions);
+            Out(o, n, "exception in ENEMY_ToggleOneHitKill 0x%08lx", kOhkToggle);
+            return false;
+        }
+    }
+    bool after = ByteAt(kOneHitKill);
+    Log(1, "cheat: one-hit kill %s (toggle 0x%08lx %s, byte 0x%08lx = %d)", after ? "ON" : "OFF", kOhkToggle,
+        on != now ? "called" : "not needed", kOneHitKill, after ? 1 : 0);
+    CheatPersistSave();
+    Out(o, n, "cheat.onehitkill %d", after ? 1 : 0);
+    return after == on;
+}
+
+void ValCheatEnemyHp(char *o, size_t n) { Out(o, n, "%d", ByteAt(kEnemyHealth) ? 1 : 0); }
+bool RunCheatEnemyHp(const char *arg, char *o, size_t n) {
+    if (!CheatGate(g_enemyHpOk, g_enemyHpWhy, o, n)) return false;
+    bool on = BoolArg(arg, ByteAt(kEnemyHealth));
+    if (!PutByte(kEnemyHealth, on ? 1 : 0)) { Out(o, n, "write to 0x%08lx failed", kEnemyHealth); return false; }
+    Log(1, "cheat: show enemy health %s (byte 0x%08lx = %d)", on ? "ON" : "OFF", kEnemyHealth, on ? 1 : 0);
+    CheatPersistSave();
+    Out(o, n, "cheat.enemyhealth %d (EnemyProcessFunc prints the hit points through the game's debug text - may draw "
+        "nothing in retail)", on ? 1 : 0);
+    return true;
+}
+
+// infinite ammo: per weapon in the 15 slots, T = INSTANCE_Query(inst, 0x36) (the weapon tuning the reload 0x69c600 /
+// 0x6e7ae0 reads; ResetAmmo 0x6f58d1 passes the slot instances to 0x6e7ae0), T+0x88 |= 0x80 -> reload without using
+// the reserve. T is the weapon object's shared data (every instance of that weapon). Only bits TruMenu set are cleared.
+int AmmoMarkFind(DWORD t) {
+    for (int i = 0; i < g_ammoMarkCount; ++i) if (g_ammoMarks[i].t == t) return i;
+    return -1;
+}
+// game thread: on = set the bit on every slot weapon (remember which ones we changed); off = clear ours
+int InfAmmoWalk(bool on, int *changed) {
+    *changed = 0;
+    DWORD wm = WeaponManager();
+    if (!wm) return -1;
+    for (int i = 0; i < g_ammoMarkCount; ++i) g_ammoMarks[i].seen = false;
+    int weapons = 0;
+    for (int slot = 0; slot < 15; ++slot)
+        for (int left = 0; left < 2; ++left) {
+            DWORD inst = HandleInstance(wm + (left ? 0xc : 0x4) + 0x10 * slot);
+            if (!inst) continue;
+            DWORD t = 0;
+            __try {
+                t = reinterpret_cast<InstanceQueryFn>(kInstanceQuery)(inst, 0x36);
+            } __except (EXCEPTION_EXECUTE_HANDLER) {
+                InterlockedIncrement(&g_ownExceptions);
+                t = 0;
+            }
+            BYTE flags = 0, type = 0;
+            if (!t || !ReadByte(t + 0x88, &flags) || !ReadByte(t + 0xa, &type)) continue;
+            ++weapons;
+            int k = AmmoMarkFind(t);
+            if (k >= 0) g_ammoMarks[k].seen = true;
+            if (on) {
+                if (type == 0xff) continue;                  // no ammo type: already unlimited
+                if (!(flags & 0x80)) {
+                    if (PutByte(t + 0x88, static_cast<BYTE>(flags | 0x80))) ++*changed;
+                    if (k < 0 && g_ammoMarkCount < 32) { g_ammoMarks[g_ammoMarkCount++] = {t, true, true}; }
+                    else if (k >= 0) g_ammoMarks[k].ours = true;
+                } else if (k < 0 && g_ammoMarkCount < 32) {
+                    g_ammoMarks[g_ammoMarkCount++] = {t, false, true};   // the weapon had the bit itself
+                }
+            } else if (k >= 0 && g_ammoMarks[k].ours && (flags & 0x80)) {
+                if (PutByte(t + 0x88, static_cast<BYTE>(flags & ~0x80))) ++*changed;
+                g_ammoMarks[k].ours = false;
+            }
+        }
+    // marks of weapon data no slot returned this time are dropped (never written again: the data may be gone)
+    if (weapons) {
+        int kept = 0;
+        for (int i = 0; i < g_ammoMarkCount; ++i) if (g_ammoMarks[i].seen) g_ammoMarks[kept++] = g_ammoMarks[i];
+        g_ammoMarkCount = kept;
+    }
+    if (!on && weapons) g_ammoMarkCount = 0;
+    return weapons;
+}
+void ValCheatAmmo(char *o, size_t n) { Out(o, n, "%d", g_infAmmo ? 1 : 0); }
+bool RunCheatAmmo(const char *arg, char *o, size_t n) {
+    if (!CheatGate(g_infAmmoOk, g_infAmmoWhy, o, n)) return false;
+    bool on = BoolArg(arg, g_infAmmo != 0);
+    int changed = 0, weapons = InfAmmoWalk(on, &changed);
+    InterlockedExchange(&g_infAmmo, on ? 1 : 0);
+    Log(1, "cheat: infinite ammo %s (%d slot weapon(s), %d weapon data bit(s) T+0x88 & 0x80 %s)", on ? "ON" : "OFF",
+        weapons < 0 ? 0 : weapons, changed, on ? "set" : "cleared");
+    CheatPersistSave();
+    Out(o, n, "cheat.ammo %d: %d weapon(s), %d bit(s) %s%s", on ? 1 : 0, weapons < 0 ? 0 : weapons, changed,
+        on ? "set" : "cleared", on ? " (new weapons are picked up every 30 game frames)" : "");
+    return true;
+}
+
+// fill 'er up: the prototype's DEBUG_FillUpAll = RAZIEL_DebugHealthFillUp (GainHealth(max, 0) + UI fade group 1 - the
+// PC GainHealth triggers the HUD itself, 0x6f4f5f) + playerInvDebugAmmoFillUp (here: ammo.fill, reserve = MaxAmmo)
+bool RunCheatFill(const char *, char *o, size_t n) {
+    if (!CheatGate(g_fillOk, g_fillWhy, o, n)) return false;
+    if (!PlayerState()) { Out(o, n, "no playerstate [0x%08lx]", kPlayerState); return false; }
+    float before = 0.0f, after = 0.0f, max = 0.0f;
+    ReadFloats(PlayerState() + 0x628, &before, 1);
+    __try {
+        max = reinterpret_cast<MaxHealthFn>(kMaxHealth)();
+        if (max > 0.0f) reinterpret_cast<GainHealthFn>(kGainHealth)(max, 0);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        Out(o, n, "exception in MaxHealth / GainHealth 0x%08lx", kGainHealth);
+        return false;
+    }
+    ReadFloats(PlayerState() + 0x628, &after, 1);
+    char ammo[200] = "ammo not verified - health only";
+    if (g_ammoOk && g_maxAmmoOk) RunAmmoFill("", ammo, sizeof(ammo));
+    Log(1, "cheat: fill 'er up - health %.1f -> %.1f (GainHealth 0x%08lx(%.1f, 0)); %s", before, after, kGainHealth, max, ammo);
+    Out(o, n, "health %.1f -> %.1f (max %.1f); %s", before, after, max, ammo);
+    return true;
+}
+
+// the cheat-code path: GAMELOOP_Process 0x5dfc5f calls 0x5d74d0 every frame unless gameMode is 6 / 10, which runs
+// CheatCodes::Process and DEBUG_ApplyCheatCode(code). The function first plays the hit-reaction effect on the player
+// (0x6a5dd0(player, 0x71, 0xff, 0, &player.pos) - [0xe7f094] is used without a null check), then toggles: 1 one-hit
+// kill (jmp 0x60f670), 2 0xfadf60, 9 wireframe dword 0xe7edb0, 10 textureless 0xe7edac (no readers on PC), 11 0xe91ffc.
+// TruMenu calls it on the game thread with the same guard (player set, gameMode not 6 / 10). Codes 3..8 / 65 / 66 are
+// `ret` on PC and are refused.
+const char *CheatCodeName(int code) {
+    switch (code) {
+        case 1: return "one-shot kill (toggle 0xe91ffd)";
+        case 2: return "infinite health (toggle 0xfadf60)";
+        case 9: return "wireframe (xor 0xe7edb0, no reader on PC)";
+        case 10: return "textureless (xor 0xe7edac, no reader on PC)";
+        case 11: return "draw enemy health (toggle 0xe91ffc)";
+        default: return nullptr;
+    }
+}
+void ValCheatCode(char *o, size_t n) {
+    DWORD wire = 0, tex = 0;
+    ReadDword(0x00e7edb0, &wire);
+    ReadDword(0x00e7edac, &tex);
+    Out(o, n, "codes 1 2 9 10 11; now: god %d, one-hit kill %d, enemy health %d, wireframe %lu, textureless %lu",
+        ByteAt(kGodByte) ? 1 : 0, ByteAt(kOneHitKill) ? 1 : 0, ByteAt(kEnemyHealth) ? 1 : 0, wire & 1, tex & 1);
+}
+bool RunCheatCode(const char *arg, char *o, size_t n) {
+    if (!CheatGate(g_codeOk, g_codeWhy, o, n)) return false;
+    int code = arg && arg[0] ? atoi(arg) : 0;
+    const char *name = CheatCodeName(code);
+    if (!name) { Out(o, n, "usage: cheat.code <1|2|9|10|11> (3..8, 65, 66 are empty on PC)"); return false; }
+    BYTE mode = 0;
+    ReadByte(kGameMode, &mode);
+    if (mode == 6 || mode == 10) { Out(o, n, "refused: gameMode [0x%08lx] = %u (the game skips its cheat path at 6 / 10)", kGameMode, mode); return false; }
+    __try {
+        reinterpret_cast<ApplyCheatCodeFn>(kApplyCheatCode)(code);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        Out(o, n, "exception in DEBUG_ApplyCheatCode 0x%08lx(%d)", kApplyCheatCode, code);
+        return false;
+    }
+    char now[200];
+    ValCheatCode(now, sizeof(now));
+    Log(1, "cheat: code %d %s applied via DEBUG_ApplyCheatCode 0x%08lx; %s", code, name, kApplyCheatCode, now);
+    CheatPersistSave();
+    Out(o, n, "DEBUG_ApplyCheatCode(%d) = %s done; %s", code, name, now);
+    return true;
+}
+
+// the switchable / re-attach rows that can be kept with [Cheats] Persist=1
+struct CheatRow { const char *id; int cat; void (*value)(char *, size_t); bool (*run)(const char *, char *, size_t); };
+const CheatRow kCheatRows[] = {
+    {"cheat.god", kCatSwitch, ValCheatGod, RunCheatGod},
+    {"cheat.godfull", kCatSwitch, ValCheatGodFull, RunCheatGodFull},
+    {"cheat.onehitkill", kCatSwitch, ValCheatOhk, RunCheatOhk},
+    {"cheat.enemyhealth", kCatSwitch, ValCheatEnemyHp, RunCheatEnemyHp},
+    {"cheat.ammo", kCatReattach, ValCheatAmmo, RunCheatAmmo},
+};
+// "rebuild from the prototype" rows: read-only in 0.8 (reader gone on PC; the prototype function that read the flag)
+struct RebuildRow { const char *name, *proto, *pc; };
+const RebuildRow kRebuildRows[] = {
+    {"no fall damage", "g_playerNoFallDamage, read in PLAYER_CalculateFallingDamage", "PC fall-damage function not found"},
+    {"enemies ignore Lara (no senses)", "g_enemyNoSense, read in EnemySensesControl::GetNearestEnemyCommon",
+     "senses rebuilt in retail, hook point open"},
+    {"no AI", "g_enemyNoAI, read in EnemyProcessFunc / ENEMY_UpdateSystem", "no such test in PC EnemyProcessFunc 0x638d40"},
+    {"infinite grenades", "gInfiniteGrenades, read in ProcessCombat (refills item 3)", "rebuild with ammo.fill per frame"},
+    {"enemies don't attack", "g_enemyNoAttack (11 readers, EnemyBehavior_*::Priority)", "partners not paired"},
+    {"enemies: no attack damage", "g_enemyNoAttackDamage, ENEMY_PostDamageToTarget", "partners not paired"},
+    {"enemies: no health", "g_enemyNoHealth, ENEMY_ApplyDamage", "partners not paired"},
+    {"enemies don't move", "g_enemyNoMove, ENEMY_CanMove", "partners not paired"},
+    {"enemies don't investigate", "g_enemyNoInvestigate, EnemyBehavior_Investigate::Priority", "partners not paired"},
+    {"enemies: no barks", "g_enemyNoBarks, ENEMY_PlayBark / ENEMY_UpdateBark", "ENEMY_UpdateBark -> PC 0x616c20 (tier D)"},
+};
+
+void CheatPersistSave() {
+    if (!g_cheatPersist || !g_iniPath[0]) return;
+    char list[256] = "";
+    size_t used = 0;
+    for (const CheatRow &r : kCheatRows) {
+        char v[8];
+        r.value(v, sizeof(v));
+        if (v[0] != '1') continue;
+        int w = _snprintf_s(list + used, sizeof(list) - used, _TRUNCATE, "%s%s", used ? "," : "", r.id);
+        if (w > 0) used += static_cast<size_t>(w);
+    }
+    strncpy_s(g_cheatState, sizeof(g_cheatState), list, _TRUNCATE);
+    WritePrivateProfileStringA("Cheats", "State", list, g_iniPath);
+}
+
+// game thread, once per game frame (PadHook): [Cheats] Persist=1 restore in the first level; infinite ammo re-apply
+void CheatsTick() {
+    static int frames = 0;
+    if (!g_cheatsEnabled || !g_experimental || !InLevel()) return;
+    if (g_cheatPersist && !g_cheatRestored) {
+        g_cheatRestored = true;
+        char copy[sizeof(g_cheatState)];
+        strncpy_s(copy, sizeof(copy), g_cheatState, _TRUNCATE);
+        char *context = nullptr;
+        for (char *id = strtok_s(copy, ", ", &context); id; id = strtok_s(nullptr, ", ", &context))
+            for (const CheatRow &r : kCheatRows)
+                if (!_stricmp(r.id, id)) {
+                    char o[300];
+                    bool ok = r.run("1", o, sizeof(o));
+                    Log(1, "cheats: [Cheats] Persist=1 - %s on again: %s%s", id, ok ? "" : "err ", o);
+                }
+    }
+    if (g_infAmmo && ++frames >= 30) {
+        frames = 0;
+        int changed = 0;
+        InfAmmoWalk(true, &changed);
+        if (changed) Log(2, "cheat: infinite ammo - %d new weapon data bit(s) set", changed);
+    }
+}
+
+// cheat.list: every row with category and state / reason
+void ValCheatList(char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    auto put = [&](const char *fmt, const char *a, const char *b, const char *c) {
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, fmt, a, b, c);
+        if (w > 0) used += static_cast<size_t>(w);
+    };
+    const char *why[] = {g_godOk ? "" : g_godWhy, g_godFullOk ? "" : g_godFullWhy, g_ohkOk ? "" : g_ohkWhy,
+                         g_enemyHpOk ? "" : g_enemyHpWhy, g_infAmmoOk ? "" : g_infAmmoWhy};
+    int i = 0;
+    for (const CheatRow &r : kCheatRows) {
+        char v[8];
+        r.value(v, sizeof(v));
+        put("%s%s [%s] = ", used ? "; " : "", r.id, kCheatCatNames[r.cat]);
+        put("%s%s%s", v, why[i][0] ? " disabled: " : "", why[i]);
+        ++i;
+    }
+    put("; cheat.fillup [%s]%s%s", kCheatCatNames[kCatReattach], g_fillOk ? "" : " disabled: ", g_fillOk ? "" : g_fillWhy);
+    put("; cheat.code [%s]%s%s", kCheatCatNames[kCatCode], g_codeOk ? "" : " disabled: ", g_codeOk ? "" : g_codeWhy);
+    for (const RebuildRow &r : kRebuildRows) put("; %s [%s] not built yet%s", r.name, kCheatCatNames[kCatRebuild], "");
+}
+
+// Start: byte pre-checks (all from work\asi\menu080\precheck_080.txt); a failed check disables that row with the reason
+void CheatsCheck() {
+    bool player = g_playerOk && g_healthOk;
+    g_godOk = HexBytesAt(0x006f5163, "803d63dffa0000 7509 803d60dffa0000 7421") &&
+              HexBytesAt(0x005d355a, "803d60dffa0000 0f94c0 a260dffa00");
+    g_godWhy = g_godOk ? "ok" : "ProcessHealth 0x6f5163 / cheat code 2 0x5d355a bytes differ";
+    g_godFullOk = g_godOk && HexBytesAt(0x006f5031, "f60544f1e70001");
+    g_godFullWhy = g_godFullOk ? "ok" : g_godOk ? "PlayerTakeDamage cheatMode test 0x6f5031 differs" : g_godWhy;
+    g_ohkOk = HexBytesAt(kOhkToggle, "803dfd1fe90000 0f94c0 a2fd1fe900 c3") && HexBytesAt(0x0062e39f, "803dfd1fe90000") &&
+              HexBytesAt(0x00633eb3, "803dfd1fe90000") && HexBytesAt(0x0063bb68, "381dfd1fe900");
+    g_ohkWhy = g_ohkOk ? "ok" : "ENEMY_ToggleOneHitKill 0x60f670 / its readers differ";
+    g_enemyHpOk = HexBytesAt(0x00638ed4, "803dfc1fe90000 741e d986642c0000") &&
+                  HexBytesAt(0x005d357a, "803dfc1fe90000 0f94c1 880dfc1fe900");
+    g_enemyHpWhy = g_enemyHpOk ? "ok" : "EnemyProcessFunc reader 0x638ed4 / cheat code 11 differ";
+    g_infAmmoOk = HexBytesAt(kInstanceQuery, "8b4c2404 8d8110010000 85c0 740a 8b811c010000 85c0 7503 33c0 c3") &&
+                  HexBytesAt(0x0069c61b, "6a36 51 e8cd70f1ff 8a480a 83c408 80f9ff 7448 f6808800000080") &&
+                  HexBytesAt(0x006e7afb, "6a36 51 e8edbbecff 0fbe480a") && HexBytesAt(0x006e7b10, "f6808800000080") &&
+                  HexBytesAt(0x006f58d1, "e8fae0ebff 83c418 85c0 740a 56 50 e8fc21ffff");
+    g_infAmmoWhy = !g_infAmmoOk ? "INSTANCE_Query 0x5b36f0 / reload 0x69c61b / 0x6e7afb / ResetAmmo 0x6f58d1 differ"
+                 : !g_slotsOk ? "weapon slot code (0.4 check) failed" : "ok";
+    g_infAmmoOk = g_infAmmoOk && g_slotsOk;
+    g_fillOk = player && HexBytesAt(kGainHealth, "a158dbfa00 d9442404 d88028060000 0528060000 83ec08 807c241000") &&
+               HexBytesAt(0x006f4f34, "6a01 51 8b0d58dbfa00 d98128060000 d91c24 6a2c e8b301eeff");
+    g_fillWhy = g_fillOk ? "ok" : !player ? "player / health code (0.3 check) failed" : "GainHealth 0x6f4ef0 bytes differ";
+    g_codeOk = g_playerOk && HexBytesAt(kApplyCheatCode, "a194f0e700 8d4820 51 6a00 68ff000000 6a71 50 e898280d00 8b442418 "
+                                                         "83c0ff 83c414 83f840 7743 0fb690a8355d00 ff24958c355d00") &&
+               HexBytesAt(0x005d3555, "e916c10300") && HexBytesAt(0x005d356a, "8335b0ede70001 c3 8335acede70001 c3") &&
+               HexBytesAt(0x005d358c, "55355d00 5a355d00 8a355d00 6a355d00 72355d00 7a355d00 8a355d00") &&
+               HexBytesAt(0x005d35a8, "00 01 02 06 06 06 06 06 03 04 05") &&
+               HexBytesAt(0x005dfc49, "a043f1e700 3c06 0f841c030000 3c0a 0f8414030000 57 e86c78ffff") && g_godOk &&
+               g_ohkOk && g_enemyHpOk;
+    g_codeWhy = g_codeOk ? "ok" : "DEBUG_ApplyCheatCode 0x5d3520 / its tables / the game loop call 0x5dfc49 (or a cheat "
+                                  "byte check) differ";
+    // the bytes live in .bss: readable?
+    BYTE b = 0;
+    if (!ReadByte(kGodByte, &b) || !ReadByte(kGodByteOld, &b)) { g_godOk = g_godFullOk = g_codeOk = false; g_godWhy = g_godFullWhy = "0xfadf60 not readable"; }
+    if (!ReadByte(kOneHitKill, &b) || !ReadByte(kEnemyHealth, &b)) { g_ohkOk = g_enemyHpOk = g_codeOk = false; g_ohkWhy = g_enemyHpWhy = "0xe91ffc not readable"; }
+    Log(1, "0.8 cheats (enabled %d, persist %d): god %d, god full %d, one-hit kill %d, enemy health %d, infinite ammo %d, "
+           "fill 'er up %d, cheat code %d", g_cheatsEnabled, g_cheatPersist, g_godOk, g_godFullOk, g_ohkOk, g_enemyHpOk,
+        g_infAmmoOk, g_fillOk, g_codeOk);
+    const struct { bool ok; const char *id, *why; } rows[] = {
+        {g_godOk, "cheat.god", g_godWhy}, {g_godFullOk, "cheat.godfull", g_godFullWhy}, {g_ohkOk, "cheat.onehitkill", g_ohkWhy},
+        {g_enemyHpOk, "cheat.enemyhealth", g_enemyHpWhy}, {g_infAmmoOk, "cheat.ammo", g_infAmmoWhy},
+        {g_fillOk, "cheat.fillup", g_fillWhy}, {g_codeOk, "cheat.code", g_codeWhy}};
+    for (const auto &r : rows) if (!r.ok) Log(0, "0.8 cheats: %s disabled - %s", r.id, r.why);
+}
+
 // ---- favourites: [Favorites] Ids in TruMenu.ini (comma list of item ids; empty = kFavDefault) ----
 bool ItemUsable(const char *id);         // defined after kItems: id exists and is not a todo item
 
@@ -3877,13 +4380,11 @@ void TestSaveLocked() {
     fclose(f);
 }
 
-void TestLoad() {
-    FILE *f = nullptr;
-    if (!g_testPath[0] || fopen_s(&f, g_testPath, "rb") != 0 || !f) return;
+// 0.8: the row parser of TruMenu.tests.txt, shared with the regression lists (same format); returns the row count
+int ParseTestRows(FILE *f, TestRow *rows, int max) {
     char line[1024];
-    EnterCriticalSection(&g_testLock);
-    g_testCount = 0;
-    while (g_testCount < kTestMax && fgets(line, sizeof(line), f)) {
+    int count = 0;
+    while (count < max && fgets(line, sizeof(line), f)) {
         size_t len = strlen(line);
         while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = 0;
         if (!line[0] || line[0] == '#') continue;
@@ -3895,7 +4396,7 @@ void TestLoad() {
             field[k] = tab + 1;
         }
         if (!field[0][0]) continue;
-        TestRow &t = g_tests[g_testCount++];
+        TestRow &t = rows[count++];
         memset(&t, 0, sizeof(t));
         const char *kind = field[5] && (!_stricmp(field[5], "step") || !_stricmp(field[5], "toggle")) ? field[5] : "check";
         strncpy_s(t.kind, sizeof(t.kind), kind, _TRUNCATE);
@@ -3910,6 +4411,14 @@ void TestLoad() {
         strncpy_s(t.target, sizeof(t.target), field[6] ? field[6] : "", _TRUNCATE);
         t.num = field[7] ? atoi(field[7]) : 0;
     }
+    return count;
+}
+
+void TestLoad() {
+    FILE *f = nullptr;
+    if (!g_testPath[0] || fopen_s(&f, g_testPath, "rb") != 0 || !f) return;
+    EnterCriticalSection(&g_testLock);
+    g_testCount = ParseTestRows(f, g_tests, kTestMax);
     int count = g_testCount;
     LeaveCriticalSection(&g_testLock);
     fclose(f);
@@ -4262,6 +4771,359 @@ void TestExportBlock(char *o, size_t n) {
     _snprintf_s(o + used, n - used, _TRUNCATE, ".");
 }
 
+// ======================================================================================================================
+// 0.8 Regression page: fixed lists next to the ASI (TruMenu.regress_dlc1.txt / TruMenu.regress_dlc2.txt, copied by
+// Set-TruMenu.ps1 from tests\regress\*.txt; same row format as TruMenu.tests.txt). The lists themselves are never
+// written: every mark / note of a session is appended to TruMenu.regress_results.txt next to the ASI:
+//   "#session<TAB>start<TAB>plugin versions<TAB>sha256 of the loaded Tru*.asi"   once per session, before its first row
+//   "time<TAB>list<TAB>id<TAB>state<TAB>note<TAB>session start"                  one line per mark / note
+// The rows start open at every game start (and at regress.load); the results file keeps the history.
+// ======================================================================================================================
+const int kRegLists = 2;
+const char *const kRegNames[kRegLists] = {"dlc1", "dlc2"};
+TestRow g_reg[kRegLists][kTestMax];
+int g_regCount[kRegLists] = {0, 0};
+bool g_regFound[kRegLists] = {false, false};
+int g_regSel = 2;                            // 0 dlc1, 1 dlc2, 2 all (render thread + items; int writes)
+char g_regPath[kRegLists][MAX_PATH];
+char g_regResultsPath[MAX_PATH] = "";
+char g_regSession[24] = "";                  // session start "yyyy-mm-dd hh:mm:ss"
+bool g_regSessionWritten = false;            // g_testLock held
+char g_regVersions[2048] = "";               // plugin versions (computed once, RegVersions)
+char g_regHashes[2048] = "";                 // sha256 of the loaded Tru*.asi files
+volatile LONG g_regHashState = 0;            // 0 not yet, 1 computing, 2 done
+
+// ---- SHA-256 (FIPS 180-4), small and table driven: the results name the exact plugin builds like the install scripts
+struct Sha256 { DWORD h[8]; BYTE buf[64]; DWORD used; unsigned long long bits; };
+const DWORD kShaK[64] = {
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01,
+    0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+    0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+    0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08,
+    0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+DWORD Ror(DWORD x, int r) { return (x >> r) | (x << (32 - r)); }
+void ShaBlock(Sha256 &s, const BYTE *p) {
+    DWORD w[64];
+    for (int i = 0; i < 16; ++i)
+        w[i] = (static_cast<DWORD>(p[4 * i]) << 24) | (static_cast<DWORD>(p[4 * i + 1]) << 16) |
+               (static_cast<DWORD>(p[4 * i + 2]) << 8) | p[4 * i + 3];
+    for (int i = 16; i < 64; ++i) {
+        DWORD s0 = Ror(w[i - 15], 7) ^ Ror(w[i - 15], 18) ^ (w[i - 15] >> 3);
+        DWORD s1 = Ror(w[i - 2], 17) ^ Ror(w[i - 2], 19) ^ (w[i - 2] >> 10);
+        w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+    }
+    DWORD a = s.h[0], b = s.h[1], c = s.h[2], d = s.h[3], e = s.h[4], f = s.h[5], g = s.h[6], h = s.h[7];
+    for (int i = 0; i < 64; ++i) {
+        DWORD t1 = h + (Ror(e, 6) ^ Ror(e, 11) ^ Ror(e, 25)) + ((e & f) ^ (~e & g)) + kShaK[i] + w[i];
+        DWORD t2 = (Ror(a, 2) ^ Ror(a, 13) ^ Ror(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
+        h = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+    }
+    s.h[0] += a; s.h[1] += b; s.h[2] += c; s.h[3] += d; s.h[4] += e; s.h[5] += f; s.h[6] += g; s.h[7] += h;
+}
+void ShaInit(Sha256 &s) {
+    const DWORD init[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+    memcpy(s.h, init, sizeof(init));
+    s.used = 0;
+    s.bits = 0;
+}
+void ShaAdd(Sha256 &s, const BYTE *p, size_t n) {
+    s.bits += static_cast<unsigned long long>(n) * 8;
+    while (n) {
+        size_t take = 64 - s.used < n ? 64 - s.used : n;
+        memcpy(s.buf + s.used, p, take);
+        s.used += static_cast<DWORD>(take);
+        p += take;
+        n -= take;
+        if (s.used == 64) { ShaBlock(s, s.buf); s.used = 0; }
+    }
+}
+void ShaHex(Sha256 &s, char *out) {        // out: 65 bytes
+    unsigned long long bits = s.bits;
+    BYTE pad = 0x80, zero = 0;
+    ShaAdd(s, &pad, 1);
+    while (s.used != 56) ShaAdd(s, &zero, 1);
+    BYTE len[8];
+    for (int i = 0; i < 8; ++i) len[i] = static_cast<BYTE>(bits >> (56 - 8 * i));
+    ShaAdd(s, len, 8);
+    for (int i = 0; i < 8; ++i) _snprintf_s(out + 8 * i, 65 - 8 * i, _TRUNCATE, "%08lx", s.h[i]);
+}
+bool ShaFile(const char *path, char *out) {
+    HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (f == INVALID_HANDLE_VALUE) return false;
+    Sha256 s;
+    ShaInit(s);
+    static BYTE chunk[65536];
+    DWORD got = 0;
+    bool ok = true;
+    while (ok && (ok = ReadFile(f, chunk, sizeof(chunk), &got, nullptr) != 0) && got) ShaAdd(s, chunk, got);
+    CloseHandle(f);
+    if (ok) ShaHex(s, out);
+    return ok;
+}
+
+// "TruMenu=TruMenu 0.8.0; TruShadowPower=...": each plugin's *Version export up to " (" (or "loaded" / "no")
+const char *const kRegPlugins[] = {"TruMenu", "TruShadowPower", "TruDoppelganger", "TruDlc2Player", "TruRockVein",
+                                   "TruGuard", "TruLink", "TruDataGuard"};
+void RegVersionsBuild() {
+    size_t vUsed = 0, hUsed = 0;
+    char versions[sizeof(g_regVersions)] = "", hashes[sizeof(g_regHashes)] = "";
+    for (const char *name : kRegPlugins) {
+        char file[64], exportName[64];
+        _snprintf_s(file, sizeof(file), _TRUNCATE, "%s.asi", name);
+        _snprintf_s(exportName, sizeof(exportName), _TRUNCATE, "%sVersion", name);
+        HMODULE module = GetModuleHandleA(file);
+        char version[96] = "no";
+        if (module) {
+            typedef const char *(*VersionFn)();
+            VersionFn fn = reinterpret_cast<VersionFn>(GetProcAddress(module, exportName));
+            const char *text = fn ? fn() : nullptr;
+            if (text) {
+                strncpy_s(version, sizeof(version), text, _TRUNCATE);
+                char *cut = strstr(version, " (");
+                if (cut) *cut = 0;
+            } else {
+                strncpy_s(version, sizeof(version), "loaded", _TRUNCATE);
+            }
+            TestClean(version);
+            char path[MAX_PATH], sha[65] = "";
+            if (GetModuleFileNameA(module, path, MAX_PATH) && ShaFile(path, sha)) {
+                int w = _snprintf_s(hashes + hUsed, sizeof(hashes) - hUsed, _TRUNCATE, "%s%s.asi=%s", hUsed ? "; " : "",
+                                    name, sha);
+                if (w > 0) hUsed += static_cast<size_t>(w);
+            }
+        }
+        int w = _snprintf_s(versions + vUsed, sizeof(versions) - vUsed, _TRUNCATE, "%s%s=%s", vUsed ? "; " : "", name,
+                            version);
+        if (w > 0) vUsed += static_cast<size_t>(w);
+    }
+    EnterCriticalSection(&g_testLock);
+    strncpy_s(g_regVersions, sizeof(g_regVersions), versions, _TRUNCATE);
+    strncpy_s(g_regHashes, sizeof(g_regHashes), hashes[0] ? hashes : "-", _TRUNCATE);
+    LeaveCriticalSection(&g_testLock);
+}
+// worker thread once the device exists (every plugin is loaded by then); a mark before that computes it at once
+void RegVersionsTick() {
+    if (InterlockedCompareExchange(&g_regHashState, 1, 0) != 0) return;
+    RegVersionsBuild();
+    InterlockedExchange(&g_regHashState, 2);
+    Log(2, "regress: plugin versions / sha256 ready: %s", g_regVersions);
+}
+
+void RegLoadOne(int list) {
+    FILE *f = nullptr;
+    int count = 0;
+    bool found = g_regPath[list][0] && fopen_s(&f, g_regPath[list], "rb") == 0 && f;
+    EnterCriticalSection(&g_testLock);
+    if (found) count = ParseTestRows(f, g_reg[list], kTestMax);
+    for (int i = 0; i < count; ++i) {             // a fresh session: every row open, no note / time
+        TestRow &t = g_reg[list][i];
+        strncpy_s(t.state, sizeof(t.state), TestDefaultState(t.kind), _TRUNCATE);
+        t.note[0] = t.when[0] = 0;
+    }
+    g_regCount[list] = count;
+    g_regFound[list] = found;
+    LeaveCriticalSection(&g_testLock);
+    if (f) fclose(f);
+    Log(1, "regress: %s %d rows from %s", kRegNames[list], count, found ? g_regPath[list] : "(file not found)");
+}
+
+int RegListIndex(const char *name) {
+    for (int i = 0; i < kRegLists; ++i) if (!_stricmp(name, kRegNames[i])) return i;
+    if (!_stricmp(name, "all")) return 2;
+    return -1;
+}
+
+void RegCountsLocked(int list, int *open, int *ok, int *fail, int *skip) {
+    *open = *ok = *fail = *skip = 0;
+    for (int i = 0; i < g_regCount[list]; ++i) {
+        const TestRow &t = g_reg[list][i];
+        if (!TestIs(t, "check")) continue;
+        if (!_stricmp(t.state, "ok")) ++*ok;
+        else if (!_stricmp(t.state, "fail")) ++*fail;
+        else if (!_stricmp(t.state, "skip")) ++*skip;
+        else ++*open;
+    }
+}
+
+// "list:id" or "id" (searched in the selected lists, then in both; ambiguous ids need the list) -> list, row
+bool RegFindLocked(const char *spec, int *list, int *row, char *o, size_t n) {
+    char name[16] = "";
+    const char *id = spec;
+    const char *colon = strchr(spec, ':');
+    if (colon && static_cast<size_t>(colon - spec) < sizeof(name)) {
+        memcpy(name, spec, static_cast<size_t>(colon - spec));
+        name[colon - spec] = 0;
+        id = colon + 1;
+    }
+    int only = name[0] ? RegListIndex(name) : -1;
+    if (name[0] && (only < 0 || only > 1)) { Out(o, n, "unknown list '%s' (dlc1 / dlc2)", name); return false; }
+    int hits = 0;
+    for (int l = 0; l < kRegLists; ++l) {
+        if (only >= 0 && l != only) continue;
+        if (only < 0 && g_regSel != 2 && l != g_regSel) continue;
+        for (int i = 0; i < g_regCount[l]; ++i)
+            if (!_stricmp(g_reg[l][i].id, id)) { *list = l; *row = i; ++hits; }
+    }
+    if (!hits && only < 0 && g_regSel != 2)      // not in the selected list: try both
+        for (int l = 0; l < kRegLists; ++l)
+            for (int i = 0; i < g_regCount[l]; ++i)
+                if (!_stricmp(g_reg[l][i].id, id)) { *list = l; *row = i; ++hits; }
+    if (hits == 1) return true;
+    Out(o, n, hits ? "'%s' is in both lists - write dlc1:%s or dlc2:%s" : "no regression row '%s%s%s' (regress.list)",
+        id, hits ? id : "", hits ? id : "");
+    return false;
+}
+
+// g_testLock held: one result line (+ the session line before the first one)
+void RegAppendLocked(int list, const TestRow &t) {
+    if (!g_regResultsPath[0]) return;
+    FILE *f = nullptr;
+    if (fopen_s(&f, g_regResultsPath, "ab") != 0 || !f) { Log(1, "regress: cannot write %s", g_regResultsPath); return; }
+    if (!g_regSessionWritten) {
+        fprintf(f, "#session\t%s\t%s\t%s\r\n", g_regSession, g_regVersions[0] ? g_regVersions : "-",
+                g_regHashes[0] ? g_regHashes : "-");
+        g_regSessionWritten = true;
+    }
+    SYSTEMTIME s;
+    GetLocalTime(&s);
+    fprintf(f, "%04d-%02d-%02d %02d:%02d:%02d\t%s\t%s\t%s\t%s\t%s\r\n", s.wYear, s.wMonth, s.wDay, s.wHour, s.wMinute,
+            s.wSecond, kRegNames[list], t.id, t.state, t.note, g_regSession);
+    fclose(f);
+}
+
+// state: check ok|fail|skip|open, step done|open; note = nullptr keeps the note
+bool RegMark(const char *spec, const char *state, const char *note, char *o, size_t n) {
+    if (InterlockedCompareExchange(&g_regHashState, 0, 0) != 2) RegVersionsTick();   // versions before the first line
+    for (int i = 0; i < 50 && InterlockedCompareExchange(&g_regHashState, 0, 0) != 2; ++i) Sleep(10);   // worker busy
+    EnterCriticalSection(&g_testLock);
+    int list = -1, row = -1;
+    if (!RegFindLocked(spec, &list, &row, o, n)) { LeaveCriticalSection(&g_testLock); return false; }
+    TestRow &t = g_reg[list][row];
+    if (state && !TestStateFits(t.kind, state)) {
+        Out(o, n, "%s:%s is a %s row: %s", kRegNames[list], t.id, t.kind, TestIs(t, "step") ? "done|open" : "ok|fail|skip|open");
+        LeaveCriticalSection(&g_testLock);
+        return false;
+    }
+    if (state) { strncpy_s(t.state, sizeof(t.state), state, _TRUNCATE); _strlwr_s(t.state, sizeof(t.state)); }
+    if (note) { strncpy_s(t.note, sizeof(t.note), note, _TRUNCATE); TestClean(t.note); }
+    SYSTEMTIME s;
+    GetLocalTime(&s);
+    _snprintf_s(t.when, sizeof(t.when), _TRUNCATE, "%02d:%02d:%02d", s.wHour, s.wMinute, s.wSecond);
+    RegAppendLocked(list, t);
+    Out(o, n, "regress %s:%s %s%s%s", kRegNames[list], t.id, t.state, t.note[0] ? " - " : "", t.note);
+    LeaveCriticalSection(&g_testLock);
+    Log(1, "regress: %s", o);
+    return true;
+}
+
+bool RunRegressLoad(const char *arg, char *o, size_t n) {
+    int sel = arg && arg[0] ? RegListIndex(arg) : g_regSel;
+    if (sel < 0) { Out(o, n, "usage: regress.load dlc1|dlc2|all"); return false; }
+    for (int l = 0; l < kRegLists; ++l) if (sel == 2 || sel == l) RegLoadOne(l);
+    g_regSel = sel;
+    EnterCriticalSection(&g_testLock);
+    int c1 = g_regCount[0], c2 = g_regCount[1];
+    bool f1 = g_regFound[0], f2 = g_regFound[1];
+    LeaveCriticalSection(&g_testLock);
+    Out(o, n, "regress.load %s: dlc1 %d rows%s, dlc2 %d rows%s (all rows open; results append to %s)",
+        sel == 2 ? "all" : kRegNames[sel], c1, f1 ? "" : " (no file)", c2, f2 ? "" : " (no file)",
+        g_regResultsPath[0] ? g_regResultsPath : "-");
+    return (sel == 2 ? (f1 || f2) : g_regFound[sel]);
+}
+
+// "<list:id|id> ok|fail|skip|open|done [note]"
+bool RunRegressMark(const char *arg, char *o, size_t n) {
+    char spec[96] = "", state[16] = "";
+    const char *rest = TestWord(arg, spec, sizeof(spec));
+    rest = TestWord(rest, state, sizeof(state));
+    if (!spec[0] || !(TestStateOk(state) || !_stricmp(state, "done"))) {
+        Out(o, n, "usage: regress.mark <dlc1:id|dlc2:id|id> ok|fail|skip|open [note] (steps: done|open)");
+        return false;
+    }
+    return RegMark(spec, state, rest[0] ? rest : nullptr, o, n);
+}
+
+// "<list:id|id> <note text>": the note of a row (the state stays; a result line is written)
+bool RunRegressNote(const char *arg, char *o, size_t n) {
+    char spec[96] = "";
+    const char *rest = TestWord(arg, spec, sizeof(spec));
+    if (!spec[0]) { Out(o, n, "usage: regress.note <dlc1:id|dlc2:id|id> <note text>"); return false; }
+    return RegMark(spec, nullptr, rest, o, n);
+}
+
+void ValRegressList(char *o, size_t n) {
+    EnterCriticalSection(&g_testLock);
+    int used = _snprintf_s(o, n, _TRUNCATE, "selected %s", g_regSel == 2 ? "all" : kRegNames[g_regSel]);
+    for (int l = 0; l < kRegLists && used >= 0; ++l) {
+        int open, ok, fail, skip;
+        RegCountsLocked(l, &open, &ok, &fail, &skip);
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "; %s %d rows%s (%d open, %d ok, %d fail, %d skip)%s",
+                            kRegNames[l], g_regCount[l], g_regFound[l] ? "" : " (no file)", open, ok, fail, skip,
+                            g_regCount[l] ? ":" : "");
+        if (w < 0) break;
+        used += w;
+        for (int i = 0; i < g_regCount[l]; ++i) {
+            const TestRow &t = g_reg[l][i];
+            w = _snprintf_s(o + used, n - used, _TRUNCATE, " %s [%s]%s%s%s", t.id, t.state, t.note[0] ? " {" : "", t.note,
+                            t.note[0] ? "}" : "");
+            if (w < 0) break;
+            used += w;
+        }
+    }
+    LeaveCriticalSection(&g_testLock);
+}
+
+// regress.export: "ok+ regress.export ..." then "list<TAB>kind<TAB>id<TAB>state<TAB>number<TAB>target<TAB>hint<TAB>
+// note<TAB>time" per row, then "."
+void ValRegressExport(char *o, size_t n) {
+    EnterCriticalSection(&g_testLock);
+    int used = 0;
+    for (int l = 0; l < kRegLists; ++l) {
+        int open, ok, fail, skip;
+        RegCountsLocked(l, &open, &ok, &fail, &skip);
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s %d rows: %d open %d ok %d fail %d skip", l ? "; " : "",
+                            kRegNames[l], g_regCount[l], open, ok, fail, skip);
+        if (w < 0) break;
+        used += w;
+    }
+    LeaveCriticalSection(&g_testLock);
+}
+void RegressExportBlock(char *o, size_t n) {
+    char head[200];
+    ValRegressExport(head, sizeof(head));
+    int used = _snprintf_s(o, n, _TRUNCATE, "ok+ regress.export %s (list kind id state number target hint note time, tab "
+                           "separated; session %s; results %s)\n", head, g_regSession, g_regResultsPath[0] ? g_regResultsPath : "-");
+    if (used < 0) used = 0;
+    EnterCriticalSection(&g_testLock);
+    for (int l = 0; l < kRegLists; ++l)
+        for (int i = 0; i < g_regCount[l]; ++i) {
+            const TestRow &t = g_reg[l][i];
+            int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n", kRegNames[l], t.kind,
+                                t.id, t.state, t.num, t.target, t.hint, t.note, t.when);
+            if (w < 0) break;
+            used += w;
+        }
+    LeaveCriticalSection(&g_testLock);
+    if (static_cast<size_t>(used) + 2 >= n) used = static_cast<int>(n) - 3;
+    _snprintf_s(o + used, n - used, _TRUNCATE, ".");
+}
+
+void RegStart() {
+    for (int l = 0; l < kRegLists; ++l)
+        _snprintf_s(g_regPath[l], sizeof(g_regPath[l]), _TRUNCATE, "%sTruMenu.regress_%s.txt", g_asiDir, kRegNames[l]);
+    _snprintf_s(g_regResultsPath, sizeof(g_regResultsPath), _TRUNCATE, "%sTruMenu.regress_results.txt", g_asiDir);
+    SYSTEMTIME s;
+    GetLocalTime(&s);
+    _snprintf_s(g_regSession, sizeof(g_regSession), _TRUNCATE, "%04d-%02d-%02d %02d:%02d:%02d", s.wYear, s.wMonth, s.wDay,
+                s.wHour, s.wMinute, s.wSecond);
+    int sel = RegListIndex(g_regressStart);
+    g_regSel = sel < 0 ? 2 : sel;
+    for (int l = 0; l < kRegLists; ++l) RegLoadOne(l);   // both lists, the selection only filters the page
+}
+
 // ---- settings: the kOpts table vs the file ----
 void ReadOptions(const char *dir);       // with Start below
 
@@ -4516,6 +5378,36 @@ const Item kItems[] = {
     // 0.7
     {"cmd.keyboard", "action", "open the menu, focus the command bar and show the on-screen keyboard (as L3)", false,
      ValCmdBar, RunCmdKeyboard},
+    // 0.8 Regression page
+    {"regress.list", "info", "regression lists dlc1 / dlc2: counts, id [state] {note}", false, ValRegressList, nullptr},
+    {"regress.load", "action", "dlc1|dlc2|all: (re)load TruMenu.regress_<list>.txt (rows open again) and select it on the "
+                               "Regression page", false, ValRegressList, RunRegressLoad},
+    {"regress.mark", "action", "<dlc1:id|dlc2:id|id> ok|fail|skip|open [note] (steps done|open); appends to "
+                               "TruMenu.regress_results.txt", false, ValRegressList, RunRegressMark},
+    {"regress.note", "action", "<dlc1:id|dlc2:id|id> <text>: note of a regression row (result line appended)", false,
+     ValRegressList, RunRegressNote},
+    {"regress.export", "info", "both regression lists as a block (list kind id state number target hint note time)", false,
+     ValRegressExport, nullptr},
+    // 0.8 Cheats page (docs Befund-Prototyp-2007 3i; game thread, needs a level, [Cheats] Enabled)
+    {"cheat.list", "info", "every cheat row with its category and state / reason (incl. the rows not built yet)", false,
+     ValCheatList, nullptr},
+    {"cheat.god", "bool", "god mode: gInvincibleCheat 0xfadf60 (ProcessHealth keeps the hit timer full; types 8 / 5 and "
+                          "instant deaths pass) [PC has it]", true, ValCheatGod, RunCheatGod},
+    {"cheat.godfull", "bool", "god mode + cheatMode bit 0 (PlayerTakeDamage returns; the bit is also cheat.flight's - "
+                              "side effects possible) [PC has it]", true, ValCheatGodFull, RunCheatGodFull},
+    {"cheat.onehitkill", "bool", "one-hit kill 0xe91ffd through ENEMY_ToggleOneHitKill 0x60f670 [PC has it]", true,
+     ValCheatOhk, RunCheatOhk},
+    {"cheat.enemyhealth", "bool", "show enemy health 0xe91ffc (EnemyProcessFunc prints hit points) [PC has it]", true,
+     ValCheatEnemyHp, RunCheatEnemyHp},
+    {"cheat.ammo", "bool", "infinite ammo: weapon data INSTANCE_Query(inst, 0x36)+0x88 |= 0x80 per slot weapon "
+                           "[re-attach]", true, ValCheatAmmo, RunCheatAmmo},
+    {"cheat.fillup", "action", "fill 'er up: GainHealth 0x6f4ef0(MaxHealth, 0) + ammo.fill [re-attach]", true, ValHealth,
+     RunCheatFill},
+    {"cheat.code", "action", "<1|2|9|10|11>: DEBUG_ApplyCheatCode 0x5d3520(code) as a completed pad code (1 one-hit kill, "
+                             "2 god, 9 wireframe, 10 textureless, 11 enemy health)", true, ValCheatCode, RunCheatCode},
+    // 0.8 camera log
+    {"camera.log", "bool", "log camera manager mode / current camera changes ([Log] CameraChanges, read-only)", false,
+     ValCameraLog, RunCameraLog},
 };
 
 const Item *FindItem(const char *id) {
@@ -4622,6 +5514,10 @@ const char *InvokeCore(const char *id, const char *arg, bool wait) {
     }
     if (item && !_stricmp(item->id, "test.export")) {          // 0.5: a block answer ("ok+ ...", rows, ".")
         TestExportBlock(t_answer, sizeof(t_answer));
+        return t_answer;
+    }
+    if (item && !_stricmp(item->id, "regress.export")) {       // 0.8: the same block form for the regression lists
+        RegressExportBlock(t_answer, sizeof(t_answer));
         return t_answer;
     }
     if (item && !_stricmp(item->id, "cmd.run"))                // 0.6: the answer of the line's own item
@@ -6118,6 +7014,11 @@ void Status03Line() {
                        g_healthOk ? "ok" : "NO");
     ImGui::TextWrapped("0.4: weapon slots %s, ammo.fill %s, gear.give %s; TO TEST file %s", g_slotsOk ? "ok" : "NO",
                        g_maxAmmoOk && g_ammoOk ? "ok" : "NO", g_gearOk ? "ok" : "NO", g_testPath);
+    ImGui::TextWrapped("0.8: cheats god %s, god full %s, one-hit kill %s, enemy health %s, infinite ammo %s, fill %s, "
+                       "cheat code %s; camera log %s; regression dlc1 %d / dlc2 %d rows", g_godOk ? "ok" : "NO",
+                       g_godFullOk ? "ok" : "NO", g_ohkOk ? "ok" : "NO", g_enemyHpOk ? "ok" : "NO",
+                       g_infAmmoOk ? "ok" : "NO", g_fillOk ? "ok" : "NO", g_codeOk ? "ok" : "NO",
+                       g_camLogOk ? "ok" : "NO", g_regCount[0], g_regCount[1]);
 }
 
 void Note(const char *text) {
@@ -6184,6 +7085,8 @@ void TestMarkFromMenu(const char *id, const char *state) {
     TestMark(id, state, nullptr, o, sizeof(o));
     _snprintf_s(g_lastAction, sizeof(g_lastAction), _TRUNCATE, "%s", o);
 }
+bool g_rowX = false, g_rowY = false;          // 0.8: X / Y edge of this frame for the focused TO TEST / Regression row
+bool g_rowFocusAny = false;                   // 0.8: a TO TEST or Regression row had the focus this frame
 
 bool ConfirmButton(const char *label, const char *key);
 
@@ -6231,7 +7134,7 @@ void PageTests() {
     int c = g_testCount;
     memcpy(rows, g_tests, sizeof(TestRow) * static_cast<size_t>(c));
     LeaveCriticalSection(&g_testLock);
-    bool xPressed = InterlockedExchange(&g_testX, 0) != 0, yPressed = InterlockedExchange(&g_testY, 0) != 0;
+    bool xPressed = g_rowX, yPressed = g_rowY;   // 0.8: taken once per frame in DrawMenu (TO TEST + Regression)
     bool anyFocus = false;
     PageTestToggles(rows, c);
     int nextStep = -1;
@@ -6317,10 +7220,211 @@ void PageTests() {
         ImGui::Unindent();
         ImGui::PopID();
     }
-    InterlockedExchange(&g_testFocus, anyFocus ? 1 : 0);
+    if (anyFocus) g_rowFocusAny = true;          // 0.8: DrawMenu sets g_testFocus from both pages
     if (ImGui::Button("Remove the marked rows  [test.clear done]")) { char o[160]; RunTestClear("done", o, sizeof(o)); }
     ImGui::SameLine();
     if (ConfirmButton("Remove all rows  [test.clear]", "testclear")) { char o[160]; RunTestClear("", o, sizeof(o)); }
+}
+
+// 0.8 Regression page: selector DLC 1 / DLC 2 / all; checks A = OK, X = FAIL, Y = SKIP (as TO TEST); "Note" puts
+// "regress.note <list>:<id> " into the command bar and opens the on-screen keyboard; steps: A = run + done
+void RegMarkFromMenu(int list, const char *id, const char *state) {
+    char spec[96], o[300];
+    _snprintf_s(spec, sizeof(spec), _TRUNCATE, "%s:%s", kRegNames[list], id);
+    RegMark(spec, state, nullptr, o, sizeof(o));
+    _snprintf_s(g_lastAction, sizeof(g_lastAction), _TRUNCATE, "%s", o);
+}
+void RegNoteFromMenu(int list, const char *id, const char *note) {
+    _snprintf_s(g_cmdBuf, sizeof(g_cmdBuf), _TRUNCATE, "regress.note %s:%s %s", kRegNames[list], id, note);
+    strncpy_s(g_cmdSetText, sizeof(g_cmdSetText), g_cmdBuf, _TRUNCATE);   // if the text field is active already
+    g_cmdSetPending = true;
+    OskEdited();
+    char o[160];
+    if (g_cmdKeyboard) RunCmdKeyboard("", o, sizeof(o));
+    else RunCmdFocus("", o, sizeof(o));
+    _snprintf_s(g_lastAction, sizeof(g_lastAction), _TRUNCATE, "note for %s:%s - type it in the command bar, Enter / Run "
+                "saves (%s)", kRegNames[list], id, o);
+}
+
+void PageRegress() {
+    static TestRow rows[kRegLists][kTestMax];
+    int count[kRegLists];
+    bool found[kRegLists];
+    EnterCriticalSection(&g_testLock);
+    for (int l = 0; l < kRegLists; ++l) {
+        count[l] = g_regCount[l];
+        found[l] = g_regFound[l];
+        memcpy(rows[l], g_reg[l], sizeof(TestRow) * static_cast<size_t>(count[l]));
+    }
+    LeaveCriticalSection(&g_testLock);
+    ImGui::TextWrapped("Fixed lists (tests\\regress in the repo, copied next to the .asi by Set-TruMenu.ps1). Checks: A = OK, "
+                       "X = FAIL, Y = SKIP, Note = text via the command bar / keyboard. Steps: A = run + done. Every mark "
+                       "is appended to %s (session %s).", g_regResultsPath[0] ? g_regResultsPath : "-", g_regSession);
+    const char *selName[] = {"DLC 1", "DLC 2", "all"};
+    for (int s = 0; s < 3; ++s) {
+        if (s) ImGui::SameLine();
+        char label[64];
+        _snprintf_s(label, sizeof(label), _TRUNCATE, g_regSel == s ? "[%s]##rs%d" : "%s##rs%d", selName[s], s);
+        if (ImGui::Button(label)) g_regSel = s;
+    }
+    ImGui::SameLine();
+    if (ConfirmButton("Reload lists (all rows open)  [regress.load]", "regload")) {
+        char o[300];
+        bool ok = RunRegressLoad(g_regSel == 2 ? "all" : kRegNames[g_regSel], o, sizeof(o));
+        SetLastAction("regress.load", ok, o);
+    }
+    bool xPressed = g_rowX, yPressed = g_rowY, anyFocus = false;
+    for (int l = 0; l < kRegLists; ++l) {
+        if (g_regSel != 2 && g_regSel != l) continue;
+        int open = 0, ok = 0, fail = 0, skip = 0;
+        for (int i = 0; i < count[l]; ++i) {
+            const TestRow &t = rows[l][i];
+            if (!TestIs(t, "check")) continue;
+            if (!_stricmp(t.state, "ok")) ++ok; else if (!_stricmp(t.state, "fail")) ++fail;
+            else if (!_stricmp(t.state, "skip")) ++skip; else ++open;
+        }
+        char head[160];
+        _snprintf_s(head, sizeof(head), _TRUNCATE, "%s: %d open, %d ok, %d fail, %d skip%s", l ? "DLC 2 (Lara's Shadow)"
+                    : "DLC 1 (Beneath the Ashes)", open, ok, fail, skip, found[l] ? "" : " - TruMenu.regress file missing");
+        ImGui::SeparatorText(head);
+        for (int i = 0; i < count[l]; ++i) {
+            const TestRow &t = rows[l][i];
+            ImGui::PushID(l * 1000 + i);
+            if (TestIs(t, "step")) {
+                bool done = !_stricmp(t.state, "done");
+                char itemId[64];
+                const char *runArg = "";
+                bool runnable = t.target[0] && TestRunTarget(t.target, itemId, sizeof(itemId), &runArg);
+                char label[512];
+                _snprintf_s(label, sizeof(label), _TRUNCATE, "%s %2d. %s", done ? "[DONE]" : "      ", t.num, t.hint);
+                ImGui::PushStyleColor(ImGuiCol_Text, done ? ImVec4(0.6f, 0.6f, 0.6f, 1.0f) : ImVec4(0.75f, 0.85f, 1.0f, 1.0f));
+                bool activated = ImGui::Selectable(label);
+                ImGui::PopStyleColor();
+                if (activated) {
+                    if (runnable) QueueItem(itemId, runArg);
+                    RegMarkFromMenu(l, t.id, "done");
+                }
+                ImGui::Indent();
+                if (runnable) {
+                    char run[160];
+                    _snprintf_s(run, sizeof(run), _TRUNCATE, "Run %s%s%s", itemId, runArg[0] ? " " : "", runArg);
+                    if (ImGui::SmallButton(run)) QueueItem(itemId, runArg);
+                    ImGui::SameLine();
+                }
+                if (ImGui::SmallButton(done ? "Open again" : "Done")) RegMarkFromMenu(l, t.id, done ? "open" : "done");
+                ImGui::Unindent();
+                ImGui::PopID();
+                continue;
+            }
+            bool okS = !_stricmp(t.state, "ok"), failS = !_stricmp(t.state, "fail"), skipS = !_stricmp(t.state, "skip");
+            ImVec4 colour = okS ? ImVec4(0.45f, 1.0f, 0.45f, 1.0f) : failS ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f)
+                          : skipS ? ImVec4(0.65f, 0.65f, 0.65f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+            char label[512];
+            _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  %s   [%s]%s%s", okS ? "[OK]  " : failS ? "[FAIL]" : skipS ? "[SKIP]"
+                        : "[    ]", t.hint[0] ? t.hint : "(no text)", t.id, t.note[0] ? "  - " : "", t.note);
+            ImGui::PushStyleColor(ImGuiCol_Text, colour);
+            bool activated = ImGui::Selectable(label);
+            ImGui::PopStyleColor();
+            if (ImGui::IsItemFocused()) {
+                anyFocus = true;
+                if (xPressed) RegMarkFromMenu(l, t.id, "fail");
+                else if (yPressed) RegMarkFromMenu(l, t.id, "skip");
+            }
+            if (activated) RegMarkFromMenu(l, t.id, "ok");
+            ImGui::Indent();
+            if (ImGui::SmallButton("OK")) RegMarkFromMenu(l, t.id, "ok");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("FAIL")) RegMarkFromMenu(l, t.id, "fail");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("SKIP")) RegMarkFromMenu(l, t.id, "skip");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Note")) RegNoteFromMenu(l, t.id, t.note);
+            if (t.when[0]) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s", t.when);
+            }
+            ImGui::Unindent();
+            ImGui::PopID();
+        }
+        if (!count[l]) ImGui::TextDisabled(found[l] ? "(no rows)" : "(install with Set-TruMenu.ps1 -Install: it copies the lists)");
+    }
+    if (anyFocus) g_rowFocusAny = true;
+}
+
+// 0.8 Cheats page: one row per cheat with its category; a failed pre-check shows the row disabled with the reason
+void CheatRowWidget(const char *id, int cat, bool ok, const char *why) {
+    const Item *item = FindItem(id);
+    if (!item) return;
+    ImGui::PushID(id);
+    char value[256] = "";
+    item->value(value, sizeof(value));
+    bool usable = ok && g_cheatsEnabled && g_experimental && InLevel();
+    if (!usable) ImGui::BeginDisabled();
+    char label[300];
+    if (!strcmp(item->type, "bool")) {
+        bool on = value[0] == '1';
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  [%s]", id, kCheatCatNames[cat]);
+        if (ImGui::Checkbox(label, &on)) QueueItem(id, on ? "1" : "0");
+    } else {
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  [%s]", id, kCheatCatNames[cat]);
+        if (ImGui::Button(label)) QueueItem(id, "");
+    }
+    if (!usable) ImGui::EndDisabled();
+    FavKey(id);
+    ImGui::Indent();
+    ImGui::TextDisabled("%s", item->label);
+    if (!ok) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.5f, 0.4f, 1.0f));
+        ImGui::TextWrapped("disabled: %s", why);
+        ImGui::PopStyleColor();
+    }
+    ImGui::Unindent();
+    ImGui::PopID();
+}
+
+void PageCheats() {
+    ImGui::TextWrapped("From the 2007 prototype evaluation (docs\\Befund-Prototyp-2007.md 3i), static facts - every row is "
+                       "a live TO TEST. Runs on the game thread, in a level only; each switch logs on / off. [Cheats] "
+                       "Enabled=%d, Persist=%d (0 = all off at every game start).", g_cheatsEnabled, g_cheatPersist);
+    if (!g_cheatsEnabled) ImGui::TextUnformatted("([Cheats] Enabled=0: list only)");
+    else if (!g_experimental) ImGui::TextUnformatted("([Cheat] Experimental=0: list only)");
+    else if (!InLevel()) ImGui::TextUnformatted("needs a level (no player instance) - the switches are greyed out");
+    ImGui::SeparatorText("PC has it (switchable)");
+    CheatRowWidget("cheat.god", kCatSwitch, g_godOk, g_godWhy);
+    CheatRowWidget("cheat.godfull", kCatSwitch, g_godFullOk, g_godFullWhy);
+    CheatRowWidget("cheat.onehitkill", kCatSwitch, g_ohkOk, g_ohkWhy);
+    CheatRowWidget("cheat.enemyhealth", kCatSwitch, g_enemyHpOk, g_enemyHpWhy);
+    ImGui::SeparatorText("Logic present, entry cut (re-attach)");
+    CheatRowWidget("cheat.ammo", kCatReattach, g_infAmmoOk, g_infAmmoWhy);
+    CheatRowWidget("cheat.fillup", kCatReattach, g_fillOk, g_fillWhy);
+    ImGui::SeparatorText("Cheat-code path: DEBUG_ApplyCheatCode 0x5d3520 (as a completed pad code)");
+    {
+        static const int codes[] = {1, 2, 9, 10, 11};
+        bool usable = g_codeOk && g_cheatsEnabled && g_experimental && InLevel();
+        if (!usable) ImGui::BeginDisabled();
+        for (int i = 0; i < 5; ++i) {
+            if (i) ImGui::SameLine();
+            char label[48], arg[8];
+            _snprintf_s(label, sizeof(label), _TRUNCATE, "code %d##cc%d", codes[i], codes[i]);
+            _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%d", codes[i]);
+            if (ImGui::Button(label)) QueueItem("cheat.code", arg);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", CheatCodeName(codes[i]));
+        }
+        if (!usable) ImGui::EndDisabled();
+        char v[200];
+        ValCheatCode(v, sizeof(v));
+        ImGui::TextDisabled("[cheat.code] 1 one-hit kill, 2 god, 9 wireframe, 10 textureless, 11 enemy health - %s", v);
+        if (!g_codeOk) ImGui::TextWrapped("disabled: %s", g_codeWhy);
+    }
+    ImGui::SeparatorText("Flag + reader gone: rebuild from the prototype (not built yet)");
+    ImGui::BeginDisabled();
+    for (const RebuildRow &r : kRebuildRows) {
+        ImGui::TextWrapped("%s - not built yet", r.name);
+        ImGui::Indent();
+        ImGui::TextWrapped("prototype: %s; PC: %s", r.proto, r.pc);
+        ImGui::Unindent();
+    }
+    ImGui::EndDisabled();
 }
 
 // in-menu confirmation (no dialogs): the first A arms a button for 5 s, the second A runs it
@@ -6698,6 +7802,10 @@ void DrawMenu() {
     g_menuPos = ImGui::GetWindowPos();       // 0.6: the command bar sits directly under this window
     g_menuSize = ImGui::GetWindowSize();
     g_menuRectOk = true;
+    // 0.8: X / Y edges once per frame for the focused TO TEST / Regression row
+    g_rowX = InterlockedExchange(&g_testX, 0) != 0;
+    g_rowY = InterlockedExchange(&g_testY, 0) != 0;
+    g_rowFocusAny = false;
     if (began) {
         // 0.4: TO TEST first, only while the list holds rows
         int open04, ok04, fail04, skip04, total04;
@@ -6712,7 +7820,22 @@ void DrawMenu() {
             ImGui::PopStyleColor();
             if (show) { PageTests(); testShown = true; }
         }
-        if (!testShown) InterlockedExchange(&g_testFocus, 0);
+        (void)testShown;
+        {                                                                   // 0.8 Regression page
+            int ro = 0, rk = 0, rf = 0, rs = 0;
+            EnterCriticalSection(&g_testLock);
+            for (int l = 0; l < kRegLists; ++l) {
+                if (g_regSel != 2 && g_regSel != l) continue;
+                int o2, k2, f2, s2;
+                RegCountsLocked(l, &o2, &k2, &f2, &s2);
+                ro += o2; rk += k2; rf += f2; rs += s2;
+            }
+            LeaveCriticalSection(&g_testLock);
+            char header[112];
+            _snprintf_s(header, sizeof(header), _TRUNCATE, "Regression %s (%d open, %d ok, %d fail, %d skip)###regress",
+                        g_regSel == 2 ? "DLC 1 + DLC 2" : g_regSel ? "DLC 2" : "DLC 1", ro, rk, rf, rs);
+            if (ImGui::CollapsingHeader(header)) PageRegress();
+        }
         if (ImGui::CollapsingHeader("Quick access / Favourites", ImGuiTreeNodeFlags_DefaultOpen)) PageFavourites();
         if (ImGui::CollapsingHeader("Status")) PageStatus();
         if (ImGui::CollapsingHeader("Developer menu (original)")) PageDev();
@@ -6725,6 +7848,7 @@ void DrawMenu() {
         if (ImGui::CollapsingHeader("Overlay: Lara's position")) PageOverlay();
         if (ImGui::CollapsingHeader("Free camera")) PageCamera();
         if (ImGui::CollapsingHeader("Cheat / flight")) PageCheat();
+        if (ImGui::CollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
         if (ImGui::CollapsingHeader("Markup / collision draw")) PageMarkup();
         if (ImGui::CollapsingHeader("Level select")) PageLevel();
         if (ImGui::CollapsingHeader("Outfits (next level load)")) PageOutfits();
@@ -6736,6 +7860,7 @@ void DrawMenu() {
         Text("last action: %s", g_lastAction);
         if (ImGui::Button("Close menu")) open = false;
     }
+    InterlockedExchange(&g_testFocus, g_rowFocusAny ? 1 : 0);   // 0.8: X / Y to the focused TO TEST / Regression row
     ImGui::End();
     if (!open && g_menuOpen) ToggleMenu("close button");
     if (g_menuOpen) DrawCmdBar(justOpened);   // 0.6, a window of its own: the menu window's navigation is unchanged
@@ -6798,6 +7923,7 @@ void Render(IDirect3DDevice9 *device) {
     MouseTick();                                 // 0.7: hold / release the game's cursor calls with the menu
     PauseTick();                                 // 0.7.1 [Menu] PauseGame
     AutoStartTick();                             // 0.7.1 [Test] AutoStart
+    CameraTick();                                // 0.8 [Log] CameraChanges (read-only, every 200 ms)
     if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup) return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
@@ -6985,6 +8111,7 @@ DWORD WINAPI WorkerThread(LPVOID) {
                 HookDevice(reinterpret_cast<IDirect3DDevice9 *>(device));
         }
         UnitTick();                                  // 0.7.1 [Log] UnitChanges (read-only)
+        if (g_device) RegVersionsTick();             // 0.8: plugin versions + sha256 for the regression results (once)
         LogTailTick();
         Sleep(g_device ? 250 : 50);
     }
@@ -7047,6 +8174,12 @@ void ReadOptions(const char *dir) {
     OptString(ini, "Log", "OverlaySources", g_ovlSources, sizeof(g_ovlSources));
     OptString(ini, "Log", "OverlayExclude", g_ovlExclude, sizeof(g_ovlExclude));
     LeaveCriticalSection(&g_logRingLock);
+    // 0.8
+    g_cheatsEnabled = OptInt(ini, "Cheats", "Enabled") != 0;
+    g_cheatPersist = OptInt(ini, "Cheats", "Persist") != 0;
+    OptString(ini, "Cheats", "State", g_cheatState, sizeof(g_cheatState));
+    InterlockedExchange(&g_cameraChanges, OptInt(ini, "Log", "CameraChanges") ? 1 : 0);
+    OptString(ini, "Regress", "List", g_regressStart, sizeof(g_regressStart));
 }
 
 void Start(HMODULE self) {
@@ -7167,6 +8300,19 @@ void Start(HMODULE self) {
     Log(1, "0.7.2: pending check %d (main state 2 / 9 + GameTracker+0xb9), outfit rule %d (ini %d; DLC 2 without the "
            "outfit selection as the title update), game.quit ready (exit code 0x%x, menu / bar / favourites only)",
         g_pendingOk ? 1 : 0, g_outfitRuleOk && g_outfitRule ? 1 : 0, g_outfitRule, kQuitExitCode);
+    // 0.8: cheats (each row its own check), camera log (manager process -> chooser, mode fields), regression lists
+    CheatsCheck();
+    g_camLogOk = HexBytesAt(0x005f3e0c, "b9f004e800 e85afeffff") && HexBytesAt(0x005f3d12, "8bce d91c24 e8c442ffff") &&
+                 HexBytesAt(0x005e7feb, "8bf1") && HexBytesAt(0x005e8041, "8b4658 83f801") &&
+                 HexBytesAt(0x005e80b9, "c7465834000000") && HexBytesAt(0x005e80da, "8b7e58 397e54 7465") &&
+                 HexBytesAt(0x005e810b, "8b4e58 d95e5c 5f 894e54") && HexBytesAt(0x005f3cb0, "8d8620010000 394644");
+    if (!g_camLogOk) Log(0, "0.8 camera log: camera manager / mode chooser code (0x5f3e0c, 0x5e7fe0) does not match - "
+                            "[Log] CameraChanges off");
+    RegStart();
+    Log(1, "0.8: camera log %d ([Log] CameraChanges %ld; mode = manager 0x%08lx +0x58 / +0x54), regression lists %s "
+           "(dlc1 %d rows, dlc2 %d rows, page shows %s), results %s, session %s", g_camLogOk ? 1 : 0, g_cameraChanges,
+        kCameraManager, g_asiDir, g_regCount[0], g_regCount[1], g_regSel == 2 ? "all" : kRegNames[g_regSel],
+        g_regResultsPath, g_regSession);
     DevRead();
     g_logOverlay = g_logOverlayAtStart ? 1 : 0;
     g_logLines = g_logLinesAtStart;
