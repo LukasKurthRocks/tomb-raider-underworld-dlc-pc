@@ -25,7 +25,20 @@ W = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'rebu
 
 
 def ima_decode(data, skip_first):
-    """mono 36-byte IMA blocks -> int16 samples; skip_first=False: FSB (nibbles 0..62), True: game (nibbles 1..63)"""
+    """mono 36-byte IMA blocks -> int16 samples; skip_first=False: FSB (nibbles 0..62, standard IMA = FMOD, for wave
+    sections), True: game convention = tru.exe's own .mul decoder, exact model mul_audio_nch.decode_game (step cap
+    8191, pmulhw rounding, 4-lane saturation; fix N10). Environment TRUDLC_IMA_DECODER=old: the old model
+    (ima_decode_old) for the game convention too - only for reproducing SNR numbers measured before 2026-11-04."""
+    if skip_first and os.environ.get('TRUDLC_IMA_DECODER') != 'old':
+        import mul_audio_nch as MN
+        return MN.decode_game(bytes(data))
+    return ima_decode_old(data, skip_first)
+
+
+def ima_decode_old(data, skip_first):
+    """OLD model: mono 36-byte IMA blocks -> int16 samples with the standard IMA steps (up to 32767) and shift-sum
+    diffs; skip_first=False: FSB (nibbles 0..62), True: game convention (nibbles 1..63). For the game convention this
+    is NOT what tru.exe does (no step cap) - every .mul SNR in the docs before 2026-11-04 was measured with it."""
     nb = len(data) // 36
     if nb == 0: return np.zeros(0, dtype=np.int16)
     b = np.frombuffer(data[:nb * 36], dtype=np.uint8).reshape(nb, 36)

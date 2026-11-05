@@ -1,4 +1,10 @@
-"""Xbox music (music\\<name>\\<name>.{mus,sam,mul}) -> PC, silent audio.
+"""Xbox music (music\\<name>\\<name>.{mus,sam,mul}) -> PC; the command line writes real audio (2026-11-03), the library
+functions convert_mul / convert_streams still write the silent stub that stage 2a (dlc_audio_build) fills.
+
+Real audio (main, default): convert_mul (silent stub: PC sample count + block table) then mul_audio_nch.swap (every Xbox
+XMA1 stream decoded with ffmpeg, IMA-encoded for the game's decoder into its own channel slot) - the same two steps as
+stage 1 + stage 2a of the pipeline and tools/proto_audio_convert.py. Before 2026-11-03 main stopped after step one and
+wrote digital silence (--silent keeps that for comparisons). Check: tools/music_audio_report.py (docs Befund-DLC-Musik.md).
 
 Learned on the 32 base pairs (Xbox layer1/2 vs PC bigfile), tools/music_convert.py validate:
   .sam : identical on every Xbox base file (4 XMA RIFF test samples, 8512 B) and on PC 4 FSB4 IMA samples (1024 B, only the FSB
@@ -11,7 +17,8 @@ Learned on the 32 base pairs (Xbox layer1/2 vs PC bigfile), tools/music_convert.
          [A, end)     per track 0x58-B record 'S=S=SSSSSS===S=SS=====': [0] rate, [1] 0, [2] 2, [3] loop, [4] total samples
   .mul : the cinstream multiplex format with audio blocks only (mul_convert): PC total = round(xbox total / 256) * 256 (same rule
          as the PC files), blocks a_i = floor(i*rate/30/256)*256 up to the total, silent IMA, header float = #blocks - 1.
-usage: music_convert.py OUTDIR name [name ...]   (DLC names from pack10/pack11)   |   music_convert.py validate"""
+usage: music_convert.py OUTDIR name [name ...] [--silent]  (DLC names from pack10/pack11)   |   music_convert.py validate
+       OUTDIR gets music\\<name>\\<name>.{mus,sam,mul}; --silent = the old silent .mul (no XMA decode)"""
 import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from archive import Archive
@@ -133,11 +140,14 @@ if __name__ == '__main__':
     if sys.argv[1] == 'validate': validate(); sys.exit()
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from convert_dlc import R as ROOT, PACKS
-    out = sys.argv[1]
+    argv = sys.argv[1:]
+    silent = '--silent' in argv
+    if silent: argv.remove('--silent')
+    out = argv[0]
     pairs = base_pairs(); template(pairs)
     pc_sam = pairs['l3_chapel_mus_01']['sam'][1]
     xb_sam = pairs['l3_chapel_mus_01']['sam'][0]
-    for d in sys.argv[2:]:
+    for d in argv[1:]:
         files = {}
         for p in PACKS:
             a = arc(ROOT + p, 'be')
@@ -147,10 +157,14 @@ if __name__ == '__main__':
         if len(files) != 3: print(d, 'missing', set(('mus', 'sam', 'mul')) - set(files)); continue
         if files['sam'] != xb_sam: print(d, 'WARNING: .sam differs from the base Xbox .sam -> base PC .sam used anyway')
         ol, T = convert_mul(files['mul'])
+        info = 'silent'
+        if not silent:          # real audio: the stage 2a step (mul_audio_nch.swap), same stub size, only IMA bytes change
+            import mul_audio_nch as MN
+            ol, info = MN.swap(files['mul'], ol)
         om, bad = convert_mus(files['mus'], T)
         dd = os.path.join(out, 'music', d); os.makedirs(dd, exist_ok=True)
         for e, b in (('mus', om), ('sam', pc_sam), ('mul', ol)): open(os.path.join(dd, '%s.%s' % (d, e)), 'wb').write(b)
-        print(d, 'total', T, 'mus template mismatches', bad, 'mul', len(ol))
+        print(d, 'total', T, 'mus template mismatches', bad, 'mul', len(ol), 'audio', info, flush=True)
 
 def convert_streams(out, packs=('pack10',)):
     """audio\\streams\\*.mul of the DLC packs (audio-only multiplex streams: event sounds, stingers, VO) -> silent PC streams.
@@ -162,7 +176,7 @@ def convert_streams(out, packs=('pack10',)):
         if len(r) < 4 or r[1] not in packs or 'audio\\streams' not in r[-1] or not r[-1].endswith('.mul'): continue
         nm = r[-1]
         if nm in done: continue
-        a = arc(ROOT + PACKS[['pack10', 'pack11', 'pack1', 'pack2'].index(r[1])], 'be')
+        a = arc(ROOT + PACKS[['pack10', 'pack11', 'pack1', 'pack2', 'pack20'].index(r[1])], 'be')
         rr = {x['spec']: x for x in a.find(crc(nm))}
         sp = 0xffffffff if 0xffffffff in rr else (0xffffffe1 if 0xffffffe1 in rr else sorted(rr)[0])
         ol, T = convert_mul(a.read(rr[sp]))
