@@ -103,6 +103,11 @@
 // [Look] MoveEvents (0x823d77f0 events 0x83 / 0x84 and Start's 0x83 by gameTracker+0x1f0, the same PC field),
 // [Look] CameraFlag (Start's camera manager vtbl[0xa4]), [Look] StrikeLook (0x823d8a80 / 0x823d9050 on player anim
 // events 5 / 4 in doppelganger mode; meter interface v4 strikeLookOff for TruShadowCombat).
+//
+// 0.15 (2026-11-06, project doc Befund-F20-Zopf-0611.md): [Cloth] TuTimeStep (default 0 = 0.14) - the TU's player
+// cloth time step. TU 0x82278120 (retail 0x8227b220, PC tru+0x1bbe70) updates the cloth component (type 14, Lara's
+// ponytail) of an instance; the TU divides the player's frame time by the world time scale there, so the hair keeps
+// real time while the shadow power slows the world (without it the ponytail stretches). Section "0.15" below.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -1999,6 +2004,8 @@ void ReportAdrenalineHits() {
 void LoopTick(BYTE *gt);
 void LoopFree(const char *why);
 void MoveEvents();
+// 0.15, defined below (section "0.15")
+void ReportClothTimeStep();
 
 // ---- new tracker -> new meter (TU player init 0x82412ca0 -> 0x82409418 -> meter init 0x823d7700) ----
 typedef int(__cdecl *GenerationFn)();
@@ -2044,6 +2051,7 @@ int g_inputDiag = 0;
 
 void MeterTick(bool padHeld) {
     ScreenEffectPoll();                          // 0.10: only while an event 0x32 is pending
+    ReportClothTimeStep();                       // 0.15: log only ([Cloth] TuTimeStep=1)
     if (g_legacyPadStart) { LegacyMeterTick(padHeld); return; }
     NewTrackerCheck();
     // TU 0x824128a4..0x824128b8: the player update runs the tick only when gameTracker+0x1244 is set
@@ -2995,6 +3003,109 @@ void PatchStrikeLook() {
            "with flag 2; meter interface v4 strikeLookOff for TruShadowCombat");
 }
 
+// ---- 0.15 [Cloth] TuTimeStep: the TU's player cloth time step (TU 0x82278120, retail 0x8227b220) ----
+// TU 0x82278120 = PC tru+0x1bbe70, cdecl(instance) (TU callers 0x822995a8 / 0x82299d88, PC tru+0x1d4688 /
+// tru+0x1dfee1): after the instance's own part it looks up component type 14 (the cloth, Lara's ponytail; TU
+// 0x82275ab0) and updates it with the frame time. Retail 0x8227b2dc..0x8227b2e8 (= the PC code): dt = [0x82efb358
+// +0x100]. TU 0x822781dc..0x822781f8, gt = 0x82efb458 (= PC 0xe7f088, the same field offsets):
+//     r10 = [gt+0xc]        the player instance                       PC [0xe7f094]
+//     f1  = [gt+0x100]      frame time * world time scale             PC [0xe7f188] (tru+0x1da5af / 0x1da5b5)
+//     if (r26 == r10)       r26 = the function's ARGUMENT (the instance; 0x8227812c mr r26,r3), not the component
+//         f1 /= [gt+0x118]  the world time scale                      PC [0xe7f1a0] (tru+0x1da595)
+//     bl 0x82102e70         component update (component, f1)          PC tru+0x5d680
+// There is no other test in the TU (no gameTracker+0x1244, no scale > 0): the player's cloth runs on the unscaled
+// frame time wherever the world is slowed (shadow power 0.3, base-game slow motion). Site tru+0x1bbec2 (6 bytes
+// fld dword [0xe7f188]): esi / edi are already restored, so the instance is the argument [esp+4]; eax = the component
+// (kept), ecx and the flags are dead there (push ecx only makes room for the fstp).
+const DWORD kClothFunc = 0x005bbe70;                           // TU 0x82278120 / retail 0x8227b220
+const char *const kClothFuncHex = "56 8b742408 f6461c01 57 7409 56 e8fe23eaff 83c404 8b7e70 83c668";
+const DWORD kClothSite = 0x005bbeb5;                           // component lookup end .. call tru+0x5d680 .. ret
+const char *const kClothSiteHex = "3bc1 5f 5e 7418 8b4004 85c0 7411 d90588f1e700 51 8bc8 d91c24 e8ad17eaff c3";
+const DWORD kClothPatch = 0x005bbec2;                          // fld dword [0xe7f188] (6 bytes)
+const DWORD kClothCaller1 = 0x005d4688, kClothCaller2 = 0x005dfee1;
+const DWORD kWorldScaleSite = 0x005da595;                      // world scale -> 0xe7f1a0, 0xe7f194 / 0xe7f188 *= it
+const char *const kWorldScaleHex = "d91da0f1e700 d905a0f1e700 d9c0 d80d94f1e700 d91d94f1e700 d80d88f1e700 d91d88f1e700";
+DWORD g_clothBack = 0x005bbec8;                                // push ecx; mov ecx,eax; fstp [esp]; call tru+0x5d680
+int g_clothTimeStep = 0;                                       // [Cloth] TuTimeStep
+bool g_clothOk = false;
+volatile LONG g_clothHits = 0;                                 // player cloth updates divided (log only)
+volatile LONG g_clothZero = 0;                                 // of them with world scale +-0.0 (the TU divides anyway)
+volatile DWORD g_clothDtBits = 0, g_clothScaleBits = 0;        // last scaled dt / world scale (log only)
+
+__declspec(naked) void ClothDtStub() {
+    __asm {
+        fld dword ptr ds:[0x00e7f188]           // TU 0x822781e8 lfs f1,0x100(r11)
+        mov ecx, dword ptr [esp + 4]            // the instance (TU r26)
+        cmp ecx, dword ptr ds:[0x00e7f094]      // TU 0x822781e4 / 0x822781ec cmplw cr6,r26,r10 (r10 = [gt+0xc])
+        jne done                                // TU 0x822781f0 bne cr6,0x822781fc
+        fdiv dword ptr ds:[0x00e7f1a0]          // TU 0x822781f4 lfs f0,0x118(r11) / 0x822781f8 fdivs f1,f1,f0
+        inc dword ptr [g_clothHits]             // from here on: log only
+        mov ecx, dword ptr ds:[0x00e7f188]
+        mov dword ptr [g_clothDtBits], ecx
+        mov ecx, dword ptr ds:[0x00e7f1a0]
+        mov dword ptr [g_clothScaleBits], ecx
+        test ecx, 7fffffffh
+        jnz done
+        inc dword ptr [g_clothZero]
+    done:
+        jmp dword ptr [g_clothBack]             // TU 0x822781fc bl 0x82102e70 = PC tru+0x5d680
+    }
+}
+
+LONG g_clothReported = 0, g_clothZeroReported = 0;
+bool g_clothSlowLogged = false;
+
+// called once per game frame from MeterTick (game thread, like the cloth update)
+void ReportClothTimeStep() {
+    if (!g_clothOk) return;
+    LONG n = g_clothHits, last = g_clothReported;
+    if (n == last) return;
+    g_clothReported = n;
+    DWORD dtBits = g_clothDtBits, scaleBits = g_clothScaleBits;
+    float dt, scale;
+    memcpy(&dt, &dtBits, 4);
+    memcpy(&scale, &scaleBits, 4);
+    double result = scale != 0.0f ? static_cast<double>(dt) / scale : 0.0;
+    if (last == 0)
+        Log(1, "cloth time step: first player cloth update with the TU division (dt %.5f / world scale %.3f = %.5f, "
+               "TU 0x822781f8)", dt, scale, result);
+    // log threshold only (not part of the translation): the first update while the world runs slower / faster than 1 %
+    if (!g_clothSlowLogged && (scale < 0.99f || scale > 1.01f)) {
+        g_clothSlowLogged = true;
+        Log(1, "cloth time step: world time scaled - player cloth dt %.5f / world scale %.3f = %.5f (update %ld)", dt,
+            scale, result, n);
+    }
+    bool pow2 = false;
+    for (LONG p = 1; p > 0 && p <= n; p <<= 1)
+        if (p > last) { pow2 = true; break; }
+    if (g_logLevel >= 2 && pow2)
+        Log(2, "cloth time step: %ld player cloth updates divided (last dt %.5f / world scale %.3f)", n, dt, scale);
+    LONG z = g_clothZero;
+    if (z != g_clothZeroReported) {
+        if (g_clothZeroReported == 0)
+            Log(0, "cloth time step: world scale 0 at a player cloth update (%ld times) - the TU divides anyway", z);
+        g_clothZeroReported = z;
+    }
+}
+
+void PatchClothTimeStep() {
+    if (!g_clothTimeStep) return;                       // default: nothing checked, nothing patched (0.14 behaviour)
+    const char *bad = !HexBytesAt(kClothFunc, kClothFuncHex) ? "function entry tru+0x1bbe70"
+                      : !HexBytesAt(kClothSite, kClothSiteHex) ? "site tru+0x1bbec2"
+                      : !CallTargetIs(kClothCaller1, kClothFunc) || !CallTargetIs(kClothCaller2, kClothFunc)
+                          ? "callers tru+0x1d4688 / tru+0x1dfee1"
+                      : !HexBytesAt(kWorldScaleSite, kWorldScaleHex) ? "world scale tru+0x1da595"
+                                                                     : nullptr;
+    if (bad) { Log(0, "cloth time step: code does not match (%s) - off", bad); return; }
+    if (!WriteJumpN(kClothPatch, reinterpret_cast<const void *>(&ClothDtStub), 6)) {
+        Log(0, "cloth time step: VirtualProtect failed (%lu) - off", GetLastError());
+        return;
+    }
+    g_clothOk = true;
+    Log(1, "cloth time step: [Cloth] TuTimeStep=1 - tru+0x1bbec2 runs TU 0x822781dc..0x822781f8: the player's cloth "
+           "(component 14) gets dt [0xe7f188] / world scale [0xe7f1a0] when the instance is [0xe7f094]");
+}
+
 // ---- meter interface (docs Befund-Schattenkampf.md section 5; version 1 = TruShadowCombat's proposal, version 2
 // appends the HUD natives f70-f73 of larabase, TU 0x824aa060 / 0x824aa0a0 / 0x824aa120 / 0x824aa150, for a later HUD
 // plugin - Plan-Nacht-Analysen-2026-11-03.md section 2). Fields are only appended; check version / size.
@@ -3078,6 +3189,7 @@ void ReadOptions(const char *dir) {
     g_moveEvents = GetPrivateProfileIntA("Look", "MoveEvents", 0, ini);
     g_cameraFlag = GetPrivateProfileIntA("Look", "CameraFlag", 0, ini);
     g_strikeLook = GetPrivateProfileIntA("Look", "StrikeLook", 0, ini);
+    g_clothTimeStep = GetPrivateProfileIntA("Cloth", "TuTimeStep", 0, ini);     // 0.15, default 0
 }
 
 void Start(HMODULE self) {
@@ -3088,13 +3200,13 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.14 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.15 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
-        "camera flag %d, strike look %d)", g_enabled, g_buttons, g_hudFeed, g_fallback,
+        "camera flag %d, strike look %d; 0.15: cloth TU time step %d)", g_enabled, g_buttons, g_hudFeed, g_fallback,
         g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled, g_legacyPadStart, g_gameInput,
         g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled, g_state2102Enabled, g_loopSound, g_moveEvents,
-        g_cameraFlag, g_strikeLook);
+        g_cameraFlag, g_strikeLook, g_clothTimeStep);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -3205,6 +3317,7 @@ void Start(HMODULE self) {
     CheckMoveEvents();
     CheckCameraFlag();
     PatchStrikeLook();
+    PatchClothTimeStep();               // 0.15: only with [Cloth] TuTimeStep=1 (independent of the doppelganger flag)
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -3225,11 +3338,12 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.14 (translated TU meter with the TU tick gates, Lara conditions 1046 / 1047 / 1048-1056 / "
+    return "TruShadowPower 0.15 (translated TU meter with the TU tick gates, Lara conditions 1046 / 1047 / 1048-1056 / "
            "2401, states 243 / 245 / 1018 / 2102, activities 1009 / 1039, shadow look = TU player events of start / stop, "
            "adrenaline look = meter flag 0x40 / camera mode 0x34, look screen effect report / switch, GlobalParams[7], "
            "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4; switches default off: loop "
-           "sound, move events 0x83 / 0x84, camera flag, strike look 0x823d8a80 / 0x823d9050)";
+           "sound, move events 0x83 / 0x84, camera flag, strike look 0x823d8a80 / 0x823d9050, cloth TU time step "
+           "0x82278120)";
 }
 
 // 0.11: the TU meter object for other plugins (TruShadowCombat: condition 538, the shadow strike) - interface version

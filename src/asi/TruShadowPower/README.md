@@ -20,9 +20,55 @@ white-black with the look); 0.10 (look screen-effect report / switch, with the d
 2026-11-03, not played; 0.11 (GlobalParams[7], state 2102, meter interface v2) built 2026-11-03, not played; 0.12
 (meter interface v3, InstanceParams[1] in cinematics) built 2026-11-03, played in the runs of 2026-11-03 (state 2102
 never registered); 0.13 (state 2102 next to TruDataGuard) built 2026-11-04, not played; 0.14 (loop sound, movement
-events, camera flag, strike look - four switches, all default off) built 2026-11-04, not played.** Not covered: the
+events, camera flag, strike look - four switches, all default off) built 2026-11-04, not played; 0.15 (the TU's
+player cloth time step, `[Cloth] TuTimeStep`, default off) built 2026-11-06, not played.** Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.15: the TU's player cloth time step - Lara's ponytail in slow motion (2026-11-06)
+
+On the PC the ponytail stretches ("janky", very long) while the shadow power slows the world (world 0.3, Lara 1.2):
+the cloth of every instance is stepped with the world-scaled frame time. The title update fixed that in the caller of
+the cloth update, and only there (the cloth code itself, PC tru+0x5d680 / 0x5fab0 / 0x601c0, is unchanged in the TU).
+`[Cloth] TuTimeStep=1` translates that change; **default 0** = 0.14 behaviour (nothing checked, nothing patched).
+Project doc `Befund-F20-Zopf-0611.md` has the evidence; byte pre-checks `work\asi\v15\prechecks_v15.txt` (6 checks,
+0 mismatches against the installed exe; the 0.14 list re-run: 36 checks, 0 mismatches). Build `work\asi\v15`.
+
+| | Xbox | PC |
+|---|---|---|
+| function | TU 0x82278120 (retail 0x8227b220), cdecl(instance); callers 0x822995a8 / 0x82299d88 | tru+0x1bbe70; callers tru+0x1d4688 / tru+0x1dfee1 |
+| cloth component | type 14 via 0x82275ab0, update 0x82102e70(component, dt) | component list +0x68 / +0x70, update tru+0x5d680 (thiscall, dt on the stack) |
+| retail dt | `lfs f1,0x100(r10)`, r10 = 0x82efb358 | `fld dword [0xe7f188]` at tru+0x1bbec2 |
+| TU change 0x822781dc..0x822781f8 | gt = 0x82efb458: `r10 = [gt+0xc]; f1 = [gt+0x100]; if (r26 == r10) f1 /= [gt+0x118]` | `fld [0xe7f188]; if ([esp+4] == [0xe7f094]) fdiv [0xe7f1a0]` |
+
+Field partners (gt = PC 0xe7f088, same offsets): +0xc = 0xe7f094 the player instance, +0x100 = 0xe7f188 the frame
+time multiplied by the world scale (tru+0x1da5af / 0x1da5b5), +0x118 = 0xe7f1a0 the world time scale (tru+0x1da595).
+r26 is the function's **argument** (0x8227812c `mr r26,r3`), i.e. the instance, not the component; at tru+0x1bbec2
+esi / edi are already restored, so the instance is `[esp+4]`. The TU has **no further test** - no gameTracker+0x1244
+(doppelganger mode) and no "scale > 0": the player's cloth runs on the unscaled frame time in every level whenever the
+world time is scaled (shadow power, base-game slow motion such as script 205). Cross-check only: the upstream B270 exe
+patches the same site, but compares `[component+0]` instead of the instance, and adds the +0x1244 and scale > 0 tests
+(and a counter) - none of that is in the TU, so the plugin does not do it.
+
+Hook: tru+0x1bbec2, 6 bytes -> `jmp ClothDtStub; nop`, back to tru+0x1bbec8 (`push ecx; mov ecx,eax; fstp [esp];
+call tru+0x5d680`); eax (the component) is kept, ecx and the flags are dead there. Checked first: function entry,
+the site from tru+0x1bbeb5 to the `ret`, both callers, the world-scale code tru+0x1da595. The site holds a jump on the
+upstream B270 exe -> the check fails there and the switch stays off (`site tru+0x1bbec2`).
+
+**Log lines**: `cloth time step: [Cloth] TuTimeStep=1 - tru+0x1bbec2 runs TU 0x822781dc..0x822781f8 ...` (patched),
+`cloth time step: first player cloth update with the TU division (dt ... / world scale ... = ...)`, `cloth time
+step: world time scaled - player cloth dt ... / world scale 0.300 = ... (update N)` (first update with the world
+scale more than 1 % away from 1.0 - a log threshold only), LogLevel 2: `cloth time step: N player cloth updates
+divided` at powers of two. `cloth time step: world scale 0 at a player cloth update (N times) - the TU divides anyway`
+(LogLevel 0, once). A failed check: `cloth time step: code does not match (<part>) - off`. The report runs in the
+per-frame tick of the pad poll, so it needs the plugin's pad hook (as every other part).
+
+**TO TEST (0.15)**
+
+| # | switch | test | what the owner should see / the log |
+|---|---|---|---|
+| 1 | TuTimeStep=1 | DLC 2, hold RB (shadow power on), run and hit with the power, watch the ponytail | normal length / movement in slow motion; `cloth time step: [Cloth] TuTimeStep=1`, `first player cloth update`, `world time scaled ... world scale 0.300` |
+| 2 | TuTimeStep=0 | the same | ponytail stretches as before (comparison); no `cloth time step` lines |
 
 ## 0.14: the remaining TU parts of the power, each behind its own switch (2026-11-04)
 
@@ -387,6 +433,7 @@ every `*.asi` next to `tru.exe`.
 | `[States] State2102` | 1 | see 0.11 |
 | `[Sound] LoopSound` | 0 | 0.14: the TU's looping sound of the power |
 | `[Look] MoveEvents / CameraFlag / StrikeLook` | 0 | 0.14: movement events 0x83 / 0x84, camera flag of Start, the shadow-strike look |
+| `[Cloth] TuTimeStep` | 0 | 0.15: the TU's player cloth time step (TU 0x82278120): the ponytail gets the frame time / world scale, so it keeps real time in slow motion |
 
 The 0.2 options `WorldScale`, `PlayerScale`, `RampSeconds`, `[Meter] Enabled`, `DrainSeconds`, `RefillSeconds`,
 `RefillDelay`, `MinStart` are gone - those values now come from the data / the TU constants.

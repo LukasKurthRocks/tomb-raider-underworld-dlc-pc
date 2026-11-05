@@ -64,7 +64,8 @@ $earlierBuilds = @{
                              'fe42c05135581cdef87fae7b1d5e41c2a08213f2d2d38f02f36a82fc2c85f30a',   # 0.11 GlobalParams[7] / 2102 / API v2 (work\asi\v11)
                              'a3dd085da71e630a87ea220b4c7b24294421e1080c9c592f84bf173f533b0c5e',   # 0.12 (work\asi\v12)
                              'a3961fb70975d8436a032250203df6ef6577987429b1529993bdfd415493fb1b',   # 0.13 2102 check next to TruDataGuard (work\asi\v13)
-                             'e8746362890d87be6139d297feb3dbb4978fc05a88698ced5969c846c0619bd6')   # 0.14 loop sound / move events / camera flag / strike look (work\asi\v14)
+                             'e8746362890d87be6139d297feb3dbb4978fc05a88698ced5969c846c0619bd6',   # 0.14 loop sound / move events / camera flag / strike look (work\asi\v14)
+                             'b0432e31f71cd3ab9b4cdcfa7ab3ecc69d86155f2fea4f7c2da53f13b4ed42ab')   # 0.15 cloth TU time step (work\asi\v15)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
@@ -75,7 +76,8 @@ $earlierBuilds = @{
                              '97dccd43228ed0942fa9fbc4f7a35b17aa17189e9fc1843d4ef4f82f0dd25f16',   # 0.10 sample .ini (ScreenEffect)
                              'dab30d022a0067b58b8d6e1c20fab323f3e71d1fb6ed358fa4cf86437b95c0cd',   # 0.11 sample .ini (GlobalParams7, State2102)
                              'd8467e122ed50150aeac292075e6ec3ee6c634295e6867a3ab91355e521bf132',   # 0.12 / 0.13 sample .ini
-                             '5bf019742d81fe897bbc08fe145cccde0b45468c603852c469798f468b2d0c50')   # 0.14 sample .ini ([Sound] LoopSound, [Look] MoveEvents / CameraFlag / StrikeLook)
+                             '5bf019742d81fe897bbc08fe145cccde0b45468c603852c469798f468b2d0c50',   # 0.14 sample .ini ([Sound] LoopSound, [Look] MoveEvents / CameraFlag / StrikeLook)
+                             '4109ea03592cbb70cc1cf96158336d8045d8ddebbba8da87b9548a8add1cbea3')   # 0.15 sample .ini ([Cloth] TuTimeStep)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
