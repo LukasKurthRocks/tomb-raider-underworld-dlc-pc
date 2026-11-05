@@ -55,6 +55,10 @@ testing in the game. You need your own copy of the game and your own Xbox DLC fi
   in-game controller menu with a radial menu and a guided test flow (`TruMenu`), a local link for scripted checks
   (`TruLink`) and a log-only trace of sounds, state changes, spawns and level loads (`TruTrace`).
 
+![Development build: Lara's Shadow, Yggdrasil hall 02](assets/dev-dlc2-hall02-thralls-2026-11-02.jpg)
+*Development build, 2 Nov 2026: DLC 2 in the second Yggdrasil hall with the test menu's log overlay. The thralls
+still use substitute shaders here (translated since).*
+
 **Still missing (short list)**
 
 - DLC 2: the shadow finisher never starts (its target list stays empty); beaten thralls get up again; a moaning sound
