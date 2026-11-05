@@ -23,6 +23,9 @@ Since TruMenu 0.11 also the [Flow] values (Enabled / Overlay / AutoAdvance 0 / 1
 3, Lines 1 .. 3, ToastSeconds 1 .. 30, PollMs 100 .. 5000, File), the flow items in kItems, the include of TruFlowCore.h,
 and the flow entries flow.next / flow.skip / flow.back / flow.status (no argument, once each) allowed in the level Claude
 next to the six marks (which keep their order).
+Since TruMenu 0.12 also the [Debug] values (Enabled / NavMask 0 / 1, NavDraw a comma list of the switch names of
+kNavSwitches in TruMenu.cpp), the items nav.status / nav.draw / nav.mask / nav.off in kItems and the nav.* entries of the
+radial file (nav.draw takes exactly one switch name of kNavSwitches, nav.mask / nav.off / nav.status no argument).
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -50,7 +53,9 @@ FLOW_RANGES = {'Size': (0.5, 3.0), 'Lines': (1, 3), 'ToastSeconds': (1, 30), 'Po
 FLOW_ITEMS = ['flow.status', 'flow.list', 'flow.next', 'flow.back', 'flow.skip', 'flow.goto', 'flow.add', 'flow.say',
               'flow.result', 'flow.reload']
 FLOW_RING = ['flow.next', 'flow.skip', 'flow.back', 'flow.status']
-LIT = re.compile(r'"((?:[^"\\]|\\.)*)"')
+# 0.12 Debug-Zeichnung: the nav items and their types
+NAV_ITEMS = {'nav.status': 'info', 'nav.draw': 'action', 'nav.mask': 'bool', 'nav.off': 'action'}
+LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 
 def item_types(src):
@@ -331,6 +336,64 @@ def check_flow(ini_path):
     return problems
 
 
+def nav_switches(src):
+    """0.12: the switch names of kNavSwitches in TruMenu.cpp (in table order)"""
+    if 'const NavSwitch kNavSwitches[] = {' not in src: return []
+    block = src[src.index('const NavSwitch kNavSwitches[] = {'):]
+    block = block[:block.index('\n};')]
+    return re.findall(r'\{"([a-z0-9_]+)", 0x', block)
+
+
+def check_debug(ini_path, radial_path):
+    """0.12: the [Debug] values of the INI, the nav items in kItems, the nav.* entries of the radial file"""
+    problems, section, seen = [], None, set()
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    switches = nav_switches(src)
+    if not switches: problems.append('TruMenu.cpp: kNavSwitches missing or empty')
+    for n, line in enumerate(open(ini_path, encoding='utf-8').read().splitlines(), 1):
+        line = line.strip()
+        m = re.match(r'^\[(.+)\]$', line)
+        if m:
+            section = m.group(1)
+            continue
+        if section != 'Debug' or not line or line.startswith(';') or '=' not in line: continue
+        key, _, value = line.partition('=')
+        key, value = key.strip(), value.strip()
+        seen.add(key)
+        if key in ('Enabled', 'NavMask') and value not in ('0', '1'):
+            problems.append('%s:%d: [Debug] %s=%s (0 / 1)' % (name, n, key, value))
+        elif key == 'NavDraw':
+            for word in [w for w in re.split(r'[ ,]+', value) if w]:
+                if word not in switches: problems.append('%s:%d: [Debug] NavDraw names "%s" (not in kNavSwitches)'
+                                                         % (name, n, word))
+    for key in ('Enabled', 'NavDraw', 'NavMask'):
+        if key not in seen: problems.append('%s: [Debug] %s missing' % (name, key))
+    items = item_types(src)
+    for item, typ in sorted(NAV_ITEMS.items()):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    entries, used = 0, set()
+    if os.path.exists(radial_path):
+        for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.count('|') != 2: continue
+            path, label, cmd = (x.strip() for x in line.split('|'))
+            word, _, arg = cmd.partition(' ')
+            arg = arg.strip()
+            if not word.startswith('nav.'): continue
+            entries += 1
+            where = '%s:%d' % (os.path.basename(radial_path), n)
+            if word == 'nav.draw':
+                if arg not in switches:
+                    problems.append('%s: nav.draw needs one switch of kNavSwitches, got "%s"' % (where, arg))
+                else:
+                    used.add(arg)
+            elif arg:
+                problems.append('%s: %s takes no argument in the ring, got "%s"' % (where, word, arg))
+    return problems, '%d switches in kNavSwitches, %d nav entries in the radial file (%d switches)' % (
+        len(switches), entries, len(used))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -398,7 +461,11 @@ def main(argv):
     if not fproblems: print('ok: [Flow] Enabled / File / Overlay / Position / Size / Lines / AutoAdvance / ToastSeconds / '
                             'PollMs values, %d flow items, TruFlowCore.h included' % len(FLOW_ITEMS))
     problems += fproblems
-    have = open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
+    dproblems, dsummary = check_debug(ini_path, radial_path)   # 0.12
+    for p in dproblems: print('DEBUG %s' % p)
+    if not dproblems: print('ok: [Debug] Enabled / NavDraw / NavMask values, %d nav items, %s' % (len(NAV_ITEMS), dsummary))
+    problems += dproblems
+    have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))
         return 1 if problems else 0

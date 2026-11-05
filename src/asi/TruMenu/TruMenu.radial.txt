@@ -59,6 +59,20 @@ Spieler/Objekte | Kiste A | instance.spawn sh_ei_combat_crate_a
 Spieler/Objekte | Kiste B | instance.spawn sh_ei_combat_crate_b
 Spieler/Objekte | Kiste C | instance.spawn sh_ei_combat_crate_c
 Spieler/Objekte | Schrotflinte (Objekt) | instance.spawn wp_shotgun
+# 0.12 Debug-Zeichnung (debug view stage S0): the NavPower debug drawing compiled into tru.exe - only with [Debug]
+# Enabled=1 and in a loaded level (greyed otherwise); each switch shows on / off. Below Spieler so the top level keeps its
+# 8 sectors. Verbindungen / Normalen draw only together with Flaechen or Flaechen gefuellt (same area loop); "Alle
+# Ebenen" = nav.mask (layer mask 0xffffffff); "Alles aus" = every switch and the mask back to the values before.
+Spieler/Debug | Navmesh Flaechen | nav.draw planner_areas
+Spieler/Debug | Navmesh gefuellt | nav.draw planner_areas_solid
+Spieler/Debug | Navmesh Verbindungen | nav.draw planner_connectivity
+Spieler/Debug | Hindernisse | nav.draw obstacles
+Spieler/Debug | Nav-Proben | nav.draw recent_navprobes
+Spieler/Debug | Laufweg (Flieger) | nav.draw draw_mover3d_path
+Spieler/Debug | Alle Ebenen | nav.mask
+Spieler/Debug | Alles aus | nav.off
+Spieler/Debug | Flaechen-Normalen | nav.draw planner_area_normals
+Spieler/Debug | Debug: Stand | nav.status
 # 0.10.5 (owner wish 2026-11-05): Claude marks, drawn in coral - each pick writes one TruMenu.log line
 # "claude.mark <kind>: <time> unit=<stream unit> pos=<x y z> step=<TO TEST step or -> shot=<file> src=ring" and takes a
 # clean shot named <kind>; the ring closes after the pick. [Shot] Hotkey (F11 = 0x7A, default off) = "Jetzt".

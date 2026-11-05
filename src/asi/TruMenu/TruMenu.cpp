@@ -50,7 +50,12 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.11 (Ablauf: guided test runs from TruMenu.flow.txt ([Flow] Enabled, 0 by default) "
+const char *const kVersion = "TruMenu 0.12 (Debug-Zeichnung: nav.draw <switch> 0|1 switches the NavPower debug drawing "
+                             "compiled into tru.exe (planner_areas, planner_areas_solid, planner_connectivity, "
+                             "planner_area_normals, obstacles, recent_navprobes, draw_mover3d_path - data bytes only, in a "
+                             "loaded level), nav.mask (planner layer mask, every layer), nav.off, nav.status, ring Spieler / "
+                             "Debug, [Debug] Enabled 0 by default; "
+                             "0.11: Ablauf: guided test runs from TruMenu.flow.txt ([Flow] Enabled, 0 by default) "
                              "- action / observe / mark steps, counters (TruTrace unit / level loads and restores, plugin "
                              "log patterns, player deaths, switch flips, item runs, marks), conditions after= / check= / "
                              "fail=, ring level Claude: Weiter / Ueberspringen / Zurueck + Gut / Fehler = the step result, "
@@ -388,6 +393,15 @@ const OptDef kOpts[] = {
     {"Flow", "ToastSeconds", "6", "0.11: seconds a flow.say toast (TruLink: menu flow.say <text>) stays, 1 .. 30"},
     {"Flow", "PollMs", "500", "0.11: milliseconds between two reads of the log files the flow's patterns name (every new "
                               "byte, at most 256 KB per\nfile and read), 100 .. 5000"},
+    {"Debug", "Enabled", "0", "0.12: 1 = Debug-Zeichnung: the items nav.draw / nav.mask / nav.off (ring Spieler / Debug, "
+                              "command bar, TruLink) may switch\nthe NavPower debug drawing compiled into tru.exe (data "
+                              "bytes only, in a loaded level, never while loading); 0 = off (the ring\nentries are greyed, "
+                              "nav.status still reads)"},
+    {"Debug", "NavDraw", "", "0.12: comma list of NavPower switches turned on once the first level is loaded (needs "
+                             "Enabled=1), e.g. planner_areas;\nempty = none. Names: planner_areas, planner_areas_solid, "
+                             "planner_connectivity, planner_area_normals, obstacles,\nrecent_navprobes, draw_mover3d_path"},
+    {"Debug", "NavMask", "0", "0.12: 1 = together with NavDraw also nav.mask 1 (planner layer mask [0x88e454] = 0xffffffff: "
+                              "every layer is drawn);\n0 = the game's mask"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -432,6 +446,8 @@ bool g_pendingOk = false;                                                    // 
 bool g_outfitRuleOk = false;                                                 // 0.7.2: f27 arg 2 = selection flag checks
 int g_cheatsEnabled = 1, g_cheatPersist = 0;                                 // 0.8 [Cheats] Enabled / Persist
 char g_cheatState[256] = "";                                                 // 0.8 [Cheats] State (Persist=1)
+int g_debugEnabled = 0, g_navAutoMask = 0;                                   // 0.12 [Debug] Enabled / NavMask
+char g_navAuto[256] = "";                                                    // 0.12 [Debug] NavDraw (comma list)
 volatile LONG g_cameraChanges = 1;                                           // 0.8 [Log] CameraChanges
 char g_regressStart[8] = "all";                                              // 0.8 [Regress] List
 volatile LONG g_inputTrace = 1;                                              // 0.8.1 [Log] InputTrace
@@ -618,6 +634,7 @@ bool InLevel();
 void WeaponsTick();    // 0.3 costume switch: player message 35 a frame later
 void InvincibleTick(); // 0.3 player.invincible: health = MaxHealth once per game frame
 void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite ammo re-apply (game thread)
+void NavTick();        // 0.12 Debug-Zeichnung: [Debug] NavDraw / NavMask once in the first loaded level (game thread)
 void SafeGroundTick(); // 0.8.1 player.unstuck: ring of recent safe positions (game thread)
 void NoDamageTick();   // 0.10.2 cheat.godfull: the player's no-damage bit once per game frame (game thread)
 void SoundFreezeTick(); // 0.10.3 [Radial] FreezeSound / [Menu] PauseSound: sound pause with the world (game thread)
@@ -831,6 +848,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         InvincibleTick();
         NoDamageTick();                       // 0.10.2: cheat.godfull no-damage bit [0xfada74] & 0x20000
         CheatsTick();                         // 0.8: [Cheats] Persist restore, infinite ammo re-apply
+        NavTick();                            // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
         SafeGroundTick();                     // 0.8.1: player.unstuck ring
     }
     return result;
@@ -5241,6 +5259,438 @@ void CheatsCheck() {
     for (const auto &r : rows) if (!r.ok) Log(0, "0.8 cheats: %s disabled - %s", r.id, r.why);
 }
 
+// ---- 0.12 Debug-Zeichnung (debug view stage S0, F28): the NavPower ("bfx") debug drawing compiled into tru.exe ----
+// Workspace docs\Befund-Debug-Ansicht-0511.md 1.1 and docs\Befund-TruMenu-Debug-0511.md; every byte check below is
+// pinned in work\asi\menu012\precheck_012.txt (tools/pe_bytes_check.py on the Steam exe: 33 / 33 ok). NavPower's frame
+// draw (game frame 0x5da141 -> 0x489c60 -> jmp 0x42f900: the draw function of every component while
+// [[0x8c0f0c]+0x10] == 1) tests one byte per BoolSetting; the bytes sit in .bss (0 in retail) and no instruction writes
+// them (tools/pe_abs_uses.py: only the readers and the static initialisers' reads). TruMenu writes only these bytes and
+// the layer mask dword [0x88e454] - game code stays unchanged. The lines reach the screen through CDCRenderer (vtable
+// 0x845224, object [0x8c0f3c]) slot 0 0x48a500 -> DRAW_DrawLines 0x5bfcd0 (not yet seen live). Middleware text ends in
+// the empty stub 0x6457a0, so only switches that draw lines are offered (islands, refcount, stats are text).
+const DWORD kNavRenderer = 0x008c0f3c, kNavRendererVtbl = 0x00845224, kNavLineBuffer = 0x008c0f48,
+            kNavSystem = 0x008c0f0c, kNavPlanner = 0x008bf310, kNavMask = 0x0088e454, kNavSettingVtbl = 0x00841144;
+// nav.mask 1: the mask's value in the tru.exe file (.data, tools/pe_dis.py --dwords 0x88e454 = 0xffffffff) before the
+// CDC init 0x48aa23 narrows it to (1 << n) | (1 << (n + 16)), n = [0xa03590]; the planner draw 0x418680 draws layer i
+// (of 32) only when bit i is set, and nothing at all when the mask is 0
+const DWORD kNavMaskAll = 0xffffffff;
+struct NavCheckBytes { DWORD at; const char *hex; };
+// kind 0 = drives the per-area loop of the planner draw (0x41869c / 0x4186a5), 1 = read inside the per-area draw
+// 0x40c3a0 (draws only with a kind 0 switch on), 2 = its own draw path
+struct NavSwitch {
+    const char *name;            // the setting name = the string at nameAt in tru.exe
+    DWORD byte, object, nameAt;  // switch byte (.bss); BoolSetting object (+0 vtable, +0xc name, +0x10 the byte)
+    int kind;
+    const char *draws;
+    NavCheckBytes checks[4];     // its readers + the static initialiser that pairs name and byte (precheck 4 .. 10)
+};
+const NavSwitch kNavSwitches[] = {
+    {"planner_areas", 0x008bf2e5, 0x008bf430, 0x00842600, 0, "navmesh areas, outline",
+     {{0x0040c3a0, "8a15e5f28b00"}, {0x0083098e, "c7053cf48b0000268400 c70540f48b00e5f28b00"}, {0, nullptr}, {0, nullptr}}},
+    {"planner_areas_solid", 0x008bf2e6, 0x008bf36c, 0x00842610, 0, "navmesh areas, filled (cost per frame unknown)",
+     {{0x0040c3ba, "803de6f28b0000"}, {0x0040c68d, "803de6f28b0000"},
+      {0x008309ce, "c70578f38b0010268400 c7057cf38b00e6f28b00"}, {0, nullptr}}},
+    {"planner_connectivity", 0x008bf2e7, 0x008bf384, 0x00842624, 1, "a line from each area to each neighbour",
+     {{0x0040c8bb, "803de7f28b0000 0f841d010000"}, {0x00830a0e, "c70590f38b0024268400 c70594f38b00e7f28b00"},
+      {0, nullptr}, {0, nullptr}}},
+    {"planner_area_normals", 0x008bf2ec, 0x008bf354, 0x0084263c, 1, "the normal of each area",
+     {{0x0040c7c8, "803decf28b0000 0f84e6000000"}, {0x00830a4e, "c70560f38b003c268400 c70564f38b00ecf28b00"},
+      {0, nullptr}, {0, nullptr}}},
+    {"obstacles", 0x008bf308, 0x008bf33c, 0x008426cc, 2, "dynamic obstacles (list [0x8bf2f8])",
+     {{0x00407690, "803d08f38b0000 7427"}, {0x00830c4e, "c70548f38b00cc268400 c7054cf38b0008f38b00"}, {0, nullptr},
+      {0, nullptr}}},
+    {"recent_navprobes", 0x008bf309, 0x008bf4b0, 0x008426d8, 2, "the latest navmesh probes (the probe query 0x420580 "
+     "records each probe while on)",
+     {{0x00420583, "381d09f38b00"}, {0x004205bf, "803d09f38b0000"},
+      {0x00830c8e, "c705bcf48b00d8268400 c705c0f48b0009f38b00"}, {0, nullptr}}},
+    {"draw_mover3d_path", 0x008bf006, 0x008bf08c, 0x0084152c, 2, "the path of each Mover3D (flyers, list [0x8bf00c])",
+     {{0x0040432d, "803d06f08b0000 7437"}, {0x00405da5, "e806e1ffff"}, {0x0040617b, "68805d4000"},
+      {0x0083031e, "c70598f08b002c158400 c7059cf08b0006f08b00"}}},
+};
+const int kNavCount = static_cast<int>(sizeof(kNavSwitches) / sizeof(kNavSwitches[0]));
+bool g_navCoreOk = false, g_navMaskOk = false, g_navAreaOk = false, g_navSwOk[kNavCount] = {};
+const char *g_navCoreWhy = "not checked", *g_navMaskWhy = "not checked", *g_navSwWhy[kNavCount] = {};
+BYTE g_navOrig[kNavCount] = {};              // the byte before TruMenu's first write (nav.off writes it back)
+bool g_navSaved[kNavCount] = {};
+DWORD g_navMaskPrev = 0;                     // nav.mask 1: the mask before (nav.mask 0 / nav.off restore it)
+bool g_navMaskSet = false;
+bool g_navAutoDone = false, g_navAutoWaitLogged = false;   // [Debug] NavDraw / NavMask: applied once
+
+const char *ShotSource(const char *item);    // 0.10.5, below: "ring", "TruLink" or the given name
+
+// switch index of the first word of text ("" / unknown = -1)
+int NavFind(const char *text) {
+    if (!text) return -1;
+    while (*text == ' ') ++text;
+    size_t len = 0;
+    while (text[len] && text[len] != ' ') ++len;
+    for (int i = 0; i < kNavCount; ++i)
+        if (strlen(kNavSwitches[i].name) == len && !_strnicmp(kNavSwitches[i].name, text, len)) return i;
+    return -1;
+}
+bool NavByteOn(int i) { return ByteAt(kNavSwitches[i].byte); }
+bool NavPutDword(DWORD address, DWORD value) {   // .data dword (writable section, no VirtualProtect)
+    __try {
+        *reinterpret_cast<volatile DWORD *>(address) = value;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+// the planner layers that hold something, tested as 0x4186bb .. 0x4186cd do (bit i of the mask, [planner + 4 * i] != 0,
+// [layer + 8] != 0); returns the bit set, the text lists the layer numbers
+DWORD NavLayers(char *o, size_t n) {
+    o[0] = 0;
+    DWORD planner = 0, bits = 0;
+    if (!ReadDword(kNavPlanner, &planner) || !planner) { Out(o, n, "no planner ([0x%08lx] = 0)", kNavPlanner); return 0; }
+    size_t used = 0;
+    for (DWORD i = 0; i < 32; ++i) {
+        DWORD layer = 0, graphs = 0;
+        if (!ReadDword(planner + 4 * i, &layer) || !layer || !ReadDword(layer + 8, &graphs) || !graphs) continue;
+        bits |= 1ul << i;
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%lu", used ? " " : "", i);
+        if (w > 0) used += static_cast<size_t>(w);
+    }
+    if (!bits) Out(o, n, "none");
+    return bits;
+}
+// NavPower system state [[0x8c0f0c]+0x10] (1 = started: the frame loop runs the draw functions), -1 = not readable
+long NavState() {
+    DWORD sys = 0, state = 0;
+    if (!ReadDword(kNavSystem, &sys) || !sys || !ReadDword(sys + 0x10, &state)) return -1;
+    return static_cast<long>(state);
+}
+
+// the world guard of every write: a loaded level (player, main state 1, no level change pending - never while
+// loading, as instance.spawn) and the draw bridge set up (CDCRenderer, NavPower line buffer)
+bool NavWorldReady(char *why, size_t n) {
+    DWORD state = 0, renderer = 0, vtable = 0, buffer = 0;
+    if (!InLevel()) { Out(why, n, "needs a level (no player instance)"); return false; }
+    if (!g_mainStateOk) { Out(why, n, "main state code (0.3 check) failed - loading cannot be told apart"); return false; }
+    ReadDword(kMainState, &state);
+    if (state != 1) { Out(why, n, "in a loaded level only (main state %lu, needs 1)", state); return false; }
+    if (LevelChangePending(why, n)) return false;
+    if (!ReadDword(kNavRenderer, &renderer) || !renderer || !ReadDword(renderer, &vtable) || vtable != kNavRendererVtbl) {
+        Out(why, n, "CDCRenderer [0x%08lx] = 0x%08lx, vtable 0x%08lx (want 0x%08lx) - the draw bridge is not set up",
+            kNavRenderer, renderer, vtable, kNavRendererVtbl);
+        return false;
+    }
+    if (!ReadDword(kNavLineBuffer, &buffer) || !buffer) {
+        Out(why, n, "NavPower line buffer [0x%08lx] = 0 - NavPower not started", kNavLineBuffer);
+        return false;
+    }
+    return true;
+}
+
+// the setting object still pairs this name and this byte (its static initialiser ran, nothing moved it)
+bool NavObjectOk(int i, char *why, size_t n) {
+    const NavSwitch &s = kNavSwitches[i];
+    DWORD vtable = 0, name = 0, ptr = 0;
+    char text[48];
+    ReadDword(s.object, &vtable);
+    ReadDword(s.object + 0xc, &name);
+    ReadDword(s.object + 0x10, &ptr);
+    ReadString(s.nameAt, text, sizeof(text));
+    if (vtable == kNavSettingVtbl && name == s.nameAt && ptr == s.byte && strcmp(text, s.name) == 0) return true;
+    Out(why, n, "setting object 0x%08lx: vtable 0x%08lx, name 0x%08lx '%s', byte 0x%08lx (want 0x%08lx, 0x%08lx '%s', "
+        "0x%08lx)", s.object, vtable, name, text, ptr, kNavSettingVtbl, s.nameAt, s.name, s.byte);
+    return false;
+}
+
+// common gate of nav.draw / nav.mask / nav.off (as CheatGate: INI, experimental, pre-check, level)
+bool NavGate(char *o, size_t n) {
+    if (!g_debugEnabled) { Out(o, n, "debug drawing off ([Debug] Enabled=0)"); return false; }
+    if (!g_experimental) { Out(o, n, "experimental actions off ([Cheat] Experimental=0)"); return false; }
+    if (!g_navCoreOk) { Out(o, n, "disabled: pre-check failed (%s)", g_navCoreWhy); return false; }
+    char why[200];
+    if (!NavWorldReady(why, sizeof(why))) { Out(o, n, "refused: %s", why); return false; }
+    return true;
+}
+
+// switch i to on / off (gate passed); one TruMenu.log line "nav.draw <name> <0|1> ..." per call
+bool NavSet(int i, bool on, const char *src, char *o, size_t n) {
+    const NavSwitch &s = kNavSwitches[i];
+    char why[240];
+    if (!g_navSwOk[i]) {
+        Out(o, n, "disabled: pre-check failed (%s)", g_navSwWhy[i]);
+        Log(1, "nav.draw %s %d refused - %s (src=%s)", s.name, on ? 1 : 0, o, src);
+        return false;
+    }
+    if (!NavObjectOk(i, why, sizeof(why))) {
+        Out(o, n, "refused: %s", why);
+        Log(1, "nav.draw %s %d refused - %s (src=%s)", s.name, on ? 1 : 0, o, src);
+        return false;
+    }
+    BYTE before = 0, after = 0;
+    bool read = ReadByte(s.byte, &before);
+    if (read && !g_navSaved[i]) { g_navOrig[i] = before; g_navSaved[i] = true; }
+    if (!read || !PutByte(s.byte, on ? 1 : 0) || !ReadByte(s.byte, &after)) {
+        Out(o, n, "write to 0x%08lx failed", s.byte);
+        Log(1, "nav.draw %s %d failed - %s (src=%s)", s.name, on ? 1 : 0, o, src);
+        return false;
+    }
+    DWORD mask = 0;
+    ReadDword(kNavMask, &mask);
+    char layers[120];
+    DWORD bits = NavLayers(layers, sizeof(layers));
+    const char *note = "";
+    if (on && s.kind == 1 && !NavByteOn(0) && !NavByteOn(1))
+        note = " - draws only together with planner_areas / planner_areas_solid (the area loop of 0x418680 runs only then)";
+    else if (on && s.kind <= 1 && !mask)
+        note = " - layer mask [0x88e454] = 0: the planner draws nothing (nav.mask 1)";
+    else if (on && s.kind <= 1 && bits && !(mask & bits))
+        note = " - no layer that holds a navgraph is in the layer mask (nav.mask 1)";
+    Log(1, "nav.draw %s %d (byte 0x%08lx %u -> %u; %s; mask [0x%08lx] = 0x%08lx, layers %s (0x%08lx), NavPower state %ld; "
+           "src=%s)%s", s.name, on ? 1 : 0, s.byte, before, after, s.draws, kNavMask, mask, layers, bits, NavState(), src,
+        note);
+    Out(o, n, "nav.draw %s %d (%s; byte 0x%08lx %u -> %u, mask 0x%08lx, layers %s)%s", s.name, on ? 1 : 0, s.draws, s.byte,
+        before, after, mask, layers, note);
+    return after == (on ? 1 : 0);
+}
+
+// nav.mask on / off (gate passed): on = kNavMaskAll (the value before is kept), off = the value before - only when the
+// mask still holds TruMenu's value (else the game wrote it meanwhile and it stays)
+bool NavMaskApply(bool on, const char *src, char *o, size_t n) {
+    if (!g_navMaskOk) {
+        Out(o, n, "disabled: pre-check failed (%s)", g_navMaskWhy);
+        Log(1, "nav.mask %d refused - %s (src=%s)", on ? 1 : 0, o, src);
+        return false;
+    }
+    DWORD before = 0, after = 0;
+    if (!ReadDword(kNavMask, &before)) { Out(o, n, "mask 0x%08lx not readable", kNavMask); return false; }
+    const char *what = "";
+    bool ok = true;
+    if (on) {
+        if (!g_navMaskSet) g_navMaskPrev = before;
+        ok = NavPutDword(kNavMask, kNavMaskAll);
+        if (ok) g_navMaskSet = true;
+        what = ok ? "every layer" : "write failed";
+    } else if (!g_navMaskSet) {
+        what = "TruMenu has not changed it - left as is";
+    } else if (before != kNavMaskAll) {
+        what = "changed by the game since nav.mask 1 - left as is";
+        g_navMaskSet = false;
+    } else {
+        ok = NavPutDword(kNavMask, g_navMaskPrev);
+        what = ok ? "the value before" : "write failed";
+        if (ok) g_navMaskSet = false;
+    }
+    ReadDword(kNavMask, &after);
+    char layers[120];
+    DWORD bits = NavLayers(layers, sizeof(layers));
+    Log(1, "nav.mask %d ([0x%08lx] 0x%08lx -> 0x%08lx: %s; layers %s (0x%08lx), NavPower state %ld; src=%s)", on ? 1 : 0,
+        kNavMask, before, after, what, layers, bits, NavState(), src);
+    Out(o, n, "nav.mask %d (0x%08lx -> 0x%08lx: %s; layers %s)", on ? 1 : 0, before, after, what, layers);
+    return ok;
+}
+
+void ValNavDraw(char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < kNavCount; ++i) {
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s %d%s%s", i ? ", " : "", kNavSwitches[i].name,
+                            NavByteOn(i) ? 1 : 0, g_navSwOk[i] ? "" : " (disabled: ", g_navSwOk[i] ? "" : g_navSwWhy[i]);
+        if (w > 0) used += static_cast<size_t>(w);
+        if (!g_navSwOk[i] && used + 1 < n) {
+            w = _snprintf_s(o + used, n - used, _TRUNCATE, ")");
+            if (w > 0) used += static_cast<size_t>(w);
+        }
+    }
+}
+bool RunNavDraw(const char *arg, char *o, size_t n) {
+    const char *src = ShotSource("menu");
+    char buf[96];
+    strncpy_s(buf, sizeof(buf), arg ? arg : "", _TRUNCATE);
+    char *context = nullptr;
+    char *name = strtok_s(buf, " ", &context);
+    char *value = name ? strtok_s(nullptr, " ", &context) : nullptr;
+    if (!name) {
+        char now[600];
+        ValNavDraw(now, sizeof(now));
+        Out(o, n, "usage: nav.draw <switch> [0|1] (no 0 / 1 = flip); now: %s", now);
+        return false;
+    }
+    int i = NavFind(name);
+    if (i < 0) {
+        Out(o, n, "unknown switch '%s' (planner_areas, planner_areas_solid, planner_connectivity, planner_area_normals, "
+            "obstacles, recent_navprobes, draw_mover3d_path)", name);
+        return false;
+    }
+    bool on = BoolArg(value ? value : "", NavByteOn(i));
+    if (!NavGate(o, n)) {
+        Log(1, "nav.draw %s %d refused - %s (src=%s)", kNavSwitches[i].name, on ? 1 : 0, o, src);
+        return false;
+    }
+    return NavSet(i, on, src, o, n);
+}
+
+void ValNavMask(char *o, size_t n) {
+    DWORD mask = 0;
+    bool read = ReadDword(kNavMask, &mask);
+    Out(o, n, "%d (layer mask [0x%08lx] = %s0x%08lx, %s)", g_navMaskSet ? 1 : 0, kNavMask, read ? "" : "unreadable ", mask,
+        g_navMaskSet ? "set by nav.mask 1" : "the game's");
+}
+bool RunNavMask(const char *arg, char *o, size_t n) {
+    const char *src = ShotSource("menu");
+    bool on = BoolArg(arg, g_navMaskSet);
+    if (!NavGate(o, n)) {
+        Log(1, "nav.mask %d refused - %s (src=%s)", on ? 1 : 0, o, src);
+        return false;
+    }
+    return NavMaskApply(on, src, o, n);
+}
+
+// nav.off: every switch TruMenu wrote back to the value before its first write, then the mask
+bool RunNavOff(const char *, char *o, size_t n) {
+    const char *src = ShotSource("menu");
+    if (!NavGate(o, n)) {
+        Log(1, "nav.off refused - %s (src=%s)", o, src);
+        return false;
+    }
+    int restored = 0, failed = 0;
+    char names[200] = "";
+    size_t used = 0;
+    for (int i = 0; i < kNavCount; ++i) {
+        if (!g_navSaved[i]) continue;
+        BYTE now = 0;
+        if (ReadByte(kNavSwitches[i].byte, &now) && now != g_navOrig[i]) {
+            if (PutByte(kNavSwitches[i].byte, g_navOrig[i])) {
+                ++restored;
+                int w = _snprintf_s(names + used, sizeof(names) - used, _TRUNCATE, "%s%s", used ? " " : "",
+                                    kNavSwitches[i].name);
+                if (w > 0) used += static_cast<size_t>(w);
+            } else {
+                ++failed;
+            }
+        }
+        g_navSaved[i] = false;
+    }
+    char mask[220] = "mask: not changed by TruMenu";
+    if (g_navMaskSet && !NavMaskApply(false, src, mask, sizeof(mask))) ++failed;
+    Log(1, "nav.off: %d switch(es) back to the value before (%s), %d failed; %s (src=%s)", restored,
+        restored ? names : "-", failed, mask, src);
+    Out(o, n, "nav.off: %d switch(es) back (%s), %d failed; %s", restored, restored ? names : "-", failed, mask);
+    return failed == 0;
+}
+
+// nav.status: read-only, any time
+void ValNavStatus(char *o, size_t n) {
+    DWORD renderer = 0, vtable = 0, buffer = 0, mask = 0;
+    ReadDword(kNavRenderer, &renderer);
+    if (renderer) ReadDword(renderer, &vtable);
+    ReadDword(kNavLineBuffer, &buffer);
+    ReadDword(kNavMask, &mask);
+    char layers[120], draws[600];
+    DWORD bits = NavLayers(layers, sizeof(layers));
+    ValNavDraw(draws, sizeof(draws));
+    Out(o, n, "[Debug] Enabled %d; draw path %s, layer mask code %s; CDCRenderer [0x%08lx] 0x%08lx (vtable 0x%08lx%s), "
+        "line buffer [0x%08lx] 0x%08lx, NavPower state %ld; mask 0x%08lx (%s), layers %s (0x%08lx); %s", g_debugEnabled,
+        g_navCoreWhy, g_navMaskWhy, kNavRenderer, renderer, vtable, vtable == kNavRendererVtbl ? " ok" : " - not set up",
+        kNavLineBuffer, buffer, NavState(), mask, g_navMaskSet ? "set by nav.mask 1" : "the game's", layers, bits, draws);
+}
+
+// ring: why a nav.* entry is greyed out right now ("" = usable); arg = the entry's argument (nav.draw <switch>)
+const char *NavRadWhy(const char *id, const char *arg) {
+    if (!_stricmp(id, "nav.status")) return "";
+    if (!g_debugEnabled) return "debug drawing off ([Debug] Enabled=0)";
+    if (!g_experimental) return "experimental off ([Cheat] Experimental=0)";
+    if (!g_navCoreOk) return g_navCoreWhy;
+    if (!_stricmp(id, "nav.mask") && !g_navMaskOk) return g_navMaskWhy;
+    if (!_stricmp(id, "nav.draw")) {
+        int i = NavFind(arg);
+        if (i < 0) return "unknown NavPower switch";
+        if (!g_navSwOk[i]) return g_navSwWhy[i];
+    }
+    if (!InLevel()) return "needs a level";
+    DWORD state = 0;
+    if (g_mainStateOk && ReadDword(kMainState, &state) && state != 1) return "not while loading (main state is not 1)";
+    return "";
+}
+
+// load: the byte checks of precheck_012.txt; a failed check disables that switch (or all) with the reason
+void NavCheck() {
+    bool renderer = HexBytesAt(0x0048a95f, "c70024528400 a33c0f8c00") && HexBytesAt(kNavRendererVtbl, "00a54800");
+    bool frame = HexBytesAt(0x005da141, "e81afbeaff") && HexBytesAt(0x00489c68, "e9935cfaff") &&
+                 HexBytesAt(0x0042f98a, "a10c0f8c00 83781001");
+    bool planner = HexBytesAt(0x004211ad, "6870884100") &&
+                   HexBytesAt(0x00418870, "8b0d10f38b00 e805feffff e810eefeff 803d09f38b0000 7428");
+    g_navCoreOk = renderer && frame && planner;
+    g_navCoreWhy = !renderer ? "CDCRenderer creation 0x48a95f / vtable slot 0 0x845224 differ"
+                 : !frame ? "NavPower frame draw 0x5da141 / 0x489c68 / component loop 0x42f98a differ"
+                 : !planner ? "planner draw registration 0x4211ad / frame draw 0x418870 differ" : "ok";
+    bool reads = HexBytesAt(0x0041868f, "833d54e4880000 0f84b8000000 803de5f28b0000 7509 803de6f28b0000 7472") &&
+                 HexBytesAt(0x004186bb, "8b0d54e48800 85c1 7416") && HexBytesAt(0x004186d3, "e878e0ffff") &&
+                 HexBytesAt(0x004186f4, "8b3d54e48800") && HexBytesAt(0x0041873e, "a154e48800");
+    bool writer = HexBytesAt(0x0048aa23, "891554e48800");
+    DWORD mask = 0;
+    bool maskRead = ReadDword(kNavMask, &mask);
+    g_navMaskOk = g_navCoreOk && reads && writer && maskRead;
+    g_navMaskWhy = !g_navCoreOk ? g_navCoreWhy : !reads ? "planner draw 0x418680 mask / area tests differ"
+                 : !writer ? "mask writer 0x48aa23 differs" : !maskRead ? "mask 0x88e454 not readable" : "ok";
+    g_navAreaOk = HexBytesAt(0x004167a4, "e8a7caffff") && HexBytesAt(0x004132d2, "e8c990ffff");
+    int ok = 0;
+    for (int i = 0; i < kNavCount; ++i) {
+        const NavSwitch &s = kNavSwitches[i];
+        bool bytes = true;
+        for (const NavCheckBytes &c : s.checks)
+            if (c.hex && !HexBytesAt(c.at, c.hex)) bytes = false;
+        BYTE v = 0;
+        bool readable = ReadByte(s.byte, &v);
+        bool chain = s.kind == 2 || (g_navMaskOk && g_navAreaOk);
+        g_navSwOk[i] = g_navCoreOk && bytes && readable && chain;
+        g_navSwWhy[i] = !g_navCoreOk ? g_navCoreWhy : !bytes ? "its reader / initialiser bytes differ (precheck_012.txt)"
+                      : !readable ? "switch byte not readable"
+                      : !chain ? (g_navMaskOk ? "area chain 0x4167a4 / 0x4132d2 differs" : g_navMaskWhy) : "ok";
+        if (g_navSwOk[i]) ++ok;
+        else Log(0, "0.12 debug drawing: nav.draw %s disabled - %s", s.name, g_navSwWhy[i]);
+    }
+    if (!g_navMaskOk) Log(0, "0.12 debug drawing: nav.mask disabled - %s", g_navMaskWhy);
+    char auto_[300];
+    _snprintf_s(auto_, sizeof(auto_), _TRUNCATE, "%s", g_navAuto[0] ? g_navAuto : "-");
+    Log(1, "0.12 debug drawing: [Debug] Enabled %d (NavDraw %s, NavMask %d), draw path %s, layer mask %s (0x%08lx now), "
+           "%d / %d switches ok", g_debugEnabled, auto_, g_navAutoMask, g_navCoreWhy, g_navMaskWhy, mask, ok, kNavCount);
+}
+
+// game thread, once per game frame: [Debug] NavDraw / NavMask applied once in the first loaded level
+void NavTick() {
+    if (g_navAutoDone || !g_debugEnabled || (!g_navAuto[0] && !g_navAutoMask)) return;
+    char why[240];
+    if (!g_experimental || !g_navCoreOk) {
+        g_navAutoDone = true;
+        Log(0, "nav: [Debug] NavDraw / NavMask not applied - %s",
+            !g_experimental ? "experimental actions off ([Cheat] Experimental=0)" : g_navCoreWhy);
+        return;
+    }
+    if (!NavWorldReady(why, sizeof(why))) {
+        if (InLevel() && !g_navAutoWaitLogged) {
+            g_navAutoWaitLogged = true;
+            Log(1, "nav: [Debug] NavDraw / NavMask wait - %s", why);
+        }
+        return;
+    }
+    g_navAutoDone = true;
+    char copy[sizeof(g_navAuto)], answer[600];
+    strncpy_s(copy, sizeof(copy), g_navAuto, _TRUNCATE);
+    char *context = nullptr;
+    int done = 0, failed = 0;
+    for (char *name = strtok_s(copy, ", ", &context); name; name = strtok_s(nullptr, ", ", &context)) {
+        int i = NavFind(name);
+        if (i < 0) {
+            ++failed;
+            Log(0, "nav: [Debug] NavDraw: unknown switch '%s'", name);
+            continue;
+        }
+        if (NavSet(i, true, "[Debug] NavDraw", answer, sizeof(answer))) ++done;
+        else ++failed;
+    }
+    if (g_navAutoMask) {
+        if (NavMaskApply(true, "[Debug] NavMask", answer, sizeof(answer))) ++done;
+        else ++failed;
+    }
+    Log(1, "nav: [Debug] NavDraw / NavMask applied in the first loaded level: %d ok, %d failed", done, failed);
+}
+
 // ---- favourites: [Favorites] Ids in TruMenu.ini (comma list of item ids; empty = kFavDefault) ----
 bool ItemUsable(const char *id);         // defined after kItems: id exists and is not a todo item
 
@@ -8733,6 +9183,16 @@ const Item kItems[] = {
                               "shot)", false, ValFlowStatus, RunFlowResult},
     {"flow.reload", "action", "0.11: read the flow file again (every step and counter starts anew)", false, ValFlowStatus,
      RunFlowReload},
+    // 0.12 Debug-Zeichnung ([Debug] Enabled; the NavPower debug switches of tru.exe - data bytes only, a loaded level)
+    {"nav.status", "info", "0.12: NavPower debug drawing - [Debug], checks, CDCRenderer / line buffer / NavPower state, "
+                           "layer mask, layers, every switch", false, ValNavStatus, nullptr},
+    {"nav.draw", "action", "0.12 <switch> [0|1]: one NavPower debug switch - planner_areas, planner_areas_solid, "
+                           "planner_connectivity, planner_area_normals, obstacles, recent_navprobes, draw_mover3d_path "
+                           "(no 0 / 1 = flip)", false, ValNavDraw, RunNavDraw},
+    {"nav.mask", "bool", "0.12: planner layer mask [0x88e454] = 0xffffffff (every layer drawn); 0 = the value before",
+     false, ValNavMask, RunNavMask},
+    {"nav.off", "action", "0.12: every NavPower switch TruMenu set and the layer mask back to the values before", false,
+     ValNavDraw, RunNavOff},
 };
 
 const Item *FindItem(const char *id) {
@@ -10513,6 +10973,10 @@ const char *RadialWhy(const RadItem &e) {
         return "health code not verified";
     if (!_stricmp(id, "time.scale") && !g_timeOk) return "time code not verified";
     if (!_stricmp(id, "time.pause") && !g_pauseOk) return "pause code not verified";
+    if (!_strnicmp(id, "nav.", 4)) {         // 0.12 Debug-Zeichnung: [Debug] Enabled, byte checks, a loaded level
+        const char *navWhy = NavRadWhy(id, e.arg);
+        if (navWhy[0]) return navWhy;
+    }
     const Item *item = FindItem(id);
     if (((item && item->gameThread) || !_stricmp(id, "time.scale")) && !g_experimental)
         return "experimental off ([Cheat] Experimental=0)";
@@ -10535,7 +10999,12 @@ const char *RadialWhy(const RadItem &e) {
 // bool item without an argument: its value is "on"
 bool RadialOn(const RadItem &e, bool *isBool) {
     if (e.special == kRadSpecialVirt && e.vkind == kRaToggle) { *isBool = true; return e.von != 0; }   // 0.10.1 Schalter
-    *isBool = e.child < 0 && !e.special && !e.bad[0] && !e.arg[0] && CmdKindOf(e.id) == kCkBool;
+    // 0.12: "nav.draw <switch>" (one word) shows on / off of that NavPower switch byte; RadialRun adds the target state
+    if (e.child < 0 && !e.special && !e.bad[0] && e.arg[0] && !strchr(e.arg, ' ') && !_stricmp(e.id, "nav.draw")) {
+        int nav = NavFind(e.arg);
+        if (nav >= 0) { *isBool = true; return NavByteOn(nav); }
+    }
+    *isBool =e.child < 0 && !e.special && !e.bad[0] && !e.arg[0] && CmdKindOf(e.id) == kCkBool;
     if (!*isBool) return false;
     char v[64];
     CmdValue(e.id, v, sizeof(v));
@@ -10551,7 +11020,9 @@ void RadialRun(const RadItem &e) {
     strncpy_s(arg, sizeof(arg), e.arg, _TRUNCATE);
     bool isBool = false;
     bool on = RadialOn(e, &isBool);
-    if (isBool) strncpy_s(arg, sizeof(arg), on ? "0" : "1", _TRUNCATE);   // the target state (0.8.1: no "" = flip)
+    if (isBool && e.arg[0])                  // 0.12: nav.draw <switch> -> "<switch> 0|1"
+        _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%s %s", e.arg, on ? "0" : "1");
+    else if (isBool) strncpy_s(arg, sizeof(arg), on ? "0" : "1", _TRUNCATE);   // the target state (0.8.1: no "" = flip)
     g_radRunning = true;                     // 0.10.5: src=ring in shot / claude.mark lines
     const char *answer = InvokeCore(e.id, arg, false);
     g_radRunning = false;
@@ -13437,6 +13908,9 @@ void ReadOptions(const char *dir) {
     g_cheatsEnabled = OptInt(ini, "Cheats", "Enabled") != 0;
     g_cheatPersist = OptInt(ini, "Cheats", "Persist") != 0;
     OptString(ini, "Cheats", "State", g_cheatState, sizeof(g_cheatState));
+    g_debugEnabled = OptInt(ini, "Debug", "Enabled") != 0 ? 1 : 0;                  // 0.12 Debug-Zeichnung
+    g_navAutoMask = OptInt(ini, "Debug", "NavMask") != 0 ? 1 : 0;
+    OptString(ini, "Debug", "NavDraw", g_navAuto, sizeof(g_navAuto));
     InterlockedExchange(&g_cameraChanges, OptInt(ini, "Log", "CameraChanges") ? 1 : 0);
     OptString(ini, "Regress", "List", g_regressStart, sizeof(g_regressStart));
     InterlockedExchange(&g_inputTrace, OptInt(ini, "Log", "InputTrace") ? 1 : 0);   // 0.8.1
@@ -13667,6 +14141,7 @@ void Start(HMODULE self) {
         g_pendingOk ? 1 : 0, g_outfitRuleOk && g_outfitRule ? 1 : 0, g_outfitRule, kQuitExitCode);
     // 0.8: cheats (each row its own check), camera log (manager process -> chooser, mode fields), regression lists
     CheatsCheck();
+    NavCheck();                               // 0.12 Debug-Zeichnung: NavPower switches (precheck_012.txt)
     g_camLogOk = HexBytesAt(0x005f3e0c, "b9f004e800 e85afeffff") && HexBytesAt(0x005f3d12, "8bce d91c24 e8c442ffff") &&
                  HexBytesAt(0x005e7feb, "8bf1") && HexBytesAt(0x005e8041, "8b4658 83f801") &&
                  HexBytesAt(0x005e80b9, "c7465834000000") && HexBytesAt(0x005e80da, "8b7e58 397e54 7465") &&

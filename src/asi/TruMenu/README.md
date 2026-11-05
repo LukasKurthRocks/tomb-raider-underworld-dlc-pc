@@ -1277,6 +1277,109 @@ no new hook / patch / write, one new byte pre-check (0x75aa69); `tools/trumenu_i
 items, the flow entries in the level Claude); `selftest/TruFlowCoreTest.cpp` + the workbench test compare the C++
 parser / matcher with the PowerShell parser and .NET Regex.
 
+## TruMenu 0.12 "Debug-Zeichnung" (NavPower debug drawing, debug view stage S0)
+
+Built into `work\asi\menu012`; compiled, offline checks only - **not yet seen in the game**. Owner notes (German):
+`<workspace>\docs\Befund-Debug-Ansicht-0511.md` section 1.1 (the research) and `<workspace>\docs\Befund-TruMenu-Debug-0511.md`
+(this build). Everything is off without `[Debug] Enabled=1`; the ring entries are greyed then.
+
+**What it switches.** The Steam `tru.exe` contains the complete debug drawing of the NavPower ("BabelFlux", `bfx`)
+middleware: 39 `BoolSetting` objects (vtable 0x841144, `tools/bfx_settings_dump.py`), each pointing at one switch byte in
+`.bss` (0 in retail; `tools/pe_abs_uses.py`: no instruction writes them). Every game frame 0x5da141 -> 0x489c60 ->
+`jmp 0x42f900` runs the draw function of every NavPower component while `[[0x8c0f0c]+0x10] == 1`; the planner's
+(0x418870, registered at 0x4211ad) calls the planner draw 0x418680 and the obstacle draw 0x407690 and draws the recent
+navprobes. Lines go through Crystal's renderer bridge `CDCRenderer` (vtable 0x845224, object `[0x8c0f3c]`) slot 0
+0x48a500 -> `DRAW_DrawLines` 0x5bfcd0. TruMenu only writes those data bytes (and the layer mask below) - **no game code
+is changed, no new hook**. Middleware text goes to the empty stub 0x6457a0 (invisible), so only line switches are offered:
+
+| Switch (`nav.draw <name>`) | Byte | Reader(s) | Draws | Note |
+|---|---|---|---|---|
+| `planner_areas` | 0x8bf2e5 | 0x41869c, 0x40c3a0 | navmesh areas, outline | drives the per-area loop |
+| `planner_areas_solid` | 0x8bf2e6 | 0x4186a5, 0x40c3ba, 0x40c68d | navmesh areas, filled | drives the per-area loop; cost unknown |
+| `planner_connectivity` | 0x8bf2e7 | 0x40c8bb | a line from each area to each neighbour | **only with `planner_areas` or `_solid` on** |
+| `planner_area_normals` | 0x8bf2ec | 0x40c7c8 | the normal of each area | **only with `planner_areas` or `_solid` on** |
+| `obstacles` | 0x8bf308 | 0x407690 | dynamic obstacles (list `[0x8bf2f8]`) | own path |
+| `recent_navprobes` | 0x8bf309 | 0x418880, 0x420583, 0x4205bf | the latest navmesh probes of the AI | the probe query 0x420580 records each probe while on (one extra call 0x41b4b0 in the query path) |
+| `draw_mover3d_path` | 0x8bf006 | 0x40432d | the path of each Mover3D | flyers only (list `[0x8bf00c]`, component 4) - probably empty in the Yggdrasil units |
+
+Why connectivity / normals need the areas: 0x418680 jumps over the whole per-layer loop (0x416750 -> 0x413250 -> per area
+0x40c3a0) unless `planner_areas` or `planner_areas_solid` is set; both are read only inside 0x40c3a0. The answer and the log
+line say so.
+
+**Layer mask `[0x88e454]`** (dword, `.data`, file value 0xffffffff; 5 references in the exe: 4 reads in 0x418680, the only
+writer 0x48aa23 in the CDC init, which sets `(1 << n) | (1 << (n + 16))`, n = `[0xa03590]`). The planner draws nothing when
+it is 0 and layer i (of 32) only when bit i is set. `nav.mask 1` writes the file value 0xffffffff (every layer) and keeps
+the value before; `nav.mask 0` / `nav.off` write that value back - unless the game changed the mask meanwhile (then it
+stays). The mask is used by nothing but the draw function. `nav.status` lists the layers that hold something (tested as
+0x4186bb .. 0x4186cd: bit i, `[[0x8bf310] + 4i] != 0`, `[layer + 8] != 0`), so a missing drawing can be told apart from a
+mask that leaves the navmesh layers out.
+
+### Items (TruLink `menu <id> [arg]`, command bar)
+
+| Item | Meaning |
+|---|---|
+| `nav.draw <switch> [0\|1]` | one switch; no 0 / 1 = flip; no switch = usage + every state |
+| `nav.mask [0\|1]` | bool: layer mask = 0xffffffff / the value before |
+| `nav.off` | every switch TruMenu wrote back to the value before its first write (0 in retail), then the mask |
+| `nav.status` | read-only, any time: `[Debug]`, check results, CDCRenderer / line buffer / NavPower state, mask, layers, every switch |
+
+Guards of every write (as `CheatGate` + `instance.spawn`): `[Debug] Enabled=1`, `[Cheat] Experimental=1`, the byte
+checks below, a player instance, main state `[0xe7ed60]` = 1, no level change pending (`GameTracker+0xb9`, main state 2 /
+9) - never while loading -, `[0x8c0f3c]` = an object with vtable 0x845224, line buffer `[0x8c0f48]` != 0; per switch at
+run time the setting object still pairs name and byte (`[obj]` = 0x841144, `[obj+0xc]` = the name string, the string itself,
+`[obj+0x10]` = the byte). The items run on the calling thread (one byte / dword write each; no game function is called).
+
+### Ring level `Spieler/Debug` (TruMenu.radial.txt)
+
+Page 1: Navmesh Flaechen, Navmesh gefuellt, Navmesh Verbindungen, Hindernisse, Nav-Proben, Laufweg (Flieger), Alle Ebenen
+(`nav.mask`), Alles aus (`nav.off`); page 2 (RB): Flaechen-Normalen, Debug: Stand (`nav.status`). Each switch shows on /
+off: an entry `nav.draw <switch>` (one word) is treated as a bool of that switch byte, the ring sends
+`nav.draw <switch> 0|1`. Below `Spieler` so the top level keeps its 8 sectors (as `Spieler/Objekte` in 0.10.5).
+
+### `TruMenu.log` lines
+
+```text
+0.12 debug drawing: [Debug] Enabled <0|1> (NavDraw <list|->, NavMask <0|1>), draw path ok, layer mask ok (0x<mask> now), 7 / 7 switches ok
+nav.draw <switch> <0|1> (byte 0x<addr> <before> -> <after>; <what it draws>; mask [0x0088e454] = 0x<mask>, layers <n n ..|none|no planner> (0x<bits>), NavPower state <s>; src=<ring|menu|TruLink|[Debug] NavDraw>)[ - <note>]
+nav.draw <switch> <0|1> refused - <reason> (src=...)
+nav.mask <0|1> ([0x0088e454] 0x<before> -> 0x<after>: <every layer|the value before|...>; layers ...; src=...)
+nav.off: <n> switch(es) back to the value before (<names>|-), <n> failed; <mask answer> (src=...)
+nav: [Debug] NavDraw / NavMask applied in the first loaded level: <n> ok, <n> failed
+```
+
+Notes after `nav.draw`: `draws only together with planner_areas / planner_areas_solid ...`, `layer mask [0x88e454] = 0:
+the planner draws nothing (nav.mask 1)`, `no layer that holds a navgraph is in the layer mask (nav.mask 1)`.
+
+### Keys, checks
+
+| Key | Default | Meaning |
+|---|---|---|
+| `[Debug] Enabled` | `0` | 1 = the nav items may write (ring entries usable) |
+| `[Debug] NavDraw` | (empty) | comma list of switches turned on once in the first loaded level (game thread, same guards) |
+| `[Debug] NavMask` | `0` | 1 = with NavDraw also `nav.mask 1` |
+
+**Byte checks** (`NavCheck` at load; pinned in `work\asi\menu012\precheck_012.txt`, `tools/pe_bytes_check.py` on the Steam
+exe: 33 / 33 ok; `tools/trumenu_precheck_match.py`: the 33 lines = the 33 checks in the source section): the draw path
+(CDCRenderer creation 0x48a95f, vtable slot 0, frame calls 0x5da141 / 0x489c68, component loop 0x42f98a, planner
+registration 0x4211ad, planner frame draw 0x418870), the mask (its 4 reads + its only writer 0x48aa23), the area chain
+(0x4167a4, 0x4132d2), per switch its readers and the static initialiser that stores name and byte into the setting object
+(e.g. 0x83098e `c7053cf48b0000268400 c70540f48b00e5f28b00` for `planner_areas`). A failed check greys that switch (or all
+of them) with the reason; one log line per disabled switch.
+
+Offline checks: `/W4` 0 warnings in `TruMenu.cpp`; `tools/pe_import_export_diff.py` 0.11 vs 0.12: imports and exports
+unchanged; `tools/src_hook_sites_diff.py`: no new hook, patch or VirtualProtect, 1 new raw store (the mask dword), 11 new
+byte pre-check lines (= the 33 checks, the table rows run in one loop); `tools/trumenu_ini_check.py` (`[Debug]` values, the
+nav items, the nav entries of the radial file: `nav.draw` one switch name of `kNavSwitches`, the others without argument).
+
+**TO TEST (0.12)** - `[Debug] Enabled=1`, `dlc_yggdrasil_hall02`:
+
+1. `TruMenu.log`: `0.12 debug drawing: ... 7 / 7 switches ok`.
+2. Ring -> Spieler -> Debug -> Navmesh Flaechen: lines on the floor = the engine drawing works on PC (log `nav.draw
+   planner_areas 1 ...`, note the layers and the mask). Nothing: Alle Ebenen, look again; still nothing = the lines do
+   not reach the screen (`DRAW_DrawLines` path) - `nav.status` into the log (Debug: Stand).
+3. With the areas on: Navmesh Verbindungen, then Nav-Proben near thralls, Hindernisse; frame rate with Navmesh gefuellt.
+4. Alles aus: everything gone, log `nav.off: n switch(es) back ...`.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
