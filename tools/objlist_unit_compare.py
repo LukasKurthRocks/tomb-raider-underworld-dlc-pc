@@ -5,8 +5,9 @@ objects (e.g. doppelganger_casual / player_tru_dlc2_extension) are listed at all
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/objlist_unit_compare.py XOBJECTLIST XOBJLIST.dat PCOBJECTLIST PCOBJLIST.dat
-        [--units SUBSTR] [--find NAME,NAME..]
+        [--units SUBSTR] [--find NAME,NAME..] [--list]
   Xbox lists big-endian (work/generic/lists/dlc_pack11_*), PC lists little-endian (mods/tr8/pc-w/*).
+  --list (with --units, TruMenu 0.10.3 light-shaft search 04.11.): also print every object name of each unit (PC list)
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,6 +16,8 @@ import objlists as OL
 
 def main(argv):
     units, find = None, []
+    listing = '--list' in argv
+    if listing: argv.remove('--list')
     if '--units' in argv:
         k = argv.index('--units'); units = argv[k + 1]; del argv[k:k + 2]
     if '--find' in argv:
@@ -42,6 +45,8 @@ def main(argv):
                 print('  only Xbox: %s' % ', '.join(sorted(xs - ps)))
             if ps - xs:
                 print('  only PC:   %s' % ', '.join(sorted(ps - xs)))
+            if listing:
+                print('  objects:   %s' % ', '.join(sorted(ps if n in pd else xs)))
 
 
 if __name__ == '__main__':

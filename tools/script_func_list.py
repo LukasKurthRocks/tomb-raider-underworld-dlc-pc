@@ -6,6 +6,11 @@ Usage (from the repository root):
   ../bin/pyt tools/script_func_list.py FILE.drm SCRIPT_ID     a PC (little-endian) DRM file, e.g. a test tree's generalbank
   optional third argument TARGET_ID: also list the relocations into script TARGET_ID (e.g. its calls); "all": every
   referenced script with its native package/name and the offsets used
+  SOURCE prefixes (also for script_members_list.py, 2026-11-04 thrall unload crash):
+    pc:NAME.drm    the PC base-game file (patch.000 first, then bigfile.000)
+    xbox:NAME.drm  the Xbox base-game file (title update first, then layer1 / layer2), big endian
+    xdisc:NAME.drm / xtu:NAME.drm  only the disc layers / only the title update
+    dlc:NAME.drm   the Xbox DLC original (convert_dlc.raw_dlc: pack10 first, TRUDLC_PACK_FIRST=pack11 for DLC 2), big endian
 """
 import sys, os, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -14,10 +19,29 @@ import menu_dlc_probe as P
 
 
 def sections(src):
-    """[(type, id, data, reloc)], endian for a probe variant or a PC DRM file"""
+    """[(type, id, data, reloc)], endian for a probe variant, a pc: / xbox: / dlc: base-game name or a PC DRM file"""
     if src in P.SRC:
         C = P.cache()
         return [(s['type'], s['id'], s['data'], s['reloc']) for s in P.secs(C, src)], P.SRC[src][1]
+    if src.split(':', 1)[0] in ('pc', 'xbox', 'dlc', 'xdisc', 'xtu') and ':' in src[:6]:
+        import dtp_word_classes as C
+        from drm import cdrm_decode, sections_with_data
+        pre, name = src.split(':', 1)
+        if pre == 'dlc':
+            import convert_dlc as CD
+            raw, _ = CD.raw_dlc(name)
+            secs = sections_with_data(cdrm_decode(raw, 'be'), 'be')[1] if raw else None
+            e = 'be'
+        elif pre == 'xbox':
+            secs = C.find(C.BASE, 'be', 'xenon-w' + C.BS + name); e = 'be'
+        elif pre == 'xdisc':       # Xbox disc version only (layer1 / layer2, without the title update)
+            secs = C.find(C.BASE[1:], 'be', 'xenon-w' + C.BS + name); e = 'be'
+        elif pre == 'xtu':         # Xbox title update only
+            secs = C.find(C.BASE[:1], 'be', 'xenon-w' + C.BS + name); e = 'be'
+        else:
+            secs = C.find(C.PC, 'le', 'pc-w' + C.BS + name); e = 'le'
+        if secs is None: sys.exit('not found: ' + src)
+        return [(s['type'], s['id'], s['data'], s['reloc']) for s in secs], e
     import drm_write as DW
     D = DW.read(open(src, 'rb').read(), 'le')
     return [(s.type, s.id, s.data, s.reloc) for s in D.sections], 'le'
