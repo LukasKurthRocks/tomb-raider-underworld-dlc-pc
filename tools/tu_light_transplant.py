@@ -390,7 +390,11 @@ def grow_params(s, vals):
         at = o + 16 * n; add = 16 * (len(vals) - n)
         # nothing of the block may be pointed at from inside [o, at) except the block start
         d[at:at] = bytes(add)
-        r.internal = [(a + add if a >= at else a, b + add if b >= at else b) for a, b in r.internal]
+        # 50m fix: with an EMPTY PC block (n == 0, e.g. effect materials 20744 / 24958: Xbox 7, PC 0) the insert point is
+        # the block start itself, and the +0x5C pointer (target == at) must stay there - before, it moved with the data
+        # behind it and pointed at the texture records (test 50l, Befund-Shader-Nacht part 2). n > 0: unchanged rule.
+        r.internal = [(a + add if a >= at else a, b + add if (b > at or (b == at and not (a == 0x5C and n == 0))) else b)
+                      for a, b in r.internal]
         r.idref = [(t, off + add if off >= at else off) for t, off in r.idref]
         r.idref_a = [(t, off + add if off >= at else off) for t, off in r.idref_a]
         if r.external: raise SystemExit('material %d has external pointers' % s.id)

@@ -21,8 +21,9 @@ Usage (from the repository root):
   ../bin/pyt -t 900 tools/tu_perlight.py oracle XB/PB[/PD] [...] [--slots 2,0,4,6,1] [--debug]   base pairs (PD defaults to PB)
   ../bin/pyt -t 3000 tools/tu_perlight.py oracle-random N SEED      N random base lit pairs, slot 2
   ../bin/pyt -t 900 tools/tu_perlight.py ldiag XB PB SLOT BIT       light term of one bool, T vs the PC lib (writes T asm)
-  ../bin/pyt -t 1800 tools/tu_perlight.py build PC.drm XBOX.drm OUTDIR --mesh 21730 --libs XID[,XID] [--donor PD]
-      like tu_light_transplant build (same plan.json / .bin layout, usable by its pack / apply / vscheck)
+  ../bin/pyt -t 1800 tools/tu_perlight.py build PC.drm XBOX.drm OUTDIR --mesh 21730 --libs XID[,XID] [--donor PD] [--mats PM,PM]
+      like tu_light_transplant build (same plan.json / .bin layout, usable by its pack / apply / vscheck);
+      --mats: only these PC materials of the mesh (one lib per sampler-map / DXN set; refused when the users differ)
 """
 import sys, os, json, struct, hashlib, collections, re
 import numpy as np
@@ -509,7 +510,7 @@ def cmd_oracle(specs, slots):
             for l in log: print('     ' + l[:300])
 
 
-def cmd_build(pcf, xf, out, mesh, ids, donor):
+def cmd_build(pcf, xf, out, mesh, ids, donor, only_mats=None):
     os.makedirs(out, exist_ok=True)
     _, Pd_ = TLT.load(pcf, 'le'); _, Xd = TLT.load(xf, 'be')
     pl, xl = TLT.mesh_mats(Pd_, mesh, 'le'), TLT.mesh_mats(Xd, mesh, 'be')
@@ -518,6 +519,19 @@ def cmd_build(pcf, xf, out, mesh, ids, donor):
     for xid in ids:
         lib = TLT.tu_lib(xid)
         mats = [(pm, xm) for pm, xm in zip(pl, xl) if struct.unpack_from('>4I', Xd[(10, xm)].data, 0x28)[2] == xid]
+        # 50l: --mats restricts the build (and so the material that apply re-points) to the given PC materials - the users
+        # of one Xbox lib can differ in which textures are DXN (2644: 26357 has DXN on PC s1 / s2, 26360 only on s1), and
+        # the DXN handling is compiled into the shader, so they need one lib each
+        if only_mats: mats = [m for m in mats if m[0] in only_mats]
+        if not mats: raise SystemExit('d%d: no material of mesh %d uses it%s' % (xid, mesh, ' (--mats %s)' % sorted(only_mats) if only_mats else ''))
+        # the materials of one build must agree on the sampler map and the DXN registers (both are compiled in)
+        def recs(pm, xm):
+            pr_, xr_ = TLT.records(Pd_[(10, pm)], 'le'), TLT.records(Xd[(10, xm)], 'be')
+            return ({x[3]: p[3] for p, x in zip(pr_, xr_)},
+                    {p[3] for p, x in zip(pr_, xr_) if (5, x[0]) in Xd and struct.unpack_from('>I', Xd[(5, x[0])].data, 4)[0] & 0x3f == 0x31})
+        r0 = recs(*mats[0])
+        for m in mats[1:]:
+            if recs(*m) != r0: raise SystemExit('d%d: materials %s and %s differ in sampler map / DXN registers %s vs %s - build them separately (--mats)' % (xid, mats[0][0], m[0], r0, recs(*m)))
         pm0, xm0 = mats[0]
         pr, xr = TLT.records(Pd_[(10, pm0)], 'le'), TLT.records(Xd[(10, xm0)], 'be')
         smap = {x[3]: p[3] for p, x in zip(pr, xr)}
@@ -565,7 +579,8 @@ def main(a):
     if a[0] == 'build':
         mesh = int(a[a.index('--mesh') + 1]); ids = [int(x) for x in a[a.index('--libs') + 1].split(',')]
         donor = int(a[a.index('--donor') + 1]) if '--donor' in a else None
-        cmd_build(a[1], a[2], a[3], mesh, ids, donor); return
+        only = {int(x) for x in a[a.index('--mats') + 1].split(',')} if '--mats' in a else None
+        cmd_build(a[1], a[2], a[3], mesh, ids, donor, only); return
     sys.exit(__doc__)
 
 
