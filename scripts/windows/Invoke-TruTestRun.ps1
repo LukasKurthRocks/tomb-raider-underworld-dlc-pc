@@ -73,7 +73,9 @@ OUTSIDE record (fatal fault outside tru.exe, TruGuard 0.4.2+) count as a crash e
     are copied to <run>\TruShots\ and summary.md gets the section "Ablauf" (step, result, time, duration, counters,
     marks with shot files) from the "flow: ..." / "claude.mark ..." lines of TruMenu.log. In the verdict an open TO
     TEST check whose id is a flow step takes that step's result, a failed flow step is a FAIL, an open one INCOMPLETE.
-    Without "flowFile" nothing of this happens (no copy, no shots, no section, the verdict as before).
+    Without "flowFile" nothing of this happens (no copy, no TruShots\, no section, the verdict as before). Independent
+    of "flowFile", every run copies the TruMenu shots of the run (shot_*.png in the [Shot] Folder, written since the
+    start) into <run>\shots\ (function Copy-TruRunShots, 05.11.).
 
     Every run writes <workspace>\logs\Invoke-TruTestRun_<time>_<mode>.log. -Verbose shows the steps, -Debug paths,
     hashes, command lines and TruLink traffic, -Trace adds a PowerShell line trace.
@@ -853,6 +855,20 @@ function Get-TruFlowShotDir {
     if (!$f) { return (Join-Path $GameFolder 'TruShots') }
     if ([IO.Path]::IsPathRooted($f)) { return $f }
     return (Join-Path $GameFolder $f)
+}
+
+function Copy-TruRunShots {
+    # every run, with or without "flowFile" (05.11.: los15 / los15e had no shots\): the TruMenu screenshots of this
+    # run (shot_*.png in the [Shot] Folder, LastWriteTime >= the run start) -> <run>\shots\; returns the number copied
+    # (0 when the folder is missing or holds no new shot - then no shots\ folder is created). Copies, never moves.
+    param([string]$ShotDir, [string]$Destination, [datetime]$Since)
+    if (!$ShotDir -or !(Test-Path -LiteralPath $ShotDir -PathType Container)) { return 0 }
+    $files = @(Get-ChildItem -LiteralPath $ShotDir -Filter 'shot_*.png' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like 'shot_*.png' -and $_.LastWriteTime -ge $Since })
+    if (!$files.Count) { return 0 }
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    foreach ($f in $files) { Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $Destination $f.Name) -Force }
+    return $files.Count
 }
 
 function Get-TruFlowResult {
@@ -1738,6 +1754,11 @@ try {
         if (Test-Path -LiteralPath $g) { Copy-Item -LiteralPath $g -Destination (Join-Path $runFolder "ini-after\$n.ini") }
     }
     if (Test-Path -LiteralPath $cdbLog) { $run.collected += 'cdb.log' }
+    # every profile: the shots of this run ([Shot] Folder of the installed TruMenu.ini, shot_*.png since the start)
+    $runShotSrc = Get-TruFlowShotDir -GameFolder $GamePath -IniPath (Join-Path $GamePath 'TruMenu.ini')
+    $runShots = Copy-TruRunShots -ShotDir $runShotSrc -Destination (Join-Path $runFolder 'shots') -Since $startTime
+    if ($runShots) { $run.collected += "shots\ ($runShots shot_*.png from $runShotSrc)" }
+    Write-Log "shots: $runShots shot_*.png collected from $runShotSrc" -Level VERBOSE
     if ($flowPlan) {
         # TruMenu 0.11 run: the shots of this run (TruMenu 0.10.5 [Shot] Folder, *.png written since the start)
         $shotSrc = Get-TruFlowShotDir -GameFolder $GamePath -IniPath (Join-Path $GamePath 'TruMenu.ini')

@@ -985,7 +985,7 @@
                         "id":  "sp-meterapi-v3",
                         "file":  "TruShadowPower.log",
                         "mode":  "present",
-                        "pattern":  "meter interface: TruShadowPowerMeterApi version 3 exported",
+                        "pattern":  "meter interface: TruShadowPowerMeterApi version [34] exported",
                         "text":  "TruShadowPower exports the meter interface version 3",
                         "min":  1,
                         "optional":  false
@@ -1065,7 +1065,7 @@
                         "id":  "sc-meter-v3",
                         "file":  "TruShadowCombat.log",
                         "mode":  "present",
-                        "pattern":  "TruShadowPower meter interface found \\(version 3",
+                        "pattern":  "TruShadowPower meter interface found \\(version [34]",
                         "text":  "TruShadowCombat uses the meter interface version 3 (gameTracker+0x1280 shared)",
                         "min":  1,
                         "optional":  false

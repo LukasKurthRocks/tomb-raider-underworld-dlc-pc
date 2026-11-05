@@ -1170,7 +1170,7 @@
                         "id":  "hud-meter",
                         "file":  "TruShadowHud.log",
                         "mode":  "present",
-                        "pattern":  "TruShadowPower meter interface found \\(version 3",
+                        "pattern":  "TruShadowPower meter interface found \\(version [34]",
                         "text":  "TruShadowHud found the meter interface (version 3)",
                         "min":  1,
                         "optional":  false
