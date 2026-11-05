@@ -7,7 +7,8 @@
              from -SourceDir (default <workspace>\work\asi) into the game folder; the Ultimate ASI Loader the game ships
              as binkw32.dll loads every *.asi there.
     -Remove  deletes them again - only if they are ours: the same SHA-256 as a TruDataGuard.asi / .ini built anywhere
-             below <workspace>\work\asi (e.g. work\asi\dataguard01); a foreign file of the same name is never
+             below <workspace>\work\asi (e.g. work\asi\dataguard02) or one of our released builds listed in
+             $earlierBuilds (0.1); a foreign file of the same name is never
              overwritten or removed. TruDataGuard.log is left in place. Nothing installed = nothing to do (no error),
              so the test harness may call -Remove for every profile.
     -Install over an earlier build of ours replaces it (update); an .ini the owner edited is not ours and is kept
@@ -22,7 +23,7 @@
     Folder with the built TruDataGuard.asi / .ini (default <workspace>\work\asi).
 
 .EXAMPLE
-    .\Set-TruDataGuard.ps1 -Install -SourceDir ..\..\work\asi\dataguard01 -Verbose
+    .\Set-TruDataGuard.ps1 -Install -SourceDir ..\..\work\asi\dataguard02 -Verbose
     .\Set-TruDataGuard.ps1 -Remove
 #>
 [CmdletBinding(DefaultParameterSetName = 'Install')]
@@ -44,6 +45,11 @@ $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $asiRoot = Join-Path $repo 'work\asi'
 $built   = if ($SourceDir) { $SourceDir } else { $asiRoot }
 $names   = 'TruDataGuard.asi', 'TruDataGuard.ini'
+# released builds of ours (SHA-256), recognised even when their output folder below work\asi is gone
+$earlierBuilds = @{
+    'TruDataGuard.asi' = @('40e29d094a56074473380a45a27b5f8d71e76c6a19f26170a7ca4a6e56c3a0d0')   # 0.1 (work\asi\dataguard01)
+    'TruDataGuard.ini' = @('0c48da5dd8e9c3bd2d78067bd1336edb23bbd2eb75a0d4befc1d70047976c28f')   # 0.1 / 0.2 sample .ini
+}
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $logFile = Join-Path $logDir ('Set-TruDataGuard_{0}_{1}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'), $PSCmdlet.ParameterSetName)
@@ -54,10 +60,10 @@ function Get-Sha256 {
     (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLower()
 }
 
-# SHA-256 of every build of ours below work\asi (all output folders), per file name
+# SHA-256 of every build of ours: the released ones in $earlierBuilds and every build below work\asi, per file name
 function Get-OwnHashes {
     param([string]$Name)
-    $hashes = @()
+    $hashes = @($earlierBuilds[$Name])
     if (Test-Path -LiteralPath $asiRoot) {
         foreach ($f in @(Get-ChildItem -LiteralPath $asiRoot -Recurse -File -Filter $Name -ErrorAction SilentlyContinue)) {
             $hashes += Get-Sha256 $f.FullName

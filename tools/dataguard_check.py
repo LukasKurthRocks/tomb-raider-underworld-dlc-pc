@@ -12,9 +12,14 @@ Usage (from the repository root):
   ../bin/pyt -t 900 tools/dataguard_check.py table DUMP [DUMP ...]
         reads the 0x8000-entry table from a full crash dump (tru_av2_full.dmp), applies the plugin's rule to every
         entry (all non-zero entries must pass = good ids) and prints the record field statistics; then replays the
-        recorded bad ids of 2026-11-02 (50d / 50e / 50f / 50h) and the faulting id of the dump's own exception.
+        recorded bad ids of 2026-11-02 (50d / 50e / 50f / 50h / 50k) and the faulting id of the dump's own exception.
+        Prints the 0.2 rule and, for comparison, the 0.1 rule (which also rejected records with refs 0).
   ../bin/pyt -t 60 tools/dataguard_check.py replay
         the recorded bad ids against the rule without a dump (out-of-range ids only need the bound).
+  ../bin/pyt -t 900 tools/dataguard_check.py hits [--exe EXE] LOG [LOG ...] [--dump DUMP ...]
+        replays every hit line of TruDataGuard.log files against the 0.1 and 0.2 rule: out-of-table ids must stay
+        rejected, the 0.1 "table entry ... is not a section record" hits of the unload callback tru+0x18bd3a must pass
+        under 0.2 (record replayed in the release state refs 0 / loading 0). --exe byte-checks that release path.
   ../bin/pyt -t 300 tools/dataguard_check.py prechecks EXE src/asi/TruDataGuard/TruDataGuard.cpp OUT.txt
         checks that the plugin's kGuardedCallers equals the TESTS callers found now and writes the plugin's byte
         checks as a list for tools/pe_bytes_check.py --file.
@@ -40,12 +45,17 @@ BAD_IDS = [
     ('50e', 0x495f0000, 0x5920f4, 'fx node id; table read gave entry 0x2104 (cmp byte [eax+4] faulted)'),
     ('50f', 0x04900000, 0x75eefe, 'state-chart parameter id 1112 with swapped u16 halves'),
     ('50h', 0x00652000, 0x5953f2, 'thrall anim event list: next record header 0020 6500 read as id'),
+    ('50k', 0x68f40000, 0x594cad, 'TruDataGuard 0.1 hit 233 (run 20261102_221539, dlc_yggdrasil_hall02): id 0x68f4 '
+                                  'with swapped u16 halves, guarded caller -> 0, no crash'),
 ]
 
 
-def rule(id_, entry, rec):
+def rule(id_, entry, rec, version=2):
     """The plugin's decision. rec = 16 bytes of the record or None (unreadable). Returns (result, reason):
-    result 'ok' (engine path), 'zero' (engine's own not-found: entry 0 or record still loading), 'reject' (guard)."""
+    result 'ok' (engine path), 'zero' (engine's own not-found: entry 0 or record still loading), 'reject' (guard).
+    version 1 = TruDataGuard 0.1 (also rejected refs 0); version 2 = 0.2: refs 0 is a legitimate state - the release
+    function tru+0x14f320 decrements refs to 0 and then calls the type pre-unload tru+0x14f200 and the type handler's
+    unload callback ([0xc57000 + type*4] vtable +8) with the entry still in the table (cleared after the free)."""
     if id_ >= COUNT:
         return 'reject', 'id out of the table (>= 0x%x)' % COUNT
     if entry == 0:
@@ -56,11 +66,16 @@ def rule(id_, entry, rec):
         return 'reject', 'record 0x%08x not readable' % entry
     refs, = struct.unpack_from('<H', rec, 0)
     loading, kind = rec[4], rec[5]
-    if refs == 0 or loading > 1 or kind > 0x7f:
+    if (version < 2 and refs == 0) or loading > 1 or kind > 0x7f:
         return 'reject', 'record 0x%08x fields refs %d loading %d type %d' % (entry, refs, loading, kind)
     if loading:
         return 'zero', 'record still loading'
     return 'ok', ''
+
+
+# the record state while the unload callback runs (release tru+0x14f320: refs already 0, loading 0, entry still set);
+# type 13 = the handler at [0xc57034] (vtable 0x84ca70, +8 = tru+0x18bd30 -> lookup, return tru+0x18bd3a)
+UNLOAD_CALLBACK_TYPE = 13
 
 
 # ---- callers ----
@@ -265,10 +280,14 @@ def cmd_table(argv):
         entries = struct.unpack('<%dI' % COUNT, raw)
         regions = memory_info(m)
         stats = {'ok': 0, 'zero': 0, 'reject': 0}
+        stats01 = {'ok': 0, 'zero': 0, 'reject': 0}
+        refs0 = 0
         lo, hi, aligns, kinds, loadings, refmax = 0xffffffff, 0, {}, {}, {}, 0
         for id_, e in enumerate(entries):
             rec = m.read(e, 16) if e else None
             res, why = rule(id_, e, rec)
+            stats01[rule(id_, e, rec, 1)[0]] += 1
+            if rec and struct.unpack_from('<H', rec, 0)[0] == 0: refs0 += 1
             if e and res == 'reject':
                 bad += 1
                 print('   GOOD ENTRY REJECTED id 0x%04x entry 0x%08x: %s' % (id_, e, why))
@@ -283,8 +302,10 @@ def cmd_table(argv):
                     refmax = max(refmax, struct.unpack_from('<H', rec, 0)[0])
         nz = COUNT - entries.count(0)
         print('   entries: %d non-zero of 0x%x; table[0] 0x%08x; range 0x%08x..0x%08x' % (nz, COUNT, entries[0], lo, hi))
-        print('   rule: ok %d, engine not-found %d (entry 0 / loading), rejected %d' % (stats['ok'], stats['zero'],
-                                                                                        stats['reject']))
+        print('   rule 0.2: ok %d, engine not-found %d (entry 0 / loading), rejected %d' % (
+            stats['ok'], stats['zero'], stats['reject']))
+        print('   rule 0.1: ok %d, engine not-found %d, rejected %d; records with refs 0 in the dump: %d' % (
+            stats01['ok'], stats01['zero'], stats01['reject'], refs0))
         print('   pointer alignment (lowest set bit, capped 0x40): %s' % ', '.join(
             '0x%x x%d' % kv for kv in sorted(aligns.items())))
         print('   +4 loading byte: %s; +5 type byte: %s; max refcount %d' % (
@@ -316,9 +337,11 @@ def replay(entries=None):
     for run, id_, ret, note in BAD_IDS:
         e = entries[id_] if entries is not None and id_ < COUNT else None
         res, why = rule(id_, e if e is not None else 0, None)
-        flag = 'ok' if res == 'reject' else 'NOT REJECTED'
-        if res != 'reject': bad += 1
-        print('     %-4s id 0x%08x caller ret 0x%08x -> %s, %s [%s] (%s)' % (run, id_, ret, res, why, flag, note))
+        res01 = rule(id_, e if e is not None else 0, None, 1)[0]
+        flag = 'ok' if res == 'reject' and res01 == 'reject' else 'NOT REJECTED'
+        if flag != 'ok': bad += 1
+        print('     %-4s id 0x%08x caller ret 0x%08x -> 0.2 %s, 0.1 %s, %s [%s] (%s)' % (run, id_, ret, res, res01,
+                                                                                    why, flag, note))
     # the swapped-halves partner of each recorded id is a good id (when it is in range) - must stay in range
     for run, id_, ret, note in BAD_IDS:
         swapped = ((id_ & 0xffff) << 16) | (id_ >> 16)
@@ -326,6 +349,110 @@ def replay(entries=None):
             e = entries[swapped] if entries is not None else None
             info = 'entry 0x%08x' % e if e is not None else 'no dump'
             print('     %-4s swapped halves 0x%04x (the intended id) in range, %s' % (run, swapped, info))
+    return bad
+
+
+# The release path that produces refs 0 while the entry is still set (tru.exe bytes, checked by `hits --exe`)
+RELEASE_CHAIN = [
+    (0x54f320, '56 8b742408 8b04b5286fc300 668100ffff 8b04b5286fc300 66833800 754c 0fb64005 50 56 e8b7feffff '
+               '8b0cb5286fc300 0fb65105 8b0c950070c500 83c408 85c9 7408 8b01 8b5008 56 ffd2 8b0dc46fc500 8b01 '
+               '8b14b5286fc300 8b4038 52 ffd0 c704b5286fc30000000000',
+     'release: refs -= 1; refs 0 -> pre-unload tru+0x14f200(id, type), handler[type] vtable +8 (id), free, entry = 0'),
+    (0x84c9a8, '20f35400', 'section manager vtable 0x84c990 +0x18 = release tru+0x14f320'),
+    (0x55259d, 'c70070ca8400 eb02 33c0 6a04 a33470c500', 'handler object (vtable 0x84ca70) stored at [0xc57034] = type 13'),
+    (0x84ca78, '30bd5800', 'vtable 0x84ca70 +8 (unload callback) = tru+0x18bd30'),
+    (0x58bd30, '8b442404 50 e84622fcff 8b0d00818a00 83c404 89442404 e964f6ffff',
+     'tru+0x18bd30: lookup(id) (return tru+0x18bd3a), result to tru+0x18b3b0 with ecx = [0x8a8100]'),
+]
+
+
+def check_release_chain(exe_path):
+    exe = open(exe_path, 'rb').read()
+    base, secs = PE.sections(exe)
+    bad = 0
+    for va, hexes, what in RELEASE_CHAIN:
+        want = bytes.fromhex(hexes.replace(' ', ''))
+        o = next((rptr + va - sva for _, sva, rptr, size, _ in secs if sva <= va < sva + size), None)
+        same = o is not None and exe[o:o + len(want)] == want
+        if not same: bad += 1
+        print('   %s 0x%08x %2d bytes: %s' % ('ok  ' if same else 'DIFF', va, len(want), what))
+    return bad
+
+
+def cmd_hits(argv):
+    """hits [--exe EXE] LOG [LOG ...] [--dump DUMP ...]: replays every logged hit line against the 0.1 and the 0.2
+    rule. Out-of-table ids must stay rejected. A 'table entry ... is not a section record' hit has no record bytes in
+    the log: its record is replayed in the state of the release path (refs 0, loading 0, type 13 for the unload
+    callback tru+0x18bd30, else the type of the id's record in a given dump, if any)."""
+    import re
+    import minidump_read as MD
+    exe, logs, dumps, target = None, [], [], None
+    i = 0
+    while i < len(argv):
+        if argv[i] == '--exe': exe = argv[i + 1]; i += 2; continue
+        if argv[i] == '--dump': target = dumps; i += 1; continue
+        (target if target is not None else logs).append(argv[i]); i += 1
+    bad = 0
+    if exe:
+        print('== release path in %s' % exe)
+        bad += check_release_chain(exe)
+    tables = []
+    for path in dumps:
+        m = MD.Minidump(path)
+        raw = m.read(TABLE, COUNT * 4)
+        tables.append((path, m, struct.unpack('<%dI' % COUNT, raw) if raw else None))
+    pat = re.compile(r'invalid id 0x([0-9a-f]{8}) \((outside the section table[^)]*|table entry 0x([0-9a-f]{8}) is not '
+                     r'a section record[^)]*)\) in (section lookup|section exists test) tru\+0x[0-9a-f]+, caller '
+                     r'0x([0-9a-f]{8})')
+    total = {'hits': 0, 'id': 0, 'entry': 0, 'rej01': 0, 'rej02': 0}
+    for path in logs:
+        print('== %s' % path)
+        n = {'hits': 0, 'id': 0, 'entry': 0, 'rej01': 0, 'rej02': 0}
+        callers = {}
+        for line in open(path, encoding='ascii', errors='replace'):
+            mt = pat.search(line)
+            if not mt: continue
+            id_, caller = int(mt.group(1), 16), int(mt.group(5), 16)
+            n['hits'] += 1
+            callers[caller] = callers.get(caller, 0) + 1
+            if mt.group(3) is None:
+                n['id'] += 1
+                r1, r2 = rule(id_, 0, None, 1)[0], rule(id_, 0, None)[0]
+                ok = r1 == 'reject' and r2 == 'reject'
+                print('   id    0x%08x caller 0x%08x: 0.1 %s, 0.2 %s [%s]' % (id_, caller, r1, r2,
+                                                                          'true hit, stays rejected' if ok else 'BAD'))
+            else:
+                n['entry'] += 1
+                entry = int(mt.group(3), 16)
+                kind, info = UNLOAD_CALLBACK_TYPE if caller == 0x58bd3a else None, []
+                for dpath, m, ent in tables:
+                    if ent is None: continue
+                    now = ent[id_]
+                    rec = m.read(now, 16) if now else None
+                    if rec:
+                        info.append('dump: entry 0x%08x refs %d loading %d type %d' % (
+                            now, struct.unpack_from('<H', rec, 0)[0], rec[4], rec[5]))
+                        if kind is None: kind = rec[5]
+                    else:
+                        info.append('dump: entry 0x%08x' % now)
+                if kind is None:
+                    print('   entry 0x%04x caller 0x%08x: no record type known - not replayed' % (id_, caller))
+                    bad += 1; continue
+                rec = struct.pack('<HHBB10x', 0, 0, 0, kind)     # release state: refs 0, loading 0
+                r1, r2 = rule(id_, entry, rec, 1)[0], rule(id_, entry, rec)[0]
+                ok = r1 == 'reject' and r2 == 'ok'
+                print('   entry 0x%04x 0x%08x caller 0x%08x: release state (refs 0, loading 0, type %d) -> 0.1 %s, '
+                      '0.2 %s [%s]%s' % (id_, entry, caller, kind, r1, r2, 'false positive gone' if ok else 'BAD',
+                                         ('; ' + '; '.join(info)) if info else ''))
+            if r1 == 'reject': n['rej01'] += 1
+            if r2 == 'reject': n['rej02'] += 1
+            if not ok: bad += 1
+        print('   %d hit lines (%d out-of-table ids, %d table entries); rejected by 0.1: %d, by 0.2: %d; callers %s' % (
+            n['hits'], n['id'], n['entry'], n['rej01'], n['rej02'],
+            ', '.join('0x%08x x%d' % kv for kv in sorted(callers.items()))))
+        for k in total: total[k] += n[k]
+    print('== total: %d hit lines (%d out-of-table ids, %d table entries); rejected by 0.1: %d, by 0.2: %d; '
+          'problems: %d' % (total['hits'], total['id'], total['entry'], total['rej01'], total['rej02'], bad))
     return bad
 
 
@@ -364,7 +491,7 @@ def cmd_prechecks(argv):
         print('  only in the source: %s' % ', '.join('0x%08x' % a for a in sorted(set(cpp) - set(found))))
         print('  only found now:     %s' % ', '.join('0x%08x' % a for a in sorted(set(found) - set(cpp))))
     hexes = dict(re.findall(r'const char \*const (k\w+Hex) = "([0-9a-f ]+)"', src))
-    lines = ['# TruDataGuard 0.1 byte checks (generated by tools/dataguard_check.py prechecks from TruDataGuard.cpp)',
+    lines = ['# TruDataGuard byte checks (generated by tools/dataguard_check.py prechecks from TruDataGuard.cpp)',
              '0054df80 ' + hexes['kLookupHex'], '0054df70 ' + hexes['kExistsHex'], '0054dd10 ' + hexes['kRegisterHex'],
              '005c1b50 ' + hexes['kUnitLookupHex'], '005c1c4e ' + hexes['kUnitStoreHex'],
              '005c1c28 ' + hexes['kUnitNameHex'],
@@ -384,6 +511,7 @@ def main(argv):
     if argv[0] == 'callers': cmd_callers(argv[1:]); return 0
     if argv[0] == 'prechecks': return cmd_prechecks(argv[1:])
     if argv[0] == 'table': return 1 if cmd_table(argv[1:]) else 0
+    if argv[0] == 'hits': return 1 if cmd_hits(argv[1:]) else 0
     if argv[0] == 'replay':
         print('== replay without a dump'); return 1 if replay() else 0
     print(__doc__); return 2

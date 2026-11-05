@@ -12,6 +12,12 @@
 //   0x495f0000 (50e, fx node, entry read 0x2104), 0x04900000 (50f, state-chart parameter), 0x00652000 (50h, thrall
 //   anim event list). All four are >= 0x8000; in the two full dumps of 50f / 50h all 2317 / 2718 non-zero entries are
 //   16-byte aligned record pointers with refs 1..9, loading 0, type <= 34 (tools/dataguard_check.py table).
+//   Refs 0 is a legitimate transitional state (0.2): the release tru+0x14f320 (section manager vtable 0x84c990 +0x18)
+//   decrements refs and, at 0, calls the type pre-unload tru+0x14f200 and the type handler's unload callback
+//   ([0xc57000 + type*4] vtable +8) while the entry is still set; only then it frees the record and clears the entry.
+//   The type-13 handler (vtable 0x84ca70, +8 = tru+0x18bd30) looks its section up there (return tru+0x18bd3a): 0.1
+//   rejected those 20+ lookups per level change as "not a section record" (runs 50j / 50k, tools/dataguard_check.py
+//   hits). The record checks stay: pointer (aligned, >= 0x10000), loading flag 0 / 1, type <= 0x7f.
 // Exists test tru+0x14df70 (cdecl): mov eax,[esp+4]; cmp dword [eax*4+0C36F28h],0; setne al; ret - one caller
 //   (tru+0x12cd85, `test al,al`).
 //
@@ -220,11 +226,19 @@ DWORD __stdcall OnBad(DWORD kind, DWORD id, DWORD entry, DWORD ret) {
     if (!detail) return answer;
     char unit[64];
     UnitName(unit, sizeof(unit));
-    char what[96];
+    char what[128];
     if (kind == kKindId || kind == kKindExistsId)
         _snprintf_s(what, sizeof(what), _TRUNCATE, "outside the section table 0..0x%lx", g_count - 1);
-    else
-        _snprintf_s(what, sizeof(what), _TRUNCATE, "table entry 0x%08lx is not a section record", entry);
+    else {
+        // record header {u16 refs, u16, u8 loading, u8 type} - our own guarded read, for the log only
+        DWORD w0 = 0, w1 = 0;
+        if (entry >= kMinPointer && ReadDword(entry, &w0) && ReadDword(entry + 4, &w1))
+            _snprintf_s(what, sizeof(what), _TRUNCATE,
+                        "table entry 0x%08lx is not a section record: refs %lu, loading %lu, type %lu", entry,
+                        w0 & 0xffff, w1 & 0xff, (w1 >> 8) & 0xff);
+        else
+            _snprintf_s(what, sizeof(what), _TRUNCATE, "table entry 0x%08lx is not a section record", entry);
+    }
     Log(1, "invalid id 0x%08lx (%s) in %s tru+0x%lx, caller 0x%08lx (tru+0x%lx, %s) -> %s; unit %s; hit %ld%s", id,
         what, exists ? "section exists test" : "section lookup", (exists ? kExists : kLookup) - kImageBase, ret,
         ret - kImageBase, guarded ? "tests for 0" : "does not test for 0",
@@ -250,8 +264,7 @@ __declspec(naked) void LookupStub() {
         jne bad_entry
         cmp eax, 0x10000                // kMinPointer
         jb bad_entry
-        cmp word ptr [eax], 0           // refs
-        je bad_entry
+        // refs (u16 at +0) is not checked since 0.2: the release tru+0x14f320 calls the unload callbacks with refs 0
         cmp byte ptr [eax+4], 1         // loading flag 0 / 1
         ja bad_entry
         cmp byte ptr [eax+5], 0x7f      // type (flags >> 1) & 0x7f
@@ -432,7 +445,7 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDataGuard.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDataGuard 0.1 loaded (enabled %d, log level %d, section lookup %d, section exists %d, unchecked callers "
+    Log(1, "TruDataGuard 0.2 loaded (enabled %d, log level %d, section lookup %d, section exists %d, unchecked callers "
         "%d, log first %d, log unit %d)", g_enabled, g_logLevel, g_sectionLookup, g_sectionExists, g_uncheckedCallers,
         g_logFirst, g_logUnit);
     if (!g_enabled) { Log(1, "disabled by TruDataGuard.ini - nothing patched"); return; }
@@ -604,17 +617,23 @@ extern "C" __declspec(dllexport) int __cdecl TruDataGuardSelfTest(char *report, 
     Log(1, "self test start (test table, every hit below is a planted case)");
     memset(g_testTable, 0, sizeof(g_testTable));
     memset(g_testRecords, 0, sizeof(g_testRecords));
-    // record layout {u16 refs, u16, u8 loading, u8 type}: 0 good, 1 loading, 2 refs 0, 3 type 0x80
+    // record layout {u16 refs, u16, u8 loading, u8 type}: 0 good, 1 loading, 2 refs 0 (release state: the unload
+    // callback of tru+0x14f320 runs with refs 0), 3 type 0x80, 4 loading flag 2, 5 refs 0 and still loading
     BYTE *good = g_testRecords[0], *loading = g_testRecords[1], *norefs = g_testRecords[2], *badtype = g_testRecords[3];
+    BYTE *badloading = g_testRecords[4], *norefsLoading = g_testRecords[5];
     good[0] = 1; good[5] = 13;
     loading[0] = 1; loading[4] = 1; loading[5] = 19;
     norefs[0] = 0; norefs[5] = 13;
     badtype[0] = 2; badtype[5] = 0x80;
+    badloading[0] = 1; badloading[4] = 2; badloading[5] = 13;
+    norefsLoading[0] = 0; norefsLoading[4] = 1; norefsLoading[5] = 13;
     DWORD goodAt = reinterpret_cast<DWORD>(good);
     g_testTable[0x688c] = goodAt;                                   // 50d: the intended id of 0x688c0000
     g_testTable[0x0100] = reinterpret_cast<DWORD>(loading);
     g_testTable[0x0101] = reinterpret_cast<DWORD>(norefs);
     g_testTable[0x0102] = reinterpret_cast<DWORD>(badtype);
+    g_testTable[0x0105] = reinterpret_cast<DWORD>(badloading);
+    g_testTable[0x0106] = reinterpret_cast<DWORD>(norefsLoading);
     g_testTable[0x0103] = 0x00002104;                               // 50e: the entry value read for 0x495f0000
     g_testTable[0x0104] = goodAt + 4;                               // misaligned
     g_testTable[0x7fff] = goodAt;                                   // last valid id
@@ -635,15 +654,20 @@ extern "C" __declspec(dllexport) int __cdecl TruDataGuardSelfTest(char *report, 
     CheckLookup(&o, "first id past the table 0x8000", 0x8000, 0, 1, kKindId);
     CheckLookup(&o, "entry 0x2104 (not a pointer)", 0x0103, 0, 1, kKindEntry);
     CheckLookup(&o, "misaligned entry", 0x0104, 0, 1, kKindEntry);
-    CheckLookup(&o, "record with refs 0", 0x0101, 0, 1, kKindEntry);
+    CheckLookup(&o, "refs 0 (unload callback, 0.2)", 0x0101, reinterpret_cast<DWORD>(norefs) + 0x10, 0, 0);
+    CheckLookup(&o, "refs 0 and still loading", 0x0106, 0, 0, 0);
+    CheckLookup(&o, "50k id 0x68f4 swapped halves", 0x68f40000, 0, 1, kKindId);
     CheckLookup(&o, "record type 0x80", 0x0102, 0, 1, kKindEntry);
+    CheckLookup(&o, "record loading flag 2", 0x0105, 0, 1, kKindEntry);
     CheckExists(&o, "good record", 0x688c, 1, 0);
     CheckExists(&o, "empty entry", 0x0001, 0, 0);
     CheckExists(&o, "50f state-chart parameter", 0x04900000, 0, 1);
     CheckExists(&o, "entry 0x2104 (not a pointer)", 0x0103, 0, 1);
-    // a caller that does not test for 0: the original lookup runs (a record with refs 0 is harmless to read here)
+    // a caller that does not test for 0: the original lookup runs (the test record with type 0x80 is readable here)
     g_testUnguarded = true;
-    CheckLookup(&o, "unguarded caller, refs 0 -> original", 0x0101, reinterpret_cast<DWORD>(norefs) + 0x10, 1, kKindEntry);
+    CheckLookup(&o, "unguarded caller, type 0x80 -> original", 0x0102, reinterpret_cast<DWORD>(badtype) + 0x10, 1,
+                kKindEntry);
+    CheckLookup(&o, "unguarded caller, refs 0 -> no hit", 0x0101, reinterpret_cast<DWORD>(norefs) + 0x10, 0, 0);
     CheckExists(&o, "unguarded caller, misaligned -> original", 0x0104, 1, 1);
     g_testUnguarded = false;
     g_testMode = false;
@@ -652,6 +676,8 @@ extern "C" __declspec(dllexport) int __cdecl TruDataGuardSelfTest(char *report, 
     Report(&o, IsGuarded(0x00535ec5), "caller list: 50d tru+0x135ec5 tests for 0");
     Report(&o, IsGuarded(0x005920f4), "caller list: 50e tru+0x1920f4 tests for 0");
     Report(&o, IsGuarded(0x005953f2), "caller list: 50h tru+0x1953f2 tests for 0");
+    Report(&o, IsGuarded(0x00594cad), "caller list: 50k tru+0x194cad tests for 0");
+    Report(&o, !IsGuarded(0x0058bd3a), "caller list: unload callback tru+0x18bd3a does not test for 0 (tail jmp)");
     Report(&o, !IsGuarded(0x0075eefe), "caller list: 50f tru+0x35eefe does not test for 0 (tail jmp to tru+0x1ee890)");
     bool sorted = true;
     for (int i = 1; i < kGuardedCount; ++i) if (kGuardedCallers[i] <= kGuardedCallers[i - 1]) sorted = false;
@@ -666,4 +692,4 @@ extern "C" __declspec(dllexport) int __cdecl TruDataGuardSelfTest(char *report, 
 }
 
 // exported so the loader / tools can identify the plugin
-extern "C" __declspec(dllexport) const char *TruDataGuardVersion() { return "TruDataGuard 0.1 (section lookup / exists test: invalid ids -> not found)"; }
+extern "C" __declspec(dllexport) const char *TruDataGuardVersion() { return "TruDataGuard 0.2 (section lookup / exists test: invalid ids -> not found)"; }
