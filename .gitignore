@@ -68,6 +68,9 @@ work/f10_shotgun/
 work/f13_sibilants/
 work/f14_help/
 work/truguard_fix_0511/
+work/handgun_check/
+work/f5_moan/
+work/f25_dungeon/
 # safety net: audio never belongs in the repository (game streams .mul_001 ..., WAV listening copies)
 *.wav
 *.mul_0*
