@@ -74,6 +74,7 @@ work/f25_dungeon/
 work/f5_pipeline/
 work/names_0511/
 work/b270_kit/
+work/debugviz_0511/
 # safety net: audio never belongs in the repository (game streams .mul_001 ..., WAV listening copies)
 *.wav
 *.mul_0*
