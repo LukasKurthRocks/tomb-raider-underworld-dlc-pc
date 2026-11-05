@@ -2492,6 +2492,21 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      tried and the copy with the most id-equal pairs wins, finding 38), `tools/stage_by_md5.py --paths`,
      `tools/profile_fix_plan.py` (new: where a fix tree can go in a profile's tree list so that only its own input
      copies are replaced, and what both checks report then), `dlc_struct_fixes.py check A,B` (overlay of two folders).
+   * Profile-specific fix trees for the existing test profiles (2026-11-05, workspace docs Befund-Seq-Baeume-0511.md):
+     the base a profile meets is the game folder with the PREVIOUS harness run undone (`Invoke-TruTestRun.ps1`
+     `Undo-PreviousInstall`), not the folder as it stands - `profile_fix_plan.py --base-undo runs/installed-state.json`
+     replays that (tree backups in reverse, md5 checked against each manifest). With it the 47 active profiles need 11
+     distinct input sets (15 files each: 14 DLC 2 DRMs + `dlc1_uo_crushers`; one set is the crushers file alone);
+     without it 3 sets of the earlier 19-profile plan were wrong (they had taken level copies from the run left
+     installed). Each set was staged (`stage_by_md5.py --paths`) and run through `dlc_struct_fixes.py --steps seqrepeat`
+     into `work/rebuild/dlc_test51r_seq<N>_*`: 46 words per 15-file set (39 with the repeat byte, 7 only +0xd..+0xf),
+     proven by the new `tools/seq_tree_proof.py` (every changed byte inside a planned Sequence word +0xc..+0xf, new
+     word = Xbox word, headers / relocations identical, re-plan 0), `fix_word_diff.py` 0 other words, `scan` 0,
+     `check --steps seqrepeat` ok, `tree_check.py` readback ok. Set 1 reproduces `dlc_test51p_moan` 14 / 14 plus the
+     crushers file. `profile_fix_plan.py --tex-fix NAME --seq ...` simulates every profile with the texture fix tree
+     and the matching sequence tree appended: 43 of 47 profiles end with both checks 0 and only the intended copies
+     replaced; in the 4 single-tree DLC 2 profiles the texture fix tree would also swap `dlc_fx_cine_thrall_death`
+     (base copy with 8 other words in DTPs 20372-20374), so they need a texture fix of their own base copy.
 
 ## The "VM" in upstream (what it was, what we do instead)
 

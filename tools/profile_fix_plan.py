@@ -25,6 +25,21 @@ Usage (from the repository root):
   (tools/stage_by_md5.py); a combo is applied in the order given, each tree at its latest valid position in the list
   that already holds the earlier ones.
   ../bin/pyt -t 300 tools/profile_fix_plan.py table OUT.json      markdown table of a saved --json report
+
+Additions (2026-11-05, agent Seq-Baeume, docs Befund-Seq-Baeume-0511.md):
+  --base-undo STATE.json   the base as the NEXT harness run sees it: DIR (--base) with the installs of the previous run
+        undone (runs/installed-state.json of scripts/windows/Invoke-TruTestRun.ps1 Undo-PreviousInstall: its tree
+        backups in reverse order, replaced files from backup/<tree>/files/<path> (md5 checked against the manifest),
+        added files removed). Without it the game folder counts as it stands, open runner installs included.
+  --own-after-last         the --own-after fix tree is appended at the END (not at its latest valid position)
+  --own-lists DIR          per seqrepeat input set N: DIR/setN.paths (absolute path of each file, one per line, input
+        of tools/stage_by_md5.py --paths) and DIR/setN.profiles
+  --tex-fix NAME --seq NAME=TREE_DIR:INPUTS [--seq ...]   simulation per profile ("sim"): profile clean now ->
+        "no change"; else the --fix tree NAME appended at the end when the texture check fails, then the --seq tree
+        whose every file replaces exactly its input copy (0 other copies, 0 added, none shadowed by a "files" entry)
+        appended at the end when the Sequence check fails; reports both checks after, every file whose installed md5
+        changes, and per appended tree the files it replaces (intended = the tree's input copy, same = already the
+        output, other = another copy). INPUTS of a --seq tree: the staged_sources.tsv of its stage_by_md5 run.
 """
 import sys, os, json, glob, hashlib, re, io, contextlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -32,6 +47,32 @@ import profile_last_source as PLS
 
 _MD5 = {}
 _CHK = {}
+_BASE = {}
+BASE_UNDO = None          # --base-undo STATE.json
+
+
+def base_files(base):
+    """{rel: (path, 'base')} of DIR, with BASE_UNDO the open runner installs undone (cached per DIR)"""
+    if base not in _BASE:
+        m = {rel: (p, 'base') for rel, p in tree_files(base, []).items()}
+        if BASE_UNDO:
+            st = json.load(open(BASE_UNDO, encoding='utf-8-sig'))
+            if [f for f in (st.get('files') or []) if f]:
+                sys.exit('--base-undo: the state lists single-file installs (Install-TruModFile) - not supported')
+            bk = os.path.join(PLS.WS, 'backup')
+            nrep = nadd = 0
+            for t in reversed([t for t in (st.get('trees') or []) if t]):
+                man = json.load(open(os.path.join(bk, t, 'manifest.json'), encoding='utf-8-sig'))
+                for a in man.get('added') or []:
+                    if m.pop(a.replace('\\', '/').lower(), None): nadd += 1
+                for r in man.get('replaced') or []:
+                    q = os.path.join(bk, t, 'files', r['path'])
+                    if md5(q) != r['md5'].lower(): sys.exit('--base-undo: %s does not match its manifest md5' % q)
+                    m[r['path'].replace('\\', '/').lower()] = (q, 'base'); nrep += 1
+            print('base %s with the installs of %s undone (%d trees: %d replaced files restored, %d added files '
+                  'removed)' % (base, st.get('run'), len([t for t in st.get('trees') or [] if t]), nrep, nadd))
+        _BASE[base] = m
+    return _BASE[base]
 
 
 def md5(p):
@@ -77,9 +118,7 @@ def tree_files(src, exclude):
 
 def install(trees, files, base):
     """trees: [(label, {rel: path})] in order -> {rel: (path, label)} incl. base files and "files" entries"""
-    out = {}
-    if base:
-        for rel, p in tree_files(base, []).items(): out[rel] = (p, 'base')
+    out = dict(base_files(base)) if base else {}
     for label, fm in trees:
         for rel, p in fm.items(): out[rel] = (p, label)
     for rel, p in files.items(): out[rel] = (p, 'file')
@@ -138,6 +177,81 @@ def place(trees, files, base, fix):
     return None, None, reasons
 
 
+def classify(cur, files, base, fix):
+    """appending fix at the END of the tree list cur: per file of the fix tree what it replaces"""
+    prev = install(cur, files, base)
+    out = dict(intended=[], same=[], other=[], added=[], shadowed=[])
+    for rel in sorted(fix['files']):
+        n = os.path.basename(rel)
+        if rel in files: out['shadowed'].append(n); continue      # a "files" entry wins over every tree
+        if rel not in prev: out['added'].append(n); continue
+        m = md5(prev[rel][0])
+        if m == fix['outputs'][rel]: out['same'].append(n)
+        elif m == fix['inputs'].get(rel): out['intended'].append(n)
+        else: out['other'].append('%s %s from %s' % (n, m[:8], prev[rel][1]))
+    return out
+
+
+def seq_bad(s):
+    return len(s['seq_repeat']) + len(s['seq_pad']) + len(s['seq_unexpected'])
+
+
+def sim(trees, files, base, texfix, seqfixes):
+    """the profile + (texfix if the texture check fails) + (the matching seq tree if the Sequence check fails), each
+    appended at the end -> dict(now, after, steps, changed, verdict)"""
+    first = install(trees, files, base)
+    now = summary(first)
+    res = dict(now=now, steps=[], changed=[])
+    if not now['texlist'] and not seq_bad(now):
+        res.update(after=now, verdict='no change'); return res
+    cur = list(trees)
+    if now['texlist'] and texfix:
+        c = classify(cur, files, base, texfix)
+        res['steps'].append(dict(tree=texfix['name'], **c))
+        cur = cur + [(texfix['name'], texfix['files'])]
+    mid = summary(install(cur, files, base))
+    res['mid'] = mid
+    if seq_bad(mid):
+        ok, best = [], None
+        for f in seqfixes:
+            c = classify(cur, files, base, f)
+            miss = len(c['other']) + len(c['added']) + len(c['shadowed'])
+            if best is None or miss < best[0]: best = (miss, f, c)
+            if not miss and c['intended']:
+                cand = cur + [(f['name'], f['files'])]
+                ok.append((seq_bad(summary(install(cand, files, base))), f, c, cand))
+        if ok:
+            # clean result first; among those the tree that carries the fewest files the profile has already
+            # (e.g. the 1-file Crushers tree for a profile whose other 14 copies are fixed)
+            ok.sort(key=lambda x: (x[0], len(x[2]['same'])))
+            _, f, c, cand = ok[0]
+            res['steps'].append(dict(tree=f['name'], **c))
+            if len(ok) > 1: res['also_matching'] = [x[1]['name'] for x in ok[1:]]
+            cur = cand
+        else:
+            res['no_seq_tree'] = dict(best=best[1]['name'] if best else None, **(best[2] if best else {}))
+    fin = install(cur, files, base)
+    after = summary(fin)
+    res['after'] = after
+    res['changed'] = sorted(os.path.basename(rel) for rel in fin if rel not in first or md5(fin[rel][0]) != md5(first[rel][0]))
+    intended = sorted(n for s in res['steps'] for n in s['intended'])
+    other = [x for s in res['steps'] for x in s['other'] + s['added'] + s['shadowed']]
+    clean = not after['texlist'] and not seq_bad(after)
+    res['verdict'] = 'ok' if clean and not other and res['changed'] == intended else 'FAIL'
+    return res
+
+
+def sim_table(report):
+    print('\n| Profile | trees to append (in order) | texlist now -> after | Sequence (repeat / pad / unexpected) now -> after | files replaced | verdict |')
+    print('|---|---|---|---|---|---|')
+    for r in report:
+        s = r['sim']
+        tr = ', '.join(x['tree'] for x in s['steps']) or ('-' if s['verdict'] == 'no change' else 'NONE MATCHES')
+        q = lambda d: '%d / %d / %d' % (len(d['seq_repeat']), len(d['seq_pad']), len(d['seq_unexpected']))
+        print('| %s | %s | %d -> %d | %s -> %s | %d | %s |' % (r['profile'], tr, len(s['now']['texlist']),
+              len(s['after']['texlist']), q(s['now']), q(s['after']), len(s['changed']), s['verdict']))
+
+
 def table(path):
     """markdown table of a --json report (no recomputation): per profile the problems now, each fix tree's latest
     valid position (or 'none' + how many other copies stacking it last would replace), the own seqrepeat tree"""
@@ -176,7 +290,22 @@ def main(a):
     if '--json' in a: k = a.index('--json'); outj = a[k + 1]; del a[k:k + 2]
     own_after = None
     if '--own-after' in a: k = a.index('--own-after'); own_after = a[k + 1]; del a[k:k + 2]
+    global BASE_UNDO
+    if '--base-undo' in a: k = a.index('--base-undo'); BASE_UNDO = a[k + 1]; del a[k:k + 2]
+    own_last = '--own-after-last' in a
+    a = [x for x in a if x != '--own-after-last']
+    own_lists = texfix_name = None
+    if '--own-lists' in a: k = a.index('--own-lists'); own_lists = a[k + 1]; del a[k:k + 2]
+    if '--tex-fix' in a: k = a.index('--tex-fix'); texfix_name = a[k + 1]; del a[k:k + 2]
+    seqfixes = []
+    while '--seq' in a:
+        k = a.index('--seq'); seqfixes.append(load_fix(a[k + 1])); del a[k:k + 2]
+    for f in seqfixes:
+        print('seq tree %s: %s, %d files, inputs known for %d' % (f['name'], f['root'], len(f['files']),
+                                                              sum(1 for v in f['inputs'].values() if v)))
+    if a: sys.exit('unknown arguments: %s' % a)
     groups = {}
+    paths_of = {}
     byname = {f['name']: f for f in fixes}
     for f in fixes:
         print('fix %s: %s, %d files, inputs known for %d' % (f['name'], f['root'], len(f['files']),
@@ -188,6 +317,7 @@ def main(a):
         for t in prof.get('trees') or []:
             if not t: continue
             src = PLS.resolve(t['source'])
+            if not os.path.isdir(src): print('  WARNING %s: tree source %s does not exist' % (os.path.basename(pp), src))
             seg = t['source'].replace('\\', '/').rstrip('/').split('/')
             label = seg[-2] if seg[-1].lower() == 'mods' and len(seg) > 1 else seg[-1]
             trees.append((label, tree_files(src, t.get('exclude'))))
@@ -234,8 +364,10 @@ def main(a):
         # the texture fix (--own-after NAME: that fix tree at its latest valid position first, if it has one)
         cur = list(trees)
         if own_after and own_after in byname:
-            k, cand, _ = place(cur, files, base, byname[own_after])
-            if k is not None: cur = cand
+            if own_last: cur = cur + [(own_after, byname[own_after]['files'])]
+            else:
+                k, cand, _ = place(cur, files, base, byname[own_after])
+                if k is not None: cur = cand
         fin = install(cur, files, base)
         need = []
         for rel, (p, label) in sorted(fin.items()):
@@ -243,7 +375,34 @@ def main(a):
             a_, b_, c_, d_ = check(p)
             if b_ or c_ or d_: need.append((os.path.basename(rel), md5(p), label, b_, c_, d_))
         sig = tuple((n, h) for n, h, *_ in need)
-        groups.setdefault(sig, []).append(pn)
+        if sig: groups.setdefault(sig, []).append(pn)
+        if sig and sig not in paths_of:
+            paths_of[sig] = [os.path.abspath(fin[rel][0]) for rel in sorted(fin) if rel.endswith('.drm') and
+                             any(os.path.basename(rel) == n and md5(fin[rel][0]) == h for n, h in sig)]
+        if seqfixes or texfix_name:
+            s = sim(trees, files, base, byname.get(texfix_name), seqfixes)
+            rep['sim'] = s
+            print('  sim: %s; appended %s; texlist %d -> %d; seq repeat/pad/unexpected %d/%d/%d -> %d/%d/%d; %d files '
+                  'change (%s)' % (s['verdict'], ', '.join(x['tree'] for x in s['steps']) or '-', len(s['now']['texlist']),
+                                  len(s['after']['texlist']), len(s['now']['seq_repeat']), len(s['now']['seq_pad']),
+                                  len(s['now']['seq_unexpected']), len(s['after']['seq_repeat']),
+                                  len(s['after']['seq_pad']), len(s['after']['seq_unexpected']), len(s['changed']),
+                                  ', '.join(s['changed']) or '-'))
+            for x in s['steps']:
+                print('    + %s: intended %d, same %d, other %d%s, added %d%s, shadowed %d' % (
+                    x['tree'], len(x['intended']), len(x['same']), len(x['other']),
+                    (' (%s)' % ', '.join(x['other'])) if x['other'] else '', len(x['added']),
+                    (' (%s)' % ', '.join(x['added'])) if x['added'] else '', len(x['shadowed'])))
+            if s.get('no_seq_tree'):
+                nb = s['no_seq_tree']
+                print('    NO matching seq tree; closest %s: other %d (%s), added %d, shadowed %d' % (
+                    nb.get('best'), len(nb.get('other') or []), ', '.join(nb.get('other') or []),
+                    len(nb.get('added') or []), len(nb.get('shadowed') or [])))
+            if s.get('also_matching'): print('    also matching: %s' % ', '.join(s['also_matching']))
+            if s['verdict'] != 'no change':
+                print('    after: texlist %s | seq repeat %s | seq pad-only %s | seq unexpected %s' % (
+                    s['after']['texlist'] or '-', s['after']['seq_repeat'] or '-', s['after']['seq_pad'] or '-',
+                    s['after']['seq_unexpected'] or '-'))
         print('  own seqrepeat tree (after %s): %d files: %s' % (own_after or '-', len(need), ', '.join(
             '%s %s from %s (repeat %d, pad %d%s)' % (n, h[:8], lb, b_, c_, (', UNEXPECTED %d' % d_) if d_ else '')
             for n, h, lb, b_, c_, d_ in need)))
@@ -253,6 +412,14 @@ def main(a):
     for i, (sig, ps) in enumerate(sorted(groups.items(), key=lambda kv: -len(kv[1]))):
         print('  set %d (%d files): %s' % (i + 1, len(sig), ', '.join(ps)))
         print('     %s' % ', '.join('%s %s' % (n, h[:8]) for n, h in sig))
+        if own_lists:
+            os.makedirs(own_lists, exist_ok=True)
+            with open(os.path.join(own_lists, 'set%d.paths' % (i + 1)), 'w', encoding='utf-8', newline='\n') as h:
+                for p in paths_of[sig]: h.write(p.replace('\\', '/') + '\n')
+            with open(os.path.join(own_lists, 'set%d.profiles' % (i + 1)), 'w', encoding='utf-8', newline='\n') as h:
+                for p in ps: h.write(p + '\n')
+            for p in paths_of[sig]: print('     path %s %s' % (md5(p), p.replace('\\', '/')))
+    if seqfixes or texfix_name: sim_table(report)
     if outj:
         json.dump(report, open(outj, 'w', encoding='utf-8'), indent=1)
     return 0

@@ -1,6 +1,6 @@
 {
     "name":  "regress_shadowlara_50n_radial2",
-    "description":  "Test 50n_radial2 (03.11. afternoon): regress_shadowlara_50n with TruMenu 0.10.1 (work/asi/menu0101: radial menu as a menu, built-in Tests level with Rundgang from TruMenu.tour.txt incl. the level Versteckt; Set-TruMenu.ps1 installs TruMenu.radial.txt / TruMenu.tour.txt from the build folder) and TruShadowCombat 0.4.1 (work/asi/combat041: [Strike] Translate / [States] Translate1013 read again at run time, at most once per second - the TO TEST switches sc-strike / sc-translate1013 work without a restart). New steps 13 / 14 (after the hall02 fight): at a downed thrall switch sc-translate1013, then sc-strike on, X / Y, compare, switch off. The base\u0027s own steps are kept; no quit-sector confirm step (the game ends as in regress_shadowlara_50n). Base regress_shadowlara_50n: Test 50n (03.11. morning): regress_shadowlara_50l + the shader tree dlc_test50n_merged (night parts 3 + 4: 34 remaining TU pixel-shader groups of DLC 1 / 2 rooms and objects (libs 2840-2874), 5 groups with new vertex shaders (Xenos VS translator, VS 2876-2880, PS 2881-2885), grapple variants 2886 / 2887; on top of the 50l shader tree) with the chart fix of 50l_merged re-applied to its doppelganger_casual.drm (chart_act_u8_fix.py, DTP 20212) and the achievement fix of 50l_ach re-applied to its dlc_yggdrasil_end / hall02 (section 8:23101). Tree order: ... 50c_vein, 50k_streams, 50l_shaders_dlc1, 50l_ach, dlc_test50n_merged, autostart_gb (last). Plugins / tests as 50l plus three look checks. Run WITH -Debugger -Session \u003cworkbench\u003e\\session_thrall_watch.cdb.",
+    "description":  "05.11. sequence-repeat fix (Befund-Seq-Baeume-0511.md, Add-SeqTrees.ps1): appended last dlc_test51q_dungeon + dlc_test51r_seq11_50n. Test 50n_radial2 (03.11. afternoon): regress_shadowlara_50n with TruMenu 0.10.1 (work/asi/menu0101: radial menu as a menu, built-in Tests level with Rundgang from TruMenu.tour.txt incl. the level Versteckt; Set-TruMenu.ps1 installs TruMenu.radial.txt / TruMenu.tour.txt from the build folder) and TruShadowCombat 0.4.1 (work/asi/combat041: [Strike] Translate / [States] Translate1013 read again at run time, at most once per second - the TO TEST switches sc-strike / sc-translate1013 work without a restart). New steps 13 / 14 (after the hall02 fight): at a downed thrall switch sc-translate1013, then sc-strike on, X / Y, compare, switch off. The base\u0027s own steps are kept; no quit-sector confirm step (the game ends as in regress_shadowlara_50n). Base regress_shadowlara_50n: Test 50n (03.11. morning): regress_shadowlara_50l + the shader tree dlc_test50n_merged (night parts 3 + 4: 34 remaining TU pixel-shader groups of DLC 1 / 2 rooms and objects (libs 2840-2874), 5 groups with new vertex shaders (Xenos VS translator, VS 2876-2880, PS 2881-2885), grapple variants 2886 / 2887; on top of the 50l shader tree) with the chart fix of 50l_merged re-applied to its doppelganger_casual.drm (chart_act_u8_fix.py, DTP 20212) and the achievement fix of 50l_ach re-applied to its dlc_yggdrasil_end / hall02 (section 8:23101). Tree order: ... 50c_vein, 50k_streams, 50l_shaders_dlc1, 50l_ach, dlc_test50n_merged, autostart_gb (last). Plugins / tests as 50l plus three look checks. Run WITH -Debugger -Session \u003cworkbench\u003e\\session_thrall_watch.cdb.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -247,6 +247,41 @@
                                   ],
                       "md5":  {
                                   "generalbank.drm":  "586c37ad378691d534f0aab2cee3c439"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test51q_dungeon/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_fx_cine_thrall_death.drm":  "0fd61eb0c8241cf9579bb84f28ae30df",
+                                  "dlc_fx_goo_machine_column_core.drm":  "ee010dd09200fc35203bb9bae0ae86d1"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test51r_seq11_50n/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_yggdrasil_end.drm":  "1abf17cbc8870fd29ac573b8fd501fb8",
+                                  "dlc_yggdrasil_hall02.drm":  "a2aea0d3f2f58c13591ff4ce3c9a6b81",
+                                  "dlc1_uo_crushers.drm":  "1b90aed9f1d0633d6c0a024f50264276",
+                                  "dlc2_ceremony_room.drm":  "56804f5f7ec6f0c6d267446034874502",
+                                  "dlc2_checkpoint.drm":  "33123d6386327bd82bbfe3d802644ca3",
+                                  "dlc2_goo_room.drm":  "f9f8f3f71f526015c71378df542cb2e0",
+                                  "dlc2_hall_ceremony_goo.drm":  "e0d0d4ee79b2c28292f71c96cb95521c",
+                                  "dlc2_hall_goo_machine.drm":  "4b0b14fefb3b29360ffa066947dd5c64",
+                                  "dlc2_hall_machine_ceremony.drm":  "75e1319feb27d9cc9e223f641b387f8c",
+                                  "dlc2_machine_room.drm":  "776e08df128786d7bfe36e2b62069d93",
+                                  "dlc2_treasure_room_cine.drm":  "42adf17d4833f97c6a82467dd5362781",
+                                  "dlc2_uo_goo_grinder.drm":  "02655e82840deac04c62a236dbb835fd",
+                                  "dlc2_uo_gooconverter.drm":  "408834a504933feee2ba5942e8371458",
+                                  "dlc2_uo_treadmill_block_spawner.drm":  "55c9f43638c1372d469b3c5553923ad3",
+                                  "doppelganger_casual.drm":  "300f8e81187c7b5c26999eae5fca20e6"
                               }
                   }
               ],

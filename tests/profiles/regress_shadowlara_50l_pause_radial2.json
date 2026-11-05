@@ -1,6 +1,6 @@
 {
     "name":  "regress_shadowlara_50l_pause_radial2",
-    "description":  "Test 50l_pause_radial2 (03.11.): regress_shadowlara_50l_radial2 + tree dlc_test50l_pause (last, wins over autostart_gb): generalbank = autostart_gb 586c37ad + the pause part of TU script 7 (tools/script7_pause_port.py): pause menu open / close send paused / unpaused on PauseMsgCh (hint box, DLC 2 PDA; the uipopupmgr f8 call at the open dropped as in the TU), DLC units send DLC to HODRefresh before the Help-on-Demand refresh (DLC 1 help in the pause menu). No banner, no script 110. New rows: DLC 2 hint box step after the intro, DLC 1 help / hint steps before the quit steps. Docs Befund-Pausemenue-TU.md. Base: Test 50l_radial2 (03.11.): regress_shadowlara_50l_radial with only TruMenu swapped to 0.10.1 (work/asi/menu0101: the radial menu works like a menu - [Radial] Mode=menu: L3 + R3 held / F9 tapped opens the ring and it stays open, left stick / D-pad / mouse pick, only A / Enter / click runs, B back, L3 + R3 / F9 again closes; [Radial] Freeze=world while open (switch radial-freeze, read at every open); built-in top sector Spiel beenden (game.quit, A twice / hold 1 s); built-in level Tests (TO TEST, Regression, Prepare, Schalter, Rundgang from TruMenu.tour.txt); installed next to tru.exe by Set-TruMenu.ps1) and the radial TO TEST rows adapted to the menu mode; the LAST step ends the game through the quit sector, so the Status page quit step only arms / disarms. Update 03.11. afternoon: TruShadowCombat 0.4.1 (work/asi/combat041: [Strike] Translate and [States] Translate1013 read again at run time, at most once per second - the switches sc-strike / sc-translate1013 work without a restart; new steps 13 / 14 at a downed thrall) and the tour file with the level Versteckt (golden shotgun, container1, extended ending - TruMenu.tour.txt in menu0101, no TruMenu rebuild). Everything else as 50l_radial / 50l. Base 50l: Test 50l (morning 03.11.): everything finished of the night in one run. Trees: 48i_tex, 48i_markup (both fully overridden by the merged tree, kept as in 50l_look), dlc_test50l_merged (= dlc_test50l_shaders: TU per-light outfit / thrall / natla shaders, unlit effect libs, look fix of material 20744; + chart fix of DTP 20212 in the same doppelganger_casual.drm (chart_act_u8_fix.py, 4 words); + player_tru_dlc2_extension.drm with the tuning target fix (dlc_test50l_combat); + dlc2_machine_room.drm with the two jump target pads (dlc_test50l_jump)), 50c_vein, 50k_streams, dlc_test50l_shaders_dlc1 (DLC 1 knight thrall copies), dlc_test50l_ach (achievement fix of 31.10.: 11 calls into missing TU natives neutralised in 8 DRMs the installed mods of 30.10. still have), autostart_gb (clean generalbank, [Test] AutoStart). Plugins: TruShadowPower 0.12 (meter interface v3, InstanceParams[1]), TruMenu 0.10.1 (radial menu as a menu; 0.10 R2 spawn; 0.9 Saves, music, Quit now, InputTrace, unstuck, Prepare), TruDataGuard 0.2, TruShadowCombat 0.4.1 (target list, states 1017 / 244, 1013 probe; Translate / Translate1013 off at the start, switchable live), TruDlc2Player 0.2, TruRockVein 0.9, TruDoppelganger, TruLink, TruGuard 0.4. Not in it: dark wall streaks (50m), DLC music (50l_music), HUD (profile regress_shadowlara_50l_hud). Run WITH -Debugger -Session \u003cworkbench\u003e\\session_thrall_watch.cdb (THRALLLINK hardware write breakpoints).",
+    "description":  "05.11. sequence-repeat fix (Befund-Seq-Baeume-0511.md, Add-SeqTrees.ps1): appended last dlc_test51q_dungeon + dlc_test51r_seq2_50l. Test 50l_pause_radial2 (03.11.): regress_shadowlara_50l_radial2 + tree dlc_test50l_pause (last, wins over autostart_gb): generalbank = autostart_gb 586c37ad + the pause part of TU script 7 (tools/script7_pause_port.py): pause menu open / close send paused / unpaused on PauseMsgCh (hint box, DLC 2 PDA; the uipopupmgr f8 call at the open dropped as in the TU), DLC units send DLC to HODRefresh before the Help-on-Demand refresh (DLC 1 help in the pause menu). No banner, no script 110. New rows: DLC 2 hint box step after the intro, DLC 1 help / hint steps before the quit steps. Docs Befund-Pausemenue-TU.md. Base: Test 50l_radial2 (03.11.): regress_shadowlara_50l_radial with only TruMenu swapped to 0.10.1 (work/asi/menu0101: the radial menu works like a menu - [Radial] Mode=menu: L3 + R3 held / F9 tapped opens the ring and it stays open, left stick / D-pad / mouse pick, only A / Enter / click runs, B back, L3 + R3 / F9 again closes; [Radial] Freeze=world while open (switch radial-freeze, read at every open); built-in top sector Spiel beenden (game.quit, A twice / hold 1 s); built-in level Tests (TO TEST, Regression, Prepare, Schalter, Rundgang from TruMenu.tour.txt); installed next to tru.exe by Set-TruMenu.ps1) and the radial TO TEST rows adapted to the menu mode; the LAST step ends the game through the quit sector, so the Status page quit step only arms / disarms. Update 03.11. afternoon: TruShadowCombat 0.4.1 (work/asi/combat041: [Strike] Translate and [States] Translate1013 read again at run time, at most once per second - the switches sc-strike / sc-translate1013 work without a restart; new steps 13 / 14 at a downed thrall) and the tour file with the level Versteckt (golden shotgun, container1, extended ending - TruMenu.tour.txt in menu0101, no TruMenu rebuild). Everything else as 50l_radial / 50l. Base 50l: Test 50l (morning 03.11.): everything finished of the night in one run. Trees: 48i_tex, 48i_markup (both fully overridden by the merged tree, kept as in 50l_look), dlc_test50l_merged (= dlc_test50l_shaders: TU per-light outfit / thrall / natla shaders, unlit effect libs, look fix of material 20744; + chart fix of DTP 20212 in the same doppelganger_casual.drm (chart_act_u8_fix.py, 4 words); + player_tru_dlc2_extension.drm with the tuning target fix (dlc_test50l_combat); + dlc2_machine_room.drm with the two jump target pads (dlc_test50l_jump)), 50c_vein, 50k_streams, dlc_test50l_shaders_dlc1 (DLC 1 knight thrall copies), dlc_test50l_ach (achievement fix of 31.10.: 11 calls into missing TU natives neutralised in 8 DRMs the installed mods of 30.10. still have), autostart_gb (clean generalbank, [Test] AutoStart). Plugins: TruShadowPower 0.12 (meter interface v3, InstanceParams[1]), TruMenu 0.10.1 (radial menu as a menu; 0.10 R2 spawn; 0.9 Saves, music, Quit now, InputTrace, unstuck, Prepare), TruDataGuard 0.2, TruShadowCombat 0.4.1 (target list, states 1017 / 244, 1013 probe; Translate / Translate1013 off at the start, switchable live), TruDlc2Player 0.2, TruRockVein 0.9, TruDoppelganger, TruLink, TruGuard 0.4. Not in it: dark wall streaks (50m), DLC music (50l_music), HUD (profile regress_shadowlara_50l_hud). Run WITH -Debugger -Session \u003cworkbench\u003e\\session_thrall_watch.cdb (THRALLLINK hardware write breakpoints).",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -175,6 +175,41 @@
                                   ],
                       "md5":  {
                                   "generalbank.drm":  "ee6fd8fd333d61ee8a01a51321766bc6"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test51q_dungeon/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_fx_cine_thrall_death.drm":  "0fd61eb0c8241cf9579bb84f28ae30df",
+                                  "dlc_fx_goo_machine_column_core.drm":  "ee010dd09200fc35203bb9bae0ae86d1"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test51r_seq2_50l/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_yggdrasil_end.drm":  "3e7ce9ff3e0a6903ca6ca91021c1b022",
+                                  "dlc_yggdrasil_hall02.drm":  "f46b56dcbe3c1e52c8b72e894c5f887f",
+                                  "dlc1_uo_crushers.drm":  "1b90aed9f1d0633d6c0a024f50264276",
+                                  "dlc2_ceremony_room.drm":  "56804f5f7ec6f0c6d267446034874502",
+                                  "dlc2_checkpoint.drm":  "33123d6386327bd82bbfe3d802644ca3",
+                                  "dlc2_goo_room.drm":  "f9f8f3f71f526015c71378df542cb2e0",
+                                  "dlc2_hall_ceremony_goo.drm":  "e0d0d4ee79b2c28292f71c96cb95521c",
+                                  "dlc2_hall_goo_machine.drm":  "4b0b14fefb3b29360ffa066947dd5c64",
+                                  "dlc2_hall_machine_ceremony.drm":  "75e1319feb27d9cc9e223f641b387f8c",
+                                  "dlc2_machine_room.drm":  "776e08df128786d7bfe36e2b62069d93",
+                                  "dlc2_treasure_room_cine.drm":  "42adf17d4833f97c6a82467dd5362781",
+                                  "dlc2_uo_goo_grinder.drm":  "cc03d439fd7c7c9579f1593e7920fbbd",
+                                  "dlc2_uo_gooconverter.drm":  "aa2a29a393d36537716f86877d878ee1",
+                                  "dlc2_uo_treadmill_block_spawner.drm":  "55c9f43638c1372d469b3c5553923ad3",
+                                  "doppelganger_casual.drm":  "d9f03c93dc4a7a8c7a7252721c620ec8"
                               }
                   }
               ],

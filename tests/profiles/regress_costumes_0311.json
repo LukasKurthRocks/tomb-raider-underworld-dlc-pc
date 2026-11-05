@@ -1,6 +1,6 @@
 {
     "name":  "regress_costumes_0311",
-    "description":  "Costume packs (03.11.): the morning state of regress_shadowlara_50l plus the tree dlc_test50l_costumes = the six costumes of the Xbox costume packs converted with the pipeline (pack1 Wetsuit: dlc_costume_k Red Drysuit, dlc_costume_p Blue Wetsuit; pack2 Classic: dlc_costume_a Classic Lara, dlc_costume_h Legend Lara; pack20 Designer: dlc_costume_l Fashion Winner, dlc_costume_m People\u0027s Choice). No table change: outfit images, names and object lists are already installed; the loading-screen script offers a slot when dlc_costume_X.drm exists (dlcsystem f1). TruMenu [Test] AutoStart removed: start DLC 1 through the mission screen (outfit list). Docs docs\\COSTUMES.md, workspace docs\\Befund-Kostueme-Port.md.",
+    "description":  "05.11. sequence-repeat fix (Befund-Seq-Baeume-0511.md, Add-SeqTrees.ps1): appended last dlc_test51q_dungeon + dlc_test51r_seq2_50l. Costume packs (03.11.): the morning state of regress_shadowlara_50l plus the tree dlc_test50l_costumes = the six costumes of the Xbox costume packs converted with the pipeline (pack1 Wetsuit: dlc_costume_k Red Drysuit, dlc_costume_p Blue Wetsuit; pack2 Classic: dlc_costume_a Classic Lara, dlc_costume_h Legend Lara; pack20 Designer: dlc_costume_l Fashion Winner, dlc_costume_m People\u0027s Choice). No table change: outfit images, names and object lists are already installed; the loading-screen script offers a slot when dlc_costume_X.drm exists (dlcsystem f1). TruMenu [Test] AutoStart removed: start DLC 1 through the mission screen (outfit list). Docs docs\\COSTUMES.md, workspace docs\\Befund-Kostueme-Port.md.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -180,6 +180,41 @@
                                   "dlc_costume_l.drm":  "3017f02b87e7be15e14e360b1a8b94a6",
                                   "dlc_costume_m.drm":  "776a3f3c0f02aca638608597f2e5a696",
                                   "dlc_costume_p.drm":  "30a7dc9905ab0e9c98e8d68cc916d1a9"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test51q_dungeon/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_fx_cine_thrall_death.drm":  "0fd61eb0c8241cf9579bb84f28ae30df",
+                                  "dlc_fx_goo_machine_column_core.drm":  "ee010dd09200fc35203bb9bae0ae86d1"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test51r_seq2_50l/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_yggdrasil_end.drm":  "3e7ce9ff3e0a6903ca6ca91021c1b022",
+                                  "dlc_yggdrasil_hall02.drm":  "f46b56dcbe3c1e52c8b72e894c5f887f",
+                                  "dlc1_uo_crushers.drm":  "1b90aed9f1d0633d6c0a024f50264276",
+                                  "dlc2_ceremony_room.drm":  "56804f5f7ec6f0c6d267446034874502",
+                                  "dlc2_checkpoint.drm":  "33123d6386327bd82bbfe3d802644ca3",
+                                  "dlc2_goo_room.drm":  "f9f8f3f71f526015c71378df542cb2e0",
+                                  "dlc2_hall_ceremony_goo.drm":  "e0d0d4ee79b2c28292f71c96cb95521c",
+                                  "dlc2_hall_goo_machine.drm":  "4b0b14fefb3b29360ffa066947dd5c64",
+                                  "dlc2_hall_machine_ceremony.drm":  "75e1319feb27d9cc9e223f641b387f8c",
+                                  "dlc2_machine_room.drm":  "776e08df128786d7bfe36e2b62069d93",
+                                  "dlc2_treasure_room_cine.drm":  "42adf17d4833f97c6a82467dd5362781",
+                                  "dlc2_uo_goo_grinder.drm":  "cc03d439fd7c7c9579f1593e7920fbbd",
+                                  "dlc2_uo_gooconverter.drm":  "aa2a29a393d36537716f86877d878ee1",
+                                  "dlc2_uo_treadmill_block_spawner.drm":  "55c9f43638c1372d469b3c5553923ad3",
+                                  "doppelganger_casual.drm":  "d9f03c93dc4a7a8c7a7252721c620ec8"
                               }
                   }
               ],
