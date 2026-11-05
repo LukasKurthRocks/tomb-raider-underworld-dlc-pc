@@ -18,10 +18,18 @@ reference at object +8, follows the internal pointers of D (relocation table) an
   ok   summary per object with the number of groups and texture ids
 
 Usage (from the repository root):
-  ../bin/pyt -t 900 tools/objdata_texlist_check.py PATH [PATH ...] [--maxn 64] [--all]
-    PATH = .drm file or folder (not recursive); --all also prints the objects without problems
+  ../bin/pyt -t 900 tools/objdata_texlist_check.py PATH [PATH ...] [--maxn 64] [--all] [-r] [--dedupe]
+    PATH = .drm file or folder (not recursive unless -r); --all also prints the objects without problems;
+    --dedupe checks each file content (md5) once and prints the unique problem files at the end
+  ../bin/pyt -t 900 tools/objdata_texlist_check.py --profile PROFILE.json [--profile ...] [--base DIR]
+    (agent F25, 05.11.2026, crash paket17a in dlc_dungeon) what a test profile ends up installing: the last source of
+    every .drm (the tree order of Install-TruTree, tools/profile_last_source.py), plus with --base the .drm files of
+    DIR (recursive, e.g. the game mods folder) that no tree of the profile brings. PROFILE may be a glob
+    ("tests/profiles/paket*.json"); one result line per profile. Note: --base is taken as it stands - a game folder
+    that still holds the trees of an earlier run is not the clean base install.
+Exit code: 0 = no problem found, 1 = at least one problem (usable as a gate before a package is built).
 """
-import sys, os, struct
+import sys, os, struct, glob, hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW, drm_reloc as R
 
@@ -29,14 +37,34 @@ LISTS = [(0x0c, 0x10, 0x17c, (0x110,)), (0x14, 0x18, 0x2c, (0x20,)), (0x1c, 0x20
          (0x24, 0x28, 0xb8, (0x64, 0x68)), (0x2c, 0x30, 0x64, (0x48,)), (0x54, 0x58, 0x3c, (4, 8))]
 
 
-def files(paths):
+def files(paths, recursive=False):
     for p in paths:
         if os.path.isdir(p):
+            if recursive:
+                for r, _, fs in sorted(os.walk(p)):
+                    for n in sorted(fs):
+                        if n.lower().endswith('.drm'):
+                            yield os.path.join(r, n)
+                continue
             for n in sorted(os.listdir(p)):
                 if n.lower().endswith('.drm'):
                     yield os.path.join(p, n)
         else:
             yield p
+
+
+def profile_files(profile, base):
+    """.drm paths a profile ends up installing (last tree source), plus the base files no tree brings."""
+    import profile_last_source as PLS
+    m = PLS.installed_map(profile)
+    out = [path for rel, (path, src, k) in sorted(m.items()) if rel.endswith('.drm')]
+    nbase = 0
+    if base:
+        for path in files([base], True):
+            rel = os.path.relpath(path, base).replace('\\', '/').lower()
+            if rel not in m:
+                out.append(path); nbase += 1
+    return out, nbase
 
 
 def check_drm(path, maxn, show_all):
@@ -111,14 +139,50 @@ def main():
     if '--maxn' in a:
         k = a.index('--maxn'); maxn = int(a[k + 1]); del a[k:k + 2]
     show_all = '--all' in a
-    a = [x for x in a if x != '--all']
+    recursive = '-r' in a
+    dedupe = '--dedupe' in a
+    a = [x for x in a if x not in ('--all', '-r', '--dedupe')]
+    base = None
+    if '--base' in a:
+        k = a.index('--base'); base = a[k + 1]; del a[k:k + 2]
+    profiles = []
+    while '--profile' in a:
+        k = a.index('--profile')
+        pat = a[k + 1]; del a[k:k + 2]
+        profiles += sorted(glob.glob(pat)) or [pat]
+    if profiles:
+        nbadp = 0
+        for p in profiles:
+            fl, nbase = profile_files(p, base)
+            tot = bad = 0
+            for f in fl:
+                o, b = check_drm(f, maxn, show_all)
+                tot += o; bad += b
+            nbadp += 1 if bad else 0
+            print('PROFILE %s: files %d (%d from the base), objects with object-data DTP %d, with problems %d'
+                  % (os.path.basename(p), len(fl), nbase, tot, bad))
+        print('profiles %d, with problems %d' % (len(profiles), nbadp))
+        return 1 if nbadp else 0
     tot = bad = nf = 0
-    for f in files(a):
+    seen = {}
+    badfiles = []
+    for f in files(a, recursive):
+        if dedupe:
+            h = hashlib.md5(open(f, 'rb').read()).hexdigest()
+            if h in seen:
+                continue
+            seen[h] = f
         nf += 1
         o, b = check_drm(f, maxn, show_all)
         tot += o; bad += b
-    print('files %d, objects with object-data DTP %d, with problems %d' % (nf, tot, bad))
+        if b and dedupe:
+            badfiles.append((h, f))
+    print('files %d%s, objects with object-data DTP %d, with problems %d' % (
+        nf, ' (unique md5)' if dedupe else '', tot, bad))
+    for h, f in badfiles:
+        print('UNIQUE-BAD %s %s' % (h, f.replace('\\', '/')))
+    return 1 if bad else 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

@@ -2391,6 +2391,15 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      converter rule would have to type the D+0x68 groups and the 0x17c record like the base layout. Check gate for
      every tree: `dlc_struct_fixes.py check <mods>` (or `objdata_texlist_check.py` / `objdata_rec_classes.py scan`)
      must report 0.
+   * 2026-11-05 (agent F25): the same count crashed DLC 1 - write AV at `tru+0x12b4a0` 22 s after `level.load
+     dlc_dungeon`, object 912 `dlc_fx_cine_thrall_death` (object table entry 95, D = DTP 20369, group 4 of 7 at
+     D+0xdc = 0x04000000, 2 516 152 ids / 9.6 MB masked until an unmapped page; `tools/texgroup_crash_identify.py
+     DUMP --drm FILE` reads this from a minidump and matches D with the file, 38 / 38 dwords). Cause: the B138 DLC 1
+     copy (pack10, 4 groups) is fine, but `dlc_test50l_merged` installs the DLC 2 copy (pack11, raw count) under the
+     same name (finding 38), and the packages of the costume line (paket12 / 12b / 13 / 14 / 17a / 17b, also 04 and
+     the regress profiles) never stack `dlc_test51c_objfx`. Fix tree `work/rebuild/dlc_test51q_dungeon` (2 DRMs,
+     md5-identical to the 51c copies). Gate per package: `objdata_texlist_check.py --profile PROFILE.json --base
+     <game mods>` (new option, exit 1 on a problem) checks what a profile ends up installing.
 
 48. **The night's stand-alone fixes are pipeline steps; the breath-sound ids must be translated, not only
     byte-swapped (2026-11-04, agent N11; workspace docs Befund-Pipeline-Integration-0411.md).**

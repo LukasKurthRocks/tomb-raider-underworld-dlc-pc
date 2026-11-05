@@ -38,7 +38,9 @@ steps, docs Befund-Pipeline-Integration-0411.md). Diagnostic builds (e.g. 48i_te
 material 25521) are never steps.
 Check mode (objtex / objrec / objid only; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
   ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid] [--pack pack11] [--report R.json]
-        nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok
+        nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
+        objtex also runs the pack-independent structural check of tools/objdata_texlist_check.py on every DRM (a DTP
+        whose Xbox copy of the chosen pack has another layout is skipped by the comparison, 2026-11-05 dlc_dungeon)
 
 translist / actlist / condlist run only on player charts (>= statechart_fix_tree.MIN_COND condition records of the title update's
 ids; DLC 2 doppelganger_casual DTP 20212) with the base pair lara.drm (Xbox layer2 12647 / PC 850, extracted on demand).
@@ -487,11 +489,26 @@ def run_check(tree, steps, names=None, report=None):
         S = Steps(tmp, None)
         for rel, path in sorted(DA.overlay([os.path.abspath(tree)], names).items()):
             n += 1
+            if 'objtex' in steps and rel.lower().endswith('.drm'):
+                # pack-independent structural check (agent F25 2026-11-05): the Xbox comparison above skips a DTP whose
+                # Xbox copy has another layout - e.g. the DLC 2 (pack11) dlc_fx_cine_thrall_death checked against the
+                # pack10 copy ("u16 group count +0x64 Xbox 4 PC 7", 0 words, check ok) - so a raw group count
+                # (0x04000000, crash tru+0x12b4a0 in DLC 1 dlc_dungeon) passed; objdata_texlist_check walks the groups
+                # of the PC file alone and fails on a count > 64 / byte-swapped / past the DTP end
+                import objdata_texlist_check as TLC
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    _, nbad_tl = TLC.check_drm(path, 64, False)
+                if nbad_tl:
+                    rep['objtex']['files'].append(rel)
+                    rep['objtex']['lines'] += ['objtex %s: structural (pack independent): %s' % (
+                        rel, ' | '.join(x.strip() for x in buf.getvalue().splitlines()))]
             if raw_dlc(rel.replace('/', '\\'))[0] is None and raw_dlc(os.path.basename(rel))[0] is None:
                 nox.append(rel); continue
             for s in steps:
                 log = []
-                if S.process(rel, path, [s], log, collections.Counter()) is not None: rep[s]['files'].append(rel)
+                if S.process(rel, path, [s], log, collections.Counter()) is not None and rel not in rep[s]['files']:
+                    rep[s]['files'].append(rel)
                 rep[s]['lines'] += log
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
