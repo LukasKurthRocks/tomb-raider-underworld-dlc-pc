@@ -1,0 +1,16 @@
+{
+ "rule": "PC ids of the pipeline step `scriptclash` (tools/script_clash_fix.py, docs/WINDOWS_REBUILD.md findings 45 / 46): a DLC script class re-authored under the id of an always-resident PC script (pc:generalbank.drm) with another instance layout, which DLC classes derive from, gets its own id. Key = old id : instance size / align : member offset.kind list of the DLC copy. Entries never change (rebuilds keep their ids); a new group gets max(PC index, DLC id table, this file, tree) + 1 and is appended.",
+ "ids": [
+  {
+   "type": 8,
+   "old": 12433,
+   "key": "12433:8/4:4.10",
+   "new": 26884,
+   "size": 8,
+   "members": 1,
+   "resident_size": 16,
+   "resident_members": 3,
+   "note": "DLC 2 thrall base class (Xbox 8453, pack11): health +4; resident main-game 12433: playersensor +4 / +8, health +12. Test tree dlc_test51a_thrall (2026-11-04)."
+  }
+ ]
+}

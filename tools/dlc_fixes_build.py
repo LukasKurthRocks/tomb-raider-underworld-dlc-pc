@@ -29,6 +29,16 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          (tools/dlc_structure_audit.py, ~20 min), object child id list by name, player-chart transition lists, state
          records / activity entries and the condition records every transition lists, object event lists, model record list stride 36 -> 40, own fade pixel-shader libraries of the TU-drawn
          player objects, anim event lists, object markup records, VM literals
+  objtex, objrec, objid (ours, 2026-11-04, findings 47 / 48) after markup, also tools/dlc_struct_fixes.py: texture group
+         counts of the object data DTP as the Xbox u32 (F16 machine_column crash), the 0x17c particle records by the 66
+         proven byte classes (F3 / B24 crash tru+0x42e62), the player data breath-sound ids +0x94 / +0x98 as one u32
+         (doppelganger_casual 0x68f40000); only words whose PC bytes are another byte order of the Xbox word, each
+         written DRM proven (only the planned bytes differ, headers / relocations identical, re-check 0)
+  objevent, idword, animlist, fxnode, statevm, chartid (ours, 2026-11-03, finding 44) the converter fault families
+         that the crash dumps of tests 50d-50j uncovered (tools/converter_faults_fix.py, rules proven on x_lara /
+         pc_lara): object event list words and their sub-0x32 id word, anim event list words, effect node headers and
+         type-1 ids, state-VM code words, state-chart id values of types 3 / 5. Sections paired by position; base-mapped
+         sections (renumbered base DTPs) are reported, never changed; any word a rule cannot explain stops the build
   uirecord (ours, finding 43) UI text element records of the new DLC scripts by Crystal's PC conversion rules (w1/w3
          as u32 instead of swapped halves, the PC word 0x00010000, -1.0f) - tools/script_records_dlc.py; after the
          other script fixes, so it sees the final scripts (it only touches type-8 records; test 34, played
@@ -36,7 +46,12 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
   achievement (ours, finding 43, test 40) script calls into the title update's achievement natives f16-f20, which
          the PC exe lacks (16 natives instead of 21): call sequence -> its line marker, relocation dropped
          (tools/script_missing_native_fix.py; DLC 1 treasure room, DLC 2 halls and Yggdrasil end; 1 + 10 calls).
-         Last: it only touches script code words and their relocations
+         It only touches script code words and their relocations
+  scriptclash (ours, findings 45 / 46, 2026-11-04) DLC script classes re-authored under the id of an always-resident
+         PC generalbank script with another instance layout (DLC 2 thrall base 12433: 8 instead of 16 bytes - the
+         unload crash tru+0x1976a3) get their own PC id from docs/data/script_clash_ids.json (12433 -> 26884), by
+         rule (tools/script_clash_fix.py: resident id, no native, other instance layout, a DLC class derives from
+         it); section ids and type-8 id references only. Last: it renumbers ids, so it sees the final sections
 
 Report: <OUT>/../fixes_report.json (per fix: files, log lines).
 
@@ -315,10 +330,40 @@ def _struct_fix(step):
 # proven structure fixes after `statechart`: the base-twin pass first (byte-order errors of every same-size section of
 # the DLC 2 player files), then the record layouts in the order the test trees 47 / 48c-48m were built in - a proven
 # layout always has the last word
+# objtex / objrec / objid (2026-11-04, agent N11): the object data DTP fixes of N7 / N8 after markup (no other step
+# touches the object data DTP); tools/Invoke-TruPipeline.ps1 checks them afterwards (dlc_struct_fixes.py check)
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
-                'markup', 'vmliteral')
+                'markup', 'objtex', 'objrec', 'objid', 'vmliteral')
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
- fix_markup, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+ fix_markup, fix_objtex, fix_objrec, fix_objid, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+
+
+def _fault_fix(step):
+    """one converter fault family of tools/converter_faults_fix.py over the tree (2026-11-03, finding 44: the classes
+    the crash dumps of tests 50d-50j found, each rule proven on x_lara / pc_lara); srcs: as in fix_uitext (out is read
+    too and wins). Fails (SystemExit) on any word the rule cannot explain - nothing is guessed."""
+    def fn(out, srcs=None):
+        sys.path.insert(0, HERE)
+        import converter_faults_fix as CF
+        dirs = [os.path.abspath(s) for s in (srcs or [])] + [os.path.abspath(out)]
+        logs = []
+        r = CF.run_tree(dirs, out, [step], log=logs.append)
+        CF.summary(r, log=logs.append)
+        if r['unexpected'] or r['files_without_xbox_original']:
+            for l in logs: print('  ', l, flush=True)
+            raise SystemExit('converter fault step %s: %d unexpected word(s), %d DRM(s) without an Xbox original - see the '
+                             'UNEXPECTED / NO XBOX ORIGINAL lines' % (step, len(r['unexpected']), len(r['files_without_xbox_original'])))
+        return {'files': r['written'], 'log': logs, 'counts': r['counts'][step], 'changes': r['changes'],
+                'kept_base_mapped': r['kept_base_mapped']}
+    fn.__name__ = 'fix_' + step
+    return fn
+
+
+# the converter fault families (tools/converter_faults_fix.STEPS), after the structure steps: objevent / animlist re-check
+# the event lists eventlist / animfx already set (base-pair rules of x_lara / pc_lara plus the sub-0x32 id word), the
+# others are classes no earlier step touches
+FAULT_STEPS = ('objevent', 'idword', 'animlist', 'fxnode', 'statevm', 'chartid')
+(fix_objevent, fix_idword, fix_animlist, fix_fxnode, fix_statevm, fix_chartid) = (_fault_fix(s) for s in FAULT_STEPS)
 
 
 UIRECORD_SKIP = {'g_pda.drm'}      # merged g_pda of the DLC 2 tree: not installed (finding 40), left as built
@@ -368,10 +413,23 @@ def fix_achievement(out, srcs=None):
     return {'files': files, 'log': log}
 
 
+def fix_scriptclash(out, srcs=None):
+    """DLC copies of always-resident PC scripts with another instance layout that DLC classes derive from: own PC
+    id (findings 45 / 46; tools/script_clash_fix.run_tree, in place over OUT; reference pc:generalbank.drm, the PC
+    patch version - read-only). srcs: not used (the rule needs the whole tree, which OUT already is). Ids come from
+    docs/data/script_clash_ids.json; a new group is appended there and reported. Fails (SystemExit) when an id is
+    taken or a rewritten DRM does not verify (other words changed, old references left)."""
+    sys.path.insert(0, HERE)
+    import script_clash_fix as SCF
+    log = []
+    r = SCF.run_tree(out, out, log=log.append)
+    return {'files': r['files'], 'log': log, 'mapping': r['mapping'], 'stats': r['stats'], 'vt_only': r['vt_only']}
+
+
 FIXES = [('cine', fix_cine), ('float', fix_float), ('tag404', fix_tag404), ('cloth', fix_cloth), ('uipath', fix_uipath), ('uitext', fix_uitext), ('postfix', fix_postfix),
          ('analog', fix_analog), ('statechart', fix_statechart),
-         ] + [(s, globals()['fix_' + s]) for s in STRUCT_STEPS] + [
-         ('uirecord', fix_uirecord), ('achievement', fix_achievement)]
+         ] + [(s, globals()['fix_' + s]) for s in STRUCT_STEPS] + [(s, globals()['fix_' + s]) for s in FAULT_STEPS] + [
+         ('uirecord', fix_uirecord), ('achievement', fix_achievement), ('scriptclash', fix_scriptclash)]
 
 
 def main(argv):

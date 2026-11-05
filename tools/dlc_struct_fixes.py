@@ -6,14 +6,24 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
   actlist    tools/state_actlist_fix.py     state record headers, activity entries, u16 lists +0x18 / +0x20 (test 48)
   eventlist  tools/obj_eventlist_fix.py     the object event list (type-11 object +4) of every object (test 48c)
   reclist    tools/model_reclist_fix.py     model DTP record list 36 -> 40 bytes where the PC kept the Xbox stride (48d)
-  animfx     tools/animfx_list_fix.py       anim event lists (u32 0 head) of every DRM (test 48g ledge crash)
+  animfx     tools/animfx_list_fix.py       anim event lists (u32 0 head) of every DRM (test 48g ledge crash); lists of
+             renumbered base DTPs (Xbox partner by position has another id) are skipped (2026-11-03, finding 44)
   childids   tools/dlc2_player_fix.py ids   object child id list (chart +0x48) remapped by name (DLC 2 objects)
   fadeslots  tools/fade_slots_translate.py  own fade (odd-slot) pixel-shader libraries for the TU-drawn player
              objects FADE_OBJECTS (test 48e-48g): build from the file's libraries with empty odd slots, new ids from
              FADE_FIRST_ID in library order, then apply (materials' PS slots old -> new)
   markup     tools/markup_fix.py            object markup records (0x5c bytes; DLC 2 machine column ids, 2026-11-01)
   vmliteral  tools/vm_literal_fix.py        VM literals after opcode 2 = one u32 (test 48l crash, 48m)
-  twins      tools/dlc_structure_audit.py   base-twin truth for every same-size section of TWIN_FILES (the DLC 2
+  objtex     tools/objdata_fx_fix.py        object data DTP (object +8) texture group counts {u32 n, ids} at D+0x68 =
+             the Xbox u32 (F16 2026-11-04: a raw 0x03000000 made tru+0x12b360 AND 0x1fff over 50 M dwords)
+  objrec     tools/objdata_fx_fix.py        0x17c particle records of the object data DTP by the 66 byte classes
+             proven on the base pairs (F3 / B24 2026-11-04: +0x148 anim byte 0x41 = 65 -> crash tru+0x42e62); every
+             copy of the DTP; only words whose PC bytes are another byte order of the Xbox word
+  objid      tools/objdata_idword_fix.py    player data block (DTP +0xc8 pointer) +0x94 / +0x98 breath-sound section ids
+             = one u32 where the converter wrote two u16 and the Xbox u32 names a section of the same file (N8
+             2026-11-04: doppelganger_casual DTP 20212 0x68f40000 -> 26868, TruDataGuard 'invalid id' at tru+0x194cad);
+             the generic u16-pair candidates of objdata_idword_fix scan are NOT repaired
+  twins     tools/dlc_structure_audit.py   base-twin truth for every same-size section of TWIN_FILES (the DLC 2
              player objects): only byte-order errors, re-authored words are left alone; runs first (before the
              layout steps, so a proven layout always has the last word - e.g. the u16 transition list word +0x4c550
              of DTP 20212, where the twins' raw block disagrees with state_translist_fix / state_actlist_fix)
@@ -21,8 +31,14 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              proven transition / record layouts (2026-11-02: 134 records such as {800,501}, {500,1} left u32-swapped
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
-eventlist, reclist, fadeslots, animfx, markup, vmliteral. Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of
+eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, vmliteral (objtex / objrec / objid since
+2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
+dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
+steps, docs Befund-Pipeline-Integration-0411.md). Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of
 material 25521) are never steps.
+Check mode (objtex / objrec / objid only; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
+  ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid] [--pack pack11] [--report R.json]
+        nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok
 
 translist / actlist / condlist run only on player charts (>= statechart_fix_tree.MIN_COND condition records of the title update's
 ids; DLC 2 doppelganger_casual DTP 20212) with the base pair lara.drm (Xbox layer2 12647 / PC 850, extracted on demand).
@@ -40,7 +56,7 @@ import drm_write as DW, drm_reloc as R
 
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
-       'vmliteral')
+       'objtex', 'objrec', 'objid', 'vmliteral')
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (markup_level.py --objects; 23 = TU type)
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -63,7 +79,7 @@ def encode(PD, like):
 class Steps:
     def __init__(self, tmp, objlist=None):
         self.tmp = tmp; self._oe = self._af = None; self._refs = None; self._ids = None
-        self.objlist = objlist
+        self.objlist = objlist; self._objrules = None
 
     # ---- shared inputs, built once per run
     def oe_table(self):
@@ -166,23 +182,34 @@ class Steps:
 
     def s_animfx(self, rel, xf, XD, cur):
         import animfx_list_fix as AF
+        import converter_faults_fix as CF
         T = self.af_table(); PD = DW.read(cur, 'le')
         res = AF.check_lists(T, XD, PD)
+        # check_lists pairs the lists by DTP id; a PC list whose Xbox partner by position (the converter keeps the
+        # section order, CF.pairs_by_position) has another id is a renumbered base DTP, and the Xbox list of the same
+        # id is an unrelated one (id coincidence: dlc_costume_* / lara_doppelganger DTPs 1183, 1444, 1799, 2012 got
+        # foreign frames, 2026-11-03 finding 44) - skipped; tools/converter_faults_fix.py animlist checks them
+        own = {id(p) for k, x, p in CF.pairs_by_position(XD, PD) if x.id == p.id}
+        skipped = sum(1 for r in res if r[2] is not None and r[3] and id(r[1]) not in own)
+        res = [r for r in res if id(r[1]) in own]
         n = nl = 0
         for xl, pl, wk, diffs, unk in res:
             if wk is None or not diffs: continue
             b = bytearray(pl.data)
             for o, kk, x4, p4, want in diffs: b[o:o + 4] = want; n += 1
             pl.data = bytes(b); nl += 1
-        if not n: return None, None
+        note = ('; %d base-mapped list(s) with an id-coincident Xbox list skipped' % skipped) if skipped else ''
+        if not n: return None, (('animfx %s: 0 words set' % rel) + note) if skipped else None
         new = encode(PD, cur)
-        again = AF.check_lists(T, XD, DW.read(new, 'le'))
+        ND = DW.read(new, 'le')
+        own2 = {id(p) for k, x, p in CF.pairs_by_position(XD, ND) if x.id == p.id}
+        again = [r for r in AF.check_lists(T, XD, ND) if id(r[1]) in own2]
         crash = 0
         for xl, pl, wk, diffs, unk in again:
             if wk is None: continue
             crash += sum(1 for b in AF.branch_report(xl.data, pl.data, wk[1]) if b[3] == 1 and b[1] < 3)
-        return new, 'animfx %s: %d words in %d lists set; re-check %d words differ, %d effect records with < 3 words' % (
-            rel, n, nl, sum(len(r[3]) for r in again), crash)
+        return new, 'animfx %s: %d words in %d lists set; re-check %d words differ, %d effect records with < 3 words%s' % (
+            rel, n, nl, sum(len(r[3]) for r in again), crash, note)
 
     def s_reclist(self, rel, xf, XD, cur):
         import model_reclist_fix as MR
@@ -293,6 +320,56 @@ class Steps:
         if not n_all: return None, ('markup %s: %s' % (rel, '; '.join(notes))) if notes else None
         return encode(PD, cur), 'markup %s: %s' % (rel, '; '.join(notes))
 
+    def s_objtex(self, rel, xf, XD, cur):
+        return self._objdata(rel, XD, cur, 'objtex', 'texcount')
+
+    def s_objrec(self, rel, xf, XD, cur):
+        return self._objdata(rel, XD, cur, 'objrec', 'rec')
+
+    def _objdata(self, rel, XD, cur, name, step):
+        """tools/objdata_fx_fix.py step on one DRM; the written bytes are proven (decoded DRM differs only in the planned
+        bytes, headers / relocations identical, re-check 0) - a failed proof leaves the DRM unchanged"""
+        import objdata_fx_fix as OF
+        if step == 'rec' and self._objrules is None: self._objrules = OF.load_rules()
+        PD = DW.read(cur, 'le')
+        changes, notes = OF.fix_drm(XD, PD, [step], self._objrules or {})
+        odd = [n for n in notes if 'words set' not in n]
+        if not changes:
+            return None, ('%s %s: 0 words; %s' % (name, rel, '; '.join(odd))) if odd else None
+        new = encode(PD, cur)
+        try:
+            proof = OF.verify(cur, new, changes, XD, [step], self._objrules or {})
+        except AssertionError as e:
+            return None, '%s %s: proof failed (%s) - nothing changed' % (name, rel, e)
+        return new, '%s %s: %d words (%s);%s' % (name, rel, len(changes),
+                                               '; '.join(n for n in notes if 'words set' in n and ': 0 words' not in n),
+                                               proof[0].replace('  proof:', ''))
+
+    def s_objid(self, rel, xf, XD, cur):
+        """player data breath-sound ids +0x94 / +0x98 of the +0xc8 data block (tools/objdata_idword_fix.fix_drm, N8
+        2026-11-04: doppelganger_casual DTP 20212 0x68f40000 -> 26868); proven class only. Proof: the decoded DRM
+        differs from the input only in the planned bytes, headers / relocations identical, re-check plans 0 words"""
+        import objdata_idword_fix as IW
+        PD = DW.read(cur, 'le')
+        changes, lines, cnt = IW.fix_drm(XD, PD)
+        if not changes: return None, None
+        new = encode(PD, cur)
+        D0, D1 = DW.read(cur, 'le'), DW.read(new, 'le')
+        planned = {(k, o + j) for k, o, a, b in changes for j in range(4) if a[j] != b[j]}
+        got = set()
+        for k, (a, b) in enumerate(zip(D0.sections, D1.sections)):
+            if (a.type, a.id, a.flags, a.ver, a.spec, a.pad, bytes(a.reloc), len(a.data)) != \
+               (b.type, b.id, b.flags, b.ver, b.spec, b.pad, bytes(b.reloc), len(b.data)):
+                return None, 'objid %s: proof failed (section %d header / relocation changed) - nothing changed' % (rel, k)
+            got |= {(k, i) for i in range(len(a.data)) if a.data[i] != b.data[i]}
+        if got != planned or len(D0.sections) != len(D1.sections) or (D0.names, D0.pad) != (D1.names, D1.pad):
+            return None, 'objid %s: proof failed (%d bytes differ, %d planned) - nothing changed' % (rel, len(got), len(planned))
+        again = IW.fix_drm(XD, DW.read(new, 'le'))[0]
+        if again: return None, 'objid %s: proof failed (re-check plans %d words) - nothing changed' % (rel, len(again))
+        return new, 'objid %s: %d words (%s); proof: %d bytes differ = planned, headers + relocations identical, ' \
+                    're-check 0' % (rel, len(changes), ', '.join('DTP %d +0x%x %s -> %s' % (
+                        PD.sections[k].id, o, a.hex(), b.hex()) for k, o, a, b in changes), len(got))
+
     def s_vmliteral(self, rel, xf, XD, cur):
         """VM literals after opcode 2 (tools/vm_literal_fix.py, test 48l: one u32 whatever it holds)"""
         # the check of vm_literal_fix.check, but only byte-order errors are set: a literal whose PC value is no byte
@@ -395,11 +472,57 @@ def run_twins(srcs, out, names, tmp):
     return files, log
 
 
+CHECK_STEPS = ('objtex', 'objrec', 'objid')   # steps with a check mode (no tool run, no shared corpus pass)
+
+
+def run_check(tree, steps, names=None, report=None):
+    """check mode (2026-11-04, agent N11): run the steps on every DRM of TREE in memory, write nothing; exit code 1 when
+    any DRM would change (a fix left out), 0 otherwise. Report: JSON {step: {files, lines}}."""
+    import dtp_audit as DA, json
+    tmpdir = os.path.join(W, 'statechart'); os.makedirs(tmpdir, exist_ok=True)
+    tmp = tempfile.mkdtemp(prefix='structchk_', dir=tmpdir)
+    rep = {s: {'files': [], 'lines': []} for s in steps}; n = 0; nox = []
+    from convert_dlc import raw_dlc
+    try:
+        S = Steps(tmp, None)
+        for rel, path in sorted(DA.overlay([os.path.abspath(tree)], names).items()):
+            n += 1
+            if raw_dlc(rel.replace('/', '\\'))[0] is None and raw_dlc(os.path.basename(rel))[0] is None:
+                nox.append(rel); continue
+            for s in steps:
+                log = []
+                if S.process(rel, path, [s], log, collections.Counter()) is not None: rep[s]['files'].append(rel)
+                rep[s]['lines'] += log
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    bad = sum(len(v['files']) for v in rep.values())
+    print('check %s: %d DRMs, %d without an Xbox original (not checked)%s' % (
+        tree, n, len(nox), (': ' + ', '.join(nox[:10])) if nox else ''))
+    import re
+    for s in steps:
+        rep[s]['words'] = sum(int(m.group(1)) for m in (re.match(r'%s \S+: (\d+) words' % s, l) for l in rep[s]['lines']) if m)
+        print('check %-7s %d of %d DRMs would change, %d words%s' % (s, len(rep[s]['files']), n, rep[s]['words'],
+                                                          (': ' + ', '.join(rep[s]['files'][:20])) if rep[s]['files'] else ''))
+        for l in rep[s]['lines'][:200]: print('   ', l[:400])
+    print('check: %s' % ('FAIL - %d file/step pair(s) still to fix' % bad if bad else 'ok (%d DRMs, steps %s)' % (n, ','.join(steps))))
+    if report:
+        os.makedirs(os.path.dirname(os.path.abspath(report)), exist_ok=True)
+        json.dump(dict(tree=tree, drms=n, no_xbox_original=nox, steps=list(steps), result='fail' if bad else 'ok', per_step=rep),
+                  open(report, 'w', encoding='utf-8'), indent=1)
+    return 1 if bad else 0
+
+
 def main(argv):
     names = None; steps = None
     if '--names' in argv: k = argv.index('--names'); names = set(argv[k + 1].split(',')); del argv[k:k + 2]
     if '--steps' in argv: k = argv.index('--steps'); steps = argv[k + 1].split(','); del argv[k:k + 2]
     if '--pack' in argv: k = argv.index('--pack'); os.environ['TRUDLC_PACK_FIRST'] = argv[k + 1]; del argv[k:k + 2]
+    if argv and argv[0] == 'check':
+        rep = None
+        if '--report' in argv: k = argv.index('--report'); rep = argv[k + 1]; del argv[k:k + 2]
+        steps = steps or list(CHECK_STEPS)
+        if len(argv) != 2 or any(s not in CHECK_STEPS for s in steps): raise SystemExit(__doc__)
+        sys.exit(run_check(argv[1], [s for s in ALL if s in steps], names, rep))
     if len(argv) != 2 or not steps or any(s not in ALL for s in steps): raise SystemExit(__doc__)
     ol = os.path.join(argv[0], 'tr8', 'pc-w', 'objectlist.txt')
     files, log = run_tree([argv[0]], argv[1], [s for s in ALL if s in steps], names, ol if os.path.exists(ol) else None)

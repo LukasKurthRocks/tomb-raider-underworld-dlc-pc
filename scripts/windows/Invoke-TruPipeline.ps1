@@ -10,7 +10,8 @@
 
     Steps (in order):
       Index    tools\index_all.py (3x)        which DRM sits where, with section lists
-               -> work\idx_pc.json (bigfile + patch.000), idx_xbox_base.json (layers + TU), idx_dlc.json (pack10/11)
+               -> work\idx_pc.json (bigfile + patch.000), idx_xbox_base.json (layers + TU), idx_dlc.json (pack10/11 and,
+               since 2026-11-03, the costume packs pack1/2/20 after them)
       Cache    tools\generic_cache.py        pair the base-game DRMs Xbox <-> PC  -> work\generic\pairs.pkl
                tools\generic_cache.py patch   runtime pairs (Xbox TU / PC patch.000) -> work\generic\pairs_patch.pkl
       Ids      generic_store, generic_ids, objlists_extract (our reconstruction), objlist_merge
@@ -45,8 +46,40 @@
                twins / childids / translist / actlist / condlist / eventlist / reclist / fadeslots / animfx / markup /
                vmliteral (2026-11-01/02) apply the structure layouts proven on the base pairs
                (tools/dlc_struct_fixes.py, tests 47 / 48 / 48c-48m; twins ~20 min);
-               achievement (2026-10-31, last) drops the 11 script calls into the title update's achievement natives
-               f16-f20 that the PC exe lacks (1 in DLC 1, 10 in DLC 2)
+               objtex / objrec / objid (2026-11-04, after markup, findings 47 / 48) set the object data DTP faults:
+               texture group counts (F16 machine room), particle record byte classes (F3 / B24) and the player data
+               breath-sound ids (doppelganger_casual 0x68f40000); dlc_struct_fixes check runs on each output tree
+               (exit 1 on a word left, report <tree>\objdata_check.json);
+               objevent / idword / animlist / fxnode / statevm / chartid (2026-11-03, finding 44) set the converter
+               fault families that crash dumps of tests 50d-50j uncovered (tools/converter_faults_fix.py: event list
+               words and sub-0x32 ids, anim event list words, effect node headers / type-1 ids, state-VM code words,
+               state-chart id values); the step first proves every rule on the base pair (converter_faults_fix proof)
+               and checks each output tree afterwards (converter_faults_fix check: exit 1 on any wrong or unexpected
+               word, report <tree>\converter_faults_check.json);
+               achievement (2026-10-31) drops the 11 script calls into the title update's achievement natives
+               f16-f20 that the PC exe lacks (1 in DLC 1, 10 in DLC 2);
+               scriptclash (2026-11-04, last, finding 46) gives DLC script classes re-authored under the id of an
+               always-resident PC generalbank script with another instance layout their own PC id (rule in
+               tools/script_clash_fix.py, ids in docs/data/script_clash_ids.json: DLC 2 thrall base 12433 -> 26884,
+               16 DRMs; DLC 1: nothing); script_clash_fix check runs on each output tree (exit 1 on a clash left,
+               report <tree>\script_clash_check.json).
+               -FixesOut DIR (relative to the repository) writes DIR\dlc1\mods and DIR\dlc2\mods instead of
+               work\rebuild\asm_stage2b and dlc2_asm_stage2b (check runs that must not replace the usual outputs)
+      Costumes the three Xbox costume packs (2026-11-03; pack1 Wetsuit k / p, pack2 Classic a / h, pack20 Designer
+               l / m), after Assemble (render tables) and Fixes' proof: verify_ids extend (adds the packs' ids to
+               dlc_idmap.json, existing entries never change; second run adds nothing), converter_faults_fix proof,
+               then per pack the DLC 2 route: dlc_media_build, dlc_assemble_build --pack, dlc_audio_build --pack,
+               tree_check, dlc_fixes_build --pack, converter_faults_fix check --pack, script_clash_fix check,
+               dlc_struct_fixes check --pack (objtex / objrec / objid)
+               -> work\rebuild\costumes\<pack>\{stage1,asm_stage1,asm_stage2a,stage2b}\mods (-FixesOut DIR: DIR\<pack>\...)
+               Only the two dlc_costume_<x>.drm of each pack are new for the game; images, names and lists are in
+               the DLC 1 tree already (docs/COSTUMES.md)
+               Needs the render tables WITH the costume packs (Index since 2026-11-03, then Assemble's rend_extract dlc /
+               shader_map (shaderlibs.pkl moved away first) / material_dlc / pc_shader_sections); otherwise assemble
+               passes the packs' materials through as Xbox bytes (media_error). Proven 2026-11-03: the extended tables
+               leave DLC 1 / DLC 2 assemble byte-identical (tools/render_tables_compare.py tables / tree).
+               About 75-90 min per costume DRM: their DTPs are larger than every Xbox base record (no pc_copy /
+               template, route 'convert'; tools/costume_pack_check.py xids)
       Repair   the repair tree for an installed B138 (finding 43, tested in game 2026-10-30): b138_snapshot (pristine
                B138 mods, verified against the kit manifest, from the game folder and the Install-TruTree backups),
                generalbank_build (see Generalbank), b138_fix_tree (shader constant fix, grapple ring shaders, DLC 1 UI
@@ -55,8 +88,14 @@
                -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
       Generalbank  our generalbank.drm alone (after Repair's snapshot): B138's + mission screen style + the title
                update's loading screen (script 6, DLC titles) and hint box (script 10 -> 9), 21 steps with the
-               existing tools, two of them load the generic store (~16 GB RAM, one after the other); the result is
-               compared with the played test 38 file (MD5) -> work\rebuild\generalbank_build\mods\generalbank.drm
+               existing tools, two of them load the generic store (~16 GB RAM, one after the other); step 21 is
+               compared with the played test 38 file (MD5); step 22 (2026-11-04) appends the title update's 6 input
+               bindings of Lara's set 17 (tools/input_map_tu_fix.py: RB / X / Y / LB for the DLC 2 shadow combat)
+               -> work\rebuild\generalbank_build\mods\generalbank.drm; input_map_tu_fix --verify checks the result
+               (also in Repair, on b138_fixes), report <dir>\input_map_check.json
+               -FixesOut DIR (2026-11-04, check runs): Generalbank writes DIR\generalbank_build; Repair writes
+               DIR\b138_pristine\mods, DIR\generalbank_build (--base = that snapshot's generalbank.drm) and
+               DIR\b138_fixes\mods instead of the usual work\rebuild\b138_pristine / generalbank_build / b138_fixes
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
@@ -76,13 +115,21 @@
     .\Invoke-TruPipeline.ps1 -Step Cache -Verbose
 .EXAMPLE
     .\Invoke-TruPipeline.ps1 -Step Tables -FromTool 5 -Verbose
+.EXAMPLE
+    .\Invoke-TruPipeline.ps1 -Step Fixes -FixesOut work/rebuild/pipeline_check_0311 -Verbose
+.EXAMPLE
+    .\Invoke-TruPipeline.ps1 -Step Costumes -FixesOut work/rebuild/costumes_0311 -Jobs 1 -Verbose
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Repair', 'Generalbank')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(0, 16)][int]$Jobs = 0,
     [ValidateRange(0, 64)][int]$LightJobs = 0,
+    # steps Fixes / Costumes / Generalbank / Repair: output folder below the repository instead of work/rebuild/asm_stage2b + dlc2_asm_stage2b
+    # (Costumes: work/rebuild/costumes; Generalbank / Repair: work/rebuild/generalbank_build, b138_pristine, b138_fixes)
+    # (one folder directly below work/rebuild; never a test tree dlc_test*)
+    [ValidatePattern('^work[\\/]rebuild[\\/](?!dlc_test)[\w\-\.]+[\\/]?$')][string]$FixesOut,
     [switch]$Trace
 )
 
@@ -100,13 +147,63 @@ $logDir = $paths.Logs
 
 $align = '@7ff00000'          # bigfile part size (tools/archive.py ALIGN)
 $dlc   = '../data/Xenia-SteveRepack/Content/534307EC/00000002'
+# outputs of step Fixes (-FixesOut: a separate check folder, the usual trees stay untouched)
+if ($FixesOut) {
+    $fixRoot = ($FixesOut -replace '\\', '/').TrimEnd('/')
+    $fix1 = "$fixRoot/dlc1/mods"; $fix2 = "$fixRoot/dlc2/mods"
+    $fixLabel = Split-Path -Leaf $fixRoot
+    $cmp1 = "${fixLabel}_dlc1"
+} else {
+    $fix1 = 'work/rebuild/asm_stage2b/mods'; $fix2 = 'work/rebuild/dlc2_asm_stage2b/mods'
+    $cmp1 = 'asm_stage2b'
+}
+$chk1 = (Split-Path -Parent $fix1) + '/converter_faults_check.json'
+$chk2 = (Split-Path -Parent $fix2) + '/converter_faults_check.json'
+$clash1 = (Split-Path -Parent $fix1) + '/script_clash_check.json'
+$clash2 = (Split-Path -Parent $fix2) + '/script_clash_check.json'
+$obj1 = (Split-Path -Parent $fix1) + '/objdata_check.json'
+$obj2 = (Split-Path -Parent $fix2) + '/objdata_check.json'
+$gbOut = 'work/rebuild/generalbank_build'
+$repPristine = 'work/rebuild/b138_pristine/mods'
+$repFixes = 'work/rebuild/b138_fixes/mods'
+$gbBase = @()
+if ($FixesOut) {
+    # steps Generalbank / Repair as check runs: every output below -FixesOut, the usual trees stay untouched
+    $gbOut = "$fixRoot/generalbank_build"
+    $repPristine = "$fixRoot/b138_pristine/mods"
+    $repFixes = "$fixRoot/b138_fixes/mods"
+    # Repair: generalbank_build reads its base from this run's own snapshot (its default is work/rebuild/b138_pristine)
+    if ($Step -eq 'Repair') { $gbBase = @('--base', "$repPristine/generalbank.drm") }
+}
+# step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
+$costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
+$costumeTools = @(
+    @('tools\verify_ids.py', 'extend'),
+    @('tools\converter_faults_fix.py', 'proof')
+)
+foreach ($pk in 'pack1', 'pack2', 'pack20') {
+    $o = "$costRoot/$pk"
+    $costumeTools += , @('tools\dlc_media_build.py', "$o/stage1/mods", $pk)
+    $costumeTools += , @('tools\dlc_assemble_build.py', "$o/stage1/mods", "$o/asm_stage1/mods", '--pack', $pk)
+    $costumeTools += , @('tools\dlc_audio_build.py', "$o/asm_stage1/mods", "$o/asm_stage2a/mods", '--pack', $pk)
+    $costumeTools += , @('tools\tree_check.py', "$o/asm_stage2a/mods", ('{0}_{1}' -f (Split-Path -Leaf $costRoot), $pk))
+    $costumeTools += , @('tools\dlc_fixes_build.py', "$o/asm_stage2a/mods", "$o/stage2b/mods", '--pack', $pk)
+    $costumeTools += , @('tools\converter_faults_fix.py', 'check', "$o/stage2b/mods", '--pack', $pk, '--report', "$o/converter_faults_check.json")
+    $costumeTools += , @('tools\script_clash_fix.py', 'check', "$o/stage2b/mods", '--report', "$o/script_clash_check.json")
+    $costumeTools += , @('tools\dlc_struct_fixes.py', 'check', "$o/stage2b/mods", '--pack', $pk, '--report', "$o/objdata_check.json")
+}
 $steps = @{
     Index = @(
         @('tools\index_all.py', 'work/idx_pc.json', 'le', "../data/pc/bigfile.000$align", "../data/pc/patch.000$align"),
         @('tools\index_all.py', 'work/idx_xbox_base.json', 'be', "../data/TombRaiderUnderworld_Patched/layer1.000$align",
           "../data/TombRaiderUnderworld_Patched/layer2.000$align", "../data/TombRaiderUnderworld_Patched/TitleUpdate.000$align"),
+        # costume packs last (2026-11-03): the first record of a section id wins in the render tables, so pack10 / pack11
+        # keep every entry they had (tools/render_tables_compare.py index / tables)
         @('tools\index_all.py', 'work/idx_dlc.json', 'be', "$dlc/9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000$align",
-          "$dlc/600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000$align")
+          "$dlc/600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000$align",
+          "$dlc/E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000$align",
+          "$dlc/9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000$align",
+          "$dlc/AC0089F81B621CD0E0C156B6176EFCC6C844705D53/pack20.000$align")
     )
     Cache = @(
         @('tools\generic_cache.py'),
@@ -164,6 +261,8 @@ $steps = @{
         @('tools\rend_extract.py', 'pairs'),
         @('tools\render_tables_build.py', 'check'),
         @('tools\rend_extract.py', 'dlc'),
+        # shader_map reads work\render\shaderlibs.pkl as a cache when it exists: after a new rend_extract (pairs / dlc)
+        # move that file away first, else the libraries / materials of the new index are missing from all DLC tables
         @('tools\shader_map.py'),
         @('tools\material_rules.py'),
         @('tools\material_dlc.py'),
@@ -182,17 +281,28 @@ $steps = @{
         @('tools\tree_check.py', 'work/rebuild/dlc2_asm_stage2a/mods', 'dlc2_asm_stage2a')
     )
     Fixes = @(
-        @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', 'work/rebuild/asm_stage2b/mods'),
-        @('tools\compare_b138.py', 'work/rebuild/asm_stage2b/mods', 'asm_stage2b'),
-        @('tools\dlc_fixes_build.py', 'work/rebuild/dlc2_asm_stage2a/mods', 'work/rebuild/dlc2_asm_stage2b/mods', '--pack', 'pack11')
+        @('tools\converter_faults_fix.py', 'proof'),
+        @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
+        @('tools\converter_faults_fix.py', 'check', $fix1, '--report', $chk1),
+        @('tools\script_clash_fix.py', 'check', $fix1, '--report', $clash1),
+        @('tools\dlc_struct_fixes.py', 'check', $fix1, '--report', $obj1),
+        @('tools\compare_b138.py', $fix1, $cmp1),
+        @('tools\dlc_fixes_build.py', 'work/rebuild/dlc2_asm_stage2a/mods', $fix2, '--pack', 'pack11'),
+        @('tools\converter_faults_fix.py', 'check', $fix2, '--pack', 'pack11', '--report', $chk2),
+        @('tools\script_clash_fix.py', 'check', $fix2, '--report', $clash2),
+        @('tools\dlc_struct_fixes.py', 'check', $fix2, '--pack', 'pack11', '--report', $obj2)
     )
+    Costumes = $costumeTools
     Repair = @(
-        @('tools\b138_snapshot.py', '../release/B138/kit/manifest.json', '../data/pc/mods', '../backup', 'work/rebuild/b138_pristine/mods', '../backup/mods', 'work/rebuild/base_b138'),
-        @('tools\generalbank_build.py', 'work/rebuild/generalbank_build'),
-        @('tools\b138_fix_tree.py', 'work/rebuild/b138_pristine/mods', 'work/rebuild/b138_fixes/mods', '--dlc2', '--replace', '--generalbank', 'work/rebuild/generalbank_build/mods/generalbank.drm')
+        @('tools\b138_snapshot.py', '../release/B138/kit/manifest.json', '../data/pc/mods', '../backup', $repPristine, '../backup/mods', 'work/rebuild/base_b138'),
+        (@('tools\generalbank_build.py', $gbOut) + $gbBase),
+        @('tools\input_map_tu_fix.py', '--verify', "$gbOut/mods/generalbank.drm", '--report', "$gbOut/input_map_check.json"),
+        @('tools\b138_fix_tree.py', $repPristine, $repFixes, '--dlc2', '--replace', '--generalbank', "$gbOut/mods/generalbank.drm"),
+        @('tools\input_map_tu_fix.py', '--verify', "$repFixes/generalbank.drm", '--report', ((Split-Path -Parent $repFixes) + '/input_map_check.json'))
     )
     Generalbank = @(
-        @('tools\generalbank_build.py', 'work/rebuild/generalbank_build')
+        @('tools\generalbank_build.py', $gbOut),
+        @('tools\input_map_tu_fix.py', '--verify', "$gbOut/mods/generalbank.drm", '--report', "$gbOut/input_map_check.json")
     )
 }
 $outputDirs = @{
@@ -209,6 +319,7 @@ $outputDirs = @{
     Assemble = @('work\render', 'work\rebuild')
     Dlc2    = @('work\rebuild')
     Fixes   = @('work\rebuild')
+    Costumes = @('work\rebuild')
     Repair  = @('work\rebuild')
     Generalbank = @('work\rebuild')
 }

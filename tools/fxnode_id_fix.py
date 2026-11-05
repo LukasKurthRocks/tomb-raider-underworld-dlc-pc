@@ -54,8 +54,11 @@ def check_pair(SP, SX, ids, by_order, all_types, fixes, label=''):
     # anim event lists (tools/animfx.py walk, list+0 = u32 0): kind-1 records of sub 0x32 carry a u32 id in payload
     # word 1 (reader tru+0x1486b2, see tools/eventlist_idword_fix.py) - the same check for every such list
     import animfx as AF
+    xs7 = {s.id: s for s in SX if s.type == 7}
     for p in SP:
-        x = xs.get((7, p.id)) if p.type == 7 else None
+        # (until 2026-11-03 this looked up xs[(7, id)] in a dict keyed by id - always None, so the anim-list sub-0x32
+        # check never ran; tools/animlist_check.py / converter_faults_fix.py animlist cover these words)
+        x = xs7.get(p.id) if p.type == 7 else None
         if x is None or len(x.data) != len(p.data): continue
         w = AF.walk(x.data, '>')
         if w is None: continue

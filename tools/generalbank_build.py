@@ -30,7 +30,14 @@ Steps (each tool checks the old values it replaces; intermediate files in OUT/st
   19 script_word_set         script 9: prototype name of f9 (test 36)
   20 script_word_set         script 9: f0 constants 1 (test 36b, the played test 36)
   21 script_dlc2_flag_stub   script 9: "DLC 2 active" = current unit is a DLC 2 unit (test 37b)
-The result is compared with --expect (default: the played test 38 file).
+  22 input_map_tu_fix        input map DTP 47: the title update's 6 bindings of Lara's set 17 (141 RB, 142 X, 143 Y,
+                             145 LB, 146 Y, 147 X) appended (2026-11-04, F4 / B26 shadow combat: the DLC 2 chart's
+                             attack requests {150,152,142/143/147} never fired on the PC; docs Befund-Schattenkampf.md);
+                             --done-ok: a base that already has them passes unchanged
+The output of step 21 is compared with the played test 38 file (EXPECT21, always; a difference stops the build unless
+--expect none), the result (step 22) with --expect (default EXPECT: step 21 + the input bindings, first built
+2026-11-04 by agent N11 - md5-identical to the hand-built tree dlc_test50l_input after the test-only script 104 step
+`dlc2_player_fix.py gb`, docs Befund-Pipeline-Integration-0411.md).
 
 Usage (from the repository root; steps 2 and 8 load the generic store, ~16 GB RAM each, one after the other):
   ../bin/pyt -t 7200 tools/generalbank_build.py OUT_DIR [--base B138_GENERALBANK] [--expect MD5|none] [--from N]
@@ -43,7 +50,8 @@ import sys, os, shutil, subprocess, hashlib, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_util as BU
 
-EXPECT = '57f5226610903c8b58a1d911d53fc65a'      # test 38 (played 2026-10-30 21:19): titles, hint box, menu style
+EXPECT21 = '57f5226610903c8b58a1d911d53fc65a'    # step 21 = test 38 (played 2026-10-30 21:19): titles, hint box, menu style
+EXPECT = '5c6c468dd16327a275b2001e6a30da4e'      # step 22 = EXPECT21 + the 6 TU input bindings (2026-11-04, not played)
 SYM = 'work/rebuild/sym_base_evidence.json'     # base evidence symbol names (finding 42, sym_calibration_check.py)
 LOCMAP = 'work/rebuild/stage1/locmap_xbox_to_pc.json'      # Xbox -> PC locals string ids (pipeline step Media)
 
@@ -113,7 +121,9 @@ def steps(base, st, out):
                                       '1128=014d014d:02050205'), S('19_name.drm'), None),
         (20, 'script 9: f0 results 1', ('script_word_set.py', S('19_name.drm'), S('20_f0true.drm'), '9',
                                         '0444=04000000:04000001,0968=04000000:04000001'), S('20_f0true.drm'), None),
-        (21, 'script 9: DLC 2 flag stub', ('script_dlc2_flag_stub.py', S('20_f0true.drm'), out), out, None),
+        (21, 'script 9: DLC 2 flag stub', ('script_dlc2_flag_stub.py', S('20_f0true.drm'), S('21_stub.drm')),
+         S('21_stub.drm'), None),
+        (22, 'input map: TU bindings of set 17', ('input_map_tu_fix.py', S('21_stub.drm'), out, '--done-ok'), out, None),
     ]
 
 
@@ -154,11 +164,16 @@ def main(argv):
             sys.exit('step %d failed (exit %d, output %s)' % (n, r.returncode, 'present' if os.path.isfile(made) else 'missing'))
         msg = '        -> %s md5 %s (%.0f s)' % (os.path.relpath(made), md5(made), time.time() - t0)
         print(msg, flush=True); log.write(msg + '\n')
+        if n == 21:     # the played test 38 file - every later step builds on it
+            ok21 = md5(made) == EXPECT21
+            msg = '        step 21 %s the played test 38 file %s' % ('identical to' if ok21 else 'DIFFERS from', EXPECT21)
+            print(msg, flush=True); log.write(msg + '\n')
+            if not ok21 and expect.lower() != 'none': log.close(); sys.exit('step 21 differs from the played test 38 file')
     got = md5(out)
     if expect.lower() == 'none':
         res = 'result %s md5 %s (not compared)' % (out, got)
     elif got == expect:
-        res = 'result %s md5 %s identical to the expected (played) file' % (out, got)
+        res = 'result %s md5 %s identical to the expected file (step 21 = played test 38 + step 22)' % (out, got)
     else:
         res = 'result %s md5 %s DIFFERS from the expected %s' % (out, got, expect)
     print(res); log.write(res + '\n'); log.close()
