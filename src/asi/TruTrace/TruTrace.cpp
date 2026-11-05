@@ -56,6 +56,15 @@
 //     contains one of ProgressFilter; [Messages] INSTANCE_Post tru+0x1b3750 (inst, msg, data) to such instances;
 //     [GameData] changed byte ranges of the active save buffer (0x140000 bytes) - progress flags, unit save data.
 //
+// 0.3 (05.11., F5 follow-up, docs Befund-Stoehnen-0511.md): [Sound] SoundSlots - the object sound-slot play
+//   tru+0x193d50 (thiscall, ecx = the instance sound list [inst+0x248]; slot, mode, p3, p4; ret 0x10), reached only from
+//   the anim event dispatcher tru+0x1b69c0 (type 0x60, call 0x5b6a30: slot = payload byte +4, mode = +5, p3 / p4 =
+//   the dispatcher's arguments 2 / 4). Mode 1 starts the slot's SoundPlex node through 0x593c90 (return 0x593dec) only
+//   when the slot's handle has no live emitter, mode 0 stops a live one (node vtbl[+0x10](4)) or releases a dead
+//   handle. The entry + leave lines name the owner instance, slot, mode, p3 / p4, the emitter before / after and the
+//   dispatcher's caller; emitters started there carry "fixed slot N of <instance>" in their START / LONG / END lines,
+//   so "sound 20212" (the section id of the doppelganger's slot nodes) is tied to a slot.
+//
 // Every hook site and every fact the decoding relies on is byte-checked first; a mismatch switches that category off
 // and is logged. Lines are buffered and written by the poll thread (every 100 ms) - no file access in the game's hooks.
 // Rate limit per category: MaxLinesPerSecond, MaxLinesPerCategory. Options: TruTrace.ini [Trace], log TruTrace.log.
@@ -71,7 +80,7 @@
 
 namespace {
 
-const char kVersion[] = "TruTrace 0.2";
+const char kVersion[] = "TruTrace 0.3";
 const DWORD kImageBase = 0x00400000;
 
 // ---- game data (read only) ----
@@ -112,6 +121,21 @@ const DWORD kRetLevelLoad = 0x005de02a;       // STREAM_LevelLoadAndInit from 0x
 const DWORD kRetStreamMove = 0x005c1c4e;      // STREAM_LevelLoadAndInit through [0x8aa840] from 0x5c1bf0
 const DWORD kRetPlaceLoad = 0x005de179;       // player placement from 0x5de040 (after a level load)
 const DWORD kRetPlaceRestore = 0x005de6fa;    // player placement from 0x5de480 (restore path)
+
+// ---- 0.3: object sound-slot play tru+0x193d50 (read only) ----
+const DWORD kRetSlotPlay = 0x005b6a35;        // tru+0x193d50 from the anim event dispatcher tru+0x1b69c0 (type 0x60)
+const DWORD kRetSlotStart = 0x00593dec;       // play 0x593c90 called from tru+0x193d50 (mode 1)
+// facts of the slot hook only (a mismatch switches SoundSlots off, not the whole sound category)
+const char *const kSlotFacts[][2] = {
+    {"005b69c0", "8b44240c 0fbf08"},                                         // payload = dispatcher arg 3, type word
+    {"005b69f4", "8b4c2404 8b8948020000 85c9"},                              // ecx = [inst+0x248]
+    {"005b6a1c", "0fbe4005 56 8b742414 56 8b742410 56 0fbed2 50 52 e81bd3fdff 5e c3"},   // slot / mode / p3 / p4, ret
+    {"00593d82", "8b4508 8d1440 8d3491 8b4f08 0fbf5cc104 8d04c1 8b08 8b4514 3dff000000 7402 8bd8 8b450c 83e800 "
+                 "0f84b9000000 83e801 0f85ea000000 8b06 85c0 7422 833800 0f85db000000"},   // slots 0xc / table 8, modes
+    {"00593de7", "e8a4feffff 83c408"},                                       // mode 1: play 0x593c90 (return 0x593dec)
+    {"00593e38", "668b4d10 66894844"},                                       // p3 -> emitter +0x44
+    {"00593e97", "8b4908 8b11 8b4210 6a04 ffd0"},                            // mode 0: node vtbl[+0x10](4)
+};
 
 // ---- facts (read-only byte checks; same strings as work\asi\trace01\precheck_trace01.txt) ----
 enum Cat { kCatTrace, kCatSound, kCatTele, kCatChart, kCatPower, kCatSpawn, kCatObj, kCatTime, kCatLevel, kCatPortal,
@@ -499,13 +523,15 @@ void SaveLeave(Regs *r, const DWORD *ctx);
 bool RestoreEnter(Regs *r, DWORD *ctx);
 void RestoreLeave(Regs *r, const DWORD *ctx);
 bool PostEnter(Regs *r, DWORD *ctx);
+bool SlotPlayEnter(Regs *r, DWORD *ctx);
+void SlotPlayLeave(Regs *r, const DWORD *ctx);
 
 // offline self test (TruTraceSelfTest): hooks on the plugin's own test functions, same framework
 bool TestEnter(Regs *r, DWORD *ctx);
 void TestLeave(Regs *r, const DWORD *ctx);
 
 enum { kHSound, kHDtor, kHListRelease, kHSlotStop, kHWake, kHChartMove, kHChartReset, kHChartStart, kHIntro, kHBirth,
-       kHBirth2, kHRequest, kHStreamLoad, kHPlace, kHMoveUnit, kHPortal, kHSave, kHRestore, kHPost, kRealHooks,
+       kHBirth2, kHRequest, kHStreamLoad, kHPlace, kHMoveUnit, kHPortal, kHSave, kHRestore, kHPost, kHSlotPlay, kRealHooks,
        kHT1 = kRealHooks, kHT2, kHT3, kHT4, kHT5, kHT6, kHT7, kHT8, kHT9, kHT10, kHookCount };
 Hook g_hooks[kHookCount] = {
     {"emitter create tru+0x1935d0", kCatSound, 0x005935d0, "53 57 8b7c2410 85ff 8bd9 750f 8b44240c", 6, 0xc, false,
@@ -548,6 +574,9 @@ Hook g_hooks[kHookCount] = {
      RestoreEnter, RestoreLeave, 0, 0, false, 0},
     {"INSTANCE_Post tru+0x1b3750", kCatMsg, 0x005b3750, "56 8b742408 8d8610010000 85c0 7422 57 8bbe20010000", 5, 0, false,
      PostEnter, nullptr, 0, 0, false, 0},
+    // 0.3: object sound-slot play (copy 6 = push ebp / mov ebp, esp / and esp, -16, as tru+0x1bcc30)
+    {"sound slot play tru+0x193d50", kCatSound, 0x00593d50, "55 8bec 83e4f0 83ec14 53 56 57 8bf9 8b4f0c 85c9 751d", 6, 0x10,
+     false, SlotPlayEnter, SlotPlayLeave, 0, 0, false, 0},
     // self test only (at / vtOrig filled in by TruTraceSelfTest; never placed in the game)
     {"test cdecl", kCatTrace, 0, "55 8bec 83e4f0", 6, 0, false, TestEnter, TestLeave, 0, 0, false, 0},
     {"test thiscall ret 0xc", kCatTrace, 0, "53 57 8b7c2410", 6, 0xc, false, TestEnter, TestLeave, 0, 0, false, 0},
@@ -741,7 +770,13 @@ struct Tracked {
     int inList;               // 1 = into [inst+0x248] (payload byte 1 bit 0 / channel + param), 0 = handle released
     int longDone;
     DWORD stopMode;           // last 0x589820 mode seen for it (0 = none)
+    DWORD slotPlus1, slotOwner;   // 0.3: started by the slot play tru+0x193d50 (slot + 1, owner instance; 0 = no)
 };
+// 0.3: the slot play running on this thread (set at its entry, cleared at its leave; the emitter create runs inside it)
+struct SlotCtx { DWORD tid, list, owner, slot; };
+SlotCtx g_slotCtx = {0, 0, 0, 0};
+int g_soundSlots = 1;         // [Trace] SoundSlots
+bool g_slotFactsOk = false;
 const int kTrackMax = 768;
 Tracked g_track[kTrackMax];
 CRITICAL_SECTION g_soundLock;
@@ -757,6 +792,11 @@ void SoundOrigin(const Tracked &t, char *o, size_t n) {
         DescInst(t.inst, inst, sizeof(inst));
         _snprintf_s(o, n, _TRUNCATE, "%s from %s (0x1b99c0 called from 0x%08lx), payload 0x%08lx", kKindName[t.kind], inst,
                     t.via, t.payload);
+    } else if (t.via && t.slotPlus1) {
+        char inst[160];
+        DescInst(t.slotOwner, inst, sizeof(inst));
+        _snprintf_s(o, n, _TRUNCATE, "%s (return 0x%08lx, its caller 0x%08lx) - fixed slot %lu of %s (slot play "
+                    "tru+0x193d50)", kKindName[t.kind], t.caller, t.via, t.slotPlus1 - 1, inst);
     } else if (t.via) {
         _snprintf_s(o, n, _TRUNCATE, "%s (return 0x%08lx, its caller 0x%08lx)", kKindName[t.kind], t.caller, t.via);
     } else {
@@ -821,6 +861,12 @@ void SoundCreateLeave(Regs *, const DWORD *ctx) {
         frame = static_cast<SHORT>(W(payload - 6));
         inList = kind == 1 && ((b1 & 1) || (chan != -1 && param != -1)) ? 1 : 0;
     }
+    // 0.3: started by the slot play on this thread (wrapper 0x593c90 called from 0x593dec)
+    DWORD slotPlus1 = 0, slotOwner = 0;
+    if (kind == 4 && via == kRetSlotStart && g_slotCtx.tid == GetCurrentThreadId()) {
+        slotPlus1 = g_slotCtx.slot + 1;
+        slotOwner = g_slotCtx.owner;
+    }
     if (emitter) {
         EnterCriticalSection(&g_soundLock);
         Tracked *slot = nullptr;
@@ -837,10 +883,11 @@ void SoundCreateLeave(Regs *, const DWORD *ctx) {
             slot->emitter = emitter; slot->sid = sid; slot->tick = GetTickCount(); slot->inst = inst;
             slot->payload = payload; slot->caller = ret; slot->via = via; slot->kind = kind; slot->inList = inList;
             slot->longDone = 0; slot->stopMode = 0;
+            slot->slotPlus1 = slotPlus1; slot->slotOwner = slotOwner;
         }
         LeaveCriticalSection(&g_soundLock);
     }
-    char who[200], instText[160];
+    char who[400], instText[160];
     DescInst(inst, instText, sizeof(instText));
     // repeats of one sound by one starter (instance for anim events, else the calling code) within 10 s
     DWORD now = GetTickCount(), key = (kind == 1 || kind == 2) ? inst : (via ? via : ret);
@@ -864,7 +911,7 @@ void SoundCreateLeave(Regs *, const DWORD *ctx) {
                               "firing)", sid, same + 1, instText);
     } else {
         Tracked t = {};
-        t.kind = kind; t.caller = ret; t.via = via;
+        t.kind = kind; t.caller = ret; t.via = via; t.slotPlus1 = slotPlus1; t.slotOwner = slotOwner;
         SoundOrigin(t, who, sizeof(who));
         Log(kCatSound, 2, "start sound %lu (soundplex 0x%08lx) emitter 0x%08lx: %s", sid, sp, emitter, who);
         if (repeat)
@@ -883,7 +930,7 @@ bool EmitterDtorEnter(Regs *r, DWORD *) {
     LeaveCriticalSection(&g_soundLock);
     if (!found) { InterlockedIncrement(&g_soundUntrackedEnds); return false; }
     InterlockedIncrement(&g_soundEnds);
-    char who[260];
+    char who[400];
     SoundOrigin(t, who, sizeof(who));
     DWORD age = GetTickCount() - t.tick;
     char stop[48] = "";
@@ -969,6 +1016,80 @@ bool SlotStopEnter(Regs *r, DWORD *) {
     return false;
 }
 
+// 0.3: object sound-slot play tru+0x193d50 (thiscall, ecx = the sound list [inst+0x248]: +0 owner, +4 fixed slot count,
+// +8 slot table (8 bytes: SoundPlex node, s16 default parameter), +0xc handles (0xc bytes: handle -> emitter)).
+// Entry from the dispatcher call 0x5b6a30: [esp] 0x5b6a35, +4 slot, +8 mode, +0xc p3, +0x10 p4, +0x14 saved esi,
+// +0x18 the dispatcher's return, +0x1c..+0x28 its arguments (instance, p3, payload, p4).
+struct SlotKey { DWORD owner, slot, mode, result; LONG count; };
+SlotKey g_slotKeys[64];
+int g_slotKeyPos = 0;
+const char *const kSlotResult[] = {"?", "STARTED", "already playing - not restarted", "stop mode 4 sent to the playing emitter",
+                                   "dead handle released / slot empty", "mode not 0 / 1 - nothing", "start gave no emitter"};
+
+bool SlotPlayEnter(Regs *r, DWORD *ctx) {
+    const DWORD *E = &r->ret;
+    const DWORD list = r->ecx, slot = E[1];
+    const bool fromDispatcher = E[0] == kRetSlotPlay;
+    ctx[0] = list;
+    ctx[1] = slot;
+    ctx[2] = E[2];                                  // mode
+    ctx[3] = E[3];                                  // p3 (word -> emitter +0x44)
+    ctx[4] = E[4];                                  // p4 (0xff = the slot's default parameter)
+    ctx[5] = fromDispatcher ? E[6] : E[0];          // the dispatcher's caller (else the direct caller)
+    DWORD slots = D(list + 0xc), handle = slots ? D(slots + slot * 0xc) : 0;
+    ctx[6] = handle ? D(handle) : 0;                // emitter before (0 = none / dead handle)
+    ctx[7] = fromDispatcher ? E[9] : 0;             // the event payload (type word, +4 slot, +5 mode)
+    g_slotCtx.list = list;
+    g_slotCtx.owner = D(list);
+    g_slotCtx.slot = slot;
+    g_slotCtx.tid = GetCurrentThreadId();
+    return true;
+}
+
+void SlotPlayLeave(Regs *, const DWORD *ctx) {
+    const DWORD list = ctx[0], slot = ctx[1], mode = ctx[2], p3 = ctx[3], p4 = ctx[4], caller = ctx[5], before = ctx[6],
+                payload = ctx[7];
+    if (g_slotCtx.tid == GetCurrentThreadId()) g_slotCtx.tid = 0;
+    const DWORD owner = D(list), count = D(list + 4), table = D(list + 8), slots = D(list + 0xc);
+    const DWORD node = table ? D(table + slot * 8) : 0;
+    const SHORT defParam = table ? static_cast<SHORT>(W(table + slot * 8 + 4)) : 0;
+    const DWORD handle = slots ? D(slots + slot * 0xc) : 0, after = handle ? D(handle) : 0;
+    int result = 5;
+    if (mode == 1) result = before ? 2 : (after ? 1 : 6);
+    else if (mode == 0) result = before ? 3 : 4;
+    if (result == 1) {                              // the create hook tags it already; tag it here if it could not
+        EnterCriticalSection(&g_soundLock);
+        for (int k = 0; k < kTrackMax; ++k)
+            if (g_track[k].emitter == after && !g_track[k].slotPlus1) { g_track[k].slotPlus1 = slot + 1; g_track[k].slotOwner = owner; }
+        LeaveCriticalSection(&g_soundLock);
+    }
+    // the same (owner, slot, mode, result): the first 5 and every 20th at level 1, the others at level 2
+    LONG seen = 1;
+    EnterCriticalSection(&g_soundLock);
+    SlotKey *key = nullptr;
+    for (SlotKey &k : g_slotKeys)
+        if (k.count && k.owner == owner && k.slot == slot && k.mode == mode && k.result == static_cast<DWORD>(result)) key = &k;
+    if (!key) {
+        key = &g_slotKeys[g_slotKeyPos];
+        g_slotKeyPos = (g_slotKeyPos + 1) % 64;
+        *key = {owner, slot, mode, static_cast<DWORD>(result), 0};
+    }
+    seen = ++key->count;
+    LeaveCriticalSection(&g_soundLock);
+    char inst[160], param[40];
+    DescInst(owner, inst, sizeof(inst));
+    if (p4 == 0xff) _snprintf_s(param, sizeof(param), _TRUNCATE, "0xff = default %d", defParam);
+    else _snprintf_s(param, sizeof(param), _TRUNCATE, "%ld", static_cast<LONG>(p4));
+    const char *path = caller == 0x005b9fe8 ? "anim event kind 2 (call 0x5b9fe3)" : caller == 0x005b9f52 ? "call 0x5b9f4d"
+                       : caller == 0x005bc336 ? "call 0x5bc331" : "?";
+    Log(kCatSound, (seen <= 5 || seen % 20 == 0) ? 1 : 2,
+        "SLOT %s of %s: slot %lu (of %lu) mode %lu (1 start, 0 stop), p3 0x%lx (emitter +0x44), p4 %s; node 0x%08lx "
+        "(section %lu); emitter before 0x%08lx (sound %lu) -> after 0x%08lx (sound %lu); dispatcher caller 0x%08lx (%s), "
+        "payload 0x%08lx bytes +4 %u +5 %u (seen %ld times)", kSlotResult[result], inst, slot, count, mode, p3 & 0xffff,
+        param, node, node ? D(node + 8) : 0, before, before ? D(before + 0xc) : 0, after, after ? D(after + 0xc) : 0,
+        caller, path, payload, payload ? B(payload + 4) : 0, payload ? B(payload + 5) : 0, seen);
+}
+
 void SoundTick() {                              // poll thread, once per second
     DWORD now = GetTickCount();
     Tracked longs[8];
@@ -983,7 +1104,7 @@ void SoundTick() {                              // poll thread, once per second
     LeaveCriticalSection(&g_soundLock);
     for (int i = 0; i < n; ++i) {
         const Tracked &t = longs[i];
-        char who[260];
+        char who[400];
         SoundOrigin(t, who, sizeof(who));
         DWORD age = now - t.tick;
         Log(kCatSound, 1, "LONG sound %lu emitter 0x%08lx still alive after %lu.%03lu s (refcount %u, flags +0x24 0x%08lx, "
@@ -2070,6 +2191,7 @@ void ReadOptions(const char *dir) {
     g_catOn[kCatSound] = GetPrivateProfileIntA("Trace", "Sound", 1, ini);
     g_soundLiveMs = GetPrivateProfileIntA("Trace", "SoundLiveMs", 4000, ini);
     g_soundRepeat = GetPrivateProfileIntA("Trace", "SoundRepeat", 3, ini);
+    g_soundSlots = GetPrivateProfileIntA("Trace", "SoundSlots", 1, ini);     // 0.3
     g_catOn[kCatTele] = GetPrivateProfileIntA("Trace", "Teleport", 1, ini);
     g_teleUnits = GetPrivateProfileIntA("Trace", "TeleportUnits", 300, ini);
     g_teleWindowMs = GetPrivateProfileIntA("Trace", "TeleportWindowMs", 3000, ini);
@@ -2129,6 +2251,7 @@ void StartInner(HMODULE self) {
     Log(kCatTrace, 0, "0.2: level %d, portal %d, stream units %d, save %d, progress %d / messages %d (filter '%s', %d "
         "tokens), game data %d (%d ms)", g_catOn[kCatLevel], g_catOn[kCatPortal], g_catOn[kCatStream], g_catOn[kCatSave],
         g_catOn[kCatProg], g_catOn[kCatMsg], g_progFilterText, g_progFilterN, g_catOn[kCatData], g_gameDataMs);
+    Log(kCatTrace, 0, "0.3: sound slots %d (object sound-slot play tru+0x193d50, needs sound)", g_soundSlots);
     if (!g_enabled) { Log(kCatTrace, 0, "disabled by TruTrace.ini - nothing hooked, no poll thread"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(kCatTrace, 0, "image base 0x%08lx, expected 0x%08lx - nothing hooked", base, kImageBase); return; }
@@ -2175,9 +2298,16 @@ void StartInner(HMODULE self) {
         return;
     }
     FindTsp();
+    // 0.3: the slot play hook has its own facts (a mismatch switches only SoundSlots off)
+    g_slotFactsOk = true;
+    for (const auto &f : kSlotFacts)
+        if (!HexBytesAt(strtoul(f[0], nullptr, 16), f[1])) {
+            g_slotFactsOk = false;
+            Log(kCatSound, 0, "sound slot play: fact check 0x%s differs - SoundSlots off", f[0]);
+        }
     bool want[kRealHooks], ok[kRealHooks];
     for (int i = 0; i < kRealHooks; ++i) {
-        want[i] = g_catOn[g_hooks[i].cat] != 0;
+        want[i] = g_catOn[g_hooks[i].cat] != 0 && (i != kHSlotPlay || (g_soundSlots && g_slotFactsOk));
         ok[i] = want[i] && Install(i);            // stub + trampoline at idx * 48 (Patch finds it there)
     }
     DWORD old = 0;

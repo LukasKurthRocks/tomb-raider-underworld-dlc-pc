@@ -1,4 +1,32 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.5.1)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.5.2)
+
+0.5.2 (2026-11-05, **offline, not yet seen in game; log only - behaviour unchanged**): diagnostics for F21 (the
+finisher 1013 is never entered because condition 2011 finds targeter 9 empty). Static result first: the TU fills
+targeter 9 with the **same** code as every other targeter - the instance add 0x82406390 (mask 0x3f1, the 0.1 patch) and
+the candidate add 0x82404650 (= PC tru+0x316860 / tru+0x3164d0); all five TU callers of the instance add have PC
+partners (instance init tru+0x1ba5a3 / +0x1ba801, tru+0x2d6126, the list ctor tru+0x31dc93, player message 0x1dc
+tru+0x31f93e; message ids TU = PC), and the per-frame sort / select / set / get functions are relink (TU = retail).
+No TU-only filler, so nothing new is translated. The log answers which step loses the thrall (`[Diag]`, default on):
+* entry hooks (log only, the original runs with the same arguments): candidate add tru+0x3164d0 (instance, marker
+  data, mask vs. slot bit 0x200, return and outer caller: which of the five paths), set target tru+0x316730, select
+  tru+0x316590 (bucket entries present but nothing passed = sight test / exclusion), remove tru+0x319f80 (target
+  cleared), per-frame update tru+0x31a270 (target changes, bucket / rejected counts); redirected calls: target list
+  array build tru+0x32263a / destroy tru+0x32219e (slots 0..9, slot 9 bit / parameters). Changes of +0x90 that none
+  of these made are reported as "changed outside the hooked functions".
+* `Targeter9Why=1`: once per second for up to 4 rejected candidates the game's own eligibility tru+0x2ecca0 and the
+  filter tru+0x312090 per group (the functions the update calls for them every frame) - which test rejects them.
+* condition 2011: every evaluation in doppelganger mode on change (else every 2 s) with the record {+0, +2 id, +4
+  value, +6 flags}, targeter 9 before / after the get call, excluded, the answer of query 0x161.
+* lines `0.5.2 diag ...`, capped by `[Diag] MaxLines=4000`. New byte checks: 21
+  (`work\asi\combat052\prechecks_combat052.txt`; with the 88 of 0.5 and the 6 of 0.5.1: 115, 0 mismatches). Imports:
+  `VirtualAlloc` added (trampoline page, RW -> RX). Build `work\asi\combat052`.
+
+| # | TO TEST 0.5.2 (hall02 / Yggdrasil end, power on, all Translate switches as in the package) | expected |
+|---|---|---|
+| 1 | load | `0.5.2 diag: targeter 9 (log only) - entries ...`; at the level `0.5.2 diag target list BUILT ...: slot 9: index 9, bit 0x200, parameters 0x...` |
+| 2 | walk to the thralls | `0.5.2 diag targeter 9 candidate TAKEN ...` with the thrall's object name = it is offered; only `not offered (mask)` lines for it = its marker flags lack bit 0 (data) |
+| 3 | knock one down, stand next to it, power on | `targeter 9 state changed ...` buckets / rejected; `WHY rejected`: eligibility 0 = the thrall's answers (queries 0x14c / 0xca / 0x185 / 0x1d), groups passed 0 = distance / cone; `SELECT ... none passed` = sight test; `SET target` = it got one |
+| 4 | X / Y next to it | `0.5.2 diag condition 2011 changed ...: path 2` + `query 0x161 0` = target there, thrall says no; path 3 = 2011 true (then `state 1013` should follow) |
 
 0.5.1 (2026-11-04, **offline, not yet seen in game**): two TU differences in Lara's state table of retail states
 (found while porting 1019 / 1020), translated 1:1, **default off**:
@@ -147,6 +175,10 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Strike] Translate` | 0 | 0.2: 1 = the TU shadow strike (needs `TruShadowPowerMeterApi`, logged "no meter interface" otherwise); 0.4.1: read again at run time (<= 1 / s) |
 | `[States] Translate1013` | 0 | 0.4: 1 = the finisher 1013 in doppelganger mode as the TU; 0.4.1: read again at run time (<= 1 / s) |
 | `[Probe] State1013` | 1 | 0.3: log the PC / TU target of the finisher 1013 |
+| `[Diag] Targeter9` | 1 | 0.5.2: log-only hooks of targeter 9 (add / update / select / set / remove, list build / destroy); 0 = no hooks |
+| `[Diag] Targeter9Why` | 1 | 0.5.2: eligibility / filter result of the rejected candidates of targeter 9 (once per second) |
+| `[Diag] Condition2011` | 1 | 0.5.2: every evaluation of condition 2011 in doppelganger mode with its inputs |
+| `[Diag] MaxLines` | 4000 | 0.5.2: total cap of the diagnostic lines |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 

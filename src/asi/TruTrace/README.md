@@ -5,8 +5,9 @@ hook writes log lines and then runs the original code with all registers, the fl
 were. It answers "where do we have to change it?" for open points of the DLC port. Log `TruTrace.log`, options
 `TruTrace.ini` `[Trace]` (both next to `tru.exe`). Every category is on by default and rate limited.
 
-**Status 0.2: built 2026-11-05 (`work\asi\trace02`), offline self test 17 / 17, byte checks 0.1 51 / 51 + 0.2 55 / 55,
-not played.** 0.1: built 2026-11-04 (`work\asi\trace01`), self test 11 / 11.
+**Status 0.3: built 2026-11-05 (`work\asi\trace03`), offline self test 17 / 17 (framework; the new hook itself only
+runs in the game), byte checks 0.1 51 / 51 + 0.2 55 / 55 + 0.3 8 / 8, not played.** 0.2: built 2026-11-05
+(`work\asi\trace02`), self test 17 / 17. 0.1: built 2026-11-04 (`work\asi\trace01`), self test 11 / 11.
 
 ## Categories
 
@@ -32,6 +33,12 @@ not played.** 0.1: built 2026-11-04 (`work\asi\trace01`), self test 11 / 11.
 | `Messages` | Which messages reach those instances | `INSTANCE_Post` `tru+0x1b3750` (instance, message, data) to ProgressFilter objects |
 | `GameData`, `GameDataMs` | Which game data bytes change (progress flags) | diff of the active save buffer `[0xc59258]` (0x140000 bytes) every `GameDataMs`; a word changing in 8 polls in a row is muted |
 
+0.3 (F5 follow-up: which fixed sound slot plays "sound 20212"?):
+
+| INI key | Question | Source of the lines |
+|---|---|---|
+| `SoundSlots` (needs `Sound`) | Which object sound slot started / stopped an emitter, with which mode and parameter | entry + leave hook on the slot play `tru+0x193d50` (thiscall, `ecx` = the instance sound list `[inst+0x248]`: +0 owner, +4 slot count, +8 slot table of {SoundPlex node, s16 default parameter}, +0xc handles), reached only from the anim event dispatcher `tru+0x1b69c0` (type 0x60, call `0x5b6a30`): `SLOT STARTED / already playing - not restarted / stop mode 4 sent / dead handle released` with owner instance, slot, mode (1 start only when the slot has no live emitter, 0 stop), p3 (word -> emitter +0x44), p4 (0xff = the slot's default parameter), node + its section id, emitter / sound before and after, the dispatcher's caller (`0x5b9fe8` = anim event kind 2) and the payload bytes +4 / +5. The same (owner, slot, mode, result) is logged at level 1 the first 5 times and every 20th time, else at level 2. Emitters started there carry `fixed slot N of <instance>` in their START / REPEAT / LONG / END lines |
+
 No generic "trigger fired" / script event point was proven statically; `Progress` / `Messages` / `GameData` log the
 effects instead.
 
@@ -41,8 +48,9 @@ fault (should stay 0).
 ## Safety
 
 * Every hook site and every fact the decoding relies on is byte-checked at load (list in
-  `work\asi\trace01\precheck_trace01.txt` 51 / 51 and `work\asi\trace02\precheck_trace02.txt` 55 / 55, offline
-  `tools/pe_bytes_check.py`); a mismatch switches that category off and is logged. The plugin loads after the other
+  `work\asi\trace01\precheck_trace01.txt` 51 / 51, `work\asi\trace02\precheck_trace02.txt` 55 / 55 and
+  `work\asi\trace03\precheck_trace03.txt` 8 / 8, offline `tools/pe_bytes_check.py`); a mismatch switches that category
+  off and is logged (0.3: a slot-play fact mismatch switches only `SoundSlots` off). The plugin loads after the other
   `Tru*.asi` (alphabetical), so it sees their patches. 0.2 never hooks a site another plugin patches; it hooks entries
   that TruMenu (`0x5df8c0`, `0x5c1bf0`, `0x5b3750`), TruLink / TruShadowCombat (`0x5b3750`) only byte-check in their
   own start, and the placement `0x5d40c0` whose body TruDlc2Player patches at `0x5d42e9` (not checked by TruTrace).

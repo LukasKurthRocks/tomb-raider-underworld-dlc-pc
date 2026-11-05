@@ -23,6 +23,8 @@
 // 5. 0.5.1: TU table differences of states 231 (slots 0 / 1 = 0x82464160, the move helper with the doppelganger branch)
 //    and 1004 (slots 0 / 1 = 0x8245efc8, hit list kept with parameter 0x415); PC handlers unless [States]
 //    Translate231Slot0 / Translate231Slot1 / Translate1004 = 1.
+// 6. 0.5.2 (F21, log only, [Diag]): who fills / clears targeter 9 (TU index 9) - candidate add, per-frame sort, select,
+//    set, remove, the target list array build / destroy - and every evaluation of condition 2011 with its inputs.
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -34,15 +36,18 @@
 #include <stdarg.h>
 #include <string.h>
 #include <math.h>
+#include <intrin.h>
+#pragma intrinsic(_ReturnAddress, _AddressOfReturnAddress)
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.5.1 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.5.2 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
                         "(Translate231Slot0 / Translate231Slot1 / Translate1004, PC handler by default), strike look off "
-                        "0x823d9050 through TruShadowPowerMeterApi v4)";
+                        "0x823d9050 through TruShadowPowerMeterApi v4; 0.5.2: F21 diagnostics of targeter 9 / condition "
+                        "2011, log only ([Diag]))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -529,6 +534,133 @@ bool CheckBlocks() {
     return true;
 }
 
+// ---------------------------------------------------------------- 0.5.2: F21 diagnostics, part 1 (log only)
+// Live (los15e, 05.11.2026): condition 2011 found targeter 9 empty, the finisher 1013 never ran. TU and PC fill the
+// targeters with the same code (docs Befund-F21-Finisher-Log-0511.md, main workspace): tru+0x316860 (TU 0x82406390,
+// mask 0x71 -> 0x3f1, patched) offers an instance to every targeter, tru+0x3164d0 (TU 0x82404650) takes it when the
+// mask has the targeter's bit (+4 = 1 << index); every frame tru+0x31a270 (TU 0x82404c60) sorts each candidate into
+// the bucket of the first filter group it passes (eligibility tru+0x2ecca0, filter tru+0x312090) or into the
+// rejected list +0x3c; tru+0x316590 (TU 0x82405b90) picks the first bucket entry that passes the sight test,
+// tru+0x316730 (TU 0x82406190) sets the target node +0x90, tru+0x319f80 removes a node. The diagnostics only read
+// and log (slot 9 = TU index 9); every original runs with the same arguments. [Diag] in TruShadowCombat.ini.
+// Targeter layout (PC ctor tru+0x31d900, all byte-checked below): +0 index, +4 mask, +8 flags, +0xc candidates,
+// +0x34 parameters {flags, groups, group pointers}, +0x38 buckets (0x14 each: +0 head, +8 count), +0x3c rejected list
+// (+0x44 count), +0x50 frame, +0x90 target node; node: +0 next, +8 handle {object, id}, +0x14 marker data.
+int g_diagT9 = 1;                  // [Diag] Targeter9
+int g_diagWhy = 1;                 // [Diag] Targeter9Why
+int g_diag2011 = 1;                // [Diag] Condition2011
+int g_diagMax = 4000;              // [Diag] MaxLines
+volatile LONG g_diagLines = 0;
+bool g_namesOk = false;            // object name table [0xdb94d0] (same check as TruTrace: tru+0x1bcff9)
+const DWORD kObjNames = 0x00db94d0;
+
+// every diagnostic line counts against [Diag] MaxLines; the line that reaches it says so once
+bool DiagLog(const char *fmt, ...) {
+    LONG n = InterlockedIncrement(&g_diagLines);
+    if (n > g_diagMax) {
+        if (n == g_diagMax + 1) Log(1, "0.5.2 diag: [Diag] MaxLines %d reached - no more diagnostic lines", g_diagMax);
+        return false;
+    }
+    char line[640];
+    va_list ap;
+    va_start(ap, fmt);
+    _vsnprintf_s(line, sizeof(line), _TRUNCATE, fmt, ap);
+    va_end(ap);
+    Log(1, "%s", line);
+    return true;
+}
+
+DWORD Rd(const void *p) {
+    __try {
+        return p ? *reinterpret_cast<const volatile DWORD *>(p) : 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+}
+
+// "0x.. obj 1004 viking_thrall_tutorial_dlc2_" (object id = object +0x14 low word, as TruTrace)
+void Describe(const BYTE *inst, char *out, size_t size) {
+    if (!inst) { _snprintf_s(out, size, _TRUNCATE, "0"); return; }
+    const BYTE *obj = reinterpret_cast<const BYTE *>(Rd(inst + 0x10));
+    DWORD id = obj ? (Rd(obj + 0x14) & 0xffff) : 0;
+    char name[64] = "?";
+    if (g_namesOk && id) {
+        const BYTE *table = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kObjNames)));
+        DWORD count = table ? Rd(table) : 0;
+        const char *s = (table && count < 8192 && id <= count) ? reinterpret_cast<const char *>(Rd(table + id * 8)) : nullptr;
+        __try {
+            if (s) {
+                size_t i = 0;
+                for (; s[i] && i + 1 < sizeof(name); ++i) name[i] = s[i];
+                name[i] = 0;
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            strcpy_s(name, sizeof(name), "?");
+        }
+    }
+    _snprintf_s(out, size, _TRUNCATE, "0x%08lx obj %lu %s", reinterpret_cast<DWORD>(inst), id, name);
+}
+
+// targeter state: target node / object, flags, candidates, bucket counts, rejected count
+struct TState { DWORD node; BYTE *obj; DWORD flags, total, pflags, groups, bucket[4], rejected; };
+bool IsSlot9(const BYTE *t) { return t && Rd(t) == 9; }
+void ReadT(const BYTE *t, TState *s) {
+    memset(s, 0, sizeof(*s));
+    if (!t) return;
+    s->node = Rd(t + 0x90);
+    __try {
+        s->obj = s->node ? HandleObject(reinterpret_cast<const DWORD *>(s->node + 8)) : nullptr;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        s->obj = nullptr;
+    }
+    s->flags = Rd(t + 8);
+    s->total = Rd(t + 0xc);
+    const BYTE *params = reinterpret_cast<const BYTE *>(Rd(t + 0x34));
+    s->pflags = params ? Rd(params) : 0;
+    s->groups = params ? Rd(params + 4) : 0;
+    const BYTE *buckets = reinterpret_cast<const BYTE *>(Rd(t + 0x38));
+    for (DWORD b = 0; buckets && b < s->groups && b < 4; ++b) s->bucket[b] = Rd(buckets + b * 0x14 + 8);
+    s->rejected = Rd(t + 0x44);
+}
+void FormatT(const TState &s, char *out, size_t size) {
+    char obj[96];
+    Describe(s.obj, obj, sizeof(obj));
+    _snprintf_s(out, size, _TRUNCATE, "+0x90 node 0x%08lx (target %s), flags 0x%lx, candidates %lu = buckets %lu/%lu/%lu/%lu "
+                "(groups %lu) + rejected %lu, parameter flags 0x%08lx", s.node, obj, s.flags, s.total, s.bucket[0],
+                s.bucket[1], s.bucket[2], s.bucket[3], s.groups, s.rejected, s.pflags);
+}
+BYTE *Slot9() {
+    BYTE **list = g_listOk ? List() : nullptr;
+    return list ? reinterpret_cast<BYTE *>(Rd(list + 9)) : nullptr;
+}
+
+// condition 2011 inputs (Pred2011): state of targeter 9 before / after the get call tru+0x319f00 (TU 0x82404568)
+struct Diag2011 { BYTE *t; TState before, after; int query, excluded; };
+volatile LONG g_d2011Calls = 0;
+DWORD g_d2011Last[4] = {0xffffffff, 0, 0, 0};
+DWORD g_d2011Tick = 0;
+void Diag2011Log(const BYTE *record, const Diag2011 &d, DWORD path, BYTE *target, int r) {
+    LONG n = InterlockedIncrement(&g_d2011Calls);
+    DWORD now = GetTickCount();
+    DWORD key[4] = {path, reinterpret_cast<DWORD>(target), d.after.node, static_cast<DWORD>(d.query)};
+    bool changed = memcmp(key, g_d2011Last, sizeof(key)) != 0;
+    if (!changed && now - g_d2011Tick < 2000) return;
+    memcpy(g_d2011Last, key, sizeof(key));
+    g_d2011Tick = now;
+    char before[300], after[300], obj[96];
+    FormatT(d.before, before, sizeof(before));
+    FormatT(d.after, after, sizeof(after));
+    Describe(target, obj, sizeof(obj));
+    DiagLog("0.5.2 diag condition 2011 %s (call %ld): record 0x%08lx {+0 %u, +2 id %u, +4 value %u, +6 flags 0x%02x} -> %d, "
+            "path %lu (1 targeter 9 empty / excluded, 2 query 0x161 = 0, 3 ok, 9 list off), target %s, excluded %d, query "
+            "0x161 %d (-1 = not asked); targeter 9 0x%08lx before get: %s", changed ? "changed" : "still", n,
+            reinterpret_cast<DWORD>(record), record ? (Rd(record) & 0xffff) : 0, record ? (Rd(record) >> 16) : 0,
+            record ? (Rd(record + 4) & 0xffff) : 0, record ? ((Rd(record + 4) >> 16) & 0xff) : 0, r, path, obj, d.excluded,
+            d.query, reinterpret_cast<DWORD>(d.t), before);
+    if (d.after.node != d.before.node || d.after.flags != d.before.flags)
+        DiagLog("0.5.2 diag condition 2011: targeter 9 after get (tru+0x319f00): %s", after);
+}
+
 // ---------------------------------------------------------------- 2. predicates
 Probe g_p2005 = {"condition 2005 (TU 0x8246e8e0: aim target / targeter 6 agree)"};
 Probe g_p2006 = {"condition 2006 (TU 0x8246eb08: target is a data-type 0x4f / 0xb00b instance)"};
@@ -624,15 +756,21 @@ char __cdecl Pred2011(const BYTE *record) {
     char r = 0;
     DWORD why = 0;
     BYTE *target = nullptr;
+    Diag2011 d;                                                         // 0.5.2: log only
+    memset(&d, 0, sizeof(d));
+    d.query = -1;
     __try {
         if (!g_listOk) { why = 9; goto done; }
+        if (g_diag2011) { d.t = Slot9(); ReadT(d.t, &d.before); }
         // TU 0x8246f170..: doppelganger -> targeter 9
         target = TargeterObject(9);
+        if (g_diag2011) { ReadT(d.t, &d.after); d.excluded = (target && Excluded(target)) ? 1 : 0; }
         if (!target || Excluded(target)) { why = 1; goto done; }
         BYTE *player = Player();
         void *arg = player;                                             // TU [0x829bffa4] = &{player}
         why = 2;
-        if (reinterpret_cast<QueryArgFn>(kQueryArg)(target, 0x161, &arg)) { why = 3; r = 1; }
+        d.query = reinterpret_cast<QueryArgFn>(kQueryArg)(target, 0x161, &arg);
+        if (d.query) { why = 3; r = 1; }
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         why = 8;
         r = 0;
@@ -640,6 +778,7 @@ char __cdecl Pred2011(const BYTE *record) {
 done:
     Hit(g_p2011, r, "doppelganger, target 0x%08lx, path %lu (1 targeter 9 empty, 2 query 0x161 = 0, 3 ok, 8 fault, 9 list off)",
         reinterpret_cast<DWORD>(target), why);
+    if (g_diag2011) Diag2011Log(record, d, why, target, r);
     return r;
 }
 
@@ -1528,6 +1667,365 @@ void SetupTranslate1013() {
                "patched but they run the PC path; the switch turns it on at run time (read again at most once per second)");
 }
 
+// ---------------------------------------------------------------- 0.5.2: F21 diagnostics, part 2 (log only)
+// Entry hooks: a 5-byte jmp at the function entry to a wrapper with the same calling convention; the wrapper calls the
+// original through a trampoline (the relocated, position-independent prologue + jmp back) with the same arguments and
+// returns its eax. Two call sites (the target list array build / destroy, one caller each) are redirected the same
+// way as the 1013 sites. Only targeter slot 9 is logged. Nothing is written into game data.
+typedef DWORD(__fastcall *AddFn)(BYTE *t, int, BYTE *inst, DWORD mask, DWORD marker);   // tru+0x3164d0, ret 0xc
+typedef DWORD(__fastcall *SetFn)(BYTE *t, int, BYTE *node);                             // tru+0x316730, ret 4
+typedef DWORD(__fastcall *SelectFn)(BYTE *t, int);                                      // tru+0x316590, ret
+typedef DWORD(__fastcall *RemoveFn)(BYTE *t, int, BYTE *list, BYTE *node);              // tru+0x319f80, ret 8
+typedef DWORD(__fastcall *UpdateFn)(BYTE *t, int, DWORD dt);                            // tru+0x31a270, ret 4 (float)
+typedef BYTE **(__fastcall *ListBuildFn)(BYTE **mem, int);                              // tru+0x31dc30
+typedef DWORD(__fastcall *ListDestroyFn)(BYTE **list, int);                             // tru+0x3167d0
+typedef char(__cdecl *EligFn)(const DWORD *handle);                                     // tru+0x2ecca0 = TU 0x82403918
+AddFn g_oAdd = nullptr;
+SetFn g_oSet = nullptr;
+SelectFn g_oSelect = nullptr;
+RemoveFn g_oRemove = nullptr;
+UpdateFn g_oUpdate = nullptr;
+const DWORD kEligibility = 0x006ecca0, kFilter = 0x00712090;
+BYTE *g_diagCode = nullptr;        // trampolines, 32 bytes each
+DWORD g_t9Seen = 0;                // last +0x90 of slot 9 seen by a hook (changes elsewhere are reported)
+volatile LONG g_t9Adds = 0, g_t9Offers = 0, g_t9Removes = 0, g_t9Sets = 0;
+DWORD g_t9LastSel = 0xffffffff, g_t9SelTick = 0, g_t9SnapTick = 0, g_t9WhyTick = 0;
+TState g_t9Snap;
+bool g_t9SnapValid = false;
+
+// one entry hook: trampoline (copy whole instructions, then jmp at + copy) - the jmp is written by EntryPatch
+struct EntryHook { DWORD at; const char *hex; int copy; const void *to; void **orig; const char *what; };
+bool EntryPrepare(int k, const EntryHook &h) {
+    if (!HexAt(h.at, h.hex)) { Log(0, "0.5.2 diag: %s at 0x%08lx does not match - diagnostics off", h.what, h.at); return false; }
+    BYTE *tr = g_diagCode + k * 32;
+    memcpy(tr, reinterpret_cast<const void *>(h.at), static_cast<size_t>(h.copy));
+    tr[h.copy] = 0xe9;
+    DWORD rel = (h.at + static_cast<DWORD>(h.copy)) - (reinterpret_cast<DWORD>(tr) + static_cast<DWORD>(h.copy) + 5);
+    memcpy(tr + h.copy + 1, &rel, 4);
+    *h.orig = tr;
+    return true;
+}
+bool EntryPatch(const EntryHook &h) {
+    BYTE j[16];
+    memset(j, 0x90, sizeof(j));
+    j[0] = 0xe9;
+    DWORD rel = reinterpret_cast<DWORD>(h.to) - (h.at + 5);
+    memcpy(j + 1, &rel, 4);
+    return WriteCode(h.at, j, static_cast<size_t>(h.copy));
+}
+
+// a change of slot 9's +0x90 that no hooked function made (seen at the entry of the next hook)
+void T9Seen(const BYTE *t, const char *where) {
+    DWORD now = Rd(t + 0x90);
+    if (now == g_t9Seen) return;
+    char obj[96] = "?";
+    __try {
+        Describe(now ? HandleObject(reinterpret_cast<const DWORD *>(now + 8)) : nullptr, obj, sizeof(obj));
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    DiagLog("0.5.2 diag targeter 9: +0x90 0x%08lx -> 0x%08lx (%s) changed outside the hooked functions (seen at %s)",
+            g_t9Seen, now, obj, where);
+    g_t9Seen = now;
+}
+
+const char *OuterName(DWORD ret) {
+    switch (ret) {
+    case 0x005ba5a8: return "instance init tru+0x1ba5a3 (TU 0x822723a8)";
+    case 0x005ba806: return "instance init tru+0x1ba801 (TU 0x82272660)";
+    case 0x006d612b: return "tru+0x2d6126 (TU 0x823c6e98)";
+    case 0x0071dc98: return "target list ctor tru+0x31dc30 (all instances, TU 0x824062c8)";
+    case 0x0071f943: return "player message 0x1dc tru+0x31f93e (TU 0x823eeaec)";
+    default: return "?";
+    }
+}
+
+// tru+0x3164d0 (TU 0x82404650): candidate offered to one targeter; taken when mask & [t+4]
+DWORD __fastcall DiagAdd(BYTE *t, int edx, BYTE *inst, DWORD mask, DWORD marker) {
+    const DWORD ret = reinterpret_cast<DWORD>(_ReturnAddress());
+    const DWORD *entry = reinterpret_cast<const DWORD *>(_AddressOfReturnAddress());
+    const bool s9 = g_diagT9 && IsSlot9(t);
+    DWORD before = s9 ? Rd(t + 0xc) : 0;
+    if (s9) T9Seen(t, "candidate add");
+    DWORD r = g_oAdd(t, edx, inst, mask, marker);
+    if (!s9) return r;
+    __try {
+        // outer caller: the return of tru+0x316860 at [esp + 0x38] when called from its two loops (0x71693e / 0x7169c8)
+        DWORD outer = (ret == 0x00716943 || ret == 0x007169cd) ? entry[0x38 / 4] : 0;
+        DWORD bit = Rd(t + 4);
+        bool taken = (mask & bit) != 0;
+        LONG n = InterlockedIncrement(taken ? &g_t9Adds : &g_t9Offers);
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        if (taken ? (n <= 300 || n % 100 == 0) : (n <= 60 || n % 500 == 0))
+            DiagLog("0.5.2 diag targeter 9 candidate %s (%s %ld): %s, marker data 0x%08lx, mask 0x%03lx (slot bit 0x%03lx), "
+                    "candidates %lu -> %lu; caller 0x%08lx, outer 0x%08lx %s", taken ? "TAKEN" : "not offered (mask)",
+                    taken ? "add" : "offer", n, who, marker, mask, bit, before, Rd(t + 0xc), ret, outer,
+                    outer ? OuterName(outer) : (ret == 0x00776c00 ? "script native tru+0x376ba0 (TU 0x824788a8, index 1)" : ""));
+        g_t9Seen = Rd(t + 0x90);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return r;
+}
+
+// tru+0x316730 (TU 0x82406190): set the target node +0x90
+DWORD __fastcall DiagSet(BYTE *t, int edx, BYTE *node) {
+    const DWORD ret = reinterpret_cast<DWORD>(_ReturnAddress());
+    const bool s9 = g_diagT9 && IsSlot9(t);
+    DWORD before = s9 ? Rd(t + 0x90) : 0;
+    if (s9) T9Seen(t, "set target");
+    DWORD r = g_oSet(t, edx, node);
+    if (!s9) return r;
+    __try {
+        DWORD after = Rd(t + 0x90);
+        LONG n = InterlockedIncrement(&g_t9Sets);
+        if (after != before || n <= 20) {
+            char obj[96];
+            Describe(node ? HandleObject(reinterpret_cast<const DWORD *>(node + 8)) : nullptr, obj, sizeof(obj));
+            DiagLog("0.5.2 diag targeter 9 SET target (tru+0x316730, call %ld): node 0x%08lx (%s), +0x90 0x%08lx -> 0x%08lx, "
+                    "flags 0x%lx; caller 0x%08lx", n, reinterpret_cast<DWORD>(node), obj, before, after, Rd(t + 8), ret);
+        }
+        g_t9Seen = after;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return r;
+}
+
+// tru+0x316590 (TU 0x82405b90): pick the first bucket entry that passes eligibility / exclusion / sight test
+DWORD __fastcall DiagSelect(BYTE *t, int edx) {
+    const DWORD ret = reinterpret_cast<DWORD>(_ReturnAddress());
+    const bool s9 = g_diagT9 && IsSlot9(t);
+    if (s9) T9Seen(t, "select");
+    DWORD r = g_oSelect(t, edx);
+    if (!s9) return r;
+    __try {
+        DWORD now = GetTickCount();
+        if (r != g_t9LastSel || now - g_t9SelTick >= 5000) {
+            TState s;
+            ReadT(t, &s);
+            DWORD inBuckets = s.bucket[0] + s.bucket[1] + s.bucket[2] + s.bucket[3];
+            char obj[96], st[300];
+            Describe(r ? HandleObject(reinterpret_cast<const DWORD *>(r + 8)) : nullptr, obj, sizeof(obj));
+            FormatT(s, st, sizeof(st));
+            DiagLog("0.5.2 diag targeter 9 SELECT (tru+0x316590): -> node 0x%08lx (%s)%s; %s; caller 0x%08lx", r, obj,
+                    (!r && inBuckets) ? " - bucket entries present but none passed eligibility / gameTracker+0x610 "
+                                        "exclusion / sight test tru+0x313200" : "", st, ret);
+            g_t9LastSel = r;
+            g_t9SelTick = now;
+        }
+        g_t9Seen = Rd(t + 0x90);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return r;
+}
+
+// tru+0x319f80: remove a node from a bucket / the rejected list (clears +0x90 when it is the target)
+DWORD __fastcall DiagRemove(BYTE *t, int edx, BYTE *list, BYTE *node) {
+    const DWORD ret = reinterpret_cast<DWORD>(_ReturnAddress());
+    const bool s9 = g_diagT9 && IsSlot9(t);
+    DWORD before = s9 ? Rd(t + 0x90) : 0;
+    char obj[96] = "";
+    if (s9) {
+        T9Seen(t, "remove");
+        __try {
+            Describe(node ? HandleObject(reinterpret_cast<const DWORD *>(node + 8)) : nullptr, obj, sizeof(obj));
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+        }
+    }
+    DWORD r = g_oRemove(t, edx, list, node);
+    if (!s9) return r;
+    __try {
+        DWORD after = Rd(t + 0x90);
+        LONG n = InterlockedIncrement(&g_t9Removes);
+        if (after != before || n <= 100)
+            DiagLog("0.5.2 diag targeter 9 REMOVE (tru+0x319f80, call %ld): node 0x%08lx (%s; object gone = 0) from list "
+                    "0x%08lx (%s)%s; candidates now %lu; caller 0x%08lx", n, reinterpret_cast<DWORD>(node), obj,
+                    reinterpret_cast<DWORD>(list), reinterpret_cast<DWORD>(list) == reinterpret_cast<DWORD>(t) + 0x3c ?
+                    "rejected list" : "bucket", after != before ? " - it was the TARGET, +0x90 cleared" : "", Rd(t + 0xc), ret);
+        g_t9Seen = after;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return r;
+}
+
+// tru+0x312090 (filter of one group): ecx = frame (targeter +0x50), edx = handle, one stack argument the caller removes
+__declspec(naked) char __cdecl CallFilter(DWORD /*frame*/, DWORD /*handle*/, DWORD /*group*/) {
+    __asm {
+        mov ecx, [esp + 4]
+        mov edx, [esp + 8]
+        push dword ptr [esp + 12]
+        mov eax, 0x00712090
+        call eax
+        add esp, 4
+        ret
+    }
+}
+
+// [Diag] Targeter9Why: for the first rejected candidates the game's own eligibility / filter (same functions the
+// update calls for them every frame) - which test sends them to the rejected list
+struct WhyLast { DWORD obj, result; DWORD tick; } g_why[8];
+void DiagWhy(BYTE *t, const TState &s) {
+    const BYTE *params = reinterpret_cast<const BYTE *>(Rd(t + 0x34));
+    BYTE *player = Player();
+    BYTE *node = reinterpret_cast<BYTE *>(Rd(t + 0x3c));
+    for (int k = 0; node && k < 4; ++k, node = reinterpret_cast<BYTE *>(Rd(node))) {
+        const DWORD *handle = reinterpret_cast<const DWORD *>(node + 8);
+        BYTE *obj = HandleObject(handle);
+        char elig = reinterpret_cast<EligFn>(kEligibility)(handle);
+        DWORD pass = 0;
+        for (DWORD g = 0; elig && params && g < s.groups && g < 8; ++g)
+            if (CallFilter(reinterpret_cast<DWORD>(t) + 0x50, reinterpret_cast<DWORD>(handle), Rd(params + 8 + g * 4)))
+                pass |= 1u << g;
+        DWORD result = (elig ? 0x100 : 0) | pass, now = GetTickCount();
+        WhyLast &w = g_why[k];
+        if (w.obj == reinterpret_cast<DWORD>(obj) && w.result == result && now - w.tick < 10000) continue;
+        w.obj = reinterpret_cast<DWORD>(obj);
+        w.result = result;
+        w.tick = now;
+        char who[96];
+        Describe(obj, who, sizeof(who));
+        float d[3] = {0, 0, 0}, dist = -1.0f;
+        if (obj && player) {
+            for (int i = 0; i < 3; ++i)
+                d[i] = reinterpret_cast<const float *>(obj + 0x20)[i] - reinterpret_cast<const float *>(player + 0x20)[i];
+            dist = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        }
+        DiagLog("0.5.2 diag targeter 9 WHY rejected #%d: %s, marker data 0x%08lx, node +0x18 %lu: eligibility tru+0x2ecca0 "
+                "%d (queries 0x14c / 0xca / 0x185 / 0x1d), filter groups passed 0x%02lx of %lu (tru+0x312090: distance / "
+                "angle records); instance - Lara (+0x20): %.1f %.1f %.1f, distance %.1f", k, who, Rd(node + 0x14),
+                Rd(node + 0x18), elig ? 1 : 0, pass, s.groups, d[0], d[1], d[2], dist);
+    }
+}
+
+// tru+0x31a270 (TU 0x82404c60): per-frame update of one targeter (re-sort, clear stale / lost target)
+DWORD __fastcall DiagUpdate(BYTE *t, int edx, DWORD dt) {
+    const DWORD ret = reinterpret_cast<DWORD>(_ReturnAddress());
+    const bool s9 = g_diagT9 && IsSlot9(t);
+    DWORD before = s9 ? Rd(t + 0x90) : 0;
+    if (s9) T9Seen(t, "update");
+    DWORD r = g_oUpdate(t, edx, dt);
+    if (!s9) return r;
+    __try {
+        TState s;
+        ReadT(t, &s);
+        DWORD now = GetTickCount();
+        if (s.node != before) {
+            char obj[96];
+            Describe(s.obj, obj, sizeof(obj));
+            DiagLog("0.5.2 diag targeter 9 target changed in the per-frame update tru+0x31a270: +0x90 0x%08lx -> 0x%08lx "
+                    "(%s), flags 0x%lx; caller 0x%08lx", before, s.node, obj, s.flags, ret);
+        }
+        bool counts = !g_t9SnapValid || memcmp(s.bucket, g_t9Snap.bucket, sizeof(s.bucket)) != 0 ||
+                      s.rejected != g_t9Snap.rejected || s.total != g_t9Snap.total;
+        if ((counts && now - g_t9SnapTick >= 1000) || now - g_t9SnapTick >= 10000) {
+            if (counts || s.total || Doppelganger()) {
+                char st[300];
+                FormatT(s, st, sizeof(st));
+                DiagLog("0.5.2 diag targeter 9 state%s (doppelganger %d): %s; adds %ld, not offered %ld, removes %ld",
+                        counts ? " changed" : "", Doppelganger(), st, g_t9Adds, g_t9Offers, g_t9Removes);
+            }
+            g_t9Snap = s;
+            g_t9SnapValid = true;
+            g_t9SnapTick = now;
+        }
+        if (g_diagWhy && s.rejected && now - g_t9WhyTick >= 1000) {
+            g_t9WhyTick = now;
+            DiagWhy(t, s);
+        }
+        g_t9Seen = Rd(t + 0x90);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "0.5.2 diag: access fault while logging targeter 9 (update) - the game code ran unchanged");
+    }
+    return r;
+}
+
+// the target list array (7 -> 10 targeters): build at the player init (tru+0x322638) and destroy (tru+0x32219c)
+BYTE **__fastcall DiagListBuild(BYTE **mem, int edx) {
+    BYTE **list = reinterpret_cast<ListBuildFn>(0x0071dc30)(mem, edx);
+    __try {
+        BYTE *t = list ? list[9] : nullptr;
+        TState s;
+        ReadT(t, &s);
+        char st[300];
+        FormatT(s, st, sizeof(st));
+        DiagLog("0.5.2 diag target list BUILT (tru+0x31dc30 from the player init): array 0x%08lx, slots 0..9 = %08lx %08lx "
+                "%08lx %08lx %08lx %08lx %08lx %08lx %08lx %08lx; slot 9: index %lu, bit 0x%03lx, parameters 0x%08lx, %s",
+                reinterpret_cast<DWORD>(list), Rd(list), Rd(list + 1), Rd(list + 2), Rd(list + 3), Rd(list + 4),
+                Rd(list + 5), Rd(list + 6), Rd(list + 7), Rd(list + 8), Rd(list + 9), Rd(t), Rd(t + 4), Rd(t + 0x34), st);
+        g_t9Seen = Rd(t + 0x90);
+        g_t9SnapValid = false;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return list;
+}
+DWORD __fastcall DiagListDestroy(BYTE **list, int edx) {
+    DiagLog("0.5.2 diag target list DESTROYED (tru+0x3167d0): array 0x%08lx, slot 9 0x%08lx (adds %ld, removes %ld, sets %ld "
+            "so far)", reinterpret_cast<DWORD>(list), Rd(list + 9), g_t9Adds, g_t9Removes, g_t9Sets);
+    g_t9Seen = 0;
+    g_t9SnapValid = false;
+    return reinterpret_cast<ListDestroyFn>(0x007167d0)(list, edx);
+}
+
+void SetupDiag() {
+    if (!g_diagT9) { Log(1, "0.5.2 diag: [Diag] Targeter9=0 - targeter 9 hooks not placed"); return; }
+    if (!g_listOk || !g_blocksOk) { Log(1, "0.5.2 diag: target list / building blocks not active - targeter 9 hooks not placed"); return; }
+    // layout facts the log relies on (read only)
+    struct { DWORD at; const char *hex; const char *what; } const facts[] = {
+        {0x0071d913, "8b4d08 890f b801000000 d3e0 33c9 3bd9 894f08 894704 894f0c 895f30 895f34 894f38 894f3c 894f40 894f44",
+         "targeter ctor tru+0x31d900: +0 index, +4 bit 1 << index, +8 / +0xc, +0x34 parameters, +0x38 / +0x3c / +0x44"},
+        {0x0071d97d, "898f90000000", "targeter ctor: +0x90 target node"},
+        {0x00716524, "8d7e08 55 57 e8c2d4e9ff 8b4c2424 83c408 894e14", "candidate node +8 handle, +0x14 marker data"},
+        {0x00716548, "8b4b34 85c9 7421 0fb6c0 3b4104 7419 8d1480 8b4338 8d0c90", "bucket index == groups -> rejected list, buckets 0x14"},
+        {0x00716570, "8d4b3c 56 e8c767fdff 016b0c", "rejected list +0x3c, candidates +0xc"},
+        {0x007131c8, "837e0400 57 7626 8b7c241c 33c0 8b448608 50 8bcf 8bd5 e8adeeffff 83c404", "stage tru+0x3131a0: groups +4, "
+         "group pointers +8, filter tru+0x312090 (ecx frame, edx handle, caller removes 4)"},
+        {0x00719faf, "015a08", "list count +8"},
+        {kEligibility, "57 8b7c2408 f6471001 7504 32c0 5f c3", "eligibility tru+0x2ecca0 (cdecl handle)"},
+        {kFilter, "55 8bec 83e4f0 81ecd4010000 53 56 57 8b7d08 0fb64708 8bf2", "filter tru+0x312090"},
+        {0x005bcff9, "8b0dd094db00 52 8b14c1", "object name table [0xdb94d0] (as TruTrace)"},
+        {0x00722638, "8bc8 e8f1b5ffff a3acdffa00", "target list build call tru+0x32263a"},
+        {0x0072219c, "8bf9 e82d46ffff 8b0dac9ccd00", "target list destroy call tru+0x32219e"},
+        {0x00716938, "8b0cb1 50 55 53 e88dfbffff 83c601", "instance add loop 1 call tru+0x31693e (return 0x716943)"},
+        {0x007169c0, "8b4cb500 6aff 57 53 e803fbffff 83c601", "instance add loop 2 call tru+0x3169c8 (return 0x7169cd)"},
+        {0x00716860, "83ec18 53 8b5c2420 3b1d94f0e700 55 8be9 896c241c", "instance add frame (0x18 + 4 registers)"},
+        {0x00716891, "56 57", "instance add: esi / edi pushed before both loops"},
+    };
+    for (const auto &f : facts)
+        if (!HexAt(f.at, f.hex)) { Log(0, "0.5.2 diag: %s at 0x%08lx does not match - diagnostics off", f.what, f.at); return; }
+    g_namesOk = true;
+    const EntryHook hooks[5] = {
+        {0x007164d0, "53 55 8b6c240c 85ed 8bd9 0f849e000000 8b442410 854304", 6, &DiagAdd, reinterpret_cast<void **>(&g_oAdd),
+         "candidate add tru+0x3164d0"},
+        {0x00716730, "a158dbfa00 56 8bf1 8b8804050000 8b09 f6414001", 5, &DiagSet, reinterpret_cast<void **>(&g_oSet),
+         "set target tru+0x316730"},
+        {0x00716590, "83ec08 55 8be9 8b4534 834d0802 85c0 7505", 6, &DiagSelect, reinterpret_cast<void **>(&g_oSelect),
+         "select tru+0x316590"},
+        {0x00719f80, "53 56 57 8b7c2414 83cbff 85ff 8bf1 7422", 7, &DiagRemove, reinterpret_cast<void **>(&g_oRemove),
+         "remove node tru+0x319f80"},
+        {0x0071a270, "51 d9ee 56 8bf1 d89694000000 dfe0", 6, &DiagUpdate, reinterpret_cast<void **>(&g_oUpdate),
+         "per-frame update tru+0x31a270"},
+    };
+    g_diagCode = static_cast<BYTE *>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+    if (!g_diagCode) { Log(0, "0.5.2 diag: no code page (%lu) - diagnostics off", GetLastError()); return; }
+    for (int k = 0; k < 5; ++k)
+        if (!EntryPrepare(k, hooks[k])) return;
+    DWORD old = 0;
+    if (!VirtualProtect(g_diagCode, 4096, PAGE_EXECUTE_READ, &old)) {
+        Log(0, "0.5.2 diag: code page protection failed (%lu) - diagnostics off", GetLastError());
+        return;
+    }
+    // all checks passed: from here every write is a jmp / call to a wrapper that runs the original unchanged
+    for (int k = 0; k < 5; ++k)
+        if (!EntryPatch(hooks[k])) { Log(0, "0.5.2 diag: patch %s failed - restart without the plugin", hooks[k].what); return; }
+    if (!WriteCall(0x0072263a, reinterpret_cast<const void *>(&DiagListBuild)) ||
+        !WriteCall(0x0072219e, reinterpret_cast<const void *>(&DiagListDestroy))) {
+        Log(0, "0.5.2 diag: patch of the list build / destroy calls failed - restart without the plugin");
+        return;
+    }
+    Log(1, "0.5.2 diag: targeter 9 (log only) - entries tru+0x3164d0 add, +0x316730 set, +0x316590 select, +0x319f80 "
+           "remove, +0x31a270 update; calls tru+0x32263a list build, +0x32219e destroy; why %d, condition 2011 %d, max %d lines",
+        g_diagWhy, g_diag2011, g_diagMax);
+}
+
 void __cdecl State1007Slot4(void *agent) { State1007(agent, 4); }
 void __cdecl State1007Slot5(void *agent) { State1007(agent, 5); }
 
@@ -2071,6 +2569,11 @@ void ReadOptions(const char *dir) {
     g_translate231s1 = GetPrivateProfileIntA("States", "Translate231Slot1", 0, ini) ? 1 : 0;
     g_translate1004 = GetPrivateProfileIntA("States", "Translate1004", 0, ini) ? 1 : 0;
     g_probe231 = GetPrivateProfileIntA("Probe", "States231And1004", 1, ini);
+    g_diagT9 = GetPrivateProfileIntA("Diag", "Targeter9", 1, ini);
+    g_diagWhy = GetPrivateProfileIntA("Diag", "Targeter9Why", 1, ini);
+    g_diag2011 = GetPrivateProfileIntA("Diag", "Condition2011", 1, ini);
+    g_diagMax = GetPrivateProfileIntA("Diag", "MaxLines", 4000, ini);
+    if (g_diagMax < 0) g_diagMax = 0;
 }
 
 void Start(HMODULE self) {
@@ -2113,6 +2616,7 @@ void Start(HMODULE self) {
                "(the TU's targeters 6 / 9 do not exist)");
     SetupTranslate1013();
     SetupRegistration();
+    SetupDiag();                      // 0.5.2: last - after every other byte check of this plugin
 }
 
 }  // namespace
