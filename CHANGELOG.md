@@ -1,13 +1,13 @@
 # Changelog
 
-"Played" = the project owner ran it in the game (Windows 11 VM). "Offline" = checked with static gates and data comparisons against the
-Xbox/PC originals only, **not yet seen in game**.
+"Played" means the project owner ran it in game (Windows 11 VM). "Offline" means it was checked only with static gates and data comparisons against the Xbox/PC originals and has **not yet been seen in game**.
 
 ## Fork branch `windows` — unreleased (no kit; personal Windows rebuild, see the notice in the README)
 
 Not a release of the port. This section lists what the fork's branch `windows` adds on top of B138; everything below
-it is the original project's changelog, unchanged. Details and numbers: [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md)
-(findings 1-44), [docs/DLC2.md](docs/DLC2.md), overview [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+it is the original project's changelog, unchanged (up to B270). In this section "played" means the fork's owner ran it
+on one Windows PC. Details and numbers: [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) (findings 1-49),
+[docs/DLC2.md](docs/DLC2.md), overview [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 | Date | Change |
 |---|---|
@@ -74,6 +74,81 @@ it is the original project's changelog, unchanged. Details and numbers: [docs/WI
 
 State of DLC 1 against B138 (offline): 46 of 133 DRMs fully identical, sections script 99.2 %, DTP 98.7 %, shader
 97.7 %, mesh 99.1 %, material 90.4 %. Not done: shader translator (B72-B89), later layers up to B138.
+
+## B270 — Nov 2026 (release build `B270_acqua`; kit not published)
+
+B270_acqua is B269_nativo plus two fixes to how a vertex shader feeds a pixel shader (COLOR0). Both are verified offline only; B270_acqua was installed in the VM and the dungeon water is no longer black; the rest of the build is as B269_nativo (not played through yet).
+
+| Area | Change | Why |
+|---|---|---|
+| DLC1 dungeons: water (material 20262 in `dlc_caverns`, `dungeon_main`, `dungeon_sewer`) | VS 976 → 164. VS 164 is the same base-game vertex shader with vertex colour, copied byte for byte from the PC game | Surrogate VS 976 did not write COLOR0. The water PS takes its alpha from it (`oC0.w = MaterialOpacity * v0.w`), so with a newer driver the input was 0 and the water was invisible: "black water". The Xbox shader passes the vertex colour |
+| DLC2 treasure room (material 26584) | VS 831 → 243, the twin with vertex colour already in the file | same missing COLOR0, here the alpha of an additive layer |
+
+Still open in B270, in addition to the B269 list below:
+
+| Issue | Notes |
+|---|---|
+| Guillotine `dlc1_uo_guillotine` | pixel shaders 738/739 discard on `v0.w`, which vertex shader 211 never writes. Not fixed |
+
+## B269 — Nov 2026 (kit `trudlcport-kit-B269.zip`, kit format 2)
+
+**Lara's Shadow (DLC2) is now converted and can be played.** This release also needs a new install procedure:
+
+- **Installer and kit, format 2.**
+  - The installer needs `pack11.000` as well. Files shared by both DLCs are built for both. `--dlc1-only` exists but is untested.
+  - The exe patch now starts from the **Steamless** output of your own `tru.exe` instead of the encrypted Steam exe, so the kit no longer carries the game's code.
+  - Xbox textures are converted on your PC (`tex_convert.py`, needs `numpy`) instead of travelling inside the patches.
+  - Each installed file is re-read from disk and checked. `--verify` and `--restore` use an install record.
+- **End credits.** The credits movies are no longer in the kit. `--credits` builds `credits_DLC1.bik` and `credits_DLC2.bik` on your PC from your own `.wmv` files (Windows, ffmpeg + RAD Video Tools). Without them the game hangs on a black screen after each final cutscene.
+- **Native Direct3D 9.** The pixel shaders with forms that Windows' own D3D9 rejects on AMD are rewritten. On B269_tubi there were 240 of them: 228 `cmp` with `-|c|` and 12 `sincos` with destination = source. This is offline only; please run the native test v3.
+- **What was played.** The release build is **B269_nativo**, which is B269_tubi plus the shader rewrite. B269_tubi was tested in the VM; B269_nativo is in its first VM test (TEST 56) and has not been played through yet.
+- **Lock the game to 60 fps**, as before.
+
+### What changed since B138, in plain words
+| Builds | Area | Change |
+|---|---|---|
+| B139–B141 | DLC2 start | 210 new files converted from `pack11`. The opening cutscene starts, the doppelganger outfit is forced, and the effect ids of the first fight are mapped to PC ids |
+| B147–B158 | Materials (DLC2, back-ported to DLC1) | 98 lit materials rebuilt with new shader libraries, dedicated libraries for the materials with no PC donor, missing-texture placeholders, back-buffer flags, and the RGB light bridge in transplanted libraries |
+| B159–B213 | Doppelganger and thrall data | Tens of thousands of data words that the generic converter had byte-swapped the wrong way: behaviour graph, tuning, action lists, block tables, id references. Where possible each word was checked against an independent PC oracle (the PC Lara class 850); the rest was decided with context models trained on the base game and cross-checked with the data audit. The fixes were back-ported to the DLC1 costumes |
+| B202, B216, B218 | DLC menu | Mission descriptions no longer overlap the title (wrapped as on Xbox) |
+| B215–B236 | Doppelganger crashes and controls | Fixed crashes on spawn, actions, animation index and node lists. The black screen when jumping at a rock vein is gone (movement profile 26 was big-endian), and so is a vein marker with swapped bytes |
+| B230–B231, B238–B245 | Doppelganger look | Green arms (normal map on the colour sampler), cube map, flat normals, trousers |
+| B237, B246–B247 | Combat | Q/E punches and kicks deal damage. Fixed the crash on Shift+E (FX id). Distortion and trail of the shadow attack are restored without the black overlay |
+| B251–B258 | Data audit | 24 + 71 more (type, index) words swapped at 32 bits. This fixes the crash after the Natla cutscene (`0x444c62`), on the cannonball, Natla pod and pistons, and on bridges, columns and pipes |
+| B259 | Ceremony room | Its cutscene now starts (script message 103) |
+| B260–B261 | Lighting | Irradiance probes of ceremony_room and dungeon fixed, so the doppelganger and thralls are no longer magenta near goo or while shooting. Goo cannon materials fixed |
+| B264–B265 | Goo | Waterfall and goo materials fixed. The four ceremony-room goo FX are **switched off** (they drew wrong shapes) |
+| B266–B268 | Ending, scripts | DLC2 final sequence (wrong script symbols that left the game paused on a black screen), 11 DLC1 scripts, yggdrasil_end camera spline, goo converter. Script vtable slots 14 and 31 match the PC layout |
+| B269 | Machine room | The dark extending bridges and goo pipes (materials 22915/25901) get their translated Xbox shaders. On top of that comes the native-D3D9 shader fix above |
+
+The **exe** chain also gained, step by step, these patches (all on the Steamless exe, offline-verified and then played):
+
+- title-update code the PC exe lacked, needed by DLC2 (wall-run, attacks);
+- crash guards;
+- the cloth time step for the doppelganger's hair when time is scaled;
+- a fix for the ChunkDoll geometry;
+- a larger SweepAndPrune pool (3000, like the Xbox title update);
+- a guard for NPC camera shakes.
+
+### Should be fixed: please report in game
+- [ ] No "display driver" box on a real GPU with Windows' own D3D9 (run the native test v3 if it still appears)
+- [ ] DLC2 end: final cutscene → crush cutscene → credits → menu (needs `credits_DLC2.bik`)
+- [ ] Machine room: extending bridges and goo pipes are no longer black
+- [ ] DLC1 still fine from start to end credits on B269 (it received many back-ported fixes)
+
+### Still open
+| Issue | Notes |
+|---|---|
+| Flicker on Natla, the doppelganger and the throne in the Natla cutscene | block-shaped patches. Cause not found (duplicated instances and lights excluded) |
+| Wall-run on rock veins in some places | on B269 one vein in front of the doppelganger reported `NONE` in the F8 menu. To be checked spot by spot |
+| Ceremony-room goo FX switched off | they rendered wrong shapes. To be re-enabled once understood |
+| Machine-room terrain material 26622 black | fix ready but needs the Xbox vertex shader too (UV scale) |
+| Material 25165 (goo grinder / converter) black | surrogate shader with real parameters. Not fixed |
+| Glow pass without alpha clip in some goo libraries | translator bug found in B269. The affected libraries need regenerating |
+| Rare FMOD crash at start-up, golden shotgun, dungeon material 23211 | unchanged |
+
+### In breve (italiano)
+B269 aggiunge il DLC2 (*Lara's Shadow*): si gioca col doppelganger fino all'area finale; la finale e' corretta offline ma non ancora confermata. Servono anche `pack11.000` e l'exe sbustato con Steamless; i crediti `.bik` li crea l'installatore sul tuo PC con `--credits` (servono per finire i DLC). Blocca il gioco a 60 fps.
 
 ## B138 — 21 Oct 2026 (kit `trudlcport-kit-B138.zip`)
 
