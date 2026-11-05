@@ -2507,6 +2507,22 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      and the matching sequence tree appended: 43 of 47 profiles end with both checks 0 and only the intended copies
      replaced; in the 4 single-tree DLC 2 profiles the texture fix tree would also swap `dlc_fx_cine_thrall_death`
      (base copy with 8 other words in DTPs 20372-20374), so they need a texture fix of their own base copy.
+   * Profile-specific script clash trees (2026-11-05 night, workspace docs Befund-Clash-Baeume-0511.md): 20 of the 48
+     active profiles stack no `dlc_test51a_thrall*` tree and still install the 16 DRMs with the DLC 2 thrall base
+     class under the resident id 12433 (findings 45 / 46). Appending `dlc_test51a_thrall` itself is no fix there (it
+     would swap the profiles' own level copies and undo the sequence fix in them). `script_clash_fix.py` got
+     `check --profile/--base` (one `PROFILE` line, exit 1 on an unfixed copy; new `Data` row in
+     `Test-TruPreflight.ps1`) and `profile_fix_plan.py` counts the clash per file (`--clash-lists`, `--clash`). The
+     final copies (after `dlc_test51q_dungeon` and the matching `dlc_test51r_seq*` tree where a profile lacks them)
+     form 4 input sets; each was staged and run through `script_clash_fix.py apply` into
+     `work/rebuild/dlc_test51s_clash<N>_*` (16 DRMs each: 16 section ids + 72 type-8 id words 12433 -> 26884,
+     `fix_word_diff.py` 0 other words / headers / relocations, `check` ok, sequence scan 0, texture check 0,
+     `dlc_struct_fixes.py check` unchanged, `script_layout_clash.py` 86 OVERLAP -> 0). The 12 level files of set 1 are
+     byte-identical with `dlc_test51r_seq10_thrall51a` (the same two fixes applied in the other order). Simulation of
+     all 48 profiles: 28 need nothing, 16 end with texture / sequence / clash 0 and only the intended copies replaced;
+     the 4 single-tree DLC 2 profiles reach 0 / 0 / 0 too, but the texture fix tree swaps their
+     `dlc_fx_cine_thrall_death` (as above). Open: the thrall copies of these 20 profiles also miss the `animfx` step
+     that `dlc_test51a_thrall` carries (`animfx_list_fix.py scan`: 102 words in the 50l line, 472 in the 48 line).
 
 ## The "VM" in upstream (what it was, what we do instead)
 

@@ -40,6 +40,17 @@ Additions (2026-11-05, agent Seq-Baeume, docs Befund-Seq-Baeume-0511.md):
         appended at the end when the Sequence check fails; reports both checks after, every file whose installed md5
         changes, and per appended tree the files it replaces (intended = the tree's input copy, same = already the
         output, other = another copy). INPUTS of a --seq tree: the staged_sources.tsv of its stage_by_md5 run.
+
+Additions (2026-11-05 night, agent Clash-Baeume, docs Befund-Clash-Baeume-0511.md):
+  every check now also counts the script clash (tools/script_clash_fix.unfixed_in_file, findings 45 / 46: a DLC
+  script class under a resident PC id with another instance layout and a DLC class deriving from it in the same DRM,
+  e.g. the thrall base 12433 that the step scriptclash renumbers to 26884); 'clash' in every summary.
+  --clash-lists DIR        per profile the final copies (after the steps the simulation appends before the clash step,
+        else the profile as it is) that still carry a clash, grouped over all profiles by (name, md5):
+        DIR/clash<N>.paths + DIR/clash<N>.profiles (input of tools/stage_by_md5.py --paths and script_clash_fix apply)
+  --clash NAME=TREE_DIR:INPUTS [--clash ...]   simulation: after the texture / Sequence steps, when the clash check
+        fails, the --clash tree whose every file replaces exactly its input copy is appended at the end (same choice
+        rule as --seq); the verdict needs texlist 0, Sequence 0 and clash 0.
 """
 import sys, os, json, glob, hashlib, re, io, contextlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -85,8 +96,22 @@ def md5(p):
     return _MD5[p]
 
 
+_RES = []                 # resident script layouts of tools/script_clash_fix (loaded once)
+
+
+def clash_count(path):
+    """unfixed script clash groups (with a derived DLC class) of one DRM; 0 for the resident bank itself"""
+    import script_clash_fix as SC
+    if os.path.basename(path).lower() in SC.SKIP: return 0
+    if not _RES: _RES.append(SC.resident())
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        return len(SC.unfixed_in_file(path, _RES[0]))
+
+
 def check(path):
-    """(texlist problems, seq repeat-wrong words, seq pad-only words, seq unexpected) of one file, cached by md5"""
+    """(texlist problems, seq repeat-wrong words, seq pad-only words, seq unexpected, script clash groups) of one
+    file, cached by md5"""
     h = md5(path)
     if h not in _CHK:
         import objdata_texlist_check as TLC, soundplex_sequence_fix as SQ
@@ -101,7 +126,7 @@ def check(path):
                 if r[6] == 'other': unexp += 1
                 elif r[4][0] != r[5][0]: rep += 1
                 else: pad += 1
-        _CHK[h] = (nbad, rep, pad, unexp)
+        _CHK[h] = (nbad, rep, pad, unexp, clash_count(path))
     return _CHK[h]
 
 
@@ -144,15 +169,16 @@ def load_fix(arg):
 
 
 def summary(final):
-    tl, rep, pad, unexp = [], [], [], []
+    tl, rep, pad, unexp, cl = [], [], [], [], []
     for rel, (p, label) in sorted(final.items()):
         if not rel.endswith('.drm'): continue
-        a, b, c, d = check(p)
+        a, b, c, d, e = check(p)
         if a: tl.append(os.path.basename(rel))
         if b: rep.append(os.path.basename(rel))
         if c: pad.append(os.path.basename(rel))
         if d: unexp.append(os.path.basename(rel))
-    return dict(texlist=tl, seq_repeat=rep, seq_pad=pad, seq_unexpected=unexp)
+        if e: cl.append(os.path.basename(rel))
+    return dict(texlist=tl, seq_repeat=rep, seq_pad=pad, seq_unexpected=unexp, clash=cl)
 
 
 def place(trees, files, base, fix):
@@ -196,13 +222,34 @@ def seq_bad(s):
     return len(s['seq_repeat']) + len(s['seq_pad']) + len(s['seq_unexpected'])
 
 
-def sim(trees, files, base, texfix, seqfixes):
-    """the profile + (texfix if the texture check fails) + (the matching seq tree if the Sequence check fails), each
-    appended at the end -> dict(now, after, steps, changed, verdict)"""
+def pick(cur, files, base, cands, badness):
+    """the candidate tree whose every file replaces exactly its input copy (0 other copies, 0 added, none shadowed),
+    appended at the end: (step dict, new tree list, also matching names) or (None, closest dict, [])"""
+    ok, best = [], None
+    for f in cands:
+        c = classify(cur, files, base, f)
+        miss = len(c['other']) + len(c['added']) + len(c['shadowed'])
+        if best is None or miss < best[0]: best = (miss, f, c)
+        if not miss and c['intended']:
+            cand = cur + [(f['name'], f['files'])]
+            ok.append((badness(summary(install(cand, files, base))), f, c, cand))
+    if not ok:
+        return None, dict(best=best[1]['name'] if best else None, **(best[2] if best else {})), []
+    # clean result first; among those the tree that carries the fewest files the profile has already
+    # (e.g. the 1-file Crushers tree for a profile whose other 14 copies are fixed)
+    ok.sort(key=lambda x: (x[0], len(x[2]['same'])))
+    _, f, c, cand = ok[0]
+    return dict(tree=f['name'], **c), cand, [x[1]['name'] for x in ok[1:]]
+
+
+def sim(trees, files, base, texfix, seqfixes, clashfixes=()):
+    """the profile + (texfix if the texture check fails) + (the matching seq tree if the Sequence check fails) + (the
+    matching clash tree if the script clash check fails), each appended at the end -> dict(now, after, steps, changed,
+    verdict, pre_clash = the tree list before the clash step)"""
     first = install(trees, files, base)
     now = summary(first)
-    res = dict(now=now, steps=[], changed=[])
-    if not now['texlist'] and not seq_bad(now):
+    res = dict(now=now, steps=[], changed=[], pre_clash=list(trees))
+    if not now['texlist'] and not seq_bad(now) and not now['clash']:
         res.update(after=now, verdict='no change'); return res
     cur = list(trees)
     if now['texlist'] and texfix:
@@ -211,45 +258,42 @@ def sim(trees, files, base, texfix, seqfixes):
         cur = cur + [(texfix['name'], texfix['files'])]
     mid = summary(install(cur, files, base))
     res['mid'] = mid
-    if seq_bad(mid):
-        ok, best = [], None
-        for f in seqfixes:
-            c = classify(cur, files, base, f)
-            miss = len(c['other']) + len(c['added']) + len(c['shadowed'])
-            if best is None or miss < best[0]: best = (miss, f, c)
-            if not miss and c['intended']:
-                cand = cur + [(f['name'], f['files'])]
-                ok.append((seq_bad(summary(install(cand, files, base))), f, c, cand))
-        if ok:
-            # clean result first; among those the tree that carries the fewest files the profile has already
-            # (e.g. the 1-file Crushers tree for a profile whose other 14 copies are fixed)
-            ok.sort(key=lambda x: (x[0], len(x[2]['same'])))
-            _, f, c, cand = ok[0]
-            res['steps'].append(dict(tree=f['name'], **c))
-            if len(ok) > 1: res['also_matching'] = [x[1]['name'] for x in ok[1:]]
-            cur = cand
-        else:
-            res['no_seq_tree'] = dict(best=best[1]['name'] if best else None, **(best[2] if best else {}))
+    if seq_bad(mid) and seqfixes:
+        st, cand, also = pick(cur, files, base, seqfixes, seq_bad)
+        if st:
+            res['steps'].append(st); cur = cand
+            if also: res['also_matching'] = also
+        else: res['no_seq_tree'] = cand
+    res['pre_clash'] = list(cur)
+    mid2 = summary(install(cur, files, base))
+    if mid2['clash'] and clashfixes:
+        st, cand, also = pick(cur, files, base, clashfixes, lambda s: len(s['clash']) + seq_bad(s) + len(s['texlist']))
+        if st:
+            res['steps'].append(st); cur = cand
+            if also: res['also_matching_clash'] = also
+        else: res['no_clash_tree'] = cand
     fin = install(cur, files, base)
     after = summary(fin)
     res['after'] = after
     res['changed'] = sorted(os.path.basename(rel) for rel in fin if rel not in first or md5(fin[rel][0]) != md5(first[rel][0]))
-    intended = sorted(n for s in res['steps'] for n in s['intended'])
+    # a set: a later step (clash) may replace the output of an earlier one (seq) - same file, counted once
+    intended = sorted({n for s in res['steps'] for n in s['intended']})
     other = [x for s in res['steps'] for x in s['other'] + s['added'] + s['shadowed']]
-    clean = not after['texlist'] and not seq_bad(after)
+    clean = not after['texlist'] and not seq_bad(after) and not after['clash']
     res['verdict'] = 'ok' if clean and not other and res['changed'] == intended else 'FAIL'
     return res
 
 
 def sim_table(report):
-    print('\n| Profile | trees to append (in order) | texlist now -> after | Sequence (repeat / pad / unexpected) now -> after | files replaced | verdict |')
-    print('|---|---|---|---|---|---|')
+    print('\n| Profile | trees to append (in order) | texlist now -> after | Sequence (repeat / pad / unexpected) now -> after | clash DRMs now -> after | files replaced | verdict |')
+    print('|---|---|---|---|---|---|---|')
     for r in report:
         s = r['sim']
         tr = ', '.join(x['tree'] for x in s['steps']) or ('-' if s['verdict'] == 'no change' else 'NONE MATCHES')
         q = lambda d: '%d / %d / %d' % (len(d['seq_repeat']), len(d['seq_pad']), len(d['seq_unexpected']))
-        print('| %s | %s | %d -> %d | %s -> %s | %d | %s |' % (r['profile'], tr, len(s['now']['texlist']),
-              len(s['after']['texlist']), q(s['now']), q(s['after']), len(s['changed']), s['verdict']))
+        print('| %s | %s | %d -> %d | %s -> %s | %d -> %d | %d | %s |' % (r['profile'], tr, len(s['now']['texlist']),
+              len(s['after']['texlist']), q(s['now']), q(s['after']), len(s['now']['clash']), len(s['after']['clash']),
+              len(s['changed']), s['verdict']))
 
 
 def table(path):
@@ -303,6 +347,15 @@ def main(a):
     for f in seqfixes:
         print('seq tree %s: %s, %d files, inputs known for %d' % (f['name'], f['root'], len(f['files']),
                                                               sum(1 for v in f['inputs'].values() if v)))
+    clashfixes = []
+    while '--clash' in a:
+        k = a.index('--clash'); clashfixes.append(load_fix(a[k + 1])); del a[k:k + 2]
+    for f in clashfixes:
+        print('clash tree %s: %s, %d files, inputs known for %d' % (f['name'], f['root'], len(f['files']),
+                                                                sum(1 for v in f['inputs'].values() if v)))
+    clash_lists = None
+    if '--clash-lists' in a: k = a.index('--clash-lists'); clash_lists = a[k + 1]; del a[k:k + 2]
+    cgroups, cpaths = {}, {}
     if a: sys.exit('unknown arguments: %s' % a)
     groups = {}
     paths_of = {}
@@ -325,8 +378,9 @@ def main(a):
         pn = os.path.basename(pp)[:-5]
         now = summary(install(trees, files, base))
         print('\nPROFILE %s: %d trees (%s)' % (pn, len(trees), ', '.join(t[0] for t in trees)))
-        print('  now: texlist %s | seq repeat %s | seq pad-only %s | seq unexpected %s' % (
-            now['texlist'] or '-', now['seq_repeat'] or '-', now['seq_pad'] or '-', now['seq_unexpected'] or '-'))
+        print('  now: texlist %s | seq repeat %s | seq pad-only %s | seq unexpected %s | clash %s' % (
+            now['texlist'] or '-', now['seq_repeat'] or '-', now['seq_pad'] or '-', now['seq_unexpected'] or '-',
+            now['clash'] or '-'))
         rep = dict(profile=pn, trees=[t[0] for t in trees], now=now, single={}, combos={})
         for f in fixes:
             k, cand, notes = place(trees, files, base, f)
@@ -372,22 +426,31 @@ def main(a):
         need = []
         for rel, (p, label) in sorted(fin.items()):
             if not rel.endswith('.drm'): continue
-            a_, b_, c_, d_ = check(p)
+            a_, b_, c_, d_, _e = check(p)
             if b_ or c_ or d_: need.append((os.path.basename(rel), md5(p), label, b_, c_, d_))
         sig = tuple((n, h) for n, h, *_ in need)
         if sig: groups.setdefault(sig, []).append(pn)
         if sig and sig not in paths_of:
             paths_of[sig] = [os.path.abspath(fin[rel][0]) for rel in sorted(fin) if rel.endswith('.drm') and
                              any(os.path.basename(rel) == n and md5(fin[rel][0]) == h for n, h in sig)]
-        if seqfixes or texfix_name:
-            s = sim(trees, files, base, byname.get(texfix_name), seqfixes)
+        pre_clash = list(trees)
+        if seqfixes or texfix_name or clashfixes:
+            s = sim(trees, files, base, byname.get(texfix_name), seqfixes, clashfixes)
+            pre_clash = s.pop('pre_clash')
             rep['sim'] = s
-            print('  sim: %s; appended %s; texlist %d -> %d; seq repeat/pad/unexpected %d/%d/%d -> %d/%d/%d; %d files '
-                  'change (%s)' % (s['verdict'], ', '.join(x['tree'] for x in s['steps']) or '-', len(s['now']['texlist']),
-                                  len(s['after']['texlist']), len(s['now']['seq_repeat']), len(s['now']['seq_pad']),
-                                  len(s['now']['seq_unexpected']), len(s['after']['seq_repeat']),
-                                  len(s['after']['seq_pad']), len(s['after']['seq_unexpected']), len(s['changed']),
-                                  ', '.join(s['changed']) or '-'))
+            print('  sim: %s; appended %s; texlist %d -> %d; seq repeat/pad/unexpected %d/%d/%d -> %d/%d/%d; clash DRMs '
+                  '%d -> %d; %d files change (%s)' % (
+                      s['verdict'], ', '.join(x['tree'] for x in s['steps']) or '-', len(s['now']['texlist']),
+                      len(s['after']['texlist']), len(s['now']['seq_repeat']), len(s['now']['seq_pad']),
+                      len(s['now']['seq_unexpected']), len(s['after']['seq_repeat']), len(s['after']['seq_pad']),
+                      len(s['after']['seq_unexpected']), len(s['now']['clash']), len(s['after']['clash']),
+                      len(s['changed']), ', '.join(s['changed']) or '-'))
+            if s.get('no_clash_tree'):
+                nb = s['no_clash_tree']
+                print('    NO matching clash tree; closest %s: other %d (%s), added %d, shadowed %d' % (
+                    nb.get('best'), len(nb.get('other') or []), ', '.join(nb.get('other') or []),
+                    len(nb.get('added') or []), len(nb.get('shadowed') or [])))
+            if s.get('also_matching_clash'): print('    also matching (clash): %s' % ', '.join(s['also_matching_clash']))
             for x in s['steps']:
                 print('    + %s: intended %d, same %d, other %d%s, added %d%s, shadowed %d' % (
                     x['tree'], len(x['intended']), len(x['same']), len(x['other']),
@@ -400,13 +463,28 @@ def main(a):
                     len(nb.get('added') or []), len(nb.get('shadowed') or [])))
             if s.get('also_matching'): print('    also matching: %s' % ', '.join(s['also_matching']))
             if s['verdict'] != 'no change':
-                print('    after: texlist %s | seq repeat %s | seq pad-only %s | seq unexpected %s' % (
+                print('    after: texlist %s | seq repeat %s | seq pad-only %s | seq unexpected %s | clash %s' % (
                     s['after']['texlist'] or '-', s['after']['seq_repeat'] or '-', s['after']['seq_pad'] or '-',
-                    s['after']['seq_unexpected'] or '-'))
+                    s['after']['seq_unexpected'] or '-', s['after']['clash'] or '-'))
         print('  own seqrepeat tree (after %s): %d files: %s' % (own_after or '-', len(need), ', '.join(
             '%s %s from %s (repeat %d, pad %d%s)' % (n, h[:8], lb, b_, c_, (', UNEXPECTED %d' % d_) if d_ else '')
             for n, h, lb, b_, c_, d_ in need)))
         rep['own_seqrepeat'] = [dict(name=n, md5=h, source=lb, repeat=b_, pad=c_, unexpected=d_) for n, h, lb, b_, c_, d_ in need]
+        # files a profile-specific scriptclash tree would have to carry: the final copies (after the steps the
+        # simulation appends before its clash step) that still carry a clash group
+        pfin = install(pre_clash, files, base)
+        cneed = [(os.path.basename(rel), md5(p), label, check(p)[4]) for rel, (p, label) in sorted(pfin.items())
+                 if rel.endswith('.drm') and check(p)[4]]
+        csig = tuple((n, h) for n, h, *_ in cneed)
+        if csig:
+            cgroups.setdefault(csig, []).append(pn)
+            cpaths.setdefault(csig, [os.path.abspath(pfin[rel][0]) for rel in sorted(pfin) if rel.endswith('.drm') and
+                                     any(os.path.basename(rel) == n and md5(pfin[rel][0]) == h for n, h in csig)])
+            sub = [rel for rel in sorted(pfin) if '/' in rel and any(os.path.basename(rel) == n for n, h in csig)]
+            if sub: print('  WARNING clash copies in a sub folder (a flat staged tree would put them at the root): %s' % sub)
+        print('  own scriptclash tree (after %s): %d files: %s' % (', '.join(t[0] for t in pre_clash[len(trees):]) or 'the profile',
+              len(cneed), ', '.join('%s %s from %s (groups %d)' % (n, h[:8], lb, g) for n, h, lb, g in cneed)))
+        rep['own_scriptclash'] = [dict(name=n, md5=h, source=lb, groups=g) for n, h, lb, g in cneed]
         report.append(rep)
     print('\nown seqrepeat trees: %d distinct input sets' % len(groups))
     for i, (sig, ps) in enumerate(sorted(groups.items(), key=lambda kv: -len(kv[1]))):
@@ -419,7 +497,18 @@ def main(a):
             with open(os.path.join(own_lists, 'set%d.profiles' % (i + 1)), 'w', encoding='utf-8', newline='\n') as h:
                 for p in ps: h.write(p + '\n')
             for p in paths_of[sig]: print('     path %s %s' % (md5(p), p.replace('\\', '/')))
-    if seqfixes or texfix_name: sim_table(report)
+    print('\nown scriptclash trees: %d distinct input sets' % len(cgroups))
+    for i, (sig, ps) in enumerate(sorted(cgroups.items(), key=lambda kv: (-len(kv[1]), kv[1]))):
+        print('  clash set %d (%d files): %s' % (i + 1, len(sig), ', '.join(ps)))
+        print('     %s' % ', '.join('%s %s' % (n, h[:8]) for n, h in sig))
+        for p in cpaths[sig]: print('     path %s %s' % (md5(p), p.replace('\\', '/')))
+        if clash_lists:
+            os.makedirs(clash_lists, exist_ok=True)
+            with open(os.path.join(clash_lists, 'clash%d.paths' % (i + 1)), 'w', encoding='utf-8', newline='\n') as h:
+                for p in cpaths[sig]: h.write(p.replace('\\', '/') + '\n')
+            with open(os.path.join(clash_lists, 'clash%d.profiles' % (i + 1)), 'w', encoding='utf-8', newline='\n') as h:
+                for p in ps: h.write(p + '\n')
+    if seqfixes or texfix_name or clashfixes: sim_table(report)
     if outj:
         json.dump(report, open(outj, 'w', encoding='utf-8'), indent=1)
     return 0

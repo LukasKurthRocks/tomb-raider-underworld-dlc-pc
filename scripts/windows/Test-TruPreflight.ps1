@@ -22,7 +22,9 @@
         .drm plus the game folder's mods\ for the files no tree brings - the folder as it stands, so trees still
         installed by an earlier run count as base): tools\objdata_texlist_check.py --profile (texture group counts of
         the object data DTPs, finding 47: a raw count wipes game memory) and tools\soundplex_sequence_fix.py scan
-        --profile (SoundPlex Sequence repeat word, finding 49: repeat 0 = endless sound); both read-only, run with
+        --profile (SoundPlex Sequence repeat word, finding 49: repeat 0 = endless sound) and
+        tools\script_clash_fix.py check --profile (script class clash, findings 45 / 46: the DLC 2 thrall base 12433
+        on the resident layout = crash when the thralls are unloaded); all read-only, run with
         the project venv from the repository; a problem = fail, a tool that cannot evaluate the profile = warn
         (-SkipDataChecks leaves them out),
       * with -RunProfile: the tree sources and their md5 lists (a mismatch makes the run abort), each profile ASI
@@ -61,8 +63,8 @@
 .PARAMETER SkipTreeHashes
     Do not hash the profile tree files (faster; the md5 lists are then not checked).
 .PARAMETER SkipDataChecks
-    Do not run the two data checks of the profile's DRMs (objdata_texlist_check / soundplex_sequence_fix scan,
-    together about 1-2 minutes).
+    Do not run the three data checks of the profile's DRMs (objdata_texlist_check / soundplex_sequence_fix scan /
+    script_clash_fix check, together about 3-4 minutes).
 .PARAMETER Trace
     PowerShell line trace (Set-PSDebug -Trace 1).
 
@@ -748,7 +750,7 @@ try {
         Add-Row 'Profile' 'Tree / file sources' $(if ($missing.Count -or $bad.Count) { 'fail' } else { 'ok' }) $detail
 
         # ---- data checks of what the profile installs (read-only repository tools; findings 47 / 49) ----
-        if ($SkipDataChecks) { Add-Row 'Data' 'Profile DRM checks' 'info' '-SkipDataChecks: objdata_texlist_check / soundplex_sequence_fix scan not run' }
+        if ($SkipDataChecks) { Add-Row 'Data' 'Profile DRM checks' 'info' '-SkipDataChecks: objdata_texlist_check / soundplex_sequence_fix scan / script_clash_fix check not run' }
         else {
             $ppFull = (Resolve-Path -LiteralPath $pp).Path
             $baseArgs = @()
@@ -789,6 +791,21 @@ try {
                 }
                 else {
                     Add-Row 'Data' 'SoundPlex Sequence repeat' 'fail' ('{0} ({1}) - a wrong repeat byte 0 plays the sequence for ever (finding 49); a tree with the fixed copies (dlc_test51p_moan for DLC 2) must come last' -f $sum, $baseNote)
+                }
+            }
+            # script class clash (findings 45 / 46: a DLC script class under a resident generalbank id with another
+            # instance layout, e.g. the DLC 2 thrall base 12433 - crash tru+0x1976a3 when the thralls are unloaded)
+            $r = Invoke-TruPyCheck -ToolArgs (@('tools\script_clash_fix.py', 'check', '--profile', $ppFull) + $baseArgs)
+            $sum = @($r.Lines | Where-Object { $_ -like 'PROFILE *: *clash groups*' }) | Select-Object -First 1
+            if ($null -eq $r.Code -or $r.Code -gt 1 -or !$sum) {
+                Add-Row 'Data' 'Script class clash' 'warn' ('cannot evaluate the profile with script_clash_fix.py check: {0}' -f $(if ($r.Why) { $r.Why } else { "exit $($r.Code), no PROFILE line" }))
+            }
+            else {
+                $sum = $sum -replace '^PROFILE [^:]+: ', ''
+                if ($r.Code -eq 0) { Add-Row 'Data' 'Script class clash' 'ok' ('{0} ({1})' -f $sum, $baseNote) }
+                else {
+                    $groups = @($r.Lines | ForEach-Object { if ($_ -match '^UNFIXED group (\d+):') { 'script {0}' -f $Matches[1] } } | Select-Object -Unique)
+                    Add-Row 'Data' 'Script class clash' 'fail' ('{0} ({1}): {2} - the DLC copy runs on the resident layout (findings 45 / 46, crash when the thralls are unloaded); a tree with the renumbered copies (dlc_test51a_thrall or a dlc_test51s_clash tree) must come last' -f $sum, $baseNote, ($groups -join ', '))
                 }
             }
         }

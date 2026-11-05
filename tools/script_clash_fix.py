@@ -28,6 +28,10 @@ Usage (from the repository root):
   ../bin/pyt -t 900 tools/script_clash_fix.py check TREE [--resident ...] [--report OUT.json]
         exit 1 when an instance-layout clash with a derived DLC class is left (pipeline check after Fixes)
   ../bin/pyt -t 900 tools/script_clash_fix.py compare DIR_A DIR_B     md5 per common DRM (the proof against a test tree)
+  ../bin/pyt -t 900 tools/script_clash_fix.py check --profile P.json [--profile ...] [--base DIR] [--report OUT.json]
+        (2026-11-05, agent Clash-Baeume) the same check on what a test profile ends up installing (last tree source of
+        every .drm, with --base the files of DIR no tree brings; tools/objdata_texlist_check.profile_files); one line
+        'PROFILE <name>: ok|FAIL, ...' per profile, exit 1 when a profile installs an unfixed copy (preflight Data row)
 In the pipeline: tools/dlc_fixes_build.py fix `scriptclash` (last fix) runs run_tree() over the stage-2b tree in place.
 """
 import sys, os, struct, json, hashlib, collections
@@ -107,8 +111,13 @@ def type8_refs(D, value):
 def plan(tree, res):
     """scan a tree: {group key (old id, ikey): dict(layout, resident, drms, derived, vt_only)} and the vt-only list.
     group key as a JSON-able string via gkey()"""
+    return plan_files(tree_drms(tree), res)
+
+
+def plan_files(items, res):
+    """plan() over [(path, rel)] (e.g. the files a test profile ends up installing; 2026-11-05 agent Clash-Baeume)"""
     groups = collections.OrderedDict(); vt_only = collections.OrderedDict(); ids_in_tree = collections.Counter()
-    for p, rel in tree_drms(tree):
+    for p, rel in items:
         try: D = DW.read(open(p, 'rb').read(), 'le')
         except Exception as x: print('  %s: read failed %s' % (rel, x)); continue
         own = {}
@@ -258,6 +267,46 @@ def run_tree(src, out, res_spec=None, log=print, write_ids=True):
                 vt_only={str(k): dict(dlc_vt=sorted(v['dlc_vt']), res_vt=v['res_vt'], drms=len(v['drms'])) for k, v in vt_only.items()})
 
 
+def unfixed_in_file(path, res):
+    """[(group key string, derived DLC class count)] of one DRM: the clash groups with a derived DLC class that this
+    copy still carries under the resident id (the rule is per DRM: a group needs a deriving class in the same DRM)"""
+    groups, _, _ = plan_files([(path, os.path.basename(path))], res)
+    return [(gkey(*k), len(g['derived'])) for k, g in groups.items() if g['derived']]
+
+
+def profile_items(profile, base):
+    """[(path, name)] of the .drm files a test profile ends up installing (tools/objdata_texlist_check.profile_files:
+    last tree source, plus with base the files of DIR no tree brings), the resident bank skipped as in tree_drms"""
+    import objdata_texlist_check as TLC
+    fl, nbase = TLC.profile_files(profile, base)
+    return [(p, os.path.basename(p)) for p in fl if os.path.basename(p).lower() not in SKIP], nbase
+
+
+def check_profiles(profiles, base, res_spec=None, report=None):
+    """check --profile: one 'PROFILE <name>: ...' line per profile (read by scripts/windows/Test-TruPreflight.ps1);
+    exit 1 when any profile still installs a copy with an unfixed clash group"""
+    import glob
+    res = resident(res_spec); todo = []; out = []
+    for pat in profiles: todo += sorted(glob.glob(pat)) or [pat]
+    for pp in todo:
+        items, nbase = profile_items(pp, base)
+        groups, vt_only, ids_in_tree = plan_files(items, res)
+        bad = [(k, g) for k, g in groups.items() if g['derived']]
+        fixed = {e['new'] for e in load_ids()['ids']}
+        present = {n: ids_in_tree[n] for n in fixed if ids_in_tree.get(n)}
+        for (old, ik), g in bad:
+            print('UNFIXED group %s: %d DRMs (%s), %d derived DLC classes' % (gkey(old, ik), len(g['drms']),
+                                                                             ', '.join(g['drms']), len(g['derived'])))
+        n = os.path.basename(pp)[:-5] if pp.lower().endswith('.json') else os.path.basename(pp)
+        print('PROFILE %s: %s, %d .drm files (%d from the base %s), clash groups with derived DLC classes %d, DRMs with '
+              'an unfixed copy %d, renumbered ids present %s' % (
+                  n, 'FAIL' if bad else 'ok', len(items), nbase, base or '-', len(bad),
+                  len({d for _, g in bad for d in g['drms']}), present or '-'))
+        out.append(dict(profile=pp, base=base, unfixed={gkey(*k): sorted(g['drms']) for k, g in bad}, present=present))
+    if report: json.dump(out, open(report, 'w'), indent=1)
+    return 1 if any(o['unfixed'] for o in out) else 0
+
+
 def check(tree, res_spec=None, report=None):
     res = resident(res_spec)
     groups, vt_only, ids_in_tree = plan(tree, res)
@@ -295,7 +344,12 @@ def main(argv):
     if '--resident' in argv: k = argv.index('--resident'); rs = argv[k + 1]; del argv[k:k + 2]
     rep = None
     if '--report' in argv: k = argv.index('--report'); rep = argv[k + 1]; del argv[k:k + 2]
+    profiles = []
+    while '--profile' in argv: k = argv.index('--profile'); profiles.append(argv[k + 1]); del argv[k:k + 2]
+    base = None
+    if '--base' in argv: k = argv.index('--base'); base = argv[k + 1]; del argv[k:k + 2]
     cmd = argv[0]
+    if cmd == 'check' and profiles: sys.exit(check_profiles(profiles, base, rs, rep))
     if cmd == 'scan':
         res = resident(rs); groups, vt_only, ids_in_tree = plan(argv[1], res)
         for (old, ik), g in groups.items():
