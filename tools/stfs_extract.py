@@ -1,8 +1,8 @@
 """Xbox 360 STFS package (CON / LIVE / PIRS) reader: metadata, file table, block-hash verification, extraction.
 Read-only on the package; only writes into the OUT_DIR given to `extract`. Pure data parser (nothing in the package is
-executed). Written for the TRU DLC prototype packages (docs/Befund-Prototyp-DLC.md); can later let the installer
-accept a raw LIVE package instead of a pre-extracted pack10.000 / pack11.000 (docs/RELATED_WORK.md, "Accept the raw
-LIVE package").
+executed). Written for the TRU DLC prototype packages (docs/Befund-Prototyp-DLC.md); lets the installer accept a raw
+LIVE package instead of a pre-extracted pack10.000 / pack11.000 (scripts/windows/TruDlcPackage.psm1 runs `identify`,
+`verify` and `extract`; docs/RELATED_WORK.md, "Accept the raw LIVE package").
 
 Format (Free60 "STFS", Velocity StfsPackage.cpp; all big endian unless noted):
   0x000 magic 'CON ' / 'LIVE' / 'PIRS'; 0x22C 16 license entries (u64 id, u32 bits, u32 flags); 0x32C header SHA-1
@@ -31,9 +31,21 @@ Usage (from the repository root):
   ../bin/pyt -t 1800 tools/stfs_extract.py extract PACKAGE OUT_DIR
         writes every file below OUT_DIR (directories kept), verifies each block it reads and the hash tree, writes
         OUT_DIR.manifest.json (metadata, files with size / blocks / times / md5 / sha1, mismatch counts)
-Exit code 1 when a hash mismatch was found.
+  ../bin/pyt -t 300 tools/stfs_extract.py identify PACKAGE [--known LIST.json] [--json OUT.json]
+        header only (fast, reads no data blocks besides the file table): magic, title id 534307EC, content type 2,
+        header SHA-1 (= content id) against the header bytes and against the file name (an Xbox content file is
+        named <content id, 40 hex><2 hex>, e.g. ...E753), truncation check, file table, and the match in the
+        known-packages list (default scripts/windows/TruDlcPackages.json): name, role, file names and sizes.
+        Exit 0 = known package, all checks passed; 3 = intact TRU package, but not in the list (or its files differ
+        from the list); 1 = damaged or foreign (not STFS, other title / content type, header hash wrong, truncated,
+        file name contradicts the header).
+  ../bin/pyt -t 900 tools/stfs_extract.py catalog OUT.json [NAME=]DIR [[NAME=]DIR ...] [--base LIST.json]
+        writes a known-packages list from extracted package folders (NAME defaults to the folder name): per file
+        relative path, size, md5, sha1; content id = the first 40 characters of NAME. Roles, display names and
+        notes are carried over from --base (matched by name). Hashes and names only - no game bytes, no paths.
+Exit code 1 when a hash mismatch was found (extract: also when a file came out short).
 """
-import sys, os, struct, hashlib, json, datetime
+import sys, os, struct, hashlib, json, datetime, re
 
 BLK = 0x1000
 PER = 0xAA        # entries per hash table
@@ -317,12 +329,161 @@ def extract(S, out):
     mp = os.path.abspath(out).rstrip('\\/') + '.manifest.json'
     json.dump(man, open(mp, 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
     print('manifest', mp)
-    return 1 if (bad_blocks or bad_t) else 0
+    short = [r['path'] for r in recs if r['short']]
+    if short: print('SHORT files (package truncated?): %s' % short)
+    return 1 if (bad_blocks or bad_t or short) else 0
+
+
+# --- identify / catalog (installer: accept raw Xbox LIVE packages) ---
+TRU_TITLE_ID = 0x534307EC
+MARKETPLACE = 0x2
+NAME_RE = re.compile(r'^[0-9A-Fa-f]{42}$')
+DEFAULT_KNOWN = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts', 'windows',
+                             'TruDlcPackages.json')
+
+
+def load_known(path):
+    if not path or not os.path.isfile(path): return None
+    with open(path, 'r', encoding='utf-8-sig') as f: return json.load(f)
+
+
+def identify(pkg, known_path):
+    """header-level identification of one package file -> (exit code, result dict)"""
+    res = dict(file=os.path.basename(pkg), file_size=os.path.getsize(pkg), checks=[], problems=[], known=False)
+    with open(pkg, 'rb') as f: magic = f.read(4)
+    if magic not in (b'CON ', b'LIVE', b'PIRS'):
+        res['problems'].append('not an STFS package (magic %r)' % magic)
+        return 1, res
+    if res['file_size'] < 0xB000:
+        res['problems'].append('file too small for an STFS header (%d bytes)' % res['file_size'])
+        return 1, res
+    S = Stfs(pkg)
+    res.update(magic=S.magic, title_id='%08X' % S.title_id, content_type='%08X' % S.content_type,
+               content_type_name=CONTENT_TYPES.get(S.content_type, '?'), header_sha1=S.header_sha1,
+               display_name=S.names[0], title_name=S.title_name, package_sex='female' if S.sex == 0 else 'male',
+               allocated_blocks=S.alloc)
+    bad = res['problems']; ok = res['checks']
+
+    def check(cond, good, fail):
+        (ok if cond else bad).append(good if cond else fail)
+        return cond
+
+    check(S.magic == 'LIVE', 'magic LIVE', 'magic %r (purchased DLC is a LIVE package)' % S.magic)
+    check(S.title_id == TRU_TITLE_ID, 'title id 534307EC', 'title id %08X is not Tomb Raider: Underworld' % S.title_id)
+    check(S.content_type == MARKETPLACE, 'content type 00000002 (marketplace content)',
+          'content type %08X (%s), expected 00000002' % (S.content_type, res['content_type_name']))
+    check(S.header_hash_ok(), 'header SHA-1 matches the header bytes',
+          'header SHA-1 does not match the header (damaged or modified package)')
+    # file name = content id (40 hex) + 2 hex; a file renamed by the user is allowed (the header identifies it)
+    base = res['file']
+    res['name_is_content_name'] = bool(NAME_RE.match(base))
+    res['name_matches_header'] = res['name_is_content_name'] and base[:40].lower() == S.header_sha1
+    if res['name_is_content_name']:
+        check(res['name_matches_header'], 'file name = content id', 'file name %s does not match the header SHA-1 %s'
+              % (base, S.header_sha1))
+    else:
+        ok.append('file name %r is not a content name (renamed copy?) - identified by the header only' % base)
+    last = S.addr(S.backing_data(S.alloc - 1)) + BLK if S.alloc else S.first
+    check(S.fsize >= last, 'file size covers all %d allocated blocks' % S.alloc,
+          'file is truncated: %d bytes, the last allocated block ends at %d' % (S.fsize, last))
+    try:
+        files = [dict(path=e['path'], size=e['size']) for e in S.files() if not e['dir']]
+    except Exception as ex:                      # a broken file table is a damaged package, not a crash
+        files = []
+        bad.append('file table unreadable: %s' % ex)
+    res['files'] = files
+    if bad: return 1, res
+    known = load_known(known_path)
+    res['known_list'] = os.path.basename(known_path) if known_path else None
+    entry = None
+    for p in (known or {}).get('packages', []):
+        if p.get('content_id', '').lower() == S.header_sha1: entry = p; break
+    if entry is None:
+        bad.append('intact Tomb Raider: Underworld package, but not in the known-packages list%s'
+                   % ('' if known else ' (list not found: %s)' % known_path))
+        return 3, res
+    res.update(known=True, name=entry['name'], role=entry.get('role'), known_display_name=entry.get('display_name'))
+    ok.append('known package %s (%s)' % (entry['name'], entry.get('role')))
+    if res['name_is_content_name'] and base.upper() != entry['name'].upper():
+        bad.append('file name suffix differs from the known name %s' % entry['name'])
+    want = {f['path'].lower(): f['size'] for f in entry.get('files', [])}
+    have = {f['path'].lower(): f['size'] for f in files}
+    if want != have:
+        bad.append('files differ from the list: package %s, list %s' % (sorted(have.items()), sorted(want.items())))
+    else:
+        ok.append('file names and sizes match the list (%d files)' % len(want))
+    return (3 if bad else 0), res
+
+
+def digest(path):
+    m, s = hashlib.md5(), hashlib.sha1()
+    with open(path, 'rb') as f:
+        while True:
+            b = f.read(1 << 22)
+            if not b: break
+            m.update(b); s.update(b)
+    return m.hexdigest(), s.hexdigest()
+
+
+def catalog(argv):
+    out = argv[0]
+    base = None
+    if '--base' in argv:
+        i = argv.index('--base'); base = load_known(argv[i + 1]); argv = argv[:i] + argv[i + 2:]
+    by_name = {p['name'].upper(): p for p in (base or {}).get('packages', [])}
+    pkgs = []
+    for spec in argv[1:]:
+        name, _, d = spec.partition('=') if '=' in spec else (os.path.basename(os.path.normpath(spec)), '', spec)
+        if not NAME_RE.match(name): raise SystemExit('catalog: %r is not a 42-character content name' % name)
+        files = []
+        for dp, dn, fn in os.walk(d):
+            dn.sort()
+            for n in sorted(fn):
+                q = os.path.join(dp, n)
+                md5, sha1 = digest(q)
+                files.append(dict(path=os.path.relpath(q, d).replace(os.sep, '/'), size=os.path.getsize(q), md5=md5,
+                                  sha1=sha1))
+        old = by_name.get(name.upper(), {})
+        p = dict(name=name.upper(), content_id=name[:40].lower(), role=old.get('role', 'unknown'),
+                 display_name=old.get('display_name', ''))
+        for k, v in old.items():
+            if k not in p and k != 'files': p[k] = v
+        p['files'] = files
+        pkgs.append(p)
+        print('%s  %-18s %d files  %s' % (p['name'], p['role'], len(files),
+                                          ', '.join('%s %d %s' % (f['path'], f['size'], f['md5']) for f in files)))
+    doc = {k: v for k, v in (base or {}).items() if k != 'packages'}
+    doc.setdefault('schema', 1)
+    doc.setdefault('title_id', '534307EC')
+    doc.setdefault('content_type', '00000002')
+    doc['packages'] = pkgs
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    with open(out, 'w', encoding='utf-8', newline='\n') as f:
+        f.write(json.dumps(doc, indent=1, ensure_ascii=True) + '\n')
+    print('wrote', out, '(%d packages)' % len(pkgs))
+    return 0
 
 
 def main(argv):
     if len(argv) < 2: print(__doc__); return 2
     cmd, pkg = argv[0], argv[1]
+    if cmd == 'catalog': return catalog(argv[1:])
+    if cmd == 'identify':
+        kp = argv[argv.index('--known') + 1] if '--known' in argv else os.path.normpath(DEFAULT_KNOWN)
+        code, res = identify(pkg, kp)
+        res['exit_code'] = code
+        for k in ('file', 'file_size', 'magic', 'title_id', 'content_type', 'header_sha1', 'display_name', 'name',
+                  'role'):
+            if k in res: print('%-14s %s' % (k, res[k]))
+        for f in res.get('files', []): print('%-14s %s %d' % ('file entry', f['path'], f['size']))
+        for c in res['checks']: print('ok             %s' % c)
+        for c in res['problems']: print('PROBLEM        %s' % c)
+        print('result         %s' % {0: 'known package, OK', 1: 'damaged or foreign package',
+                                     3: 'not a known package'}[code])
+        if '--json' in argv:
+            jp = argv[argv.index('--json') + 1]
+            with open(jp, 'w', encoding='utf-8', newline='\n') as f: f.write(json.dumps(res, indent=1) + '\n')
+        return code
     S = Stfs(pkg)
     if cmd == 'list':
         m = S.meta(); fs = S.files()

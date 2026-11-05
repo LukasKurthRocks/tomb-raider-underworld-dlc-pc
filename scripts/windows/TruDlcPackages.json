@@ -1,0 +1,107 @@
+{
+ "schema": 1,
+ "title_id": "534307EC",
+ "content_type": "00000002",
+ "note": "Known Xbox 360 LIVE packages of Tomb Raider: Underworld (names, sizes and hashes only - no game data). A package file is named <content id><2 hex>; the content id is the SHA-1 of the package header (checked by tools/stfs_extract.py identify). Files: what the package holds after extraction. Regenerate: tools/stfs_extract.py catalog (see scripts/windows/README.md).",
+ "packages": [
+  {
+   "name": "9CA70CF0EDA43654D158C2E37470D301DFA850E753",
+   "content_id": "9ca70cf0eda43654d158c2e37470d301dfa850e7",
+   "role": "dlc1",
+   "display_name": "Beneath the Ashes (DLC 1)",
+   "note": "required by the B138 kit and the pipeline",
+   "files": [
+    {
+     "path": "credits_DLC1.wmv",
+     "size": 44101260,
+     "md5": "386ee1c176ce7f296873733fd45b91b9",
+     "sha1": "aed79683b4196933f2eff92d5e84401d8140cad5"
+    },
+    {
+     "path": "pack10.000",
+     "size": 973111296,
+     "md5": "5568bcf26ff41c37eb676805bb55da93",
+     "sha1": "15bf06c4955f13ecb00b0179ed92ea6d12aeb959"
+    },
+    {
+     "path": "spa.bin",
+     "size": 377782,
+     "md5": "084e9cbd6400000de1cf1e136294d175",
+     "sha1": "0a37fc55e1be53855c2345ce9cc84a56ecae6fb0"
+    }
+   ]
+  },
+  {
+   "name": "600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153",
+   "content_id": "600a12643fcdac84003e6e0dbd0a1a8f7dae9dd1",
+   "role": "dlc2",
+   "display_name": "Lara's Shadow (DLC 2)",
+   "note": "kit: optional (menu images and music only); pipeline: DLC 2 build",
+   "files": [
+    {
+     "path": "credits_DLC2.wmv",
+     "size": 46498561,
+     "md5": "7842a2bcbd015f0f47265a337461628d",
+     "sha1": "fce4c0df614b53b5f660cb6e7ebda53ce4d38477"
+    },
+    {
+     "path": "pack11.000",
+     "size": 1189642240,
+     "md5": "2af94eb5ab87be1b05c9c863dc2c088d",
+     "sha1": "d2bce3cc135be5022f019dc3c3479a946ab1cd75"
+    },
+    {
+     "path": "spa.bin",
+     "size": 434922,
+     "md5": "ab8ebd6927396f5a8f84777b0a74e4c5",
+     "sha1": "aad17bc145658b433ad3a52c4fb14b265f52badd"
+    }
+   ]
+  },
+  {
+   "name": "E5AFB2B959A72C52120D73678AED11BD8752686753",
+   "content_id": "e5afb2b959a72c52120d73678aed11bd87526867",
+   "role": "costume_wetsuit",
+   "display_name": "Costume pack: Wetsuit (k, p)",
+   "note": "costume packs are not supported yet",
+   "files": [
+    {
+     "path": "pack1.000",
+     "size": 64305152,
+     "md5": "bea3cc15b8ac8d5e68295c7e3b2b4def",
+     "sha1": "34e302f98356df89314f382e4c1189b135bf66de"
+    }
+   ]
+  },
+  {
+   "name": "9FDDD06617D1016DE468ACF53AC663E8BA2AD41853",
+   "content_id": "9fddd06617d1016de468acf53ac663e8ba2ad418",
+   "role": "costume_classic",
+   "display_name": "Costume pack: Classic (a, h)",
+   "note": "costume packs are not supported yet",
+   "files": [
+    {
+     "path": "pack2.000",
+     "size": 65755136,
+     "md5": "6f76c3ae2ad84bb42efebb969c3f3c31",
+     "sha1": "4f4a4bb655d4d27c953e429c61ee9fba17f73ce7"
+    }
+   ]
+  },
+  {
+   "name": "AC0089F81B621CD0E0C156B6176EFCC6C844705D53",
+   "content_id": "ac0089f81b621cd0e0c156b6176efcc6c844705d",
+   "role": "costume_designer",
+   "display_name": "Costume pack: Designer (l, m)",
+   "note": "costume packs are not supported yet",
+   "files": [
+    {
+     "path": "pack20.000",
+     "size": 64448512,
+     "md5": "25a719f154cc74e478a58974e96999b8",
+     "sha1": "6f6680cad3c0c8133099a012ecc0891cee40a65e"
+    }
+   ]
+  }
+ ]
+}

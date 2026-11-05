@@ -8,6 +8,17 @@
               install_dlc.py itself keeps tru.exe as tru.exe.steam_original and an old mods\ as mods_backup_<time>.
     -Restore  Puts back the original binkw32.dll and tru.exe from <workspace>\backup and renames mods\ to mods_disabled_<time>.
 
+    Raw Xbox LIVE packages: the DLC files copied from the console (Content\<profile>\534307EC\00000002\<42-character
+    name>, one file per package) can be given with -Package or put into <workspace>\input\xbox-dlc-live\. Before
+    anything else they are identified (header SHA-1 = content id = file name, title id, content type), checked
+    against scripts\windows\TruDlcPackages.json and extracted into <workspace>\input\xbox-dlc\<name>\ (every block
+    of the package's hash tree checked, then size + MD5 of every file against the list); unknown or damaged packages
+    are refused, an existing different folder is never overwritten (TruDlcPackage.psm1, Expand-TruDlcPackage).
+    With -Check the packages are only identified and verified (nothing is extracted). -PackageOnly stops after this
+    step and does not look at the game folder.
+
+    -WhatIf shows what would be extracted / installed / restored and changes nothing.
+
     Every run writes a log to <workspace>\logs\Install-TruDlc_<time>.log (environment, hashes, full python output).
     -Verbose shows each step, -Debug adds paths, hashes and command lines, -Trace adds a PowerShell line trace.
 
@@ -18,25 +29,44 @@
     .\Install-TruDlc.ps1 -Check -Verbose
 .EXAMPLE
     .\Install-TruDlc.ps1 -Restore -Debug
+.EXAMPLE
+    .\Install-TruDlc.ps1 -Package E:\Content\0000000000000000\534307EC\00000002\9CA70CF0EDA43654D158C2E37470D301DFA850E753 -PackageOnly -Verbose
+.EXAMPLE
+    .\Install-TruDlc.ps1 -Check -Verbose      # also checks the raw packages in <workspace>\input\xbox-dlc-live, if any
+.PARAMETER Package
+    Raw Xbox LIVE package file(s). Without it, the files in <workspace>\input\xbox-dlc-live\ are used (if any).
+.PARAMETER PackageOnly
+    Only verify / extract the raw packages; the game folder is not looked at.
+.PARAMETER DlcPath
+    Folder of the extracted packages (default <workspace>\input\xbox-dlc); also passed to install_dlc.py --dlc.
+.PARAMETER PackageList
+    Known-packages list (default scripts\windows\TruDlcPackages.json).
 #>
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [switch]$Check,
     [switch]$Restore,
     [switch]$Trace,
     [string]$GamePath,
-    [string]$Build = 'B138'
+    [string]$Build = 'B138',
+    [string[]]$Package,
+    [switch]$PackageOnly,
+    [string]$DlcPath,
+    [string]$PackageList
 )
 
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
 # shared helpers: Write-Log, Set-TruLogFile, Find-TruGamePath, Get-Md5, Get-TruWorkspacePath
 Import-Module (Join-Path $PSScriptRoot 'TruCommon.psm1') -Force -Verbose:$false
+# raw Xbox LIVE packages: Expand-TruDlcPackage (identify, verify, extract)
+Import-Module (Join-Path $PSScriptRoot 'TruDlcPackage.psm1') -Force -Verbose:$false
 
 # <workspace> = the folder that holds the repository (see Get-TruWorkspacePath)
 $paths     = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $root      = $paths.Workspace
-$dlcPath   = Join-Path $root 'input\xbox-dlc'
+$dlcPath   = if ($DlcPath) { [System.IO.Path]::GetFullPath($DlcPath) } else { Join-Path $root 'input\xbox-dlc' }
+$liveDir   = Join-Path $root 'input\xbox-dlc-live'
 $release   = Join-Path $root "release\$Build"
 $kitPath   = Join-Path $release 'kit'
 $installer = Join-Path $release 'install_dlc.py'
@@ -47,8 +77,8 @@ $logDir    = $paths.Logs
 $md5BinkOriginal = '2f912c88c18c4aa65b2153339482f320'
 $md5ExeOriginal  = 'b36da327a320eab8b5c8464b27685840'
 
-$mode = if ($Restore) { 'Restore' } elseif ($Check) { 'Check' } else { 'Install' }
-New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+$mode = if ($Restore) { 'Restore' } elseif ($PackageOnly -and $Check) { 'PackageCheck' } elseif ($PackageOnly) { 'Package' } elseif ($Check) { 'Check' } else { 'Install' }
+New-Item -ItemType Directory -Force -Path $logDir -WhatIf:$false | Out-Null
 $logFile = Join-Path $logDir ('Install-TruDlc_{0}_{1}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'), $mode)
 Set-TruLogFile -Path $logFile
 
@@ -101,6 +131,36 @@ if ($Trace) { Set-PSDebug -Trace 1 }
 try {
     Write-Log "Install-TruDlc mode=$mode build=$Build log=$logFile" -Level VERBOSE
     Write-Log "PowerShell $($PSVersionTable.PSVersion) on $([Environment]::OSVersion.VersionString)" -Level DEBUG
+
+    # Raw Xbox LIVE packages (-Package, or files in input\xbox-dlc-live): identify, verify, extract into $dlcPath.
+    $pendingRoles = @()
+    if (!$Restore) {
+        $packageArgs = @{ Destination = $dlcPath; CheckOnly = [bool]$Check; WhatIf = [bool]$WhatIfPreference }
+        if ($PackageList) { $packageArgs.PackageList = $PackageList }
+        $hasPackages = $false
+        if ($Package) {
+            $packageArgs.Path = $Package
+            $hasPackages = $true
+        } elseif ((Test-Path -LiteralPath $liveDir -PathType Container) -and @(Get-ChildItem -LiteralPath $liveDir -File).Count) {
+            $packageArgs.Source = $liveDir
+            $hasPackages = $true
+            Write-Log "Raw package files found in $liveDir" -Level VERBOSE
+        }
+        if ($hasPackages) {
+            $packageResults = @(Expand-TruDlcPackage @packageArgs)
+            foreach ($result in $packageResults) {
+                Write-Log ('package {0} ({1}): {2} - {3}' -f $result.Name, $result.Role, $result.Status, $result.Message)
+            }
+            $pendingRoles = @($packageResults | Where-Object { !$_.TargetPresent } | ForEach-Object { $_.Role })
+        } elseif ($PackageOnly) {
+            throw "No raw package files: pass -Package or put them into $liveDir."
+        }
+        if ($PackageOnly) {
+            Write-Log 'PackageOnly: done; the game folder was not looked at.' -Level VERBOSE
+            return
+        }
+    }
+
     if (!$GamePath) {
         $GamePath = Find-TruGamePath
         if (!$GamePath) { throw 'Game folder not found in the Steam libraries; pass -GamePath.' }
@@ -113,6 +173,7 @@ try {
     }
 
     if ($Restore) {
+        if (!$PSCmdlet.ShouldProcess($GamePath, 'Restore the original binkw32.dll and tru.exe, disable mods\ and ModLoader.asi')) { return }
         Assert-GameClosed
         Write-FileState 'before restore'
         Copy-Item -LiteralPath (Join-Path $backupDir 'binkw32.dll.steam_original') -Destination (Join-Path $GamePath 'binkw32.dll') -Force
@@ -141,11 +202,16 @@ try {
 
     if ($Check) {
         Write-FileState 'current'
+        if ($pendingRoles -contains 'dlc1') {
+            Write-Log 'The DLC 1 package is verified but not extracted yet (-Check writes nothing): install_dlc.py --check skipped. Run without -Check to extract and install.' -Level WARN
+            return
+        }
         $code = Invoke-Installer @('--check')
         if ($code -ne 0) { throw "Dry run failed (exit code $code)." }
         return
     }
 
+    if (!$PSCmdlet.ShouldProcess($GamePath, 'Install ModLoader and the DLC kit (install_dlc.py)')) { return }
     Assert-GameClosed
     Write-FileState 'before install'
 
