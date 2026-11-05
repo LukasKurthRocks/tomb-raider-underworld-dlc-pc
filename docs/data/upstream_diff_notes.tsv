@@ -1,0 +1,43 @@
+# Notes for docs/UPSTREAM_DIFF.md (scripts/windows/New-TruUpstreamDiff.ps1): why branch `windows` changed a file that
+# exists in upstream main. Columns (TAB): path, kind (fix | extension | windows), note. A path without a line is
+# reported by -Check. Lines starting with # are comments.
+tools/dlc_generic.py	fix	Symbol ids: range guard for the 0xBEEB marker, DLC-new symbols shifted by 480 like B138 (findings 27, 29); B138 symbol calibration (167 exact entries) as default (finding 35); experiment switches off by default
+tools/generic_symbols.py	fix	Seed applies the symbol range guard (the 0xBEEB marker had been learned as a symbol; finding 27)
+tools/dlc_convert_all.py	fix	Convert now runs upstream's extra_fixes (`--extra-fixes`, they were gated off; finding 32); `--jobs` / `--out`; relative paths
+tools/convert_dlc.py	extension	Shared pack10 / pack11 file names (finding 38), the DLC 2 audio streams no tree had, costume packs in the pack tables
+tools/terrain_validate.py	fix	Meshes = B138: vertex-declaration hashes and the DEC3N table learned from the base game (finding 37)
+tools/generalbank_dlc.py	extension	Title-update hint box / loading-screen scripts ported into the PC generalbank (finding 43)
+tools/music_convert.py	fix	`.mul` encoder that models the game's IMA decoder (step capped at 8191, finding 18); relative paths
+tools/dlc_names.py	extension	Names from the release kit manifests (`docs/data/*.kit_manifest.json`, hash-checked); costume packs
+tools/verify_ids.py	extension	`extend` for the costume packs (old entries unchanged, 0 collisions)
+tools/locals.py	extension	Costume packs in the pack table; relative paths
+work/ws/cine/float_fix.py	fix	Skips character-model DTPs (it damaged the DLC 2 doppelganger model; finding 39)
+work/ws/cine/cinepairs.py	windows	Paths for the stage-2b cutscene fix (finding 21)
+tools/xex_extract.py	windows	ffmpeg / openssl from `TRUDLC_*` environment variables or PATH instead of a fixed macOS path
+tools/audio_parse.py	windows	ffmpeg / openssl from `TRUDLC_*` environment variables or PATH instead of a fixed macOS path
+tools/audio_validate.py	windows	Relative tool paths (tools run from the repository root)
+tools/dlc_text_cov.py	windows	Relative tool paths
+tools/drm_write.py	windows	Relative tool paths
+tools/generic_cache.py	windows	Relative tool paths
+tools/index_all.py	windows	Relative tool paths
+tools/locals_fix_dlcimg.py	windows	Relative tool paths
+tools/menu_dlc_patch.py	windows	Relative tool paths
+tools/menu_dlc_probe.py	windows	Relative tool paths
+tools/menu_dlc_x86.py	windows	Relative tool paths
+tools/names.py	windows	Relative tool paths
+tools/override_merge.py	windows	Relative tool paths
+tools/padshock_convert.py	windows	Relative tool paths
+tools/pairs.py	windows	Relative tool paths
+tools/rend_common.py	windows	Relative tool paths
+tools/rend_extract.py	windows	Relative tool paths
+tools/rung1.py	windows	Relative tool paths
+tools/tex_dlc_all.py	windows	Relative tool paths
+tools/tex_match.py	windows	Relative tool paths
+tools/tex_match2.py	windows	Relative tool paths
+tools/tex_tally.py	windows	Relative tool paths
+tools/tex_validate.py	windows	Relative tool paths
+tools/wave_swap.py	windows	Relative tool paths
+README.md	extension	Fork notice and state on top, upstream README below
+CHANGELOG.md	extension	Section "Fork branch `windows`" on top, upstream changelog below
+docs/TROUBLESHOOTING.md	fix	Display-driver box: a third shader form (two constant registers in one instruction, 272 shaders in B138), fixed by `tools/shader_const_fix.py`
+.gitignore	windows	Analysis output folders, prototype data and audio never in the repository
