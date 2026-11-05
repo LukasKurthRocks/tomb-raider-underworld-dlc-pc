@@ -9,10 +9,6 @@ conversion of the DLC 2 data, and the Doppelgänger's shadow power - which came 
 with the DLC files - rebuilt as small add-ons for the PC game, together with tools that repair converted data and help
 testing in the game. You need your own copy of the game and your own Xbox DLC files.
 
-The original project converts *Lara's Shadow* too since B269 / B270 (2026-11-03), independently and with its own patch
-of the game's exe. This fork follows its `main` (merged up to B270); its own data builds on B138. What the fork adds on
-top of upstream `main`, file by file: [docs/UPSTREAM_DIFF.md](docs/UPSTREAM_DIFF.md).
-
 ![Unofficial](https://img.shields.io/badge/status-unofficial%20personal%20fork-lightgrey)
 ![AI-assisted](https://img.shields.io/badge/AI--assisted-Claude%20(Anthropic)-8A2BE2)
 ![Upstream](https://img.shields.io/badge/upstream-andrearicci93%2Ftrudlcport%20B270%20merged-blue)
