@@ -8,6 +8,17 @@
               install_dlc.py itself keeps tru.exe as tru.exe.steam_original and an old mods\ as mods_backup_<time>.
     -Restore  Puts back the original binkw32.dll and tru.exe from <workspace>\backup and renames mods\ to mods_disabled_<time>.
 
+    Install manifest (since 2026-11-05, E12): after a successful install the MD5 of every installed file
+    (ModLoader.asi, binkw32.dll, tru.exe and every file below mods\) is written to
+    <workspace>\backup\dlc_install_<time>\manifest.json. -Restore first compares the game files with the newest
+    manifest that is not undone yet: if ModLoader.asi, binkw32.dll or tru.exe (the files -Restore overwrites or
+    renames) no longer have their installed MD5, it refuses and changes nothing. Changed mods\ files are only
+    reported (WARN): tree installs change them on purpose, and -Restore keeps the whole folder as
+    mods_disabled_<time>. An install made before 2026-11-05 has no manifest: then the installed MD5s are taken from
+    the kit (release\<Build>\kit\manifest.json, tru.exe) and the ModLoader copy (staging\ModLoader-v1.2).
+    -Force restores anyway: the changed files are first saved to <manifest folder>\overwritten_<time>\ (or
+    backup\dlc_restore_forced_<time>\ without a manifest) with forced_restore.json, and the override is logged.
+
     Raw Xbox LIVE packages: the DLC files copied from the console (Content\<profile>\534307EC\00000002\<42-character
     name>, one file per package) can be given with -Package or put into <workspace>\input\xbox-dlc-live\. Before
     anything else they are identified (header SHA-1 = content id = file name, title id, content type), checked
@@ -41,11 +52,14 @@
     Folder of the extracted packages (default <workspace>\input\xbox-dlc); also passed to install_dlc.py --dlc.
 .PARAMETER PackageList
     Known-packages list (default scripts\windows\TruDlcPackages.json).
+.PARAMETER Force
+    With -Restore: restore even when installed files were changed since the install (they are saved first; logged).
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [switch]$Check,
     [switch]$Restore,
+    [switch]$Force,
     [switch]$Trace,
     [string]$GamePath,
     [string]$Build = 'B138',
@@ -78,9 +92,83 @@ $md5BinkOriginal = '2f912c88c18c4aa65b2153339482f320'
 $md5ExeOriginal  = 'b36da327a320eab8b5c8464b27685840'
 
 $mode = if ($Restore) { 'Restore' } elseif ($PackageOnly -and $Check) { 'PackageCheck' } elseif ($PackageOnly) { 'Package' } elseif ($Check) { 'Check' } else { 'Install' }
+$stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 New-Item -ItemType Directory -Force -Path $logDir -WhatIf:$false | Out-Null
-$logFile = Join-Path $logDir ('Install-TruDlc_{0}_{1}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'), $mode)
+$logFile = Join-Path $logDir ('Install-TruDlc_{0}_{1}.log' -f $stamp, $mode)
 Set-TruLogFile -Path $logFile
+
+function Get-InstallRecordFolders {
+    # open install manifests of this script (backup\dlc_install_<time>, not *.restored), oldest first
+    @(Get-ChildItem -LiteralPath $backupDir -Directory -Filter 'dlc_install_*' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notlike '*.restored' } | Sort-Object Name)
+}
+
+function Write-InstallManifest {
+    # E12 (2026-11-05): MD5 of every installed file -> backup\dlc_install_<time>\manifest.json
+    $folder = Join-Path $backupDir ('dlc_install_' + $stamp)
+    while (Test-Path -LiteralPath $folder) {
+        Start-Sleep -Milliseconds 250
+        $folder = Join-Path $backupDir ('dlc_install_' + (Get-Date -Format 'yyyyMMdd_HHmmss'))
+    }
+    $rel = @('ModLoader.asi', 'binkw32.dll', 'tru.exe')
+    $mods = Join-Path $GamePath 'mods'
+    if (Test-Path -LiteralPath $mods) {
+        $rel += @(Get-ChildItem -LiteralPath $mods -Recurse -File | ForEach-Object { $_.FullName.Substring($GamePath.TrimEnd('\').Length).TrimStart('\') })
+    }
+    $installed = @(Get-TruInstalledRecord -Root $GamePath -Path $rel)
+    New-Item -ItemType Directory -Force -Path $folder -WhatIf:$false | Out-Null
+    [pscustomobject]@{ time = (Split-Path -Leaf $folder).Substring(12); script = 'Install-TruDlc.ps1'; build = $Build;
+                       game = $GamePath; kit = $kitPath; manifest_version = 2; installed = $installed } |
+        ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $folder 'manifest.json') -Encoding UTF8 -WhatIf:$false
+    Write-Log ('Install manifest: {0} files with their installed MD5 -> {1}' -f $installed.Count, (Join-Path $folder 'manifest.json'))
+}
+
+function Assert-RestoreAllowed {
+    # E12 (2026-11-05): refuses -Restore when a file it overwrites / renames was changed since the install
+    $open = @(Get-InstallRecordFolders)
+    if ($open.Count) {
+        $record = $open[-1].FullName
+        $manifest = Get-Content -LiteralPath (Join-Path $record 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        $installed = @(@($manifest.installed) | Where-Object { $_ })
+        $what = Split-Path -Leaf $record
+        $saveDir = Join-Path $record ('overwritten_' + $stamp)
+        Write-Log "Install manifest: $record ($($installed.Count) installed files)" -Level VERBOSE
+    }
+    else {
+        # install made before 2026-11-05: the installed MD5s follow from the kit and the ModLoader copy
+        $kitManifest = Join-Path $kitPath 'manifest.json'
+        $what = "the $Build install (no install manifest; MD5s from the kit and the ModLoader copy)"
+        $saveDir = Join-Path $backupDir ('dlc_restore_forced_' + $stamp)
+        $sources = @((Join-Path $loaderDir 'ModLoader.asi'), (Join-Path $loaderDir 'binkw32.dll'), $kitManifest)
+        $absent = @($sources | Where-Object { !(Test-Path -LiteralPath $_ -PathType Leaf) })
+        if ($absent.Count) {
+            Write-Log "No install manifest and the expected MD5s cannot be derived (missing: $($absent -join ', '))." -Level WARN
+            if (!$Force) { throw 'Restore refused: the installed files cannot be checked (no install manifest, kit or ModLoader copy missing) - nothing changed. Pass -Force to restore anyway.' }
+            Write-Log "FORCED restore of ${what}: installed files not checked." -Level WARN
+            return
+        }
+        $exe = @((Get-Content -LiteralPath $kitManifest -Raw -Encoding UTF8 | ConvertFrom-Json).extra | Where-Object { $_.rel -eq 'tru.exe' })
+        $installed = @(
+            [pscustomobject]@{ path = 'ModLoader.asi'; md5 = (Get-Md5 (Join-Path $loaderDir 'ModLoader.asi')) },
+            [pscustomobject]@{ path = 'binkw32.dll'; md5 = (Get-Md5 (Join-Path $loaderDir 'binkw32.dll')) }
+        )
+        if ($exe.Count) { $installed += [pscustomobject]@{ path = 'tru.exe'; md5 = [string]$exe[0].md5 } }
+        Write-Log "No install manifest (install made before 2026-11-05): checking $($installed.Count) files against the kit / ModLoader MD5s." -Level VERBOSE
+    }
+    $rootFiles = @($installed | Where-Object { ([string]$_.path) -notlike 'mods\*' })
+    $modsFiles = @($installed | Where-Object { ([string]$_.path) -like 'mods\*' })
+    $devMods = @(Get-TruInstallDeviation -Root $GamePath -Installed $modsFiles)
+    if ($modsFiles.Count) {
+        Write-Log ('mods\ files: {0} of {1} unchanged since the install, {2} changed.' -f ($modsFiles.Count - $devMods.Count), $modsFiles.Count, $devMods.Count)
+    }
+    if ($devMods.Count) {
+        Write-Log ('{0} mods\ file(s) changed since the install (tree / single-file installs) - not a reason to refuse: -Restore keeps mods\ as mods_disabled_<time>, nothing in it is overwritten.' -f $devMods.Count) -Level WARN
+        foreach ($d in $devMods) { Write-Log ('  mods file changed: {0} - installed {1}, now {2}' -f $d.Path, $d.Recorded, $d.Now) -Level VERBOSE }
+    }
+    $devRoot = @(Get-TruInstallDeviation -Root $GamePath -Installed $rootFiles)
+    Write-Log ('Installed files that -Restore overwrites / renames: {0} of {1} unchanged, {2} changed.' -f ($rootFiles.Count - $devRoot.Count), $rootFiles.Count, $devRoot.Count)
+    Assert-TruRestoreAllowed -Deviation $devRoot -Root $GamePath -What $what -SaveDir $saveDir -Force:$Force
+}
 
 function Write-FileState {
     param([string]$Label)
@@ -129,7 +217,7 @@ function Invoke-Installer {
 
 if ($Trace) { Set-PSDebug -Trace 1 }
 try {
-    Write-Log "Install-TruDlc mode=$mode build=$Build log=$logFile" -Level VERBOSE
+    Write-Log "Install-TruDlc mode=$mode build=$Build force=$([bool]$Force) log=$logFile" -Level VERBOSE
     Write-Log "PowerShell $($PSVersionTable.PSVersion) on $([Environment]::OSVersion.VersionString)" -Level DEBUG
 
     # Raw Xbox LIVE packages (-Package, or files in input\xbox-dlc-live): identify, verify, extract into $dlcPath.
@@ -176,6 +264,8 @@ try {
         if (!$PSCmdlet.ShouldProcess($GamePath, 'Restore the original binkw32.dll and tru.exe, disable mods\ and ModLoader.asi')) { return }
         Assert-GameClosed
         Write-FileState 'before restore'
+        # E12: nothing is changed when a file -Restore overwrites / renames was changed since the install (unless -Force)
+        Assert-RestoreAllowed
         Copy-Item -LiteralPath (Join-Path $backupDir 'binkw32.dll.steam_original') -Destination (Join-Path $GamePath 'binkw32.dll') -Force
         Copy-Item -LiteralPath (Join-Path $backupDir 'tru.exe.steam_original') -Destination (Join-Path $GamePath 'tru.exe') -Force
         Write-Log 'Copied original binkw32.dll and tru.exe from backup.' -Level VERBOSE
@@ -194,6 +284,11 @@ try {
         if ((Get-Md5 (Join-Path $GamePath 'binkw32.dll')) -ne $md5BinkOriginal) { throw 'binkw32.dll after restore does not match the Steam original.' }
         Write-FileState 'after restore'
         Write-Log 'Restored original binkw32.dll and tru.exe (MD5 verified).'
+        # the restore undoes every recorded install (all of them end in the Steam originals)
+        foreach ($rec in @(Get-InstallRecordFolders)) {
+            Rename-Item -LiteralPath $rec.FullName -NewName ($rec.Name + '.restored')
+            Write-Log "Install manifest marked as undone: $($rec.FullName).restored" -Level VERBOSE
+        }
         return
     }
 
@@ -237,6 +332,7 @@ try {
     $code = Invoke-Installer @()
     Write-FileState 'after install'
     if ($code -ne 0) { throw "install_dlc.py failed (exit code $code)." }
+    Write-InstallManifest
     Write-Log 'Next: Steam -> start the game, new game via "Downloadable content" -> Beneath the Ashes, lock to 60 fps.'
 }
 catch {

@@ -29,6 +29,8 @@ docs Plan-Nacht-Analysen-2026-11-03.md section 1). Works on PC DRMs (little endi
       from B); --rawids-like: unrelocated words inside the renumbered DTPs that equal one of the old DTP ids are
       rewritten to the new id - only at offsets where the sister costume B (pairs EID:BID) holds its own paired id,
       i.e. where B and E prove the word is an id field (else the build stops).
+      Refuses --object ...:26 / ...:33 and an OUT named dlc_costume_g.drm / dlc_costume_n.drm (slots g / n are left
+      out of the port, owner decision E4 2026-11-05) unless --allow-left-out-slot is given.
       Re-reads OUT and lists every changed word per section against E (paired by position).
 
 Usage (from the repository root):
@@ -43,6 +45,7 @@ import drm_write as DW, drm_reloc as R
 from mesh_tr8 import Mesh, H
 
 TEXCOORD0 = None   # semantic hash of TEXCOORD0, looked up from mesh_tr8.SEM
+LEFT_OUT_OBJECTS = (26, 33)   # dlc_costume_g / dlc_costume_n: left out of the port (owner decision E4, 2026-11-05)
 
 
 def load(p):
@@ -308,7 +311,15 @@ def build(a):
         return v
     obj = take('--object'); ren = take('--renumber'); tex = take('--texture'); retex = take('--retexture'); words = take('--words')
     like = take('--rawids-like')
+    allow = '--allow-left-out-slot' in opts
+    if allow: opts.remove('--allow-left-out-slot')
     if opts: raise SystemExit('unknown arguments %s' % opts)
+    # owner decision E4 (2026-11-05): slots g (object 26) and n (object 33) are left out of the port - the Xbox data
+    # only has "Grey Jungle Shorts" (= o) for both (tools/costume_scope_check.py, docs/COSTUMES.md "Left out")
+    bad = [s for s in obj if int(s.split(':')[1]) in LEFT_OUT_OBJECTS]
+    if os.path.basename(outp).lower() in ('dlc_costume_g.drm', 'dlc_costume_n.drm'): bad.append(os.path.basename(outp))
+    if bad and not allow:
+        raise SystemExit('refused: costume slot g / n is left out of the port (E4, %s); --allow-left-out-slot overrides' % bad)
     for spec in obj:
         old, new = map(int, spec.split(':'))
         s = sec(D, 11, old)

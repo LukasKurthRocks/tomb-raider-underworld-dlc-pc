@@ -94,6 +94,26 @@ Open: on 2026-10-29 the DLC 1 outfit list showed B/W bikini, camo, casual explor
 Blue Bikini (b), although `dlc_costume_b.drm` is installed; either it was off screen or the menu filters something
 not found here.
 
+## Left out: slots g / n and `dlc_costumes4` (owner decision E4, 2026-11-05)
+
+Slots g and n are not real costumes in the Xbox data: both carry the name of o ("Grey Jungle Shorts", string
+index 61 + slot = 67 / 74); g's preview image is byte-identical to o's, n's is a roughly tinted placeholder. pack20's
+container unit `dlc\dlc_costume_containers\dlc_costumes4` has no DRM in any pack. Neither is ported.
+
+What "left out" means, and what must stay:
+
+| Item | Rule | Why |
+|---|---|---|
+| `dlc_costume_g.drm`, `dlc_costume_n.drm` | never in a mods tree | generalbank script 6 function 26 offers a slot only when its DRM exists (each of the 20 names is followed by `dlcsystem` f1 and a conditional jump - checked in the B138, `b138_fixes` and pipeline generalbank); the costume validator `0x5c54e0` also needs the file. No file = no outfit-list entry, and TruMenu's `costume.set` is refused by the game's validator |
+| unit `dlc_costumes4`, objlist record `dlc_costumes4` | never in `tr8\pc-w\unitlist.txt` / `objlist.dat` | `objlists.merge` builds the lists from the PC base + the Xbox title update only, so pack20's list never reaches them; adding it would move every unit after it |
+| object ids 26 = `dlc_costume_g`, 33 = `dlc_costume_n` in `objectlist.txt` | **keep** | ids are positions; the PC base list (retail), the Xbox lists and the DRMs refer to objects by id |
+| `image\dlc_outfit_costume_{g,n}.raw` | **keep** | B138 / pack11 ship them; script 6 function 17 loads images only for the slots function 26 appended |
+
+Gates: `tools/costume_scope_check.py` (read-only) - `tree DIR ...` (mods trees or a game's mods folder), `profiles`
+(every tree of every test profile), `script6 GENERALBANK.drm` (the offer gate), `selftest`; exit code 1 on a
+left-out item, a moved costume id or a missing gate. `tools/costume_recolor.py build` refuses object ids 26 / 33 and
+an output named `dlc_costume_g.drm` / `dlc_costume_n.drm` unless `--allow-left-out-slot` is given.
+
 ## Upstream trace
 
 The B90_gold_L4 manifest lists `convert_costumes.log` with origin `vm_extra` (a file that was in the test VM's

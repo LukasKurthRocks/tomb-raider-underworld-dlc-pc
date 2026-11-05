@@ -1,6 +1,7 @@
 ﻿<#
 .SYNOPSIS
-    Shared helpers of the trudlcport Windows scripts: run log, workspace paths, Steam game folder, MD5.
+    Shared helpers of the trudlcport Windows scripts: run log, workspace paths, Steam game folder, MD5, installed-file
+    checks of the install manifests (Install-TruTree / Install-TruDlc -Restore).
 
 .DESCRIPTION
     Every script in scripts\windows imports this module near its top:
@@ -163,4 +164,128 @@ function Get-Md5 {
     (Get-FileHash -LiteralPath $Path -Algorithm MD5).Hash.ToLower()
 }
 
-Export-ModuleMember -Function Set-TruLogFile, Write-Log, Get-TruWorkspacePath, Find-TruGamePath, Get-Md5
+function Get-TruInstalledRecord {
+    <#
+    .SYNOPSIS
+        Returns path + MD5 of files an install just wrote (the "installed" list of an install manifest).
+    .DESCRIPTION
+        One object { path = <relative path>; md5 = <MD5 of Root\path> } per path. A missing file is an error: only
+        files the install has written and verified are recorded. Added 2026-11-05 (E12).
+    .PARAMETER Root
+        Folder the relative paths are below (the game folder or its mods folder).
+    .PARAMETER Path
+        Relative paths.
+    .EXAMPLE
+        $installed = @(Get-TruInstalledRecord -Root $GamePath -Path 'tru.exe', 'binkw32.dll')
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Root, [string[]]$Path)
+    foreach ($preference in (Get-TruCallerPreference -Cmdlet $PSCmdlet).GetEnumerator()) {
+        Set-Variable -Name $preference.Key -Value $preference.Value -Scope Local
+    }
+    foreach ($rel in @($Path)) {
+        if (!$rel) { continue }
+        $full = Join-Path $Root $rel
+        if (!(Test-Path -LiteralPath $full -PathType Leaf)) { throw "Installed file missing: $full" }
+        [pscustomobject]@{ path = $rel; md5 = (Get-Md5 $full) }
+    }
+}
+
+function Get-TruInstallDeviation {
+    <#
+    .SYNOPSIS
+        Compares the installed MD5s recorded in an install manifest with the files now below Root.
+    .DESCRIPTION
+        Returns one object { Path; Recorded; Now } per file that no longer has its recorded MD5 (Now = '(missing)'
+        when the file is gone); nothing when every file is unchanged. Each comparison is logged at DEBUG level.
+        Added 2026-11-05 (E12).
+    .PARAMETER Root
+        Folder the recorded paths are below.
+    .PARAMETER Installed
+        The manifest's installed list (objects with path and md5).
+    .EXAMPLE
+        $dev = @(Get-TruInstallDeviation -Root $mods -Installed $manifest.installed)
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Root, [object[]]$Installed)
+    foreach ($preference in (Get-TruCallerPreference -Cmdlet $PSCmdlet).GetEnumerator()) {
+        Set-Variable -Name $preference.Key -Value $preference.Value -Scope Local
+    }
+    foreach ($entry in @($Installed)) {
+        if (!$entry) { continue }
+        $full = Join-Path $Root ([string]$entry.path)
+        $now = if (Test-Path -LiteralPath $full -PathType Leaf) { Get-Md5 $full } else { '(missing)' }
+        Write-Log ('installed md5 {0}: recorded {1}, now {2}' -f $entry.path, $entry.md5, $now) -Level DEBUG
+        if ($now -ne [string]$entry.md5) {
+            [pscustomobject]@{ Path = [string]$entry.path; Recorded = [string]$entry.md5; Now = $now }
+        }
+    }
+}
+
+function Assert-TruRestoreAllowed {
+    <#
+    .SYNOPSIS
+        Refuses a restore when installed files were changed after the install; -Force restores anyway, saves the
+        changed files first and logs the override.
+    .DESCRIPTION
+        Without deviations nothing happens. Each deviation is logged as WARN. Without -Force the function throws
+        (the caller has changed nothing yet). With -Force every deviating file that still exists is copied to
+        SaveDir\<path> (MD5-checked), SaveDir\forced_restore.json lists all deviations, and a WARN line
+        'FORCED restore ...' goes to the run log. Added 2026-11-05 (E12).
+    .PARAMETER Deviation
+        Output of Get-TruInstallDeviation.
+    .PARAMETER Root
+        Folder the deviation paths are below.
+    .PARAMETER What
+        Name of the install being undone (for the messages).
+    .PARAMETER SaveDir
+        Folder for the copies of the changed files (only used with -Force).
+    .PARAMETER Force
+        Restore anyway.
+    .EXAMPLE
+        Assert-TruRestoreAllowed -Deviation $dev -Root $mods -What 'tree_20261105_120000' -SaveDir $save -Force:$Force
+    #>
+    [CmdletBinding()]
+    param(
+        [object[]]$Deviation,
+        [Parameter(Mandatory)][string]$Root,
+        [string]$What,
+        [string]$SaveDir,
+        [switch]$Force
+    )
+    foreach ($preference in (Get-TruCallerPreference -Cmdlet $PSCmdlet).GetEnumerator()) {
+        Set-Variable -Name $preference.Key -Value $preference.Value -Scope Local
+    }
+    $dev = @($Deviation | Where-Object { $_ })
+    if (!$dev.Count) { return }
+    foreach ($d in $dev) {
+        Write-Log ('changed since the install: {0} - installed {1}, now {2}' -f $d.Path, $d.Recorded, $d.Now) -Level WARN
+    }
+    if (!$Force) {
+        throw (('Restore refused: {0} file(s) of {1} no longer have the MD5 the install wrote (changed after the ' +
+                'install - by hand, by another tool or by a later install that is not undone yet). Nothing was ' +
+                'changed. Undo the later installs first, or pass -Force to restore anyway (the changed files are ' +
+                'saved before they are overwritten or removed).') -f $dev.Count, $What)
+    }
+    $saved = 0
+    if ($SaveDir) {
+        New-Item -ItemType Directory -Force -Path $SaveDir | Out-Null
+        foreach ($d in $dev) {
+            $src = Join-Path $Root $d.Path
+            if (!(Test-Path -LiteralPath $src -PathType Leaf)) { continue }
+            $dst = Join-Path $SaveDir $d.Path
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+            Copy-Item -LiteralPath $src -Destination $dst -Force
+            if ((Get-Md5 $dst) -ne $d.Now) { throw "Saving the changed file $($d.Path) failed (MD5 differs) - nothing restored." }
+            Write-Log "saved changed file $($d.Path) -> $dst" -Level VERBOSE
+            $saved++
+        }
+        [pscustomobject]@{ time = (Get-Date -Format 'yyyyMMdd_HHmmss'); install = $What; root = $Root; deviations = $dev } |
+            ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $SaveDir 'forced_restore.json') -Encoding UTF8
+    }
+    Write-Log ('FORCED restore of {0}: -Force overrides {1} changed file(s); {2} of them saved to {3}' -f
+        $What, $dev.Count, $saved, $(if ($SaveDir) { $SaveDir } else { '(not saved)' })) -Level WARN
+}
+
+Export-ModuleMember -Function Set-TruLogFile, Write-Log, Get-TruWorkspacePath, Find-TruGamePath, Get-Md5,
+    Get-TruInstalledRecord, Get-TruInstallDeviation, Assert-TruRestoreAllowed
