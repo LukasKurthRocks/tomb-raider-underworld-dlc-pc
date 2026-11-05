@@ -24,8 +24,10 @@
 //   * type table: a copy of the PC table with the TU's record appended after the last PC record (PC indices 0-38
 //     unchanged; the TU inserted it at 35 and shifted four debug records - the PC code keeps its own indices), the 11
 //     code operands that address the table pointed at the copy (tru+0x1bf00a .. 0x1c547b, all checked first).
-//   * DoppelgangerInit: base init tru+0x321f80, then the flag; the PC game tracker has no +0x1244 field, the plugin
-//     keeps the flag (export TruDlc2PlayerDoppelganger) for later readers (dlc2data f0, TU-only code - not on PC).
+//   * DoppelgangerInit: base init tru+0x321f80, then the flag; the plugin keeps the flag (export
+//     TruDlc2PlayerDoppelganger) for later readers (dlc2data f0, TU-only code - not on PC) and, since 0.4, also stores
+//     it into the PC game tracker +0x1244 as the TU does (0.1-0.3 assumed the PC tracker had no such byte - wrong, see
+//     0.4 below).
 // Every patched byte is compared with the expected code / data first; on a mismatch that part is left alone and the
 // reason is logged. Options: TruDlc2Player.ini, log TruDlc2Player.log.
 //
@@ -33,13 +35,61 @@
 // stores 0 into gameTracker+0x1244 (its only writer is DoppelgangerInit's `stb 1` at 0x82412c84); the reset is the
 // allocation: every player init that takes the alloc path (TU 0x82412ca0, instance +0x14 bit 0x20000 clear) builds a
 // new tracker with the constructor 0x82413878 = memset(tracker, 0, 0x1320) and publishes it (0x82413354). The PC does
-// the same (constructor tru+0x31c2d0 = memset 0x1310, called only at tru+0x322445, published at tru+0x32247b) - but the
-// PC tracker has no +0x1244, so the flag lives in this plugin (g_doppelganger) and was never cleared: after DLC 2 a
+// the same (constructor tru+0x31c2d0 = memset 0x1310, called only at tru+0x322445, published at tru+0x32247b) - but up
+// to 0.3 the flag lived only in this plugin (g_doppelganger) and was never cleared: after DLC 2 a
 // DLC 1 / main-game level in the same session still answered 1 (live 2026-11-02). FlagReset redirects the constructor
 // call at tru+0x322445 to TrackerConstructed, which runs the constructor and then clears the plugin's flag - the
 // plugin's copy of the TU memset. DoppelgangerInit runs the base init (which constructs the tracker) before it sets 1,
 // so the DLC 2 player still ends with 1, as on the TU. Export TruDlc2PlayerTrackerGeneration counts the constructed
 // trackers (other plugins re-initialise their copies of tracker-owned TU objects, e.g. the meter +0x508).
+//
+// 0.3 (2026-11-03, test paket06 F12, docs Befund-Kostuem-Reset-DLC1): chosen-costume reset outside DLC 2. The game's
+// state save (PC tru+0x155cb1, TU 0x821ff10c / 0x821ff118) stores the current costume into the chosen costume
+// (game data +0x20c), so after DLC 2 it holds 857 doppelganger_casual (the TU stores 11 lara_doppelganger there - its
+// save maps the one to the other - which the TU level load turns back into doppelganger_casual: the same result). The
+// TU never loads another unit with that word: every mission start goes through MainTracker_UILoadLevel (TU 0x8247d818)
+// with the 4th argument 1, which calls the new-game reset 0x821fe9a8 at 0x8247d95c (+0x210 / +0x20e / +0x20c = 0 at
+// 0x821feb2c..0x821feb34; PC tru+0x156abe). The PC's direct level change (TruMenu level.load, the debug path) skips
+// that reset, so DLC 1 loaded the doppelganger (live 2026-11-03 21:07). CostumeReset: when the level load's costume is
+// the DLC 2 player (lara_doppelganger / doppelganger_casual) but the unit's own default costume (the level load's
+// fallback, tru+0x1de379 / TU 0x82297e7c: stream unit data +0x70 -> u16 +0x294) is not lara_doppelganger - i.e. the
+// unit is not a DLC 2 unit (data: dlc_level2_start / dlc_yggdrasil_* 11, DLC 1 units 25) - the plugin does the TU
+// mission start's costume part: +0x210 / +0x20e / +0x20c = 0 and the level load takes the unit default, as it does
+// with a chosen costume of 0. Not a TU code path (the TU has no direct level change), its outcome only.
+//
+// 0.4 (2026-11-04 night, docs Befund-Schattenleiste-HUD.md "Nacht 04.11.", F17): DoppelgangerInit writes the TU flag
+// into the game tracker itself. Up to 0.3 the comment said "the PC game tracker has no +0x1244" - wrong: the PC
+// tracker (constructor tru+0x31c2d0, memset 0x1310) has the byte, and two retail readers use it exactly as the TU:
+// larabase native f36 (PC tru+0x39a290 -> tru+0x377dc0 `mov eax,[0FADB58h]; mov al,[eax+1244h]`; TU binder entry 36
+// = 0x824a1188, the same function as dlc2data f0; retail 0x824a4260) and the player code tru+0x3200df (= retail
+// 0x8240b7b4 = TU 0x8240e5f4, identical). The TU's DoppelgangerInit stores `stb 1, 0x1244([0x829892b0])` at
+// 0x82412c84; [0x829892b0] = PC [0xfadb58] (kTrackerPublish). Without that store larabase f36 answers 0 on PC and the
+// TU HUD script (generalbank 37 function 15, `op69 larabase f36; op50; op64 -> +0x180c`) never enters its shadow-meter
+// block (larabase f70-f73, red / pulse). TrackerFlag=1 makes the store; the PC's memset in the tracker constructor
+// clears it with every new tracker, as the TU's does. g_doppelganger (export) stays as before.
+//
+// 0.5 (2026-11-04, docs Befund-Menue-Dlc2Player-0411b.md; Befund-Kostuem-Reset-DLC1.md section 7): the TU's costume
+// mapping 857 doppelganger_casual <-> 11 lara_doppelganger in the four places the TU added it - only all four
+// together (one alone would load lara_doppelganger as the player). `[Costume] TuMapping=1` (default 0 = as 0.4, nothing
+// patched). Translated 1:1 from the TU disassembly (work/asi/combat02/analysis/tu_all.txt); the name -> id lookup is
+// TU 0x822809e0 = PC tru+0x1bf770 (same table walk over the object names, [0x829bffc8] / [0xdb94d0]):
+//   * state save TU 0x821fef58 (PC tru+0x155be0), TU 0x821ff0dc..0x821ff118:
+//       if (id("doppelganger_casual") == current) +0x20c = id("lara_doppelganger"); else +0x20c = current
+//     PC site tru+0x155cb1 `mov ax,[0E7F1C8h]; mov [edx+20Ch],ax` (retail 0x82201080 = the plain store);
+//   * state load TU 0x821ff1e0 (PC tru+0x156e90), TU 0x821ff518..0x821ff540:
+//       v = (s16) +0x20c; current = (v == id("lara_doppelganger")) ? id("doppelganger_casual") : v
+//     PC site tru+0x156fbd `movsx ecx,word [eax+20Ch]; mov [0E7F1C8h],ecx` (retail 0x82201468 = the plain load);
+//   * player spawn TU 0x822973b0 (PC tru+0x1d40c0), TU 0x822976b0..0x822976d8, after the spawn record (PC esi) got
+//     its costume: if (u16 record+0x50 == id("lara_doppelganger")) { current = id("doppelganger_casual");
+//     record+0x50 = that } - PC site tru+0x1d42e9 (after the print of the position record, before `test edi,edi`);
+//   * player spawn TU 0x82297f10 (PC tru+0x1d4340, the costume switch's spawn, record 0xe7f2a0), TU
+//     0x8229803c..0x82298064: the same test on +0x50 (0xe7f2f0) after the unit-default fallback - PC site tru+0x1d4469
+//     (where both paths of the fallback meet, before the spawn call tru+0x1bd080).
+// Not part of the mapping, not ported: the TU load also stores the old current costume into altPlayerObjectID
+// (TU 0x821ff514 `stw r11, 0x144(r29)` = PC [0xe7f1cc]; read and cleared by the TU-changed 0x82475628), and TU spawn
+// 0x822973b0 got a validity test + unit-default fallback before the mapping (0x82297688..0x822976ac; retail and PC
+// have none there). With the mapping a PC save written in DLC 2 holds 11 like the TU's; the level load turns 11 into
+// doppelganger_casual (0.1) and outside DLC 2 the 0.3 reset zeroes it (both names are handled there).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -88,8 +138,50 @@ const char *const kTrackerCtorCallHex = "8d4f40 e8869effff 897c240c";
 const DWORD kTrackerPublish = 0x0072247b;  // add edi,40h (before); mov [0FADB58h],edi
 const char *const kTrackerPublishHex = "83c740 893d58dbfa00";   // [0xfadb58] = TU 0x829892b0
 
+// ---- 0.3: chosen-costume reset outside DLC 2 (TU mission start: UILoadLevel 0x8247d95c -> reset 0x821fe9a8) ----
+const DWORD kUnitDefault = 0x005de379;     // the level load's unit default: mov ecx,[0E7F148h]; push ecx; call 5C1B50h;
+                                           // mov edx,[eax+8]; mov eax,[edx+70h]; movzx eax,word [eax+294h]; mov ecx,[0DB94D0h]
+const char *const kUnitDefaultHex = "8b0d48f1e700 51 e8cb37feff 8b5008 8b4270 0fb78094020000 8b0dd094db00";
+const DWORD kUnitId = 0x00e7f148;          // current stream unit id
+const DWORD kStreamUnit = 0x005c1b50;      // cdecl(unit id) -> stream unit entry (0xd8 bytes, +8 unit data) or 0
+const char *const kStreamUnitHex = "56 8b742408 33c0 33d2 b940abdb00";
+const DWORD kNames = 0x00db94d0;           // pointer: +0 count, name of object id n at +n*8 (validator tru+0x1c54e0)
+
+// ---- 0.5: TU costume mapping 857 <-> 11 (save / load / two spawns), [Costume] TuMapping ----
+const DWORD kNameLookup = 0x005bf770;      // cdecl(name) -> object id (index + 1) or 0 = TU 0x822809e0
+const char *const kNameLookupHex = "8b0dd094db00 56 33f6 3931 57 7e27 8b7c240c 8b44f108";
+struct MapSite {
+    const char *what; DWORD at, back; const char *hex;   // patched bytes (whole instructions)
+    DWORD ctxAt; const char *ctxHex;                    // a neighbouring instruction that pins the registers' roles
+};
+const MapSite kMapSites[] = {
+    // TU 0x821ff0dc: the state save's store of the current costume into the chosen costume
+    {"state save", 0x00555cb1, 0x00555cbe, "66a1c8f1e700 6689820c020000", 0x00555cab, "8b156492c500"},
+    // TU 0x821ff518: the state load's chosen costume -> current costume (eax = game data)
+    {"state load", 0x00556fbd, 0x00556fca, "0fbf880c020000 890dc8f1e700", 0x00556fb8, "a16492c500"},
+    // TU 0x822976b0: spawn record esi (+0x50 = [0xe7f1c8] at 0x5d41c7..0x5d41d6), after `push edi; call print`
+    {"player spawn", 0x005d42e9, 0x005d42ee, "83c404 85ff", 0x005d41c4, "8d34c0 0fb705c8f1e700 c1e604 6689443e50 03f7"},
+    // TU 0x8229803c: costume switch spawn, record 0xe7f2a0 (+0x50 = 0xe7f2f0), after the unit-default fallback
+    {"switch spawn", 0x005d4469, 0x005d4471, "6a00 56 68a0f2e700", 0x005d445e, "a3c8f1e700 66a3f0f2e700"},
+};
+const int kMapSiteCount = sizeof(kMapSites) / sizeof(kMapSites[0]);
+const DWORD kSpawnRecordB = 0x00e7f2a0;    // TU 0x83208430 (spawn 0x82297f10's static record)
+const DWORD kSpawnCall = 0x005d4471;       // call 0x5bd080 (TU 0x82270fa0) right after the switch-spawn site
+const char *const kSpawnCallHex = "e80a8cfeff";
+
 // options (TruDlc2Player.ini, section [Dlc2Player])
-int g_enabled = 1, g_logLevel = 1, g_costume = 1, g_typeRecord = 1, g_flagReset = 1;
+int g_enabled = 1, g_logLevel = 1, g_costume = 1, g_typeRecord = 1, g_flagReset = 1, g_costumeReset = 1;
+int g_trackerFlag = 1;                     // 0.4: DoppelgangerInit also stores [[0xfadb58]]+0x1244 = 1 (TU 0x82412c84)
+int g_tuMapping = 0;                       // 0.5: [Costume] TuMapping - the TU's 857 <-> 11 in save / load / spawns
+volatile LONG g_mapCount = 0;              // 0.5: mappings done (each one logged)
+const DWORD kTrackerPtr = 0x00fadb58;      // TU 0x829892b0 (the game tracker / player state block)
+const DWORD kTrackerFlag = 0x1244;         // TU flag byte, read by larabase f36 tru+0x377dc0 and tru+0x3200df
+const DWORD kF36Body = 0x00777dc0;         // larabase f36 body: mov eax,[0FADB58h]; mov al,[eax+1244h]; ret
+const char *const kF36BodyHex = "a158dbfa00 8a8044120000 c3";
+const DWORD kFlagReader = 0x007200d6;      // player code: mov ecx,[0FADB58h]; add esp,4; cmp byte [ecx+1244h],0
+const char *const kFlagReaderHex = "8b0d58dbfa00 83c404 80b94412000000";
+bool g_trackerFlagOk = false;
+bool g_resetOk = false;                    // 0.3: unit-default code checked
 volatile LONG g_trackers = 0;              // trackers constructed since load (export TruDlc2PlayerTrackerGeneration)
 
 char g_logPath[MAX_PATH];
@@ -145,6 +237,24 @@ bool ReadWord(DWORD address, WORD *value) {
     }
 }
 
+bool WriteWord(DWORD address, WORD value) {
+    __try {
+        *reinterpret_cast<volatile WORD *>(address) = value;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+bool WriteByte(DWORD address, BYTE value) {
+    __try {
+        *reinterpret_cast<volatile BYTE *>(address) = value;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
 bool SafeName(const char *p, char *out, size_t size) {
     __try {
         size_t i = 0;
@@ -170,6 +280,41 @@ bool WriteCode(DWORD address, const void *bytes, size_t length) {
     return true;
 }
 
+bool HexBytesAt(DWORD address, const char *hex) {
+    BYTE buf[64];
+    size_t n = 0;
+    for (const char *p = hex; *p && n < sizeof(buf);) {
+        if (*p == ' ') { ++p; continue; }
+        char two[3] = {p[0], p[1], 0};
+        buf[n++] = static_cast<BYTE>(strtoul(two, nullptr, 16));
+        p += 2;
+    }
+    return BytesAt(address, buf, n);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// 0.3: the unit default costume exactly as the level load computes it when no chosen costume applies (tru+0x1de379,
+// TU 0x82297e7c): stream unit of [0xe7f148] (tru+0x1c1b50) -> unit data +8 -> +0x70 -> u16 +0x294 = object id, the
+// name from the object-name table [0xdb94d0] (id 1..count, as the validator tru+0x1c54e0 accepts it)
+typedef DWORD(__cdecl *StreamUnitFn)(DWORD);
+bool UnitDefault(DWORD *unit, WORD *id, const char **name) {
+    DWORD entry = 0, data = 0, p = 0, names = 0, count = 0, nm = 0;
+    *unit = 0; *id = 0; *name = nullptr;
+    if (!ReadDword(kUnitId, unit)) return false;
+    __try {
+        entry = reinterpret_cast<StreamUnitFn>(kStreamUnit)(*unit);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+    if (!entry || !ReadDword(entry + 8, &data) || !data || !ReadDword(data + 0x70, &p) || !p || !ReadWord(p + 0x294, id))
+        return false;
+    if (!*id || !ReadDword(kNames, &names) || !names || !ReadDword(names, &count) || *id > count ||
+        !ReadDword(names + *id * 8, &nm) || !nm)
+        return false;
+    *name = reinterpret_cast<const char *>(nm);
+    return true;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // costume: TU 0x82297d30, the added name test before GAMELOOP_RequestPlayerCostumeLoad
 extern "C" const char *__cdecl ChooseCostume(const char *name) {
@@ -184,9 +329,42 @@ extern "C" const char *__cdecl ChooseCostume(const char *name) {
         ReadWord(game + 0x210, &chosen1);
     }
     const char *result = name;
-    if (g_costume && name && strcmp(shown, kFromName) == 0) result = kToName;
+    // 0.3: the DLC 2 player costume in a unit that is not a DLC 2 unit = the chosen costume left over from DLC 2 (the
+    // state save copied 857 into +0x20c); the TU's mission start would have zeroed it (UILoadLevel -> 0x821fe9a8)
+    if (g_costumeReset && g_resetOk && name && (strcmp(shown, kFromName) == 0 || strcmp(shown, kToName) == 0)) {
+        DWORD unit = 0;
+        WORD def = 0;
+        const char *defName = nullptr;
+        char defShown[64];
+        if (!UnitDefault(&unit, &def, &defName)) {
+            Log(0, "level load %ld: costume \"%s\" - unit default of unit %lu not readable, chosen costume kept", call,
+                shown, unit);
+        } else {
+            SafeName(defName, defShown, sizeof(defShown));
+            if (strcmp(defShown, kFromName) != 0) {
+                bool cleared = game && WriteWord(game + 0x210, 0) && WriteWord(game + 0x20e, 0) &&
+                               WriteWord(game + 0x20c, 0);
+                if (cleared) {
+                    result = defName;
+                    Log(1, "level load %ld: costume \"%s\" (chosen +0x20c %u / +0x210 %u) in unit %lu whose default is "
+                           "\"%s\" (%u, not %s = no DLC 2 unit): chosen costume +0x210 / +0x20e / +0x20c = 0 as the TU's "
+                           "mission start (UILoadLevel 0x8247d95c -> reset 0x821fe9a8), unit default loaded",
+                        call, shown, chosen0, chosen1, unit, defShown, def, kFromName);
+                } else {
+                    Log(0, "level load %ld: costume \"%s\" in unit %lu (default \"%s\"): game data 0x%08lx not writable "
+                           "- chosen costume kept", call, shown, unit, defShown, game);
+                }
+            } else {
+                Log(2, "level load %ld: costume \"%s\" in unit %lu, default \"%s\" (DLC 2 unit) - kept", call, shown,
+                    unit, defShown);
+            }
+        }
+    }
+    if (g_costume && result == name && name && strcmp(shown, kFromName) == 0) result = kToName;
+    char to[64] = "";
+    if (result != name) SafeName(result, to, sizeof(to));
     Log(1, "level load %ld: costume \"%s\"%s%s (game data +0x1f4 %u, chosen +0x20c %u / +0x210 %u)", call, shown,
-        result != name ? " -> " : "", result != name ? kToName : "", mode, chosen0, chosen1);
+        result != name ? " -> " : "", to, mode, chosen0, chosen1);
     return result;
 }
 
@@ -213,11 +391,25 @@ bool PatchCostume() {
             kCostumeSite);
         return false;
     }
+    // 0.3: the reset reads the unit default the way the level load does - its code and the stream-unit lookup checked
+    if (g_costumeReset) {
+        g_resetOk = HexBytesAt(kUnitDefault, kUnitDefaultHex) && HexBytesAt(kStreamUnit, kStreamUnitHex);
+        if (!g_resetOk)
+            Log(0, "costume reset: unit default code 0x%08lx / stream unit lookup 0x%08lx does not match - reset off "
+                   "(after DLC 2 a direct level change keeps the doppelganger)", kUnitDefault, kStreamUnit);
+    }
     BYTE jmp[6] = {0xe9, 0, 0, 0, 0, 0x90};
     DWORD rel = reinterpret_cast<DWORD>(&CostumeDetour) - (kCostumeSite + 5);
     memcpy(jmp + 1, &rel, 4);
-    if (!WriteCode(kCostumeSite, jmp, sizeof(jmp))) return false;
+    if (!WriteCode(kCostumeSite, jmp, sizeof(jmp))) { g_resetOk = false; return false; }
     Log(1, "costume: \"%s\" -> \"%s\" at level load (detour at 0x%08lx)", kFromName, kToName, kCostumeSite);
+    if (g_resetOk)
+        Log(1, "costume reset: a level load of \"%s\" / \"%s\" in a unit whose default costume is not \"%s\" (no DLC 2 "
+               "unit) zeroes the chosen costume and takes the unit default, as the TU's mission start (0x821fe9a8)",
+            kFromName, kToName, kFromName);
+    else if (!g_costumeReset)
+        Log(1, "costume reset: off ([Dlc2Player] CostumeReset=0) - after DLC 2 a direct level change keeps the "
+               "doppelganger");
     return true;
 }
 
@@ -228,9 +420,36 @@ extern "C" void __cdecl DoppelgangerInit(void *instance, void *arg) {
     reinterpret_cast<InitFn>(kBaseInit)(instance, arg);
     DWORD flags = 0;
     if (ReadDword(reinterpret_cast<DWORD>(instance) + 0x14, &flags) && !(flags & 0x20000)) {
+        // 0.4: TU 0x82412c70..0x82412c84 `lwz r11, [0x829892b0]; stb 1, 0x1244(r11)` = PC [[0xfadb58]]+0x1244 = 1
+        DWORD tracker = 0;
+        bool stored = false;
+        if (g_trackerFlagOk && ReadDword(kTrackerPtr, &tracker) && tracker)
+            stored = WriteByte(tracker + kTrackerFlag, 1);
         if (InterlockedExchange(&g_doppelganger, 1) == 0)
-            Log(1, "DoppelgangerInit finished (instance 0x%08lx)", reinterpret_cast<DWORD>(instance));
+            Log(1, "DoppelgangerInit finished (instance 0x%08lx)%s", reinterpret_cast<DWORD>(instance),
+                !g_trackerFlagOk ? "" : stored ? " - game tracker +0x1244 = 1 (TU 0x82412c84; larabase f36 now answers 1)"
+                                               : " - game tracker +0x1244 NOT written (no tracker at [0xfadb58])");
+        else if (g_trackerFlagOk && !stored)
+            Log(0, "DoppelgangerInit: game tracker +0x1244 not written (tracker 0x%08lx)", tracker);
     }
+}
+
+// 0.4: check the two PC readers of the tracker byte (so the store means what the TU's means)
+void CheckTrackerFlag() {
+    if (!g_trackerFlag) {
+        Log(1, "tracker flag: off ([Dlc2Player] TrackerFlag=0) - game tracker +0x1244 stays 0 (larabase f36 answers 0, "
+               "the TU HUD shadow-meter block is skipped)");
+        return;
+    }
+    if (!HexBytesAt(kF36Body, kF36BodyHex) || !HexBytesAt(kFlagReader, kFlagReaderHex)) {
+        Log(0, "tracker flag: larabase f36 body 0x%08lx / reader 0x%08lx does not match - +0x1244 not written",
+            kF36Body, kFlagReader);
+        return;
+    }
+    g_trackerFlagOk = true;
+    Log(1, "tracker flag: DoppelgangerInit also stores game tracker [0x%08lx]+0x%lx = 1 as the TU (0x82412c84); readers "
+           "larabase f36 0x%08lx and the player code 0x%08lx verified; the tracker constructor's memset clears it",
+        kTrackerPtr, kTrackerFlag, kF36Body, kFlagReader);
 }
 
 bool PatchTypeTable() {
@@ -288,18 +507,6 @@ bool PatchTypeTable() {
 
 // ---------------------------------------------------------------------------------------------------------------
 // 0.2: flag reset with every new game tracker (TU player init alloc path: constructor 0x82413878 = memset 0x1320)
-bool HexBytesAt(DWORD address, const char *hex) {
-    BYTE buf[64];
-    size_t n = 0;
-    for (const char *p = hex; *p && n < sizeof(buf);) {
-        if (*p == ' ') { ++p; continue; }
-        char two[3] = {p[0], p[1], 0};
-        buf[n++] = static_cast<BYTE>(strtoul(two, nullptr, 16));
-        p += 2;
-    }
-    return BytesAt(address, buf, n);
-}
-
 extern "C" void __cdecl TrackerConstructed(void *tracker) {
     LONG n = InterlockedIncrement(&g_trackers);
     LONG was = InterlockedExchange(&g_doppelganger, 0);    // the TU's memset clears +0x1244
@@ -341,6 +548,184 @@ bool PatchFlagReset() {
     return true;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// 0.5: the TU costume mapping 857 doppelganger_casual <-> 11 lara_doppelganger (see the header). The ids come from the
+// name lookup at every call, as in the TU (bl 0x822809e0 with the string each time).
+typedef int(__cdecl *NameLookupFn)(const char *);
+int LookupId(const char *name) {
+    __try {
+        return reinterpret_cast<NameLookupFn>(kNameLookup)(name);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+}
+
+bool WriteDword(DWORD address, DWORD value) {
+    __try {
+        *reinterpret_cast<volatile DWORD *>(address) = value;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+// TU 0x821ff0dc..0x821ff118 (state save): r3 = id("doppelganger_casual"); r10 = current (lwz 0x140(r29));
+// equal -> sth id("lara_doppelganger"), 0x20c; else sth current, 0x20c. Returns the word the PC stores at +0x20c.
+extern "C" DWORD __cdecl MapSave() {
+    DWORD cur = 0;
+    ReadDword(kCostumeId, &cur);
+    int dc = LookupId(kToName);
+    if (static_cast<int>(cur) != dc) {
+        Log(2, "costume map (state save, TU 0x821ff0dc): current %lu is not %s (%d) - chosen +0x20c = %lu", cur, kToName,
+            dc, cur & 0xffff);
+        return cur;
+    }
+    int ld = LookupId(kFromName);
+    LONG n = InterlockedIncrement(&g_mapCount);
+    Log(1, "costume map %ld (state save, TU 0x821ff0dc..0x821ff118): current %lu = %s -> chosen +0x20c = %d (%s)", n,
+        cur, kToName, ld, kFromName);
+    return static_cast<DWORD>(ld);
+}
+
+// TU 0x821ff518..0x821ff540 (state load): r30 = extsh(lhz 0x20c); r30 == id("lara_doppelganger") ->
+// current = id("doppelganger_casual"), else current = r30. Stores [0xe7f1c8] (the PC's `mov [0E7F1C8h],ecx`) and
+// returns the value for ecx.
+extern "C" DWORD __cdecl MapLoad(DWORD gameData) {
+    WORD w = 0;
+    ReadWord(gameData + 0x20c, &w);
+    int v = static_cast<SHORT>(w);
+    int ld = LookupId(kFromName);
+    int result = v;
+    if (v == ld) {
+        result = LookupId(kToName);
+        LONG n = InterlockedIncrement(&g_mapCount);
+        Log(1, "costume map %ld (state load, TU 0x821ff518..0x821ff540): chosen +0x20c %d = %s -> current %d (%s)", n, v,
+            kFromName, result, kToName);
+    } else {
+        Log(2, "costume map (state load, TU 0x821ff518): chosen +0x20c %d is not %s (%d) - current = %d", v, kFromName,
+            ld, v);
+    }
+    if (!WriteDword(kCostumeId, static_cast<DWORD>(result)))
+        Log(0, "costume map (state load): [0x%08lx] not writable", kCostumeId);
+    return static_cast<DWORD>(result);
+}
+
+// TU 0x822976b0..0x822976d8 / 0x8229803c..0x82298064 (both spawns, the same code): lhz r10, 0x50(r31);
+// r10 == id("lara_doppelganger") -> stw id("doppelganger_casual"), 0x140(r26 / r30) (= current [0xe7f1c8]) and
+// sth it, 0x50(r31)
+void MapSpawn(DWORD record, const char *which, const char *tu) {
+    WORD w = 0;
+    if (!ReadWord(record + 0x50, &w)) {
+        Log(0, "costume map (%s): record 0x%08lx not readable", which, record);
+        return;
+    }
+    int ld = LookupId(kFromName);
+    if (static_cast<int>(w) != ld) {
+        Log(2, "costume map (%s, TU %s): record 0x%08lx +0x50 %u is not %s (%d) - kept", which, tu, record, w,
+            kFromName, ld);
+        return;
+    }
+    int dc = LookupId(kToName);
+    bool ok = WriteDword(kCostumeId, static_cast<DWORD>(dc)) && WriteWord(record + 0x50, static_cast<WORD>(dc));
+    LONG n = InterlockedIncrement(&g_mapCount);
+    Log(ok ? 1 : 0, "costume map %ld (%s, TU %s): record 0x%08lx +0x50 %u = %s -> current [0x%08lx] and +0x50 = %d (%s)%s",
+        n, which, tu, record, w, kFromName, kCostumeId, dc, kToName, ok ? "" : " - WRITE FAILED");
+}
+extern "C" void __cdecl MapSpawnA(DWORD record) { MapSpawn(record, "player spawn", "0x822976b0..0x822976d8"); }
+extern "C" void __cdecl MapSpawnB() { MapSpawn(kSpawnRecordB, "switch spawn", "0x8229803c..0x82298064"); }
+
+DWORD g_mapBack[4] = {0, 0, 0, 0};          // continue addresses, filled from kMapSites
+
+// tru+0x155cb1: mov ax, word [0xe7f1c8]; mov word [edx+0x20c], ax  (eax's upper half kept as the original does)
+__declspec(naked) void MapSaveDetour() {
+    __asm {
+        pushad
+        call MapSave
+        mov word ptr [esp + 28], ax  // saved eax (pushad frame: edi esi ebp esp ebx edx ecx eax)
+        popad
+        mov word ptr [edx + 0x20c], ax
+        jmp dword ptr [g_mapBack]
+    }
+}
+// tru+0x156fbd: movsx ecx, word [eax+0x20c]; mov [0xe7f1c8], ecx  (MapLoad stores [0xe7f1c8])
+__declspec(naked) void MapLoadDetour() {
+    __asm {
+        pushad
+        push eax
+        call MapLoad
+        add esp, 4
+        mov [esp + 24], eax          // saved ecx
+        popad
+        jmp dword ptr [g_mapBack + 4]
+    }
+}
+// tru+0x1d42e9: add esp, 4; test edi, edi  (esi = the spawn record; the jz at 0x5d42ee follows)
+__declspec(naked) void MapSpawnADetour() {
+    __asm {
+        add esp, 4
+        pushad
+        push esi
+        call MapSpawnA
+        add esp, 4
+        popad
+        test edi, edi
+        jmp dword ptr [g_mapBack + 8]
+    }
+}
+// tru+0x1d4469: push 0; push esi; push 0xe7f2a0  (then call 0x5bd080)
+__declspec(naked) void MapSpawnBDetour() {
+    __asm {
+        pushad
+        call MapSpawnB
+        popad
+        push 0
+        push esi
+        push 0x00e7f2a0
+        jmp dword ptr [g_mapBack + 12]
+    }
+}
+
+// all four or none: every site, its context and the lookup checked first; a failed write puts back what was written
+bool PatchTuMapping() {
+    if (!HexBytesAt(kNameLookup, kNameLookupHex) || !HexBytesAt(kSpawnCall, kSpawnCallHex)) {
+        Log(0, "costume map: name lookup 0x%08lx / spawn call 0x%08lx does not match - not patched (none of the four)",
+            kNameLookup, kSpawnCall);
+        return false;
+    }
+    for (int i = 0; i < kMapSiteCount; ++i) {
+        if (!HexBytesAt(kMapSites[i].at, kMapSites[i].hex) || !HexBytesAt(kMapSites[i].ctxAt, kMapSites[i].ctxHex)) {
+            Log(0, "costume map: %s at 0x%08lx (context 0x%08lx) does not match - not patched (none of the four: the TU "
+                   "mapping only works as a whole)", kMapSites[i].what, kMapSites[i].at, kMapSites[i].ctxAt);
+            return false;
+        }
+    }
+    void *const detours[4] = {reinterpret_cast<void *>(&MapSaveDetour), reinterpret_cast<void *>(&MapLoadDetour),
+                              reinterpret_cast<void *>(&MapSpawnADetour), reinterpret_cast<void *>(&MapSpawnBDetour)};
+    BYTE saved[4][16];
+    int done = 0;
+    for (; done < kMapSiteCount; ++done) {
+        const MapSite &s = kMapSites[done];
+        size_t len = s.back - s.at;
+        g_mapBack[done] = s.back;
+        BYTE code[16];
+        memset(code, 0x90, sizeof(code));
+        code[0] = 0xe9;
+        DWORD rel = reinterpret_cast<DWORD>(detours[done]) - (s.at + 5);
+        memcpy(code + 1, &rel, 4);
+        memcpy(saved[done], reinterpret_cast<const void *>(s.at), len);
+        if (!WriteCode(s.at, code, len)) break;
+    }
+    if (done != kMapSiteCount) {
+        for (int i = 0; i < done; ++i) WriteCode(kMapSites[i].at, saved[i], kMapSites[i].back - kMapSites[i].at);
+        Log(0, "costume map: patch incomplete - original code restored (none of the four)");
+        return false;
+    }
+    Log(1, "costume map: TU 857 <-> 11 patched at state save 0x%08lx, state load 0x%08lx, player spawn 0x%08lx, switch "
+           "spawn 0x%08lx (TU 0x821ff0dc / 0x821ff518 / 0x822976b0 / 0x8229803c); a save in DLC 2 now stores %s (11) "
+           "like the TU", kMapSites[0].at, kMapSites[1].at, kMapSites[2].at, kMapSites[3].at, kFromName);
+    return true;
+}
+
 void ReadOptions(const char *dir) {
     char ini[MAX_PATH];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruDlc2Player.ini", dir);
@@ -349,6 +734,9 @@ void ReadOptions(const char *dir) {
     g_logLevel = GetPrivateProfileIntA("Dlc2Player", "LogLevel", 1, ini);
     g_costume = GetPrivateProfileIntA("Dlc2Player", "Costume", 1, ini);
     g_typeRecord = GetPrivateProfileIntA("Dlc2Player", "TypeRecord", 1, ini);
+    g_costumeReset = GetPrivateProfileIntA("Dlc2Player", "CostumeReset", 1, ini);
+    g_trackerFlag = GetPrivateProfileIntA("Dlc2Player", "TrackerFlag", 1, ini);
+    g_tuMapping = GetPrivateProfileIntA("Costume", "TuMapping", 0, ini);      // 0.5, default 0 = as 0.4
 }
 
 void Start(HMODULE self) {
@@ -358,17 +746,29 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDlc2Player.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDlc2Player 0.2 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d)", g_enabled,
-        g_logLevel, g_costume, g_typeRecord, g_flagReset);
+    Log(1, "TruDlc2Player 0.5 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
+           "reset %d, tracker flag %d, [Costume] TU mapping %d)", g_enabled, g_logLevel, g_costume, g_typeRecord,
+        g_flagReset, g_costumeReset, g_trackerFlag, g_tuMapping);
     if (!g_enabled) { Log(1, "disabled by TruDlc2Player.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
+    CheckTrackerFlag();                    // before the type record: DoppelgangerInit reads g_trackerFlagOk
     // the record first: a substituted costume without its type record would be an object without player functions
     bool types = g_typeRecord ? PatchTypeTable() : false;
+    bool costume = false;
     if (g_costume) {
-        if (types) PatchCostume();
+        if (types) costume = PatchCostume();
         else Log(0, "costume: not patched because the type record \"%s\" is missing (an object of that name would "
                     "get no player functions)", kToName);
+    }
+    // 0.5: the mapping makes 857 the current costume at load / spawn - only with the type record and the level-load
+    // substitution (which loads object 857 instead of 11), as on the TU where all of them belong together
+    if (g_tuMapping) {
+        if (types && costume) PatchTuMapping();
+        else Log(0, "costume map: [Costume] TuMapping=1 but the type record / level-load costume patch is missing "
+                    "(TypeRecord=1 and Costume=1 needed) - not patched");
+    } else {
+        Log(1, "costume map: off ([Costume] TuMapping=0) - saves keep 857 (%s) as up to 0.4", kToName);
     }
     if (g_flagReset) PatchFlagReset();
     else Log(1, "flag reset: off ([Dlc2Player] FlagReset=0) - the flag stays set after DLC 2 for the whole session");
@@ -387,7 +787,9 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported: plugin identification, and the TU's gameTracker+0x1244 for other plugins (1 after DoppelgangerInit)
 extern "C" __declspec(dllexport) const char *TruDlc2PlayerVersion() {
-    return "TruDlc2Player 0.2 (DLC 2 doppelganger player object, flag reset with every new game tracker)";
+    return "TruDlc2Player 0.5 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
+           "reset outside DLC 2, game tracker +0x1244 as the TU, [Costume] TuMapping 857 <-> 11 in save / load / "
+           "spawns)";
 }
 
 extern "C" __declspec(dllexport) int TruDlc2PlayerDoppelganger() {
