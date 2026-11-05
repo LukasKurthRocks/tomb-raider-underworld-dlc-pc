@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50c",
-    "description":  "Test 50c: as 50b plus the complete doppelganger outfit - all 14 title-update pixel shaders translated (50a: 10 by light transplant; 50c: face 2679, body skin 2682 / 2685, 2688 by PC per-light geometry + Xbox BRDF, own libs 2557 / 2573 / 2576 / 2577); 50b = 50a plus the 134 repaired condition records of the DLC 2 chart (dlc_test50b_chart = outfit file + tools/chart_condlist_fix.py), TruShadowPower 0.7 (condition 1055) and TruRockVein 0.8 (type-22 jump-off / fall geometry). HOLD RB at the wall, then jump off / let go. Run WITH -Debugger.",
+    "name":  "regress_shadowlara_50e_arms",
+    "description":  "Arms / gloves bisect: as 50e (VM fix), but the arm skin materials 26349 / 26350 and the glove material 26352 back on the 50a state (surrogate shaders 1616 / 701 instead of the per-light translations 2682 / 2685 / 2688; built with tools/material_transplant.py, only these 3 sections differ from 50e). Look at the arms and gloves: normal skin / black gloves = the per-light translations are the cause.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -24,13 +24,13 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test50c_chart/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test50e_arms/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "doppelganger_casual.drm":  "8a3a5c2435a6fc9f3dabbc38b73cac99"
+                                  "doppelganger_casual.drm":  "3a4268b67b0d3e442a58050d28aef959"
                               }
                   },
                   {
@@ -70,12 +70,15 @@
                  },
                  {
                      "name":  "TruShadowPower",
-                     "sourceDir":  "trudlcport/work/asi/v07",
-                     "sha256":  "0a536f3c1f4835640e94259f653638e5983b531d634219240980d23ad3ec5394",
+                     "sourceDir":  "trudlcport/work/asi/v08",
+                     "sha256":  "8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5",
                      "ini":  {
                                  "ShadowPower":  {
                                                      "LogLevel":  "2"
-                                                 }
+                                                 },
+                                 "Look":  {
+                                              "Enabled":  "0"
+                                          }
                              }
                  },
                  {
@@ -91,12 +94,12 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
-                     "sourceDir":  "trudlcport/work/asi/menu06",
-                     "sha256":  "2febe208f812a29a6ad960fb175bfbae5397baaef7ff5e063d2a5e3d09848738",
+                     "sourceDir":  "trudlcport/work/asi/menu07",
+                     "sha256":  "6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b",
                      "ini":  {
                                  "Cheat":  {
                                                "Experimental":  "1"
@@ -173,6 +176,11 @@
                   },
                   {
                       "kind":  "check",
+                      "id":  "arms-gloves",
+                      "text":  "Arms and gloves (still the 50c shaders 2573 / 2576 / 2577): bare arm skin pale with faint veins as on the Xbox (no hard black / white blotches)? Fingerless gloves black (not olive green)? Note what you see - not fixed in 50e"
+                  },
+                  {
+                      "kind":  "check",
                       "id":  "d3d-box",
                       "text":  "No D3D error box (D3DERR_INVALIDCALL 0x8876086C) after the load"
                   },
@@ -246,6 +254,23 @@
                       "kind":  "step",
                       "n":  12,
                       "id":  "-",
+                      "text":  "Rock channel: wall run (RB + A), once jump up from the wall to the ledge above (X); then let Lara die (fall, or time.scale 0.5 + jump to death) and let the game reload. Repeat 3 times"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "death-no-crash",
+                      "text":  "Wall run, jump up, death and reload (3 times): no crash, no freeze (50b / 50d / 50d_nolook / 50d_nojump crashed here in the heap free tru+0x1982b6 / +0x1982ef)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  13,
+                      "id":  "-",
+                      "text":  "Play on for a few minutes after the last reload (walk, wall run, RB slow motion)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  14,
+                      "id":  "-",
                       "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
                   }
               ],
@@ -275,8 +300,8 @@
                         "id":  "sp-loaded",
                         "file":  "TruShadowPower.log",
                         "mode":  "present",
-                        "pattern":  "TruShadowPower 0\\.7 loaded \\(en",
-                        "text":  "TruShadowPower 0.7 loaded and enabled"
+                        "pattern":  "TruShadowPower 0\\.8 loaded \\(en",
+                        "text":  "TruShadowPower 0.8 loaded and enabled"
                     },
                     {
                         "id":  "sp-1055-added",

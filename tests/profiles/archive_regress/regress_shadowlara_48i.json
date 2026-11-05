@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50d_nojump",
-    "description":  "Bisect of the heap crash (tru+0x1982xx free) that followed a wall run in 50d / 50d_nolook / 50b: as 50d_nolook, plus TruRockVein [RockVein] JumpGeometry=0 (no 0.8 type-22 jump-off / fall branches = 0.7 geometry). Do: wall run (RB + A) up the rock channel, then jump to death.",
+    "name":  "regress_shadowlara_48i",
+    "description":  "As regress_shadowlara_guard (TruGuard, no debugger) with test 48i: TruRockVein 0.3 (markup types 22 / 23 accepted as in the title update - the rock-channel markup was disabled on PC), dlc2_uo_machine_column markup ids / bounds fixed, doppelganger_casual 48h + hair diagnosis (material 25521 MP[1] = 0, not a fix). Doc: docs/Regression-Schattenlara.md. TruMenu 0.6 with the command bar.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -22,26 +22,6 @@
                       "md5":  {
                                   "dlc2_uo_machine_column.drm":  "f4ea1892e5bf0d0bcaa3a51771b492ce"
                               }
-                  },
-                  {
-                      "source":  "trudlcport/work/rebuild/dlc_test50c_chart/mods",
-                      "exclude":  [
-                                      "local",
-                                      "padshock"
-                                  ],
-                      "md5":  {
-                                  "doppelganger_casual.drm":  "8a3a5c2435a6fc9f3dabbc38b73cac99"
-                              }
-                  },
-                  {
-                      "source":  "trudlcport/work/rebuild/dlc_test50c_vein/mods",
-                      "exclude":  [
-                                      "local",
-                                      "padshock"
-                                  ],
-                      "md5":  {
-                                  "dlc_level2_start.drm":  "9a386d2bedb5c5d43cf63d54382c7a98"
-                              }
                   }
               ],
     "files":  [
@@ -60,26 +40,22 @@
                  },
                  {
                      "name":  "TruRockVein",
-                     "sourceDir":  "trudlcport/work/asi_rv08",
-                     "sha256":  "66f80abb20e9ec6a74e2f3f6e933e8be2757ec70a870f03406197999cf55b29c",
+                     "sourceDir":  "trudlcport/work/asi/rv03",
+                     "sha256":  "f875759e392c8c3c502f03752d501688850b8e259a0751b7dc5cd6cdcf3da45f",
                      "ini":  {
                                  "RockVein":  {
-                                                  "LogLevel":  "2",
-                                                  "JumpGeometry":  "0"
+                                                  "LogLevel":  "2"
                                               }
                              }
                  },
                  {
                      "name":  "TruShadowPower",
-                     "sourceDir":  "trudlcport/work/asi/v08",
-                     "sha256":  "8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5",
+                     "sourceDir":  "trudlcport/work/asi/v05",
+                     "sha256":  "004e190490b66872c6bc3780681ae45877d25501974a602b28c9d2a9acdedd2e",
                      "ini":  {
                                  "ShadowPower":  {
                                                      "LogLevel":  "2"
-                                                 },
-                                 "Look":  {
-                                              "Enabled":  "0"
-                                          }
+                                                 }
                              }
                  },
                  {
@@ -95,12 +71,12 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
-                     "sourceDir":  "trudlcport/work/asi/menu07",
-                     "sha256":  "6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b",
+                     "sourceDir":  "trudlcport/work/asi/menu06",
+                     "sha256":  "2febe208f812a29a6ad960fb175bfbae5397baaef7ff5e063d2a5e3d09848738",
                      "ini":  {
                                  "Cheat":  {
                                                "Experimental":  "1"
@@ -173,7 +149,7 @@
                   {
                       "kind":  "check",
                       "id":  "doppel-look",
-                      "text":  "Doppelganger outfit as on the Xbox: dark red hair, black top / trousers / gloves, natural face and arm skin (no white, cyan, green or red / white parts)"
+                      "text":  "Lara looks like the doppelganger (doppelganger_casual, no grey / wrong textures)"
                   },
                   {
                       "kind":  "check",
@@ -190,11 +166,6 @@
                       "kind":  "check",
                       "id":  "wall-normal",
                       "text":  "Rock channel without shadow power: normal wall behaviour (jump against / off), no fall through, no crash"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "vein-look",
-                      "text":  "Rock vein strip at the first rock channel: bright, raised stone blocks with a dark centre joint (Xbox look), not a dark flat strip; no black / flickering patches on the wall"
                   },
                   {
                       "kind":  "step",
@@ -228,17 +199,6 @@
                       "kind":  "step",
                       "n":  10,
                       "id":  "-",
-                      "text":  "Wall run again: once jump off the wall (A with a direction), once release RB, once run until she comes down near the floor"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "wall-exit",
-                      "text":  "Leaving the wall (jump off / RB released / near the floor): Lara lands or falls normally, no crash, no teleport"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  11,
-                      "id":  "-",
                       "text":  "Take a hit or fall from a small height: the health bar drops"
                   },
                   {
@@ -248,7 +208,7 @@
                   },
                   {
                       "kind":  "step",
-                      "n":  12,
+                      "n":  11,
                       "id":  "-",
                       "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
                   }
@@ -279,37 +239,8 @@
                         "id":  "sp-loaded",
                         "file":  "TruShadowPower.log",
                         "mode":  "present",
-                        "pattern":  "TruShadowPower 0\\.8 loaded \\(en",
-                        "text":  "TruShadowPower 0.8 loaded and enabled"
-                    },
-                    {
-                        "id":  "sp-1055-added",
-                        "file":  "TruShadowPower.log",
-                        "mode":  "present",
-                        "pattern":  "1055 \\(TU predicate 0x8246e450.*added to the link",
-                        "text":  "TruShadowPower 0.7 registered condition 1055 (TU predicate)"
-                    },
-                    {
-                        "id":  "sp-1055-run",
-                        "file":  "TruShadowPower.log",
-                        "mode":  "present",
-                        "optional":  true,
-                        "pattern":  "condition 1055 predicate \\(TU 0x8246e450\\) first call: doppelganger 1 -\u003e 0",
-                        "text":  "Condition 1055 asked in DLC 2 and answered 0 (no shadow strike look) - was TRUE before"
-                    },
-                    {
-                        "id":  "rv-loaded",
-                        "file":  "TruRockVein.log",
-                        "mode":  "present",
-                        "pattern":  "TruRockVein 0\\.8 loaded \\(enabled 1",
-                        "text":  "TruRockVein 0.8 loaded and enabled"
-                    },
-                    {
-                        "id":  "rv-no-mismatch",
-                        "file":  "TruRockVein.log",
-                        "mode":  "absent",
-                        "pattern":  "does not match",
-                        "text":  "TruRockVein found every code site it patches (no \u0027does not match\u0027)"
+                        "pattern":  "TruShadowPower 0\\.5(\\.\\d+)? loaded \\(enabled 1",
+                        "text":  "TruShadowPower 0.5.x loaded and enabled"
                     },
                     {
                         "id":  "sp-conditions",
@@ -376,32 +307,32 @@
                         "file":  "cdb.log",
                         "mode":  "absent",
                         "pattern":  "^\\s*D3DFAIL\\s*$",
-                        "text":  "No D3D error handler call (D3DFAIL marker)",
-                        "optional":  false
+                        "text":  "No D3D error handler call (D3DFAIL marker) (only with -Debugger; optional in this TruGuard profile)",
+                        "optional":  true
                     },
                     {
                         "id":  "cdb-av",
                         "file":  "cdb.log",
                         "mode":  "absent",
                         "pattern":  "^\\s*AV2NDCHANCE\\s*$",
-                        "text":  "No second-chance access violation (AV2NDCHANCE marker)",
-                        "optional":  false
+                        "text":  "No second-chance access violation (AV2NDCHANCE marker) (only with -Debugger; optional in this TruGuard profile)",
+                        "optional":  true
                     },
                     {
                         "id":  "cdb-fastfail",
                         "file":  "cdb.log",
                         "mode":  "absent",
                         "pattern":  "^\\s*FASTFAIL\\s*$",
-                        "text":  "No fast fail (FASTFAIL marker)",
-                        "optional":  false
+                        "text":  "No fast fail (FASTFAIL marker) (only with -Debugger; optional in this TruGuard profile)",
+                        "optional":  true
                     },
                     {
                         "id":  "cdb-msgbox",
                         "file":  "cdb.log",
                         "mode":  "absent",
                         "pattern":  "^\\s*MESSAGEBOX_[AW]\\s*$",
-                        "text":  "No message box (MESSAGEBOX_A / MESSAGEBOX_W marker)",
-                        "optional":  false
+                        "text":  "No message box (MESSAGEBOX_A / MESSAGEBOX_W marker) (only with -Debugger; optional in this TruGuard profile)",
+                        "optional":  true
                     },
                     {
                         "id":  "rv-types",
@@ -419,39 +350,6 @@
                         "min":  1,
                         "optional":  true,
                         "text":  "Wall-run target: condition 608 true at the rock channel (type 22 markup found)"
-                    },
-                    {
-                        "id":  "rv-slots",
-                        "file":  "TruRockVein.log",
-                        "pattern":  "markup slots: 0 also true for type 22",
-                        "mode":  "present",
-                        "min":  1,
-                        "text":  "TruRockVein 0.4 translated the title-update markup manager type tests"
-                    },
-                    {
-                        "id":  "rv-nullbox",
-                        "file":  "TruRockVein.log",
-                        "pattern":  "called with box 0",
-                        "mode":  "absent",
-                        "min":  1,
-                        "text":  "No markup slot +0x08 call with an empty attach box (NullBoxGuard did not fire)"
-                    },
-                    {
-                        "id":  "rv-action608-added",
-                        "file":  "TruRockVein.log",
-                        "pattern":  "markup action 608 added",
-                        "mode":  "present",
-                        "min":  1,
-                        "text":  "TruRockVein 0.5 added the title-update case 608 (attach to the jump target)"
-                    },
-                    {
-                        "id":  "rv-action608-run",
-                        "file":  "TruRockVein.log",
-                        "pattern":  "markup action 608 \\(attach to jump target",
-                        "mode":  "present",
-                        "min":  1,
-                        "optional":  true,
-                        "text":  "Wall-run target: case 608 ran at the wall and filled the attach box"
                     }
                 ]
 }

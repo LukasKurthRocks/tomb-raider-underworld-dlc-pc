@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50k_cut",
-    "description":  "Test 50k (cut content): 50j plus the cut object dlc2_uo_jump_target (object 1042, a 1.9 x 2.1 m landing pad with one jump-landing markup, type 2; in the Feb 2009 prototype placed twice in dlc2_machine_room next to the two piston_b, gone in the final) converted from the prototype with the DLC 2 pipeline (assemble + all 2b fixes + checks clean) and loaded with dlc2_machine_room through objlist.dat (no unit of the final places it: no intro, so nothing new is visible - this is a load test of the object). Also the prototype-only stinger music\\stingers\\mystery_stinger_01 (7.7 s stereo) and voice line vo\\dlc2\\doppelganger\\i_dg_pdlc2_mach_01 (2.5 s mono) as PC streams (nothing in the final requests them). Tree work/rebuild/dlc_test50k_cut (50 files). Everything of 50j unchanged: Test 50j: as 50i plus the object event list fix: the thralls\u0027 own event lists (viking_thrall_dlc2_ 24425, viking_thrall_tutorial_dlc2_ 24535, yeti_thrall_dlc2_ 24576, yeti_thrall_armored_dlc2_ 24889, the four chunkdolls), dlc_fx_goo_room_platformreveal and the goo machine fx had record words against the base-pair rules (obj_eventlist_fix.py: kind-1 sub word u16, kind-0 payload word 0 u8u8u16, kind-2 word 3 raw, self ids u32) and the thralls\u0027 sub-0x32 id word raw (eventlist_idword_fix.py). The 50i crash at 21:08:14 (tru+0x1976a3, instance removal tru+0x1bc70d: thrall instance 0x00cf1650 with links decremented by 1 and a link written at instance - 1) is NOT explained by this fix - watch the thrall fight in dlc_yggdrasil_hall02. Tree work/rebuild/dlc_test50j_vm (46 files). Run WITH -Debugger. Plugins 0.9: TruDlc2Player 0.2 (doppelganger flag reset), TruRockVein 0.9 (5th type-22 geometry function), TruShadowPower 0.9 (TU start conditions, adrenaline-camera look attempt, input diagnostic lines). TruDataGuard 0.1 (section lookup guard tru+0x14df80: invalid ids -\u003e logged not-found for the 86 callers that test for 0).",
+    "name":  "regress_shadowlara_50j",
+    "description":  "Test 50j: as 50i plus the object event list fix: the thralls\u0027 own event lists (viking_thrall_dlc2_ 24425, viking_thrall_tutorial_dlc2_ 24535, yeti_thrall_dlc2_ 24576, yeti_thrall_armored_dlc2_ 24889, the four chunkdolls), dlc_fx_goo_room_platformreveal and the goo machine fx had record words against the base-pair rules (obj_eventlist_fix.py: kind-1 sub word u16, kind-0 payload word 0 u8u8u16, kind-2 word 3 raw, self ids u32) and the thralls\u0027 sub-0x32 id word raw (eventlist_idword_fix.py). The 50i crash at 21:08:14 (tru+0x1976a3, instance removal tru+0x1bc70d: thrall instance 0x00cf1650 with links decremented by 1 and a link written at instance - 1) is NOT explained by this fix - watch the thrall fight in dlc_yggdrasil_hall02. Tree work/rebuild/dlc_test50j_vm (46 files). Run WITH -Debugger. Plugins 0.9: TruDlc2Player 0.2 (doppelganger flag reset), TruRockVein 0.9 (5th type-22 geometry function), TruShadowPower 0.9 (TU start conditions, adrenaline-camera look attempt, input diagnostic lines). TruDataGuard 0.1 (section lookup guard tru+0x14df80: invalid ids -\u003e logged not-found for the 86 callers that test for 0).",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -24,14 +24,12 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test50k_cut/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test50j_vm/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "audio/streams/music/stingers/mystery_stinger_01.mul":  "d86d332ceb27b6e36a6dccab700aa78a",
-                                  "audio/streams/vo/dlc2/doppelganger/i_dg_pdlc2_mach_01.mul":  "ef2adf45983a585c2937cf1394005554",
                                   "dlc_fx_cine_thrall_death.drm":  "3c867d0b2057d4db63e5f222e8d6408f",
                                   "dlc_fx_goo_dun_float_ist.drm":  "c99bfae67f356fdbdd854c52060e2d34",
                                   "dlc_fx_goo_dun_ist.drm":  "012213184d2a0aacaa2eb8d83cb1601b",
@@ -57,7 +55,6 @@
                                   "dlc2_uo_goo_cannonball.drm":  "09e39a5c743e1515aed3732ae376e140",
                                   "dlc2_uo_goo_upcolumn.drm":  "a3807563cfd58b9427c060867cf1ed81",
                                   "dlc2_uo_gooconverter.drm":  "4f56c5890325393fa9547c3ab2642e47",
-                                  "dlc2_uo_jump_target.drm":  "ff151771560654279f63a623a01894b8",
                                   "dlc2_uo_machine_column.drm":  "0fa662a6543c179c798651d0db9856ca",
                                   "dlc2_uo_machine_debris.drm":  "3cf9342146b5ba7c527f20a88961f3b3",
                                   "dlc2_uo_natlapod.drm":  "cc948e28ba082af49deaa735f2936053",
@@ -71,7 +68,6 @@
                                   "dlc2_uo_treadmill_block_spawned.drm":  "ab381275d58e741b4d0b15c85bc1a259",
                                   "doppelganger_casual.drm":  "e6079979051545a76752a6c77f348fe6",
                                   "fx_waterwheel_fsfx.drm":  "d5ae44171bff1a464ee8b983ed3daea3",
-                                  "tr8/pc-w/objlist.dat":  "07cd1e6d8739692d48123633b6822ee3",
                                   "viking_thrall_chunkdoll_dlc2_.drm":  "14e1e47a128c95f7df4f4af23b5ff48e",
                                   "viking_thrall_dlc2_.drm":  "57848d768e6ea11474a7eeb2a3a438be",
                                   "viking_thrall_tutorial_dlc2_.drm":  "a8f346adead1dbbc0b6b66c890b7b034",
@@ -143,7 +139,7 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
@@ -371,39 +367,6 @@
                   {
                       "kind":  "step",
                       "n":  18,
-                      "id":  "-",
-                      "text":  "Go on to dlc2_machine_room (big machine hall with the pistons and the goo machine; shortcut: TruMenu level.load dlc2_machine_room, experimental) and walk around for a few minutes"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "machine-room-jt-load",
-                      "text":  "dlc2_machine_room loads and plays without a crash / TruGuard fault (new: the cut object dlc2_uo_jump_target is loaded with this room through objlist.dat)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  19,
-                      "id":  "-",
-                      "text":  "Cut jump target spots (prototype positions, both at the height of a piston_b): player.mark, then player.teleport -9983 27927 25210 (pad 1, piston_b 9.5 m away) and player.teleport 6707 30549 25210 (pad 2, rotated 54 deg, piston_b 8.3 m away); look around, player.recall to go back; instance.list jump"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "jump-target-spots",
-                      "text":  "Expected: NO pad there (the final room has no intro of object 1042; instance.list jump finds nothing) - note what is at the two spots (open floor, gap, ledge near a piston?), that tells where a restored pad would go"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  20,
-                      "id":  "-",
-                      "text":  "Stinger: TruMenu 0.7.2 has no command to play a stream; the planned media.music.play (srmusic, music\\\u003cname\u003e\\\u003cname\u003e.mus) cannot play it either - it is an audio stream: name music\\stingers\\mystery_stinger_01 (file audio\\streams\\music\\stingers\\mystery_stinger_01.mul). Listen offline: work\\rebuild\\test50k_work\\listen\\mystery_stinger_01.wav"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "stinger-info",
-                      "text":  "Skip (Y) unless a stream-play command exists by then (e.g. a future media.stream.play music\\stingers\\mystery_stinger_01)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  21,
                       "id":  "-",
                       "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
                   },

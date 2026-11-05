@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50k",
-    "description":  "Test 50k: 50j data + cut jump target (machine room objlist) + 25 missing DLC 2 audio streams (music, reveal stings, doppelganger lines; tree dlc_test50k_streams) + TruMenu 0.8.0 (regression, cheats incl. god mode, camera log) + TruShadowPower 0.9 with the look ON again (start events / sounds 0x85 / 0x87 fixed since 50e, adrenaline camera mode attempt).",
+    "name":  "regress_shadowlara_50h_arms",
+    "description":  "Test 50h (arms / gloves): as 50g plus the fixed per-light translations of the doppelganger arm skin / glove materials 26349 / 26350 / 26352 (TU 2682 / 2685 / 2688 -> new ShaderLibs 2582 / 2583 / 2584). Cause of the black / white blotches: light-free set-up instructions that stand after light chunk 1 in the Xbox code were moved before the light chain and overwrote the specular exponent the cloned Xbox BRDF reads (pow overflow -> inf / 0). Proven offline against an Xbox-lit reference (all 8 slots of the three libs 1.000, face unchanged). CHECK: arms / gloves look. Run WITH -Debugger.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -24,62 +24,17 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test50k_cut/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test50h_arms/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "audio/streams/music/stingers/mystery_stinger_01.mul":  "d86d332ceb27b6e36a6dccab700aa78a",
-                                  "audio/streams/vo/dlc2/doppelganger/i_dg_pdlc2_mach_01.mul":  "ef2adf45983a585c2937cf1394005554",
-                                  "dlc_fx_cine_thrall_death.drm":  "3c867d0b2057d4db63e5f222e8d6408f",
-                                  "dlc_fx_goo_dun_float_ist.drm":  "c99bfae67f356fdbdd854c52060e2d34",
-                                  "dlc_fx_goo_dun_ist.drm":  "012213184d2a0aacaa2eb8d83cb1601b",
-                                  "dlc_fx_goo_dun_less_ist.drm":  "35f2ec538f7a7444266486d81d86b95e",
-                                  "dlc_fx_goo_dun_lrg_ist.drm":  "8ac28fbebe57510a918f3ff5b4e1a9e2",
-                                  "dlc_fx_goo_machine.drm":  "29554050c9cf75ed60780542bee9b7b9",
-                                  "dlc_fx_goo_machine_a_ist.drm":  "1cbe5ae5f4462e7fc6e7eaf2b7661bf0",
-                                  "dlc_fx_goo_machine_b_ist.drm":  "9e5ce0a516be316c9d35bce21ca098ab",
-                                  "dlc_fx_goo_machine_c_ist.drm":  "48a949524934e306275b8bb44302c12b",
-                                  "dlc_fx_goo_room_platformreveal.drm":  "37f15d38adc7e5b233f0a7572f89cd8b",
-                                  "dlc_fx_goo_tres_ist.drm":  "0f41b6cd570a61209070781f27bf8401",
-                                  "dlc_fx_goo_tres_line_ist.drm":  "de70e942d64d0b3f81659de3c39bf4c7",
-                                  "dlc_fx_goo_upcolumn_pit.drm":  "59a520c0608ebb9f365444f64d8af40e",
-                                  "dlc2_goo_spout.drm":  "9e8bfa21d41c286e1ee63db928c891a2",
-                                  "dlc2_uo_capsuleadren_switch.drm":  "ee8c15e4eba2b45c3cfa020c0c563658",
-                                  "dlc2_uo_enemybreakwall.drm":  "9870b2cfd31f88cedc5eacea76b4d192",
-                                  "dlc2_uo_energy_pillar.drm":  "c2c1ec00ce59d190c2798b2243baeff9",
-                                  "dlc2_uo_energy_pillar_machine.drm":  "4e217c0fe7ed99664901c32db88ac083",
-                                  "dlc2_uo_extending_bridge.drm":  "88c958f8eb524a3d285bf702f2ddee28",
-                                  "dlc2_uo_extending_bridge_long.drm":  "271a54168a502fe8419ba7016e7f082d",
-                                  "dlc2_uo_extending_bridge_special.drm":  "64e0e4e2812ce5e511a337534f0c9066",
-                                  "dlc2_uo_falling_rune_block.drm":  "aac5123c20ee004de834dce207fe1e2e",
-                                  "dlc2_uo_goo_cannonball.drm":  "09e39a5c743e1515aed3732ae376e140",
-                                  "dlc2_uo_goo_upcolumn.drm":  "a3807563cfd58b9427c060867cf1ed81",
-                                  "dlc2_uo_gooconverter.drm":  "4f56c5890325393fa9547c3ab2642e47",
-                                  "dlc2_uo_jump_target.drm":  "ff151771560654279f63a623a01894b8",
-                                  "dlc2_uo_machine_column.drm":  "0fa662a6543c179c798651d0db9856ca",
-                                  "dlc2_uo_machine_debris.drm":  "3cf9342146b5ba7c527f20a88961f3b3",
-                                  "dlc2_uo_natlapod.drm":  "cc948e28ba082af49deaa735f2936053",
-                                  "dlc2_uo_pipes_o_goo_left.drm":  "46f3fbad6b1047db023c9f674475379b",
-                                  "dlc2_uo_pipes_o_goo_right.drm":  "d49f387facbacd4c473af4d79efe2c4a",
-                                  "dlc2_uo_piston_a.drm":  "4eab0f7a672da9a912753314dc70fce1",
-                                  "dlc2_uo_piston_b.drm":  "ab0e2c451b42c722ba9d946466038e28",
-                                  "dlc2_uo_piston_c.drm":  "e44937153e4505cfc3ef8b68a8d94fed",
-                                  "dlc2_uo_piston_square.drm":  "bb3b2e28f8c8e6eef57f473ef103db03",
-                                  "dlc2_uo_trap_pacman_blades.drm":  "8c51f73bcc9959d626bdcde7d613224b",
-                                  "dlc2_uo_treadmill_block_spawned.drm":  "ab381275d58e741b4d0b15c85bc1a259",
                                   "doppelganger_casual.drm":  "e6079979051545a76752a6c77f348fe6",
-                                  "fx_waterwheel_fsfx.drm":  "d5ae44171bff1a464ee8b983ed3daea3",
-                                  "tr8/pc-w/objlist.dat":  "07cd1e6d8739692d48123633b6822ee3",
-                                  "viking_thrall_chunkdoll_dlc2_.drm":  "14e1e47a128c95f7df4f4af23b5ff48e",
-                                  "viking_thrall_dlc2_.drm":  "57848d768e6ea11474a7eeb2a3a438be",
-                                  "viking_thrall_tutorial_dlc2_.drm":  "a8f346adead1dbbc0b6b66c890b7b034",
-                                  "wp_dlc_handgun.drm":  "21a09c29cb46222ee6b9fcc1902189ab",
-                                  "yeti_thrall_armored_chunkdoll_dlc_2_.drm":  "3b5629da9b42a35b7b847b39e69cde0c",
-                                  "yeti_thrall_armored_dlc2_.drm":  "b7fce48bb19781c14f032b5142ba8338",
-                                  "yeti_thrall_chunkdoll_dlc2_.drm":  "4e5751e9d2c48f97694d2a0723d648d9",
-                                  "yeti_thrall_dlc2_.drm":  "7575186dbba591e7589941c8e1f2609d"
+                                  "dlc_fx_goo_machine.drm":  "3379055e833fb4e4496020369ce2f4a0",
+                                  "dlc_fx_goo_machine_a_ist.drm":  "4524551c25cb100b84a83712841c3624",
+                                  "dlc_fx_goo_machine_b_ist.drm":  "a8842c74c4a2f41d070b7d4e8302ed89",
+                                  "dlc_fx_goo_machine_c_ist.drm":  "e54bebcd585725baf45166bb05208b1b"
                               }
                   },
                   {
@@ -91,9 +46,6 @@
                       "md5":  {
                                   "dlc_level2_start.drm":  "9a386d2bedb5c5d43cf63d54382c7a98"
                               }
-                  },
-                  {
-                      "source":  "trudlcport/work/rebuild/dlc_test50k_streams/mods"
                   }
               ],
     "files":  [
@@ -102,8 +54,8 @@
     "asis":  [
                  {
                      "name":  "TruDlc2Player",
-                     "sourceDir":  "trudlcport/work/asi/dlc2p02",
-                     "sha256":  "70fd89e77e9e205d8117babe9f9767c33dce524394e87bfcd2af58b17994ab3a"
+                     "sourceDir":  "trudlcport/work/asi",
+                     "sha256":  "c73c8c6693000e45a1ae60b0b29d69ecb02313796a2820ab65e4546a1267992b"
                  },
                  {
                      "name":  "TruDoppelganger",
@@ -112,8 +64,8 @@
                  },
                  {
                      "name":  "TruRockVein",
-                     "sourceDir":  "trudlcport/work/asi_rv09",
-                     "sha256":  "e7430050c8587e8d1a36f09fc8c2d7de4cb2738821e9732af00f1d6967234076",
+                     "sourceDir":  "trudlcport/work/asi_rv08",
+                     "sha256":  "66f80abb20e9ec6a74e2f3f6e933e8be2757ec70a870f03406197999cf55b29c",
                      "ini":  {
                                  "RockVein":  {
                                                   "LogLevel":  "2"
@@ -122,14 +74,14 @@
                  },
                  {
                      "name":  "TruShadowPower",
-                     "sourceDir":  "trudlcport/work/asi/v09",
-                     "sha256":  "37b0d55016689de9896c39abe6052c84aadebf415eebd2e1c60437af39616c8a",
+                     "sourceDir":  "trudlcport/work/asi/v08",
+                     "sha256":  "8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5",
                      "ini":  {
                                  "ShadowPower":  {
                                                      "LogLevel":  "2"
                                                  },
                                  "Look":  {
-                                              "Enabled":  "1"
+                                              "Enabled":  "0"
                                           }
                              }
                  },
@@ -146,25 +98,17 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
-                     "sourceDir":  "trudlcport/work/asi/menu080",
-                     "sha256":  "3cb15cb48f01a9f6a7e7652bea545f5d2cec21ea4fc9341c4bdabae451f20c36",
+                     "sourceDir":  "trudlcport/work/asi/menu07",
+                     "sha256":  "6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b",
                      "ini":  {
                                  "Cheat":  {
                                                "Experimental":  "1"
-                                           },
-                                 "Log":  {
-                                             "UnitChanges":  "1"
-                                         }
+                                           }
                              }
-                 },
-                 {
-                     "name":  "TruDataGuard",
-                     "sourceDir":  "trudlcport/work/asi/dataguard01",
-                     "sha256":  "40e29d094a56074473380a45a27b5f8d71e76c6a19f26170a7ca4a6e56c3a0d0"
                  }
              ],
     "removeOtherAsis":  true,
@@ -353,136 +297,7 @@
                       "kind":  "step",
                       "n":  16,
                       "id":  "-",
-                      "text":  "Go on from dlc_level2_start into dlc_yggdrasil_hall01 (dark corridor with red glowing runes) and walk on for a few minutes; let thralls appear / fight them if they do"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "yggdrasil-hall01-no-crash",
-                      "text":  "Enter dlc_yggdrasil_hall01 and walk on: no crash (50h crashed 3.7 s after entering, tru+0x14df84 eax 0x00652000, viking thrall anim event)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  17,
-                      "id":  "-",
-                      "text":  "Go on to dlc_yggdrasil_hall02 (group of viking thralls): fight them with punch (X) / kick (Y) and the shadow power, let them hit Lara, then walk on for a few minutes"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "yggdrasil-hall02-thralls",
-                      "text":  "dlc_yggdrasil_hall02: no crash during / after the thrall fight (50i crashed at 21:08:14, tru+0x1976a3); note whether the thralls move / attack and whether punches / kicks hit them"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  18,
-                      "id":  "-",
-                      "text":  "Go on to dlc2_machine_room (big machine hall with the pistons and the goo machine; shortcut: TruMenu level.load dlc2_machine_room, experimental) and walk around for a few minutes"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "machine-room-jt-load",
-                      "text":  "dlc2_machine_room loads and plays without a crash / TruGuard fault (new: the cut object dlc2_uo_jump_target is loaded with this room through objlist.dat)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  19,
-                      "id":  "-",
-                      "text":  "Cut jump target spots (prototype positions, both at the height of a piston_b): player.mark, then player.teleport -9983 27927 25210 (pad 1, piston_b 9.5 m away) and player.teleport 6707 30549 25210 (pad 2, rotated 54 deg, piston_b 8.3 m away); look around, player.recall to go back; instance.list jump"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "jump-target-spots",
-                      "text":  "Expected: NO pad there (the final room has no intro of object 1042; instance.list jump finds nothing) - note what is at the two spots (open floor, gap, ledge near a piston?), that tells where a restored pad would go"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  20,
-                      "id":  "-",
-                      "text":  "Stinger: TruMenu 0.7.2 has no command to play a stream; the planned media.music.play (srmusic, music\\\u003cname\u003e\\\u003cname\u003e.mus) cannot play it either - it is an audio stream: name music\\stingers\\mystery_stinger_01 (file audio\\streams\\music\\stingers\\mystery_stinger_01.mul). Listen offline: work\\rebuild\\test50k_work\\listen\\mystery_stinger_01.wav"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "stinger-info",
-                      "text":  "Skip (Y) unless a stream-play command exists by then (e.g. a future media.stream.play music\\stingers\\mystery_stinger_01)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  21,
-                      "id":  "-",
                       "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  90,
-                      "id":  "-",
-                      "text":  "Menu 0.7.1: open TruMenu in the level, type wasd into the command bar while Lara stands; hold w and open the menu"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-block-input",
-                      "text":  "Lara does not move while the menu is open (typing / held key)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-esc",
-                      "text":  "Esc in the menu does not open the game pause menu"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-b-twice",
-                      "text":  "B with the on-screen keyboard open: first B closes the keyboard, second B the menu"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-unit-log",
-                      "text":  "log.overlay on: room names (unit: ... (was ...)) appear while walking through DLC 2"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  95,
-                      "id":  "-",
-                      "text":  "Shortcut to the crash spot of 50h: TruMenu level page DLC 2 -\u003e dlc_yggdrasil_hall01 (or level.load dlc_yggdrasil_hall01); walk through the red-rune corridor and on"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-quit",
-                      "text":  "TruMenu game.quit (Status page, press twice) ends the game; the summary says ended via TruMenu game.quit, not a crash"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  96,
-                      "id":  "-",
-                      "text":  "Shadow power 0.9: hold RB while aiming at a thrall; describe the picture (soft / bright = adrenaline camera mode 0x34)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "sp09-look",
-                      "text":  "RB look: anything soft / bright / zoomed while the power is on and a target is aimed at (note what)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "sp09-cinematic",
-                      "text":  "RB during a cutscene / the hint camera pan: no slow motion, no meter drain"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  97,
-                      "id":  "-",
-                      "text":  "TruMenu 0.8 Cheats page: god mode on, then go to the thralls (level.load dlc_yggdrasil_hall02 or walk)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "k-sounds",
-                      "text":  "New DLC 2 audio: music / reveal stings / doppelganger voice lines heard where they were silent before (note where)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "k-look",
-                      "text":  "RB look ON: start sound / hand effect / any picture change when RB is pressed (note what)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "k-god",
-                      "text":  "God mode: the thralls do not kill Lara; no crash around them"
                   }
               ],
     "expects":  [
@@ -508,6 +323,13 @@
                         "text":  "TruDoppelganger registered all title-update ids (13 conditions, 9 activities, 8 states)"
                     },
                     {
+                        "id":  "sp-loaded",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "pattern":  "TruShadowPower 0\\.8 loaded \\(en",
+                        "text":  "TruShadowPower 0.8 loaded and enabled"
+                    },
+                    {
                         "id":  "sp-1055-added",
                         "file":  "TruShadowPower.log",
                         "mode":  "present",
@@ -521,6 +343,13 @@
                         "optional":  true,
                         "pattern":  "condition 1055 predicate \\(TU 0x8246e450\\) first call: doppelganger 1 -\u003e 0",
                         "text":  "Condition 1055 asked in DLC 2 and answered 0 (no shadow strike look) - was TRUE before"
+                    },
+                    {
+                        "id":  "rv-loaded",
+                        "file":  "TruRockVein.log",
+                        "mode":  "present",
+                        "pattern":  "TruRockVein 0\\.8 loaded \\(enabled 1",
+                        "text":  "TruRockVein 0.8 loaded and enabled"
                     },
                     {
                         "id":  "rv-jumpgeo",
@@ -686,21 +515,6 @@
                         "min":  1,
                         "optional":  true,
                         "text":  "Wall-run target: case 608 ran at the wall and filled the attach box"
-                    },
-                    {
-                        "id":  "dataguard-on",
-                        "file":  "TruDataGuard.log",
-                        "pattern":  "guard on: section lookup tru\\+0x14df80",
-                        "mode":  "present",
-                        "min":  1,
-                        "text":  "TruDataGuard loaded, section lookup guard on"
-                    },
-                    {
-                        "id":  "dataguard-hits",
-                        "file":  "TruDataGuard.log",
-                        "pattern":  "invalid id",
-                        "mode":  "absent",
-                        "text":  "no invalid section id (a hit = a data fault the converter must fix)"
                     }
                 ]
 }

@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50e",
-    "description":  "Test 50e: as 50d_nolook (outfit 14/14, rock vein, chart, TruRockVein 0.8, TruShadowPower 0.8 with [Look] Enabled=0, TruMenu 0.7) with doppelganger_casual from work/rebuild/dlc_test50e_vm: the heap crash of 50b / 50d / 50d_nolook / 50d_nojump (tru+0x1982b6 / +0x1982ef) was a value-stack underflow of the state-program VM (tru+0x32b20) - three code words of DTP 26870 and two of DTP 22309 were not byte-swapped by the converter (push / jz lost), the program wrote below its 0x200-byte stack into the heap boundary tag (tools/statevm_check.py); fixed to the Xbox words. Also the two event-list records of sub type 0x32 (player events 0x87 / 0x85 in DTP 20172) carry a u32 section id (26764 / 26765) instead of swapped u16 halves (tools/eventlist_idword_fix.py). CHECK: wall run, then death / reload - no crash. Arms / gloves NOT fixed yet (note what you see). Run WITH -Debugger.",
+    "name":  "regress_shadowlara_50d",
+    "description":  "Test 50d: as 50c, TruShadowPower 0.8 (work/asi/v08) - the shadow-power look translated from the title update: start fires the player events 0x89 / 0x32 / 0x81 / 0x87 or 0x88, stop 0x33 / 0x7e or 0x82 (TU 0x823d7d40 / 0x823d7fb8 -> 0x82418158 = PC tru+0x318780); the effects are the data of doppelganger_casual's event list. HOLD RB: blurry / bright picture as on the Xbox? Test 50c: as 50b plus the complete doppelganger outfit - all 14 title-update pixel shaders translated (50a: 10 by light transplant; 50c: face 2679, body skin 2682 / 2685, 2688 by PC per-light geometry + Xbox BRDF, own libs 2557 / 2573 / 2576 / 2577); 50b = 50a plus the 134 repaired condition records of the DLC 2 chart (dlc_test50b_chart = outfit file + tools/chart_condlist_fix.py), TruShadowPower 0.7 (condition 1055) and TruRockVein 0.8 (type-22 jump-off / fall geometry). HOLD RB at the wall, then jump off / let go. Run WITH -Debugger.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -24,13 +24,13 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test50e_vm/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test50c_chart/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "doppelganger_casual.drm":  "d873f49c1382b14f1025628172d379fc"
+                                  "doppelganger_casual.drm":  "8a3a5c2435a6fc9f3dabbc38b73cac99"
                               }
                   },
                   {
@@ -75,10 +75,7 @@
                      "ini":  {
                                  "ShadowPower":  {
                                                      "LogLevel":  "2"
-                                                 },
-                                 "Look":  {
-                                              "Enabled":  "0"
-                                          }
+                                                 }
                              }
                  },
                  {
@@ -94,7 +91,7 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
@@ -176,11 +173,6 @@
                   },
                   {
                       "kind":  "check",
-                      "id":  "arms-gloves",
-                      "text":  "Arms and gloves (still the 50c shaders 2573 / 2576 / 2577): bare arm skin pale with faint veins as on the Xbox (no hard black / white blotches)? Fingerless gloves black (not olive green)? Note what you see - not fixed in 50e"
-                  },
-                  {
-                      "kind":  "check",
                       "id":  "d3d-box",
                       "text":  "No D3D error box (D3DERR_INVALIDCALL 0x8876086C) after the load"
                   },
@@ -216,6 +208,11 @@
                       "kind":  "check",
                       "id":  "shadow-power",
                       "text":  "Shadow power: slow motion while RB is held, meter drains and refills"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "shadow-look",
+                      "text":  "Blur / bright look while RB is held (Xbox: picture soft and over-bright, cyan-white, glow at Lara's hands - references/DLC2/Xenia-TU_DLC2_24_Schattenkraft_Unschaerfe_hell_Anzeige_sinkt.png); gone again after release. Note what appears (nothing / hand glow only / whole picture)"
                   },
                   {
                       "kind":  "step",
@@ -254,23 +251,6 @@
                       "kind":  "step",
                       "n":  12,
                       "id":  "-",
-                      "text":  "Rock channel: wall run (RB + A), once jump up from the wall to the ledge above (X); then let Lara die (fall, or time.scale 0.5 + jump to death) and let the game reload. Repeat 3 times"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "death-no-crash",
-                      "text":  "Wall run, jump up, death and reload (3 times): no crash, no freeze (50b / 50d / 50d_nolook / 50d_nojump crashed here in the heap free tru+0x1982b6 / +0x1982ef)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  13,
-                      "id":  "-",
-                      "text":  "Play on for a few minutes after the last reload (walk, wall run, RB slow motion)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  14,
-                      "id":  "-",
                       "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
                   }
               ],
@@ -302,6 +282,59 @@
                         "mode":  "present",
                         "pattern":  "TruShadowPower 0\\.8 loaded \\(en",
                         "text":  "TruShadowPower 0.8 loaded and enabled"
+                    },
+                    {
+                        "id":  "sp-look-ok",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "pattern":  "shadow look: player event walker tru\\+0x318780 verified",
+                        "text":  "TruShadowPower 0.8 verified the PC player event walker (TU 0x82418158) - the look is translated"
+                    },
+                    {
+                        "id":  "sp-look-msg-ok",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "pattern":  "shadow look: instance list \\[0x00d98d54\\] / query \\+0x11c / wake tru\\+0x1b2de0 verified",
+                        "text":  "TruShadowPower 0.8 verified the instance list code - start / stop send messages 0x1f4 / 0x1f5 (TU 0x823d7f18 / 0x823d8080)"
+                    },
+                    {
+                        "id":  "sp-look-msg",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "min":  1,
+                        "optional":  true,
+                        "pattern":  "message 0x1f4 to [1-9]\\d* instances",
+                        "text":  "At least one instance answered query 0x172 and got message 0x1f4 (which ones react is data - informational)"
+                    },
+                    {
+                        "id":  "sp-look-msg-fault",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "absent",
+                        "pattern":  "message 0x1f[45] to the instances: access fault",
+                        "text":  "No access fault while sending 0x1f4 / 0x1f5"
+                    },
+                    {
+                        "id":  "sp-look-on",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "min":  1,
+                        "pattern":  "shadow look on: (first start, )?player events 0x89 0x32",
+                        "text":  "Shadow look on: start fired the TU player events 0x89 / 0x32 (RB held)"
+                    },
+                    {
+                        "id":  "sp-look-off",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "present",
+                        "min":  1,
+                        "pattern":  "shadow look off: player events 0x33",
+                        "text":  "Shadow look off: stop fired the TU player event 0x33 (needs LogLevel 2)"
+                    },
+                    {
+                        "id":  "sp-look-fault",
+                        "file":  "TruShadowPower.log",
+                        "mode":  "absent",
+                        "pattern":  "player event 0x[0-9a-f]{2} \\(tru\\+0x318780\\): access fault",
+                        "text":  "No access fault while firing a player event"
                     },
                     {
                         "id":  "sp-1055-added",

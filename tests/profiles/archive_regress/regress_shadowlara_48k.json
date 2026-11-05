@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50c_vein",
-    "description":  "Test 50b: as 50a (outfit) plus the 134 repaired condition records of the DLC 2 chart (dlc_test50b_chart = outfit file + tools/chart_condlist_fix.py), TruShadowPower 0.7 (condition 1055) and TruRockVein 0.8 (type-22 jump-off / fall geometry). HOLD RB at the wall, then jump off / let go. Run WITH -Debugger. Plus test 50c: dlc_test50c_vein (dlc_level2_start.drm: rock vein strip materials 24299 / 24690 on the translated TU shader 2392 = new ShaderLib 2675, waterfall libs of test 46 kept). At the first rock channel: is the vein strip bright stone blocks like on the Xbox?",
+    "name":  "regress_shadowlara_48k",
+    "description":  "As regress_shadowlara_48j with TruRockVein 0.5 (title-update case 608 of the markup action selector: PLAYER_AttachToJumpTarget, fills the attach box gameTracker+0xc94; NullBoxGuard also at tru+0x32ba40). Run WITH -Debugger.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -22,26 +22,6 @@
                       "md5":  {
                                   "dlc2_uo_machine_column.drm":  "f4ea1892e5bf0d0bcaa3a51771b492ce"
                               }
-                  },
-                  {
-                      "source":  "trudlcport/work/rebuild/dlc_test50b_chart/mods",
-                      "exclude":  [
-                                      "local",
-                                      "padshock"
-                                  ],
-                      "md5":  {
-                                  "doppelganger_casual.drm":  "bd1266d766e74de542b260ea575295a3"
-                              }
-                  },
-                  {
-                      "source":  "trudlcport/work/rebuild/dlc_test50c_vein/mods",
-                      "exclude":  [
-                                      "local",
-                                      "padshock"
-                                  ],
-                      "md5":  {
-                                  "dlc_level2_start.drm":  "9a386d2bedb5c5d43cf63d54382c7a98"
-                              }
                   }
               ],
     "files":  [
@@ -60,8 +40,8 @@
                  },
                  {
                      "name":  "TruRockVein",
-                     "sourceDir":  "trudlcport/work/asi_rv08",
-                     "sha256":  "66f80abb20e9ec6a74e2f3f6e933e8be2757ec70a870f03406197999cf55b29c",
+                     "sourceDir":  "trudlcport/work/asi_rv05",
+                     "sha256":  "8d5c97328621be81e1f4d500e1bd2c7781b3a203e914351295eaf57ba4abd4ec",
                      "ini":  {
                                  "RockVein":  {
                                                   "LogLevel":  "2"
@@ -70,8 +50,8 @@
                  },
                  {
                      "name":  "TruShadowPower",
-                     "sourceDir":  "trudlcport/work/asi/v07",
-                     "sha256":  "0a536f3c1f4835640e94259f653638e5983b531d634219240980d23ad3ec5394",
+                     "sourceDir":  "trudlcport/work/asi/v05",
+                     "sha256":  "004e190490b66872c6bc3780681ae45877d25501974a602b28c9d2a9acdedd2e",
                      "ini":  {
                                  "ShadowPower":  {
                                                      "LogLevel":  "2"
@@ -91,7 +71,7 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
@@ -188,11 +168,6 @@
                       "text":  "Rock channel without shadow power: normal wall behaviour (jump against / off), no fall through, no crash"
                   },
                   {
-                      "kind":  "check",
-                      "id":  "vein-look",
-                      "text":  "Rock vein strip at the first rock channel: bright, raised stone blocks with a dark centre joint (Xbox look), not a dark flat strip; no black / flickering patches on the wall"
-                  },
-                  {
                       "kind":  "step",
                       "n":  7,
                       "id":  "-",
@@ -224,17 +199,6 @@
                       "kind":  "step",
                       "n":  10,
                       "id":  "-",
-                      "text":  "Wall run again: once jump off the wall (A with a direction), once release RB, once run until she comes down near the floor"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "wall-exit",
-                      "text":  "Leaving the wall (jump off / RB released / near the floor): Lara lands or falls normally, no crash, no teleport"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  11,
-                      "id":  "-",
                       "text":  "Take a hit or fall from a small height: the health bar drops"
                   },
                   {
@@ -244,7 +208,7 @@
                   },
                   {
                       "kind":  "step",
-                      "n":  12,
+                      "n":  11,
                       "id":  "-",
                       "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
                   }
@@ -275,53 +239,8 @@
                         "id":  "sp-loaded",
                         "file":  "TruShadowPower.log",
                         "mode":  "present",
-                        "pattern":  "TruShadowPower 0\\.7 loaded \\(en",
-                        "text":  "TruShadowPower 0.7 loaded and enabled"
-                    },
-                    {
-                        "id":  "sp-1055-added",
-                        "file":  "TruShadowPower.log",
-                        "mode":  "present",
-                        "pattern":  "1055 \\(TU predicate 0x8246e450.*added to the link",
-                        "text":  "TruShadowPower 0.7 registered condition 1055 (TU predicate)"
-                    },
-                    {
-                        "id":  "sp-1055-run",
-                        "file":  "TruShadowPower.log",
-                        "mode":  "present",
-                        "optional":  true,
-                        "pattern":  "condition 1055 predicate \\(TU 0x8246e450\\) first call: doppelganger 1 -\u003e 0",
-                        "text":  "Condition 1055 asked in DLC 2 and answered 0 (no shadow strike look) - was TRUE before"
-                    },
-                    {
-                        "id":  "rv-loaded",
-                        "file":  "TruRockVein.log",
-                        "mode":  "present",
-                        "pattern":  "TruRockVein 0\\.8 loaded \\(enabled 1",
-                        "text":  "TruRockVein 0.8 loaded and enabled"
-                    },
-                    {
-                        "id":  "rv-jumpgeo",
-                        "file":  "TruRockVein.log",
-                        "mode":  "present",
-                        "pattern":  "jump geometry: 5 of 5 type-22 branches added",
-                        "text":  "TruRockVein 0.8 added all five type-22 jump-off / fall branches (byte checks passed)"
-                    },
-                    {
-                        "id":  "rv-no-mismatch",
-                        "file":  "TruRockVein.log",
-                        "mode":  "absent",
-                        "pattern":  "does not match",
-                        "text":  "TruRockVein found every code site it patches (no \u0027does not match\u0027)"
-                    },
-                    {
-                        "id":  "rv-geo-hit",
-                        "file":  "TruRockVein.log",
-                        "mode":  "present",
-                        "optional":  true,
-                        "min":  1,
-                        "pattern":  "\\(tru\\+0x(2fe040|307c60|311530|309500) .*type-22 box.*\\(\\d+ hits\\)",
-                        "text":  "At least one type-22 jump-off / fall branch was used at the wall (segment range / TNode / bone / corner)"
+                        "pattern":  "TruShadowPower 0\\.5(\\.\\d+)? loaded \\(enabled 1",
+                        "text":  "TruShadowPower 0.5.x loaded and enabled"
                     },
                     {
                         "id":  "sp-conditions",

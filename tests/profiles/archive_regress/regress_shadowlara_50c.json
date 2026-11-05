@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50b",
-    "description":  "Test 50b: as 50a (outfit) plus the 134 repaired condition records of the DLC 2 chart (dlc_test50b_chart = outfit file + tools/chart_condlist_fix.py), TruShadowPower 0.7 (condition 1055) and TruRockVein 0.8 (type-22 jump-off / fall geometry). HOLD RB at the wall, then jump off / let go. Run WITH -Debugger.",
+    "name":  "regress_shadowlara_50c",
+    "description":  "Test 50c: as 50b plus the complete doppelganger outfit - all 14 title-update pixel shaders translated (50a: 10 by light transplant; 50c: face 2679, body skin 2682 / 2685, 2688 by PC per-light geometry + Xbox BRDF, own libs 2557 / 2573 / 2576 / 2577); 50b = 50a plus the 134 repaired condition records of the DLC 2 chart (dlc_test50b_chart = outfit file + tools/chart_condlist_fix.py), TruShadowPower 0.7 (condition 1055) and TruRockVein 0.8 (type-22 jump-off / fall geometry). HOLD RB at the wall, then jump off / let go. Run WITH -Debugger.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -24,13 +24,23 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test50b_chart/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test50c_chart/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "doppelganger_casual.drm":  "bd1266d766e74de542b260ea575295a3"
+                                  "doppelganger_casual.drm":  "8a3a5c2435a6fc9f3dabbc38b73cac99"
+                              }
+                  },
+                  {
+                      "source":  "trudlcport/work/rebuild/dlc_test50c_vein/mods",
+                      "exclude":  [
+                                      "local",
+                                      "padshock"
+                                  ],
+                      "md5":  {
+                                  "dlc_level2_start.drm":  "9a386d2bedb5c5d43cf63d54382c7a98"
                               }
                   }
               ],
@@ -81,7 +91,7 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
@@ -159,7 +169,7 @@
                   {
                       "kind":  "check",
                       "id":  "doppel-look",
-                      "text":  "Lara looks like the doppelganger (doppelganger_casual, no grey / wrong textures)"
+                      "text":  "Doppelganger outfit as on the Xbox: dark red hair, black top / trousers / gloves, natural face and arm skin (no white, cyan, green or red / white parts)"
                   },
                   {
                       "kind":  "check",
@@ -176,6 +186,11 @@
                       "kind":  "check",
                       "id":  "wall-normal",
                       "text":  "Rock channel without shadow power: normal wall behaviour (jump against / off), no fall through, no crash"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "vein-look",
+                      "text":  "Rock vein strip at the first rock channel: bright, raised stone blocks with a dark centre joint (Xbox look), not a dark flat strip; no black / flickering patches on the wall"
                   },
                   {
                       "kind":  "step",

@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50h",
-    "description":  "Test 50h: 50g data + the arm / glove per-light libs rebuilt with the fixed tools/tu_perlight.py (hoist_select; 2582 / 2583 / 2584 for 26349 / 26350 / 26352) + TruMenu 0.7.1 (input freeze, B twice, room names in the log overlay, level.start).",
+    "name":  "regress_shadowlara_50c_vein",
+    "description":  "Test 50b: as 50a (outfit) plus the 134 repaired condition records of the DLC 2 chart (dlc_test50b_chart = outfit file + tools/chart_condlist_fix.py), TruShadowPower 0.7 (condition 1055) and TruRockVein 0.8 (type-22 jump-off / fall geometry). HOLD RB at the wall, then jump off / let go. Run WITH -Debugger. Plus test 50c: dlc_test50c_vein (dlc_level2_start.drm: rock vein strip materials 24299 / 24690 on the translated TU shader 2392 = new ShaderLib 2675, waterfall libs of test 46 kept). At the first rock channel: is the vein strip bright stone blocks like on the Xbox?",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -24,17 +24,13 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test50h_arms/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test50b_chart/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "doppelganger_casual.drm":  "e6079979051545a76752a6c77f348fe6",
-                                  "dlc_fx_goo_machine.drm":  "3379055e833fb4e4496020369ce2f4a0",
-                                  "dlc_fx_goo_machine_a_ist.drm":  "4524551c25cb100b84a83712841c3624",
-                                  "dlc_fx_goo_machine_b_ist.drm":  "a8842c74c4a2f41d070b7d4e8302ed89",
-                                  "dlc_fx_goo_machine_c_ist.drm":  "e54bebcd585725baf45166bb05208b1b"
+                                  "doppelganger_casual.drm":  "bd1266d766e74de542b260ea575295a3"
                               }
                   },
                   {
@@ -74,15 +70,12 @@
                  },
                  {
                      "name":  "TruShadowPower",
-                     "sourceDir":  "trudlcport/work/asi/v08",
-                     "sha256":  "8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5",
+                     "sourceDir":  "trudlcport/work/asi/v07",
+                     "sha256":  "0a536f3c1f4835640e94259f653638e5983b531d634219240980d23ad3ec5394",
                      "ini":  {
                                  "ShadowPower":  {
                                                      "LogLevel":  "2"
-                                                 },
-                                 "Look":  {
-                                              "Enabled":  "0"
-                                          }
+                                                 }
                              }
                  },
                  {
@@ -98,19 +91,16 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
-                     "sourceDir":  "trudlcport/work/asi/menu071",
-                     "sha256":  "055b1f1e17ca547a19cbdfd90ec374f67ecec3360c357a7109c52a805008baf4",
+                     "sourceDir":  "trudlcport/work/asi/menu06",
+                     "sha256":  "2febe208f812a29a6ad960fb175bfbae5397baaef7ff5e063d2a5e3d09848738",
                      "ini":  {
                                  "Cheat":  {
                                                "Experimental":  "1"
-                                           },
-                                 "Log":  {
-                                             "UnitChanges":  "1"
-                                         }
+                                           }
                              }
                  }
              ],
@@ -179,12 +169,7 @@
                   {
                       "kind":  "check",
                       "id":  "doppel-look",
-                      "text":  "Doppelganger outfit as on the Xbox: dark red hair, black top / trousers / gloves, natural face and arm skin (no white, cyan, green or red / white parts)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "arms-gloves",
-                      "text":  "arms: pale skin with faint veins, gloves black (Xbox reference _05)"
+                      "text":  "Lara looks like the doppelganger (doppelganger_casual, no grey / wrong textures)"
                   },
                   {
                       "kind":  "check",
@@ -261,72 +246,7 @@
                       "kind":  "step",
                       "n":  12,
                       "id":  "-",
-                      "text":  "Rock channel: wall run (RB + A), once jump up from the wall to the ledge above (X); then let Lara die (fall, or time.scale 0.5 + jump to death) and let the game reload. Repeat 3 times"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "death-no-crash",
-                      "text":  "Wall run, jump up, death and reload (3 times): no crash, no freeze (50b / 50d / 50d_nolook / 50d_nojump crashed here in the heap free tru+0x1982b6 / +0x1982ef)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  13,
-                      "id":  "-",
-                      "text":  "Play on for a few minutes after the last reload (walk, wall run, RB slow motion)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  14,
-                      "id":  "-",
-                      "text":  "After the rock channel: the wall-slide section - slide down the wall with LB held (shadow power) several times; play on to the goo machine if possible"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "wallslide-no-crash",
-                      "text":  "Wall slide with LB held: no crash (50e crashed there at tru+0x14df8f, effect node id 0x495f0000)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  15,
-                      "id":  "-",
-                      "text":  "Normal deaths: jump from the upper part of a wall down to the floor (fall death), also a fall death without the power and one after a long shimmy along the wall; let the game reload each time (3 times)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "fall-death-no-crash",
-                      "text":  "Normal death (fall) and reload: no crash (50f crashed at tru+0x14df84 after a fall death, chart parameter 1112 id 0x04900000)"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  16,
-                      "id":  "-",
                       "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
-                  },
-                  {
-                      "kind":  "step",
-                      "n":  90,
-                      "id":  "-",
-                      "text":  "Menu 0.7.1: open TruMenu in the level, type wasd into the command bar while Lara stands; hold w and open the menu"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-block-input",
-                      "text":  "Lara does not move while the menu is open (typing / held key)"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-esc",
-                      "text":  "Esc in the menu does not open the game pause menu"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-b-twice",
-                      "text":  "B with the on-screen keyboard open: first B closes the keyboard, second B the menu"
-                  },
-                  {
-                      "kind":  "check",
-                      "id":  "menu-unit-log",
-                      "text":  "log.overlay on: room names (unit: ... (was ...)) appear while walking through DLC 2"
                   }
               ],
     "expects":  [
@@ -355,8 +275,8 @@
                         "id":  "sp-loaded",
                         "file":  "TruShadowPower.log",
                         "mode":  "present",
-                        "pattern":  "TruShadowPower 0\\.8 loaded \\(en",
-                        "text":  "TruShadowPower 0.8 loaded and enabled"
+                        "pattern":  "TruShadowPower 0\\.7 loaded \\(en",
+                        "text":  "TruShadowPower 0.7 loaded and enabled"
                     },
                     {
                         "id":  "sp-1055-added",

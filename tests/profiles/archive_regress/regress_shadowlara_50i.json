@@ -1,6 +1,6 @@
 {
-    "name":  "regress_shadowlara_50h_arms",
-    "description":  "Test 50h (arms / gloves): as 50g plus the fixed per-light translations of the doppelganger arm skin / glove materials 26349 / 26350 / 26352 (TU 2682 / 2685 / 2688 -> new ShaderLibs 2582 / 2583 / 2584). Cause of the black / white blotches: light-free set-up instructions that stand after light chunk 1 in the Xbox code were moved before the light chain and overwrote the specular exponent the cloned Xbox BRDF reads (pow overflow -> inf / 0). Proven offline against an Xbox-lit reference (all 8 slots of the three libs 1.000, face unchanged). CHECK: arms / gloves look. Run WITH -Debugger.",
+    "name":  "regress_shadowlara_50i",
+    "description":  "Test 50i: as 50h (50g data + arm fix, TruMenu 0.7.1) plus the anim event list fix: 37 installed DLC files (viking / yeti thralls, pistons, energy pillars, bridges, goo fx, machine column ...) had record words converted against the rules proven on the base pair (tools/animlist_check.py: kind-0 payload word 0 must be u8u8u16, kind-1 word 0 u16, kind-2 word 3 raw ...). The 50h crash 3.7 s after entering dlc_yggdrasil_hall01 (tru+0x14df84, eax 0x00652000) was viking_thrall_dlc2_ DTP 24470: a kind-0 record whose payload byte 0 read 1 instead of 0, so tru+0x1b99c0 took the 7-word path on a 2-word record and passed the next record header as a section id. Tree work/rebuild/dlc_test50i_vm (42 files). CHECK: enter dlc_yggdrasil_hall01 and walk on; fight / watch the thralls. Run WITH -Debugger. TruMenu 0.7.2 (game.quit, level-start guard, outfit rule, overlay filter).",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -24,17 +24,54 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test50h_arms/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test50i_vm/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "doppelganger_casual.drm":  "e6079979051545a76752a6c77f348fe6",
+                                  "dlc_fx_cine_thrall_death.drm":  "3c867d0b2057d4db63e5f222e8d6408f",
+                                  "dlc_fx_goo_dun_float_ist.drm":  "c99bfae67f356fdbdd854c52060e2d34",
+                                  "dlc_fx_goo_dun_ist.drm":  "012213184d2a0aacaa2eb8d83cb1601b",
+                                  "dlc_fx_goo_dun_less_ist.drm":  "35f2ec538f7a7444266486d81d86b95e",
+                                  "dlc_fx_goo_dun_lrg_ist.drm":  "8ac28fbebe57510a918f3ff5b4e1a9e2",
                                   "dlc_fx_goo_machine.drm":  "3379055e833fb4e4496020369ce2f4a0",
                                   "dlc_fx_goo_machine_a_ist.drm":  "4524551c25cb100b84a83712841c3624",
                                   "dlc_fx_goo_machine_b_ist.drm":  "a8842c74c4a2f41d070b7d4e8302ed89",
-                                  "dlc_fx_goo_machine_c_ist.drm":  "e54bebcd585725baf45166bb05208b1b"
+                                  "dlc_fx_goo_machine_c_ist.drm":  "e54bebcd585725baf45166bb05208b1b",
+                                  "dlc_fx_goo_tres_ist.drm":  "0f41b6cd570a61209070781f27bf8401",
+                                  "dlc_fx_goo_tres_line_ist.drm":  "de70e942d64d0b3f81659de3c39bf4c7",
+                                  "dlc_fx_goo_upcolumn_pit.drm":  "59a520c0608ebb9f365444f64d8af40e",
+                                  "dlc2_goo_spout.drm":  "9e8bfa21d41c286e1ee63db928c891a2",
+                                  "dlc2_uo_capsuleadren_switch.drm":  "ee8c15e4eba2b45c3cfa020c0c563658",
+                                  "dlc2_uo_enemybreakwall.drm":  "9870b2cfd31f88cedc5eacea76b4d192",
+                                  "dlc2_uo_energy_pillar.drm":  "c2c1ec00ce59d190c2798b2243baeff9",
+                                  "dlc2_uo_energy_pillar_machine.drm":  "4e217c0fe7ed99664901c32db88ac083",
+                                  "dlc2_uo_extending_bridge.drm":  "88c958f8eb524a3d285bf702f2ddee28",
+                                  "dlc2_uo_extending_bridge_long.drm":  "271a54168a502fe8419ba7016e7f082d",
+                                  "dlc2_uo_extending_bridge_special.drm":  "64e0e4e2812ce5e511a337534f0c9066",
+                                  "dlc2_uo_falling_rune_block.drm":  "aac5123c20ee004de834dce207fe1e2e",
+                                  "dlc2_uo_goo_cannonball.drm":  "09e39a5c743e1515aed3732ae376e140",
+                                  "dlc2_uo_goo_upcolumn.drm":  "a3807563cfd58b9427c060867cf1ed81",
+                                  "dlc2_uo_gooconverter.drm":  "4f56c5890325393fa9547c3ab2642e47",
+                                  "dlc2_uo_machine_column.drm":  "0fa662a6543c179c798651d0db9856ca",
+                                  "dlc2_uo_machine_debris.drm":  "3cf9342146b5ba7c527f20a88961f3b3",
+                                  "dlc2_uo_natlapod.drm":  "cc948e28ba082af49deaa735f2936053",
+                                  "dlc2_uo_pipes_o_goo_left.drm":  "46f3fbad6b1047db023c9f674475379b",
+                                  "dlc2_uo_pipes_o_goo_right.drm":  "d49f387facbacd4c473af4d79efe2c4a",
+                                  "dlc2_uo_piston_a.drm":  "4eab0f7a672da9a912753314dc70fce1",
+                                  "dlc2_uo_piston_b.drm":  "ab0e2c451b42c722ba9d946466038e28",
+                                  "dlc2_uo_piston_c.drm":  "e44937153e4505cfc3ef8b68a8d94fed",
+                                  "dlc2_uo_piston_square.drm":  "bb3b2e28f8c8e6eef57f473ef103db03",
+                                  "dlc2_uo_trap_pacman_blades.drm":  "8c51f73bcc9959d626bdcde7d613224b",
+                                  "dlc2_uo_treadmill_block_spawned.drm":  "ab381275d58e741b4d0b15c85bc1a259",
+                                  "doppelganger_casual.drm":  "e6079979051545a76752a6c77f348fe6",
+                                  "fx_waterwheel_fsfx.drm":  "d5ae44171bff1a464ee8b983ed3daea3",
+                                  "viking_thrall_dlc2_.drm":  "c3584b96696bc5baf8f8fa3ef50e1ab8",
+                                  "viking_thrall_tutorial_dlc2_.drm":  "2242a95f39aa814758901bfae8744020",
+                                  "wp_dlc_handgun.drm":  "21a09c29cb46222ee6b9fcc1902189ab",
+                                  "yeti_thrall_armored_dlc2_.drm":  "6d1533d2733bf67af65370e5b8be978d",
+                                  "yeti_thrall_dlc2_.drm":  "749c6c3b6e9e5e732dd8b54729d7c515"
                               }
                   },
                   {
@@ -98,16 +135,19 @@
                  {
                      "name":  "TruGuard",
                      "sourceDir":  "trudlcport/work/asi",
-                     "sha256":  "acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d"
+                     "sha256":  "39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319"
                  },
                  {
                      "name":  "TruMenu",
-                     "sourceDir":  "trudlcport/work/asi/menu07",
-                     "sha256":  "6f5499cd969e94877fe7ca3b9c74ca488e458b93c95895fdacda9a3acae5c66b",
+                     "sourceDir":  "trudlcport/work/asi/menu072",
+                     "sha256":  "71c280778bdd1fd5e61e45741af39124c55fb796b83259847c966fd809f9c006",
                      "ini":  {
                                  "Cheat":  {
                                                "Experimental":  "1"
-                                           }
+                                           },
+                                 "Log":  {
+                                             "UnitChanges":  "1"
+                                         }
                              }
                  }
              ],
@@ -297,7 +337,55 @@
                       "kind":  "step",
                       "n":  16,
                       "id":  "-",
+                      "text":  "Go on from dlc_level2_start into dlc_yggdrasil_hall01 (dark corridor with red glowing runes) and walk on for a few minutes; let thralls appear / fight them if they do"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "yggdrasil-hall01-no-crash",
+                      "text":  "Enter dlc_yggdrasil_hall01 and walk on: no crash (50h crashed 3.7 s after entering, tru+0x14df84 eax 0x00652000, viking thrall anim event)"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  17,
+                      "id":  "-",
                       "text":  "Mark the checks (A ok, X fail, Y skip), then end the game normally"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  90,
+                      "id":  "-",
+                      "text":  "Menu 0.7.1: open TruMenu in the level, type wasd into the command bar while Lara stands; hold w and open the menu"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-block-input",
+                      "text":  "Lara does not move while the menu is open (typing / held key)"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-esc",
+                      "text":  "Esc in the menu does not open the game pause menu"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-b-twice",
+                      "text":  "B with the on-screen keyboard open: first B closes the keyboard, second B the menu"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-unit-log",
+                      "text":  "log.overlay on: room names (unit: ... (was ...)) appear while walking through DLC 2"
+                  },
+                  {
+                      "kind":  "step",
+                      "n":  95,
+                      "id":  "-",
+                      "text":  "Shortcut to the crash spot of 50h: TruMenu level page DLC 2 -\u003e dlc_yggdrasil_hall01 (or level.load dlc_yggdrasil_hall01); walk through the red-rune corridor and on"
+                  },
+                  {
+                      "kind":  "check",
+                      "id":  "menu-quit",
+                      "text":  "TruMenu game.quit (Status page, press twice) ends the game; the summary says ended via TruMenu game.quit, not a crash"
                   }
               ],
     "expects":  [
