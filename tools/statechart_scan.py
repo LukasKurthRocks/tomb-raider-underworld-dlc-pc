@@ -26,6 +26,8 @@ def main(argv):
     A = Archive(path, e)
     mods = argv[2]
     names = argv[3:] or sorted(n for n in os.listdir(mods) if n.endswith('.drm'))
+    if not argv[3:] and os.path.isdir(os.path.join(mods, 'streamgroups')):     # 05.11.: area DRMs too (Xbox name streamgroups\x.drm)
+        names += sorted('streamgroups\\' + n for n in os.listdir(os.path.join(mods, 'streamgroups')) if n.endswith('.drm'))
     for name in names:
         recs = A.find(crc(pre + '\\' + name))
         if not recs: continue

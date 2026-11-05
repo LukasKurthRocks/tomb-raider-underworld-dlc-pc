@@ -70,24 +70,49 @@ def lit_lib(xid):
 
 
 # ---------------------------------------------------------------------------------------------------- xdump
+def xbox_names():
+    """{(pack, hash): basename} from work/generic/dlc_names.txt - the cache keys the streamgroup DRMs (and other records
+    without a filelist name) only by their hash; the PC files carry the resolved name (05.11.: streamgroups were missed)"""
+    out = {}
+    p = os.path.join(ROOT, 'work', 'generic', 'dlc_names.txt')
+    if not os.path.exists(p): return out
+    for l in open(p, encoding='utf8', errors='ignore'):
+        t = l.split()
+        if len(t) >= 3 and t[1] in ('pack10', 'pack11') and t[-1] != '?' and t[-1].lower().endswith('.drm'):
+            out[('ack' + t[1][4:] + '.000', int(t[0], 16))] = t[-1].replace('\\', '/').split('/')[-1][:-4].lower()
+    return out
+
+
 def cmd_xdump(outd):
     C = pickle.load(open(os.path.join(ROOT, 'work', 'generic', 'dlc_drms.pkl'), 'rb'))
-    n = 0
+    XN = xbox_names()
+    n = nh = 0; seen = set()
     for key, (h, secs) in C.items():
         pack, path = key[0], key[1]
-        if pack not in ('ack10.000', 'ack11.000') or not path.lower().endswith('.drm'): continue
+        if pack not in ('ack10.000', 'ack11.000'): continue
+        # hash-only keys ('0x17fc0130', no extension): the streamgroup DRMs - named via dlc_names.txt below
+        hv = None
+        if path.lower().startswith('0x') and '\\' not in path and '/' not in path:
+            try: hv = int(path, 16)
+            except ValueError: hv = None
+        if hv is None and not path.lower().endswith('.drm'): continue
+        if hv is not None and (pack, hv) not in XN: continue      # an unnamed hash record is not a known DRM
         bad = False
         for s in secs:
             if s['type'] != 10 or len(s['data']) < 0x38: continue
             p2 = struct.unpack_from('>I', s['data'], 0x30)[0]
             if SMAP.get(p2, {}).get('cls') in UNTR: bad = True; break
         if not bad: continue
-        name = os.path.splitext(path.replace('\\', '/').split('/')[-1])[0].lower()
+        if hv is not None:
+            name = XN[(pack, hv)]; nh += 1; print('  %s %s = %s' % (pack, path, name))
+        else: name = os.path.splitext(path.replace('\\', '/').split('/')[-1])[0].lower()
         od = os.path.join(outd, pack.split('.')[0]); os.makedirs(od, exist_ok=True)
+        if (pack, name) in seen: print('  %s: %s.drm written twice - last one kept' % (pack, name))
+        seen.add((pack, name))
         S = [DW.Section(s['type'], s['id'], s['data'], s['reloc'], s['flags'], s['ver'], s['spec']) for s in secs]
         D = DW.Drm(S, b'\0' * h['namesz'], b'\0' * h['padsz'], h['ver'], h['u0'], h['u1'])
         open(os.path.join(od, name + '.drm'), 'wb').write(D.write('be')); n += 1
-    print('wrote %d Xbox DRMs with untranslated pass-2 materials to %s' % (n, outd))
+    print('wrote %d Xbox DRMs with untranslated pass-2 materials to %s (%d named via dlc_names.txt)' % (n, outd, nh))
 
 
 # ---------------------------------------------------------------------------------------------------- inventory
@@ -152,7 +177,10 @@ def cmd_inv(xdir, outp, trees):
         except Exception as e:
             print('%s: not readable %s' % (name, e)); continue
         base = name[:-4]
+        sg = os.path.basename(os.path.dirname(eff[name])).lower() == 'streamgroups'
         us = set(ubo.get(base, set())) | ({base} if base in units else set())
+        if sg:      # streamgroup '<unit>_<group>': level geometry of that unit
+            us |= {u for u in [max((u for u in units if base.startswith(u + '_')), key=len, default=None)] if u}
         for pm, xm, mesh in TN.mats_of(P, X):
             if (10, pm) not in P or (10, xm) not in X: continue
             xt = struct.unpack_from('>4I', X[(10, xm)].data, 0x28); pt = struct.unpack_from('<4I', P[(10, pm)].data, 0x28)
@@ -161,11 +189,12 @@ def cmd_inv(xdir, outp, trees):
             r = rows.setdefault(pm, dict(mat=pm, xmat=xm, xlib=xt[2], cls=c, lit=lit_lib(xt[2]), surrogate=SMAP[xt[2]].get('pc'),
                                          vs=(xt[3], pt[3]), vscls=SMAP.get(xt[3], {}).get('cls', 'base'), files=[], units=set(), groups=set()))
             if r['xlib'] != xt[2]: r.setdefault('conflict', []).append(name); continue
-            r['files'].append(dict(name=name, pc=eff[name], xbox=xf, pcl=pt[2], xmat=xm))
-            r['units'] |= us; r['groups'].add(group(base, base in units))
+            r['files'].append(dict(name=name, pc=eff[name], xbox=xf, pcl=pt[2], xmat=xm, sg=sg))
+            r['units'] |= us; r['groups'].add(group(base, base in units or sg))
     out = []
     for r in rows.values():
         g = max(r['groups'], key=lambda x: GROUP_W[x]); r['group'] = g
+        r['sgonly'] = all(f['sg'] for f in r['files'])
         r['score'] = round(GROUP_W[g] * (1 + math.log(1 + len(r['units']))), 3)
         r['units'] = sorted(r['units']); r['groups'] = sorted(r['groups'])
         out.append(r)
@@ -177,9 +206,11 @@ def cmd_inv(xdir, outp, trees):
             len(out), len(bylib), sum(1 for r in out if r['lit']), sum(1 for r in out if not r['lit'])))
         for g in GROUP_W: t.write('  %-16s %d materials\n' % (g, sum(1 for r in out if r['group'] == g)))
         for r in out:
-            t.write('%6.2f %-8s mat %5d xlib %4d %-2s %s VS %s(%s) units %2d files %s\n' % (
+            t.write('%6.2f %-8s mat %5d xlib %4d %-2s %s VS %s(%s) units %2d files %s%s\n' % (
                 r['score'], r['group'], r['mat'], r['xlib'], r['cls'], 'lit  ' if r['lit'] else 'unlit', r['vs'], r['vscls'],
-                len(r['units']), ' '.join(f['name'] for f in r['files'])))
+                len(r['units']), ' '.join(('streamgroups/' if f['sg'] else '') + f['name'] for f in r['files']),
+                ' [streamgroup-only]' if r['sgonly'] else ''))
+        t.write('streamgroup-only materials: %d\n' % sum(1 for r in out if r['sgonly']))
     print(open(os.path.splitext(outp)[0] + '.txt').read()[:3000])
 
 
@@ -303,8 +334,9 @@ def pack_lib(res, nid, taken, nslots):
 
 def progress(tree, state):
     p = os.path.join(tree, 'PROGRESS.md')
-    lines = ['# PROGRESS test 50m shaders (updated %s)' % time.strftime('%Y-%m-%d %H:%M:%S'), '',
-             'Tree = copy of dlc_test50l_shaders + the groups below. Tool: tools/tu_batch.py run; log %s.' % state['log'], '',
+    lines = ['# PROGRESS %s (updated %s)' % (os.path.basename(os.path.normpath(tree)), time.strftime('%Y-%m-%d %H:%M:%S')), '',
+             'Tree = the groups below, each changed file copied from its effective source of the inventory %s first '
+             '(stack it after the trees of that inventory). Tool: tools/tu_batch.py run; log %s.' % (state['inv'], state['log']), '',
              '| status | Xbox lib | lit | new lib | materials | files | note |', '|---|---|---|---|---|---|---|']
     for g in state['groups']:
         lines.append('| %s | %s | %s | %s | %s | %s | %s |' % (g['status'], g['xlib'], 'lit' if g['lit'] else 'unlit', g.get('new', '-'),

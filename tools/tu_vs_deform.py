@@ -604,7 +604,10 @@ def cmd_treecheck(tree, specs):
     for sp in specs:
         vid, libf, mats = sp.split(':'); vid = int(vid); mats = {int(m) for m in mats.split('+')}
         data = open(libf, 'rb').read()
-        for f in sorted(os.listdir(os.path.join(tree, 'mods'))):
+        md = os.path.join(tree, 'mods')       # 05.11.: mods\streamgroups\ too (area DRMs carry material copies)
+        fl = sorted(os.listdir(md)) + (['streamgroups/' + x for x in sorted(os.listdir(os.path.join(md, 'streamgroups')))]
+                                       if os.path.isdir(os.path.join(md, 'streamgroups')) else [])
+        for f in fl:
             if not f.lower().endswith('.drm'): continue
             D = DW.read(open(os.path.join(tree, 'mods', f), 'rb').read(), 'le')
             sec = {(s.type, s.id): s for s in D.sections}

@@ -48,8 +48,11 @@ def main(argv):
     print('DLC Xbox materials: %d, with at least one untranslated library: %d' % (len(mat_libs), nbad))
     where = collections.defaultdict(list)          # material id -> [drm]
     mods = argv[0]
-    for f in sorted(os.listdir(mods)):
-        if not f.endswith('.drm'): continue
+    # mods\ and mods\streamgroups\ (the area DRMs; 05.11.: the streamgroup-only materials were missed)
+    names = [f for f in sorted(os.listdir(mods)) if f.endswith('.drm')]
+    if os.path.isdir(os.path.join(mods, 'streamgroups')):
+        names += ['streamgroups/' + f for f in sorted(os.listdir(os.path.join(mods, 'streamgroups'))) if f.endswith('.drm')]
+    for f in names:
         try:
             D = DW.read(open(os.path.join(mods, f), 'rb').read(), 'le')
         except Exception as ex:
