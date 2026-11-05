@@ -1,20 +1,20 @@
 # TruMenu regression list DLC 1 (Beneath the Ashes) - from docs/Regression-DLC1.md; Set-TruMenu.ps1 copies it next to the ASI as TruMenu.regress_dlc1.txt
-# format as TruMenu.tests.txt: id<TAB>state<TAB>hint<TAB>note<TAB>time<TAB>kind<TAB>target<TAB>number (steps: id step<n>, target = item id or id:arg)
+# format as TruMenu.tests.txt: id<TAB>state<TAB>hint<TAB>note<TAB>time<TAB>kind<TAB>target<TAB>number (steps: id step<n>, target = item id or id:arg); optional 9th column shortcut = #title;cmd;cmd (TruMenu 0.8.1 Prepare button / regress.prepare)
 step1	open	Main menu: open the DLC mission menu at once (before the attract timer of test 41e starts DLC 2)			step		1
 dlc1-menu	open	Mission menu shows Unter der Asche / Beneath the Ashes, title and text in the game language			check		0
 step2	open	Start DLC 1 from the mission menu (not level.load - it skips the intro)			step		2
 dlc1-load-title	open	Loading screen: title UNTER DER ASCHE / BENEATH THE ASHES above the line, description directly below the line (not on it)			check		0
 dlc1-cutscene	open	Intro plays to its end in the game language (voice / subtitles); skip-cinematic bar as on the Xbox			check		0
-step3	open	Move Lara; walk to the first health-pack hint and the grapple points			step		3
+step3	open	Move Lara; walk to the first health-pack hint and the grapple points			step		3	#DLC 1 start unit (no intro);level.load dlc_level1_start
 dlc1-lara	open	Lara in her normal DLC 1 outfit (no doppelganger, no DLC 2 costume swap)			check		0
 dlc1-hint	open	Health-pack hint top right in a faint dark box, no Press A line, no pause			check		0
 dlc1-grapple	open	Grapple ring rusty copper with highlights, holder without yellow / olive highlight; shiny copper in the camera zoom			check		0
 dlc1-bridge	open	Adrenaline bridge (padshock dlc1_adren_bridge): crossing it does not crash			check		0
 step4	open	Hold RB and LB a few seconds each			step		4
 dlc1-no-shadow	open	RB / LB: normal DLC 1 behaviour - no slow motion, no shadow meter in the HUD (DLC 2 plugins inactive)			check		0
-step5	open	Take a hit / fall, then jump to death			step		5
+step5	open	Take a hit / fall, then jump to death			step		5	#Death test: god mode off;cheat.god 0
 dlc1-death	open	Health drops; after the death Lara reappears at the checkpoint, no crash			check		0
-dlc1-treasure	open	Treasure room (dlc_treasureroom, achievement fix): entering it and its trigger do not crash (level.load dlc_treasureroom allowed)			check		0
+dlc1-treasure	open	Treasure room (dlc_treasureroom, achievement fix): entering it and its trigger do not crash (level.load dlc_treasureroom allowed)			check		0	#Treasure room;level.load dlc_treasureroom
 dlc1-outfits	open	Outfit list: English / German descriptions as on the Xbox, four lines; fewer entries = known gap (costume packs)			check		0
 step6	open	Mark the checks (A ok, X fail, Y skip), then end the game normally			step		6
 no-crash	open	No crash, freeze or box during the whole run			check		0

@@ -106,6 +106,12 @@ try {
 
     $ini = Join-Path $srcDir "$Name.ini"
     if (Test-Path -LiteralPath $ini) { Copy-Item -LiteralPath $ini -Destination (Join-Path $outDir "$Name.ini") -Force }
+    # TruMenu 0.10: the default radial menu file goes into the build folder as well (Set-TruMenu.ps1 installs it);
+    # 0.10.1: the tour file (radial level Tests / Rundgang) too
+    foreach ($suffix in 'radial.txt', 'tour.txt') {
+        $radial = Join-Path $srcDir "$Name.$suffix"
+        if (Test-Path -LiteralPath $radial) { Copy-Item -LiteralPath $radial -Destination (Join-Path $outDir "$Name.$suffix") -Force }
+    }
 
     # check: 32-bit DLL, exports, imports (dumpbin from the same toolchain)
     $dumpCmd = 'call "{0}" amd64_x86 >nul && dumpbin /nologo /headers /exports /imports "{1}"' -f $vcvars, $asi

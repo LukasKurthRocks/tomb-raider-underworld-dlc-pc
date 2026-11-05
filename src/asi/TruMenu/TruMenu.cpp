@@ -17,6 +17,8 @@
 //          parameter of the CreateDevice call tru+0x122736; +0x208 are the present parameters). A worker thread waits for that device and patches the
 //          device's own vtable entries Reset (16) and Present (17). This works with or without a d3d9.dll proxy
 //          (TRAWindowed): the vtable patched is the one of the object the game calls.
+//   shots  0.10.5: no hook of its own - the Present hooks above copy the back buffer (GetRenderTargetData into a
+//          system-memory surface) before or after TruMenu draws; PNG encoding and the file write on a worker thread.
 //   game   Every menu entry is an item with a stable id (kItems); items that touch the game (cheat, camera, level
 //          change, debug flag) are queued and run on the game thread inside PadHook - or inside the Present hook
 //          while the game does not poll the pad. Exports TruMenuList / TruMenuInvoke make them callable without the
@@ -34,17 +36,65 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <shlobj.h>                         // 0.9: SHGetFolderPathW (the save folder as tru.exe 0x78b550)
+#pragma comment(lib, "shell32.lib")
 
 #include "imgui.h"
 #include "imgui_internal.h"                 // 0.6: ClearActiveID (command bar -> pad picker)
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
+#include "TruShotPng.h"                     // 0.10.5: PNG writer of the shot worker (own code)
+#include "TruFlowCore.h"                    // 0.11: flow file parser + pattern matcher (own code, no game access)
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.8.0 (Regression page: lists TruMenu.regress_dlc1 / _dlc2.txt, A ok / X fail / "
+const char *const kVersion = "TruMenu 0.11 (Ablauf: guided test runs from TruMenu.flow.txt ([Flow] Enabled, 0 by default) "
+                             "- action / observe / mark steps, counters (TruTrace unit / level loads and restores, plugin "
+                             "log patterns, player deaths, switch flips, item runs, marks), conditions after= / check= / "
+                             "fail=, ring level Claude: Weiter / Ueberspringen / Zurueck + Gut / Fehler = the step result, "
+                             "a status line in coral ([Flow] Overlay / Position / Size / Lines), flow.say toast, "
+                             "flow.goto / skip / add / status over TruLink, 'flow: ...' lines in TruMenu.log; "
+                             "0.10.5: screenshots: shot.save [ui|clean] [name] -> [Shot] Folder (TruShots next "
+                             "to tru.exe) as shot_<HHMMSS>_<TO TEST step>_<name>.png, taken in the game's Present "
+                             "before TruMenu draws ([Shot] Clean=1) or after it, PNG encoded and written on a worker "
+                             "thread, [Shot] Hotkey / MaxPerMinute, export TruMenuShot; Claude marks: ring level "
+                             "Claude (coral), claude.mark <kind> = a TruMenu.log line 'claude.mark <kind>: ...' + a "
+                             "clean shot, export TruMenuMark; ring level Objekte moved to Spieler/Objekte; "
+                             "0.10.4: F7 light shaft: [Radial] FreezeShaderClock, 0 by default - the world "
+                             "freeze also holds the shader clock TimeVector the pause menu's way (0x5bfdf0), ring item "
+                             "time.freezeclock / state time.clock; the costume check accepts TruDlc2Player 0.5's "
+                             "detour at the state save; "
+                             "0.10.3: F7: [Radial] FreezeSound / [Menu] PauseSound, both 0 by default - "
+                             "the world freeze also pauses the sound with the pause menu's own pair 0x5874b0 / "
+                             "0x5874d0, never while the pause menu is open; ring items time.freezesound / "
+                             "time.pausesound / time.sound; "
+                             "0.10.2: fixes from the 03.11. ring tests: cheat.godfull without flight - the "
+                             "player's no-damage bit 0xfada74 & 0x20000 per frame instead of cheatMode bit 0, the off "
+                             "also ends a left-over flight; player.unstuck samples no safe ground while the menu / ring "
+                             "is open, the world is paused, in a cinematic or with control off, and takes a spot by a "
+                             "chord / slope test over ~1 s instead of 'height still'; marks and safe spots keep the "
+                             "yaw; level.start greyed in the ring outside the main menu; "
+                             "0.10.1: radial menu as a menu: [Radial] Mode=menu (default) - L3 + R3 held / "
+                             "F9 tapped opens the ring and it stays open, left stick / right stick / D-pad / mouse "
+                             "picks, only A / Enter / click runs, B back, L3 + R3 / F9 again closes; [Radial] Freeze "
+                             "world / player / 0 while it is open; built-in top sector 'Spiel beenden' (game.quit, A "
+                             "twice or hold 1 s, [Radial] QuitSector); Mode=wheel = the 0.10 hold-and-release ring; "
+                             "0.10: radial menu: L3 + R3 held = a ring of up to 8 entries from "
+                             "TruMenu.radial.txt, right stick / mouse picks, release runs, A runs and stays, B back, LB / "
+                             "RB pages; F9 / mouse button hold; [Radial] keys; stage R2 instance.spawn <object> at Lara "
+                             "behind [Radial] Spawn=1; "
+                             "0.9: Saves page: the game's save folder (CSIDL_PERSONAL\\Eidos\\Tomb Raider - "
+                             "Underworld, *.TRUSave), list with CRC check / unit / checkpoint, backup, restore, delete "
+                             "and import with a backup first and a safety step, export; Media: srmusic tracks from "
+                             "TruMenu.media.txt, media.music.play / stop through SRMUSIC_LoadMusic 0x594320, "
+                             "media.music.now (8 slots), dev.musicvars / dev.monstermusicvars; "
+                             "0.8.1: fixes from the 0.8.0 live test: game.quit 'Quit now' button with a "
+                             "stable id while armed (10 s, hold A 1 s), [Log] InputTrace, menu keys released at open / "
+                             "close (stuck Enter), a queued item runs once (cheat.flight ran twice), cheat.ammo reasons "
+                             "per weapon, player.unstuck (mark / safe-ground ring), regression shortcuts (prepare); "
+                             "0.8: Regression page: lists TruMenu.regress_dlc1 / _dlc2.txt, A ok / X fail / "
                              "Y skip, notes, TruMenu.regress_results.txt with plugin versions + sha256; Cheats page "
                              "from the 2007 prototype evaluation: god mode, one-hit kill, enemy health, infinite ammo, "
                              "fill 'er up, cheat codes, each with its category and a byte pre-check; camera log "
@@ -186,6 +236,10 @@ const OptDef kOpts[] = {
                                     "as 0.7 (pad: [Pad] BlockInput, mouse: FreeMouse)"},
     {"Menu", "PauseGame", "0", "1 = also pause the game time while the menu is open (time.pause: streamFlags bit 0x1000); "
                                "on close the state\nfrom before the menu comes back (unless time.pause was used meanwhile)"},
+    {"Menu", "PauseSound", "0", "0.10.3: 1 = while the world pause bit is on in a level and the ring did not set it "
+                                "(time.pause, PauseGame), the sound\npauses too - the pause menu's own functions "
+                                "(0x5874b0 / 0x5874d0), not while the pause menu is open; item time.pausesound\n"
+                                "switches it until the next start, a changed value here is taken over within a second"},
     {"Pad", "BlockInput", "1", "1 = the game gets a neutral pad while the menu is open; 0 = the game sees the pad as well"},
     {"Cheat", "Experimental", "1", "1 = show the experimental actions (cheat / flight, camera mode, level load, costumes, "
                                    "developer menu rows, time /\nplayer / instance / video items); 0 = read-only"},
@@ -222,6 +276,10 @@ const OptDef kOpts[] = {
     {"Log", "CameraChanges", "1", "0.8: 1 = a line \"camera: mode A -> B\" / \"camera: object ...\" when the camera "
                                   "manager's mode or current camera\nchanges (polled a few times per second, read-only; "
                                   "TruMenu.log, log page and overlay)"},
+    {"Log", "InputTrace", "1", "0.8.1: 1 = with LogLevel 2 one line per pad button edge, mouse click and key while the "
+                               "menu is open, with the source\n(XInput hook / Present fallback / window message) and what "
+                               "the menu did (focused widget, activated or why not);\n0 = only the summary line at each "
+                               "menu close"},
     {"Favorites", "Ids", "", "item ids on the \"Quick access / Favourites\" page (comma list); empty = default list. Y on an "
                              "item in the menu\npins / unpins it and rewrites this line (TruLink: menu fav.add <id> / "
                              "fav.del <id> / fav.list)"},
@@ -243,6 +301,93 @@ const OptDef kOpts[] = {
     {"Test", "AutoStartDelay", "3", "seconds the main menu must be up before AutoStart starts the level, 1 .. 60"},
     {"Regress", "List", "all", "0.8: list shown on the Regression page at start: dlc1, dlc2 or all (TruMenu.regress_dlc1.txt "
                                "/ _dlc2.txt next to\nthe .asi; results go to TruMenu.regress_results.txt)"},
+    {"Media", "MusicInLevels", "0", "0.9: 1 = media.music.play / stop also in a level; 0 = main menu only (until a live "
+                                    "test proves play in a level safe)"},
+    {"Media", "MusicFade", "60", "0.9: fade in / out of media.music.play / stop in frames (30 per second; the game's unit "
+                                 "start uses 60), 0 .. 300"},
+    {"Saves", "Folder", "", "0.9: save folder for the Saves page; empty = the game's own (Documents\\Eidos\\Tomb Raider - "
+                            "Underworld, as tru.exe\n0x78b550). Backups, export and import live in TruMenu.saves next "
+                            "to tru.exe"},
+    {"Radial", "Enabled", "1", "0.10: 1 = radial menu: hold HoldButtons for HoldMs - a ring of up to 8 entries from "
+                               "TruMenu.radial.txt next to tru.exe,\nhow it is used says Mode; a short press opens TruMenu as "
+                               "before (at the release when\nHoldButtons = [Menu] ToggleButtons); 0 = TruMenu exactly as 0.9"},
+    {"Radial", "Mode", "menu", "0.10.1: menu = the ring stays open after the open (L3 + R3 held / Key or MouseButton "
+                               "tapped), left stick / right stick /\nD-pad / mouse pick, only A / Enter / left click runs or "
+                               "opens a level, B / Backspace / right click = back, L3 + R3 / Key again\ncloses, the game gets "
+                               "a neutral pad and no keys; wheel = the 0.10 ring (right stick picks, releasing the hold "
+                               "runs)"},
+    {"Radial", "Freeze", "world", "0.10.1, Mode=menu: while the ring is open in a level: world (or 1) = time.pause (the "
+                                  "whole world incl. enemies stops; the\nstate from before comes back at the close unless "
+                                  "time.pause was run meanwhile), player (or 2) = player.control 0 (restored at\nthe close), "
+                                  "0 = nothing. Read again at every open (a TO TEST switch works at once)"},
+    {"Radial", "FreezeSound", "0", "0.10.3: 1 = while Freeze=world holds the world (the ring set the pause bit), the "
+                                   "sound pauses too ([Menu] PauseSound\nfor every other pause); item time.freezesound "
+                                   "switches it until the next start, a changed value here is taken over\nwithin a "
+                                   "second"},
+    {"Radial", "FreezeShaderClock", "0", "0.10.4: 1 = while the world is frozen in a level (the ring's Freeze=world or "
+                                         "time.pause / [Menu] PauseGame), the shader\nclock TimeVector holds too, the "
+                                         "pause menu's own way (0x5bfdf0: dt 0, the accumulator RenderDevice +0xfa4c "
+                                         "stays,\nso it goes on without a jump); item time.freezeclock switches it "
+                                         "until the next start, a changed value here is\ntaken over within a second"},
+    {"Radial", "QuitSector", "1", "0.10.1, Mode=menu: 1 = built-in last sector \"Spiel beenden\" on the top level (not "
+                                  "from TruMenu.radial.txt): A arms it\n(red, 10 s), A again or A held 1 s = game.quit; "
+                                  "pointing away / B / closing disarms; 0 = hidden"},
+    {"Radial", "TestsLevel", "1", "0.10.1, Mode=menu: 1 = built-in top level \"Tests\": TO TEST rows, Regression lists, "
+                                  "Prepare shortcuts, Schalter (TO TEST\ntoggles) - the page functions - and Rundgang "
+                                  "(TruMenu.tour.txt next to tru.exe); 0 = hidden"},
+    {"Radial", "HoldButtons", "0x00C0", "0.10: XInput buttons held together for the radial menu (hex or decimal): 0x00C0 = "
+                                        "L3 + R3; 0 = no pad hold (key / mouse only)"},
+    {"Radial", "HoldMs", "500", "0.10: milliseconds the buttons must be held (shorter = TruMenu), 100 .. 3000"},
+    {"Radial", "Key", "0x78", "0.10: keyboard key for the radial menu (virtual key code, hex or decimal; 0x78 = F9 - for "
+                              "a Steam Controller back\nbutton map it to that key in Steam Input; Mode=menu: a tap opens / "
+                              "closes, Mode=wheel: held); the game does not get\nthis key while it is set; 0 = off"},
+    {"Radial", "MouseButton", "0", "0.10: mouse button for the radial menu (3 = middle, 4 / 5 = side buttons; as Key); the "
+                                   "mouse direction picks the entry;\n0 = off"},
+    {"Radial", "RememberPosition", "1", "0.10: 1 = the ring opens again at the level, page and entry of its last close; "
+                                        "0 = always at the top"},
+    {"Radial", "PassLeftStick", "1", "0.10, Mode=wheel only: 1 = the left stick still reaches the game while the ring is "
+                                     "open (Lara can walk); 0 = neutral pad\n(Mode=menu: always neutral - the left stick "
+                                     "picks)"},
+    {"Radial", "SlowMotion", "0", "0.10: time.scale while the ring is open (e.g. 0.25; the value from before comes back at "
+                                  "the close); 0 = off"},
+    {"Radial", "Deadzone", "0.5", "0.10: stick deflection (0.2 .. 0.95 of full) that picks an entry; inside it the centre "
+                                  "(Mode=wheel: no entry, release = cancel;\nMode=menu: the pick stays)"},
+    {"Radial", "Scale", "1.0", "0.10: size of the ring relative to the back-buffer height, 0.5 .. 2"},
+    {"Radial", "Spawn", "0", "0.10 stage R2: 1 = instance.spawn <object> works (ring level Spieler/Objekte since 0.10.5, "
+                             "command bar): the object is loaded and born at\nLara on the game thread (experimental - back "
+                             "up the saves first); 0 = refused. Read again while the game runs (a TO TEST switch works at "
+                             "once)"},
+    {"Shot", "Enabled", "1", "0.10.5: 1 = screenshots on request only: item shot.save [ui|clean] [name] (command bar, TruLink "
+                             "\"menu shot.save <name>\"),\nring Spieler / Screenshot, the ring level Claude (claude.mark: a "
+                             "TruMenu.log line + a clean shot each), Hotkey, the exports\nTruMenuShot / TruMenuMark of "
+                             "other plugins; nothing is taken automatically; 0 = every shot refused (claude.mark lines "
+                             "are still\nwritten, with shot=-)"},
+    {"Shot", "Folder", "", "0.10.5: folder for the PNG files; empty = TruShots next to tru.exe, a relative path is below the "
+                           "game folder. File name\nshot_<HHMMSS>_<first open TO TEST step or ->_<name>.png; one TruMenu.log "
+                           "line \"shot: <path> <w>x<h> <bytes> bytes, capture ... ms\" per file"},
+    {"Shot", "Clean", "1", "0.10.5: 1 = the back buffer is copied before TruMenu draws (no menu, ring, command bar or "
+                           "TruMenu overlay in the shot);\n0 = after it (as on screen). shot.save ui / clean overrides it "
+                           "per shot; claude.mark is always clean"},
+    {"Shot", "Hotkey", "0", "0.10.5: keyboard key (virtual key code, hex or decimal; 0x7A = F11) = claude.mark now (a mark "
+                            "line + a clean shot);\nthe game still gets the key; 0 = off"},
+    {"Shot", "MaxPerMinute", "30", "0.10.5: at most this many shots - and as many claude.mark lines - per minute, 1 .. 120; "
+                                   "more are refused with a log line;\n0 = no limit"},
+    {"Flow", "Enabled", "0", "0.11: 1 = Ablauf: read the flow file below (steps, counters; Invoke-TruTestRun.ps1 installs a "
+                             "profile's flowFile) - the ring level\nClaude shows Weiter / Ueberspringen / Zurueck, Gut / "
+                             "Fehler set the step result, 'flow: ...' lines go to TruMenu.log; 0 = off (no file read,\nno "
+                             "tail, the flow.* items answer 'no flow')"},
+    {"Flow", "File", "TruMenu.flow.txt", "0.11: flow file next to tru.exe (a relative name) or an absolute path"},
+    {"Flow", "Overlay", "1", "0.11: 1 = the status line 'Claude-Ablauf  Schritt n/m | <counter a/b> | naechster: ...' in "
+                             "Claude's coral in a screen corner while a flow\nis loaded; 0 = only in the ring"},
+    {"Flow", "Position", "br", "0.11: corner of the status line: tl, tr, bl, br (top / bottom, left / right)"},
+    {"Flow", "Size", "1.0", "0.11: text size of the status line and the flow.say toast, 0.5 .. 3"},
+    {"Flow", "Lines", "2", "0.11: lines of the status line: 1 = step / counter / next, 2 = + the current step's text, 3 = + "
+                           "what it waits for / its hint"},
+    {"Flow", "AutoAdvance", "1", "0.11: 1 = a step finished by its check= / fail= / its commands moves the flow on to the "
+                                 "next step; 0 = only Weiter /\nGut / Fehler / Ueberspringen move on"},
+    {"Flow", "ToastSeconds", "6", "0.11: seconds a flow.say toast (TruLink: menu flow.say <text>) stays, 1 .. 30"},
+    {"Flow", "PollMs", "500", "0.11: milliseconds between two reads of the log files the flow's patterns name (every new "
+                              "byte, at most 256 KB per\nfile and read), 100 .. 5000"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -289,6 +434,34 @@ int g_cheatsEnabled = 1, g_cheatPersist = 0;                                 // 
 char g_cheatState[256] = "";                                                 // 0.8 [Cheats] State (Persist=1)
 volatile LONG g_cameraChanges = 1;                                           // 0.8 [Log] CameraChanges
 char g_regressStart[8] = "all";                                              // 0.8 [Regress] List
+volatile LONG g_inputTrace = 1;                                              // 0.8.1 [Log] InputTrace
+// 0.10 [Radial] (workspace docs\Konzept-Bau-Rad.md): hold the pad buttons / the key / the mouse button = radial menu
+int g_radEnabled = 1;
+WORD g_radHold = kPadL3 | kPadR3;                                            // [Radial] HoldButtons (0 = no pad hold)
+int g_radHoldMs = 500, g_radKey = 0x78, g_radMouse = 0;                     // HoldMs, Key (F9), MouseButton (0 = off)
+int g_radRemember = 1, g_radPassLeft = 1, g_radSpawn = 0;                    // RememberPosition, PassLeftStick, Spawn
+float g_radSlow = 0.0f, g_radDead = 0.5f, g_radScale = 1.0f;                 // SlowMotion, Deadzone, Scale
+DWORD g_radKeyDik = 0;                                                       // DirectInput code of Key (kept from the game)
+// ring state: 0 closed, 1 hold mode (the release runs the entry), 2 latched (stays open: after a level change or A)
+volatile LONG g_radOpen = 0;
+volatile LONG g_radBy = 0;                   // who holds it: 1 pad, 2 key, 3 mouse button, 4 radial.open (TruLink)
+volatile LONG g_radJust = 0;                 // opened this frame (render thread sets level / page / slow motion)
+volatile LONG g_radRelease = 0;              // the hold was released (OnPad / RadialTick) - the render thread runs it
+volatile LONG g_radSwallow = 0;              // after the close: the pad stays neutral until every button is up
+enum { kRadByPad = 1, kRadByKey = 2, kRadByMouse = 3, kRadByLink = 4 };
+bool g_holdHeld[4], g_holdPending[4];        // pad hold: buttons down / waiting for HoldMs (under g_padLock)
+DWORD g_holdStart[4];
+// 0.10.1 [Radial] Mode / Freeze / QuitSector (workspace docs\Konzept-Bau-Rad.md section 10 "Bedienung v2")
+enum { kRadModeMenu = 0, kRadModeWheel = 1 };
+enum { kRadFreezeNone = 0, kRadFreezeWorld = 1, kRadFreezePlayer = 2 };
+int g_radMode = kRadModeMenu;                // Mode=menu: the ring stays open (state 2), only A runs
+int g_radFreeze = kRadFreezeWorld;           // [Radial] Freeze at the start; read again at every open (RadFreezeRead)
+int g_radQuitSector = 1;                     // [Radial] QuitSector
+volatile LONG g_radCloseReq = 0;             // Mode=menu: L3 + R3 pressed again on the open ring (OnPad) - render thread closes
+volatile LONG g_radPaused = 0;               // Freeze=world: the ring set the time.pause bit (RunPause clears it: user's choice)
+volatile LONG g_radCtlOurs = 0;              // Freeze=player: the ring wrote player.control 0 (RunControl clears it)
+BYTE g_radCtlBefore = 1;                     // player.control before the open
+bool RadMenuOpen() { return g_radOpen != 0 && g_radMode == kRadModeMenu; }   // the ring holds pad + keyboard
 
 // ---- state ----
 char g_logPath[MAX_PATH];
@@ -445,7 +618,17 @@ bool InLevel();
 void WeaponsTick();    // 0.3 costume switch: player message 35 a frame later
 void InvincibleTick(); // 0.3 player.invincible: health = MaxHealth once per game frame
 void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite ammo re-apply (game thread)
-void LogTailTick();    // 0.3 log page: tail Tru*.log once per second (worker thread)
+void SafeGroundTick(); // 0.8.1 player.unstuck: ring of recent safe positions (game thread)
+void NoDamageTick();   // 0.10.2 cheat.godfull: the player's no-damage bit once per game frame (game thread)
+void SoundFreezeTick(); // 0.10.3 [Radial] FreezeSound / [Menu] PauseSound: sound pause with the world (game thread)
+void ShaderClockTick(); // 0.10.4 [Radial] FreezeShaderClock: the shader clock TimeVector holds with the freeze
+void LogTailTick();   // 0.3 log page: tail Tru*.log once per second (worker thread)
+// 0.11 Ablauf hooks (defined in the flow section): they only queue an event (any thread, any lock held)
+void FlowOnItem(const char *id);
+void FlowOnToggle(const char *id, const char *state);
+void FlowOnMark(const char *kind, const char *file);
+bool FlowShotStep(char *o, size_t n);
+void ValFlowStatus(char *o, size_t n);
 
 // flight: while cheat mode is on and the menu is closed, the triggers move Lara up (RT) / down (LT) - TRLAU moves
 // position.z the same way with keys
@@ -465,6 +648,35 @@ void FlightTick(const PadState &pad) {
     }
 }
 
+// ---- 0.8.1 input trace ([Log] InputTrace; owner wish 2026-11-02 after the game.quit case) ----
+// Every raw pad button edge (OnPad: "XInput hook" = the game's poll through PadHook, "Present fallback" = SelfPoll),
+// mouse click and key message (window procedure) while the menu is open goes into a small queue. The render thread
+// takes the queue at the start of frame N and writes one line per edge at the end of frame N + 1: by then ImGui has
+// applied a D-pad move, and the frame-N record says which widget had the focus / was hovered / was activated. Labels
+// come from the Tm* widget wrappers (TraceItem), ids from imgui_internal (NavId, HoveredId, NavActivateId).
+enum { kEdgePad = 0, kEdgeMouse = 1, kEdgeKey = 2 };
+struct InputEdge { DWORD tick; BYTE kind, down, source, pad; WORD code; SHORT x, y; };
+const int kEdgeMax = 48;
+InputEdge g_edgeQueue[kEdgeMax];
+int g_edgeCount = 0;
+LONG g_edgeDropped = 0;
+CRITICAL_SECTION g_edgeLock;
+WORD g_edgePrev[4];                       // last buttons per pad (under g_padLock)
+const char *const kEdgeSource[] = {"XInput hook", "Present fallback", "window message"};
+struct PadBitName { WORD mask; const char *name; };
+const PadBitName kPadBits[] = {{0x1000, "A"}, {0x2000, "B"}, {0x4000, "X"}, {0x8000, "Y"}, {0x0100, "LB"},
+                               {0x0200, "RB"}, {0x0040, "L3"}, {0x0080, "R3"}, {0x0010, "Start"}, {0x0020, "View"},
+                               {0x0001, "Up"}, {0x0002, "Down"}, {0x0004, "Left"}, {0x0008, "Right"}};
+// per menu session, written at the close (also with InputTrace=0)
+LONG g_sumPad = 0, g_sumA = 0, g_sumAAct = 0, g_sumANot = 0, g_sumMouse = 0, g_sumKeys = 0;
+
+void EdgeAdd(BYTE kind, BYTE down, BYTE source, BYTE pad, WORD code, SHORT x, SHORT y) {
+    EnterCriticalSection(&g_edgeLock);
+    if (g_edgeCount < kEdgeMax) g_edgeQueue[g_edgeCount++] = {GetTickCount(), kind, down, source, pad, code, x, y};
+    else ++g_edgeDropped;
+    LeaveCriticalSection(&g_edgeLock);
+}
+
 // ---- pad ----
 void ToggleMenu(const char *by) {
     LONG open = !InterlockedCompareExchange(&g_menuOpen, 0, 0);
@@ -473,31 +685,91 @@ void ToggleMenu(const char *by) {
     Log(1, "menu %s (%s)", open ? "opened" : "closed", by);   // 0.7.1: level 1 - the reason of every close in the log
 }
 
-// real pad state in, toggle detection; returns true when the game must get a neutral state
-bool OnPad(DWORD index, bool connected, const PadState *state) {
-    if (index > 3) return false;
+// real pad state in, toggle detection; returns what the game gets: 0 the real state, 1 a neutral state, 2 (0.10, radial
+// menu with [Radial] PassLeftStick=1) a neutral state that keeps the left stick
+// source: 0 = PadHook (the game's poll), 1 = SelfPoll in Present (0.8.1 input trace)
+// 0.10 radial hold: when [Radial] HoldButtons = [Menu] ToggleButtons ("shared", L3 + R3) and the menu is closed, the press
+// no longer toggles at once - a release before HoldMs opens the menu, HoldMs reached opens the ring in hold mode and the
+// release then runs its entry (the render thread does that, g_radRelease). A different HoldButtons mask is watched on its
+// own (the menu toggles as before; the game sees those buttons until the ring opens). The latched ring (open after the
+// hold) goes back into hold mode when the buttons are pressed again.
+int OnPad(DWORD index, bool connected, const PadState *state, BYTE source) {
+    if (index > 3) return 0;
     EnterCriticalSection(&g_padLock);
     g_padConnected[index] = connected;
     WORD buttons = connected ? state->wButtons : 0;
+    WORD changed = static_cast<WORD>(buttons ^ g_edgePrev[index]);   // 0.8.1: edges for the input trace
+    g_edgePrev[index] = buttons;
+    if (changed && g_menuOpen)
+        for (const PadBitName &b : kPadBits)
+            if (changed & b.mask)
+                EdgeAdd(kEdgePad, (buttons & b.mask) ? 1 : 0, source, static_cast<BYTE>(index), b.mask, 0, 0);
     if (connected) {
         g_pad[index] = *state;
         if (buttons) g_lastPad = static_cast<int>(index);
     }
     bool combo = (buttons & g_toggleButtons) == g_toggleButtons;
+    WORD hold = g_radEnabled ? g_radHold : 0;
+    bool shared = hold && hold == g_toggleButtons;
+    bool holdCombo = hold && (buttons & hold) == hold;
     bool toggled = false;
+    const char *toggleBy = "pad";
+    int radial = 0;                          // 1 = HoldMs reached, 2 = hold released, 3 = latched ring held again
     if (combo && !g_comboHeld[index]) {
         g_comboHeld[index] = true;
         g_swallow[index] = true;
-        toggled = true;
+        if (!shared || g_menuOpen) toggled = !g_radOpen || !shared;   // shared + menu closed: decided at the release
     } else if (!combo) {
         g_comboHeld[index] = false;
+    }
+    if (hold) {
+        DWORD now = GetTickCount();
+        if (holdCombo && !g_holdHeld[index]) {
+            g_holdHeld[index] = true;
+            if (g_radOpen == 2) radial = g_radMode == kRadModeMenu ? 4 : 3;   // 0.10.1 Mode=menu: pressed again = close
+            else if (!g_radOpen && !g_menuOpen && !toggled) {
+                g_holdPending[index] = true;
+                g_holdStart[index] = now;
+            }
+        } else if (!holdCombo && g_holdHeld[index]) {
+            g_holdHeld[index] = false;
+            if (g_holdPending[index]) {          // shorter than HoldMs
+                g_holdPending[index] = false;
+                if (shared) { toggled = true; toggleBy = "pad, short press"; }
+            } else if (g_radOpen == 1 && g_radBy == kRadByPad) {
+                radial = 2;
+            }
+        }
+        if (g_holdPending[index] && holdCombo && now - g_holdStart[index] >= static_cast<DWORD>(g_radHoldMs)) {
+            g_holdPending[index] = false;
+            radial = 1;
+        }
     }
     // after a toggle the pad stays neutral until both sticks are released, so the game never sees the half combo
     if (g_swallow[index] && !(buttons & g_toggleButtons)) g_swallow[index] = false;
     bool neutral = g_swallow[index];
+    bool pending = g_holdPending[index] && shared;
     LeaveCriticalSection(&g_padLock);
-    if (toggled) ToggleMenu("pad");
-    return neutral || (g_blockInput && g_menuOpen);
+    if (toggled) ToggleMenu(toggleBy);
+    if (radial == 1 && !g_menuOpen) {
+        InterlockedExchange(&g_radBy, kRadByPad);
+        InterlockedExchange(&g_radJust, 1);
+        // 0.10.1 Mode=menu: open = latched at once (state 2) - the release of the hold runs nothing
+        InterlockedExchange(&g_radOpen, g_radMode == kRadModeMenu ? 2 : 1);
+        Log(2, "radial: opened (pad hold %d ms%s)", g_radHoldMs, g_radMode == kRadModeMenu ? ", menu mode: stays open" : "");
+    } else if (radial == 2) {
+        InterlockedExchange(&g_radRelease, 1);
+    } else if (radial == 3) {
+        InterlockedExchange(&g_radBy, kRadByPad);
+        InterlockedExchange(&g_radOpen, 1);
+    } else if (radial == 4) {
+        InterlockedExchange(&g_radCloseReq, 1);
+    }
+    if (g_radSwallow && !buttons) InterlockedExchange(&g_radSwallow, 0);
+    if (g_blockInput && g_menuOpen) return 1;
+    // 0.10.1: PassLeftStick only in Mode=wheel; Mode=menu gives the game the whole pad neutral (the left stick picks)
+    if (g_radOpen || pending || g_radSwallow) return g_radPassLeft && g_radMode == kRadModeWheel ? 2 : 1;
+    return neutral ? 1 : 0;
 }
 
 // project chaining rule (TruShadowPower / TruLink / TruMenu share the slot 0x00a02b8c): hook once, re-hook only when
@@ -536,20 +808,30 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     bool connected = result == ERROR_SUCCESS && state;
     PadState copy = {};
     if (connected) copy = *state;
-    if (OnPad(index, connected, &copy) && connected) {
+    int neutral = OnPad(index, connected, &copy, 0);
+    if (neutral && connected) {
         DWORD packet = state->dwPacketNumber;
+        SHORT lx = state->sThumbLX, ly = state->sThumbLY;
         memset(state, 0, sizeof(*state));
         state->dwPacketNumber = packet;
+        if (neutral == 2) {                   // 0.10 radial menu, [Radial] PassLeftStick=1: Lara can walk
+            state->sThumbLX = lx;
+            state->sThumbLY = ly;
+        }
     }
     g_lastPadHookTick = GetTickCount();
     if (g_reqPending) RunPending();           // game thread; the game clock may stand still (front end, pause)
+    SoundFreezeTick();                        // 0.10.3: every poll - the game clock stands still while paused
+    ShaderClockTick();                        // 0.10.4: likewise (F7 light shaft: TimeVector held with the freeze)
     DWORD clock = *kGameClock;
     if (clock != g_lastClock) {               // once per game frame (the game polls several pads per frame)
         g_lastClock = clock;
         if (!g_menuOpen && connected) FlightTick(copy);
         WeaponsTick();
         InvincibleTick();
+        NoDamageTick();                       // 0.10.2: cheat.godfull no-damage bit [0xfada74] & 0x20000
         CheatsTick();                         // 0.8: [Cheats] Persist restore, infinite ammo re-apply
+        SafeGroundTick();                     // 0.8.1: player.unstuck ring
     }
     return result;
 }
@@ -697,7 +979,7 @@ bool FullClip(const RECT &r) {               // GetClipCursor answers the virtua
 
 // render thread, every Present: follow the menu state (hold on open, release on close)
 void MouseTick() {
-    bool want = g_menuOpen && g_freeMouse;
+    bool want = (g_menuOpen || g_radOpen) && g_freeMouse;   // 0.10: the radial menu holds the mouse as well
     if (want == (g_mouseHeld != 0)) return;
     if (want) {
         g_openPosOk = GetCursorPos(&g_openPos) != FALSE;
@@ -804,8 +1086,9 @@ int __fastcall KbdReadHook(void *self, void *edx, KbdEvent *events, int room, in
     if (!events || room <= 0 || n < 0 || n > room) return n;
     for (int i = 0; i < n; ++i)
         if (events[i].type == 1 && events[i].key < 256) g_kbdRealDown[events[i].key] = events[i].value > 0.5f ? 1 : 0;
-    if (g_blockGameInput && g_menuOpen) {
-        if (!g_kbdWasBlocked) Log(2, "keyboard: held (menu open)");
+    // 0.10.1: the radial menu in Mode=menu holds the keyboard like the menu (Enter / Backspace / Esc / arrows are its keys)
+    if (g_blockGameInput && (g_menuOpen || RadMenuOpen())) {
+        if (!g_kbdWasBlocked) Log(2, "keyboard: held (%s open)", g_menuOpen ? "menu" : "radial menu");
         g_kbdWasBlocked = true;
         g_kbdHeldEvents += n;
         int out = 0;
@@ -832,6 +1115,7 @@ int __fastcall KbdReadHook(void *self, void *edx, KbdEvent *events, int room, in
         KbdEvent e = events[i];
         if (e.type == 1 && e.key < 256) {
             bool down = e.value > 0.5f;
+            if (g_radKeyDik && e.key == g_radKeyDik) continue;   // 0.10: [Radial] Key belongs to the radial menu
             if (g_kbdSwallow[e.key]) {          // held since the menu was open: the game never saw it go down
                 if (!down) g_kbdSwallow[e.key] = 0;
                 ++g_kbdSwallowed;
@@ -881,6 +1165,19 @@ bool IsKeyMessage(UINT msg) {
 }
 
 LRESULT CALLBACK WndProcHook(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (g_imguiReady && g_menuOpen) {           // 0.8.1 input trace: clicks and keys (no auto-repeat) as edges
+        SHORT mx = static_cast<SHORT>(LOWORD(lParam)), my = static_cast<SHORT>(HIWORD(lParam));
+        switch (msg) {
+        case WM_LBUTTONDOWN: case WM_LBUTTONUP: EdgeAdd(kEdgeMouse, msg == WM_LBUTTONDOWN, 2, 0, 1, mx, my); break;
+        case WM_RBUTTONDOWN: case WM_RBUTTONUP: EdgeAdd(kEdgeMouse, msg == WM_RBUTTONDOWN, 2, 0, 2, mx, my); break;
+        case WM_MBUTTONDOWN: case WM_MBUTTONUP: EdgeAdd(kEdgeMouse, msg == WM_MBUTTONDOWN, 2, 0, 3, mx, my); break;
+        case WM_KEYDOWN:
+            if (!(lParam & 0x40000000)) EdgeAdd(kEdgeKey, 1, 2, 0, static_cast<WORD>(wParam & 0xff), 0, 0);
+            break;
+        case WM_KEYUP: EdgeAdd(kEdgeKey, 0, 2, 0, static_cast<WORD>(wParam & 0xff), 0, 0); break;
+        default: break;
+        }
+    }
     if (g_imguiReady && g_menuOpen && msg == WM_KEYDOWN) {
         // 0.7.1: a real key for the on-screen keyboard switch (not Esc / modifiers / F2 / Tab / the toggle key)
         WPARAM vk = wParam;
@@ -911,9 +1208,25 @@ LRESULT CALLBACK WndProcHook(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         // Key-up messages still do, so a key the game saw going down before the focus moved is released there too.
         if (g_cmdWantText && (msg == WM_KEYDOWN || msg == WM_CHAR || msg == WM_DEADCHAR || msg == WM_SYSCHAR))
             return 0;
+    } else if (g_blockGameInput && RadMenuOpen() && IsKeyMessage(msg)) {
+        // 0.10.1 [Radial] Mode=menu: no key message reaches the game while the ring is open (the ring reads Enter /
+        // Backspace / Esc / arrows with GetAsyncKeyState); a key that went down meanwhile keeps its key-up away after the
+        // close (g_msgKeyHeld, as for the menu)
+        if (msg == WM_KEYDOWN && wParam < 256) g_msgKeyHeld[wParam] = 1;
+        if (msg == WM_KEYUP && wParam < 256) g_msgKeyHeld[wParam] = 0;
+        return 0;
     } else if (g_blockGameInput && msg == WM_KEYUP && wParam < 256 && g_msgKeyHeld[wParam]) {
         g_msgKeyHeld[wParam] = 0;               // 0.7.1: went down while the menu was open - the game saw no key-down
         return 0;
+    } else if (g_radEnabled) {
+        // 0.10 radial menu: its key and mouse button never reach the game; while the ring is open the mouse belongs to
+        // it ([Menu] FreeMouse) - the direction is read with GetCursorPos in RadialTick, no message is needed
+        if ((msg == WM_KEYDOWN || msg == WM_KEYUP) && g_radKey && static_cast<int>(wParam) == g_radKey) return 0;
+        if ((msg == WM_MBUTTONDOWN || msg == WM_MBUTTONUP) && g_radMouse == 3) return 0;
+        if ((msg == WM_XBUTTONDOWN || msg == WM_XBUTTONUP) && (g_radMouse == 4 || g_radMouse == 5) &&
+            GET_XBUTTON_WPARAM(wParam) == (g_radMouse == 4 ? XBUTTON1 : XBUTTON2))
+            return 0;
+        if (g_radOpen && g_freeMouse && IsMouseMessage(msg)) return 0;
     }
     return IsWindowUnicode(hwnd) ? CallWindowProcW(g_wndProcOriginal, hwnd, msg, wParam, lParam)
                                  : CallWindowProcA(g_wndProcOriginal, hwnd, msg, wParam, lParam);
@@ -962,6 +1275,206 @@ bool InitImGui(IDirect3DDevice9 *device) {
     return true;
 }
 
+bool CmdTextActive();                       // 0.6 command bar state, defined with the bar
+// 0.8.1 input trace: what the menu did in one frame (render thread only)
+struct TraceFrameRec {
+    ImGuiID navId, hoverId, actId, navActId;
+    char navLabel[72], hoverLabel[72], actLabel[72], navWindow[40], barNote[120];
+    bool navAlive, navDisabled, osk, barFocus, textActive;
+    WORD raw, fed, barOwned, rowOwned;   // pad buttons: read, given to ImGui, taken by the bar / keyboard, by a row
+    InputEdge edges[kEdgeMax];
+    int edgeCount;
+};
+TraceFrameRec g_trf[2];
+int g_trfCur = 0;
+
+void TraceLabel(const char *label, char *out, size_t size) {
+    size_t i = 0;
+    for (; label[i] && i + 1 < size && !(label[i] == '#' && label[i + 1] == '#'); ++i) out[i] = label[i];
+    while (i && out[i - 1] == ' ') --i;
+    out[i] = 0;
+    if (!i) _snprintf_s(out, size, _TRUNCATE, "%.60s", label);   // "##id" only: show the id part
+}
+// after every wrapped widget: remember its label when it is the focused / hovered / activated one
+void TraceItem(const char *label, bool pressed) {
+    if (!g_menuOpen || !label) return;
+    ImGuiContext &g = *GImGui;
+    ImGuiID id = g.LastItemData.ID;
+    if (!id) return;
+    TraceFrameRec &f = g_trf[g_trfCur];
+    if (id == g.NavId) {
+        TraceLabel(label, f.navLabel, sizeof(f.navLabel));
+        f.navDisabled = (g.LastItemData.ItemFlags & ImGuiItemFlags_Disabled) != 0;
+    }
+    if (id == g.HoveredId) TraceLabel(label, f.hoverLabel, sizeof(f.hoverLabel));
+    if (pressed) {
+        f.actId = id;
+        TraceLabel(label, f.actLabel, sizeof(f.actLabel));
+    }
+}
+// the widgets the pages use, with the trace hook (same arguments as ImGui's)
+template <typename... A> bool TmButton(const char *label, A... a) {
+    bool r = ImGui::Button(label, a...);
+    TraceItem(label, r);
+    return r;
+}
+template <typename... A> bool TmSmallButton(const char *label, A... a) {
+    bool r = ImGui::SmallButton(label, a...);
+    TraceItem(label, r);
+    return r;
+}
+template <typename... A> bool TmCheckbox(const char *label, A... a) {
+    bool r = ImGui::Checkbox(label, a...);
+    TraceItem(label, r);
+    return r;
+}
+template <typename... A> bool TmSelectable(const char *label, A... a) {
+    bool r = ImGui::Selectable(label, a...);
+    TraceItem(label, r);
+    return r;
+}
+template <typename... A> bool TmCollapsingHeader(const char *label, A... a) {
+    bool r = ImGui::CollapsingHeader(label, a...);
+    TraceItem(label, ImGui::IsItemToggledOpen());
+    return r;
+}
+
+const char *KeyName(WORD vk, char *buf, size_t size) {
+    switch (vk) {
+    case VK_RETURN: return "Enter";
+    case VK_ESCAPE: return "Esc";
+    case VK_SPACE: return "Space";
+    case VK_TAB: return "Tab";
+    case VK_BACK: return "Backspace";
+    case VK_UP: return "Up";
+    case VK_DOWN: return "Down";
+    case VK_LEFT: return "Left";
+    case VK_RIGHT: return "Right";
+    case VK_SHIFT: return "Shift";
+    case VK_CONTROL: return "Ctrl";
+    default: break;
+    }
+    if (vk >= VK_F1 && vk <= VK_F24) _snprintf_s(buf, size, _TRUNCATE, "F%d", vk - VK_F1 + 1);
+    else if ((vk >= '0' && vk <= '9') || (vk >= 'A' && vk <= 'Z')) _snprintf_s(buf, size, _TRUNCATE, "%c", vk);
+    else _snprintf_s(buf, size, _TRUNCATE, "vk 0x%02x", vk);
+    return buf;
+}
+
+// start of a frame (before FeedGamepad): the record of this frame, the edges since the last frame
+void TraceBegin() {
+    g_trfCur ^= 1;
+    TraceFrameRec &f = g_trf[g_trfCur];
+    memset(&f, 0, sizeof(f));
+    EnterCriticalSection(&g_edgeLock);
+    f.edgeCount = g_edgeCount;
+    memcpy(f.edges, g_edgeQueue, sizeof(InputEdge) * static_cast<size_t>(g_edgeCount));
+    g_edgeCount = 0;
+    LeaveCriticalSection(&g_edgeLock);
+}
+
+// end of frame N + 1: one line per edge of frame N ("prev") with the focus of both frames
+void TraceEnd() {
+    ImGuiContext &g = *GImGui;
+    TraceFrameRec &cur = g_trf[g_trfCur], &prev = g_trf[g_trfCur ^ 1];
+    cur.navId = g.NavId;
+    cur.navAlive = g.NavIdIsAlive;
+    cur.hoverId = g.HoveredId;
+    cur.navActId = g.NavActivateId;
+    _snprintf_s(cur.navWindow, sizeof(cur.navWindow), _TRUNCATE, "%s", g.NavWindow ? g.NavWindow->Name : "-");
+    char *hash = strstr(cur.navWindow, "###");
+    if (hash) *hash = 0;
+    if (!cur.navLabel[0] && cur.navId) _snprintf_s(cur.navLabel, sizeof(cur.navLabel), _TRUNCATE, "0x%08x", cur.navId);
+    bool trace = g_inputTrace && g_logLevel >= 2;
+    for (int i = 0; i < prev.edgeCount; ++i) {
+        const InputEdge &e = prev.edges[i];
+        char what[48], result[400] = "-", kb[16];
+        bool aLike = false;
+        if (e.kind == kEdgePad) {
+            const char *name = "?";
+            for (const PadBitName &b : kPadBits) if (b.mask == e.code) name = b.name;
+            _snprintf_s(what, sizeof(what), _TRUNCATE, "pad%d %s %s", e.pad, name, e.down ? "down" : "up");
+            if (e.down) InterlockedIncrement(&g_sumPad);
+            if (!e.down) {
+                result[0] = 0;
+            } else if (static_cast<int>(e.pad) != g_lastPad) {
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "not the menu's pad (menu reads pad%d)", g_lastPad);
+            } else if (!(prev.raw & e.code)) {
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "pressed and released between two frames - ImGui never saw it");
+            } else if (prev.barOwned & e.code) {
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "%s owns the pad%s%s", prev.osk ? "on-screen keyboard" :
+                            "command bar", prev.barNote[0] ? ": " : "", prev.barNote);
+            } else if (prev.rowOwned & e.code) {
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "%s on the focused TO TEST / Regression row",
+                            e.code == 0x4000 ? "X = fail" : "Y = skip");
+            } else if (e.code & g_toggleButtons) {
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "menu combo / FocusButton (not given to a widget)");
+            } else if (e.code == 0x1000) {
+                aLike = true;
+            } else if (e.code & 0x000F) {
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "focus '%s' -> '%s' (%s)", prev.navLabel[0] ? prev.navLabel :
+                            "none", cur.navLabel[0] ? cur.navLabel : "none", cur.navWindow);
+            } else {
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "given to ImGui (focus '%s')", prev.navLabel[0] ?
+                            prev.navLabel : "none");
+            }
+        } else if (e.kind == kEdgeMouse) {
+            _snprintf_s(what, sizeof(what), _TRUNCATE, "mouse %s %s at %d,%d", e.code == 1 ? "left" : e.code == 2 ?
+                        "right" : "middle", e.down ? "down" : "up", e.x, e.y);
+            if (e.down) {
+                InterlockedIncrement(&g_sumMouse);
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "over '%s'", prev.hoverLabel[0] ? prev.hoverLabel :
+                            prev.hoverId ? "unlabelled widget" : "no widget");
+            } else if (e.code == 1) {
+                if (prev.actId) _snprintf_s(result, sizeof(result), _TRUNCATE, "activated '%s'", prev.actLabel);
+                else _snprintf_s(result, sizeof(result), _TRUNCATE, "no click (released outside the pressed widget, "
+                                 "or its id changed meanwhile)");
+            } else {
+                result[0] = 0;
+            }
+        } else {
+            WORD vk = e.code;
+            _snprintf_s(what, sizeof(what), _TRUNCATE, "key %s %s", KeyName(vk, kb, sizeof(kb)), e.down ? "down" : "up");
+            if (e.down) InterlockedIncrement(&g_sumKeys);
+            if (!e.down) result[0] = 0;
+            else if (prev.textActive) _snprintf_s(result, sizeof(result), _TRUNCATE, "into the command bar text field");
+            else if (vk == VK_RETURN || vk == VK_SPACE) aLike = true;
+            else if (vk == VK_UP || vk == VK_DOWN || vk == VK_LEFT || vk == VK_RIGHT)
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "focus '%s' -> '%s' (%s)", prev.navLabel[0] ?
+                            prev.navLabel : "none", cur.navLabel[0] ? cur.navLabel : "none", cur.navWindow);
+        }
+        if (aLike) {                                  // pad A / Enter / Space: activated or why not
+            if (e.kind == kEdgePad) InterlockedIncrement(&g_sumA);
+            ImGuiID act = prev.actId ? prev.actId : prev.navActId;
+            if (act) {
+                if (e.kind == kEdgePad) InterlockedIncrement(&g_sumAAct);
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "activated '%s' (0x%08x)", prev.actId ? prev.actLabel :
+                            "unlabelled widget", act);
+            } else {
+                if (e.kind == kEdgePad) InterlockedIncrement(&g_sumANot);
+                const char *why = !prev.navId ? "no widget has the nav focus"
+                                : !prev.navAlive ? "the focused widget was not drawn in that frame - its id changed "
+                                                   "(label with ## instead of ###) or its page is closed"
+                                : prev.navDisabled ? "the focused widget is disabled"
+                                : !(g.IO.ConfigFlags & ImGuiConfigFlags_NavEnableGamepad) ? "gamepad navigation off"
+                                : "ImGui saw the press but no widget took it";
+                _snprintf_s(result, sizeof(result), _TRUNCATE, "not activated: %s (focus '%s' 0x%08x in %s)", why,
+                            prev.navLabel[0] ? prev.navLabel : "none", prev.navId, prev.navWindow);
+            }
+        }
+        if (trace)
+            Log(2, "input: %s (%s)%s%s", what, kEdgeSource[e.source < 3 ? e.source : 2], result[0] ? " -> " : "", result);
+    }
+}
+
+// at the menu close: the summary (also with InputTrace=0)
+void TraceSummary() {
+    LONG dropped = InterlockedExchange(&g_edgeDropped, 0);
+    Log(1, "input while the menu was open: %ld pad presses (A %ld: %ld activated, %ld not), %ld mouse clicks, %ld keys%s",
+        InterlockedExchange(&g_sumPad, 0), InterlockedExchange(&g_sumA, 0), InterlockedExchange(&g_sumAAct, 0),
+        InterlockedExchange(&g_sumANot, 0), InterlockedExchange(&g_sumMouse, 0), InterlockedExchange(&g_sumKeys, 0),
+        dropped ? " (some edges dropped: queue full)" : "");
+}
+
 void FeedGamepad(ImGuiIO &io) {
     io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
     PadState pad = {};
@@ -970,6 +1483,7 @@ void FeedGamepad(ImGuiIO &io) {
     if (g_padConnected[g_lastPad]) { pad = g_pad[g_lastPad]; have = true; }
     LeaveCriticalSection(&g_padLock);
     if (!g_menuOpen || !have) memset(&pad, 0, sizeof(pad));
+    const WORD rawButtons = pad.wButtons;        // 0.8.1 input trace
     // 0.7: [Cmd] FocusButton (L3) pressed and released alone = focus into the bar + on-screen keyboard. A press that
     // becomes part of the open / close combo (L3 + R3) is not one: any other combo button down while it is held cancels.
     {
@@ -1017,6 +1531,16 @@ void FeedGamepad(ImGuiIO &io) {
     cmdOwned &= cmdBits;
     pad.wButtons &= static_cast<WORD>(~cmdOwned);
     if (cmdOwned & 0x000F) pad.sThumbLX = pad.sThumbLY = 0;
+    {                                            // 0.8.1 input trace: who got which button in this frame
+        TraceFrameRec &tf = g_trf[g_trfCur];
+        tf.raw = rawButtons;
+        tf.rowOwned = rowOwned;
+        tf.barOwned = cmdOwned;
+        tf.fed = pad.wButtons;
+        tf.osk = g_oskOpen;
+        tf.barFocus = g_cmdOwnPad;
+        tf.textActive = CmdTextActive();
+    }
     struct { ImGuiKey key; WORD mask; } const buttons[] = {
         {ImGuiKey_GamepadStart, 0x0010}, {ImGuiKey_GamepadBack, 0x0020}, {ImGuiKey_GamepadFaceLeft, 0x4000},
         {ImGuiKey_GamepadFaceRight, 0x2000}, {ImGuiKey_GamepadFaceUp, 0x8000}, {ImGuiKey_GamepadFaceDown, 0x1000},
@@ -1049,13 +1573,13 @@ void SelfPoll(XInputGetStateFn poll) {
     PadState state = {};
     DWORD index = static_cast<DWORD>(g_lastPad);
     bool connected = poll(index, &state) == ERROR_SUCCESS;
-    OnPad(index, connected, &state);
+    OnPad(index, connected, &state, 1);
     // no pad at that index: look at the next one twice a second (a pad that sends buttons becomes g_lastPad)
     if (!connected && ++frames % 30 == 0) {
         DWORD next = (index + 1 + (frames / 30) % 3) % 4;
         PadState other = {};
         bool found = poll(next, &other) == ERROR_SUCCESS;
-        OnPad(next, found, &other);
+        OnPad(next, found, &other, 1);
         if (found) g_lastPad = static_cast<int>(next);
     }
 }
@@ -1099,6 +1623,8 @@ void PlayerInfo(char *o, size_t n);
 const char *GameState();
 void QueueItem(const char *id, const char *arg);   // defined after kItems
 bool QuitArmed(DWORD *leftMs);                     // 0.7.2 game.quit, defined after the command history
+void QuitByHold();                                 // 0.8.1: button held 1 s
+void ValRadialStatus(char *o, size_t n);           // 0.10 radial menu, defined after the command bar
 
 void PageStatus() {
     ImGui::TextWrapped("%s", kVersion);
@@ -1144,25 +1670,63 @@ void PageStatus() {
     ImGui::TextWrapped("mouse (0.7): %s", g_mouseMode);
     ImGui::TextWrapped("keyboard (0.7.1): %s; %ld events held, %ld releases sent, %ld kept after close", g_kbdMode,
                        g_kbdHeldEvents, g_kbdReleases, g_kbdSwallowed);
+    {
+        static char radial[1024];
+        ValRadialStatus(radial, sizeof(radial));
+        ImGui::TextWrapped("radial (0.10.1): %s   [radial.status]", radial);
+        ValFlowStatus(radial, sizeof(radial));   // 0.11
+        ImGui::TextWrapped("flow (0.11): %s   [flow.status]", radial);
+    }
     HMODULE d3d9 = GetModuleHandleA("d3d9.dll");
     char d3dPath[MAX_PATH] = "not loaded";
     if (d3d9) GetModuleFileNameA(d3d9, d3dPath, MAX_PATH);
     Text("d3d9: %s", g_d3dMode);
     ImGui::TextWrapped("  d3d9.dll = %s", d3dPath);
     Text("  device 0x%08lx, window 0x%08lx", reinterpret_cast<DWORD>(g_device), reinterpret_cast<DWORD>(g_hwnd));
-    // 0.7.2 game.quit: owner only, two presses within 5 s (the item itself keeps the safety step)
+    // game.quit: owner only (the item itself keeps the safety step). 0.8.1 (P00c): 0.8.0 put the countdown into the
+    // armed label "CONFIRM ... (%lu s) ...##quit" - "##" only hides the rest, the id is the hash of the WHOLE label, so
+    // the button got a new id every second. The pad / keyboard focus (NavId) then named a widget that no longer
+    // existed and A did nothing until the label was "Quit game (press twice)##quit" again - the first id, so that press
+    // re-armed (live 22:24:06 / :12 / :17 / :24). Now: fixed labels with "###" ids; while armed a separate red
+    // "Quit now" button (fixed label; the focus moves to it once the arming press is released), the time left as text
+    // beside it; holding A / Enter / the mouse 1 s on either button quits as well.
     ImGui::Separator();
     DWORD left = 0;
     bool armed = QuitArmed(&left);
-    char label[128];
-    if (armed)
-        _snprintf_s(label, sizeof(label), _TRUNCATE, "CONFIRM: quit the game now (%lu s)  [game.quit]##quit",
-                    (left + 999) / 1000);
-    else
-        _snprintf_s(label, sizeof(label), _TRUNCATE, "Quit game (press twice)  [game.quit]##quit");
-    if (armed) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.1f, 1.0f));
-    if (ImGui::Button(label)) QueueItem("game.quit", "");
-    if (armed) ImGui::PopStyleColor();
+    static bool focusMoved = false;
+    static DWORD holdStart = 0;
+    bool holding = false;
+    if (TmButton("Quit game (press twice, or hold 1 s)  [game.quit]###quitarm")) QueueItem("game.quit", "");
+    holding = holding || ImGui::IsItemActive();
+    if (!armed) focusMoved = false;
+    if (armed) {
+        ImGui::SameLine();
+        bool held = ImGui::IsKeyDown(ImGuiKey_GamepadFaceDown) || ImGui::IsKeyDown(ImGuiKey_Enter) ||
+                    ImGui::IsKeyDown(ImGuiKey_Space) || ImGui::IsMouseDown(ImGuiMouseButton_Left);
+        if (!focusMoved && !held) {               // after the arming press: the focus to "Quit now"
+            ImGui::SetKeyboardFocusHere();
+            focusMoved = true;
+        }
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.1f, 1.0f));
+        if (TmButton("Quit now  [game.quit]###quitnow")) QueueItem("game.quit", "");
+        holding = holding || ImGui::IsItemActive();
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f), "armed - %lu s left", (left + 999) / 1000);
+    }
+    if (holding) {
+        DWORD now = GetTickCount();
+        if (!holdStart) holdStart = now ? now : 1;
+        DWORD held = now - holdStart;
+        ImGui::ProgressBar(held >= 1000 ? 1.0f : static_cast<float>(held) / 1000.0f, ImVec2(-1.0f, 0.0f),
+                           "hold 1 s to quit");
+        if (held >= 1000) {
+            holdStart = 0;
+            QuitByHold();
+        }
+    } else {
+        holdStart = 0;
+    }
     ImGui::TextWrapped("game.quit ends tru.exe at once (TerminateProcess, exit code 0x544D = 21581) - also while the game "
                        "hangs; TruMenu.log, the TO TEST list and the history are written first. Never automatic.");
 }
@@ -1759,8 +2323,11 @@ void ValMenu(char *o, size_t n) { Out(o, n, "%d", g_menuOpen ? 1 : 0); }
 void ValOverlay(char *o, size_t n) { Out(o, n, "%d", g_overlay ? 1 : 0); }
 void ValVersion(char *o, size_t n) { Out(o, n, "%s", kVersion); }
 void ValHooks(char *o, size_t n) {
-    Out(o, n, "pad=%s; d3d9=%s; frontend-pad=%d; mouse=%s; keyboard=%s; pause=%s; autostart=%s", g_padMode, g_d3dMode,
-        g_padModeIdle ? 1 : 0, g_mouseMode, g_kbdMode, g_pauseMode, g_autoStartMode);
+    Out(o, n, "pad=%s; d3d9=%s; frontend-pad=%d; mouse=%s; keyboard=%s; pause=%s; autostart=%s; radial=%s (enabled %d, "
+        "mode %s)", g_padMode, g_d3dMode, g_padModeIdle ? 1 : 0, g_mouseMode, g_kbdMode, g_pauseMode, g_autoStartMode,
+        g_radOpen == 1 ? "open (hold)" : g_radOpen == 2 ? (g_radMode == kRadModeMenu ? "open (menu)" : "open (latched)")
+                                                        : "closed",
+        g_radEnabled, g_radMode == kRadModeMenu ? "menu" : "wheel");
 }
 void ValPlayer(char *o, size_t n) {
     float p[3], r[3];
@@ -2276,6 +2843,8 @@ bool g_timeOk = false, g_pauseOk = false, g_controlOk = false, g_uiOk = false, g
      g_switchOk = false, g_movieOk = false, g_menuLoopOk = false, g_mainStateOk = false;
 float g_mark[3];
 bool g_markSet = false;
+DWORD g_markTick = 0;                          // 0.8.1 player.unstuck
+char g_markUnit[40] = "";
 volatile LONG g_weaponsPending = 0;          // frames until INSTANCE_Post(player, 35, 0) after a costume switch
 char g_menuLoopName[64];
 char g_exeDir[MAX_PATH], g_asiDir[MAX_PATH];
@@ -2320,6 +2889,7 @@ bool RunPause(const char *arg, char *o, size_t n) {
     bool on = BoolArg(arg, (*f & 0x1000) != 0);
     if (on) *f |= 0x1000; else *f &= ~0x1000u;
     InterlockedExchange(&g_menuPaused, 0);      // 0.7.1: set by hand - the menu close does not undo it
+    InterlockedExchange(&g_radPaused, 0);       // 0.10.1: nor the radial close ([Radial] Freeze=world): the user's choice
     Out(o, n, "time.pause %d (streamFlags 0x%08lx)", on ? 1 : 0, *f);
     return true;
 }
@@ -2356,6 +2926,7 @@ bool RunControl(const char *arg, char *o, size_t n) {
     volatile BYTE *b = reinterpret_cast<volatile BYTE *>(kPlayerControl);
     bool on = BoolArg(arg, *b != 0);
     *b = on ? 1 : 0;
+    InterlockedExchange(&g_radCtlOurs, 0);      // 0.10.1: [Radial] Freeze=player does not restore over the user's choice
     Out(o, n, "player.control %d (byte 0x%08lx)", on ? 1 : 0, kPlayerControl);
     return true;
 }
@@ -2518,24 +3089,224 @@ bool RunTeleport(const char *arg, char *o, size_t n) {
     Out(o, n, "player at %.1f %.1f %.1f (tip: cheat.flight on, so Lara does not fall)", p[0], p[1], p[2]);
     return true;
 }
+// 0.10.2 (F6, los7: "Zur Marke" after a jump left Lara hanging at a ledge): marks and safe spots keep Lara's facing too.
+// Only the yaw (instance +0x38, rotation z; TRLAU Instance.h rotation at +0x30) is written back - x / y stay as the game
+// has them. Lara's movement state and velocity are NOT reset: no player-state / velocity field and no "stand now" call
+// is proven (docs Menue-Funktionen-Katalog.md 2 / 17, Befund-*.md: none; locomotion is animation driven), so a recall
+// during a jump or fall keeps that state (she may still grab a ledge in reach) - recall while she stands.
+// 0.10.4 (F6, [Menu] MarkSetStand NOT built): no game function to put the player into standing was found offline -
+// every PC state change goes through the data-driven chart (SCAgent::ChangeState tru+0x387890, called only from the
+// agent's own transition / event code tru+0x387c78 / 0x387d53 / 0x387d9e); the script teleport NsInstance::WarpTo
+// (2007 prototype map) and INSTANCE_SetPositionPlayerFindGround set position / rotation only. Which chart state is
+// "stand" is data - a state log (TruTrace) has to show it first (docs Befund-Menue-Dlc2Player-0411b.md).
+float g_markYaw = 0.0f;
+bool SetYaw(DWORD inst, float yaw) {
+    __try {
+        reinterpret_cast<volatile float *>(inst + kInstanceRotation)[2] = yaw;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
 bool RunMark(const char *, char *o, size_t n) {
     float p[3], r[3];
     DWORD instance = 0;
     if (!ReadLara(p, r, &instance)) { Out(o, n, "needs a level"); return false; }
     memcpy(g_mark, p, sizeof(g_mark));
+    g_markYaw = r[2];                            // 0.10.2
     g_markSet = true;
-    Out(o, n, "mark %.1f %.1f %.1f", p[0], p[1], p[2]);
+    g_markTick = GetTickCount();                 // 0.8.1 player.unstuck: the newer of mark / safe ground wins
+    CurrentUnit(g_markUnit, sizeof(g_markUnit));
+    Out(o, n, "mark %.1f %.1f %.1f yaw %.3f", p[0], p[1], p[2], r[2]);
     return true;
 }
 void ValMark(char *o, size_t n) {
-    if (g_markSet) Out(o, n, "%.1f %.1f %.1f", g_mark[0], g_mark[1], g_mark[2]); else Out(o, n, "-");
+    if (g_markSet) Out(o, n, "%.1f %.1f %.1f yaw %.3f", g_mark[0], g_mark[1], g_mark[2], g_markYaw); else Out(o, n, "-");
 }
 bool RunRecall(const char *, char *o, size_t n) {
     DWORD player = 0;
     if (!NeedPlayer(&player, o, n)) return false;
     if (!g_markSet) { Out(o, n, "no mark (player.mark first)"); return false; }
     if (!SetPosition(player, g_mark)) { Out(o, n, "write failed"); return false; }
-    Out(o, n, "player back at the mark %.1f %.1f %.1f", g_mark[0], g_mark[1], g_mark[2]);
+    bool yaw = SetYaw(player, g_markYaw);
+    Out(o, n, "player back at the mark %.1f %.1f %.1f, yaw %.3f%s (movement state / velocity unchanged)", g_mark[0],
+        g_mark[1], g_mark[2], g_markYaw, yaw ? "" : " NOT written");
+    return true;
+}
+
+// ---- 0.8.1 player.unstuck (P00c: in hall02 with god mode Lara slid into the eitr and could not get out) ----
+// No "Lara stands on ground" flag is proven yet, so "safe ground" is read from the position (0.8.1: once per 15 game
+// frames, standing = height changed less than 5 units over three samples; 0.10.2: see below). A spot goes into a ring
+// of 16 when it is at least
+// 100 units from the newest entry. player.unstuck takes the newer of player.mark and the newest ring entry that is at
+// least 3 s old and 150 units away from Lara (so not the spot she is stuck at); run again within 20 s it goes one
+// entry further back. Same unit only (GameTracker+0x38). "mark" / "safe" force the source.
+//
+// 0.10.2 (F6, B28): the sampler had two faults in the 03.11. tests. los3: the spot it chose (-1311 4869 -683) lay
+// ~7300 units above Lara - recorded during the DLC 2 intro (a cinematic: Lara's instance stands still somewhere
+// else). los7: walking on uneven ground changes the height by >= 5 units within 1 s, so hardly anything was recorded
+// and unstuck went back to the DLC 2 start. Now:
+//   * no sampling (and the window starts again) while the menu or the ring is open, the world pause bit
+//     (streamFlags 0x1000, time.pause) is set, the main state is not 1 (play game; TRLAU enum: 5 = cinematic), a
+//     cinematic runs (the game's own test tru+0x53f00: [0xe7f1c0] && byte +0xdd && dword +0x2c != -1 - the TU gate
+//     TruShadowPower 0.9 uses; read here, not called; bytes checked at load), player.control is off, time.scale is
+//     not 1 (the window is in game frames), flight is on or health <= 0.
+//   * a HEURISTIC instead of "height still" (no proven "on ground" signal: no player-state / collision flag is
+//     documented; the state-mode word [0xfada74] is rewritten by every state entry with undocumented bits): 7 samples
+//     5 game frames apart (~1 s at 30 frames/s). The middle sample is a safe spot when every sample lies within 12
+//     units of the straight line (chord) between the first and the last one - free flight (jump, fall) is a parabola
+//     and leaves the chord by g t^2 / 8 (~120 units over 1 s at ~980 units/s^2, 1 unit ~ 1 cm) - and the slope from
+//     first to last is at most 0.8 (~39 degrees: no ladder, climb or lift), with at most 10 units extra for steps.
+//     Walking up / down a ramp or over small bumps passes, standing still passes as before. Known blind spots
+//     (documented in README / docs\TruMenu-0.10.2.md): hanging at a ledge and shimmying, swimming at the surface and
+//     riding a moving platform look like ground too.
+struct SafeSpot { float p[3]; float yaw; DWORD tick; char unit[40]; };
+const int kSafeMax = 16;
+const int kSafeEvery = 5, kSafeWindow = 7;            // 0.10.2: sample spacing (game frames), samples per window
+const float kSafeChord = 12.0f, kSafeSlope = 0.8f, kSafeStep = 10.0f;
+SafeSpot g_safe[kSafeMax];
+int g_safeCount = 0, g_safeNext = 0;           // ring (game thread writes, render thread reads the count)
+CRITICAL_SECTION g_safeLock;
+DWORD g_unstuckLastTick = 0, g_unstuckLastSpot = 0;   // repeat: entries older than the last one used
+DWORD PlayerState();                                  // weapons section below
+const char *g_safePause = "-";                        // 0.10.2: why the sampler waits now (player.unstuck value)
+LONG g_safeRejected = 0, g_safeAccepted = 0;          // windows that failed / passed the ground test
+bool g_cineOk = false;                                // 0.10.2: tru+0x53f00 bytes as expected
+
+// 0.10.2: the game's cinematic test tru+0x53f00 (TruShadowPower's kCinematic), as reads
+bool CinematicNow() {
+    if (!g_cineOk) return false;
+    DWORD cine = 0, track = 0;
+    BYTE on = 0;
+    if (!ReadDword(0x00e7f1c0, &cine) || !cine) return false;
+    if (!ReadByte(cine + 0xdd, &on) || !on) return false;
+    return ReadDword(cine + 0x2c, &track) && track != 0xffffffff;
+}
+
+// why no safe ground is sampled now ("" = sample)
+const char *SafePauseReason() {
+    if (g_menuOpen) return "menu open";
+    if (g_radOpen) return "ring open";
+    if (g_flight) return "flight on";
+    DWORD v = 0;
+    if (ReadDword(kStreamFlags, &v) && (v & 0x1000)) return "world paused (streamFlags 0x1000)";
+    if (g_mainStateOk && ReadDword(kMainState, &v) && v != 1) return "main state not 1 (play game)";
+    if (CinematicNow()) return "cinematic";
+    BYTE control = 1;
+    if (g_controlOk && ReadByte(kPlayerControl, &control) && !control) return "player control off";
+    float scale = 1.0f;
+    if (g_timeOk && ReadFloats(kTimeDilation, &scale, 1) && (scale < 0.99f || scale > 1.01f)) return "time.scale not 1";
+    return "";
+}
+
+void SafeGroundTick() {
+    static int frames = 0;
+    static float w[kSafeWindow][4];                   // x y z yaw, oldest first
+    static int wCount = 0;
+    if (++frames < kSafeEvery) return;
+    frames = 0;
+    float p[3], r[3];
+    DWORD inst = 0;
+    const char *why = SafePauseReason();
+    float health = 0.0f;
+    DWORD ps = PlayerState();
+    if (!why[0] && !ReadLara(p, r, &inst)) why = "no player";
+    if (!why[0] && (!ps || !ReadFloats(ps + 0x628, &health, 1) || !(health > 0.0f))) why = "health <= 0";
+    g_safePause = why[0] ? why : "-";
+    if (why[0]) { wCount = 0; return; }
+    if (wCount == kSafeWindow) {
+        memmove(w[0], w[1], sizeof(w[0]) * (kSafeWindow - 1));
+        --wCount;
+    }
+    w[wCount][0] = p[0]; w[wCount][1] = p[1]; w[wCount][2] = p[2]; w[wCount][3] = r[2];
+    if (++wCount < kSafeWindow) return;
+    const float *a = w[0], *b = w[kSafeWindow - 1];
+    float hx = b[0] - a[0], hy = b[1] - a[1], rise = b[2] - a[2];
+    float run = sqrtf(hx * hx + hy * hy);
+    bool ground = fabsf(rise) <= kSafeSlope * run + kSafeStep;
+    for (int i = 1; i < kSafeWindow - 1 && ground; ++i) {
+        float expect = a[2] + rise * static_cast<float>(i) / static_cast<float>(kSafeWindow - 1);
+        if (fabsf(w[i][2] - expect) > kSafeChord) ground = false;
+    }
+    if (!ground) { ++g_safeRejected; return; }
+    ++g_safeAccepted;
+    const float *m = w[kSafeWindow / 2];
+    char unit[40];
+    CurrentUnit(unit, sizeof(unit));
+    EnterCriticalSection(&g_safeLock);
+    bool add = true;
+    if (g_safeCount) {
+        const SafeSpot &last = g_safe[(g_safeNext + kSafeMax - 1) % kSafeMax];
+        float dx = m[0] - last.p[0], dy = m[1] - last.p[1], dz = m[2] - last.p[2];
+        add = dx * dx + dy * dy + dz * dz >= 100.0f * 100.0f || _stricmp(last.unit, unit) != 0;
+    }
+    if (add) {
+        SafeSpot &s = g_safe[g_safeNext];
+        memcpy(s.p, m, sizeof(s.p));
+        s.yaw = m[3];
+        s.tick = GetTickCount();
+        strncpy_s(s.unit, sizeof(s.unit), unit, _TRUNCATE);
+        g_safeNext = (g_safeNext + 1) % kSafeMax;
+        if (g_safeCount < kSafeMax) ++g_safeCount;
+    }
+    LeaveCriticalSection(&g_safeLock);
+}
+void ValUnstuck(char *o, size_t n) {
+    EnterCriticalSection(&g_safeLock);
+    int c = g_safeCount;
+    SafeSpot last = {};
+    if (c) last = g_safe[(g_safeNext + kSafeMax - 1) % kSafeMax];
+    LeaveCriticalSection(&g_safeLock);
+    // 0.10.2: + windows passed / failed by the ground test and why the sampler waits
+    if (!c) Out(o, n, "%d safe spots; mark %s; ground windows %ld ok / %ld not; waiting: %s", c, g_markSet ? "set" : "-",
+                g_safeAccepted, g_safeRejected, g_safePause);
+    else Out(o, n, "%d safe spots, newest %.0f %.0f %.0f (%lu s ago, %s); mark %s; ground windows %ld ok / %ld not; "
+             "waiting: %s", c, last.p[0], last.p[1], last.p[2], (GetTickCount() - last.tick) / 1000, last.unit,
+             g_markSet ? "set" : "-", g_safeAccepted, g_safeRejected, g_safePause);
+}
+bool RunUnstuck(const char *arg, char *o, size_t n) {
+    DWORD player = 0;
+    if (!NeedPlayer(&player, o, n)) return false;
+    float p[3], r[3];
+    DWORD inst = 0;
+    if (!ReadLara(p, r, &inst)) { Out(o, n, "needs a level"); return false; }
+    bool onlyMark = arg && !_stricmp(arg, "mark"), onlySafe = arg && !_stricmp(arg, "safe");
+    if (arg && arg[0] && !onlyMark && !onlySafe) { Out(o, n, "usage: player.unstuck [mark|safe]"); return false; }
+    char unit[40];
+    CurrentUnit(unit, sizeof(unit));
+    DWORD now = GetTickCount();
+    bool repeat = g_unstuckLastTick && now - g_unstuckLastTick < 20000;
+    // newest usable ring entry
+    SafeSpot spot = {};
+    bool haveSpot = false;
+    EnterCriticalSection(&g_safeLock);
+    for (int i = 1; i <= g_safeCount && !onlyMark; ++i) {
+        const SafeSpot &s = g_safe[(g_safeNext + kSafeMax - i) % kSafeMax];
+        if (_stricmp(s.unit, unit) != 0 || now - s.tick < 3000) continue;
+        if (repeat && g_unstuckLastSpot && static_cast<LONG>(s.tick - g_unstuckLastSpot) >= 0) continue;
+        float dx = p[0] - s.p[0], dy = p[1] - s.p[1], dz = p[2] - s.p[2];
+        if (dx * dx + dy * dy + dz * dz < 150.0f * 150.0f) continue;
+        spot = s;
+        haveSpot = true;
+        break;
+    }
+    LeaveCriticalSection(&g_safeLock);
+    bool markOk = g_markSet && !onlySafe && !_stricmp(g_markUnit, unit) && (!repeat || onlyMark);   // repeat: further back
+    bool useMark = markOk && (!haveSpot || static_cast<LONG>(g_markTick - spot.tick) > 0 || onlyMark);
+    if (!useMark && !haveSpot) {
+        Out(o, n, "no target: %s%s", markOk || onlySafe ? "" : "no player.mark in this unit, ",
+            onlyMark ? "" : "no safe spot >= 3 s old and >= 150 units away in this unit (walk on firm ground first)");
+        return false;
+    }
+    const float *to = useMark ? g_mark : spot.p;
+    if (!SetPosition(player, to)) { Out(o, n, "write failed"); return false; }
+    float yaw = useMark ? g_markYaw : spot.yaw;  // 0.10.2: the facing of that moment too
+    bool yawOk = SetYaw(player, yaw);
+    g_unstuckLastTick = now;
+    g_unstuckLastSpot = useMark ? g_markTick : spot.tick;
+    Out(o, n, "player.unstuck: %s %.0f %.0f %.0f yaw %.3f%s%s (from %.0f %.0f %.0f)", useMark ? "player.mark" : "safe ground",
+        to[0], to[1], to[2], yaw, yawOk ? "" : " (yaw NOT written)", useMark ? "" : (repeat ? ", one further back" : ""),
+        p[0], p[1], p[2]);
     return true;
 }
 bool RunGoto(const char *arg, char *o, size_t n) {
@@ -3809,6 +4580,181 @@ bool RunGearGive(const char *arg, char *o, size_t n) {
     return true;
 }
 
+// ---- 0.10 stage R2: instance.spawn <object> at Lara ([Radial] Spawn=1; workspace docs\Menue-Funktionen-Katalog.md
+// section 6 "Spawn object at Lara", addresses re-read with tools/pe_dis.py / pe_callers.py / pe_find_bytes.py,
+// byte list work\asi\menu010\precheck_010.txt) ----
+// The order of the catalog row, each step the game's own function:
+//   1. DRM present: 0x5bf7b0(name) = LOAD_UnitFileName 0x477970(buf[0x100], name) ("%s%s.drm" 0x8443bc with the prefix
+//      0xa03824) + GetFS 0x472b50 ([0x9ce278]) -> vtable +8 (FileExists) - the game's own composition (the costume
+//      validator 0x5c54e0 tail-calls it, the level load calls it at 0x5de368); bool cdecl, plain ret
+//   2. OBTABLE_GetObjectID 0x5bf770 != 0 (TruMenu's ObjectId reads the same table)
+//   3. STREAM_GetObjectTrackerByName 0x5c17d0(name) cdecl: id -> 0x5c1550(id, 0) = find or request the tracker entry
+//      (0xdb7400, 0xcc entries of 0x24: +8 Object*, +0xc s16 id, +0xe u16 status; a new entry gets status 1 at
+//      0x5c1670; no free entry = "Out of objecttracker space!" 0x854154 - so TruMenu wants 2 free entries first)
+//   4. STREAM_PollLoadQueue 0x5c1da0 () until status 2 = loaded (the game's own loaded test 0x5bf2e0 "cmp word
+//      [eax+0xe], 2"), at most kSpawnTimeoutMs; the costume switch 0x6f0bc5 polls the same way after 0x5c17d0
+//   5. INSTANCE_BirthObjectNoParent 0x5bd0f0(StreamUnitID [0xe7f148], &pos, &rot, NULL, tracker->object, 0, 1) cdecl,
+//      7 arguments (the script native 0x780aaf passes (unit, &pos, &rot, x, object, 0, 1), add esp 0x1c); pos / rot are
+//      copied at once (0x5bd180: 16 bytes each into instance +0x20 / +0x30); returns the new instance or 0
+// Runs on the game thread (queued); the load blocks it (a stutter), inside __try.
+typedef bool(__cdecl *DrmExistsFn)(const char *name);
+typedef DWORD(__cdecl *TrackerByNameFn)(const char *name);
+typedef int(__cdecl *PollLoadQueueFn)();
+typedef DWORD(__cdecl *BirthObjectFn)(DWORD unitId, const float *pos, const float *rot, void *intro, DWORD object, int a,
+                                      int b);
+const DWORD kDrmExists = 0x005bf7b0, kTrackerByName = 0x005c17d0, kPollLoadQueue = 0x005c1da0,
+            kBirthObject = 0x005bd0f0;
+const DWORD kSpawnTimeoutMs = 3000;
+bool g_spawnOk = false;
+const char *g_spawnWhy = "not checked";
+LONG g_spawnCount = 0;
+
+bool SpawnCheck() {
+    bool drm = HexBytesAt(kDrmExists, "81ec04010000 a1e8d78b00 33c4 89842400010000 8b842408010000 50 8d442404 50 "
+                                      "e89a81ebff 83c408 e87233ebff 8b10 8b5208 8d0c24 51 8bc8 ffd2") &&
+               HexBytesAt(0x00477970, "8b442408 8b4c2404 50 682438a000 68bc438400 51 e86cc23900 83c410 c3") &&
+               HexBytesAt(0x008443bc, "25732573 2e64726d 00") && HexBytesAt(0x00472b50, "a178e29c00 c3") &&
+               HexBytesAt(0x005c54f8, "e9b3a2ffff");
+    bool tracker = HexBytesAt(kTrackerByName, "56 57 8b7c240c 57 e894dfffff 8bf0 83c404 85f6 750e 57 68b8418500 "
+                                              "e86073ebff 83c408 6a00 56 e855fdffff") &&
+                   HexBytesAt(0x005c17fb, "83c408 83f8ff 5f 5e 7503 33c0 c3 8d04c0 8d04850074db00 c3") &&
+                   HexBytesAt(0x005c15c6, "66837e0e00 7459") && HexBytesAt(0x005c162e, "e87dfeffff 6854418500 e87356fdff") &&
+                   HexBytesAt(0x005c1670, "66c7460e0100 66896e0c") &&
+                   HexBytesAt(0x005bf2d4, "b80074db00 b9cc000000 57 90 6683780e02 7508 0fbf780c 3bfa");
+    bool poll = HexBytesAt(kPollLoadQueue, "56 e8aa0debff 8b10 8bc8 8b4218 ffd0 8bf0 e89a0debff 8b10 8bc8 8b421c ffd0 "
+                                           "83fe01 5e 7416") &&
+                HexBytesAt(0x005c1dd8, "33c0 c3 b801000000 c3") &&
+                HexBytesAt(0x006f0bc5, "e8060cedff 83c414 8bf0 e8cc11edff 84c0 7423");
+    bool birth = HexBytesAt(kBirthObject, "55 8bec 83e4f0 83ec24 53 56 57 8b7d18 85ff 897c242c 0f8455010000 8b07 "
+                                          "f6400810 0f8549010000 e8d45dffff 8bf0 85f6") &&
+                 HexBytesAt(0x005bd180, "8b03 f30f10051c118400 894620 8b4b04 894e24 8b5308 895628 8b430c 89462c 8b0f "
+                                        "894e30") &&
+                 HexBytesAt(0x005bd257, "8bc6 5f 5e 5b 8be5 5d c3") &&
+                 HexBytesAt(0x00780aaf, "6a01 6a00 53 52 83c030 50 57 51 e830c6e3ff 8bf0 83c41c");
+    bool names = HexBytesAt(kNameLookup, kNameLookupBytes) &&
+                 HexBytesAt(0x005dfc88, "8b1548f1e700 3b90e0000000");   // StreamUnitID 0xe7f148 vs player +0xe0
+    g_spawnWhy = !drm ? "DRM check 0x5bf7b0 / LOAD_UnitFileName 0x477970 / GetFS 0x472b50 bytes differ"
+               : !tracker ? "STREAM_GetObjectTrackerByName 0x5c17d0 / tracker table code differs"
+               : !poll ? "STREAM_PollLoadQueue 0x5c1da0 bytes differ"
+               : !birth ? "INSTANCE_BirthObjectNoParent 0x5bd0f0 / its script native call 0x780aaf differ"
+               : !names ? "OBTABLE_GetObjectID 0x5bf770 / the StreamUnitID read 0x5dfc88 differ"
+               : !g_playerOk || !g_unitOk ? "player / stream unit code (0.1 / 0.2 checks) failed"
+               : !g_mainStateOk ? "main state check (0.3) failed" : "ok";
+    return drm && tracker && poll && birth && names && g_playerOk && g_unitOk && g_mainStateOk;
+}
+
+// [Radial] Spawn is read again from TruMenu.ini (at most once a second), so the TO TEST switch
+// "ini:TruMenu:Radial:Spawn" works in the running game - the safe default 0 stays until the owner ticks it
+bool SpawnOn() {
+    static DWORD last = 0;
+    DWORD now = GetTickCount();
+    if (g_iniPath[0] && (!last || now - last > 1000)) {
+        last = now ? now : 1;
+        g_radSpawn = GetPrivateProfileIntA("Radial", "Spawn", g_radSpawn, g_iniPath) != 0 ? 1 : 0;
+    }
+    return g_radSpawn != 0;
+}
+
+void ValSpawn(char *o, size_t n) {
+    Out(o, n, "%s; [Radial] Spawn=%d; %ld spawned this session", g_spawnOk ? "code ok" : g_spawnWhy, g_radSpawn,
+        g_spawnCount);
+}
+
+// tracker entries: the one of <id> (status != 0) or -1, and the number of free ones (status 0)
+int TrackerScan(int id, int *freeCount) {
+    int found = -1, unused = 0;
+    for (int i = 0; i < kObjectEntries; ++i) {
+        WORD status = 0, oid = 0;
+        DWORD e = kObjectTable + static_cast<DWORD>(i) * 0x24;
+        if (!ReadWord(e + 0xe, &status) || !ReadWord(e + 0xc, &oid)) continue;
+        if (!status) ++unused;
+        else if (static_cast<SHORT>(oid) == id && found < 0) found = i;
+    }
+    *freeCount = unused;
+    return found;
+}
+
+bool RunInstanceSpawn(const char *arg, char *o, size_t n) {
+    if (!SpawnOn()) { Out(o, n, "off ([Radial] Spawn=0 - stage R2, back up the saves before switching it on)"); return false; }
+    if (!g_spawnOk) { Out(o, n, "disabled: pre-check failed (%s)", g_spawnWhy); return false; }
+    if (!g_experimental) { Out(o, n, "experimental actions off ([Cheat] Experimental=0)"); return false; }
+    DWORD state = 0, player = 0;
+    ReadDword(kMainState, &state);
+    if (!InLevel() || state != 1 || !ReadDword(kPlayerPtr, &player) || !player) {
+        Out(o, n, "in a level only (main state %lu, needs 1)", state);
+        return false;
+    }
+    char why[160];
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: %s", why); return false; }
+    static char name[64];                    // stays valid for the game (tracker / log calls keep the pointer)
+    size_t len = 0;
+    for (; arg && arg[len] && arg[len] != ' ' && len + 1 < sizeof(name); ++len) {
+        char c = static_cast<char>(tolower(static_cast<unsigned char>(arg[len])));
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) {
+            Out(o, n, "object names are a-z 0-9 _ only");
+            return false;
+        }
+        name[len] = c;
+    }
+    name[len] = 0;
+    if (!len) { Out(o, n, "usage: instance.spawn <object name> (e.g. sh_ei_combat_crate_a, g_healthpack)"); return false; }
+    int id = ObjectId(name);
+    if (!id) { Out(o, n, "'%s' is not in the object list (OBTABLE_GetObjectID would answer 0)", name); return false; }
+    int freeCount = 0;
+    int entry = TrackerScan(id, &freeCount);
+    if (entry < 0 && freeCount < 2) {
+        Out(o, n, "refused: object tracker nearly full (%d free of %d) - the game would stop with \"Out of objecttracker "
+            "space!\"", freeCount, kObjectEntries);
+        return false;
+    }
+    __declspec(align(16)) float pos[4], rot[4];
+    DWORD unitId = 0, playerUnit = 0, tracker = 0, object = 0, inst = 0, start = GetTickCount(), polls = 0;
+    WORD status = 0;
+    bool exists = false;
+    __try {
+        exists = reinterpret_cast<DrmExistsFn>(kDrmExists)(name);
+        if (!exists) {
+            Out(o, n, "no %s.drm (the game's FileExists 0x5bf7b0 answered 0)", name);
+            return false;
+        }
+        tracker = reinterpret_cast<TrackerByNameFn>(kTrackerByName)(name);
+        if (!tracker) { Out(o, n, "STREAM_GetObjectTrackerByName(\"%s\") = 0", name); return false; }
+        while (ReadWord(tracker + 0xe, &status) && status != 2 && GetTickCount() - start < kSpawnTimeoutMs) {
+            reinterpret_cast<PollLoadQueueFn>(kPollLoadQueue)();
+            ++polls;
+            Sleep(1);
+        }
+        if (status != 2) {
+            Out(o, n, "%s not loaded within %lu ms (tracker 0x%08lx status %u after %lu polls) - the load request stays; "
+                "run it again", name, kSpawnTimeoutMs, tracker, status, polls);
+            return false;
+        }
+        if (!ReadDword(tracker + 8, &object) || !object) { Out(o, n, "tracker 0x%08lx has no object", tracker); return false; }
+        if (!ReadFloats(player + kInstancePosition, pos, 4) || !ReadFloats(player + kInstanceRotation, rot, 4) ||
+            !ReadDword(kUnitId, &unitId)) {
+            Out(o, n, "player position / stream unit id not readable");
+            return false;
+        }
+        ReadDword(player + 0xe0, &playerUnit);
+        inst = reinterpret_cast<BirthObjectFn>(kBirthObject)(unitId, pos, rot, nullptr, object, 0, 1);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        Out(o, n, "exception while spawning %s (tracker 0x%08lx, object 0x%08lx)", name, tracker, object);
+        Log(0, "instance.spawn: exception (%s, tracker 0x%08lx status %u, object 0x%08lx)", name, tracker, status, object);
+        return false;
+    }
+    if (!inst) {
+        Out(o, n, "INSTANCE_BirthObjectNoParent returned 0 for %s (object 0x%08lx, unit %lu)", name, object, unitId);
+        return false;
+    }
+    InterlockedIncrement(&g_spawnCount);
+    Out(o, n, "%s (id %d) born at Lara (%.0f %.0f %.0f): instance 0x%08lx; tracker 0x%08lx %s, %lu polls / %lu ms; "
+        "stream unit %lu (player +0xe0 = %lu)", name, id, pos[0], pos[1], pos[2], inst, tracker,
+        entry >= 0 ? "was in the table" : "requested now", polls, GetTickCount() - start, unitId, playerUnit);
+    Log(1, "instance.spawn: %s", o);
+    return true;
+}
+
 // ======================================================================================================================
 // 0.8 Cheats page (docs\Befund-Prototyp-2007.md section 3i; names from the 2007 prototype map, PC addresses by code
 // semantics, checked with tools/pe_dis.py / pe_abs_uses.py / pe_callers.py; byte list work\asi\menu080\precheck_080.txt).
@@ -3837,7 +4783,21 @@ bool g_godOk = false, g_godFullOk = false, g_ohkOk = false, g_enemyHpOk = false,
 const char *g_godWhy = "not checked", *g_godFullWhy = "not checked", *g_ohkWhy = "not checked",
            *g_enemyHpWhy = "not checked", *g_infAmmoWhy = "not checked", *g_fillWhy = "not checked",
            *g_codeWhy = "not checked";
-bool g_godFullBitOurs = false;              // cheat.godfull set cheatMode bit 0 (and clears only that)
+// 0.10.2 (F15, los7 2026-11-03: cheatMode bit 0 made Lara fly): cheat.godfull no longer touches cheatMode. It uses the
+// player's own no-damage bit instead: [0xfada74] & 0x20000 (prototype ControlFlag bit "rlwinm 14,14", docs
+// Abakus-Pruefung.md 18.7 / item 1) is tested before anything else in ApplyDamage 0x6f4f71 - the only function that
+// lowers health (P+0x628 writes in 0x6e0000..0x780000: 0x6f4e6c / 0x7000d9 = refill, 0x6f4f2e = GainHealth, 0x6f4fd7 /
+// 0x6f5004 inside ApplyDamage, 0x6f55cc = HealthInstantDeath) - and by all three of its callers (PlayerTakeDamage
+// 0x6f5042 before the type 8 / 5 tests, DamageBypass 0x6f5140, 0x703008), so types 8 / 5 are blocked too. 0x721c8d
+// skips ProcessHealth 0x6f5160 while it is set (the death state's own value 0x40020208 at 0x75a447 contains it). State
+// entries overwrite the word (mov [0xfada74], imm), so the bit is OR-ed in again once per game frame (PadHook, before
+// GAMELOOP_Process): a state entry and a hit in the same frame can still pass one hit. Instant deaths
+// (HealthInstantDeath 0x6f55a0, callers 0x75afda / 0x75b099) test neither this bit nor cheatMode - they still kill.
+const DWORD kPlayerModeFlags = 0x00fada74;  // player state-mode flags (written by every state entry)
+const DWORD kNoDamageBit = 0x00020000;
+volatile LONG g_godFull = 0;                // cheat.godfull on (game thread re-applies the bit)
+bool g_noDamageOurs = false;                // game thread: the bit was absent and we set it ...
+DWORD g_noDamageWord = 0;                   // ... and this is the word we left (an unchanged word = still ours)
 volatile LONG g_infAmmo = 0;                // cheat.ammo on (re-applied every 30 game frames)
 struct AmmoMark { DWORD t; bool ours; bool seen; };
 AmmoMark g_ammoMarks[32];
@@ -3874,39 +4834,63 @@ bool RunCheatGod(const char *arg, char *o, size_t n) {
         kGodByte, on ? 1 : 0);
     CheatPersistSave();
     Out(o, n, "cheat.god %d (gInvincibleCheat 0x%08lx; damage types 8 / 5 and instant deaths still pass - cheat.godfull "
-        "adds cheatMode & 1)", on ? 1 : 0, kGodByte);
+        "adds the no-damage bit [0x%08lx] & 0x%05lx)", on ? 1 : 0, kGodByte, kPlayerModeFlags, kNoDamageBit);
     return true;
 }
 
-// god mode + GameTracker.cheatMode bit 0 (PlayerTakeDamage 0x6f5030 returns at once when it is set). That bit is also
-// cheat.flight's switch and has 60 uses in tru.exe (pe_abs_uses.py) - side effects are expected, live test.
-void ValCheatGodFull(char *o, size_t n) {
-    BYTE mode = 0;
-    ReadByte(kCheatMode, &mode);
-    Out(o, n, "%d", ByteAt(kGodByte) && (mode & 1) && g_godFullBitOurs ? 1 : 0);
+// 0.10.2: god mode + the player's no-damage bit (see kPlayerModeFlags). Game thread (QueueItem) and NoDamageTick.
+void NoDamageApply() {
+    DWORD word = 0;
+    if (!ReadDword(kPlayerModeFlags, &word)) return;
+    if (!(word & kNoDamageBit)) {
+        *reinterpret_cast<volatile DWORD *>(kPlayerModeFlags) = word | kNoDamageBit;
+        g_noDamageOurs = true;
+    } else if (word != g_noDamageWord) {
+        g_noDamageOurs = false;              // a state entry wrote the word with the bit itself (e.g. the death state)
+    }
+    g_noDamageWord = word | kNoDamageBit;
 }
+// game thread, once per game frame (PadHook)
+void NoDamageTick() {
+    if (!g_godFull || !g_godFullOk || !InLevel()) return;
+    NoDamageApply();
+}
+void ValCheatGodFull(char *o, size_t n) { Out(o, n, "%d", g_godFull && ByteAt(kGodByte) ? 1 : 0); }
 bool RunCheatGodFull(const char *arg, char *o, size_t n) {
     if (!CheatGate(g_godFullOk, g_godFullWhy, o, n)) return false;
-    BYTE mode = 0;
-    ReadByte(kCheatMode, &mode);
     char cur[4];
     ValCheatGodFull(cur, sizeof(cur));
     bool on = BoolArg(arg, cur[0] == '1');
+    const char *flight = "";
     if (on) {
-        if (!(mode & 1)) { g_godFullBitOurs = true; PutByte(kCheatMode, static_cast<BYTE>(mode | 1)); }
-        else if (!g_godFullBitOurs) g_godFullBitOurs = !g_flight;   // set by someone else: keep it at the off
         PutByte(kGodByte, 1);
+        InterlockedExchange(&g_godFull, 1);
+        NoDamageApply();
     } else {
+        InterlockedExchange(&g_godFull, 0);
         PutByte(kGodByte, 0);
-        if (g_godFullBitOurs && !g_flight) PutByte(kCheatMode, static_cast<BYTE>(mode & ~1));
-        g_godFullBitOurs = false;
+        DWORD word = 0;
+        // clear the bit only while the word is still the one we left (no state entry since): else it is the game's
+        if (g_noDamageOurs && ReadDword(kPlayerModeFlags, &word) && word == g_noDamageWord)
+            *reinterpret_cast<volatile DWORD *>(kPlayerModeFlags) = word & ~kNoDamageBit;
+        g_noDamageOurs = false;
+        // F15: a flight left over (0.8 - 0.10.1 godfull set cheatMode bit 0 without message 12, or a [Cheats] Persist
+        // restore of that) ends with the off - unless cheat.flight itself is on
+        BYTE mode = 0;
+        DWORD player = 0;
+        if (ReadByte(kCheatMode, &mode) && (mode & 1) && !g_flight) {
+            PutByte(kCheatMode, static_cast<BYTE>(mode & ~1));
+            if (g_postOk && ReadDword(kPlayerPtr, &player) && player) Post(player, 12, 0);   // as cheat.flight 0
+            flight = "; cheatMode bit 0 (flight) was set without cheat.flight - cleared, message 12 (0) posted";
+        }
     }
-    ReadByte(kCheatMode, &mode);
-    Log(1, "cheat: god mode full %s (byte 0x%08lx = %d, cheatMode 0x%08lx = %u)", on ? "ON" : "OFF", kGodByte, on ? 1 : 0,
-        kCheatMode, mode);
+    DWORD word = 0;
+    ReadDword(kPlayerModeFlags, &word);
+    Log(1, "cheat: god mode full %s (byte 0x%08lx = %d, mode flags [0x%08lx] = 0x%08lx%s)", on ? "ON" : "OFF", kGodByte,
+        on ? 1 : 0, kPlayerModeFlags, word, flight);
     CheatPersistSave();
-    Out(o, n, "cheat.godfull %d (gInvincibleCheat + cheatMode bit 0 = %u; the bit is also cheat.flight's switch)", on ? 1 : 0,
-        mode & 1);
+    Out(o, n, "cheat.godfull %d (gInvincibleCheat + no-damage bit [0x%08lx] & 0x%05lx per frame, no flight; instant "
+        "deaths still kill%s)", on ? 1 : 0, kPlayerModeFlags, kNoDamageBit, flight);
     return true;
 }
 
@@ -3950,9 +4934,23 @@ int AmmoMarkFind(DWORD t) {
     for (int i = 0; i < g_ammoMarkCount; ++i) if (g_ammoMarks[i].t == t) return i;
     return -1;
 }
-// game thread: on = set the bit on every slot weapon (remember which ones we changed); off = clear ours
-int InfAmmoWalk(bool on, int *changed) {
+// game thread: on = set the bit on every slot weapon (remember which ones we changed); off = clear ours.
+// 0.8.1 (P00c: live "2 weapon(s), 0 bit(s) set" in hall02, run 223338): the reload 0x69c600 skips the reserve when
+// T+0xa (ammo type) == 0xff OR T+0x88 & 0x80 (bytes 0x69c623..0x69c635, read again 2026-11-02) - a weapon with type
+// 0xff (the pistols) or with the bit already set needs nothing, so "0 set" for the two pistol hands is the expected
+// answer, not a failed write. detail (optional) names every slot weapon with type / flags and what happened.
+int InfAmmoWalk(bool on, int *changed, char *detail = nullptr, size_t dn = 0) {
     *changed = 0;
+    if (detail && dn) detail[0] = 0;
+    size_t used = 0;
+    auto note = [&](const char *fmt, ...) {
+        if (!detail || used + 1 >= dn) return;
+        va_list ap;
+        va_start(ap, fmt);
+        int w = _vsnprintf_s(detail + used, dn - used, _TRUNCATE, fmt, ap);
+        va_end(ap);
+        if (w > 0) used += static_cast<size_t>(w);
+    };
     DWORD wm = WeaponManager();
     if (!wm) return -1;
     for (int i = 0; i < g_ammoMarkCount; ++i) g_ammoMarks[i].seen = false;
@@ -3961,6 +4959,8 @@ int InfAmmoWalk(bool on, int *changed) {
         for (int left = 0; left < 2; ++left) {
             DWORD inst = HandleInstance(wm + (left ? 0xc : 0x4) + 0x10 * slot);
             if (!inst) continue;
+            char name[48];
+            if (!InstanceObjectName(inst, name, sizeof(name))) strncpy_s(name, sizeof(name), "?", _TRUNCATE);
             DWORD t = 0;
             __try {
                 t = reinterpret_cast<InstanceQueryFn>(kInstanceQuery)(inst, 0x36);
@@ -3969,23 +4969,39 @@ int InfAmmoWalk(bool on, int *changed) {
                 t = 0;
             }
             BYTE flags = 0, type = 0;
-            if (!t || !ReadByte(t + 0x88, &flags) || !ReadByte(t + 0xa, &type)) continue;
+            if (!t || !ReadByte(t + 0x88, &flags) || !ReadByte(t + 0xa, &type)) {
+                note("%sslot %d%s %s: query 0x36 = 0x%08lx - no weapon data", used ? "; " : "", slot, left ? "L" : "",
+                     name, t);
+                continue;
+            }
             ++weapons;
             int k = AmmoMarkFind(t);
             if (k >= 0) g_ammoMarks[k].seen = true;
+            const char *what = "-";
             if (on) {
-                if (type == 0xff) continue;                  // no ammo type: already unlimited
-                if (!(flags & 0x80)) {
-                    if (PutByte(t + 0x88, static_cast<BYTE>(flags | 0x80))) ++*changed;
+                if (type == 0xff) {
+                    what = "ammo type 0xff = unlimited already (the reload never uses a reserve)";
+                } else if (!(flags & 0x80)) {
+                    bool put = PutByte(t + 0x88, static_cast<BYTE>(flags | 0x80));
+                    if (put) ++*changed;
+                    what = put ? "bit set" : "write failed";
                     if (k < 0 && g_ammoMarkCount < 32) { g_ammoMarks[g_ammoMarkCount++] = {t, true, true}; }
                     else if (k >= 0) g_ammoMarks[k].ours = true;
-                } else if (k < 0 && g_ammoMarkCount < 32) {
-                    g_ammoMarks[g_ammoMarkCount++] = {t, false, true};   // the weapon had the bit itself
+                } else {
+                    what = k >= 0 && g_ammoMarks[k].ours ? "bit set by TruMenu (same weapon data as another slot)"
+                                                         : "bit 0x80 set already (by the weapon itself)";
+                    if (k < 0 && g_ammoMarkCount < 32) g_ammoMarks[g_ammoMarkCount++] = {t, false, true};
                 }
             } else if (k >= 0 && g_ammoMarks[k].ours && (flags & 0x80)) {
-                if (PutByte(t + 0x88, static_cast<BYTE>(flags & ~0x80))) ++*changed;
+                bool put = PutByte(t + 0x88, static_cast<BYTE>(flags & ~0x80));
+                if (put) ++*changed;
+                what = put ? "bit cleared" : "write failed";
                 g_ammoMarks[k].ours = false;
+            } else {
+                what = "not ours - unchanged";
             }
+            note("%sslot %d%s %s: T 0x%08lx type %d flags 0x%02x -> %s", used ? "; " : "", slot, left ? "L" : "", name, t,
+                 type == 0xff ? -1 : static_cast<int>(type), flags, what);
         }
     // marks of weapon data no slot returned this time are dropped (never written again: the data may be gone)
     if (weapons) {
@@ -4000,13 +5016,16 @@ void ValCheatAmmo(char *o, size_t n) { Out(o, n, "%d", g_infAmmo ? 1 : 0); }
 bool RunCheatAmmo(const char *arg, char *o, size_t n) {
     if (!CheatGate(g_infAmmoOk, g_infAmmoWhy, o, n)) return false;
     bool on = BoolArg(arg, g_infAmmo != 0);
-    int changed = 0, weapons = InfAmmoWalk(on, &changed);
+    char detail[700];
+    int changed = 0, weapons = InfAmmoWalk(on, &changed, detail, sizeof(detail));
     InterlockedExchange(&g_infAmmo, on ? 1 : 0);
-    Log(1, "cheat: infinite ammo %s (%d slot weapon(s), %d weapon data bit(s) T+0x88 & 0x80 %s)", on ? "ON" : "OFF",
-        weapons < 0 ? 0 : weapons, changed, on ? "set" : "cleared");
+    Log(1, "cheat: infinite ammo %s (%d slot weapon(s), %d weapon data bit(s) T+0x88 & 0x80 %s): %s", on ? "ON" : "OFF",
+        weapons < 0 ? 0 : weapons, changed, on ? "set" : "cleared", weapons < 0 ? "no weapon manager (needs a level)" :
+        detail[0] ? detail : "no weapon in the 15 slots");
     CheatPersistSave();
-    Out(o, n, "cheat.ammo %d: %d weapon(s), %d bit(s) %s%s", on ? 1 : 0, weapons < 0 ? 0 : weapons, changed,
-        on ? "set" : "cleared", on ? " (new weapons are picked up every 30 game frames)" : "");
+    Out(o, n, "cheat.ammo %d: %d weapon(s), %d bit(s) %s%s - %.400s", on ? 1 : 0, weapons < 0 ? 0 : weapons, changed,
+        on ? "set" : "cleared", on ? " (new weapons are picked up every 30 game frames)" : "",
+        detail[0] ? detail : "no slot weapon");
     return true;
 }
 
@@ -4173,8 +5192,16 @@ void CheatsCheck() {
     g_godOk = HexBytesAt(0x006f5163, "803d63dffa0000 7509 803d60dffa0000 7421") &&
               HexBytesAt(0x005d355a, "803d60dffa0000 0f94c0 a260dffa00");
     g_godWhy = g_godOk ? "ok" : "ProcessHealth 0x6f5163 / cheat code 2 0x5d355a bytes differ";
-    g_godFullOk = g_godOk && HexBytesAt(0x006f5031, "f60544f1e70001");
-    g_godFullWhy = g_godFullOk ? "ok" : g_godOk ? "PlayerTakeDamage cheatMode test 0x6f5031 differs" : g_godWhy;
+    // 0.10.2: the five tests of the no-damage bit [0xfada74] & 0x20000 (ApplyDamage, PlayerTakeDamage, DamageBypass,
+    // 0x703008, the ProcessHealth skip 0x721c8d) and ApplyDamage's three calls (precheck_0102.txt)
+    g_godFullOk = g_godOk && HexBytesAt(0x006f4f71, "f70574dafa0000000200 0f85a7000000") &&
+                  HexBytesAt(0x006f5042, "f70574dafa0000000200 0f85eb000000 56 8b742410 83fe08") &&
+                  HexBytesAt(0x006f5140, "f70574dafa0000000200 7512 d9442404 6a00 51 d91c24 e815feffff") &&
+                  HexBytesAt(0x00703008, "f70574dafa0000000200 757c 6a01 51 d91c24 e8511fffff") &&
+                  HexBytesAt(0x00721c8d, "f70574dafa0000000200 7509 56 e8c134fdff") &&
+                  HexBytesAt(0x006f50aa, "e8c1feffff");
+    g_godFullWhy = g_godFullOk ? "ok" : g_godOk ? "no-damage bit tests [0xfada74] & 0x20000 (0x6f4f71 / 0x6f5042 / "
+                                                  "0x6f5140 / 0x703008 / 0x721c8d) differ" : g_godWhy;
     g_ohkOk = HexBytesAt(kOhkToggle, "803dfd1fe90000 0f94c0 a2fd1fe900 c3") && HexBytesAt(0x0062e39f, "803dfd1fe90000") &&
               HexBytesAt(0x00633eb3, "803dfd1fe90000") && HexBytesAt(0x0063bb68, "381dfd1fe900");
     g_ohkWhy = g_ohkOk ? "ok" : "ENEMY_ToggleOneHitKill 0x60f670 / its readers differ";
@@ -4292,7 +5319,9 @@ struct TestRow {
     char id[64]; char state[8]; char hint[240]; char note[160]; char when[16];
     char kind[8]; char target[128]; int num;
 };
-const int kTestMax = 64;
+// 0.10.1: 128 rows (was 64) - Invoke-TruTestRun.ps1 sends the profile rows with test.step / test.add / test.toggle and
+// the radial profiles have more than 64 (regress_shadowlara_50l_radial 77, _radial2 94: rows 65+ got "list full")
+const int kTestMax = 128;
 TestRow g_tests[kTestMax];
 int g_testCount = 0;
 CRITICAL_SECTION g_testLock;
@@ -4380,22 +5409,26 @@ void TestSaveLocked() {
     fclose(f);
 }
 
-// 0.8: the row parser of TruMenu.tests.txt, shared with the regression lists (same format); returns the row count
-int ParseTestRows(FILE *f, TestRow *rows, int max) {
-    char line[1024];
+// 0.8: the row parser of TruMenu.tests.txt, shared with the regression lists (same format); returns the row count.
+// 0.8.1: an optional 9th column "shortcut" (regression lists: ';'-separated commands that prepare the situation, an
+// optional first element "#title") goes into shortcuts[row] when given
+const int kShortcutLen = 320;
+int ParseTestRows(FILE *f, TestRow *rows, int max, char (*shortcuts)[kShortcutLen] = nullptr) {
+    char line[1400];
     int count = 0;
     while (count < max && fgets(line, sizeof(line), f)) {
         size_t len = strlen(line);
         while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = 0;
         if (!line[0] || line[0] == '#') continue;
-        char *field[8] = {line, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
-        for (int k = 1; k < 8; ++k) {
+        char *field[9] = {line, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+        for (int k = 1; k < 9; ++k) {
             char *tab = field[k - 1] ? strchr(field[k - 1], '\t') : nullptr;
             if (!tab) break;
             *tab = 0;
             field[k] = tab + 1;
         }
         if (!field[0][0]) continue;
+        if (shortcuts) strncpy_s(shortcuts[count], kShortcutLen, field[8] ? field[8] : "", _TRUNCATE);
         TestRow &t = rows[count++];
         memset(&t, 0, sizeof(t));
         const char *kind = field[5] && (!_stricmp(field[5], "step") || !_stricmp(field[5], "toggle")) ? field[5] : "check";
@@ -4679,6 +5712,7 @@ bool TestMark(const char *id, const char *state, const char *note, char *o, size
         LeaveCriticalSection(&g_testLock);          // the INI write / item run happens without the lock
         bool ok = TestToggleApply(target, !_stricmp(state, "on"), apply, sizeof(apply));
         if (!ok) { Out(o, n, "%s", apply); Log(1, "tests: toggle %s: %s", id, apply); return false; }
+        FlowOnToggle(id, state);                    // 0.11: toggle:<id> counters (an event only)
         EnterCriticalSection(&g_testLock);
         i = TestFindLocked(id);
         if (i < 0) { LeaveCriticalSection(&g_testLock); Out(o, n, "%s (row removed meanwhile)", apply); return true; }
@@ -4782,6 +5816,7 @@ void TestExportBlock(char *o, size_t n) {
 const int kRegLists = 2;
 const char *const kRegNames[kRegLists] = {"dlc1", "dlc2"};
 TestRow g_reg[kRegLists][kTestMax];
+char g_regShortcut[kRegLists][kTestMax][kShortcutLen];   // 0.8.1 column 9 (g_testLock)
 int g_regCount[kRegLists] = {0, 0};
 bool g_regFound[kRegLists] = {false, false};
 int g_regSel = 2;                            // 0 dlc1, 1 dlc2, 2 all (render thread + items; int writes)
@@ -4917,7 +5952,7 @@ void RegLoadOne(int list) {
     int count = 0;
     bool found = g_regPath[list][0] && fopen_s(&f, g_regPath[list], "rb") == 0 && f;
     EnterCriticalSection(&g_testLock);
-    if (found) count = ParseTestRows(f, g_reg[list], kTestMax);
+    if (found) count = ParseTestRows(f, g_reg[list], kTestMax, g_regShortcut[list]);
     for (int i = 0; i < count; ++i) {             // a fresh session: every row open, no note / time
         TestRow &t = g_reg[list][i];
         strncpy_s(t.state, sizeof(t.state), TestDefaultState(t.kind), _TRUNCATE);
@@ -5124,6 +6159,185 @@ void RegStart() {
     for (int l = 0; l < kRegLists; ++l) RegLoadOne(l);   // both lists, the selection only filters the page
 }
 
+// ---- 0.8.1 regression shortcuts (owner wish 2026-11-02) ----
+// Column 9 of a regression row: "#title;cmd;cmd ..." (title optional). "Prepare" runs the commands one after the other
+// through the command bar path (CmdRunLine, source "shortcut") from the render thread: the next one only when the
+// game-thread request slot is free; after level.load / level.start / level.reload it waits until no level change is
+// pending, a player exists and (level.load) the unit is the requested one, for 2 s in a row (timeout 120 s). An "err"
+// answer stops the run. game.quit is refused in a shortcut (never automatic).
+const char *CmdRunLine(const char *line, bool wait, const char *source);   // 0.6 command bar, below
+const int kScMaxSteps = 12, kScStepLen = 160;
+CRITICAL_SECTION g_scLock;
+volatile LONG g_scActive = 0;
+char g_scTitle[96] = "";
+char g_scSteps[kScMaxSteps][kScStepLen];
+int g_scCount = 0, g_scIndex = 0;
+bool g_scWaitLevel = false;
+char g_scWaitUnit[64] = "";
+char g_scQueued[64] = "";                      // id of the last step that went to the game thread
+DWORD g_scWaitStart = 0, g_scReadySince = 0;
+char g_scState[200] = "idle";
+
+// "#title;a;b" -> title + steps; false + reason on an empty / too long list or game.quit
+bool ShortcutParse(const char *text, char *title, size_t titleSize, char (*steps)[kScStepLen], int *count, char *o,
+                   size_t n) {
+    *count = 0;
+    title[0] = 0;
+    char copy[kShortcutLen];
+    strncpy_s(copy, sizeof(copy), text ? text : "", _TRUNCATE);
+    char *context = nullptr;
+    for (char *part = strtok_s(copy, ";", &context); part; part = strtok_s(nullptr, ";", &context)) {
+        while (*part == ' ') ++part;
+        size_t len = strlen(part);
+        while (len && part[len - 1] == ' ') part[--len] = 0;
+        if (!len) continue;
+        if (part[0] == '#') { if (!title[0]) strncpy_s(title, titleSize, part + 1, _TRUNCATE); continue; }
+        if (!_strnicmp(part, "game.quit", 9) && (!part[9] || part[9] == ' ')) {
+            Out(o, n, "game.quit is never run by a shortcut");
+            return false;
+        }
+        if (*count >= kScMaxSteps) { Out(o, n, "more than %d commands", kScMaxSteps); return false; }
+        strncpy_s(steps[(*count)++], kScStepLen, part, _TRUNCATE);
+    }
+    if (!*count) { Out(o, n, "no command in the shortcut"); return false; }
+    return true;
+}
+bool ShortcutStart(const char *text, const char *fallbackTitle, char *o, size_t n) {
+    char title[96], steps[kScMaxSteps][kScStepLen];
+    int count = 0;
+    if (!ShortcutParse(text, title, sizeof(title), steps, &count, o, n)) return false;
+    EnterCriticalSection(&g_scLock);
+    strncpy_s(g_scTitle, sizeof(g_scTitle), title[0] ? title : fallbackTitle, _TRUNCATE);
+    memcpy(g_scSteps, steps, sizeof(steps));
+    g_scCount = count;
+    g_scIndex = 0;
+    g_scWaitLevel = false;
+    g_scQueued[0] = 0;
+    g_scWaitUnit[0] = 0;
+    _snprintf_s(g_scState, sizeof(g_scState), _TRUNCATE, "%s: step 1 of %d next", g_scTitle, count);
+    InterlockedExchange(&g_scActive, 1);
+    LeaveCriticalSection(&g_scLock);
+    Log(1, "shortcut '%s' started: %d command(s): %s", g_scTitle, count, text);
+    Out(o, n, "shortcut '%s' started (%d command(s); level changes are waited for)", g_scTitle, count);
+    return true;
+}
+void ShortcutStopLocked(const char *why) {
+    InterlockedExchange(&g_scActive, 0);
+    _snprintf_s(g_scState, sizeof(g_scState), _TRUNCATE, "%s: %s", g_scTitle, why);
+    Log(1, "shortcut '%s' %s", g_scTitle, why);
+}
+// render thread, every frame (also with the menu closed)
+void ShortcutTick() {
+    if (!g_scActive) return;
+    EnterCriticalSection(&g_scLock);
+    DWORD now = GetTickCount();
+    while (g_scActive) {
+        if (g_reqPending) break;                       // the step before still waits for the game thread
+        if (g_scQueued[0]) {                           // its game-thread answer: err stops the run
+            char result[200] = "";
+            EnterCriticalSection(&g_reqLock);
+            if (!_stricmp(g_reqId, g_scQueued)) strncpy_s(result, sizeof(result), g_reqResult, _TRUNCATE);
+            LeaveCriticalSection(&g_reqLock);
+            g_scQueued[0] = 0;
+            if (!strncmp(result, "err", 3)) {
+                Log(1, "shortcut '%s': %.180s", g_scTitle, result);
+                ShortcutStopLocked("stopped: a command answered err on the game thread");
+                break;
+            }
+        }
+        if (g_scWaitLevel) {
+            if (now - g_scWaitStart > 120000) { ShortcutStopLocked("stopped: the level did not come up within 120 s"); break; }
+            if (now - g_scWaitStart < 1500) break;     // let the change start
+            char why[200], unit[64];
+            CurrentUnit(unit, sizeof(unit));
+            bool ready = !LevelChangePending(why, sizeof(why)) && InLevel() &&
+                         (!g_scWaitUnit[0] || !_stricmp(unit, g_scWaitUnit));
+            if (!ready) { g_scReadySince = 0; break; }
+            if (!g_scReadySince) { g_scReadySince = now; break; }
+            if (now - g_scReadySince < 2000) break;
+            g_scWaitLevel = false;
+        }
+        if (g_scIndex >= g_scCount) { ShortcutStopLocked("done"); break; }
+        const char *step = g_scSteps[g_scIndex++];
+        const char *answer = CmdRunLine(step, false, "shortcut");
+        bool ok = !strncmp(answer, "ok", 2);
+        Log(1, "shortcut '%s' %d/%d: %s -> %.200s", g_scTitle, g_scIndex, g_scCount, step, answer);
+        _snprintf_s(g_scState, sizeof(g_scState), _TRUNCATE, "%s: %d of %d ran (%s)", g_scTitle, g_scIndex, g_scCount,
+                    step);
+        if (!ok) { ShortcutStopLocked("stopped: a command answered err (see the command bar / TruMenu.log)"); break; }
+        if (!strncmp(answer, "ok queued ", 10)) {      // remember the id: its result is checked when it ran
+            size_t w = 0;
+            while (step[w] && step[w] != ' ' && w + 1 < sizeof(g_scQueued)) { g_scQueued[w] = step[w]; ++w; }
+            g_scQueued[w] = 0;
+        }
+        if (!_strnicmp(step, "level.", 6)) {           // level.load / level.start / level.reload: wait for the level
+            g_scWaitLevel = true;
+            g_scWaitStart = now;
+            g_scReadySince = 0;
+            g_scWaitUnit[0] = 0;
+            if (!_strnicmp(step, "level.load ", 11)) strncpy_s(g_scWaitUnit, sizeof(g_scWaitUnit), step + 11, _TRUNCATE);
+            break;
+        }
+        break;                                         // one command per frame
+    }
+    LeaveCriticalSection(&g_scLock);
+}
+void ValShortcut(char *o, size_t n) {
+    EnterCriticalSection(&g_scLock);
+    Out(o, n, "%s%s", g_scActive ? "running - " : "", g_scState);
+    LeaveCriticalSection(&g_scLock);
+}
+// "<dlc1:id|dlc2:id|id>" = run that row's shortcut; "stop" = stop the running one
+bool RunRegressPrepare(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { Out(o, n, "usage: regress.prepare <dlc1:id|dlc2:id|id> | stop (regress.shortcuts lists them)"); return false; }
+    if (!_stricmp(arg, "stop")) {
+        EnterCriticalSection(&g_scLock);
+        bool was = g_scActive != 0;
+        if (was) ShortcutStopLocked("stopped by the owner");
+        LeaveCriticalSection(&g_scLock);
+        Out(o, n, was ? "shortcut stopped" : "no shortcut running");
+        return true;
+    }
+    char text[kShortcutLen] = "", title[96] = "";
+    EnterCriticalSection(&g_testLock);
+    int list = -1, row = -1;
+    bool found = RegFindLocked(arg, &list, &row, o, n);
+    if (found) {
+        strncpy_s(text, sizeof(text), g_regShortcut[list][row], _TRUNCATE);
+        _snprintf_s(title, sizeof(title), _TRUNCATE, "%s:%s", kRegNames[list], g_reg[list][row].id);
+    }
+    LeaveCriticalSection(&g_testLock);
+    if (!found) return false;
+    if (!text[0]) { Out(o, n, "%s has no shortcut (column 9 of tests\\regress\\%s.txt)", title, kRegNames[list]); return false; }
+    return ShortcutStart(text, title, o, n);
+}
+void ValRegressShortcuts(char *o, size_t n) {
+    EnterCriticalSection(&g_testLock);
+    int used = 0, c = 0;
+    o[0] = 0;
+    for (int l = 0; l < kRegLists; ++l)
+        for (int i = 0; i < g_regCount[l]; ++i) {
+            if (!g_regShortcut[l][i][0]) continue;
+            ++c;
+            int w = _snprintf_s(o + used, n - static_cast<size_t>(used), _TRUNCATE, "%s%s:%s = %s", used ? "; " : "",
+                                kRegNames[l], g_reg[l][i].id, g_regShortcut[l][i]);
+            if (w < 0) break;
+            used += w;
+        }
+    LeaveCriticalSection(&g_testLock);
+    if (!c) Out(o, n, "no row with a shortcut (column 9)");
+}
+
+// 0.8.1 [Log] InputTrace for this session
+void ValInputTrace(char *o, size_t n) { Out(o, n, "%d", g_inputTrace ? 1 : 0); }
+bool RunInputTrace(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, g_inputTrace != 0);
+    InterlockedExchange(&g_inputTrace, on ? 1 : 0);
+    Out(o, n, "log.inputtrace %d%s", on ? 1 : 0, on && g_logLevel < 2 ? " (LogLevel is below 2: only the summary "
+        "lines are written - [Menu] LogLevel=2 in TruMenu.ini)" : "");
+    return true;
+}
+
 // ---- settings: the kOpts table vs the file ----
 void ReadOptions(const char *dir);       // with Start below
 
@@ -5183,7 +6397,7 @@ bool RunSettingsReset(const char *, char *o, size_t n) {
         Out(o, n, "backup to %s failed (%lu) - nothing changed", backup, GetLastError());
         return false;
     }
-    static char text[8192];
+    static char text[16384];                     // 0.10: the [Radial] section made the text larger than 8 KB
     size_t len = DefaultIniText(text, sizeof(text));
     FILE *f = nullptr;
     if (fopen_s(&f, g_iniPath, "wb") != 0 || !f) { Out(o, n, "cannot write %s", g_iniPath); return false; }
@@ -5204,6 +6418,2004 @@ void FavKey(const char *id) {
     if (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp, false)) FavToggle(id);
 }
 
+// ======================================================================================================================
+// 0.9 P0d: Saves page. Static facts (catalog section 11.4, tools/trusave_info.py, tools/pe_find_wstr.py):
+//   folder  0x78b550: SHGetFolderLocation(CSIDL_PERSONAL) (fallback: registry Shell Folders "Personal", then
+//           L"C:\My Documents") + L"\Eidos\" + L"Tomb Raider - Underworld" + L"\"; files L"<name>.TRUSave" (0x8614b0),
+//           the load list enumerates L"*.TRUSave" (0x8614e4), the autosave is L"Autosave" (0x86140c).
+//   format  0x0000 rich saved game header 'RGMH' (0x6db2f0, 0x2028 bytes), 0x2028 'PCUD' block (0x6dbb4f / 0x6dbba7):
+//           +0x10 count, +0x14 table CRC, +0x18 header CRC, then count x {size, offset, CRC}; CRC = 0x596d80
+//           (polynomial 0x04C11DB7 MSB first, init ~0, final ~ = CRC-32/BZIP2), checked by the reader 0x6dbc8d /
+//           0x6dbbd5 / 0x6dbcc6. Data block (0x140000 bytes): +0x10 unit name (written 0x556cbe from GameTracker+0x38
+//           0xe7f0c0, read back 0x556f38), +0x90 the checkpoint id ("MAIN checkpoint restore %s ID wanted = %d"
+//           0x556f83). Nothing else of the block is proven - no field is written by TruMenu (no manipulation in 0.9).
+// Every action is a file operation of TruMenu itself (no engine call): list / backup / export are harmless; restore /
+// delete / import change the save folder and need the safety step (the same item twice within 10 s, menu buttons:
+// a separate CONFIRM button) and are refused over TruLink (owner only). delete and import / restore always back up
+// the files they replace first; nothing is ever deleted for good.
+// ======================================================================================================================
+const DWORD kSaveArmMs = 10000, kSaveArmMinGapMs = 300;
+const int kSaveMax = 48, kSaveBackupMax = 24, kSaveImportMax = 24;
+const DWORD kSaveDataSize = 0x140000;          // savegame type registration 0x7744e2: push 0x140000
+struct SaveInfo {
+    wchar_t name[128];                         // without .TRUSave
+    char utf8[200];
+    ULONGLONG size;
+    FILETIME written;
+    bool formatOk;                             // RGMH / PCUD + all three CRCs
+    char problem[80];
+    char unit[64];                             // data +0x10
+    DWORD checkpoint;                          // data +0x90
+};
+struct SaveDir { char name[64]; int files; };
+CRITICAL_SECTION g_saveLock;
+SaveInfo g_saves[kSaveMax];
+int g_saveCount = -1;                          // -1 = not scanned yet
+SaveDir g_saveBackups[kSaveBackupMax];
+int g_saveBackupCount = 0;
+SaveDir g_saveImports[kSaveImportMax];         // name = file name without .TRUSave, files = 1 if its CRCs are ok
+int g_saveImportCount = 0;
+wchar_t g_saveFolder[MAX_PATH] = L"";
+char g_saveFolderU8[MAX_PATH * 2] = "";
+char g_saveFolderHow[96] = "not looked up";
+wchar_t g_saveRoot[MAX_PATH] = L"";            // <game>\TruMenu.saves\ (backups, export, import)
+char g_saveRootU8[MAX_PATH * 2] = "";
+char g_saveFolderIni[MAX_PATH] = "";            // [Saves] Folder (UTF-8; empty = as the game)
+char g_saveArmKey[200] = "";
+volatile LONG g_saveArmAt = 0;
+DWORD g_saveCrcTable[256];
+bool g_saveCrcReady = false;
+
+void SaveCrcInit() {
+    for (DWORD i = 0; i < 256; ++i) {
+        DWORD c = i << 24;
+        for (int k = 0; k < 8; ++k) c = (c & 0x80000000u) ? ((c << 1) ^ 0x04C11DB7u) : (c << 1);
+        g_saveCrcTable[i] = c;
+    }
+    g_saveCrcReady = true;
+}
+DWORD SaveCrc(const BYTE *p, size_t n) {          // as 0x596d80
+    if (!g_saveCrcReady) SaveCrcInit();
+    DWORD c = 0xFFFFFFFFu;
+    for (size_t i = 0; i < n; ++i) c = (c << 8) ^ g_saveCrcTable[(c >> 24) ^ p[i]];
+    return ~c;
+}
+void WideToUtf8(const wchar_t *w, char *o, size_t n) {
+    if (!WideCharToMultiByte(CP_UTF8, 0, w, -1, o, static_cast<int>(n), nullptr, nullptr)) o[0] = 0;
+}
+bool Utf8ToWide(const char *s, wchar_t *o, size_t n) {
+    return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, o, static_cast<int>(n)) > 0;
+}
+DWORD U32At(const BYTE *p) { return static_cast<DWORD>(p[0]) | (static_cast<DWORD>(p[1]) << 8) |
+                                    (static_cast<DWORD>(p[2]) << 16) | (static_cast<DWORD>(p[3]) << 24); }
+
+// the folder the game uses (0x78b550) or [Saves] Folder
+void SaveFolderInit() {
+    wchar_t path[MAX_PATH] = L"";
+    if (g_saveFolderIni[0]) {
+        if (Utf8ToWide(g_saveFolderIni, path, MAX_PATH)) {
+            size_t len = wcslen(path);
+            if (len && path[len - 1] != L'\\' && len + 1 < MAX_PATH) wcscat_s(path, L"\\");
+            wcscpy_s(g_saveFolder, path);
+            strncpy_s(g_saveFolderHow, sizeof(g_saveFolderHow), "[Saves] Folder", _TRUNCATE);
+        }
+    } else if (SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, path))) {
+        _snwprintf_s(g_saveFolder, MAX_PATH, _TRUNCATE, L"%s\\Eidos\\Tomb Raider - Underworld\\", path);
+        strncpy_s(g_saveFolderHow, sizeof(g_saveFolderHow), "CSIDL_PERSONAL + \\Eidos\\Tomb Raider - Underworld (as "
+                  "tru.exe 0x78b550)", _TRUNCATE);
+    } else {
+        strncpy_s(g_saveFolderHow, sizeof(g_saveFolderHow), "CSIDL_PERSONAL not available - set [Saves] Folder",
+                  _TRUNCATE);
+    }
+    WideToUtf8(g_saveFolder, g_saveFolderU8, sizeof(g_saveFolderU8));
+    wchar_t exe[MAX_PATH] = L"";
+    MultiByteToWideChar(CP_ACP, 0, g_exeDir, -1, exe, MAX_PATH);
+    _snwprintf_s(g_saveRoot, MAX_PATH, _TRUNCATE, L"%sTruMenu.saves\\", exe);
+    WideToUtf8(g_saveRoot, g_saveRootU8, sizeof(g_saveRootU8));
+}
+
+// reads one save and checks the container; fills unit / checkpoint from the data block
+bool SaveRead(const wchar_t *path, SaveInfo *s) {
+    s->formatOk = false;
+    s->problem[0] = s->unit[0] = 0;
+    s->checkpoint = 0;
+    HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (f == INVALID_HANDLE_VALUE) { Out(s->problem, sizeof(s->problem), "cannot open (%lu)", GetLastError()); return false; }
+    LARGE_INTEGER size = {};
+    GetFileSizeEx(f, &size);
+    if (size.QuadPart < 0x2050 || size.QuadPart > 0x400000) {
+        CloseHandle(f);
+        Out(s->problem, sizeof(s->problem), "size %lld outside 0x2050..4 MB", size.QuadPart);
+        return false;
+    }
+    DWORD n = static_cast<DWORD>(size.QuadPart), got = 0;
+    BYTE *b = static_cast<BYTE *>(HeapAlloc(GetProcessHeap(), 0, n));
+    bool read = b && ReadFile(f, b, n, &got, nullptr) && got == n;
+    CloseHandle(f);
+    if (!read) {
+        if (b) HeapFree(GetProcessHeap(), 0, b);
+        Out(s->problem, sizeof(s->problem), "read failed");
+        return false;
+    }
+    DWORD o = 0;
+    if (memcmp(b, "RGMH", 4) == 0) o = U32At(b + 8);                    // header size (0x2028)
+    if (o + 0x1c > n || memcmp(b + o, "PCUD", 4) != 0 || U32At(b + o + 4) != 0x100 || memcmp(b + o + 8, "SURT", 4) != 0) {
+        Out(s->problem, sizeof(s->problem), "no RGMH / PCUD 0x100 'SURT' block");
+    } else {
+        DWORD count = U32At(b + o + 0x10), table = o + 0x1c;
+        if (count == 0 || count > 16 || table + 12 * count > n) {
+            Out(s->problem, sizeof(s->problem), "entry count %lu", count);
+        } else if (SaveCrc(b + o, 0x18) != U32At(b + o + 0x18)) {
+            Out(s->problem, sizeof(s->problem), "header CRC mismatch");
+        } else if (SaveCrc(b + table, 12 * count) != U32At(b + o + 0x14)) {
+            Out(s->problem, sizeof(s->problem), "table CRC mismatch");
+        } else {
+            bool ok = true;
+            for (DWORD k = 0; k < count && ok; ++k) {
+                DWORD es = U32At(b + table + 12 * k), eo = U32At(b + table + 12 * k + 4);
+                if (eo > n || es > n - eo) { Out(s->problem, sizeof(s->problem), "entry %lu outside the file", k); ok = false; }
+                else if (SaveCrc(b + eo, es) != U32At(b + table + 12 * k + 8)) {
+                    Out(s->problem, sizeof(s->problem), "entry %lu data CRC mismatch", k);
+                    ok = false;
+                } else if (k == 0 && es >= 0x94) {
+                    const char *u = reinterpret_cast<const char *>(b + eo + 0x10);
+                    size_t len = 0;
+                    while (len < 63 && u[len] && isprint(static_cast<unsigned char>(u[len]))) ++len;
+                    memcpy(s->unit, u, len);
+                    s->unit[len] = 0;
+                    s->checkpoint = U32At(b + eo + 0x90);
+                }
+            }
+            s->formatOk = ok;
+        }
+    }
+    HeapFree(GetProcessHeap(), 0, b);
+    return s->formatOk;
+}
+
+void SaveScanDirs() {                          // backups (folders below the root) and import files
+    g_saveBackupCount = g_saveImportCount = 0;
+    wchar_t pattern[MAX_PATH];
+    _snwprintf_s(pattern, MAX_PATH, _TRUNCATE, L"%s*", g_saveRoot);
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(pattern, &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || fd.cFileName[0] == L'.' ||
+                !_wcsicmp(fd.cFileName, L"export") || !_wcsicmp(fd.cFileName, L"import"))
+                continue;
+            SaveDir d = {};
+            WideToUtf8(fd.cFileName, d.name, sizeof(d.name));
+            wchar_t inner[MAX_PATH];
+            _snwprintf_s(inner, MAX_PATH, _TRUNCATE, L"%s%s\\*.TRUSave", g_saveRoot, fd.cFileName);
+            WIN32_FIND_DATAW f2;
+            HANDLE h2 = FindFirstFileW(inner, &f2);
+            if (h2 != INVALID_HANDLE_VALUE) {
+                do { ++d.files; } while (FindNextFileW(h2, &f2));
+                FindClose(h2);
+            }
+            // newest first: the names start with yyyyMMdd_HHmmss
+            int at = 0;
+            while (at < g_saveBackupCount && strcmp(g_saveBackups[at].name, d.name) > 0) ++at;
+            if (at >= kSaveBackupMax) continue;
+            int last = g_saveBackupCount < kSaveBackupMax ? g_saveBackupCount : kSaveBackupMax - 1;
+            for (int i = last; i > at; --i) g_saveBackups[i] = g_saveBackups[i - 1];
+            g_saveBackups[at] = d;
+            if (g_saveBackupCount < kSaveBackupMax) ++g_saveBackupCount;
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+    _snwprintf_s(pattern, MAX_PATH, _TRUNCATE, L"%simport\\*.TRUSave", g_saveRoot);
+    h = FindFirstFileW(pattern, &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if (g_saveImportCount >= kSaveImportMax) break;
+            SaveDir &d = g_saveImports[g_saveImportCount++];
+            d = SaveDir();
+            wchar_t base[128];
+            wcsncpy_s(base, fd.cFileName, _TRUNCATE);
+            wchar_t *dot = wcsrchr(base, L'.');
+            if (dot) *dot = 0;
+            WideToUtf8(base, d.name, sizeof(d.name));
+            wchar_t full[MAX_PATH];
+            _snwprintf_s(full, MAX_PATH, _TRUNCATE, L"%simport\\%s", g_saveRoot, fd.cFileName);
+            SaveInfo tmp;
+            d.files = SaveRead(full, &tmp) ? 1 : 0;
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+}
+
+DWORD g_saveScanAt = 0;
+// reads every save (CRC over ~1.3 MB each): at most every 1.5 s unless forced (after an action, the Refresh button)
+void SaveScan(bool force = true) {
+    EnterCriticalSection(&g_saveLock);
+    if (!force && g_saveCount >= 0 && GetTickCount() - g_saveScanAt < 1500) { LeaveCriticalSection(&g_saveLock); return; }
+    g_saveScanAt = GetTickCount();
+    if (!g_saveFolder[0] && !g_saveRoot[0]) SaveFolderInit();
+    g_saveCount = 0;
+    wchar_t pattern[MAX_PATH];
+    _snwprintf_s(pattern, MAX_PATH, _TRUNCATE, L"%s*.TRUSave", g_saveFolder);
+    WIN32_FIND_DATAW fd = {};
+    HANDLE h = g_saveFolder[0] ? FindFirstFileW(pattern, &fd) : INVALID_HANDLE_VALUE;
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || g_saveCount >= kSaveMax) continue;
+            SaveInfo &s = g_saves[g_saveCount++];
+            wcsncpy_s(s.name, fd.cFileName, _TRUNCATE);
+            wchar_t *dot = wcsrchr(s.name, L'.');
+            if (dot) *dot = 0;
+            WideToUtf8(s.name, s.utf8, sizeof(s.utf8));
+            s.size = (static_cast<ULONGLONG>(fd.nFileSizeHigh) << 32) | fd.nFileSizeLow;
+            s.written = fd.ftLastWriteTime;
+            wchar_t full[MAX_PATH];
+            _snwprintf_s(full, MAX_PATH, _TRUNCATE, L"%s%s", g_saveFolder, fd.cFileName);
+            SaveRead(full, &s);
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+    SaveScanDirs();
+    LeaveCriticalSection(&g_saveLock);
+}
+
+void FileTimeText(const FILETIME &ft, char *o, size_t n) {
+    FILETIME local;
+    SYSTEMTIME st;
+    if (FileTimeToLocalFileTime(&ft, &local) && FileTimeToSystemTime(&local, &st))
+        Out(o, n, "%04u-%02u-%02u %02u:%02u:%02u", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+    else
+        Out(o, n, "?");
+}
+
+// "<name>" of an existing save in the folder (UTF-8 argument, no path parts)
+bool SaveNameArg(const char *arg, wchar_t *name, size_t size, char *o, size_t n) {
+    if (!arg || !arg[0]) { Out(o, n, "give a save name (save.list; without .TRUSave)"); return false; }
+    if (strchr(arg, '\\') || strchr(arg, '/') || strchr(arg, ':') || strstr(arg, "..") || strlen(arg) > 120) {
+        Out(o, n, "a save name only (no path, no ..)");
+        return false;
+    }
+    if (!Utf8ToWide(arg, name, size)) { Out(o, n, "name is not valid UTF-8"); return false; }
+    wchar_t *dot = wcsrchr(name, L'.');
+    if (dot && !_wcsicmp(dot, L".TRUSave")) *dot = 0;
+    return true;
+}
+bool SaveBackupNameOk(const char *arg) {
+    if (!arg || !arg[0] || strlen(arg) > 60) return false;
+    for (const char *p = arg; *p; ++p)
+        if (!(isalnum(static_cast<unsigned char>(*p)) || *p == '_' || *p == '-')) return false;
+    return true;
+}
+bool FileExistsW(const wchar_t *path) {
+    DWORD a = GetFileAttributesW(path);
+    return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
+}
+bool MakeDirW(const wchar_t *path) {
+    return CreateDirectoryW(path, nullptr) || GetLastError() == ERROR_ALREADY_EXISTS;
+}
+
+// the safety step: the same "<item> <arg>" twice within 10 s (and not faster than 0.3 s)
+bool SaveConfirmed(const char *item, const char *arg, char *o, size_t n) {
+    char key[200];
+    _snprintf_s(key, sizeof(key), _TRUNCATE, "%s %s", item, arg ? arg : "");
+    DWORD now = GetTickCount(), at = static_cast<DWORD>(g_saveArmAt), age = now - at;
+    EnterCriticalSection(&g_saveLock);
+    bool same = at && age <= kSaveArmMs && !strcmp(g_saveArmKey, key);
+    if (same && age >= kSaveArmMinGapMs) {
+        g_saveArmKey[0] = 0;
+        InterlockedExchange(&g_saveArmAt, 0);
+        LeaveCriticalSection(&g_saveLock);
+        return true;
+    }
+    if (!same) {
+        strncpy_s(g_saveArmKey, sizeof(g_saveArmKey), key, _TRUNCATE);
+        InterlockedExchange(&g_saveArmAt, static_cast<LONG>(now ? now : 1));
+    }
+    LeaveCriticalSection(&g_saveLock);
+    Log(1, "saves: '%s' armed - again within 10 s to confirm", key);
+    Out(o, n, "armed - run '%s' again within 10 s to confirm (menu: the red CONFIRM button)", key);
+    return false;
+}
+bool SaveArmed(char *key, size_t size, DWORD *left) {
+    DWORD at = static_cast<DWORD>(g_saveArmAt), age = GetTickCount() - at;
+    if (!at || age > kSaveArmMs) return false;
+    EnterCriticalSection(&g_saveLock);
+    strncpy_s(key, size, g_saveArmKey, _TRUNCATE);
+    LeaveCriticalSection(&g_saveLock);
+    *left = kSaveArmMs - age;
+    return key[0] != 0;
+}
+void SaveDisarm() {
+    InterlockedExchange(&g_saveArmAt, 0);
+    EnterCriticalSection(&g_saveLock);
+    g_saveArmKey[0] = 0;
+    LeaveCriticalSection(&g_saveLock);
+}
+
+// <root><time>[_label]\ with a copy of every *.TRUSave of the save folder; folder name (UTF-8) into dirName
+bool SaveBackupAll(const char *label, char *dirName, size_t dirSize, int *copied, char *o, size_t n) {
+    *copied = 0;
+    if (!g_saveFolder[0]) { Out(o, n, "save folder unknown (%s)", g_saveFolderHow); return false; }
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    char name[96];
+    _snprintf_s(name, sizeof(name), _TRUNCATE, "%04u%02u%02u_%02u%02u%02u%s%s", st.wYear, st.wMonth, st.wDay, st.wHour,
+                st.wMinute, st.wSecond, label && label[0] ? "_" : "", label ? label : "");
+    wchar_t wname[96], dir[MAX_PATH];
+    MultiByteToWideChar(CP_ACP, 0, name, -1, wname, 96);
+    if (!MakeDirW(g_saveRoot)) { Out(o, n, "cannot create %s (%lu)", g_saveRootU8, GetLastError()); return false; }
+    _snwprintf_s(dir, MAX_PATH, _TRUNCATE, L"%s%s", g_saveRoot, wname);
+    for (int k = 2; GetFileAttributesW(dir) != INVALID_FILE_ATTRIBUTES && k < 100; ++k)   // same second twice
+        _snwprintf_s(dir, MAX_PATH, _TRUNCATE, L"%s%s_%d", g_saveRoot, wname, k);
+    if (!CreateDirectoryW(dir, nullptr)) { Out(o, n, "cannot create the backup folder (%lu)", GetLastError()); return false; }
+    const wchar_t *leaf = wcsrchr(dir, L'\\');
+    WideToUtf8(leaf ? leaf + 1 : dir, dirName, dirSize);
+    wchar_t pattern[MAX_PATH];
+    _snwprintf_s(pattern, MAX_PATH, _TRUNCATE, L"%s*.TRUSave", g_saveFolder);
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(pattern, &fd);
+    int failed = 0;
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+            wchar_t src[MAX_PATH], dst[MAX_PATH];
+            _snwprintf_s(src, MAX_PATH, _TRUNCATE, L"%s%s", g_saveFolder, fd.cFileName);
+            _snwprintf_s(dst, MAX_PATH, _TRUNCATE, L"%s\\%s", dir, fd.cFileName);
+            if (CopyFileW(src, dst, TRUE)) ++*copied; else ++failed;
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+    Log(1, "saves: backup %s: %d file(s) copied, %d failed (from %s)", dirName, *copied, failed, g_saveFolderU8);
+    if (failed) { Out(o, n, "backup %s: %d copied, %d FAILED - see TruMenu.log", dirName, *copied, failed); return false; }
+    Out(o, n, "backup %s: %d file(s) -> %s%s", dirName, *copied, g_saveRootU8, dirName);
+    return true;
+}
+
+void ValSaveFolder(char *o, size_t n) {
+    EnterCriticalSection(&g_saveLock);
+    if (!g_saveFolder[0] && !g_saveRoot[0]) SaveFolderInit();
+    Out(o, n, "%s (%s); backups %s", g_saveFolderU8[0] ? g_saveFolderU8 : "-", g_saveFolderHow, g_saveRootU8);
+    LeaveCriticalSection(&g_saveLock);
+}
+void ValSaveList(char *o, size_t n) {
+    SaveScan(false);
+    EnterCriticalSection(&g_saveLock);
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < g_saveCount; ++i) {
+        const SaveInfo &s = g_saves[i];
+        char when[32];
+        FileTimeText(s.written, when, sizeof(when));
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s | %s | %llu bytes | unit %s | checkpoint %lu | %s",
+                            used ? "\n" : "", s.utf8, when, s.size, s.unit[0] ? s.unit : "?", s.checkpoint,
+                            s.formatOk ? "CRC ok" : s.problem);
+        if (w < 0) break;
+        used += static_cast<size_t>(w);
+    }
+    if (!g_saveCount) Out(o, n, "no *.TRUSave in %s", g_saveFolderU8[0] ? g_saveFolderU8 : "(folder unknown)");
+    LeaveCriticalSection(&g_saveLock);
+}
+void ValSaveBackups(char *o, size_t n) {
+    SaveScan(false);
+    EnterCriticalSection(&g_saveLock);
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < g_saveBackupCount; ++i) {
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s (%d)", used ? " " : "", g_saveBackups[i].name,
+                            g_saveBackups[i].files);
+        if (w < 0) break;
+        used += static_cast<size_t>(w);
+    }
+    if (!g_saveBackupCount) Out(o, n, "no backups in %s", g_saveRootU8);
+    LeaveCriticalSection(&g_saveLock);
+}
+bool RunSaveBackup(const char *arg, char *o, size_t n) {
+    if (arg && arg[0] && !SaveBackupNameOk(arg)) { Out(o, n, "label: a-z 0-9 _ - only, up to 60"); return false; }
+    char dir[96];
+    int copied = 0;
+    EnterCriticalSection(&g_saveLock);
+    if (!g_saveFolder[0] && !g_saveRoot[0]) SaveFolderInit();
+    bool ok = SaveBackupAll(arg, dir, sizeof(dir), &copied, o, n);
+    LeaveCriticalSection(&g_saveLock);
+    SaveScan();
+    return ok;
+}
+bool RunSaveExport(const char *arg, char *o, size_t n) {
+    wchar_t name[128];
+    if (!SaveNameArg(arg, name, 128, o, n)) return false;
+    EnterCriticalSection(&g_saveLock);
+    if (!g_saveFolder[0] && !g_saveRoot[0]) SaveFolderInit();
+    wchar_t src[MAX_PATH], dir[MAX_PATH], dst[MAX_PATH];
+    _snwprintf_s(src, MAX_PATH, _TRUNCATE, L"%s%s.TRUSave", g_saveFolder, name);
+    _snwprintf_s(dir, MAX_PATH, _TRUNCATE, L"%sexport", g_saveRoot);
+    _snwprintf_s(dst, MAX_PATH, _TRUNCATE, L"%s\\%s.TRUSave", dir, name);
+    bool ok = false;
+    if (!FileExistsW(src)) Out(o, n, "no save '%s' (save.list)", arg);
+    else if (!MakeDirW(g_saveRoot) || !MakeDirW(dir)) Out(o, n, "cannot create %sexport (%lu)", g_saveRootU8, GetLastError());
+    else {
+        if (FileExistsW(dst)) {                // never overwrite an earlier export: add the time
+            SYSTEMTIME st;
+            GetLocalTime(&st);
+            _snwprintf_s(dst, MAX_PATH, _TRUNCATE, L"%s\\%s_%04u%02u%02u_%02u%02u%02u.TRUSave", dir, name, st.wYear,
+                         st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+        }
+        ok = CopyFileW(src, dst, TRUE) != 0;
+        char d8[MAX_PATH * 2];
+        WideToUtf8(dst, d8, sizeof(d8));
+        if (ok) Out(o, n, "exported '%s' -> %s", arg, d8); else Out(o, n, "copy to %s failed (%lu)", d8, GetLastError());
+    }
+    LeaveCriticalSection(&g_saveLock);
+    Log(1, "saves: export: %s", o);
+    SaveScan();
+    return ok;
+}
+bool RunSaveDelete(const char *arg, char *o, size_t n) {
+    wchar_t name[128];
+    if (!SaveNameArg(arg, name, 128, o, n)) return false;
+    wchar_t src[MAX_PATH];
+    EnterCriticalSection(&g_saveLock);
+    if (!g_saveFolder[0] && !g_saveRoot[0]) SaveFolderInit();
+    _snwprintf_s(src, MAX_PATH, _TRUNCATE, L"%s%s.TRUSave", g_saveFolder, name);
+    bool exists = FileExistsW(src);
+    LeaveCriticalSection(&g_saveLock);
+    if (!exists) { Out(o, n, "no save '%s' (save.list)", arg); return false; }
+    if (!SaveConfirmed("save.delete", arg, o, n)) return true;
+    // first a full backup "<time>_deleted" (all files), then the file itself is removed from the save folder
+    char dir[96];
+    int copied = 0;
+    EnterCriticalSection(&g_saveLock);
+    bool ok = SaveBackupAll("deleted", dir, sizeof(dir), &copied, o, n);
+    wchar_t wdir[96], kept[MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, dir, -1, wdir, 96);
+    _snwprintf_s(kept, MAX_PATH, _TRUNCATE, L"%s%s\\%s.TRUSave", g_saveRoot, wdir, name);
+    if (ok && !FileExistsW(kept)) { Out(o, n, "backup %s has no copy of '%s' - NOT deleted", dir, arg); ok = false; }
+    if (ok) {
+        ok = DeleteFileW(src) != 0;
+        if (ok) Out(o, n, "'%s' deleted from the save folder; copy (with all other saves) in %s%s", arg, g_saveRootU8, dir);
+        else Out(o, n, "delete failed (%lu); backup %s made", GetLastError(), dir);
+    }
+    LeaveCriticalSection(&g_saveLock);
+    Log(1, "saves: delete by the owner: %s", o);
+    SaveScan();
+    return ok;
+}
+// copies every file of a backup / one import file into the save folder after a backup of the current state
+bool SaveCopyIn(const wchar_t *const *files, int count, const char *label, char *o, size_t n) {
+    for (int i = 0; i < count; ++i) {
+        SaveInfo tmp;
+        if (!SaveRead(files[i], &tmp)) {
+            char f8[MAX_PATH * 2];
+            WideToUtf8(files[i], f8, sizeof(f8));
+            Out(o, n, "%s: %s - nothing copied", f8, tmp.problem);
+            return false;
+        }
+    }
+    char dir[96];
+    int copied = 0;
+    if (!SaveBackupAll(label, dir, sizeof(dir), &copied, o, n)) return false;
+    int done = 0;
+    for (int i = 0; i < count; ++i) {
+        const wchar_t *leaf = wcsrchr(files[i], L'\\');
+        wchar_t dst[MAX_PATH];
+        _snwprintf_s(dst, MAX_PATH, _TRUNCATE, L"%s%s", g_saveFolder, leaf ? leaf + 1 : files[i]);
+        if (CopyFileW(files[i], dst, FALSE)) ++done;
+        else { Out(o, n, "copy failed (%lu) after %d of %d; the state before is in %s%s", GetLastError(), done, count,
+                   g_saveRootU8, dir); return false; }
+    }
+    Out(o, n, "%d file(s) copied into the save folder; the state before is in %s%s", done, g_saveRootU8, dir);
+    return true;
+}
+bool RunSaveRestore(const char *arg, char *o, size_t n) {
+    if (!SaveBackupNameOk(arg)) { Out(o, n, "give a backup folder name (save.backups)"); return false; }
+    wchar_t dir[MAX_PATH], wname[64];
+    MultiByteToWideChar(CP_UTF8, 0, arg, -1, wname, 64);
+    EnterCriticalSection(&g_saveLock);
+    if (!g_saveFolder[0] && !g_saveRoot[0]) SaveFolderInit();
+    _snwprintf_s(dir, MAX_PATH, _TRUNCATE, L"%s%s\\", g_saveRoot, wname);
+    LeaveCriticalSection(&g_saveLock);
+    DWORD a = GetFileAttributesW(dir);
+    if (a == INVALID_FILE_ATTRIBUTES || !(a & FILE_ATTRIBUTE_DIRECTORY)) { Out(o, n, "no backup '%s' (save.backups)", arg); return false; }
+    if (!SaveConfirmed("save.restore", arg, o, n)) return true;
+    static wchar_t paths[kSaveMax][MAX_PATH];
+    const wchar_t *list[kSaveMax];
+    int count = 0;
+    wchar_t pattern[MAX_PATH];
+    _snwprintf_s(pattern, MAX_PATH, _TRUNCATE, L"%s*.TRUSave", dir);
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(pattern, &fd);
+    if (h != INVALID_HANDLE_VALUE) {
+        do {
+            if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || count >= kSaveMax) continue;
+            _snwprintf_s(paths[count], MAX_PATH, _TRUNCATE, L"%s%s", dir, fd.cFileName);
+            list[count] = paths[count];
+            ++count;
+        } while (FindNextFileW(h, &fd));
+        FindClose(h);
+    }
+    if (!count) { Out(o, n, "backup '%s' holds no *.TRUSave", arg); return false; }
+    EnterCriticalSection(&g_saveLock);
+    bool ok = SaveCopyIn(list, count, "before_restore", o, n);
+    LeaveCriticalSection(&g_saveLock);
+    Log(1, "saves: restore %s by the owner: %s", arg, o);
+    SaveScan();
+    return ok;
+}
+bool RunSaveImport(const char *arg, char *o, size_t n) {
+    wchar_t name[128];
+    if (!SaveNameArg(arg, name, 128, o, n)) return false;
+    wchar_t src[MAX_PATH];
+    EnterCriticalSection(&g_saveLock);
+    if (!g_saveFolder[0] && !g_saveRoot[0]) SaveFolderInit();
+    _snwprintf_s(src, MAX_PATH, _TRUNCATE, L"%simport\\%s.TRUSave", g_saveRoot, name);
+    LeaveCriticalSection(&g_saveLock);
+    if (!FileExistsW(src)) { Out(o, n, "no %simport\\%s.TRUSave", g_saveRootU8, arg); return false; }
+    if (!SaveConfirmed("save.import", arg, o, n)) return true;
+    const wchar_t *list[1] = {src};
+    EnterCriticalSection(&g_saveLock);
+    bool ok = SaveCopyIn(list, 1, "before_import", o, n);
+    LeaveCriticalSection(&g_saveLock);
+    Log(1, "saves: import %s by the owner: %s", arg, o);
+    SaveScan();
+    return ok;
+}
+bool SaveOwnerOnly(const char *id) {
+    return !_stricmp(id, "save.delete") || !_stricmp(id, "save.restore") || !_stricmp(id, "save.import");
+}
+
+// ======================================================================================================================
+// 0.9 P1-P3: music through the engine's own srmusic functions (catalog 11.2; translate, don't imitate). PC facts:
+//   SRMUSIC_LoadMusic 0x594320 cdecl (slot, name, a, b): ecx = 0xcc5260 + slot * 0x528, MusicSlot::LoadMusic 0x593eb0
+//     (thiscall, play = 1). The game's own call when a unit starts: 0x5b2211 LoadMusic(0, name, 60, 60) (0x5b21d0,
+//     name in 0xd98f64; "dummy" -> ""). Script natives: NtMusic::Play 0x4aa450 LoadMusic(slot, name, t1*30, t2*30),
+//     stop 0x4aa490 LoadMusic(slot, NULL, t*30, 0) - a NULL name fades the slot out (0x593f8f). fps double 30.0 at
+//     0x8439b8.
+//   8 slots: the sound update 0x5954d0 walks 0xcc5260 .. 0xcc7ba0 in 0x528 steps (0x595588); slot +0 = current
+//     name (strcmp at 0x593f30 against the request), +0x100 = the requested name (copied at 0x593f45), +0x51c = the
+//     loaded music object (tested 0x593fa8).
+// Calls run on the game thread (queued), like the natives.
+// ======================================================================================================================
+typedef void(__cdecl *MusicLoadFn)(int slot, const char *name, int a, int b);
+const DWORD kMusicLoad = 0x00594320, kMusicSlots = 0x00cc5260, kMusicSlotSize = 0x528, kMusicUnitName = 0x00d98f64;
+const int kMusicSlotCount = 8;
+const char *const kMusicLoadBytes = "8b442410 8b4c240c 8b542408 6a01 50 51 8b4c2410 69c928050000 52 81c16052cc00 "
+                                    "e86afbffff c3";
+bool g_musicOk = false;
+char g_musicCheck[160] = "not checked";
+int g_musicInLevels = 0, g_musicFade = 60, g_musicVarsOk = 0, g_monsterVarsOk = 0;
+struct MediaRow { char kind[8]; char name[64]; char source[40]; char flag[16]; };
+const int kMediaMax = 160;
+MediaRow g_media[kMediaMax];
+int g_mediaCount = -1;                         // -1 = TruMenu.media.txt missing
+char g_mediaPath[MAX_PATH] = "";
+
+void MediaLoad() {
+    _snprintf_s(g_mediaPath, sizeof(g_mediaPath), _TRUNCATE, "%sTruMenu.media.txt", g_asiDir);
+    FILE *f = nullptr;
+    if (fopen_s(&f, g_mediaPath, "rb") != 0 || !f) { g_mediaCount = -1; return; }
+    g_mediaCount = 0;
+    char line[256];
+    while (fgets(line, sizeof(line), f) && g_mediaCount < kMediaMax) {
+        if (line[0] == '#' || line[0] == '\r' || line[0] == '\n') continue;
+        char *ctx = nullptr;
+        char *kind = strtok_s(line, "\t\r\n", &ctx), *name = strtok_s(nullptr, "\t\r\n", &ctx);
+        char *source = strtok_s(nullptr, "\t\r\n", &ctx), *flag = strtok_s(nullptr, "\t\r\n", &ctx);
+        if (!kind || !name) continue;
+        MediaRow &r = g_media[g_mediaCount++];
+        strncpy_s(r.kind, sizeof(r.kind), kind, _TRUNCATE);
+        strncpy_s(r.name, sizeof(r.name), name, _TRUNCATE);
+        strncpy_s(r.source, sizeof(r.source), source ? source : "-", _TRUNCATE);
+        strncpy_s(r.flag, sizeof(r.flag), flag ? flag : "-", _TRUNCATE);
+    }
+    fclose(f);
+}
+const MediaRow *MediaFind(const char *kind, const char *name) {
+    for (int i = 0; i < g_mediaCount; ++i)
+        if (!_stricmp(g_media[i].kind, kind) && !_stricmp(g_media[i].name, name)) return &g_media[i];
+    return nullptr;
+}
+bool MusicCheck() {
+    // the wrapper, the unit start call, the stop native, the play native's call, the 8-slot loop and the slot fields
+    bool wrap = HexBytesAt(kMusicLoad, kMusicLoadBytes);
+    bool unit = HexBytesAt(0x005b2211, "6a3c 6a3c 56 6a00 e80321feff") && HexBytesAt(0x005b21d4, "ba648fd900");
+    bool stop = HexBytesAt(0x004aa490, "d9442404 56 dc0db8398400 6a00 8bf1 e87ca83600 50 8b4604 6a00 50 e8709e0e00");
+    bool play = HexBytesAt(0x004aa470, "8b4e04 50 8b06 50 51 e8a39e0e00");
+    bool loop = HexBytesAt(0x00595588, "be6052cc00") && HexBytesAt(0x00595597, "81c628050000 81fea07bcc00 7ceb");
+    bool fields = HexBytesAt(0x00593f2d, "8bc2 50 56 e8dbac2900") && HexBytesAt(0x00593f45, "8dbe00010000") &&
+                  HexBytesAt(0x00593fa8, "8b861c050000") && HexBytesAt(0x00593ecb, "85d2 56 57 8bf1 0f84b8000000");
+    Out(g_musicCheck, sizeof(g_musicCheck), "LoadMusic 0x594320 %s, unit call 0x5b2211 %s, stop native 0x4aa490 %s, play "
+        "native 0x4aa470 %s, slot loop 0x595588 %s, slot fields %s", wrap ? "ok" : "NO", unit ? "ok" : "NO",
+        stop ? "ok" : "NO", play ? "ok" : "NO", loop ? "ok" : "NO", fields ? "ok" : "NO");
+    return wrap && unit && stop && play && loop && fields;
+}
+// where music may run now: main menu always, a level only with [Media] MusicInLevels=1
+bool MusicPlace(char *o, size_t n) {
+    DWORD state = 0;
+    if (!g_mainStateOk || !ReadDword(kMainState, &state)) { Out(o, n, "main state not verified"); return false; }
+    if (state == 10) return true;
+    if (InLevel()) {
+        if (g_musicInLevels) return true;
+        Out(o, n, "in a level: [Media] MusicInLevels=0 (default until a live test proves it safe)");
+        return false;
+    }
+    Out(o, n, "only in the main menu (main state %lu, needs 10) or in a level with [Media] MusicInLevels=1", state);
+    return false;
+}
+void ValMusicList(char *o, size_t n) {
+    if (g_mediaCount < 0) { Out(o, n, "no %s (tools/music_list.py --menu-out; the install copies it)", g_mediaPath); return; }
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < g_mediaCount; ++i) {
+        if (_stricmp(g_media[i].kind, "music")) continue;
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s (%s%s)", used ? " " : "", g_media[i].name,
+                            g_media[i].source, strcmp(g_media[i].flag, "unused?") ? "" : ", unused?");
+        if (w < 0) break;
+        used += static_cast<size_t>(w);
+    }
+}
+int MusicSlotArg(const char *s, int def) {
+    if (!s || !*s) return def;
+    char *end = nullptr;
+    long v = strtol(s, &end, 10);
+    return (end && !*end && v >= 0 && v < kMusicSlotCount) ? static_cast<int>(v) : -1;
+}
+bool RunMusicPlay(const char *arg, char *o, size_t n) {
+    if (!g_musicOk || !g_experimental) { Out(o, n, "music code not verified (%s) / experimental off", g_musicCheck); return false; }
+    if (!arg || !arg[0]) { Out(o, n, "usage: media.music.play <track> [slot 0-7] (media.music.list)"); return false; }
+    static char name[64];
+    char slotText[8] = "";
+    if (sscanf_s(arg, "%63s %7s", name, static_cast<unsigned>(sizeof(name)), slotText,
+                 static_cast<unsigned>(sizeof(slotText))) < 1) { Out(o, n, "give a track name"); return false; }
+    int slot = MusicSlotArg(slotText, 0);
+    if (slot < 0) { Out(o, n, "slot 0..7"); return false; }
+    if (g_mediaCount < 0) { Out(o, n, "no TruMenu.media.txt - the track names are not known, nothing played"); return false; }
+    const MediaRow *row = MediaFind("music", name);
+    if (!row) { Out(o, n, "'%s' is not in TruMenu.media.txt (media.music.list)", name); return false; }
+    strncpy_s(name, sizeof(name), row->name, _TRUNCATE);
+    if (!MusicPlace(o, n)) return false;
+    reinterpret_cast<MusicLoadFn>(kMusicLoad)(slot, name, g_musicFade, g_musicFade);
+    Out(o, n, "SRMUSIC_LoadMusic 0x%08lx(%d, \"%s\", %d, %d) called (%s)", kMusicLoad, slot, name, g_musicFade,
+        g_musicFade, row->source);
+    Log(1, "media.music.play: %s", o);
+    return true;
+}
+bool RunMusicStop(const char *arg, char *o, size_t n) {
+    if (!g_musicOk || !g_experimental) { Out(o, n, "music code not verified (%s) / experimental off", g_musicCheck); return false; }
+    bool all = arg && !_stricmp(arg, "all");
+    int slot = all ? 0 : MusicSlotArg(arg, 0);
+    if (slot < 0) { Out(o, n, "usage: media.music.stop [slot 0-7 | all]"); return false; }
+    if (!MusicPlace(o, n)) return false;
+    for (int s = all ? 0 : slot; s <= (all ? kMusicSlotCount - 1 : slot); ++s)
+        reinterpret_cast<MusicLoadFn>(kMusicLoad)(s, nullptr, g_musicFade, 0);   // as the stop native 0x4aa490
+    char which[8];
+    Out(which, sizeof(which), all ? "0..7" : "%d", slot);
+    Out(o, n, "SRMUSIC_LoadMusic(%s, NULL, %d, 0) called (fade out, as the stop native 0x4aa490)", which, g_musicFade);
+    Log(1, "media.music.stop %s: %s", all ? "all" : arg && arg[0] ? arg : "0", o);
+    return true;
+}
+void ValMusicNow(char *o, size_t n) {
+    if (!g_musicOk) { Out(o, n, "music code not verified (%s)", g_musicCheck); return; }
+    size_t used = 0;
+    o[0] = 0;
+    char unit[64] = "";
+    ReadString(kMusicUnitName, unit, sizeof(unit));
+    int w = _snprintf_s(o, n, _TRUNCATE, "unit music [0x%08lx] '%s';", kMusicUnitName, unit);
+    if (w > 0) used = static_cast<size_t>(w);
+    int shown = 0;
+    for (int s = 0; s < kMusicSlotCount; ++s) {
+        DWORD base = kMusicSlots + kMusicSlotSize * static_cast<DWORD>(s), handle = 0;
+        char cur[64] = "", req[64] = "";
+        ReadString(base, cur, sizeof(cur));
+        ReadString(base + 0x100, req, sizeof(req));
+        ReadDword(base + 0x51c, &handle);
+        if (!cur[0] && !req[0] && !handle) continue;
+        w = _snprintf_s(o + used, n - used, _TRUNCATE, " slot %d: '%s'%s%s%s, object %s;", s, cur, req[0] ? " (requested '" : "",
+                        req, req[0] ? "')" : "", handle ? "loaded" : "none");
+        if (w < 0) break;
+        used += static_cast<size_t>(w);
+        ++shown;
+    }
+    if (!shown && used < n) _snprintf_s(o + used, n - used, _TRUNCATE, " all 8 slots empty");
+}
+// dev.musicvars / dev.monstermusicvars: the bits the original developer table names (rows found at runtime)
+const DevRow *DevRowFor(DWORD target, DWORD mask) {
+    for (int i = 0; g_devOk && i < g_devCount; ++i)
+        if (g_dev[i].type == kDevFlag && g_dev[i].target == target && g_dev[i].p5 == mask) return &g_dev[i];
+    return nullptr;
+}
+void ValFlagBit(DWORD target, DWORD mask, char *o, size_t n) {
+    const DevRow *d = DevRowFor(target, mask);
+    DWORD v = 0;
+    if (!d) { Out(o, n, "no developer-table row for [0x%08lx] & 0x%08lx", target, mask); return; }
+    if (ReadDword(target, &v)) Out(o, n, "%d (%s)", (v & mask) ? 1 : 0, d->text); else Out(o, n, "?");
+}
+bool RunFlagBit(DWORD target, DWORD mask, const char *arg, char *o, size_t n) {
+    const DevRow *d = DevRowFor(target, mask);
+    DWORD v = 0;
+    if (!d || !ReadDword(target, &v)) { Out(o, n, "no developer-table row for [0x%08lx] & 0x%08lx - not switched", target, mask); return false; }
+    bool on = BoolArg(arg, (v & mask) != 0);
+    WriteDword(target, on ? (v | mask) : (v & ~mask));
+    Out(o, n, "%s = %d ([0x%08lx] & 0x%08lx, developer row 0x%08lx)", d->text, on ? 1 : 0, target, mask, d->addr);
+    return true;
+}
+void ValMusicVars(char *o, size_t n) { ValFlagBit(0x00e7f098, 0x10000000, o, n); }
+bool RunMusicVars(const char *arg, char *o, size_t n) { return RunFlagBit(0x00e7f098, 0x10000000, arg, o, n); }
+void ValMonsterMusicVars(char *o, size_t n) { ValFlagBit(0x00e7f0a0, 0x01000000, o, n); }
+bool RunMonsterMusicVars(const char *arg, char *o, size_t n) { return RunFlagBit(0x00e7f0a0, 0x01000000, arg, o, n); }
+void ValMediaVideoFlags(char *o, size_t n) {
+    if (g_mediaCount < 0) { Out(o, n, "no TruMenu.media.txt"); return; }
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < g_mediaCount; ++i) {
+        if (_stricmp(g_media[i].kind, "video")) continue;
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s (%s, %s)", used ? " " : "", g_media[i].name,
+                            g_media[i].source, g_media[i].flag);
+        if (w < 0) break;
+        used += static_cast<size_t>(w);
+    }
+}
+
+// ======================================================================================================================
+// 0.10.5 [Shot]: in-game screenshots and Claude marks (owner wish 2026-11-05: the main session gets named shots in the
+// run folder instead of ShareX files without names / with wrong times).
+// A request (item shot.save / claude.mark, the ring, [Shot] Hotkey, the exports TruMenuShot / TruMenuMark; any thread)
+// gets its file name at once - local time of the request, the first open TO TEST step, the name - and waits in a small
+// queue. The render thread takes it in the game's Present call (PresentHook / SwapPresentHook, no new hook): before
+// Render() = clean (nothing TruMenu draws is in it), after Render() = ui. There: GetBackBuffer(0), for a multisampled
+// back buffer a StretchRect into a plain render target, GetRenderTargetData into a D3DPOOL_SYSTEMMEM plain surface,
+// the rows copied into memory, every surface released in the same call (nothing is left over for a Reset). Pixel
+// conversion, PNG encoding (TruShotPng.h) and the file write run on a worker thread (at most kShotMaxInFlight at once;
+// a request waits a frame while they are busy). One TruMenu.log line per file: "shot: <path> <w>x<h> <bytes> bytes,
+// capture <ms> ms (render thread), encode <ms> ms + write <ms> ms (worker); clean|with TruMenu, <source>".
+// claude.mark <kind> writes "claude.mark <kind>: <HH:MM:SS.mmm> unit=<stream unit> pos=<x> <y> <z> step=<step|->
+// shot=<file|-> src=<source>" (TruMenu.log) and requests a clean shot named <kind>.
+// ======================================================================================================================
+int g_shotEnabled = 1, g_shotClean = 1, g_shotKey = 0, g_shotMaxPerMin = 30;   // [Shot]
+char g_shotDir[MAX_PATH] = "";                // resolved [Shot] Folder with a trailing backslash
+struct ShotReq { char file[128]; bool ui; char source[24]; LONG seq; };
+const int kShotQueueMax = 4;
+const LONG kShotMaxInFlight = 2;
+ShotReq g_shotQueue[kShotQueueMax];
+int g_shotQueueCount = 0;
+CRITICAL_SECTION g_shotLock;                  // queue, counters, last texts, rate windows, the name repeat counter
+volatile LONG g_shotQueued = 0;               // queue entries (the fast test in Present)
+volatile LONG g_shotInFlight = 0;             // worker threads converting / writing
+volatile LONG g_shotSeq = 0, g_shotTakenSeq = 0;   // last request / last captured request (shot.save over TruLink waits)
+volatile DWORD g_renderThread = 0;            // thread id of the game's Present call
+LONG g_shotWritten = 0, g_shotFailed = 0, g_shotRefused = 0, g_markCount = 0;
+char g_shotLast[400] = "none", g_shotLastErr[300] = "none";
+struct RateWindow { DWORD t[120]; int next; };   // request ticks of the last minute (MaxPerMinute is at most 120)
+RateWindow g_shotRate = {}, g_markRate = {};
+char g_shotLastBase[96] = "";
+int g_shotBaseRepeat = 0;
+bool g_shotKeyHeld = false;
+bool g_radRunning = false;                    // RadialRun is running an entry (render thread): src=ring
+bool RadFront();                              // radial menu, below: a window of this process is in front
+
+// who runs shot.save / claude.mark: the ring, TruMenuInvoke on another thread (TruLink "menu"), else the menu / bar
+const char *ShotSource(const char *item) {
+    if (g_radRunning) return "ring";
+    DWORD render = g_renderThread;
+    if (render && GetCurrentThreadId() != render) return "TruLink";
+    return item;
+}
+
+// lock held; true = one more request fits into the last minute
+bool RateAllow(RateWindow &r, int maxPerMin, DWORD now) {
+    if (maxPerMin <= 0) return true;
+    int recent = 0;
+    for (DWORD t : r.t)
+        if (t && now - t < 60000) ++recent;
+    if (recent >= maxPerMin) return false;
+    r.t[r.next] = now ? now : 1;
+    r.next = (r.next + 1) % 120;
+    return true;
+}
+
+// "step<n>" of the TO TEST step with the lowest number that is not done, "-" without one
+void ShotStep(char *o, size_t n) {
+    if (FlowShotStep(o, n)) return;          // 0.11: while a flow is loaded = its current step id
+    Out(o, n, "-");
+    EnterCriticalSection(&g_testLock);
+    int best = -1;
+    for (int i = 0; i < g_testCount; ++i) {
+        const TestRow &t = g_tests[i];
+        if (!TestIs(t, "step") || !_stricmp(t.state, "done")) continue;
+        if (best < 0 || t.num < g_tests[best].num) best = i;
+    }
+    if (best >= 0) Out(o, n, "step%d", g_tests[best].num);
+    LeaveCriticalSection(&g_testLock);
+}
+
+// file-name part: A-Z a-z 0-9 _ - . kept, anything else '-', at most 40 characters, "" = "-"
+void ShotName(const char *in, char *o, size_t n, bool lower) {
+    size_t k = 0;
+    for (const char *p = in ? in : ""; *p && k + 1 < n && k < 40; ++p) {
+        char c = *p;
+        bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' ||
+                  c == '.';
+        char v = ok ? (lower && c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c) : '-';
+        if (v == '-' && k && o[k - 1] == '-') continue;
+        o[k++] = v;
+    }
+    while (k && (o[k - 1] == '-' || o[k - 1] == '.')) --k;
+    o[k] = 0;
+    if (!k) strncpy_s(o, n, "-", _TRUNCATE);
+}
+
+// [Shot] Folder -> g_shotDir: empty = <game folder>\TruShots\, relative = below the game folder
+void ShotSetFolder(const char *folder) {
+    char f[MAX_PATH];
+    strncpy_s(f, sizeof(f), folder ? folder : "", _TRUNCATE);
+    for (char *p = f; *p; ++p)
+        if (*p == '/') *p = '\\';
+    if (!f[0]) _snprintf_s(g_shotDir, sizeof(g_shotDir), _TRUNCATE, "%sTruShots\\", g_exeDir);
+    else if (f[1] == ':' || (f[0] == '\\' && f[1] == '\\')) strncpy_s(g_shotDir, sizeof(g_shotDir), f, _TRUNCATE);
+    else _snprintf_s(g_shotDir, sizeof(g_shotDir), _TRUNCATE, "%s%s", g_exeDir, f[0] == '\\' ? f + 1 : f);
+    size_t len = strlen(g_shotDir);
+    if (len && g_shotDir[len - 1] != '\\' && len + 1 < sizeof(g_shotDir)) { g_shotDir[len] = '\\'; g_shotDir[len + 1] = 0; }
+}
+
+// worker thread: every folder of g_shotDir (an existing one is fine); true when it is a folder now
+bool ShotEnsureDir() {
+    char p[MAX_PATH];
+    strncpy_s(p, sizeof(p), g_shotDir, _TRUNCATE);
+    size_t len = strlen(p);
+    for (size_t i = 3; i < len; ++i) {      // after "C:\"; for \\server\share the first two parts fail harmlessly
+        if (p[i] != '\\') continue;
+        p[i] = 0;
+        wchar_t wide[MAX_PATH];              // the W call TruMenu imports already (no new import for the A one)
+        if (MultiByteToWideChar(CP_ACP, 0, p, -1, wide, MAX_PATH)) CreateDirectoryW(wide, nullptr);
+        p[i] = '\\';
+    }
+    DWORD a = GetFileAttributesA(g_shotDir);
+    return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+// any thread: queue a shot of the next frame. ui: 1 = after TruMenu draws, 0 = before (clean), -1 = [Shot] Clean.
+// <file> = the planned file name (folder g_shotDir); false + <why> when refused. Never waits.
+bool ShotRequest(const char *name, int ui, const char *source, char *file, size_t fileSize, char *why, size_t whySize,
+                 LONG *seq) {
+    file[0] = why[0] = 0;
+    bool withUi = ui < 0 ? g_shotClean == 0 : ui != 0;
+    char clean[48], step[16], base[96];
+    ShotName(name, clean, sizeof(clean), false);
+    ShotStep(step, sizeof(step));
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    _snprintf_s(base, sizeof(base), _TRUNCATE, "shot_%02d%02d%02d_%s_%s", t.wHour, t.wMinute, t.wSecond, step, clean);
+    bool ok = true;
+    EnterCriticalSection(&g_shotLock);
+    if (!g_shotEnabled) { Out(why, whySize, "shots off ([Shot] Enabled=0)"); ok = false; }
+    else if (!g_device) { Out(why, whySize, "no d3d9 device hooked yet"); ok = false; }
+    else if (g_shotQueueCount >= kShotQueueMax) { Out(why, whySize, "busy (%d shots wait for a frame)", g_shotQueueCount); ok = false; }
+    else if (!RateAllow(g_shotRate, g_shotMaxPerMin, GetTickCount())) {
+        Out(why, whySize, "more than %d shots per minute ([Shot] MaxPerMinute)", g_shotMaxPerMin);
+        ok = false;
+    }
+    if (ok) {
+        if (!strcmp(base, g_shotLastBase)) ++g_shotBaseRepeat;   // the same second, step and name: _2, _3, ...
+        else { strncpy_s(g_shotLastBase, sizeof(g_shotLastBase), base, _TRUNCATE); g_shotBaseRepeat = 1; }
+        if (g_shotBaseRepeat > 1) _snprintf_s(file, fileSize, _TRUNCATE, "%s_%d.png", base, g_shotBaseRepeat);
+        else _snprintf_s(file, fileSize, _TRUNCATE, "%s.png", base);
+        ShotReq &r = g_shotQueue[g_shotQueueCount++];
+        strncpy_s(r.file, sizeof(r.file), file, _TRUNCATE);
+        strncpy_s(r.source, sizeof(r.source), source, _TRUNCATE);
+        r.ui = withUi;
+        r.seq = InterlockedIncrement(&g_shotSeq);
+        if (seq) *seq = r.seq;
+        InterlockedIncrement(&g_shotQueued);
+    } else {
+        ++g_shotRefused;
+    }
+    LeaveCriticalSection(&g_shotLock);
+    static DWORD lastRefusedLog = 0;
+    if (ok) {
+        Log(2, "shot: %s queued %s (%s)", source, file, withUi ? "with TruMenu" : "clean");
+    } else if (GetTickCount() - lastRefusedLog >= 1000) {   // a held key / a loop never floods the log
+        lastRefusedLog = GetTickCount();
+        Log(1, "shot: %s refused - %s", source, why);
+    }
+    return ok;
+}
+
+struct ShotJob {
+    unsigned char *raw;
+    size_t row;                               // bytes per row in raw (no padding)
+    int w, h;
+    trushot::PixelKind kind;
+    bool ui;
+    double captureMs;
+    char file[128], source[24];
+};
+
+void ShotNote(bool failed, const char *fmt, ...) {
+    char text[300];
+    va_list ap;
+    va_start(ap, fmt);
+    _vsnprintf_s(text, sizeof(text), _TRUNCATE, fmt, ap);
+    va_end(ap);
+    EnterCriticalSection(&g_shotLock);
+    if (failed) { ++g_shotFailed; strncpy_s(g_shotLastErr, sizeof(g_shotLastErr), text, _TRUNCATE); }
+    else { ++g_shotWritten; strncpy_s(g_shotLast, sizeof(g_shotLast), text, _TRUNCATE); }
+    LeaveCriticalSection(&g_shotLock);
+    Log(failed ? 0 : 1, "shot: %s", text);
+}
+
+DWORD WINAPI ShotWorker(LPVOID param) {
+    ShotJob *j = static_cast<ShotJob *>(param);
+    LARGE_INTEGER freq, t0, t1, t2;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&t0);
+    unsigned char *rgb = static_cast<unsigned char *>(malloc(static_cast<size_t>(j->w) * 3 * static_cast<size_t>(j->h)));
+    trushot::Buf png;
+    trushot::BufInit(png);
+    bool encoded = false;
+    if (rgb) {
+        trushot::ToRgb(j->raw, j->row, j->w, j->h, j->kind, rgb);
+        encoded = trushot::EncodePng(rgb, j->w, j->h, png);
+    }
+    free(rgb);
+    free(j->raw);
+    QueryPerformanceCounter(&t1);
+    char path[MAX_PATH + 32] = "";
+    DWORD err = 0;
+    bool written = false, dirOk = encoded && ShotEnsureDir();
+    if (dirOk) {
+        char stem[128];
+        strncpy_s(stem, sizeof(stem), j->file, _TRUNCATE);
+        size_t sl = strlen(stem);
+        if (sl > 4) stem[sl - 4] = 0;        // without ".png"
+        for (int k = 1; k <= 9; ++k) {        // a file of that name from an earlier session: -2 .. -9
+            if (k == 1) _snprintf_s(path, sizeof(path), _TRUNCATE, "%s%s", g_shotDir, j->file);
+            else _snprintf_s(path, sizeof(path), _TRUNCATE, "%s%s-%d.png", g_shotDir, stem, k);
+            HANDLE file = CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+            if (file == INVALID_HANDLE_VALUE) {
+                err = GetLastError();
+                if (err == ERROR_FILE_EXISTS) continue;
+                break;
+            }
+            DWORD done = 0;
+            written = WriteFile(file, png.p, static_cast<DWORD>(png.n), &done, nullptr) && done == png.n;
+            if (!written) err = GetLastError();
+            CloseHandle(file);
+            break;
+        }
+    }
+    QueryPerformanceCounter(&t2);
+    double encodeMs = 1000.0 * static_cast<double>(t1.QuadPart - t0.QuadPart) / static_cast<double>(freq.QuadPart);
+    double writeMs = 1000.0 * static_cast<double>(t2.QuadPart - t1.QuadPart) / static_cast<double>(freq.QuadPart);
+    if (written)
+        ShotNote(false, "%s %dx%d %lu bytes, capture %.1f ms (render thread), encode %.0f ms + write %.0f ms (worker); "
+                 "%s, %s", path, j->w, j->h, static_cast<unsigned long>(png.n), j->captureMs, encodeMs, writeMs,
+                 j->ui ? "with TruMenu" : "clean", j->source);
+    else if (!encoded)
+        ShotNote(true, "%s not written - out of memory while encoding (%dx%d)", j->file, j->w, j->h);
+    else if (!dirOk)
+        ShotNote(true, "%s not written - folder %s cannot be made (error %lu)", j->file, g_shotDir, GetLastError());
+    else
+        ShotNote(true, "%s not written - error %lu (%s)", j->file, err, path);
+    trushot::BufFree(png);
+    free(j);
+    InterlockedDecrement(&g_shotInFlight);
+    return 0;
+}
+
+// render thread: copy the back buffer of <device> into memory and hand it to a worker
+void ShotCapture(IDirect3DDevice9 *device, const ShotReq &r) {
+    LARGE_INTEGER freq, t0, t1;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&t0);
+    IDirect3DSurface9 *back = nullptr, *resolved = nullptr, *sys = nullptr;
+    unsigned char *raw = nullptr;
+    D3DSURFACE_DESC d = {};
+    int bpp = 0;
+    trushot::PixelKind kind = trushot::kPixNone;
+    const char *step = "GetBackBuffer";
+    HRESULT hr = device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back);
+    if (SUCCEEDED(hr) && !back) hr = E_POINTER;
+    if (SUCCEEDED(hr)) { step = "GetDesc"; hr = back->GetDesc(&d); }
+    if (SUCCEEDED(hr)) {
+        kind = trushot::KindOfD3dFormat(static_cast<unsigned>(d.Format), &bpp);
+        if (kind == trushot::kPixNone || !d.Width || !d.Height) { step = "back-buffer format"; hr = E_NOTIMPL; }
+    }
+    IDirect3DSurface9 *src = back;
+    if (SUCCEEDED(hr) && d.MultiSampleType != D3DMULTISAMPLE_NONE) {   // GetRenderTargetData needs a plain surface
+        step = "CreateRenderTarget";
+        hr = device->CreateRenderTarget(d.Width, d.Height, d.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &resolved, nullptr);
+        if (SUCCEEDED(hr)) { step = "StretchRect"; hr = device->StretchRect(back, nullptr, resolved, nullptr, D3DTEXF_NONE); }
+        src = resolved;
+    }
+    if (SUCCEEDED(hr)) {
+        step = "CreateOffscreenPlainSurface";
+        hr = device->CreateOffscreenPlainSurface(d.Width, d.Height, d.Format, D3DPOOL_SYSTEMMEM, &sys, nullptr);
+    }
+    if (SUCCEEDED(hr)) { step = "GetRenderTargetData"; hr = device->GetRenderTargetData(src, sys); }
+    size_t row = static_cast<size_t>(d.Width) * static_cast<size_t>(bpp);
+    if (SUCCEEDED(hr)) {
+        D3DLOCKED_RECT lr = {};
+        step = "LockRect";
+        hr = sys->LockRect(&lr, nullptr, D3DLOCK_READONLY);
+        if (SUCCEEDED(hr)) {
+            raw = static_cast<unsigned char *>(malloc(row * d.Height));
+            if (raw)
+                for (UINT y = 0; y < d.Height; ++y)
+                    memcpy(raw + row * y, static_cast<const unsigned char *>(lr.pBits) + static_cast<size_t>(lr.Pitch) * y, row);
+            sys->UnlockRect();
+            if (!raw) { step = "memory"; hr = E_OUTOFMEMORY; }
+        }
+    }
+    if (sys) sys->Release();
+    if (resolved) resolved->Release();
+    if (back) back->Release();
+    QueryPerformanceCounter(&t1);
+    double ms = 1000.0 * static_cast<double>(t1.QuadPart - t0.QuadPart) / static_cast<double>(freq.QuadPart);
+    if (FAILED(hr)) {
+        ShotNote(true, "%s not taken - %s failed 0x%08lx (back buffer %ux%u format %u, multisample %u)", r.file, step,
+                 static_cast<DWORD>(hr), d.Width, d.Height, static_cast<unsigned>(d.Format),
+                 static_cast<unsigned>(d.MultiSampleType));
+        free(raw);
+        return;
+    }
+    ShotJob *job = static_cast<ShotJob *>(malloc(sizeof(ShotJob)));
+    if (!job) { free(raw); ShotNote(true, "%s not taken - out of memory", r.file); return; }
+    job->raw = raw;
+    job->row = row;
+    job->w = static_cast<int>(d.Width);
+    job->h = static_cast<int>(d.Height);
+    job->kind = kind;
+    job->ui = r.ui;
+    job->captureMs = ms;
+    strncpy_s(job->file, sizeof(job->file), r.file, _TRUNCATE);
+    strncpy_s(job->source, sizeof(job->source), r.source, _TRUNCATE);
+    InterlockedIncrement(&g_shotInFlight);
+    HANDLE thread = CreateThread(nullptr, 0, ShotWorker, job, 0, nullptr);
+    if (!thread) {
+        DWORD e = GetLastError();
+        InterlockedDecrement(&g_shotInFlight);
+        free(raw);
+        free(job);
+        ShotNote(true, "%s not written - CreateThread failed (%lu)", r.file, e);
+        return;
+    }
+    CloseHandle(thread);
+}
+
+// render thread, the game's Present call: before = true before Render() (clean requests), false after it (ui ones)
+void ShotFrame(IDirect3DDevice9 *device, bool before) {
+    if (!g_shotQueued || !device || g_shotInFlight >= kShotMaxInFlight) return;   // busy workers: the request waits
+    ShotReq r = {};
+    bool have = false;
+    EnterCriticalSection(&g_shotLock);
+    for (int i = 0; i < g_shotQueueCount && !have; ++i) {
+        if (g_shotQueue[i].ui == before) continue;
+        r = g_shotQueue[i];
+        for (int k = i + 1; k < g_shotQueueCount; ++k) g_shotQueue[k - 1] = g_shotQueue[k];
+        --g_shotQueueCount;
+        have = true;
+    }
+    LeaveCriticalSection(&g_shotLock);
+    if (!have) return;
+    InterlockedDecrement(&g_shotQueued);
+    ShotCapture(device, r);
+    InterlockedExchange(&g_shotTakenSeq, r.seq);
+}
+
+bool ClaudeMark(const char *kindIn, const char *source, char *o, size_t n);
+
+// render thread, every Present before the clean capture: [Shot] Hotkey = claude.mark now (key-down edge, game in front)
+void ShotKeyTick() {
+    if (!g_shotKey) return;
+    bool down = (GetAsyncKeyState(g_shotKey) & 0x8000) != 0 && RadFront();
+    if (down && !g_shotKeyHeld) {
+        char o[256];
+        ClaudeMark("now", "hotkey", o, sizeof(o));
+    }
+    g_shotKeyHeld = down;
+}
+
+// the start of PresentHook / SwapPresentHook
+void ShotBeforeRender(IDirect3DDevice9 *device) {
+    g_renderThread = GetCurrentThreadId();
+    ShotKeyTick();
+    ShotFrame(device, true);
+}
+
+// claude.mark <kind>: the log line + a clean shot named <kind> (any thread; never waits)
+bool ClaudeMark(const char *kindIn, const char *source, char *o, size_t n) {
+    char kind[24];
+    ShotName(kindIn && kindIn[0] ? kindIn : "now", kind, sizeof(kind), true);
+    if (strlen(kind) > 16) kind[16] = 0;
+    EnterCriticalSection(&g_shotLock);
+    bool allowed = RateAllow(g_markRate, g_shotMaxPerMin, GetTickCount());
+    if (allowed) ++g_markCount;
+    LeaveCriticalSection(&g_shotLock);
+    if (!allowed) {
+        Out(o, n, "more than %d marks per minute ([Shot] MaxPerMinute) - not marked", g_shotMaxPerMin);
+        static DWORD lastLog = 0;
+        if (GetTickCount() - lastLog >= 1000) { lastLog = GetTickCount(); Log(1, "claude.mark %s refused (%s): %s", kind, source, o); }
+        return false;
+    }
+    char file[128], why[160];
+    bool shot = ShotRequest(kind, 0, "claude.mark", file, sizeof(file), why, sizeof(why), nullptr);
+    char unit[64] = "", pos[64], step[16];
+    DWORD id = 0;
+    if (ReadDword(kUnitId, &id)) StreamUnitName(id, unit, sizeof(unit));
+    if (!unit[0]) CurrentUnit(unit, sizeof(unit));
+    for (char *p = unit; *p; ++p)
+        if (*p == ' ') *p = '_';
+    if (!unit[0]) strncpy_s(unit, sizeof(unit), "-", _TRUNCATE);
+    float p3[3], r3[3];
+    DWORD instance = 0;
+    if (ReadLara(p3, r3, &instance)) Out(pos, sizeof(pos), "%.0f %.0f %.0f", p3[0], p3[1], p3[2]);
+    else Out(pos, sizeof(pos), "- - -");
+    ShotStep(step, sizeof(step));
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    char line[400];
+    _snprintf_s(line, sizeof(line), _TRUNCATE, "claude.mark %s: %02d:%02d:%02d.%03d unit=%s pos=%s step=%s shot=%s src=%s%s%s%s",
+                kind, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, unit, pos, step, shot ? file : "-", source,
+                shot ? "" : " (no shot: ", shot ? "" : why, shot ? "" : ")");
+    Log(1, "%s", line);
+    Out(o, n, "%s", line);
+    FlowOnMark(kind, shot ? file : "");      // 0.11: the flow step's result / marks (an event only)
+    return true;
+}
+
+void ValShot(char *o, size_t n) {
+    EnterCriticalSection(&g_shotLock);
+    Out(o, n, "enabled %d, clean %d, hotkey 0x%02x%s, max %d per minute, folder %s; written %ld, failed %ld, refused %ld, "
+        "waiting %d, in flight %ld, marks %ld; last: %s; last error: %s", g_shotEnabled, g_shotClean, g_shotKey,
+        g_shotKey ? " (= claude.mark now)" : " (off)", g_shotMaxPerMin, g_shotDir, g_shotWritten, g_shotFailed,
+        g_shotRefused, g_shotQueueCount, g_shotInFlight, g_markCount, g_shotLast, g_shotLastErr);
+    LeaveCriticalSection(&g_shotLock);
+}
+void ValMarks(char *o, size_t n) {
+    Out(o, n, "%ld marks (kinds now good bug gfx sound stutter; [Shot] MaxPerMinute %d, Hotkey 0x%02x)", g_markCount,
+        g_shotMaxPerMin, g_shotKey);
+}
+
+// shot.save [ui|clean] [name]: from the render thread (menu, ring, command bar) only queued; from another thread
+// (TruLink) it waits up to 2 s until the frame is copied and answers with the path
+bool RunShotSave(const char *arg, char *o, size_t n) {
+    char a[160];
+    strncpy_s(a, sizeof(a), arg ? arg : "", _TRUNCATE);
+    char *rest = a;
+    while (*rest == ' ') ++rest;
+    int ui = -1;
+    for (int k = 0; k < 2; ++k) {
+        const char *word = k ? "clean" : "ui";
+        size_t len = strlen(word);
+        if (!_strnicmp(rest, word, len) && (rest[len] == 0 || rest[len] == ' ')) {
+            ui = k ? 0 : 1;
+            rest += len;
+            while (*rest == ' ') ++rest;
+            break;
+        }
+    }
+    char file[128], why[160];
+    LONG seq = 0;
+    if (!ShotRequest(rest, ui, ShotSource("menu"), file, sizeof(file), why, sizeof(why), &seq)) { Out(o, n, "%s", why); return false; }
+    DWORD render = g_renderThread;
+    if (!render || GetCurrentThreadId() == render) {
+        Out(o, n, "queued %s%s (next frame; TruMenu.log 'shot:' line when written)", g_shotDir, file);
+        return true;
+    }
+    for (int i = 0; i < 100 && g_shotTakenSeq - seq < 0; ++i) Sleep(20);
+    if (g_shotTakenSeq - seq >= 0)
+        Out(o, n, "captured %s%s (the PNG is written on a worker thread - TruMenu.log 'shot:' line)", g_shotDir, file);
+    else
+        Out(o, n, "queued %s%s (no frame within 2 s - taken at the next one)", g_shotDir, file);
+    return true;
+}
+bool RunClaudeMark(const char *arg, char *o, size_t n) { return ClaudeMark(arg, ShotSource("menu"), o, n); }
+
+// the exports TruMenuShot / TruMenuMark (other plugins; any thread, never wait); the name is copied SEH-guarded
+int ShotExport(const char *name) {
+    char copy[64] = "";
+    if (name) ReadString(reinterpret_cast<DWORD>(name), copy, sizeof(copy));
+    char file[128], why[160];
+    bool ok = ShotRequest(copy, -1, "TruMenuShot", file, sizeof(file), why, sizeof(why), nullptr);
+    Log(1, "shot: TruMenuShot(\"%s\") -> %s%s", copy, ok ? "queued " : "refused: ", ok ? file : why);
+    return ok ? 1 : 0;
+}
+int MarkExport(const char *kind) {
+    char copy[64] = "";
+    if (kind) ReadString(reinterpret_cast<DWORD>(kind), copy, sizeof(copy));
+    char o[400];
+    return ClaudeMark(copy, "TruMenuMark", o, sizeof(o)) ? 1 : 0;
+}
+
+// ======================================================================================================================
+// 0.11 "Ablauf" (guided test runs, stage 2; owner wish 2026-11-05): TruMenu.flow.txt next to tru.exe ([Flow] File)
+// holds steps (action / observe / mark), counters and conditions (format: TruFlowCore.h, README "Ablauf"). The ring
+// level Claude shows the current step ("Weiter: ..." runs an action's do= commands through the regression-shortcut
+// path ShortcutStart / ShortcutTick - level changes are waited for there), Gut / Fehler (= claude.mark good / bug: mark
+// + clean shot + the step's result), Ueberspringen, Zurueck; a status line in Claude's coral sits in a screen corner
+// ([Flow] Overlay / Position / Size / Lines). Counters: unit / level loads and checkpoint restores from the TruTrace.log
+// tail, plugin-log patterns from the Tru*.log tails (own tail, [Flow] PollMs, every new byte up to 256 KB per poll),
+// player deaths from the player state-mode word, TO TEST switch flips, item runs, Claude marks. Every event is a
+// TruMenu.log line "flow: ..." (Invoke-TruTestRun.ps1 builds the summary section "Ablauf" from them).
+// Threads: g_flowLock guards g_flow and the run state (render thread FlowTick, worker FlowTailTick, item callers);
+// FlowOnItem / FlowOnToggle / FlowOnMark only queue an event under the leaf lock g_flowEvLock (they are called while
+// g_scLock / g_testLock / g_shotLock may be held), FlowTick applies the events. Only the render thread starts a step's
+// commands (g_flowRunReq), so g_flowLock -> g_scLock is the only order of the two.
+// Player deaths, static (tools/pe_abs_uses.py 0xfada74, tools/pe_dis.py; data/pc/tru.exe sha256 6905b046...): bit
+// 0x10000 of [0xfada74] is set by exactly one instruction, `or dword [0xfada74], 0x10408` at 0x75aa69 =
+// DeathState::Entry 0x75aa50 (name: docs Befund-Prototyp-2007.md, agrees with TRLAU); the ten immediate stores
+// (0x48 0x2d9 0xc9 0x40020208 0x40 0x1049 0xc0000001 0x48 0x48 0x49) and the two register stores (ecx = 0x81 at
+// 0x7522d5) never hold it, no and-mask clears it. So a rising edge of the bit is one DeathState entry; the next state
+// entry's immediate store clears it. The bytes at 0x75aa69 are checked at load (mismatch = no death counter).
+// ======================================================================================================================
+int g_flowEnabled = 0, g_flowOverlay = 1, g_flowLines = 2, g_flowToastMs = 6000, g_flowPollMs = 500, g_flowAuto = 1;
+int g_flowPos = 3;                           // [Flow] Position: 0 top left, 1 top right, 2 bottom left, 3 bottom right
+const char *const kFlowCorners[4] = {"tl", "tr", "bl", "br"};
+float g_flowSize = 1.0f;
+char g_flowFile[MAX_PATH] = "TruMenu.flow.txt", g_flowPath[MAX_PATH] = "";
+CRITICAL_SECTION g_flowLock, g_flowEvLock;
+truflow::Flow g_flow;                        // under g_flowLock
+enum { kFsOpen = 0, kFsRun, kFsOk, kFsFail, kFsSkip };
+const char *const kFsNames[] = {"open", "run", "ok", "fail", "skip"};
+struct FlowRun {
+    int state;
+    bool started, cmdsDone, scOurs;
+    DWORD start, end;                        // GetTickCount of the (last) start / the result
+    LONG startSeq;                           // g_flowSeq at the start: check= / fail= log lines must be newer
+    unsigned marks;                          // Claude mark kinds seen since the start (bit = FlowMarkKind)
+    char by[24], note[160], shots[200];
+};
+FlowRun g_flowRun[truflow::kMaxSteps];
+int g_flowCount[truflow::kMaxCounters];
+bool g_flowCountDirty[truflow::kMaxCounters], g_flowCountReached[truflow::kMaxCounters];
+DWORD g_flowCountLogTick[truflow::kMaxCounters];
+LONG g_flowWatchHits[truflow::kMaxWatches], g_flowWatchSeq[truflow::kMaxWatches];
+LONG g_flowSeq = 0;                          // order of matched log lines (under g_flowLock)
+LONG g_flowGen = 0;                          // +1 per load: the worker drops matches of an older flow
+int g_flowCur = 0;                           // current step; g_flow.nSteps = finished
+bool g_flowLoaded = false, g_flowDoneLogged = false;
+char g_flowState[200] = "not loaded ([Flow] Enabled=0)";
+DWORD g_flowT0 = 0;
+int g_flowRunReq = -1;                       // flow.next on an action: the render thread starts its commands
+DWORD g_flowRunReqTick = 0;
+volatile LONG g_flowLoadReq = 1;             // the worker (re)loads the file: 1 at the start, flow.reload
+char g_flowToast[200] = "";
+DWORD g_flowToastTick = 0;
+bool g_flowDeathOk = false, g_flowDeathBit = false;
+DWORD g_flowDeathWord = 0;
+LONG g_flowDeaths = 0;
+const DWORD kFlowDeathSite = 0x0075aa69;     // DeathState::Entry: or dword [0xfada74], 0x10408
+const DWORD kFlowDeathBit = 0x00010000;
+struct FlowEv { int type; char a[48]; char b[128]; };
+enum { kFeItem = 1, kFeToggle, kFeMark };
+FlowEv g_flowEv[32];
+int g_flowEvCount = 0;
+LONG g_flowEvLost = 0;
+struct FlowTail { char file[truflow::kFileLen]; char path[MAX_PATH]; LONGLONG offset; };
+FlowTail g_flowTails[8];                     // worker thread only
+int g_flowTailCount = 0;
+LONG g_flowTailSkipped = 0;
+
+float FlowSec() { return static_cast<float>(GetTickCount() - g_flowT0) / 1000.0f; }
+
+// Claude mark kind (claude.mark now / good / bug / gfx / sound / stutter) of a name: the kind word or the German ring
+// label; -1 = another word
+int FlowMarkKind(const char *name) {
+    static const char *const kinds[6][4] = {{"now", "jetzt", "", ""}, {"good", "gut", "", ""}, {"bug", "fehler", "", ""},
+                                            {"gfx", "grafik", "grafik komisch", ""}, {"sound", "ton", "ton komisch", ""},
+                                            {"stutter", "ruckler", "haenger", "ruckler / haenger"}};
+    for (int k = 0; k < 6; ++k)
+        for (const char *w : kinds[k])
+            if (w[0] && !_stricmp(w, name)) return k;
+    return -1;
+}
+
+void FlowCondText(const truflow::Cond &c, char *o, size_t n) {
+    if (c.type == truflow::kCondWatch && c.index >= 0 && c.index < g_flow.nWatches) {
+        const truflow::Watch &w = g_flow.watches[c.index];
+        if (w.cat[0]) _snprintf_s(o, n, _TRUNCATE, "trace:%s:%s", w.cat, w.source);
+        else _snprintf_s(o, n, _TRUNCATE, "log:%s:%s", w.file, w.source);
+    } else _snprintf_s(o, n, _TRUNCATE, "%s:%s", truflow::kCondNames[c.type], c.ref);
+}
+
+// g_flowLock held. check = a log line / mark newer than the step's start; else (after=) any time since the load
+bool FlowCondMetLocked(int i, const truflow::Cond &c, bool check) {
+    switch (c.type) {
+    case truflow::kCondStep: return c.index >= 0 && g_flowRun[c.index].state == kFsOk;
+    case truflow::kCondDone: return c.index >= 0 && g_flowRun[c.index].state >= kFsOk;
+    case truflow::kCondCounter: {
+        const truflow::Counter &k = g_flow.counters[c.index];
+        return k.target > 0 && g_flowCount[c.index] >= k.target;
+    }
+    case truflow::kCondMark: {
+        int kind = FlowMarkKind(c.ref);
+        return kind >= 0 && (g_flowRun[i].marks >> kind) & 1;
+    }
+    case truflow::kCondWatch:
+        return check ? g_flowWatchSeq[c.index] > g_flowRun[i].startSeq : g_flowWatchHits[c.index] > 0;
+    }
+    return false;
+}
+
+// "" = every after= is met, else the first one that is not (for the overlay / Weiter)
+const char *FlowWaitLocked(int i, char *o, size_t n) {
+    o[0] = 0;
+    const truflow::Step &s = g_flow.steps[i];
+    for (int k = 0; k < s.nAfter; ++k)
+        if (!FlowCondMetLocked(i, s.after[k], false)) {
+            FlowCondText(s.after[k], o, n);
+            break;
+        }
+    return o;
+}
+
+void FlowAdvanceLocked();
+
+// a step's result; the current step moves on with [Flow] AutoAdvance=1 (Gut / Fehler / Weiter always)
+void FlowFinishLocked(int i, int state, const char *by, const char *note, bool advance) {
+    FlowRun &r = g_flowRun[i];
+    if (!r.started) { r.started = true; r.start = GetTickCount(); r.startSeq = g_flowSeq; }
+    r.state = state;
+    r.end = GetTickCount();
+    r.scOurs = false;
+    strncpy_s(r.by, sizeof(r.by), by, _TRUNCATE);
+    if (note) strncpy_s(r.note, sizeof(r.note), note, _TRUNCATE);
+    Log(1, "flow: step %s %s %d/%d t=%.1f dur=%.1f by=%s%s%s", g_flow.steps[i].id, kFsNames[state], i + 1, g_flow.nSteps,
+        FlowSec(), static_cast<float>(r.end - r.start) / 1000.0f, by, r.note[0] ? " note=" : "", r.note);
+    if (i == g_flowCur && advance) FlowAdvanceLocked();
+}
+
+// step i becomes the current one (a step with skip= is skipped at once)
+void FlowEnterLocked(int i) {
+    g_flowCur = i;
+    if (i >= g_flow.nSteps) {
+        if (g_flowDoneLogged) return;
+        g_flowDoneLogged = true;
+        int c[5] = {};
+        for (int k = 0; k < g_flow.nSteps; ++k) ++c[g_flowRun[k].state];
+        Log(1, "flow: done %d ok, %d fail, %d skip, %d open t=%.1f", c[kFsOk], c[kFsFail], c[kFsSkip], c[kFsOpen] + c[kFsRun],
+            FlowSec());
+        return;
+    }
+    g_flowDoneLogged = false;
+    FlowRun &r = g_flowRun[i];
+    const truflow::Step &s = g_flow.steps[i];
+    r.started = true;
+    r.start = GetTickCount();
+    r.startSeq = g_flowSeq;
+    r.marks = 0;
+    if (r.state != kFsRun) r.state = kFsOpen;
+    Log(1, "flow: step %s start %d/%d (%s) t=%.1f: %s", s.id, i + 1, g_flow.nSteps, truflow::kKindNames[s.kind], FlowSec(), s.text);
+    if (s.skip[0]) FlowFinishLocked(i, kFsSkip, "file", s.skip, true);
+}
+
+// the next step after the current one that has no result yet; none = the flow is done
+void FlowAdvanceLocked() {
+    for (int j = g_flowCur + 1; j < g_flow.nSteps; ++j)
+        if (g_flowRun[j].state < kFsOk) { FlowEnterLocked(j); return; }
+    FlowEnterLocked(g_flow.nSteps);
+}
+
+void FlowCounterAddLocked(int c, int delta) {
+    if (delta <= 0) return;
+    g_flowCount[c] += delta;
+    g_flowCountDirty[c] = true;
+}
+
+void FlowErrLine(void *, int line, const char *message) { Log(0, "flow: error line %d: %s", line, message); }
+
+// worker thread: (re)reads the file; every state and counter starts anew
+void FlowLoad() {
+    static char text[256 * 1024 + 1];
+    size_t got = 0;
+    bool found = false;
+    FILE *f = nullptr;
+    if (fopen_s(&f, g_flowPath, "rb") == 0 && f) {
+        got = fread(text, 1, sizeof(text) - 1, f);
+        found = true;
+        fclose(f);
+    }
+    text[got] = 0;
+    bool deathOk = HexBytesAt(kFlowDeathSite, "810d74dafa0008040100");
+    EnterCriticalSection(&g_flowLock);
+    ++g_flowGen;
+    memset(g_flowRun, 0, sizeof(g_flowRun));
+    memset(g_flowCount, 0, sizeof(g_flowCount));
+    memset(g_flowCountDirty, 0, sizeof(g_flowCountDirty));
+    memset(g_flowCountReached, 0, sizeof(g_flowCountReached));
+    memset(g_flowCountLogTick, 0, sizeof(g_flowCountLogTick));
+    memset(g_flowWatchHits, 0, sizeof(g_flowWatchHits));
+    memset(g_flowWatchSeq, 0, sizeof(g_flowWatchSeq));
+    g_flowSeq = 0;
+    g_flowRunReq = -1;
+    g_flowDoneLogged = false;
+    g_flowT0 = GetTickCount();
+    g_flowDeathOk = deathOk;
+    g_flowTailCount = 0;                     // the worker syncs the tails (this is the worker thread)
+    if (!found) {
+        memset(&g_flow, 0, sizeof(g_flow));
+        g_flowLoaded = false;
+        _snprintf_s(g_flowState, sizeof(g_flowState), _TRUNCATE, "%s not found (Invoke-TruTestRun.ps1 installs a "
+                    "profile's flowFile)", g_flowPath);
+        Log(0, "flow: %s", g_flowState);
+    } else {
+        int errors = truflow::ParseText(g_flow, text, FlowErrLine, nullptr);
+        g_flowLoaded = g_flow.nSteps > 0;
+        _snprintf_s(g_flowState, sizeof(g_flowState), _TRUNCATE, "%s: %d steps, %d counters, %d log patterns, %d errors%s",
+                    g_flowPath, g_flow.nSteps, g_flow.nCounters, g_flow.nWatches, errors,
+                    got >= sizeof(text) - 1 ? " (cut at 256 KB)" : "");
+        Log(1, "flow: loaded %s (id %s: %s); deaths %s", g_flowState, g_flow.id[0] ? g_flow.id : "-", g_flow.title,
+            deathOk ? "counted (DeathState entry 0x75aa69 checked)" : "NOT counted (bytes at 0x75aa69 differ)");
+        if (g_flowLoaded) FlowEnterLocked(0);
+    }
+    LeaveCriticalSection(&g_flowLock);
+}
+
+// a hook event (any thread, any lock held): queued under the leaf lock, FlowTick applies it
+void FlowEvent(int type, const char *a, const char *b) {
+    if (!g_flowLoaded) return;
+    EnterCriticalSection(&g_flowEvLock);
+    if (g_flowEvCount < 32) {
+        FlowEv &e = g_flowEv[g_flowEvCount++];
+        e.type = type;
+        strncpy_s(e.a, sizeof(e.a), a ? a : "", _TRUNCATE);
+        strncpy_s(e.b, sizeof(e.b), b ? b : "", _TRUNCATE);
+    } else ++g_flowEvLost;
+    LeaveCriticalSection(&g_flowEvLock);
+}
+void FlowOnItem(const char *id) { FlowEvent(kFeItem, id, ""); }
+void FlowOnToggle(const char *id, const char *state) { FlowEvent(kFeToggle, id, state); }
+void FlowOnMark(const char *kind, const char *file) { FlowEvent(kFeMark, kind, file); }
+
+// g_flowLock held: one event
+void FlowApplyLocked(const FlowEv &e) {
+    using namespace truflow;
+    int kind = e.type == kFeMark ? FlowMarkKind(e.a) : -1;
+    for (int c = 0; c < g_flow.nCounters; ++c) {
+        const Counter &k = g_flow.counters[c];
+        if ((e.type == kFeItem && k.source == kSrcItem && !_stricmp(k.arg, e.a)) ||
+            (e.type == kFeToggle && k.source == kSrcToggle && !_stricmp(k.arg, e.a)) ||
+            (e.type == kFeMark && k.source == kSrcMark && (kind >= 0 ? FlowMarkKind(k.arg) == kind : !_stricmp(k.arg, e.a))))
+            FlowCounterAddLocked(c, 1);
+    }
+    if (e.type != kFeMark) return;
+    int i = g_flowCur;
+    bool cur = i < g_flow.nSteps;
+    Log(1, "flow: mark %s step=%s shot=%s t=%.1f", e.a, cur ? g_flow.steps[i].id : "-", e.b[0] ? e.b : "-", FlowSec());
+    if (!cur) return;
+    FlowRun &r = g_flowRun[i];
+    if (kind >= 0) r.marks |= 1u << kind;
+    size_t used = strlen(r.shots);
+    _snprintf_s(r.shots + used, sizeof(r.shots) - used, _TRUNCATE, "%s%s:%s", used ? "; " : "", e.a, e.b[0] ? e.b : "-");
+    if (r.state >= kFsOk) return;
+    // Gut / Fehler = the owner's result for every kind; any other mark finishes a mark step
+    if (kind == 1) FlowFinishLocked(i, kFsOk, "Gut", nullptr, true);
+    else if (kind == 2) FlowFinishLocked(i, kFsFail, "Fehler", nullptr, true);
+    else if (g_flow.steps[i].kind == kKindMark) FlowFinishLocked(i, kFsOk, e.a, nullptr, true);
+}
+
+// render thread, every frame
+void FlowTick() {
+    if (!g_flowLoaded) return;
+    using namespace truflow;
+    FlowEv ev[32];
+    int nev = 0;
+    EnterCriticalSection(&g_flowEvLock);
+    nev = g_flowEvCount;
+    memcpy(ev, g_flowEv, sizeof(FlowEv) * static_cast<size_t>(nev));
+    g_flowEvCount = 0;
+    LeaveCriticalSection(&g_flowEvLock);
+    DWORD word = 0;
+    bool bit = g_flowDeathOk && ReadDword(kPlayerModeFlags, &word) && (word & kFlowDeathBit);
+    EnterCriticalSection(&g_flowLock);
+    if (!g_flowLoaded) { LeaveCriticalSection(&g_flowLock); return; }
+    for (int k = 0; k < nev; ++k) FlowApplyLocked(ev[k]);
+    // player deaths: a rising edge of the DeathState bit while in a level
+    if (bit && !g_flowDeathBit && InLevel()) {
+        ++g_flowDeaths;
+        g_flowDeathWord = word;
+        Log(1, "flow: death %ld ([0x%08lx] = 0x%08lx, DeathState entry bit 0x%05lx) t=%.1f", g_flowDeaths, kPlayerModeFlags,
+            word, kFlowDeathBit, FlowSec());
+        for (int c = 0; c < g_flow.nCounters; ++c)
+            if (g_flow.counters[c].source == kSrcDeaths) FlowCounterAddLocked(c, 1);
+    }
+    g_flowDeathBit = bit;
+    // flow.next on an action: start its commands when the shortcut slot is free (at most 10 s)
+    if (g_flowRunReq >= 0 && g_flowRunReq < g_flow.nSteps) {
+        int i = g_flowRunReq;
+        if (!g_scActive) {
+            g_flowRunReq = -1;
+            char title[48], o[200];
+            _snprintf_s(title, sizeof(title), _TRUNCATE, "flow:%s", g_flow.steps[i].id);
+            if (ShortcutStart(g_flow.steps[i].cmds, title, o, sizeof(o))) {
+                g_flowRun[i].scOurs = true;
+                g_flowRun[i].cmdsDone = false;
+                Log(1, "flow: step %s run %d/%d t=%.1f cmds=%s", g_flow.steps[i].id, i + 1, g_flow.nSteps, FlowSec(),
+                    g_flow.steps[i].cmds);
+            } else FlowFinishLocked(i, kFsFail, "commands", o, true);
+        } else if (GetTickCount() - g_flowRunReqTick > 10000) {
+            g_flowRunReq = -1;
+            FlowFinishLocked(i, kFsFail, "commands", "another shortcut / Prepare kept running for 10 s", true);
+        }
+    }
+    for (int i = 0; i < g_flow.nSteps; ++i) {
+        FlowRun &r = g_flowRun[i];
+        const Step &s = g_flow.steps[i];
+        if (!r.started || r.state >= kFsOk) continue;
+        if (r.state == kFsRun && r.scOurs) {           // the step's commands: done / stopped / replaced
+            char title[48], state[200];
+            _snprintf_s(title, sizeof(title), _TRUNCATE, "flow:%s", s.id);
+            EnterCriticalSection(&g_scLock);
+            bool active = g_scActive != 0, ours = !_stricmp(g_scTitle, title);
+            strncpy_s(state, sizeof(state), g_scState, _TRUNCATE);
+            LeaveCriticalSection(&g_scLock);
+            if (!ours) { FlowFinishLocked(i, kFsFail, "commands", "replaced by another shortcut / Prepare", true); continue; }
+            if (!active) {
+                r.scOurs = false;
+                size_t len = strlen(state);
+                if (len >= 6 && !strcmp(state + len - 6, ": done")) {
+                    r.cmdsDone = true;
+                    Log(1, "flow: step %s commands done t=%.1f", s.id, FlowSec());
+                    if (!s.nCheck) { FlowFinishLocked(i, kFsOk, "commands", nullptr, g_flowAuto != 0); continue; }
+                } else { FlowFinishLocked(i, kFsFail, "commands", state, true); continue; }
+            }
+        }
+        bool done = false;
+        for (int k = 0; k < s.nFail && !done; ++k)
+            if (FlowCondMetLocked(i, s.fail[k], true)) {
+                char t[200];
+                FlowCondText(s.fail[k], t, sizeof(t));
+                FlowFinishLocked(i, kFsFail, "auto", t, g_flowAuto != 0);
+                done = true;
+            }
+        if (done || (s.kind == kKindAction && !r.cmdsDone)) continue;
+        for (int k = 0; k < s.nCheck && !done; ++k)
+            if (FlowCondMetLocked(i, s.check[k], true)) {
+                char t[200];
+                FlowCondText(s.check[k], t, sizeof(t));
+                FlowFinishLocked(i, kFsOk, "auto", t, g_flowAuto != 0);
+                done = true;
+            }
+    }
+    // counters: at most one line per counter and second, the target line always
+    DWORD now = GetTickCount();
+    for (int c = 0; c < g_flow.nCounters; ++c) {
+        const Counter &k = g_flow.counters[c];
+        bool reached = k.target > 0 && g_flowCount[c] >= k.target && !g_flowCountReached[c];
+        if (!g_flowCountDirty[c] || (!reached && now - g_flowCountLogTick[c] < 1000)) continue;
+        g_flowCountDirty[c] = false;
+        g_flowCountLogTick[c] = now;
+        if (reached) g_flowCountReached[c] = true;
+        Log(1, "flow: counter %s %d/%d t=%.1f%s", k.id, g_flowCount[c], k.target, FlowSec(), reached ? " reached" : "");
+    }
+    LeaveCriticalSection(&g_flowLock);
+}
+
+// worker thread: load requests + the log tails (every [Flow] PollMs; all new bytes up to 256 KB per file and poll)
+void FlowTailTick() {
+    if (!g_flowEnabled) return;
+    if (InterlockedExchange(&g_flowLoadReq, 0)) FlowLoad();
+    static DWORD last = 0;
+    DWORD now = GetTickCount();
+    if (!g_flowLoaded || now - last < static_cast<DWORD>(g_flowPollMs)) return;
+    last = now;
+    using namespace truflow;
+    static Watch watches[kMaxWatches];
+    int nw = 0;
+    LONG gen = 0;
+    EnterCriticalSection(&g_flowLock);           // a copy of the watches: matching runs without the lock
+    nw = g_flow.nWatches;
+    memcpy(watches, g_flow.watches, sizeof(Watch) * static_cast<size_t>(nw));
+    gen = g_flowGen;
+    LeaveCriticalSection(&g_flowLock);
+    for (int w = 0; w < nw; ++w) {                // tails for new files (load, flow.add); a new tail starts at the end
+        bool have = false;
+        for (int t = 0; t < g_flowTailCount; ++t) have = have || !_stricmp(g_flowTails[t].file, watches[w].file);
+        if (have || g_flowTailCount >= 8) continue;
+        FlowTail &t = g_flowTails[g_flowTailCount++];
+        strncpy_s(t.file, sizeof(t.file), watches[w].file, _TRUNCATE);
+        _snprintf_s(t.path, sizeof(t.path), _TRUNCATE, "%s%s", g_exeDir, watches[w].file);
+        WIN32_FILE_ATTRIBUTE_DATA a;
+        t.offset = GetFileAttributesExA(t.path, GetFileExInfoStandard, &a)
+                 ? (static_cast<LONGLONG>(a.nFileSizeHigh) << 32) | a.nFileSizeLow : 0;
+        Log(2, "flow: tail %s from byte %lld", t.path, t.offset);
+    }
+    static char buf[256 * 1024 + 1];
+    static LONG hits[kMaxWatches];
+    static LONG lineSeq[kMaxWatches];
+    for (int t = 0; t < g_flowTailCount; ++t) {
+        FlowTail &tl = g_flowTails[t];
+        HANDLE h = CreateFileA(tl.path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (h == INVALID_HANDLE_VALUE) continue;
+        LARGE_INTEGER size = {};
+        GetFileSizeEx(h, &size);
+        if (size.QuadPart < tl.offset) tl.offset = 0;      // recreated
+        LONGLONG avail = size.QuadPart - tl.offset;
+        if (avail > static_cast<LONGLONG>(sizeof(buf) - 1)) {
+            LONGLONG skip = avail - static_cast<LONGLONG>(sizeof(buf) - 1);
+            tl.offset += skip;
+            InterlockedExchangeAdd(&g_flowTailSkipped, static_cast<LONG>(skip > 0x7fffffff ? 0x7fffffff : skip));
+            Log(1, "flow: tail %s: %lld bytes skipped (more than 256 KB in one poll) - counters may miss lines", tl.file, skip);
+            avail = static_cast<LONGLONG>(sizeof(buf) - 1);
+        }
+        DWORD got = 0;
+        LARGE_INTEGER pos;
+        pos.QuadPart = tl.offset;
+        if (avail > 0 && SetFilePointerEx(h, pos, nullptr, FILE_BEGIN) &&
+            ReadFile(h, buf, static_cast<DWORD>(avail), &got, nullptr) && got) {
+            buf[got] = 0;
+            char *lastNl = nullptr;
+            for (DWORD k = got; k > 0; --k) if (buf[k - 1] == '\n') { lastNl = buf + k - 1; break; }
+            if (lastNl) {
+                tl.offset += (lastNl + 1) - buf;
+                *lastNl = 0;
+                memset(hits, 0, sizeof(hits));
+                memset(lineSeq, 0, sizeof(lineSeq));
+                LONG line = 0;
+                char *ctx = nullptr;
+                for (char *l = strtok_s(buf, "\n", &ctx); l; l = strtok_s(nullptr, "\n", &ctx)) {
+                    size_t len = strlen(l);
+                    if (len && l[len - 1] == '\r') l[len - 1] = 0;
+                    ++line;
+                    for (int w = 0; w < nw; ++w)
+                        if (!_stricmp(watches[w].file, tl.file) && WatchMatches(watches[w], l)) { ++hits[w]; lineSeq[w] = line; }
+                }
+                EnterCriticalSection(&g_flowLock);
+                if (gen == g_flowGen) {
+                    LONG base = g_flowSeq;
+                    for (int w = 0; w < nw; ++w) {
+                        if (!hits[w]) continue;
+                        g_flowWatchHits[w] += hits[w];
+                        g_flowWatchSeq[w] = base + lineSeq[w];
+                        for (int c = 0; c < g_flow.nCounters; ++c)
+                            if (g_flow.counters[c].watch == w) FlowCounterAddLocked(c, hits[w]);
+                    }
+                    g_flowSeq = base + line;
+                }
+                LeaveCriticalSection(&g_flowLock);
+            } else if (got == sizeof(buf) - 1) tl.offset += got;   // one line longer than the buffer: dropped
+        }
+        CloseHandle(h);
+    }
+}
+
+// ---- items ----
+bool FlowReady(char *o, size_t n) {
+    if (!g_flowEnabled) { Out(o, n, "no flow ([Flow] Enabled=0)"); return false; }
+    if (!g_flowLoaded) { Out(o, n, "no flow loaded (%s)", g_flowState); return false; }
+    return true;
+}
+void ValFlowStatus(char *o, size_t n) {
+    EnterCriticalSection(&g_flowLock);
+    if (!g_flowEnabled || !g_flowLoaded) {
+        Out(o, n, "%s", g_flowEnabled ? g_flowState : "off ([Flow] Enabled=0)");
+        LeaveCriticalSection(&g_flowLock);
+        return;
+    }
+    int c[5] = {};
+    for (int k = 0; k < g_flow.nSteps; ++k) ++c[g_flowRun[k].state];
+    o[0] = 0;
+    auto add = [&](const char *fmt, auto... a) {
+        size_t used = strlen(o);
+        if (used + 1 < n) _snprintf_s(o + used, n - used, _TRUNCATE, fmt, a...);
+    };
+    if (g_flowCur < g_flow.nSteps) {
+        char wait[200];
+        FlowWaitLocked(g_flowCur, wait, sizeof(wait));
+        add("flow %s step %d/%d %s (%s, %s)%s%s: %s", g_flow.id, g_flowCur + 1, g_flow.nSteps, g_flow.steps[g_flowCur].id,
+            truflow::kKindNames[g_flow.steps[g_flowCur].kind], kFsNames[g_flowRun[g_flowCur].state],
+            wait[0] ? " waits for " : "", wait, g_flow.steps[g_flowCur].text);
+    } else add("flow %s done (%d steps)", g_flow.id, g_flow.nSteps);
+    add("; %d ok, %d fail, %d skip, %d open; deaths %ld%s", c[kFsOk], c[kFsFail], c[kFsSkip], c[kFsOpen] + c[kFsRun],
+        g_flowDeaths, g_flowDeathOk ? "" : " (not counted)");
+    for (int k = 0; k < g_flow.nCounters; ++k)
+        add("%s%s %d/%d", k ? ", " : "; counters ", g_flow.counters[k].id, g_flowCount[k], g_flow.counters[k].target);
+    LeaveCriticalSection(&g_flowLock);
+}
+void ValFlowList(char *o, size_t n) {
+    EnterCriticalSection(&g_flowLock);
+    o[0] = 0;
+    size_t used = 0;
+    for (int i = 0; i < g_flow.nSteps && g_flowLoaded; ++i) {
+        const FlowRun &r = g_flowRun[i];
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s%d %s %s %s%s%s", used ? "; " : "", i == g_flowCur ? ">" : "", i + 1,
+                            g_flow.steps[i].id, truflow::kKindNames[g_flow.steps[i].kind], kFsNames[r.state],
+                            r.by[0] ? " by " : "", r.by);
+        if (w < 0) break;
+        used += static_cast<size_t>(w);
+    }
+    if (!used) Out(o, n, "%s", g_flowState);
+    LeaveCriticalSection(&g_flowLock);
+}
+// Weiter: action = start its commands; mark = done; observe = left open; then the next step
+bool RunFlowNext(const char *, char *o, size_t n) {
+    if (!FlowReady(o, n)) return false;
+    EnterCriticalSection(&g_flowLock);
+    bool ok = true;
+    int i = g_flowCur;
+    if (i >= g_flow.nSteps) { Out(o, n, "flow done - flow.goto <id> / Zurueck to repeat a step"); ok = false; }
+    else {
+        const truflow::Step &s = g_flow.steps[i];
+        FlowRun &r = g_flowRun[i];
+        char wait[200];
+        if (r.state >= kFsOk) { FlowAdvanceLocked(); Out(o, n, "step %s was %s - next", s.id, kFsNames[r.state]); }
+        else if (s.kind == truflow::kKindAction) {
+            if (r.state == kFsRun) { Out(o, n, "step %s runs (its commands / check)", s.id); ok = false; }
+            else if (FlowWaitLocked(i, wait, sizeof(wait))[0]) { Out(o, n, "step %s waits for %s (Ueberspringen / flow.goto)", s.id, wait); ok = false; }
+            else if (g_scActive || g_flowRunReq >= 0) { Out(o, n, "a shortcut / Prepare still runs - try again"); ok = false; }
+            else {
+                r.state = kFsRun;
+                g_flowRunReq = i;
+                g_flowRunReqTick = GetTickCount();
+                Out(o, n, "step %s: %s", s.id, s.cmds);
+            }
+        } else if (s.kind == truflow::kKindMark) {
+            FlowFinishLocked(i, kFsOk, "Weiter", nullptr, true);
+            Out(o, n, "step %s done", s.id);
+        } else {
+            Log(1, "flow: step %s open %d/%d t=%.1f by=Weiter", s.id, i + 1, g_flow.nSteps, FlowSec());
+            FlowAdvanceLocked();
+            Out(o, n, "step %s left open (no Gut / Fehler)", s.id);
+        }
+    }
+    LeaveCriticalSection(&g_flowLock);
+    return ok;
+}
+int FlowFindLocked(const char *id) { return truflow::FindStep(g_flow, id); }
+// a finished / left step becomes current again (state open; its marks start anew)
+void FlowReopenLocked(int i, const char *by) {
+    FlowRun &r = g_flowRun[i];
+    if (r.state >= kFsOk || r.state == kFsRun) Log(1, "flow: step %s open %d/%d t=%.1f by=%s", g_flow.steps[i].id, i + 1, g_flow.nSteps,
+                                                   FlowSec(), by);
+    if (g_flowRunReq == i) g_flowRunReq = -1;
+    r.state = kFsOpen;
+    r.cmdsDone = r.scOurs = false;
+    r.by[0] = r.note[0] = 0;
+    FlowEnterLocked(i);
+}
+bool RunFlowBack(const char *, char *o, size_t n) {
+    if (!FlowReady(o, n)) return false;
+    EnterCriticalSection(&g_flowLock);
+    bool ok = g_flowCur > 0;
+    if (ok) { FlowReopenLocked(g_flowCur - 1, "Zurueck"); Out(o, n, "step %s again", g_flow.steps[g_flowCur].id); }
+    else Out(o, n, "at the first step");
+    LeaveCriticalSection(&g_flowLock);
+    return ok;
+}
+bool RunFlowGoto(const char *arg, char *o, size_t n) {
+    if (!FlowReady(o, n)) return false;
+    char id[truflow::kIdLen] = "";
+    if (arg) sscanf_s(arg, "%31s", id, static_cast<unsigned>(sizeof(id)));
+    EnterCriticalSection(&g_flowLock);
+    int i = FlowFindLocked(id);
+    if (i >= 0) {
+        Log(1, "flow: goto %s t=%.1f", id, FlowSec());
+        FlowReopenLocked(i, "flow.goto");
+        Out(o, n, "step %s (%d/%d) is current", g_flow.steps[i].id, i + 1, g_flow.nSteps);
+    } else Out(o, n, "usage: flow.goto <step id> (no step '%s' - flow.list)", id);
+    LeaveCriticalSection(&g_flowLock);
+    return i >= 0;
+}
+// "[<id> [reason]]": no id = the current step (ring: Ueberspringen)
+bool RunFlowSkip(const char *arg, char *o, size_t n) {
+    if (!FlowReady(o, n)) return false;
+    char id[truflow::kIdLen] = "";
+    int used = 0;
+    if (arg && arg[0]) sscanf_s(arg, "%31s %n", id, static_cast<unsigned>(sizeof(id)), &used);
+    const char *why = used > 0 && static_cast<size_t>(used) <= strlen(arg) ? arg + used : "";
+    char reason[160];
+    truflow::Ascii(why[0] ? why : "Ueberspringen", reason, sizeof(reason));
+    EnterCriticalSection(&g_flowLock);
+    int i = id[0] ? FlowFindLocked(id) : g_flowCur;
+    bool ok = i >= 0 && i < g_flow.nSteps;
+    if (ok) {
+        if (g_flowRunReq == i) g_flowRunReq = -1;
+        FlowFinishLocked(i, kFsSkip, id[0] ? "flow.skip" : "Ueberspringen", reason, true);
+        Out(o, n, "step %s skipped (%s)", g_flow.steps[i].id, reason);
+    } else Out(o, n, id[0] ? "no step '%s' (flow.list)" : "flow done - nothing to skip%s", id);
+    LeaveCriticalSection(&g_flowLock);
+    return ok;
+}
+bool RunFlowAdd(const char *arg, char *o, size_t n) {
+    if (!FlowReady(o, n)) return false;
+    char why[240] = "";
+    EnterCriticalSection(&g_flowLock);
+    int before = g_flow.nSteps;
+    bool ok = arg && arg[0] && truflow::ParseRecord(g_flow, arg, why, sizeof(why));
+    if (ok && g_flow.nSteps > before) {
+        int bad = -1;
+        if (!truflow::Resolve(g_flow, before, &bad, why, sizeof(why))) { --g_flow.nSteps; ok = false; }
+        else {
+            memset(&g_flowRun[before], 0, sizeof(FlowRun));
+            if (g_flowCur >= before) FlowEnterLocked(before);   // the flow was done: the new step is current
+        }
+    }
+    if (!arg || !arg[0]) strncpy_s(why, sizeof(why), "usage: flow.add <counter | ... / step | ... record>", _TRUNCATE);
+    Log(1, "flow: add %s -> %s%s", arg ? arg : "", ok ? "ok" : "err ", ok ? "" : why);
+    if (ok) Out(o, n, "added (%d steps, %d counters)", g_flow.nSteps, g_flow.nCounters);
+    else Out(o, n, "%s", why);
+    LeaveCriticalSection(&g_flowLock);
+    return ok;
+}
+bool RunFlowSay(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { Out(o, n, "usage: flow.say <text>"); return false; }
+    char text[200];
+    truflow::Ascii(arg, text, sizeof(text));
+    EnterCriticalSection(&g_flowLock);
+    strncpy_s(g_flowToast, sizeof(g_flowToast), text, _TRUNCATE);
+    g_flowToastTick = GetTickCount();
+    LeaveCriticalSection(&g_flowLock);
+    Log(1, "flow: say %s", text);
+    Out(o, n, "toast for %d s: %s", g_flowToastMs / 1000, text);
+    return true;
+}
+bool RunFlowReload(const char *, char *o, size_t n) {
+    if (!g_flowEnabled) { Out(o, n, "no flow ([Flow] Enabled=0)"); return false; }
+    InterlockedExchange(&g_flowLoadReq, 1);
+    Out(o, n, "%s is read again by the worker (within a second)", g_flowPath);
+    return true;
+}
+// ok|fail [note] = claude.mark good / bug (the TruMenu.log mark line + a clean shot + the step result)
+bool RunFlowResult(const char *arg, char *o, size_t n) {
+    if (!FlowReady(o, n)) return false;
+    bool good = arg && !_strnicmp(arg, "ok", 2), bad = arg && !_strnicmp(arg, "fail", 4);
+    if (!good && !bad) { Out(o, n, "usage: flow.result ok|fail [note]"); return false; }
+    const char *note = arg + (good ? 2 : 4);
+    while (*note == ' ') ++note;
+    if (note[0]) {
+        char t[160];
+        truflow::Ascii(note, t, sizeof(t));
+        EnterCriticalSection(&g_flowLock);
+        if (g_flowCur < g_flow.nSteps) strncpy_s(g_flowRun[g_flowCur].note, sizeof(g_flowRun[g_flowCur].note), t, _TRUNCATE);
+        LeaveCriticalSection(&g_flowLock);
+    }
+    return ClaudeMark(good ? "good" : "bug", ShotSource("menu"), o, n);
+}
+
+// shot / claude.mark file names: the current flow step instead of the TO TEST step
+bool FlowShotStep(char *o, size_t n) {
+    if (!g_flowLoaded) return false;
+    EnterCriticalSection(&g_flowLock);       // order g_shotLock -> g_flowLock only (flow code never takes g_shotLock)
+    bool have = g_flowLoaded && g_flowCur < g_flow.nSteps;
+    if (have) Out(o, n, "%s", g_flow.steps[g_flowCur].id);
+    LeaveCriticalSection(&g_flowLock);
+    return have;
+}
+
+// ---- ring (level Claude) ----
+const char *FlowRadWhy(const char *id) {
+    if (_strnicmp(id, "flow.", 5)) return "";
+    if (!g_flowEnabled) return "kein Ablauf ([Flow] Enabled=0)";
+    if (!g_flowLoaded) return "kein Ablauf geladen (TruMenu.flow.txt)";
+    if ((!_stricmp(id, "flow.next") || !_stricmp(id, "flow.skip")) && g_flowCur >= g_flow.nSteps) return "Ablauf fertig";
+    if (!_stricmp(id, "flow.back") && g_flowCur <= 0) return "erster Schritt";
+    return "";
+}
+// the label of a flow entry right now (false = keep the file's label)
+bool FlowRadLabel(const char *id, char *o, size_t n) {
+    if (_strnicmp(id, "flow.", 5) || !g_flowLoaded) return false;
+    EnterCriticalSection(&g_flowLock);
+    bool set = true;
+    int i = g_flowCur;
+    if (!_stricmp(id, "flow.next") && i < g_flow.nSteps)
+        _snprintf_s(o, n, _TRUNCATE, "Weiter: %s", g_flow.steps[i].text);
+    else if (!_stricmp(id, "flow.status"))
+        _snprintf_s(o, n, _TRUNCATE, "Ablauf %d/%d", i < g_flow.nSteps ? i + 1 : g_flow.nSteps, g_flow.nSteps);
+    else set = false;
+    LeaveCriticalSection(&g_flowLock);
+    return set;
+}
+// the centre text when a flow entry / a Claude mark is picked (false = the ring's own text)
+bool FlowRadInfo(const char *id, const char *arg, char *o, size_t n) {
+    bool mark = !_stricmp(id, "claude.mark");
+    if ((_strnicmp(id, "flow.", 5) && !mark) || !g_flowLoaded) return false;
+    EnterCriticalSection(&g_flowLock);
+    int i = g_flowCur;
+    if (i >= g_flow.nSteps) _snprintf_s(o, n, _TRUNCATE, "Ablauf fertig (%d Schritte)", g_flow.nSteps);
+    else {
+        const truflow::Step &s = g_flow.steps[i];
+        char wait[200];
+        FlowWaitLocked(i, wait, sizeof(wait));
+        if (mark && arg && (!_stricmp(arg, "good") || !_stricmp(arg, "bug")))
+            _snprintf_s(o, n, _TRUNCATE, "%s %s = %s + Marke + Bild", s.id, !_stricmp(arg, "good") ? "Gut" : "Fehler",
+                        !_stricmp(arg, "good") ? "ok" : "fail");
+        else if (!_stricmp(id, "flow.back") && i > 0)
+            _snprintf_s(o, n, _TRUNCATE, "zurueck zu %d/%d: %s", i, g_flow.nSteps, g_flow.steps[i - 1].text);
+        else
+            _snprintf_s(o, n, _TRUNCATE, "%d/%d %s: %s%s%s%s%s", i + 1, g_flow.nSteps, truflow::kKindNames[s.kind], s.text,
+                        s.hint[0] ? " - " : "", s.hint, wait[0] ? " - wartet: " : "", wait);
+    }
+    LeaveCriticalSection(&g_flowLock);
+    return true;
+}
+
+// ---- status line + toast (render thread, inside the ImGui frame) ----
+bool FlowWantsDraw() {
+    return g_flowEnabled && ((g_flowLoaded && g_flowOverlay) || (g_flowToast[0] && GetTickCount() - g_flowToastTick < static_cast<DWORD>(g_flowToastMs)));
+}
+void DrawFlowOverlay() {
+    const ImVec4 coral(217.0f / 255.0f, 119.0f / 255.0f, 87.0f / 255.0f, 1.0f);
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
+                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
+                             ImGuiWindowFlags_NoSavedSettings;
+    char l1[320] = "", l2[220] = "", l3[220] = "", toast[200] = "";
+    bool showToast = false;
+    EnterCriticalSection(&g_flowLock);
+    if (g_flowToast[0] && GetTickCount() - g_flowToastTick < static_cast<DWORD>(g_flowToastMs)) {
+        strncpy_s(toast, sizeof(toast), g_flowToast, _TRUNCATE);
+        showToast = true;
+    }
+    if (g_flowLoaded && g_flowOverlay) {
+        int i = g_flowCur, total = g_flow.nSteps;
+        char counter[96] = "", next[120] = "";
+        if (i < total) {
+            const truflow::Step &s = g_flow.steps[i];
+            if (s.nCount) {
+                int c = s.counters[0];
+                const truflow::Counter &k = g_flow.counters[c];
+                if (k.target > 0) _snprintf_s(counter, sizeof(counter), _TRUNCATE, " | %s %d/%d", k.text[0] ? k.text : k.id, g_flowCount[c], k.target);
+                else _snprintf_s(counter, sizeof(counter), _TRUNCATE, " | %s %d", k.text[0] ? k.text : k.id, g_flowCount[c]);
+            }
+            for (int j = i + 1; j < total; ++j)
+                if (g_flowRun[j].state < kFsOk) { _snprintf_s(next, sizeof(next), _TRUNCATE, " | naechster: %.80s", g_flow.steps[j].text); break; }
+            _snprintf_s(l1, sizeof(l1), _TRUNCATE, "Claude-Ablauf  Schritt %d/%d%s%s", i + 1, total, counter, next);
+            _snprintf_s(l2, sizeof(l2), _TRUNCATE, "%s %s: %.150s", g_flowRun[i].state == kFsRun ? "laeuft" : "jetzt",
+                        truflow::kKindNames[s.kind], s.text);
+            char wait[200];
+            FlowWaitLocked(i, wait, sizeof(wait));
+            if (wait[0]) _snprintf_s(l3, sizeof(l3), _TRUNCATE, "wartet: %s", wait);
+            else if (s.hint[0]) _snprintf_s(l3, sizeof(l3), _TRUNCATE, "%s", s.hint);
+        } else {
+            int c[5] = {};
+            for (int k = 0; k < total; ++k) ++c[g_flowRun[k].state];
+            _snprintf_s(l1, sizeof(l1), _TRUNCATE, "Claude-Ablauf fertig: %d ok, %d Fehler, %d uebersprungen, %d offen", c[kFsOk],
+                        c[kFsFail], c[kFsSkip], c[kFsOpen] + c[kFsRun]);
+        }
+    }
+    LeaveCriticalSection(&g_flowLock);
+    if (l1[0]) {
+        bool right = g_flowPos == 1 || g_flowPos == 3, bottom = g_flowPos >= 2;
+        ImVec2 at(right ? vp->WorkPos.x + vp->WorkSize.x - 10.0f : vp->WorkPos.x + 10.0f,
+                  bottom ? vp->WorkPos.y + vp->WorkSize.y - 10.0f : vp->WorkPos.y + 10.0f);
+        ImGui::SetNextWindowPos(at, ImGuiCond_Always, ImVec2(right ? 1.0f : 0.0f, bottom ? 1.0f : 0.0f));
+        ImGui::SetNextWindowBgAlpha(0.55f);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(vp->WorkSize.x * 0.6f, vp->WorkSize.y * 0.3f));
+        if (ImGui::Begin("##TruMenuFlow", nullptr, flags)) {
+            ImGui::SetWindowFontScale(g_flowSize);
+            ImGui::PushStyleColor(ImGuiCol_Text, coral);
+            ImGui::TextUnformatted(l1);
+            ImGui::PopStyleColor();
+            if (g_flowLines >= 2 && l2[0]) ImGui::TextUnformatted(l2);
+            if (g_flowLines >= 3 && l3[0]) ImGui::TextUnformatted(l3);
+        }
+        ImGui::End();
+    }
+    if (showToast) {
+        ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + vp->WorkSize.y * 0.12f),
+                                ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(coral.x, coral.y, coral.z, 0.92f));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+        ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(vp->WorkSize.x * 0.7f, vp->WorkSize.y * 0.3f));
+        if (ImGui::Begin("##TruMenuFlowToast", nullptr, flags)) {
+            ImGui::SetWindowFontScale(g_flowSize * 1.3f);
+            ImGui::TextUnformatted("Claude:");
+            ImGui::TextWrapped("%s", toast);
+        }
+        ImGui::End();
+        ImGui::PopStyleColor(2);
+    }
+}
+
+// game.quit: one last summary line (no waiting for a lock a hung thread may hold)
+void FlowFinal(const char *why) {
+    if (!g_flowLoaded || !TryEnterCriticalSection(&g_flowLock)) return;
+    int c[5] = {};
+    for (int k = 0; k < g_flow.nSteps; ++k) ++c[g_flowRun[k].state];
+    Log(0, "flow: end (%s) step %d/%d; %d ok, %d fail, %d skip, %d open t=%.1f", why,
+        g_flowCur < g_flow.nSteps ? g_flowCur + 1 : g_flow.nSteps, g_flow.nSteps, c[kFsOk], c[kFsFail], c[kFsSkip],
+        c[kFsOpen] + c[kFsRun], FlowSec());
+    LeaveCriticalSection(&g_flowLock);
+}
+
 // 0.6 command bar items, defined with the bar below
 void ValCmdHistory(char *o, size_t n);
 void ValCmdBar(char *o, size_t n);
@@ -5212,6 +8424,18 @@ bool RunCmdRun(const char *arg, char *o, size_t n);
 bool RunCmdKeyboard(const char *arg, char *o, size_t n);   // 0.7
 void ValGameQuit(char *o, size_t n);                       // 0.7.2
 bool RunGameQuit(const char *arg, char *o, size_t n);
+void ValRadialStatus(char *o, size_t n);                   // 0.10 radial menu, defined after the command bar
+void ValRadialList(char *o, size_t n);
+bool RunRadialReload(const char *arg, char *o, size_t n);
+bool RunRadialOpen(const char *arg, char *o, size_t n);
+void ValFreezeSound(char *o, size_t n);      // 0.10.3 (F7) sound pause items, defined after the radial freeze
+void ValPauseSound(char *o, size_t n);
+void ValSoundState(char *o, size_t n);
+bool RunFreezeSound(const char *arg, char *o, size_t n);
+bool RunPauseSound(const char *arg, char *o, size_t n);
+void ValFreezeClock(char *o, size_t n);      // 0.10.4 (F7) shader clock items, defined after the sound items
+void ValClockState(char *o, size_t n);
+bool RunFreezeClock(const char *arg, char *o, size_t n);
 
 struct Item {
     const char *id, *type, *label;
@@ -5230,7 +8454,7 @@ const Item kItems[] = {
     {"status.player", "info", "player instance, object id / name, type record", false, ValPlayerObject, nullptr},
     {"status.plugins", "info", "our ASIs (loaded? version)", false, ValPlugins, nullptr},
     // 0.7.2: render / bar thread (works while the game thread hangs); refused over TruLink (InvokeCore, wait = true)
-    {"game.quit", "action", "quit the game now: run twice within 5 s; logs written, then TerminateProcess(exit code "
+    {"game.quit", "action", "quit the game now: run twice within 10 s (menu: or hold 1 s); logs written, then TerminateProcess(exit code "
                             "0x544D); menu / command bar / favourites only, never over TruLink", false, ValGameQuit,
      RunGameQuit},
     {"guard.status", "info", "TruGuard: mode, fault/dump counters, limits, log path", false, ValGuardStatus, nullptr},
@@ -5306,11 +8530,26 @@ const Item kItems[] = {
      ValDevList, nullptr},
     {"time.scale", "float", "timeDilation 0xe7f1d0 (0..10, \"\" = 1)", false, ValTimeScale, RunTimeScale},
     {"time.pause", "bool", "freeze the world: streamFlags 0xe7f0b8 bit 0x1000", true, ValPause, RunPause},
+    // 0.10.3 (F7): the sound with the world freeze - runtime switches over the ini keys (TruMenu.ini is not written)
+    {"time.freezesound", "bool", "0.10.3 [Radial] FreezeSound: the sound pauses while the ring holds the world "
+                                 "(pause menu pair 0x5874b0 / 0x5874d0; until the next start)", false, ValFreezeSound,
+     RunFreezeSound},
+    {"time.pausesound", "bool", "0.10.3 [Menu] PauseSound: the sound pauses with every other world pause (time.pause, "
+                                "PauseGame; until the next start)", false, ValPauseSound, RunPauseSound},
+    {"time.sound", "info", "0.10.3: sound pause state - switches, pause bit, gameMode, [0xccde88], last action", false,
+     ValSoundState, nullptr},
+    // 0.10.4 (F7, light shaft): the shader clock TimeVector with every world freeze (pause menu's 0x5bfdf0)
+    {"time.freezeclock", "bool", "0.10.4 [Radial] FreezeShaderClock: the shader clock TimeVector holds while the world "
+                                 "is frozen (ring or time.pause; the pause menu's 0x5bfdf0; until the next start)",
+     false, ValFreezeClock, RunFreezeClock},
+    {"time.clock", "info", "0.10.4: shader clock state - switch, pause bit, gameMode, [0xdb94de], RenderDevice "
+                           "+0xfa4c / +0xfa48, last action", false, ValClockState, nullptr},
     {"player.control", "bool", "player control byte 0x8ab4e6 (1 = on)", true, ValControl, RunControl},
     {"player.die", "action", "INSTANCE_Post(player, 4, 3): ragdoll death, needs a level", true, ValPlayer, RunDie},
     {"player.teleport", "action", "Lara to <x> <y> <z>, needs a level", true, ValPlayer, RunTeleport},
-    {"player.mark", "action", "remember Lara's position", false, ValMark, RunMark},
-    {"player.recall", "action", "Lara back to the mark", true, ValMark, RunRecall},
+    {"player.mark", "action", "remember Lara's position and facing (yaw, 0.10.2)", false, ValMark, RunMark},
+    {"player.recall", "action", "Lara back to the mark, facing as then (movement state / velocity unchanged)", true,
+     ValMark, RunRecall},
     {"player.goto", "action", "Lara to an instance (intro id, 0x<address> or #<index>)", true, ValPlayer, RunGoto},
     {"ui.hide", "bool", "hide the HUD (bool 0xcdc9a0)", true, ValUiHide, RunUiHide},
     {"camera.fov", "float", "current camera +0xb0 fov in radians (\"\" = pi/4), needs a level", true, ValFov, RunFov},
@@ -5340,6 +8579,37 @@ const Item kItems[] = {
     {"media.video.play", "action", "0x4a12b0(<name>, 0), front end only (main state 10)", true, ValVideoList, RunVideoPlay},
     {"media.video.menuloop", "action", "main menu background loop [0x8abf20] = <name> (\"\" = medsea_loop)", false,
      ValMenuLoop, RunMenuLoop},
+    // 0.9 media (P1-P3): tracks from TruMenu.media.txt (tools/music_list.py), the engine's SRMUSIC_LoadMusic
+    {"media.video.flags", "info", "videos with source and referenced / unused? (TruMenu.media.txt)", false,
+     ValMediaVideoFlags, nullptr},
+    {"media.music.list", "info", "srmusic tracks: name (source, unused?) from TruMenu.media.txt", false, ValMusicList,
+     nullptr},
+    {"media.music.play", "action", "<track> [slot 0-7]: SRMUSIC_LoadMusic 0x594320(slot, name, fade, fade) as the unit "
+                                   "start 0x5b2211; main menu, in a level only with [Media] MusicInLevels=1; experimental",
+     true, ValMusicNow, RunMusicPlay},
+    {"media.music.stop", "action", "[slot 0-7 | all]: SRMUSIC_LoadMusic(slot, NULL, fade, 0) as the stop native 0x4aa490",
+     true, ValMusicNow, RunMusicStop},
+    {"media.music.now", "info", "the 8 srmusic slots 0xcc5260 (+0 current, +0x100 requested, +0x51c object) and the unit "
+                                "music name 0xd98f64", false, ValMusicNow, nullptr},
+    {"dev.musicvars", "bool", "developer flag Show Music Vars ([0xe7f098] & 0x10000000; row from the original table)", true,
+     ValMusicVars, RunMusicVars},
+    {"dev.monstermusicvars", "bool", "developer flag Show Monster Music Vars ([0xe7f0a0] & 0x01000000; no reader in "
+                                     "retail known)", true, ValMonsterMusicVars, RunMonsterMusicVars},
+    // 0.9 saves (P0d): file operations of TruMenu; delete / restore / import: twice within 10 s, never over TruLink
+    {"save.folder", "info", "the game's save folder (as tru.exe 0x78b550) and the backup folder TruMenu.saves", false,
+     ValSaveFolder, nullptr},
+    {"save.list", "info", "*.TRUSave: name | date | size | unit (data +0x10) | checkpoint (+0x90) | CRC check", false,
+     ValSaveList, nullptr},
+    {"save.backups", "info", "backup folders in TruMenu.saves (newest first, file count)", false, ValSaveBackups, nullptr},
+    {"save.backup", "action", "[label]: copy every *.TRUSave into TruMenu.saves\\<time>[_label]\\", false, ValSaveFolder,
+     RunSaveBackup},
+    {"save.export", "action", "<save>: copy one save to TruMenu.saves\\export\\", false, ValSaveFolder, RunSaveExport},
+    {"save.delete", "action", "<save>: backup of all saves (<time>_deleted), then the file is removed; run twice within "
+                              "10 s; owner only", false, ValSaveFolder, RunSaveDelete},
+    {"save.restore", "action", "<backup>: back up the current saves (<time>_before_restore), then copy the backup's files "
+                               "in (others stay); twice within 10 s; owner only", false, ValSaveFolder, RunSaveRestore},
+    {"save.import", "action", "<name>: TruMenu.saves\\import\\<name>.TRUSave into the save folder (CRC checked, the old "
+                              "state backed up first); twice within 10 s; owner only", false, ValSaveFolder, RunSaveImport},
     // 0.4
     {"log.collapse", "bool", "collapse repeated lines (same source + text) into \"text xN (first-last)\"", false,
      ValLogCollapse, RunLogCollapse},
@@ -5393,8 +8663,9 @@ const Item kItems[] = {
      ValCheatList, nullptr},
     {"cheat.god", "bool", "god mode: gInvincibleCheat 0xfadf60 (ProcessHealth keeps the hit timer full; types 8 / 5 and "
                           "instant deaths pass) [PC has it]", true, ValCheatGod, RunCheatGod},
-    {"cheat.godfull", "bool", "god mode + cheatMode bit 0 (PlayerTakeDamage returns; the bit is also cheat.flight's - "
-                              "side effects possible) [PC has it]", true, ValCheatGodFull, RunCheatGodFull},
+    {"cheat.godfull", "bool", "god mode + the player's no-damage bit 0xfada74 & 0x20000 per frame (ApplyDamage returns, "
+                              "also types 8 / 5; no flight since 0.10.2; instant deaths still kill) [PC has it]", true,
+     ValCheatGodFull, RunCheatGodFull},
     {"cheat.onehitkill", "bool", "one-hit kill 0xe91ffd through ENEMY_ToggleOneHitKill 0x60f670 [PC has it]", true,
      ValCheatOhk, RunCheatOhk},
     {"cheat.enemyhealth", "bool", "show enemy health 0xe91ffc (EnemyProcessFunc prints hit points) [PC has it]", true,
@@ -5408,6 +8679,60 @@ const Item kItems[] = {
     // 0.8 camera log
     {"camera.log", "bool", "log camera manager mode / current camera changes ([Log] CameraChanges, read-only)", false,
      ValCameraLog, RunCameraLog},
+    // 0.8.1
+    {"player.unstuck", "action", "Lara to the newer of player.mark and the last safe ground spot (>= 3 s old, >= 150 "
+                                 "units away; again within 20 s = one further back); arg mark|safe; 0.10.2: no sampling "
+                                 "in menu / ring / pause / cinematic, chord + slope ground test, yaw kept", true,
+     ValUnstuck, RunUnstuck},
+    {"player.safeground", "info", "0.10.2: the player.unstuck state - safe spots, ground windows passed / failed, why "
+                                  "the sampler waits now (read-only)", false, ValUnstuck, nullptr},
+    {"regress.prepare", "action", "<dlc1:id|dlc2:id|id>: run that regression row's shortcut (column 9: level.load, "
+                                  "cheat.god ... one after the other, level changes waited for) | stop", false,
+     ValShortcut, RunRegressPrepare},
+    {"regress.shortcuts", "info", "every regression row with a shortcut (list:id = #title;commands)", false,
+     ValRegressShortcuts, nullptr},
+    {"log.inputtrace", "bool", "a TruMenu.log line per pad edge / click / key while the menu is open, with what the menu "
+                               "did ([Log] InputTrace; needs LogLevel 2)", false, ValInputTrace, RunInputTrace},
+    // 0.10 radial menu ([Radial]; TruMenu.radial.txt next to tru.exe) and stage R2
+    {"radial.status", "info", "radial menu: [Radial] options, file, entries / levels, dropped / unknown ids, state", false,
+     ValRadialStatus, nullptr},
+    {"radial.list", "info", "every radial entry: path | label | item [arg] (= greyed: reason)", false, ValRadialList,
+     nullptr},
+    {"radial.reload", "action", "read TruMenu.radial.txt again (ring closed)", false, ValRadialStatus, RunRadialReload},
+    {"radial.open", "action", "[path]: open the ring latched (at that level), e.g. for a test without the pad", false,
+     ValRadialStatus, RunRadialOpen},
+    {"instance.spawn", "action", "<object>: R2, needs [Radial] Spawn=1: DRM check 0x5bf7b0, tracker 0x5c17d0, poll 0x5c1da0 "
+                                 "until loaded, INSTANCE_BirthObjectNoParent 0x5bd0f0 at Lara (game thread, experimental)",
+     true, ValSpawn, RunInstanceSpawn},
+    // 0.10.5 [Shot]: screenshots of the next frame (render thread copy, PNG on a worker) and Claude marks
+    {"shot.save", "action", "0.10.5 [ui|clean] [name]: screenshot of the next frame as [Shot] Folder\\shot_<HHMMSS>_<TO TEST "
+                            "step>_<name>.png (clean = before TruMenu draws, default [Shot] Clean=1); over TruLink the "
+                            "answer waits for the copy (2 s)", false, ValShot, RunShotSave},
+    {"shot.status", "info", "0.10.5: [Shot] options, folder, shots written / failed / refused, last file and last error",
+     false, ValShot, nullptr},
+    {"claude.mark", "action", "0.10.5 <now|good|bug|gfx|sound|stutter>: TruMenu.log line 'claude.mark <kind>: <time> unit= "
+                              "pos= step= shot= src=' + a clean shot named <kind> (ring level Claude; [Shot] Hotkey = "
+                              "now)", false, ValMarks, RunClaudeMark},
+    // 0.11 Ablauf (TruMenu.flow.txt, [Flow] Enabled=1): ring level Claude, TruLink "menu flow.<x>"
+    {"flow.status", "info", "0.11: the flow - file, step n/m with its state / what it waits for, results, deaths, counters",
+     false, ValFlowStatus, nullptr},
+    {"flow.list", "info", "0.11: every flow step: n id kind state by (> = the current one)", false, ValFlowList, nullptr},
+    {"flow.next", "action", "0.11 Weiter: the current step - action: run its do= commands (the shortcut path, level changes "
+                            "waited for), mark: done, observe: left open; then the next step", false, ValFlowStatus,
+     RunFlowNext},
+    {"flow.back", "action", "0.11 Zurueck: the step before is current again (reopened)", false, ValFlowStatus, RunFlowBack},
+    {"flow.skip", "action", "0.11 [<id> [reason]]: skip that step (no id = the current one, ring: Ueberspringen)", false,
+     ValFlowStatus, RunFlowSkip},
+    {"flow.goto", "action", "0.11 <id>: that step is current (reopened when it had a result)", false, ValFlowStatus,
+     RunFlowGoto},
+    {"flow.add", "action", "0.11 <record>: append a 'counter | ...' or 'step | ...' record (TruMenu.flow.txt syntax)", false,
+     ValFlowStatus, RunFlowAdd},
+    {"flow.say", "action", "0.11 <text>: a toast in Claude's coral for [Flow] ToastSeconds + a 'flow: say' log line", false,
+     ValFlowStatus, RunFlowSay},
+    {"flow.result", "action", "0.11 ok|fail [note]: the current step's result = claude.mark good / bug (mark line + clean "
+                              "shot)", false, ValFlowStatus, RunFlowResult},
+    {"flow.reload", "action", "0.11: read the flow file again (every step and counter starts anew)", false, ValFlowStatus,
+     RunFlowReload},
 };
 
 const Item *FindItem(const char *id) {
@@ -5442,9 +8767,15 @@ void SetLastAction(const char *id, bool ok, const char *text) {
     Log(ok ? 2 : 1, "item %s", g_lastAction);
 }
 
-// game thread: run the queued request
+// game thread: run the queued request.
+// 0.8.1 (P00c, cheat.flight 1 at 22:19:54.690 and 0 at .706 from ONE "queued"): 0.8.0 tested g_reqPending outside the
+// lock and never again inside it. A second caller that passed the test while the first one ran (PadHook on another
+// thread, the Present fallback, or PadHook re-entered from the item through the pad poll - g_reqLock is recursive for
+// the same thread) waited for the lock and then ran the same request again; a toggle ("" = flip) flipped back. Now the
+// request is claimed atomically (1 = queued -> 2 = running): whoever loses the exchange returns, so a request runs
+// exactly once. Enqueue / the waiting callers treat 2 like 1 (still pending).
 void RunPending() {
-    if (!InterlockedCompareExchange(&g_reqPending, 0, 0)) return;
+    if (InterlockedCompareExchange(&g_reqPending, 2, 1) != 1) return;
     EnterCriticalSection(&g_reqLock);
     const Item *item = FindItem(g_reqId);
     char text[1000] = "";
@@ -5512,6 +8843,12 @@ const char *InvokeCore(const char *id, const char *arg, bool wait) {
                     "favourite (owner) - never over TruLink");
         return t_answer;
     }
+    if (item && wait && SaveOwnerOnly(item->id)) {             // 0.9: save folder changes only by the owner
+        Log(1, "%s refused: TruLink / cmd.run (owner only: menu, command bar)", item->id);
+        _snprintf_s(t_answer, sizeof(t_answer), _TRUNCATE, "err %s only from the menu or the command bar (owner) - never "
+                    "over TruLink", item->id);
+        return t_answer;
+    }
     if (item && !_stricmp(item->id, "test.export")) {          // 0.5: a block answer ("ok+ ...", rows, ".")
         TestExportBlock(t_answer, sizeof(t_answer));
         return t_answer;
@@ -5522,6 +8859,7 @@ const char *InvokeCore(const char *id, const char *arg, bool wait) {
     }
     if (item && !_stricmp(item->id, "cmd.run"))                // 0.6: the answer of the line's own item
         return CmdRunLine(arg ? arg : "", wait, "TruLink");
+    if (item && item->run) FlowOnItem(item->id);                // 0.11: item:<id> counters (an event only)
     if (item && !item->run) {
         char *value = t_value;
         item->value(value, sizeof(t_value));
@@ -5768,11 +9106,11 @@ void CmdHistAddLocked(const char *text) {
 }
 
 // ---- 0.7.2 game.quit (owner wish 2026-11-02: the game showed only black, TruMenu still worked) ----
-// Safety step: the first run arms it, a second run 0.3 .. 5 s later quits. Runs on the calling thread (render hook /
-// command bar - not the game thread, which may hang). TerminateProcess, not ExitProcess: no DLL detach / atexit that
+// Safety step: the first run arms it, a second run 0.3 .. 10 s later quits (0.8.1: 10 s, was 5; in the menu also a
+// button held 1 s). Runs on the calling thread (render hook / command bar - not the game thread, which may hang). TerminateProcess, not ExitProcess: no DLL detach / atexit that
 // could block on a hung thread. Never automatic: InvokeCore refuses it over TruLink, nothing in TruMenu queues it.
 const UINT kQuitExitCode = 0x544D;          // "TM"; Invoke-TruTestRun.ps1 maps 21581 to "ended via TruMenu game.quit"
-const DWORD kQuitWindowMs = 5000, kQuitMinGapMs = 300;
+const DWORD kQuitWindowMs = 10000, kQuitMinGapMs = 300;
 volatile LONG g_quitArmedAt = 0;             // GetTickCount of the first run, 0 = not armed
 
 bool QuitArmed(DWORD *leftMs) {
@@ -5784,11 +9122,12 @@ bool QuitArmed(DWORD *leftMs) {
 void ValGameQuit(char *o, size_t n) {
     DWORD left = 0;
     if (QuitArmed(&left)) Out(o, n, "ARMED - run again within %lu ms to quit", left);
-    else Out(o, n, "not armed (run twice within 5 s)");
+    else Out(o, n, "not armed (run twice within 10 s)");
 }
 DWORD QuitNow() {                            // returns only when TerminateProcess failed (its error)
     Log(0, "game.quit by the owner (TruMenu) - logs flushed next, then TerminateProcess(GetCurrentProcess(), 0x%x)",
         kQuitExitCode);
+    FlowFinal("game.quit");                  // 0.11: the flow's last summary line
     // TO TEST rows and the history are written on every change already; once more, without waiting for a lock a
     // hung thread may hold, and only when there is something to write
     if (g_testCount > 0 && TryEnterCriticalSection(&g_testLock)) { TestSaveLocked(); LeaveCriticalSection(&g_testLock); }
@@ -5811,11 +9150,12 @@ bool RunGameQuit(const char *, char *o, size_t n) {
     DWORD now = GetTickCount(), at = static_cast<DWORD>(g_quitArmedAt), age = now - at;
     if (!at || age > kQuitWindowMs) {
         InterlockedExchange(&g_quitArmedAt, static_cast<LONG>(now ? now : 1));
-        Log(1, "game.quit armed by the owner - run it again within 5 s to end the game");
-        Out(o, n, "armed - run game.quit again within 5 s to end the game (TerminateProcess, exit code 0x544D)");
+        Log(1, "game.quit armed by the owner - run it again within 10 s to end the game");
+        Out(o, n, "armed - run game.quit again within 10 s to end the game (TerminateProcess, exit code 0x544D)");
         return true;
     }
     if (age < kQuitMinGapMs) {
+        Log(1, "game.quit: second press too fast (%lu ms) - still armed", age);
         Out(o, n, "armed - second press too fast (%lu ms), press again", age);
         return true;
     }
@@ -5823,6 +9163,14 @@ bool RunGameQuit(const char *, char *o, size_t n) {
     DWORD error = QuitNow();
     Out(o, n, "TerminateProcess failed (%lu) - see TruMenu.log", error);
     return false;
+}
+// 0.8.1: a game.quit button in the menu held 1 s (A / Enter / Space / mouse) - the hold is the safety step
+void QuitByHold() {
+    Log(1, "game.quit: button held 1 s by the owner");
+    InterlockedExchange(&g_quitArmedAt, 0);
+    DWORD error = QuitNow();
+    SetLastAction("game.quit", false, "TerminateProcess failed - see TruMenu.log");
+    (void)error;
 }
 
 void CmdHistLoad() {
@@ -5989,6 +9337,7 @@ int g_cmdHistPos = -1;                       // browsing the history (index), -1
 bool g_cmdLeaveReq = false;                  // Up / Down with nothing to choose: focus into the menu
 bool g_cmdPadMode = false;                   // pad picker: D-pad scrolls the suggestions, A runs / picks
 bool g_cmdTextActive = false;                // the text field was active last frame
+bool CmdTextActive() { return g_cmdTextActive; }   // 0.8.1 input trace (FeedGamepad is above)
 int g_pickMode = 0;                          // 0 list, 1 value picker (+/-)
 char g_pickId[64] = "";
 double g_pickValue = 0, g_pickStep = 1, g_pickMin = 0, g_pickMax = 0;
@@ -6670,24 +10019,31 @@ void DrawCmdBar(bool menuJustOpened) {
         }
         if (e & static_cast<WORD>(~0x2000)) g_oskBackClosed = false;   // 0.7.1: only B right after B counts
         if (barHadFocus && !g_cmdPadMode && !toPicker && !g_oskOpen) {   // text field (or idle bar): the pad goes on
+            char *note = g_trf[g_trfCur].barNote;     // 0.8.1 input trace: what the bar did with the press
+            size_t noteSize = sizeof(g_trf[g_trfCur].barNote);
             if ((e & 0x2000) && g_oskBackClosed) {       // 0.7.1: B closed the keyboard, this B closes the menu
                 g_oskBackClosed = false;
                 if (g_menuOpen) ToggleMenu("B twice: keyboard, then menu");
                 e = 0;
+                Out(note, noteSize, "B twice - the keyboard was closed, this B closed the menu");
             } else if (e & 0x200F) {                     // D-pad / stick / B: into the menu
                 leave = true;
                 // 0.7 FirstPadPressOnlyFocuses=0: the direction also moves in the menu (FeedGamepad hands it over)
                 if (!g_cmdFirstPressFocus && (e & 0x000F)) g_cmdHandOver = true;
+                Out(note, noteSize, (e & 0x000F) && g_cmdFirstPressFocus ? "focus from the bar into the menu - swallowed "
+                    "by FirstPadPressOnlyFocuses (this press only moves the focus)" : "focus from the bar into the menu");
             } else if (e & 0x1000) {                     // A: run the typed line, empty = into the menu
-                if (g_cmdTextActive && g_cmdBuf[0]) runNow = true;
-                else if (g_cmdTextActive) leave = true;
+                if (g_cmdTextActive && g_cmdBuf[0]) { runNow = true; Out(note, noteSize, "A ran the typed line"); }
+                else if (g_cmdTextActive) { leave = true; Out(note, noteSize, "A on the empty line: focus into the menu"); }
                 else if (g_cmdKeyboard) {                // 0.7: A in the idle bar = the on-screen keyboard
                     g_oskOpen = true;
                     OskEdited();
                     g_oskRow = 3;
                     g_oskCol = 0;
-                } else wantFocus = true;
+                    Out(note, noteSize, "A in the idle bar opened the on-screen keyboard");
+                } else { wantFocus = true; Out(note, noteSize, "A focused the text field"); }
             } else if (e & 0x0020) {                     // View: pad picker
+                Out(note, noteSize, "View: pad picker");
                 ImGui::ClearActiveID();
                 g_cmdPadMode = true;
                 g_pickMode = 0;
@@ -6710,7 +10066,16 @@ void DrawCmdBar(bool menuJustOpened) {
         if (textActive && g_oskOpen) g_oskOpen = false;   // 0.7: a click into the field = typing on the real keyboard
         if (ImGui::IsItemDeactivated() && ImGui::IsKeyPressed(ImGuiKey_Escape, false)) leave = true;
         ImGui::SameLine();
-        if (ImGui::Button("Pick (View)")) { g_cmdPadMode = true; g_pickMode = 0; }
+        if (TmButton("Pick (View)")) { g_cmdPadMode = true; g_pickMode = 0; }
+        // 0.8.1: Enter only counts as a fresh press - a held / stuck Enter (ImGui's key repeat) ran the line every
+        // 100 ms (run 224047: 70 "empty line" answers and single letters "u", "i", "." while the owner typed)
+        if (enter && !ImGui::IsKeyPressed(ImGuiKey_Enter, false) && !ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false)) {
+            enter = false;
+            strncpy_s(g_cmdSetText, sizeof(g_cmdSetText), g_cmdBuf, _TRUNCATE);   // keep the text, stay in the field
+            g_cmdSetPending = true;
+            InterlockedExchange(&g_cmdFocusReq, 1);
+            Log(3, "cmd: Enter repeat ignored");
+        }
         if (enter || runNow) {
             char line[kCmdLine];
             if (g_sugSel >= 0 && g_sugSel < g_sugCount) CmdCompletionText(g_sugSel, line, sizeof(line), false);
@@ -6813,6 +10178,1659 @@ void DrawCmdBar(bool menuJustOpened) {
     g_cmdOwnPad = focused;
 }
 
+// ======================================================================================================================
+// 0.10 radial menu (workspace docs\Konzept-Bau-Rad.md, stage R1; R2 = instance.spawn above): a faster way to run the
+// existing items. Entries come from TruMenu.radial.txt next to tru.exe ("path | label | item id [argument]", # comments);
+// a level holds the folders of its sub-paths and its entries in file order, at most 8 sectors per page (LB / RB). The
+// ring is drawn into ImGui's foreground draw list (no window, no ImGui navigation); the input is read raw: the right stick
+// of the last pad (g_pad, before PadHook neutralises it) or the mouse direction since the open (GetCursorPos), A / B /
+// LB / RB / R3 edges of that pad, left / right click. An entry runs through InvokeCore (wait = false) - the command bar's
+// path: game-thread items are queued, their answer arrives as "last action". Hold mode (buttons / key / mouse button
+// still held): the stick picks live, the release runs the picked entry (a folder: enters it and the ring stays open,
+// "latched"), the centre = cancel. Latched: the pick stays when the stick springs back (the thumb goes to A), A runs and
+// stays, R3 alone runs and closes, the hold buttons again = hold mode. That is [Radial] Mode=wheel since 0.10.1.
+// 0.10.1 [Radial] Mode=menu (default, owner wish 2026-11-03 "like a menu, not a weapon wheel"; workspace
+// docs\Konzept-Bau-Rad.md section 10): the ring opens latched (state 2) and stays open; the left stick, the right stick,
+// the D-pad left / right, the arrow keys and the mouse direction only move the pick; nothing runs on a release or by
+// pointing - A / Enter / left click runs the pick or opens its level, B / Backspace / Esc / right click goes one level
+// back (closes at the top), LB / RB pages, L3 + R3 / Key / MouseButton again closes. The game gets a neutral pad and no
+// keys while it is open. [Radial] Freeze: world = the time.pause bit (as [Menu] PauseGame), player = player.control 0,
+// both undone at the close unless the user ran that item meanwhile. A built-in last sector of the top level, "Spiel
+// beenden" ([Radial] QuitSector=1, never from the file), runs game.quit with the safety step of the Status page button.
+// ======================================================================================================================
+const int kRadMaxItems = 256, kRadMaxLevels = 48, kRadPerLevel = 64, kRadPerPage = 8;
+const float kPi = 3.14159265f;
+enum { kRadSpecialNone = 0, kRadSpecialQuit = 1, kRadSpecialVirt = 2 };
+// 0.10.1 Tests level (owner request 2026-11-03): the levels below "Tests" (TO TEST, Regression, Prepare, Schalter) are
+// virtual - one reserved level slot (g_radVirtLevel) whose entries are made every frame from the existing lists
+// (g_tests, g_reg, g_regShortcut under g_testLock); every action calls the function of the TO TEST / Regression page
+// (TestMarkFromMenu, RegMarkFromMenu, QueueItem, RunRegressPrepare) - no second copy of a list. "Rundgang" is a real
+// level read from TruMenu.tour.txt (the radial file format) below Tests/Rundgang.
+enum RadVirt {
+    kRvNone = 0, kRvTodo, kRvTodoRow, kRvRegLists, kRvReg, kRvRegRow, kRvPrepare, kRvToggles,   // virtual levels
+    kRaRun, kRaOk, kRaFail, kRaSkip, kRaDone, kRaHint, kRaPrepare, kRaStop, kRaToggle           // virtual actions
+};
+struct RadItem {
+    char label[48], id[48], arg[96], path[96];
+    int child;                               // level of a folder entry, -1 = an item entry
+    int line;                                // line in the file (0 = folder made from a path / built-in)
+    const char *bad;                         // unknown item / todo found at load ("" = fine)
+    int special;                             // 0.10.1: kRadSpecialQuit "Spiel beenden", kRadSpecialVirt (Tests level)
+    int vkind, vlist, von;                   // 0.10.1 virtual entries: RadVirt kind, regression list, toggle state
+    char info[160];                          // 0.10.1: text for the centre when picked (row hint), "" = id + arg
+};
+// entries of the virtual level (after the file entries in g_radItems) = all TO TEST rows; a file level keeps at most
+// kRadPerLevel (RadAppend), only the virtual slot uses the rest of items[]
+const int kRadVirtMax = kTestMax;
+struct RadLevel { char path[96]; int parent; int count; short items[kRadVirtMax]; };
+RadItem g_radItems[kRadMaxItems + kRadVirtMax];
+RadLevel g_radLevels[kRadMaxLevels];
+int g_radItemCount = 0, g_radLevelCount = 1, g_radDropped = 0, g_radUnknown = 0, g_radSkipped = 0;
+char g_radFilePath[MAX_PATH] = "", g_radFileState[64] = "not read";
+CRITICAL_SECTION g_radLock;                  // items / levels (render thread, radial.reload / radial.list callers)
+int g_radLevel = 0, g_radPage = 0, g_radSel = -1;   // render thread; kept over a close with RememberPosition=1
+bool g_radMoved = false;                     // the stick / mouse left the centre since this page was shown
+char g_radResult[320] = "";
+DWORD g_radResultTick = 0;
+float g_radSlowBefore = -1.0f;               // time.scale before the open (SlowMotion), -1 = nothing to restore
+volatile LONG g_radOpenReq = 0;              // radial.open: open latched at g_radOpenPath (render thread)
+char g_radOpenPath[96] = "";
+LONG g_radRuns = 0;
+POINT g_radMouseOrigin = {};
+float g_radMouseDx = 0.0f, g_radMouseDy = 0.0f;
+// never offered in the ring (owner rule: game.quit is button-only; the others need the owner's second press or would
+// chain other commands); tools/trumenu_ini_check.py has the same list
+const char *const kRadForbidden[] = {"game.quit", "cmd.run", "save.delete", "save.restore", "save.import",
+                                     "settings.reset"};
+// 0.10.1 built-in quit sector: armed by the first confirm press (render thread only - RadialTick, from the real pad /
+// keyboard / mouse; no item, no TruLink command, no list reaches it), own arm time (the Status page button keeps
+// g_quitArmedAt). The ring has no ImGui widgets, so the 0.8.1 id lesson (fixed "###" ids) is kept the other way round:
+// the arm belongs to the sector's item index, never to its label (the label shows the seconds left).
+const char *const kRadQuitLabel = "Spiel beenden";
+int g_radQuitItem = -1;                      // index in g_radItems, -1 = no quit sector
+int g_radTests = 1;                          // [Radial] TestsLevel
+int g_radTestsLevel = -1, g_radVirtLevel = -1;   // the real level "Tests", the reserved virtual slot
+int g_radTestsItems[4] = {-1, -1, -1, -1};   // the virtual folders in Tests (labels with counts, refreshed)
+int g_rvKind = kRvNone, g_rvList = 0, g_rvRowList = 0;   // the virtual level shown: kind, list view, the row's list
+char g_rvRow[64] = "";                       // the row id of kRvTodoRow / kRvRegRow
+char g_radTourPath[MAX_PATH] = "", g_radTourState[64] = "not read";
+void TestMarkFromMenu(const char *id, const char *state);              // TO TEST page, below
+void RegMarkFromMenu(int list, const char *id, const char *state);     // Regression page, below
+bool TestRunTarget(const char *target, char *itemId, size_t idSize, const char **runArg);
+DWORD g_radQuitArmedAt = 0;                  // GetTickCount of the arming press, 0 = not armed
+DWORD g_radQuitHoldFrom = 0;                 // confirm held on the armed sector since (A / Enter / left button), 0 = no
+const char *g_radFreezeState = "-";          // radial.status: what the last open froze
+
+bool RadForbidden(const char *id) {
+    for (const char *f : kRadForbidden)
+        if (!_stricmp(f, id)) return true;
+    return false;
+}
+
+void RadTrim(char *s) {
+    size_t len = strlen(s);
+    while (len && (s[len - 1] == ' ' || s[len - 1] == '\t' || s[len - 1] == '\r' || s[len - 1] == '\n')) s[--len] = 0;
+    size_t lead = 0;
+    while (s[lead] == ' ' || s[lead] == '\t') ++lead;
+    if (lead) memmove(s, s + lead, len - lead + 1);
+}
+
+// adds item <e> to level <level>; false (with a log line) when a limit is reached
+bool RadAppend(int level, const RadItem &e) {
+    RadLevel &l = g_radLevels[level];
+    if (g_radItemCount >= kRadMaxItems || l.count >= kRadPerLevel) {
+        Log(0, "radial: line %d: more than %d entries (or %d in one level) - '%s' skipped", e.line, kRadMaxItems,
+            kRadPerLevel, e.label);
+        ++g_radSkipped;
+        return false;
+    }
+    g_radItems[g_radItemCount] = e;
+    l.items[l.count++] = static_cast<short>(g_radItemCount++);
+    return true;
+}
+
+// the level of <path> ("A/B"), created with its folder entries on the way; -1 when a limit is reached
+int RadLevelFor(const char *path, int line) {
+    int level = 0;
+    char copy[96];
+    strncpy_s(copy, sizeof(copy), path, _TRUNCATE);
+    char *context = nullptr;
+    for (char *seg = strtok_s(copy, "/", &context); seg; seg = strtok_s(nullptr, "/", &context)) {
+        RadTrim(seg);
+        if (!seg[0]) continue;
+        int found = -1;
+        const RadLevel &l = g_radLevels[level];
+        for (int i = 0; i < l.count && found < 0; ++i) {
+            const RadItem &f = g_radItems[l.items[i]];
+            if (f.child >= 0 && !_stricmp(f.label, seg)) found = f.child;
+        }
+        if (found < 0) {
+            if (g_radLevelCount >= kRadMaxLevels) {
+                Log(0, "radial: line %d: more than %d levels - '%s' skipped", line, kRadMaxLevels, path);
+                ++g_radSkipped;
+                return -1;
+            }
+            RadLevel &nl = g_radLevels[g_radLevelCount];
+            _snprintf_s(nl.path, sizeof(nl.path), _TRUNCATE, "%s%s%s", l.path, l.path[0] ? "/" : "", seg);
+            nl.parent = level;
+            nl.count = 0;
+            RadItem folder = {};
+            strncpy_s(folder.label, sizeof(folder.label), seg, _TRUNCATE);
+            strncpy_s(folder.path, sizeof(folder.path), l.path, _TRUNCATE);
+            folder.child = g_radLevelCount;
+            folder.bad = "";
+            if (!RadAppend(level, folder)) return -1;
+            found = g_radLevelCount++;
+        }
+        level = found;
+    }
+    return level;
+}
+
+// the lines of a radial-format file ("path | label | item id [argument]") into the levels below <prefix> ("" = top;
+// 0.10.1 "Tests/Rundgang" for TruMenu.tour.txt); <src> names the file in the log lines ("" = TruMenu.radial.txt)
+void RadialParse(FILE *f, const char *prefix, const char *src, int *dropped, int *unknown, int *skipped) {
+    char line[512];
+    int number = 0;
+    while (fgets(line, sizeof(line), f)) {
+        ++number;
+        RadTrim(line);
+        if (!line[0] || line[0] == '#') continue;
+        char *p1 = strchr(line, '|');
+        char *p2 = p1 ? strchr(p1 + 1, '|') : nullptr;
+        if (!p1 || !p2 || strchr(p2 + 1, '|')) {
+            Log(0, "radial: %sline %d: want \"path | label | item id [argument]\" - skipped", src, number);
+            ++*skipped;
+            continue;
+        }
+        *p1 = *p2 = 0;
+        char path[96], cmd[160];
+        RadItem e = {};
+        e.child = -1;
+        e.line = number;
+        e.bad = "";
+        strncpy_s(path, sizeof(path), line, _TRUNCATE);
+        strncpy_s(e.label, sizeof(e.label), p1 + 1, _TRUNCATE);
+        strncpy_s(cmd, sizeof(cmd), p2 + 1, _TRUNCATE);
+        RadTrim(path);
+        RadTrim(e.label);
+        RadTrim(cmd);
+        char *space = strchr(cmd, ' ');
+        if (space) {
+            *space = 0;
+            strncpy_s(e.arg, sizeof(e.arg), space + 1, _TRUNCATE);
+            RadTrim(e.arg);
+        }
+        strncpy_s(e.id, sizeof(e.id), cmd, _TRUNCATE);
+        if (!e.id[0] || !e.label[0]) {
+            Log(0, "radial: %sline %d: empty label or item id - skipped", src, number);
+            ++*skipped;
+            continue;
+        }
+        if (RadForbidden(e.id)) {
+            Log(0, "radial: %sline %d: %s is never offered in the radial menu - dropped", src, number, e.id);
+            ++*dropped;
+            continue;
+        }
+        CmdKind kind = CmdKindOf(e.id);
+        if (kind == kCkUnknown || kind == kCkBuiltin) {
+            e.bad = "unknown item";
+            Log(0, "radial: %sline %d: unknown item '%s' - entry greyed out", src, number, e.id);
+            ++*unknown;
+        } else if (kind == kCkTodo) {
+            e.bad = "todo item";
+        }
+        char full[192];
+        _snprintf_s(full, sizeof(full), _TRUNCATE, "%s%s%s", prefix, prefix[0] && path[0] ? "/" : "", path);
+        int level = RadLevelFor(full, number);
+        if (level < 0) continue;
+        strncpy_s(e.path, sizeof(e.path), g_radLevels[level].path, _TRUNCATE);
+        RadAppend(level, e);
+    }
+}
+
+// 0.10.1 Tests level (Mode=menu, [Radial] TestsLevel=1): the real level "Tests" with four virtual folders (their
+// entries come from the TO TEST / regression lists, RadVirtBuild) and the real level "Rundgang" from TruMenu.tour.txt
+void RadialAddTests() {
+    g_radTestsLevel = g_radVirtLevel = -1;
+    for (int &i : g_radTestsItems) i = -1;
+    g_rvKind = kRvNone;
+    if (g_radMode != kRadModeMenu || !g_radTests) return;
+    int tests = RadLevelFor("Tests", 0);
+    if (tests < 0) return;
+    if (g_radLevelCount >= kRadMaxLevels) {
+        Log(0, "radial: more than %d levels - no room for the Tests level", kRadMaxLevels);
+        return;
+    }
+    g_radTestsLevel = tests;
+    g_radVirtLevel = g_radLevelCount++;
+    RadLevel &v = g_radLevels[g_radVirtLevel];
+    v.path[0] = 0;
+    v.parent = tests;
+    v.count = 0;
+    const struct { const char *label; int kind; } folders[] = {
+        {"TO TEST", kRvTodo}, {"Regression", kRvRegLists}, {"Prepare", kRvPrepare}, {"Schalter", kRvToggles}};
+    for (int k = 0; k < 4; ++k) {
+        RadItem e = {};
+        strncpy_s(e.label, sizeof(e.label), folders[k].label, _TRUNCATE);
+        strncpy_s(e.path, sizeof(e.path), "Tests", _TRUNCATE);
+        e.child = g_radVirtLevel;
+        e.bad = "";
+        e.special = kRadSpecialVirt;
+        e.vkind = folders[k].kind;
+        if (!RadAppend(tests, e)) return;
+        g_radTestsItems[k] = g_radItemCount - 1;
+    }
+    int tour = RadLevelFor("Tests/Rundgang", 0);
+    int dropped = 0, unknown = 0, skipped = 0, before = g_radItemCount;
+    FILE *f = nullptr;
+    if (tour < 0) {
+        strncpy_s(g_radTourState, sizeof(g_radTourState), "no room for the level", _TRUNCATE);
+    } else if (fopen_s(&f, g_radTourPath, "r") != 0 || !f) {
+        strncpy_s(g_radTourState, sizeof(g_radTourState), "missing - Rundgang is empty", _TRUNCATE);
+        Log(0, "radial: tour %s not found - Rundgang is empty (Set-TruMenu.ps1 -Install copies it)", g_radTourPath);
+    } else {
+        RadialParse(f, "Tests/Rundgang", "tour ", &dropped, &unknown, &skipped);
+        fclose(f);
+        int items = 0;
+        for (int i = before; i < g_radItemCount; ++i) if (g_radItems[i].child < 0) ++items;
+        _snprintf_s(g_radTourState, sizeof(g_radTourState), _TRUNCATE, "%d stops / entries", items);
+        Log(1, "radial: tour %d entries from %s (%d dropped, %d unknown, %d lines skipped)", items, g_radTourPath, dropped,
+            unknown, skipped);
+    }
+}
+
+// 0.10.1: the built-in sectors after the file (caller holds g_radLock): the Tests level, then "Spiel beenden" as the
+// last entry of the top level (Mode=menu; each counts as one of the 8 sectors, more than 8 top entries = pages)
+void RadialAddBuiltins() {
+    g_radQuitItem = -1;
+    g_radQuitArmedAt = g_radQuitHoldFrom = 0;
+    RadialAddTests();
+    if (g_radMode != kRadModeMenu || !g_radQuitSector) return;
+    RadItem q = {};
+    strncpy_s(q.label, sizeof(q.label), kRadQuitLabel, _TRUNCATE);
+    q.child = -1;
+    q.bad = "";
+    q.special = kRadSpecialQuit;
+    if (!RadAppend(0, q)) return;
+    g_radQuitItem = g_radItemCount - 1;
+    Log(1, "radial: built-in top sector '%s' (game.quit: A arms, A again within %lu s or A held 1 s quits) - %d top "
+        "sector(s), %d page(s)", kRadQuitLabel, kQuitWindowMs / 1000, g_radLevels[0].count,
+        (g_radLevels[0].count + kRadPerPage - 1) / kRadPerPage);
+}
+
+// reads TruMenu.radial.txt (caller holds g_radLock); unknown ids stay as greyed entries, forbidden ones are dropped
+void RadialLoad() {
+    g_radQuitItem = -1;
+    g_radItemCount = 0;
+    g_radLevelCount = 1;
+    g_radDropped = g_radUnknown = g_radSkipped = 0;
+    g_radLevels[0].path[0] = 0;
+    g_radLevels[0].parent = -1;
+    g_radLevels[0].count = 0;
+    g_radLevel = g_radPage = 0;
+    g_radSel = -1;
+    FILE *f = nullptr;
+    if (fopen_s(&f, g_radFilePath, "r") != 0 || !f) {
+        strncpy_s(g_radFileState, sizeof(g_radFileState), "missing - the ring is empty", _TRUNCATE);
+        Log(0, "radial: %s not found - the ring is empty (Set-TruMenu.ps1 -Install copies the default file)", g_radFilePath);
+        RadialAddBuiltins();
+        return;
+    }
+    RadialParse(f, "", "", &g_radDropped, &g_radUnknown, &g_radSkipped);
+    fclose(f);
+    int items = 0;
+    for (int i = 0; i < g_radItemCount; ++i) if (g_radItems[i].child < 0) ++items;
+    _snprintf_s(g_radFileState, sizeof(g_radFileState), _TRUNCATE, "%d entries, %d levels", items, g_radLevelCount);
+    Log(1, "radial: %d entries in %d levels from %s (%d dropped, %d unknown, %d lines skipped)", items, g_radLevelCount,
+        g_radFilePath, g_radDropped, g_radUnknown, g_radSkipped);
+    RadialAddBuiltins();
+}
+
+// why an entry is greyed out right now ("" = usable): the item's byte pre-check, the INI switches, a level
+const char *RadialWhy(const RadItem &e) {
+    if (e.child >= 0 || e.special) return "";
+    if (e.bad[0]) return e.bad;
+    const char *id = e.id;
+    const char *flowWhy = FlowRadWhy(id);   // 0.11: flow.* entries need a loaded flow
+    if (flowWhy[0]) return flowWhy;
+    const struct { const char *id; bool ok; const char *why; } cheats[] = {
+        {"cheat.god", g_godOk, g_godWhy}, {"cheat.godfull", g_godFullOk, g_godFullWhy},
+        {"cheat.onehitkill", g_ohkOk, g_ohkWhy}, {"cheat.enemyhealth", g_enemyHpOk, g_enemyHpWhy},
+        {"cheat.ammo", g_infAmmoOk, g_infAmmoWhy}, {"cheat.fillup", g_fillOk, g_fillWhy}, {"cheat.code", g_codeOk, g_codeWhy}};
+    for (const auto &c : cheats) {
+        if (_stricmp(id, c.id) != 0) continue;
+        if (!g_cheatsEnabled) return "cheats off ([Cheats] Enabled=0)";
+        if (!c.ok) return c.why;
+    }
+    if (!_stricmp(id, "instance.spawn")) {
+        if (!SpawnOn()) return "[Radial] Spawn=0 (stage R2 off)";
+        if (!g_spawnOk) return g_spawnWhy;
+    }
+    if (!_stricmp(id, "weapon.give") && !g_weaponOk) return "weapon.give code not verified";
+    if (!_stricmp(id, "ammo.fill") && !(g_ammoOk && g_maxAmmoOk)) return "ammo code not verified";
+    if ((!_stricmp(id, "player.health") || !_stricmp(id, "player.invincible")) && !g_healthOk)
+        return "health code not verified";
+    if (!_stricmp(id, "time.scale") && !g_timeOk) return "time code not verified";
+    if (!_stricmp(id, "time.pause") && !g_pauseOk) return "pause code not verified";
+    const Item *item = FindItem(id);
+    if (((item && item->gameThread) || !_stricmp(id, "time.scale")) && !g_experimental)
+        return "experimental off ([Cheat] Experimental=0)";
+    static const char *const kNeedLevel[] = {"cheat.", "player.", "weapon.give", "ammo.", "gear.", "instance.bring",
+                                             "instance.spawn", "instance.remove", "instance.unhide", "camera.mode",
+                                             "camera.restore", "camera.fov", "costume.next", "costume.set"};
+    bool needs = false;
+    for (const char *p : kNeedLevel)
+        if (!_strnicmp(id, p, strlen(p))) needs = true;
+    if (!_stricmp(id, "cheat.list") || !_stricmp(id, "cheat.speed") || !_stricmp(id, "player.position")) needs = false;
+    if (needs && !InLevel()) return "needs a level";
+    // 0.10.2 (F8, los7 21:22:37 "err main menu only"): level.start runs from the main menu only; in a level the tour
+    // has a "Laden <unit>" entry (level.load) next to it
+    DWORD state = 0;
+    if (!_stricmp(id, "level.start") && g_mainStateOk && ReadDword(kMainState, &state) && state != 10)
+        return "main menu only - in a level: 'Laden ...' (level.load, no intro)";
+    return "";
+}
+
+// bool item without an argument: its value is "on"
+bool RadialOn(const RadItem &e, bool *isBool) {
+    if (e.special == kRadSpecialVirt && e.vkind == kRaToggle) { *isBool = true; return e.von != 0; }   // 0.10.1 Schalter
+    *isBool = e.child < 0 && !e.special && !e.bad[0] && !e.arg[0] && CmdKindOf(e.id) == kCkBool;
+    if (!*isBool) return false;
+    char v[64];
+    CmdValue(e.id, v, sizeof(v));
+    return v[0] == '1' || !_strnicmp(v, "on", 2) || !_strnicmp(v, "true", 4);
+}
+
+void RadialClose(const char *why);          // below (0.10.5: claude.mark closes the ring)
+
+void RadialRun(const RadItem &e) {
+    if (e.special) return;                  // 0.10.1: the quit sector runs only through RadQuitPress (RadialTick)
+    if (RadForbidden(e.id)) { Log(0, "radial: %s refused (never from the ring)", e.id); return; }
+    char arg[96];
+    strncpy_s(arg, sizeof(arg), e.arg, _TRUNCATE);
+    bool isBool = false;
+    bool on = RadialOn(e, &isBool);
+    if (isBool) strncpy_s(arg, sizeof(arg), on ? "0" : "1", _TRUNCATE);   // the target state (0.8.1: no "" = flip)
+    g_radRunning = true;                     // 0.10.5: src=ring in shot / claude.mark lines
+    const char *answer = InvokeCore(e.id, arg, false);
+    g_radRunning = false;
+    ++g_radRuns;
+    Log(1, "radial: %s -> %s%s%s: %.200s", e.path[0] ? e.path : "(top)", e.id, arg[0] ? " " : "", arg, answer);
+    _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s: %s", e.label, answer);
+    g_radResultTick = GetTickCount();
+    // 0.10.5: a Claude mark closes the ring - play goes on at once (the shot is clean either way: it is copied before
+    // TruMenu draws, at the next Present)
+    if (!_stricmp(e.id, "claude.mark")) RadialClose("claude.mark");
+    // 0.11: Weiter that started / finished a step closes the ring as well (play goes on; a refusal keeps it open)
+    else if (!_stricmp(e.id, "flow.next") && !strncmp(answer, "ok", 2)) RadialClose("flow.next");
+}
+
+// 0.10.5: the level "Claude" (top-level folder entry and everything below it) is drawn in Claude's coral #D97757
+bool RadClaude(const RadItem &e) {
+    if (e.child >= 0 && !e.path[0] && !_stricmp(e.label, "Claude")) return true;
+    return !_strnicmp(e.path, "Claude", 6) && (e.path[6] == 0 || e.path[6] == '/');
+}
+
+int RadPages(int level) {
+    int count = g_radLevels[level].count;
+    return count <= 0 ? 1 : (count + kRadPerPage - 1) / kRadPerPage;
+}
+int RadPageCount(int level, int page) {             // sectors on that page
+    int left = g_radLevels[level].count - page * kRadPerPage;
+    return left < 0 ? 0 : left > kRadPerPage ? kRadPerPage : left;
+}
+const RadItem *RadAt(int level, int page, int sector) {
+    if (sector < 0 || sector >= RadPageCount(level, page)) return nullptr;
+    return &g_radItems[g_radLevels[level].items[page * kRadPerPage + sector]];
+}
+
+void RadShow(int level, int page, int sel) {
+    g_radLevel = level;
+    g_radPage = page;
+    g_radSel = sel;
+    g_radMoved = false;
+}
+
+// ---- 0.10.1 quit sector: safety step as the Status page button (0.8.1): the first confirm arms (10 s), a second one
+// >= 0.3 s later or the confirm held 1 s quits through QuitNow (TruMenu.log line, TO TEST list / history / logs
+// flushed, TerminateProcess exit code 0x544D). Pointing away, B, a page / level change, closing and the 10 s disarm.
+bool RadQuitArmed() { return g_radQuitArmedAt != 0; }
+void RadQuitDisarm(const char *why) {
+    if (!g_radQuitArmedAt) return;
+    g_radQuitArmedAt = g_radQuitHoldFrom = 0;
+    Log(1, "game.quit (radial sector): disarmed - %s", why);
+}
+bool RadQuitPicked() {                       // the pick is the quit sector (top level, its page and sector)
+    const RadItem *e = RadAt(g_radLevel, g_radPage, g_radSel);
+    return e && e->special == kRadSpecialQuit;
+}
+void RadQuitPress(const char *by) {          // a confirm press (edge) on the quit sector
+    DWORD now = GetTickCount();
+    if (!g_radQuitArmedAt) {
+        g_radQuitArmedAt = now ? now : 1;
+        g_radQuitHoldFrom = g_radQuitArmedAt;
+        Log(1, "game.quit armed by the owner (radial sector '%s', %s) - press A again within %lu s (or hold A 1 s) to "
+            "end the game", kRadQuitLabel, by, kQuitWindowMs / 1000);
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s: armed - A again within %lu s ends the game",
+                    kRadQuitLabel, kQuitWindowMs / 1000);
+        g_radResultTick = now;
+        return;
+    }
+    DWORD age = now - g_radQuitArmedAt;
+    if (age < kQuitMinGapMs) {
+        g_radQuitHoldFrom = now ? now : 1;
+        Log(1, "game.quit (radial sector): second press too fast (%lu ms) - still armed", age);
+        return;
+    }
+    Log(1, "game.quit (radial sector): confirmed by the owner (%s, second press after %lu ms)", by, age);
+    g_radQuitArmedAt = g_radQuitHoldFrom = 0;
+    DWORD error = QuitNow();                 // returns only when TerminateProcess failed
+    _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s: err TerminateProcess failed (%lu) - see TruMenu.log",
+                kRadQuitLabel, error);
+    g_radResultTick = GetTickCount();
+}
+// every frame of the open ring (Mode=menu): disarm when the pick left the sector / 10 s passed; the 1 s hold
+void RadQuitTick(bool confirmHeld) {
+    if (!g_radQuitArmedAt) return;
+    DWORD now = GetTickCount();
+    if (!RadQuitPicked()) { RadQuitDisarm("the pick left the sector"); return; }
+    if (now - g_radQuitArmedAt > kQuitWindowMs) { RadQuitDisarm("10 s passed"); return; }
+    if (!confirmHeld) { g_radQuitHoldFrom = 0; return; }
+    if (!g_radQuitHoldFrom) return;          // held again after a release: the press edge counts (RadQuitPress)
+    if (now - g_radQuitHoldFrom >= 1000) {
+        Log(1, "game.quit (radial sector): held 1 s by the owner");
+        g_radQuitArmedAt = g_radQuitHoldFrom = 0;
+        DWORD error = QuitNow();
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s: err TerminateProcess failed (%lu) - see TruMenu.log",
+                    kRadQuitLabel, error);
+        g_radResultTick = GetTickCount();
+    }
+}
+
+// ---- 0.10.1 [Radial] Freeze (Mode=menu, render thread = the game's Present call, as PauseTick) ----
+int RadFreezeParse(const char *v) {
+    while (*v == ' ') ++v;
+    if (!_stricmp(v, "world") || !strcmp(v, "1")) return kRadFreezeWorld;
+    if (!_stricmp(v, "player") || !strcmp(v, "2")) return kRadFreezePlayer;
+    return kRadFreezeNone;                   // "0", "off", "none", anything else
+}
+int RadFreezeRead() {                        // read again at every open: the TO TEST switch ini:TruMenu:Radial:Freeze
+    if (!g_iniPath[0]) return g_radFreeze;
+    char v[32];
+    GetPrivateProfileStringA("Radial", "Freeze", g_radFreeze == kRadFreezeWorld ? "world" : g_radFreeze == kRadFreezePlayer
+                                                 ? "player" : "0", v, sizeof(v), g_iniPath);
+    return RadFreezeParse(v);
+}
+void RadFreezeApply() {
+    int mode = RadFreezeRead();
+    if (mode == kRadFreezeNone) { g_radFreezeState = "off ([Radial] Freeze=0)"; return; }
+    if (!InLevel()) { g_radFreezeState = "not in a level - nothing frozen"; return; }
+    if (mode == kRadFreezeWorld) {
+        if (!g_pauseOk) {
+            g_radFreezeState = "not possible: streamFlags check failed (Freeze=world) - nothing frozen";
+            Log(1, "radial: freeze %s", g_radFreezeState);
+            return;
+        }
+        LONG before = InterlockedOr(reinterpret_cast<volatile LONG *>(kStreamFlags), 0x1000);
+        InterlockedExchange(&g_radPaused, (before & 0x1000) ? 0 : 1);
+        g_radFreezeState = (before & 0x1000) ? "world: paused already (left as it is at the close)"
+                                             : "world - time.pause bit set by the ring (streamFlags 0x1000)";
+    } else {
+        if (!g_controlOk || !g_experimental) {
+            g_radFreezeState = "not possible: control byte not verified / experimental off (Freeze=player) - nothing frozen";
+            Log(1, "radial: freeze %s", g_radFreezeState);
+            return;
+        }
+        volatile BYTE *b = reinterpret_cast<volatile BYTE *>(kPlayerControl);
+        g_radCtlBefore = *b;
+        *b = 0;
+        InterlockedExchange(&g_radCtlOurs, 1);
+        g_radFreezeState = "player - player.control 0 set by the ring";
+    }
+    Log(2, "radial: freeze %s", g_radFreezeState);
+}
+void RadFreezeRelease() {
+    if (InterlockedExchange(&g_radPaused, 0)) {
+        InterlockedAnd(reinterpret_cast<volatile LONG *>(kStreamFlags), ~0x1000L);
+        Log(2, "radial: freeze world released (time.pause bit cleared)");
+    } else if (strncmp(g_radFreezeState, "world", 5) == 0) {
+        Log(2, "radial: freeze world - pause bit left as it was (paused before the ring, or time.pause run in the ring)");
+    }
+    if (InterlockedExchange(&g_radCtlOurs, 0)) {
+        volatile BYTE *b = reinterpret_cast<volatile BYTE *>(kPlayerControl);
+        if (*b == 0) *b = g_radCtlBefore;    // only over our own 0
+        Log(2, "radial: freeze player released (player.control %u)", *b);
+    }
+}
+
+// ---- 0.10.3 F7 (B29, los3 2026-11-03: "Welt einfrieren" stopped the world, the sound played on) ----
+// The pause menu (open 0x5d4780 / 0x5d4810: pause bit 0x1000 cleared, gameMode 0xe7f143 = 6) pauses the sound with
+// 0x5874b0; its close (0x5d4700, only at gameMode 6) resumes it with 0x5874d0. Statically (docs\TruMenu-0.10.2.md,
+// section 0.10.3; the only other callers of 0x5874d0 are the level start 0x5de4a5 and the level loads 0x5df80c /
+// 0x5dfb7d / 0x5dfb8e):
+//   0x5874b0 = 0x5873a0(1); [0xccde88] = 1; jmp 0x4831c0     0x5874d0 = 0x5873a0(0); [0xccde88] = 0; jmp 0x4831d0
+//   0x5873a0(b): for every index in the list [0xccdea0] (+0x1c count, +0x20 ints) bit 0 of +0x10 of the sound group
+//     [0x8a80d8] + index * 0x84 := b - a SET, no toggle, no counter. [0xccdea0] is read without a null test (0
+//     between levels, 0x5df961), so it is never called then. Which groups the list holds is game data, not code.
+//   [0xccde88] = 1: the stream / music update 0x595250 (8 players at 0xcca9a0, 0x178 bytes) returns at once.
+//   0x4831c0 / 0x4831d0: input manager 0xa02bd0 (0x4816f0 / 0x481750), per pad 4 byte flags off / on again (not
+//     the XInputSetState path 0x484940 - rumble is not proven).
+// No counter: one resume undoes any number of pauses. So TruMenu acts on the edges of its own want only, only when
+// the state is the other one ([0xccde88]), never at gameMode 6 (the pause menu owns the sound then: it resumes it at
+// its close and cleared the pause bit at its open - our claim is dropped), and it does not fight the game: once the
+// game resumed the sound itself (level load / start) it stays so until the next freeze. Game thread (PadHook), every
+// poll: the game clock stands still while paused.
+const DWORD kSoundPause = 0x005874b0;        // cdecl (), the pause menu's sound pause (callers 0x5d47b6, 0x5d4821)
+const DWORD kSoundResume = 0x005874d0;       // cdecl (), its counterpart (0x5d4738 = the pause menu's close)
+const DWORD kSoundPaused = 0x00ccde88;       // dword: 1 after 0x5874b0, 0 after 0x5874d0 (read by 0x595253)
+const DWORD kSoundGroups = 0x00ccdea0;       // pointer to the group index list, 0 between levels
+bool g_soundOk = false;                      // the bytes of the pair and of the pause menu's use of it (Start)
+int g_freezeSound = 0, g_pauseSound = 0;     // [Radial] FreezeSound / [Menu] PauseSound now (items change them)
+int g_freezeSoundIni = 0, g_pauseSoundIni = 0; // the values last read from TruMenu.ini (a change there wins)
+bool g_sndOurs = false;                      // game thread: 0x5874b0 called by us, not resumed yet
+bool g_sndWant = false, g_sndCand = false;   // game thread: the want acted on / the want of the last poll
+char g_sndLast[200] = "-";                   // last action, for time.sound and the log
+
+void SndNote(int level, const char *fmt, ...) {
+    char text[160];
+    va_list ap;
+    va_start(ap, fmt);
+    _vsnprintf_s(text, sizeof(text), _TRUNCATE, fmt, ap);
+    va_end(ap);
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    _snprintf_s(g_sndLast, sizeof(g_sndLast), _TRUNCATE, "%02d:%02d:%02d %s", t.wHour, t.wMinute, t.wSecond, text);
+    Log(level, "sound: %s", text);
+}
+// at most once a second: a value changed in TruMenu.ini (TO TEST switch ini:TruMenu:Radial:FreezeSound /
+// ini:TruMenu:Menu:PauseSound) is taken over; the items' runtime value stays until the ini value changes
+void SoundSwitchesRead() {
+    static DWORD last = 0;
+    DWORD now = GetTickCount();
+    if (!g_iniPath[0] || (last && now - last < 1000)) return;
+    last = now ? now : 1;
+    int f = GetPrivateProfileIntA("Radial", "FreezeSound", g_freezeSoundIni, g_iniPath) != 0 ? 1 : 0;
+    int p = GetPrivateProfileIntA("Menu", "PauseSound", g_pauseSoundIni, g_iniPath) != 0 ? 1 : 0;
+    if (f != g_freezeSoundIni) {
+        g_freezeSoundIni = g_freezeSound = f;
+        Log(1, "sound: [Radial] FreezeSound=%d taken over from TruMenu.ini", f);
+    }
+    if (p != g_pauseSoundIni) {
+        g_pauseSoundIni = g_pauseSound = p;
+        Log(1, "sound: [Menu] PauseSound=%d taken over from TruMenu.ini", p);
+    }
+}
+bool SoundCall(DWORD fn, const char *what) {
+    __try {
+        reinterpret_cast<VoidFn>(fn)();
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        g_soundOk = false;
+        SndNote(0, "%s 0x%08lx faulted - sound pause off until the next start", what, fn);
+        return false;
+    }
+}
+void SoundFreezeTick() {
+    if (!g_soundOk) return;
+    SoundSwitchesRead();
+    if (!g_freezeSound && !g_pauseSound && !g_sndOurs && !g_sndWant) return;   // both off, nothing held
+    DWORD flags = 0, groups = 0, paused = 0;
+    BYTE mode = 0;
+    if (!ReadDword(kStreamFlags, &flags) || !ReadByte(kGameMode, &mode) || !ReadDword(kSoundGroups, &groups) ||
+        !ReadDword(kSoundPaused, &paused))
+        return;
+    bool ring = g_radPaused != 0;            // the ring set the bit (Freeze=world) - FreezeSound decides
+    bool want = (flags & 0x1000) && groups && InLevel() && (ring ? g_freezeSound != 0 : g_pauseSound != 0);
+    if (mode == 6) {                         // the pause menu owns the sound now
+        if (g_sndOurs) {
+            g_sndOurs = false;
+            SndNote(1, "the pause menu opened - it holds the sound and resumes it at its close (our pause dropped)");
+        }
+        g_sndWant = g_sndCand = false;
+        return;
+    }
+    if (want != g_sndCand) { g_sndCand = want; return; }   // the same answer on two polls (the ring sets the bit and
+                                                           // its flag one after the other on the render thread)
+    if (want == g_sndWant) {
+        if (want && g_sndOurs && !paused) {
+            g_sndOurs = false;
+            SndNote(1, "the game resumed the sound itself (level start / load?) - not paused again until the next freeze");
+        }
+        return;
+    }
+    g_sndWant = want;
+    const char *why = ring ? "ring freeze, [Radial] FreezeSound" : "world pause bit, [Menu] PauseSound";
+    if (want) {
+        if (paused) { SndNote(1, "freeze (%s): the sound was paused already - left as it is", why); return; }
+        if (SoundCall(kSoundPause, "pause")) {
+            g_sndOurs = true;
+            SndNote(1, "sound paused (0x5874b0) - %s", why);
+        }
+        return;
+    }
+    if (!g_sndOurs) { SndNote(2, "freeze over - the sound was not paused by TruMenu, nothing to resume"); return; }
+    g_sndOurs = false;
+    if (!paused) { SndNote(1, "freeze over - the game had resumed the sound already"); return; }
+    if (!groups) { SndNote(1, "freeze over - no sound group list (between levels): the level load resumes the sound"); return; }
+    if (SoundCall(kSoundResume, "resume"))
+        SndNote(1, "sound resumed (0x5874d0) - %s", (flags & 0x1000) ? "switch off / pause bit no longer ours"
+                                                                      : "pause bit cleared");
+}
+bool SoundCheck() {                          // Start: the pair, the reader of the flag, the pause menu's own calls
+    return HexBytesAt(kSoundPause, "6a01 e8e9feffff 83c404 c70588decc0001000000 e9f7bcefff") &&
+           HexBytesAt(kSoundResume, "6a00 e8c9feffff 83c404 c70588decc0000000000 e9e7bcefff") &&
+           HexBytesAt(0x005873a0, "a1a0decc00 56 8b701c 33c9 85f6 7e52") &&
+           HexBytesAt(0x00595253, "833d88decc0000") &&
+           HexBytesAt(0x005d47a7, "c60543f1e70006 e83db6feff 83c404 e8f52cfbff") &&
+           HexBytesAt(0x005d4700, "803d43f1e70006 7534") && HexBytesAt(0x005d4738, "e8932dfbff");
+}
+void ValFreezeSound(char *o, size_t n) { Out(o, n, "%d", g_freezeSound); }
+void ValPauseSound(char *o, size_t n) { Out(o, n, "%d", g_pauseSound); }
+bool RunSoundSwitch(int *v, const char *name, const char *key, const char *arg, char *o, size_t n) {
+    if (!g_soundOk) { Out(o, n, "sound pause code not verified (0x5874b0 / 0x5874d0) - stays off"); return false; }
+    *v = BoolArg(arg, *v != 0) ? 1 : 0;
+    Out(o, n, "%s %d (%s until the next start, TruMenu.ini not written)", name, *v, key);
+    Log(1, "sound: %s %d (%s, runtime only)", name, *v, key);
+    return true;
+}
+bool RunFreezeSound(const char *arg, char *o, size_t n) {
+    return RunSoundSwitch(&g_freezeSound, "time.freezesound", "[Radial] FreezeSound", arg, o, n);
+}
+bool RunPauseSound(const char *arg, char *o, size_t n) {
+    return RunSoundSwitch(&g_pauseSound, "time.pausesound", "[Menu] PauseSound", arg, o, n);
+}
+void ValSoundState(char *o, size_t n) {
+    if (!g_soundOk) { Out(o, n, "sound pause code not verified - off"); return; }
+    DWORD flags = 0, paused = 0;
+    BYTE mode = 0;
+    ReadDword(kStreamFlags, &flags);
+    ReadDword(kSoundPaused, &paused);
+    ReadByte(kGameMode, &mode);
+    Out(o, n, "ring %d / pause %d (ini %d / %d); pause bit %d (ring's %d), gameMode %u, sound paused %lu (by TruMenu %d); "
+        "last: %s", g_freezeSound, g_pauseSound, g_freezeSoundIni, g_pauseSoundIni, (flags & 0x1000) ? 1 : 0,
+        g_radPaused ? 1 : 0, mode, paused, g_sndOurs ? 1 : 0, g_sndLast);
+}
+
+// ---- 0.10.4 (F7, light shaft): the shader clock TimeVector with the freeze, [Radial] FreezeShaderClock ----
+// How the game makes the value (static, docs Befund-Menue-Dlc2Player-0411b.md; TruMenu-0.10.2.md section 3):
+//   0x5bf840 (once per frame, from 0x5cebc0): dt = byte [0xdb94de] ? 0 : [0xe7f188] / [0x8439b8] (unless held:
+//     [0xe7f194] / [0x84bd00] while [0xe7f0b4] & 0x10000000), then RenderDevice [0xa1407c] vtable +0xc = 0x506f10(dt):
+//     +0xfa48 = dt, +0xfa4c += (int)(dt * [0x8416d8]) - an integer accumulator (also read by the getter 0x509190)
+//   upload 0x5096c7: TimeVector (PS c53 0x509711 / VS c23 0x509721) = ((+0xfa4c mod 1000000) * [0x8416d0], +0xfa48, 0, 0)
+// The world pause bit 0x1000 (time.pause, the ring's Freeze=world) does not touch it - every TimeVector material keeps
+// moving in the freeze. Only the pause menu holds it: 0x5bfdf0(1) at its open (0x5d47ae: [0xdb94de] = 1, dt = 0, the
+// accumulator stays, x is held, y = 0), 0x5bfdf0(0) at its close (0x5d4765); the accumulator then goes on from the held
+// value - no jump, so no offset is needed. TruMenu uses the same function with the 0.10.3 sound rules: acts on the edges
+// of its own want only, never at gameMode 6 (the pause menu owns the byte and clears it at its close - our claim is
+// dropped), and does not fight the game (level start 0x5de3c7 and the unknown menu 0x6e4887 / 0x6e548c write 0: claim
+// dropped). Game thread (PadHook), every poll.
+const DWORD kRenderHoldSet = 0x005bfdf0;     // cdecl (BYTE): [0xdb94de] := arg
+const DWORD kRenderHold = 0x00db94de;        // byte: 1 = render dt 0 (read only by 0x5bf841)
+const DWORD kRenderDevice = 0x00a1407c;      // pointer: RenderDevice (+0xfa4c accumulator, +0xfa48 dt)
+bool g_clockOk = false;                      // Start: reader, setter, accumulator, upload, the pause menu's calls
+int g_freezeClock = 0, g_freezeClockIni = 0; // [Radial] FreezeShaderClock now / last read from TruMenu.ini
+bool g_clkOurs = false, g_clkWant = false, g_clkCand = false;
+DWORD g_clkHeldAt = 0, g_clkHeldTick = 0;    // accumulator value / tick count when TruMenu held the clock
+char g_clkLast[200] = "-";
+
+bool ClockValues(DWORD *acc, float *dt) {
+    DWORD dev = 0;
+    *acc = 0; *dt = 0.0f;
+    return ReadDword(kRenderDevice, &dev) && dev && ReadDword(dev + 0xfa4c, acc) && ReadFloats(dev + 0xfa48, dt, 1);
+}
+void ClkNote(int level, const char *fmt, ...) {
+    char text[160];
+    va_list ap;
+    va_start(ap, fmt);
+    _vsnprintf_s(text, sizeof(text), _TRUNCATE, fmt, ap);
+    va_end(ap);
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    _snprintf_s(g_clkLast, sizeof(g_clkLast), _TRUNCATE, "%02d:%02d:%02d %s", t.wHour, t.wMinute, t.wSecond, text);
+    Log(level, "shader clock: %s", text);
+}
+typedef void(__cdecl *ByteArgFn)(int);
+bool ClockCall(int on) {
+    __try {
+        reinterpret_cast<ByteArgFn>(kRenderHoldSet)(on);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        g_clockOk = false;
+        ClkNote(0, "0x%08lx(%d) faulted - shader clock hold off until the next start", kRenderHoldSet, on);
+        return false;
+    }
+}
+void ShaderClockTick() {
+    if (!g_clockOk) return;
+    static DWORD lastRead = 0;               // a changed ini value is taken over within a second (TO TEST switch)
+    DWORD now = GetTickCount();
+    if (g_iniPath[0] && (!lastRead || now - lastRead >= 1000)) {
+        lastRead = now ? now : 1;
+        int v = GetPrivateProfileIntA("Radial", "FreezeShaderClock", g_freezeClockIni, g_iniPath) != 0 ? 1 : 0;
+        if (v != g_freezeClockIni) {
+            g_freezeClockIni = g_freezeClock = v;
+            ClkNote(1, "[Radial] FreezeShaderClock=%d taken over from TruMenu.ini", v);
+        }
+    }
+    if (!g_freezeClock && !g_clkOurs && !g_clkWant) return;
+    DWORD flags = 0;
+    BYTE mode = 0, held = 0;
+    if (!ReadDword(kStreamFlags, &flags) || !ReadByte(kGameMode, &mode) || !ReadByte(kRenderHold, &held)) return;
+    bool ring = g_radPaused != 0;
+    bool want = (flags & 0x1000) && InLevel() && g_freezeClock != 0;
+    DWORD acc = 0;
+    float dt = 0.0f;
+    if (mode == 6) {                         // the pause menu owns the byte now
+        if (g_clkOurs) {
+            g_clkOurs = false;
+            ClkNote(1, "the pause menu opened - it holds the clock and releases it at its close (our hold dropped)");
+        }
+        g_clkWant = g_clkCand = false;
+        return;
+    }
+    if (want != g_clkCand) { g_clkCand = want; return; }   // the same answer on two polls (as the sound)
+    if (want == g_clkWant) {
+        if (want && g_clkOurs && !held) {
+            g_clkOurs = false;
+            ClockValues(&acc, &dt);
+            ClkNote(1, "the game released the clock itself (level start?) - accumulator %lu; not held again until the "
+                       "next freeze", acc);
+        }
+        return;
+    }
+    g_clkWant = want;
+    const char *why = ring ? "ring freeze" : "world pause bit";
+    ClockValues(&acc, &dt);
+    if (want) {
+        if (held) { ClkNote(1, "freeze (%s): the clock was held already - left as it is", why); return; }
+        if (ClockCall(1)) {
+            g_clkOurs = true;
+            g_clkHeldAt = acc;
+            g_clkHeldTick = now;
+            ClkNote(1, "ON - TimeVector held (0x5bfdf0(1), %s, [Radial] FreezeShaderClock): accumulator +0xfa4c %lu, "
+                       "dt +0xfa48 %.5f", why, acc, dt);
+        }
+        return;
+    }
+    if (!g_clkOurs) { ClkNote(2, "freeze over - the clock was not held by TruMenu, nothing to release"); return; }
+    g_clkOurs = false;
+    if (!held) { ClkNote(1, "freeze over - the game had released the clock already (accumulator %lu)", acc); return; }
+    if (ClockCall(0))
+        ClkNote(1, "OFF - TimeVector runs on (0x5bfdf0(0), %s) after %.1f s: accumulator %lu (held at %lu: %s)",
+                (flags & 0x1000) ? "switch off" : "pause bit cleared", (now - g_clkHeldTick) / 1000.0, acc, g_clkHeldAt,
+                acc == g_clkHeldAt ? "unchanged = no jump" : "CHANGED while held");
+}
+bool ClockCheck() {                          // Start: the game's own path, byte for byte (precheck_0104.txt)
+    return HexBytesAt(0x005bf841, "a0de94db00 84c0 7404 d9ee eb0c d90588f1e700") &&
+           HexBytesAt(kRenderHoldSet, "8a442404 a2de94db00 c3") &&
+           HexBytesAt(0x00506fb8, "01864cfa0000") &&
+           HexBytesAt(0x005096c7, "8b854cfa0000 33d2 b940420f00 f7f1") &&
+           HexBytesAt(0x005d47a5, "6a01 c60543f1e70006 e83db6feff") &&
+           HexBytesAt(0x005d475c, "6a00 c60543f1e70000 e886b6feff");
+}
+void ValFreezeClock(char *o, size_t n) { Out(o, n, "%d", g_freezeClock); }
+bool RunFreezeClock(const char *arg, char *o, size_t n) {
+    if (!g_clockOk) { Out(o, n, "shader clock code not verified (0x5bfdf0 / 0x5bf841) - stays off"); return false; }
+    g_freezeClock = BoolArg(arg, g_freezeClock != 0) ? 1 : 0;
+    Out(o, n, "time.freezeclock %d ([Radial] FreezeShaderClock until the next start, TruMenu.ini not written)",
+        g_freezeClock);
+    ClkNote(1, "time.freezeclock %d (runtime only)", g_freezeClock);
+    return true;
+}
+void ValClockState(char *o, size_t n) {
+    if (!g_clockOk) { Out(o, n, "shader clock code not verified - off"); return; }
+    DWORD flags = 0, acc = 0;
+    BYTE mode = 0, held = 0;
+    float dt = 0.0f;
+    ReadDword(kStreamFlags, &flags);
+    ReadByte(kGameMode, &mode);
+    ReadByte(kRenderHold, &held);
+    ClockValues(&acc, &dt);
+    Out(o, n, "switch %d (ini %d); pause bit %d (ring's %d), gameMode %u, hold byte [0xdb94de] %u (by TruMenu %d); "
+        "accumulator +0xfa4c %lu, dt %.5f; last: %s", g_freezeClock, g_freezeClockIni, (flags & 0x1000) ? 1 : 0,
+        g_radPaused ? 1 : 0, mode, held, g_clkOurs ? 1 : 0, acc, dt, g_clkLast);
+}
+
+void RadialClose(const char *why) {
+    if (!g_radOpen) return;
+    InterlockedExchange(&g_radOpen, 0);
+    InterlockedExchange(&g_radRelease, 0);
+    InterlockedExchange(&g_radCloseReq, 0);
+    InterlockedExchange(&g_radSwallow, 1);   // the pad stays neutral until every button is up (B / A / R3 of the close)
+    RadQuitDisarm("ring closed");
+    RadFreezeRelease();
+    if (g_radSlowBefore >= 0.0f) {           // SlowMotion: back to the value from before, unless an entry changed it
+        float now = 0.0f;
+        if (ReadFloats(kTimeDilation, &now, 1) && fabsf(now - g_radSlow) < 0.001f)
+            *reinterpret_cast<volatile float *>(kTimeDilation) = g_radSlowBefore;
+        g_radSlowBefore = -1.0f;
+    }
+    if (!g_radRemember) { RadShow(0, 0, -1); g_rvKind = kRvNone; }
+    Log(2, "radial: closed (%s) at '%s'", why, g_radLevels[g_radLevel].path);
+}
+
+// ---- 0.10.1 Tests level: the virtual levels (render thread, g_radLock held; the lists under g_testLock) ----
+const char *const kRvRegLabels[3] = {"DLC 1", "DLC 2", "Alle"};
+
+// one entry of the virtual level; folder = it opens the next virtual level
+void RadVirtAdd(const char *label, int vkind, int vlist, const char *arg, const char *info, bool folder, int on) {
+    RadLevel &v = g_radLevels[g_radVirtLevel];
+    if (v.count >= kRadVirtMax) return;
+    RadItem &e = g_radItems[kRadMaxItems + v.count];
+    e = RadItem();
+    strncpy_s(e.label, sizeof(e.label), label, _TRUNCATE);
+    strncpy_s(e.arg, sizeof(e.arg), arg ? arg : "", _TRUNCATE);
+    strncpy_s(e.info, sizeof(e.info), info ? info : "", _TRUNCATE);
+    strncpy_s(e.path, sizeof(e.path), v.path, _TRUNCATE);
+    e.child = folder ? g_radVirtLevel : -1;
+    e.bad = "";
+    e.special = kRadSpecialVirt;
+    e.vkind = vkind;
+    e.vlist = vlist;
+    e.von = on;
+    v.items[v.count] = static_cast<short>(kRadMaxItems + v.count);
+    ++v.count;
+}
+
+// open = step not done / check open; the counts of a list (toggles not counted)
+bool RadRowOpen(const TestRow &t) {
+    if (TestIs(t, "step")) return _stricmp(t.state, "done") != 0;
+    return TestIs(t, "check") && !_stricmp(t.state, "open");
+}
+void RadRowCount(const TestRow *rows, int c, int *open, int *total) {
+    *open = *total = 0;
+    for (int i = 0; i < c; ++i) {
+        if (TestIs(rows[i], "toggle")) continue;
+        ++*total;
+        if (RadRowOpen(rows[i])) ++*open;
+    }
+}
+// the item a row runs: steps their target ("id" / "id:arg"), checks their id (as the TO TEST page); never an id of
+// kRadForbidden (game.quit, cmd.run, save.*, settings.reset) - stricter than the page
+bool RadRowRunnable(const TestRow &t, char *itemId, size_t idSize, const char **runArg) {
+    bool ok = TestIs(t, "step") ? t.target[0] && TestRunTarget(t.target, itemId, idSize, runArg)
+                                : TestRunTarget(t.id, itemId, idSize, runArg);
+    return ok && !RadForbidden(itemId);
+}
+// "S12 Ring: left stick ..." / "[ok] radial-open"
+void RadRowLabel(const TestRow &t, bool withState, char *o, size_t n) {
+    const char *tag = !withState ? "" : !_stricmp(t.state, "ok") ? "[ok] " : !_stricmp(t.state, "fail") ? "[FAIL] "
+                    : !_stricmp(t.state, "skip") ? "[skip] " : !_stricmp(t.state, "done") ? "[done] " : "";
+    if (TestIs(t, "step")) _snprintf_s(o, n, _TRUNCATE, "%sS%d %s", tag, t.num, t.hint);
+    else _snprintf_s(o, n, _TRUNCATE, "%s%s", tag, t.id);
+}
+
+// the row's actions: Run (if allowed), OK / Fail / Skip (checks) or Done (steps), Prepare (regression shortcut), Hint
+void RadVirtRowActions(const TestRow &t, int list, const char *shortcut) {
+    char itemId[64], label[48], info[160];
+    const char *runArg = "";
+    _snprintf_s(info, sizeof(info), _TRUNCATE, "%s", t.hint[0] ? t.hint : t.id);
+    if (RadRowRunnable(t, itemId, sizeof(itemId), &runArg)) {
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "Run %s%s%s", itemId, runArg[0] ? " " : "", runArg);
+        RadVirtAdd(label, kRaRun, list, t.id, info, false, 0);
+    }
+    if (TestIs(t, "step")) {
+        RadVirtAdd(_stricmp(t.state, "done") ? "Done" : "Wieder offen", kRaDone, list, t.id, info, false, 0);
+    } else {
+        RadVirtAdd("OK", kRaOk, list, t.id, info, false, 0);
+        RadVirtAdd("Fail", kRaFail, list, t.id, info, false, 0);
+        RadVirtAdd("Skip", kRaSkip, list, t.id, info, false, 0);
+    }
+    if (shortcut && shortcut[0]) RadVirtAdd("Prepare", kRaPrepare, list, t.id, shortcut, false, 0);
+    RadVirtAdd("Hint", kRaHint, list, t.id, info, false, 0);
+}
+
+// the virtual level of g_rvKind from the current lists (every frame while it is shown)
+void RadVirtBuild() {
+    if (g_radVirtLevel < 0) return;
+    static TestRow rows[kRegLists + 1][kTestMax];   // [0] dlc1, [1] dlc2, [2] TO TEST
+    static char cuts[kRegLists][kTestMax][kShortcutLen];
+    int count[kRegLists + 1];
+    EnterCriticalSection(&g_testLock);
+    for (int l = 0; l < kRegLists; ++l) {
+        count[l] = g_regCount[l];
+        memcpy(rows[l], g_reg[l], sizeof(TestRow) * static_cast<size_t>(count[l]));
+        memcpy(cuts[l], g_regShortcut[l], kShortcutLen * static_cast<size_t>(count[l]));
+    }
+    count[2] = g_testCount;
+    memcpy(rows[2], g_tests, sizeof(TestRow) * static_cast<size_t>(count[2]));
+    LeaveCriticalSection(&g_testLock);
+    auto find = [&](int list, const char *id) {
+        for (int i = 0; i < count[list]; ++i) if (!_stricmp(rows[list][i].id, id)) return i;
+        return -1;
+    };
+    // a row that vanished (test.clear, regress.load) -> its list
+    if (g_rvKind == kRvTodoRow && find(2, g_rvRow) < 0) g_rvKind = kRvTodo;
+    if (g_rvKind == kRvRegRow && find(g_rvRowList, g_rvRow) < 0) g_rvKind = kRvReg;
+    RadLevel &v = g_radLevels[g_radVirtLevel];
+    v.count = 0;
+    char label[48], line[160];
+    switch (g_rvKind) {
+    case kRvTodo:
+        strncpy_s(v.path, sizeof(v.path), "Tests/TO TEST", _TRUNCATE);
+        for (int i = 0; i < count[2]; ++i) {
+            const TestRow &t = rows[2][i];
+            if (TestIs(t, "toggle") || !RadRowOpen(t)) continue;
+            RadRowLabel(t, false, label, sizeof(label));
+            RadVirtAdd(label, kRvTodoRow, 2, t.id, t.hint, true, 0);
+        }
+        break;
+    case kRvTodoRow: {
+        const TestRow &t = rows[2][find(2, g_rvRow)];
+        _snprintf_s(v.path, sizeof(v.path), _TRUNCATE, "Tests/TO TEST/%s", t.id);
+        RadVirtRowActions(t, 2, nullptr);
+        break;
+    }
+    case kRvRegLists:
+        strncpy_s(v.path, sizeof(v.path), "Tests/Regression", _TRUNCATE);
+        for (int l = 0; l <= kRegLists; ++l) {
+            int open = 0, total = 0, o2 = 0, t2 = 0;
+            if (l < kRegLists) RadRowCount(rows[l], count[l], &open, &total);
+            else { RadRowCount(rows[0], count[0], &open, &total); RadRowCount(rows[1], count[1], &o2, &t2); open += o2; total += t2; }
+            _snprintf_s(label, sizeof(label), _TRUNCATE, "%s %d/%d offen", kRvRegLabels[l], open, total);
+            RadVirtAdd(label, kRvReg, l, "", "", true, 0);
+        }
+        break;
+    case kRvReg:
+        _snprintf_s(v.path, sizeof(v.path), _TRUNCATE, "Tests/Regression/%s", kRvRegLabels[g_rvList]);
+        for (int l = 0; l < kRegLists; ++l) {
+            if (g_rvList != 2 && g_rvList != l) continue;
+            for (int i = 0; i < count[l]; ++i) {
+                const TestRow &t = rows[l][i];
+                RadRowLabel(t, true, label, sizeof(label));
+                RadVirtAdd(label, kRvRegRow, l, t.id, t.hint, true, 0);
+            }
+        }
+        break;
+    case kRvRegRow: {
+        int i = find(g_rvRowList, g_rvRow);
+        const TestRow &t = rows[g_rvRowList][i];
+        _snprintf_s(v.path, sizeof(v.path), _TRUNCATE, "Tests/Regression/%s/%s", kRvRegLabels[g_rvRowList], t.id);
+        RadVirtRowActions(t, g_rvRowList, cuts[g_rvRowList][i]);
+        break;
+    }
+    case kRvPrepare:                         // one entry per distinct shortcut, as the page's "Quick prepare" list
+        strncpy_s(v.path, sizeof(v.path), "Tests/Prepare", _TRUNCATE);
+        for (int l = 0; l < kRegLists; ++l)
+            for (int i = 0; i < count[l]; ++i) {
+                if (!cuts[l][i][0]) continue;
+                bool dup = false;
+                for (int j = 0; j < i && !dup; ++j) dup = !strcmp(cuts[l][j], cuts[l][i]);
+                if (dup) continue;
+                char title[96] = "", steps[kScMaxSteps][kScStepLen], o[80];
+                int c = 0;
+                ShortcutParse(cuts[l][i], title, sizeof(title), steps, &c, o, sizeof(o));
+                _snprintf_s(label, sizeof(label), _TRUNCATE, "%s", title[0] ? title : rows[l][i].id);
+                _snprintf_s(line, sizeof(line), _TRUNCATE, "%s:%s = %s", kRegNames[l], rows[l][i].id, cuts[l][i]);
+                RadVirtAdd(label, kRaPrepare, l, rows[l][i].id, line, false, 0);
+            }
+        if (g_scActive) {
+            ValShortcut(line, sizeof(line));
+            RadVirtAdd("Stop", kRaStop, 0, "", line, false, 0);
+        }
+        break;
+    case kRvToggles:
+        strncpy_s(v.path, sizeof(v.path), "Tests/Schalter", _TRUNCATE);
+        for (int i = 0; i < count[2]; ++i) {
+            const TestRow &t = rows[2][i];
+            if (!TestIs(t, "toggle")) continue;
+            _snprintf_s(line, sizeof(line), _TRUNCATE, "%s (%s)", t.hint[0] ? t.hint : t.id, t.target);
+            RadVirtAdd(t.id, kRaToggle, 2, t.id, line, false, !_stricmp(t.state, "on") ? 1 : 0);
+        }
+        break;
+    default:
+        strncpy_s(v.path, sizeof(v.path), "Tests", _TRUNCATE);
+        break;
+    }
+    int pages = RadPages(g_radVirtLevel);
+    if (g_radLevel == g_radVirtLevel) {
+        if (g_radPage >= pages) g_radPage = pages - 1;
+        int n = RadPageCount(g_radVirtLevel, g_radPage);
+        if (g_radSel >= n) g_radSel = n - 1;
+    }
+}
+
+// the labels of the four folders in Tests with their counts ("TO TEST 3/28 offen")
+void RadTestsLabels() {
+    if (g_radTestsItems[0] < 0) return;
+    int open = 0, total = 0, regOpen = 0, regTotal = 0, cuts = 0, toggles = 0, on = 0;
+    EnterCriticalSection(&g_testLock);
+    RadRowCount(g_tests, g_testCount, &open, &total);
+    for (int l = 0; l < kRegLists; ++l) {
+        int o = 0, t = 0;
+        RadRowCount(g_reg[l], g_regCount[l], &o, &t);
+        regOpen += o;
+        regTotal += t;
+        for (int i = 0; i < g_regCount[l]; ++i) {
+            if (!g_regShortcut[l][i][0]) continue;
+            bool dup = false;
+            for (int j = 0; j < i && !dup; ++j) dup = !strcmp(g_regShortcut[l][j], g_regShortcut[l][i]);
+            if (!dup) ++cuts;
+        }
+    }
+    for (int i = 0; i < g_testCount; ++i)
+        if (TestIs(g_tests[i], "toggle")) { ++toggles; if (!_stricmp(g_tests[i].state, "on")) ++on; }
+    LeaveCriticalSection(&g_testLock);
+    _snprintf_s(g_radItems[g_radTestsItems[0]].label, sizeof(g_radItems[0].label), _TRUNCATE, "TO TEST %d/%d offen", open,
+                total);
+    _snprintf_s(g_radItems[g_radTestsItems[1]].label, sizeof(g_radItems[0].label), _TRUNCATE, "Regression %d/%d offen",
+                regOpen, regTotal);
+    _snprintf_s(g_radItems[g_radTestsItems[2]].label, sizeof(g_radItems[0].label), _TRUNCATE, "Prepare (%d)", cuts);
+    _snprintf_s(g_radItems[g_radTestsItems[3]].label, sizeof(g_radItems[0].label), _TRUNCATE, "Schalter %d/%d an", on,
+                toggles);
+}
+
+// pick the entry whose arg is <arg> (or the one at <fallback>) on the virtual level
+void RadVirtSelect(const char *arg, int fallback) {
+    const RadLevel &v = g_radLevels[g_radVirtLevel];
+    int at = -1;
+    for (int i = 0; i < v.count && at < 0; ++i)
+        if (arg && arg[0] && !_stricmp(g_radItems[v.items[i]].arg, arg)) at = i;
+    if (at < 0) at = fallback < v.count ? fallback : v.count - 1;
+    if (at < 0) at = 0;
+    RadShow(g_radVirtLevel, at / kRadPerPage, v.count ? at % kRadPerPage : -1);
+}
+
+void RadVirtEnter(int kind, int list, int rowList, const char *row) {
+    g_rvKind = kind;
+    if (kind == kRvReg) g_rvList = list;
+    g_rvRowList = rowList;
+    strncpy_s(g_rvRow, sizeof(g_rvRow), row ? row : "", _TRUNCATE);
+    RadVirtBuild();
+    RadShow(g_radVirtLevel, 0, g_radLevels[g_radVirtLevel].count ? 0 : -1);
+    Log(2, "radial: level '%s'", g_radLevels[g_radVirtLevel].path);
+}
+
+// B on a virtual level: row -> its list (the row picked), list -> the level above, the first level -> Tests
+void RadVirtBack() {
+    char row[64];
+    strncpy_s(row, sizeof(row), g_rvRow, _TRUNCATE);
+    switch (g_rvKind) {
+    case kRvTodoRow: g_rvKind = kRvTodo; RadVirtBuild(); RadVirtSelect(row, 0); return;
+    case kRvRegRow: g_rvKind = kRvReg; RadVirtBuild(); RadVirtSelect(row, 0); return;
+    case kRvReg: g_rvKind = kRvRegLists; RadVirtBuild(); RadVirtSelect(nullptr, g_rvList); return;
+    default: break;
+    }
+    int kind = g_rvKind;
+    g_rvKind = kRvNone;
+    const RadLevel &p = g_radLevels[g_radTestsLevel];
+    int pos = 0;
+    for (int i = 0; i < p.count; ++i)
+        if (g_radItems[p.items[i]].special == kRadSpecialVirt && g_radItems[p.items[i]].vkind == kind) pos = i;
+    RadShow(g_radTestsLevel, pos / kRadPerPage, pos % kRadPerPage);
+}
+
+// a confirm press on a virtual entry; every action goes through the page's own function
+void RadVirtActivate(const RadItem &e) {
+    char o[300] = "";
+    if (e.child >= 0) {                      // a virtual folder: from Tests (vkind = the level) or a list
+        if (e.vkind == kRvTodoRow || e.vkind == kRvRegRow) RadVirtEnter(e.vkind, g_rvList, e.vlist, e.arg);
+        else RadVirtEnter(e.vkind, e.vlist, 0, "");
+        return;
+    }
+    bool todo = e.vlist == 2;
+    switch (e.vkind) {
+    case kRaRun: {
+        TestRow t = {};
+        bool found = false;
+        EnterCriticalSection(&g_testLock);
+        const TestRow *rows = todo ? g_tests : g_reg[e.vlist];
+        int c = todo ? g_testCount : g_regCount[e.vlist];
+        for (int i = 0; i < c && !found; ++i)
+            if (!_stricmp(rows[i].id, e.arg)) { t = rows[i]; found = true; }
+        LeaveCriticalSection(&g_testLock);
+        char itemId[64];
+        const char *runArg = "";
+        if (!found || !RadRowRunnable(t, itemId, sizeof(itemId), &runArg)) {
+            _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s: not available - no runnable item", e.arg);
+            break;
+        }
+        char argCopy[128];
+        strncpy_s(argCopy, sizeof(argCopy), runArg, _TRUNCATE);
+        QueueItem(itemId, argCopy);          // as the page's Run button
+        ++g_radRuns;
+        Log(1, "radial: %s -> run %s%s%s (row %s)", g_radLevels[g_radLevel].path, itemId, argCopy[0] ? " " : "", argCopy,
+            e.arg);
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s", g_lastAction);
+        if (!_strnicmp(itemId, "level.", 6) && g_radOpen) {
+            g_radResultTick = GetTickCount();
+            RadialClose("level change from a test row - the world must run");
+            return;
+        }
+        break;
+    }
+    case kRaOk: case kRaFail: case kRaSkip: case kRaDone: {
+        const char *state = e.vkind == kRaOk ? "ok" : e.vkind == kRaFail ? "fail" : e.vkind == kRaSkip ? "skip"
+                          : !_stricmp(e.label, "Done") ? "done" : "open";
+        if (todo) TestMarkFromMenu(e.arg, state);
+        else RegMarkFromMenu(e.vlist, e.arg, state);
+        Log(2, "radial: %s -> mark %s", g_radLevels[g_radLevel].path, state);
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s", g_lastAction);
+        g_radResultTick = GetTickCount();
+        RadVirtBack();                       // back to the list (an open TO TEST row disappears there)
+        return;
+    }
+    case kRaHint:
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s: %s", e.arg, e.info);
+        break;
+    case kRaPrepare: {
+        char spec[96];
+        _snprintf_s(spec, sizeof(spec), _TRUNCATE, "%s:%s", kRegNames[e.vlist], e.arg);
+        bool ok = RunRegressPrepare(spec, o, sizeof(o));
+        SetLastAction("regress.prepare", ok, o);   // as the page's Prepare button
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "Prepare %s: %s%s", spec, ok ? "" : "err ", o);
+        g_radResultTick = GetTickCount();
+        if (ok && g_radOpen) RadialClose("Prepare started - the world must run for its level change");
+        return;
+    }
+    case kRaStop: {
+        bool ok = RunRegressPrepare("stop", o, sizeof(o));
+        SetLastAction("regress.prepare", ok, o);
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "Prepare: %s", o);
+        break;
+    }
+    case kRaToggle:
+        TestMarkFromMenu(e.arg, e.von ? "off" : "on");   // the target state, as the page's checkbox
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s", g_lastAction);
+        break;
+    default:
+        break;
+    }
+    g_radResultTick = GetTickCount();
+}
+
+// A / R3 / the release on the picked sector: a folder opens its level, an entry runs (closeAfter: the ring closes)
+void RadialActivate(bool closeAfter) {
+    const RadItem *e = RadAt(g_radLevel, g_radPage, g_radSel);
+    if (!e) {
+        if (closeAfter) RadialClose("released in the centre");
+        return;
+    }
+    if (e->special) return;                  // 0.10.1: the quit sector only through RadQuitPress (Mode=menu confirm)
+    if (e->child >= 0) {
+        int parent = g_radLevel;
+        RadShow(e->child, 0, -1);
+        if (closeAfter) InterlockedExchange(&g_radOpen, 2);   // the release entered a level: the ring stays (latched)
+        Log(2, "radial: level '%s' (from '%s')", g_radLevels[g_radLevel].path, g_radLevels[parent].path);
+        return;
+    }
+    const char *why = RadialWhy(*e);
+    if (why[0]) {
+        _snprintf_s(g_radResult, sizeof(g_radResult), _TRUNCATE, "%s: not available - %s", e->label, why);
+        g_radResultTick = GetTickCount();
+        Log(2, "radial: %s -> %s not run: %s", e->path, e->id, why);
+        if (closeAfter) RadialClose("entry not available");
+        return;
+    }
+    RadialRun(*e);
+    if (closeAfter) RadialClose("entry run");
+}
+
+// B: one level back (to the folder entry that leads here); at the top the ring closes
+void RadialBack() {
+    RadQuitDisarm("B");
+    if (g_radLevel <= 0) { RadialClose("B at the top"); return; }
+    if (g_radLevel == g_radVirtLevel) { RadVirtBack(); return; }   // 0.10.1 Tests level
+    int child = g_radLevel, parent = g_radLevels[child].parent;
+    const RadLevel &p = g_radLevels[parent];
+    int at = 0;
+    for (int i = 0; i < p.count; ++i)
+        if (g_radItems[p.items[i]].child == child) at = i;
+    RadShow(parent, at / kRadPerPage, at % kRadPerPage);
+}
+
+void RadialOnOpen() {
+    bool valid = g_radLevel >= 0 && g_radLevel < g_radLevelCount && g_radPage < RadPages(g_radLevel);
+    if (!valid || (!g_radRemember && g_radBy != kRadByLink))   // radial.open has set its level already
+        RadShow(0, 0, -1);
+    else
+        g_radMoved = false;                  // remembered pick: highlighted, the release still needs a deflection
+    GetCursorPos(&g_radMouseOrigin);
+    g_radMouseDx = g_radMouseDy = 0.0f;
+    if (g_radSlow > 0.0f && g_timeOk && g_experimental) {
+        float before = 1.0f;
+        if (ReadFloats(kTimeDilation, &before, 1)) {
+            g_radSlowBefore = before;
+            *reinterpret_cast<volatile float *>(kTimeDilation) = g_radSlow;
+        }
+    }
+    g_radQuitArmedAt = g_radQuitHoldFrom = 0;
+    if (g_radMode == kRadModeMenu) {
+        if (g_radLevel == g_radVirtLevel && g_radVirtLevel >= 0) {   // a remembered Tests level: the lists of now
+            if (g_rvKind == kRvNone) RadShow(g_radTestsLevel, 0, 0);
+            else RadVirtBuild();
+        }
+        if (g_radSel < 0 && RadPageCount(g_radLevel, g_radPage) > 0) g_radSel = 0;   // a menu: something is picked
+        RadFreezeApply();
+    }
+    static const char *const by[] = {"?", "pad", "key", "mouse button", "radial.open"};
+    LONG who = g_radBy;
+    Log(2, "radial: opened by %s at '%s' page %d", by[who >= 0 && who <= 4 ? who : 0], g_radLevels[g_radLevel].path,
+        g_radPage + 1);
+}
+
+bool RadFront() {                            // the game window (any window of this process) is in front
+    HWND w = GetForegroundWindow();
+    DWORD pid = 0;
+    if (w) GetWindowThreadProcessId(w, &pid);
+    return pid == GetCurrentProcessId();
+}
+
+// render thread, every Present: key / mouse button hold, radial.open, the open ring's input
+void RadialTick() {
+    if (!g_radEnabled) return;
+    bool front = RadFront();
+    static bool keyWas = false, mouseWas = false;
+    int vkMouse = g_radMouse == 3 ? VK_MBUTTON : g_radMouse == 4 ? VK_XBUTTON1 : g_radMouse == 5 ? VK_XBUTTON2 : 0;
+    bool key = g_radKey && front && (GetAsyncKeyState(g_radKey) & 0x8000) != 0;
+    bool mouse = vkMouse && front && (GetAsyncKeyState(vkMouse) & 0x8000) != 0;
+    if ((key && !keyWas) || (mouse && !mouseWas)) {
+        LONG by = key && !keyWas ? kRadByKey : kRadByMouse;
+        if (g_radMode == kRadModeMenu) {     // 0.10.1: a tap opens (stays open), the next tap closes
+            if (!g_menuOpen && !g_radOpen) {
+                InterlockedExchange(&g_radBy, by);
+                InterlockedExchange(&g_radJust, 1);
+                InterlockedExchange(&g_radOpen, 2);
+            } else if (g_radOpen) {
+                RadialClose(by == kRadByKey ? "key again" : "mouse button again");
+            }
+        } else if (!g_menuOpen && !g_radOpen) {
+            InterlockedExchange(&g_radBy, by);
+            InterlockedExchange(&g_radJust, 1);
+            InterlockedExchange(&g_radOpen, 1);
+        } else if (g_radOpen == 2) {
+            InterlockedExchange(&g_radBy, by);
+            InterlockedExchange(&g_radOpen, 1);
+        }
+    }
+    if (g_radMode == kRadModeWheel && g_radOpen == 1 &&
+        ((!key && keyWas && g_radBy == kRadByKey) || (!mouse && mouseWas && g_radBy == kRadByMouse)))
+        InterlockedExchange(&g_radRelease, 1);
+    keyWas = key;
+    mouseWas = mouse;
+    if (InterlockedExchange(&g_radCloseReq, 0) && g_radOpen) RadialClose("L3 + R3 again");   // 0.10.1 Mode=menu
+    if (InterlockedExchange(&g_radOpenReq, 0) && !g_menuOpen) {
+        EnterCriticalSection(&g_radLock);
+        int level = 0;
+        for (int i = 0; i < g_radLevelCount; ++i)
+            if (!_stricmp(g_radLevels[i].path, g_radOpenPath)) level = i;
+        RadShow(level, 0, -1);
+        LeaveCriticalSection(&g_radLock);
+        InterlockedExchange(&g_radBy, kRadByLink);
+        InterlockedExchange(&g_radJust, 1);
+        InterlockedExchange(&g_radOpen, 2);
+    }
+    if (g_radOpen && g_menuOpen) RadialClose("TruMenu opened");
+    static WORD prev = 0, lastMouse = 0;
+    static bool r3Armed = false;
+    PadState pad = {};
+    EnterCriticalSection(&g_padLock);
+    bool have = g_padConnected[g_lastPad];
+    if (have) pad = g_pad[g_lastPad];
+    LeaveCriticalSection(&g_padLock);
+    WORD clicks = static_cast<WORD>((front && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) ? 1 : 0) |
+                                    (front && (GetAsyncKeyState(VK_RBUTTON) & 0x8000) ? 2 : 0));
+    // 0.10.1 Mode=menu keys (the game gets no keys while the ring is open): 1 Enter, 2 Backspace, 4 Esc, 8 left, 16 right
+    static WORD lastKeys = 0;
+    WORD keys = 0;
+    if (front && g_radMode == kRadModeMenu) {
+        const int vks[] = {VK_RETURN, VK_BACK, VK_ESCAPE, VK_LEFT, VK_RIGHT};
+        for (int i = 0; i < 5; ++i)
+            if (GetAsyncKeyState(vks[i]) & 0x8000) keys = static_cast<WORD>(keys | (1 << i));
+    }
+    if (!g_radOpen) {
+        prev = pad.wButtons;
+        lastMouse = clicks;
+        lastKeys = keys;
+        r3Armed = false;
+        return;
+    }
+    EnterCriticalSection(&g_radLock);
+    if (InterlockedExchange(&g_radJust, 0)) {
+        RadialOnOpen();
+        prev = pad.wButtons;                 // buttons held at the open (L3 + R3) are no edges
+        lastMouse = clicks;
+        lastKeys = keys;
+        r3Armed = false;
+    }
+    if (g_radMode == kRadModeMenu) {         // 0.10.1 Tests level: counts and lists of this frame
+        if (g_radLevel == g_radTestsLevel) RadTestsLabels();
+        if (g_radLevel == g_radVirtLevel && g_radVirtLevel >= 0) {
+            if (g_rvKind == kRvNone) RadShow(g_radTestsLevel, 0, 0);
+            else RadVirtBuild();
+        }
+    }
+    // the release first, with the pick of the last frame (the stick may spring back in the release poll)
+    if (InterlockedExchange(&g_radRelease, 0) && g_radOpen == 1) {
+        if (g_radMoved && g_radSel >= 0) RadialActivate(true);
+        else RadialClose("released in the centre");
+    }
+    WORD edges = static_cast<WORD>(pad.wButtons & ~prev);
+    WORD ups = static_cast<WORD>(prev & ~pad.wButtons);
+    WORD clickEdges = static_cast<WORD>(clicks & ~lastMouse);
+    WORD keyEdges = static_cast<WORD>(keys & ~lastKeys);
+    prev = pad.wButtons;
+    lastMouse = clicks;
+    lastKeys = keys;
+    if (g_radOpen && g_radMode == kRadModeMenu) {
+        // 0.10.1 Mode=menu: nothing runs by pointing or releasing - only the confirm press below
+        int pages = RadPages(g_radLevel);
+        if (edges & 0x0100) { RadQuitDisarm("page change"); RadShow(g_radLevel, (g_radPage + pages - 1) % pages, -1); }
+        if (edges & 0x0200) { RadQuitDisarm("page change"); RadShow(g_radLevel, (g_radPage + 1) % pages, -1); }
+        int n = RadPageCount(g_radLevel, g_radPage);
+        if (g_radSel < 0 && n > 0) g_radSel = 0;
+        if (n > 0 && ((edges & 0x0008) || (keyEdges & 16))) g_radSel = (g_radSel + 1) % n;       // D-pad / arrow right
+        if (n > 0 && ((edges & 0x0004) || (keyEdges & 8))) g_radSel = (g_radSel + n - 1) % n;    // D-pad / arrow left
+        bool confirm = (edges & 0x1000) || (keyEdges & 1) || (clickEdges & 1);
+        if (confirm) {
+            const RadItem *e = RadAt(g_radLevel, g_radPage, g_radSel);
+            // a level.* entry (tour / file): the ring closes after it - whether a level change goes on while
+            // time.pause is set is not proven, so the freeze must end (README "Radial menu 0.10.1")
+            bool levelChange = e && e->child < 0 && !e->special && !_strnicmp(e->id, "level.", 6) && !RadialWhy(*e)[0];
+            if (RadQuitPicked())
+                RadQuitPress((edges & 0x1000) ? "pad A" : (keyEdges & 1) ? "Enter" : "left click");
+            else if (e && e->special == kRadSpecialVirt)
+                RadVirtActivate(*e);         // 0.10.1 Tests level: the page functions
+            else
+                RadialActivate(false);       // a level opens, an entry runs; the ring stays open
+            if (levelChange && g_radOpen) RadialClose("level change - the world must run");
+            if (g_radOpen && g_radSel < 0 && RadPageCount(g_radLevel, g_radPage) > 0) g_radSel = 0;
+        }
+        if (g_radOpen && ((edges & 0x2000) || (keyEdges & 2) || (keyEdges & 4) || (clickEdges & 2))) {
+            RadialBack();                    // B / Backspace / Esc / right click
+            if (g_radOpen && g_radSel < 0 && RadPageCount(g_radLevel, g_radPage) > 0) g_radSel = 0;
+        }
+    } else if (g_radOpen) {
+        int pages = RadPages(g_radLevel);
+        if (edges & 0x0100) RadShow(g_radLevel, (g_radPage + pages - 1) % pages, -1);   // LB
+        if (edges & 0x0200) RadShow(g_radLevel, (g_radPage + 1) % pages, -1);           // RB
+        if ((edges & 0x1000) || (clickEdges & 1)) RadialActivate(false);                // A / left click: run, stay
+        if ((edges & 0x2000) || (clickEdges & 2)) RadialBack();                         // B / right click
+        // R3 alone (latched ring): run the pick and close; L3 joining makes it the hold combo instead
+        if (g_radOpen == 2) {
+            if ((edges & kPadR3) && !(pad.wButtons & kPadL3)) r3Armed = true;
+            if (pad.wButtons & kPadL3) r3Armed = false;
+            if ((ups & kPadR3) && r3Armed) {
+                r3Armed = false;
+                if (RadAt(g_radLevel, g_radPage, g_radSel)) RadialActivate(true);
+            }
+        } else {
+            r3Armed = false;
+        }
+    }
+    if (g_radOpen) {                         // the pick: right stick, else the mouse direction since the open
+        bool menu = g_radMode == kRadModeMenu;
+        int n = RadPageCount(g_radLevel, g_radPage);
+        float x = have ? pad.sThumbRX / 32767.0f : 0.0f, y = have ? pad.sThumbRY / 32767.0f : 0.0f;
+        if (menu && have) {                  // 0.10.1 Mode=menu: the left stick picks too (the stronger one wins)
+            float lx = pad.sThumbLX / 32767.0f, ly = pad.sThumbLY / 32767.0f;
+            if (lx * lx + ly * ly > x * x + y * y) { x = lx; y = ly; }
+        }
+        bool deflected = sqrtf(x * x + y * y) >= g_radDead;
+        float angle = deflected ? atan2f(x, y) : 0.0f;   // clockwise from up
+        POINT cur = {};
+        static POINT lastCur = {};
+        bool mouseMoved = true;
+        if (GetCursorPos(&cur)) {
+            // Mode=menu: the mouse picks only while it moves (a resting mouse does not undo a D-pad / arrow step)
+            mouseMoved = !menu || cur.x != lastCur.x || cur.y != lastCur.y;
+            lastCur = cur;
+            float dx = static_cast<float>(cur.x - g_radMouseOrigin.x), dy = static_cast<float>(cur.y - g_radMouseOrigin.y);
+            float dist = sqrtf(dx * dx + dy * dy), limit = 160.0f * g_radScale;
+            if (dist > limit) {              // keep the virtual cursor on the ring: the origin follows
+                g_radMouseOrigin.x = cur.x - static_cast<LONG>(dx * limit / dist);
+                g_radMouseOrigin.y = cur.y - static_cast<LONG>(dy * limit / dist);
+                dx = dx * limit / dist;
+                dy = dy * limit / dist;
+                dist = limit;
+            }
+            g_radMouseDx = dx;
+            g_radMouseDy = dy;
+            if (!deflected && mouseMoved && dist >= 60.0f * g_radScale * g_radDead) {
+                deflected = true;
+                angle = atan2f(dx, -dy);
+            }
+        }
+        int sector = -1;
+        if (deflected && n > 0) {
+            if (angle < 0.0f) angle += 2.0f * kPi;
+            float step = 2.0f * kPi / static_cast<float>(n);
+            sector = static_cast<int>((angle + step * 0.5f) / step) % n;
+        }
+        if (sector >= 0) {
+            g_radSel = sector;
+            g_radMoved = true;
+        } else if (g_radOpen == 1 && g_radMoved) {
+            g_radSel = -1;                   // hold mode: back in the centre = nothing picked (release = cancel)
+        }
+        if (menu) {                          // 0.10.1: the quit sector's 10 s window, pointing away, the 1 s hold
+            bool confirmHeld = (have && (pad.wButtons & 0x1000)) || (keys & 1) || (clicks & 1);
+            RadQuitTick(confirmHeld);
+        }
+    }
+    LeaveCriticalSection(&g_radLock);
+}
+
+// one text centred on <at>, broken at spaces into lines of at most <width> pixels
+void RadText(ImDrawList *dl, ImFont *font, float size, ImVec2 at, ImU32 col, const char *text, float width) {
+    char lines[4][64];
+    int count = 0;
+    const char *p = text;
+    while (*p && count < 4) {
+        int len = 0, lastSpace = -1;
+        while (p[len] && len < 63) {
+            char probe[64];
+            memcpy(probe, p, static_cast<size_t>(len) + 1);
+            probe[len + 1] = 0;
+            if (font->CalcTextSizeA(size, FLT_MAX, 0.0f, probe).x > width && lastSpace > 0) break;
+            if (p[len] == ' ') lastSpace = len;
+            ++len;
+        }
+        if (p[len] && lastSpace > 0) len = lastSpace;
+        memcpy(lines[count], p, static_cast<size_t>(len));
+        lines[count][len] = 0;
+        ++count;
+        p += len;
+        while (*p == ' ') ++p;
+    }
+    float lineH = size * 1.1f, top = at.y - lineH * static_cast<float>(count) * 0.5f;
+    for (int i = 0; i < count; ++i) {
+        float w = font->CalcTextSizeA(size, FLT_MAX, 0.0f, lines[i]).x;
+        ImVec2 pos(at.x - w * 0.5f + 1.0f, top + lineH * static_cast<float>(i) + 1.0f);
+        dl->AddText(font, size, pos, IM_COL32(0, 0, 0, 200), lines[i]);   // shadow
+        dl->AddText(font, size, ImVec2(pos.x - 1.0f, pos.y - 1.0f), col, lines[i]);
+    }
+}
+
+// the ring: 8 (or fewer) arc segments, the picked one bright, labels, on / off of switches, path + page in the centre
+void DrawRadial() {
+    ImGuiIO &io = ImGui::GetIO();
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    ImFont *font = ImGui::GetFont();
+    float h = io.DisplaySize.y, w = io.DisplaySize.x;
+    if (h <= 0.0f || w <= 0.0f) return;
+    EnterCriticalSection(&g_radLock);
+    ImVec2 c(w * 0.5f, h * 0.5f);
+    float outer = h * 0.36f * g_radScale, inner = outer * 0.42f, mid = (outer + inner) * 0.5f, thick = outer - inner;
+    float size = h / 1080.0f * 25.0f * g_radScale;
+    if (size < 11.0f) size = 11.0f;
+    int n = RadPageCount(g_radLevel, g_radPage), pages = RadPages(g_radLevel);
+    float step = n > 0 ? 2.0f * kPi / static_cast<float>(n) : 2.0f * kPi;
+    float gap = n > 1 ? 0.03f : 0.0f;
+    for (int i = 0; i < n; ++i) {
+        const RadItem &e = *RadAt(g_radLevel, g_radPage, i);
+        const char *why = RadialWhy(e);
+        bool grey = why[0] != 0, hi = i == g_radSel;
+        float a = -0.5f * kPi + step * static_cast<float>(i);   // centre angle: 0 = up, clockwise
+        bool quit = e.special == kRadSpecialQuit, armed = quit && RadQuitArmed();
+        bool claude = RadClaude(e);          // 0.10.5: coral #D97757 (217, 119, 87), white text
+        ImU32 fill = grey ? (hi ? IM_COL32(95, 75, 60, 225) : IM_COL32(45, 45, 45, 175))
+                   : armed ? IM_COL32(200, 40, 30, 245)
+                   : quit ? (hi ? IM_COL32(150, 60, 50, 235) : IM_COL32(70, 28, 24, 205))
+                   : claude ? (hi ? IM_COL32(238, 150, 119, 250) : IM_COL32(217, 119, 87, 235))
+                   : e.child >= 0 ? (hi ? IM_COL32(70, 140, 95, 235) : IM_COL32(30, 55, 42, 205))
+                                  : (hi ? IM_COL32(70, 110, 190, 235) : IM_COL32(28, 34, 50, 205));
+        dl->PathClear();
+        dl->PathArcTo(c, mid, a - step * 0.5f + gap, a + step * 0.5f - gap, 40);
+        dl->PathStroke(fill, 0, thick);
+        ImU32 rim = hi ? IM_COL32(255, 220, 90, 255) : IM_COL32(150, 160, 180, 120);
+        dl->PathClear();
+        dl->PathArcTo(c, outer, a - step * 0.5f + gap, a + step * 0.5f - gap, 40);
+        dl->PathStroke(rim, 0, hi ? 3.0f : 1.5f);
+        char text[64];
+        _snprintf_s(text, sizeof(text), _TRUNCATE, "%s%s", e.label, e.child >= 0 ? " >" : "");
+        if (e.child < 0 && !e.special) FlowRadLabel(e.id, text, sizeof(text));   // 0.11: "Weiter: <step>", "Ablauf n/m"
+        if (armed) {                         // the countdown is only text: the arm belongs to the sector, not the label
+            DWORD age = GetTickCount() - g_radQuitArmedAt;
+            DWORD left = age < kQuitWindowMs ? (kQuitWindowMs - age + 999) / 1000 : 0;
+            _snprintf_s(text, sizeof(text), _TRUNCATE, "A nochmal = beenden (%lu s)", left);
+        }
+        ImVec2 at(c.x + cosf(a) * mid, c.y + sinf(a) * mid);
+        float width = thick * 1.25f, arc = mid * step * 0.85f;
+        if (n > 1 && arc < width) width = arc;
+        bool isBool = false;
+        bool on = RadialOn(e, &isBool);
+        ImU32 col = grey ? IM_COL32(150, 150, 150, 255) : claude ? IM_COL32(255, 255, 255, 255) : IM_COL32(240, 240, 240, 255);
+        RadText(dl, font, size, ImVec2(at.x, at.y - (isBool || grey ? size * 0.45f : 0.0f)), col, text, width);
+        if (isBool && !grey)
+            RadText(dl, font, size * 0.85f, ImVec2(at.x, at.y + size * 1.0f),
+                    on ? IM_COL32(110, 230, 120, 255) : IM_COL32(170, 170, 170, 255), on ? "on" : "off", width);
+        else if (grey)
+            RadText(dl, font, size * 0.75f, ImVec2(at.x, at.y + size * 1.0f), IM_COL32(220, 120, 100, 255), "n/a", width);
+    }
+    if (!n) RadText(dl, font, size, ImVec2(c.x, c.y - outer * 0.7f), IM_COL32(220, 120, 100, 255),
+                    g_radItemCount ? "(empty level)" : "(no entries - TruMenu.radial.txt)", outer * 2.0f);
+    // centre: path, page, the pick and why it is greyed
+    dl->AddCircleFilled(c, inner * 0.94f, IM_COL32(14, 16, 22, 225), 48);
+    dl->AddCircle(c, inner * 0.94f, IM_COL32(150, 160, 180, 140), 48, 1.5f);
+    const char *path = g_radLevels[g_radLevel].path;
+    bool claudeLevel = !_strnicmp(path, "Claude", 6) && (path[6] == 0 || path[6] == '/');   // 0.10.5: the title in coral
+    RadText(dl, font, size * 0.9f, ImVec2(c.x, c.y - inner * 0.55f),
+            claudeLevel ? IM_COL32(217, 119, 87, 255) : IM_COL32(255, 220, 90, 255), path[0] ? path : "TruMenu",
+            inner * 1.6f);
+    char line[160];
+    if (pages > 1) {
+        _snprintf_s(line, sizeof(line), _TRUNCATE, "page %d / %d  (LB / RB)", g_radPage + 1, pages);
+        RadText(dl, font, size * 0.7f, ImVec2(c.x, c.y - inner * 0.25f), IM_COL32(200, 200, 200, 255), line, inner * 1.7f);
+    }
+    const RadItem *pick = RadAt(g_radLevel, g_radPage, g_radSel);
+    if (pick) {
+        const char *why = RadialWhy(*pick);
+        if (pick->special == kRadSpecialQuit)
+            _snprintf_s(line, sizeof(line), _TRUNCATE, "game.quit: A twice or hold A 1 s");
+        else if (pick->child < 0 && !pick->special && FlowRadInfo(pick->id, pick->arg, line, sizeof(line))) {}   // 0.11
+        else if (pick->info[0]) _snprintf_s(line, sizeof(line), _TRUNCATE, "%s", pick->info);   // 0.10.1: row hint
+        else if (pick->special == kRadSpecialVirt) _snprintf_s(line, sizeof(line), _TRUNCATE, "-> %s", pick->label);
+        else if (pick->child >= 0) _snprintf_s(line, sizeof(line), _TRUNCATE, "-> %s", g_radLevels[pick->child].path);
+        else _snprintf_s(line, sizeof(line), _TRUNCATE, "%s%s%s", pick->id, pick->arg[0] ? " " : "", pick->arg);
+        RadText(dl, font, size * 0.7f, ImVec2(c.x, c.y + inner * 0.12f), IM_COL32(170, 200, 255, 255), line, inner * 1.7f);
+        if (why[0])
+            RadText(dl, font, size * 0.65f, ImVec2(c.x, c.y + inner * 0.5f), IM_COL32(240, 120, 100, 255), why,
+                    inner * 1.7f);
+    } else {
+        RadText(dl, font, size * 0.7f, ImVec2(c.x, c.y + inner * 0.2f), IM_COL32(170, 170, 170, 255),
+                g_radOpen == 1 ? "centre = cancel" : "B = back", inner * 1.7f);
+    }
+    // mouse: a dot for the virtual cursor (direction since the open)
+    if (g_radBy == kRadByKey || g_radBy == kRadByMouse || g_radMouseDx != 0.0f || g_radMouseDy != 0.0f) {
+        float k = inner * 0.85f / (160.0f * g_radScale);
+        dl->AddCircleFilled(ImVec2(c.x + g_radMouseDx * k, c.y + g_radMouseDy * k), size * 0.25f,
+                            IM_COL32(255, 255, 255, 200), 16);
+    }
+    // under the ring: the controls of the mode, the last result
+    const char *help = g_radMode == kRadModeMenu
+        ? "stick / D-pad / mouse = pick   A / Enter / click = OK   B / Backspace = back   LB / RB = page   L3+R3 / F9 = close"
+        : g_radOpen == 1
+        ? "release = run   centre = cancel   A = run, stay open   B = back   LB / RB = page"
+        : "stick / mouse = pick   A / click = run   R3 = run + close   B / right click = back   hold again = release runs";
+    RadText(dl, font, size * 0.7f, ImVec2(c.x, c.y + outer + size * 1.2f), IM_COL32(210, 210, 210, 230), help, w * 0.9f);
+    if (g_radResult[0] && GetTickCount() - g_radResultTick < 8000) {
+        bool err = strstr(g_radResult, ": err ") != nullptr || strstr(g_radResult, "not available") != nullptr;
+        RadText(dl, font, size * 0.75f, ImVec2(c.x, c.y + outer + size * 2.6f),
+                err ? IM_COL32(255, 130, 110, 255) : IM_COL32(130, 230, 140, 255), g_radResult, w * 0.9f);
+        if (strstr(g_radResult, "ok queued"))
+            RadText(dl, font, size * 0.65f, ImVec2(c.x, c.y + outer + size * 3.9f), IM_COL32(200, 200, 200, 230),
+                    g_lastAction, w * 0.9f);
+    }
+    LeaveCriticalSection(&g_radLock);
+}
+
+void ValRadialStatus(char *o, size_t n) {
+    static const char *const modes[] = {"closed", "open (hold: the release runs)", "open (latched)"};
+    static const char *const by[] = {"-", "pad", "key", "mouse button", "radial.open"};
+    LONG open = g_radOpen, who = g_radBy;
+    EnterCriticalSection(&g_radLock);
+    Out(o, n, "enabled %d (hold 0x%04x %d ms%s, key 0x%02x (DirectInput 0x%02lx), mouse button %d, remember %d, pass left "
+        "stick %d, slow motion %.2f, deadzone %.2f, scale %.2f); file %s: %s, %d dropped, %d unknown, %d skipped; ring %s "
+        "by %s at '%s' page %d / %d; %ld entries run; spawn %s (Spawn=%d)", g_radEnabled, g_radHold, g_radHoldMs,
+        g_radHold && g_radHold == g_toggleButtons ? " = the menu combo: short = menu at the release" : "", g_radKey,
+        g_radKeyDik, g_radMouse, g_radRemember, g_radPassLeft, g_radSlow, g_radDead, g_radScale,
+        g_radFilePath[0] ? g_radFilePath : "-", g_radFileState, g_radDropped, g_radUnknown, g_radSkipped,
+        modes[open >= 0 && open <= 2 ? open : 0], by[who >= 0 && who <= 4 ? who : 0], g_radLevels[g_radLevel].path,
+        g_radPage + 1, RadPages(g_radLevel), g_radRuns, g_spawnOk ? "code ok" : g_spawnWhy, g_radSpawn);
+    size_t used = strlen(o);                 // 0.10.1
+    int freezeNow = RadFreezeRead();
+    if (used + 1 < n)
+        _snprintf_s(o + used, n - used, _TRUNCATE, "; 0.10.1: mode %s, freeze %s (ini now %s; last open: %s), quit sector "
+                    "%s, tests level %s (tour %s: %s)", g_radMode == kRadModeMenu ? "menu" : "wheel",
+                    g_radFreeze == kRadFreezeWorld ? "world" : g_radFreeze == kRadFreezePlayer ? "player" : "0",
+                    freezeNow == kRadFreezeWorld ? "world" : freezeNow == kRadFreezePlayer ? "player" : "0",
+                    g_radFreezeState, g_radQuitItem >= 0 ? (RadQuitArmed() ? "ARMED" : "on") : "off",
+                    g_radTestsLevel >= 0 ? "on" : "off", g_radTourPath[0] ? g_radTourPath : "-", g_radTourState);
+    LeaveCriticalSection(&g_radLock);
+}
+
+void ValRadialList(char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    EnterCriticalSection(&g_radLock);
+    for (int i = 0; i < g_radItemCount; ++i) {
+        const RadItem &e = g_radItems[i];
+        if (e.child >= 0) continue;
+        if (e.special == kRadSpecialQuit) {  // 0.10.1: the built-in sector (not from the file, no item run)
+            int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s- | %s | (built-in game.quit safety sector)",
+                                used ? "; " : "", e.label);
+            if (w < 0) break;
+            used += static_cast<size_t>(w);
+            continue;
+        }
+        const char *why = RadialWhy(e);
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s | %s | %s%s%s%s%s", used ? "; " : "", e.path[0] ? e.path : "-",
+                            e.label, e.id, e.arg[0] ? " " : "", e.arg, why[0] ? " = greyed: " : "", why);
+        if (w < 0) break;
+        used += static_cast<size_t>(w);
+    }
+    LeaveCriticalSection(&g_radLock);
+    if (!used) Out(o, n, "(no entries: %s)", g_radFileState);
+}
+
+bool RunRadialReload(const char *, char *o, size_t n) {
+    if (!g_radEnabled) { Out(o, n, "radial menu off ([Radial] Enabled=0)"); return false; }
+    if (g_radOpen) { Out(o, n, "close the ring first"); return false; }
+    EnterCriticalSection(&g_radLock);
+    RadialLoad();
+    Out(o, n, "%s: %s, %d dropped, %d unknown, %d skipped", g_radFilePath, g_radFileState, g_radDropped, g_radUnknown,
+        g_radSkipped);
+    LeaveCriticalSection(&g_radLock);
+    return true;
+}
+
+bool RunRadialOpen(const char *arg, char *o, size_t n) {
+    if (!g_radEnabled) { Out(o, n, "radial menu off ([Radial] Enabled=0)"); return false; }
+    if (g_menuOpen) { Out(o, n, "close TruMenu first (the ring and the menu are never open together)"); return false; }
+    EnterCriticalSection(&g_radLock);
+    strncpy_s(g_radOpenPath, sizeof(g_radOpenPath), arg ? arg : "", _TRUNCATE);
+    RadTrim(g_radOpenPath);
+    bool known = !g_radOpenPath[0];
+    for (int i = 0; i < g_radLevelCount && !known; ++i) known = !_stricmp(g_radLevels[i].path, g_radOpenPath);
+    LeaveCriticalSection(&g_radLock);
+    if (!known) { Out(o, n, "no level '%s' (radial.list)", g_radOpenPath); return false; }
+    InterlockedExchange(&g_radOpenReq, 1);
+    Out(o, n, "ring opens latched at '%s' with the next frame (B at the top closes it)", g_radOpenPath);
+    return true;
+}
+
 void PageLevel() {
     char unit[64];
     CurrentUnit(unit, sizeof(unit));
@@ -6829,13 +11847,13 @@ void PageLevel() {
     for (char *name = strtok_s(list, ", ", &context); name; name = strtok_s(nullptr, ", ", &context), ++index) {
         char label[96];
         _snprintf_s(label, sizeof(label), _TRUNCATE, "Load %s##lvl%d", name, index);
-        if (ImGui::Button(label)) QueueItem("level.load", name);
+        if (TmButton(label)) QueueItem("level.load", name);
     }
-    if (unit[0] && ImGui::Button("Reload current unit  [level.reload]")) QueueItem("level.reload", "");
+    if (unit[0] && TmButton("Reload current unit  [level.reload]")) QueueItem("level.reload", "");
     // 0.7.1: the mission menu's start (main menu only) - the intro plays, unlike level.load
     if (g_missionOk) {                                     // 0.7.2: DLC 1 first
-        if (ImGui::Button("Start DLC 1 as the mission menu (intro)  [level.start dlc1]")) QueueItem("level.start", "dlc1");
-        if (ImGui::Button("Start DLC 2 as the mission menu (intro)  [level.start dlc2]")) QueueItem("level.start", "dlc2");
+        if (TmButton("Start DLC 1 as the mission menu (intro)  [level.start dlc1]")) QueueItem("level.start", "dlc1");
+        if (TmButton("Start DLC 2 as the mission menu (intro)  [level.start dlc2]")) QueueItem("level.start", "dlc2");
         char why[200];
         if (LevelChangePending(why, sizeof(why))) ImGui::TextDisabled("level.load / level.start refused now: %s", why);
     } else {
@@ -6854,7 +11872,7 @@ void PageLevel() {
             for (int k = i; k < i + count; ++k) {
                 char label[96];
                 _snprintf_s(label, sizeof(label), _TRUNCATE, "%s##unit%d", kUnits[k].unit, k);
-                if (ImGui::Button(label)) QueueItem("level.load", kUnits[k].unit);
+                if (TmButton(label)) QueueItem("level.load", kUnits[k].unit);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", kUnits[k].path);
             }
             ImGui::TreePop();
@@ -6882,8 +11900,8 @@ void PageOutfits() {
     Text("unit default (unit %lu, data +0x70 -> +0x294): %s", s.unitId, s.unitDefault < 0 ? "-" : def);
     if (!g_experimental) { ImGui::TextUnformatted("(experimental actions off in TruMenu.ini)"); return; }
     static bool reload = false;
-    ImGui::Checkbox("reload the current unit after choosing  [costume.setreload]", &reload);
-    if (ImGui::Button("Reset chosen costume (0 / 0 / 0)  [costume.reset]")) QueueItem("costume.reset", "");
+    TmCheckbox("reload the current unit after choosing  [costume.setreload]", &reload);
+    if (TmButton("Reset chosen costume (0 / 0 / 0)  [costume.reset]")) QueueItem("costume.reset", "");
     ImGui::Separator();
     ImGui::TextUnformatted("Player records of the type table (index  name  object id):");
     // object ids by record, recomputed when the object name table or the type table moves (the lookup walks ~1000 names)
@@ -6902,10 +11920,10 @@ void PageOutfits() {
         bool chosen = id && id == (s.mode ? s.chosen2 : s.chosen0);
         bool now = id && static_cast<DWORD>(id) == s.current;
         char label[128];
-        _snprintf_s(label, sizeof(label), _TRUNCATE, "%2d  %s  (%d)%s%s##cos%d", i, name, id, chosen ? "  [chosen]" : "",
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "%2d  %s  (%d)%s%s###cos%d", i, name, id, chosen ? "  [chosen]" : "",
                     now ? "  [current]" : "", i);
         if (!id) ImGui::BeginDisabled();
-        if (ImGui::Button(label)) {
+        if (TmButton(label)) {
             char arg[16];
             _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%d", i);
             QueueItem(reload ? "costume.setreload" : "costume.set", arg);
@@ -6921,7 +11939,7 @@ void PageOutfits() {
 void PageOverlay() {
     bool overlay = g_overlay != 0;
     if (!g_playerOk) ImGui::BeginDisabled();
-    if (ImGui::Checkbox("Show Lara's position (top left)", &overlay)) InterlockedExchange(&g_overlay, overlay);
+    if (TmCheckbox("Show Lara's position (top left)", &overlay)) InterlockedExchange(&g_overlay, overlay);
     if (!g_playerOk) ImGui::EndDisabled();
     float p[3], r[3];
     DWORD instance = 0;
@@ -6959,8 +11977,8 @@ void PageCamera() {
     ImGui::SliderInt("mode", &g_cameraModeChoice, 0, 12);
     char arg[16];
     _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%d", g_cameraModeChoice);
-    if (ImGui::Button("CAMERA_SetMode(mode)  [camera.mode]")) QueueItem("camera.mode", arg);
-    if (ImGui::Button("Restore game camera  [camera.restore]")) QueueItem("camera.restore", "");
+    if (TmButton("CAMERA_SetMode(mode)  [camera.mode]")) QueueItem("camera.mode", arg);
+    if (TmButton("Restore game camera  [camera.restore]")) QueueItem("camera.restore", "");
 }
 
 void PageCheat() {
@@ -6974,8 +11992,10 @@ void PageCheat() {
                                                       : "INSTANCE_Post / player check failed");
         return;
     }
-    if (ImGui::Button(cheat ? "Cheat / flight OFF  [cheat.flight]" : "Cheat / flight ON  [cheat.flight]"))
-        QueueItem("cheat.flight", "");
+    // 0.8.1: the target state, not "" (= flip): a request run twice can no longer switch it back; "###" = one id for
+    // both labels (the focus stays on the button when its label changes)
+    if (TmButton(cheat ? "Cheat / flight OFF  [cheat.flight]###flight" : "Cheat / flight ON  [cheat.flight]###flight"))
+        QueueItem("cheat.flight", cheat ? "0" : "1");
     ImGui::TextWrapped("Toggles cheatMode and posts message 12 to the player (TRLAU Skew.cpp). While on and the menu "
                        "is closed: RT moves Lara up, LT down (speed %.0f per 30 fps frame, [Cheat] FlightSpeed).",
                        g_flightSpeed);
@@ -6988,9 +12008,9 @@ void PageMarkup() {
                        "(original)\" (e.g. Show Spline Info = debugFlags2 0x400000).");
     if (!g_drawOk) { ImGui::TextUnformatted("markup / projection code check failed"); return; }
     bool markup = g_drawMarkup != 0, ledges = g_drawLedges != 0;
-    if (ImGui::Checkbox("draw markup  [draw.markup]", &markup)) { char o[96]; RunDrawMarkup(markup ? "1" : "0", o, sizeof(o)); }
+    if (TmCheckbox("draw markup  [draw.markup]", &markup)) { char o[96]; RunDrawMarkup(markup ? "1" : "0", o, sizeof(o)); }
     ImGui::SameLine();
-    if (ImGui::Checkbox("ledges only  [draw.ledges]", &ledges)) { char o[96]; RunDrawLedges(ledges ? "1" : "0", o, sizeof(o)); }
+    if (TmCheckbox("ledges only  [draw.ledges]", &ledges)) { char o[96]; RunDrawLedges(ledges ? "1" : "0", o, sizeof(o)); }
     ImGui::SliderFloat("projected width  [draw.scale]", &g_drawW, 256.0f, 2048.0f, "%.0f");
     ImGui::SliderFloat("projected height", &g_drawH, 224.0f, 2048.0f, "%.0f");
     Text("boxes drawn last frame: %d", g_drawnBoxes);
@@ -7049,13 +12069,13 @@ void ItemWidget(const char *id) {
     if (strcmp(type, "bool") == 0) {
         bool on = value[0] == '1';
         _snprintf_s(text, sizeof(text), _TRUNCATE, "%s  [%s]", label, id);
-        if (ImGui::Checkbox(text, &on)) QueueItem(id, on ? "1" : "0");
+        if (TmCheckbox(text, &on)) QueueItem(id, on ? "1" : "0");
     } else if (strcmp(type, "info") == 0) {
-        _snprintf_s(text, sizeof(text), _TRUNCATE, "%s: %.120s", id, value);
-        ImGui::Selectable(text);
+        _snprintf_s(text, sizeof(text), _TRUNCATE, "%s: %.120s###wi", id, value);
+        TmSelectable(text);
     } else {
-        _snprintf_s(text, sizeof(text), _TRUNCATE, "%s  [%s]%s%s", label, id, value[0] ? " = " : "", value);
-        if (ImGui::Button(text)) QueueItem(id, "");
+        _snprintf_s(text, sizeof(text), _TRUNCATE, "%s  [%s]%s%s###wb", label, id, value[0] ? " = " : "", value);
+        if (TmButton(text)) QueueItem(id, "");
     }
     FavKey(id);
     ImGui::PopID();
@@ -7069,7 +12089,7 @@ void PageFavourites() {
     if (ImGui::TreeNode("Add an item (A or Y on an id)")) {
         for (const Item &item : kItems) {
             if (strcmp(item.type, "todo") == 0 || FavHas(item.id)) continue;
-            if (ImGui::Selectable(item.id)) FavToggle(item.id);
+            if (TmSelectable(item.id)) FavToggle(item.id);
             else FavKey(item.id);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", item.label);
         }
@@ -7114,7 +12134,7 @@ void PageTestToggles(const TestRow *rows, int c) {
         bool on = !_stricmp(t.state, "on");
         char label[512];
         _snprintf_s(label, sizeof(label), _TRUNCATE, "%s   [%s -> %s]", t.hint[0] ? t.hint : t.id, t.id, t.target);
-        if (ImGui::Checkbox(label, &on)) TestMarkFromMenu(t.id, on ? "on" : "off");
+        if (TmCheckbox(label, &on)) TestMarkFromMenu(t.id, on ? "on" : "off");
         if (t.note[0] || t.when[0]) {
             ImGui::Indent();
             ImGui::TextDisabled("%s%s%s", t.note, t.note[0] && t.when[0] ? "  " : "", t.when);
@@ -7150,12 +12170,12 @@ void PageTests() {
             const char *runArg = "";
             bool runnable = t.target[0] && TestRunTarget(t.target, itemId, sizeof(itemId), &runArg);
             char label[512];
-            _snprintf_s(label, sizeof(label), _TRUNCATE, "%s %2d. %s", done ? "[DONE]" : i == nextStep ? "NEXT->" : "      ",
+            _snprintf_s(label, sizeof(label), _TRUNCATE, "%s %2d. %s###ts", done ? "[DONE]" : i == nextStep ? "NEXT->" : "      ",
                         t.num, t.hint[0] ? t.hint : "(no text)");
             ImVec4 colour = done ? ImVec4(0.6f, 0.6f, 0.6f, 1.0f) : i == nextStep ? ImVec4(1.0f, 0.85f, 0.3f, 1.0f)
                                                                                   : ImVec4(0.75f, 0.85f, 1.0f, 1.0f);
             ImGui::PushStyleColor(ImGuiCol_Text, colour);
-            bool activated = ImGui::Selectable(label);
+            bool activated = TmSelectable(label);
             ImGui::PopStyleColor();
             if (activated) {
                 if (runnable) QueueItem(itemId, runArg);
@@ -7165,13 +12185,13 @@ void PageTests() {
             if (runnable) {
                 char run[160];
                 _snprintf_s(run, sizeof(run), _TRUNCATE, "Run %s%s%s", itemId, runArg[0] ? " " : "", runArg);
-                if (ImGui::SmallButton(run)) QueueItem(itemId, runArg);
+                if (TmSmallButton(run)) QueueItem(itemId, runArg);
                 ImGui::SameLine();
             } else if (t.target[0]) {
                 ImGui::TextDisabled("(%s: no such item)", t.target);
                 ImGui::SameLine();
             }
-            if (ImGui::SmallButton(done ? "Open again" : "Done")) TestMarkFromMenu(t.id, done ? "open" : "done");
+            if (TmSmallButton(done ? "Open again" : "Done")) TestMarkFromMenu(t.id, done ? "open" : "done");
             if (t.when[0]) {
                 ImGui::SameLine();
                 ImGui::TextDisabled("%s", t.when);
@@ -7185,10 +12205,10 @@ void PageTests() {
         ImVec4 colour = ok ? ImVec4(0.45f, 1.0f, 0.45f, 1.0f) : fail ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f)
                       : skip ? ImVec4(0.65f, 0.65f, 0.65f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
         char label[512];
-        _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  %s   [%s]%s%s", ok ? "[OK]  " : fail ? "[FAIL]" : skip ? "[SKIP]" : "[    ]",
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  %s   [%s]%s%s###tc", ok ? "[OK]  " : fail ? "[FAIL]" : skip ? "[SKIP]" : "[    ]",
                     t.hint[0] ? t.hint : "(no hint)", t.id, t.note[0] ? "  - " : "", t.note);
         ImGui::PushStyleColor(ImGuiCol_Text, colour);
-        bool activated = ImGui::Selectable(label);
+        bool activated = TmSelectable(label);
         ImGui::PopStyleColor();
         if (ImGui::IsItemFocused()) {
             anyFocus = true;
@@ -7197,11 +12217,11 @@ void PageTests() {
         }
         if (activated) TestMarkFromMenu(t.id, "ok");
         ImGui::Indent();
-        if (ImGui::SmallButton("OK")) TestMarkFromMenu(t.id, "ok");
+        if (TmSmallButton("OK")) TestMarkFromMenu(t.id, "ok");
         ImGui::SameLine();
-        if (ImGui::SmallButton("FAIL")) TestMarkFromMenu(t.id, "fail");
+        if (TmSmallButton("FAIL")) TestMarkFromMenu(t.id, "fail");
         ImGui::SameLine();
-        if (ImGui::SmallButton("SKIP")) TestMarkFromMenu(t.id, "skip");
+        if (TmSmallButton("SKIP")) TestMarkFromMenu(t.id, "skip");
         char itemId[64];
         strncpy_s(itemId, sizeof(itemId), t.id, _TRUNCATE);
         char *colon = strchr(itemId, ':');
@@ -7211,7 +12231,7 @@ void PageTests() {
             ImGui::SameLine();
             char run[160];
             _snprintf_s(run, sizeof(run), _TRUNCATE, "Run %s%s%s", itemId, runArg[0] ? " " : "", runArg);
-            if (ImGui::SmallButton(run)) QueueItem(itemId, runArg);
+            if (TmSmallButton(run)) QueueItem(itemId, runArg);
         }
         if (t.when[0]) {
             ImGui::SameLine();
@@ -7221,7 +12241,7 @@ void PageTests() {
         ImGui::PopID();
     }
     if (anyFocus) g_rowFocusAny = true;          // 0.8: DrawMenu sets g_testFocus from both pages
-    if (ImGui::Button("Remove the marked rows  [test.clear done]")) { char o[160]; RunTestClear("done", o, sizeof(o)); }
+    if (TmButton("Remove the marked rows  [test.clear done]")) { char o[160]; RunTestClear("done", o, sizeof(o)); }
     ImGui::SameLine();
     if (ConfirmButton("Remove all rows  [test.clear]", "testclear")) { char o[160]; RunTestClear("", o, sizeof(o)); }
 }
@@ -7248,6 +12268,7 @@ void RegNoteFromMenu(int list, const char *id, const char *note) {
 
 void PageRegress() {
     static TestRow rows[kRegLists][kTestMax];
+    static char shortcut[kRegLists][kTestMax][kShortcutLen];   // 0.8.1 column 9
     int count[kRegLists];
     bool found[kRegLists];
     EnterCriticalSection(&g_testLock);
@@ -7255,8 +12276,49 @@ void PageRegress() {
         count[l] = g_regCount[l];
         found[l] = g_regFound[l];
         memcpy(rows[l], g_reg[l], sizeof(TestRow) * static_cast<size_t>(count[l]));
+        memcpy(shortcut[l], g_regShortcut[l], kShortcutLen * static_cast<size_t>(count[l]));
     }
     LeaveCriticalSection(&g_testLock);
+    // 0.8.1 regression shortcuts: "Prepare" per row and this quick list (one button per distinct shortcut)
+    auto prepare = [](int list, const TestRow &t) {
+        char spec[96], o[300];
+        _snprintf_s(spec, sizeof(spec), _TRUNCATE, "%s:%s", kRegNames[list], t.id);
+        bool ok = RunRegressPrepare(spec, o, sizeof(o));
+        SetLastAction("regress.prepare", ok, o);
+    };
+    {
+        char state[220];
+        ValShortcut(state, sizeof(state));
+        bool running = g_scActive != 0;
+        int shown = 0;
+        for (int l = 0; l < kRegLists; ++l) {
+            if (g_regSel != 2 && g_regSel != l) continue;
+            for (int i = 0; i < count[l]; ++i) {
+                if (!shortcut[l][i][0]) continue;
+                bool dup = false;
+                for (int j = 0; j < i && !dup; ++j) dup = !strcmp(shortcut[l][j], shortcut[l][i]);
+                if (dup) continue;
+                if (!shown++) ImGui::SeparatorText("Quick prepare (regression shortcuts)  [regress.prepare]");
+                char title[96] = "", steps[kScMaxSteps][kScStepLen], o[80], label[200];
+                int c = 0;
+                ShortcutParse(shortcut[l][i], title, sizeof(title), steps, &c, o, sizeof(o));
+                _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  (%s:%s)###qp%d_%d", title[0] ? title : rows[l][i].id,
+                            kRegNames[l], rows[l][i].id, l, i);
+                if (TmButton(label)) prepare(l, rows[l][i]);
+                if (ImGui::IsItemHovered() || ImGui::IsItemFocused()) ImGui::SetItemTooltip("%s", shortcut[l][i]);
+            }
+        }
+        if (shown || running) {
+            ImGui::TextDisabled("shortcut: %s", state);
+            if (running) {
+                ImGui::SameLine();
+                if (TmSmallButton("Stop###scstop")) {
+                    char o[120];
+                    RunRegressPrepare("stop", o, sizeof(o));
+                }
+            }
+        }
+    }
     ImGui::TextWrapped("Fixed lists (tests\\regress in the repo, copied next to the .asi by Set-TruMenu.ps1). Checks: A = OK, "
                        "X = FAIL, Y = SKIP, Note = text via the command bar / keyboard. Steps: A = run + done. Every mark "
                        "is appended to %s (session %s).", g_regResultsPath[0] ? g_regResultsPath : "-", g_regSession);
@@ -7264,8 +12326,8 @@ void PageRegress() {
     for (int s = 0; s < 3; ++s) {
         if (s) ImGui::SameLine();
         char label[64];
-        _snprintf_s(label, sizeof(label), _TRUNCATE, g_regSel == s ? "[%s]##rs%d" : "%s##rs%d", selName[s], s);
-        if (ImGui::Button(label)) g_regSel = s;
+        _snprintf_s(label, sizeof(label), _TRUNCATE, g_regSel == s ? "[%s]###rsel%d" : "%s###rsel%d", selName[s], s);
+        if (TmButton(label)) g_regSel = s;
     }
     ImGui::SameLine();
     if (ConfirmButton("Reload lists (all rows open)  [regress.load]", "regload")) {
@@ -7296,9 +12358,9 @@ void PageRegress() {
                 const char *runArg = "";
                 bool runnable = t.target[0] && TestRunTarget(t.target, itemId, sizeof(itemId), &runArg);
                 char label[512];
-                _snprintf_s(label, sizeof(label), _TRUNCATE, "%s %2d. %s", done ? "[DONE]" : "      ", t.num, t.hint);
+                _snprintf_s(label, sizeof(label), _TRUNCATE, "%s %2d. %s###rs", done ? "[DONE]" : "      ", t.num, t.hint);
                 ImGui::PushStyleColor(ImGuiCol_Text, done ? ImVec4(0.6f, 0.6f, 0.6f, 1.0f) : ImVec4(0.75f, 0.85f, 1.0f, 1.0f));
-                bool activated = ImGui::Selectable(label);
+                bool activated = TmSelectable(label);
                 ImGui::PopStyleColor();
                 if (activated) {
                     if (runnable) QueueItem(itemId, runArg);
@@ -7308,10 +12370,16 @@ void PageRegress() {
                 if (runnable) {
                     char run[160];
                     _snprintf_s(run, sizeof(run), _TRUNCATE, "Run %s%s%s", itemId, runArg[0] ? " " : "", runArg);
-                    if (ImGui::SmallButton(run)) QueueItem(itemId, runArg);
+                    if (TmSmallButton(run)) QueueItem(itemId, runArg);
                     ImGui::SameLine();
                 }
-                if (ImGui::SmallButton(done ? "Open again" : "Done")) RegMarkFromMenu(l, t.id, done ? "open" : "done");
+                if (shortcut[l][i][0]) {                 // 0.8.1
+                    if (TmSmallButton("Prepare###prep")) prepare(l, t);
+                    if (ImGui::IsItemHovered() || ImGui::IsItemFocused()) ImGui::SetItemTooltip("%s", shortcut[l][i]);
+                    ImGui::SameLine();
+                }
+                if (TmSmallButton(done ? "Open again###done" : "Done###done"))
+                    RegMarkFromMenu(l, t.id, done ? "open" : "done");
                 ImGui::Unindent();
                 ImGui::PopID();
                 continue;
@@ -7320,10 +12388,10 @@ void PageRegress() {
             ImVec4 colour = okS ? ImVec4(0.45f, 1.0f, 0.45f, 1.0f) : failS ? ImVec4(1.0f, 0.45f, 0.4f, 1.0f)
                           : skipS ? ImVec4(0.65f, 0.65f, 0.65f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
             char label[512];
-            _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  %s   [%s]%s%s", okS ? "[OK]  " : failS ? "[FAIL]" : skipS ? "[SKIP]"
+            _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  %s   [%s]%s%s###rc", okS ? "[OK]  " : failS ? "[FAIL]" : skipS ? "[SKIP]"
                         : "[    ]", t.hint[0] ? t.hint : "(no text)", t.id, t.note[0] ? "  - " : "", t.note);
             ImGui::PushStyleColor(ImGuiCol_Text, colour);
-            bool activated = ImGui::Selectable(label);
+            bool activated = TmSelectable(label);
             ImGui::PopStyleColor();
             if (ImGui::IsItemFocused()) {
                 anyFocus = true;
@@ -7332,13 +12400,18 @@ void PageRegress() {
             }
             if (activated) RegMarkFromMenu(l, t.id, "ok");
             ImGui::Indent();
-            if (ImGui::SmallButton("OK")) RegMarkFromMenu(l, t.id, "ok");
+            if (TmSmallButton("OK")) RegMarkFromMenu(l, t.id, "ok");
             ImGui::SameLine();
-            if (ImGui::SmallButton("FAIL")) RegMarkFromMenu(l, t.id, "fail");
+            if (TmSmallButton("FAIL")) RegMarkFromMenu(l, t.id, "fail");
             ImGui::SameLine();
-            if (ImGui::SmallButton("SKIP")) RegMarkFromMenu(l, t.id, "skip");
+            if (TmSmallButton("SKIP")) RegMarkFromMenu(l, t.id, "skip");
             ImGui::SameLine();
-            if (ImGui::SmallButton("Note")) RegNoteFromMenu(l, t.id, t.note);
+            if (TmSmallButton("Note")) RegNoteFromMenu(l, t.id, t.note);
+            if (shortcut[l][i][0]) {                     // 0.8.1
+                ImGui::SameLine();
+                if (TmSmallButton("Prepare###prep")) prepare(l, t);
+                if (ImGui::IsItemHovered() || ImGui::IsItemFocused()) ImGui::SetItemTooltip("%s", shortcut[l][i]);
+            }
             if (t.when[0]) {
                 ImGui::SameLine();
                 ImGui::TextDisabled("%s", t.when);
@@ -7364,10 +12437,10 @@ void CheatRowWidget(const char *id, int cat, bool ok, const char *why) {
     if (!strcmp(item->type, "bool")) {
         bool on = value[0] == '1';
         _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  [%s]", id, kCheatCatNames[cat]);
-        if (ImGui::Checkbox(label, &on)) QueueItem(id, on ? "1" : "0");
+        if (TmCheckbox(label, &on)) QueueItem(id, on ? "1" : "0");
     } else {
         _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  [%s]", id, kCheatCatNames[cat]);
-        if (ImGui::Button(label)) QueueItem(id, "");
+        if (TmButton(label)) QueueItem(id, "");
     }
     if (!usable) ImGui::EndDisabled();
     FavKey(id);
@@ -7407,7 +12480,7 @@ void PageCheats() {
             char label[48], arg[8];
             _snprintf_s(label, sizeof(label), _TRUNCATE, "code %d##cc%d", codes[i], codes[i]);
             _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%d", codes[i]);
-            if (ImGui::Button(label)) QueueItem("cheat.code", arg);
+            if (TmButton(label)) QueueItem("cheat.code", arg);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", CheatCodeName(codes[i]));
         }
         if (!usable) ImGui::EndDisabled();
@@ -7433,9 +12506,9 @@ bool ConfirmButton(const char *label, const char *key) {
     static DWORD armedAt = 0;
     bool isArmed = strcmp(armed, key) == 0 && GetTickCount() - armedAt < 5000;
     char text[160];
-    _snprintf_s(text, sizeof(text), _TRUNCATE, isArmed ? "%s - press A again to confirm##%s" : "%s##%s", label, key);
+    _snprintf_s(text, sizeof(text), _TRUNCATE, isArmed ? "%s - press A again to confirm###%s" : "%s###%s", label, key);
     if (isArmed) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.1f, 1.0f));
-    bool pressed = ImGui::Button(text);
+    bool pressed = TmButton(text);
     if (isArmed) ImGui::PopStyleColor();
     if (!pressed) return false;
     if (isArmed) { armed[0] = 0; return true; }
@@ -7446,7 +12519,7 @@ bool ConfirmButton(const char *label, const char *key) {
 
 void PageSettings() {
     Text("TruMenu.ini: %s", g_iniPath[0] ? g_iniPath : "-");
-    static char all[8192];
+    static char all[16384];
     ValSettings(all, sizeof(all));
     char *context = nullptr;
     for (char *line = strtok_s(all, ";", &context); line; line = strtok_s(nullptr, ";", &context)) {
@@ -7479,7 +12552,7 @@ void PageDev() {
     DevPageName(g_devPage, name, sizeof(name));
     ImGui::Separator();
     Text("page: %s (0x%08lx)", name, g_devPage);
-    if (g_devPage != kDevRoot && ImGui::Button("<< root page##devroot")) g_devPage = kDevRoot;
+    if (g_devPage != kDevRoot && TmButton("<< root page##devroot")) g_devPage = kDevRoot;
     for (int i = 0; i < g_devCount; ++i) {
         const DevRow &d = g_dev[i];
         if (d.page != g_devPage) continue;
@@ -7497,7 +12570,7 @@ void PageDev() {
         case kDevLink: {
             char label[96];
             _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  ->", d.text);
-            if (ImGui::Button(label)) g_devPage = d.target;
+            if (TmButton(label)) g_devPage = d.target;
             break;
         }
         case kDevFlag:
@@ -7506,7 +12579,7 @@ void PageDev() {
             char label[120];
             _snprintf_s(label, sizeof(label), _TRUNCATE, "%s  [%s]", d.text, d.id);
             if (!g_experimental) ImGui::BeginDisabled();
-            if (ImGui::Checkbox(label, &on)) QueueItem(d.id, on ? "1" : "0");
+            if (TmCheckbox(label, &on)) QueueItem(d.id, on ? "1" : "0");
             FavKey(d.id);
             if (!g_experimental) ImGui::EndDisabled();
             if (ImGui::IsItemHovered())
@@ -7536,7 +12609,7 @@ void PageDev() {
             bool empty = IsEmptyFunction(d.target);
             _snprintf_s(label, sizeof(label), _TRUNCATE, "%s%s  [%s]", d.text, empty ? " (empty in retail)" : "", d.id);
             if (!g_experimental) ImGui::BeginDisabled();
-            if (ImGui::Button(label)) QueueItem(d.id, "");
+            if (TmButton(label)) QueueItem(d.id, "");
             FavKey(d.id);
             if (!g_experimental) ImGui::EndDisabled();
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("cdecl 0x%08lx(0x%lx)", d.target, d.p1);
@@ -7558,7 +12631,7 @@ void PageDev() {
             DevPageName(g_devPages[p], name, sizeof(name));
             char label[96];
             _snprintf_s(label, sizeof(label), _TRUNCATE, "%s (%d rows)##devp%d", name, rows, p);
-            if (ImGui::Button(label)) g_devPage = g_devPages[p];
+            if (TmButton(label)) g_devPage = g_devPages[p];
         }
         ImGui::TreePop();
     }
@@ -7574,24 +12647,29 @@ void PageTimePlayer() {
         _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%.3f", scale);
         QueueItem("time.scale", arg);
     }
-    if (ImGui::Button("time scale 1.0##ts1")) QueueItem("time.scale", "1");
+    if (TmButton("time scale 1.0##ts1")) QueueItem("time.scale", "1");
     if (!g_timeOk || !g_experimental) ImGui::EndDisabled();
     ValPause(v, sizeof(v));
     bool paused = v[0] == '1';
-    if (ImGui::Checkbox("freeze world (streamFlags 0x1000)  [time.pause]", &paused)) QueueItem("time.pause", paused ? "1" : "0");
+    if (TmCheckbox("freeze world (streamFlags 0x1000)  [time.pause]", &paused)) QueueItem("time.pause", paused ? "1" : "0");
     ValUiHide(v, sizeof(v));
     bool hidden = v[0] == '1';
-    if (ImGui::Checkbox("hide HUD  [ui.hide]", &hidden)) QueueItem("ui.hide", hidden ? "1" : "0");
+    if (TmCheckbox("hide HUD  [ui.hide]", &hidden)) QueueItem("ui.hide", hidden ? "1" : "0");
     if (!InLevel()) { ImGui::TextUnformatted("player items: needs a level"); return; }
     ValControl(v, sizeof(v));
     bool control = v[0] == '1';
-    if (ImGui::Checkbox("player control  [player.control]", &control)) QueueItem("player.control", control ? "1" : "0");
-    if (ImGui::Button("Ragdoll death  [player.die]")) QueueItem("player.die", "");
-    if (ImGui::Button("Mark position  [player.mark]")) QueueItem("player.mark", "");
+    if (TmCheckbox("player control  [player.control]", &control)) QueueItem("player.control", control ? "1" : "0");
+    if (TmButton("Ragdoll death  [player.die]")) QueueItem("player.die", "");
+    if (TmButton("Mark position  [player.mark]")) QueueItem("player.mark", "");
     ImGui::SameLine();
-    if (ImGui::Button("Back to mark  [player.recall]")) QueueItem("player.recall", "");
+    if (TmButton("Back to mark  [player.recall]")) QueueItem("player.recall", "");
+    ImGui::SameLine();
+    if (TmButton("Unstuck  [player.unstuck]")) QueueItem("player.unstuck", "");   // 0.8.1
     ValMark(v, sizeof(v));
     Text("mark: %s   (player.teleport x y z over TruLink)", v);
+    ValUnstuck(v, sizeof(v));
+    ImGui::TextWrapped("unstuck: %s - the newer of the mark and the last safe ground spot (>= 3 s old, >= 150 units "
+                       "away); again within 20 s = one spot further back", v);
     ValFov(v, sizeof(v));
     float fov = static_cast<float>(atof(v));
     if (fov > 0.05f && fov < 3.1f && ImGui::SliderFloat("camera fov (rad)  [camera.fov]", &fov, 0.2f, 2.5f, "%.3f")) {
@@ -7605,15 +12683,15 @@ void PageTimePlayer() {
     ValHealth(v, sizeof(v));
     ValAmmo(ammo, sizeof(ammo));
     Text("health %s   [player.health]   reserve ammo %s   [ammo.show / ammo.set <type> <n>]", v, ammo);
-    if (g_healthOk && ImGui::Button("Full health  [player.health]")) QueueItem("player.health", "");
+    if (g_healthOk && TmButton("Full health  [player.health]")) QueueItem("player.health", "");
     bool inv = g_invincible != 0;
-    if (g_healthOk && ImGui::Checkbox("invincible (health = max every frame)  [player.invincible]", &inv))
+    if (g_healthOk && TmCheckbox("invincible (health = max every frame)  [player.invincible]", &inv))
         QueueItem("player.invincible", inv ? "1" : "0");
     for (const WeaponName &w : kWeapons) {
         char label[64];
         _snprintf_s(label, sizeof(label), _TRUNCATE, "Give %s##wg%d", w.name, w.id);
         if (!g_weaponOk) ImGui::BeginDisabled();
-        if (ImGui::Button(label)) QueueItem("weapon.give", w.name);
+        if (TmButton(label)) QueueItem("weapon.give", w.name);
         if (!g_weaponOk) ImGui::EndDisabled();
         if (w.id != 41 && w.id != 114) ImGui::SameLine();
     }
@@ -7631,22 +12709,22 @@ void PageInstances() {
         if (filter[0] && !strstr(x.name, filter)) return true;
         if (++shown > 200) return false;
         char label[160], arg[16];
-        _snprintf_s(label, sizeof(label), _TRUNCATE, "#%d  %s  intro %ld  (%.0f %.0f %.0f)##inst%d", i, x.name, x.intro,
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "#%d  %s  intro %ld  (%.0f %.0f %.0f)###inst%d", i, x.name, x.intro,
                     x.pos[0], x.pos[1], x.pos[2], i);
         _snprintf_s(arg, sizeof(arg), _TRUNCATE, "#%d", i);
         if (ImGui::TreeNode(label)) {
-            if (ImGui::Button("Lara goes there  [player.goto]")) QueueItem("player.goto", arg);
+            if (TmButton("Lara goes there  [player.goto]")) QueueItem("player.goto", arg);
             ImGui::SameLine();
-            if (ImGui::Button("Bring to Lara  [instance.bring]")) QueueItem("instance.bring", arg);
-            if (ImGui::Button("Unhide  [instance.unhide]")) QueueItem("instance.unhide", arg);
+            if (TmButton("Bring to Lara  [instance.bring]")) QueueItem("instance.bring", arg);
+            if (TmButton("Unhide  [instance.unhide]")) QueueItem("instance.unhide", arg);
             ImGui::SameLine();
-            if (ImGui::Button("Remove  [instance.remove]")) QueueItem("instance.remove", arg);
+            if (TmButton("Remove  [instance.remove]")) QueueItem("instance.remove", arg);
             ImGui::TreePop();
         }
         return true;
     });
     Text("%d instances, %d shown (max 200)", index, shown > 200 ? 200 : shown);
-    if (ImGui::Button("Unhide all  [instance.unhideall]")) QueueItem("instance.unhideall", "");
+    if (TmButton("Unhide all  [instance.unhideall]")) QueueItem("instance.unhideall", "");
 }
 
 void PageCostumeLive() {
@@ -7654,7 +12732,7 @@ void PageCostumeLive() {
                        "= id, or 0 = next of the cycle list GlobalInfo [0xe7ee50]+4; then player message 35 (weapons).");
     if (!g_switchOk) { ImGui::TextUnformatted("costume switch code check failed"); return; }
     if (!InLevel()) { ImGui::TextUnformatted("needs a level"); return; }
-    if (ImGui::Button("Next outfit  [costume.next]")) QueueItem("costume.next", "");
+    if (TmButton("Next outfit  [costume.next]")) QueueItem("costume.next", "");
     WORD ids[128];
     int c = GlobalCostumes(ids, 128);
     DWORD now = 0;
@@ -7662,9 +12740,9 @@ void PageCostumeLive() {
     for (int i = 0; i < c; ++i) {
         char name[64], label[96], arg[16];
         if (!ObjectName(ids[i], name, sizeof(name))) Out(name, sizeof(name), "?");
-        _snprintf_s(label, sizeof(label), _TRUNCATE, "%u %s%s##live%d", ids[i], name, ids[i] == now ? "  [current]" : "", i);
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "%u %s%s###live%d", ids[i], name, ids[i] == now ? "  [current]" : "", i);
         _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%u", ids[i]);
-        if (ImGui::Button(label)) QueueItem("costume.set", arg);
+        if (TmButton(label)) QueueItem("costume.set", arg);
     }
     if (c < 0) ImGui::TextUnformatted("no GlobalInfo list");
 }
@@ -7673,28 +12751,28 @@ void PageLog() {
     ImGui::TextWrapped("Tails of the Tru*.log files next to the .asi / tru.exe (once per second) and, with log.script on, "
                        "the game's script print / log natives.");
     bool overlay = g_logOverlay != 0;
-    if (ImGui::Checkbox("corner overlay  [log.overlay]", &overlay)) InterlockedExchange(&g_logOverlay, overlay ? 1 : 0);
+    if (TmCheckbox("corner overlay  [log.overlay]", &overlay)) InterlockedExchange(&g_logOverlay, overlay ? 1 : 0);
     ImGui::SameLine();
     bool script = g_scriptLog != 0;
     if (!g_scriptOk) ImGui::BeginDisabled();
-    if (ImGui::Checkbox("script prints  [log.script]", &script)) QueueItem("log.script", script ? "1" : "0");
+    if (TmCheckbox("script prints  [log.script]", &script)) QueueItem("log.script", script ? "1" : "0");
     if (!g_scriptOk) ImGui::EndDisabled();
     ImGui::SliderInt("lines  [log.lines]", &g_logLines, 1, 64);
     // sources: every tailed file + "script"
-    if (ImGui::Button(g_logFilter[0] ? "all##lf" : "[all]##lf")) g_logFilter[0] = 0;
+    if (TmButton(g_logFilter[0] ? "all##lf" : "[all]##lf")) g_logFilter[0] = 0;
     for (int i = 0; i < 16; ++i) {
         if (!g_tails[i].used) continue;
         ImGui::SameLine();
         char label[48];
         bool active = _stricmp(g_logFilter, g_tails[i].name) == 0;
-        _snprintf_s(label, sizeof(label), _TRUNCATE, active ? "[%s]##lf%d" : "%s##lf%d", g_tails[i].name, i);
-        if (ImGui::Button(label)) strncpy_s(g_logFilter, sizeof(g_logFilter), g_tails[i].name, _TRUNCATE);
+        _snprintf_s(label, sizeof(label), _TRUNCATE, active ? "[%s]###lf%d" : "%s###lf%d", g_tails[i].name, i);
+        if (TmButton(label)) strncpy_s(g_logFilter, sizeof(g_logFilter), g_tails[i].name, _TRUNCATE);
     }
     ImGui::SameLine();
-    if (ImGui::Button(_stricmp(g_logFilter, "script") == 0 ? "[script]##lfs" : "script##lfs"))
+    if (TmButton(_stricmp(g_logFilter, "script") == 0 ? "[script]##lfs" : "script##lfs"))
         strncpy_s(g_logFilter, sizeof(g_logFilter), "script", _TRUNCATE);
     ImGui::SameLine();
-    if (ImGui::Button("clear  [log.clear]")) { char o[64]; RunLogClear("", o, sizeof(o)); }
+    if (TmButton("clear  [log.clear]")) { char o[64]; RunLogClear("", o, sizeof(o)); }
     {                                                                       // 0.7.2 overlay filter
         char src[300], exc[600];
         ValOvlSources(src, sizeof(src));
@@ -7704,16 +12782,16 @@ void PageLog() {
     }
     // 0.4: collapse, TruLink reads, severity, rate
     bool collapse = g_logCollapse != 0, hide = g_logHideReads != 0;
-    if (ImGui::Checkbox("collapse repeats  [log.collapse]", &collapse)) InterlockedExchange(&g_logCollapse, collapse ? 1 : 0);
+    if (TmCheckbox("collapse repeats  [log.collapse]", &collapse)) InterlockedExchange(&g_logCollapse, collapse ? 1 : 0);
     ImGui::SameLine();
-    if (ImGui::Checkbox("hide TruLink reads  [log.hidereads]", &hide)) InterlockedExchange(&g_logHideReads, hide ? 1 : 0);
+    if (TmCheckbox("hide TruLink reads  [log.hidereads]", &hide)) InterlockedExchange(&g_logHideReads, hide ? 1 : 0);
     ImGui::TextUnformatted("show  [log.level]:");
     for (int i = 0; i < 3; ++i) {
         ImGui::SameLine();
         char label[32];
-        _snprintf_s(label, sizeof(label), _TRUNCATE, g_logMinLevel == i ? "[%s]##ll%d" : "%s##ll%d",
+        _snprintf_s(label, sizeof(label), _TRUNCATE, g_logMinLevel == i ? "[%s]###ll%d" : "%s###ll%d",
                     i == 0 ? "all" : i == 1 ? "warnings + errors" : "errors", i);
-        if (ImGui::Button(label)) g_logMinLevel = i;
+        if (TmButton(label)) g_logMinLevel = i;
     }
     ImGui::SliderInt("max lines per source and second (0 = off)  [log.rate]", &g_logRate, 0, 200);
     static LogLine lines[64];
@@ -7753,16 +12831,156 @@ void PageMedia() {
         char label[96];
         _snprintf_s(label, sizeof(label), _TRUNCATE, "Play %s##vp%d", name, i);
         if (state != 10 || !g_movieOk) ImGui::BeginDisabled();
-        if (ImGui::Button(label)) QueueItem("media.video.play", name);
+        if (TmButton(label)) QueueItem("media.video.play", name);
         if (state != 10 || !g_movieOk) ImGui::EndDisabled();
         ImGui::SameLine();
         _snprintf_s(label, sizeof(label), _TRUNCATE, "as menu loop##vl%d", i);
-        if (ImGui::Button(label)) QueueItem("media.video.menuloop", name);
+        if (TmButton(label)) QueueItem("media.video.menuloop", name);
     }
-    if (ImGui::Button("menu loop back to medsea_loop")) QueueItem("media.video.menuloop", "");
+    if (TmButton("menu loop back to medsea_loop")) QueueItem("media.video.menuloop", "");
     ImGui::TextWrapped("0x4a12b0(name, loop) is a blocking-style player (its callers loop while it plays): play only "
                        "from the main menu; experimental. The menu loop name is read when the main menu (re)starts "
                        "its background movie (0x5daf35).");
+    char flags[1024];
+    ValMediaVideoFlags(flags, sizeof(flags));
+    ImGui::TextWrapped("videos (source, flag): %s   [media.video.flags]", flags);
+}
+
+// 0.9 P3: music through the engine's SRMUSIC_LoadMusic (catalog 11.2); every label with a stable ### id
+void PageMusic() {
+    char why[200] = "";
+    bool place = MusicPlace(why, sizeof(why));
+    bool can = g_musicOk && g_experimental && place;
+    if (!g_musicOk) ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "music off - code check: %s", g_musicCheck);
+    else if (!g_experimental) ImGui::TextUnformatted("music items need [Cheat] Experimental=1");
+    else if (!place) ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "buttons disabled: %s", why);
+    char now[1024];
+    ValMusicNow(now, sizeof(now));
+    ImGui::TextWrapped("now: %s   [media.music.now]", now);
+    if (!can) ImGui::BeginDisabled();
+    if (TmButton("Stop slot 0 (fade)  [media.music.stop]###mstop")) QueueItem("media.music.stop", "");
+    ImGui::SameLine();
+    if (TmButton("Stop all slots  [media.music.stop all]###mstopall")) QueueItem("media.music.stop", "all");
+    if (!can) ImGui::EndDisabled();
+    bool vars = false;
+    char v[96];
+    ValMusicVars(v, sizeof(v));
+    vars = v[0] == '1';
+    if (!g_musicVarsOk) ImGui::BeginDisabled();
+    if (TmCheckbox("Show Music Vars (developer flag)  [dev.musicvars]###mvars", &vars)) QueueItem("dev.musicvars", vars ? "1" : "0");
+    if (!g_musicVarsOk) ImGui::EndDisabled();
+    ValMonsterMusicVars(v, sizeof(v));
+    vars = v[0] == '1';
+    ImGui::SameLine();
+    if (!g_monsterVarsOk) ImGui::BeginDisabled();
+    if (TmCheckbox("Show Monster Music Vars  [dev.monstermusicvars]###mmvars", &vars))
+        QueueItem("dev.monstermusicvars", vars ? "1" : "0");
+    if (!g_monsterVarsOk) ImGui::EndDisabled();
+    if (g_mediaCount < 0) {
+        ImGui::TextWrapped("no track list: %s missing (tools/music_list.py --menu-out <folder>; Set-TruMenu.ps1 copies "
+                           "it next to the .asi). Nothing can be played without it.", g_mediaPath);
+        return;
+    }
+    static char filter[32] = "";
+    ImGui::InputText("track filter###mfilter", filter, sizeof(filter));
+    for (int i = 0; i < g_mediaCount; ++i) {
+        const MediaRow &r = g_media[i];
+        if (_stricmp(r.kind, "music")) continue;
+        if (filter[0] && !strstr(r.name, filter)) continue;
+        bool unused = !strcmp(r.flag, "unused?");
+        char label[128];
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "Play###mp_%s", r.name);
+        if (!can) ImGui::BeginDisabled();
+        if (TmButton(label)) QueueItem("media.music.play", r.name);
+        if (!can) ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (unused) ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.3f, 1.0f), "%s  [%s, unused?]", r.name, r.source);
+        else Text("%s  [%s]", r.name, r.source);
+    }
+    ImGui::TextWrapped("Play = SRMUSIC_LoadMusic 0x594320(0, name, fade, fade) as the unit start 0x5b2211 does; Stop = "
+                       "LoadMusic(slot, NULL, fade, 0) as the stop native 0x4aa490. DLC tracks of the port are "
+                       "converted with silent audio (tools/music_convert.py) - they play silence. Experimental.");
+}
+
+// 0.9 P0d: Saves page (file operations; restore / delete / import with a backup first and a CONFIRM button)
+void PageSaves() {
+    static bool scanned = false;
+    if (!scanned || TmButton("Refresh  [save.list]###svref")) { SaveScan(true); scanned = true; }
+    ImGui::SameLine();
+    if (TmButton("Back up all saves now  [save.backup]###svbak")) QueueItem("save.backup", "");
+    char key[200];
+    DWORD left = 0;
+    if (SaveArmed(key, sizeof(key), &left)) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.7f, 0.2f, 0.1f, 1.0f));
+        if (TmButton("CONFIRM  [run the armed action]###svconfirm")) {
+            char item[32] = "", *space = strchr(key, ' ');
+            if (space) {
+                size_t len = static_cast<size_t>(space - key);
+                if (len < sizeof(item)) { memcpy(item, key, len); item[len] = 0; }
+                QueueItem(item, space + 1);
+            }
+        }
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        if (TmButton("cancel###svcancel")) SaveDisarm();
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.4f, 1.0f), "armed: %s - %lu s left", key, (left + 999) / 1000);
+    }
+    EnterCriticalSection(&g_saveLock);
+    ImGui::TextWrapped("folder: %s (%s)", g_saveFolderU8[0] ? g_saveFolderU8 : "-", g_saveFolderHow);
+    ImGui::TextWrapped("backups / export / import: %s", g_saveRootU8);
+    // copy the rows: QueueItem below runs file actions that take the lock again
+    static SaveInfo rows[kSaveMax];
+    static SaveDir backups[kSaveBackupMax], imports[kSaveImportMax];
+    int count = g_saveCount < 0 ? 0 : g_saveCount, nb = g_saveBackupCount, ni = g_saveImportCount;
+    for (int i = 0; i < count; ++i) rows[i] = g_saves[i];
+    for (int i = 0; i < nb; ++i) backups[i] = g_saveBackups[i];
+    for (int i = 0; i < ni; ++i) imports[i] = g_saveImports[i];
+    LeaveCriticalSection(&g_saveLock);
+    Text("saves: %d", count);
+    for (int i = 0; i < count; ++i) {
+        const SaveInfo &s = rows[i];
+        char when[32], label[160];
+        FileTimeText(s.written, when, sizeof(when));
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "Export###svx_%s", s.utf8);
+        if (TmButton(label)) QueueItem("save.export", s.utf8);
+        ImGui::SameLine();
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "Delete###svd_%s", s.utf8);
+        if (TmButton(label)) QueueItem("save.delete", s.utf8);
+        ImGui::SameLine();
+        if (s.formatOk)
+            ImGui::TextWrapped("%s | %s | %llu B | unit %s | checkpoint %lu | CRC ok", s.utf8, when, s.size,
+                               s.unit[0] ? s.unit : "?", s.checkpoint);
+        else
+            ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "%s | %s | %s", s.utf8, when, s.problem);
+    }
+    ImGui::Separator();
+    Text("backups (newest first): %d", nb);
+    for (int i = 0; i < nb; ++i) {
+        char label[128];
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "Restore###svr_%s", backups[i].name);
+        if (TmButton(label)) QueueItem("save.restore", backups[i].name);
+        ImGui::SameLine();
+        Text("%s  (%d file(s))", backups[i].name, backups[i].files);
+    }
+    if (ni) {
+        ImGui::Separator();
+        Text("import folder: %d file(s)", ni);
+        for (int i = 0; i < ni; ++i) {
+            char label[128];
+            _snprintf_s(label, sizeof(label), _TRUNCATE, "Import###svi_%s", imports[i].name);
+            if (!imports[i].files) ImGui::BeginDisabled();
+            if (TmButton(label)) QueueItem("save.import", imports[i].name);
+            if (!imports[i].files) ImGui::EndDisabled();
+            ImGui::SameLine();
+            Text("%s  %s", imports[i].name, imports[i].files ? "(CRC ok)" : "(CRC / format NOT ok - refused)");
+        }
+    }
+    ImGui::TextWrapped("Delete / Restore / Import arm first: press the red CONFIRM button (or run the same command again) "
+                       "within 10 s. Each of them copies all saves into a new backup folder before it changes "
+                       "anything; nothing is deleted for good. Do not use while the game is saving. Restore copies the "
+                       "backup's files over the save folder; other saves stay. The game reads the save list when its "
+                       "load menu opens. No save field is changed by TruMenu (format: catalog 11.4).");
 }
 
 void DrawLogOverlay() {
@@ -7816,7 +13034,7 @@ void DrawMenu() {
             _snprintf_s(header, sizeof(header), _TRUNCATE, "TO TEST (%d open, %d ok, %d fail, %d skip)###totest", open04,
                         ok04, fail04, skip04);
             ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.55f, 0.35f, 0.05f, 1.0f));
-            bool show = ImGui::CollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen);
+            bool show = TmCollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen);
             ImGui::PopStyleColor();
             if (show) { PageTests(); testShown = true; }
         }
@@ -7834,31 +13052,33 @@ void DrawMenu() {
             char header[112];
             _snprintf_s(header, sizeof(header), _TRUNCATE, "Regression %s (%d open, %d ok, %d fail, %d skip)###regress",
                         g_regSel == 2 ? "DLC 1 + DLC 2" : g_regSel ? "DLC 2" : "DLC 1", ro, rk, rf, rs);
-            if (ImGui::CollapsingHeader(header)) PageRegress();
+            if (TmCollapsingHeader(header)) PageRegress();
         }
-        if (ImGui::CollapsingHeader("Quick access / Favourites", ImGuiTreeNodeFlags_DefaultOpen)) PageFavourites();
-        if (ImGui::CollapsingHeader("Status")) PageStatus();
-        if (ImGui::CollapsingHeader("Developer menu (original)")) PageDev();
-        if (ImGui::CollapsingHeader("Time / player / HUD")) PageTimePlayer();
-        if (ImGui::CollapsingHeader("Instances")) PageInstances();
-        if (ImGui::CollapsingHeader("Outfits (live switch)")) PageCostumeLive();
-        if (ImGui::CollapsingHeader("Debug / Log")) PageLog();
-        if (ImGui::CollapsingHeader("Media: videos")) PageMedia();
-        if (ImGui::CollapsingHeader("Settings")) PageSettings();
-        if (ImGui::CollapsingHeader("Overlay: Lara's position")) PageOverlay();
-        if (ImGui::CollapsingHeader("Free camera")) PageCamera();
-        if (ImGui::CollapsingHeader("Cheat / flight")) PageCheat();
-        if (ImGui::CollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
-        if (ImGui::CollapsingHeader("Markup / collision draw")) PageMarkup();
-        if (ImGui::CollapsingHeader("Level select")) PageLevel();
-        if (ImGui::CollapsingHeader("Outfits (next level load)")) PageOutfits();
-        if (ImGui::CollapsingHeader("Dev channel")) {
+        if (TmCollapsingHeader("Quick access / Favourites", ImGuiTreeNodeFlags_DefaultOpen)) PageFavourites();
+        if (TmCollapsingHeader("Status")) PageStatus();
+        if (TmCollapsingHeader("Developer menu (original)")) PageDev();
+        if (TmCollapsingHeader("Time / player / HUD")) PageTimePlayer();
+        if (TmCollapsingHeader("Instances")) PageInstances();
+        if (TmCollapsingHeader("Outfits (live switch)")) PageCostumeLive();
+        if (TmCollapsingHeader("Debug / Log")) PageLog();
+        if (TmCollapsingHeader("Media: videos")) PageMedia();
+        if (TmCollapsingHeader("Media: music (srmusic)###musicpage")) PageMusic();             // 0.9
+        if (TmCollapsingHeader("Saves (backup / restore / export / import)###savespage")) PageSaves();   // 0.9
+        if (TmCollapsingHeader("Settings")) PageSettings();
+        if (TmCollapsingHeader("Overlay: Lara's position")) PageOverlay();
+        if (TmCollapsingHeader("Free camera")) PageCamera();
+        if (TmCollapsingHeader("Cheat / flight")) PageCheat();
+        if (TmCollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
+        if (TmCollapsingHeader("Markup / collision draw")) PageMarkup();
+        if (TmCollapsingHeader("Level select")) PageLevel();
+        if (TmCollapsingHeader("Outfits (next level load)")) PageOutfits();
+        if (TmCollapsingHeader("Dev channel")) {
             ImGui::TextWrapped("tru.exe has no developer channel (TCP 9264 is FMOD's profiler).");
             Todo("re-enable the compiled-out log stub 0x6457a0 (filtered by channel id) and show it here.");
         }
         ImGui::Separator();
         Text("last action: %s", g_lastAction);
-        if (ImGui::Button("Close menu")) open = false;
+        if (TmButton("Close menu")) open = false;
     }
     InterlockedExchange(&g_testFocus, g_rowFocusAny ? 1 : 0);   // 0.8: X / Y to the focused TO TEST / Regression row
     ImGui::End();
@@ -7910,7 +13130,10 @@ void DrawGuardOverlay() {
 void Render(IDirect3DDevice9 *device) {
     // front end / loading: if the game has not polled the pad slot for 250 ms, read the pad here (toggle +
     // navigation) and run queued requests from this hook (the game's Present call)
-    bool padIdle = GetTickCount() - g_lastPadHookTick > 250;
+    // (0.8.1: the tick is read first and the difference taken signed - the game thread may store a newer tick between
+    // the two reads, and the unsigned wrap made "idle" true for one frame)
+    DWORD lastPoll = g_lastPadHookTick;
+    bool padIdle = static_cast<LONG>(GetTickCount() - lastPoll) > 250;
     XInputGetStateFn poll = g_selfPoll ? g_selfPoll : (padIdle ? RealXInput() : nullptr);
     if (poll) SelfPoll(poll);
     if (padIdle != g_padModeIdle) {
@@ -7920,11 +13143,33 @@ void Render(IDirect3DDevice9 *device) {
     if (padIdle && g_reqPending) RunPending();
     if (padIdle) WeaponsTick();
     KeyboardToggle();
+    RadialTick();                                // 0.10 radial menu: key / mouse hold, the open ring's input
     MouseTick();                                 // 0.7: hold / release the game's cursor calls with the menu
     PauseTick();                                 // 0.7.1 [Menu] PauseGame
     AutoStartTick();                             // 0.7.1 [Test] AutoStart
     CameraTick();                                // 0.8 [Log] CameraChanges (read-only, every 200 ms)
-    if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup) return;
+    ShortcutTick();                              // 0.8.1 regression shortcuts (one command per free request slot)
+    FlowTick();                                  // 0.11 Ablauf: events, deaths, the step's commands, auto checks
+    // 0.8.1: at every open / close ImGui's keys are released (a key that went down in the menu and up after the close
+    // - Enter of "level.load" closes the menu - stayed down for ImGui and repeated Enter in the bar at the next open:
+    // run 224047, 22:47:45-53, an empty line every 100 ms); the close writes the input summary
+    static bool wasOpen = false;
+    static bool clearKeys = false;
+    bool openNow = g_menuOpen != 0;
+    if (openNow != wasOpen) {
+        wasOpen = openNow;
+        clearKeys = true;
+        if (openNow) {
+            EnterCriticalSection(&g_edgeLock);
+            g_edgeCount = 0;                     // edges from before the open
+            LeaveCriticalSection(&g_edgeLock);
+            memset(g_trf, 0, sizeof(g_trf));
+        } else {
+            TraceSummary();
+        }
+    }
+    bool flowDraw = FlowWantsDraw();             // 0.11 status line / flow.say toast
+    if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_radOpen && !flowDraw) return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
         g_imguiReady = InitImGui(device);
@@ -7952,13 +13197,21 @@ void Render(IDirect3DDevice9 *device) {
         }
         back->Release();
     }
+    if (clearKeys) {
+        clearKeys = false;
+        io.ClearInputKeys();                     // keyboard + gamepad state and queued characters
+    }
+    TraceBegin();                                // 0.8.1 input trace: this frame's record + the edges so far
     FeedGamepad(io);
     ImGui::NewFrame();
     if (g_drawMarkup) DrawMarkup();
     if (g_overlay) DrawOverlay();
     if (g_logOverlay) DrawLogOverlay();
     if (g_guardOverlay) DrawGuardOverlay();
+    if (flowDraw) DrawFlowOverlay();             // 0.11
     if (g_menuOpen) DrawMenu();
+    if (g_menuOpen) TraceEnd();
+    if (g_radOpen && !g_menuOpen) DrawRadial();  // 0.10: foreground draw list, no ImGui window
     // 0.7.1: g_oskOpen is kept on close (owner decision 2026-11-02: the keyboard comes back with the menu when it was
     // open at the last close - in 0.7 only by chance, when Render returned before this line)
     if (!g_menuOpen) {
@@ -7982,7 +13235,9 @@ HRESULT STDMETHODCALLTYPE PresentHook(IDirect3DDevice9 *device, const RECT *sour
                                       const RGNDATA *dirty) {
     static bool seen = false;
     if (!seen) { seen = true; Log(1, "d3d9: first IDirect3DDevice9::Present call"); }
+    ShotBeforeRender(device);                // 0.10.5: hotkey + clean shots (the frame without TruMenu)
     Render(device);
+    ShotFrame(device, false);                // 0.10.5: shot.save ui / [Shot] Clean=0 (the frame as on screen)
     return g_presentOriginal(device, source, dest, window, dirty);
 }
 
@@ -7998,7 +13253,9 @@ HRESULT STDMETHODCALLTYPE SwapPresentHook(IDirect3DSwapChain9 *chain, const RECT
     if (!seen) { seen = true; Log(1, "d3d9: first IDirect3DSwapChain9::Present call"); }
     IDirect3DDevice9 *device = nullptr;
     if (SUCCEEDED(chain->GetDevice(&device)) && device) {
+        ShotBeforeRender(device);            // 0.10.5 as PresentHook
         Render(device);
+        ShotFrame(device, false);
         device->Release();
     }
     return g_swapPresentOriginal(chain, source, dest, window, dirty, flags);
@@ -8113,6 +13370,7 @@ DWORD WINAPI WorkerThread(LPVOID) {
         UnitTick();                                  // 0.7.1 [Log] UnitChanges (read-only)
         if (g_device) RegVersionsTick();             // 0.8: plugin versions + sha256 for the regression results (once)
         LogTailTick();
+        FlowTailTick();                              // 0.11 Ablauf: (re)load the flow file, tail the logs it names
         Sleep(g_device ? 250 : 50);
     }
     return 0;
@@ -8165,6 +13423,7 @@ void ReadOptions(const char *dir) {
     // 0.7.1
     g_blockGameInput = OptInt(ini, "Menu", "BlockGameInput");
     g_pauseGame = OptInt(ini, "Menu", "PauseGame");
+    g_pauseSound = g_pauseSoundIni = OptInt(ini, "Menu", "PauseSound") != 0 ? 1 : 0;      // 0.10.3
     g_unitChanges = OptInt(ini, "Log", "UnitChanges");
     OptString(ini, "Test", "AutoStart", g_autoStart, sizeof(g_autoStart));
     g_autoStartDelay = OptInt(ini, "Test", "AutoStartDelay");
@@ -8180,6 +13439,93 @@ void ReadOptions(const char *dir) {
     OptString(ini, "Cheats", "State", g_cheatState, sizeof(g_cheatState));
     InterlockedExchange(&g_cameraChanges, OptInt(ini, "Log", "CameraChanges") ? 1 : 0);
     OptString(ini, "Regress", "List", g_regressStart, sizeof(g_regressStart));
+    InterlockedExchange(&g_inputTrace, OptInt(ini, "Log", "InputTrace") ? 1 : 0);   // 0.8.1
+    g_musicInLevels = OptInt(ini, "Media", "MusicInLevels") != 0 ? 1 : 0;           // 0.9
+    g_musicFade = OptInt(ini, "Media", "MusicFade");
+    if (g_musicFade < 0 || g_musicFade > 300) g_musicFade = atoi(OptDefault("Media", "MusicFade"));
+    OptString(ini, "Saves", "Folder", g_saveFolderIni, sizeof(g_saveFolderIni));
+    // 0.10 [Radial]: HoldButtons / Key also as hex ("0x00C0", "0x78")
+    auto number = [&](const char *key) {
+        char v[32];
+        OptString(ini, "Radial", key, v, sizeof(v));
+        return static_cast<int>(strtoul(v, nullptr, 0));
+    };
+    auto real = [&](const char *key, float lo, float hi) {
+        char v[32];
+        OptString(ini, "Radial", key, v, sizeof(v));
+        float f = static_cast<float>(atof(v));
+        return f >= lo && f <= hi ? f : static_cast<float>(atof(OptDefault("Radial", key)));
+    };
+    g_radEnabled = number("Enabled") != 0 ? 1 : 0;
+    g_radHold = static_cast<WORD>(number("HoldButtons"));
+    g_radHoldMs = number("HoldMs");
+    if (g_radHoldMs < 100 || g_radHoldMs > 3000) g_radHoldMs = atoi(OptDefault("Radial", "HoldMs"));
+    g_radKey = number("Key") & 0xff;
+    g_radMouse = number("MouseButton");
+    if (g_radMouse != 3 && g_radMouse != 4 && g_radMouse != 5) g_radMouse = 0;
+    g_radRemember = number("RememberPosition") != 0 ? 1 : 0;
+    g_radPassLeft = number("PassLeftStick") != 0 ? 1 : 0;
+    g_radSlow = real("SlowMotion", 0.0f, 10.0f);
+    g_radDead = real("Deadzone", 0.2f, 0.95f);
+    g_radScale = real("Scale", 0.5f, 2.0f);
+    g_radSpawn = number("Spawn") != 0 ? 1 : 0;
+    {                                        // 0.10.1 Mode / Freeze / QuitSector / TestsLevel
+        char v[32];
+        OptString(ini, "Radial", "Mode", v, sizeof(v));
+        RadTrim(v);
+        g_radMode = !_stricmp(v, "wheel") ? kRadModeWheel : kRadModeMenu;   // anything else = the default menu
+        OptString(ini, "Radial", "Freeze", v, sizeof(v));
+        g_radFreeze = RadFreezeParse(v);
+        g_radQuitSector = number("QuitSector") != 0 ? 1 : 0;
+        g_radTests = number("TestsLevel") != 0 ? 1 : 0;
+        g_freezeSound = g_freezeSoundIni = number("FreezeSound") != 0 ? 1 : 0;      // 0.10.3
+        g_freezeClock = g_freezeClockIni = number("FreezeShaderClock") != 0 ? 1 : 0;   // 0.10.4
+    }
+    {                                        // 0.10.5 [Shot] (Hotkey also as hex, "0x7A")
+        auto shot = [&](const char *key) {
+            char v[32];
+            OptString(ini, "Shot", key, v, sizeof(v));
+            return static_cast<int>(strtoul(v, nullptr, 0));
+        };
+        g_shotEnabled = shot("Enabled") != 0 ? 1 : 0;
+        g_shotClean = shot("Clean") != 0 ? 1 : 0;
+        g_shotKey = shot("Hotkey") & 0xff;
+        g_shotMaxPerMin = shot("MaxPerMinute");
+        if (g_shotMaxPerMin < 0 || g_shotMaxPerMin > 120) g_shotMaxPerMin = atoi(OptDefault("Shot", "MaxPerMinute"));
+        char folder[MAX_PATH];
+        OptString(ini, "Shot", "Folder", folder, sizeof(folder));
+        ShotSetFolder(folder);
+    }
+    {                                        // 0.11 [Flow]
+        char v[MAX_PATH];
+        auto num = [&](const char *key, int lo, int hi) {
+            OptString(ini, "Flow", key, v, sizeof(v));
+            int x = static_cast<int>(strtol(v, nullptr, 0));
+            return x >= lo && x <= hi ? x : atoi(OptDefault("Flow", key));
+        };
+        g_flowEnabled = num("Enabled", 0, 1);
+        g_flowOverlay = num("Overlay", 0, 1);
+        g_flowLines = num("Lines", 1, 3);
+        g_flowAuto = num("AutoAdvance", 0, 1);
+        g_flowToastMs = num("ToastSeconds", 1, 30) * 1000;
+        g_flowPollMs = num("PollMs", 100, 5000);
+        OptString(ini, "Flow", "Size", v, sizeof(v));
+        float size = static_cast<float>(atof(v));
+        g_flowSize = size >= 0.5f && size <= 3.0f ? size : 1.0f;
+        OptString(ini, "Flow", "Position", v, sizeof(v));
+        RadTrim(v);
+        bool top = v[0] == 't' || v[0] == 'T', left = strchr(v, 'l') || strchr(v, 'L');
+        g_flowPos = (top ? 0 : 2) + (left ? 0 : 1);   // anything else = the default bottom right
+        if (!v[0]) g_flowPos = 3;
+        OptString(ini, "Flow", "File", g_flowFile, sizeof(g_flowFile));
+        RadTrim(g_flowFile);
+        if (!g_flowFile[0]) strncpy_s(g_flowFile, sizeof(g_flowFile), OptDefault("Flow", "File"), _TRUNCATE);
+        bool absolute = (g_flowFile[0] && g_flowFile[1] == ':') || g_flowFile[0] == '\\' || g_flowFile[0] == '/';
+        _snprintf_s(g_flowPath, sizeof(g_flowPath), _TRUNCATE, "%s%s", absolute ? "" : g_exeDir, g_flowFile);
+    }
+    // DirectInput code of the key (= scan code, extended keys + 0x80) - KbdReadHook keeps it from the game
+    UINT scan = g_radEnabled && g_radKey ? MapVirtualKeyA(static_cast<UINT>(g_radKey), 4 /* MAPVK_VK_TO_VSC_EX */) : 0;
+    g_radKeyDik = (scan & 0xff) | ((scan & 0xff00) == 0xe000 ? 0x80 : 0);
 }
 
 void Start(HMODULE self) {
@@ -8195,6 +13541,14 @@ void Start(HMODULE self) {
     ReadOptions(dir);
     Log(1, "%s loaded (enabled %d, toggle 0x%04x, key %d, block %d, scale %.2f, experimental %d)", kVersion, g_enabled,
         g_toggleButtons, g_toggleKey, g_blockInput, g_scale, g_experimental);
+    trushot::Crc32(0, nullptr, 0);           // 0.10.5: the CRC table once, before any shot worker runs
+    Log(1, "shot: [Shot] Enabled %d, Clean %d, Hotkey 0x%02x%s, MaxPerMinute %d, folder %s", g_shotEnabled, g_shotClean,
+        g_shotKey, g_shotKey ? " (= claude.mark now)" : " (off)", g_shotMaxPerMin, g_shotDir);
+    Log(1, "0.11 flow: [Flow] Enabled %d, file %s, overlay %d (corner %s, size %.2f, %d line(s)), auto advance %d, toast %d s, "
+        "poll %d ms%s", g_flowEnabled, g_flowPath, g_flowOverlay, kFlowCorners[g_flowPos], g_flowSize, g_flowLines, g_flowAuto,
+        g_flowToastMs / 1000, g_flowPollMs, g_flowEnabled ? " - the worker reads the file" : " - off");
+    if (g_shotKey && (g_shotKey == g_toggleKey || (g_radEnabled && g_shotKey == g_radKey)))
+        Log(0, "shot: [Shot] Hotkey 0x%02x is also [Menu] ToggleKey / [Radial] Key - both act on that key", g_shotKey);
     if (!g_enabled) { Log(1, "disabled by TruMenu.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     g_baseOk = base == kImageBase;
@@ -8216,8 +13570,19 @@ void Start(HMODULE self) {
     DWORD typeTable = 0;
     bool typeOk = HexBytesAt(kTypeLookup, "3935") && ReadDword(kTypeLookup + 2, &typeTable) &&
                   (typeTable == kTypeTableOrig || typeTable < kImageBase || typeTable >= 0x01000000);
+    // 0.10.4: the state save is the game's store or TruDlc2Player 0.5's [Costume] TuMapping detour there (jmp rel32 out
+    // of tru.exe + 8 nops; it still stores +0x20c, mapped 857 -> 11 as the TU's save)
+    DWORD saveJmp = 0;
+    bool saveOk = HexBytesAt(kSaveCostume, kSaveCostumeBytes);
+    if (!saveOk && HexBytesAt(kSaveCostume, "e9") && HexBytesAt(kSaveCostume + 5, "9090909090909090") &&
+        ReadDword(kSaveCostume + 1, &saveJmp)) {
+        DWORD to = kSaveCostume + 5 + saveJmp;
+        saveOk = to < kImageBase || to >= 0x01000000;
+        if (saveOk) Log(1, "costume: state save 0x%08lx is a detour to 0x%08lx (TruDlc2Player 0.5 TuMapping) - accepted",
+                        kSaveCostume, to);
+    }
     g_costumeOk = HexBytesAt(kLevelLoadChoice, kLevelLoadChoiceBytes) && HexBytesAt(kResetCostume, kResetCostumeBytes) &&
-                  HexBytesAt(kSaveCostume, kSaveCostumeBytes) && HexBytesAt(kNameLookup, kNameLookupBytes) &&
+                  saveOk && HexBytesAt(kNameLookup, kNameLookupBytes) &&
                   HexBytesAt(kCostumeValid, kCostumeValidBytes) && typeOk;
     g_unitOk = HexBytesAt(kUnitLookup, kUnitLookupBytes) && HexBytesAt(kDefaultCostume, kDefaultCostumeBytes);
     // 0.3: every address used by the new items, by an instruction of the game that uses it (README "0.3 facts")
@@ -8313,7 +13678,72 @@ void Start(HMODULE self) {
            "(dlc1 %d rows, dlc2 %d rows, page shows %s), results %s, session %s", g_camLogOk ? 1 : 0, g_cameraChanges,
         kCameraManager, g_asiDir, g_regCount[0], g_regCount[1], g_regSel == 2 ? "all" : kRegNames[g_regSel],
         g_regResultsPath, g_regSession);
+    {
+        int shortcuts = 0;
+        for (int l = 0; l < kRegLists; ++l)
+            for (int i = 0; i < g_regCount[l]; ++i) if (g_regShortcut[l][i][0]) ++shortcuts;
+        Log(1, "0.8.1: input trace %ld ([Log] InputTrace; lines at LogLevel 2, now %d), game.quit window %lu s + hold "
+               "1 s, request slot claimed once, regression shortcuts %d, player.unstuck ring %d spots",
+            g_inputTrace, g_logLevel, kQuitWindowMs / 1000, shortcuts, kSafeMax);
+    }
+    // 0.10.2: the game's cinematic test (read by the safe-ground sampler; same bytes as TruShadowPower's kCinematicHex)
+    g_cineOk = HexBytesAt(0x00453f00, "a1c0f1e700 85c0 7418 80b8dd00000000 740c 83782cff 7406 b801000000 c3 33c0 c3 32c0 c3");
+    if (!g_cineOk) Log(0, "0.10.2: cinematic test tru+0x53f00 does not match - the safe-ground sampler skips cinematics "
+                          "only by main state");
+    Log(1, "0.10.2: cheat.godfull = no-damage bit [0x%08lx] & 0x%05lx per frame (no flight; check %d), safe ground: "
+           "%d samples x %d frames, chord %.0f, slope %.1f + %.0f, cinematic test %d, marks keep the yaw",
+        kPlayerModeFlags, kNoDamageBit, g_godFullOk ? 1 : 0, kSafeWindow, kSafeEvery, kSafeChord, kSafeSlope, kSafeStep,
+        g_cineOk ? 1 : 0);
     DevRead();
+    // 0.9: music (engine srmusic, each address checked), media list, save folder (file system only)
+    g_musicOk = MusicCheck();
+    MediaLoad();
+    g_musicVarsOk = DevRowFor(0x00e7f098, 0x10000000) ? 1 : 0;
+    g_monsterVarsOk = DevRowFor(0x00e7f0a0, 0x01000000) ? 1 : 0;
+    EnterCriticalSection(&g_saveLock);
+    SaveFolderInit();
+    LeaveCriticalSection(&g_saveLock);
+    Log(1, "0.9 music %d (%s); MusicInLevels %d, fade %d frames; media list %s: %d rows; dev rows: music vars %d, "
+           "monster music vars %d", g_musicOk ? 1 : 0, g_musicCheck, g_musicInLevels, g_musicFade, g_mediaPath,
+        g_mediaCount, g_musicVarsOk, g_monsterVarsOk);
+    Log(1, "0.9 saves: folder %s (%s), backups %s", g_saveFolderU8[0] ? g_saveFolderU8 : "-", g_saveFolderHow,
+        g_saveRootU8);
+    // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
+    g_spawnOk = SpawnCheck();
+    _snprintf_s(g_radFilePath, sizeof(g_radFilePath), _TRUNCATE, "%sTruMenu.radial.txt", g_exeDir);
+    _snprintf_s(g_radTourPath, sizeof(g_radTourPath), _TRUNCATE, "%sTruMenu.tour.txt", g_exeDir);   // 0.10.1
+    if (g_radEnabled) {
+        EnterCriticalSection(&g_radLock);
+        RadialLoad();
+        LeaveCriticalSection(&g_radLock);
+    } else {
+        strncpy_s(g_radFileState, sizeof(g_radFileState), "not read ([Radial] Enabled=0)", _TRUNCATE);
+    }
+    Log(1, "0.10 radial: enabled %d, hold buttons 0x%04x %d ms (%s), key 0x%02x (DirectInput 0x%02lx, %s), mouse button %d, "
+           "remember %d, pass left stick %d, slow motion %.2f, deadzone %.2f, scale %.2f; spawn (R2) %s, [Radial] Spawn=%d",
+        g_radEnabled, g_radHold, g_radHoldMs,
+        g_radHold && g_radHold == g_toggleButtons ? "= the menu combo: short press = menu at the release" : "own combo",
+        g_radKey, g_radKeyDik, g_kbdOk ? "kept from the game" : "keyboard hook off - the game may see it", g_radMouse,
+        g_radRemember, g_radPassLeft, g_radSlow, g_radDead, g_radScale, g_spawnOk ? "code ok" : g_spawnWhy, g_radSpawn);
+    if (!g_spawnOk) Log(0, "0.10 instance.spawn disabled - %s", g_spawnWhy);
+    Log(1, "0.10.1 radial: mode %s (%s), freeze %s (read again at every open), quit sector %d (%s), tests level %d (tour "
+           "%s), pause code %s, control code %s", g_radMode == kRadModeMenu ? "menu" : "wheel",
+        g_radMode == kRadModeMenu ? "stays open, A confirms, B back, L3 + R3 / key again closes, pad + keys neutral"
+                                  : "0.10 hold and release",
+        g_radFreeze == kRadFreezeWorld ? "world" : g_radFreeze == kRadFreezePlayer ? "player" : "0", g_radQuitSector,
+        g_radQuitItem >= 0 ? "built in" : "not built in (Mode=wheel / QuitSector=0)", g_radTests, g_radTourState,
+        g_pauseOk ? "ok" : "NO", g_controlOk ? "ok" : "NO");
+    // 0.10.3 (F7): the pause menu's sound pause pair (only with the pause bit check: the want reads that bit)
+    g_soundOk = SoundCheck() && g_pauseOk && g_playerOk;
+    Log(1, "0.10.3 sound with the freeze: code %s (0x%08lx / 0x%08lx, flag 0x%08lx, pause menu calls), [Radial] "
+           "FreezeSound %d, [Menu] PauseSound %d (items time.freezesound / time.pausesound, state time.sound)",
+        g_soundOk ? "ok" : "NOT verified - off", kSoundPause, kSoundResume, kSoundPaused, g_freezeSound, g_pauseSound);
+    // 0.10.4 (F7, light shaft): the pause menu's shader clock hold (the want reads the pause bit as the sound's)
+    g_clockOk = ClockCheck() && g_pauseOk && g_playerOk;
+    Log(1, "0.10.4 shader clock with the freeze: code %s (hold 0x%08lx -> [0x%08lx], reader 0x005bf841, accumulator "
+           "RenderDevice +0xfa4c 0x00506fb8, TimeVector upload 0x005096c7, pause menu calls), [Radial] FreezeShaderClock "
+           "%d (item time.freezeclock, state time.clock)", g_clockOk ? "ok" : "NOT verified - off", kRenderHoldSet,
+        kRenderHold, g_freezeClock);
     g_logOverlay = g_logOverlayAtStart ? 1 : 0;
     g_logLines = g_logLinesAtStart;
     if (g_scriptLogAtStart && g_scriptOk && g_experimental) {   // at load no script runs yet: patch here
@@ -8354,6 +13784,14 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_testLock);
         InitializeCriticalSection(&g_cmdLock);
         InitializeCriticalSection(&g_mouseLock);
+        InitializeCriticalSection(&g_edgeLock);       // 0.8.1 input trace
+        InitializeCriticalSection(&g_safeLock);       // 0.8.1 player.unstuck
+        InitializeCriticalSection(&g_scLock);         // 0.8.1 regression shortcuts
+        InitializeCriticalSection(&g_saveLock);       // 0.9 Saves page
+        InitializeCriticalSection(&g_radLock);        // 0.10 radial menu
+        InitializeCriticalSection(&g_shotLock);       // 0.10.5 shots / Claude marks
+        InitializeCriticalSection(&g_flowLock);       // 0.11 Ablauf
+        InitializeCriticalSection(&g_flowEvLock);
         g_reqDone = CreateEventA(nullptr, TRUE, FALSE, nullptr);
         Start(instance);
     } else if (reason == DLL_PROCESS_DETACH) {
@@ -8374,3 +13812,12 @@ extern "C" __declspec(dllexport) const char *__cdecl TruMenuList() { return List
 extern "C" __declspec(dllexport) const char *__cdecl TruMenuInvoke(const char *id, const char *arg) {
     return InvokeItem(id, arg);
 }
+
+// 0.10.5: other plugins (TruShadowHud, TruTrace, ...) request a screenshot of the next frame. <name> as shot.save
+// (sanitised to A-Z a-z 0-9 _ - ., at most 40; NULL / "" = "-"), clean or not per [Shot] Clean; never waits (also safe
+// from the render thread). 1 = queued (the planned file name in a TruMenu.log line), 0 = refused (reason in the log).
+extern "C" __declspec(dllexport) int __cdecl TruMenuShot(const char *name) { return ShotExport(name); }
+
+// 0.10.5: a Claude mark as the ring level Claude / claude.mark <kind> (NULL / "" = now): the TruMenu.log line
+// "claude.mark <kind>: ... src=TruMenuMark" + a clean shot; never waits. 1 = marked, 0 = refused (MaxPerMinute).
+extern "C" __declspec(dllexport) int __cdecl TruMenuMark(const char *kind) { return MarkExport(kind); }

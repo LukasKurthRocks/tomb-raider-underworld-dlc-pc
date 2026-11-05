@@ -37,8 +37,16 @@ byte checks only - not yet run in the game (section "Mission start, outfit rule,
 (**Regression page** with the fixed DLC 1 / DLC 2 lists and `TruMenu.regress_results.txt`; **Cheats page** from the
 2007 prototype evaluation - god mode, one-hit kill, enemy health, infinite ammo, fill 'er up, cheat codes, each with
 its category and byte pre-check; **camera log** `[Log] CameraChanges`) built 2026-11-02 into `work\asi\menu080`,
-checked with `dumpbin` and offline byte checks only - not yet run in the game (section "Regression, Cheats, camera
-log (0.8)"). `camera.free` is still a todo (see "0.4 items").**
+checked with `dumpbin` and offline byte checks only - first live test 2026-11-02 22:15-22:26 (runs `221539`, `223338`,
+`224047`). 0.8.1 (fixes from that test: game.quit "Quit now" button, `[Log] InputTrace`, menu keys released at open /
+close, a queued item runs once, cheat.ammo reasons per weapon, `player.unstuck`, regression shortcuts) built
+2026-11-02 into `work\asi\menu081`, compiled (0 warnings in TruMenu.cpp) and offline checks only - not yet run in the
+game (section "Live-test fixes (0.8.1)"). 0.9 (Saves page, music) built 2026-11-02 into `work\asi\menu09` (section
+"Saves page and music (0.9)"; since 0.9 the DLL also imports `SHELL32.dll` for `SHGetFolderPathW`). 0.10 (**radial
+menu**: L3 + R3 held / F9 held = a ring of up to 8 entries from `TruMenu.radial.txt`, `[Radial]` keys; stage R2
+`instance.spawn <object>` behind `[Radial] Spawn=1`) built 2026-11-03 into `work\asi\menu010`, compiled (0 warnings in
+TruMenu.cpp), `dumpbin` and offline byte checks only - not yet run in the game (section "Radial menu (0.10)").
+`camera.free` is still a todo (see "0.4 items").**
 
 ## Controls
 
@@ -58,6 +66,8 @@ log (0.8)"). `camera.free` is still a todo (see "0.4 items").**
 | 0.7: mouse while the menu is open | belongs to the menu (`[Menu] FreeMouse`): ImGui draws a cursor, the game gets no mouse messages (no camera turn, no re-centring), its `SetCursorPos` / `ClipCursor` wait until the menu closes |
 | 0.7.1: keyboard while the menu is open | belongs to the menu (`[Menu] BlockGameInput`): the game's DirectInput keyboard reads no key events, no key message reaches the game - typing does not move Lara, Esc does not open the pause menu |
 | 0.7.1: **B, B** with the on-screen keyboard open | first B closes the keyboard, a second B right after it closes the menu |
+| 0.10: **L3 + R3 short** (< `[Radial] HoldMs`, menu closed) | opens the menu **at the release** (with `[Radial] Enabled=1` and HoldButtons = ToggleButtons); in the open menu L3 + R3 still closes at the press |
+| 0.10: **L3 + R3 held** (>= HoldMs, 500 ms) / **F9 held** / `[Radial] MouseButton` held | the **radial menu** (section "Radial menu (0.10)"): right stick / mouse picks, the release runs |
 
 While the menu is open the game gets a **neutral pad** (no buttons, sticks centred, triggers 0; the packet number is
 kept). After a toggle the pad stays neutral until both sticks are released, so the game never sees the L3 / R3 press
@@ -75,7 +85,7 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Page | Content | Items |
 |---|---|---|
 | TO TEST | 0.4, **first page, open, shown only while the list holds rows** (header "TO TEST (n open, n ok, n fail, n skip)"): one row per test - state, hint, id, note; on the selected row **A = OK, X = FAIL, Y = SKIP** (X / Y go to the row, not to ImGui, while a row has the focus), buttons OK / FAIL / SKIP and "Run <id>" when the id is a menu item (`id:arg` runs it with `arg`); "Remove the marked rows", "Remove all rows" (A twice). 0.5: **switches** (toggle rows, a checkbox each) on top, then **numbered steps** (NEXT marks the first open one; A = run its item + done) and checks in list order. Filled by the main session or `Invoke-TruTestRun.ps1` over TruLink; kept in `TruMenu.tests.txt` next to `tru.exe` (sections "TO TEST" below) | `test.add <id> <hint>`, `test.step <n> <id\|id:arg\|-> <text>`, `test.toggle <id> <item\|ini:Plugin:Section:Key> <text>`, `test.mark <id> ok\|fail\|skip\|open\|done\|on\|off [note]`, `test.list`, `test.export`, `test.del <id>`, `test.clear [done]` |
-| Regression | 0.8, under TO TEST, collapsed (header "Regression DLC 1 + DLC 2 (n open, n ok, n fail, n skip)"): selector **DLC 1 / DLC 2 / all**, the rows of `TruMenu.regress_dlc1.txt` / `_dlc2.txt` (next to the `.asi`, copied by `Set-TruMenu.ps1`); checks **A = OK, X = FAIL, Y = SKIP**, buttons OK / FAIL / SKIP / **Note** (puts `regress.note <list>:<id> ` into the command bar and opens the on-screen keyboard; Enter saves); steps: A = run its item + done; "Reload lists" (A twice). Every mark / note is appended to `TruMenu.regress_results.txt` (section "Regression, Cheats, camera log (0.8)") | `regress.list`, `regress.load dlc1\|dlc2\|all`, `regress.mark <dlc1:id\|dlc2:id\|id> ok\|fail\|skip\|open\|done [note]`, `regress.note <list:id> <text>`, `regress.export` |
+| Regression | 0.8, under TO TEST, collapsed (header "Regression DLC 1 + DLC 2 (n open, n ok, n fail, n skip)"): selector **DLC 1 / DLC 2 / all**, the rows of `TruMenu.regress_dlc1.txt` / `_dlc2.txt` (next to the `.asi`, copied by `Set-TruMenu.ps1`); checks **A = OK, X = FAIL, Y = SKIP**, buttons OK / FAIL / SKIP / **Note** (puts `regress.note <list>:<id> ` into the command bar and opens the on-screen keyboard; Enter saves); steps: A = run its item + done; "Reload lists" (A twice). Every mark / note is appended to `TruMenu.regress_results.txt` (section "Regression, Cheats, camera log (0.8)") | `regress.list`, `regress.load dlc1\|dlc2\|all`, `regress.mark <dlc1:id\|dlc2:id\|id> ok\|fail\|skip\|open\|done [note]`, `regress.note <list:id> <text>`, `regress.export`; 0.8.1: Quick prepare list + Prepare per row (column 9 shortcut), `regress.prepare <list:id>\|stop`, `regress.shortcuts` |
 | Cheats (2007 prototype evaluation) | 0.8: one row per cheat with its **category** (PC has it / re-attach / cheat-code path / rebuild from prototype); a failed byte pre-check greys the row and names the reason in red; in a level only; the "rebuild" rows are listed read-only as "not built yet" | `cheat.list`, `cheat.god [0/1]`, `cheat.godfull [0/1]`, `cheat.onehitkill [0/1]`, `cheat.enemyhealth [0/1]`, `cheat.ammo [0/1]`, `cheat.fillup`, `cheat.code <1\|2\|9\|10\|11>` |
 | Status | TruMenu version, `tru.exe` PE time stamp / image size, all code checks, whether a level is loaded; current unit + stream unit id; game state; costume line (current costume, game-data base, `+0x1f4`, chosen `+0x20c` / `+0x20e` / `+0x210`, unit default); player line (instance, object id / name, type record, object-table entry); our plugins (`TruShadowPower`, `TruDoppelganger`, `TruDlc2Player`, `TruRockVein`, `TruLink`: loaded? `<Name>Version()` string), ModLoader.asi, the pad chain (what the game calls, what PadHook calls, with module names), the `d3d9.dll` in use (game folder = TRAWindowed proxy, else system), device / window; 0.7.2: button **"Quit game (press twice)"** at the end (section "Mission start, outfit rule, game.quit (0.7.2)") | `status.version`, `status.hooks`, `status.unit`, `status.state`, `status.costume`, `status.player`, `status.plugins`, 0.7.2 `game.quit` |
 | Outfits (next level load) | the same costume facts, then one button per **player record of the game's type table** (index, name, object id; `[chosen]` / `[current]` marked), "Reset chosen costume", checkbox "reload the current unit after choosing" | `costume.records`, `costume.current`, `costume.choose <index\|name> [20c\|210]`, `costume.choosereload <index\|name>`, `costume.choosereset`; the 0.2 ids `costume.setreload` / `costume.reset` still work. **0.3 changed** `costume.list` (now the live cycle list; the 0.2 list = `costume.records`) and `costume.set` (now the live switch; the 0.2 meaning = `costume.choose`) |
@@ -85,7 +95,7 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Markup / collision draw | 0.3: experimental markup drawing (boxes / poly lines of the MarkupManager projected with the game's view matrix into ImGui's background draw list), "ledges only", projected-space size. `draw.debugflag` was **removed** (debugFlags2 0x100 is the TR7 / TRAE path, catalog section 7) | `draw.markup [0/1]`, `draw.ledges [0/1]`, `draw.scale <w> <h>` |
 | Quick access / Favourites | 0.3, **first page, open when the menu opens** (Status is now collapsed): one widget per favourite id (bool = checkbox, info = value, other = button that runs the item with its default argument); **Y** on an item pins / unpins it (on this page, in "Add an item" and on the Developer menu rows - other pages: use "Add an item" or TruLink); saved in `[Favorites] Ids`; default list (empty `Ids`): `player.invincible, player.health, time.scale, time.pause, level.reload, overlay.position, log.overlay, costume.next` (`camera.free` is skipped while it is a todo) | `fav.list`, `fav.add <id>`, `fav.del <id>` |
 | Developer menu (original) | 0.3: Crystal's own debug menu, read at load from the tables in `.data` and drawn row by row: page links switch pages, flags / bools as checkboxes, ints as sliders / inputs with the table's limits, actions as buttons; the table's callbacks / functions run on the game thread. Every row shows its static facts (who reads the target in retail, empty functions) in blue; "All pages" lists every page, also those the retail root no longer links | `dev.list`, `dev.<label slug>` (42 ids, list below) |
-| Time / player / HUD | 0.3: time scale slider, freeze world, hide HUD; player control, ragdoll death, mark / back to mark, camera fov; weapons / ammo / health (experimental, catalog section 17) | `time.scale <f>`, `time.pause [0/1]`, `ui.hide [0/1]`, `player.control [0/1]`, `player.die`, `player.teleport x y z`, `player.mark`, `player.recall`, `player.goto <inst>`, `camera.fov <rad>`, `player.health [n]`, `player.invincible [0/1]`, `weapon.list`, `weapon.give <name>`, `ammo.show`, `ammo.set <type> <n>`; 0.4 (TruLink / favourites, no own widgets on this page): `weapon.slots`, `weapon.has <name>`, `ammo.fill`, `gear.give <name>` |
+| Time / player / HUD | 0.3: time scale slider, freeze world, hide HUD; player control, ragdoll death, mark / back to mark, camera fov; weapons / ammo / health (experimental, catalog section 17) | `time.scale <f>`, `time.pause [0/1]`, `ui.hide [0/1]`, `player.control [0/1]`, `player.die`, `player.teleport x y z`, `player.mark`, `player.recall`, 0.8.1 `player.unstuck [mark\|safe]`, `player.goto <inst>`, `camera.fov <rad>`, `player.health [n]`, `player.invincible [0/1]`, `weapon.list`, `weapon.give <name>`, `ammo.show`, `ammo.set <type> <n>`; 0.4 (TruLink / favourites, no own widgets on this page): `weapon.slots`, `weapon.has <name>`, `ammo.fill`, `gear.give <name>` |
 | Instances | 0.3: the instance list (name filter, max 200 shown), per instance: Lara goes there, bring to Lara, unhide, remove; "Unhide all" | `instance.list [filter]`, `instance.info <inst>`, `instance.bring <inst>`, `instance.unhide <inst>`, `instance.unhideall`, `instance.remove <inst>` (`<inst>` = intro id, `0x<address>` or `#<index>`) |
 | Outfits (live switch) | 0.3: "Next outfit" and one button per id of the game's outfit cycle list; switches at once (needs a level) | `costume.list`, `costume.next`, `costume.set <name\|id>` |
 | Debug / Log | 0.3: the last lines of every `Tru*.log` next to the `.asi` / `tru.exe` (tailed once per second by the worker thread, shared read, only new bytes), the game's script prints (`log.script`), lines mentioning errors / exceptions in red, counters (exception lines, exceptions TruMenu caught in its own game calls); source filter buttons (TruLink.log holds the last TruLink commands); corner overlay bottom left. 0.4: repeated lines of a source collapse into one `text x42 (17:09:02-17:09:33)`, TruLink's read-type command lines are dropped, filter all / warnings + errors / errors (warnings yellow, errors red), at most `[Log] MaxLinesPerSecond` new lines per source and second (then one line "(n lines dropped ...)"), counters for all three | `log.page`, `log.show`, `log.script [0/1]`, `log.overlay [0/1]`, `log.lines <n>`, `log.filter <source\|all>`, `log.clear`; 0.4: `log.collapse [0/1]`, `log.hidereads [0/1]`, `log.level 0\|1\|2` (or `all` / `warn` / `error`), `log.rate <n>`; 0.7.2: `log.overlaysources <list\|*>`, `log.overlayexclude <list\|none>` (overlay only, section "Log overlay filter (0.7.2)") |
@@ -93,6 +103,7 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Media: videos | 0.3: `Movies\*.bik`, "Play" (main menu only), "as menu loop" | `media.video.list`, `media.video.play <name>`, `media.video.menuloop [name]` |
 | Level select | current unit name (GameTracker+0x38), one button per unit of `[Levels] List` (default `dlc_level1_start`, `dlc_level2_start`), "Reload current unit", 0.7.1: "Start DLC 1 / DLC 2 as the mission menu (intro)" (0.7.2: DLC 1 first; a grey line says why level.load / level.start are refused right now), then **all 111 playable units** in tree nodes per group (see below). Any other unit: `menu level.load <unit>` over TruLink | `level.current`, `level.list` (all units: `group: unit unit ...; ...`), `level.presets` (`[Levels] List`; was `level.list` in 0.1), `level.load <unit>`, `level.reload`, 0.7.1 `level.start [dlc2\|dlc1\|<unit>]` (game thread, main menu only; "Game input frozen (0.7.1)") |
 | Dev channel | there is no developer channel in `tru.exe` (TCP 9264 is FMOD's profiler). **TODO** re-enable the compiled-out log stub 0x6457a0 | `dev.log` (todo) |
+| Radial menu (0.10, no page: a ring over the game) | the entries of `TruMenu.radial.txt`; the Status page has a line `radial (0.10): ...`, the Settings page the `[Radial]` keys (section "Radial menu (0.10)") | `radial.status`, `radial.list`, `radial.reload`, `radial.open [path]`; stage R2 `instance.spawn <object>` (`[Radial] Spawn=1`) |
 | Command bar (0.6, own window under the menu) | one input line: `<id> [arg]`, `get <id>`, `list [filter]`, `help`; autocomplete, history, pad picker (section "Command bar (0.6)"); 0.7: on-screen keyboard under the bar (section "Controller and mouse (0.7)") | `cmd.focus`, `cmd.run <line>`, `cmd.history`; 0.7: `cmd.keyboard` |
 
 Items that need a level (camera, cheat) answer / show **"needs a level"** while no player instance exists
@@ -431,7 +442,10 @@ line. Still open: the live Xbox observation (Xenia checklist 12c).
 
 Status page, last button "Quit game (press twice)", and the item `game.quit` (command bar, favourites, TO TEST "Run").
 **Safety step:** the first run arms it (button turns red: "CONFIRM: quit the game now (n s)"), a second run 0.3 .. 5 s
-later quits. Then: `TruMenu.log` line `game.quit by the owner (TruMenu) - logs flushed next, then TerminateProcess(...)`,
+later quits. **0.8.1:** the countdown label broke the second press with pad / keyboard (see "Live-test fixes (0.8.1)");
+now a fixed "Quit game (press twice, or hold 1 s)" button, while armed a separate red **"Quit now"** button (the focus
+moves to it once the arming press is released) with "armed - n s left" beside it, a **10 s** window, and holding A /
+Enter / Space / the mouse **1 s** on either button quits as well (progress bar "hold 1 s to quit"). Then: `TruMenu.log` line `game.quit by the owner (TruMenu) - logs flushed next, then TerminateProcess(...)`,
 the TO TEST list and the command history are written once more, the CRT streams flushed and `TruMenu.log` committed
 (`FlushFileBuffers`), then `TerminateProcess(GetCurrentProcess(), 0x544D)` - runs on the render / bar thread, so it
 works while the game thread hangs (as long as the menu is still drawn); `TerminateProcess` instead of `ExitProcess` so
@@ -521,6 +535,748 @@ for the current camera object (manager+0x44 = 0xe80534), `camera: object 0x00e80
 the current fields and the change counters. Checks: 0x5f3e0c, 0x5f3d12, 0x5e7feb, 0x5e8041, 0x5e80b9, 0x5e80da,
 0x5e810b, 0x5f3cb0.
 
+## Live-test fixes (0.8.1)
+
+Spec: `docs\Plan-TruMenu-Medien.md` (workspace) P00c; evidence: `TruMenu.log` of the runs `20261102_221539`,
+`_223338`, `_224047` (`regress_shadowlara_50k`). No new engine address (`work\asi\menu081\precheck_081.txt` only
+re-reads the reload bytes behind the cheat.ammo finding, 2 checks ok).
+
+- **game.quit, second press lost** - cause: the armed label `CONFIRM: quit the game now (%lu s) ...##quit` changed
+  every second. In ImGui `##` only hides the rest of a label; the **id is the hash of the whole label**, so the button
+  got a new id each second. The pad / keyboard focus (`NavId`) then named a widget that no longer existed, and A /
+  Enter activated nothing; after 5 s the label was `Quit game (press twice)##quit` again - the first id, the focus
+  was alive again and that press **re-armed** (22:24:06 / :12 / :17 / :24, 5.2-7.3 s apart; with the command bar the
+  same item worked, 22:47:57 / 22:48:01). A mouse click only failed when a second boundary fell between press and
+  release. Not involved: `FirstPadPressOnlyFocuses` (command bar only), pad ownership (the bar did not have the
+  focus). Fix: fixed labels with `###` ids, a separate red "Quit now" button while armed, 10 s, hold 1 s (section
+  `game.quit` above). The same bug class was fixed on every label that changes with its state: `ConfirmButton` ("press
+  A again to confirm" - Reload lists, settings / favourites reset), item buttons with their value, TO TEST /
+  Regression rows ([OK] / [FAIL] / [DONE] / NEXT), the list selectors, live outfit / costume / instance buttons,
+  the flight button.
+- **Input trace** (`[Log] InputTrace=1`, lines at LogLevel 2; `log.inputtrace`): while the menu is open every pad
+  button edge (A B X Y LB RB L3 R3 Start View D-pad, down / up; source "XInput hook" = the game's poll through PadHook,
+  "Present fallback" = TruMenu's own read), every mouse button and every key message (no auto-repeat) is queued and
+  written one frame later as `input: pad0 A down (XInput hook) -> activated 'Quit now  [game.quit]' (0x...)` or
+  `-> not activated: <reason> (focus '<label>' 0x... in <window>)`. Reasons: no widget has the nav focus / the focused
+  widget was not drawn (id changed - the game.quit case) / disabled / pressed and released between two frames / not
+  the menu's pad / command bar or on-screen keyboard owns the pad (with what the bar did, e.g. "swallowed by
+  FirstPadPressOnlyFocuses") / X = fail, Y = skip on a row / menu combo. D-pad and arrow keys: `focus 'a' -> 'b'`.
+  Labels come from wrappers around Button / SmallButton / Checkbox / Selectable / CollapsingHeader (`TraceItem`);
+  other widgets show their id. At every close (also with InputTrace=0, LogLevel 1): `input while the menu was open:
+  n pad presses (A n: n activated, n not), n mouse clicks, n keys`.
+- **Stuck Enter in the command bar** (found in run 224047, 22:47:45-53: 70 runs of an empty line every 100 ms, plus
+  single letters "u", "i", "." while the owner typed): key messages reach ImGui only while the menu is open; the
+  Enter of `level.load ...` in the bar closed the menu before Enter went up, so ImGui kept Enter down and repeated it
+  at the next open. Fix: ImGui's keys are released (`io.ClearInputKeys`) at every open / close, and the bar runs a line
+  only on a fresh Enter (a repeat keeps the text and the focus).
+- **cheat.flight on and off within 16 ms** (22:19:54.690 / .706 after ONE "queued"): `RunPending` tested the request
+  flag outside its lock and not again inside, so a second caller that passed the test while the first one ran waited
+  for the lock and ran the same request again - with the button's "" (= flip) the flag flipped back. Which second
+  caller it was (another thread through PadHook, the Present fallback, or a re-entry through the pad poll - the lock
+  is recursive) is not visible in the 0.8.0 log. Fix: the request is claimed with one interlocked exchange (1 queued
+  -> 2 running), so it runs exactly once whatever calls it; the flight button sends the target state (1 / 0); the
+  "pad slot not polled" test is signed (a newer tick stored between two reads looked like 49 days).
+- **cheat.ammo "2 weapon(s), 0 bit(s) set"** (run 223338, hall02): not a failed write. The reload 0x69c600 queries
+  0x36 and skips the reserve when **T+0xa == 0xff or T+0x88 & 0x80** (bytes re-read: 0x69c61b..0x69c635). The two
+  slot weapons were most likely the pistol pair (left / right hand), whose ammo type is 0xff (unlimited already) - so
+  nothing had to be set. 0.8.1 names every slot weapon in the answer and the log: `slot 0 wp_pistol: T 0x... type -1
+  flags 0x.. -> ammo type 0xff = unlimited already` / `-> bit set` / `-> bit 0x80 set already` / `query 0x36 = 0 - no
+  weapon data`. Live: give a weapon with ammo (`weapon.give wp_shotgun`) and switch it on again.
+- **player.unstuck** (Lara slid into the eitr in hall02 with god mode): a ring of 16 "safe ground" spots - every
+  ~0.5 s (game thread, 15 game frames) with the menu closed, flight off, health > 0 and Lara's height changed less than
+  5 units over ~1 s, a spot at least 100 units from the newest one is kept (no proven on-ground flag yet - read from the
+  position). `player.unstuck` takes the newer of `player.mark` (same unit) and the newest spot that is >= 3 s old and
+  >= 150 units away from Lara; again within 20 s = one spot further back; `player.unstuck mark|safe` forces the source.
+  Button "Unstuck" on the Time / player / HUD page.
+- **Regression shortcuts**: optional 9th column `shortcut` in `tests\regress\*.txt` = `#title;cmd;cmd ...` (title
+  optional, at most 12 commands). Button **Prepare** on the row and a **Quick prepare** list at the top of the
+  Regression page (one button per distinct shortcut, tooltip = the commands, a status line and Stop while one runs);
+  `regress.prepare <list:id>|stop`, `regress.shortcuts`. The commands run one after the other through the command bar
+  path (source "shortcut", history + TruMenu.log line each) from the render thread: the next one when the game-thread
+  slot is free; after `level.*` it waits until no level change is pending, a player exists and (level.load) the unit
+  is the requested one for 2 s (timeout 120 s); an `err` answer stops it; `game.quit` is refused. Shipped shortcuts:
+  DLC 1 step3 (`level.load dlc_level1_start`), step5 (`cheat.god 0`), dlc1-treasure (`level.load dlc_treasureroom`);
+  DLC 2 step4 (`level.load dlc_level2_start`, rock channel ahead), health (`cheat.god 0`), step5 (`cheat.god 0;
+  time.scale 0.5`), new **step7 thrall fight** (`level.load dlc_yggdrasil_hall02;cheat.god 1`; the old step7 "Mark
+  the checks" is now step8). `tools/trumenu_ini_check.py` checks the column (known item ids, no game.quit, level.load
+  unit name, bool args 0 / 1).
+
+## Saves page and music (0.9)
+
+Spec: `docs\Plan-TruMenu-Medien.md` (workspace) P0d, P1-P3; facts with addresses and tools: workspace
+`docs\Menue-Funktionen-Katalog.md` sections 11.3 (music) and 11.4 (saves). Byte checks:
+`work\asi\menu09\precheck_09.txt` (19 checks, 0 mismatches). Nothing of this was run in the game yet.
+
+### Saves page (P0d)
+
+- **Folder** as `tru.exe` builds it (0x78B550): Documents (`CSIDL_PERSONAL`) + `\Eidos\Tomb Raider - Underworld\`,
+  files `<name>.TRUSave` (the game's own names, e.g. `Autosave.TRUSave`); `[Saves] Folder` overrides it. Backups,
+  export and import live in **`TruMenu.saves\`** next to tru.exe (never touched by `Set-TruMenu.ps1`).
+- **Format** (all proven, `tools/trusave_info.py`): `RGMH` rich saved game header (0x2028) + `PCUD` container (entry
+  table, three CRC-32/BZIP2 checks as the reader 0x6DBBA7 / 0x6DBC8D / 0x6DBCC6) + PNG thumbnail + one 0x140000-byte
+  data block; in the block only +0x10 (unit name) and +0x90 (checkpoint id) are proven. The list shows name, date,
+  size, unit, checkpoint and whether all CRCs match.
+- Items: `save.folder`, `save.list`, `save.backups` (info); `save.backup [label]` (all files ->
+  `TruMenu.saves\<yyyyMMdd_HHmmss>[_label]\`), `save.export <save>` (-> `TruMenu.saves\export\`, never overwrites);
+  **owner only, safety step** (the same command twice within 10 s; menu: a separate red `CONFIRM` button with a stable
+  id, `cancel`; refused over TruLink): `save.delete <save>` (full backup `<time>_deleted` first, then the file is
+  deleted from the save folder - the copy stays), `save.restore <backup>` (backup `<time>_before_restore` first, then
+  the backup's files are copied over; other saves stay), `save.import <name>` (`TruMenu.saves\import\<name>.TRUSave`,
+  CRCs must match; backup `<time>_before_import` first).
+- **No save field is written** (no unlocks / chapter / inventory / costume / end-game edits in 0.9): nothing beyond
+  +0x10 / +0x90 has a proven reader yet.
+
+### Music (P1-P3, Media: music page)
+
+- Engine path only (translate, don't imitate): `media.music.play <track> [slot]` = **`SRMUSIC_LoadMusic` 0x594320
+  `(slot, name, fade, fade)`** exactly as the game's unit start 0x5B2211 (slot 0, 60 frames); `media.music.stop
+  [slot|all]` = `LoadMusic(slot, NULL, fade, 0)` as the stop native 0x4AA490; `media.music.now` = the 8 slots at
+  0xCC5260 (+0 current, +0x100 requested, +0x51C loaded object) and the unit music name 0xD98F64. Game thread,
+  experimental, main menu (main state 10) always, a level only with `[Media] MusicInLevels=1`.
+- Track names only from **`TruMenu.media.txt`** next to the .asi, written by `tools/music_list.py --menu-out <build
+  folder>` and copied by `Set-TruMenu.ps1` (not in the repository). Without it nothing can be played. The list carries
+  the source (base / DLC1 / DLC2 / mods override) and `referenced` / `unused?` (today: none unused). DLC tracks of the
+  port are silent (converted with silent audio).
+- `dev.musicvars` / `dev.monstermusicvars` switch the developer flags 0xE7F098 & 0x10000000 / 0xE7F0A0 & 0x01000000,
+  only when the original developer table has that row (found at runtime). `media.video.flags` lists the videos with
+  source + flag.
+- `weapon.give` was already complete in 0.8.1 (item + "Give <name>" buttons on Time / player / HUD) - unchanged.
+
+### TO TEST 0.9 (owner, in this order)
+
+| # | Where | Step | Expected |
+|---|---|---|---|
+| 1 | load | Start the game with 0.9 | TruMenu.log: `TruMenu 0.9 (Saves page ...`, `0.9 music 1 (LoadMusic 0x594320 ok, ...)`, media list with 63 rows, `0.9 saves: folder ...\Eidos\Tomb Raider - Underworld\` |
+| 2 | main menu, Saves page | open the page | every save with date, unit (e.g. `dlc_caverns`), checkpoint, `CRC ok` |
+| 3 | Saves page | `Back up all saves now` | log `saves: backup <time>: n file(s) copied, 0 failed`; the folder appears under backups; files in `TruMenu.saves\<time>\` |
+| 4 | Saves page | `Export` on one save | file in `TruMenu.saves\export\`; a second export of the same save gets a time suffix |
+| 5 | Saves page | `Delete` on a test save, then wait 11 s | the first press only arms (red CONFIRM + seconds left); after 10 s the arm is gone, nothing deleted |
+| 6 | Saves page | `Delete` again, then `CONFIRM` | backup `<time>_deleted` holds ALL saves incl. the deleted one; the file is gone from the save folder; the game's load menu no longer lists it |
+| 7 | Saves page | `Restore` on that `_deleted` backup, `CONFIRM` | backup `<time>_before_restore` made first; the save is back, listed in the game's load menu and it loads |
+| 8 | TruLink | `menu save.delete <name>` | refused: `err save.delete only from the menu or the command bar (owner)` |
+| 9 | main menu, Music page | `Stop all slots`, then `Play` on `l2_waters_of_thailand` | note whether the title music stops; the track fades in (~2 s); `now:` shows slot 0 = the track, object loaded |
+| 10 | Music page | `Stop slot 0` | the track fades out (~2 s); `now:` slot 0 without object |
+| 11 | Music page | `Show Music Vars` on | is anything drawn in the main menu? (retail draw path unknown) - note it, switch off again |
+| 12 | Media: videos | `Play explode` (0.6 item, first live test) | the video plays, the menu comes back; `media.video.flags` lists 6 videos `referenced` |
+| 13 | level, only with `MusicInLevels=1` | play / stop once in `dlc_level1_start` | no crash, no stuck audio; the unit music comes back at the next unit change |
+
+## Radial menu (0.10)
+
+Spec: workspace `docs\Konzept-Bau-Rad.md` (stage R1; R2 behind a switch). The ring is only a faster way to run the
+existing items - every entry is an item id as typed into the command bar and runs through the same path
+(`InvokeCore`, game-thread items queued). Built 2026-11-03 into `work\asi\menu010`; compiled, `dumpbin` and offline
+checks only - **not yet seen in the game**.
+
+### Controls
+
+| Input | Effect |
+|---|---|
+| **L3 + R3 held** >= `HoldMs` (500 ms, menu closed) | the ring opens in **hold mode**: the **right stick** picks a sector live, **releasing** the buttons runs it and closes the ring; released with the stick in the **centre** = nothing (cancel); released on a **level** (`Cheats >`) = that level opens and the ring stays (**latched**) |
+| L3 + R3 short (< HoldMs) | TruMenu as before, but it opens at the **release** (owner decision: release variant). In the open menu L3 + R3 closes at the press as in 0.9 |
+| **F9 held** (`[Radial] Key`; Steam Controller back button -> F9 in Steam Input) | the ring at once (no HoldMs: F9 has no short meaning); the **mouse direction** (a white dot) or the right stick picks; releasing F9 runs |
+| `[Radial] MouseButton` held (3 middle, 4 / 5 side) | as F9 |
+| **A** (also left click) | run the pick and **stay open** (several steps in a row: hold, pick, A, A, A); on a level: open it |
+| **B** (also right click) | one level back (the pick = the folder you came from); at the top: close |
+| LB / RB | page back / on (a level with more than 8 entries) |
+| **R3 alone** (latched ring) | run the pick and close (pick with the right stick, then click it) |
+| L3 + R3 / F9 again (latched ring) | hold mode again: the release runs the pick (the stick must point at it) |
+
+- **Hold mode** picks live: back in the centre = no pick. **Latched** keeps the pick when the stick springs back (the
+  thumb goes to A). The release uses the pick of the frame before (the stick may spring back in the release poll).
+- **Remember** (`RememberPosition=1`): a close keeps level, page and pick; the next open shows them highlighted, but a
+  release without moving the stick still cancels (centre rule). Repeating an entry = A in the open ring. `0` = top.
+- The ring and TruMenu are never open together: opening the menu (F8 / TruLink) closes the ring.
+- **Pad while the ring is open:** the game gets a neutral pad (buttons, right stick, triggers), with `PassLeftStick=1`
+  the left stick still reaches it (Lara walks). After the close the pad stays neutral until every button is up (the
+  B / A / R3 of the close never reach the game). While L3 + R3 wait for HoldMs the game gets the same neutral pad.
+- **Keyboard:** `[Radial] Key` never reaches the game while the ring is enabled: `KbdReadHook` drops its DirectInput
+  events (DIK = `MapVirtualKey(VK, VSC_EX)`, F9 = 0x43; needs `[Menu] BlockGameInput=1`, which installs the hook) and
+  the window procedure drops its `WM_KEYDOWN` / `WM_KEYUP`; other keys pass (WASD walks). **F9 in the game:** tru.exe
+  holds no key-name strings at all (`tools/pe_find_str.py` / `pe_find_wstr.py`: no `F9`, `Escape`, `Backspace`,
+  `Keyboard`, ASCII or UTF-16) - the PC bindings come from the game data, not read; if the owner has F9 bound in the
+  game, set another `Key`.
+- **Mouse:** with `[Menu] FreeMouse=1` the ring holds the mouse like the menu (no camera turn, the game's
+  `SetCursorPos` / `ClipCursor` held, cursor restored at the close); the middle / side button of `MouseButton` never
+  reaches the game.
+- `SlowMotion` > 0: `time.scale` = that value while the ring is open; at the close the old value comes back unless
+  an entry changed it meanwhile.
+- Not built (concept options): a "recently used" sector, "Y = add to the ring" in the menu, the input trace for the
+  ring (`[Log] InputTrace` records while the menu is open only - test 102 checks the neutral pad by sight).
+
+### `TruMenu.radial.txt` (next to tru.exe)
+
+```text
+# TruMenu radial menu ...                      first line = marker (Set-TruMenu.ps1: ours)
+path | label | item id [argument]
+Cheats | Gott-Modus | cheat.god
+Objekte/Kisten | Kiste A | instance.spawn sh_ei_combat_crate_a       "/" = a level below
+```
+
+- A level holds the folders of its sub-paths (`Cheats >`, in the order of their first line) and its entries in file
+  order; 8 sectors per page. Limits: 256 entries incl. folders, 48 levels, 64 per level.
+- **Bool items without an argument** (`cheat.god`, `time.pause`, `player.invincible`) show **on / off** in the sector
+  and run with the other state (`cheat.god 1` / `0` - never "" = flip, the 0.8.1 lesson).
+- **Greyed out** with the reason (in the centre when picked, "not available - ..." when run): an unknown id (logged at
+  load: `radial: line 31: unknown item 'x' - entry greyed out`), a failed byte pre-check of the item (the Cheats page
+  reasons, weapon / ammo / health / time checks, `instance.spawn`), `[Cheats] Enabled=0`, `[Cheat] Experimental=0` for
+  game-thread items, `[Radial] Spawn=0`, and "needs a level" for `cheat.*`, `player.*`, `weapon.give`, `ammo.*`,
+  `gear.*`, `instance.spawn` / `bring` / `remove` / `unhide`, `camera.mode` / `restore` / `fov`, `costume.next` / `set`.
+- **Never offered** (dropped at load with a log line; `RadialRun` refuses them again): `game.quit` (owner rule:
+  button-only), `cmd.run`, `save.delete`, `save.restore`, `save.import`, `settings.reset`.
+- Every run logs `radial: <path> -> <item> [arg]: <answer>` (LogLevel 1). Queued items show their answer as "last
+  action" under the ring.
+- Shipped default (`src\asi\TruMenu\TruMenu.radial.txt`, German labels without umlauts - the menu font has none):
+  top = Cheats, Marken, Zeit, Waffen, Spieler, Objekte.
+
+| Level | Entries (item) |
+|---|---|
+| Cheats | Gott-Modus `cheat.god`, Gott-Modus voll `cheat.godfull`, Ein Treffer toetet `cheat.onehitkill`, Gegner-Leben zeigen `cheat.enemyhealth`, Munition endlos `cheat.ammo`, Alles auffuellen `cheat.fillup` |
+| Marken | Marke setzen `player.mark`, Zur Marke `player.recall`, Befreien (Marke) `player.unstuck mark` |
+| Zeit | Normal 1.0 / Zeitlupe 0.5 / 0.25 `time.scale 1 / 0.5 / 0.25`, Welt einfrieren `time.pause` |
+| Waffen | `weapon.give wp_shotgun`, `wp_uzi`, `wp_dlc_gold_shotgun`, `wp_assault_rifle`, `wp_tranq`; Munition voll `ammo.fill` |
+| Spieler | Befreien `player.unstuck`, Volle Gesundheit `player.health` ("" = MaxHealth), Unverwundbar `player.invincible` |
+| Objekte (R2) | `instance.spawn g_healthpack`, `sh_ei_combat_crate_a`, `_b`, `_c`, `wp_shotgun` (greyed while `Spawn=0`) |
+
+- `Set-TruMenu.ps1 -Install` copies the file next to tru.exe (from the build folder, else `src\asi\TruMenu`; ours =
+  first line `# TruMenu radial menu`), `-Remove` deletes only ours; `Build-TruAsi.ps1` puts it into the build folder.
+  `../bin/pyt -t 60 tools/trumenu_ini_check.py` checks it (ASCII, three fields, known ids, the forbidden list equal to
+  `kRadForbidden`, bool args 0 / 1, one name for `instance.spawn` / `weapon.give` / `level.load`, the limits).
+
+### Items (TruLink / command bar)
+
+| Item | Meaning |
+|---|---|
+| `radial.status` | the `[Radial]` options, file state (entries / levels / dropped / unknown / skipped), ring state (closed / hold / latched, by pad / key / mouse / radial.open, level, page), entries run, spawn check; also the Status page line `radial (0.10): ...` (0.10.1: `radial (0.10.1)`, plus mode / freeze / quit sector / tests level / tour) and `status.hooks` `radial=...` |
+| `radial.list` | every entry `path \| label \| item [arg]` with `= greyed: <reason>` |
+| `radial.reload` | read the file again (ring closed) |
+| `radial.open [path]` | open the ring latched at that level (test without the pad; B at the top closes) |
+
+### Stage R2: `instance.spawn <object>` (`[Radial] Spawn=1`)
+
+The catalog row "Spawn object at Lara" (workspace `docs\Menue-Funktionen-Katalog.md` section 6), every address re-read
+on the Steam exe with `tools/pe_dis.py`, `pe_callers.py`, `pe_cstr.py` and the new `tools/pe_find_bytes.py`;
+`work\asi\menu010\precheck_010.txt` = 20 checks, `tools/pe_bytes_check.py --file`: **0 mismatches** (2026-11-03). The
+same bytes are checked at load (`SpawnCheck`); a mismatch disables the item with the reason (log line
+`0.10 instance.spawn disabled - ...`).
+
+| Step | Function (cdecl) | Fact / check |
+|---|---|---|
+| DRM present | `0x5bf7b0(name)` -> bool | the game's own composition of the catalog step: `LOAD_UnitFileName 0x477970(buf[0x100], name)` (`sprintf("%s%s.drm" 0x8443bc, prefix 0xa03824, name)` - on PC two arguments, `.drm` is in the format) + `GetFS 0x472b50` (`[0x9ce278]`) -> vtable +8 (FileExists); used by the costume validator (tail call 0x5c54f8) and the level load (0x5de368) |
+| object id | `OBTABLE_GetObjectID 0x5bf770` != 0 | 0.2 check (TruMenu's `ObjectId` reads the same table) |
+| tracker | `STREAM_GetObjectTrackerByName 0x5c17d0(name)` | id -> `0x5c1550(id, 0)`: finds or requests the entry of table 0xdb7400 (0xcc entries of 0x24: +8 Object*, +0xc s16 id, +0xe u16 status; a new entry gets status 1 at 0x5c1670). No free entry = `"Out of objecttracker space!"` (0x854154 through 0x596cb0) - so TruMenu refuses with fewer than 2 free entries |
+| load | `STREAM_PollLoadQueue 0x5c1da0()` until status 2 | 1 while busy (0x5c1dc3 / 0x5c1ddb); status 2 = loaded is the game's own test (0x5bf2e0 `cmp word [eax+0xe], 2` in the loaded-object lookup); the costume switch 0x6f0bc5 polls the same way after 0x5c17d0. TruMenu: at most 3000 ms, `Sleep(1)` between polls - the game thread blocks (a stutter) |
+| birth | `INSTANCE_BirthObjectNoParent 0x5bd0f0(unit, &pos, &rot, NULL, object, 0, 1)` | 7 arguments: the script native at 0x780aaf passes `(unit, &pos, &rot, x, object, 0, 1)`, `add esp, 0x1c`; pos / rot are copied at once (0x5bd180, 16 bytes each into +0x20 / +0x30); returns the instance (0 = refused). unit = StreamUnitID `[0xe7f148]` (GameTracker+0xc0, compared with the player's +0xe0 by the game loop 0x5dfc88; both are logged) |
+
+Gates: `Spawn=1`, `[Cheat] Experimental=1`, main state 1 with a player, no level change pending, name `a-z 0-9 _`.
+Everything runs on the game thread (queued) inside `__try`; the answer / `TruMenu.log`: `instance.spawn: g_healthpack
+(id 55) born at Lara (x y z): instance 0x...; tracker 0x... was in the table / requested now, n polls / m ms; stream
+unit u (player +0xe0 = v)`. **Lara's position exactly** (as the catalog) - a crate appears inside Lara; placing in
+front of her is stage R3.
+
+**Spawn candidates** (harmless pickups / crates / a weapon object; 2026-11-03):
+
+| Object | id (merged list) | DRM (`tools/archive_has.py`) | Units that load it (`tools/objlist_users.py`, merged `objlist.dat`) | Note |
+|---|---|---|---|---|
+| `g_healthpack` | 55 | xbase, xbase2, **pcbig** | 115 units incl. `dlc_level2_start`, `dlc_yggdrasil_hall01` / `hall02`, every `dlc2_*` unit | already loaded in DLC 2: no load, tests the birth only - first test |
+| `sh_ei_combat_crate_a` | 296 | xbase, **pcbig** | l1 / l6 ship units only | loaded on demand (tests the tracker + load queue) |
+| `sh_ei_combat_crate_b` | 297 | xbase, **pcbig** | l1 / l6 ship units only | as a |
+| `sh_ei_combat_crate_c` | 306 | xbase, **pcbig** | l1 / l6 ship units only | as a |
+| `wp_shotgun` | 40 | xbase2, **pcbig** | l3 units, the DLC 1 units, `container_all_weapons` | a weapon object without an owner - test last |
+
+Not taken: `sh_ei_combat_crate_d` (same kind), `sh_ei_exploading_barrel` (explodes), `wp_dlc_gold_shotgun` /
+`dlc1_health_pack` (only in the port's mods, pack10). **Open (before more objects):** whether born instances are
+written into saves (back up the saves first - Saves page), how objects without their unit scripts behave, whether a
+crate keeps physics without its unit.
+
+### Owner questions of the concept, answered by defaults (all configurable)
+
+| Question (concept section 8) | Default in 0.10 |
+|---|---|
+| objects first | R2 candidates above (health pack, three crates, the shotgun object); enemies / traps not offered |
+| slow motion at the open | off (`SlowMotion=0`) |
+| Lara walks while the ring is open | yes (`PassLeftStick=1`) |
+| release variant (menu opens up to 0.5 s later) | yes (`HoldMs=500`); `[Radial] Enabled=0` = the 0.9 press variant |
+| R1 now, R2 later | both built, R2 off (`Spawn=0`) |
+
+## Radial menu (0.10.1)
+
+Owner wish 2026-11-03: the ring should work like a menu, not like a hold-and-release weapon wheel (workspace
+`docs\Konzept-Bau-Rad.md` section 10 "Bedienung v2"), plus a "Tests" level. Built into `work\asi\menu0101`; compiled
+(0 warnings in TruMenu.cpp), `dumpbin` and offline checks only - **not yet seen in the game**. `[Radial] Mode=wheel`
+keeps the 0.10 ring above unchanged (no Freeze, no built-in sectors).
+
+### `[Radial] Mode=menu` (default)
+
+| Input (ring open) | Effect |
+|---|---|
+| **L3 + R3 held** >= HoldMs / **F9 tapped** / `MouseButton` tapped / `radial.open` | the ring opens and **stays open** after the release; nothing runs on a release |
+| **left stick**, right stick, mouse direction | move the pick (the stronger stick wins; the pick stays when the stick springs back; the mouse picks only while it moves) |
+| **D-pad left / right**, arrow keys left / right | the previous / next sector of the page |
+| **A** / Enter / left click | runs the pick or opens its level (`Cheats >`); the ring stays open |
+| **B** / Backspace / Esc / right click | one level back (the folder you came from is picked); at the top: close |
+| LB / RB | page back / on (a level with more than 8 entries) |
+| **L3 + R3 again** / F9 again / `MouseButton` again | close (level, page and pick are kept with `RememberPosition=1`) |
+
+- The game gets the **whole pad neutral** while the ring is open (`PassLeftStick` applies to `Mode=wheel` only) and,
+  with `[Menu] BlockGameInput=1`, **no keys** (DirectInput events and key messages held as for the menu; a key that
+  went down meanwhile stays away from the game until it is released). After the close the pad stays neutral until every
+  button is up. L3 + R3 short (< HoldMs) still opens TruMenu at the release.
+- A **level.\*** entry (file, tour, a TO TEST row's Run) and "Prepare" **close the ring** after they ran: whether a
+  level change goes on while the time.pause bit is set is not proven, the freeze must end (see below).
+
+### `[Radial] Freeze` (Mode=menu; read again at every open - the TO TEST switch `radial-freeze` works at once)
+
+- `world` (or `1`, default): at the open in a level the **time.pause bit** (streamFlags 0xe7f0b8 bit 0x1000, the 0.3 code
+  check `g_pauseOk`, the same as `[Menu] PauseGame`) is set; at the close it is cleared **only if the ring set it** and
+  nobody ran `time.pause` meanwhile - `time.pause` run from the ring (Zeit -> Welt einfrieren) clears the ring's claim,
+  the user's choice stays. A pause from before the ring stays. The game's own pause menu (gameMode 6, 0x5d479b /
+  0x5d4810) clears the bit when it opens - then nothing is restored.
+- `player` (or `2`): `player.control 0` at the open (the 0.3 byte 0x8ab4e6, `[Cheat] Experimental=1`), the value from
+  before back at the close unless `player.control` ran meanwhile or something else changed the byte; the pad is
+  neutral anyway.
+- `0`: nothing. Outside a level nothing is frozen. Log lines (LogLevel 2): `radial: freeze world - time.pause bit set by
+  the ring ...`, `radial: freeze world released (time.pause bit cleared)`.
+
+**Queued items while the world is frozen (static, `tools/pe_dis.py` / `pe_callers.py` / `pe_abs_uses.py`; pinned in
+`work\asi\menu0101\precheck_0101.txt`, 17 checks, 0 mismatches):** the main loop 0x5e0190 calls the state dispatcher
+0x5e0090 and then `STREAM_PollLoadQueue` 0x5c1da0 every iteration (0x5e01ab). State 1 (in a level, 0x5dffe0) first
+calls the input update **0x483810** (no streamFlags test: only `[0xa02b78] && ![0xa02b79]`), which runs 0x483520 per
+input manager -> its device object's slot 2 0x483db0 -> the pad object (`[obj+0x2c]`, constructor 0x484520, vtable
+0x844dcc, stored at 0x486268) slot 2 0x484b70 -> `call [0xa02b8c]` = **PadHook**, where `RunPending` runs the queued
+item - all **before** `GAMELOOP_Process` 0x5dfbe0, which holds every 0x1000 test (0x5dfc2c, 0x5dfcad, 0x5dfd89,
+0x5dfdcd, 0x5dfe36, 0x5dfeb2, 0x5dff2c). So the queue does **not** stall: `instance.spawn` (its own poll loop on
+0x5c1da0, which the main loop also calls unpaused, then the birth) and the other game-thread items run while frozen;
+a born instance is not processed until the close (the instance loop 0x5bbe70 sits in the skipped 0x5dfeb2 block). Not
+traced: that the manager's device object `[0xa02b68 + 8]` is the object at `[0xa02b9c]` that holds the pad (same
+layout, +0x24 keyboard / +0x2c pad); the existing safety net covers it anyway - when PadHook is not called for 250 ms
+the Present hook runs `RunPending` itself. What **does** wait: PadHook's per-game-frame ticks (FlightTick, WeaponsTick
+- the weapon re-post after a costume switch -, InvincibleTick, CheatsTick - the cheat.ammo re-apply -, SafeGroundTick)
+run when the game clock GameTracker+0xd4 (`kGameClock`, 0xe7f15c) changes, and 0x5dfc2c advances it only without the
+pause bit - they go on at the close. No temporary unpause was built.
+
+### Built-in sector "Spiel beenden" (`[Radial] QuitSector=1`, Mode=menu)
+
+The last sector of the **top level only** - not from `TruMenu.radial.txt` (the file check still rejects `game.quit`,
+`RadialLoad` still drops it). Same safety as the Status page button of 0.8.1: the first **A** (Enter / left click)
+**arms** it (the sector turns red, label `A nochmal = beenden (n s)`, a 10 s window); a **second A** >= 0.3 s later or
+**A held 1 s** runs the same path as `game.quit` (`QuitNow`: `game.quit by the owner (TruMenu) - logs flushed next,
+then TerminateProcess(...)`, TO TEST list / history written, logs flushed, exit code 0x544D). **Pointing away**, a page
+change, **B** and **closing** disarm (`game.quit (radial sector): disarmed - <why>`); 10 s without a second press as
+well. The ring has no ImGui widgets, so the 0.8.1 id lesson is kept the other way round: the arm belongs to the
+sector's item index, the label only shows the seconds. Its own arm time (the Status button's arm is separate). Only
+`RadialTick` reaches it, from real pad / keyboard / mouse edges: no item, no TruLink command (`radial.open` only opens),
+no TO TEST toggle, no favourite, no list, no shortcut. Log lines: `game.quit armed by the owner (radial sector 'Spiel
+beenden', pad A) - ...`, `game.quit (radial sector): confirmed by the owner (pad A, second press after n ms)` or
+`... held 1 s by the owner`, `... second press too fast (n ms) - still armed`.
+
+The top level of the shipped file: Cheats, Marken, Zeit, Waffen, Spieler, Objekte + **Tests** + **Spiel beenden** = 8
+sectors (more than 8 = pages; `trumenu_ini_check.py` counts them).
+
+### Built-in level "Tests" (`[Radial] TestsLevel=1`, Mode=menu; owner request 2026-11-03)
+
+No second copy of a list: the levels below Tests are made **every frame** from the lists the pages show (`g_tests` of
+`TruMenu.tests.txt`, `g_reg` / column 9 of `TruMenu.regress_dlc1/2.txt`, under `g_testLock`) into one reserved level
+slot; every action calls the page's own function, so log lines and result files are the same as on the pages.
+
+| Level (label with counts) | Entries | A on an entry |
+|---|---|---|
+| `TO TEST n/m offen` | the **open** rows (steps not done, checks open; toggles are in Schalter), list order; steps `S<n> <text>`, checks their id | opens the row: **Run `<item>`** (only when the step's target / the check's id is a usable item and not one of `kRadForbidden` - never `game.quit`), **OK / Fail / Skip** (checks) or **Done** (steps), **Hint** (the hint under the ring; the centre shows it for every entry of the row). OK / Fail / Skip / Done = `TestMarkFromMenu` (`tests: test.mark <id> <state>`, `TruMenu.tests.txt` written) and back to the list |
+| `Regression n/m offen` -> `DLC 1` / `DLC 2` / `Alle` `n/m offen` | every row with its state (`[ok]`, `[FAIL]`, `[skip]`, `[done]`) | the row: Run (steps with a target), OK / Fail / Skip (checks) or Done / `Wieder offen` (steps), **Prepare** (rows with a shortcut), Hint - `RegMarkFromMenu` (`TruMenu.regress_results.txt` as the page) |
+| `Prepare (n)` | one entry per distinct regression shortcut (as the page's "Quick prepare"), `Stop` while one runs | `RunRegressPrepare` + `SetLastAction` (the page's Prepare button); the ring closes (its first command is a level change) |
+| `Schalter n/m an` | the TO TEST **toggles** of the loaded list (e.g. `radial-spawn`, `radial-freeze`) with on / off | `TestMarkFromMenu(id, on / off)` - the page's checkbox (INI written at once / item run with 1 / 0) |
+| `Rundgang` | `TruMenu.tour.txt` next to tru.exe, a level per section of the shader tour (Start, hall02, Yggdrasil-Ende, Maschinenraum, Halle Maschine-Zeremonie, Zeremonienraum, Halle Zeremonie-Goo, Goo-Raum, Nur in Zwischensequenzen, DLC 1) and of the hidden-content tour (Versteckt: golden shotgun, `container1`, extended ending) - 11 levels, 2 pages (0.10.2: the DLC 2 rooms below `Rundgang/DLC 2`, section "TruMenu 0.10.2") | the stop's command: `player.goto <intro id>`, `level.start dlc2 / dlc1`; a stop that needs a unit has a `Laden <unit>` entry (`level.load`) in front of it (once per unit); a stop without a command (cutscene, "RB halten") runs `status.unit`. Labels `NN <title>`, `(?)` = place unverified in the doc (04, 06, 17, 23) |
+
+- `TruMenu.tour.txt` (38 entries: 28 stops + 10 `Laden`; 2026-11-03 afternoon: + level `Versteckt` - `Laden
+  dlc_dungeon`, `26 Goldene Schrotflinte` = `player.goto 9475` (the `ma_rw_treasure` pickup), `27 container1: Test-Einheit
+  (Saves sichern!)` = `level.load container1`, `28 Erweitertes Ende (Saves sichern!)` = `level.load l7_himalaya_end`) is
+  written by `../bin/pyt -t 60 tools/tour_from_rundgang.py <workspace>\docs\Shader-Rundgang.md
+  <workspace>\docs\Versteckte-Inhalte-Rundgang.md src\asi\TruMenu\TruMenu.tour.txt` (read-only on the docs, several
+  docs in order; a stop whose only command is a `level.load` is that entry itself; `Laden` once per unit and section;
+  first line `# TruMenu tour`) - also into the build folder `work\asi\menu0101` (data only, no rebuild; Set-TruMenu.ps1
+  installs it from there); the radial file format and rules (forbidden ids dropped, unknown ids greyed), log `radial: tour n entries
+  from ...TruMenu.tour.txt (0 dropped, 0 unknown, 0 lines skipped)`. `Build-TruAsi.ps1` puts it into the build
+  folder, `Set-TruMenu.ps1 -Install` copies it next to tru.exe (ours = the marker line), `-Remove` deletes only ours.
+  `trumenu_ini_check.py` checks it like the radial file.
+- B on a row -> its list (the row picked), on a list -> the level above, on the first level -> Tests. A row that vanished
+  (test.clear, regress.load) -> its list. With RememberPosition the ring reopens on the same virtual level, made anew.
+- 0.10.1 also raises the TO TEST / regression list limit `kTestMax` from 64 to 128 rows: `Invoke-TruTestRun.ps1`
+  sends the profile rows one by one and the 0.10 profile `regress_shadowlara_50l_radial` has 77 (rows 65 - 77 got
+  "list full" with the 0.10 build), `_radial2` has 98 (94 + the two TruShadowCombat 0.4.1 switch steps / checks),
+  `_50n_radial2` 62, `_50l_hud_radial2` 60. The virtual level holds up to 128 entries (a file level still 64).
+- Deviation from the request: steps have no Fail / Skip (the TO TEST row kinds allow `done` / `open` only for steps);
+  "TO TEST" shows checks as well as steps (both are open rows); the regression lists show all rows with their state;
+  a note (Regression page "Note") is not offered (it needs the keyboard).
+
+### Keys, status, check
+
+| Key | Default | Meaning |
+|---|---|---|
+| `[Radial] Mode` | `menu` | `menu` / `wheel` (anything else = menu) |
+| `[Radial] Freeze` | `world` | `world` / `1`, `player` / `2`, `0` (Mode=menu) |
+| `[Radial] QuitSector` | `1` | the built-in "Spiel beenden" sector (Mode=menu) |
+| `[Radial] TestsLevel` | `1` | the built-in "Tests" level (Mode=menu) |
+
+`TruMenu.log` at the start: `0.10.1 radial: mode menu (stays open, A confirms, ...), freeze world (read again at every
+open), quit sector 1 (built in), tests level 1 (tour 38 stops / entries), pause code ok, control code ok`; Status page
+`radial (0.10.1): ... ; 0.10.1: mode menu, freeze world (ini now world; last open: ...), quit sector on / ARMED, tests
+level on (tour ...)` (`radial.status`); `status.hooks` `radial=open (menu) (enabled 1, mode menu)`; `radial.list` names
+the quit sector as `- | Spiel beenden | (built-in game.quit safety sector)` (the virtual levels are not listed).
+`tools/trumenu_ini_check.py` checks the new keys (values in the INI: Mode menu / wheel, Freeze world / player / 0 / 1 / 2,
+QuitSector / TestsLevel 0 / 1), the tour file and the limits with the built-ins (`--ini` / `--radial` / `--tour FILE`
+check a copy - the negative test).
+
+## TruMenu 0.10.2 (fixes from the 03.11. ring tests)
+
+Built into `work\asi\menu0102` (asi, ini, radial, tour, `precheck_0102.txt`); compiled with 0 warnings in TruMenu.cpp,
+`dumpbin` ok, byte checks 0102 (10) + the older lists 010 / 0101 / 071 / 072 / 080 / 081 / 09 (136): 0 mismatches,
+`trumenu_ini_check.py` ok - offline only, **not yet seen in the game**. Owner note (German):
+`<workspace>\docs\TruMenu-0.10.2.md`.
+
+### `cheat.godfull` without flight (F15, los7 21:22:21)
+
+0.8 - 0.10.1 set `GameTracker.cheatMode` bit 0: PlayerTakeDamage returns at once, but the same bit is the flight
+cheat's switch (55 `test` sites gate player behaviour with it) - Lara flew. 0.10.2 leaves cheatMode alone and uses the
+player's **own no-damage bit** `[0xfada74] & 0x20000` (the 2007 prototype's `ControlFlag` bit "rlwinm 14,14", workspace
+`docs\Abakus-Pruefung.md` 18.7 and item 1):
+
+| Site | Code | Effect of the bit |
+|---|---|---|
+| ApplyDamage 0x6f4f70 | first instruction 0x6f4f71 `test [0xfada74], 0x20000; jne ret` | no damage at all; ApplyDamage is the only code that lowers `P+0x628` (all `+0x628` writes in 0x6e0000..0x780000: 0x6f4e6c / 0x7000d9 refill, 0x6f4f2e GainHealth, 0x6f4fd7 / 0x6f5004 ApplyDamage, 0x6f55cc HealthInstantDeath) |
+| PlayerTakeDamage 0x6f5030 | 0x6f5042, **before** the type 8 (raw) / 5 tests | types 8 / 5 are blocked too (cheat.god lets them through) |
+| DamageBypass 0x6f5140, 0x703008 | the other two ApplyDamage callers | blocked |
+| 0x721c8d | skips ProcessHealth 0x6f5160 | the hit timer / death check do not run while it is set (as in the game's death state, `mov [0xfada74], 0x40020208` at 0x75a447) |
+
+Every player state entry rewrites the word (`mov [0xfada74], imm`), so `NoDamageTick` (PadHook, once per game frame,
+before `GAMELOOP_Process`) ORs the bit in again - a state entry and a hit **in the same frame** can still let one hit
+through. **Instant deaths** (`HealthInstantDeath` 0x6f55a0, callers 0x75afda in the death state's process / 0x75b099)
+test neither this bit nor cheatMode: they still kill (the old variant only avoided them because Lara flew). The off
+clears the bit only while the word is still the one the tick left (otherwise it is the game's own), sets
+`gInvincibleCheat` 0 as before, and **ends a left-over flight**: cheatMode bit 0 set while `cheat.flight` is off ->
+cleared + `INSTANCE_Post(player, 12, 0)` (as `cheat.flight 0`). Pre-check: the five tests and the call 0x6f50aa
+(`g_godFullWhy` names them). Ring label: `Gott-Modus voll (ausser Sofort-Tod)`. Log: `cheat: god mode full ON (byte
+0x00fadf60 = 1, mode flags [0x00fada74] = 0x...)`; answer `cheat.godfull 1 (gInvincibleCheat + no-damage bit ... per
+frame, no flight; instant deaths still kill)`.
+
+### `player.unstuck` / marks (F6, B28)
+
+- **No sampling** while TruMenu or the ring is open, the time.pause bit (streamFlags 0x1000) is set, the main state is
+  not 1, a **cinematic** runs (the game's own test tru+0x53f00 - `[0xe7f1c0] && byte +0xdd && dword +0x2c != -1`, the
+  gate TruShadowPower 0.9 uses; read here, not called; bytes checked at load, `g_cineOk`), player control is off,
+  `time.scale` is not 1, flight is on or health <= 0; the window starts again after each pause. los3 (20:35:58): the
+  spot used lay ~7300 units above Lara (`-1311 4869 -683` vs `684 -1149 -7947`) - it was taken during the DLC 2 intro.
+- **Ground test (heuristic, no proven on-ground flag):** 7 samples 5 game frames apart (~1 s); the middle one becomes a
+  spot when every sample is within 12 units of the chord from the first to the last (free flight is a parabola: ~120
+  units off over 1 s at ~980 units/s^2, 1 unit ~ 1 cm) and the slope first -> last is at most 0.8 plus 10 units for
+  steps. Walking up / down ramps and over small bumps passes (los7: "height changed < 5 in 1 s" let almost nothing
+  through on uneven ground). **Blind spots:** hanging at a ledge / shimmying, swimming at the surface, a moving
+  platform look like ground.
+- **Facing:** `player.mark` and every safe spot store Lara's yaw (instance +0x38); `player.recall` / `player.unstuck`
+  write it back with the position (x / y rotation untouched). **Not done:** movement state and velocity - no
+  player-state / velocity field and no "stand now" call is proven, so a recall during a jump or fall keeps that state
+  (los7: she grabbed a ledge in reach). Recall while she stands.
+- `player.safeground` (info, ring `Spieler/Helfer/Befreien: Stand`): `n safe spots, newest ...; mark set; ground windows
+  a ok / b not; waiting: <reason>`. Start log: `0.10.2: cheat.godfull = no-damage bit ..., safe ground: 7 samples x 5
+  frames, chord 12, slope 0.8 + 10, cinematic test 1, marks keep the yaw`.
+
+### Tour and `level.start` (F8)
+
+- `tools/tour_from_rundgang.py`: the "DLC 2 - <room>" sections of the shader tour go below **`Rundgang/DLC 2/<room>`**
+  (8 rooms = one page); DLC 1, Versteckt, Paket-Ziele and "Nur in Zwischensequenzen" stay on the Rundgang level (5
+  sectors). Every `level.start` stop gets a `Laden <start unit>` entry in front (dlc2 -> `dlc_level2_start`, dlc1 ->
+  `dlc_level1_start`): `level.start` works from the main menu only (los7 21:22:37 `err main menu only (main state 1)`),
+  the `Laden` entry is the in-level way (no intro). 33 stops, 46 entries, 12 sections.
+- The ring greys `level.start` out outside the main menu (main state != 10): `main menu only - in a level: 'Laden ...'
+  (level.load, no intro)`. The item itself is unchanged (TruLink / TO TEST / AutoStart).
+- Note: `Laden dlc_level1_start` from DLC 2 is the cross-DLC load of F12 (Lara loads as the doppelganger; the fix is
+  TruDlc2Player 0.3 `[Dlc2Player] CostumeReset`, offline) - without it, start DLC 1 from the main menu.
+
+## TruMenu 0.10.3 (F7: sound with the world freeze)
+
+Built into `work\asi\menu0103` (asi, ini, radial, tour, `precheck_0103.txt`); 0 warnings in TruMenu.cpp, `dumpbin`
+ok, byte checks 0103 (15) + 0102 (10): 0 mismatches, `trumenu_ini_check.py` ok - offline only, **not yet heard in
+the game**. Owner note (German): `<workspace>\docs\TruMenu-0.10.2.md`, section "0.10.3".
+
+**Switches (both 0 = off by default, live test first):** `[Radial] FreezeSound=1` - while `[Radial] Freeze=world`
+holds the world (the ring set the pause bit itself) the sound pauses too; `[Menu] PauseSound=1` - for every other
+world pause in a level (`time.pause` from ring / menu / bar, `[Menu] PauseGame`). Items (runtime only, TruMenu.ini is
+not written; a value changed in the ini is taken over within a second, so the TO TEST switches
+`ini:TruMenu:Radial:FreezeSound` / `ini:TruMenu:Menu:PauseSound` work too): `time.freezesound`, `time.pausesound`
+(bool), `time.sound` (info: switches, pause bit, gameMode, `[0xccde88]`, last action). Ring: `Zeit` -> `Ton mit
+Rad-Einfrieren`, `Ton mit Welt einfrieren`, `Ton-Pause: Stand`.
+
+**The game's functions (static, `tools/pe_dis.py` / `pe_callers.py` / `pe_abs_uses.py`):**
+
+| Function | What it does | Callers |
+|---|---|---|
+| 0x5874b0 | `0x5873a0(1)`; `[0xccde88] = 1`; `jmp 0x4831c0` | pause menu open 0x5d47b6 (0x5d4780), 0x5d4821 (0x5d4810) |
+| 0x5874d0 | `0x5873a0(0)`; `[0xccde88] = 0`; `jmp 0x4831d0` | pause menu close 0x5d4738 (only at gameMode 6), level start 0x5de4a5, level loads 0x5df80c / 0x5dfb7d / 0x5dfb8e |
+| 0x5873a0(b) | for each index in the list `[0xccdea0]` (+0x1c count, +0x20 ints): bit 0 of `+0x10` of the sound group `[0x8a80d8] + index * 0x84` := b | the two above |
+| `[0xccde88]` | 1 = the stream / music update 0x595250 (8 players at 0xcca9a0, 0x178 bytes) returns at once | set only by the pair, 0 at init 0x586435 |
+| 0x4831c0 / 0x4831d0 | input manager 0xa02bd0: 0x4816f0 clears, 0x481750 sets again one byte flag in 4 slots of 4 pads | only the pair (rumble not proven: XInputSetState is called from 0x484940, another object) |
+
+- **No counter, no toggle:** the pair *sets* a state - two pauses and one resume = running. `[0xccdea0]` is read
+  without a null test and is 0 between levels (set 0x5df0c9, cleared 0x5df961) - TruMenu never calls the pair then.
+  Which sound groups the list holds (sfx / voice / music?) is game data, not code. The window-focus pause
+  (0x587410 / 0x587460, flag `[0xccde92]`, master group via 0x7b9490) is separate and not touched.
+- **Balance with the pause menu:** the menu's open clears the pause bit 0x1000 itself and pauses the sound; its close
+  resumes only at gameMode 6. TruMenu (`SoundFreezeTick`, game thread, every pad poll) acts only on the edges of its
+  own want (the same answer on two polls), only when `[0xccde88]` is the other state, never at gameMode 6 (an own
+  pause is dropped then - the menu resumes at its close), and once the game resumed the sound itself (level start /
+  load) it is not paused again until the next freeze. A fault in a call turns the feature off (`__try`).
+- Load check `SoundCheck`: both functions, 0x5873a0's list read, the reader 0x595253, the pause menu's open
+  (gameMode 6 + call) and close (gameMode test + call). Start log: `0.10.3 sound with the freeze: code ok ...`.
+- Log lines: `sound: sound paused (0x5874b0) - ring freeze, [Radial] FreezeSound`, `sound: sound resumed (0x5874d0) -
+  pause bit cleared`, `sound: the pause menu opened - ...`, `sound: time.freezesound 1 (...)`.
+
+**Light shaft (B29, not built):** the shader clock `TimeVector` (PS c53 / VS c23, uploaded at 0x5096c7 from
+RenderDevice `[0xa1407c]` +0xfa4c / +0xfa48) advances by the dt of 0x5bf840 = `[0xe7f188]` (frame time x time scale),
+which the pause bit 0x1000 does not stop (it only skips the instances). Only the pause menu stops it, through
+0x5bfdf0(1) (`[0xdb94de] = 1`, back to 0 at the close 0x5d4765). So every `TimeVector` material keeps moving in the
+freeze - in `dlc_level2_start.drm` (Xbox materials with `TimeVector`: 23157 = tuple 1058-1061, unlit one-texture
+material with opacity and height fog, base twins in `l7_helheim0x` / `l7_yggdrasil_end` = the likely light shaft;
+24920 eitr water surface, 24691 eitr column, 24736 / 26444 / 26445, 972 distortion). The unit's 41 objects contain no
+light-ray object (`tools/objlist_unit_compare.py --units dlc_level2_start --list`), so the shaft is level geometry.
+Proposal: a later `[Radial] FreezeShaders` calls 0x5bfdf0(1) / (0) with the same edge / gameMode-6 rules.
+
+## TruMenu 0.10.4 (F7: shader clock with the world freeze; F6 stand state not built)
+
+Built into `work\asi\menu0104` (asi, ini, radial, tour, `precheck_0104.txt`); 0 warnings in TruMenu.cpp (2 x C4100
+in `imgui_demo.cpp` as before), exports / imports as 0.10.3, byte checks 0104 (14) + 0103 (15) + 0102 (10): 0
+mismatches, `trumenu_ini_check.py` ok (60 keys) - offline only, **not yet seen in the game**. Owner note (German):
+`<workspace>\docs\Befund-Menue-Dlc2Player-0411b.md`.
+
+**Switch (0 = off by default):** `[Radial] FreezeShaderClock=1` - while the world is frozen in a level (pause bit
+0x1000: the ring's `Freeze=world`, `time.pause`, `[Menu] PauseGame`) the shader clock `TimeVector` holds too. Item
+`time.freezeclock` (bool, runtime only; a value changed in the ini is taken over within a second, TO TEST switch
+`ini:TruMenu:Radial:FreezeShaderClock`), info `time.clock` (switch, pause bit, gameMode, `[0xdb94de]`, RenderDevice
++0xfa4c / +0xfa48, last action). Ring: `Zeit` -> `Shader-Uhr mit Einfrieren`.
+
+**How the game makes the value (static, `pe_dis.py` / `pe_callers.py` / `pe_disp_scan.py`):**
+
+| Step | PC | What |
+|---|---|---|
+| dt | 0x5bf840 (only caller 0x5cebc0, once per frame) | `[0xdb94de]` != 0 -> dt = 0 (`fldz`), else `[0xe7f188]` / `[0x8439b8]` (double 30.0; or `[0xe7f194]` / `[0x84bd00]` while `[0xe7f0b4]` & 0x10000000) |
+| accumulate | RenderDevice `[0xa1407c]` vtable +0xc = 0x506f10(dt) | `+0xfa48` = dt; `+0xfa4c` += (int)(dt x `[0x8416d8]`, double 1000.0) - an integer accumulator (getter 0x509190; also written at 0x508900, `mov [esi+0FA4Ch], ebx`); only when the device state test at 0x506f67..0x506f7b passes |
+| upload | 0x5096c7 | TimeVector = ((`+0xfa4c` mod 1000000) x `[0x8416d0]` (double 0.001), `+0xfa48`, 0, 0) -> PS c53 (0x509711) / VS c23 (0x509721) |
+| hold | 0x5bfdf0(b) = `[0xdb94de]` := b | pause menu open 0x5d47ae (1), close 0x5d4765 (0), level start 0x5de3c7 (0), unknown menu 0x6e4887 / 0x6e548c |
+
+The pause bit does not touch this path; the pause menu holds it with 0x5bfdf0(1): dt 0, the accumulator stays (x held,
+y = 0), and after 0x5bfdf0(0) it goes on from the held value - **no jump, so no offset is needed**. TruMenu
+(`ShaderClockTick`, game thread, every pad poll) calls the same function with the 0.10.3 sound rules: own edges only
+(two polls agree), never at gameMode 6 (the pause menu owns the byte: claim dropped), the game's own release (level
+start) is not fought. Load check `ClockCheck` (reader, setter, accumulator, upload, pause menu open / close). Log:
+`shader clock: ON - TimeVector held (0x5bfdf0(1), ring freeze, ...): accumulator +0xfa4c N, dt ...`, `shader clock:
+OFF - TimeVector runs on (0x5bfdf0(0), ...) after S s: accumulator N (held at N: unchanged = no jump)`, `shader clock:
+the pause menu opened - ...`, `shader clock: the game released the clock itself ...`.
+
+**Costume check:** the state save tru+0x155cb1 is accepted as the game's store or as TruDlc2Player 0.5's
+`[Costume] TuMapping` detour (`jmp` out of tru.exe + 8 nops) - log `costume: state save 0x00555cb1 is a detour to ...
+accepted`; 0.10.3 turns its costume items off in that case.
+
+**F6 "Zur Marke" stand state - not built (`[Menu] MarkSetStand` not added):** no game function that puts the player
+into standing was found offline. Every player state change on PC goes through the data-driven chart:
+SCAgent::ChangeState tru+0x387890 (string `* Agent %d ChangeState to NULL is illegal!` 0x861070) is called only from
+the agent's own transition / event code (tru+0x387c78 / 0x387d53 / 0x387d9e). The 2007 prototype map names the
+script teleport `NsInstance::WarpTo` (position, stream unit, rotation only) and `INSTANCE_SetPositionPlayerFindGround`
+(ground probe + `STREAM_SetInstancePosition` + `PLAYER_ResetSmoothRide`) - neither touches the state; a respawn builds
+a new tracker / agent (initial chart state), which is not a teleport. Which chart state is "stand" is data, so a state
+log (TruTrace) has to show it first. `player.recall` is unchanged.
+
+## TruMenu 0.10.5 (screenshots, Claude marks)
+
+Built into `work\asi\menu0105` - offline only, **not yet seen in the game**. Owner note (German):
+`<workspace>\docs\Befund-TruMenu-Shot-0511.md`. Goal: the test session gets named in-game screenshots in the run
+folder instead of ShareX files (no useful names, wrong times), and marks the player sets while playing.
+
+**Screenshots.** Item `shot.save [ui|clean] [name]` (command bar, TruLink `menu shot.save <name>`, ring `Spieler` ->
+`Screenshot`), the export `TruMenuShot(const char *name)` for other plugins, and the Claude marks below. A request gets
+its file name at once: `[Shot] Folder` (default `TruShots\` next to tru.exe) + `shot_<HHMMSS>_<step>_<name>.png`,
+`<step>` = `step<n>` of the lowest TO TEST step that is not done, else `-`; `<name>` sanitised to `A-Z a-z 0-9 _ - .`
+(at most 40, empty = `-`); the same second / step / name again = `_2`, `_3`; a file left from an earlier session =
+`-2` .. `-9`. The copy is taken by the existing Present hooks (device Present slot 17 and swap-chain Present slot 3 -
+**no new hook**): before `Render()` = clean (no menu, ring, command bar or TruMenu overlay; default `[Shot] Clean=1`),
+after it = as on screen (`shot.save ui ...` or `Clean=0`). On the render thread only: `GetBackBuffer(0)`, for a
+multisampled back buffer `CreateRenderTarget` + `StretchRect`, `CreateOffscreenPlainSurface(D3DPOOL_SYSTEMMEM)` +
+`GetRenderTargetData`, `LockRect` + row copy, all surfaces released in the same call (nothing is held over a Reset).
+Pixel conversion (X8R8G8B8 / A8R8G8B8, R5G6B5, X1R5G5B5 / A1R5G5B5, A2R10G10B10), PNG encoding (`TruShotPng.h`, own
+code: per-row PNG filter, fixed-Huffman deflate with a 32 KB hash-chain LZ77, CRC-32, Adler-32) and the file write
+run on a worker thread (at most 2 at once; a request waits a frame while they are busy; queue of 4). One log line
+per file:
+
+```text
+shot: <folder>\shot_142233_step3_lightshaft.png 1920x1080 1672169 bytes, capture <ms> ms (render thread), encode <ms> ms + write <ms> ms (worker); clean, TruLink
+```
+
+The capture time is the GPU sync of `GetRenderTargetData` and only known from a live run; the offline encoder test
+took 255.5 ms for a synthetic 1920x1080 image (worker thread). Over TruLink the answer waits up to 2 s for the copy:
+`ok captured <path> (the PNG is written on a worker thread ...)`; from the menu / ring / bar it is `ok queued <path>
+...`. Refusals: `shots off ([Shot] Enabled=0)`, `no d3d9 device hooked yet`, `busy (...)`, `more than N shots per
+minute ([Shot] MaxPerMinute)` (log line `shot: <source> refused - ...`, at most one per second). `shot.status` shows
+the options, the folder, the counters and the last file / error.
+
+**Claude marks.** Ring level `Claude` on the top level, drawn in coral #D97757 (217, 119, 87) with white text:
+`Jetzt` (now), `Gut` (good), `Fehler` (bug), `Grafik komisch` (gfx), `Ton komisch` (sound), `Ruckler / Haenger`
+(stutter) = item `claude.mark <kind>` (also command bar / TruLink `menu claude.mark bug`, export
+`TruMenuMark(const char *kind)`, `[Shot] Hotkey` = `now`). Each writes one TruMenu.log line and requests a clean shot
+named `<kind>`; the ring closes after the pick (play goes on at once; the shot is clean either way):
+
+```text
+HH:MM:SS.mmm claude.mark <kind>: <HH:MM:SS.mmm> unit=<stream unit> pos=<x> <y> <z> step=<step<n>|-> shot=<file|-> src=<ring|hotkey|menu|TruLink|TruMenuMark>[ (no shot: <reason>)]
+```
+
+`unit` = the stream unit Lara is in (as `[Log] UnitChanges`; else the unit at GameTracker+0x38, else `-`), `pos` =
+Lara's position rounded (`- - -` without a player), `shot` = the file name in `[Shot] Folder`. Marks are rate-limited
+like shots (`MaxPerMinute`, own window). To make room on the top level (8 sectors, one page), the R2 level `Objekte`
+moved to `Spieler/Objekte` (`Claude` takes its sector; Cheats, Marken, Zeit, Waffen, Spieler, Tests, Spiel beenden keep
+their places).
+
+**Options** `[Shot]`: `Enabled=1` (requests only - nothing is taken automatically), `Folder=` (empty = `TruShots`
+next to tru.exe, relative = below the game folder), `Clean=1`, `Hotkey=0` (e.g. `0x7A` = F11 -> `claude.mark now`;
+the game still gets the key), `MaxPerMinute=30` (1 .. 120, 0 = no limit).
+
+**Offline proof:** `selftest\TruShotPngTest.cpp` (built with the same x86 compiler, not part of the asi) encodes 8
+test images in every supported format with padded rows; `tools/png_selftest_check.py` decodes each PNG on its own
+(chunk CRCs, zlib / Adler-32, the five filters) and compares the pixels with its own conversion of the raw source
+pixels: 8 / 8 equal. `tools/pe_import_export_diff.py` 0.10.4 vs 0.10.5: imports unchanged (141 functions, KERNEL32 /
+SHELL32 / USER32; the D3D9 calls go through the device vtable), exports + `TruMenuShot`, `TruMenuMark`.
+`tools/src_hook_sites_diff.py`: vtable patches 4 / 4, code writes 12 / 12, VirtualProtect 6 / 6, byte checks 147 / 147
+- the new lines are 5 device calls in `ShotCapture`, 1 `CreateThread` (worker) and the 2 exports.
+`tools/trumenu_ini_check.py` checks the `[Shot]` values and the Claude level.
+
+## TruMenu 0.11 "Ablauf" (guided test runs)
+
+Owner wish 2026-11-05 (stage 2 of the Claude marks): a test run is a **flow** of steps that the ring shows one after
+the other, with counters that fill themselves from the plugin logs. Built into `work\asi\menu011`; compiled, offline
+checks only - **not yet seen in the game**. Everything is off without `[Flow] Enabled=1` (the profile sets it); the
+ring entries of the flow are then greyed out ("kein Ablauf").
+
+### `TruMenu.flow.txt` (next to tru.exe, `[Flow] File`)
+
+UTF-8 (BOM optional), one record per line, fields separated by `|` (so `|` cannot appear inside a field), `#` lines and
+empty lines skipped. First line `# TruMenu flow ...` = ours (`Set-TruMenu.ps1`, `Invoke-TruTestRun.ps1`). Written by
+the workbench generator `New-FlowFile.ps1` from a test profile; the parser is `TruFlowCore.h` (own code) and the same
+rules in PowerShell in `Invoke-TruTestRun.ps1` / `Test-TruPreflight.ps1`.
+
+```text
+flow    | <id> | <title>                               once, optional
+counter | <id> | <source> | <target> | <text>          target 0 = only counted
+step    | <id> | action|observe|mark | <text> [| key=value ...]
+```
+
+| Step kind | Weiter (`flow.next`) | Gut / Fehler (`claude.mark good / bug`) | other Claude mark |
+|---|---|---|---|
+| `action` | runs its `do=` commands (the regression-shortcut path: one command per free game-thread slot, `level.*` waited for, an `err` stops); ok when they are done and (if any) a `check=` is met | ok / fail | recorded on the step |
+| (any kind) | | | `mark:<name>` conditions and `mark:` counters see it |
+| `observe` | leaves it open (no result) and goes on | ok / fail | recorded |
+| `mark` (an instruction) | done (ok) | ok / fail | done (ok) |
+
+| Step key | Meaning |
+|---|---|
+| `do=<cmd>;<cmd>` | action only; at most 12 commands / 319 characters (`kShortcutLen`), never `game.quit`, no `#title` |
+| `after=<cond>` | all must be met before Weiter runs an action (repeatable, at most 4); the status line shows "wartet: ..." |
+| `check=<cond>` | any one met after the step started = ok (an action: after its commands); at most 4 |
+| `fail=<cond>` | any one met after the step started = fail; at most 4 |
+| `count=<counter>[,<counter>]` | at most 4; the first one is shown in the status line |
+| `skip=<reason>` | skipped when the flow reaches it |
+| `hint=<text>` | third line of the status line / the ring centre |
+
+Conditions: `step:<id>` (that step ok), `done:<id>` (ok / fail / skip), `counter:<id>` (target reached; target must
+be > 0), `mark:<name>` (a Claude mark of that kind while the step is current: `now`/`Jetzt`, `good`/`Gut`,
+`bug`/`Fehler`, `gfx`/`Grafik`, `sound`/`Ton`, `stutter`/`Ruckler`), `log:<TruX.log>:<pattern>`,
+`trace:<category>:<pattern>` (TruTrace.log lines `time [unit] <category>: text`, an empty pattern = any line).
+
+Counter sources:
+
+| Source | Counts | From |
+|---|---|---|
+| `units[:<unit>]` | stream unit slots that became loaded | TruTrace 0.2 `stream: stream unit slot n: id x '<unit>' state 2 = loaded` |
+| `levels[:<unit>]` | level loads (result of `STREAM_LevelLoadAndInit`) | TruTrace 0.2 `level: STREAM_LevelLoadAndInit '<unit>' (...) -> unit entry` |
+| `restores` | checkpoint restores | TruTrace 0.2 `save: SAVE_RestoreGame(n) -> r` |
+| `deaths` | player deaths | the rising edge of bit 0x10000 of the player state-mode word `[0xfada74]` (below) |
+| `toggle:<id>` | TO TEST switch flips | `test.mark <id> on/off` (page, ring Schalter, TruLink) |
+| `item:<id>` | runs of an item (not info reads) | `InvokeCore` (menu, ring, bar, TruLink, shortcuts) |
+| `mark:<name>` | Claude marks of that kind | `claude.mark` (ring, hotkey, TruLink, `TruMenuMark`) |
+| `log:<TruX.log>:<pattern>` / `trace:<cat>:<pattern>` | matching lines | the tail below |
+
+Patterns: plain text = substring (case-sensitive); `re:<expr>` = a regex subset (literals, `.`, `\d \w \s \D \W \S`,
+escaped punctuation, classes `[a-z]` / `[^...]`, the postfix `* + ?`, `^` first and `$` last; no groups, no `|`, no
+`{n}`), matched as a state set (linear in the line, no backtracking). Texts are shown in ASCII (`ae oe ue ss`).
+Limits: 64 steps, 16 counters, 48 distinct log patterns, 8 log files, 159 bytes per text.
+
+**Why the log tail and not a TruTrace export:** TruTrace writes the unit / level / restore lines anyway; reading them
+needs no interface between the two plugins (no load-order or version coupling, no change to TruTrace, works with an
+older TruTrace for the other counters and degrades to "0" without it). TruMenu's own tail (worker thread, every
+`[Flow] PollMs` = 500 ms) reads **every** new byte of the files the flow names (at most 256 KB per file and poll; more
+is skipped with a log line), not the 6 KB window of the log page. TruTrace rate-limits its categories (40 lines / s) -
+unit / level / restore lines are far below that. A pattern line is "after the step started" with poll granularity.
+
+**Player deaths (static, `tools/pe_flag_bit_writers.py data/pc/tru.exe 0xfada74 0x10000`, pinned in
+`work\asi\menu011\precheck_011.txt`, 14 / 14 ok):** of the 33 instructions that write `[0xfada74]` only one sets bit
+0x10000: `or dword [0xfada74], 0x10408` at 0x75aa69 in `DeathState::Entry` 0x75aa50; 11 clear it (the immediate stores
+of every other state entry and the store of ecx = 0x81 at 0x7522da), 20 keep it, 1 (0x752320, ecx = 0x81 from 0x7522d5,
+no ecx write in between - read by hand) clears it too. TruMenu reads the word once per frame (render thread, no hook)
+and counts a rising edge while a player exists; the bytes at 0x75aa69 are checked at load (mismatch = deaths not
+counted, said in the load line).
+
+### Ring level "Claude" (TruMenu.radial.txt)
+
+Page 1: **Weiter** (`flow.next`, label "Weiter: <current step>"), **Ueberspringen** (`flow.skip`), Jetzt, **Gut**,
+**Fehler**, Grafik komisch, Ton komisch, Ruckler / Haenger (the 0.10.5 marks, order kept); page 2 (RB): **Zurueck**
+(`flow.back`), **Ablauf n/m** (`flow.status`). The centre shows the current step, its hint and what it waits for. Gut /
+Fehler write the 0.10.5 mark line + clean shot and set the current step ok / fail; Weiter that ran / finished a step
+closes the ring (as a mark does). Shot names use the current flow step instead of the TO TEST step.
+
+### Status line, toast
+
+`[Flow] Overlay=1`: `Claude-Ablauf  Schritt n/m | <counter a/b> | naechster: <text>` in coral in the corner
+`[Flow] Position` (tl / tr / bl / br, default br), `Size`, `Lines` (2 = + the current step, 3 = + waits for / hint).
+`flow.say <text>`: a coral toast at the top for `[Flow] ToastSeconds` (6 s). Both drawn by TruMenu (not in clean shots).
+
+### Items (TruLink `menu <id> [arg]`, command bar)
+
+| Item | Meaning |
+|---|---|
+| `flow.status` | file, step n/m with state / waits for, results, deaths, every counter (one line) |
+| `flow.list` | every step `n id kind state by` (`>` = current) |
+| `flow.next` / `flow.back` | Weiter / Zurueck (the step before is reopened) |
+| `flow.skip [<id> [reason]]` | skip (no id = the current step) |
+| `flow.goto <id>` | that step is current (reopened) |
+| `flow.add <record>` | append a counter or step record (file syntax) |
+| `flow.say <text>` | toast + log line |
+| `flow.result ok` / `fail [note]` | = `claude.mark good / bug` (+ the note on the step) |
+| `flow.reload` | read the file again (all states anew) |
+
+TruLink needs no change (`menu` passes the rest of the line), but its tokenizer keeps at most 24 words per line and
+joins them with single spaces: a long `flow.add` record is cut, double spaces in a pattern become one.
+
+### `TruMenu.log` lines (Invoke-TruTestRun.ps1 builds the summary section "Ablauf" from them)
+
+```text
+flow: loaded <path>: n steps, m counters, w log patterns, e errors (id <id>: <title>); deaths counted (...)
+flow: error line <n>: <message>
+flow: step <id> start|run|open|ok|fail|skip <i>/<n> t=<s since load> [dur=<s>] [by=<Weiter|Gut|Fehler|auto|commands|file|...>] [note=<text>]
+flow: counter <id> <value>/<target> t=<s>[ reached]          (at most one line per counter and second)
+flow: mark <kind> step=<id|-> shot=<file|-> t=<s>
+flow: death <n> ([0x00fada74] = 0x..., DeathState entry bit 0x10000) t=<s>
+flow: say <text> | flow: add <record> -> ok|err ... | flow: goto <id> | flow: done ... | flow: end (game.quit) ...
+```
+
+### Keys, checks
+
+| Key | Default | Meaning |
+|---|---|---|
+| `[Flow] Enabled` | `0` | 1 = read the flow file (worker thread), tail the logs it names, flow entries in the ring |
+| `[Flow] File` | `TruMenu.flow.txt` | relative = next to tru.exe |
+| `[Flow] Overlay` / `Position` / `Size` / `Lines` | `1` / `br` / `1.0` / `2` | status line |
+| `[Flow] AutoAdvance` | `1` | a step finished by check / fail / its commands moves on |
+| `[Flow] ToastSeconds` / `PollMs` | `6` / `500` | toast time, tail interval |
+
+Offline checks: `/W4` 0 warnings in `TruMenu.cpp` / `TruFlowCore.h`; `tools/pe_import_export_diff.py` 0.10.5 vs 0.11:
+exports unchanged, one new import `KERNEL32!GetFileAttributesExA` (the tail's start size); `tools/src_hook_sites_diff.py`:
+no new hook / patch / write, one new byte pre-check (0x75aa69); `tools/trumenu_ini_check.py` (`[Flow]` values, flow
+items, the flow entries in the level Claude); `selftest/TruFlowCoreTest.cpp` + the workbench test compare the C++
+parser / matcher with the PowerShell parser and .NET Regex.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
@@ -542,7 +1298,8 @@ menu test.del <id>      menu test.clear      menu test.clear done               
   as TruLink's force flag and dropped; the argument is cut at 511 characters.
 - **File** `TruMenu.tests.txt` next to `tru.exe`, rewritten on every change, read at start (survives a restart):
   a `#` comment line, then one line per row `id<TAB>state<TAB>hint<TAB>note<TAB>time` (time = `HH:MM:SS` of the last
-  mark). At most 64 rows; `test.add` on a full list answers `err list full`.
+  mark). At most 64 rows (0.10.1: 128 - the radial profiles send 77 / 98 rows; also the regression lists); `test.add`
+  on a full list answers `err list full`.
 - **In the menu** the page "TO TEST" is the first page (open) and is not drawn while the list is empty. A marks the
   selected row OK (also a mouse click), X FAIL, Y SKIP; while a row has the nav focus TruMenu keeps X and Y away from
   ImGui (else X would jump to the title bar layer and Y would activate the row = OK). A mark from the menu keeps the
@@ -867,9 +1624,29 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Log] OverlaySources` | `TruMenu,TruGuard` | 0.7.2: sources the corner overlay shows (log names without `.log`, plus `script`); `*` or empty = all; overlay only (`log.overlaysources`) |
 | `[Log] OverlayExclude` | (empty) | 0.7.2: overlay only - lines holding one of these texts (comma list) are not shown (`log.overlayexclude`; `none` = off) |
 | `[Log] CameraChanges` | 1 | 0.8: `camera: mode A -> B` / `camera: object ...` lines when the camera manager's mode (manager+0x58) or current camera changes (read-only poll, 200 ms; `camera.log`) |
+| `[Log] InputTrace` | 1 | 0.8.1: with `[Menu] LogLevel=2` one `input: ...` line per pad button edge / mouse click / key while the menu is open, with the source and what the menu did (focus, activated or why not); 0 = only the summary line at each close (`log.inputtrace`) |
 | `[Test] AutoStart` | (empty = off) | 0.7.1, test only: `dlc2` / `dlc1` / a unit name - once per game start, when the main menu is up, `level.start` (mission menu path, intro plays); without the verified path `level.load` + log line "intro skipped" |
 | `[Test] AutoStartDelay` | 3 | 0.7.1: seconds the main menu must be up before AutoStart starts, 1 .. 60 |
 | `[Regress] List` | `all` | 0.8: list the Regression page shows at start: `dlc1`, `dlc2` or `all` |
+| `[Media] MusicInLevels` | 0 | 0.9: 1 = `media.music.play` / `stop` also in a level; 0 = main menu only (until a live test proves it safe) |
+| `[Media] MusicFade` | 60 | 0.9: fade in / out frames (30 per second) of `media.music.play` / `stop`, 0 .. 300 (the game's unit start uses 60) |
+| `[Saves] Folder` | (empty) | 0.9: save folder of the Saves page; empty = the game's own (Documents\Eidos\Tomb Raider - Underworld) |
+| `[Radial] Enabled` | 1 | 0.10: radial menu on; 0 = TruMenu exactly as 0.9 (L3 + R3 toggles at the press, F9 reaches the game) |
+| `[Radial] HoldButtons` | `0x00C0` | 0.10: pad buttons held for the ring (hex or decimal; L3 + R3); 0 = no pad hold. Same mask as `[Menu] ToggleButtons` = short press menu (at the release), held = ring; another mask = watched on its own |
+| `[Radial] HoldMs` | 500 | 0.10: hold time in ms, 100 .. 3000 |
+| `[Radial] Key` | `0x78` | 0.10: virtual key held for the ring (F9; Steam Controller back button -> F9 in Steam Input); kept from the game (DirectInput event + key messages); 0 = off |
+| `[Radial] MouseButton` | 0 | 0.10: 3 = middle, 4 / 5 = side buttons held = ring (mouse direction picks); 0 = off |
+| `[Radial] RememberPosition` | 1 | 0.10: the ring opens at the level / page / pick of its last close; 0 = always at the top |
+| `[Radial] PassLeftStick` | 1 | 0.10: the left stick reaches the game while the ring is open (Lara walks); 0 = neutral pad |
+| `[Radial] SlowMotion` | 0 | 0.10: `time.scale` while the ring is open (e.g. 0.25), the old value comes back at the close (unless an entry changed it); 0 = off |
+| `[Radial] Deadzone` | 0.5 | 0.10: stick deflection that picks a sector, 0.2 .. 0.95 (mouse: 30 px x Scale at 0.5) |
+| `[Radial] Scale` | 1.0 | 0.10: ring size relative to the back-buffer height, 0.5 .. 2 |
+| `[Radial] Spawn` | 0 | 0.10 stage R2: 1 = `instance.spawn <object>` works (ring level Objekte - `Spieler/Objekte` since 0.10.5, command bar, TruLink); 0 = refused. Read again from the ini at most once a second, so a TO TEST switch `ini:TruMenu:Radial:Spawn` works in the running game |
+| `[Shot] Enabled` | 1 | 0.10.5: screenshots on request (`shot.save`, ring, `claude.mark`, Hotkey, exports `TruMenuShot` / `TruMenuMark`); nothing automatic; 0 = every shot refused (mark lines still written, `shot=-`) |
+| `[Shot] Folder` | (empty) | 0.10.5: PNG folder; empty = `TruShots` next to tru.exe, relative = below the game folder |
+| `[Shot] Clean` | 1 | 0.10.5: 1 = copied before TruMenu draws; 0 = after (as on screen); `shot.save ui` / `clean` per shot; `claude.mark` always clean |
+| `[Shot] Hotkey` | 0 | 0.10.5: virtual key (e.g. `0x7A` = F11) = `claude.mark now`; the game still gets it; 0 = off |
+| `[Shot] MaxPerMinute` | 30 | 0.10.5: shots (and, separately, marks) per minute, 1 .. 120; 0 = no limit |
 
 ## Build, install, test (Windows)
 
@@ -879,7 +1656,9 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 .\scripts\windows\Set-TruMenu.ps1 -Remove                   # removes them again (only if they are a build of ours)
 ```
 
-Static runtime (`/MT`), imports `KERNEL32.dll` and `USER32.dll` only. Test plan for the first run:
+Static runtime (`/MT`), imports `KERNEL32.dll` and `USER32.dll` only (since 0.9 also `SHELL32.dll`:
+`SHGetFolderPathW` for the save folder; 0.10 added `GetWindowThreadProcessId` / `MapVirtualKeyA` from USER32). Test plan
+for the first run:
 
 1. Main menu: press L3 + R3 - the menu appears (Status page open). Check the code-check line (all `ok`), the pad line
    ("PadHook given to the game ..."), `d3d9.dll` path, "pad read in Present" (yes = the game does not poll there).
@@ -1140,6 +1919,135 @@ send `TruMenu.log` and `TruMenu.regress_results.txt`.
 82. Camera log (DLC 2, `log.overlay 1`): walk - "camera: mode ... at the start of the log"; hold RB / aim -> mode lines;
     the second DLC 2 hint (rock channel) that swings the camera to the wall: which "camera: mode" / "camera: object"
     lines come (copy them into the report). `camera.log 0` -> no more lines.
+
+0.8.1 additions (built with `-OutDir work\asi\menu081`; install with `Set-TruMenu.ps1 -Install -SourceDir
+.\work\asi\menu081` - `.asi`, the new `TruMenu.ini` (one new key `[Log] InputTrace`) and the two regression lists; the
+0.8.0 build and its ini are recognised as ours). Run with `[Menu] LogLevel=2` (the harness profiles do) and send
+`TruMenu.log` + `TruMenu.regress_results.txt`.
+
+83. Start: `TruMenu.log` holds "0.8.1: input trace 1 (... now 2), game.quit window 10 s + hold 1 s, request slot claimed
+    once, regression shortcuts 7, player.unstuck ring 16 spots".
+84. **game.quit with the pad**: Status page, D-pad to "Quit game (press twice, or hold 1 s)", A once -> a red
+    "Quit now" button appears beside it with "armed - 10 s left" (the label does not change), the focus jumps to
+    "Quit now" after you let go of A; A again within 10 s -> the game ends (exit code 0x544D). Log: two
+    `input: pad0 A down (XInput hook) -> activated '...'` lines, "game.quit armed", "game.quit by the owner".
+85. game.quit, hold: A on "Quit game ..." and keep it held -> a progress bar "hold 1 s to quit" fills, after 1 s the game
+    ends (log "game.quit: button held 1 s by the owner"). Same with the PC keyboard (arrow keys + Enter) and with the
+    mouse (click "Quit game", then click "Quit now"; or hold the mouse 1 s). Let it run out once: after 10 s the red
+    button disappears and nothing happens.
+86. Input trace: open the menu, press A on a few buttons, D-pad around, a key, a mouse click; close. `TruMenu.log`: one
+    `input:` line per press / release with "activated" / "focus 'a' -> 'b'" / a "not activated: <reason>" that makes
+    sense, and at the close "input while the menu was open: n pad presses (A n: n activated, n not), ...". Try the
+    bar: D-pad down from the bar -> "command bar owns the pad: focus from the bar into the menu - swallowed by
+    FirstPadPressOnlyFocuses". `log.inputtrace 0` -> only the summary lines.
+87. Stuck Enter: in the bar type `level.load dlc_level2_start`, Enter (menu closes, level loads); open the menu again
+    -> the bar must NOT run empty lines (no "cmd (bar):  -> err empty line" lines in the log); hold Enter in the bar
+    with a typed line -> it runs once.
+88. cheat.flight: Cheat / flight page, "Cheat / flight ON" -> one `item cheat.flight: cheat.flight 1` line only (no
+    "0" right after), Lara flies with RT / LT (menu closed); "OFF" -> one `cheat.flight 0` line. Several times.
+89. cheat.ammo in hall02 with only the pistols: answer lists every slot weapon, e.g. "slot 0 ...: type -1 ... ammo type
+    0xff = unlimited already" (copy the line). Then `weapon.give wp_shotgun` (or any ammo weapon), wait 1 s, `cheat.ammo
+    0` + `cheat.ammo 1` -> that weapon shows "bit set"; shoot past one clip: the reserve (`ammo.show`) does not drop.
+90. player.unstuck: in hall02 walk around on firm ground for ~10 s, then jump / slide into the eitr (god mode on);
+    `player.unstuck` (button on Time / player / HUD or command bar) -> Lara stands on ground she walked on before; again
+    within 20 s -> one spot further back. `player.mark` somewhere, walk away, `player.unstuck` -> back at the mark
+    (newer). Before walking anywhere: "no target: ..." (no crash).
+91. Regression shortcuts: Regression page -> "Quick prepare" list with "Thrall fight: hall02 + god mode (dlc2:step7)",
+    "DLC 2 start unit ...", "Treasure room", ... A on "Thrall fight" -> the menu closes for the level load, hall02
+    loads, about 2 s later god mode switches on (`TruMenu.log`: "shortcut 'Thrall fight: hall02 + god mode' 1/2:
+    level.load ... 2/2: cheat.god 1 -> ok ..., done"); the page line "shortcut: ...: done". "Prepare" on the dlc2 step5
+    row: god mode off + time.scale 0.5. `menu regress.prepare dlc2:step7` over TruLink works the same; `regress.prepare
+    stop` while it waits stops it.
+
+0.10 additions (radial menu; built with `-OutDir work\asi\menu010`, profile `regress_shadowlara_50l_radial`; install with
+`Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu010` - also copies `TruMenu.radial.txt`; the new `TruMenu.ini` has the
+`[Radial]` section, an edited ini is kept and takes the defaults). Section "Radial menu (0.10)".
+
+92. Start: `TruMenu.log` holds "0.10 radial: enabled 1, hold buttons 0x00c0 500 ms (= the menu combo: short press = menu
+    at the release), key 0x78 (DirectInput 0x43, kept from the game) ..." and "radial: 27 entries in 7 levels from
+    ...TruMenu.radial.txt (0 dropped, 0 unknown, 0 lines skipped)"; Status page line `radial (0.10): ...`; Settings page
+    lists the 11 `[Radial]` keys.
+93. L3 + R3 **short** (main menu or level): TruMenu opens when you let go ("menu opened (pad, short press)"); L3 + R3 in
+    the open menu closes it at once. Lara does not crouch / look while you press.
+94. In a level, **hold** L3 + R3: after 0.5 s the ring with Cheats, Marken, Zeit, Waffen, Spieler, Objekte; the right
+    stick lights one sector; release on **Zeit** -> the Zeit level opens and the ring stays open.
+95. Latched ring in Zeit: stick to "Zeitlupe 0.5", **A** -> the world runs slower, the ring stays, `TruMenu.log`
+    "radial: Zeit -> time.scale 0.5: ok time.scale 0.500 ..."; stick to "Normal 1.0", **R3** -> runs and closes.
+96. Hold, leave the stick in the **centre**, release -> nothing runs ("radial: closed (released in the centre)" at
+    LogLevel 2). Hold, release on Cheats, **B** -> top level, **B** -> closed.
+97. Remember: close the ring in Cheats with a sector picked; hold again -> it opens in Cheats with that sector lit;
+    release without moving the stick -> nothing runs. `[Radial] RememberPosition=0` (restart) -> always the top.
+98. Cheats -> Gott-Modus shows **off**; A -> **on** (green), log "radial: Cheats -> cheat.god 1"; A again -> off
+    ("cheat.god 0"). Same for Spieler -> Unverwundbar and Zeit -> Welt einfrieren.
+99. Main menu (no level): hold -> Cheats / Spieler / Waffen entries grey with "needs a level" in the centre; A on one ->
+    "not available - needs a level" under the ring. Objekte entries grey "[Radial] Spawn=0 (stage R2 off)".
+100. Keyboard: **hold F9** -> the ring at once; move the mouse -> a white dot and the sector in that direction; release
+    F9 -> runs. The game does not react to F9. Steam Controller: Steam Input, map a back button to F9 -> the same.
+101. `[Radial] MouseButton=3` (restart): hold the middle mouse button -> ring, mouse picks, release runs; left click = A,
+    right click = B.
+102. While the ring is open: the camera does not turn (right stick, mouse), A / B / LB / RB do nothing in the game,
+    Lara walks with the left stick; `[Radial] PassLeftStick=0` (restart) -> she stands. After closing with B / R3 the
+    game does not see that button.
+103. `[Radial] SlowMotion=0.25` (restart): the world slows while the ring is open and is back to normal after the close;
+    with "Zeitlupe 0.5" run from the ring it stays at 0.5.
+104. Waffen -> Schrotflinte (in hall02 or dlc_level2_start): `weapon.give wp_shotgun` queued, "last action" shows the
+    answer; the shotgun is in the inventory. Munition voll -> `ammo.show` at max.
+105. `[Radial] Enabled=0` (restart): L3 + R3 toggles at the press as in 0.9, holding does nothing else, F9 reaches the
+    game; `radial.status` says "enabled 0".
+106. TruLink: `menu radial.status`, `menu radial.list` (27 entries, the Objekte ones "= greyed: [Radial] Spawn=0"), `menu
+    radial.open Zeit` (ring opens latched at Zeit, B B closes), `menu radial.reload`.
+
+Stage R2 - **only with `[Radial] Spawn=1`, back up the saves first** (Saves page "Back up all saves now"; the key is
+read again while the game runs - in the profile the TO TEST switch `radial-spawn` sets it, no restart):
+
+107. `TruMenu.log` at the start: "0.10 radial: ... spawn (R2) code ok, [Radial] Spawn=0"; switch it on (TO TEST switch or
+    ini) -> within a second the Objekte entries are no longer grey (in a level); `radial.status` "... (Spawn=1)".
+108. hall02 (or dlc_level2_start): Objekte -> **Medipack** -> `TruMenu.log` "instance.spawn: g_healthpack (id 55) born
+    at Lara ...: instance 0x...; tracker ... was in the table, 0 polls" - a health pack at Lara's feet; walk away, look,
+    pick it up if possible. `instance.list healthpack` lists it.
+109. Objekte -> **Kiste A**: a short stutter (load), "... requested now, n polls / m ms"; a crate at Lara (inside her -
+    step out); push / shoot it, note physics. Kiste B / C the same. A second Kiste A: "was in the table", no stutter.
+110. Objekte -> **Schrotflinte (Objekt)** last: note what appears (pickup or bare model), whether it can be taken, no
+    crash. Then a save / load (checkpoint): are the spawned objects in the loaded game? Note it (open point of R2).
+111. Command bar: `instance.spawn sh_ei_combat_crate_a` works the same; `instance.spawn nosuch` -> "not in the object
+    list"; `[Radial] Spawn=0` again afterwards.
+
+0.10.1 additions (radial menu as a menu, Freeze, quit sector, Tests level; built with `-OutDir work\asi\menu0101`,
+profile `regress_shadowlara_50l_radial2`; install with `Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu0101` - also
+copies `TruMenu.tour.txt`). Section "Radial menu (0.10.1)". Tests 93 - 104 above describe `[Radial] Mode=wheel` now.
+
+112. Start: `TruMenu.log` "0.10.1 radial: mode menu (...), freeze world ..., quit sector 1 (built in), tests level 1
+    (tour 38 stops / entries) ..." and "radial: tour 38 entries from ...TruMenu.tour.txt (0 dropped, 0 unknown, 0 lines
+    skipped)" (34 with the tour file of the first 0.10.1 build); Settings page lists the 15 `[Radial]` keys.
+113. In a level **hold** L3 + R3 0.5 s: the ring with Cheats, Marken, Zeit, Waffen, Spieler, Objekte, Tests, Spiel
+    beenden (8 sectors); **let go** - it stays open, nothing runs.
+114. **Left stick** to Zeit, let the stick go - Zeit stays picked; nothing runs. **A** -> the Zeit level. D-pad right /
+    left steps through the entries. A on "Zeitlupe 0.5" -> runs (`radial: Zeit -> time.scale 0.5`), the ring stays.
+115. **B** -> top level (Zeit picked), **B** -> closed. Hold L3 + R3 again -> it opens in the top level with Zeit lit;
+    **L3 + R3** again -> closed. Lara never moved, the camera never turned, A / B never reached the game.
+116. Freeze world (TO TEST switch `radial-freeze` on = `[Radial] Freeze=1`): open the ring next to a thrall / moving
+    water -> everything stands still while it is open, runs on after the close (`radial: freeze world - time.pause bit
+    set by the ring`, `... released`). Switch `radial-freeze` off, open again -> the world keeps running.
+117. Freeze on: Zeit -> "Welt einfrieren" shows **on** -> A (off) -> the world runs in the open ring and stays running
+    after the close (the user's choice). Freeze off: A on it (on) -> close -> the world stays frozen; open, A (off).
+118. Spawn while frozen (only with `radial-spawn`, after "Back up all saves now"): Objekte -> Medipack -> TruMenu.log
+    `instance.spawn: g_healthpack ... born at Lara` while the world stands; it moves / can be taken after the close.
+119. **F9 tapped** -> ring; the mouse moves the pick; **Enter** / left click runs; Backspace = back; **F9** again closes.
+    The game never saw F9 / Enter / Backspace.
+120. Top level **Spiel beenden**: A -> red, "A nochmal = beenden (10 s)" counting down; wait 11 s -> disarmed (log
+    `game.quit (radial sector): disarmed - 10 s passed`). A, then the stick to another sector -> disarmed ("the pick left
+    the sector"). A, then B -> disarmed ("B") and closed. A, then L3 + R3 -> disarmed ("ring closed").
+121. Tests -> `TO TEST n/m offen` -> a row -> Hint (text under the ring), Run (if offered), OK / Done -> back in the
+    list, the row is gone, the TO TEST page shows it marked (`tests: test.mark ...`). Tests -> Schalter -> `radial-freeze`
+    toggles on / off as the page's checkbox. Tests -> Regression -> DLC 2 -> a check -> OK (`regress: ...` line,
+    `TruMenu.regress_results.txt`). Tests -> Prepare -> one shortcut runs (ring closes). Tests -> Rundgang -> Maschinenraum
+    -> "Laden dlc2_machine_room" (ring closes); after the load reopen -> "10 Maschinensaeule" -> Lara at the column.
+    Tests -> Rundgang -> **Versteckt** shows `Laden dlc_dungeon`, `26 Goldene Schrotflinte ...`, `27 container1: ...
+    (Saves sichern!)`, `28 Erweitertes Ende (Saves sichern!)` - run 27 / 28 only after "Back up all saves now", in a
+    run of its own (workspace `docs\Versteckte-Inhalte-Rundgang.md`).
+122. **Last step - ends the game:** top level Spiel beenden, A (red), A again within 10 s (or hold A 1 s) -> the game
+    ends; `TruMenu.log` `game.quit (radial sector): confirmed by the owner ...` then `game.quit by the owner (TruMenu)
+    ...`; the run summary says "ended via TruMenu game.quit (exit code 0x544D, not a crash)".
 
 ## Ideas
 

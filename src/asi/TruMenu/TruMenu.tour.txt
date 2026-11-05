@@ -1,0 +1,52 @@
+# TruMenu tour (TruMenu 0.10.2) - Set-TruMenu.ps1 copies it next to tru.exe as TruMenu.tour.txt.
+# Written by tools/tour_from_rundgang.py from the workspace docs/Shader-Rundgang.md + docs/Versteckte-Inhalte-Rundgang.md + docs/Rad-Zusatzstopps.md (33 stops); do not edit
+# by hand - run the tool again. Radial menu: Tests / Rundgang / <section> (DLC 2 rooms: Tests / Rundgang /
+# DLC 2 / <room>); "(?)" = place unverified in the document; level.start = main menu only, its "Laden"
+# entry is for use in a level. One entry per line: path | label | item id [argument] (path below
+# Tests/Rundgang).
+DLC 2/Start | Laden dlc_level2_start | level.load dlc_level2_start
+DLC 2/Start | 01 Intro: Doppelgaengerin wuergt Lara | level.start dlc2
+DLC 2/Start | 02 Startpunkt: Doppelgaengerin im Level | status.unit
+DLC 2/Start | 03 Startpunkt: Schattenkraft (RB halten) | status.unit
+DLC 2/Start | 04 Becken unter dem Wasserfall: Waende (?) | player.goto 11301
+DLC 2/Start | 05 Felsrinne (Referenz, muss gleich bleiben) | player.goto 10193
+DLC 2/hall02 | Laden dlc_yggdrasil_hall02 | level.load dlc_yggdrasil_hall02
+DLC 2/hall02 | 06 hall02 Eingang: Boden, Wandband, Waende (?) | player.goto 11258
+DLC 2/hall02 | 07 hall02 Thrall-Kampf (Tutorial-Wikinger) | player.goto 11523
+DLC 2/hall02 | 08 hall02 Yeti und Brechwand | player.goto 11259
+DLC 2/Yggdrasil-Ende | Laden dlc_yggdrasil_end | level.load dlc_yggdrasil_end
+DLC 2/Yggdrasil-Ende | 09 Goo-Roehre ueber der Druckplatte | player.goto 11515
+DLC 2/Maschinenraum | Laden dlc2_machine_room | level.load dlc2_machine_room
+DLC 2/Maschinenraum | 10 Maschinensaeule | player.goto 11705
+DLC 2/Maschinenraum | 11 Maschinentruemmer | player.goto 11669
+DLC 2/Maschinenraum | 12 Ausfahrbare Bruecken | player.goto 10486
+DLC 2/Maschinenraum | 13 Punch-Switch | player.goto 11692
+DLC 2/Maschinenraum | 14 Grosser Goo-Speier und Korkenzieher | player.goto 11264
+DLC 2/Maschinenraum | 15 Kolben | player.goto 12194
+DLC 2/Halle Maschine-Zeremonie | Laden dlc2_hall_machine_ceremony | level.load dlc2_hall_machine_ceremony
+DLC 2/Halle Maschine-Zeremonie | 16 Stampfer | player.goto 12054
+DLC 2/Halle Maschine-Zeremonie | 17 Laufband-Bloecke (?) | player.goto 11513
+DLC 2/Zeremonienraum | Laden dlc2_ceremony_room | level.load dlc2_ceremony_room
+DLC 2/Zeremonienraum | 18 Natla-Kapsel, Zeremonie-Runen, Natla-Thrall | player.goto 11868
+DLC 2/Zeremonienraum | 19 Thrall-Gruppe am Boden (Panzer-Yeti) | player.goto 11422
+DLC 2/Halle Zeremonie-Goo | Laden dlc2_hall_ceremony_goo | level.load dlc2_hall_ceremony_goo
+DLC 2/Halle Zeremonie-Goo | 20 Fallender Runenblock | player.goto 11328
+DLC 2/Goo-Raum | Laden dlc2_goo_room | level.load dlc2_goo_room
+DLC 2/Goo-Raum | 21 Goo-Konverter, Goo-Muehle, Goo-Saeule | player.goto 12172
+Nur in Zwischensequenzen | 22 Schatzraum-Zwischensequenz (DLC 2 Ende) | status.unit
+DLC 1 | Laden dlc_level1_start | level.load dlc_level1_start
+DLC 1 | 23 Intro DLC 1: Ritter-Thrall-Kopie (?) | level.start dlc1
+DLC 1 | 24 Hoehlen: Adrenalinfalle und Deckenhaken | player.goto 9864
+DLC 1 | Laden dlc_dungeon | level.load dlc_dungeon
+DLC 1 | 25 Kerker: Dragon-Slider und Wand-Greifhaken | player.goto 9414
+Versteckt | Laden dlc_dungeon | level.load dlc_dungeon
+Versteckt | 26 Goldene Schrotflinte: Schatz im Kerker | player.goto 9475
+Versteckt | 27 container1: Test-Einheit (Saves sichern!) | level.load container1
+Versteckt | 28 Erweitertes Ende (Saves sichern!) | level.load l7_himalaya_end
+Paket-Ziele | Laden dlc2_machine_room | level.load dlc2_machine_room
+Paket-Ziele | 29 Goo-Rohre links | player.goto 10425
+Paket-Ziele | 30 Goo-Rohre rechts | player.goto 12104
+Paket-Ziele | 31 Sprungplatte 1 | player.goto 12126
+Paket-Ziele | 32 Sprungplatte 2 | player.goto 12127
+Paket-Ziele | Laden dlc2_ceremony_room | level.load dlc2_ceremony_room
+Paket-Ziele | 33 Kapselschalter (Adrenalin) | player.goto 11903

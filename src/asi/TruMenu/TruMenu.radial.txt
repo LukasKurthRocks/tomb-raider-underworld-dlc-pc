@@ -1,0 +1,77 @@
+# TruMenu radial menu (TruMenu 0.10) - Set-TruMenu.ps1 copies it next to tru.exe as TruMenu.radial.txt.
+# One entry per line: path | label | item id [argument]
+#   path     the ring level: "Cheats", "Objekte/Kisten" ("/" = a level below); a level with more than 8 entries gets
+#            pages (LB / RB). Levels show up in the order of their first line.
+#   label    the text in the sector - ASCII only (the menu font has no umlauts), at most 47 characters
+#   item id  a TruMenu item as typed into the command bar ("list" there shows all); a bool item without an argument
+#            switches to the other state and shows on / off in its sector
+# Never offered (dropped with a log line): game.quit, cmd.run, save.delete, save.restore, save.import, settings.reset.
+# Unknown ids are greyed out and named in TruMenu.log. "menu radial.reload" (or the item in the command bar) reads the
+# file again; tools/trumenu_ini_check.py checks the shipped file.
+Cheats | Gott-Modus | cheat.god
+# 0.10.2 (F15): no flight any more (the player's no-damage bit instead of cheatMode bit 0); instant deaths still kill
+Cheats | Gott-Modus voll (ausser Sofort-Tod) | cheat.godfull
+Cheats | Ein Treffer toetet | cheat.onehitkill
+Cheats | Gegner-Leben zeigen | cheat.enemyhealth
+Cheats | Munition endlos | cheat.ammo
+Cheats | Alles auffuellen | cheat.fillup
+Marken | Marke setzen | player.mark
+Marken | Zur Marke | player.recall
+Marken | Befreien (Marke) | player.unstuck mark
+Zeit | Normal 1.0 | time.scale 1
+Zeit | Zeitlupe 0.5 | time.scale 0.5
+Zeit | Zeitlupe 0.25 | time.scale 0.25
+Zeit | Welt einfrieren | time.pause
+# 0.10.3 (F7): the sound pauses with the freeze (default off, switched until the next start; state in the ring centre)
+Zeit | Ton mit Rad-Einfrieren | time.freezesound
+Zeit | Ton mit Welt einfrieren | time.pausesound
+Zeit | Ton-Pause: Stand | time.sound
+# 0.10.4 (F7, light shaft): the shader clock TimeVector holds with every world freeze (default off; state: time.clock)
+Zeit | Shader-Uhr mit Einfrieren | time.freezeclock
+Waffen | Schrotflinte | weapon.give wp_shotgun
+Waffen | Uzis | weapon.give wp_uzi
+Waffen | Goldene Schrotflinte | weapon.give wp_dlc_gold_shotgun
+Waffen | Sturmgewehr | weapon.give wp_assault_rifle
+Waffen | Betaeubungsgewehr | weapon.give wp_tranq
+Waffen | Munition voll | ammo.fill
+Spieler | Befreien | player.unstuck
+Spieler | Volle Gesundheit | player.health
+Spieler | Unverwundbar | player.invincible
+# test packages (03.11., docs/Testpakete-Rad.md): helpers so a package runs from the ring alone
+Spieler/Helfer | Saves sichern | save.backup
+Spieler/Helfer | Skript-Log an | log.script 1
+Spieler/Helfer | Skript-Log aus | log.script 0
+Spieler/Helfer | Sterben | player.die
+Spieler/Helfer | Level neu laden | level.reload
+Spieler/Helfer | Musik: Thailand | media.music.play l2_waters_of_thailand
+Spieler/Helfer | Musik aus | media.music.stop all
+# 0.10.2 (F6): what the safe-ground sampler is waiting for and how many windows passed (shows in the ring centre)
+Spieler/Helfer | Befreien: Stand | player.safeground
+# 0.10.5: a screenshot of the next frame into TruShots\ next to tru.exe ([Shot]; clean = without the ring)
+Spieler | Screenshot | shot.save ring
+# stage R2 - only with [Radial] Spawn=1 (greyed out otherwise); back up the saves first (Saves page). Candidates whose
+# DRMs are in the PC bigfile (tools/archive_has.py: pcbig) and whose object ids are in the merged object list:
+# g_healthpack is already loaded in the DLC 2 units (tools/objlist_users.py), the crates and the shotgun are loaded on
+# demand by the spawn (object tracker + load queue).
+# 0.10.5: below Spieler (was a top level until 0.10.4) - the top level keeps 8 sectors with the new level Claude
+Spieler/Objekte | Medipack | instance.spawn g_healthpack
+Spieler/Objekte | Kiste A | instance.spawn sh_ei_combat_crate_a
+Spieler/Objekte | Kiste B | instance.spawn sh_ei_combat_crate_b
+Spieler/Objekte | Kiste C | instance.spawn sh_ei_combat_crate_c
+Spieler/Objekte | Schrotflinte (Objekt) | instance.spawn wp_shotgun
+# 0.10.5 (owner wish 2026-11-05): Claude marks, drawn in coral - each pick writes one TruMenu.log line
+# "claude.mark <kind>: <time> unit=<stream unit> pos=<x y z> step=<TO TEST step or -> shot=<file> src=ring" and takes a
+# clean shot named <kind>; the ring closes after the pick. [Shot] Hotkey (F11 = 0x7A, default off) = "Jetzt".
+# 0.11 Ablauf (TruMenu.flow.txt, [Flow] Enabled=1; greyed without a flow): "Weiter" shows the current step ("Weiter:
+# <step>"), runs an action's commands / finishes a mark step and closes the ring; Gut / Fehler also set the current
+# step's result (ok / fail); page 2 (RB): Zurueck = the step before again, "Ablauf n/m" = flow.status as the result.
+Claude | Weiter | flow.next
+Claude | Ueberspringen | flow.skip
+Claude | Jetzt | claude.mark now
+Claude | Gut | claude.mark good
+Claude | Fehler | claude.mark bug
+Claude | Grafik komisch | claude.mark gfx
+Claude | Ton komisch | claude.mark sound
+Claude | Ruckler / Haenger | claude.mark stutter
+Claude | Zurueck | flow.back
+Claude | Ablauf | flow.status
