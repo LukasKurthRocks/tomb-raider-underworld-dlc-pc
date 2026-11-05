@@ -46,7 +46,9 @@ $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # SHA-256 of earlier builds of ours (0.1 = slow motion only, 0.2 = estimated meter, 0.3 = translated meter, all
 # 2026-10-30; 0.4 = Lara meter conditions, 2026-10-31; 0.5 = TU states (work\asi\v05) and 0.5.1 as installed for
 # test 48k, 2026-11-01; 0.6 = condition 1046 (work\asi\v06), 2026-11-01; 0.7 = condition 1055 (work\asi\v07) and the
-# sample .ini of 0.5-0.7, 2026-11-02) - recognised as ours for update / removal
+# sample .ini of 0.5-0.7, 2026-11-02; 0.8 = look events (work\asi\v08); 0.9 = TU tick / adrenaline look (work\asi\v09),
+# 2026-11-02; 0.10 = look screen effect (work\asi\v10), 0.11 = GlobalParams[7] / state 2102 / meter API v2
+# (work\asi\v11), 2026-11-03) - recognised as ours for update / removal
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
@@ -56,13 +58,24 @@ $earlierBuilds = @{
                              '004e190490b66872c6bc3780681ae45877d25501974a602b28c9d2a9acdedd2e',
                              '68009a611af59f980a6d80053720e791173e32ec93b6ef5a4707e2bd6f5005b9',
                              '0a536f3c1f4835640e94259f653638e5983b531d634219240980d23ad3ec5394',
-                             '8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5')   # 0.8 look (work\asi\v08)
+                             '8e27662950b98778a882334e86fbe8be404c4fb39f12456b5969f8fefd904af5',   # 0.8 look (work\asi\v08)
+                             '37b0d55016689de9896c39abe6052c84aadebf415eebd2e1c60437af39616c8a',   # 0.9 TU tick / adrenaline (work\asi\v09)
+                             '9570fe9089d8b82dfc8cb6fb1033d52a49445dda11e3d5bfaa8b8224be202256',   # 0.10 look screen effect (work\asi\v10)
+                             'fe42c05135581cdef87fae7b1d5e41c2a08213f2d2d38f02f36a82fc2c85f30a',   # 0.11 GlobalParams[7] / 2102 / API v2 (work\asi\v11)
+                             'a3dd085da71e630a87ea220b4c7b24294421e1080c9c592f84bf173f533b0c5e',   # 0.12 (work\asi\v12)
+                             'a3961fb70975d8436a032250203df6ef6577987429b1529993bdfd415493fb1b',   # 0.13 2102 check next to TruDataGuard (work\asi\v13)
+                             'e8746362890d87be6139d297feb3dbb4978fc05a88698ced5969c846c0619bd6')   # 0.14 loop sound / move events / camera flag / strike look (work\asi\v14)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
                              '4924bfb8cac427467517c10c543f9c6eadc1f7503cf755ff54a5ef99671e29d9',
                              '162111a4586f70f7c19ca9e98f186998f1961a8441a8296a6b9fc34b0296c745',
-                             '2cdc7d4992fdad5449c521370df9b2a786d2a3b5c34673af5f62d42489de1ac9')   # 0.8 sample .ini ([Look])
+                             '2cdc7d4992fdad5449c521370df9b2a786d2a3b5c34673af5f62d42489de1ac9',   # 0.8 sample .ini ([Look])
+                             'c9e7fde0b34d80362fe608aa1bd8b91c2a9d376050032135efb6b47a52bfb07c',   # 0.9 sample .ini (AdrenalineMode)
+                             '97dccd43228ed0942fa9fbc4f7a35b17aa17189e9fc1843d4ef4f82f0dd25f16',   # 0.10 sample .ini (ScreenEffect)
+                             'dab30d022a0067b58b8d6e1c20fab323f3e71d1fb6ed358fa4cf86437b95c0cd',   # 0.11 sample .ini (GlobalParams7, State2102)
+                             'd8467e122ed50150aeac292075e6ec3ee6c634295e6867a3ab91355e521bf132',   # 0.12 / 0.13 sample .ini
+                             '5bf019742d81fe897bbc08fe145cccde0b45468c603852c469798f468b2d0c50')   # 0.14 sample .ini ([Sound] LoopSound, [Look] MoveEvents / CameraFlag / StrikeLook)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

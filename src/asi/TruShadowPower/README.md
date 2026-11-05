@@ -15,9 +15,187 @@ values. The translation table, the data sources and every left-out part are docu
 **Status: 3.1 (slow motion) played; 3.2 (meter with estimated rates) played - meter OK, HUD silhouette not shown;
 3.3 (translated meter + HUD trigger) played 2026-10-30 - drain / refill 200/s as in the data, tuning from the
 fallback copy; 0.4 (lookup diagnostics, Lara conditions) played 2026-10-31 (test A); 0.5 (TU states) built
-2026-10-31, not yet played; 0.9 (TU tick gates, adrenaline look) built 2026-11-02, not played.** Not covered: sounds,
-the shadow-strike look, rock veins (TruRockVein.asi), the shadow
-strike target states and the combat conditions (0.5 gaps below).
+2026-10-31, not yet played; 0.9 (TU tick gates, adrenaline look) played 2026-11-02 (test 50k: power OK, screen black /
+white-black with the look); 0.10 (look screen-effect report / switch, with the data fix tree `dlc_test50l_look`) built
+2026-11-03, not played; 0.11 (GlobalParams[7], state 2102, meter interface v2) built 2026-11-03, not played; 0.12
+(meter interface v3, InstanceParams[1] in cinematics) built 2026-11-03, played in the runs of 2026-11-03 (state 2102
+never registered); 0.13 (state 2102 next to TruDataGuard) built 2026-11-04, not played; 0.14 (loop sound, movement
+events, camera flag, strike look - four switches, all default off) built 2026-11-04, not played.** Not covered: the
+meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
+and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.14: the remaining TU parts of the power, each behind its own switch (2026-11-04)
+
+All four are **off by default** - with the 0.14 sample ini the plugin behaves as 0.13 (nothing checked, nothing
+patched). Project doc `Befund-Schattenkraft-0411b.md` has the evidence; byte pre-checks `work\asi\v14\prechecks_v14.txt`
+(36 checks, 0 mismatches; the v12 / v13 lists unchanged: 37 / 6, 0 mismatches). Build `work\asi\v14`.
+
+| switch | TU | PC translation |
+|---|---|---|
+| `[Sound] LoopSound` | meter +0x0 handle (init 0x823d7700: {+0xc = tuning +0x5c, +0x10 weak node}; tick 0x823d7ae0..0x823d7b34: power on -> TU-only 0x82480440, off -> TU-only 0x824805c8) | start = tru+0x193c90 (= TU 0x8223ee58: tru+0x1935d0 on the sound manager [0x8a8100]), position = tru+0x183340 (= 0x82241918), emitter +0x2c / +0x30 / +0x34 = value / start value / value, stop = (emitter +8)->vtbl[0x10](6), weak-node free list [0xcda0c4], pool tru+0x198570; data = tuning +0x5c of object 858 (SoundPlex node -> DTP 22864). The handle is made at the first tick of a tracker generation with object 858 loaded (the PC player init is not hooked) and freed (0x823d7680) with the next tracker |
+| `[Look] MoveEvents` | 0x823d77f0 per tick (events 0x84 / 0x83 by \|gameTracker+0x1f0\| against 10.0 and 3000 ms, meter +0x30 / +0x34) and Start's 0x83 when the length is > 10 | PC gameTracker+0x1f0 = the same field: the PC twin tru+0x317eb6 of retail 0x82409660 (switch tru+0x316f30 = retail 0x824077e0, map verified) builds `[0xfadb58] + 0x1f0`. Branches as the TU (unordered compares included); length with sqrtf instead of vrsqrtefp128 + one Newton step |
+| `[Look] CameraFlag` | Start: (*0x82efc780)->vtbl[0xa4] = 0x822a9e58 (+0x7c \|= 2) | manager 0xe804f0, vtable 0x855ae4 slot 0xa4 = tru+0x1eb200 (+0x80 \|= 2); slots 0x8c..0xac in the same order on both; the PC retail strike look tru+0x315103 makes the same call |
+| `[Look] StrikeLook` | player anim events 5 / 4 in doppelganger mode: 0x823d8a80 / 0x823d9050 instead of the retail 0x823e0308 / 0x823e07e8; Stop calls 0x823d9050 with flag 2 | call sites tru+0x316f6b / tru+0x316f86 (switch tru+0x316f30) go to the plugin: doppelganger mode -> translation, else the PC handlers tru+0x315020 / tru+0x318ea0. Look on: request slot 2 = tuning +0x50 / +0x4c, event 0x7a (tru+0x318780), target from TruShadowCombatStrikeState (handle, count), query 0x188 (tru+0x1b3720, arg = count) -> segment matrix +0x30, aim = TU 0x823e2b98 (point 0: tru+0x30db20; else its tail written out with tru+0x3020e0 / tru+0x2e6a70), second model +0x40 \|= 0x200, strike latch 0, flag 4. Look off: request 2 cleared, event 0x7b, tru+0x2e6ca0, 0x200 cleared on both models, flag 4 cleared |
+
+**Meter interface version 4** (pure append): `void (__cdecl *strikeLookOff)()` = TU 0x823d9050 for the strike tick /
+end (TU 0x823d8d18 / 0x823d9210 call it next to their 100 % drain); does nothing unless meter flag 4 is set.
+
+**Log lines** (LogLevel 1 = first time, 2 = every time): `loop sound: handle made`, `loop sound: started (TU
+0x8223ee58 ...)`, `loop sound: first stop (TU 0x824805c8 ...)`; `move events: TU 0x823d77f0 runs`, `move events:
+speed fell to ... player event 0x84`, `move events: ... player event 0x83`; `camera flag: TU 0x823d7f14 ... +0x80
+0x........ -> 0x........`; `strike look: player anim event 5 in doppelganger mode -> TU 0x823d8a80`, `strike look ON
+(TU 0x823d8a80 ...)`, `strike look OFF (TU 0x823d9050 ...)`. A failed check: `... code does not match (<part>) - off`.
+
+**TO TEST (0.14)**
+
+| # | switch | test | what the owner should see / the log |
+|---|---|---|---|
+| 1 | LoopSound=1 | DLC 2, hold RB a few seconds, release | a loop sound while the power runs, gone after release; `loop sound: handle made`, `started`, `first stop` |
+| 2 | MoveEvents=1 | power on while running, stop, run again | `move events: speed fell to ... 0x84` on every stop with the power on; 0x83 only by the TU's 3000 ms rule (statically: hardly ever) or at a start while running (`start while moving`) |
+| 3 | CameraFlag=1 | power on once | `camera flag: ... +0x80 0x..0 -> 0x..2` (sticky); describe any camera change |
+| 4 | StrikeLook=1 + TruShadowCombat `[Strike] Translate=1` | hall02, after the F4 fix: power on, strike at a thrall | `strike look: player anim event 5 ...`, `strike look ON`, condition 1055 -> 1 (LogLevel 2), then `strike look OFF` |
+
+## 0.13: state 2102 next to TruDataGuard.asi (2026-11-04)
+
+In every run of 2026-11-03 the log said `state 2102: camera code does not match - not registered`. The expected bytes
+are right (`tools/pe_bytes_check.py` against the clean `tru.exe`: all 5 checks ok). The failing check is the section
+lookup **tru+0x14df80** (the camera-settings lookup of TU 0x822bc198): **TruDataGuard.asi** loads first (alphabetical
+order) and replaces its first 5 bytes with `E9 <stub>` (TruDataGuard.cpp `WriteJump(kLookup, &LookupStub)`); the
+check ran afterwards and saw `e9 ..` instead of `8b 44 24 04 8b`. Since TruDataGuard 0.1 (run 50j) the two were never
+installed without each other while TruShadowPower had state 2102 (0.11+).
+
+0.13 accepts the original bytes **or** exactly that patch: `E9` whose target lies in a module named
+`TruDataGuard.asi` and the unchanged rest of the function from +5 (`04 85 28 6f c3 00 ..`). The guard stub returns the
+same entry for valid ids (State2102 is not one of TruDataGuard's "tests for 0" callers: an invalid id is logged and the
+original lookup runs). A failing check now names itself in the log (`camera code does not match (<check>)`). Log on
+success with TruDataGuard: `state 2102: section lookup tru+0x14df80 jumps to TruDataGuard.asi (0x........) - accepted`,
+then `Lara states: ... 2102 (camera blend to its end ...) added`; in the wall run `state 2102 ... first call`.
+
+Details: docs `Befund-2102-und-Id68f4.md` (project folder).
+
+## 0.12: meter interface v3, the second TU block of 0x82474728 (2026-11-03)
+
+**Meter interface version 3.** Pure append to version 2 (layout of v1 / v2 unchanged): `volatile LONG *gt1280` = the
+plugin's TU-only gameTracker+0x1280 (move step count), as requested in docs Befund-Schattenkampf.md section 5 ("Version
+3 request"). State 245 writes it (since 0.5), TruShadowCombat's state 244 can write the same variable through the
+pointer, condition 1048 reads it (unchanged code, the variable is now `volatile LONG`).
+
+**InstanceParams[1] of the player model (`[Look] CinematicParam`, default 1).** The second block the TU appended to
+0x82474728 (0x8247498c..0x82474a24, same gate as GlobalParams[7]: game tracker and object 858's tuning): model =
+(instance +0x244)->+0x10[(s8)((+0x244)->+4)->+0x234], `model->vtbl[0x50](1, cinematic ? (1, 0, 0, 0) : (0, 0, 0, 0))`
+(cinematic = [0x82efb590] +0xdd and +0x2c != -1). PC layout checked: the same three fields in the PC helpers
+(tru+0x1b6abd: `mov eax,[ecx+0x244]; mov edx,[eax+4]; movsx ecx,byte [edx+0x234]; mov edx,[eax+0x10]; mov ecx,
+[edx+ecx*4]`); slot 0x50 of `cdc::PCRenderModelInstance` (vtable 0x849764, RTTI) = tru+0xf4f60 = set InstanceParams
+[index] (allocates the 0x90-byte block, `[+0x1c + 16 x index] = *vec`); same slot on both platforms: retail 0x8248fe38
+(map: verified = PC tru+0x393680) calls vtbl[0x50](0, v) / (1, +0x4a0), the PC twin `call [edx+0x50]` with push 0 /
+push 1 + vector pointer. Translation in the 0.11 wrapper after GlobalParams[7]; the cinematic test is PC tru+0x53f00
+(the plugin's verified copy of the same test); the model's vtable is checked at run time (else a log line, nothing set).
+
+**Doppelganger default camera (+0x14c) - documented, not patched.** 28 PC sites inline TU 0x822bc198's fallback as
+`call tru+0x1d4080; mov eax, [eax+0x144]` (`tools/camera2102.py pcdefaults`), all followed by the settings lookup
+tru+0x14df80. What PC [0xe7ee50] +0x14c holds is not proven (the only +0x14c writers near the camera code,
+tru+0x1ddba7 / tru+0x1ddc19, write a four-id block +0x140..+0x14c of an object not proven to be [0xe7ee50]); a wrong
+id makes the lookup return 0 and some sites dereference it. Not patched; list for a
+Xenia comparison in project doc Befund-Look.md section 9.
+
+Byte pre-checks `work\asi\v12\prechecks_v12.txt`: 37 checks, 0 mismatches. Build `work\asi\v12`.
+
+**TO TEST (0.12)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | DLC 2 start (intro cutscene, then play) | log "InstanceParams[1] of the player model (TU 0x8247498c) = ..." at the first frame; at LogLevel 2 a line when a cinematic starts / ends; doppelganger look in cutscenes vs gameplay as on the Xbox |
+| 2 | with TruShadowCombat 0.2 | TruShadowCombat.log "meter interface found (version 3)"; shadow dash (state 244) then condition 1048 lines in TruShadowPower.log ("steps x 100 = ...") with the dash's step count |
+| 3 | `[Look] CinematicParam=0` | no InstanceParams line, everything else as 0.11 |
+| 4 | main game | nothing of this (object 858 not loaded) |
+
+## 0.11: GlobalParams[7], state 2102, the meter interface (2026-11-03)
+
+**GlobalParams[7] (`[Look] GlobalParams7`, default 1).** 19 TU pixel shaders (the look 2327, the rock vein 2392, ...)
+read GlobalParams[7] (PC c147); no base shader does. Writer found: TU **0x82474728** (= retail 0x8246eff0 = PC
+**tru+0x373a70**, called per frame for the player from tru+0x373bf0) sets GlobalParams[0..6] (player position, six bones)
+through `(*0x829be0a4)->vtbl[0x84](index, 1, vec)`; the TU appended at 0x824748e4, when the game tracker and the tuning
+(0x82415518 = object 858) exist: **GlobalParams[7] = (meter / tuning +0x10, meter / meter +0xc, flags & 1, fade)**
+with 0x823d8548 / 0x823d85a8; fade = clamp((clock - meter +0x3c) x 0.03 / tuning +0x60) while the power is on, else
+1 - clamp(... / tuning +0x64) (1 when the span is <= 0). PC: the same setter `[0xa1407c]->vtbl[0x84]` = tru+0x107110;
+the call tru+0x373bfd goes to a wrapper (`GlobalsWrap`) that runs tru+0x373a70 and then the TU block. The meter's
+start time now uses the TU's clock: TU +0x3c = [0x82efb528] = **PC 0xe7f158** (gameTrackerX has one offset between the
+platforms: 0x82efb464 / 0x514 / 0x560 / 0x590 = PC 0xe7f094 / 0xf144 / 0xf190 / 0xf1c0); 0.3-0.10 stored 0xe7f15c (no
+reader). Not translated: the second appended TU block 0x8247498c (player instance +0x244 -> ...->vtbl[0x50](1,
+cinematic ? (1,0,0,0) : 0)).
+
+**State 2102 (`[States] State2102`, default 1).** TU record `{2102, 0x824627b0, 0 x5}` (Lara table, 0x82758c18):
+r3 = camera manager 0x82efc780, 0x822ae918: if the Lara camera (+0xb50) is current -> its vtbl[0x80] = TU-only
+**0x822c2130**: `+0x1e4 = settings +0xb8 + settings +0xb4` (the camera blend jumps to its end; settings =
+0x822bc198(+0x1d0), whose TU fallback uses the defaults +0x14c instead of +0x144 in doppelganger mode). The TU split
+this out of the retail slot 0x6c (PC tru+0x202290, body tru+0x202298..0x2022db); the PC vtable 0x85600c has no slot
+0x80, so the body is written out: manager 0xe804f0, `+0xb80`, is-current tru+0x1e7fb0, settings tru+0x14df80,
+defaults [0xe7ee50]. Added to Lara's state copy only when TruDoppelganger's generic table holds 2102.
+
+**Meter interface `TruShadowPowerMeterApi` (version 2).** `extern "C" const TruShadowPowerMeter *__cdecl
+TruShadowPowerMeterApi()` - version 1 exactly as TruShadowCombat's proposal (docs Befund-Schattenkampf.md section 5:
+size, version, flags, value, startValue, request[7][2], selector 0x823d7520, drain 0x823d8380 with the meter's tuning);
+version 2 appends for a later HUD plugin (larabase natives, Plan-Nacht-Analysen section 2): `float *delay` (+0x10),
+`delayStart()` = f70 0x824aa060 (+0x10 = tuning +0x24), `strikeReady()` = f71 0x824aa0a0 (flag 8 and value > tuning
++0x70 x 0.01 x tuning +0x10, game tracker and tuning present), `canStart()` = f72 0x824aa120 (the plugin's CanStart =
+0x823d8120, clears flag 0x200 above +0x28), `delayLeft()` = f73 0x824aa150 (max(+0x10, 0)). Game thread only. The
+tuning is the meter's own (TU 0x82415518; with `[Meter] Fallback=1` possibly the file copy). Not in the struct: the
+meter fields +0x15 / +0x18 / +0x1c / +0x28 / +0x2c the strike would write (not in the proposal).
+
+Byte pre-checks `work\asi\v11\prechecks_v11.txt`: 33 checks, 0 mismatches. Build `work\asi\v11`.
+
+**TO TEST (0.11)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | DLC 2 start with tree `dlc_test50l_look` | log "GlobalParams[7] (TU 0x824748e4): first set (...)" and "meter interface: TruShadowPowerMeterApi version 2 exported" |
+| 2 | hold RB | the look edges fade in over ~1 s (tuning +0x60 = 25 frames) and out after release; rock vein strip: note whether it changes with the power (TU shader 2392 reads the same vector) |
+| 3 | wall run (RB + A at the rock channel) | log "state 2102 (TU 0x822ae918 -> 0x822c2130) first call ..."; the camera settles at once, no jump / flicker |
+| 4 | with TruShadowCombat 0.1 | TruShadowCombat.log "TruShadowPower meter interface found (version 2)" |
+| 5 | main game | no "GlobalParams[7]" line (object 858 not loaded -> not set), adrenaline unchanged |
+
+## 0.10: the black / white-black screen of the look (2026-11-03)
+
+**Cause (data, not the camera).** The bad picture of tests 50k (screenshots `_64` / `_67`) and the black screen at the
+DLC 2 start follow the **power**, not camera mode 0x30 / 0x34: in all three cases the camera was mode 1 when the
+picture was taken (the camera log ends in mode 1 while the power is on), and at the DLC 2 start there was no mode 0x30 /
+0x34 at all. Start event **0x32** of `doppelganger_casual` fires kind 1 sub 0xb {0xe} = **record 14** of the model
+record list (DTP 20134). PC `tru+0x135cc0` turns it into an instance effect of **type 0x85** (global effect list
+`[0xae4d00]`); `tru+0x1469a0` draws it every frame: record word 7 = **material 20744** -> `tru+0x146340` ->
+`tru+0x13ef30` = a **full-screen quad drawn with material 20744** (colour 0x80576b79, alpha x fade). On the Xbox that
+material runs TU pixel shader **2327**: a 13-tap radial blur of the back buffer (s0 / s2), desaturated and tinted
+(MaterialParams 0-6), blended in by its mask texture **6619** (black centre, white edges) - the soft / bright look of
+`Xenia-TU_DLC2_24`. The converter gave it a **surrogate** (PC lib 2517 = copy of base 405, class D, score 0.13) that
+outputs `s0 x InstanceParams.w x .y + s1 x InstanceParams.z` with alpha = MaterialOpacity, and dropped the 7
+MaterialParams: the screen shows the mask texture 6619 opaque (white edges, black centre - the exact shape of
+screenshot 67) or plain black. Only effects drawn after it (additive eitr, HUD) stay visible.
+
+**Fix (data, tree `work\rebuild\dlc_test50l_look`).** `tools/look_material_fix.py`: TU 2327 translated Xenos -> ps_3_0
+(upstream xenos2sm3, constants by name: ScreenExtents c51, MaterialOpacity c98, MaterialParams c100-c106,
+GlobalParams[7] c147) as **ShaderLib 2943** (8 slots, slot k = Xbox slot k & 1); **VS 2944** = the material's PC VS 406
+(PC twin of base Xbox 350, which TU VS 2328 extends) plus the vertex-colour pass-through of 2328 (the PS reads COLOR0.w,
+the fade); material 20744 = Xbox MaterialParams (7 vec4, Xbox layout byte for byte). Applied to all five DRMs that
+carry material 20744 (doppelganger_casual and the four DLC 2 thralls - the engine keeps the first loaded copy).
+
+**Plugin 0.10.** After event 0x32 the plugin looks for the player's type-0x85 effect in `[0xae4d00]` (up to 30 frames)
+and logs its material and colour ("look screen effect: ..."). `[Look] ScreenEffect=0` removes it with the engine's own
+kill `tru+0x12f1c0` - for data without the fix (the rest of the look stays). Five new byte pre-checks
+(`work\asi\v10\prechecks_v10.txt`, 22 checks, 0 mismatches).
+
+**Open.** GlobalParams[7] (PC c147) is read by 19 TU shaders (2327, the vein shader 2392, ...), by no base shader; on
+the PC `cdc::PCScene` uploads 16 GlobalParams from `+0x49c` (`tru+0x1150e0`, PS c140 / VS c65), zeroed in the
+constructor and written by no PC code - the TU writer is not found yet, so 2327 runs with GlobalParams[7].y = 0 (the
+offline preview shows the blurred / brightened edges either way). Materials 24356 / 24958 (records 10-13, events not
+fired today) have the same surrogate.
+
+**TO TEST (0.10)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | tree `dlc_test50l_look` + 0.10, DLC 2 start: hold RB / LB | slow motion; the picture stays visible: centre normal, edges blurred and brighter / blue-grey (like `Xenia-TU_DLC2_24`), no black screen; log "look screen effect: type 0x85 effect of the player, material 20744, colour 0x80576b79" |
+| 2 | same, hall02 near thralls, RB + aim | as 1; camera modes 0x34 / 0x30 come and go without a black or white-black picture |
+| 3 | old data (50k tree) + 0.10 with `[Look] ScreenEffect=0` | power and slow motion without the full-screen effect, no black screen; log "... - REMOVED ([Look] ScreenEffect=0)" |
+| 4 | main game: adrenaline dodge | unchanged |
 
 ## 0.9: the power only through the TU path, and the adrenaline look (2026-11-02)
 
@@ -205,6 +383,10 @@ every `*.asi` next to `tru.exe`.
 | `[States] Enabled` | 1 | see 0.5 |
 | `[Look] Enabled / Messages` | 1 | see 0.8; Enabled=0 also turns AdrenalineMode off |
 | `[Look] AdrenalineMode` | 1 | 0.9: TU meter flag 0x40 (0x823d94f8 group) + doppelganger branches of camera mode chooser (mode 0x34), adrenaline start / stop / tick, condition 1047 |
+| `[Look] ScreenEffect / GlobalParams7 / CinematicParam` | 1 | see 0.10 / 0.11 / 0.12 |
+| `[States] State2102` | 1 | see 0.11 |
+| `[Sound] LoopSound` | 0 | 0.14: the TU's looping sound of the power |
+| `[Look] MoveEvents / CameraFlag / StrikeLook` | 0 | 0.14: movement events 0x83 / 0x84, camera flag of Start, the shadow-strike look |
 
 The 0.2 options `WorldScale`, `PlayerScale`, `RampSeconds`, `[Meter] Enabled`, `DrainSeconds`, `RefillSeconds`,
 `RefillDelay`, `MinStart` are gone - those values now come from the data / the TU constants.

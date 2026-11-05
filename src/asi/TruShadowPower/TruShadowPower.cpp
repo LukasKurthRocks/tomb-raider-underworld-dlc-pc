@@ -78,6 +78,31 @@
 //     instead of player +0x1fc bit 27, and the adrenaline start / stop / tick (0x823ded18 / 0x823dee58 / 0x823defa8 =
 //     tru+0x3189c0 / tru+0x318ad0 / tru+0x318bd0) read flag 0x40 for "active" and meter flag 2 for +0x1fc bit 21;
 //     condition 1047 (TU predicate 0x8246e538 = PC tru+0x365600) the same. [Look] AdrenalineMode.
+//
+// 0.10 (2026-11-03, project doc Befund-Look.md): the black / white-black screen of the look was data, not the camera
+// mode: event 0x32 creates a full-screen effect (type 0x85) drawn with material 20744, whose converted pixel shader was
+// a surrogate. The fix is the data tree dlc_test50l_look (TU shader translated). 0.10 reports that effect in the log and
+// can remove it ([Look] ScreenEffect=0, for data without the fix).
+//
+// 0.11 (2026-11-03, Befund-Look.md section 7): GlobalParams[7] = the TU's shader vector of the power (TU 0x82474728
+// appends it to the per-frame GlobalParams 0-6 of the player; PC tru+0x373a70 + wrapper), state 2102 (camera blend to
+// its end, TU 0x822ae918 / 0x822c2130), the meter interface TruShadowPowerMeterApi (version 2: TruShadowCombat + HUD natives),
+// and the meter's start time on the TU's clock (PC 0xe7f158 = Xbox 0x82efb528, read by the look fade).
+//
+// 0.12 (2026-11-03, Befund-Look.md section 9): meter interface version 3 (+ gt1280, the step count shared with
+// TruShadowCombat's state 244 and read by condition 1048), and the second appended block of TU 0x82474728 (the player
+// model's InstanceParams[1] = (1, 0, 0, 0) while a cinematic runs, else 0; [Look] CinematicParam).
+//
+// 0.13 (2026-11-04, docs Befund-2102-und-Id68f4.md): state 2102 is registered again next to TruDataGuard.asi. Its byte
+// check of the section lookup tru+0x14df80 (the camera-settings lookup) failed in every run since TruDataGuard 0.1:
+// TruDataGuard loads first (alphabetical) and writes a 5-byte jump to its guard stub there. The check now accepts
+// exactly that patch (E9 into TruDataGuard.asi, the rest of the function unchanged) and names the failing check.
+//
+// 0.14 (2026-11-04, project doc Befund-Schattenkraft-0411b.md): the remaining TU parts of the power, four switches,
+// all default 0 (= 0.13): [Sound] LoopSound (meter +0x0 looping sound, 0x823d7700 / 0x82480440 / 0x824805c8),
+// [Look] MoveEvents (0x823d77f0 events 0x83 / 0x84 and Start's 0x83 by gameTracker+0x1f0, the same PC field),
+// [Look] CameraFlag (Start's camera manager vtbl[0xa4]), [Look] StrikeLook (0x823d8a80 / 0x823d9050 on player anim
+// events 5 / 4 in doppelganger mode; meter interface v4 strikeLookOff for TruShadowCombat).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -123,6 +148,13 @@ const DWORD kFrameStoreSite = 0x005da40c;                   // fst dword [0xe7f1
 const BYTE kFrameStoreBytes[] = {0xd9, 0x15, 0x90, 0xf1, 0xe7, 0x00};
 const float *const kFrameTime = reinterpret_cast<const float *>(0x00e7f190);
 const volatile DWORD *const kGameClock = reinterpret_cast<const volatile DWORD *>(0x00e7f15c);
+// 0.11: the clock the TU meter keeps in +0x3c (Start / Stop: [0x82efb458 +0xd0] = 0x82efb528) and the look fade
+// 0x823d85a8 reads. gameTrackerX has the same layout on both platforms (0x82efb464 / 0x82efb514 / 0x82efb560 /
+// 0x82efb590 = PC 0xe7f094 / 0xe7f144 / 0xe7f190 / 0xe7f1c0, one offset), so 0x82efb528 = PC 0xe7f158 (advanced once
+// per frame by `add [0xe7f158], eax` at tru+0x1da813). Up to 0.10 the meter stored 0xe7f15c (nothing read it).
+const volatile DWORD *const kTuClock = reinterpret_cast<const volatile DWORD *>(0x00e7f158);
+const DWORD kTuClockAdd = 0x005da813;
+const char *const kTuClockAddHex = "010558f1e700";
 
 // HUD: the second silhouette is a uimeter fed by hudscreenmgr native 36 (0xfae8d4); it is drawn while display group 1
 // is requested. The TU meter does "0x829ca6cc = value / max; 0x829ca724 |= 2; (*0x829ca720)->vtbl[0xc]()", the PC
@@ -224,6 +256,8 @@ struct Meter {
     float startValue;                   // +0x0c value when the power started (1000 after a stop)
     float delay;                        // +0x10 refill delay timer (no writer found in the TU besides the refill)
     BYTE latch;                         // +0x14 buttons seen held
+    float moveLength;                   // +0x30 0.14: last length of gameTracker+0x1f0 (0x823d77f0; 0.0 at init)
+    LONG moveSince;                     // +0x34 0.14: game clock of the rising edge, -1 = none (0x823d77f0)
     float requestTimer;                 // +0x38 frames until request slot 4 (condition 2401) is cleared
     DWORD startTime;                    // +0x3c game clock at the last start / stop
     // +0x40..+0x77: time-scale request list of 0x823d7520, 7 slots {player, world}; a value <= 0 = no request
@@ -241,6 +275,10 @@ int g_fallback = 1;                     // [Meter] Fallback: file copy of the tu
 int g_legacyPadStart = 0;               // 0.9 [ShadowPower] LegacyPadStart: 1 = the 0.8 tick (no TU gates)
 int g_gameInput = 0;                    // 0.9 [ShadowPower] GameInput: 1 = LB / RB from the game's input records
 int g_adrenalineMode = 1;               // 0.9 [Look] AdrenalineMode: TU 0x823d94f8 group + mode chooser / adrenaline
+int g_loopSound = 0;                    // 0.14 [Sound] LoopSound: TU looping sound of the power (meter +0x0)
+int g_moveEvents = 0;                   // 0.14 [Look] MoveEvents: TU 0x823d77f0 + Start's event 0x83 (gameTracker+0x1f0)
+int g_cameraFlag = 0;                   // 0.14 [Look] CameraFlag: TU Start's camera manager vtbl[0xa4] (+0x80 |= 2)
+int g_strikeLook = 0;                   // 0.14 [Look] StrikeLook: TU 0x823d8a80 / 0x823d9050 (player anim events 5 / 4)
 
 char g_logPath[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -408,6 +446,9 @@ void MeterInit() {
     g_meter.latch = 0;
     g_meter.value = kMeterStart;
     g_meter.delay = kZero;
+    g_meter.moveLength = kZero;                         // 0.14: TU 0x823d7738 stfs 0.0, +0x30
+    g_meter.moveSince = -1;                             // 0.14: not set by 0x823d7700 nor the allocation 0x82409c68..;
+                                                        // -1 is 0x823d77f0's own idle value (set on every tick while off)
     g_meter.requestTimer = kZero;
     for (int i = 0; i < 7; ++i) g_meter.request[i][0] = g_meter.request[i][1] = kNoRequest;
 }
@@ -507,9 +548,80 @@ int BroadcastPowerMessage(int msg) {
     return sent;
 }
 
+// 0.10 (docs Befund-Look.md): the full-screen part of the look. Event 0x32 of doppelganger_casual fires kind 1 sub 0xb
+// {0xe} = record 14 of the model record list (DTP 20134); tru+0x135cc0 makes it an instance effect of type 0x85 in the
+// global effect list [0xae4d00] (+0 next, +8 instance, +0x10 type, +0x30 colour, +0x4c material = record word 7).
+// tru+0x1469a0 draws it each frame: material != 0 -> tru+0x146340 -> tru+0x13ef30 = a full-screen quad with MATERIAL
+// 20744 (colour 0x80576b79, alpha x fade). On the converted data that material had a surrogate pixel shader (lib 2517)
+// that shows its mask texture 6619 (black centre, white edges) or black - the "look draws wrong" bug. The fix is data
+// (tree dlc_test50l_look: the TU pixel shader 2327 translated, lib 2943 / VS 2944, Xbox MaterialParams). This plugin
+// only reports the effect ([Look] ScreenEffect=1) or removes it with the engine's own kill tru+0x12f1c0 (=0; for the
+// old data). Read-only walk of the list; called from the game thread (pad poll) like the event walker.
+typedef void(__cdecl *EffectKillFn)(void *effect);
+const DWORD kEffectHead = 0x00ae4d00;
+const DWORD kEffectWalk = 0x0054773b;           // mov esi, [0xae4d00]; xor edi, edi; cmp esi, edi (tru+0x147220)
+const char *const kEffectWalkHex = "8b35004dae00 33ff 3bf7";
+const DWORD kFx85Create = 0x00535d2e;           // tru+0x135cc0: callback 0x535c00, +8 instance, +0x10 = 0x85
+const char *const kFx85CreateHex = "c74604005c5300 660fbe4709 66894614 8b44240c 894608 8b4844 894e0c 81481c00020000 "
+                                   "83caff c6461085";
+const DWORD kFx85Material = 0x00535de8;         // mov eax, [edi+0x1c]; mov [esi+0x4c], eax (record word 7)
+const char *const kFx85MaterialHex = "8b471c 89464c";
+const DWORD kFx85Draw = 0x00546dd2;             // tru+0x1469a0: cmp [esi+0x4c], 0 -> tru+0x146340 (material quad)
+const char *const kFx85DrawHex = "837e4c00 7411 51 d91c24 6a00 56";
+const DWORD kEffectKill = 0x0052f1c0;           // marks the effect dead (+0x10 |= 0x40), the list walk frees it
+const char *const kEffectKillHex = "56 8b742408 85f6 743d 8a4610 a840 7536";
+int g_lookScreen = 1;                           // [Look] ScreenEffect
+bool g_fxOk = false;                            // effect list code verified
+int g_fxPending = 0;                            // frames left to look for the effect after event 0x32
+volatile LONG g_fxSeen = 0;
+
+// returns the number of type-0x85 effects of the player found (and removed when [Look] ScreenEffect=0)
+int ScreenEffectCheck() {
+    void *player = *reinterpret_cast<void *const *>(0x00e7f094);
+    if (!g_fxOk || !player) return 0;
+    int found = 0;
+    __try {
+        BYTE *e = *reinterpret_cast<BYTE *const *>(kEffectHead);
+        for (int guard = 0; e && guard < 8192; ++guard) {
+            BYTE *next = *reinterpret_cast<BYTE *const *>(e);
+            if (e[0x10] == 0x85 && *reinterpret_cast<void *const *>(e + 8) == player) {
+                ++found;
+                DWORD material = *reinterpret_cast<const DWORD *>(e + 0x4c);
+                DWORD colour = *reinterpret_cast<const DWORD *>(e + 0x30);
+                if (!g_lookScreen) reinterpret_cast<EffectKillFn>(kEffectKill)(e);
+                if (InterlockedIncrement(&g_fxSeen) == 1)
+                    Log(1, "look screen effect: type 0x85 effect of the player, material %lu, colour 0x%08lx (record 14 "
+                           "of doppelganger_casual, drawn as a full-screen quad by tru+0x1469a0 -> tru+0x13ef30)%s",
+                        material, colour, g_lookScreen ? "" : " - REMOVED ([Look] ScreenEffect=0)");
+                else
+                    Log(2, "look screen effect: material %lu, colour 0x%08lx%s", material, colour,
+                        g_lookScreen ? "" : " - removed");
+            }
+            e = next;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "look screen effect: access fault in the effect list after %d - skipped", found);
+        return -1;
+    }
+    return found;
+}
+
+// per tick after event 0x32 until the effect is found (the anim event may create it a frame later)
+void ScreenEffectPoll() {
+    if (g_fxPending <= 0) return;
+    int n = ScreenEffectCheck();
+    if (n != 0) { g_fxPending = 0; return; }
+    if (--g_fxPending == 0) Log(2, "look screen effect: no type-0x85 effect of the player within 30 frames of event 0x32");
+}
+
 // 0.9, defined below: the TU's start gates (cinematic / 0x829ca6da / health) and the flag-0x40 clear 0x823d9438
 bool TuStartRefused();
 void Clear40();
+// 0.14, defined below (section "0.14"): length of gameTracker+0x1f0, the camera call of Start, the strike look off
+bool MoveLength(float *length);
+void StartCameraFlag();
+void StrikeLookOff();
+volatile LONG g_move83Start = 0;
 
 // 0x823d8120
 bool CanStart(const BYTE *tuning) {
@@ -539,17 +651,34 @@ void StartPower(const BYTE *tuning) {
     };
     fire(0x89);
     fire(0x32);
-    // 0x83 when the length of gameTracker+0x1f0 > 10.0 [0x8205262c]: not ported (PC gameTracker +0x1f0 not mapped;
-    // its only record in DTP 20172 is sound 0x1cd)
+    if (g_fxOk && g_lookEnabled) { g_fxPending = 30; ScreenEffectPoll(); }      // 0.10: the full-screen effect
+    // 0x823d7e30..0x823d7e9c: 0x83 unless the length of gameTracker+0x1f0 <= 10.0 [0x8205262c] (ble skips it). 0.14:
+    // PC gameTracker+0x1f0 = the same field (twin block tru+0x317eb6 of retail 0x82409660); [Look] MoveEvents (default
+    // 0 = as 0.13: not fired). Its only record in DTP 20172 is sound 0x1cd.
+    if (g_moveEvents) {
+        float len = 0.0f;
+        if (MoveLength(&len) && !(len <= 10.0f)) {
+            const int before = n;
+            fire(0x83);
+            const bool f = n != before;
+            LONG k = InterlockedIncrement(&g_move83Start);
+            if (k == 1 || g_logLevel >= 2)
+                Log(k == 1 ? 1 : 2, "move events: start while moving (|gameTracker+0x1f0| = %.1f > 10) - player event 0x83 "
+                    "%s (TU 0x823d7e9c)%s", len, f ? "fired" : "not fired", k == 1 ? ", first time" : "");
+        }
+    }
     float max = Tune(tuning, kTuneMax);
     if (g_meter.value == max) fire(0x81);                       // [r28+8] == tuning +0x10
     float high = Tune(tuning, 0x70) * kPercent * max;           // tuning +0x70 x [0x820536ec] x tuning +0x10
     if (!(g_meter.value < high)) fire(0x87);
     else fire(0x88);
+    // 0x823d7f00..0x823d7f14: (*0x82efc780)->vtbl[0xa4]() = camera manager +0x7c |= 2. 0.14 [Look] CameraFlag (default
+    // 0 = as 0.13: not called): PC manager 0xe804f0, its vtable slot 0xa4 = tru+0x1eb200 (+0x80 |= 2)
+    if (g_cameraFlag) StartCameraFlag();
     g_meter.startValue = g_meter.value;
     g_meter.flags |= 1;
     int sent = BroadcastPowerMessage(0x1f4);                    // 0x823d7f18..0x823d7fa0
-    g_meter.startTime = *kGameClock;
+    g_meter.startTime = *kTuClock;                    // 0.11: TU +0x3c = [0x82efb528] = PC 0xe7f158
     Log(2, "shadow power ON (meter %.1f)", g_meter.value);
     if (g_lookOk && g_lookEnabled) {
         if (InterlockedIncrement(&g_lookStarts) == 1)
@@ -564,9 +693,10 @@ void StartPower(const BYTE *tuning) {
 // 0x823d7fb8 (request cleared: both ramps back to 1.0 in 33 ms)
 void StopPower(const char *why) {
     if (!(g_meter.flags & 1)) return;
-    // 0.9: flag 0x40 -> 0x823d9438 (Clear40, translated with [Look] AdrenalineMode); not ported: flag 2 -> 0x823d9050
-    // (flag 2 is set only by the shadow strike 0x823d8978, not ported - never set here)
+    // 0.9: flag 0x40 -> 0x823d9438 (Clear40, translated with [Look] AdrenalineMode); flag 2 -> 0x823d9050 (0.14: the
+    // strike look off, [Look] StrikeLook; flag 2 is set only by the shadow strike 0x823d8978 = TruShadowCombat)
     if (g_meter.flags & 0x40) Clear40();
+    if (g_strikeLook && (g_meter.flags & 2)) StrikeLookOff();
     g_meter.request[0][0] = g_meter.request[0][1] = kNoRequest;
     Selector();
     // 0.8: 0x823d7ffc..0x823d8068 - event 0x33, then 0x7e (ran empty, flag 0x200) or 0x82
@@ -578,7 +708,7 @@ void StopPower(const char *why) {
     g_meter.flags &= ~1u;
     g_meter.startValue = kMeterStart;
     int sent = BroadcastPowerMessage(0x1f5);                    // 0x823d8080..
-    g_meter.startTime = *kGameClock;
+    g_meter.startTime = *kTuClock;                    // 0.11: TU +0x3c = [0x82efb528] = PC 0xe7f158
     Log(2, "shadow power OFF (%s, meter %.1f)", why, g_meter.value);
     if (g_lookOk && g_lookEnabled)
         Log(2, "shadow look off: player events%s%s%s, message 0x1f5 to %d instances", fired33 ? " 0x33" : "",
@@ -862,8 +992,9 @@ bool HexBytesAt(DWORD address, const char *hex) {
 }
 
 bool g_tuStatesOk = false;          // all kTuBlocks verified
-int g_gt1280 = 0;                   // TU-only gameTracker+0x1280 (move step count of 244 / 245, read by 1048) - the
-                                    // PC uses +0x1280 for other data, so the translation keeps it here
+volatile LONG g_gt1280 = 0;         // TU-only gameTracker+0x1280 (move step count of 244 / 245, read by 1048) - the
+                                    // PC uses +0x1280 for other data, so the translation keeps it here; 0.12: exported
+                                    // (meter interface v3) - TruShadowCombat's state 244 writes the same variable
 
 BYTE *GameTracker() { return *reinterpret_cast<BYTE *const *>(kGameTrackerPtr); }
 
@@ -994,7 +1125,7 @@ void __cdecl State245(BYTE *agent) {
         reinterpret_cast<ChanMoveFn>(kChanMode2)(chan, 0, target, frames);
         // direction of the move (-row): (0, 0, +-1) = vertical (wall run), otherwise horizontal
         Hit(kP245a, "direction %.2f %.2f %.2f", -row[0], -row[1], -row[2]);
-        Log(2, "state 245: steps %d, length %.1f, frames %.0f, from %.1f %.1f %.1f to %.1f %.1f %.1f", g_gt1280, length,
+        Log(2, "state 245: steps %d, length %.1f, frames %.0f, from %.1f %.1f %.1f to %.1f %.1f %.1f", static_cast<int>(g_gt1280), length,
             frames, position[0], position[1], position[2], target[0], target[1], target[2]);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         Log(0, "state 245: access fault - skipped");
@@ -1107,7 +1238,8 @@ int Doppelganger();                       // 0.6, below: TruDlc2Player's doppelg
 
 // TU 0x8246e450: doppelganger mode -> (gameTracker+0x508)->flags bit 4 (rlwinm 0x1e = bit value 4), else
 // (gameTracker+0x504)->+0x1fc bit 0x20000000 (rlwinm 3). The TU reads the meter without a null test; the plugin's meter
-// always exists. Writers of flag 4 on the TU: 0x823d8a80 (set, needs flag 2) and 0x823d9050 (clear) - not ported here.
+// always exists. Writers of flag 4 on the TU: 0x823d8a80 (set, needs flag 2) and 0x823d9050 (clear) - 0.14 ports them
+// behind [Look] StrikeLook (default 0: flag 4 stays clear, the answer in DLC 2 stays 0).
 char __cdecl Pred1055(const BYTE *) {
     int dg = Doppelganger();
     char r = 0;
@@ -1123,7 +1255,7 @@ char __cdecl Pred1055(const BYTE *) {
     }
     if (InterlockedIncrement(&g_p1055Calls) == 1)
         Log(1, "condition 1055 predicate (TU 0x8246e450) first call: doppelganger %d -> %d (meter flags 0x%03lx; flag 4 "
-               "comes only from the shadow look of the shadow strike, not ported)", dg, r, g_meter.flags);
+               "comes only from the shadow look of the shadow strike, [Look] StrikeLook %d)", dg, r, g_meter.flags, g_strikeLook);
     return r;
 }
 
@@ -1339,6 +1471,11 @@ bool PatchPush(DWORD operandAddress, DWORD value) {
     return true;
 }
 
+// 0.11, defined below (section "0.11")
+void __cdecl State2102(BYTE *);
+bool CheckState2102();
+int g_state2102Enabled = 1;                 // [States] State2102
+
 void RegisterLaraStates() {
     if (!g_statesEnabled) { Log(1, "Lara states / activities: off ([States] Enabled=0)"); return; }
     if (!g_tuStatesOk) { Log(0, "Lara states / activities: building blocks not verified - not registered"); return; }
@@ -1397,19 +1534,32 @@ void RegisterLaraStates() {
             stateGeneric);
         return;
     }
-    const DWORD rec[3][7] = {
+    // 0.11: state 2102 (TU Lara table record at 0x82758c18: {2102, 0x824627b0, 0, 0, 0, 0, 0}) when the generic table holds it
+    // and the camera code is verified
+    const DWORD id2102[] = {2102};
+    bool add2102 = g_state2102Enabled && CheckState2102();
+    for (int i = 0; add2102 && i < kLaraStateCount; ++i)
+        if (states[i * 7] == 2102) add2102 = false;
+    if (add2102 && GenericHolds(kGenericStatePush, kGenericStateTable, 7, id2102, 1) != 1) {
+        Log(0, "state 2102: generic table lacks the id (TruDoppelganger.asi active?) - not registered");
+        add2102 = false;
+    }
+    const DWORD rec[4][7] = {
         {243, reinterpret_cast<DWORD>(&State243), 0, 0, 0, 0, 0},
         {245, reinterpret_cast<DWORD>(&State245), 0, 0, reinterpret_cast<DWORD>(&State245Slot3), 0, 0},
         {1018, reinterpret_cast<DWORD>(&State1018Slot0), reinterpret_cast<DWORD>(&State1018Slot1),
-         reinterpret_cast<DWORD>(&State1018Slot2), 0, 0, 0}};
+         reinterpret_cast<DWORD>(&State1018Slot2), 0, 0, 0},
+        {2102, reinterpret_cast<DWORD>(&State2102), 0, 0, 0, 0, 0}};
     memcpy(g_laraStates, states, kLaraStateCount * 7 * sizeof(DWORD));
     int n = kLaraStateCount;
-    for (int k = 0; k < 3; ++k, ++n) memcpy(g_laraStates + n * 7, rec[k], 7 * sizeof(DWORD));
+    const int count = add2102 ? 4 : 3;
+    for (int k = 0; k < count; ++k, ++n) memcpy(g_laraStates + n * 7, rec[k], 7 * sizeof(DWORD));
     memcpy(g_laraStates + n * 7, stateEnd, 7 * sizeof(DWORD));
     if (PatchPush(kLaraStatePush + 1, reinterpret_cast<DWORD>(g_laraStates)))
         Log(1, "Lara states: 243 (move to gameTracker+0x1270), 245 (move tuning +0x6c along the player), 1018 (meter "
-               "cost / world request) added (copy 0x%08lx, %d records); not translated: 244, 1017, 1019, 1020, 2102",
-            reinterpret_cast<DWORD>(g_laraStates), n);
+               "cost / world request)%s added (copy 0x%08lx, %d records); not translated: 244, 1017, 1019, 1020%s",
+            add2102 ? ", 2102 (camera blend to its end, TU 0x822ae918 / 0x822c2130)" : "",
+            reinterpret_cast<DWORD>(g_laraStates), n, add2102 ? "" : ", 2102");
     else
         Log(0, "Lara states: VirtualProtect failed (%lu) - not registered", GetLastError());
 }
@@ -1845,6 +1995,11 @@ void ReportAdrenalineHits() {
     }
 }
 
+// 0.14, defined below (section "0.14")
+void LoopTick(BYTE *gt);
+void LoopFree(const char *why);
+void MoveEvents();
+
 // ---- new tracker -> new meter (TU player init 0x82412ca0 -> 0x82409418 -> meter init 0x823d7700) ----
 typedef int(__cdecl *GenerationFn)();
 GenerationFn g_generation = nullptr;
@@ -1871,6 +2026,9 @@ void NewTrackerCheck() {
             reinterpret_cast<HudClearFn>(kHudClear)(0xc);
             g_hudUpdate();
         }
+        // 0.14: the player teardown 0x82412ea8..0x82412ebc frees the old meter's loop handle (0x823d7680: stop,
+        // release the node, free) before the new player init builds a new meter (0x823d7700 then makes a new handle)
+        if (g_loopSound) LoopFree("new game tracker");
         MeterInit();
         if (requests) Selector();       // the plugin's meter outlives the TU object: release its time-scale requests
         Log(1, "new game tracker (generation %d): meter re-initialised (was flags 0x%03lx%s)", gen, was,
@@ -1885,6 +2043,7 @@ bool g_lastPadHeld = false;
 int g_inputDiag = 0;
 
 void MeterTick(bool padHeld) {
+    ScreenEffectPoll();                          // 0.10: only while an event 0x32 is pending
     if (g_legacyPadStart) { LegacyMeterTick(padHeld); return; }
     NewTrackerCheck();
     // TU 0x824128a4..0x824128b8: the player update runs the tick only when gameTracker+0x1244 is set
@@ -1936,7 +2095,10 @@ void MeterTick(bool padHeld) {
         } __except (EXCEPTION_EXECUTE_HANDLER) {
         }
     }
-    // not ported: 0x823d7ae0..0x823d7b34 looping sound (+0x0 handle), 0x823d77f0 (shadow-strike look group)
+    // 0.14: 0x823d7ae0..0x823d7b34 looping sound (+0x0 handle; [Sound] LoopSound) and 0x823d77f0 (movement events
+    // 0x83 / 0x84; [Look] MoveEvents) - both off by default (= 0.13)
+    if (g_loopSound) LoopTick(gt);
+    if (g_moveEvents) MoveEvents();                                         // 0x823d77f0
     LookTick(tuning);                                                       // 0x823d94f8
     if (!(g_meter.flags & 0x90)) {
         bool buttons = padHeld;
@@ -1984,6 +2146,913 @@ void MeterTick(bool padHeld) {
     }
 }
 
+// ================================================================================================================
+// 0.11 (project doc Befund-Look.md section 7): GlobalParams[7], state 2102, the meter interface
+
+// ---- GlobalParams[7] = the TU's shadow-power shader vector ----
+// TU 0x82474728 (= retail 0x8246eff0 = PC tru+0x373a70, called per frame for the player instance from tru+0x373bf0)
+// sets GlobalParams[0..6] (player position and six bones) through (*0x829be0a4)->vtbl[0x84](index, 1, vec); the TU
+// appended (0x824748e4..0x82474988), when gameTracker [0x829892b0] and the tuning 0x82415518 exist:
+//   GlobalParams[7] = { 0x823d8548(meter) = value / tuning +0x10, value / meter +0xc, (float)(flags & 1),
+//                       0x823d85a8(meter) = fade: t = (clock 0x82efb528 - meter +0x3c) x 0.03 [0x8207d6fc];
+//                       active: clamp(t / tuning +0x60) (1 if +0x60 <= 0), else 1 - clamp(t / tuning +0x64) }
+// read by 19 TU pixel shaders (look 2327 as a lerp factor, the vein 2392, ...). PC: the same setter
+// [0xa1407c]->vtbl[0x84] = tru+0x107110 (thiscall(index, count, vec) -> renderer +0xfb18 + 16 x index). Translation:
+// the call tru+0x373bfd (-> tru+0x373a70) goes to a wrapper that runs the PC function and then the TU's block.
+// Not translated (named): the second TU block 0x8247498c.. (player instance +0x244 -> ...->vtbl[0x50](1, cinematic ?
+// (1,0,0,0) : 0) - PC layout of +0x244 not checked).
+typedef void(__cdecl *GlobalsFn)(void *instance);
+typedef void(__fastcall *SetGlobalFn)(void *renderer, int, int index, int count, const float *vec);
+const DWORD kGlobalsCall = 0x00773bfd;              // call tru+0x373a70 in tru+0x373bf0 (only caller)
+const char *const kGlobalsCallHex = "e86efeffff d9450c d9ee 83c404";
+const DWORD kGlobalsFn = 0x00773a70;
+const char *const kGlobalsFnHex = "55 8bec 83e4f0 83ec18 56 8b7508 85f6 57 0f8464010000";
+const DWORD kGlobalsTail = 0x00773be1;              // push 6; ...; call edx = GlobalParams[6] - the TU's block follows
+const char *const kGlobalsTailHex = "6a06 0f2944241c ffd2 5f 5e 8be5 5d c3";
+const DWORD kRendererPtr = 0x00a1407c;
+const DWORD kSetGlobalSlot = 0x00849350;            // renderer vtable 0x8492cc + 0x84
+const DWORD kSetGlobal = 0x00507110;
+const char *const kSetGlobalHex = "8b442404 8b542408 56 8d3410 83fe10 5e 771c c1e204";
+int g_gp7Enabled = 1;                               // [Look] GlobalParams7
+bool g_gp7Ok = false;
+volatile LONG g_gp7Sets = 0;
+float g_gp7Last[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+
+// 0x823d85a8
+float LookFade(const BYTE *tuning) {
+    float t = static_cast<float>(static_cast<DWORD>(*kTuClock - g_meter.startTime)) * 0.03f;   // [0x8207d6fc]
+    float span = Tune(tuning, (g_meter.flags & 1) ? 0x60 : 0x64);
+    if (!(kZero < span)) return kOne;
+    float x = t / span;
+    float c = (kOne - x >= kZero) ? x : kOne;                  // fsel f10, 1 - x, x, 1
+    c = (c >= kZero) ? c : kZero;                              // fsel f1, f10, f10, 0
+    return (g_meter.flags & 1) ? c : kOne - c;
+}
+
+// ---- 0.12: the second appended TU block 0x8247498c..0x82474a24 ----
+// model = (instance +0x244)->+0x10[(s8)((+0x244)->+4)->+0x234] (the instance's current render model; PC: the same
+// fields, e.g. tru+0x1b6abd), model->vtbl[0x50](1, cinematic ? (1, 0, 0, 0) [0x8207dc20] : (0, 0, 0, 0) [0x8207db30])
+// with the TU's inline cinematic test ([0x82efb590] +0xdd and +0x2c != -1 = PC tru+0x53f00). Slot 0x50 = set
+// InstanceParams[index] (PCRenderModelInstance vtable 0x849764 -> tru+0xf4f60: lazily allocated 0x90-byte block,
+// [+0x1c + 16 x index] = *vec, movaps); proven the same slot on both platforms: retail 0x8248fe38 (map: verified =
+// PC tru+0x393680) calls vtbl[0x50](0, v) / (1, +0x4a0), the PC twin `call [edx+0x50]` with push 0 / push 1 + vec*.
+typedef void(__fastcall *SetInstParamFn)(void *model, int, int index, const float *vec);
+const DWORD kModelOfInstance = 0x005b6abd;      // mov eax,[ecx+0x244]; mov edx,[eax+4]; movsx ecx,[edx+0x234]; ...
+const char *const kModelOfInstanceHex = "8b8144020000 8b5004 0fbe8a34020000 8b5010 8b0c8a";
+const DWORD kModelVtable = 0x00849764;          // cdc::PCRenderModelInstance (RTTI)
+const DWORD kModelSlot50 = 0x004f4f60;
+const char *const kModelSlot50Hex = "55 8bec 83e4f0 83ec0c 56 8bf1 e84ff6ffff 837e1800";
+const DWORD kModelSlot50Store = 0x004f4fb2;     // mov edx,[ebp+8]; mov eax,[ebp+0xc]; movaps xmm0,[eax]; shl edx,4; ...
+const char *const kModelSlot50StoreHex = "8b5508 8b450c 0f2800 c1e204 03561c 5e 0f2902 8be5 5d c20800";
+int g_cineParamEnabled = 1;                     // [Look] CinematicParam
+bool g_cineParamOk = false;
+volatile LONG g_cineParamSets = 0;
+int g_cineLast = -1;
+__declspec(align(16)) const float kVecX[4] = {1.0f, 0.0f, 0.0f, 0.0f};   // [0x8207dc20]
+__declspec(align(16)) const float kVec0[4] = {0.0f, 0.0f, 0.0f, 0.0f};   // [0x8207db30]
+
+void CinematicParam(BYTE *instance) {
+    __try {
+        BYTE *o = *reinterpret_cast<BYTE *const *>(instance + 0x244);
+        if (!o) return;                                                     // TU 0x82474990 beq
+        BYTE *m4 = *reinterpret_cast<BYTE *const *>(o + 4);
+        void *const *arr = *reinterpret_cast<void *const *const *>(o + 0x10);
+        if (!m4 || !arr) return;
+        void *model = arr[*reinterpret_cast<const signed char *>(m4 + 0x234)];
+        if (!model) return;                                                 // TU 0x824749b4 beq
+        if (*reinterpret_cast<const DWORD *>(model) != kModelVtable) {
+            if (InterlockedIncrement(&g_cineParamSets) == 1)
+                Log(1, "InstanceParams[1] (TU 0x8247498c): player model 0x%08lx has vtable 0x%08lx, not "
+                       "PCRenderModelInstance 0x%08lx - not set", reinterpret_cast<DWORD>(model),
+                    *reinterpret_cast<const DWORD *>(model), kModelVtable);
+            return;
+        }
+        const int cine = Cinematic() ? 1 : 0;
+        reinterpret_cast<SetInstParamFn>(kModelSlot50)(model, 0, 1, cine ? kVecX : kVec0);
+        if (InterlockedIncrement(&g_cineParamSets) == 1 || (cine != g_cineLast && g_logLevel >= 2))
+            Log(g_cineParamSets == 1 ? 1 : 2, "InstanceParams[1] of the player model (TU 0x8247498c) = %s (cinematic %d)",
+                cine ? "(1, 0, 0, 0)" : "(0, 0, 0, 0)", cine);
+        g_cineLast = cine;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "InstanceParams[1] (TU 0x8247498c): access fault - off");
+        g_cineParamOk = false;
+    }
+}
+
+void SetGlobalParams7(const BYTE *tuning);
+
+void __cdecl GlobalsWrap(void *instance) {
+    reinterpret_cast<GlobalsFn>(kGlobalsFn)(instance);
+    if (!instance || !g_gp7Ok) return;                         // TU: r31 == 0 -> end of function
+    if (!GameTracker()) return;                                // TU: [0x829892b0] == 0
+    const BYTE *tuning = ObjectTuning();                       // TU 0x82415518 (the game object only, no fallback)
+    if (!tuning) return;
+    if (g_gp7Enabled) SetGlobalParams7(tuning);
+    if (g_cineParamEnabled && g_cineParamOk) CinematicParam(static_cast<BYTE *>(instance));   // 0.12, TU order
+}
+
+void SetGlobalParams7(const BYTE *tuning) {
+    float v[4];
+    float max = Tune(tuning, kTuneMax);
+    v[0] = (max != kZero) ? g_meter.value / max : kZero;      // 0x823d8548
+    v[1] = g_meter.value / g_meter.startValue;                 // [m+8] / [m+0xc]
+    v[2] = static_cast<float>(g_meter.flags & 1);
+    v[3] = LookFade(tuning);                                   // 0x823d85a8
+    __try {
+        void *renderer = *reinterpret_cast<void *const *>(kRendererPtr);
+        if (!renderer) return;
+        SetGlobalFn set = reinterpret_cast<SetGlobalFn>((*reinterpret_cast<DWORD *const *>(renderer))[0x84 / 4]);
+        set(renderer, 0, 7, 1, v);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "GlobalParams[7]: access fault in the renderer call - off");
+        g_gp7Ok = false;
+        return;
+    }
+    if (InterlockedIncrement(&g_gp7Sets) == 1)
+        Log(1, "GlobalParams[7] (TU 0x824748e4): first set (%.3f, %.3f, %.0f, %.3f) - meter / max, meter / start, "
+               "active, look fade", v[0], v[1], v[2], v[3]);
+    else if (g_logLevel >= 3 && (v[2] != g_gp7Last[2] || fabsf(v[3] - g_gp7Last[3]) > 0.2f))
+        Log(3, "GlobalParams[7] = (%.3f, %.3f, %.0f, %.3f)", v[0], v[1], v[2], v[3]);
+    memcpy(g_gp7Last, v, sizeof(v));
+}
+
+bool WriteCall5(DWORD at, const void *to) {
+    BYTE code[5] = {0xe8, 0, 0, 0, 0};
+    DWORD rel = reinterpret_cast<DWORD>(to) - (at + 5);
+    memcpy(code + 1, &rel, 4);
+    DWORD old = 0, dummy = 0;
+    if (!VirtualProtect(reinterpret_cast<void *>(at), 5, PAGE_EXECUTE_READWRITE, &old)) return false;
+    memcpy(reinterpret_cast<void *>(at), code, 5);
+    VirtualProtect(reinterpret_cast<void *>(at), 5, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void *>(at), 5);
+    return true;
+}
+
+void PatchGlobalParams7() {
+    // 0.12: the same wrapper also runs the second appended TU block ([Look] CinematicParam)
+    g_cineParamOk = g_cineParamEnabled && g_gatesOk && HexBytesAt(kModelOfInstance, kModelOfInstanceHex) &&
+                    HexBytesAt(kModelSlot50, kModelSlot50Hex) && HexBytesAt(kModelSlot50Store, kModelSlot50StoreHex) &&
+                    *reinterpret_cast<const DWORD *>(kModelVtable + 0x50) == kModelSlot50;
+    if (g_cineParamEnabled && !g_cineParamOk)
+        Log(0, "InstanceParams[1] (TU 0x8247498c): model code at 0x%08lx / 0x%08lx or the cinematic test does not match "
+               "- not set", kModelOfInstance, kModelSlot50);
+    if (!g_gp7Enabled) Log(1, "GlobalParams[7]: off ([Look] GlobalParams7=0)");
+    if (!g_cineParamEnabled) Log(1, "InstanceParams[1] of the player model: off ([Look] CinematicParam=0)");
+    if (!g_gp7Enabled && !g_cineParamOk) return;
+    g_gp7Ok = HexBytesAt(kGlobalsCall, kGlobalsCallHex) && HexBytesAt(kGlobalsFn, kGlobalsFnHex) &&
+              HexBytesAt(kGlobalsTail, kGlobalsTailHex) && HexBytesAt(kSetGlobal, kSetGlobalHex) &&
+              *reinterpret_cast<const DWORD *>(kSetGlobalSlot) == kSetGlobal && g_tableOk &&
+              HexBytesAt(kTuClockAdd, kTuClockAddHex);
+    if (!g_gp7Ok) { Log(0, "GlobalParams[7]: code at 0x%08lx / 0x%08lx does not match - not set", kGlobalsCall, kSetGlobal); return; }
+    if (!WriteCall5(kGlobalsCall, reinterpret_cast<const void *>(&GlobalsWrap))) {
+        g_gp7Ok = false;
+        Log(0, "GlobalParams[7]: VirtualProtect failed (%lu) - not set", GetLastError());
+        return;
+    }
+    Log(1, "GlobalParams[7] %s / InstanceParams[1] %s: TU 0x824748e4 / 0x8247498c translated - after tru+0x373a70 "
+           "(GlobalParams 0-6) the wrapper sets index 7 through [0x%08lx]->vtbl[0x84] = tru+0x107110 and the player "
+           "model's InstanceParams[1] (cinematic) while object 858's tuning is loaded", g_gp7Enabled ? "on" : "off",
+        g_cineParamOk ? "on" : "off", kRendererPtr);
+}
+
+// ---- state 2102 (TU 0x824627b0 -> 0x822ae918 -> camera vtbl[0x80] = TU-only 0x822c2130) ----
+// The TU moved the end of the Lara camera's slot 0x6c (retail 0x822c4df8 = PC tru+0x202290: after tru+0x201d30, the
+// "jump the camera blend to its end" part) into a new slot 0x80 and calls it from state 2102 when that camera is the
+// manager's current one. PC: no slot 0x80 (the vtable 0x85600c ends at 0x7c), so the slot's body is written out from
+// its PC copy tru+0x202298..0x2022db, with the TU's doppelganger default of 0x822bc198 (settings +0x14c instead of
+// +0x144 when gameTracker+0x1244 is set). Manager 0xe804f0 (+0xb80 = Xbox +0xb50), is-current tru+0x1e7fb0.
+typedef char(__fastcall *CamIsCurrentFn)(void *mgr, int, void *cam);
+typedef BYTE *(__cdecl *CamSettingsFn)(int id);
+const DWORD kCamMgr = 0x00e804f0;
+const DWORD kCamMgrVtable = 0x00855ae4;
+const DWORD kCamMgrDtor = 0x0083cee0;
+const char *const kCamMgrDtorHex = "b9f004e800 e9b6e1daff";
+const DWORD kCamIsCurrent = 0x005e7fb0;
+const char *const kCamIsCurrentHex = "8b4144 8b542404 3bc2 7419 56 8db170060000 3bc6 5e 7508 3991b0070000 7405";
+const DWORD kCamSnapBody = 0x00602298;
+const char *const kCamSnapBodyHex = "8b86d0010000 83f8ff 740d 50 e8d7bcf4ff 83c404 85c0 7514 e8cb1dfdff 8b8044010000 50 "
+                                    "e8bfbcf4ff 83c404 83c010 7412 d980b8000000 d880b4000000 d99ee4010000";
+const DWORD kCamSettings = 0x0054df80;
+const char *const kCamSettingsHex = "8b442404 8b0485286fc300 85c0 740a 80780400 7504 83c010 c3 33c0 c3";
+const DWORD kCamDefaults = 0x005d4080;              // mov eax, [0xe7ee50]; ret (Xbox [0x829ca200])
+const char *const kCamDefaultsHex = "a150eee700 c3";
+bool g_state2102Ok = false;
+volatile LONG g_state2102Calls = 0;
+
+void __cdecl State2102(BYTE *) {
+    if (!g_state2102Ok) return;
+    LONG n = InterlockedIncrement(&g_state2102Calls);
+    __try {
+        BYTE *mgr = reinterpret_cast<BYTE *>(kCamMgr);
+        if (*reinterpret_cast<const DWORD *>(mgr) != kCamMgrVtable) return;
+        BYTE *cam = *reinterpret_cast<BYTE *const *>(mgr + 0xb80);
+        if (!cam || !reinterpret_cast<CamIsCurrentFn>(kCamIsCurrent)(mgr, 0, cam)) {
+            if (n == 1) Log(1, "state 2102 (TU 0x822ae918) first call: Lara camera not current - nothing");
+            return;
+        }
+        // 0x822c2130 with 0x822bc198
+        int id = *reinterpret_cast<const int *>(cam + 0x1d0);
+        BYTE *e = id != -1 ? reinterpret_cast<CamSettingsFn>(kCamSettings)(id) : nullptr;
+        const bool dg = Doppelganger() != 0;
+        if (!e) {
+            BYTE *defaults = *reinterpret_cast<BYTE *const *>(0x00e7ee50);
+            if (!defaults) return;
+            e = reinterpret_cast<CamSettingsFn>(kCamSettings)(*reinterpret_cast<const int *>(defaults + (dg ? 0x14c : 0x144)));
+        }
+        if (!e) return;
+        const BYTE *s = e + 0x10;
+        float end = *reinterpret_cast<const float *>(s + 0xb8) + *reinterpret_cast<const float *>(s + 0xb4);
+        *reinterpret_cast<float *>(cam + 0x1e4) = end;
+        if (n == 1 || g_logLevel >= 2)
+            Log(n == 1 ? 1 : 2, "state 2102 (TU 0x822ae918 -> 0x822c2130)%s: Lara camera 0x%08lx settings %d%s -> blend "
+                "time +0x1e4 = %.2f (end)", n == 1 ? " first call" : "", reinterpret_cast<DWORD>(cam), id,
+                id == -1 ? (dg ? " (doppelganger default +0x14c)" : " (default +0x144)") : "", end);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 2102: access fault - off");
+        g_state2102Ok = false;
+    }
+}
+
+// 0.13: TruDataGuard.asi replaces the first 5 bytes of the lookup (mov eax,[esp+4] + the first byte of the next
+// instruction) with `jmp stub`; the stub does the same lookup plus the bound / record checks, so valid ids give the
+// same result (invalid ids: logged, original lookup - this plugin is not one of its "tests for 0" callers). The tail
+// from +5 stays the original code.
+const char *const kCamSettingsTailHex = "0485286fc300 85c0 740a 80780400 7504 83c010 c3 33c0 c3";
+
+bool InModuleNamed(DWORD address, const char *want) {
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            reinterpret_cast<LPCSTR>(static_cast<ULONG_PTR>(address)), &module))
+        return false;
+    char path[MAX_PATH] = {0};
+    if (!GetModuleFileNameA(module, path, MAX_PATH)) return false;
+    const char *name = strrchr(path, '\\');
+    name = name ? name + 1 : path;
+    return _stricmp(name, want) == 0;
+}
+
+// 1 = original bytes, 2 = TruDataGuard's jump + original tail, 0 = neither
+int CamSettingsState(DWORD *target) {
+    *target = 0;
+    if (HexBytesAt(kCamSettings, kCamSettingsHex)) return 1;
+    __try {
+        if (*reinterpret_cast<const BYTE *>(kCamSettings) != 0xe9) return 0;
+        *target = kCamSettings + 5 + *reinterpret_cast<const DWORD *>(kCamSettings + 1);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+    return InModuleNamed(*target, "TruDataGuard.asi") && HexBytesAt(kCamSettings + 5, kCamSettingsTailHex) ? 2 : 0;
+}
+
+bool CheckState2102() {
+    DWORD target = 0;
+    const int lookup = CamSettingsState(&target);
+    const char *bad = !HexBytesAt(kCamMgrDtor, kCamMgrDtorHex) ? "camera manager tru+0x43cee0"
+                      : !HexBytesAt(kCamIsCurrent, kCamIsCurrentHex) ? "is-current tru+0x1e7fb0"
+                      : !HexBytesAt(kCamSnapBody, kCamSnapBodyHex) ? "slot 0x6c body tru+0x202298"
+                      : lookup == 0 ? "section lookup tru+0x14df80 (neither original nor TruDataGuard's jump)"
+                      : !HexBytesAt(kCamDefaults, kCamDefaultsHex) ? "defaults getter tru+0x1d4080"
+                                                                    : nullptr;
+    g_state2102Ok = bad == nullptr;
+    if (!g_state2102Ok) Log(0, "state 2102: camera code does not match (%s) - not registered", bad);
+    else if (lookup == 2)
+        Log(1, "state 2102: section lookup tru+0x14df80 jumps to TruDataGuard.asi (0x%08lx) - accepted (same result for "
+               "valid ids)", target);
+    return g_state2102Ok;
+}
+
+// ================================================================================================================
+// 0.14 (2026-11-04, project doc Befund-Schattenkraft-0411b.md): the remaining TU parts of the power, each behind its
+// own switch, all default 0 (= 0.13 behaviour): the looping sound, the movement events, the camera flag of Start, the
+// strike look. Every PC part is byte-checked at load; a mismatch leaves the part off and says so.
+
+// ---- [Sound] LoopSound: the looping sound of the power (TU meter +0x0) ----
+// TU 0x823d7700 (meter init, run by the player init after the extension instance exists): gameTracker and 0x82415518
+// -> handle = new 0x14-byte object {+0xc = tuning +0x5c, +0x10 = 0}; the weak-node pool is made first when
+// [0x829beb60] is 0 (0x82250ed8(0x2000) = PC tru+0x198570(0x2000), [0xcda0c0]); an old handle is freed first by
+// 0x823d7680 (0x824805c8, node release, free). tuning +0x5c is a SoundPlex node of player_tru_dlc2_extension (DTP
+// 22497 +0x14c -> +0x190: type 1, -> id 22864 = the loop's SoundPlex tree).
+// TU tick 0x823d7ae0..0x823d7b34: gameTracker, 0x82415518 and the handle set -> power on (flags & 1):
+// 0x82480440(handle, value +8, start value +0xc, value, player [0x82efb464] +0x20), else 0x824805c8(handle).
+// 0x82480440 (TU-only): dead node (+0 = 0) -> release; no node -> 0x8223ee58(&node, +0xc) starts the sound (= PC
+// tru+0x193c90, the same body: tru+0x1935d0 on the sound manager [0x8a8100] with 0.0, then the dead-node test with the
+// free list [0xcda0c4] = TU 0x829beb64); then emitter = node +0: 0x82241918(emitter, &pos) (= PC tru+0x183340:
+// +0x68 |= 0x100, +0x70 = pos) and emitter +0x2c / +0x30 / +0x34 = value / start / value (emitter layout: PC
+// constructor tru+0x190860 = TU inline constructor in 0x82241b68, both zero seven parameter words +0x28..+0x40).
+// 0x824805c8 (TU-only): no node -> nothing; dead node -> release, +0x10 = 0; else (emitter +8)->vtbl[0x10](6) (stop of
+// the SoundPlex instance tree: PC slot 0x10 = thiscall(mode) in the same classes, e.g. the forwarders tru+0x183700 /
+// tru+0x1838b0 = TU 0x82242fa0 / 0x82243560); the node is kept until the emitter is dead (called every tick).
+// PC difference (named): the PC player init is not hooked; the handle is made at the first tick of a tracker
+// generation in which object 858's tuning (the game object, as 0x82415518 - not the file copy) exists.
+typedef BYTE **(__cdecl *SoundPlayFn)(BYTE **out, const void *data);           // tru+0x193c90 = TU 0x8223ee58
+typedef void(__fastcall *SoundPosFn)(BYTE *emitter, int, const float *pos);      // tru+0x183340 = TU 0x82241918
+typedef void(__fastcall *SoundStopFn)(void *instance, int, int mode);            // SoundPlex vtbl slot 0x10
+typedef void(__cdecl *NodePoolFn)(int count);                                    // tru+0x198570 = TU 0x82250ed8
+const DWORD kSoundPlay = 0x00593c90;
+const char *const kSoundPlayHex = "d9ee 8b442408 56 8b742408 51 8b0d00818a00 d91c24 50 56 e824f9ffff 8b06 85c0 7428 833800 "
+                                  "751d 834004ff 750d 8b0dc4a0cd00 8908 a3c4a0cd00 c70600000000 8bc6 5e c3 8b00 836024fe "
+                                  "8bc6 5e c3";
+const DWORD kSoundEmit = 0x005935d0;              // TU 0x82241b68: data 0 -> out 0; alloc 0xb0; +0x24 |= 1; +0xc = data +8
+const char *const kSoundEmitHex = "53 57 8b7c2410 85ff 8bd9 750f";
+const DWORD kSoundEmitAlloc = 0x0059360b;
+const char *const kSoundEmitAllocHex = "6a00 68b0000000 ffd0 85c0 740b 8bc8 e841d2ffff";
+const DWORD kEmitterParams = 0x0059088d;          // constructor tru+0x190860: +0x28..+0x40 = 0 (parameter words)
+const char *const kEmitterParamsHex = "894828 d90530118400 89482c 894830 894834 894838 89483c 894840";
+const DWORD kSoundPos = 0x00583340;
+const char *const kSoundPosHex = "55 8bec 83e4f0 8bc1 668148680001 83ec0c 56 8d7070 8b4508 8b08 890e";
+const DWORD kSoundFwd1 = 0x00583700, kSoundFwd2 = 0x005838b0;   // slot 0x10 forwarders (TU 0x82242fa0 / 0x82243560)
+const char *const kSoundFwd1Hex = "d9ee d9592c 8b4914 8b01 8b4010 ffe0";
+const char *const kSoundFwd2Hex = "8b4914 8b01 8b4010 ffe0";
+const DWORD kNodePool = 0x00598570;
+const char *const kNodePoolHex = "833dc0a0cd0000 757e a1ac9ccd00";
+const DWORD kNodePoolHead = 0x00cda0c0, kNodeFree = 0x00cda0c4;   // TU 0x829beb60 / 0x829beb64
+const DWORD kSoundMgr = 0x008a8100;                               // TU [0x827741c0]
+
+struct LoopHandle { DWORD unused[3]; const void *data; BYTE *node; };   // TU: 0x14 bytes, +0xc data, +0x10 node
+LoopHandle g_loopStore;
+LoopHandle *g_loop = nullptr;                   // TU meter +0x0
+bool g_loopOk = false, g_loopMake = true, g_loopWasOn = false;
+volatile LONG g_loopNodes = 0, g_loopStopCalls = 0, g_loopNoEmitter = 0;
+
+// TU (inline everywhere): --node+4; at 0 the node goes to the head of the free list
+void NodeRelease(BYTE *node) {
+    LONG *count = reinterpret_cast<LONG *>(node + 4);
+    if (--*count == 0) {
+        *reinterpret_cast<DWORD *>(node) = *reinterpret_cast<const DWORD *>(kNodeFree);
+        *reinterpret_cast<DWORD *>(kNodeFree) = reinterpret_cast<DWORD>(node);
+    }
+}
+
+// TU 0x824805c8
+void LoopStop(LoopHandle *h) {
+    BYTE *node = h->node;
+    if (!node) return;
+    BYTE *emitter = *reinterpret_cast<BYTE **>(node);
+    if (!emitter) {
+        NodeRelease(node);
+        h->node = nullptr;
+        return;
+    }
+    void *instance = *reinterpret_cast<void **>(emitter + 8);
+    SoundStopFn stop = (*reinterpret_cast<SoundStopFn *const *>(instance))[0x10 / 4];
+    stop(instance, 0, 6);
+    if (InterlockedIncrement(&g_loopStopCalls) == 1)
+        Log(1, "loop sound: first stop (TU 0x824805c8: emitter 0x%08lx +8 -> vtbl[0x10](6))", reinterpret_cast<DWORD>(emitter));
+}
+
+// TU 0x82480440
+void LoopPlay(LoopHandle *h, float a, float b, float c, const float *pos) {
+    BYTE *node = h->node;
+    if (node) {
+        if (*reinterpret_cast<BYTE **>(node)) goto alive;
+        NodeRelease(node);
+        h->node = nullptr;
+    }
+    {
+        BYTE *made = nullptr;
+        reinterpret_cast<SoundPlayFn>(kSoundPlay)(&made, h->data);
+        BYTE *old = h->node;                    // the smart-pointer assignment of 0x824804c0..0x82480508
+        if (old) NodeRelease(old);
+        h->node = made;
+        if (made) ++*reinterpret_cast<LONG *>(made + 4);
+        if (made) NodeRelease(made);            // the temporary's release 0x8248050c..0x8248053c
+        if (made) {
+            LONG k = InterlockedIncrement(&g_loopNodes);
+            if (k == 1 || g_logLevel >= 2)
+                Log(k == 1 ? 1 : 2, "loop sound: started (TU 0x8223ee58 = tru+0x193c90: data 0x%08lx, emitter 0x%08lx)%s",
+                    reinterpret_cast<DWORD>(h->data), *reinterpret_cast<const DWORD *>(made), k == 1 ? ", first time" : "");
+        } else if (InterlockedIncrement(&g_loopNoEmitter) <= 3) {
+            Log(1, "loop sound: tru+0x193c90 made no emitter (data 0x%08lx) - nothing plays (retried every tick as the TU)",
+                reinterpret_cast<DWORD>(h->data));
+        }
+    }
+alive:
+    node = h->node;
+    if (!node) return;
+    {
+        BYTE *emitter = *reinterpret_cast<BYTE **>(node);
+        if (!emitter) {
+            NodeRelease(node);
+            h->node = nullptr;
+            return;
+        }
+        __declspec(align(16)) float p[4];
+        memcpy(p, pos, sizeof(p));
+        reinterpret_cast<SoundPosFn>(kSoundPos)(emitter, 0, p);
+        emitter = *reinterpret_cast<BYTE **>(h->node);
+        *reinterpret_cast<float *>(emitter + 0x2c) = a;
+        *reinterpret_cast<float *>(emitter + 0x30) = b;
+        *reinterpret_cast<float *>(emitter + 0x34) = c;
+    }
+}
+
+// TU 0x823d7680 (stop, node release, free) - from 0x823d7700 and the player teardown 0x82412ea8
+void LoopFree(const char *why) {
+    g_loopMake = true;
+    LoopHandle *h = g_loop;
+    if (!h) return;
+    __try {
+        LoopStop(h);
+        if (h->node) NodeRelease(h->node);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "loop sound: access fault while freeing the handle - loop sound off");
+        g_loopOk = false;
+    }
+    h->node = nullptr;
+    g_loop = nullptr;
+    Log(2, "loop sound: handle freed (%s, TU 0x823d7680)", why);
+}
+
+// TU 0x823d7700's handle part
+void LoopMake(const BYTE *tuning) {
+    if (g_loop) LoopFree("meter init");
+    LoopHandle *h = &g_loopStore;
+    memset(h, 0, sizeof(*h));
+    const void *data = *reinterpret_cast<const void *const *>(tuning + 0x5c);
+    h->node = nullptr;
+    if (*reinterpret_cast<const DWORD *>(kNodePoolHead) == 0) reinterpret_cast<NodePoolFn>(kNodePool)(0x2000);
+    h->data = data;
+    g_loop = h;
+    g_loopMake = false;
+    Log(1, "loop sound: handle made (TU 0x823d7700: tuning +0x5c = SoundPlex data 0x%08lx of object 858)",
+        reinterpret_cast<DWORD>(data));
+}
+
+// TU 0x823d7ae0..0x823d7b34, once per tick
+void LoopTick(BYTE *gt) {
+    if (!g_loopOk) return;
+    __try {
+        const BYTE *tuning = ObjectTuning();                // TU 0x82415518 (the game object)
+        if (g_loopMake && gt && tuning) LoopMake(tuning);
+        if (!gt || !tuning || !g_loop) return;
+        const bool on = (g_meter.flags & 1) != 0;
+        if (on) {
+            const BYTE *player = *reinterpret_cast<const BYTE *const *>(kPlayerPtr);
+            if (!player) return;
+            LoopPlay(g_loop, g_meter.value, g_meter.startValue, g_meter.value,
+                     reinterpret_cast<const float *>(player + 0x20));
+        } else {
+            LoopStop(g_loop);
+        }
+        if (on != g_loopWasOn) {
+            Log(2, "loop sound: power %s -> %s", on ? "on" : "off",
+                on ? "TU 0x82480440 (keep playing, position, parameters)" : "TU 0x824805c8 (stop 6)");
+            g_loopWasOn = on;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "loop sound: access fault in the sound code - loop sound off for this run");
+        g_loopOk = false;
+    }
+}
+
+void CheckLoopSound() {
+    if (!g_loopSound) return;
+    const char *bad = !HexBytesAt(kSoundPlay, kSoundPlayHex) ? "start tru+0x193c90"
+                      : !HexBytesAt(kSoundEmit, kSoundEmitHex) ? "emitter tru+0x1935d0"
+                      : !HexBytesAt(kSoundEmitAlloc, kSoundEmitAllocHex) ? "emitter alloc tru+0x19360b"
+                      : !HexBytesAt(kEmitterParams, kEmitterParamsHex) ? "emitter constructor tru+0x19088d"
+                      : !HexBytesAt(kSoundPos, kSoundPosHex) ? "position tru+0x183340"
+                      : !HexBytesAt(kSoundFwd1, kSoundFwd1Hex) || !HexBytesAt(kSoundFwd2, kSoundFwd2Hex) ? "slot 0x10 forwarders"
+                      : !HexBytesAt(kNodePool, kNodePoolHex) ? "node pool tru+0x198570"
+                      : !g_tableOk ? "object table (tuning lookup)"
+                                   : nullptr;
+    g_loopOk = bad == nullptr;
+    if (!g_loopOk)
+        Log(0, "loop sound: code does not match (%s) - off", bad);
+    else
+        Log(1, "loop sound: [Sound] LoopSound=1 - TU 0x823d7ae0..0x823d7b34 per tick (start / position / parameters "
+               "0x82480440 while the power is on, stop 0x824805c8 when off), sound manager [0x%08lx], free list [0x%08lx]",
+            kSoundMgr, kNodeFree);
+}
+
+// ---- [Look] MoveEvents: TU 0x823d77f0 (per tick) and Start's event 0x83 ----
+// gameTracker+0x1f0 is the same field on the PC: the PC twin of retail 0x824077e0 (TU 0x8240a430, player anim-event
+// switch) = tru+0x316f30 (map: verified) builds `mov eax, [0xfadb58]; add eax, 0x1f0` at tru+0x317eb6 exactly where
+// retail 0x8240965c / TU 0x8240c3f0 build gameTracker+0x1f0 (same block: [0xfada74] |= 8, [0xfad754] = 10, then the
+// vector to tru+0x30b7c0 = retail 0x824173d8). Length = vdot3fp128 + vrsqrtefp128 with one Newton step on the TU
+// (0 when the dot product is 0); here sqrtf (same value to float precision).
+const DWORD kMoveFieldSite = 0x00717e9e;
+const char *const kMoveFieldHex = "a158dbfa00 830d74dafa0008 d915f0dffa00 d91df4dffa00 05f0010000";
+bool g_moveOk = false;
+volatile LONG g_move83 = 0, g_move84 = 0, g_moveRuns = 0;
+
+bool MoveLength(float *length) {
+    if (!g_moveOk) return false;
+    const BYTE *gt = GameTracker();
+    if (!gt) return false;
+    const float *v = reinterpret_cast<const float *>(gt + 0x1f0);
+    float d = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+    *length = (d == 0.0f) ? d : sqrtf(d);
+    return true;
+}
+
+// TU 0x823d77f0, branch for branch (fcmpu: an unordered compare takes neither bgt nor ble)
+void MoveEvents() {
+    if (!g_moveOk) return;
+    __try {
+        float len = 0.0f;
+        if (!MoveLength(&len)) return;
+        if (InterlockedIncrement(&g_moveRuns) == 1)
+            Log(1, "move events: TU 0x823d77f0 runs (|gameTracker+0x1f0| = %.2f, meter +0x30 = %.2f)", len, g_meter.moveLength);
+        const float limit = 10.0f;                           // [0x8205262c]
+        const bool active = (g_meter.flags & 1) != 0;
+        const DWORD clock = *kTuClock;                       // [0x82efb458 +0xd0] = 0x82efb528
+        if (!active) goto L9b8;
+        if (g_meter.moveLength > limit) goto L8b4;           // 0x823d782c bgt
+        if (len <= limit) goto L8b4;                          // 0x823d7878 ble
+        if (static_cast<float>(g_meter.moveSince) >= 0.0f) goto L9c0;   // 0x823d78a0 bge
+        g_meter.moveSince = static_cast<LONG>(clock);         // rising edge: +0x34 = clock
+        goto L9c0;
+    L8b4:
+        if (!active) goto L9b8;
+        if (g_meter.moveLength <= limit) goto L93c;           // 0x823d78c4 ble
+        if (len > limit) goto L93c;                           // 0x823d7910 bgt
+        {
+            bool f = FireEvent(0x84);                         // falling edge
+            LONG k = InterlockedIncrement(&g_move84);
+            if (k == 1 || g_logLevel >= 2)
+                Log(k == 1 ? 1 : 2, "move events: speed fell to %.1f (<= 10) - player event 0x84 %s (TU 0x823d7928)%s", len,
+                    f ? "fired" : "not fired", k == 1 ? ", first time" : "");
+        }
+        g_meter.moveSince = -1;
+        goto L9c0;
+    L93c:
+        if (!active) goto L9b8;
+        if (static_cast<float>(g_meter.moveSince) <= 0.0f) goto L9b8;   // 0x823d7968 ble
+        if (static_cast<float>(static_cast<DWORD>(clock - static_cast<DWORD>(g_meter.moveSince))) <= 3000.0f)
+            goto L9b8;                                         // 0x823d799c ble ([0x8207d938] = 3000.0)
+        {
+            bool f = FireEvent(0x83);
+            LONG k = InterlockedIncrement(&g_move83);
+            if (k == 1 || g_logLevel >= 2)
+                Log(k == 1 ? 1 : 2, "move events: moving for > 3000 ms (%.1f) - player event 0x83 %s (TU 0x823d79ac)%s", len,
+                    f ? "fired" : "not fired", k == 1 ? ", first time" : "");
+        }
+        goto L9c0;
+    L9b8:
+        g_meter.moveSince = -1;
+    L9c0:
+        g_meter.moveLength = len;                             // 0x823d79c0..0x823d7a04 (+0x30 = the length again)
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "move events: access fault - off");
+        g_moveOk = false;
+    }
+}
+
+void CheckMoveEvents() {
+    if (!g_moveEvents) return;
+    g_moveOk = HexBytesAt(kMoveFieldSite, kMoveFieldHex) && g_lookOk && g_lookEnabled;
+    if (!g_moveOk)
+        Log(0, "move events: gameTracker+0x1f0 reader tru+0x317e9e or the player event walker does not match / [Look] "
+               "Enabled=0 - off");
+    else
+        Log(1, "move events: [Look] MoveEvents=1 - TU 0x823d77f0 per tick (events 0x84 / 0x83 by |gameTracker+0x1f0| "
+               "against 10.0 and 3000 ms) and event 0x83 at the start while moving");
+}
+
+// ---- [Look] CameraFlag: Start's (*0x82efc780)->vtbl[0xa4]() ----
+// TU manager 0x82efc780 (vtable 0x82068930) = PC 0xe804f0 (vtable 0x855ae4, state 2102 / docs L3). The bit helpers
+// are in the same order on both: slots 0x8c..0xac = set / clear / test of bit 4, bit 1, bit 2 (TU 0x822a9df8..
+// 0x822a9e78 on +0x7c, PC tru+0x1eb1a0..0x1eb220 on +0x80); slot 0xa4 = TU 0x822a9e58 = PC tru+0x1eb200 (+0x80 |= 2).
+// The PC retail strike look (tru+0x315020 = retail 0x823e0308) makes the same call (`call 0x5e7770(0)` -> vtbl[0xa4]);
+// the TU moved it into Start. Reader of the bit (TU 0x822a9a7c in 0x822a9888 = retail 0x822ac840: other camera curves)
+// - PC partner not found (as docs L9).
+const DWORD kCamSlotA4 = 0x00855ae4 + 0xa4;
+const DWORD kCamSet2 = 0x005eb200;
+const char *const kCamSet2Hex = "83898000000002 c3";
+const DWORD kCamRetailCall = 0x00715103;            // tru+0x315020: push 0; call 0x5e7770; ...; call [edx+0xa4]
+const char *const kCamRetailCallHex = "6a00 e86626edff 8b10 8bc8 8b82a4000000 83c414 ffd0";
+bool g_camFlagOk = false;
+volatile LONG g_camFlagCalls = 0;
+
+void StartCameraFlag() {
+    if (!g_camFlagOk || !Doppelganger()) return;            // TU Start exists only with the DLC 2 meter (as FireEvent)
+    __try {
+        BYTE *mgr = reinterpret_cast<BYTE *>(kCamMgr);
+        const DWORD *vtbl = *reinterpret_cast<const DWORD *const *>(mgr);
+        LONG k = InterlockedIncrement(&g_camFlagCalls);
+        if (reinterpret_cast<DWORD>(vtbl) != kCamMgrVtable || vtbl[0xa4 / 4] != kCamSet2) {
+            if (k == 1) Log(1, "camera flag: manager 0x%08lx has vtable 0x%08lx - not called", kCamMgr, reinterpret_cast<DWORD>(vtbl));
+            return;
+        }
+        DWORD before = *reinterpret_cast<const DWORD *>(mgr + 0x80);
+        reinterpret_cast<void(__fastcall *)(void *, int)>(vtbl[0xa4 / 4])(mgr, 0);
+        DWORD after = *reinterpret_cast<const DWORD *>(mgr + 0x80);
+        if (k == 1 || g_logLevel >= 2)
+            Log(k == 1 ? 1 : 2, "camera flag: TU 0x823d7f14 (*0x82efc780)->vtbl[0xa4] = tru+0x1eb200 on 0x%08lx: +0x80 0x%08lx "
+                "-> 0x%08lx%s", kCamMgr, before, after, k == 1 ? ", first time" : "");
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "camera flag: access fault - off");
+        g_camFlagOk = false;
+    }
+}
+
+void CheckCameraFlag() {
+    if (!g_cameraFlag) return;
+    g_camFlagOk = *reinterpret_cast<const DWORD *>(kCamSlotA4) == kCamSet2 && HexBytesAt(kCamSet2, kCamSet2Hex) &&
+                  HexBytesAt(kCamRetailCall, kCamRetailCallHex) && HexBytesAt(kCamMgrDtor, kCamMgrDtorHex);
+    if (!g_camFlagOk)
+        Log(0, "camera flag: vtable 0x855ae4 slot 0xa4 / tru+0x1eb200 / the manager does not match - off");
+    else
+        Log(1, "camera flag: [Look] CameraFlag=1 - Start calls the camera manager 0x%08lx vtbl[0xa4] (+0x80 |= 2, TU "
+               "0x823d7f00)", kCamMgr);
+}
+
+// ---- [Look] StrikeLook: the shadow-strike look, TU 0x823d8a80 (anim event 5) / 0x823d9050 (anim event 4) ----
+// TU switch 0x8240a430 (= PC tru+0x316f30, map verified): case 5 (0x8240a67c) / case 4 (0x8240a6c0) call, when
+// gameTracker+0x1244 is set, 0x823d8a80 / 0x823d9050 with the meter, else the retail 0x823e0308 / 0x823e07e8 with
+// gameTracker+0x504 (= PC tru+0x315020 / tru+0x318ea0, called at tru+0x316f6b / tru+0x316f86 with ecx = [gt+0x504]).
+// The TU functions are the retail ones moved into the meter: retail player time ramp -> request slot 2 (tuning +0x50
+// player / +0x4c world), events 0x32 / 0x33 -> the inline walks of type 0x7a / 0x7b (= 0x82418158 = PC tru+0x318780),
+// player +0x1fc bit 29 -> meter flag 4, camera vtbl[0xa4] / [0xa8] -> not called (Start does vtbl[0xa4]).
+// 0x823d8a80: flag 2 set and flag 4 clear; request 2; type 0x7a; target = handle meter +0x18 / +0x1c (valid when
+// target +0x44 == +0x1c): [0x829bffa4] = +0x28, q = target->+0x11c(0x188) (= PC tru+0x1b3720(target, 0x188, +0x28),
+// [0xd98f9c]), point = (target +0x90)[q] row +0x30 -> 0x823e2b98(P->+0, &point); no target -> 0x823e2b98(P->+0, 0);
+// (P->+4)->+0x40 |= 0x200; +0x15 = 0; flags |= 4 (P = [gameTracker+0x504]).
+// 0x823e2b98(A, point) = retail 0x823e0540 (= PC tru+0x30db20, called by tru+0x315119 with ecx = [P]) plus the point
+// argument: point 0 -> the retail body; else A +0x3c == 0 -> return, the target point = *point instead of
+// 0x82406690(target), then the retail tail (written out from PC tru+0x30db60..0x30dbd2: tru+0x3020e0, tru+0x2e6a70,
+// A +0x20, HUD 0x802 / mask 2 / update, [0xfae8ae] = 0, A +0x44 / +0x48 = 0, A +0x40 |= 0x40).
+// 0x823d9050: flag 4 set: request 2 cleared; type 0x7b; 0x823e2ca0(P->+0) (= PC tru+0x2e6ca0); (P->+0) / (P->+4)
+// +0x40 &= ~0x200; flags &= ~4. Also called by Stop (flag 2) and by the strike tick / end (TruShadowCombat, through
+// the meter interface v4 strikeLookOff). The strike's meter fields +0x15 / +0x18 / +0x1c / +0x28 are
+// TruShadowCombat's (TruShadowCombatStrikeState).
+typedef void(__fastcall *ThisFn)(void *self, int);
+typedef int(__cdecl *QueryArgFn)(BYTE *instance, int id, void *arg);            // tru+0x1b3720
+typedef void(__cdecl *AimProjectFn)(float *out, char *b1, char *b0, const float *point);   // tru+0x3020e0 = TU 0x82418600
+typedef float *(__fastcall *AimVectorFn)(BYTE *a, int, float *out, const float *in);       // tru+0x2e6a70 = TU 0x823e20e8
+const DWORD kCase5Site = 0x00716f5f, kCase5Call = 0x00716f6b, kRetail5 = 0x00715020;
+const char *const kCase5Hex = "8b0d58dbfa00 8b8904050000 e8b0e0ffff 8b451c";
+const DWORD kCase4Site = 0x00716f7a, kCase4Call = 0x00716f86, kRetail4 = 0x00718ea0;
+const char *const kCase4Hex = "8b1558dbfa00 8b8a04050000 e8151f0000 8b451c";
+const DWORD kCaseIndex = 0x0071811c;                // byte index of the switch: cases 1..5 -> 0, 1, 2, 3, 4
+const char *const kCaseIndexHex = "00010203 04";
+const DWORD kCaseTable = 0x00718024;
+const char *const kRetail5Hex = "83ec0c 56 8bf1 8b86fc010000 8bc8 c1e915 f6c101";
+const char *const kRetail4Hex = "83ec0c 56 8bf1 8b86fc010000 c1e81d a801";
+const DWORD kRetail5Aim = 0x00715119;               // mov ecx,[esi]; call tru+0x30db20; mov eax,[esi+4]; or word [eax+0x40],0x200
+const char *const kRetail5AimHex = "8b0e e8008affff 8b4604 668148400002";
+const DWORD kRetail4Off = 0x00718f89;               // the PC's inline copy of 0x823e2ca0 and the two 0x200 clears
+const char *const kRetail4OffHex = "8b3e 6a0b e8de4b0600 6a01 e8374a0600 6a01 e8a04a0600 83c40c e8c84a0600 668167403fff "
+                                   "8b06 b9fffd0000 66214840 8b4604 66214840";
+const DWORD kAimRetail = 0x0070db20;
+const char *const kAimRetailHex =
+    "55 8bec 83e4f0 83ec38 56 8bf1 57 8b7e3c 85ff 0f849d000000 57 e8925eeaff 83c404 85c0 741b f7401400004000 7512 "
+    "8b4f0c 51 50 8d542418 52 e8e314ffff 83c40c 8d442410 50 8d4c2412 51 8d542417 52 8d44242c 50 e86745ffff 83c410 "
+    "8d4c2420 51 8d542434 52 8bce e8e38efdff 8b08 894e20 8b5004 895624 8b4808 894e28 8b500c 6a0b 89562c e825fe0600 "
+    "6a01 e81efe0600 6a01 e867fe0600 83c40c e8affe0600 d9ee c605aee8fa0000 d95648 66834e4040 d95e44 5f 5e 8be5 5d c3";
+const DWORD kAimProject = 0x007020e0;
+const char *const kAimProjectHex = "55 8bec 83e4f0 83ec34 8b0d94f0e700 8b450c";
+const DWORD kAimVector = 0x006e6a70;
+const char *const kAimVectorHex = "55 8bec 83e4f0 83ec28 56 8b7508 57 8bf9";
+const DWORD kAimOff = 0x006e6ca0;
+const char *const kAimOffHex = "56 6a0b 8bf1 e8c66e0900 6a01 e81f6d0900 6a01 e8886d0900 83c40c e8b06d0900 668166403fff 5e c3";
+const DWORD kHudMask2Set = 0x0077da20;
+const char *const kHudMask2SetHex = "8b4c2404 8d41ff 83f81e 770e ba01000000 d3e2 091528e9fa00 c3";
+const DWORD kQueryArg = 0x005b3720;
+const char *const kQueryArgHex = "8b4c2404 8b44240c 8d9110010000 85d2 a39c8fd900 740a 8b811c010000 85c0";
+const DWORD kHudStrikeByte = 0x00fae8ae;            // TU 0x829ca67f (retail 0x829ca5be)
+bool g_strikeLookOk = false;
+volatile LONG g_slOn = 0, g_slOff = 0, g_slEvent5 = 0, g_slEvent4 = 0;
+
+struct TruShadowCombatStrike { DWORD size, version; BYTE *latch; DWORD *target; LONG *count; float *frames; };
+const TruShadowCombatStrike *g_strikeState = nullptr;
+int g_strikeStateLooked = 0;
+
+const TruShadowCombatStrike *StrikeState() {
+    if (!g_strikeStateLooked) {
+        g_strikeStateLooked = 1;
+        HMODULE m = GetModuleHandleA("TruShadowCombat.asi");
+        typedef const TruShadowCombatStrike *(__cdecl *StateFn)();
+        StateFn fn = m ? reinterpret_cast<StateFn>(GetProcAddress(m, "TruShadowCombatStrikeState")) : nullptr;
+        const TruShadowCombatStrike *s = fn ? fn() : nullptr;
+        if (s && s->size >= sizeof(TruShadowCombatStrike) && s->version >= 1 && s->latch && s->target && s->count) {
+            g_strikeState = s;
+            Log(1, "strike look: TruShadowCombatStrikeState version %lu found (target handle / count / latch of the strike)",
+                s->version);
+        } else {
+            Log(0, "strike look: TruShadowCombat.asi / TruShadowCombatStrikeState not found - the look runs without a target");
+        }
+    }
+    return g_strikeState;
+}
+
+// TU 0x823e2b98
+void AimAt(BYTE *a, const float *point) {
+    if (!point) { reinterpret_cast<ThisFn>(kAimRetail)(a, 0); return; }
+    if (!*reinterpret_cast<void *const *>(a + 0x3c)) return;
+    __declspec(align(16)) float pt[4];
+    __declspec(align(16)) float proj[4];
+    __declspec(align(16)) float out[4];
+    struct { char b0, b1; } bytes = {0, 0};
+    memcpy(pt, point, sizeof(pt));
+    reinterpret_cast<AimProjectFn>(kAimProject)(proj, &bytes.b1, &bytes.b0, pt);
+    const float *r = reinterpret_cast<AimVectorFn>(kAimVector)(a, 0, out, proj);
+    memcpy(a + 0x20, r, 16);
+    if (g_hudOk && *kHudManager) {
+        g_hudGroup(0xb);
+        g_hudGroup(1);
+        reinterpret_cast<HudGroupFn>(kHudMask2Set)(1);
+        g_hudUpdate();
+    }
+    *reinterpret_cast<volatile BYTE *>(kHudStrikeByte) = 0;
+    *reinterpret_cast<float *>(a + 0x48) = kZero;
+    *reinterpret_cast<WORD *>(a + 0x40) |= 0x40;
+    *reinterpret_cast<float *>(a + 0x44) = kZero;
+}
+
+// TU 0x823d8a80
+void StrikeLookOn() {
+    if (!(g_meter.flags & 2) || (g_meter.flags & 4)) return;
+    BYTE *gt = GameTracker();
+    if (!gt) return;
+    const BYTE *tuning = g_tuning;
+    if (tuning) {
+        g_meter.request[2][0] = Tune(tuning, 0x50);           // +0x50 = tuning +0x50 (player)
+        g_meter.request[2][1] = Tune(tuning, 0x4c);           // +0x54 = tuning +0x4c (world)
+        Selector();
+    }
+    const bool ev = FireEvent(0x7a);
+    const TruShadowCombatStrike *s = StrikeState();
+    BYTE *target = nullptr;
+    if (s) {
+        BYTE *o = reinterpret_cast<BYTE *>(s->target[0]);
+        if (o && *reinterpret_cast<const DWORD *>(o + 0x44) == s->target[1]) target = o;
+    }
+    BYTE *p = *reinterpret_cast<BYTE **>(gt + 0x504);
+    BYTE *a = *reinterpret_cast<BYTE **>(p);
+    int q = -1;
+    if (target) {
+        q = reinterpret_cast<QueryArgFn>(kQueryArg)(target, 0x188, reinterpret_cast<void *>(static_cast<LONG_PTR>(*s->count)));
+        const BYTE *mats = *reinterpret_cast<const BYTE *const *>(target + 0x90);
+        __declspec(align(16)) float point[4];
+        memcpy(point, mats + (static_cast<DWORD>(q) << 6) + 0x30, sizeof(point));
+        AimAt(a, point);
+    } else {
+        AimAt(a, nullptr);
+    }
+    *reinterpret_cast<WORD *>(*reinterpret_cast<BYTE **>(p + 4) + 0x40) |= 0x200;
+    if (s) *s->latch = 0;
+    g_meter.flags |= 4;
+    LONG k = InterlockedIncrement(&g_slOn);
+    if (k == 1 || g_logLevel >= 2)
+        Log(k == 1 ? 1 : 2, "strike look ON (TU 0x823d8a80%s): request 2 = %.3f / %.3f, event 0x7a %s, target 0x%08lx (query "
+            "0x188 -> %d), second model +0x40 |= 0x200, meter flags 0x%03lx", k == 1 ? ", first time" : "",
+            tuning ? Tune(tuning, 0x50) : 0.0f, tuning ? Tune(tuning, 0x4c) : 0.0f, ev ? "fired" : "not fired",
+            reinterpret_cast<DWORD>(target), q, g_meter.flags);
+}
+
+// TU 0x823d9050
+void StrikeLookOffBody() {
+    if (!(g_meter.flags & 4)) return;
+    BYTE *gt = GameTracker();
+    if (!gt) return;
+    if (g_tuning) {
+        g_meter.request[2][0] = g_meter.request[2][1] = kNoRequest;
+        Selector();
+    }
+    const bool ev = FireEvent(0x7b);
+    BYTE *p = *reinterpret_cast<BYTE **>(gt + 0x504);
+    reinterpret_cast<ThisFn>(kAimOff)(*reinterpret_cast<BYTE **>(p), 0);
+    *reinterpret_cast<WORD *>(*reinterpret_cast<BYTE **>(p) + 0x40) &= 0xfdff;
+    *reinterpret_cast<WORD *>(*reinterpret_cast<BYTE **>(p + 4) + 0x40) &= 0xfdff;
+    g_meter.flags &= ~4u;
+    LONG k = InterlockedIncrement(&g_slOff);
+    if (k == 1 || g_logLevel >= 2)
+        Log(k == 1 ? 1 : 2, "strike look OFF (TU 0x823d9050%s): request 2 cleared, event 0x7b %s, HUD tru+0x2e6ca0, 0x200 "
+            "cleared on both models, meter flags 0x%03lx", k == 1 ? ", first time" : "", ev ? "fired" : "not fired",
+            g_meter.flags);
+}
+
+void StrikeLookOff() {
+    if (!g_strikeLookOk) return;
+    __try {
+        StrikeLookOffBody();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "strike look: access fault in 0x823d9050 - strike look off (retail handlers again)");
+        g_strikeLookOk = false;
+    }
+}
+
+// tru+0x316f6b / tru+0x316f86: `call tru+0x315020` / `call tru+0x318ea0` with ecx = [gameTracker+0x504]
+void __fastcall AnimEvent5(BYTE *p, int) {
+    if (g_strikeLookOk && Doppelganger()) {
+        if (InterlockedIncrement(&g_slEvent5) == 1)
+            Log(1, "strike look: player anim event 5 in doppelganger mode -> TU 0x823d8a80 (meter flags 0x%03lx)", g_meter.flags);
+        __try {
+            StrikeLookOn();
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            Log(0, "strike look: access fault in 0x823d8a80 - strike look off (retail handlers again)");
+            g_strikeLookOk = false;
+        }
+        return;
+    }
+    reinterpret_cast<ThisFn>(kRetail5)(p, 0);
+}
+
+void __fastcall AnimEvent4(BYTE *p, int) {
+    if (g_strikeLookOk && Doppelganger()) {
+        if (InterlockedIncrement(&g_slEvent4) == 1)
+            Log(1, "strike look: player anim event 4 in doppelganger mode -> TU 0x823d9050 (meter flags 0x%03lx)", g_meter.flags);
+        StrikeLookOff();
+        return;
+    }
+    reinterpret_cast<ThisFn>(kRetail4)(p, 0);
+}
+
+bool CallTargetIs(DWORD at, DWORD target) {
+    __try {
+        return *reinterpret_cast<const BYTE *>(at) == 0xe8 && at + 5 + *reinterpret_cast<const DWORD *>(at + 1) == target;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+void PatchStrikeLook() {
+    if (!g_strikeLook) return;
+    const DWORD *table = reinterpret_cast<const DWORD *>(kCaseTable);
+    const char *bad = !HexBytesAt(kCase5Site, kCase5Hex) || !CallTargetIs(kCase5Call, kRetail5) ? "case 5 tru+0x316f5f"
+                      : !HexBytesAt(kCase4Site, kCase4Hex) || !CallTargetIs(kCase4Call, kRetail4) ? "case 4 tru+0x316f7a"
+                      : !HexBytesAt(kCaseIndex, kCaseIndexHex) || table[3] != kCase4Site || table[4] != kCase5Site
+                          ? "switch tables tru+0x31811c / tru+0x318024"
+                      : !HexBytesAt(kRetail5, kRetail5Hex) || !HexBytesAt(kRetail4, kRetail4Hex) ? "retail look tru+0x315020 / tru+0x318ea0"
+                      : !HexBytesAt(kRetail5Aim, kRetail5AimHex) || !HexBytesAt(kRetail4Off, kRetail4OffHex) ? "retail look body"
+                      : !HexBytesAt(kAimRetail, kAimRetailHex) ? "aim tru+0x30db20"
+                      : !HexBytesAt(kAimProject, kAimProjectHex) || !HexBytesAt(kAimVector, kAimVectorHex) ? "aim helpers"
+                      : !HexBytesAt(kAimOff, kAimOffHex) || !HexBytesAt(kHudMask2Set, kHudMask2SetHex) ? "HUD tru+0x2e6ca0 / tru+0x37da20"
+                      : !HexBytesAt(kQueryArg, kQueryArgHex) ? "query tru+0x1b3720"
+                      : !g_lookOk || !g_lookEnabled ? "player event walker / [Look] Enabled"
+                                                    : nullptr;
+    if (bad) { Log(0, "strike look: code does not match (%s) - off", bad); return; }
+    g_strikeLookOk = true;                   // before the patch: the stubs read it
+    if (!WriteCall5(kCase5Call, reinterpret_cast<const void *>(&AnimEvent5)) ||
+        !WriteCall5(kCase4Call, reinterpret_cast<const void *>(&AnimEvent4))) {
+        Log(0, "strike look: VirtualProtect failed (%lu)", GetLastError());
+        return;
+    }
+    Log(1, "strike look: [Look] StrikeLook=1 - player anim events 5 / 4 (tru+0x316f6b / tru+0x316f86) run TU 0x823d8a80 / "
+           "0x823d9050 in doppelganger mode, else the PC handlers tru+0x315020 / tru+0x318ea0; Stop runs 0x823d9050 "
+           "with flag 2; meter interface v4 strikeLookOff for TruShadowCombat");
+}
+
+// ---- meter interface (docs Befund-Schattenkampf.md section 5; version 1 = TruShadowCombat's proposal, version 2
+// appends the HUD natives f70-f73 of larabase, TU 0x824aa060 / 0x824aa0a0 / 0x824aa120 / 0x824aa150, for a later HUD
+// plugin - Plan-Nacht-Analysen-2026-11-03.md section 2). Fields are only appended; check version / size.
+struct TruShadowPowerMeter {
+    DWORD size;                           // sizeof this struct
+    DWORD version;                        // 3 (0.12; 2 = 0.11)
+    volatile DWORD *flags;                // TU meter +0x04 (1 active, 2 strike, 4 strike look, 8 value >= tuning +0x2c, ..)
+    float *value;                         // +0x08
+    float *startValue;                    // +0x0c
+    float (*request)[2];                  // +0x40: 7 time-scale request slots {player, world}
+    void(__cdecl *selector)();            // 0x823d7520
+    void(__cdecl *drain)(float amount);   // 0x823d8380
+    // version 2
+    float *delay;                         // +0x10 refill delay (frames)
+    void(__cdecl *delayStart)();          // f70 0x824aa060: +0x10 = tuning +0x24
+    char(__cdecl *strikeReady)();         // f71 0x824aa0a0: flag 8 and value > tuning +0x70 x 0.01 x tuning +0x10
+    char(__cdecl *canStart)();            // f72 0x824aa120: CanStart 0x823d8120 (clears flag 0x200 above +0x28)
+    float(__cdecl *delayLeft)();          // f73 0x824aa150: max(+0x10, 0.0)
+    // version 3 (0.12, docs Befund-Schattenkampf.md section 5 "Version 3 request")
+    volatile LONG *gt1280;                // TU-only gameTracker+0x1280: move steps of states 244 (TruShadowCombat) / 245,
+                                          // read by condition 1048
+    // version 4 (0.14)
+    void(__cdecl *strikeLookOff)();       // TU 0x823d9050 (only with meter flag 4 = [Look] StrikeLook=1; else nothing):
+                                          // the strike tick 0x823d8d18 / end 0x823d9210 call it next to their drain
+};
+
+void __cdecl ApiSelector() { Selector(); }
+// the tuning the meter runs with (TU 0x82415518; the plugin's last tick, incl. the file copy with [Meter] Fallback=1)
+void __cdecl ApiDrain(float amount) {
+    const BYTE *tuning = g_tuning;
+    if (tuning) Drain(tuning, amount);
+}
+void __cdecl ApiDelayStart() {                                 // f70
+    const BYTE *tuning = g_tuning;
+    if (tuning) g_meter.delay = Tune(tuning, 0x24);
+}
+char __cdecl ApiStrikeReady() {                                // f71
+    const BYTE *tuning = g_tuning;
+    if (!GameTracker() || !tuning || !(g_meter.flags & 8)) return 0;
+    float high = Tune(tuning, 0x70) * kPercent;                // fmuls f11 = +0x70 x [0x820536ec]
+    high = high * Tune(tuning, kTuneMax);                       // fmuls f0 = f11 x +0x10
+    return g_meter.value > high ? 1 : 0;
+}
+char __cdecl ApiCanStart() {                                   // f72
+    return CanStart(g_tuning) ? 1 : 0;
+}
+float __cdecl ApiDelayLeft() {                                 // f73
+    return kZero < g_meter.delay ? g_meter.delay : kZero;
+}
+void __cdecl ApiStrikeLookOff() {                              // 0.14: 0x823d9050
+    StrikeLookOff();
+}
+
+const TruShadowPowerMeter g_meterApi = {
+    sizeof(TruShadowPowerMeter), 4, reinterpret_cast<volatile DWORD *>(&g_meter.flags), &g_meter.value,
+    &g_meter.startValue, g_meter.request, &ApiSelector, &ApiDrain, &g_meter.delay, &ApiDelayStart, &ApiStrikeReady,
+    &ApiCanStart, &ApiDelayLeft, &g_gt1280, &ApiStrikeLookOff};
+
 void ReadOptions(const char *dir) {
     char ini[MAX_PATH];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruShadowPower.ini", dir);
@@ -2001,6 +3070,14 @@ void ReadOptions(const char *dir) {
     g_fallback = GetPrivateProfileIntA("Meter", "Fallback", 1, ini);
     g_lookEnabled = GetPrivateProfileIntA("Look", "Enabled", 1, ini);
     g_lookMessages = GetPrivateProfileIntA("Look", "Messages", 1, ini);
+    g_lookScreen = GetPrivateProfileIntA("Look", "ScreenEffect", 1, ini);
+    g_gp7Enabled = GetPrivateProfileIntA("Look", "GlobalParams7", 1, ini);
+    g_cineParamEnabled = GetPrivateProfileIntA("Look", "CinematicParam", 1, ini);
+    g_state2102Enabled = GetPrivateProfileIntA("States", "State2102", 1, ini);
+    g_loopSound = GetPrivateProfileIntA("Sound", "LoopSound", 0, ini);           // 0.14, all default 0
+    g_moveEvents = GetPrivateProfileIntA("Look", "MoveEvents", 0, ini);
+    g_cameraFlag = GetPrivateProfileIntA("Look", "CameraFlag", 0, ini);
+    g_strikeLook = GetPrivateProfileIntA("Look", "StrikeLook", 0, ini);
 }
 
 void Start(HMODULE self) {
@@ -2011,10 +3088,13 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.9 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
-        "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d)", g_enabled,
-        g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled,
-        g_legacyPadStart, g_gameInput, g_adrenalineMode);
+    Log(1, "TruShadowPower 0.14 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+        "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
+        "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
+        "camera flag %d, strike look %d)", g_enabled, g_buttons, g_hudFeed, g_fallback,
+        g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled, g_legacyPadStart, g_gameInput,
+        g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled, g_state2102Enabled, g_loopSound, g_moveEvents,
+        g_cameraFlag, g_strikeLook);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -2061,7 +3141,22 @@ void Start(HMODULE self) {
                                        "not sent", g_msgOk ? kInstanceHead : kInstWalk);
     else if (g_lookEnabled)
         Log(1, "shadow look: messages 0x1f4 / 0x1f5 off ([Look] Messages=0)");
+    // 0.10: the full-screen effect of event 0x32 (record 14 -> material 20744), report / remove
+    g_fxOk = HexBytesAt(kEffectWalk, kEffectWalkHex) && HexBytesAt(kFx85Create, kFx85CreateHex) &&
+             HexBytesAt(kFx85Material, kFx85MaterialHex) && HexBytesAt(kFx85Draw, kFx85DrawHex) &&
+             HexBytesAt(kEffectKill, kEffectKillHex);
+    if (g_lookEnabled && g_lookOk)
+        Log(g_fxOk ? 1 : 0, g_fxOk ? "look screen effect: effect list [0x%08lx] / type-0x85 effect tru+0x135cc0 / draw "
+                                     "tru+0x1469a0 verified - %s"
+                                   : "look screen effect: effect list code at 0x%08lx does not match - not reported%s",
+            g_fxOk ? kEffectHead : kEffectWalk,
+            g_fxOk ? (g_lookScreen ? "the effect of event 0x32 is reported (needs the translated material 20744 of "
+                                     "tree dlc_test50l_look, else the screen turns black)"
+                                   : "the effect of event 0x32 is REMOVED ([Look] ScreenEffect=0)") : "");
     MeterInit();
+    Log(1, "meter interface: TruShadowPowerMeterApi version 4 exported (flags / value / start value / requests, "
+           "selector 0x823d7520, drain 0x823d8380; v2: delay, HUD natives f70-f73; v3: gameTracker+0x1280 steps; v4: "
+           "strikeLookOff 0x823d9050)");
     g_tuStatesOk = true;
     for (const auto &c : kTuBlocks)
         if (!HexBytesAt(c.address, c.bytes)) {
@@ -2078,6 +3173,7 @@ void Start(HMODULE self) {
                 HexBytesAt(kBlockSetter, kBlockSetterHex) && HexBytesAt(kBlockSetterCall, kBlockSetterCallHex) &&
                 HexBytesAt(kGtxFlagsCheck, kGtxFlagsCheckHex);
     g_inputOk = HexBytesAt(kInputCheck, kInputCheckHex);
+    PatchGlobalParams7();               // 0.11 / 0.12 (needs g_tableOk for the tuning lookup, g_gatesOk for the cinematic test)
     if (g_legacyPadStart)
         Log(1, "tick: LEGACY 0.8 path ([ShadowPower] LegacyPadStart=1) - power in every level, no cinematic gates");
     else if (g_gatesOk)
@@ -2100,6 +3196,15 @@ void Start(HMODULE self) {
         PatchAdrenalineMode();
     else
         Log(1, "adrenaline look: off ([Look] Enabled=0)");
+    // 0.14: each part only when its switch is 1 (default 0: nothing checked, nothing patched - 0.13 behaviour)
+    if (g_legacyPadStart && (g_loopSound || g_moveEvents)) {
+        Log(1, "0.14 loop sound / move events: off with LegacyPadStart=1 (they belong to the TU tick)");
+        g_loopSound = g_moveEvents = 0;
+    }
+    CheckLoopSound();
+    CheckMoveEvents();
+    CheckCameraFlag();
+    PatchStrikeLook();
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -2120,7 +3225,17 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.9 (translated TU meter with the TU tick gates, Lara conditions 1046 / 1047 / 1048-1056 / "
-           "2401, states 243 / 245 / 1018, activities 1009 / 1039, shadow look = TU player events of start / stop, "
-           "adrenaline look = meter flag 0x40 / camera mode 0x34)";
+    return "TruShadowPower 0.14 (translated TU meter with the TU tick gates, Lara conditions 1046 / 1047 / 1048-1056 / "
+           "2401, states 243 / 245 / 1018 / 2102, activities 1009 / 1039, shadow look = TU player events of start / stop, "
+           "adrenaline look = meter flag 0x40 / camera mode 0x34, look screen effect report / switch, GlobalParams[7], "
+           "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4; switches default off: loop "
+           "sound, move events 0x83 / 0x84, camera flag, strike look 0x823d8a80 / 0x823d9050)";
+}
+
+// 0.11: the TU meter object for other plugins (TruShadowCombat: condition 538, the shadow strike) - interface version
+// 4 (1 = TruShadowCombat's proposal in docs Befund-Schattenkampf.md section 5, 2 adds the HUD natives f70-f73, 3 gt1280,
+// 4 strikeLookOff). Pointers stay valid for the life of the process (the meter
+// is re-initialised in place per game tracker). Call from the game thread only (as the meter itself).
+extern "C" __declspec(dllexport) const void *__cdecl TruShadowPowerMeterApi() {
+    return &g_meterApi;
 }
