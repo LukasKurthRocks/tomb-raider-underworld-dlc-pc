@@ -10,8 +10,7 @@ import sys, os, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW
 from shader_const_fix import split_end, lib_parse
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'native_test'))
-from native_extract import NEW_LIBS
+from shader_libs import NEW_LIBS
 
 
 def main(argv):

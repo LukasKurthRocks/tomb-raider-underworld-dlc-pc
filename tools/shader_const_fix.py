@@ -21,8 +21,7 @@ import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW
 import shader_disasm as SD, shader_validate as SV
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'native_test'))
-from native_extract import NEW_LIBS            # one list for the check (shader_lib_check) and the fix
+from shader_libs import NEW_LIBS              # one list for the check (shader_lib_check) and the fix
 DCL, DEF, DEFI, DEFB, END, COMMENT, MOV = 0x1F, 0x51, 0x30, 0x2F, 0xFFFF, 0xFFFE, 0x01
 # instructions without a destination token: call, callnz, loop, ret, endloop, label, rep, endrep, if, ifc, else,
 # endif, break, breakc, breakp (D3DSIO_* 25-30, 38-45, 96)

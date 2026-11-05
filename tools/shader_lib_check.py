@@ -10,8 +10,7 @@ Usage (from the repository root):
 """
 import sys, os, hashlib, collections, re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'native_test'))
-import native_extract as NE
+import shader_libs as NE        # our copy of upstream's B138 native_extract helpers (native test v3 dropped them)
 import shader_disasm as SD, shader_validate as SV
 
 
