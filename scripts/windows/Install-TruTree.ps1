@@ -137,6 +137,14 @@ try {
     }
 
     $bk = Join-Path $backupDir "tree_$stamp"
+    # two installs in the same second (e.g. Invoke-TruTestRun stacking small trees) would share one backup folder and
+    # the second manifest would overwrite the first: wait for a free second instead (keeps the name order for -Restore)
+    while ((Test-Path -LiteralPath $bk) -or (Test-Path -LiteralPath "$bk.restored")) {
+        Write-Log "backup folder tree_$stamp exists already - waiting for the next second" -Level VERBOSE
+        Start-Sleep -Milliseconds 250
+        $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+        $bk = Join-Path $backupDir "tree_$stamp"
+    }
     New-Item -ItemType Directory -Force -Path (Join-Path $bk 'files') | Out-Null
     # folders that do not exist yet and will be created by the copies (so -Restore removes exactly these)
     $createdDirs = New-Object System.Collections.Generic.List[string]

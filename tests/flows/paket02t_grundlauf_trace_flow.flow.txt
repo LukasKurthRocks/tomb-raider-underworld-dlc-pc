@@ -1,0 +1,50 @@
+﻿# TruMenu flow (TruMenu 0.11) - paket02t_grundlauf_trace_flow; written by New-FlowFile.ps1 2026-11-05 14:07 from tests/profiles/paket02t_grundlauf_trace_flow.json - do not edit by hand,
+# run the script again. Format: TruFlowCore.h / TruMenu README "Ablauf" (flow | counter | step records, " | " fields).
+flow | los2t_flow | los2t Ablauf: Grundlauf DLC 2 mit Wand-Lauf (2102), Stöhn-Schleife (F5) und 3 Toden
+counter | units | units | 0 | Einheiten geladen
+counter | hall01 | units:dlc_yggdrasil_hall01 | 1 | hall01 geladen
+counter | backup | log:TruMenu.log:re:saves: backup \S+: \d+ file\(s\) copied, 0 failed | 1 | Saves gesichert
+counter | spon | log:TruShadowPower.log:shadow power ON ( | 1 | Schattenkraft an
+counter | s2102 | log:TruShadowPower.log:re:state 2102 \(TU 0x822ae918 -> 0x822c2130\) first call | 1 | 2102 erster Aufruf
+counter | moanlong | trace:sound:LONG sound | 1 | lange Töne
+counter | moanrep | trace:sound:re:REPEAT sound \d+ started \d+ times | 0 | Ton-Wiederholungen
+counter | tonmark | mark:sound | 0 | Ton komisch gedrückt
+counter | deaths | deaths | 3 | Tode
+counter | restores | restores | 3 | Checkpoint geladen
+step | s1 | mark | Main menu: wait - TruMenu AutoStart starts DLC 2 after 3 s; let the intro play to its end (do not skip it) / NEW (TruMenu 0.10.5): ring top level Claude -> ...
+step | cutscene | observe | The intro cutscene played (picture and sound, no hang)
+step | cine-param | observe | Doppelganger in the cutscene vs in play as on the Xbox (TruShadowPower 0.12 InstanceParams[1]; log "InstanceParams[1] of the player model (TU 0x8247498c) = ...
+step | s2 | action | In the level: open the ring (hold L3+R3 0.5 s, or F9) -> Spieler -> Helfer -> Saves sichern (save.backup); B, B | do=save.backup | check=counter:backup | count=backup | hint=Weiter = save.backup (der Ring macht es selbst)
+step | saves-backup | observe | TruMenu.log "saves: backup <time>: n file(s) copied, 0 failed"; the backup shows under backups | check=counter:backup | count=backup
+step | s3 | mark | Move Lara: walk, run, turn the camera; look at her hair in light and in shade
+step | doppel-hair | observe | Doppelganger hair: dark red in the light with the new Xbox hair lighting - compare with Xbox Xenia-TU_DLC2_08; if it looks off next to Lara s hair note it ...
+step | doppel-look | observe | Doppelganger outfit as on the Xbox: top / trousers dark with seams, belt metal, gloves black, natural face and arm skin also in sunlight (no white, cyan, g ...
+step | d3d-box | observe | No D3D error box (D3DERR_INVALIDCALL 0x8876086C) after the load
+step | s4 | mark | Water on the way in dlc_level2_start: dive a few seconds, then surface - listen for Lara breathing / gasping. Once stay under until the air is used up (hea ...
+step | breath-sound | observe | Surfacing: breath / gasp sound audible (tree 51e: breath-sound ids 26867 / 26868 of the player data now u32), also after the air ran out; TruDataGuard.log ...
+step | s5 | mark | Walk to the rock channel (Felsrinne) without the shadow power: jump against it - it should behave like a normal wall
+step | wall-normal | observe | Rock channel without shadow power: normal wall behaviour (jump against / off), no fall through, no crash
+step | vein-look | observe | Rock vein strip at the first rock channel: bright, raised stone blocks with a dark centre joint (Xbox look), no black / flickering patches
+step | s6 | mark | Hold RB for a few seconds: slow motion, the yellow silhouette drains; release RB: normal speed, it refills | count=spon
+step | shadow-power | observe | Shadow power: slow motion while RB is held, meter drains and refills | count=spon
+step | look-screen | observe | Look while RB is held (here and later in hall02): picture stays visible - centre normal, edges blurred and brighter / blue-grey (Xbox Xenia-TU_DLC2_24); NO ...
+step | globalparams7 | observe | While RB is held the look edges fade in over ~1 s and out after release (TruShadowPower.log "GlobalParams[7] (TU 0x824748e4): first set ...") | check=log:TruShadowPower.log:re:GlobalParams\[7\] \(TU 0x824748e4\): first set
+step | s7 | mark | Rock channel wall: hold RB and press A at the wall (wall run); once jump off (A with a direction), once release RB, once run until she comes down | count=s2102
+step | wr2102 | observe | Wand-Lauf: springt die Kamera sofort in die Wand-Lauf-Ansicht (Zustand 2102)? | after=counter:s2102 | count=s2102 | hint=Gut = springt sofort, Fehler = gleitet / hinkt hinterher; wartet auf die 2102-Zeile
+step | wall-run | observe | Wall run: Lara runs along the wall, no crash, no box. TruShadowPower 0.13 state 2102: at the wall run start the camera jumps straight into the wall-run vie ... | count=s2102
+step | wall-exit | observe | Leaving the wall (jump off / RB released / near the floor): Lara lands or falls normally, no crash, no teleport
+step | s8 | mark | TruTrace F5 (moan sound): after the wall run stand still (no input) until the moaning sound comes; NOTE THE CLOCK TIME (Windows clock), then stand still 30 ... | count=moanlong,moanrep
+step | f5wait | mark | Stillstehen bis das Stöhnen kommt - dann Claude / Ton komisch drücken | check=mark:sound | count=moanlong,tonmark | hint=Ton komisch = Marke mit Uhrzeit + Bild; danach noch 30 s stehen
+step | f5long | observe | TruTrace: langer Ton (LONG sound) nach dem Wand-Lauf gesehen | check=counter:moanlong | count=moanlong,moanrep | hint=geht von selbst auf ok, sobald TruTrace LONG sound schreibt
+step | trace-f5-moan | observe | TruTrace.log around that time: "sound: LONG sound <id> ... started by anim event from inst ... obj <id> <name>" = the sound that does not end and who start ... | count=moanlong,moanrep
+step | s9 | mark | Wall run, jump up to the ledge (X), then let Lara die (fall) and let the game reload - 3 times; also fall deaths without the power | count=deaths,restores
+step | die3 | observe | 3x sterben und neu laden: 3 Tode gezählt, 3 Checkpoints geladen | check=counter:deaths | count=deaths,restores | hint=Tode = DeathState-Bit, Checkpoint = TruTrace SAVE_RestoreGame
+step | death-no-crash | observe | Deaths and reloads (wall run / fall / without power): no crash, no freeze (50b-50f crashed here) | count=deaths
+step | s10 | mark | After the rock channel: slide down the wall with LB held several times; go on into dlc_yggdrasil_hall01 (red-rune corridor) | count=hall01,units
+step | wallslide-hall01-no-crash | observe | Wall slide with LB and entering dlc_yggdrasil_hall01: no crash (50e / 50h crashed there) | count=hall01
+step | s11 | action | Lara is in hall01 now. Ring Tests -> Rundgang -> DLC 1 -> Laden dlc_level1_start; after the load look at Lara, walk, hold RB for a few seconds. Thrall fix ... | do=level.load dlc_level1_start | hint=Weiter = level.load dlc_level1_start (Ring: Tests / Rundgang / DLC 1)
+step | dlc1-no-power | observe | DLC 1 after DLC 2: RB does nothing (no slow motion, no meter, no look) - the doppelganger flag was reset
+step | dlc1-after-dlc2-lara | observe | DLC 1 after DLC 2 (F12): normal Lara (not the doppelganger), stick forward walks (no grenade / grapple), RB does nothing, camera steady
+step | s12 | mark | Mark the checks from the ring: Tests -> TO TEST, pick a row, Hint, then OK / Done (or X fail, Y skip)
+step | s13 | mark | LAST STEP, ends the game: ring top level Spiel beenden, A (red), A again within 10 s
+step | radial-quit-confirm | observe | Second A ended the game; summary: ended via TruMenu game.quit (not a crash); log game.quit (radial sector): confirmed
