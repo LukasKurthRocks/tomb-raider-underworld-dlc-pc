@@ -9,15 +9,13 @@ conversion of the DLC 2 data, and the Doppelgänger's shadow power - which came 
 with the DLC files - rebuilt as small add-ons for the PC game, together with tools that repair converted data and help
 testing in the game. You need your own copy of the game and your own Xbox DLC files.
 
-> [!NOTE]
-> **The original project has moved on.** Since builds B269 / B270 (2026-11-03) andrearicci93 converts *Lara's
-> Shadow* as well, independently of this fork and with their own patch of the game's exe. This fork is still based on
-> B138; the two DLC 2 conversions have not been compared yet. For the current state of the port, see the original
-> repository.
+The original project converts *Lara's Shadow* too since B269 / B270 (2026-11-03), independently and with its own patch
+of the game's exe. This fork follows its `main` (merged up to B270); its own data builds on B138. What the fork adds on
+top of upstream `main`, file by file: [docs/UPSTREAM_DIFF.md](docs/UPSTREAM_DIFF.md).
 
 ![Unofficial](https://img.shields.io/badge/status-unofficial%20personal%20fork-lightgrey)
 ![AI-assisted](https://img.shields.io/badge/AI--assisted-Claude%20(Anthropic)-8A2BE2)
-![Upstream](https://img.shields.io/badge/based%20on-andrearicci93%2Ftrudlcport%20B138-blue)
+![Upstream](https://img.shields.io/badge/upstream-andrearicci93%2Ftrudlcport%20B270%20merged-blue)
 
 > [!WARNING]
 > **This is a personal fork, not the original project.** For installing the DLC port, releases and reporting
@@ -141,8 +139,8 @@ All credit for the port itself goes to **andrearicci93**. License: MIT, as the o
 
 ---
 
-*The original README follows unchanged, as of B270 (upstream `main` 7761890). The data of this fork is still based on
-B138; the current state of the port is in the [original repository](https://github.com/andrearicci93/trudlcport).*
+*The original README follows unchanged, as of B270 (upstream `main` 7761890); releases and the installer are in the
+[original repository](https://github.com/andrearicci93/trudlcport).*
 
 # trudlcport
 
