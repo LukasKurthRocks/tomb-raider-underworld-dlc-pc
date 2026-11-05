@@ -104,13 +104,32 @@ def units_by_object():
     return out, units
 
 
+SUBDIRS = ('', 'streamgroups')     # mods\ and mods\streamgroups\ (area DRMs the game streams in; 05.11.: were missed)
+
+
+def mods_drms(mods):
+    """{name: path} of the DRMs in a mods folder and its streamgroups sub folder; a name in both levels is refused"""
+    out = {}
+    for sub in SUBDIRS:
+        d = os.path.join(mods, sub)
+        if not os.path.isdir(d): continue
+        for f in os.listdir(d):
+            if not f.lower().endswith('.drm'): continue
+            if f.lower() in out: raise SystemExit('%s: %s exists in mods\\ and mods\\streamgroups\\ - refused' % (mods, f))
+            out[f.lower()] = os.path.join(d, f)
+    return out
+
+
+def tree_dst(tree, pc_path):
+    """path of a PC file inside TREE/mods, keeping the streamgroups sub folder"""
+    sub = 'streamgroups' if os.path.basename(os.path.dirname(pc_path)).lower() == 'streamgroups' else ''
+    return os.path.join(tree, 'mods', sub, os.path.basename(pc_path))
+
+
 def effective(trees):
-    eff = {}
-    for f in os.listdir(need_game_mods()):
-        if f.lower().endswith('.drm'): eff[f.lower()] = os.path.join(GAME_MODS, f)
+    eff = mods_drms(need_game_mods())
     for t in trees:
-        for f in os.listdir(os.path.join(t, 'mods')):
-            if f.lower().endswith('.drm'): eff[f.lower()] = os.path.join(t, 'mods', f)
+        eff.update(mods_drms(os.path.join(t, 'mods')))
     return eff
 
 
@@ -318,7 +337,7 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
         # every copy gets the lib built for its own records (the engine draws the first loaded copy, each is exact)
         bysig = collections.OrderedDict(); bad = None
         for f in r['files']:
-            pcp = os.path.join(tree, 'mods', os.path.basename(f['pc'])) if os.path.exists(os.path.join(tree, 'mods', os.path.basename(f['pc']))) else f['pc']
+            pcp = tree_dst(tree, f['pc']) if os.path.exists(tree_dst(tree, f['pc'])) else f['pc']
             Pd = load(pcp, 'le'); Xd = load(f['xbox'], 'be')
             rr = recs_of(Pd, Xd, r['mat'], f['xmat'])
             if rr is None: bad = 'records do not pair (%s)' % f['name']; break
@@ -337,7 +356,7 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
     used_ids = set()
     # installed mods + the current test trees (50x, 48i: the ones profiles stack) - older trees are never installed together
     for p in [need_game_mods()] + glob.glob(os.path.join(ROOT, 'work', 'rebuild', 'dlc_test5*', 'mods')) + glob.glob(os.path.join(ROOT, 'work', 'rebuild', 'dlc_test48i*', 'mods')):
-        for f in glob.glob(os.path.join(p, '*.drm')):
+        for f in glob.glob(os.path.join(p, '*.drm')) + glob.glob(os.path.join(p, 'streamgroups', '*.drm')):
             try: used_ids |= {s.id for s in DW.read(open(f, 'rb').read(), 'le').sections if s.type == 9}
             except Exception: pass
     for idx in ('idx_pc.json', 'idx_dlc.json'):
@@ -354,7 +373,7 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
         try:
             if g['bad']: raise TP.Fail(g['bad'])
             r0 = g['rows'][0]; f0 = r0['files'][0]
-            pcp0 = os.path.join(tree, 'mods', os.path.basename(f0['pc'])) if os.path.exists(os.path.join(tree, 'mods', os.path.basename(f0['pc']))) else f0['pc']
+            pcp0 = tree_dst(tree, f0['pc']) if os.path.exists(tree_dst(tree, f0['pc'])) else f0['pc']
             Pd0 = load(pcp0, 'le'); Xd0 = load(f0['xbox'], 'be')
             smap, dxn = recs_of(Pd0, Xd0, r0['mat'], f0['xmat'])
             XPs = {tuple(map(tuple, TLT.mparams(load(rr['files'][0]['xbox'], 'be')[(10, rr['files'][0]['xmat'])], 'be'))) for rr in g['rows']}
@@ -369,7 +388,7 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
             need = {s for s in need if s[0] in (5, 10)}
             for rr in g['rows']:
                 for f in rr['files']:
-                    pcp = os.path.join(tree, 'mods', os.path.basename(f['pc'])) if os.path.exists(os.path.join(tree, 'mods', os.path.basename(f['pc']))) else f['pc']
+                    pcp = tree_dst(tree, f['pc']) if os.path.exists(tree_dst(tree, f['pc'])) else f['pc']
                     Pd = load(pcp, 'le'); vid = struct.unpack_from('<4I', Pd[(10, rr['mat'])].data, 0x28)[3]
                     outs = vs_outputs_any(Pd, vid)
                     if outs is None: raise TP.Fail('VS %d of material %d not found' % (vid, rr['mat']))
@@ -386,8 +405,9 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
             open(os.path.join(pk, '%d.lib' % nid), 'wb').write(data)
             for fname, ms in perfile.items():
                 f = ms[0][2]
-                dst = os.path.join(tree, 'mods', os.path.basename(f['pc']))
-                if not os.path.exists(dst): shutil.copyfile(f['pc'], dst)
+                dst = tree_dst(tree, f['pc'])
+                if not os.path.exists(dst):
+                    os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.copyfile(f['pc'], dst)
                 json.dump({str(g['xlib']): dict(new=nid, mats=[(m, x) for m, x, _ in ms])}, open(os.path.join(pk, 'map.json'), 'w'))
                 tmp = dst + '.tmp50m'
                 import io, contextlib
@@ -421,7 +441,7 @@ def cmd_verify(invp, wd, tree):
         data = open(os.path.join(wd, 'p', str(g['new']), '%d.lib' % g['new']), 'rb').read()
         for m in g['mats']:
             for f in [f_ for f_ in inv[m]['files'] if not g.get('files') or f_['name'] in g['files']]:
-                p = os.path.join(tree, 'mods', os.path.basename(f['pc']))
+                p = tree_dst(tree, f['pc'])
                 _, Pd = TLT.load(p, 'le'); _, Xd = TLT.load(f['xbox'], 'be')
                 cur = struct.unpack_from('<4I', Pd[(10, m)].data, 0x28)[2]
                 good = cur == g['new'] and Pd[(9, cur)].data == data
