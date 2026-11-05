@@ -50,7 +50,12 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.12 (Debug-Zeichnung: nav.draw <switch> 0|1 switches the NavPower debug drawing "
+const char *const kVersion = "TruMenu 0.13 (Thrall-Labels: dbg.labels draws a text label at the projected screen position "
+                             "of each thrall / enemy instance near Lara - object name, intro id, distance, health "
+                             "(EnemyProcessFunc's value), and from TruShadowCombat 0.5.3's TscTargeterSnapshot targeter 9 "
+                             "bucket / rejected (reason) / target, hit list, last condition 2011 - projected like the game's "
+                             "own instance text (matrix 0xe804a0, 0x49f630), ring Spieler / Debug, [Debug] Labels 0 by "
+                             "default; 0.12: Debug-Zeichnung: nav.draw <switch> 0|1 switches the NavPower debug drawing "
                              "compiled into tru.exe (planner_areas, planner_areas_solid, planner_connectivity, "
                              "planner_area_normals, obstacles, recent_navprobes, draw_mover3d_path - data bytes only, in a "
                              "loaded level), nav.mask (planner layer mask, every layer), nav.off, nav.status, ring Spieler / "
@@ -402,6 +407,16 @@ const OptDef kOpts[] = {
                              "planner_connectivity, planner_area_normals, obstacles,\nrecent_navprobes, draw_mover3d_path"},
     {"Debug", "NavMask", "0", "0.12: 1 = together with NavDraw also nav.mask 1 (planner layer mask [0x88e454] = 0xffffffff: "
                               "every layer is drawn);\n0 = the game's mask"},
+    {"Debug", "Labels", "0", "0.13: 1 = Thrall-Labels on from the start (needs Enabled=1; item dbg.labels, ring Spieler / "
+                             "Debug): a text label at each\nthrall near Lara - name, intro id, distance, health, "
+                             "targeter 9 / hit list / condition 2011 from TruShadowCombat 0.5.3\n(read-only, in a loaded "
+                             "level only); 0 = off"},
+    {"Debug", "LabelRadius", "3000", "0.13: labels only for instances at most this far from Lara (game units, 100 .. 50000)"},
+    {"Debug", "LabelMax", "12", "0.13: at most this many labels, the nearest first (thralls before other matches), 1 .. 32"},
+    {"Debug", "LabelMatch", "thrall", "0.13: comma list of parts of object names that get a label, e.g. thrall,yeti; * = every "
+                                      "instance in the radius"},
+    {"Debug", "LabelCross", "1", "0.13: 1 = a magenta cross at Lara's position (+0x20) projected the same way - the live "
+                                 "check of the projection; 0 = none"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -448,6 +463,9 @@ int g_cheatsEnabled = 1, g_cheatPersist = 0;                                 // 
 char g_cheatState[256] = "";                                                 // 0.8 [Cheats] State (Persist=1)
 int g_debugEnabled = 0, g_navAutoMask = 0;                                   // 0.12 [Debug] Enabled / NavMask
 char g_navAuto[256] = "";                                                    // 0.12 [Debug] NavDraw (comma list)
+int g_lblAtStart = 0, g_lblMax = 12, g_lblCross = 1;                         // 0.13 [Debug] Labels / LabelMax / LabelCross
+float g_lblRadius = 3000.0f;                                                 // 0.13 [Debug] LabelRadius
+char g_lblMatch[128] = "thrall";                                             // 0.13 [Debug] LabelMatch
 volatile LONG g_cameraChanges = 1;                                           // 0.8 [Log] CameraChanges
 char g_regressStart[8] = "all";                                              // 0.8 [Regress] List
 volatile LONG g_inputTrace = 1;                                              // 0.8.1 [Log] InputTrace
@@ -5691,6 +5709,329 @@ void NavTick() {
     Log(1, "nav: [Debug] NavDraw / NavMask applied in the first loaded level: %d ok, %d failed", done, failed);
 }
 
+// ---- 0.13 Thrall-Labels (debug view stage S1, F28): a text label at each thrall / enemy instance near Lara ----
+// Workspace docs\Befund-Thrall-Labels-0511.md; every byte check is pinned in work\asi\menu0130\precheck_013.txt
+// (tools/pe_bytes_check.py on the Steam exe: 20 / 20 ok). Read-only: nothing is written into game memory, no game
+// function is called. Drawn into ImGui's foreground draw list at Present, only in a loaded level (player instance, main
+// state 1, no level change pending - the guards of nav.draw), with fixed static buffers (no allocation per frame).
+// Projection = the game's own text-at-an-instance path (EnemyProcessFunc's health text 0x6224e0): matrix = the address
+// the getter 0x5e7890 returns (0xe804a0), projected like TRANS_RotTransPersVectorf 0x49f630 (x' = row-0 dot p + m[12],
+// ...; screen x = x' / z' * f + 256.0, y = y' / z' * f + 224.0, f = [0x8906d0]), drawn when 16.0 < z' ([0x8451e4],
+// 0x62257b). 0xe804a0 is written once per game frame by the camera update 0x5f3df0 (called at 0x5d46a9 right after the
+// instance walk): the camera's world -> camera matrix, column x scaled by (4 / 3) / aspect ([[0xad75e4]+0x170] / 10000,
+// 0x5c59f0), column y by 448 / 384 (0x5e7b30); f = 192 / tan(fov / 2) (0x5f3ef6 -> 0x49f610). So the game's text space
+// is 512 x 448 with a vertical field of view - mapped onto the back buffer with draw.scale (default 512 448), the same
+// scale draw.markup uses. Live check: the magenta cross ([Debug] LabelCross) must sit on Lara's feet / origin, and with
+// cheat.enemyhealth the game's own health number must sit at the label's anchor dot.
+// Health = EnemyProcessFunc 0x638d40's value: brain = [[inst+0x2d0]]+0x2ec (0x638d59), hit points brain+0x2c64
+// (printed at 0x638edd) - read only for names containing "thrall" (the DLC thralls; enemy type not proven per
+// instance in code). A state-chart state id is NOT shown: the only chart machine constructor tru+0x3873c0 has one
+// caller (tru+0x2eff9a, the player's machines playerstate +0xf10..), the thralls' chart runs elsewhere (unknown).
+// TruShadowCombat 0.5.3: TscTargeterSnapshot(9, &snapshot, size) (version 1, size checked) - bucket / rejected (with
+// the last WHY result) / target of targeter 9, the player's hit list, the last condition 2011. Without the export the
+// labels show TruMenu's own data only.
+const DWORD kLblMatrix = 0x00e804a0, kLblAspect = 0x00ad75e4;
+bool g_lblOk = false;
+const char *g_lblWhy = "not checked";
+volatile LONG g_lblOn = 0;                   // dbg.labels
+int g_lblShown = 0, g_lblInRadius = 0, g_lblThralls = 0;     // last frame
+char g_lblState[160] = "off";                // last frame: why nothing / what was drawn (dbg.labels value)
+DWORD g_lblLogTick = 0;                      // calibration log line, every 10 s while on
+signed char g_lblNameKind[4096];             // per object id: 0 unknown, 1 thrall, 2 other match, 3 no label
+
+// TruShadowCombat 0.5.3 export (layout = TscTargeterSnapshotV1 in TruShadowCombat.cpp, version 1)
+struct LblTscEntry { const void *instance; DWORD where, why, whyTick, marker; };
+struct LblTscSnap {
+    DWORD size, version, tick, built;
+    const void *targeter, *target;
+    DWORD node, flags, candidates, groups, bucket[4], rejected;
+    DWORD count, truncated;
+    LblTscEntry entries[24];
+    const void *hitList[8];
+    DWORD c2011Calls, c2011Tick, c2011Path, c2011Result;
+    LONG c2011Query;
+    const void *c2011Target;
+};
+static_assert(sizeof(LblTscEntry) == 20 && sizeof(LblTscSnap) == 604, "TscTargeterSnapshot v1 layout (TruShadowCombat)");
+typedef DWORD(__cdecl *TscSnapFn)(DWORD tuIndex, void *out, DWORD outSize);
+TscSnapFn g_tscSnap = nullptr;
+DWORD g_tscLookTick = 0;
+const char *g_tscState = "not looked up";
+LblTscSnap g_lblSnap;
+bool g_lblSnapOk = false;
+
+// load: the byte checks of precheck_013.txt
+void LabelCheck() {
+    bool text = HexBytesAt(0x005e7890, "b8a004e800 c3") && HexBytesAt(0x006224ed, "e89e53fcff 50 e828d1e7ff") &&
+                HexBytesAt(0x0062257b, "d905e4518400 d85c2420");
+    bool update = HexBytesAt(0x005d46a9, "e842f70100") &&
+                  HexBytesAt(0x005f3e25, "50 b9a004e800 e8e0dfe3ff 68a004e800 e8f63cffff") &&
+                  HexBytesAt(0x005e7b30, "56 8b742408 d906 dd05905a8400 dcc9 dd05d8548400") &&
+                  HexBytesAt(0x005e7b5d, "d94604 dd05d0548400 dcc9 dd05f0598500") && HexBytesAt(0x005e7b87, "e864defdff") &&
+                  HexBytesAt(0x005c59f1, "a1e475ad00 8b8870010000 db8070010000") &&
+                  HexBytesAt(0x005f3ef6, "d91d98c28a00 e8cf34ffff d90598c28a00 51 dc3de8598500") &&
+                  HexBytesAt(0x005f3f19, "e8f2b6eaff") && HexBytesAt(0x0049f610, "d9442404 d91dd0068900 c3");
+    bool project = HexBytesAt(0x0049f6f8, "d905d0068900") && HexBytesAt(0x0049f702, "dc05003a8400") &&
+                   HexBytesAt(0x0049f713, "dc05c8548400") && HexBytesAt(0x00843a00, "0000000000007040") &&
+                   HexBytesAt(0x008454c8, "0000000000006c40") && HexBytesAt(0x008451e4, "00008041");
+    bool health = HexBytesAt(0x00638d59, "8b87d0020000 85c0 7504 33f6 eb08 8b00 8bb0ec020000") &&
+                  HexBytesAt(0x00638edd, "d986642c0000");
+    g_lblOk = text && update && project && health && g_instOk && g_playerOk && g_mainStateOk;
+    g_lblWhy = !text ? "game instance text 0x6224e0 (matrix getter 0x5e7890, z test 0x62257b) differs"
+             : !update ? "camera update 0x5f3df0 / 0x5e7b30 / focal 0x49f610 differs"
+             : !project ? "projection 0x49f630 constants differ"
+             : !health ? "EnemyProcessFunc health chain 0x638d59 / 0x638edd differs"
+             : !g_instOk ? "instance list (0.3 check) failed"
+             : !g_playerOk ? "player pointer check failed" : !g_mainStateOk ? "main state check failed" : "ok";
+    memset(g_lblNameKind, 0, sizeof(g_lblNameKind));
+    if (g_lblAtStart && g_debugEnabled && g_lblOk) InterlockedExchange(&g_lblOn, 1);
+    Log(g_lblOk ? 1 : 0, "0.13 thrall labels: checks %s; [Debug] Labels %d (on now %d), LabelRadius %.0f, LabelMax %d, "
+        "LabelMatch '%s', LabelCross %d; projection matrix 0x%08lx, focal [0x8906d0], text space %.0f x %.0f (draw.scale)",
+        g_lblWhy, g_lblAtStart, g_lblOn ? 1 : 0, g_lblRadius, g_lblMax, g_lblMatch, g_lblCross, kLblMatrix, g_drawW, g_drawH);
+}
+
+// loaded level only (as NavWorldReady without the NavPower parts)
+bool LabelWorldReady(char *why, size_t n) {
+    if (!InLevel()) { Out(why, n, "needs a level (no player instance)"); return false; }
+    DWORD state = 0;
+    ReadDword(kMainState, &state);
+    if (state != 1) { Out(why, n, "not while loading (main state %lu, needs 1)", state); return false; }
+    return !LevelChangePending(why, n);
+}
+
+// object id -> 1 thrall (name contains "thrall"), 2 other instance, 3 no label: only names that contain a part of
+// [Debug] LabelMatch (or LabelMatch "*") get a label; cached per object id (the name of an id does not change)
+int LabelKind(int id) {
+    if (id > 0 && id < 4096 && g_lblNameKind[id]) return g_lblNameKind[id];
+    char name[64], list[sizeof(g_lblMatch)];
+    int kind = 3;
+    if (ObjectName(id, name, sizeof(name))) {
+        _strlwr_s(name, sizeof(name));
+        strncpy_s(list, sizeof(list), g_lblMatch, _TRUNCATE);
+        _strlwr_s(list, sizeof(list));
+        char *context = nullptr;
+        for (char *part = strtok_s(list, ", ", &context); part; part = strtok_s(nullptr, ", ", &context))
+            if (!strcmp(part, "*") || strstr(name, part)) { kind = strstr(name, "thrall") ? 1 : 2; break; }
+    }
+    if (id > 0 && id < 4096) g_lblNameKind[id] = static_cast<signed char>(kind);
+    return kind;
+}
+
+// TruShadowCombat's snapshot of this frame (false = none: plugin / export missing, wrong version, no copy yet)
+bool LabelTsc() {
+    DWORD now = GetTickCount();
+    if (!g_tscSnap && (!g_tscLookTick || now - g_tscLookTick >= 5000)) {
+        g_tscLookTick = now;
+        HMODULE module = GetModuleHandleA("TruShadowCombat.asi");
+        g_tscSnap = module ? reinterpret_cast<TscSnapFn>(GetProcAddress(module, "TscTargeterSnapshot")) : nullptr;
+        const char *was = g_tscState;
+        g_tscState = !module ? "TruShadowCombat not loaded" : !g_tscSnap ? "TruShadowCombat without TscTargeterSnapshot "
+                     "(older than 0.5.3)" : "export found";
+        if (g_tscState != was) Log(1, "0.13 thrall labels: %s", g_tscState);     // only when it changes
+    }
+    if (!g_tscSnap) return false;
+    DWORD r = 0;
+    __try {
+        r = g_tscSnap(9, &g_lblSnap, sizeof(g_lblSnap));
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        g_tscSnap = nullptr;
+        g_tscState = "TscTargeterSnapshot faulted - not called again";
+        return false;
+    }
+    if (g_lblSnap.version != 1 || g_lblSnap.size != sizeof(LblTscSnap)) {
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            Log(0, "0.13 thrall labels: TscTargeterSnapshot version %lu, size %lu (want 1, %u) - not used",
+                g_lblSnap.version, g_lblSnap.size, static_cast<unsigned>(sizeof(LblTscSnap)));
+        }
+        g_tscState = "TscTargeterSnapshot version / size differ - not used";
+        return false;
+    }
+    g_tscState = r == 1 ? "snapshot ok" : "no snapshot (first frame, [Diag] Targeter9 / Snapshot 0, or no target list)";
+    return r == 1;
+}
+
+struct LblCand { DWORD inst; float pos[3]; float dist2; int kind; };
+LblCand g_lblCand[33];
+
+// appends to o (size n, *used bytes used so far)
+void LabelAdd(char *o, size_t n, size_t *used, const char *fmt, ...) {
+    if (*used + 1 >= n) return;
+    va_list ap;
+    va_start(ap, fmt);
+    int w = _vsnprintf_s(o + *used, n - *used, _TRUNCATE, fmt, ap);
+    va_end(ap);
+    if (w > 0) *used += static_cast<size_t>(w);
+}
+
+// what TruShadowCombat knows about an instance (second label line) and the label colour: yellow = targeter 9's target,
+// green = in a bucket, orange = rejected (E0 = eligibility tru+0x2ecca0 failed, Fxx = filter groups passed, "?" = not
+// evaluated by WHY yet), white = not in targeter 9; " | H" = in the player's hit list; "2011 Pfad p q.. = r" = the last
+// condition 2011 had this instance as targeter 9's target (path 1 empty / excluded, 2 query 0x161 = 0, 3 ok)
+void LabelTscText(DWORD inst, char *o, size_t n, ImU32 *colour) {
+    o[0] = 0;
+    if (!g_lblSnapOk) return;
+    const LblTscSnap &s = g_lblSnap;
+    const void *p = reinterpret_cast<const void *>(inst);
+    size_t used = 0;
+    bool listed = false;
+    if (s.target && s.target == p) {
+        LabelAdd(o, n, &used, "Z9 ZIEL");
+        *colour = IM_COL32(255, 230, 60, 255);
+        listed = true;
+    }
+    for (DWORD i = 0; i < s.count && i < 24; ++i) {
+        const LblTscEntry &e = s.entries[i];
+        if (e.instance != p) continue;
+        const char *gap = listed ? " " : "";
+        if (e.where == 0x20) {
+            if (e.why == 0xffffffff) LabelAdd(o, n, &used, "%sZ9 abgelehnt (Grund ?)", gap);
+            else if (!(e.why & 0x100)) LabelAdd(o, n, &used, "%sZ9 abgelehnt E0 (Eignung)", gap);
+            else LabelAdd(o, n, &used, "%sZ9 abgelehnt F%02lx (Filter)", gap, e.why & 0xff);
+            if (!listed) *colour = IM_COL32(255, 120, 80, 255);
+        } else {
+            LabelAdd(o, n, &used, "%sZ9 Fach %lu", gap, e.where - 0x10);
+            if (!listed) *colour = IM_COL32(110, 235, 120, 255);
+        }
+        listed = true;
+        break;
+    }
+    if (!listed) LabelAdd(o, n, &used, "Z9 -");
+    for (const void *h : s.hitList)
+        if (h && h == p) { LabelAdd(o, n, &used, " | H"); break; }
+    if (s.c2011Target == p && s.c2011Calls)
+        LabelAdd(o, n, &used, " | 2011 Pfad %lu q%ld = %lu (%lus)", s.c2011Path, s.c2011Query, s.c2011Result,
+                 (GetTickCount() - s.c2011Tick) / 1000);
+}
+
+// one label: background box, anchor dot, two text lines above the anchor
+void LabelDraw(ImDrawList *dl, ImVec2 at, const char *line1, const char *line2, ImU32 colour) {
+    const float fs = ImGui::GetFontSize();
+    ImVec2 s1 = ImGui::CalcTextSize(line1);
+    ImVec2 s2 = line2[0] ? ImGui::CalcTextSize(line2) : ImVec2(0.0f, 0.0f);
+    float w = (s1.x > s2.x ? s1.x : s2.x) + 8.0f, h = line2[0] ? 2.0f * fs + 6.0f : fs + 4.0f;
+    ImVec2 box(at.x - w * 0.5f, at.y - h - 8.0f);
+    dl->AddRectFilled(box, ImVec2(box.x + w, box.y + h), IM_COL32(0, 0, 0, 150), 3.0f);
+    dl->AddLine(ImVec2(at.x, at.y - 8.0f), at, colour, 1.5f);
+    dl->AddCircleFilled(at, 3.0f, colour, 8);
+    dl->AddText(ImVec2(box.x + 4.0f, box.y + 2.0f), colour, line1);
+    if (line2[0]) dl->AddText(ImVec2(box.x + 4.0f, box.y + 4.0f + fs), colour, line2);
+}
+
+// Present, every frame while dbg.labels is on
+void DrawLabels() {
+    char why[160];
+    g_lblShown = g_lblInRadius = g_lblThralls = 0;
+    if (!g_debugEnabled || !g_lblOk) { Out(g_lblState, sizeof(g_lblState), "%s", !g_debugEnabled ? "[Debug] Enabled=0" : g_lblWhy); return; }
+    if (!LabelWorldReady(why, sizeof(why))) { Out(g_lblState, sizeof(g_lblState), "waits: %s", why); return; }
+    ImGuiIO &io = ImGui::GetIO();
+    View v;
+    if (!ReadView(&v, io.DisplaySize.x, io.DisplaySize.y) || !ReadFloats(kLblMatrix, v.m, 16)) {
+        Out(g_lblState, sizeof(g_lblState), "camera matrix 0x%08lx / focal not readable", kLblMatrix);
+        return;
+    }
+    DWORD player = 0;
+    float lara[3];
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
+    g_lblSnapOk = LabelTsc();
+    const float r2 = g_lblRadius * g_lblRadius;
+    int count = 0;
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0, object = 0, oid = 0;
+        float p[3];
+        if (inst != player && ReadFloats(inst + kInstancePosition, p, 3)) {
+            float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2], d2 = dx * dx + dy * dy + dz * dz;
+            if (d2 <= r2 && ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid)) {
+                int kind = LabelKind(static_cast<int>(oid & 0xffff));
+                if (kind != 3) {
+                    ++g_lblInRadius;
+                    // sorted insert: thralls first, then nearest; keep g_lblMax
+                    int at = count;
+                    while (at > 0 && (g_lblCand[at - 1].kind > kind ||
+                                      (g_lblCand[at - 1].kind == kind && g_lblCand[at - 1].dist2 > d2)))
+                        --at;
+                    if (at < g_lblMax) {
+                        int last = count < g_lblMax ? count : g_lblMax - 1;
+                        for (int k = last; k > at; --k) g_lblCand[k] = g_lblCand[k - 1];
+                        LblCand &c = g_lblCand[at];
+                        c.inst = inst;
+                        c.pos[0] = p[0]; c.pos[1] = p[1]; c.pos[2] = p[2];
+                        c.dist2 = d2;
+                        c.kind = kind;
+                        if (count < g_lblMax) ++count;
+                    }
+                }
+            }
+        }
+        if (!ReadDword(inst + 8, &next)) break;
+        inst = next;
+    }
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    ImVec2 laraAt(0.0f, 0.0f);
+    bool laraSeen = Project(v, lara, &laraAt);
+    if (g_lblCross && laraSeen) {
+        const ImU32 magenta = IM_COL32(255, 60, 255, 255);
+        dl->AddLine(ImVec2(laraAt.x - 10.0f, laraAt.y), ImVec2(laraAt.x + 10.0f, laraAt.y), magenta, 2.0f);
+        dl->AddLine(ImVec2(laraAt.x, laraAt.y - 10.0f), ImVec2(laraAt.x, laraAt.y + 10.0f), magenta, 2.0f);
+    }
+    for (int i = 0; i < count; ++i) {
+        const LblCand &c = g_lblCand[i];
+        ImVec2 at;
+        if (!Project(v, c.pos, &at)) continue;
+        DWORD object = 0, oid = 0, intro = 0;
+        ReadDword(c.inst + 0x10, &object);
+        if (object) ReadDword(object + 0x14, &oid);
+        ReadDword(c.inst + 0x58, &intro);
+        char name[64], line1[160], line2[160], hp[32] = "";
+        if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        DWORD a = 0, b = 0, brain = 0;
+        float health = 0.0f;
+        if (c.kind == 1 && ReadDword(c.inst + 0x2d0, &a) && a && ReadDword(a, &b) && b && ReadDword(b + 0x2ec, &brain) &&
+            brain && ReadFloats(brain + 0x2c64, &health, 1) && health > -1.0e6f && health < 1.0e6f)
+            Out(hp, sizeof(hp), " | LP %.1f", health);
+        Out(line1, sizeof(line1), "%s %ld | %.0f%s", name, static_cast<LONG>(intro), sqrtf(c.dist2), hp);
+        ImU32 colour = IM_COL32(235, 235, 235, 255);
+        LabelTscText(c.inst, line2, sizeof(line2), &colour);
+        LabelDraw(dl, at, line1, line2, colour);
+        ++g_lblShown;
+        if (c.kind == 1) ++g_lblThralls;
+    }
+    Out(g_lblState, sizeof(g_lblState), "%d shown (%d thralls), %d in %.0f units; TruShadowCombat: %s", g_lblShown,
+        g_lblThralls, g_lblInRadius, g_lblRadius, g_tscState);
+    DWORD now = GetTickCount();
+    if (!g_lblLogTick || now - g_lblLogTick >= 10000) {       // calibration line (log only), every 10 s while on
+        g_lblLogTick = now;
+        DWORD dev = 0, aspect = 0;
+        if (ReadDword(kLblAspect, &dev) && dev) ReadDword(dev + 0x170, &aspect);
+        Log(1, "0.13 thrall labels: %s; matrix 0xe804a0 rows %.3f %.3f %.3f | %.3f %.3f %.3f | %.3f %.3f %.3f | t %.1f %.1f "
+            "%.1f, focal %.2f, aspect [[0xad75e4]+0x170] %lu, back buffer %.0f x %.0f; Lara (%.1f %.1f %.1f) -> %s %.1f %.1f",
+            g_lblState, v.m[0], v.m[1], v.m[2], v.m[4], v.m[5], v.m[6], v.m[8], v.m[9], v.m[10], v.m[12], v.m[13], v.m[14],
+            v.f, aspect, io.DisplaySize.x, io.DisplaySize.y, lara[0], lara[1], lara[2], laraSeen ? "screen" : "not in view",
+            laraAt.x, laraAt.y);
+    }
+}
+
+void ValLabels(char *o, size_t n) { Out(o, n, "%d (%s)", g_lblOn ? 1 : 0, g_lblOn ? g_lblState : "off"); }
+bool RunLabels(const char *arg, char *o, size_t n) {
+    if (!g_debugEnabled) { Out(o, n, "debug drawing off ([Debug] Enabled=0)"); return false; }
+    if (!g_lblOk) { Out(o, n, "disabled: pre-check failed (%s)", g_lblWhy); return false; }
+    bool on = BoolArg(arg, g_lblOn != 0);
+    InterlockedExchange(&g_lblOn, on ? 1 : 0);
+    g_lblLogTick = 0;                        // a calibration line with the first frame
+    Log(1, "dbg.labels %d (src=%s)", on ? 1 : 0, ShotSource("dbg.labels"));
+    Out(o, n, "dbg.labels %d", on ? 1 : 0);
+    return true;
+}
+// ring: why dbg.labels is greyed out ("" = usable; outside a level it may be switched, it draws in the next level)
+const char *LabelRadWhy() {
+    if (!g_debugEnabled) return "debug drawing off ([Debug] Enabled=0)";
+    if (!g_lblOk) return g_lblWhy;
+    return "";
+}
+
 // ---- favourites: [Favorites] Ids in TruMenu.ini (comma list of item ids; empty = kFavDefault) ----
 bool ItemUsable(const char *id);         // defined after kItems: id exists and is not a todo item
 
@@ -9193,6 +9534,9 @@ const Item kItems[] = {
      false, ValNavMask, RunNavMask},
     {"nav.off", "action", "0.12: every NavPower switch TruMenu set and the layer mask back to the values before", false,
      ValNavDraw, RunNavOff},
+    // 0.13 Thrall-Labels ([Debug] Enabled; read-only, drawn at Present in a loaded level)
+    {"dbg.labels", "bool", "0.13: Thrall-Labels - name, intro id, distance, health, targeter 9 / hit list / condition 2011 "
+                           "(TruShadowCombat 0.5.3) at each thrall near Lara", false, ValLabels, RunLabels},
 };
 
 const Item *FindItem(const char *id) {
@@ -10976,6 +11320,10 @@ const char *RadialWhy(const RadItem &e) {
     if (!_strnicmp(id, "nav.", 4)) {         // 0.12 Debug-Zeichnung: [Debug] Enabled, byte checks, a loaded level
         const char *navWhy = NavRadWhy(id, e.arg);
         if (navWhy[0]) return navWhy;
+    }
+    if (!_stricmp(id, "dbg.labels")) {       // 0.13 Thrall-Labels: [Debug] Enabled, byte checks
+        const char *lblWhy = LabelRadWhy();
+        if (lblWhy[0]) return lblWhy;
     }
     const Item *item = FindItem(id);
     if (((item && item->gameThread) || !_stricmp(id, "time.scale")) && !g_experimental)
@@ -13640,7 +13988,9 @@ void Render(IDirect3DDevice9 *device) {
         }
     }
     bool flowDraw = FlowWantsDraw();             // 0.11 status line / flow.say toast
-    if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_radOpen && !flowDraw) return;
+    if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_lblOn && !g_radOpen &&
+        !flowDraw)
+        return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
         g_imguiReady = InitImGui(device);
@@ -13676,6 +14026,7 @@ void Render(IDirect3DDevice9 *device) {
     FeedGamepad(io);
     ImGui::NewFrame();
     if (g_drawMarkup) DrawMarkup();
+    if (g_lblOn) DrawLabels();                   // 0.13 Thrall-Labels (foreground draw list)
     if (g_overlay) DrawOverlay();
     if (g_logOverlay) DrawLogOverlay();
     if (g_guardOverlay) DrawGuardOverlay();
@@ -13911,6 +14262,17 @@ void ReadOptions(const char *dir) {
     g_debugEnabled = OptInt(ini, "Debug", "Enabled") != 0 ? 1 : 0;                  // 0.12 Debug-Zeichnung
     g_navAutoMask = OptInt(ini, "Debug", "NavMask") != 0 ? 1 : 0;
     OptString(ini, "Debug", "NavDraw", g_navAuto, sizeof(g_navAuto));
+    g_lblAtStart = OptInt(ini, "Debug", "Labels") != 0 ? 1 : 0;                     // 0.13 Thrall-Labels
+    g_lblMax = OptInt(ini, "Debug", "LabelMax");
+    if (g_lblMax < 1 || g_lblMax > 32) g_lblMax = atoi(OptDefault("Debug", "LabelMax"));
+    g_lblCross = OptInt(ini, "Debug", "LabelCross") != 0 ? 1 : 0;
+    {
+        char radius[32];
+        OptString(ini, "Debug", "LabelRadius", radius, sizeof(radius));
+        float r = static_cast<float>(atof(radius));
+        g_lblRadius = (r >= 100.0f && r <= 50000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "LabelRadius")));
+    }
+    OptString(ini, "Debug", "LabelMatch", g_lblMatch, sizeof(g_lblMatch));
     InterlockedExchange(&g_cameraChanges, OptInt(ini, "Log", "CameraChanges") ? 1 : 0);
     OptString(ini, "Regress", "List", g_regressStart, sizeof(g_regressStart));
     InterlockedExchange(&g_inputTrace, OptInt(ini, "Log", "InputTrace") ? 1 : 0);   // 0.8.1
@@ -14142,6 +14504,7 @@ void Start(HMODULE self) {
     // 0.8: cheats (each row its own check), camera log (manager process -> chooser, mode fields), regression lists
     CheatsCheck();
     NavCheck();                               // 0.12 Debug-Zeichnung: NavPower switches (precheck_012.txt)
+    LabelCheck();                             // 0.13 Thrall-Labels (precheck_013.txt)
     g_camLogOk = HexBytesAt(0x005f3e0c, "b9f004e800 e85afeffff") && HexBytesAt(0x005f3d12, "8bce d91c24 e8c442ffff") &&
                  HexBytesAt(0x005e7feb, "8bf1") && HexBytesAt(0x005e8041, "8b4658 83f801") &&
                  HexBytesAt(0x005e80b9, "c7465834000000") && HexBytesAt(0x005e80da, "8b7e58 397e54 7465") &&

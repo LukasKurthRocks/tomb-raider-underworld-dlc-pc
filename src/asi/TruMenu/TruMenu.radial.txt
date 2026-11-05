@@ -73,6 +73,9 @@ Spieler/Debug | Alle Ebenen | nav.mask
 Spieler/Debug | Alles aus | nav.off
 Spieler/Debug | Flaechen-Normalen | nav.draw planner_area_normals
 Spieler/Debug | Debug: Stand | nav.status
+# 0.13 Thrall-Labels (debug view stage S1): a label at each thrall near Lara (name, intro id, distance, health, targeter 9
+# / hit list / condition 2011 from TruShadowCombat 0.5.3); on / off, needs [Debug] Enabled=1, draws in a loaded level
+Spieler/Debug | Thrall-Labels | dbg.labels
 # 0.10.5 (owner wish 2026-11-05): Claude marks, drawn in coral - each pick writes one TruMenu.log line
 # "claude.mark <kind>: <time> unit=<stream unit> pos=<x y z> step=<TO TEST step or -> shot=<file> src=ring" and takes a
 # clean shot named <kind>; the ring closes after the pick. [Shot] Hotkey (F11 = 0x7A, default off) = "Jetzt".

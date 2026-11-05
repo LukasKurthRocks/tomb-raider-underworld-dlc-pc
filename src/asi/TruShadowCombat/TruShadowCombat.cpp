@@ -41,13 +41,15 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.5.2 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.5.3 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
                         "(Translate231Slot0 / Translate231Slot1 / Translate1004, PC handler by default), strike look off "
                         "0x823d9050 through TruShadowPowerMeterApi v4; 0.5.2: F21 diagnostics of targeter 9 / condition "
-                        "2011, log only ([Diag]))";
+                        "2011, log only ([Diag]); 0.5.3: read-only export TscTargeterSnapshot (targeter 9 buckets / "
+                        "rejected with reason / target, hit list, last condition 2011) for TruMenu's thrall labels, "
+                        "WHY walks the rejected list by its next link +4)";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -550,6 +552,7 @@ int g_diagT9 = 1;                  // [Diag] Targeter9
 int g_diagWhy = 1;                 // [Diag] Targeter9Why
 int g_diag2011 = 1;                // [Diag] Condition2011
 int g_diagMax = 4000;              // [Diag] MaxLines
+int g_diagSnap = 1;                // 0.5.3 [Diag] Snapshot (TscTargeterSnapshot export; built only while asked for)
 volatile LONG g_diagLines = 0;
 bool g_namesOk = false;            // object name table [0xdb94d0] (same check as TruTrace: tru+0x1bcff9)
 const DWORD kObjNames = 0x00db94d0;
@@ -660,6 +663,11 @@ void Diag2011Log(const BYTE *record, const Diag2011 &d, DWORD path, BYTE *target
     if (d.after.node != d.before.node || d.after.flags != d.before.flags)
         DiagLog("0.5.2 diag condition 2011: targeter 9 after get (tru+0x319f00): %s", after);
 }
+
+// 0.5.3: the last condition 2011 evaluation in doppelganger mode, for TscTargeterSnapshot. Written by Pred2011 and
+// copied by SnapBuild - both on the game thread (chart condition / targeter update).
+struct Last2011 { DWORD calls, tick, path, result; LONG query; BYTE *target; };
+Last2011 g_last2011 = {0, 0, 0, 0, -1, nullptr};
 
 // ---------------------------------------------------------------- 2. predicates
 Probe g_p2005 = {"condition 2005 (TU 0x8246e8e0: aim target / targeter 6 agree)"};
@@ -779,6 +787,12 @@ done:
     Hit(g_p2011, r, "doppelganger, target 0x%08lx, path %lu (1 targeter 9 empty, 2 query 0x161 = 0, 3 ok, 8 fault, 9 list off)",
         reinterpret_cast<DWORD>(target), why);
     if (g_diag2011) Diag2011Log(record, d, why, target, r);
+    ++g_last2011.calls;                                                 // 0.5.3: for TscTargeterSnapshot (no log)
+    g_last2011.tick = GetTickCount();
+    g_last2011.path = why;
+    g_last2011.result = r ? 1 : 0;
+    g_last2011.query = d.query;
+    g_last2011.target = target;
     return r;
 }
 
@@ -1862,12 +1876,15 @@ __declspec(naked) char __cdecl CallFilter(DWORD /*frame*/, DWORD /*handle*/, DWO
 
 // [Diag] Targeter9Why: for the first rejected candidates the game's own eligibility / filter (same functions the
 // update calls for them every frame) - which test sends them to the rejected list
+// 0.5.3: the walk follows node +4 (next). The list append tru+0x2ecd40 links tail +4 -> new node and new +0 -> old tail
+// (+0 = prev), the select walk tru+0x3166f3 reads `mov esi, [esi+4]`; 0.5.2 followed +0 from the head (prev = 0) and so
+// reported only the first rejected candidate.
 struct WhyLast { DWORD obj, result; DWORD tick; } g_why[8];
 void DiagWhy(BYTE *t, const TState &s) {
     const BYTE *params = reinterpret_cast<const BYTE *>(Rd(t + 0x34));
     BYTE *player = Player();
     BYTE *node = reinterpret_cast<BYTE *>(Rd(t + 0x3c));
-    for (int k = 0; node && k < 4; ++k, node = reinterpret_cast<BYTE *>(Rd(node))) {
+    for (int k = 0; node && k < 4; ++k, node = reinterpret_cast<BYTE *>(Rd(node + 4))) {
         const DWORD *handle = reinterpret_cast<const DWORD *>(node + 8);
         BYTE *obj = HandleObject(handle);
         char elig = reinterpret_cast<EligFn>(kEligibility)(handle);
@@ -1894,6 +1911,97 @@ void DiagWhy(BYTE *t, const TState &s) {
                 "angle records); instance - Lara (+0x20): %.1f %.1f %.1f, distance %.1f", k, who, Rd(node + 0x14),
                 Rd(node + 0x18), elig ? 1 : 0, pass, s.groups, d[0], d[1], d[2], dist);
     }
+}
+
+// ---------------------------------------------------------------- 0.5.3: TscTargeterSnapshot (read-only export)
+// TruMenu 0.13 (Thrall-Labels, debug view stage S1) draws per instance whether it sits in a bucket of targeter 9, in its
+// rejected list (with the last WHY result of DiagWhy) or is the target, whether it is in the player's hit list, and
+// the last condition 2011. The copy is built on the game thread at the end of slot 9's per-frame update (DiagUpdate,
+// after the original ran) and only while a reader asked within the last 2 s; the export copies it under a sequence
+// counter (odd = being written). Nothing is written into game data, no game function is called for it.
+// Lists (list append tru+0x2ecd40): +0 head, +4 tail, +8 count; node +0 prev, +4 next, +8 handle {object, id},
+// +0x14 marker data. Hit list: [[0xfadb58]+0x504] +0xa4, 8 slots (state 1004 slot 0 tru+0x35e020 clears it through
+// tru+0x2e6950 with ecx = that object).
+const int kSnapEntries = 24;
+struct TscT9Entry {
+    const void *instance;    // object of the node's handle (0 = stale handle)
+    DWORD where;             // 0x10 + g = bucket of filter group g, 0x20 = rejected list
+    DWORD why;               // rejected only: last WHY result (0x100 = eligibility passed, low byte = groups passed);
+                             // 0xffffffff = not evaluated (WHY looks at the first 4 rejected, once per second)
+    DWORD whyTick;           // GetTickCount of that WHY result (0 = none)
+    DWORD marker;            // node +0x14
+};
+struct TscTargeterSnapshotV1 {
+    DWORD size, version;     // sizeof(TscTargeterSnapshotV1), 1
+    DWORD tick, built;       // GetTickCount of the copy, copies built so far
+    const void *targeter;    // slot 9 (TU index 9)
+    const void *target;      // object of +0x90 (0 = none / stale handle)
+    DWORD node, flags, candidates, groups, bucket[4], rejected;
+    DWORD count, truncated;  // entries used; 1 = more nodes than kSnapEntries
+    TscT9Entry entries[kSnapEntries];
+    const void *hitList[8];  // [[0xfadb58]+0x504] +0xa4
+    DWORD c2011Calls, c2011Tick, c2011Path, c2011Result;   // last condition 2011 (doppelganger branch; path as the log)
+    LONG c2011Query;         // answer to query 0x161 (-1 = not asked)
+    const void *c2011Target;
+};
+// version 1 layout = TruMenu 0.13's LblTscSnap (same static_assert there); a change needs version 2
+static_assert(sizeof(TscT9Entry) == 20 && sizeof(TscTargeterSnapshotV1) == 604, "TscTargeterSnapshot v1 layout");
+TscTargeterSnapshotV1 g_snap;            // written by SnapBuild (game thread) only
+volatile LONG g_snapSeq = 0;             // odd while SnapBuild writes
+volatile LONG g_snapAsked = 0;           // GetTickCount | 1 of the last export call (0 = never asked)
+bool g_diagOn = false;                   // the 0.5.2 hooks are placed
+bool g_snapHitOk = false;                // hit list facts checked (SetupDiag)
+
+void SnapList(TscTargeterSnapshotV1 &s, const BYTE *list, DWORD where) {
+    const BYTE *node = reinterpret_cast<const BYTE *>(Rd(list));
+    for (int guard = 0; node && guard < 256; ++guard, node = reinterpret_cast<const BYTE *>(Rd(node + 4))) {
+        if (s.count >= static_cast<DWORD>(kSnapEntries)) { s.truncated = 1; return; }
+        TscT9Entry &e = s.entries[s.count++];
+        e.instance = HandleObject(reinterpret_cast<const DWORD *>(node + 8));
+        e.where = where;
+        e.marker = Rd(node + 0x14);
+        e.why = 0xffffffff;
+        e.whyTick = 0;
+        if (where != 0x20) continue;
+        for (const WhyLast &w : g_why)
+            if (w.tick && w.obj == reinterpret_cast<DWORD>(e.instance)) { e.why = w.result; e.whyTick = w.tick; break; }
+    }
+}
+void SnapBuild(BYTE *t, const TState &st) {
+    InterlockedIncrement(&g_snapSeq);    // odd: being written
+    TscTargeterSnapshotV1 &s = g_snap;
+    DWORD built = s.built;
+    memset(&s, 0, sizeof(s));
+    s.size = sizeof(s);
+    s.version = 1;
+    s.built = built + 1;
+    __try {
+        s.targeter = t;
+        s.target = st.obj;
+        s.node = st.node;
+        s.flags = st.flags;
+        s.candidates = st.total;
+        s.groups = st.groups;
+        memcpy(s.bucket, st.bucket, sizeof(s.bucket));
+        s.rejected = st.rejected;
+        const BYTE *buckets = reinterpret_cast<const BYTE *>(Rd(t + 0x38));
+        for (DWORD g = 0; buckets && g < st.groups && g < 4; ++g) SnapList(s, buckets + g * 0x14, 0x10 + g);
+        SnapList(s, t + 0x3c, 0x20);
+        const BYTE *gt = GameTracker();
+        const BYTE *owner = (g_snapHitOk && gt) ? reinterpret_cast<const BYTE *>(Rd(gt + 0x504)) : nullptr;
+        for (int k = 0; owner && k < 8; ++k) s.hitList[k] = reinterpret_cast<const void *>(Rd(owner + 0xa4 + 4 * k));
+        s.c2011Calls = g_last2011.calls;
+        s.c2011Tick = g_last2011.tick;
+        s.c2011Path = g_last2011.path;
+        s.c2011Result = g_last2011.result;
+        s.c2011Query = g_last2011.query;
+        s.c2011Target = g_last2011.target;
+        s.tick = GetTickCount();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        s.count = 0;
+        s.tick = 0;                      // the export answers 0 for this copy
+    }
+    InterlockedIncrement(&g_snapSeq);    // even: complete
 }
 
 // tru+0x31a270 (TU 0x82404c60): per-frame update of one targeter (re-sort, clear stale / lost target)
@@ -1932,6 +2040,9 @@ DWORD __fastcall DiagUpdate(BYTE *t, int edx, DWORD dt) {
             DiagWhy(t, s);
         }
         g_t9Seen = Rd(t + 0x90);
+        // 0.5.3: the copy for TscTargeterSnapshot, only while a reader (TruMenu's labels) asked within 2 s
+        const DWORD asked = static_cast<DWORD>(g_snapAsked);
+        if (g_diagSnap && asked && now - asked < 2000) SnapBuild(t, s);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         Log(0, "0.5.2 diag: access fault while logging targeter 9 (update) - the game code ran unchanged");
     }
@@ -1988,6 +2099,10 @@ void SetupDiag() {
         {0x007169c0, "8b4cb500 6aff 57 53 e803fbffff 83c601", "instance add loop 2 call tru+0x3169c8 (return 0x7169cd)"},
         {0x00716860, "83ec18 53 8b5c2420 3b1d94f0e700 55 8be9 896c241c", "instance add frame (0x18 + 4 registers)"},
         {0x00716891, "56 57", "instance add: esi / edi pushed before both loops"},
+        // 0.5.3: list links (WHY walk, snapshot): append tru+0x2ecd40 (tail +4 -> node +4, node +0 = old tail, node +4 =
+        // 0, count +8), the select walk tru+0x3166f3 (next = node +4)
+        {0x006ecd4b, "894204 8b5104 8910 c7400400000000 83410801", "list append tru+0x2ecd40: node +4 next, +0 prev, +8 count"},
+        {0x007166f3, "8b7604 85f6 0f8559ffffff", "select walk tru+0x3166f3: next = node +4"},
     };
     for (const auto &f : facts)
         if (!HexAt(f.at, f.hex)) { Log(0, "0.5.2 diag: %s at 0x%08lx does not match - diagnostics off", f.what, f.at); return; }
@@ -2024,6 +2139,14 @@ void SetupDiag() {
     Log(1, "0.5.2 diag: targeter 9 (log only) - entries tru+0x3164d0 add, +0x316730 set, +0x316590 select, +0x319f80 "
            "remove, +0x31a270 update; calls tru+0x32263a list build, +0x32219e destroy; why %d, condition 2011 %d, max %d lines",
         g_diagWhy, g_diag2011, g_diagMax);
+    g_diagOn = true;
+    // 0.5.3 snapshot: the hit list owner [[0xfadb58]+0x504] (state 1004 slot 0) and its 8 slots +0xa4..+0xc0 (clear)
+    g_snapHitOk = HexAt(0x0075e020, "a158dbfa00 8b8804050000 e82089f8ff") &&
+                  HexAt(0x006e6950, "33c0 8981a4000000 8981a8000000 8981ac000000 8981b0000000 8981b4000000 8981b8000000 "
+                                    "8981bc000000 8981c0000000 c3");
+    Log(1, "0.5.3 snapshot: TscTargeterSnapshot (read-only export for TruMenu's thrall labels) %s, hit list %s",
+        g_diagSnap ? "on - built only while a reader asks" : "off ([Diag] Snapshot=0)",
+        g_snapHitOk ? "verified" : "bytes differ - left empty");
 }
 
 void __cdecl State1007Slot4(void *agent) { State1007(agent, 4); }
@@ -2573,6 +2696,7 @@ void ReadOptions(const char *dir) {
     g_diagWhy = GetPrivateProfileIntA("Diag", "Targeter9Why", 1, ini);
     g_diag2011 = GetPrivateProfileIntA("Diag", "Condition2011", 1, ini);
     g_diagMax = GetPrivateProfileIntA("Diag", "MaxLines", 4000, ini);
+    g_diagSnap = GetPrivateProfileIntA("Diag", "Snapshot", 1, ini) ? 1 : 0;   // 0.5.3
     if (g_diagMax < 0) g_diagMax = 0;
 }
 
@@ -2639,6 +2763,36 @@ extern "C" __declspec(dllexport) const TruShadowCombatStrike *__cdecl TruShadowC
     static const TruShadowCombatStrike s = {sizeof(TruShadowCombatStrike), 1, &g_strike.latch, g_strike.target,
                                             &g_strike.count, &g_strike.frames};
     return &s;
+}
+
+// 0.5.3: copy of the targeter snapshot (see TscTargeterSnapshotV1 above) into out (at most outSize bytes; the caller
+// checks the returned version 1 and out->size == sizeof its struct). Returns 1 = a copy built on the game thread within
+// the last frames, 0 = none (index other than 9, [Diag] Targeter9=0 / Snapshot=0, hooks not placed, no frame since the
+// first request, or the copy was being written). Every call marks "asked": the game thread builds copies for 2 s.
+extern "C" __declspec(dllexport) DWORD __cdecl TscTargeterSnapshot(DWORD tuIndex, void *out, DWORD outSize) {
+    if (!out || outSize < 8) return 0;
+    InterlockedExchange(&g_snapAsked, static_cast<LONG>(GetTickCount() | 1));
+    memset(out, 0, outSize);
+    DWORD *head = static_cast<DWORD *>(out);
+    head[0] = sizeof(TscTargeterSnapshotV1);         // a smaller caller struct still learns size and version
+    head[1] = 1;
+    if (outSize < sizeof(TscTargeterSnapshotV1) || tuIndex != 9 || !g_diagSnap || !g_diagOn) return 0;
+    TscTargeterSnapshotV1 *s = static_cast<TscTargeterSnapshotV1 *>(out);
+    for (int tries = 0; tries < 4; ++tries) {
+        const LONG before = InterlockedCompareExchange(&g_snapSeq, 0, 0);
+        if (before & 1) continue;
+        memcpy(s, &g_snap, sizeof(g_snap));
+        MemoryBarrier();
+        if (InterlockedCompareExchange(&g_snapSeq, 0, 0) == before) {
+            s->size = sizeof(TscTargeterSnapshotV1);     // also before the first copy was built (g_snap still 0)
+            s->version = 1;
+            return s->tick ? 1 : 0;
+        }
+    }
+    memset(s, 0, sizeof(*s));
+    s->size = sizeof(TscTargeterSnapshotV1);
+    s->version = 1;
+    return 0;
 }
 
 // TU target of a targeter by TU index (0..9) for diagnostics (TruMenu / tests): object pointer or 0

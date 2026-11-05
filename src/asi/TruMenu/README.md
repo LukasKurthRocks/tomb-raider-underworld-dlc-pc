@@ -1380,6 +1380,90 @@ nav items, the nav entries of the radial file: `nav.draw` one switch name of `kN
 3. With the areas on: Navmesh Verbindungen, then Nav-Proben near thralls, Hindernisse; frame rate with Navmesh gefuellt.
 4. Alles aus: everything gone, log `nav.off: n switch(es) back ...`.
 
+## TruMenu 0.13 "Thrall-Labels" (debug view stage S1, F28)
+
+Built into `work\asi\menu0130` (`menu013` already held an older build from 31.10. and was not touched); compiled, offline
+checks only - **not yet seen in the game**. Owner notes (German): `<workspace>\docs\Befund-Thrall-Labels-0511.md`. Off
+unless `[Debug] Enabled=1` and `dbg.labels 1` (ring `Spieler/Debug` -> Thrall-Labels, or `[Debug] Labels=1`).
+
+**What it draws.** Every Present while on, in a loaded level only (player instance, main state 1, no level change
+pending - the guards of `nav.draw`): for the instances within `[Debug] LabelRadius` of Lara whose object name contains a
+part of `[Debug] LabelMatch` (default `thrall`; `*` = every instance), thralls first, then the nearest, at most
+`LabelMax`, a label in ImGui's foreground draw list at the projected instance position (+0x20):
+
+* line 1: object name, intro id (+0x58), distance to Lara (game units), `LP <hit points>` for names containing `thrall`
+  - EnemyProcessFunc 0x638d40's own value: brain = `[[inst+0x2d0]]+0x2ec` (0x638d59), hit points brain+0x2c64 (the value
+  `cheat.enemyhealth` prints at 0x638edd);
+* line 2 (only with TruShadowCombat 0.5.3, export `TscTargeterSnapshot`): `Z9 ZIEL` (yellow, targeter 9's target),
+  `Z9 Fach <g>` (green, in the bucket of filter group g), `Z9 abgelehnt E0` / `F<xx>` / `(Grund ?)` (orange, in the
+  rejected list: eligibility tru+0x2ecca0 failed / filter groups passed as a bit mask / not evaluated yet - the last WHY
+  result of TruShadowCombat's diagnostics), `Z9 -` (white, not in targeter 9), ` | H` (in the player's hit list
+  `[[0xfadb58]+0x504]+0xa4`), ` | 2011 Pfad <p> q<query> = <result> (<age>s)` (the last condition 2011 had this instance
+  as target; path 1 empty / excluded, 2 query 0x161 = 0, 3 ok);
+* a magenta cross at Lara's position (`[Debug] LabelCross`, default 1) - the live check of the projection.
+
+No state-chart state id: the only chart machine constructor tru+0x3873c0 has one caller (tru+0x2eff9a, the player's
+machines at playerstate +0xf10..); where the thralls' charts run is unknown, so nothing is shown (translate, don't
+imitate).
+
+**Projection = the game's own text-at-an-instance path** (EnemyProcessFunc's health text 0x6224e0, not the TRANS matrix
+0xa038f0 that `draw.markup` reads - that one holds whatever 0x49f620 set last): matrix = the address the getter 0x5e7890
+returns (0xe804a0), projected like TRANS_RotTransPersVectorf 0x49f630 (`x' = m[0] x + m[4] y + m[8] z + m[12]`, ...;
+screen `x = x' / z' * f + 256.0`, `y = y' / z' * f + 224.0`, f = `[0x8906d0]`), drawn when `16.0 < z'` (0x62257b).
+0xe804a0 is written once per game frame by the camera update 0x5f3df0 (called at 0x5d46a9, right after the instance
+walk): a copy of the camera's world -> camera matrix, column x scaled by `(4 / 3) / aspect` (0x5c59f0, aspect =
+`[[0xad75e4]+0x170] / 10000`), column y by `448 / 384` (0x5e7b30); `f = 192 / tan(fov / 2)` (0x5f3ef6, tan = 0x813870
+with `fptan`, stored by 0x49f610). So the text space is 512 x 448 with a vertical field of view; it is scaled to the back
+buffer with `draw.scale` (default 512 448, shared with `draw.markup`). Constants and the derivation: `tools/pe_dis.py`,
+`tools/pe_float_consts.py` (new, logs `labels0511_*`).
+
+**Live checks** (cannot be done offline): the magenta cross must sit on Lara's origin (feet); with `cheat.enemyhealth 1`
+the game's own `%8.2f` hit points must appear at the anchor dot of a thrall's label (same matrix, same projection); if
+the cross is offset by a constant factor, `draw.scale <w> <h>` fixes the text-space size (log line below prints the
+matrix, focal, aspect, back buffer and Lara's projected point every 10 s).
+
+### Item, ring, keys
+
+| Item / key | Default | Meaning |
+|---|---|---|
+| `dbg.labels [0\|1]` | 0 | bool; needs `[Debug] Enabled=1` and the byte checks; may be switched outside a level (draws in the next one) |
+| `[Debug] Labels` | `0` | 1 = on from the start (needs `Enabled=1`) |
+| `[Debug] LabelRadius` | `3000` | game units, 100 .. 50000 |
+| `[Debug] LabelMax` | `12` | 1 .. 32 |
+| `[Debug] LabelMatch` | `thrall` | comma list of name parts, `*` = every instance |
+| `[Debug] LabelCross` | `1` | the magenta cross at Lara |
+
+Ring `Spieler/Debug`: entry 11 "Thrall-Labels" (page 2), shows on / off. Cost per frame: one walk of the instance list
+(position read, distance test; the name test is cached per object id), at most 32 projections and labels; fixed static
+buffers, no allocation by TruMenu (ImGui reuses its draw list buffers). TruShadowCombat builds its copy on the game
+thread only while TruMenu asked within 2 s.
+
+**Byte checks** (`LabelCheck` at load; pinned in `work\asi\menu0130\precheck_013.txt`, `tools/pe_bytes_check.py` on the
+Steam exe: 20 / 20 ok; `tools/trumenu_precheck_match.py --from "---- 0.13 Thrall-Labels" --to "---- favourites"`: 20 =
+20): the game's instance-text path (0x5e7890, 0x6224ed, 0x62257b), the camera update (0x5d46a9, 0x5f3e25, 0x5e7b30,
+0x5e7b5d, 0x5e7b87, 0x5c59f1, 0x5f3ef6, 0x5f3f19, 0x49f610), the projection and its constants (0x49f6f8, 0x49f702,
+0x49f713, 256.0 at 0x843a00, 224.0 at 0x8454c8, 16.0 at 0x8451e4), the health chain (0x638d59, 0x638edd); plus the 0.3
+instance-list, player and main-state checks. A failed check disables `dbg.labels` with the reason.
+
+### `TruMenu.log` lines
+
+```text
+0.13 thrall labels: checks ok; [Debug] Labels <0|1> (on now <0|1>), LabelRadius <r>, LabelMax <n>, LabelMatch '<list>', LabelCross <0|1>; projection matrix 0x00e804a0, focal [0x8906d0], text space 512 x 448 (draw.scale)
+0.13 thrall labels: <TruShadowCombat not loaded | TruShadowCombat without TscTargeterSnapshot (older than 0.5.3) | export found>
+dbg.labels <0|1> (src=<ring|menu|TruLink>)
+0.13 thrall labels: <n> shown (<k> thralls), <m> in <r> units; TruShadowCombat: <state>; matrix 0xe804a0 rows ...; t ...; focal <f>, aspect [[0xad75e4]+0x170] <a>, back buffer <w> x <h>; Lara (<x y z>) -> screen <sx> <sy>
+```
+
+The last line comes with the first labelled frame after `dbg.labels 1` and then every 10 s while on (log only).
+
+**TO TEST (0.13)** - `[Debug] Enabled=1`, TruShadowCombat 0.5.3 (`work\asi\combat053`), `dlc_yggdrasil_hall02`:
+
+1. `TruMenu.log`: `0.13 thrall labels: checks ok`; `TruShadowCombat.log`: `0.5.3 snapshot: TscTargeterSnapshot ... on`.
+2. Ring -> Spieler -> Debug -> Thrall-Labels: magenta cross on Lara, a label above each thrall (name, intro id,
+   distance, LP). `cheat.enemyhealth 1`: the game's number at the label's dot?
+3. Knock a thrall down, stand next to it, power on: line 2 changes `Z9 -` -> `Z9 abgelehnt ...` / `Z9 Fach 0` /
+   `Z9 ZIEL`; X / Y at the thrall: `2011 Pfad ...` on its label.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

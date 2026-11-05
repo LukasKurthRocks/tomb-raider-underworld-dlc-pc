@@ -26,6 +26,9 @@ next to the six marks (which keep their order).
 Since TruMenu 0.12 also the [Debug] values (Enabled / NavMask 0 / 1, NavDraw a comma list of the switch names of
 kNavSwitches in TruMenu.cpp), the items nav.status / nav.draw / nav.mask / nav.off in kItems and the nav.* entries of the
 radial file (nav.draw takes exactly one switch name of kNavSwitches, nav.mask / nav.off / nav.status no argument).
+Since TruMenu 0.13 also the [Debug] label values (Labels / LabelCross 0 / 1, LabelRadius 100 .. 50000, LabelMax 1 .. 32,
+LabelMatch a comma list of name parts a-z 0-9 _ or *), the item dbg.labels in kItems and exactly one dbg.labels entry
+in the radial file (no argument).
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -55,6 +58,10 @@ FLOW_ITEMS = ['flow.status', 'flow.list', 'flow.next', 'flow.back', 'flow.skip',
 FLOW_RING = ['flow.next', 'flow.skip', 'flow.back', 'flow.status']
 # 0.12 Debug-Zeichnung: the nav items and their types
 NAV_ITEMS = {'nav.status': 'info', 'nav.draw': 'action', 'nav.mask': 'bool', 'nav.off': 'action'}
+# 0.13 Thrall-Labels: the [Debug] label keys, their ranges, the item
+LABEL_KEYS = ('Labels', 'LabelRadius', 'LabelMax', 'LabelMatch', 'LabelCross')
+LABEL_RANGES = {'LabelRadius': (100, 50000), 'LabelMax': (1, 32)}
+LABEL_ITEMS = {'dbg.labels': 'bool'}
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 
@@ -361,18 +368,27 @@ def check_debug(ini_path, radial_path):
         key, _, value = line.partition('=')
         key, value = key.strip(), value.strip()
         seen.add(key)
-        if key in ('Enabled', 'NavMask') and value not in ('0', '1'):
+        if key in ('Enabled', 'NavMask', 'Labels', 'LabelCross') and value not in ('0', '1'):
             problems.append('%s:%d: [Debug] %s=%s (0 / 1)' % (name, n, key, value))
+        elif key in LABEL_RANGES:
+            lo, hi = LABEL_RANGES[key]
+            try:
+                ok = lo <= float(value) <= hi and (key != 'LabelMax' or value.isdigit())
+            except ValueError:
+                ok = False
+            if not ok: problems.append('%s:%d: [Debug] %s=%s (%g .. %g)' % (name, n, key, value, lo, hi))
+        elif key == 'LabelMatch' and (not value or not re.match(r'^[A-Za-z0-9_*, ]+$', value)):
+            problems.append('%s:%d: [Debug] LabelMatch=%s (comma list of name parts a-z 0-9 _ or *)' % (name, n, value))
         elif key == 'NavDraw':
             for word in [w for w in re.split(r'[ ,]+', value) if w]:
                 if word not in switches: problems.append('%s:%d: [Debug] NavDraw names "%s" (not in kNavSwitches)'
                                                          % (name, n, word))
-    for key in ('Enabled', 'NavDraw', 'NavMask'):
+    for key in ('Enabled', 'NavDraw', 'NavMask') + LABEL_KEYS:
         if key not in seen: problems.append('%s: [Debug] %s missing' % (name, key))
     items = item_types(src)
-    for item, typ in sorted(NAV_ITEMS.items()):
+    for item, typ in sorted(NAV_ITEMS.items()) + sorted(LABEL_ITEMS.items()):
         if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
-    entries, used = 0, set()
+    entries, used, labels = 0, set(), 0
     if os.path.exists(radial_path):
         for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
             line = line.strip()
@@ -380,6 +396,11 @@ def check_debug(ini_path, radial_path):
             path, label, cmd = (x.strip() for x in line.split('|'))
             word, _, arg = cmd.partition(' ')
             arg = arg.strip()
+            if word in LABEL_ITEMS:          # 0.13: dbg.labels, no argument (the ring flips it)
+                labels += 1
+                if arg: problems.append('%s:%d: %s takes no argument in the ring, got "%s"'
+                                        % (os.path.basename(radial_path), n, word, arg))
+                continue
             if not word.startswith('nav.'): continue
             entries += 1
             where = '%s:%d' % (os.path.basename(radial_path), n)
@@ -390,8 +411,10 @@ def check_debug(ini_path, radial_path):
                     used.add(arg)
             elif arg:
                 problems.append('%s: %s takes no argument in the ring, got "%s"' % (where, word, arg))
-    return problems, '%d switches in kNavSwitches, %d nav entries in the radial file (%d switches)' % (
-        len(switches), entries, len(used))
+    if os.path.exists(radial_path) and labels != 1:
+        problems.append('%s: dbg.labels must be in the radial file once, found %d' % (os.path.basename(radial_path), labels))
+    return problems, '%d switches in kNavSwitches, %d nav entries in the radial file (%d switches), %d dbg.labels entry' % (
+        len(switches), entries, len(used), labels)
 
 
 def unescape(s):

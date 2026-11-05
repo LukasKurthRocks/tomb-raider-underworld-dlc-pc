@@ -1,4 +1,24 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.5.2)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.5.3)
+
+0.5.3 (2026-11-05, **offline, not yet seen in game; read-only - behaviour unchanged**): a data export for TruMenu
+0.13's thrall labels (debug view stage S1) and one fix of the 0.5.2 diagnostics. Build `work\asi\combat053`.
+* Export `DWORD __cdecl TscTargeterSnapshot(DWORD tuIndex, void *out, DWORD outSize)`: tuIndex 9 only; copies
+  `TscTargeterSnapshotV1` (version 1, 604 bytes; `static_assert` in both plugins): targeter 9, its target object
+  (+0x90), flags / candidates / groups / bucket counts / rejected count, up to 24 list entries {instance, where = 0x10 +
+  group (bucket) or 0x20 (rejected), the last WHY result for rejected ones (0x100 = eligibility passed, low byte = filter
+  groups passed; 0xffffffff = not evaluated), its tick, marker data}, the player's 8-slot hit list
+  `[[0xfadb58]+0x504]+0xa4`, the last condition 2011 (calls, tick, path, result, query 0x161, target). Returns 1 = a copy
+  from the game thread, 0 = none (the first 8 bytes always carry size and version). Every call marks "asked"; the copy
+  is built at the end of slot 9's per-frame update (after the original) only while a reader asked within 2 s, under a
+  sequence counter. No game data written, no game function called for it. `[Diag] Snapshot=1` (0 = the export answers
+  "none"); needs `[Diag] Targeter9=1`.
+* Fix: `WHY rejected` walked the rejected list by node +0 - that is the **prev** link (list append tru+0x2ecd40: tail +4
+  -> new node, new node +0 = old tail; the select walk tru+0x3166f3 reads `mov esi, [esi+4]`), so 0.5.2 reported only the
+  first rejected candidate. 0.5.3 follows +4 (next): up to 4 candidates as documented.
+* New byte checks: 4 (`work\asi\combat053\prechecks_combat053.txt`: the two list-link facts in SetupDiag, the hit list
+  owner / clear for the snapshot); with 88 + 6 + 21: 119, 0 mismatches. Imports unchanged (79); exports + 1.
+* Log: `0.5.3 snapshot: TscTargeterSnapshot (read-only export for TruMenu's thrall labels) on - built only while a reader
+  asks, hit list verified`.
 
 0.5.2 (2026-11-05, **offline, not yet seen in game; log only - behaviour unchanged**): diagnostics for F21 (the
 finisher 1013 is never entered because condition 2011 finds targeter 9 empty). Static result first: the TU fills
@@ -179,6 +199,7 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Diag] Targeter9Why` | 1 | 0.5.2: eligibility / filter result of the rejected candidates of targeter 9 (once per second) |
 | `[Diag] Condition2011` | 1 | 0.5.2: every evaluation of condition 2011 in doppelganger mode with its inputs |
 | `[Diag] MaxLines` | 4000 | 0.5.2: total cap of the diagnostic lines |
+| `[Diag] Snapshot` | 1 | 0.5.3: read-only export `TscTargeterSnapshot` for TruMenu's thrall labels (built only while asked) |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 
