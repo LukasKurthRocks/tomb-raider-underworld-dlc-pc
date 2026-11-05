@@ -296,8 +296,8 @@ def cmd_table(argv):
     if kind == 'music':
         by = {}
         for r in rows: by.setdefault(r['track'], {})[r['file'][:-4]] = r
-        print('| Stück | Kanäle | Hz | Länge Xbox (s) | Länge PC inst. (s) | Δ Samples inst. | SNR inst. (dB) | edge Xbox / inst. '
-              '| Δ Samples 50l | SNR 50l (dB) | edge 50l | Auffällig |')
+        print('| Track | Channels | Hz | Length Xbox (s) | Length PC inst. (s) | Δ samples inst. | SNR inst. (dB) | edge Xbox / inst. '
+              '| Δ samples 50l | SNR 50l (dB) | edge 50l | Notable |')
         print('|---|---|---|---|---|---|---|---|---|---|---|---|')
         for t in sorted(by):
             x, i, a = by[t].get('xbox'), by[t].get('pc_installed'), by[t].get('pc_50l')
@@ -306,11 +306,11 @@ def cmd_table(argv):
                 if not r: continue
                 tag = 'inst.' if r is i else '50l'
                 if not r['rate_equal']: odd.append('%s Rate' % tag)
-                if not r['channels_equal']: odd.append('%s Kanäle' % tag)
-                if r['silent_channels']: odd.append('%s stumme Kanäle %s' % (tag, r['silent_channels']))
-                if r['edge'] >= 1.1: odd.append('%s Blockkanten-Ticks (edge %s)' % (tag, fmt(r['edge'], 2)))
-                if x and r['jumps'] > 2 * x['jumps'] + 50: odd.append('%s Sprünge %d (Xbox %d)' % (tag, r['jumps'], x['jumps']))
-                if x and abs(r['lead_silence_s'] - x['lead_silence_s']) > 0.05: odd.append('%s Anfangsstille' % tag)
+                if not r['channels_equal']: odd.append('%s channels' % tag)
+                if r['silent_channels']: odd.append('%s silent channels %s' % (tag, r['silent_channels']))
+                if r['edge'] >= 1.1: odd.append('%s block-edge ticks (edge %s)' % (tag, fmt(r['edge'], 2)))
+                if x and r['jumps'] > 2 * x['jumps'] + 50: odd.append('%s jumps %d (Xbox %d)' % (tag, r['jumps'], x['jumps']))
+                if x and abs(r['lead_silence_s'] - x['lead_silence_s']) > 0.05: odd.append('%s lead silence' % tag)
             print('| %s | %d | %d | %s | %s | %+d | %s | %s / %s | %s | %s | %s | %s |' % (
                 t, x['channels'], x['rate'], fmt(x['seconds']), fmt(i['seconds']), i['len_diff_vs_xbox'],
                 fmt(i['snr_vs_xbox_db'], 1), fmt(x['edge'], 2), fmt(i['edge'], 2),
@@ -330,7 +330,7 @@ def cmd_table(argv):
     else:
         by = {}
         for r in rows: by.setdefault(r['hash'], []).append(r)
-        print('| Hash | Sprachen | Kanäle | Hz | Länge (s) | Schleife ab (s) | RMS (L, R) | Stille Anfang / Ende (s) | Dateien |')
+        print('| Hash | Languages | Channels | Hz | Length (s) | Loop from (s) | RMS (L, R) | Silence start / end (s) | Files |')
         print('|---|---|---|---|---|---|---|---|---|')
         for h in sorted(by):
             rs = by[h]

@@ -474,7 +474,7 @@ Spec: `docs\Plan-TruMenu-Medien.md` (workspace) P0, P0c, P0b. Byte pre-checks of
 ### Regression page (P0)
 
 - **Lists** `tests\regress\dlc1.txt` (DLC 1: 6 steps + 12 checks, from `docs/Regression-DLC1.md`) and
-  `tests\regress\dlc2.txt` (DLC 2: 7 steps + 23 checks, from `docs/Regression-Schattenlara.md`), the row format of
+  `tests\regress\dlc2.txt` (DLC 2: 7 steps + 23 checks, from `docs/Regression-DLC2.md`), the row format of
   `TruMenu.tests.txt` (`id<TAB>state<TAB>hint<TAB>note<TAB>time<TAB>kind<TAB>target<TAB>number`; check ids = the ids in
   the docs, steps `step<n>`; step 5 of DLC 2 runs `time.scale 0.5`). ASCII only, no game data.
   `tools/trumenu_ini_check.py` checks them too (8 columns, unique ids, every check id named in its doc).

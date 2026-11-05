@@ -1,4 +1,4 @@
-# TruMenu regression list DLC 2 (Lara's Shadow) - from docs/Regression-Schattenlara.md; Set-TruMenu.ps1 copies it next to the ASI as TruMenu.regress_dlc2.txt
+# TruMenu regression list DLC 2 (Lara's Shadow) - from docs/Regression-DLC2.md; Set-TruMenu.ps1 copies it next to the ASI as TruMenu.regress_dlc2.txt
 # format as TruMenu.tests.txt: id<TAB>state<TAB>hint<TAB>note<TAB>time<TAB>kind<TAB>target<TAB>number (steps: id step<n>, target = item id or id:arg); optional 9th column shortcut = #title;cmd;cmd (TruMenu 0.8.1 Prepare button / regress.prepare)
 step1	open	Wait until the main menu is shown completely; L3 + R3 opens TruMenu - check the switches (a change needs a restart)			step		1
 step2	open	Close the menu; wait for the direct start into DLC 2 or start it from the DLC mission menu (not level.load - it skips the intro)			step		2

@@ -1,6 +1,6 @@
 {
   "name": "regress_shadowlara",
-  "description": "Regression test of the shadow Lara (doppelganger) logic, run after every change to TruDlc2Player / TruDoppelganger / TruRockVein / TruShadowPower, doppelganger_casual or the pipeline statechart steps. State as dlc2_48h (tree dlc_test48h, the same ASIs and switches), direct start into DLC 2 (no level.load); TruShadowPower LogLevel 2 so that every shadow power start / stop is logged for the automatic checks. Doc: docs/Regression-Schattenlara.md.",
+  "description": "Regression test of the shadow Lara (doppelganger) logic, run after every change to TruDlc2Player / TruDoppelganger / TruRockVein / TruShadowPower, doppelganger_casual or the pipeline statechart steps. State as dlc2_48h (tree dlc_test48h, the same ASIs and switches), direct start into DLC 2 (no level.load); TruShadowPower LogLevel 2 so that every shadow power start / stop is logged for the automatic checks. Doc: docs/Regression-DLC2.md.",
   "trees": [
     {
       "source": "trudlcport/work/rebuild/dlc_test48h/mods",

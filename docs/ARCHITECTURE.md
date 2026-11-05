@@ -264,7 +264,7 @@ a log line. Every behaviour comes from the title-update code with the PC counter
 
 Game tests run from profiles (`tests/profiles/*.json`, `scripts/windows/Invoke-TruTestRun.ps1`): exact trees, plugin
 builds and INI values, a checklist the owner ticks in `TruMenu`, automatic log checks, a verdict per run, dumps kept
-per run. The regression lists are `docs/Regression-Schattenlara.md` (DLC 2) and `docs/Regression-DLC1.md`. Crashes
+per run. The regression lists are `docs/Regression-DLC2.md` (DLC 2) and `docs/Regression-DLC1.md`. Crashes
 found this way led to converter checks for data the original converter mishandles (state-VM code words, section ids
 in event lists / effect nodes / state-chart parameters): `tools/statevm_check.py`, `eventlist_idword_fix.py`,
 `fxnode_id_fix.py`, `chart_idvalue_fix.py`, `animlist_check.py`, `obj_eventlist_fix.py` - since 2026-11-03 fixed

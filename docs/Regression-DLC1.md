@@ -1,6 +1,6 @@
 # Regression test: DLC 1 "Beneath the Ashes"
 
-Counterpart of `Regression-Schattenlara.md` (DLC 2). Profile `tests/profiles/regress_dlc1.json` (created 2026-11-02
+Counterpart of `Regression-DLC2.md` (DLC 2). Profile `tests/profiles/regress_dlc1.json` (created 2026-11-02
 from `regress_shadowlara_50f`: the same trees and plugins, so DLC 1 is checked in the state the DLC 2 tests leave the
 game in; 18 rows, 10 automatic checks), run by `scripts/windows/Invoke-TruTestRun.ps1`.
 
