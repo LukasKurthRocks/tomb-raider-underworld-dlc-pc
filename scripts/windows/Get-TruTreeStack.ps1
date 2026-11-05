@@ -65,8 +65,11 @@ $known = @{
     '3a2b9a1d7b689d13d73037d3b412ea5b' = 'generalbank 41e + script 104 fix (test only)'
     '57f5226610903c8b58a1d911d53fc65a' = 'generalbank pipeline (no direct start)'
     '586c37ad378691d534f0aab2cee3c439' = 'generalbank AutoStart (profile 50l/50n)'
-    '5c6c468dd16327a275b2001e6a30da4e' = 'generalbank pipeline + TU input bindings (generalbank_build step 22)'
-    '66efd71d19aed26ec458cbb3f8f25421' = 'generalbank AutoStart + TU input bindings (dlc_test50l_input)'
+    '5c6c468dd16327a275b2001e6a30da4e' = 'generalbank pipeline step 22 (TU input bindings, without script 104)'
+    '66efd71d19aed26ec458cbb3f8f25421' = 'generalbank pipeline step 23 (+ script 104 S104) = AutoStart + TU input bindings (dlc_test50l_input)'
+    '2ff716288e69a6ba8baca595f9c6f354' = 'generalbank pipeline + HUD (dlc_test50l_hud_input)'
+    '3fe0a2842dc5ad8443accd99a1151950' = 'generalbank pipeline + pause port (dlc_test50l_pause_input)'
+    '219fdf16e7bdf6ee236eea6ae6397ebb' = 'generalbank pipeline + HUD + pause port (dlc_test50l_hud_pause_input)'
     'ce29c75231e4cbe3ea84ed882d3a737a' = 'generalbank DLC menu fix 27.10. (Install-TruModFile)'
 }
 

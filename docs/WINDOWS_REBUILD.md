@@ -2427,9 +2427,23 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      still compared with its first build (`62efb0ee...`), the result `2ff71628...` is byte-identical to the hand-built
      `dlc_test50l_hud_input` (`cmp`). The pause port (`tools/script7_pause_port.py`) is a separate tool;
      `dlc_test50l_pause` + `input_map_tu_fix.py` = `dlc_test50l_pause_input` (`3fe0a284...`, only DTP 47 differs).
+   * **Script 104 is generalbank step 23 (2026-11-05, owner's decision S104).** The mission screen starts DLC 2
+     (`dlc_level2_start`) like levels 4-6 with `uigamedata` "load level"(unit, 0, 0, 1) - no costume / weapon
+     selection, the player is the doppelganger - as the title update's script 134 function 9 does. Step 23 =
+     `dlc2_player_fix.py gb` (step 22 now writes `steps/22_input.drm` and is compared with `5c6c468d...`); the result
+     is `66efd71d...` = the played hand-built `dlc_test50l_input` (`--no-script104` stops after step 22). New check
+     `dlc2_player_fix.py verify BEFORE AFTER --tu TU_GB`: every other section byte-identical, each of the 21 changed /
+     appended words of script 104 explained by the plan from BEFORE (the PC words at the site checked again), exactly
+     the 4 planned relocations, and the block decoded from AFTER alone has the test order (4, 5, 6, 2) and opcodes of
+     the Xbox TU script 134 (`+0x257c`). It runs inside `generalbank_build` (so also in Repair) and as a gate of step
+     `Generalbank`. `tools/s104_selftest.py`: 9 tampered files (one word / byte / relocation each) refused, the real
+     pair passes. Run `-Step Generalbank -FixesOut work/rebuild/s104_check` (737 s, 3 / 3 tools exit 0); HUD
+     (`generalbank_hud_build --base` the result) and pause port built on it are byte-identical to
+     `dlc_test50l_hud_input` (`2ff71628...`), `_pause_input` (`3fe0a284...`), `_hud_pause_input` (`219fdf16...`).
    * Check gates in `Invoke-TruPipeline.ps1`: `dlc_struct_fixes.py check <tree> [--pack]` after Fixes (DLC 1, DLC 2)
      and per costume pack (exit 1 when objtex / objrec / objid would still change a DRM; `objdata_check.json`);
-     `input_map_tu_fix.py --verify` after Generalbank / Repair (`input_map_check.json`).
+     `input_map_tu_fix.py --verify` after Generalbank / Repair (`input_map_check.json`); `dlc2_player_fix.py verify`
+     after Generalbank (`script104_check.json`, 2026-11-05).
    * Proof: the steps on the inputs of the night's test trees (staged by md5 from the stand-alone tools' logs,
      `tools/stage_by_md5.py`) reproduce `dlc_test51c_objfx` (21 / 22; the 22nd, doppelganger_casual, additionally
      gets `objid`) = `dlc_test51e_dgids` byte for byte, the same for the `_50o` line (8 / 9 + doppelganger =

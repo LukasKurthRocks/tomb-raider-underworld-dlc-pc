@@ -99,7 +99,10 @@
                compared with the played test 38 file (MD5); step 22 (2026-11-04) appends the title update's 6 input
                bindings of Lara's set 17 (tools/input_map_tu_fix.py: RB / X / Y / LB for the DLC 2 shadow combat)
                -> work\rebuild\generalbank_build\mods\generalbank.drm; input_map_tu_fix --verify checks the result
-               (also in Repair, on b138_fixes), report <dir>\input_map_check.json
+               (also in Repair, on b138_fixes), report <dir>\input_map_check.json; step 23 (2026-11-05, S104):
+               mission screen script 104 starts DLC 2 like the title update, without costume / weapon selection
+               (tools/dlc2_player_fix.py gb; result = dlc_test50l_input, md5 66efd71d...), gate
+               dlc2_player_fix verify (every changed word explained), report <dir>\script104_check.json
                -FixesOut DIR (2026-11-04, check runs): Generalbank writes DIR\generalbank_build; Repair writes
                DIR\b138_pristine\mods, DIR\generalbank_build (--base = that snapshot's generalbank.drm) and
                DIR\b138_fixes\mods instead of the usual work\rebuild\b138_pristine / generalbank_build / b138_fixes
@@ -317,7 +320,9 @@ $steps = @{
     )
     Generalbank = @(
         @('tools\generalbank_build.py', $gbOut),
-        @('tools\input_map_tu_fix.py', '--verify', "$gbOut/mods/generalbank.drm", '--report', "$gbOut/input_map_check.json")
+        @('tools\input_map_tu_fix.py', '--verify', "$gbOut/mods/generalbank.drm", '--report', "$gbOut/input_map_check.json"),
+        # gate S104 (2026-11-05): the result = step 22 + exactly the script 104 fix of step 23, block = TU script 134 test
+        @('tools\dlc2_player_fix.py', 'verify', "$gbOut/steps/22_input.drm", "$gbOut/mods/generalbank.drm", '--tu', "$gbOut/steps/10_tu_be.drm", '--report', "$gbOut/script104_check.json")
     )
 }
 $outputDirs = @{

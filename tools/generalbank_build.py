@@ -34,16 +34,25 @@ Steps (each tool checks the old values it replaces; intermediate files in OUT/st
                              145 LB, 146 Y, 147 X) appended (2026-11-04, F4 / B26 shadow combat: the DLC 2 chart's
                              attack requests {150,152,142/143/147} never fired on the PC; docs Befund-Schattenkampf.md);
                              --done-ok: a base that already has them passes unchanged
-The output of step 21 is compared with the played test 38 file (EXPECT21, always; a difference stops the build unless
---expect none), the result (step 22) with --expect (default EXPECT: step 21 + the input bindings, first built
-2026-11-04 by agent N11 - md5-identical to the hand-built tree dlc_test50l_input after the test-only script 104 step
-`dlc2_player_fix.py gb`, docs Befund-Pipeline-Integration-0411.md).
+  23 dlc2_player_fix gb      mission screen script 104 function 9 (2026-11-05, owner's decision S104): DLC 2
+                             (dlc_level2_start) is started like levels 4-6 with uigamedata "load level"(unit, 0, 0, 1),
+                             no costume / weapon selection - the title update's level test (4, 5, 6, 2) of its script
+                             134 function 9 in an appended block; every PC word at the site checked first
+     dlc2_player_fix verify  the check of step 23: the result = step 22 + exactly that fix (every other section
+                             byte-identical, every changed word explained, the block = the TU script 134 test),
+                             report OUT/steps/23_script104_check.json
+The output of step 21 is compared with the played test 38 file (EXPECT21) and step 22 with EXPECT22 (always; a
+difference stops the build unless --expect none), the result (step 23) with --expect (default EXPECT: step 22 + the
+script 104 fix = the played hand-built tree dlc_test50l_input, which the test packages install; first proven
+2026-11-04, docs Befund-Pipeline-Volllauf-0411b.md section 5).
 
 Usage (from the repository root; steps 2 and 8 load the generic store, ~16 GB RAM each, one after the other):
   ../bin/pyt -t 7200 tools/generalbank_build.py OUT_DIR [--base B138_GENERALBANK] [--expect MD5|none] [--from N]
+                                                [--no-script104]
   OUT_DIR below work/rebuild (replaced unless --from N > 1), e.g. work/rebuild/generalbank_build
   --base: default work/rebuild/b138_pristine/mods/generalbank.drm (pipeline step Repair, tools/b138_snapshot.py)
   --from N: resume at step N with the step files of an earlier run in OUT_DIR/steps
+  --no-script104: stop after step 22 (the file before the S104 decision, EXPECT22 5c6c468d...)
   -> OUT_DIR/mods/generalbank.drm (install with Install-TruTree.ps1 -Source OUT_DIR/mods), OUT_DIR/build_log.txt
 """
 import sys, os, shutil, subprocess, hashlib, time
@@ -51,7 +60,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_util as BU
 
 EXPECT21 = '57f5226610903c8b58a1d911d53fc65a'    # step 21 = test 38 (played 2026-10-30 21:19): titles, hint box, menu style
-EXPECT = '5c6c468dd16327a275b2001e6a30da4e'      # step 22 = EXPECT21 + the 6 TU input bindings (2026-11-04, not played)
+EXPECT22 = '5c6c468dd16327a275b2001e6a30da4e'    # step 22 = EXPECT21 + the 6 TU input bindings (2026-11-04, not played)
+EXPECT = '66efd71d19aed26ec458cbb3f8f25421'      # step 23 = EXPECT22 + script 104 = dlc_test50l_input (played packages)
 SYM = 'work/rebuild/sym_base_evidence.json'     # base evidence symbol names (finding 42, sym_calibration_check.py)
 LOCMAP = 'work/rebuild/stage1/locmap_xbox_to_pc.json'      # Xbox -> PC locals string ids (pipeline step Media)
 
@@ -63,9 +73,15 @@ def md5(p):
     return h.hexdigest()
 
 
-def steps(base, st, out):
+def steps(base, st, out, s104=True):
     """[(number, title, [tool, args...], output file, extra environment)]"""
     S = lambda n: os.path.join(st, n)
+    out22 = S('22_input.drm') if s104 else out
+    s104_steps = [
+        (23, 'script 104: DLC 2 without costume selection', ('dlc2_player_fix.py', 'gb', out22, out), out, None),
+        (23, 'script 104: check', ('dlc2_player_fix.py', 'verify', out22, out, '--tu', S('10_tu_be.drm'), '--report',
+                                   S('23_script104_check.json')), S('23_script104_check.json'), None),
+    ] if s104 else []
     B = S('01_menu/generalbank.drm')                    # the base of every later step (also the vtable reference)
     tu6 = S('02_tu_generalbank.drm')
     nop9 = lambda i, o, at, w0: ('script_nop_call.py', i, o, '9', at, '%s,0f000050,65000000,*' % w0)
@@ -123,12 +139,16 @@ def steps(base, st, out):
                                         '0444=04000000:04000001,0968=04000000:04000001'), S('20_f0true.drm'), None),
         (21, 'script 9: DLC 2 flag stub', ('script_dlc2_flag_stub.py', S('20_f0true.drm'), S('21_stub.drm')),
          S('21_stub.drm'), None),
-        (22, 'input map: TU bindings of set 17', ('input_map_tu_fix.py', S('21_stub.drm'), out, '--done-ok'), out, None),
-    ]
+        (22, 'input map: TU bindings of set 17', ('input_map_tu_fix.py', S('21_stub.drm'), out22, '--done-ok'), out22,
+         None),
+    ] + s104_steps
 
 
 def main(argv):
-    base = 'work/rebuild/b138_pristine/mods/generalbank.drm'; expect = EXPECT; start = 1
+    base = 'work/rebuild/b138_pristine/mods/generalbank.drm'; start = 1
+    s104 = '--no-script104' not in argv
+    argv = [a for a in argv if a != '--no-script104']
+    expect = EXPECT if s104 else EXPECT22
     if '--base' in argv: k = argv.index('--base'); base = argv[k + 1]; del argv[k:k + 2]
     if '--expect' in argv: k = argv.index('--expect'); expect = argv[k + 1]; del argv[k:k + 2]
     if '--from' in argv: k = argv.index('--from'); start = int(argv[k + 1]); del argv[k:k + 2]
@@ -145,7 +165,7 @@ def main(argv):
     log = open(os.path.join(outdir, 'build_log.txt'), 'a', encoding='utf-8')
     log.write('=== generalbank_build %s base %s (md5 %s) from step %d\n' % (time.strftime('%Y-%m-%d %H:%M:%S'), base,
                                                                          md5(base), start))
-    plan = steps(base, st, out)
+    plan = steps(base, st, out, s104)
     for n, title, cmd, made, env in plan:
         if n < start:
             if not os.path.isfile(made): sys.exit('--from %d: output of step %d missing: %s' % (start, n, made))
@@ -169,11 +189,18 @@ def main(argv):
             msg = '        step 21 %s the played test 38 file %s' % ('identical to' if ok21 else 'DIFFERS from', EXPECT21)
             print(msg, flush=True); log.write(msg + '\n')
             if not ok21 and expect.lower() != 'none': log.close(); sys.exit('step 21 differs from the played test 38 file')
+        if n == 22 and s104:    # the input bindings file of 2026-11-04 - step 23 builds on it
+            ok22 = md5(made) == EXPECT22
+            msg = '        step 22 %s the step 22 file of 2026-11-04 %s' % ('identical to' if ok22 else 'DIFFERS from',
+                                                                            EXPECT22)
+            print(msg, flush=True); log.write(msg + '\n')
+            if not ok22 and expect.lower() != 'none': log.close(); sys.exit('step 22 differs from %s' % EXPECT22)
     got = md5(out)
     if expect.lower() == 'none':
         res = 'result %s md5 %s (not compared)' % (out, got)
     elif got == expect:
-        res = 'result %s md5 %s identical to the expected file (step 21 = played test 38 + step 22)' % (out, got)
+        res = 'result %s md5 %s identical to the expected file (step 21 = played test 38 + step 22%s)' % (
+            out, got, ' + step 23 = dlc_test50l_input' if s104 else '')
     else:
         res = 'result %s md5 %s DIFFERS from the expected %s' % (out, got, expect)
     print(res); log.write(res + '\n'); log.close()
