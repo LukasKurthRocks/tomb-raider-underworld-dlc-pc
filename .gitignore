@@ -28,3 +28,46 @@ tools/native_test/shaders/
 tools/native_test/native_report.txt
 # built ASI plugins (binaries)
 work/asi/
+# --- local analysis output (game code / data extracts, scratch results), moved from .git/info/exclude ---
+work/xenia_dump/
+work/test33_native/
+work/test37/
+work/test41/
+work/rockvein/
+work/xmap/
+work/statechart/
+work/tu_audit/
+work/tu_funcdiff/
+work/obj858/
+work/tustates/
+work/menu02/
+work/heap50d/
+work/shadowlook/
+work/cut_ending/
+work/cut_scan/
+work/media/
+work/night_analyses/
+work/shader_tour/
+work/thrall_report_test/
+work/live_pkg_test/
+work/asi_*/
+work/render_backup_*/
+work/ws/shader4/f9_oracolo.md
+work/ws/shader4/f9_oracolo.tsv
+work/ws/shader4/pc_ctab_by_pos.json
+work/ws/shader4/pc_ctab_names.json
+# prototype builds (never in the repository)
+work/proto*/
+# listening copies (WAV) and the upstream author's release manifests
+work/listen/
+work/upstream/
+# analysis output since 2026-11-04
+work/b138_repair_check/
+work/b138_vo_compare/
+work/f10_shotgun/
+work/f13_sibilants/
+work/f14_help/
+work/truguard_fix_0511/
+# safety net: audio never belongs in the repository (game streams .mul_001 ..., WAV listening copies)
+*.wav
+*.mul_0*
