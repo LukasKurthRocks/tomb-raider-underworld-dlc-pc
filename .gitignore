@@ -77,6 +77,8 @@ work/b270_kit/
 work/debugviz_0511/
 work/mat_b270_0511/
 work/kitrest_0511/
+work/sg_audit_0511/
+work/exe_cmp_0511/
 # safety net: audio never belongs in the repository (game streams .mul_001 ..., WAV listening copies)
 *.wav
 *.mul_0*
