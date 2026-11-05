@@ -2444,6 +2444,55 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      test packages install last: B138 files, shader / look test trees, the F2 thralls). `generalbank_build.py` from
      scratch: step 21 = `57f52266...` (test 38), step 22 = `5c6c468d...`.
 
+49. **SoundPlex Sequence repeat word +0xc is raw on the PC: pipeline step `seqrepeat` with base proof and gates
+    (2026-11-05, F5 endless groan; workspace docs Befund-Stoehnen-0511.md, Befund-Pipeline-F5-F25-0511.md).**
+   * What: a SoundPlex Sequence node (type 10) has the data `{u32 count, ptr children, ptr, s8 repeat + 3 bytes}`.
+     The PC builds it in `tru+0x18e070` (`movsx byte [data+0xc]`), the Xbox in TU `0x8224277c` / retail `0x822442ac`
+     (`lbz 0xc; extsb`: the FIRST byte of the big-endian word); the update (`tru+0x193720`, TU `0x822457f0`) plays
+     the children again while passes < repeat OR repeat == 0. The converter's learned type-7 table swapped the word
+     as a u32 in some DTPs: Xbox `01000000` (1 pass) -> PC `00000001` = repeat 0 = for ever. In run paket02t the
+     doppelganger's voice sequences (DTPs 26086 / 26183 / 22711 / 22713) lived up to 284 s.
+   * Rule and base proof (`tools/soundplex_sequence_fix.py proof`, base pairs of `work/generic/store.pkl` with the
+     same size and internal relocations): 90 pairs, 172 Sequence nodes; +0x0 a u32 172 / 172, +0x4 / +0x8 pointers
+     344; word +0xc raw only 71, raw or u8u8u16 23, uninformative 78, contradicting 0; the 71 pairs whose Xbox bytes
+     +0xe / +0xf differ keep both raw, so the rule is "the whole word raw", not only the repeat byte. Exit 1 when a
+     pair contradicts the rule or any count differs from `PROOF_EXPECT`.
+   * Step `seqrepeat` (`tools/dlc_struct_fixes.py`, in `dlc_fixes_build.STRUCT_STEPS` after `objid`, before
+     `vmliteral`; library `soundplex_sequence_fix.fix_drm`): sections paired by position
+     (`converter_faults_fix.pairs_by_position`); a pair with another id is a renumbered base DTP (the PC game's own
+     section) and stays; a PC word that is a byte order of the Xbox word (u32 / u16u16 / u8u8u16) gets the Xbox bytes;
+     a word that is no byte order of it stops the build (SystemExit, nothing guessed). Per DRM: the decoded DRM
+     differs only in the planned bytes, headers and relocations identical, a re-plan finds 0 words. Place: a byte
+     field inside a type-7 table of variable layout, the same class as `objtex` / `objrec` (finding 47), and
+     `dlc_struct_fixes.py check` already gates every tree; no other step writes the word except `twins`, which sets
+     the same bytes in `doppelganger_casual` from its base-twin truth (26 words in `dlc2_asm_stage2a`, 0 left in the
+     stage-2b output), so the step finds nothing there in the pipeline.
+   * Gates in `Invoke-TruPipeline.ps1`: `soundplex_sequence_fix.py proof` at the start of Fixes and Costumes; after
+     every tree `soundplex_sequence_fix.py scan <tree> --pack <pack> --report .../soundplex_sequence_check.json`
+     (exit 1 on a wrong or unexplained word; DLC 1 `--pack pack10`, DLC 2 `pack11`, costumes their pack) and
+     `dlc_struct_fixes.py check` (`seqrepeat` added to its check steps). `scan --profile P.json --base DIR` checks
+     what a test profile installs; `scripts/windows/Test-TruPreflight.ps1` runs it together with
+     `objdata_texlist_check.py --profile` (finding 47) for the profile it checks.
+   * Proof without a new pipeline run: (1) the step on the 80 inputs of test tree `dlc_test51p_moan` (the files
+     paket02t installs last plus the game folder's `dlc2_checkpoint.drm`, staged with `tools/stage_by_md5.py
+     --paths`) writes 14 DRMs, all md5-identical with `dlc_test51p_moan` (`tree_diff_report.py`: 14 / 14);
+     `fix_word_diff.py`: 44 words changed (26 in doppelganger_casual, 1-4 elsewhere), 0 other words, 0 header or
+     relocation changes; the other 66 inputs are not written. (2) On the stage-2b outputs of
+     `pipeline_check_0411b`: DLC 1 25 words in 11 DRMs (2 with a wrong repeat: `dlc_caverns_hall` DTP 24035 and
+     `dlc_dungeonhallb` DTP 23938, Xbox 1 -> PC 0; 20 words `00000100` -> `00010000` and the 2 words of
+     `dlc1_uo_crushers` DTP 20247 `06000100` -> `06000001` with the right repeat byte), DLC 2 18 words in 13 DRMs (13
+     x DTP 22819 repeat 1 -> 0 in the level / object files and `dlc2_checkpoint`, 5 words with repeat 0); costume
+     packs pack1 / pack2 / pack20: no DLC Sequence node (only renumbered base sections). After the step: `scan` 0
+     wrong (DLC 1 40 nodes, DLC 2 72 nodes), `dlc_struct_fixes.py check` ok for all four check steps on both trees and
+     the three costume trees; `fix_word_diff.py`: only the planned words, 0 other.
+   * B138's own DLC 1 files carry the repeat bytes right (the game folder has only the 2 crusher padding words);
+     our DLC 1 build had the two endless DLC 1 sequences above until this step.
+   * Tools: `tools/soundplex_sequence_fix.py` (`proof`, `scan` with `--pack` / `--profile` / `--base` / `--report`
+     and exit code, `fix`, library `plan` / `fix_drm` / `verify`; without `--pack` every pack that holds a name is
+     tried and the copy with the most id-equal pairs wins, finding 38), `tools/stage_by_md5.py --paths`,
+     `tools/profile_fix_plan.py` (new: where a fix tree can go in a profile's tree list so that only its own input
+     copies are replaced, and what both checks report then), `dlc_struct_fixes.py check A,B` (overlay of two folders).
+
 ## The "VM" in upstream (what it was, what we do instead)
 
 Upstream was developed on macOS (homebrew paths, `/path/to/` placeholders); the game ran in a **Windows 11 VM** with

@@ -50,6 +50,12 @@
                texture group counts (F16 machine room), particle record byte classes (F3 / B24) and the player data
                breath-sound ids (doppelganger_casual 0x68f40000); dlc_struct_fixes check runs on each output tree
                (exit 1 on a word left, report <tree>\objdata_check.json);
+               seqrepeat (2026-11-05, after objid, finding 49) sets the SoundPlex Sequence word +0xc (repeat byte +
+               3 bytes) to the Xbox bytes (the converter u32-swapped repeat 1 to 0 = endless: DLC 2 doppelganger groan,
+               DLC 1 dlc_caverns_hall / dlc_dungeonhallb); the step first proves the rule on the base pairs
+               (soundplex_sequence_fix proof: exit 1 when a pair contradicts it or a count differs) and gates each
+               output tree afterwards (soundplex_sequence_fix scan: exit 1 on a wrong or unexplained word, report
+               <tree>\soundplex_sequence_check.json; dlc_struct_fixes check covers seqrepeat too);
                objevent / idword / animlist / fxnode / statevm / chartid (2026-11-03, finding 44) set the converter
                fault families that crash dumps of tests 50d-50j uncovered (tools/converter_faults_fix.py: event list
                words and sub-0x32 ids, anim event list words, effect node headers / type-1 ids, state-VM code words,
@@ -68,9 +74,10 @@
       Costumes the three Xbox costume packs (2026-11-03; pack1 Wetsuit k / p, pack2 Classic a / h, pack20 Designer
                l / m), after Assemble (render tables) and Fixes' proof: verify_ids extend (adds the packs' ids to
                dlc_idmap.json, existing entries never change; second run adds nothing), converter_faults_fix proof,
-               then per pack the DLC 2 route: dlc_media_build, dlc_assemble_build --pack, dlc_audio_build --pack,
-               tree_check, dlc_fixes_build --pack, converter_faults_fix check --pack, script_clash_fix check,
-               dlc_struct_fixes check --pack (objtex / objrec / objid)
+               soundplex_sequence_fix proof (2026-11-05), then per pack the DLC 2 route: dlc_media_build,
+               dlc_assemble_build --pack, dlc_audio_build --pack, tree_check, dlc_fixes_build --pack,
+               converter_faults_fix check --pack, script_clash_fix check, dlc_struct_fixes check --pack (objtex / objrec
+               / objid / seqrepeat), soundplex_sequence_fix scan --pack
                -> work\rebuild\costumes\<pack>\{stage1,asm_stage1,asm_stage2a,stage2b}\mods (-FixesOut DIR: DIR\<pack>\...)
                Only the two dlc_costume_<x>.drm of each pack are new for the game; images, names and lists are in
                the DLC 1 tree already (docs/COSTUMES.md)
@@ -163,6 +170,8 @@ $clash1 = (Split-Path -Parent $fix1) + '/script_clash_check.json'
 $clash2 = (Split-Path -Parent $fix2) + '/script_clash_check.json'
 $obj1 = (Split-Path -Parent $fix1) + '/objdata_check.json'
 $obj2 = (Split-Path -Parent $fix2) + '/objdata_check.json'
+$seq1 = (Split-Path -Parent $fix1) + '/soundplex_sequence_check.json'
+$seq2 = (Split-Path -Parent $fix2) + '/soundplex_sequence_check.json'
 $gbOut = 'work/rebuild/generalbank_build'
 $repPristine = 'work/rebuild/b138_pristine/mods'
 $repFixes = 'work/rebuild/b138_fixes/mods'
@@ -179,7 +188,8 @@ if ($FixesOut) {
 $costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
 $costumeTools = @(
     @('tools\verify_ids.py', 'extend'),
-    @('tools\converter_faults_fix.py', 'proof')
+    @('tools\converter_faults_fix.py', 'proof'),
+    @('tools\soundplex_sequence_fix.py', 'proof')
 )
 foreach ($pk in 'pack1', 'pack2', 'pack20') {
     $o = "$costRoot/$pk"
@@ -191,6 +201,7 @@ foreach ($pk in 'pack1', 'pack2', 'pack20') {
     $costumeTools += , @('tools\converter_faults_fix.py', 'check', "$o/stage2b/mods", '--pack', $pk, '--report', "$o/converter_faults_check.json")
     $costumeTools += , @('tools\script_clash_fix.py', 'check', "$o/stage2b/mods", '--report', "$o/script_clash_check.json")
     $costumeTools += , @('tools\dlc_struct_fixes.py', 'check', "$o/stage2b/mods", '--pack', $pk, '--report', "$o/objdata_check.json")
+    $costumeTools += , @('tools\soundplex_sequence_fix.py', 'scan', "$o/stage2b/mods", '--pack', $pk, '--report', "$o/soundplex_sequence_check.json")
 }
 $steps = @{
     Index = @(
@@ -282,15 +293,19 @@ $steps = @{
     )
     Fixes = @(
         @('tools\converter_faults_fix.py', 'proof'),
+        @('tools\soundplex_sequence_fix.py', 'proof'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
         @('tools\converter_faults_fix.py', 'check', $fix1, '--report', $chk1),
         @('tools\script_clash_fix.py', 'check', $fix1, '--report', $clash1),
         @('tools\dlc_struct_fixes.py', 'check', $fix1, '--report', $obj1),
+        # DLC 1 = pack10 first, the same Xbox sources as dlc_fixes_build without --pack
+        @('tools\soundplex_sequence_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $seq1),
         @('tools\compare_b138.py', $fix1, $cmp1),
         @('tools\dlc_fixes_build.py', 'work/rebuild/dlc2_asm_stage2a/mods', $fix2, '--pack', 'pack11'),
         @('tools\converter_faults_fix.py', 'check', $fix2, '--pack', 'pack11', '--report', $chk2),
         @('tools\script_clash_fix.py', 'check', $fix2, '--report', $clash2),
-        @('tools\dlc_struct_fixes.py', 'check', $fix2, '--pack', 'pack11', '--report', $obj2)
+        @('tools\dlc_struct_fixes.py', 'check', $fix2, '--pack', 'pack11', '--report', $obj2),
+        @('tools\soundplex_sequence_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $seq2)
     )
     Costumes = $costumeTools
     Repair = @(

@@ -34,6 +34,10 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          proven byte classes (F3 / B24 crash tru+0x42e62), the player data breath-sound ids +0x94 / +0x98 as one u32
          (doppelganger_casual 0x68f40000); only words whose PC bytes are another byte order of the Xbox word, each
          written DRM proven (only the planned bytes differ, headers / relocations identical, re-check 0)
+  seqrepeat (ours, 2026-11-05, finding 49) after objid, also tools/dlc_struct_fixes.py: the word data +0xc of SoundPlex
+         Sequence nodes (s8 repeat + 3 bytes) raw = the Xbox bytes (tools/soundplex_sequence_fix.py; the converter
+         u32-swapped repeat 1 to 0 = endless, the DLC 2 doppelganger's groan); a word that is no byte order of the
+         Xbox word stops the build
   objevent, idword, animlist, fxnode, statevm, chartid (ours, 2026-11-03, finding 44) the converter fault families
          that the crash dumps of tests 50d-50j uncovered (tools/converter_faults_fix.py, rules proven on x_lara /
          pc_lara): object event list words and their sub-0x32 id word, anim event list words, effect node headers and
@@ -332,10 +336,13 @@ def _struct_fix(step):
 # layout always has the last word
 # objtex / objrec / objid (2026-11-04, agent N11): the object data DTP fixes of N7 / N8 after markup (no other step
 # touches the object data DTP); tools/Invoke-TruPipeline.ps1 checks them afterwards (dlc_struct_fixes.py check)
+# seqrepeat (2026-11-05, finding 49): SoundPlex Sequence repeat word +0xc raw, after objid (no other step writes the word);
+# Invoke-TruPipeline.ps1 proves the rule first (soundplex_sequence_fix.py proof) and gates every tree afterwards
+# (soundplex_sequence_fix.py scan + dlc_struct_fixes.py check)
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
-                'markup', 'objtex', 'objrec', 'objid', 'vmliteral')
+                'markup', 'objtex', 'objrec', 'objid', 'seqrepeat', 'vmliteral')
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
- fix_markup, fix_objtex, fix_objrec, fix_objid, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+ fix_markup, fix_objtex, fix_objrec, fix_objid, fix_seqrepeat, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 def _fault_fix(step):

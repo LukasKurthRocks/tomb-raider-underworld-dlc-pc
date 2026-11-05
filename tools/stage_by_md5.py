@@ -10,6 +10,10 @@ Usage (from the repository root):
         [--tsv REPORT.tsv]
   --log: lines '<name>.drm (Xbox <pack>, md5 <md5>): ...' as tools/objdata_fx_fix.py check prints them
   --tsv: name TAB md5 TAB source path of every staged file (default OUT_DIR/../staged_sources.tsv)
+  ../bin/pyt -t 900 tools/stage_by_md5.py OUT_DIR --paths LIST_OR_DIR[,LIST_OR_DIR ...] [--tsv REPORT.tsv]
+        (2026-11-05, F5 pipeline proof) stage the files of a path list (one .drm path per line, e.g. tools/
+        profile_last_source.py paths PROFILE), a folder or a single .drm, several joined with ',' (a later name wins,
+        as tools/soundplex_sequence_fix.file_list) - for test trees whose fix log names the input paths, not md5s
 Exit 1 when a wanted file is not found (the others are staged anyway).
 """
 import sys, os, re, hashlib, shutil
@@ -22,7 +26,34 @@ def md5(p):
     return h.hexdigest()
 
 
+def stage_paths(out, spec, tsv):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from soundplex_sequence_fix import file_list
+    paths = file_list(spec)
+    os.makedirs(out, exist_ok=True)
+    tsv = tsv or os.path.join(os.path.dirname(os.path.abspath(out)), 'staged_sources.tsv')
+    rows = []
+    for p in paths:
+        n = os.path.basename(p).lower(); q = os.path.join(out, n)
+        if os.path.exists(q): sys.exit('stage: %s exists already in %s - give a new, empty OUT_DIR' % (n, out))
+        shutil.copyfile(p, q)
+        h = md5(p)
+        assert md5(q) == h
+        rows.append((n, h, p.replace('\\', '/')))
+        print('staged %s md5 %s from %s' % (n, h, p))
+    with open(tsv, 'w', encoding='utf-8', newline='\n') as h:
+        h.write('name\tmd5\tsource\n')
+        for r in rows: h.write('%s\t%s\t%s\n' % r)
+    print('staged %d files to %s (sources %s)' % (len(rows), out, tsv))
+    return 0
+
+
 def main(argv):
+    tsv0 = None
+    if '--paths' in argv:
+        if '--tsv' in argv: k = argv.index('--tsv'); tsv0 = argv[k + 1]; del argv[k:k + 2]
+        k = argv.index('--paths')
+        return stage_paths(argv[0], argv[k + 1], tsv0)
     if not argv or '--search' not in argv: sys.exit(__doc__)
     out = argv[0]
     want = {}

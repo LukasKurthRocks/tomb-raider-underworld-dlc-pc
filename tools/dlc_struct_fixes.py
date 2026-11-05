@@ -23,6 +23,11 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              = one u32 where the converter wrote two u16 and the Xbox u32 names a section of the same file (N8
              2026-11-04: doppelganger_casual DTP 20212 0x68f40000 -> 26868, TruDataGuard 'invalid id' at tru+0x194cad);
              the generic u16-pair candidates of objdata_idword_fix scan are NOT repaired
+  seqrepeat  tools/soundplex_sequence_fix.py SoundPlex Sequence nodes (type 10): the word data +0xc (s8 repeat + 3 bytes)
+             raw = the Xbox bytes, as on every informative base pair (`soundplex_sequence_fix.py proof`; F5 2026-11-05:
+             the converter u32-swapped `01 00 00 00` to `00 00 00 01` = repeat 0 = endless, the doppelganger's
+             groan); only PC words that are a byte order of the Xbox word, sections paired by position (renumbered
+             base DTPs left alone); a word that is no byte order of it stops the step (SystemExit)
   twins     tools/dlc_structure_audit.py   base-twin truth for every same-size section of TWIN_FILES (the DLC 2
              player objects): only byte-order errors, re-authored words are left alone; runs first (before the
              layout steps, so a proven layout always has the last word - e.g. the u16 transition list word +0x4c550
@@ -31,14 +36,16 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              proven transition / record layouts (2026-11-02: 134 records such as {800,501}, {500,1} left u32-swapped
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
-eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, vmliteral (objtex / objrec / objid since
-2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
+eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, seqrepeat, vmliteral (objtex / objrec / objid
+since 2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
 dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
-steps, docs Befund-Pipeline-Integration-0411.md). Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of
-material 25521) are never steps.
-Check mode (objtex / objrec / objid only; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
-  ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid] [--pack pack11] [--report R.json]
+steps, docs Befund-Pipeline-Integration-0411.md; seqrepeat since 2026-11-05, WINDOWS_REBUILD finding 49: it touches
+only the word +0xc of SoundPlex Sequence nodes, no other step writes it; it reproduces the test tree dlc_test51p_moan).
+Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
+Check mode (objtex / objrec / objid / seqrepeat only; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
+  ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
+        TREE may be 'A,B' (overlay, the later folder wins - e.g. a pipeline tree with a fix tree on top);
         objtex also runs the pack-independent structural check of tools/objdata_texlist_check.py on every DRM (a DTP
         whose Xbox copy of the chosen pack has another layout is skipped by the comparison, 2026-11-05 dlc_dungeon)
 
@@ -58,7 +65,7 @@ import drm_write as DW, drm_reloc as R
 
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
-       'objtex', 'objrec', 'objid', 'vmliteral')
+       'objtex', 'objrec', 'objid', 'seqrepeat', 'vmliteral')
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (markup_level.py --objects; 23 = TU type)
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -372,6 +379,26 @@ class Steps:
                     're-check 0' % (rel, len(changes), ', '.join('DTP %d +0x%x %s -> %s' % (
                         PD.sections[k].id, o, a.hex(), b.hex()) for k, o, a, b in changes), len(got))
 
+    def s_seqrepeat(self, rel, xf, XD, cur):
+        """SoundPlex Sequence nodes: data +0xc raw (tools/soundplex_sequence_fix.fix_drm, F5 2026-11-05, finding 49).
+        Proof per DRM (in fix_drm): the decoded DRM differs only in the planned bytes, headers / relocations identical,
+        re-plan 0 words - a failed proof leaves the DRM unchanged (the check gate then fails); a PC word that is no
+        byte order of the Xbox word raises SystemExit (nothing is guessed)"""
+        import soundplex_sequence_fix as SQ
+        try:
+            new, changes, info = SQ.fix_drm(XD, cur)
+        except AssertionError as e:
+            return None, 'seqrepeat %s: proof failed (%s) - nothing changed' % (rel, e)
+        notes = []
+        if info['layout']: notes.append('layout differs (not paired): DTP %s' % info['layout'])
+        if info['unpaired']: notes.append('no PC section by position: DTP %s' % info['unpaired'])
+        if new is None:
+            return None, ('seqrepeat %s: 0 words; %s' % (rel, '; '.join(notes))) if notes else None
+        return new, 'seqrepeat %s: %d words (%s); proof: only the planned bytes differ, headers + relocations ' \
+                    'identical, re-check 0%s' % (rel, len(changes), ', '.join(
+                        'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes),
+                        ('; ' + '; '.join(notes)) if notes else '')
+
     def s_vmliteral(self, rel, xf, XD, cur):
         """VM literals after opcode 2 (tools/vm_literal_fix.py, test 48l: one u32 whatever it holds)"""
         # the check of vm_literal_fix.check, but only byte-order errors are set: a literal whose PC value is no byte
@@ -474,7 +501,7 @@ def run_twins(srcs, out, names, tmp):
     return files, log
 
 
-CHECK_STEPS = ('objtex', 'objrec', 'objid')   # steps with a check mode (no tool run, no shared corpus pass)
+CHECK_STEPS = ('objtex', 'objrec', 'objid', 'seqrepeat')   # steps with a check mode (no tool run, no shared corpus pass)
 
 
 def run_check(tree, steps, names=None, report=None):
@@ -487,7 +514,8 @@ def run_check(tree, steps, names=None, report=None):
     from convert_dlc import raw_dlc
     try:
         S = Steps(tmp, None)
-        for rel, path in sorted(DA.overlay([os.path.abspath(tree)], names).items()):
+        # TREE may be 'A,B' (an overlay, the later folder wins: e.g. a pipeline tree plus a fix tree on top)
+        for rel, path in sorted(DA.overlay([os.path.abspath(t) for t in tree.split(',')], names).items()):
             n += 1
             if 'objtex' in steps and rel.lower().endswith('.drm'):
                 # pack-independent structural check (agent F25 2026-11-05): the Xbox comparison above skips a DTP whose

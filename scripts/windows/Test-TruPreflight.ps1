@@ -18,6 +18,13 @@
         foreign tree newer than the harness trees makes the next run refuse (fail),
       * mods\generalbank.drm: the old direct-start test patch 41e (md5 b57d8c48...) or 41e + script 104 fix
         (3a2b9a1d...) = warn, the profile's generalbank = ok,
+      * with -RunProfile, data checks of what the profile ends up installing (2026-11-05; last tree source of every
+        .drm plus the game folder's mods\ for the files no tree brings - the folder as it stands, so trees still
+        installed by an earlier run count as base): tools\objdata_texlist_check.py --profile (texture group counts of
+        the object data DTPs, finding 47: a raw count wipes game memory) and tools\soundplex_sequence_fix.py scan
+        --profile (SoundPlex Sequence repeat word, finding 49: repeat 0 = endless sound); both read-only, run with
+        the project venv from the repository; a problem = fail, a tool that cannot evaluate the profile = warn
+        (-SkipDataChecks leaves them out),
       * with -RunProfile: the tree sources and their md5 lists (a mismatch makes the run abort), each profile ASI
         (source sha256 vs. profile; installed <game>\<name>.asi sha256), each INI (installed sha256, sample sha256,
         the profile's INI overrides vs. the current values), other ASIs in the game folder,
@@ -53,6 +60,9 @@
     Free RAM below this is a warning (default 4 GB; below 2 GB a fail).
 .PARAMETER SkipTreeHashes
     Do not hash the profile tree files (faster; the md5 lists are then not checked).
+.PARAMETER SkipDataChecks
+    Do not run the two data checks of the profile's DRMs (objdata_texlist_check / soundplex_sequence_fix scan,
+    together about 1-2 minutes).
 .PARAMETER Trace
     PowerShell line trace (Set-PSDebug -Trace 1).
 
@@ -71,6 +81,7 @@ param(
     [ValidateRange(1, 10000)][int]$MinFreeDiskGB = 10,
     [ValidateRange(1, 1024)][int]$MinFreeRamGB = 4,
     [switch]$SkipTreeHashes,
+    [switch]$SkipDataChecks,
     [switch]$Trace
 )
 
@@ -571,6 +582,44 @@ function Test-FreeDisk {
     catch { Add-Row 'System' "Free disk ($Label)" 'warn' "not readable: $($_.Exception.Message)" }
 }
 
+function Invoke-TruPyCheck {
+    # one read-only repository tool with the project venv (-u -I -X utf8, working folder = repository, no window);
+    # every output line goes to the log (DEBUG). Returns @{ Code; Lines; Why } - Code $null = could not run / did not
+    # finish (Why says why). A tool still running after the timeout is reported with its PID and NOT ended.
+    param([string[]]$ToolArgs, [int]$TimeoutSeconds = 1800)
+    $python = Join-Path $workspace 'bin\venv\Scripts\python.exe'
+    if (!(Test-Path -LiteralPath $python)) { return @{ Code = $null; Lines = @(); Why = "no project venv ($python)" } }
+    if (!(Test-Path -LiteralPath (Join-Path $repo $ToolArgs[0]))) { return @{ Code = $null; Lines = @(); Why = "tool missing: $($ToolArgs[0])" } }
+    $allArgs = @('-u', '-I', '-X', 'utf8') + $ToolArgs
+    $argLine = ($allArgs | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
+    Write-Log "python $argLine" -Level DEBUG
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $python
+    $psi.Arguments = $argLine
+    $psi.WorkingDirectory = $repo
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+    $t0 = Get-Date
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $outTask = $p.StandardOutput.ReadToEndAsync()
+    $errTask = $p.StandardError.ReadToEndAsync()
+    if (!$p.WaitForExit($TimeoutSeconds * 1000)) {
+        return @{ Code = $null; Lines = @(); Why = ('still running after {0} s (PID {1}, not ended - end it yourself if needed)' -f $TimeoutSeconds, $p.Id) }
+    }
+    $p.WaitForExit()
+    $lines = @(($outTask.Result -split "`r?`n") | Where-Object { $_ -ne '' })
+    $errLines = @(($errTask.Result -split "`r?`n") | Where-Object { $_ -ne '' })
+    foreach ($l in $lines) { Write-Log "  $l" -Level DEBUG }
+    foreach ($l in $errLines) { Write-Log "  stderr: $l" -Level DEBUG }
+    Write-Log ('{0}: exit {1}, {2} lines, {3:N0} s' -f (Split-Path -Leaf $ToolArgs[0]), $p.ExitCode, $lines.Count, ((Get-Date) - $t0).TotalSeconds) -Level VERBOSE
+    $why = if ($errLines.Count) { 'stderr: ' + $errLines[-1] } else { '' }
+    return @{ Code = $p.ExitCode; Lines = $lines; Why = $why }
+}
+
 if ($Trace) { Set-PSDebug -Trace 1 }
 try {
     Write-Log "Test-TruPreflight profile=$RunProfile session=$Session log=$logFile (read-only)" -Level VERBOSE
@@ -697,6 +746,52 @@ try {
         if ($missing.Count) { $detail += '; MISSING: ' + ($missing -join ', ') }
         if ($bad.Count) { $detail += '; md5 MISMATCH (the run aborts without -AllowMd5Mismatch): ' + ($bad -join '; ') }
         Add-Row 'Profile' 'Tree / file sources' $(if ($missing.Count -or $bad.Count) { 'fail' } else { 'ok' }) $detail
+
+        # ---- data checks of what the profile installs (read-only repository tools; findings 47 / 49) ----
+        if ($SkipDataChecks) { Add-Row 'Data' 'Profile DRM checks' 'info' '-SkipDataChecks: objdata_texlist_check / soundplex_sequence_fix scan not run' }
+        else {
+            $ppFull = (Resolve-Path -LiteralPath $pp).Path
+            $baseArgs = @()
+            $baseNote = 'no base (game folder not found): only the files of the profile trees'
+            if ($gameOk -and (Test-Path -LiteralPath (Join-Path $GamePath 'mods'))) {
+                $baseArgs = @('--base', (Join-Path $GamePath 'mods'))
+                $baseNote = 'other files from the game mods folder as it stands'
+            }
+            # texture group counts of the object data DTPs (finding 47: a raw count makes tru+0x12b360 AND 0x1fff
+            # over millions of dwords - crash tru+0x12b4a0 / the FMOD timer thread)
+            $r = Invoke-TruPyCheck -ToolArgs (@('tools\objdata_texlist_check.py', '--profile', $ppFull) + $baseArgs)
+            $sum = @($r.Lines | Where-Object { $_ -like 'PROFILE *' }) | Select-Object -First 1
+            if ($null -eq $r.Code -or $r.Code -gt 1 -or !$sum) {
+                Add-Row 'Data' 'Object data texture groups' 'warn' ('cannot evaluate the profile with objdata_texlist_check.py: {0}' -f $(if ($r.Why) { $r.Why } else { "exit $($r.Code), no PROFILE line" }))
+            }
+            else {
+                $sum = $sum -replace '^PROFILE [^:]+: ', ''
+                $hits = @($r.Lines | ForEach-Object { if ($_ -match '^(\S+\.drm) object (\d+) -> DTP (\d+)') { '{0} (object {1}, DTP {2})' -f $Matches[1], $Matches[2], $Matches[3] } } | Select-Object -Unique)
+                if ($r.Code -eq 1) {
+                    Add-Row 'Data' 'Object data texture groups' 'fail' ('{0} ({1}): {2} - raw group count (finding 47); a tree with the fixed copy (dlc_test51c_objfx or dlc_test51q_dungeon) must come after the tree that brings the file' -f $sum, $baseNote, ($hits -join ', '))
+                }
+                else { Add-Row 'Data' 'Object data texture groups' 'ok' ('{0} ({1})' -f $sum, $baseNote) }
+            }
+            # SoundPlex Sequence repeat word (finding 49: the converter u32-swapped repeat 1 -> 0 = endless sound)
+            $r = Invoke-TruPyCheck -ToolArgs (@('tools\soundplex_sequence_fix.py', 'scan', '--profile', $ppFull) + $baseArgs)
+            $sum = @($r.Lines | Where-Object { $_ -like 'PROFILE *: *Sequence nodes*' }) | Select-Object -First 1
+            if ($null -eq $r.Code -or $r.Code -gt 1 -or !$sum) {
+                Add-Row 'Data' 'SoundPlex Sequence repeat' 'warn' ('cannot evaluate the profile with soundplex_sequence_fix.py scan: {0}' -f $(if ($r.Why) { $r.Why } else { "exit $($r.Code), no PROFILE line" }))
+            }
+            else {
+                $sum = $sum -replace '^PROFILE [^:]+: ', 'scan '
+                $nRepeat = if ($sum -match 'repeat byte (\d+)\)') { [int]$Matches[1] } else { -1 }
+                $nUnexp = if ($sum -match 'unexpected (\d+)') { [int]$Matches[1] } else { -1 }
+                if ($r.Code -eq 0) { Add-Row 'Data' 'SoundPlex Sequence repeat' 'ok' ('{0} ({1})' -f $sum, $baseNote) }
+                elseif ($nRepeat -eq 0 -and $nUnexp -eq 0) {
+                    # only the bytes +0xd..+0xf differ (no known reader): wrong by the proven rule, no effect on the repeat
+                    Add-Row 'Data' 'SoundPlex Sequence repeat' 'warn' ('{0} ({1}) - repeat bytes right, only the 3 bytes after them differ (no known reader; the pipeline step seqrepeat sets them, the B138 repair tree not yet)' -f $sum, $baseNote)
+                }
+                else {
+                    Add-Row 'Data' 'SoundPlex Sequence repeat' 'fail' ('{0} ({1}) - a wrong repeat byte 0 plays the sequence for ever (finding 49); a tree with the fixed copies (dlc_test51p_moan for DLC 2) must come last' -f $sum, $baseNote)
+                }
+            }
+        }
 
         # ---- ASIs + INIs ----
         $profAsiNames = @()
