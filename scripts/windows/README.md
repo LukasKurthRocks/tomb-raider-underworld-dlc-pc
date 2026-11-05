@@ -13,6 +13,8 @@ Shared helpers live in `TruCommon.psm1` next to the scripts; every script import
 log writer (`Set-TruLogFile`, `Write-Log`), the workspace paths (`Get-TruWorkspacePath`), the Steam game folder search
 (`Find-TruGamePath`) and `Get-Md5`. Its functions take over the calling script's `-Verbose`/`-Debug` and
 `ErrorActionPreference`, so they behave like the former per-script copies. Keep the module in this folder.
+`TruDlcPackage.psm1` (raw Xbox LIVE packages: `Expand-TruDlcPackage`, `Test-TruDlcInput`, `Get-TruDlcPackageList`)
+builds on it, together with the known-packages list `TruDlcPackages.json`.
 
 ## Workspace
 
@@ -26,6 +28,7 @@ sub folder of it.
 | `bin\` | tools: Python venv (`bin\venv`), ffmpeg, Yura, Ghidra + JDK, Xenia Canary - `Get-Tools.ps1` |
 | `data\` | junctions to the game, the Xbox files and the repository - see [Pipeline](#pipeline) |
 | `input\xbox-dlc\` | your Xbox 360 DLC content (folder `534307EC\00000002\...`, see below) |
+| `input\xbox-dlc-live\` | optional: raw DLC package files as copied from the console; `Install-TruDlc.ps1` verifies and extracts them into `input\xbox-dlc\` (see [Raw Xbox LIVE packages](#raw-xbox-live-packages)) |
 | `input\xbox-game\` | your Xbox 360 game (`layer1/2.000/.001`, `default.xex`) + title update (`TitleUpdate.000`, `default.xexp`); only for the pipeline |
 | `input\ModLoader-v1.2.zip` | [TombRaiderModding/ModLoader](https://github.com/TombRaiderModding/ModLoader/releases) v1.2 |
 | `release\<build>\` | `install_dlc.py` + `trudlcport-kit-<build>.zip` from the original's [releases](https://github.com/andrearicci93/trudlcport/releases) |
@@ -37,13 +40,40 @@ Xbox 360 content folders (title id `534307EC`, content type `00000002`):
 |---|---|---|
 | `9CA70CF0EDA43654D158C2E37470D301DFA850E753` | `pack10.000`, `credits_DLC1.wmv` | DLC 1 *Beneath the Ashes* (required) |
 | `600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153` | `pack11.000`, `credits_DLC2.wmv` | DLC 2 *Lara's Shadow* (optional; menu images and music only) |
-| `E5AF...`, `9FDD...`, `AC00...` | `pack1.000`, `pack2.000`, `pack20.000` | costume packs - not supported yet, see [docs/COSTUMES.md](../../docs/COSTUMES.md) |
+| `E5AF...`, `9FDD...`, `AC00...` | `pack1.000`, `pack2.000`, `pack20.000` | costume packs (Wetsuit k / p, Classic a / h, Designer l / m) - pipeline step `Costumes` (converted and checked offline, not played yet), see [docs/COSTUMES.md](../../docs/COSTUMES.md) |
+
+### Raw Xbox LIVE packages
+
+On the console (hard drive or USB stick, copied with e.g. Horizon or Velocity) every DLC is **one file without
+extension** in `Content\<profile id or 0000000000000000>\534307EC\00000002\`, named like the folders above
+(42 characters: the content id = SHA-1 of the package header, plus 2 hex). Copy these files into
+`<workspace>\input\xbox-dlc-live\` (or pass them with `-Package`) and run `Install-TruDlc.ps1` as usual - or only
+`.\scripts\windows\Install-TruDlc.ps1 -PackageOnly -Verbose` to extract them. Per package
+(`TruDlcPackage.psm1`, `Expand-TruDlcPackage`):
+
+1. `tools\stfs_extract.py identify`: magic `LIVE`, title id `534307EC`, content type 2, header SHA-1 against the
+   header bytes and the file name (a renamed copy is fine; a name that contradicts the header is refused), not
+   truncated, file names and sizes against `TruDlcPackages.json`. Unknown or damaged packages are refused.
+2. Folder `input\xbox-dlc\<name>\` already there: identical to the list (size + MD5) -> skipped; different -> error
+   (never overwritten).
+3. Extract into `input\xbox-dlc\<name>.tmp\` (every data block and the whole hash tree checked), size + MD5 of every
+   file against the list, rename to `<name>\` - the same flat layout as a Xenia-extracted folder. The extraction
+   manifest goes to `logs\`.
+
+`-Check` only identifies and verifies the packages (nothing is extracted); `-WhatIf` shows what would happen.
+`Test-TruDlcInput` (same module, read-only) compares the folders in `input\xbox-dlc` with the list.
+
+`TruDlcPackages.json` holds names, roles, file sizes and hashes only (no game data). Regenerate it from extracted
+folders (roles and display names are kept):
+`..\bin\pyt -t 900 tools/stfs_extract.py catalog scripts/windows/TruDlcPackages.json ../input/xbox-dlc/<name> ... --base scripts/windows/TruDlcPackages.json`.
+Tested on 13 prototype DLC packages (file name = header SHA-1 in all 13, every extracted file = size + MD5 of the
+earlier extraction of 2026-11-02, damaged / truncated / renamed copies handled); not yet on a raw final package.
 
 ## Scripts
 
 | Script | Purpose |
 |---|---|
-| `Install-TruDlc.ps1` | install a release kit + ModLoader into the game folder: `-Check` (dry run, writes nothing), install, `-Restore`; finds the Steam game folder itself (`-GamePath` to override), `-Build` (default `B138`) |
+| `Install-TruDlc.ps1` | install a release kit + ModLoader into the game folder: `-Check` (dry run, writes nothing), install, `-Restore`; finds the Steam game folder itself (`-GamePath` to override), `-Build` (default `B138`); raw Xbox LIVE packages first (`-Package <file(s)>` or the files in `input\xbox-dlc-live\`; `-PackageOnly` stops after extracting, `-DlcPath`, `-PackageList`); `-WhatIf` changes nothing |
 | `Install-TruModFile.ps1` | replace one file in the game's `mods\` (`-Name`, `-Source`), keeping the old one as `backup\mods\<name>.<md5>`; `-Restore` puts it back |
 | `Install-TruTree.ps1` | lay a whole converted tree over `mods\` (e.g. the DLC 2 test tree): `-Check` dry run; install saves every replaced file and a manifest (added files, replaced files, created folders) in `backup\tree_<time>\`; `-Restore` undoes exactly that, newest install first - installs stack, one `-Restore` per install (tested on copies of `mods\`: install + restore 275/275 files, two stacked installs + two restores 461/461, folder lists identical). `local\` and `padshock\` are excluded by default (the installed string tables carry the DLC menu text fix) |
 | `Set-TruDisplay.ps1` | `-Windowed` (installs TRAWindowed's `d3d9.dll` in the game folder; in game F6 border, Shift+F6 centre) / `-Fullscreen` / `-Restore` (remove it again; a foreign `d3d9.dll` is never touched) and `-Language English\|French\|German\|Italian\|Spanish\|Dutch` (registry, exported to `backup\` first) |
@@ -56,10 +86,11 @@ Xbox 360 content folders (title id `534307EC`, content type `00000002`):
 | `Set-TruRockVein.ps1` | `-Install` / `-Remove` `TruRockVein.asi` + `.ini` (DLC 2 rock veins: markup conditions 607 / 608) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1` |
 | `Set-TruLink.ps1` | `-Install` / `-Remove` `TruLink.asi` + `.ini` (test tool: live read / write channel on 127.0.0.1:9265, `src\asi\TruLink\README.md`) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1` |
 | `Invoke-TruLink.ps1` | client for `TruLink.asi`: `-Command 'read32 cheat'`, `-Script file.txt` or `-Interactive`; prints the answers (`-PassThru` returns them) |
-| `Set-TruMenu.ps1` | `-Install` / `-Remove` `TruMenu.asi` + `.ini` (in-game debug menu, L3 + R3, Dear ImGui; `src\asi\TruMenu\README.md`) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1`. Build with `Build-TruAsi.ps1 -Name TruMenu` (compiles the ImGui sources from `src\asi\third_party\imgui` as well) |
+| `Set-TruMenu.ps1` | `-Install` / `-Remove` `TruMenu.asi` + `.ini` (in-game debug menu, L3 + R3, Dear ImGui; `src\asi\TruMenu\README.md`) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1`; also the regression lists, `TruMenu.media.txt` and (0.10) the radial menu file `TruMenu.radial.txt` (build folder, else `src\asi\TruMenu`; ours = first line `# TruMenu radial menu`). Build with `Build-TruAsi.ps1 -Name TruMenu` (compiles the ImGui sources from `src\asi\third_party\imgui` as well; copies `TruMenu.radial.txt` into the build folder) |
 | `Invoke-TruPipeline.ps1` | run the conversion pipeline one step at a time (`-Step`, `-FromTool` to resume), with progress and a summary |
 | `Test-TruUploadReady.ps1` | read-only check of our commits before an upload (paths, machine name, identity, e-mails, secrets, hardware, local patterns) |
 | `Invoke-TruTestRun.ps1` | one regression run of the game from a profile `tests\profiles\<name>.json`: installs exactly that state, starts the game (plain or under cdb), preloads the TruMenu TO TEST rows, waits for the end, collects logs / markers / test states into `<workspace>\runs\<time>_<profile>\` with `summary.md` + `summary.json`; dumps written during the run are copied into `<run>\dumps\` (`-NoDumpCopy`); `-Compare` (see [Regression runs](#regression-runs)) |
+| `Test-TruPreflight.ps1` | read-only check before a test evening (`-RunProfile`, `-Session`): game folder, open `backup\tree_*` installs, direct-start generalbank 41e, profile sources / ASI / INI state, cdb, disk, RAM, save folder, LocalDumps / Fullscreen (information); status table + `<workspace>\logs\Test-TruPreflight_<time>.log`, exit 1 on a fail row |
 | `Connect-TruDevChannel.ps1` | read-only client for the TCP server inside `tru.exe` on port 9264 - the FMOD Ex profiler (audio telemetry), not a developer channel |
 | `Measure-TruProcessMemory.ps1` | read-only samples of the memory of running Python processes, to size parallel pipeline runs |
 
@@ -104,9 +135,12 @@ code, the state of every TO TEST row); after a run it compares the new run with 
 ## Install (play DLC 1)
 
 1. Put the kit into `<workspace>\release\B138\` and ModLoader into `<workspace>\input\`, your Xbox DLC files into
-   `<workspace>\input\xbox-dlc\`. Python 3.9+ with `pip install bsdiff4`.
+   `<workspace>\input\xbox-dlc\` - extracted folders, or the raw package files from the console into
+   `<workspace>\input\xbox-dlc-live\` (see [Raw Xbox LIVE packages](#raw-xbox-live-packages)). Python 3.9+ with
+   `pip install bsdiff4`.
 2. Close the game. Dry run: `.\scripts\windows\Install-TruDlc.ps1 -Check -Verbose` - it must end with
-   *All inputs OK*.
+   *All inputs OK* (with raw packages that are not extracted yet it only verifies the packages; extract them first
+   with `-PackageOnly`, then repeat the dry run).
 3. Install: `.\scripts\windows\Install-TruDlc.ps1 -Verbose`. The original `binkw32.dll` and `tru.exe` are backed up
    first; `-Restore` returns to the original game.
 4. Start a new DLC game from the main menu (*Downloadable content*), lock the game to 60 fps.
@@ -154,9 +188,20 @@ part only; then the proven structure fixes of `tools/dlc_struct_fixes.py`, one s
 the DLC 2 player chart), `condlist` (the condition records every transition of that chart lists), `eventlist` (object
 event lists), `reclist` (model record list 36 -> 40 bytes), `fadeslots`
 (own fade pixel-shader libraries 2494.. of the TU-drawn DLC 2 player objects), `animfx` (anim event lists), `markup`
-(object markup records), `vmliteral` (VM literals); `uirecord`: the UI text element records of the new DLC scripts by Crystal's PC rules; last fix
+(object markup records), `vmliteral` (VM literals); then the converter fault families that crash dumps of tests
+50d-50j uncovered (2026-11-03, `tools/converter_faults_fix.py`, each rule proven on the base pair `lara.drm`):
+`objevent` (object event list words), `idword` (kind-1 sub-0x32 event payload = one u32 section id), `animlist` (anim
+event list words), `fxnode` (effect node headers and type-1 section ids), `statevm` (state-program VM code words),
+`chartid` (state-chart id values of types 3 / 5); the step `Fixes` first runs `converter_faults_fix.py proof` (every
+rule on the base pair) and after each tree `converter_faults_fix.py check` (exit code 1 on any wrong or unexpected word,
+report `<tree>\converter_faults_check.json`); `-FixesOut work\rebuild\<name>` writes `<name>\dlc1\mods` and
+`<name>\dlc2\mods` instead of the usual `asm_stage2b` / `dlc2_asm_stage2b` (check runs); `uirecord`: the UI text element records of the new DLC scripts by Crystal's PC rules; last fix
 `achievement`: the 11 script calls into the title update's achievement natives f16-f20, which the PC exe lacks, are
-dropped - on the Xbox they only queue an Xbox Live achievement) and
+dropped - on the Xbox they only queue an Xbox Live achievement), `Costumes` (2026-11-03: the three costume packs
+through the DLC 2 route, one chain per pack - `verify_ids.py extend` adds their ids to the id table first (existing
+entries never change), then media, assemble, audio, `tree_check`, stage 2b, `converter_faults_fix check` ->
+`work\rebuild\costumes\<pack>\...` or `-FixesOut DIR` -> `DIR\<pack>\...`; only the two `dlc_costume_<x>.drm` of each
+pack are new for the game, see [docs/COSTUMES.md](../../docs/COSTUMES.md)) and
 `Repair` (the tested repair tree for an installed B138: shader constant fix, grapple ring shaders, UI paths, texts and
 text element records of DLC 1, state charts of DLC 1, the DLC 1 structure fixes (step `struct`: costume anim event
 lists, pillar markup), the DLC 1 achievement call, cinematics in all five languages,

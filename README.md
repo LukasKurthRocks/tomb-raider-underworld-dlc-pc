@@ -91,7 +91,10 @@ flowchart LR
 **What is new here** (details on branch `windows`)
 
 - [scripts/windows/](scripts/windows/README.md) – PowerShell scripts: install the kit, swap single mod files, display
-  mode and language, tools, the pipeline step by step, a pre-upload check
+  mode and language, tools, the pipeline step by step, a pre-upload check. The installer also takes the raw DLC
+  package files as copied from the console (`Install-TruDlc.ps1 -Package`, or the files in `input\xbox-dlc-live\`):
+  checked against a list of the known packages, verified block by block and extracted
+  ([Raw Xbox LIVE packages](scripts/windows/README.md#raw-xbox-live-packages))
 - [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) – running the pipeline on Windows: missing glue scripts rebuilt,
   stage-by-stage comparison with B138, run log and findings
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) – overview of the Windows rebuild: data flow, steps, learned tables,

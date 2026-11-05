@@ -39,7 +39,7 @@ flowchart LR
 ```
 
 The trees live in `work/rebuild/<tree>/mods` (B138 layout: root, `streamgroups/`, `cinstream/`, `music/`, `audio/`,
-`image/`, `local/`, `padshock/`, `tr8/`). The 2b fixes are not a pipeline step yet (section 4).
+`image/`, `local/`, `padshock/`, `tr8/`). The 2b fixes are pipeline step `Fixes` (section 4).
 
 ## 2. Pipeline steps
 
@@ -116,17 +116,44 @@ not by exit code.
 
 ## 4. Stage 2b fixes and later stages
 
-`tools/dlc_fixes_build.py SRC_MODS OUT_MODS [--only fix,...]` copies a stage-2a tree and applies upstream's data
-fixes in order; report `<OUT>/../fixes_report.json`. It is run directly (`stage2a -> stage2b`,
-`asm_stage2a -> asm_stage2b`), not by `Invoke-TruPipeline.ps1`.
+`tools/dlc_fixes_build.py SRC_MODS OUT_MODS [--only fix,...] [--pack pack11]` copies a stage-2a tree and applies
+the data fixes in order; report `<OUT>/../fixes_report.json`. Pipeline step `Fixes` runs it for DLC 1
+(`asm_stage2a -> asm_stage2b`) and DLC 2 (`dlc2_asm_stage2a -> dlc2_asm_stage2b`, `--pack pack11`); `-FixesOut
+work/rebuild/<name>` writes `<name>/dlc1/mods` and `<name>/dlc2/mods` instead (check runs that keep the usual trees).
 
 | Fix | Upstream build | What | Finding |
 |---|---|---|---|
 | `cine` | B44/B45 | cutscene command lists and effect DTPs (`work/ws/cine/build_cine.py`) | F21 |
 | `float` | B46/B47 | float words of new DLC DTPs (`work/ws/cine/float_fix.py`, modes `s16`, `raw`; top folder only) | F22 |
 | `tag404` | B33 | raft/grapple ring records, +4 word raw in DTPs with id >= 20000 (rule read from B138) | F23 |
+| `cloth`, `uipath`, `uitext` | - | cloth iteration counts, UI timeline target paths, UI string ids (DLC 2 first, `uipath` / `uitext` also DLC 1) | F43 |
 | `postfix` | - | upstream's `tools/dlc1_postfix.py` steps 1-2 (streamgroup names, type-0 name strings) | F24 |
 | `analog` | fix18 | near-clone DTPs take the base PC bytes (`tools/analog_word_fix.py`) | F26 |
+| `statechart` | - | state charts, record tables and id lists of the new DLC objects from the base Xbox/PC pairs | F43 |
+| `twins` ... `vmliteral` | - | proven structure layouts (`tools/dlc_struct_fixes.py`: base twins, child ids, transition / activity / condition lists, object / anim event lists, model record lists, own fade libraries, markup, VM literals) | F43 |
+| `objevent`, `idword`, `animlist`, `fxnode`, `statevm`, `chartid` | - | converter fault families found by crash dumps (tests 50d-50j), `tools/converter_faults_fix.py` | F44 |
+| `uirecord`, `achievement` | - | UI text element records; calls into the title update's achievement natives dropped | F43 |
+
+**Converter fault steps (F44).** The generic DTP converter (`dlc_generic`) learned its byte-order classes from base
+pairs per (region, offset); in DLC-only DTPs some word classes come out wrong. Six families were found one crash dump
+at a time and each rule was proven on the base pair `lara.drm` (Xbox layer2 / PC bigfile):
+
+| Step | Words | Rule (proof on x_lara / pc_lara) | Crash it caused |
+|---|---|---|---|
+| `objevent` | object event list records (the DTP a type-11 object names at +4) | per key (kind, payload words, word index[, payload byte 0]) one byte class; 1 list, 494 words reproduced | 50j (thralls) |
+| `idword` | kind-1 records of sub 0x32, payload word 1 | one u32 section id (reader `tru+0x1486b2`; no such record in the base pair) | 50d / 50e (events 0x85 / 0x87) |
+| `animlist` | anim event list records (u32 0 head) | the object-list rules + the sub-0x32 word; 46 408 words reproduced, 0 wrong | 50h / 50i |
+| `fxnode` | effect node headers {type, ptr, self id, 0} and the type-1 id word | u32 each, the self id = the PC DTP id; 10 680 type-1 ids and 66 501 header words in 895 node DTPs | 50e / 50f |
+| `statevm` | state-program VM code words (opcodes and literals) | one u32 per word; 218 sections, 108 908 words, 0 differing | 50d / 50e (heap) |
+| `chartid` | state-chart activity entries of value types 3 / 5 | a section id, u32, the PC id of the aligned DTP (10 of 11) or the base value (1) | 50f / 50g |
+
+The tool pairs every PC section with its Xbox original by position (difflib alignment of (type, size), as
+`chart_idvalue_fix.id_map`), changes a word only when its rule gives a definite PC value and the PC word is a byte-order
+variant of it (raw / swapped halves) or a wrong record word, and stops the build on any word it cannot explain.
+Base-mapped sections (the PC id is not the Xbox id: a renumbered base DTP taken from the base game) are reported,
+never changed. `converter_faults_fix.py proof` re-proves all rules (step `Fixes`, first tool), `check DIR` re-checks a
+tree (after each `dlc_fixes_build`), `compare NEW REF [--before DIR] --changes fixes_report.json` compares a tree with a
+hand-built test tree word by word.
 
 Stage 3 (shader translation B72-B89, `work/ws/shader4/`, `contratti/`, `codefirst/`, `giro5/`, `giro6/`) and stage 4
 (layers up to B90_gold_L4, then the CHANGELOG changes up to B138) are open; the plan is in
@@ -240,4 +267,5 @@ builds and INI values, a checklist the owner ticks in `TruMenu`, automatic log c
 per run. The regression lists are `docs/Regression-Schattenlara.md` (DLC 2) and `docs/Regression-DLC1.md`. Crashes
 found this way led to converter checks for data the original converter mishandles (state-VM code words, section ids
 in event lists / effect nodes / state-chart parameters): `tools/statevm_check.py`, `eventlist_idword_fix.py`,
-`fxnode_id_fix.py`, `chart_idvalue_fix.py` - to become fixed pipeline steps.
+`fxnode_id_fix.py`, `chart_idvalue_fix.py`, `animlist_check.py`, `obj_eventlist_fix.py` - since 2026-11-03 fixed
+pipeline steps (`tools/converter_faults_fix.py`, section 4).

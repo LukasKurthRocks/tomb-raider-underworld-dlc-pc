@@ -224,6 +224,42 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `dlc2_ceremony_room_amb_02` 15.0, `dlc2_machine_room_amb_03` 15.2, `pdlc1_030_finale` 16.0 - so B138 changed
      these beyond re-encoding (perhaps its anti-click work: CHANGELOG "≈432 clicks/min, now ≈9 in the offline
      emulation"). Open: what B138 did there, and whether our version clicks in game (needs a listening test).
+   * **Note 2026-11-03 (DLC music "plays silence"): measured - not true for the built trees.** New read-only tool
+     `tools/music_audio_report.py` (PC `.mul` decoded with the game convention vs the decoded Xbox XMA1 source; `.mus`
+     version check of tru.exe 0x580EAC `cmp dword [mus + 8], 0x114`, else "The musicfile %s has an incorrect
+     version!"; `.mus` records vs `.mul` header; `.sam` vs the base PC `.sam`). Installed `mods\music`: 25 / 25 tracks
+     non-silent on every channel, rate / channels / total-sample rule equal to the Xbox source, `.mus` version 0x114,
+     record rate / total = `.mul`, `.sam` FSB4; worst-channel SNR min 20.7 / median 45.6 dB (the 6 DLC 1 `.mul` are
+     B138's encode, the 19 DLC 2 ours). The 32 base PC tracks show the same header words (`Mus!`, 0x2560, 0x114).
+     The silent path was only the command line of `tools/music_convert.py`: it stopped after the silent stub (stage 1
+     does the same by design, stage 2a `dlc_audio_build.py` fills it). Its main now also runs `mul_audio_nch.swap`
+     (`--silent` keeps the stub); output = `work/rebuild/asm_stage2a/mods/music` byte for byte (75 / 75 files),
+     SNR min 25.1 / median 46.0 dB. No pipeline change needed.
+   * **Note 2026-11-04 (game-model IMA encoder, crackling "s").** tru.exe does not play `.mul` streams through
+     FMOD but with its own MMX IMA decoder (0x5957a0, tables built once at 0x595670): the step is capped at 8191
+     (indices 75..88), diff = `pmulhw(+-2048*(2n+1), 4*step)` = floor(+-(2n+1)*step/8), four samples per MMX step
+     with saturating prefix sums. Our old encoder and our check decoder (`compare_audio.ima_decode`) used the
+     standard steps up to 32767, so loud high-frequency parts (sibilants) drift inside a block and snap back at the
+     next header - the crackle the owner heard in game only. Fix: `mul_audio_nch.encode_game` is now the default
+     encoder of `swap` (and so of `dlc_audio_build`, `mul_lang_build`, `music_convert`, `proto_audio_convert`): beam
+     search per block on the exact 4-lane decoder (all 89 start indices, 128 paths for samples 1..7, then 16), per
+     block the better of that and the old encode under the game decoder; its internal decoder model equals
+     `mul_audio_nch.decode_game` sample for sample (`tools/ima_game_encoder_test.py`: 7 channels of 5 DLC files plus
+     5 saturating synthetic signals, 0 mismatches). Old encoder: `ima_encode_blind`, `TRUDLC_IMA_ENCODER=blind`.
+     `compare_audio.ima_decode(..., True)` now uses the game model (FSB convention for wave sections unchanged);
+     the old model is `ima_decode_old`, `TRUDLC_IMA_DECODER=old` restores it. **Every `.mul` SNR in this document
+     before this note was measured with the old model** (finding 18 above, test 29 below, the voice-line decision
+     "B138 14-33 dB, ours 32-36 dB", DLC2.md). Under the game decoder: German DLC 1 intro 11.1 / 9.6 -> 21.1 / 18.0 dB,
+     doppelganger line `i_dg_pdlc2_mach_02` 5.6 -> 16.3 / 16.1 dB, German Lara line 17.3 -> 30.8 dB; B138's English
+     intro / finale, `light_flash_huge_a_07` and the 6 DLC 1 music tracks were already encoded for this decoder
+     (B138: 31.9 dB intro) and stay. The 2026-10-30 voice-line decision was an artefact of the old model: B138's
+     English Lara / Zip lines measure 33.3-36.6 dB under the game decoder, our installed ones 23.1-31.8 dB; the new
+     encode beats both (34.0-37.3 dB). Encoding is slower: 1.6 s per channel-second alone, 2.55 s with 12 parallel
+     workers (stage 2a was 2.5 min; all 140 non-B138 installed streams, 16 065 channel-seconds, took 58 min on 12
+     workers). Re-encode of every installed non-B138 `.mul`:
+     `tools/mul_reencode_tree.py` -> test tree `work/rebuild/dlc_test51f_audio` (only files that measure better),
+     cut content of test 50k in `dlc_test51f_audio_cut`; numbers in the workspace `docs/Befund-S-Laute.md`
+     (section "Fix-Bau N10").
 19. **Text encodings on Windows (pipes, code pages).**
    * Python started with `-I` ignores `PYTHONIOENCODING`; writing to a pipe it then uses cp1252, and any character
      outside cp1252 (e.g. `→`, game text) raises `UnicodeEncodeError` - reproduced 2026-10-27 with a print of `→`.
@@ -2160,6 +2196,244 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      convert == PC; flags: 152 param count differs from the surrogate, 59 fewer textures, 11 tuple unseen);
      `pc_shader_sections.py`; `terrain_validate.py`: 335 terrain pairs, all valid, 333 reloc-exact, 83 exact,
      245 semantic. Next: convert with `assemble_dlc` (material 'dlc') and compare materials/meshes with B138.
+44. **The converter fault families of the crash dumps (tests 50d-50j) are fixed pipeline steps (2026-11-03).**
+   * Six word classes the generic converter gets wrong in DLC data were found one crash dump at a time and applied to
+     the test trees `dlc_test50e_vm` ... `dlc_test50k_cut` by hand (workspace `Befund-Felsrinne.md`, tests 50e-50j).
+     New `tools/converter_faults_fix.py` applies them over a whole tree as steps `objevent`, `idword`, `animlist`,
+     `fxnode`, `statevm`, `chartid` of `tools/dlc_fixes_build.py` (after `vmliteral`); table and rules:
+     [ARCHITECTURE.md](ARCHITECTURE.md) section 4. Modes `fix`, `check` (exit 1 on any wrong / unexpected word),
+     `proof`, `compare`. Step `Fixes` of `Invoke-TruPipeline.ps1` now runs: `proof`, DLC 1 build, `check`,
+     `compare_b138`, DLC 2 build, `check`; `-FixesOut work/rebuild/<name>` for check runs.
+   * **Base proof** (`converter_faults_fix.py proof`, lara.drm Xbox layer2 md5 `831ec8a2...` / PC md5 `b15bfe4b...`):
+     `statevm` 218 sections, 108 908 code words, 0 differing; `fxnode` 895 node DTPs, 10 680 type-1 ids + 66 501
+     header words, 0 wrong (the one pair with another node layout is the chart 12647 / 850 itself); `chartid` 11
+     entries, 10 by the DTP map, 0 wrong; `animlist` 46 408 words ok, 0 wrong (9 303 without a rule); `objevent` 1 list,
+     494 words, 0 wrong; `idword` 0 sub-0x32 records (rule from the reader `tru+0x1486b2`).
+   * **Pairing.** Sections are paired with their Xbox original by position (difflib alignment of (type, size); DLC 2
+     6 070 of 6 071 PC DTPs paired). Pairing by id - as the single tools and the existing step `animfx` did - meets
+     id coincidences in base-derived DRMs: a PC DTP whose aligned Xbox partner has another id is a renumbered base DTP.
+     The fault steps report such pairs and leave them alone, except anim lists whose record framing (every header word
+     and the terminator) is the conversion of the aligned Xbox list - those are conversions of that list and get the
+     rule (`dlc_costume_*` / `lara_doppelganger` DTP 1581: 19 kind-0 payload words as u16 pairs, the 50h crash class;
+     B138 has the rule's bytes).
+   * **Bug found in the existing step `animfx`** (2026-11-01): `animfx_list_fix.check_lists` pairs lists by id, so in
+     the six DLC 1 costume files and `lara_doppelganger` it rewrote four renumbered base lists (DTPs 1183, 1444, 1799,
+     2012: 21 + 7 + 10 + 3 = 41 words: record headers / frames) from unrelated Xbox lists of the same id. The 10-30
+     output and B138 have the old bytes. `dlc_struct_fixes.s_animfx` now skips lists whose position partner has another
+     id. The trees built since 11-01 (`dlc2_asm_stage2b_50`, test trees from it) carry the damaged lists in
+     `lara_doppelganger.drm`.
+   * **New words beyond the test trees: effect node headers.** `fxnode_id_fix.nodes` finds a node on the PC side only
+     when its self id is already right, so the single tool never saw nodes whose self id the converter left raw:
+     `viking_thrall_dlc2_` / `viking_thrall_tutorial_dlc2_` DTP 24445 (16 nodes, self id `00005f7d` raw each) and two
+     nodes of the doppelganger chart 20212 (+0x20ef0 swapped halves, +0x20f70 raw) - 34 words, now set from the Xbox
+     node list (the base proof covers the header words). Their type-1 id words were right. Not in `dlc_test50k_cut`.
+   * Also fixed: `fxnode_id_fix.check_pair` looked up `xs[(7, id)]` in a dict keyed by id, so its anim-list sub-0x32
+     check never ran (the 50f statement "none outside object 857's list" came from that dead branch; `animlist` covers
+     these words).
+   * **Pipeline run** (`-Step Fixes -FixesOut work/rebuild/pipeline_check_0311`, 2026-11-03 01:37-02:56, exit 0,
+     4 749 s; DLC 1 part rerun 06:18-06:41 with the final code, see below). DLC 2 (`dlc2_asm_stage2a` -> `dlc2/mods`, 166
+     DRMs, 0 without an Xbox original, 0 unexpected): `objevent` 69 lists / 3 166 words, 0 set; `idword` 6 records, 6
+     set (doppelganger_casual 2, the four thralls 1 each); `animlist` 2 598 lists, 102 097 words ok, 19 set
+     (lara_doppelganger 1581); `fxnode` 22 175 type-1 ids, 16 set (doppelganger 12, goo machine x 4) + 34 header words;
+     `statevm` 458 sections / 192 246 words, 5 set; `chartid` 78 charts / 14 entries, 14 set. `check` afterwards: 0
+     wrong, 0 unexpected. `objevent` / `animlist` set (almost) nothing in DLC 2 because the structure steps `eventlist`
+     / `animfx` already write the same bytes for every list the base rules cover; the 717 + 39 words of tests 50i / 50j
+     were in the older installed files.
+   * **Reproducibility** (`compare dlc2/mods dlc2_asm_stage2b_50/mods --changes dlc2/fixes_report.json`): 156 of 166
+     DRMs identical; the 10 others differ in 135 words = 94 fault-step words + the 41 `animfx` words above
+     (lara_doppelganger). Nothing else changed.
+   * **Against the hand-built test tree** (`compare dlc2/mods dlc_test50k_cut/mods --before dlc2_asm_stage2b_50/mods
+     --classify`; 47 DRMs, 45 in the DLC 2 tree): every word the test trees fixed by hand comes out equal (41: idword 6,
+     fxnode 16, statevm 5, chartid 14); 34 new differences = the node header words above; 1 021 words differ before and
+     after the fault steps (not caused by them). With the 10-30 output as `--before`, 1 028 of those are words where
+     the 10-30 pipeline equals 50k: the test files were built from installed files of that time, the pipeline gained
+     the structure steps since (regions: state chart 259, anim list 105, object event list 8, other 622 - `twins`,
+     `statechart`, `condlist`, `animfx`, `eventlist`); 23 words differ from both pipeline states = hand work of the
+     test trees only (17 anim-list words of 4 effect files - `dlc_fx_cine_thrall_death`, `dlc_fx_goo_dun_ist`,
+     `_tres_ist`, `_tres_line_ist`: second u16 of kind-1 records, e.g. `03000500` in 50k vs `03000000`, words without a
+     base rule, origin in the installed files not traced; 3 chart words; 2 material words and 1 shader word of
+     48i_tex / 50a-50h); plus the TU shader translations (13 materials of another size, 17 more
+     sections in doppelganger_casual: 3 817 vs 3 800). `dlc2_uo_jump_target.drm` (prototype, test only) and
+     `fx_waterwheel_fsfx.drm` (DLC 1 tree) are not in the DLC 2 tree.
+   * DLC 1 (`asm_stage2a` -> `dlc1/mods`, 134 DRMs, rerun 06:18-06:41 with the final code, exit 0; `check` 0 wrong,
+     0 unexpected): `animlist` 115 words set (DTP 1581 of the six `dlc_costume_*` 19 each, `fx_waterwheel_fsfx` 1),
+     every other step 0 (`statevm` 1 313 DTPs / 654 203 words, `fxnode` 65 532 type-1 ids, `chartid` 45 charts,
+     `objevent` 58 lists). `animfx` skipped 4 id-coincident lists in each costume file. Against B138
+     (`compare dlc1/mods b138_pristine/mods --before asm_stage2b/mods`): the 114 costume words = B138, DTPs 1183 /
+     1444 / 1799 / 2012 = B138 again; the waterwheel word (float 1.0 as one u32) differs from B138 (B138: swapped
+     halves) and equals `dlc_test50k_cut` - the whole file is identical to the 50k one. DTP 1581 +0xa6c (no rule)
+     still differs from B138 (`00000002` vs `02000000`), before and after.
+   * Costume packs: the steps need the Xbox original of every DRM (`convert_dlc.raw_dlc`); a DRM without one stops the
+     build ("NO XBOX ORIGINAL"). `convert_dlc.PACKS` has pack1 / pack2 but not pack20.
+
+45. **DLC 2 re-authored the thrall base script under a main-game id; the PC generalbank keeps the main-game one
+    resident - the DLC 2 thralls ran on the wrong base layout (unload crash tru+0x1976a3, 2026-11-04).**
+   * Xbox script 8453 is 3300 bytes in the base game and in DLC 1 (pack10: instance 16 bytes = playersensor +4,
+     playersensor +8, health +12; vtable 69) but 152 bytes in all 16 DLC 2 DRMs that carry it (pack11: instance 8
+     bytes = health +4; no functions; vtable 64). The DLC 2 thrall classes 24347 (viking), 22813 (viking tutorial),
+     24545 (yeti), 24891 (armoured yeti) derive from it and put their members after 8 bytes (+8 int, +12 health,
+     +16 messagechannel). `DlcIds` maps ids, not contents, so every 8453 became PC 12433.
+   * The Xbox generalbank (disc 166 scripts, title update 168) holds no thrall script; the PC patch `generalbank.drm`
+     (398 scripts) holds 12433 (main-game version), 12435 (`enemythrallbase`), 5816, 14578, 16595. The engine keeps the
+     first loaded section of an id, so on the PC the DLC copy of 12433 is never used (live dump: the base type of 24347
+     in memory has instance size 0x10, 3 members, vtable 0x45).
+   * Unload: `tru+0x57b240` walks the unique data of the class chain (`cdc::ScriptUniqueDataCursor`, advance
+     `tru+0x579670`: most derived class first, up through root +0x18, each instance offset once) and releases kind-0xa
+     members through the native type handler (vtable +0x1c). 24347 claims +8 / +12 / +16; the resident 12433 adds +4
+     as a **playersensor** (handler +0x1c = `tru+0x3ace30` -> `tru+0x4a3420`, `u16 [ptr+4] -= 1`), but the DLC layout
+     keeps the instance pointer there (health +4) - the release decrements the instance's category-list prev link
+     (writer `tru+0xa342c`, caught live with debugger session 2 in run `paket01_yggdrasil`), the next unlink crashes.
+     Main-game thralls (14578 / 16595, members from +16) do not overlap.
+   * Fix: `tools/script_base_clash_fix.py` (`proof`, `free`, `check [--out]`) gives the DLC 2 copy (only a 12433
+     section with the 8-byte / 1-member layout) the free PC id **26884** (= max of the DLC id table 26883 + 1, unused
+     in the PC index and every tree) and rewrites the type-8 id references to it (self +0x14, base +0x18 and +0x5c of
+     24347 / 24545): 3 words per thrall DRM, 5 per unit DRM, nothing else changes (word-level verify). generalbank /
+     DLC 1 copies are left alone. tru.exe holds no dword 12433; 12433 is a pure script class (no natives).
+     `tools/script_resident_clash.py` lists DLC scripts whose PC id is resident with another layout: in the 16
+     DRMs 21 groups before (16 x 12433, 5 x 3581), 5 after; whole DLC 2 tree `dlc2_asm_stage2b_50`: 16 x 12433, 7 x
+     3581; DLC 1 tree: 13 x script 72 (vtable 33 vs 34), no 12433 (3581: vtable 31 vs 32 - the PC version appends one entry,
+     same instance layout; not this class of fault). Since 2026-11-04 a pipeline step: `scriptclash` (finding 46);
+     a converter rule would have to map ids by content (DLC 1 keeps 12433 for the same Xbox id).
+   * Test tree `work/rebuild/dlc_test51a_thrall` (16 DRMs: the 4 thralls + 12 units that carry 24347 / 24545; sources
+     = the files installed by profile `paket01_yggdrasil`), plus the `animfx` step on top (thralls: 11 words / 8 lists
+     viking, 40 / 18 yeti; re-scan 0 wrong words, 0 sound / effect branch changes); `tree_check` 16 / 16 read back,
+     0 errors, local id references unchanged (114 333). Profile `tests/profiles/paket13_thrall51a.json`. Live test open.
+   * Helpers added: `script_func_list.sections` reads `pc:` / `xbox:` / `xdisc:` / `xtu:` / `dlc:` sources (also for
+     `script_members_list.py`, `script_dis.py`); `tools/script_members_scan.py`, `tools/script_root_ids.py`,
+     `tools/section_id_index.py`.
+
+46. **Script classes against resident base layouts: systematic scan, and the thrall fix as pipeline step
+    `scriptclash` (2026-11-04).**
+   * Question: which other DLC script classes run on the PC against a base class (or a copy of themselves) whose
+     layout differs from the one they were compiled against? `tools/script_layout_clash.py` (new, read-only) pairs
+     every converted DRM with its Xbox original (section position) and follows each DLC class's base chain on both
+     sides - PC: resident generalbank first (the first loaded copy wins), then the DRM's own copy; Xbox: the DRM's own
+     copy, then the Xbox generalbank - and reports every level whose PC layout differs (instance size, member offsets
+     / kinds, vtable size), with a verdict: `OVERLAP` (own members below the PC base size), `relaid` (the converter
+     already laid the class out on the PC base: PC size - Xbox size = the base's difference), `appended`, `MOVED`;
+     vtable `short+N` / `SHIFT+N` / `fixed+N`. It also maps every external relocation of a DRM into a dropped copy of
+     a resident script to its element (function / prototype / member / vtable entry) and checks that the resident
+     section holds the same element there. Reference: the generalbank of profile `paket13_thrall51a`
+     (`test50l_look_work/autostart_gb`, 400 scripts); trees `dlc2_asm_stage2b_50` (132 DRMs with scripts),
+     `b138_pristine` + `b138_fixes` (DLC 1).
+   * Result (reports `work/rebuild/test51b_work/layout_clash_{dlc2,dlc1,51a}.txt|json`):
+
+     | Script / ancestor | Where | PC vs compiled layout | DLC classes affected | Verdict |
+     |---|---|---|---|---|
+     | 12433 (thrall base) | DLC 2, 16 DRMs | 16 vs 8 bytes, 3 vs 1 members, vt 69 vs 64 | 86, all `OVERLAP` | dangerous - fixed (26884) |
+     | 3581 (UI widget, base 93) | DLC 2, 7 DRMs | vt 32 vs 31 only, members equal | 0 derived, 0 relocations into it | harmless |
+     | 72 (base 93) | DLC 1, 13 DRMs (DLC 2 carries the PC version) | vt 34 vs 33 only | 0 derived, 0 relocations | harmless |
+     | 213 `larabase`, 66 `achievement` (natives) | both | 70 vs 74 / 16 vs 21 functions (title update) | relocations: 633 / 60 same element; DLC 1 pristine: the treasure-room call of f16 | harmless / handled by fix `achievement` |
+     | 3485, 3523, 3586 (+ the base-game files of the B138 kit) | both | same structure, 1-36 words differ | 52 / 319 / 821 relocations, same offsets | harmless |
+     | 93 `uiscreen` (native) | DLC 2: 20 level classes (+19 in the merged `g_pda`, not installed); DLC 1: 10 | vt 32 vs 31: the PC appends slot 31 = f111 (1 code word, empty) | own slots start at 31 on Xbox - DLC 2: 19 `SHIFT+1` (10 with 1 own slot, 9 with 3) + 1 `short+1`; DLC 1: 9 + 1 | risk, not proven: matters only if the exe dispatches slot 31; no script calls prototype 111, the 74 PC references to f111 are inherited vtable entries; DLC 1 has the same pattern and plays - not changed |
+     | 3671 / 12424, 4751 / 12945 (DLC 2); + 3924 / 7951 / 11964 (DLC 1) | own copies (PC version) | +12 bytes on PC | 44 / 45 class levels | `relaid` (the converter re-laid the DLC classes, e.g. 20906 108 -> 120 bytes) - harmless |
+     | 3674 (base of 3671), `--pcindex` | 45 base-game unit / treasure DRMs, not resident | DLC copy 2 188 vs PC 2 252 bytes, same layout | - | only when a base-game unit is loaded at the same time; same in DLC 1 |
+
+   * So 12433 is the only instance-layout clash. `tools/script_ref_find.py` (new) lists external relocations into a
+     script at given offsets (used for 93 f111 / prototype 111). Fixing the 93 slot would mean, per DLC class above:
+     insert 93's VTE (`s93+0xcc8`) at slot 31, vtableSize + 1, own prototypes with vtIndex >= 31 + 1 (the
+     `script_vtable_insert.py` method with 93 as the slot source) - not done (DLC 1 identical and played).
+   * **Pipeline step `scriptclash`** (`tools/script_clash_fix.py`, last fix of `tools/dlc_fixes_build.py`): rule, no
+     list - a type-8 section is renumbered when its id is resident in `pc:generalbank.drm` (PC patch version), neither
+     copy is native, its instance layout (size, align, member offsets / kinds) differs from the resident one, and a DLC
+     class of the tree derives from it. Groups = (old id, DLC instance layout); ids come from
+     `docs/data/script_clash_ids.json` (stable across rebuilds: `12433:8/4:4.10` -> 26884); a new group gets
+     max(PC index, DLC id table, file, tree) + 1 and is appended; every run checks that the id is free (PC index, DLC
+     id table) and verifies each rewritten DRM word by word (only the old id words changed, no reference left).
+     vtable-size-only differences (3581, 72) are reported and left alone. `script_clash_fix.py check TREE` (exit 1 on
+     a clash left) runs in `Invoke-TruPipeline.ps1` after Fixes for both trees and per costume pack.
+   * Proof: (1) `apply` on the 16 source DRMs of test tree 51a = N1's F1 output, 16 / 16 byte-identical;
+     (2) `dlc_fixes_build --only animfx,scriptclash --pack pack11` on the same sources = **`dlc_test51a_thrall/mods`,
+     16 / 16 byte-identical**; (3) `--only scriptclash` on the whole `dlc2_asm_stage2b_50`: 16 DRMs, 72 id words,
+     `check` ok, 11 / 16 equal to 51a - the other 5 already differ in their sources (51a took them from
+     `dlc_test50l_merged`, the thralls also got F2); `check` on the unfixed tree: exit 1; a second run over 51a writes
+     0 files; DLC 1 (`asm_stage2b`, `b138_fixes`) and the costume packs: nothing to change. (4) Full
+     `Invoke-TruPipeline.ps1 -Step Fixes -FixesOut work/rebuild/pipeline_check_0411` (5 050 s, every tool exit 0;
+     log `logs/Invoke-TruPipeline_Fixes_20261103_232756.log`): DLC 1 0 files (72: vtable only), DLC 2 16 files /
+     72 id words -> 26884, both `script_clash_fix check` ok; again 11 / 16 equal to 51a, the same 5 differ for the
+     source reason above.
+   * Open: the id table (`dlc_generic.DlcIds.extend`, e.g. new costume ids) does not know the reserved ids; should it
+     ever hand out 26884, the step stops with "id is taken" instead of writing a collision. A live test of 51a is
+     still the proof of the cause.
+
+47. **Object data DTPs: raw texture group counts wipe game memory, u32-swapped particle record bytes spawn
+    objects with a wrong animation (F16 / F3 / B24, 2026-11-04; number provisional).**
+   * The object data DTP `D` is the DTP an object section (type 11) names at +8. On load `tru+0x12b360` (called
+     from the object post-load handler `tru+0x14e200`) ANDs every texture id with 0x1fff, among them the groups
+     `u16 [D+0x64]` x `{u32 n, u32 id[n]}` at `[D+0x68]`. The converter left a group count raw in
+     `dlc_fx_goo_machine_column_core` (DTP 26321 +0xd4, Xbox 3 -> PC 0x03000000) and `dlc_fx_cine_thrall_death`
+     (DTP 20369 +0xdc, 4 -> 0x04000000): loading the machine room ANDs 0x1fff over ~50 M dwords behind the object and
+     destroys the FMOD mixer object (crash in the WINMM timer thread). Base pairs (`objdata_fx_fix.py proof`, 416
+     objects): 1 564 / 1 564 group counts are the same u32 on both platforms; the ids are renumbered on the PC
+     (7 366 / 7 368 differ), so only the counts are set.
+   * The 0x17c-byte particle records (`u16 [D+0x0c]` x 0x17c at `[D+0x10]`) are read field by field by the emitter
+     set-up (`tru+0x1442b9` ff., `tru+0x1453a5`: +0x148 = {u8 anim, u8, u16 spawn bits}). 66 record offsets have one
+     byte class on all 471 paired base objects (`objdata_rec_classes.py calibrate`, recomputed and equal in
+     `objdata_fx_fix.py proof`; e.g. +0x004 / +0x070 / +0x0b0 raw, +0x044 / +0x084 s16 pairs, +0x148 / +0x15c u8u8u16).
+     The converter swapped 5 383 such words as u32 / s16 in 20 DLC DRMs, mostly in the FIRST copy of the DTP (the one
+     the engine loads): `dlc2_uo_goo_drips_spawned` 24414 record 2 +0x148 `ffff0041` -> `4100ffff` = animation 65 on
+     a 5-animation object, spawn mode 7 -> B24 crash `tru+0x42e62`; `doppelganger_casual` 20134 2 593 words,
+     `viking_thrall_dlc2_` 956, `yeti_thrall_dlc2_` 916, `dlc2_uo_machine_column` 494.
+   * Fix: `tools/objdata_fx_fix.py` (`proof`, `check [--out-dir]`, steps `texcount` and `rec`) sets only words whose
+     PC bytes are another byte order of the Xbox word (0 other words were found), never a relocated slot, in every
+     copy of the DTP (k-th Xbox copy with the k-th PC copy). Per written DRM it proves: the decoded DRM differs from
+     the input only in the planned bytes, section headers and all relocation blobs identical, re-check 0. Test trees
+     `work/rebuild/dlc_test51c_objfx` (22 DRMs: inputs = the files the packages install last, the thralls / treadmill
+     spawner from `dlc_test51a_thrall`; install AFTER `dlc_test51a_thrall`) and `dlc_test51c_objfx_50o` (the 9 files
+     `paket04_shader` takes from `dlc_test50n_merged` / `dlc_test50o_shaders`; install after `dlc_test51c_objfx`).
+     Re-scans on both trees: `objdata_texlist_check` 0, `objdata_rec148_scan` 0, `objdata_rec_classes scan` 0;
+     `tree_check` all read back; doppelganger's earlier fixes unchanged (`chart_act_u8_fix`, `state_actlist_fix
+     check`, `animfx_list_fix check`). Helper `tools/profile_last_source.py` replays a profile's tree order.
+   * Pipeline place: both steps are converter faults of the type-7 tables (a count / byte field inside a variable
+     layout), so they belong to the struct-fix stage after `statechart`: `tools/dlc_struct_fixes.py --steps
+     objtex,objrec` (added, after `markup`; output md5-identical to the test tree on 4 checked DRMs). Since finding
+     48 (same night) they are in `dlc_fixes_build.STRUCT_STEPS` with a check gate in `Invoke-TruPipeline.ps1`; a
+     converter rule would have to type the D+0x68 groups and the 0x17c record like the base layout. Check gate for
+     every tree: `dlc_struct_fixes.py check <mods>` (or `objdata_texlist_check.py` / `objdata_rec_classes.py scan`)
+     must report 0.
+
+48. **The night's stand-alone fixes are pipeline steps; the breath-sound ids must be translated, not only
+    byte-swapped (2026-11-04, agent N11; workspace docs Befund-Pipeline-Integration-0411.md).**
+   * Stage 2b (`dlc_fixes_build.STRUCT_STEPS`, DLC 1, DLC 2 and every costume pack): `... markup, objtex, objrec,
+     objid, vmliteral`. `objtex` / `objrec` = finding 47. `objid` (new, `tools/dlc_struct_fixes.py` on
+     `tools/objdata_idword_fix.fix_drm`; the name `idword` is the converter-fault family of finding 44): the player
+     data block (DTP +0xc8 pointer, air maximum 4000 at +0xf8) holds two breath-sound section ids at +0x94 / +0x98
+     that the engine reads as one u32 (`tru+0x356c40` / `tru+0x356db0` -> `tru+0x1954b0` -> section lookup
+     `tru+0x14df80`); the converter wrote them as two swapped u16 (doppelganger_casual DTP 20212: `0x68f40000`, the
+     TruDataGuard hits `invalid id 0x68f40000` at `tru+0x194cad`). Only this proven class is set; the 20 generic
+     u16-pair candidates of `objdata_idword_fix.py scan` are not.
+   * The id is **translated**: the value written is the PC id of the DTP the Xbox id names, found by position
+     (`id_map`, `converter_faults_fix.pairs_by_position`). For new DLC DTPs that is the same id (26867 / 26868), but
+     the six Xbox costume packs name base DTPs 1161 / 1162, which the PC calls 962 / 963 - the base pair `lara.drm`
+     (Xbox 12647 / PC 850) and all six played B138 DLC 1 costumes hold `0x3c2` / `0x3c3` there
+     (`tools/player_breath_ids.py`), and the converted PC costume has *other* DTPs 1161 / 1162 (0xf4 bytes). Writing
+     the Xbox value back (the first form of the rule) would have pointed the breath sound at a foreign DTP.
+   * generalbank: the pipeline builds it only in `tools/generalbank_build.py` (steps Generalbank / Repair); new step
+     22 `tools/input_map_tu_fix.py --done-ok` appends the title update's six bindings of Lara's set 17 to the input
+     map DTP 47 (Befund-Schattenkampf, F4 / B26). Step 21 is still compared with the played test 38 file
+     (`57f52266...`), the result is `5c6c468d...`. The hand-built test generalbanks (AutoStart / HUD / pause) are
+     built on that file; `5c6c468d...` + the test-only script 104 step `dlc2_player_fix.py gb` is byte-identical to
+     `dlc_test50l_input` (`66efd71d...`). The shadow meter HUD build `tools/generalbank_hud_build.py` starts from the
+     older AutoStart file without the bindings, so it got the same step as T10 (2026-11-04, agent N15): step T9 is
+     still compared with its first build (`62efb0ee...`), the result `2ff71628...` is byte-identical to the hand-built
+     `dlc_test50l_hud_input` (`cmp`). The pause port (`tools/script7_pause_port.py`) is a separate tool;
+     `dlc_test50l_pause` + `input_map_tu_fix.py` = `dlc_test50l_pause_input` (`3fe0a284...`, only DTP 47 differs).
+   * Check gates in `Invoke-TruPipeline.ps1`: `dlc_struct_fixes.py check <tree> [--pack]` after Fixes (DLC 1, DLC 2)
+     and per costume pack (exit 1 when objtex / objrec / objid would still change a DRM; `objdata_check.json`);
+     `input_map_tu_fix.py --verify` after Generalbank / Repair (`input_map_check.json`).
+   * Proof: the steps on the inputs of the night's test trees (staged by md5 from the stand-alone tools' logs,
+     `tools/stage_by_md5.py`) reproduce `dlc_test51c_objfx` (21 / 22; the 22nd, doppelganger_casual, additionally
+     gets `objid`) = `dlc_test51e_dgids` byte for byte, the same for the `_50o` line (8 / 9 + doppelganger =
+     `dlc_test51e_dgids_50o`); a second run changes nothing. Costumes (TODO K4): objtex 0, objrec 0 (424 records /
+     27 984 words per costume checked), scriptclash 0, objid 2 words in each of the six costumes -> test tree
+     `work/rebuild/dlc_test51g_costumes` (= `dlc_test50l_costumes` + 2 words per file, `fix_word_diff` 0 other words).
+     Full runs: `Invoke-TruPipeline.ps1 -Step Fixes -FixesOut work/rebuild/pipeline_check_0411b` (5 485 s, every tool
+     exit 0, every check ok; DLC 1 objrec 5 files, DLC 2 objtex 2 / objrec 15 / objid 1) differs from the run without
+     the new steps (`pipeline_check_0411`) in exactly those 5 + 17 files, and the steps applied at the very end of
+     that run give the same trees (271 / 271, 293 / 293 identical) - the place in the order does not matter. Where
+     the pipeline output differs from the test trees, the input already differs (the test trees took the files the
+     test packages install last: B138 files, shader / look test trees, the F2 thralls). `generalbank_build.py` from
+     scratch: step 21 = `57f52266...` (test 38), step 22 = `5c6c468d...`.
 
 ## The "VM" in upstream (what it was, what we do instead)
 
