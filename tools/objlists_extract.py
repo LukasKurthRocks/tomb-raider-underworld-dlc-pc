@@ -7,7 +7,9 @@ Prefixes and sources (the first archive that has the file wins = runtime authori
   xboxtu      TitleUpdate.000
   dlc_pack10  pack10.000 (Beneath the Ashes)
   dlc_pack11  pack11.000 (Lara's Shadow)
-  dlc_pack1   pack1.000  (costume pack)
+  dlc_pack1   pack1.000  (costume pack Wetsuit)
+  dlc_pack2   pack2.000  (costume pack Classic)
+  dlc_pack20  pack20.000 (costume pack Designer)
 Several records of one name (specMask variants) must have identical content.
 
 Usage (from the repository root):  ..\\bin\\venv\\Scripts\\python.exe -I tools/objlists_extract.py
@@ -26,6 +28,8 @@ SOURCES = {
     'dlc_pack10': ([(C + '9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', 'be')], '\\tr8\\xenon-w\\'),
     'dlc_pack11': ([(C + '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000', 'be')], '\\tr8\\xenon-w\\'),
     'dlc_pack1':  ([(C + 'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', 'be')], '\\tr8\\xenon-w\\'),
+    'dlc_pack2':  ([(C + '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000', 'be')], '\\tr8\\xenon-w\\'),
+    'dlc_pack20': ([(C + 'AC0089F81B621CD0E0C156B6176EFCC6C844705D53/pack20.000', 'be')], '\\tr8\\xenon-w\\'),
 }
 FILES = ('objectlist.txt', 'unitlist.txt', 'objlist.dat')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'generic', 'lists')

@@ -1,4 +1,4 @@
-"""Convert DLC Xbox DRMs (from pack10/pack11/pack1/pack2) to PC with the full DLC pipeline.
+"""Convert DLC Xbox DRMs (from pack10/pack11/pack1/pack2/pack20) to PC with the full DLC pipeline.
 usage: tools/venv/bin/python -I tools/convert_dlc.py OUTDIR name1.drm name2.drm ..."""
 import sys, os, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -7,7 +7,10 @@ from archive import Archive
 from names import crc
 R = '../data/Xenia-SteveRepack/Content/534307EC/00000002/'
 PACKS = ['9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000',
-         'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000']
+         'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000',
+         'AC0089F81B621CD0E0C156B6176EFCC6C844705D53/pack20.000']
+# PACKS order is an interface: other tools index it (dlc_assemble_build / dlc_media_build PACK_INDEX). The costume packs
+# (pack1 Wetsuit k/p, pack2 Classic a/h, pack20 Designer l/m) only hold names no other pack has (docs/COSTUMES.md).
 def raw_dlc(name):
     # 10 DRM names exist in pack10 AND pack11 with different content (tools/pack_overlap.py); the first pack wins, so a
     # DLC 2 run sets TRUDLC_PACK_FIRST=pack11 to get the pack11 record as the Xbox source (WINDOWS_REBUILD finding 38)

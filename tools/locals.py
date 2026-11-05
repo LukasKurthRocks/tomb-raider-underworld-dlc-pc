@@ -24,7 +24,9 @@ SRC = {'xbase': (B + 'TombRaiderUnderworld_Patched/layer1.000', 'be', 'xenon-w')
        'pack10': (C + '9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', 'be', 'xenon-w'),
        'pack11': (C + '600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153/pack11.000', 'be', 'xenon-w'),
        'pack1': (C + 'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', 'be', 'xenon-w'),
-       'pack2': (C + '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000', 'be', 'xenon-w')}
+       'pack2': (C + '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000', 'be', 'xenon-w'),
+       'pack20': (C + 'AC0089F81B621CD0E0C156B6176EFCC6C844705D53/pack20.000', 'be', 'xenon-w')}
+# the packs are surveyed only; the PC tables are built from the PC patch table + the title update (merged())
 
 def parse(b, endian):
     e = '>' if endian == 'be' else '<'

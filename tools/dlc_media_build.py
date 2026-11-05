@@ -25,7 +25,7 @@ from names import crc, load, L
 from convert_dlc import R as ROOT, PACKS
 
 W = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'generic')
-PACK_INDEX = {'pack10': 0, 'pack11': 1, 'pack1': 2, 'pack2': 3}
+PACK_INDEX = {'pack10': 0, 'pack11': 1, 'pack1': 2, 'pack2': 3, 'pack20': 4}
 # music written for a pack: the B138 kit ships the DLC 2 (pack11) tracks with DLC 1
 MUSIC_PACKS = {'pack10': ('pack10', 'pack11')}
 

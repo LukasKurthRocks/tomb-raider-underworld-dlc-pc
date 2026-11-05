@@ -11,7 +11,8 @@ tree (dlc_media_build.py output); only the DRMs are replaced, at the rel path of
 
 Usage (from the repository root):
   ..\\bin\\venv\\Scripts\\python.exe -u -I -X utf8 tools/dlc_assemble_build.py SRC_MODS_DIR OUT_MODS_DIR [--pack pack10|pack11] [--only SUBSTR] [--jobs N]
-  --pack: which DLC (default pack10 = DLC 1; pack11 = DLC 2, SRC = its Media tree, e.g. work/rebuild/dlc2_stage1/mods)
+  --pack: which DLC (default pack10 = DLC 1; pack11 = DLC 2, SRC = its Media tree, e.g. work/rebuild/dlc2_stage1/mods;
+          pack1 / pack2 / pack20 = the costume packs, 2 costume DRMs each)
   --jobs N: N processes (default: environment TRUDLC_JOBS, else 1); ~16 GB RAM each (finding 36)
   e.g. work/rebuild/stage1/mods work/rebuild/asm_stage1/mods   (OUT is replaced, must be below work/rebuild)
 Report: <OUT>/../assemble_report.tsv (per DRM: status, bytes, seconds, bad, missing shaders, routes).
@@ -24,7 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WG = os.path.join(HERE, '..', 'work', 'generic')
 
 
-PACK_INDEX = {'pack10': 0, 'pack11': 1}     # index into convert_dlc.PACKS
+PACK_INDEX = {'pack10': 0, 'pack11': 1, 'pack1': 2, 'pack2': 3, 'pack20': 4}     # index into convert_dlc.PACKS
 
 
 def pack_drms(pack):
