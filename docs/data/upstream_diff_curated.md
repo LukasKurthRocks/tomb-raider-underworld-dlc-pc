@@ -19,13 +19,14 @@ show them too. Numbers: [WINDOWS_REBUILD.md](WINDOWS_REBUILD.md).
 
 ## 3. Names not listed in the B270 manifest
 
-Two pack11 audio streams have no entry in `docs/data/B270_acqua.kit_manifest.json`, so the B270 kit probably does not
-install them (not checked against the kit itself). Both names are hash-checked: `tools/name_hash_check.py <name>`.
+Four DLC records have no entry in `docs/data/B270_acqua.kit_manifest.json` (nor in B269 / B138, searched by source hash
+and target path with `tools/kit_manifest_names.py`), so the kits probably do not install them. Every name is
+hash-checked (`tools/name_hash_check.py <name>`) and now listed in `docs/data/dlc_names_extra.txt`, which
+`tools/dlc_names.py` reads (it refuses a line whose hash does not match).
 
-| Hash | Name (under `xenon-w\audio\streams\`) | Where the name comes from |
+| Hash | Name | What it is / where the name comes from |
 |---|---|---|
-| `0xc986dd53` | `event_triggered\reveals\dlc2_machine_room_second_bridge_reveal.mul` | upstream's own `tools/dlc_names3.py` (round 3) finds it; the pipeline step that writes `dlc_names.txt` runs round 1 only |
-| `0xc2492c8b` | `music\l7_valhalla_2\entering_hellheim(1).mul` | strings of the 2007 prototype DLC data |
-
-Still unnamed: two `RAW!` images, `0x753ecefd` (983 168 bytes, in pack10 and pack11) and `0xae29666a` (3 768 448 bytes,
-pack11).
+| `0x753ecefd` (pack10 and pack11, identical) | `xenon-w\image\loading_bg_dlc1.raw` | DLC 1 loading-screen background, 640x360 A8R8G8B8 (= `dlc_level1_preview` without the white frame); named by the title-update loading-screen script (generalbank script 8:6) next to the base `loading_bg_*` |
+| `0xae29666a` (pack11) | `xenon-w\image\loading_bg_dlc2.raw` | DLC 2 loading-screen background, 1280x720, same script |
+| `0xc986dd53` (pack11) | `xenon-w\audio\streams\event_triggered\reveals\dlc2_machine_room_second_bridge_reveal.mul` | named in `dlc2_goo_room` (script 8:26727); upstream's own `tools/dlc_names3.py` (round 3) finds it |
+| `0xc2492c8b` (pack11) | `xenon-w\audio\streams\music\l7_valhalla_2\entering_hellheim(1).mul` | named in `dlc2_goo_room` (script 8:26727); round 3 misses it (the `(1)` does not fit its pattern) |

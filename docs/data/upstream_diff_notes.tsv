@@ -8,7 +8,7 @@ tools/convert_dlc.py	extension	Shared pack10 / pack11 file names (finding 38), t
 tools/terrain_validate.py	fix	Meshes = B138: vertex-declaration hashes and the DEC3N table learned from the base game (finding 37)
 tools/generalbank_dlc.py	extension	Title-update hint box / loading-screen scripts ported into the PC generalbank (finding 43)
 tools/music_convert.py	fix	`.mul` encoder that models the game's IMA decoder (step capped at 8191, finding 18); relative paths
-tools/dlc_names.py	extension	Names from the release kit manifests (`docs/data/*.kit_manifest.json`, hash-checked); costume packs
+tools/dlc_names.py	extension	Names from the release kit manifests (`docs/data/*.kit_manifest.json`) and from `docs/data/dlc_names_extra.txt` (4 names no list had: the two DLC loading-screen backgrounds and two DLC 2 streams; hash-checked, a mismatch stops the run); `--out` / `--extra`; costume packs
 tools/verify_ids.py	extension	`extend` for the costume packs (old entries unchanged, 0 collisions)
 tools/locals.py	extension	Costume packs in the pack table; relative paths
 work/ws/cine/float_fix.py	fix	Skips character-model DTPs (it damaged the DLC 2 doppelganger model; finding 39)

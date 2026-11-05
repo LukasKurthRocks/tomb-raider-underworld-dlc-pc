@@ -2,13 +2,16 @@
 
 Hash = CRC-32/BZIP2 (poly 0x04C11DB7 MSB-first, init/xorout 0xffffffff) of the lower-case path (names.crc); a table-driven
 version with prefix-state caching is used here (names.crc is bit-serial and slow).
-Known names: the Xbox filelist, work/generic/dlc_names_recovered.txt and the Xbox source names of the release kit
+Known names: the Xbox filelist, work/generic/dlc_names_recovered.txt, the tracked list docs/data/dlc_names_extra.txt
+(each line verified: fcrc(name) must equal its hash, else the run stops) and the Xbox source names of the release kit
 manifests (docs/data/*.kit_manifest.json; only taken when the hash matches).
 Candidates: identifier strings found in all DLC files (DRM section data, raw .mul/.raw/other payloads), base filelist
 basenames, DLC unit/object list names; combined with templates learned from the Xbox filelist (directories x extensions,
 '<unit>_map', streamgroups '<unit>_<group>', music '<dir>\\<file>', image '<name>_preview' ...).
 Output: work/generic/dlc_names.txt  (hash, pack, size, kind, name) for every DLC record, names resolved or '?'.
-Usage: python3 -I tools/dlc_names.py
+Usage: python3 -I tools/dlc_names.py [--out FILE] [--extra FILE|none]
+  --out    output file (default work/generic/dlc_names.txt)
+  --extra  tracked extra names (default docs/data/dlc_names_extra.txt; 'none' = do not read it)
 """
 import sys, os, re, json, glob, struct, collections, itertools
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -39,6 +42,21 @@ PACKS = {'pack10': C + '9CA70CF0EDA43654D158C2E37470D301DFA850E753/pack10.000', 
          'pack1': C + 'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', 'pack2': C + '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000',
          'pack20': C + 'AC0089F81B621CD0E0C156B6176EFCC6C844705D53/pack20.000'}
 W = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'generic')
+EXTRA = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'data', 'dlc_names_extra.txt')
+
+def load_extra(path):
+    """{hash: name} from a tracked extra-names file ('0x<hash> <name>' per line, '#' comments); refuses any line whose
+    name does not hash to its hash"""
+    out = {}
+    for no, l in enumerate(open(path, encoding='utf8'), 1):
+        l = l.strip()
+        if not l or l.startswith('#'): continue
+        t = l.split()
+        if len(t) != 2 or not t[0].startswith('0x'): raise SystemExit('%s:%d: bad line %r' % (path, no, l))
+        h = int(t[0], 16)
+        if fcrc(t[1]) != h: raise SystemExit('%s:%d: hash mismatch: fcrc(%s) = 0x%08x, line says 0x%08x' % (path, no, t[1], fcrc(t[1]), h))
+        out[h] = t[1]
+    return out
 
 def kind(b):
     if b[:4] == b'CDRM' or b[:4] == b'\0\0\0\x13': return 'drm'
@@ -46,6 +64,11 @@ def kind(b):
     return b[:4].hex()
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    ap.add_argument('--out', default=os.path.join(W, 'dlc_names.txt'))
+    ap.add_argument('--extra', default=EXTRA)
+    a = ap.parse_args()
     xn = load(L + 'Tomb Raider Underworld (Xenon).txt')
     pcn = load(L + 'Tomb Raider Underworld (PC).txt')
     known = dict(xn)
@@ -55,6 +78,10 @@ def main():
             for l in open(p):
                 l = l.split()
                 if len(l) == 2 and l[0].startswith('0x'): known[int(l[0], 16)] = l[1]
+    if a.extra != 'none':
+        extra = load_extra(a.extra)
+        print('extra names', len(extra), 'from', a.extra)
+        known.update(extra)
     recs = []; strings = set()
     from drm import cdrm_decode
     for pk, path in PACKS.items():
@@ -133,7 +160,7 @@ def main():
                 try_name(full)
     print('found', len(found))
     known.update(found)
-    out = os.path.join(W, 'dlc_names.txt')
+    out = a.out
     st = collections.Counter()
     with open(out, 'w') as f:
         for h, pk, spec, size, k in sorted(recs, key=lambda r: (r[1], known.get(r[0], '~'))):

@@ -1,0 +1,13 @@
+# Extra Xbox names for DLC pack records that no file list / kit manifest names (read by tools/dlc_names.py).
+# Format: 0x<hash> <full xenon-w name>; '#' lines are comments (one per source). tools/dlc_names.py refuses the file
+# when fcrc(name) != hash (CRC-32/BZIP2 of the lower-case name).
+#
+# Source: title update generalbank.drm, loading screen script 8:6 ("uiloading"), string list next to the base names
+# loading_bg_mansion ... loading_bg_arcticsea (base files xenon-w\image\loading_bg_<name>.raw); same picture as
+# dlc_level1_preview / dlc_level2_preview without the white frame. First guessed by tools/hidden_scan.py guess.
+0x753ecefd xenon-w\image\loading_bg_dlc1.raw
+0xae29666a xenon-w\image\loading_bg_dlc2.raw
+# Source: pack11 dlc2_goo_room.drm, script 8:26727 strings 'music\l7_valhalla_2\entering_hellheim(1)' and
+# 'event_triggered\reveals\dlc2_machine_room_second_bridge_reveal' (relative to xenon-w\audio\streams\, '.mul').
+0xc2492c8b xenon-w\audio\streams\music\l7_valhalla_2\entering_hellheim(1).mul
+0xc986dd53 xenon-w\audio\streams\event_triggered\reveals\dlc2_machine_room_second_bridge_reveal.mul
