@@ -84,7 +84,8 @@
                soundplex_sequence_fix proof (2026-11-05), then per pack the DLC 2 route: dlc_media_build,
                dlc_assemble_build --pack, dlc_audio_build --pack, tree_check, dlc_fixes_build --pack,
                converter_faults_fix check --pack, script_clash_fix check, dlc_struct_fixes check --pack (objtex / objrec
-               / objid / seqrepeat), soundplex_sequence_fix scan --pack
+               / objid / seqrepeat), soundplex_sequence_fix scan --pack, costume_scope_check tree (E4: no
+               dlc_costume_g / n DRM, no dlc_costumes4 unit / record, costume object ids 20..35 unchanged)
                -> work\rebuild\costumes\<pack>\{stage1,asm_stage1,asm_stage2a,stage2b}\mods (-FixesOut DIR: DIR\<pack>\...)
                Only the two dlc_costume_<x>.drm of each pack are new for the game; images, names and lists are in
                the DLC 1 tree already (docs/COSTUMES.md)
@@ -199,6 +200,7 @@ if ($FixesOut) {
 # step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
 $costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
 $costumeTools = @(
+    @('tools\costume_scope_check.py', 'selftest'),
     @('tools\verify_ids.py', 'extend'),
     @('tools\converter_faults_fix.py', 'proof'),
     @('tools\soundplex_sequence_fix.py', 'proof')
@@ -214,6 +216,8 @@ foreach ($pk in 'pack1', 'pack2', 'pack20') {
     $costumeTools += , @('tools\script_clash_fix.py', 'check', "$o/stage2b/mods", '--report', "$o/script_clash_check.json")
     $costumeTools += , @('tools\dlc_struct_fixes.py', 'check', "$o/stage2b/mods", '--pack', $pk, '--report', "$o/objdata_check.json")
     $costumeTools += , @('tools\soundplex_sequence_fix.py', 'scan', "$o/stage2b/mods", '--pack', $pk, '--report', "$o/soundplex_sequence_check.json")
+    # E4 (2026-11-05, docs Befund-E4-E12-0511.md): no dlc_costume_g / n DRM, no dlc_costumes4 unit, costume ids unchanged
+    $costumeTools += , @('tools\costume_scope_check.py', 'tree', "$o/stage2b/mods", '--report', "$o/costume_scope_check.json")
 }
 $steps = @{
     Index = @(

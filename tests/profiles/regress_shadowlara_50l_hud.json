@@ -1,6 +1,6 @@
 {
     "name":  "regress_shadowlara_50l_hud",
-    "description":  "05.11. sequence-repeat fix (Befund-Seq-Baeume-0511.md, Add-SeqTrees.ps1): appended last dlc_test51q_dungeon + dlc_test51r_seq2_50l. Test 50l_hud = regress_shadowlara_50l with the tree dlc_test50l_hud (generalbank md5 62efb0ee...: the clean autostart generalbank + the TU HUD script 38 / PC 37 and the 74-entry TU larabase type script) INSTEAD of autostart_gb (last tree), plus TruShadowHud 0.1 (work/asi/hud01: larabase f70-f73, dlc2data f0; LogLevel 2). That generalbank must never run without TruShadowHud (its HUD script calls f71-f73 / dlc2data f0 every frame - null natives without the plugin). If the run aborts after the trees were installed, run Invoke-TruTestRun.ps1 -Undo before starting the game by hand. Shadow meter: red when empty until \u003e 150, pulse above 75 %. Docs Befund-Schattenleiste-HUD.md. Test 50l (morning 03.11.): everything finished of the night in one run. Trees: 48i_tex, 48i_markup (both fully overridden by the merged tree, kept as in 50l_look), dlc_test50l_merged (= dlc_test50l_shaders: TU per-light outfit / thrall / natla shaders, unlit effect libs, look fix of material 20744; + chart fix of DTP 20212 in the same doppelganger_casual.drm (chart_act_u8_fix.py, 4 words); + player_tru_dlc2_extension.drm with the tuning target fix (dlc_test50l_combat); + dlc2_machine_room.drm with the two jump target pads (dlc_test50l_jump)), 50c_vein, 50k_streams, dlc_test50l_shaders_dlc1 (DLC 1 knight thrall copies), dlc_test50l_ach (achievement fix of 31.10.: 11 calls into missing TU natives neutralised in 8 DRMs the installed mods of 30.10. still have), autostart_gb (clean generalbank, [Test] AutoStart). Plugins: TruShadowPower 0.12 (meter interface v3, InstanceParams[1]), TruMenu 0.9 (Saves, music, Quit now, InputTrace, unstuck, Prepare), TruDataGuard 0.2, TruShadowCombat 0.4 (target list, states 1017 / 244, 1013 probe; Translate / Translate1013 off), TruDlc2Player 0.2, TruRockVein 0.9, TruDoppelganger, TruLink, TruGuard 0.4. Not in it: dark wall streaks (50m), DLC music (50l_music), HUD (profile regress_shadowlara_50l_hud). Run WITH -Debugger -Session \u003cworkbench\u003e\\session_thrall_watch.cdb (THRALLLINK hardware write breakpoints).",
+    "description":  "06.11. combined fix tree (Befund-Navmesh-Kombi-0511.md variant B, Set-KombiTrees.ps1): removed dlc_test51q_dungeon, dlc_test51r_seq2_50l; appended last dlc_test51v_fix22_50l. 05.11. sequence-repeat fix (Befund-Seq-Baeume-0511.md, Add-SeqTrees.ps1): appended last dlc_test51q_dungeon + dlc_test51r_seq2_50l. Test 50l_hud = regress_shadowlara_50l with the tree dlc_test50l_hud (generalbank md5 62efb0ee...: the clean autostart generalbank + the TU HUD script 38 / PC 37 and the 74-entry TU larabase type script) INSTEAD of autostart_gb (last tree), plus TruShadowHud 0.1 (work/asi/hud01: larabase f70-f73, dlc2data f0; LogLevel 2). That generalbank must never run without TruShadowHud (its HUD script calls f71-f73 / dlc2data f0 every frame - null natives without the plugin). If the run aborts after the trees were installed, run Invoke-TruTestRun.ps1 -Undo before starting the game by hand. Shadow meter: red when empty until \u003e 150, pulse above 75 %. Docs Befund-Schattenleiste-HUD.md. Test 50l (morning 03.11.): everything finished of the night in one run. Trees: 48i_tex, 48i_markup (both fully overridden by the merged tree, kept as in 50l_look), dlc_test50l_merged (= dlc_test50l_shaders: TU per-light outfit / thrall / natla shaders, unlit effect libs, look fix of material 20744; + chart fix of DTP 20212 in the same doppelganger_casual.drm (chart_act_u8_fix.py, 4 words); + player_tru_dlc2_extension.drm with the tuning target fix (dlc_test50l_combat); + dlc2_machine_room.drm with the two jump target pads (dlc_test50l_jump)), 50c_vein, 50k_streams, dlc_test50l_shaders_dlc1 (DLC 1 knight thrall copies), dlc_test50l_ach (achievement fix of 31.10.: 11 calls into missing TU natives neutralised in 8 DRMs the installed mods of 30.10. still have), autostart_gb (clean generalbank, [Test] AutoStart). Plugins: TruShadowPower 0.12 (meter interface v3, InstanceParams[1]), TruMenu 0.9 (Saves, music, Quit now, InputTrace, unstuck, Prepare), TruDataGuard 0.2, TruShadowCombat 0.4 (target list, states 1017 / 244, 1013 probe; Translate / Translate1013 off), TruDlc2Player 0.2, TruRockVein 0.9, TruDoppelganger, TruLink, TruGuard 0.4. Not in it: dark wall streaks (50m), DLC music (50l_music), HUD (profile regress_shadowlara_50l_hud). Run WITH -Debugger -Session \u003cworkbench\u003e\\session_thrall_watch.cdb (THRALLLINK hardware write breakpoints).",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -168,38 +168,68 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test51q_dungeon/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test51v_fix22_50l/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "dlc_fx_cine_thrall_death.drm":  "0fd61eb0c8241cf9579bb84f28ae30df",
-                                  "dlc_fx_goo_machine_column_core.drm":  "ee010dd09200fc35203bb9bae0ae86d1"
-                              }
-                  },
-                  {
-                      "source":  "trudlcport/work/rebuild/dlc_test51r_seq2_50l/mods",
-                      "exclude":  [
-                                      "local",
-                                      "padshock"
-                                  ],
-                      "md5":  {
-                                  "dlc_yggdrasil_end.drm":  "3e7ce9ff3e0a6903ca6ca91021c1b022",
-                                  "dlc_yggdrasil_hall02.drm":  "f46b56dcbe3c1e52c8b72e894c5f887f",
+                                  "cinstream/pdlc1_010_intro.drm":  "20e0f9cc7b35a8666bebaad5f473b971",
+                                  "co_dlc2_goo.drm":  "6500b59bef44aa9a09c4e4c32ea4124f",
+                                  "dlc_costume_b.drm":  "0f588a0c32cb508239b8bf338416ac6a",
+                                  "dlc_costume_c.drm":  "5131fe9b08444511938dba2fa5eb7601",
+                                  "dlc_costume_e.drm":  "e1d0ecec48ebd448cf80ceeb082b8c47",
+                                  "dlc_costume_j.drm":  "8420c33cc675bf68e046291adb102285",
+                                  "dlc_costume_o.drm":  "aed8e13d4f37b5cf6365a248b554da2a",
+                                  "dlc_fx_cine_falling_chunks.drm":  "ef0d6d4a6f11aa4957387ac17d17be67",
+                                  "dlc_fx_cine_thrall_death.drm":  "cc52665eb6dda52bf83daed3cf895af0",
+                                  "dlc_fx_glare_simple_hallb_ist.drm":  "4e781206b7a5fac2fadc07b4b46915bc",
+                                  "dlc_fx_glare_simple_waterwhl_ist.drm":  "40828e7711cbb56e17bccacdb3134b3c",
+                                  "dlc_fx_goo_dun_ist.drm":  "6744bbf3f53222e7d9fc0407616aecfb",
+                                  "dlc_fx_goo_machine_column_core.drm":  "ee010dd09200fc35203bb9bae0ae86d1",
+                                  "dlc_fx_goo_tres_ist.drm":  "91123b29819fc037899f0206d5a961b7",
+                                  "dlc_fx_goo_tres_line_ist.drm":  "e170bd82d77b7f28cd780efe7c9e0631",
+                                  "dlc_level2_start.drm":  "a499a74f8200899895bf248d33ca9acb",
+                                  "dlc_yggdrasil_end.drm":  "646c0ced52e1c80a0cf172b46a7722c3",
+                                  "dlc_yggdrasil_hall01.drm":  "e890b91bc846b510bd56647ff03abace",
+                                  "dlc_yggdrasil_hall02.drm":  "f6de26a141f6a4f6fcf56217e3dab7a5",
+                                  "dlc1_uo_adren_trap.drm":  "d59d7574a749039b56303dca9fd3ebdc",
                                   "dlc1_uo_crushers.drm":  "1b90aed9f1d0633d6c0a024f50264276",
-                                  "dlc2_ceremony_room.drm":  "56804f5f7ec6f0c6d267446034874502",
+                                  "dlc1_uo_raft_bridge.drm":  "0c6c550f078fbfeab4aa5e048ed658da",
+                                  "dlc1_uo_raft_bridge_spawned.drm":  "22659b99073c99cd445da06a9ccb94eb",
+                                  "dlc1_uo_sluice_falls.drm":  "0b82085fb9ac6e4d6c92a15a2a108b20",
+                                  "dlc1_uo_water_wheel.drm":  "56beed2c6f3174e37dcd050070beba5e",
+                                  "dlc2_ceremony_room.drm":  "fc4615317ad7be54848e90ff2c9a6193",
                                   "dlc2_checkpoint.drm":  "33123d6386327bd82bbfe3d802644ca3",
-                                  "dlc2_goo_room.drm":  "f9f8f3f71f526015c71378df542cb2e0",
-                                  "dlc2_hall_ceremony_goo.drm":  "e0d0d4ee79b2c28292f71c96cb95521c",
-                                  "dlc2_hall_goo_machine.drm":  "4b0b14fefb3b29360ffa066947dd5c64",
-                                  "dlc2_hall_machine_ceremony.drm":  "75e1319feb27d9cc9e223f641b387f8c",
-                                  "dlc2_machine_room.drm":  "776e08df128786d7bfe36e2b62069d93",
-                                  "dlc2_treasure_room_cine.drm":  "42adf17d4833f97c6a82467dd5362781",
-                                  "dlc2_uo_goo_grinder.drm":  "cc03d439fd7c7c9579f1593e7920fbbd",
-                                  "dlc2_uo_gooconverter.drm":  "aa2a29a393d36537716f86877d878ee1",
-                                  "dlc2_uo_treadmill_block_spawner.drm":  "55c9f43638c1372d469b3c5553923ad3",
-                                  "doppelganger_casual.drm":  "d9f03c93dc4a7a8c7a7252721c620ec8"
+                                  "dlc2_goo_room.drm":  "d903bb888c197aff1a500ce3d209098f",
+                                  "dlc2_hall_ceremony_goo.drm":  "32e2a75a3b6d4566953aa74700f1d172",
+                                  "dlc2_hall_goo_machine.drm":  "e4f6264a8287af38cc924a49716a496b",
+                                  "dlc2_hall_machine_ceremony.drm":  "d17adcb5ddc3cdf163cb94005c4b0b4d",
+                                  "dlc2_machine_room.drm":  "36701309fe6bcc93e529596011c11802",
+                                  "dlc2_treasure_room_cine.drm":  "be22c9b3cc78a804e7ce41823e9d679f",
+                                  "dlc2_uo_extending_bridge.drm":  "20b75d03d0d342a0709f9342800afa59",
+                                  "dlc2_uo_goo_drips_spawned.drm":  "9a97571f40865e6736980cd09d223a29",
+                                  "dlc2_uo_goo_grinder.drm":  "bd8c309d8b2b92bfff16dd3976c296a3",
+                                  "dlc2_uo_gooconverter.drm":  "a27a5e3967f14bcfbd675be4457c6fb2",
+                                  "dlc2_uo_machine_column.drm":  "f5b790d5bf5907e534efd1efcc8146e0",
+                                  "dlc2_uo_pipes_o_goo_left.drm":  "4cc094eccba146e78ed94f59c89d2a5f",
+                                  "dlc2_uo_pipes_o_goo_right.drm":  "a36533f8e4bd3b4eaffb54fcc6e04137",
+                                  "dlc2_uo_treadmill_block_spawned_faulty_a.drm":  "41f46116ecbfaa0c6aa61abd0fdd8fb1",
+                                  "dlc2_uo_treadmill_block_spawned_faulty_b.drm":  "4ef5a8e1364af41d2b06ceb2bf030cd0",
+                                  "dlc2_uo_treadmill_block_spawner.drm":  "13871d1bb739ac3076ee3efbd5baebc3",
+                                  "doppelganger_casual.drm":  "62f12aa15e99164ac30a31ec171eb1d3",
+                                  "fx_mex_puddle_ist.drm":  "074236ac39a7ab18db4e7cb2ec4d29e5",
+                                  "fx_waterwheel_fsfx.drm":  "ec545495d743ececfe1b8efc967b63ba",
+                                  "lara_doppelganger.drm":  "2e58d67dcf6df4f5cec4f0dc4829c0a8",
+                                  "ma_ani_adren_trap.drm":  "9f6d2a96e98da188f14ded2d20fa4825",
+                                  "viking_thrall_dlc2_.drm":  "b48dd095771f0f1deeb73a4989ae0829",
+                                  "viking_thrall_dlc2_extension.drm":  "7dd3e2f2270371176d649f44bbcb0421",
+                                  "viking_thrall_tutorial_dlc2_.drm":  "dae62d15b783c00d2b35a3bfac9da3e0",
+                                  "yeti_thrall_armored_chunkdoll_dlc_2_.drm":  "69d36d1e91953547f99b35ec30ea5b46",
+                                  "yeti_thrall_armored_dlc2_.drm":  "3602c40d3c2b944f784f234e704ef834",
+                                  "yeti_thrall_armored_dlc2_extension.drm":  "5dcbbf97c96fd9faadbb91a1229fe180",
+                                  "yeti_thrall_dlc2_.drm":  "8ae095500d4dfbafa9cb7c30b5dd9cfd",
+                                  "yeti_thrall_dlc2_extension.drm":  "70ecac1b3bcc8fcea726134cd32dc19d"
                               }
                   }
               ],

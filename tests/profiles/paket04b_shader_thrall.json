@@ -1,6 +1,6 @@
 {
     "name":  "paket04b_shader_thrall",
-    "description":  "05.11. sequence-repeat fix (Befund-Seq-Baeume-0511.md, Add-SeqTrees.ps1): appended last dlc_test51r_seq8_51a50o. Test package 4b (night 03./04.11., TruMenu 0.10.2 ring + TruDlc2Player 0.4) = paket04_shader + thrall fix + particle fix: Shader tour on 50o (= 50n + deforming VS 2474 / 2704 + PS 2342): one screenshot per stop PC-50o_SR_NN; thrall rooms last. Trees, plugins, INIs and expects = paket04_shader (regress_shadowlara_50o_radial2 + generalbank trudlcport/work/rebuild/dlc_test50l_input/mods) + tree trudlcport/work/rebuild/dlc_test51a_thrall_50o/mods (thrall base class 12433 -\u003e 26884 + animfx on the 50n / 50o versions of the 16 thrall / unit DRMs, docs Befund-Thrall-Absturz.md section 12) + trees trudlcport/work/rebuild/dlc_test51c_objfx/mods + trudlcport/work/rebuild/dlc_test51c_objfx_50o/mods + trudlcport/work/rebuild/dlc_test51e_dgids_50o/mods (after it, in this order; agent N7 particle record + texture group count fix objdata_fx_fix = Xbox values, the second one rebuilt on the 50n / 50o versions; docs Befund-Ton-und-Abstuerze-0411.md Fix-Bau N7; the 4 thralls and the treadmill spawner carry both fixes) + expect thrall51a-no-release-write. Written by the workbench script New-Paket04b.ps1 (not by New-TestPakete2.ps1). Run WITH -Debugger -Session \u003cworkbench\u003e\\session_thrall_watch2.cdb. 04.11. 07:35: + trees dlc_test51i_ids, dlc_test51f_audio (last, same bases as paket01, Test-ExtraTreeBase.ps1), TruGuard pin = new build (Lukas), expect dataguard-no-68f4.",
+    "description":  "06.11. combined fix tree (Befund-Navmesh-Kombi-0511.md variant B, Set-KombiTrees.ps1): removed dlc_test51r_seq8_51a50o; appended last dlc_test51v_fix30_04b. 05.11. sequence-repeat fix (Befund-Seq-Baeume-0511.md, Add-SeqTrees.ps1): appended last dlc_test51r_seq8_51a50o. Test package 4b (night 03./04.11., TruMenu 0.10.2 ring + TruDlc2Player 0.4) = paket04_shader + thrall fix + particle fix: Shader tour on 50o (= 50n + deforming VS 2474 / 2704 + PS 2342): one screenshot per stop PC-50o_SR_NN; thrall rooms last. Trees, plugins, INIs and expects = paket04_shader (regress_shadowlara_50o_radial2 + generalbank trudlcport/work/rebuild/dlc_test50l_input/mods) + tree trudlcport/work/rebuild/dlc_test51a_thrall_50o/mods (thrall base class 12433 -\u003e 26884 + animfx on the 50n / 50o versions of the 16 thrall / unit DRMs, docs Befund-Thrall-Absturz.md section 12) + trees trudlcport/work/rebuild/dlc_test51c_objfx/mods + trudlcport/work/rebuild/dlc_test51c_objfx_50o/mods + trudlcport/work/rebuild/dlc_test51e_dgids_50o/mods (after it, in this order; agent N7 particle record + texture group count fix objdata_fx_fix = Xbox values, the second one rebuilt on the 50n / 50o versions; docs Befund-Ton-und-Abstuerze-0411.md Fix-Bau N7; the 4 thralls and the treadmill spawner carry both fixes) + expect thrall51a-no-release-write. Written by the workbench script New-Paket04b.ps1 (not by New-TestPakete2.ps1). Run WITH -Debugger -Session \u003cworkbench\u003e\\session_thrall_watch2.cdb. 04.11. 07:35: + trees dlc_test51i_ids, dlc_test51f_audio (last, same bases as paket01, Test-ExtraTreeBase.ps1), TruGuard pin = new build (Lukas), expect dataguard-no-68f4.",
     "trees":  [
                   {
                       "source":  "trudlcport/work/rebuild/dlc_test48i_tex/mods",
@@ -527,27 +527,53 @@
                               }
                   },
                   {
-                      "source":  "trudlcport/work/rebuild/dlc_test51r_seq8_51a50o/mods",
+                      "source":  "trudlcport/work/rebuild/dlc_test51v_fix30_04b/mods",
                       "exclude":  [
                                       "local",
                                       "padshock"
                                   ],
                       "md5":  {
-                                  "dlc_yggdrasil_end.drm":  "25d907e7f516805addd95e6eb2a66064",
-                                  "dlc_yggdrasil_hall02.drm":  "0eb8547949d7a991417ccf7be3e00564",
+                                  "cinstream/pdlc1_010_intro.drm":  "20e0f9cc7b35a8666bebaad5f473b971",
+                                  "dlc_costume_b.drm":  "0f588a0c32cb508239b8bf338416ac6a",
+                                  "dlc_costume_c.drm":  "5131fe9b08444511938dba2fa5eb7601",
+                                  "dlc_costume_e.drm":  "e1d0ecec48ebd448cf80ceeb082b8c47",
+                                  "dlc_costume_j.drm":  "8420c33cc675bf68e046291adb102285",
+                                  "dlc_costume_o.drm":  "aed8e13d4f37b5cf6365a248b554da2a",
+                                  "dlc_fx_cine_thrall_death.drm":  "cc52665eb6dda52bf83daed3cf895af0",
+                                  "dlc_fx_glare_simple_hallb_ist.drm":  "4e781206b7a5fac2fadc07b4b46915bc",
+                                  "dlc_fx_glare_simple_waterwhl_ist.drm":  "40828e7711cbb56e17bccacdb3134b3c",
+                                  "dlc_fx_goo_dun_ist.drm":  "6744bbf3f53222e7d9fc0407616aecfb",
+                                  "dlc_fx_goo_tres_ist.drm":  "91123b29819fc037899f0206d5a961b7",
+                                  "dlc_fx_goo_tres_line_ist.drm":  "e170bd82d77b7f28cd780efe7c9e0631",
+                                  "dlc_level2_start.drm":  "e0be53dfe12406ce911e9c732aff3838",
+                                  "dlc_yggdrasil_end.drm":  "684e8432ff7804c6fa70862ea135f122",
+                                  "dlc_yggdrasil_hall01.drm":  "e890b91bc846b510bd56647ff03abace",
+                                  "dlc_yggdrasil_hall02.drm":  "58cf655388380d18c4ee518aca031f42",
                                   "dlc1_uo_crushers.drm":  "1b90aed9f1d0633d6c0a024f50264276",
-                                  "dlc2_ceremony_room.drm":  "765e29c8ef3d7f1404d15e58f15ac6e4",
+                                  "dlc1_uo_sluice_falls.drm":  "0b82085fb9ac6e4d6c92a15a2a108b20",
+                                  "dlc1_uo_water_wheel.drm":  "56beed2c6f3174e37dcd050070beba5e",
+                                  "dlc2_ceremony_room.drm":  "fc4615317ad7be54848e90ff2c9a6193",
                                   "dlc2_checkpoint.drm":  "33123d6386327bd82bbfe3d802644ca3",
-                                  "dlc2_goo_room.drm":  "af06bcec69626977f1928fbf79454343",
-                                  "dlc2_hall_ceremony_goo.drm":  "9942f1d2aaed4aff564a5de6dc7fcabe",
-                                  "dlc2_hall_goo_machine.drm":  "6c3ae230354fb0e90f51ee087f200d24",
-                                  "dlc2_hall_machine_ceremony.drm":  "b195f1fedab8dbd0816e44772fa390e2",
-                                  "dlc2_machine_room.drm":  "32b4d850197b5b4c4833a44afa5b3ae2",
+                                  "dlc2_goo_room.drm":  "d903bb888c197aff1a500ce3d209098f",
+                                  "dlc2_hall_ceremony_goo.drm":  "32e2a75a3b6d4566953aa74700f1d172",
+                                  "dlc2_hall_goo_machine.drm":  "e4f6264a8287af38cc924a49716a496b",
+                                  "dlc2_hall_machine_ceremony.drm":  "d17adcb5ddc3cdf163cb94005c4b0b4d",
+                                  "dlc2_machine_room.drm":  "36701309fe6bcc93e529596011c11802",
                                   "dlc2_treasure_room_cine.drm":  "be22c9b3cc78a804e7ce41823e9d679f",
                                   "dlc2_uo_goo_grinder.drm":  "e3b8af49b9c029ce4fc4fcf887cbcb63",
                                   "dlc2_uo_gooconverter.drm":  "d7ed526bef27feaf12a8e865b22d85ee",
                                   "dlc2_uo_treadmill_block_spawner.drm":  "13871d1bb739ac3076ee3efbd5baebc3",
-                                  "doppelganger_casual.drm":  "0c8e8a2bb220e66ea8c5fd5bf081a797"
+                                  "doppelganger_casual.drm":  "9c955d73b4785c419c1f98f078ed4a97",
+                                  "fx_mex_puddle_ist.drm":  "074236ac39a7ab18db4e7cb2ec4d29e5",
+                                  "lara_doppelganger.drm":  "2e58d67dcf6df4f5cec4f0dc4829c0a8",
+                                  "viking_thrall_dlc2_.drm":  "ebbd3830e53f5998c0f0ccf91d6eaef5",
+                                  "viking_thrall_dlc2_extension.drm":  "7dd3e2f2270371176d649f44bbcb0421",
+                                  "viking_thrall_tutorial_dlc2_.drm":  "1e1f3aeb08fb6439e06b9bc770bc795b",
+                                  "yeti_thrall_armored_chunkdoll_dlc_2_.drm":  "69d36d1e91953547f99b35ec30ea5b46",
+                                  "yeti_thrall_armored_dlc2_.drm":  "951e529a0ba4be2a2e4178f5d690e36c",
+                                  "yeti_thrall_armored_dlc2_extension.drm":  "5dcbbf97c96fd9faadbb91a1229fe180",
+                                  "yeti_thrall_dlc2_.drm":  "66cc9c8bb92c514c0a13339b8a84265a",
+                                  "yeti_thrall_dlc2_extension.drm":  "70ecac1b3bcc8fcea726134cd32dc19d"
                               }
                   }
               ],
