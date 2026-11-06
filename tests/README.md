@@ -5,7 +5,8 @@ installs the profile's trees, plugins and INI settings, starts the game (optiona
 into the in-game menu (TruMenu, over TruLink), waits for the game to end, collects logs, dumps and screenshots, checks
 the expected log lines and writes a verdict to `runs\<time>_<profile>\summary.md`. Before a run:
 `scripts/windows/Test-TruPreflight.ps1 -RunProfile <profile>` (read-only; its "Data" lines check the texture group
-counts and the SoundPlex sequence repeat bytes of what the profile installs).
+counts, the SoundPlex sequence repeat bytes, the script class clash and the NavPower navmesh of the DLC 2 units of what
+the profile installs; `paket15g_finisher_diag` keeps the old navmesh on purpose and gets a warning there, not a fail).
 
 | Folder | Content |
 |---|---|

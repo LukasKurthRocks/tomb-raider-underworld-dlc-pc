@@ -6,7 +6,7 @@
 .DESCRIPTION
     Every check adds one row to a status table (ok / warn / fail / info, shown as check mark / warning / cross /
     info sign); the table goes to the console and to the per-run log <workspace>\logs\Test-TruPreflight_<time>.log
-    (the only file this script writes). Nothing in the game folder, the save folder, the backups or the registry is
+    (with -RunProfile also the navmesh file list + report next to it; nothing else is written). Nothing in the game folder, the save folder, the backups or the registry is
     changed; no process is started or ended.
 
     Checks:
@@ -24,9 +24,12 @@
         the object data DTPs, finding 47: a raw count wipes game memory) and tools\soundplex_sequence_fix.py scan
         --profile (SoundPlex Sequence repeat word, finding 49: repeat 0 = endless sound) and
         tools\script_clash_fix.py check --profile (script class clash, findings 45 / 46: the DLC 2 thrall base 12433
-        on the resident layout = crash when the thralls are unloaded); all read-only, run with
-        the project venv from the repository; a problem = fail, a tool that cannot evaluate the profile = warn
-        (-SkipDataChecks leaves them out),
+        on the resident layout = crash when the thralls are unloaded) and tools\navgraph_raw_fix.py scan <list>
+        --pack pack11 (NavPower navmesh, finding 50 / decision 18: swapped words in the NavGraph image of the DLC 2
+        units; the profiles in $navmeshOldStateProfiles keep the old navmesh on purpose = warn instead of fail; the
+        file list and the tool report go to logs\Test-TruPreflight_<time>_navgraph_files.txt / _navgraph.json); all
+        read-only, run with the project venv from the repository; a problem = fail, a tool that cannot evaluate the
+        profile = warn (-SkipDataChecks leaves them out),
       * with -RunProfile: the tree sources and their md5 lists (a mismatch makes the run abort), each profile ASI
         (source sha256 vs. profile; installed <game>\<name>.asi sha256), each INI (installed sha256, sample sha256,
         the profile's INI overrides vs. the current values), other ASIs in the game folder,
@@ -63,8 +66,8 @@
 .PARAMETER SkipTreeHashes
     Do not hash the profile tree files (faster; the md5 lists are then not checked).
 .PARAMETER SkipDataChecks
-    Do not run the three data checks of the profile's DRMs (objdata_texlist_check / soundplex_sequence_fix scan /
-    script_clash_fix check, together about 3-4 minutes).
+    Do not run the four data checks of the profile's DRMs (objdata_texlist_check / soundplex_sequence_fix scan /
+    script_clash_fix check / navgraph_raw_fix scan, together about 3-4 minutes).
 .PARAMETER Trace
     PowerShell line trace (Set-PSDebug -Trace 1).
 
@@ -109,6 +112,13 @@ $knownAsis = 'TruDlc2Player', 'TruDoppelganger', 'TruRockVein', 'TruShadowPower'
 $generalbankKnown = @{
     'b57d8c482accab7afab59ee20bd8ccad' = 'test patch 41e (direct start: attract timer loads dlc_level2_start) - test only, never ship'
     '3a2b9a1d7b689d13d73037d3b412ea5b' = 'test patch 41e + script 104 fix (direct start) - test only, never ship'
+}
+# Data row "NavPower navmesh" (finding 50, decision 18): profiles that keep the OLD DLC 2 navmesh on purpose - a fail
+# of that row is reported as a warning for them. Only a profile built for a before / after comparison belongs here.
+$navmeshOldStateProfiles = @{
+    # los15g = the old data of the 15g / 15h comparison (Befund-Navmesh-Kombi-0511.md section 5: same plugins, 15h adds
+    # the combined fix tree dlc_test51v_fix26_15f with the raw navmesh); 15g must keep the swapped words
+    'paket15g_finisher_diag' = 'before / after comparison with paket15h (15g = old state)'
 }
 $icons = @{
     ok   = [string][char]0x2705                      # check mark
@@ -622,6 +632,44 @@ function Invoke-TruPyCheck {
     return @{ Code = $p.ExitCode; Lines = $lines; Why = $why }
 }
 
+function Get-TruProfileDrm {
+    # the .drm files a profile ends up installing - the same replay as tools/profile_last_source.py installed_map (the
+    # order of Install-TruTree.ps1 in Invoke-TruTestRun.ps1): the trees in order, every file below the source except
+    # the sub folders whose top folder is in "exclude" (default local / padshock), then the "files" entries; a later
+    # source wins per relative path. With -BaseDir the .drm files of that folder (recursive) that no tree / file brings
+    # are added, as objdata_texlist_check.profile_files --base. Returns @{ Paths = absolute paths; Base = count from it }
+    param($Prof, [string]$BaseDir)
+    $map = @{}   # relative path, lower case with '/' -> absolute path of the last source
+    foreach ($t in @($Prof.trees)) {
+        if (!$t) { continue }
+        $src = Resolve-WorkspacePath ([string]$t.source)
+        if (!$src -or !(Test-Path -LiteralPath $src -PathType Container)) { continue }
+        $ex = if ($null -ne $t.exclude) { @(@($t.exclude) | ForEach-Object { ([string]$_).ToLowerInvariant() }) } else { @('local', 'padshock') }
+        $root = (Resolve-Path -LiteralPath $src).Path.TrimEnd('\')
+        foreach ($f in @(Get-ChildItem -LiteralPath $root -File -Recurse -Force -ErrorAction SilentlyContinue)) {
+            $rel = $f.FullName.Substring($root.Length + 1).Replace('\', '/')
+            if ($rel.Contains('/') -and $ex -contains $rel.Split('/')[0].ToLowerInvariant()) { continue }
+            $map[$rel.ToLowerInvariant()] = $f.FullName
+        }
+    }
+    foreach ($f in @($Prof.files)) {
+        if (!$f -or !$f.name) { continue }
+        $map[([string]$f.name).Replace('\', '/').ToLowerInvariant()] = Resolve-WorkspacePath ([string]$f.source)
+    }
+    $out = New-Object System.Collections.Generic.List[string]
+    foreach ($k in @($map.Keys | Where-Object { $_.EndsWith('.drm') } | Sort-Object)) { $out.Add($map[$k]) }
+    $nBase = 0
+    if ($BaseDir -and (Test-Path -LiteralPath $BaseDir -PathType Container)) {
+        $broot = (Resolve-Path -LiteralPath $BaseDir).Path.TrimEnd('\')
+        foreach ($f in @(Get-ChildItem -LiteralPath $broot -File -Recurse -Force -Filter '*.drm' -ErrorAction SilentlyContinue | Sort-Object FullName)) {
+            if (!$f.Name.ToLowerInvariant().EndsWith('.drm')) { continue }
+            $rel = $f.FullName.Substring($broot.Length + 1).Replace('\', '/').ToLowerInvariant()
+            if (!$map.ContainsKey($rel)) { $out.Add($f.FullName); $nBase++ }
+        }
+    }
+    return @{ Paths = $out.ToArray(); Base = $nBase }
+}
+
 if ($Trace) { Set-PSDebug -Trace 1 }
 try {
     Write-Log "Test-TruPreflight profile=$RunProfile session=$Session log=$logFile (read-only)" -Level VERBOSE
@@ -749,8 +797,8 @@ try {
         if ($bad.Count) { $detail += '; md5 MISMATCH (the run aborts without -AllowMd5Mismatch): ' + ($bad -join '; ') }
         Add-Row 'Profile' 'Tree / file sources' $(if ($missing.Count -or $bad.Count) { 'fail' } else { 'ok' }) $detail
 
-        # ---- data checks of what the profile installs (read-only repository tools; findings 47 / 49) ----
-        if ($SkipDataChecks) { Add-Row 'Data' 'Profile DRM checks' 'info' '-SkipDataChecks: objdata_texlist_check / soundplex_sequence_fix scan / script_clash_fix check not run' }
+        # ---- data checks of what the profile installs (read-only repository tools; findings 45-47 / 49 / 50) ----
+        if ($SkipDataChecks) { Add-Row 'Data' 'Profile DRM checks' 'info' '-SkipDataChecks: objdata_texlist_check / soundplex_sequence_fix scan / script_clash_fix check / navgraph_raw_fix scan not run' }
         else {
             $ppFull = (Resolve-Path -LiteralPath $pp).Path
             $baseArgs = @()
@@ -806,6 +854,70 @@ try {
                 else {
                     $groups = @($r.Lines | ForEach-Object { if ($_ -match '^UNFIXED group (\d+):') { 'script {0}' -f $Matches[1] } } | Select-Object -Unique)
                     Add-Row 'Data' 'Script class clash' 'fail' ('{0} ({1}): {2} - the DLC copy runs on the resident layout (findings 45 / 46, crash when the thralls are unloaded); a tree with the renumbered copies (dlc_test51a_thrall or a dlc_test51s_clash tree) must come last' -f $sum, $baseNote, ($groups -join ', '))
+                }
+            }
+            # NavPower navmesh (finding 50, decision 18: the converter byte-swapped words of the Level+0x60 NavGraph
+            # image, which is raw on the PC - areas off in the debug drawing, enemies on a broken navmesh). The final
+            # .drm list of the profile goes through the pipeline gate navgraph_raw_fix.py scan --pack pack11; a unit the
+            # tool pairs with a pack11 original is a DLC 2 unit and judged (no unit name is in both DLC packs, finding
+            # 38: the shared names are objects / effects without a NavGraph). DLC 1 units fall back to pack10 and only
+            # add a note (warn when one is wrong). Measured 2026-11-06: about 20-30 s for ~300 files, no cache needed.
+            $navProfile = [IO.Path]::GetFileNameWithoutExtension($ppFull)
+            $navFiles = Get-TruProfileDrm -Prof $prof -BaseDir $(if ($baseArgs.Count) { [string]$baseArgs[1] } else { '' })
+            $navList = Join-Path $paths.Logs ('Test-TruPreflight_{0}_navgraph_files.txt' -f $stamp)
+            $navReport = Join-Path $paths.Logs ('Test-TruPreflight_{0}_navgraph.json' -f $stamp)
+            [IO.File]::WriteAllLines($navList, [string[]]$navFiles.Paths, (New-Object System.Text.UTF8Encoding($false)))
+            Write-Log ('navmesh: {0} .drm file(s) ({1} from the base) -> {2}' -f $navFiles.Paths.Count, $navFiles.Base, $navList) -Level DEBUG
+            $r = Invoke-TruPyCheck -ToolArgs @('tools\navgraph_raw_fix.py', 'scan', $navList, '--pack', 'pack11', '--report', $navReport)
+            $rep = $null
+            if ($null -ne $r.Code -and $r.Code -le 1 -and (Test-Path -LiteralPath $navReport)) {
+                try { $rep = Get-Content -LiteralPath $navReport -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $rep = $null }
+            }
+            if (!$rep -or !$rep.totals) {
+                Add-Row 'Data' 'NavPower navmesh' 'warn' ('cannot evaluate the profile with navgraph_raw_fix.py scan: {0}' -f $(if ($r.Why) { $r.Why } else { "exit $($r.Code), no report $navReport" }))
+            }
+            else {
+                $dlc2Bad = New-Object System.Collections.Generic.List[string]
+                $otherBad = New-Object System.Collections.Generic.List[string]
+                $nDlc2 = 0; $nOther = 0; $wDlc2 = 0
+                foreach ($l in @($rep.lines)) {
+                    if ([string]$l -notmatch '^(?<n>.+?)\.drm: (?<pk>[^:]+): (?<rest>.*)$') { $otherBad.Add("unparsed line '$l'"); continue }
+                    $unit = $Matches['n']; $pk = $Matches['pk']; $rest = $Matches['rest']
+                    $isDlc2 = $pk -like 'pack11*'
+                    $bad = $null
+                    if ($rest -match 'raw \(0 differ\)') { }
+                    elseif ($rest -match '(\d+) differ (\{[^}]*\})') { $bad = '{0} {1} words {2}' -f $unit, $Matches[1], ($Matches[2] -replace "'", '') }
+                    else { $bad = '{0} not comparable ({1})' -f $unit, $rest }
+                    if ($isDlc2) {
+                        $nDlc2++
+                        if ($rest -match ', (\d+) words, ') { $wDlc2 += [int]$Matches[1] }
+                        if ($bad) { $dlc2Bad.Add($bad) }
+                    }
+                    else {
+                        $nOther++
+                        if ($bad) { $otherBad.Add(('{0} ({1})' -f $bad, $pk)) }
+                    }
+                }
+                $navTot = $rep.totals
+                $navSum = '{0} .drm file(s) ({1} from the base), {2} unit(s): DLC 2 {3}, other {4}; no Xbox source {5}' -f
+                    $navFiles.Paths.Count, $navFiles.Base, [int]$navTot.units, $nDlc2, $nOther, [int]$navTot.no_xbox_source
+                $otherNote = if ($otherBad.Count) { '; other units (not DLC 2, outside decision 18): ' + ($otherBad -join ', ') } else { '' }
+                $oldState = $navmeshOldStateProfiles[$navProfile]
+                if ($dlc2Bad.Count -and $oldState) {
+                    Add-Row 'Data' 'NavPower navmesh' 'warn' ('expected old state (navmesh not fixed, intended: {0}): {1} DLC 2 unit(s) with swapped words: {2} ({3}, {4}){5}' -f
+                        $oldState, $dlc2Bad.Count, ($dlc2Bad -join ', '), $navSum, $baseNote, $otherNote)
+                }
+                elseif ($dlc2Bad.Count) {
+                    Add-Row 'Data' 'NavPower navmesh' 'fail' ('{0} DLC 2 unit(s) with swapped NavGraph words (finding 50): {1} ({2}, {3}) - a tree with the raw navmesh (pipeline step navraw, e.g. dlc_test51v_fix26_15f) must come last{4}' -f
+                        $dlc2Bad.Count, ($dlc2Bad -join ', '), $navSum, $baseNote, $otherNote)
+                }
+                elseif ($otherBad.Count) {
+                    Add-Row 'Data' 'NavPower navmesh' 'warn' ('DLC 2 units raw ({0} words); {1} ({2}){3}' -f $wDlc2, $navSum, $baseNote, $otherNote)
+                }
+                elseif (!$nDlc2) { Add-Row 'Data' 'NavPower navmesh' 'info' ('no DLC 2 unit installed; {0} ({1})' -f $navSum, $baseNote) }
+                else {
+                    $note = if ($oldState) { ' - listed as an old-state profile, but its navmesh is raw' } else { '' }
+                    Add-Row 'Data' 'NavPower navmesh' 'ok' ('all {0} DLC 2 unit(s) raw ({1} words, 0 swapped); {2} ({3}){4}' -f $nDlc2, $wDlc2, $navSum, $baseNote, $note)
                 }
             }
         }
