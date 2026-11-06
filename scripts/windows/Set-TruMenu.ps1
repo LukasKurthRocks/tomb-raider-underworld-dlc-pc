@@ -52,7 +52,7 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruMenu.asi', 'TruMenu.ini'
-# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.14) - recognised as
+# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.15) - recognised as
 # ours for update / removal
 $earlierBuilds = @{
     'TruMenu.asi' = @('50ebd28adcf96cef7e1db673ce293b5810bd8d64d0669617d09a1250598491a3',
@@ -78,7 +78,8 @@ $earlierBuilds = @{
                       '64b225881626eb437d7d7f556c1f3579471b9e9e65567f76983a7bcdc1df20c7',   # 0.11 Ablauf / flow file (work\asi\menu011)
                       '247a834a529646527731324c70e353c6e0f36f7eef500602bd4647c0deea38db',   # 0.12 NavPower debug drawing (work\asi\menu012)
                       '9314430b42eaaa78bae82d25c4c809b59dbb4b890786105a745aaa49c6eed463',   # 0.13 Thrall-Labels (work\asi\menu0130)
-                      'eb6274a9c2aa5f253ab2060cc82518cdfde572ffa44b63647ba41de006dc54b7')   # 0.14 Debug view (work\asi\menu014)
+                      'eb6274a9c2aa5f253ab2060cc82518cdfde572ffa44b63647ba41de006dc54b7',   # 0.14 Debug view (work\asi\menu014)
+                      'e45acc3cd2714911444580b5096c58a38e59ae0927cfa5eab59bc5c4dbea66d3')   # 0.15 Render mode (work\asi\menu015)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
@@ -98,7 +99,8 @@ $earlierBuilds = @{
                       'b4fcc6d7b667a43ad62f4c96cf8d21e3523c740f0db6334083f08b09a38449a4',   # 0.11 ([Flow]; work\asi\menu011)
                       '7d8c6de86056fa6e6ecd848da7e76caa89bad113c5703a0e48d493f3cbcf0e27',   # 0.12 ([Debug] Enabled / NavDraw / NavMask; work\asi\menu012)
                       'b465d1b58bc4257ad7a40b6b612e4e9c3cf91323e197375975c2a5584b321058',   # 0.13 ([Debug] Label*; work\asi\menu0130)
-                      '2530e2e5867d3d225e800821e880169eb95c4fd90ba6d26666a08e30ceddf476')   # 0.14 ([Debug] View / Trg* / Name*; work\asi\menu014)
+                      '2530e2e5867d3d225e800821e880169eb95c4fd90ba6d26666a08e30ceddf476',   # 0.14 ([Debug] View / Trg* / Name*; work\asi\menu014)
+                      '1313d4494a3583a9081c1bf37f03cbf362617348a19c0d1d053d5ccae586d2c0')   # 0.15 ([Debug] Slide / Coll* / Census* / Flat*; work\asi\menu015)
 }
 # 0.10 radial menu file and 0.10.1 tour file (next to tru.exe; the default comes from the build folder or src\asi\TruMenu)
 $radialFiles = @(

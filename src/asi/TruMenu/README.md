@@ -1703,6 +1703,75 @@ dbg.flat <0|1> (passes 0x200, colour material, models 0, edges 0, any target 0; 
 No line per frame: the `drawn` line once after a switch, patch / unpatch lines only when the slots change (switch,
 level change), the census block once, the collision line once per reading of the loaded units.
 
+## TruMenu 0.16 "Readability" (debug view after the first live run, 2026-11-06)
+
+Owner feedback from the first live run of 0.15 in the Croft Manor prologue: it works, but it is hard to read (lines
+over Lara and through walls, labels on top of each other, legend cut off, huge enclosing volumes, the active checkpoint
+marker filling the foreground, 15 triggers silently missing at TriggerMax 64). Workspace report
+`docs\Befund-TruMenu-Lesbarkeit-0611.md`; byte checks `work\asi\menu016\precheck_016.txt` (17, section
+"---- 0.16 depth" of `TruMenu.cpp`); offline math `tools/trumenu_readability_check.py`.
+
+* **Depth** (`dbg.depth off|on|dim`, `[Debug] Depth` 0 / 1 / 2, default 0): with 1 / 2 the lines and faces of every
+  debug view layer are not drawn by ImGui at Present but kept in a world-space buffer and drawn by TruMenu inside the
+  next frame, right after `PCScene::Draw` returned (vtable word 0x849a2c - the 0.15 census slot, patched while Depth is
+  on and a layer is on), into the render target / depth surface the scene left bound: pre-transformed vertices, x / y
+  from the 0.14 projection, z from the scene's own projection `[scene+0x100]` applied to the depth (after checking that
+  the scene's view `[scene+0x140]` gives the same depth as the 0.14 camera), Z test on, Z write off. `dim` draws the
+  hidden parts first at `DepthDim` % with the inverse test. Only a scene without its own target object
+  (`[scene+0x1c0]` = 0), render target 0 of the back buffer's size and a depth surface; `DepthCall` picks the n-th such
+  scene of a frame. Device state through a `D3DSBT_ALL` state block (captured before, applied after - as ImGui's DX9
+  backend), own dynamic vertex buffer (released in the Reset hook). If anything does not fit, that frame draws as
+  Depth 0 (lines on top) and `dbg.style` / the legend say why. Labels and the legend stay on top (ImGui).
+* **Style**: `[Debug] LineAlpha` (60 %, `dbg.alpha`), `LineBright` (100 %, `dbg.bright`), distance fade `Fade` /
+  `FadeStart` 2000 / `FadeEnd` 10000 / `FadeMin` 20 % (`dbg.fade`), faint faces `Fill` / `FillAlpha` 10 % (`dbg.fill`,
+  default off) - for every 0.14 / 0.15 overlay (triggers, loading areas, checkpoints, collision faces).
+* **Labels**: trigger, loading-area and checkpoint labels are candidates drawn at the end of the frame, nearest first,
+  at most `ViewLabelMax` (10), each nudged up / down or skipped when it overlaps one already drawn or the legend;
+  coincident triggers (same kind, centres within 25 units) get one label `TV x3 (4535..4537)`, both directions of one
+  loading area `a <-> b`. `LabelShort` (`dbg.short`, 1): `TV 4463`, `TP 4129`, `FIRE 4492`, `-> main_bedroom`; the nearest
+  label and the one nearest to the screen centre keep the full text. Every label (also `dbg.names`) shows the distance
+  to Lara and the height difference in game units (`6100u v1500u`) and the owner unit when it is not Lara's
+  (`[mansion_exterior_afterburn]`, from the loaded unit whose intro array holds the instance's intro). Dark background
+  box, text in the kind's colour, anchored at the top centre.
+* **Lara in** (`dbg.larain`, `[Debug] LaraIn` 1): the point the engine tests (Lara +0x20 + 200 up) against every listed
+  trigger with the engine's math; the containing ones bold with a pulsing white outline, the legend line
+  `Lara in: triggervolume 4537` (3 names, then +N; "(aus)" / "(nicht Spieler)" when the engine would skip the entry).
+  Planes: "near" within 50 units (the engine tests a crossing). The engine keeps no inside flag of its own (0x5cd1b0
+  returns 0 / 1 / 2 / 3 = out / inside / enter / exit from the old and the new position every frame).
+* **Clutter**: boxes around the camera, or big ones (`EnclosingSize` 1500) around Lara, dim + dashed
+  (`dbg.enclosing normal|dim|hide`, `[Debug] Enclosing` 1); `ViewSkip` (default `sound`) = layers `dbg.view` / `View=1`
+  leave off; checkpoint markers at most `MarkerMax` (8 %) of the screen height; `TriggerMax` 256 (was 64, 1 .. 512).
+* **Legend**: fully inside the screen, right-aligned, as wide as its text, counts (drawn / found) in their own column,
+  colour squares at the right edge; extra rows `GEKAPPT / capped` (warning colour) when TriggerMax cuts, `Lara in`,
+  enclosing count, depth state.
+* **Ring**: `Spieler/Debug` page 1 Alles an / aus, **Fliegen** (`cheat.flight`), **Darstellung**, Render, Leveldaten, KI,
+  Namen, Lara; page 2 Legende, Debug: Stand, Navmesh: Stand, Flug-Tempo 10 / 20 / 40 (`cheat.speed`).
+  `Spieler/Debug/Darstellung` (17 entries, 3 pages): Tiefe an / gedimmt / aus, Deckkraft 100 / 60 / 35, Ferne blasser,
+  Flaechen fuellen | Kurze Namen, Lara drin markieren, Heller / normal / Dunkler, Umhuellende blass / aus / normal |
+  Darstellung: Stand. Menu page "Debug view": new first group "Display / Darstellung (0.16)" (legend and Persist note
+  moved there).
+* **Script prints into TruMenu.log** (`log.scriptfile`, `[Log] ScriptToFile`, default 0; checkbox on the Log page): with
+  `log.script` on, every script line also as `script: <text>` in `TruMenu.log` - at most `[Log] MaxLinesPerSecond` per
+  second (the rest counted: `script: <n> line(s) dropped`), a line repeated at once is counted (`script: (last line x N
+  more)`, at the latest every 10 s) instead of written again. Note: the log page tails `TruMenu.log` too, so such a line
+  shows there once as `script` and once as `TruMenu`.
+
+Writes into game memory added by 0.16: the vtable word 0x00849a2c (`PCScene::Draw`, 0x005150e0 -> TruMenu) now also
+while Depth is 1 / 2, a debug view layer is on and a level is loaded (same rules, same log lines as the 0.15 census:
+written only while it holds the game's function, put back at off / level change / unload). Device calls inside the
+frame (render thread, after the game's scene Draw): CreateStateBlock / Capture / Apply, SetViewport, SetFVF,
+SetStreamSource, Set(Vertex|Pixel)Shader(NULL), SetTexture(0, NULL), 30 SetRenderState, 7 SetTextureStageState,
+DrawPrimitive, GetRenderTarget / GetDepthStencilSurface; CreateVertexBuffer once per device.
+
+```text
+0.16 readability: depth <ok|why>, Lara in <ok|why>, owner units <ok|why>; [Debug] Depth off (DepthDim 25, DepthCall 0), LineAlpha 60, ...
+dbg.depth on (DepthDim 25, DepthCall 0; src=ring)
+0.15 render mode patched (depth lines (0.16)): +PCScene::Draw 0x00849a2c (0x005150e0 -> TruMenu)
+0.16 depth: vertex buffer created on device 0x........ (6144 vertices, dynamic, default pool)
+0.16 depth drawn: an (scene 0 of 1 qualifying, 3 calls; row vectors, z LESSEQUAL, z(16.5) 0.0000; 812 lines, 0 faces)
+0.16 depth waits (180 frames): wartet, Linien oben / waits, lines on top: <why> (.. scene calls, .. qualifying)
+```
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

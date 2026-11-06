@@ -43,6 +43,14 @@ kDvLayers with 15 layers (slide / enemycoll have their own items dbg.slide / dbg
 dbg.flat / dbg.flatpass / dbg.flatpasses / dbg.flatcolour / dbg.flatmodels / dbg.flatedges / dbg.flatanyrt / dbg.render /
 dbg.slide / dbg.enemycoll in kItems and their ring entries: each switch once without an argument, dbg.flatpass once per
 pass id, dbg.flatcolour once for material and once for class, dbg.flatpasses with census / default / a mask.
+Since TruMenu 0.16 (2026-11-06 TruMenu 0.16 readability) also the display keys (Fade / Fill / LabelShort / LaraIn 0 / 1,
+Depth 0 .. 2, DepthDim 5 .. 80, DepthCall 0 .. 7, LineAlpha 10 .. 100, LineBright 30 .. 150, FadeStart 0 .. 100000,
+FadeEnd 500 .. 200000, FadeMin 0 .. 100, FillAlpha 2 .. 40, ViewLabelMax 0 .. 64, Enclosing 0 .. 2, EnclosingSize 100 ..
+100000, MarkerMax 2 .. 50, TriggerMax now 1 .. 512, ViewSkip a comma list of kDvLayers names or empty), the items
+dbg.depth / dbg.alpha / dbg.bright / dbg.fade / dbg.fill / dbg.short / dbg.larain / dbg.enclosing / dbg.style in kItems
+and their ring entries (dbg.depth once each for on / dim / off, dbg.enclosing once each for normal / dim / hide,
+dbg.alpha 10 .. 100, dbg.bright 30 .. 150, the switches once without an argument) and the flight entries of the ring
+(cheat.flight once without an argument, cheat.speed with a number 0 .. 1000).
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -80,18 +88,31 @@ LABEL_ITEMS = {'dbg.labels': 'bool'}
 DV_BOOL_KEYS = ('View', 'Triggers', 'TrgDeath', 'TrgFire', 'TrgCheckpoint', 'TrgWater', 'TrgSound', 'TrgVolume',
                 'TrgPlane', 'TrgUnknown', 'Portals', 'Checkpoints', 'TrgLabels', 'Legend', 'Markup', 'Persist', 'Names',
                 'NameIds',
-                'Slide', 'EnemyColl', 'Census', 'Flat', 'FlatModels', 'FlatEdges', 'FlatAnyTarget')   # 0.15
-DV_RANGES = {'TriggerMax': (1, 256), 'TriggerRadius': (500, 200000), 'TriggerLabelMax': (0, 64),
+                'Slide', 'EnemyColl', 'Census', 'Flat', 'FlatModels', 'FlatEdges', 'FlatAnyTarget',   # 0.15
+                'Fade', 'Fill', 'LabelShort', 'LaraIn')                                              # 0.16
+DV_RANGES = {'TriggerMax': (1, 512), 'TriggerRadius': (500, 200000), 'TriggerLabelMax': (0, 64),
              'NameRadius': (100, 200000), 'NameMax': (1, 64), 'NameScale': (0.5, 3),
-             'CollRadius': (500, 200000), 'CollMax': (100, 20000), 'CensusFrames': (10, 1200)}   # 0.15
-DV_FLOAT_KEYS = ('TriggerRadius', 'NameRadius', 'NameScale', 'CollRadius')     # the others are whole numbers
+             'CollRadius': (500, 200000), 'CollMax': (100, 20000), 'CensusFrames': (10, 1200),   # 0.15
+             'Depth': (0, 2), 'DepthDim': (5, 80), 'DepthCall': (0, 7), 'LineAlpha': (10, 100),   # 0.16
+             'LineBright': (30, 150), 'FadeStart': (0, 100000), 'FadeEnd': (500, 200000), 'FadeMin': (0, 100),
+             'FillAlpha': (2, 40), 'ViewLabelMax': (0, 64), 'Enclosing': (0, 2), 'EnclosingSize': (100, 100000),
+             'MarkerMax': (2, 50)}
+DV_FLOAT_KEYS = ('TriggerRadius', 'NameRadius', 'NameScale', 'CollRadius',     # the others are whole numbers
+                 'FadeStart', 'FadeEnd', 'EnclosingSize')                      # 0.16
 DV_ITEMS = {'dbg.view': 'bool', 'dbg.triggers': 'bool', 'dbg.show': 'action', 'dbg.portals': 'bool',
             'dbg.checkpoints': 'bool', 'dbg.legend': 'bool', 'dbg.status': 'info', 'dbg.names': 'bool',
             'dbg.namefilter': 'action', 'dbg.namecolour': 'action', 'dbg.namesize': 'action',
             # 0.15 render mode
             'dbg.census': 'action', 'dbg.flat': 'bool', 'dbg.flatpass': 'action', 'dbg.flatpasses': 'action',
             'dbg.flatcolour': 'action', 'dbg.flatmodels': 'bool', 'dbg.flatedges': 'bool', 'dbg.flatanyrt': 'bool',
-            'dbg.render': 'info', 'dbg.slide': 'bool', 'dbg.enemycoll': 'bool'}
+            'dbg.render': 'info', 'dbg.slide': 'bool', 'dbg.enemycoll': 'bool',
+            # 0.16 readability
+            'dbg.depth': 'action', 'dbg.alpha': 'action', 'dbg.bright': 'action', 'dbg.fade': 'bool', 'dbg.fill': 'bool',
+            'dbg.short': 'bool', 'dbg.larain': 'bool', 'dbg.enclosing': 'action', 'dbg.style': 'info'}
+# 0.16: ring entries with a fixed set of arguments (each once), percent presets, switches without an argument (once)
+DP_RING_ARGS = {'dbg.depth': ('on', 'dim', 'off'), 'dbg.enclosing': ('normal', 'dim', 'hide')}
+DP_RING_PERCENT = {'dbg.alpha': (10, 100), 'dbg.bright': (30, 150)}
+DP_RING_SWITCHES = ('dbg.fade', 'dbg.fill', 'dbg.short', 'dbg.larain', 'dbg.style')
 DV_OWN_ITEM = {'portals': 'dbg.portals', 'checkpoints': 'dbg.checkpoints', 'legend': 'dbg.legend', 'names': 'dbg.names',
                'slide': 'dbg.slide', 'enemycoll': 'dbg.enemycoll'}
 # 0.15: the pass ids of the flat view (kRmPassNames in TruMenu.cpp), their mask, the ring switches without an argument
@@ -457,13 +478,17 @@ def check_debug(ini_path, radial_path):
                                        '0x200)' % (name, n, value))
         elif key == 'FlatColour' and value not in ('material', 'class'):
             problems.append('%s:%d: [Debug] FlatColour=%s (material / class)' % (name, n, value))
-    for key in (('Enabled', 'NavDraw', 'NavMask', 'ViewNav', 'NameColour', 'NameMatch', 'FlatPasses', 'FlatColour') +
-                LABEL_KEYS + DV_BOOL_KEYS + tuple(sorted(DV_RANGES))):
+        elif key == 'ViewSkip':                  # 0.16: layer names of kDvLayers, may be empty
+            for word in [w for w in re.split(r'[ ,]+', value) if w]:
+                if word not in layers: problems.append('%s:%d: [Debug] ViewSkip names "%s" (not in kDvLayers)'
+                                                       % (name, n, word))
+    for key in (('Enabled', 'NavDraw', 'NavMask', 'ViewNav', 'NameColour', 'NameMatch', 'FlatPasses', 'FlatColour',
+                 'ViewSkip') + LABEL_KEYS + DV_BOOL_KEYS + tuple(sorted(DV_RANGES))):
         if key not in seen: problems.append('%s: [Debug] %s missing' % (name, key))
     items = item_types(src)
     for item, typ in sorted(NAV_ITEMS.items()) + sorted(LABEL_ITEMS.items()) + sorted(DV_ITEMS.items()):
         if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
-    entries, used, labels = 0, set(), 0
+    entries, used, labels, flight = 0, set(), 0, 0
     dv_seen = {}                             # 0.14: layer / item -> count of ring entries
     if os.path.exists(radial_path):
         for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
@@ -518,10 +543,33 @@ def check_debug(ini_path, radial_path):
                         ok = False
                     if not ok: problems.append('%s: dbg.flatpasses needs census, default or a pass mask, got "%s"'
                                                % (where, arg))
+                elif word in DP_RING_ARGS:           # 0.16: dbg.depth on / dim / off, dbg.enclosing normal / dim / hide
+                    if arg not in DP_RING_ARGS[word]:
+                        problems.append('%s: %s needs one of %s, got "%s"' % (where, word, ' / '.join(DP_RING_ARGS[word]),
+                                                                              arg))
+                    else:
+                        dv_seen[word + ' ' + arg] = dv_seen.get(word + ' ' + arg, 0) + 1
+                elif word in DP_RING_PERCENT:        # 0.16: dbg.alpha / dbg.bright presets
+                    lo, hi = DP_RING_PERCENT[word]
+                    if not (arg.isdigit() and lo <= int(arg) <= hi):
+                        problems.append('%s: %s needs a percent %d .. %d, got "%s"' % (where, word, lo, hi, arg))
                 elif arg:
                     problems.append('%s: %s takes no argument in the ring, got "%s"' % (where, word, arg))
                 else:
                     dv_seen[word] = dv_seen.get(word, 0) + 1
+                continue
+            if word == 'cheat.flight':           # 0.16: the flight switch in the ring, once, no argument
+                flight += 1
+                if arg: problems.append('%s:%d: cheat.flight takes no argument in the ring, got "%s"'
+                                        % (os.path.basename(radial_path), n, arg))
+                continue
+            if word == 'cheat.speed':            # 0.16: speed presets
+                try:
+                    ok = 0.0 < float(arg) < 1000.0
+                except ValueError:
+                    ok = False
+                if not ok: problems.append('%s:%d: cheat.speed needs a number 0 .. 1000, got "%s"'
+                                           % (os.path.basename(radial_path), n, arg))
                 continue
             if not word.startswith('nav.'): continue
             entries += 1
@@ -539,10 +587,14 @@ def check_debug(ini_path, radial_path):
         want = [DV_OWN_ITEM.get(l, l) for l in layers] + ['dbg.view', 'dbg.triggers', 'dbg.status']
         want += list(RM_RING_SWITCHES) + ['dbg.flatpass ' + p for p in RM_PASSES] + \
             ['dbg.flatcolour material', 'dbg.flatcolour class']                     # 0.15 render mode
+        want += list(DP_RING_SWITCHES) + ['%s %s' % (w, a) for w, args in sorted(DP_RING_ARGS.items()) for a in args]
         for w in want:
             if dv_seen.get(w, 0) != 1:
                 problems.append('%s: debug view entry %s must be in the radial file once, found %d'
                                 % (os.path.basename(radial_path), w, dv_seen.get(w, 0)))
+        if flight != 1:                      # 0.16
+            problems.append('%s: cheat.flight must be in the radial file once, found %d'
+                            % (os.path.basename(radial_path), flight))
     return problems, ('%d switches in kNavSwitches, %d nav entries in the radial file (%d switches), %d dbg.labels entry, '
                       '%d debug view layers, %d debug view entries' % (len(switches), entries, len(used), labels,
                                                                        len(layers), sum(dv_seen.values())))

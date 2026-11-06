@@ -20,6 +20,8 @@
 //          0.15 render mode: only while the census / flat view is on in a loaded level also the device's DrawPrimitive
 //          (81) / DrawIndexedPrimitive (82) and the drawable Draw words 0x849948 / 0x849758 (census: 0x849a2c) of
 //          tru.exe's .rdata - put back when switched off, at a level change and at unload (section "0.15 Render mode").
+//          0.16 depth: while [Debug] Depth is 1 / 2 and a debug view layer is on, the PCScene::Draw word 0x849a2c the
+//          same way (the debug view lines are then drawn inside the frame after the scene, section "0.16 depth").
 //   shots  0.10.5: no hook of its own - the Present hooks above copy the back buffer (GetRenderTargetData into a
 //          system-memory surface) before or after TruMenu draws; PNG encoding and the file write on a worker thread.
 //   game   Every menu entry is an item with a stable id (kItems); items that touch the game (cheat, camera, level
@@ -53,7 +55,17 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.15 (Render mode: dbg.census = render census (drawable / device draws per pass "
+const char *const kVersion = "TruMenu 0.16 (Readability of the debug view: dbg.depth off / on / dim = lines on top, "
+                             "hidden behind the level geometry and Lara, or the hidden parts faint (drawn inside the frame "
+                             "after PCScene::Draw with the scene's depth buffer); dbg.alpha / dbg.bright / dbg.fade / "
+                             "dbg.fill = opacity, brightness, distance fade, faint faces; labels nearest first without "
+                             "overlap, short texts, coincident triggers merged, distance / height to Lara and the owner "
+                             "unit; dbg.larain = the triggers Lara's test point is in, bold and named in the legend; "
+                             "enclosing boxes dim + dashed; legend right-aligned with counts and colour squares at the right "
+                             "edge, capped warning; checkpoint markers capped in size; TriggerMax 256; [Debug] ViewSkip "
+                             "(sound off in dbg.view); ring Spieler / Debug / Darstellung, Fliegen; log.scriptfile = "
+                             "script prints also in TruMenu.log ([Log] ScriptToFile); "
+                             "0.15: Render mode: dbg.census = render census (drawable / device draws per pass "
                              "id for N frames, one '0.15 census' block in TruMenu.log, suggested pass mask); dbg.flat = "
                              "flat view (level geometry in solid palette colours: pixel shader swap inside the terrain / "
                              "model drawable Draw slots of the passes in dbg.flatpasses, the game's shader put back after "
@@ -288,6 +300,9 @@ const OptDef kOpts[] = {
     {"Log", "Lines", "12", "lines on the Debug / Log page and in the overlay, 1 .. 64"},
     {"Log", "Script", "0", "1 = redirect the game's 8 script print / log natives to the log page from the start (patches 5 "
                            "bytes each)"},
+    {"Log", "ScriptToFile", "0", "0.16 (log.scriptfile): 1 = the script lines (needs Script / log.script) also as 'script: "
+                                 "...' in TruMenu.log, at most\nMaxLinesPerSecond per second, a line repeated at once "
+                                 "counted instead of written again; 0 = log page only"},
     {"Log", "Collapse", "1", "1 = repeated lines (same source, same text after the time stamp) become one line \"text x42 "
                              "(17:09:02-17:09:33)\""},
     {"Log", "HideLinkReads", "1", "1 = drop TruLink's echo of read / scan / watch / ping commands and of menu reads (info "
@@ -459,8 +474,9 @@ const OptDef kOpts[] = {
                                 "trglabels)"},
     {"Debug", "Legend", "0", "0.14: 1 = the legend top right on from the start (dbg.legend)"},
     {"Debug", "Markup", "0", "0.14: 1 = draw.markup on from the start"},
-    {"Debug", "TriggerMax", "64", "0.14: at most this many triggers drawn per frame, the nearest to the camera first, "
-                                  "1 .. 256"},
+    {"Debug", "TriggerMax", "256", "0.14: at most this many triggers drawn per frame, the nearest to the camera first, "
+                                   "1 .. 512 (0.16: 256, was 64 - a corridor of\nthe manor has 98; the legend shows "
+                                   "GEKAPPT / capped when the cap is hit)"},
     {"Debug", "TriggerRadius", "20000", "0.14: triggers only up to this distance from the camera (game units, 500 .. "
                                         "200000)"},
     {"Debug", "TriggerLabelMax", "16", "0.14: at most this many trigger names per frame (the nearest), 0 .. 64"},
@@ -505,6 +521,39 @@ const OptDef kOpts[] = {
     {"Debug", "FlatEdges", "0", "0.15: 1 = edge pass: every flat draw again as a dark wireframe (one more draw per draw)"},
     {"Debug", "FlatAnyTarget", "0", "0.15: 1 = flat in every render target; 0 = only in targets of the back buffer's size "
                                     "(shadow maps / reflections keep\nthe game's shading even with a wrong pass mask)"},
+    {"Debug", "Depth", "0", "0.16 (dbg.depth): 0 = debug view lines on top of everything (as 0.15); 1 = hidden behind the "
+                            "level geometry and Lara (drawn\ninside the game frame with the scene's depth buffer - patches "
+                            "the PCScene::Draw vtable word 0x849a2c while on and a layer is\non); 2 = like 1, the hidden "
+                            "parts faint (DepthDim)"},
+    {"Debug", "DepthDim", "25", "0.16: Depth=2 - opacity of the hidden parts in percent, 5 .. 80"},
+    {"Debug", "DepthCall", "0", "0.16: Depth - which PCScene::Draw of a frame (counted among those into a back-buffer-size "
+                                "target with a depth surface)\nthe lines go into, 0 .. 7 (dbg.style shows how many there are)"},
+    {"Debug", "LineAlpha", "60", "0.16 (dbg.alpha): opacity of every debug view line in percent, 10 .. 100 (0.15: 100)"},
+    {"Debug", "LineBright", "100", "0.16 (dbg.bright): brightness of the debug view colours in percent, 30 .. 150"},
+    {"Debug", "Fade", "1", "0.16 (dbg.fade): 1 = far objects fainter (from FadeStart to FadeEnd game units from the camera, "
+                           "down to FadeMin percent); 0 = off"},
+    {"Debug", "FadeStart", "2000", "0.16: distance where the fade starts (game units, 0 .. 100000)"},
+    {"Debug", "FadeEnd", "10000", "0.16: distance where the fade reaches FadeMin (game units, 500 .. 200000)"},
+    {"Debug", "FadeMin", "20", "0.16: opacity left at FadeEnd and beyond, percent 0 .. 100"},
+    {"Debug", "Fill", "0", "0.16 (dbg.fill): 1 = faint face fill of trigger boxes / planes and loading areas (FillAlpha); "
+                           "0 = lines only"},
+    {"Debug", "FillAlpha", "10", "0.16: opacity of the face fill in percent, 2 .. 40"},
+    {"Debug", "ViewLabelMax", "10", "0.16: at most this many labels of triggers, loading areas and checkpoints together, the "
+                                    "nearest first, each nudged or\nskipped when it would overlap another, 0 .. 64 "
+                                    "(TriggerLabelMax still caps the trigger names)"},
+    {"Debug", "LabelShort", "1", "0.16 (dbg.short): 1 = short labels (TV 4463, TP 4129, FIRE 4492, '-> main_bedroom') - the "
+                                 "nearest one and the one at the\nscreen centre keep the full name; 0 = full names"},
+    {"Debug", "LaraIn", "1", "0.16 (dbg.larain): 1 = the triggers the test point (Lara +200) is in are drawn bold with a "
+                             "pulsing white outline and named\nin the legend (Lara in: ...); 0 = off"},
+    {"Debug", "Enclosing", "1", "0.16 (dbg.enclosing): boxes around the camera, or big ones (EnclosingSize) around Lara: "
+                                "0 = drawn like the others, 1 = dim\nand dashed, 2 = hidden"},
+    {"Debug", "EnclosingSize", "1500", "0.16: a box / sphere counts as big from this half extent / radius on (game units, "
+                                       "100 .. 100000)"},
+    {"Debug", "MarkerMax", "8", "0.16: checkpoint markers at most this percent of the screen height (the active one stood "
+                                "at Lara and filled the\nforeground), 2 .. 50"},
+    {"Debug", "ViewSkip", "sound", "0.16: layers dbg.view (Alles an / aus) and View=1 leave off - comma list of layer names "
+                                   "(death, fire, checkpoint, water,\nsound, volume, plane, unknown, portals, checkpoints, "
+                                   "trglabels, legend, names, slide, enemycoll); empty = none"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -3881,11 +3930,50 @@ ScriptNative g_natives[] = {
 };
 const int kNativeCount = sizeof(g_natives) / sizeof(g_natives[0]);
 
+// 0.16 [Log] ScriptToFile (live test 2026-11-06: the prologue skip's script prints were only on the log page): each
+// script line also as "script: <text>" in TruMenu.log - at most [Log] MaxLinesPerSecond per second (the rest counted,
+// one "dropped" line in the next second), a line repeated at once counted instead of written ("(last line x N)" when
+// another line comes, at the latest every 10 s). Script natives run on the game thread only.
+volatile LONG g_scriptToFile = 0;
+char g_sfLast[200] = "";
+LONG g_sfRepeat = 0, g_sfDropped = 0;
+DWORD g_sfSecond = 0, g_sfRepeatTick = 0;
+int g_sfInSecond = 0;
+LONG g_sfWritten = 0;
+void ScriptToFile(const char *line) {
+    if (!g_scriptToFile) return;
+    DWORD now = GetTickCount();
+    if (!strcmp(line, g_sfLast)) {
+        ++g_sfRepeat;
+        if (now - g_sfRepeatTick >= 10000) {
+            Log(1, "script: (last line x%ld in %lu s)", g_sfRepeat, (now - g_sfRepeatTick) / 1000);
+            g_sfRepeat = 0;
+            g_sfRepeatTick = now;
+        }
+        return;
+    }
+    if (g_sfRepeat) Log(1, "script: (last line x%ld more)", g_sfRepeat);
+    g_sfRepeat = 0;
+    strncpy_s(g_sfLast, sizeof(g_sfLast), line, _TRUNCATE);
+    g_sfRepeatTick = now;
+    if (now / 1000 != g_sfSecond) {
+        if (g_sfDropped) Log(1, "script: %ld line(s) dropped ([Log] MaxLinesPerSecond %d)", g_sfDropped, g_logRate);
+        g_sfDropped = 0;
+        g_sfSecond = now / 1000;
+        g_sfInSecond = 0;
+    }
+    if (g_logRate > 0 && g_sfInSecond >= g_logRate) { ++g_sfDropped; return; }
+    ++g_sfInSecond;
+    ++g_sfWritten;
+    Log(1, "script: %s", line);
+}
+
 void ScriptText(const char *text, bool newline) {
     for (const char *p = text; *p; ++p) {
         if (*p == '\n' || g_scriptPartialLen + 1 >= sizeof(g_scriptPartial)) {
             g_scriptPartial[g_scriptPartialLen] = 0;
             PushLine("script", g_scriptPartial);
+            ScriptToFile(g_scriptPartial);   // 0.16
             g_scriptPartialLen = 0;
             if (*p == '\n') continue;
         }
@@ -3894,6 +3982,7 @@ void ScriptText(const char *text, bool newline) {
     if (newline) {
         g_scriptPartial[g_scriptPartialLen] = 0;
         PushLine("script", g_scriptPartial);
+        ScriptToFile(g_scriptPartial);       // 0.16
         g_scriptPartialLen = 0;
     }
     ++g_scriptCount;
@@ -3966,6 +4055,18 @@ bool SetScriptLog(bool on, char *o, size_t n) {
 }
 bool RunScriptLog(const char *arg, char *o, size_t n) { return SetScriptLog(BoolArg(arg, g_scriptLog != 0), o, n); }
 void ValScriptLog(char *o, size_t n) { Out(o, n, "%d (%ld prints)", g_scriptLog ? 1 : 0, g_scriptCount); }
+// 0.16 log.scriptfile [0|1]: the script lines also into TruMenu.log (needs log.script on to get any line)
+void ValScriptFile(char *o, size_t n) {
+    Out(o, n, "%d (%ld written, log.script %d)", g_scriptToFile ? 1 : 0, g_sfWritten, g_scriptLog ? 1 : 0);
+}
+bool RunScriptFile(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, g_scriptToFile != 0);
+    InterlockedExchange(&g_scriptToFile, on ? 1 : 0);
+    Log(1, "log.scriptfile %d (script lines also in TruMenu.log, at most %d per second; log.script %d)", on ? 1 : 0,
+        g_logRate, g_scriptLog ? 1 : 0);
+    Out(o, n, "log.scriptfile %d%s", on ? 1 : 0, on && !g_scriptLog ? " - log.script is off: no script line yet" : "");
+    return true;
+}
 
 void LinesText(const char *filter, int max, char *o, size_t n) {
     static LogLine lines[64];                // only called from one thread at a time in practice (menu / TruLink)
@@ -6285,9 +6386,10 @@ const char *g_dvTrgWhy = "not checked", *g_dvPortalWhy = "not checked", *g_dvCpW
 volatile LONG g_dvOn[kDvCount] = {};         // the layers (dbg.show <layer>, dbg.triggers, dbg.portals, ...)
 int g_dvAtStart[kDvCount] = {};              // [Debug] TrgDeath .. Legend
 int g_dvViewAtStart = 0, g_dvTrgAtStart = 0, g_dvMarkupAtStart = 0, g_dvPersist = 0;   // [Debug] View / Triggers / ..
-int g_dvTrgMax = 64, g_dvLabelMax = 16;      // [Debug] TriggerMax / TriggerLabelMax
+int g_dvTrgMax = 256, g_dvLabelMax = 16;     // [Debug] TriggerMax (0.16: 256, was 64) / TriggerLabelMax
 float g_dvRadius = 20000.0f;                 // [Debug] TriggerRadius (from the camera)
 char g_dvViewNav[160] = "planner_areas,planner_connectivity,obstacles";   // [Debug] ViewNav
+char g_dvViewSkip[96] = "sound";             // 0.16 [Debug] ViewSkip: layers dbg.view / [Debug] View leave off
 char g_dvState[640] = "off";                 // last frame: why nothing / what was drawn (dbg.status)
 int g_dvDrawn[kDvCount] = {}, g_dvListed[kDvCount] = {};   // last frame per layer: drawn / found in the lists
 volatile LONG g_dvLogPending = 0;            // one "drawn" log line with the first frame after a switch
@@ -6308,6 +6410,7 @@ bool DvChecks(const DvCheck *c, size_t count, DWORD *failedAt) {
 }
 char g_dvTrgWhyBuf[96], g_dvPortalWhyBuf[96], g_dvCpWhyBuf[96];
 bool DvLayerOk(int layer, const char **why);  // below
+bool DvViewSkips(int layer);                 // 0.16, below
 void DebugViewCheck() {
     DWORD at = 0;
     bool base = g_lblProjOk && g_instOk && g_playerOk && g_mainStateOk;
@@ -6333,7 +6436,7 @@ void DebugViewCheck() {
     int on = 0;
     if (g_debugEnabled) {
         for (int i = 0; i < kDvCount; ++i) {
-            bool want = g_dvAtStart[i] || g_dvViewAtStart || (i < kDvKinds && g_dvTrgAtStart);
+            bool want = g_dvAtStart[i] || (g_dvViewAtStart && !DvViewSkips(i)) || (i < kDvKinds && g_dvTrgAtStart);
             const char *why = "";
             if (want && DvLayerOk(i, &why)) { InterlockedExchange(&g_dvOn[i], 1); ++on; }
         }
@@ -6369,6 +6472,15 @@ int DvFind(const char *text) {
 bool DvAnyOn() {
     for (int i = 0; i < kDvCount; ++i)
         if (g_dvOn[i]) return true;
+    return false;
+}
+// 0.16: [Debug] ViewSkip names this layer (dbg.view / [Debug] View leave it off)
+bool DvViewSkips(int layer) {
+    char list[sizeof(g_dvViewSkip)];
+    strncpy_s(list, sizeof(list), g_dvViewSkip, _TRUNCATE);
+    char *context = nullptr;
+    for (char *word = strtok_s(list, ", ", &context); word; word = strtok_s(nullptr, ", ", &context))
+        if (!_stricmp(word, kDvLayers[layer].name)) return true;
     return false;
 }
 bool DvAnyTrigger() {
@@ -6449,12 +6561,139 @@ bool DvCamToScreen(const DvCam &c, const float *q, ImVec2 *out) {
     out->y = y;
     return true;
 }
-// a world line, clipped at the near plane; false = nothing of it in front of the camera
+// ---- 0.16 readability (owner feedback 2026-11-06 from the first live run in the Croft Manor prologue) ----
+// Workspace docs\Befund-TruMenu-Lesbarkeit-0611.md; the new byte checks are pinned in work\asi\menu016\precheck_016.txt.
+// Style: every 0.14 / 0.15 overlay colour goes through DvTint - [Debug] LineAlpha (global opacity), LineBright
+//   (brightness), Fade / FadeStart / FadeEnd / FadeMin (far objects fainter, distance from the camera), Enclosing (a box
+//   around the camera, or a big one around Lara: dim + dashed, or hidden), Fill / FillAlpha (faint faces of boxes and
+//   trigger planes).
+// Labels: every trigger / portal / checkpoint label is a candidate (DvTagAdd), drawn at the end of the frame nearest
+//   first, at most [Debug] ViewLabelMax, each nudged up / down or skipped when its box overlaps one already drawn (or
+//   the legend); coincident triggers (same kind, centres within 25 units) share one label "TV x3 (4535..4537)", the
+//   two directions of one loading area one label "a <-> b"; LabelShort = short text (TV 4463 / TP 4129 / FIRE 4492,
+//   portal "-> main_bedroom") except the nearest label and the one nearest to the screen centre (full text).
+// Lara in: the point the engine tests (player +0x20 + (0, 0, 200)) against every listed trigger with the engine's math
+//   (box |(p - c) . row_i| <= h_i = 0x46b730, sphere |p - c|^2 < r^2; a plane is a crossing test in the engine, so
+//   "near" = within 50 units of its quad); drawn bold with a pulsing white outline, named in the legend. The engine
+//   keeps no inside flag of its own: 0x5cd1b0 tests the old and the new position every frame and returns 0 out,
+//   1 inside, 2 enter, 3 exit (0x5cd4ef / 0x5cd507); the loop sends enter / exit (0x5cd661 / 0x5cd68b / 0x5cd6b6) only
+//   for entries with +0x24 bit 31 (enabled) and bit 30 (tested against the player).
+// Depth ([Debug] Depth 1 / 2, below in the 0.16 depth section): lines / faces go into a world-space buffer instead of
+//   ImGui and are drawn inside the next frame right after PCScene::Draw returned, with the scene's depth buffer.
+int g_dvAlpha = 60, g_dvBright = 100, g_dvFade = 1, g_dvFadeMin = 20;   // [Debug] LineAlpha / LineBright / Fade / FadeMin
+float g_dvFadeStart = 2000.0f, g_dvFadeEnd = 10000.0f;                  // [Debug] FadeStart / FadeEnd
+int g_dvFill = 0, g_dvFillAlpha = 10;                                   // [Debug] Fill / FillAlpha
+int g_dvShort = 1, g_dvLaraIn = 1, g_dvTagMax = 10;                      // [Debug] LabelShort / LaraIn / ViewLabelMax
+int g_dvEncl = 1, g_dvMarkerMax = 8;                                    // [Debug] Enclosing (0 / 1 / 2) / MarkerMax (%)
+float g_dvEnclSize = 1500.0f;                                           // [Debug] EnclosingSize
+volatile LONG g_dpMode = 0;                  // [Debug] Depth: 0 on top (0.15), 1 hidden behind geometry, 2 hidden dim
+int g_dpDim = 25, g_dpCall = 0;              // [Debug] DepthDim (%) / DepthCall
+bool g_dpOk = false, g_dvLaraOk = false;     // precheck_016.txt: depth (scene) / the engine's inside result codes
+const char *g_dpWhy = "not checked";
+char g_dpWhyBuf[96];
+bool g_dvDashed = false;                     // the DvLine calls of one enclosing box draw dashed
+float g_dvCamPos[3] = {0, 0, 0};             // camera position (inverse of the 0.14 camera), this frame
+bool g_dvCamOk = false;
+
+// distance fade factor (1 = near .. FadeMin / 100 = far)
+float DvFadeAt(float dist2) {
+    if (!g_dvFade || !(g_dvFadeEnd > g_dvFadeStart)) return 1.0f;
+    float d = sqrtf(dist2 > 0.0f ? dist2 : 0.0f), t = (d - g_dvFadeStart) / (g_dvFadeEnd - g_dvFadeStart);
+    t = t < 0.0f ? 0.0f : t > 1.0f ? 1.0f : t;
+    return 1.0f - t * (1.0f - g_dvFadeMin / 100.0f);
+}
+ImU32 DvRgba(float r, float g, float b, float a) {
+    int ir = static_cast<int>(r), ig = static_cast<int>(g), ib = static_cast<int>(b), ia = static_cast<int>(a);
+    ir = ir < 0 ? 0 : ir > 255 ? 255 : ir;
+    ig = ig < 0 ? 0 : ig > 255 ? 255 : ig;
+    ib = ib < 0 ? 0 : ib > 255 ? 255 : ib;
+    ia = ia < 0 ? 0 : ia > 255 ? 255 : ia;
+    return IM_COL32(ir, ig, ib, ia);
+}
+// a layer colour with LineBright, LineAlpha, the distance fade and an extra factor (disabled / enclosing)
+ImU32 DvTint(ImU32 colour, float dist2, float extra) {
+    const float k = g_dvBright / 100.0f;
+    return DvRgba((colour & 0xff) * k, ((colour >> 8) & 0xff) * k, ((colour >> 16) & 0xff) * k,
+                  ((colour >> 24) & 0xff) * (g_dvAlpha / 100.0f) * extra * DvFadeAt(dist2));
+}
+// the face fill colour: FillAlpha with the fade (not LineAlpha)
+ImU32 DvFillTint(ImU32 colour, float dist2, float extra) {
+    const float k = g_dvBright / 100.0f;
+    return DvRgba((colour & 0xff) * k, ((colour >> 8) & 0xff) * k, ((colour >> 16) & 0xff) * k,
+                  255.0f * (g_dvFillAlpha / 100.0f) * extra * DvFadeAt(dist2));
+}
+
+// the depth sink: one world-space buffer per Present (three, so the scene hook never reads the one being filled)
+struct DpLine { float a[3], b[3]; ImU32 colour; float thick; int dashed; };
+struct DpTri { float v[3][3]; ImU32 colour; };
+const int kDpLineMax = 16384, kDpTriMax = 16384;
+struct DpBuf { LONG frame; int lines, tris, dropped; DpLine line[kDpLineMax]; DpTri tri[kDpTriMax]; };
+DpBuf g_dpBuf[3];
+volatile LONG g_dpPub = -1, g_dpRead = -1;   // published buffer / the one the scene hook reads (-1 none)
+DpBuf *g_dpFill = nullptr;                   // Present: the buffer DrawDebugView fills now (nullptr = ImGui path)
+LONG g_dpFillIndex = -1;
+volatile LONG g_dpFrame = 0;                 // Present counter (RenderModeTick)
+void DpPushLine(const float *a, const float *b, ImU32 colour, float thick) {
+    DpBuf &d = *g_dpFill;
+    if (d.lines >= kDpLineMax) { ++d.dropped; return; }
+    DpLine &l = d.line[d.lines++];
+    for (int k = 0; k < 3; ++k) { l.a[k] = a[k]; l.b[k] = b[k]; }
+    l.colour = colour;
+    l.thick = thick;
+    l.dashed = g_dvDashed ? 1 : 0;
+}
+void DpPushTri(const float *a, const float *b, const float *c, ImU32 colour) {
+    DpBuf &d = *g_dpFill;
+    if (d.tris >= kDpTriMax) { ++d.dropped; return; }
+    DpTri &t = d.tri[d.tris++];
+    for (int k = 0; k < 3; ++k) { t.v[0][k] = a[k]; t.v[1][k] = b[k]; t.v[2][k] = c[k]; }
+    t.colour = colour;
+}
+
+// a screen segment clipped to the rectangle [x0, x1] x [y0, y1] (Liang-Barsky); t0 / t1 = the kept part of a .. b
+bool DvClip2D(const ImVec2 &a, const ImVec2 &b, float x0, float y0, float x1, float y1, float *t0, float *t1) {
+    float dx = b.x - a.x, dy = b.y - a.y, lo = 0.0f, hi = 1.0f;
+    const float p[4] = {-dx, dx, -dy, dy}, q[4] = {a.x - x0, x1 - a.x, a.y - y0, y1 - a.y};
+    for (int i = 0; i < 4; ++i) {
+        if (p[i] == 0.0f) {
+            if (q[i] < 0.0f) return false;
+            continue;
+        }
+        float r = q[i] / p[i];
+        if (p[i] < 0.0f) { if (r > hi) return false; if (r > lo) lo = r; }
+        else { if (r < lo) return false; if (r < hi) hi = r; }
+    }
+    *t0 = lo;
+    *t1 = hi;
+    return true;
+}
+const float kDvDashOn = 9.0f, kDvDashOff = 7.0f;   // px
+// a dashed screen line (enclosing boxes), clipped to the display first
+void DvDash(ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 colour, float thick) {
+    const ImVec2 ds = ImGui::GetIO().DisplaySize;
+    float t0 = 0.0f, t1 = 1.0f;
+    if (!DvClip2D(a, b, -20.0f, -20.0f, ds.x + 20.0f, ds.y + 20.0f, &t0, &t1)) return;
+    float dx = b.x - a.x, dy = b.y - a.y, len = sqrtf(dx * dx + dy * dy) * (t1 - t0);
+    if (len < 1.0f) return;
+    ImVec2 s(a.x + dx * t0, a.y + dy * t0);
+    float ux = dx * (t1 - t0) / len, uy = dy * (t1 - t0) / len;
+    for (float at = 0.0f; at < len; at += kDvDashOn + kDvDashOff) {
+        float e = at + kDvDashOn < len ? at + kDvDashOn : len;
+        dl->AddLine(ImVec2(s.x + ux * at, s.y + uy * at), ImVec2(s.x + ux * e, s.y + uy * e), colour, thick);
+    }
+}
+
+// a world line, clipped at the near plane; false = nothing of it in front of the camera. 0.16: into the depth buffer
+// when the depth path fills one this frame, dashed while g_dvDashed
 bool DvLine(ImDrawList *dl, const DvCam &c, const float *a, const float *b, ImU32 colour, float thick) {
     float ca[3], cb[3];
     DvToCam(c, a, ca);
     DvToCam(c, b, cb);
     if (ca[2] < kDvNear && cb[2] < kDvNear) return false;
+    if (g_dpFill) {
+        DpPushLine(a, b, colour, thick);
+        return true;
+    }
     if (ca[2] < kDvNear || cb[2] < kDvNear) {
         float *near_ = ca[2] < kDvNear ? ca : cb;
         const float *far_ = ca[2] < kDvNear ? cb : ca;
@@ -6464,8 +6703,39 @@ bool DvLine(ImDrawList *dl, const DvCam &c, const float *a, const float *b, ImU3
     }
     ImVec2 sa, sb;
     if (!DvCamToScreen(c, ca, &sa) || !DvCamToScreen(c, cb, &sb)) return false;
-    dl->AddLine(sa, sb, colour, thick);
+    if (g_dvDashed) DvDash(dl, sa, sb, colour, thick);
+    else dl->AddLine(sa, sb, colour, thick);
     return true;
+}
+// 0.16: a convex world polygon (3 or 4 points), near-plane clipped, filled (face fill; R2 faces)
+void DvPoly(ImDrawList *dl, const DvCam &c, const float (*p)[3], int n, ImU32 colour) {
+    if (n < 3 || n > 4 || !(colour >> 24)) return;
+    if (g_dpFill) {
+        float q[3];
+        bool any = false;
+        for (int i = 0; i < n && !any; ++i) { DvToCam(c, p[i], q); any = q[2] >= kDvNear; }
+        for (int i = 1; any && i + 1 < n; ++i) DpPushTri(p[0], p[i], p[i + 1], colour);
+        return;
+    }
+    float q[4][3], poly[5][3];
+    for (int a = 0; a < n; ++a) DvToCam(c, p[a], q[a]);
+    int m = 0;
+    for (int a = 0; a < n; ++a) {                         // Sutherland-Hodgman against z' >= near
+        const float *p0 = q[a], *p1 = q[(a + 1) % n];
+        bool in0 = p0[2] >= kDvNear, in1 = p1[2] >= kDvNear;
+        if (in0) { poly[m][0] = p0[0]; poly[m][1] = p0[1]; poly[m][2] = p0[2]; ++m; }
+        if (in0 != in1) {
+            float s = (kDvNear - p0[2]) / (p1[2] - p0[2]);
+            for (int b = 0; b < 3; ++b) poly[m][b] = p0[b] + (p1[b] - p0[b]) * s;
+            poly[m][2] = kDvNear;
+            ++m;
+        }
+    }
+    if (m < 3) return;
+    ImVec2 pts[5];
+    for (int a = 0; a < m; ++a)
+        if (!DvCamToScreen(c, poly[a], &pts[a])) return;
+    dl->AddConvexPolyFilled(pts, m, colour);
 }
 bool DvFinite(const float *p, int count) {
     for (int i = 0; i < count; ++i)
@@ -6486,11 +6756,14 @@ void DvPoint(const float *pos, const float rows[3][3], float a, float b, float c
 struct DvTrig {
     DWORD entry, inst;
     float pos[3], rot[3], ext[3], radius, dist2, extent;
+    float rows[3][3];                        // 0.16: M = Rz * Ry * Rx (DvEulerRows), once per frame
     int kind;                                // layer index kDvDeath .. kDvUnknown
     BYTE shape;                              // 1 box, 2 sphere, 0 plane / unknown
+    BYTE laraIn;                             // 0.16: 1 the test point is inside, 2 within 50 units of a plane quad
     bool plane, enabled, oneSided;
+    bool player, camIn, big;                 // 0.16: +0x24 bit 30, the camera is inside, a big volume
 };
-DvTrig g_dvTrig[257];
+DvTrig g_dvTrig[513];                        // 0.16: TriggerMax up to 512 (0.14: 256)
 struct DvMark { DWORD inst; float pos[3], dist2; };
 DvMark g_dvCp[33];
 
@@ -6520,6 +6793,24 @@ void DvTrigInsert(const DvTrig &t) {
     if (g_dvTrigCount < g_dvTrgMax) ++g_dvTrigCount;
 }
 
+// 0.16: is point p inside trigger t (the engine's math: box 0x46b730 = |(p - c) . row_i| <= h_i, sphere |p - c|^2 <
+// r^2 as 0x5cd445 .. 0x5cd4aa); planes: 2 when p is within 50 units of the quad (the engine tests a crossing), else 0
+int DvInside(const DvTrig &t, const float *p) {
+    float d[3] = {p[0] - t.pos[0], p[1] - t.pos[1], p[2] - t.pos[2]}, l[3];
+    for (int i = 0; i < 3; ++i) l[i] = d[0] * t.rows[i][0] + d[1] * t.rows[i][1] + d[2] * t.rows[i][2];
+    if (t.plane) return fabsf(l[0]) <= t.ext[0] && fabsf(l[2]) <= t.ext[2] && fabsf(l[1]) <= 50.0f ? 2 : 0;
+    if (t.shape == 1) return fabsf(l[0]) <= t.ext[0] && fabsf(l[1]) <= t.ext[1] && fabsf(l[2]) <= t.ext[2] ? 1 : 0;
+    if (t.shape == 2) return d[0] * d[0] + d[1] * d[1] + d[2] * d[2] < t.radius * t.radius ? 1 : 0;
+    return 0;
+}
+// 0.16 "Lara in": the triggers the test point is in this frame (every listed one, also of a kind switched off)
+struct DvIn { DWORD inst; LONG intro; int kind; BYTE how; bool enabled, player; };
+DvIn g_dvIn[16];
+int g_dvInN = 0, g_dvInMore = 0;
+float g_dvTestPt[3];
+bool g_dvTestOk = false;
+int g_dvCapped = 0, g_dvEnclN = 0;           // 0.16: last frame - capped at TriggerMax, enclosing boxes dimmed / hidden
+
 // collect one list (planes or volumes) into g_dvTrig; counters for the state line
 struct DvCount { int listed, behind, far_, noData, disabled; };
 void DvCollect(const DvCam &c, bool planes, DvCount *k) {
@@ -6547,6 +6838,33 @@ void DvCollect(const DvCam &c, bool planes, DvCount *k) {
         t.kind = !known ? kDvUnknown : kind >= 0 ? kind : planes ? kDvPlane : kDvVolume;
         if (!haveData) ++k->noData;
         ++g_dvListed[t.kind];
+        // 0.16: rows once; Lara in (every listed trigger with data, also of a kind switched off); camera inside / big
+        DvEulerRows(t.rot, t.rows);
+        t.player = (flags & 0x40000000u) != 0;
+        if (known && g_dvTestOk && g_dvLaraOk) {
+            t.laraIn = static_cast<BYTE>(DvInside(t, g_dvTestPt));
+            if (t.laraIn) {
+                if (g_dvInN < 16) {
+                    DvIn &in = g_dvIn[g_dvInN++];
+                    in.inst = t.inst;
+                    in.intro = 0;
+                    DWORD uid = 0;
+                    if (ReadDword(t.inst + 0x58, &uid)) in.intro = static_cast<LONG>(uid);
+                    in.kind = t.kind;
+                    in.how = t.laraIn;
+                    in.enabled = t.enabled;
+                    in.player = t.player;
+                } else {
+                    ++g_dvInMore;
+                }
+            }
+        }
+        if (known && !planes) {
+            t.camIn = g_dvCamOk && DvInside(t, g_dvCamPos) == 1;
+            float big = t.shape == 2 ? fabsf(t.radius) : t.ext[0] > t.ext[1] ? (t.ext[0] > t.ext[2] ? t.ext[0] : t.ext[2])
+                                                                               : (t.ext[1] > t.ext[2] ? t.ext[1] : t.ext[2]);
+            t.big = big >= g_dvEnclSize;
+        }
         if (!g_dvOn[t.kind]) continue;
         ++k->listed;
         if (!t.enabled) ++k->disabled;
@@ -6559,12 +6877,11 @@ void DvCollect(const DvCam &c, bool planes, DvCount *k) {
 }
 
 // one trigger: box 12 lines, sphere 3 circles, plane quad + diagonals (+ normal arrow when one-sided), unknown a cross
-void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImVec2 *labelAt, bool *labelSeen) {
-    ImU32 colour = kDvLayers[t.kind].colour;
-    if (!t.enabled) colour = (colour & 0x00ffffff) | (90u << 24);   // the game skips a disabled entry
-    float thick = t.kind == kDvDeath ? 2.5f : 1.8f;
-    float rows[3][3];
-    DvEulerRows(t.rot, rows);
+// 0.16: colour / thickness / face fill come from the caller (DvTint, Lara in, enclosing); fill 0 = no faces; the label
+// anchor is the top centre (box: +h along row 2, plane: the upper edge's centre, sphere: the top)
+void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImU32 colour, float thick, ImU32 fill, ImVec2 *labelAt,
+                bool *labelSeen) {
+    const float (*rows)[3] = t.rows;
     float top[3] = {t.pos[0], t.pos[1], t.pos[2]};
     if (t.kind == kDvUnknown && !(t.plane || t.shape == 1 || t.shape == 2)) {
         for (int a = 0; a < 3; ++a) {
@@ -6577,6 +6894,7 @@ void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImVec2 *labelAt
         float q[4][3];
         const float s[4][2] = {{1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
         for (int i = 0; i < 4; ++i) DvPoint(t.pos, rows, s[i][0] * t.ext[0], 0.0f, s[i][1] * t.ext[2], q[i]);
+        if (fill) DvPoly(dl, c, q, 4, fill);  // 0.16 face fill
         for (int i = 0; i < 4; ++i) DvLine(dl, c, q[i], q[(i + 1) & 3], colour, thick);
         DvLine(dl, c, q[0], q[2], colour, 1.0f);
         DvLine(dl, c, q[1], q[3], colour, 1.0f);
@@ -6587,11 +6905,21 @@ void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImVec2 *labelAt
             DvPoint(t.pos, rows, 0.0f, len, 0.0f, tip);
             DvLine(dl, c, t.pos, tip, colour, thick);
         }
+        DvPoint(t.pos, rows, 0.0f, 0.0f, t.ext[2], top);   // 0.16: the upper edge's centre (0.14: the centre)
     } else if (t.shape == 1) {
         float q[8][3];
         for (int i = 0; i < 8; ++i)
             DvPoint(t.pos, rows, (i & 1 ? 1.0f : -1.0f) * t.ext[0], (i & 2 ? 1.0f : -1.0f) * t.ext[1],
                     (i & 4 ? 1.0f : -1.0f) * t.ext[2], q[i]);
+        if (fill) {                           // 0.16 face fill: the 6 faces (corner index bits x 1, y 2, z 4)
+            static const BYTE kFaces[6][4] = {{0, 2, 6, 4}, {1, 3, 7, 5}, {0, 1, 5, 4}, {2, 3, 7, 6}, {0, 1, 3, 2},
+                                              {4, 5, 7, 6}};
+            for (const auto &f : kFaces) {
+                const float face[4][3] = {{q[f[0]][0], q[f[0]][1], q[f[0]][2]}, {q[f[1]][0], q[f[1]][1], q[f[1]][2]},
+                                          {q[f[2]][0], q[f[2]][1], q[f[2]][2]}, {q[f[3]][0], q[f[3]][1], q[f[3]][2]}};
+                DvPoly(dl, c, face, 4, fill);
+            }
+        }
         static const BYTE kEdges[12][2] = {{0, 1}, {2, 3}, {4, 5}, {6, 7}, {0, 2}, {1, 3}, {4, 6}, {5, 7},
                                            {0, 4}, {1, 5}, {2, 6}, {3, 7}};
         for (const auto &e : kEdges) DvLine(dl, c, q[e[0]], q[e[1]], colour, thick);
@@ -6615,6 +6943,233 @@ void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImVec2 *labelAt
     float q[3];
     DvToCam(c, top, q);
     *labelSeen = DvCamToScreen(c, q, labelAt);
+}
+
+// 0.16 labels ("tags"): candidates of the frame, drawn nearest first with overlap avoidance (DvTagsDraw)
+struct DvTag {
+    ImVec2 at;                               // anchor on screen
+    float dist2, centre[3];
+    ImU32 colour;
+    int kind;                                // trigger kind (merge key), kDvPortals, or -1 = never merged
+    int count;                               // merged coincident triggers
+    LONG idMin, idMax;                       // intro ids (triggers), -1 = text only
+    char full[96], brief[48], sufFull[24], sufBrief[16];
+    char unit[40];                           // owner unit when it is not Lara's ("" = Lara's / unknown)
+};
+// 0.16 (live finding 2026-11-06: a fire volume of a neighbour unit looked near, was ~6100 units away): every label
+// shows the distance to Lara (+0x20) and the height difference in game units, and the owner unit of the instance
+// when it is not Lara's unit - owner = the loaded unit whose intro array (Level +0x74 -> unit DTP: +0xc count, +0x10
+// Intro* of 0x90 bytes, as the intro loader 0x5d1dda .. 0x5d1e39 walks it) holds the instance's intro (+0x100).
+// Live coordinates of every unit are in Lara's unit frame (data - origin Level +0x80 of Lara's unit), so the distance
+// of two live positions is right across units.
+size_t DvCommonPrefix(const char *a, const char *b);   // below
+struct DvUnitRange { DWORD lo, hi; char name[40]; };
+DvUnitRange g_dvUnits[16];
+int g_dvUnitN = 0;
+char g_dvLaraUnit[40] = "";
+float g_dvLaraPos[3];
+bool g_dvLaraPosOk = false;
+bool g_dvUnitOk = false;                     // precheck_016.txt: the intro loader's Level +0x74 layout
+void DvUnitsRead() {
+    g_dvUnitN = 0;
+    g_dvLaraUnit[0] = 0;
+    if (!g_dvUnitOk) return;
+    DWORD cur = 0;
+    bool haveCur = g_unitOk && ReadDword(kUnitId, &cur);
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd && g_dvUnitN < 16; e += kStreamUnitSize) {
+        DWORD id = 0, state = 0, level = 0, dtp = 0, n = 0, arr = 0;
+        if (!ReadDword(e, &id) || !ReadDword(e + 4, &state) || (state & 0xff) != 2) continue;
+        char name[40];
+        if (!ReadString(e + 0xc, name, sizeof(name))) name[0] = 0;
+        if (haveCur && id == cur) strncpy_s(g_dvLaraUnit, sizeof(g_dvLaraUnit), name, _TRUNCATE);
+        if (!ReadDword(e + 8, &level) || !level || !ReadDword(level + 0x74, &dtp) || !dtp || !ReadDword(dtp + 0xc, &n) ||
+            n > 20000 || !ReadDword(dtp + 0x10, &arr) || !arr)
+            continue;
+        DvUnitRange &u = g_dvUnits[g_dvUnitN++];
+        u.lo = arr;
+        u.hi = arr + 0x90 * n;
+        strncpy_s(u.name, sizeof(u.name), name, _TRUNCATE);
+    }
+}
+// the owner unit's name of an instance when it is not Lara's unit, else "" (also when unknown)
+const char *DvOwnerUnit(DWORD inst) {
+    DWORD intro = 0;
+    if (!g_dvUnitN || !ReadDword(inst + 0x100, &intro) || !intro) return "";
+    for (int i = 0; i < g_dvUnitN; ++i)
+        if (intro >= g_dvUnits[i].lo && intro < g_dvUnits[i].hi)
+            return _stricmp(g_dvUnits[i].name, g_dvLaraUnit) ? g_dvUnits[i].name : "";
+    return "";
+}
+// " 6100u v1500u [mansion_exterior_afterburn]": distance to Lara, height (^ above / v below, from 50 units), owner unit
+void DvDistText(const float *p, const char *unit, char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    if (g_dvLaraPosOk) {
+        float dx = p[0] - g_dvLaraPos[0], dy = p[1] - g_dvLaraPos[1], dz = p[2] - g_dvLaraPos[2];
+        LONG d = static_cast<LONG>(sqrtf(dx * dx + dy * dy + dz * dz) / 10.0f + 0.5f) * 10;
+        LabelAdd(o, n, &used, " %ldu", d);
+        if (fabsf(dz) >= 50.0f) LabelAdd(o, n, &used, " %c%ldu", dz > 0.0f ? '^' : 'v',
+                                         static_cast<LONG>(fabsf(dz) / 10.0f + 0.5f) * 10);
+    }
+    if (unit && unit[0]) LabelAdd(o, n, &used, " [%s]", unit + (g_dvLaraUnit[0] ? DvCommonPrefix(unit, g_dvLaraUnit) : 0));
+}
+const int kDvTagMax = 160;
+DvTag g_dvTag[kDvTagMax];
+int g_dvTagN = 0, g_dvTagShown = 0, g_dvTagSkipped = 0, g_dvTagMerged = 0, g_dvTagTrg = 0;
+struct DvRect { float x0, y0, x1, y1; };
+DvRect g_dvRects[224];
+int g_dvRectN = 0;
+DvRect g_dvLegendRect = {0, 0, 0, 0};        // the legend panel of the last frame (labels keep out of it)
+const char *const kDvBrief[kDvKinds] = {"DEATH", "FIRE", "CPT", "WATER", "SND", "TV", "TP", "?"};
+
+bool DvRectFree(const DvRect &r) {
+    for (int i = 0; i < g_dvRectN; ++i) {
+        const DvRect &o = g_dvRects[i];
+        if (r.x0 < o.x1 && o.x0 < r.x1 && r.y0 < o.y1 && o.y0 < r.y1) return false;
+    }
+    return true;
+}
+void DvRectTake(const DvRect &r) {
+    if (g_dvRectN < static_cast<int>(sizeof(g_dvRects) / sizeof(g_dvRects[0]))) g_dvRects[g_dvRectN++] = r;
+}
+// one label candidate: full / brief text (+ suffixes appended after the id), merge kind and intro id (triggers)
+void DvTagAdd(ImVec2 at, float dist2, const float *centre, ImU32 colour, int kind, LONG id, const char *full,
+              const char *brief, const char *sufFull, const char *sufBrief, const char *unit) {
+    if (g_dvTagN >= kDvTagMax) return;
+    DvTag &t = g_dvTag[g_dvTagN++];
+    strncpy_s(t.unit, sizeof(t.unit), unit ? unit : "", _TRUNCATE);
+    t.at = at;
+    t.dist2 = dist2;
+    for (int k = 0; k < 3; ++k) t.centre[k] = centre[k];
+    t.colour = colour;
+    t.kind = kind;
+    t.count = 1;
+    t.idMin = t.idMax = id;
+    strncpy_s(t.full, sizeof(t.full), full, _TRUNCATE);
+    strncpy_s(t.brief, sizeof(t.brief), brief, _TRUNCATE);
+    strncpy_s(t.sufFull, sizeof(t.sufFull), sufFull, _TRUNCATE);
+    strncpy_s(t.sufBrief, sizeof(t.sufBrief), sufBrief, _TRUNCATE);
+}
+// "l3_bedroom_hall" / "l3_main_bedroom" -> length of the common prefix up to its last '_' ("l3_")
+size_t DvCommonPrefix(const char *a, const char *b) {
+    size_t i = 0, cut = 0;
+    while (a[i] && a[i] == b[i]) {
+        if (a[i] == '_') cut = i + 1;
+        ++i;
+    }
+    return cut;
+}
+// draw the candidates: sort nearest first, merge coincident ones, full text for the nearest and the one nearest to the
+// screen centre (or all with LabelShort=0), nudge up / down or skip on overlap, at most ViewLabelMax
+void DvTagsDraw(ImDrawList *dl) {
+    const ImVec2 ds = ImGui::GetIO().DisplaySize;
+    g_dvTagShown = g_dvTagSkipped = g_dvTagMerged = g_dvTagTrg = 0;
+    for (int i = 1; i < g_dvTagN; ++i) {     // insertion sort by distance
+        DvTag t = g_dvTag[i];
+        int j = i;
+        while (j > 0 && g_dvTag[j - 1].dist2 > t.dist2) { g_dvTag[j] = g_dvTag[j - 1]; --j; }
+        g_dvTag[j] = t;
+    }
+    for (int i = 0; i < g_dvTagN; ++i) {     // merge coincident (centres within 25 units, same kind) into the nearer
+        DvTag &a = g_dvTag[i];
+        if (a.kind < 0 || !a.count) continue;
+        for (int j = i + 1; j < g_dvTagN; ++j) {
+            DvTag &b = g_dvTag[j];
+            if (!b.count || b.kind != a.kind) continue;
+            float dx = a.centre[0] - b.centre[0], dy = a.centre[1] - b.centre[1], dz = a.centre[2] - b.centre[2];
+            if (dx * dx + dy * dy + dz * dz > 25.0f * 25.0f) continue;
+            if (a.kind == kDvPortals) {      // the two directions of one loading area: "a <-> b"
+                const char *arrow = strstr(a.full, " -> ");
+                if (arrow && a.count == 1) {
+                    char unit[48];
+                    size_t len = static_cast<size_t>(arrow - a.full);
+                    strncpy_s(unit, sizeof(unit), a.full, len < sizeof(unit) - 1 ? len : sizeof(unit) - 1);
+                    char both[96];
+                    Out(both, sizeof(both), "%s <-> %s", unit, arrow + 4);
+                    strncpy_s(a.full, sizeof(a.full), both, _TRUNCATE);
+                    size_t cut = DvCommonPrefix(unit, arrow + 4);
+                    Out(a.brief, sizeof(a.brief), "%s <-> %s", unit + cut, arrow + 4 + cut);
+                }
+            } else {
+                if (b.idMin < a.idMin) a.idMin = b.idMin;
+                if (b.idMax > a.idMax) a.idMax = b.idMax;
+            }
+            ++a.count;
+            b.count = 0;
+            ++g_dvTagMerged;
+        }
+    }
+    int aim = -1;                            // nearest to the screen centre (within 15 % of the width)
+    float best = ds.x * 0.15f * ds.x * 0.15f;
+    for (int i = 0; i < g_dvTagN; ++i) {
+        if (!g_dvTag[i].count) continue;
+        float dx = g_dvTag[i].at.x - ds.x * 0.5f, dy = g_dvTag[i].at.y - ds.y * 0.5f;
+        if (dx * dx + dy * dy < best) { best = dx * dx + dy * dy; aim = i; }
+    }
+    const float fs = ImGui::GetFontSize();
+    bool first = true;
+    for (int i = 0; i < g_dvTagN; ++i) {
+        const DvTag &t = g_dvTag[i];
+        if (!t.count) continue;
+        if (g_dvTagShown >= g_dvTagMax) { ++g_dvTagSkipped; continue; }
+        bool full = !g_dvShort || first || i == aim;
+        first = false;
+        char text[160], dist[64];
+        const char *base = full ? t.full : t.brief;
+        const char *suf = full ? t.sufFull : t.sufBrief;
+        DvDistText(t.centre, t.unit, dist, sizeof(dist));
+        if (t.idMin < 0 && t.idMax < 0) Out(text, sizeof(text), "%s%s%s", base, suf, dist);
+        else if (t.count > 1 && t.kind != kDvPortals)
+            Out(text, sizeof(text), "%s x%d (%ld..%ld)%s", base, t.count, t.idMin, t.idMax, dist);
+        else Out(text, sizeof(text), "%s %ld%s%s", base, t.idMin, suf, dist);
+        ImVec2 s = ImGui::CalcTextSize(text);
+        float w = s.x + 8.0f, h = fs + 4.0f;
+        DvRect r = {t.at.x - w * 0.5f, t.at.y - h - 8.0f, 0, 0};
+        r.x0 = r.x0 < 4.0f ? 4.0f : r.x0 > ds.x - w - 4.0f ? ds.x - w - 4.0f : r.x0;
+        bool placed = false;
+        const float shift[5] = {0.0f, -(h + 2.0f), h + 2.0f, -2.0f * (h + 2.0f), 2.0f * (h + 2.0f)};
+        DvRect pick = r;
+        for (float dy : shift) {
+            pick.x0 = r.x0;
+            pick.y0 = r.y0 + dy;
+            pick.y0 = pick.y0 < 4.0f ? 4.0f : pick.y0 > ds.y - h - 4.0f ? ds.y - h - 4.0f : pick.y0;
+            pick.x1 = pick.x0 + w;
+            pick.y1 = pick.y0 + h;
+            if (DvRectFree(pick)) { placed = true; break; }
+        }
+        if (!placed) { ++g_dvTagSkipped; continue; }
+        DvRectTake(pick);
+        ImU32 lead = (t.colour & 0x00ffffff) | (170u << 24);
+        dl->AddLine(ImVec2(t.at.x, pick.y1 < t.at.y ? pick.y1 : pick.y0), t.at, lead, 1.2f);
+        dl->AddCircleFilled(t.at, 2.5f, t.colour, 8);
+        dl->AddRectFilled(ImVec2(pick.x0, pick.y0), ImVec2(pick.x1, pick.y1), IM_COL32(0, 0, 0, 170), 3.0f);
+        dl->AddText(ImVec2(pick.x0 + 4.0f, pick.y0 + 2.0f), t.colour | 0xff000000u, text);
+        ++g_dvTagShown;
+        if (t.kind >= 0 && t.kind < kDvKinds) ++g_dvTagTrg;
+    }
+}
+// 0.16: camera position = the point the 0.14 camera maps to (0, 0, 0): solve A p = -t (A = the 3x3 part, columns
+// scaled like the text space - the inverse takes that out)
+bool DvCamPos(const DvCam &c, float *o) {
+    const float *m = c.v.m;
+    const float a00 = m[0], a01 = m[4], a02 = m[8], a10 = m[1], a11 = m[5], a12 = m[9], a20 = m[2], a21 = m[6], a22 = m[10];
+    const float det = a00 * (a11 * a22 - a12 * a21) - a01 * (a10 * a22 - a12 * a20) + a02 * (a10 * a21 - a11 * a20);
+    if (!(fabsf(det) > 1.0e-12f)) return false;
+    const float b0 = -m[12], b1 = -m[13], b2 = -m[14];
+    o[0] = (b0 * (a11 * a22 - a12 * a21) - a01 * (b1 * a22 - a12 * b2) + a02 * (b1 * a21 - a11 * b2)) / det;
+    o[1] = (a00 * (b1 * a22 - a12 * b2) - b0 * (a10 * a22 - a12 * a20) + a02 * (a10 * b2 - b1 * a20)) / det;
+    o[2] = (a00 * (a11 * b2 - b1 * a21) - a01 * (a10 * b2 - b1 * a20) + b0 * (a10 * a21 - a11 * a20)) / det;
+    return DvFinite(o, 3);
+}
+// 0.16: camera matrix + focal for a target of w x h pixels (0.14 projection), false = not readable
+bool DvCamRead(DvCam *c, float w, float h) {
+    if (!ReadView(&c->v, w, h) || !ReadFloats(kLblMatrix, c->v.m, 16) || !DvFinite(c->v.m, 16)) return false;
+    float lx = sqrtf(c->v.m[0] * c->v.m[0] + c->v.m[4] * c->v.m[4] + c->v.m[8] * c->v.m[8]);
+    float ly = sqrtf(c->v.m[1] * c->v.m[1] + c->v.m[5] * c->v.m[5] + c->v.m[9] * c->v.m[9]);
+    if (!(lx > 1.0e-4f && ly > 1.0e-4f)) return false;
+    c->ux = 1.0f / lx;
+    c->uy = 1.0f / ly;
+    return true;
 }
 
 // object names: does object id / name pass [Debug] NameMatch (cached per object id; the cache is cleared on a change)
@@ -6677,7 +7232,7 @@ void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, 
     ImFont *font = ImGui::GetFont();
     const float size = ImGui::GetFontSize() * g_dvNameScale;
     const ImU32 colour = IM_COL32((g_dvNameRgb >> 16) & 0xff, (g_dvNameRgb >> 8) & 0xff, g_dvNameRgb & 0xff, 255);
-    int drawn = 0;
+    int drawn = 0, skipped = 0;
     for (int i = 0; i < count; ++i) {
         const DvName &d = g_dvNames[i];
         float q[3];
@@ -6685,83 +7240,126 @@ void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, 
         DvToCam(c, d.pos, q);
         if (!DvCamToScreen(c, q, &at)) continue;
         DWORD object = 0, oid = 0, intro = 0;
-        char name[64], line[96];
+        char name[64], line[160];
         ReadDword(d.inst + 0x10, &object);
         if (object) ReadDword(object + 0x14, &oid);
         if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
         ReadDword(d.inst + 0x58, &intro);
-        if (g_dvNameIds) Out(line, sizeof(line), "%s %ld", name, static_cast<LONG>(intro));
-        else Out(line, sizeof(line), "%s", name);
+        char dist[64];                        // 0.16: distance / height to Lara, owner unit when not Lara's
+        DvDistText(d.pos, DvOwnerUnit(d.inst), dist, sizeof(dist));
+        if (g_dvNameIds) Out(line, sizeof(line), "%s %ld%s", name, static_cast<LONG>(intro), dist);
+        else Out(line, sizeof(line), "%s%s", name, dist);
         ImVec2 s = font->CalcTextSizeA(size, FLT_MAX, 0.0f, line);
         ImVec2 box(at.x - s.x * 0.5f - 3.0f, at.y - s.y - 8.0f);
-        dl->AddRectFilled(box, ImVec2(box.x + s.x + 6.0f, box.y + s.y + 2.0f), IM_COL32(0, 0, 0, 140), 3.0f);
+        const DvRect r = {box.x, box.y, box.x + s.x + 6.0f, box.y + s.y + 2.0f};
+        if (!DvRectFree(r)) { ++skipped; continue; }   // 0.16: no name over a label / another name / the legend
+        DvRectTake(r);
+        dl->AddRectFilled(box, ImVec2(box.x + s.x + 6.0f, box.y + s.y + 2.0f), IM_COL32(0, 0, 0, 165), 3.0f);
         dl->AddCircleFilled(at, 2.5f, colour, 8);
         dl->AddText(font, size, ImVec2(box.x + 3.0f, box.y + 1.0f), colour, line);
         ++drawn;
     }
     g_dvListed[kDvNames] = found;
     g_dvDrawn[kDvNames] = drawn;
-    LabelAdd(state, stateSize, used, "names %d drawn of %d matching '%s' (%d instances, radius %.0f, max %d); ", drawn, found,
-             g_dvNameMatch[0] ? g_dvNameMatch : "*", walked, g_dvNameRadius, g_dvNameMax);
+    LabelAdd(state, stateSize, used, "names %d drawn of %d matching '%s' (%d instances, radius %.0f, max %d, %d skipped: "
+             "overlap); ", drawn, found, g_dvNameMatch[0] ? g_dvNameMatch : "*", walked, g_dvNameRadius, g_dvNameMax, skipped);
 }
 
 // 0.15, below: the collision overlay (stage R2) - slide faces / enemy-only collision groups of the loaded units
 void RcDraw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used);
+
+// 0.16, below (depth section): the depth path is usable this frame (the scene hook qualified a frame ago)
+bool DpUsable();
+void DpBeginFill();
+void DpPublish();
+const char *DpStateText();
 
 // Present, every frame while a 0.14 layer is on
 void DrawDebugView() {
     char why[160];
     memset(g_dvDrawn, 0, sizeof(g_dvDrawn));
     memset(g_dvListed, 0, sizeof(g_dvListed));
+    g_dvInN = g_dvInMore = g_dvCapped = g_dvEnclN = 0;
+    g_dvTagN = g_dvRectN = 0;
+    g_dvTagShown = g_dvTagSkipped = g_dvTagMerged = g_dvTagTrg = 0;
     if (!g_debugEnabled) { Out(g_dvState, sizeof(g_dvState), "[Debug] Enabled=0"); return; }
     if (!g_dvBaseOk) { Out(g_dvState, sizeof(g_dvState), "pre-check failed: %s", g_dvBaseWhy); return; }
     if (!LabelWorldReady(why, sizeof(why))) { Out(g_dvState, sizeof(g_dvState), "waits: %s", why); return; }
     ImGuiIO &io = ImGui::GetIO();
     DvCam c;
-    if (!ReadView(&c.v, io.DisplaySize.x, io.DisplaySize.y) || !ReadFloats(kLblMatrix, c.v.m, 16) || !DvFinite(c.v.m, 16)) {
-        Out(g_dvState, sizeof(g_dvState), "camera matrix 0x%08lx / focal not readable", kLblMatrix);
+    if (!DvCamRead(&c, io.DisplaySize.x, io.DisplaySize.y)) {
+        Out(g_dvState, sizeof(g_dvState), "camera matrix 0x%08lx / focal not readable or degenerate", kLblMatrix);
         return;
     }
-    float lx = sqrtf(c.v.m[0] * c.v.m[0] + c.v.m[4] * c.v.m[4] + c.v.m[8] * c.v.m[8]);
-    float ly = sqrtf(c.v.m[1] * c.v.m[1] + c.v.m[5] * c.v.m[5] + c.v.m[9] * c.v.m[9]);
-    if (!(lx > 1.0e-4f && ly > 1.0e-4f)) { Out(g_dvState, sizeof(g_dvState), "camera matrix degenerate"); return; }
-    c.ux = 1.0f / lx;
-    c.uy = 1.0f / ly;
+    g_dvCamOk = DvCamPos(c, g_dvCamPos);
     ImDrawList *dl = ImGui::GetBackgroundDrawList();
     size_t used = 0;
     g_dvState[0] = 0;
+    if (g_dvOn[kDvLegend] && g_dvLegendRect.x1 > g_dvLegendRect.x0) DvRectTake(g_dvLegendRect);
+    // 0.16 depth: lines / faces of this frame go into a world buffer drawn inside the next frame (else ImGui, on top)
+    g_dpFill = nullptr;
+    if (DpUsable()) DpBeginFill();
+    // the point the game tests: player +0x20 + (0, 0, 200)
+    DWORD player = 0;
+    g_dvTestOk = ReadDword(kPlayerPtr, &player) && player && ReadFloats(player + kInstancePosition, g_dvTestPt, 3) &&
+                 DvFinite(g_dvTestPt, 3);
+    g_dvLaraPosOk = g_dvTestOk;              // 0.16: labels measure from Lara +0x20
+    if (g_dvTestOk) {
+        for (int a = 0; a < 3; ++a) g_dvLaraPos[a] = g_dvTestPt[a];
+        g_dvTestPt[2] += kDvTestLift;
+    }
+    DvUnitsRead();                           // 0.16: owner units of the labelled instances
     // triggers
     DvCount k = {};
     g_dvTrigCount = 0;
-    int boxes = 0, spheres = 0, quads = 0, labels = 0;
+    int boxes = 0, spheres = 0, quads = 0, labels = 0, hiddenEncl = 0;
     if (g_dvTrgOk && DvAnyTrigger()) {
         DvCollect(c, true, &k);
         DvCollect(c, false, &k);
+        // 0.16 Lara in: pulsing white outline (0.55 .. 1)
+        const float pulse = 0.775f + 0.225f * sinf(static_cast<float>(GetTickCount() % 100000u) * 0.006f);
         for (int i = 0; i < g_dvTrigCount; ++i) {
             const DvTrig &t = g_dvTrig[i];
             ImVec2 at;
             bool seen = false;
-            DvDrawTrig(dl, c, t, &at, &seen);
+            // 0.16: enclosing = the camera inside, or Lara inside a big one (sound volumes over a whole corridor)
+            bool encl = t.camIn || (t.laraIn == 1 && t.big);
+            if (encl && g_dvEncl == 2) { ++hiddenEncl; continue; }
+            float extra = t.enabled ? 1.0f : 0.35f;   // the game skips a disabled entry
+            g_dvDashed = encl && g_dvEncl == 1;
+            if (g_dvDashed) { extra *= 0.35f; ++g_dvEnclN; }
+            float thick = t.kind == kDvDeath ? 2.5f : 1.8f;
+            ImU32 colour = DvTint(kDvLayers[t.kind].colour, t.dist2, extra);
+            ImU32 fill = g_dvFill ? DvFillTint(kDvLayers[t.kind].colour, t.dist2, extra) : 0;
+            if (g_dvLaraIn && g_dvLaraOk && t.laraIn && !encl) {
+                DvDrawTrig(dl, c, t, IM_COL32(255, 255, 255, static_cast<int>(220.0f * pulse)), thick + 3.0f, 0, &at, &seen);
+                colour = DvRgba((kDvLayers[t.kind].colour & 0xff) * 1.0f, ((kDvLayers[t.kind].colour >> 8) & 0xff) * 1.0f,
+                                ((kDvLayers[t.kind].colour >> 16) & 0xff) * 1.0f, 255.0f);
+                thick += 1.2f;
+            }
+            DvDrawTrig(dl, c, t, colour, thick, fill, &at, &seen);
+            g_dvDashed = false;
             ++g_dvDrawn[t.kind];
             if (t.plane) ++quads;
             else if (t.shape == 2) ++spheres;
             else if (t.shape == 1) ++boxes;
             if (g_dvOn[kDvTrgLabels] && seen && labels < g_dvLabelMax) {
-                char name[64], line[112];
+                char name[64], sufFull[24], sufBrief[16];
                 DWORD intro = 0;
                 if (DvNameKind(t.inst, name, sizeof(name)) == -2) Out(name, sizeof(name), "?");
                 ReadDword(t.inst + 0x58, &intro);
-                Out(line, sizeof(line), "%s %ld%s%s", name, static_cast<LONG>(intro), t.enabled ? "" : " (aus)",
-                    t.plane ? (t.oneSided ? " E1" : " E2") : t.shape == 2 ? " K" : t.shape == 1 ? " B" : " ?");
-                LabelDraw(dl, at, line, "", kDvLayers[t.kind].colour);
+                Out(sufFull, sizeof(sufFull), "%s%s%s", t.plane ? (t.oneSided ? " E1" : " E2") : t.shape == 2 ? " K"
+                    : t.shape == 1 ? " B" : " ?", t.enabled ? "" : " (aus)", t.laraIn && g_dvLaraIn ? " <Lara>" : "");
+                Out(sufBrief, sizeof(sufBrief), "%s%s", t.enabled ? "" : " aus", t.laraIn && g_dvLaraIn ? " <L>" : "");
+                DvTagAdd(at, t.dist2, t.pos, kDvLayers[t.kind].colour, t.kind, static_cast<LONG>(intro), name,
+                         kDvBrief[t.kind], sufFull, sufBrief, DvOwnerUnit(t.inst));
                 ++labels;
             }
         }
-        // the point the game tests: player +0x20 + (0, 0, 200)
-        DWORD player = 0;
-        float p[3];
-        if (ReadDword(kPlayerPtr, &player) && player && ReadFloats(player + kInstancePosition, p, 3) && DvFinite(p, 3)) {
-            p[2] += kDvTestLift;
+        g_dvCapped = k.listed - k.behind - k.far_ - g_dvTrigCount;
+        // the point the game tests: player +0x20 + (0, 0, 200) (white cross, not tinted: the reference)
+        if (g_dvTestOk) {
+            const float *p = g_dvTestPt;
             const ImU32 white = IM_COL32(255, 255, 255, 230);
             for (int a = 0; a < 3; ++a) {
                 float p0[3] = {p[0], p[1], p[2]}, p1[3] = {p[0], p[1], p[2]};
@@ -6770,15 +7368,18 @@ void DrawDebugView() {
                 DvLine(dl, c, p0, p1, white, 2.0f);
             }
         }
+        g_dvEnclN += hiddenEncl;
         LabelAdd(g_dvState, sizeof(g_dvState), &used, "triggers %d drawn (box %d, sphere %d, plane %d) of %d listed, "
-                 "%d off-screen, %d beyond %.0f, %d capped at %d, %d disabled (dim), %d without data; ", g_dvTrigCount,
-                 boxes, spheres, quads, k.listed, k.behind, k.far_, g_dvRadius,
-                 k.listed - k.behind - k.far_ - g_dvTrigCount, g_dvTrgMax, k.disabled, k.noData);
+                 "%d off-screen, %d beyond %.0f, %d capped at %d, %d disabled (dim), %d without data, %d enclosing (%s), "
+                 "Lara in %d%s; ", g_dvTrigCount, boxes, spheres, quads, k.listed, k.behind, k.far_, g_dvRadius,
+                 g_dvCapped, g_dvTrgMax, k.disabled, k.noData, g_dvEnclN,
+                 g_dvEncl == 2 ? "hidden" : g_dvEncl == 1 ? "dim + dashed" : "normal", g_dvInN + g_dvInMore,
+                 g_dvLaraOk ? "" : " (result code check failed - off)");
     }
     // portals of every loaded stream unit
     if (g_dvPortalOk && g_dvOn[kDvPortals]) {
         int units = 0, portals = 0, drawn = 0;
-        const ImU32 colour = kDvLayers[kDvPortals].colour;
+        const ImU32 base = kDvLayers[kDvPortals].colour;
         for (DWORD e = kStreamUnits; e < kStreamUnitsEnd && portals < 128; e += kStreamUnitSize) {
             DWORD state = 0, level = 0, terrain = 0, arr = 0;
             WORD count = 0;
@@ -6799,22 +7400,29 @@ void DrawDebugView() {
                 float dist2 = 0.0f;
                 float extent = fabsf(q[0][0] - q[2][0]) + fabsf(q[0][1] - q[2][1]) + fabsf(q[0][2] - q[2][2]);
                 if (!DvVisible(c, centre, extent, &dist2)) continue;
+                const ImU32 colour = DvTint(base, dist2, 1.0f), thin = DvTint(base, dist2, 0.47f);
+                if (g_dvFill) {                      // 0.16 face fill (the corners are 4-float records)
+                    const float quad[4][3] = {{q[0][0], q[0][1], q[0][2]}, {q[1][0], q[1][1], q[1][2]},
+                                              {q[2][0], q[2][1], q[2][2]}, {q[3][0], q[3][1], q[3][2]}};
+                    DvPoly(dl, c, quad, 4, DvFillTint(base, dist2, 1.0f));
+                }
                 bool any = false;
                 for (int a = 0; a < 4; ++a) any |= DvLine(dl, c, q[a], q[(a + 1) & 3], colour, 3.0f);
-                DvLine(dl, c, q[0], q[2], (colour & 0x00ffffff) | (120u << 24), 1.0f);
-                DvLine(dl, c, q[1], q[3], (colour & 0x00ffffff) | (120u << 24), 1.0f);
+                DvLine(dl, c, q[0], q[2], thin, 1.0f);
+                DvLine(dl, c, q[1], q[3], thin, 1.0f);
                 float tip[3] = {centre[0] + q[4][0] * 150.0f, centre[1] + q[4][1] * 150.0f, centre[2] + q[4][2] * 150.0f};
                 DvLine(dl, c, centre, tip, colour, 2.0f);
                 if (!any) continue;
                 ++drawn;
-                char name[48], line[112];
+                char name[48], full[96], brief[48];
                 if (!ReadString(p, name, sizeof(name))) name[0] = 0;
                 float cq[3];
                 ImVec2 at;
                 DvToCam(c, centre, cq);
-                if (DvCamToScreen(c, cq, &at)) {
-                    Out(line, sizeof(line), "%s -> %s", unit, name);
-                    LabelDraw(dl, at, line, "", colour);
+                if (DvCamToScreen(c, cq, &at)) {     // 0.16: a label candidate (short: "-> main_bedroom")
+                    Out(full, sizeof(full), "%s -> %s", unit, name);
+                    Out(brief, sizeof(brief), "-> %s", name + DvCommonPrefix(unit, name));
+                    DvTagAdd(at, dist2, centre, base, kDvPortals, -1, full, brief, "", "", "");
                 }
             }
         }
@@ -6860,23 +7468,38 @@ void DrawDebugView() {
             if (!ReadDword(inst + 8, &next)) break;
             inst = next;
         }
-        int activeSeen = 0;
+        int activeSeen = 0, capped = 0;
+        const float capPx = g_dvMarkerMax / 100.0f * ImGui::GetIO().DisplaySize.y;
         for (int i = 0; i < count; ++i) {
             const DvMark &m = g_dvCp[i];
             DWORD intro = 0;
             ReadDword(m.inst + 0x58, &intro);
             bool isActive = intro == active;
-            ImU32 colour = isActive ? IM_COL32(230, 255, 60, 255) : kDvLayers[kDvCheckpoints].colour;
-            float thick = isActive ? 3.0f : 2.0f, top[3] = {m.pos[0], m.pos[1], m.pos[2] + 250.0f};
+            const ImU32 base = isActive ? IM_COL32(230, 255, 60, 255) : kDvLayers[kDvCheckpoints].colour;
+            const ImU32 colour = DvTint(base, m.dist2, 1.0f);
+            float thick = isActive ? 2.4f : 1.8f;
+            // 0.16: the marker (post 250 + diamond 60) at most MarkerMax % of the screen height - the active one stood
+            // right at Lara and filled the foreground
+            float scale = 1.0f, foot[3] = {m.pos[0], m.pos[1], m.pos[2]}, head[3] = {m.pos[0], m.pos[1], m.pos[2] + 310.0f};
+            float qa[3], qb[3];
+            ImVec2 sa, sb;
+            DvToCam(c, foot, qa);
+            DvToCam(c, head, qb);
+            if (capPx > 0.0f && DvCamToScreen(c, qa, &sa) && DvCamToScreen(c, qb, &sb)) {
+                float px = sqrtf((sb.x - sa.x) * (sb.x - sa.x) + (sb.y - sa.y) * (sb.y - sa.y));
+                if (px > capPx) { scale = capPx / px; ++capped; }
+                if (scale < 0.1f) scale = 0.1f;
+            }
+            float top[3] = {m.pos[0], m.pos[1], m.pos[2] + 250.0f * scale};
             DvLine(dl, c, m.pos, top, colour, thick);
             float d[4][3];
             const float s[4][2] = {{60, 0}, {0, 60}, {-60, 0}, {0, -60}};
             for (int a = 0; a < 4; ++a) {
-                d[a][0] = top[0] + s[a][0];
-                d[a][1] = top[1] + s[a][1];
+                d[a][0] = top[0] + s[a][0] * scale;
+                d[a][1] = top[1] + s[a][1] * scale;
                 d[a][2] = top[2];
             }
-            float up[3] = {top[0], top[1], top[2] + 60.0f}, down[3] = {top[0], top[1], top[2] - 60.0f};
+            float up[3] = {top[0], top[1], top[2] + 60.0f * scale}, down[3] = {top[0], top[1], top[2] - 60.0f * scale};
             for (int a = 0; a < 4; ++a) {
                 DvLine(dl, c, d[a], up, colour, thick);
                 DvLine(dl, c, d[a], down, colour, thick);
@@ -6884,55 +7507,141 @@ void DrawDebugView() {
             float q[3];
             ImVec2 at;
             DvToCam(c, up, q);
-            if (DvCamToScreen(c, q, &at)) {
+            if (DvCamToScreen(c, q, &at)) {      // 0.16: a label candidate
                 char line[64];
                 Out(line, sizeof(line), "CP %ld%s", static_cast<LONG>(intro), isActive ? " AKTIV" : "");
-                LabelDraw(dl, at, line, "", colour);
+                DvTagAdd(at, m.dist2, m.pos, base, -1, -1, line, line, "", "", DvOwnerUnit(m.inst));
             }
             if (isActive) ++activeSeen;
         }
         g_dvListed[kDvCheckpoints] = found;
         g_dvDrawn[kDvCheckpoints] = count;
-        LabelAdd(g_dvState, sizeof(g_dvState), &used, "checkpoints %d drawn of %d (active id %ld%s); ", count, found,
-                 static_cast<LONG>(active), activeSeen ? ", drawn" : "");
+        LabelAdd(g_dvState, sizeof(g_dvState), &used, "checkpoints %d drawn of %d (active id %ld%s, %d marker(s) scaled to "
+                 "%d%% of the screen); ", count, found, static_cast<LONG>(active), activeSeen ? ", drawn" : "", capped,
+                 g_dvMarkerMax);
     }
-    if (g_dvBaseOk && g_dvOn[kDvNames]) DvDrawNames(dl, c, g_dvState, sizeof(g_dvState), &used);
     if (g_dvOn[kDvSlide] || g_dvOn[kDvEnemyColl]) RcDraw(dl, c, g_dvState, sizeof(g_dvState), &used);   // 0.15 R2
+    // 0.16: the world buffer is complete - the scene hook draws it inside the next frame; labels stay on top (ImGui)
+    DWORD sinkDrop = 0;
+    if (g_dpFill) {
+        sinkDrop = static_cast<DWORD>(g_dpFill->dropped);
+        DpPublish();
+    }
+    g_dpFill = nullptr;
+    DvTagsDraw(dl);                          // trigger / portal / checkpoint labels: nearest first, no overlap
+    g_dvListed[kDvTrgLabels] = labels;
+    g_dvDrawn[kDvTrgLabels] = g_dvTagTrg;
+    if (g_dvTagN) LabelAdd(g_dvState, sizeof(g_dvState), &used, "labels %d shown of %d candidates (%d merged, %d skipped: "
+                           "overlap / ViewLabelMax %d); ", g_dvTagShown, g_dvTagN, g_dvTagMerged, g_dvTagSkipped, g_dvTagMax);
+    if (g_dvBaseOk && g_dvOn[kDvNames]) DvDrawNames(dl, c, g_dvState, sizeof(g_dvState), &used);
+    if (g_dpMode) LabelAdd(g_dvState, sizeof(g_dvState), &used, "depth: %s%s; ", DpStateText(),
+                           sinkDrop ? " (buffer full - some dropped)" : "");
     if (!used) Out(g_dvState, sizeof(g_dvState), "nothing switched on that this frame can draw");
-    if (InterlockedExchange(&g_dvLogPending, 0)) Log(1, "0.14 debug view drawn: %s", g_dvState);   // once per switch
+    // once per switch (text kept from 0.14: test profiles match "0.14 debug view drawn")
+    if (InterlockedExchange(&g_dvLogPending, 0)) Log(1, "0.14 debug view drawn: %s", g_dvState);
 }
 
 // 0.15, below: the legend lines of the render mode (flat view state, slide colours); returns the new count
 int RmLegend(char (*lines)[112], ImU32 *colours, int n, int max);
 
-// the legend (foreground, top right): every layer that is on with its colour and drawn / listed
+// the legend (foreground, top right). 0.16 (owner wish 2026-11-06): fully inside the screen, right-aligned panel as wide
+// as its text, semi-transparent dark background, the counts (drawn / found) in their own right-aligned column and the
+// colour squares at the RIGHT edge; extra rows: capped at TriggerMax (warning colour), Lara in, depth state
 void DrawDebugLegend() {
     ImGuiIO &io = ImGui::GetIO();
     ImDrawList *dl = ImGui::GetForegroundDrawList();
-    const float fs = ImGui::GetFontSize(), w = 330.0f;
-    char lines[kDvCount + 6][112];
-    ImU32 colours[kDvCount + 6];
+    const float fs = ImGui::GetFontSize(), pad = 8.0f, sq = 11.0f, gap = 14.0f, rowH = fs + 3.0f;
+    const int kRows = kDvCount + 12;
+    char lines[kRows][112], counts[kRows][24];
+    ImU32 colours[kRows];
+    bool square[kRows];
     int n = 0;
-    Out(lines[n], sizeof(lines[n]), "TruMenu 0.15 Debug-Ansicht (gezeichnet / gefunden)");
-    colours[n++] = IM_COL32(235, 235, 235, 255);
+    Out(lines[n], sizeof(lines[n]), "TruMenu 0.16 Debug-Ansicht / debug view");
+    Out(counts[n], sizeof(counts[n]), "gez. / gef.");
+    colours[n] = IM_COL32(235, 235, 235, 255);
+    square[n++] = false;
     for (int i = 0; i < kDvCount; ++i) {
         if (!g_dvOn[i] || i == kDvLegend) continue;
-        if (i == kDvTrgLabels) Out(lines[n], sizeof(lines[n]), "%s / %s", kDvLayers[i].de, kDvLayers[i].en);
-        else Out(lines[n], sizeof(lines[n]), "%s / %s: %d / %d", kDvLayers[i].de, kDvLayers[i].en, g_dvDrawn[i],
-                 g_dvListed[i]);
-        colours[n++] = kDvLayers[i].colour;
+        Out(lines[n], sizeof(lines[n]), "%s / %s", kDvLayers[i].de, kDvLayers[i].en);
+        if (i == kDvTrgLabels) Out(counts[n], sizeof(counts[n]), "%d / %d", g_dvTagTrg, g_dvListed[i]);
+        else Out(counts[n], sizeof(counts[n]), "%d / %d", g_dvDrawn[i], g_dvListed[i]);
+        colours[n] = kDvLayers[i].colour;
+        square[n++] = true;
     }
     if (DvAnyTrigger()) {
         Out(lines[n], sizeof(lines[n]), "Testpunkt (Lara +200) / test point; blass = aus / disabled");
-        colours[n++] = IM_COL32(255, 255, 255, 230);
+        counts[n][0] = 0;
+        colours[n] = IM_COL32(255, 255, 255, 230);
+        square[n++] = true;
+        if (g_dvCapped > 0) {                // 0.16: live 2026-11-06 - 15 triggers silently missing at TriggerMax 64
+            Out(lines[n], sizeof(lines[n]), "GEKAPPT / capped (TriggerMax %d)", g_dvTrgMax);
+            Out(counts[n], sizeof(counts[n]), "%d", g_dvCapped);
+            colours[n] = IM_COL32(255, 90, 60, 255);
+            square[n++] = true;
+        }
+        if (g_dvLaraIn && g_dvLaraOk) {      // 0.16 Lara in: up to 3 names, then +N
+            size_t used = 0;
+            lines[n][0] = 0;
+            LabelAdd(lines[n], sizeof(lines[n]), &used, "Lara in:");
+            int total = g_dvInN + g_dvInMore;
+            for (int i = 0; i < g_dvInN && i < 3; ++i) {
+                char name[64];
+                if (DvNameKind(g_dvIn[i].inst, name, sizeof(name)) == -2) Out(name, sizeof(name), "?");
+                LabelAdd(lines[n], sizeof(lines[n]), &used, "%s %s %ld%s%s", i ? "," : "", name, g_dvIn[i].intro,
+                         g_dvIn[i].how == 2 ? " (nah / near)" : "", !g_dvIn[i].enabled ? " (aus)"
+                         : !g_dvIn[i].player ? " (nicht Spieler)" : "");
+            }
+            if (total > 3) LabelAdd(lines[n], sizeof(lines[n]), &used, " +%d", total - 3);
+            if (!total) LabelAdd(lines[n], sizeof(lines[n]), &used, " -");
+            Out(counts[n], sizeof(counts[n]), "%d", total);
+            colours[n] = IM_COL32(255, 255, 255, 255);
+            square[n++] = total > 0;
+        }
+        if (g_dvEnclN > 0) {
+            Out(lines[n], sizeof(lines[n]), "umhuellend / enclosing (%s)", g_dvEncl == 2 ? "aus / hidden"
+                                                                             : "blass, gestrichelt / dim, dashed");
+            Out(counts[n], sizeof(counts[n]), "%d", g_dvEnclN);
+            colours[n] = IM_COL32(200, 200, 200, 230);
+            square[n++] = false;
+        }
     }
-    n = RmLegend(lines, colours, n, kDvCount + 6);   // 0.15 flat view / slide colours
-    ImVec2 at(io.DisplaySize.x - w - 12.0f, 40.0f);
-    dl->AddRectFilled(at, ImVec2(at.x + w, at.y + n * (fs + 3.0f) + 8.0f), IM_COL32(0, 0, 0, 160), 4.0f);
+    if (g_dpMode && n < kRows) {
+        Out(lines[n], sizeof(lines[n]), "Tiefe / depth: %s", DpStateText());
+        counts[n][0] = 0;
+        colours[n] = DpUsable() ? IM_COL32(160, 230, 255, 255) : IM_COL32(255, 170, 90, 255);
+        square[n++] = false;
+    }
+    char rmLines[6][112];
+    ImU32 rmColours[6];
+    int rm = RmLegend(rmLines, rmColours, 0, 6);   // 0.15 flat view / slide colours
+    for (int i = 0; i < rm && n < kRows; ++i) {
+        strncpy_s(lines[n], sizeof(lines[n]), rmLines[i], _TRUNCATE);
+        counts[n][0] = 0;
+        colours[n] = rmColours[i];
+        square[n++] = true;
+    }
+    float nameW = 0.0f, countW = 0.0f;
     for (int i = 0; i < n; ++i) {
-        ImVec2 p(at.x + 8.0f, at.y + 4.0f + i * (fs + 3.0f));
-        if (i) dl->AddRectFilled(ImVec2(p.x, p.y + 3.0f), ImVec2(p.x + 10.0f, p.y + fs - 3.0f), colours[i]);
-        dl->AddText(ImVec2(p.x + (i ? 16.0f : 0.0f), p.y), colours[i], lines[i]);
+        float a = ImGui::CalcTextSize(lines[i]).x, b = counts[i][0] ? ImGui::CalcTextSize(counts[i]).x : 0.0f;
+        if (a > nameW) nameW = a;
+        if (b > countW) countW = b;
+    }
+    const float maxW = io.DisplaySize.x - 24.0f;
+    float w = pad + nameW + gap + countW + 8.0f + sq + pad;
+    if (w > maxW) { nameW -= w - maxW; w = maxW; }   // a too long name is clipped, the counts stay readable
+    const float x0 = io.DisplaySize.x - 12.0f - w, y0 = 40.0f, h = n * rowH + 2.0f * pad - 3.0f;
+    dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(0, 0, 0, 165), 5.0f);
+    g_dvLegendRect = {x0, y0, x0 + w, y0 + h};
+    const float countRight = x0 + pad + nameW + gap + countW, sqX = x0 + w - pad - sq;
+    for (int i = 0; i < n; ++i) {
+        const float y = y0 + pad + i * rowH;
+        dl->PushClipRect(ImVec2(x0, y), ImVec2(x0 + pad + nameW + 2.0f, y + rowH), true);
+        dl->AddText(ImVec2(x0 + pad, y), colours[i] | 0xff000000u, lines[i]);
+        dl->PopClipRect();
+        if (counts[i][0]) dl->AddText(ImVec2(countRight - ImGui::CalcTextSize(counts[i]).x, y), colours[i] | 0xff000000u,
+                                      counts[i]);
+        if (square[i]) dl->AddRectFilled(ImVec2(sqX, y + (fs - sq) * 0.5f + 1.0f), ImVec2(sqX + sq, y + (fs + sq) * 0.5f + 1.0f),
+                                         colours[i] | 0xff000000u, 2.0f);
     }
 }
 
@@ -7064,6 +7773,8 @@ bool RunDvTriggers(const char *arg, char *o, size_t n) {
 
 // dbg.view: the master - on = every 0.14 layer + dbg.labels + draw.markup + the [Debug] ViewNav switches; off = all of
 // them off (nav.off); each one stays switchable alone afterwards. Value = 1 while any of them is on.
+// 0.16: the layers named in [Debug] ViewSkip (default "sound": the sound / swoosh volumes cover whole corridors) are left
+// as they are when the master switches on; off still switches them off.
 bool DvViewAny() {
     if (DvAnyOn() || g_lblOn || g_drawMarkup) return true;
     for (int i = 0; i < kNavCount; ++i)
@@ -7085,6 +7796,7 @@ bool RunDvView(const char *arg, char *o, size_t n) {
     for (int i = 0; i < kDvCount; ++i) {
         const char *why = "";
         if (!DvLayerOk(i, &why)) continue;
+        if (on && DvViewSkips(i)) continue;   // 0.16 [Debug] ViewSkip (default sound): stays as it is; off = all off
         InterlockedExchange(&g_dvOn[i], on ? 1 : 0);
         DvPersistKey(kDvLayers[i].key, on);
         ++layers;
@@ -7123,8 +7835,10 @@ bool RunDvView(const char *arg, char *o, size_t n) {
 // ring: why a dbg.* entry (not dbg.labels) is greyed out ("" = usable; outside a level it may be switched)
 const char *RmRadWhy(const char *id);        // 0.15, below
 const char *DvRadWhy(const char *id, const char *arg) {
-    if (!_stricmp(id, "dbg.status")) return "";
+    if (!_stricmp(id, "dbg.status") || !_stricmp(id, "dbg.style")) return "";
     if (!g_debugEnabled) return "debug drawing off ([Debug] Enabled=0)";
+    if (!_stricmp(id, "dbg.depth") && arg && _stricmp(arg, "off") && _stricmp(arg, "aus") && !g_dpOk) return g_dpWhy;   // 0.16
+    if (!_stricmp(id, "dbg.larain") && !g_dvLaraOk) return "Lara-in checks failed";
     const char *why = "";
     if (!_stricmp(id, "dbg.show")) {
         int i = DvFind(arg);
@@ -7562,6 +8276,7 @@ int __fastcall RmTerrainDrawHook(void *self, void *edx, int pass, void *prev) {
 int __fastcall RmModelDrawHook(void *self, void *edx, int pass, void *prev) {
     return RmDrawCommon(kRmModel, self, edx, pass, prev);
 }
+void DpSceneEnd(void *self);                 // 0.16 depth, below: the debug view lines after the game's scene Draw
 int __fastcall RmSceneDrawHook(void *self, void *edx, int pass, void *prev) {
     RmDrawFn original = reinterpret_cast<RmDrawFn>(g_rmSlot[kRmScene].orig);
     if (g_rmCsRun) {
@@ -7573,7 +8288,9 @@ int __fastcall RmSceneDrawHook(void *self, void *edx, int pass, void *prev) {
             s->Release();
         }
     }
-    return original(self, edx, pass, prev);
+    int r = original(self, edx, pass, prev);
+    DpSceneEnd(self);                        // 0.16: cheap return while [Debug] Depth is 0
+    return r;
 }
 void *RmHookOf(int slot) {
     switch (slot) {
@@ -7752,9 +8469,12 @@ void RmCensusReport(const char *how) {
 }
 
 // ---- Present hook: requests, patching, census frames, the one-shot "drawn" line (cheap while everything is off) ----
+void DpTick();                               // 0.16 depth, below
+bool DpWantScene();
 void RenderModeTick(IDirect3DDevice9 *presented) {
-    bool flat = g_rmFlat != 0;
-    if (!flat && !g_rmCensusReq && !g_rmCsRun && !RmSlotsOn()) return;
+    DpTick();                                // 0.16: frame counter / depth state (cheap)
+    bool flat = g_rmFlat != 0, depth = DpWantScene();
+    if (!flat && !depth && !g_rmCensusReq && !g_rmCsRun && !RmSlotsOn()) return;
     // the object the game draws with ([0xad75e4]+0x20, hooked by HookDevice) - also when the frame came through the
     // swap chain's Present (whose GetDevice may name the device behind a proxy)
     IDirect3DDevice9 *device = g_device ? g_device : presented;
@@ -7800,12 +8520,15 @@ void RenderModeTick(IDirect3DDevice9 *presented) {
     }
     DWORD want = 0;
     if (world && (flat || g_rmCsRun)) want = (1u << kRmTerrain) | (1u << kRmModel) | (1u << kRmDip) | (1u << kRmDp);
-    if (world && g_rmCsRun) want |= 1u << kRmScene;
-    const char *reason = want ? (g_rmCsRun ? (flat ? "flat view + census" : "census") : "flat view")
-                       : !world ? why : "flat view off / census done";
+    if (world && (g_rmCsRun || depth)) want |= 1u << kRmScene;   // 0.16: also for the depth lines
+    char reason[80];
+    if (want) Out(reason, sizeof(reason), "%s%s%s%s%s", flat ? "flat view" : "", flat && g_rmCsRun ? " + " : "",
+                  g_rmCsRun ? "census" : "", (flat || g_rmCsRun) && depth ? " + " : "", depth ? "depth lines (0.16)" : "");
+    else Out(reason, sizeof(reason), "%s", !world ? why : "flat view off / census done / depth off");
     if (!RmApplySlots(device, want, reason)) {
         InterlockedExchange(&g_rmFlat, 0);
         if (g_rmCsRun) { g_rmCsRun = false; Log(0, "0.15 census cancelled - the slots could not be patched"); }
+        if (g_dpMode) { InterlockedExchange(&g_dpMode, 0); Log(0, "0.16 depth off - the PCScene::Draw slot could not be patched"); }
         RmApplySlots(device, 0, "patch refused");
     }
     if (!world) Out(g_rmWaitWhy, sizeof(g_rmWaitWhy), "%s", why);
@@ -7825,12 +8548,14 @@ void RenderModeTick(IDirect3DDevice9 *presented) {
         Log(1, "0.15 flat view drawn: %s", g_rmState);
 }
 // Reset hook (before the game's Reset): the palette shaders go, the next Present creates them again
+void DpOnReset();                            // 0.16 depth, below: its vertex buffer
 void RenderModeOnReset() {
     if (g_rmPsDevice) {
         RmShadersRelease(true);
         Log(3, "0.15 flat view: palette shaders released for Reset");
     }
     memset(g_rmPsVer, 0, sizeof(g_rmPsVer));
+    DpOnReset();
 }
 // unload: every slot back (no log; the process may be ending)
 void RenderModeShutdown() {
@@ -8096,6 +8821,11 @@ void RcCollect(DWORD want) {
 }
 // one triangle, clipped at the near plane (0.14's projection), filled + edges
 void RcDrawTri(ImDrawList *dl, const DvCam &c, const RcTri &t, ImU32 fill, ImU32 edge) {
+    if (g_dpFill) {                           // 0.16 depth: into the world buffer (drawn with the scene's depth)
+        DvPoly(dl, c, t.v, 3, fill);
+        for (int a = 0; a < 3; ++a) DvLine(dl, c, t.v[a], t.v[(a + 1) % 3], edge, 1.0f);
+        return;
+    }
     float q[3][3], poly[4][3];
     for (int a = 0; a < 3; ++a) DvToCam(c, t.v[a], q[a]);
     int n = 0;
@@ -8166,14 +8896,15 @@ void RcDraw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_
             --cutTake;
         }
         const RcTri &t = g_rcTri[g_rcSel[s]];
+        const float d2 = g_rcD2[s];           // 0.16: LineAlpha / LineBright / fade like every overlay
         if ((t.flags & 1) && (want & 1)) {
             bool isSteep = t.nz < cosT && t.nz < 0.9999f;
             if (isSteep) ++steep;
-            RcDrawTri(dl, c, t, isSteep ? IM_COL32(255, 45, 45, 105) : IM_COL32(255, 150, 30, 95),
-                      isSteep ? IM_COL32(255, 110, 110, 230) : IM_COL32(255, 190, 90, 220));
+            RcDrawTri(dl, c, t, DvTint(isSteep ? IM_COL32(255, 45, 45, 105) : IM_COL32(255, 150, 30, 95), d2, 1.0f),
+                      DvTint(isSteep ? IM_COL32(255, 110, 110, 230) : IM_COL32(255, 190, 90, 220), d2, 1.0f));
             ++drawnSlide;
         } else {
-            RcDrawTri(dl, c, t, IM_COL32(190, 80, 255, 85), IM_COL32(215, 150, 255, 220));
+            RcDrawTri(dl, c, t, DvTint(IM_COL32(190, 80, 255, 85), d2, 1.0f), DvTint(IM_COL32(215, 150, 255, 220), d2, 1.0f));
             ++drawnEnemy;
         }
     }
@@ -8196,6 +8927,561 @@ void ValRcEnemy(char *o, size_t n) {
 }
 bool RunRcEnemy(const char *arg, char *o, size_t n) { return DvRunOne(kDvEnemyColl, "dbg.enemycoll", arg, o, n); }
 
+// ---- 0.16 depth: the debug view lines inside the frame, with the scene's depth buffer ([Debug] Depth 1 / 2) ----
+// PCScene::Draw 0x5150e0 (this = esi, 0x5150f1) sets the state manager's projection / view from its own matrices
+// (0x51518a -> 0x514680: [this+0x100] -> SM +0x530, [this+0x140] -> SM +0x4f0, 0x5146f4; the upload 0x526aca ..
+// 0x526b29 puts view * projection into the vertex shader constants from c8), draws its lists and, when it has a target
+// object of its own [this+0x1c0] (0x515115), finishes that target at its end (0x515406 -> 0x510050). TruMenu draws
+// right after the game's Draw returned (the 0.15 census slot 0x849a2c, patched while Depth is on and a debug view layer
+// is on): only a scene without its own target object, render target 0 of the back buffer's size and a depth surface
+// bound; the DepthCall-th such scene of a frame (default the first). Vertices pre-transformed (D3DFVF_XYZRHW |
+// DIFFUSE): x / y from the 0.14 projection (live-checked), z = the scene's projection applied to the depth z' (pulled
+// 2 units + 0.4 % towards the camera against z-fighting) - used only when the scene's view gives the 0.14 camera's
+// depth for two test points (row or column convention, found at run time) and the projection is perspective (w = +-z,
+// no constant) with z(near) ~ 0 or ~ 1 (reversed) and monotonic; the visible test follows its direction. Lines = screen
+// quads (thickness in pixels, dashed in screen space), faces = triangles; for a perspective projection z and 1 / z' are
+// affine in screen space, so interpolating them along a quad is exact. Device state: a D3DSBT_ALL state block captured
+// before and applied after (as ImGui's DX9 backend does at Present on the same device), own dynamic vertex buffer
+// (D3DPOOL_DEFAULT, released in the Reset hook). Mode 2 draws the hidden parts first with the inverse Z test at
+// DepthDim % (texture factor alpha), then the visible ones. Nothing is written into tru.exe memory by this part except
+// the vtable word 0x849a2c (0.15's RmApplySlots, same rules and log lines).
+const DvCheck kDpChecks[] = {
+    {0x005150ef, "56 57 8bf1 8bf8 8b8084020000"},
+    {0x00515115, "8b8ec0010000 33db 3bcb 89442418 7407 e896b3ffff"},
+    {0x0051518a, "8bce e8eff4ffff d9ee 0f289600010000"},
+    {0x005146f4, "8d9e00010000 53 8d8f30050000 e80ad7f1ff 8d8640010000 50 8d8ff0040000"},
+    {0x00431e10, "8bc1 8b4c2404 8b11 8910 8b5104 895004"},
+    {0x00515406, "8b8ec0010000 85c9 7405 e83bacffff"},
+    {0x00526aca, "8db330050000 56 8d8bf0040000 51"},
+    {0x00526af5, "8b430c 6a08 b910000000"},
+    {0x00526b1e, "8b08 6a08 50 8b8178010000 ffd0"},
+};
+// Lara in: the engine's inside / enter / exit result codes (0x5cd1b0 old + new position) and their dispatch
+const DvCheck kDvInChecks[] = {
+    {0x005cd4ef, "84db 7414 33d2 84c0 0f94c2 8d541201 8bc2"},
+    {0x005cd507, "84c0 740c b802000000"},
+    {0x005cd661, "3bc5 7526 8d4c2414 89742414 e80ef61c00"},
+    {0x005cd68b, "83f803 7526 8d4c2414 89742414 e823f61c00"},
+    {0x005cd6b6, "83f801 7515"},
+};
+// owner units: the intro loader walks Level +0x74 -> unit DTP (+0x10 Intro*, +0xc count, 0x90 bytes each)
+const DvCheck kDvUnitChecks[] = {
+    {0x005d1dda, "8b4674 894e2c 83781000 0f8416010000 33d2 39500c"},
+    {0x005d1df3, "8b4e74 8b4910 0f284c0110"},
+    {0x005d1e2e, "83c201 0590000000 3b510c 72b8"},
+};
+const DWORD kDpSceneProj = 0x100, kDpSceneView = 0x140, kDpSceneTarget = 0x1c0;
+const DWORD kDpFvf = D3DFVF_XYZRHW | D3DFVF_DIFFUSE;
+struct DpVtx { float x, y, z, rhw; DWORD colour; };
+const int kDpBatch = 6144;                   // vertices per vertex buffer fill (2048 triangles)
+DpVtx g_dpVtx[kDpBatch];
+int g_dpVtxN = 0;
+IDirect3DVertexBuffer9 *g_dpVb = nullptr;
+IDirect3DDevice9 *g_dpVbDevice = nullptr;
+volatile LONG g_dpReady = -1000;             // g_dpFrame of the last scene that qualified with a usable depth mapping
+LONG g_dpCallFrame = -1;
+int g_dpCallIdx = 0;
+struct DpStat { LONG calls, qualified, drawn, lines, tris, verts; };
+DpStat g_dpNow = {}, g_dpLast = {};
+char g_dpWhyNow[160] = "no scene drawn yet";
+float g_dpA = 0.0f, g_dpB = 0.0f, g_dpW = 1.0f, g_dpSign = 1.0f, g_dpZNear = 0.0f, g_dpZFar = 1.0f;
+int g_dpForm = 0;                            // 1 row vectors, 2 column vectors (the scene's view / projection)
+bool g_dpLess = true;                        // z grows with the distance: visible = LESSEQUAL
+bool g_dpFailed = false;                     // a D3D call failed: depth off until dbg.depth is switched again
+volatile LONG g_dpLogPending = 0;
+int g_dpWaitFrames = 0;
+char g_dpStateText[240] = "off";
+const char *const kDpModeNames[3] = {"off", "on", "dim"};
+const char *const kDpModeDe[3] = {"aus", "an", "gedimmt"};
+
+bool DpUsable() {
+    return g_dpMode && g_dpOk && !g_dpFailed && g_rmSlot[kRmScene].on && g_dpFrame - g_dpReady <= 2;
+}
+bool DpWantScene() { return g_debugEnabled && g_dpMode && g_dpOk && !g_dpFailed && DvAnyOn(); }
+void DpBeginFill() {
+    LONG pub = g_dpPub, rd = g_dpRead, w = 0;
+    while (w == pub || w == rd) ++w;         // one of the three is always free
+    DpBuf &b = g_dpBuf[w];
+    b.frame = g_dpFrame;
+    b.lines = b.tris = b.dropped = 0;
+    g_dpFillIndex = w;
+    g_dpFill = &b;
+}
+void DpPublish() {
+    if (g_dpFillIndex >= 0) InterlockedExchange(&g_dpPub, g_dpFillIndex);
+    g_dpFillIndex = -1;
+}
+const char *DpStateText() { return g_dpStateText; }
+DWORD DpArgb(ImU32 c) {
+    return (((c >> 24) & 0xff) << 24) | ((c & 0xff) << 16) | (((c >> 8) & 0xff) << 8) | ((c >> 16) & 0xff);
+}
+// z' (depth in world units) -> the depth value the scene's projection gives (pulled a little towards the camera)
+float DpDepth(float zc) {
+    float zb = zc - 2.0f - 0.004f * zc;
+    if (zb < kDvNear) zb = kDvNear;
+    const float zv = g_dpSign * zb, z = (g_dpA * zv + g_dpB) / (g_dpW * zv);
+    return z < 0.0f ? 0.0f : z > 1.0f ? 1.0f : z;
+}
+// the scene's view / projection against the 0.14 camera (see the section comment); false + why = no depth this frame
+bool DpMapping(DWORD scene, const DvCam &c, char *why, size_t n) {
+    float P[16], V[16], cam[3];
+    if (!ReadFloats(scene + kDpSceneProj, P, 16) || !ReadFloats(scene + kDpSceneView, V, 16) || !DvFinite(P, 16) ||
+        !DvFinite(V, 16)) {
+        Out(why, n, "scene matrices [scene+0x100 / +0x140] not readable");
+        return false;
+    }
+    if (!DvCamPos(c, cam)) { Out(why, n, "camera position not solvable"); return false; }
+    const float *m = c.v.m;
+    float f[3] = {m[2], m[6], m[10]}, r[3] = {m[0] * c.ux, m[4] * c.ux, m[8] * c.ux};   // depth gradient, unit right
+    float fl = sqrtf(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
+    if (!(fl > 0.5f && fl < 2.0f)) { Out(why, n, "camera depth row not a unit vector (%.3f)", fl); return false; }
+    float pts[2][3];
+    for (int k = 0; k < 3; ++k) {
+        pts[0][k] = cam[k] + f[k] / (fl * fl) * 1000.0f;
+        pts[1][k] = cam[k] + f[k] / (fl * fl) * 3000.0f + r[k] * 700.0f;
+    }
+    int form = 0;
+    float sign = 1.0f;
+    for (int conv = 1; conv <= 2 && !form; ++conv) {
+        bool ok = true;
+        float s = 0.0f;
+        for (int i = 0; i < 2 && ok; ++i) {
+            const float *p = pts[i];
+            float zq[3];
+            DvToCam(c, p, zq);
+            float zv = conv == 1 ? V[2] * p[0] + V[6] * p[1] + V[10] * p[2] + V[14]
+                                 : V[8] * p[0] + V[9] * p[1] + V[10] * p[2] + V[11];
+            float si = zv < 0.0f ? -1.0f : 1.0f;
+            ok = zq[2] > 100.0f && fabsf(fabsf(zv) - zq[2]) <= 0.03f * zq[2] + 5.0f && (i == 0 || si == s);
+            s = si;
+        }
+        if (ok) { form = conv; sign = s; }
+    }
+    if (!form) { Out(why, n, "scene view [scene+0x140] does not give the 0.14 camera's depth"); return false; }
+    float w = 0.0f, b = 0.0f;
+    if (fabsf(fabsf(P[11]) - 1.0f) <= 0.02f) { w = P[11]; b = P[14]; }        // row vectors: w = z * P23
+    else if (fabsf(fabsf(P[14]) - 1.0f) <= 0.02f) { w = P[14]; b = P[11]; }   // column vectors
+    if (w == 0.0f || !(fabsf(P[15]) < 1.0e-3f) || !(w * sign > 0.0f)) {
+        Out(why, n, "scene projection not perspective (P23 %.3f, P32 %.3f, P33 %.4f)", P[11], P[14], P[15]);
+        return false;
+    }
+    g_dpA = P[10];
+    g_dpB = b;
+    g_dpW = w;
+    g_dpSign = sign;
+    g_dpForm = form;
+    float zn = (g_dpA * sign * kDvNear + b) / (w * sign * kDvNear), z1 = (g_dpA * sign * 1000.0f + b) / (w * sign * 1000.0f),
+          zf = (g_dpA * sign * 50000.0f + b) / (w * sign * 50000.0f);
+    bool nearOk = (zn > -0.03f && zn < 0.05f) || (zn > 0.95f && zn < 1.03f);
+    bool mono = (zn < z1 && z1 < zf) || (zn > z1 && z1 > zf);
+    if (!nearOk || !mono || !(zf > -0.05f && zf < 1.05f)) {
+        Out(why, n, "scene projection depth range odd (z(16.5) %.4f, z(1000) %.4f, z(50000) %.4f)", zn, z1, zf);
+        return false;
+    }
+    g_dpLess = z1 > zn;
+    g_dpZNear = zn;
+    g_dpZFar = zf;
+    return true;
+}
+bool DpVbReady(IDirect3DDevice9 *dev) {
+    if (g_dpVb && g_dpVbDevice == dev) return true;
+    if (g_dpVb) {
+        Log(1, "0.16 depth: device changed 0x%08lx -> 0x%08lx - vertex buffer of the old device dropped",
+            reinterpret_cast<DWORD>(g_dpVbDevice), reinterpret_cast<DWORD>(dev));
+        g_dpVb = nullptr;                     // belongs to the old device: never released through the new one
+    }
+    HRESULT hr = dev->CreateVertexBuffer(kDpBatch * sizeof(DpVtx), D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, kDpFvf,
+                                         D3DPOOL_DEFAULT, &g_dpVb, nullptr);
+    if (FAILED(hr) || !g_dpVb) {
+        g_dpVb = nullptr;
+        g_dpFailed = true;
+        Log(0, "0.16 depth: CreateVertexBuffer failed 0x%08lx - depth off, lines on top", static_cast<DWORD>(hr));
+        return false;
+    }
+    g_dpVbDevice = dev;
+    Log(1, "0.16 depth: vertex buffer created on device 0x%08lx (%d vertices, dynamic, default pool)",
+        reinterpret_cast<DWORD>(dev), kDpBatch);
+    return true;
+}
+// Reset hook (before the game's Reset): the vertex buffer goes, the next depth frame creates it again
+void DpOnReset() {
+    if (g_dpVb) {
+        g_dpVb->Release();
+        g_dpVb = nullptr;
+        g_dpVbDevice = nullptr;
+        Log(3, "0.16 depth: vertex buffer released for Reset");
+    }
+}
+// the batch so far into the vertex buffer and drawn (mode 2: the hidden parts first, dim)
+void DpFlush(IDirect3DDevice9 *dev) {
+    int n = g_dpVtxN - g_dpVtxN % 3;
+    g_dpVtxN = 0;
+    if (n < 3) return;
+    void *p = nullptr;
+    if (FAILED(g_dpVb->Lock(0, n * sizeof(DpVtx), &p, D3DLOCK_DISCARD)) || !p) return;
+    memcpy(p, g_dpVtx, n * sizeof(DpVtx));
+    g_dpVb->Unlock();
+    if (g_dpMode == 2) {
+        const DWORD dim = static_cast<DWORD>(g_dpDim * 255 / 100);
+        dev->SetRenderState(D3DRS_ZFUNC, g_dpLess ? D3DCMP_GREATER : D3DCMP_LESS);
+        dev->SetRenderState(D3DRS_TEXTUREFACTOR, (dim << 24) | 0x00ffffff);
+        dev->DrawPrimitive(D3DPT_TRIANGLELIST, 0, n / 3);
+    }
+    dev->SetRenderState(D3DRS_ZFUNC, g_dpLess ? D3DCMP_LESSEQUAL : D3DCMP_GREATEREQUAL);
+    dev->SetRenderState(D3DRS_TEXTUREFACTOR, 0xffffffff);
+    dev->DrawPrimitive(D3DPT_TRIANGLELIST, 0, n / 3);
+    g_dpNow.verts += n;
+}
+void DpTriangle(IDirect3DDevice9 *dev, const DpVtx &a, const DpVtx &b, const DpVtx &c) {
+    if (g_dpVtxN + 3 > kDpBatch) DpFlush(dev);
+    g_dpVtx[g_dpVtxN++] = a;
+    g_dpVtx[g_dpVtxN++] = b;
+    g_dpVtx[g_dpVtxN++] = c;
+}
+DpVtx DpV(float x, float y, float z, float rhw, DWORD colour) {
+    DpVtx v = {x - 0.5f, y - 0.5f, z, rhw, colour};   // D3D9: pixel centres at .0, minus half a pixel
+    return v;
+}
+// one screen quad of a line piece a .. b (depth / rhw per end)
+void DpQuad(IDirect3DDevice9 *dev, ImVec2 a, ImVec2 b, float za, float zb, float ia, float ib, float thick, DWORD col) {
+    float dx = b.x - a.x, dy = b.y - a.y, len = sqrtf(dx * dx + dy * dy);
+    if (len < 0.01f) return;
+    float nx = -dy / len * thick * 0.5f, ny = dx / len * thick * 0.5f;
+    DpVtx v0 = DpV(a.x + nx, a.y + ny, za, ia, col), v1 = DpV(a.x - nx, a.y - ny, za, ia, col),
+          v2 = DpV(b.x + nx, b.y + ny, zb, ib, col), v3 = DpV(b.x - nx, b.y - ny, zb, ib, col);
+    DpTriangle(dev, v0, v1, v2);
+    DpTriangle(dev, v1, v3, v2);
+}
+void DpLineDraw(IDirect3DDevice9 *dev, const DvCam &c, const DpLine &l, float w, float h) {
+    float ca[3], cb[3];
+    DvToCam(c, l.a, ca);
+    DvToCam(c, l.b, cb);
+    if (ca[2] < kDvNear && cb[2] < kDvNear) return;
+    if (ca[2] < kDvNear || cb[2] < kDvNear) {
+        float *near_ = ca[2] < kDvNear ? ca : cb;
+        const float *far_ = ca[2] < kDvNear ? cb : ca;
+        float t = (kDvNear - near_[2]) / (far_[2] - near_[2]);
+        for (int k = 0; k < 3; ++k) near_[k] += (far_[k] - near_[k]) * t;
+        near_[2] = kDvNear;
+    }
+    ImVec2 sa, sb;
+    if (!DvCamToScreen(c, ca, &sa) || !DvCamToScreen(c, cb, &sb)) return;
+    float t0 = 0.0f, t1 = 1.0f, m = l.thick + 2.0f;
+    if (!DvClip2D(sa, sb, -m, -m, w + m, h + m, &t0, &t1)) return;
+    const float za = DpDepth(ca[2]), zb = DpDepth(cb[2]), ia = 1.0f / ca[2], ib = 1.0f / cb[2];
+    const DWORD col = DpArgb(l.colour);
+    const float dx = sb.x - sa.x, dy = sb.y - sa.y;
+    auto at = [&](float t) { return ImVec2(sa.x + dx * t, sa.y + dy * t); };
+    if (!l.dashed) {
+        DpQuad(dev, at(t0), at(t1), za + (zb - za) * t0, za + (zb - za) * t1, ia + (ib - ia) * t0, ia + (ib - ia) * t1,
+               l.thick, col);
+        return;
+    }
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len < 1.0f) return;
+    for (float s = t0 * len; s < t1 * len; s += kDvDashOn + kDvDashOff) {
+        float u0 = s / len, u1 = (s + kDvDashOn) / len;
+        if (u1 > t1) u1 = t1;
+        DpQuad(dev, at(u0), at(u1), za + (zb - za) * u0, za + (zb - za) * u1, ia + (ib - ia) * u0, ia + (ib - ia) * u1,
+               l.thick, col);
+    }
+}
+void DpTriDraw(IDirect3DDevice9 *dev, const DvCam &c, const DpTri &t) {
+    float q[3][3], poly[4][3];
+    for (int a = 0; a < 3; ++a) DvToCam(c, t.v[a], q[a]);
+    int m = 0;
+    for (int a = 0; a < 3; ++a) {             // Sutherland-Hodgman against z' >= near
+        const float *p0 = q[a], *p1 = q[(a + 1) % 3];
+        bool in0 = p0[2] >= kDvNear, in1 = p1[2] >= kDvNear;
+        if (in0) { poly[m][0] = p0[0]; poly[m][1] = p0[1]; poly[m][2] = p0[2]; ++m; }
+        if (in0 != in1) {
+            float s = (kDvNear - p0[2]) / (p1[2] - p0[2]);
+            for (int b = 0; b < 3; ++b) poly[m][b] = p0[b] + (p1[b] - p0[b]) * s;
+            poly[m][2] = kDvNear;
+            ++m;
+        }
+    }
+    if (m < 3) return;
+    DpVtx v[4];
+    const DWORD col = DpArgb(t.colour);
+    for (int a = 0; a < m; ++a) {
+        ImVec2 s;
+        if (!DvCamToScreen(c, poly[a], &s)) return;
+        v[a] = DpV(s.x, s.y, DpDepth(poly[a][2]), 1.0f / poly[a][2], col);
+    }
+    for (int a = 1; a + 1 < m; ++a) DpTriangle(dev, v[0], v[a], v[a + 1]);
+}
+// one buffer into the bound target with the bound depth surface; every state put back by the state block
+void DpDrawBuffer(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b, UINT w, UINT h) {
+    if (!DpVbReady(dev)) return;
+    IDirect3DStateBlock9 *sb = nullptr;
+    HRESULT hr = dev->CreateStateBlock(D3DSBT_ALL, &sb);
+    if (FAILED(hr) || !sb) {
+        g_dpFailed = true;
+        Log(0, "0.16 depth: CreateStateBlock(D3DSBT_ALL) failed 0x%08lx - depth off, lines on top", static_cast<DWORD>(hr));
+        return;
+    }
+    sb->Capture();                            // as ImGui's DX9 backend (#3857)
+    D3DVIEWPORT9 vp = {0, 0, w, h, 0.0f, 1.0f};
+    dev->SetViewport(&vp);
+    dev->SetPixelShader(nullptr);
+    dev->SetVertexShader(nullptr);
+    dev->SetFVF(kDpFvf);
+    dev->SetStreamSource(0, g_dpVb, 0, sizeof(DpVtx));
+    dev->SetTexture(0, nullptr);
+    dev->SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID);
+    dev->SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD);
+    dev->SetRenderState(D3DRS_ZENABLE, D3DZB_TRUE);
+    dev->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+    dev->SetRenderState(D3DRS_ALPHATESTENABLE, FALSE);
+    dev->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    dev->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+    dev->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+    dev->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+    dev->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+    dev->SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, FALSE);
+    dev->SetRenderState(D3DRS_COLORWRITEENABLE, D3DCOLORWRITEENABLE_RED | D3DCOLORWRITEENABLE_GREEN |
+                                                    D3DCOLORWRITEENABLE_BLUE);   // the target's alpha stays the game's
+    dev->SetRenderState(D3DRS_COLORWRITEENABLE1, 0);
+    dev->SetRenderState(D3DRS_COLORWRITEENABLE2, 0);
+    dev->SetRenderState(D3DRS_COLORWRITEENABLE3, 0);
+    dev->SetRenderState(D3DRS_SRGBWRITEENABLE, FALSE);
+    dev->SetRenderState(D3DRS_SCISSORTESTENABLE, FALSE);
+    dev->SetRenderState(D3DRS_FOGENABLE, FALSE);
+    dev->SetRenderState(D3DRS_RANGEFOGENABLE, FALSE);
+    dev->SetRenderState(D3DRS_SPECULARENABLE, FALSE);
+    dev->SetRenderState(D3DRS_STENCILENABLE, FALSE);
+    dev->SetRenderState(D3DRS_CLIPPING, TRUE);
+    dev->SetRenderState(D3DRS_LIGHTING, FALSE);
+    dev->SetRenderState(D3DRS_CLIPPLANEENABLE, 0);
+    dev->SetRenderState(D3DRS_DEPTHBIAS, 0);
+    dev->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS, 0);
+    dev->SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+    dev->SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_DIFFUSE);
+    dev->SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+    dev->SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_DIFFUSE);
+    dev->SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+    dev->SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+    dev->SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
+    g_dpVtxN = 0;
+    const float fw = static_cast<float>(w), fh = static_cast<float>(h);
+    for (int i = 0; i < b.tris; ++i) DpTriDraw(dev, c, b.tri[i]);       // faces first, the lines over them
+    for (int i = 0; i < b.lines; ++i) DpLineDraw(dev, c, b.line[i], fw, fh);
+    DpFlush(dev);
+    sb->Apply();
+    sb->Release();
+    ++g_dpNow.drawn;
+    g_dpNow.lines = b.lines;
+    g_dpNow.tris = b.tris;
+}
+// PCScene::Draw returned (RmSceneDrawHook, render thread): is this the scene to draw into, then the newest buffer
+void DpSceneEnd(void *self) {
+    if (!g_dpMode || !g_dpOk || g_dpFailed) return;
+    IDirect3DDevice9 *dev = g_device;
+    if (!dev) return;
+    const LONG frame = g_dpFrame;
+    if (frame != g_dpCallFrame) { g_dpCallFrame = frame; g_dpCallIdx = 0; }
+    ++g_dpNow.calls;
+    const DWORD scene = reinterpret_cast<DWORD>(self);
+    DWORD own = 0;
+    if (!ReadDword(scene + kDpSceneTarget, &own) || own) {
+        Out(g_dpWhyNow, sizeof(g_dpWhyNow), "the scene has a target object of its own ([scene+0x1c0] 0x%08lx)", own);
+        return;
+    }
+    IDirect3DSurface9 *rt = nullptr, *ds = nullptr;
+    D3DSURFACE_DESC rd = {}, dd = {};
+    bool ok = SUCCEEDED(dev->GetRenderTarget(0, &rt)) && rt && SUCCEEDED(rt->GetDesc(&rd));
+    if (rt) rt->Release();
+    if (!ok || rd.Width != g_bbWidth || rd.Height != g_bbHeight) {
+        Out(g_dpWhyNow, sizeof(g_dpWhyNow), "render target 0 %ux%u, back buffer %ux%u", rd.Width, rd.Height, g_bbWidth,
+            g_bbHeight);
+        return;
+    }
+    ok = SUCCEEDED(dev->GetDepthStencilSurface(&ds)) && ds && SUCCEEDED(ds->GetDesc(&dd));
+    if (ds) ds->Release();
+    if (!ok || dd.Width < rd.Width || dd.Height < rd.Height) {
+        Out(g_dpWhyNow, sizeof(g_dpWhyNow), "no depth surface bound (or smaller than the target)");
+        return;
+    }
+    ++g_dpNow.qualified;
+    if (g_dpCallIdx++ != g_dpCall) return;
+    DvCam c;
+    if (!DvCamRead(&c, static_cast<float>(rd.Width), static_cast<float>(rd.Height))) {
+        Out(g_dpWhyNow, sizeof(g_dpWhyNow), "camera not readable");
+        return;
+    }
+    if (!DpMapping(scene, c, g_dpWhyNow, sizeof(g_dpWhyNow))) return;
+    g_dpWhyNow[0] = 0;
+    InterlockedExchange(&g_dpReady, frame);
+    LONG p = -1;
+    for (int tries = 0; tries < 4; ++tries) {   // the newest published buffer, marked as read (DpBeginFill skips it)
+        p = g_dpPub;
+        InterlockedExchange(&g_dpRead, p);
+        if (g_dpPub == p) break;
+    }
+    if (p >= 0 && p <= 2 && frame - g_dpBuf[p].frame <= 3 && (g_dpBuf[p].lines || g_dpBuf[p].tris))
+        DpDrawBuffer(dev, c, g_dpBuf[p], rd.Width, rd.Height);
+    InterlockedExchange(&g_dpRead, -1);
+}
+// Present (RenderModeTick): frame counter, last frame's numbers, the state text, the one-shot log line
+void DpTick() {
+    InterlockedIncrement(&g_dpFrame);
+    g_dpLast = g_dpNow;
+    memset(&g_dpNow, 0, sizeof(g_dpNow));
+    if (!g_dpMode) { Out(g_dpStateText, sizeof(g_dpStateText), "aus / off (lines on top)"); return; }
+    if (!g_debugEnabled || !g_dpOk) Out(g_dpStateText, sizeof(g_dpStateText), "nicht verfuegbar / unavailable: %s",
+                                        g_debugEnabled ? g_dpWhy : "[Debug] Enabled=0");
+    else if (g_dpFailed) Out(g_dpStateText, sizeof(g_dpStateText), "aus nach D3D-Fehler / off after a D3D failure (log)");
+    else if (!g_rmSlot[kRmScene].on) Out(g_dpStateText, sizeof(g_dpStateText), "wartet / waits: %s",
+                                         g_rmWaitWhy[0] ? g_rmWaitWhy : "PCScene::Draw slot not patched yet");
+    else if (DpUsable() && g_dpLast.drawn)
+        Out(g_dpStateText, sizeof(g_dpStateText), "%s (scene %d of %ld qualifying, %ld calls; %s vectors, z %s, z(16.5) %.4f; "
+            "%ld lines, %ld faces)", kDpModeDe[g_dpMode], g_dpCall, g_dpLast.qualified, g_dpLast.calls,
+            g_dpForm == 1 ? "row" : "column", g_dpLess ? "LESSEQUAL" : "GREATEREQUAL", g_dpZNear, g_dpLast.lines,
+            g_dpLast.tris);
+    else if (DpUsable()) Out(g_dpStateText, sizeof(g_dpStateText), "%s (scene ok, nothing to draw yet)", kDpModeDe[g_dpMode]);
+    else Out(g_dpStateText, sizeof(g_dpStateText), "wartet, Linien oben / waits, lines on top: %s (%ld scene calls, %ld "
+             "qualifying)", g_dpWhyNow, g_dpLast.calls, g_dpLast.qualified);
+    if (g_dpLogPending && DvAnyOn()) {
+        if (g_dpLast.drawn) {
+            Log(1, "0.16 depth drawn: %s", g_dpStateText);
+            InterlockedExchange(&g_dpLogPending, 0);
+        } else if (++g_dpWaitFrames > 180) {
+            Log(1, "0.16 depth waits (180 frames): %s", g_dpStateText);
+            InterlockedExchange(&g_dpLogPending, 0);
+        }
+    }
+}
+// load: the byte checks of precheck_016.txt (depth: section 1, Lara in: 2, owner units: 3)
+void ReadabilityCheck() {
+    DWORD at = 0;
+    bool dp = DvChecks(kDpChecks, sizeof(kDpChecks) / sizeof(kDpChecks[0]), &at);
+    if (!g_rmOk) Out(g_dpWhyBuf, sizeof(g_dpWhyBuf), "render mode checks (0.15) failed: %s", g_rmWhy);
+    else if (!g_dvBaseOk) Out(g_dpWhyBuf, sizeof(g_dpWhyBuf), "debug view base checks failed: %s", g_dvBaseWhy);
+    else Out(g_dpWhyBuf, sizeof(g_dpWhyBuf), "scene code differs at 0x%08lx", at);
+    g_dpOk = dp && g_rmOk && g_dvBaseOk;
+    g_dpWhy = g_dpOk ? "ok" : g_dpWhyBuf;
+    DWORD atIn = 0, atUnit = 0;
+    g_dvLaraOk = g_dvTrgOk && DvChecks(kDvInChecks, sizeof(kDvInChecks) / sizeof(kDvInChecks[0]), &atIn);
+    g_dvUnitOk = g_unitOk && DvChecks(kDvUnitChecks, sizeof(kDvUnitChecks) / sizeof(kDvUnitChecks[0]), &atUnit);
+    if (g_dpMode) InterlockedExchange(&g_dpLogPending, 1);
+    Log(g_dpOk && g_dvLaraOk && g_dvUnitOk ? 1 : 0, "0.16 readability: depth %s, Lara in %s, owner units %s; [Debug] Depth "
+        "%s (DepthDim %d, DepthCall %d), LineAlpha %d, LineBright %d, Fade %d (%.0f .. %.0f, min %d), Fill %d (%d), "
+        "ViewLabelMax %d, LabelShort %d, LaraIn %d, Enclosing %d (size %.0f), MarkerMax %d, ViewSkip '%s', TriggerMax %d",
+        g_dpWhy, g_dvLaraOk ? "ok" : !g_dvTrgOk ? "off (trigger checks)" : "result codes differ", g_dvUnitOk ? "ok"
+        : !g_unitOk ? "off (unit table check)" : "intro loader differs", kDpModeNames[g_dpMode], g_dpDim, g_dpCall,
+        g_dvAlpha, g_dvBright, g_dvFade, g_dvFadeStart, g_dvFadeEnd, g_dvFadeMin, g_dvFill, g_dvFillAlpha, g_dvTagMax,
+        g_dvShort, g_dvLaraIn, g_dvEncl, g_dvEnclSize, g_dvMarkerMax, g_dvViewSkip, g_dvTrgMax);
+}
+
+// ---- 0.16 items ----
+void DvPersistInt(const char *key, int v) {
+    if (!g_dvPersist || !g_iniPath[0]) return;
+    char text[16];
+    Out(text, sizeof(text), "%d", v);
+    WritePrivateProfileStringA("Debug", key, text, g_iniPath);
+}
+bool DvGate(const char *item, char *o, size_t n) {
+    if (!g_debugEnabled) { Out(o, n, "debug drawing off ([Debug] Enabled=0)"); return false; }
+    (void)item;
+    return true;
+}
+void ValDpDepth(char *o, size_t n) { Out(o, n, "%s / %s (%s)", kDpModeNames[g_dpMode], kDpModeDe[g_dpMode], g_dpStateText); }
+// dbg.depth off|on|dim (aus / an / gedimmt, 0 / 1 / 2; no argument = the next one)
+bool RunDpDepth(const char *arg, char *o, size_t n) {
+    char v[32];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    int mode = -1;
+    for (int i = 0; i < 3; ++i)
+        if (!_stricmp(v, kDpModeNames[i]) || !_stricmp(v, kDpModeDe[i]) || (v[0] == '0' + i && !v[1])) mode = i;
+    if (!v[0]) mode = (g_dpMode + 1) % 3;
+    if (mode < 0) { Out(o, n, "usage: dbg.depth off|on|dim (aus|an|gedimmt, 0|1|2); now %s", kDpModeNames[g_dpMode]); return false; }
+    if (!DvGate("dbg.depth", o, n)) return false;
+    if (mode && !g_dpOk) {
+        Out(o, n, "disabled: pre-check failed (%s)", g_dpWhy);
+        Log(1, "dbg.depth %s refused - %s (src=%s)", kDpModeNames[mode], o, ShotSource("dbg.depth"));
+        return false;
+    }
+    g_dpFailed = false;                       // a new try after a D3D failure
+    g_dpWaitFrames = 0;
+    InterlockedExchange(&g_dpMode, mode);
+    InterlockedExchange(&g_dpLogPending, mode ? 1 : 0);
+    DvPersistInt("Depth", mode);
+    Log(1, "dbg.depth %s (DepthDim %d, DepthCall %d; src=%s)", kDpModeNames[mode], g_dpDim, g_dpCall, ShotSource("dbg.depth"));
+    Out(o, n, "dbg.depth %s (%s)%s", kDpModeNames[mode], kDpModeDe[mode],
+        mode && !DvAnyOn() ? " - switch a debug view layer on to see it" : "");
+    return true;
+}
+// dbg.alpha / dbg.bright <percent>
+bool DvRunPercent(int *var, int lo, int hi, const char *item, const char *key, const char *arg, char *o, size_t n) {
+    char v[32];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    size_t len = strlen(v);
+    if (len && v[len - 1] == '%') v[--len] = 0;
+    char *end = nullptr;
+    long value = strtol(v, &end, 10);
+    if (!len || !end || *end || value < lo || value > hi) {
+        Out(o, n, "usage: %s <%d .. %d> (percent); now %d", item, lo, hi, *var);
+        return false;
+    }
+    if (!DvGate(item, o, n)) return false;
+    *var = static_cast<int>(value);
+    DvPersistInt(key, *var);
+    Log(1, "%s %d (src=%s)", item, *var, ShotSource(item));
+    Out(o, n, "%s %d%%", item, *var);
+    return true;
+}
+void ValDvAlpha(char *o, size_t n) { Out(o, n, "%d%%", g_dvAlpha); }
+bool RunDvAlpha(const char *arg, char *o, size_t n) { return DvRunPercent(&g_dvAlpha, 10, 100, "dbg.alpha", "LineAlpha", arg, o, n); }
+void ValDvBright(char *o, size_t n) { Out(o, n, "%d%%", g_dvBright); }
+bool RunDvBright(const char *arg, char *o, size_t n) { return DvRunPercent(&g_dvBright, 30, 150, "dbg.bright", "LineBright", arg, o, n); }
+// the 0.16 bool switches (dbg.fade / dbg.fill / dbg.short / dbg.larain)
+bool DvRunFlag(int *var, const char *item, const char *key, const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, *var != 0);
+    if (!DvGate(item, o, n)) return false;
+    *var = on ? 1 : 0;
+    DvPersistKey(key, on);
+    Log(1, "%s %d (src=%s)", item, *var, ShotSource(item));
+    Out(o, n, "%s %d", item, *var);
+    return true;
+}
+void ValDvFade(char *o, size_t n) { Out(o, n, "%d (%.0f .. %.0f, min %d%%)", g_dvFade, g_dvFadeStart, g_dvFadeEnd, g_dvFadeMin); }
+bool RunDvFade(const char *arg, char *o, size_t n) { return DvRunFlag(&g_dvFade, "dbg.fade", "Fade", arg, o, n); }
+void ValDvFill(char *o, size_t n) { Out(o, n, "%d (%d%%)", g_dvFill, g_dvFillAlpha); }
+bool RunDvFill(const char *arg, char *o, size_t n) { return DvRunFlag(&g_dvFill, "dbg.fill", "Fill", arg, o, n); }
+void ValDvShort(char *o, size_t n) { Out(o, n, "%d", g_dvShort); }
+bool RunDvShort(const char *arg, char *o, size_t n) { return DvRunFlag(&g_dvShort, "dbg.short", "LabelShort", arg, o, n); }
+void ValDvLaraIn(char *o, size_t n) {
+    Out(o, n, "%d (%s; last frame %d)", g_dvLaraIn, g_dvLaraOk ? "checks ok" : "checks failed - off", g_dvInN + g_dvInMore);
+}
+bool RunDvLaraIn(const char *arg, char *o, size_t n) { return DvRunFlag(&g_dvLaraIn, "dbg.larain", "LaraIn", arg, o, n); }
+const char *const kDvEnclNames[3] = {"normal", "dim", "hide"};
+void ValDvEnclosing(char *o, size_t n) { Out(o, n, "%s (size %.0f; last frame %d)", kDvEnclNames[g_dvEncl], g_dvEnclSize, g_dvEnclN); }
+// dbg.enclosing normal|dim|hide (0 / 1 / 2)
+bool RunDvEnclosing(const char *arg, char *o, size_t n) {
+    char v[32];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    int mode = -1;
+    for (int i = 0; i < 3; ++i)
+        if (!_stricmp(v, kDvEnclNames[i]) || (v[0] == '0' + i && !v[1])) mode = i;
+    if (mode < 0) { Out(o, n, "usage: dbg.enclosing normal|dim|hide (0|1|2); now %s", kDvEnclNames[g_dvEncl]); return false; }
+    if (!DvGate("dbg.enclosing", o, n)) return false;
+    g_dvEncl = mode;
+    DvPersistInt("Enclosing", mode);
+    Log(1, "dbg.enclosing %s (src=%s)", kDvEnclNames[mode], ShotSource("dbg.enclosing"));
+    Out(o, n, "dbg.enclosing %s", kDvEnclNames[mode]);
+    return true;
+}
+void ValDvStyle(char *o, size_t n) {
+    Out(o, n, "alpha %d%%, bright %d%%, fade %d (%.0f .. %.0f, min %d%%), fill %d (%d%%), labels max %d short %d, Lara in %d, "
+        "enclosing %s (size %.0f), marker max %d%%, view skip '%s', trigger max %d; depth %s: %s", g_dvAlpha, g_dvBright,
+        g_dvFade, g_dvFadeStart, g_dvFadeEnd, g_dvFadeMin, g_dvFill, g_dvFillAlpha, g_dvTagMax, g_dvShort, g_dvLaraIn,
+        kDvEnclNames[g_dvEncl], g_dvEnclSize, g_dvMarkerMax, g_dvViewSkip, g_dvTrgMax, kDpModeNames[g_dpMode], g_dpStateText);
+}
+
 // legend lines of the render mode (DrawDebugLegend)
 int RmLegend(char (*lines)[112], ImU32 *colours, int n, int limit) {
     if (g_rmFlat && n < limit) {
@@ -8216,7 +9502,8 @@ int RmLegend(char (*lines)[112], ImU32 *colours, int n, int limit) {
     }
     if (g_dvOn[kDvSlide] || g_dvOn[kDvEnemyColl]) {
         if (n < limit) {
-            Out(lines[n], sizeof(lines[n]), "Kollision liegt oben (durch Waende) / on top");
+            Out(lines[n], sizeof(lines[n]), "%s", DpUsable() ? "Kollision mit Tiefe / with depth"
+                                                             : "Kollision liegt oben (durch Waende) / on top");
             colours[n++] = IM_COL32(200, 200, 200, 230);
         }
     }
@@ -8233,6 +9520,52 @@ void PageDebugView() {
     bool all = DvViewAny();
     if (TmCheckbox("Everything / Alles an / aus  [dbg.view]###dvall", &all)) RunDvView(all ? "1" : "0", o, sizeof(o));
     ImGui::TextWrapped("last frame: %s", DvAnyOn() ? g_dvState : "off");
+    // 0.16 display (owner feedback after the first live run): first group - depth, opacity, fade, fill, labels, legend
+    if (ImGui::TreeNodeEx("Display / Darstellung (0.16)###dvstyle", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::TextUnformatted("depth / Tiefe  [dbg.depth]:");
+        for (int i = 0; i < 3; ++i) {
+            char label[64];
+            Out(label, sizeof(label), "%s / %s###dpm%d", kDpModeNames[i], kDpModeDe[i], i);
+            ImGui::SameLine();
+            if (ImGui::RadioButton(label, g_dpMode == i)) RunDpDepth(kDpModeNames[i], o, sizeof(o));
+        }
+        if (!g_dpOk) ImGui::TextWrapped("depth unavailable: %s", g_dpWhy);
+        ImGui::TextWrapped("depth: %s", g_dpStateText);
+        ImGui::SliderInt("hidden parts / verdeckte Teile %  [Debug] DepthDim", &g_dpDim, 5, 80);
+        ImGui::SliderInt("scene / Szene  [Debug] DepthCall", &g_dpCall, 0, 7);
+        ImGui::SliderInt("opacity / Deckkraft %  [dbg.alpha]###dvalpha", &g_dvAlpha, 10, 100);
+        if (ImGui::IsItemDeactivatedAfterEdit()) { char a[16]; Out(a, sizeof(a), "%d", g_dvAlpha); RunDvAlpha(a, o, sizeof(o)); }
+        ImGui::SliderInt("brightness / Helligkeit %  [dbg.bright]###dvbright", &g_dvBright, 30, 150);
+        if (ImGui::IsItemDeactivatedAfterEdit()) { char a[16]; Out(a, sizeof(a), "%d", g_dvBright); RunDvBright(a, o, sizeof(o)); }
+        bool fade = g_dvFade != 0, fill = g_dvFill != 0, brief = g_dvShort != 0, larain = g_dvLaraIn != 0;
+        if (TmCheckbox("far objects fainter / Ferne blasser  [dbg.fade]###dvfade", &fade)) RunDvFade(fade ? "1" : "0", o, sizeof(o));
+        ImGui::SliderFloat("fade start / Beginn  [Debug] FadeStart", &g_dvFadeStart, 0.0f, 100000.0f, "%.0f");
+        ImGui::SliderFloat("fade end / Ende  [Debug] FadeEnd", &g_dvFadeEnd, 500.0f, 200000.0f, "%.0f");
+        ImGui::SliderInt("far opacity / Rest %  [Debug] FadeMin", &g_dvFadeMin, 0, 100);
+        if (TmCheckbox("face fill / Flaechen fuellen  [dbg.fill]###dvfill", &fill)) RunDvFill(fill ? "1" : "0", o, sizeof(o));
+        ImGui::SliderInt("fill opacity / Fuellung %  [Debug] FillAlpha", &g_dvFillAlpha, 2, 40);
+        ImGui::SliderInt("labels / Beschriftungen  [Debug] ViewLabelMax", &g_dvTagMax, 0, 64);
+        if (TmCheckbox("short labels / Kurze Namen  [dbg.short]###dvshort", &brief)) RunDvShort(brief ? "1" : "0", o, sizeof(o));
+        if (TmCheckbox("mark the triggers Lara is in / Lara drin markieren  [dbg.larain]###dvlarain", &larain))
+            RunDvLaraIn(larain ? "1" : "0", o, sizeof(o));
+        ImGui::TextUnformatted("enclosing boxes / umhuellende  [dbg.enclosing]:");
+        for (int i = 0; i < 3; ++i) {
+            static const char *const kDe[3] = {"normal", "blass", "aus"};
+            char label[64];
+            Out(label, sizeof(label), "%s / %s###dve%d", kDvEnclNames[i], kDe[i], i);
+            ImGui::SameLine();
+            if (ImGui::RadioButton(label, g_dvEncl == i)) RunDvEnclosing(kDvEnclNames[i], o, sizeof(o));
+        }
+        ImGui::SliderFloat("big from / gross ab  [Debug] EnclosingSize", &g_dvEnclSize, 100.0f, 100000.0f, "%.0f");
+        ImGui::SliderInt("checkpoint marker max % of screen  [Debug] MarkerMax", &g_dvMarkerMax, 2, 50);
+        bool v = g_dvOn[kDvLegend] != 0;
+        if (TmCheckbox("legend / Legende  [dbg.legend]###dvleg", &v)) DvSet(kDvLegend, v, "menu", o, sizeof(o));
+        ImGui::TextWrapped("dbg.view leaves off / Alles an laesst aus: '%s'  [Debug] ViewSkip", g_dvViewSkip);
+        ImGui::TextWrapped("[Debug] Persist %d: %s", g_dvPersist, g_dvPersist ? "every switch here is written to TruMenu.ini"
+                           " at once (Set-TruMenu.ps1 then keeps the INI as owner-edited)" : "switches last until the "
+                           "game ends; start values = the [Debug] keys");
+        ImGui::TreePop();
+    }
     // 0.15 render mode (stages R0 / R1; not part of dbg.view - the flat view is its own big switch)
     if (ImGui::TreeNodeEx("Render (0.15) / Render###dvrender", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (!g_rmOk) ImGui::TextWrapped("render mode off: %s", g_rmWhy);
@@ -8289,7 +9622,7 @@ void PageDebugView() {
                 g_dvListed[i], i);
             if (TmCheckbox(label, &v)) DvSet(i, v, "menu", o, sizeof(o));
         }
-        ImGui::SliderInt("max triggers / frame  [Debug] TriggerMax", &g_dvTrgMax, 1, 256);
+        ImGui::SliderInt("max triggers / frame  [Debug] TriggerMax", &g_dvTrgMax, 1, 512);
         ImGui::SliderFloat("radius from the camera  [Debug] TriggerRadius", &g_dvRadius, 500.0f, 200000.0f, "%.0f");
         ImGui::SliderInt("trigger names / frame  [Debug] TriggerLabelMax", &g_dvLabelMax, 0, 64);
         if (!g_rcOk) ImGui::TextWrapped("collision overlay off: %s", g_rcWhy);
@@ -8379,14 +9712,7 @@ void PageDebugView() {
         ImGui::TextWrapped("The white cross with the triggers is the point the game tests: Lara +0x20 + 200 up.");
         ImGui::TreePop();
     }
-    if (ImGui::TreeNodeEx("Display / Anzeige###dvdisplay", ImGuiTreeNodeFlags_DefaultOpen)) {
-        bool v = g_dvOn[kDvLegend] != 0;
-        if (TmCheckbox("legend / Legende  [dbg.legend]###dvleg", &v)) DvSet(kDvLegend, v, "menu", o, sizeof(o));
-        ImGui::TextWrapped("[Debug] Persist %d: %s", g_dvPersist, g_dvPersist ? "every switch here is written to TruMenu.ini"
-                           " at once (Set-TruMenu.ps1 then keeps the INI as owner-edited)" : "switches last until the "
-                           "game ends; start values = the [Debug] keys");
-        ImGui::TreePop();
-    }
+    // 0.16: legend + Persist note moved into "Display / Darstellung" (first group)
 }
 
 // ---- favourites: [Favorites] Ids in TruMenu.ini (comma list of item ids; empty = kFavDefault) ----
@@ -11712,6 +13038,8 @@ const Item kItems[] = {
     {"log.show", "info", "last script print / log lines", false, ValScriptLines, nullptr},
     {"log.script", "bool", "redirect the 8 NsCoreBase print / log natives to the log page", true, ValScriptLog,
      RunScriptLog},
+    {"log.scriptfile", "bool", "0.16: the script lines also into TruMenu.log ('script: ...', MaxLinesPerSecond, repeats "
+                               "counted; needs log.script)", false, ValScriptFile, RunScriptFile},
     {"log.overlay", "bool", "log lines in the bottom-left corner", false, ValLogOverlay, RunLogOverlay},
     {"log.lines", "int", "lines on the page / overlay (1..64)", false, ValLogLines, RunLogLines},
     {"log.filter", "action", "only one source (TruLink, TruMenu, script, ...; \"\" / all = every source)", false,
@@ -11941,6 +13269,22 @@ const Item kItems[] = {
                           "than the tuning angle (Lara slides), orange = flatter; on top", false, ValRcSlide, RunRcSlide},
     {"dbg.enemycoll", "bool", "0.15: R2 enemy-only collision - faces of TerrainGroups with extra flags 0x800 (violet, on top)",
      false, ValRcEnemy, RunRcEnemy},
+    // 0.16 readability ([Debug] Enabled; Depth patches the PCScene::Draw vtable word while on, the rest is drawing only)
+    {"dbg.depth", "action", "0.16 off|on|dim (aus|an|gedimmt): debug view lines on top / hidden behind the level geometry "
+                            "and Lara / hidden parts faint (no argument = the next mode)", false, ValDpDepth, RunDpDepth},
+    {"dbg.alpha", "action", "0.16 <10 .. 100>: opacity of every debug view line in percent", false, ValDvAlpha, RunDvAlpha},
+    {"dbg.bright", "action", "0.16 <30 .. 150>: brightness of the debug view colours in percent", false, ValDvBright,
+     RunDvBright},
+    {"dbg.fade", "bool", "0.16: far objects fainter ([Debug] FadeStart .. FadeEnd, FadeMin)", false, ValDvFade, RunDvFade},
+    {"dbg.fill", "bool", "0.16: faint face fill of trigger boxes / planes and loading areas", false, ValDvFill, RunDvFill},
+    {"dbg.short", "bool", "0.16: short labels (TV 4463 / TP 4129 / FIRE 4492; the nearest and the centred one in full)",
+     false, ValDvShort, RunDvShort},
+    {"dbg.larain", "bool", "0.16: the triggers Lara's test point is in - bold, pulsing outline, legend line 'Lara in'",
+     false, ValDvLaraIn, RunDvLaraIn},
+    {"dbg.enclosing", "action", "0.16 normal|dim|hide: boxes around the camera or big ones around Lara", false,
+     ValDvEnclosing, RunDvEnclosing},
+    {"dbg.style", "info", "0.16: the display settings (opacity, brightness, fade, fill, labels, Lara in, enclosing, marker "
+                          "size) and the depth state", false, ValDvStyle, nullptr},
 };
 
 const Item *FindItem(const char *id) {
@@ -15993,6 +17337,10 @@ void PageLog() {
     if (!g_scriptOk) ImGui::BeginDisabled();
     if (TmCheckbox("script prints  [log.script]", &script)) QueueItem("log.script", script ? "1" : "0");
     if (!g_scriptOk) ImGui::EndDisabled();
+    bool scriptFile = g_scriptToFile != 0;     // 0.16
+    char o16[160];
+    if (TmCheckbox("script prints also into TruMenu.log / Skript-Ausgaben auch ins Log  [log.scriptfile]###logsf", &scriptFile))
+        RunScriptFile(scriptFile ? "1" : "0", o16, sizeof(o16));
     ImGui::SliderInt("lines  [log.lines]", &g_logLines, 1, 64);
     // sources: every tailed file + "script"
     if (TmButton(g_logFilter[0] ? "all##lf" : "[all]##lf")) g_logFilter[0] = 0;
@@ -16306,7 +17654,7 @@ void DrawMenu() {
         if (TmCollapsingHeader("Cheat / flight")) PageCheat();
         if (TmCollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
         if (TmCollapsingHeader("Markup / collision draw")) PageMarkup();
-        if (TmCollapsingHeader("Debug view / Debug-Ansicht (0.12 - 0.15)###debugview")) PageDebugView();   // 0.14 / 0.15
+        if (TmCollapsingHeader("Debug view / Debug-Ansicht (0.12 - 0.16)###debugview")) PageDebugView();   // 0.14 - 0.16
         if (TmCollapsingHeader("Level select")) PageLevel();
         if (TmCollapsingHeader("Outfits (next level load)")) PageOutfits();
         if (TmCollapsingHeader("Dev channel")) {
@@ -16648,6 +17996,7 @@ void ReadOptions(const char *dir) {
     g_logLinesAtStart = OptInt(ini, "Log", "Lines");
     if (g_logLinesAtStart < 1 || g_logLinesAtStart > 64) g_logLinesAtStart = atoi(OptDefault("Log", "Lines"));
     g_scriptLogAtStart = OptInt(ini, "Log", "Script");
+    InterlockedExchange(&g_scriptToFile, OptInt(ini, "Log", "ScriptToFile") != 0 ? 1 : 0);   // 0.16
     // 0.4: applied at once (also by settings.reset)
     InterlockedExchange(&g_logCollapse, OptInt(ini, "Log", "Collapse") ? 1 : 0);
     InterlockedExchange(&g_logHideReads, OptInt(ini, "Log", "HideLinkReads") ? 1 : 0);
@@ -16704,7 +18053,7 @@ void ReadOptions(const char *dir) {
     g_dvPersist = OptInt(ini, "Debug", "Persist") != 0 ? 1 : 0;
     OptString(ini, "Debug", "ViewNav", g_dvViewNav, sizeof(g_dvViewNav));
     g_dvTrgMax = OptInt(ini, "Debug", "TriggerMax");
-    if (g_dvTrgMax < 1 || g_dvTrgMax > 256) g_dvTrgMax = atoi(OptDefault("Debug", "TriggerMax"));
+    if (g_dvTrgMax < 1 || g_dvTrgMax > 512) g_dvTrgMax = atoi(OptDefault("Debug", "TriggerMax"));   // 0.16: up to 512
     g_dvLabelMax = OptInt(ini, "Debug", "TriggerLabelMax");
     if (g_dvLabelMax < 0 || g_dvLabelMax > 64) g_dvLabelMax = atoi(OptDefault("Debug", "TriggerLabelMax"));
     {
@@ -16752,6 +18101,36 @@ void ReadOptions(const char *dir) {
         InterlockedExchange(&g_rmFlatModels, OptInt(ini, "Debug", "FlatModels") != 0 ? 1 : 0);
         InterlockedExchange(&g_rmFlatEdges, OptInt(ini, "Debug", "FlatEdges") != 0 ? 1 : 0);
         InterlockedExchange(&g_rmFlatAnyRt, OptInt(ini, "Debug", "FlatAnyTarget") != 0 ? 1 : 0);
+    }
+    {                                            // 0.16 readability (out of range = the default)
+        auto range = [&](const char *key, int lo, int hi) {
+            int v = OptInt(ini, "Debug", key);
+            return v >= lo && v <= hi ? v : atoi(OptDefault("Debug", key));
+        };
+        auto rangeF = [&](const char *key, float lo, float hi) {
+            char v[32];
+            OptString(ini, "Debug", key, v, sizeof(v));
+            float f = static_cast<float>(atof(v));
+            return v[0] && f >= lo && f <= hi ? f : static_cast<float>(atof(OptDefault("Debug", key)));
+        };
+        InterlockedExchange(&g_dpMode, range("Depth", 0, 2));
+        g_dpDim = range("DepthDim", 5, 80);
+        g_dpCall = range("DepthCall", 0, 7);
+        g_dvAlpha = range("LineAlpha", 10, 100);
+        g_dvBright = range("LineBright", 30, 150);
+        g_dvFade = OptInt(ini, "Debug", "Fade") != 0 ? 1 : 0;
+        g_dvFadeStart = rangeF("FadeStart", 0.0f, 100000.0f);
+        g_dvFadeEnd = rangeF("FadeEnd", 500.0f, 200000.0f);
+        g_dvFadeMin = range("FadeMin", 0, 100);
+        g_dvFill = OptInt(ini, "Debug", "Fill") != 0 ? 1 : 0;
+        g_dvFillAlpha = range("FillAlpha", 2, 40);
+        g_dvTagMax = range("ViewLabelMax", 0, 64);
+        g_dvShort = OptInt(ini, "Debug", "LabelShort") != 0 ? 1 : 0;
+        g_dvLaraIn = OptInt(ini, "Debug", "LaraIn") != 0 ? 1 : 0;
+        g_dvEncl = range("Enclosing", 0, 2);
+        g_dvEnclSize = rangeF("EnclosingSize", 100.0f, 100000.0f);
+        g_dvMarkerMax = range("MarkerMax", 2, 50);
+        OptString(ini, "Debug", "ViewSkip", g_dvViewSkip, sizeof(g_dvViewSkip));
     }
     if (g_dvViewAtStart && g_debugEnabled) {     // dbg.view at start: labels + the ViewNav switches (as NavDraw)
         g_lblAtStart = 1;
@@ -16991,6 +18370,7 @@ void Start(HMODULE self) {
     LabelCheck();                             // 0.13 Thrall-Labels (precheck_013.txt)
     RenderModeCheck();                        // 0.15 render mode (precheck_015.txt) - before 0.14: the R2 layers' check
     DebugViewCheck();                         // 0.14 debug view (precheck_014.txt)
+    ReadabilityCheck();                       // 0.16 depth / Lara in / owner units (precheck_016.txt) - after 0.15 / 0.14
     g_camLogOk = HexBytesAt(0x005f3e0c, "b9f004e800 e85afeffff") && HexBytesAt(0x005f3d12, "8bce d91c24 e8c442ffff") &&
                  HexBytesAt(0x005e7feb, "8bf1") && HexBytesAt(0x005e8041, "8b4658 83f801") &&
                  HexBytesAt(0x005e80b9, "c7465834000000") && HexBytesAt(0x005e80da, "8b7e58 397e54 7465") &&

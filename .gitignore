@@ -27,6 +27,8 @@ work/render/
 work/manor_0611/
 work/arachno_0611/
 work/debugview_0611/
+# 2026-11-06 save analysis: copies of the owner's .TRUSave backups (personal data, never in the repository)
+work/saves_0611/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report
 tools/native_test/shaders/
 tools/native_test/native_report.txt

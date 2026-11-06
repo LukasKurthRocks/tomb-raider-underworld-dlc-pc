@@ -65,6 +65,30 @@ Spieler/Objekte | Schrotflinte (Objekt) | instance.spawn wp_shotgun
 # flying (cheat.flight). "Alles an / aus" = dbg.view: every layer + Thrall-Labels + Markup + [Debug] ViewNav on, or all
 # off (nav.off); afterwards each entry switches alone. Below Spieler so the top level keeps its 8 sectors.
 Spieler/Debug | Alles an / aus | dbg.view
+# 0.16 (live test 2026-11-06, "how can I fly?"): Fliegen = cheat.flight (shows on / off; RT up / LT down), the speed
+# presets are on page 2 of Spieler/Debug
+Spieler/Debug | Fliegen | cheat.flight
+# 0.16 Darstellung (owner feedback after the first live run): Tiefe = debug view lines hidden behind the level geometry
+# and Lara (an), the hidden parts faint (gedimmt) or on top as before (aus); Deckkraft = opacity of every line; Ferne
+# blasser = distance fade; Flaechen fuellen = faint faces; page 2 (RB): short labels, Lara-in marking, brightness,
+# enclosing boxes (around the camera / big ones around Lara); page 3: the state line (dbg.style)
+Spieler/Debug/Darstellung | Tiefe: an | dbg.depth on
+Spieler/Debug/Darstellung | Tiefe: gedimmt | dbg.depth dim
+Spieler/Debug/Darstellung | Tiefe: aus (oben) | dbg.depth off
+Spieler/Debug/Darstellung | Deckkraft 100 | dbg.alpha 100
+Spieler/Debug/Darstellung | Deckkraft 60 | dbg.alpha 60
+Spieler/Debug/Darstellung | Deckkraft 35 | dbg.alpha 35
+Spieler/Debug/Darstellung | Ferne blasser | dbg.fade
+Spieler/Debug/Darstellung | Flaechen fuellen | dbg.fill
+Spieler/Debug/Darstellung | Kurze Namen | dbg.short
+Spieler/Debug/Darstellung | Lara drin markieren | dbg.larain
+Spieler/Debug/Darstellung | Heller (130) | dbg.bright 130
+Spieler/Debug/Darstellung | Helligkeit normal | dbg.bright 100
+Spieler/Debug/Darstellung | Dunkler (70) | dbg.bright 70
+Spieler/Debug/Darstellung | Umhuellende blass | dbg.enclosing dim
+Spieler/Debug/Darstellung | Umhuellende aus | dbg.enclosing hide
+Spieler/Debug/Darstellung | Umhuellende normal | dbg.enclosing normal
+Spieler/Debug/Darstellung | Darstellung: Stand | dbg.style
 # 0.15 Render (debug render mode R0 / R1, owner order 2026-11-06): second entry of Spieler/Debug. Flach-Ansicht = the
 # level geometry in solid palette colours without textures (dbg.flat - NOT part of "Alles an / aus"); Render-Zaehlung =
 # one census of N frames ('0.15 census' block in TruMenu.log, suggests the pass mask); page 2 (RB) = the pass ids of the
@@ -138,6 +162,10 @@ Spieler/Debug/Lara | Nur Kanten | draw.ledges
 Spieler/Debug | Legende | dbg.legend
 Spieler/Debug | Debug: Stand | dbg.status
 Spieler/Debug | Navmesh: Stand | nav.status
+# 0.16: flight speed presets (cheat.speed, per 30 fps frame; start value [Cheat] FlightSpeed)
+Spieler/Debug | Flug-Tempo 10 | cheat.speed 10
+Spieler/Debug | Flug-Tempo 20 | cheat.speed 20
+Spieler/Debug | Flug-Tempo 40 | cheat.speed 40
 # 0.10.5 (owner wish 2026-11-05): Claude marks, drawn in coral - each pick writes one TruMenu.log line
 # "claude.mark <kind>: <time> unit=<stream unit> pos=<x y z> step=<TO TEST step or -> shot=<file> src=ring" and takes a
 # clean shot named <kind>; the ring closes after the pick. [Shot] Hotkey (F11 = 0x7A, default off) = "Jetzt".
