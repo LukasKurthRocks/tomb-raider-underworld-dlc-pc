@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installs or removes TruGuard.asi (exception diagnostics: fault sites, minidumps, optional resume) next to tru.exe.
 
@@ -41,8 +41,29 @@ $names   = 'TruGuard.asi', 'TruGuard.ini'
 # SHA-256 of earlier builds of ours - recognised as ours for update / removal (0.1 of 2026-11-01, used in the field
 # runs guard / 48i-48l; its shipped .ini)
 $earlierBuilds = @{
-    'TruGuard.asi' = @('0886a0332228dc9f298fcc2e72433fd0ea4d188ad256d5cd845f1935b496510e')
-    'TruGuard.ini' = @('fc7ae32cd19ceb7b1853a9004e84072d2415e55a055ec8aa39419a1558775c6c')
+    'TruGuard.asi' = @(
+        '0886a0332228dc9f298fcc2e72433fd0ea4d188ad256d5cd845f1935b496510e'  # 0.1
+        'c138012bc8e338e2703633ebc4025b8d665cd83186f4a0c441b3890267df7e19'  # 0.2
+        'ae6fbcc5c4fc2319d759d25c141ef29e60d988828b7b6bab55caec92be0f36f7'  # 0.2
+        'da38cd9c641fd9c91d4bd639cac03a0529e6b850af63a9f9488eafbbe1a6c2cc'  # 0.3
+        'acd2a742848f3137668b2c2825352dcd0ac713c18340c1c15b8fbe438578ed8d'  # 0.4 before the review fixes
+        '1ff03f56a5fc931a4fa3c8204c7ba27ae6813b3337335a361a1a17ddc47323a9'  # 0.4 review fixes, first build
+        'b9f72a529ecd6c564b3df5803caf75c84fc300f898fa78f266dc940b7f105a0c'  # 0.4 review fixes, second build
+        'f6c5da1338d38830ebb6408011a119153052c0f863ee9f844dbc011f780792ab'  # 0.4 review fixes, third build
+        'db259e5a7b0a382e266d94dc057cda5c091da0d1d29ea6ce047448c0134c1aa1'  # 0.4 review fixes, fourth build
+        '45dd58533ea157f19acbacdc05692711df98e74f4e3992966d89dc96c137c4dc'  # 0.4 review fixes
+        '39fa6858a5bf5f1b5f24023828a0ac1211c43b1c24f974606553ea779e7870e4'  # 0.4.1
+        '0e7224594f2ee130dcbddb64ce7b61b6a63edd83367502c3183973192ad6755d'  # 0.4.2, first build
+        '39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319'  # 0.4.2, current build
+    )
+    'TruGuard.ini' = @(
+        'fc7ae32cd19ceb7b1853a9004e84072d2415e55a055ec8aa39419a1558775c6c'  # 0.1
+        '64b9a62891320bea529e1e7c40dbea6147936d2fd6c1004d6ea019da509e7b1d'  # 0.3/0.4 before the review fixes
+        '55cfd7d4495f6f8cf3f9cc19cebea5fc10c040efccd259dffeb0a7cb65896c2b'  # 0.4 review fixes, second build
+        'ea012508203d7577ba27ac483a458636077e160bbb9e5acc36f27e0204d341e6'  # 0.4 review fixes
+        '834e07f458d64f40c0e0df403f01f67c6c3252ff5281872db5de31b60bd9e9b8'  # 0.4.1
+        '1fa917927799193d93d1278f95064c96e62d646af6a683f9802b5a6185c12220'  # 0.4.2, current build
+    )
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

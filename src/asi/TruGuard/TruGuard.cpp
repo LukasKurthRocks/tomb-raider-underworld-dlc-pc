@@ -20,11 +20,12 @@
 //   5. On demand (TruLink "menu guard.dump", menu row): a full dump plus a snapshot of every thread, also for a
 //      hung game - no exception needed. The last faults are kept in a small ring and printed with a fatal record.
 //
-// The log is written with a pre-opened HANDLE (WriteFile, FILE_APPEND_DATA); the handler does not allocate, takes no
-// CRT lock and uses only VirtualQuery-protected reads. A spin lock plus an in-handler flag keep it reentrancy safe;
-// if the lock is busy the line is still written (worst case interleaved) - a deadlock in a crash handler would be
-// worse. MiniDumpWriteDump is loaded from dbghelp.dll at start and called inside the handler (accepted risk: it can
-// block; Dump / DumpType turn it off).
+// The log is written with a pre-opened HANDLE (WriteFile, FILE_APPEND_DATA); the handler does not allocate and uses
+// only VirtualQuery-protected reads. A spin lock plus a single-handler flag serialize the main record; a fault on a
+// second thread while one is already handling is counted/dropped (VEH) or waits briefly (unhandled filter). If the
+// lock is busy the line is still written (worst case interleaved) - a deadlock in a crash handler would be worse. The static
+// CRT formatters are used, so "no heap / no CRT locks" is not a hard guarantee. MiniDumpWriteDump is loaded from
+// dbghelp.dll at start and called inside the handler (accepted risk: it can block; Dump / DumpType turn it off).
 //
 // Scope: local, offline, single player, no anti-cheat. Nothing of this is meant for end users.
 //
@@ -33,6 +34,12 @@
 //                    (executable target, rate cap) and an [Ignore] list.
 // 0.4 (2026-11-02) - GuardRails: plugin event/rail API (TruGuardEvent/TruGuardRail), passive context ring,
 //                    optional [GuardRails]/[Watch]/[Rail.*], events in fatal record; no game code patched.
+// 0.4 (2026-11-04) - review fixes: reserved fatal site when the table is full, debugger flag in markers, dump begin
+//                    line, extra dump info flags, worker skips Toolhelp while a dump is active.
+// 0.4.1 (2026-11-04) - review follow-up: wall-clock wait in the UEF, one MaxDumps slot reserved for fatal dumps,
+//                      skipped concurrent faults counted in the status.
+// 0.4.2 (2026-11-05) - section 9 follow-up: UEF logs fatal faults outside tru.exe (module, thread/start, registers,
+//                      EBP frames, tru.exe stack hints); re-arm also happens for outside faults.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -48,7 +55,7 @@ namespace {
 const DWORD kImageBaseExpected = 0x00400000;
 
 // game addresses (see TruMenu.cpp / TruLink.cpp; all verified there)
-// legacy name: this is the static player/agent block, not the heap GameTracker (see kGameTrackerPtr)
+// legacy name: this is the static player/agent block, not the heap GameTracker (see kPlayerState)
 const DWORD kGameTracker = 0x00e7f088;  // +0xbc cheatMode (dword), +0x38 unit name
 const DWORD kPlayerPtr = 0x00e7f094;    // +0xc player instance
 const DWORD kCheatMode = 0x00e7f144;
@@ -100,6 +107,7 @@ int g_allowExecuteSkip = 1;
 int g_logStack = 1;
 int g_logContext = 1;
 int g_handledNote = 1;             // worker: one line per site if no unhandled filter call follows within 2 s
+int g_outsideFatal = 1;            // UEF: log a short record for fatal faults outside tru.exe
 int g_maxResumesPerSecond = 20;    // 0 = no cap; stops a Mode=2 fault storm from looping
 int g_guardRails = 1;              // passive context/event/rail support (no game patch)
 int g_railEvents = 1;              // store TruGuardEvent calls and print them at LogLevel 2
@@ -124,6 +132,7 @@ struct Site {
     volatile LONG hits;
     volatile LONG detailed;
     volatile LONG dumped;
+    volatile LONG fatalDumped;  // a fatal hit gets one extra dump even if the first-chance dump exists
     volatile LONG failed;   // the dump attempt failed: markers say dump=failed instead of dump=earlier
     volatile LONG unhandled;    // the unhandled filter saw this site: it was not handled by the game
     volatile LONG handledNoted; // worker printed the TRUGUARD_HANDLED line for this site
@@ -132,8 +141,10 @@ struct Site {
     DWORD lastTick, code, access, fault, thread;
 };
 const int kMaxSites = 64;
-Site g_sites[kMaxSites];
+const int kFatalSite = kMaxSites;   // reserve slot: a fatal hit still gets a record when the table is full
+Site g_sites[kMaxSites + 1];
 volatile LONG g_siteCount = 0;
+volatile LONG g_siteFullNoted = 0;
 
 // fault ring: the last few faults of the run, appended to a fatal record (the current fault is the newest entry)
 struct Fault {
@@ -178,6 +189,7 @@ const int kContextSize = 32;
 ContextSample g_context[kContextSize];
 volatile LONG g_contextCount = 0;
 volatile LONG g_contextSeq = 0;
+volatile LONG g_contextFaulted = 0;   // a TOCTOU read faulted: stop sampling, keep the rail API alive
 
 struct Event {
     DWORD tick;
@@ -201,6 +213,8 @@ volatile LONG g_resumedCount = 0;
 volatile LONG g_dumpCount = 0;
 volatile LONG g_detailCount = 0;
 volatile LONG g_inHandler = 0;
+volatile LONG g_handlerDropped = 0;
+volatile LONG g_handlerBusy = 0;   // faults skipped because another handler was already running
 volatile LONG g_stackNoted = 0;
 volatile LONG g_logSpin = 0;
 volatile LONG g_stateSeq = 0;
@@ -208,6 +222,7 @@ volatile LONG g_uefNoted = 0;   // the game installs its own filter during init 
 volatile LONG g_dumping = 0;    // MiniDumpWriteDump is not reentrant: one dump at a time
 volatile LONG g_manualCount = 0;
 volatile LONG g_handledCount = 0;
+volatile LONG g_outsideCount = 0;
 
 DWORD g_resumeWindowTick = 0;   // resume rate window (handlers are serialized by g_inHandler)
 int g_resumeWindowCount = 0;
@@ -227,6 +242,9 @@ HANDLE g_stop = nullptr;
 typedef BOOL(WINAPI *MiniDumpWriteDumpFn)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, PMINIDUMP_EXCEPTION_INFORMATION,
                                           PMINIDUMP_USER_STREAM_INFORMATION, PMINIDUMP_CALLBACK_INFORMATION);
 MiniDumpWriteDumpFn g_miniDump = nullptr;
+
+typedef LONG(NTAPI *NtQueryInformationThreadFn)(HANDLE, ULONG, PVOID, ULONG, PULONG);
+const ULONG kThreadQuerySetWin32StartAddress = 9;
 
 // module snapshot: the writer fills the inactive buffer and flips the index, readers never lock
 struct ModEntry {
@@ -285,6 +303,21 @@ bool SafeString(DWORD address, char *out, int capacity) {
     return true;
 }
 
+bool ModuleOfLive(DWORD address, char *name, size_t capacity, DWORD *offset) {
+    MEMORY_BASIC_INFORMATION mbi;
+    if (VirtualQuery(reinterpret_cast<const void *>(static_cast<UINT_PTR>(address)), &mbi, sizeof(mbi)) == 0) return false;
+    if (mbi.Type != MEM_IMAGE || !mbi.AllocationBase) return false;
+    char path[MAX_PATH];
+    DWORD length = GetModuleFileNameA(static_cast<HMODULE>(mbi.AllocationBase), path, MAX_PATH);
+    if (!length || length >= MAX_PATH) return false;
+    char *base = path;
+    for (char *p = path; *p; ++p)
+        if (*p == '\\' || *p == '/') base = p + 1;
+    strncpy_s(name, capacity, base, _TRUNCATE);
+    *offset = address - static_cast<DWORD>(reinterpret_cast<UINT_PTR>(mbi.AllocationBase));
+    return true;
+}
+
 bool ModuleOf(DWORD address, char *name, size_t capacity, DWORD *offset) {
     LONG active = g_modActive;
     LONG count = g_modCount[active];
@@ -301,7 +334,18 @@ bool ModuleOf(DWORD address, char *name, size_t capacity, DWORD *offset) {
         *offset = address - g_truBase;
         return true;
     }
-    return false;
+    return ModuleOfLive(address, name, capacity, offset);
+}
+
+DWORD ThreadStartAddress() {
+    HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+    if (!ntdll) return 0;
+    NtQueryInformationThreadFn query =
+        reinterpret_cast<NtQueryInformationThreadFn>(GetProcAddress(ntdll, "NtQueryInformationThread"));
+    if (!query) return 0;
+    DWORD start = 0;
+    LONG status = query(GetCurrentThread(), kThreadQuerySetWin32StartAddress, &start, sizeof(start), nullptr);
+    return status >= 0 ? start : 0;
 }
 
 void KnownName(DWORD offset, char *out, size_t capacity) {
@@ -315,12 +359,13 @@ void KnownName(DWORD offset, char *out, size_t capacity) {
     else if (delta <= 0x100) _snprintf_s(out, capacity, _TRUNCATE, "%s+0x%lx", best->name, delta);
 }
 
-void LockSpin() {
+bool LockSpin() {
     for (int i = 0; i < 4000; ++i) {
-        if (InterlockedCompareExchange(&g_logSpin, 1, 0) == 0) return;
+        if (InterlockedCompareExchange(&g_logSpin, 1, 0) == 0) return true;
         YieldProcessor();
     }
-    // fall through: write anyway, an interleaved line beats a hang
+    // fall through: write anyway, an interleaved line beats a hang - and never unlock a foreign lock
+    return false;
 }
 
 void UnlockSpin() { InterlockedExchange(&g_logSpin, 0); }
@@ -342,8 +387,7 @@ void LogV(int level, const char *fmt, va_list ap) {
     _vsnprintf_s(line + n, sizeof(line) - n, _TRUNCATE, fmt, ap);
     size_t used = strlen(line);
     if (used + 1 < sizeof(line)) { line[used++] = '\n'; line[used] = 0; }
-    bool locked = InterlockedCompareExchange(&g_logSpin, 0, 0) == 0;
-    if (locked) LockSpin();
+    bool locked = LockSpin();
     WriteRaw(line, used);
     if (locked) UnlockSpin();
 }
@@ -558,7 +602,7 @@ bool IsIgnored(DWORD offset) {
     return false;
 }
 
-int FindSite(DWORD offset, bool *created) {
+int FindSite(DWORD offset, bool *created, bool reserve = false) {
     if (created) *created = false;
     LONG count = g_siteCount;
     for (LONG i = 0; i < count && i < kMaxSites; ++i)
@@ -566,13 +610,19 @@ int FindSite(DWORD offset, bool *created) {
     LONG slot = InterlockedIncrement(&g_siteCount) - 1;
     if (slot >= kMaxSites) {
         InterlockedDecrement(&g_siteCount);
-        return -1;
+        if (!reserve) {
+            if (InterlockedCompareExchange(&g_siteFullNoted, 1, 0) == 0)
+                Log(0, "fault-site table full (%d) - further sites are not tracked", kMaxSites);
+            return -1;
+        }
+        slot = kFatalSite;
     }
     Site &site = g_sites[slot];
     site.offset = offset;
     site.hits = 0;
     site.detailed = 0;
     site.dumped = 0;
+    site.fatalDumped = 0;
     site.failed = 0;
     site.unhandled = 0;
     site.handledNoted = 0;
@@ -647,22 +697,6 @@ void AppendRing(Buf &b) {
     if (count <= 1) return;
     b.add("previous faults (%d, newest first):\n", count - 1);
     for (int i = count - 2; i >= 0 && i >= count - 9; --i) AddFaultLine(b, faults[i]);
-}
-
-// the fatal path keeps the first-chance record (Describe is not called again): log the ring on its own
-void LogRing() {
-    Fault faults[kRingSize];
-    int count = RingCopy(faults, kRingSize);
-    if (count <= 1) return;
-    char text[1024];
-    Buf b = {text, sizeof(text), 0};
-    b.add("---- TruGuard %s: previous faults (%d, newest first):\n", g_runId, count - 1);
-    for (int i = count - 2; i >= 0 && i >= count - 9; --i) AddFaultLine(b, faults[i]);
-    b.finish();
-    bool locked = InterlockedCompareExchange(&g_logSpin, 0, 0) == 0;
-    if (locked) LockSpin();
-    WriteRaw(text, b.used);
-    if (locked) UnlockSpin();
 }
 
 // one marker line so a script does not have to parse the record block
@@ -807,32 +841,39 @@ void AppendEvents(Buf &b) {
 }
 
 void SampleContext() {
-    if (!g_guardRails) return;
-    DWORD gameTracker = 0, agent = 0, box = 0, attachBox = 0, agent528 = 0;
-    SafeRead(kPlayerState, &gameTracker, 4);
-    SafeRead(kPlayerPtr, &agent, 4);
-    if (gameTracker) {
-        SafeRead(gameTracker + 0xa64, &box, 4);
-        SafeRead(gameTracker + 0xc94, &attachBox, 4);
-    }
-    if (agent) {
-        BYTE value = 0;
-        if (SafeRead(agent + kAgent528, &value, 1)) agent528 = value;
-    }
-    ContextPush(gameTracker, agent, box, attachBox, agent528);
+    if (!g_guardRails || g_contextFaulted) return;
+    __try {
+        DWORD gameTracker = 0, agent = 0, box = 0, attachBox = 0, agent528 = 0;
+        SafeRead(kPlayerState, &gameTracker, 4);
+        SafeRead(kPlayerPtr, &agent, 4);
+        if (gameTracker) {
+            SafeRead(gameTracker + 0xa64, &box, 4);
+            SafeRead(gameTracker + 0xc94, &attachBox, 4);
+        }
+        if (agent) {
+            BYTE value = 0;
+            if (SafeRead(agent + kAgent528, &value, 1)) agent528 = value;
+        }
+        ContextPush(gameTracker, agent, box, attachBox, agent528);
 
-    // A markup box without an attach box is exactly the 48j constellation. Two consecutive samples keep a
-    // one-frame leftover from producing noise; this is only a log line, no state is changed.
-    static DWORD lastBox = 0;
-    static int pending = 0;
-    if (g_attachPendingNote && box && !attachBox) {
-        if (box != lastBox) pending = 0;
-        if (++pending == 2)
-            Log(1, "TRUGUARD_RAIL id=attach_pending value=0 action=log hits=1");
-    } else {
-        pending = 0;
+        // A markup box without an attach box is exactly the 48j constellation. Two consecutive samples keep a
+        // one-frame leftover from producing noise; this is only a log line, no state is changed.
+        static DWORD lastBox = 0;
+        static int pending = 0;
+        if (g_attachPendingNote && box && !attachBox) {
+            if (box != lastBox) pending = 0;
+            if (++pending == 2)
+                Log(1, "TRUGUARD_RAIL id=attach_pending value=0 action=log hits=1");
+        } else {
+            pending = 0;
+        }
+        lastBox = box;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        // VirtualQuery + memcpy is still TOCTOU when the game frees a page between the two calls. Never let that
+        // fault escape into the game: the rail API stays usable, only passive sampling stops.
+        InterlockedExchange(&g_contextFaulted, 1);
+        Log(0, "context sampler faulted - passive sampling stopped (rail API still available)");
     }
-    lastBox = box;
 }
 
 // ---- minidump ------------------------------------------------------------------------------------------------
@@ -946,7 +987,8 @@ bool ManualDump(const char *reason) {
     EmitContextMarker();
     SnapshotThreads();
     MINIDUMP_TYPE type = static_cast<MINIDUMP_TYPE>(MiniDumpWithThreadInfo | MiniDumpWithFullMemory |
-                                                    MiniDumpWithDataSegs | MiniDumpWithHandleData);
+                                                    MiniDumpWithDataSegs | MiniDumpWithHandleData |
+                                                    MiniDumpWithFullMemoryInfo | MiniDumpWithUnloadedModules);
     bool ok = DumpFile(path, type, nullptr);
     InterlockedExchange(&g_dumping, 0);
     if (ok) {
@@ -957,15 +999,29 @@ bool ManualDump(const char *reason) {
     return ok;
 }
 
-bool WriteDump(PEXCEPTION_POINTERS info, int site, DWORD offset) {
+bool WriteDump(PEXCEPTION_POINTERS info, int site, DWORD offset, bool fatal = false) {
     g_lastDumpPath[0] = 0;
     if (!g_miniDump || !g_dump || g_dumpType == 0) return false;
-    if (g_sites[site].dumped) return false;
-    if (g_maxDumps <= 0 || g_dumpCount >= g_maxDumps) return false;   // do not mark a site as dumped without a file
-    if (InterlockedCompareExchange(&g_sites[site].dumped, 1, 0) != 0) return false;
+    if (g_mode <= 0) return false;   // Mode=0 is log only (manual dumps use ManualDump)
+    if (fatal) {
+        if (g_sites[site].fatalDumped) return false;
+        if (InterlockedCompareExchange(&g_sites[site].fatalDumped, 1, 0) != 0) return false;
+    } else {
+        if (g_sites[site].dumped) return false;
+        if (InterlockedCompareExchange(&g_sites[site].dumped, 1, 0) != 0) return false;
+    }
+    // Keep one MaxDumps slot for a fatal hit: a run full of first-chance dumps must not hide the crash dump.
+    LONG dumpLimit = g_maxDumps;
+    if (!fatal && dumpLimit > 0) --dumpLimit;
+    if (g_maxDumps <= 0 || g_dumpCount >= dumpLimit) {   // do not mark a site as dumped without a file
+        if (fatal) InterlockedExchange(&g_sites[site].fatalDumped, 0);
+        else InterlockedExchange(&g_sites[site].dumped, 0);
+        return false;
+    }
     if (InterlockedCompareExchange(&g_dumping, 1, 0) != 0) {
         // avoid deadlock/blocking a fatal path: let the site be marked failed
-        InterlockedExchange(&g_sites[site].dumped, 0);
+        if (fatal) InterlockedExchange(&g_sites[site].fatalDumped, 0);
+        else InterlockedExchange(&g_sites[site].dumped, 0);
         InterlockedExchange(&g_sites[site].failed, 1);
         Log(0, "minidump skipped (another dump in progress)");
         return false;
@@ -977,13 +1033,17 @@ bool WriteDump(PEXCEPTION_POINTERS info, int site, DWORD offset) {
                 number);
     MINIDUMP_TYPE type = MiniDumpWithThreadInfo;
     if (g_dumpType == 2) type = static_cast<MINIDUMP_TYPE>(type | MiniDumpWithFullMemory | MiniDumpWithDataSegs |
-                                                          MiniDumpWithHandleData);
-    else type = static_cast<MINIDUMP_TYPE>(type | MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithDataSegs);
+                                                          MiniDumpWithHandleData | MiniDumpWithFullMemoryInfo |
+                                                          MiniDumpWithUnloadedModules);
+    else type = static_cast<MINIDUMP_TYPE>(type | MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithDataSegs |
+                                           MiniDumpWithFullMemoryInfo | MiniDumpWithUnloadedModules);
+    Log(0, "minidump begin %s", path);
     bool ok = DumpFile(path, type, info);
     InterlockedExchange(&g_dumping, 0);
     if (ok) {
         strncpy_s(g_lastDumpPath, sizeof(g_lastDumpPath), path, _TRUNCATE);
-        Log(1, "minidump %s (%ld of max %d)", path, number, g_maxDumps);
+        if (fatal) InterlockedExchange(&g_sites[site].dumped, 1);
+        Log(1, "minidump %s (%ld of max %d)%s", path, number, g_maxDumps, fatal ? " (fatal)" : "");
         SetLast("site tru+0x%lx: dump %s", offset, path);
         return true;
     }
@@ -1050,6 +1110,22 @@ void AddStack(Buf &b, const CONTEXT *ctx) {
     }
 }
 
+void AddTruStackHints(Buf &b, const CONTEXT *ctx) {
+    if (!g_logStack || !g_truBase) return;
+    b.add("tru-stack:");
+    DWORD found = 0;
+    for (DWORD i = 0; i < 256; ++i) {
+        DWORD value = 0;
+        if (!SafeRead(ctx->Esp + i * 4, &value, 4)) break;
+        if (value >= g_truBase && value < g_truEnd) {
+            b.add(" %08lx(tru+0x%lx)", value, value - g_truBase);
+            if (++found >= 8) break;
+        }
+    }
+    if (!found) b.add(" none");
+    b.add("\n");
+}
+
 void AddGameContext(Buf &b) {
     if (!g_logContext) return;
     char unit[64];
@@ -1088,8 +1164,8 @@ void EmitDetailMarker(int site, DWORD offset, DWORD code, DWORD access, DWORD fa
                       const char *dump) {
     const char *where = (dump && dump[0]) ? dump
                         : (g_sites[site].failed ? "failed" : (g_sites[site].dumped ? "earlier" : "none"));
-    Log(1, "TRUGUARD_DETAIL site=tru+0x%lx code=%08lx access=%s addr=0x%08lx hits=%ld state=%s dump=%s", offset, code,
-        AccessName(access), fault, g_sites[site].hits, state, where);
+    Log(1, "TRUGUARD_DETAIL site=tru+0x%lx code=%08lx access=%s addr=0x%08lx hits=%ld state=%s debugger=%d dump=%s",
+        offset, code, AccessName(access), fault, g_sites[site].hits, state, IsDebuggerPresent() ? 1 : 0, where);
 }
 
 void Describe(PEXCEPTION_POINTERS info, int site, const char *state, bool dump) {
@@ -1113,8 +1189,8 @@ void Describe(PEXCEPTION_POINTERS info, int site, const char *state, bool dump) 
     b.data = text;
     b.cap = sizeof(text);
 
-    b.add("---- TruGuard %s: tru.exe+0x%lx %s %s at 0x%08lx (thread %lu, %s)\n", g_runId, offset, known,
-          AccessName(access), fault, GetCurrentThreadId(), state);
+    b.add("---- TruGuard %s: tru.exe+0x%lx %s %s at 0x%08lx (thread %lu, debugger=%d, %s)\n", g_runId, offset,
+          known, AccessName(access), fault, GetCurrentThreadId(), IsDebuggerPresent() ? 1 : 0, state);
     b.add("exception 0x%08lx", code);
     if (rec->ExceptionFlags & EXCEPTION_NONCONTINUABLE) b.add(" (noncontinuable)");
     b.add("; eip 0x%08lx; hits %ld\n", eip, g_sites[site].hits);
@@ -1145,8 +1221,7 @@ void Describe(PEXCEPTION_POINTERS info, int site, const char *state, bool dump) 
         AppendEvents(b);
     }
     b.finish();
-    bool locked = InterlockedCompareExchange(&g_logSpin, 0, 0) == 0;
-    if (locked) LockSpin();
+    bool locked = LockSpin();
     WriteRaw(text, b.used);
     if (locked) UnlockSpin();
 
@@ -1159,7 +1234,7 @@ void Describe(PEXCEPTION_POINTERS info, int site, const char *state, bool dump) 
     g_sites[site].lastTick = GetTickCount();
     SetLast("tru+0x%lx %s 0x%08lx thread %lu hits %ld (%s)", offset, AccessName(access), fault,
             GetCurrentThreadId(), g_sites[site].hits, state);
-    bool wrote = dump && WriteDump(info, site, offset);
+    bool wrote = dump && WriteDump(info, site, offset, fatal);
     EmitContextMarker();
     EmitDetailMarker(site, offset, code, access, fault, state, wrote ? g_lastDumpPath : nullptr);
     if (fatal) EmitPrevMarker();
@@ -1285,8 +1360,8 @@ LONG HandleFirstChance(PEXCEPTION_POINTERS info, DWORD code, DWORD eip) {
             }
         }
         if (g_firstChance && !ignored && hits == 1) {
-            Log(1, "TRUGUARD_FAULT site=tru+0x%lx code=%08lx access=%s addr=0x%08lx hits=%ld", offset, code,
-                AccessName(access), fault, hits);
+            Log(1, "TRUGUARD_FAULT site=tru+0x%lx code=%08lx access=%s addr=0x%08lx hits=%ld debugger=%d", offset, code,
+                AccessName(access), fault, hits, IsDebuggerPresent() ? 1 : 0);
             // the game may handle this fault itself, so the full record (and optionally the dump) can be
             // requested for the first occurrence as well - the unhandled filter only adds the fatal state
             if (g_firstChanceDetail) Describe(info, site, "firstchance", g_firstChanceDump != 0);
@@ -1306,8 +1381,7 @@ LONG HandleFirstChance(PEXCEPTION_POINTERS info, DWORD code, DWORD eip) {
     if (setEax >= 0) extra.add(", eax 0x%08x -> 0x%08x", oldEax, setEax);
     if (setEcx >= 0) extra.add(", ecx 0x%08x -> 0x%08x", oldEcx, setEcx);
     extra.finish();
-    bool locked = InterlockedCompareExchange(&g_logSpin, 0, 0) == 0;
-    if (locked) LockSpin();
+    bool locked = LockSpin();
     WriteRaw(text, extra.used);
     if (locked) UnlockSpin();
 
@@ -1321,13 +1395,64 @@ LONG HandleFirstChance(PEXCEPTION_POINTERS info, DWORD code, DWORD eip) {
 
 LONG WINAPI UnhandledFilter(PEXCEPTION_POINTERS info);
 
+void LogOutsideFatal(PEXCEPTION_POINTERS info) {
+    if (!g_outsideFatal) return;
+    const EXCEPTION_RECORD *rec = info->ExceptionRecord;
+    const CONTEXT *ctx = info->ContextRecord;
+    DWORD eip = static_cast<DWORD>(ctx->Eip);
+    DWORD code = rec->ExceptionCode;
+    DWORD access = 0xffffffff, fault = 0;
+    if (rec->NumberParameters >= 2) {
+        access = static_cast<DWORD>(rec->ExceptionInformation[0]);
+        fault = static_cast<DWORD>(rec->ExceptionInformation[1]);
+    }
+    char module[48] = "?";
+    DWORD offset = 0;
+    bool named = ModuleOf(eip, module, sizeof(module), &offset);
+    if (!named) offset = 0;
+    DWORD thread = GetCurrentThreadId();
+    DWORD start = ThreadStartAddress();
+    InterlockedIncrement(&g_outsideCount);
+
+    Log(0, "TRUGUARD_OUTSIDE module=%s+0x%lx code=%08lx access=%s addr=0x%08lx eip=0x%08lx thread=%lu start=0x%08lx",
+        module, offset, code, AccessName(access), fault, eip, thread, start);
+
+    Buf b = {nullptr, 0, 0};
+    char text[4096];
+    b.data = text;
+    b.cap = sizeof(text);
+    b.add("---- TruGuard %s: outside tru.exe %s+0x%lx %s at 0x%08lx (thread %lu start 0x%08lx, %s)\n", g_runId,
+          module, offset, AccessName(access), fault, thread, start, "unhandled");
+    b.add("exception 0x%08lx", code);
+    if (rec->ExceptionFlags & EXCEPTION_NONCONTINUABLE) b.add(" (noncontinuable)");
+    b.add("; eip 0x%08lx\n", eip);
+    b.add("regs: eax 0x%08lx ebx 0x%08lx ecx 0x%08lx edx 0x%08lx\n", ctx->Eax, ctx->Ebx, ctx->Ecx, ctx->Edx);
+    b.add("      esi 0x%08lx edi 0x%08lx ebp 0x%08lx esp 0x%08lx\n", ctx->Esi, ctx->Edi, ctx->Ebp, ctx->Esp);
+    b.add("      efl 0x%08lx\n", ctx->EFlags);
+    if (code != EXCEPTION_STACK_OVERFLOW) {
+        AddStack(b, ctx);
+        AddTruStackHints(b, ctx);
+    }
+    b.finish();
+    bool locked = LockSpin();
+    WriteRaw(text, b.used);
+    if (locked) UnlockSpin();
+    SetLast("outside %s+0x%lx %s 0x%08lx thread %lu", module, offset, AccessName(access), fault, thread);
+}
+
 // tru.exe installs its own unhandled-exception filter during init (it imports SetUnhandledExceptionFilter and
 // calls it after our DllMain). Re-arm ours from the vectored handler: a list entry cannot be replaced, the
-// filter pointer can. Called for every interesting fault in tru.exe; the note is logged once.
-void ArmUnhandled() {
+// filter pointer can. Only the VEH call passes note=true; the initial call in Start must not consume the note
+// (the previous filter is normally NULL or the CRT's, not a later replacement by the game).
+void ArmUnhandled(bool note) {
     LPTOP_LEVEL_EXCEPTION_FILTER previous = SetUnhandledExceptionFilter(UnhandledFilter);
-    if (previous != UnhandledFilter && InterlockedCompareExchange(&g_uefNoted, 1, 0) == 0) {
-        Log(1, "unhandled-exception filter had been replaced (0x%p) - re-armed from the fault handler", previous);
+    if (note && previous != UnhandledFilter && InterlockedCompareExchange(&g_uefNoted, 1, 0) == 0) {
+        char module[48];
+        DWORD offset = 0;
+        if (ModuleOf(static_cast<DWORD>(reinterpret_cast<UINT_PTR>(previous)), module, sizeof(module), &offset))
+            Log(1, "unhandled-exception filter replaced by %s+0x%lx - re-armed", module, offset);
+        else
+            Log(1, "unhandled-exception filter replaced by 0x%p - re-armed", previous);
     }
 }
 
@@ -1336,10 +1461,12 @@ LONG CALLBACK Veh(PEXCEPTION_POINTERS info) {
     DWORD code = info->ExceptionRecord->ExceptionCode;
     if (!Interesting(code)) return EXCEPTION_CONTINUE_SEARCH;   // guard pages / breakpoints / debug prints stay untouched
     DWORD eip = static_cast<DWORD>(info->ContextRecord->Eip);
+    if (code != EXCEPTION_STACK_OVERFLOW) ArmUnhandled(true);
     if (eip < g_truBase || eip >= g_truEnd) return EXCEPTION_CONTINUE_SEARCH;
-
-    ArmUnhandled();
-    if (InterlockedCompareExchange(&g_inHandler, 1, 0) != 0) return EXCEPTION_CONTINUE_SEARCH;
+    if (InterlockedCompareExchange(&g_inHandler, 1, 0) != 0) {
+        InterlockedIncrement(&g_handlerBusy);
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
     LONG result = EXCEPTION_CONTINUE_SEARCH;
     __try {
         if (code == EXCEPTION_STACK_OVERFLOW) {
@@ -1362,35 +1489,40 @@ LONG WINAPI UnhandledFilter(PEXCEPTION_POINTERS info) {
     DWORD code = info->ExceptionRecord->ExceptionCode;
     if (!Interesting(code)) return EXCEPTION_CONTINUE_SEARCH;
     DWORD eip = static_cast<DWORD>(info->ContextRecord->Eip);
-    if (eip < g_truBase || eip >= g_truEnd) return EXCEPTION_CONTINUE_SEARCH;
-    if (InterlockedCompareExchange(&g_inHandler, 1, 0) != 0) return EXCEPTION_CONTINUE_SEARCH;
-    DWORD access = 0xffffffff, fault = 0;
-    if (info->ExceptionRecord->NumberParameters >= 2) {
-        access = static_cast<DWORD>(info->ExceptionRecord->ExceptionInformation[0]);
-        fault = static_cast<DWORD>(info->ExceptionRecord->ExceptionInformation[1]);
+    if (eip < g_truBase || eip >= g_truEnd) {
+        LogOutsideFatal(info);
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+    // A second thread may be logging/dumping the first fatal hit. Wait briefly instead of dropping the fatal
+    // record; 2 s is longer than a normal log and still bounded if the first dump hangs. Sleep(1) can round up to
+    // the timer resolution, so use a wall-clock deadline instead of counting iterations.
+    bool entered = false;
+    DWORD waitStart = GetTickCount();
+    for (;;) {
+        if (InterlockedCompareExchange(&g_inHandler, 1, 0) == 0) {
+            entered = true;
+            break;
+        }
+        if (GetTickCount() - waitStart >= 2000) break;
+        Sleep(1);
+    }
+    if (!entered) {
+        InterlockedIncrement(&g_handlerBusy);
+        if (InterlockedCompareExchange(&g_handlerDropped, 1, 0) == 0)
+            Log(0, "unhandled handler busy for 2 s - fatal record for tru+0x%lx dropped", eip - g_truBase);
+        return EXCEPTION_CONTINUE_SEARCH;
     }
     __try {
         if (code != EXCEPTION_STACK_OVERFLOW) {
             DWORD offset = eip - g_truBase;
-            int site = FindSite(offset, nullptr);
+            int site = FindSite(offset, nullptr, true);
             if (site >= 0) {
                 InterlockedIncrement(&g_unhandledCount);
                 InterlockedExchange(&g_sites[site].unhandled, 1);
-                if (InterlockedCompareExchange(&g_sites[site].detailed, 1, 0) == 0) {
-                    // no record yet (first chance was off or quiet): this one is real
-                    Describe(info, site, "unhandled", true);
-                } else {
-                    // a first-chance record exists: keep it and add the fatal state, the dump and the marker
-                    bool wrote = false;
-                    if (!g_sites[site].dumped) wrote = WriteDump(info, site, offset);
-                    EmitDetailMarker(site, offset, code, access, fault, "unhandled", wrote ? g_lastDumpPath : nullptr);
-                    Log(1, "unhandled tru+0x%lx %s 0x%08lx - first-chance record kept%s", offset, AccessName(access),
-                        fault, wrote ? ", dump written" : "");
-                    LogRing();
-                    EmitPrevMarker();
-                    SetLast("tru+0x%lx unhandled %s 0x%08lx%s", offset, AccessName(access), fault,
-                            wrote ? ", dump written" : "");
-                }
+                // A first-chance record can belong to an earlier, non-fatal hit at the same site. Always write the
+                // fatal record again: the registers/stack and the dump are for this hit, and WriteDump() allows one
+                // extra fatal dump per site.
+                Describe(info, site, "unhandled", true);
             }
         } else {
             if (InterlockedCompareExchange(&g_stackNoted, 1, 0) == 0)
@@ -1448,7 +1580,7 @@ DWORD WINAPI Worker(LPVOID) {
     int slow = 0;
     for (;;) {
         SampleContext();
-        if (slow == 0) {
+        if (slow == 0 && !g_dumping) {   // no Toolhelp while a handler is inside MiniDumpWriteDump
             RefreshModules();
             NoteHandledSites();
         }
@@ -1553,6 +1685,7 @@ void ReadOptions(const char *ini) {
     g_logStack = GetPrivateProfileIntA("Guard", "LogStack", 1, ini);
     g_logContext = GetPrivateProfileIntA("Guard", "LogContext", 1, ini);
     g_handledNote = GetPrivateProfileIntA("Guard", "HandledNote", 1, ini);
+    g_outsideFatal = GetPrivateProfileIntA("Guard", "OutsideFatal", 1, ini);
     g_maxResumesPerSecond = GetPrivateProfileIntA("Guard", "MaxResumesPerSecond", 20, ini);
     g_guardRails = GetPrivateProfileIntA("GuardRails", "Enabled", 1, ini);
     g_railEvents = GetPrivateProfileIntA("GuardRails", "Events", 1, ini);
@@ -1562,6 +1695,7 @@ void ReadOptions(const char *ini) {
     if (g_firstChanceDetail != 0) g_firstChanceDetail = 1;
     if (g_firstChanceDump != 0) g_firstChanceDump = 1;
     if (g_handledNote != 0) g_handledNote = 1;
+    if (g_outsideFatal != 0) g_outsideFatal = 1;
     if (g_maxDumps < 0) g_maxDumps = 0;
     if (g_maxDumps > 200) g_maxDumps = 200;
     if (g_maxHitsPerSite < 1) g_maxHitsPerSite = 1;
@@ -1597,7 +1731,7 @@ void Start(HMODULE self) {
 
     g_log = CreateFileA(g_logPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
                         FILE_ATTRIBUTE_NORMAL, nullptr);
-    Log(1, "TruGuard 0.4 loaded (enabled %d, log %d, mode %d, firstChance %d/%d/%d, dump %d/%d, maxDumps %d, "
+    Log(1, "TruGuard 0.4.2 loaded (enabled %d, log %d, mode %d, firstChance %d/%d/%d, dump %d/%d, maxDumps %d, "
            "handled %d, rules %ld, ignores %ld, maxResumes/s %d, guardRails %d/%d/%d, rails %d)",
         g_enabled, g_logLevel, g_mode, g_firstChance, g_firstChanceDetail, g_firstChanceDump, g_dump, g_dumpType,
         g_maxDumps, g_handledNote, g_ruleCount, g_ignoreCount, g_maxResumesPerSecond, g_guardRails, g_railEvents,
@@ -1640,7 +1774,7 @@ void Start(HMODULE self) {
         Log(0, "AddVectoredExceptionHandler failed (%lu) - not watching", GetLastError());
         return;
     }
-    ArmUnhandled();   // the game replaces this filter during init - the vectored handler re-arms it as well
+    ArmUnhandled(false);   // the game replaces this filter during init - the vectored handler re-arms it as well
     Log(1, "watching tru.exe 0x%08lx..0x%08lx, log %s, dumps %s%s", g_truBase, g_truEnd, g_logPath, g_dumpDir,
         g_mode >= 2 ? " (resume where possible)" : "");
     SetLast("watching, no fault yet (mode %d)", g_mode);
@@ -1657,7 +1791,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 extern "C" __declspec(dllexport) const char *TruGuardVersion() {
-    return "TruGuard 0.4 (GuardRails event/rail API, passive context, fault ring, on-demand dump)";
+    return "TruGuard 0.4.2 (outside-fatal record, GuardRails event/rail API, passive context, fault ring, on-demand dump)";
 }
 
 extern "C" __declspec(dllexport) int TruGuardCount() { return static_cast<int>(g_firstChanceCount); }
@@ -1675,10 +1809,12 @@ extern "C" __declspec(dllexport) int TruGuardStatus(char *out, int size) {
     if (sites > kMaxSites) sites = kMaxSites;
     int n = _snprintf_s(out, static_cast<size_t>(size), _TRUNCATE,
                         "mode=%d firstChance=%ld details=%ld unhandled=%ld resumed=%ld dumps=%ld handled=%ld manual=%ld "
-                        "sites=%ld maxSites=%d maxHits=%d skipUnknown=%d rules=%ld ignores=%ld maxResumes=%d "
+                        "outside=%ld busy=%ld sites=%ld maxSites=%d maxHits=%d skipUnknown=%d rules=%ld ignores=%ld maxResumes=%d "
                         "guardRails=%d events=%ld context=%ld rails=%d log=%s",
                         g_mode, g_firstChanceCount, g_detailCount, g_unhandledCount, g_resumedCount, g_dumpCount,
-                        g_handledCount, g_manualCount, sites, kMaxSites, g_maxHitsPerSite, g_skipUnknown, g_ruleCount,
+                        g_handledCount, g_manualCount, g_outsideCount, g_handlerBusy, sites, kMaxSites, g_maxHitsPerSite,
+                        g_skipUnknown,
+                        g_ruleCount,
                         g_ignoreCount, g_maxResumesPerSecond, g_guardRails, g_eventCount, g_contextCount, kRailCount,
                         g_logPath);
     return n < 0 ? size - 1 : n;
