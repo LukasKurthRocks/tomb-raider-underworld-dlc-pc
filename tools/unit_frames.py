@@ -77,11 +77,13 @@ def cmd_dump(argv):
 
 
 def quad_points(q):
-    """the portal points: every float triple (+0x88 + 16*k, k = 0..6) that is finite and not all zero.
-    Returns [(x, y, z)] - the caller compares like with like (same record layout on both sides)."""
+    """the portal points: every vec4 (+0x90 + 16*k, k = 0..6) whose xyz is finite and not all zero.
+    Returns [(x, y, z)] - the caller compares like with like (same record layout on both sides).
+    2026-11-06: was +0x88 + 16*k (mixed the w of one vec4 with the xy of the next); the engine aligns the vec4 at
+    +0x90 (STREAM_ConnectStreamToStream 0x5d13e0, docs Befund-Unit-Streaming-0611.md), q['f'] starts at +0x88."""
     pts = []
     for k in range(7):
-        a = q['f'][4 * k:4 * k + 3]
+        a = q['f'][2 + 4 * k:2 + 4 * k + 3]
         if all(v == v and abs(v) < 1e7 for v in a) and any(a): pts.append(a)
     return pts
 
@@ -122,8 +124,10 @@ def cmd_pairs(argv):
             ca = [sum(v[i] for v in a) / len(a) for i in range(3)]
             cb = [sum(v[i] for v in b) / len(b) for i in range(3)]
             off = [ca[i] - cb[i] for i in range(3)]
-            print('%-30s -> %-30s own %4d to %4d: centre A (%.1f %.1f %.1f)  B (%.1f %.1f %.1f)  A-B (%.1f %.1f %.1f)' % (
-                n, tgt, q['own'], q['to'], *ca, *cb, *off))
+            # the engine's own relocation: [A portal +0x90] - [B portal +0x90] (STREAM_ConnectStreamToStream 0x5d13e0)
+            eng = [q['f'][2 + i] - r['f'][2 + i] for i in range(3)]
+            print('%-30s -> %-30s own %4d to %4d: centre A (%.1f %.1f %.1f)  B (%.1f %.1f %.1f)  A-B (%.1f %.1f %.1f)'
+                  '  engine +0x90 A-B (%.1f %.1f %.1f)' % (n, tgt, q['own'], q['to'], *ca, *cb, *off, *eng))
     return 0
 
 

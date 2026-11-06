@@ -2,7 +2,7 @@
 top, isometric) plus its textures as PNG, read-only on the DRM. For a first look at an object nothing loads
 (dlc_rewards, object 891, Befund-Versteckte-Inhalte.md 3.1) without starting the game.
 
-Per mesh it prints the bounding box (game units; 100 units = 1 m in TRU), batch / vertex / triangle counts, the
+Per mesh it prints the bounding box (game units; about 290 units = 1 m in TRU, Lara is ~511 units tall), batch / vertex / triangle counts, the
 texture and material ids of the mesh's material table and, for small meshes (<= 64 vertices), the distinct vertex
 positions. Textures: PC files through tex_convert.pc_image, Xbox files (:be) first through tex_convert.convert
 (the converter the port uses), then the same; per texture size, format tag and mean RGBA.

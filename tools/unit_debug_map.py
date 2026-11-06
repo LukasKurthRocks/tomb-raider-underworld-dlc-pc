@@ -364,7 +364,7 @@ def main(argv):
     img = Image.new('RGB', (W + legend_w, max(H, 900)), (250, 250, 247))
     dr = ImageDraw.Draw(img, 'RGBA')
     S = lambda x, y: (20 + (x - x0) * sc, 60 + (y1 - y) * sc)       # +x right, +y up (top-down view)
-    dr.text((20, 8), '%s  top-down (x right, y up), frame %s, 100 units = 1 m' % (unit, frame), fill=(0, 0, 0))
+    dr.text((20, 8), '%s  top-down (x right, y up), frame %s, ~290 units = 1 m' % (unit, frame), fill=(0, 0, 0))
     # grid every 10 m
     g = 1000.0
     gx = math.floor(x0 / g) * g

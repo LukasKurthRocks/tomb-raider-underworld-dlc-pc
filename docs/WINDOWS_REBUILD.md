@@ -1553,7 +1553,10 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
        (`audio\streams\vo\dlc1\lara|zip\*.mul`) exist in five languages in pack10 (specs as the cinematics);
        `music_convert.convert_streams` and B138 write only the English record. `mul_lang_build.py` now also writes
        every localised `audio\streams` .mul as `<path>_NNN` (B138's English voice lines measure 14-33 dB against the
-       decoded Xbox source, ours 32-36 dB, so the plain name gets our English conversion); pack11 has no localised
+       decoded Xbox source, ours 32-36 dB, so the plain name gets our English conversion); ~~pack11 has no localised voice streams~~ [corrected 2026-11-06:
+       pack11 does have localised voice streams - the 4 doppelganger lines `vo\dlc2\doppelganger\i_dg_pdlc2_mach_02 / _07 /
+       _08 / cere_02` in five languages, named by CRC; installed today only under the plain (English) name, see CHANGELOG
+       2026-11-06 audio research]. Former wording of this sentence: pack11 has no localised
        voice streams. Repair tree: **99 files** (24 shader + 10 ui + 35 cinematic + 30 voice).
      * **The crackling "s" (Lara, intro)**: WAVs of the Xbox source, our current encode and the lookahead encode
        (`ima_encoder_check.py --wav`, decoded with our model of the game's decoder) sound **identical** to the owner -
