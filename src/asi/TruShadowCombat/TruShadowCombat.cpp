@@ -25,6 +25,8 @@
 //    Translate231Slot0 / Translate231Slot1 / Translate1004 = 1.
 // 6. 0.5.2 (F21, log only, [Diag]): who fills / clears targeter 9 (TU index 9) - candidate add, per-frame sort, select,
 //    set, remove, the target list array build / destroy - and every evaluation of condition 2011 with its inputs.
+// 7. 0.6 (K14): the enemy damage function tru+0x237590 - entry probe counting the incoming damage types ([Damage]
+//    Log=1, changes nothing) and the TU's extension of its type switch 0..16 -> 0..27 ([Damage] Translate=1).
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -41,7 +43,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.5.3 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -49,7 +51,9 @@ const char kVersion[] = "TruShadowCombat 0.5.3 (TU target list 7 -> 10, conditio
                         "0x823d9050 through TruShadowPowerMeterApi v4; 0.5.2: F21 diagnostics of targeter 9 / condition "
                         "2011, log only ([Diag]); 0.5.3: read-only export TscTargeterSnapshot (targeter 9 buckets / "
                         "rejected with reason / target, hit list, last condition 2011) for TruMenu's thrall labels, "
-                        "WHY walks the rejected list by its next link +4)";
+                        "WHY walks the rejected list by its next link +4; 0.6: K14 damage-type switch tru+0x237590 - burst log of "
+                        "the incoming damage types ([Damage] Log) and the TU switch 0..27 ([Damage] Translate, off by "
+                        "default))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -2672,6 +2676,332 @@ bool SetupRegistration() {
     return true;
 }
 
+// ---------------------------------------------------------------- 0.6: K14 - the damage-type switch of the enemy
+// damage function tru+0x237590 (TU 0x822f60e0, retail 0x822f87d8; docs Befund-K14-Schadensarten-0611.md).
+// cdecl (instance, hit vector, float amount, bool, int type, int subtype, int flags): brain = [[inst+0x2d0]]+0x2ec;
+// brain +8 bit 0x800 -> returns at once; then a switch over the type: bound 16 (`cmp esi, 0x10` tru+0x237619), byte
+// table 0x6376c4 (17 entries) -> jump table 0x6376b8 {0x637630 damage (health component brain+0x2c60, tru+0x22e370)
+// + death check (tru+0x220380, flags bit 0: LP <= 0 -> regenerate or die), 0x637685 stamina (tru+0x220ea0) +
+// tru+0x25a860 (flags bit 1), 0x6376b1 nothing}. The TU bounds the type at 0x1b; its 28-word table 0x822f61e4 has 0..16 as retail / PC, 17 -> nothing,
+// 18..27 -> damage + death check (the same case body). Lara's DLC 2 attack records (doppelganger_casual DTP 20212,
+// activity 1005 -> CombatManager+0xc4, record +0x0c) use 17..27, so on the PC those hits do nothing at all.
+// [Damage] Translate=1 extends the PC switch exactly so: the byte-table operand of `movzx edx, byte [esi + table]`
+// (tru+0x237625) points at kTuDamageCase (plugin .rdata), then the bound becomes 0x1b. Jump table and case bodies stay
+// the game's. Write order keeps every intermediate state valid (table first, bound last; off: bound first).
+// [Damage] Log=1 (default, changes nothing): an entry hook counts the incoming types per target and caller and logs
+// them as burst lines every 2 s while hits happen.
+const DWORD kDamageFn = 0x00637590;
+const char kDamageEntryHex[] = "55 8b6c2408 8b85d0020000 85c0 57 7504 33ff eb08 8b00 8bb8ec020000 8b4f08 c1e90b f6c101 "
+                               "0f85f7000000";
+const DWORD kDamageBound = 0x0063761b;          // imm8 of cmp esi, 0x10
+const DWORD kDamageTableOperand = 0x00637625;   // disp32 of movzx edx, byte [esi + 0x6376c4]
+const DWORD kDamagePcTable = 0x006376c4;
+const BYTE kDamagePcBound = 0x10, kDamageTuBound = 0x1b;
+// TU 0x822f61e4 (28 words): 0x822f6254 -> 0 (damage + death check = PC 0x637630), 0x822f62c0 -> 1 (stamina = PC
+// 0x637685), 0x822f62e8 -> 2 (nothing = PC 0x6376b1)
+const BYTE kTuDamageCase[28] = {0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 1, 2, 0, 0, 2, 0,   // 0..16 = PC 0x6376c4
+                                2,                                                 // 17
+                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                     // 18..27
+typedef DWORD(__cdecl *DamageFn)(BYTE *inst, void *vec, float amount, DWORD reset, DWORD type, DWORD sub, DWORD flags);
+DamageFn g_oDamage = nullptr;
+int g_dmgTranslate = 0;            // [Damage] Translate (read again at run time, at most once per second, while hits come)
+int g_dmgLog = 1;                  // [Damage] Log
+int g_dmgMax = 3000;               // [Damage] MaxLines
+bool g_dmgHooked = false;          // entry hook placed (all checks passed)
+bool g_dmgApplied = false;         // switch extended (bound 0x1b, TU table)
+bool g_dmgBroken = false;          // the switch bytes are neither ours nor the game's - switch frozen
+bool g_dmgLabels = false;          // the three call sites below verified (names in the log)
+bool g_dmgFlusher = false;         // flush thread runs
+BYTE *g_dmgCode = nullptr;         // trampoline page
+DWORD g_dmgSwitchTick = 0;
+volatile LONG g_dmgLines = 0;
+CRITICAL_SECTION g_dmgLock;
+
+enum { kVSkip = 0, kVDamage = 1, kVStamina = 2, kVNothing = 3, kVDropped = 4 };
+const char *const kVerdict[5] = {"no effect (brain flag 0x800: returns at once)", "damage + death check", "stamina",
+                                 "nothing (case)", "DROPPED (above the bound)"};
+int DamageCase(DWORD type, bool tu) {
+    if (type > (tu ? 27u : 16u)) return kVDropped;
+    const BYTE c = kTuDamageCase[type];
+    return c == 0 ? kVDamage : c == 1 ? kVStamina : kVNothing;
+}
+
+// game state of the switch: 0 = the game's (bound 0x10, table 0x6376c4), 1 = ours, 2 = half ours (table ours, bound
+// still 0x10 - valid: indices 0..16 read the same values), -1 = anything else
+int DamageSwitchState() {
+    const DWORD cmp = Rd(reinterpret_cast<const void *>(kDamageBound - 2));     // 83 fe <bound> 0f
+    const DWORD op = Rd(reinterpret_cast<const void *>(kDamageTableOperand));
+    const BYTE bound = static_cast<BYTE>(cmp >> 16);
+    if ((cmp & 0xff00ffff) != 0x0f00fe83) return -1;
+    if (bound == kDamagePcBound && op == kDamagePcTable) return 0;
+    if (bound == kDamageTuBound && op == reinterpret_cast<DWORD>(kTuDamageCase)) return 1;
+    if (bound == kDamagePcBound && op == reinterpret_cast<DWORD>(kTuDamageCase)) return 2;
+    return -1;
+}
+
+// one store (a byte, or a dword inside one cache line: 0x637625..0x637628 lie in 0x637600..0x63763f)
+bool WriteSmall(DWORD at, DWORD value, size_t length) {
+    DWORD old = 0;
+    void *p = reinterpret_cast<void *>(at);
+    if (!VirtualProtect(p, length, PAGE_EXECUTE_READWRITE, &old)) {
+        Log(0, "VirtualProtect failed (%lu) at 0x%08lx", GetLastError(), at);
+        return false;
+    }
+    if (length == 1) *static_cast<volatile BYTE *>(p) = static_cast<BYTE>(value);
+    else *static_cast<volatile DWORD *>(p) = value;
+    DWORD dummy = 0;
+    VirtualProtect(p, length, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), p, length);
+    return true;
+}
+
+// extend (on) / restore (off) the switch; all or nothing - a partial result (one write failed) is still a valid
+// switch (table first / bound last), it is reported and the switch is frozen
+bool DamageSet(bool on, const char *when) {
+    const int st = DamageSwitchState();
+    if (st < 0) {
+        g_dmgBroken = true;
+        Log(0, "0.6 damage switch (%s): bytes at tru+0x237619 / +0x237625 are neither the game's nor ours - left alone, "
+               "[Damage] Translate frozen at %d", when, g_dmgApplied ? 1 : 0);
+        return false;
+    }
+    if (st == (on ? 1 : 0)) { g_dmgApplied = on; return true; }
+    bool ok;
+    if (on) ok = WriteSmall(kDamageTableOperand, reinterpret_cast<DWORD>(kTuDamageCase), 4) &&
+                 WriteSmall(kDamageBound, kDamageTuBound, 1);
+    else ok = WriteSmall(kDamageBound, kDamagePcBound, 1) && WriteSmall(kDamageTableOperand, kDamagePcTable, 4);
+    const int now = DamageSwitchState();
+    g_dmgApplied = now == 1;
+    if (!ok || now != (on ? 1 : 0)) {
+        g_dmgBroken = true;
+        Log(0, "0.6 damage switch (%s): %s failed (state %d) - switch frozen", when, on ? "extend" : "restore", now);
+        return false;
+    }
+    Log(1, "0.6 damage switch (%s): %s - tru+0x23761b bound 0x%02x, byte table tru+0x237625 -> 0x%08lx%s", when,
+        on ? "EXTENDED as the TU (0..27: 17 nothing, 18..27 damage + death check)" : "the game's (0..16, above dropped)",
+        on ? kDamageTuBound : kDamagePcBound, on ? reinterpret_cast<DWORD>(kTuDamageCase) : kDamagePcTable,
+        on ? " (plugin table, 28 entries)" : "");
+    return true;
+}
+
+// [Damage] Translate again from the INI, at most once per second, on the game thread (from the entry hook, before the
+// original runs - so the hit that notices the change already uses it)
+void DamageReadSwitch() {
+    if (!g_iniPath[0] || g_dmgBroken) return;
+    const DWORD now = GetTickCount();
+    if (now - g_dmgSwitchTick < 1000) return;
+    g_dmgSwitchTick = now;
+    const int t = GetPrivateProfileIntA("Damage", "Translate", g_dmgTranslate, g_iniPath) ? 1 : 0;
+    if (t == (g_dmgTranslate ? 1 : 0)) return;
+    Log(1, "0.6 switch: [Damage] Translate %d -> %d (read again from TruShadowCombat.ini)", g_dmgTranslate ? 1 : 0, t);
+    g_dmgTranslate = t;
+    DamageSet(t != 0, "run time");
+}
+
+float RdFloat(const void *p) {
+    const DWORD v = Rd(p);
+    float f;
+    memcpy(&f, &v, 4);
+    return f;
+}
+
+BYTE *DamageBrain(const BYTE *inst) {
+    const BYTE *h = reinterpret_cast<const BYTE *>(Rd(inst ? inst + 0x2d0 : nullptr));
+    const BYTE *b = h ? reinterpret_cast<const BYTE *>(Rd(h)) : nullptr;
+    return b ? reinterpret_cast<BYTE *>(Rd(b + 0x2ec)) : nullptr;
+}
+
+const char *DamageCaller(DWORD ret) {
+    if (!g_dmgLabels) return nullptr;
+    switch (ret) {
+    case 0x0063ab6b: return "hit message 0x11c (tru+0x23aaa0)";
+    case 0x0063772c: return "kill (tru+0x2376e0, amount = LP)";
+    case 0x0065afa1: return "fall (EnemyState_Fall tru+0x25adb0)";
+    default: return nullptr;
+    }
+}
+
+// burst counters: one slot per target / type / subtype / caller / verdict / switch state, flushed every 2 s
+struct DmgSlot {
+    BYTE *inst; DWORD type, sub, ret, flags, count; int verdict; bool applied;
+    float amount, lpBefore, lpAfter; char who[96];
+};
+const int kDmgSlots = 24;
+DmgSlot g_dmgSlot[kDmgSlots];
+int g_dmgUsed = 0;
+LONG g_dmgMissed = 0;
+DWORD g_dmgStart = 0;
+
+void DamageLine(const DmgSlot &s) {
+    LONG n = InterlockedIncrement(&g_dmgLines);
+    if (n > g_dmgMax) {
+        if (n == g_dmgMax + 1) Log(1, "0.6 damage types: [Damage] MaxLines %d reached - no more lines", g_dmgMax);
+        return;
+    }
+    char via[48];
+    const char *name = DamageCaller(s.ret);
+    if (name) strcpy_s(via, sizeof(via), name);
+    else _snprintf_s(via, sizeof(via), _TRUNCATE, "return 0x%08lx", s.ret);
+    const int pc = DamageCase(s.type, false), tu = DamageCase(s.type, true);
+    char what[160];
+    if (s.verdict == kVSkip)
+        _snprintf_s(what, sizeof(what), _TRUNCATE, "%s", kVerdict[kVSkip]);
+    else if (s.applied)
+        _snprintf_s(what, sizeof(what), _TRUNCATE, "switch as TU: %s%s%s%s", kVerdict[tu], pc != tu ? " (PC alone: " : "",
+                    pc != tu ? kVerdict[pc] : "", pc != tu ? ")" : "");
+    else
+        _snprintf_s(what, sizeof(what), _TRUNCATE, "PC: %s%s%s%s", kVerdict[pc], pc != tu ? " (TU: " : "",
+                    pc != tu ? kVerdict[tu] : "", pc != tu ? ")" : "");
+    Log(1, "0.6 damage types: %s type %lu sub %ld x%lu via %s, amount %.1f, flags 0x%lx, LP %.0f -> %.0f: %s", s.who,
+        s.type, static_cast<long>(s.sub), s.count, via, s.amount, s.flags, s.lpBefore, s.lpAfter, what);
+}
+
+void DamageFlush(bool force) {
+    DmgSlot copy[kDmgSlots];
+    int n = 0;
+    LONG missed = 0;
+    EnterCriticalSection(&g_dmgLock);
+    if (g_dmgUsed && (force || GetTickCount() - g_dmgStart >= 2000)) {
+        n = g_dmgUsed;
+        memcpy(copy, g_dmgSlot, sizeof(DmgSlot) * static_cast<size_t>(n));
+        missed = g_dmgMissed;
+        g_dmgUsed = 0;
+        g_dmgMissed = 0;
+    }
+    LeaveCriticalSection(&g_dmgLock);
+    for (int k = 0; k < n; ++k) DamageLine(copy[k]);
+    if (missed) Log(1, "0.6 damage types: %ld more hits in this window not counted (more than %d target / type pairs)",
+                    missed, kDmgSlots);
+}
+
+// flushes the burst counters every 250 ms once their window is 2 s old (no game memory read or written here)
+DWORD WINAPI DamageFlushThread(LPVOID) {
+    for (;;) {
+        Sleep(250);
+        DamageFlush(false);
+    }
+}
+
+// game thread, after the original: count the hit (names resolved once per new slot, every read SEH-guarded)
+void DamageRecord(BYTE *inst, DWORD type, DWORD sub, DWORD ret, DWORD flags, float amount, float before, float after,
+                  int verdict) {
+    EnterCriticalSection(&g_dmgLock);
+    if (!g_dmgUsed) g_dmgStart = GetTickCount();
+    int k = 0;
+    for (; k < g_dmgUsed; ++k) {
+        const DmgSlot &s = g_dmgSlot[k];
+        if (s.inst == inst && s.type == type && s.sub == sub && s.ret == ret && s.verdict == verdict &&
+            s.applied == g_dmgApplied) break;
+    }
+    if (k == g_dmgUsed) {
+        if (g_dmgUsed < kDmgSlots) {
+            DmgSlot &s = g_dmgSlot[g_dmgUsed++];
+            memset(&s, 0, sizeof(s));
+            s.inst = inst; s.type = type; s.sub = sub; s.ret = ret; s.verdict = verdict; s.applied = g_dmgApplied;
+            s.lpBefore = before;
+            Describe(inst, s.who, sizeof(s.who));
+        } else {
+            ++g_dmgMissed;
+            k = -1;
+        }
+    }
+    if (k >= 0) {
+        DmgSlot &s = g_dmgSlot[k];
+        ++s.count;
+        s.flags = flags;
+        s.amount = amount;
+        s.lpAfter = after;
+    }
+    const bool flushNow = !g_dmgFlusher && GetTickCount() - g_dmgStart >= 2000;
+    LeaveCriticalSection(&g_dmgLock);
+    if (flushNow) DamageFlush(false);
+}
+
+// entry hook of tru+0x237590: the original runs with the same arguments; the type is only counted
+DWORD __cdecl DamageHook(BYTE *inst, void *vec, float amount, DWORD reset, DWORD type, DWORD sub, DWORD flags) {
+    const DWORD ret = reinterpret_cast<DWORD>(_ReturnAddress());
+    DamageReadSwitch();
+    BYTE *brain = DamageBrain(inst);
+    const float before = brain ? RdFloat(brain + 0x2c64) : 0.0f;
+    const bool skip = brain && (Rd(brain + 8) & 0x800) != 0;
+    const int verdict = skip ? kVSkip : DamageCase(type, g_dmgApplied);
+    const DWORD r = g_oDamage(inst, vec, amount, reset, type, sub, flags);
+    if (g_dmgLog) DamageRecord(inst, type, sub, ret, flags, amount, before, brain ? RdFloat(brain + 0x2c64) : 0.0f, verdict);
+    return r;
+}
+
+void SetupDamage() {
+    if (!g_dmgLog && !g_dmgTranslate) {
+        Log(1, "0.6 damage: [Damage] Log=0 and Translate=0 - tru+0x237590 untouched (a later Translate=1 needs a restart)");
+        return;
+    }
+    // the function as analysed (read only); a mismatch leaves it untouched
+    struct { DWORD at; const char *hex; const char *what; } const facts[] = {
+        {kDamageFn, kDamageEntryHex, "entry tru+0x237590 (brain [[inst+0x2d0]]+0x2ec, flag 0x800 -> return)"},
+        {0x00637614, "56 8b742420 83fe10 0f878f000000 0fb696c4766300 ff2495b8766300",
+         "switch tru+0x237614: type = argument 4, bound 0x10, byte table 0x6376c4, jump table 0x6376b8"},
+        {0x006376b8, "30766300 85766300 b1766300", "jump table 0x6376b8 {0x637630, 0x637685, 0x6376b1}"},
+        {0x006376c4, "00 00 00 02 00 02 00 02 00 02 00 01 02 00 00 02 00", "byte table 0x6376c4 (17 entries = TU 0..16)"},
+        {0x00637630, "d9442418 56 51 8d8f602c0000 d91c24 e82c6dffff 83fe06 740a 83fe08 c644241000 7505 c644241001 "
+                     "f644242801 7452 8b44241c 8b4c2424 8b542410 6a00 6a00 50 8b442420 51 56 52 50 55 e8028dfeff "
+                     "83c420 5e 5f 5d c3",
+         "case 0x637630: health component tru+0x22e370(amount, type), 6 / 8 flag, flags bit 0 -> death check tru+0x220380"},
+        {0x00637685, "d9442418 51 8d8f602c0000 d91c24 e80898feff 8b4c2428 d1e9 f6c101 740e 8b542414 52 55 e8b2310200 "
+                     "83c408 5e 5f 5d c3",
+         "case 0x637685: stamina tru+0x220ea0(amount), flags bit 1 -> tru+0x25a860; 0x6376b1 = return"},
+        {0x0062e370, "8b542408 83faff 8bc1 7424 56 8bca 83e11f be01000000 d3e6 c1fa05 8574901c",
+         "health component tru+0x22e370: type = bit index into the mask +0x1c (types up to 31)"},
+        {0x006376e0, "8b542404 8b82d0020000 85c0 7504 33c9 eb08 8b00 8b88ec020000 51 8bc4 c70003000000 d981642c0000",
+         "kill tru+0x2376e0: same brain path, LP = brain +0x2c64"},
+    };
+    for (const auto &f : facts)
+        if (!HexAt(f.at, f.hex)) {
+            Log(0, "0.6 damage: %s at 0x%08lx does not match - damage probe and switch off", f.what, f.at);
+            return;
+        }
+    if (!BytesAt(kDamagePcTable, kTuDamageCase, 17)) {
+        Log(0, "0.6 damage: PC byte table differs from the TU table 0..16 - damage probe and switch off");
+        return;
+    }
+    if (DamageSwitchState() != 0) {
+        Log(0, "0.6 damage: switch bytes are not the game's - damage probe and switch off");
+        return;
+    }
+    // names in the log: the object name table as TruTrace / 0.5.2 (read only)
+    if (HexAt(0x005bcff9, "8b0dd094db00 52 8b14c1")) g_namesOk = true;
+    // call sites (labels only): kill tru+0x237727, hit message tru+0x23ab66 (+0x50 -> type, +0x64 -> subtype), fall
+    g_dmgLabels = HexAt(0x00637727, "e864feffff") && HexAt(0x0063ab66, "e825caffff") && HexAt(0x0065af9c, "e8efc5fdff") &&
+                  HexAt(0x0063ab50, "8b5664 8b4650");
+    g_dmgCode = static_cast<BYTE *>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+    if (!g_dmgCode) { Log(0, "0.6 damage: no code page (%lu) - damage probe and switch off", GetLastError()); return; }
+    memcpy(g_dmgCode, reinterpret_cast<const void *>(kDamageFn), 5);    // push ebp; mov ebp, [esp+8]
+    g_dmgCode[5] = 0xe9;
+    const DWORD rel = (kDamageFn + 5) - (reinterpret_cast<DWORD>(g_dmgCode) + 10);
+    memcpy(g_dmgCode + 6, &rel, 4);
+    DWORD old = 0;
+    if (!VirtualProtect(g_dmgCode, 4096, PAGE_EXECUTE_READ, &old)) {
+        Log(0, "0.6 damage: code page protection failed (%lu) - damage probe and switch off", GetLastError());
+        return;
+    }
+    g_oDamage = reinterpret_cast<DamageFn>(g_dmgCode);
+    InitializeCriticalSection(&g_dmgLock);
+    if (!WriteJump(kDamageFn, reinterpret_cast<const void *>(&DamageHook))) {
+        Log(0, "0.6 damage: entry hook tru+0x237590 failed - damage probe and switch off");
+        return;
+    }
+    g_dmgHooked = true;
+    if (g_dmgLog) {
+        HANDLE t = CreateThread(nullptr, 0, &DamageFlushThread, nullptr, 0, nullptr);
+        if (t) { g_dmgFlusher = true; CloseHandle(t); }
+    }
+    Log(1, "0.6 damage: entry hook tru+0x237590 placed - log %d (burst lines every 2 s, max %d, %s), call sites %s; "
+           "switch: [Damage] Translate %d (read again at run time at most once per second while hits come)",
+        g_dmgLog, g_dmgMax, g_dmgFlusher ? "flush thread" : "flushed by the next hit",
+        g_dmgLabels ? "named" : "by return address", g_dmgTranslate);
+    if (g_dmgTranslate) DamageSet(true, "start");
+    else Log(1, "0.6 damage switch (start): the game's (0..16, types 17..27 dropped) - [Damage] Translate=0");
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -2697,6 +3027,10 @@ void ReadOptions(const char *dir) {
     g_diag2011 = GetPrivateProfileIntA("Diag", "Condition2011", 1, ini);
     g_diagMax = GetPrivateProfileIntA("Diag", "MaxLines", 4000, ini);
     g_diagSnap = GetPrivateProfileIntA("Diag", "Snapshot", 1, ini) ? 1 : 0;   // 0.5.3
+    g_dmgTranslate = GetPrivateProfileIntA("Damage", "Translate", 0, ini) ? 1 : 0;   // 0.6
+    g_dmgLog = GetPrivateProfileIntA("Damage", "Log", 1, ini) ? 1 : 0;
+    g_dmgMax = GetPrivateProfileIntA("Damage", "MaxLines", 3000, ini);
+    if (g_dmgMax < 0) g_dmgMax = 0;
     if (g_diagMax < 0) g_diagMax = 0;
 }
 
@@ -2740,7 +3074,8 @@ void Start(HMODULE self) {
                "(the TU's targeters 6 / 9 do not exist)");
     SetupTranslate1013();
     SetupRegistration();
-    SetupDiag();                      // 0.5.2: last - after every other byte check of this plugin
+    SetupDiag();                      // 0.5.2: after every other byte check of this plugin
+    SetupDamage();                    // 0.6: K14 (independent of the parts above)
 }
 
 }  // namespace

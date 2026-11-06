@@ -54,6 +54,8 @@ work/m021_0611/
 work/k14_0611/
 work/sp017_0611/
 TruMenu.arachno*.png
+work/coop_0611/
+work/sndgroups_0611/
 # local profile archives (moved out of the repository folder, never committed)
 tests/profiles/archive_0311/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report

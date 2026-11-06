@@ -1,4 +1,38 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.5.3)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6)
+
+0.6 (2026-11-06, **offline, not yet seen in game**): K14 - the damage-type switch of the enemy damage function
+tru+0x237590 (TU 0x822f60e0, retail 0x822f87d8; `docs\Befund-K14-Schadensarten-0611.md` in the main workspace).
+Build `work\asi\combat06`.
+* The function (cdecl: instance, hit vector, float amount, bool, **type**, subtype, flags) switches over the damage
+  type: PC / retail bound 16, byte table 0x6376c4 -> jump table 0x6376b8 with three case bodies (damage + death check
+  0x637630, stamina 0x637685, nothing 0x6376b1). The TU bounds it at 0x1b and its 28-word table adds **17 -> nothing,
+  18..27 -> damage + death check** (the same case body); 0..16 are unchanged. Lara's DLC 2 attack records
+  (`doppelganger_casual` DTP 20212, activity 1005 -> CombatManager+0xc4, record +0x0c, `tools/chart_attack_damage_types.py`)
+  use 17..27 for most hits (18..25 for the combo steps, 26 / 27 for the shadow moves of state 1018), so on the PC
+  those hits never reach the health component nor the death / regenerate check (tru+0x220380, LP <= 0) - no damage,
+  no `Hit`, no `RegenerateDeath`. The finisher's own records (types 1 / 4) and the shadow step (17) are not affected.
+* `[Damage] Translate=1` (default **0**): the byte-table operand of `movzx edx, byte [esi + table]` (tru+0x237625)
+  points at a 28-entry table in the plugin (TU mapping), then the bound byte tru+0x23761b becomes 0x1b - jump table
+  and case bodies stay the game's. Table first, bound last (off: bound first), so every intermediate state is a valid
+  switch. Read again at run time at most once per second while hits come (from the entry hook, before the original
+  runs); bytes that are neither the game's nor ours freeze the switch (logged).
+* `[Damage] Log=1` (default, **changes nothing**): entry hook on tru+0x237590 (5 bytes -> trampoline, the original
+  runs with the same arguments). Per target / type / subtype / caller it counts the hits and writes burst lines every
+  2 s while hits happen (a flush thread; no game memory read or written there):
+  `0.6 damage types: 0x... obj 1004 viking_thrall_tutorial_dlc2_ type 19 sub 2 x3 via hit message 0x11c
+  (tru+0x23aaa0), amount 40.0, flags 0x3, LP 500 -> 500: PC: DROPPED (above the bound) (TU: damage + death check)`.
+  Callers named: hit message (tru+0x23aaa0, type = message +0x50), kill (tru+0x2376e0, amount = LP), fall
+  (EnemyState_Fall tru+0x25adb0, type 8). `[Damage] MaxLines=3000`. With `Log=0` and `Translate=0` the function is not
+  touched (then a later `Translate=1` needs a restart).
+* New byte checks: 13 (`work\asi\combat06\prechecks_combat06.txt`); with 88 + 6 + 21 + 4: 132, 0 mismatches on the
+  Steam exe. Imports: `CreateThread`, `Sleep` added (81, KERNEL32 only); exports unchanged.
+
+| # | TO TEST 0.6 (DLC 2 hall01 / hall02 tutorial thralls, god mode, `[Debug] EnemyStateLog=1` in TruMenu) | expected |
+|---|---|---|
+| 1 | load | `0.6 damage: entry hook tru+0x237590 placed ...`, `0.6 damage switch (start): the game's ...` |
+| 2 | `Translate=0`: punch / kick / shadow move on a thrall | `0.6 damage types:` lines; types 18..27 with `DROPPED`, LP unchanged |
+| 3 | `Translate=1` (INI, no restart) | `0.6 switch: [Damage] Translate 0 -> 1`, `damage switch (run time): EXTENDED ...`; LP drops, `Hit`; lethal hit with 18..24 -> `RegenerateDeath` -> `Regenerate`, others -> `Death` |
+| 4 | trouble | `Translate=0` (restored at the next hit) or `Log=0` + `Translate=0` and restart |
 
 0.5.3 (2026-11-05, **offline, not yet seen in game; read-only - behaviour unchanged**): a data export for TruMenu
 0.13's thrall labels (debug view stage S1) and one fix of the 0.5.2 diagnostics. Build `work\asi\combat053`.
