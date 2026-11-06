@@ -1,22 +1,94 @@
-"""List the unit markup records of a level DRM (read-only; DLC 2 rock vein, 607 / 608 ctx 0, 2026-11-01).
+"""List the unit markup of a level DRM (read-only; DLC 2 rock vein, 607 / 608 ctx 0, 2026-11-01; fixed and extended
+2026-11-06 markup / scale, docs/Befund-Markup-Massstab-0611.md).
 
-The PC adds a unit's markup at tru+0x5d21b4 .. +0x5d21c5: header = [level+0] (level = section 0, the unit's Level
-struct), count = [header+8], records = [header+0xc], stride 0x5c, loop tru+0x5ce4f0 (+0x28 runtime flags, 0 in the
-file -> flags from the type char at +0x33 via TRMarkupManager vtable +0x1c (tru+0x5d6f90) | +0x20 (tru+0x5d70a0);
-+0x2e id (s16), +0x32 byte (1 = skip in the query), +0x58 pointer to the poly line {int count; points at +0x10}).
-This tool follows section 0 +0 -> header, header +0xc -> records (relocations), and prints each record: id, type char,
-+0x28, +0x30..+0x33 bytes, position +0x34 (3 floats), poly line point count and first / last point.
+Classic unit markup: the PC adds it at 0x5d2192 .. 0x5d21c5: `mov esi,[edi+8]` (= the Level struct = section 0 of
+the unit DRM), count = [Level+8], records = [Level+0xc], stride 0x5c, add loop 0x5ce4f0 (record +0x28 flags word, 0
+in the file -> flags from the type char +0x33 via TRMarkupManager vtable +0x1c (0x5d6f90) | +0x20 (0x5d70a0); +0x2e
+id (s16), +0x32 byte (1 = skipped by the queries), +0x58 pointer to the poly line {int count; points at +0x10}).
+FIX 2026-11-06: until then the default followed Level+0 (the terrain header, section 1) - its "records" were
+TerrainGroups. The default now reads section 0 itself (same as the old `--level 0`).
+
+Markup2 unit markup (NEW 2026-11-06; this is where the Croft Manor units keep their ledges): 0x5d21ca .. 0x5d2217
+loops `[[Level+0x74]+0x2c]` items of the pointer list `[[Level+0x74]+0x30]` (unit DTP; the items lie as 0xb0-byte
+records behind DTP +0x34, tools/unit_ids.py) and calls 0x5c9da0 per item, which builds a 0x5c MarkUp record
+(0x5be650: record +0x2e = item +0x48 u16 id, +0x2c = item +0x4a, +0x32 = item +0x4c kind byte, +0x33 = 0, flags =
+GetMUDFlag(item +0x4d type) | class | 8) and a poly line of item +0x9c points (item +0xa0, stride 0x20) transformed by
+0x49ba20 (out = x*row0 + y*row1 + z*row2 + row3, rows = item +0x00 / +0x10 / +0x20 / +0x30) plus the unit vector of
+[Level-owner+0xd0] vt+0x20 = -origin. So live = M * p - origin(Level+0x80). The box gets +0x24 = item, so the
+engine's type getter 0x5be340 reads item +0x4d.
 
 Usage (from the repository root):
-  ../bin/pyt -t 120 tools/markup_level.py FILE.drm [--be] [--raw]
-  --be   big-endian (Xbox) DRM, e.g. work/rockvein/dlc_level2_start_xbox.drm or a pack11 original
-  --raw  also print the 23 words of every record
+  ../bin/pyt -t 120 tools/markup_level.py FILE.drm [--be] [--raw] [--origin X,Y,Z] [--near X,Y,Z [--radius R]]
+  --be      big-endian (Xbox) DRM, e.g. work/rockvein/dlc_level2_start_xbox.drm or a pack11 original
+  --raw     also print the 23 words of every classic record / the first 0x58 bytes of every markup2 item
+  --origin  unit origin for the live frame (default: Level+0x80 from the file)
+  --near    live point (TruMenu position frame of this unit): sort markup2 items by the distance of their poly
+            line (point-to-segment) to it and print the nearest (all within --radius, default 300)
+  Other modes (unchanged): --objects [--xbox X.drm], --object DTP, --level SECTION, --find, --scan, --brute
 """
 import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW, drm_reloc as R
 
 STRIDE = 0x5c
+ITEM2 = 0xb0
+# markup type -> MUD flag name: PC GetMUDFlag 0x5d6f90 == prototype MarkupManager::GetMUDFlag 0x8211e318 for 0..20,
+# names = prototype MUD_Flagnames 0x82843fd0 (entry i = bit 31 - i); 15 (bit 0x10) = MUD_FLAG_PILLAR (prototype
+# PrintTestMessage 0x8225fd10); tools/markup_flag_names.py prints the proof. 21 = no move bit; 22 / 23 = TU only.
+TYPE_NAME = {0: 'none', 1: 'ledgegrab', 2: 'jumplanding', 3: 'enemydropdown', 4: 'wallvertpole', 5: 'vertpole',
+             6: 'horizpole', 7: 'zipline', 8: 'railslide', 9: 'ladder', 10: 'volume', 11: 'rope', 12: 'cover',
+             13: 'perch', 14: 'balancebeam', 15: 'pillar', 16: '2hold', 17: '1hold', 18: '4hold', 19: '3holdtopl',
+             20: '3holdtopr', 21: 'type21', 22: 'type22 (TU vein)', 23: 'type23 (TU)'}
+
+
+def tname(t):
+    return TYPE_NAME.get(t, 'type %d' % t)
+
+
+def seg_dist(p, a, b):
+    """distance of point p to segment a-b (3D)"""
+    ab = [b[i] - a[i] for i in range(3)]
+    ap = [p[i] - a[i] for i in range(3)]
+    L = sum(v * v for v in ab)
+    t = 0.0 if L == 0 else max(0.0, min(1.0, sum(ap[i] * ab[i] for i in range(3)) / L))
+    q = [a[i] + t * ab[i] for i in range(3)]
+    return sum((p[i] - q[i]) ** 2 for i in range(3)) ** 0.5
+
+
+def markup2_items(D, rel, f, origin):
+    """unit markup2 items: [(index, section, offset, id, aux, kind, type, flags50, live points)] (see docstring)"""
+    t = target(D, rel, 0, 0x74)
+    if t is None:
+        return None, 'Level+0x74 not relocated'
+    ds, do = t
+    dd = bytes(D.sections[ds].data)
+    n = struct.unpack_from(f + 'I', dd, do + 0x2c)[0]
+    lst = target(D, rel, ds, do + 0x30)
+    out = []
+    if not n or lst is None:
+        return out, 'unit DTP section %d (id %d): +0x2c = %d, +0x30 -> %s' % (ds, D.sections[ds].id, n, lst)
+    for k in range(n):
+        it = target(D, rel, lst[0], lst[1] + 4 * k)
+        if it is None:
+            continue
+        si, o = it
+        d = bytes(D.sections[si].data)
+        M = [struct.unpack_from(f + '4f', d, o + 16 * r) for r in range(4)]
+        iid, aux = struct.unpack_from(f + 'HH', d, o + 0x48)
+        kind, typ = d[o + 0x4c], struct.unpack_from('b', d, o + 0x4d)[0]
+        fl = d[o + 0x50]
+        cnt = struct.unpack_from(f + 'i', d, o + 0x9c)[0]
+        pp = target(D, rel, si, o + 0xa0)
+        pts = []
+        if pp and 0 < cnt < 4096:
+            pd = bytes(D.sections[pp[0]].data)
+            for j in range(cnt):
+                x, y, z = struct.unpack_from(f + '3f', pd, pp[1] + 0x20 * j)
+                w = [x * M[0][c] + y * M[1][c] + z * M[2][c] + M[3][c] for c in range(3)]
+                pts.append(tuple(w[c] - origin[c] for c in range(3)))
+        out.append((k, si, o, iid, aux, kind, typ, fl, pts))
+    return out, 'unit DTP section %d (id %d): +0x2c = %d items, +0x30 -> section %d +0x%x' % (
+        ds, D.sections[ds].id, n, lst[0], lst[1])
 
 
 def target(D, rel, si, o):
@@ -25,6 +97,37 @@ def target(D, rel, si, o):
     if o in r[0]: return si, r[0][o]
     if o in r[1]: return r[1][o]
     return None
+
+
+def show_markup2(D, rel, f, origin, near, radius, raw):
+    items, head = markup2_items(D, rel, f, origin)
+    print('markup2 (unit DTP +0x2c / +0x30, live = M * p - origin (%.1f %.1f %.1f)): %s' % (
+        origin[0], origin[1], origin[2], head))
+    if not items:
+        return
+    tc = collections.Counter((it[5], it[6]) for it in items)
+    print('  kind / type counts: ' + ', '.join('kind %d %s: %d' % (k, tname(t), c) for (k, t), c in sorted(tc.items())))
+    rows = []
+    for k, si, o, iid, aux, kind, typ, fl, pts in items:
+        dist = None
+        if near is not None and pts:
+            segs = list(zip(pts, pts[1:])) or [(pts[0], pts[0])]
+            dist = min(seg_dist(near, a, b) for a, b in segs)
+        rows.append((dist, k, si, o, iid, aux, kind, typ, fl, pts))
+    if near is not None:
+        rows.sort(key=lambda r: (r[0] is None, r[0]))
+        print('  nearest to live (%.1f %.1f %.1f), radius %.0f:' % (near[0], near[1], near[2], radius))
+    for dist, k, si, o, iid, aux, kind, typ, fl, pts in rows:
+        if near is not None and (dist is None or dist > radius) and rows.index((dist, k, si, o, iid, aux, kind, typ,
+                                                                                 fl, pts)) >= 3:
+            continue
+        ends = ' .. '.join('(%.1f %.1f %.1f)' % p for p in (pts[:1] + pts[-1:] if len(pts) > 1 else pts))
+        print('  item %3d sec %d +0x%05x id %5d +4a %5d kind %d type %2d %-14s +50 %02x  %2d pts %s%s' % (
+            k, si, o, iid, aux, kind, typ, tname(typ), fl, len(pts), ends,
+            '' if dist is None else '  dist %.1f' % dist))
+        if raw:
+            d = bytes(D.sections[si].data)
+            print('       ' + ' '.join('%08x' % struct.unpack_from(f + 'I', d, o + q)[0] for q in range(0, 0x58, 4)))
 
 
 def main(argv):
@@ -39,6 +142,14 @@ def main(argv):
     level = obj = None
     if '--object' in argv: k = argv.index('--object'); obj = int(argv[k + 1]); del argv[k:k + 2]
     if '--level' in argv: k = argv.index('--level'); level = int(argv[k + 1]); del argv[k:k + 2]
+    origin = near = None
+    radius = 300.0
+    if '--origin' in argv:
+        k = argv.index('--origin'); origin = tuple(float(v) for v in argv[k + 1].split(',')); del argv[k:k + 2]
+    if '--near' in argv:
+        k = argv.index('--near'); near = tuple(float(v) for v in argv[k + 1].split(',')); del argv[k:k + 2]
+    if '--radius' in argv:
+        k = argv.index('--radius'); radius = float(argv[k + 1]); del argv[k:k + 2]
     argv = [a for a in argv if not a.startswith('--')]
     e = 'be' if be else 'le'; f = '>' if be else '<'
     D = DW.read(open(argv[0], 'rb').read(), e)
@@ -164,10 +275,8 @@ def main(argv):
     elif level is not None:
         h = (level, 0)
     else:
-        h = target(D, rel, 0, 0)
+        h = (0, 0)      # FIX 2026-11-06: the Level struct is section 0 itself (0x5d2192 mov esi,[edi+8]), not [section 0 +0]
     if obj is None:
-        if h is None:
-            print('section 0 +0 is not relocated - no level header'); return
         hs, ho = h
         hd = bytes(D.sections[hs].data)
         words = [struct.unpack_from(f + 'I', hd, ho + 4 * i)[0] for i in range(min(6, (len(hd) - ho) // 4))]
@@ -178,8 +287,12 @@ def main(argv):
                 k, t[0], D.sections[t[0]].type, D.sections[t[0]].id, len(D.sections[t[0]].data), t[1]))
         n = words[2]
         t = target(D, rel, hs, ho + 0xc)
+        if level is None:
+            if origin is None:
+                origin = struct.unpack_from(f + '3f', hd, 0x80)
+            show_markup2(D, rel, f, origin, near, radius, raw)
         if t is None:
-            print('header +0xc not relocated (count %d)' % n); return
+            print('classic unit markup: Level+0x08 = %d, Level+0x0c not relocated - none' % n); return
         rs, ro = t
     rd = bytes(D.sections[rs].data)
     print('records: %d x 0x%x at section %d +0x%x (section size 0x%x)' % (n, STRIDE, rs, ro, len(rd)))
