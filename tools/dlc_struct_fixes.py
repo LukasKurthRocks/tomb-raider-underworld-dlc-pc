@@ -28,6 +28,11 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              the converter u32-swapped `01 00 00 00` to `00 00 00 01` = repeat 0 = endless, the doppelganger's
              groan); only PC words that are a byte order of the Xbox word, sections paired by position (renumbered
              base DTPs left alone); a word that is no byte order of it stops the step (SystemExit)
+  navraw    tools/navgraph_raw_fix.py      NavPower NavGraph image of every unit (Level+0x60) = the Xbox bytes, the
+             count word after resource 1 u32-swapped, as on every base pair (`navgraph_raw_fix.py proof`, 82 pairs, 0
+             byte-order words; 2026-11-05, docs Befund-Navmesh-Kombi-0511.md: the converter u16-pair / u32-swapped
+             words of the image, DLC 2 dlc_yggdrasil_end 3201 words); the base proof runs once per process, a word that
+             is no byte order of the wanted word stops the step (SystemExit), an unpaired unit fails the check
   twins     tools/dlc_structure_audit.py   base-twin truth for every same-size section of TWIN_FILES (the DLC 2
              player objects): only byte-order errors, re-authored words are left alone; runs first (before the
              layout steps, so a proven layout always has the last word - e.g. the u16 transition list word +0x4c550
@@ -42,8 +47,9 @@ dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on f
 steps, docs Befund-Pipeline-Integration-0411.md; seqrepeat since 2026-11-05, WINDOWS_REBUILD finding 49: it touches
 only the word +0xc of SoundPlex Sequence nodes, no other step writes it; it reproduces the test tree dlc_test51p_moan).
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
-Check mode (objtex / objrec / objid / seqrepeat only; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
-  ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat] [--pack pack11] [--report R.json]
+Check mode (objtex / objrec / objid / seqrepeat by default, navraw with --steps; tools/Invoke-TruPipeline.ps1 after
+Fixes and per costume pack):
+  ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
         TREE may be 'A,B' (overlay, the later folder wins - e.g. a pipeline tree with a fix tree on top);
         objtex also runs the pack-independent structural check of tools/objdata_texlist_check.py on every DRM (a DTP
@@ -65,7 +71,7 @@ import drm_write as DW, drm_reloc as R
 
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
-       'objtex', 'objrec', 'objid', 'seqrepeat', 'vmliteral')
+       'objtex', 'objrec', 'objid', 'seqrepeat', 'navraw', 'vmliteral')
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (markup_level.py --objects; 23 = TU type)
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -399,6 +405,30 @@ class Steps:
                         'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes),
                         ('; ' + '; '.join(notes)) if notes else '')
 
+    def s_navraw(self, rel, xf, XD, cur):
+        """NavPower NavGraph image of a unit (Level+0x60) = the Xbox bytes, the count word after resource 1 u32-swapped
+        (tools/navgraph_raw_fix.fix_drm, 2026-11-05, docs Befund-Navmesh-Kombi-0511.md). The base proof
+        (navgraph_raw_fix proof: 82 base pairs, 0 byte-order words) runs once per process; it failing stops the step
+        (SystemExit). Proof per DRM (in fix_drm): only the planned bytes differ, headers / relocations identical,
+        re-plan 0 words - a failed proof leaves the DRM unchanged; a PC word that is no byte order of the wanted word
+        raises SystemExit; a unit whose image the rule cannot pair is left alone and reported (the gate fails on it)"""
+        import navgraph_raw_fix as NR
+        ok, lines = NR.proven()
+        if not ok:
+            raise SystemExit('navraw: base proof FAILED - %s' % ' / '.join(lines))
+        try:
+            new, changes, info = NR.fix_drm(XD, cur)
+        except AssertionError as e:
+            return None, 'navraw %s: proof failed (%s) - nothing changed' % (rel, e)
+        if info['status'] not in ('ok', 'no image'):
+            return None, 'navraw %s: NOT PAIRED (%s) - nothing changed' % (rel, info['status'])
+        if new is None: return None, None
+        cl = collections.Counter(r[3] for r in info['rows'])
+        return new, 'navraw %s: %d words (%s) in the image (section %d, %d bytes, %d resource(s)); proof: only the ' \
+                    'planned bytes differ, headers + relocations identical, re-check 0' % (
+                        rel, len(changes), ', '.join('%s %d' % kv for kv in sorted(cl.items())), info['pi']['sec'],
+                        info['pi']['len'], len(info['resources']))
+
     def s_vmliteral(self, rel, xf, XD, cur):
         """VM literals after opcode 2 (tools/vm_literal_fix.py, test 48l: one u32 whatever it holds)"""
         # the check of vm_literal_fix.check, but only byte-order errors are set: a literal whose PC value is no byte
@@ -502,6 +532,7 @@ def run_twins(srcs, out, names, tmp):
 
 
 CHECK_STEPS = ('objtex', 'objrec', 'objid', 'seqrepeat')   # steps with a check mode (no tool run, no shared corpus pass)
+CHECK_ALLOWED = CHECK_STEPS + ('navraw',)   # navraw: check only with --steps (2026-11-05, not yet in the default gate)
 
 
 def run_check(tree, steps, names=None, report=None):
@@ -537,6 +568,9 @@ def run_check(tree, steps, names=None, report=None):
                 log = []
                 if S.process(rel, path, [s], log, collections.Counter()) is not None and rel not in rep[s]['files']:
                     rep[s]['files'].append(rel)
+                # navraw: a unit the rule cannot pair or whose proof failed is not "ok" either (nothing is assumed)
+                if s == 'navraw' and any('NOT PAIRED' in l or 'proof failed' in l for l in log) and rel not in rep[s]['files']:
+                    rep[s]['files'].append(rel)
                 rep[s]['lines'] += log
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -566,7 +600,7 @@ def main(argv):
         rep = None
         if '--report' in argv: k = argv.index('--report'); rep = argv[k + 1]; del argv[k:k + 2]
         steps = steps or list(CHECK_STEPS)
-        if len(argv) != 2 or any(s not in CHECK_STEPS for s in steps): raise SystemExit(__doc__)
+        if len(argv) != 2 or any(s not in CHECK_ALLOWED for s in steps): raise SystemExit(__doc__)
         sys.exit(run_check(argv[1], [s for s in ALL if s in steps], names, rep))
     if len(argv) != 2 or not steps or any(s not in ALL for s in steps): raise SystemExit(__doc__)
     ol = os.path.join(argv[0], 'tr8', 'pc-w', 'objectlist.txt')

@@ -2538,6 +2538,46 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      `dlc_fx_cine_thrall_death` (as above). Open: the thrall copies of these 20 profiles also miss the `animfx` step
      that `dlc_test51a_thrall` carries (`animfx_list_fix.py scan`: 102 words in the 50l line, 472 in the 48 line).
 
+50. **The NavPower navmesh is raw on the PC: pipeline step `navraw`; one combined fix tree per test profile
+    (2026-11-05 / 06; workspace docs Befund-Debug-Ansicht-0511.md, Befund-Navmesh-Kombi-0511.md).**
+   * What: Level+0x60 points to the NavGraph image (section type 0 / id 0, no relocations): `ffffffff`, resource 1
+     `{u32 0, u32 1, u32 size, u32 checksum, size bytes}`, then a u32 COUNT of further resources, then those
+     resources. NavPower's own data is little-endian on the Xbox too; only COUNT is in platform order (Xbox
+     `00000001` -> PC `01000000`). The converter u16-pair / u32 / u8u8u16-swapped the image like a DTP: in the game
+     folder 5187 words in 10 DLC 2 units (`dlc_yggdrasil_end` 3201, `dlc2_machine_room` 1301, `dlc2_ceremony_room`
+     325, `dlc2_goo_room` 213, ..., `dlc_yggdrasil_hall02` 30), our own DLC 1 build 1670 words in 8 units; B138 and
+     B270 have 0 (upstream fixed it for DLC 1 before B132). In the debug drawing 292 of 600 areas of
+     `dlc_yggdrasil_end` were off.
+   * Rule and base proof (`tools/navgraph_raw_fix.py proof`, base pairs Xbox xbase / xbase2 / tu against PC pcbig /
+     pcpatch): 82 unit pairs with an image; 52 exactly "raw + COUNT u32", 30 rebuilt by the PC team (14 same size,
+     16 other size: new resource-1 checksum) with 0 words that are a byte order of the Xbox word; 7 of 7 COUNT words
+     with value 1 are `01000000` on the PC. The counts are `PROOF_EXPECT` (exit 1 when one changes). The DLC 1 word
+     `dlc_dungeon` +0x288cc that every build has "u32-swapped" is that COUNT - correct, it stays.
+   * Step `navraw` (`tools/dlc_struct_fixes.py`, library `navgraph_raw_fix`): copies the image raw from the Xbox
+     original of the same unit, COUNT u32-swapped; an unexplained word stops the step, an unpaired unit fails
+     `check`. Proven on copies of the 10 installed units (`navgraph_probe.py --compare` 0 differences, only the image
+     section changed, headers / relocations equal, step output md5 = tool output). `Invoke-TruPipeline.ps1` Fixes:
+     `proof`, an in-place `dlc_struct_fixes.py TREE TREE --steps navraw` after each `dlc_fixes_build` and a gate
+     `navgraph_raw_fix.py scan` (report `<tree>\navgraph_check.json`); Fixes now has 17 tools (`-FromTool` numbers
+     moved). Open: `navraw` into `dlc_fixes_build.STRUCT_STEPS` / `dlc_struct_fixes.CHECK_STEPS` (then the two
+     in-place calls go), a `Test-TruPreflight.ps1` Data row for the navmesh.
+   * Thrall charts: the 445 wrong chart truth words of the thrall copies in the test trees (finding of the F21
+     agent) come from a stage-2b build of 2026-10-30 23:24, before step `statechart` existed (new read-only
+     `tools/dtp_lineage.py`: origin per DTP section). `statechart_fix_tree` on 51i changes exactly 445 words in 16
+     DTPs, nothing else; charts and lists are then md5-equal with the `_sc` build, the 51o thrall floats stay.
+   * Combined fix trees (`tools/profile_fix_tree.py plan / build / prove / verify`): per profile every final
+     installed copy is checked by 16 rules (statechart for thralls / extensions, animfx, objtex, objrec, objid,
+     seqrepeat, navraw, the 6 families of `converter_faults_fix.py`, kitdtp = the DTP words of the B270 leftovers,
+     achievement, scriptclash), Xbox source per copy by best pairing (finding 38). `prove`: every changed byte is the
+     byte one rule sets alone, then every rule finds 0. The 48 active profiles form 14 sets; trees
+     `work/rebuild/dlc_test51v_fix21..34_*` replace the stacked `dlc_test51q_*` / `dlc_test51r_*` / `dlc_test51s_*`
+     trees (variant B); `verify` 48 / 48: only the tree's own input copies replaced, all rule checks of the final set
+     0. Where only one old rule applies, the new trees are byte-identical with `dlc_test51w_dtp`, the seq and the
+     clash trees. The four 48 profiles (`dlc2_48g`, `dlc2_48h`, `dlc2_doppelganger`, `regress_shadowlara`) lose
+     their 11 achievement calls (finding of the kit leftovers: they crash on the PC). Not applied: `statechart_other`
+     (the twin truth also flags words in B138 files and 50l objects - open which side is right). 8 installed copies
+     have no Xbox source and are checked for achievement / scriptclash only.
+
 ## The "VM" in upstream (what it was, what we do instead)
 
 Upstream was developed on macOS (homebrew paths, `/path/to/` placeholders); the game ran in a **Windows 11 VM** with
