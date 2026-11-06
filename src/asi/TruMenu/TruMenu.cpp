@@ -55,7 +55,12 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.20 (layers dbg.collect = collectibles (*_rw_* rewards by kind, reward pots "
+const char *const kVersion = "TruMenu 0.20.1 (sound list snd.list: every voice of the game's voice pool 0x8a8108 - "
+                             "music / SFX / speech group, wave id or stream, volume, state, distance - bottom left by "
+                             "default, settings [Sound] / Debug view / bar Debug / Darstellung / ring Spieler/Debug/Ton, "
+                             "snd.dump into the log; media.mutemusic mutes the FMOD channel groups of the music groups "
+                             "(FMOD Ex is linked into tru.exe), the option slider stays; "
+                             "0.20 layers dbg.collect = collectibles (*_rw_* rewards by kind, reward pots "
                              "'enthaelt Artefakt' with their reward index from the intro data) and dbg.enemies = every AI "
                              "enemy by kind (thralls, spiders, sharks, big cats, naga, bats, mercs, other) with intro id, "
                              "LP and distance, thralls with the targeter 9 line; ai.dumb forgets on switch-on: the enemy's "
@@ -389,9 +394,10 @@ const OptDef kOpts[] = {
                                     "test proves play in a level safe)"},
     {"Media", "MusicFade", "60", "0.9: fade in / out of media.music.play / stop in frames (30 per second; the game's unit "
                                  "start uses 60), 0 .. 300"},
-    {"Media", "MuteMusic", "0", "0.20 (media.mutemusic): 1 = background music muted from the start - the game's own "
-                                "SOUND_SetMusicVolume 0x589520(0),\nre-applied when a level load or a music ramp brings "
-                                "it back; off = the player's slider value again (never written)"},
+    {"Media", "MuteMusic", "0", "0.20 (media.mutemusic): 1 = background music muted from the start. 0.20.1: the FMOD "
+                                "channel groups of the music\ngroups are muted (FMOD's own setMute) - no volume and not "
+                                "the option slider is changed; muted again after a level\nload; off = unmuted. Fallback "
+                                "when that code differs: SOUND_SetMusicVolume 0x589520(0) as in 0.20"},
     {"Media", "MuteAmbient", "0", "0.20 (media.muteambient): 1 = ambience beds played as music ('_amb_' tracks, DLC 2) "
                                   "stopped whenever they start;\nnot covered: base-game ambience in sound groups (group "
                                   "index not known yet), effect sounds"},
@@ -633,6 +639,9 @@ const OptDef kOpts[] = {
                                      "500 .. 200000)"},
     {"Debug", "MarkMax", "24", "0.20: at most this many collectible and this many enemy markers per frame, the nearest to "
                                "the camera first, 1 .. 64"},
+    {"Debug", "EnemyStateLog", "0", "0.20.1: 1 = one TruMenu.log line whenever the behaviour state of an enemy with a "
+                                    "drawn label changes (dbg.enemies /\ndbg.labels; e.g. Vaulted -> Land -> Getup, "
+                                    "RegenerateDeath -> Regenerate); never per frame"},
     {"Debug", "CheckpointHide", "", "0.17 (dbg.cp / dbg.cpall): intro ids of checkpoints whose marker is not drawn (comma "
                                     "list; written back with Persist=1);\nempty = every checkpoint drawn"},
     {"Quick", "Enabled", "1", "0.17 Schnellschalter (quick.open): 1 = OpenButtons open / close a small bar at the left "
@@ -668,6 +677,24 @@ const OptDef kOpts[] = {
     {"AI", "NoAttack", "0", "0.19 (ai.noattack): 1 = the same enemies do not attack - brain+8 bits 0x20 (Attack / "
                             "ScriptAttack) and 0x100000\n(Melee), the prototype's g_enemyNoAttack; partial: close / ranged "
                             "combat states not checked"},
+    {"Sound", "List", "0", "0.20.1 (snd.list): 1 = the sound list from the start - every voice the game plays (group, "
+                           "wave / stream, volume, state,\ndistance to Lara), built on the game thread from the voice "
+                           "pool 0x8a8108; snd.dump writes it into TruMenu.log"},
+    {"Sound", "Position", "bl", "0.20.1 (snd.pos): corner of the sound list - bl bottom left, tl top left, tr top right, "
+                                "br bottom right"},
+    {"Sound", "MaxLines", "16", "0.20.1 (snd.lines): lines of the sound list below its header, 1 .. 40"},
+    {"Sound", "RefreshMs", "1000", "0.20.1 (snd.refresh): one walk of the voice pool every n ms, 100 .. 10000"},
+    {"Sound", "Sort", "group", "0.20.1 (snd.sort): group (music, SFX, speech, other; then the group number), volume or "
+                               "name (streams, then the wave id)"},
+    {"Sound", "FontScale", "1.0", "0.20.1 (snd.scale): font scale of the sound list, 0.5 .. 3"},
+    {"Sound", "OnlyPlaying", "0", "0.20.1 (snd.playing): 1 = only audible voices; 0 = also paused, muted, virtual, "
+                                  "starting and ending ones (dimmed)"},
+    {"Sound", "ShowMusic", "1", "0.20.1 (snd.music): music lines (the groups of the music slider and of the channel "
+                                "group 'music')"},
+    {"Sound", "ShowSfx", "1", "0.20.1 (snd.sfx): SFX lines (the group of the effects slider)"},
+    {"Sound", "ShowSpeech", "1", "0.20.1 (snd.speech): speech lines (the group of the third slider - speech / "
+                                 "cutscenes)"},
+    {"Sound", "ShowOther", "1", "0.20.1 (snd.other): lines of voices in no known group"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -922,6 +949,9 @@ void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite am
 void SaveLoadTick();   // 0.18 save.load: a confirmed request, then its progress (game thread)
 void AiTick();         // 0.19 dumb AI: purge / gate patches / brain flags (game thread, section "0.19 dumb AI")
 void SndMuteTick();    // 0.20 media.mutemusic / media.muteambient (game thread, section "0.20 collectibles")
+void SnTick();         // 0.20.1 snd.list: the voice pool walk every [Sound] RefreshMs (game thread, every poll)
+void DrawSoundList();  // 0.20.1 snd.list overlay (render thread, section "0.20.1 sound list")
+extern volatile LONG g_snOn;
 void NavTick();        // 0.12 Debug-Zeichnung: [Debug] NavDraw / NavMask once in the first loaded level (game thread)
 void SafeGroundTick(); // 0.8.1 player.unstuck: ring of recent safe positions (game thread)
 void NoDamageTick();   // 0.10.2 cheat.godfull: the player's no-damage bit once per game frame (game thread)
@@ -1142,6 +1172,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     }
     g_lastPadHookTick = GetTickCount();
     if (g_reqPending) RunPending();           // game thread; the game clock may stand still (front end, pause)
+    SnTick();                                 // 0.20.1 sound list (cheap while off: one flag; else once per RefreshMs)
     SoundFreezeTick();                        // 0.10.3: every poll - the game clock stands still while paused
     ShaderClockTick();                        // 0.10.4: likewise (F7 light shaft: TimeVector held with the freeze)
     DWORD clock = *kGameClock;
@@ -6135,6 +6166,7 @@ const char *g_tscState = "not looked up";
 LblTscSnap g_lblSnap;
 bool g_lblSnapOk = false;
 DWORD AiBrainOf(DWORD inst);                 // 0.19, below (section "0.19 dumb AI")
+void EsStateText(DWORD inst, DWORD brain, char *o, size_t n);   // 0.20.1 enemy state, section "0.20.1 sound list"
 bool M20EnemiesOn();                         // 0.20, below: dbg.enemies on (dbg.labels then leaves AI enemies to it)
 
 // load: the byte checks of precheck_013.txt
@@ -6372,7 +6404,9 @@ void DrawLabels() {
         if (c.kind == 1 && ReadDword(c.inst + 0x2d0, &a) && a && ReadDword(a, &b) && b && ReadDword(b + 0x2ec, &brain) &&
             brain && ReadFloats(brain + 0x2c64, &health, 1) && health > -1.0e6f && health < 1.0e6f)
             Out(hp, sizeof(hp), " | LP %.1f", health);
-        Out(line1, sizeof(line1), "%s %ld | %.0f%s", name, static_cast<LONG>(intro), sqrtf(c.dist2), hp);
+        char st[64];
+        EsStateText(c.inst, c.kind == 1 ? brain : 0, st, sizeof(st));   // 0.20.1: thrall behaviour state
+        Out(line1, sizeof(line1), "%s %ld | %.0f%s%s", name, static_cast<LONG>(intro), sqrtf(c.dist2), hp, st);
         ImU32 colour = IM_COL32(235, 235, 235, 255);
         LabelTscText(c.inst, line2, sizeof(line2), &colour);
         LabelDraw(dl, at, line1, line2, colour);
@@ -9993,6 +10027,7 @@ bool RunQuickOpen(const char *arg, char *o, size_t n);
 bool RunShotOnCine(const char *arg, char *o, size_t n);
 bool RunDpDump(const char *arg, char *o, size_t n);
 void PageCpPos();                            // the checkpoint list / positions (0.17)
+void PageSoundList();                        // 0.20.1, section "0.20.1 sound list"
 
 // menu page "Debug view": the same groups as the ring Spieler / Debug (master, level data, AI, Lara, display)
 void PageDebugView() {
@@ -10012,6 +10047,12 @@ void PageDebugView() {
         if (TmCheckbox(label, &qb)) RunQuickOpen(qb ? "1" : "0", o, sizeof(o));
         if (TmCheckbox("cutscene shot pairs / Zwischensequenz-Fotos  [shot.oncine]###ocon", &oc))
             RunShotOnCine(oc ? "1" : "0", o, sizeof(o));
+    }
+    // 0.20.1 sound list (Lukas: "mit Settings im Debug Menu"; it draws no world geometry but lives here with the other
+    // debug switches; also on the bar page Debug / Darstellung and in the ring Spieler/Debug/Ton)
+    if (ImGui::TreeNodeEx("Sound list / Ton-Liste (0.20.1)###dvsound", ImGuiTreeNodeFlags_DefaultOpen)) {
+        PageSoundList();
+        ImGui::TreePop();
     }
     // 0.16 display (owner feedback after the first live run): first group - depth, opacity, fade, fill, labels, legend
     if (ImGui::TreeNodeEx("Display / Darstellung (0.16)###dvstyle", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -13369,8 +13410,10 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
         float health = 0.0f;
         if (brain && ReadFloats(brain + 0x2c64, &health, 1) && health > -1.0e6f && health < 1.0e6f)
             Out(hp, sizeof(hp), " | LP %.0f", health);
+        char st[64];
+        EsStateText(m.inst, brain, st, sizeof(st));   // 0.20.1: behaviour state (+ rest time in RegenerateDeath)
         DvDistText(m.pos, DvOwnerUnit(m.inst), dist, sizeof(dist));
-        Out(m.line1, sizeof(m.line1), "%s %ld%s%s", name, static_cast<LONG>(intro), hp, dist);
+        Out(m.line1, sizeof(m.line1), "%s %ld%s%s%s", name, static_cast<LONG>(intro), hp, st, dist);
         m.line2[0] = 0;
         m.colour = k.colour;
         m.colour2 = IM_COL32(235, 235, 235, 255);
@@ -13576,9 +13619,18 @@ void SndAmbTick() {
             ok ? "stopped" : "stop faulted", s, g_musicFade);
     }
 }
+// 0.20.1 (section "0.20.1 sound list"): the music mute through the FMOD channel groups - the slider stays
+bool g_smOk = false;                         // the FMOD group mute checks (kSmChecks, M201Check)
+char g_smWhy[96] = "not checked";
+bool g_smActive = false;                     // at least one music channel group muted by TruMenu
+void SmMuteOn();
+void SmMuteOff();
 // PadHook, once per game frame
 void SndMuteTick() {
-    if (g_sndOk) {
+    if (g_smOk) {                            // 0.20.1: FMOD channel group mute (no game volume is written)
+        if (g_sndMuteMusic) SmMuteOn();
+        else if (g_smActive) SmMuteOff();
+    } else if (g_sndOk) {                    // fallback: the 0.20 path (moves the option slider - logged at load)
         DWORD cats = 0;
         if (g_sndMuteMusic) {
             if (SndReady(&cats) && SndMusicLoud(cats) && SndCall(0)) {
@@ -13611,16 +13663,23 @@ void ValDvEnemies(char *o, size_t n) {
 }
 bool RunDvEnemies(const char *arg, char *o, size_t n) { return DvRunOne(kDvEnemies, "dbg.enemies", arg, o, n); }
 void ValMuteMusic(char *o, size_t n) {
-    Out(o, n, "%d%s%s", g_sndMuteMusic ? 1 : 0, g_sndOk ? (g_sndMusicMuted ? " (muted)" : "") : " disabled: ",
-        g_sndOk ? "" : g_sndWhy);
+    if (g_smOk) { Out(o, n, "%d%s (FMOD channel groups)", g_sndMuteMusic ? 1 : 0, g_smActive ? " muted" : ""); return; }
+    Out(o, n, "%d%s%s", g_sndMuteMusic ? 1 : 0, g_sndOk ? (g_sndMusicMuted ? " (muted, fallback 0x589520)" : "")
+                                                       : " disabled: ", g_sndOk ? "" : g_sndWhy);
 }
 bool RunMuteMusic(const char *arg, char *o, size_t n) {
-    if (!g_sndOk) { Out(o, n, "disabled: pre-check failed (%s)", g_sndWhy); return false; }
+    if (!g_smOk && !g_sndOk) { Out(o, n, "disabled: pre-check failed (%s; %s)", g_smWhy, g_sndWhy); return false; }
     const bool on = BoolArg(arg, g_sndMuteMusic != 0);
     InterlockedExchange(&g_sndMuteMusic, on ? 1 : 0);
-    Log(1, "media.mutemusic %d (src=%s): %s", on ? 1 : 0, ShotSource("media.mutemusic"),
-        on ? "SOUND_SetMusicVolume 0x589520(0) with the next game frame, again whenever the music comes back"
-           : "the player's music volume [0x8900d8] with the next game frame");
+    if (g_smOk)
+        Log(1, "media.mutemusic %d (src=%s): %s", on ? 1 : 0, ShotSource("media.mutemusic"),
+            on ? "the music channel groups muted with the next game frame (FMOD ChannelGroupI::setMute; the option slider "
+                 "and every volume stay)" : "the channel groups TruMenu muted are unmuted with the next game frame");
+    else
+        Log(1, "media.mutemusic %d (src=%s): fallback %s", on ? 1 : 0, ShotSource("media.mutemusic"),
+            on ? "SOUND_SetMusicVolume 0x589520(0) with the next game frame, again whenever the music comes back (moves "
+                 "the option slider - the FMOD group checks failed)" : "the player's music volume [0x8900d8] with the "
+                 "next game frame");
     Out(o, n, "media.mutemusic %d", on ? 1 : 0);
     return true;
 }
@@ -13658,7 +13717,7 @@ void M20Check() {
     g_sndOk = DvChecks(kSndMusicChecks, sizeof(kSndMusicChecks) / sizeof(kSndMusicChecks[0]), &at);
     if (g_sndOk) Out(g_sndWhy, sizeof(g_sndWhy), "ok");
     else Out(g_sndWhy, sizeof(g_sndWhy), "music volume code differs at 0x%08lx", at);
-    if (!g_sndOk) InterlockedExchange(&g_sndMuteMusic, 0);
+    // (0.20.1: [Media] MuteMusic is reset in M201Check, when neither the FMOD group mute nor this path is usable)
     if (!g_musicOk) InterlockedExchange(&g_sndMuteAmb, 0);
     memset(g_coKind, 0, sizeof(g_coKind));
     memset(g_enKind, 0, sizeof(g_enKind));
@@ -13680,6 +13739,859 @@ void M20Check() {
         g_dvAtStart[kDvCollect], g_dvAtStart[kDvEnemies], g_m20Radius, g_m20Max, g_sndMuteMusic, g_sndMuteAmb);
 }
 // ---- end of 0.20 collectibles ----
+
+// ======================================================================================================================
+// ---- 0.20.1 sound list (Lukas live 2026-11-06 ~22:05: "Ton-Liste unten links" - everything that plays now, so he can
+// say what he hears; settings in the debug menu; "Musik aus" must not move the option slider). Facts:
+// docs\Befund-TruMenu-0201-0611.md, disassembly work\m0201_0611, byte checks work\asi\menu0201\precheck_0201.txt.
+// FMOD Ex is linked INTO tru.exe: no fmodex.dll import (the fmodex.dll next to tru.exe is not used by the exe), the
+// library's own source names (..\..\src\fmod_systemi.cpp ..) and its public C++ wrappers at 0x7b9xxx (__stdcall, `this`
+// on the stack; tools/pe_fmod_api_map.py lists them with their callers). FMOD::System* = [0xcc9f80] (System_Create
+// 0x7b919d(&[0xcc9f80]) at 0x586dff; every later System call pushes it, e.g. createSound 0x586a82).
+// Every channel the game plays comes from one place, the voice pool 0x8a8108: VoicePool::Play 0x58bfc0 is the only
+// caller of System::playSound 0x7b9938 (its callers: sound players 0x591351, MUSBANK notes 0x593229, streams 0x595f95).
+//   pool +8 list head (node +0 next, +4 voice; end = [0xcd3bc0], walked like the per-frame update 0x591600), +0x100c
+//   count (at most 0x200).
+//   voice: +4 FMOD channel handle, +0x10 sample (+4 its FMOD::Sound - a wave or a stream buffer), +0x18 the channel volume
+//   the game set (0x591480: params +0 * 0x58e100), +0x1c params (+0 volume, node +0x50), +0x20 source (+0x19 bit 0 =
+//   3D), +0x24 start pending, +0x26 finished (Channel::isPlaying false), +0x30 world position of a 3D voice (0x58e2ee).
+//   wave id = (sample - ([0xc56fe0] + 8)) / 0x18 (Wave_Find 0x584300: 0x1400 waves of 0x18 bytes). Sounds carry no
+//   name in memory (createSound FMOD_OPENMEMORY | FMOD_LOWMEM, 0x586a49), so the wave id is the name; a sample outside
+//   the wave table is a stream buffer (createSound 0x586c15, OPENMEMORY_POINT | LOOP_NORMAL).
+//   group: node = params+0x50, parent node [node+0x18] (0x58d9b8), FMOD channel group [node+0x1c] (0x583260 makes one
+//   per group node - named "music" for the group [cats+0xc] - and adds it under the parent's). Group table [0x8a80d8],
+//   count [0x8a80dc], entries of 0x84 bytes: +0 volume, +0x64 the group's runtime object R (0x59207f; node R+0x50, its
+//   channel group R+0x6c). The voice's group = the first ancestor node that is an R+0x50.
+//   categories [[0xccdea0]+0x24] (> 0 = set): [0] music (SOUND_SetMusicVolume - slider "Musik"), [1] SFX
+//   (SOUND_SetSfxVolume), [2] speech (SOUND_SetSpeechVolume 0x587140 - the third slider 0x5a4b7d / [0x8900e0], the
+//   cutscene / speech one), [3] the group of the channel group "music" (0x591f53), [4] the default group.
+// The list is built on the game thread (PadHook, every [Sound] RefreshMs - also while the game is paused), the thread
+// that runs the pool; read-only: memory reads plus the game's own read-only FMOD queries Channel::isPlaying 0x7b9eeb,
+// getPaused 0x7b9c04, getVolume 0x7b9c5d, isVirtual 0x7b9f1b (they validate the handle; under __try). The render
+// thread draws the last snapshot with the current filter / sort / lines.
+// media.mutemusic (0.20.1): the FMOD channel groups of the music groups ([cats+0] and [cats+0xc]) muted with FMOD's own
+//   ChannelGroupI::setMute 0x7c48cd (thiscall (mute, setstate), ret 8: +0x58 = mute, every channel of the group and its
+//   child groups re-evaluated; ChannelI::setMute 0x7c92b5 walks the group chain +0x8c / parent +0x1c, a channel that
+//   joins later is muted by setChannelGroup 0x7c9eac, setVolume keeps a muted channel silent 0x7c8bcc). The exe has no
+//   public ChannelGroup::setMute wrapper (the game never mutes a group), so the internal function is called with the
+//   ChannelGroup pointer (= ChannelGroupI: validate 0x7c4757 is a cast). No volume of the game is written - group
+//   volumes, MUSIC_masterVolume and the slider value stay as they are. Off: setMute(0) on the groups TruMenu muted (only
+//   when the group is still the same object and still muted). A level load creates new groups (CreateGroups 0x593530):
+//   the next game frame mutes the new ones. When these checks fail, the 0.20 path (SOUND_SetMusicVolume) is the
+//   fallback (logged).
+// ======================================================================================================================
+const DvCheck kSnChecks[] = {
+    {0x0058bfc0, "55 8bec 83e4f0 83ec14 53 56 8bf1 81be0c10000000020000 57 8b7d08"},   // VoicePool::Play, count +0x100c
+    {0x0058bff3, "8b4f04 8b15809fcc00 8d44240c 50 6a01 51 6aff 52 e82cd92200"},   // System::playSound, System [0xcc9f80]
+    {0x0058c047, "d90530118400 d95618 894e04 d95e28 897e10"},   // voice +0x18, +4 channel, +0x10 sample
+    {0x0058c119, "8b4c2414 56 e80dfeffff"},                      // into the pool list
+    {0x0058bf30, "83810c10000001 8b4108 85c0 56 8d7108"},        // list add: count, head +8
+    {0x00591600, "83ec18 8b4108 55 8d6908 57 33ff 3b05c03bcd00"},   // per-frame walk: head, end [0xcd3bc0]
+    {0x00591630, "8b7004 8bce e846feffff"},                      // node +4 = voice
+    {0x00591655, "8b6d00 8b4500 3b05c03bcd00"},                  // next = [node]
+    {0x00591480, "83ec10 56 57 8bf1 8b4e04 8d44240a 50 51 33ff e8548a2200 807c240a00 750c c6462601"},   // isPlaying, +0x26
+    {0x005914bb, "8b461c 85c0 0f842b010000 d944240c d808 d95c240c d944240c d95618"},   // params +0 -> voice +0x18
+    {0x00591373, "8b4e18 895020 8b5004 83c150 52 89581c e8881effff"},   // voice +0x20 / +0x1c, group from params node
+    {0x00583210, "56 8bf1 85f6 8bc6 7436 8da42400000000 83781c00 7512 8b4018 85c0 75f3"},   // node +0x1c cg, +0x18 parent
+    {0x0058d9b8, "397e18 7452 e8ded7ffff 897e18"},               // node link: +0x18 = parent
+    {0x00583260, "56 57 8bf9 837f1c00 8d771c 7531 807c240c00 b808078500 7505 b86c218400 56 50 a1809fcc00 50 e886662300 "
+                 "8b4718 85c0 740c 8b0e 8b501c 51 52 e818622300"},   // channel group per node ("music"), addGroup
+    {0x00590658, "83c150 8d7e50 8907"},                          // group object: node +0x50 under the parent's node
+    {0x00590691, "8b451c 50 8bcf e8c42bffff"},                   // .. then its channel group
+    {0x00584300, "8b542404 56 33f6 81fa00140000 721f"},          // Wave_Find: 0x1400 waves ..
+    {0x0058432e, "8d0452 3974c108 8d44c108"},                    // .. of 0x18 bytes at manager +8
+    {0x00850d90, "00435800"},                                    // manager vtable +0x64 = Wave_Find
+    {0x00591245, "8b0de06fc500 8b11 8b00 8b5264 50 ffd2"},       // manager [0xc56fe0]
+    {0x00591281, "8b0ddc808a00 3bc1 720a 51 50 e80e450b00 83c408 69c084000000 0305d8808a00 8be8 8b4564"},   // group table
+    {0x0059207f, "894664 8d470c 897e70 894674"},                 // entry +0x64 = runtime object
+    {0x00591f53, "395d04 8b0da0decc00 8b5124 8b420c"},           // categories +0xc: the "music" channel group's group
+    {0x005870a0, "a1a0decc00 8b4824 8b01 85c0 7e2e"},            // category [0] music
+    {0x005870f0, "a1a0decc00 8b4824 8b4104 85c0 7e2e"},          // [1] SFX
+    {0x00587190, "a1a0decc00 8b4824 8b4108 85c0 7e2e"},          // [2] speech
+    {0x0058e17f, "8b4320 f6401901"},                             // source +0x19 bit 0 = 3D
+    {0x0058e2ee, "894b30 8b4c2448 d95c2434 d9ee 895334 8b54242c d95c2454 894338"},   // voice +0x30 .. +0x38 position
+    {0x007b9c04, "55 8bec 8d4508 50 ff7508 e847e20000 85c0 59 59 740c 8b4d0c 85c9 7410 c60100 eb0b ff750c 8b4d08 "
+                 "e81fef0000 5d c20800"},                        // Channel::getPaused
+    {0x007b9c5d, "55 8bec 8d4508 50 ff7508 e8eee10000 85c0 59 59 740d 8b4d0c 85c9 7411 d9ee d919 eb0b ff750c 8b4d08 "
+                 "e8beef0000 5d c20800"},                        // Channel::getVolume
+    {0x007b9eeb, "55 8bec 8d4508 50 ff7508 e860df0000 85c0 59 59 740c 8b4d0c 85c9 7410 c60100 eb0b ff750c 8b4d08 "
+                 "e8d8f50000 5d c20800"},                        // Channel::isPlaying
+    {0x007b9f1b, "55 8bec 8d4508 50 ff7508 e830df0000 85c0 59 59 740c 8b4d0c 85c9 7410 c60100 eb0b ff750c 8b4d08 "
+                 "e86df60000 5d c20800"},                        // Channel::isVirtual
+    {0x007c8b66, "8a4974 80e101 8808 33c0 c20400"},              // ChannelI::getPaused: flags +0x74 bit 0
+    {0x007c8c5f, "d981b8000000 d918 33c0 c20400"},               // ChannelI::getVolume: +0xb8
+};
+const DvCheck kSmChecks[] = {
+    {0x007c48cd, "807c240800 53 8b5c2408 56 57 8bf9 7403 885f58 8b4720 85c0 7417 8b30 3bf0 7411 6a00 53 8bce "
+                 "e8d6ffffff 8b36 3b7720 75ef"},                 // ChannelGroupI::setMute: +0x58, child groups ..
+    {0x007c48fe, "83c724 8b37 eb15 8b4e08 8b4174 d1e8 2501ffffff 50 e89d490000 8b36 3bf7 75e7 5f 5e 33c0 5b c20800"},
+    {0x007c92d4, "834e7402 eb04 836674fd 8b868c000000 385858 7509 8b401c 3bc3 75f4"},   // ChannelI::setMute: group chain
+    {0x007c9eac, "e804f4ffff"},                                  // setChannelGroup re-evaluates the mute
+    {0x007c8bcc, "f6467408"},                                    // setVolume: muted channels stay silent
+    {0x007c4757, "8b4c2404 85c9 7504 6a24 58 c3 8b442408 85c0 7504 6a25 58 c3 8908 33c0 c3"},   // validate = a cast
+};
+const DWORD kSnPool = 0x008a8108, kSnPoolEnd = 0x00cd3bc0, kSnWaveMgr = 0x00c56fe0, kSnFmodSystem = 0x00cc9f80;
+const DWORD kFmChIsPlaying = 0x007b9eeb, kFmChGetPaused = 0x007b9c04, kFmChGetVolume = 0x007b9c5d,
+            kFmChIsVirtual = 0x007b9f1b, kFmCgSetMute = 0x007c48cd;
+typedef int(__stdcall *FmChBoolFn)(DWORD channel, unsigned char *out);
+typedef int(__stdcall *FmChFloatFn)(DWORD channel, float *out);
+typedef int(__fastcall *FmCgMuteFn)(DWORD cg, void *edx, int mute, int setstate);   // thiscall, ret 8
+bool g_snOk = false;                         // g_smOk / g_smActive: above SndMuteTick
+char g_snWhy[96] = "not checked";            // (g_smWhy: above SndMuteTick)
+
+// ---- settings ([Sound]) ----
+volatile LONG g_snOn = 0;                    // snd.list
+int g_snPos = 0;                             // 0 bl, 1 tl, 2 tr, 3 br
+int g_snLines = 16, g_snRefresh = 1000, g_snSort = 0, g_snOnlyPlaying = 0;   // sort 0 group, 1 volume, 2 name
+float g_snScale = 1.0f;
+int g_snShow[4] = {1, 1, 1, 1};              // music, SFX, speech, other
+int g_esLog = 0;                             // [Debug] EnemyStateLog (enemy state block below)
+const char *const kSnPosNames[4] = {"bl", "tl", "tr", "br"};
+const char *const kSnPosDe[4] = {"unten links", "oben links", "oben rechts", "unten rechts"};
+const char *const kSnPosEn[4] = {"bottom left", "top left", "top right", "bottom right"};
+const char *const kSnSortNames[3] = {"group", "volume", "name"};
+const char *const kSnSortDe[3] = {"Gruppe", "Lautstaerke", "Name"};
+enum { kSnMusic = 0, kSnSfx, kSnSpeech, kSnOther, kSnCats };
+const char *const kSnCatDe[kSnCats] = {"MUSIK", "SFX", "SPRACHE", "?"};
+const char *const kSnCatEn[kSnCats] = {"MUSIC", "SFX", "SPEECH", "?"};
+const char *const kSnShowKeys[kSnCats] = {"ShowMusic", "ShowSfx", "ShowSpeech", "ShowOther"};
+const char *const kSnShowItems[kSnCats] = {"snd.music", "snd.sfx", "snd.speech", "snd.other"};
+const ImU32 kSnCatColour[kSnCats] = {IM_COL32(205, 165, 255, 255), IM_COL32(235, 235, 235, 255),
+                                     IM_COL32(140, 235, 140, 255), IM_COL32(185, 185, 185, 255)};
+
+// ---- the snapshot (game thread writes, render thread reads; g_snLock) ----
+struct SnVoice {
+    DWORD voice, channel, sample, params, cg;
+    int cat, group, wave;                    // wave -1 = not in the wave table (stream buffer)
+    float vol, chVol, grpVol, dist;          // dist -1 = 2D, -2 = 3D but Lara unknown
+    float pos[3];
+    bool playing, paused, grpPaused, muted, virt, ending, pending, chOk;
+};
+enum { kSnStPlaying = 0, kSnStVirtual, kSnStPaused, kSnStMuted, kSnStPending, kSnStEnding, kSnStates };
+const char *const kSnStateDe[kSnStates] = {"spielt", "virtuell", "pausiert", "stumm", "startet", "endet"};
+const char *const kSnStateEn[kSnStates] = {"playing", "virtual", "paused", "muted", "starting", "ending"};
+const int kSnMax = 160, kSnGroupMax = 256;
+CRITICAL_SECTION g_snLock;
+SnVoice g_snSnap[kSnMax], g_snWork[kSnMax];
+int g_snSnapN = 0, g_snSnapAll = 0, g_snSnapCount = 0, g_snSnapGroups = 0, g_snSnapAudible = 0;
+int g_snSnapCats[5] = {0, 0, 0, 0, 0};
+DWORD g_snSnapTick = 0, g_snSnapSystem = 0;
+char g_snSnapMusic[160] = "";
+DWORD g_snNodes[kSnGroupMax];                // game thread: group i -> its node R+0x50 (this refresh)
+float g_snGrpVol[kSnGroupMax];
+DWORD g_snLastBuild = 0;
+DWORD g_snGameThread = 0;                    // the thread PadHook runs on (SnTick)
+volatile LONG g_snLogPending = 0;            // the burst line after a switch-on (game thread, first build)
+
+int SnState(const SnVoice &v) {
+    if (!v.playing || v.ending) return kSnStEnding;
+    if (v.pending) return kSnStPending;
+    if (v.muted) return kSnStMuted;
+    if (v.paused || v.grpPaused) return kSnStPaused;
+    return v.virt ? kSnStVirtual : kSnStPlaying;
+}
+// the game's read-only FMOD queries; a stale handle gives an FMOD error code, never a crash (__try anyway)
+bool SnFmBool(DWORD fn, DWORD channel, bool *out) {
+    unsigned char b = 0;
+    *out = false;
+    __try {
+        const int r = reinterpret_cast<FmChBoolFn>(fn)(channel, &b);
+        *out = b != 0;
+        return r == 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+bool SnFmVolume(DWORD channel, float *out) {
+    float v = 0.0f;
+    *out = 0.0f;
+    __try {
+        const int r = reinterpret_cast<FmChFloatFn>(kFmChGetVolume)(channel, &v);
+        *out = v;
+        return r == 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+// [[0xccdea0]+0x24]: 5 category group indices (0 = none)
+bool SnCats(int cats[5]) {
+    DWORD info = 0, p = 0;
+    for (int i = 0; i < 5; ++i) cats[i] = 0;
+    if (!ReadDword(kSndInfo, &info) || !info || !ReadDword(info + 0x24, &p) || !p) return false;
+    for (int i = 0; i < 5; ++i) {
+        DWORD v = 0;
+        if (!ReadDword(p + static_cast<DWORD>(i) * 4, &v)) return false;
+        cats[i] = static_cast<int>(v);
+    }
+    return true;
+}
+// the group table of this refresh (game thread): node and volume per group; returns the count used
+int SnReadGroups() {
+    DWORD table = 0, count = 0;
+    if (!ReadDword(kSndGroups, &table) || !table || !ReadDword(kSndGroups + 4, &count)) return 0;
+    const int n = count > static_cast<DWORD>(kSnGroupMax) ? kSnGroupMax : static_cast<int>(count);
+    for (int i = 0; i < n; ++i) {
+        const DWORD entry = table + static_cast<DWORD>(i) * 0x84;
+        DWORD r = 0;
+        g_snNodes[i] = ReadDword(entry + 0x64, &r) && r ? r + 0x50 : 0;
+        if (!ReadFloats(entry, &g_snGrpVol[i], 1)) g_snGrpVol[i] = -1.0f;
+    }
+    return n;
+}
+int SnGroupOfNode(DWORD node, int groups) {
+    for (int i = 0; i < groups; ++i)
+        if (g_snNodes[i] == node) return i;
+    return -1;
+}
+// a voice's group (first group node above its params), category (music / SFX / speech by the ancestors) and the FMOD
+// channel group it plays in (the first node with one, as 0x583210)
+void SnClassify(DWORD params, const int cats[5], int groups, int *group, int *cat, DWORD *cg) {
+    *group = -1;
+    *cat = kSnOther;
+    *cg = 0;
+    DWORD node = params ? params + 0x50 : 0;
+    for (int depth = 0; node && depth < 24; ++depth) {
+        DWORD c = 0, parent = 0;
+        if (!*cg && ReadDword(node + 0x1c, &c) && c) *cg = c;
+        const int g = SnGroupOfNode(node, groups);
+        if (g == 0 && *group < 0) *group = 0;   // the root group (master) only
+        if (g > 0) {
+            if (*group < 0) *group = g;
+            if (g == cats[0] || g == cats[3]) { *cat = kSnMusic; return; }
+            if (g == cats[1]) { *cat = kSnSfx; return; }
+            if (g == cats[2]) { *cat = kSnSpeech; return; }
+        }
+        if (!ReadDword(node + 0x18, &parent) || parent == node) break;
+        node = parent;
+    }
+}
+// FMOD group chain of a channel group: muted / paused anywhere above (ChannelGroupI +0x58 / +0x59, parent +0x1c)
+void SnCgState(DWORD cg, bool *muted, bool *paused) {
+    *muted = *paused = false;
+    for (int depth = 0; cg && depth < 16; ++depth) {
+        DWORD flags = 0, parent = 0;
+        if (!ReadDword(cg + 0x58, &flags)) return;
+        if (flags & 0xff) *muted = true;
+        if (flags & 0xff00) *paused = true;
+        if (!ReadDword(cg + 0x1c, &parent) || parent == cg) return;
+        cg = parent;
+    }
+}
+// srmusic slot names (0.9 facts) of the music now playing / requested, for the MUSIK lines
+void SnMusicNames(char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    if (!g_musicOk) return;
+    for (int s = 0; s < kMusicSlotCount; ++s) {
+        char cur[64] = "";
+        ReadString(kMusicSlots + kMusicSlotSize * static_cast<DWORD>(s), cur, sizeof(cur));
+        if (!cur[0]) continue;
+        const int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s", used ? ", " : "", cur);
+        if (w < 0) break;
+        used += static_cast<size_t>(w);
+    }
+}
+// game thread: walk the pool once into g_snWork, then publish it; returns the voices walked
+int SnBuild(int *audible) {
+    int cats[5];
+    *audible = 0;
+    const bool catsOk = SnCats(cats);
+    if (!catsOk)
+        for (int i = 0; i < 5; ++i) cats[i] = 0;
+    const int groups = SnReadGroups();
+    DWORD mgr = 0, player = 0, node = 0, end = 0, count = 0, system = 0;
+    ReadDword(kSnWaveMgr, &mgr);
+    ReadDword(kSnFmodSystem, &system);
+    ReadDword(kSnPool + 0x100c, &count);
+    float lara[3] = {0.0f, 0.0f, 0.0f};
+    const bool laraOk = g_playerOk && ReadDword(kPlayerPtr, &player) && player &&
+                        ReadFloats(player + kInstancePosition, lara, 3) && DvFinite(lara, 3);
+    const DWORD waveLo = mgr ? mgr + 8 : 0, waveHi = mgr ? mgr + 8 + 0x1400 * 0x18 : 0;
+    int n = 0, all = 0;
+    if (ReadDword(kSnPool + 8, &node) && ReadDword(kSnPoolEnd, &end)) {
+        for (int steps = 0; node && node != end && steps < 1024; ++steps) {
+            DWORD voice = 0, next = 0;
+            if (!ReadDword(node + 4, &voice) || !ReadDword(node, &next)) break;
+            node = next;
+            if (!voice) continue;
+            ++all;
+            if (n >= kSnMax) continue;
+            SnVoice &v = g_snWork[n];
+            memset(&v, 0, sizeof(v));
+            v.voice = voice;
+            DWORD flags = 0, source = 0, srcFlags = 0;
+            if (!ReadDword(voice + 4, &v.channel) || !ReadDword(voice + 0x10, &v.sample) ||
+                !ReadDword(voice + 0x1c, &v.params) || !ReadFloats(voice + 0x18, &v.vol, 1) ||
+                !ReadDword(voice + 0x24, &flags))
+                continue;
+            v.pending = (flags & 0xff) != 0;
+            v.ending = (flags & 0xff0000) != 0;
+            v.wave = v.sample >= waveLo && v.sample < waveHi && (v.sample - waveLo) % 0x18 == 0
+                   ? static_cast<int>((v.sample - waveLo) / 0x18) : -1;
+            SnClassify(v.params, cats, groups, &v.group, &v.cat, &v.cg);
+            v.grpVol = v.group >= 0 && v.group < groups ? g_snGrpVol[v.group] : -1.0f;
+            v.chOk = SnFmBool(kFmChIsPlaying, v.channel, &v.playing);
+            SnFmBool(kFmChGetPaused, v.channel, &v.paused);
+            SnFmBool(kFmChIsVirtual, v.channel, &v.virt);
+            if (!SnFmVolume(v.channel, &v.chVol)) v.chVol = -1.0f;
+            SnCgState(v.cg, &v.muted, &v.grpPaused);
+            v.dist = -1.0f;
+            if (ReadDword(voice + 0x20, &source) && source && ReadDword(source + 0x18, &srcFlags) && (srcFlags & 0x100) &&
+                ReadFloats(voice + 0x30, v.pos, 3) && DvFinite(v.pos, 3)) {
+                if (laraOk) {
+                    const float dx = v.pos[0] - lara[0], dy = v.pos[1] - lara[1], dz = v.pos[2] - lara[2];
+                    v.dist = sqrtf(dx * dx + dy * dy + dz * dz);
+                } else {
+                    v.dist = -2.0f;
+                }
+            }
+            if (SnState(v) == kSnStPlaying) ++*audible;
+            ++n;
+        }
+    }
+    char music[160];
+    SnMusicNames(music, sizeof(music));
+    EnterCriticalSection(&g_snLock);
+    memcpy(g_snSnap, g_snWork, sizeof(SnVoice) * static_cast<size_t>(n));
+    g_snSnapN = n;
+    g_snSnapAll = all;
+    g_snSnapCount = static_cast<int>(count);
+    g_snSnapGroups = groups;
+    g_snSnapAudible = *audible;
+    for (int i = 0; i < 5; ++i) g_snSnapCats[i] = cats[i];
+    g_snSnapTick = GetTickCount();
+    g_snSnapSystem = system;
+    strncpy_s(g_snSnapMusic, sizeof(g_snSnapMusic), music, _TRUNCATE);
+    LeaveCriticalSection(&g_snLock);
+    return all;
+}
+// one voice as text (overlay and dump share it; de = German words)
+void SnVoiceText(const SnVoice &v, bool de, bool full, const char *music, char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    const int st = SnState(v);
+    LabelAdd(o, n, &used, "%-7s", (de ? kSnCatDe : kSnCatEn)[v.cat]);
+    if (v.group >= 0) LabelAdd(o, n, &used, " g%-2d", v.group);
+    else LabelAdd(o, n, &used, " g? ");
+    if (v.wave >= 0) LabelAdd(o, n, &used, " %s %-4d", de ? "Welle" : "wave", v.wave);
+    else LabelAdd(o, n, &used, " Stream    ");
+    LabelAdd(o, n, &used, "  %.2f", static_cast<double>(v.vol));
+    if (v.grpVol >= 0.0f) LabelAdd(o, n, &used, " (%s %.2f)", de ? "Gr" : "grp", static_cast<double>(v.grpVol));
+    LabelAdd(o, n, &used, "  %s", (de ? kSnStateDe : kSnStateEn)[st]);
+    if (v.dist >= 0.0f) LabelAdd(o, n, &used, "  %.0fu", static_cast<double>(v.dist));
+    else if (v.dist < -1.5f) LabelAdd(o, n, &used, "  3D");
+    if (v.cat == kSnMusic && music && music[0]) LabelAdd(o, n, &used, "  [%s]", music);
+    if (full)
+        LabelAdd(o, n, &used, " | voice 0x%08lx ch 0x%08lx%s sample 0x%08lx params 0x%08lx cg 0x%08lx fmod vol %.3f "
+                 "playing %d paused %d grp-paused %d muted %d virtual %d pending %d finished %d pos %.0f %.0f %.0f",
+                 v.voice, v.channel, v.chOk ? "" : " (invalid)", v.sample, v.params, v.cg,
+                 static_cast<double>(v.chVol), v.playing ? 1 : 0, v.paused ? 1 : 0, v.grpPaused ? 1 : 0, v.muted ? 1 : 0,
+                 v.virt ? 1 : 0, v.pending ? 1 : 0, v.ending ? 1 : 0, static_cast<double>(v.pos[0]),
+                 static_cast<double>(v.pos[1]), static_cast<double>(v.pos[2]));
+}
+void SnBurstLog(int all, int audible) {
+    int cats[5];
+    EnterCriticalSection(&g_snLock);
+    for (int i = 0; i < 5; ++i) cats[i] = g_snSnapCats[i];
+    const int count = g_snSnapCount, groups = g_snSnapGroups;
+    const DWORD system = g_snSnapSystem;
+    LeaveCriticalSection(&g_snLock);
+    Log(1, "snd.list on: FMOD system 0x%08lx ([0xcc9f80], FMOD Ex linked into tru.exe), voice pool 0x8a8108: %d voice(s) "
+        "(pool count %d), %d audible; %d sound groups - music %d (player group %d), SFX %d, speech %d, default %d; "
+        "refresh %d ms, %s, max %d lines, sort %s; music mute via %s", system, all, count, audible, groups, cats[0],
+        cats[3], cats[1], cats[2], cats[4], g_snRefresh, kSnPosNames[g_snPos], g_snLines, kSnSortNames[g_snSort],
+        g_smOk ? "FMOD channel groups" : g_sndOk ? "SOUND_SetMusicVolume (fallback)" : "nothing (checks failed)");
+}
+// PadHook, every poll (also while the game clock stands still): one walk per [Sound] RefreshMs while the list is on
+void SnTick() {
+    g_snGameThread = GetCurrentThreadId();   // snd.dump runs only here (never from the Present self-poll)
+    if (!g_snOk || !g_snOn) return;
+    const DWORD now = GetTickCount();
+    if (g_snLastBuild && now - g_snLastBuild < static_cast<DWORD>(g_snRefresh)) return;
+    g_snLastBuild = now;
+    int audible = 0;
+    const int all = SnBuild(&audible);
+    if (InterlockedExchange(&g_snLogPending, 0)) SnBurstLog(all, audible);
+}
+
+// ---- overlay (render thread) ----
+SnVoice g_snDraw[kSnMax];                    // render thread copy
+int g_snOrder[kSnMax];
+bool SnBefore(const SnVoice &a, const SnVoice &b) {
+    if (g_snSort == 1 && a.vol != b.vol) return a.vol > b.vol;
+    if (g_snSort == 2) {
+        if ((a.wave < 0) != (b.wave < 0)) return a.wave < 0;   // streams first
+        if (a.wave != b.wave) return a.wave < b.wave;
+    }
+    if (a.cat != b.cat) return a.cat < b.cat;
+    if (a.group != b.group) return a.group < b.group;
+    return a.vol > b.vol;
+}
+void DrawSoundList() {
+    if (!g_snOk) return;
+    char music[160];
+    int n = 0, all = 0, audible = 0;
+    DWORD tick = 0;
+    EnterCriticalSection(&g_snLock);
+    n = g_snSnapN;
+    all = g_snSnapAll;
+    audible = g_snSnapAudible;
+    tick = g_snSnapTick;
+    memcpy(g_snDraw, g_snSnap, sizeof(SnVoice) * static_cast<size_t>(n));
+    strncpy_s(music, sizeof(music), g_snSnapMusic, _TRUNCATE);
+    LeaveCriticalSection(&g_snLock);
+    const bool de = g_qbLang == 0;
+    int shown = 0;
+    for (int i = 0; i < n; ++i) {
+        const SnVoice &v = g_snDraw[i];
+        if (!g_snShow[v.cat]) continue;
+        if (g_snOnlyPlaying && SnState(v) != kSnStPlaying) continue;
+        int k = shown++;
+        while (k > 0 && SnBefore(v, g_snDraw[g_snOrder[k - 1]])) {   // insertion sort (at most kSnMax)
+            g_snOrder[k] = g_snOrder[k - 1];
+            --k;
+        }
+        g_snOrder[k] = i;
+    }
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    const bool right = g_snPos == 2 || g_snPos == 3, bottom = g_snPos == 0 || g_snPos == 3;
+    ImGui::SetNextWindowPos(ImVec2(right ? vp->WorkPos.x + vp->WorkSize.x - 10.0f : vp->WorkPos.x + 10.0f,
+                                   bottom ? vp->WorkPos.y + vp->WorkSize.y - 10.0f : vp->WorkPos.y + 10.0f),
+                            ImGuiCond_Always, ImVec2(right ? 1.0f : 0.0f, bottom ? 1.0f : 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.45f);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(vp->WorkSize.x * 0.7f, vp->WorkSize.y * 0.9f));
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
+                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
+                             ImGuiWindowFlags_NoSavedSettings;
+    if (ImGui::Begin("##TruSoundList", nullptr, flags)) {
+        ImGui::SetWindowFontScale(g_snScale);
+        const DWORD age = tick ? (GetTickCount() - tick) / 1000 : 0;
+        char head[160];
+        Out(head, sizeof(head), de ? "Ton (%d spielen)  -  %d Stimmen, %d gezeigt" : "Sound (%d playing)  -  %d voices, %d "
+            "shown", audible, all, shown < g_snLines ? shown : g_snLines);
+        if (!tick) Out(head, sizeof(head), de ? "Ton - noch keine Daten (Spiel-Thread)" : "Sound - no data yet (game thread)");
+        ImGui::TextUnformatted(head);
+        if (tick && age >= 3) ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), de ? "Stand vor %lu s" : "%lu s old", age);
+        char line[400];
+        for (int k = 0; k < shown && k < g_snLines; ++k) {
+            const SnVoice &v = g_snDraw[g_snOrder[k]];
+            SnVoiceText(v, de, false, music, line, sizeof(line));
+            ImU32 c = kSnCatColour[v.cat];
+            if (SnState(v) != kSnStPlaying) c = (c & 0x00ffffff) | 0x90000000;   // dimmed: not audible
+            ImGui::PushStyleColor(ImGuiCol_Text, c);
+            ImGui::TextUnformatted(line);
+            ImGui::PopStyleColor();
+        }
+        if (shown > g_snLines) ImGui::Text(de ? "... %d weitere" : "... %d more", shown - g_snLines);
+        ImGui::SetWindowFontScale(1.0f);
+    }
+    ImGui::End();
+}
+
+// ---- media.mutemusic through the FMOD channel groups (game thread) ----
+struct SmMute { DWORD cg; int group; bool ours; };
+SmMute g_smMute[2] = {{0, 0, false}, {0, 0, false}};
+LONG g_smMutes = 0;                          // setMute(1) calls while on (a level load adds one per group)
+DWORD SmGroupCg(int group) {
+    DWORD table = 0, count = 0, r = 0, cg = 0;
+    if (group <= 0 || !ReadDword(kSndGroups, &table) || !table || !ReadDword(kSndGroups + 4, &count) ||
+        static_cast<DWORD>(group) >= count)
+        return 0;
+    if (!ReadDword(table + static_cast<DWORD>(group) * 0x84 + 0x64, &r) || !r || !ReadDword(r + 0x6c, &cg)) return 0;
+    return cg;
+}
+// the music groups: [cats+0] (slider) and [cats+0xc] ("music" channel group) - never SFX / speech / the root
+int SmMusicGroups(int out[2]) {
+    int cats[5], n = 0;
+    if (!SnCats(cats)) return 0;
+    const int want[2] = {cats[0], cats[3]};
+    for (int w : want) {
+        if (w <= 0 || w == cats[1] || w == cats[2] || (n == 1 && out[0] == w)) continue;
+        out[n++] = w;
+    }
+    return n;
+}
+bool SmSetMute(DWORD cg, bool mute) {
+    __try {
+        reinterpret_cast<FmCgMuteFn>(kFmCgSetMute)(cg, nullptr, mute ? 1 : 0, 1);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+bool SmMuted(DWORD cg) {
+    DWORD flags = 0;
+    return ReadDword(cg + 0x58, &flags) && (flags & 0xff) != 0;
+}
+// once per game frame while media.mutemusic is on: mute every music group whose channel group is not muted
+void SmMuteOn() {
+    int groups[2] = {0, 0};
+    const int n = SmMusicGroups(groups);
+    for (int k = 0; k < n; ++k) {             // (no groups now, e.g. while loading: the records stay for the off)
+        const DWORD cg = SmGroupCg(groups[k]);
+        if (!cg) continue;                    // no FMOD (no audio driver) or no group yet
+        if (SmMuted(cg)) {
+            if (g_smMute[k].cg != cg) {       // muted by someone else: not ours, never undone
+                g_smMute[k].cg = cg;
+                g_smMute[k].group = groups[k];
+                g_smMute[k].ours = false;
+            }
+            continue;
+        }
+        const bool again = g_smMute[k].ours && g_smMute[k].cg && g_smMute[k].cg != cg;
+        if (!SmSetMute(cg, true)) continue;
+        ++g_smMutes;
+        Log(1, "media.mutemusic: %smusic group %d muted (FMOD channel group 0x%08lx, ChannelGroupI::setMute 0x7c48cd) - "
+            "volumes and the option slider untouched", again ? "new (level load) " : "", groups[k], cg);
+        g_smMute[k].cg = cg;
+        g_smMute[k].group = groups[k];
+        g_smMute[k].ours = true;
+        g_smActive = true;
+    }
+}
+void SmMuteOff() {
+    int undone = 0, gone = 0;
+    for (SmMute &m : g_smMute) {
+        if (!m.ours) { m.cg = 0; continue; }
+        const DWORD cg = SmGroupCg(m.group);
+        if (cg && cg == m.cg && SmMuted(cg) && SmSetMute(cg, false)) ++undone;
+        else ++gone;
+        m.cg = 0;
+        m.ours = false;
+    }
+    g_smActive = false;
+    Log(1, "media.mutemusic off: %d music channel group(s) unmuted (setMute 0)%s; %ld mute call(s) while on - volumes "
+        "were never changed", undone, gone ? ", others were rebuilt by a level load (new groups are not muted)" : "",
+        g_smMutes);
+    g_smMutes = 0;
+}
+
+// ---- items ----
+void ValSnList(char *o, size_t n) {
+    if (!g_snOk) { Out(o, n, "%d disabled: %s", g_snOn ? 1 : 0, g_snWhy); return; }
+    Out(o, n, "%d (%d voices, %d audible; %s, %d lines)", g_snOn ? 1 : 0, g_snSnapAll, g_snSnapAudible,
+        kSnPosNames[g_snPos], g_snLines);
+}
+bool RunSnList(const char *arg, char *o, size_t n) {
+    if (!g_snOk) { Out(o, n, "disabled: pre-check failed (%s)", g_snWhy); return false; }
+    const bool on = BoolArg(arg, g_snOn != 0);
+    InterlockedExchange(&g_snOn, on ? 1 : 0);
+    if (on) {
+        g_snLastBuild = 0;                   // the next game-thread poll builds at once
+        InterlockedExchange(&g_snLogPending, 1);
+    }
+    Log(1, "snd.list %d (src=%s)%s", on ? 1 : 0, ShotSource("snd.list"), on ? ": one burst line follows with the first "
+        "list (game thread)" : "");
+    Out(o, n, "snd.list %d", on ? 1 : 0);
+    return true;
+}
+void ValSnPos(char *o, size_t n) { Out(o, n, "%s (%s)", kSnPosNames[g_snPos], kSnPosDe[g_snPos]); }
+bool RunSnPos(const char *arg, char *o, size_t n) {
+    for (int i = 0; i < 4; ++i)
+        if (arg && _stricmp(arg, kSnPosNames[i]) == 0) {
+            g_snPos = i;
+            Out(o, n, "snd.pos %s (%s / %s)", kSnPosNames[i], kSnPosDe[i], kSnPosEn[i]);
+            return true;
+        }
+    Out(o, n, "usage: snd.pos bl|tl|tr|br");
+    return false;
+}
+void ValSnLines(char *o, size_t n) { Out(o, n, "%d", g_snLines); }
+bool RunSnLines(const char *arg, char *o, size_t n) {
+    const int v = arg ? atoi(arg) : 0;
+    if (v < 1 || v > 40) { Out(o, n, "usage: snd.lines 1 .. 40"); return false; }
+    g_snLines = v;
+    Out(o, n, "snd.lines %d", v);
+    return true;
+}
+void ValSnRefresh(char *o, size_t n) { Out(o, n, "%d ms", g_snRefresh); }
+bool RunSnRefresh(const char *arg, char *o, size_t n) {
+    const int v = arg ? atoi(arg) : 0;
+    if (v < 100 || v > 10000) { Out(o, n, "usage: snd.refresh 100 .. 10000 (ms)"); return false; }
+    g_snRefresh = v;
+    Out(o, n, "snd.refresh %d ms", v);
+    return true;
+}
+void ValSnSort(char *o, size_t n) { Out(o, n, "%s (%s)", kSnSortNames[g_snSort], kSnSortDe[g_snSort]); }
+bool RunSnSort(const char *arg, char *o, size_t n) {
+    for (int i = 0; i < 3; ++i)
+        if (arg && _stricmp(arg, kSnSortNames[i]) == 0) {
+            g_snSort = i;
+            Out(o, n, "snd.sort %s", kSnSortNames[i]);
+            return true;
+        }
+    Out(o, n, "usage: snd.sort group|volume|name");
+    return false;
+}
+void ValSnScale(char *o, size_t n) { Out(o, n, "%.2f", static_cast<double>(g_snScale)); }
+bool RunSnScale(const char *arg, char *o, size_t n) {
+    const float v = arg ? static_cast<float>(atof(arg)) : 0.0f;
+    if (!(v >= 0.5f && v <= 3.0f)) { Out(o, n, "usage: snd.scale 0.5 .. 3"); return false; }
+    g_snScale = v;
+    Out(o, n, "snd.scale %.2f", static_cast<double>(v));
+    return true;
+}
+void ValSnPlaying(char *o, size_t n) { Out(o, n, "%d", g_snOnlyPlaying ? 1 : 0); }
+bool RunSnPlaying(const char *arg, char *o, size_t n) {
+    g_snOnlyPlaying = BoolArg(arg, g_snOnlyPlaying != 0) ? 1 : 0;
+    Out(o, n, "snd.playing %d (%s)", g_snOnlyPlaying, g_snOnlyPlaying ? "only audible voices" : "every voice");
+    return true;
+}
+bool SnShowRun(int cat, const char *arg, char *o, size_t n) {
+    g_snShow[cat] = BoolArg(arg, g_snShow[cat] != 0) ? 1 : 0;
+    Out(o, n, "%s %d", kSnShowItems[cat], g_snShow[cat]);
+    return true;
+}
+void ValSnMusic(char *o, size_t n) { Out(o, n, "%d", g_snShow[kSnMusic]); }
+void ValSnSfx(char *o, size_t n) { Out(o, n, "%d", g_snShow[kSnSfx]); }
+void ValSnSpeech(char *o, size_t n) { Out(o, n, "%d", g_snShow[kSnSpeech]); }
+void ValSnOther(char *o, size_t n) { Out(o, n, "%d", g_snShow[kSnOther]); }
+bool RunSnMusic(const char *arg, char *o, size_t n) { return SnShowRun(kSnMusic, arg, o, n); }
+bool RunSnSfx(const char *arg, char *o, size_t n) { return SnShowRun(kSnSfx, arg, o, n); }
+bool RunSnSpeech(const char *arg, char *o, size_t n) { return SnShowRun(kSnSpeech, arg, o, n); }
+bool RunSnOther(const char *arg, char *o, size_t n) { return SnShowRun(kSnOther, arg, o, n); }
+void ValSnStatus(char *o, size_t n) {
+    Out(o, n, "list %s, music mute %s (%s); %d voices, %d audible, %d groups (music %d / %d, SFX %d, speech %d)",
+        g_snOk ? "ok" : g_snWhy, g_smOk ? "FMOD channel groups" : g_sndOk ? "fallback SOUND_SetMusicVolume" : "off",
+        g_smOk ? "ok" : g_smWhy, g_snSnapAll, g_snSnapAudible, g_snSnapGroups, g_snSnapCats[0], g_snSnapCats[3],
+        g_snSnapCats[1], g_snSnapCats[2]);
+}
+// game thread (queued): the whole current list into TruMenu.log, unfiltered, in pool order
+bool RunSnDump(const char *, char *o, size_t n) {
+    if (!g_snOk) { Out(o, n, "disabled: pre-check failed (%s)", g_snWhy); return false; }
+    if (GetCurrentThreadId() != g_snGameThread) {   // the request ran from Present (the game does not poll the pad)
+        Out(o, n, "snd.dump: only on the game thread - the game is not polling the pad now (loading / front end?), "
+            "try again in a level");
+        return false;
+    }
+    int audible = 0;
+    const int all = SnBuild(&audible);
+    g_snLastBuild = GetTickCount();
+    EnterCriticalSection(&g_snLock);
+    const int count = g_snSnapN;             // g_snWork still holds this walk (game thread only)
+    char music[160];
+    strncpy_s(music, sizeof(music), g_snSnapMusic, _TRUNCATE);
+    int cats[5];
+    for (int i = 0; i < 5; ++i) cats[i] = g_snSnapCats[i];
+    const int groups = g_snSnapGroups;
+    LeaveCriticalSection(&g_snLock);
+    Log(1, "snd.dump (src=%s): %d voice(s) in the pool, %d listed, %d audible; groups %d - music %d (player group %d), "
+        "SFX %d, speech %d, default %d; srmusic '%s'; music mute %s%s", ShotSource("snd.dump"), all, count, audible,
+        groups, cats[0], cats[3], cats[1], cats[2], cats[4], music, g_sndMuteMusic ? "on" : "off",
+        g_smActive ? " (FMOD channel groups muted by TruMenu)" : "");
+    char line[480];
+    for (int i = 0; i < count; ++i) {
+        SnVoiceText(g_snWork[i], true, true, music, line, sizeof(line));
+        Log(1, "snd.dump %3d %s", i, line);
+    }
+    Out(o, n, "snd.dump: %d voice(s) written to TruMenu.log (%d audible)", count, audible);
+    return true;
+}
+// [Sound] at load
+void SnReadOptions(const char *ini) {
+    InterlockedExchange(&g_snOn, OptInt(ini, "Sound", "List") != 0 ? 1 : 0);
+    char v[32];
+    OptString(ini, "Sound", "Position", v, sizeof(v));
+    g_snPos = 0;
+    for (int i = 0; i < 4; ++i)
+        if (_stricmp(v, kSnPosNames[i]) == 0) g_snPos = i;
+    g_snLines = OptInt(ini, "Sound", "MaxLines");
+    if (g_snLines < 1 || g_snLines > 40) g_snLines = 16;
+    g_snRefresh = OptInt(ini, "Sound", "RefreshMs");
+    if (g_snRefresh < 100 || g_snRefresh > 10000) g_snRefresh = 1000;
+    OptString(ini, "Sound", "Sort", v, sizeof(v));
+    g_snSort = 0;
+    for (int i = 0; i < 3; ++i)
+        if (_stricmp(v, kSnSortNames[i]) == 0) g_snSort = i;
+    OptString(ini, "Sound", "FontScale", v, sizeof(v));
+    g_snScale = static_cast<float>(atof(v));
+    if (!(g_snScale >= 0.5f && g_snScale <= 3.0f)) g_snScale = 1.0f;
+    g_snOnlyPlaying = OptInt(ini, "Sound", "OnlyPlaying") != 0 ? 1 : 0;
+    for (int i = 0; i < kSnCats; ++i) g_snShow[i] = OptInt(ini, "Sound", kSnShowKeys[i]) != 0 ? 1 : 0;
+    g_esLog = OptInt(ini, "Debug", "EnemyStateLog") != 0 ? 1 : 0;   // enemy state lines (EsStateText)
+}
+// menu page Debug view, group "Ton-Liste"
+void PageSoundList() {
+    char o[400];
+    if (!g_snOk) ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "sound list off - code check: %s", g_snWhy);
+    if (!g_snOk) ImGui::BeginDisabled();
+    bool on = g_snOn != 0, only = g_snOnlyPlaying != 0;
+    if (TmCheckbox("sound list / Ton-Liste  [snd.list]###sllist", &on)) RunSnList(on ? "1" : "0", o, sizeof(o));
+    ImGui::SameLine();
+    if (TmButton("into the log / ins Log  [snd.dump]###sldump")) QueueItem("snd.dump", "");
+    ImGui::TextUnformatted("position / Ort  [snd.pos]:");
+    for (int i = 0; i < 4; ++i) {
+        char label[64];
+        Out(label, sizeof(label), "%s / %s###slpos%d", kSnPosEn[i], kSnPosDe[i], i);
+        ImGui::SameLine();
+        if (ImGui::RadioButton(label, g_snPos == i)) RunSnPos(kSnPosNames[i], o, sizeof(o));
+    }
+    ImGui::TextUnformatted("sort / Sortierung  [snd.sort]:");
+    for (int i = 0; i < 3; ++i) {
+        char label[64];
+        Out(label, sizeof(label), "%s / %s###slsort%d", kSnSortNames[i], kSnSortDe[i], i);
+        ImGui::SameLine();
+        if (ImGui::RadioButton(label, g_snSort == i)) RunSnSort(kSnSortNames[i], o, sizeof(o));
+    }
+    ImGui::SliderInt("max lines / Zeilen  [snd.lines]###sllines", &g_snLines, 1, 40);
+    ImGui::SliderInt("refresh ms / Takt  [snd.refresh]###slrefresh", &g_snRefresh, 100, 10000);
+    ImGui::SliderFloat("font scale / Schrift  [snd.scale]###slscale", &g_snScale, 0.5f, 3.0f, "%.2f");
+    if (TmCheckbox("audible only / nur hoerbare  [snd.playing]###slonly", &only)) RunSnPlaying(only ? "1" : "0", o, sizeof(o));
+    ImGui::TextUnformatted("groups / Gruppen:");
+    static const char *const kLabels[kSnCats] = {"music / Musik  [snd.music]###slm", "SFX / Effekte  [snd.sfx]###sls",
+                                                 "speech, cutscene / Sprache  [snd.speech]###slp",
+                                                 "other / andere  [snd.other]###slo"};
+    for (int i = 0; i < kSnCats; ++i) {
+        bool v = g_snShow[i] != 0;
+        ImGui::SameLine();
+        if (TmCheckbox(kLabels[i], &v)) SnShowRun(i, v ? "1" : "0", o, sizeof(o));
+    }
+    if (!g_snOk) ImGui::EndDisabled();
+    char status[400];
+    ValSnStatus(status, sizeof(status));
+    ImGui::TextWrapped("state: %s   [snd.status]", status);
+    ImGui::TextWrapped("names: a wave id (sounds carry no name in memory) or 'Stream'; MUSIK lines add the srmusic tracks "
+                       "of media.music.now. Speech = the group of the third option slider (cutscenes / speech).");
+}
+// ---- enemy behaviour state on the dbg.enemies / dbg.labels labels (coordinator 2026-11-06, docs\Befund-Thrall-Felder-
+// 0611.md section 4): enemies run their own state machine at brain+0x1254 (not Lara's chart); the current state object
+// of layer 0 = [brain+0x125c] (IsInState 0x6711f0 reads [SM+8+4*layer]; 0x67f126 reads exactly [brain+0x125c]), its
+// name = (char *)[obj+8], none = "(none)" (0x85a56c). RegenerateDeath (object 0x8afa4c, 0x67f12c): the wake time is a
+// 64-bit game clock value at data +0 / +4, data = (brain + 0x1273 + ([brain+0x18d4] + 2 * layer) * 0x19c) & ~0xf
+// (0x67ee38), compared with [0xecfaec] / [0xecfaf0] (0x67ee62); the clock's unit is not known, so TruMenu measures its
+// rate (ticks per real second, sampled every 0.5 s while labels draw) and shows the rest as "~n s". Read-only, render
+// thread, every pointer checked (state object and name inside the exe image, name printable ASCII). [Debug]
+// EnemyStateLog=1: one log line per state change and enemy (only enemies whose label is drawn), never per frame.
+const DvCheck kEsChecks[] = {
+    {0x006711f0, "8b442404 8b448108 85c0 7507 b86ca58500 eb03 8b4008"},   // IsInState: [SM+8+4L], name [obj+8]
+    {0x0067f110, "8b442404 8b80d0020000 85c0 7408 8b08 8b81ec020000 8b805c120000 3d4cfa8a00"},   // [brain+0x125c]
+    {0x0067ee38, "8b4c2410 8b9488d4180000 8d0c4a 8b9068010000 69c99c010000 8db40173120000 52 83e6f0"},   // state data
+    {0x0067ee62, "8b4604 8b0df0faec00 83c404 3bc8 770b 7537 a1ecfaec00 3b06"},   // wake time vs the game clock
+};
+const DWORD kEsRegenDeath = 0x008afa4c, kEsClock = 0x00ecfaec;
+bool g_esOk = false;                         // (g_esLog: [Debug] EnemyStateLog, at the top of the section)
+DWORD g_esImageLo = 0, g_esImageHi = 0;      // tru.exe image (state objects and names live there)
+unsigned __int64 g_esClockLast = 0;
+DWORD g_esClockTick = 0;
+double g_esRate = 0.0;                       // game clock ticks per real second (measured)
+struct EsSeen { DWORD inst, state; };
+EsSeen g_esSeen[64];
+int g_esSeenN = 0;
+LONG g_esChanges = 0;
+bool EsInImage(DWORD a) { return a >= g_esImageLo && a < g_esImageHi; }
+bool EsClock(unsigned __int64 *t) {
+    DWORD lo = 0, hi = 0;
+    if (!ReadDword(kEsClock, &lo) || !ReadDword(kEsClock + 4, &hi)) return false;
+    *t = (static_cast<unsigned __int64>(hi) << 32) | lo;
+    return true;
+}
+void EsClockSample() {                       // render thread, at most every 500 ms
+    const DWORD now = GetTickCount();
+    if (g_esClockTick && now - g_esClockTick < 500) return;
+    unsigned __int64 t = 0;
+    if (!EsClock(&t)) return;
+    if (g_esClockTick && t >= g_esClockLast) {
+        const double r = static_cast<double>(t - g_esClockLast) * 1000.0 / static_cast<double>(now - g_esClockTick);
+        if (r > 0.0) g_esRate = g_esRate > 0.0 ? g_esRate * 0.5 + r * 0.5 : r;   // 0 while the game clock stands
+    }
+    g_esClockLast = t;
+    g_esClockTick = now;
+}
+// " | <state>" (+ " ~n s" in RegenerateDeath) for a brain; logs a change when [Debug] EnemyStateLog=1
+void EsStateText(DWORD inst, DWORD brain, char *o, size_t n) {
+    o[0] = 0;
+    if (!g_esOk || !brain) return;
+    EsClockSample();
+    DWORD obj = 0, namePtr = 0;
+    char name[32] = "";
+    if (!ReadDword(brain + 0x125c, &obj)) return;
+    if (!obj) {
+        strncpy_s(name, sizeof(name), "(none)", _TRUNCATE);
+    } else {
+        if (!EsInImage(obj) || !ReadDword(obj + 8, &namePtr) || !EsInImage(namePtr) ||
+            !ReadString(namePtr, name, sizeof(name)))
+            return;
+        size_t len = 0;
+        for (; name[len]; ++len)
+            if (name[len] < 0x20 || name[len] > 0x7e) return;
+        if (len < 2) return;
+    }
+    char rest[32] = "";
+    if (obj == kEsRegenDeath) {
+        DWORD slot = 2, lo = 0, hi = 0;
+        unsigned __int64 now = 0;
+        if (ReadDword(brain + 0x18d4, &slot) && slot < 2) {
+            const DWORD data = (brain + 0x1273 + slot * 0x19c) & ~static_cast<DWORD>(0xf);
+            if (ReadDword(data, &lo) && ReadDword(data + 4, &hi) && EsClock(&now)) {
+                const unsigned __int64 wake = (static_cast<unsigned __int64>(hi) << 32) | lo;
+                const __int64 left = static_cast<__int64>(wake - now);
+                if (left <= 0) Out(rest, sizeof(rest), " (wacht)");
+                else if (g_esRate > 0.0) Out(rest, sizeof(rest), " ~%.1f s", static_cast<double>(left) / g_esRate);
+                else Out(rest, sizeof(rest), " %lld Ticks", static_cast<long long>(left));
+            }
+        }
+    }
+    Out(o, n, " | %s%s", name, rest);
+    if (!g_esLog) return;
+    int k = 0;
+    for (; k < g_esSeenN && g_esSeen[k].inst != inst; ++k) {}
+    if (k == g_esSeenN) {
+        if (g_esSeenN < 64) ++g_esSeenN;
+        else k = static_cast<int>(GetTickCount() % 64);   // full: reuse a slot
+        g_esSeen[k].inst = inst;
+        g_esSeen[k].state = obj;
+        return;                                             // first sight: no change line
+    }
+    if (g_esSeen[k].state == obj) return;
+    g_esSeen[k].state = obj;
+    ++g_esChanges;
+    DWORD intro = 0;
+    ReadDword(inst + 0x58, &intro);
+    Log(1, "enemy state: instance 0x%08lx intro %ld -> %s%s (state object 0x%08lx; [Debug] EnemyStateLog)", inst,
+        static_cast<LONG>(intro), name, rest, obj);
+}
+void EsCheck() {                             // g_esLog: [Debug] EnemyStateLog, read in SnReadOptions
+    DWORD at = 0;
+    const BYTE *base = reinterpret_cast<const BYTE *>(GetModuleHandleA(nullptr));
+    __try {
+        const IMAGE_NT_HEADERS *nt = reinterpret_cast<const IMAGE_NT_HEADERS *>(
+            base + reinterpret_cast<const IMAGE_DOS_HEADER *>(base)->e_lfanew);
+        g_esImageLo = reinterpret_cast<DWORD>(base);
+        g_esImageHi = g_esImageLo + nt->OptionalHeader.SizeOfImage;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        g_esImageLo = g_esImageHi = 0;
+    }
+    g_esOk = g_esImageHi > g_esImageLo && DvChecks(kEsChecks, sizeof(kEsChecks) / sizeof(kEsChecks[0]), &at);
+    Log(g_esOk ? 1 : 0, "0.20.1: enemy state on the labels %s (%d checks%s), image 0x%08lx .. 0x%08lx; [Debug] "
+        "EnemyStateLog %d", g_esOk ? "ok" : "off", static_cast<int>(sizeof(kEsChecks) / sizeof(kEsChecks[0])),
+        g_esOk ? "" : at ? ", differs" : ", no image", g_esImageLo, g_esImageHi, g_esLog);
+}
+// load: the byte checks of precheck_0201.txt (after M20Check)
+void M201Check() {
+    DWORD at = 0;
+    g_snOk = DvChecks(kSnChecks, sizeof(kSnChecks) / sizeof(kSnChecks[0]), &at);
+    if (g_snOk) Out(g_snWhy, sizeof(g_snWhy), "ok");
+    else Out(g_snWhy, sizeof(g_snWhy), "voice pool / FMOD code differs at 0x%08lx", at);
+    at = 0;
+    g_smOk = g_snOk && DvChecks(kSmChecks, sizeof(kSmChecks) / sizeof(kSmChecks[0]), &at);
+    if (g_smOk) Out(g_smWhy, sizeof(g_smWhy), "ok");
+    else Out(g_smWhy, sizeof(g_smWhy), !g_snOk ? "needs the sound list checks" : "FMOD group mute differs at 0x%08lx", at);
+    if (!g_snOk) InterlockedExchange(&g_snOn, 0);
+    if (g_snOn) InterlockedExchange(&g_snLogPending, 1);
+    if (!g_smOk && !g_sndOk) InterlockedExchange(&g_sndMuteMusic, 0);   // (was in M20Check)
+    EsCheck();                               // enemy behaviour state on the labels (kEsChecks, own log line)
+    Log(g_snOk && g_smOk ? 1 : 0, "0.20.1: sound list %s (%d checks), music mute %s (%d checks) - media.mutemusic via %s; "
+        "[Sound] List %ld, Position %s, MaxLines %d, RefreshMs %d, Sort %s, FontScale %.2f, OnlyPlaying %d, Show "
+        "music %d SFX %d speech %d other %d", g_snWhy, static_cast<int>(sizeof(kSnChecks) / sizeof(kSnChecks[0])),
+        g_smWhy, static_cast<int>(sizeof(kSmChecks) / sizeof(kSmChecks[0])),
+        g_smOk ? "the FMOD channel groups" : g_sndOk ? "SOUND_SetMusicVolume (0.20 fallback - moves the slider)" : "nothing",
+        g_snOn, kSnPosNames[g_snPos], g_snLines, g_snRefresh, kSnSortNames[g_snSort], static_cast<double>(g_snScale),
+        g_snOnlyPlaying, g_snShow[0], g_snShow[1], g_snShow[2], g_snShow[3]);
+}
+// ---- end of 0.20.1 sound list ----
 
 // ======================================================================================================================
 // 0.10.5 [Shot]: in-game screenshots and Claude marks (owner wish 2026-11-05: the main session gets named shots in the
@@ -15460,14 +16372,35 @@ const Item kItems[] = {
      RunDvCollect},
     {"dbg.enemies", "bool", "0.20: enemies - every AI enemy coloured by kind, label name + intro id + LP + distance, "
                             "thralls with the targeter 9 line", false, ValDvEnemies, RunDvEnemies},
-    {"media.mutemusic", "bool", "0.20: background music muted (the game's SOUND_SetMusicVolume 0x589520(0), re-applied after "
-                                "level loads; off = the player's slider value) ([Media] MuteMusic)", false, ValMuteMusic,
-     RunMuteMusic},
+    {"media.mutemusic", "bool", "0.20.1: background music muted - the FMOD channel groups of the music groups muted "
+                                "(volumes and the option slider untouched; again after level loads; fallback 0.20 "
+                                "SOUND_SetMusicVolume) ([Media] MuteMusic)", false, ValMuteMusic, RunMuteMusic},
     {"media.muteambient", "bool", "0.20: ambience beds played as music ('_amb_' srmusic tracks, DLC 2) stopped whenever they "
                                   "start; base-game ambience not covered ([Media] MuteAmbient)", false, ValMuteAmbient,
      RunMuteAmbient},
     {"pos.portal", "action", "0.20 <unit>: Lara to the centre of a loaded unit's stream portal towards <unit> (the "
                              "pos.goload path; flight should be on)", true, ValPos, RunPosPortal},
+    // 0.20.1 (docs\Befund-TruMenu-0201-0611.md): sound list
+    {"snd.list", "bool", "0.20.1: sound list overlay - every voice the game plays: group, wave id / stream, volume, state, "
+                         "distance ([Sound] List)", false, ValSnList, RunSnList},
+    {"snd.pos", "action", "0.20.1 bl|tl|tr|br: corner of the sound list ([Sound] Position)", false, ValSnPos, RunSnPos},
+    {"snd.lines", "action", "0.20.1 <1 .. 40>: lines of the sound list ([Sound] MaxLines)", false, ValSnLines, RunSnLines},
+    {"snd.refresh", "action", "0.20.1 <100 .. 10000>: ms between two walks of the voice pool ([Sound] RefreshMs)", false,
+     ValSnRefresh, RunSnRefresh},
+    {"snd.sort", "action", "0.20.1 group|volume|name: order of the sound list ([Sound] Sort)", false, ValSnSort, RunSnSort},
+    {"snd.scale", "action", "0.20.1 <0.5 .. 3>: font scale of the sound list ([Sound] FontScale)", false, ValSnScale,
+     RunSnScale},
+    {"snd.playing", "bool", "0.20.1: only audible voices in the sound list ([Sound] OnlyPlaying)", false, ValSnPlaying,
+     RunSnPlaying},
+    {"snd.music", "bool", "0.20.1: music lines in the sound list ([Sound] ShowMusic)", false, ValSnMusic, RunSnMusic},
+    {"snd.sfx", "bool", "0.20.1: SFX lines in the sound list ([Sound] ShowSfx)", false, ValSnSfx, RunSnSfx},
+    {"snd.speech", "bool", "0.20.1: speech / cutscene lines in the sound list ([Sound] ShowSpeech)", false, ValSnSpeech,
+     RunSnSpeech},
+    {"snd.other", "bool", "0.20.1: lines of voices in no known group ([Sound] ShowOther)", false, ValSnOther, RunSnOther},
+    {"snd.dump", "action", "0.20.1: the whole current sound list (every voice, unfiltered, with addresses) into "
+                           "TruMenu.log once", true, ValSnStatus, RunSnDump},
+    {"snd.status", "info", "0.20.1: sound list - checks, voices, groups, how media.mutemusic mutes", false, ValSnStatus,
+     nullptr},
 };
 
 const Item *FindItem(const char *id) {
@@ -18914,7 +19847,8 @@ enum QbFlag { kQfConfirm = 1, kQfBackup = 2 };
 enum QbCount { kQcNone = 0, kQcLayer, kQcTriggers, kQcTrgLabels, kQcLaraIn, kQcEncl, kQcLabels, kQcMarkup, kQcFlat, kQcOn,
                kQcCine, kQcAi };          // 0.19 kQcAi: enemies in the ai.dumb scope (last frame)
 enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvPass, kQvLang, kQvTime, kQvMark, kQvWeapon,
-             kQvAssist, kQvAiMode };     // 0.19 kQvAiMode: ai.mode purge / gate
+             kQvAssist, kQvAiMode,       // 0.19 kQvAiMode: ai.mode purge / gate
+             kQvSndPos, kQvSndLines, kQvSndSort };   // 0.20.1 sound list: corner, lines, order
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
 enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves };
@@ -18925,7 +19859,8 @@ const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230
             kQbMarkup = IM_COL32(120, 230, 140, 255), kQbRed = IM_COL32(255, 120, 100, 255),
             kQbCheat = IM_COL32(255, 230, 120, 255), kQbClaude = IM_COL32(255, 140, 110, 255),
             kQbTime = IM_COL32(190, 200, 255, 255), kQbChapter = IM_COL32(200, 230, 170, 255),
-            kQbAi = IM_COL32(255, 170, 220, 255);   // 0.19 dumb AI rows
+            kQbAi = IM_COL32(255, 170, 220, 255),   // 0.19 dumb AI rows
+            kQbSound = IM_COL32(205, 180, 255, 255);   // 0.20.1 sound list rows
 // choice rows: the arguments a choice row cycles through (claude.mark kinds as the ring level Claude, the five ring
 // weapons of Waffen)
 struct QbChoice { const char *arg, *de, *en; };
@@ -18981,6 +19916,18 @@ const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Kurze Namen", "Short labels", "dbg.short", "", kQbBool, -1, kQcNone, 0, kQbBlue},
     {"Lara drin", "Lara in", "dbg.larain", "", kQbBool, -1, kQcLaraIn, 0, kQbWhite},
     {"Umhuellende", "Enclosing", "dbg.enclosing", "", kQbValue, -1, kQcEncl, kQvEncl, kQbBlue},
+    // 0.20.1 Ton-Liste (Lukas: "mit Settings im Debug Menu")
+    {"Ton-Liste", "Sound list", "-", "", kQbLabel, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton-Liste", "Sound list", "snd.list", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton: Ort", "Sound: corner", "snd.pos", "", kQbValue, -1, kQcNone, kQvSndPos, kQbSound, 0},
+    {"Ton: Zeilen", "Sound: lines", "snd.lines", "", kQbValue, -1, kQcNone, kQvSndLines, kQbSound, 0},
+    {"Ton: Sortierung", "Sound: order", "snd.sort", "", kQbValue, -1, kQcNone, kQvSndSort, kQbSound, 0},
+    {"Ton: nur hoerbare", "Sound: audible only", "snd.playing", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton: Musik", "Sound: music", "snd.music", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton: Effekte", "Sound: SFX", "snd.sfx", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton: Sprache", "Sound: speech", "snd.speech", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton: andere", "Sound: other", "snd.other", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton-Liste ins Log", "Sound list to log", "snd.dump", "", kQbAction, -1, kQcNone, 0, kQbSound, 0},
 };
 const QbRow kQbRender[] = {
     {"Flach-Ansicht", "Flat view", "dbg.flat", "", kQbBool, -1, kQcFlat, 0, kQbFlat},
@@ -19029,6 +19976,8 @@ const QbRow kQbTimeTest[] = {                // 0.18 Zeit / Test
     {"Ton: Stand", "Sound state", "time.sound", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Musik aus", "Music off", "media.mutemusic", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},        // 0.20
     {"Ambient aus", "Ambience off", "media.muteambient", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},  // 0.20
+    {"Ton-Liste", "Sound list", "snd.list", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},             // 0.20.1
+    {"Ton-Liste ins Log", "Sound list to log", "snd.dump", "", kQbAction, -1, kQcNone, 0, kQbSound, 0},   // 0.20.1
     {"Claude-Marke", "Claude mark", "claude.mark", "", kQbChoice, -1, kQcNone, kQvMark, kQbClaude, 0},
     {"Ablauf: weiter", "Flow: next", "flow.next", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
     {"Ablauf: ueberspringen", "Flow: skip", "flow.skip", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
@@ -19240,8 +20189,9 @@ const char *QbWhy(const QbRow &r) {
 int QbValueCount(int val) {
     return val == kQvDepth || val == kQvEncl || val == kQvTime || val == kQvAssist ? 3 : val == kQvAlpha ? 10
          : val == kQvBright ? 13 : val == kQvSpeed ? 5 : val == kQvPass ? kRmPassN : val == kQvLang || val == kQvAiMode ? 2
-         : 0;
+         : val == kQvSndPos || val == kQvSndLines ? 4 : val == kQvSndSort ? 3 : 0;   // 0.20.1
 }
+const int kQbSndLines[4] = {8, 16, 24, 32};   // 0.20.1 snd.lines steps
 const int kQbSpeeds[5] = {5, 10, 20, 40, 80};
 const float kQbTimes[3] = {0.25f, 0.5f, 1.0f};     // 0.18 time.scale steps (as the ring's Zeit level)
 const float kQbAssists[3] = {0.5f, 0.75f, 1.0f};   // 0.18 Barrierefreiheit: slow motion as an assist
@@ -19257,6 +20207,9 @@ void QbValueArg(int val, int i, char *o, size_t n) {
     case kQvTime: Out(o, n, "%g", static_cast<double>(kQbTimes[i])); break;
     case kQvAssist: Out(o, n, "%g", static_cast<double>(kQbAssists[i])); break;
     case kQvAiMode: Out(o, n, "%s", i ? "gate" : "purge"); break;   // 0.19
+    case kQvSndPos: Out(o, n, "%s", kSnPosNames[i]); break;         // 0.20.1
+    case kQvSndLines: Out(o, n, "%d", kQbSndLines[i]); break;
+    case kQvSndSort: Out(o, n, "%s", kSnSortNames[i]); break;
     default: o[0] = 0;
     }
 }
@@ -19278,6 +20231,12 @@ int QbValueNow(int val) {
         break;
     case kQvLang: v = g_qbLang; break;
     case kQvAiMode: v = g_aiGateMode ? 1 : 0; break;   // 0.19
+    case kQvSndPos: v = g_snPos; break;                 // 0.20.1
+    case kQvSndSort: v = g_snSort; break;
+    case kQvSndLines:
+        for (int i = 0; i < 4; ++i)
+            if (abs(g_snLines - kQbSndLines[i]) < abs(g_snLines - kQbSndLines[v])) v = i;
+        break;
     case kQvTime:
     case kQvAssist: {
         const float *steps = val == kQvTime ? kQbTimes : kQbAssists;
@@ -21746,9 +22705,10 @@ void PageMusic() {
     {                                        // 0.20: mutes for tests (no experimental flag; own checks)
         char o[200];
         bool mm = g_sndMuteMusic != 0, ma = g_sndMuteAmb != 0;
-        if (!g_sndOk) ImGui::BeginDisabled();
+        const bool canMute = g_smOk || g_sndOk;   // 0.20.1: FMOD channel groups, else the 0.20 fallback
+        if (!canMute) ImGui::BeginDisabled();
         if (TmCheckbox("music off / Musik aus  [media.mutemusic]###mutemus", &mm)) RunMuteMusic(mm ? "1" : "0", o, sizeof(o));
-        if (!g_sndOk) ImGui::EndDisabled();
+        if (!canMute) ImGui::EndDisabled();
         ImGui::SameLine();
         if (!g_musicOk) ImGui::BeginDisabled();
         if (TmCheckbox("ambience off / Ambient aus  [media.muteambient]###muteamb", &ma))
@@ -22173,6 +23133,7 @@ void Render(IDirect3DDevice9 *device) {
     if (g_overlay) DrawOverlay();
     if (g_logOverlay) DrawLogOverlay();
     if (g_guardOverlay) DrawGuardOverlay();
+    if (g_snOn) DrawSoundList();                 // 0.20.1 sound list ([Sound] Position, default bottom left)
     if (flowDraw) DrawFlowOverlay();             // 0.11
     if (g_menuOpen) DrawMenu();
     if (g_menuOpen) TraceEnd();
@@ -22540,6 +23501,7 @@ void ReadOptions(const char *dir) {
     OptString(ini, "Saves", "Folder", g_saveFolderIni, sizeof(g_saveFolderIni));
     g_slDirect = OptInt(ini, "Saves", "DirectLoad") != 0 ? 1 : 0;                   // 0.18 save.load
     AiReadOptions(ini);                                                              // 0.19 [AI]
+    SnReadOptions(ini);                                                              // 0.20.1 [Sound]
     // 0.10 [Radial]: HoldButtons / Key also as hex ("0x00C0", "0x78")
     auto number = [&](const char *key) {
         char v[32];
@@ -22851,6 +23813,7 @@ void Start(HMODULE self) {
     AiCheck();                                // 0.19 dumb AI (precheck_019.txt; after the instance / player / main state checks)
     M20Check();                               // 0.20 collectibles / enemies / forget / mutes (precheck_020.txt; after
                                               // AiCheck, MusicCheck and DebugViewCheck)
+    M201Check();                              // 0.20.1 sound list + FMOD music mute (precheck_0201.txt; after M20Check)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
     _snprintf_s(g_radFilePath, sizeof(g_radFilePath), _TRUNCATE, "%sTruMenu.radial.txt", g_exeDir);
@@ -22929,6 +23892,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_mouseLock);
         InitializeCriticalSection(&g_edgeLock);       // 0.8.1 input trace
         InitializeCriticalSection(&g_safeLock);       // 0.8.1 player.unstuck
+        InitializeCriticalSection(&g_snLock);         // 0.20.1 sound list snapshot
         InitializeCriticalSection(&g_scLock);         // 0.8.1 regression shortcuts
         InitializeCriticalSection(&g_saveLock);       // 0.9 Saves page
         InitializeCriticalSection(&g_radLock);        // 0.10 radial menu

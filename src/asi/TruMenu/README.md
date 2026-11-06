@@ -1944,6 +1944,40 @@ Report `docs\Befund-TruMenu-020-0611.md`; byte checks `work\asi\menu020\precheck
   "Gegner-Leben zeigen", "Kanten", Zeit / Test "Musik aus" / "Ambient aus", Notfall last row "Spiel beenden"
   (`game.quit`: right arms, right again within 10 s quits). Ring: Leveldaten, KI, Zeit.
 
+## TruMenu 0.20.1 (sound list, music mute without the slider, enemy state on the labels; 2026-11-06)
+
+Report `docs\Befund-TruMenu-0201-0611.md`; byte checks `work\asi\menu0201\precheck_0201.txt` (44, section
+"// ---- 0.20.1 sound list" .. "// ---- end of 0.20.1 sound list"); analysis files `work\m0201_0611`.
+
+* **FMOD Ex is linked into `tru.exe`**: the exe imports no `fmodex.dll` (the DLL next to it is not used by the exe);
+  `tools/pe_fmod_api_map.py` lists the linked public wrappers (System 26, Channel 24, ChannelGroup 5, DSP / Sound 21)
+  and their callers. `FMOD::System*` = `[0xcc9f80]`.
+* **`snd.list`** (`[Sound] List`): an overlay, **bottom left** by default, header "Ton (n spielen)", one line per voice:
+  group (MUSIK / SFX / SPRACHE / ?, plus the group number), wave id (`Welle 1234`; sounds carry no name in memory) or
+  `Stream`, the channel volume the game set and the group volume, state (spielt / virtuell / pausiert / stumm /
+  startet / endet; not audible = dimmed), distance to Lara for 3D voices; MUSIK lines add the srmusic tracks
+  (`media.music.now`). Source: the game's voice pool `0x8a8108` - `VoicePool::Play 0x58bfc0` is the only caller of
+  `System::playSound`, so every channel the game plays is in it. Built on the game thread every `RefreshMs` (also while
+  paused): memory reads plus the game's read-only FMOD wrappers `Channel::isPlaying / getPaused / getVolume /
+  isVirtual`. Groups: music = categories [0] (slider "Musik") and [3] (FMOD channel group "music"), SFX = [1], speech
+  = [2] (the third option slider, speech / cutscenes).
+* Settings `[Sound]` Position (bl / tl / tr / br), MaxLines 16, RefreshMs 1000, Sort (group / volume / name), FontScale,
+  OnlyPlaying, ShowMusic / ShowSfx / ShowSpeech / ShowOther; items `snd.list / pos / lines / refresh / sort / scale /
+  playing / music / sfx / speech / other / status`. Menu page Debug view, group "Sound list / Ton-Liste"; bar Debug /
+  Darstellung (every switch; Ort / Zeilen / Sortierung as value rows) and Zeit / Test (Ton-Liste, ins Log); ring
+  Spieler/Debug/Ton (on / off, dump, four corners, audible only, sort group / volume, status) and Zeit | Ton-Liste. The
+  ring is now at TruMenu's 256-entry limit - the group filters stay on the bar and the menu page.
+* **`snd.dump`** (game thread, once): every voice, unfiltered, with addresses / flags / position into `TruMenu.log`;
+  `snd.list` on writes one burst line (FMOD system, voices, groups), never per frame.
+* **`media.mutemusic`** now mutes the **FMOD channel groups** of the music groups (FMOD's own
+  `ChannelGroupI::setMute 0x7c48cd`; no public wrapper is linked, the game never mutes a group) - no game volume and
+  not the option slider is written; muted again after a level load (new groups); off unmutes only the groups TruMenu
+  muted. Fallback when those checks fail: the 0.20 `SOUND_SetMusicVolume` path (logged at load).
+* **Enemy state** (coordinator): the `dbg.enemies` label and the thrall line of `dbg.labels` show the behaviour state
+  `(char *)[[brain+0x125c]+8]` (e.g. Vaulted, Land, Getup, RegenerateDeath, Regenerate); RegenerateDeath adds the rest
+  until it stands up (`~n s` from the measured game clock rate; `(wacht)` when due). `[Debug] EnemyStateLog=1`: one log
+  line per state change of a labelled enemy.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

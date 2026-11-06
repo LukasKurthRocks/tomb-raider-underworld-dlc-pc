@@ -40,9 +40,20 @@ it checks that the rules themselves do what the build report claims):
  11. forget    AiForgetOnce: once per enemy {instance, handle id} and setting; a new setting / ai.dumb off / a level
              change forgets again; the slot rule (mode 1 = Lara's handle, mode 0 = a sense whose target is Lara, mode -1 /
              2 / another target untouched); +0x30 / +0xf0 cleared, +0x70 / +0xb0 only counted.
+2026-11-06 TruMenu 0.20.1 sound list adds two models (section "---- 0.20.1 sound list" of TruMenu.cpp):
+ 12. soundlist SnBuild / SnClassify / SnState / DrawSoundList: the wave id rule (manager + 8, 0x18 steps, 0x1400 waves),
+             the group = the first ancestor node that is a group node (root 0 only when nothing else), the category by
+             the ancestors (music = [cats+0] or [cats+0xc], SFX [1], speech [2], else other), the state precedence
+             (ending > starting > muted > paused > virtual > playing), the filter (groups, audible only), the three
+             orders (group / volume / name = streams first, then the wave id) and the line limit.
+ 13. mutemusic SmMusicGroups / SmMuteOn / SmMuteOff: the music groups are [cats+0] and [cats+0xc] (never SFX / speech /
+             the root, no duplicate); a group is muted once (not again while muted), a group muted by someone else is
+             never touched, a level load's new channel group is muted once more, no groups (loading) keeps the
+             records, off unmutes only TruMenu's groups and only when the channel group is the same object and still
+             muted (a rebuilt group is left alone) - no volume is ever written.
 
 Usage (from the repository root):
-  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all eleven, exit 1 on a failure
+  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all thirteen, exit 1 on a failure
 """
 import math, random, sys
 
@@ -805,10 +816,202 @@ def check_bits():
     return ok
 
 
+# ------------------------------------------------------------------------------------------------- 0.20.1 sound list
+MUSIC, SFX, SPEECH, OTHER = 0, 1, 2, 3
+ST_PLAYING, ST_VIRTUAL, ST_PAUSED, ST_MUTED, ST_PENDING, ST_ENDING = range(6)
+
+
+def sn_wave(sample, mgr):                     # SnBuild: wave id or -1 (stream buffer)
+    lo = mgr + 8 if mgr else 0
+    hi = mgr + 8 + 0x1400 * 0x18 if mgr else 0
+    return (sample - lo) // 0x18 if lo <= sample < hi and (sample - lo) % 0x18 == 0 else -1
+
+
+def sn_classify(node, parent_of, group_nodes, cats):   # SnClassify: (group, category)
+    group, depth = -1, 0
+    while node and depth < 24:
+        g = group_nodes.index(node) if node in group_nodes else -1
+        if g == 0 and group < 0: group = 0
+        if g > 0:
+            if group < 0: group = g
+            if g in (cats[0], cats[3]): return group, MUSIC
+            if g == cats[1]: return group, SFX
+            if g == cats[2]: return group, SPEECH
+        parent = parent_of.get(node, 0)
+        if parent == node: break
+        node, depth = parent, depth + 1
+    return group, OTHER
+
+
+def sn_state(v):                              # SnState
+    if not v['playing'] or v['ending']: return ST_ENDING
+    if v['pending']: return ST_PENDING
+    if v['muted']: return ST_MUTED
+    if v['paused'] or v['grp_paused']: return ST_PAUSED
+    return ST_VIRTUAL if v['virt'] else ST_PLAYING
+
+
+def sn_before(a, b, sort):                    # SnBefore
+    if sort == 1 and a['vol'] != b['vol']: return a['vol'] > b['vol']
+    if sort == 2:
+        if (a['wave'] < 0) != (b['wave'] < 0): return a['wave'] < 0
+        if a['wave'] != b['wave']: return a['wave'] < b['wave']
+    if a['cat'] != b['cat']: return a['cat'] < b['cat']
+    if a['group'] != b['group']: return a['group'] < b['group']
+    return a['vol'] > b['vol']
+
+
+def sn_lines(voices, show, only, sort, lines):   # DrawSoundList: filter, insertion sort, the shown lines
+    order = []
+    for v in voices:
+        if not show[v['cat']]: continue
+        if only and sn_state(v) != ST_PLAYING: continue
+        k = len(order)
+        order.append(v)
+        while k > 0 and sn_before(v, order[k - 1], sort):
+            order[k] = order[k - 1]
+            k -= 1
+        order[k] = v
+    return order[:lines], len(order)
+
+
+def check_soundlist():
+    mgr = 0x30000000
+    good = sn_wave(mgr + 8, mgr) == 0 and sn_wave(mgr + 8 + 0x18 * 1234, mgr) == 1234
+    good &= sn_wave(mgr + 8 + 0x18 * 0x1400, mgr) == -1 and sn_wave(mgr + 9, mgr) == -1 and sn_wave(0x1234, 0) == -1
+    # groups: 0 root, 1 music (slider), 2 SFX, 3 speech, 4 "music" channel group (under 1), 5 default (under 2), 6 free
+    cats = [1, 2, 3, 4, 5]
+    gn = [0x100 + 0x84 * i for i in range(7)]                       # group nodes R+0x50
+    parent = {gn[1]: gn[0], gn[2]: gn[0], gn[3]: gn[0], gn[4]: gn[1], gn[5]: gn[2], gn[6]: gn[0]}
+
+    def voice_node(group, via_owner):                               # params node -> (owner node) -> group node
+        p, o = 0x9000 + group * 0x10 + (8 if via_owner else 0), 0xa000 + group * 0x10
+        if via_owner: parent[p], parent[o] = o, gn[group]
+        else: parent[p] = gn[group]
+        return p
+    want = {1: (1, MUSIC), 2: (2, SFX), 3: (3, SPEECH), 4: (4, MUSIC), 5: (5, SFX), 6: (6, OTHER), 0: (0, OTHER)}
+    for g, w in want.items():
+        for via in (False, True):
+            got = sn_classify(voice_node(g, via), parent, gn, cats)
+            if got != w:
+                good = False
+                print('  soundlist: group %d via owner %s -> %s, want %s' % (g, via, got, w))
+    good &= sn_classify(0x7777, {}, gn, cats) == (-1, OTHER)        # not under any group
+    good &= sn_classify(0x5000, {0x5000: 0x5000}, gn, cats) == (-1, OTHER)   # its own parent ends the walk
+    base = dict(playing=True, ending=False, pending=False, muted=False, paused=False, grp_paused=False, virt=False)
+    states = [(dict(base), ST_PLAYING), (dict(base, playing=False), ST_ENDING),
+              (dict(base, ending=True, muted=True), ST_ENDING), (dict(base, pending=True, muted=True), ST_PENDING),
+              (dict(base, muted=True, paused=True), ST_MUTED), (dict(base, grp_paused=True, virt=True), ST_PAUSED),
+              (dict(base, virt=True), ST_VIRTUAL)]
+    good &= all(sn_state(v) == w for v, w in states)
+    rng = random.Random(201)
+    voices = []
+    for _ in range(60):
+        st = rng.choice([{}, {}, {}, {'paused': True}, {'muted': True}, {'virt': True}, {'ending': True}])
+        v = dict(base, cat=rng.randrange(4), group=rng.randrange(1, 7), wave=rng.choice([-1, rng.randrange(5000)]),
+                 vol=round(rng.random(), 2))
+        v.update(st)
+        voices.append(v)
+    show = [1, 1, 1, 1]
+    for sort in (0, 1, 2):
+        shown, total = sn_lines(voices, show, False, sort, 16)
+        full, _ = sn_lines(voices, show, False, sort, 99)
+        good &= total == 60 and len(shown) == 16 and shown == full[:16]
+        good &= all(not sn_before(full[k + 1], full[k], sort) for k in range(len(full) - 1))   # sorted
+    full, _ = sn_lines(voices, show, False, 2, 99)
+    streams = [v['wave'] < 0 for v in full]
+    good &= streams == sorted(streams, reverse=True)                 # name order: every stream before every wave
+    waves = [v['wave'] for v in full if v['wave'] >= 0]
+    good &= waves == sorted(waves)
+    full, _ = sn_lines(voices, show, False, 1, 99)
+    good &= [v['vol'] for v in full] == sorted((v['vol'] for v in voices), reverse=True)
+    only, n_only = sn_lines(voices, [1, 0, 1, 0], True, 0, 99)
+    good &= n_only == sum(1 for v in voices if v['cat'] in (0, 2) and sn_state(v) == ST_PLAYING) and n_only > 0
+    good &= all(v['cat'] in (0, 2) and sn_state(v) == ST_PLAYING for v in only)
+    good &= sn_lines(voices, [0, 0, 0, 0], False, 0, 16) == ([], 0)
+    print('soundlist: wave id rule, group / category by the ancestors (direct and via an owner node, root, loop), '
+          'state precedence, filters, the three orders, line limit  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+class Mute:                                   # SmMusicGroups / SmMuteOn / SmMuteOff over a model of the group table
+    def __init__(self):
+        self.rec = [{'cg': 0, 'group': 0, 'ours': False}, {'cg': 0, 'group': 0, 'ours': False}]
+        self.active, self.calls, self.lines = False, [], []
+
+    @staticmethod
+    def groups(cats):
+        if cats is None: return []
+        out = []
+        for w in (cats[0], cats[3]):
+            if w <= 0 or w == cats[1] or w == cats[2] or (len(out) == 1 and out[0] == w): continue
+            out.append(w)
+        return out
+
+    def on(self, game):
+        for k, g in enumerate(self.groups(game['cats'])):
+            cg = game['cg'].get(g, 0)
+            if not cg: continue
+            if game['muted'].get(cg):
+                if self.rec[k]['cg'] != cg: self.rec[k] = {'cg': cg, 'group': g, 'ours': False}
+                continue
+            again = self.rec[k]['ours'] and self.rec[k]['cg'] and self.rec[k]['cg'] != cg
+            game['muted'][cg] = True
+            self.calls.append(('mute', cg))
+            self.lines.append('new' if again else 'muted')
+            self.rec[k] = {'cg': cg, 'group': g, 'ours': True}
+            self.active = True
+
+    def off(self, game):
+        for m in self.rec:
+            if m['ours']:
+                cg = game['cg'].get(m['group'], 0)
+                if cg and cg == m['cg'] and game['muted'].get(cg):
+                    game['muted'][cg] = False
+                    self.calls.append(('unmute', cg))
+            m['cg'], m['ours'] = 0, False
+        self.active = False
+
+
+def check_mutemusic():
+    good = Mute.groups([1, 2, 3, 4, 5]) == [1, 4] and Mute.groups([1, 2, 3, 1, 5]) == [1]
+    good &= Mute.groups([0, 2, 3, 4, 5]) == [4] and Mute.groups([2, 2, 3, 3, 5]) == [] and Mute.groups(None) == []
+    game = {'cats': [1, 2, 3, 4, 5], 'cg': {1: 0xa1, 4: 0xa4, 2: 0xa2}, 'muted': {}}
+    m = Mute()
+    for _ in range(5): m.on(game)                                     # 5 frames: one mute per group
+    good &= m.calls == [('mute', 0xa1), ('mute', 0xa4)] and m.lines == ['muted', 'muted']
+    good &= not game['muted'].get(0xa2)                               # SFX untouched
+    game['cg'] = {1: 0xb1, 4: 0xb4, 2: 0xb2}                          # level load: new channel groups
+    m.on(game)
+    m.on(game)
+    good &= m.calls[2:] == [('mute', 0xb1), ('mute', 0xb4)] and m.lines[2:] == ['new', 'new']
+    saved = dict(game['cg'])
+    game['cats'], game['cg'] = None, {}                               # loading: no sound info, no groups
+    m.on(game)
+    good &= len(m.calls) == 4 and m.rec[0]['ours'] and m.rec[1]['ours']   # the records stay
+    game['cats'], game['cg'] = [1, 2, 3, 4, 5], saved
+    m.off(game)
+    good &= m.calls[4:] == [('unmute', 0xb1), ('unmute', 0xb4)] and not m.active
+    good &= not game['muted'][0xb1] and not game['muted'][0xb4]
+    # a group muted by someone else is never touched; a rebuilt group is not unmuted
+    game = {'cats': [1, 2, 3, 4, 5], 'cg': {1: 0xc1, 4: 0xc4}, 'muted': {0xc4: True}}
+    m = Mute()
+    m.on(game)
+    good &= m.calls == [('mute', 0xc1)] and not m.rec[1]['ours']
+    game['cg'][1] = 0xd1                                              # rebuilt while on, before the next frame
+    m.off(game)
+    good &= m.calls == [('mute', 0xc1)] and game['muted'][0xc4] and not game['muted'].get(0xd1)
+    print('mutemusic: music groups [cats+0] / [cats+0xc] only, one mute per group, level load re-mute, loading keeps '
+          'the records, off restores only its own unchanged groups, foreign mute untouched, no volume written  %s'
+          % ('ok' if good else 'FAIL'))
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
-               check_burst(), check_bits(), check_goload(), check_waitunit(), check_forget()]   # 0.20: + three
+               check_burst(), check_bits(), check_goload(), check_waitunit(), check_forget(),   # 0.20: + three
+               check_soundlist(), check_mutemusic()]                                         # 0.20.1: + two
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

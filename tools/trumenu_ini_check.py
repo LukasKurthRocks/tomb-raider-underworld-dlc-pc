@@ -79,6 +79,14 @@ media.mutemusic / media.muteambient / pos.portal, the owner's bar rows (Leveldat
 enemy health, edges; Zeit / Test music / ambience off; game.quit as the last plain action row of Notfall), the ring's
 dbg.collect / dbg.enemies / media.mutemusic / media.muteambient once without an argument (pos.portal never), and the
 precheck tables kCoChecks / kAiForgetChecks / kSndMusicChecks with at most 64 bytes per check.
+Since TruMenu 0.20.1 (2026-11-06 sound list) also the [Sound] values (List / OnlyPlaying / ShowMusic / ShowSfx /
+ShowSpeech / ShowOther 0 / 1, Position bl / tl / tr / br, MaxLines 1 .. 40, RefreshMs 100 .. 10000, Sort group / volume /
+name, FontScale 0.5 .. 3) and [Debug] EnemyStateLog 0 / 1, the snd.* items in kItems (snd.dump on the game thread),
+snd.pos / snd.lines / snd.sort as value rows, the bar rows on Debug / Darstellung (every snd.* switch) and Zeit / Test
+(snd.list, snd.dump), the ring's snd.* entries (snd.list in Zeit and Spieler/Debug/Ton, the four corners once each,
+snd.dump once, snd.sort group / volume / name, snd.lines 1 .. 40, bool / info / dump entries without argument), the
+precheck tables kSnChecks / kSmChecks / kEsChecks with at most 64 bytes per check, and SndMuteTick trying the FMOD group
+mute (g_smOk / SmMuteOn) before the 0.20 SOUND_SetMusicVolume path.
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -167,7 +175,8 @@ QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info'
             'dbg.cpgo': 'action', 'pos.save': 'action', 'pos.list': 'info', 'pos.go': 'action'}
 QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess')
 QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang',
-                  'time.scale', 'ai.mode')                                       # 0.19 ai.mode
+                  'time.scale', 'ai.mode',                                       # 0.19 ai.mode
+                  'snd.pos', 'snd.lines', 'snd.sort')                            # 0.20.1 sound list
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
@@ -187,6 +196,22 @@ Q20_BAR = (('kQbLevel', 'dbg.collect', ''), ('kQbRender', 'dbg.enemies', ''), ('
            ('kQbTimeTest', 'media.muteambient', ''), ('kQbEmergency', 'game.quit', ''))
 Q20_RING = ('dbg.collect', 'dbg.enemies', 'media.mutemusic', 'media.muteambient')
 Q20_DEFAULTS = (('AI', 'DumbMode', 'gate'), ('Debug', 'Depth', '2'), ('Debug', 'FlatPasses', '0x600'))
+# 0.20.1: the sound list - items, [Sound] keys (key, rule), bar rows (table, item, kind), check tables
+Q201_ITEMS = {'snd.list': 'bool', 'snd.pos': 'action', 'snd.lines': 'action', 'snd.refresh': 'action',
+              'snd.sort': 'action', 'snd.scale': 'action', 'snd.playing': 'bool', 'snd.music': 'bool', 'snd.sfx': 'bool',
+              'snd.speech': 'bool', 'snd.other': 'bool', 'snd.dump': 'action', 'snd.status': 'info'}
+SND_POS = ('bl', 'tl', 'tr', 'br')
+SND_SORT = ('group', 'volume', 'name')
+Q201_KEYS = (('List', 'bool'), ('Position', SND_POS), ('MaxLines', (1, 40)), ('RefreshMs', (100, 10000)),
+             ('Sort', SND_SORT), ('FontScale', (0.5, 3.0)), ('OnlyPlaying', 'bool'), ('ShowMusic', 'bool'),
+             ('ShowSfx', 'bool'), ('ShowSpeech', 'bool'), ('ShowOther', 'bool'))
+Q201_BAR = (('kQbDebug', 'snd.list', 'kQbBool'), ('kQbDebug', 'snd.pos', 'kQbValue'),
+            ('kQbDebug', 'snd.lines', 'kQbValue'), ('kQbDebug', 'snd.sort', 'kQbValue'),
+            ('kQbDebug', 'snd.playing', 'kQbBool'), ('kQbDebug', 'snd.music', 'kQbBool'),
+            ('kQbDebug', 'snd.sfx', 'kQbBool'), ('kQbDebug', 'snd.speech', 'kQbBool'),
+            ('kQbDebug', 'snd.other', 'kQbBool'), ('kQbDebug', 'snd.dump', 'kQbAction'),
+            ('kQbTimeTest', 'snd.list', 'kQbBool'), ('kQbTimeTest', 'snd.dump', 'kQbAction'))
+Q201_TABLES = ('kSnChecks', 'kSmChecks', 'kEsChecks')
 DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -1025,6 +1050,95 @@ def check_020(ini_path, radial_path, rows):
         ', '.join('%s %s' % (k, v) for s, k, v in Q20_DEFAULTS))
 
 
+def snd_value_ok(rule, v):
+    if rule == 'bool': return v in ('0', '1')
+    if isinstance(rule[0], str): return v.lower() in rule
+    try:
+        x = float(v)
+    except ValueError:
+        return False
+    return rule[0] <= x <= rule[1] and (isinstance(rule[0], float) or v.isdigit())
+
+
+def check_0201(ini_path, radial_path):
+    """0.20.1 (2026-11-06 sound list): [Sound] values, [Debug] EnemyStateLog, the snd.* items (snd.dump on the game
+    thread), the bar rows, the ring entries and their arguments, the precheck tables, the mute order in SndMuteTick"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    found = {k: (n, v) for n, k, v in ini_section(ini_path, 'Sound')}
+    for key, rule in Q201_KEYS:
+        if key not in found:
+            problems.append('%s: [Sound] %s missing' % (name, key))
+        elif not snd_value_ok(rule, found[key][1]):
+            problems.append('%s:%d: [Sound] %s=%s (%s)' % (name, found[key][0], key, found[key][1],
+                                                           '0 / 1' if rule == 'bool' else ' .. '.join(map(str, rule))
+                                                           if not isinstance(rule[0], str) else ' / '.join(rule)))
+    dbg = {k: (n, v) for n, k, v in ini_section(ini_path, 'Debug')}
+    if 'EnemyStateLog' not in dbg: problems.append('%s: [Debug] EnemyStateLog missing' % name)
+    elif dbg['EnemyStateLog'][1] not in ('0', '1'):
+        problems.append('%s:%d: [Debug] EnemyStateLog=%s (0 / 1)' % (name, dbg['EnemyStateLog'][0],
+                                                                     dbg['EnemyStateLog'][1]))
+    items = item_types(src)
+    for item, typ in sorted(Q201_ITEMS.items()):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    m = re.search(r'\{"snd\.dump", "action", (?:"[^"]*"\s*)+, (true|false),', src)
+    if not m or m.group(1) != 'true':
+        problems.append('TruMenu.cpp: snd.dump must run on the game thread (gameThread true)')
+    bar = qb_rows(src)
+    for table, item, kind in Q201_BAR:
+        if not any(t == table and i == item and k == kind and not a for t, de, i, a, k, layer in bar):
+            problems.append('TruMenu.cpp: %s has no %s row %s' % (table, kind, item))
+    counts, levels = {}, {}
+    if os.path.exists(radial_path):
+        rname = os.path.basename(radial_path)
+        for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.count('|') != 2: continue
+            path, _, cmd = [p.strip() for p in line.split('|')]
+            word, _, arg = cmd.partition(' ')
+            arg = arg.strip()
+            if not word.startswith('snd.'): continue
+            key = word + (' ' + arg if arg else '')
+            counts[key] = counts.get(key, 0) + 1
+            levels.setdefault(word, set()).add(path)
+            where = '%s:%d: %s' % (rname, n, cmd)
+            if word not in Q201_ITEMS: problems.append(where + ' (unknown snd.* item)')
+            elif word == 'snd.pos' and arg not in SND_POS: problems.append(where + ' (bl / tl / tr / br)')
+            elif word == 'snd.sort' and arg not in SND_SORT: problems.append(where + ' (group / volume / name)')
+            elif word == 'snd.lines' and not (arg.isdigit() and 1 <= int(arg) <= 40): problems.append(where + ' (1 .. 40)')
+            elif word == 'snd.refresh' and not (arg.isdigit() and 100 <= int(arg) <= 10000):
+                problems.append(where + ' (100 .. 10000)')
+            elif word == 'snd.scale' and not snd_value_ok((0.5, 3.0), arg): problems.append(where + ' (0.5 .. 3)')
+            elif (Q201_ITEMS[word] in ('bool', 'info') or word == 'snd.dump') and arg:
+                problems.append(where + ' (no argument)')
+        for pos in SND_POS:
+            if counts.get('snd.pos ' + pos, 0) != 1:
+                problems.append('%s: snd.pos %s must be in the ring once, found %d'
+                                % (rname, pos, counts.get('snd.pos ' + pos, 0)))
+        for want in ('Zeit', 'Spieler/Debug/Ton'):
+            if want not in levels.get('snd.list', set()):
+                problems.append('%s: snd.list missing in level %s' % (rname, want))
+        if counts.get('snd.dump', 0) != 1:
+            problems.append('%s: snd.dump must be in the ring once, found %d' % (rname, counts.get('snd.dump', 0)))
+    for tbl in Q201_TABLES:
+        mt = re.search(r'const DvCheck %s\[\] = \{(.*?)\n\};' % tbl, src, re.S)
+        if not mt:
+            problems.append('TruMenu.cpp: %s missing' % tbl)
+            continue
+        body = re.sub(r'"\s*\n\s*"', '', mt.group(1))
+        for a, h in re.findall(r'\{(0x[0-9a-fA-F]+), "([0-9a-fA-F ]+)"\}', body):
+            hexs = h.replace(' ', '')
+            if len(hexs) % 2 or len(hexs) // 2 > 64:
+                problems.append('TruMenu.cpp: %s %s (whole bytes, at most 64; got %d)' % (tbl, a, len(hexs) // 2))
+    ms = re.search(r'\nvoid SndMuteTick\(\) \{(.*?)\n\}', src, re.S)
+    body = ms.group(1) if ms else ''
+    if 'SmMuteOn()' not in body or not (0 <= body.find('g_smOk') < body.find('g_sndOk')):
+        problems.append('TruMenu.cpp: SndMuteTick must try the FMOD group mute (g_smOk / SmMuteOn) before the 0.20 path')
+    return problems, '%d items, [Sound] %d keys + [Debug] EnemyStateLog, %d bar rows, %d ring snd.* entries, tables %s' % (
+        len(Q201_ITEMS), len(Q201_KEYS), len(Q201_BAR), sum(counts.values()), ' / '.join(Q201_TABLES))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -1114,6 +1228,10 @@ def main(argv):
     for p in zproblems: print('Q020 %s' % p)
     if not zproblems: print('ok: 0.20: %s' % zsummary)
     problems += zproblems
+    nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
+    for p in nproblems: print('Q0201 %s' % p)
+    if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)
+    problems += nproblems
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

@@ -28,10 +28,14 @@ Zeit | Ton mit Welt einfrieren | time.pausesound
 Zeit | Ton-Pause: Stand | time.sound
 # 0.10.4 (F7, light shaft): the shader clock TimeVector holds with every world freeze (default off; state: time.clock)
 Zeit | Shader-Uhr mit Einfrieren | time.freezeclock
-# 0.20 (tests): Musik aus = the game's music volume 0 until switched off (comes back after level loads otherwise);
-# Ambient aus = only '_amb_' tracks played as music (DLC 2), base-game ambience not covered yet
+# 0.20 (tests): Musik aus = since 0.20.1 the FMOD channel groups of the music muted until switched off (the option slider
+# and every volume stay; again after level loads); Ambient aus = only '_amb_' tracks played as music (DLC 2), base-game
+# ambience not covered yet
 Zeit | Musik aus | media.mutemusic
 Zeit | Ambient aus | media.muteambient
+# 0.20.1: Ton-Liste = everything the game plays now (bottom left by default; settings and the dump into TruMenu.log in
+# Spieler/Debug/Ton)
+Zeit | Ton-Liste | snd.list
 Waffen | Schrotflinte | weapon.give wp_shotgun
 Waffen | Uzis | weapon.give wp_uzi
 Waffen | Goldene Schrotflinte | weapon.give wp_dlc_gold_shotgun
@@ -181,6 +185,19 @@ Spieler/Debug/Namen | Schrift 2x | dbg.namesize 2
 # 0.3 markup (MarkupManager boxes, projected with the TRANS matrix 0xa038f0 - see the README note)
 Spieler/Debug/Lara | Markup | draw.markup
 Spieler/Debug/Lara | Nur Kanten | draw.ledges
+# 0.20.1 Ton-Liste (Lukas 2026-11-06: what plays now, so he can say what he hears): on / off, the whole list into
+# TruMenu.log, corner, audible only, order. The group filters (snd.music / sfx / speech / other), lines and sort by name
+# are on the bar page Debug / Darstellung and the menu page Debug view only - TruMenu keeps 256 ring entries in all
+Spieler/Debug/Ton | Ton-Liste | snd.list
+Spieler/Debug/Ton | Ton-Liste ins Log | snd.dump
+Spieler/Debug/Ton | Unten links | snd.pos bl
+Spieler/Debug/Ton | Oben links | snd.pos tl
+Spieler/Debug/Ton | Oben rechts | snd.pos tr
+Spieler/Debug/Ton | Unten rechts | snd.pos br
+Spieler/Debug/Ton | Nur hoerbare | snd.playing
+Spieler/Debug/Ton | Sortierung Gruppe | snd.sort group
+Spieler/Debug/Ton | Sortierung Lautstaerke | snd.sort volume
+Spieler/Debug/Ton | Ton: Stand | snd.status
 Spieler/Debug | Legende | dbg.legend
 Spieler/Debug | Debug: Stand | dbg.status
 Spieler/Debug | Navmesh: Stand | nav.status
