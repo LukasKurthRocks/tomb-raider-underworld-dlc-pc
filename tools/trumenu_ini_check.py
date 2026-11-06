@@ -36,6 +36,13 @@ dbg.portals / dbg.checkpoints / dbg.legend / dbg.status in kItems, every layer o
 (dbg.show <layer> or its own bool item) and dbg.show taking exactly one layer name of kDvLayers; the object name keys
 (Names / NameIds 0 / 1, NameMatch a comma list or empty, NameRadius 100 .. 200000, NameMax 1 .. 64, NameScale 0.5 .. 3,
 NameColour RRGGBB), the items dbg.names / dbg.namefilter / dbg.namecolour / dbg.namesize and their ring arguments.
+Since TruMenu 0.15 (2026-11-06 TruMenu 0.15 render mode) also the render mode keys (Slide / EnemyColl / Census / Flat /
+FlatModels / FlatEdges / FlatAnyTarget 0 / 1, CollRadius 500 .. 200000, CollMax 100 .. 20000, CensusFrames 10 .. 1200,
+FlatPasses a hex / decimal mask of the pass ids 0x200 0x100 0x80 0x400 0x800 1 2 (0xf83), FlatColour material / class),
+kDvLayers with 15 layers (slide / enemycoll have their own items dbg.slide / dbg.enemycoll), the items dbg.census /
+dbg.flat / dbg.flatpass / dbg.flatpasses / dbg.flatcolour / dbg.flatmodels / dbg.flatedges / dbg.flatanyrt / dbg.render /
+dbg.slide / dbg.enemycoll in kItems and their ring entries: each switch once without an argument, dbg.flatpass once per
+pass id, dbg.flatcolour once for material and once for class, dbg.flatpasses with census / default / a mask.
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -72,14 +79,26 @@ LABEL_ITEMS = {'dbg.labels': 'bool'}
 # 0.14 debug view: the [Debug] keys (0 / 1 or ranges), the items, the layers that have a bool item of their own
 DV_BOOL_KEYS = ('View', 'Triggers', 'TrgDeath', 'TrgFire', 'TrgCheckpoint', 'TrgWater', 'TrgSound', 'TrgVolume',
                 'TrgPlane', 'TrgUnknown', 'Portals', 'Checkpoints', 'TrgLabels', 'Legend', 'Markup', 'Persist', 'Names',
-                'NameIds')
+                'NameIds',
+                'Slide', 'EnemyColl', 'Census', 'Flat', 'FlatModels', 'FlatEdges', 'FlatAnyTarget')   # 0.15
 DV_RANGES = {'TriggerMax': (1, 256), 'TriggerRadius': (500, 200000), 'TriggerLabelMax': (0, 64),
-             'NameRadius': (100, 200000), 'NameMax': (1, 64), 'NameScale': (0.5, 3)}
-DV_FLOAT_KEYS = ('TriggerRadius', 'NameRadius', 'NameScale')     # the others are whole numbers
+             'NameRadius': (100, 200000), 'NameMax': (1, 64), 'NameScale': (0.5, 3),
+             'CollRadius': (500, 200000), 'CollMax': (100, 20000), 'CensusFrames': (10, 1200)}   # 0.15
+DV_FLOAT_KEYS = ('TriggerRadius', 'NameRadius', 'NameScale', 'CollRadius')     # the others are whole numbers
 DV_ITEMS = {'dbg.view': 'bool', 'dbg.triggers': 'bool', 'dbg.show': 'action', 'dbg.portals': 'bool',
             'dbg.checkpoints': 'bool', 'dbg.legend': 'bool', 'dbg.status': 'info', 'dbg.names': 'bool',
-            'dbg.namefilter': 'action', 'dbg.namecolour': 'action', 'dbg.namesize': 'action'}
-DV_OWN_ITEM = {'portals': 'dbg.portals', 'checkpoints': 'dbg.checkpoints', 'legend': 'dbg.legend', 'names': 'dbg.names'}
+            'dbg.namefilter': 'action', 'dbg.namecolour': 'action', 'dbg.namesize': 'action',
+            # 0.15 render mode
+            'dbg.census': 'action', 'dbg.flat': 'bool', 'dbg.flatpass': 'action', 'dbg.flatpasses': 'action',
+            'dbg.flatcolour': 'action', 'dbg.flatmodels': 'bool', 'dbg.flatedges': 'bool', 'dbg.flatanyrt': 'bool',
+            'dbg.render': 'info', 'dbg.slide': 'bool', 'dbg.enemycoll': 'bool'}
+DV_OWN_ITEM = {'portals': 'dbg.portals', 'checkpoints': 'dbg.checkpoints', 'legend': 'dbg.legend', 'names': 'dbg.names',
+               'slide': 'dbg.slide', 'enemycoll': 'dbg.enemycoll'}
+# 0.15: the pass ids of the flat view (kRmPassNames in TruMenu.cpp), their mask, the ring switches without an argument
+RM_PASSES = ('0x200', '0x100', '0x80', '0x400', '0x800', '1', '2')
+RM_PASS_ALL = 0xf83
+RM_RING_SWITCHES = ('dbg.flat', 'dbg.census', 'dbg.flatedges', 'dbg.flatmodels', 'dbg.flatanyrt', 'dbg.render')
+DV_LAYER_COUNT = 15
 DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -387,7 +406,8 @@ def check_debug(ini_path, radial_path):
     switches = nav_switches(src)
     if not switches: problems.append('TruMenu.cpp: kNavSwitches missing or empty')
     layers = dv_layers(src)
-    if len(layers) != 13: problems.append('TruMenu.cpp: kDvLayers has %d layers, want 13' % len(layers))
+    if len(layers) != DV_LAYER_COUNT:
+        problems.append('TruMenu.cpp: kDvLayers has %d layers, want %d' % (len(layers), DV_LAYER_COUNT))
     for n, line in enumerate(open(ini_path, encoding='utf-8').read().splitlines(), 1):
         line = line.strip()
         m = re.match(r'^\[(.+)\]$', line)
@@ -427,8 +447,18 @@ def check_debug(ini_path, radial_path):
         elif key == 'NameMatch' and value and not re.match(r'^[A-Za-z0-9_*, ]+$', value):
             problems.append('%s:%d: [Debug] NameMatch=%s (comma list of name parts a-z 0-9 _ or *, may be empty)'
                             % (name, n, value))
-    for key in (('Enabled', 'NavDraw', 'NavMask', 'ViewNav', 'NameColour', 'NameMatch') + LABEL_KEYS + DV_BOOL_KEYS +
-                tuple(sorted(DV_RANGES))):
+        elif key == 'FlatPasses':                # 0.15: a mask of the pass ids, hex or decimal
+            try:
+                mask = int(value, 0)
+                ok = mask > 0 and not (mask & ~RM_PASS_ALL)
+            except ValueError:
+                ok = False
+            if not ok: problems.append('%s:%d: [Debug] FlatPasses=%s (a mask of 0x200 0x100 0x80 0x400 0x800 1 2, e.g. '
+                                       '0x200)' % (name, n, value))
+        elif key == 'FlatColour' and value not in ('material', 'class'):
+            problems.append('%s:%d: [Debug] FlatColour=%s (material / class)' % (name, n, value))
+    for key in (('Enabled', 'NavDraw', 'NavMask', 'ViewNav', 'NameColour', 'NameMatch', 'FlatPasses', 'FlatColour') +
+                LABEL_KEYS + DV_BOOL_KEYS + tuple(sorted(DV_RANGES))):
         if key not in seen: problems.append('%s: [Debug] %s missing' % (name, key))
     items = item_types(src)
     for item, typ in sorted(NAV_ITEMS.items()) + sorted(LABEL_ITEMS.items()) + sorted(DV_ITEMS.items()):
@@ -470,6 +500,24 @@ def check_debug(ini_path, radial_path):
                     except ValueError:
                         ok = False
                     if not ok: problems.append('%s: dbg.namesize needs 0.5 .. 3, got "%s"' % (where, arg))
+                elif word == 'dbg.flatpass':         # 0.15: one pass id, once each
+                    if arg not in RM_PASSES:
+                        problems.append('%s: dbg.flatpass needs one pass id of %s, got "%s"'
+                                        % (where, ' '.join(RM_PASSES), arg))
+                    else:
+                        dv_seen[word + ' ' + arg] = dv_seen.get(word + ' ' + arg, 0) + 1
+                elif word == 'dbg.flatcolour':       # 0.15: material / class, once each
+                    if arg not in ('material', 'class'):
+                        problems.append('%s: dbg.flatcolour needs material or class, got "%s"' % (where, arg))
+                    else:
+                        dv_seen[word + ' ' + arg] = dv_seen.get(word + ' ' + arg, 0) + 1
+                elif word == 'dbg.flatpasses':       # 0.15: census / default / a mask
+                    try:
+                        ok = arg in ('census', 'default') or (int(arg, 0) > 0 and not (int(arg, 0) & ~RM_PASS_ALL))
+                    except ValueError:
+                        ok = False
+                    if not ok: problems.append('%s: dbg.flatpasses needs census, default or a pass mask, got "%s"'
+                                               % (where, arg))
                 elif arg:
                     problems.append('%s: %s takes no argument in the ring, got "%s"' % (where, word, arg))
                 else:
@@ -489,6 +537,8 @@ def check_debug(ini_path, radial_path):
         problems.append('%s: dbg.labels must be in the radial file once, found %d' % (os.path.basename(radial_path), labels))
     if os.path.exists(radial_path):          # 0.14: every layer and every dbg.* switch item once
         want = [DV_OWN_ITEM.get(l, l) for l in layers] + ['dbg.view', 'dbg.triggers', 'dbg.status']
+        want += list(RM_RING_SWITCHES) + ['dbg.flatpass ' + p for p in RM_PASSES] + \
+            ['dbg.flatcolour material', 'dbg.flatcolour class']                     # 0.15 render mode
         for w in want:
             if dv_seen.get(w, 0) != 1:
                 problems.append('%s: debug view entry %s must be in the radial file once, found %d'

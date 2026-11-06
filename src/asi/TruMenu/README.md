@@ -1586,6 +1586,123 @@ The `drawn` line is written once with the first frame after a switch (no per-fra
 3. `cheat.flight 1`, RT up, look down; `Alles an / aus`: everything stays drawn from above, the nearest first.
 4. Namen -> `Objektnamen`, `Filter: alle`, `Farbe gelb`, `Schrift 1.5x`.
 
+Fixed in 0.15: in 0.14 the Present hook returned before the ImGui frame unless the menu / ring was open or labels /
+markup were on, so a 0.14 layer disappeared as soon as the ring closed (`DvAnyOn()` is now part of that test).
+
+## TruMenu 0.15 "Render mode" (render census, flat view, collision overlay; debug render stages R0 / R1 / R2)
+
+Built into `work\asi\menu015`; compiled, offline checks only - **not yet seen in the game**. Owner notes:
+`<workspace>\docs\Befund-TruMenu-Rendermodus-0611.md` (research: `docs\Befund-Debug-Rendermodus-0611.md`). Off unless
+`[Debug] Enabled=1` plus a switch. The renderer is Crystal's cdc PC renderer (RTTI): `cdc::PCTerrainDrawable` (vtable
+0x849944) and `cdc::PCModelDrawable` (0x849754) have `Draw` in slot 1 (0x510dd0 / 0x50f4a0, thiscall `(pass,
+previous drawable)`, `ret 8`), called by the draw list 0x4f6080 for the pass ids 1, 2, 0x80, 0x100, 0x200, 0x400, 0x800
+(`PCScene::Draw` 0x5150e0 hands its lists over in the order 0x200, 0x100, 0x80, 0x800, 0x80). The device is created
+PURE (0x522687: behaviour flags 0x50), so TruMenu asks the device for no state: the game's state manager
+`[[0xad75e4]+0x284]` (device at +0xc) keeps the pixel shader it set at +0x20 (0x526630; the `IDirect3DPixelShader9` at
+PCPixelShader +0xc) and every render state at `+0x168 + 4 * state` (0x502b70).
+
+**R0 census (`dbg.census [frames]`).** For N frames (`[Debug] CensusFrames`, 120) TruMenu counts per pass id and class
+(terrain / model) the drawable calls and their device draws, render target 0 (pointer, size, format; up to 3 per pass),
+RT1 bound, and from the state manager's cache Z, Z write, alpha test, alpha blend and colour write 0 per draw, the
+material pass `[0x8a2340]`, plus the `PCScene::Draw` calls per frame (render target at entry) and the device draws
+outside a drawable. Then **one block** of `0.15 census` lines in `TruMenu.log`, a verdict per pass (colour candidate /
+no colour writes / other target size / blended) and the suggested pass mask (passes drawn into a target of the back
+buffer's size with colour writes and mostly without blending). `dbg.flatpasses census` takes it over.
+
+**R1 flat view (`dbg.flat`).** Inside the terrain (and with `dbg.flatmodels` the model) `Draw` of a pass in
+`[Debug] FlatPasses` (default 0x200, the first opaque list - a guess until the census), every device
+`DrawIndexedPrimitive` / `DrawPrimitive` draws with one of 16 palette pixel shaders, then the game's own pixel shader is
+set again at once (state manager +0x20), so the state manager's cache and the device stay equal. Colour = hash of the
+current material `[0xa14188]` (`dbg.flatcolour material`) or terrain one colour / models another (`class`). The palette
+shaders are built from tokens at run time (`def c0, r, g, b, 1` + `mov oC0, c0`, no constant register written) as
+ps_2_0 and ps_3_0; the version of the game's shader of that draw picks the set (a vs_3_0 needs a ps_3_0 and the other
+way round; `GetFunction` once per game shader). `tools/trumenu_flat_ps_check.py` disassembles all 34 with the Windows
+`d3dcompiler_47.dll` and compares the HLSL compiler's own ps_2_0 / ps_3_0 output (same tokens without its comment
+block). Edge pass (`dbg.flatedges`): the same draw again in wireframe with a dark shader, depth bias -0.00005 / slope
+-1, Z write off; fill mode, depth bias and Z write come back from the state manager's cache. By default only into a
+render target of the back buffer's size (`dbg.flatanyrt` / `[Debug] FlatAnyTarget=1` = every target), so shadow maps
+and reflections keep the game's shading even with a wrong pass mask. Water, effects, HUD are other classes - unchanged;
+fog / DOF still tint the result. **Not part of `dbg.view`** (a big separate switch; the master covers the overlays).
+
+**Writes into game memory (R0 / R1 only, TruGuard).** Only while the census runs or the flat view is on, in a loaded
+level (player instance, main state 1, no level change pending): `.rdata` words **0x849948** (PCTerrainDrawable::Draw,
+game value 0x510dd0) and **0x849758** (PCModelDrawable::Draw, 0x50f4a0), during a census also **0x849a2c**
+(PCScene::Draw, 0x5150e0). A word is written only while it holds the game's value (else refused with a log line),
+`WriteDword` = VirtualProtect + interlocked store + VirtualProtect back; it is put back (only while it still holds
+TruMenu's hook) when switched off, when the level is left or a level change starts, when the census ends and at unload.
+The same for the game device's vtable slots 81 / 82 (`DrawPrimitive` / `DrawIndexedPrimitive`, memory of d3d9.dll or of
+a proxy such as TRAWindowed, not of tru.exe). Everything is patched / unpatched in the Present hook, between two frames.
+The palette shaders are created on the game's device in the Present hook and released in the Reset hook (created again
+at the next Present).
+
+**R2 collision overlay (`dbg.slide`, `dbg.enemycoll`; layers `slide` / `enemycoll` of the 0.14 table, part of
+`dbg.view`).** Read-only. The collision meshes of every loaded stream unit: table 0xdbab40 (state 2) +8 Level,
+`[Level]` Terrain, +8 group count, +0xc TerrainGroups (0x50 bytes), group +0x38 mesh - taken only when mesh +0x3c points
+back to the group (0x48d2d4 reads it that way); faces 20 bytes at mesh +0x34 (count +0x44), vertices at +0x30 (mesh +0x54
+word 0: 3 x s16 converted without a scale, else 16-byte floats - 0x460770 / 0x460690 / 0x460824), world = vertex + mesh
++0x20 (the mesh query 0x78d040 subtracts it). Read once per change of the loaded units into a static buffer (24576
+triangles, no allocation), drawn as translucent triangles with edges through the 0.14 projection (near plane clipped),
+the nearest to the camera first (`[Debug] CollRadius` 8000, `CollMax` 3000), **on top** (no depth test - visible
+through walls). Slide = clientFlags (face +0x0e) & 0x04 (0x5d3af0 / ground probe 0x5dd356): **red** when steeper than
+the tuning angle s16 `[[0xfad764]+0x100e]` degrees (0x5dd3ba: the game slides only then), **orange** when flatter.
+Enemy-only = TerrainGroup extra flags (`[group +0x30]` +0) & 0x800, **violet**: the name is TRLAU's; in tru.exe the
+collision filter 0x48d2d0 (collide kinds 7 and 4, registered at 0x4964eb / 0x4964ff) skips such groups and the filter
+0x48d280 of kind 3 does not - which kind is the player's is not proven. A `0.15 collision: read ...` line per reading.
+
+### Items, keys, menu, ring
+
+| Item | Type | Meaning |
+|---|---|---|
+| `dbg.census [frames]` | action | R0: one census of N frames (10 .. 1200), result in `TruMenu.log` |
+| `dbg.flat [0\|1]` | bool | R1 flat view |
+| `dbg.flatpass <0x200\|0x100\|0x80\|0x400\|0x800\|1\|2> [0\|1]` | action | one pass id in / out of the mask (live) |
+| `dbg.flatpasses <mask>\|census\|default` | action | the whole mask (`census` = the last census' suggestion) |
+| `dbg.flatcolour material\|class` | action | colour per material, or terrain / models |
+| `dbg.flatmodels`, `dbg.flatedges`, `dbg.flatanyrt` | bool | models flat too, edge pass, every render target |
+| `dbg.render` | info | checks, patched slots, last frame (flat draws, skipped), census state / suggestion |
+| `dbg.slide`, `dbg.enemycoll` (also `dbg.show slide` / `enemycoll`) | bool | R2 overlay layers |
+
+`[Debug]` keys (0 / off by default): `Slide`, `EnemyColl`, `CollRadius` (8000, 500 .. 200000), `CollMax` (3000, 100 ..
+20000), `Census` (1 = one census in the first loaded level), `CensusFrames` (120, 10 .. 1200), `Flat`, `FlatPasses`
+(0x200), `FlatColour` (material / class), `FlatModels`, `FlatEdges`, `FlatAnyTarget`. With `Persist=1` the switches are
+written back as the 0.14 ones.
+
+Menu page "Debug view": new group **Render (0.15)** at the top (flat view, census button + state, one checkbox per pass
+id, census suggestion / default buttons, colour mode, models, edges, every target, state line); `slide faces` in Level
+data (after checkpoint objects) with the sliders CollRadius / CollMax, `enemy-only collision` in AI / KI. Ring
+`Spieler/Debug`: `Render` as the second entry (page 1: Flach-Ansicht, Render-Zaehlung, Kanten, Figuren einfaerben,
+Farbe: Material, Farbe: Terrain / Figuren, Jedes Ziel (auch Schatten), Render: Stand; page 2: Pass 0x200 .. Pass 2,
+Passe aus Zaehlung), `Rutschflaechen` in Leveldaten (4th), `Gegner-Kollision` in KI (5th); `Navmesh: Stand` moved to
+page 2 of `Spieler/Debug`.
+
+**Byte checks** (`RenderModeCheck` at load; `work\asi\menu015\precheck_015.txt`, 46 / 46 ok on the Steam exe;
+`tools/trumenu_precheck_match.py --from "---- 0.15 Render mode" --to "---- favourites"`: 46 = 46): R0 / R1 (27) - the
+three vtable words, the constructors' stores, the draw list call, the Draw heads / tails, the terrain pass dispatch, the
+device draw sites (vtable +0x148), the scene's list dispatch, the state manager getter / SetPixelShader / SetRenderState
+wrappers, the material pointer / pass globals; R2 (19) - face clientFlags reader, ground probe masks, tuning angle
+reader and pi / 180, mesh query / vertex fetch (both vertex formats), the collision filters and their registration. A
+failed group disables its part with the reason (`dbg.render`, greyed ring entries).
+
+### `TruMenu.log` lines
+
+```text
+0.15 render mode: census / flat view <ok|why>, collision overlay <ok|why>; [Debug] Flat <0|1> (passes ..., colour ..., models, edges, any target), Census .., Slide .., EnemyColl .., CollRadius .., CollMax ..
+dbg.flat <0|1> (passes 0x200, colour material, models 0, edges 0, any target 0; src=...)   dbg.flatpass 0x100 1 (mask now 0x300; src=...)
+0.15 flat view: 34 palette pixel shaders created (17 ps_2_0 + 17 ps_3_0) on device 0x........
+0.15 render mode patched (flat view): +PCTerrainDrawable::Draw 0x00849948 (0x00510dd0 -> TruMenu), +PCModelDrawable::Draw ..., +device DrawIndexedPrimitive (82) ..., +device DrawPrimitive (81) ...
+0.15 render mode unpatched (<why: not while loading / flat view off / census done>): -PCTerrainDrawable::Draw 0x00849948, ...
+0.15 flat view drawn: flat 1 (passes ...), slots 0x1b; last frame: <n> drawable calls, <n> flat (terrain .., model ..), <n> without game shader / version, <n> other pass, <n> other target
+0.15 census started: 120 frames, back buffer 1920x1080
+0.15 census (done): 120 frame(s), back buffer ...; PCScene::Draw <f> per frame (render target 0 at entry: ...); device draws outside a drawable ...
+0.15 census pass 0x200: terrain .. calls / .. DIP .. DP, model ..; per draw Z ..%, Z write ..%, alpha test ..%, blend ..%, colour write 0 ..%, RT1 bound ..%; [0x8a2340] ... -> colour candidate
+0.15 census pass 0x200: render target 0 0x........ 1920x1080 fmt 21 (n), ...
+0.15 census: suggested [Debug] FlatPasses=0x... (...) - 'dbg.flatpasses census' sets it; now 0x200
+0.15 collision: read <n> unit(s), <n> mesh(es) (...), <n> faces: <n> slide (clientFlags 0x04), <n> in <n> enemy-only group(s) ...
+```
+
+No line per frame: the `drawn` line once after a switch, patch / unpatch lines only when the slots change (switch,
+level change), the census block once, the collision line once per reading of the loaded units.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

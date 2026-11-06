@@ -65,10 +65,33 @@ Spieler/Objekte | Schrotflinte (Objekt) | instance.spawn wp_shotgun
 # flying (cheat.flight). "Alles an / aus" = dbg.view: every layer + Thrall-Labels + Markup + [Debug] ViewNav on, or all
 # off (nav.off); afterwards each entry switches alone. Below Spieler so the top level keeps its 8 sectors.
 Spieler/Debug | Alles an / aus | dbg.view
-# Leveldaten: page 1 = the overview switches and the dangerous kinds, page 2 (RB) = the rest; colours as the legend
+# 0.15 Render (debug render mode R0 / R1, owner order 2026-11-06): second entry of Spieler/Debug. Flach-Ansicht = the
+# level geometry in solid palette colours without textures (dbg.flat - NOT part of "Alles an / aus"); Render-Zaehlung =
+# one census of N frames ('0.15 census' block in TruMenu.log, suggests the pass mask); page 2 (RB) = the pass ids of the
+# flat view one by one (switch live after the census) and "Passe aus Zaehlung" = take the census' suggestion.
+Spieler/Debug/Render | Flach-Ansicht | dbg.flat
+Spieler/Debug/Render | Render-Zaehlung | dbg.census
+Spieler/Debug/Render | Kanten | dbg.flatedges
+Spieler/Debug/Render | Figuren einfaerben | dbg.flatmodels
+Spieler/Debug/Render | Farbe: Material | dbg.flatcolour material
+Spieler/Debug/Render | Farbe: Terrain / Figuren | dbg.flatcolour class
+Spieler/Debug/Render | Jedes Ziel (auch Schatten) | dbg.flatanyrt
+Spieler/Debug/Render | Render: Stand | dbg.render
+Spieler/Debug/Render | Pass 0x200 | dbg.flatpass 0x200
+Spieler/Debug/Render | Pass 0x100 | dbg.flatpass 0x100
+Spieler/Debug/Render | Pass 0x80 | dbg.flatpass 0x80
+Spieler/Debug/Render | Pass 0x400 | dbg.flatpass 0x400
+Spieler/Debug/Render | Pass 0x800 | dbg.flatpass 0x800
+Spieler/Debug/Render | Pass 1 | dbg.flatpass 1
+Spieler/Debug/Render | Pass 2 | dbg.flatpass 2
+Spieler/Debug/Render | Passe aus Zaehlung | dbg.flatpasses census
+# Leveldaten: page 1 = the overview switches and the dangerous kinds, page 2 (RB) = the rest; colours as the legend.
+# 0.15: Rutschflaechen (dbg.slide) = collision faces with the slide flag, red = steeper than the tuning angle (Lara
+# slides), orange = flatter - drawn on top, also through walls
 Spieler/Debug/Leveldaten | Trigger alle | dbg.triggers
 Spieler/Debug/Leveldaten | Ladebereiche | dbg.portals
 Spieler/Debug/Leveldaten | Checkpoints | dbg.checkpoints
+Spieler/Debug/Leveldaten | Rutschflaechen | dbg.slide
 Spieler/Debug/Leveldaten | Tod / Kill | dbg.show death
 Spieler/Debug/Leveldaten | Feuer | dbg.show fire
 Spieler/Debug/Leveldaten | Checkpoint-Trigger | dbg.show checkpoint
@@ -87,6 +110,8 @@ Spieler/Debug/KI | Navmesh Flaechen | nav.draw planner_areas
 Spieler/Debug/KI | Navmesh Verbindungen | nav.draw planner_connectivity
 Spieler/Debug/KI | Hindernisse | nav.draw obstacles
 Spieler/Debug/KI | Thrall-Labels | dbg.labels
+# 0.15: Gegner-Kollision (dbg.enemycoll) = faces of the collision groups only enemies collide with (extra flags 0x800)
+Spieler/Debug/KI | Gegner-Kollision | dbg.enemycoll
 Spieler/Debug/KI | Navmesh gefuellt | nav.draw planner_areas_solid
 Spieler/Debug/KI | Nav-Proben | nav.draw recent_navprobes
 Spieler/Debug/KI | Laufweg (Flieger) | nav.draw draw_mover3d_path

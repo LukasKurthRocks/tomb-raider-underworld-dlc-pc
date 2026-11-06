@@ -17,6 +17,9 @@
 //          parameter of the CreateDevice call tru+0x122736; +0x208 are the present parameters). A worker thread waits for that device and patches the
 //          device's own vtable entries Reset (16) and Present (17). This works with or without a d3d9.dll proxy
 //          (TRAWindowed): the vtable patched is the one of the object the game calls.
+//          0.15 render mode: only while the census / flat view is on in a loaded level also the device's DrawPrimitive
+//          (81) / DrawIndexedPrimitive (82) and the drawable Draw words 0x849948 / 0x849758 (census: 0x849a2c) of
+//          tru.exe's .rdata - put back when switched off, at a level change and at unload (section "0.15 Render mode").
 //   shots  0.10.5: no hook of its own - the Present hooks above copy the back buffer (GetRenderTargetData into a
 //          system-memory surface) before or after TruMenu draws; PNG encoding and the file write on a worker thread.
 //   game   Every menu entry is an item with a stable id (kItems); items that touch the game (cheat, camera, level
@@ -50,7 +53,15 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.14 (Debug view: dbg.triggers draws the game's trigger planes / volumes as "
+const char *const kVersion = "TruMenu 0.15 (Render mode: dbg.census = render census (drawable / device draws per pass "
+                             "id for N frames, one '0.15 census' block in TruMenu.log, suggested pass mask); dbg.flat = "
+                             "flat view (level geometry in solid palette colours: pixel shader swap inside the terrain / "
+                             "model drawable Draw slots of the passes in dbg.flatpasses, the game's shader put back after "
+                             "each draw; colour per material or terrain / models, edges, models, any target); dbg.slide / "
+                             "dbg.enemycoll = collision overlay (slide faces red / orange by the tuning angle, enemy-only "
+                             "collision groups violet); ring Spieler / Debug / Render, [Debug] keys 0 by default; fix: "
+                             "debug view layers draw with the menu closed; "
+                             "0.14: Debug view: dbg.triggers draws the game's trigger planes / volumes as "
                              "wireframes the way the engine tests them (box = 12 lines along the instance's Euler "
                              "matrix, sphere = 3 circles, plane = its quad, one-sided arrow), coloured by kind from the "
                              "object name (death, fire, checkpoint, water, sound, plain volume, plane, unknown), each kind "
@@ -467,6 +478,33 @@ const OptDef kOpts[] = {
     {"Debug", "Persist", "0", "0.14: 1 = every debug view switch (layers, Labels, Markup, NavDraw) is written back into "
                               "this file at once, so the\nchosen set comes back at the next start (Set-TruMenu.ps1 then "
                               "keeps the file as owner-edited); 0 = switches\nlast until the game ends"},
+    {"Debug", "Slide", "0", "0.15: 1 = slide faces on from the start (dbg.slide): collision faces with clientFlags 0x04 of "
+                            "the loaded units, red =\nsteeper than the tuning angle (Lara slides there), orange = flatter; "
+                            "drawn on top (also through walls)"},
+    {"Debug", "EnemyColl", "0", "0.15: 1 = enemy-only collision on from the start (dbg.enemycoll): faces of TerrainGroups "
+                                "with extra flags 0x800, violet"},
+    {"Debug", "CollRadius", "8000", "0.15: slide / enemy collision faces only up to this distance from the camera (game "
+                                    "units, 500 .. 200000)"},
+    {"Debug", "CollMax", "3000", "0.15: at most this many collision faces per frame, the nearest to the camera first, 100 .. "
+                                 "20000"},
+    {"Debug", "Census", "0", "0.15 stage R0: 1 = one render census in the first loaded level (dbg.census): CensusFrames "
+                             "frames of drawable /\ndevice draw counts per pass id, then one block of '0.15 census' lines "
+                             "in TruMenu.log with a suggested FlatPasses"},
+    {"Debug", "CensusFrames", "120", "0.15: frames one render census counts, 10 .. 1200"},
+    {"Debug", "Flat", "0", "0.15 stage R1: 1 = flat view on from the start (dbg.flat): the level geometry in solid palette "
+                           "colours without\ntextures - pixel shader swap inside the terrain / model draws of FlatPasses; "
+                           "while it is on in a level TruMenu patches\n2 vtable words of tru.exe (0x849948, 0x849758) "
+                           "and the device's DrawPrimitive / DrawIndexedPrimitive slots"},
+    {"Debug", "FlatPasses", "0x200", "0.15: drawable pass ids the flat view colours, a hex mask of 0x200 0x100 0x80 0x400 "
+                                     "0x800 1 2; 0x200 = best guess (the first\nopaque list of PCScene::Draw) - run the "
+                                     "census and take its suggestion (dbg.flatpasses census)"},
+    {"Debug", "FlatColour", "material", "0.15: material = a palette colour per material (hash of [0xa14188]); class = "
+                                        "terrain one colour, models another"},
+    {"Debug", "FlatModels", "0", "0.15: 1 = models (Lara, enemies, objects) flat too; 0 = only the terrain, models keep the "
+                                 "game's shading"},
+    {"Debug", "FlatEdges", "0", "0.15: 1 = edge pass: every flat draw again as a dark wireframe (one more draw per draw)"},
+    {"Debug", "FlatAnyTarget", "0", "0.15: 1 = flat in every render target; 0 = only in targets of the back buffer's size "
+                                    "(shadow maps / reflections keep\nthe game's shading even with a wrong pass mask)"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -6200,10 +6238,11 @@ const DWORD kDvPlaneCount = 0x00dba21c, kDvPlanes = 0x00da61c8, kDvVolCount = 0x
 const DWORD kDvListMax = 0x200, kDvGameData = 0x00c59264;
 const float kDvTestLift = 200.0f;            // [0x853f08], added to the player position by both tests
 
-// the layers: 8 trigger kinds first (kind = layer index), then portals, checkpoint objects, trigger names, legend
+// the layers: 8 trigger kinds first (kind = layer index), then portals, checkpoint objects, trigger names, legend;
+// 0.15: the collision overlay layers (stage R2, drawn by the 0.15 section: slide faces, enemy-only collision groups)
 enum DvLayer {
     kDvDeath = 0, kDvFire, kDvCheckpoint, kDvWater, kDvSound, kDvVolume, kDvPlane, kDvUnknown, kDvKinds,
-    kDvPortals = kDvKinds, kDvCheckpoints, kDvTrgLabels, kDvLegend, kDvNames, kDvCount
+    kDvPortals = kDvKinds, kDvCheckpoints, kDvTrgLabels, kDvLegend, kDvNames, kDvSlide, kDvEnemyColl, kDvCount
 };
 struct DvLayerDef { const char *name, *key, *de, *en; ImU32 colour; };
 const DvLayerDef kDvLayers[kDvCount] = {
@@ -6220,6 +6259,8 @@ const DvLayerDef kDvLayers[kDvCount] = {
     {"trglabels", "TrgLabels", "Trigger-Namen", "trigger names", IM_COL32(235, 235, 235, 255)},
     {"legend", "Legend", "Legende", "legend", IM_COL32(235, 235, 235, 255)},
     {"names", "Names", "Objektnamen", "object names", IM_COL32(255, 255, 255, 255)},
+    {"slide", "Slide", "Rutschflaechen", "slide faces", IM_COL32(255, 45, 45, 255)},
+    {"enemycoll", "EnemyColl", "Gegner-Kollision", "enemy-only collision", IM_COL32(190, 80, 255, 255)},
 };
 // object name part -> kind (first match wins, so "deathfiretriggervolume" is death)
 struct DvWord { const char *part; int kind; };
@@ -6307,7 +6348,9 @@ void DebugViewCheck() {
 }
 
 // the check a layer needs (true = usable)
+bool RcLayerOk(const char **why);            // 0.15, below: the collision overlay checks (precheck_015.txt 4 .. 6)
 bool DvLayerOk(int layer, const char **why) {
+    if (layer == kDvSlide || layer == kDvEnemyColl) return RcLayerOk(why);
     bool ok = layer < kDvKinds || layer == kDvTrgLabels ? g_dvTrgOk : layer == kDvPortals ? g_dvPortalOk
             : layer == kDvCheckpoints ? g_dvCpOk : layer == kDvNames ? g_dvBaseOk : true;
     *why = layer < kDvKinds || layer == kDvTrgLabels ? g_dvTrgWhy : layer == kDvPortals ? g_dvPortalWhy
@@ -6662,6 +6705,9 @@ void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, 
              g_dvNameMatch[0] ? g_dvNameMatch : "*", walked, g_dvNameRadius, g_dvNameMax);
 }
 
+// 0.15, below: the collision overlay (stage R2) - slide faces / enemy-only collision groups of the loaded units
+void RcDraw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used);
+
 // Present, every frame while a 0.14 layer is on
 void DrawDebugView() {
     char why[160];
@@ -6851,19 +6897,23 @@ void DrawDebugView() {
                  static_cast<LONG>(active), activeSeen ? ", drawn" : "");
     }
     if (g_dvBaseOk && g_dvOn[kDvNames]) DvDrawNames(dl, c, g_dvState, sizeof(g_dvState), &used);
+    if (g_dvOn[kDvSlide] || g_dvOn[kDvEnemyColl]) RcDraw(dl, c, g_dvState, sizeof(g_dvState), &used);   // 0.15 R2
     if (!used) Out(g_dvState, sizeof(g_dvState), "nothing switched on that this frame can draw");
     if (InterlockedExchange(&g_dvLogPending, 0)) Log(1, "0.14 debug view drawn: %s", g_dvState);   // once per switch
 }
+
+// 0.15, below: the legend lines of the render mode (flat view state, slide colours); returns the new count
+int RmLegend(char (*lines)[112], ImU32 *colours, int n, int max);
 
 // the legend (foreground, top right): every layer that is on with its colour and drawn / listed
 void DrawDebugLegend() {
     ImGuiIO &io = ImGui::GetIO();
     ImDrawList *dl = ImGui::GetForegroundDrawList();
     const float fs = ImGui::GetFontSize(), w = 330.0f;
-    char lines[kDvCount + 2][112];
-    ImU32 colours[kDvCount + 2];
+    char lines[kDvCount + 6][112];
+    ImU32 colours[kDvCount + 6];
     int n = 0;
-    Out(lines[n], sizeof(lines[n]), "TruMenu 0.14 Debug-Ansicht (gezeichnet / gefunden)");
+    Out(lines[n], sizeof(lines[n]), "TruMenu 0.15 Debug-Ansicht (gezeichnet / gefunden)");
     colours[n++] = IM_COL32(235, 235, 235, 255);
     for (int i = 0; i < kDvCount; ++i) {
         if (!g_dvOn[i] || i == kDvLegend) continue;
@@ -6876,6 +6926,7 @@ void DrawDebugLegend() {
         Out(lines[n], sizeof(lines[n]), "Testpunkt (Lara +200) / test point; blass = aus / disabled");
         colours[n++] = IM_COL32(255, 255, 255, 230);
     }
+    n = RmLegend(lines, colours, n, kDvCount + 6);   // 0.15 flat view / slide colours
     ImVec2 at(io.DisplaySize.x - w - 12.0f, 40.0f);
     dl->AddRectFilled(at, ImVec2(at.x + w, at.y + n * (fs + 3.0f) + 8.0f), IM_COL32(0, 0, 0, 160), 4.0f);
     for (int i = 0; i < n; ++i) {
@@ -6909,7 +6960,7 @@ bool RunDvShow(const char *arg, char *o, size_t n) {
     int i = DvFind(name);
     if (i < 0) {
         Out(o, n, "usage: dbg.show <layer> [0|1] - death, fire, checkpoint, water, sound, volume, plane, unknown, portals, "
-            "checkpoints, trglabels, legend, names");
+            "checkpoints, trglabels, legend, names, slide, enemycoll");
         return false;
     }
     return DvSet(i, BoolArg(value ? value : "", g_dvOn[i] != 0), ShotSource("dbg.show"), o, n);
@@ -7070,6 +7121,7 @@ bool RunDvView(const char *arg, char *o, size_t n) {
 }
 
 // ring: why a dbg.* entry (not dbg.labels) is greyed out ("" = usable; outside a level it may be switched)
+const char *RmRadWhy(const char *id);        // 0.15, below
 const char *DvRadWhy(const char *id, const char *arg) {
     if (!_stricmp(id, "dbg.status")) return "";
     if (!g_debugEnabled) return "debug drawing off ([Debug] Enabled=0)";
@@ -7083,7 +7135,1092 @@ const char *DvRadWhy(const char *id, const char *arg) {
     if (!_stricmp(id, "dbg.portals")) return g_dvPortalOk ? "" : g_dvPortalWhy;
     if (!_stricmp(id, "dbg.checkpoints")) return g_dvCpOk ? "" : g_dvCpWhy;
     if (!_strnicmp(id, "dbg.name", 8)) return g_dvBaseOk ? "" : g_dvBaseWhy;   // dbg.names / namefilter / colour / size
+    if (!_stricmp(id, "dbg.slide") || !_stricmp(id, "dbg.enemycoll")) return DvLayerOk(kDvSlide, &why) ? "" : why;   // 0.15
+    if (!_strnicmp(id, "dbg.flat", 8) || !_stricmp(id, "dbg.census")) return RmRadWhy(id);   // 0.15 R0 / R1
     return "";
+}
+
+// ---- 0.15 Render mode (debug view stages R0 / R1 / R2, owner order 2026-11-06): render census, flat view, collision
+// overlay ----
+// Workspace docs\Befund-Debug-Rendermodus-0611.md (research) and docs\Befund-TruMenu-Rendermodus-0611.md (this build);
+// every byte check is pinned in work\asi\menu015\precheck_015.txt (tools/pe_bytes_check.py on the Steam exe).
+// R0 census (dbg.census [frames]): for N frames the drawable Draw calls per pass id (1, 2, 0x80, 0x100, 0x200, 0x400,
+//   0x800) and class (terrain / model), their device draws, render target 0 (pointer, size, format), RT1 bound, the
+//   render states the game's state manager holds for each draw (cache [sm + 0x168 + 4 * state], 0x502b70: Z, Z write,
+//   alpha test, alpha blend, colour write), the material pass [0x8a2340] and the PCScene::Draw calls per frame; then
+//   ONE block of "0.15 census" lines in TruMenu.log with a suggested pass mask (passes drawn into a target of the back
+//   buffer's size with colour writes and mostly without blending). No line per frame.
+// R1 flat view (dbg.flat): inside PCTerrainDrawable / PCModelDrawable Draw of a pass in [Debug] FlatPasses every device
+//   DrawIndexedPrimitive / DrawPrimitive draws with one of 16 palette pixel shaders (colour = hash of the material
+//   [0xa14188], or terrain one colour / models another); right after the draw the game's own pixel shader (state
+//   manager +0x20 -> PCPixelShader +0xc, the one 0x526630 set) is set again, so the state manager's cache and the
+//   device agree. The device is created PURE (0x522687: flags 0x50) - no Get* state calls; the game's shader comes
+//   from the cache. Palette shaders: "def c0, r, g, b, 1; mov oC0, c0" as ps_2_0 and ps_3_0, picked by the version of
+//   the game's shader of that draw (a vs_3_0 needs a ps_3_0 and the other way round); no constant register is written.
+//   Edge pass (dbg.flatedges): the same draw again in wireframe with a dark shader, a small depth bias and Z write off;
+//   fill mode / depth bias / Z write are put back from the state manager's cache. Only into a render target of the
+//   back buffer's size unless [Debug] FlatAnyTarget=1 (shadow maps / reflections stay as they are even with a wrong
+//   pass mask).
+// Writes into game memory (pass this list on to TruGuard's author): only while the census runs or the flat view is on,
+//   in a loaded level - the .rdata words 0x849948 (PCTerrainDrawable::Draw, 0x510dd0) and 0x849758
+//   (PCModelDrawable::Draw, 0x50f4a0), during a census also 0x849a2c (PCScene::Draw, 0x5150e0); each only when it
+//   holds the game's function, VirtualProtect around the write (WriteDword); put back - only while it still holds
+//   TruMenu's hook - when switched off, when the level is left / a level change starts, when the census ends and at
+//   unload. The game device's vtable slots 81 / 82 (DrawPrimitive / DrawIndexedPrimitive, d3d9.dll or proxy memory,
+//   not tru.exe) the same way. Patched / unpatched only in the Present hook (between two frames).
+// R2 collision overlay (the layers slide / enemycoll of the 0.14 table): the collision meshes of every loaded stream
+//   unit (table 0xdbab40, state 2: +8 Level, [Level] Terrain, +8 group count, +0xc TerrainGroups of 0x50 bytes, +0x38
+//   mesh - taken only when mesh +0x3c points back to the group, 0x48d2d4), faces 20 bytes at mesh +0x34 (count +0x44),
+//   vertices at +0x30 (mesh +0x54 word 0: 3 x s16, else 16-byte floats, 0x460770), world = vertex + mesh +0x20
+//   (0x78d05a). Read once per change of the loaded units into a static buffer (no allocation), drawn at Present as
+//   translucent triangles + edges through the 0.14 projection, the nearest to the camera first ([Debug] CollRadius /
+//   CollMax), on top of everything (no depth test). Slide = clientFlags (face +0x0e) & 0x04 (0x5d3af0): red when
+//   steeper than the tuning angle s16 [[0xfad764]+0x100e] degrees (0x5dd3ba: the game slides only then), orange when
+//   flatter; enemy-only = TerrainGroup extra flags ([group +0x30] +0) & 0x800 (TRLAU's name; tru.exe's collision
+//   filter 0x48d2d0 of collide kinds 4 / 7 skips such groups, kind 3's 0x48d280 does not - which kind is the player is
+//   not proven), violet. Read-only.
+const DvCheck kRmChecks[] = {
+    {0x00849948, "d00d5100"},
+    {0x00849758, "a0f45000"},
+    {0x00849a2c, "e0505100"},
+    {0x005106af, "c70044998400"},
+    {0x0050e6d8, "c70654978400"},
+    {0x00513c00, "c703289a8400"},
+    {0x004f609f, "8b17 50 8b4204 53 8bcf ffd0"},
+    {0x00510dd0, "83ec30 53 55 8be9 8b4510 8b4814 8b442440"},
+    {0x0051122f, "c20800"},
+    {0x0050f4a0, "83ec0c 8b15e475ad00 53 55 56 8bf1 8b4e10"},
+    {0x0050f6c0, "c20800"},
+    {0x005150e0, "55 8bec 83e4f0 83ec24 a1e475ad00"},
+    {0x00515504, "5f 5e 5b 8be5 5d c20800"},
+    {0x00510e72, "8b442444 81c6fcfd0000 3d00010000"},
+    {0x00510f11, "3d00020000 748a 3d00040000 7483 3d00080000 7559"},
+    {0x00511184, "8b442444 8b8848010000 ffd1"},
+    {0x00511207, "8b442444 8b8848010000 ffd1"},
+    {0x0050f06e, "8b8b48010000 50 6a04 57 ffd1"},
+    {0x005152bd, "6800020000 8bcf e81711feff 6800020000 8bcf e8ab0dfeff"},
+    {0x00510deb, "8bbe84020000"},
+    {0x00526630, "56 57 8b7c240c 8bf1 3b7e20 742c 85ff 8b460c 8b08 7415 8b570c 52 50 8b81ac010000 ffd0 897e20"},
+    {0x00502b70, "53 8b5c240c 56 57 8b7c2410 8bf1 399cbe68010000 7417 8b460c 8b08 8b91e4000000 53 57 50 ffd2 "
+                 "899cbe68010000"},
+    {0x00505e1f, "3b2d8841a100"},
+    {0x00505ee0, "892d8841a100"},
+    {0x005068c7, "3b358841a100"},
+    {0x00506b80, "89358841a100"},
+    {0x005066ca, "390540238a00"},
+};
+const DvCheck kRcChecks[] = {
+    {0x005d3b0a, "0fb7770e 0fb7442410 23f0"},
+    {0x005dd356, "68000a0000 8d4c2434 6a44 51 33db e88767ffff"},
+    {0x005dd36f, "a904020000 7405 bb02000000 a940080000"},
+    {0x005dd3ae, "a164d7fa00 dd9c2420010000 0fbf880e100000"},
+    {0x005dd3c9, "dc0d70308400"},
+    {0x00843070, "000000a046df913f"},
+    {0x0078d057, "8b7510 0f284620"},
+    {0x0078d0b7, "8b4e34"},
+    {0x0078d0e8, "8d04bf 8d0481"},
+    {0x00460779, "6683795400 53 56 57 0f859d000000"},
+    {0x0046078a, "8b7930"},
+    {0x00460794, "8d0c40 8d0c4f"},
+    {0x00460699, "0fbf11"},
+    {0x00460824, "8b5130 8b750c 8b0e 8b4508 c1e104"},
+    {0x0048d2d4, "8b403c 8b4030 f60008 752e 8a4802 f6c108 7526 f6c102 7521 f6400108 751b"},
+    {0x0048d285, "8b703c 8b4630 f60008 7530 8a4002 a808 7529 a802 7525"},
+    {0x004964d1, "6880d24800 6a00 8b0df437a000 6a03"},
+    {0x004964eb, "68d0d24800 6a00 6a07"},
+    {0x004964ff, "68d0d24800 6a00 6a04"},
+};
+const DWORD kRmSmField = 0x284, kRmSmDevice = 0x0c, kRmSmPs = 0x20, kRmPcPsD3d = 0x0c, kRmSmRs = 0x168;
+const DWORD kRmMaterial = 0x00a14188, kRmMatPass = 0x008a2340;
+const DWORD kRcTuning = 0x00fad764, kRcTuningAngle = 0x100e;
+// the drawables' pass ids (0x510e72 ff.), in the order of PCScene::Draw's lists first; index 7 = any other value
+const DWORD kRmPassIds[7] = {0x200, 0x100, 0x80, 0x400, 0x800, 1, 2};
+const char *const kRmPassNames[8] = {"0x200", "0x100", "0x80", "0x400", "0x800", "1", "2", "other"};
+const int kRmPassN = 7;
+const DWORD kRmPassAll = 0xf83;
+// 16 palette colours (medium bright, so the dark edges show) + the edge colour (index 16)
+const float kRmPalette[17][3] = {
+    {0.86f, 0.80f, 0.68f}, {0.55f, 0.70f, 0.88f}, {0.60f, 0.82f, 0.55f}, {0.92f, 0.65f, 0.42f},
+    {0.76f, 0.60f, 0.88f}, {0.88f, 0.86f, 0.52f}, {0.48f, 0.78f, 0.78f}, {0.88f, 0.55f, 0.62f},
+    {0.66f, 0.66f, 0.66f}, {0.45f, 0.55f, 0.80f}, {0.70f, 0.82f, 0.38f}, {0.82f, 0.48f, 0.38f},
+    {0.58f, 0.45f, 0.74f}, {0.38f, 0.66f, 0.50f}, {0.94f, 0.76f, 0.60f}, {0.62f, 0.55f, 0.44f},
+    {0.08f, 0.08f, 0.10f},
+};
+const int kRmEdgeColour = 16;
+// palette pixel shader tokens: version, def c0 = (r, g, b, 1), mov oC0, c0, end (D3D9 shader bytecode; checked offline
+// with D3DDisassemble by tools/trumenu_flat_ps_check.py)
+const DWORD kRmPsVersion[2] = {0xffff0200, 0xffff0300};      // ps_2_0, ps_3_0
+const DWORD kRmPsDef = 0x05000051, kRmPsDefDst = 0xa00f0000, kRmPsMov = 0x02000001, kRmPsMovDst = 0x800f0800,
+            kRmPsMovSrc = 0xa0e40000, kRmPsEnd = 0x0000ffff;
+
+// the slots TruMenu patches (index = kRm*): game .rdata words (fixed) and the game device's vtable slots
+enum { kRmTerrain = 0, kRmModel, kRmScene, kRmDip, kRmDp, kRmSlots };
+struct RmSlot { const char *name; DWORD at, want; volatile DWORD orig; bool on; };
+RmSlot g_rmSlot[kRmSlots] = {
+    {"PCTerrainDrawable::Draw", 0x00849948, 0x00510dd0, 0x00510dd0, false},
+    {"PCModelDrawable::Draw", 0x00849758, 0x0050f4a0, 0x0050f4a0, false},
+    {"PCScene::Draw", 0x00849a2c, 0x005150e0, 0x005150e0, false},
+    {"device DrawIndexedPrimitive (82)", 0, 0, 0, false},
+    {"device DrawPrimitive (81)", 0, 0, 0, false},
+};
+bool g_rmOk = false, g_rcOk = false;
+const char *g_rmWhy = "not checked", *g_rcWhy = "not checked";
+char g_rmWhyBuf[96], g_rcWhyBuf[96];
+volatile LONG g_rmFlat = 0, g_rmFlatModels = 0, g_rmFlatEdges = 0, g_rmFlatAnyRt = 0;   // dbg.flat / flatmodels / ..
+volatile LONG g_rmPassMask = 0x200;          // [Debug] FlatPasses
+volatile LONG g_rmColourMode = 0;            // [Debug] FlatColour: 0 material, 1 class (terrain / models)
+volatile LONG g_rmCensusReq = 0;             // dbg.census: frames asked for (the Present hook starts it in a level)
+int g_rmFlatAtStart = 0, g_rmCensusAtStart = 0, g_rmCensusFrames = 120;
+float g_rcRadius = 8000.0f;                  // [Debug] CollRadius
+int g_rcMax = 3000;                          // [Debug] CollMax
+UINT g_rmBbW = 0, g_rmBbH = 0;               // back buffer of the last Present while the render mode is active
+DWORD g_rmBb = 0;
+volatile LONG g_rmLogDrawn = 0;              // one "drawn" line with the first patched frame after a switch
+char g_rmState[360] = "off";                 // dbg.render: patched slots, last frame
+char g_rmWaitWhy[160] = "";
+DWORD g_rmSuggest = 0;                       // census: suggested FlatPasses (0 = no census yet)
+
+// the innermost drawable Draw running (render thread); thread 0 = none
+struct RmCtx { DWORD thread, pass, sm; int cls; bool swap; IDirect3DDevice9 *dev; };
+RmCtx g_rmCtx = {};
+// per frame (reset at Present) and the last frame
+struct RmFrame { LONG flatT, flatM, noPs, maskOut, rtOut, calls; };
+RmFrame g_rmFrame = {}, g_rmLast = {};
+// census
+struct RmRt { DWORD surf; UINT w, h; DWORD fmt, draws; };
+struct RmCsPass { DWORD calls[2], dips[2], dps[2], prims, rt1, zon, zwrite, atest, blend, cw0, matPass, rtOther; RmRt rt[3]; };
+RmCsPass g_rmCs[8];
+DWORD g_rmCsScene = 0, g_rmCsOutDip = 0, g_rmCsOutDp = 0, g_rmCsFrames = 0, g_rmCsSceneOther = 0;
+RmRt g_rmCsSceneRt[3];
+bool g_rmCsRun = false;
+int g_rmCsWant = 0;
+// palette shaders [ps_2_0 / ps_3_0][colour], created on the game's device in the Present hook, released at Reset
+IDirect3DPixelShader9 *g_rmPs[2][17];
+IDirect3DDevice9 *g_rmPsDevice = nullptr;
+// game pixel shader -> shader model major version (GetFunction once per shader), cleared at Reset / level change
+struct RmPsVer { DWORD ps; int major; };
+RmPsVer g_rmPsVer[512];
+BYTE g_rmFuncBuf[65536];
+
+DWORD RmFloatBits(float f) {
+    DWORD d = 0;
+    memcpy(&d, &f, sizeof(d));
+    return d;
+}
+int RmPassIndex(DWORD pass) {
+    for (int i = 0; i < kRmPassN; ++i)
+        if (kRmPassIds[i] == pass) return i;
+    return 7;
+}
+// a pass by its name (0x200 / 200 / 512 / 0x80 / 1 / 2 ...), -1 = unknown
+int RmPassFind(const char *text) {
+    if (!text) return -1;
+    while (*text == ' ') ++text;
+    char word[16];
+    size_t len = 0;
+    while (text[len] && text[len] != ' ' && len + 1 < sizeof(word)) { word[len] = text[len]; ++len; }
+    word[len] = 0;
+    if (!len) return -1;
+    for (int i = 0; i < kRmPassN; ++i)
+        if (!_stricmp(word, kRmPassNames[i])) return i;   // "0x200" .. "1" / "2"
+    char *end = nullptr;
+    DWORD hex = strtoul(word, &end, 16);                 // "200" / "80" without 0x
+    if (end && !*end)
+        for (int i = 0; i < kRmPassN; ++i)
+            if (kRmPassIds[i] > 2 && hex == kRmPassIds[i]) return i;
+    return -1;
+}
+void RmPassText(DWORD mask, char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < kRmPassN; ++i)
+        if (mask & kRmPassIds[i]) LabelAdd(o, n, &used, "%s%s", used ? " " : "", kRmPassNames[i]);
+    if (!used) Out(o, n, "none");
+}
+// a render state from the state manager's cache (0x502b70: [sm + 0x168 + 4 * state])
+bool RmRs(DWORD sm, DWORD state, DWORD *v) { return sm && ReadDword(sm + kRmSmRs + 4 * state, v); }
+DWORD RmStateManager() {
+    DWORD mgr = 0, sm = 0;
+    if (!ReadDword(kDeviceManager, &mgr) || !mgr || !ReadDword(mgr + kRmSmField, &sm)) return 0;
+    return sm;
+}
+
+// load: the byte checks of precheck_015.txt (R0 / R1: sections 1 .. 3, R2: 4 .. 6)
+void RenderModeCheck() {
+    DWORD at = 0;
+    bool rm = DvChecks(kRmChecks, sizeof(kRmChecks) / sizeof(kRmChecks[0]), &at);
+    if (!g_d3dCodeOk) Out(g_rmWhyBuf, sizeof(g_rmWhyBuf), "device manager code (0.1 check) failed");
+    else if (!g_mainStateOk || !g_playerOk) Out(g_rmWhyBuf, sizeof(g_rmWhyBuf), "player / main state check failed");
+    else Out(g_rmWhyBuf, sizeof(g_rmWhyBuf), "render code differs at 0x%08lx", at);
+    g_rmOk = rm && g_d3dCodeOk && g_mainStateOk && g_playerOk;
+    g_rmWhy = g_rmOk ? "ok" : g_rmWhyBuf;
+    bool rc = DvChecks(kRcChecks, sizeof(kRcChecks) / sizeof(kRcChecks[0]), &at);
+    bool base = g_lblProjOk && g_instOk && g_playerOk && g_mainStateOk && g_unitOk;
+    if (!base) Out(g_rcWhyBuf, sizeof(g_rcWhyBuf), "projection / unit table / player checks failed");
+    else Out(g_rcWhyBuf, sizeof(g_rcWhyBuf), "collision code differs at 0x%08lx", at);
+    g_rcOk = rc && base;
+    g_rcWhy = g_rcOk ? "ok" : g_rcWhyBuf;
+    memset(g_rmPsVer, 0, sizeof(g_rmPsVer));
+    if (g_debugEnabled && g_rmOk) {
+        if (g_rmFlatAtStart) InterlockedExchange(&g_rmFlat, 1);
+        if (g_rmCensusAtStart) InterlockedExchange(&g_rmCensusReq, g_rmCensusFrames);
+    }
+    char passes[64];
+    RmPassText(static_cast<DWORD>(g_rmPassMask), passes, sizeof(passes));
+    Log(g_rmOk && g_rcOk ? 1 : 0, "0.15 render mode: census / flat view %s, collision overlay %s; [Debug] Flat %d (passes %s, "
+        "colour %s, models %d, edges %d, any target %d), Census %d (%d frames), Slide %d, EnemyColl %d, CollRadius %.0f, "
+        "CollMax %d", g_rmWhy, g_rcWhy, g_rmFlatAtStart, passes, g_rmColourMode ? "class" : "material",
+        g_rmFlatModels ? 1 : 0, g_rmFlatEdges ? 1 : 0, g_rmFlatAnyRt ? 1 : 0, g_rmCensusAtStart, g_rmCensusFrames,
+        g_dvAtStart[kDvSlide], g_dvAtStart[kDvEnemyColl], g_rcRadius, g_rcMax);
+}
+bool RcLayerOk(const char **why) {
+    *why = g_rcWhy;
+    return g_rcOk;
+}
+
+// ---- R0 / R1 hooks (render thread) ----
+typedef int(__fastcall *RmDrawFn)(void *self, void *edx, int pass, void *prev);   // thiscall, ret 8
+typedef HRESULT(STDMETHODCALLTYPE *RmDipFn)(IDirect3DDevice9 *, D3DPRIMITIVETYPE, INT, UINT, UINT, UINT, UINT);
+typedef HRESULT(STDMETHODCALLTYPE *RmDpFn)(IDirect3DDevice9 *, D3DPRIMITIVETYPE, UINT, UINT);
+
+bool RmRtIsBackBuffer(IDirect3DDevice9 *dev) {
+    IDirect3DSurface9 *s = nullptr;
+    if (!dev || FAILED(dev->GetRenderTarget(0, &s)) || !s) return false;
+    D3DSURFACE_DESC d = {};
+    bool same = SUCCEEDED(s->GetDesc(&d)) && d.Width == g_rmBbW && d.Height == g_rmBbH;
+    s->Release();
+    return same;
+}
+void RmRtAdd(RmRt *list, DWORD *other, IDirect3DSurface9 *s) {
+    D3DSURFACE_DESC d = {};
+    s->GetDesc(&d);
+    DWORD p = reinterpret_cast<DWORD>(s);
+    for (int i = 0; i < 3; ++i) {
+        if (list[i].surf == p) { ++list[i].draws; return; }
+        if (!list[i].surf) {
+            list[i].surf = p;
+            list[i].w = d.Width;
+            list[i].h = d.Height;
+            list[i].fmt = static_cast<DWORD>(d.Format);
+            list[i].draws = 1;
+            return;
+        }
+    }
+    ++*other;
+}
+// census of one device draw inside a drawable
+void RmCensusDraw(IDirect3DDevice9 *dev, const RmCtx &c, UINT prims, bool indexed) {
+    RmCsPass &p = g_rmCs[RmPassIndex(c.pass)];
+    int cls = c.cls == kRmModel ? 1 : 0;
+    if (indexed) ++p.dips[cls];
+    else ++p.dps[cls];
+    p.prims += prims;
+    IDirect3DSurface9 *s = nullptr;
+    if (SUCCEEDED(dev->GetRenderTarget(0, &s)) && s) {
+        RmRtAdd(p.rt, &p.rtOther, s);
+        s->Release();
+    }
+    s = nullptr;
+    if (SUCCEEDED(dev->GetRenderTarget(1, &s)) && s) {
+        ++p.rt1;
+        s->Release();
+    }
+    DWORD v = 0;
+    if (RmRs(c.sm, D3DRS_ZENABLE, &v) && v) ++p.zon;
+    if (RmRs(c.sm, D3DRS_ZWRITEENABLE, &v) && v) ++p.zwrite;
+    if (RmRs(c.sm, D3DRS_ALPHATESTENABLE, &v) && v) ++p.atest;
+    if (RmRs(c.sm, D3DRS_ALPHABLENDENABLE, &v) && v) ++p.blend;
+    if (RmRs(c.sm, D3DRS_COLORWRITEENABLE, &v) && !(v & 0xf)) ++p.cw0;
+    DWORD mp = 0;
+    if (ReadDword(kRmMatPass, &mp)) p.matPass |= 1u << RmPassIndex(mp);
+}
+// shader model major version of a game pixel shader (0 = unknown); one GetFunction per shader
+int RmPsMajor(IDirect3DPixelShader9 *ps) {
+    DWORD key = reinterpret_cast<DWORD>(ps);
+    DWORD h = ((key >> 4) * 2654435761u) >> 23;          // 9 bits
+    for (int probe = 0; probe < 8; ++probe) {
+        RmPsVer &e = g_rmPsVer[(h + probe) & 511];
+        if (e.ps == key) return e.major;
+        if (e.ps) continue;
+        UINT size = 0;
+        int major = 0;
+        if (SUCCEEDED(ps->GetFunction(nullptr, &size)) && size >= 4 && size <= sizeof(g_rmFuncBuf) &&
+            SUCCEEDED(ps->GetFunction(g_rmFuncBuf, &size))) {
+            DWORD version = 0;
+            memcpy(&version, g_rmFuncBuf, sizeof(version));
+            if ((version & 0xffff0000) == 0xffff0000) major = static_cast<int>((version >> 8) & 0xff);
+        }
+        e.ps = key;
+        e.major = major;
+        return major;
+    }
+    return 0;                                             // table crowded: no swap for this draw
+}
+// the flat / edge shader for this draw and the game's shader to put back; false = draw as the game does
+bool RmPick(IDirect3DDevice9 *dev, const RmCtx &c, IDirect3DPixelShader9 **game, IDirect3DPixelShader9 **flat,
+            IDirect3DPixelShader9 **edge) {
+    DWORD smDev = 0, pcps = 0, ps = 0;
+    if (!ReadDword(c.sm + kRmSmDevice, &smDev) || smDev != reinterpret_cast<DWORD>(dev)) return false;
+    if (!ReadDword(c.sm + kRmSmPs, &pcps) || !pcps || !ReadDword(pcps + kRmPcPsD3d, &ps) || !ps) return false;
+    *game = reinterpret_cast<IDirect3DPixelShader9 *>(ps);
+    int major = RmPsMajor(*game);
+    if (major < 1 || major > 3) return false;
+    int set = major == 3 ? 1 : 0;
+    int colour = 0;
+    if (g_rmColourMode) colour = c.cls == kRmTerrain ? 0 : 1;
+    else {
+        DWORD m = 0;
+        ReadDword(kRmMaterial, &m);
+        colour = static_cast<int>(((m >> 4) * 2654435761u) >> 28);
+    }
+    *flat = g_rmPs[set][colour];
+    *edge = g_rmFlatEdges ? g_rmPs[set][kRmEdgeColour] : nullptr;
+    return *flat != nullptr;
+}
+// edge pass: wireframe, small depth bias, no Z write; put back from the state manager's cache (invalid -> D3D default)
+void RmEdgeBegin(IDirect3DDevice9 *dev) {
+    dev->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+    dev->SetRenderState(D3DRS_DEPTHBIAS, RmFloatBits(-0.00005f));
+    dev->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS, RmFloatBits(-1.0f));
+    dev->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+}
+void RmEdgeEnd(IDirect3DDevice9 *dev, DWORD sm) {
+    DWORD fill = D3DFILL_SOLID, bias = 0, slope = 0, zwrite = TRUE;
+    if (!RmRs(sm, D3DRS_FILLMODE, &fill) || fill < static_cast<DWORD>(D3DFILL_POINT) || fill > static_cast<DWORD>(D3DFILL_SOLID))
+        fill = D3DFILL_SOLID;
+    if (!RmRs(sm, D3DRS_DEPTHBIAS, &bias)) bias = 0;
+    if (!RmRs(sm, D3DRS_SLOPESCALEDEPTHBIAS, &slope)) slope = 0;
+    if (!RmRs(sm, D3DRS_ZWRITEENABLE, &zwrite) || zwrite > 1) zwrite = TRUE;
+    dev->SetRenderState(D3DRS_FILLMODE, fill);
+    dev->SetRenderState(D3DRS_DEPTHBIAS, bias);
+    dev->SetRenderState(D3DRS_SLOPESCALEDEPTHBIAS, slope);
+    dev->SetRenderState(D3DRS_ZWRITEENABLE, zwrite);
+}
+// one device draw: census, flat shader, draw, edge pass, the game's shader back
+template <typename F> HRESULT RmDeviceDraw(IDirect3DDevice9 *dev, UINT prims, bool indexed, F draw) {
+    const RmCtx c = g_rmCtx;
+    if (!c.thread || c.thread != GetCurrentThreadId()) {   // not inside a drawable (ImGui, HUD, effects, other threads)
+        if (g_rmCsRun) ++(indexed ? g_rmCsOutDip : g_rmCsOutDp);
+        return draw();
+    }
+    if (g_rmCsRun) RmCensusDraw(dev, c, prims, indexed);
+    if (!c.swap) return draw();
+    IDirect3DPixelShader9 *game = nullptr, *flat = nullptr, *edge = nullptr;
+    if (!RmPick(dev, c, &game, &flat, &edge)) {
+        ++g_rmFrame.noPs;
+        return draw();
+    }
+    dev->SetPixelShader(flat);
+    HRESULT hr = draw();
+    if (edge) {
+        RmEdgeBegin(dev);
+        dev->SetPixelShader(edge);
+        draw();
+        RmEdgeEnd(dev, c.sm);
+    }
+    dev->SetPixelShader(game);
+    ++(c.cls == kRmTerrain ? g_rmFrame.flatT : g_rmFrame.flatM);
+    return hr;
+}
+HRESULT STDMETHODCALLTYPE RmDipHook(IDirect3DDevice9 *dev, D3DPRIMITIVETYPE type, INT base, UINT minIndex, UINT verts,
+                                    UINT start, UINT prims) {
+    RmDipFn original = reinterpret_cast<RmDipFn>(g_rmSlot[kRmDip].orig);
+    return RmDeviceDraw(dev, prims, true, [&]() { return original(dev, type, base, minIndex, verts, start, prims); });
+}
+HRESULT STDMETHODCALLTYPE RmDpHook(IDirect3DDevice9 *dev, D3DPRIMITIVETYPE type, UINT start, UINT prims) {
+    RmDpFn original = reinterpret_cast<RmDpFn>(g_rmSlot[kRmDp].orig);
+    return RmDeviceDraw(dev, prims, false, [&]() { return original(dev, type, start, prims); });
+}
+// a drawable's Draw(pass, previous): set the context for its device draws, call the game's Draw, restore
+int RmDrawCommon(int slot, void *self, void *edx, int pass, void *prev) {
+    RmDrawFn original = reinterpret_cast<RmDrawFn>(g_rmSlot[slot].orig);
+    RmCtx saved = g_rmCtx;
+    RmCtx c = {};
+    c.thread = GetCurrentThreadId();
+    c.pass = static_cast<DWORD>(pass);
+    c.cls = slot;
+    c.sm = RmStateManager();
+    DWORD dev = 0;
+    if (c.sm) ReadDword(c.sm + kRmSmDevice, &dev);
+    c.dev = reinterpret_cast<IDirect3DDevice9 *>(dev);
+    int index = RmPassIndex(c.pass);
+    if (g_rmCsRun) ++g_rmCs[index].calls[slot == kRmModel ? 1 : 0];
+    ++g_rmFrame.calls;
+    if (g_rmFlat && g_rmPsDevice && (slot == kRmTerrain || g_rmFlatModels)) {
+        if (index >= kRmPassN || !(static_cast<DWORD>(g_rmPassMask) & c.pass)) ++g_rmFrame.maskOut;
+        else if (!g_rmFlatAnyRt && !RmRtIsBackBuffer(c.dev)) ++g_rmFrame.rtOut;
+        else c.swap = true;
+    }
+    g_rmCtx = c;
+    int r = original(self, edx, pass, prev);
+    g_rmCtx = saved;
+    return r;
+}
+int __fastcall RmTerrainDrawHook(void *self, void *edx, int pass, void *prev) {
+    return RmDrawCommon(kRmTerrain, self, edx, pass, prev);
+}
+int __fastcall RmModelDrawHook(void *self, void *edx, int pass, void *prev) {
+    return RmDrawCommon(kRmModel, self, edx, pass, prev);
+}
+int __fastcall RmSceneDrawHook(void *self, void *edx, int pass, void *prev) {
+    RmDrawFn original = reinterpret_cast<RmDrawFn>(g_rmSlot[kRmScene].orig);
+    if (g_rmCsRun) {
+        ++g_rmCsScene;
+        IDirect3DDevice9 *dev = g_device;
+        IDirect3DSurface9 *s = nullptr;
+        if (dev && SUCCEEDED(dev->GetRenderTarget(0, &s)) && s) {
+            RmRtAdd(g_rmCsSceneRt, &g_rmCsSceneOther, s);
+            s->Release();
+        }
+    }
+    return original(self, edx, pass, prev);
+}
+void *RmHookOf(int slot) {
+    switch (slot) {
+    case kRmTerrain: return reinterpret_cast<void *>(&RmTerrainDrawHook);
+    case kRmModel: return reinterpret_cast<void *>(&RmModelDrawHook);
+    case kRmScene: return reinterpret_cast<void *>(&RmSceneDrawHook);
+    case kRmDip: return reinterpret_cast<void *>(&RmDipHook);
+    default: return reinterpret_cast<void *>(&RmDpHook);
+    }
+}
+
+// ---- patching (Present hook only) ----
+// one slot on: a game word only while it holds the game's function; a device slot whatever is there (chained)
+bool RmSlotOn(int i, IDirect3DDevice9 *device, char *o, size_t n) {
+    RmSlot &s = g_rmSlot[i];
+    if (s.on) return true;
+    DWORD hook = reinterpret_cast<DWORD>(RmHookOf(i)), cur = 0;
+    if (i == kRmDip || i == kRmDp) {
+        DWORD vtable = 0;
+        if (!device || !ReadDword(reinterpret_cast<DWORD>(device), &vtable) || !vtable) {
+            Out(o, n, "device vtable not readable");
+            return false;
+        }
+        s.at = vtable + 4 * (i == kRmDip ? 82 : 81);
+    }
+    if (!ReadDword(s.at, &cur) || !cur) { Out(o, n, "%s 0x%08lx not readable", s.name, s.at); return false; }
+    if (cur == hook) { s.on = true; return true; }   // still ours from before (an unpatch found it chained)
+    if (s.want && cur != s.want) {
+        Out(o, n, "%s 0x%08lx holds 0x%08lx, not the game's 0x%08lx - left untouched (another plugin?)", s.name, s.at, cur,
+            s.want);
+        return false;
+    }
+    s.orig = cur;                                         // before the swap: the game may call it at once
+    if (!WriteDword(s.at, hook)) { Out(o, n, "%s 0x%08lx: VirtualProtect failed (%lu)", s.name, s.at, GetLastError()); return false; }
+    s.on = true;
+    return true;
+}
+// one slot off: put the original back only while TruMenu's hook is there (else someone chained on top: left, the hook
+// stays as a pass-through - its original pointer is kept)
+const char *RmSlotOff(int i) {
+    RmSlot &s = g_rmSlot[i];
+    if (!s.on) return "";
+    s.on = false;
+    DWORD cur = 0, hook = reinterpret_cast<DWORD>(RmHookOf(i));
+    if (!ReadDword(s.at, &cur)) return " (not readable)";
+    if (cur != hook) return " (changed by someone else - left, TruMenu's hook stays a pass-through)";
+    return WriteDword(s.at, s.orig) ? "" : " (VirtualProtect failed)";
+}
+DWORD RmSlotsOn() {
+    DWORD bits = 0;
+    for (int i = 0; i < kRmSlots; ++i)
+        if (g_rmSlot[i].on) bits |= 1u << i;
+    return bits;
+}
+// bring the slots to "want" (bits); one TruMenu.log line when something changed
+bool RmApplySlots(IDirect3DDevice9 *device, DWORD want, const char *why) {
+    DWORD have = RmSlotsOn();
+    if (have == want) return true;
+    char text[480] = "", fail[200] = "";
+    size_t used = 0;
+    bool ok = true;
+    for (int i = 0; i < kRmSlots; ++i) {
+        bool w = (want >> i) & 1, h = (have >> i) & 1;
+        if (w == h) continue;
+        if (w) {
+            if (RmSlotOn(i, device, fail, sizeof(fail))) {
+                LabelAdd(text, sizeof(text), &used, "%s+%s 0x%08lx (0x%08lx -> TruMenu)", used ? ", " : "", g_rmSlot[i].name,
+                         g_rmSlot[i].at, static_cast<DWORD>(g_rmSlot[i].orig));
+            } else {
+                ok = false;
+                break;
+            }
+        } else {
+            const char *note = RmSlotOff(i);
+            LabelAdd(text, sizeof(text), &used, "%s-%s 0x%08lx%s", used ? ", " : "", g_rmSlot[i].name, g_rmSlot[i].at, note);
+        }
+    }
+    if (!ok) {                                            // all or nothing: what was set now goes back
+        for (int i = 0; i < kRmSlots; ++i)
+            if (g_rmSlot[i].on && !((have >> i) & 1)) RmSlotOff(i);
+        Log(0, "0.15 render mode: patch refused - %s; %s", fail, used ? text : "nothing changed");
+        Out(g_rmWaitWhy, sizeof(g_rmWaitWhy), "patch refused: %s", fail);
+        return false;
+    }
+    Log(1, "0.15 render mode %s (%s): %s", want ? "patched" : "unpatched", why, used ? text : "-");
+    return true;
+}
+void RmShadersRelease(bool callRelease) {
+    for (int s = 0; s < 2; ++s)
+        for (int i = 0; i < 17; ++i) {
+            if (g_rmPs[s][i] && callRelease) g_rmPs[s][i]->Release();
+            g_rmPs[s][i] = nullptr;
+        }
+    g_rmPsDevice = nullptr;
+}
+bool RmShadersCreate(IDirect3DDevice9 *device) {
+    if (g_rmPsDevice == device) return true;
+    if (g_rmPsDevice) {
+        Log(1, "0.15 flat view: device changed 0x%08lx -> 0x%08lx - shaders of the old device dropped",
+            reinterpret_cast<DWORD>(g_rmPsDevice), reinterpret_cast<DWORD>(device));
+        RmShadersRelease(false);                          // they belong to the old device: never released through it
+    }
+    for (int s = 0; s < 2; ++s)
+        for (int i = 0; i < 17; ++i) {
+            DWORD code[11] = {kRmPsVersion[s], kRmPsDef, kRmPsDefDst, RmFloatBits(kRmPalette[i][0]),
+                              RmFloatBits(kRmPalette[i][1]), RmFloatBits(kRmPalette[i][2]), RmFloatBits(1.0f), kRmPsMov,
+                              kRmPsMovDst, kRmPsMovSrc, kRmPsEnd};
+            HRESULT hr = device->CreatePixelShader(code, &g_rmPs[s][i]);
+            if (FAILED(hr) || !g_rmPs[s][i]) {
+                g_rmPs[s][i] = nullptr;
+                g_rmPsDevice = device;
+                RmShadersRelease(true);
+                Log(0, "0.15 flat view: CreatePixelShader (%s, colour %d) failed 0x%08lx - flat view off", s ? "ps_3_0" : "ps_2_0",
+                    i, static_cast<DWORD>(hr));
+                return false;
+            }
+        }
+    g_rmPsDevice = device;
+    Log(1, "0.15 flat view: 34 palette pixel shaders created (17 ps_2_0 + 17 ps_3_0) on device 0x%08lx",
+        reinterpret_cast<DWORD>(device));
+    return true;
+}
+
+// ---- census report (one block of TruMenu.log lines) ----
+int RmPct(DWORD part, DWORD whole) { return whole ? static_cast<int>(part * 100.0 / whole + 0.5) : 0; }
+void RmRtText(const RmRt *list, DWORD other, char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < 3 && list[i].surf; ++i)
+        LabelAdd(o, n, &used, "%s0x%08lx %ux%u fmt %lu (%lu)", used ? ", " : "", list[i].surf, list[i].w, list[i].h,
+                 list[i].fmt, list[i].draws);
+    if (other) LabelAdd(o, n, &used, "%sother %lu", used ? ", " : "", other);
+    if (!used) Out(o, n, "-");
+}
+void RmCensusReport(const char *how) {
+    const float frames = g_rmCsFrames ? static_cast<float>(g_rmCsFrames) : 1.0f;
+    char rts[200];
+    RmRtText(g_rmCsSceneRt, g_rmCsSceneOther, rts, sizeof(rts));
+    Log(1, "0.15 census (%s): %lu frame(s), back buffer 0x%08lx %ux%u; PCScene::Draw %.2f per frame (render target 0 at "
+           "entry: %s); device draws outside a drawable %.1f DIP / %.1f DP per frame (HUD, effects, ImGui ...)", how,
+        g_rmCsFrames, g_rmBb, g_rmBbW, g_rmBbH, g_rmCsScene / frames, rts, g_rmCsOutDip / frames, g_rmCsOutDp / frames);
+    g_rmSuggest = 0;
+    char sug[64] = "";
+    size_t sugUsed = 0;
+    for (int i = 0; i < 8; ++i) {
+        const RmCsPass &p = g_rmCs[i];
+        DWORD calls = p.calls[0] + p.calls[1], draws = p.dips[0] + p.dips[1] + p.dps[0] + p.dps[1];
+        if (!calls && !draws) continue;
+        int best = -1;
+        for (int k = 0; k < 3; ++k)
+            if (p.rt[k].surf && (best < 0 || p.rt[k].draws > p.rt[best].draws)) best = k;
+        bool bbSize = best >= 0 && p.rt[best].w == g_rmBbW && p.rt[best].h == g_rmBbH;
+        int cw0 = RmPct(p.cw0, draws), blend = RmPct(p.blend, draws);
+        const char *verdict = !draws ? "no device draws"
+                            : cw0 >= 50 ? "mostly no colour writes (depth / stencil only?)"
+                            : !bbSize ? "target not of the back buffer's size (shadow map / reflection?)"
+                            : blend >= 50 ? "mostly blended (translucent?)" : "colour candidate";
+        if (i < kRmPassN && draws && cw0 < 50 && bbSize && blend < 50) {
+            g_rmSuggest |= kRmPassIds[i];
+            LabelAdd(sug, sizeof(sug), &sugUsed, "%s%s", sugUsed ? " " : "", kRmPassNames[i]);
+        }
+        char mp[64] = "";
+        size_t mpUsed = 0;
+        for (int k = 0; k < 8; ++k)
+            if (p.matPass & (1u << k)) LabelAdd(mp, sizeof(mp), &mpUsed, "%s%s", mpUsed ? " " : "", kRmPassNames[k]);
+        Log(1, "0.15 census pass %s: terrain %lu calls / %lu DIP %lu DP, model %lu calls / %lu DIP %lu DP, %.1f draws and "
+               "%.0f primitives per frame; per draw Z %d%%, Z write %d%%, alpha test %d%%, blend %d%%, colour write 0 %d%%, "
+               "RT1 bound %d%%; [0x8a2340] %s -> %s", kRmPassNames[i], p.calls[0], p.dips[0], p.dps[0], p.calls[1],
+            p.dips[1], p.dps[1], draws / frames, p.prims / frames, RmPct(p.zon, draws), RmPct(p.zwrite, draws),
+            RmPct(p.atest, draws), blend, cw0, RmPct(p.rt1, draws), mpUsed ? mp : "-", verdict);
+        RmRtText(p.rt, p.rtOther, rts, sizeof(rts));
+        Log(1, "0.15 census pass %s: render target 0 %s", kRmPassNames[i], rts);
+    }
+    Log(1, "0.15 census: suggested [Debug] FlatPasses=0x%03lx (%s) - 'dbg.flatpasses census' sets it; now 0x%03lx",
+        g_rmSuggest, sugUsed ? sug : "none", static_cast<DWORD>(g_rmPassMask));
+}
+
+// ---- Present hook: requests, patching, census frames, the one-shot "drawn" line (cheap while everything is off) ----
+void RenderModeTick(IDirect3DDevice9 *presented) {
+    bool flat = g_rmFlat != 0;
+    if (!flat && !g_rmCensusReq && !g_rmCsRun && !RmSlotsOn()) return;
+    // the object the game draws with ([0xad75e4]+0x20, hooked by HookDevice) - also when the frame came through the
+    // swap chain's Present (whose GetDevice may name the device behind a proxy)
+    IDirect3DDevice9 *device = g_device ? g_device : presented;
+    char why[160] = "";
+    bool world = false;
+    if (!g_debugEnabled) Out(why, sizeof(why), "[Debug] Enabled=0");
+    else if (!g_rmOk) Out(why, sizeof(why), "pre-check failed: %s", g_rmWhy);
+    else if (!device) Out(why, sizeof(why), "no device yet");
+    else world = LabelWorldReady(why, sizeof(why));
+    if (device && world) {
+        IDirect3DSurface9 *back = nullptr;
+        if (SUCCEEDED(device->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back)) && back) {
+            D3DSURFACE_DESC d = {};
+            if (SUCCEEDED(back->GetDesc(&d))) { g_rmBbW = d.Width; g_rmBbH = d.Height; }
+            g_rmBb = reinterpret_cast<DWORD>(back);
+            back->Release();
+        }
+    }
+    // census: frames of the running one, then the report; a request starts in a loaded level
+    if (g_rmCsRun) {
+        if (!world) {
+            g_rmCsRun = false;
+            RmCensusReport("stopped early - left the level");
+        } else if (++g_rmCsFrames >= static_cast<DWORD>(g_rmCsWant)) {
+            g_rmCsRun = false;
+            RmCensusReport("done");
+        }
+    }
+    LONG req = g_rmCensusReq;
+    if (req && world && !g_rmCsRun) {
+        InterlockedExchange(&g_rmCensusReq, 0);
+        memset(g_rmCs, 0, sizeof(g_rmCs));
+        memset(g_rmCsSceneRt, 0, sizeof(g_rmCsSceneRt));
+        g_rmCsScene = g_rmCsOutDip = g_rmCsOutDp = g_rmCsFrames = g_rmCsSceneOther = 0;
+        g_rmCsWant = static_cast<int>(req);
+        g_rmCsRun = true;
+        Log(1, "0.15 census started: %d frames, back buffer %ux%u", g_rmCsWant, g_rmBbW, g_rmBbH);
+    }
+    // flat view: shaders on the game's device first
+    if (flat && world && !RmShadersCreate(device)) {
+        InterlockedExchange(&g_rmFlat, 0);
+        flat = false;
+    }
+    DWORD want = 0;
+    if (world && (flat || g_rmCsRun)) want = (1u << kRmTerrain) | (1u << kRmModel) | (1u << kRmDip) | (1u << kRmDp);
+    if (world && g_rmCsRun) want |= 1u << kRmScene;
+    const char *reason = want ? (g_rmCsRun ? (flat ? "flat view + census" : "census") : "flat view")
+                       : !world ? why : "flat view off / census done";
+    if (!RmApplySlots(device, want, reason)) {
+        InterlockedExchange(&g_rmFlat, 0);
+        if (g_rmCsRun) { g_rmCsRun = false; Log(0, "0.15 census cancelled - the slots could not be patched"); }
+        RmApplySlots(device, 0, "patch refused");
+    }
+    if (!world) Out(g_rmWaitWhy, sizeof(g_rmWaitWhy), "%s", why);
+    else if (want) g_rmWaitWhy[0] = 0;
+    // last frame + the one-shot drawn line
+    g_rmLast = g_rmFrame;
+    memset(&g_rmFrame, 0, sizeof(g_rmFrame));
+    char passes[64];
+    RmPassText(static_cast<DWORD>(g_rmPassMask), passes, sizeof(passes));
+    Out(g_rmState, sizeof(g_rmState), "flat %d (passes %s, colour %s, models %d, edges %d, any target %d), slots 0x%02lx%s%s; "
+        "last frame: %ld drawable calls, %ld flat (terrain %ld, model %ld), %ld without game shader / version, %ld other "
+        "pass, %ld other target", g_rmFlat ? 1 : 0, passes, g_rmColourMode ? "class" : "material", g_rmFlatModels ? 1 : 0,
+        g_rmFlatEdges ? 1 : 0, g_rmFlatAnyRt ? 1 : 0, RmSlotsOn(), g_rmWaitWhy[0] ? ", waits: " : "", g_rmWaitWhy,
+        g_rmLast.calls, g_rmLast.flatT + g_rmLast.flatM, g_rmLast.flatT, g_rmLast.flatM, g_rmLast.noPs, g_rmLast.maskOut,
+        g_rmLast.rtOut);
+    if (flat && RmSlotsOn() && g_rmLast.calls && InterlockedExchange(&g_rmLogDrawn, 0))
+        Log(1, "0.15 flat view drawn: %s", g_rmState);
+}
+// Reset hook (before the game's Reset): the palette shaders go, the next Present creates them again
+void RenderModeOnReset() {
+    if (g_rmPsDevice) {
+        RmShadersRelease(true);
+        Log(3, "0.15 flat view: palette shaders released for Reset");
+    }
+    memset(g_rmPsVer, 0, sizeof(g_rmPsVer));
+}
+// unload: every slot back (no log; the process may be ending)
+void RenderModeShutdown() {
+    for (int i = 0; i < kRmSlots; ++i) RmSlotOff(i);
+}
+
+// ---- items ----
+const char *RmRadWhy(const char *id) {
+    if (!_stricmp(id, "dbg.render")) return "";
+    if (!g_debugEnabled) return "debug drawing off ([Debug] Enabled=0)";
+    if (!g_rmOk) return g_rmWhy;
+    return "";
+}
+bool RmGate(const char *item, int value, char *o, size_t n) {
+    if (!g_debugEnabled) { Out(o, n, "debug drawing off ([Debug] Enabled=0)"); return false; }
+    if (!g_rmOk) {
+        Out(o, n, "disabled: pre-check failed (%s)", g_rmWhy);
+        Log(1, "%s %d refused - %s (src=%s)", item, value, o, ShotSource(item));
+        return false;
+    }
+    return true;
+}
+void RmPersistPasses() {
+    if (!g_dvPersist || !g_iniPath[0]) return;
+    char v[16];
+    Out(v, sizeof(v), "0x%03lX", static_cast<DWORD>(g_rmPassMask));
+    WritePrivateProfileStringA("Debug", "FlatPasses", v, g_iniPath);
+}
+void ValRmRender(char *o, size_t n) {
+    char sug[48] = "none yet";
+    if (g_rmSuggest) Out(sug, sizeof(sug), "0x%03lx", g_rmSuggest);
+    Out(o, n, "checks: render %s, collision %s; %s; census %s (suggested %s)", g_rmWhy, g_rcWhy, g_rmState,
+        g_rmCsRun ? "running" : g_rmCensusReq ? "requested" : "idle", sug);
+}
+void ValRmCensus(char *o, size_t n) {
+    if (g_rmCsRun) Out(o, n, "running: frame %lu of %d", g_rmCsFrames, g_rmCsWant);
+    else if (g_rmCensusReq) Out(o, n, "requested (%ld frames, starts in a loaded level)", static_cast<LONG>(g_rmCensusReq));
+    else if (g_rmSuggest) Out(o, n, "idle; last census suggested FlatPasses 0x%03lx", g_rmSuggest);
+    else Out(o, n, "idle");
+}
+bool RunRmCensus(const char *arg, char *o, size_t n) {
+    int frames = arg && arg[0] ? atoi(arg) : g_rmCensusFrames;
+    if (frames < 10 || frames > 1200) { Out(o, n, "usage: dbg.census [10 .. 1200 frames] (default [Debug] CensusFrames %d)", g_rmCensusFrames); return false; }
+    if (!RmGate("dbg.census", frames, o, n)) return false;
+    if (g_rmCsRun) { Out(o, n, "a census is running (frame %lu of %d)", g_rmCsFrames, g_rmCsWant); return false; }
+    InterlockedExchange(&g_rmCensusReq, frames);
+    Log(1, "dbg.census %d requested (src=%s)", frames, ShotSource("dbg.census"));
+    Out(o, n, "census of %d frames starts in the next loaded-level frame; result: '0.15 census' lines in TruMenu.log", frames);
+    return true;
+}
+void ValRmFlat(char *o, size_t n) { Out(o, n, "%d (%s)", g_rmFlat ? 1 : 0, g_rmState); }
+bool RunRmFlat(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, g_rmFlat != 0);
+    if (!RmGate("dbg.flat", on ? 1 : 0, o, n)) return false;
+    InterlockedExchange(&g_rmFlat, on ? 1 : 0);
+    InterlockedExchange(&g_rmLogDrawn, on ? 1 : 0);
+    DvPersistKey("Flat", on);
+    char passes[64];
+    RmPassText(static_cast<DWORD>(g_rmPassMask), passes, sizeof(passes));
+    Log(1, "dbg.flat %d (passes %s, colour %s, models %d, edges %d, any target %d; src=%s)", on ? 1 : 0, passes,
+        g_rmColourMode ? "class" : "material", g_rmFlatModels ? 1 : 0, g_rmFlatEdges ? 1 : 0, g_rmFlatAnyRt ? 1 : 0,
+        ShotSource("dbg.flat"));
+    Out(o, n, "dbg.flat %d (passes %s)", on ? 1 : 0, passes);
+    return true;
+}
+void ValRmPasses(char *o, size_t n) {
+    char passes[64];
+    RmPassText(static_cast<DWORD>(g_rmPassMask), passes, sizeof(passes));
+    Out(o, n, "0x%03lx (%s)", static_cast<DWORD>(g_rmPassMask), passes);
+}
+// dbg.flatpass <pass> [0|1]: one pass id in / out of the mask (live, no rebuild)
+bool RunRmFlatPass(const char *arg, char *o, size_t n) {
+    char buf[48];
+    strncpy_s(buf, sizeof(buf), arg ? arg : "", _TRUNCATE);
+    char *context = nullptr;
+    char *name = strtok_s(buf, " ", &context);
+    char *value = name ? strtok_s(nullptr, " ", &context) : nullptr;
+    int i = RmPassFind(name);
+    if (i < 0) { Out(o, n, "usage: dbg.flatpass <0x200|0x100|0x80|0x400|0x800|1|2> [0|1]"); return false; }
+    bool on = BoolArg(value ? value : "", (static_cast<DWORD>(g_rmPassMask) & kRmPassIds[i]) != 0);
+    if (!RmGate("dbg.flatpass", on ? 1 : 0, o, n)) return false;
+    DWORD mask = static_cast<DWORD>(g_rmPassMask);
+    mask = on ? (mask | kRmPassIds[i]) : (mask & ~kRmPassIds[i]);
+    InterlockedExchange(&g_rmPassMask, static_cast<LONG>(mask));
+    InterlockedExchange(&g_rmLogDrawn, g_rmFlat ? 1 : 0);
+    RmPersistPasses();
+    Log(1, "dbg.flatpass %s %d (mask now 0x%03lx; src=%s)", kRmPassNames[i], on ? 1 : 0, mask, ShotSource("dbg.flatpass"));
+    Out(o, n, "dbg.flatpass %s %d (mask 0x%03lx)", kRmPassNames[i], on ? 1 : 0, mask);
+    return true;
+}
+// dbg.flatpasses <mask>|census|default
+bool RunRmFlatPasses(const char *arg, char *o, size_t n) {
+    char v[32];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    DWORD mask = 0;
+    bool ok = v[0] != 0;
+    if (!_stricmp(v, "census")) {
+        if (!g_rmSuggest) { Out(o, n, "no census result yet (dbg.census first; a census that found no colour pass suggests none)"); return false; }
+        mask = g_rmSuggest;
+    } else if (!_stricmp(v, "default")) {
+        mask = 0x200;
+    } else if (ok) {
+        char *end = nullptr;
+        mask = strtoul(v, &end, 0);
+        ok = end && !*end && !(mask & ~kRmPassAll);
+    }
+    if (!ok) {
+        Out(o, n, "usage: dbg.flatpasses <mask of 0x200 0x100 0x80 0x400 0x800 1 2, e.g. 0x300>|census|default; now 0x%03lx",
+            static_cast<DWORD>(g_rmPassMask));
+        return false;
+    }
+    if (!RmGate("dbg.flatpasses", static_cast<int>(mask), o, n)) return false;
+    InterlockedExchange(&g_rmPassMask, static_cast<LONG>(mask));
+    InterlockedExchange(&g_rmLogDrawn, g_rmFlat ? 1 : 0);
+    RmPersistPasses();
+    char passes[64];
+    RmPassText(mask, passes, sizeof(passes));
+    Log(1, "dbg.flatpasses 0x%03lx (%s; from '%s'; src=%s)", mask, passes, v, ShotSource("dbg.flatpasses"));
+    Out(o, n, "dbg.flatpasses 0x%03lx (%s)", mask, passes);
+    return true;
+}
+void ValRmColour(char *o, size_t n) { Out(o, n, "%s", g_rmColourMode ? "class" : "material"); }
+bool RunRmColour(const char *arg, char *o, size_t n) {
+    char v[32];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    int mode = !_stricmp(v, "material") ? 0 : !_stricmp(v, "class") ? 1 : -1;
+    if (mode < 0) { Out(o, n, "usage: dbg.flatcolour material|class; now %s", g_rmColourMode ? "class" : "material"); return false; }
+    if (!RmGate("dbg.flatcolour", mode, o, n)) return false;
+    InterlockedExchange(&g_rmColourMode, mode);
+    if (g_dvPersist && g_iniPath[0]) WritePrivateProfileStringA("Debug", "FlatColour", mode ? "class" : "material", g_iniPath);
+    Log(1, "dbg.flatcolour %s (src=%s)", mode ? "class" : "material", ShotSource("dbg.flatcolour"));
+    Out(o, n, "dbg.flatcolour %s", mode ? "class" : "material");
+    return true;
+}
+bool RmRunBool(volatile LONG *flag, const char *item, const char *key, const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, *flag != 0);
+    if (!RmGate(item, on ? 1 : 0, o, n)) return false;
+    InterlockedExchange(flag, on ? 1 : 0);
+    InterlockedExchange(&g_rmLogDrawn, g_rmFlat ? 1 : 0);
+    DvPersistKey(key, on);
+    Log(1, "%s %d (src=%s)", item, on ? 1 : 0, ShotSource(item));
+    Out(o, n, "%s %d", item, on ? 1 : 0);
+    return true;
+}
+void ValRmModels(char *o, size_t n) { Out(o, n, "%d", g_rmFlatModels ? 1 : 0); }
+bool RunRmModels(const char *arg, char *o, size_t n) { return RmRunBool(&g_rmFlatModels, "dbg.flatmodels", "FlatModels", arg, o, n); }
+void ValRmEdges(char *o, size_t n) { Out(o, n, "%d", g_rmFlatEdges ? 1 : 0); }
+bool RunRmEdges(const char *arg, char *o, size_t n) { return RmRunBool(&g_rmFlatEdges, "dbg.flatedges", "FlatEdges", arg, o, n); }
+void ValRmAnyRt(char *o, size_t n) { Out(o, n, "%d", g_rmFlatAnyRt ? 1 : 0); }
+bool RunRmAnyRt(const char *arg, char *o, size_t n) { return RmRunBool(&g_rmFlatAnyRt, "dbg.flatanyrt", "FlatAnyTarget", arg, o, n); }
+
+// ---- R2 collision overlay (Present, inside DrawDebugView) ----
+struct RcTri { float v[3][3], c[3], nz, ext; BYTE flags; };   // flags 1 slide face, 2 face of an enemy-only group
+const int kRcMax = 24576;
+RcTri g_rcTri[kRcMax];
+int g_rcSel[kRcMax];
+float g_rcD2[kRcMax];
+int g_rcCount = 0, g_rcUnits = 0, g_rcMeshes = 0, g_rcFaces = 0, g_rcSlideN = 0, g_rcEnemyN = 0, g_rcEnemyGroups = 0,
+    g_rcNoBack = 0, g_rcFaults = 0, g_rcBadIdx = 0;
+bool g_rcCapped = false;
+DWORD g_rcSig = 0;
+
+// the loaded units' collision layout + the layers on (a change = read again)
+DWORD RcSignature(DWORD want) {
+    DWORD h = 2166136261u ^ want;
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD state = 0, level = 0, terrain = 0, groups = 0, count = 0;
+        if (!ReadDword(e + 4, &state) || (state & 0xff) != 2 || !ReadDword(e + 8, &level) || !level) continue;
+        ReadDword(level, &terrain);
+        if (terrain) { ReadDword(terrain + 8, &count); ReadDword(terrain + 0xc, &groups); }
+        h = (h ^ level) * 16777619u;
+        h = (h ^ groups) * 16777619u;
+        h = (h ^ count) * 16777619u;
+    }
+    return h ? h : 1;
+}
+// one mesh into g_rcTri (raw reads inside one __try: a fault skips the rest of this mesh)
+bool RcScanMesh(DWORD mesh, bool enemy, DWORD want) {
+    __try {
+        const BYTE *m = reinterpret_cast<const BYTE *>(mesh);
+        const BYTE *verts = *reinterpret_cast<const BYTE *const *>(m + 0x30);
+        const BYTE *faces = *reinterpret_cast<const BYTE *const *>(m + 0x34);
+        DWORD nf = *reinterpret_cast<const DWORD *>(m + 0x44), nv = *reinterpret_cast<const DWORD *>(m + 0x48);
+        WORD w54 = *reinterpret_cast<const WORD *>(m + 0x54);
+        float pos[3] = {reinterpret_cast<const float *>(m + 0x20)[0], reinterpret_cast<const float *>(m + 0x20)[1],
+                        reinterpret_cast<const float *>(m + 0x20)[2]};
+        if (!verts || !faces || nf > 400000 || nv > 400000 || !DvFinite(pos, 3)) return true;
+        for (DWORD k = 0; k < nf; ++k) {
+            const DWORD *f = reinterpret_cast<const DWORD *>(faces + 20 * k);   // +0 .. +0xf only (last record is short)
+            ++g_rcFaces;
+            bool slide = ((f[3] >> 16) & 0x04) != 0;              // +0x0e u16 clientFlags & 0x04
+            if (slide) ++g_rcSlideN;
+            if (enemy) ++g_rcEnemyN;
+            BYTE flags = static_cast<BYTE>((slide && (want & 1) ? 1 : 0) | (enemy && (want & 2) ? 2 : 0));
+            if (!flags) continue;
+            if (f[0] >= nv || f[1] >= nv || f[2] >= nv) { ++g_rcBadIdx; continue; }
+            if (g_rcCount >= kRcMax) { g_rcCapped = true; return true; }
+            RcTri &t = g_rcTri[g_rcCount];
+            for (int a = 0; a < 3; ++a) {
+                if (w54 == 0) {
+                    const short *s = reinterpret_cast<const short *>(verts + 6 * f[a]);
+                    for (int b = 0; b < 3; ++b) t.v[a][b] = static_cast<float>(s[b]) + pos[b];
+                } else {
+                    const float *p = reinterpret_cast<const float *>(verts + 16 * f[a]);
+                    for (int b = 0; b < 3; ++b) t.v[a][b] = p[b] + pos[b];
+                }
+            }
+            if (!DvFinite(&t.v[0][0], 9)) { ++g_rcBadIdx; continue; }
+            float u[3], w[3], nrm[3];
+            for (int b = 0; b < 3; ++b) {
+                u[b] = t.v[1][b] - t.v[0][b];
+                w[b] = t.v[2][b] - t.v[0][b];
+                t.c[b] = (t.v[0][b] + t.v[1][b] + t.v[2][b]) / 3.0f;
+            }
+            nrm[0] = u[1] * w[2] - u[2] * w[1];
+            nrm[1] = u[2] * w[0] - u[0] * w[2];
+            nrm[2] = u[0] * w[1] - u[1] * w[0];
+            float len = sqrtf(nrm[0] * nrm[0] + nrm[1] * nrm[1] + nrm[2] * nrm[2]);
+            t.nz = len > 1.0e-6f ? fabsf(nrm[2]) / len : 1.0f;
+            t.ext = 0.0f;
+            for (int a = 0; a < 3; ++a) {
+                float dx = t.v[a][0] - t.c[0], dy = t.v[a][1] - t.c[1], dz = t.v[a][2] - t.c[2];
+                float d = sqrtf(dx * dx + dy * dy + dz * dz);
+                if (d > t.ext) t.ext = d;
+            }
+            t.flags = flags;
+            ++g_rcCount;
+        }
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+// every loaded unit's TerrainGroups (Level -> Terrain +8 count / +0xc groups of 0x50, +0x38 mesh, back pointer +0x3c)
+void RcCollect(DWORD want) {
+    g_rcCount = g_rcUnits = g_rcMeshes = g_rcFaces = g_rcSlideN = g_rcEnemyN = g_rcEnemyGroups = g_rcNoBack = 0;
+    g_rcFaults = g_rcBadIdx = 0;
+    g_rcCapped = false;
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD state = 0, level = 0, terrain = 0, groups = 0, count = 0;
+        if (!ReadDword(e + 4, &state) || (state & 0xff) != 2 || !ReadDword(e + 8, &level) || !level) continue;
+        if (!ReadDword(level, &terrain) || !terrain || !ReadDword(terrain + 8, &count) || count > 4096 ||
+            !ReadDword(terrain + 0xc, &groups) || !groups)
+            continue;
+        ++g_rcUnits;
+        for (DWORD g = 0; g < count; ++g) {
+            DWORD grp = groups + 0x50 * g, mesh = 0, back = 0, extra = 0, flags = 0;
+            if (!ReadDword(grp + 0x38, &mesh) || !mesh) continue;
+            if (!ReadDword(mesh + 0x3c, &back) || back != grp) { ++g_rcNoBack; continue; }
+            if (ReadDword(grp + 0x30, &extra) && extra) ReadDword(extra, &flags);
+            bool enemy = (flags & 0x800) != 0;
+            if (enemy) ++g_rcEnemyGroups;
+            ++g_rcMeshes;
+            if (!RcScanMesh(mesh, enemy, want)) ++g_rcFaults;
+        }
+    }
+    Log(1, "0.15 collision: read %d unit(s), %d mesh(es) (%d without the back pointer, %d faulted), %d faces: %d slide "
+           "(clientFlags 0x04), %d in %d enemy-only group(s) (extra flags 0x800), %d bad indices; cached %d for slide %d / "
+           "enemycoll %d%s", g_rcUnits, g_rcMeshes, g_rcNoBack, g_rcFaults, g_rcFaces, g_rcSlideN, g_rcEnemyN,
+        g_rcEnemyGroups, g_rcBadIdx, g_rcCount, (want & 1) ? 1 : 0, (want & 2) ? 1 : 0, g_rcCapped ? " - CAPPED at 24576" : "");
+}
+// one triangle, clipped at the near plane (0.14's projection), filled + edges
+void RcDrawTri(ImDrawList *dl, const DvCam &c, const RcTri &t, ImU32 fill, ImU32 edge) {
+    float q[3][3], poly[4][3];
+    for (int a = 0; a < 3; ++a) DvToCam(c, t.v[a], q[a]);
+    int n = 0;
+    for (int a = 0; a < 3; ++a) {                          // Sutherland-Hodgman against z' >= near
+        const float *p0 = q[a], *p1 = q[(a + 1) % 3];
+        bool in0 = p0[2] >= kDvNear, in1 = p1[2] >= kDvNear;
+        if (in0) { poly[n][0] = p0[0]; poly[n][1] = p0[1]; poly[n][2] = p0[2]; ++n; }
+        if (in0 != in1) {
+            float s = (kDvNear - p0[2]) / (p1[2] - p0[2]);
+            for (int b = 0; b < 3; ++b) poly[n][b] = p0[b] + (p1[b] - p0[b]) * s;
+            poly[n][2] = kDvNear;
+            ++n;
+        }
+    }
+    if (n < 3) return;
+    ImVec2 pts[4];
+    for (int a = 0; a < n; ++a)
+        if (!DvCamToScreen(c, poly[a], &pts[a])) return;
+    dl->AddConvexPolyFilled(pts, n, fill);
+    dl->AddPolyline(pts, n, edge, ImDrawFlags_Closed, 1.0f);
+}
+void RcDraw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used) {
+    if (!g_rcOk) { LabelAdd(state, stateSize, used, "collision: pre-check failed (%s); ", g_rcWhy); return; }
+    DWORD want = (g_dvOn[kDvSlide] ? 1u : 0u) | (g_dvOn[kDvEnemyColl] ? 2u : 0u);
+    DWORD sig = RcSignature(want);
+    if (sig != g_rcSig) {
+        RcCollect(want);
+        g_rcSig = sig;
+    }
+    DWORD tun = 0;
+    WORD raw = 0;
+    int deg = 0;
+    if (ReadDword(kRcTuning, &tun) && tun && ReadWord(tun + kRcTuningAngle, &raw)) deg = static_cast<short>(raw);
+    bool tunOk = deg > 0 && deg < 90;
+    const float cosT = tunOk ? cosf(static_cast<float>(deg) * 3.14159265f / 180.0f) : 2.0f;   // unknown: every face red
+    const float r2 = g_rcRadius * g_rcRadius;
+    int sel = 0;
+    for (int i = 0; i < g_rcCount; ++i) {
+        const RcTri &t = g_rcTri[i];
+        if (!(t.flags & want)) continue;
+        float d2 = 0.0f;
+        if (!DvVisible(c, t.c, t.ext, &d2) || d2 > r2) continue;
+        g_rcSel[sel] = i;
+        g_rcD2[sel] = d2;
+        ++sel;
+    }
+    // nearest first: a 64-bucket histogram of the distance gives the cut when more than CollMax are in reach
+    int cutBucket = 64, cutTake = 0;
+    if (sel > g_rcMax) {
+        int hist[64] = {};
+        for (int s = 0; s < sel; ++s) {
+            int b = static_cast<int>(g_rcD2[s] / r2 * 64.0f);
+            ++hist[b < 0 ? 0 : b > 63 ? 63 : b];
+        }
+        int sum = 0;
+        for (int b = 0; b < 64; ++b) {
+            if (sum + hist[b] >= g_rcMax) { cutBucket = b; cutTake = g_rcMax - sum; break; }
+            sum += hist[b];
+        }
+    }
+    int drawnSlide = 0, drawnEnemy = 0, steep = 0;
+    for (int s = 0; s < sel; ++s) {
+        int b = static_cast<int>(g_rcD2[s] / r2 * 64.0f);
+        b = b < 0 ? 0 : b > 63 ? 63 : b;
+        if (b > cutBucket) continue;
+        if (b == cutBucket) {
+            if (cutTake <= 0) continue;
+            --cutTake;
+        }
+        const RcTri &t = g_rcTri[g_rcSel[s]];
+        if ((t.flags & 1) && (want & 1)) {
+            bool isSteep = t.nz < cosT && t.nz < 0.9999f;
+            if (isSteep) ++steep;
+            RcDrawTri(dl, c, t, isSteep ? IM_COL32(255, 45, 45, 105) : IM_COL32(255, 150, 30, 95),
+                      isSteep ? IM_COL32(255, 110, 110, 230) : IM_COL32(255, 190, 90, 220));
+            ++drawnSlide;
+        } else {
+            RcDrawTri(dl, c, t, IM_COL32(190, 80, 255, 85), IM_COL32(215, 150, 255, 220));
+            ++drawnEnemy;
+        }
+    }
+    g_dvListed[kDvSlide] = g_rcSlideN;
+    g_dvDrawn[kDvSlide] = drawnSlide;
+    g_dvListed[kDvEnemyColl] = g_rcEnemyN;
+    g_dvDrawn[kDvEnemyColl] = drawnEnemy;
+    char tunText[48];
+    if (tunOk) Out(tunText, sizeof(tunText), "%d deg", deg);
+    else Out(tunText, sizeof(tunText), "not readable (%d) - all red", deg);
+    LabelAdd(state, stateSize, used, "collision: slide %d drawn of %d (%d steeper than the tuning angle %s), enemy-only %d "
+             "drawn of %d in %d group(s); %d in reach of %.0f, max %d%s; ", drawnSlide, g_rcSlideN, steep, tunText,
+             drawnEnemy, g_rcEnemyN, g_rcEnemyGroups, sel, g_rcRadius, g_rcMax, g_rcCapped ? ", cache CAPPED" : "");
+}
+void ValRcSlide(char *o, size_t n) { Out(o, n, "%d (%d drawn of %d)", g_dvOn[kDvSlide] ? 1 : 0, g_dvDrawn[kDvSlide], g_dvListed[kDvSlide]); }
+bool RunRcSlide(const char *arg, char *o, size_t n) { return DvRunOne(kDvSlide, "dbg.slide", arg, o, n); }
+void ValRcEnemy(char *o, size_t n) {
+    Out(o, n, "%d (%d drawn of %d in %d group(s))", g_dvOn[kDvEnemyColl] ? 1 : 0, g_dvDrawn[kDvEnemyColl],
+        g_dvListed[kDvEnemyColl], g_rcEnemyGroups);
+}
+bool RunRcEnemy(const char *arg, char *o, size_t n) { return DvRunOne(kDvEnemyColl, "dbg.enemycoll", arg, o, n); }
+
+// legend lines of the render mode (DrawDebugLegend)
+int RmLegend(char (*lines)[112], ImU32 *colours, int n, int limit) {
+    if (g_rmFlat && n < limit) {
+        char passes[64];
+        RmPassText(static_cast<DWORD>(g_rmPassMask), passes, sizeof(passes));
+        if (RmSlotsOn()) Out(lines[n], sizeof(lines[n]), "Flach / flat: Pass %s, %ld flach (T %ld / F %ld)", passes,
+                             g_rmLast.flatT + g_rmLast.flatM, g_rmLast.flatT, g_rmLast.flatM);
+        else Out(lines[n], sizeof(lines[n]), "Flach / flat: wartet / waits (%s)", g_rmWaitWhy[0] ? g_rmWaitWhy : "-");
+        colours[n++] = IM_COL32(220, 220, 200, 255);
+    }
+    if (g_dvOn[kDvSlide] && n < limit) {
+        DWORD tun = 0;
+        WORD raw = 0;
+        int deg = 0;
+        if (ReadDword(kRcTuning, &tun) && tun && ReadWord(tun + kRcTuningAngle, &raw)) deg = static_cast<short>(raw);
+        Out(lines[n], sizeof(lines[n]), "rot = steiler als %d Grad (rutscht), orange = flacher", deg);
+        colours[n++] = IM_COL32(255, 150, 30, 255);
+    }
+    if (g_dvOn[kDvSlide] || g_dvOn[kDvEnemyColl]) {
+        if (n < limit) {
+            Out(lines[n], sizeof(lines[n]), "Kollision liegt oben (durch Waende) / on top");
+            colours[n++] = IM_COL32(200, 200, 200, 230);
+        }
+    }
+    return n;
 }
 
 // menu page "Debug view": the same groups as the ring Spieler / Debug (master, level data, AI, Lara, display)
@@ -7096,12 +8233,50 @@ void PageDebugView() {
     bool all = DvViewAny();
     if (TmCheckbox("Everything / Alles an / aus  [dbg.view]###dvall", &all)) RunDvView(all ? "1" : "0", o, sizeof(o));
     ImGui::TextWrapped("last frame: %s", DvAnyOn() ? g_dvState : "off");
+    // 0.15 render mode (stages R0 / R1; not part of dbg.view - the flat view is its own big switch)
+    if (ImGui::TreeNodeEx("Render (0.15) / Render###dvrender", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (!g_rmOk) ImGui::TextWrapped("render mode off: %s", g_rmWhy);
+        bool flat = g_rmFlat != 0;
+        if (TmCheckbox("flat view / Flach-Ansicht  [dbg.flat]###rmflat", &flat)) RunRmFlat(flat ? "1" : "0", o, sizeof(o));
+        char census[160], label[200];
+        ValRmCensus(census, sizeof(census));
+        Out(label, sizeof(label), "render census / Render-Zaehlung (%d frames)  [dbg.census]###rmcensus", g_rmCensusFrames);
+        if (TmButton(label)) RunRmCensus("", o, sizeof(o));
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", census);
+        ImGui::TextUnformatted("passes / Passe  [dbg.flatpass]:");
+        for (int i = 0; i < kRmPassN; ++i) {
+            bool v = (static_cast<DWORD>(g_rmPassMask) & kRmPassIds[i]) != 0;
+            char id[48], a[32];
+            Out(id, sizeof(id), "%s###rmp%d", kRmPassNames[i], i);
+            ImGui::SameLine();
+            if (TmCheckbox(id, &v)) {
+                Out(a, sizeof(a), "%s %d", kRmPassNames[i], v ? 1 : 0);
+                RunRmFlatPass(a, o, sizeof(o));
+            }
+        }
+        if (g_rmSuggest) {
+            Out(label, sizeof(label), "use the census / aus Zaehlung: 0x%03lx  [dbg.flatpasses census]###rmsug", g_rmSuggest);
+            if (TmButton(label)) RunRmFlatPasses("census", o, sizeof(o));
+            ImGui::SameLine();
+        }
+        if (TmButton("default / Vorgabe 0x200###rmdef")) RunRmFlatPasses("default", o, sizeof(o));
+        if (ImGui::RadioButton("colour per material / Farbe je Material###rmcm", g_rmColourMode == 0)) RunRmColour("material", o, sizeof(o));
+        ImGui::SameLine();
+        if (ImGui::RadioButton("terrain / models - Terrain / Figuren###rmcc", g_rmColourMode == 1)) RunRmColour("class", o, sizeof(o));
+        bool models = g_rmFlatModels != 0, edges = g_rmFlatEdges != 0, anyRt = g_rmFlatAnyRt != 0;
+        if (TmCheckbox("models flat too / Figuren einfaerben  [dbg.flatmodels]###rmmod", &models)) RunRmModels(models ? "1" : "0", o, sizeof(o));
+        if (TmCheckbox("edges / Kanten  [dbg.flatedges]###rmedge", &edges)) RunRmEdges(edges ? "1" : "0", o, sizeof(o));
+        if (TmCheckbox("every render target / Jedes Ziel  [dbg.flatanyrt]###rmany", &anyRt)) RunRmAnyRt(anyRt ? "1" : "0", o, sizeof(o));
+        ImGui::TextWrapped("state: %s", g_rmState);
+        ImGui::TreePop();
+    }
     if (ImGui::TreeNodeEx("Level data / Leveldaten###dvlevel", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (!g_dvTrgOk) ImGui::TextWrapped("triggers off: %s", g_dvTrgWhy);
         bool trg = DvAnyTrigger();
         if (TmCheckbox("all triggers / Trigger alle  [dbg.triggers]###dvtrg", &trg)) RunDvTriggers(trg ? "1" : "0", o, sizeof(o));
-        const int order[] = {kDvPortals, kDvCheckpoints, kDvDeath, kDvFire, kDvCheckpoint, kDvWater, kDvSound, kDvVolume,
-                             kDvPlane, kDvUnknown, kDvTrgLabels};
+        const int order[] = {kDvPortals, kDvCheckpoints, kDvSlide, kDvDeath, kDvFire, kDvCheckpoint, kDvWater, kDvSound,
+                             kDvVolume, kDvPlane, kDvUnknown, kDvTrgLabels};
         for (int i : order) {
             const DvLayerDef &d = kDvLayers[i];
             ImVec4 col = ImGui::ColorConvertU32ToFloat4(d.colour);
@@ -7117,6 +8292,9 @@ void PageDebugView() {
         ImGui::SliderInt("max triggers / frame  [Debug] TriggerMax", &g_dvTrgMax, 1, 256);
         ImGui::SliderFloat("radius from the camera  [Debug] TriggerRadius", &g_dvRadius, 500.0f, 200000.0f, "%.0f");
         ImGui::SliderInt("trigger names / frame  [Debug] TriggerLabelMax", &g_dvLabelMax, 0, 64);
+        if (!g_rcOk) ImGui::TextWrapped("collision overlay off: %s", g_rcWhy);
+        ImGui::SliderFloat("collision radius  [Debug] CollRadius", &g_rcRadius, 500.0f, 200000.0f, "%.0f");
+        ImGui::SliderInt("collision faces / frame  [Debug] CollMax", &g_rcMax, 100, 20000);
         ImGui::TreePop();
     }
     if (ImGui::TreeNodeEx("AI / KI###dvai", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -7135,6 +8313,17 @@ void PageDebugView() {
         if (TmCheckbox("Thrall-Labels  [dbg.labels]###dvlbl", &lbl)) {
             RunLabels(lbl ? "1" : "0", o, sizeof(o));
             DvPersistKey("Labels", lbl);
+        }
+        {                                    // 0.15 R2: enemy-only collision groups
+            const DvLayerDef &d = kDvLayers[kDvEnemyColl];
+            ImGui::ColorButton("##dvcenemy", ImGui::ColorConvertU32ToFloat4(d.colour), ImGuiColorEditFlags_NoTooltip,
+                               ImVec2(14.0f, 14.0f));
+            ImGui::SameLine();
+            bool v = g_dvOn[kDvEnemyColl] != 0;
+            char label[128];
+            Out(label, sizeof(label), "%s / %s  [dbg.enemycoll]  %d / %d###dvenemy", d.en, d.de, g_dvDrawn[kDvEnemyColl],
+                g_dvListed[kDvEnemyColl]);
+            if (TmCheckbox(label, &v)) DvSet(kDvEnemyColl, v, "menu", o, sizeof(o));
         }
         ImGui::TreePop();
     }
@@ -10711,7 +11900,8 @@ const Item kItems[] = {
     {"dbg.triggers", "bool", "0.14: trigger wireframes of every kind (the game's plane / volume lists: box, sphere, "
                              "plane quad, coloured by kind)", false, ValDvTriggers, RunDvTriggers},
     {"dbg.show", "action", "0.14 <layer> [0|1]: one layer - death, fire, checkpoint, water, sound, volume, plane, unknown "
-                           "(trigger kinds), portals, checkpoints, trglabels, legend (no 0 / 1 = flip)", false, ValDvShow,
+                           "(trigger kinds), portals, checkpoints, trglabels, legend, names, slide, enemycoll (no 0 / 1 = "
+                           "flip)", false, ValDvShow,
      RunDvShow},
     {"dbg.portals", "bool", "0.14: loading areas - the stream portal quads of every loaded unit (-> destination unit)",
      false, ValDvPortals, RunDvPortals},
@@ -10728,6 +11918,29 @@ const Item kItems[] = {
      ValDvNameColour, RunDvNameColour},
     {"dbg.namesize", "action", "0.14 <0.5 .. 3>: font size factor of the object names", false, ValDvNameSize,
      RunDvNameSize},
+    // 0.15 render mode ([Debug] Enabled; R0 census + R1 flat view patch 2 / 3 vtable words of tru.exe while active,
+    // R2 collision overlay read-only; dbg.view covers slide / enemycoll, not the flat view)
+    {"dbg.census", "action", "0.15 [frames]: R0 render census - drawable / device draws per pass id for N frames (default "
+                             "[Debug] CensusFrames), one '0.15 census' block in TruMenu.log with a suggested pass mask",
+     false, ValRmCensus, RunRmCensus},
+    {"dbg.flat", "bool", "0.15: R1 flat view - the level geometry in solid palette colours without textures (pixel shader "
+                         "swap in the terrain / model draws of the passes in dbg.flatpasses)", false, ValRmFlat, RunRmFlat},
+    {"dbg.flatpass", "action", "0.15 <0x200|0x100|0x80|0x400|0x800|1|2> [0|1]: one drawable pass id in / out of the flat "
+                               "view's pass mask (live)", false, ValRmPasses, RunRmFlatPass},
+    {"dbg.flatpasses", "action", "0.15 <mask>|census|default: the flat view's pass mask (hex, e.g. 0x300; census = the last "
+                                 "census' suggestion; default = 0x200)", false, ValRmPasses, RunRmFlatPasses},
+    {"dbg.flatcolour", "action", "0.15 material|class: flat colour per material, or terrain one colour / models another",
+     false, ValRmColour, RunRmColour},
+    {"dbg.flatmodels", "bool", "0.15: models (Lara, enemies, objects) flat too", false, ValRmModels, RunRmModels},
+    {"dbg.flatedges", "bool", "0.15: edge pass - each flat draw again as a dark wireframe", false, ValRmEdges, RunRmEdges},
+    {"dbg.flatanyrt", "bool", "0.15: flat in every render target (default only targets of the back buffer's size)", false,
+     ValRmAnyRt, RunRmAnyRt},
+    {"dbg.render", "info", "0.15: render mode checks, patched slots, last frame (flat draws), census state / suggestion",
+     false, ValRmRender, nullptr},
+    {"dbg.slide", "bool", "0.15: R2 slide faces - collision faces with clientFlags 0x04 of the loaded units, red = steeper "
+                          "than the tuning angle (Lara slides), orange = flatter; on top", false, ValRcSlide, RunRcSlide},
+    {"dbg.enemycoll", "bool", "0.15: R2 enemy-only collision - faces of TerrainGroups with extra flags 0x800 (violet, on top)",
+     false, ValRcEnemy, RunRcEnemy},
 };
 
 const Item *FindItem(const char *id) {
@@ -12550,6 +13763,11 @@ bool RadialOn(const RadItem &e, bool *isBool) {
     if (e.child < 0 && !e.special && !e.bad[0] && e.arg[0] && !strchr(e.arg, ' ') && !_stricmp(e.id, "dbg.show")) {
         int layer = DvFind(e.arg);
         if (layer >= 0) { *isBool = true; return g_dvOn[layer] != 0; }
+    }
+    // 0.15: "dbg.flatpass <pass>" (one word) shows whether that pass id is in the flat view's mask
+    if (e.child < 0 && !e.special && !e.bad[0] && e.arg[0] && !strchr(e.arg, ' ') && !_stricmp(e.id, "dbg.flatpass")) {
+        int pass = RmPassFind(e.arg);
+        if (pass >= 0) { *isBool = true; return (static_cast<DWORD>(g_rmPassMask) & kRmPassIds[pass]) != 0; }
     }
     *isBool =e.child < 0 && !e.special && !e.bad[0] && !e.arg[0] && CmdKindOf(e.id) == kCkBool;
     if (!*isBool) return false;
@@ -15088,7 +16306,7 @@ void DrawMenu() {
         if (TmCollapsingHeader("Cheat / flight")) PageCheat();
         if (TmCollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
         if (TmCollapsingHeader("Markup / collision draw")) PageMarkup();
-        if (TmCollapsingHeader("Debug view / Debug-Ansicht (0.12 - 0.14)###debugview")) PageDebugView();   // 0.14
+        if (TmCollapsingHeader("Debug view / Debug-Ansicht (0.12 - 0.15)###debugview")) PageDebugView();   // 0.14 / 0.15
         if (TmCollapsingHeader("Level select")) PageLevel();
         if (TmCollapsingHeader("Outfits (next level load)")) PageOutfits();
         if (TmCollapsingHeader("Dev channel")) {
@@ -15188,8 +16406,10 @@ void Render(IDirect3DDevice9 *device) {
         }
     }
     bool flowDraw = FlowWantsDraw();             // 0.11 status line / flow.say toast
+    RenderModeTick(device);                      // 0.15 render mode: census / flat view patching (cheap while off)
+    // 0.15: DvAnyOn() added - in 0.14 a debug view layer drew only while the menu / ring was open (or labels / markup on)
     if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_lblOn && !g_radOpen &&
-        !flowDraw)
+        !flowDraw && !DvAnyOn())
         return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
@@ -15287,6 +16507,7 @@ HRESULT STDMETHODCALLTYPE SwapPresentHook(IDirect3DSwapChain9 *chain, const RECT
 
 HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params) {
     if (g_imguiReady) ImGui_ImplDX9_InvalidateDeviceObjects();
+    RenderModeOnReset();                     // 0.15: the flat view's palette shaders (created again at the next Present)
     HRESULT hr = g_resetOriginal(device, params);
     Log(hr < 0 ? 0 : 3, "d3d9: Reset 0x%08lx", static_cast<DWORD>(hr));
     return hr;                               // device objects are re-created by the next ImGui_ImplDX9_NewFrame
@@ -15508,6 +16729,29 @@ void ReadOptions(const char *dir) {
         OptString(ini, "Debug", "NameColour", nameOpt, sizeof(nameOpt));
         g_dvNameRgb = (strlen(nameOpt) == 6 && strspn(nameOpt, "0123456789abcdefABCDEF") == 6) ? strtoul(nameOpt, nullptr, 16)
                                                                                                 : 0xffffff;
+    }
+    {                                            // 0.15 render mode
+        char v[32];
+        OptString(ini, "Debug", "CollRadius", v, sizeof(v));
+        float r = static_cast<float>(atof(v));
+        g_rcRadius = (r >= 500.0f && r <= 200000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "CollRadius")));
+        g_rcMax = OptInt(ini, "Debug", "CollMax");
+        if (g_rcMax < 100 || g_rcMax > 20000) g_rcMax = atoi(OptDefault("Debug", "CollMax"));
+        g_rmCensusAtStart = OptInt(ini, "Debug", "Census") != 0 ? 1 : 0;
+        g_rmCensusFrames = OptInt(ini, "Debug", "CensusFrames");
+        if (g_rmCensusFrames < 10 || g_rmCensusFrames > 1200) g_rmCensusFrames = atoi(OptDefault("Debug", "CensusFrames"));
+        g_rmFlatAtStart = OptInt(ini, "Debug", "Flat") != 0 ? 1 : 0;
+        OptString(ini, "Debug", "FlatPasses", v, sizeof(v));
+        char *end = nullptr;
+        DWORD mask = strtoul(v, &end, 0);
+        if (!v[0] || !end || *end || (mask & ~kRmPassAll)) mask = strtoul(OptDefault("Debug", "FlatPasses"), nullptr, 0);
+        InterlockedExchange(&g_rmPassMask, static_cast<LONG>(mask));
+        OptString(ini, "Debug", "FlatColour", v, sizeof(v));
+        DvTrim(v);
+        InterlockedExchange(&g_rmColourMode, !_stricmp(v, "class") ? 1 : 0);
+        InterlockedExchange(&g_rmFlatModels, OptInt(ini, "Debug", "FlatModels") != 0 ? 1 : 0);
+        InterlockedExchange(&g_rmFlatEdges, OptInt(ini, "Debug", "FlatEdges") != 0 ? 1 : 0);
+        InterlockedExchange(&g_rmFlatAnyRt, OptInt(ini, "Debug", "FlatAnyTarget") != 0 ? 1 : 0);
     }
     if (g_dvViewAtStart && g_debugEnabled) {     // dbg.view at start: labels + the ViewNav switches (as NavDraw)
         g_lblAtStart = 1;
@@ -15745,6 +16989,7 @@ void Start(HMODULE self) {
     CheatsCheck();
     NavCheck();                               // 0.12 Debug-Zeichnung: NavPower switches (precheck_012.txt)
     LabelCheck();                             // 0.13 Thrall-Labels (precheck_013.txt)
+    RenderModeCheck();                        // 0.15 render mode (precheck_015.txt) - before 0.14: the R2 layers' check
     DebugViewCheck();                         // 0.14 debug view (precheck_014.txt)
     g_camLogOk = HexBytesAt(0x005f3e0c, "b9f004e800 e85afeffff") && HexBytesAt(0x005f3d12, "8bce d91c24 e8c442ffff") &&
                  HexBytesAt(0x005e7feb, "8bf1") && HexBytesAt(0x005e8041, "8b4658 83f801") &&
@@ -15875,6 +17120,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         Start(instance);
     } else if (reason == DLL_PROCESS_DETACH) {
         g_stop = 1;
+        RenderModeShutdown();                         // 0.15: patched vtable words back (only those still ours)
     }
     return TRUE;
 }
