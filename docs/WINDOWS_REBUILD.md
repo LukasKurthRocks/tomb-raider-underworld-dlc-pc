@@ -2559,8 +2559,10 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      section changed, headers / relocations equal, step output md5 = tool output). `Invoke-TruPipeline.ps1` Fixes:
      `proof`, an in-place `dlc_struct_fixes.py TREE TREE --steps navraw` after each `dlc_fixes_build` and a gate
      `navgraph_raw_fix.py scan` (report `<tree>\navgraph_check.json`); Fixes now has 17 tools (`-FromTool` numbers
-     moved). Open: `navraw` into `dlc_fixes_build.STRUCT_STEPS` / `dlc_struct_fixes.CHECK_STEPS` (then the two
-     in-place calls go), a `Test-TruPreflight.ps1` Data row for the navmesh.
+     moved). Since 2026-11-06 `navraw` is a step of `dlc_fixes_build.STRUCT_STEPS` (after `seqrepeat`) and part of
+     the default `dlc_struct_fixes.py check`; the two in-place calls are gone (Fixes has 16 tools instead of 18, `-FromTool`
+     numbers after the first `dlc_fixes_build` moved). DRMs without a NavGraph image (the costume packs) are left alone.
+     Open: a `Test-TruPreflight.ps1` Data row for the navmesh.
    * Thrall charts: the 445 wrong chart truth words of the thrall copies in the test trees (finding of the F21
      agent) come from a stage-2b build of 2026-10-30 23:24, before step `statechart` existed (new read-only
      `tools/dtp_lineage.py`: origin per DTP section). `statechart_fix_tree` on 51i changes exactly 445 words in 16

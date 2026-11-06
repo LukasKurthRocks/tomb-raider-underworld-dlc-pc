@@ -38,6 +38,10 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          Sequence nodes (s8 repeat + 3 bytes) raw = the Xbox bytes (tools/soundplex_sequence_fix.py; the converter
          u32-swapped repeat 1 to 0 = endless, the DLC 2 doppelganger's groan); a word that is no byte order of the
          Xbox word stops the build
+  navraw (ours, 2026-11-06, finding 50) after seqrepeat, also tools/dlc_struct_fixes.py: the NavPower NavGraph image of
+         every unit (Level+0x60) raw = the Xbox bytes, the count word after resource 1 u32-swapped
+         (tools/navgraph_raw_fix.py; base proof once per process, a unit it cannot pair is left alone and fails the
+         check; DRMs without an image - e.g. the costume packs - are not touched)
   objevent, idword, animlist, fxnode, statevm, chartid (ours, 2026-11-03, finding 44) the converter fault families
          that the crash dumps of tests 50d-50j uncovered (tools/converter_faults_fix.py, rules proven on x_lara /
          pc_lara): object event list words and their sub-0x32 id word, anim event list words, effect node headers and
@@ -339,10 +343,13 @@ def _struct_fix(step):
 # seqrepeat (2026-11-05, finding 49): SoundPlex Sequence repeat word +0xc raw, after objid (no other step writes the word);
 # Invoke-TruPipeline.ps1 proves the rule first (soundplex_sequence_fix.py proof) and gates every tree afterwards
 # (soundplex_sequence_fix.py scan + dlc_struct_fixes.py check)
+# navraw (2026-11-06, finding 50): NavPower NavGraph image raw, after seqrepeat (no other step writes the image);
+# before, Invoke-TruPipeline.ps1 ran it in place after dlc_fixes_build; the gates stay (navgraph_raw_fix.py scan +
+# dlc_struct_fixes.py check)
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
-                'markup', 'objtex', 'objrec', 'objid', 'seqrepeat', 'vmliteral')
+                'markup', 'objtex', 'objrec', 'objid', 'seqrepeat', 'navraw', 'vmliteral')
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
- fix_markup, fix_objtex, fix_objrec, fix_objid, fix_seqrepeat, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+ fix_markup, fix_objtex, fix_objrec, fix_objid, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 def _fault_fix(step):

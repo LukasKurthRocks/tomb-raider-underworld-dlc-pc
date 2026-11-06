@@ -41,13 +41,14 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              proven transition / record layouts (2026-11-02: 134 records such as {800,501}, {500,1} left u32-swapped
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
-eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, seqrepeat, vmliteral (objtex / objrec / objid
+eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, seqrepeat, navraw, vmliteral (objtex / objrec / objid
 since 2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
 dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
 steps, docs Befund-Pipeline-Integration-0411.md; seqrepeat since 2026-11-05, WINDOWS_REBUILD finding 49: it touches
-only the word +0xc of SoundPlex Sequence nodes, no other step writes it; it reproduces the test tree dlc_test51p_moan).
+only the word +0xc of SoundPlex Sequence nodes, no other step writes it; it reproduces the test tree dlc_test51p_moan;
+navraw since 2026-11-06, finding 50: only the NavGraph image of a unit, no other step writes it).
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
-Check mode (objtex / objrec / objid / seqrepeat by default, navraw with --steps; tools/Invoke-TruPipeline.ps1 after
+Check mode (objtex / objrec / objid / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after
 Fixes and per costume pack):
   ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
@@ -531,8 +532,8 @@ def run_twins(srcs, out, names, tmp):
     return files, log
 
 
-CHECK_STEPS = ('objtex', 'objrec', 'objid', 'seqrepeat')   # steps with a check mode (no tool run, no shared corpus pass)
-CHECK_ALLOWED = CHECK_STEPS + ('navraw',)   # navraw: check only with --steps (2026-11-05, not yet in the default gate)
+CHECK_STEPS = ('objtex', 'objrec', 'objid', 'seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass)
+CHECK_ALLOWED = CHECK_STEPS   # navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS)
 
 
 def run_check(tree, steps, names=None, report=None):

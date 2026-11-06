@@ -59,10 +59,11 @@
                navraw (2026-11-05, docs Befund-Navmesh-Kombi-0511.md) copies the NavPower NavGraph image of every unit
                (Level+0x60) raw from the Xbox original, the count word after resource 1 u32-swapped (the converter
                u16-pair / u32-swapped words of the image: DLC 2 5187 words in 10 units, our DLC 1 1670 in 8); the rule
-               is proven first (navgraph_raw_fix proof: 82 base pairs, exit 1 when a count differs), applied in place
-               after each dlc_fixes_build (dlc_struct_fixes.py TREE TREE --steps navraw) and gated afterwards
-               (navgraph_raw_fix scan: exit 1 on a wrong, unexplained or unpaired word, report <tree>\navgraph_check.json).
-               The costume packs hold no unit (no NavGraph) - Costumes has no navraw tool;
+               is proven first (navgraph_raw_fix proof: 82 base pairs, exit 1 when a count differs), applied as step
+               navraw of dlc_fixes_build (after seqrepeat; since 2026-11-06, before an in-place run after it) and gated
+               afterwards (navgraph_raw_fix scan: exit 1 on a wrong, unexplained or unpaired word, report
+               <tree>\navgraph_check.json; dlc_struct_fixes check covers navraw too). The costume packs hold no unit
+               (no NavGraph): the step and the check leave them alone;
                objevent / idword / animlist / fxnode / statevm / chartid (2026-11-03, finding 44) set the converter
                fault families that crash dumps of tests 50d-50j uncovered (tools/converter_faults_fix.py: event list
                words and sub-0x32 ids, anim event list words, effect node headers / type-1 ids, state-VM code words,
@@ -312,8 +313,6 @@ $steps = @{
         @('tools\soundplex_sequence_fix.py', 'proof'),
         @('tools\navgraph_raw_fix.py', 'proof'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
-        # navraw (2026-11-05, docs Befund-Navmesh-Kombi-0511.md): the NavPower NavGraph image of every unit raw, in place
-        @('tools\dlc_struct_fixes.py', $fix1, $fix1, '--steps', 'navraw', '--pack', 'pack10'),
         @('tools\converter_faults_fix.py', 'check', $fix1, '--report', $chk1),
         @('tools\script_clash_fix.py', 'check', $fix1, '--report', $clash1),
         @('tools\dlc_struct_fixes.py', 'check', $fix1, '--report', $obj1),
@@ -322,7 +321,6 @@ $steps = @{
         @('tools\navgraph_raw_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $nav1),
         @('tools\compare_b138.py', $fix1, $cmp1),
         @('tools\dlc_fixes_build.py', 'work/rebuild/dlc2_asm_stage2a/mods', $fix2, '--pack', 'pack11'),
-        @('tools\dlc_struct_fixes.py', $fix2, $fix2, '--steps', 'navraw', '--pack', 'pack11'),
         @('tools\converter_faults_fix.py', 'check', $fix2, '--pack', 'pack11', '--report', $chk2),
         @('tools\script_clash_fix.py', 'check', $fix2, '--report', $clash2),
         @('tools\dlc_struct_fixes.py', 'check', $fix2, '--pack', 'pack11', '--report', $obj2),
