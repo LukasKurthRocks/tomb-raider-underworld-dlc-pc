@@ -1877,6 +1877,44 @@ save.load: 'Slot 2' (list index 1) loading - 0x789de0 = 1, step 2 set; Lara was 
 save.load: 'Slot 2' loaded - unit l4_trailstart (14.2 s)
 ```
 
+## TruMenu 0.19 "Dumme KI" (enemies ignore Lara; 2026-11-06)
+
+Workspace finding `docs\Befund-Gegner-Wahrnehmung-0611.md` (one brain class for every AI enemy, one perception list),
+report `docs\Befund-TruMenu-019-DummeKI-0611.md`; byte checks `work\asi\menu019\precheck_019.txt` (33, section
+"// ---- 0.19 dumb AI" .. the next "// ======" line).
+
+* **`ai.dumb`** `off|all|sharks|spiders|thralls|filter [0|1]` or `list <name parts>` (`[AI] Dumb` 0 / 1 / 2,
+  `[AI] DumbFilter`): every AI enemy, or those whose object name contains a part (sharks `shark`, spiders
+  `spider,tarantula`, thralls `thrall`, filter = the INI list), ignore Lara. One setting at a time - switching a group
+  on replaces the other; `<preset> 0` only switches off its own active setting; `""` / `1` bring the last one back.
+  Not AI enemies (no effect): jellyfish, kraken, Natla, `natla_thrall` (DLC 2).
+* **Method** (`ai.mode`, `[AI] DumbMode`): `purge` (default, stage A, no code patch) - once per game frame (PadHook,
+  game thread) every enemy in scope gets each sense slot that holds Lara reset with the engine's own `0x65a140` (the
+  function `EnemySense::DoProcess` calls when a target is gone). Lara can be sensed again by the scan of the same frame;
+  whether that is enough is the first live question. `gate` (stage B) - only while `ai.dumb` is on in a loaded level:
+  the rel32 of the calls `0x6648bb` / `0x659d8f` / `0x664a64` (AddToSenses) and `0x623e5f` (noise override) and the
+  EnemySense vtable slot `0x85a2fc` lead through TruMenu, which passes everything except Lara for an enemy in scope;
+  patched / put back on the game thread, all or nothing, only over the game's bytes; back when off, at a level change
+  and at unload.
+* **`ai.noinvestigate` / `ai.noattack`** (`[AI] NoInvestigate` / `NoAttack`): the prototype's flags rebuilt as brain+8
+  bits - 0x80 (Investigate), 0x20 (Attack / ScriptAttack) + 0x100000 (Melee); set once per frame for the enemies in
+  scope (the ai.dumb filter, else every AI enemy), only TruMenu's bits are cleared again. `ai.noattack` is partial
+  (close / ranged combat states not checked).
+* **Where**: ring Spieler / Debug / KI (8 entries) and Spieler / Barrierefreiheit (Haie / Spinnen ignorieren Lara),
+  quick-toggle bar Render / KI (heading + 9 rows, count = enemies in scope), Notfall ("Gegner ignorieren Lara"),
+  Barrierefreiheit (Sonstige: the planned row "Haie" is now "Haie ignorieren Lara", plus "Spinnen ignorieren Lara"),
+  menu page "AI / KI: enemies ignore Lara (0.19)"; `ai.status` = setting, checks, enemies seen / in scope, last second.
+* **Log**: one line per switch change, one per burst of removals / gate blocks (when it ends, every 30 s while it lasts),
+  never per frame. Cheats page: the rebuild rows "no senses" / "don't attack" / "don't investigate" name their 0.19 item;
+  "no barks" is unknown (0x616c20 is the EnemyProcess constructor, not ENEMY_UpdateBark).
+
+```text
+0.19 dumb AI: purge (stage A) ok (11 checks), gate (stage B) ok (15), brain flags ok (7); [AI] Dumb -> off, ...
+ai.dumb sharks (src=ring): off -> filter 'shark'; purge (stage A): the engine's sense reset 0x65a140 once per frame
+ai.dumb: burst ended after 4.0 s (4 active second(s)) - stage A purge 37 sense(s); gate 0 add(s) / 0 override(s) ...
+ai.dumb gate (stage B) on (ai.dumb on): A1 scan 0x6648bb, A2 AddTarget 0x659d8f, ... -> TruMenu
+```
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

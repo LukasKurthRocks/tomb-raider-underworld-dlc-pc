@@ -55,7 +55,14 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.18 (Lara in: the triggers Lara's test point is in as a coloured line under the "
+const char *const kVersion = "TruMenu 0.19 (Dumme KI: ai.dumb - enemies ignore Lara, every AI enemy or by object name "
+                             "(sharks / spiders / thralls / [AI] DumbFilter); purge = the engine's sense reset 0x65a140 "
+                             "once per game frame (stage A, no code patch, default), gate = 4 call gates + 1 vtable slot "
+                             "while on in a level (stage B, [AI] DumbMode=gate); ai.noinvestigate / ai.noattack = brain+8 "
+                             "bits 0x80 / 0x20 + 0x100000; ring Spieler / Debug / KI and Barrierefreiheit, quick-toggle "
+                             "bar Render / KI, Notfall and Barrierefreiheit, menu page AI; rebuild rows corrected (no "
+                             "barks partner unknown); "
+                             "0.18: Lara in: the triggers Lara's test point is in as a coloured line under the "
                              "position overlay, independent of the trigger layers (overlay.larain); owner units compared "
                              "case-insensitively; shot.oncine in segments (unit change, new cinematic, StartCinematic print) "
                              "with pairs spread over long cutscenes; quick-toggle bar with 9 pages - Notfall / Cheats, "
@@ -615,6 +622,25 @@ const OptDef kOpts[] = {
     {"Quick", "Language", "de", "0.17: language of the bar, de or en (quick.lang switches it until the next start)"},
     {"Quick", "Top", "30", "0.17: top edge of the bar in percent of the screen height, 5 .. 80"},
     {"Quick", "Scale", "1.0", "0.17: text size of the bar relative to the menu font, 0.5 .. 3"},
+    {"AI", "Dumb", "0", "0.19 Dumme KI (ai.dumb): enemies ignore Lara from the start - 0 = off, 1 = every AI enemy, 2 = only "
+                        "the enemies whose\nobject name contains a part of DumbFilter. Switched while the game runs with "
+                        "ai.dumb (ring Spieler / Debug / KI and\nSpieler / Barrierefreiheit, quick-toggle bar Render / KI "
+                        "and Notfall, menu page AI); not written back"},
+    {"AI", "DumbFilter", "", "0.19: comma list of object name parts for Dumb=2 and 'ai.dumb filter' (shark = sharks, "
+                             "spider,tarantula = spiders,\nthrall = thralls, merc,poacher = humans, tiger,panther = big "
+                             "cats); empty = every AI enemy"},
+    {"AI", "DumbMode", "purge", "0.19 (ai.mode): purge = stage A, no code patch - once per game frame the engine's own "
+                                "sense reset 0x65a140 takes\nLara out of the perception list of every enemy in the filter "
+                                "(it may sense her again until the next frame);\ngate = stage B - while ai.dumb is on in a "
+                                "level 4 calls + 1 vtable slot of tru.exe lead through TruMenu, Lara never\ngets into the "
+                                "list (put back when off, at a level change, at unload); use it only if purge is not "
+                                "enough"},
+    {"AI", "NoInvestigate", "0", "0.19 (ai.noinvestigate): 1 = the enemies of the ai.dumb filter (every AI enemy while "
+                                 "ai.dumb is off or all) do not\nwalk to noises - brain+8 bit 0x80, the prototype's "
+                                 "g_enemyNoInvestigate; set per frame, cleared again when off"},
+    {"AI", "NoAttack", "0", "0.19 (ai.noattack): 1 = the same enemies do not attack - brain+8 bits 0x20 (Attack / "
+                            "ScriptAttack) and 0x100000\n(Melee), the prototype's g_enemyNoAttack; partial: close / ranged "
+                            "combat states not checked"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -867,6 +893,7 @@ void WeaponsTick();    // 0.3 costume switch: player message 35 a frame later
 void InvincibleTick(); // 0.3 player.invincible: health = MaxHealth once per game frame
 void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite ammo re-apply (game thread)
 void SaveLoadTick();   // 0.18 save.load: a confirmed request, then its progress (game thread)
+void AiTick();         // 0.19 dumb AI: purge / gate patches / brain flags (game thread, section "0.19 dumb AI")
 void NavTick();        // 0.12 Debug-Zeichnung: [Debug] NavDraw / NavMask once in the first loaded level (game thread)
 void SafeGroundTick(); // 0.8.1 player.unstuck: ring of recent safe positions (game thread)
 void NoDamageTick();   // 0.10.2 cheat.godfull: the player's no-damage bit once per game frame (game thread)
@@ -1098,6 +1125,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         NoDamageTick();                       // 0.10.2: cheat.godfull no-damage bit [0xfada74] & 0x20000
         CheatsTick();                         // 0.8: [Cheats] Persist restore, infinite ammo re-apply
         SaveLoadTick();                       // 0.18 save.load (cheap: one flag while idle)
+        AiTick();                             // 0.19 dumb AI (cheap while everything is off: no walk)
         NavTick();                           // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
         SafeGroundTick();                     // 0.8.1: player.unstuck ring
     }
@@ -5445,19 +5473,29 @@ const CheatRow kCheatRows[] = {
     {"cheat.ammo", kCatReattach, ValCheatAmmo, RunCheatAmmo},
 };
 // "rebuild from the prototype" rows: read-only in 0.8 (reader gone on PC; the prototype function that read the flag)
-struct RebuildRow { const char *name, *proto, *pc; };
+// 0.19 (docs\Befund-Gegner-Wahrnehmung-0611.md section 3 / 6): built = the TruMenu item that rebuilds the row (nullptr =
+// not built); the 0.8 barks partner 0x616c20 was wrong - it is the EnemyProcess constructor (vtable store 0x616c28)
+struct RebuildRow { const char *name, *proto, *pc, *built; };
 const RebuildRow kRebuildRows[] = {
-    {"no fall damage", "g_playerNoFallDamage, read in PLAYER_CalculateFallingDamage", "PC fall-damage function not found"},
+    {"no fall damage", "g_playerNoFallDamage, read in PLAYER_CalculateFallingDamage", "PC fall-damage function not found",
+     nullptr},
     {"enemies ignore Lara (no senses)", "g_enemyNoSense, read in EnemySensesControl::GetNearestEnemyCommon",
-     "senses rebuilt in retail, hook point open"},
-    {"no AI", "g_enemyNoAI, read in EnemyProcessFunc / ENEMY_UpdateSystem", "no such test in PC EnemyProcessFunc 0x638d40"},
-    {"infinite grenades", "gInfiniteGrenades, read in ProcessCombat (refills item 3)", "rebuild with ammo.fill per frame"},
-    {"enemies don't attack", "g_enemyNoAttack (11 readers, EnemyBehavior_*::Priority)", "partners not paired"},
-    {"enemies: no attack damage", "g_enemyNoAttackDamage, ENEMY_PostDamageToTarget", "partners not paired"},
-    {"enemies: no health", "g_enemyNoHealth, ENEMY_ApplyDamage", "partners not paired"},
-    {"enemies don't move", "g_enemyNoMove, ENEMY_CanMove", "partners not paired"},
-    {"enemies don't investigate", "g_enemyNoInvestigate, EnemyBehavior_Investigate::Priority", "partners not paired"},
-    {"enemies: no barks", "g_enemyNoBarks, ENEMY_PlayBark / ENEMY_UpdateBark", "ENEMY_UpdateBark -> PC 0x616c20 (tier D)"},
+     "no 1:1 partner (query split); hook point EnemySensesControl::AddToSenses 0x659bd0 (3 callers) + noise override "
+     "0x623e5f, reset 0x65a140", "0.19 ai.dumb (purge stage A / gate stage B)"},
+    {"no AI", "g_enemyNoAI, read in EnemyProcessFunc / ENEMY_UpdateSystem", "no such test in PC EnemyProcessFunc 0x638d40",
+     nullptr},
+    {"infinite grenades", "gInfiniteGrenades, read in ProcessCombat (refills item 3)", "rebuild with ammo.fill per frame",
+     nullptr},
+    {"enemies don't attack", "g_enemyNoAttack (11 readers, EnemyBehavior_*::Priority)",
+     "brain+8 bit 0x20 (Attack::Priority 0x61a380, ScriptAttack 0x61efe0) + bit 0x100000 (Melee 0x6281b0); close / ranged "
+     "combat not checked", "0.19 ai.noattack (partial)"},
+    {"enemies: no attack damage", "g_enemyNoAttackDamage, ENEMY_PostDamageToTarget", "partners not paired", nullptr},
+    {"enemies: no health", "g_enemyNoHealth, ENEMY_ApplyDamage", "partners not paired", nullptr},
+    {"enemies don't move", "g_enemyNoMove, ENEMY_CanMove", "partners not paired", nullptr},
+    {"enemies don't investigate", "g_enemyNoInvestigate, EnemyBehavior_Investigate::Priority",
+     "brain+8 bit 0x80 (Investigate::Priority 0x6370d0)", "0.19 ai.noinvestigate"},
+    {"enemies: no barks", "g_enemyNoBarks, ENEMY_PlayBark / ENEMY_UpdateBark",
+     "unknown - not paired (0x616c20 of 0.8 is the EnemyProcess constructor, not ENEMY_UpdateBark)", nullptr},
 };
 
 void CheatPersistSave() {
@@ -5520,7 +5558,9 @@ void ValCheatList(char *o, size_t n) {
     }
     put("; cheat.fillup [%s]%s%s", kCheatCatNames[kCatReattach], g_fillOk ? "" : " disabled: ", g_fillOk ? "" : g_fillWhy);
     put("; cheat.code [%s]%s%s", kCheatCatNames[kCatCode], g_codeOk ? "" : " disabled: ", g_codeOk ? "" : g_codeWhy);
-    for (const RebuildRow &r : kRebuildRows) put("; %s [%s] not built yet%s", r.name, kCheatCatNames[kCatRebuild], "");
+    for (const RebuildRow &r : kRebuildRows)   // 0.19: the rebuilt rows name their item
+        put(r.built ? "; %s [%s] built: %s" : "; %s [%s] not built yet%s", r.name, kCheatCatNames[kCatRebuild],
+            r.built ? r.built : "");
 }
 
 // Start: byte pre-checks (all from work\asi\menu080\precheck_080.txt); a failed check disables that row with the reason
@@ -12062,6 +12102,706 @@ void SaveLoadCheck() {
 }
 
 // ======================================================================================================================
+// ---- 0.19 dumb AI (Lukas / coordinator 2026-11-06: "Dumme KI" = enemies ignore Lara; Barrierefreiheit: sharks /
+// spiders ignore Lara) ----
+// Static facts (workspace docs\Befund-Gegner-Wahrnehmung-0611.md, measured on the Steam exe; logs of this build in
+// work\dumbai_0611): every AI enemy has one brain (ctor 0x634020; [[inst+0x2d0]]+0x2ec as EnemyProcessFunc 0x638d59 reads
+// it) that owns one EnemySensesControl at brain+0x170 (vtable 0x85a3cc, ctor 0x664670) with 12 EnemySense slots at
+// +0x30 + i * 0xe0 (vtable 0x85a2f8, ctor 0x659b50); a slot's +0x1c / +0x20 is the owner handle {instance,
+// [instance+0x44]} (0x5b39f0, set by the senses ctor for every slot), +0xa8 the target instance, +0xac its handle id.
+// Lara gets into that list only through AddToSenses 0x659bd0 (3 callers: the proximity scan 0x6648bb, AddTarget 0x659d8f,
+// ForcePlayerTarget 0x664a64) plus one bypass: the noise handler sets Lara as the targeting override 0x623e5f -> 0x60e450
+// (ecx = brain+0x4e10, EnemyTargeting). The engine's own removal of a sense is the reset 0x65a140 (thiscall, no
+// argument, plain ret): it posts 0x11b ("disengaged") to Lara when the enemy was engaged, clears the slot and takes it
+// out of its process list - EnemySense::DoProcess 0x664e80 calls it itself when the target is gone (0x664ef1).
+// Stage A ([AI] DumbMode purge, the default - no code patch): once per game frame (PadHook, game thread) every enemy whose
+// senses pass the checks (vtable, owner handle = this instance) and whose object name is in the filter gets each sense
+// slot that holds Lara reset with 0x65a140. The scan of the same frame may add Lara again - whether the enemies still
+// attack is the live question (finding 5.2: churn expected, the noise bypass 0x623e5f is not covered).
+// Stage B ([AI] DumbMode gate): only while ai.dumb is on in a loaded level the rel32 of the 4 calls points to AiGateAdd /
+// AiGateOverride and EnemySense vtable slot 1 (0x85a2fc) to AiSensePurge; each passes everything through except Lara for
+// an enemy in the filter. Patched and put back on the game thread (the only thread that runs that code), all or nothing,
+// only while the bytes are the game's (or TruMenu's); put back when off, at a level change and at unload. A hook found
+// changed by someone else is left - TruMenu's gate then stays a pure pass-through (g_aiGateLive 0).
+// ai.noinvestigate / ai.noattack (the prototype's g_enemyNoInvestigate / g_enemyNoAttack): brain+8 bit 0x80
+// (EnemyBehavior_Investigate::Priority 0x6370d0) / bits 0x20 (Attack 0x61a380, ScriptAttack 0x61efe0) + 0x100000 (Melee
+// 0x6281b0) for the enemies in scope, set once per frame (the game re-derives them) and cleared again when off - only the
+// bits TruMenu set. Scope: the ai.dumb filter while ai.dumb is a filter, else every AI enemy.
+// Byte checks: work\asi\menu019\precheck_019.txt = kAiChecks + kAiGateChecks + kAiBitChecks. Log: one line per switch
+// change, one per burst of removals / gate blocks (when it ends, every 30 s while it lasts) - never per frame.
+const DvCheck kAiChecks[] = {
+    {0x00638d59, "8b87d0020000 85c0 7504 33f6 eb08 8b00 8bb0ec020000"},          // brain = [[inst+0x2d0]]+0x2ec
+    {0x0063408d, "8d8e70010000"},                                                 // brain+0x170 = the senses ..
+    {0x0063409f, "e8cc050300"},                                                   // .. built by 0x664670
+    {0x006646b5, "c707cca38500 8d7730 c74424180b000000 8bce e88354ffff 81c6e0000000"},   // vtable, 12 slots of 0xe0 at +0x30
+    {0x00664712, "8b54241c 52 8d8650ffffff 50 e8cdf2f4ff"},                       // slot +0x1c = the owner handle
+    {0x005b39f0, "8b442408 85c0 8b4c2404 8901 7407 8b4044 894104 c3"},            // handle = {inst, [inst+0x44]}
+    {0x00659b7e, "c706f8a28500"},                                                 // slot vtable 0x85a2f8
+    {0x0065a140, "53 56 8bf1 8b86a8000000 33db 3b0594f0e700"},                    // reset: target +0xa8 vs [0xe7f094]
+    {0x0065a155, "8d4e1c 51 e87298f5ff"},                                         // .. owner handle +0x1c (0x5b39d0)
+    {0x0065a1e2, "8b4e08 3bcb 7406 56 e8716c0100 5f 5e 5b c3"},                   // .. out of the process list, ret
+    {0x00664eda, "8b87a8000000 85c0 740b 8b5044 3b97ac000000 740e 8bcf e84a52ffff"},   // the game's own reset (target gone)
+};
+const DvCheck kAiGateChecks[] = {
+    {0x006648b8, "56 8bcd e81053ffff"},                                           // A1 scan: push target, ecx = senses
+    {0x00659d8c, "53 8bcf e83cfeffff 8bf0 85f6 7440"},                            // A2 AddTarget: the result is tested
+    {0x00664a5b, "8b0d94f0e700 51 8bce e86751ffff 8b86c80a0000"},                 // A3 ForcePlayerTarget: re-reads +0xac8
+    {0x00623e4b, "8d8f104e0000"},                                                 // A4 noise: ecx = brain+0x4e10 ..
+    {0x00623e5b, "8b4624 50 e8eca5feff"},                                         // .. push the instance, call 0x60e450
+    {0x006342b1, "8d8e104e0000 e894f40100"},                                      // brain+0x4e10 = EnemyTargeting
+    {0x0085a2f8, "90ac6800 804e6600 a0576400"},                                   // A5 EnemySense vtable, slot 1 0x664e80
+    {0x00659bd0, "558bec83e4f083ec145356578bf9"},                                 // AddToSenses (thiscall) ..
+    {0x00659c9b, "c20400"},                                                       // .. ret 4
+    {0x00659d4a, "c20400"},
+    {0x00659d55, "c20400"},
+    {0x0060e450, "d9442408 8b442404 51 d91c24 50 81c1f0000000 e888580400 c20800"},   // override setter, ret 8
+    {0x00664e80, "558bec83e4f081eca4000000"},                                     // EnemySense::DoProcess ..
+    {0x00664ed3, "5f5e5b8be55dc3"},                                               // .. plain ret (twice)
+    {0x00664ef6, "5f5e5b8be55dc3"},
+};
+const DvCheck kAiBitChecks[] = {
+    {0x008582d8, "d0706300"},                                                     // Investigate vtable slot 3 = 0x6370d0
+    {0x006370ea, "8b5108 c1ea07 f6c201 752c"},                                    // .. brain+8 bit 0x80
+    {0x00858058, "80a36100"},                                                     // Attack vtable slot 3 = 0x61a380
+    {0x0061a3a8, "8b5008 c1ea05"},                                                // .. brain+8 bit 0x20
+    {0x00856b98, "b0816200"},                                                     // Melee vtable slot 3 = 0x6281b0
+    {0x006281cb, "8b4208 c1e814 a801 7407 83c8ff"},                               // .. brain+8 bit 0x100000 -> -1
+    {0x0061f00a, "8b4a08 c1e905"},                                                // ScriptAttack 0x61efe0: bit 0x20
+};
+const DWORD kAiSensesVt = 0x0085a3cc, kAiSenseVt = 0x0085a2f8, kAiSenses = 0x170, kAiSlot0 = 0x30, kAiSlotSize = 0xe0;
+const DWORD kAiSlots = 12, kAiTargeting = 0x4e10;
+const DWORD kAiAddToSenses = 0x00659bd0, kAiSetInstTarget = 0x0060e450, kAiSenseDo = 0x00664e80, kAiSenseReset = 0x0065a140;
+const DWORD kAiBitInv = 0x80, kAiBitAtk = 0x20 | 0x100000;
+typedef void *(__fastcall *AiAddFn)(void *senses, void *edx, void *target);            // thiscall, ret 4
+typedef void(__fastcall *AiOverrideFn)(void *targeting, void *edx, void *inst, float t);   // thiscall, ret 8
+typedef void(__fastcall *AiSenseFn)(void *sense, void *edx);                            // thiscall, ret
+
+enum { kAiOff = 0, kAiAll = 1, kAiFilter = 2 };
+volatile LONG g_aiMode = kAiOff;             // ai.dumb / [AI] Dumb
+volatile LONG g_aiGateMode = 0;              // [AI] DumbMode / ai.mode: 0 purge (stage A), 1 gate (stage B)
+volatile LONG g_aiNoInv = 0, g_aiNoAtk = 0;  // ai.noinvestigate / ai.noattack ([AI] NoInvestigate / NoAttack)
+volatile LONG g_aiGateLive = 0;              // the gates filter (stage B patched and on); 0 = pure pass-through
+volatile LONG g_aiGen = 0;                   // bumped by every mode / list change: the game thread drops its name cache
+char g_aiIniFilter[128] = "";                // [AI] DumbFilter (normalised)
+char g_aiList[2][128] = {"", ""};            // the active list: written by the item into the other buffer, then flipped
+volatile LONG g_aiListIdx = 0;
+char g_aiLastOn[16] = "all";                 // the setting "ai.dumb" / "ai.dumb 1" switches back on ..
+LONG g_aiLastMode = 1;                       // .. its mode and list
+char g_aiLastList[128] = "";
+bool g_aiOk = false, g_aiGateOk = false, g_aiBitsOk = false;
+char g_aiWhy[112] = "not checked", g_aiGateWhy[112] = "not checked", g_aiBitsWhy[112] = "not checked";
+// game thread only
+LONG g_aiGenSeen = -1;
+signed char g_aiKind[4096];                  // per object id: 0 not known yet, 1 in the filter, 2 not
+bool g_aiGateOn = false;                     // the 5 patches are in place
+int g_aiEnemies = 0, g_aiMatched = 0;        // the last walk: AI enemies seen / in the ai.dumb scope (-1 = not walked)
+struct AiPatch { DWORD site, target; bool call; const char *name; DWORD game, hook; bool on; };
+AiPatch g_aiPatches[5] = {
+    {0x006648bb, kAiAddToSenses, true, "A1 scan 0x6648bb", 0, 0, false},
+    {0x00659d8f, kAiAddToSenses, true, "A2 AddTarget 0x659d8f", 0, 0, false},
+    {0x00664a64, kAiAddToSenses, true, "A3 ForcePlayerTarget 0x664a64", 0, 0, false},
+    {0x00623e5f, kAiSetInstTarget, true, "A4 noise override 0x623e5f", 0, 0, false},
+    {0x0085a2fc, kAiSenseDo, false, "A5 EnemySense slot 1 0x85a2fc", 0, 0, false},
+};
+// brain+8 bits TruMenu set (so that only those are cleared again)
+struct AiBitRec { DWORD inst, id, brain, bits; };
+AiBitRec g_aiBits[256];
+int g_aiBitN = 0;
+// counters: this second / the last closed second / the running burst
+enum { kAiNotePurge = 0, kAiNoteAdd, kAiNoteOverride, kAiNoteSlot, kAiNotes };
+LONG g_aiSec[kAiNotes] = {}, g_aiLastSec[kAiNotes] = {};
+DWORD g_aiSecInst[64];
+int g_aiSecInstN = 0, g_aiLastSecEnemies = 0;
+DWORD g_aiSecStart = 0;
+struct AiBurst { bool on; DWORD start, lastActive, lastLine; LONG total[kAiNotes]; int maxEnemies, seconds; };
+AiBurst g_aiBurst = {};
+
+// presets: the ring / bar / menu rows ("filter" = [AI] DumbFilter)
+struct AiPreset { const char *name, *list, *de, *en; };
+const AiPreset kAiPresets[] = {{"all", "", "alle Gegner", "every enemy"},
+                               {"sharks", "shark", "Haie", "sharks"},
+                               {"spiders", "spider,tarantula", "Spinnen", "spiders"},
+                               {"thralls", "thrall", "Thralls", "thralls"}};
+const AiPreset *AiPresetFind(const char *name) {
+    for (const AiPreset &p : kAiPresets)
+        if (!_stricmp(name, p.name)) return &p;
+    return nullptr;
+}
+const char *AiList() { return g_aiList[g_aiListIdx & 1]; }
+// "Spider, Tarantula" -> "spider,tarantula"; false = a character other than a-z 0-9 _ * , and blanks
+bool AiNormList(const char *in, char *out, size_t n) {
+    size_t used = 0;
+    bool part = false, ok = true;
+    for (const char *p = in ? in : ""; *p; ++p) {
+        char c = static_cast<char>(tolower(static_cast<unsigned char>(*p)));
+        if (c == ',' || c == ' ') {
+            part = false;
+            continue;
+        }
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '*')) {
+            ok = false;
+            continue;
+        }
+        if (!part && used && used + 1 < n) out[used++] = ',';
+        part = true;
+        if (used + 1 < n) out[used++] = c;
+    }
+    out[used] = 0;
+    return ok;
+}
+// the scope of ai.dumb (mode all / a filter list; an empty list or "*" = every AI enemy); for the brain+8 switches mode
+// off counts as all. Object name of the id as dbg.labels (LabelKind), cached per id until the list changes.
+bool AiNameIn(int id) {
+    if (id <= 0 || id >= 4096) return false;
+    if (g_aiKind[id]) return g_aiKind[id] == 1;
+    char name[64], list[128];
+    int kind = 2;
+    if (ObjectName(id, name, sizeof(name))) {
+        _strlwr_s(name, sizeof(name));
+        strncpy_s(list, sizeof(list), AiList(), _TRUNCATE);
+        char *context = nullptr;
+        for (char *part = strtok_s(list, ",", &context); part; part = strtok_s(nullptr, ",", &context))
+            if (part[0] && strstr(name, part)) { kind = 1; break; }
+    }
+    g_aiKind[id] = static_cast<signed char>(kind);
+    return kind == 1;
+}
+bool AiInScope(DWORD inst, LONG mode) {
+    if (mode != kAiFilter) return true;
+    const char *list = AiList();
+    if (!list[0] || strchr(list, '*')) return true;
+    DWORD object = 0, oid = 0;
+    if (!ReadDword(inst + 0x10, &object) || !object || !ReadDword(object + 0x14, &oid)) return false;
+    return AiNameIn(static_cast<int>(oid & 0xffff));
+}
+// the brain of an AI enemy instance, 0 = none: the chain of 0x638d59, the senses vtable and their owner handle = inst
+DWORD AiBrainOf(DWORD inst) {
+    DWORD a = 0, b = 0, brain = 0, vt = 0, owner = 0, id = 0, own = 0;
+    if (!ReadDword(inst + 0x2d0, &a) || !a || !ReadDword(a, &b) || !b || !ReadDword(b + 0x2ec, &brain) || !brain) return 0;
+    if (!ReadDword(brain + kAiSenses, &vt) || vt != kAiSensesVt) return 0;
+    if (!ReadDword(brain + kAiSenses + 0x1c, &owner) || owner != inst) return 0;
+    if (!ReadDword(brain + kAiSenses + 0x20, &id) || !ReadDword(inst + 0x44, &own) || id != own) return 0;
+    return brain;
+}
+// the owner instance of an enemy process with the owner handle at +0x1c / +0x20 (the game's test 0x5b39d0), 0 = none
+DWORD AiOwner(DWORD proc) {
+    __try {
+        DWORD inst = *reinterpret_cast<const volatile DWORD *>(proc + 0x1c);
+        if (!inst) return 0;
+        return *reinterpret_cast<const volatile DWORD *>(inst + 0x44) == *reinterpret_cast<const volatile DWORD *>(proc + 0x20)
+                   ? inst : 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+}
+// game thread: true = this enemy must not get Lara (target) now
+bool AiIgnore(DWORD owner, DWORD target) {
+    LONG mode = g_aiMode;
+    DWORD player = 0;
+    if (!mode || !target || !owner || !ReadDword(kPlayerPtr, &player) || target != player) return false;
+    return AiInScope(owner, mode);
+}
+void AiNote(DWORD owner, int what) {
+    ++g_aiSec[what];
+    for (int i = 0; i < g_aiSecInstN; ++i)
+        if (g_aiSecInst[i] == owner) return;
+    if (g_aiSecInstN < 64) g_aiSecInst[g_aiSecInstN++] = owner;
+}
+
+// ---- stage B: the gates (called by the game in place of its own functions while patched) ----
+void *__fastcall AiGateAdd(void *senses, void *, void *target) {
+    if (g_aiGateLive) {
+        DWORD owner = AiOwner(reinterpret_cast<DWORD>(senses));
+        if (AiIgnore(owner, reinterpret_cast<DWORD>(target))) {
+            AiNote(owner, kAiNoteAdd);
+            return nullptr;                  // the callers treat 0 as "senses full" (0x6648bb ignores it, 0x659d96 /
+        }                                    // 0x664a69 test it)
+    }
+    return reinterpret_cast<AiAddFn>(kAiAddToSenses)(senses, nullptr, target);
+}
+void __fastcall AiGateOverride(void *targeting, void *, void *inst, float t) {
+    if (g_aiGateLive) {
+        DWORD senses = reinterpret_cast<DWORD>(targeting) - kAiTargeting + kAiSenses, vt = 0;
+        DWORD owner = ReadDword(senses, &vt) && vt == kAiSensesVt ? AiOwner(senses) : 0;
+        if (AiIgnore(owner, reinterpret_cast<DWORD>(inst))) {
+            AiNote(owner, kAiNoteOverride);
+            return;
+        }
+    }
+    reinterpret_cast<AiOverrideFn>(kAiSetInstTarget)(targeting, nullptr, inst, t);
+}
+void __fastcall AiSensePurge(void *sense, void *) {
+    if (g_aiGateLive) {
+        DWORD s = reinterpret_cast<DWORD>(sense), target = 0;
+        DWORD owner = AiOwner(s);
+        if (ReadDword(s + 0xa8, &target) && AiIgnore(owner, target)) {
+            reinterpret_cast<AiSenseFn>(kAiSenseReset)(sense, nullptr);   // the game's own reset, as at 0x664ef1
+            AiNote(owner, kAiNoteSlot);
+            return;
+        }
+    }
+    reinterpret_cast<AiSenseFn>(kAiSenseDo)(sense, nullptr);
+}
+DWORD AiPatchAddr(const AiPatch &p) { return p.call ? p.site + 1 : p.site; }
+// one patch on: only while the dword is the game's (or already TruMenu's)
+bool AiPatchOn(AiPatch &p, char *o, size_t n) {
+    DWORD at = AiPatchAddr(p), cur = 0;
+    if (!ReadDword(at, &cur)) { Out(o, n, "%s not readable", p.name); return false; }
+    if (cur == p.hook) { p.on = true; return true; }
+    if (cur != p.game) {
+        Out(o, n, "%s holds 0x%08lx, not the game's 0x%08lx - left untouched (another plugin?)", p.name, cur, p.game);
+        return false;
+    }
+    if (!WriteDword(at, p.hook)) { Out(o, n, "%s: VirtualProtect failed (%lu)", p.name, GetLastError()); return false; }
+    if (p.call) FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void *>(p.site), 5);
+    p.on = true;
+    return true;
+}
+// one patch off: the game's dword back only while TruMenu's is there
+const char *AiPatchOff(AiPatch &p) {
+    if (!p.on) return "";
+    p.on = false;
+    DWORD at = AiPatchAddr(p), cur = 0;
+    if (!ReadDword(at, &cur)) return " (not readable)";
+    if (cur != p.hook) return " (changed by someone else - left, TruMenu's gate stays a pass-through)";
+    if (!WriteDword(at, p.game)) return " (VirtualProtect failed)";
+    if (p.call) FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void *>(p.site), 5);
+    return "";
+}
+// game thread: the 5 patches to "want" (all or nothing); one log line when something changed
+void AiGateApply(bool want, const char *why) {
+    if (want == g_aiGateOn) return;
+    char text[400] = "", fail[200] = "";
+    size_t used = 0;
+    if (want) {
+        bool ok = true;
+        for (AiPatch &p : g_aiPatches) {
+            if (!AiPatchOn(p, fail, sizeof(fail))) { ok = false; break; }
+            LabelAdd(text, sizeof(text), &used, "%s%s", used ? ", " : "", p.name);
+        }
+        if (!ok) {
+            for (AiPatch &p : g_aiPatches) AiPatchOff(p);
+            InterlockedExchange(&g_aiGateMode, 0);
+            Log(0, "ai.dumb gate (stage B): patch refused - %s; nothing stays patched, back to purge (stage A)", fail);
+            return;
+        }
+        g_aiGateOn = true;
+        InterlockedExchange(&g_aiGateLive, 1);
+        Log(1, "ai.dumb gate (stage B) on (%s): %s -> TruMenu", why, text);
+        return;
+    }
+    InterlockedExchange(&g_aiGateLive, 0);
+    for (AiPatch &p : g_aiPatches) {
+        const char *note = AiPatchOff(p);
+        LabelAdd(text, sizeof(text), &used, "%s%s%s", used ? ", " : "", p.name, note);
+    }
+    g_aiGateOn = false;
+    Log(1, "ai.dumb gate (stage B) off (%s): %s put back", why, text);
+}
+// unload: every patch back (no log; the process may be ending)
+void AiShutdown() {
+    InterlockedExchange(&g_aiGateLive, 0);
+    for (AiPatch &p : g_aiPatches) AiPatchOff(p);
+    g_aiGateOn = false;
+}
+
+// ---- stage A: the purge, and the brain+8 switches (game thread, once per game frame) ----
+bool AiReset(DWORD sense) {
+    __try {
+        reinterpret_cast<AiSenseFn>(kAiSenseReset)(reinterpret_cast<void *>(sense), nullptr);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+bool AiPutDword(DWORD address, DWORD value) {
+    __try {
+        *reinterpret_cast<volatile DWORD *>(address) = value;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+// every sense slot of this enemy that holds Lara: the engine's reset (the slot's own owner handle checked first - 0x65a140
+// dereferences the owner's brain without a test)
+void AiPurgeEnemy(DWORD inst, DWORD brain, DWORD player) {
+    DWORD id = 0;
+    if (!ReadDword(inst + 0x44, &id)) return;
+    for (DWORD i = 0; i < kAiSlots; ++i) {
+        DWORD s = brain + kAiSenses + kAiSlot0 + i * kAiSlotSize, vt = 0, target = 0, owner = 0, ownerId = 0;
+        if (!ReadDword(s, &vt) || vt != kAiSenseVt || !ReadDword(s + 0xa8, &target) || target != player) continue;
+        if (!ReadDword(s + 0x1c, &owner) || owner != inst || !ReadDword(s + 0x20, &ownerId) || ownerId != id) continue;
+        if (AiReset(s)) AiNote(inst, kAiNotePurge);
+    }
+}
+DWORD AiBitsWanted(DWORD inst) {
+    DWORD want = (g_aiNoInv ? kAiBitInv : 0) | (g_aiNoAtk ? kAiBitAtk : 0);
+    return want && g_aiBitsOk && AiInScope(inst, g_aiMode) ? want : 0;
+}
+void AiBitsSet(DWORD inst, DWORD brain, DWORD want) {
+    DWORD flags = 0, id = 0;
+    if (!want || !ReadDword(brain + 8, &flags) || !ReadDword(inst + 0x44, &id)) return;
+    DWORD missing = want & ~flags;
+    if (!missing) return;
+    int k = 0;
+    while (k < g_aiBitN && !(g_aiBits[k].inst == inst && g_aiBits[k].brain == brain && g_aiBits[k].id == id)) ++k;
+    if (k == g_aiBitN) {
+        if (g_aiBitN >= static_cast<int>(sizeof(g_aiBits) / sizeof(g_aiBits[0]))) return;   // full: never set a bit
+        g_aiBits[k].inst = inst;                                                            // that cannot be cleared
+        g_aiBits[k].id = id;
+        g_aiBits[k].brain = brain;
+        g_aiBits[k].bits = 0;
+        ++g_aiBitN;
+    }
+    if (AiPutDword(brain + 8, flags | missing)) g_aiBits[k].bits |= missing;
+}
+// the bits TruMenu set and no longer wants go (only on a brain that is still this enemy's)
+void AiBitsSweep() {
+    for (int k = 0; k < g_aiBitN;) {
+        AiBitRec &r = g_aiBits[k];
+        DWORD id = 0, flags = 0;
+        bool alive = ReadDword(r.inst + 0x44, &id) && id == r.id && AiBrainOf(r.inst) == r.brain;
+        if (alive) {
+            DWORD clear = r.bits & ~AiBitsWanted(r.inst);
+            if (clear && ReadDword(r.brain + 8, &flags) && AiPutDword(r.brain + 8, flags & ~clear)) r.bits &= ~clear;
+        }
+        if (!alive || !r.bits) g_aiBits[k] = g_aiBits[--g_aiBitN];
+        else ++k;
+    }
+}
+void AiModeText(LONG mode, char *o, size_t n) {
+    if (mode == kAiAll) Out(o, n, "all");
+    else if (mode == kAiFilter) Out(o, n, "filter '%s'", AiList()[0] ? AiList() : "(empty = every enemy)");
+    else Out(o, n, "off");
+}
+void AiBurstLine(DWORD now, const char *what) {
+    const AiBurst &b = g_aiBurst;
+    char mode[160];
+    AiModeText(g_aiMode, mode, sizeof(mode));
+    Log(1, "ai.dumb: burst %s after %.1f s (%d active second(s)) - stage A purge %ld sense(s); gate %ld add(s) / %ld "
+        "override(s) blocked, %ld slot(s) purged; at most %d enemies per second; now %s, %s", what,
+        static_cast<double>(now - b.start) / 1000.0, b.seconds, b.total[kAiNotePurge], b.total[kAiNoteAdd],
+        b.total[kAiNoteOverride], b.total[kAiNoteSlot], b.maxEnemies, mode,
+        g_aiGateOn ? "gate patched" : "purge (stage A)");
+}
+// once per game frame: close a second, open / continue / end a burst
+void AiSecondTick(DWORD now) {
+    if (!g_aiSecStart) g_aiSecStart = now;
+    if (now - g_aiSecStart < 1000) return;
+    g_aiSecStart = now;
+    LONG sum = 0;
+    for (int i = 0; i < kAiNotes; ++i) {
+        g_aiLastSec[i] = g_aiSec[i];
+        sum += g_aiSec[i];
+        g_aiSec[i] = 0;
+    }
+    g_aiLastSecEnemies = g_aiSecInstN;
+    g_aiSecInstN = 0;
+    AiBurst &b = g_aiBurst;
+    if (sum) {
+        if (!b.on) {
+            memset(&b, 0, sizeof(b));
+            b.on = true;
+            b.start = b.lastLine = now - 1000;
+        }
+        b.lastActive = now;
+        ++b.seconds;
+        for (int i = 0; i < kAiNotes; ++i) b.total[i] += g_aiLastSec[i];
+        if (g_aiLastSecEnemies > b.maxEnemies) b.maxEnemies = g_aiLastSecEnemies;
+        if (now - b.lastLine >= 30000) {
+            AiBurstLine(now, "goes on");
+            b.lastLine = now;
+        }
+    } else if (b.on && now - b.lastActive >= 2000) {
+        AiBurstLine(b.lastActive, "ended");
+        b.on = false;
+    }
+}
+void AiWalk(LONG mode, bool bits) {
+    DWORD player = 0, inst = 0;
+    int enemies = 0, matched = 0;
+    if (ReadDword(kPlayerPtr, &player) && player) ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        DWORD brain = inst != player ? AiBrainOf(inst) : 0;
+        if (brain) {
+            ++enemies;
+            if (mode && AiInScope(inst, mode)) {
+                ++matched;
+                AiPurgeEnemy(inst, brain, player);
+            }
+            if (bits) AiBitsSet(inst, brain, AiBitsWanted(inst));
+        }
+        inst = next;
+    }
+    if (g_aiBitN) AiBitsSweep();
+    g_aiEnemies = enemies;
+    g_aiMatched = matched;
+}
+// PadHook, once per game frame
+void AiTick() {
+    if (!g_aiOk) return;
+    if (g_aiGen != g_aiGenSeen) {
+        g_aiGenSeen = g_aiGen;
+        memset(g_aiKind, 0, sizeof(g_aiKind));
+    }
+    const LONG mode = g_aiMode;
+    const bool bits = g_aiBitsOk && (g_aiNoInv || g_aiNoAtk);
+    DWORD now = GetTickCount();
+    if (!mode && !bits && !g_aiBitN && !g_aiGateOn) {   // idle: no walk, only an open burst may end
+        g_aiEnemies = g_aiMatched = -1;
+        if (g_aiBurst.on) AiSecondTick(now);
+        return;
+    }
+    char why[160];
+    const bool world = LabelWorldReady(why, sizeof(why));
+    AiGateApply(world && mode && g_aiGateMode && g_aiGateOk, world ? (mode && g_aiGateMode ? "ai.dumb on" : "ai.dumb off "
+                                                                     "/ purge") : why);
+    if (!world) {
+        if (g_aiBitN) {
+            Log(1, "ai: %d enemy flag record(s) dropped - %s (the brains go with the level)", g_aiBitN, why);
+            g_aiBitN = 0;
+        }
+        g_aiEnemies = g_aiMatched = -1;
+    } else {
+        AiWalk(mode, bits);
+    }
+    AiSecondTick(now);
+}
+
+// ---- items ----
+bool AiPresetOn(const char *name) {
+    LONG mode = g_aiMode;
+    if (!mode || !name) return false;
+    if (!_stricmp(name, "all")) return mode == kAiAll;
+    if (mode != kAiFilter) return false;
+    const AiPreset *p = AiPresetFind(name);
+    const char *list = !_stricmp(name, "filter") ? g_aiIniFilter : p ? p->list : nullptr;
+    return list && !_stricmp(list, AiList());
+}
+bool AiPresetKnown(const char *name) { return name && (AiPresetFind(name) || !_stricmp(name, "filter")); }
+// the active setting: mode + list, one log line (game thread or the Present fallback - never two at once: the request
+// slot runs one item at a time)
+void AiApply(LONG mode, const char *list, const char *setting, const char *src) {
+    char before[160], after[160];
+    AiModeText(g_aiMode, before, sizeof(before));
+    LONG idx = (g_aiListIdx + 1) & 1;
+    strncpy_s(g_aiList[idx], sizeof(g_aiList[idx]), list ? list : "", _TRUNCATE);
+    InterlockedExchange(&g_aiListIdx, idx);
+    InterlockedExchange(&g_aiMode, mode);
+    InterlockedIncrement(&g_aiGen);
+    if (mode && setting) {
+        strncpy_s(g_aiLastOn, sizeof(g_aiLastOn), setting, _TRUNCATE);
+        g_aiLastMode = mode;
+        strncpy_s(g_aiLastList, sizeof(g_aiLastList), list ? list : "", _TRUNCATE);
+    }
+    AiModeText(mode, after, sizeof(after));
+    Log(1, "ai.dumb %s (src=%s): %s -> %s; %s", setting ? setting : "off", src, before, after,
+        !mode ? "every Lara sense comes back with the next scan in range (immediate aggro near enemies)"
+        : g_aiGateMode ? (g_aiGateOk ? "gate (stage B): patched on the game thread in a loaded level"
+                                     : "gate wanted but its checks failed - purge (stage A)")
+                       : "purge (stage A): the engine's sense reset 0x65a140 once per frame");
+}
+bool AiSetting(const char *setting, LONG *mode, char *list, size_t n) {   // "all" / preset / "filter" -> mode + list
+    if (!_stricmp(setting, "all")) { *mode = kAiAll; list[0] = 0; return true; }
+    if (!_stricmp(setting, "filter")) { *mode = kAiFilter; strncpy_s(list, n, g_aiIniFilter, _TRUNCATE); return true; }
+    const AiPreset *p = AiPresetFind(setting);
+    if (!p) return false;
+    *mode = kAiFilter;
+    strncpy_s(list, n, p->list, _TRUNCATE);
+    return true;
+}
+void ValAiDumb(char *o, size_t n) {
+    if (!g_aiOk) { Out(o, n, "off (disabled: %s)", g_aiWhy); return; }
+    char mode[160];
+    AiModeText(g_aiMode, mode, sizeof(mode));
+    Out(o, n, "%s - %s%s", mode, g_aiGateMode ? "gate (stage B)" : "purge (stage A)",
+        !g_aiMode ? "" : g_aiGateMode ? (g_aiGateOn ? ", patched" : ", waits for a level") : "");
+}
+bool RunAiDumb(const char *arg, char *o, size_t n) {
+    if (!g_aiOk) { Out(o, n, "disabled: pre-check failed (%s)", g_aiWhy); return false; }
+    char a[160], list[128];
+    strncpy_s(a, sizeof(a), arg ? arg : "", _TRUNCATE);
+    DvTrim(a);
+    char *rest = strchr(a, ' ');
+    if (rest) {
+        *rest++ = 0;
+        while (*rest == ' ') ++rest;
+    } else {
+        rest = a + strlen(a);
+    }
+    const char *src = ShotSource("ai.dumb");
+    LONG mode = kAiOff;
+    const char *usage = "usage: ai.dumb [0|off|1|on|2|all|sharks|spiders|thralls|filter [0|1]|list <name parts>]";
+    if (!_stricmp(a, "0") || !_stricmp(a, "off") || (!a[0] && g_aiMode)) {   // off ("" toggles)
+        AiApply(kAiOff, AiList(), nullptr, src);
+        Out(o, n, "ai.dumb off - enemies sense Lara again (in range: at once)");
+        return true;
+    }
+    if (!a[0] || !_stricmp(a, "1") || !_stricmp(a, "on")) {                    // on: the last setting again
+        char last[16], lastList[128];
+        strncpy_s(last, sizeof(last), g_aiLastOn, _TRUNCATE);
+        strncpy_s(lastList, sizeof(lastList), g_aiLastList, _TRUNCATE);
+        AiApply(g_aiLastMode, lastList, last, src);
+        char now[160];
+        AiModeText(g_aiLastMode, now, sizeof(now));
+        Out(o, n, "ai.dumb %s: %s", last, now);
+        return true;
+    }
+    if (!_stricmp(a, "2")) {
+        strcpy_s(a, sizeof(a), "filter");
+    }
+    if (!_stricmp(a, "list")) {              // an own list of name parts
+        if (!rest[0] || !AiNormList(rest, list, sizeof(list)) || !list[0]) {
+            Out(o, n, "ai.dumb list needs name parts a-z 0-9 _ (comma list, e.g. shark,tiger); %s", usage);
+            return false;
+        }
+        mode = strchr(list, '*') ? kAiAll : kAiFilter;
+        AiApply(mode, mode == kAiAll ? "" : list, mode == kAiAll ? "all" : "list", src);
+        Out(o, n, "ai.dumb %s", mode == kAiAll ? "all" : list);
+        return true;
+    }
+    if (!AiSetting(a, &mode, list, sizeof(list))) { Out(o, n, "unknown setting '%s'; %s", a, usage); return false; }
+    if (!_stricmp(rest, "0")) {              // ring / bar "<preset> 0": off only when that preset is the active one
+        if (!AiPresetOn(a)) {
+            char now[160];
+            AiModeText(g_aiMode, now, sizeof(now));
+            Out(o, n, "ai.dumb %s is not active (now %s) - nothing changed", a, now);
+            return true;
+        }
+        AiApply(kAiOff, AiList(), nullptr, src);
+        Out(o, n, "ai.dumb off (was %s)", a);
+        return true;
+    }
+    if (rest[0] && _stricmp(rest, "1")) { Out(o, n, "%s", usage); return false; }
+    AiApply(mode, list, a, src);
+    char now[160];
+    AiModeText(mode, now, sizeof(now));
+    Out(o, n, "ai.dumb %s: %s - %s", a, now, g_aiGateMode && g_aiGateOk ? "gate (stage B)" : "purge (stage A)");
+    return true;
+}
+void ValAiMode(char *o, size_t n) {
+    Out(o, n, "%s%s", g_aiGateMode ? "gate" : "purge",
+        !g_aiGateMode ? " (stage A, no code patch)" : g_aiGateOn ? " (stage B, patched)"
+        : !g_aiGateOk ? " (stage B checks failed)" : " (stage B, patched while ai.dumb is on in a level)");
+}
+bool RunAiMode(const char *arg, char *o, size_t n) {
+    if (!g_aiOk) { Out(o, n, "disabled: pre-check failed (%s)", g_aiWhy); return false; }
+    char a[32];
+    strncpy_s(a, sizeof(a), arg ? arg : "", _TRUNCATE);
+    DvTrim(a);
+    LONG gate = !a[0] ? !g_aiGateMode : !_stricmp(a, "gate") || !_stricmp(a, "b") || !_stricmp(a, "1") ? 1
+              : !_stricmp(a, "purge") || !_stricmp(a, "a") || !_stricmp(a, "0") ? 0 : -1;
+    if (gate < 0) { Out(o, n, "usage: ai.mode purge|gate"); return false; }
+    if (gate && !g_aiGateOk) { Out(o, n, "gate (stage B) refused: %s - purge stays", g_aiGateWhy); return false; }
+    InterlockedExchange(&g_aiGateMode, gate);
+    Log(1, "ai.mode %s (src=%s)%s", gate ? "gate (stage B: 4 calls + 1 vtable slot while ai.dumb is on in a level)"
+                                         : "purge (stage A: no code patch)", ShotSource("ai.mode"),
+        g_aiGateOn && !gate ? " - the patches go back at the next game frame" : "");
+    Out(o, n, "ai.mode %s", gate ? "gate" : "purge");
+    return true;
+}
+bool AiBitsRun(const char *item, volatile LONG *flag, const char *arg, char *o, size_t n) {
+    if (!g_aiOk || !g_aiBitsOk) { Out(o, n, "disabled: pre-check failed (%s)", !g_aiOk ? g_aiWhy : g_aiBitsWhy); return false; }
+    bool on = BoolArg(arg, *flag != 0);
+    InterlockedExchange(flag, on ? 1 : 0);
+    char scope[160];
+    if (g_aiMode == kAiFilter) AiModeText(g_aiMode, scope, sizeof(scope));
+    else Out(scope, sizeof(scope), "every AI enemy");
+    Log(1, "%s %d (src=%s): brain+8 %s for %s", item, on ? 1 : 0, ShotSource(item),
+        flag == &g_aiNoInv ? "bit 0x80 (Investigate)" : "bits 0x20 (Attack / ScriptAttack) + 0x100000 (Melee)", scope);
+    Out(o, n, "%s %d (%s)", item, on ? 1 : 0, scope);
+    return true;
+}
+void ValAiNoInv(char *o, size_t n) { Out(o, n, "%d%s%s", g_aiNoInv ? 1 : 0, g_aiBitsOk ? "" : " disabled: ", g_aiBitsOk ? "" : g_aiBitsWhy); }
+void ValAiNoAtk(char *o, size_t n) { Out(o, n, "%d%s%s", g_aiNoAtk ? 1 : 0, g_aiBitsOk ? "" : " disabled: ", g_aiBitsOk ? "" : g_aiBitsWhy); }
+bool RunAiNoInv(const char *arg, char *o, size_t n) { return AiBitsRun("ai.noinvestigate", &g_aiNoInv, arg, o, n); }
+bool RunAiNoAtk(const char *arg, char *o, size_t n) { return AiBitsRun("ai.noattack", &g_aiNoAtk, arg, o, n); }
+void ValAiStatus(char *o, size_t n) {
+    char mode[160], walk[96];
+    AiModeText(g_aiMode, mode, sizeof(mode));
+    if (g_aiEnemies < 0) Out(walk, sizeof(walk), "no walk (off or no level)");
+    else Out(walk, sizeof(walk), "%d AI enemies, %d in scope", g_aiEnemies, g_aiMatched);
+    Out(o, n, "ai.dumb %s; checks: purge %s, gate %s, flags %s; method %s%s; last frame: %s; last second: %d enemies, purge "
+        "%ld, gate %ld add / %ld override / %ld slot; noinvestigate %ld, noattack %ld (%d flag record(s)); [AI] DumbFilter "
+        "'%s'", mode, g_aiOk ? "ok" : g_aiWhy, g_aiGateOk ? "ok" : g_aiGateWhy, g_aiBitsOk ? "ok" : g_aiBitsWhy,
+        g_aiGateMode ? "gate" : "purge", g_aiGateOn ? " (patched)" : "", walk, g_aiLastSecEnemies,
+        g_aiLastSec[kAiNotePurge], g_aiLastSec[kAiNoteAdd], g_aiLastSec[kAiNoteOverride], g_aiLastSec[kAiNoteSlot],
+        g_aiNoInv, g_aiNoAtk, g_aiBitN, g_aiIniFilter);
+}
+// ring / bar: why an ai.* entry is greyed ("" = usable; outside a level it may be switched - it works in the next level)
+const char *AiRadWhy(const char *id) {
+    if (!_stricmp(id, "ai.status")) return "";
+    if (!g_aiOk) return g_aiWhy;
+    if ((!_stricmp(id, "ai.noinvestigate") || !_stricmp(id, "ai.noattack")) && !g_aiBitsOk) return g_aiBitsWhy;
+    return "";
+}
+// TruMenu.ini [AI] (start, settings.reset)
+void AiReadOptions(const char *ini) {
+    char v[160];
+    OptString(ini, "AI", "DumbFilter", v, sizeof(v));
+    if (!AiNormList(v, g_aiIniFilter, sizeof(g_aiIniFilter)))
+        Log(0, "0.19 [AI] DumbFilter '%s': characters other than a-z 0-9 _ , dropped -> '%s'", v, g_aiIniFilter);
+    OptString(ini, "AI", "DumbMode", v, sizeof(v));
+    DvTrim(v);
+    bool gate = !_stricmp(v, "gate");
+    if (!gate && _stricmp(v, "purge")) Log(0, "0.19 [AI] DumbMode '%s' unknown - purge", v);
+    InterlockedExchange(&g_aiGateMode, gate ? 1 : 0);
+    int dumb = OptInt(ini, "AI", "Dumb");
+    LONG mode = dumb == 1 ? kAiAll : dumb == 2 ? kAiFilter : kAiOff;
+    if (dumb < 0 || dumb > 2) Log(0, "0.19 [AI] Dumb=%d unknown - off", dumb);
+    LONG idx = (g_aiListIdx + 1) & 1;
+    strncpy_s(g_aiList[idx], sizeof(g_aiList[idx]), mode == kAiFilter ? g_aiIniFilter : "", _TRUNCATE);
+    InterlockedExchange(&g_aiListIdx, idx);
+    InterlockedExchange(&g_aiMode, mode);
+    if (mode) {
+        strcpy_s(g_aiLastOn, sizeof(g_aiLastOn), mode == kAiAll ? "all" : "filter");
+        g_aiLastMode = mode;
+        strncpy_s(g_aiLastList, sizeof(g_aiLastList), g_aiList[idx], _TRUNCATE);
+    }
+    InterlockedExchange(&g_aiNoInv, OptInt(ini, "AI", "NoInvestigate") != 0 ? 1 : 0);
+    InterlockedExchange(&g_aiNoAtk, OptInt(ini, "AI", "NoAttack") != 0 ? 1 : 0);
+    InterlockedIncrement(&g_aiGen);
+}
+// load: the byte checks of precheck_019.txt (after the 0.3 instance list / player / main state checks)
+void AiCheck() {
+    DWORD at = 0;
+    g_aiOk = g_instOk && g_playerOk && g_mainStateOk && DvChecks(kAiChecks, sizeof(kAiChecks) / sizeof(kAiChecks[0]), &at);
+    if (!g_instOk) Out(g_aiWhy, sizeof(g_aiWhy), "instance list check failed");
+    else if (!g_playerOk) Out(g_aiWhy, sizeof(g_aiWhy), "player pointer check failed");
+    else if (!g_mainStateOk) Out(g_aiWhy, sizeof(g_aiWhy), "main state check failed");
+    else if (!g_aiOk) Out(g_aiWhy, sizeof(g_aiWhy), "enemy brain / senses code differs at 0x%08lx", at);
+    else Out(g_aiWhy, sizeof(g_aiWhy), "ok");
+    at = 0;
+    g_aiGateOk = g_aiOk && DvChecks(kAiGateChecks, sizeof(kAiGateChecks) / sizeof(kAiGateChecks[0]), &at);
+    if (g_aiGateOk) Out(g_aiGateWhy, sizeof(g_aiGateWhy), "ok");
+    else Out(g_aiGateWhy, sizeof(g_aiGateWhy), !g_aiOk ? "needs the purge checks" : "gate site differs at 0x%08lx", at);
+    at = 0;
+    g_aiBitsOk = g_aiOk && DvChecks(kAiBitChecks, sizeof(kAiBitChecks) / sizeof(kAiBitChecks[0]), &at);
+    if (g_aiBitsOk) Out(g_aiBitsWhy, sizeof(g_aiBitsWhy), "ok");
+    else Out(g_aiBitsWhy, sizeof(g_aiBitsWhy), !g_aiOk ? "needs the purge checks" : "behaviour reader differs at 0x%08lx", at);
+    const DWORD fn[5] = {reinterpret_cast<DWORD>(&AiGateAdd), reinterpret_cast<DWORD>(&AiGateAdd),
+                         reinterpret_cast<DWORD>(&AiGateAdd), reinterpret_cast<DWORD>(&AiGateOverride),
+                         reinterpret_cast<DWORD>(&AiSensePurge)};
+    for (int i = 0; i < 5; ++i) {
+        AiPatch &p = g_aiPatches[i];
+        p.game = p.call ? p.target - (p.site + 5) : p.target;
+        p.hook = p.call ? fn[i] - (p.site + 5) : fn[i];
+    }
+    if (g_aiGateMode && !g_aiGateOk) InterlockedExchange(&g_aiGateMode, 0);
+    char mode[160];
+    AiModeText(g_aiMode, mode, sizeof(mode));
+    Log(g_aiOk ? 1 : 0, "0.19 dumb AI: purge (stage A) %s (%d checks), gate (stage B) %s (%d), brain flags %s (%d); [AI] "
+        "Dumb -> %s, DumbMode %s, NoInvestigate %ld, NoAttack %ld, DumbFilter '%s'", g_aiWhy,
+        static_cast<int>(sizeof(kAiChecks) / sizeof(kAiChecks[0])), g_aiGateWhy,
+        static_cast<int>(sizeof(kAiGateChecks) / sizeof(kAiGateChecks[0])), g_aiBitsWhy,
+        static_cast<int>(sizeof(kAiBitChecks) / sizeof(kAiBitChecks[0])), mode, g_aiGateMode ? "gate" : "purge", g_aiNoInv,
+        g_aiNoAtk, g_aiIniFilter);
+}
+
+// ======================================================================================================================
 // 0.9 P1-P3: music through the engine's own srmusic functions (catalog 11.2; translate, don't imitate). PC facts:
 //   SRMUSIC_LoadMusic 0x594320 cdecl (slot, name, a, b): ecx = 0xcc5260 + slot * 0x528, MusicSlot::LoadMusic 0x593eb0
 //     (thiscall, play = 1). The game's own call when a unit starts: 0x5b2211 LoadMusic(0, name, 60, 60) (0x5b21d0,
@@ -14011,6 +14751,19 @@ const Item kItems[] = {
     {"save.load", "action", "0.18 <save>|autosave: load that save the game's own way (load step table 0x789de0, the "
                             "file read + SAVE_RestoreGame + level change of the game) - in a level only, run twice "
                             "within 10 s, never over TruLink ([Saves] DirectLoad)", false, ValSaveLoad, RunSaveLoad},
+    // 0.19 Dumme KI (docs\Befund-Gegner-Wahrnehmung-0611.md): enemies ignore Lara
+    {"ai.dumb", "action", "0.19 off|all|sharks|spiders|thralls|filter [0|1] | list <name parts>: enemies ignore Lara - "
+                          "every AI enemy or those whose object name holds a part; purge = the engine's sense reset "
+                          "0x65a140 per frame, gate = 4 call gates + 1 vtable slot ([AI] Dumb / DumbFilter / DumbMode)",
+     true, ValAiDumb, RunAiDumb},
+    {"ai.mode", "action", "0.19 purge|gate: how ai.dumb works - purge (stage A, no code patch) or gate (stage B, patched "
+                          "while ai.dumb is on in a level)", true, ValAiMode, RunAiMode},
+    {"ai.noinvestigate", "bool", "0.19: the ai.dumb enemies (every AI enemy while ai.dumb is off / all) do not walk to "
+                                 "noises - brain+8 bit 0x80 ([AI] NoInvestigate)", true, ValAiNoInv, RunAiNoInv},
+    {"ai.noattack", "bool", "0.19: the same enemies do not attack - brain+8 bits 0x20 + 0x100000 (partial; [AI] NoAttack)",
+     true, ValAiNoAtk, RunAiNoAtk},
+    {"ai.status", "info", "0.19: dumb AI - setting, checks, method, enemies seen / in scope, last second's removals", false,
+     ValAiStatus, nullptr},
 };
 
 const Item *FindItem(const char *id) {
@@ -15802,6 +16555,10 @@ const char *RadialWhy(const RadItem &e) {
         const char *dvWhy = DvRadWhy(id, e.arg);
         if (dvWhy[0]) return dvWhy;
     }
+    if (!_strnicmp(id, "ai.", 3)) {          // 0.19 dumb AI: byte checks (switchable outside a level: works in the next)
+        const char *aiWhy = AiRadWhy(id);
+        if (aiWhy[0]) return aiWhy;
+    }
     const Item *item = FindItem(id);
     if (((item && item->gameThread) || !_stricmp(id, "time.scale")) && !g_experimental)
         return "experimental off ([Cheat] Experimental=0)";
@@ -15850,6 +16607,8 @@ bool ItemValueShort(const char *id, bool de, char *o, size_t n) {
         float t = 0.0f;
         if (g_timeOk && ReadFloats(kTimeDilation, &t, 1)) Out(o, n, "%.2f", t);
         else Out(o, n, "?");
+    } else if (!_stricmp(id, "ai.mode")) {   // 0.19 (bar row KI-Weg)
+        Out(o, n, "%s%s", g_aiGateMode ? "gate (B)" : "purge (A)", g_aiGateOn ? (de ? " aktiv" : " patched") : "");
     } else return false;
     return true;
 }
@@ -15891,6 +16650,7 @@ bool ItemArgActive(const char *id, const char *arg) {
         float t = 0.0f;
         return g_timeOk && ReadFloats(kTimeDilation, &t, 1) && fabsf(static_cast<float>(atof(a)) - t) < 0.01f;
     }
+    if (!_stricmp(id, "ai.mode")) return !_stricmp(a, g_aiGateMode ? "gate" : "purge");   // 0.19
     return false;
 }
 
@@ -15910,6 +16670,13 @@ bool RadialOn(const RadItem &e, bool *isBool) {
     if (e.child < 0 && !e.special && !e.bad[0] && e.arg[0] && !strchr(e.arg, ' ') && !_stricmp(e.id, "dbg.flatpass")) {
         int pass = RmPassFind(e.arg);
         if (pass >= 0) { *isBool = true; return (static_cast<DWORD>(g_rmPassMask) & kRmPassIds[pass]) != 0; }
+    }
+    // 0.19: "ai.dumb <preset>" (one word: all / sharks / spiders / thralls / filter) shows whether that setting is the
+    // active one; RadialRun / the bar add the target state ("<preset> 0|1")
+    if (e.child < 0 && !e.special && !e.bad[0] && e.arg[0] && !strchr(e.arg, ' ') && !_stricmp(e.id, "ai.dumb") &&
+        AiPresetKnown(e.arg)) {
+        *isBool = true;
+        return AiPresetOn(e.arg);
     }
     *isBool =e.child < 0 && !e.special && !e.bad[0] && !e.arg[0] && CmdKindOf(e.id) == kCkBool;
     if (!*isBool) return false;
@@ -17441,9 +18208,9 @@ void PageMarkup() {
 enum QbKind { kQbBool = 0, kQbValue, kQbAction, kQbInfo, kQbChoice, kQbLabel, kQbPlanned };
 enum QbFlag { kQfConfirm = 1, kQfBackup = 2 };
 enum QbCount { kQcNone = 0, kQcLayer, kQcTriggers, kQcTrgLabels, kQcLaraIn, kQcEncl, kQcLabels, kQcMarkup, kQcFlat, kQcOn,
-               kQcCine };
+               kQcCine, kQcAi };          // 0.19 kQcAi: enemies in the ai.dumb scope (last frame)
 enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvPass, kQvLang, kQvTime, kQvMark, kQvWeapon,
-             kQvAssist };
+             kQvAssist, kQvAiMode };     // 0.19 kQvAiMode: ai.mode purge / gate
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
 enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves };
@@ -17453,7 +18220,8 @@ const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230
             kQbFlat = IM_COL32(220, 220, 200, 255), kQbThrall = IM_COL32(255, 170, 170, 255),
             kQbMarkup = IM_COL32(120, 230, 140, 255), kQbRed = IM_COL32(255, 120, 100, 255),
             kQbCheat = IM_COL32(255, 230, 120, 255), kQbClaude = IM_COL32(255, 140, 110, 255),
-            kQbTime = IM_COL32(190, 200, 255, 255), kQbChapter = IM_COL32(200, 230, 170, 255);
+            kQbTime = IM_COL32(190, 200, 255, 255), kQbChapter = IM_COL32(200, 230, 170, 255),
+            kQbAi = IM_COL32(255, 170, 220, 255);   // 0.19 dumb AI rows
 // choice rows: the arguments a choice row cycles through (claude.mark kinds as the ring level Claude, the five ring
 // weapons of Waffen)
 struct QbChoice { const char *arg, *de, *en; };
@@ -17475,6 +18243,7 @@ const QbRow kQbEmergency[] = {               // 0.18 Notfall (Lukas: "falls man 
     {"Unverwundbar", "Invincible", "player.invincible", "", kQbBool, -1, kQcNone, 0, kQbPlayer, 0},
     {"Gott", "God mode", "cheat.god", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Gott (voll)", "God mode (full)", "cheat.godfull", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
+    {"Gegner ignorieren Lara", "Enemies ignore Lara", "ai.dumb", "all", kQbBool, -1, kQcAi, 0, kQbAi, 0},   // 0.19
     {"Unit neu laden", "Reload unit", "level.reload", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Munition unendlich", "Infinite ammo", "cheat.ammo", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Auffuellen", "Fill up", "cheat.fillup", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
@@ -17516,6 +18285,17 @@ const QbRow kQbRender[] = {
     {"Objektnamen", "Object names", "dbg.names", "", kQbBool, kDvNames, kQcLayer, 0, 0},
     {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},
     {"Nur Kanten", "Ledges only", "draw.ledges", "", kQbBool, -1, kQcNone, 0, kQbMarkup},
+    // 0.19 Dumme KI: one setting at a time (switching a group on replaces the other); the count = enemies in scope
+    {"KI: Gegner ignorieren Lara", "AI: enemies ignore Lara", "-", "", kQbLabel, -1, kQcNone, 0, kQbAi, 0},
+    {"Alle Gegner", "Every enemy", "ai.dumb", "all", kQbBool, -1, kQcAi, 0, kQbAi, 0},
+    {"Haie", "Sharks", "ai.dumb", "sharks", kQbBool, -1, kQcAi, 0, kQbAi, 0},
+    {"Spinnen", "Spiders", "ai.dumb", "spiders", kQbBool, -1, kQcAi, 0, kQbAi, 0},
+    {"Thralls", "Thralls", "ai.dumb", "thralls", kQbBool, -1, kQcAi, 0, kQbAi, 0},
+    {"Filter aus INI", "INI filter", "ai.dumb", "filter", kQbBool, -1, kQcAi, 0, kQbAi, 0},
+    {"Nicht nachsehen", "No investigating", "ai.noinvestigate", "", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Nicht angreifen", "No attacks", "ai.noattack", "", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"KI-Weg", "AI method", "ai.mode", "", kQbValue, -1, kQcNone, kQvAiMode, kQbAi, 0},
+    {"KI: Stand", "AI state", "ai.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
 };
 const QbRow kQbLevel[] = {
     {"Alle Trigger", "All triggers", "dbg.triggers", "", kQbBool, -1, kQcTriggers, 0, kQbWhite},
@@ -17576,6 +18356,8 @@ const QbRow kQbChapters[] = {
 // (Phobien). Only existing, working items are live (Steuerung: time.scale as an assist 0.5 / 0.75 / 1, player.unstuck,
 // player.safeground, player.invincible and cheat.godfull as assists); everything planned is a greyed row "geplant"
 // whose right press says in one line what it will do. The same list is the menu page "Barrierefreiheit" (kQbAccess).
+// 0.19: Sonstige - "Spinnen ignorieren Lara" / "Haie ignorieren Lara" = ai.dumb spiders / sharks (the planned row "Haie"
+// is replaced; Arachnophobie / Thalassophobie stay planned: they are about pictures and water, not the AI).
 const QbRow kQbAccess[] = {
     {"Sehen", "Vision", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
     {"Farbpaletten", "Colour palettes", "-", "Paletten fuer Farbfehlsicht (Debug-Ansicht, spaeter HUD)|palettes for colour "
@@ -17604,10 +18386,10 @@ const QbRow kQbAccess[] = {
     {"Sonstige (Phobien)", "Other (phobias)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
     {"Arachnophobie", "Arachnophobia", "-", "Spinnen als Bild / ersetzt (Befund-Arachnophobie-0611.md)|spiders as an image "
      "/ replaced (Befund-Arachnophobie-0611.md)", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Spinnen ignorieren Lara", "Spiders ignore Lara", "ai.dumb", "spiders", kQbBool, -1, kQcAi, 0, kQbAi, 0},   // 0.19
     {"Thalassophobie", "Thalassophobia", "-", "tiefes Wasser heller, Weg zur Oberflaeche|deep water brighter, way to the "
      "surface", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"Haie", "Sharks", "-", "Haie sehen Lara nicht / entfernt / als Bild|sharks do not see Lara / removed / as an image",
-     kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Haie ignorieren Lara", "Sharks ignore Lara", "ai.dumb", "sharks", kQbBool, -1, kQcAi, 0, kQbAi, 0},   // 0.19 (was planned)
     {"Kamera-Wackeln aus", "No camera shake", "-", "Kamera-Shakes aus, Blitze daempfen|camera shakes off, flashes dimmed",
      kQbPlanned, -1, kQcNone, 0, 0, 0},
 };
@@ -17744,7 +18526,8 @@ const char *QbWhy(const QbRow &r) {
 // value rows: the steps left / right walk through (as the item's argument), the step of the current value
 int QbValueCount(int val) {
     return val == kQvDepth || val == kQvEncl || val == kQvTime || val == kQvAssist ? 3 : val == kQvAlpha ? 10
-         : val == kQvBright ? 13 : val == kQvSpeed ? 5 : val == kQvPass ? kRmPassN : val == kQvLang ? 2 : 0;
+         : val == kQvBright ? 13 : val == kQvSpeed ? 5 : val == kQvPass ? kRmPassN : val == kQvLang || val == kQvAiMode ? 2
+         : 0;
 }
 const int kQbSpeeds[5] = {5, 10, 20, 40, 80};
 const float kQbTimes[3] = {0.25f, 0.5f, 1.0f};     // 0.18 time.scale steps (as the ring's Zeit level)
@@ -17760,6 +18543,7 @@ void QbValueArg(int val, int i, char *o, size_t n) {
     case kQvLang: Out(o, n, "%s", i ? "en" : "de"); break;
     case kQvTime: Out(o, n, "%g", static_cast<double>(kQbTimes[i])); break;
     case kQvAssist: Out(o, n, "%g", static_cast<double>(kQbAssists[i])); break;
+    case kQvAiMode: Out(o, n, "%s", i ? "gate" : "purge"); break;   // 0.19
     default: o[0] = 0;
     }
 }
@@ -17780,6 +18564,7 @@ int QbValueNow(int val) {
             if (static_cast<DWORD>(g_rmPassMask) & kRmPassIds[i]) v = i;   // the first pass id of the mask in table order
         break;
     case kQvLang: v = g_qbLang; break;
+    case kQvAiMode: v = g_aiGateMode ? 1 : 0; break;   // 0.19
     case kQvTime:
     case kQvAssist: {
         const float *steps = val == kQvTime ? kQbTimes : kQbAssists;
@@ -17832,6 +18617,7 @@ void QbCountText(const QbRow &r, bool on, char *o, size_t n) {
     case kQcFlat: if (on) v = static_cast<int>(g_rmLast.flatT + g_rmLast.flatM); break;
     case kQcOn: v = QbLayersOn(); break;
     case kQcCine: if (g_ocBursts || g_oc.active) v = static_cast<int>(g_ocBursts); break;
+    case kQcAi: if (on && g_aiMatched >= 0) v = g_aiMatched; break;   // 0.19: enemies in the ai.dumb scope
     default: break;
     }
     if (v >= 0) Out(o, n, "%d", v);
@@ -18055,9 +18841,12 @@ void QbBuild(int page) {
 void PageAccess() {
     ImGui::TextWrapped("Skeleton (0.18): the five categories of the game paper 'Barrierefreiheit in Games' (game e.V., "
                        "July 2025). Only existing items work; planned functions are grey - hover for what they will do. "
-                       "Quick-toggle bar: page Barrierefreiheit; ring: Spieler / Barrierefreiheit.");
+                       "Quick-toggle bar: page Barrierefreiheit; ring: Spieler / Barrierefreiheit. 0.19: sharks / "
+                       "spiders ignore Lara = ai.dumb sharks / spiders (page 'AI / KI' for every setting).");
     char o[300];
+    int index = 0;
     for (const QbRow &r : kQbAccess) {
+        ++index;                             // 0.19: widget ids by row (two rows may run the same item, ai.dumb)
         if (r.kind == kQbLabel) {
             ImGui::Separator();
             ImGui::TextColored(ImVec4(0.63f, 0.9f, 1.0f, 1.0f), "%s / %s", r.de, r.en);
@@ -18073,8 +18862,15 @@ void PageAccess() {
         if (why[0]) ImGui::BeginDisabled();
         if (r.kind == kQbBool) {
             bool on = QbRowOn(r);
-            Out(label, sizeof(label), "%s / %s  [%s]###acc_%s", r.de, r.en, r.id, r.id);
-            if (TmCheckbox(label, &on)) QueueItem(r.id, on ? "1" : "0");
+            if (!strcmp(r.id, "ai.dumb") && g_aiMatched >= 0 && on)   // 0.19: the enemies in scope
+                Out(label, sizeof(label), "%s / %s  [%s %s]  %d###acc_%d", r.de, r.en, r.id, r.arg, g_aiMatched, index);
+            else
+                Out(label, sizeof(label), "%s / %s  [%s%s%s]###acc_%d", r.de, r.en, r.id, r.arg[0] ? " " : "", r.arg, index);
+            if (TmCheckbox(label, &on)) {
+                char arg[96];                // 0.19: a row with an argument ("ai.dumb sharks") adds the target state
+                Out(arg, sizeof(arg), "%s%s%s", r.arg, r.arg[0] ? " " : "", on ? "1" : "0");
+                QueueItem(r.id, arg);
+            }
         } else if (r.kind == kQbValue) {
             char v[40];
             if (!ItemValueShort(r.id, true, v, sizeof(v))) Out(v, sizeof(v), "?");
@@ -18099,6 +18895,65 @@ void PageAccess() {
             ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "(%s)", why);
         }
     }
+}
+
+// 0.19 menu page "AI / KI: enemies ignore Lara" - the same settings as the ring (Spieler / Debug / KI) and the bar (Render /
+// KI): one setting at a time, an own list, the method, the two brain flags, the state
+void PageAi() {
+    char o[600];
+    ValAiStatus(o, sizeof(o));
+    ImGui::TextWrapped("%s", o);
+    if (!g_aiOk) { ImGui::TextWrapped("disabled: %s", g_aiWhy); return; }
+    ImGui::SeparatorText("Enemies ignore Lara / Gegner ignorieren Lara  [ai.dumb]");
+    const char *const names[5] = {"all", "sharks", "spiders", "thralls", "filter"};
+    const char *const de[5] = {"alle Gegner", "Haie (shark)", "Spinnen (spider, tarantula)", "Thralls (thrall)",
+                               "Filter aus INI"};
+    const char *const en[5] = {"every enemy", "sharks", "spiders", "thralls", "INI filter [AI] DumbFilter"};
+    for (int i = 0; i < 5; ++i) {
+        bool on = AiPresetOn(names[i]);
+        char label[160], arg[32];
+        Out(label, sizeof(label), "%s / %s  [ai.dumb %s]###aip%d", de[i], en[i], names[i], i);
+        if (TmCheckbox(label, &on)) {
+            Out(arg, sizeof(arg), "%s %d", names[i], on ? 1 : 0);
+            QueueItem("ai.dumb", arg);
+        }
+    }
+    if (TmButton("off / aus  [ai.dumb 0]###aioff")) QueueItem("ai.dumb", "0");
+    static char list[96] = "";
+    if (ImGui::InputText("own list of name parts / eigene Liste  [ai.dumb list ...]###ailist", list, sizeof(list),
+                         ImGuiInputTextFlags_EnterReturnsTrue)) {
+        char arg[128];
+        Out(arg, sizeof(arg), "list %s", list);
+        QueueItem("ai.dumb", arg);
+    }
+    ImGui::TextDisabled("INI filter: '%s' (empty = every AI enemy); examples: merc,poacher = humans, tiger,panther = big cats",
+                        g_aiIniFilter);
+    ImGui::SeparatorText("Method / Weg  [ai.mode]");
+    bool gate = g_aiGateMode != 0;
+    if (ImGui::RadioButton("purge (stage A: the engine's sense reset 0x65a140 once per frame, no code patch)###aimpa", !gate))
+        QueueItem("ai.mode", "purge");
+    if (!g_aiGateOk) ImGui::BeginDisabled();
+    if (ImGui::RadioButton("gate (stage B: 4 calls + 1 vtable slot while on in a level)###aimpb", gate)) QueueItem("ai.mode", "gate");
+    if (!g_aiGateOk) {
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "(%s)", g_aiGateWhy);
+    }
+    ImGui::SeparatorText("Prototype flags / Prototyp-Schalter (same enemies; every AI enemy while ai.dumb is off / all)");
+    if (!g_aiBitsOk) ImGui::BeginDisabled();
+    bool inv = g_aiNoInv != 0, atk = g_aiNoAtk != 0;
+    if (TmCheckbox("no investigating / nicht nachsehen  [ai.noinvestigate] brain+8 0x80###aiinv", &inv))
+        QueueItem("ai.noinvestigate", inv ? "1" : "0");
+    if (TmCheckbox("no attacks / nicht angreifen  [ai.noattack] brain+8 0x20 + 0x100000 (partial)###aiatk", &atk))
+        QueueItem("ai.noattack", atk ? "1" : "0");
+    if (!g_aiBitsOk) {
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("disabled: %s", g_aiBitsWhy);
+    }
+    ImGui::TextWrapped("Side effects (finding 5.3): the enemies stay killable and still play hit reactions; a shot does not "
+                       "make them turn (gate); they may still walk to noises (use 'no investigating'); scripts that wait "
+                       "for an enemy to notice Lara do not fire; switching off near enemies = immediate aggro. Not AI "
+                       "enemies (no effect): jellyfish, kraken, Natla, natla_thrall.");
 }
 
 // render thread, every Present (Render, before its early return): the open bar's input from the raw pad (g_pad, before
@@ -19726,15 +20581,15 @@ void PageCheats() {
         ImGui::TextDisabled("[cheat.code] 1 one-hit kill, 2 god, 9 wireframe, 10 textureless, 11 enemy health - %s", v);
         if (!g_codeOk) ImGui::TextWrapped("disabled: %s", g_codeWhy);
     }
-    ImGui::SeparatorText("Flag + reader gone: rebuild from the prototype (not built yet)");
-    ImGui::BeginDisabled();
-    for (const RebuildRow &r : kRebuildRows) {
-        ImGui::TextWrapped("%s - not built yet", r.name);
+    ImGui::SeparatorText("Flag + reader gone: rebuild from the prototype");
+    for (const RebuildRow &r : kRebuildRows) {   // 0.19: rebuilt rows name their item (page 'AI / KI')
+        if (!r.built) ImGui::BeginDisabled();
+        ImGui::TextWrapped("%s - %s", r.name, r.built ? r.built : "not built yet");
         ImGui::Indent();
         ImGui::TextWrapped("prototype: %s; PC: %s", r.proto, r.pc);
         ImGui::Unindent();
+        if (!r.built) ImGui::EndDisabled();
     }
-    ImGui::EndDisabled();
 }
 
 // in-menu confirmation (no dialogs): the first A arms a button for 5 s, the second A runs it
@@ -20317,6 +21172,7 @@ void DrawMenu() {
         if (TmCollapsingHeader("Settings")) PageSettings();
         if (TmCollapsingHeader("Overlay: Lara's position")) PageOverlay();
         if (TmCollapsingHeader("Accessibility / Barrierefreiheit (0.18)###access")) PageAccess();   // 0.18 skeleton
+        if (TmCollapsingHeader("AI / KI: enemies ignore Lara (0.19)###aipage")) PageAi();             // 0.19 Dumme KI
         if (TmCollapsingHeader("Free camera")) PageCamera();
         if (TmCollapsingHeader("Cheat / flight")) PageCheat();
         if (TmCollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
@@ -20870,6 +21726,7 @@ void ReadOptions(const char *dir) {
     if (g_musicFade < 0 || g_musicFade > 300) g_musicFade = atoi(OptDefault("Media", "MusicFade"));
     OptString(ini, "Saves", "Folder", g_saveFolderIni, sizeof(g_saveFolderIni));
     g_slDirect = OptInt(ini, "Saves", "DirectLoad") != 0 ? 1 : 0;                   // 0.18 save.load
+    AiReadOptions(ini);                                                              // 0.19 [AI]
     // 0.10 [Radial]: HoldButtons / Key also as hex ("0x00C0", "0x78")
     auto number = [&](const char *key) {
         char v[32];
@@ -21178,6 +22035,7 @@ void Start(HMODULE self) {
     Log(1, "0.9 saves: folder %s (%s), backups %s", g_saveFolderU8[0] ? g_saveFolderU8 : "-", g_saveFolderHow,
         g_saveRootU8);
     SaveLoadCheck();                          // 0.18 save.load (precheck_018.txt section 2; after the main state check)
+    AiCheck();                                // 0.19 dumb AI (precheck_019.txt; after the instance / player / main state checks)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
     _snprintf_s(g_radFilePath, sizeof(g_radFilePath), _TRUNCATE, "%sTruMenu.radial.txt", g_exeDir);
@@ -21267,6 +22125,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
     } else if (reason == DLL_PROCESS_DETACH) {
         g_stop = 1;
         RenderModeShutdown();                         // 0.15: patched vtable words back (only those still ours)
+        AiShutdown();                                 // 0.19: the gate patches back (only those still ours)
     }
     return TRUE;
 }

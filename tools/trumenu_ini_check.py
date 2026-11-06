@@ -64,12 +64,21 @@ never in the ring), the bar's row tables kQbEmergency .. kQbAccess (new kinds: i
 action items, label / planned rows with id "-" and a planned row's text "German|English"; kQfConfirm / kQfBackup rows
 are actions; level.load rows take one unit name a-z 0-9 _; time.scale is a value item), the ring's overlay.larain once
 (no argument), pos.goload with a saved name or last, time.scale with a number 0 .. 10.
+Since TruMenu 0.19 (2026-11-06 TruMenu 0.19 dumb AI) also the [AI] keys (Dumb 0 .. 2, DumbFilter a comma list of name
+parts a-z 0-9 _ or empty, DumbMode purge / gate, NoInvestigate / NoAttack 0 / 1), every INI comment shorter than 512
+characters (DefaultIniText cuts there), the items ai.dumb / ai.mode / ai.noinvestigate / ai.noattack / ai.status in
+kItems, the presets of kAiPresets (all / sharks / spiders / thralls) plus filter, bool rows "ai.dumb <preset>" in the bar
+(the only bool rows with an argument besides dbg.show), ai.mode as a value row, the ring's ai.dumb entries (exactly one
+preset word, all / sharks / spiders each at least once, sharks / spiders also in Spieler/Barrierefreiheit), ai.noinvestigate
+/ ai.noattack / ai.status once each without an argument, the Barrierefreiheit bar page without the planned row "Haie",
+and the 0.19 precheck tables kAiChecks / kAiGateChecks / kAiBitChecks present with at most 64 bytes per check.
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
                                                          list problem; exit 1 on a mismatch
   ../bin/pyt -t 60 tools/trumenu_ini_check.py --print    print the text generated from the table
-  options (negative tests on copies): --ini FILE, --radial FILE, --tour FILE check that file instead of the shipped one
+  options (negative tests on copies): --ini FILE, --radial FILE, --tour FILE check that file instead of the shipped one;
+  since 0.19 also --cpp FILE (a copy of TruMenu.cpp: the table rules of the bar, kItems, kAiPresets, the precheck tables)
 """
 import os, re, sys
 
@@ -145,11 +154,17 @@ QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info'
             'dbg.cpgo': 'action', 'pos.save': 'action', 'pos.list': 'info', 'pos.go': 'action'}
 QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess')
 QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang',
-                  'time.scale')
+                  'time.scale', 'ai.mode')                                       # 0.19 ai.mode
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
 QB_PAGES_MAX = 10
+# 0.19 dumb AI: the items, the presets (kAiPresets + "filter"), the [AI] keys
+Q19_ITEMS = {'ai.dumb': 'action', 'ai.mode': 'action', 'ai.noinvestigate': 'bool', 'ai.noattack': 'bool',
+             'ai.status': 'info'}
+AI_PRESETS = ('all', 'sharks', 'spiders', 'thralls')
+AI_SETTINGS = AI_PRESETS + ('filter',)
+AI_KEYS = ('Dumb', 'DumbFilter', 'DumbMode', 'NoInvestigate', 'NoAttack')
 DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -724,6 +739,8 @@ def check_quick(ini_path, radial_path):
             if item == 'dbg.show':
                 if arg not in layers: problems.append(where + ': dbg.show needs a layer of kDvLayers')
                 reach.add(arg)
+            elif item == 'ai.dumb':          # 0.19: "ai.dumb <preset>" (the bar adds 0 / 1)
+                if arg not in AI_SETTINGS: problems.append(where + ': ai.dumb needs one of %s' % ' / '.join(AI_SETTINGS))
             elif items[item] != 'bool' or arg: problems.append(where + ': a bool row needs a bool item without argument')
         elif kind == 'kQbValue' and item not in QB_VALUE_ITEMS:
             problems.append(where + ': a value row needs one of %s' % ', '.join(QB_VALUE_ITEMS))
@@ -832,6 +849,96 @@ def check_018(ini_path, radial_path):
         len(pages) + len(special), len(special), labels, planned, confirm, len(Q18_ITEMS), len(Q18_KEYS))
 
 
+def check_019(ini_path, radial_path, rows):
+    """0.19 (2026-11-06 TruMenu 0.19 dumb AI): the [AI] keys, every INI comment < 512 characters, the ai.* items, the
+    presets of kAiPresets, the bar's ai.dumb rows (presets) and Barrierefreiheit page, the ring's ai.* entries, the 0.19
+    precheck tables (present, at most 64 bytes a check - HexBytesAt's buffer)"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    found = {}
+    for n, key, value in ini_section(ini_path, 'AI'):
+        found[key] = (n, value)
+    for key in AI_KEYS:
+        if key not in found:
+            problems.append('%s: [AI] %s missing' % (name, key))
+            continue
+        n, value = found[key]
+        where = '%s:%d: [AI] %s=%s' % (name, n, key, value)
+        if key == 'Dumb' and value not in ('0', '1', '2'): problems.append(where + ' (0 / 1 / 2)')
+        elif key == 'DumbFilter' and value and not re.fullmatch(r'[A-Za-z0-9_]+( *, *[A-Za-z0-9_]+)*', value):
+            problems.append(where + ' (comma list of name parts a-z 0-9 _, or empty)')
+        elif key == 'DumbMode' and value not in ('purge', 'gate'): problems.append(where + ' (purge / gate)')
+        elif key in ('NoInvestigate', 'NoAttack') and value not in ('0', '1'): problems.append(where + ' (0 / 1)')
+    for sec, key, default, comment in rows:
+        if len(comment) >= 512:
+            problems.append('TruMenu.cpp: kOpts [%s] %s comment has %d characters (DefaultIniText keeps 511)'
+                            % (sec, key, len(comment)))
+    items = item_types(src)
+    for item, typ in sorted(Q19_ITEMS.items()):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    m = re.search(r'const AiPreset kAiPresets\[\] = \{(.*?)\};', src, re.S)
+    cpp_presets = tuple(re.findall(r'\{"([a-z]+)", "', m.group(1))) if m else ()
+    if cpp_presets != AI_PRESETS:
+        problems.append('TruMenu.cpp: kAiPresets %s differs from this tool %s' % (cpp_presets, AI_PRESETS))
+    for table in ('kAiChecks', 'kAiGateChecks', 'kAiBitChecks'):
+        m = re.search(r'const DvCheck %s\[\] = \{(.*?)\n\};' % table, src, re.S)
+        if not m:
+            problems.append('TruMenu.cpp: %s missing' % table)
+            continue
+        for a, h in re.findall(r'\{(0x[0-9a-fA-F]+), "([0-9a-fA-F ]+)"\}', m.group(1)):
+            hexs = h.replace(' ', '')
+            if len(hexs) % 2 or len(hexs) // 2 > 64:
+                problems.append('TruMenu.cpp: %s %s "%s" (whole bytes, at most 64)' % (table, a, h))
+    bar_ai = {}
+    access = []
+    for table, de, item, arg, kind, layer, tail in qb_rows(src, True):
+        if item == 'ai.dumb':
+            if kind != 'kQbBool': problems.append('TruMenu.cpp: %s row "%s": ai.dumb rows are bool rows' % (table, de))
+            bar_ai[arg] = bar_ai.get(arg, 0) + 1
+        if item == 'ai.mode' and kind != 'kQbValue':
+            problems.append('TruMenu.cpp: %s row "%s": ai.mode is a value row' % (table, de))
+        if table == 'kQbAccess': access.append((de, item, arg, kind))
+    for want in AI_SETTINGS:
+        if not bar_ai.get(want): problems.append('TruMenu.cpp: no bar row ai.dumb %s' % want)
+    if any(de == 'Haie' and kind == 'kQbPlanned' for de, item, arg, kind in access):
+        problems.append('TruMenu.cpp: kQbAccess still has the planned row "Haie" (0.19: ai.dumb sharks)')
+    for want in ('sharks', 'spiders'):
+        if not any(item == 'ai.dumb' and arg == want for de, item, arg, kind in access):
+            problems.append('TruMenu.cpp: kQbAccess has no row ai.dumb %s' % want)
+    counts, access_ring = {}, set()
+    if os.path.exists(radial_path):
+        for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.count('|') != 2: continue
+            path, label, cmd = (x.strip() for x in line.split('|'))
+            word, _, arg = cmd.partition(' ')
+            arg = arg.strip()
+            where = '%s:%d: %s' % (os.path.basename(radial_path), n, cmd)
+            if word == 'ai.dumb':
+                if arg not in AI_SETTINGS:
+                    problems.append(where + ' (exactly one of %s - the ring adds 0 / 1)' % ' / '.join(AI_SETTINGS))
+                counts[word + ' ' + arg] = counts.get(word + ' ' + arg, 0) + 1
+                if path.lower() == 'spieler/barrierefreiheit': access_ring.add(arg)
+            elif word in ('ai.noinvestigate', 'ai.noattack', 'ai.status'):
+                counts[word] = counts.get(word, 0) + 1
+                if arg: problems.append(where + ' (no argument in the ring)')
+            elif word == 'ai.mode' and arg not in ('purge', 'gate'):
+                problems.append(where + ' (purge / gate)')
+        for want in ('ai.noinvestigate', 'ai.noattack', 'ai.status'):
+            if counts.get(want, 0) != 1:
+                problems.append('%s: %s must be in the radial file once, found %d'
+                                % (os.path.basename(radial_path), want, counts.get(want, 0)))
+        for want in ('all', 'sharks', 'spiders'):
+            if not counts.get('ai.dumb ' + want):
+                problems.append('%s: ai.dumb %s missing in the radial file' % (os.path.basename(radial_path), want))
+        for want in ('sharks', 'spiders'):
+            if want not in access_ring:
+                problems.append('%s: Spieler/Barrierefreiheit has no ai.dumb %s' % (os.path.basename(radial_path), want))
+    return problems, '%d [AI] keys, %d items, presets %s, %d bar ai.dumb rows, %d ring ai.* entries' % (
+        len(AI_KEYS), len(Q19_ITEMS), '/'.join(cpp_presets), sum(bar_ai.values()), sum(counts.values()))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -861,6 +968,8 @@ def text(header, rows):
 
 
 def main(argv):
+    global CPP
+    if '--cpp' in argv[:-1]: CPP = argv[argv.index('--cpp') + 1]   # 0.19: negative tests on a copy of TruMenu.cpp
     header, rows = table(open(CPP, encoding='utf-8').read())
     want = text(header, rows)
     if argv and argv[0] == '--print':
@@ -911,6 +1020,10 @@ def main(argv):
     for p in eproblems: print('Q018 %s' % p)
     if not eproblems: print('ok: 0.18 keys / items / bar pages: %s' % esummary)
     problems += eproblems
+    aproblems, asummary = check_019(ini_path, radial_path, rows)   # 0.19
+    for p in aproblems: print('Q019 %s' % p)
+    if not aproblems: print('ok: 0.19 dumb AI: %s' % asummary)
+    problems += aproblems
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

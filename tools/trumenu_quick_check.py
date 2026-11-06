@@ -18,9 +18,18 @@ it checks that the rules themselves do what the build report claims):
              a cinematic object appearing after the camera signal (adopted, no new segment), a script print and the 1 s
              minimum, a unit name differing only in case (no change), the 2 s end debounce.
   5. confirm   the bar's second-press confirmation (QbConfirm / QbArmed: same key within 3 s).
+2026-11-06 TruMenu 0.19 dumb AI adds three models (section "---- 0.19 dumb AI" of TruMenu.cpp):
+  6. presets   RunAiDumb / AiPresetOn / RadialOn: ring and bar rows "ai.dumb <preset>" get "<preset> 0|1" from the shown
+             state; one setting at a time (a group replaces the other), "<preset> 0" switches off only its own active
+             setting, "" / "1" bring the last setting back (also an own list), "filter" = [AI] DumbFilter.
+  7. burst     AiSecondTick's log rule at 60 frames per second: per-frame removals never give more than one line per
+             burst end, a long burst one line every 30 s, a pause under 2 s keeps the burst, 2 s ends it.
+  8. bits      AiBitsSet / AiBitsSweep: only the brain+8 bits TruMenu set are cleared again (a bit the game set stays),
+             a bit the game clears is set again while on, out of scope / off clears TruMenu's bits, a gone brain drops
+             its record without a write.
 
 Usage (from the repository root):
-  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all five, exit 1 on a failure
+  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all eight, exit 1 on a failure
 """
 import math, random, sys
 
@@ -463,9 +472,190 @@ def check_confirm():
     return ok
 
 
+# ------------------------------------------------------------------------------------------------- 0.19 dumb AI presets
+AI_PRESETS = {'all': '', 'sharks': 'shark', 'spiders': 'spider,tarantula', 'thralls': 'thrall'}
+
+
+class AiModel:
+    """mode 0 off / 1 all / 2 filter, list, the last setting (RunAiDumb, AiApply, AiSetting, AiPresetOn)"""
+    def __init__(self, ini_filter=''):
+        self.mode, self.list, self.ini = 0, '', ini_filter
+        self.last, self.last_mode, self.last_list = 'all', 1, ''
+
+    def apply(self, mode, lst, setting):
+        self.mode, self.list = mode, lst
+        if mode and setting:
+            self.last, self.last_mode, self.last_list = setting, mode, lst
+
+    def preset_on(self, name):
+        if not self.mode: return False
+        if name == 'all': return self.mode == 1
+        if self.mode != 2: return False
+        lst = self.ini if name == 'filter' else AI_PRESETS.get(name)
+        return lst is not None and lst == self.list
+
+    def setting(self, name):
+        if name == 'all': return 1, ''
+        if name == 'filter': return 2, self.ini
+        return (2, AI_PRESETS[name]) if name in AI_PRESETS else None
+
+    def run(self, arg):
+        words = arg.split()
+        a, rest = (words[0] if words else ''), ' '.join(words[1:])
+        if a in ('0', 'off') or (not a and self.mode):
+            self.apply(0, self.list, None)
+            return 'off'
+        if not a or a in ('1', 'on'):
+            self.apply(self.last_mode, self.last_list, self.last)
+            return 'on'
+        if a == '2': a = 'filter'
+        if a == 'list':
+            parts = ','.join(p for p in rest.replace(' ', ',').split(',') if p).lower()
+            if not parts: return 'err'
+            if '*' in parts: self.apply(1, '', 'all')
+            else: self.apply(2, parts, 'list')
+            return 'on'
+        s = self.setting(a)
+        if not s: return 'err'
+        if rest == '0':
+            if not self.preset_on(a): return 'unchanged'
+            self.apply(0, self.list, None)
+            return 'off'
+        if rest not in ('', '1'): return 'err'
+        self.apply(s[0], s[1], a)
+        return 'on'
+
+    def ring(self, preset):                  # RadialRun / QbAct bool row: the target state from the shown one
+        return self.run('%s %d' % (preset, 0 if self.preset_on(preset) else 1))
+
+
+def check_presets():
+    cases = []
+    m = AiModel()
+    m.ring('sharks')
+    cases.append(('ring sharks', (m.mode, m.list, m.preset_on('sharks'), m.preset_on('all')), (2, 'shark', True, False)))
+    m.ring('spiders')
+    cases.append(('ring spiders replaces sharks', (m.mode, m.list, m.preset_on('sharks'), m.preset_on('spiders')),
+                  (2, 'spider,tarantula', False, True)))
+    r = m.run('sharks 0')
+    cases.append(('sharks 0 while spiders are on', (r, m.mode, m.list), ('unchanged', 2, 'spider,tarantula')))
+    m.ring('spiders')
+    cases.append(('ring spiders again = off', (m.mode, m.preset_on('spiders')), (0, False)))
+    m.run('')
+    cases.append(('"" brings spiders back', (m.mode, m.list), (2, 'spider,tarantula')))
+    m.run('list Tiger, panther')
+    m.run('0')
+    m.run('1')
+    cases.append(('own list, off, 1 = the list again', (m.mode, m.list, m.last), (2, 'tiger,panther', 'list')))
+    m.run('list *')
+    cases.append(('list * = all', (m.mode, m.preset_on('all')), (1, True)))
+    m2 = AiModel(ini_filter='shark')
+    m2.run('2')
+    cases.append(('2 = filter from the INI; equal to the sharks preset', (m2.preset_on('filter'), m2.preset_on('sharks')),
+                  (True, True)))
+    cases.append(('unknown preset', (m2.run('cats'), m2.mode), ('err', 2)))
+    cases.append(('bad state word', (m2.run('sharks 2'), m2.mode), ('err', 2)))
+    ok = True
+    for name, got, want in cases:
+        good = got == want
+        ok &= good
+        if not good: print('presets: %s -> %s, want %s  FAIL' % (name, got, want))
+    print('presets: %d / %d ring / bar / command sequences as expected  %s' % (
+        sum(1 for _, g, w in cases if g == w), len(cases), 'ok' if ok else 'FAIL'))
+    return ok
+
+
+# --------------------------------------------------------------------------------------------------- 0.19 burst log rule
+def burst_lines(active, end_ms, fps=60):
+    """AiSecondTick at fps frames per second; active(t) = removals in the frame at t ms; returns [(t, what)]"""
+    lines, sec_start, sec_sum = [], 0, 0
+    b = {'on': False, 'start': 0, 'last_active': 0, 'last_line': 0}
+    t = 1.0
+    while t < end_ms:
+        now = int(t)
+        sec_sum += active(now)
+        if not sec_start: sec_start = now
+        if now - sec_start >= 1000:
+            sec_start, total, sec_sum = now, sec_sum, 0
+            if total:
+                if not b['on']: b.update(on=True, start=now - 1000, last_line=now - 1000)
+                b['last_active'] = now
+                if now - b['last_line'] >= 30000:
+                    lines.append((now, 'goes on'))
+                    b['last_line'] = now
+            elif b['on'] and now - b['last_active'] >= 2000:
+                lines.append((b['last_active'], 'ended'))
+                b['on'] = False
+        t += 1000.0 / fps
+    return lines
+
+
+def check_burst():
+    cases = [
+        ('per-frame removals for 95 s', lambda t: 1 if t < 95000 else 0, 100000, ['goes on'] * 3 + ['ended']),
+        ('3 short bursts 5 s apart', lambda t: 1 if t % 5000 < 400 else 0, 15500, ['ended'] * 3),
+        ('pause of 1.5 s inside a burst', lambda t: 1 if t < 4000 or 5500 <= t < 9000 else 0, 15000, ['ended']),
+        ('pause of 3.5 s splits it', lambda t: 1 if t < 4000 or 7500 <= t < 9000 else 0, 15000, ['ended', 'ended']),
+        ('nothing happens', lambda t: 0, 20000, []),
+    ]
+    ok = True
+    for name, fn, end, want in cases:
+        got = [w for _, w in burst_lines(fn, end)]
+        good = got == want
+        ok &= good
+        print('burst: %s -> %d line(s) %s  %s' % (name, len(got), ' / '.join(got) or '-', 'ok' if good else 'FAIL'))
+    return ok
+
+
+# ------------------------------------------------------------------------------------------------- 0.19 brain+8 records
+def check_bits():
+    """one brain with its record (AiBitsSet in the walk, then AiBitsSweep); want = the wanted bits of this frame"""
+    INV, ATK = 0x80, 0x20 | 0x100000
+    state = {'flags': 0, 'rec': None, 'alive': True}
+
+    def frame(want):
+        if state['alive'] and want:          # AiBitsSet
+            missing = want & ~state['flags']
+            if missing:
+                if state['rec'] is None: state['rec'] = 0
+                state['flags'] |= missing
+                state['rec'] |= missing
+        if state['rec'] is not None:         # AiBitsSweep
+            if state['alive']:
+                clear = state['rec'] & ~want
+                if clear:
+                    state['flags'] &= ~clear
+                    state['rec'] &= ~clear
+            if not state['alive'] or not state['rec']: state['rec'] = None
+
+    cases = []
+    state.update(flags=0x40 | INV, rec=None, alive=True)       # the game set 0x80 itself (intro flag)
+    frame(INV | ATK)
+    cases.append(("on: only the missing bits are TruMenu's", (state['flags'], state['rec']), (0x40 | INV | ATK, ATK)))
+    state['flags'] &= ~0x20                                      # the game clears 0x20 (0x6507f6)
+    frame(INV | ATK)
+    cases.append(('the game cleared 0x20 -> set again', (state['flags'], state['rec']), (0x40 | INV | ATK, ATK)))
+    frame(0)
+    cases.append(("off: the game's 0x80 stays", (state['flags'], state['rec']), (0x40 | INV, None)))
+    state.update(flags=0, rec=None, alive=True)
+    frame(ATK)
+    state['alive'] = False
+    frame(ATK)
+    cases.append(('brain gone: record dropped, no write', (state['flags'], state['rec']), (ATK, None)))
+    ok = True
+    for name, got, want in cases:
+        good = got == want
+        ok &= good
+        if not good: print('bits: %s -> %s, want %s  FAIL' % (name, got, want))
+    print("bits: %d / %d record cases as expected (only TruMenu's bits are cleared)  %s" % (
+        sum(1 for _, g, w in cases if g == w), len(cases), 'ok' if ok else 'FAIL'))
+    return ok
+
+
 def main():
     rng = random.Random(17)
-    results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm()]
+    results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
+               check_burst(), check_bits()]
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

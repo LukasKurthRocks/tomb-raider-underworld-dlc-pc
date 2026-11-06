@@ -130,6 +130,18 @@ Spieler/Debug/Leveldaten | Trigger-Namen | dbg.show trglabels
 # nav.mask (layer mask 0xffffffff); "Navmesh aus" = nav.off: every switch and the mask back to the values before.
 # 0.13 Thrall-Labels (debug view stage S1): a label at each thrall near Lara (name, intro id, distance, health, targeter 9
 # / hit list / condition 2011 from TruShadowCombat 0.5.3).
+# 0.19 Dumme KI (docs/Befund-TruMenu-019-DummeKI-0611.md): enemies ignore Lara - every AI enemy or one group by object
+# name; one setting at a time (switching a group on replaces the other), each entry shows on / off. Default method purge
+# = the engine's own sense reset once per frame (no code patch); [AI] DumbMode=gate = call gates. Nicht nachsehen /
+# Nicht angreifen = the prototype's brain flags for the same enemies (every AI enemy while ai.dumb is off / all).
+Spieler/Debug/KI | Gegner ignorieren Lara | ai.dumb all
+Spieler/Debug/KI | Haie ignorieren Lara | ai.dumb sharks
+Spieler/Debug/KI | Spinnen ignorieren Lara | ai.dumb spiders
+Spieler/Debug/KI | Thralls ignorieren Lara | ai.dumb thralls
+Spieler/Debug/KI | KI-Filter aus INI | ai.dumb filter
+Spieler/Debug/KI | Nicht nachsehen | ai.noinvestigate
+Spieler/Debug/KI | Nicht angreifen | ai.noattack
+Spieler/Debug/KI | Dumme KI: Stand | ai.status
 Spieler/Debug/KI | Navmesh Flaechen | nav.draw planner_areas
 Spieler/Debug/KI | Navmesh Verbindungen | nav.draw planner_connectivity
 Spieler/Debug/KI | Hindernisse | nav.draw obstacles
@@ -195,6 +207,9 @@ Spieler/Barrierefreiheit | Befreien | player.unstuck
 Spieler/Barrierefreiheit | Befreien: Stand | player.safeground
 Spieler/Barrierefreiheit | Unverwundbar (Hilfe) | player.invincible
 Spieler/Barrierefreiheit | Gott voll (Hilfe) | cheat.godfull
+# 0.19 Sonstige (Phobien): sharks / spiders ignore Lara (ai.dumb sharks / spiders - the same switch as Spieler/Debug/KI)
+Spieler/Barrierefreiheit | Haie ignorieren Lara | ai.dumb sharks
+Spieler/Barrierefreiheit | Spinnen ignorieren Lara | ai.dumb spiders
 # 0.10.5 (owner wish 2026-11-05): Claude marks, drawn in coral - each pick writes one TruMenu.log line
 # "claude.mark <kind>: <time> unit=<stream unit> pos=<x y z> step=<TO TEST step or -> shot=<file> src=ring" and takes a
 # clean shot named <kind>; the ring closes after the pick. [Shot] Hotkey (F11 = 0x7A, default off) = "Jetzt".
