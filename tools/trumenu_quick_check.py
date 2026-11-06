@@ -27,9 +27,22 @@ it checks that the rules themselves do what the build report claims):
   8. bits      AiBitsSet / AiBitsSweep: only the brain+8 bits TruMenu set are cleared again (a bit the game set stays),
              a bit the game clears is set again while on, out of scope / off clears TruMenu's bits, a gone brain drops
              its record without a write.
+2026-11-06 TruMenu 0.20 changes model 4 and adds three models:
+  4. segments  (0.20) OcSegReason no longer starts a segment on a TRACK change of the same cinematic object (the track
+             is followed): the live case 20:23 (track 0 -> 28 -> 60 -> 92 .. once a second = a new pair every second
+             with the 0.18 rule) must give ONE segment; a new cinematic object, a unit change and a script print still
+             start one (the 0.18 cases keep their results).
+  9. goload    RunPosGoLoad's path: loaded -> flight + pos.go; not loaded with a portal of a loaded unit (portal name =
+             the target unit, case-insensitive, never the target's own portals) -> flight + pos.portal + wait.unit +
+             pos.go; no such portal or "load" -> level.load + flight + pos.go.
+ 10. waitunit  ShortcutTick's wait.unit: the unit must be loaded 1 s in a row (a flicker restarts the second), at most
+             30 s, then the run stops with the reason.
+ 11. forget    AiForgetOnce: once per enemy {instance, handle id} and setting; a new setting / ai.dumb off / a level
+             change forgets again; the slot rule (mode 1 = Lara's handle, mode 0 = a sense whose target is Lara, mode -1 /
+             2 / another target untouched); +0x30 / +0xf0 cleared, +0x70 / +0xb0 only counted.
 
 Usage (from the repository root):
-  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all eight, exit 1 on a failure
+  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all eleven, exit 1 on a failure
 """
 import math, random, sys
 
@@ -366,9 +379,11 @@ def check_frames():
 
 
 # ------------------------------------------------------------------------------------------------- 0.18 cutscene segments
-def oc_run(timeline, end, segments=True, pairs=10, fast=4, fast_ms=1500, slow_ms=8000, end_ms=2000, seg_min=1000):
+def oc_run(timeline, end, segments=True, pairs=10, fast=4, fast_ms=1500, slow_ms=8000, end_ms=2000, seg_min=1000,
+           track_seg=False):
     """OnCineTick / OcSegReason / OcSegStart as a model, polled every 50 ms. timeline(t) -> (signal, unit, cine, track,
-    script_tick). Returns [(segment, [pair times])]."""
+    script_tick). Returns [(segment, [pair times])]. track_seg=True = the 0.18 rule (a track change starts a segment),
+    False = 0.20 (the track of the same cinematic is followed)."""
     st = None
     segs = []
     for t in range(0, end, 50):
@@ -384,8 +399,9 @@ def oc_run(timeline, end, segments=True, pairs=10, fast=4, fast_ms=1500, slow_ms
                 if unit and st['unit'] and unit.lower() != st['unit'].lower(): why = 'unit'
                 elif cine and track != -1 and (not st['cine'] or st['track'] == -1):
                     st['cine'], st['track'] = cine, track          # adopt, no new segment
-                elif cine and track != -1 and (cine != st['cine'] or track != st['track']): why = 'cine'
-                elif script and script != st['script'] and script > st['seg_start']: why = 'script'
+                elif cine and track != -1 and (cine != st['cine'] or (track_seg and track != st['track'])): why = 'cine'
+                elif cine and track != -1: st['track'] = track             # 0.20: followed, no new segment
+                if not why and script and script != st['script'] and script > st['seg_start']: why = 'script'
             if why:
                 st.update(seg_start=t, next=t, done=0, unit=unit, cine=cine, track=track, script=script)
                 segs.append((len(segs) + 1, []))
@@ -446,7 +462,144 @@ def check_segments():
     a, b = oc_run(gap, 15000), oc_run(gap2, 15000)
     good = len(a) == 1 and len(b) == 2
     print('segments: signal gone 1.9 s -> %d burst(s), 2.1 s -> %d  %s' % (len(a), len(b), 'ok' if good else 'FAIL'))
+    ok &= good
+    # 0.20: the live case 2026-11-06 20:23 - one cinematic object, its track 0 -> 28 -> 60 -> 92 .. once a second, 60 s
+    def track(t): return True, 'dlc_level1_start', 0x3000, (t // 1000) * 32 - (4 if t >= 1000 else 0), 0
+    old = oc_run(track, 60000, track_seg=True)
+    new = oc_run(track, 60000)
+    old_pairs = sum(len(ts) for s, ts in old)
+    good = len(old) >= 50 and len(new) == 1 and len(new[0][1]) == 10
+    print('segments: 0.20 - track changes of one cinematic every second for 60 s -> 0.18 rule %d segments / %d pairs, '
+          '0.20 rule %d segment / %d pairs  %s' % (len(old), old_pairs, len(new), sum(len(ts) for s, ts in new),
+                                                    'ok' if good else 'FAIL'))
+    ok &= good
+    # 0.20: a new cinematic object at +20 s still starts a segment (with the track running in both)
+    def obj(t): return True, 'u', (0x3000 if t < 20000 else 0x4000), (t // 1000) * 32, 0
+    s = oc_run(obj, 40000)
+    good = len(s) == 2 and s[1][1] and s[1][1][0] == 20000
+    print('segments: 0.20 - another cinematic object at 20 s -> %d segments  %s' % (len(s), 'ok' if good else 'FAIL'))
     return ok and good
+
+
+# ---------------------------------------------------------------------------------------------------- 0.20 pos.goload
+def goload_steps(name, unit, loaded_units, portals, force=False):
+    """RunPosGoLoad as a model. loaded_units: names with state 2; portals: {owner unit: [portal names]}. Returns the step
+    list of the shortcut."""
+    loaded = any(u.lower() == unit.lower() for u in loaded_units)
+    portal = None
+    if not loaded and not force:
+        for owner in loaded_units:                      # PosPortalTo: loaded units, never the target itself
+            if owner.lower() == unit.lower(): continue
+            if any(p.lower() == unit.lower() for p in portals.get(owner, [])):
+                portal = owner
+                break
+    if loaded: return ['cheat.flight 1', 'pos.go %s' % name]
+    if portal: return ['cheat.flight 1', 'pos.portal %s' % unit, 'wait.unit %s' % unit, 'pos.go %s' % name]
+    return ['level.load %s' % unit, 'cheat.flight 1', 'pos.go %s' % name]
+
+
+def check_goload():
+    portals = {'l3_main_bedroom': ['l3_bedroom_hall', 'l3_chamberrockhall'], 'l3_bedroom_hall': ['L3_Main_Hall']}
+    cases = [
+        (('glas', 'l3_main_bedroom', ['l3_main_bedroom'], portals), 'cheat.flight 1|pos.go glas'),
+        (('glas', 'l3_bedroom_hall', ['l3_main_bedroom'], portals),
+         'cheat.flight 1|pos.portal l3_bedroom_hall|wait.unit l3_bedroom_hall|pos.go glas'),
+        (('glas', 'l3_main_hall', ['l3_main_bedroom', 'l3_bedroom_hall'], portals),        # name case differs
+         'cheat.flight 1|pos.portal l3_main_hall|wait.unit l3_main_hall|pos.go glas'),
+        (('glas', 'l3_main_hall', ['l3_main_bedroom'], portals),                           # two hops: no portal path
+         'level.load l3_main_hall|cheat.flight 1|pos.go glas'),
+        (('glas', 'l3_bedroom_hall', ['l3_main_bedroom'], portals, True),                  # "load" forces level.load
+         'level.load l3_bedroom_hall|cheat.flight 1|pos.go glas'),
+    ]
+    ok = 0
+    for args, want in cases:
+        got = '|'.join(goload_steps(*args))
+        ok += got == want
+        if got != want: print('goload: %s -> %s, want %s  FAIL' % (args[:3], got, want))
+    good = ok == len(cases)
+    print('goload: %d / %d path cases (loaded / portal / case / two hops / forced load)  %s'
+          % (ok, len(cases), 'ok' if good else 'FAIL'))
+    return good
+
+
+def waitunit(loaded_at, end=40000, step=16):
+    """ShortcutTick's wait.unit as a model: loaded_at(t) -> bool; returns ('done', t) or ('stopped', t)"""
+    start, ready = 0, None
+    for t in range(0, end, step):
+        if t - start > 30000: return 'stopped', t
+        if not loaded_at(t):
+            ready = None
+            continue
+        if ready is None:
+            ready = t
+            continue
+        if t - ready < 1000: continue
+        return 'done', t
+
+
+def check_waitunit():
+    cases = [(lambda t: t >= 2000, 'done', 3000, 3100),               # streamed after 2 s, 1 s in a row
+             (lambda t: t >= 2000 and not 2500 <= t < 2600, 'done', 3600, 3700),   # a flicker restarts the second
+             (lambda t: False, 'stopped', 30000, 30100),              # never: stopped after 30 s
+             (lambda t: t >= 29500, 'stopped', 30000, 30100)]         # too late for the 1 s
+    ok = 0
+    for f, want, lo, hi in cases:
+        what, t = waitunit(f)
+        ok += what == want and lo <= t <= hi
+    good = ok == len(cases)
+    print('waitunit: %d / %d cases (1 s in a row, flicker, 30 s limit)  %s' % (ok, len(cases), 'ok' if good else 'FAIL'))
+    return good
+
+
+# ---------------------------------------------------------------------------------------------------- 0.20 ai forget
+class Forget:
+    """AiForgetOnce / AiForgetReset / AiSlotLara as a model"""
+    def __init__(self):
+        self.done, self.cleared, self.counted = set(), [], 0
+
+    def reset(self): self.done = set()
+
+    @staticmethod
+    def slot_lara(slot, lara):
+        mode = slot.get('mode', -1)
+        if mode == 1: return slot.get('inst') == lara['inst'] and slot.get('id') == lara['id']
+        if mode == 0: return slot.get('sense_target') == lara['inst']
+        return False
+
+    def once(self, enemy, lara):
+        key = (enemy['inst'], enemy['id'])
+        if key in self.done: return False
+        self.done.add(key)
+        for off in (0x30, 0xf0):
+            if self.slot_lara(enemy['slots'].get(off, {}), lara):
+                self.cleared.append((key, off))
+                enemy['slots'][off] = {'mode': -1}
+        for off in (0x70, 0xb0):
+            if self.slot_lara(enemy['slots'].get(off, {}), lara): self.counted += 1
+        return True
+
+
+def check_forget():
+    lara = {'inst': 0x1000, 'id': 7}
+    def enemy(inst, eid, slots): return {'inst': inst, 'id': eid, 'slots': slots}
+    f = Forget()
+    a = enemy(0x2000, 1, {0x30: {'mode': 1, 'inst': 0x1000, 'id': 7}, 0xf0: {'mode': 0, 'sense_target': 0x1000},
+                          0x70: {'mode': 1, 'inst': 0x1000, 'id': 7}})
+    b = enemy(0x3000, 2, {0x30: {'mode': 1, 'inst': 0x1000, 'id': 6},               # stale handle id: not Lara
+                          0xf0: {'mode': 2}, 0xb0: {'mode': 0, 'sense_target': 0x5000}})
+    c = enemy(0x4000, 3, {0x30: {'mode': 0, 'sense_target': 0x1000}})
+    frames = [f.once(e, lara) for e in (a, b, c)] + [f.once(e, lara) for e in (a, b, c)]   # the second frame: nothing
+    good = frames == [True, True, True, False, False, False]
+    good &= sorted(f.cleared) == sorted([((0x2000, 1), 0x30), ((0x2000, 1), 0xf0), ((0x4000, 3), 0x30)]) and f.counted == 1
+    good &= b['slots'][0x30]['mode'] == 1 and b['slots'][0xf0]['mode'] == 2           # untouched
+    f.reset()                                                                         # a new setting / off / level change
+    a['slots'][0x30] = {'mode': 1, 'inst': 0x1000, 'id': 7}                           # the enemy picked Lara again
+    again = f.once(a, lara) and a['slots'][0x30]['mode'] == -1
+    respawn = f.once(enemy(0x2000, 9, {0x30: {'mode': 1, 'inst': 0x1000, 'id': 7}}), lara)   # same slot, new handle id
+    good &= again and respawn
+    print('forget: once per enemy and setting, slot rule (mode 1 / 0 / -1 / 2, stale id), +0x70 / +0xb0 only counted, '
+          'reset and a reused instance slot  %s' % ('ok' if good else 'FAIL'))
+    return good
 
 
 # ----------------------------------------------------------------------------------------------------- 0.18 bar confirm
@@ -655,7 +808,7 @@ def check_bits():
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
-               check_burst(), check_bits()]
+               check_burst(), check_bits(), check_goload(), check_waitunit(), check_forget()]   # 0.20: + three
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

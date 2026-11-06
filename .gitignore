@@ -37,6 +37,11 @@ work/thalasso_0611/
 work/crash15h_0611/
 work/sap_0611/
 work/dumbai_0611/
+# 2026-11-06 evening: TruMenu 0.20 research, unit streaming, thrall fields, audio / merc voice (disassembly, DRM extracts)
+work/m020_0611/
+work/stream_0611/
+work/thrall_0611/
+work/audio_0611/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report
 tools/native_test/shaders/
 tools/native_test/native_report.txt

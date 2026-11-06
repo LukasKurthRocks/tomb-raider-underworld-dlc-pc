@@ -55,7 +55,19 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.19 (Dumme KI: ai.dumb - enemies ignore Lara, every AI enemy or by object name "
+const char *const kVersion = "TruMenu 0.20 (layers dbg.collect = collectibles (*_rw_* rewards by kind, reward pots "
+                             "'enthaelt Artefakt' with their reward index from the intro data) and dbg.enemies = every AI "
+                             "enemy by kind (thralls, spiders, sharks, big cats, naga, bats, mercs, other) with intro id, "
+                             "LP and distance, thralls with the targeter 9 line; ai.dumb forgets on switch-on: the enemy's "
+                             "current / override target on Lara cleared once with the engine's slot setter 0x653cf0, "
+                             "senses purged once; [AI] DumbMode gate by default (purge = fallback); shot.oncine segments "
+                             "no longer on track changes of the same cinematic; pos.goload over a loaded neighbour's "
+                             "stream portal (pos.portal + wait.unit) before a level.load; [Debug] Depth dim and "
+                             "FlatPasses 0x600 by default; media.mutemusic (SOUND_SetMusicVolume 0x589520(0), "
+                             "re-applied) / media.muteambient ('_amb_' srmusic tracks); bar rows Gegner, Gegner-Leben, "
+                             "Kanten, Musik aus, Ambient aus, Sammelgegenstaende, Notfall 'Spiel beenden' (game.quit, "
+                             "twice within 10 s); "
+                             "0.19 Dumme KI: ai.dumb - enemies ignore Lara, every AI enemy or by object name "
                              "(sharks / spiders / thralls / [AI] DumbFilter); purge = the engine's sense reset 0x65a140 "
                              "once per game frame (stage A, no code patch, default), gate = 4 call gates + 1 vtable slot "
                              "while on in a level (stage B, [AI] DumbMode=gate); ai.noinvestigate / ai.noattack = brain+8 "
@@ -377,6 +389,12 @@ const OptDef kOpts[] = {
                                     "test proves play in a level safe)"},
     {"Media", "MusicFade", "60", "0.9: fade in / out of media.music.play / stop in frames (30 per second; the game's unit "
                                  "start uses 60), 0 .. 300"},
+    {"Media", "MuteMusic", "0", "0.20 (media.mutemusic): 1 = background music muted from the start - the game's own "
+                                "SOUND_SetMusicVolume 0x589520(0),\nre-applied when a level load or a music ramp brings "
+                                "it back; off = the player's slider value again (never written)"},
+    {"Media", "MuteAmbient", "0", "0.20 (media.muteambient): 1 = ambience beds played as music ('_amb_' tracks, DLC 2) "
+                                  "stopped whenever they start;\nnot covered: base-game ambience in sound groups (group "
+                                  "index not known yet), effect sounds"},
     {"Saves", "Folder", "", "0.9: save folder for the Saves page; empty = the game's own (Documents\\Eidos\\Tomb Raider - "
                             "Underworld, as tru.exe\n0x78b550). Backups, export and import live in TruMenu.saves next "
                             "to tru.exe"},
@@ -458,9 +476,9 @@ const OptDef kOpts[] = {
     {"Shot", "OnCineSlowMs", "8000", "0.17: milliseconds between the later pairs, 250 .. 60000 (0.18: 8000, was 5000 - "
                                      "spread over long cutscenes)"},
     {"Shot", "OnCineSegments", "1", "0.18: 1 = a running cutscene starts a new segment (own pair budget, own log lines) "
-                                    "when Lara's unit changes, the\ngame's cinematic object / track changes or a script "
-                                    "prints 'StartCinematic called' / 'Cine about to play' (needs\nlog.script); 0 = one "
-                                    "budget per cutscene (0.17)"},
+                                    "when Lara's unit changes, the\ngame's cinematic object changes or a script prints "
+                                    "'StartCinematic called' / 'Cine about to play' (needs\nlog.script); 0 = one budget "
+                                    "per cutscene (0.17); 0.20: a track change of the same cinematic is no new segment"},
     {"Shot", "OnCineSignal", "both", "0.17: what counts as a cutscene - cine = the game's cinematic test (0x453f00), camera "
                                      "= the current camera is not the\ngameplay camera [0xe804f0+0xb80], both = either "
                                      "of them"},
@@ -558,9 +576,9 @@ const OptDef kOpts[] = {
                            "colours without\ntextures - pixel shader swap inside the terrain / model draws of FlatPasses; "
                            "while it is on in a level TruMenu patches\n2 vtable words of tru.exe (0x849948, 0x849758) "
                            "and the device's DrawPrimitive / DrawIndexedPrimitive slots"},
-    {"Debug", "FlatPasses", "0x200", "0.15: drawable pass ids the flat view colours, a hex mask of 0x200 0x100 0x80 0x400 "
-                                     "0x800 1 2; 0x200 = best guess (the first\nopaque list of PCScene::Draw) - run the "
-                                     "census and take its suggestion (dbg.flatpasses census)"},
+    {"Debug", "FlatPasses", "0x600", "0.15: drawable pass ids the flat view colours, a hex mask of 0x200 0x100 0x80 0x400 "
+                                     "0x800 1 2; 0.20: 0x600 = the census of 2026-11-06\n(0x200 main colour pass + 0x400 "
+                                     "small rest; 0.15 - 0.19: 0x200) - dbg.flatpasses census takes a new suggestion"},
     {"Debug", "FlatColour", "material", "0.15: material = a palette colour per material (hash of [0xa14188]); class = "
                                         "terrain one colour, models another"},
     {"Debug", "FlatModels", "0", "0.15: 1 = models (Lara, enemies, objects) flat too; 0 = only the terrain, models keep the "
@@ -568,10 +586,10 @@ const OptDef kOpts[] = {
     {"Debug", "FlatEdges", "0", "0.15: 1 = edge pass: every flat draw again as a dark wireframe (one more draw per draw)"},
     {"Debug", "FlatAnyTarget", "0", "0.15: 1 = flat in every render target; 0 = only in targets of the back buffer's size "
                                     "(shadow maps / reflections keep\nthe game's shading even with a wrong pass mask)"},
-    {"Debug", "Depth", "0", "0.16 (dbg.depth): 0 = debug view lines on top of everything (as 0.15); 1 = hidden behind the "
+    {"Debug", "Depth", "2", "0.16 (dbg.depth): 0 = debug view lines on top of everything (as 0.15); 1 = hidden behind the "
                             "level geometry and Lara (drawn\ninside the game frame with the scene's depth buffer - patches "
                             "the PCScene::Draw vtable word 0x849a2c while on and a layer is\non); 2 = like 1, the hidden "
-                            "parts faint (DepthDim)"},
+                            "parts faint (DepthDim); 0.20: 2 by default (live: 1 hid almost every box)"},
     {"Debug", "DepthDim", "25", "0.16: Depth=2 - opacity of the hidden parts in percent, 5 .. 80"},
     {"Debug", "DepthCall", "-1", "0.16: Depth - which PCScene::Draw of a frame (counted among those into a back-buffer-size "
                                  "target with a depth surface)\nthe lines go into, 0 .. 7 (dbg.style shows how many there "
@@ -604,7 +622,17 @@ const OptDef kOpts[] = {
                                 "at Lara and filled the\nforeground), 2 .. 50"},
     {"Debug", "ViewSkip", "sound", "0.16: layers dbg.view (Alles an / aus) and View=1 leave off - comma list of layer names "
                                    "(death, fire, checkpoint, water,\nsound, volume, plane, unknown, portals, checkpoints, "
-                                   "trglabels, legend, names, slide, enemycoll); empty = none"},
+                                   "trglabels, legend, names, slide, enemycoll, collect,\nenemies); empty = none"},
+    {"Debug", "Collect", "0", "0.20: 1 = collectibles on from the start (dbg.collect): every *_rw_* reward (artifact gold, "
+                              "treasure pink, shard\nturquoise, other reward light gold) and every reward pot / weight-break "
+                              "container (magenta ring, 'enthaelt\nArtefakt' + the reward index of its intro data)"},
+    {"Debug", "Enemies", "0", "0.20: 1 = enemies on from the start (dbg.enemies): every AI enemy, colour by kind (thralls, "
+                              "spiders, sharks, big cats,\nnaga, bats, mercs, other), label name + intro id + LP + distance; "
+                              "thralls with the targeter 9 line of dbg.labels"},
+    {"Debug", "MarkRadius", "15000", "0.20: collectibles / enemies only up to this distance from the camera (game units, "
+                                     "500 .. 200000)"},
+    {"Debug", "MarkMax", "24", "0.20: at most this many collectible and this many enemy markers per frame, the nearest to "
+                               "the camera first, 1 .. 64"},
     {"Debug", "CheckpointHide", "", "0.17 (dbg.cp / dbg.cpall): intro ids of checkpoints whose marker is not drawn (comma "
                                     "list; written back with Persist=1);\nempty = every checkpoint drawn"},
     {"Quick", "Enabled", "1", "0.17 Schnellschalter (quick.open): 1 = OpenButtons open / close a small bar at the left "
@@ -629,12 +657,11 @@ const OptDef kOpts[] = {
     {"AI", "DumbFilter", "", "0.19: comma list of object name parts for Dumb=2 and 'ai.dumb filter' (shark = sharks, "
                              "spider,tarantula = spiders,\nthrall = thralls, merc,poacher = humans, tiger,panther = big "
                              "cats); empty = every AI enemy"},
-    {"AI", "DumbMode", "purge", "0.19 (ai.mode): purge = stage A, no code patch - once per game frame the engine's own "
-                                "sense reset 0x65a140 takes\nLara out of the perception list of every enemy in the filter "
-                                "(it may sense her again until the next frame);\ngate = stage B - while ai.dumb is on in a "
-                                "level 4 calls + 1 vtable slot of tru.exe lead through TruMenu, Lara never\ngets into the "
-                                "list (put back when off, at a level change, at unload); use it only if purge is not "
-                                "enough"},
+    {"AI", "DumbMode", "gate", "0.19 (ai.mode): gate = stage B - while ai.dumb is on in a level 4 calls + 1 vtable slot of "
+                               "tru.exe lead through\nTruMenu, Lara never gets into the list (put back when off, at a level "
+                               "change, at unload); purge = stage A, no code\npatch - the engine's sense reset 0x65a140 once "
+                               "per frame. 0.20: gate by default (live 2026-11-06: purge did not\nstop a tarantula, gate "
+                               "did); purge = the fallback when the gate checks fail"},
     {"AI", "NoInvestigate", "0", "0.19 (ai.noinvestigate): 1 = the enemies of the ai.dumb filter (every AI enemy while "
                                  "ai.dumb is off or all) do not\nwalk to noises - brain+8 bit 0x80, the prototype's "
                                  "g_enemyNoInvestigate; set per frame, cleared again when off"},
@@ -894,6 +921,7 @@ void InvincibleTick(); // 0.3 player.invincible: health = MaxHealth once per gam
 void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite ammo re-apply (game thread)
 void SaveLoadTick();   // 0.18 save.load: a confirmed request, then its progress (game thread)
 void AiTick();         // 0.19 dumb AI: purge / gate patches / brain flags (game thread, section "0.19 dumb AI")
+void SndMuteTick();    // 0.20 media.mutemusic / media.muteambient (game thread, section "0.20 collectibles")
 void NavTick();        // 0.12 Debug-Zeichnung: [Debug] NavDraw / NavMask once in the first loaded level (game thread)
 void SafeGroundTick(); // 0.8.1 player.unstuck: ring of recent safe positions (game thread)
 void NoDamageTick();   // 0.10.2 cheat.godfull: the player's no-damage bit once per game frame (game thread)
@@ -1126,6 +1154,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         CheatsTick();                         // 0.8: [Cheats] Persist restore, infinite ammo re-apply
         SaveLoadTick();                       // 0.18 save.load (cheap: one flag while idle)
         AiTick();                             // 0.19 dumb AI (cheap while everything is off: no walk)
+        SndMuteTick();                        // 0.20 music / ambience mutes (cheap while off: one flag each)
         NavTick();                           // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
         SafeGroundTick();                     // 0.8.1: player.unstuck ring
     }
@@ -6105,6 +6134,8 @@ DWORD g_tscLookTick = 0;
 const char *g_tscState = "not looked up";
 LblTscSnap g_lblSnap;
 bool g_lblSnapOk = false;
+DWORD AiBrainOf(DWORD inst);                 // 0.19, below (section "0.19 dumb AI")
+bool M20EnemiesOn();                         // 0.20, below: dbg.enemies on (dbg.labels then leaves AI enemies to it)
 
 // load: the byte checks of precheck_013.txt
 void LabelCheck() {
@@ -6282,6 +6313,7 @@ void DrawLabels() {
     float lara[3];
     if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
     g_lblSnapOk = LabelTsc();
+    const bool enemiesOn = M20EnemiesOn();
     const float r2 = g_lblRadius * g_lblRadius;
     int count = 0;
     DWORD inst = 0;
@@ -6293,6 +6325,7 @@ void DrawLabels() {
             float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2], d2 = dx * dx + dy * dy + dz * dz;
             if (d2 <= r2 && ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid)) {
                 int kind = LabelKind(static_cast<int>(oid & 0xffff));
+                if (kind != 3 && enemiesOn && AiBrainOf(inst)) kind = 3;   // 0.20: dbg.enemies labels it
                 if (kind != 3) {
                     ++g_lblInRadius;
                     // sorted insert: thralls first, then nearest; keep g_lblMax
@@ -6495,7 +6528,9 @@ const float kDvTestLift = 200.0f;            // [0x853f08], added to the player 
 // 0.15: the collision overlay layers (stage R2, drawn by the 0.15 section: slide faces, enemy-only collision groups)
 enum DvLayer {
     kDvDeath = 0, kDvFire, kDvCheckpoint, kDvWater, kDvSound, kDvVolume, kDvPlane, kDvUnknown, kDvKinds,
-    kDvPortals = kDvKinds, kDvCheckpoints, kDvTrgLabels, kDvLegend, kDvNames, kDvSlide, kDvEnemyColl, kDvCount
+    kDvPortals = kDvKinds, kDvCheckpoints, kDvTrgLabels, kDvLegend, kDvNames, kDvSlide, kDvEnemyColl,
+    kDvCollect, kDvEnemies,                  // 0.20: collectibles / enemies (section "0.20 collectibles")
+    kDvCount
 };
 // 0.17 brief: the legend's short English term (owner wish 2026-11-06 after the 0.16 live run: the legend was too long -
 // short English words only, whatever the language; the menu keeps de / en)
@@ -6516,8 +6551,11 @@ const DvLayerDef kDvLayers[kDvCount] = {
     {"names", "Names", "Objektnamen", "object names", IM_COL32(255, 255, 255, 255), "Names"},
     {"slide", "Slide", "Rutschflaechen", "slide faces", IM_COL32(255, 45, 45, 255), "Slide faces"},
     {"enemycoll", "EnemyColl", "Gegner-Kollision", "enemy-only collision", IM_COL32(190, 80, 255, 255), "Enemy collision"},
+    {"collect", "Collect", "Sammelgegenstaende", "collectibles", IM_COL32(255, 210, 40, 255), "Collectibles"},
+    {"enemies", "Enemies", "Gegner", "enemies", IM_COL32(255, 90, 90, 255), "Enemies"},
 };
-// object name part -> kind (first match wins, so "deathfiretriggervolume" is death)
+float g_m20Radius = 15000.0f;                // 0.20 [Debug] MarkRadius (collectibles / enemies, from the camera)
+int g_m20Max = 24;                           // 0.20 [Debug] MarkMax (per layer and frame)// object name part -> kind (first match wins, so "deathfiretriggervolume" is death)
 struct DvWord { const char *part; int kind; };
 const DvWord kDvWords[] = {{"checkpoint", kDvCheckpoint}, {"death", kDvDeath}, {"kill", kDvDeath}, {"fire", kDvFire},
                            {"burn", kDvFire},  {"flame", kDvFire}, {"water", kDvWater}, {"swim", kDvWater},
@@ -6606,8 +6644,10 @@ void DebugViewCheck() {
 
 // the check a layer needs (true = usable)
 bool RcLayerOk(const char **why);            // 0.15, below: the collision overlay checks (precheck_015.txt 4 .. 6)
+bool M20LayerOk(int layer, const char **why);   // 0.20, below: collectibles / enemies
 bool DvLayerOk(int layer, const char **why) {
     if (layer == kDvSlide || layer == kDvEnemyColl) return RcLayerOk(why);
+    if (layer == kDvCollect || layer == kDvEnemies) return M20LayerOk(layer, why);
     bool ok = layer < kDvKinds || layer == kDvTrgLabels ? g_dvTrgOk : layer == kDvPortals ? g_dvPortalOk
             : layer == kDvCheckpoints ? g_dvCpOk : layer == kDvNames ? g_dvBaseOk : true;
     *why = layer < kDvKinds || layer == kDvTrgLabels ? g_dvTrgWhy : layer == kDvPortals ? g_dvPortalWhy
@@ -6741,7 +6781,8 @@ int g_dvShort = 1, g_dvLaraIn = 1, g_dvTagMax = 10;                      // [Deb
 int g_dvLegendLaraIn = 0;                                               // 0.18 [Debug] LegendLaraIn
 int g_dvEncl = 1, g_dvMarkerMax = 8;                                    // [Debug] Enclosing (0 / 1 / 2) / MarkerMax (%)
 float g_dvEnclSize = 1500.0f;                                           // [Debug] EnclosingSize
-volatile LONG g_dpMode = 0;                  // [Debug] Depth: 0 on top (0.15), 1 hidden behind geometry, 2 hidden dim
+volatile LONG g_dpMode = 2;                  // [Debug] Depth: 0 on top (0.15), 1 hidden behind geometry, 2 hidden dim
+                                             // (0.20: 2 by default)
 int g_dpDim = 25, g_dpCall = 0;              // [Debug] DepthDim (%) / DepthCall
 bool g_dpOk = false, g_dvLaraOk = false;     // precheck_016.txt: depth (scene) / the engine's inside result codes
 const char *g_dpWhy = "not checked";
@@ -7511,6 +7552,11 @@ void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, 
 
 // 0.15, below: the collision overlay (stage R2) - slide faces / enemy-only collision groups of the loaded units
 void RcDraw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used);
+// 0.20, below (section "0.20 collectibles"): markers of collectibles / enemies (world, before the depth buffer is
+// published), their labels (after the trigger labels), their legend rows
+void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used);
+void M20Labels(ImDrawList *dl);
+int M20Legend(char (*lines)[112], char (*counts)[24], ImU32 *colours, bool *square, int n, int max);
 
 // 0.16, below (depth section): the depth path is usable this frame (the scene hook qualified a frame ago)
 bool DpUsable();
@@ -7768,6 +7814,7 @@ void DrawDebugView() {
                  activeSeen ? ", drawn" : "", capped, g_dvMarkerMax, hidden);
     }
     if (g_dvOn[kDvSlide] || g_dvOn[kDvEnemyColl]) RcDraw(dl, c, g_dvState, sizeof(g_dvState), &used);   // 0.15 R2
+    if (g_dvOn[kDvCollect] || g_dvOn[kDvEnemies]) M20Draw(dl, c, g_dvState, sizeof(g_dvState), &used);   // 0.20
     // 0.16: the world buffer is complete - the scene hook draws it inside the next frame; labels stay on top (ImGui)
     DWORD sinkDrop = 0;
     if (g_dpFill) {
@@ -7776,6 +7823,7 @@ void DrawDebugView() {
     }
     g_dpFill = nullptr;
     DvTagsDraw(dl);                          // trigger / portal / checkpoint labels: nearest first, no overlap
+    M20Labels(dl);                           // 0.20: collectible / enemy labels (only what M20Draw left this frame)
     g_dvListed[kDvTrgLabels] = labels;
     g_dvDrawn[kDvTrgLabels] = g_dvTagTrg;
     if (g_dvTagN) LabelAdd(g_dvState, sizeof(g_dvState), &used, "labels %d shown of %d candidates (%d merged, %d skipped: "
@@ -7798,7 +7846,7 @@ void DrawDebugLegend() {
     ImGuiIO &io = ImGui::GetIO();
     ImDrawList *dl = ImGui::GetForegroundDrawList();
     const float fs = ImGui::GetFontSize(), pad = 8.0f, sq = 11.0f, gap = 14.0f, rowH = fs + 3.0f;
-    const int kRows = kDvCount + 12;
+    const int kRows = kDvCount + 26;         // 0.20: + up to 13 kind rows of collectibles / enemies
     char lines[kRows][112], counts[kRows][24];
     ImU32 colours[kRows];
     bool square[kRows];
@@ -7816,6 +7864,7 @@ void DrawDebugLegend() {
         colours[n] = kDvLayers[i].colour;
         square[n++] = true;
     }
+    n = M20Legend(lines, counts, colours, square, n, kRows - 12);   // 0.20: the kinds seen (keeps 12 rows for the rest)
     if (DvAnyTrigger()) {
         Out(lines[n], sizeof(lines[n]), "Test point");
         counts[n][0] = 0;
@@ -7917,7 +7966,7 @@ bool RunDvShow(const char *arg, char *o, size_t n) {
     int i = DvFind(name);
     if (i < 0) {
         Out(o, n, "usage: dbg.show <layer> [0|1] - death, fire, checkpoint, water, sound, volume, plane, unknown, portals, "
-            "checkpoints, trglabels, legend, names, slide, enemycoll");
+            "checkpoints, trglabels, legend, names, slide, enemycoll, collect, enemies");
         return false;
     }
     return DvSet(i, BoolArg(value ? value : "", g_dvOn[i] != 0), ShotSource("dbg.show"), o, n);
@@ -8229,7 +8278,7 @@ bool g_rmOk = false, g_rcOk = false;
 const char *g_rmWhy = "not checked", *g_rcWhy = "not checked";
 char g_rmWhyBuf[96], g_rcWhyBuf[96];
 volatile LONG g_rmFlat = 0, g_rmFlatModels = 0, g_rmFlatEdges = 0, g_rmFlatAnyRt = 0;   // dbg.flat / flatmodels / ..
-volatile LONG g_rmPassMask = 0x200;          // [Debug] FlatPasses
+volatile LONG g_rmPassMask = 0x600;          // [Debug] FlatPasses (0.20: 0x600, the census of 2026-11-06)
 volatile LONG g_rmColourMode = 0;            // [Debug] FlatColour: 0 material, 1 class (terrain / models)
 volatile LONG g_rmCensusReq = 0;             // dbg.census: frames asked for (the Present hook starts it in a level)
 int g_rmFlatAtStart = 0, g_rmCensusAtStart = 0, g_rmCensusFrames = 120;
@@ -8905,7 +8954,7 @@ bool RunRmFlatPasses(const char *arg, char *o, size_t n) {
         if (!g_rmSuggest) { Out(o, n, "no census result yet (dbg.census first; a census that found no colour pass suggests none)"); return false; }
         mask = g_rmSuggest;
     } else if (!_stricmp(v, "default")) {
-        mask = 0x200;
+        mask = strtoul(OptDefault("Debug", "FlatPasses"), nullptr, 0);   // 0.20: 0x600 (was 0x200)
     } else if (ok) {
         char *end = nullptr;
         mask = strtoul(v, &end, 0);
@@ -10039,7 +10088,7 @@ void PageDebugView() {
             if (TmButton(label)) RunRmFlatPasses("census", o, sizeof(o));
             ImGui::SameLine();
         }
-        if (TmButton("default / Vorgabe 0x200###rmdef")) RunRmFlatPasses("default", o, sizeof(o));
+        if (TmButton("default / Vorgabe 0x600###rmdef")) RunRmFlatPasses("default", o, sizeof(o));
         if (ImGui::RadioButton("colour per material / Farbe je Material###rmcm", g_rmColourMode == 0)) RunRmColour("material", o, sizeof(o));
         ImGui::SameLine();
         if (ImGui::RadioButton("terrain / models - Terrain / Figuren###rmcc", g_rmColourMode == 1)) RunRmColour("class", o, sizeof(o));
@@ -10054,8 +10103,8 @@ void PageDebugView() {
         if (!g_dvTrgOk) ImGui::TextWrapped("triggers off: %s", g_dvTrgWhy);
         bool trg = DvAnyTrigger();
         if (TmCheckbox("all triggers / Trigger alle  [dbg.triggers]###dvtrg", &trg)) RunDvTriggers(trg ? "1" : "0", o, sizeof(o));
-        const int order[] = {kDvPortals, kDvCheckpoints, kDvSlide, kDvDeath, kDvFire, kDvCheckpoint, kDvWater, kDvSound,
-                             kDvVolume, kDvPlane, kDvUnknown, kDvTrgLabels};
+        const int order[] = {kDvPortals, kDvCheckpoints, kDvCollect, kDvSlide, kDvDeath, kDvFire, kDvCheckpoint, kDvWater,
+                             kDvSound, kDvVolume, kDvPlane, kDvUnknown, kDvTrgLabels};   // 0.20: + collectibles
         for (int i : order) {
             const DvLayerDef &d = kDvLayers[i];
             ImVec4 col = ImGui::ColorConvertU32ToFloat4(d.colour);
@@ -10103,6 +10152,19 @@ void PageDebugView() {
             Out(label, sizeof(label), "%s / %s  [dbg.enemycoll]  %d / %d###dvenemy", d.en, d.de, g_dvDrawn[kDvEnemyColl],
                 g_dvListed[kDvEnemyColl]);
             if (TmCheckbox(label, &v)) DvSet(kDvEnemyColl, v, "menu", o, sizeof(o));
+        }
+        {                                    // 0.20: every AI enemy by kind
+            const DvLayerDef &d = kDvLayers[kDvEnemies];
+            ImGui::ColorButton("##dvcenemies", ImGui::ColorConvertU32ToFloat4(d.colour), ImGuiColorEditFlags_NoTooltip,
+                               ImVec2(14.0f, 14.0f));
+            ImGui::SameLine();
+            bool v = g_dvOn[kDvEnemies] != 0;
+            char label[128];
+            Out(label, sizeof(label), "%s / %s  [dbg.enemies]  %d / %d###dvenemies", d.en, d.de, g_dvDrawn[kDvEnemies],
+                g_dvListed[kDvEnemies]);
+            if (TmCheckbox(label, &v)) DvSet(kDvEnemies, v, "menu", o, sizeof(o));
+            ImGui::SliderFloat("markers radius  [Debug] MarkRadius###m20r", &g_m20Radius, 500.0f, 200000.0f, "%.0f");
+            ImGui::SliderInt("markers / frame  [Debug] MarkMax###m20m", &g_m20Max, 1, 64);
         }
         ImGui::TreePop();
     }
@@ -11094,6 +11156,8 @@ char g_scTitle[96] = "";
 char g_scSteps[kScMaxSteps][kScStepLen];
 int g_scCount = 0, g_scIndex = 0;
 bool g_scWaitLevel = false;
+bool g_scWaitStream = false;                   // 0.20 "wait.unit <unit>": until the stream unit table has it loaded
+bool PosUnitLoaded(const char *unit);          // 0.20, section "0.17 position bookmarks"
 char g_scWaitUnit[64] = "";
 char g_scQueued[64] = "";                      // id of the last step that went to the game thread
 DWORD g_scWaitStart = 0, g_scReadySince = 0;
@@ -11133,6 +11197,7 @@ bool ShortcutStart(const char *text, const char *fallbackTitle, char *o, size_t 
     g_scCount = count;
     g_scIndex = 0;
     g_scWaitLevel = false;
+    g_scWaitStream = false;
     g_scQueued[0] = 0;
     g_scWaitUnit[0] = 0;
     _snprintf_s(g_scState, sizeof(g_scState), _TRUNCATE, "%s: step 1 of %d next", g_scTitle, count);
@@ -11178,8 +11243,34 @@ void ShortcutTick() {
             if (now - g_scReadySince < 2000) break;
             g_scWaitLevel = false;
         }
+        if (g_scWaitStream) {                          // 0.20 wait.unit: loaded (state 2) for 1 s, at most 30 s
+            if (now - g_scWaitStart > 30000) {
+                char why[160];
+                _snprintf_s(why, sizeof(why), _TRUNCATE, "stopped: unit %s was not streamed within 30 s at the portal "
+                            "(pos.goload <name> load = level.load)", g_scWaitUnit);
+                ShortcutStopLocked(why);
+                break;
+            }
+            if (!PosUnitLoaded(g_scWaitUnit)) { g_scReadySince = 0; break; }
+            if (!g_scReadySince) { g_scReadySince = now; break; }
+            if (now - g_scReadySince < 1000) break;
+            g_scWaitStream = false;
+            Log(1, "shortcut '%s': unit %s streamed (%.1f s after the portal)", g_scTitle, g_scWaitUnit,
+                static_cast<double>(now - g_scWaitStart) / 1000.0);
+        }
         if (g_scIndex >= g_scCount) { ShortcutStopLocked("done"); break; }
         const char *step = g_scSteps[g_scIndex++];
+        if (!_strnicmp(step, "wait.unit ", 10)) {     // 0.20: a runner step, no item
+            g_scWaitStream = true;
+            g_scWaitStart = now;
+            g_scReadySince = 0;
+            strncpy_s(g_scWaitUnit, sizeof(g_scWaitUnit), step + 10, _TRUNCATE);
+            Log(1, "shortcut '%s' %d/%d: %s -> waits for the stream unit (at most 30 s)", g_scTitle, g_scIndex, g_scCount,
+                step);
+            _snprintf_s(g_scState, sizeof(g_scState), _TRUNCATE, "%s: %d of %d - waits for unit %s", g_scTitle, g_scIndex,
+                        g_scCount, g_scWaitUnit);
+            break;
+        }
         const char *answer = CmdRunLine(step, false, "shortcut");
         bool ok = !strncmp(answer, "ok", 2);
         Log(1, "shortcut '%s' %d/%d: %s -> %.200s", g_scTitle, g_scIndex, g_scCount, step, answer);
@@ -12114,7 +12205,9 @@ void SaveLoadCheck() {
 // (ecx = brain+0x4e10, EnemyTargeting). The engine's own removal of a sense is the reset 0x65a140 (thiscall, no
 // argument, plain ret): it posts 0x11b ("disengaged") to Lara when the enemy was engaged, clears the slot and takes it
 // out of its process list - EnemySense::DoProcess 0x664e80 calls it itself when the target is gone (0x664ef1).
-// Stage A ([AI] DumbMode purge, the default - no code patch): once per game frame (PadHook, game thread) every enemy whose
+// (0.20: [AI] DumbMode gate is the default - live 2026-11-06 purge did not stop a tarantula, gate did; purge stays the
+// fallback when the gate checks fail.)
+// Stage A ([AI] DumbMode purge, 0.19's default - no code patch): once per game frame (PadHook, game thread) every enemy whose
 // senses pass the checks (vtable, owner handle = this instance) and whose object name is in the filter gets each sense
 // slot that holds Lara reset with 0x65a140. The scan of the same frame may add Lara again - whether the enemies still
 // attack is the live question (finding 5.2: churn expected, the noise bypass 0x623e5f is not covered).
@@ -12518,6 +12611,9 @@ void AiSecondTick(DWORD now) {
         b.on = false;
     }
 }
+void AiForgetOnce(DWORD inst, DWORD brain, DWORD player);   // 0.20, section "0.20 collectibles": clear Lara as target
+void AiForgetReset();
+void AiForgetLog(DWORD now);
 void AiWalk(LONG mode, bool bits) {
     DWORD player = 0, inst = 0;
     int enemies = 0, matched = 0;
@@ -12530,7 +12626,8 @@ void AiWalk(LONG mode, bool bits) {
             ++enemies;
             if (mode && AiInScope(inst, mode)) {
                 ++matched;
-                AiPurgeEnemy(inst, brain, player);
+                AiForgetOnce(inst, brain, player);   // 0.20: once per enemy and setting (before the purge: mode 0
+                AiPurgeEnemy(inst, brain, player);   // slots are recognised by their sense's target)
             }
             if (bits) AiBitsSet(inst, brain, AiBitsWanted(inst));
         }
@@ -12546,10 +12643,13 @@ void AiTick() {
     if (g_aiGen != g_aiGenSeen) {
         g_aiGenSeen = g_aiGen;
         memset(g_aiKind, 0, sizeof(g_aiKind));
+        AiForgetReset();                     // 0.20: a new setting forgets once more
     }
     const LONG mode = g_aiMode;
     const bool bits = g_aiBitsOk && (g_aiNoInv || g_aiNoAtk);
     DWORD now = GetTickCount();
+    if (!mode) AiForgetReset();              // 0.20: switching on again forgets again
+    AiForgetLog(now);                        // 0.20: at most one line per 2 s while enemies are forgotten
     if (!mode && !bits && !g_aiBitN && !g_aiGateOn) {   // idle: no walk, only an open burst may end
         g_aiEnemies = g_aiMatched = -1;
         if (g_aiBurst.on) AiSecondTick(now);
@@ -12564,6 +12664,7 @@ void AiTick() {
             Log(1, "ai: %d enemy flag record(s) dropped - %s (the brains go with the level)", g_aiBitN, why);
             g_aiBitN = 0;
         }
+        AiForgetReset();                     // 0.20: the next level's enemies are forgotten once each
         g_aiEnemies = g_aiMatched = -1;
     } else {
         AiWalk(mode, bits);
@@ -12992,6 +13093,593 @@ void ValMediaVideoFlags(char *o, size_t n) {
         used += static_cast<size_t>(w);
     }
 }
+
+// ======================================================================================================================
+// ---- 0.20 collectibles, enemies, ai.dumb forget, sound mutes (Lukas / coordinator 2026-11-06) ----
+// Workspace docs\Befund-TruMenu-020-0611.md; every byte check of this section is pinned in
+// work\asi\menu020\precheck_020.txt (tools/pe_bytes_check.py on the Steam exe: 16 / 16 ok).
+// Collectibles (dbg.collect, layer kDvCollect): every instance whose object name (live PC object list, ObjectName) holds
+//   "_rw_" - the reward objects of the PC name list (ar / ca / ma / sa / sh / med / tp _rw_artifact / _treasure / _shard,
+//   tp_rw_artifact_spawned), by kind - and every reward container: a name holding "_pt_" and "reward"
+//   (dlc1_pt_reward_pot, *_pt_weightbreak_reward). Proof (read-only, work\m020_0611): the containers' object type data
+//   (dlc1_pt_reward_pot DTP 23205 +0x640, base ma_pt_weightbreak_reward DTP 11765 +0x640) names object 103
+//   tp_rw_artifact_spawned - every such container spawns that artifact, nothing per pot names another reward; per pot
+//   only the reward index differs: intro data +0x30 ([[inst+0x100]+0x78]+0x30 - the intro record's data pointer as the
+//   0.14 trigger test reads it, 0x5cd235), one numbering with the placed rewards (DLC 1: 206 .. 234). So an unbroken
+//   container is marked "enthaelt Artefakt #<index>" (magenta ring); one with its own instance script ([intro+0x7c] != 0)
+//   gets " Skript <id>" (pot 9421 of dlc_dungeonhallb runs the health-pack class - what it gives is a live question).
+//   "Collected" is not shown: the artifact class keeps it in a stickybool of its script instance, a cheap live read is
+//   not verified (docs\Befund-Saves-Sticky-0611.md); a picked-up reward is expected to leave the instance list (inferred).
+// Enemies (dbg.enemies, layer kDvEnemies): every instance the 0.19 brain test AiBrainOf accepts (kAiChecks), Lara never;
+//   colour by kind from the object name (first match: thrall, spider / tarantula, shark, tiger / panther, naga, bat,
+//   merc / poacher, else other - docs\Befund-Gegner-Wahrnehmung-0611.md section 2), label name + intro id + LP
+//   (brain+0x2c64, the 0.13 health chain) + distance / height; thralls get the 0.13 targeter 9 line (TruShadowCombat
+//   0.5.3 snapshot). While the layer is on, dbg.labels leaves AI enemies to it (no double labels).
+// Both layers: render thread (Present, inside DrawDebugView), read-only, the nearest MarkMax within MarkRadius of the
+//   camera; a world marker (post + diamond / ring, through the 0.16 depth path) and a label without overlap.
+// ai.dumb forget (live 2026-11-06 20:38 - 20:41, tarantula 9881 in DLC 1: the gate blocked every new sense, but an enemy
+//   that had Lara selected when ai.dumb came on kept turning to her): once per enemy and setting (switch-on, a new
+//   filter, an enemy entering scope / spawned while on), game thread, right before the 0.19 purge of its senses:
+//   EnemyTargeting = brain+0x4e10 (vtable 0x85a1e8, owner handle +0x1c / +0x20 = the enemy - ctor 0x653750); target
+//   slots of 0x40 bytes (+4 mode: -1 none, 0 sense, 1 instance, 2 position; +0x20 instance handle {inst, id}; +0x28 sense
+//   handle {sense, id}). The current target +0x30 and the override +0xf0 (what select 0x6695d0 compares / reads) are
+//   cleared with the engine's slot setter 0x653cf0 (thiscall (what, score), ret 8; what = 0: every field cleared, mode
+//   -1 - the setter 0x60e450 uses for the override) when they hold Lara (mode 1: the handle is Lara; mode 0: the sense's
+//   target +0xa8 is Lara). +0x70 (previous target, copied from +0x30 at 0x6699a7) and +0xb0 are only counted for the
+//   log - their role is not read yet. One log line per 2 s while enemies are forgotten, never per frame.
+// Sound mutes (Lukas 2026-11-06, for tests), game thread once per game frame while on:
+//   media.mutemusic: SOUND_SetMusicVolume 0x589520 (cdecl (vol 0 .. 128) - the options slider's own call 0x5a4b3d) with
+//     0 whenever MUSIC_masterVolume [0x8a7af8] or the music group's volume (group [[[0xccdea0]+0x24]+0], entry [0x8a80d8]
+//     + group * 0x84, +0 float) is not 0: a level load sets 128 again (CreateGroups 0x593530) and re-applies the saved
+//     slider [0x8900d8] (0x477ca0); off = 0x589520([0x8900d8]) once - the player's own setting (0x8900d8 and the
+//     profile are never written).
+//   media.muteambient: srmusic slots (0.9 facts, MusicCheck) whose requested (+0x100) or current (+0) name holds "_amb_"
+//     (the DLC 2 ambience beds played as music, work\media\music_list.txt) are stopped with SRMUSIC_LoadMusic(slot,
+//     NULL, MusicFade, 0) - the stop native's own call - once per request. Not covered: base-game ambience (sound
+//     emitters / soundvolume triggers in a sound group whose index is not known yet - SoundGroupCollection::SetVolume
+//     0x587770 could mute it once a live look names the group), effect-object sounds, SFX and speech (untouched).
+// ======================================================================================================================
+const DvCheck kCoChecks[] = {
+    {0x005cd235, "0f284820 8b7120 0f58c8 0f294c2470 8b8600010000 85c0 0f84c5020000 8b7878 85ff 0f84ba020000"},   // intro data
+};
+const DvCheck kAiForgetChecks[] = {
+    {0x00653758, "c70650668500 895e08 8d6e1c 53 55 895e0c 895e10 e87f02f6ff 8b7c241c 57 895d04 55 c6462401 e86d02f6ff "
+                 "83c410 57 8d4e30"},                            // ctor: owner handle +0x1c (ebp) = the enemy (edi) ..
+    {0x0065378a, "c706e8a18500 e8db33fcff 57 8d4e70 e8d233fcff 57 8d8eb0000000 e8c633fcff"},   // .. vtable, slots
+    {0x006697cd, "8b86f4000000 81c6f0000000"},                   // select: override slot +0xf0, its mode +0xf4
+    {0x00669922, "80b83801000000 8d7830"},                       // select: the current target slot +0x30
+    {0x00669863, "8d4620 50 e864a1f4ff"},                        // mode 1: instance handle +0x20 (0x5b39d0)
+    {0x00669871, "8d4e28 e86762fdff"},                           // mode 0: sense handle +0x28 (0x63fae0)
+    {0x0063fae0, "8b01 85c0 7445 83b8a800000000 743c 8b90a8000000 85d2 7432 8b5244 3b90ac000000 7527"},   // {sense, id}
+    {0x00653cf0, "55 8bec 83e4f0 51 53 56 57 8b7d08 8bf1 8d5e20 6a00 53 e8e6fcf5ff d9ee 33c0 0f57c0 0f294610 83c408 3bf8 "
+                 "894628 89462c d95e30 c74604ffffffff 7417"},    // slot setter: what = 0 -> cleared, mode -1
+    {0x00653d40, "83c408 5f 5e 5b 8be5 5d c20800"},              // .. ret 8
+};
+const DvCheck kSndMusicChecks[] = {
+    {0x00589520, "51 a1a0decc00 dd0570968400 8b4824 8b01 85c0 7e36"},   // SOUND_SetMusicVolume: group [cats+0] > 0
+    {0x00589555, "8b15d8808a00 69c084000000 c60593decc0001 d91c10 da4c2408 d91df87a8a00 d905fc7a8a00 d80df87a8a00 "
+                 "d91d047b8a00 83c404 e971fdffff"},             // group +0 / master 0x8a7af8, tail jmp
+    {0x005a4b3c, "56 e8de49feff"},                               // the options slider calls it ..
+    {0x005a4b5c, "8935d8008900"},                                // .. and keeps the value in [0x8900d8]
+    {0x00477cac, "8b0dd8008900 51 e868181100"},                  // level load: the saved value applied again
+    {0x00587770, "8b5104 8b442404 3bc2 720a"},                   // group count = [0x8a80d8 + 4]
+};
+const DWORD kAiTgtVt = 0x0085a1e8, kAiSlotSet = 0x00653cf0;
+const DWORD kSndSetMusicVol = 0x00589520, kSndInfo = 0x00ccdea0, kSndGroups = 0x008a80d8, kSndMusicMaster = 0x008a7af8;
+const DWORD kSndMusicSaved = 0x008900d8;
+typedef void(__fastcall *AiSlotSetFn)(void *slot, void *edx, void *what, float score);   // thiscall, ret 8
+typedef void(__cdecl *SndVolFn)(int vol);
+bool g_coOk = false, g_afOk = false, g_sndOk = false;
+char g_coWhy[96] = "not checked", g_afWhy[96] = "not checked", g_sndWhy[96] = "not checked";
+
+// ---- collectibles / enemies: kinds ----
+enum { kCoArtifact = 0, kCoTreasure, kCoShard, kCoReward, kCoPot, kCoKinds };
+enum { kEnThrall = 0, kEnSpider, kEnShark, kEnCat, kEnNaga, kEnBat, kEnMerc, kEnOther, kEnKinds };
+struct M20Kind { const char *parts, *brief, *de; ImU32 colour; };
+const M20Kind kCoKindDefs[kCoKinds] = {
+    {"artifact", "Artifact", "Artefakt", IM_COL32(255, 210, 40, 255)},
+    {"treasure", "Treasure", "Schatz", IM_COL32(255, 130, 200, 255)},
+    {"shard", "Shard", "Splitter", IM_COL32(70, 240, 220, 255)},
+    {"", "Reward", "Belohnung", IM_COL32(240, 225, 160, 255)},
+    {"", "Pot: artifact", "Topf: Artefakt", IM_COL32(255, 70, 230, 255)},
+};
+const M20Kind kEnKindDefs[kEnKinds] = {
+    {"thrall", "Thrall", "Thrall", IM_COL32(255, 90, 90, 255)},
+    {"spider,tarantula", "Spider", "Spinne", IM_COL32(185, 120, 255, 255)},
+    {"shark", "Shark", "Hai", IM_COL32(80, 170, 255, 255)},
+    {"tiger,panther", "Big cat", "Grosskatze", IM_COL32(255, 160, 40, 255)},
+    {"naga", "Naga", "Naga", IM_COL32(120, 230, 90, 255)},
+    {"bat", "Bat", "Fledermaus", IM_COL32(190, 150, 110, 255)},
+    {"merc,poacher", "Merc", "Soeldner", IM_COL32(245, 245, 120, 255)},
+    {"", "Other enemy", "Anderer Gegner", IM_COL32(225, 225, 225, 255)},
+};
+signed char g_coKind[4096], g_enKind[4096];  // per object id: 0 not looked up, kind + 1, 100 none (render thread)
+int CoKindOf(int id) {
+    if (id > 0 && id < 4096 && g_coKind[id]) return g_coKind[id] >= 100 ? -1 : g_coKind[id] - 1;
+    char name[64];
+    int kind = -1;
+    if (ObjectName(id, name, sizeof(name))) {
+        _strlwr_s(name, sizeof(name));
+        if (strstr(name, "_rw_")) {
+            kind = kCoReward;
+            for (int k = kCoArtifact; k <= kCoShard; ++k)
+                if (strstr(name, kCoKindDefs[k].parts)) { kind = k; break; }
+        } else if (strstr(name, "_pt_") && strstr(name, "reward")) {
+            kind = kCoPot;
+        }
+    }
+    if (id > 0 && id < 4096) g_coKind[id] = static_cast<signed char>(kind < 0 ? 100 : kind + 1);
+    return kind;
+}
+int EnKindOf(int id) {                       // an AI enemy's kind (the caller tested the brain)
+    if (id > 0 && id < 4096 && g_enKind[id]) return g_enKind[id] - 1;
+    char name[64];
+    int kind = kEnOther;
+    if (ObjectName(id, name, sizeof(name))) {
+        _strlwr_s(name, sizeof(name));
+        for (int k = 0; k < kEnOther && kind == kEnOther; ++k) {
+            char parts[40];
+            strncpy_s(parts, sizeof(parts), kEnKindDefs[k].parts, _TRUNCATE);
+            char *context = nullptr;
+            for (char *p = strtok_s(parts, ",", &context); p; p = strtok_s(nullptr, ",", &context))
+                if (strstr(name, p)) { kind = k; break; }
+        }
+    }
+    if (id > 0 && id < 4096) g_enKind[id] = static_cast<signed char>(kind + 1);
+    return kind;
+}
+
+// ---- collectibles / enemies: one walk, markers, labels, legend (render thread) ----
+struct M20Mark {
+    DWORD inst;
+    float pos[3], dist2;
+    int kind;
+    char line1[128], line2[128];
+    ImU32 colour, colour2;
+    float top[3];
+};
+M20Mark g_coMarks[65], g_enMarks[65];
+int g_coN = 0, g_enN = 0, g_coKindN[kCoKinds] = {}, g_enKindN[kEnKinds] = {};
+bool g_m20Fresh = false;                     // M20Draw ran this frame (M20Labels draws only then)
+DvCam g_m20Cam;                              // .. with this camera
+bool M20EnemiesOn() { return g_dvOn[kDvEnemies] != 0; }
+int M20Insert(M20Mark *arr, int count, DWORD inst, const float *p, float d2, int kind) {
+    const int max = g_m20Max < 1 ? 1 : g_m20Max > 64 ? 64 : g_m20Max;
+    int at = count;
+    while (at > 0 && arr[at - 1].dist2 > d2) --at;
+    if (at >= max) return count;
+    int last = count < max ? count : max - 1;
+    for (int k = last; k > at; --k) arr[k] = arr[k - 1];
+    M20Mark &m = arr[at];
+    m.inst = inst;
+    m.pos[0] = p[0]; m.pos[1] = p[1]; m.pos[2] = p[2];
+    m.dist2 = d2;
+    m.kind = kind;
+    return count < max ? count + 1 : count;
+}
+// the reward index of a collectible / container: intro data +0x30 (0 = none / not readable)
+DWORD CoRewardIndex(DWORD inst, DWORD *script) {
+    DWORD intro = 0, data = 0, ri = 0;
+    *script = 0;
+    if (!g_coOk || !ReadDword(inst + 0x100, &intro) || !intro) return 0;
+    ReadDword(intro + 0x7c, script);
+    if (!ReadDword(intro + 0x78, &data) || !data || !ReadDword(data + 0x30, &ri) || ri > 100000) return 0;
+    return ri;
+}
+void M20Diamond(ImDrawList *dl, const DvCam &c, const float *centre, float s, ImU32 colour, float thick) {
+    const float up[3] = {centre[0], centre[1], centre[2] + s}, down[3] = {centre[0], centre[1], centre[2] - s};
+    const float d[4][2] = {{s, 0}, {0, s}, {-s, 0}, {0, -s}};
+    for (int a = 0; a < 4; ++a) {
+        const float p[3] = {centre[0] + d[a][0], centre[1] + d[a][1], centre[2]};
+        const float q[3] = {centre[0] + d[(a + 1) & 3][0], centre[1] + d[(a + 1) & 3][1], centre[2]};
+        DvLine(dl, c, p, up, colour, thick);
+        DvLine(dl, c, p, down, colour, thick);
+        DvLine(dl, c, p, q, colour, thick);
+    }
+}
+void M20Ring(ImDrawList *dl, const DvCam &c, const float *centre, float r, ImU32 colour, float thick) {
+    for (int a = 0; a < 12; ++a) {
+        const float t0 = a * 0.5235988f, t1 = (a + 1) * 0.5235988f;
+        const float p[3] = {centre[0] + r * cosf(t0), centre[1] + r * sinf(t0), centre[2]};
+        const float q[3] = {centre[0] + r * cosf(t1), centre[1] + r * sinf(t1), centre[2]};
+        DvLine(dl, c, p, q, colour, thick);
+    }
+}
+void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used) {
+    const bool co = g_dvOn[kDvCollect] && g_coOk, en = g_dvOn[kDvEnemies] && g_aiOk;
+    g_coN = g_enN = 0;
+    memset(g_coKindN, 0, sizeof(g_coKindN));
+    memset(g_enKindN, 0, sizeof(g_enKindN));
+    int coFound = 0, enFound = 0, walked = 0;
+    DWORD player = 0, inst = 0;
+    ReadDword(kPlayerPtr, &player);
+    ReadDword(kFirstInstance, &inst);
+    const float r2 = g_m20Radius * g_m20Radius;
+    for (int guard = 0; inst && guard < 4096; ++guard, ++walked) {
+        DWORD next = 0, object = 0, oid = 0;
+        float p[3], d2 = 0.0f;
+        if (inst != player && ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid) &&
+            ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            const int id = static_cast<int>(oid & 0xffff);
+            const int ck = co ? CoKindOf(id) : -1;
+            const int ek = ck < 0 && en && AiBrainOf(inst) ? EnKindOf(id) : -1;
+            if (ck >= 0) {
+                ++coFound;
+                ++g_coKindN[ck];
+                if (DvVisible(c, p, 150.0f, &d2) && d2 <= r2) g_coN = M20Insert(g_coMarks, g_coN, inst, p, d2, ck);
+            } else if (ek >= 0) {
+                ++enFound;
+                ++g_enKindN[ek];
+                if (DvVisible(c, p, 200.0f, &d2) && d2 <= r2) g_enN = M20Insert(g_enMarks, g_enN, inst, p, d2, ek);
+            }
+        }
+        if (!ReadDword(inst + 8, &next)) break;
+        inst = next;
+    }
+    // collectibles: reward = diamond on a short post; container = ring + post ("enthaelt Artefakt")
+    for (int i = 0; i < g_coN; ++i) {
+        M20Mark &m = g_coMarks[i];
+        const M20Kind &k = kCoKindDefs[m.kind];
+        const ImU32 colour = DvTint(k.colour, m.dist2, 1.0f);
+        const bool pot = m.kind == kCoPot;
+        const float base[3] = {m.pos[0], m.pos[1], m.pos[2]};
+        const float mid[3] = {m.pos[0], m.pos[1], m.pos[2] + (pot ? 60.0f : 110.0f)};
+        DvLine(dl, c, base, mid, colour, 1.8f);
+        if (pot) {
+            M20Ring(dl, c, mid, 70.0f, colour, 2.4f);
+            M20Ring(dl, c, mid, 45.0f, colour, 1.6f);
+        } else {
+            M20Diamond(dl, c, mid, 35.0f, colour, 2.0f);
+        }
+        DWORD object = 0, oid = 0, intro = 0, script = 0;
+        char name[64], dist[64], extra[64] = "";
+        ReadDword(m.inst + 0x10, &object);
+        if (object) ReadDword(object + 0x14, &oid);
+        ReadDword(m.inst + 0x58, &intro);
+        if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        const DWORD ri = CoRewardIndex(m.inst, &script);
+        if (pot && ri) Out(extra, sizeof(extra), " | enthaelt Artefakt #%lu", ri);
+        else if (pot) Out(extra, sizeof(extra), " | enthaelt Artefakt");
+        else if (ri) Out(extra, sizeof(extra), " | #%lu", ri);
+        DvDistText(m.pos, DvOwnerUnit(m.inst), dist, sizeof(dist));
+        Out(m.line1, sizeof(m.line1), "%s %ld%s%s", name, static_cast<LONG>(intro), extra, dist);
+        if (pot && script) Out(m.line2, sizeof(m.line2), "Skript %lu (eigene Instanz)", script);
+        else m.line2[0] = 0;
+        m.colour = k.colour;
+        m.colour2 = IM_COL32(220, 220, 220, 255);
+        m.top[0] = mid[0]; m.top[1] = mid[1]; m.top[2] = mid[2] + 75.0f;
+    }
+    // enemies: post + small diamond above the origin; label name, intro id, LP, distance; thralls + targeter 9
+    if (g_enN && g_lblOk) g_lblSnapOk = LabelTsc();
+    for (int i = 0; i < g_enN; ++i) {
+        M20Mark &m = g_enMarks[i];
+        const M20Kind &k = kEnKindDefs[m.kind];
+        const ImU32 colour = DvTint(k.colour, m.dist2, 1.0f);
+        const float base[3] = {m.pos[0], m.pos[1], m.pos[2]};
+        const float head[3] = {m.pos[0], m.pos[1], m.pos[2] + 190.0f};
+        DvLine(dl, c, base, head, colour, 2.0f);
+        M20Diamond(dl, c, head, 25.0f, colour, 2.0f);
+        DWORD object = 0, oid = 0, intro = 0;
+        char name[64], dist[64], hp[32] = "";
+        ReadDword(m.inst + 0x10, &object);
+        if (object) ReadDword(object + 0x14, &oid);
+        ReadDword(m.inst + 0x58, &intro);
+        if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        const DWORD brain = AiBrainOf(m.inst);
+        float health = 0.0f;
+        if (brain && ReadFloats(brain + 0x2c64, &health, 1) && health > -1.0e6f && health < 1.0e6f)
+            Out(hp, sizeof(hp), " | LP %.0f", health);
+        DvDistText(m.pos, DvOwnerUnit(m.inst), dist, sizeof(dist));
+        Out(m.line1, sizeof(m.line1), "%s %ld%s%s", name, static_cast<LONG>(intro), hp, dist);
+        m.line2[0] = 0;
+        m.colour = k.colour;
+        m.colour2 = IM_COL32(235, 235, 235, 255);
+        if (m.kind == kEnThrall && g_lblOk) LabelTscText(m.inst, m.line2, sizeof(m.line2), &m.colour2);   // 0.13 Z9
+        m.top[0] = head[0]; m.top[1] = head[1]; m.top[2] = head[2] + 40.0f;
+    }
+    g_dvListed[kDvCollect] = coFound;
+    g_dvListed[kDvEnemies] = enFound;
+    g_m20Cam = c;
+    g_m20Fresh = true;
+    if (co) LabelAdd(state, stateSize, used, "collectibles %d of %d (radius %.0f, max %d); ", g_coN, coFound, g_m20Radius,
+                     g_m20Max);
+    if (en) LabelAdd(state, stateSize, used, "enemies %d of %d in %d instances; ", g_enN, enFound, walked);
+}
+// one label above the marker, nudged up once on overlap, else skipped
+bool M20Label(ImDrawList *dl, const M20Mark &m) {
+    float q[3];
+    ImVec2 at;
+    const ImGuiIO &io = ImGui::GetIO();
+    DvToCam(g_m20Cam, m.top, q);
+    if (!DvCamToScreen(g_m20Cam, q, &at) || at.x < 0.0f || at.y < 0.0f || at.x > io.DisplaySize.x || at.y > io.DisplaySize.y)
+        return false;
+    const float fs = ImGui::GetFontSize();
+    const ImVec2 s1 = ImGui::CalcTextSize(m.line1), s2 = m.line2[0] ? ImGui::CalcTextSize(m.line2) : ImVec2(0.0f, 0.0f);
+    const float w = (s1.x > s2.x ? s1.x : s2.x) + 8.0f, h = m.line2[0] ? 2.0f * fs + 6.0f : fs + 4.0f;
+    DvRect r = {at.x - w * 0.5f, at.y - h - 6.0f, at.x + w * 0.5f, at.y - 6.0f};
+    if (!DvRectFree(r)) {
+        r.y0 -= h + 4.0f;
+        r.y1 -= h + 4.0f;
+        if (!DvRectFree(r)) return false;
+    }
+    DvRectTake(r);
+    dl->AddLine(ImVec2(at.x, r.y1), at, (m.colour & 0x00ffffffu) | (170u << 24), 1.2f);
+    dl->AddRectFilled(ImVec2(r.x0, r.y0), ImVec2(r.x1, r.y1), IM_COL32(0, 0, 0, 170), 3.0f);
+    dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 2.0f), m.colour | 0xff000000u, m.line1);
+    if (m.line2[0]) dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 4.0f + fs), m.colour2 | 0xff000000u, m.line2);
+    return true;
+}
+void M20Labels(ImDrawList *dl) {
+    if (!g_m20Fresh) return;
+    g_m20Fresh = false;
+    int co = 0, en = 0;
+    for (int i = 0; i < g_enN; ++i) en += M20Label(dl, g_enMarks[i]) ? 1 : 0;   // enemies first (they move)
+    for (int i = 0; i < g_coN; ++i) co += M20Label(dl, g_coMarks[i]) ? 1 : 0;
+    g_dvDrawn[kDvCollect] = g_dvOn[kDvCollect] ? g_coN : 0;
+    g_dvDrawn[kDvEnemies] = g_dvOn[kDvEnemies] ? g_enN : 0;
+    static DWORD logTick = 0;                // one diagnosis line per 30 s while a layer is on (log only)
+    const DWORD now = GetTickCount();
+    if (!logTick || now - logTick >= 30000) {
+        logTick = now;
+        Log(1, "0.20 markers: collectibles %d drawn of %d (%d labelled), enemies %d drawn of %d (%d labelled); radius "
+            "%.0f, max %d", g_coN, g_dvListed[kDvCollect], co, g_enN, g_dvListed[kDvEnemies], en, g_m20Radius, g_m20Max);
+    }
+}
+// legend: one row per kind seen in the loaded units (found count), below the layer rows
+int M20Legend(char (*lines)[112], char (*counts)[24], ImU32 *colours, bool *square, int n, int max) {
+    if (g_dvOn[kDvCollect])
+        for (int k = 0; k < kCoKinds && n < max; ++k) {
+            if (!g_coKindN[k]) continue;
+            Out(lines[n], 112, "  %s", kCoKindDefs[k].brief);
+            Out(counts[n], 24, "%d", g_coKindN[k]);
+            colours[n] = kCoKindDefs[k].colour;
+            square[n++] = true;
+        }
+    if (g_dvOn[kDvEnemies])
+        for (int k = 0; k < kEnKinds && n < max; ++k) {
+            if (!g_enKindN[k]) continue;
+            Out(lines[n], 112, "  %s", kEnKindDefs[k].brief);
+            Out(counts[n], 24, "%d", g_enKindN[k]);
+            colours[n] = kEnKindDefs[k].colour;
+            square[n++] = true;
+        }
+    return n;
+}
+
+// ---- ai.dumb forget (game thread, from AiWalk) ----
+struct AiForgotRec { DWORD inst, id; };
+AiForgotRec g_afDone[512];
+int g_afN = 0;
+bool g_afFull = false;
+LONG g_afEnemies = 0, g_afCur = 0, g_afOver = 0, g_afOther = 0, g_afFail = 0;   // since the last log line
+DWORD g_afLogTick = 0;
+void AiForgetReset() {
+    g_afN = 0;
+    g_afFull = false;
+}
+// the target slot holds Lara: mode 1 = her instance handle, mode 0 = a sense whose target is her
+bool AiSlotLara(DWORD slot, DWORD player) {
+    DWORD mode = 0, a = 0, b = 0, pid = 0, sense = 0, target = 0;
+    if (!ReadDword(slot + 4, &mode)) return false;
+    if (mode == 1)
+        return ReadDword(slot + 0x20, &a) && a == player && ReadDword(slot + 0x24, &b) && ReadDword(player + 0x44, &pid) &&
+               b == pid;
+    if (mode == 0) return ReadDword(slot + 0x28, &sense) && sense && ReadDword(sense + 0xa8, &target) && target == player;
+    return false;
+}
+bool AiSlotClear(DWORD slot) {
+    __try {
+        reinterpret_cast<AiSlotSetFn>(kAiSlotSet)(reinterpret_cast<void *>(slot), nullptr, nullptr, 0.0f);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+void AiForgetOnce(DWORD inst, DWORD brain, DWORD player) {
+    DWORD id = 0;
+    if (!ReadDword(inst + 0x44, &id)) return;
+    for (int i = 0; i < g_afN; ++i)
+        if (g_afDone[i].inst == inst && g_afDone[i].id == id) return;
+    if (g_afN >= static_cast<int>(sizeof(g_afDone) / sizeof(g_afDone[0]))) {
+        if (!g_afFull) Log(1, "ai.dumb forget: record table full (%d enemies) - further enemies only purged", g_afN);
+        g_afFull = true;
+        return;
+    }
+    g_afDone[g_afN].inst = inst;
+    g_afDone[g_afN].id = id;
+    ++g_afN;
+    ++g_afEnemies;
+    if (!g_afOk) return;
+    const DWORD tgt = brain + kAiTargeting;
+    DWORD vt = 0;
+    if (!ReadDword(tgt, &vt) || vt != kAiTgtVt || AiOwner(tgt) != inst) return;
+    if (AiSlotLara(tgt + 0x30, player)) { if (AiSlotClear(tgt + 0x30)) ++g_afCur; else ++g_afFail; }
+    if (AiSlotLara(tgt + 0xf0, player)) { if (AiSlotClear(tgt + 0xf0)) ++g_afOver; else ++g_afFail; }
+    if (AiSlotLara(tgt + 0x70, player)) ++g_afOther;
+    if (AiSlotLara(tgt + 0xb0, player)) ++g_afOther;
+}
+void AiForgetLog(DWORD now) {
+    if (!g_afEnemies || now - g_afLogTick < 2000) return;
+    g_afLogTick = now;
+    Log(1, "ai.dumb forget: %ld enemy(ies) forgotten once - current target on Lara cleared %ld, override on Lara cleared "
+        "%ld (slot setter 0x653cf0), previous / aux slot on Lara left %ld, failed %ld%s; their Lara senses purged "
+        "(0x65a140)", g_afEnemies, g_afCur, g_afOver, g_afOther, g_afFail, g_afOk ? "" : " - targeting checks failed: "
+        "senses only");
+    g_afEnemies = g_afCur = g_afOver = g_afOther = g_afFail = 0;
+}
+
+// ---- sound mutes (game thread) ----
+volatile LONG g_sndMuteMusic = 0, g_sndMuteAmb = 0;   // media.mutemusic / media.muteambient ([Media] MuteMusic / ..)
+bool g_sndMusicMuted = false;                // TruMenu set the music volume to 0 (off restores the slider value)
+LONG g_sndMusicCalls = 0, g_sndAmbStops = 0;
+char g_sndAmbDone[8][64];                    // per srmusic slot: the "_amb_" request already stopped
+bool g_sndAmbCurDone[8];                     // .. a running "_amb_" track (no request) already stopped
+bool SndCall(int vol) {
+    __try {
+        reinterpret_cast<SndVolFn>(kSndSetMusicVol)(vol);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+bool SndReady(DWORD *cats) {                 // the sound info exists (the setter does not test it)
+    DWORD info = 0;
+    return ReadDword(kSndInfo, &info) && info && ReadDword(info + 0x24, cats) && *cats;
+}
+bool SndMusicLoud(DWORD cats) {
+    float master = 0.0f, vol = 0.0f;
+    DWORD group = 0, count = 0, table = 0;
+    if (ReadFloats(kSndMusicMaster, &master, 1) && master != 0.0f) return true;
+    if (!ReadDword(cats, &group) || !ReadDword(kSndGroups + 4, &count) || !ReadDword(kSndGroups, &table) || !table)
+        return false;
+    return static_cast<int>(group) > 0 && group < count && ReadFloats(table + group * 0x84, &vol, 1) && vol != 0.0f;
+}
+bool SndAmbName(const char *s) {
+    char low[64];
+    strncpy_s(low, sizeof(low), s, _TRUNCATE);
+    _strlwr_s(low, sizeof(low));
+    return strstr(low, "_amb_") != nullptr;
+}
+bool SndStopSlot(int slot) {
+    __try {
+        reinterpret_cast<MusicLoadFn>(kMusicLoad)(slot, nullptr, g_musicFade, 0);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+void SndAmbTick() {
+    for (int s = 0; s < kMusicSlotCount; ++s) {
+        const DWORD slot = kMusicSlots + static_cast<DWORD>(s) * kMusicSlotSize;
+        char want[64], cur[64];
+        if (!ReadString(slot + 0x100, want, sizeof(want))) want[0] = 0;
+        if (!ReadString(slot, cur, sizeof(cur))) cur[0] = 0;
+        const bool wantAmb = want[0] && SndAmbName(want), curAmb = cur[0] && SndAmbName(cur);
+        if (!wantAmb) g_sndAmbDone[s][0] = 0;          // a new request of the same track counts again
+        if (!curAmb) g_sndAmbCurDone[s] = false;
+        const char *hit = nullptr;
+        if (wantAmb && _stricmp(g_sndAmbDone[s], want)) {
+            hit = want;
+            strncpy_s(g_sndAmbDone[s], sizeof(g_sndAmbDone[s]), want, _TRUNCATE);
+            g_sndAmbCurDone[s] = true;
+        } else if (!wantAmb && curAmb && !g_sndAmbCurDone[s]) {
+            hit = cur;
+            g_sndAmbCurDone[s] = true;
+        }
+        if (!hit) continue;
+        const bool ok = SndStopSlot(s);
+        ++g_sndAmbStops;
+        Log(1, "media.muteambient: srmusic slot %d '%s' %s (SRMUSIC_LoadMusic(%d, NULL, %d, 0))", s, hit,
+            ok ? "stopped" : "stop faulted", s, g_musicFade);
+    }
+}
+// PadHook, once per game frame
+void SndMuteTick() {
+    if (g_sndOk) {
+        DWORD cats = 0;
+        if (g_sndMuteMusic) {
+            if (SndReady(&cats) && SndMusicLoud(cats) && SndCall(0)) {
+                if (!g_sndMusicMuted) Log(1, "media.mutemusic: music volume 0 (SOUND_SetMusicVolume 0x589520(0))");
+                g_sndMusicMuted = true;
+                ++g_sndMusicCalls;
+            }
+        } else if (g_sndMusicMuted && SndReady(&cats)) {
+            DWORD saved = 128;
+            if (!ReadDword(kSndMusicSaved, &saved) || saved > 128) saved = 128;
+            SndCall(static_cast<int>(saved));
+            g_sndMusicMuted = false;
+            Log(1, "media.mutemusic off: music volume back to the player's setting %lu / 128 ([0x8900d8]); %ld mute "
+                "call(s) while on", saved, g_sndMusicCalls);
+            g_sndMusicCalls = 0;
+        }
+    }
+    if (g_sndMuteAmb && g_musicOk) SndAmbTick();
+}
+
+// ---- items ----
+void ValDvCollect(char *o, size_t n) {
+    Out(o, n, "%d (%d drawn of %d%s)", g_dvOn[kDvCollect] ? 1 : 0, g_dvDrawn[kDvCollect], g_dvListed[kDvCollect],
+        g_coOk ? "" : "; checks failed");
+}
+bool RunDvCollect(const char *arg, char *o, size_t n) { return DvRunOne(kDvCollect, "dbg.collect", arg, o, n); }
+void ValDvEnemies(char *o, size_t n) {
+    Out(o, n, "%d (%d drawn of %d%s)", g_dvOn[kDvEnemies] ? 1 : 0, g_dvDrawn[kDvEnemies], g_dvListed[kDvEnemies],
+        g_aiOk ? "" : "; brain checks failed");
+}
+bool RunDvEnemies(const char *arg, char *o, size_t n) { return DvRunOne(kDvEnemies, "dbg.enemies", arg, o, n); }
+void ValMuteMusic(char *o, size_t n) {
+    Out(o, n, "%d%s%s", g_sndMuteMusic ? 1 : 0, g_sndOk ? (g_sndMusicMuted ? " (muted)" : "") : " disabled: ",
+        g_sndOk ? "" : g_sndWhy);
+}
+bool RunMuteMusic(const char *arg, char *o, size_t n) {
+    if (!g_sndOk) { Out(o, n, "disabled: pre-check failed (%s)", g_sndWhy); return false; }
+    const bool on = BoolArg(arg, g_sndMuteMusic != 0);
+    InterlockedExchange(&g_sndMuteMusic, on ? 1 : 0);
+    Log(1, "media.mutemusic %d (src=%s): %s", on ? 1 : 0, ShotSource("media.mutemusic"),
+        on ? "SOUND_SetMusicVolume 0x589520(0) with the next game frame, again whenever the music comes back"
+           : "the player's music volume [0x8900d8] with the next game frame");
+    Out(o, n, "media.mutemusic %d", on ? 1 : 0);
+    return true;
+}
+void ValMuteAmbient(char *o, size_t n) {
+    Out(o, n, "%d (%ld stop(s)%s)", g_sndMuteAmb ? 1 : 0, g_sndAmbStops, g_musicOk ? "" : "; music checks failed");
+}
+bool RunMuteAmbient(const char *arg, char *o, size_t n) {
+    if (!g_musicOk) { Out(o, n, "disabled: music pre-check failed (%s)", g_musicCheck); return false; }
+    const bool on = BoolArg(arg, g_sndMuteAmb != 0);
+    InterlockedExchange(&g_sndMuteAmb, on ? 1 : 0);
+    Log(1, "media.muteambient %d (src=%s): '_amb_' srmusic tracks (DLC 2 beds) %s; base-game ambience in sound groups is "
+        "not covered", on ? 1 : 0, ShotSource("media.muteambient"), on ? "stopped whenever they start" : "play again "
+        "with their next start");
+    Out(o, n, "media.muteambient %d%s", on ? 1 : 0, on ? " (only '_amb_' music tracks - DLC 2)" : "");
+    return true;
+}
+bool M20LayerOk(int layer, const char **why) {
+    if (layer == kDvCollect) { *why = g_coWhy; return g_coOk; }
+    const bool ok = g_dvBaseOk && g_aiOk;
+    *why = !g_dvBaseOk ? g_dvBaseWhy : !g_aiOk ? g_aiWhy : "ok";
+    return ok;
+}
+// load: the byte checks of precheck_020.txt (after AiCheck and MusicCheck); the two layers at the start
+void M20Check() {
+    DWORD at = 0;
+    g_coOk = g_dvBaseOk && DvChecks(kCoChecks, sizeof(kCoChecks) / sizeof(kCoChecks[0]), &at);
+    if (g_coOk) Out(g_coWhy, sizeof(g_coWhy), "ok");
+    else if (!g_dvBaseOk) Out(g_coWhy, sizeof(g_coWhy), "%s", g_dvBaseWhy);
+    else Out(g_coWhy, sizeof(g_coWhy), "intro data read differs at 0x%08lx", at);
+    at = 0;
+    g_afOk = g_aiOk && DvChecks(kAiForgetChecks, sizeof(kAiForgetChecks) / sizeof(kAiForgetChecks[0]), &at);
+    if (g_afOk) Out(g_afWhy, sizeof(g_afWhy), "ok");
+    else Out(g_afWhy, sizeof(g_afWhy), !g_aiOk ? "needs the 0.19 purge checks" : "targeting code differs at 0x%08lx", at);
+    at = 0;
+    g_sndOk = DvChecks(kSndMusicChecks, sizeof(kSndMusicChecks) / sizeof(kSndMusicChecks[0]), &at);
+    if (g_sndOk) Out(g_sndWhy, sizeof(g_sndWhy), "ok");
+    else Out(g_sndWhy, sizeof(g_sndWhy), "music volume code differs at 0x%08lx", at);
+    if (!g_sndOk) InterlockedExchange(&g_sndMuteMusic, 0);
+    if (!g_musicOk) InterlockedExchange(&g_sndMuteAmb, 0);
+    memset(g_coKind, 0, sizeof(g_coKind));
+    memset(g_enKind, 0, sizeof(g_enKind));
+    int on = 0;
+    if (g_debugEnabled) {
+        const int layers[2] = {kDvCollect, kDvEnemies};
+        for (int i : layers) {
+            const char *why = "";
+            const bool want = g_dvAtStart[i] || (g_dvViewAtStart && !DvViewSkips(i));
+            if (want && DvLayerOk(i, &why)) { InterlockedExchange(&g_dvOn[i], 1); ++on; }
+        }
+    }
+    Log(g_coOk && g_afOk && g_sndOk ? 1 : 0, "0.20: collectibles %s (%d check), enemies %s, ai.dumb forget %s (%d), music "
+        "mute %s (%d), ambience mute %s (0.9 music checks); %d layer(s) on now; [Debug] Collect %d, Enemies %d, MarkRadius "
+        "%.0f, MarkMax %d; [Media] MuteMusic %ld, MuteAmbient %ld", g_coWhy,
+        static_cast<int>(sizeof(kCoChecks) / sizeof(kCoChecks[0])), g_aiOk ? "ok" : g_aiWhy, g_afWhy,
+        static_cast<int>(sizeof(kAiForgetChecks) / sizeof(kAiForgetChecks[0])), g_sndWhy,
+        static_cast<int>(sizeof(kSndMusicChecks) / sizeof(kSndMusicChecks[0])), g_musicOk ? "ok" : "off", on,
+        g_dvAtStart[kDvCollect], g_dvAtStart[kDvEnemies], g_m20Radius, g_m20Max, g_sndMuteMusic, g_sndMuteAmb);
+}
+// ---- end of 0.20 collectibles ----
 
 // ======================================================================================================================
 // 0.10.5 [Shot]: in-game screenshots and Claude marks (owner wish 2026-11-05: the main session gets named shots in the
@@ -14336,6 +15024,7 @@ void ValPosList(char *o, size_t n);
 bool RunPosSave(const char *arg, char *o, size_t n);
 bool RunPosGo(const char *arg, char *o, size_t n);
 bool RunPosGoLoad(const char *arg, char *o, size_t n);   // 0.18, defined below
+bool RunPosPortal(const char *arg, char *o, size_t n);   // 0.20, defined below
 void ValSaveLoad(char *o, size_t n);
 bool RunSaveLoad(const char *arg, char *o, size_t n);
 
@@ -14745,9 +15434,10 @@ const Item kItems[] = {
     {"pos.go", "action", "0.17 <name>|last: Lara to a saved position - only when its unit is loaded, converted with the "
                          "unit's shift then and now; otherwise refused with the reason", true, ValPos, RunPosGo},
     // 0.18 (coordinator / Lukas, live 2026-11-06)
-    {"pos.goload", "action", "0.18 <name>|last: as pos.go, but when the unit is not loaded first level.load <unit> (waits "
-                             "for the level), then cheat.flight 1 + pos.go - explicit only; a level.load may change "
-                             "story state", false, ValPos, RunPosGoLoad},
+    {"pos.goload", "action", "0.18 <name>|last [load]: as pos.go, but when the unit is not loaded - 0.20: first over a "
+                             "loaded neighbour's stream portal (cheat.flight 1, pos.portal, wait.unit, pos.go), only "
+                             "without such a portal (or with 'load') level.load <unit> - explicit only; a level.load may "
+                             "change story state", false, ValPos, RunPosGoLoad},
     {"save.load", "action", "0.18 <save>|autosave: load that save the game's own way (load step table 0x789de0, the "
                             "file read + SAVE_RestoreGame + level change of the game) - in a level only, run twice "
                             "within 10 s, never over TruLink ([Saves] DirectLoad)", false, ValSaveLoad, RunSaveLoad},
@@ -14764,6 +15454,20 @@ const Item kItems[] = {
      true, ValAiNoAtk, RunAiNoAtk},
     {"ai.status", "info", "0.19: dumb AI - setting, checks, method, enemies seen / in scope, last second's removals", false,
      ValAiStatus, nullptr},
+    // 0.20 (docs\Befund-TruMenu-020-0611.md)
+    {"dbg.collect", "bool", "0.20: collectibles - every *_rw_* reward by kind and every reward pot / weight-break container "
+                            "('enthaelt Artefakt' + reward index), nearest MarkMax within MarkRadius", false, ValDvCollect,
+     RunDvCollect},
+    {"dbg.enemies", "bool", "0.20: enemies - every AI enemy coloured by kind, label name + intro id + LP + distance, "
+                            "thralls with the targeter 9 line", false, ValDvEnemies, RunDvEnemies},
+    {"media.mutemusic", "bool", "0.20: background music muted (the game's SOUND_SetMusicVolume 0x589520(0), re-applied after "
+                                "level loads; off = the player's slider value) ([Media] MuteMusic)", false, ValMuteMusic,
+     RunMuteMusic},
+    {"media.muteambient", "bool", "0.20: ambience beds played as music ('_amb_' srmusic tracks, DLC 2) stopped whenever they "
+                                  "start; base-game ambience not covered ([Media] MuteAmbient)", false, ValMuteAmbient,
+     RunMuteAmbient},
+    {"pos.portal", "action", "0.20 <unit>: Lara to the centre of a loaded unit's stream portal towards <unit> (the "
+                             "pos.goload path; flight should be on)", true, ValPos, RunPosPortal},
 };
 
 const Item *FindItem(const char *id) {
@@ -18251,6 +18955,9 @@ const QbRow kQbEmergency[] = {               // 0.18 Notfall (Lukas: "falls man 
     {"Gegner-Gesundheit", "Enemy health", "cheat.enemyhealth", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Munition voll", "Ammo fill", "ammo.fill", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
     {"Waffe geben", "Give weapon", "weapon.give", "", kQbChoice, -1, kQcNone, kQvWeapon, kQbCheat, 0},
+    // 0.20 (coordinator): game.quit as the ring's top sector - the item arms itself (right), a second right within 10 s
+    // quits (TerminateProcess 0x544D); never over TruLink (InvokeCore wait=false = an owner action)
+    {"Spiel beenden", "Quit game", "game.quit", "", kQbAction, -1, kQcNone, 0, kQbRed, 0},
 };
 const QbRow kQbLara[] = {                    // + the saved positions (special page kQsLara)
     {"Fliegen", "Flight", "cheat.flight", "", kQbBool, -1, kQcNone, 0, kQbPlayer, 0},
@@ -18277,10 +18984,13 @@ const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
 };
 const QbRow kQbRender[] = {
     {"Flach-Ansicht", "Flat view", "dbg.flat", "", kQbBool, -1, kQcFlat, 0, kQbFlat},
+    {"Kanten", "Edges", "dbg.flatedges", "", kQbBool, -1, kQcNone, 0, kQbFlat, 0},             // 0.20
     {"Pass", "Pass", "dbg.flatpasses", "", kQbValue, -1, kQcNone, kQvPass, kQbFlat},
     {"Zaehlung", "Census", "dbg.census", "", kQbAction, -1, kQcNone, 0, kQbFlat},
     {"Rutschflaechen", "Slide faces", "dbg.slide", "", kQbBool, kDvSlide, kQcLayer, 0, 0},
     {"Gegner-Kollision", "Enemy collision", "dbg.enemycoll", "", kQbBool, kDvEnemyColl, kQcLayer, 0, 0},
+    {"Gegner", "Enemies", "dbg.enemies", "", kQbBool, kDvEnemies, kQcLayer, 0, 0},              // 0.20
+    {"Gegner-Leben zeigen", "Enemy health", "cheat.enemyhealth", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},   // 0.20
     {"Thrall-Labels", "Thrall labels", "dbg.labels", "", kQbBool, -1, kQcLabels, 0, kQbThrall},   // 0.17 KI / Namen
     {"Objektnamen", "Object names", "dbg.names", "", kQbBool, kDvNames, kQcLayer, 0, 0},
     {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},
@@ -18310,12 +19020,15 @@ const QbRow kQbLevel[] = {
     {"Ladebereiche", "Loading areas", "dbg.portals", "", kQbBool, kDvPortals, kQcLayer, 0, 0},
     {"Checkpoints", "Checkpoints", "dbg.checkpoints", "", kQbBool, kDvCheckpoints, kQcLayer, 0, 0},
     {"Trigger-Namen", "Labels", "dbg.show", "trglabels", kQbBool, kDvTrgLabels, kQcTrgLabels, 0, 0},
+    {"Sammelgegenstaende", "Collectibles", "dbg.collect", "", kQbBool, kDvCollect, kQcLayer, 0, 0},   // 0.20
 };
 const QbRow kQbTimeTest[] = {                // 0.18 Zeit / Test
     {"Welt anhalten", "Pause world", "time.pause", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
     {"Zeitlupe", "Time scale", "time.scale", "", kQbValue, -1, kQcNone, kQvTime, kQbTime, 0},
     {"Ton mit anhalten", "Freeze sound too", "time.freezesound", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
     {"Ton: Stand", "Sound state", "time.sound", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Musik aus", "Music off", "media.mutemusic", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},        // 0.20
+    {"Ambient aus", "Ambience off", "media.muteambient", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},  // 0.20
     {"Claude-Marke", "Claude mark", "claude.mark", "", kQbChoice, -1, kQcNone, kQvMark, kQbClaude, 0},
     {"Ablauf: weiter", "Flow: next", "flow.next", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
     {"Ablauf: ueberspringen", "Flow: skip", "flow.skip", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
@@ -19212,8 +19925,9 @@ bool OcSignal(char *what, size_t n) {
 // 0.18 segments (live 2026-11-06 18:12:56 - 18:16:00: cutscene 160 flowed into the exterior cutscene 170 without the
 // gameplay camera coming back - ONE cutscene, its 10 pairs were used up at 18:13:31 and the wanted forecourt moment got
 // none): while a cutscene runs, a new SEGMENT with a fresh pair budget (OnCinePairs, OnCineFastPairs fast ones first) starts
-// when (a) Lara's unit changes (GameTracker+0x38, case-insensitive), (b) the game's cinematic object [0xe7f1c0] or its
-// track +0x2c changes to another valid one (the reads of the 0.10.2 cinematic test, same byte check), (c) a script prints
+// when (a) Lara's unit changes (GameTracker+0x38, case-insensitive), (b) the game's cinematic object [0xe7f1c0] changes
+// to another valid one (the reads of the 0.10.2 cinematic test, same byte check; 0.20: NOT its track +0x2c - live
+// 2026-11-06 20:23 the track ran 0 -> 28 -> 60 -> 92 .. inside one cinematic = a new pair every second), (c) a script prints
 // "StartCinematic called" / "Cine about to play" (only while log.script redirects the prints - ScriptText). A segment is
 // at least 1 s old before the next may start (one change usually shows in two signals). Spread: after the fast pairs one
 // pair every OnCineSlowMs (8000 by default, was 5000) up to OnCinePairs - 4 x 1.5 s + 6 x 8 s ~ 54 s per segment.
@@ -19275,11 +19989,13 @@ void OcSegReason(DWORD now, char *o, size_t n) {
     if (cine && track != 0xffffffff && (!g_oc.cine || g_oc.track == 0xffffffff)) {
         g_oc.cine = cine;                    // the segment began on the camera signal: its cinematic, no new segment
         g_oc.track = track;
-    } else if (cine && track != 0xffffffff && (cine != g_oc.cine || track != g_oc.track)) {
+    } else if (cine && track != 0xffffffff && cine != g_oc.cine) {
         Out(o, n, "cinematic 0x%08lx track %ld -> 0x%08lx track %ld", g_oc.cine, static_cast<LONG>(g_oc.track), cine,
             static_cast<LONG>(track));
         return;
-    }
+    } else if (cine && track != 0xffffffff) {
+        g_oc.track = track;                  // 0.20 (live 20:23: track 0 -> 28 -> 60 -> 92 .. = a pair per second): the
+    }                                        // track runs on inside ONE cinematic - followed, no new segment
     DWORD script = static_cast<DWORD>(g_ocScriptTick);
     if (script && script != g_oc.scriptSeen && static_cast<LONG>(script - g_oc.segStart) > 0)
         Out(o, n, "script print 'StartCinematic called' / 'Cine about to play'");
@@ -19718,12 +20434,78 @@ void ValPos(char *o, size_t n) {
 // that unit, 2 s in a row, at most 120 s), then "cheat.flight 1" and "pos.go <name>" (the same conversion with the
 // unit's shift). Explicit only (an item, a bar row with a second press, a menu button) - never automatic. A level.load
 // starts the unit fresh: what that does to story values (stickies, chapter) is not known.
+// 0.20 (Lukas, live 2026-11-06: a level.load for a unit right next door restarts it): when a loaded unit has a stream
+// portal towards the target unit (portal +0 = the unit on the other side - docs\Befund-TruMenu-Trigger-0611.md, logs
+// trg0611_portals_l3_main_bedroom.txt; the 0.14 dbg.portals read, g_dvPortalOk), the steps are "cheat.flight 1;
+// pos.portal <unit>;wait.unit <unit>;pos.go <name>": Lara (flying) to the portal quad's centre, the runner waits until the
+// stream unit table has the unit loaded (state 2) for 1 s (at most 30 s), then the usual pos.go. One hop only (a portal
+// of a LOADED unit). Without such a portal - or with "pos.goload <name> load" - the 0.18 level.load path.
+// the portal of a loaded unit (not the target itself) whose name is the target unit; its centre and the owner's name
+bool PosPortalTo(const char *target, float *centre, char *from, size_t fromSize) {
+    if (!g_dvPortalOk || !g_unitOk) return false;
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD state = 0, level = 0, terrain = 0, arr = 0;
+        WORD count = 0;
+        char unit[48];
+        if (!ReadDword(e + 4, &state) || (state & 0xff) != 2 || !ReadString(e + 0xc, unit, sizeof(unit))) continue;
+        if (!_stricmp(unit, target)) continue;
+        if (!ReadDword(e + 8, &level) || !level || !ReadDword(level, &terrain) || !terrain ||
+            !ReadWord(terrain + 2, &count) || count > 64 || !ReadDword(terrain + 4, &arr) || !arr)
+            continue;
+        for (DWORD i = 0; i < count; ++i) {
+            const DWORD p = arr + i * 0x100;
+            char name[48];
+            float q[4][4];
+            if (!ReadString(p, name, sizeof(name)) || _stricmp(name, target)) continue;
+            if (!ReadFloats(p + 0xb0, &q[0][0], 16) || !DvFinite(&q[0][0], 16)) continue;
+            for (int b = 0; b < 3; ++b) centre[b] = (q[0][b] + q[1][b] + q[2][b] + q[3][b]) * 0.25f;
+            strncpy_s(from, fromSize, unit, _TRUNCATE);
+            return true;
+        }
+    }
+    return false;
+}
+bool PosUnitLoaded(const char *unit) {       // 0.20 wait.unit: the stream unit table has it, state 2
+    float shift[3], origin[3];
+    return unit && unit[0] && PosUnitFrame(unit, shift, origin);
+}
+// game thread (queued): pos.portal <unit>
+bool RunPosPortal(const char *arg, char *o, size_t n) {
+    if (!g_posOk || !g_dvPortalOk) {
+        Out(o, n, "disabled: pre-check failed (%s)", !g_posOk ? g_posWhy : g_dvPortalWhy);
+        return false;
+    }
+    DWORD player = 0;
+    if (!NeedPlayer(&player, o, n)) return false;
+    char unit[48], from[48];
+    strncpy_s(unit, sizeof(unit), arg ? arg : "", _TRUNCATE);
+    DvTrim(unit);
+    if (!unit[0]) { Out(o, n, "usage: pos.portal <unit> (a stream portal of a loaded unit towards it)"); return false; }
+    float centre[3];
+    if (!PosPortalTo(unit, centre, from, sizeof(from))) {
+        Out(o, n, "no loaded unit has a stream portal towards %s", unit);
+        return false;
+    }
+    if (!SetPosition(player, centre)) { Out(o, n, "write failed"); return false; }
+    Log(1, "pos.portal %s: Lara to the portal of %s at %.1f %.1f %.1f (src=%s)", unit, from, centre[0], centre[1], centre[2],
+        ShotSource("pos.portal"));
+    Out(o, n, "pos.portal %s: Lara at the portal of %s (%.0f %.0f %.0f)", unit, from, centre[0], centre[1], centre[2]);
+    return true;
+}
 bool RunPosGoLoad(const char *arg, char *o, size_t n) {
     if (!g_posOk) { Out(o, n, "disabled: pre-check failed (%s)", g_posWhy); return false; }
     char name[40];
     strncpy_s(name, sizeof(name), arg ? arg : "", _TRUNCATE);
     DvTrim(name);
-    if (!name[0]) { Out(o, n, "usage: pos.goload <name>|last (pos.list)"); return false; }
+    bool forceLoad = false;                  // 0.20: "<name> load" = the level.load path even with a portal
+    if (char *sp = strchr(name, ' ')) {
+        char *rest = sp + 1;
+        while (*rest == ' ') ++rest;
+        if (_stricmp(rest, "load")) { Out(o, n, "usage: pos.goload <name>|last [load]"); return false; }
+        forceLoad = true;
+        *sp = 0;
+    }
+    if (!name[0]) { Out(o, n, "usage: pos.goload <name>|last [load] (pos.list)"); return false; }
     static PosRow rows[kPosMax];
     int k = PosLoad(rows, kPosMax), hit = -1;
     for (int i = 0; i < k; ++i)
@@ -19734,14 +20516,22 @@ bool RunPosGoLoad(const char *arg, char *o, size_t n) {
     if (!InLevel()) { Out(o, n, "needs a level"); return false; }
     char why[200];
     if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: level change pending (%s)", why); return false; }
-    float shift[3], origin[3];
+    float shift[3], origin[3], centre[3];
     const bool loaded = PosUnitFrame(r.unit, shift, origin);
-    char steps[200], title[64];
-    if (loaded) Out(steps, sizeof(steps), "cheat.flight 1;pos.go %s", r.name);
-    else Out(steps, sizeof(steps), "level.load %s;cheat.flight 1;pos.go %s", r.unit, r.name);
+    char steps[300], title[64], from[48] = "", how[96];
+    const bool portal = !loaded && !forceLoad && PosPortalTo(r.unit, centre, from, sizeof(from));
+    if (loaded) {
+        Out(steps, sizeof(steps), "cheat.flight 1;pos.go %s", r.name);
+        Out(how, sizeof(how), "loaded");
+    } else if (portal) {
+        Out(steps, sizeof(steps), "cheat.flight 1;pos.portal %s;wait.unit %s;pos.go %s", r.unit, r.unit, r.name);
+        Out(how, sizeof(how), "not loaded - over the stream portal of %s", from);
+    } else {
+        Out(steps, sizeof(steps), "level.load %s;cheat.flight 1;pos.go %s", r.unit, r.name);
+        Out(how, sizeof(how), "not loaded - %s", forceLoad ? "level.load asked for" : "no loaded unit has a portal to it");
+    }
     Out(title, sizeof(title), "pos.goload %s", r.name);
-    Log(1, "pos.goload %s: unit %s %s -> %s (src=%s)", r.name, r.unit, loaded ? "loaded" : "not loaded", steps,
-        ShotSource("pos.goload"));
+    Log(1, "pos.goload %s: unit %s %s -> %s (src=%s)", r.name, r.unit, how, steps, ShotSource("pos.goload"));
     return ShortcutStart(steps, title, o, n);
 }
 // ---- 0.18 quick-toggle pages (render thread): the special rows of the pages Lara (saved positions), Checkpoints and
@@ -20953,6 +21743,19 @@ void PageMusic() {
     char now[1024];
     ValMusicNow(now, sizeof(now));
     ImGui::TextWrapped("now: %s   [media.music.now]", now);
+    {                                        // 0.20: mutes for tests (no experimental flag; own checks)
+        char o[200];
+        bool mm = g_sndMuteMusic != 0, ma = g_sndMuteAmb != 0;
+        if (!g_sndOk) ImGui::BeginDisabled();
+        if (TmCheckbox("music off / Musik aus  [media.mutemusic]###mutemus", &mm)) RunMuteMusic(mm ? "1" : "0", o, sizeof(o));
+        if (!g_sndOk) ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (!g_musicOk) ImGui::BeginDisabled();
+        if (TmCheckbox("ambience off / Ambient aus  [media.muteambient]###muteamb", &ma))
+            RunMuteAmbient(ma ? "1" : "0", o, sizeof(o));
+        if (!g_musicOk) ImGui::EndDisabled();
+        ImGui::TextWrapped("Ambient aus = only '_amb_' tracks played as music (DLC 2); base-game ambience is not covered yet");
+    }
     if (!can) ImGui::BeginDisabled();
     if (TmButton("Stop slot 0 (fade)  [media.music.stop]###mstop")) QueueItem("media.music.stop", "");
     ImGui::SameLine();
@@ -21620,6 +22423,14 @@ void ReadOptions(const char *dir) {
     g_dvViewAtStart = OptInt(ini, "Debug", "View") != 0 ? 1 : 0;
     g_dvTrgAtStart = OptInt(ini, "Debug", "Triggers") != 0 ? 1 : 0;
     for (int i = 0; i < kDvCount; ++i) g_dvAtStart[i] = OptInt(ini, "Debug", kDvLayers[i].key) != 0 ? 1 : 0;
+    {                                        // 0.20 collectibles / enemies
+        char radius[32];
+        OptString(ini, "Debug", "MarkRadius", radius, sizeof(radius));
+        float r = static_cast<float>(atof(radius));
+        g_m20Radius = (r >= 500.0f && r <= 200000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "MarkRadius")));
+        g_m20Max = OptInt(ini, "Debug", "MarkMax");
+        if (g_m20Max < 1 || g_m20Max > 64) g_m20Max = atoi(OptDefault("Debug", "MarkMax"));
+    }
     g_dvMarkupAtStart = OptInt(ini, "Debug", "Markup") != 0 ? 1 : 0;
     g_dvPersist = OptInt(ini, "Debug", "Persist") != 0 ? 1 : 0;
     OptString(ini, "Debug", "ViewNav", g_dvViewNav, sizeof(g_dvViewNav));
@@ -21724,6 +22535,8 @@ void ReadOptions(const char *dir) {
     g_musicInLevels = OptInt(ini, "Media", "MusicInLevels") != 0 ? 1 : 0;           // 0.9
     g_musicFade = OptInt(ini, "Media", "MusicFade");
     if (g_musicFade < 0 || g_musicFade > 300) g_musicFade = atoi(OptDefault("Media", "MusicFade"));
+    InterlockedExchange(&g_sndMuteMusic, OptInt(ini, "Media", "MuteMusic") != 0 ? 1 : 0);        // 0.20
+    InterlockedExchange(&g_sndMuteAmb, OptInt(ini, "Media", "MuteAmbient") != 0 ? 1 : 0);        // 0.20
     OptString(ini, "Saves", "Folder", g_saveFolderIni, sizeof(g_saveFolderIni));
     g_slDirect = OptInt(ini, "Saves", "DirectLoad") != 0 ? 1 : 0;                   // 0.18 save.load
     AiReadOptions(ini);                                                              // 0.19 [AI]
@@ -22036,6 +22849,8 @@ void Start(HMODULE self) {
         g_saveRootU8);
     SaveLoadCheck();                          // 0.18 save.load (precheck_018.txt section 2; after the main state check)
     AiCheck();                                // 0.19 dumb AI (precheck_019.txt; after the instance / player / main state checks)
+    M20Check();                               // 0.20 collectibles / enemies / forget / mutes (precheck_020.txt; after
+                                              // AiCheck, MusicCheck and DebugViewCheck)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
     _snprintf_s(g_radFilePath, sizeof(g_radFilePath), _TRUNCATE, "%sTruMenu.radial.txt", g_exeDir);

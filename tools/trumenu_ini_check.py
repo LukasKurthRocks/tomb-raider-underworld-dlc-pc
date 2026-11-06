@@ -72,6 +72,13 @@ kItems, the presets of kAiPresets (all / sharks / spiders / thralls) plus filter
 preset word, all / sharks / spiders each at least once, sharks / spiders also in Spieler/Barrierefreiheit), ai.noinvestigate
 / ai.noattack / ai.status once each without an argument, the Barrierefreiheit bar page without the planned row "Haie",
 and the 0.19 precheck tables kAiChecks / kAiGateChecks / kAiBitChecks present with at most 64 bytes per check.
+Since TruMenu 0.20 (2026-11-06 TruMenu 0.20) also 17 layers (collect / enemies with their own items dbg.collect /
+dbg.enemies), [Debug] Collect / Enemies 0 / 1, MarkRadius 500 .. 200000, MarkMax 1 .. 64, [Media] MuteMusic / MuteAmbient
+0 / 1, the defaults DumbMode gate / Depth 2 / FlatPasses 0x600 in kOpts, the items dbg.collect / dbg.enemies /
+media.mutemusic / media.muteambient / pos.portal, the owner's bar rows (Leveldaten collectibles; Render / KI enemies,
+enemy health, edges; Zeit / Test music / ambience off; game.quit as the last plain action row of Notfall), the ring's
+dbg.collect / dbg.enemies / media.mutemusic / media.muteambient once without an argument (pos.portal never), and the
+precheck tables kCoChecks / kAiForgetChecks / kSndMusicChecks with at most 64 bytes per check.
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -111,16 +118,19 @@ DV_BOOL_KEYS = ('View', 'Triggers', 'TrgDeath', 'TrgFire', 'TrgCheckpoint', 'Trg
                 'TrgPlane', 'TrgUnknown', 'Portals', 'Checkpoints', 'TrgLabels', 'Legend', 'Markup', 'Persist', 'Names',
                 'NameIds',
                 'Slide', 'EnemyColl', 'Census', 'Flat', 'FlatModels', 'FlatEdges', 'FlatAnyTarget',   # 0.15
-                'Fade', 'Fill', 'LabelShort', 'LaraIn')                                              # 0.16
+                'Fade', 'Fill', 'LabelShort', 'LaraIn',                                              # 0.16
+                'Collect', 'Enemies')                                                                # 0.20
 DV_RANGES = {'TriggerMax': (1, 512), 'TriggerRadius': (500, 200000), 'TriggerLabelMax': (0, 64),
              'NameRadius': (100, 200000), 'NameMax': (1, 64), 'NameScale': (0.5, 3),
              'CollRadius': (500, 200000), 'CollMax': (100, 20000), 'CensusFrames': (10, 1200),   # 0.15
              'Depth': (0, 2), 'DepthDim': (5, 80), 'DepthCall': (-1, 7), 'LineAlpha': (10, 100),  # 0.16 (0.17: -1 auto)
              'LineBright': (30, 150), 'FadeStart': (0, 100000), 'FadeEnd': (500, 200000), 'FadeMin': (0, 100),
              'FillAlpha': (2, 40), 'ViewLabelMax': (0, 64), 'Enclosing': (0, 2), 'EnclosingSize': (100, 100000),
-             'MarkerMax': (2, 50)}
+             'MarkerMax': (2, 50),
+             'MarkRadius': (500, 200000), 'MarkMax': (1, 64)}                                       # 0.20
 DV_FLOAT_KEYS = ('TriggerRadius', 'NameRadius', 'NameScale', 'CollRadius',     # the others are whole numbers
-                 'FadeStart', 'FadeEnd', 'EnclosingSize')                      # 0.16
+                 'FadeStart', 'FadeEnd', 'EnclosingSize',                      # 0.16
+                 'MarkRadius')                                                 # 0.20
 DV_ITEMS = {'dbg.view': 'bool', 'dbg.triggers': 'bool', 'dbg.show': 'action', 'dbg.portals': 'bool',
             'dbg.checkpoints': 'bool', 'dbg.legend': 'bool', 'dbg.status': 'info', 'dbg.names': 'bool',
             'dbg.namefilter': 'action', 'dbg.namecolour': 'action', 'dbg.namesize': 'action',
@@ -130,18 +140,21 @@ DV_ITEMS = {'dbg.view': 'bool', 'dbg.triggers': 'bool', 'dbg.show': 'action', 'd
             'dbg.render': 'info', 'dbg.slide': 'bool', 'dbg.enemycoll': 'bool',
             # 0.16 readability
             'dbg.depth': 'action', 'dbg.alpha': 'action', 'dbg.bright': 'action', 'dbg.fade': 'bool', 'dbg.fill': 'bool',
-            'dbg.short': 'bool', 'dbg.larain': 'bool', 'dbg.enclosing': 'action', 'dbg.style': 'info'}
+            'dbg.short': 'bool', 'dbg.larain': 'bool', 'dbg.enclosing': 'action', 'dbg.style': 'info',
+            # 0.20 collectibles / enemies
+            'dbg.collect': 'bool', 'dbg.enemies': 'bool'}
 # 0.16: ring entries with a fixed set of arguments (each once), percent presets, switches without an argument (once)
 DP_RING_ARGS = {'dbg.depth': ('on', 'dim', 'off'), 'dbg.enclosing': ('normal', 'dim', 'hide')}
 DP_RING_PERCENT = {'dbg.alpha': (10, 100), 'dbg.bright': (30, 150)}
 DP_RING_SWITCHES = ('dbg.fade', 'dbg.fill', 'dbg.short', 'dbg.larain', 'dbg.style')
 DV_OWN_ITEM = {'portals': 'dbg.portals', 'checkpoints': 'dbg.checkpoints', 'legend': 'dbg.legend', 'names': 'dbg.names',
-               'slide': 'dbg.slide', 'enemycoll': 'dbg.enemycoll'}
+               'slide': 'dbg.slide', 'enemycoll': 'dbg.enemycoll',
+               'collect': 'dbg.collect', 'enemies': 'dbg.enemies'}                                  # 0.20
 # 0.15: the pass ids of the flat view (kRmPassNames in TruMenu.cpp), their mask, the ring switches without an argument
 RM_PASSES = ('0x200', '0x100', '0x80', '0x400', '0x800', '1', '2')
 RM_PASS_ALL = 0xf83
 RM_RING_SWITCHES = ('dbg.flat', 'dbg.census', 'dbg.flatedges', 'dbg.flatmodels', 'dbg.flatanyrt', 'dbg.render')
-DV_LAYER_COUNT = 15
+DV_LAYER_COUNT = 17                          # 0.20: + collect, enemies
 # 0.17 quick toggles: [Quick] keys / ranges, the buttons the open bar owns, [Shot] OnCine ranges, the new items, the row
 # tables of the bar and the items a value row may use
 QB_KEYS = ('Enabled', 'OpenButtons', 'ChordMs', 'ShowClosed', 'Language', 'Top', 'Scale')
@@ -165,6 +178,15 @@ Q19_ITEMS = {'ai.dumb': 'action', 'ai.mode': 'action', 'ai.noinvestigate': 'bool
 AI_PRESETS = ('all', 'sharks', 'spiders', 'thralls')
 AI_SETTINGS = AI_PRESETS + ('filter',)
 AI_KEYS = ('Dumb', 'DumbFilter', 'DumbMode', 'NoInvestigate', 'NoAttack')
+# 0.20: the new items, the [Media] mute keys, the bar rows the owner asked for (table, item, arg), the ring entries once
+Q20_ITEMS = {'dbg.collect': 'bool', 'dbg.enemies': 'bool', 'media.mutemusic': 'bool', 'media.muteambient': 'bool',
+             'pos.portal': 'action'}
+Q20_MEDIA_KEYS = ('MuteMusic', 'MuteAmbient')
+Q20_BAR = (('kQbLevel', 'dbg.collect', ''), ('kQbRender', 'dbg.enemies', ''), ('kQbRender', 'cheat.enemyhealth', ''),
+           ('kQbRender', 'dbg.flatedges', ''), ('kQbTimeTest', 'media.mutemusic', ''),
+           ('kQbTimeTest', 'media.muteambient', ''), ('kQbEmergency', 'game.quit', ''))
+Q20_RING = ('dbg.collect', 'dbg.enemies', 'media.mutemusic', 'media.muteambient')
+Q20_DEFAULTS = (('AI', 'DumbMode', 'gate'), ('Debug', 'Depth', '2'), ('Debug', 'FlatPasses', '0x600'))
 DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -939,6 +961,70 @@ def check_019(ini_path, radial_path, rows):
         len(AI_KEYS), len(Q19_ITEMS), '/'.join(cpp_presets), sum(bar_ai.values()), sum(counts.values()))
 
 
+def check_020(ini_path, radial_path, rows):
+    """0.20 (2026-11-06 TruMenu 0.20): the [Media] mute keys 0 / 1, the new defaults (DumbMode gate, Depth 2, FlatPasses
+    0x600) in kOpts, the new items in kItems, the bar rows the owner asked for (collectibles on Leveldaten, enemies /
+    enemy health / edges on Render / KI, the mutes on Zeit / Test, game.quit as the LAST row of Notfall), the ring entries
+    once without an argument, the 0.20 precheck tables present with at most 64 bytes a check"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    found = {k: (n, v) for n, k, v in ini_section(ini_path, 'Media')}
+    for key in Q20_MEDIA_KEYS:
+        if key not in found: problems.append('%s: [Media] %s missing' % (name, key))
+        elif found[key][1] not in ('0', '1'):
+            problems.append('%s:%d: [Media] %s=%s (0 / 1)' % (name, found[key][0], key, found[key][1]))
+    defaults = {(sec, key): default for sec, key, default, comment in rows}
+    for sec, key, want in Q20_DEFAULTS:
+        if defaults.get((sec, key)) != want:
+            problems.append('TruMenu.cpp: kOpts [%s] %s default "%s", want "%s" (0.20)' % (sec, key, defaults.get((sec, key)),
+                                                                                       want))
+    items = item_types(src)
+    for item, typ in sorted(Q20_ITEMS.items()):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    bar = qb_rows(src, True)
+    for table, item, arg in Q20_BAR:
+        if not any(t == table and i == item and a == arg for t, de, i, a, kind, layer, tail in bar):
+            problems.append('TruMenu.cpp: %s has no row %s%s' % (table, item, ' ' + arg if arg else ''))
+    emergency = [r for r in bar if r[0] == 'kQbEmergency']
+    if emergency and emergency[-1][2] != 'game.quit':
+        problems.append('TruMenu.cpp: kQbEmergency - game.quit must be the last row (got %s)' % emergency[-1][2])
+    for t, de, i, a, kind, layer, tail in bar:
+        if i == 'game.quit' and ('kQfConfirm' in tail or kind != 'kQbAction'):
+            problems.append('TruMenu.cpp: %s row "%s": game.quit is a plain action row (the item arms itself, 10 s)'
+                            % (t, de))
+    counts = {}
+    if os.path.exists(radial_path):
+        for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.count('|') != 2: continue
+            cmd = line.split('|')[2].strip()
+            word, _, arg = cmd.partition(' ')
+            if word in Q20_RING or word == 'pos.portal':
+                counts[word] = counts.get(word, 0) + 1
+                if arg.strip(): problems.append('%s:%d: %s (no argument in the ring)' % (os.path.basename(radial_path), n,
+                                                                                         cmd))
+        for want in Q20_RING:
+            if counts.get(want, 0) != 1:
+                problems.append('%s: %s must be in the radial file once, found %d'
+                                % (os.path.basename(radial_path), want, counts.get(want, 0)))
+        if counts.get('pos.portal'):
+            problems.append('%s: pos.portal is a pos.goload step, not a ring entry' % os.path.basename(radial_path))
+    for tbl in ('kCoChecks', 'kAiForgetChecks', 'kSndMusicChecks'):
+        m = re.search(r'const DvCheck %s\[\] = \{(.*?)\n\};' % tbl, src, re.S)
+        if not m:
+            problems.append('TruMenu.cpp: %s missing' % tbl)
+            continue
+        body = re.sub(r'"\s*\n\s*"', '', m.group(1))           # a literal split over two lines is one literal
+        for a, h in re.findall(r'\{(0x[0-9a-fA-F]+), "([0-9a-fA-F ]+)"\}', body):
+            hexs = h.replace(' ', '')
+            if len(hexs) % 2 or len(hexs) // 2 > 64:
+                problems.append('TruMenu.cpp: %s %s (whole bytes, at most 64; got %d)' % (tbl, a, len(hexs) // 2))
+    return problems, '%d items, [Media] %d keys, %d bar rows, %d ring entries, defaults %s' % (
+        len(Q20_ITEMS), len(Q20_MEDIA_KEYS), len(Q20_BAR), sum(counts.get(w, 0) for w in Q20_RING),
+        ', '.join('%s %s' % (k, v) for s, k, v in Q20_DEFAULTS))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -1024,6 +1110,10 @@ def main(argv):
     for p in aproblems: print('Q019 %s' % p)
     if not aproblems: print('ok: 0.19 dumb AI: %s' % asummary)
     problems += aproblems
+    zproblems, zsummary = check_020(ini_path, radial_path, rows)   # 0.20
+    for p in zproblems: print('Q020 %s' % p)
+    if not zproblems: print('ok: 0.20: %s' % zsummary)
+    problems += zproblems
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

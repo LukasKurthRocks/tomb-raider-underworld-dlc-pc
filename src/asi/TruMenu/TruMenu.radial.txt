@@ -28,6 +28,10 @@ Zeit | Ton mit Welt einfrieren | time.pausesound
 Zeit | Ton-Pause: Stand | time.sound
 # 0.10.4 (F7, light shaft): the shader clock TimeVector holds with every world freeze (default off; state: time.clock)
 Zeit | Shader-Uhr mit Einfrieren | time.freezeclock
+# 0.20 (tests): Musik aus = the game's music volume 0 until switched off (comes back after level loads otherwise);
+# Ambient aus = only '_amb_' tracks played as music (DLC 2), base-game ambience not covered yet
+Zeit | Musik aus | media.mutemusic
+Zeit | Ambient aus | media.muteambient
 Waffen | Schrotflinte | weapon.give wp_shotgun
 Waffen | Uzis | weapon.give wp_uzi
 Waffen | Goldene Schrotflinte | weapon.give wp_dlc_gold_shotgun
@@ -125,14 +129,18 @@ Spieler/Debug/Leveldaten | Trigger (Volumen) | dbg.show volume
 Spieler/Debug/Leveldaten | Trigger-Ebenen | dbg.show plane
 Spieler/Debug/Leveldaten | Trigger unbekannt | dbg.show unknown
 Spieler/Debug/Leveldaten | Trigger-Namen | dbg.show trglabels
+# 0.20: Sammelgegenstaende (dbg.collect) = every *_rw_* reward by kind and every reward pot ("enthaelt Artefakt" + the
+# reward index of its intro data)
+Spieler/Debug/Leveldaten | Sammelgegenstaende | dbg.collect
 # 0.12 Debug-Zeichnung (debug view stage S0): the NavPower debug drawing compiled into tru.exe - in a loaded level only.
 # Verbindungen / Normalen draw only together with Flaechen or Flaechen gefuellt (same area loop); "Alle Ebenen" =
 # nav.mask (layer mask 0xffffffff); "Navmesh aus" = nav.off: every switch and the mask back to the values before.
 # 0.13 Thrall-Labels (debug view stage S1): a label at each thrall near Lara (name, intro id, distance, health, targeter 9
 # / hit list / condition 2011 from TruShadowCombat 0.5.3).
 # 0.19 Dumme KI (docs/Befund-TruMenu-019-DummeKI-0611.md): enemies ignore Lara - every AI enemy or one group by object
-# name; one setting at a time (switching a group on replaces the other), each entry shows on / off. Default method purge
-# = the engine's own sense reset once per frame (no code patch); [AI] DumbMode=gate = call gates. Nicht nachsehen /
+# name; one setting at a time (switching a group on replaces the other), each entry shows on / off. 0.20: default method
+# gate = call gates ([AI] DumbMode), purge = the engine's own sense reset once per frame (fallback); switching on clears
+# an enemy's current target on Lara once (forget). Nicht nachsehen /
 # Nicht angreifen = the prototype's brain flags for the same enemies (every AI enemy while ai.dumb is off / all).
 Spieler/Debug/KI | Gegner ignorieren Lara | ai.dumb all
 Spieler/Debug/KI | Haie ignorieren Lara | ai.dumb sharks
@@ -146,6 +154,8 @@ Spieler/Debug/KI | Navmesh Flaechen | nav.draw planner_areas
 Spieler/Debug/KI | Navmesh Verbindungen | nav.draw planner_connectivity
 Spieler/Debug/KI | Hindernisse | nav.draw obstacles
 Spieler/Debug/KI | Thrall-Labels | dbg.labels
+# 0.20: Gegner (dbg.enemies) = every AI enemy by kind with intro id, LP and distance (thralls with the targeter 9 line)
+Spieler/Debug/KI | Gegner (alle Arten) | dbg.enemies
 # 0.15: Gegner-Kollision (dbg.enemycoll) = faces of the collision groups only enemies collide with (extra flags 0x800)
 Spieler/Debug/KI | Gegner-Kollision | dbg.enemycoll
 Spieler/Debug/KI | Navmesh gefuellt | nav.draw planner_areas_solid

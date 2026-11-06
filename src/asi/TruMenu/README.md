@@ -1915,6 +1915,35 @@ ai.dumb: burst ended after 4.0 s (4 active second(s)) - stage A purge 37 sense(s
 ai.dumb gate (stage B) on (ai.dumb on): A1 scan 0x6648bb, A2 AddTarget 0x659d8f, ... -> TruMenu
 ```
 
+## TruMenu 0.20 (collectibles, enemies, forget, goload over portals, mutes; 2026-11-06)
+
+Report `docs\Befund-TruMenu-020-0611.md`; byte checks `work\asi\menu020\precheck_020.txt` (16, section
+"// ---- 0.20 collectibles, enemies" .. "// ---- end of 0.20 collectibles"); analysis files `work\m020_0611`.
+
+* **`dbg.collect`** (layer `collect`, `[Debug] Collect`): every instance whose object name holds `_rw_` (artifact gold,
+  treasure pink, shard turquoise, other reward light gold) and every reward container (`_pt_` + `reward`:
+  `dlc1_pt_reward_pot`, `*_pt_weightbreak_reward`) as a magenta ring with **"enthaelt Artefakt #<index>"** - the
+  container's object type data names `tp_rw_artifact_spawned` (the same for every pot), the reward index is intro data
+  +0x30 (`[[inst+0x100]+0x78]+0x30`). "Collected" is not shown (not verified cheaply).
+* **`dbg.enemies`** (layer `enemies`, `[Debug] Enemies`): every AI enemy (the 0.19 brain test) coloured by kind -
+  thrall, spider / tarantula, shark, tiger / panther, naga, bat, merc / poacher, other; label name, intro id, LP,
+  distance; thralls with the 0.13 targeter 9 line. While on, `dbg.labels` leaves AI enemies to it. Both layers: the
+  nearest `[Debug] MarkMax` within `MarkRadius`, legend rows per kind (found in the loaded units).
+* **ai.dumb forget**: when ai.dumb comes on (and for an enemy entering scope while on) the enemy's current target
+  (`EnemyTargeting` +0x30) and override (+0xf0) are cleared once with the engine's slot setter `0x653cf0` when they
+  hold Lara, then her senses are purged. **`[AI] DumbMode=gate` is the default** (purge = fallback).
+* **`shot.oncine`**: a track change of the same cinematic no longer starts a segment (unit change, another cinematic
+  object or a StartCinematic print still do).
+* **`pos.goload <name> [load]`**: a target unit that a loaded unit has a stream portal to is reached over that portal -
+  `cheat.flight 1;pos.portal <unit>;wait.unit <unit>;pos.go <name>` (`wait.unit` = the runner waits until the unit is
+  loaded 1 s in a row, at most 30 s); `level.load` only without such a portal or with `load`.
+* **`media.mutemusic`** (`[Media] MuteMusic`): `SOUND_SetMusicVolume 0x589520(0)` whenever the music comes back
+  (level loads re-apply the slider); off = the player's value `[0x8900d8]`. **`media.muteambient`**
+  (`[Media] MuteAmbient`): `_amb_` srmusic tracks (DLC 2) stopped when they start; base-game ambience not covered.
+* Defaults: `[Debug] Depth=2` (dim), `FlatPasses=0x600`. Bar: Leveldaten "Sammelgegenstaende", Render / KI "Gegner",
+  "Gegner-Leben zeigen", "Kanten", Zeit / Test "Musik aus" / "Ambient aus", Notfall last row "Spiel beenden"
+  (`game.quit`: right arms, right again within 10 s quits). Ring: Leveldaten, KI, Zeit.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
