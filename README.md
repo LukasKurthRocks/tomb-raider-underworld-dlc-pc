@@ -53,6 +53,12 @@ testing in the game. You need your own copy of the game and your own Xbox DLC fi
 *Development build, 2 Nov 2026: DLC 2 in the second Yggdrasil hall with the test menu's log overlay. The thralls
 still use substitute shaders here (translated since).*
 
+![Development build: TruMenu debug view, Croft Manor forecourt](assets/dev-debugview-manor-forecourt-2026-11-06.jpg)
+*Development build, 6 Nov 2026: the test menu's debug view (TruMenu 0.15) in the base game, on the forecourt at
+Croft Manor's entrance during the end-of-chapter cutscene. Trigger volumes by kind (red: fire that kills, yellow:
+plain, cyan: planes), the loading area between the main hall and the exterior, the active checkpoint and object
+names. The main hall's triggers hang beside the cutscene's facade set - the walkable interior is not behind it.*
+
 **Still missing (short list)**
 
 - DLC 2: the shadow finisher never starts (its target list stays empty); beaten thralls get up again; a moaning sound
