@@ -50,7 +50,16 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.13 (Thrall-Labels: dbg.labels draws a text label at the projected screen position "
+const char *const kVersion = "TruMenu 0.14 (Debug view: dbg.triggers draws the game's trigger planes / volumes as "
+                             "wireframes the way the engine tests them (box = 12 lines along the instance's Euler "
+                             "matrix, sphere = 3 circles, plane = its quad, one-sided arrow), coloured by kind from the "
+                             "object name (death, fire, checkpoint, water, sound, plain volume, plane, unknown), each kind "
+                             "its own switch (dbg.show <layer>); dbg.portals = the stream portal quads (loading areas) of "
+                             "the loaded units; dbg.checkpoints = checkpoint objects, the active one marked; dbg.legend; "
+                             "dbg.view = master switch for every overlay (0.14 layers, dbg.labels, draw.markup, [Debug] "
+                             "ViewNav); menu page Debug view, ring Spieler / Debug in groups Leveldaten / KI / Lara, "
+                             "[Debug] keys per layer (0 by default), Persist; "
+                             "0.13: Thrall-Labels: dbg.labels draws a text label at the projected screen position "
                              "of each thrall / enemy instance near Lara - object name, intro id, distance, health "
                              "(EnemyProcessFunc's value), and from TruShadowCombat 0.5.3's TscTargeterSnapshot targeter 9 "
                              "bucket / rejected (reason) / target, hit list, last condition 2011 - projected like the game's "
@@ -417,6 +426,47 @@ const OptDef kOpts[] = {
                                       "instance in the radius"},
     {"Debug", "LabelCross", "1", "0.13: 1 = a magenta cross at Lara's position (+0x20) projected the same way - the live "
                                  "check of the projection; 0 = none"},
+    {"Debug", "View", "0", "0.14: 1 = the whole debug view on from the start (dbg.view: every layer below, Labels, Markup, "
+                           "and ViewNav as NavDraw when\nNavDraw is empty; needs Enabled=1); 0 = only the single keys"},
+    {"Debug", "ViewNav", "planner_areas,planner_connectivity,obstacles", "0.14: the NavPower switches dbg.view turns on "
+                                                                         "(comma list, names as NavDraw)"},
+    {"Debug", "Triggers", "0", "0.14: 1 = every trigger kind on from the start (dbg.triggers; wireframes of the game's "
+                               "trigger planes / volumes)"},
+    {"Debug", "TrgDeath", "0", "0.14: 1 = trigger kind death / kill on from the start (red; dbg.show death)"},
+    {"Debug", "TrgFire", "0", "0.14: 1 = trigger kind fire / slow fire on from the start (orange; dbg.show fire)"},
+    {"Debug", "TrgCheckpoint", "0", "0.14: 1 = checkpoint triggers on from the start (green; dbg.show checkpoint)"},
+    {"Debug", "TrgWater", "0", "0.14: 1 = water triggers on from the start (blue; dbg.show water)"},
+    {"Debug", "TrgSound", "0", "0.14: 1 = sound / swoosh triggers on from the start (violet; dbg.show sound)"},
+    {"Debug", "TrgVolume", "0", "0.14: 1 = plain trigger volumes on from the start (yellow; dbg.show volume)"},
+    {"Debug", "TrgPlane", "0", "0.14: 1 = plain trigger planes on from the start (cyan; dbg.show plane)"},
+    {"Debug", "TrgUnknown", "0", "0.14: 1 = triggers of unknown kind on from the start (grey; dbg.show unknown)"},
+    {"Debug", "Portals", "0", "0.14: 1 = loading areas (stream portal quads of the loaded units) on from the start (white; "
+                              "dbg.portals)"},
+    {"Debug", "Checkpoints", "0", "0.14: 1 = checkpoint objects on from the start (light green, the active one yellow; "
+                                  "dbg.checkpoints)"},
+    {"Debug", "TrgLabels", "0", "0.14: 1 = trigger names (object name, intro id, shape) on from the start (dbg.show "
+                                "trglabels)"},
+    {"Debug", "Legend", "0", "0.14: 1 = the legend top right on from the start (dbg.legend)"},
+    {"Debug", "Markup", "0", "0.14: 1 = draw.markup on from the start"},
+    {"Debug", "TriggerMax", "64", "0.14: at most this many triggers drawn per frame, the nearest to the camera first, "
+                                  "1 .. 256"},
+    {"Debug", "TriggerRadius", "20000", "0.14: triggers only up to this distance from the camera (game units, 500 .. "
+                                        "200000)"},
+    {"Debug", "TriggerLabelMax", "16", "0.14: at most this many trigger names per frame (the nearest), 0 .. 64"},
+    {"Debug", "Names", "0", "0.14: 1 = object names on from the start (dbg.names: the object name of every instance from "
+                            "the live object list)"},
+    {"Debug", "NameMatch", "", "0.14: object names only for names containing one of these parts (comma list a-z 0-9 _, "
+                               "e.g. thrall); empty or * = every\ninstance"},
+    {"Debug", "NameRadius", "5000", "0.14: object names only up to this distance from the camera (game units, 100 .. "
+                                    "200000)"},
+    {"Debug", "NameMax", "24", "0.14: at most this many object names per frame, the nearest to the camera first, 1 .. 64"},
+    {"Debug", "NameScale", "1.0", "0.14: font size factor of the object names, 0.5 .. 3"},
+    {"Debug", "NameColour", "FFFFFF", "0.14: colour of the object names, RRGGBB (ring presets: white FFFFFF, yellow "
+                                      "FFE040, cyan 40E8FF, magenta FF50FF)"},
+    {"Debug", "NameIds", "1", "0.14: 1 = the intro id after each object name; 0 = the name only"},
+    {"Debug", "Persist", "0", "0.14: 1 = every debug view switch (layers, Labels, Markup, NavDraw) is written back into "
+                              "this file at once, so the\nchosen set comes back at the next start (Set-TruMenu.ps1 then "
+                              "keeps the file as owner-edited); 0 = switches\nlast until the game ends"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -5335,6 +5385,7 @@ bool g_navMaskSet = false;
 bool g_navAutoDone = false, g_navAutoWaitLogged = false;   // [Debug] NavDraw / NavMask: applied once
 
 const char *ShotSource(const char *item);    // 0.10.5, below: "ring", "TruLink" or the given name
+void DvPersistNav();                         // 0.14, below: [Debug] Persist=1 writes NavDraw
 
 // switch index of the first word of text ("" / unknown = -1)
 int NavFind(const char *text) {
@@ -5540,7 +5591,9 @@ bool RunNavDraw(const char *arg, char *o, size_t n) {
         Log(1, "nav.draw %s %d refused - %s (src=%s)", kNavSwitches[i].name, on ? 1 : 0, o, src);
         return false;
     }
-    return NavSet(i, on, src, o, n);
+    bool ok = NavSet(i, on, src, o, n);
+    if (ok) DvPersistNav();                  // 0.14 [Debug] Persist=1: NavDraw = the switches on now
+    return ok;
 }
 
 void ValNavMask(char *o, size_t n) {
@@ -5588,6 +5641,7 @@ bool RunNavOff(const char *, char *o, size_t n) {
     if (g_navMaskSet && !NavMaskApply(false, src, mask, sizeof(mask))) ++failed;
     Log(1, "nav.off: %d switch(es) back to the value before (%s), %d failed; %s (src=%s)", restored,
         restored ? names : "-", failed, mask, src);
+    DvPersistNav();                          // 0.14 [Debug] Persist=1
     Out(o, n, "nav.off: %d switch(es) back (%s), %d failed; %s", restored, restored ? names : "-", failed, mask);
     return failed == 0;
 }
@@ -5732,6 +5786,7 @@ void NavTick() {
 // labels show TruMenu's own data only.
 const DWORD kLblMatrix = 0x00e804a0, kLblAspect = 0x00ad75e4;
 bool g_lblOk = false;
+bool g_lblProjOk = false;                    // 0.14: the text / camera update / projection checks alone (debug view)
 const char *g_lblWhy = "not checked";
 volatile LONG g_lblOn = 0;                   // dbg.labels
 int g_lblShown = 0, g_lblInRadius = 0, g_lblThralls = 0;     // last frame
@@ -5777,6 +5832,7 @@ void LabelCheck() {
     bool health = HexBytesAt(0x00638d59, "8b87d0020000 85c0 7504 33f6 eb08 8b00 8bb0ec020000") &&
                   HexBytesAt(0x00638edd, "d986642c0000");
     g_lblOk = text && update && project && health && g_instOk && g_playerOk && g_mainStateOk;
+    g_lblProjOk = text && update && project;      // 0.14 debug view: the same projection, no health chain needed
     g_lblWhy = !text ? "game instance text 0x6224e0 (matrix getter 0x5e7890, z test 0x62257b) differs"
              : !update ? "camera update 0x5f3df0 / 0x5e7b30 / focal 0x49f610 differs"
              : !project ? "projection 0x49f630 constants differ"
@@ -6030,6 +6086,1118 @@ const char *LabelRadWhy() {
     if (!g_debugEnabled) return "debug drawing off ([Debug] Enabled=0)";
     if (!g_lblOk) return g_lblWhy;
     return "";
+}
+
+// ---- 0.14 Debug view (debug view stage S3, owner order 2026-11-06): trigger wireframes by kind, stream portals
+// (loading areas), checkpoint objects, legend, master switch dbg.view ----
+// Workspace docs\Befund-TruMenu-Trigger-0611.md; every byte check is pinned in work\asi\menu014\precheck_014.txt
+// (tools/pe_bytes_check.py on the Steam exe: 67 / 67 ok). Read-only: nothing is written into game memory and no game
+// function is called (dbg.view only calls the 0.12 / 0.13 / 0.3 items, which keep their own gates). Drawn at Present
+// into ImGui's background draw list (legend: foreground), only in a loaded level (player instance, main state 1, no
+// level change pending - the gates of dbg.labels; nothing about Lara's own state, so it keeps drawing during the 0.8.1
+// flight), with fixed static buffers (no allocation by TruMenu per frame) and the projection of 0.13 (matrix 0xe804a0,
+// 0x49f630) plus near-plane clipping per line (z' > 16), so a box around the camera still draws its visible part.
+// Triggers = the two lists the game tests every frame (0x5cd520): planes count [0xdba21c] / array 0xda61c8, volumes
+// count [0xdba220] / array 0xdb6be0 (at most 0x200 each, adders 0x5c8990 / 0x5c89e0). Entry +0x20 = the trigger
+// instance, +0x24 bit 31 = enabled (0x4a4360; a disabled entry is skipped by the game and drawn dim here), bit 30 =
+// tested against the player (0x4a4450). Data = [[instance+0x100]+0x78] (IntroDataTrigger). The game tests the point
+// player +0x20 + (0, 0, 200.0) ([0x853f08]; drawn as the white "Testpunkt" cross):
+//   volume (0x5cd1b0): byte +0x30 = shape; 1 box: centre = instance +0x20, half extents +0x34 / +0x38 / +0x3c along the
+//     rows of M = Rz * Ry * Rx built from the instance Euler angles +0x30 (0x49d500: identity post-multiplied by the
+//     axis rotations 0x49bd40 / 0x49bc70 / 0x49bb90, row vectors), tested through its quaternion (0x49d720) as
+//     |conjugate(q) rotated (p - centre)| <= h (0x46b730) - i.e. local = (p - centre) * M^T, so corner = centre +
+//     (+-h) * M; 2 sphere: squared distance to instance +0x20 < radius +0x40 squared (0x4355d0) -> 3 great circles.
+//   plane (0x5ccc20): the quad (+-w, 0, +-h) * M + instance +0x20 (0x435220 -> 0x49ba20 adds row 3), w = +0x34,
+//     h = +0x3c; byte +0x44 = 0 -> one-sided (the crossing direction is tested) -> arrow along row 1 (the quad normal).
+// Kind (colour) from the trigger instance's object name (first match wins): checkpoint, death / kill, fire / burn /
+// flame, water / swim, sound / swoosh / audio / music / sfx; no keyword = plain volume / plane; no intro data, an
+// unknown shape or no name = unknown. Portals (loading areas): every loaded stream unit (table 0xdbab40, state 2): entry
+// +8 Level, [Level] Terrain, Terrain +2 s16 count, +4 array of 0x100-byte StreamUnitPortal (name +0, quad corners
+// +0xb0 / +0xc0 / +0xd0 / +0xe0, normal +0xf0 - the corner layout is read from the unit DRMs, docs). Checkpoints =
+// instances whose object name contains "checkpoint"; the active one = game data [0xc59264] +0x90 (+0x114 when the word
+// +0x1f4 is not 0), the id the player placement 0x5d40c0 uses.
+struct DvCheck { DWORD at; const char *hex; };
+const DvCheck kDvTrigChecks[] = {
+    {0x005cd527, "392d1ca2db00"},
+    {0x005cd540, "8b1cadc861da00 8bcb e8126eedff 84c0 0f84b6000000 8bcb e8f36eedff"},
+    {0x005cd561, "a194f0e700 53 50 e8b3f6ffff"},
+    {0x005cd61b, "33c0 390520a2db00 89442410 0f8e8f010000 8d6802 8b3485e06bdb00 8bce e8226dedff"},
+    {0x005cd651, "8b1594f0e700 56 52 e852fbffff"},
+    {0x005c89a1, "8b0d1ca2db00 81f900020000"},
+    {0x005c89f1, "8b0d20a2db00 81f900020000"},
+    {0x004a4360, "8b4124 c1e81f 2401 c3"},
+    {0x004a4450, "8b4124 c1e81e 2401 c3"},
+    {0x005cd1c2, "d905083f8500"},
+    {0x00853f08, "00004843"},
+    {0x005cd235, "0f284820 8b7120 0f58c8 0f294c2470 8b8600010000 85c0 0f84c5020000 8b7878 85ff 0f84ba020000"},
+    {0x005cd27a, "0fb65f30"},
+    {0x005cd345, "8b4e20 894c2440 8b5624 89542444 8b4628 89442448 8b4e2c 894c244c 83c630 56 8d8c24b4000000 e88f01edff"},
+    {0x005cd3c1, "8d9424b0000000 52 8d8c24a4000000 0f298424e4000000 e84303edff d94734"},
+    {0x005cd3ec, "d94738"},
+    {0x005cd3f9, "d9473c"},
+    {0x005cd42e, "d94740 8bc3 d95c2420 83e801 7470 83e801 0f85d2000000 d9442420"},
+    {0x005cd456, "dcc8"},
+    {0x005cd468, "e86381e6ff dc5c2420"},
+    {0x004355d0, "55 8bec 83e4f0 83ec10 0f2801 0f59c0"},
+    {0x005cd4c6, "e865e2e9ff"},
+    {0x005cd4e7, "e844e2e9ff"},
+    {0x0046b75f, "f30f1005a82a8400"},
+    {0x0046b7a3, "8d442420 50 8d4c2404 0f29442434 0f2802 51 0f5cc8 8d4c2438 0f294c2428 e87a150300"},
+    {0x0046b7c6, "d90424 8b4d14 d901 d8d9 dfe0 f6c405 7b4f d901 d9e0 ded9"},
+    {0x0049cdce, "e86dfbffff"},
+    {0x0049cdea, "e851fbffff"},
+    {0x0049c987, "d944240c d9c0 d9442410 d9c0 deca d9442414 d9c0 d9442418 d9c0 deca d9cc dec1 d944241c d9c0 d84c2404 dec2 "
+                 "d90424 d84c2408 deea"},
+    {0x0049d50b, "f30f10051c118400 f30f100d34118400"},
+    {0x0084111c, "00000000"},
+    {0x00841134, "0000803f"},
+    {0x0049d5a3, "d94708 d95c240c d944240c e86d5e3700 d95c2408 d9442408 51 d91c24 d9442410 e8b8603700"},
+    {0x0049d5d0, "51 8bce d91c24 e865e7ffff d94704"},
+    {0x0049d5e6, "e8355e3700"},
+    {0x0049d5fb, "e880603700"},
+    {0x0049d608, "51 8bce d91c24 e85de6ffff d907"},
+    {0x0049d61d, "e8fe5d3700"},
+    {0x0049d632, "e849603700"},
+    {0x0049d63f, "51 8bce d91c24 e846e5ffff"},
+    {0x0081348d, "d9ff"},
+    {0x008136ed, "d9fe"},
+    {0x0049bd40, "83ec08 8bc1 d900 d91c24 d94004 d95c2404 d90424 d9c0 d9442410 d9c0 deca d9442404 d9c0 d944240c d9c0 deca "
+                 "d9cc dee1 d918 d9c2 decc d8c9 dec3 d9ca d95804"},
+    {0x0049bc70, "83ec08 8bc1 d900 d95c2404 d94008 d91c24 d90424 d9c0 d944240c d9c0 deca d9442404 d9c0 d9442410 d9c0 deca "
+                 "d9cc dec1 d918 d9c2 decc d8c9 deeb d9ca d95808"},
+    {0x0049bb90, "83ec08 8bc1 d94004 d91c24 d94008 d95c2404 d90424 d9c0 d9442410 d9c0 deca d9442404 d9c0 d944240c d9c0 deca "
+                 "d9cc dee1 d95804 d9c2 decc d8c9 dec3 d9ca d95808"},
+    {0x0049d720, "8b542404 d902 d84214 d84228 d95c2404 d9ee d9442404 d8d1 dfe0 ddd9 f6c441 752b d94218 d86224 d919 d94220 "
+                 "d86208 d95904 d94204 d86210 d95908"},
+    {0x005ccc40, "d905083f8500"},
+    {0x005cccb4, "8b7120"},
+    {0x005cccc6, "8b8600010000 85c0 0f58c1 0f84b4040000 8b7878"},
+    {0x005ccd22, "8d4e30 0f5cca 51"},
+    {0x005ccd3b, "e8c007edff d94628"},
+    {0x005ccda3, "d94734 f30f10051c118400 d95c2448 d9473c"},
+    {0x005cce6e, "e8ad83e6ff"},
+    {0x005ccea3, "e87883e6ff"},
+    {0x005ccee4, "e83783e6ff"},
+    {0x005ccf1c, "e8ff82e6ff"},
+    {0x005ccf55, "807f4400"},
+    {0x00435259, "e8c2670600"},
+    {0x0049ba20, "55 8bec 83e4f0 8b4d10 0f2801 8b4d0c 0f285120 0f285910 8b4508 0f28c8 0fc6c8aa 0f59ca 0f285130 0f58ca"},
+    {0x0049ba4b, "0f28d0 0fc6d055 0f59d3 0f58ca 0f28d0 0fc6d000 0f2801 0f59d0 0f58ca 0f2908"},
+};
+const DvCheck kDvPortalChecks[] = {
+    {0x005d295f, "8b5608 8b02 0fbf4802 8b6804"},
+    {0x005d2a48, "81c500010000"},
+    {0x005d2ab5, "8b4808 8b11 8b4c2420 8b7914 c1e708 037a04"},
+    {0x005d2aca, "0fbf9f84000000"},
+};
+const DvCheck kDvCpChecks[] = {
+    {0x005d41df, "a16492c500 8b8890000000 8b9014010000 0fb780f4010000"},
+    {0x005d4214, "6639b8f4010000 7408 8b9814010000 eb06 8b9890000000"},
+    {0x0085512c, "636865636b706f696e7400"},
+    {0x00855118, "696e7669735f636865636b706f696e7400"},
+};
+const DWORD kDvPlaneCount = 0x00dba21c, kDvPlanes = 0x00da61c8, kDvVolCount = 0x00dba220, kDvVols = 0x00db6be0;
+const DWORD kDvListMax = 0x200, kDvGameData = 0x00c59264;
+const float kDvTestLift = 200.0f;            // [0x853f08], added to the player position by both tests
+
+// the layers: 8 trigger kinds first (kind = layer index), then portals, checkpoint objects, trigger names, legend
+enum DvLayer {
+    kDvDeath = 0, kDvFire, kDvCheckpoint, kDvWater, kDvSound, kDvVolume, kDvPlane, kDvUnknown, kDvKinds,
+    kDvPortals = kDvKinds, kDvCheckpoints, kDvTrgLabels, kDvLegend, kDvNames, kDvCount
+};
+struct DvLayerDef { const char *name, *key, *de, *en; ImU32 colour; };
+const DvLayerDef kDvLayers[kDvCount] = {
+    {"death", "TrgDeath", "Tod / Kill", "death / kill", IM_COL32(255, 50, 50, 255)},
+    {"fire", "TrgFire", "Feuer", "fire / slow fire", IM_COL32(255, 150, 30, 255)},
+    {"checkpoint", "TrgCheckpoint", "Checkpoint-Trigger", "checkpoint trigger", IM_COL32(70, 255, 110, 255)},
+    {"water", "TrgWater", "Wasser", "water", IM_COL32(70, 150, 255, 255)},
+    {"sound", "TrgSound", "Ton / Swoosh", "sound / swoosh", IM_COL32(220, 110, 255, 255)},
+    {"volume", "TrgVolume", "Trigger (Volumen)", "plain trigger volume", IM_COL32(255, 235, 70, 255)},
+    {"plane", "TrgPlane", "Trigger-Ebene", "trigger plane", IM_COL32(60, 235, 235, 255)},
+    {"unknown", "TrgUnknown", "Trigger unbekannt", "unknown trigger", IM_COL32(170, 170, 170, 255)},
+    {"portals", "Portals", "Ladebereiche", "loading areas (stream portals)", IM_COL32(255, 255, 255, 255)},
+    {"checkpoints", "Checkpoints", "Checkpoints", "checkpoint objects", IM_COL32(150, 255, 190, 255)},
+    {"trglabels", "TrgLabels", "Trigger-Namen", "trigger names", IM_COL32(235, 235, 235, 255)},
+    {"legend", "Legend", "Legende", "legend", IM_COL32(235, 235, 235, 255)},
+    {"names", "Names", "Objektnamen", "object names", IM_COL32(255, 255, 255, 255)},
+};
+// object name part -> kind (first match wins, so "deathfiretriggervolume" is death)
+struct DvWord { const char *part; int kind; };
+const DvWord kDvWords[] = {{"checkpoint", kDvCheckpoint}, {"death", kDvDeath}, {"kill", kDvDeath}, {"fire", kDvFire},
+                           {"burn", kDvFire},  {"flame", kDvFire}, {"water", kDvWater}, {"swim", kDvWater},
+                           {"sound", kDvSound}, {"swoosh", kDvSound}, {"audio", kDvSound}, {"music", kDvSound},
+                           {"sfx", kDvSound}};
+
+bool g_dvTrgOk = false, g_dvPortalOk = false, g_dvCpOk = false, g_dvBaseOk = false;   // base = projection + lists
+const char *g_dvBaseWhy = "not checked";
+// object names (layer names, owner wish 2026-11-06): every instance's object name from the LIVE PC object list
+// [0xdb94d0] (ObjectName, as LabelKind / dbg.labels) - never a name table taken from the Xbox data
+char g_dvNameMatch[128] = "";                // [Debug] NameMatch: comma list of name parts, empty or * = every instance
+float g_dvNameRadius = 5000.0f, g_dvNameScale = 1.0f;   // [Debug] NameRadius (from the camera) / NameScale (font)
+int g_dvNameMax = 24, g_dvNameIds = 1;       // [Debug] NameMax / NameIds (intro id after the name)
+DWORD g_dvNameRgb = 0xffffff;                // [Debug] NameColour RRGGBB
+signed char g_dvNameHit[4096];               // per object id: 0 not looked up, 1 matches NameMatch, 2 not
+struct DvColourPreset { const char *name, *de; DWORD rgb; };
+const DvColourPreset kDvNameColours[] = {{"white", "weiss", 0xffffff}, {"yellow", "gelb", 0xffe040},
+                                         {"cyan", "cyan", 0x40e8ff}, {"magenta", "magenta", 0xff50ff}};
+const char *g_dvTrgWhy = "not checked", *g_dvPortalWhy = "not checked", *g_dvCpWhy = "not checked";
+volatile LONG g_dvOn[kDvCount] = {};         // the layers (dbg.show <layer>, dbg.triggers, dbg.portals, ...)
+int g_dvAtStart[kDvCount] = {};              // [Debug] TrgDeath .. Legend
+int g_dvViewAtStart = 0, g_dvTrgAtStart = 0, g_dvMarkupAtStart = 0, g_dvPersist = 0;   // [Debug] View / Triggers / ..
+int g_dvTrgMax = 64, g_dvLabelMax = 16;      // [Debug] TriggerMax / TriggerLabelMax
+float g_dvRadius = 20000.0f;                 // [Debug] TriggerRadius (from the camera)
+char g_dvViewNav[160] = "planner_areas,planner_connectivity,obstacles";   // [Debug] ViewNav
+char g_dvState[640] = "off";                 // last frame: why nothing / what was drawn (dbg.status)
+int g_dvDrawn[kDvCount] = {}, g_dvListed[kDvCount] = {};   // last frame per layer: drawn / found in the lists
+volatile LONG g_dvLogPending = 0;            // one "drawn" log line with the first frame after a switch
+signed char g_dvNameKind[4096];              // per object id: 0 not looked up, kind + 1, 100 no keyword, 101 checkpoint
+
+void DvTrim(char *s) {                       // leading / trailing blanks off (item arguments)
+    size_t len = strlen(s);
+    while (len && (s[len - 1] == ' ' || s[len - 1] == '\t')) s[--len] = 0;
+    size_t lead = strspn(s, " \t");
+    if (lead) memmove(s, s + lead, len - lead + 1);
+}
+
+// load: the byte checks of precheck_014.txt (projection = the 0.13 checks, g_lblProjOk)
+bool DvChecks(const DvCheck *c, size_t count, DWORD *failedAt) {
+    for (size_t i = 0; i < count; ++i)
+        if (!HexBytesAt(c[i].at, c[i].hex)) { *failedAt = c[i].at; return false; }
+    return true;
+}
+char g_dvTrgWhyBuf[96], g_dvPortalWhyBuf[96], g_dvCpWhyBuf[96];
+bool DvLayerOk(int layer, const char **why);  // below
+void DebugViewCheck() {
+    DWORD at = 0;
+    bool base = g_lblProjOk && g_instOk && g_playerOk && g_mainStateOk;
+    const char *baseWhy = !g_lblProjOk ? "projection (0.13 checks) failed" : !g_instOk ? "instance list (0.3 check) failed"
+                        : !g_playerOk ? "player pointer check failed" : "main state check failed";
+    g_dvTrgOk = base && DvChecks(kDvTrigChecks, sizeof(kDvTrigChecks) / sizeof(kDvTrigChecks[0]), &at);
+    if (!base) Out(g_dvTrgWhyBuf, sizeof(g_dvTrgWhyBuf), "%s", baseWhy);
+    else Out(g_dvTrgWhyBuf, sizeof(g_dvTrgWhyBuf), "trigger code differs at 0x%08lx", at);
+    g_dvTrgWhy = g_dvTrgOk ? "ok" : g_dvTrgWhyBuf;
+    g_dvPortalOk = base && g_unitOk && DvChecks(kDvPortalChecks, sizeof(kDvPortalChecks) / sizeof(kDvPortalChecks[0]), &at);
+    if (!base) Out(g_dvPortalWhyBuf, sizeof(g_dvPortalWhyBuf), "%s", baseWhy);
+    else if (!g_unitOk) Out(g_dvPortalWhyBuf, sizeof(g_dvPortalWhyBuf), "stream unit table check failed");
+    else Out(g_dvPortalWhyBuf, sizeof(g_dvPortalWhyBuf), "stream portal code differs at 0x%08lx", at);
+    g_dvPortalWhy = g_dvPortalOk ? "ok" : g_dvPortalWhyBuf;
+    g_dvCpOk = base && DvChecks(kDvCpChecks, sizeof(kDvCpChecks) / sizeof(kDvCpChecks[0]), &at);
+    if (!base) Out(g_dvCpWhyBuf, sizeof(g_dvCpWhyBuf), "%s", baseWhy);
+    else Out(g_dvCpWhyBuf, sizeof(g_dvCpWhyBuf), "checkpoint game data code differs at 0x%08lx", at);
+    g_dvCpWhy = g_dvCpOk ? "ok" : g_dvCpWhyBuf;
+    g_dvBaseOk = base;
+    g_dvBaseWhy = base ? "ok" : baseWhy;
+    memset(g_dvNameKind, 0, sizeof(g_dvNameKind));
+    memset(g_dvNameHit, 0, sizeof(g_dvNameHit));
+    int on = 0;
+    if (g_debugEnabled) {
+        for (int i = 0; i < kDvCount; ++i) {
+            bool want = g_dvAtStart[i] || g_dvViewAtStart || (i < kDvKinds && g_dvTrgAtStart);
+            const char *why = "";
+            if (want && DvLayerOk(i, &why)) { InterlockedExchange(&g_dvOn[i], 1); ++on; }
+        }
+        if ((g_dvMarkupAtStart || g_dvViewAtStart) && g_drawOk) InterlockedExchange(&g_drawMarkup, 1);
+    }
+    Log(g_dvTrgOk && g_dvPortalOk && g_dvCpOk ? 1 : 0, "0.14 debug view: triggers %s, portals %s, checkpoints %s, object "
+        "names %s; [Debug] View %d, Triggers %d, %d layer(s) on now, Markup %d, ViewNav '%s', TriggerMax %d, TriggerRadius "
+        "%.0f, TriggerLabelMax %d, NameMatch '%s', NameRadius %.0f, NameMax %d, NameScale %.2f, NameColour %06lX, NameIds "
+        "%d, Persist %d", g_dvTrgWhy, g_dvPortalWhy, g_dvCpWhy, g_dvBaseWhy, g_dvViewAtStart, g_dvTrgAtStart, on,
+        g_drawMarkup ? 1 : 0, g_dvViewNav, g_dvTrgMax, g_dvRadius, g_dvLabelMax, g_dvNameMatch, g_dvNameRadius,
+        g_dvNameMax, g_dvNameScale, g_dvNameRgb, g_dvNameIds, g_dvPersist);
+}
+
+// the check a layer needs (true = usable)
+bool DvLayerOk(int layer, const char **why) {
+    bool ok = layer < kDvKinds || layer == kDvTrgLabels ? g_dvTrgOk : layer == kDvPortals ? g_dvPortalOk
+            : layer == kDvCheckpoints ? g_dvCpOk : layer == kDvNames ? g_dvBaseOk : true;
+    *why = layer < kDvKinds || layer == kDvTrgLabels ? g_dvTrgWhy : layer == kDvPortals ? g_dvPortalWhy
+         : layer == kDvCheckpoints ? g_dvCpWhy : layer == kDvNames ? g_dvBaseWhy : "ok";
+    return ok;
+}
+int DvFind(const char *text) {
+    if (!text) return -1;
+    while (*text == ' ') ++text;
+    size_t len = 0;
+    while (text[len] && text[len] != ' ') ++len;
+    for (int i = 0; i < kDvCount; ++i)
+        if (strlen(kDvLayers[i].name) == len && !_strnicmp(kDvLayers[i].name, text, len)) return i;
+    return -1;
+}
+bool DvAnyOn() {
+    for (int i = 0; i < kDvCount; ++i)
+        if (g_dvOn[i]) return true;
+    return false;
+}
+bool DvAnyTrigger() {
+    for (int i = 0; i < kDvKinds; ++i)
+        if (g_dvOn[i]) return true;
+    return false;
+}
+
+// [Debug] Persist=1: a switch is written back to TruMenu.ini at once (read at the next start)
+void DvPersistKey(const char *key, bool on) {
+    if (g_dvPersist && g_iniPath[0]) WritePrivateProfileStringA("Debug", key, on ? "1" : "0", g_iniPath);
+}
+void DvPersistNav() {
+    if (!g_dvPersist || !g_iniPath[0]) return;
+    char list[200] = "";
+    size_t used = 0;
+    for (int i = 0; i < kNavCount; ++i) {
+        if (!NavByteOn(i)) continue;
+        int w = _snprintf_s(list + used, sizeof(list) - used, _TRUNCATE, "%s%s", used ? "," : "", kNavSwitches[i].name);
+        if (w > 0) used += static_cast<size_t>(w);
+    }
+    WritePrivateProfileStringA("Debug", "NavDraw", list, g_iniPath);
+}
+
+// one layer on / off (check passed); src for the log line
+bool DvSet(int layer, bool on, const char *src, char *o, size_t n) {
+    const char *why = "";
+    if (!g_debugEnabled) { Out(o, n, "debug drawing off ([Debug] Enabled=0)"); return false; }
+    if (!DvLayerOk(layer, &why)) {
+        Out(o, n, "disabled: pre-check failed (%s)", why);
+        Log(1, "dbg.show %s %d refused - %s (src=%s)", kDvLayers[layer].name, on ? 1 : 0, o, src);
+        return false;
+    }
+    InterlockedExchange(&g_dvOn[layer], on ? 1 : 0);
+    InterlockedExchange(&g_dvLogPending, 1);
+    DvPersistKey(kDvLayers[layer].key, on);
+    Log(1, "dbg.show %s %d (src=%s)", kDvLayers[layer].name, on ? 1 : 0, src);
+    Out(o, n, "dbg.show %s %d", kDvLayers[layer].name, on ? 1 : 0);
+    return true;
+}
+
+// object id -> kind of a trigger instance (kDvDeath .. kDvSound), -1 no keyword, -2 no name; cached per object id
+int DvNameKind(DWORD inst, char *name, size_t size) {
+    DWORD object = 0, oid = 0;
+    name[0] = 0;
+    if (!ReadDword(inst + 0x10, &object) || !object || !ReadDword(object + 0x14, &oid)) return -2;
+    int id = static_cast<int>(oid & 0xffff);
+    if (!ObjectName(id, name, size)) return -2;
+    if (id > 0 && id < 4096 && g_dvNameKind[id]) {
+        int c = g_dvNameKind[id];
+        return c >= 100 ? -1 : c - 1;
+    }
+    char low[64];
+    strncpy_s(low, sizeof(low), name, _TRUNCATE);
+    _strlwr_s(low, sizeof(low));
+    int kind = -1;
+    for (const DvWord &w : kDvWords)
+        if (strstr(low, w.part)) { kind = w.kind; break; }
+    if (id > 0 && id < 4096) g_dvNameKind[id] = static_cast<signed char>(kind < 0 ? 100 : kind + 1);
+    return kind;
+}
+
+// projection with a near plane: camera space (x', y' scaled like the game's text space, z' = depth in world units)
+struct DvCam { View v; float ux, uy; };     // ux / uy = 1 / length of the scaled x / y columns (world distances)
+void DvToCam(const DvCam &c, const float *p, float *o) {
+    const float *m = c.v.m;
+    o[0] = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12];
+    o[1] = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
+    o[2] = m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14];
+}
+const float kDvNear = 16.5f;                 // the game draws when 16.0 < z' ([0x8451e4])
+bool DvCamToScreen(const DvCam &c, const float *q, ImVec2 *out) {
+    if (!(q[2] >= kDvNear)) return false;
+    float x = static_cast<float>(q[0] / q[2] * c.v.f + c.v.cx) * c.v.sx;
+    float y = static_cast<float>(q[1] / q[2] * c.v.f + c.v.cy) * c.v.sy;
+    if (!(x > -100000.0f && x < 100000.0f && y > -100000.0f && y < 100000.0f)) return false;
+    out->x = x;
+    out->y = y;
+    return true;
+}
+// a world line, clipped at the near plane; false = nothing of it in front of the camera
+bool DvLine(ImDrawList *dl, const DvCam &c, const float *a, const float *b, ImU32 colour, float thick) {
+    float ca[3], cb[3];
+    DvToCam(c, a, ca);
+    DvToCam(c, b, cb);
+    if (ca[2] < kDvNear && cb[2] < kDvNear) return false;
+    if (ca[2] < kDvNear || cb[2] < kDvNear) {
+        float *near_ = ca[2] < kDvNear ? ca : cb;
+        const float *far_ = ca[2] < kDvNear ? cb : ca;
+        float t = (kDvNear - near_[2]) / (far_[2] - near_[2]);
+        for (int k = 0; k < 3; ++k) near_[k] += (far_[k] - near_[k]) * t;
+        near_[2] = kDvNear;
+    }
+    ImVec2 sa, sb;
+    if (!DvCamToScreen(c, ca, &sa) || !DvCamToScreen(c, cb, &sb)) return false;
+    dl->AddLine(sa, sb, colour, thick);
+    return true;
+}
+bool DvFinite(const float *p, int count) {
+    for (int i = 0; i < count; ++i)
+        if (!(p[i] > -1.0e7f && p[i] < 1.0e7f)) return false;
+    return true;
+}
+// rows of M = Rz * Ry * Rx (0x49d500) from the Euler angles r (x, y, z), row vectors: world offset = local * M
+void DvEulerRows(const float *r, float rows[3][3]) {
+    float cx = cosf(r[0]), sx = sinf(r[0]), cy = cosf(r[1]), sy = sinf(r[1]), cz = cosf(r[2]), sz = sinf(r[2]);
+    rows[0][0] = cz * cy; rows[0][1] = sz * cx + cz * sy * sx; rows[0][2] = sz * sx - cz * sy * cx;
+    rows[1][0] = -sz * cy; rows[1][1] = cz * cx - sz * sy * sx; rows[1][2] = cz * sx + sz * sy * cx;
+    rows[2][0] = sy; rows[2][1] = -cy * sx; rows[2][2] = cy * cx;
+}
+void DvPoint(const float *pos, const float rows[3][3], float a, float b, float c, float *o) {
+    for (int k = 0; k < 3; ++k) o[k] = pos[k] + a * rows[0][k] + b * rows[1][k] + c * rows[2][k];
+}
+
+struct DvTrig {
+    DWORD entry, inst;
+    float pos[3], rot[3], ext[3], radius, dist2, extent;
+    int kind;                                // layer index kDvDeath .. kDvUnknown
+    BYTE shape;                              // 1 box, 2 sphere, 0 plane / unknown
+    bool plane, enabled, oneSided;
+};
+DvTrig g_dvTrig[257];
+struct DvMark { DWORD inst; float pos[3], dist2; };
+DvMark g_dvCp[33];
+
+// distance from the camera (world units) and a cheap "can it be on screen" test with a bounding radius
+bool DvVisible(const DvCam &c, const float *p, float extent, float *dist2) {
+    float q[3];
+    DvToCam(c, p, q);
+    float x = q[0] * c.ux, y = q[1] * c.uy;
+    *dist2 = x * x + y * y + q[2] * q[2];
+    if (q[2] + extent < kDvNear) return false;                // behind the camera
+    float z = q[2] > kDvNear ? q[2] : kDvNear;
+    // text space half width 256 / half height 224 at focal f: |x'| / z' * f <= 256 (+ the extent)
+    if ((fabsf(q[0]) - extent / c.ux) * c.v.f > 320.0f * z) return false;
+    if ((fabsf(q[1]) - extent / c.uy) * c.v.f > 290.0f * z) return false;
+    return true;
+}
+
+// sorted insert (nearest first), at most g_dvTrgMax; returns false when it did not fit
+int g_dvTrigCount = 0;
+void DvTrigInsert(const DvTrig &t) {
+    int at = g_dvTrigCount;
+    while (at > 0 && g_dvTrig[at - 1].dist2 > t.dist2) --at;
+    if (at >= g_dvTrgMax) return;
+    int last = g_dvTrigCount < g_dvTrgMax ? g_dvTrigCount : g_dvTrgMax - 1;
+    for (int k = last; k > at; --k) g_dvTrig[k] = g_dvTrig[k - 1];
+    g_dvTrig[at] = t;
+    if (g_dvTrigCount < g_dvTrgMax) ++g_dvTrigCount;
+}
+
+// collect one list (planes or volumes) into g_dvTrig; counters for the state line
+struct DvCount { int listed, behind, far_, noData, disabled; };
+void DvCollect(const DvCam &c, bool planes, DvCount *k) {
+    DWORD count = 0;
+    if (!ReadDword(planes ? kDvPlaneCount : kDvVolCount, &count) || count > kDvListMax) return;
+    for (DWORD i = 0; i < count; ++i) {
+        DvTrig t = {};
+        DWORD flags = 0, intro = 0, data = 0;
+        if (!ReadDword((planes ? kDvPlanes : kDvVols) + i * 4, &t.entry) || !t.entry) continue;
+        if (!ReadDword(t.entry + 0x20, &t.inst) || !t.inst || !ReadDword(t.entry + 0x24, &flags)) continue;
+        if (!ReadFloats(t.inst + kInstancePosition, t.pos, 3) || !ReadFloats(t.inst + 0x30, t.rot, 3) ||
+            !DvFinite(t.pos, 3) || !DvFinite(t.rot, 3))
+            continue;
+        t.plane = planes;
+        t.enabled = (flags & 0x80000000u) != 0;
+        bool haveData = ReadDword(t.inst + 0x100, &intro) && intro && ReadDword(intro + 0x78, &data) && data &&
+                        ReadFloats(data + 0x34, t.ext, 3) && ReadFloats(data + 0x40, &t.radius, 1) &&
+                        DvFinite(t.ext, 3) && DvFinite(&t.radius, 1) && ReadByte(data + 0x30, &t.shape);
+        BYTE side = 1;
+        if (haveData && planes) ReadByte(data + 0x44, &side);
+        t.oneSided = planes && side == 0;
+        char name[64];
+        int kind = DvNameKind(t.inst, name, sizeof(name));
+        bool known = haveData && (planes || t.shape == 1 || t.shape == 2) && kind != -2;
+        t.kind = !known ? kDvUnknown : kind >= 0 ? kind : planes ? kDvPlane : kDvVolume;
+        if (!haveData) ++k->noData;
+        ++g_dvListed[t.kind];
+        if (!g_dvOn[t.kind]) continue;
+        ++k->listed;
+        if (!t.enabled) ++k->disabled;
+        t.extent = !known ? 60.0f : planes ? sqrtf(t.ext[0] * t.ext[0] + t.ext[2] * t.ext[2])
+                 : t.shape == 2 ? fabsf(t.radius) : sqrtf(t.ext[0] * t.ext[0] + t.ext[1] * t.ext[1] + t.ext[2] * t.ext[2]);
+        if (!DvVisible(c, t.pos, t.extent, &t.dist2)) { ++k->behind; continue; }
+        if (t.dist2 > g_dvRadius * g_dvRadius) { ++k->far_; continue; }
+        DvTrigInsert(t);
+    }
+}
+
+// one trigger: box 12 lines, sphere 3 circles, plane quad + diagonals (+ normal arrow when one-sided), unknown a cross
+void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImVec2 *labelAt, bool *labelSeen) {
+    ImU32 colour = kDvLayers[t.kind].colour;
+    if (!t.enabled) colour = (colour & 0x00ffffff) | (90u << 24);   // the game skips a disabled entry
+    float thick = t.kind == kDvDeath ? 2.5f : 1.8f;
+    float rows[3][3];
+    DvEulerRows(t.rot, rows);
+    float top[3] = {t.pos[0], t.pos[1], t.pos[2]};
+    if (t.kind == kDvUnknown && !(t.plane || t.shape == 1 || t.shape == 2)) {
+        for (int a = 0; a < 3; ++a) {
+            float p0[3] = {t.pos[0], t.pos[1], t.pos[2]}, p1[3] = {t.pos[0], t.pos[1], t.pos[2]};
+            p0[a] -= 60.0f;
+            p1[a] += 60.0f;
+            DvLine(dl, c, p0, p1, colour, thick);
+        }
+    } else if (t.plane) {
+        float q[4][3];
+        const float s[4][2] = {{1, -1}, {1, 1}, {-1, 1}, {-1, -1}};
+        for (int i = 0; i < 4; ++i) DvPoint(t.pos, rows, s[i][0] * t.ext[0], 0.0f, s[i][1] * t.ext[2], q[i]);
+        for (int i = 0; i < 4; ++i) DvLine(dl, c, q[i], q[(i + 1) & 3], colour, thick);
+        DvLine(dl, c, q[0], q[2], colour, 1.0f);
+        DvLine(dl, c, q[1], q[3], colour, 1.0f);
+        if (t.oneSided) {
+            float len = t.ext[0] < t.ext[2] ? t.ext[0] : t.ext[2];
+            len = len < 50.0f ? 50.0f : len > 300.0f ? 300.0f : len;
+            float tip[3];
+            DvPoint(t.pos, rows, 0.0f, len, 0.0f, tip);
+            DvLine(dl, c, t.pos, tip, colour, thick);
+        }
+    } else if (t.shape == 1) {
+        float q[8][3];
+        for (int i = 0; i < 8; ++i)
+            DvPoint(t.pos, rows, (i & 1 ? 1.0f : -1.0f) * t.ext[0], (i & 2 ? 1.0f : -1.0f) * t.ext[1],
+                    (i & 4 ? 1.0f : -1.0f) * t.ext[2], q[i]);
+        static const BYTE kEdges[12][2] = {{0, 1}, {2, 3}, {4, 5}, {6, 7}, {0, 2}, {1, 3}, {4, 6}, {5, 7},
+                                           {0, 4}, {1, 5}, {2, 6}, {3, 7}};
+        for (const auto &e : kEdges) DvLine(dl, c, q[e[0]], q[e[1]], colour, thick);
+        DvPoint(t.pos, rows, 0.0f, 0.0f, t.ext[2], top);
+    } else {                                  // sphere: world-axis great circles, 24 segments each
+        const float r = fabsf(t.radius);
+        for (int plane = 0; plane < 3; ++plane) {
+            int a = plane == 2 ? 1 : 0, b = plane == 0 ? 1 : 2;
+            float prev[3] = {t.pos[0], t.pos[1], t.pos[2]};
+            prev[a] += r;
+            for (int s = 1; s <= 24; ++s) {
+                float ang = s * (2.0f * 3.14159265f / 24.0f), p[3] = {t.pos[0], t.pos[1], t.pos[2]};
+                p[a] += r * cosf(ang);
+                p[b] += r * sinf(ang);
+                DvLine(dl, c, prev, p, colour, thick);
+                prev[0] = p[0]; prev[1] = p[1]; prev[2] = p[2];
+            }
+        }
+        top[2] += r;
+    }
+    float q[3];
+    DvToCam(c, top, q);
+    *labelSeen = DvCamToScreen(c, q, labelAt);
+}
+
+// object names: does object id / name pass [Debug] NameMatch (cached per object id; the cache is cleared on a change)
+bool DvNameMatches(int id, const char *name) {
+    if (id > 0 && id < 4096 && g_dvNameHit[id]) return g_dvNameHit[id] == 1;
+    bool hit = !g_dvNameMatch[0];
+    if (!hit) {
+        char low[64], list[sizeof(g_dvNameMatch)];
+        strncpy_s(low, sizeof(low), name, _TRUNCATE);
+        _strlwr_s(low, sizeof(low));
+        strncpy_s(list, sizeof(list), g_dvNameMatch, _TRUNCATE);
+        _strlwr_s(list, sizeof(list));
+        char *context = nullptr;
+        for (char *part = strtok_s(list, ", ", &context); part && !hit; part = strtok_s(nullptr, ", ", &context))
+            hit = !strcmp(part, "*") || strstr(low, part) != nullptr;
+    }
+    if (id > 0 && id < 4096) g_dvNameHit[id] = hit ? 1 : 2;
+    return hit;
+}
+struct DvName { DWORD inst; float pos[3], dist2; };
+DvName g_dvNames[65];
+// every instance (also Lara) whose object name matches, the nearest to the camera first (also from high above while
+// flying), at most [Debug] NameMax within NameRadius; text size NameScale, colour NameColour
+void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used) {
+    int count = 0, found = 0, walked = 0;
+    const float r2 = g_dvNameRadius * g_dvNameRadius;
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard, ++walked) {
+        DWORD next = 0, object = 0, oid = 0;
+        float p[3], d2 = 0.0f;
+        if (ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid) &&
+            ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            int id = static_cast<int>(oid & 0xffff);
+            bool hit = false;
+            if (id > 0 && id < 4096 && g_dvNameHit[id]) hit = g_dvNameHit[id] == 1;
+            else {
+                char name[64];
+                hit = ObjectName(id, name, sizeof(name)) && DvNameMatches(id, name);
+            }
+            if (hit) {
+                ++found;
+                if (DvVisible(c, p, 100.0f, &d2) && d2 <= r2) {
+                    int at = count;
+                    while (at > 0 && g_dvNames[at - 1].dist2 > d2) --at;
+                    if (at < g_dvNameMax) {
+                        int last = count < g_dvNameMax ? count : g_dvNameMax - 1;
+                        for (int m = last; m > at; --m) g_dvNames[m] = g_dvNames[m - 1];
+                        g_dvNames[at].inst = inst;
+                        g_dvNames[at].pos[0] = p[0]; g_dvNames[at].pos[1] = p[1]; g_dvNames[at].pos[2] = p[2];
+                        g_dvNames[at].dist2 = d2;
+                        if (count < g_dvNameMax) ++count;
+                    }
+                }
+            }
+        }
+        if (!ReadDword(inst + 8, &next)) break;
+        inst = next;
+    }
+    ImFont *font = ImGui::GetFont();
+    const float size = ImGui::GetFontSize() * g_dvNameScale;
+    const ImU32 colour = IM_COL32((g_dvNameRgb >> 16) & 0xff, (g_dvNameRgb >> 8) & 0xff, g_dvNameRgb & 0xff, 255);
+    int drawn = 0;
+    for (int i = 0; i < count; ++i) {
+        const DvName &d = g_dvNames[i];
+        float q[3];
+        ImVec2 at;
+        DvToCam(c, d.pos, q);
+        if (!DvCamToScreen(c, q, &at)) continue;
+        DWORD object = 0, oid = 0, intro = 0;
+        char name[64], line[96];
+        ReadDword(d.inst + 0x10, &object);
+        if (object) ReadDword(object + 0x14, &oid);
+        if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        ReadDword(d.inst + 0x58, &intro);
+        if (g_dvNameIds) Out(line, sizeof(line), "%s %ld", name, static_cast<LONG>(intro));
+        else Out(line, sizeof(line), "%s", name);
+        ImVec2 s = font->CalcTextSizeA(size, FLT_MAX, 0.0f, line);
+        ImVec2 box(at.x - s.x * 0.5f - 3.0f, at.y - s.y - 8.0f);
+        dl->AddRectFilled(box, ImVec2(box.x + s.x + 6.0f, box.y + s.y + 2.0f), IM_COL32(0, 0, 0, 140), 3.0f);
+        dl->AddCircleFilled(at, 2.5f, colour, 8);
+        dl->AddText(font, size, ImVec2(box.x + 3.0f, box.y + 1.0f), colour, line);
+        ++drawn;
+    }
+    g_dvListed[kDvNames] = found;
+    g_dvDrawn[kDvNames] = drawn;
+    LabelAdd(state, stateSize, used, "names %d drawn of %d matching '%s' (%d instances, radius %.0f, max %d); ", drawn, found,
+             g_dvNameMatch[0] ? g_dvNameMatch : "*", walked, g_dvNameRadius, g_dvNameMax);
+}
+
+// Present, every frame while a 0.14 layer is on
+void DrawDebugView() {
+    char why[160];
+    memset(g_dvDrawn, 0, sizeof(g_dvDrawn));
+    memset(g_dvListed, 0, sizeof(g_dvListed));
+    if (!g_debugEnabled) { Out(g_dvState, sizeof(g_dvState), "[Debug] Enabled=0"); return; }
+    if (!g_dvBaseOk) { Out(g_dvState, sizeof(g_dvState), "pre-check failed: %s", g_dvBaseWhy); return; }
+    if (!LabelWorldReady(why, sizeof(why))) { Out(g_dvState, sizeof(g_dvState), "waits: %s", why); return; }
+    ImGuiIO &io = ImGui::GetIO();
+    DvCam c;
+    if (!ReadView(&c.v, io.DisplaySize.x, io.DisplaySize.y) || !ReadFloats(kLblMatrix, c.v.m, 16) || !DvFinite(c.v.m, 16)) {
+        Out(g_dvState, sizeof(g_dvState), "camera matrix 0x%08lx / focal not readable", kLblMatrix);
+        return;
+    }
+    float lx = sqrtf(c.v.m[0] * c.v.m[0] + c.v.m[4] * c.v.m[4] + c.v.m[8] * c.v.m[8]);
+    float ly = sqrtf(c.v.m[1] * c.v.m[1] + c.v.m[5] * c.v.m[5] + c.v.m[9] * c.v.m[9]);
+    if (!(lx > 1.0e-4f && ly > 1.0e-4f)) { Out(g_dvState, sizeof(g_dvState), "camera matrix degenerate"); return; }
+    c.ux = 1.0f / lx;
+    c.uy = 1.0f / ly;
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    size_t used = 0;
+    g_dvState[0] = 0;
+    // triggers
+    DvCount k = {};
+    g_dvTrigCount = 0;
+    int boxes = 0, spheres = 0, quads = 0, labels = 0;
+    if (g_dvTrgOk && DvAnyTrigger()) {
+        DvCollect(c, true, &k);
+        DvCollect(c, false, &k);
+        for (int i = 0; i < g_dvTrigCount; ++i) {
+            const DvTrig &t = g_dvTrig[i];
+            ImVec2 at;
+            bool seen = false;
+            DvDrawTrig(dl, c, t, &at, &seen);
+            ++g_dvDrawn[t.kind];
+            if (t.plane) ++quads;
+            else if (t.shape == 2) ++spheres;
+            else if (t.shape == 1) ++boxes;
+            if (g_dvOn[kDvTrgLabels] && seen && labels < g_dvLabelMax) {
+                char name[64], line[112];
+                DWORD intro = 0;
+                if (DvNameKind(t.inst, name, sizeof(name)) == -2) Out(name, sizeof(name), "?");
+                ReadDword(t.inst + 0x58, &intro);
+                Out(line, sizeof(line), "%s %ld%s%s", name, static_cast<LONG>(intro), t.enabled ? "" : " (aus)",
+                    t.plane ? (t.oneSided ? " E1" : " E2") : t.shape == 2 ? " K" : t.shape == 1 ? " B" : " ?");
+                LabelDraw(dl, at, line, "", kDvLayers[t.kind].colour);
+                ++labels;
+            }
+        }
+        // the point the game tests: player +0x20 + (0, 0, 200)
+        DWORD player = 0;
+        float p[3];
+        if (ReadDword(kPlayerPtr, &player) && player && ReadFloats(player + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            p[2] += kDvTestLift;
+            const ImU32 white = IM_COL32(255, 255, 255, 230);
+            for (int a = 0; a < 3; ++a) {
+                float p0[3] = {p[0], p[1], p[2]}, p1[3] = {p[0], p[1], p[2]};
+                p0[a] -= 25.0f;
+                p1[a] += 25.0f;
+                DvLine(dl, c, p0, p1, white, 2.0f);
+            }
+        }
+        LabelAdd(g_dvState, sizeof(g_dvState), &used, "triggers %d drawn (box %d, sphere %d, plane %d) of %d listed, "
+                 "%d off-screen, %d beyond %.0f, %d capped at %d, %d disabled (dim), %d without data; ", g_dvTrigCount,
+                 boxes, spheres, quads, k.listed, k.behind, k.far_, g_dvRadius,
+                 k.listed - k.behind - k.far_ - g_dvTrigCount, g_dvTrgMax, k.disabled, k.noData);
+    }
+    // portals of every loaded stream unit
+    if (g_dvPortalOk && g_dvOn[kDvPortals]) {
+        int units = 0, portals = 0, drawn = 0;
+        const ImU32 colour = kDvLayers[kDvPortals].colour;
+        for (DWORD e = kStreamUnits; e < kStreamUnitsEnd && portals < 128; e += kStreamUnitSize) {
+            DWORD state = 0, level = 0, terrain = 0, arr = 0;
+            WORD count = 0;
+            if (!ReadDword(e + 4, &state) || (state & 0xff) != 2) continue;
+            if (!ReadDword(e + 8, &level) || !level || !ReadDword(level, &terrain) || !terrain ||
+                !ReadWord(terrain + 2, &count) || count > 64 || !ReadDword(terrain + 4, &arr) || !arr)
+                continue;
+            ++units;
+            char unit[48];
+            if (!ReadString(e + 0xc, unit, sizeof(unit))) unit[0] = 0;
+            for (DWORD i = 0; i < count && portals < 128; ++i) {
+                DWORD p = arr + i * 0x100;
+                float q[5][4], centre[3] = {0, 0, 0};
+                if (!ReadFloats(p + 0xb0, &q[0][0], 20) || !DvFinite(&q[0][0], 20)) continue;
+                ++portals;
+                for (int a = 0; a < 4; ++a)
+                    for (int b = 0; b < 3; ++b) centre[b] += q[a][b] * 0.25f;
+                float dist2 = 0.0f;
+                float extent = fabsf(q[0][0] - q[2][0]) + fabsf(q[0][1] - q[2][1]) + fabsf(q[0][2] - q[2][2]);
+                if (!DvVisible(c, centre, extent, &dist2)) continue;
+                bool any = false;
+                for (int a = 0; a < 4; ++a) any |= DvLine(dl, c, q[a], q[(a + 1) & 3], colour, 3.0f);
+                DvLine(dl, c, q[0], q[2], (colour & 0x00ffffff) | (120u << 24), 1.0f);
+                DvLine(dl, c, q[1], q[3], (colour & 0x00ffffff) | (120u << 24), 1.0f);
+                float tip[3] = {centre[0] + q[4][0] * 150.0f, centre[1] + q[4][1] * 150.0f, centre[2] + q[4][2] * 150.0f};
+                DvLine(dl, c, centre, tip, colour, 2.0f);
+                if (!any) continue;
+                ++drawn;
+                char name[48], line[112];
+                if (!ReadString(p, name, sizeof(name))) name[0] = 0;
+                float cq[3];
+                ImVec2 at;
+                DvToCam(c, centre, cq);
+                if (DvCamToScreen(c, cq, &at)) {
+                    Out(line, sizeof(line), "%s -> %s", unit, name);
+                    LabelDraw(dl, at, line, "", colour);
+                }
+            }
+        }
+        g_dvListed[kDvPortals] = portals;
+        g_dvDrawn[kDvPortals] = drawn;
+        LabelAdd(g_dvState, sizeof(g_dvState), &used, "portals %d drawn of %d in %d loaded unit(s); ", drawn, portals, units);
+    }
+    // checkpoint objects (instances named *checkpoint*), the active one from the game data
+    if (g_dvCpOk && g_dvOn[kDvCheckpoints]) {
+        DWORD data = 0, active = 0xffffffff;
+        WORD mode = 0;
+        if (ReadDword(kDvGameData, &data) && data && ReadWord(data + 0x1f4, &mode)) ReadDword(data + (mode ? 0x114 : 0x90), &active);
+        int count = 0, found = 0;
+        DWORD inst = 0;
+        ReadDword(kFirstInstance, &inst);
+        for (int guard = 0; inst && guard < 4096; ++guard) {
+            DWORD next = 0, object = 0, oid = 0;
+            if (ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid)) {
+                int id = static_cast<int>(oid & 0xffff);
+                int cached = id > 0 && id < 4096 ? g_dvNameKind[id] : 0;
+                bool cp = cached == kDvCheckpoint + 1;
+                if (!cached) {
+                    char name[64];
+                    cp = DvNameKind(inst, name, sizeof(name)) == kDvCheckpoint;
+                }
+                float p[3], d2 = 0.0f;
+                if (cp && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+                    ++found;
+                    if (DvVisible(c, p, 300.0f, &d2)) {
+                        int at = count;
+                        while (at > 0 && g_dvCp[at - 1].dist2 > d2) --at;
+                        if (at < 32) {
+                            int last = count < 32 ? count : 31;
+                            for (int m = last; m > at; --m) g_dvCp[m] = g_dvCp[m - 1];
+                            g_dvCp[at].inst = inst;
+                            g_dvCp[at].pos[0] = p[0]; g_dvCp[at].pos[1] = p[1]; g_dvCp[at].pos[2] = p[2];
+                            g_dvCp[at].dist2 = d2;
+                            if (count < 32) ++count;
+                        }
+                    }
+                }
+            }
+            if (!ReadDword(inst + 8, &next)) break;
+            inst = next;
+        }
+        int activeSeen = 0;
+        for (int i = 0; i < count; ++i) {
+            const DvMark &m = g_dvCp[i];
+            DWORD intro = 0;
+            ReadDword(m.inst + 0x58, &intro);
+            bool isActive = intro == active;
+            ImU32 colour = isActive ? IM_COL32(230, 255, 60, 255) : kDvLayers[kDvCheckpoints].colour;
+            float thick = isActive ? 3.0f : 2.0f, top[3] = {m.pos[0], m.pos[1], m.pos[2] + 250.0f};
+            DvLine(dl, c, m.pos, top, colour, thick);
+            float d[4][3];
+            const float s[4][2] = {{60, 0}, {0, 60}, {-60, 0}, {0, -60}};
+            for (int a = 0; a < 4; ++a) {
+                d[a][0] = top[0] + s[a][0];
+                d[a][1] = top[1] + s[a][1];
+                d[a][2] = top[2];
+            }
+            float up[3] = {top[0], top[1], top[2] + 60.0f}, down[3] = {top[0], top[1], top[2] - 60.0f};
+            for (int a = 0; a < 4; ++a) {
+                DvLine(dl, c, d[a], up, colour, thick);
+                DvLine(dl, c, d[a], down, colour, thick);
+            }
+            float q[3];
+            ImVec2 at;
+            DvToCam(c, up, q);
+            if (DvCamToScreen(c, q, &at)) {
+                char line[64];
+                Out(line, sizeof(line), "CP %ld%s", static_cast<LONG>(intro), isActive ? " AKTIV" : "");
+                LabelDraw(dl, at, line, "", colour);
+            }
+            if (isActive) ++activeSeen;
+        }
+        g_dvListed[kDvCheckpoints] = found;
+        g_dvDrawn[kDvCheckpoints] = count;
+        LabelAdd(g_dvState, sizeof(g_dvState), &used, "checkpoints %d drawn of %d (active id %ld%s); ", count, found,
+                 static_cast<LONG>(active), activeSeen ? ", drawn" : "");
+    }
+    if (g_dvBaseOk && g_dvOn[kDvNames]) DvDrawNames(dl, c, g_dvState, sizeof(g_dvState), &used);
+    if (!used) Out(g_dvState, sizeof(g_dvState), "nothing switched on that this frame can draw");
+    if (InterlockedExchange(&g_dvLogPending, 0)) Log(1, "0.14 debug view drawn: %s", g_dvState);   // once per switch
+}
+
+// the legend (foreground, top right): every layer that is on with its colour and drawn / listed
+void DrawDebugLegend() {
+    ImGuiIO &io = ImGui::GetIO();
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    const float fs = ImGui::GetFontSize(), w = 330.0f;
+    char lines[kDvCount + 2][112];
+    ImU32 colours[kDvCount + 2];
+    int n = 0;
+    Out(lines[n], sizeof(lines[n]), "TruMenu 0.14 Debug-Ansicht (gezeichnet / gefunden)");
+    colours[n++] = IM_COL32(235, 235, 235, 255);
+    for (int i = 0; i < kDvCount; ++i) {
+        if (!g_dvOn[i] || i == kDvLegend) continue;
+        if (i == kDvTrgLabels) Out(lines[n], sizeof(lines[n]), "%s / %s", kDvLayers[i].de, kDvLayers[i].en);
+        else Out(lines[n], sizeof(lines[n]), "%s / %s: %d / %d", kDvLayers[i].de, kDvLayers[i].en, g_dvDrawn[i],
+                 g_dvListed[i]);
+        colours[n++] = kDvLayers[i].colour;
+    }
+    if (DvAnyTrigger()) {
+        Out(lines[n], sizeof(lines[n]), "Testpunkt (Lara +200) / test point; blass = aus / disabled");
+        colours[n++] = IM_COL32(255, 255, 255, 230);
+    }
+    ImVec2 at(io.DisplaySize.x - w - 12.0f, 40.0f);
+    dl->AddRectFilled(at, ImVec2(at.x + w, at.y + n * (fs + 3.0f) + 8.0f), IM_COL32(0, 0, 0, 160), 4.0f);
+    for (int i = 0; i < n; ++i) {
+        ImVec2 p(at.x + 8.0f, at.y + 4.0f + i * (fs + 3.0f));
+        if (i) dl->AddRectFilled(ImVec2(p.x, p.y + 3.0f), ImVec2(p.x + 10.0f, p.y + fs - 3.0f), colours[i]);
+        dl->AddText(ImVec2(p.x + (i ? 16.0f : 0.0f), p.y), colours[i], lines[i]);
+    }
+}
+
+void ValDvStatus(char *o, size_t n) {
+    char on[200] = "";
+    size_t used = 0;
+    for (int i = 0; i < kDvCount; ++i)
+        if (g_dvOn[i]) LabelAdd(on, sizeof(on), &used, "%s%s", used ? "," : "", kDvLayers[i].name);
+    Out(o, n, "[Debug] Enabled %d; checks: triggers %s, portals %s, checkpoints %s; on: %s; last frame: %s", g_debugEnabled,
+        g_dvTrgWhy, g_dvPortalWhy, g_dvCpWhy, used ? on : "-", DvAnyOn() ? g_dvState : "off");
+}
+void ValDvShow(char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < kDvCount; ++i)
+        LabelAdd(o, n, &used, "%s%s %d", i ? ", " : "", kDvLayers[i].name, g_dvOn[i] ? 1 : 0);
+}
+// dbg.show <layer> [0|1]
+bool RunDvShow(const char *arg, char *o, size_t n) {
+    char buf[64];
+    strncpy_s(buf, sizeof(buf), arg ? arg : "", _TRUNCATE);
+    char *context = nullptr;
+    char *name = strtok_s(buf, " ", &context);
+    char *value = name ? strtok_s(nullptr, " ", &context) : nullptr;
+    int i = DvFind(name);
+    if (i < 0) {
+        Out(o, n, "usage: dbg.show <layer> [0|1] - death, fire, checkpoint, water, sound, volume, plane, unknown, portals, "
+            "checkpoints, trglabels, legend, names");
+        return false;
+    }
+    return DvSet(i, BoolArg(value ? value : "", g_dvOn[i] != 0), ShotSource("dbg.show"), o, n);
+}
+// one layer as a bool item (dbg.portals / dbg.checkpoints / dbg.legend)
+bool DvRunOne(int layer, const char *item, const char *arg, char *o, size_t n) {
+    return DvSet(layer, BoolArg(arg, g_dvOn[layer] != 0), ShotSource(item), o, n);
+}
+void ValDvPortals(char *o, size_t n) { Out(o, n, "%d (%d drawn of %d)", g_dvOn[kDvPortals] ? 1 : 0, g_dvDrawn[kDvPortals], g_dvListed[kDvPortals]); }
+bool RunDvPortals(const char *arg, char *o, size_t n) { return DvRunOne(kDvPortals, "dbg.portals", arg, o, n); }
+void ValDvCheckpoints(char *o, size_t n) {
+    Out(o, n, "%d (%d drawn of %d)", g_dvOn[kDvCheckpoints] ? 1 : 0, g_dvDrawn[kDvCheckpoints], g_dvListed[kDvCheckpoints]);
+}
+bool RunDvCheckpoints(const char *arg, char *o, size_t n) { return DvRunOne(kDvCheckpoints, "dbg.checkpoints", arg, o, n); }
+void ValDvLegend(char *o, size_t n) { Out(o, n, "%d", g_dvOn[kDvLegend] ? 1 : 0); }
+bool RunDvLegend(const char *arg, char *o, size_t n) { return DvRunOne(kDvLegend, "dbg.legend", arg, o, n); }
+// object names: dbg.names (layer), dbg.namefilter <list|*>, dbg.namecolour <preset|RRGGBB>, dbg.namesize <0.5..3>
+void ValDvNames(char *o, size_t n) {
+    Out(o, n, "%d (%d drawn of %d; filter '%s', radius %.0f, max %d, size %.2f, colour %06lX, ids %d)",
+        g_dvOn[kDvNames] ? 1 : 0, g_dvDrawn[kDvNames], g_dvListed[kDvNames], g_dvNameMatch[0] ? g_dvNameMatch : "*",
+        g_dvNameRadius, g_dvNameMax, g_dvNameScale, g_dvNameRgb, g_dvNameIds);
+}
+bool RunDvNames(const char *arg, char *o, size_t n) { return DvRunOne(kDvNames, "dbg.names", arg, o, n); }
+void ValDvNameFilter(char *o, size_t n) { Out(o, n, "%s", g_dvNameMatch[0] ? g_dvNameMatch : "*"); }
+bool RunDvNameFilter(const char *arg, char *o, size_t n) {
+    char v[sizeof(g_dvNameMatch)];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    bool okChars = v[0] != 0;
+    for (const char *p = v; *p; ++p)
+        if (!(isalnum(static_cast<unsigned char>(*p)) || *p == '_' || *p == '*' || *p == ',' || *p == ' ')) okChars = false;
+    if (!okChars) {
+        Out(o, n, "usage: dbg.namefilter <comma list of name parts a-z 0-9 _ | *> (* = every instance); now '%s'",
+            g_dvNameMatch[0] ? g_dvNameMatch : "*");
+        return false;
+    }
+    strncpy_s(g_dvNameMatch, sizeof(g_dvNameMatch), strcmp(v, "*") ? v : "", _TRUNCATE);
+    memset(g_dvNameHit, 0, sizeof(g_dvNameHit));
+    if (g_dvPersist && g_iniPath[0]) WritePrivateProfileStringA("Debug", "NameMatch", g_dvNameMatch, g_iniPath);
+    Log(1, "dbg.namefilter '%s' (src=%s)", g_dvNameMatch[0] ? g_dvNameMatch : "*", ShotSource("dbg.namefilter"));
+    Out(o, n, "dbg.namefilter %s", g_dvNameMatch[0] ? g_dvNameMatch : "*");
+    return true;
+}
+void ValDvNameColour(char *o, size_t n) { Out(o, n, "%06lX", g_dvNameRgb); }
+bool RunDvNameColour(const char *arg, char *o, size_t n) {
+    char v[32];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    DWORD rgb = 0xffffffff;
+    for (const DvColourPreset &c : kDvNameColours)
+        if (!_stricmp(v, c.name) || !_stricmp(v, c.de)) rgb = c.rgb;
+    if (rgb == 0xffffffff && strlen(v) == 6 && strspn(v, "0123456789abcdefABCDEF") == 6) rgb = strtoul(v, nullptr, 16);
+    if (rgb == 0xffffffff) {
+        Out(o, n, "usage: dbg.namecolour white|yellow|cyan|magenta|RRGGBB; now %06lX", g_dvNameRgb);
+        return false;
+    }
+    g_dvNameRgb = rgb;
+    char text[8];
+    Out(text, sizeof(text), "%06lX", rgb);
+    if (g_dvPersist && g_iniPath[0]) WritePrivateProfileStringA("Debug", "NameColour", text, g_iniPath);
+    Log(1, "dbg.namecolour %s (src=%s)", text, ShotSource("dbg.namecolour"));
+    Out(o, n, "dbg.namecolour %s", text);
+    return true;
+}
+void ValDvNameSize(char *o, size_t n) { Out(o, n, "%.2f", g_dvNameScale); }
+bool RunDvNameSize(const char *arg, char *o, size_t n) {
+    float v = arg && arg[0] ? static_cast<float>(atof(arg)) : 0.0f;
+    if (!(v >= 0.5f && v <= 3.0f)) { Out(o, n, "usage: dbg.namesize <0.5 .. 3> (font size factor); now %.2f", g_dvNameScale); return false; }
+    g_dvNameScale = v;
+    char text[16];
+    Out(text, sizeof(text), "%.2f", v);
+    if (g_dvPersist && g_iniPath[0]) WritePrivateProfileStringA("Debug", "NameScale", text, g_iniPath);
+    Log(1, "dbg.namesize %s (src=%s)", text, ShotSource("dbg.namesize"));
+    Out(o, n, "dbg.namesize %s", text);
+    return true;
+}
+// dbg.triggers: every trigger kind together
+void ValDvTriggers(char *o, size_t n) {
+    int drawn = 0, listed = 0;
+    for (int i = 0; i < kDvKinds; ++i) { drawn += g_dvDrawn[i]; listed += g_dvListed[i]; }
+    Out(o, n, "%d (%d drawn of %d)", DvAnyTrigger() ? 1 : 0, drawn, listed);
+}
+bool RunDvTriggers(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, DvAnyTrigger());
+    const char *src = ShotSource("dbg.triggers");
+    if (!g_debugEnabled) { Out(o, n, "debug drawing off ([Debug] Enabled=0)"); return false; }
+    if (!g_dvTrgOk) {
+        Out(o, n, "disabled: pre-check failed (%s)", g_dvTrgWhy);
+        Log(1, "dbg.triggers %d refused - %s (src=%s)", on ? 1 : 0, o, src);
+        return false;
+    }
+    for (int i = 0; i < kDvKinds; ++i) {
+        InterlockedExchange(&g_dvOn[i], on ? 1 : 0);
+        DvPersistKey(kDvLayers[i].key, on);
+    }
+    InterlockedExchange(&g_dvLogPending, 1);
+    Log(1, "dbg.triggers %d (all %d kinds, src=%s)", on ? 1 : 0, static_cast<int>(kDvKinds), src);
+    Out(o, n, "dbg.triggers %d", on ? 1 : 0);
+    return true;
+}
+
+// dbg.view: the master - on = every 0.14 layer + dbg.labels + draw.markup + the [Debug] ViewNav switches; off = all of
+// them off (nav.off); each one stays switchable alone afterwards. Value = 1 while any of them is on.
+bool DvViewAny() {
+    if (DvAnyOn() || g_lblOn || g_drawMarkup) return true;
+    for (int i = 0; i < kNavCount; ++i)
+        if (NavByteOn(i)) return true;
+    return false;
+}
+void ValDvView(char *o, size_t n) {
+    int layers = 0, nav = 0;
+    for (int i = 0; i < kDvCount; ++i) layers += g_dvOn[i] ? 1 : 0;
+    for (int i = 0; i < kNavCount; ++i) nav += NavByteOn(i) ? 1 : 0;
+    Out(o, n, "%d (%d / %d layers, labels %d, markup %d, %d nav switch(es))", DvViewAny() ? 1 : 0, layers,
+        static_cast<int>(kDvCount), g_lblOn ? 1 : 0, g_drawMarkup ? 1 : 0, nav);
+}
+bool RunDvView(const char *arg, char *o, size_t n) {
+    if (!g_debugEnabled) { Out(o, n, "debug drawing off ([Debug] Enabled=0)"); return false; }
+    bool on = BoolArg(arg, DvViewAny());
+    const char *src = ShotSource("dbg.view");
+    int layers = 0;
+    for (int i = 0; i < kDvCount; ++i) {
+        const char *why = "";
+        if (!DvLayerOk(i, &why)) continue;
+        InterlockedExchange(&g_dvOn[i], on ? 1 : 0);
+        DvPersistKey(kDvLayers[i].key, on);
+        ++layers;
+    }
+    InterlockedExchange(&g_dvLogPending, 1);
+    char lbl[160] = "not verified", mk[96] = "not verified", nav[400] = "", one[300];
+    if (g_lblOk) {
+        RunLabels(on ? "1" : "0", lbl, sizeof(lbl));
+        DvPersistKey("Labels", on);
+    }
+    if (g_drawOk) {
+        RunDrawMarkup(on ? "1" : "0", mk, sizeof(mk));
+        DvPersistKey("Markup", on);
+    }
+    size_t used = 0;
+    if (on) {
+        char copy[sizeof(g_dvViewNav)];
+        strncpy_s(copy, sizeof(copy), g_dvViewNav, _TRUNCATE);
+        char *context = nullptr;
+        for (char *name = strtok_s(copy, ", ", &context); name; name = strtok_s(nullptr, ", ", &context)) {
+            char cmd[64];
+            Out(cmd, sizeof(cmd), "%s 1", name);
+            bool ok = RunNavDraw(cmd, one, sizeof(one));
+            LabelAdd(nav, sizeof(nav), &used, "%s%s %s", used ? ", " : "", name, ok ? "on" : "refused");
+        }
+    } else {
+        bool ok = RunNavOff("", one, sizeof(one));
+        LabelAdd(nav, sizeof(nav), &used, "nav.off %s", ok ? "ok" : one);
+    }
+    Log(1, "dbg.view %d: %d layer(s), labels: %s, markup: %s, nav: %s (src=%s)", on ? 1 : 0, layers, lbl, mk,
+        used ? nav : "-", src);
+    Out(o, n, "dbg.view %d: %d layer(s), labels %s, markup %s, nav %s", on ? 1 : 0, layers, lbl, mk, used ? nav : "-");
+    return true;
+}
+
+// ring: why a dbg.* entry (not dbg.labels) is greyed out ("" = usable; outside a level it may be switched)
+const char *DvRadWhy(const char *id, const char *arg) {
+    if (!_stricmp(id, "dbg.status")) return "";
+    if (!g_debugEnabled) return "debug drawing off ([Debug] Enabled=0)";
+    const char *why = "";
+    if (!_stricmp(id, "dbg.show")) {
+        int i = DvFind(arg);
+        if (i < 0) return "unknown layer";
+        return DvLayerOk(i, &why) ? "" : why;
+    }
+    if (!_stricmp(id, "dbg.triggers")) return g_dvTrgOk ? "" : g_dvTrgWhy;
+    if (!_stricmp(id, "dbg.portals")) return g_dvPortalOk ? "" : g_dvPortalWhy;
+    if (!_stricmp(id, "dbg.checkpoints")) return g_dvCpOk ? "" : g_dvCpWhy;
+    if (!_strnicmp(id, "dbg.name", 8)) return g_dvBaseOk ? "" : g_dvBaseWhy;   // dbg.names / namefilter / colour / size
+    return "";
+}
+
+// menu page "Debug view": the same groups as the ring Spieler / Debug (master, level data, AI, Lara, display)
+void PageDebugView() {
+    char o[400];
+    if (!g_debugEnabled) {
+        ImGui::TextWrapped("[Debug] Enabled=0 in TruMenu.ini - the debug view is off (read-only drawing, set Enabled=1).");
+        return;
+    }
+    bool all = DvViewAny();
+    if (TmCheckbox("Everything / Alles an / aus  [dbg.view]###dvall", &all)) RunDvView(all ? "1" : "0", o, sizeof(o));
+    ImGui::TextWrapped("last frame: %s", DvAnyOn() ? g_dvState : "off");
+    if (ImGui::TreeNodeEx("Level data / Leveldaten###dvlevel", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (!g_dvTrgOk) ImGui::TextWrapped("triggers off: %s", g_dvTrgWhy);
+        bool trg = DvAnyTrigger();
+        if (TmCheckbox("all triggers / Trigger alle  [dbg.triggers]###dvtrg", &trg)) RunDvTriggers(trg ? "1" : "0", o, sizeof(o));
+        const int order[] = {kDvPortals, kDvCheckpoints, kDvDeath, kDvFire, kDvCheckpoint, kDvWater, kDvSound, kDvVolume,
+                             kDvPlane, kDvUnknown, kDvTrgLabels};
+        for (int i : order) {
+            const DvLayerDef &d = kDvLayers[i];
+            ImVec4 col = ImGui::ColorConvertU32ToFloat4(d.colour);
+            char id[32], label[128];
+            Out(id, sizeof(id), "##dvc%d", i);
+            ImGui::ColorButton(id, col, ImGuiColorEditFlags_NoTooltip, ImVec2(14.0f, 14.0f));
+            ImGui::SameLine();
+            bool v = g_dvOn[i] != 0;
+            Out(label, sizeof(label), "%s / %s  [dbg.show %s]  %d / %d###dvl%d", d.en, d.de, d.name, g_dvDrawn[i],
+                g_dvListed[i], i);
+            if (TmCheckbox(label, &v)) DvSet(i, v, "menu", o, sizeof(o));
+        }
+        ImGui::SliderInt("max triggers / frame  [Debug] TriggerMax", &g_dvTrgMax, 1, 256);
+        ImGui::SliderFloat("radius from the camera  [Debug] TriggerRadius", &g_dvRadius, 500.0f, 200000.0f, "%.0f");
+        ImGui::SliderInt("trigger names / frame  [Debug] TriggerLabelMax", &g_dvLabelMax, 0, 64);
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNodeEx("AI / KI###dvai", ImGuiTreeNodeFlags_DefaultOpen)) {
+        for (int i = 0; i < kNavCount; ++i) {
+            bool v = NavByteOn(i);
+            char label[128], cmd[64];
+            Out(label, sizeof(label), "%s  [nav.draw]%s###dvn%d", kNavSwitches[i].name, g_navSwOk[i] ? "" : "  (off)", i);
+            if (TmCheckbox(label, &v)) {
+                Out(cmd, sizeof(cmd), "%s %d", kNavSwitches[i].name, v ? 1 : 0);
+                RunNavDraw(cmd, o, sizeof(o));
+            }
+        }
+        bool mask = g_navMaskSet;
+        if (TmCheckbox("every layer / Alle Ebenen  [nav.mask]###dvmask", &mask)) RunNavMask(mask ? "1" : "0", o, sizeof(o));
+        bool lbl = g_lblOn != 0;
+        if (TmCheckbox("Thrall-Labels  [dbg.labels]###dvlbl", &lbl)) {
+            RunLabels(lbl ? "1" : "0", o, sizeof(o));
+            DvPersistKey("Labels", lbl);
+        }
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNodeEx("Object names / Objektnamen###dvnames", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (!g_dvBaseOk) ImGui::TextWrapped("object names off: %s", g_dvBaseWhy);
+        bool v = g_dvOn[kDvNames] != 0;
+        char label[96];
+        Out(label, sizeof(label), "object names / Objektnamen  [dbg.names]  %d / %d###dvnm", g_dvDrawn[kDvNames],
+            g_dvListed[kDvNames]);
+        if (TmCheckbox(label, &v)) DvSet(kDvNames, v, "menu", o, sizeof(o));
+        static char filter[sizeof(g_dvNameMatch)] = "";
+        static bool filterInit = false;
+        if (!filterInit) { strncpy_s(filter, sizeof(filter), g_dvNameMatch[0] ? g_dvNameMatch : "*", _TRUNCATE); filterInit = true; }
+        if (ImGui::InputText("filter (parts, * = all)  [dbg.namefilter]###dvnf", filter, sizeof(filter),
+                             ImGuiInputTextFlags_EnterReturnsTrue))
+            RunDvNameFilter(filter, o, sizeof(o));
+        if (TmButton("all / alle###dvnfall")) { RunDvNameFilter("*", o, sizeof(o)); strcpy_s(filter, sizeof(filter), "*"); }
+        ImGui::SameLine();
+        if (TmButton("Thralls###dvnfthr")) { RunDvNameFilter("thrall", o, sizeof(o)); strcpy_s(filter, sizeof(filter), "thrall"); }
+        ImGui::SameLine();
+        if (TmButton("triggers###dvnftrg")) { RunDvNameFilter("trigger,volume,plane", o, sizeof(o)); strcpy_s(filter, sizeof(filter), "trigger,volume,plane"); }
+        ImGui::SliderFloat("radius from the camera  [Debug] NameRadius", &g_dvNameRadius, 100.0f, 200000.0f, "%.0f");
+        ImGui::SliderInt("max names / frame  [Debug] NameMax", &g_dvNameMax, 1, 64);
+        // size / colour follow the widget at once; the log line (and Persist) once the edit is done
+        ImGui::SliderFloat("font size  [dbg.namesize]###dvnsz", &g_dvNameScale, 0.5f, 3.0f, "%.2fx");
+        if (ImGui::IsItemDeactivatedAfterEdit()) { char a[16]; Out(a, sizeof(a), "%.2f", g_dvNameScale); RunDvNameSize(a, o, sizeof(o)); }
+        float col[3] = {((g_dvNameRgb >> 16) & 0xff) / 255.0f, ((g_dvNameRgb >> 8) & 0xff) / 255.0f, (g_dvNameRgb & 0xff) / 255.0f};
+        if (ImGui::ColorEdit3("colour  [dbg.namecolour]###dvncol", col))
+            g_dvNameRgb = (static_cast<DWORD>(col[0] * 255.0f + 0.5f) << 16) | (static_cast<DWORD>(col[1] * 255.0f + 0.5f) << 8) |
+                          static_cast<DWORD>(col[2] * 255.0f + 0.5f);
+        if (ImGui::IsItemDeactivatedAfterEdit()) { char a[16]; Out(a, sizeof(a), "%06lX", g_dvNameRgb); RunDvNameColour(a, o, sizeof(o)); }
+        for (const DvColourPreset &c : kDvNameColours) {
+            char b[48];
+            Out(b, sizeof(b), "%s / %s###dvnc%s", c.name, c.de, c.name);
+            if (TmButton(b)) RunDvNameColour(c.name, o, sizeof(o));
+            ImGui::SameLine();
+        }
+        ImGui::NewLine();
+        bool ids = g_dvNameIds != 0;
+        if (TmCheckbox("intro id after the name  [Debug] NameIds###dvnid", &ids)) {
+            g_dvNameIds = ids ? 1 : 0;
+            DvPersistKey("NameIds", ids);
+        }
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNodeEx("Lara###dvlara", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool mk = g_drawMarkup != 0, ledges = g_drawLedges != 0;
+        if (TmCheckbox("markup / Markup  [draw.markup]###dvmk", &mk)) {
+            RunDrawMarkup(mk ? "1" : "0", o, sizeof(o));
+            DvPersistKey("Markup", mk);
+        }
+        if (TmCheckbox("ledges only / Nur Kanten  [draw.ledges]###dvledge", &ledges)) RunDrawLedges(ledges ? "1" : "0", o, sizeof(o));
+        ImGui::TextWrapped("The white cross with the triggers is the point the game tests: Lara +0x20 + 200 up.");
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNodeEx("Display / Anzeige###dvdisplay", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool v = g_dvOn[kDvLegend] != 0;
+        if (TmCheckbox("legend / Legende  [dbg.legend]###dvleg", &v)) DvSet(kDvLegend, v, "menu", o, sizeof(o));
+        ImGui::TextWrapped("[Debug] Persist %d: %s", g_dvPersist, g_dvPersist ? "every switch here is written to TruMenu.ini"
+                           " at once (Set-TruMenu.ps1 then keeps the INI as owner-edited)" : "switches last until the "
+                           "game ends; start values = the [Debug] keys");
+        ImGui::TreePop();
+    }
 }
 
 // ---- favourites: [Favorites] Ids in TruMenu.ini (comma list of item ids; empty = kFavDefault) ----
@@ -9537,6 +10705,29 @@ const Item kItems[] = {
     // 0.13 Thrall-Labels ([Debug] Enabled; read-only, drawn at Present in a loaded level)
     {"dbg.labels", "bool", "0.13: Thrall-Labels - name, intro id, distance, health, targeter 9 / hit list / condition 2011 "
                            "(TruShadowCombat 0.5.3) at each thrall near Lara", false, ValLabels, RunLabels},
+    // 0.14 Debug view ([Debug] Enabled; read-only, drawn at Present in a loaded level, also during the flight)
+    {"dbg.view", "bool", "0.14: master switch - every 0.14 layer + dbg.labels + draw.markup + the [Debug] ViewNav "
+                         "switches on / off (nav.off); each one stays switchable alone", false, ValDvView, RunDvView},
+    {"dbg.triggers", "bool", "0.14: trigger wireframes of every kind (the game's plane / volume lists: box, sphere, "
+                             "plane quad, coloured by kind)", false, ValDvTriggers, RunDvTriggers},
+    {"dbg.show", "action", "0.14 <layer> [0|1]: one layer - death, fire, checkpoint, water, sound, volume, plane, unknown "
+                           "(trigger kinds), portals, checkpoints, trglabels, legend (no 0 / 1 = flip)", false, ValDvShow,
+     RunDvShow},
+    {"dbg.portals", "bool", "0.14: loading areas - the stream portal quads of every loaded unit (-> destination unit)",
+     false, ValDvPortals, RunDvPortals},
+    {"dbg.checkpoints", "bool", "0.14: checkpoint objects (instances named *checkpoint*), the active one (game data "
+                                "+0x90 / +0x114) in yellow", false, ValDvCheckpoints, RunDvCheckpoints},
+    {"dbg.legend", "bool", "0.14: legend top right - every layer that is on, its colour, drawn / found", false,
+     ValDvLegend, RunDvLegend},
+    {"dbg.status", "info", "0.14: debug view checks, layers on, what the last frame drew", false, ValDvStatus, nullptr},
+    {"dbg.names", "bool", "0.14: object names - the name (live PC object list) and intro id of every instance matching "
+                          "[Debug] NameMatch, nearest to the camera first", false, ValDvNames, RunDvNames},
+    {"dbg.namefilter", "action", "0.14 <list|*>: object names only for names containing one of the comma-separated parts "
+                                 "(e.g. thrall); * = every instance", false, ValDvNameFilter, RunDvNameFilter},
+    {"dbg.namecolour", "action", "0.14 white|yellow|cyan|magenta|RRGGBB: colour of the object names", false,
+     ValDvNameColour, RunDvNameColour},
+    {"dbg.namesize", "action", "0.14 <0.5 .. 3>: font size factor of the object names", false, ValDvNameSize,
+     RunDvNameSize},
 };
 
 const Item *FindItem(const char *id) {
@@ -11324,6 +12515,9 @@ const char *RadialWhy(const RadItem &e) {
     if (!_stricmp(id, "dbg.labels")) {       // 0.13 Thrall-Labels: [Debug] Enabled, byte checks
         const char *lblWhy = LabelRadWhy();
         if (lblWhy[0]) return lblWhy;
+    } else if (!_strnicmp(id, "dbg.", 4)) {  // 0.14 Debug view: [Debug] Enabled, byte checks of the layer
+        const char *dvWhy = DvRadWhy(id, e.arg);
+        if (dvWhy[0]) return dvWhy;
     }
     const Item *item = FindItem(id);
     if (((item && item->gameThread) || !_stricmp(id, "time.scale")) && !g_experimental)
@@ -11351,6 +12545,11 @@ bool RadialOn(const RadItem &e, bool *isBool) {
     if (e.child < 0 && !e.special && !e.bad[0] && e.arg[0] && !strchr(e.arg, ' ') && !_stricmp(e.id, "nav.draw")) {
         int nav = NavFind(e.arg);
         if (nav >= 0) { *isBool = true; return NavByteOn(nav); }
+    }
+    // 0.14: "dbg.show <layer>" (one word) shows on / off of that layer; RadialRun adds the target state
+    if (e.child < 0 && !e.special && !e.bad[0] && e.arg[0] && !strchr(e.arg, ' ') && !_stricmp(e.id, "dbg.show")) {
+        int layer = DvFind(e.arg);
+        if (layer >= 0) { *isBool = true; return g_dvOn[layer] != 0; }
     }
     *isBool =e.child < 0 && !e.special && !e.bad[0] && !e.arg[0] && CmdKindOf(e.id) == kCkBool;
     if (!*isBool) return false;
@@ -13889,6 +15088,7 @@ void DrawMenu() {
         if (TmCollapsingHeader("Cheat / flight")) PageCheat();
         if (TmCollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
         if (TmCollapsingHeader("Markup / collision draw")) PageMarkup();
+        if (TmCollapsingHeader("Debug view / Debug-Ansicht (0.12 - 0.14)###debugview")) PageDebugView();   // 0.14
         if (TmCollapsingHeader("Level select")) PageLevel();
         if (TmCollapsingHeader("Outfits (next level load)")) PageOutfits();
         if (TmCollapsingHeader("Dev channel")) {
@@ -14027,6 +15227,8 @@ void Render(IDirect3DDevice9 *device) {
     ImGui::NewFrame();
     if (g_drawMarkup) DrawMarkup();
     if (g_lblOn) DrawLabels();                   // 0.13 Thrall-Labels (foreground draw list)
+    if (DvAnyOn()) DrawDebugView();              // 0.14 debug view (background draw list)
+    if (g_dvOn[kDvLegend]) DrawDebugLegend();    // 0.14 legend (foreground, top right)
     if (g_overlay) DrawOverlay();
     if (g_logOverlay) DrawLogOverlay();
     if (g_guardOverlay) DrawGuardOverlay();
@@ -14273,6 +15475,44 @@ void ReadOptions(const char *dir) {
         g_lblRadius = (r >= 100.0f && r <= 50000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "LabelRadius")));
     }
     OptString(ini, "Debug", "LabelMatch", g_lblMatch, sizeof(g_lblMatch));
+    // 0.14 debug view
+    g_dvViewAtStart = OptInt(ini, "Debug", "View") != 0 ? 1 : 0;
+    g_dvTrgAtStart = OptInt(ini, "Debug", "Triggers") != 0 ? 1 : 0;
+    for (int i = 0; i < kDvCount; ++i) g_dvAtStart[i] = OptInt(ini, "Debug", kDvLayers[i].key) != 0 ? 1 : 0;
+    g_dvMarkupAtStart = OptInt(ini, "Debug", "Markup") != 0 ? 1 : 0;
+    g_dvPersist = OptInt(ini, "Debug", "Persist") != 0 ? 1 : 0;
+    OptString(ini, "Debug", "ViewNav", g_dvViewNav, sizeof(g_dvViewNav));
+    g_dvTrgMax = OptInt(ini, "Debug", "TriggerMax");
+    if (g_dvTrgMax < 1 || g_dvTrgMax > 256) g_dvTrgMax = atoi(OptDefault("Debug", "TriggerMax"));
+    g_dvLabelMax = OptInt(ini, "Debug", "TriggerLabelMax");
+    if (g_dvLabelMax < 0 || g_dvLabelMax > 64) g_dvLabelMax = atoi(OptDefault("Debug", "TriggerLabelMax"));
+    {
+        char radius[32];
+        OptString(ini, "Debug", "TriggerRadius", radius, sizeof(radius));
+        float r = static_cast<float>(atof(radius));
+        g_dvRadius = (r >= 500.0f && r <= 200000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "TriggerRadius")));
+    }
+    OptString(ini, "Debug", "NameMatch", g_dvNameMatch, sizeof(g_dvNameMatch));
+    if (!strcmp(g_dvNameMatch, "*")) g_dvNameMatch[0] = 0;
+    g_dvNameMax = OptInt(ini, "Debug", "NameMax");
+    if (g_dvNameMax < 1 || g_dvNameMax > 64) g_dvNameMax = atoi(OptDefault("Debug", "NameMax"));
+    g_dvNameIds = OptInt(ini, "Debug", "NameIds") != 0 ? 1 : 0;
+    {
+        char nameOpt[32];
+        OptString(ini, "Debug", "NameRadius", nameOpt, sizeof(nameOpt));
+        float r = static_cast<float>(atof(nameOpt));
+        g_dvNameRadius = (r >= 100.0f && r <= 200000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "NameRadius")));
+        OptString(ini, "Debug", "NameScale", nameOpt, sizeof(nameOpt));
+        float s = static_cast<float>(atof(nameOpt));
+        g_dvNameScale = (s >= 0.5f && s <= 3.0f) ? s : static_cast<float>(atof(OptDefault("Debug", "NameScale")));
+        OptString(ini, "Debug", "NameColour", nameOpt, sizeof(nameOpt));
+        g_dvNameRgb = (strlen(nameOpt) == 6 && strspn(nameOpt, "0123456789abcdefABCDEF") == 6) ? strtoul(nameOpt, nullptr, 16)
+                                                                                                : 0xffffff;
+    }
+    if (g_dvViewAtStart && g_debugEnabled) {     // dbg.view at start: labels + the ViewNav switches (as NavDraw)
+        g_lblAtStart = 1;
+        if (!g_navAuto[0]) strncpy_s(g_navAuto, sizeof(g_navAuto), g_dvViewNav, _TRUNCATE);
+    }
     InterlockedExchange(&g_cameraChanges, OptInt(ini, "Log", "CameraChanges") ? 1 : 0);
     OptString(ini, "Regress", "List", g_regressStart, sizeof(g_regressStart));
     InterlockedExchange(&g_inputTrace, OptInt(ini, "Log", "InputTrace") ? 1 : 0);   // 0.8.1
@@ -14505,6 +15745,7 @@ void Start(HMODULE self) {
     CheatsCheck();
     NavCheck();                               // 0.12 Debug-Zeichnung: NavPower switches (precheck_012.txt)
     LabelCheck();                             // 0.13 Thrall-Labels (precheck_013.txt)
+    DebugViewCheck();                         // 0.14 debug view (precheck_014.txt)
     g_camLogOk = HexBytesAt(0x005f3e0c, "b9f004e800 e85afeffff") && HexBytesAt(0x005f3d12, "8bce d91c24 e8c442ffff") &&
                  HexBytesAt(0x005e7feb, "8bf1") && HexBytesAt(0x005e8041, "8b4658 83f801") &&
                  HexBytesAt(0x005e80b9, "c7465834000000") && HexBytesAt(0x005e80da, "8b7e58 397e54 7465") &&

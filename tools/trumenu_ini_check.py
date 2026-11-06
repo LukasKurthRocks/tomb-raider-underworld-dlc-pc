@@ -29,6 +29,13 @@ radial file (nav.draw takes exactly one switch name of kNavSwitches, nav.mask / 
 Since TruMenu 0.13 also the [Debug] label values (Labels / LabelCross 0 / 1, LabelRadius 100 .. 50000, LabelMax 1 .. 32,
 LabelMatch a comma list of name parts a-z 0-9 _ or *), the item dbg.labels in kItems and exactly one dbg.labels entry
 in the radial file (no argument).
+Since TruMenu 0.14 (2026-11-06 TruMenu 0.14 triggers) also the [Debug] debug view values (View / Triggers / Trg* /
+Portals / Checkpoints / TrgLabels / Legend / Markup / Persist 0 / 1, TriggerMax 1 .. 256, TriggerRadius 500 .. 200000,
+TriggerLabelMax 0 .. 64, ViewNav a comma list of kNavSwitches names), the items dbg.view / dbg.triggers / dbg.show /
+dbg.portals / dbg.checkpoints / dbg.legend / dbg.status in kItems, every layer of kDvLayers once in the radial file
+(dbg.show <layer> or its own bool item) and dbg.show taking exactly one layer name of kDvLayers; the object name keys
+(Names / NameIds 0 / 1, NameMatch a comma list or empty, NameRadius 100 .. 200000, NameMax 1 .. 64, NameScale 0.5 .. 3,
+NameColour RRGGBB), the items dbg.names / dbg.namefilter / dbg.namecolour / dbg.namesize and their ring arguments.
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -62,6 +69,18 @@ NAV_ITEMS = {'nav.status': 'info', 'nav.draw': 'action', 'nav.mask': 'bool', 'na
 LABEL_KEYS = ('Labels', 'LabelRadius', 'LabelMax', 'LabelMatch', 'LabelCross')
 LABEL_RANGES = {'LabelRadius': (100, 50000), 'LabelMax': (1, 32)}
 LABEL_ITEMS = {'dbg.labels': 'bool'}
+# 0.14 debug view: the [Debug] keys (0 / 1 or ranges), the items, the layers that have a bool item of their own
+DV_BOOL_KEYS = ('View', 'Triggers', 'TrgDeath', 'TrgFire', 'TrgCheckpoint', 'TrgWater', 'TrgSound', 'TrgVolume',
+                'TrgPlane', 'TrgUnknown', 'Portals', 'Checkpoints', 'TrgLabels', 'Legend', 'Markup', 'Persist', 'Names',
+                'NameIds')
+DV_RANGES = {'TriggerMax': (1, 256), 'TriggerRadius': (500, 200000), 'TriggerLabelMax': (0, 64),
+             'NameRadius': (100, 200000), 'NameMax': (1, 64), 'NameScale': (0.5, 3)}
+DV_FLOAT_KEYS = ('TriggerRadius', 'NameRadius', 'NameScale')     # the others are whole numbers
+DV_ITEMS = {'dbg.view': 'bool', 'dbg.triggers': 'bool', 'dbg.show': 'action', 'dbg.portals': 'bool',
+            'dbg.checkpoints': 'bool', 'dbg.legend': 'bool', 'dbg.status': 'info', 'dbg.names': 'bool',
+            'dbg.namefilter': 'action', 'dbg.namecolour': 'action', 'dbg.namesize': 'action'}
+DV_OWN_ITEM = {'portals': 'dbg.portals', 'checkpoints': 'dbg.checkpoints', 'legend': 'dbg.legend', 'names': 'dbg.names'}
+DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 
@@ -351,13 +370,24 @@ def nav_switches(src):
     return re.findall(r'\{"([a-z0-9_]+)", 0x', block)
 
 
+def dv_layers(src):
+    """0.14: the layer names of kDvLayers in TruMenu.cpp (in table order)"""
+    if 'const DvLayerDef kDvLayers[kDvCount] = {' not in src: return []
+    block = src[src.index('const DvLayerDef kDvLayers[kDvCount] = {'):]
+    block = block[:block.index('\n};')]
+    return re.findall(r'\{"([a-z]+)", "[A-Za-z]+", ', block)
+
+
 def check_debug(ini_path, radial_path):
-    """0.12: the [Debug] values of the INI, the nav items in kItems, the nav.* entries of the radial file"""
+    """0.12: the [Debug] values of the INI, the nav items in kItems, the nav.* entries of the radial file; 0.13 the
+    label keys / dbg.labels; 0.14 the debug view keys, items and ring entries"""
     problems, section, seen = [], None, set()
     name = os.path.basename(ini_path)
     src = open(CPP, encoding='utf-8').read()
     switches = nav_switches(src)
     if not switches: problems.append('TruMenu.cpp: kNavSwitches missing or empty')
+    layers = dv_layers(src)
+    if len(layers) != 13: problems.append('TruMenu.cpp: kDvLayers has %d layers, want 13' % len(layers))
     for n, line in enumerate(open(ini_path, encoding='utf-8').read().splitlines(), 1):
         line = line.strip()
         m = re.match(r'^\[(.+)\]$', line)
@@ -379,16 +409,32 @@ def check_debug(ini_path, radial_path):
             if not ok: problems.append('%s:%d: [Debug] %s=%s (%g .. %g)' % (name, n, key, value, lo, hi))
         elif key == 'LabelMatch' and (not value or not re.match(r'^[A-Za-z0-9_*, ]+$', value)):
             problems.append('%s:%d: [Debug] LabelMatch=%s (comma list of name parts a-z 0-9 _ or *)' % (name, n, value))
-        elif key == 'NavDraw':
+        elif key in ('NavDraw', 'ViewNav'):
             for word in [w for w in re.split(r'[ ,]+', value) if w]:
-                if word not in switches: problems.append('%s:%d: [Debug] NavDraw names "%s" (not in kNavSwitches)'
-                                                         % (name, n, word))
-    for key in ('Enabled', 'NavDraw', 'NavMask') + LABEL_KEYS:
+                if word not in switches: problems.append('%s:%d: [Debug] %s names "%s" (not in kNavSwitches)'
+                                                         % (name, n, key, word))
+        elif key in DV_BOOL_KEYS and value not in ('0', '1'):        # 0.14
+            problems.append('%s:%d: [Debug] %s=%s (0 / 1)' % (name, n, key, value))
+        elif key in DV_RANGES:
+            lo, hi = DV_RANGES[key]
+            try:
+                ok = lo <= float(value) <= hi and (key in DV_FLOAT_KEYS or value.isdigit())
+            except ValueError:
+                ok = False
+            if not ok: problems.append('%s:%d: [Debug] %s=%s (%g .. %g)' % (name, n, key, value, lo, hi))
+        elif key == 'NameColour' and not re.fullmatch(r'[0-9A-Fa-f]{6}', value):
+            problems.append('%s:%d: [Debug] NameColour=%s (RRGGBB)' % (name, n, value))
+        elif key == 'NameMatch' and value and not re.match(r'^[A-Za-z0-9_*, ]+$', value):
+            problems.append('%s:%d: [Debug] NameMatch=%s (comma list of name parts a-z 0-9 _ or *, may be empty)'
+                            % (name, n, value))
+    for key in (('Enabled', 'NavDraw', 'NavMask', 'ViewNav', 'NameColour', 'NameMatch') + LABEL_KEYS + DV_BOOL_KEYS +
+                tuple(sorted(DV_RANGES))):
         if key not in seen: problems.append('%s: [Debug] %s missing' % (name, key))
     items = item_types(src)
-    for item, typ in sorted(NAV_ITEMS.items()) + sorted(LABEL_ITEMS.items()):
+    for item, typ in sorted(NAV_ITEMS.items()) + sorted(LABEL_ITEMS.items()) + sorted(DV_ITEMS.items()):
         if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
     entries, used, labels = 0, set(), 0
+    dv_seen = {}                             # 0.14: layer / item -> count of ring entries
     if os.path.exists(radial_path):
         for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
             line = line.strip()
@@ -400,6 +446,34 @@ def check_debug(ini_path, radial_path):
                 labels += 1
                 if arg: problems.append('%s:%d: %s takes no argument in the ring, got "%s"'
                                         % (os.path.basename(radial_path), n, word, arg))
+                continue
+            if word in DV_ITEMS:             # 0.14: dbg.show <layer>, the others no argument
+                where = '%s:%d' % (os.path.basename(radial_path), n)
+                if word == 'dbg.show':
+                    if arg not in layers:
+                        problems.append('%s: dbg.show needs one layer of kDvLayers, got "%s"' % (where, arg))
+                    elif arg in DV_OWN_ITEM:
+                        problems.append('%s: layer %s has its own item %s - use that' % (where, arg, DV_OWN_ITEM[arg]))
+                    else:
+                        dv_seen[arg] = dv_seen.get(arg, 0) + 1
+                elif word == 'dbg.namefilter':
+                    if not re.fullmatch(r'[A-Za-z0-9_*,]+', arg):
+                        problems.append('%s: dbg.namefilter needs one list of name parts (a-z 0-9 _ , or *), got "%s"'
+                                        % (where, arg))
+                elif word == 'dbg.namecolour':
+                    if arg not in DV_NAME_COLOURS and not re.fullmatch(r'[0-9A-Fa-f]{6}', arg):
+                        problems.append('%s: dbg.namecolour needs a preset %s or RRGGBB, got "%s"'
+                                        % (where, '/'.join(DV_NAME_COLOURS), arg))
+                elif word == 'dbg.namesize':
+                    try:
+                        ok = 0.5 <= float(arg) <= 3.0
+                    except ValueError:
+                        ok = False
+                    if not ok: problems.append('%s: dbg.namesize needs 0.5 .. 3, got "%s"' % (where, arg))
+                elif arg:
+                    problems.append('%s: %s takes no argument in the ring, got "%s"' % (where, word, arg))
+                else:
+                    dv_seen[word] = dv_seen.get(word, 0) + 1
                 continue
             if not word.startswith('nav.'): continue
             entries += 1
@@ -413,8 +487,15 @@ def check_debug(ini_path, radial_path):
                 problems.append('%s: %s takes no argument in the ring, got "%s"' % (where, word, arg))
     if os.path.exists(radial_path) and labels != 1:
         problems.append('%s: dbg.labels must be in the radial file once, found %d' % (os.path.basename(radial_path), labels))
-    return problems, '%d switches in kNavSwitches, %d nav entries in the radial file (%d switches), %d dbg.labels entry' % (
-        len(switches), entries, len(used), labels)
+    if os.path.exists(radial_path):          # 0.14: every layer and every dbg.* switch item once
+        want = [DV_OWN_ITEM.get(l, l) for l in layers] + ['dbg.view', 'dbg.triggers', 'dbg.status']
+        for w in want:
+            if dv_seen.get(w, 0) != 1:
+                problems.append('%s: debug view entry %s must be in the radial file once, found %d'
+                                % (os.path.basename(radial_path), w, dv_seen.get(w, 0)))
+    return problems, ('%d switches in kNavSwitches, %d nav entries in the radial file (%d switches), %d dbg.labels entry, '
+                      '%d debug view layers, %d debug view entries' % (len(switches), entries, len(used), labels,
+                                                                       len(layers), sum(dv_seen.values())))
 
 
 def unescape(s):

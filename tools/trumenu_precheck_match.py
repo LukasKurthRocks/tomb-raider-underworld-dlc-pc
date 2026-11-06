@@ -5,6 +5,8 @@ other way round).
 
 Source checks found in the section: `HexBytesAt(0xADDR, "hex")`, `HexBytesAt(kName, "hex")` with `kName = 0xADDR`
 defined anywhere in the file, and table rows `{0xADDR, "hex"}`. Hex is compared without spaces, lower case.
+Since 2026-11-06 (TruMenu 0.14 triggers) a hex literal continued on the next line ("..ab"\n  "cd..", C++ string
+concatenation) counts as one literal.
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_precheck_match.py PRECHECK.txt [--from TEXT] [--to TEXT] [--cpp FILE]
@@ -55,6 +57,11 @@ def main(argv):
         return 1
     i1 = next((i for i in range(i0 + 1, len(lines)) if end in lines[i]), len(lines))
     section = '\n'.join(lines[i0:i1])
+    # 0.14: a hex literal split over two lines ("..ab"\n  "cd..") is one literal
+    while True:
+        joined = re.sub(r'([0-9a-fA-F ])"\s*\n\s*"([0-9a-fA-F ])', r'\1\2', section)
+        if joined == section: break
+        section = joined
     found = []
     for m in re.finditer(r'HexBytesAt\(\s*(0x[0-9a-fA-F]+|k[A-Za-z0-9_]+)\s*,\s*"([0-9a-fA-F ]+)"\)', section):
         a = m.group(1)

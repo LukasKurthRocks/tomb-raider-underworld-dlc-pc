@@ -75,7 +75,9 @@ $earlierBuilds = @{
                       '0dab4078bf10616f03e4f2d62d63cdbe3a9db49124cbdc6383a939addafe2f1d',   # 0.10.3 freeze sound switches (work\asi\menu0103)
                       'ac89cafadfbe3dcbf3464eb19bb5eb4268e99108a70b64b95d6c6a245b4bf7db',   # 0.10.4 shader clock switch (work\asi\menu0104)
                       'e018d6fa5b93ead697a1ef6cf862a3c509422d8b02af91a8f896e3c63877209a',   # 0.10.5 shots / Claude marks (work\asi\menu0105)
-                      '64b225881626eb437d7d7f556c1f3579471b9e9e65567f76983a7bcdc1df20c7')   # 0.11 Ablauf / flow file (work\asi\menu011)
+                      '64b225881626eb437d7d7f556c1f3579471b9e9e65567f76983a7bcdc1df20c7',   # 0.11 Ablauf / flow file (work\asi\menu011)
+                      '247a834a529646527731324c70e353c6e0f36f7eef500602bd4647c0deea38db',   # 0.12 NavPower debug drawing (work\asi\menu012)
+                      '9314430b42eaaa78bae82d25c4c809b59dbb4b890786105a745aaa49c6eed463')   # 0.13 Thrall-Labels (work\asi\menu0130)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
@@ -92,7 +94,9 @@ $earlierBuilds = @{
                       '7357c82399aedb92fd9ff11e817e0afb93cd9a02b41d9e7c8e49ca38f61d377a',   # 0.10.3 ([Radial] FreezeSound, [Menu] PauseSound; work\asi\menu0103)
                       '41000377fa6b7e13564731a2c287abcf4e231a7b432375dc29ce05517117c5b4',   # 0.10.4 ([Radial] FreezeShaderClock; work\asi\menu0104)
                       '95ad7f894d827d4bad68256cf54764f0dfb5388c65bd0741d2e542e746eb0de2',   # 0.10.5 ([Shot]; work\asi\menu0105)
-                      'b4fcc6d7b667a43ad62f4c96cf8d21e3523c740f0db6334083f08b09a38449a4')   # 0.11 ([Flow]; work\asi\menu011)
+                      'b4fcc6d7b667a43ad62f4c96cf8d21e3523c740f0db6334083f08b09a38449a4',   # 0.11 ([Flow]; work\asi\menu011)
+                      '7d8c6de86056fa6e6ecd848da7e76caa89bad113c5703a0e48d493f3cbcf0e27',   # 0.12 ([Debug] Enabled / NavDraw / NavMask; work\asi\menu012)
+                      'b465d1b58bc4257ad7a40b6b612e4e9c3cf91323e197375975c2a5584b321058')   # 0.13 ([Debug] Label*; work\asi\menu0130)
 }
 # 0.10 radial menu file and 0.10.1 tour file (next to tru.exe; the default comes from the build folder or src\asi\TruMenu)
 $radialFiles = @(

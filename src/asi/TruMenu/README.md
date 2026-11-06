@@ -1464,6 +1464,128 @@ The last line comes with the first labelled frame after `dbg.labels 1` and then 
 3. Knock a thrall down, stand next to it, power on: line 2 changes `Z9 -` -> `Z9 abgelehnt ...` / `Z9 Fach 0` /
    `Z9 ZIEL`; X / Y at the thrall: `2011 Pfad ...` on its label.
 
+## TruMenu 0.14 "Debug view" (triggers, loading areas, checkpoints, object names; debug view stage S3)
+
+Built into `work\asi\menu014`; compiled, offline checks only - **not yet seen in the game**. Owner notes (German):
+`<workspace>\docs\Befund-TruMenu-Trigger-0611.md`. Everything is read-only (no game memory written, no game function
+called) and off unless `[Debug] Enabled=1` plus a layer switch. Drawn at Present (background draw list; legend in the
+foreground) in a loaded level only - player instance, main state 1, no level change pending, the gates of `dbg.labels`;
+nothing about Lara's own state, so it keeps drawing during the 0.8.1 flight (`cheat.flight`, RT up / LT down). Fixed
+static buffers, nothing allocated by TruMenu per frame; projection as 0.13 (matrix 0xe804a0, 0x49f630) plus clipping of
+every line at the near plane (`z' > 16`), so a box the camera stands in still shows its visible edges.
+
+**Triggers (`dbg.triggers`, per kind `dbg.show <kind>`).** The two lists the game tests every frame (0x5cd520): planes
+`[0xdba21c]` / 0xda61c8, volumes `[0xdba220]` / 0xdb6be0 (at most 0x200 each, adders 0x5c8990 / 0x5c89e0); entry +0x20 =
+the trigger instance, +0x24 bit 31 = enabled (0x4a4360; disabled entries are skipped by the game and drawn dim), bit 30
+= tested against the player (0x4a4450). Data = `[[instance+0x100]+0x78]` (IntroDataTrigger). Drawn the way the engine
+tests them:
+
+* volume, shape byte +0x30 = 1 (box): centre = instance +0x20, half extents +0x34 / +0x38 / +0x3c along the rows of
+  `M = Rz * Ry * Rx` from the instance Euler angles +0x30 (0x49d500: identity post-multiplied by 0x49bd40 / 0x49bc70 /
+  0x49bb90, cos 0x813420 / sin 0x813680; row vectors). The game tests through the quaternion of M (0x49d720) as
+  `|conjugate(q) rotated (p - centre)| <= h` (0x46b730, Hamilton product 0x49c940), i.e. corner = centre + (+-h) * M -
+  12 lines. `tools/trigger_box_math.py` checks the closed form against those steps (2000 random cases: 0 matrix
+  elements off, 16000 / 16000 corners inside at x0.999 and outside at x1.001, 8000 / 8000 plane corners equal; the
+  transposed matrix fails as it must);
+* volume, shape 2 (sphere): squared distance to instance +0x20 below radius +0x40 squared (0x4355d0) - 3 circles;
+* plane (0x5ccc20): the quad `(+-w, 0, +-h) * M + instance +0x20` (0x435220 -> 0x49ba20 adds row 3), w = +0x34,
+  h = +0x3c; byte +0x44 = 0 = one-sided (the crossing direction is tested) -> an arrow along row 1 (the quad normal).
+  The game tests the segment of the player's test point between two frames against the two triangles (0x461640);
+* the test point itself: player +0x20 + (0, 0, 200.0) (`[0x853f08]`) - a white cross.
+
+Kind (colour) from the trigger instance's object name, first match wins: `checkpoint` (green), `death` / `kill` (red),
+`fire` / `burn` / `flame` (orange), `water` / `swim` (blue), `sound` / `swoosh` / `audio` / `music` / `sfx` (violet);
+no keyword = plain volume (yellow) / plane (cyan); no intro data, unknown shape or no name = unknown (grey). A full
+memory dump of DLC 2 (30.10., `dlc_level2_start` + `dlc_yggdrasil_hall01` loaded, `tools/debugview_dump_check.py`) holds 7 planes (`triggerplane`) and 19
+volumes (`triggervolume`, `soundvolume`, `soundtriggervolume`), all boxes; the generic names carry no death / fire
+meaning there - what a plain trigger does is in its script, which 0.14 does not read. Selection: the triggers nearest to
+the camera first, at most `[Debug] TriggerMax` (64) within `TriggerRadius` (20000 units from the camera, so it still works
+from high above), names for the nearest `TriggerLabelMax` (`dbg.show trglabels`: object name, intro id, B / K / E1 / E2
+= box / sphere / one-sided / two-sided plane, `(aus)` = disabled).
+
+**Loading areas (`dbg.portals`).** Every loaded stream unit (table 0xdbab40, state 2): entry +8 Level, `[Level]`
+Terrain, Terrain +2 s16 count, +4 array of 0x100-byte StreamUnitPortal (0x5d295f, 0x5d2ab5); quad corners +0xb0 /
++0xc0 / +0xd0 / +0xe0, normal +0xf0 (layout from the unit DRMs; in the DLC 2 dump the two records of the
+`dlc_level2_start` <-> `dlc_yggdrasil_hall01` connection lie on the same quad, normals opposite). White quad, diagonals,
+normal arrow, label `<unit> -> <destination>`. What actually starts a unit load is the signal geometry of a terrain group
+(0x5d2ca0 -> 0x5d2aa0); the quad is the portal's boundary.
+
+**Checkpoints (`dbg.checkpoints`).** Instances whose object name contains `checkpoint` (`checkpoint`,
+`invis_checkpoint`, `dlc2_checkpoint`): a post with a diamond and `CP <intro id>`; the active one (game data
+`[0xc59264]` +0x90, +0x114 when the word +0x1f4 is not 0 - the id the player placement 0x5d40c0 uses) in yellow with
+`AKTIV`. In the DLC 2 dump: 5 `checkpoint` instances, game data id 9400 = one of them.
+
+**Object names (`dbg.names`).** The object name of every instance from the **live PC object list** `[0xdb94d0]` (via
+`[[inst+0x10]+0x14]`, the `ObjectName` / `LabelKind` path - never a name table from the Xbox data), with the intro id
+(`[Debug] NameIds`), nearest to the camera first, at most `NameMax` within `NameRadius`; filter `NameMatch` / item
+`dbg.namefilter <parts|*>` (ring presets: all, thralls, triggers); font size `NameScale` / `dbg.namesize 0.5 .. 3`;
+colour `NameColour` / `dbg.namecolour white|yellow|cyan|magenta|RRGGBB` (menu: colour picker). The 0.13 Thrall-Labels
+(`dbg.labels`) stay as they were.
+
+**Legend (`dbg.legend`)**: top right, every layer that is on with its colour and `drawn / found`.
+
+**Master (`dbg.view`)**: on = every 0.14 layer whose checks passed + `dbg.labels` + `draw.markup` + the NavPower
+switches of `[Debug] ViewNav` (default `planner_areas,planner_connectivity,obstacles`; these need a loaded level and
+`[Cheat] Experimental=1` like `nav.draw`); off = all of them off (`nav.off`). Afterwards every switch works alone; the
+value of `dbg.view` is 1 while any of them is on.
+
+### Items, keys, menu, ring
+
+| Item | Type | Meaning |
+|---|---|---|
+| `dbg.view [0\|1]` | bool | master switch (above) |
+| `dbg.triggers [0\|1]` | bool | every trigger kind |
+| `dbg.show <layer> [0\|1]` | action | one layer: `death fire checkpoint water sound volume plane unknown` (trigger kinds), `portals checkpoints trglabels legend names` |
+| `dbg.portals` / `dbg.checkpoints` / `dbg.legend` / `dbg.names` | bool | the same layers as items of their own (ring on / off) |
+| `dbg.namefilter <parts\|*>`, `dbg.namecolour <preset\|RRGGBB>`, `dbg.namesize <f>` | action | object name settings |
+| `dbg.status` | info | checks, layers on, what the last frame drew |
+
+`[Debug]` keys (all 0 / off by default): `View`, `ViewNav`, `Triggers`, `TrgDeath`, `TrgFire`, `TrgCheckpoint`,
+`TrgWater`, `TrgSound`, `TrgVolume`, `TrgPlane`, `TrgUnknown`, `Portals`, `Checkpoints`, `TrgLabels`, `Legend`,
+`Markup`, `TriggerMax` (64, 1 .. 256), `TriggerRadius` (20000, 500 .. 200000), `TriggerLabelMax` (16, 0 .. 64), `Names`,
+`NameMatch` (empty = all), `NameRadius` (5000), `NameMax` (24, 1 .. 64), `NameScale` (1.0, 0.5 .. 3), `NameColour`
+(FFFFFF), `NameIds` (1), `Persist` (0; 1 = every switch of the debug view - layers, Labels, Markup, NavDraw, name
+settings - is written back into `TruMenu.ini` at once; `Set-TruMenu.ps1` then treats the file as owner-edited and keeps
+it on updates).
+
+Menu page **"Debug view / Debug-Ansicht (0.12 - 0.14)"**: master checkbox; groups Level data / Leveldaten (triggers
+all, loading areas, checkpoints, the eight kinds with colour swatch and drawn / found, trigger names, sliders), AI / KI
+(the seven NavPower switches, every layer, Thrall-Labels), Object names / Objektnamen (switch, filter text + presets,
+radius, max, font size, colour picker + presets, intro id), Lara (markup, ledges), Display / Anzeige (legend, Persist
+note). Ring **`Spieler/Debug`**: `Alles an / aus` (dbg.view), folders `Leveldaten` (12 entries, 2 pages), `KI` (the
+0.12 NavPower entries + Thrall-Labels, 10 entries, 2 pages - moved from `Spieler/Debug`), `Namen` (11, 2 pages),
+`Lara` (markup), then `Legende`, `Debug: Stand` (dbg.status), `Navmesh: Stand` (nav.status). Every switch shows on / off.
+
+**Byte checks** (`DebugViewCheck` at load; pinned in `work\asi\menu014\precheck_014.txt`, `tools/pe_bytes_check.py` on
+the Steam exe: 68 / 68 ok; `tools/trumenu_precheck_match.py --from "---- 0.14 Debug view" --to "---- favourites"`: 68 =
+68): trigger lists, loop and adders (0x5cd527 .. 0x5c89f1), the enabled / player bits (0x4a4360, 0x4a4450), the volume
+test (test point lift, data chain, shape, extents, radius, branches, 0x4355d0), the box test (0x46b75f .. 0x46b7c6,
+0x49cdce, 0x49cdea, 0x49c987), the Euler matrix (0x49d50b .. 0x49d63f, constants 0.0 / 1.0, fcos / fsin, the three
+axis rotations), the quaternion (0x49d720), the plane test (0x5ccc40 .. 0x5ccf55, 0x435259, 0x49ba20 / 0x49ba4b), the
+portal walk (0x5d295f, 0x5d2a48, 0x5d2ab5, 0x5d2aca), the checkpoint game data reader (0x5d41df, 0x5d4214) and names
+(0x85512c, 0x855118); plus the 0.13 projection checks and the 0.3 instance / player / main-state checks. A failed group
+disables its layers with the reason (`dbg.status`, greyed ring entries).
+
+### `TruMenu.log` lines
+
+```text
+0.14 debug view: triggers <ok|why>, portals <ok|why>, checkpoints <ok|why>, object names <ok|why>; [Debug] View <0|1>, Triggers <0|1>, <n> layer(s) on now, Markup <0|1>, ViewNav '<list>', TriggerMax <n>, ...
+dbg.show <layer> <0|1> (src=<ring|menu|TruLink>)      dbg.triggers <0|1> (all 8 kinds, src=...)
+dbg.view <0|1>: <n> layer(s), labels: <answer>, markup: <answer>, nav: <switch on|refused, ...> (src=...)
+0.14 debug view drawn: triggers <n> drawn (box b, sphere s, plane p) of <m> listed, <k> off-screen, ...; portals ...; checkpoints ...; names ...
+```
+
+The `drawn` line is written once with the first frame after a switch (no per-frame logging).
+
+**TO TEST (0.14)** - `[Debug] Enabled=1`, a loaded level (e.g. Croft Manor `l3_*` via the level select):
+
+1. `TruMenu.log`: `0.14 debug view: triggers ok, portals ok, checkpoints ok, object names ok`.
+2. Ring -> Spieler -> Debug -> `Legende`, then Leveldaten -> `Trigger alle`, `Ladebereiche`, `Checkpoints`: boxes /
+   quads where doors, rooms and corridors are; the white cross 200 above Lara; walking into a box triggers what it
+   should (the box is where the game tests).
+3. `cheat.flight 1`, RT up, look down; `Alles an / aus`: everything stays drawn from above, the nearest first.
+4. Namen -> `Objektnamen`, `Filter: alle`, `Farbe gelb`, `Schrift 1.5x`.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

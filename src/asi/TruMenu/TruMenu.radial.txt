@@ -59,23 +59,60 @@ Spieler/Objekte | Kiste A | instance.spawn sh_ei_combat_crate_a
 Spieler/Objekte | Kiste B | instance.spawn sh_ei_combat_crate_b
 Spieler/Objekte | Kiste C | instance.spawn sh_ei_combat_crate_c
 Spieler/Objekte | Schrotflinte (Objekt) | instance.spawn wp_shotgun
-# 0.12 Debug-Zeichnung (debug view stage S0): the NavPower debug drawing compiled into tru.exe - only with [Debug]
-# Enabled=1 and in a loaded level (greyed otherwise); each switch shows on / off. Below Spieler so the top level keeps its
-# 8 sectors. Verbindungen / Normalen draw only together with Flaechen or Flaechen gefuellt (same area loop); "Alle
-# Ebenen" = nav.mask (layer mask 0xffffffff); "Alles aus" = every switch and the mask back to the values before.
-Spieler/Debug | Navmesh Flaechen | nav.draw planner_areas
-Spieler/Debug | Navmesh gefuellt | nav.draw planner_areas_solid
-Spieler/Debug | Navmesh Verbindungen | nav.draw planner_connectivity
-Spieler/Debug | Hindernisse | nav.draw obstacles
-Spieler/Debug | Nav-Proben | nav.draw recent_navprobes
-Spieler/Debug | Laufweg (Flieger) | nav.draw draw_mover3d_path
-Spieler/Debug | Alle Ebenen | nav.mask
-Spieler/Debug | Alles aus | nav.off
-Spieler/Debug | Flaechen-Normalen | nav.draw planner_area_normals
-Spieler/Debug | Debug: Stand | nav.status
+# 0.14 Debug-Ansicht (owner order 2026-11-06): Spieler/Debug = the master switch, then the groups Leveldaten (triggers by
+# kind, loading areas, checkpoints), KI (navmesh, thrall labels) and Lara (markup), then legend and state. Everything only
+# with [Debug] Enabled=1 (greyed otherwise); every entry shows on / off; the overlays draw in a loaded level, also while
+# flying (cheat.flight). "Alles an / aus" = dbg.view: every layer + Thrall-Labels + Markup + [Debug] ViewNav on, or all
+# off (nav.off); afterwards each entry switches alone. Below Spieler so the top level keeps its 8 sectors.
+Spieler/Debug | Alles an / aus | dbg.view
+# Leveldaten: page 1 = the overview switches and the dangerous kinds, page 2 (RB) = the rest; colours as the legend
+Spieler/Debug/Leveldaten | Trigger alle | dbg.triggers
+Spieler/Debug/Leveldaten | Ladebereiche | dbg.portals
+Spieler/Debug/Leveldaten | Checkpoints | dbg.checkpoints
+Spieler/Debug/Leveldaten | Tod / Kill | dbg.show death
+Spieler/Debug/Leveldaten | Feuer | dbg.show fire
+Spieler/Debug/Leveldaten | Checkpoint-Trigger | dbg.show checkpoint
+Spieler/Debug/Leveldaten | Wasser | dbg.show water
+Spieler/Debug/Leveldaten | Ton / Swoosh | dbg.show sound
+Spieler/Debug/Leveldaten | Trigger (Volumen) | dbg.show volume
+Spieler/Debug/Leveldaten | Trigger-Ebenen | dbg.show plane
+Spieler/Debug/Leveldaten | Trigger unbekannt | dbg.show unknown
+Spieler/Debug/Leveldaten | Trigger-Namen | dbg.show trglabels
+# 0.12 Debug-Zeichnung (debug view stage S0): the NavPower debug drawing compiled into tru.exe - in a loaded level only.
+# Verbindungen / Normalen draw only together with Flaechen or Flaechen gefuellt (same area loop); "Alle Ebenen" =
+# nav.mask (layer mask 0xffffffff); "Navmesh aus" = nav.off: every switch and the mask back to the values before.
 # 0.13 Thrall-Labels (debug view stage S1): a label at each thrall near Lara (name, intro id, distance, health, targeter 9
-# / hit list / condition 2011 from TruShadowCombat 0.5.3); on / off, needs [Debug] Enabled=1, draws in a loaded level
-Spieler/Debug | Thrall-Labels | dbg.labels
+# / hit list / condition 2011 from TruShadowCombat 0.5.3).
+Spieler/Debug/KI | Navmesh Flaechen | nav.draw planner_areas
+Spieler/Debug/KI | Navmesh Verbindungen | nav.draw planner_connectivity
+Spieler/Debug/KI | Hindernisse | nav.draw obstacles
+Spieler/Debug/KI | Thrall-Labels | dbg.labels
+Spieler/Debug/KI | Navmesh gefuellt | nav.draw planner_areas_solid
+Spieler/Debug/KI | Nav-Proben | nav.draw recent_navprobes
+Spieler/Debug/KI | Laufweg (Flieger) | nav.draw draw_mover3d_path
+Spieler/Debug/KI | Alle Ebenen | nav.mask
+Spieler/Debug/KI | Flaechen-Normalen | nav.draw planner_area_normals
+Spieler/Debug/KI | Navmesh aus | nav.off
+# 0.14 object names (owner wish 2026-11-06): the object name of every instance from the live PC object list, nearest to
+# the camera first; filter presets (dbg.namefilter), colour presets (dbg.namecolour), font size (dbg.namesize); the free
+# colour / size / filter text are on the menu page "Debug view"
+Spieler/Debug/Namen | Objektnamen | dbg.names
+Spieler/Debug/Namen | Filter: alle | dbg.namefilter *
+Spieler/Debug/Namen | Filter: Thralls | dbg.namefilter thrall
+Spieler/Debug/Namen | Filter: Trigger | dbg.namefilter trigger,volume,plane
+Spieler/Debug/Namen | Farbe weiss | dbg.namecolour white
+Spieler/Debug/Namen | Farbe gelb | dbg.namecolour yellow
+Spieler/Debug/Namen | Farbe cyan | dbg.namecolour cyan
+Spieler/Debug/Namen | Farbe magenta | dbg.namecolour magenta
+Spieler/Debug/Namen | Schrift 1x | dbg.namesize 1
+Spieler/Debug/Namen | Schrift 1.5x | dbg.namesize 1.5
+Spieler/Debug/Namen | Schrift 2x | dbg.namesize 2
+# 0.3 markup (MarkupManager boxes, projected with the TRANS matrix 0xa038f0 - see the README note)
+Spieler/Debug/Lara | Markup | draw.markup
+Spieler/Debug/Lara | Nur Kanten | draw.ledges
+Spieler/Debug | Legende | dbg.legend
+Spieler/Debug | Debug: Stand | dbg.status
+Spieler/Debug | Navmesh: Stand | nav.status
 # 0.10.5 (owner wish 2026-11-05): Claude marks, drawn in coral - each pick writes one TruMenu.log line
 # "claude.mark <kind>: <time> unit=<stream unit> pos=<x y z> step=<TO TEST step or -> shot=<file> src=ring" and takes a
 # clean shot named <kind>; the ring closes after the pick. [Shot] Hotkey (F11 = 0x7A, default off) = "Jetzt".
