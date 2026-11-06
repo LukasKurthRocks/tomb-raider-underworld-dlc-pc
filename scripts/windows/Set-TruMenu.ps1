@@ -80,7 +80,8 @@ $earlierBuilds = @{
                       '9314430b42eaaa78bae82d25c4c809b59dbb4b890786105a745aaa49c6eed463',   # 0.13 Thrall-Labels (work\asi\menu0130)
                       'eb6274a9c2aa5f253ab2060cc82518cdfde572ffa44b63647ba41de006dc54b7',   # 0.14 Debug view (work\asi\menu014)
                       'e45acc3cd2714911444580b5096c58a38e59ae0927cfa5eab59bc5c4dbea66d3',   # 0.15 Render mode (work\asi\menu015)
-                      '73abc68cba4abe371991b3165c6000385a9f6cbad56fb35d335960e5e6d890ba')   # 0.16 Readability (work\asi\menu016)
+                      '73abc68cba4abe371991b3165c6000385a9f6cbad56fb35d335960e5e6d890ba',   # 0.16 Readability (work\asi\menu016)
+                      '249ca8c0fa5f080a71f00083091b442c0c631fd853fa15720a4377fc6ad98a7f')   # 0.17 Schnellschalter (work\asi\menu017)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

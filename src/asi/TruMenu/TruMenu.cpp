@@ -55,7 +55,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.17 (Schnellschalter: quick-toggle bar at the left screen edge, the game keeps "
+const char *const kVersion = "TruMenu 0.17.1 (depth: scene view +0x100 / projection +0x140 swapped back after the live "
+                             "depthdump; 0.17 Schnellschalter: quick-toggle bar at the left screen edge, the game keeps "
                              "running - [Quick] OpenButtons (View + Start, a chord window keeps a lone button from the "
                              "game for ChordMs), D-pad up / down = row, left / right = off / on or the value, LB / RB = "
                              "page; rows in the colour of their layer with the count drawn, pages Debug / Darstellung / "
@@ -9050,7 +9051,10 @@ const DvCheck kDvUnitChecks[] = {
     {0x005d1df3, "8b4e74 8b4910 0f284c0110"},
     {0x005d1e2e, "83c201 0590000000 3b510c 72b8"},
 };
-const DWORD kDpSceneProj = 0x100, kDpSceneView = 0x140, kDpSceneTarget = 0x1c0;
+// 0.17.1 (live dbg.depthdump 2026-11-06 18:07, l3_main_hall): +0x100 is the VIEW (row vectors; its depth column
+// -0.428 / -0.818 / -0.385, translation z 5069.52 = the 0.14 camera's; test point 1 gives 1000.0 for camera z' 999.999)
+// and +0x140 the PROJECTION (1.358, 2.414, 1.00023 / 1, -16.0036 / 0) - 0.16 / 0.17 read them the other way round
+const DWORD kDpSceneProj = 0x140, kDpSceneView = 0x100, kDpSceneTarget = 0x1c0;
 const DWORD kDpFvf = D3DFVF_XYZRHW | D3DFVF_DIFFUSE;
 struct DpVtx { float x, y, z, rhw; DWORD colour; };
 const int kDpBatch = 6144;                   // vertices per vertex buffer fill (2048 triangles)
