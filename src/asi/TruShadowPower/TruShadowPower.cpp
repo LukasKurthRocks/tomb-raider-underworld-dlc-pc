@@ -108,6 +108,15 @@
 // cloth time step. TU 0x82278120 (retail 0x8227b220, PC tru+0x1bbe70) updates the cloth component (type 14, Lara's
 // ponytail) of an instance; the TU divides the player's frame time by the world time scale there, so the hair keeps
 // real time while the shadow power slows the world (without it the ponytail stretches). Section "0.15" below.
+//
+// 0.16 (2026-11-06, project doc Befund-15h-Absturz-Finisher-0611.md section 1): crash fix. The TU runs the meter tick
+// inside Lara's player update (0x824128a4..0x824128b8) - no Lara, no tick. The plugin ticks from the pad poll, so
+// during a level teardown (level.load, save.load, mission start, death reload) a tick ran with player state
+// [0xfadb58] = 0; with the meter below max Refill -> ShowMeter -> HUD manager vtbl[3] -> HUD script -> uigamedata f32
+// (tru+0x3a0db0 -> tru+0x37bd80) read [0xfadb58]+0x50d -> AV tru+0x37bdd3. MeterTick now returns at once (no refill,
+// no HUD call, no state change) while the player state or the player instance [0xe7f094] is 0, the main state
+// [0xe7ed60] is not 1 or a level change waits (GameTracker+0xb9); every HUD call of the plugin needs the player state.
+// One log line per skip burst and one when the tick resumes. Section "0.16" below.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -433,9 +442,31 @@ const BYTE *FindTuning() {
     return tuning;
 }
 
+// 0.16 (Befund-15h-Absturz-Finisher-0611.md section 1): the HUD update below runs the HUD script, which reads the
+// current weapon name through uigamedata f32 (native 0x20, tru+0x3a0db0 -> tru+0x37bd80): `mov ecx,[0xfadb58]` at
+// tru+0x37bdb5, then `mov al,[ecx+0x50d]` at tru+0x37bdd3 without a null test. The player state [0xfadb58] (TU
+// 0x829892b0; kGameTrackerPtr below, TruMenu's "playerstate P") is set by tru+0x32247b and cleared (ebx = 0 from
+// tru+0x321ffa) by tru+0x322304 when the player goes. So no HUD call of this plugin while it is 0. Pinned by bytes in
+// the 0.16 tick gate checks (section "0.16"); the test itself is a plain read of a global and always applies.
+const DWORD kPlayerStatePtr = 0x00fadb58;
+volatile LONG g_hudSkips = 0;           // HUD calls skipped for a missing player state
+
+bool PlayerStateNow() { return *reinterpret_cast<const volatile DWORD *>(kPlayerStatePtr) != 0; }
+
+// false (and counted / logged rate-limited) when there is no player state: the caller skips its HUD call
+bool HudPlayerOk(const char *what) {
+    if (PlayerStateNow()) return true;
+    LONG n = InterlockedIncrement(&g_hudSkips);
+    if (n == 1 || (g_logLevel >= 2 && (n & (n - 1)) == 0))
+        Log(n == 1 ? 1 : 2, "HUD call skipped (%s): no player state [0xfadb58] - the HUD script would read it (%ld times)",
+            what, n);
+    return false;
+}
+
 // HUD part of 0x823d81a0 / 0x823d8380: fraction, request display group 1, let the HUD manager react
 void ShowMeter(float fraction) {
     if (!g_hudOk || !g_hudFeed) return;
+    if (!HudPlayerOk("meter")) return;                  // 0.16: no fraction write, no group, no update
     *kHudValue = fraction;
     if (!*kHudManager) return;
     g_hudGroup(1);
@@ -1692,7 +1723,8 @@ void Set40(const BYTE *tuning) {
     __try {
         const BYTE *player = *reinterpret_cast<const BYTE *const *>(gt + 0x504);
         if ((*reinterpret_cast<const DWORD *>(player + 0x1fc) >> 10) & 1) {
-            if (g_hudOk && *kHudManager) {                       // 0x829ca724 |= 0x9000; vtbl[0xc] - as tru+0x3189d7
+            if (g_hudOk && *kHudManager && HudPlayerOk("flag 0x40 on")) {   // 0x829ca724 |= 0x9000; vtbl[0xc] - as
+                                                                            // tru+0x3189d7 (0.16: needs the player state)
                 g_hudGroup(0xf);
                 g_hudGroup(0xc);
                 g_hudUpdate();
@@ -1718,7 +1750,8 @@ void Clear40() {
         g_meter.request[3][0] = g_meter.request[3][1] = kNoRequest;
         Selector();
     }
-    if (g_hudOk && g_lookAdrOk && *kHudManager) {               // 0x829ca724 &= 0xffff6fff; vtbl[0xc]
+    if (g_hudOk && g_lookAdrOk && *kHudManager && HudPlayerOk("flag 0x40 off")) {   // 0x829ca724 &= 0xffff6fff;
+                                                                                    // vtbl[0xc] (0.16: player state)
         reinterpret_cast<HudClearFn>(kHudClear)(0xf);
         reinterpret_cast<HudClearFn>(kHudClear)(0xc);
         g_hudUpdate();
@@ -2028,7 +2061,7 @@ void NewTrackerCheck() {
         bool requests = false;
         for (int i = 0; i < 7; ++i) requests = requests || kZero < g_meter.request[i][0] || kZero < g_meter.request[i][1];
         DWORD was = g_meter.flags;
-        if ((was & 0x40) && g_hudOk && g_lookAdrOk && *kHudManager) {
+        if ((was & 0x40) && g_hudOk && g_lookAdrOk && *kHudManager && HudPlayerOk("new tracker, flag 0x40")) {
             reinterpret_cast<HudClearFn>(kHudClear)(0xf);
             reinterpret_cast<HudClearFn>(kHudClear)(0xc);
             g_hudUpdate();
@@ -2044,12 +2077,127 @@ void NewTrackerCheck() {
     g_lastGeneration = gen;
 }
 
+// ================================================================================================================
+// 0.16 (project doc Befund-15h-Absturz-Finisher-0611.md section 1): the tick only while Lara exists and updates.
+//
+// TU: the player update 0x824126d8 calls the tick 0x823d7a10 (0x824128a4..0x824128b8) - without Lara (unit unload,
+// level change, front end) there is no player update and so no tick. The plugin ticks from the pad poll; up to 0.15 its
+// only gate was the doppelganger flag, which stays 1 until the next tracker constructor. The 15h run crashed on the
+// first tick after a level.load unload: player state 0, meter 99.6 %, Refill -> ShowMeter -> HUD script -> uigamedata
+// f32 -> AV tru+0x37bdd3. MeterTick now returns at once - no refill, no drain, no HUD call, no flag / latch / request
+// change, no new-tracker re-init (that runs at the first tick after the skip, before any refill) - when:
+//   1 player state [0xfadb58] == 0         the HUD script's f32 dereferences it (tru+0x37bdb5 / 0x37bdd3)
+//   2 player instance [0xe7f094] == 0      GameTracker 0xe7f088 + 0xc (reader tru+0x341764, TruMenu's InLevel())
+//   3 main state [0xe7ed60] != 1           dispatcher tru+0x1e0090 (&mainState from the game loop tru+0x1e01ab): state
+//                                          1 -> tru+0x1e00e1 -> tru+0x1e0050 = the level loop; 2 = a level start is set
+//                                          up (tru+0x1dfb83, level load tru+0x1de9c0), 9 outfit selection, 10 front end
+//   4 level change byte GameTracker+0xb9   [0xe7f141] set by the request tru+0x1df88a, tested by GAMELOOP_Request-
+//                                          LevelChangeByName tru+0x1df8d3, cleared by the level load tru+0x1de86c
+// 1 / 2 are plain reads of two globals and always apply; 3 / 4 (TruMenu's LevelChangePending / SafePauseReason tests)
+// apply only when their code is verified (kTickGateChecks); 1 and 2 are pinned there too.
+const volatile DWORD *const kMainStateVar = reinterpret_cast<const volatile DWORD *>(0x00e7ed60);
+const volatile BYTE *const kLevelChangeByte = reinterpret_cast<const volatile BYTE *>(0x00e7f141);
+const volatile DWORD *const kPlayerInstanceVar = reinterpret_cast<const volatile DWORD *>(0x00e7f094);
+const CodeCheck kTickGateChecks[] = {
+    // player state: the faulting reader (uigamedata f32 body tru+0x37bd80), its writers (set / clear with ebx = 0)
+    {0x0077bdb5, "8b0d58dbfa00 8944240f 89442413 89442417 8944241b 8944241f 89442423 8a810d050000"},
+    {0x0072247b, "893d58dbfa00"}, {0x00721ffa, "33db"}, {0x00722304, "891d58dbfa00"},
+    // player instance [0xe7f094] (GameTracker + 0xc)
+    {0x00741764, "8b0d94f0e700"},
+    // main state: the game loop passes &mainState, the dispatcher, table entry state 1 -> the level loop handler
+    {0x005e01ab, "6888f0e700 6860ede700 e8d6feffff"},
+    {0x005e0096, "8b3e 8d47ff 83f809 0f87b0000000 ff24855c015e00"},
+    {0x005e015c, "e1005e00"}, {0x005e00e1, "8b4c2410 51 56 e864ffffff"},
+    // main state 1 after the level load, 2 on a mission start from a level / the front end
+    {0x005de9f0, "c70560ede70001000000"}, {0x005dfb5c, "833d60ede70001"}, {0x005dfb83, "c70560ede70002000000"},
+    // GameTracker+0xb9: request sets it, RequestLevelChangeByName tests it (edi = GameTracker), level load clears it
+    {0x005df883, "c60543f1e70000 a241f1e700"}, {0x005df8d3, "80bfb900000000 754d"},
+    {0x005de864, "381d41f1e700 7406 881d41f1e700"},
+};
+bool g_levelGateOk = false;             // kTickGateChecks verified (else only tests 1 / 2)
+int g_skipReason = 0;                   // 0 ticking, else the reason of the running skip burst (1..4)
+LONG g_skipTicks = 0;                   // ticks skipped in the running burst
+DWORD g_skipClock = 0;                  // game clock [0xe7f15c] at the burst's first skip
+LONG g_skipBursts = 0;                  // bursts so far (logged at LogLevel 1 up to kSkipBurstLog, then at 2)
+const LONG kSkipBurstLog = 64;
+
+// 0 = the tick may run, else 1 no player state, 2 no player instance, 3 main state not 1, 4 level change pending
+int TickSkipReason() {
+    if (!PlayerStateNow()) return 1;
+    if (!*kPlayerInstanceVar) return 2;
+    if (g_levelGateOk) {
+        if (*kMainStateVar != 1) return 3;
+        if (*kLevelChangeByte) return 4;
+    }
+    return 0;
+}
+
+const char *SkipReasonText(int reason) {
+    static const char *const texts[] = {"none", "no player state [0xfadb58]", "no player instance [0xe7f094]",
+                                        "main state [0xe7ed60] not 1", "level change pending (GameTracker+0xb9)"};
+    return texts[reason >= 0 && reason <= 4 ? reason : 0];
+}
+
+// true = skip this tick (logs the start of a burst, a reason change at LogLevel 2 and the resume)
+bool TickGate() {
+    int reason = TickSkipReason();
+    if (reason) {
+        if (!g_skipReason) {
+            g_skipClock = *kGameClock;
+            g_skipTicks = 0;
+            LONG burst = ++g_skipBursts;
+            if (burst <= kSkipBurstLog || g_logLevel >= 2)
+                Log(burst <= kSkipBurstLog ? 1 : 2,
+                    "meter tick skipped (no player / level change): %s - player state 0x%08lx, player 0x%08lx, main "
+                    "state %lu, GameTracker+0xb9 %u; meter %.1f, flags 0x%03lx kept (TU: the tick runs only in Lara's "
+                    "update 0x824128a4; burst %ld%s)", SkipReasonText(reason),
+                    *reinterpret_cast<const volatile DWORD *>(kPlayerStatePtr), *kPlayerInstanceVar, *kMainStateVar,
+                    static_cast<unsigned>(*kLevelChangeByte), g_meter.value, g_meter.flags, burst,
+                    burst == kSkipBurstLog ? ", later bursts at LogLevel 2" : "");
+        } else if (reason != g_skipReason) {
+            Log(2, "meter tick still skipped: %s (was: %s)", SkipReasonText(reason), SkipReasonText(g_skipReason));
+        }
+        g_skipReason = reason;
+        ++g_skipTicks;
+        return true;
+    }
+    if (g_skipReason) {
+        DWORD ms = *kGameClock - g_skipClock;
+        if (g_skipBursts <= kSkipBurstLog || g_logLevel >= 2)
+            Log(g_skipBursts <= kSkipBurstLog ? 1 : 2,
+                "meter tick resumed: player state 0x%08lx, player 0x%08lx, main state 1 - %ld ticks skipped over %lu ms "
+                "game clock (last reason: %s)", *reinterpret_cast<const volatile DWORD *>(kPlayerStatePtr),
+                *kPlayerInstanceVar, g_skipTicks, ms, SkipReasonText(g_skipReason));
+        g_skipReason = 0;
+        g_skipTicks = 0;
+    }
+    return false;
+}
+
+void CheckTickGate() {
+    g_levelGateOk = true;
+    for (const auto &c : kTickGateChecks)
+        if (!HexBytesAt(c.address, c.bytes)) {
+            Log(0, "0.16 tick gate: code at 0x%08lx does not match - main state / level change tests off (the tick "
+                   "still needs the player state [0xfadb58] and the player instance [0xe7f094])", c.address);
+            g_levelGateOk = false;
+            break;
+        }
+    if (g_levelGateOk)
+        Log(1, "0.16 tick gate: %u code checks passed - the meter ticks only with player state [0xfadb58], player "
+               "instance [0xe7f094], main state [0xe7ed60] = 1 and no level change pending (GameTracker+0xb9) - as the "
+               "TU's tick inside Lara's update; every HUD call needs the player state",
+            static_cast<unsigned>(sizeof(kTickGateChecks) / sizeof(kTickGateChecks[0])));
+}
+
 // ---- the TU tick 0x823d7a10 ----
 int g_lastDg = -1;
 bool g_lastPadHeld = false;
 int g_inputDiag = 0;
 
 void MeterTick(bool padHeld) {
+    if (TickGate()) return;                      // 0.16: no player / not in a level / level change - TU: no tick
+                                                 // (also for the legacy 0.8 tick below)
     ScreenEffectPoll();                          // 0.10: only while an event 0x32 is pending
     ReportClothTimeStep();                       // 0.15: log only ([Cloth] TuTimeStep=1)
     if (g_legacyPadStart) { LegacyMeterTick(padHeld); return; }
@@ -2857,7 +3005,7 @@ void AimAt(BYTE *a, const float *point) {
     reinterpret_cast<AimProjectFn>(kAimProject)(proj, &bytes.b1, &bytes.b0, pt);
     const float *r = reinterpret_cast<AimVectorFn>(kAimVector)(a, 0, out, proj);
     memcpy(a + 0x20, r, 16);
-    if (g_hudOk && *kHudManager) {
+    if (g_hudOk && *kHudManager && HudPlayerOk("strike look aim")) {     // 0.16: the HUD script needs the player state
         g_hudGroup(0xb);
         g_hudGroup(1);
         reinterpret_cast<HudGroupFn>(kHudMask2Set)(1);
@@ -3200,7 +3348,7 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.15 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.16 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d)", g_enabled, g_buttons, g_hudFeed, g_fallback,
@@ -3318,6 +3466,7 @@ void Start(HMODULE self) {
     CheckCameraFlag();
     PatchStrikeLook();
     PatchClothTimeStep();               // 0.15: only with [Cloth] TuTimeStep=1 (independent of the doppelganger flag)
+    CheckTickGate();                    // 0.16: main state / level change tests of the tick (player tests always on)
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -3338,8 +3487,8 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.15 (translated TU meter with the TU tick gates, Lara conditions 1046 / 1047 / 1048-1056 / "
-           "2401, states 243 / 245 / 1018 / 2102, activities 1009 / 1039, shadow look = TU player events of start / stop, "
+    return "TruShadowPower 0.16 (translated TU meter with the TU tick gates, tick only with a player in a level, Lara "
+           "conditions 1046 / 1047 / 1048-1056 / 2401, states 243 / 245 / 1018 / 2102, activities 1009 / 1039, shadow look = TU player events of start / stop, "
            "adrenaline look = meter flag 0x40 / camera mode 0x34, look screen effect report / switch, GlobalParams[7], "
            "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4; switches default off: loop "
            "sound, move events 0x83 / 0x84, camera flag, strike look 0x823d8a80 / 0x823d9050, cloth TU time step "

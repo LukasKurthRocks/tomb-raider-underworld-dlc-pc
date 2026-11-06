@@ -48,7 +48,9 @@ $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # test 48k, 2026-11-01; 0.6 = condition 1046 (work\asi\v06), 2026-11-01; 0.7 = condition 1055 (work\asi\v07) and the
 # sample .ini of 0.5-0.7, 2026-11-02; 0.8 = look events (work\asi\v08); 0.9 = TU tick / adrenaline look (work\asi\v09),
 # 2026-11-02; 0.10 = look screen effect (work\asi\v10), 0.11 = GlobalParams[7] / state 2102 / meter API v2
-# (work\asi\v11), 2026-11-03) - recognised as ours for update / removal
+# (work\asi\v11), 2026-11-03; 0.12 - 0.15 (work\asi\v12 .. v15), 2026-11-03 .. 2026-11-06) - recognised as ours for
+# update / removal. The current build 0.16 (tick only with a player in a level, work\asi\v16, 2026-11-06) ships the
+# unchanged 0.15 sample .ini.
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',

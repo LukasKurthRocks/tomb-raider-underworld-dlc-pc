@@ -21,9 +21,45 @@ white-black with the look); 0.10 (look screen-effect report / switch, with the d
 (meter interface v3, InstanceParams[1] in cinematics) built 2026-11-03, played in the runs of 2026-11-03 (state 2102
 never registered); 0.13 (state 2102 next to TruDataGuard) built 2026-11-04, not played; 0.14 (loop sound, movement
 events, camera flag, strike look - four switches, all default off) built 2026-11-04, not played; 0.15 (the TU's
-player cloth time step, `[Cloth] TuTimeStep`, default off) built 2026-11-06, not played.** Not covered: the
+player cloth time step, `[Cloth] TuTimeStep`, default off) built 2026-11-06, not played; 0.16 (crash fix: the meter
+ticks only with a player in a level) built 2026-11-06, not played.** Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.16: the meter ticks only with a player in a level - crash fix (2026-11-06)
+
+The 15h live run crashed at tru+0x37bdd3 (`mov al,[ecx+0x50d]`, ecx = 0) on the first meter tick after a ring
+`level.load` unload: the player state `[0xfadb58]` was already 0, the meter stood at 99.6 %, so Refill -> ShowMeter ->
+HUD manager vtbl[3] -> HUD script -> uigamedata f32 (tru+0x3a0db0 -> tru+0x37bd80) read the player state without a
+null test (project doc `Befund-15h-Absturz-Finisher-0611.md` section 1). On the TU the tick runs inside Lara's player
+update (0x824128a4..0x824128b8): no Lara, no tick. The plugin ticks from the pad poll, and its only gate was the
+doppelganger flag, which stays 1 through a teardown.
+
+0.16 mirrors the TU: `MeterTick` returns at once - no refill, no drain, no HUD call, no flag / latch / request change,
+no new-tracker re-init (that one runs at the first tick after the skip, before any refill) - while
+
+| # | Test | PC evidence (byte pre-checks `work\asi\v16\prechecks_v16.txt`, 15 checks) | Applies |
+|---|---|---|---|
+| 1 | player state `[0xfadb58]` == 0 | the faulting reader tru+0x37bdb5 / 0x37bdd3; set tru+0x32247b, cleared (ebx = 0 from tru+0x321ffa) tru+0x322304 | always |
+| 2 | player instance `[0xe7f094]` == 0 | GameTracker 0xe7f088 + 0xc, reader tru+0x341764 (TruMenu `InLevel()`) | always |
+| 3 | main state `[0xe7ed60]` != 1 | game loop tru+0x1e01ab -> dispatcher tru+0x1e0090, state 1 -> tru+0x1e0050 (level loop); 1 after the level load tru+0x1de9f0, 2 on a mission start tru+0x1dfb83 | code verified |
+| 4 | level change pending, byte GameTracker+0xb9 `[0xe7f141]` != 0 | set by the request tru+0x1df88a, tested by GAMELOOP_RequestLevelChangeByName tru+0x1df8d3, cleared by the level load tru+0x1de86c | code verified |
+
+Tests 1 / 2 are plain reads of two globals and always apply; 3 / 4 are TruMenu's `LevelChangePending` /
+`SafePauseReason` tests and apply only when their code matches (otherwise one error line; the tick keeps tests 1 / 2).
+Second line of defence: **every HUD call** of the plugin (ShowMeter, flag 0x40 on / off, the new-tracker HUD clear,
+the strike-look aim) is skipped while `[0xfadb58]` is 0, also when called through the meter interface
+(`TruShadowPowerMeterApi` drain). Nothing else changed: all switches (`[Sound] LoopSound`, `[Look] MoveEvents` /
+`CameraFlag` / `StrikeLook`, `[Cloth] TuTimeStep`, ...) and the sample .ini are as in 0.15.
+
+**Log lines**: `0.16 tick gate: 15 code checks passed - the meter ticks only with player state [0xfadb58], ...` at load
+(or `0.16 tick gate: code at 0x... does not match - main state / level change tests off ...`); per skip burst
+`meter tick skipped (no player / level change): <reason> - player state 0x..., player 0x..., main state N,
+GameTracker+0xb9 N; meter M, flags 0x... kept (... burst K)` and on resume `meter tick resumed: ... - N ticks skipped
+over T ms game clock (last reason: ...)` (the first 64 bursts at LogLevel 1, later ones at 2; a reason change inside a
+burst at 2); `HUD call skipped (<what>): no player state [0xfadb58] ...` (first time at 1, then powers of two at 2).
+When the game clock advances in the main menu (the tick runs only then), the first such line is a skip with reason
+`no player state` - expected.
 
 ## 0.15: the TU's player cloth time step - Lara's ponytail in slow motion (2026-11-06)
 
