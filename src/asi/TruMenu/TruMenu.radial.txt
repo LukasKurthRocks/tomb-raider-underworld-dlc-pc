@@ -184,6 +184,17 @@ Spieler/Debug/Leveldaten | Checkpoints: Liste | dbg.cplist
 Spieler/Positionen | Position merken | pos.save
 Spieler/Positionen | Zur letzten Position | pos.go last
 Spieler/Positionen | Positionen: Liste | pos.list
+# 0.18: pos.goload loads the unit of a position first (level.load, then flight + pos.go); the overlay's "Lara in" line
+Spieler/Positionen | Letzte laden + hin | pos.goload last
+Spieler/Positionen | Lara-drin-Zeile | overlay.larain
+# 0.18 Barrierefreiheit (skeleton): only the working assists here - the planned rows are on the menu page / bar page
+Spieler/Barrierefreiheit | Zeitlupe 0.5 | time.scale 0.5
+Spieler/Barrierefreiheit | Zeitlupe 0.75 | time.scale 0.75
+Spieler/Barrierefreiheit | Zeit normal | time.scale 1
+Spieler/Barrierefreiheit | Befreien | player.unstuck
+Spieler/Barrierefreiheit | Befreien: Stand | player.safeground
+Spieler/Barrierefreiheit | Unverwundbar (Hilfe) | player.invincible
+Spieler/Barrierefreiheit | Gott voll (Hilfe) | cheat.godfull
 # 0.10.5 (owner wish 2026-11-05): Claude marks, drawn in coral - each pick writes one TruMenu.log line
 # "claude.mark <kind>: <time> unit=<stream unit> pos=<x y z> step=<TO TEST step or -> shot=<file> src=ring" and takes a
 # clean shot named <kind>; the ring closes after the pick. [Shot] Hotkey (F11 = 0x7A, default off) = "Jetzt".

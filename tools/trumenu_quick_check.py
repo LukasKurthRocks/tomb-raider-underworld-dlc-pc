@@ -12,9 +12,15 @@ it checks that the rules themselves do what the build report claims):
              D-pad held at the close staying away until released.
   3. frames  pos.go's conversion target = saved - P(saved) + P(now) against the memory dump numbers of
              docs/Befund-Position-und-Schrotflinte.md (test 50h: live - data = -V + P per unit).
+2026-11-06 TruMenu 0.18 adds two models:
+  4. segments  shot.oncine's segments (OnCineTick / OcSegReason / OcSegStart): the live case 18:12:56 - 18:16:00 (0.17
+             rules: one cutscene, 10 pairs used up after ~35 s; 0.18: a second segment with pairs in the exterior part),
+             a cinematic object appearing after the camera signal (adopted, no new segment), a script print and the 1 s
+             minimum, a unit name differing only in case (no change), the 2 s end debounce.
+  5. confirm   the bar's second-press confirmation (QbConfirm / QbArmed: same key within 3 s).
 
 Usage (from the repository root):
-  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all three, exit 1 on a failure
+  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all five, exit 1 on a failure
 """
 import math, random, sys
 
@@ -350,9 +356,116 @@ def check_frames():
     return ok and good
 
 
+# ------------------------------------------------------------------------------------------------- 0.18 cutscene segments
+def oc_run(timeline, end, segments=True, pairs=10, fast=4, fast_ms=1500, slow_ms=8000, end_ms=2000, seg_min=1000):
+    """OnCineTick / OcSegReason / OcSegStart as a model, polled every 50 ms. timeline(t) -> (signal, unit, cine, track,
+    script_tick). Returns [(segment, [pair times])]."""
+    st = None
+    segs = []
+    for t in range(0, end, 50):
+        sig, unit, cine, track, script = timeline(t)
+        if st is not None:
+            if not sig:
+                st['off'] = st['off'] if st['off'] is not None else t
+                if t - st['off'] >= end_ms: st = None
+                continue
+            st['off'] = None
+            why = ''
+            if segments and t - st['seg_start'] >= seg_min:
+                if unit and st['unit'] and unit.lower() != st['unit'].lower(): why = 'unit'
+                elif cine and track != -1 and (not st['cine'] or st['track'] == -1):
+                    st['cine'], st['track'] = cine, track          # adopt, no new segment
+                elif cine and track != -1 and (cine != st['cine'] or track != st['track']): why = 'cine'
+                elif script and script != st['script'] and script > st['seg_start']: why = 'script'
+            if why:
+                st.update(seg_start=t, next=t, done=0, unit=unit, cine=cine, track=track, script=script)
+                segs.append((len(segs) + 1, []))
+        else:
+            if not sig: continue
+            st = dict(seg_start=t, next=t, done=0, unit=unit, cine=cine, track=track, script=script, off=None)
+            segs.append((len(segs) + 1, []))
+        if st['done'] < pairs and t >= st['next']:
+            segs[-1][1].append(t)
+            st['done'] += 1
+            st['next'] = t + (fast_ms if st['done'] < fast else slow_ms)
+    return segs
+
+
+def check_segments():
+    """the live case 2026-11-06 18:12:56 - 18:16:00: cutscene 160 (main hall) flowed into 170 (exterior, a level change)
+    without the gameplay camera coming back; plus the adopt / script / case / end-debounce rules"""
+    ok = True
+    change = 118000                                     # ~18:14:54: the exterior cutscene 170 (unit + cinematic change)
+    def live(t):
+        if t < change: return True, 'l3_main_hall', 0x1000, 160, 0
+        return True, 'l3_mansion_exterior_afterburn', 0x2000, 170, 0
+    old = oc_run(live, 184000, segments=False, slow_ms=5000)   # 0.17 rules
+    new = oc_run(live, 184000)
+    last_old = old[0][1][-1] if old and old[0][1] else -1
+    good = len(old) == 1 and len(old[0][1]) == 10 and 33000 <= last_old <= 36000   # live: used up at 18:13:31 (+35 s)
+    print('segments: 0.17 rules - %d segment, %d pairs, the last at +%.1f s (live: +35 s)  %s'
+          % (len(old), len(old[0][1]) if old else 0, last_old / 1000.0, 'ok' if good else 'FAIL'))
+    ok &= good
+    after = sum(1 for s, ts in new for x in ts if x >= change)
+    good = len(new) == 2 and after >= 4 and all(len(ts) <= 10 for s, ts in new)
+    print('segments: 0.18 rules - %d segments (%s pairs), %d pair(s) in the exterior part  %s'
+          % (len(new), ' + '.join(str(len(ts)) for s, ts in new), after, 'ok' if good else 'FAIL'))
+    ok &= good
+    # the camera signal comes first, the cinematic object 0.3 s later: adopted, no second segment
+    def late(t): return True, 'u', (0x1000 if t >= 300 else 0), (5 if t >= 300 else -1), 0
+    s = oc_run(late, 20000)
+    good = len(s) == 1
+    print('segments: cinematic appears 0.3 s after the camera signal -> %d segment(s)  %s' % (len(s), 'ok' if good else 'FAIL'))
+    ok &= good
+    # a script print 'StartCinematic called' at +12 s -> segment 2; a unit change 0.5 s later waits for the 1 s minimum
+    def script(t): return True, ('a' if t < 12500 else 'b'), 0x1000, 1, (12000 if t >= 12000 else 0)
+    s = oc_run(script, 30000)
+    starts = [ts[0] if ts else -1 for _, ts in s]
+    good = len(s) == 3 and starts[1] == 12000 and starts[2] == 13000
+    print('segments: script print at 12.0 s, unit change at 12.5 s -> segment starts %s  %s'
+          % ([x / 1000.0 for x in starts], 'ok' if good else 'FAIL'))
+    ok &= good
+    # case only: "L3_main_bedroom" vs "l3_main_bedroom" is no unit change
+    def case(t): return True, ('L3_main_bedroom' if t < 5000 else 'l3_main_bedroom'), 0x1000, 1, 0
+    s = oc_run(case, 20000)
+    good = len(s) == 1
+    print('segments: unit name changes only in case -> %d segment(s)  %s' % (len(s), 'ok' if good else 'FAIL'))
+    ok &= good
+    # the signal gone 1.9 s keeps the cutscene, 2.1 s ends it (a new one starts when it comes back)
+    def gap(t): return (t < 5000 or t >= 6900), 'u', 0, -1, 0
+    def gap2(t): return (t < 5000 or t >= 7100), 'u', 0, -1, 0
+    a, b = oc_run(gap, 15000), oc_run(gap2, 15000)
+    good = len(a) == 1 and len(b) == 2
+    print('segments: signal gone 1.9 s -> %d burst(s), 2.1 s -> %d  %s' % (len(a), len(b), 'ok' if good else 'FAIL'))
+    return ok and good
+
+
+# ----------------------------------------------------------------------------------------------------- 0.18 bar confirm
+def check_confirm():
+    """QbConfirm / QbArmed: a second right press on the same key within 3 s runs, a later one re-arms, another key
+    re-arms (the first one is then no longer armed), a third press after a run arms again"""
+    arm = {'key': '', 'tick': 0}
+    def confirm(key, t):
+        if arm['tick'] and t - arm['tick'] <= 3000 and arm['key'] == key:
+            arm.update(key='', tick=0)
+            return True
+        arm.update(key=key, tick=t or 1)
+        return False
+    cases = [([('a', 1000), ('a', 2500)], [False, True]), ([('a', 1000), ('a', 4100)], [False, False]),
+             ([('a', 1000), ('b', 1500), ('a', 2000)], [False, False, False]),
+             ([('a', 1000), ('a', 2000), ('a', 2500)], [False, True, False])]
+    good = 0
+    for presses, want in cases:
+        arm.update(key='', tick=0)
+        good += 1 if [confirm(k, t) for k, t in presses] == want else 0
+    ok = good == len(cases)
+    print('confirm: %d / %d press sequences as expected (3 s window, same key)  %s' % (good, len(cases), 'ok' if ok else 'FAIL'))
+    return ok
+
+
 def main():
     rng = random.Random(17)
-    results = [check_depth(rng), check_chord(), check_frames()]
+    results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm()]
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

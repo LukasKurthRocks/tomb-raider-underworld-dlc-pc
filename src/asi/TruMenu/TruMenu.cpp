@@ -55,7 +55,15 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.17.1 (depth: scene view +0x100 / projection +0x140 swapped back after the live "
+const char *const kVersion = "TruMenu 0.18 (Lara in: the triggers Lara's test point is in as a coloured line under the "
+                             "position overlay, independent of the trigger layers (overlay.larain); owner units compared "
+                             "case-insensitively; shot.oncine in segments (unit change, new cinematic, StartCinematic print) "
+                             "with pairs spread over long cutscenes; quick-toggle bar with 9 pages - Notfall / Cheats, "
+                             "Lara + positions, Debug / Darstellung, Leveldaten, Render / KI, Zeit / Test, Checkpoints "
+                             "(go with confirm), Saves (backup, restore, save.load), Kapitel (debug level.load); second "
+                             "press within 3 s confirms the dangerous rows; save.load = the game's own load step table "
+                             "0x789de0 (byte-checked); pos.goload = level.load + flight + pos.go; "
+                             "0.17.1: depth - scene view +0x100 / projection +0x140 swapped back after the live "
                              "depthdump; 0.17 Schnellschalter: quick-toggle bar at the left screen edge, the game keeps "
                              "running - [Quick] OpenButtons (View + Start, a chord window keeps a lone button from the "
                              "game for ChordMs), D-pad up / down = row, left / right = off / on or the value, LB / RB = "
@@ -278,6 +286,9 @@ const OptDef kOpts[] = {
     {"Menu", "ToggleKey", "0", "keyboard key that also opens / closes the menu (virtual key code, e.g. 119 = F8); 0 = off"},
     {"Menu", "Scale", "1.5", "size of the menu (font and spacing), 0.5 .. 4"},
     {"Menu", "Overlay", "0", "1 = show the Lara position overlay from the start"},
+    {"Menu", "OverlayLaraIn", "1", "0.18 (overlay.larain): 1 = the position overlay has a second line 'Lara in: <trigger> "
+                                   "<id>' (up to 3, then +N, each in the\ncolour of its kind) - computed every 100 ms "
+                                   "whether a trigger layer is drawn or not; 0 = coordinates only"},
     {"Menu", "FreeMouse", "1", "1 = while the menu is open the mouse belongs to the menu: a cursor is drawn, the game gets no "
                                "mouse messages (no camera\nturn, no re-centring) and its SetCursorPos / ClipCursor calls "
                                "wait until the menu closes; 0 = as before 0.7"},
@@ -362,6 +373,9 @@ const OptDef kOpts[] = {
     {"Saves", "Folder", "", "0.9: save folder for the Saves page; empty = the game's own (Documents\\Eidos\\Tomb Raider - "
                             "Underworld, as tru.exe\n0x78b550). Backups, export and import live in TruMenu.saves next "
                             "to tru.exe"},
+    {"Saves", "DirectLoad", "1", "0.18 (save.load): 1 = a save of the game's list can be loaded from TruMenu (menu Saves "
+                                 "page, quick-toggle bar page\nSaves; twice within 10 s, never over TruLink) - the game's "
+                                 "own load step table 0x789de0, in a level only; 0 = refused"},
     {"Radial", "Enabled", "1", "0.10: 1 = radial menu: hold HoldButtons for HoldMs - a ring of up to 8 entries from "
                                "TruMenu.radial.txt next to tru.exe,\nhow it is used says Mode; a short press opens TruMenu as "
                                "before (at the release when\nHoldButtons = [Menu] ToggleButtons); 0 = TruMenu exactly as 0.9"},
@@ -430,11 +444,16 @@ const OptDef kOpts[] = {
                             "one with TruMenu (debug\nview, legend) of the same frame, shot_<HHMMSS>_<step>_cine<NN>_<i>"
                             "_clean / _ui.png; the cutscene ends when the signal has\nbeen gone for 2 s; pairs have "
                             "their own MaxPerMinute window; 0 = off"},
-    {"Shot", "OnCinePairs", "10", "0.17: at most this many shot pairs per cutscene, 1 .. 50"},
-    {"Shot", "OnCineFastPairs", "4", "0.17: the first pairs of a cutscene come every OnCineIntervalMs, the rest every "
-                                     "OnCineSlowMs, 1 .. 50"},
+    {"Shot", "OnCinePairs", "10", "0.17: at most this many shot pairs per cutscene (0.18: per segment), 1 .. 50"},
+    {"Shot", "OnCineFastPairs", "4", "0.17: the first pairs of a cutscene (0.18: of a segment) come every OnCineIntervalMs, "
+                                     "the rest every OnCineSlowMs, 1 .. 50"},
     {"Shot", "OnCineIntervalMs", "1500", "0.17: milliseconds between the first pairs, 250 .. 10000"},
-    {"Shot", "OnCineSlowMs", "5000", "0.17: milliseconds between the later pairs, 250 .. 60000"},
+    {"Shot", "OnCineSlowMs", "8000", "0.17: milliseconds between the later pairs, 250 .. 60000 (0.18: 8000, was 5000 - "
+                                     "spread over long cutscenes)"},
+    {"Shot", "OnCineSegments", "1", "0.18: 1 = a running cutscene starts a new segment (own pair budget, own log lines) "
+                                    "when Lara's unit changes, the\ngame's cinematic object / track changes or a script "
+                                    "prints 'StartCinematic called' / 'Cine about to play' (needs\nlog.script); 0 = one "
+                                    "budget per cutscene (0.17)"},
     {"Shot", "OnCineSignal", "both", "0.17: what counts as a cutscene - cine = the game's cinematic test (0x453f00), camera "
                                      "= the current camera is not the\ngameplay camera [0xe804f0+0xb80], both = either "
                                      "of them"},
@@ -568,6 +587,8 @@ const OptDef kOpts[] = {
                                  "nearest one and the one at the\nscreen centre keep the full name; 0 = full names"},
     {"Debug", "LaraIn", "1", "0.16 (dbg.larain): 1 = the triggers the test point (Lara +200) is in are drawn bold with a "
                              "pulsing white outline and named\nin the legend (Lara in: ...); 0 = off"},
+    {"Debug", "LegendLaraIn", "0", "0.18: 1 = the legend keeps its row 'Lara in: ...' (0.16 / 0.17); 0 = the names are in "
+                                   "the position overlay (OverlayLaraIn)\nonly - the pulsing outline of LaraIn stays"},
     {"Debug", "Enclosing", "1", "0.16 (dbg.enclosing): boxes around the camera, or big ones (EnclosingSize) around Lara: "
                                 "0 = drawn like the others, 1 = dim\nand dashed, 2 = hidden"},
     {"Debug", "EnclosingSize", "1500", "0.16: a box / sphere counts as big from this half extent / radius on (game units, "
@@ -697,7 +718,8 @@ volatile LONG g_stop = 0;
 volatile LONG g_menuOpen = 0;
 volatile LONG g_menuJustOpened = 0;
 volatile LONG g_overlay = 0;
-volatile LONG g_guardOverlay = 0;        // TruGuard status in the top-right corner (opt-in, plugin is optional)
+volatile LONG g_ovLaraIn = 1;            // 0.18 [Menu] OverlayLaraIn (overlay.larain): the "Lara in" line of the overlay
+volatile LONG g_guardOverlay = 0;       // TruGuard status in the top-right corner (opt-in, plugin is optional)
 volatile LONG g_testFocus = 0;          // 0.4: a TO TEST row had the nav focus last frame (X / Y go to the row)
 volatile LONG g_testX = 0, g_testY = 0; // 0.4: X / Y pressed while a row had the focus (edges, consumed by the page)
 // 0.6 command bar: pad ownership (FeedGamepad, from the bar state of the last frame) and keyboard capture (WndProcHook)
@@ -844,6 +866,7 @@ bool InLevel();
 void WeaponsTick();    // 0.3 costume switch: player message 35 a frame later
 void InvincibleTick(); // 0.3 player.invincible: health = MaxHealth once per game frame
 void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite ammo re-apply (game thread)
+void SaveLoadTick();   // 0.18 save.load: a confirmed request, then its progress (game thread)
 void NavTick();        // 0.12 Debug-Zeichnung: [Debug] NavDraw / NavMask once in the first loaded level (game thread)
 void SafeGroundTick(); // 0.8.1 player.unstuck: ring of recent safe positions (game thread)
 void NoDamageTick();   // 0.10.2 cheat.godfull: the player's no-damage bit once per game frame (game thread)
@@ -1074,7 +1097,8 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         InvincibleTick();
         NoDamageTick();                       // 0.10.2: cheat.godfull no-damage bit [0xfada74] & 0x20000
         CheatsTick();                         // 0.8: [Cheats] Persist restore, infinite ammo re-apply
-        NavTick();                            // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
+        SaveLoadTick();                       // 0.18 save.load (cheap: one flag while idle)
+        NavTick();                           // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
         SafeGroundTick();                     // 0.8.1: player.unstuck ring
     }
     return result;
@@ -2608,6 +2632,17 @@ bool RunOverlay(const char *arg, char *o, size_t n) {
     Out(o, n, "overlay.position %d", on ? 1 : 0);
     return true;
 }
+// 0.18 overlay.larain: the "Lara in" line of the position overlay (needs the overlay itself on to be seen)
+void ValOvLaraIn(char *o, size_t n) {
+    Out(o, n, "%d%s", g_ovLaraIn ? 1 : 0, g_overlay ? "" : " (overlay.position is off)");
+}
+bool RunOvLaraIn(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, g_ovLaraIn != 0);
+    InterlockedExchange(&g_ovLaraIn, on ? 1 : 0);
+    Log(1, "overlay.larain %d (overlay.position %ld)", on ? 1 : 0, static_cast<LONG>(g_overlay));
+    Out(o, n, "overlay.larain %d%s", on ? 1 : 0, on && !g_overlay ? " - overlay.position is off: switch it on to see it" : "");
+    return true;
+}
 bool RunCameraMode(const char *arg, char *o, size_t n) {
     if (!g_cameraOk || !g_experimental) { Out(o, n, "camera code not verified / experimental off"); return false; }
     if (!InLevel()) { Out(o, n, "needs a level"); return false; }
@@ -4039,12 +4074,14 @@ void ScriptToFile(const char *line) {
     Log(1, "script: %s", line);
 }
 
+void OcScriptLine(const char *line);         // 0.18 shot.oncine segments, defined in the 0.17 cutscene shots section
 void ScriptText(const char *text, bool newline) {
     for (const char *p = text; *p; ++p) {
         if (*p == '\n' || g_scriptPartialLen + 1 >= sizeof(g_scriptPartial)) {
             g_scriptPartial[g_scriptPartialLen] = 0;
             PushLine("script", g_scriptPartial);
             ScriptToFile(g_scriptPartial);   // 0.16
+            OcScriptLine(g_scriptPartial);   // 0.18
             g_scriptPartialLen = 0;
             if (*p == '\n') continue;
         }
@@ -4054,6 +4091,7 @@ void ScriptText(const char *text, bool newline) {
         g_scriptPartial[g_scriptPartialLen] = 0;
         PushLine("script", g_scriptPartial);
         ScriptToFile(g_scriptPartial);       // 0.16
+        OcScriptLine(g_scriptPartial);       // 0.18
         g_scriptPartialLen = 0;
     }
     ++g_scriptCount;
@@ -4389,8 +4427,11 @@ int PendingMainState() {
     return state == 2 || state == 9 ? static_cast<int>(state) : 0;
 }
 
+volatile LONG g_slActive = 0;                // 0.18 save.load: a load TruMenu started runs (section "0.18 save.load")
+int g_slDirect = 1;                          // 0.18 [Saves] DirectLoad
 // true (with the reason) while a level change or a mission start is pending: level.load / level.start are refused
 bool LevelChangePending(char *why, size_t n) {
+    if (g_slActive) { Out(why, n, "save.load runs (the game loads a save)"); return true; }   // 0.18
     DWORD busy = 0;
     ReadDword(kGameTracker + 0xb8, &busy);
     if ((busy >> 8) & 0xff) { Out(why, n, "GameTracker+0xb9 = %lu: a level change request waits", (busy >> 8) & 0xff); return true; }
@@ -6657,6 +6698,7 @@ int g_dvAlpha = 60, g_dvBright = 100, g_dvFade = 1, g_dvFadeMin = 20;   // [Debu
 float g_dvFadeStart = 2000.0f, g_dvFadeEnd = 10000.0f;                  // [Debug] FadeStart / FadeEnd
 int g_dvFill = 0, g_dvFillAlpha = 10;                                   // [Debug] Fill / FillAlpha
 int g_dvShort = 1, g_dvLaraIn = 1, g_dvTagMax = 10;                      // [Debug] LabelShort / LaraIn / ViewLabelMax
+int g_dvLegendLaraIn = 0;                                               // 0.18 [Debug] LegendLaraIn
 int g_dvEncl = 1, g_dvMarkerMax = 8;                                    // [Debug] Enclosing (0 / 1 / 2) / MarkerMax (%)
 float g_dvEnclSize = 1500.0f;                                           // [Debug] EnclosingSize
 volatile LONG g_dpMode = 0;                  // [Debug] Depth: 0 on top (0.15), 1 hidden behind geometry, 2 hidden dim
@@ -6884,36 +6926,47 @@ float g_dvTestPt[3];
 bool g_dvTestOk = false;
 int g_dvCapped = 0, g_dvEnclN = 0;           // 0.16: last frame - capped at TriggerMax, enclosing boxes dimmed / hidden
 
+// one entry of a trigger list (planes or volumes): instance, position, rotation, data (extent, radius, shape, side),
+// kind, rows, flags; false = no usable entry. 0.18: shared by DvCollect and the overlay's "Lara in" scan
+bool DvTrigRead(bool planes, DWORD i, DvTrig *out, bool *known, bool *haveData) {
+    DvTrig t = {};
+    DWORD flags = 0, intro = 0, data = 0;
+    if (!ReadDword((planes ? kDvPlanes : kDvVols) + i * 4, &t.entry) || !t.entry) return false;
+    if (!ReadDword(t.entry + 0x20, &t.inst) || !t.inst || !ReadDword(t.entry + 0x24, &flags)) return false;
+    if (!ReadFloats(t.inst + kInstancePosition, t.pos, 3) || !ReadFloats(t.inst + 0x30, t.rot, 3) ||
+        !DvFinite(t.pos, 3) || !DvFinite(t.rot, 3))
+        return false;
+    t.plane = planes;
+    t.enabled = (flags & 0x80000000u) != 0;
+    *haveData = ReadDword(t.inst + 0x100, &intro) && intro && ReadDword(intro + 0x78, &data) && data &&
+                ReadFloats(data + 0x34, t.ext, 3) && ReadFloats(data + 0x40, &t.radius, 1) &&
+                DvFinite(t.ext, 3) && DvFinite(&t.radius, 1) && ReadByte(data + 0x30, &t.shape);
+    BYTE side = 1;
+    if (*haveData && planes) ReadByte(data + 0x44, &side);
+    t.oneSided = planes && side == 0;
+    char name[64];
+    int kind = DvNameKind(t.inst, name, sizeof(name));
+    *known = *haveData && (planes || t.shape == 1 || t.shape == 2) && kind != -2;
+    t.kind = !*known ? kDvUnknown : kind >= 0 ? kind : planes ? kDvPlane : kDvVolume;
+    DvEulerRows(t.rot, t.rows);
+    t.player = (flags & 0x40000000u) != 0;
+    *out = t;
+    return true;
+}
+
 // collect one list (planes or volumes) into g_dvTrig; counters for the state line
 struct DvCount { int listed, behind, far_, noData, disabled; };
 void DvCollect(const DvCam &c, bool planes, DvCount *k) {
     DWORD count = 0;
     if (!ReadDword(planes ? kDvPlaneCount : kDvVolCount, &count) || count > kDvListMax) return;
     for (DWORD i = 0; i < count; ++i) {
-        DvTrig t = {};
-        DWORD flags = 0, intro = 0, data = 0;
-        if (!ReadDword((planes ? kDvPlanes : kDvVols) + i * 4, &t.entry) || !t.entry) continue;
-        if (!ReadDword(t.entry + 0x20, &t.inst) || !t.inst || !ReadDword(t.entry + 0x24, &flags)) continue;
-        if (!ReadFloats(t.inst + kInstancePosition, t.pos, 3) || !ReadFloats(t.inst + 0x30, t.rot, 3) ||
-            !DvFinite(t.pos, 3) || !DvFinite(t.rot, 3))
-            continue;
-        t.plane = planes;
-        t.enabled = (flags & 0x80000000u) != 0;
-        bool haveData = ReadDword(t.inst + 0x100, &intro) && intro && ReadDword(intro + 0x78, &data) && data &&
-                        ReadFloats(data + 0x34, t.ext, 3) && ReadFloats(data + 0x40, &t.radius, 1) &&
-                        DvFinite(t.ext, 3) && DvFinite(&t.radius, 1) && ReadByte(data + 0x30, &t.shape);
-        BYTE side = 1;
-        if (haveData && planes) ReadByte(data + 0x44, &side);
-        t.oneSided = planes && side == 0;
-        char name[64];
-        int kind = DvNameKind(t.inst, name, sizeof(name));
-        bool known = haveData && (planes || t.shape == 1 || t.shape == 2) && kind != -2;
-        t.kind = !known ? kDvUnknown : kind >= 0 ? kind : planes ? kDvPlane : kDvVolume;
+        DvTrig t;
+        bool known = false, haveData = false;
+        if (!DvTrigRead(planes, i, &t, &known, &haveData)) continue;
         if (!haveData) ++k->noData;
         ++g_dvListed[t.kind];
-        // 0.16: rows once; Lara in (every listed trigger with data, also of a kind switched off); camera inside / big
-        DvEulerRows(t.rot, t.rows);
-        t.player = (flags & 0x40000000u) != 0;
+        // 0.16: rows once (DvTrigRead); Lara in (every listed trigger with data, also of a kind switched off); camera
+        // inside / big
         if (known && g_dvTestOk && g_dvLaraOk) {
             t.laraIn = static_cast<BYTE>(DvInside(t, g_dvTestPt));
             if (t.laraIn) {
@@ -6946,6 +6999,54 @@ void DvCollect(const DvCam &c, bool planes, DvCount *k) {
         if (!DvVisible(c, t.pos, t.extent, &t.dist2)) { ++k->behind; continue; }
         if (t.dist2 > g_dvRadius * g_dvRadius) { ++k->far_; continue; }
         DvTrigInsert(t);
+    }
+}
+
+// ---- 0.18 "Lara in" in the position overlay (Lukas, live 2026-11-06: "Lara in" belongs top left under the coordinates,
+// not in the legend; it must work without a trigger layer) ----
+// Render thread, at most every 100 ms while the overlay draws: both trigger lists with DvTrigRead and the 0.16 test
+// (DvInside: point = player +0x20 + (0, 0, 200), box / sphere inside, plane within 50 units of the quad), every kind,
+// whether a layer is drawn or not. Needs the 0.14 trigger checks and the 0.16 result-code checks (g_dvTrgOk, g_dvLaraOk)
+// - the same reads as the debug view; nothing is written. g_ovIn: in list order (planes first, then volumes).
+DvIn g_ovIn[8];
+int g_ovInN = 0, g_ovInMore = 0;
+DWORD g_ovInTick = 0;
+const char *g_ovInWhy = "not scanned yet";
+void OvLaraInScan() {
+    const DWORD now = GetTickCount();
+    if (g_ovInTick && now - g_ovInTick < 100) return;
+    g_ovInTick = now ? now : 1;
+    g_ovInN = g_ovInMore = 0;
+    if (!g_dvTrgOk) { g_ovInWhy = g_dvTrgWhy; return; }
+    if (!g_dvLaraOk) { g_ovInWhy = "Lara-in result code checks failed"; return; }
+    DWORD player = 0;
+    float p[3];
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, p, 3) || !DvFinite(p, 3)) {
+        g_ovInWhy = "no player";
+        return;
+    }
+    p[2] += kDvTestLift;
+    g_ovInWhy = "";
+    for (int list = 0; list < 2; ++list) {
+        const bool planes = list == 0;
+        DWORD count = 0;
+        if (!ReadDword(planes ? kDvPlaneCount : kDvVolCount, &count) || count > kDvListMax) continue;
+        for (DWORD i = 0; i < count; ++i) {
+            DvTrig t;
+            bool known = false, haveData = false;
+            if (!DvTrigRead(planes, i, &t, &known, &haveData) || !known) continue;
+            const int how = DvInside(t, p);
+            if (!how) continue;
+            if (g_ovInN >= static_cast<int>(sizeof(g_ovIn) / sizeof(g_ovIn[0]))) { ++g_ovInMore; continue; }
+            DvIn &in = g_ovIn[g_ovInN++];
+            DWORD uid = 0;
+            in.inst = t.inst;
+            in.intro = ReadDword(t.inst + 0x58, &uid) ? static_cast<LONG>(uid) : 0;
+            in.kind = t.kind;
+            in.how = static_cast<BYTE>(how);
+            in.enabled = t.enabled;
+            in.player = t.player;
+        }
     }
 }
 
@@ -7043,18 +7144,31 @@ char g_dvLaraUnit[40] = "";
 float g_dvLaraPos[3];
 bool g_dvLaraPosOk = false;
 bool g_dvUnitOk = false;                     // precheck_016.txt: the intro loader's Level +0x74 layout
+// 0.18 (live 2026-11-06, prologue start: labels said [L3_main_bedroom] while Lara stood in that unit): unit names come
+// in two spellings - the stream table entry +0xc holds the name the unit was requested with ("L3_main_bedroom" from the
+// new-game start data, "l3_main_hall" from a portal), GameTracker+0x38 the current unit name. So "Lara's unit" = the
+// stream entry of GameTracker+0xc0 (the whole table is scanned now - 0.16 stopped after 16 units with intro arrays and
+// could miss Lara's entry); only when no loaded entry has that id, GameTracker+0x38 (it may stay on the unit the level
+// was loaded with while Lara walks on, so it is the fallback, not a second match). Every comparison is case-insensitive
+// (DvSameUnit, DvCommonPrefix). One "0.18 units:" log line when the two names differ in more than case.
+char g_dvLaraUnit2[40] = "";                 // GameTracker+0x38 (CurrentUnit)
+void CurrentUnit(char *out, size_t size);    // 0.2, above
+bool DvSameUnit(const char *a, const char *b) { return a && b && a[0] && b[0] && !_stricmp(a, b); }
+bool DvIsLaraUnit(const char *name) { return DvSameUnit(name, g_dvLaraUnit[0] ? g_dvLaraUnit : g_dvLaraUnit2); }
 void DvUnitsRead() {
     g_dvUnitN = 0;
     g_dvLaraUnit[0] = 0;
+    CurrentUnit(g_dvLaraUnit2, sizeof(g_dvLaraUnit2));
     if (!g_dvUnitOk) return;
     DWORD cur = 0;
     bool haveCur = g_unitOk && ReadDword(kUnitId, &cur);
-    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd && g_dvUnitN < 16; e += kStreamUnitSize) {
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
         DWORD id = 0, state = 0, level = 0, dtp = 0, n = 0, arr = 0;
         if (!ReadDword(e, &id) || !ReadDword(e + 4, &state) || (state & 0xff) != 2) continue;
         char name[40];
         if (!ReadString(e + 0xc, name, sizeof(name))) name[0] = 0;
         if (haveCur && id == cur) strncpy_s(g_dvLaraUnit, sizeof(g_dvLaraUnit), name, _TRUNCATE);
+        if (g_dvUnitN >= 16) continue;       // 0.18: keep scanning for Lara's entry
         if (!ReadDword(e + 8, &level) || !level || !ReadDword(level + 0x74, &dtp) || !dtp || !ReadDword(dtp + 0xc, &n) ||
             n > 20000 || !ReadDword(dtp + 0x10, &arr) || !arr)
             continue;
@@ -7063,14 +7177,24 @@ void DvUnitsRead() {
         u.hi = arr + 0x90 * n;
         strncpy_s(u.name, sizeof(u.name), name, _TRUNCATE);
     }
+    static char lastA[40] = "", lastB[40] = "";   // diagnosis, once per change
+    if (strcmp(lastA, g_dvLaraUnit) || strcmp(lastB, g_dvLaraUnit2)) {
+        strncpy_s(lastA, sizeof(lastA), g_dvLaraUnit, _TRUNCATE);
+        strncpy_s(lastB, sizeof(lastB), g_dvLaraUnit2, _TRUNCATE);
+        if (g_dvLaraUnit2[0] && !DvSameUnit(g_dvLaraUnit, g_dvLaraUnit2))
+            Log(1, "0.18 units: Lara's stream unit '%s' (GameTracker+0xc0 %lu), GameTracker+0x38 '%s' - the owner tags "
+                   "use %s", g_dvLaraUnit[0] ? g_dvLaraUnit : "(no loaded entry)", cur, g_dvLaraUnit2,
+                g_dvLaraUnit[0] ? "the stream unit" : "GameTracker+0x38 (fallback)");
+    }
 }
-// the owner unit's name of an instance when it is not Lara's unit, else "" (also when unknown)
+// the owner unit's name of an instance when it is not Lara's unit, else "" (also when unknown); 0.18: case-insensitive
+// against both of Lara's unit names
 const char *DvOwnerUnit(DWORD inst) {
     DWORD intro = 0;
     if (!g_dvUnitN || !ReadDword(inst + 0x100, &intro) || !intro) return "";
     for (int i = 0; i < g_dvUnitN; ++i)
         if (intro >= g_dvUnits[i].lo && intro < g_dvUnits[i].hi)
-            return _stricmp(g_dvUnits[i].name, g_dvLaraUnit) ? g_dvUnits[i].name : "";
+            return DvIsLaraUnit(g_dvUnits[i].name) ? "" : g_dvUnits[i].name;
     return "";
 }
 // " 6100u v1500u [mansion_exterior_afterburn]": distance to Lara, height (^ above / v below, from 50 units), owner unit
@@ -7084,7 +7208,9 @@ void DvDistText(const float *p, const char *unit, char *o, size_t n) {
         if (fabsf(dz) >= 50.0f) LabelAdd(o, n, &used, " %c%ldu", dz > 0.0f ? '^' : 'v',
                                          static_cast<LONG>(fabsf(dz) / 10.0f + 0.5f) * 10);
     }
-    if (unit && unit[0]) LabelAdd(o, n, &used, " [%s]", unit + (g_dvLaraUnit[0] ? DvCommonPrefix(unit, g_dvLaraUnit) : 0));
+    const char *lara = g_dvLaraUnit[0] ? g_dvLaraUnit : g_dvLaraUnit2;   // 0.18: case-insensitive, second name
+    if (unit && unit[0] && !DvIsLaraUnit(unit))
+        LabelAdd(o, n, &used, " [%s]", unit + (lara[0] ? DvCommonPrefix(unit, lara) : 0));
 }
 const int kDvTagMax = 160;
 DvTag g_dvTag[kDvTagMax];
@@ -7126,9 +7252,9 @@ void DvTagAdd(ImVec2 at, float dist2, const float *centre, ImU32 colour, int kin
     strncpy_s(t.sufBrief, sizeof(t.sufBrief), sufBrief, _TRUNCATE);
 }
 // "l3_bedroom_hall" / "l3_main_bedroom" -> length of the common prefix up to its last '_' ("l3_")
-size_t DvCommonPrefix(const char *a, const char *b) {
+size_t DvCommonPrefix(const char *a, const char *b) {   // 0.18: case-insensitive ("L3_main_bedroom" / "l3_main_hall")
     size_t i = 0, cut = 0;
-    while (a[i] && a[i] == b[i]) {
+    while (a[i] && tolower(static_cast<unsigned char>(a[i])) == tolower(static_cast<unsigned char>(b[i]))) {
         if (a[i] == '_') cut = i + 1;
         ++i;
     }
@@ -7661,7 +7787,8 @@ void DrawDebugLegend() {
             colours[n] = IM_COL32(255, 90, 60, 255);
             square[n++] = true;
         }
-        if (g_dvLaraIn && g_dvLaraOk) {      // 0.16 Lara in: up to 3 names, then +N
+        // 0.16 Lara in: up to 3 names, then +N; 0.18: only with [Debug] LegendLaraIn=1 (the names are in the overlay)
+        if (g_dvLaraIn && g_dvLaraOk && g_dvLegendLaraIn) {
             size_t used = 0;
             lines[n][0] = 0;
             LabelAdd(lines[n], sizeof(lines[n]), &used, "Lara in:");
@@ -11200,6 +11327,7 @@ struct SaveInfo {
     char problem[80];
     char unit[64];                             // data +0x10
     DWORD checkpoint;                          // data +0x90
+    DWORD playTime;                            // 0.18: data +0x1a0 play time (s, unit inferred - tools/trusave_diff.py)
 };
 struct SaveDir { char name[64]; int files; };
 CRITICAL_SECTION g_saveLock;
@@ -11272,7 +11400,7 @@ void SaveFolderInit() {
 bool SaveRead(const wchar_t *path, SaveInfo *s) {
     s->formatOk = false;
     s->problem[0] = s->unit[0] = 0;
-    s->checkpoint = 0;
+    s->checkpoint = s->playTime = 0;
     HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (f == INVALID_HANDLE_VALUE) { Out(s->problem, sizeof(s->problem), "cannot open (%lu)", GetLastError()); return false; }
     LARGE_INTEGER size = {};
@@ -11318,6 +11446,7 @@ bool SaveRead(const wchar_t *path, SaveInfo *s) {
                     memcpy(s->unit, u, len);
                     s->unit[len] = 0;
                     s->checkpoint = U32At(b + eo + 0x90);
+                    if (es >= 0x1a4) s->playTime = U32At(b + eo + 0x1a0);   // 0.18
                 }
             }
             s->formatOk = ok;
@@ -11712,7 +11841,224 @@ bool RunSaveImport(const char *arg, char *o, size_t n) {
     return ok;
 }
 bool SaveOwnerOnly(const char *id) {
-    return !_stricmp(id, "save.delete") || !_stricmp(id, "save.restore") || !_stricmp(id, "save.import");
+    return !_stricmp(id, "save.delete") || !_stricmp(id, "save.restore") || !_stricmp(id, "save.import") ||
+           !_stricmp(id, "save.load");      // 0.18
+}
+
+// ---- 0.18 save.load (Lukas, 2026-11-06: load a save straight from the quick-toggle bar) ----
+// Static research (workspace logs r18_load_*.txt, docs\Befund-TruMenu-018-0611.md section 4): the game's "Load game" of
+// the main menu (native uiloadmenu f5 0x7a1b50 -> 0x77cba0) and of the pause menu (the yes / no dialog's action 10,
+// 0x77e928) both end in 0x788b50(index) -> 0x789de0(index) (cdecl): [0xfaf7c0] = index, step 0, wait flag 0, step table
+// [0xfaf7a0] = 0x8b7280. The save system's per-frame runner (0x47b0b7 -> 0x788850 -> 0x78b2b0) works that table: step 0
+// 0x789670, step 1 = the game's own yes / no box 0x789f40(0xb), step 2 = the load 0x78a1a0(0xd): path = folder 0x78b550 +
+// list entry 0xfb0108 + index * 0x250 (WCHAR stem) + ".TRUSave", state [0x8b7158] = 9 and [0xfaf7bd] = 1 (start the
+// level after loading); the state machine 0x78ab60 opens, checks (version 0x100, 'SURT', one entry, 0x140000 bytes),
+// reads, copies into [0xc5925c], runs SAVE_RestoreGame(1) 0x557130, and in idle (0x11) with [0xfaf7bd] set it calls
+// 0x7743c0(chapter, unit) = GAMELOOP_RequestLevelChangeByName(unit, GT, 10) with main state 2. TruMenu replaces the
+// game's yes / no box with its own double confirmation: 0x788a50() (clears the message-box callbacks), 0x789de0(index),
+// then the step index [0xfaf7a4] = 2 - the load step, as if "Yes" had been answered. Only in a level (main state 1, no
+// level change pending), with the save system idle ([0x8b7158] 0x11, no step table, wait / start / busy bytes 0, message
+// box idle [0xfaf270] 1) and the name found in the game's own list (count [0xfaf794] <= 0x38, Autosave = index 0x38).
+// Game thread (PadHook, once per game frame). While it runs LevelChangePending says so (level.load / start refused).
+// Not seen live yet: the game keeps running during the asynchronous read (the pause menu normally pauses it).
+const DvCheck kSlChecks[] = {
+    {0x00789de0, "8b442404a3c0f7fa0033c0a3a4f7fa00a2a8f7fa00"},
+    {0x00789df5, "c705a0f7fa0080728b00b801000000c3"},
+    {0x008b7280, "70967800000000000200000001000000"},
+    {0x008b7290, "409f78000b00000001000000ffff0000"},
+    {0x008b72a0, "a0a178000d000000ffff000001000000"},
+    {0x0078b2b0, "56be05000000e8a5f8ffff83ee0175f6"},
+    {0x0078b2c0, "8b0da0f7fa0085c95e7474803da8f7fa0000756b"},
+    {0x0078b2d4, "a1a4f7fa00c1e0048b140803c18b480451ffd2"},
+    {0x0078a1b4, "8b0dc0f7fa0069c9500200008d04245081c10801fb00"},
+    {0x0078a223, "c70558718b0009000000c605bdf7fa0001b802000000"},
+    {0x0078ab74, "a158718b005333db83f810568d7303"},
+    {0x0078ab83, "0f87ca050000ff248568b27800"},
+    {0x0078af3b, "b9d0fefa00e8cb05f5ff3d0001000075b4"},
+    {0x0078aff7, "680000140051e86eabdcff50e8989808006a01e821c1dcff"},
+    {0x0078b14e, "a158718b0083f8110f85f2000000381db7f7fa00"},
+    {0x0078b1d6, "381dbdf7fa007470881dbdf7fa00e89733d3ffe8f233d3ff"},
+    {0x0078b1ee, "e86d33d3ffe8882bd3ffe8135dd1ffa16892c500"},
+    {0x0078b235, "a16492c5000fbf90f20100008d48105152e87591feff"},
+    {0x007744a7, "6a0a6888f0e70068c0f0e700e808b4e6ff83c41c5f5e"},
+    {0x007744bd, "c70560ede70002000000c605f2f1e70001c60541f1e70000"},
+    {0x00557130, "83ec1ca19092c5005355565768fcd98400"},
+    {0x005571c6, "81bf00001400efbeadde741e"},
+    {0x0047b0b7, "e894d73000e85fe13000"},
+    {0x00788850, "e95b2a0000cccccc"},
+    {0x00788a50, "33c0a37cf2fa00a380f2fa00a384f2fa00a388f2fa00c3"},
+    {0x00788b50, "8b44240450e88612000083c404c3"},
+    {0x00789670, "a15cf2fa0083c0fcb9030000003bc81bc0f7d8c3"},
+    {0x00789610, "833d70f2fa00017408"},
+    {0x0077e928, "a1f4408b0083f8ff7e135350e817a20000"},
+    {0x007a1b50, "8b44240c8b0851e844b0fdff"},
+    {0x0077cba0, "8b4424046a0050e8a4bf0000"},
+    {0x0078a6e0, "8d7b388d6b01eb7ca194f7fa0083f8387507"},   // the list: Autosave at 0x38, count [0xfaf794]
+    {0x0078a764, "69ff500200008d8424840000008db70801fb00"},  // entry = 0xfb0108 + index * 0x250
+};
+const DWORD kSlList = 0x00fb0108, kSlStride = 0x250, kSlCount = 0x00faf794, kSlAutoIndex = 0x38;
+const DWORD kSlState = 0x008b7158, kSlTable = 0x00faf7a0, kSlStep = 0x00faf7a4, kSlWait = 0x00faf7a8;
+const DWORD kSlStartLevel = 0x00faf7bd, kSlBusy = 0x00faf7b7, kSlBox = 0x00faf270;
+const DWORD kSlClearBoxes = 0x00788a50, kSlArm = 0x00789de0;
+typedef void(__cdecl *SlVoidFn)();
+typedef int(__cdecl *SlArmFn)(int);
+bool g_slOk = false;
+const char *g_slWhy = "not checked";
+volatile LONG g_slReq = 0;                   // 1 = a confirmed request waits for the game thread
+wchar_t g_slNameW[128] = L"";
+DWORD g_slStart = 0;
+bool g_slSawChange = false;
+char g_slState[240] = "idle";
+
+// the WCHAR stem of list entry i (false = unreadable)
+bool SlEntryName(DWORD i, wchar_t *o, size_t n) {
+    o[0] = 0;
+    for (size_t k = 0; k + 1 < n; ++k) {
+        WORD c = 0;
+        if (!ReadWord(kSlList + i * kSlStride + static_cast<DWORD>(k * 2), &c)) return false;
+        o[k] = static_cast<wchar_t>(c);
+        if (!c) return true;
+    }
+    o[n - 1] = 0;
+    return true;
+}
+// why the save system is not idle now ("" = idle)
+const char *SlBusyWhy(char *o, size_t n) {
+    DWORD state = 0, table = 0, box = 0;
+    BYTE wait = 0, start = 0, busy = 0;
+    if (!ReadDword(kSlState, &state) || !ReadDword(kSlTable, &table) || !ReadByte(kSlWait, &wait) ||
+        !ReadByte(kSlStartLevel, &start) || !ReadByte(kSlBusy, &busy) || !ReadDword(kSlBox, &box)) {
+        Out(o, n, "save system globals not readable");
+        return o;
+    }
+    if (state != 0x11) Out(o, n, "save system state %lu (0x11 = idle)", state);
+    else if (table) Out(o, n, "a save / load step table runs (0x%08lx)", table);
+    else if (wait || start || busy) Out(o, n, "save system flags busy (wait %u, start %u, busy %u)", wait, start, busy);
+    else if (box != 1) Out(o, n, "a game message box is open (state %lu)", box);
+    else o[0] = 0;
+    return o;
+}
+// game thread, once per game frame (PadHook): a confirmed request, then follow it until the level is back
+void SaveLoadTick() {
+    const DWORD now = GetTickCount();
+    if (g_slActive) {
+        DWORD state = 0;
+        ReadDword(kMainState, &state);
+        if (state != 1) g_slSawChange = true;
+        char busy[96];
+        SlBusyWhy(busy, sizeof(busy));
+        char name[160];
+        WideToUtf8(g_slNameW, name, sizeof(name));
+        if (g_slSawChange && state == 1 && InLevel() && !busy[0]) {
+            char unit[64];
+            CurrentUnit(unit, sizeof(unit));
+            Out(g_slState, sizeof(g_slState), "'%s' loaded - unit %s (%.1f s)", name, unit[0] ? unit : "-",
+                static_cast<double>(now - g_slStart) / 1000.0);
+            Log(1, "save.load: %s", g_slState);
+            InterlockedExchange(&g_slActive, 0);
+        } else if (!g_slSawChange && !busy[0] && now - g_slStart > 3000) {
+            Out(g_slState, sizeof(g_slState), "'%s': the save system went idle without a level change (the game's failure "
+                "box? file not readable / not accepted)", name);
+            Log(0, "save.load: %s", g_slState);
+            InterlockedExchange(&g_slActive, 0);
+        } else if (now - g_slStart > 120000) {
+            Out(g_slState, sizeof(g_slState), "'%s': no level after 120 s (main state %lu, %s) - TruMenu stops waiting",
+                name, state, busy[0] ? busy : "save system idle");
+            Log(0, "save.load: %s", g_slState);
+            InterlockedExchange(&g_slActive, 0);
+        }
+        return;
+    }
+    if (InterlockedCompareExchange(&g_slReq, 0, 1) != 1) return;
+    char name[160], why[160];
+    WideToUtf8(g_slNameW, name, sizeof(name));
+    DWORD state = 0;
+    why[0] = 0;
+    if (!g_slOk) Out(why, sizeof(why), "pre-check failed (%s)", g_slWhy);
+    else if (!g_mainStateOk || !ReadDword(kMainState, &state) || state != 1) Out(why, sizeof(why), "main state %lu (1 = in a level)", state);
+    else if (!InLevel()) Out(why, sizeof(why), "no player");
+    else if (LevelChangePending(why, sizeof(why))) {
+    } else SlBusyWhy(why, sizeof(why));
+    int index = -1;
+    DWORD count = 0;
+    if (!why[0]) {
+        wchar_t entry[128];
+        if (!_wcsicmp(g_slNameW, L"Autosave")) {
+            if (SlEntryName(kSlAutoIndex, entry, 128) && !_wcsicmp(entry, L"Autosave")) index = static_cast<int>(kSlAutoIndex);
+        } else if (ReadDword(kSlCount, &count) && count <= kSlAutoIndex) {
+            for (DWORD i = 0; i < count && index < 0; ++i)
+                if (SlEntryName(i, entry, 128) && !_wcsicmp(entry, g_slNameW)) index = static_cast<int>(i);
+        }
+        if (index < 0)
+            Out(why, sizeof(why), "'%s' is not in the game's save list (%lu entries; the game reads the list when its load "
+                "menu opens - open it once, or the save is newer)", name, count);
+    }
+    if (why[0]) {
+        Out(g_slState, sizeof(g_slState), "'%s' refused: %s", name, why);
+        Log(1, "save.load: %s", g_slState);
+        return;
+    }
+    int r = 0;
+    __try {
+        reinterpret_cast<SlVoidFn>(kSlClearBoxes)();
+        r = reinterpret_cast<SlArmFn>(kSlArm)(index);
+        *reinterpret_cast<volatile DWORD *>(kSlStep) = 2;   // the load step (the game's yes / no box answered "yes")
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        Out(g_slState, sizeof(g_slState), "'%s': exception in 0x%08lx / 0x%08lx", name, kSlClearBoxes, kSlArm);
+        Log(0, "save.load: %s", g_slState);
+        return;
+    }
+    g_slStart = now;
+    g_slSawChange = false;
+    InterlockedExchange(&g_slActive, 1);
+    char unit[64];
+    CurrentUnit(unit, sizeof(unit));
+    Out(g_slState, sizeof(g_slState), "'%s' (list index %d) loading - 0x789de0 = %d, step 2 set; Lara was in %s", name, index,
+        r, unit[0] ? unit : "-");
+    Log(1, "save.load: %s", g_slState);
+}
+void ValSaveLoad(char *o, size_t n) {
+    Out(o, n, "%s; [Saves] DirectLoad %d, checks %s%s", g_slState, g_slDirect, g_slOk ? "ok" : g_slWhy,
+        g_slActive ? " - a load runs" : g_slReq ? " - a request waits for the game thread" : "");
+}
+// save.load <save>|autosave: checked here, armed / confirmed (SaveConfirmed, as restore / delete), run on the game thread
+bool RunSaveLoad(const char *arg, char *o, size_t n) {
+    if (!g_slDirect) { Out(o, n, "refused: [Saves] DirectLoad=0"); return false; }
+    if (!g_slOk) { Out(o, n, "disabled: pre-check failed (%s)", g_slWhy); return false; }
+    wchar_t name[128];
+    if (!SaveNameArg(arg, name, 128, o, n)) return false;
+    if (!_wcsicmp(name, L"autosave")) wcscpy_s(name, L"Autosave");
+    wchar_t path[MAX_PATH];
+    EnterCriticalSection(&g_saveLock);
+    if (!g_saveFolder[0] && !g_saveRoot[0]) SaveFolderInit();
+    _snwprintf_s(path, MAX_PATH, _TRUNCATE, L"%s%s.TRUSave", g_saveFolder, name);
+    LeaveCriticalSection(&g_saveLock);
+    if (!FileExistsW(path)) { Out(o, n, "no save '%s' in the save folder (save.list)", arg); return false; }
+    if (g_slActive || g_slReq) { Out(o, n, "a save.load is already running (%s)", g_slState); return false; }
+    char why[200];
+    DWORD state = 0;
+    if (!InLevel()) { Out(o, n, "needs a level (the main menu has its own load menu)"); return false; }
+    if (g_mainStateOk && ReadDword(kMainState, &state) && state != 1) { Out(o, n, "main state %lu - only in a level (1)", state); return false; }
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: level change pending (%s)", why); return false; }
+    if (!SaveConfirmed("save.load", arg, o, n)) return true;
+    wcscpy_s(g_slNameW, name);
+    Out(g_slState, sizeof(g_slState), "'%s' requested - waits for the game thread", arg);
+    InterlockedExchange(&g_slReq, 1);
+    Log(1, "save.load %s by the owner: requested (runs on the game thread at the next game frame)", arg);
+    Out(o, n, "load of '%s' requested - the game loads it now (TruMenu.log 'save.load:' line)", arg);
+    return true;
+}
+void SaveLoadCheck() {
+    DWORD at = 0;
+    static char why[96];
+    g_slOk = g_mainStateOk && g_playerOk && DvChecks(kSlChecks, sizeof(kSlChecks) / sizeof(kSlChecks[0]), &at);
+    if (!g_mainStateOk) Out(why, sizeof(why), "main state check failed");
+    else if (!g_playerOk) Out(why, sizeof(why), "player pointer check failed");
+    else Out(why, sizeof(why), "load path code differs at 0x%08lx", at);
+    g_slWhy = g_slOk ? "ok" : why;
+    Log(g_slOk ? 1 : 0, "0.18 save.load: %s ([Saves] DirectLoad %d; %d byte checks)", g_slWhy, g_slDirect,
+        static_cast<int>(sizeof(kSlChecks) / sizeof(kSlChecks[0])));
 }
 
 // ======================================================================================================================
@@ -13249,6 +13595,9 @@ void ValPos(char *o, size_t n);
 void ValPosList(char *o, size_t n);
 bool RunPosSave(const char *arg, char *o, size_t n);
 bool RunPosGo(const char *arg, char *o, size_t n);
+bool RunPosGoLoad(const char *arg, char *o, size_t n);   // 0.18, defined below
+void ValSaveLoad(char *o, size_t n);
+bool RunSaveLoad(const char *arg, char *o, size_t n);
 
 struct Item {
     const char *id, *type, *label;
@@ -13281,6 +13630,8 @@ const Item kItems[] = {
     {"guard.dump", "action", "TruGuard: full dump + thread snapshot now (arg = reason; also works while hung)", false,
      ValGuardOverlay, RunGuardDump},
     {"overlay.position", "bool", "Lara position overlay", false, ValOverlay, RunOverlay},
+    {"overlay.larain", "bool", "0.18: the overlay's line 'Lara in: <trigger> <id>' (every trigger kind, also without a "
+                               "trigger layer; [Menu] OverlayLaraIn)", false, ValOvLaraIn, RunOvLaraIn},
     {"player.position", "info", "Lara position / rotation (needs a level)", false, ValPlayer, nullptr},
     {"camera.current", "info", "current camera object", false, ValCamera, nullptr},
     {"camera.mode", "action", "CAMERA_SetMode(arg 0..15), experimental, needs a level", true, ValCamera, RunCameraMode},
@@ -13653,6 +14004,13 @@ const Item kItems[] = {
     {"pos.list", "info", "0.17: the saved positions (TruMenu.positions.txt)", false, ValPosList, nullptr},
     {"pos.go", "action", "0.17 <name>|last: Lara to a saved position - only when its unit is loaded, converted with the "
                          "unit's shift then and now; otherwise refused with the reason", true, ValPos, RunPosGo},
+    // 0.18 (coordinator / Lukas, live 2026-11-06)
+    {"pos.goload", "action", "0.18 <name>|last: as pos.go, but when the unit is not loaded first level.load <unit> (waits "
+                             "for the level), then cheat.flight 1 + pos.go - explicit only; a level.load may change "
+                             "story state", false, ValPos, RunPosGoLoad},
+    {"save.load", "action", "0.18 <save>|autosave: load that save the game's own way (load step table 0x789de0, the "
+                            "file read + SAVE_RestoreGame + level change of the game) - in a level only, run twice "
+                            "within 10 s, never over TruLink ([Saves] DirectLoad)", false, ValSaveLoad, RunSaveLoad},
 };
 
 const Item *FindItem(const char *id) {
@@ -15161,7 +15519,7 @@ float g_radMouseDx = 0.0f, g_radMouseDy = 0.0f;
 // never offered in the ring (owner rule: game.quit is button-only; the others need the owner's second press or would
 // chain other commands); tools/trumenu_ini_check.py has the same list
 const char *const kRadForbidden[] = {"game.quit", "cmd.run", "save.delete", "save.restore", "save.import",
-                                     "settings.reset"};
+                                     "settings.reset", "save.load"};
 // 0.10.1 built-in quit sector: armed by the first confirm press (render thread only - RadialTick, from the real pad /
 // keyboard / mouse; no item, no TruLink command, no list reaches it), own arm time (the Status page button keeps
 // g_quitArmedAt). The ring has no ImGui widgets, so the 0.8.1 id lesson (fixed "###" ids) is kept the other way round:
@@ -15488,7 +15846,11 @@ bool ItemValueShort(const char *id, bool de, char *o, size_t n) {
             if (c.rgb == g_dvNameRgb) Out(o, n, "%s", de ? c.de : c.name);
     } else if (!_stricmp(id, "dbg.namesize")) Out(o, n, "%.2gx", g_dvNameScale);
     else if (!_stricmp(id, "quick.lang")) Out(o, n, "%s", g_qbLang ? "EN" : "DE");
-    else return false;
+    else if (!_stricmp(id, "time.scale")) {  // 0.18 (quick-toggle bar row Zeitlupe)
+        float t = 0.0f;
+        if (g_timeOk && ReadFloats(kTimeDilation, &t, 1)) Out(o, n, "%.2f", t);
+        else Out(o, n, "?");
+    } else return false;
     return true;
 }
 // 0.17: a preset entry "<value item> <arg>" is the current value (numbers compared as numbers, words case-insensitive;
@@ -15525,6 +15887,10 @@ bool ItemArgActive(const char *id, const char *arg) {
         return end && !*end && mask == static_cast<DWORD>(g_rmPassMask);
     }
     if (!_stricmp(id, "quick.lang")) return !_stricmp(a, g_qbLang ? "en" : "de");
+    if (!_stricmp(id, "time.scale")) {       // 0.18
+        float t = 0.0f;
+        return g_timeOk && ReadFloats(kTimeDilation, &t, 1) && fabsf(static_cast<float>(atof(a)) - t) < 0.01f;
+    }
     return false;
 }
 
@@ -16962,6 +17328,9 @@ void PageOverlay() {
     bool overlay = g_overlay != 0;
     if (!g_playerOk) ImGui::BeginDisabled();
     if (TmCheckbox("Show Lara's position (top left)", &overlay)) InterlockedExchange(&g_overlay, overlay);
+    bool larain = g_ovLaraIn != 0;           // 0.18
+    if (TmCheckbox("line 'Lara in: <trigger>' under it / Zeile 'Lara in'  [overlay.larain]###ovlarain", &larain))
+        InterlockedExchange(&g_ovLaraIn, larain ? 1 : 0);
     if (!g_playerOk) ImGui::EndDisabled();
     float p[3], r[3];
     DWORD instance = 0;
@@ -17060,26 +17429,74 @@ void PageMarkup() {
 // Rows: no state of their own - every row runs the existing item through InvokeCore (as the ring: game-thread items are
 // queued) and reads its state the ring's way (RadialOn / RadialWhy / ItemValueShort), so menu, ring and bar always agree.
 // One "quick: <page> / <row> -> <item> <arg>: <answer>" line per action (the item's own line as well); no per-frame log.
-enum QbKind { kQbBool = 0, kQbValue, kQbAction };
+// 0.18 (Lukas live 2026-11-06: "sicher schneller als das Radialmenue" - which menu / ring functions does the bar still
+// lack?): 9 pages - Notfall / Cheats, Lara (+ the saved positions), Debug / Darstellung, Leveldaten (start page), Render /
+// KI, Zeit / Test, Checkpoints, Saves, Kapitel (debug). Row kinds: bool (left / right = off / on), value (one step),
+// action (right = run), info (right = the item's value in the footer), choice (left = next choice, right = run with it).
+// kQfConfirm: a second right press on the same row within 3 s runs it (die, unit reload, chapter loads, checkpoint /
+// position go with a level load); kQfBackup: save.backup first, then the item as a two-step shortcut (chapters).
+// Pages with special rows (positions, checkpoints, saves) are built in the section "0.18 quick-toggle pages" below.
+// kQbLabel = a group heading (id "-"), kQbPlanned = a planned function (id "-", greyed, right = what it will do; arg =
+// "German text|English text")
+enum QbKind { kQbBool = 0, kQbValue, kQbAction, kQbInfo, kQbChoice, kQbLabel, kQbPlanned };
+enum QbFlag { kQfConfirm = 1, kQfBackup = 2 };
 enum QbCount { kQcNone = 0, kQcLayer, kQcTriggers, kQcTrgLabels, kQcLaraIn, kQcEncl, kQcLabels, kQcMarkup, kQcFlat, kQcOn,
                kQcCine };
-enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvPass, kQvLang };
-struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; };   // colour 0 = the layer's
-struct QbPage { const char *de, *en; const QbRow *rows; int n; };
+enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvPass, kQvLang, kQvTime, kQvMark, kQvWeapon,
+             kQvAssist };
+// colour 0 = the layer's; flags = QbFlag
+struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
+enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves };
+struct QbPage { const char *de, *en; const QbRow *rows; int n; int special; };
 const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230, 255, 255),
             kQbPlayer = IM_COL32(255, 205, 120, 255), kQbGrey = IM_COL32(200, 200, 200, 255),
             kQbFlat = IM_COL32(220, 220, 200, 255), kQbThrall = IM_COL32(255, 170, 170, 255),
-            kQbMarkup = IM_COL32(120, 230, 140, 255);
-// the pages in the order of the menu / ring groups (Spieler/Debug, Darstellung, Render, Leveldaten, KI / Namen / Lara)
-const QbRow kQbDebug[] = {
-    {"Alles an / aus", "Everything", "dbg.view", "", kQbBool, -1, kQcOn, 0, kQbWhite},
-    {"Legende", "Legend", "dbg.legend", "", kQbBool, -1, kQcNone, 0, kQbWhite},
-    {"Fliegen", "Flight", "cheat.flight", "", kQbBool, -1, kQcNone, 0, kQbPlayer},
-    {"Flug-Tempo", "Flight speed", "cheat.speed", "", kQbValue, -1, kQcNone, kQvSpeed, kQbPlayer},
-    {"Zwischensequenz-Fotos", "Cutscene shots", "shot.oncine", "", kQbBool, -1, kQcCine, 0, kQbPlayer},
-    {"Sprache", "Language", "quick.lang", "", kQbValue, -1, kQcNone, kQvLang, kQbGrey},
+            kQbMarkup = IM_COL32(120, 230, 140, 255), kQbRed = IM_COL32(255, 120, 100, 255),
+            kQbCheat = IM_COL32(255, 230, 120, 255), kQbClaude = IM_COL32(255, 140, 110, 255),
+            kQbTime = IM_COL32(190, 200, 255, 255), kQbChapter = IM_COL32(200, 230, 170, 255);
+// choice rows: the arguments a choice row cycles through (claude.mark kinds as the ring level Claude, the five ring
+// weapons of Waffen)
+struct QbChoice { const char *arg, *de, *en; };
+const QbChoice kQbMarks[] = {{"now", "Jetzt", "now"}, {"good", "Gut", "good"}, {"bug", "Fehler", "bug"},
+                             {"gfx", "Grafik", "graphics"}, {"sound", "Ton", "sound"}, {"stutter", "Ruckler", "stutter"}};
+const QbChoice kQbWeapons[] = {{"wp_shotgun", "Schrotflinte", "shotgun"}, {"wp_uzi", "Uzis", "Uzis"},
+                               {"wp_dlc_gold_shotgun", "Gold-Schrotflinte", "gold shotgun"},
+                               {"wp_assault_rifle", "Sturmgewehr", "assault rifle"},
+                               {"wp_tranq", "Betaeubungsgewehr", "tranquilliser"}};
+int g_qbChoice[2] = {0, 0};                  // render thread: the current choice of kQvMark / kQvWeapon
+// the pages
+const QbRow kQbEmergency[] = {               // 0.18 Notfall (Lukas: "falls man buggt") + the cheats
+    {"Sterben", "Die", "player.die", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Befreien: Stand", "Safe ground state", "player.safeground", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Punkt merken", "Mark here", "player.mark", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Zum Punkt", "Back to mark", "player.recall", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Volle Gesundheit", "Full health", "player.health", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Unverwundbar", "Invincible", "player.invincible", "", kQbBool, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Gott", "God mode", "cheat.god", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
+    {"Gott (voll)", "God mode (full)", "cheat.godfull", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
+    {"Unit neu laden", "Reload unit", "level.reload", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Munition unendlich", "Infinite ammo", "cheat.ammo", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
+    {"Auffuellen", "Fill up", "cheat.fillup", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
+    {"Ein Treffer", "One-hit kill", "cheat.onehitkill", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
+    {"Gegner-Gesundheit", "Enemy health", "cheat.enemyhealth", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
+    {"Munition voll", "Ammo fill", "ammo.fill", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
+    {"Waffe geben", "Give weapon", "weapon.give", "", kQbChoice, -1, kQcNone, kQvWeapon, kQbCheat, 0},
 };
-const QbRow kQbStyle[] = {
+const QbRow kQbLara[] = {                    // + the saved positions (special page kQsLara)
+    {"Fliegen", "Flight", "cheat.flight", "", kQbBool, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Flug-Tempo", "Flight speed", "cheat.speed", "", kQbValue, -1, kQcNone, kQvSpeed, kQbPlayer, 0},
+    {"Positions-Anzeige", "Position overlay", "overlay.position", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    {"Lara-drin-Zeile", "Lara-in line", "overlay.larain", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    {"Foto mit UI", "Shot with UI", "shot.save", "ui", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
+    {"Foto sauber", "Clean shot", "shot.save", "clean", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
+    {"Position merken", "Save position", "pos.save", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+};
+const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
+    {"Alles an / aus", "Everything", "dbg.view", "", kQbBool, -1, kQcOn, 0, kQbWhite, 0},
+    {"Legende", "Legend", "dbg.legend", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    {"Zwischensequenz-Fotos", "Cutscene shots", "shot.oncine", "", kQbBool, -1, kQcCine, 0, kQbPlayer, 0},
+    {"Sprache", "Language", "quick.lang", "", kQbValue, -1, kQcNone, kQvLang, kQbGrey, 0},
     {"Tiefe", "Depth", "dbg.depth", "", kQbValue, -1, kQcNone, kQvDepth, kQbBlue},
     {"Deckkraft", "Opacity", "dbg.alpha", "", kQbValue, -1, kQcNone, kQvAlpha, kQbBlue},
     {"Helligkeit", "Brightness", "dbg.bright", "", kQbValue, -1, kQcNone, kQvBright, kQbBlue},
@@ -17095,6 +17512,10 @@ const QbRow kQbRender[] = {
     {"Zaehlung", "Census", "dbg.census", "", kQbAction, -1, kQcNone, 0, kQbFlat},
     {"Rutschflaechen", "Slide faces", "dbg.slide", "", kQbBool, kDvSlide, kQcLayer, 0, 0},
     {"Gegner-Kollision", "Enemy collision", "dbg.enemycoll", "", kQbBool, kDvEnemyColl, kQcLayer, 0, 0},
+    {"Thrall-Labels", "Thrall labels", "dbg.labels", "", kQbBool, -1, kQcLabels, 0, kQbThrall},   // 0.17 KI / Namen
+    {"Objektnamen", "Object names", "dbg.names", "", kQbBool, kDvNames, kQcLayer, 0, 0},
+    {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},
+    {"Nur Kanten", "Ledges only", "draw.ledges", "", kQbBool, -1, kQcNone, 0, kQbMarkup},
 };
 const QbRow kQbLevel[] = {
     {"Alle Trigger", "All triggers", "dbg.triggers", "", kQbBool, -1, kQcTriggers, 0, kQbWhite},
@@ -17110,20 +17531,104 @@ const QbRow kQbLevel[] = {
     {"Checkpoints", "Checkpoints", "dbg.checkpoints", "", kQbBool, kDvCheckpoints, kQcLayer, 0, 0},
     {"Trigger-Namen", "Labels", "dbg.show", "trglabels", kQbBool, kDvTrgLabels, kQcTrgLabels, 0, 0},
 };
-const QbRow kQbAi[] = {
-    {"Thrall-Labels", "Thrall labels", "dbg.labels", "", kQbBool, -1, kQcLabels, 0, kQbThrall},
-    {"Objektnamen", "Object names", "dbg.names", "", kQbBool, kDvNames, kQcLayer, 0, 0},
-    {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},
-    {"Nur Kanten", "Ledges only", "draw.ledges", "", kQbBool, -1, kQcNone, 0, kQbMarkup},
+const QbRow kQbTimeTest[] = {                // 0.18 Zeit / Test
+    {"Welt anhalten", "Pause world", "time.pause", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
+    {"Zeitlupe", "Time scale", "time.scale", "", kQbValue, -1, kQcNone, kQvTime, kQbTime, 0},
+    {"Ton mit anhalten", "Freeze sound too", "time.freezesound", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
+    {"Ton: Stand", "Sound state", "time.sound", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Claude-Marke", "Claude mark", "claude.mark", "", kQbChoice, -1, kQcNone, kQvMark, kQbClaude, 0},
+    {"Ablauf: weiter", "Flow: next", "flow.next", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
+    {"Ablauf: ueberspringen", "Flow: skip", "flow.skip", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
+    {"Ablauf: zurueck", "Flow: back", "flow.back", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
+    {"Ablauf: Stand", "Flow: status", "flow.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Skript-Log", "Script log", "log.script", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
+    {"Tiefe: Diagnose", "Depth dump", "dbg.depthdump", "", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
 };
-#define QB_PAGE(de, en, rows) {de, en, rows, static_cast<int>(sizeof(rows) / sizeof(rows[0]))}
-const QbPage kQbPages[] = {QB_PAGE("Debug", "Debug", kQbDebug), QB_PAGE("Darstellung", "Display", kQbStyle),
-                           QB_PAGE("Render", "Render", kQbRender), QB_PAGE("Leveldaten", "Level data", kQbLevel),
-                           QB_PAGE("KI / Namen / Lara", "AI / names / Lara", kQbAi)};
+// 0.18 Kapitel (coordinator, stage 1 - debug: only level.load, no story value is set): the start units the game's own
+// level select uses (generalbank script (8, 119), tools/script_dis.py pp 119, logs r18_levelselect_script119.txt:
+// L1_seatop, L2_cliffclimb, L3_caverns_start, L4_trailstart, L5_startsnow, l6_ship_exterior, L7_thin_ice), the new-game
+// start l3_main_bedroom (generalbank DTP (7, 2), Befund-Manor-Prolog-0611.md) and the DLC starts (script (8, 104)
+// 'dlc_level1_start.drm' / 'dlc_level2_start.drm'). Right twice within 3 s: save.backup kapitel, then level.load.
+const QbRow kQbChapters[] = {
+    {"Prolog (Croft Manor)", "Prologue (Croft Manor)", "level.load", "l3_main_bedroom", kQbAction, -1, kQcNone, 0,
+     kQbChapter, kQfConfirm | kQfBackup},
+    {"1 Mittelmeer", "1 Mediterranean Sea", "level.load", "l1_seatop", kQbAction, -1, kQcNone, 0, kQbChapter,
+     kQfConfirm | kQfBackup},
+    {"2 Thailand", "2 Coastal Thailand", "level.load", "l2_cliffclimb", kQbAction, -1, kQcNone, 0, kQbChapter,
+     kQfConfirm | kQfBackup},
+    {"3 Croft Manor", "3 Croft Manor", "level.load", "l3_caverns_start", kQbAction, -1, kQcNone, 0, kQbChapter,
+     kQfConfirm | kQfBackup},
+    {"4 Mexiko", "4 Southern Mexico", "level.load", "l4_trailstart", kQbAction, -1, kQcNone, 0, kQbChapter,
+     kQfConfirm | kQfBackup},
+    {"5 Jan Mayen", "5 Jan Mayen Island", "level.load", "l5_startsnow", kQbAction, -1, kQcNone, 0, kQbChapter,
+     kQfConfirm | kQfBackup},
+    {"6 Andamanensee", "6 Andaman Sea", "level.load", "l6_ship_exterior", kQbAction, -1, kQcNone, 0, kQbChapter,
+     kQfConfirm | kQfBackup},
+    {"7 Arktisches Meer", "7 Arctic Sea", "level.load", "l7_thin_ice", kQbAction, -1, kQcNone, 0, kQbChapter,
+     kQfConfirm | kQfBackup},
+    {"DLC 1 Unter der Asche", "DLC 1 Beneath the Ashes", "level.load", "dlc_level1_start", kQbAction, -1, kQcNone, 0,
+     kQbChapter, kQfConfirm | kQfBackup},
+    {"DLC 2 Laras Schatten", "DLC 2 Lara's Shadow", "level.load", "dlc_level2_start", kQbAction, -1, kQcNone, 0,
+     kQbChapter, kQfConfirm | kQfBackup},
+};
+// 0.18 Barrierefreiheit (coordinator / Lukas 2026-11-06, TODO.md "Ideen": the skeleton only) - the five categories of the
+// game paper "Barrierefreiheit in Games" (game e.V., July 2025): Sehen / Hoeren / Verstehen / Steuerung / Sonstige
+// (Phobien). Only existing, working items are live (Steuerung: time.scale as an assist 0.5 / 0.75 / 1, player.unstuck,
+// player.safeground, player.invincible and cheat.godfull as assists); everything planned is a greyed row "geplant"
+// whose right press says in one line what it will do. The same list is the menu page "Barrierefreiheit" (kQbAccess).
+const QbRow kQbAccess[] = {
+    {"Sehen", "Vision", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Farbpaletten", "Colour palettes", "-", "Paletten fuer Farbfehlsicht (Debug-Ansicht, spaeter HUD)|palettes for colour "
+     "vision deficiency (debug view, later the HUD)", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Untertitel gross", "Large subtitles", "-", "Untertitel groesser, dunkler Hintergrund, Sprechername|larger subtitles, dark "
+     "background, speaker name", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Kontrast", "Contrast", "-", "Kontrast-Modus / HUD-Skalierung|contrast mode / HUD scaling", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Hoeren", "Hearing", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Geraeusch-Untertitel", "Sound captions", "-", "Geraeusche als Text ([Explosion], [Thrall knurrt]), Richtung|sounds as "
+     "text ([explosion], [thrall growls]), direction", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Mono-Ton", "Mono sound", "-", "Ton in Mono|sound in mono", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Verstehen", "Understanding", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Ziel-Erinnerung", "Objective reminder", "-", "was ist zu tun (PDA / Hinweise), Raetsel-Hinweise in Stufen|what to do "
+     "(PDA / hints), puzzle hints in steps", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Kapitel ueberspringen", "Skip chapter", "-", "ein Kapitel so beenden wie das Spiel (Story-Werte aus den Save-Diffs) - "
+     "Stufe 2; Stufe 1 = Seite Kapitel (debug)|end a chapter the way the game does (story values from the save diffs) - "
+     "stage 2; stage 1 = page Chapters (debug)", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Steuerung", "Controls", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Zeitlupe (Hilfe)", "Slow motion (assist)", "time.scale", "", kQbValue, -1, kQcNone, kQvAssist, kQbTime, 0},
+    {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Befreien: Stand", "Safe ground state", "player.safeground", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Unverwundbar (Hilfe)", "Invincible (assist)", "player.invincible", "", kQbBool, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Gott voll (Hilfe)", "Full god mode (assist)", "cheat.godfull", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
+    {"Reaktions-Momente", "Reaction moments", "-", "Adrenalin-Momente laenger oder automatisch|adrenaline moments longer "
+     "or automatic", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Sonstige (Phobien)", "Other (phobias)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Arachnophobie", "Arachnophobia", "-", "Spinnen als Bild / ersetzt (Befund-Arachnophobie-0611.md)|spiders as an image "
+     "/ replaced (Befund-Arachnophobie-0611.md)", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Thalassophobie", "Thalassophobia", "-", "tiefes Wasser heller, Weg zur Oberflaeche|deep water brighter, way to the "
+     "surface", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Haie", "Sharks", "-", "Haie sehen Lara nicht / entfernt / als Bild|sharks do not see Lara / removed / as an image",
+     kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Kamera-Wackeln aus", "No camera shake", "-", "Kamera-Shakes aus, Blitze daempfen|camera shakes off, flashes dimmed",
+     kQbPlanned, -1, kQcNone, 0, 0, 0},
+};
+#define QB_PAGE(de, en, rows, special) {de, en, rows, static_cast<int>(sizeof(rows) / sizeof(rows[0])), special}
+const QbPage kQbPages[] = {
+    QB_PAGE("Notfall / Cheats", "Emergency / cheats", kQbEmergency, kQsNone),
+    QB_PAGE("Lara", "Lara", kQbLara, kQsLara),
+    QB_PAGE("Debug / Darstellung", "Debug / display", kQbDebug, kQsNone),
+    QB_PAGE("Leveldaten", "Level data", kQbLevel, kQsNone),
+    QB_PAGE("Render / KI", "Render / AI", kQbRender, kQsNone),
+    QB_PAGE("Zeit / Test", "Time / test", kQbTimeTest, kQsNone),
+    {"Checkpoints", "Checkpoints", nullptr, 0, kQsCheckpoints},
+    {"Saves", "Saves", nullptr, 0, kQsSaves},
+    QB_PAGE("Kapitel (debug)", "Chapters (debug)", kQbChapters, kQsNone),
+    QB_PAGE("Barrierefreiheit", "Accessibility", kQbAccess, kQsNone),
+};
 #undef QB_PAGE
 const int kQbPageN = static_cast<int>(sizeof(kQbPages) / sizeof(kQbPages[0]));
 const int kQbStartPage = 3;                  // Leveldaten: the layers are what the bar is mostly for
-int g_qbPage = kQbStartPage, g_qbRow[8] = {};  // render thread; kept over a close
+const int kQbViewMax = 40;                   // rows of one page (static + special)
+int g_qbPage = kQbStartPage, g_qbRow[16] = {};  // render thread; kept over a close
 int g_qbShowClosed = 1, g_qbTop = 30;        // [Quick] ShowClosed / Top (percent of the screen height)
 float g_qbScale = 1.0f;                      // [Quick] Scale
 LONG g_qbToggles = 0, g_qbTaps = 0, g_qbLate = 0, g_qbRuns = 0;   // quick.status counters
@@ -17238,10 +17743,12 @@ const char *QbWhy(const QbRow &r) {
 }
 // value rows: the steps left / right walk through (as the item's argument), the step of the current value
 int QbValueCount(int val) {
-    return val == kQvDepth || val == kQvEncl ? 3 : val == kQvAlpha ? 10 : val == kQvBright ? 13 : val == kQvSpeed ? 5
-         : val == kQvPass ? kRmPassN : val == kQvLang ? 2 : 0;
+    return val == kQvDepth || val == kQvEncl || val == kQvTime || val == kQvAssist ? 3 : val == kQvAlpha ? 10
+         : val == kQvBright ? 13 : val == kQvSpeed ? 5 : val == kQvPass ? kRmPassN : val == kQvLang ? 2 : 0;
 }
 const int kQbSpeeds[5] = {5, 10, 20, 40, 80};
+const float kQbTimes[3] = {0.25f, 0.5f, 1.0f};     // 0.18 time.scale steps (as the ring's Zeit level)
+const float kQbAssists[3] = {0.5f, 0.75f, 1.0f};   // 0.18 Barrierefreiheit: slow motion as an assist
 void QbValueArg(int val, int i, char *o, size_t n) {
     switch (val) {
     case kQvDepth: Out(o, n, "%s", kDpModeNames[i]); break;
@@ -17251,6 +17758,8 @@ void QbValueArg(int val, int i, char *o, size_t n) {
     case kQvSpeed: Out(o, n, "%d", kQbSpeeds[i]); break;
     case kQvPass: Out(o, n, "%s", kRmPassNames[i]); break;
     case kQvLang: Out(o, n, "%s", i ? "en" : "de"); break;
+    case kQvTime: Out(o, n, "%g", static_cast<double>(kQbTimes[i])); break;
+    case kQvAssist: Out(o, n, "%g", static_cast<double>(kQbAssists[i])); break;
     default: o[0] = 0;
     }
 }
@@ -17271,6 +17780,15 @@ int QbValueNow(int val) {
             if (static_cast<DWORD>(g_rmPassMask) & kRmPassIds[i]) v = i;   // the first pass id of the mask in table order
         break;
     case kQvLang: v = g_qbLang; break;
+    case kQvTime:
+    case kQvAssist: {
+        const float *steps = val == kQvTime ? kQbTimes : kQbAssists;
+        float t = 1.0f;
+        if (!ReadFloats(kTimeDilation, &t, 1)) t = 1.0f;
+        for (int i = 0; i < 3; ++i)
+            if (fabsf(t - steps[i]) < fabsf(t - steps[v])) v = i;
+        break;
+    }
     default: break;
     }
     int count = QbValueCount(val);
@@ -17284,8 +17802,18 @@ int QbLayersOn() {
         if (i != kDvLegend && g_dvOn[i]) ++on;
     return on + (g_lblOn ? 1 : 0) + (g_drawMarkup ? 1 : 0) + (g_rmFlat ? 1 : 0);
 }
-struct OcState { bool active, armed; int burst, pairs, refused; DWORD start, next, offSince; char lastWhy[160]; };
-OcState g_oc = {false, true, 0, 0, 0, 0, 0, 0, ""};   // 0.17 cutscene shots (section below)
+// 0.18: seg = segment of the cutscene (1 ..), pairs / refused per segment, allPairs / allRefused per cutscene; cine /
+// track / unit = what the segment started with
+struct OcState {
+    bool active, armed;
+    int burst, pairs, refused;
+    DWORD start, next, offSince;
+    char lastWhy[160];
+    int seg, allPairs, allRefused;
+    DWORD segStart, cine, track, scriptSeen;
+    char unit[64];
+};
+OcState g_oc = {false, true, 0, 0, 0, 0, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, ""};   // 0.17 cutscene shots (section below)
 LONG g_ocBursts = 0;
 // the count column (what the layer drew in the last frame), "" = none
 void QbCountText(const QbRow &r, bool on, char *o, size_t n) {
@@ -17316,14 +17844,90 @@ void QbResult(bool err, const char *fmt, ...) {
     g_qbResultErr = err;
     g_qbResultTick = GetTickCount();
 }
+// 0.18 confirm (kQfConfirm rows, position / checkpoint go): the first right press arms that row's key for 3 s and says
+// so in the footer, a second one on the same key runs it; any other key or the time out disarms
+char g_qbArmKey[160] = "";
+DWORD g_qbArmTick = 0;
+const DWORD kQbConfirmMs = 3000;
+bool QbArmed(const char *key) {
+    return g_qbArmTick && GetTickCount() - g_qbArmTick <= kQbConfirmMs && !strcmp(g_qbArmKey, key);
+}
+bool QbConfirm(const char *key, const char *name, const char *what) {
+    const bool de = g_qbLang == 0;
+    if (QbArmed(key)) {
+        g_qbArmKey[0] = 0;
+        g_qbArmTick = 0;
+        return true;
+    }
+    strncpy_s(g_qbArmKey, sizeof(g_qbArmKey), key, _TRUNCATE);
+    g_qbArmTick = GetTickCount();
+    if (!g_qbArmTick) g_qbArmTick = 1;
+    QbResult(true, "%s: %s%s%s", name, what && what[0] ? what : "", what && what[0] ? " - " : "",
+             de ? "rechts nochmal (3 s) = ausfuehren" : "right again (3 s) = run");
+    return false;
+}
+// run an item from the bar: one log line, the answer in the footer
+void QbRun(const char *page, const char *rowName, const char *label, const char *id, const char *arg) {
+    g_qbRunning = true;                      // src=quick in the item's own log line
+    const char *answer = InvokeCore(id, arg, false);
+    g_qbRunning = false;
+    ++g_qbRuns;
+    Log(1, "quick: %s / %s -> %s%s%s: %.200s", page, rowName, id, arg && arg[0] ? " " : "", arg ? arg : "", answer);
+    bool ok = !strncmp(answer, "ok", 2);
+    const char *text = answer + (ok ? 2 : 3);
+    while (*text == ' ') ++text;
+    QbResult(!ok, "%s: %s", label, text);
+}
+const QbChoice *QbChoices(int val, int *count) {
+    if (val == kQvMark) { *count = static_cast<int>(sizeof(kQbMarks) / sizeof(kQbMarks[0])); return kQbMarks; }
+    if (val == kQvWeapon) { *count = static_cast<int>(sizeof(kQbWeapons) / sizeof(kQbWeapons[0])); return kQbWeapons; }
+    *count = 0;
+    return nullptr;
+}
+int &QbChoiceIndex(int val) { return g_qbChoice[val == kQvWeapon ? 1 : 0]; }
+
 // one row, left (dir -1) or right (+1): the item with the target state / the next value / the action (right only)
 void QbAct(int page, int row, int dir) {
     const QbRow &r = kQbPages[page].rows[row];
     const bool de = g_qbLang == 0;
     const char *name = de ? r.de : r.en;
+    if (r.kind == kQbLabel) return;          // 0.18: a group heading
+    if (r.kind == kQbPlanned) {              // 0.18: what the planned function will do ("de|en")
+        char text[200];
+        strncpy_s(text, sizeof(text), r.arg, _TRUNCATE);
+        char *bar = strchr(text, '|');
+        const char *say = text;
+        if (bar) { *bar = 0; if (!de) say = bar + 1; }
+        QbResult(false, "%s (%s): %s", name, de ? "geplant" : "planned", say);
+        return;
+    }
+    if (r.kind == kQbChoice && dir < 0) {    // 0.18: left = the next choice (wraps), nothing runs
+        int count = 0;
+        const QbChoice *c = QbChoices(r.val, &count);
+        if (!c || !count) return;
+        int &i = QbChoiceIndex(r.val);
+        i = (i + 1) % count;
+        QbResult(false, "%s: %s", name, de ? c[i].de : c[i].en);
+        return;
+    }
     const char *why = QbWhy(r);
     if (why[0]) { QbResult(true, "%s: %s", name, why); return; }   // greyed: say why, run nothing
     char arg[96] = "";
+    if (r.kind == kQbInfo) {                 // 0.18: right = the value in the footer (and the log)
+        if (dir < 0) { QbResult(false, "%s: %s", name, de ? "rechts = anzeigen" : "right = show"); return; }
+        char v[240];
+        if (!ItemValueText(r.id, v, sizeof(v))) Out(v, sizeof(v), "?");
+        Log(1, "quick: %s / %s -> %s: %.200s", kQbPages[page].de, r.de, r.id, v);
+        QbResult(false, "%s: %s", name, v);
+        return;
+    }
+    if (r.kind == kQbChoice) {               // right = run with the current choice
+        int count = 0;
+        const QbChoice *c = QbChoices(r.val, &count);
+        if (!c || !count) return;
+        QbRun(kQbPages[page].de, r.de, name, r.id, c[QbChoiceIndex(r.val) % count].arg);
+        return;
+    }
     if (r.kind == kQbBool) {
         bool want = dir > 0, on = QbRowOn(r);
         if (on == want) {
@@ -17338,41 +17942,178 @@ void QbAct(int page, int row, int dir) {
     } else {
         if (dir < 0) { QbResult(false, "%s: %s", name, de ? "rechts = starten" : "right = start"); return; }
         strncpy_s(arg, sizeof(arg), r.arg, _TRUNCATE);
+        char key[160];
+        Out(key, sizeof(key), "%d/%s %s", page, r.id, r.arg);
+        if ((r.flags & kQfConfirm) && !QbConfirm(key, name, nullptr)) return;
+        if (r.flags & kQfBackup) {           // 0.18 chapters: save.backup first, then the item (shortcut runner)
+            char steps[200], title[64], o[300];
+            Out(steps, sizeof(steps), "save.backup kapitel;%s %s", r.id, r.arg);
+            Out(title, sizeof(title), "%s", r.en);
+            bool ok = ShortcutStart(steps, title, o, sizeof(o));
+            ++g_qbRuns;
+            Log(1, "quick: %s / %s -> shortcut '%s': %s%s", kQbPages[page].de, r.de, steps, ok ? "" : "err ", o);
+            QbResult(!ok, "%s: %s", name, ok ? (de ? "Sicherung, dann laden (debug, keine Story-Werte)"
+                                                   : "backup, then load (debug, no story values)") : o);
+            return;
+        }
     }
-    g_qbRunning = true;                      // src=quick in the item's own log line
-    const char *answer = InvokeCore(r.id, arg, false);
-    g_qbRunning = false;
-    ++g_qbRuns;
-    Log(1, "quick: %s / %s -> %s%s%s: %.200s", kQbPages[page].de, r.de, r.id, arg[0] ? " " : "", arg, answer);
-    bool ok = !strncmp(answer, "ok", 2);
-    const char *text = answer + (ok ? 2 : 3);
-    while (*text == ' ') ++text;
-    QbResult(!ok, "%s: %s", name, text);
+    QbRun(kQbPages[page].de, r.de, name, r.id, arg);
 }
 
-// 0.17 checkpoint page (Lukas' checkpoint list, "if it fits"): one page more after the static ones while the checkpoint
-// checks passed - its rows are the checkpoints of the last bar frame (section "---- 0.17 checkpoint list")
-int QbPageCount() { return kQbPageN + (g_dvCpOk ? 1 : 0); }
+// 0.18: 9 fixed pages (0.17: the checkpoint page only while its checks passed)
+int QbPageCount() { return kQbPageN; }
 const char *QbPageName(int page, bool de) {
-    if (page == kQbPageN) return "Checkpoints";
     if (page < 0 || page >= kQbPageN) return "?";
     return de ? kQbPages[page].de : kQbPages[page].en;
 }
-int QbCpRows();                              // below
-void QbCpAct(int row, int dir);
-void DrawQuickCp(float x0, float y0);
+// 0.18: one drawn row of a page (static rows and the special rows of the Lara / Checkpoints / Saves pages)
+struct QbView {
+    char name[112], state[48], count[24];
+    ImU32 col, stateCol;
+    int square;                              // 0 none, 1 filled (on), 2 outline (off)
+    bool skip;                               // a heading: up / down pass over it
+};
+QbView g_qbView[kQbViewMax];
+int g_qbViewN = 0, g_qbViewPage = -1;
+char g_qbHead[160] = "";                     // a second header line of a special page ("" = none)
+int g_qbSavesPageSeen = 0;                   // the Saves page was built in the last frame (a fresh scan on entering)
+int QbSpecialBuild(int special, int base, bool de);   // section "0.18 quick-toggle pages" (after the positions)
+void QbSpecialAct(int special, int row, int dir);
+
+// 0.18: the rows of a page for this frame - static rows the 0.17 way (state, colour, count), then the special rows
+LONG g_qbFrame = 0, g_qbBuiltFrame = -1;
+void QbBuild(int page) {
+    const bool de = g_qbLang == 0;
+    const QbPage &p = kQbPages[page];
+    g_qbViewN = 0;
+    g_qbHead[0] = 0;
+    if (p.special != kQsSaves) g_qbSavesPageSeen = 0;   // entering the Saves page again re-reads the files
+    for (int i = 0; i < p.n && g_qbViewN < kQbViewMax; ++i) {
+        const QbRow &r = p.rows[i];
+        QbView &v = g_qbView[g_qbViewN++];
+        if (r.kind == kQbLabel || r.kind == kQbPlanned) {   // 0.18: heading / planned (no item)
+            const bool label = r.kind == kQbLabel;
+            Out(v.name, sizeof(v.name), "%s%s", label ? "-- " : "   ", de ? r.de : r.en);
+            Out(v.state, sizeof(v.state), "%s", label ? "" : de ? "geplant" : "planned");
+            v.count[0] = 0;
+            v.square = 0;
+            v.col = label ? (r.colour ? r.colour : kQbBlue) : IM_COL32(125, 125, 125, 255);
+            v.stateCol = IM_COL32(125, 125, 125, 255);
+            v.skip = label;
+            continue;
+        }
+        const char *why = QbWhy(r);
+        const bool grey = why[0] != 0;
+        bool on = false;
+        v.square = 0;
+        v.skip = false;
+        Out(v.name, sizeof(v.name), "%s", de ? r.de : r.en);
+        if (r.kind == kQbBool) {
+            on = QbRowOn(r);
+            Out(v.state, sizeof(v.state), "%s", grey ? (de ? "gesperrt" : "n/a") : on ? (de ? "an" : "on") : (de ? "aus" : "off"));
+            v.square = on && !grey ? 1 : 2;
+        } else if (r.kind == kQbValue) {
+            char val[40];
+            if (!ItemValueShort(r.id, de, val, sizeof(val))) Out(val, sizeof(val), "?");
+            Out(v.state, sizeof(v.state), "< %s >", val);
+        } else if (r.kind == kQbChoice) {
+            int count = 0;
+            const QbChoice *c = QbChoices(r.val, &count);
+            const int k = count ? QbChoiceIndex(r.val) % count : 0;
+            Out(v.state, sizeof(v.state), "< %s >", c ? (de ? c[k].de : c[k].en) : "?");
+        } else if (r.kind == kQbInfo) {
+            Out(v.state, sizeof(v.state), "%s", de ? "rechts = zeigen" : "right = show");
+        } else if (!_stricmp(r.id, "dbg.census")) {   // idle / requested / running
+            Out(v.state, sizeof(v.state), "%s", g_rmCsRun ? (de ? "laeuft" : "running")
+                                                : g_rmCensusReq ? (de ? "angefordert" : "requested")
+                                                : (de ? "rechts = start" : "right = start"));
+        } else {
+            char key[160];
+            Out(key, sizeof(key), "%d/%s %s", page, r.id, r.arg);
+            const bool armed = (r.flags & kQfConfirm) && QbArmed(key);
+            Out(v.state, sizeof(v.state), "%s", armed ? (de ? "nochmal rechts!" : "right again!")
+                                                : (r.flags & kQfConfirm) ? (de ? "rechts 2x" : "right 2x")
+                                                : (de ? "rechts" : "right"));
+        }
+        QbCountText(r, on || r.kind != kQbBool, v.count, sizeof(v.count));
+        ImU32 col = r.colour ? r.colour : r.layer >= 0 ? kDvLayers[r.layer].colour : kQbWhite;
+        if (grey) col = IM_COL32(130, 130, 130, 255);
+        else if (r.kind == kQbBool && !on) col = (col & 0x00ffffffu) | (150u << 24);   // off: the colour, fainter
+        v.col = col;
+        v.stateCol = grey ? IM_COL32(220, 120, 100, 255) : r.kind == kQbBool ? (on ? IM_COL32(110, 230, 120, 255)
+                                                                                   : IM_COL32(170, 170, 170, 255))
+                   : !strncmp(v.state, "nochmal", 7) || !strncmp(v.state, "right again", 11) ? IM_COL32(255, 110, 90, 255)
+                   : IM_COL32(235, 235, 235, 255);
+    }
+    if (p.special) g_qbViewN += QbSpecialBuild(p.special, g_qbViewN, de);
+    g_qbViewPage = page;
+    g_qbBuiltFrame = g_qbFrame;
+}
+
+// 0.18 menu page "Accessibility / Barrierefreiheit": the same rows as the bar page (kQbAccess) - headings, the working
+// assists (checkboxes / buttons running the existing items), the planned functions greyed with a one-line tooltip
+void PageAccess() {
+    ImGui::TextWrapped("Skeleton (0.18): the five categories of the game paper 'Barrierefreiheit in Games' (game e.V., "
+                       "July 2025). Only existing items work; planned functions are grey - hover for what they will do. "
+                       "Quick-toggle bar: page Barrierefreiheit; ring: Spieler / Barrierefreiheit.");
+    char o[300];
+    for (const QbRow &r : kQbAccess) {
+        if (r.kind == kQbLabel) {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(0.63f, 0.9f, 1.0f, 1.0f), "%s / %s", r.de, r.en);
+            continue;
+        }
+        if (r.kind == kQbPlanned) {
+            ImGui::TextDisabled("   %s / %s  (geplant / planned)", r.de, r.en);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", r.arg);
+            continue;
+        }
+        const char *why = QbWhy(r);
+        char label[160];
+        if (why[0]) ImGui::BeginDisabled();
+        if (r.kind == kQbBool) {
+            bool on = QbRowOn(r);
+            Out(label, sizeof(label), "%s / %s  [%s]###acc_%s", r.de, r.en, r.id, r.id);
+            if (TmCheckbox(label, &on)) QueueItem(r.id, on ? "1" : "0");
+        } else if (r.kind == kQbValue) {
+            char v[40];
+            if (!ItemValueShort(r.id, true, v, sizeof(v))) Out(v, sizeof(v), "?");
+            ImGui::Text("%s / %s: %s", r.de, r.en, v);
+            for (int i = 0; i < QbValueCount(r.val); ++i) {
+                char arg[16];
+                QbValueArg(r.val, i, arg, sizeof(arg));
+                Out(label, sizeof(label), "%s###acc_%s_%d", arg, r.id, i);
+                ImGui::SameLine();
+                if (TmButton(label)) QueueItem(r.id, arg);
+            }
+        } else if (r.kind == kQbInfo) {
+            ItemValueText(r.id, o, sizeof(o));
+            ImGui::TextWrapped("%s / %s: %s", r.de, r.en, o);
+        } else {
+            Out(label, sizeof(label), "%s / %s  [%s]###acc_%s", r.de, r.en, r.id, r.id);
+            if (TmButton(label)) QueueItem(r.id, r.arg);
+        }
+        if (why[0]) {
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "(%s)", why);
+        }
+    }
+}
 
 // render thread, every Present (Render, before its early return): the open bar's input from the raw pad (g_pad, before
 // QbPad masks it for the game) - edges of D-pad / LB / RB, a held D-pad direction repeats after 400 ms every 120 ms
 void QuickTick() {
     static WORD prev = 0;
     static DWORD repeatAt = 0;
+    ++g_qbFrame;
     PadState pad = {};
     EnterCriticalSection(&g_padLock);
     bool have = g_padConnected[g_lastPad];
     if (have) pad = g_pad[g_lastPad];
     LeaveCriticalSection(&g_padLock);
     const WORD b = have ? static_cast<WORD>(pad.wButtons & kQbOwn) : 0;
+    if (!g_qbOpen) g_qbSavesPageSeen = 0;    // 0.18: reopened on the Saves page = a fresh scan
     if (!g_qbOpen || g_menuOpen || g_radOpen || InterlockedExchange(&g_qbJust, 0)) {
         prev = b;                            // buttons held at the open (or while the menu / ring had them) are no edges
         repeatAt = 0;
@@ -17392,17 +18133,19 @@ void QuickTick() {
     if (g_qbPage < 0 || g_qbPage >= pages) g_qbPage = 0;
     if (edges & 0x0100) g_qbPage = (g_qbPage + pages - 1) % pages;         // LB
     if (edges & 0x0200) g_qbPage = (g_qbPage + 1) % pages;                 // RB
-    const bool cp = g_qbPage == kQbPageN;    // the checkpoint page: rows from the last frame's list
-    const int n = cp ? (QbCpRows() > 0 ? QbCpRows() : 1) : kQbPages[g_qbPage].n;
+    QbBuild(g_qbPage);                       // 0.18: this frame's rows (static + special)
+    const int n = g_qbViewN > 0 ? g_qbViewN : 1;
     int &row = g_qbRow[g_qbPage];
     if (row < 0 || row >= n) row = 0;
     if (edges & 0x0001) row = (row + n - 1) % n;                            // up
     if (edges & 0x0002) row = (row + 1) % n;                                // down
-    if (cp) {
-        if (edges & 0x0004) QbCpAct(row, -1);
-        else if (edges & 0x0008) QbCpAct(row, 1);
-    } else if (edges & 0x0004) QbAct(g_qbPage, row, -1);                    // left = off / one step down
-    else if (edges & 0x0008) QbAct(g_qbPage, row, 1);                       // right = on / one step up
+    for (int k = 0; k < n && row < g_qbViewN && g_qbView[row].skip; ++k)   // 0.18: headings are passed over
+        row = (edges & 0x0001) ? (row + n - 1) % n : (row + 1) % n;
+    if (!(edges & 0x000C)) return;
+    const int d = (edges & 0x0004) ? -1 : 1;                                // left = off / step down, right = on / up
+    const QbPage &p = kQbPages[g_qbPage];
+    if (row < p.n) QbAct(g_qbPage, row, d);
+    else if (p.special) QbSpecialAct(p.special, row - p.n, d);
 }
 
 // the closed line ([Quick] ShowClosed) only with the debug view enabled and in a level; the open bar always
@@ -17437,41 +18180,39 @@ void DrawQuick() {
         return;
     }
     if (g_qbPage < 0 || g_qbPage >= QbPageCount()) g_qbPage = 0;
-    if (g_qbPage == kQbPageN) { DrawQuickCp(x0, y0); return; }   // the checkpoint page
+    if (g_qbBuiltFrame != g_qbFrame || g_qbViewPage != g_qbPage) QbBuild(g_qbPage);   // 0.18 (QuickTick skipped it)
     const QbPage &p = kQbPages[g_qbPage];
+    const int n = g_qbViewN;
     int sel = g_qbRow[g_qbPage];
-    if (sel < 0 || sel >= p.n) sel = 0;
-    char title[96];
+    if (sel < 0 || sel >= (n ? n : 1)) sel = 0;
+    // 0.18: pages longer than the screen scroll with the selection (the rows above / below are counted in the title)
+    const float fsSmall = fs * 0.8f;
+    const float fixedH = pad + rowH + (g_qbHead[0] ? rowH : 0.0f) + 2.0f * (fsSmall + 3.0f) + pad;
+    int visible = static_cast<int>((io.DisplaySize.y * 0.97f - y0 - fixedH) / rowH);
+    if (visible < 6) visible = 6;
+    int first = 0;
+    if (n > visible) {
+        first = sel - visible / 2;
+        if (first < 0) first = 0;
+        if (first > n - visible) first = n - visible;
+    }
+    const int last = n < first + visible ? n : first + visible;
+    char title[128];
     Out(title, sizeof(title), "%s  < %s >  %d/%d", de ? "Schnellschalter" : "Quick toggles", de ? p.de : p.en,
         g_qbPage + 1, QbPageCount());
-    char state[16][48], count[16][16];
-    const char *why[16];
-    bool on[16];
+    if (n > visible) {
+        char more[48];
+        Out(more, sizeof(more), "   %d-%d / %d", first + 1, last, n);
+        strncat_s(title, sizeof(title), more, _TRUNCATE);
+    }
     float nameW = 0.0f, stateW = 0.0f, countW = 0.0f;
-    for (int i = 0; i < p.n && i < 16; ++i) {
-        const QbRow &r = p.rows[i];
-        why[i] = QbWhy(r);
-        on[i] = false;
-        if (r.kind == kQbBool) {
-            on[i] = QbRowOn(r);
-            Out(state[i], sizeof(state[i]), "%s", why[i][0] ? (de ? "gesperrt" : "n/a") : on[i] ? (de ? "an" : "on")
-                                                                                             : (de ? "aus" : "off"));
-        } else if (r.kind == kQbValue) {
-            char v[40];
-            if (!ItemValueShort(r.id, de, v, sizeof(v))) Out(v, sizeof(v), "?");
-            Out(state[i], sizeof(state[i]), "< %s >", v);
-        } else {                             // dbg.census: idle / requested / running
-            Out(state[i], sizeof(state[i]), "%s", g_rmCsRun ? (de ? "laeuft" : "running")
-                                                  : g_rmCensusReq ? (de ? "angefordert" : "requested")
-                                                  : (de ? "rechts = start" : "right = start"));
-        }
-        QbCountText(r, on[i] || r.kind != kQbBool, count[i], sizeof(count[i]));
-        float a = width(de ? r.de : r.en, fs), b = width(state[i], fs), c = width(count[i], fs);
+    for (int i = first; i < last; ++i) {
+        float a = width(g_qbView[i].name, fs), b = width(g_qbView[i].state, fs), c = width(g_qbView[i].count, fs);
         if (a > nameW) nameW = a;
         if (b > stateW) stateW = b;
         if (c > countW) countW = c;
     }
-    char foot[200];
+    char foot[240];
     bool result = g_qbResult[0] && GetTickCount() - g_qbResultTick < 5000;
     if (result) Out(foot, sizeof(foot), "%s", g_qbResult);
     else Out(foot, sizeof(foot), "%s", de ? "hoch / runter: Zeile   links / rechts: aus / an   LB / RB: Seite"
@@ -17479,44 +18220,47 @@ void DrawQuick() {
     char close[64];
     Out(close, sizeof(close), "%s: %s", combo, de ? "zu" : "close");
     float w = pad + sq + pad + nameW + gap + stateW + gap + countW + pad;
-    float tw = width(title, fs) + 2.0f * pad, fw = width(foot, fs * 0.8f) + 2.0f * pad, cw = width(close, fs * 0.8f) + 2.0f * pad;
+    float tw = width(title, fs) + 2.0f * pad, fw = width(foot, fsSmall) + 2.0f * pad, cw = width(close, fsSmall) + 2.0f * pad;
+    float hw = g_qbHead[0] ? width(g_qbHead, fs) + 2.0f * pad : 0.0f;
     if (tw > w) w = tw;
     if (cw > w) w = cw;
     const float maxW = io.DisplaySize.x * 0.45f;
+    if (hw > w) w = hw < maxW ? hw : maxW;
     if (fw > w) w = fw < maxW ? fw : maxW;
-    const float h = pad + rowH + p.n * rowH + 2.0f * (fs * 0.8f + 3.0f) + pad;
+    const int shown = n ? last - first : 1;
+    const float h = fixedH + shown * rowH;
     dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(0, 0, 0, 175), 5.0f);
     dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(160, 230, 255, 120), 5.0f, 0, 1.0f);
     g_qbRect = {x0, y0, x0 + w, y0 + h};
+    dl->PushClipRect(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), true);
     float y = y0 + pad;
     dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(255, 220, 90, 255), title);
     y += rowH;
+    if (g_qbHead[0]) {
+        dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(190, 190, 190, 255), g_qbHead);
+        y += rowH;
+    }
+    if (!n) {
+        dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(170, 170, 170, 255), de ? "(keine)" : "(none)");
+        y += rowH;
+    }
     const float nameX = x0 + pad + sq + pad, stateX = nameX + nameW + gap, countRight = x0 + w - pad;
-    for (int i = 0; i < p.n && i < 16; ++i) {
-        const QbRow &r = p.rows[i];
-        const bool grey = why[i][0] != 0;
-        ImU32 col = r.colour ? r.colour : r.layer >= 0 ? kDvLayers[r.layer].colour : kQbWhite;
-        if (grey) col = IM_COL32(130, 130, 130, 255);
-        else if (r.kind == kQbBool && !on[i]) col = (col & 0x00ffffffu) | (150u << 24);   // off: the colour, fainter
+    for (int i = first; i < last; ++i) {
+        const QbView &v = g_qbView[i];
         if (i == sel) {
             dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + w - 2.0f, y + rowH - 1.0f), IM_COL32(70, 110, 190, 150), 3.0f);
             dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + 5.0f, y + rowH - 1.0f), IM_COL32(255, 220, 90, 255));
         }
-        if (r.kind == kQbBool) {             // the colour square: filled = on, an outline = off
+        if (v.square) {                      // the colour square: filled = on, an outline = off
             ImVec2 a(x0 + pad, y + (fs - sq) * 0.5f + 1.0f), b(a.x + sq, a.y + sq);
-            if (on[i] && !grey) dl->AddRectFilled(a, b, col | 0xff000000u, 2.0f);
-            else dl->AddRect(a, b, col, 2.0f, 0, 1.2f);
+            if (v.square == 1) dl->AddRectFilled(a, b, v.col | 0xff000000u, 2.0f);
+            else dl->AddRect(a, b, v.col, 2.0f, 0, 1.2f);
         }
-        dl->AddText(font, fs, ImVec2(nameX, y), col, de ? r.de : r.en);
-        ImU32 stateCol = grey ? IM_COL32(220, 120, 100, 255) : r.kind == kQbBool ? (on[i] ? IM_COL32(110, 230, 120, 255)
-                                                                                         : IM_COL32(170, 170, 170, 255))
-                       : IM_COL32(235, 235, 235, 255);
-        dl->AddText(font, fs, ImVec2(stateX, y), stateCol, state[i]);
-        if (count[i][0]) dl->AddText(font, fs, ImVec2(countRight - width(count[i], fs), y), col | 0xff000000u, count[i]);
+        dl->AddText(font, fs, ImVec2(nameX, y), v.col, v.name);
+        dl->AddText(font, fs, ImVec2(stateX, y), v.stateCol, v.state);
+        if (v.count[0]) dl->AddText(font, fs, ImVec2(countRight - width(v.count, fs), y), v.col | 0xff000000u, v.count);
         y += rowH;
     }
-    const float fsSmall = fs * 0.8f;
-    dl->PushClipRect(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), true);
     dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + 2.0f), result ? (g_qbResultErr ? IM_COL32(255, 130, 110, 255)
                                                                                : IM_COL32(130, 230, 140, 255))
                                                                : IM_COL32(190, 190, 190, 230), foot);
@@ -17526,7 +18270,7 @@ void DrawQuick() {
 
 // items
 void ValQuickOpen(char *o, size_t n) {
-    int page = g_qbPage >= 0 && g_qbPage <= kQbPageN ? g_qbPage : 0;
+    int page = g_qbPage >= 0 && g_qbPage < kQbPageN ? g_qbPage : 0;
     Out(o, n, "%d (page %s, row %d; %s)", g_qbOpen ? 1 : 0, QbPageName(page, true), g_qbRow[page] + 1,
         g_qbEnabled ? "[Quick] Enabled=1" : "off: [Quick] Enabled=0");
 }
@@ -17556,7 +18300,7 @@ bool RunQuickLang(const char *arg, char *o, size_t n) {
 void ValQuickStatus(char *o, size_t n) {
     char combo[48];
     QbComboText(g_qbButtons, combo, sizeof(combo));
-    int page = g_qbPage >= 0 && g_qbPage <= kQbPageN ? g_qbPage : 0;
+    int page = g_qbPage >= 0 && g_qbPage < kQbPageN ? g_qbPage : 0;
     Out(o, n, "enabled %d, open %d, page %d/%d '%s' row %d; OpenButtons 0x%04x (%s), ChordMs %d, ShowClosed %d, "
         "Language %s, Top %d%%, Scale %.2f; toggles %ld, lone combo taps passed on %ld, held alone (passed late) %ld, rows "
         "run %ld; debug layers on %d; last: %s", g_qbEnabled, g_qbOpen ? 1 : 0, page + 1, QbPageCount(), QbPageName(page, true),
@@ -17610,12 +18354,80 @@ bool OcSignal(char *what, size_t n) {
     Out(what, n, "%s%s%s", cine ? "cinematic test" : "", cine && other ? " + " : "", other ? "camera left [manager+0xb80]" : "");
     return true;
 }
-// one summary line per cutscene (the start line names the signal)
+// 0.18 segments (live 2026-11-06 18:12:56 - 18:16:00: cutscene 160 flowed into the exterior cutscene 170 without the
+// gameplay camera coming back - ONE cutscene, its 10 pairs were used up at 18:13:31 and the wanted forecourt moment got
+// none): while a cutscene runs, a new SEGMENT with a fresh pair budget (OnCinePairs, OnCineFastPairs fast ones first) starts
+// when (a) Lara's unit changes (GameTracker+0x38, case-insensitive), (b) the game's cinematic object [0xe7f1c0] or its
+// track +0x2c changes to another valid one (the reads of the 0.10.2 cinematic test, same byte check), (c) a script prints
+// "StartCinematic called" / "Cine about to play" (only while log.script redirects the prints - ScriptText). A segment is
+// at least 1 s old before the next may start (one change usually shows in two signals). Spread: after the fast pairs one
+// pair every OnCineSlowMs (8000 by default, was 5000) up to OnCinePairs - 4 x 1.5 s + 6 x 8 s ~ 54 s per segment.
+volatile LONG g_ocScriptTick = 0;            // GetTickCount of the last StartCinematic / Cine about to play print
+int g_ocSegments = 1;                        // [Shot] OnCineSegments
+const DWORD kOcSegMinMs = 1000;
+// game thread (ScriptText): a script line that announces a cinematic
+void OcScriptLine(const char *line) {
+    if (!line || !line[0]) return;
+    char low[200];
+    strncpy_s(low, sizeof(low), line, _TRUNCATE);
+    _strlwr_s(low, sizeof(low));
+    if (strstr(low, "startcinematic called") || strstr(low, "cine about to play")) {
+        DWORD now = GetTickCount();
+        InterlockedExchange(&g_ocScriptTick, static_cast<LONG>(now ? now : 1));
+    }
+}
+// the game's cinematic object and its track (0 / 0xffffffff = none); reads only, the 0.10.2 check covers them
+void OcCineNow(DWORD *cine, DWORD *track) {
+    *cine = 0;
+    *track = 0xffffffff;
+    if (!g_cineOk || !ReadDword(0x00e7f1c0, cine) || !*cine) { *cine = 0; return; }
+    if (!ReadDword(*cine + 0x2c, track)) *track = 0xffffffff;
+}
+// one summary line per segment / per cutscene (the start lines name the signal)
+void OcSegEnd(const char *why) {
+    Log(1, "shot.oncine: cutscene %02d segment %d end (%s) - %d pair(s) taken, %d refused%s%s; %.1f s", g_oc.burst,
+        g_oc.seg, why, g_oc.pairs, g_oc.refused, g_oc.refused ? " - last: " : "", g_oc.refused ? g_oc.lastWhy : "",
+        static_cast<double>(GetTickCount() - g_oc.segStart) / 1000.0);
+}
 void OcEnd(const char *why) {
-    Log(1, "shot.oncine: cutscene %02d end (%s) - %d pair(s) taken, %d refused%s%s; %.1f s", g_oc.burst, why, g_oc.pairs,
-        g_oc.refused, g_oc.refused ? " - last: " : "", g_oc.refused ? g_oc.lastWhy : "",
-        static_cast<double>(GetTickCount() - g_oc.start) / 1000.0);
+    OcSegEnd(why);
+    Log(1, "shot.oncine: cutscene %02d end (%s) - %d segment(s), %d pair(s) taken, %d refused; %.1f s", g_oc.burst, why,
+        g_oc.seg, g_oc.allPairs, g_oc.allRefused, static_cast<double>(GetTickCount() - g_oc.start) / 1000.0);
     g_oc.active = false;
+}
+// a new segment (seg 1 = the cutscene start): fresh pair budget, what it starts with
+void OcSegStart(DWORD now, const char *why) {
+    ++g_oc.seg;
+    g_oc.pairs = g_oc.refused = 0;
+    g_oc.lastWhy[0] = 0;
+    g_oc.segStart = g_oc.next = now;
+    OcCineNow(&g_oc.cine, &g_oc.track);
+    CurrentUnit(g_oc.unit, sizeof(g_oc.unit));
+    g_oc.scriptSeen = static_cast<DWORD>(g_ocScriptTick);
+    if (g_oc.seg > 1)
+        Log(1, "shot.oncine: cutscene %02d segment %d start - %s; unit %s; cinematic 0x%08lx track %ld; up to %d pair(s)",
+            g_oc.burst, g_oc.seg, why, g_oc.unit[0] ? g_oc.unit : "-", g_oc.cine, static_cast<LONG>(g_oc.track), g_ocPairs);
+}
+// why a new segment starts now ("" = none)
+void OcSegReason(DWORD now, char *o, size_t n) {
+    o[0] = 0;
+    if (!g_ocSegments || now - g_oc.segStart < kOcSegMinMs) return;
+    char unit[64];
+    CurrentUnit(unit, sizeof(unit));
+    if (unit[0] && g_oc.unit[0] && _stricmp(unit, g_oc.unit)) { Out(o, n, "unit %s -> %s", g_oc.unit, unit); return; }
+    DWORD cine = 0, track = 0;
+    OcCineNow(&cine, &track);
+    if (cine && track != 0xffffffff && (!g_oc.cine || g_oc.track == 0xffffffff)) {
+        g_oc.cine = cine;                    // the segment began on the camera signal: its cinematic, no new segment
+        g_oc.track = track;
+    } else if (cine && track != 0xffffffff && (cine != g_oc.cine || track != g_oc.track)) {
+        Out(o, n, "cinematic 0x%08lx track %ld -> 0x%08lx track %ld", g_oc.cine, static_cast<LONG>(g_oc.track), cine,
+            static_cast<LONG>(track));
+        return;
+    }
+    DWORD script = static_cast<DWORD>(g_ocScriptTick);
+    if (script && script != g_oc.scriptSeen && static_cast<LONG>(script - g_oc.segStart) > 0)
+        Out(o, n, "script print 'StartCinematic called' / 'Cine about to play'");
 }
 void OnCineTick() {
     if (!g_ocOn) {
@@ -17641,39 +18453,54 @@ void OnCineTick() {
             return;
         }
         g_oc.offSince = 0;
+        char why[160];
+        OcSegReason(now, why, sizeof(why));  // 0.18: a new segment inside the running cutscene
+        if (why[0]) {
+            OcSegEnd(why);
+            OcSegStart(now, why);
+        }
     } else {
         if (!sig || !g_oc.armed) return;
         g_oc.active = true;
         g_oc.armed = false;
         g_oc.offSince = 0;
         g_oc.burst = static_cast<int>((InterlockedIncrement(&g_ocBursts) - 1) % 99 + 1);   // 01 .. 99
-        g_oc.pairs = g_oc.refused = 0;
-        g_oc.lastWhy[0] = 0;
-        g_oc.start = g_oc.next = now;
+        g_oc.seg = 0;
+        g_oc.allPairs = g_oc.allRefused = 0;
+        g_oc.start = now;
+        OcSegStart(now, "cutscene start");
         DWORD cam = 0, state = 0;
         ReadDword(kCurrentCamera, &cam);
         ReadDword(kMainState, &state);
-        char camText[96], unit[64] = "";
+        char camText[96];
         CameraObjectName(cam, camText, sizeof(camText));
-        CurrentUnit(unit, sizeof(unit));
-        Log(1, "shot.oncine: cutscene %02d start - %s; camera %s; main state %lu; unit %s; up to %d pair(s): %d every %d ms, "
-            "then every %d ms", g_oc.burst, what, camText, state, unit[0] ? unit : "-", g_ocPairs, g_ocFastPairs,
-            g_ocIntervalMs, g_ocSlowMs);
+        Log(1, "shot.oncine: cutscene %02d start - %s; camera %s; main state %lu; unit %s; cinematic 0x%08lx track %ld; up "
+            "to %d pair(s) per segment: %d every %d ms, then every %d ms; segments %s", g_oc.burst, what, camText, state,
+            g_oc.unit[0] ? g_oc.unit : "-", g_oc.cine, static_cast<LONG>(g_oc.track), g_ocPairs, g_ocFastPairs,
+            g_ocIntervalMs, g_ocSlowMs, g_ocSegments ? "on (unit / cinematic / script print)" : "off");
     }
     const int done = g_oc.pairs + g_oc.refused;
     if (done < g_ocPairs && static_cast<LONG>(now - g_oc.next) >= 0) {
         char name[32], file[160], why[160];
-        Out(name, sizeof(name), "cine%02d_%d", g_oc.burst, done + 1);
-        if (ShotRequestPair(name, "shot.oncine", file, sizeof(file), why, sizeof(why))) ++g_oc.pairs;
-        else { ++g_oc.refused; strncpy_s(g_oc.lastWhy, sizeof(g_oc.lastWhy), why, _TRUNCATE); }
+        if (g_oc.seg > 1) Out(name, sizeof(name), "cine%02ds%d_%d", g_oc.burst, g_oc.seg, done + 1);
+        else Out(name, sizeof(name), "cine%02d_%d", g_oc.burst, done + 1);
+        if (ShotRequestPair(name, "shot.oncine", file, sizeof(file), why, sizeof(why))) { ++g_oc.pairs; ++g_oc.allPairs; }
+        else {
+            ++g_oc.refused;
+            ++g_oc.allRefused;
+            strncpy_s(g_oc.lastWhy, sizeof(g_oc.lastWhy), why, _TRUNCATE);
+        }
         g_oc.next = now + static_cast<DWORD>(done + 1 < g_ocFastPairs ? g_ocIntervalMs : g_ocSlowMs);
     }
 }
 void ValShotOnCine(char *o, size_t n) {
-    Out(o, n, "%d (up to %d pairs per cutscene: %d every %d ms, then every %d ms; signal %s; camera checks %s, cinematic "
-        "test %s; %ld cutscene(s), %s)", g_ocOn ? 1 : 0, g_ocPairs, g_ocFastPairs, g_ocIntervalMs, g_ocSlowMs,
-        OcSignalName(g_ocSignal), g_ocCamOk ? "ok" : "failed", g_ocCineOk ? "ok" : "failed", g_ocBursts,
-        g_oc.active ? "a cutscene runs" : "armed");
+    char run[48];
+    if (g_oc.active) Out(run, sizeof(run), "a cutscene runs, segment %d", g_oc.seg);
+    else Out(run, sizeof(run), "armed");
+    Out(o, n, "%d (up to %d pairs per segment: %d every %d ms, then every %d ms; segments %s; signal %s; camera checks %s, "
+        "cinematic test %s; %ld cutscene(s), %s)", g_ocOn ? 1 : 0, g_ocPairs, g_ocFastPairs, g_ocIntervalMs, g_ocSlowMs,
+        g_ocSegments ? "on" : "off", OcSignalName(g_ocSignal), g_ocCamOk ? "ok" : "failed", g_ocCineOk ? "ok" : "failed",
+        g_ocBursts, run);
 }
 bool RunShotOnCine(const char *arg, char *o, size_t n) {
     bool on = BoolArg(arg, g_ocOn != 0);
@@ -18010,8 +18837,8 @@ bool RunPosGo(const char *arg, char *o, size_t n) {
     char lara[48];
     PosLaraUnit(lara, sizeof(lara));
     if (!PosUnitFrame(r.unit, shift, origin)) {
-        Out(o, n, "refused: unit %s is not loaded (Lara is in %s) - load it first (level.load %s), then pos.go %s again", r.unit,
-            lara[0] ? lara : "-", r.unit, r.name);
+        Out(o, n, "refused: unit %s is not loaded (Lara is in %s) - pos.goload %s loads it and goes there (bar / menu: "
+            "'laden + hin'; a level.load may change story state)", r.unit, lara[0] ? lara : "-", r.name);
         Log(1, "pos.go %s refused: unit %s not loaded (Lara in %s)", r.name, r.unit, lara[0] ? lara : "-");
         return false;
     }
@@ -18030,87 +18857,281 @@ void ValPos(char *o, size_t n) {
     PosLaraUnit(unit, sizeof(unit));
     Out(o, n, "%s; Lara's unit %s", g_posOk ? "checks ok" : g_posWhy, unit[0] ? unit : "-");
 }
-// the quick-toggle bar's checkpoint page (render thread): the nearest 14 checkpoints, left / right = marker off / on
-int QbCpRows() { return g_cpRowN < 14 ? g_cpRowN : 14; }
-void QbCpAct(int row, int dir) {
-    const bool de = g_qbLang == 0;
-    if (row < 0 || row >= QbCpRows()) { QbResult(true, "%s", de ? "keine Checkpoints geladen" : "no checkpoints loaded"); return; }
-    const CpRow &r = g_cpRows[row];
-    const bool show = dir > 0;
-    if (show == !CpHidden(r.intro)) {
-        QbResult(false, "CP %ld: %s", r.intro, de ? (show ? "schon an" : "schon aus") : (show ? "already on" : "already off"));
-        return;
-    }
-    char arg[32];
-    Out(arg, sizeof(arg), "%ld %d", r.intro, show ? 1 : 0);
-    g_qbRunning = true;
-    const char *answer = InvokeCore("dbg.cp", arg, false);
-    g_qbRunning = false;
-    ++g_qbRuns;
-    Log(1, "quick: Checkpoints / CP %ld -> dbg.cp %s: %.200s", r.intro, arg, answer);
-    bool ok = !strncmp(answer, "ok", 2);
-    QbResult(!ok, "CP %ld: %s", r.intro, answer + (ok ? 3 : 4));
+// 0.18 pos.goload <name>|last (coordinator, live 2026-11-06: "pos.go glaskasten" from the prologue start was refused
+// correctly, but Lukas did not know what to do): a shortcut through the 0.8.1 runner - when the unit is not loaded
+// "level.load <unit>" first (the runner waits until no level change is pending, a player exists and GameTracker+0x38 is
+// that unit, 2 s in a row, at most 120 s), then "cheat.flight 1" and "pos.go <name>" (the same conversion with the
+// unit's shift). Explicit only (an item, a bar row with a second press, a menu button) - never automatic. A level.load
+// starts the unit fresh: what that does to story values (stickies, chapter) is not known.
+bool RunPosGoLoad(const char *arg, char *o, size_t n) {
+    if (!g_posOk) { Out(o, n, "disabled: pre-check failed (%s)", g_posWhy); return false; }
+    char name[40];
+    strncpy_s(name, sizeof(name), arg ? arg : "", _TRUNCATE);
+    DvTrim(name);
+    if (!name[0]) { Out(o, n, "usage: pos.goload <name>|last (pos.list)"); return false; }
+    static PosRow rows[kPosMax];
+    int k = PosLoad(rows, kPosMax), hit = -1;
+    for (int i = 0; i < k; ++i)
+        if (!_stricmp(rows[i].name, name)) hit = i;
+    if (!_stricmp(name, "last") && k) hit = k - 1;
+    if (hit < 0) { Out(o, n, "no position '%s' (%d in TruMenu.positions.txt)", name, k); return false; }
+    const PosRow &r = rows[hit];
+    if (!InLevel()) { Out(o, n, "needs a level"); return false; }
+    char why[200];
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: level change pending (%s)", why); return false; }
+    float shift[3], origin[3];
+    const bool loaded = PosUnitFrame(r.unit, shift, origin);
+    char steps[200], title[64];
+    if (loaded) Out(steps, sizeof(steps), "cheat.flight 1;pos.go %s", r.name);
+    else Out(steps, sizeof(steps), "level.load %s;cheat.flight 1;pos.go %s", r.unit, r.name);
+    Out(title, sizeof(title), "pos.goload %s", r.name);
+    Log(1, "pos.goload %s: unit %s %s -> %s (src=%s)", r.name, r.unit, loaded ? "loaded" : "not loaded", steps,
+        ShotSource("pos.goload"));
+    return ShortcutStart(steps, title, o, n);
 }
-void DrawQuickCp(float x0, float y0) {
-    ImDrawList *dl = ImGui::GetForegroundDrawList();
-    ImFont *font = ImGui::GetFont();
-    const float fs = ImGui::GetFontSize() * g_qbScale, pad = 6.0f * g_qbScale, rowH = fs + 4.0f * g_qbScale, sq = fs * 0.55f;
-    const bool de = g_qbLang == 0;
-    auto width = [&](const char *t, float size) { return font->CalcTextSizeA(size, FLT_MAX, 0.0f, t).x; };
+// ---- 0.18 quick-toggle pages (render thread): the special rows of the pages Lara (saved positions), Checkpoints and
+// Saves. Each row is a QbView (drawn by DrawQuick) plus a QbDyn (what left / right do). Rows of the last QbBuild.
+enum QbDynKind { kQdNone = 0, kQdPos, kQdCpActive, kQdCpAll, kQdCp, kQdBackupNow, kQdRescan, kQdSave, kQdBackup, kQdLabel };
+struct QbDyn { int kind; LONG intro; char arg[64], unit[48]; bool loaded; };
+QbDyn g_qbDyn[kQbViewMax];
+int g_qbDynN = 0;
+// Lara page: the saved positions, newest first (the file read at most once a second)
+int QbPosRows(QbView *v, QbDyn *d, int max, bool de) {
+    static PosRow rows[kPosMax];
+    static int count = 0;
+    static DWORD readAt = 0;
+    if (!readAt || GetTickCount() - readAt > 1000) { count = PosLoad(rows, kPosMax); readAt = GetTickCount(); }
+    char lara[48];
+    PosLaraUnit(lara, sizeof(lara));
+    int n = 0;
+    for (int i = count - 1; i >= 0 && n < max && n < 8; --i) {
+        const PosRow &r = rows[i];
+        float shift[3], origin[3];
+        const bool loaded = PosUnitFrame(r.unit, shift, origin);
+        QbView &w = v[n];
+        QbDyn &q = d[n];
+        ++n;
+        q.kind = kQdPos;
+        q.loaded = loaded;
+        strncpy_s(q.arg, sizeof(q.arg), r.name, _TRUNCATE);
+        strncpy_s(q.unit, sizeof(q.unit), r.unit, _TRUNCATE);
+        const char *u = r.unit + (lara[0] ? DvCommonPrefix(r.unit, lara) : 0);
+        Out(w.name, sizeof(w.name), "-> %s [%s]", r.name, u);
+        char key[160];
+        Out(key, sizeof(key), "pos.goload %s", r.name);
+        const bool armed = QbArmed(key);
+        Out(w.state, sizeof(w.state), "%s", loaded ? (de ? "rechts = hin" : "right = go")
+                                         : armed ? (de ? "nochmal rechts!" : "right again!")
+                                         : (de ? "laden + hin (2x)" : "load + go (2x)"));
+        w.count[0] = 0;
+        w.square = 0;
+        w.skip = false;
+        w.col = loaded ? IM_COL32(150, 240, 150, 255) : IM_COL32(190, 190, 190, 255);
+        w.stateCol = armed ? IM_COL32(255, 110, 90, 255) : loaded ? IM_COL32(110, 230, 120, 255) : IM_COL32(235, 200, 120, 255);
+    }
+    return n;
+}
+// Checkpoints page: "to the active one", all markers on / off, the nearest 14 (left = marker on / off, right = go with
+// a confirm - flight on + player.goto, two queued steps)
+int QbCpPageRows(QbView *v, QbDyn *d, int max, bool de) {
     int total = 0;
     g_cpRowN = CpCollect(g_cpRows, kCpMax, true, &total);
-    const int n = QbCpRows();
-    int &sel = g_qbRow[kQbPageN];
-    if (sel < 0 || sel >= (n ? n : 1)) sel = 0;
-    char title[96], head[96], foot[200], text[16][128];
-    Out(title, sizeof(title), "%s  < Checkpoints >  %d/%d", de ? "Schnellschalter" : "Quick toggles", kQbPageN + 1, QbPageCount());
-    Out(head, sizeof(head), "%d %s%s", total, de ? "geladen" : "loaded", g_dvOn[kDvCheckpoints] ? ""
-        : de ? " - Ebene Checkpoints ist aus" : " - layer Checkpoints is off");
-    float w = width(title, fs) + 2.0f * pad;
-    for (int i = 0; i < n; ++i) {
-        CpRowText(g_cpRows[i], de, text[i], sizeof(text[i]));
-        float tw = pad + sq + pad + width(text[i], fs) + fs + width(de ? "aus" : "off", fs) + pad;
-        if (tw > w) w = tw;
-    }
-    bool result = g_qbResult[0] && GetTickCount() - g_qbResultTick < 5000;
-    Out(foot, sizeof(foot), "%s", result ? g_qbResult : de ? "links / rechts: Marker aus / an   Liste + hin: Menue"
-                                                          : "left / right: marker off / on   list + go to: menu");
-    const float fsSmall = fs * 0.8f;
-    if (width(foot, fsSmall) + 2.0f * pad > w) w = width(foot, fsSmall) + 2.0f * pad;
-    const float h = pad + 2.0f * rowH + (n ? n : 1) * rowH + fsSmall + 6.0f + pad;
-    dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(0, 0, 0, 175), 5.0f);
-    dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(160, 230, 255, 120), 5.0f, 0, 1.0f);
-    g_qbRect = {x0, y0, x0 + w, y0 + h};
-    float y = y0 + pad;
-    dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(255, 220, 90, 255), title);
-    y += rowH;
-    dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(190, 190, 190, 255), head);
-    y += rowH;
-    if (!n) {
-        dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(170, 170, 170, 255), de ? "(keine)" : "(none)");
-        y += rowH;
-    }
-    for (int i = 0; i < n; ++i) {
+    Out(g_qbHead, sizeof(g_qbHead), "%d %s%s%s", total, de ? "geladen" : "loaded", g_dvOn[kDvCheckpoints] ? ""
+        : de ? " - Ebene Checkpoints ist aus" : " - layer Checkpoints is off", g_dvCpOk ? "" : " - checks failed");
+    int n = 0;
+    auto add = [&](int kind, const char *name, const char *state, ImU32 col, ImU32 stateCol, int square) -> QbDyn & {
+        QbView &w = v[n];
+        QbDyn &q = d[n];
+        ++n;
+        memset(&q, 0, sizeof(q));
+        q.kind = kind;
+        Out(w.name, sizeof(w.name), "%s", name);
+        Out(w.state, sizeof(w.state), "%s", state);
+        w.count[0] = 0;
+        w.square = square;
+        w.skip = false;
+        w.col = col;
+        w.stateCol = stateCol;
+        return q;
+    };
+    if (max < 2) return 0;
+    const bool armedActive = QbArmed("dbg.cpgo active");
+    add(kQdCpActive, de ? "Zum aktiven Checkpoint" : "To the active checkpoint",
+        armedActive ? (de ? "nochmal rechts!" : "right again!") : (de ? "rechts 2x = hin" : "right 2x = go"),
+        IM_COL32(230, 255, 60, 255), armedActive ? IM_COL32(255, 110, 90, 255) : IM_COL32(235, 235, 235, 255), 0);
+    char st[48];
+    Out(st, sizeof(st), "< %d %s >", CpHiddenCount(), de ? "verborgen" : "hidden");
+    add(kQdCpAll, de ? "Alle Marker aus / an" : "All markers off / on", st, kDvLayers[kDvCheckpoints].colour,
+        IM_COL32(235, 235, 235, 255), 0);
+    for (int i = 0; i < g_cpRowN && i < 14 && n < max; ++i) {
         const CpRow &r = g_cpRows[i];
-        const bool on = !r.hidden;
+        char text[128], key[48];
+        CpRowText(r, de, text, sizeof(text));
+        Out(key, sizeof(key), "dbg.cpgo %ld", r.intro);
+        const bool armed = QbArmed(key), on = !r.hidden;
         ImU32 col = r.active ? IM_COL32(230, 255, 60, 255) : kDvLayers[kDvCheckpoints].colour;
         if (!on) col = (col & 0x00ffffffu) | (150u << 24);
-        if (i == sel) {
-            dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + w - 2.0f, y + rowH - 1.0f), IM_COL32(70, 110, 190, 150), 3.0f);
-            dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + 5.0f, y + rowH - 1.0f), IM_COL32(255, 220, 90, 255));
-        }
-        ImVec2 a(x0 + pad, y + (fs - sq) * 0.5f + 1.0f), b(a.x + sq, a.y + sq);
-        if (on) dl->AddRectFilled(a, b, col | 0xff000000u, 2.0f);
-        else dl->AddRect(a, b, col, 2.0f, 0, 1.2f);
-        dl->AddText(font, fs, ImVec2(x0 + pad + sq + pad, y), col, text[i]);
-        const char *st = on ? (de ? "an" : "on") : (de ? "aus" : "off");
-        dl->AddText(font, fs, ImVec2(x0 + w - pad - width(st, fs), y), on ? IM_COL32(110, 230, 120, 255)
-                                                                          : IM_COL32(170, 170, 170, 255), st);
-        y += rowH;
+        Out(st, sizeof(st), "%s  %s", on ? (de ? "an" : "on") : (de ? "aus" : "off"),
+            armed ? (de ? "nochmal rechts!" : "right again!") : (de ? "rechts 2x = hin" : "right 2x = go"));
+        QbDyn &q = add(kQdCp, text, st, col, armed ? IM_COL32(255, 110, 90, 255) : on ? IM_COL32(110, 230, 120, 255)
+                                                                                     : IM_COL32(170, 170, 170, 255),
+                       on ? 1 : 2);
+        q.intro = r.intro;
+        q.loaded = on;
     }
-    dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + 2.0f), result ? (g_qbResultErr ? IM_COL32(255, 130, 110, 255)
-                                                                                 : IM_COL32(130, 230, 140, 255))
-                                                                 : IM_COL32(190, 190, 190, 230), foot);
+    return n;
+}
+// Saves page: backup now, re-read, the save files (newest first: right twice within 10 s = save.load), the backups
+// (newest first: right twice within 10 s = save.restore - the 0.9 double confirmation)
+void PlayTimeText(DWORD s, char *o, size_t n) { Out(o, n, "%lu:%02lu:%02lu", s / 3600, (s / 60) % 60, s % 60); }
+int QbSavesRows(QbView *v, QbDyn *d, int max, bool de) {
+    if (!g_qbSavesPageSeen) SaveScan(true);  // entering the page: a fresh scan (CRC over every file, render thread)
+    g_qbSavesPageSeen = 2;
+    static SaveInfo rows[kSaveMax];
+    static SaveDir backups[kSaveBackupMax];
+    EnterCriticalSection(&g_saveLock);
+    int count = g_saveCount < 0 ? 0 : g_saveCount, nb = g_saveBackupCount;
+    for (int i = 0; i < count; ++i) rows[i] = g_saves[i];
+    for (int i = 0; i < nb; ++i) backups[i] = g_saveBackups[i];
+    LeaveCriticalSection(&g_saveLock);
+    int order[kSaveMax];                     // newest first (FILETIME as a 64-bit number - no new import)
+    auto stamp = [&](int i) {
+        return (static_cast<ULONGLONG>(rows[i].written.dwHighDateTime) << 32) | rows[i].written.dwLowDateTime;
+    };
+    for (int i = 0; i < count; ++i) {
+        int at = i;
+        while (at > 0 && stamp(order[at - 1]) < stamp(i)) { order[at] = order[at - 1]; --at; }
+        order[at] = i;
+    }
+    char armedKey[200] = "";
+    DWORD left = 0;
+    SaveArmed(armedKey, sizeof(armedKey), &left);
+    Out(g_qbHead, sizeof(g_qbHead), "%d %s, %d %s; %s", count, de ? "Spielstaende" : "saves", nb, de ? "Sicherungen" : "backups",
+        !g_slDirect ? (de ? "Laden aus (DirectLoad=0)" : "load off (DirectLoad=0)")
+        : !g_slOk ? (de ? "Laden: Pruefung fehlgeschlagen" : "load: checks failed")
+        : g_slActive ? (de ? "ein Laden laeuft" : "a load runs") : (de ? "rechts 2x = laden" : "right 2x = load"));
+    int n = 0;
+    auto add = [&](int kind, const char *name, const char *state, ImU32 col, ImU32 stateCol, bool skip) -> QbDyn & {
+        QbView &w = v[n];
+        QbDyn &q = d[n];
+        ++n;
+        memset(&q, 0, sizeof(q));
+        q.kind = kind;
+        Out(w.name, sizeof(w.name), "%s", name);
+        Out(w.state, sizeof(w.state), "%s", state);
+        w.count[0] = 0;
+        w.square = 0;
+        w.skip = skip;
+        w.col = col;
+        w.stateCol = stateCol;
+        return q;
+    };
+    if (max < 4) return 0;
+    add(kQdBackupNow, de ? "Jetzt sichern" : "Back up now", de ? "rechts" : "right", kQbPlayer, IM_COL32(235, 235, 235, 255), false);
+    add(kQdRescan, de ? "Liste neu lesen" : "Re-read the list", de ? "rechts" : "right", kQbGrey, IM_COL32(235, 235, 235, 255), false);
+    char label[64];
+    Out(label, sizeof(label), "-- %s (%d)", de ? "Spielstaende" : "Saves", count);
+    add(kQdLabel, label, "", kQbBlue, kQbBlue, true);
+    for (int k = 0; k < count && k < 8 && n < max - 2; ++k) {
+        const SaveInfo &s = rows[order[k]];
+        char when[32], play[24], text[160], key[200];
+        FileTimeText(s.written, when, sizeof(when));
+        PlayTimeText(s.playTime, play, sizeof(play));
+        if (s.formatOk) Out(text, sizeof(text), "%s | %s CP %lu | %s | %s", s.utf8, s.unit[0] ? s.unit : "?", s.checkpoint, play,
+                            strlen(when) > 5 ? when + 5 : when);   // "MM-DD hh:mm:ss"
+        else Out(text, sizeof(text), "%s | %s", s.utf8, s.problem);
+        Out(key, sizeof(key), "save.load %s", s.utf8);
+        const bool armed = !strcmp(armedKey, key);
+        const bool can = s.formatOk && g_slDirect && g_slOk;
+        QbDyn &q = add(kQdSave, text, armed ? (de ? "nochmal rechts!" : "right again!") : can ? (de ? "laden (2x)" : "load (2x)") : "-",
+                       s.formatOk ? IM_COL32(235, 235, 235, 255) : IM_COL32(255, 140, 120, 255),
+                       armed ? IM_COL32(255, 110, 90, 255) : can ? IM_COL32(235, 200, 120, 255) : IM_COL32(150, 150, 150, 255), false);
+        strncpy_s(q.arg, sizeof(q.arg), s.utf8, _TRUNCATE);
+        q.loaded = can;
+    }
+    Out(label, sizeof(label), "-- %s (%d)", de ? "Sicherungen" : "Backups", nb);
+    add(kQdLabel, label, "", kQbBlue, kQbBlue, true);
+    for (int k = 0; k < nb && k < 6 && n < max; ++k) {
+        char text[96], key[200];
+        Out(text, sizeof(text), "%s (%d %s)", backups[k].name, backups[k].files, de ? "Dateien" : "files");
+        Out(key, sizeof(key), "save.restore %s", backups[k].name);
+        const bool armed = !strcmp(armedKey, key);
+        QbDyn &q = add(kQdBackup, text, armed ? (de ? "nochmal rechts!" : "right again!") : (de ? "zurueckspielen (2x)" : "restore (2x)"),
+                       IM_COL32(200, 200, 200, 255), armed ? IM_COL32(255, 110, 90, 255) : IM_COL32(235, 200, 120, 255), false);
+        strncpy_s(q.arg, sizeof(q.arg), backups[k].name, _TRUNCATE);
+    }
+    return n;
+}
+int QbSpecialBuild(int special, int base, bool de) {
+    const int max = kQbViewMax - base;
+    g_qbDynN = 0;
+    if (max <= 0) return 0;
+    int n = 0;
+    if (special == kQsLara) n = QbPosRows(g_qbView + base, g_qbDyn, max, de);
+    else if (special == kQsCheckpoints) n = QbCpPageRows(g_qbView + base, g_qbDyn, max, de);
+    else if (special == kQsSaves) n = QbSavesRows(g_qbView + base, g_qbDyn, max, de);
+    g_qbDynN = n;
+    return n;
+}
+void QbSpecialAct(int special, int row, int dir) {
+    (void)special;
+    const bool de = g_qbLang == 0;
+    if (row < 0 || row >= g_qbDynN) return;
+    const QbDyn &q = g_qbDyn[row];
+    char arg[96], key[160];
+    switch (q.kind) {
+    case kQdPos:
+        if (dir < 0) { QbResult(false, "%s", de ? "rechts = hin" : "right = go"); return; }
+        if (q.loaded) { QbRun("Lara", "position", q.arg, "pos.go", q.arg); return; }
+        Out(key, sizeof(key), "pos.goload %s", q.arg);
+        {
+            char lara[48], what[160];
+            PosLaraUnit(lara, sizeof(lara));
+            Out(what, sizeof(what), de ? "Unit %s nicht geladen (Lara in %s) - laedt sie (Story-Werte?)"
+                                       : "unit %s not loaded (Lara in %s) - loads it (story values?)", q.unit, lara[0] ? lara : "-");
+            if (!QbConfirm(key, q.arg, what)) return;
+        }
+        QbRun("Lara", "position", q.arg, "pos.goload", q.arg);
+        return;
+    case kQdCpActive:
+        if (dir < 0) { QbResult(false, "%s", de ? "rechts 2x = hin" : "right 2x = go"); return; }
+        if (!QbConfirm("dbg.cpgo active", de ? "Aktiver Checkpoint" : "Active checkpoint", nullptr)) return;
+        QbRun("Checkpoints", "active", de ? "Aktiver Checkpoint" : "Active checkpoint", "dbg.cpgo", "active");
+        return;
+    case kQdCpAll:
+        QbRun("Checkpoints", "all", de ? "Alle Marker" : "All markers", "dbg.cpall", dir > 0 ? "1" : "0");
+        return;
+    case kQdCp:
+        Out(arg, sizeof(arg), "%ld", q.intro);
+        if (dir < 0) {                       // left = marker on <-> off
+            Out(arg, sizeof(arg), "%ld %d", q.intro, q.loaded ? 0 : 1);
+            QbRun("Checkpoints", "marker", "CP", "dbg.cp", arg);
+            return;
+        }
+        Out(key, sizeof(key), "dbg.cpgo %ld", q.intro);
+        if (!QbConfirm(key, "CP", de ? "Fliegen an + hin" : "flight on + go")) return;
+        QbRun("Checkpoints", "go", "CP", "dbg.cpgo", arg);
+        return;
+    case kQdBackupNow:
+        if (dir < 0) return;
+        QbRun("Saves", "backup", de ? "Sichern" : "Backup", "save.backup", "");
+        return;
+    case kQdRescan:
+        if (dir < 0) return;
+        SaveScan(true);
+        QbResult(false, "%s", de ? "Liste neu gelesen" : "list re-read");
+        return;
+    case kQdSave:
+        if (dir < 0) { QbResult(false, "%s", de ? "rechts 2x (10 s) = laden" : "right 2x (10 s) = load"); return; }
+        QbRun("Saves", "load", q.arg, "save.load", q.arg);
+        return;
+    case kQdBackup:
+        if (dir < 0) { QbResult(false, "%s", de ? "rechts 2x (10 s) = zurueckspielen" : "right 2x (10 s) = restore"); return; }
+        QbRun("Saves", "restore", q.arg, "save.restore", q.arg);
+        return;
+    default:
+        return;
+    }
 }
 
 // menu (Debug view page, render thread): the checkpoint list and the positions
@@ -18155,8 +19176,13 @@ void PageCpPos() {
             const PosRow &r = rows[i];
             bool loadedUnit = PosUnitFrame(r.unit, shift, origin);
             char id[96];
-            Out(id, sizeof(id), "go / hin###posg%d", i);
-            if (TmButton(id)) InvokeCore("pos.go", r.name, false);
+            if (loadedUnit) {
+                Out(id, sizeof(id), "go / hin###posg%d", i);
+                if (TmButton(id)) InvokeCore("pos.go", r.name, false);
+            } else {                             // 0.18: load the unit first (level.load), then flight + pos.go
+                Out(id, sizeof(id), "load + go / laden + hin###posgl%d", i);
+                if (TmButton(id)) InvokeCore("pos.goload", r.name, false);
+            }
             ImGui::SameLine();
             ImGui::TextColored(loadedUnit ? ImVec4(0.6f, 1.0f, 0.6f, 1.0f) : ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s  [%s%s]  %.0f %.0f "
                                "%.0f  %s", r.name, r.unit, loadedUnit ? "" : ", not loaded", r.p[0], r.p[1], r.p[2], r.saved);
@@ -18209,8 +19235,13 @@ void QuickCheck() {
     else if (!g_cineOk) Out(cineText, sizeof(cineText), "failed (0.10.2 check)");
     else Out(cineText, sizeof(cineText), "failed at 0x%08lx", cineAt);
     int rows = 0, unknown = 0;
+    int planned = 0;
     for (const QbPage &p : kQbPages)
         for (int i = 0; i < p.n; ++i) {
+            if (p.rows[i].kind == kQbLabel || p.rows[i].kind == kQbPlanned) {   // 0.18: no item
+                planned += p.rows[i].kind == kQbPlanned ? 1 : 0;
+                continue;
+            }
             ++rows;
             if (!FindItem(p.rows[i].id)) {
                 ++unknown;
@@ -18220,11 +19251,12 @@ void QuickCheck() {
     char combo[48];
     QbComboText(g_qbButtons, combo, sizeof(combo));
     Log(g_ocCamOk && g_ocCineOk && !unknown ? 1 : 0, "0.17 quick toggles: [Quick] Enabled %d, OpenButtons 0x%04x (%s), "
-        "ChordMs %d, ShowClosed %d, Language %s, Top %d%%, Scale %.2f; %d pages, %d rows, %d unknown item(s); cutscene "
-        "shots: camera checks %s, cinematic test %s, [Shot] OnCine %ld (up to %d pairs: %d every %d ms, then every %d ms; "
-        "signal %s)", g_qbEnabled, g_qbButtons, combo, g_qbChordMs, g_qbShowClosed, g_qbLang ? "en" : "de", g_qbTop,
-        g_qbScale, kQbPageN, rows, unknown, camText, cineText, static_cast<LONG>(g_ocOn), g_ocPairs, g_ocFastPairs,
-        g_ocIntervalMs, g_ocSlowMs, OcSignalName(g_ocSignal));
+        "ChordMs %d, ShowClosed %d, Language %s, Top %d%%, Scale %.2f; %d pages (0.18), %d item rows + %d planned, %d "
+        "unknown item(s); cutscene shots: camera checks %s, cinematic test %s, [Shot] OnCine %ld (up to %d pairs per "
+        "segment: %d every %d ms, then every %d ms; signal %s; segments %d)", g_qbEnabled, g_qbButtons, combo, g_qbChordMs,
+        g_qbShowClosed, g_qbLang ? "en" : "de", g_qbTop, g_qbScale, kQbPageN, rows, planned, unknown, camText, cineText,
+        static_cast<LONG>(g_ocOn), g_ocPairs, g_ocFastPairs, g_ocIntervalMs, g_ocSlowMs, OcSignalName(g_ocSignal),
+        g_ocSegments);
 }
 
 // ---- 0.3 pages ----
@@ -19157,9 +20189,16 @@ void PageSaves() {
         _snprintf_s(label, sizeof(label), _TRUNCATE, "Delete###svd_%s", s.utf8);
         if (TmButton(label)) QueueItem("save.delete", s.utf8);
         ImGui::SameLine();
+        _snprintf_s(label, sizeof(label), _TRUNCATE, "Load###svl_%s", s.utf8);   // 0.18 save.load (arms; CONFIRM runs)
+        if (!s.formatOk || !g_slDirect || !g_slOk) ImGui::BeginDisabled();
+        if (TmButton(label)) QueueItem("save.load", s.utf8);
+        if (!s.formatOk || !g_slDirect || !g_slOk) ImGui::EndDisabled();
+        ImGui::SameLine();
+        char play[24];
+        PlayTimeText(s.playTime, play, sizeof(play));
         if (s.formatOk)
-            ImGui::TextWrapped("%s | %s | %llu B | unit %s | checkpoint %lu | CRC ok", s.utf8, when, s.size,
-                               s.unit[0] ? s.unit : "?", s.checkpoint);
+            ImGui::TextWrapped("%s | %s | %llu B | unit %s | checkpoint %lu | play time %s | CRC ok", s.utf8, when, s.size,
+                               s.unit[0] ? s.unit : "?", s.checkpoint, play);
         else
             ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.4f, 1.0f), "%s | %s | %s", s.utf8, when, s.problem);
     }
@@ -19185,6 +20224,8 @@ void PageSaves() {
             Text("%s  %s", imports[i].name, imports[i].files ? "(CRC ok)" : "(CRC / format NOT ok - refused)");
         }
     }
+    ImGui::TextWrapped("0.18 Load: %s - the game's own load path (load step table 0x789de0), in a level only; it arms "
+                       "like Restore. The game keeps running while it reads the file.", g_slState);
     ImGui::TextWrapped("Delete / Restore / Import arm first: press the red CONFIRM button (or run the same command again) "
                        "within 10 s. Each of them copies all saves into a new backup folder before it changes "
                        "anything; nothing is deleted for good. Do not use while the game is saving. Restore copies the "
@@ -19275,6 +20316,7 @@ void DrawMenu() {
         if (TmCollapsingHeader("Saves (backup / restore / export / import)###savespage")) PageSaves();   // 0.9
         if (TmCollapsingHeader("Settings")) PageSettings();
         if (TmCollapsingHeader("Overlay: Lara's position")) PageOverlay();
+        if (TmCollapsingHeader("Accessibility / Barrierefreiheit (0.18)###access")) PageAccess();   // 0.18 skeleton
         if (TmCollapsingHeader("Free camera")) PageCamera();
         if (TmCollapsingHeader("Cheat / flight")) PageCheat();
         if (TmCollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
@@ -19296,6 +20338,46 @@ void DrawMenu() {
     if (g_menuOpen) DrawCmdBar(justOpened);   // 0.6, a window of its own: the menu window's navigation is unchanged
 }
 
+// 0.18: "Lara in: triggervolume 4537, firetriggervolume 4492 +2" - each name in the colour of its kind (death red, fire
+// orange, checkpoint green, water blue, sound violet, plain trigger yellow, plane cyan, unknown grey; kDvLayers), the most
+// dangerous kinds first (kind order), "near" for a plane within 50 units, "(off)" for a disabled entry
+void DrawOverlayLaraIn() {
+    OvLaraInScan();
+    const ImVec4 grey(0.75f, 0.75f, 0.75f, 1.0f);
+    if (g_ovInWhy[0]) {
+        ImGui::TextColored(grey, "Lara in: (%s)", g_ovInWhy);
+        return;
+    }
+    ImGui::TextUnformatted("Lara in:");
+    const int total = g_ovInN + g_ovInMore;
+    if (!total) {
+        ImGui::SameLine(0.0f, 4.0f);
+        ImGui::TextColored(grey, "-");
+        return;
+    }
+    int order[8], n = 0;
+    for (int i = 0; i < g_ovInN; ++i) {      // stable by kind
+        int at = n;
+        while (at > 0 && g_ovIn[order[at - 1]].kind > g_ovIn[i].kind) { order[at] = order[at - 1]; --at; }
+        order[at] = i;
+        ++n;
+    }
+    for (int k = 0; k < n && k < 3; ++k) {
+        const DvIn &in = g_ovIn[order[k]];
+        char name[64], text[112];
+        if (DvNameKind(in.inst, name, sizeof(name)) == -2) Out(name, sizeof(name), "?");
+        Out(text, sizeof(text), "%s %ld%s%s%s", name, in.intro, in.how == 2 ? " near" : "", in.enabled ? "" : " (off)",
+            k + 1 < n && k < 2 ? "," : "");
+        const int kind = in.kind >= 0 && in.kind < kDvKinds ? in.kind : kDvUnknown;
+        ImGui::SameLine(0.0f, 5.0f);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(kDvLayers[kind].colour), "%s", text);
+    }
+    if (total > 3) {
+        ImGui::SameLine(0.0f, 5.0f);
+        ImGui::TextColored(grey, "+%d", total - 3);
+    }
+}
+
 void DrawOverlay() {
     float p[3], r[3];
     DWORD instance = 0;
@@ -19306,10 +20388,12 @@ void DrawOverlay() {
                              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
                              ImGuiWindowFlags_NoSavedSettings;
     if (ImGui::Begin("##TruMenuOverlay", nullptr, flags)) {
-        if (ReadLara(p, r, &instance))
+        const bool have = ReadLara(p, r, &instance);
+        if (have)
             Text("Lara  %.0f  %.0f  %.0f   rot %.2f", p[0], p[1], p[2], r[2]);
         else
             ImGui::TextUnformatted("Lara  -");
+        if (have && g_ovLaraIn) DrawOverlayLaraIn();   // 0.18
     }
     ImGui::End();
 }
@@ -19612,6 +20696,7 @@ void ReadOptions(const char *dir) {
     g_scale = static_cast<float>(atof(text));
     if (!(g_scale >= 0.5f && g_scale <= 4.0f)) g_scale = static_cast<float>(atof(OptDefault("Menu", "Scale")));
     g_overlayAtStart = OptInt(ini, "Menu", "Overlay");
+    InterlockedExchange(&g_ovLaraIn, OptInt(ini, "Menu", "OverlayLaraIn") != 0 ? 1 : 0);   // 0.18
     g_blockInput = OptInt(ini, "Pad", "BlockInput");
     g_experimental = OptInt(ini, "Cheat", "Experimental");
     OptString(ini, "Cheat", "FlightSpeed", text, sizeof(text));
@@ -19764,6 +20849,7 @@ void ReadOptions(const char *dir) {
         g_dvTagMax = range("ViewLabelMax", 0, 64);
         g_dvShort = OptInt(ini, "Debug", "LabelShort") != 0 ? 1 : 0;
         g_dvLaraIn = OptInt(ini, "Debug", "LaraIn") != 0 ? 1 : 0;
+        g_dvLegendLaraIn = OptInt(ini, "Debug", "LegendLaraIn") != 0 ? 1 : 0;   // 0.18
         g_dvEncl = range("Enclosing", 0, 2);
         g_dvEnclSize = rangeF("EnclosingSize", 100.0f, 100000.0f);
         g_dvMarkerMax = range("MarkerMax", 2, 50);
@@ -19783,6 +20869,7 @@ void ReadOptions(const char *dir) {
     g_musicFade = OptInt(ini, "Media", "MusicFade");
     if (g_musicFade < 0 || g_musicFade > 300) g_musicFade = atoi(OptDefault("Media", "MusicFade"));
     OptString(ini, "Saves", "Folder", g_saveFolderIni, sizeof(g_saveFolderIni));
+    g_slDirect = OptInt(ini, "Saves", "DirectLoad") != 0 ? 1 : 0;                   // 0.18 save.load
     // 0.10 [Radial]: HoldButtons / Key also as hex ("0x00C0", "0x78")
     auto number = [&](const char *key) {
         char v[32];
@@ -19840,6 +20927,7 @@ void ReadOptions(const char *dir) {
         if (g_ocFastPairs < 1 || g_ocFastPairs > 50) g_ocFastPairs = atoi(OptDefault("Shot", "OnCineFastPairs"));
         g_ocSlowMs = shot("OnCineSlowMs");
         if (g_ocSlowMs < 250 || g_ocSlowMs > 60000) g_ocSlowMs = atoi(OptDefault("Shot", "OnCineSlowMs"));
+        g_ocSegments = shot("OnCineSegments") != 0 ? 1 : 0;                   // 0.18
         char sig[32];
         OptString(ini, "Shot", "OnCineSignal", sig, sizeof(sig));
         DvTrim(sig);
@@ -20089,6 +21177,7 @@ void Start(HMODULE self) {
         g_mediaCount, g_musicVarsOk, g_monsterVarsOk);
     Log(1, "0.9 saves: folder %s (%s), backups %s", g_saveFolderU8[0] ? g_saveFolderU8 : "-", g_saveFolderHow,
         g_saveRootU8);
+    SaveLoadCheck();                          // 0.18 save.load (precheck_018.txt section 2; after the main state check)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
     _snprintf_s(g_radFilePath, sizeof(g_radFilePath), _TRUNCATE, "%sTruMenu.radial.txt", g_exeDir);

@@ -52,8 +52,8 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruMenu.asi', 'TruMenu.ini'
-# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.16) - recognised as
-# ours for update / removal
+# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.17.1) - recognised
+# as ours for update / removal
 $earlierBuilds = @{
     'TruMenu.asi' = @('50ebd28adcf96cef7e1db673ce293b5810bd8d64d0669617d09a1250598491a3',
                       'cd1b8796e40fccb09ab063d7e9f955b9029a230e37b21dce9bb570c1a3cb1892',
@@ -81,7 +81,8 @@ $earlierBuilds = @{
                       'eb6274a9c2aa5f253ab2060cc82518cdfde572ffa44b63647ba41de006dc54b7',   # 0.14 Debug view (work\asi\menu014)
                       'e45acc3cd2714911444580b5096c58a38e59ae0927cfa5eab59bc5c4dbea66d3',   # 0.15 Render mode (work\asi\menu015)
                       '73abc68cba4abe371991b3165c6000385a9f6cbad56fb35d335960e5e6d890ba',   # 0.16 Readability (work\asi\menu016)
-                      '249ca8c0fa5f080a71f00083091b442c0c631fd853fa15720a4377fc6ad98a7f')   # 0.17 Schnellschalter (work\asi\menu017)
+                      '249ca8c0fa5f080a71f00083091b442c0c631fd853fa15720a4377fc6ad98a7f',   # 0.17 Schnellschalter (work\asi\menu017)
+                      'b28bd9ccfa4bef9cf70476bb3a759dbc65c46e243f38e971de67b4a8541e3209')   # 0.17.1 depth matrices swapped (work\asi\menu0171)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
@@ -103,7 +104,8 @@ $earlierBuilds = @{
                       'b465d1b58bc4257ad7a40b6b612e4e9c3cf91323e197375975c2a5584b321058',   # 0.13 ([Debug] Label*; work\asi\menu0130)
                       '2530e2e5867d3d225e800821e880169eb95c4fd90ba6d26666a08e30ceddf476',   # 0.14 ([Debug] View / Trg* / Name*; work\asi\menu014)
                       '1313d4494a3583a9081c1bf37f03cbf362617348a19c0d1d053d5ccae586d2c0',   # 0.15 ([Debug] Slide / Coll* / Census* / Flat*; work\asi\menu015)
-                      'fa17e43dc5cc34405a532750201c42c652be3e8c653693673f4703f46162e4f4')   # 0.16 ([Debug] Depth / LineAlpha / Fade* / Fill* / LaraIn ..; work\asi\menu016)
+                      'fa17e43dc5cc34405a532750201c42c652be3e8c653693673f4703f46162e4f4',   # 0.16 ([Debug] Depth / LineAlpha / Fade* / Fill* / LaraIn ..; work\asi\menu016)
+                      '249bfa8643122a3033f63dfc2385bcd28e486ac8233e316ca2362c6a92845eea')   # 0.17 / 0.17.1 ([Quick], [Shot] OnCine*; work\asi\menu017, menu0171)
 }
 # 0.10 radial menu file and 0.10.1 tour file (next to tru.exe; the default comes from the build folder or src\asi\TruMenu)
 $radialFiles = @(

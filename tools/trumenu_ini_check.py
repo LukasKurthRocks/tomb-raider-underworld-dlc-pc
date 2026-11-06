@@ -58,6 +58,12 @@ OnCineSignal cine / camera / both, [Debug] CheckpointHide (intro ids or empty), 
 dbg.depthdump / dbg.cp* / pos.* in kItems, the quick-toggle bar's row tables kQbDebug .. kQbAi (every item id in kItems,
 bool rows on bool items or dbg.show <layer>, value rows on the value items, every kDvLayers layer reachable) and the new
 ring entries (quick.open / shot.oncine / dbg.depthdump / dbg.cplist / dbg.cpall 0 / dbg.cpall 1 once each).
+Since TruMenu 0.18 (2026-11-06 TruMenu 0.18) also [Menu] OverlayLaraIn / [Debug] LegendLaraIn / [Saves] DirectLoad /
+[Shot] OnCineSegments 0 / 1, the items overlay.larain / pos.goload / save.load in kItems, save.load in kRadForbidden (and
+never in the ring), the bar's row tables kQbEmergency .. kQbAccess (new kinds: info rows on info items, choice rows on
+action items, label / planned rows with id "-" and a planned row's text "German|English"; kQfConfirm / kQfBackup rows
+are actions; level.load rows take one unit name a-z 0-9 _; time.scale is a value item), the ring's overlay.larain once
+(no argument), pos.goload with a saved name or last, time.scale with a number 0 .. 10.
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -73,7 +79,7 @@ INI = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.ini')
 REGRESS = {'dlc1.txt': 'Regression-DLC1.md', 'dlc2.txt': 'Regression-DLC2.md'}
 RADIAL = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.radial.txt')
 TOUR = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.tour.txt')
-RADIAL_FORBIDDEN = ['game.quit', 'cmd.run', 'save.delete', 'save.restore', 'save.import', 'settings.reset']
+RADIAL_FORBIDDEN = ['game.quit', 'cmd.run', 'save.delete', 'save.restore', 'save.import', 'settings.reset', 'save.load']
 RADIAL_VALUES = {'Mode': ('menu', 'wheel'), 'Freeze': ('world', 'player', '0', '1', '2'), 'QuitSector': ('0', '1'),
                  'TestsLevel': ('0', '1'), 'FreezeSound': ('0', '1'), 'FreezeShaderClock': ('0', '1')}
 SHOT_VALUES = {'Enabled': ('0', '1'), 'Clean': ('0', '1')}       # 0.10.5; Hotkey / MaxPerMinute / Folder in check_shot
@@ -137,8 +143,13 @@ OC_RANGES = {'OnCinePairs': (1, 50), 'OnCineFastPairs': (1, 50), 'OnCineInterval
 QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info', 'shot.oncine': 'bool',
             'dbg.depthdump': 'action', 'dbg.cp': 'action', 'dbg.cpall': 'action', 'dbg.cplist': 'info',
             'dbg.cpgo': 'action', 'pos.save': 'action', 'pos.list': 'info', 'pos.go': 'action'}
-QB_TABLES = ('kQbDebug', 'kQbStyle', 'kQbRender', 'kQbLevel', 'kQbAi')
-QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang')
+QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess')
+QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang',
+                  'time.scale')
+# 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
+Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
+Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
+QB_PAGES_MAX = 10
 DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -634,17 +645,20 @@ def ini_section(ini_path, wanted):
     return out
 
 
-def qb_rows(src):
-    """0.17: the rows of the quick-toggle bar tables kQbDebug .. kQbAi: [(table, de, id, arg, kind, layer)]"""
+def qb_rows(src, with_tail=False):
+    """0.17: the rows of the quick-toggle bar tables: [(table, de, id, arg, kind, layer)]; 0.18: id may be "-" (label /
+    planned rows), the argument may be several adjacent string literals, with_tail adds the rest of the row (flags)"""
     rows = []
     for table in QB_TABLES:
         start = 'const QbRow %s[] = {' % table
         if start not in src: continue
         block = src[src.index(start):]
         block = block[:block.index('\n};')]
-        for m in re.finditer(r'\{"([^"]*)", "([^"]*)", "([a-z][a-z0-9_.]*)", "([^"]*)", (kQb[A-Za-z]+), '
-                             r'(-1|kDv[A-Za-z]+),', block):
-            rows.append((table, m.group(1), m.group(3), m.group(4), m.group(5), m.group(6)))
+        for m in re.finditer(r'\{"([^"]*)", "([^"]*)", "([a-z][a-z0-9_.]*|-)", ((?:"[^"]*"\s*)+), (kQb[A-Za-z]+), '
+                             r'(-1|kDv[A-Za-z]+),([^{}]*)\}', block, re.S):
+            arg = ''.join(re.findall(r'"([^"]*)"', m.group(4)))
+            row = (table, m.group(1), m.group(3), arg, m.group(5), m.group(6))
+            rows.append(row + (m.group(7),) if with_tail else row)
     return rows
 
 
@@ -703,6 +717,8 @@ def check_quick(ini_path, radial_path):
     reach = set()
     for table, de, item, arg, kind, layer in rows:
         where = 'TruMenu.cpp: %s row "%s" (%s %s)' % (table, de, item, arg)
+        if kind in ('kQbLabel', 'kQbPlanned') or item == '-':   # 0.18: checked in check_018
+            continue
         if item not in items: problems.append(where + ': item not in kItems')
         elif kind == 'kQbBool':
             if item == 'dbg.show':
@@ -711,7 +727,10 @@ def check_quick(ini_path, radial_path):
             elif items[item] != 'bool' or arg: problems.append(where + ': a bool row needs a bool item without argument')
         elif kind == 'kQbValue' and item not in QB_VALUE_ITEMS:
             problems.append(where + ': a value row needs one of %s' % ', '.join(QB_VALUE_ITEMS))
-        elif kind == 'kQbAction' and items[item] != 'action': problems.append(where + ': an action row needs an action item')
+        elif kind == 'kQbAction' and items[item] != 'action' and not (item == 'player.health' and not arg):
+            problems.append(where + ': an action row needs an action item (or player.health without argument)')
+        elif kind == 'kQbInfo' and items[item] != 'info': problems.append(where + ': an info row needs an info item')
+        elif kind == 'kQbChoice' and items[item] != 'action': problems.append(where + ': a choice row needs an action item')
         for lname, own in DV_OWN_ITEM.items():
             if item == own: reach.add(lname)
     for lname in layers:
@@ -743,6 +762,74 @@ def check_quick(ini_path, radial_path):
                                 % (os.path.basename(radial_path), want, counts.get(want, 0)))
     return problems, '%d bar rows in %d tables (every one of %d layers reachable), %d new items, [Quick] %d keys' % (
         len(rows), len({r[0] for r in rows}), len(layers), len(QB_ITEMS), len(QB_KEYS))
+
+
+def check_018(ini_path, radial_path):
+    """0.18 (2026-11-06 TruMenu 0.18): the 0 / 1 keys, the new items, kQbPages (at most QB_PAGES_MAX pages, every table
+    on a page), label / planned rows, confirm / backup flags only on action rows, level.load rows with one unit name, the
+    ring's overlay.larain (once, no argument), pos.goload (a name or last), time.scale (a number 0 .. 10)"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    for section, key in Q18_KEYS:
+        found = [(n, v) for n, k, v in ini_section(ini_path, section) if k == key]
+        if len(found) != 1: problems.append('%s: [%s] %s missing' % (name, section, key))
+        elif found[0][1] not in ('0', '1'):
+            problems.append('%s:%d: [%s] %s=%s (0 / 1)' % (name, found[0][0], section, key, found[0][1]))
+    items = item_types(src)
+    for item, typ in sorted(Q18_ITEMS.items()):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    block = src[src.index('const QbPage kQbPages[] = {'):]
+    block = block[:block.index('\n};')]
+    pages = re.findall(r'QB_PAGE\("([^"]*)", "([^"]*)", (kQb[A-Za-z]+), (kQs[A-Za-z]+)\)', block)
+    special = re.findall(r'\{"([^"]*)", "([^"]*)", nullptr, 0, (kQs[A-Za-z]+)\}', block)
+    if len(pages) + len(special) > QB_PAGES_MAX:
+        problems.append('TruMenu.cpp: kQbPages has %d pages (at most %d)' % (len(pages) + len(special), QB_PAGES_MAX))
+    on_page = {p[2] for p in pages}
+    for table in QB_TABLES:
+        if table not in on_page: problems.append('TruMenu.cpp: row table %s is on no page of kQbPages' % table)
+    planned = labels = confirm = 0
+    for table, de, item, arg, kind, layer, tail in qb_rows(src, True):
+        where = 'TruMenu.cpp: %s row "%s" (%s %s)' % (table, de, item, arg)
+        flags = 'kQfConfirm' in tail or 'kQfBackup' in tail
+        if (item == '-') != (kind in ('kQbLabel', 'kQbPlanned')):
+            problems.append(where + ': id "-" exactly on label / planned rows')
+        if kind == 'kQbPlanned':
+            planned += 1
+            if arg.count('|') != 1 or not all(arg.split('|')): problems.append(where + ': planned text "German|English"')
+        if kind == 'kQbLabel': labels += 1
+        if flags:
+            confirm += 1
+            if kind != 'kQbAction': problems.append(where + ': kQfConfirm / kQfBackup only on action rows')
+        if item == 'level.load' and not re.fullmatch(r'[a-z0-9_]+', arg):
+            problems.append(where + ': level.load takes one unit name a-z 0-9 _')
+        if item == 'level.load' and 'kQfConfirm' not in tail: problems.append(where + ': level.load rows need kQfConfirm')
+        if not re.fullmatch(r'[\x20-\x7e]*', de + arg): problems.append(where + ': ASCII only')
+    counts = {}
+    if os.path.exists(radial_path):
+        for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.count('|') != 2: continue
+            cmd = line.split('|')[2].strip()
+            word, _, arg = cmd.partition(' ')
+            arg = arg.strip()
+            where = '%s:%d: %s' % (os.path.basename(radial_path), n, cmd)
+            if word == 'overlay.larain':
+                counts[word] = counts.get(word, 0) + 1
+                if arg: problems.append(where + ' (no argument in the ring)')
+            elif word == 'pos.goload' and not re.fullmatch(r'[A-Za-z0-9_-]+', arg):
+                problems.append(where + ' (a saved name or last)')
+            elif word == 'time.scale':
+                try:
+                    ok = 0.0 <= float(arg) <= 10.0
+                except ValueError:
+                    ok = False
+                if not ok: problems.append(where + ' (a number 0 .. 10)')
+        if counts.get('overlay.larain', 0) != 1:
+            problems.append('%s: overlay.larain must be in the radial file once, found %d'
+                            % (os.path.basename(radial_path), counts.get('overlay.larain', 0)))
+    return problems, '%d pages (%d special), %d label + %d planned rows, %d confirm rows, %d new items, %d keys' % (
+        len(pages) + len(special), len(special), labels, planned, confirm, len(Q18_ITEMS), len(Q18_KEYS))
 
 
 def unescape(s):
@@ -820,6 +907,10 @@ def main(argv):
     for p in qproblems: print('QUICK %s' % p)
     if not qproblems: print('ok: [Quick] / [Shot] OnCine* / CheckpointHide values, %s, ring entries' % qsummary)
     problems += qproblems
+    eproblems, esummary = check_018(ini_path, radial_path)   # 0.18
+    for p in eproblems: print('Q018 %s' % p)
+    if not eproblems: print('ok: 0.18 keys / items / bar pages: %s' % esummary)
+    problems += eproblems
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

@@ -1826,6 +1826,57 @@ shot.oncine: cutscene 01 end (gameplay camera back 2 s) - 7 pair(s) taken, 0 ref
 0.17 depthdump frame 1234 call 0: scene 0x........ - qualifying; [scene+0x1c0] 0x00000000; target 1920x1080 (...)
 ```
 
+## TruMenu 0.18 (Lara in overlay, owner units, cutscene segments, bar pages, save.load; 2026-11-06)
+
+Lukas' live wishes after 0.17 plus the found bugs. Workspace report `docs\Befund-TruMenu-018-0611.md`; byte checks
+`work\asi\menu018\precheck_018.txt` (33, section "// ---- 0.18 save.load" .. the next "// ======" line); static load-path
+research `logs\r18_load_*.txt` (workspace).
+
+* **Lara in** (`overlay.larain`, `[Menu] OverlayLaraIn` 1): the position overlay (top left) has a second line
+  `Lara in: triggervolume 4537, ...` - up to 3 names (most dangerous kind first) and `+N`, each in its kind's colour
+  (death red, fire orange, checkpoint green, water blue, sound violet, trigger yellow, plane cyan, unknown grey). It is
+  computed every 100 ms from both trigger lists with the 0.16 test (player +0x20 + (0, 0, 200); box / sphere inside,
+  plane within 50 units), whether a trigger layer is drawn or not. The legend's row is gone (`[Debug] LegendLaraIn` 1
+  brings it back); the pulsing outline of `dbg.larain` stays.
+* **Owner units**: stream table names come in two spellings (`L3_main_bedroom` from the new-game start data,
+  `l3_main_hall` from a portal) - the label prefix cut is case-insensitive now, Lara's stream entry is found in the
+  whole table (0.16 stopped after 16 units), GameTracker+0x38 is the fallback when no loaded entry has Lara's id; one
+  `0.18 units:` log line when the two names differ.
+* **shot.oncine segments** (`[Shot] OnCineSegments` 1): inside a running cutscene a new segment with its own pair budget
+  starts when GameTracker+0x38 changes, the cinematic object `[0xe7f1c0]` / its track +0x2c changes, or a script prints
+  `StartCinematic called` / `Cine about to play` (with `log.script`); at least 1 s per segment. `OnCineSlowMs` 8000 (was
+  5000): 4 pairs every 1.5 s, then every 8 s up to 10 per segment (~54 s). Names `cine<NN>_<i>` / `cine<NN>s<k>_<i>`;
+  log lines per segment and one summary per cutscene.
+* **Quick-toggle bar: 10 pages** - Notfall / Cheats, Lara (+ the saved positions), Debug / Darstellung, Leveldaten
+  (start page), Render / KI, Zeit / Test, Checkpoints, Saves, Kapitel (debug), Barrierefreiheit. New row kinds: info
+  (right = the item's value in the footer), choice (left = next choice, right = run: weapons, Claude marks), heading,
+  planned (greyed, right = what it will do). Dangerous rows need a second right press within 3 s (die, unit reload,
+  chapter loads, checkpoint go, "load + go" of a position); restore / load keep the 0.9 double confirmation (10 s).
+  Long pages scroll with the selection.
+* **save.load** `<save>|autosave` (`[Saves] DirectLoad` 1; menu Saves page "Load" + CONFIRM, bar page Saves, never over
+  TruLink, never in the ring): the game's own load path - `0x788a50()`, `0x789de0(index)`, step index `[0xfaf7a4]` = 2
+  (TruMenu's confirmation replaces the game's yes / no box); the game then reads the file, runs `SAVE_RestoreGame` and
+  changes the level. Only in a level (main state 1, no level change pending), with the save system idle and the name in
+  the game's own list (index by name; Autosave = 0x38). Runs on the game thread; while it runs `LevelChangePending`
+  says so. Not seen live yet.
+* **pos.goload** `<name>|last`: level.load of the position's unit when it is not loaded, then `cheat.flight 1` and
+  `pos.go` (the 0.8.1 shortcut runner waits for the level). Explicit only; a level.load may change story state.
+* **Kapitel (debug)**: one bar row per chapter start the game's level select uses (`L1_seatop`, `L2_cliffclimb`,
+  `L3_caverns_start`, `L4_trailstart`, `L5_startsnow`, `l6_ship_exterior`, `L7_thin_ice` - generalbank script (8, 119))
+  plus the prologue `l3_main_bedroom` and the DLC starts; right twice = `save.backup kapitel`, then `level.load` - no
+  story value is set.
+* **Barrierefreiheit** (skeleton): menu page, ring level Spieler / Barrierefreiheit, bar page - the five categories of
+  the game paper (Sehen / Hoeren / Verstehen / Steuerung / Sonstige); working assists only (Zeitlupe 0.5 / 0.75 / 1,
+  Befreien, Befreien: Stand, Unverwundbar, Gott voll), everything else greyed "geplant".
+
+```text
+0.18 save.load: ok ([Saves] DirectLoad 1; 33 byte checks)
+0.17 quick toggles: ... 10 pages (0.18), 82 item rows + 10 planned, 0 unknown item(s); ... segments 1)
+shot.oncine: cutscene 01 segment 2 start - unit l3_main_hall -> l3_mansion_exterior_afterburn; unit ...; up to 10 pair(s)
+save.load: 'Slot 2' (list index 1) loading - 0x789de0 = 1, step 2 set; Lara was in l3_main_hall
+save.load: 'Slot 2' loaded - unit l4_trailstart (14.2 s)
+```
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
