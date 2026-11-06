@@ -1772,6 +1772,60 @@ dbg.depth on (DepthDim 25, DepthCall 0; src=ring)
 0.16 depth waits (180 frames): wartet, Linien oben / waits, lines on top: <why> (.. scene calls, .. qualifying)
 ```
 
+## TruMenu 0.17 "Schnellschalter" (quick-toggle bar, cutscene shots, depth diagnosis, checkpoints, positions; 2026-11-06)
+
+A third control next to the long menu and the ring, for switching the debug view while playing, plus the live findings
+of 0.16. Workspace report `docs\Befund-TruMenu-Schnellschalter-0611.md`; byte checks `work\asi\menu017\precheck_017.txt`
+(6, section "// ---- 0.17 quick toggles ----" .. "// ---- 0.3 pages ----"); offline models `tools/trumenu_quick_check.py`.
+
+* **Schnellschalter** (`quick.open`, `[Quick]`): a small panel at the LEFT screen edge (`Top` % of the height), the game
+  keeps running - no freeze, no neutral pad. **View + Start** (`OpenButtons` 0x0030) opens / closes it; D-pad up / down
+  = row, left / right = off / on (value rows: one step down / up), LB / RB = page; a held direction repeats after 400 ms.
+  While it is open only D-pad, LB and RB are kept from the game (masked in the state PadHook hands the game; one held at
+  the close stays away until released). The combo itself never reaches the game: a lone View / Start is held back for
+  `ChordMs` (250); released inside that window the game gets it as a 100 ms tap at once, held longer it gets it late.
+  Why View + Start: every pad button is bound in the PC input map (generalbank DTP 47, `tools/input_map_find.py`):
+  D-pad and LB / RB are gameplay, L3 + R3 is TruMenu's own menu / ring combo; View and Start are menu buttons (pause /
+  PDA, actions 9 / 10 / 71 / 89 in set 0) and no binding uses both together.
+* Pages (the menu / ring group order): **Debug** (Alles an / aus, Legende, Fliegen, Flug-Tempo, Zwischensequenz-Fotos,
+  Sprache), **Darstellung** (Tiefe, Deckkraft, Helligkeit, Ferne blasser, Flaechen fuellen, Kurze Namen, Lara drin,
+  Umhuellende), **Render** (Flach-Ansicht, Pass, Zaehlung, Rutschflaechen, Gegner-Kollision), **Leveldaten** (Alle
+  Trigger, Tod, Feuer, Checkpoint-Trigger, Wasser, Ton, Trigger, Ebenen, Unbekannt, Ladebereiche, Checkpoints,
+  Trigger-Namen - the start page), **KI / Namen / Lara** (Thrall-Labels, Objektnamen, Markup, Nur Kanten) and
+  **Checkpoints** (the nearest 14, marker off / on). Rows in their layer colour with the count drawn in the last frame;
+  greyed rows say why. Every row runs the existing item (`dbg.show`, `dbg.depth`, `dbg.alpha`, `cheat.flight`, ...)
+  through the ring's path and reads its state the ring's way - no state of its own. One `quick: <page> / <row> ->
+  <item> <arg>: <answer>` line per action. Closed: one line `Debug: N an` (`ShowClosed`, with `[Debug] Enabled=1`, in a
+  level). `quick.lang de|en` / `[Quick] Language` (TruMenu has no global language switch).
+* **shot.oncine** (`[Shot] OnCine*`, ring Spieler / Debug): when a cutscene starts in a level - the game's cinematic
+  test 0x453f00 or the camera leaving the gameplay camera `[0xe804f0+0xb80]` (`OnCineSignal` both) - pairs of shots, a
+  clean one and a ui one of the same Present (`cine<NN>_<i>_clean / _ui`): the first `OnCineFastPairs` (4) every
+  `OnCineIntervalMs` (1500), then every `OnCineSlowMs` (5000), at most `OnCinePairs` (10). The cutscene ends when the
+  signal has been gone for 2 s (camera flips inside a cutscene keep one burst); pairs have their own MaxPerMinute window.
+* **Depth diagnosis** (live: `[scene+0x140]` never mapped): `dbg.depthdump` writes one block per PCScene::Draw call of
+  the next frame (scene +0xe0 .. +0x1fc, the 0.14 camera, 0xa038f0, five test points against six view forms);
+  `DpMapping` now tries six view forms (row / column, camera-relative, of the inverse) with a least-squares scale over
+  five test points, |k| = 1 first, and needs the projection to span half the depth range; `[Debug] DepthCall` -1 (new
+  default) = the first qualifying scene that maps.
+* Ring entries that set a value show the current one ("= an (wartet)", "jetzt 60%"), switches show an / aus.
+* Legend in short English terms (`Death`, `Fire`, `Checkpoint trg`, ..., `CAPPED`, `Lara in: ...`, `Depth: on (waits)`);
+  labels whose anchor lies outside the screen are skipped (they were pinned to the screen edges).
+* **Checkpoint list** (`dbg.cp <id> 0|1`, `dbg.cpall 0|1`, `dbg.cplist`, `dbg.cpgo <id>|active`, `[Debug]
+  CheckpointHide`): menu page Debug view, the bar's page Checkpoints, ring Leveldaten.
+* **Positions** (`pos.save [name]`, `pos.list`, `pos.go <name>|last`, `TruMenu.positions.txt` next to tru.exe): unit,
+  live position, yaw, the unit's shift P and origin V; `pos.go` only while that unit is loaded, converted with its shift
+  then and now (live = data - V + P), otherwise refused with the reason.
+
+```text
+0.17 quick toggles: [Quick] Enabled 1, OpenButtons 0x0030 (Start + View), ChordMs 250, ... cutscene shots: camera checks ok, cinematic test ok, ...
+0.17 checkpoint list: 0 marker(s) hidden ([Debug] CheckpointHide); positions: ok, file <game>\TruMenu.positions.txt
+quick: opened (pad 0: Start + View)
+quick: Leveldaten / Tod -> dbg.show death 1: ok dbg.show death 1
+shot.oncine: cutscene 01 start - camera left [manager+0xb80]; camera 0x00e80de0 (other, vtable ...); main state 1; ...
+shot.oncine: cutscene 01 end (gameplay camera back 2 s) - 7 pair(s) taken, 0 refused; 21.4 s
+0.17 depthdump frame 1234 call 0: scene 0x........ - qualifying; [scene+0x1c0] 0x00000000; target 1920x1080 (...)
+```
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

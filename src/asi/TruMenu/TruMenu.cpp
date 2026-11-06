@@ -55,7 +55,15 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.16 (Readability of the debug view: dbg.depth off / on / dim = lines on top, "
+const char *const kVersion = "TruMenu 0.17 (Schnellschalter: quick-toggle bar at the left screen edge, the game keeps "
+                             "running - [Quick] OpenButtons (View + Start, a chord window keeps a lone button from the "
+                             "game for ChordMs), D-pad up / down = row, left / right = off / on or the value, LB / RB = "
+                             "page; rows in the colour of their layer with the count drawn, pages Debug / Darstellung / "
+                             "Render / Leveldaten / KI-Namen-Lara; every row runs the existing item (quick.open / "
+                             "quick.lang / quick.status); collapsed line 'Debug: N an'; shot.oncine = clean + ui shot pairs "
+                             "when a cutscene starts (the game's cinematic test or the camera leaving the gameplay camera "
+                             "[manager+0xb80]); legend in short English terms, labels with the anchor off screen skipped; "
+                             "0.16: Readability of the debug view: dbg.depth off / on / dim = lines on top, "
                              "hidden behind the level geometry and Lara, or the hidden parts faint (drawn inside the frame "
                              "after PCScene::Draw with the scene's depth buffer); dbg.alpha / dbg.bright / dbg.fade / "
                              "dbg.fill = opacity, brightness, distance fade, faint faces; labels nearest first without "
@@ -417,6 +425,18 @@ const OptDef kOpts[] = {
                             "line + a clean shot);\nthe game still gets the key; 0 = off"},
     {"Shot", "MaxPerMinute", "30", "0.10.5: at most this many shots - and as many claude.mark lines - per minute, 1 .. 120; "
                                    "more are refused with a log line;\n0 = no limit"},
+    {"Shot", "OnCine", "0", "0.17 (shot.oncine): 1 = when a cutscene starts in a level, pairs of shots - a clean one and "
+                            "one with TruMenu (debug\nview, legend) of the same frame, shot_<HHMMSS>_<step>_cine<NN>_<i>"
+                            "_clean / _ui.png; the cutscene ends when the signal has\nbeen gone for 2 s; pairs have "
+                            "their own MaxPerMinute window; 0 = off"},
+    {"Shot", "OnCinePairs", "10", "0.17: at most this many shot pairs per cutscene, 1 .. 50"},
+    {"Shot", "OnCineFastPairs", "4", "0.17: the first pairs of a cutscene come every OnCineIntervalMs, the rest every "
+                                     "OnCineSlowMs, 1 .. 50"},
+    {"Shot", "OnCineIntervalMs", "1500", "0.17: milliseconds between the first pairs, 250 .. 10000"},
+    {"Shot", "OnCineSlowMs", "5000", "0.17: milliseconds between the later pairs, 250 .. 60000"},
+    {"Shot", "OnCineSignal", "both", "0.17: what counts as a cutscene - cine = the game's cinematic test (0x453f00), camera "
+                                     "= the current camera is not the\ngameplay camera [0xe804f0+0xb80], both = either "
+                                     "of them"},
     {"Flow", "Enabled", "0", "0.11: 1 = Ablauf: read the flow file below (steps, counters; Invoke-TruTestRun.ps1 installs a "
                              "profile's flowFile) - the ring level\nClaude shows Weiter / Ueberspringen / Zurueck, Gut / "
                              "Fehler set the step result, 'flow: ...' lines go to TruMenu.log; 0 = off (no file read,\nno "
@@ -526,8 +546,10 @@ const OptDef kOpts[] = {
                             "the PCScene::Draw vtable word 0x849a2c while on and a layer is\non); 2 = like 1, the hidden "
                             "parts faint (DepthDim)"},
     {"Debug", "DepthDim", "25", "0.16: Depth=2 - opacity of the hidden parts in percent, 5 .. 80"},
-    {"Debug", "DepthCall", "0", "0.16: Depth - which PCScene::Draw of a frame (counted among those into a back-buffer-size "
-                                "target with a depth surface)\nthe lines go into, 0 .. 7 (dbg.style shows how many there are)"},
+    {"Debug", "DepthCall", "-1", "0.16: Depth - which PCScene::Draw of a frame (counted among those into a back-buffer-size "
+                                 "target with a depth surface)\nthe lines go into, 0 .. 7 (dbg.style shows how many there "
+                                 "are); 0.17: -1 = auto, the first of them whose view maps\n(live 2026-11-06: scene 0 did "
+                                 "not map - dbg.depthdump writes every scene's matrices to TruMenu.log)"},
     {"Debug", "LineAlpha", "60", "0.16 (dbg.alpha): opacity of every debug view line in percent, 10 .. 100 (0.15: 100)"},
     {"Debug", "LineBright", "100", "0.16 (dbg.bright): brightness of the debug view colours in percent, 30 .. 150"},
     {"Debug", "Fade", "1", "0.16 (dbg.fade): 1 = far objects fainter (from FadeStart to FadeEnd game units from the camera, "
@@ -554,6 +576,23 @@ const OptDef kOpts[] = {
     {"Debug", "ViewSkip", "sound", "0.16: layers dbg.view (Alles an / aus) and View=1 leave off - comma list of layer names "
                                    "(death, fire, checkpoint, water,\nsound, volume, plane, unknown, portals, checkpoints, "
                                    "trglabels, legend, names, slide, enemycoll); empty = none"},
+    {"Debug", "CheckpointHide", "", "0.17 (dbg.cp / dbg.cpall): intro ids of checkpoints whose marker is not drawn (comma "
+                                    "list; written back with Persist=1);\nempty = every checkpoint drawn"},
+    {"Quick", "Enabled", "1", "0.17 Schnellschalter (quick.open): 1 = OpenButtons open / close a small bar at the left "
+                              "screen edge while the game\nkeeps running: D-pad up / down = row, left / right = off / on "
+                              "(value rows: one step), LB / RB = page; only D-pad, LB\nand RB are kept from the game while "
+                              "it is open; 0 = off (the buttons reach the game as before 0.17)"},
+    {"Quick", "OpenButtons", "0x0030", "0.17: XInput buttons pressed together that open / close the bar (hex or decimal): "
+                                       "0x0030 = View (Back) + Start -\nmenu buttons of the game (pause / PDA), never "
+                                       "pressed together by it; do not use D-pad, LB or RB here"},
+    {"Quick", "ChordMs", "250", "0.17: milliseconds a lone OpenButtons button is kept from the game waiting for the other "
+                                "one, 50 .. 1000; released\nearlier the game gets it as a short tap, held longer it gets "
+                                "it (late)"},
+    {"Quick", "ShowClosed", "1", "0.17: 1 = the closed bar shows one line 'Debug: N an' (needs [Debug] Enabled=1, in a "
+                                 "level); 0 = nothing while closed"},
+    {"Quick", "Language", "de", "0.17: language of the bar, de or en (quick.lang switches it until the next start)"},
+    {"Quick", "Top", "30", "0.17: top edge of the bar in percent of the screen height, 5 .. 80"},
+    {"Quick", "Scale", "1.0", "0.17: text size of the bar relative to the menu font, 0.5 .. 3"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -633,6 +672,21 @@ volatile LONG g_radPaused = 0;               // Freeze=world: the ring set the t
 volatile LONG g_radCtlOurs = 0;              // Freeze=player: the ring wrote player.control 0 (RunControl clears it)
 BYTE g_radCtlBefore = 1;                     // player.control before the open
 bool RadMenuOpen() { return g_radOpen != 0 && g_radMode == kRadModeMenu; }   // the ring holds pad + keyboard
+// 0.17 [Quick] Schnellschalter (section "---- 0.17 quick toggles"): the pad side runs in OnPad (QbPad), the bar itself
+// on the render thread (QuickTick / DrawQuick)
+int g_qbEnabled = 1, g_qbChordMs = 250;      // [Quick] Enabled / ChordMs
+WORD g_qbButtons = 0x0030;                   // [Quick] OpenButtons: View (Back) 0x0020 + Start 0x0010
+volatile LONG g_qbOpen = 0;                  // the bar is open: D-pad / LB / RB belong to it
+volatile LONG g_qbJust = 0;                  // opened since the last frame (buttons held at the open are no edges)
+const WORD kQbOwn = 0x030F;                  // D-pad + LB + RB: kept from the game while the bar is open
+WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject);   // below (g_padLock not held by the caller)
+bool g_qbRunning = false;                    // a bar row runs an item (render thread): src=quick
+int g_qbLang = 0;                            // [Quick] Language: 0 de, 1 en (quick.lang)
+volatile LONG g_ocOn = 0;                    // 0.17 [Shot] OnCine / shot.oncine (section "---- 0.17 cutscene shots")
+// 0.17 checkpoint list ([Debug] CheckpointHide, dbg.cp): one bit per intro id 0 .. 65535 = that marker is hidden (byte
+// writes only - the render thread draws, items may come from TruLink)
+volatile BYTE g_cpHide[8192] = {};
+bool CpHidden(LONG intro) { return intro >= 0 && intro < 65536 && (g_cpHide[intro >> 3] & (1 << (intro & 7))) != 0; }
 
 // ---- state ----
 char g_logPath[MAX_PATH];
@@ -865,7 +919,12 @@ void ToggleMenu(const char *by) {
 // release then runs its entry (the render thread does that, g_radRelease). A different HoldButtons mask is watched on its
 // own (the menu toggles as before; the game sees those buttons until the ring opens). The latched ring (open after the
 // hold) goes back into hold mode when the buttons are pressed again.
-int OnPad(DWORD index, bool connected, const PadState *state, BYTE source) {
+// 0.17: clear / inject (optional) = the quick-toggle bar's buttons to take from / give to the game (QbPad); applied by
+// PadHook only when the game gets the real pad (0) or the 0.10 left-stick pad (2)
+int OnPad(DWORD index, bool connected, const PadState *state, BYTE source, WORD *clear = nullptr,
+          WORD *inject = nullptr) {
+    if (clear) *clear = 0;
+    if (inject) *inject = 0;
     if (index > 3) return 0;
     EnterCriticalSection(&g_padLock);
     g_padConnected[index] = connected;
@@ -938,10 +997,18 @@ int OnPad(DWORD index, bool connected, const PadState *state, BYTE source) {
         InterlockedExchange(&g_radCloseReq, 1);
     }
     if (g_radSwallow && !buttons) InterlockedExchange(&g_radSwallow, 0);
-    if (g_blockInput && g_menuOpen) return 1;
+    int result = 0;
+    if (g_blockInput && g_menuOpen) result = 1;
     // 0.10.1: PassLeftStick only in Mode=wheel; Mode=menu gives the game the whole pad neutral (the left stick picks)
-    if (g_radOpen || pending || g_radSwallow) return g_radPassLeft && g_radMode == kRadModeWheel ? 2 : 1;
-    return neutral ? 1 : 0;
+    else if (g_radOpen || pending || g_radSwallow) result = g_radPassLeft && g_radMode == kRadModeWheel ? 2 : 1;
+    else if (neutral) result = 1;
+    // 0.17 quick-toggle bar: its open combo (chord window) and, while it is open, D-pad / LB / RB - only while neither
+    // the menu nor the ring owns the pad (their own combos and neutral pads stay exactly as before)
+    WORD qbInject = 0;
+    WORD qbClear = QbPad(index, buttons, connected && result == 0 && !g_menuOpen && !g_radOpen, &qbInject);
+    if (clear) *clear = qbClear;
+    if (inject) *inject = qbInject;
+    return result;
 }
 
 // project chaining rule (TruShadowPower / TruLink / TruMenu share the slot 0x00a02b8c): hook once, re-hook only when
@@ -980,7 +1047,10 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     bool connected = result == ERROR_SUCCESS && state;
     PadState copy = {};
     if (connected) copy = *state;
-    int neutral = OnPad(index, connected, &copy, 0);
+    WORD qbClear = 0, qbInject = 0;
+    int neutral = OnPad(index, connected, &copy, 0, &qbClear, &qbInject);
+    if (neutral != 1 && connected && (qbClear || qbInject))   // 0.17 quick-toggle bar: only these buttons change
+        state->wButtons = static_cast<WORD>((state->wButtons & ~qbClear) | qbInject);
     if (neutral && connected) {
         DWORD packet = state->dwPacketNumber;
         SHORT lx = state->sThumbLX, ly = state->sThumbLY;
@@ -6345,23 +6415,25 @@ enum DvLayer {
     kDvDeath = 0, kDvFire, kDvCheckpoint, kDvWater, kDvSound, kDvVolume, kDvPlane, kDvUnknown, kDvKinds,
     kDvPortals = kDvKinds, kDvCheckpoints, kDvTrgLabels, kDvLegend, kDvNames, kDvSlide, kDvEnemyColl, kDvCount
 };
-struct DvLayerDef { const char *name, *key, *de, *en; ImU32 colour; };
+// 0.17 brief: the legend's short English term (owner wish 2026-11-06 after the 0.16 live run: the legend was too long -
+// short English words only, whatever the language; the menu keeps de / en)
+struct DvLayerDef { const char *name, *key, *de, *en; ImU32 colour; const char *brief; };
 const DvLayerDef kDvLayers[kDvCount] = {
-    {"death", "TrgDeath", "Tod / Kill", "death / kill", IM_COL32(255, 50, 50, 255)},
-    {"fire", "TrgFire", "Feuer", "fire / slow fire", IM_COL32(255, 150, 30, 255)},
-    {"checkpoint", "TrgCheckpoint", "Checkpoint-Trigger", "checkpoint trigger", IM_COL32(70, 255, 110, 255)},
-    {"water", "TrgWater", "Wasser", "water", IM_COL32(70, 150, 255, 255)},
-    {"sound", "TrgSound", "Ton / Swoosh", "sound / swoosh", IM_COL32(220, 110, 255, 255)},
-    {"volume", "TrgVolume", "Trigger (Volumen)", "plain trigger volume", IM_COL32(255, 235, 70, 255)},
-    {"plane", "TrgPlane", "Trigger-Ebene", "trigger plane", IM_COL32(60, 235, 235, 255)},
-    {"unknown", "TrgUnknown", "Trigger unbekannt", "unknown trigger", IM_COL32(170, 170, 170, 255)},
-    {"portals", "Portals", "Ladebereiche", "loading areas (stream portals)", IM_COL32(255, 255, 255, 255)},
-    {"checkpoints", "Checkpoints", "Checkpoints", "checkpoint objects", IM_COL32(150, 255, 190, 255)},
-    {"trglabels", "TrgLabels", "Trigger-Namen", "trigger names", IM_COL32(235, 235, 235, 255)},
-    {"legend", "Legend", "Legende", "legend", IM_COL32(235, 235, 235, 255)},
-    {"names", "Names", "Objektnamen", "object names", IM_COL32(255, 255, 255, 255)},
-    {"slide", "Slide", "Rutschflaechen", "slide faces", IM_COL32(255, 45, 45, 255)},
-    {"enemycoll", "EnemyColl", "Gegner-Kollision", "enemy-only collision", IM_COL32(190, 80, 255, 255)},
+    {"death", "TrgDeath", "Tod / Kill", "death / kill", IM_COL32(255, 50, 50, 255), "Death"},
+    {"fire", "TrgFire", "Feuer", "fire / slow fire", IM_COL32(255, 150, 30, 255), "Fire"},
+    {"checkpoint", "TrgCheckpoint", "Checkpoint-Trigger", "checkpoint trigger", IM_COL32(70, 255, 110, 255), "Checkpoint trg"},
+    {"water", "TrgWater", "Wasser", "water", IM_COL32(70, 150, 255, 255), "Water"},
+    {"sound", "TrgSound", "Ton / Swoosh", "sound / swoosh", IM_COL32(220, 110, 255, 255), "Sound"},
+    {"volume", "TrgVolume", "Trigger (Volumen)", "plain trigger volume", IM_COL32(255, 235, 70, 255), "Trigger"},
+    {"plane", "TrgPlane", "Trigger-Ebene", "trigger plane", IM_COL32(60, 235, 235, 255), "Plane"},
+    {"unknown", "TrgUnknown", "Trigger unbekannt", "unknown trigger", IM_COL32(170, 170, 170, 255), "Unknown"},
+    {"portals", "Portals", "Ladebereiche", "loading areas (stream portals)", IM_COL32(255, 255, 255, 255), "Loading areas"},
+    {"checkpoints", "Checkpoints", "Checkpoints", "checkpoint objects", IM_COL32(150, 255, 190, 255), "Checkpoints"},
+    {"trglabels", "TrgLabels", "Trigger-Namen", "trigger names", IM_COL32(235, 235, 235, 255), "Labels"},
+    {"legend", "Legend", "Legende", "legend", IM_COL32(235, 235, 235, 255), "Legend"},
+    {"names", "Names", "Objektnamen", "object names", IM_COL32(255, 255, 255, 255), "Names"},
+    {"slide", "Slide", "Rutschflaechen", "slide faces", IM_COL32(255, 45, 45, 255), "Slide faces"},
+    {"enemycoll", "EnemyColl", "Gegner-Kollision", "enemy-only collision", IM_COL32(190, 80, 255, 255), "Enemy collision"},
 };
 // object name part -> kind (first match wins, so "deathfiretriggervolume" is death)
 struct DvWord { const char *part; int kind; };
@@ -7016,10 +7088,12 @@ void DvDistText(const float *p, const char *unit, char *o, size_t n) {
 const int kDvTagMax = 160;
 DvTag g_dvTag[kDvTagMax];
 int g_dvTagN = 0, g_dvTagShown = 0, g_dvTagSkipped = 0, g_dvTagMerged = 0, g_dvTagTrg = 0;
+int g_dvTagOff = 0;                          // 0.17: candidates whose anchor lies outside the screen (skipped)
 struct DvRect { float x0, y0, x1, y1; };
 DvRect g_dvRects[224];
 int g_dvRectN = 0;
 DvRect g_dvLegendRect = {0, 0, 0, 0};        // the legend panel of the last frame (labels keep out of it)
+DvRect g_qbRect = {0, 0, 0, 0};              // 0.17: the quick-toggle bar of the last frame (labels keep out of it too)
 const char *const kDvBrief[kDvKinds] = {"DEATH", "FIRE", "CPT", "WATER", "SND", "TV", "TP", "?"};
 
 bool DvRectFree(const DvRect &r) {
@@ -7063,7 +7137,7 @@ size_t DvCommonPrefix(const char *a, const char *b) {
 // screen centre (or all with LabelShort=0), nudge up / down or skip on overlap, at most ViewLabelMax
 void DvTagsDraw(ImDrawList *dl) {
     const ImVec2 ds = ImGui::GetIO().DisplaySize;
-    g_dvTagShown = g_dvTagSkipped = g_dvTagMerged = g_dvTagTrg = 0;
+    g_dvTagShown = g_dvTagSkipped = g_dvTagMerged = g_dvTagTrg = g_dvTagOff = 0;
     for (int i = 1; i < g_dvTagN; ++i) {     // insertion sort by distance
         DvTag t = g_dvTag[i];
         int j = i;
@@ -7112,6 +7186,9 @@ void DvTagsDraw(ImDrawList *dl) {
         const DvTag &t = g_dvTag[i];
         if (!t.count) continue;
         if (g_dvTagShown >= g_dvTagMax) { ++g_dvTagSkipped; continue; }
+        // 0.17 (live 2026-11-06: off-screen boxes had their labels pinned to the screen edges): a label whose anchor is
+        // outside the screen is skipped; an anchor on screen still keeps its box inside the screen (clamp below)
+        if (!(t.at.x >= 0.0f && t.at.x <= ds.x && t.at.y >= 0.0f && t.at.y <= ds.y)) { ++g_dvTagOff; continue; }
         bool full = !g_dvShort || first || i == aim;
         first = false;
         char text[160], dist[64];
@@ -7273,6 +7350,7 @@ bool DpUsable();
 void DpBeginFill();
 void DpPublish();
 const char *DpStateText();
+const char *DpLegendText();                  // 0.17: "Depth: on" / "Depth: dim (waits)" for the legend
 
 // Present, every frame while a 0.14 layer is on
 void DrawDebugView() {
@@ -7296,6 +7374,7 @@ void DrawDebugView() {
     size_t used = 0;
     g_dvState[0] = 0;
     if (g_dvOn[kDvLegend] && g_dvLegendRect.x1 > g_dvLegendRect.x0) DvRectTake(g_dvLegendRect);
+    if (g_qbRect.x1 > g_qbRect.x0) DvRectTake(g_qbRect);   // 0.17: no label under the quick-toggle bar
     // 0.16 depth: lines / faces of this frame go into a world buffer drawn inside the next frame (else ImGui, on top)
     g_dpFill = nullptr;
     if (DpUsable()) DpBeginFill();
@@ -7468,12 +7547,13 @@ void DrawDebugView() {
             if (!ReadDword(inst + 8, &next)) break;
             inst = next;
         }
-        int activeSeen = 0, capped = 0;
+        int activeSeen = 0, capped = 0, hidden = 0;
         const float capPx = g_dvMarkerMax / 100.0f * ImGui::GetIO().DisplaySize.y;
         for (int i = 0; i < count; ++i) {
             const DvMark &m = g_dvCp[i];
             DWORD intro = 0;
             ReadDword(m.inst + 0x58, &intro);
+            if (CpHidden(static_cast<LONG>(intro))) { ++hidden; continue; }   // 0.17 checkpoint list: hidden marker
             bool isActive = intro == active;
             const ImU32 base = isActive ? IM_COL32(230, 255, 60, 255) : kDvLayers[kDvCheckpoints].colour;
             const ImU32 colour = DvTint(base, m.dist2, 1.0f);
@@ -7509,16 +7589,16 @@ void DrawDebugView() {
             DvToCam(c, up, q);
             if (DvCamToScreen(c, q, &at)) {      // 0.16: a label candidate
                 char line[64];
-                Out(line, sizeof(line), "CP %ld%s", static_cast<LONG>(intro), isActive ? " AKTIV" : "");
+                Out(line, sizeof(line), "CP %ld%s", static_cast<LONG>(intro), isActive ? " ACTIVE" : "");
                 DvTagAdd(at, m.dist2, m.pos, base, -1, -1, line, line, "", "", DvOwnerUnit(m.inst));
             }
             if (isActive) ++activeSeen;
         }
         g_dvListed[kDvCheckpoints] = found;
-        g_dvDrawn[kDvCheckpoints] = count;
+        g_dvDrawn[kDvCheckpoints] = count - hidden;
         LabelAdd(g_dvState, sizeof(g_dvState), &used, "checkpoints %d drawn of %d (active id %ld%s, %d marker(s) scaled to "
-                 "%d%% of the screen); ", count, found, static_cast<LONG>(active), activeSeen ? ", drawn" : "", capped,
-                 g_dvMarkerMax);
+                 "%d%% of the screen, %d hidden by the list); ", count - hidden, found, static_cast<LONG>(active),
+                 activeSeen ? ", drawn" : "", capped, g_dvMarkerMax, hidden);
     }
     if (g_dvOn[kDvSlide] || g_dvOn[kDvEnemyColl]) RcDraw(dl, c, g_dvState, sizeof(g_dvState), &used);   // 0.15 R2
     // 0.16: the world buffer is complete - the scene hook draws it inside the next frame; labels stay on top (ImGui)
@@ -7556,25 +7636,26 @@ void DrawDebugLegend() {
     ImU32 colours[kRows];
     bool square[kRows];
     int n = 0;
-    Out(lines[n], sizeof(lines[n]), "TruMenu 0.16 Debug-Ansicht / debug view");
-    Out(counts[n], sizeof(counts[n]), "gez. / gef.");
+    // 0.17 (owner, live 2026-11-06): short English terms only, no explanations - the counts and squares stay
+    Out(lines[n], sizeof(lines[n]), "Debug view");
+    Out(counts[n], sizeof(counts[n]), "drawn/found");
     colours[n] = IM_COL32(235, 235, 235, 255);
     square[n++] = false;
     for (int i = 0; i < kDvCount; ++i) {
         if (!g_dvOn[i] || i == kDvLegend) continue;
-        Out(lines[n], sizeof(lines[n]), "%s / %s", kDvLayers[i].de, kDvLayers[i].en);
+        Out(lines[n], sizeof(lines[n]), "%s", kDvLayers[i].brief);
         if (i == kDvTrgLabels) Out(counts[n], sizeof(counts[n]), "%d / %d", g_dvTagTrg, g_dvListed[i]);
         else Out(counts[n], sizeof(counts[n]), "%d / %d", g_dvDrawn[i], g_dvListed[i]);
         colours[n] = kDvLayers[i].colour;
         square[n++] = true;
     }
     if (DvAnyTrigger()) {
-        Out(lines[n], sizeof(lines[n]), "Testpunkt (Lara +200) / test point; blass = aus / disabled");
+        Out(lines[n], sizeof(lines[n]), "Test point");
         counts[n][0] = 0;
         colours[n] = IM_COL32(255, 255, 255, 230);
         square[n++] = true;
         if (g_dvCapped > 0) {                // 0.16: live 2026-11-06 - 15 triggers silently missing at TriggerMax 64
-            Out(lines[n], sizeof(lines[n]), "GEKAPPT / capped (TriggerMax %d)", g_dvTrgMax);
+            Out(lines[n], sizeof(lines[n]), "CAPPED");
             Out(counts[n], sizeof(counts[n]), "%d", g_dvCapped);
             colours[n] = IM_COL32(255, 90, 60, 255);
             square[n++] = true;
@@ -7588,8 +7669,8 @@ void DrawDebugLegend() {
                 char name[64];
                 if (DvNameKind(g_dvIn[i].inst, name, sizeof(name)) == -2) Out(name, sizeof(name), "?");
                 LabelAdd(lines[n], sizeof(lines[n]), &used, "%s %s %ld%s%s", i ? "," : "", name, g_dvIn[i].intro,
-                         g_dvIn[i].how == 2 ? " (nah / near)" : "", !g_dvIn[i].enabled ? " (aus)"
-                         : !g_dvIn[i].player ? " (nicht Spieler)" : "");
+                         g_dvIn[i].how == 2 ? " near" : "", !g_dvIn[i].enabled ? " off"
+                         : !g_dvIn[i].player ? " not player" : "");
             }
             if (total > 3) LabelAdd(lines[n], sizeof(lines[n]), &used, " +%d", total - 3);
             if (!total) LabelAdd(lines[n], sizeof(lines[n]), &used, " -");
@@ -7598,15 +7679,14 @@ void DrawDebugLegend() {
             square[n++] = total > 0;
         }
         if (g_dvEnclN > 0) {
-            Out(lines[n], sizeof(lines[n]), "umhuellend / enclosing (%s)", g_dvEncl == 2 ? "aus / hidden"
-                                                                             : "blass, gestrichelt / dim, dashed");
+            Out(lines[n], sizeof(lines[n]), "%s", g_dvEncl == 2 ? "Enclosing hidden" : "Enclosing");
             Out(counts[n], sizeof(counts[n]), "%d", g_dvEnclN);
             colours[n] = IM_COL32(200, 200, 200, 230);
             square[n++] = false;
         }
     }
     if (g_dpMode && n < kRows) {
-        Out(lines[n], sizeof(lines[n]), "Tiefe / depth: %s", DpStateText());
+        Out(lines[n], sizeof(lines[n]), "%s", DpLegendText());
         counts[n][0] = 0;
         colours[n] = DpUsable() ? IM_COL32(160, 230, 255, 255) : IM_COL32(255, 170, 90, 255);
         square[n++] = false;
@@ -8985,7 +9065,18 @@ struct DpStat { LONG calls, qualified, drawn, lines, tris, verts; };
 DpStat g_dpNow = {}, g_dpLast = {};
 char g_dpWhyNow[160] = "no scene drawn yet";
 float g_dpA = 0.0f, g_dpB = 0.0f, g_dpW = 1.0f, g_dpSign = 1.0f, g_dpZNear = 0.0f, g_dpZFar = 1.0f;
-int g_dpForm = 0;                            // 1 row vectors, 2 column vectors (the scene's view / projection)
+float g_dpK = 1.0f;                          // 0.17: signed scale scene z / 0.14 camera z' (0.16: always +-1)
+int g_dpForm = 0;                            // view convention kDpConvNames (0.16: 1 row, 2 column)
+int g_dpUsedIdx = -1;                        // 0.17: the qualifying scene of the frame the lines went into
+LONG g_dpAutoFrame = -1;                     // 0.17 DepthCall=-1 (auto): a scene of this frame mapped already
+volatile LONG g_dpDumpFrame = -1;            // 0.17 dbg.depthdump: the frame whose scene calls are dumped
+int g_dpDumpCount = 0;                       // scene calls dumped in that frame
+// 0.17 view conventions (live 2026-11-06, l3_main_bedroom: [scene+0x140] matched neither 0.16 form): 1 / 2 the 0.16
+// row / column forms, 3 / 4 the same with the point taken relative to the camera (a camera-relative view without
+// translation), 5 / 6 of the inverted matrix ([scene+0x140] = camera -> world); every form may carry a common scale k
+// = zv / z' (a scene in other units) that both test points must agree on - forms with k = +-1 are tried first
+const char *const kDpConvNames[7] = {"-", "row", "column", "row, camera-relative", "column, camera-relative",
+                                     "row of the inverse", "column of the inverse"};
 bool g_dpLess = true;                        // z grows with the distance: visible = LESSEQUAL
 bool g_dpFailed = false;                     // a D3D call failed: depth off until dbg.depth is switched again
 volatile LONG g_dpLogPending = 0;
@@ -9019,69 +9110,144 @@ DWORD DpArgb(ImU32 c) {
 float DpDepth(float zc) {
     float zb = zc - 2.0f - 0.004f * zc;
     if (zb < kDvNear) zb = kDvNear;
-    const float zv = g_dpSign * zb, z = (g_dpA * zv + g_dpB) / (g_dpW * zv);
+    const float zv = g_dpK * zb, z = (g_dpA * zv + g_dpB) / (g_dpW * zv);
     return z < 0.0f ? 0.0f : z > 1.0f ? 1.0f : z;
 }
-// the scene's view / projection against the 0.14 camera (see the section comment); false + why = no depth this frame
+// 0.17: general 4 x 4 inverse (as stored, 16 floats); false = singular
+bool DpInvert(const float *m, float *o) {
+    float inv[16];
+    inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
+    inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
+    inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+    inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+    inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+    inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+    inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+    inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+    inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+    inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+    inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+    inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+    inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+    inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+    inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+    inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+    float det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
+    if (!(fabsf(det) > 1.0e-20f)) return false;
+    for (int i = 0; i < 16; ++i) o[i] = inv[i] / det;
+    return DvFinite(o, 16);
+}
+// 0.17: the scene's z of world point p in view convention conv (kDpConvNames); Vi = the inverse (conv 5 / 6)
+float DpConvZ(int conv, const float *V, const float *Vi, const float *cam, const float *p) {
+    const float *M = conv >= 5 ? Vi : V;
+    float q[3] = {p[0], p[1], p[2]};
+    if (conv == 3 || conv == 4)
+        for (int k = 0; k < 3; ++k) q[k] -= cam[k];
+    return (conv & 1) ? M[2] * q[0] + M[6] * q[1] + M[10] * q[2] + M[14] : M[8] * q[0] + M[9] * q[1] + M[10] * q[2] + M[11];
+}
+// the test points of the mapping check (0.17: five, spread ahead / right / up of the 0.14 camera - two points along
+// the view could not tell the view forms apart, tools/trumenu_quick_check.py)
+const int kDpPts = 5;
+const float kDpAhead[kDpPts] = {1000.0f, 3000.0f, 2000.0f, 6000.0f, 4000.0f};
+const float kDpRight[kDpPts] = {0.0f, 700.0f, 0.0f, -1500.0f, 900.0f};
+const float kDpUp[kDpPts] = {0.0f, 0.0f, 700.0f, 0.0f, -1200.0f};
+bool DpTestPoints(const DvCam &c, float *cam, float pts[kDpPts][3], char *why, size_t n) {
+    if (!DvCamPos(c, cam)) { Out(why, n, "camera position not solvable"); return false; }
+    const float *m = c.v.m;
+    float f[3] = {m[2], m[6], m[10]}, r[3] = {m[0] * c.ux, m[4] * c.ux, m[8] * c.ux},   // depth gradient, unit right
+          u[3] = {m[1] * c.uy, m[5] * c.uy, m[9] * c.uy};                               // unit up (text space y)
+    float fl = sqrtf(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
+    if (!(fl > 0.5f && fl < 2.0f)) { Out(why, n, "camera depth row not a unit vector (%.3f)", fl); return false; }
+    for (int i = 0; i < kDpPts; ++i)
+        for (int k = 0; k < 3; ++k)
+            pts[i][k] = cam[k] + f[k] / (fl * fl) * kDpAhead[i] + r[k] * kDpRight[i] + u[k] * kDpUp[i];
+    return true;
+}
+// the scene's view / projection against the 0.14 camera (see the section comment); false + why = no depth this frame.
+// 0.17: every view form gets its least-squares scale k (scene z ~ k * z') over the five points; the form with the
+// smallest worst relative residual wins, and only when every point lies within 3 % + 5 units (the 0.16 tolerance)
 bool DpMapping(DWORD scene, const DvCam &c, char *why, size_t n) {
-    float P[16], V[16], cam[3];
+    float P[16], V[16], Vi[16], cam[3], pts[kDpPts][3];
     if (!ReadFloats(scene + kDpSceneProj, P, 16) || !ReadFloats(scene + kDpSceneView, V, 16) || !DvFinite(P, 16) ||
         !DvFinite(V, 16)) {
         Out(why, n, "scene matrices [scene+0x100 / +0x140] not readable");
         return false;
     }
-    if (!DvCamPos(c, cam)) { Out(why, n, "camera position not solvable"); return false; }
-    const float *m = c.v.m;
-    float f[3] = {m[2], m[6], m[10]}, r[3] = {m[0] * c.ux, m[4] * c.ux, m[8] * c.ux};   // depth gradient, unit right
-    float fl = sqrtf(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
-    if (!(fl > 0.5f && fl < 2.0f)) { Out(why, n, "camera depth row not a unit vector (%.3f)", fl); return false; }
-    float pts[2][3];
-    for (int k = 0; k < 3; ++k) {
-        pts[0][k] = cam[k] + f[k] / (fl * fl) * 1000.0f;
-        pts[1][k] = cam[k] + f[k] / (fl * fl) * 3000.0f + r[k] * 700.0f;
+    if (!DpTestPoints(c, cam, pts, why, n)) return false;
+    const bool invOk = DpInvert(V, Vi);
+    float zq[kDpPts];
+    for (int i = 0; i < kDpPts; ++i) {
+        float q[3];
+        DvToCam(c, pts[i], q);
+        zq[i] = q[2];
+        if (!(zq[i] > 100.0f)) { Out(why, n, "test points not in front of the camera"); return false; }
     }
-    int form = 0;
-    float sign = 1.0f;
-    for (int conv = 1; conv <= 2 && !form; ++conv) {
-        bool ok = true;
-        float s = 0.0f;
-        for (int i = 0; i < 2 && ok; ++i) {
-            const float *p = pts[i];
-            float zq[3];
-            DvToCam(c, p, zq);
-            float zv = conv == 1 ? V[2] * p[0] + V[6] * p[1] + V[10] * p[2] + V[14]
-                                 : V[8] * p[0] + V[9] * p[1] + V[10] * p[2] + V[11];
-            float si = zv < 0.0f ? -1.0f : 1.0f;
-            ok = zq[2] > 100.0f && fabsf(fabsf(zv) - zq[2]) <= 0.03f * zq[2] + 5.0f && (i == 0 || si == s);
-            s = si;
+    // candidates: forms whose five points lie within the tolerance; order = |k| = 1 first (the 0.16 rule - a scaled
+    // inverse is exactly as good as the transposed camera-relative form with 1 / k, tools/trumenu_quick_check.py),
+    // then the smaller worst residual; the first one whose projection also passes is used
+    struct Cand { int conv; float k, err; bool unit; };
+    Cand cand[6];
+    int nc = 0;
+    for (int conv = 1; conv <= 6; ++conv) {
+        if (conv >= 5 && !invOk) continue;
+        float z[kDpPts], sz = 0.0f, sq = 0.0f;
+        for (int i = 0; i < kDpPts; ++i) {
+            z[i] = DpConvZ(conv, V, Vi, cam, pts[i]);
+            sz += z[i] * zq[i];
+            sq += zq[i] * zq[i];
         }
-        if (ok) { form = conv; sign = s; }
+        const float k = sz / sq, ak = fabsf(k);
+        if (!(ak >= 1.0e-3f && ak <= 1.0e3f)) continue;
+        float err = 0.0f;
+        bool within = true;
+        for (int i = 0; i < kDpPts; ++i) {
+            const float d = fabsf(z[i] - k * zq[i]);
+            if (d / (ak * zq[i]) > err) err = d / (ak * zq[i]);
+            if (!(d <= 0.03f * ak * zq[i] + 5.0f * ak)) within = false;
+        }
+        if (!within) continue;
+        Cand c1 = {conv, k, err, fabsf(ak - 1.0f) <= 0.03f};
+        int at = nc++;
+        while (at > 0 && ((c1.unit && !cand[at - 1].unit) || (c1.unit == cand[at - 1].unit && c1.err < cand[at - 1].err))) {
+            cand[at] = cand[at - 1];
+            --at;
+        }
+        cand[at] = c1;
     }
-    if (!form) { Out(why, n, "scene view [scene+0x140] does not give the 0.14 camera's depth"); return false; }
-    float w = 0.0f, b = 0.0f;
-    if (fabsf(fabsf(P[11]) - 1.0f) <= 0.02f) { w = P[11]; b = P[14]; }        // row vectors: w = z * P23
-    else if (fabsf(fabsf(P[14]) - 1.0f) <= 0.02f) { w = P[14]; b = P[11]; }   // column vectors
-    if (w == 0.0f || !(fabsf(P[15]) < 1.0e-3f) || !(w * sign > 0.0f)) {
-        Out(why, n, "scene projection not perspective (P23 %.3f, P32 %.3f, P33 %.4f)", P[11], P[14], P[15]);
-        return false;
+    if (!nc) { Out(why, n, "scene view [scene+0x140] does not give the 0.14 camera's depth (6 forms tried)"); return false; }
+    for (int ci = 0; ci < nc; ++ci) {
+        const float kk = cand[ci].k, sign = kk < 0.0f ? -1.0f : 1.0f;
+        float w = 0.0f, b = 0.0f;
+        if (fabsf(fabsf(P[11]) - 1.0f) <= 0.02f) { w = P[11]; b = P[14]; }        // row vectors: w = z * P23
+        else if (fabsf(fabsf(P[14]) - 1.0f) <= 0.02f) { w = P[14]; b = P[11]; }   // column vectors
+        if (w == 0.0f || !(fabsf(P[15]) < 1.0e-3f) || !(w * sign > 0.0f)) {
+            Out(why, n, "scene projection not perspective (P23 %.3f, P32 %.3f, P33 %.4f; view %s, k %.4g)", P[11], P[14],
+                P[15], kDpConvNames[cand[ci].conv], kk);
+            continue;
+        }
+        const float a = P[10];
+        float zn = (a * kk * kDvNear + b) / (w * kk * kDvNear), z1 = (a * kk * 1000.0f + b) / (w * kk * 1000.0f),
+              zf = (a * kk * 50000.0f + b) / (w * kk * 50000.0f);
+        bool nearOk = (zn > -0.03f && zn < 0.05f) || (zn > 0.95f && zn < 1.03f);
+        bool mono = (zn < z1 && z1 < zf) || (zn > z1 && z1 > zf);
+        // 0.17: 16.5 .. 50000 units must span at least half of the depth range (a wrong scale squeezes it near 0 / 1)
+        if (!nearOk || !mono || !(zf > -0.05f && zf < 1.05f) || !(fabsf(zf - zn) >= 0.5f)) {
+            Out(why, n, "scene projection depth range odd (z(16.5) %.4f, z(1000) %.4f, z(50000) %.4f; view %s, k %.4g)", zn,
+                z1, zf, kDpConvNames[cand[ci].conv], kk);
+            continue;
+        }
+        g_dpA = a;
+        g_dpB = b;
+        g_dpW = w;
+        g_dpSign = sign;
+        g_dpK = kk;
+        g_dpForm = cand[ci].conv;
+        g_dpLess = z1 > zn;
+        g_dpZNear = zn;
+        g_dpZFar = zf;
+        return true;
     }
-    g_dpA = P[10];
-    g_dpB = b;
-    g_dpW = w;
-    g_dpSign = sign;
-    g_dpForm = form;
-    float zn = (g_dpA * sign * kDvNear + b) / (w * sign * kDvNear), z1 = (g_dpA * sign * 1000.0f + b) / (w * sign * 1000.0f),
-          zf = (g_dpA * sign * 50000.0f + b) / (w * sign * 50000.0f);
-    bool nearOk = (zn > -0.03f && zn < 0.05f) || (zn > 0.95f && zn < 1.03f);
-    bool mono = (zn < z1 && z1 < zf) || (zn > z1 && z1 > zf);
-    if (!nearOk || !mono || !(zf > -0.05f && zf < 1.05f)) {
-        Out(why, n, "scene projection depth range odd (z(16.5) %.4f, z(1000) %.4f, z(50000) %.4f)", zn, z1, zf);
-        return false;
-    }
-    g_dpLess = z1 > zn;
-    g_dpZNear = zn;
-    g_dpZFar = zf;
-    return true;
+    return false;                            // why = the last candidate's projection reason
 }
 bool DpVbReady(IDirect3DDevice9 *dev) {
     if (g_dpVb && g_dpVbDevice == dev) return true;
@@ -9274,6 +9440,64 @@ void DpDrawBuffer(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b, UINT w,
     g_dpNow.lines = b.lines;
     g_dpNow.tris = b.tris;
 }
+// 0.17 dbg.depthdump (coordinator, live 2026-11-06: the 0.16 mapping never accepted [scene+0x140]): one block in
+// TruMenu.log per PCScene::Draw call of ONE frame - the scene words +0xe0 .. +0x1fc as floats (projection +0x100, view
+// +0x140 and their neighbours), the target object, the 0.14 camera (0xe804a0) and the markup view (0xa038f0), focal,
+// scale, solved camera position, and for both test points z' of the camera against z of every view convention.
+// Render thread (inside the game's frame, after its Draw returned); reads only; at most 8 calls; never per frame.
+void DpDumpCall(DWORD scene, int call, const char *what, UINT w, UINT h) {
+    if (g_dpDumpCount >= 8) return;
+    ++g_dpDumpCount;
+    DWORD own = 0;
+    ReadDword(scene + kDpSceneTarget, &own);
+    Log(1, "0.17 depthdump frame %ld call %d: scene 0x%08lx - %s; [scene+0x1c0] 0x%08lx; target %ux%u (back buffer %ux%u)",
+        g_dpFrame, call, scene, what, own, w, h, g_bbWidth, g_bbHeight);
+    for (DWORD off = 0xe0; off < 0x200; off += 0x20) {
+        float v[8];
+        if (!ReadFloats(scene + off, v, 8)) { Log(1, "0.17 depthdump   +0x%03lx: not readable", off); continue; }
+        Log(1, "0.17 depthdump   +0x%03lx: %.6g %.6g %.6g %.6g  %.6g %.6g %.6g %.6g", off, v[0], v[1], v[2], v[3], v[4], v[5],
+            v[6], v[7]);
+    }
+    DvCam c;
+    char why[160] = "";
+    float cam[3] = {0, 0, 0}, pts[kDpPts][3], V[16], Vi[16];
+    if (!DvCamRead(&c, static_cast<float>(w ? w : g_bbWidth), static_cast<float>(h ? h : g_bbHeight))) {
+        Log(1, "0.17 depthdump   camera 0xe804a0 / focal not readable");
+        return;
+    }
+    if (call == 0 || g_dpDumpCount == 1) {   // the camera once per dump
+        const float *m = c.v.m;
+        for (int r = 0; r < 4; ++r)
+            Log(1, "0.17 depthdump   camera 0xe804a0 [%d..%d]: %.6g %.6g %.6g %.6g", r * 4, r * 4 + 3, m[r * 4], m[r * 4 + 1],
+                m[r * 4 + 2], m[r * 4 + 3]);
+        float mv[16];
+        if (ReadFloats(kViewMatrix, mv, 16))
+            for (int r = 0; r < 4; ++r)
+                Log(1, "0.17 depthdump   markup view 0xa038f0 [%d..%d]: %.6g %.6g %.6g %.6g", r * 4, r * 4 + 3, mv[r * 4],
+                    mv[r * 4 + 1], mv[r * 4 + 2], mv[r * 4 + 3]);
+        Log(1, "0.17 depthdump   focal %.6g, centre %.1f %.1f, scale %.4f %.4f, ux %.6g uy %.6g", c.v.f, c.v.cx, c.v.cy,
+            c.v.sx, c.v.sy, c.ux, c.uy);
+    }
+    if (!DpTestPoints(c, cam, pts, why, sizeof(why))) { Log(1, "0.17 depthdump   test points: %s", why); return; }
+    if (!ReadFloats(scene + kDpSceneView, V, 16)) { Log(1, "0.17 depthdump   view not readable"); return; }
+    bool invOk = DpInvert(V, Vi);
+    Log(1, "0.17 depthdump   camera position %.2f %.2f %.2f; inverse of +0x140 %s", cam[0], cam[1], cam[2],
+        invOk ? "ok" : "singular");
+    for (int i = 0; i < kDpPts; ++i) {
+        float q[3];
+        DvToCam(c, pts[i], q);
+        float z[7] = {};
+        for (int conv = 1; conv <= 6; ++conv) z[conv] = conv >= 5 && !invOk ? 0.0f : DpConvZ(conv, V, Vi, cam, pts[i]);
+        Log(1, "0.17 depthdump   point %d (%.1f %.1f %.1f): camera z' %.3f; scene z: row %.3f col %.3f rel-row %.3f "
+            "rel-col %.3f inv-row %.3f inv-col %.3f", i + 1, pts[i][0], pts[i][1], pts[i][2], q[2], z[1], z[2], z[3], z[4],
+            z[5], z[6]);
+    }
+    char mapWhy[160] = "";
+    bool mapped = DpMapping(scene, c, mapWhy, sizeof(mapWhy));
+    Log(1, "0.17 depthdump   mapping: %s%s", mapped ? "accepted, form " : "refused - ", mapped ? kDpConvNames[g_dpForm] : mapWhy);
+    if (mapped) Log(1, "0.17 depthdump   k %.6g, P22 %.6g, B %.6g, W %.6g, z(16.5) %.5f, z far %.5f", g_dpK, g_dpA, g_dpB,
+                    g_dpW, g_dpZNear, g_dpZFar);
+}
 // PCScene::Draw returned (RmSceneDrawHook, render thread): is this the scene to draw into, then the newest buffer
 void DpSceneEnd(void *self) {
     if (!g_dpMode || !g_dpOk || g_dpFailed) return;
@@ -9281,11 +9505,14 @@ void DpSceneEnd(void *self) {
     if (!dev) return;
     const LONG frame = g_dpFrame;
     if (frame != g_dpCallFrame) { g_dpCallFrame = frame; g_dpCallIdx = 0; }
+    const int callNo = static_cast<int>(g_dpNow.calls);
     ++g_dpNow.calls;
+    const bool dump = g_dpDumpFrame == frame;   // 0.17 dbg.depthdump: every call of this one frame
     const DWORD scene = reinterpret_cast<DWORD>(self);
     DWORD own = 0;
     if (!ReadDword(scene + kDpSceneTarget, &own) || own) {
         Out(g_dpWhyNow, sizeof(g_dpWhyNow), "the scene has a target object of its own ([scene+0x1c0] 0x%08lx)", own);
+        if (dump) DpDumpCall(scene, callNo, "not qualifying: own target object", 0, 0);
         return;
     }
     IDirect3DSurface9 *rt = nullptr, *ds = nullptr;
@@ -9295,23 +9522,37 @@ void DpSceneEnd(void *self) {
     if (!ok || rd.Width != g_bbWidth || rd.Height != g_bbHeight) {
         Out(g_dpWhyNow, sizeof(g_dpWhyNow), "render target 0 %ux%u, back buffer %ux%u", rd.Width, rd.Height, g_bbWidth,
             g_bbHeight);
+        if (dump) DpDumpCall(scene, callNo, "not qualifying: target size", rd.Width, rd.Height);
         return;
     }
     ok = SUCCEEDED(dev->GetDepthStencilSurface(&ds)) && ds && SUCCEEDED(ds->GetDesc(&dd));
     if (ds) ds->Release();
     if (!ok || dd.Width < rd.Width || dd.Height < rd.Height) {
         Out(g_dpWhyNow, sizeof(g_dpWhyNow), "no depth surface bound (or smaller than the target)");
+        if (dump) DpDumpCall(scene, callNo, "not qualifying: no depth surface", rd.Width, rd.Height);
         return;
     }
     ++g_dpNow.qualified;
-    if (g_dpCallIdx++ != g_dpCall) return;
+    if (dump) DpDumpCall(scene, callNo, "qualifying", rd.Width, rd.Height);
+    const int idx = g_dpCallIdx++;
+    // 0.17 DepthCall -1 (auto): the first qualifying scene of the frame whose view maps; else the DepthCall-th one
+    if (g_dpCall >= 0 ? idx != g_dpCall : g_dpAutoFrame == frame) return;
     DvCam c;
     if (!DvCamRead(&c, static_cast<float>(rd.Width), static_cast<float>(rd.Height))) {
         Out(g_dpWhyNow, sizeof(g_dpWhyNow), "camera not readable");
         return;
     }
-    if (!DpMapping(scene, c, g_dpWhyNow, sizeof(g_dpWhyNow))) return;
+    if (!DpMapping(scene, c, g_dpWhyNow, sizeof(g_dpWhyNow))) {
+        if (g_dpCall < 0) {                  // auto: name the scene that was refused (the last one wins)
+            char why[160];
+            strncpy_s(why, sizeof(why), g_dpWhyNow, _TRUNCATE);
+            Out(g_dpWhyNow, sizeof(g_dpWhyNow), "scene %d: %s", idx, why);
+        }
+        return;
+    }
     g_dpWhyNow[0] = 0;
+    g_dpAutoFrame = frame;
+    g_dpUsedIdx = idx;
     InterlockedExchange(&g_dpReady, frame);
     LONG p = -1;
     for (int tries = 0; tries < 4; ++tries) {   // the newest published buffer, marked as read (DpBeginFill skips it)
@@ -9328,17 +9569,24 @@ void DpTick() {
     InterlockedIncrement(&g_dpFrame);
     g_dpLast = g_dpNow;
     memset(&g_dpNow, 0, sizeof(g_dpNow));
+    // 0.17 dbg.depthdump: the dumped frame is over - one summary line (also when no scene call came: hook not patched)
+    if (g_dpDumpFrame >= 0 && g_dpFrame - g_dpDumpFrame >= 2) {
+        Log(1, "0.17 depthdump: frame %ld done - %d scene call(s) dumped (%ld calls, %ld qualifying in the last frame)%s",
+            g_dpDumpFrame, g_dpDumpCount, g_dpLast.calls, g_dpLast.qualified, g_dpDumpCount ? "" : " - no PCScene::Draw "
+            "came through the hook (needs dbg.depth on / dim, a debug view layer on, a loaded level)");
+        InterlockedExchange(&g_dpDumpFrame, -1);
+    }
     if (!g_dpMode) { Out(g_dpStateText, sizeof(g_dpStateText), "aus / off (lines on top)"); return; }
     if (!g_debugEnabled || !g_dpOk) Out(g_dpStateText, sizeof(g_dpStateText), "nicht verfuegbar / unavailable: %s",
                                         g_debugEnabled ? g_dpWhy : "[Debug] Enabled=0");
     else if (g_dpFailed) Out(g_dpStateText, sizeof(g_dpStateText), "aus nach D3D-Fehler / off after a D3D failure (log)");
     else if (!g_rmSlot[kRmScene].on) Out(g_dpStateText, sizeof(g_dpStateText), "wartet / waits: %s",
                                          g_rmWaitWhy[0] ? g_rmWaitWhy : "PCScene::Draw slot not patched yet");
-    else if (DpUsable() && g_dpLast.drawn)
-        Out(g_dpStateText, sizeof(g_dpStateText), "%s (scene %d of %ld qualifying, %ld calls; %s vectors, z %s, z(16.5) %.4f; "
-            "%ld lines, %ld faces)", kDpModeDe[g_dpMode], g_dpCall, g_dpLast.qualified, g_dpLast.calls,
-            g_dpForm == 1 ? "row" : "column", g_dpLess ? "LESSEQUAL" : "GREATEREQUAL", g_dpZNear, g_dpLast.lines,
-            g_dpLast.tris);
+    else if (DpUsable() && g_dpLast.drawn)   // 0.17: the scene used (DepthCall -1 = auto), view form, scale k
+        Out(g_dpStateText, sizeof(g_dpStateText), "%s (scene %d of %ld qualifying%s, %ld calls; view %s, k %.4g, z %s, "
+            "z(16.5) %.4f; %ld lines, %ld faces)", kDpModeDe[g_dpMode], g_dpUsedIdx, g_dpLast.qualified,
+            g_dpCall < 0 ? " (auto)" : "", g_dpLast.calls, kDpConvNames[g_dpForm >= 0 && g_dpForm <= 6 ? g_dpForm : 0], g_dpK,
+            g_dpLess ? "LESSEQUAL" : "GREATEREQUAL", g_dpZNear, g_dpLast.lines, g_dpLast.tris);
     else if (DpUsable()) Out(g_dpStateText, sizeof(g_dpStateText), "%s (scene ok, nothing to draw yet)", kDpModeDe[g_dpMode]);
     else Out(g_dpStateText, sizeof(g_dpStateText), "wartet, Linien oben / waits, lines on top: %s (%ld scene calls, %ld "
              "qualifying)", g_dpWhyNow, g_dpLast.calls, g_dpLast.qualified);
@@ -9351,6 +9599,16 @@ void DpTick() {
             InterlockedExchange(&g_dpLogPending, 0);
         }
     }
+}
+// 0.17: the legend row of the depth state - short English (the full text stays in dbg.style / dbg.depth / the log)
+const char *DpLegendText() {
+    static char text[64];
+    const char *mode = kDpModeNames[g_dpMode >= 0 && g_dpMode <= 2 ? g_dpMode : 0];
+    const char *why = !g_dpMode ? "" : (!g_debugEnabled || !g_dpOk) ? " (unavailable)" : g_dpFailed ? " (D3D error)"
+                    : !g_rmSlot[kRmScene].on ? " (waits)" : !DpUsable() ? " (waits, on top)"
+                    : !g_dpLast.drawn ? " (idle)" : "";
+    Out(text, sizeof(text), "Depth: %s%s", mode, why);
+    return text;
 }
 // load: the byte checks of precheck_016.txt (depth: section 1, Lara in: 2, owner units: 3)
 void ReadabilityCheck() {
@@ -9487,9 +9745,9 @@ int RmLegend(char (*lines)[112], ImU32 *colours, int n, int limit) {
     if (g_rmFlat && n < limit) {
         char passes[64];
         RmPassText(static_cast<DWORD>(g_rmPassMask), passes, sizeof(passes));
-        if (RmSlotsOn()) Out(lines[n], sizeof(lines[n]), "Flach / flat: Pass %s, %ld flach (T %ld / F %ld)", passes,
-                             g_rmLast.flatT + g_rmLast.flatM, g_rmLast.flatT, g_rmLast.flatM);
-        else Out(lines[n], sizeof(lines[n]), "Flach / flat: wartet / waits (%s)", g_rmWaitWhy[0] ? g_rmWaitWhy : "-");
+        // 0.17: short English (owner, live 2026-11-06)
+        if (RmSlotsOn()) Out(lines[n], sizeof(lines[n]), "Flat: pass %s, %ld draws", passes, g_rmLast.flatT + g_rmLast.flatM);
+        else Out(lines[n], sizeof(lines[n]), "Flat: waits");
         colours[n++] = IM_COL32(220, 220, 200, 255);
     }
     if (g_dvOn[kDvSlide] && n < limit) {
@@ -9497,18 +9755,24 @@ int RmLegend(char (*lines)[112], ImU32 *colours, int n, int limit) {
         WORD raw = 0;
         int deg = 0;
         if (ReadDword(kRcTuning, &tun) && tun && ReadWord(tun + kRcTuningAngle, &raw)) deg = static_cast<short>(raw);
-        Out(lines[n], sizeof(lines[n]), "rot = steiler als %d Grad (rutscht), orange = flacher", deg);
+        Out(lines[n], sizeof(lines[n]), "Slide: red > %d deg, orange flatter", deg);
         colours[n++] = IM_COL32(255, 150, 30, 255);
     }
     if (g_dvOn[kDvSlide] || g_dvOn[kDvEnemyColl]) {
         if (n < limit) {
-            Out(lines[n], sizeof(lines[n]), "%s", DpUsable() ? "Kollision mit Tiefe / with depth"
-                                                             : "Kollision liegt oben (durch Waende) / on top");
+            Out(lines[n], sizeof(lines[n]), "%s", DpUsable() ? "Collision: depth" : "Collision: on top");
             colours[n++] = IM_COL32(200, 200, 200, 230);
         }
     }
     return n;
 }
+
+// 0.17, defined in the section "---- 0.17 quick toggles" (and the depth dump item there)
+void QbComboText(WORD mask, char *o, size_t n);
+bool RunQuickOpen(const char *arg, char *o, size_t n);
+bool RunShotOnCine(const char *arg, char *o, size_t n);
+bool RunDpDump(const char *arg, char *o, size_t n);
+void PageCpPos();                            // the checkpoint list / positions (0.17)
 
 // menu page "Debug view": the same groups as the ring Spieler / Debug (master, level data, AI, Lara, display)
 void PageDebugView() {
@@ -9520,6 +9784,15 @@ void PageDebugView() {
     bool all = DvViewAny();
     if (TmCheckbox("Everything / Alles an / aus  [dbg.view]###dvall", &all)) RunDvView(all ? "1" : "0", o, sizeof(o));
     ImGui::TextWrapped("last frame: %s", DvAnyOn() ? g_dvState : "off");
+    {                                        // 0.17 quick-toggle bar + cutscene shot pairs
+        char combo[48], label[160];
+        QbComboText(g_qbButtons, combo, sizeof(combo));
+        bool qb = g_qbOpen != 0, oc = g_ocOn != 0;
+        Out(label, sizeof(label), "quick-toggle bar / Schnellschalter (pad: %s)  [quick.open]###qbopen", combo);
+        if (TmCheckbox(label, &qb)) RunQuickOpen(qb ? "1" : "0", o, sizeof(o));
+        if (TmCheckbox("cutscene shot pairs / Zwischensequenz-Fotos  [shot.oncine]###ocon", &oc))
+            RunShotOnCine(oc ? "1" : "0", o, sizeof(o));
+    }
     // 0.16 display (owner feedback after the first live run): first group - depth, opacity, fade, fill, labels, legend
     if (ImGui::TreeNodeEx("Display / Darstellung (0.16)###dvstyle", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::TextUnformatted("depth / Tiefe  [dbg.depth]:");
@@ -9532,7 +9805,9 @@ void PageDebugView() {
         if (!g_dpOk) ImGui::TextWrapped("depth unavailable: %s", g_dpWhy);
         ImGui::TextWrapped("depth: %s", g_dpStateText);
         ImGui::SliderInt("hidden parts / verdeckte Teile %  [Debug] DepthDim", &g_dpDim, 5, 80);
-        ImGui::SliderInt("scene / Szene  [Debug] DepthCall", &g_dpCall, 0, 7);
+        ImGui::SliderInt("scene / Szene (-1 = auto)  [Debug] DepthCall", &g_dpCall, -1, 7);
+        if (TmButton("depth diagnosis into the log / Tiefe-Diagnose ins Log  [dbg.depthdump]###dpdump"))
+            RunDpDump("", o, sizeof(o));
         ImGui::SliderInt("opacity / Deckkraft %  [dbg.alpha]###dvalpha", &g_dvAlpha, 10, 100);
         if (ImGui::IsItemDeactivatedAfterEdit()) { char a[16]; Out(a, sizeof(a), "%d", g_dvAlpha); RunDvAlpha(a, o, sizeof(o)); }
         ImGui::SliderInt("brightness / Helligkeit %  [dbg.bright]###dvbright", &g_dvBright, 30, 150);
@@ -9713,6 +9988,7 @@ void PageDebugView() {
         ImGui::TreePop();
     }
     // 0.16: legend + Persist note moved into "Display / Darstellung" (first group)
+    PageCpPos();                             // 0.17 checkpoint list + position bookmarks
 }
 
 // ---- favourites: [Favorites] Ids in TruMenu.ini (comma list of item ids; empty = kFavDefault) ----
@@ -11667,6 +11943,7 @@ bool RadFront();                              // radial menu, below: a window of
 // who runs shot.save / claude.mark: the ring, TruMenuInvoke on another thread (TruLink "menu"), else the menu / bar
 const char *ShotSource(const char *item) {
     if (g_radRunning) return "ring";
+    if (g_qbRunning) return "quick";          // 0.17 quick-toggle bar
     DWORD render = g_renderThread;
     if (render && GetCurrentThreadId() != render) return "TruLink";
     return item;
@@ -11788,6 +12065,46 @@ bool ShotRequest(const char *name, int ui, const char *source, char *file, size_
         lastRefusedLog = GetTickCount();
         Log(1, "shot: %s refused - %s", source, why);
     }
+    return ok;
+}
+
+// 0.17 shot.oncine: a pair <name>_clean (before TruMenu draws) + <name>_ui (after it) of the SAME Present - both queued
+// under one lock; pairs have a rate window of their own (MaxPerMinute pairs per minute; live 2026-11-06 the coordinator's
+// watcher script used up the shared 30 and manual shots were refused). Never waits.
+RateWindow g_shotPairRate = {};
+bool ShotRequestPair(const char *name, const char *source, char *file, size_t fileSize, char *why, size_t whySize) {
+    file[0] = why[0] = 0;
+    char clean[48], step[16], base[96];
+    ShotName(name, clean, sizeof(clean), false);
+    ShotStep(step, sizeof(step));
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    _snprintf_s(base, sizeof(base), _TRUNCATE, "shot_%02d%02d%02d_%s_%s", t.wHour, t.wMinute, t.wSecond, step, clean);
+    bool ok = true;
+    EnterCriticalSection(&g_shotLock);
+    if (!g_shotEnabled) { Out(why, whySize, "shots off ([Shot] Enabled=0)"); ok = false; }
+    else if (!g_device) { Out(why, whySize, "no d3d9 device hooked yet"); ok = false; }
+    else if (g_shotQueueCount > kShotQueueMax - 2) { Out(why, whySize, "busy (%d shots wait for a frame)", g_shotQueueCount); ok = false; }
+    else if (!RateAllow(g_shotPairRate, g_shotMaxPerMin, GetTickCount())) {   // own window: manual shots stay free
+        Out(why, whySize, "more than %d pairs per minute ([Shot] MaxPerMinute, counted apart from other shots)",
+            g_shotMaxPerMin);
+        ok = false;
+    }
+    if (ok) {
+        _snprintf_s(file, fileSize, _TRUNCATE, "%s_clean.png / _ui.png", base);
+        for (int k = 0; k < 2; ++k) {
+            ShotReq &r = g_shotQueue[g_shotQueueCount++];
+            _snprintf_s(r.file, sizeof(r.file), _TRUNCATE, "%s_%s.png", base, k ? "ui" : "clean");
+            strncpy_s(r.source, sizeof(r.source), source, _TRUNCATE);
+            r.ui = k != 0;
+            r.seq = InterlockedIncrement(&g_shotSeq);
+            InterlockedIncrement(&g_shotQueued);
+        }
+    } else {
+        ++g_shotRefused;
+    }
+    LeaveCriticalSection(&g_shotLock);
+    if (ok) Log(2, "shot: %s queued the pair %s", source, file);
     return ok;
 }
 
@@ -12910,6 +13227,24 @@ bool RunPauseSound(const char *arg, char *o, size_t n);
 void ValFreezeClock(char *o, size_t n);      // 0.10.4 (F7) shader clock items, defined after the sound items
 void ValClockState(char *o, size_t n);
 bool RunFreezeClock(const char *arg, char *o, size_t n);
+void ValQuickOpen(char *o, size_t n);        // 0.17 quick-toggle bar / cutscene shots / depth dump, defined below
+bool RunQuickOpen(const char *arg, char *o, size_t n);
+void ValQuickLang(char *o, size_t n);
+bool RunQuickLang(const char *arg, char *o, size_t n);
+void ValQuickStatus(char *o, size_t n);
+void ValShotOnCine(char *o, size_t n);
+bool RunShotOnCine(const char *arg, char *o, size_t n);
+void ValDpDump(char *o, size_t n);
+bool RunDpDump(const char *arg, char *o, size_t n);
+void ValDvCp(char *o, size_t n);             // 0.17 checkpoint list / position bookmarks, defined below
+bool RunDvCp(const char *arg, char *o, size_t n);
+bool RunDvCpAll(const char *arg, char *o, size_t n);
+void ValDvCpList(char *o, size_t n);
+bool RunDvCpGo(const char *arg, char *o, size_t n);
+void ValPos(char *o, size_t n);
+void ValPosList(char *o, size_t n);
+bool RunPosSave(const char *arg, char *o, size_t n);
+bool RunPosGo(const char *arg, char *o, size_t n);
 
 struct Item {
     const char *id, *type, *label;
@@ -13285,6 +13620,35 @@ const Item kItems[] = {
      ValDvEnclosing, RunDvEnclosing},
     {"dbg.style", "info", "0.16: the display settings (opacity, brightness, fade, fill, labels, Lara in, enclosing, marker "
                           "size) and the depth state", false, ValDvStyle, nullptr},
+    // 0.17 depth diagnostics, Schnellschalter (quick-toggle bar), cutscene shot pairs
+    {"dbg.depthdump", "action", "0.17: ONE block in TruMenu.log per PCScene::Draw call of the next frame - scene +0xe0 .. "
+                                "+0x1fc as floats, the 0.14 camera, both test points against every view form (needs "
+                                "dbg.depth on / dim and a layer on)", false, ValDpDump, RunDpDump},
+    {"quick.open", "bool", "0.17: Schnellschalter - the quick-toggle bar at the left edge ([Quick] OpenButtons, default View "
+                           "+ Start); the game keeps running, only D-pad / LB / RB belong to the bar while it is open",
+     false, ValQuickOpen, RunQuickOpen},
+    {"quick.lang", "action", "0.17 de|en: language of the bar ([Quick] Language; until the next start)", false, ValQuickLang,
+     RunQuickLang},
+    {"quick.status", "info", "0.17: bar state - open, page / row, combo and chord window, debug layers on, last action",
+     false, ValQuickStatus, nullptr},
+    {"shot.oncine", "bool", "0.17: shot pairs (clean + ui at once) when a cutscene starts - the game's cinematic test "
+                            "0x453f00 or the camera leaving the gameplay camera [manager+0xb80] ([Shot] OnCine, "
+                            "OnCinePairs, OnCineIntervalMs, OnCineSignal; until the next start)", false, ValShotOnCine,
+     RunShotOnCine},
+    // 0.17 checkpoint list (Lukas, live 2026-11-06) and position bookmarks (coordinator, live 2026-11-06)
+    {"dbg.cp", "action", "0.17 <intro id> [0|1]: the marker of one checkpoint on / off ([Debug] CheckpointHide)", false,
+     ValDvCp, RunDvCp},
+    {"dbg.cpall", "action", "0.17 0|1: 1 = every checkpoint marker shown, 0 = every checkpoint of the loaded units hidden",
+     false, ValDvCp, RunDvCpAll},
+    {"dbg.cplist", "info", "0.17: the checkpoints of the loaded units - intro id, owner unit, distance / height to Lara, "
+                           "ACTIVE, hidden", false, ValDvCpList, nullptr},
+    {"dbg.cpgo", "action", "0.17 <intro id>|active: flight on, then Lara to that checkpoint (cheat.flight 1 + player.goto as "
+                           "a two-step shortcut)", false, ValDvCp, RunDvCpGo},
+    {"pos.save", "action", "0.17 [name]: Lara's unit, live position, yaw, the unit's shift and origin into "
+                           "TruMenu.positions.txt next to tru.exe", false, ValPos, RunPosSave},
+    {"pos.list", "info", "0.17: the saved positions (TruMenu.positions.txt)", false, ValPosList, nullptr},
+    {"pos.go", "action", "0.17 <name>|last: Lara to a saved position - only when its unit is loaded, converted with the "
+                         "unit's shift then and now; otherwise refused with the reason", true, ValPos, RunPosGo},
 };
 
 const Item *FindItem(const char *id) {
@@ -15096,6 +15460,70 @@ const char *RadialWhy(const RadItem &e) {
 }
 
 // bool item without an argument: its value is "on"
+// 0.17 (Lukas, live 2026-11-06: "Tiefe steht auf an, richtig? Im Radial aendert sich da nichts mehr"): the current
+// value of the items that set a value by preset (ring entries "Tiefe: an", "Deckkraft 60", "Flug-Tempo 20", ...) - short,
+// DE or EN; false = no value item. Read from the items' own variables (the same state the menu / ring / bar switch).
+bool ItemValueShort(const char *id, bool de, char *o, size_t n) {
+    o[0] = 0;
+    if (!_stricmp(id, "dbg.depth")) {
+        int m = g_dpMode >= 0 && g_dpMode <= 2 ? static_cast<int>(g_dpMode) : 0;
+        const char *state = !m || DpUsable() ? "" : de ? " (wartet)" : " (waits)";
+        Out(o, n, "%s%s", de ? kDpModeDe[m] : kDpModeNames[m], state);
+    } else if (!_stricmp(id, "dbg.alpha")) Out(o, n, "%d%%", g_dvAlpha);
+    else if (!_stricmp(id, "dbg.bright")) Out(o, n, "%d%%", g_dvBright);
+    else if (!_stricmp(id, "dbg.enclosing")) {
+        static const char *const kDe[3] = {"normal", "blass", "aus"};
+        int m = g_dvEncl >= 0 && g_dvEncl <= 2 ? g_dvEncl : 0;
+        Out(o, n, "%s", de ? kDe[m] : kDvEnclNames[m]);
+    } else if (!_stricmp(id, "cheat.speed")) Out(o, n, "%.0f", g_flightSpeed);
+    else if (!_stricmp(id, "dbg.flatpasses")) RmPassText(static_cast<DWORD>(g_rmPassMask), o, n);
+    else if (!_stricmp(id, "dbg.flatcolour")) Out(o, n, "%s", g_rmColourMode ? "class" : "material");
+    else if (!_stricmp(id, "dbg.namecolour")) {
+        Out(o, n, "%06lX", g_dvNameRgb);
+        for (const DvColourPreset &c : kDvNameColours)
+            if (c.rgb == g_dvNameRgb) Out(o, n, "%s", de ? c.de : c.name);
+    } else if (!_stricmp(id, "dbg.namesize")) Out(o, n, "%.2gx", g_dvNameScale);
+    else if (!_stricmp(id, "quick.lang")) Out(o, n, "%s", g_qbLang ? "EN" : "DE");
+    else return false;
+    return true;
+}
+// 0.17: a preset entry "<value item> <arg>" is the current value (numbers compared as numbers, words case-insensitive;
+// dbg.depth / dbg.enclosing also by their German words)
+bool ItemArgActive(const char *id, const char *arg) {
+    if (!arg || !arg[0]) return false;
+    char a[48];
+    strncpy_s(a, sizeof(a), arg, _TRUNCATE);
+    DvTrim(a);
+    if (!_stricmp(id, "dbg.depth")) {
+        for (int i = 0; i < 3; ++i)
+            if (!_stricmp(a, kDpModeNames[i]) || !_stricmp(a, kDpModeDe[i])) return g_dpMode == i;
+        return false;
+    }
+    if (!_stricmp(id, "dbg.enclosing")) {
+        static const char *const kDe[3] = {"normal", "blass", "aus"};
+        for (int i = 0; i < 3; ++i)
+            if (!_stricmp(a, kDvEnclNames[i]) || !_stricmp(a, kDe[i])) return g_dvEncl == i;
+        return false;
+    }
+    if (!_stricmp(id, "dbg.alpha")) return atoi(a) == g_dvAlpha;
+    if (!_stricmp(id, "dbg.bright")) return atoi(a) == g_dvBright;
+    if (!_stricmp(id, "cheat.speed")) return fabsf(static_cast<float>(atof(a)) - g_flightSpeed) < 0.05f;
+    if (!_stricmp(id, "dbg.namesize")) return fabsf(static_cast<float>(atof(a)) - g_dvNameScale) < 0.005f;
+    if (!_stricmp(id, "dbg.flatcolour")) return !_stricmp(a, g_rmColourMode ? "class" : "material");
+    if (!_stricmp(id, "dbg.namecolour")) {
+        for (const DvColourPreset &c : kDvNameColours)
+            if (!_stricmp(a, c.name) || !_stricmp(a, c.de)) return c.rgb == g_dvNameRgb;
+        return false;
+    }
+    if (!_stricmp(id, "dbg.flatpasses")) {
+        char *end = nullptr;
+        DWORD mask = strtoul(a, &end, 0);
+        return end && !*end && mask == static_cast<DWORD>(g_rmPassMask);
+    }
+    if (!_stricmp(id, "quick.lang")) return !_stricmp(a, g_qbLang ? "en" : "de");
+    return false;
+}
+
 bool RadialOn(const RadItem &e, bool *isBool) {
     if (e.special == kRadSpecialVirt && e.vkind == kRaToggle) { *isBool = true; return e.von != 0; }   // 0.10.1 Schalter
     // 0.12: "nav.draw <switch>" (one word) shows on / off of that NavPower switch byte; RadialRun adds the target state
@@ -16271,11 +16699,21 @@ void DrawRadial() {
         if (n > 1 && arc < width) width = arc;
         bool isBool = false;
         bool on = RadialOn(e, &isBool);
+        // 0.17 (Lukas, live 2026-11-06): a preset entry of a value item shows the current value - green "= an" when it is
+        // the active one, grey "jetzt 60%" otherwise; switches show an / aus (the ring is German)
+        char valueText[48], valueLine[64] = "";
+        bool preset = !isBool && !grey && e.child < 0 && !e.special && e.arg[0] &&
+                      ItemValueShort(e.id, true, valueText, sizeof(valueText));
+        bool active = preset && ItemArgActive(e.id, e.arg);
+        if (preset) _snprintf_s(valueLine, sizeof(valueLine), _TRUNCATE, "%s%s", active ? "= " : "jetzt ", valueText);
         ImU32 col = grey ? IM_COL32(150, 150, 150, 255) : claude ? IM_COL32(255, 255, 255, 255) : IM_COL32(240, 240, 240, 255);
-        RadText(dl, font, size, ImVec2(at.x, at.y - (isBool || grey ? size * 0.45f : 0.0f)), col, text, width);
+        RadText(dl, font, size, ImVec2(at.x, at.y - (isBool || grey || preset ? size * 0.45f : 0.0f)), col, text, width);
         if (isBool && !grey)
             RadText(dl, font, size * 0.85f, ImVec2(at.x, at.y + size * 1.0f),
-                    on ? IM_COL32(110, 230, 120, 255) : IM_COL32(170, 170, 170, 255), on ? "on" : "off", width);
+                    on ? IM_COL32(110, 230, 120, 255) : IM_COL32(170, 170, 170, 255), on ? "an" : "aus", width);
+        else if (preset)
+            RadText(dl, font, size * 0.8f, ImVec2(at.x, at.y + size * 1.0f),
+                    active ? IM_COL32(110, 230, 120, 255) : IM_COL32(170, 170, 170, 255), valueLine, width);
         else if (grey)
             RadText(dl, font, size * 0.75f, ImVec2(at.x, at.y + size * 1.0f), IM_COL32(220, 120, 100, 255), "n/a", width);
     }
@@ -16600,6 +17038,1189 @@ void PageMarkup() {
                        "(20), orange rope (19) - catalog bit names, not verified. If lines sit off, adjust the "
                        "projected size (default 512 x 448).");
     Todo("draw.collision / portals / triggers (catalog section 7).");
+}
+
+// ---- 0.17 quick toggles ----
+// Schnellschalter (owner wish 2026-11-06, TODO.md "Ideen"; workspace docs\Befund-TruMenu-Schnellschalter-0611.md): a third
+// control next to the long menu and the ring, for switching the debug view while playing - a small panel at the LEFT
+// screen edge (the legend sits top right), the game keeps running (no freeze, no neutral pad). [Quick] OpenButtons
+// (default View + Start = 0x0030) opens / closes it; while it is open D-pad up / down picks a row, left / right switches
+// off / on (a value row: one step down / up), LB / RB changes the page. Only those buttons are kept from the game while
+// it is open (OnPad -> QbPad: masked in the state the game gets; a button held at the close stays away until released).
+// The combo itself never reaches the game: a lone combo button is held back for [Quick] ChordMs (the other one may
+// follow); released inside that window the game gets it as a 100 ms tap at once, held longer it gets it late (as held).
+// Why View + Start: every pad button is bound in the PC input map (generalbank DTP 47, tools/input_map_find.py, logs
+// r17_input_map_pc.txt): D-pad = set 0 / 2 / 18, LB / RB = sets 0 / 1 / 2 / 17 / 19 (gameplay), L3 + R3 = TruMenu's
+// menu / ring (and a chord of set 0); View (code 0xb: actions 10 / 71 / 89) and Start (0xa: action 9) are menu buttons
+// (pause / PDA) - a 250 ms delay on them costs nothing in play, and no binding uses View and Start together.
+// Rows: no state of their own - every row runs the existing item through InvokeCore (as the ring: game-thread items are
+// queued) and reads its state the ring's way (RadialOn / RadialWhy / ItemValueShort), so menu, ring and bar always agree.
+// One "quick: <page> / <row> -> <item> <arg>: <answer>" line per action (the item's own line as well); no per-frame log.
+enum QbKind { kQbBool = 0, kQbValue, kQbAction };
+enum QbCount { kQcNone = 0, kQcLayer, kQcTriggers, kQcTrgLabels, kQcLaraIn, kQcEncl, kQcLabels, kQcMarkup, kQcFlat, kQcOn,
+               kQcCine };
+enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvPass, kQvLang };
+struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; };   // colour 0 = the layer's
+struct QbPage { const char *de, *en; const QbRow *rows; int n; };
+const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230, 255, 255),
+            kQbPlayer = IM_COL32(255, 205, 120, 255), kQbGrey = IM_COL32(200, 200, 200, 255),
+            kQbFlat = IM_COL32(220, 220, 200, 255), kQbThrall = IM_COL32(255, 170, 170, 255),
+            kQbMarkup = IM_COL32(120, 230, 140, 255);
+// the pages in the order of the menu / ring groups (Spieler/Debug, Darstellung, Render, Leveldaten, KI / Namen / Lara)
+const QbRow kQbDebug[] = {
+    {"Alles an / aus", "Everything", "dbg.view", "", kQbBool, -1, kQcOn, 0, kQbWhite},
+    {"Legende", "Legend", "dbg.legend", "", kQbBool, -1, kQcNone, 0, kQbWhite},
+    {"Fliegen", "Flight", "cheat.flight", "", kQbBool, -1, kQcNone, 0, kQbPlayer},
+    {"Flug-Tempo", "Flight speed", "cheat.speed", "", kQbValue, -1, kQcNone, kQvSpeed, kQbPlayer},
+    {"Zwischensequenz-Fotos", "Cutscene shots", "shot.oncine", "", kQbBool, -1, kQcCine, 0, kQbPlayer},
+    {"Sprache", "Language", "quick.lang", "", kQbValue, -1, kQcNone, kQvLang, kQbGrey},
+};
+const QbRow kQbStyle[] = {
+    {"Tiefe", "Depth", "dbg.depth", "", kQbValue, -1, kQcNone, kQvDepth, kQbBlue},
+    {"Deckkraft", "Opacity", "dbg.alpha", "", kQbValue, -1, kQcNone, kQvAlpha, kQbBlue},
+    {"Helligkeit", "Brightness", "dbg.bright", "", kQbValue, -1, kQcNone, kQvBright, kQbBlue},
+    {"Ferne blasser", "Far fainter", "dbg.fade", "", kQbBool, -1, kQcNone, 0, kQbBlue},
+    {"Flaechen fuellen", "Face fill", "dbg.fill", "", kQbBool, -1, kQcNone, 0, kQbBlue},
+    {"Kurze Namen", "Short labels", "dbg.short", "", kQbBool, -1, kQcNone, 0, kQbBlue},
+    {"Lara drin", "Lara in", "dbg.larain", "", kQbBool, -1, kQcLaraIn, 0, kQbWhite},
+    {"Umhuellende", "Enclosing", "dbg.enclosing", "", kQbValue, -1, kQcEncl, kQvEncl, kQbBlue},
+};
+const QbRow kQbRender[] = {
+    {"Flach-Ansicht", "Flat view", "dbg.flat", "", kQbBool, -1, kQcFlat, 0, kQbFlat},
+    {"Pass", "Pass", "dbg.flatpasses", "", kQbValue, -1, kQcNone, kQvPass, kQbFlat},
+    {"Zaehlung", "Census", "dbg.census", "", kQbAction, -1, kQcNone, 0, kQbFlat},
+    {"Rutschflaechen", "Slide faces", "dbg.slide", "", kQbBool, kDvSlide, kQcLayer, 0, 0},
+    {"Gegner-Kollision", "Enemy collision", "dbg.enemycoll", "", kQbBool, kDvEnemyColl, kQcLayer, 0, 0},
+};
+const QbRow kQbLevel[] = {
+    {"Alle Trigger", "All triggers", "dbg.triggers", "", kQbBool, -1, kQcTriggers, 0, kQbWhite},
+    {"Tod", "Death", "dbg.show", "death", kQbBool, kDvDeath, kQcLayer, 0, 0},
+    {"Feuer", "Fire", "dbg.show", "fire", kQbBool, kDvFire, kQcLayer, 0, 0},
+    {"Checkpoint-Trigger", "Checkpoint trg", "dbg.show", "checkpoint", kQbBool, kDvCheckpoint, kQcLayer, 0, 0},
+    {"Wasser", "Water", "dbg.show", "water", kQbBool, kDvWater, kQcLayer, 0, 0},
+    {"Ton", "Sound", "dbg.show", "sound", kQbBool, kDvSound, kQcLayer, 0, 0},
+    {"Trigger", "Trigger", "dbg.show", "volume", kQbBool, kDvVolume, kQcLayer, 0, 0},
+    {"Ebenen", "Planes", "dbg.show", "plane", kQbBool, kDvPlane, kQcLayer, 0, 0},
+    {"Unbekannt", "Unknown", "dbg.show", "unknown", kQbBool, kDvUnknown, kQcLayer, 0, 0},
+    {"Ladebereiche", "Loading areas", "dbg.portals", "", kQbBool, kDvPortals, kQcLayer, 0, 0},
+    {"Checkpoints", "Checkpoints", "dbg.checkpoints", "", kQbBool, kDvCheckpoints, kQcLayer, 0, 0},
+    {"Trigger-Namen", "Labels", "dbg.show", "trglabels", kQbBool, kDvTrgLabels, kQcTrgLabels, 0, 0},
+};
+const QbRow kQbAi[] = {
+    {"Thrall-Labels", "Thrall labels", "dbg.labels", "", kQbBool, -1, kQcLabels, 0, kQbThrall},
+    {"Objektnamen", "Object names", "dbg.names", "", kQbBool, kDvNames, kQcLayer, 0, 0},
+    {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},
+    {"Nur Kanten", "Ledges only", "draw.ledges", "", kQbBool, -1, kQcNone, 0, kQbMarkup},
+};
+#define QB_PAGE(de, en, rows) {de, en, rows, static_cast<int>(sizeof(rows) / sizeof(rows[0]))}
+const QbPage kQbPages[] = {QB_PAGE("Debug", "Debug", kQbDebug), QB_PAGE("Darstellung", "Display", kQbStyle),
+                           QB_PAGE("Render", "Render", kQbRender), QB_PAGE("Leveldaten", "Level data", kQbLevel),
+                           QB_PAGE("KI / Namen / Lara", "AI / names / Lara", kQbAi)};
+#undef QB_PAGE
+const int kQbPageN = static_cast<int>(sizeof(kQbPages) / sizeof(kQbPages[0]));
+const int kQbStartPage = 3;                  // Leveldaten: the layers are what the bar is mostly for
+int g_qbPage = kQbStartPage, g_qbRow[8] = {};  // render thread; kept over a close
+int g_qbShowClosed = 1, g_qbTop = 30;        // [Quick] ShowClosed / Top (percent of the screen height)
+float g_qbScale = 1.0f;                      // [Quick] Scale
+LONG g_qbToggles = 0, g_qbTaps = 0, g_qbLate = 0, g_qbRuns = 0;   // quick.status counters
+char g_qbResult[240] = "";                   // the last row's answer (shown 5 s)
+bool g_qbResultErr = false;
+DWORD g_qbResultTick = 0;
+const DWORD kQbTapMs = 100;                  // a combo button released inside the chord window: the game's tap
+struct QbPadState { WORD prev, gated, passed, owned, inject; DWORD gateFrom, injectUntil; bool latched; };
+QbPadState g_qbPad[4];
+
+// "View + Start" for a button mask (the input trace's button names)
+void QbComboText(WORD mask, char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    for (const PadBitName &b : kPadBits)
+        if (mask & b.mask) LabelAdd(o, n, &used, "%s%s", used ? " + " : "", b.name);
+    if (!used) Out(o, n, "-");
+}
+
+// pad side (game thread in PadHook, or SelfPoll on the render thread): the combo with its chord window, the buttons the
+// open bar owns. active = the game gets the real pad (menu / ring closed, no TruMenu neutral pad). Returns the buttons
+// to clear in the state the game gets; *inject = buttons to set (a short tap of a combo button released early).
+WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject) {
+    *inject = 0;
+    if (index > 3) return 0;
+    const WORD combo = g_qbEnabled ? g_qbButtons : 0;
+    const DWORD now = GetTickCount();
+    bool toggled = false, nowOpen = false;
+    WORD clear = 0;
+    EnterCriticalSection(&g_padLock);
+    QbPadState &s = g_qbPad[index];
+    const WORD c = static_cast<WORD>(buttons & combo);
+    const WORD down = static_cast<WORD>(c & ~s.prev), up = static_cast<WORD>(s.prev & ~c);
+    s.prev = c;
+    if (s.latched) {                         // after a toggle: the combo stays away from the game until all are up
+        if (c) clear |= c;
+        else s.latched = false;
+    } else if (!active || !combo) {          // the menu / ring own the pad (or the bar is off): no chord window
+        s.gated = 0;
+        s.gateFrom = 0;
+        s.passed = c;
+    } else if (c == combo && down) {         // the whole combo, the last of its buttons just now: open / close
+        toggled = true;
+        s.latched = true;
+        s.gated = s.passed = 0;
+        s.gateFrom = 0;
+        clear |= c;
+    } else {
+        WORD fresh = static_cast<WORD>(down & ~s.passed);
+        if (fresh) {
+            if (!s.gated) s.gateFrom = now;
+            s.gated |= fresh;
+        }
+        WORD tap = static_cast<WORD>(up & s.gated);
+        if (tap) {                           // released inside the window: the game gets it now as a short tap
+            s.inject |= tap;
+            s.injectUntil = now + kQbTapMs;
+            s.gated &= static_cast<WORD>(~tap);
+            ++g_qbTaps;
+        }
+        if (s.gated && now - s.gateFrom >= static_cast<DWORD>(g_qbChordMs)) {   // held alone too long: the game gets it
+            s.passed |= s.gated;
+            s.gated = 0;
+            ++g_qbLate;
+        }
+        if (!s.gated) s.gateFrom = 0;
+        clear |= s.gated;
+    }
+    s.passed &= c;
+    if (s.inject) {
+        if (static_cast<LONG>(now - s.injectUntil) < 0) *inject = s.inject;
+        else s.inject = 0;
+    }
+    if (toggled) {
+        nowOpen = !g_qbOpen;
+        InterlockedExchange(&g_qbOpen, nowOpen ? 1 : 0);
+        if (nowOpen) InterlockedExchange(&g_qbJust, 1);
+        ++g_qbToggles;
+    }
+    // while the bar is open D-pad / LB / RB stay away from the game; one held at the close stays away until released
+    if (g_qbOpen && active) s.owned |= static_cast<WORD>(buttons & kQbOwn);
+    s.owned &= buttons;
+    clear |= s.owned;
+    LeaveCriticalSection(&g_padLock);
+    if (toggled) {
+        char text[48];
+        QbComboText(combo, text, sizeof(text));
+        Log(1, "quick: %s (pad %lu: %s)", nowOpen ? "opened" : "closed", index, text);
+    }
+    return static_cast<WORD>(clear & ~*inject);
+}
+
+// the ring's own view of a row (RadialOn / RadialWhy take a ring entry): no second copy of any state
+void QbEntry(const QbRow &r, RadItem *e) {
+    memset(e, 0, sizeof(*e));
+    strncpy_s(e->id, sizeof(e->id), r.id, _TRUNCATE);
+    strncpy_s(e->arg, sizeof(e->arg), r.arg, _TRUNCATE);
+    strncpy_s(e->label, sizeof(e->label), r.de, _TRUNCATE);
+    e->child = -1;
+    e->bad = "";
+}
+bool QbRowOn(const QbRow &r) {
+    RadItem e;
+    QbEntry(r, &e);
+    bool isBool = false;
+    return RadialOn(e, &isBool);
+}
+const char *QbWhy(const QbRow &r) {
+    RadItem e;
+    QbEntry(r, &e);
+    return RadialWhy(e);
+}
+// value rows: the steps left / right walk through (as the item's argument), the step of the current value
+int QbValueCount(int val) {
+    return val == kQvDepth || val == kQvEncl ? 3 : val == kQvAlpha ? 10 : val == kQvBright ? 13 : val == kQvSpeed ? 5
+         : val == kQvPass ? kRmPassN : val == kQvLang ? 2 : 0;
+}
+const int kQbSpeeds[5] = {5, 10, 20, 40, 80};
+void QbValueArg(int val, int i, char *o, size_t n) {
+    switch (val) {
+    case kQvDepth: Out(o, n, "%s", kDpModeNames[i]); break;
+    case kQvAlpha: Out(o, n, "%d", (i + 1) * 10); break;
+    case kQvBright: Out(o, n, "%d", 30 + i * 10); break;
+    case kQvEncl: Out(o, n, "%s", kDvEnclNames[i]); break;
+    case kQvSpeed: Out(o, n, "%d", kQbSpeeds[i]); break;
+    case kQvPass: Out(o, n, "%s", kRmPassNames[i]); break;
+    case kQvLang: Out(o, n, "%s", i ? "en" : "de"); break;
+    default: o[0] = 0;
+    }
+}
+int QbValueNow(int val) {
+    int v = 0;
+    switch (val) {
+    case kQvDepth: v = static_cast<int>(g_dpMode); break;
+    case kQvAlpha: v = (g_dvAlpha + 5) / 10 - 1; break;
+    case kQvBright: v = (g_dvBright - 30 + 5) / 10; break;
+    case kQvEncl: v = g_dvEncl; break;
+    case kQvSpeed:
+        for (int i = 0; i < 5; ++i)
+            if (fabsf(g_flightSpeed - static_cast<float>(kQbSpeeds[i])) < fabsf(g_flightSpeed - static_cast<float>(kQbSpeeds[v])))
+                v = i;
+        break;
+    case kQvPass:
+        for (int i = kRmPassN - 1; i >= 0; --i)
+            if (static_cast<DWORD>(g_rmPassMask) & kRmPassIds[i]) v = i;   // the first pass id of the mask in table order
+        break;
+    case kQvLang: v = g_qbLang; break;
+    default: break;
+    }
+    int count = QbValueCount(val);
+    return v < 0 ? 0 : v >= count ? count - 1 : v;
+}
+// debug view layers drawing now (the collapsed line, row "Alles an / aus"): the 0.14 / 0.15 layers without the legend,
+// Thrall-Labels, markup, flat view
+int QbLayersOn() {
+    int on = 0;
+    for (int i = 0; i < kDvCount; ++i)
+        if (i != kDvLegend && g_dvOn[i]) ++on;
+    return on + (g_lblOn ? 1 : 0) + (g_drawMarkup ? 1 : 0) + (g_rmFlat ? 1 : 0);
+}
+struct OcState { bool active, armed; int burst, pairs, refused; DWORD start, next, offSince; char lastWhy[160]; };
+OcState g_oc = {false, true, 0, 0, 0, 0, 0, 0, ""};   // 0.17 cutscene shots (section below)
+LONG g_ocBursts = 0;
+// the count column (what the layer drew in the last frame), "" = none
+void QbCountText(const QbRow &r, bool on, char *o, size_t n) {
+    o[0] = 0;
+    int v = -1;
+    switch (r.count) {
+    case kQcLayer: if (on && r.layer >= 0) v = g_dvDrawn[r.layer]; break;
+    case kQcTriggers:
+        if (on) { v = 0; for (int i = 0; i < kDvKinds; ++i) v += g_dvDrawn[i]; }
+        break;
+    case kQcTrgLabels: if (on) v = g_dvTagTrg; break;
+    case kQcLaraIn: if (on && DvAnyTrigger()) v = g_dvInN + g_dvInMore; break;
+    case kQcEncl: if (DvAnyTrigger()) v = g_dvEnclN; break;
+    case kQcLabels: if (on) v = g_lblShown; break;
+    case kQcMarkup: if (on) v = g_drawnBoxes; break;
+    case kQcFlat: if (on) v = static_cast<int>(g_rmLast.flatT + g_rmLast.flatM); break;
+    case kQcOn: v = QbLayersOn(); break;
+    case kQcCine: if (g_ocBursts || g_oc.active) v = static_cast<int>(g_ocBursts); break;
+    default: break;
+    }
+    if (v >= 0) Out(o, n, "%d", v);
+}
+void QbResult(bool err, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    _vsnprintf_s(g_qbResult, sizeof(g_qbResult), _TRUNCATE, fmt, ap);
+    va_end(ap);
+    g_qbResultErr = err;
+    g_qbResultTick = GetTickCount();
+}
+// one row, left (dir -1) or right (+1): the item with the target state / the next value / the action (right only)
+void QbAct(int page, int row, int dir) {
+    const QbRow &r = kQbPages[page].rows[row];
+    const bool de = g_qbLang == 0;
+    const char *name = de ? r.de : r.en;
+    const char *why = QbWhy(r);
+    if (why[0]) { QbResult(true, "%s: %s", name, why); return; }   // greyed: say why, run nothing
+    char arg[96] = "";
+    if (r.kind == kQbBool) {
+        bool want = dir > 0, on = QbRowOn(r);
+        if (on == want) {
+            QbResult(false, "%s: %s", name, de ? (on ? "schon an" : "schon aus") : (on ? "already on" : "already off"));
+            return;
+        }
+        _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%s%s%s", r.arg, r.arg[0] ? " " : "", want ? "1" : "0");
+    } else if (r.kind == kQbValue) {
+        int next = QbValueNow(r.val) + dir;
+        if (next < 0 || next >= QbValueCount(r.val)) { QbResult(false, "%s: %s", name, de ? "Ende" : "end"); return; }
+        QbValueArg(r.val, next, arg, sizeof(arg));
+    } else {
+        if (dir < 0) { QbResult(false, "%s: %s", name, de ? "rechts = starten" : "right = start"); return; }
+        strncpy_s(arg, sizeof(arg), r.arg, _TRUNCATE);
+    }
+    g_qbRunning = true;                      // src=quick in the item's own log line
+    const char *answer = InvokeCore(r.id, arg, false);
+    g_qbRunning = false;
+    ++g_qbRuns;
+    Log(1, "quick: %s / %s -> %s%s%s: %.200s", kQbPages[page].de, r.de, r.id, arg[0] ? " " : "", arg, answer);
+    bool ok = !strncmp(answer, "ok", 2);
+    const char *text = answer + (ok ? 2 : 3);
+    while (*text == ' ') ++text;
+    QbResult(!ok, "%s: %s", name, text);
+}
+
+// 0.17 checkpoint page (Lukas' checkpoint list, "if it fits"): one page more after the static ones while the checkpoint
+// checks passed - its rows are the checkpoints of the last bar frame (section "---- 0.17 checkpoint list")
+int QbPageCount() { return kQbPageN + (g_dvCpOk ? 1 : 0); }
+const char *QbPageName(int page, bool de) {
+    if (page == kQbPageN) return "Checkpoints";
+    if (page < 0 || page >= kQbPageN) return "?";
+    return de ? kQbPages[page].de : kQbPages[page].en;
+}
+int QbCpRows();                              // below
+void QbCpAct(int row, int dir);
+void DrawQuickCp(float x0, float y0);
+
+// render thread, every Present (Render, before its early return): the open bar's input from the raw pad (g_pad, before
+// QbPad masks it for the game) - edges of D-pad / LB / RB, a held D-pad direction repeats after 400 ms every 120 ms
+void QuickTick() {
+    static WORD prev = 0;
+    static DWORD repeatAt = 0;
+    PadState pad = {};
+    EnterCriticalSection(&g_padLock);
+    bool have = g_padConnected[g_lastPad];
+    if (have) pad = g_pad[g_lastPad];
+    LeaveCriticalSection(&g_padLock);
+    const WORD b = have ? static_cast<WORD>(pad.wButtons & kQbOwn) : 0;
+    if (!g_qbOpen || g_menuOpen || g_radOpen || InterlockedExchange(&g_qbJust, 0)) {
+        prev = b;                            // buttons held at the open (or while the menu / ring had them) are no edges
+        repeatAt = 0;
+        return;
+    }
+    WORD edges = static_cast<WORD>(b & ~prev);
+    prev = b;
+    const DWORD now = GetTickCount();
+    const WORD dir = static_cast<WORD>(b & 0x000F);
+    if (edges & 0x000F) repeatAt = now + 400;
+    else if (dir && !(dir & (dir - 1)) && repeatAt && static_cast<LONG>(now - repeatAt) >= 0) {
+        edges |= dir;
+        repeatAt = now + 120;
+    }
+    if (!dir) repeatAt = 0;
+    const int pages = QbPageCount();
+    if (g_qbPage < 0 || g_qbPage >= pages) g_qbPage = 0;
+    if (edges & 0x0100) g_qbPage = (g_qbPage + pages - 1) % pages;         // LB
+    if (edges & 0x0200) g_qbPage = (g_qbPage + 1) % pages;                 // RB
+    const bool cp = g_qbPage == kQbPageN;    // the checkpoint page: rows from the last frame's list
+    const int n = cp ? (QbCpRows() > 0 ? QbCpRows() : 1) : kQbPages[g_qbPage].n;
+    int &row = g_qbRow[g_qbPage];
+    if (row < 0 || row >= n) row = 0;
+    if (edges & 0x0001) row = (row + n - 1) % n;                            // up
+    if (edges & 0x0002) row = (row + 1) % n;                                // down
+    if (cp) {
+        if (edges & 0x0004) QbCpAct(row, -1);
+        else if (edges & 0x0008) QbCpAct(row, 1);
+    } else if (edges & 0x0004) QbAct(g_qbPage, row, -1);                    // left = off / one step down
+    else if (edges & 0x0008) QbAct(g_qbPage, row, 1);                       // right = on / one step up
+}
+
+// the closed line ([Quick] ShowClosed) only with the debug view enabled and in a level; the open bar always
+bool QuickWantsDraw() {
+    if (!g_qbEnabled) return false;
+    return g_qbOpen || (g_qbShowClosed && g_debugEnabled && InLevel());
+}
+
+// foreground draw list, left edge at [Quick] Top % of the screen height; g_qbRect = the panel (labels keep out of it)
+void DrawQuick() {
+    ImGuiIO &io = ImGui::GetIO();
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    ImFont *font = ImGui::GetFont();
+    const float fs = ImGui::GetFontSize() * g_qbScale, pad = 6.0f * g_qbScale, rowH = fs + 4.0f * g_qbScale,
+                sq = fs * 0.55f, gap = fs * 0.9f;
+    const bool de = g_qbLang == 0;
+    const float x0 = 12.0f, y0 = io.DisplaySize.y * static_cast<float>(g_qbTop) / 100.0f;
+    char combo[48];
+    QbComboText(g_qbButtons, combo, sizeof(combo));
+    auto width = [&](const char *t, float size) { return font->CalcTextSizeA(size, FLT_MAX, 0.0f, t).x; };
+    if (!g_qbOpen) {                         // collapsed: "Debug: N an  (View + Start)"
+        char line[64], hint[64];
+        const int on = QbLayersOn();
+        Out(line, sizeof(line), "Debug: %d %s", on, de ? "an" : "on");
+        Out(hint, sizeof(hint), "  %s", combo);
+        const float w = pad + width(line, fs) + width(hint, fs * 0.8f) + pad, h = fs + 2.0f * pad * 0.6f;
+        dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(0, 0, 0, 140), 4.0f);
+        dl->AddText(font, fs, ImVec2(x0 + pad, y0 + pad * 0.6f), on ? kQbBlue : IM_COL32(190, 190, 190, 255), line);
+        dl->AddText(font, fs * 0.8f, ImVec2(x0 + pad + width(line, fs), y0 + pad * 0.6f + fs * 0.15f),
+                    IM_COL32(150, 150, 150, 230), hint);
+        g_qbRect = {x0, y0, x0 + w, y0 + h};
+        return;
+    }
+    if (g_qbPage < 0 || g_qbPage >= QbPageCount()) g_qbPage = 0;
+    if (g_qbPage == kQbPageN) { DrawQuickCp(x0, y0); return; }   // the checkpoint page
+    const QbPage &p = kQbPages[g_qbPage];
+    int sel = g_qbRow[g_qbPage];
+    if (sel < 0 || sel >= p.n) sel = 0;
+    char title[96];
+    Out(title, sizeof(title), "%s  < %s >  %d/%d", de ? "Schnellschalter" : "Quick toggles", de ? p.de : p.en,
+        g_qbPage + 1, QbPageCount());
+    char state[16][48], count[16][16];
+    const char *why[16];
+    bool on[16];
+    float nameW = 0.0f, stateW = 0.0f, countW = 0.0f;
+    for (int i = 0; i < p.n && i < 16; ++i) {
+        const QbRow &r = p.rows[i];
+        why[i] = QbWhy(r);
+        on[i] = false;
+        if (r.kind == kQbBool) {
+            on[i] = QbRowOn(r);
+            Out(state[i], sizeof(state[i]), "%s", why[i][0] ? (de ? "gesperrt" : "n/a") : on[i] ? (de ? "an" : "on")
+                                                                                             : (de ? "aus" : "off"));
+        } else if (r.kind == kQbValue) {
+            char v[40];
+            if (!ItemValueShort(r.id, de, v, sizeof(v))) Out(v, sizeof(v), "?");
+            Out(state[i], sizeof(state[i]), "< %s >", v);
+        } else {                             // dbg.census: idle / requested / running
+            Out(state[i], sizeof(state[i]), "%s", g_rmCsRun ? (de ? "laeuft" : "running")
+                                                  : g_rmCensusReq ? (de ? "angefordert" : "requested")
+                                                  : (de ? "rechts = start" : "right = start"));
+        }
+        QbCountText(r, on[i] || r.kind != kQbBool, count[i], sizeof(count[i]));
+        float a = width(de ? r.de : r.en, fs), b = width(state[i], fs), c = width(count[i], fs);
+        if (a > nameW) nameW = a;
+        if (b > stateW) stateW = b;
+        if (c > countW) countW = c;
+    }
+    char foot[200];
+    bool result = g_qbResult[0] && GetTickCount() - g_qbResultTick < 5000;
+    if (result) Out(foot, sizeof(foot), "%s", g_qbResult);
+    else Out(foot, sizeof(foot), "%s", de ? "hoch / runter: Zeile   links / rechts: aus / an   LB / RB: Seite"
+                                          : "up / down: row   left / right: off / on   LB / RB: page");
+    char close[64];
+    Out(close, sizeof(close), "%s: %s", combo, de ? "zu" : "close");
+    float w = pad + sq + pad + nameW + gap + stateW + gap + countW + pad;
+    float tw = width(title, fs) + 2.0f * pad, fw = width(foot, fs * 0.8f) + 2.0f * pad, cw = width(close, fs * 0.8f) + 2.0f * pad;
+    if (tw > w) w = tw;
+    if (cw > w) w = cw;
+    const float maxW = io.DisplaySize.x * 0.45f;
+    if (fw > w) w = fw < maxW ? fw : maxW;
+    const float h = pad + rowH + p.n * rowH + 2.0f * (fs * 0.8f + 3.0f) + pad;
+    dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(0, 0, 0, 175), 5.0f);
+    dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(160, 230, 255, 120), 5.0f, 0, 1.0f);
+    g_qbRect = {x0, y0, x0 + w, y0 + h};
+    float y = y0 + pad;
+    dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(255, 220, 90, 255), title);
+    y += rowH;
+    const float nameX = x0 + pad + sq + pad, stateX = nameX + nameW + gap, countRight = x0 + w - pad;
+    for (int i = 0; i < p.n && i < 16; ++i) {
+        const QbRow &r = p.rows[i];
+        const bool grey = why[i][0] != 0;
+        ImU32 col = r.colour ? r.colour : r.layer >= 0 ? kDvLayers[r.layer].colour : kQbWhite;
+        if (grey) col = IM_COL32(130, 130, 130, 255);
+        else if (r.kind == kQbBool && !on[i]) col = (col & 0x00ffffffu) | (150u << 24);   // off: the colour, fainter
+        if (i == sel) {
+            dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + w - 2.0f, y + rowH - 1.0f), IM_COL32(70, 110, 190, 150), 3.0f);
+            dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + 5.0f, y + rowH - 1.0f), IM_COL32(255, 220, 90, 255));
+        }
+        if (r.kind == kQbBool) {             // the colour square: filled = on, an outline = off
+            ImVec2 a(x0 + pad, y + (fs - sq) * 0.5f + 1.0f), b(a.x + sq, a.y + sq);
+            if (on[i] && !grey) dl->AddRectFilled(a, b, col | 0xff000000u, 2.0f);
+            else dl->AddRect(a, b, col, 2.0f, 0, 1.2f);
+        }
+        dl->AddText(font, fs, ImVec2(nameX, y), col, de ? r.de : r.en);
+        ImU32 stateCol = grey ? IM_COL32(220, 120, 100, 255) : r.kind == kQbBool ? (on[i] ? IM_COL32(110, 230, 120, 255)
+                                                                                         : IM_COL32(170, 170, 170, 255))
+                       : IM_COL32(235, 235, 235, 255);
+        dl->AddText(font, fs, ImVec2(stateX, y), stateCol, state[i]);
+        if (count[i][0]) dl->AddText(font, fs, ImVec2(countRight - width(count[i], fs), y), col | 0xff000000u, count[i]);
+        y += rowH;
+    }
+    const float fsSmall = fs * 0.8f;
+    dl->PushClipRect(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), true);
+    dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + 2.0f), result ? (g_qbResultErr ? IM_COL32(255, 130, 110, 255)
+                                                                               : IM_COL32(130, 230, 140, 255))
+                                                               : IM_COL32(190, 190, 190, 230), foot);
+    dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + fsSmall + 5.0f), IM_COL32(150, 150, 150, 230), close);
+    dl->PopClipRect();
+}
+
+// items
+void ValQuickOpen(char *o, size_t n) {
+    int page = g_qbPage >= 0 && g_qbPage <= kQbPageN ? g_qbPage : 0;
+    Out(o, n, "%d (page %s, row %d; %s)", g_qbOpen ? 1 : 0, QbPageName(page, true), g_qbRow[page] + 1,
+        g_qbEnabled ? "[Quick] Enabled=1" : "off: [Quick] Enabled=0");
+}
+bool RunQuickOpen(const char *arg, char *o, size_t n) {
+    if (!g_qbEnabled) { Out(o, n, "quick-toggle bar off ([Quick] Enabled=0)"); return false; }
+    bool open = BoolArg(arg, g_qbOpen != 0);
+    if (open != (g_qbOpen != 0)) {
+        InterlockedExchange(&g_qbOpen, open ? 1 : 0);
+        if (open) InterlockedExchange(&g_qbJust, 1);
+        Log(1, "quick: %s (item, src=%s)", open ? "opened" : "closed", ShotSource("quick.open"));
+    }
+    Out(o, n, "quick.open %d", open ? 1 : 0);
+    return true;
+}
+void ValQuickLang(char *o, size_t n) { Out(o, n, "%s", g_qbLang ? "en" : "de"); }
+bool RunQuickLang(const char *arg, char *o, size_t n) {
+    char v[16];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    int lang = !v[0] ? !g_qbLang : !_stricmp(v, "en") ? 1 : !_stricmp(v, "de") ? 0 : -1;
+    if (lang < 0) { Out(o, n, "usage: quick.lang de|en; now %s", g_qbLang ? "en" : "de"); return false; }
+    g_qbLang = lang;
+    Log(1, "quick.lang %s (src=%s)", lang ? "en" : "de", ShotSource("quick.lang"));
+    Out(o, n, "quick.lang %s", lang ? "en" : "de");
+    return true;
+}
+void ValQuickStatus(char *o, size_t n) {
+    char combo[48];
+    QbComboText(g_qbButtons, combo, sizeof(combo));
+    int page = g_qbPage >= 0 && g_qbPage <= kQbPageN ? g_qbPage : 0;
+    Out(o, n, "enabled %d, open %d, page %d/%d '%s' row %d; OpenButtons 0x%04x (%s), ChordMs %d, ShowClosed %d, "
+        "Language %s, Top %d%%, Scale %.2f; toggles %ld, lone combo taps passed on %ld, held alone (passed late) %ld, rows "
+        "run %ld; debug layers on %d; last: %s", g_qbEnabled, g_qbOpen ? 1 : 0, page + 1, QbPageCount(), QbPageName(page, true),
+        g_qbRow[page] + 1, g_qbButtons, combo, g_qbChordMs, g_qbShowClosed, g_qbLang ? "en" : "de", g_qbTop, g_qbScale,
+        g_qbToggles, g_qbTaps, g_qbLate, g_qbRuns, QbLayersOn(), g_qbResult[0] ? g_qbResult : "-");
+}
+
+// ---- 0.17 cutscene shots ----
+// shot.oncine (owner wish 2026-11-06, replaces a TruLink watcher script): when a cutscene starts in a level, [Shot]
+// OnCinePairs pairs of shots, one every OnCineIntervalMs - each pair = a clean shot (copied before TruMenu draws) and a
+// ui shot (after it) of the SAME Present (ShotRequestPair: one lock, both in the queue; the shot worker limit may move
+// the ui one a frame later when two PNGs are still being written) - so the debug view picture can be laid over the clean
+// one. Names shot_<HHMMSS>_<step>_cine<NN>_<i>_clean.png / _ui.png (NN = cutscene since the start). Live 2026-11-06
+// (coordinator's watcher, prologue skip 160 -> 170): the camera flips between the cutscene camera and others several
+// times per cutscene - a naive re-arm saw 7 "cutscenes" in 2 minutes and ran into MaxPerMinute. So: a cutscene ends only
+// after the signal has been gone for 2 s (camera changes between non-gameplay cameras keep the same burst); the first
+// OnCineFastPairs pairs come every OnCineIntervalMs, the rest every OnCineSlowMs, at most OnCinePairs per cutscene;
+// pairs have their own rate window (MaxPerMinute pairs per minute - manual shots keep theirs). Signal ([Shot]
+// OnCineSignal, both by default):
+//   cine   = the game's own cinematic test tru+0x53f00 (0.10.2 CinematicNow: [0xe7f1c0] && byte +0xdd && dword +0x2c !=
+//            -1 - the TU gate TruShadowPower uses), re-checked here;
+//   camera = the camera manager's current camera [0xe804f0+0x44] is not the gameplay camera [manager+0xb80] (the one the
+//            manager switches back to from its transition camera +0x120, 0x5f3cbe, and whose vtable +0x54 an input edge
+//            runs, 0x5f3d9c). Live 2026-11-06: gameplay 0x00e83860, the prologue cutscene 0x00e80de0 ("other").
+// Only in a loaded level (player, no level change pending); read-only; one TruMenu.log line at the start and at the end
+// of a burst (with the count), never per frame. Render thread (Render, before its early return), polled every 50 ms.
+const DvCheck kOcCamChecks[] = {
+    {0x005f3cbe, "8bbe800b0000 8b03 8b5020 57 8bcb ffd2 897e44"},
+    {0x005f3d9c, "8b4644 8b8e800b0000 3bc1 7509 8b11 8b4254 ffd0"},
+};
+const DvCheck kOcCineChecks[] = {
+    {0x00453f00, "a1c0f1e700 85c0 7418 80b8dd00000000 740c 83782cff 7406 b801000000 c3 33c0 c3 32c0 c3"},
+};
+bool g_ocCamOk = false, g_ocCineOk = false;
+int g_ocPairs = 10, g_ocIntervalMs = 1500, g_ocSignal = 3;   // [Shot] OnCinePairs / OnCineIntervalMs / OnCineSignal
+int g_ocFastPairs = 4, g_ocSlowMs = 5000;    // [Shot] OnCineFastPairs / OnCineSlowMs
+const DWORD kOcEndMs = 2000;                 // the signal gone this long = the cutscene is over
+const char *OcSignalName(int s) { return s == 1 ? "cine" : s == 2 ? "camera" : "both"; }
+
+// true = a cutscene now (what = which signal)
+bool OcSignal(char *what, size_t n) {
+    what[0] = 0;
+    if (!InLevel()) return false;
+    char why[96];
+    if (LevelChangePending(why, sizeof(why))) return false;
+    const bool cine = (g_ocSignal & 1) && g_ocCineOk && CinematicNow();
+    DWORD cam = 0, game = 0;
+    const bool other = (g_ocSignal & 2) && g_ocCamOk && ReadDword(kCurrentCamera, &cam) &&
+                       ReadDword(kCameraManager + 0xb80, &game) && cam && game && cam != game;
+    if (!cine && !other) return false;
+    Out(what, n, "%s%s%s", cine ? "cinematic test" : "", cine && other ? " + " : "", other ? "camera left [manager+0xb80]" : "");
+    return true;
+}
+// one summary line per cutscene (the start line names the signal)
+void OcEnd(const char *why) {
+    Log(1, "shot.oncine: cutscene %02d end (%s) - %d pair(s) taken, %d refused%s%s; %.1f s", g_oc.burst, why, g_oc.pairs,
+        g_oc.refused, g_oc.refused ? " - last: " : "", g_oc.refused ? g_oc.lastWhy : "",
+        static_cast<double>(GetTickCount() - g_oc.start) / 1000.0);
+    g_oc.active = false;
+}
+void OnCineTick() {
+    if (!g_ocOn) {
+        if (g_oc.active) OcEnd("switched off");
+        g_oc.armed = true;
+        g_oc.offSince = 0;
+        return;
+    }
+    static DWORD lastPoll = 0;
+    const DWORD now = GetTickCount();
+    if (now - lastPoll < 50) return;
+    lastPoll = now;
+    char what[96];
+    const bool sig = OcSignal(what, sizeof(what));
+    if (g_oc.active) {                       // debounce: over only after the signal has been gone for kOcEndMs
+        if (!sig) {
+            if (!g_oc.offSince) g_oc.offSince = now;
+            if (now - g_oc.offSince >= kOcEndMs) {
+                OcEnd("gameplay camera back 2 s");
+                g_oc.armed = true;
+                g_oc.offSince = 0;
+            }
+            return;
+        }
+        g_oc.offSince = 0;
+    } else {
+        if (!sig || !g_oc.armed) return;
+        g_oc.active = true;
+        g_oc.armed = false;
+        g_oc.offSince = 0;
+        g_oc.burst = static_cast<int>((InterlockedIncrement(&g_ocBursts) - 1) % 99 + 1);   // 01 .. 99
+        g_oc.pairs = g_oc.refused = 0;
+        g_oc.lastWhy[0] = 0;
+        g_oc.start = g_oc.next = now;
+        DWORD cam = 0, state = 0;
+        ReadDword(kCurrentCamera, &cam);
+        ReadDword(kMainState, &state);
+        char camText[96], unit[64] = "";
+        CameraObjectName(cam, camText, sizeof(camText));
+        CurrentUnit(unit, sizeof(unit));
+        Log(1, "shot.oncine: cutscene %02d start - %s; camera %s; main state %lu; unit %s; up to %d pair(s): %d every %d ms, "
+            "then every %d ms", g_oc.burst, what, camText, state, unit[0] ? unit : "-", g_ocPairs, g_ocFastPairs,
+            g_ocIntervalMs, g_ocSlowMs);
+    }
+    const int done = g_oc.pairs + g_oc.refused;
+    if (done < g_ocPairs && static_cast<LONG>(now - g_oc.next) >= 0) {
+        char name[32], file[160], why[160];
+        Out(name, sizeof(name), "cine%02d_%d", g_oc.burst, done + 1);
+        if (ShotRequestPair(name, "shot.oncine", file, sizeof(file), why, sizeof(why))) ++g_oc.pairs;
+        else { ++g_oc.refused; strncpy_s(g_oc.lastWhy, sizeof(g_oc.lastWhy), why, _TRUNCATE); }
+        g_oc.next = now + static_cast<DWORD>(done + 1 < g_ocFastPairs ? g_ocIntervalMs : g_ocSlowMs);
+    }
+}
+void ValShotOnCine(char *o, size_t n) {
+    Out(o, n, "%d (up to %d pairs per cutscene: %d every %d ms, then every %d ms; signal %s; camera checks %s, cinematic "
+        "test %s; %ld cutscene(s), %s)", g_ocOn ? 1 : 0, g_ocPairs, g_ocFastPairs, g_ocIntervalMs, g_ocSlowMs,
+        OcSignalName(g_ocSignal), g_ocCamOk ? "ok" : "failed", g_ocCineOk ? "ok" : "failed", g_ocBursts,
+        g_oc.active ? "a cutscene runs" : "armed");
+}
+bool RunShotOnCine(const char *arg, char *o, size_t n) {
+    bool on = BoolArg(arg, g_ocOn != 0);
+    if (on && !(((g_ocSignal & 1) && g_ocCineOk) || ((g_ocSignal & 2) && g_ocCamOk))) {
+        Out(o, n, "disabled: pre-check failed (camera %s, cinematic test %s, signal %s)", g_ocCamOk ? "ok" : "failed",
+            g_ocCineOk ? "ok" : "failed", OcSignalName(g_ocSignal));
+        Log(1, "shot.oncine 1 refused - %s (src=%s)", o, ShotSource("shot.oncine"));
+        return false;
+    }
+    InterlockedExchange(&g_ocOn, on ? 1 : 0);
+    Log(1, "shot.oncine %d (%d pairs every %d ms, signal %s; src=%s)", on ? 1 : 0, g_ocPairs, g_ocIntervalMs,
+        OcSignalName(g_ocSignal), ShotSource("shot.oncine"));
+    Out(o, n, "shot.oncine %d", on ? 1 : 0);
+    return true;
+}
+
+// ---- 0.17 checkpoint list ----
+// Lukas, live 2026-11-06 ("aus den Checkpoints zum Abhaken einen Menuepunkt machen, auflisten und dann an / aus"): every
+// checkpoint instance of the loaded units (the 0.14 rule: object name contains "checkpoint") with intro id [inst+0x58],
+// owner unit (0.16 DvOwnerUnit), distance / height to Lara and ACTIVE for the one in the game data (+0x90, +0x114 when the
+// word +0x1f4 is set - the 0.14 checks); per checkpoint its marker on / off (g_cpHide, [Debug] CheckpointHide, written
+// back with Persist=1), all on / all off, and "go to" = cheat.flight 1 + player.goto <intro> as a two-step shortcut (the
+// regression-shortcut runner: one game-thread command per free request slot). Read-only except the existing items.
+struct CpRow { DWORD inst; LONG intro; float pos[3], dist, dz; char unit[40]; bool active, hidden; };
+const int kCpMax = 48;
+CpRow g_cpRows[kCpMax];                      // render thread: the list of the last menu / bar frame
+int g_cpRowN = 0;
+// the checkpoints nearest to Lara first; units = owner unit names (render thread only: DvUnitsRead's globals)
+int CpCollect(CpRow *rows, int max, bool units, int *total) {
+    *total = 0;
+    if (!g_dvCpOk || !InLevel()) return 0;
+    DWORD data = 0, active = 0xffffffff;
+    WORD mode = 0;
+    if (ReadDword(kDvGameData, &data) && data && ReadWord(data + 0x1f4, &mode)) ReadDword(data + (mode ? 0x114 : 0x90), &active);
+    float lara[3] = {0, 0, 0}, rot[3];
+    DWORD li = 0;
+    const bool haveLara = ReadLara(lara, rot, &li);
+    if (units) DvUnitsRead();
+    int n = 0;
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0, object = 0, oid = 0;
+        if (ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid)) {
+            int id = static_cast<int>(oid & 0xffff);
+            int cached = id > 0 && id < 4096 ? g_dvNameKind[id] : 0;
+            bool cp = cached == kDvCheckpoint + 1;
+            if (!cached) {
+                char name[64];
+                cp = DvNameKind(inst, name, sizeof(name)) == kDvCheckpoint;
+            }
+            float p[3];
+            DWORD intro = 0;
+            if (cp && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3) && ReadDword(inst + 0x58, &intro)) {
+                ++*total;
+                CpRow r = {};
+                r.inst = inst;
+                r.intro = static_cast<LONG>(intro);
+                for (int k = 0; k < 3; ++k) r.pos[k] = p[k];
+                float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2];
+                r.dist = haveLara ? sqrtf(dx * dx + dy * dy + dz * dz) : 0.0f;
+                r.dz = haveLara ? dz : 0.0f;
+                r.active = intro == active;
+                r.hidden = CpHidden(r.intro);
+                if (units) strncpy_s(r.unit, sizeof(r.unit), DvOwnerUnit(inst), _TRUNCATE);
+                int at = n;
+                while (at > 0 && rows[at - 1].dist > r.dist) --at;
+                if (at < max) {
+                    int last = n < max ? n : max - 1;
+                    for (int m = last; m > at; --m) rows[m] = rows[m - 1];
+                    rows[at] = r;
+                    if (n < max) ++n;
+                }
+            }
+        }
+        if (!ReadDword(inst + 8, &next)) break;
+        inst = next;
+    }
+    return n;
+}
+// "4321 [main_hall] 1200u ^300u ACTIVE (aus)"
+void CpRowText(const CpRow &r, bool de, char *o, size_t n) {
+    char dist[48] = "";
+    if (r.dist > 0.0f) {
+        LONG d = static_cast<LONG>(r.dist / 10.0f + 0.5f) * 10;
+        if (fabsf(r.dz) >= 50.0f) Out(dist, sizeof(dist), " %ldu %c%ldu", d, r.dz > 0.0f ? '^' : 'v',
+                                      static_cast<LONG>(fabsf(r.dz) / 10.0f + 0.5f) * 10);
+        else Out(dist, sizeof(dist), " %ldu", d);
+    }
+    const char *unit = r.unit + (r.unit[0] && g_dvLaraUnit[0] ? DvCommonPrefix(r.unit, g_dvLaraUnit) : 0);
+    Out(o, n, "CP %ld%s%s%s%s%s", r.intro, unit[0] ? " [" : "", unit, unit[0] ? "]" : "", dist, r.active ? " ACTIVE" : "");
+    (void)de;
+}
+void CpPersist() {
+    if (!g_dvPersist || !g_iniPath[0]) return;
+    char list[512] = "";
+    size_t used = 0;
+    for (LONG i = 0; i < 65536; ++i)
+        if (CpHidden(i)) LabelAdd(list, sizeof(list), &used, "%s%ld", used ? "," : "", i);
+    WritePrivateProfileStringA("Debug", "CheckpointHide", list, g_iniPath);
+}
+void CpSetHidden(LONG intro, bool hide) {
+    if (intro < 0 || intro >= 65536) return;
+    BYTE bit = static_cast<BYTE>(1 << (intro & 7));
+    if (hide) g_cpHide[intro >> 3] = static_cast<BYTE>(g_cpHide[intro >> 3] | bit);
+    else g_cpHide[intro >> 3] = static_cast<BYTE>(g_cpHide[intro >> 3] & ~bit);
+}
+// [Debug] CheckpointHide at the start: a comma list of intro ids
+void CpHideParse(const char *list) {
+    memset(const_cast<BYTE *>(g_cpHide), 0, sizeof(g_cpHide));
+    char copy[512];
+    strncpy_s(copy, sizeof(copy), list ? list : "", _TRUNCATE);
+    char *context = nullptr;
+    for (char *w = strtok_s(copy, ", ", &context); w; w = strtok_s(nullptr, ", ", &context)) {
+        char *end = nullptr;
+        long v = strtol(w, &end, 10);
+        if (end && !*end && v >= 0 && v < 65536) CpSetHidden(v, true);
+    }
+}
+int CpHiddenCount() {
+    int c = 0;
+    for (LONG i = 0; i < 65536; ++i) c += CpHidden(i) ? 1 : 0;
+    return c;
+}
+void ValDvCp(char *o, size_t n) { Out(o, n, "%d marker(s) hidden ([Debug] CheckpointHide)", CpHiddenCount()); }
+// dbg.cp <intro> [0|1]: one checkpoint marker on / off (no value = the other state)
+bool RunDvCp(const char *arg, char *o, size_t n) {
+    char buf[48];
+    strncpy_s(buf, sizeof(buf), arg ? arg : "", _TRUNCATE);
+    char *context = nullptr;
+    char *id = strtok_s(buf, " ", &context);
+    char *value = id ? strtok_s(nullptr, " ", &context) : nullptr;
+    char *end = nullptr;
+    long intro = id ? strtol(id, &end, 10) : -1;
+    if (!id || !end || *end || intro < 0 || intro >= 65536) { Out(o, n, "usage: dbg.cp <intro id> [0|1]"); return false; }
+    if (!DvGate("dbg.cp", o, n)) return false;
+    bool show = BoolArg(value ? value : "", !CpHidden(intro));
+    CpSetHidden(intro, !show);
+    CpPersist();
+    Log(1, "dbg.cp %ld %d (src=%s)", intro, show ? 1 : 0, ShotSource("dbg.cp"));
+    Out(o, n, "dbg.cp %ld %d%s", intro, show ? 1 : 0, g_dvOn[kDvCheckpoints] ? "" : " (layer Checkpoints is off)");
+    return true;
+}
+// dbg.cpall 0|1: 1 = every marker shown (list cleared), 0 = every checkpoint of the loaded units hidden
+bool RunDvCpAll(const char *arg, char *o, size_t n) {
+    if (!DvGate("dbg.cpall", o, n)) return false;
+    if (!g_dvCpOk) { Out(o, n, "disabled: pre-check failed (%s)", g_dvCpWhy); return false; }
+    bool show = BoolArg(arg, CpHiddenCount() != 0);
+    int total = 0, changed = 0;
+    if (show) {
+        changed = CpHiddenCount();
+        memset(const_cast<BYTE *>(g_cpHide), 0, sizeof(g_cpHide));
+    } else {
+        CpRow rows[kCpMax];
+        int k = CpCollect(rows, kCpMax, false, &total);
+        for (int i = 0; i < k; ++i)
+            if (!rows[i].hidden) { CpSetHidden(rows[i].intro, true); ++changed; }
+    }
+    CpPersist();
+    Log(1, "dbg.cpall %d: %d marker(s) changed (src=%s)", show ? 1 : 0, changed, ShotSource("dbg.cpall"));
+    Out(o, n, "dbg.cpall %d: %d marker(s) changed", show ? 1 : 0, changed);
+    return true;
+}
+void ValDvCpList(char *o, size_t n) {
+    CpRow rows[kCpMax];
+    int total = 0;
+    const bool render = g_renderThread && GetCurrentThreadId() == g_renderThread;
+    int k = CpCollect(rows, kCpMax, render, &total);
+    size_t used = 0;
+    o[0] = 0;
+    LabelAdd(o, n, &used, "%d checkpoint(s) in the loaded units%s", total, total ? ":" : "");
+    for (int i = 0; i < k; ++i) {
+        char t[128];
+        CpRowText(rows[i], false, t, sizeof(t));
+        LabelAdd(o, n, &used, " %s%s;", t, rows[i].hidden ? " (hidden)" : "");
+    }
+}
+// dbg.cpgo <intro>|active: flight on, then Lara to the checkpoint (player.goto) - two queued steps
+bool RunDvCpGo(const char *arg, char *o, size_t n) {
+    char v[32];
+    strncpy_s(v, sizeof(v), arg ? arg : "", _TRUNCATE);
+    DvTrim(v);
+    LONG intro = -1;
+    if (!_stricmp(v, "active") || !_stricmp(v, "aktiv")) {
+        CpRow rows[kCpMax];
+        int total = 0, k = CpCollect(rows, kCpMax, false, &total);
+        for (int i = 0; i < k; ++i)
+            if (rows[i].active) intro = rows[i].intro;
+        if (intro < 0) { Out(o, n, "the active checkpoint is not among the %d of the loaded units", total); return false; }
+    } else {
+        char *end = nullptr;
+        long x = strtol(v, &end, 10);
+        if (!v[0] || !end || *end || x < 0) { Out(o, n, "usage: dbg.cpgo <intro id>|active"); return false; }
+        intro = x;
+    }
+    char steps[96], title[48];
+    Out(steps, sizeof(steps), "cheat.flight 1;player.goto %ld", intro);
+    Out(title, sizeof(title), "checkpoint %ld", intro);
+    Log(1, "dbg.cpgo %ld: %s (src=%s)", intro, steps, ShotSource("dbg.cpgo"));
+    return ShortcutStart(steps, title, o, n);
+}
+
+// ---- 0.17 position bookmarks ----
+// Coordinator, live 2026-11-06: a teleport to converted coordinates of l3_main_hall from l3_main_bedroom ended in the void
+// (the target unit was not loaded, the frame conversion was off by ~450 units). pos.save <name> keeps Lara's unit, live
+// position, yaw, the unit's current shift P and its origin V in TruMenu.positions.txt next to tru.exe (one line each,
+// "name|unit|x y z|yaw|Px Py Pz|Vx Vy Vz|saved"); pos.go <name> teleports ONLY when that unit is loaded (stream unit
+// table, state 2) and converts with the unit's shift then and now: live = data - V + P (Befund-Position-und-Schrotflinte,
+// P = 0 for Lara's unit) -> target = saved - P(saved) + P(now); V cancels and is kept for tools/unit_frames.py. Not loaded
+// = refused with the reason (level.load <unit> stays a separate, explicit step). Byte checks: STREAM_LevelLoadAndInit
+// reads P = [[entry+8 Level]+0] Terrain +0x10 -> 3 floats (0x5d3180 / 0x5d31a2), the intro loader writes V = Level
+// +0x80 (0x5d1d39); the table itself = the 0.2 unit checks (g_unitOk). One TruMenu.log line per save / go.
+const DvCheck kPosChecks[] = {
+    {0x005d3180, "8b5608 8b02 8b4010 85c0 7445"},
+    {0x005d31a2, "f30f10c8 f30f5c4808 f30f114c2448 f30f10c8 f30f5c00 f30f5c4804"},
+    {0x005d1d39, "898e80000000 8b4c241c 899684000000 8b16 898688000000"},
+};
+bool g_posOk = false;
+const char *g_posWhy = "not checked";
+struct PosRow { char name[40], unit[48], saved[24]; float p[3], yaw, shift[3], origin[3]; };
+const int kPosMax = 64;
+void PosPath(char *o, size_t n) { Out(o, n, "%sTruMenu.positions.txt", g_exeDir); }
+int PosLoad(PosRow *rows, int max) {
+    char path[MAX_PATH];
+    PosPath(path, sizeof(path));
+    FILE *f = nullptr;
+    if (fopen_s(&f, path, "r") || !f) return 0;
+    int n = 0;
+    char line[512];
+    while (n < max && fgets(line, sizeof(line), f)) {
+        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
+        PosRow r = {};
+        char *context = nullptr, *field[7] = {};
+        int k = 0;
+        for (char *t = strtok_s(line, "|\r\n", &context); t && k < 7; t = strtok_s(nullptr, "|\r\n", &context)) field[k++] = t;
+        if (k < 6) continue;
+        strncpy_s(r.name, sizeof(r.name), field[0], _TRUNCATE);
+        strncpy_s(r.unit, sizeof(r.unit), field[1], _TRUNCATE);
+        if (!ParseFloats(field[2], r.p, 3) || !ParseFloats(field[4], r.shift, 3) || !ParseFloats(field[5], r.origin, 3)) continue;
+        r.yaw = static_cast<float>(atof(field[3]));
+        if (k >= 7) strncpy_s(r.saved, sizeof(r.saved), field[6], _TRUNCATE);
+        rows[n++] = r;
+    }
+    fclose(f);
+    return n;
+}
+// the loaded stream unit of that name: P (current shift) and V (origin); false = not loaded
+bool PosUnitFrame(const char *unit, float *shift, float *origin) {
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD state = 0, level = 0, terrain = 0, group = 0;
+        char name[48];
+        if (!ReadDword(e + 4, &state) || (state & 0xff) != 2 || !ReadString(e + 0xc, name, sizeof(name))) continue;
+        if (_stricmp(name, unit)) continue;
+        if (!ReadDword(e + 8, &level) || !level || !ReadFloats(level + 0x80, origin, 3)) return false;
+        shift[0] = shift[1] = shift[2] = 0.0f;   // no TerrainGroup = no shift (0x5d318a: xorps)
+        if (ReadDword(level, &terrain) && terrain && ReadDword(terrain + 0x10, &group) && group && !ReadFloats(group, shift, 3))
+            return false;
+        return DvFinite(shift, 3) && DvFinite(origin, 3);
+    }
+    return false;
+}
+// Lara's stream unit name (GameTracker +0xc0 id in the table), "" = none
+void PosLaraUnit(char *o, size_t n) {
+    o[0] = 0;
+    DWORD cur = 0;
+    if (!g_unitOk || !ReadDword(kUnitId, &cur)) return;
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD id = 0, state = 0;
+        if (ReadDword(e, &id) && id == cur && ReadDword(e + 4, &state) && (state & 0xff) == 2) {
+            if (!ReadString(e + 0xc, o, n)) o[0] = 0;
+            return;
+        }
+    }
+}
+bool RunPosSave(const char *arg, char *o, size_t n) {
+    if (!g_posOk) { Out(o, n, "disabled: pre-check failed (%s)", g_posWhy); return false; }
+    char name[40];
+    strncpy_s(name, sizeof(name), arg ? arg : "", _TRUNCATE);
+    DvTrim(name);
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    if (!name[0]) Out(name, sizeof(name), "pos%02d%02d%02d", t.wHour, t.wMinute, t.wSecond);
+    for (char *c = name; *c; ++c)
+        if (!(isalnum(static_cast<unsigned char>(*c)) || *c == '_' || *c == '-')) *c = '_';
+    float p[3], r[3], shift[3], origin[3];
+    DWORD inst = 0;
+    char unit[48];
+    if (!ReadLara(p, r, &inst)) { Out(o, n, "needs a level"); return false; }
+    PosLaraUnit(unit, sizeof(unit));
+    if (!unit[0] || !PosUnitFrame(unit, shift, origin)) { Out(o, n, "Lara's stream unit not found in the unit table"); return false; }
+    char path[MAX_PATH];
+    PosPath(path, sizeof(path));
+    bool fresh = GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES;
+    FILE *f = nullptr;
+    if (fopen_s(&f, path, "a") || !f) { Out(o, n, "cannot write %s", path); return false; }
+    if (fresh) fprintf(f, "# TruMenu positions (0.17 pos.save): name|unit|live x y z|yaw|unit shift P|unit origin V|saved"
+                          " - pos.go converts with the unit's shift then and now (the unit must be loaded)\n");
+    fprintf(f, "%s|%s|%.2f %.2f %.2f|%.5f|%.3f %.3f %.3f|%.3f %.3f %.3f|%04d-%02d-%02d %02d:%02d:%02d\n", name, unit, p[0],
+            p[1], p[2], r[2], shift[0], shift[1], shift[2], origin[0], origin[1], origin[2], t.wYear, t.wMonth, t.wDay,
+            t.wHour, t.wMinute, t.wSecond);
+    fclose(f);
+    Log(1, "pos.save %s: unit %s, live %.1f %.1f %.1f, yaw %.3f, shift P %.1f %.1f %.1f, origin V %.1f %.1f %.1f (src=%s)",
+        name, unit, p[0], p[1], p[2], r[2], shift[0], shift[1], shift[2], origin[0], origin[1], origin[2],
+        ShotSource("pos.save"));
+    Out(o, n, "pos.save %s (%s %.0f %.0f %.0f)", name, unit, p[0], p[1], p[2]);
+    return true;
+}
+void ValPosList(char *o, size_t n) {
+    static PosRow rows[kPosMax];             // the list is read on the caller's thread; one caller at a time is enough
+    int k = PosLoad(rows, kPosMax);
+    size_t used = 0;
+    o[0] = 0;
+    LabelAdd(o, n, &used, "%d position(s)%s", k, k ? ":" : " (pos.save <name>)");
+    for (int i = 0; i < k; ++i)
+        LabelAdd(o, n, &used, " %s [%s] %.0f %.0f %.0f;", rows[i].name, rows[i].unit, rows[i].p[0], rows[i].p[1], rows[i].p[2]);
+}
+// game thread (queued): pos.go <name> | last
+bool RunPosGo(const char *arg, char *o, size_t n) {
+    if (!g_posOk) { Out(o, n, "disabled: pre-check failed (%s)", g_posWhy); return false; }
+    DWORD player = 0;
+    if (!NeedPlayer(&player, o, n)) return false;
+    char name[40];
+    strncpy_s(name, sizeof(name), arg ? arg : "", _TRUNCATE);
+    DvTrim(name);
+    if (!name[0]) { Out(o, n, "usage: pos.go <name>|last (pos.list)"); return false; }
+    static PosRow rows[kPosMax];
+    int k = PosLoad(rows, kPosMax), hit = -1;
+    for (int i = 0; i < k; ++i)
+        if (!_stricmp(rows[i].name, name)) hit = i;   // the newest of that name wins
+    if (!_stricmp(name, "last") && k) hit = k - 1;
+    if (hit < 0) { Out(o, n, "no position '%s' (%d in TruMenu.positions.txt)", name, k); return false; }
+    const PosRow &r = rows[hit];
+    float shift[3], origin[3];
+    char lara[48];
+    PosLaraUnit(lara, sizeof(lara));
+    if (!PosUnitFrame(r.unit, shift, origin)) {
+        Out(o, n, "refused: unit %s is not loaded (Lara is in %s) - load it first (level.load %s), then pos.go %s again", r.unit,
+            lara[0] ? lara : "-", r.unit, r.name);
+        Log(1, "pos.go %s refused: unit %s not loaded (Lara in %s)", r.name, r.unit, lara[0] ? lara : "-");
+        return false;
+    }
+    float target[3];
+    for (int i = 0; i < 3; ++i) target[i] = r.p[i] - r.shift[i] + shift[i];
+    if (!SetPosition(player, target)) { Out(o, n, "write failed"); return false; }
+    SetYaw(player, r.yaw);
+    Log(1, "pos.go %s: unit %s (Lara was in %s), saved %.1f %.1f %.1f with shift %.1f %.1f %.1f, shift now %.1f %.1f %.1f "
+           "-> %.1f %.1f %.1f, yaw %.3f", r.name, r.unit, lara[0] ? lara : "-", r.p[0], r.p[1], r.p[2], r.shift[0], r.shift[1],
+        r.shift[2], shift[0], shift[1], shift[2], target[0], target[1], target[2], r.yaw);
+    Out(o, n, "pos.go %s: Lara at %.0f %.0f %.0f (%s)", r.name, target[0], target[1], target[2], r.unit);
+    return true;
+}
+void ValPos(char *o, size_t n) {
+    char unit[48];
+    PosLaraUnit(unit, sizeof(unit));
+    Out(o, n, "%s; Lara's unit %s", g_posOk ? "checks ok" : g_posWhy, unit[0] ? unit : "-");
+}
+// the quick-toggle bar's checkpoint page (render thread): the nearest 14 checkpoints, left / right = marker off / on
+int QbCpRows() { return g_cpRowN < 14 ? g_cpRowN : 14; }
+void QbCpAct(int row, int dir) {
+    const bool de = g_qbLang == 0;
+    if (row < 0 || row >= QbCpRows()) { QbResult(true, "%s", de ? "keine Checkpoints geladen" : "no checkpoints loaded"); return; }
+    const CpRow &r = g_cpRows[row];
+    const bool show = dir > 0;
+    if (show == !CpHidden(r.intro)) {
+        QbResult(false, "CP %ld: %s", r.intro, de ? (show ? "schon an" : "schon aus") : (show ? "already on" : "already off"));
+        return;
+    }
+    char arg[32];
+    Out(arg, sizeof(arg), "%ld %d", r.intro, show ? 1 : 0);
+    g_qbRunning = true;
+    const char *answer = InvokeCore("dbg.cp", arg, false);
+    g_qbRunning = false;
+    ++g_qbRuns;
+    Log(1, "quick: Checkpoints / CP %ld -> dbg.cp %s: %.200s", r.intro, arg, answer);
+    bool ok = !strncmp(answer, "ok", 2);
+    QbResult(!ok, "CP %ld: %s", r.intro, answer + (ok ? 3 : 4));
+}
+void DrawQuickCp(float x0, float y0) {
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    ImFont *font = ImGui::GetFont();
+    const float fs = ImGui::GetFontSize() * g_qbScale, pad = 6.0f * g_qbScale, rowH = fs + 4.0f * g_qbScale, sq = fs * 0.55f;
+    const bool de = g_qbLang == 0;
+    auto width = [&](const char *t, float size) { return font->CalcTextSizeA(size, FLT_MAX, 0.0f, t).x; };
+    int total = 0;
+    g_cpRowN = CpCollect(g_cpRows, kCpMax, true, &total);
+    const int n = QbCpRows();
+    int &sel = g_qbRow[kQbPageN];
+    if (sel < 0 || sel >= (n ? n : 1)) sel = 0;
+    char title[96], head[96], foot[200], text[16][128];
+    Out(title, sizeof(title), "%s  < Checkpoints >  %d/%d", de ? "Schnellschalter" : "Quick toggles", kQbPageN + 1, QbPageCount());
+    Out(head, sizeof(head), "%d %s%s", total, de ? "geladen" : "loaded", g_dvOn[kDvCheckpoints] ? ""
+        : de ? " - Ebene Checkpoints ist aus" : " - layer Checkpoints is off");
+    float w = width(title, fs) + 2.0f * pad;
+    for (int i = 0; i < n; ++i) {
+        CpRowText(g_cpRows[i], de, text[i], sizeof(text[i]));
+        float tw = pad + sq + pad + width(text[i], fs) + fs + width(de ? "aus" : "off", fs) + pad;
+        if (tw > w) w = tw;
+    }
+    bool result = g_qbResult[0] && GetTickCount() - g_qbResultTick < 5000;
+    Out(foot, sizeof(foot), "%s", result ? g_qbResult : de ? "links / rechts: Marker aus / an   Liste + hin: Menue"
+                                                          : "left / right: marker off / on   list + go to: menu");
+    const float fsSmall = fs * 0.8f;
+    if (width(foot, fsSmall) + 2.0f * pad > w) w = width(foot, fsSmall) + 2.0f * pad;
+    const float h = pad + 2.0f * rowH + (n ? n : 1) * rowH + fsSmall + 6.0f + pad;
+    dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(0, 0, 0, 175), 5.0f);
+    dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + w, y0 + h), IM_COL32(160, 230, 255, 120), 5.0f, 0, 1.0f);
+    g_qbRect = {x0, y0, x0 + w, y0 + h};
+    float y = y0 + pad;
+    dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(255, 220, 90, 255), title);
+    y += rowH;
+    dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(190, 190, 190, 255), head);
+    y += rowH;
+    if (!n) {
+        dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(170, 170, 170, 255), de ? "(keine)" : "(none)");
+        y += rowH;
+    }
+    for (int i = 0; i < n; ++i) {
+        const CpRow &r = g_cpRows[i];
+        const bool on = !r.hidden;
+        ImU32 col = r.active ? IM_COL32(230, 255, 60, 255) : kDvLayers[kDvCheckpoints].colour;
+        if (!on) col = (col & 0x00ffffffu) | (150u << 24);
+        if (i == sel) {
+            dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + w - 2.0f, y + rowH - 1.0f), IM_COL32(70, 110, 190, 150), 3.0f);
+            dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + 5.0f, y + rowH - 1.0f), IM_COL32(255, 220, 90, 255));
+        }
+        ImVec2 a(x0 + pad, y + (fs - sq) * 0.5f + 1.0f), b(a.x + sq, a.y + sq);
+        if (on) dl->AddRectFilled(a, b, col | 0xff000000u, 2.0f);
+        else dl->AddRect(a, b, col, 2.0f, 0, 1.2f);
+        dl->AddText(font, fs, ImVec2(x0 + pad + sq + pad, y), col, text[i]);
+        const char *st = on ? (de ? "an" : "on") : (de ? "aus" : "off");
+        dl->AddText(font, fs, ImVec2(x0 + w - pad - width(st, fs), y), on ? IM_COL32(110, 230, 120, 255)
+                                                                          : IM_COL32(170, 170, 170, 255), st);
+        y += rowH;
+    }
+    dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + 2.0f), result ? (g_qbResultErr ? IM_COL32(255, 130, 110, 255)
+                                                                                 : IM_COL32(130, 230, 140, 255))
+                                                                 : IM_COL32(190, 190, 190, 230), foot);
+}
+
+// menu (Debug view page, render thread): the checkpoint list and the positions
+void PageCpPos() {
+    char o[400];
+    if (ImGui::TreeNodeEx("Checkpoints (0.17) / Checkpoint-Liste###cplist", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (!g_dvCpOk) ImGui::TextWrapped("checkpoints off: %s", g_dvCpWhy);
+        int total = 0;
+        g_cpRowN = CpCollect(g_cpRows, kCpMax, true, &total);
+        bool layer = g_dvOn[kDvCheckpoints] != 0;
+        if (TmCheckbox("layer / Ebene  [dbg.checkpoints]###cplayer", &layer)) DvSet(kDvCheckpoints, layer, "menu", o, sizeof(o));
+        ImGui::SameLine();
+        if (TmButton("all on / alle an  [dbg.cpall 1]###cpallon")) RunDvCpAll("1", o, sizeof(o));
+        ImGui::SameLine();
+        if (TmButton("all off / alle aus  [dbg.cpall 0]###cpalloff")) RunDvCpAll("0", o, sizeof(o));
+        ImGui::Text("%d checkpoint(s) in the loaded units, nearest first; %d hidden", total, CpHiddenCount());
+        for (int i = 0; i < g_cpRowN; ++i) {
+            const CpRow &r = g_cpRows[i];
+            char text[128], id[48], arg[32];
+            CpRowText(r, false, text, sizeof(text));
+            bool show = !r.hidden;
+            Out(id, sizeof(id), "%s###cpr%ld", text, r.intro);
+            if (TmCheckbox(id, &show)) { Out(arg, sizeof(arg), "%ld %d", r.intro, show ? 1 : 0); RunDvCp(arg, o, sizeof(o)); }
+            ImGui::SameLine();
+            Out(id, sizeof(id), "go to / hin###cpg%ld", r.intro);
+            if (TmButton(id)) { Out(arg, sizeof(arg), "%ld", r.intro); RunDvCpGo(arg, o, sizeof(o)); }
+        }
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNodeEx("Positions (0.17) / Positionen###poslist", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (!g_posOk) ImGui::TextWrapped("positions off: %s", g_posWhy);
+        static char name[40] = "";
+        ImGui::InputText("name###posname", name, sizeof(name));
+        ImGui::SameLine();
+        if (TmButton("save here / hier merken  [pos.save]###possave")) RunPosSave(name, o, sizeof(o));
+        static PosRow rows[kPosMax];
+        static DWORD loaded = 0;
+        static int count = 0;
+        if (GetTickCount() - loaded > 1000) { count = PosLoad(rows, kPosMax); loaded = GetTickCount(); }   // the file, 1 / s
+        float shift[3], origin[3];
+        for (int i = count - 1; i >= 0; --i) {   // newest first
+            const PosRow &r = rows[i];
+            bool loadedUnit = PosUnitFrame(r.unit, shift, origin);
+            char id[96];
+            Out(id, sizeof(id), "go / hin###posg%d", i);
+            if (TmButton(id)) InvokeCore("pos.go", r.name, false);
+            ImGui::SameLine();
+            ImGui::TextColored(loadedUnit ? ImVec4(0.6f, 1.0f, 0.6f, 1.0f) : ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s  [%s%s]  %.0f %.0f "
+                               "%.0f  %s", r.name, r.unit, loadedUnit ? "" : ", not loaded", r.p[0], r.p[1], r.p[2], r.saved);
+        }
+        ImGui::TreePop();
+    }
+}
+void PosCheck() {
+    DWORD at = 0;
+    static char why[96];
+    g_posOk = g_unitOk && g_playerOk && DvChecks(kPosChecks, sizeof(kPosChecks) / sizeof(kPosChecks[0]), &at);
+    if (!g_unitOk) Out(why, sizeof(why), "stream unit table check (0.2) failed");
+    else if (!g_playerOk) Out(why, sizeof(why), "player pointer check failed");
+    else Out(why, sizeof(why), "unit frame code differs at 0x%08lx", at);
+    g_posWhy = g_posOk ? "ok" : why;
+    char path[MAX_PATH];
+    PosPath(path, sizeof(path));
+    Log(g_posOk ? 1 : 0, "0.17 checkpoint list: %d marker(s) hidden ([Debug] CheckpointHide); positions: %s, file %s",
+        CpHiddenCount(), g_posWhy, path);
+}
+
+// dbg.depthdump (0.17, depth section above: DpDumpCall / DpTick)
+void ValDpDump(char *o, size_t n) {
+    if (g_dpDumpFrame >= 0) Out(o, n, "pending: frame %ld", static_cast<LONG>(g_dpDumpFrame));
+    else Out(o, n, "idle (last dump: %d scene call(s))", g_dpDumpCount);
+}
+bool RunDpDump(const char *, char *o, size_t n) {
+    if (!DvGate("dbg.depthdump", o, n)) return false;
+    if (!g_dpMode) { Out(o, n, "switch dbg.depth on / dim first - the PCScene::Draw hook runs only then"); return false; }
+    if (!DvAnyOn()) { Out(o, n, "switch a debug view layer on first - the PCScene::Draw hook runs only then"); return false; }
+    if (g_dpDumpFrame >= 0) { Out(o, n, "a dump is pending (frame %ld)", static_cast<LONG>(g_dpDumpFrame)); return false; }
+    g_dpDumpCount = 0;
+    InterlockedExchange(&g_dpDumpFrame, g_dpFrame + 1);
+    Log(1, "dbg.depthdump: frame %ld requested (DepthCall %d, src=%s)", static_cast<LONG>(g_dpDumpFrame), g_dpCall,
+        ShotSource("dbg.depthdump"));
+    Out(o, n, "dump of frame %ld requested - TruMenu.log '0.17 depthdump' lines", static_cast<LONG>(g_dpDumpFrame));
+    return true;
+}
+
+// load (Start, after the 0.10.2 cinematic check): the byte checks of precheck_017.txt and the row table against kItems
+void QuickCheck() {
+    DWORD camAt = 0, cineAt = 0;
+    g_ocCamOk = g_camLogOk && DvChecks(kOcCamChecks, sizeof(kOcCamChecks) / sizeof(kOcCamChecks[0]), &camAt);
+    g_ocCineOk = g_cineOk && DvChecks(kOcCineChecks, sizeof(kOcCineChecks) / sizeof(kOcCineChecks[0]), &cineAt);
+    char camText[64], cineText[64];
+    if (g_ocCamOk) Out(camText, sizeof(camText), "ok");
+    else if (!g_camLogOk) Out(camText, sizeof(camText), "failed (0.8 camera log check)");
+    else Out(camText, sizeof(camText), "failed at 0x%08lx", camAt);
+    if (g_ocCineOk) Out(cineText, sizeof(cineText), "ok");
+    else if (!g_cineOk) Out(cineText, sizeof(cineText), "failed (0.10.2 check)");
+    else Out(cineText, sizeof(cineText), "failed at 0x%08lx", cineAt);
+    int rows = 0, unknown = 0;
+    for (const QbPage &p : kQbPages)
+        for (int i = 0; i < p.n; ++i) {
+            ++rows;
+            if (!FindItem(p.rows[i].id)) {
+                ++unknown;
+                Log(0, "0.17 quick toggles: row '%s' names the unknown item %s", p.rows[i].de, p.rows[i].id);
+            }
+        }
+    char combo[48];
+    QbComboText(g_qbButtons, combo, sizeof(combo));
+    Log(g_ocCamOk && g_ocCineOk && !unknown ? 1 : 0, "0.17 quick toggles: [Quick] Enabled %d, OpenButtons 0x%04x (%s), "
+        "ChordMs %d, ShowClosed %d, Language %s, Top %d%%, Scale %.2f; %d pages, %d rows, %d unknown item(s); cutscene "
+        "shots: camera checks %s, cinematic test %s, [Shot] OnCine %ld (up to %d pairs: %d every %d ms, then every %d ms; "
+        "signal %s)", g_qbEnabled, g_qbButtons, combo, g_qbChordMs, g_qbShowClosed, g_qbLang ? "en" : "de", g_qbTop,
+        g_qbScale, kQbPageN, rows, unknown, camText, cineText, static_cast<LONG>(g_ocOn), g_ocPairs, g_ocFastPairs,
+        g_ocIntervalMs, g_ocSlowMs, OcSignalName(g_ocSignal));
 }
 
 // ---- 0.3 pages ----
@@ -17729,6 +19350,8 @@ void Render(IDirect3DDevice9 *device) {
     if (padIdle) WeaponsTick();
     KeyboardToggle();
     RadialTick();                                // 0.10 radial menu: key / mouse hold, the open ring's input
+    QuickTick();                                 // 0.17 quick-toggle bar: the open bar's D-pad / LB / RB
+    OnCineTick();                                // 0.17 shot.oncine: shot pairs at a cutscene start (every 50 ms)
     MouseTick();                                 // 0.7: hold / release the game's cursor calls with the menu
     PauseTick();                                 // 0.7.1 [Menu] PauseGame
     AutoStartTick();                             // 0.7.1 [Test] AutoStart
@@ -17756,8 +19379,10 @@ void Render(IDirect3DDevice9 *device) {
     bool flowDraw = FlowWantsDraw();             // 0.11 status line / flow.say toast
     RenderModeTick(device);                      // 0.15 render mode: census / flat view patching (cheap while off)
     // 0.15: DvAnyOn() added - in 0.14 a debug view layer drew only while the menu / ring was open (or labels / markup on)
+    const bool quickDraw = QuickWantsDraw();     // 0.17
+    if (!quickDraw) g_qbRect = {0, 0, 0, 0};
     if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_lblOn && !g_radOpen &&
-        !flowDraw && !DvAnyOn())
+        !flowDraw && !DvAnyOn() && !quickDraw)
         return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
@@ -17797,6 +19422,7 @@ void Render(IDirect3DDevice9 *device) {
     if (g_lblOn) DrawLabels();                   // 0.13 Thrall-Labels (foreground draw list)
     if (DvAnyOn()) DrawDebugView();              // 0.14 debug view (background draw list)
     if (g_dvOn[kDvLegend]) DrawDebugLegend();    // 0.14 legend (foreground, top right)
+    if (quickDraw) DrawQuick();                  // 0.17 quick-toggle bar (foreground, left edge)
     if (g_overlay) DrawOverlay();
     if (g_logOverlay) DrawLogOverlay();
     if (g_guardOverlay) DrawGuardOverlay();
@@ -18115,7 +19741,14 @@ void ReadOptions(const char *dir) {
         };
         InterlockedExchange(&g_dpMode, range("Depth", 0, 2));
         g_dpDim = range("DepthDim", 5, 80);
-        g_dpCall = range("DepthCall", 0, 7);
+        {                                        // 0.17: -1 = auto (GetPrivateProfileInt reads a negative number as 0)
+            char v[32];
+            OptString(ini, "Debug", "DepthCall", v, sizeof(v));
+            char *end = nullptr;
+            long call = strtol(v, &end, 10);
+            g_dpCall = v[0] && end && !*end && call >= -1 && call <= 7 ? static_cast<int>(call)
+                                                                       : atoi(OptDefault("Debug", "DepthCall"));
+        }
         g_dvAlpha = range("LineAlpha", 10, 100);
         g_dvBright = range("LineBright", 30, 150);
         g_dvFade = OptInt(ini, "Debug", "Fade") != 0 ? 1 : 0;
@@ -18131,6 +19764,9 @@ void ReadOptions(const char *dir) {
         g_dvEnclSize = rangeF("EnclosingSize", 100.0f, 100000.0f);
         g_dvMarkerMax = range("MarkerMax", 2, 50);
         OptString(ini, "Debug", "ViewSkip", g_dvViewSkip, sizeof(g_dvViewSkip));
+        char hide[512];                          // 0.17 checkpoint list
+        OptString(ini, "Debug", "CheckpointHide", hide, sizeof(hide));
+        CpHideParse(hide);
     }
     if (g_dvViewAtStart && g_debugEnabled) {     // dbg.view at start: labels + the ViewNav switches (as NavDraw)
         g_lblAtStart = 1;
@@ -18191,9 +19827,44 @@ void ReadOptions(const char *dir) {
         g_shotKey = shot("Hotkey") & 0xff;
         g_shotMaxPerMin = shot("MaxPerMinute");
         if (g_shotMaxPerMin < 0 || g_shotMaxPerMin > 120) g_shotMaxPerMin = atoi(OptDefault("Shot", "MaxPerMinute"));
+        InterlockedExchange(&g_ocOn, shot("OnCine") != 0 ? 1 : 0);            // 0.17 shot.oncine
+        g_ocPairs = shot("OnCinePairs");
+        if (g_ocPairs < 1 || g_ocPairs > 50) g_ocPairs = atoi(OptDefault("Shot", "OnCinePairs"));
+        g_ocIntervalMs = shot("OnCineIntervalMs");
+        if (g_ocIntervalMs < 250 || g_ocIntervalMs > 10000) g_ocIntervalMs = atoi(OptDefault("Shot", "OnCineIntervalMs"));
+        g_ocFastPairs = shot("OnCineFastPairs");
+        if (g_ocFastPairs < 1 || g_ocFastPairs > 50) g_ocFastPairs = atoi(OptDefault("Shot", "OnCineFastPairs"));
+        g_ocSlowMs = shot("OnCineSlowMs");
+        if (g_ocSlowMs < 250 || g_ocSlowMs > 60000) g_ocSlowMs = atoi(OptDefault("Shot", "OnCineSlowMs"));
+        char sig[32];
+        OptString(ini, "Shot", "OnCineSignal", sig, sizeof(sig));
+        DvTrim(sig);
+        g_ocSignal = !_stricmp(sig, "cine") ? 1 : !_stricmp(sig, "camera") ? 2 : 3;   // anything else = both
         char folder[MAX_PATH];
         OptString(ini, "Shot", "Folder", folder, sizeof(folder));
         ShotSetFolder(folder);
+    }
+    {                                        // 0.17 [Quick] (OpenButtons also as hex, "0x0030"; out of range = the default)
+        auto quick = [&](const char *key, int lo, int hi) {
+            char v[32];
+            OptString(ini, "Quick", key, v, sizeof(v));
+            char *end = nullptr;
+            long x = strtol(v, &end, 0);
+            return v[0] && end && !*end && x >= lo && x <= hi ? static_cast<int>(x)
+                                                              : static_cast<int>(strtol(OptDefault("Quick", key), nullptr, 0));
+        };
+        g_qbEnabled = quick("Enabled", 0, 1);
+        g_qbButtons = static_cast<WORD>(quick("OpenButtons", 1, 0xffff));
+        g_qbChordMs = quick("ChordMs", 50, 1000);
+        g_qbShowClosed = quick("ShowClosed", 0, 1);
+        g_qbTop = quick("Top", 5, 80);
+        char v[32];
+        OptString(ini, "Quick", "Language", v, sizeof(v));
+        DvTrim(v);
+        g_qbLang = !_stricmp(v, "en") ? 1 : 0;
+        OptString(ini, "Quick", "Scale", v, sizeof(v));
+        float s = static_cast<float>(atof(v));
+        g_qbScale = s >= 0.5f && s <= 3.0f ? s : static_cast<float>(atof(OptDefault("Quick", "Scale")));
     }
     {                                        // 0.11 [Flow]
         char v[MAX_PATH];
@@ -18398,6 +20069,8 @@ void Start(HMODULE self) {
            "%d samples x %d frames, chord %.0f, slope %.1f + %.0f, cinematic test %d, marks keep the yaw",
         kPlayerModeFlags, kNoDamageBit, g_godFullOk ? 1 : 0, kSafeWindow, kSafeEvery, kSafeChord, kSafeSlope, kSafeStep,
         g_cineOk ? 1 : 0);
+    QuickCheck();                             // 0.17 quick-toggle bar + shot.oncine (precheck_017.txt; after 0.8 / 0.10.2)
+    PosCheck();                               // 0.17 checkpoint list / position bookmarks (precheck_017.txt)
     DevRead();
     // 0.9: music (engine srmusic, each address checked), media list, save folder (file system only)
     g_musicOk = MusicCheck();

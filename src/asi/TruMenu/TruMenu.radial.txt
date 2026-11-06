@@ -166,6 +166,24 @@ Spieler/Debug | Navmesh: Stand | nav.status
 Spieler/Debug | Flug-Tempo 10 | cheat.speed 10
 Spieler/Debug | Flug-Tempo 20 | cheat.speed 20
 Spieler/Debug | Flug-Tempo 40 | cheat.speed 40
+# 0.17 Schnellschalter (quick-toggle bar at the left edge, the game keeps running; pad View + Start opens / closes it) and
+# shot pairs at a cutscene start (shot.oncine: a clean + a ui shot of the same frame, see [Shot] OnCine*)
+Spieler/Debug | Schnellschalter | quick.open
+Spieler/Debug | Zwischensequenz-Fotos | shot.oncine
+# 0.17 (live 2026-11-06: the depth path never accepted the scene's view): one block per scene of the next frame into
+# TruMenu.log - needs Tiefe an / gedimmt and a layer on
+Spieler/Debug/Darstellung | Tiefe: Diagnose ins Log | dbg.depthdump
+# 0.17 checkpoint list (Lukas): every checkpoint marker shown / hidden, Lara to the active checkpoint (flight first), the
+# list into the ring centre / log; one marker at a time: the menu page Debug view or the bar's page Checkpoints
+Spieler/Debug/Leveldaten | Checkpoints: alle zeigen | dbg.cpall 1
+Spieler/Debug/Leveldaten | Checkpoints: alle verbergen | dbg.cpall 0
+Spieler/Debug/Leveldaten | Zum aktiven Checkpoint | dbg.cpgo active
+Spieler/Debug/Leveldaten | Checkpoints: Liste | dbg.cplist
+# 0.17 position bookmarks: pos.save stores the unit + position in TruMenu.positions.txt; pos.go only works while that unit
+# is loaded (otherwise refused - load the unit first with level.load)
+Spieler/Positionen | Position merken | pos.save
+Spieler/Positionen | Zur letzten Position | pos.go last
+Spieler/Positionen | Positionen: Liste | pos.list
 # 0.10.5 (owner wish 2026-11-05): Claude marks, drawn in coral - each pick writes one TruMenu.log line
 # "claude.mark <kind>: <time> unit=<stream unit> pos=<x y z> step=<TO TEST step or -> shot=<file> src=ring" and takes a
 # clean shot named <kind>; the ring closes after the pick. [Shot] Hotkey (F11 = 0x7A, default off) = "Jetzt".

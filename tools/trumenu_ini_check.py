@@ -51,6 +51,13 @@ dbg.depth / dbg.alpha / dbg.bright / dbg.fade / dbg.fill / dbg.short / dbg.larai
 and their ring entries (dbg.depth once each for on / dim / off, dbg.enclosing once each for normal / dim / hide,
 dbg.alpha 10 .. 100, dbg.bright 30 .. 150, the switches once without an argument) and the flight entries of the ring
 (cheat.flight once without an argument, cheat.speed with a number 0 .. 1000).
+Since TruMenu 0.17 (2026-11-06 TruMenu 0.17 quick toggles) also DepthCall -1 .. 7, the [Quick] keys (Enabled / ShowClosed
+0 / 1, OpenButtons a mask without D-pad / LB / RB, ChordMs 50 .. 1000, Language de / en, Top 5 .. 80, Scale 0.5 .. 3),
+[Shot] OnCine 0 / 1, OnCinePairs / OnCineFastPairs 1 .. 50, OnCineIntervalMs 250 .. 10000, OnCineSlowMs 250 .. 60000,
+OnCineSignal cine / camera / both, [Debug] CheckpointHide (intro ids or empty), the items quick.* / shot.oncine /
+dbg.depthdump / dbg.cp* / pos.* in kItems, the quick-toggle bar's row tables kQbDebug .. kQbAi (every item id in kItems,
+bool rows on bool items or dbg.show <layer>, value rows on the value items, every kDvLayers layer reachable) and the new
+ring entries (quick.open / shot.oncine / dbg.depthdump / dbg.cplist / dbg.cpall 0 / dbg.cpall 1 once each).
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -93,7 +100,7 @@ DV_BOOL_KEYS = ('View', 'Triggers', 'TrgDeath', 'TrgFire', 'TrgCheckpoint', 'Trg
 DV_RANGES = {'TriggerMax': (1, 512), 'TriggerRadius': (500, 200000), 'TriggerLabelMax': (0, 64),
              'NameRadius': (100, 200000), 'NameMax': (1, 64), 'NameScale': (0.5, 3),
              'CollRadius': (500, 200000), 'CollMax': (100, 20000), 'CensusFrames': (10, 1200),   # 0.15
-             'Depth': (0, 2), 'DepthDim': (5, 80), 'DepthCall': (0, 7), 'LineAlpha': (10, 100),   # 0.16
+             'Depth': (0, 2), 'DepthDim': (5, 80), 'DepthCall': (-1, 7), 'LineAlpha': (10, 100),  # 0.16 (0.17: -1 auto)
              'LineBright': (30, 150), 'FadeStart': (0, 100000), 'FadeEnd': (500, 200000), 'FadeMin': (0, 100),
              'FillAlpha': (2, 40), 'ViewLabelMax': (0, 64), 'Enclosing': (0, 2), 'EnclosingSize': (100, 100000),
              'MarkerMax': (2, 50)}
@@ -120,6 +127,18 @@ RM_PASSES = ('0x200', '0x100', '0x80', '0x400', '0x800', '1', '2')
 RM_PASS_ALL = 0xf83
 RM_RING_SWITCHES = ('dbg.flat', 'dbg.census', 'dbg.flatedges', 'dbg.flatmodels', 'dbg.flatanyrt', 'dbg.render')
 DV_LAYER_COUNT = 15
+# 0.17 quick toggles: [Quick] keys / ranges, the buttons the open bar owns, [Shot] OnCine ranges, the new items, the row
+# tables of the bar and the items a value row may use
+QB_KEYS = ('Enabled', 'OpenButtons', 'ChordMs', 'ShowClosed', 'Language', 'Top', 'Scale')
+QB_RANGES = {'ChordMs': (50, 1000), 'Top': (5, 80), 'Scale': (0.5, 3)}
+QB_OWN = 0x030F
+OC_RANGES = {'OnCinePairs': (1, 50), 'OnCineFastPairs': (1, 50), 'OnCineIntervalMs': (250, 10000),
+             'OnCineSlowMs': (250, 60000)}
+QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info', 'shot.oncine': 'bool',
+            'dbg.depthdump': 'action', 'dbg.cp': 'action', 'dbg.cpall': 'action', 'dbg.cplist': 'info',
+            'dbg.cpgo': 'action', 'pos.save': 'action', 'pos.list': 'info', 'pos.go': 'action'}
+QB_TABLES = ('kQbDebug', 'kQbStyle', 'kQbRender', 'kQbLevel', 'kQbAi')
+QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang')
 DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -459,7 +478,7 @@ def check_debug(ini_path, radial_path):
         elif key in DV_RANGES:
             lo, hi = DV_RANGES[key]
             try:
-                ok = lo <= float(value) <= hi and (key in DV_FLOAT_KEYS or value.isdigit())
+                ok = lo <= float(value) <= hi and (key in DV_FLOAT_KEYS or re.fullmatch(r'-?\d+', value) is not None)
             except ValueError:
                 ok = False
             if not ok: problems.append('%s:%d: [Debug] %s=%s (%g .. %g)' % (name, n, key, value, lo, hi))
@@ -600,6 +619,132 @@ def check_debug(ini_path, radial_path):
                                                                        len(layers), sum(dv_seen.values())))
 
 
+def ini_section(ini_path, wanted):
+    """[(line number, key, value)] of one INI section"""
+    out, section = [], None
+    for n, line in enumerate(open(ini_path, encoding='utf-8').read().splitlines(), 1):
+        line = line.strip()
+        m = re.match(r'^\[(.+)\]$', line)
+        if m:
+            section = m.group(1)
+            continue
+        if section != wanted or not line or line.startswith(';') or '=' not in line: continue
+        key, _, value = line.partition('=')
+        out.append((n, key.strip(), value.strip()))
+    return out
+
+
+def qb_rows(src):
+    """0.17: the rows of the quick-toggle bar tables kQbDebug .. kQbAi: [(table, de, id, arg, kind, layer)]"""
+    rows = []
+    for table in QB_TABLES:
+        start = 'const QbRow %s[] = {' % table
+        if start not in src: continue
+        block = src[src.index(start):]
+        block = block[:block.index('\n};')]
+        for m in re.finditer(r'\{"([^"]*)", "([^"]*)", "([a-z][a-z0-9_.]*)", "([^"]*)", (kQb[A-Za-z]+), '
+                             r'(-1|kDv[A-Za-z]+),', block):
+            rows.append((table, m.group(1), m.group(3), m.group(4), m.group(5), m.group(6)))
+    return rows
+
+
+def check_quick(ini_path, radial_path):
+    """0.17 (2026-11-06 TruMenu 0.17 quick toggles): the [Quick] values, [Shot] OnCine*, [Debug] CheckpointHide; the new
+    items in kItems; the bar's rows (every item id in kItems, bool rows on bool items or dbg.show <layer>, value rows on
+    the value items, every debug view layer reachable from the bar); the new ring entries"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    seen = set()
+    for n, key, value in ini_section(ini_path, 'Quick'):
+        seen.add(key)
+        where = '%s:%d: [Quick] %s=%s' % (name, n, key, value)
+        if key in ('Enabled', 'ShowClosed') and value not in ('0', '1'): problems.append(where + ' (0 / 1)')
+        elif key == 'OpenButtons':
+            try:
+                v = int(value, 0)
+            except ValueError:
+                v = -1
+            if not 1 <= v <= 0xFFFF: problems.append(where + ' (an XInput button mask 1 .. 0xFFFF)')
+            elif v & QB_OWN: problems.append(where + ' (must not hold D-pad / LB / RB = 0x%04X: the open bar owns them)'
+                                             % QB_OWN)
+        elif key in QB_RANGES:
+            lo, hi = QB_RANGES[key]
+            try:
+                ok = lo <= float(value) <= hi and (key == 'Scale' or value.isdigit())
+            except ValueError:
+                ok = False
+            if not ok: problems.append(where + ' (%g .. %g)' % (lo, hi))
+        elif key == 'Language' and value not in ('de', 'en'): problems.append(where + ' (de / en)')
+    for key in QB_KEYS:
+        if key not in seen: problems.append('%s: [Quick] %s missing' % (name, key))
+    seen = set()
+    for n, key, value in ini_section(ini_path, 'Shot'):
+        if not key.startswith('OnCine'): continue
+        seen.add(key)
+        where = '%s:%d: [Shot] %s=%s' % (name, n, key, value)
+        if key == 'OnCine' and value not in ('0', '1'): problems.append(where + ' (0 / 1)')
+        elif key == 'OnCineSignal' and value not in ('cine', 'camera', 'both'): problems.append(where + ' (cine / camera / both)')
+        elif key in OC_RANGES:
+            lo, hi = OC_RANGES[key]
+            if not (value.isdigit() and lo <= int(value) <= hi): problems.append(where + ' (%d .. %d)' % (lo, hi))
+    for key in ['OnCine', 'OnCineSignal'] + sorted(OC_RANGES):
+        if key not in seen: problems.append('%s: [Shot] %s missing' % (name, key))
+    hide = [v for n, k, v in ini_section(ini_path, 'Debug') if k == 'CheckpointHide']
+    if len(hide) != 1: problems.append('%s: [Debug] CheckpointHide missing' % name)
+    elif hide[0] and not all(w.isdigit() and int(w) < 65536 for w in re.split(r'[ ,]+', hide[0]) if w):
+        problems.append('%s: [Debug] CheckpointHide=%s (comma list of intro ids 0 .. 65535, or empty)' % (name, hide[0]))
+    items = item_types(src)
+    for item, typ in sorted(QB_ITEMS.items()):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    rows = qb_rows(src)
+    if len(rows) < 20: problems.append('TruMenu.cpp: quick-toggle bar tables: only %d rows found' % len(rows))
+    layers = dv_layers(src)
+    reach = set()
+    for table, de, item, arg, kind, layer in rows:
+        where = 'TruMenu.cpp: %s row "%s" (%s %s)' % (table, de, item, arg)
+        if item not in items: problems.append(where + ': item not in kItems')
+        elif kind == 'kQbBool':
+            if item == 'dbg.show':
+                if arg not in layers: problems.append(where + ': dbg.show needs a layer of kDvLayers')
+                reach.add(arg)
+            elif items[item] != 'bool' or arg: problems.append(where + ': a bool row needs a bool item without argument')
+        elif kind == 'kQbValue' and item not in QB_VALUE_ITEMS:
+            problems.append(where + ': a value row needs one of %s' % ', '.join(QB_VALUE_ITEMS))
+        elif kind == 'kQbAction' and items[item] != 'action': problems.append(where + ': an action row needs an action item')
+        for lname, own in DV_OWN_ITEM.items():
+            if item == own: reach.add(lname)
+    for lname in layers:
+        if lname not in reach: problems.append('TruMenu.cpp: layer %s is not reachable from the quick-toggle bar' % lname)
+    counts = {}
+    if os.path.exists(radial_path):
+        for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.count('|') != 2: continue
+            cmd = line.split('|')[2].strip()
+            word, _, arg = cmd.partition(' ')
+            arg = arg.strip()
+            where = '%s:%d: %s' % (os.path.basename(radial_path), n, cmd)
+            if word in ('quick.open', 'shot.oncine', 'dbg.depthdump', 'dbg.cplist', 'pos.list'):
+                counts[word] = counts.get(word, 0) + 1
+                if arg: problems.append(where + ' (no argument in the ring)')
+            elif word == 'dbg.cpall':
+                counts['dbg.cpall ' + arg] = counts.get('dbg.cpall ' + arg, 0) + 1
+                if arg not in ('0', '1'): problems.append(where + ' (0 / 1)')
+            elif word == 'dbg.cpgo' and not (arg == 'active' or arg.isdigit()):
+                problems.append(where + ' (active or an intro id)')
+            elif word == 'pos.go' and not re.fullmatch(r'[A-Za-z0-9_-]+', arg):
+                problems.append(where + ' (a saved name or last)')
+            elif word == 'pos.save' and arg and not re.fullmatch(r'[A-Za-z0-9_-]+', arg):
+                problems.append(where + ' (no argument or a name a-z 0-9 _ -)')
+        for want in ('quick.open', 'shot.oncine', 'dbg.depthdump', 'dbg.cplist', 'dbg.cpall 0', 'dbg.cpall 1'):
+            if counts.get(want, 0) != 1:
+                problems.append('%s: %s must be in the radial file once, found %d'
+                                % (os.path.basename(radial_path), want, counts.get(want, 0)))
+    return problems, '%d bar rows in %d tables (every one of %d layers reachable), %d new items, [Quick] %d keys' % (
+        len(rows), len({r[0] for r in rows}), len(layers), len(QB_ITEMS), len(QB_KEYS))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -671,6 +816,10 @@ def main(argv):
     for p in dproblems: print('DEBUG %s' % p)
     if not dproblems: print('ok: [Debug] Enabled / NavDraw / NavMask values, %d nav items, %s' % (len(NAV_ITEMS), dsummary))
     problems += dproblems
+    qproblems, qsummary = check_quick(ini_path, radial_path)   # 0.17
+    for p in qproblems: print('QUICK %s' % p)
+    if not qproblems: print('ok: [Quick] / [Shot] OnCine* / CheckpointHide values, %s, ring entries' % qsummary)
+    problems += qproblems
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))
