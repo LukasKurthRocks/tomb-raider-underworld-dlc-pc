@@ -2562,6 +2562,8 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      moved). Since 2026-11-06 `navraw` is a step of `dlc_fixes_build.STRUCT_STEPS` (after `seqrepeat`) and part of
      the default `dlc_struct_fixes.py check`; the two in-place calls are gone (Fixes has 16 tools instead of 18, `-FromTool`
      numbers after the first `dlc_fixes_build` moved). DRMs without a NavGraph image (the costume packs) are left alone.
+     Checked by a Fixes run (`pipeline_check_0611`, 16 / 16 exit 0): DLC 1 8 units / 1670 words, DLC 2 10 units / 5187
+     words; against the full run 0511 only these 18 DRMs differ, the other 577 files are byte-identical.
      Open: a `Test-TruPreflight.ps1` Data row for the navmesh.
    * Thrall charts: the 445 wrong chart truth words of the thrall copies in the test trees (finding of the F21
      agent) come from a stage-2b build of 2026-10-30 23:24, before step `statechart` existed (new read-only
