@@ -16,6 +16,23 @@ show them too. Numbers: [WINDOWS_REBUILD.md](WINDOWS_REBUILD.md).
 | UI timeline target paths and UI text string ids converted as Symbols | crash after the DLC 2 intro, empty hint box | `tools/script_u16array_fix.py`, `tools/script_uitext_fix.py` (steps `uipath` / `uitext`) | 43 |
 | Pixel shaders reading two different constant registers in one instruction (272 in B138) | "A problem has occurred with your display driver" on a real GPU | `tools/shader_const_fix.py` | 43 |
 | `.mul` IMA encoding that ignores the decoder's step cap (8191) | crackling sibilants, clicks on loud transients | game-model encoder in `tools/mul_audio_nch.py`, measure with `tools/listen_game_model.py` | 18 |
+| NavPower NavGraph image (Level+0x60) swapped like a DTP; it is little-endian on the Xbox too, only the count word after resource 1 is in platform order | navmesh areas off (292 of 600 areas in `dlc_yggdrasil_end`) | `tools/navgraph_raw_fix.py scan <mods>` (step `navraw`) | 50 |
+
+### The same checks on the B270 kit files
+
+The B270 kit was rebuilt offline from its patches (`tools/kit_rebuild.py`, 484 of 484 files) and run through the
+checks above; nothing from the kit was executed. Read-only, for whoever maintains these files:
+
+| Check | B270 kit files | Note |
+|---|---|---|
+| Pixel shaders with two constant registers in one instruction (`tools/shader_const_fix.py`) | 500 distinct shaders, 1 500 instructions in 55 files | B138: 272 |
+| Thrall base class re-authored under 12433 (`tools/script_layout_clash.py`) | 86 classes overlap | crash when thralls are unloaded (findings 45, 46) |
+| Calls into the title update's `achievement` natives (script 66) | 11 references | with the retail PC exe such a call reads address `0x0000000c` (descriptor 0) at tru+0x17de64 / tru+0x1766f0; not checked against the B270 exe patch |
+| Raw ids (`tools/converter_faults_fix.py`) | `idword` 4, `fxnode` 4, `chartid` 1, `animlist` 1 | thrall event ids, effect nodes |
+| Particle record words (`objrec`) | 8 (raft bridge) | finding 47 |
+| DTP byte order in the 22 DLC 1 files changed after B138 | all changed words confirmed by base pairs | one more word with the same rule: water wheel `+0xbc4` |
+| SoundPlex sequence repeat, texture group counts, breath-sound ids, cloth count, UI paths | 0 | – |
+| NavGraph images (`tools/navgraph_raw_fix.py scan`) | 0 in 22 units | raw, as on the Xbox |
 
 ## 3. Names not listed in the B270 manifest
 
