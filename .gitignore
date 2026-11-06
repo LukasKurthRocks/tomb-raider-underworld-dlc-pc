@@ -42,6 +42,9 @@ work/m020_0611/
 work/stream_0611/
 work/thrall_0611/
 work/audio_0611/
+work/exe_k_0611/
+# local profile archives (moved out of the repository folder, never committed)
+tests/profiles/archive_0311/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report
 tools/native_test/shaders/
 tools/native_test/native_report.txt
