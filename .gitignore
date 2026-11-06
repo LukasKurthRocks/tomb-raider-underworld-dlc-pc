@@ -44,6 +44,9 @@ work/thrall_0611/
 work/audio_0611/
 work/exe_k_0611/
 work/m0201_0611/
+# TruMercLang 0.1 scratch (byte-check list, smoke-test host + its binaries)
+work/merclang_0611/
+work/arachno2_0611/
 # local profile archives (moved out of the repository folder, never committed)
 tests/profiles/archive_0311/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report

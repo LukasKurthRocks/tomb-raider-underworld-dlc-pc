@@ -83,6 +83,7 @@ earlier extraction of 2026-11-02, damaged / truncated / renamed copies handled);
 | `Set-TruDoppelganger.ps1` | `-Install` / `-Remove` `TruDoppelganger.asi` + `.ini` (DLC 2 player: the title-update state-machine ids) next to `tru.exe`, same rules |
 | `Set-TruGuard.ps1` | `-Install` / `-Remove` `TruGuard.asi` + `.ini` (exception diagnostics: fault sites, minidumps; `src\asi\TruGuard\README.md`) next to `tru.exe`, same rules |
 | `Set-TruShadowPower.ps1` | `-Install` / `-Remove` `TruShadowPower.asi` + `.ini` next to `tru.exe` (loaded by the game's ASI loader `binkw32.dll`; foreign files are never touched) |
+| `Set-TruMercLang.ps1` | `-Install` / `-Remove` `TruMercLang.asi` + `.ini` (fun option: the mercenaries' barks in another language, default off; `src\asi\TruMercLang\README.md`) next to `tru.exe`, same rules as `Set-TruShadowHud.ps1` |
 | `Set-TruRockVein.ps1` | `-Install` / `-Remove` `TruRockVein.asi` + `.ini` (DLC 2 rock veins: markup conditions 607 / 608) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1` |
 | `Set-TruLink.ps1` | `-Install` / `-Remove` `TruLink.asi` + `.ini` (test tool: live read / write channel on 127.0.0.1:9265, `src\asi\TruLink\README.md`) next to `tru.exe`, same rules as `Set-TruShadowPower.ps1` |
 | `Invoke-TruLink.ps1` | client for `TruLink.asi`: `-Command 'read32 cheat'`, `-Script file.txt` or `-Interactive`; prints the answers (`-PassThru` returns them) |
