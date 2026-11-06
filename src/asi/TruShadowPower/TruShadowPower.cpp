@@ -117,6 +117,21 @@
 // no HUD call, no state change) while the player state or the player instance [0xe7f094] is 0, the main state
 // [0xe7ed60] is not 1 or a level change waits (GameTracker+0xb9); every HUD call of the plugin needs the player state.
 // One log line per skip burst and one when the tick resumes. Section "0.16" below.
+//
+// 0.17 (2026-11-06, project doc Befund-TruShadowPower-017-0611.md): the power counts LB / RB only as the game gets
+// them. Live 22:18 (DLC 2): every LB / RB page switch of TruMenu's quick bar started the power. The pad slot
+// 0x00a02b8c is shared by TruMenu, TruLink and this plugin, and the chain order depends on thread timing: TruMenu's
+// import filter never handed out its hook in that TruMenu.log (44 sessions, always "PadHook set on the pointer (late
+// load)"), so TruMenu often sits OUTSIDE this plugin (game -> TruMenu -> TruShadowPower -> TruLink -> XInputGetState)
+// and masks LB / RB (quick bar) or hands out a neutral pad (menu, ring) only after this plugin has read the real pad;
+// the game's state buffer is on the poll's stack (tru+0x84b7c), so nothing of it is left to read afterwards.
+// [ShadowPower] MenuInput=1 (default; 0 = 0.16): (1) once per hook generation and owner the plugin wraps the hook
+// that took the slot over it (TruMenu always, TruLink only while the plugin is innermost), so it runs outside
+// TruMenu's hook and its view is the game's view; a call that comes back into the plugin from inside that chain goes
+// on to the function it called before (every hook still runs once per poll);
+// (2) a button the real pad holds but the game does not get (read again from XInputGetState with the same packet
+// number) is ignored until it is released - also after the menu / bar closes (no start with RB still held). One log
+// line per suppression burst and one at the resume. Section "0.17" below.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -293,6 +308,7 @@ int g_loopSound = 0;                    // 0.14 [Sound] LoopSound: TU looping so
 int g_moveEvents = 0;                   // 0.14 [Look] MoveEvents: TU 0x823d77f0 + Start's event 0x83 (gameTracker+0x1f0)
 int g_cameraFlag = 0;                   // 0.14 [Look] CameraFlag: TU Start's camera manager vtbl[0xa4] (+0x80 |= 2)
 int g_strikeLook = 0;                   // 0.14 [Look] StrikeLook: TU 0x823d8a80 / 0x823d9050 (player anim events 5 / 4)
+int g_menuInput = 1;                    // 0.17 [ShadowPower] MenuInput: buttons only as the game gets them (0 = 0.16)
 
 char g_logPath[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -842,8 +858,76 @@ void MeterTick(bool padHeld);                // 0.9: the TU tick (defined below)
 XInputGetStateFn g_realXInput = nullptr;    // the real XInputGetState (xinput* module), for the re-entry guard
 __declspec(thread) int g_inPadHook = 0;
 
+// ---- 0.17: the buttons as the game gets them (project doc Befund-TruShadowPower-017-0611.md) ----
+// g_inner: the function this plugin wrapped before it went outside TruMenu's hook (HookThread, once per hook
+// generation; null = never). TruMenu then calls this plugin from inside the chain - that call goes on to g_inner, so
+// every hook still runs once per poll. g_withheld: per pad, the buttons the real pad holds but the game did not get
+// (TruMenu's neutral pad of menu / ring, the quick bar's LB / RB / D-pad) - ignored until the pad releases them.
+volatile XInputGetStateFn g_inner = nullptr;
+bool g_menuInputOk = false;                 // [ShadowPower] MenuInput=1 and the pad poll code verified (CheckPadPoll)
+WORD g_withheld[4] = {0, 0, 0, 0};
+bool g_withheldOn = false;                  // a suppression burst is running (any pad)
+WORD g_withheldMask = 0;                    // buttons of the running burst (for the log)
+LONG g_withheldBursts = 0, g_withheldPolls = 0;
+DWORD g_withheldTick = 0;
+const LONG kWithheldBurstLog = 64;          // bursts logged at LogLevel 1, later ones at 2
+
+// buttons of g_buttons the game got in this poll, minus the withheld ones. The game's view is `state` after every
+// hook inside this one; the pad's own view is a second read of the real XInputGetState, compared only when both
+// carry the same packet number (the same controller state - TruMenu keeps the packet number when it masks or
+// neutralises). With this plugin inside TruMenu both views are equal and nothing is withheld (= 0.16).
+WORD GameButtons(DWORD index, DWORD result, const PadState *state) {
+    if (result != ERROR_SUCCESS || !state) {
+        g_withheld[index] = 0;
+        return 0;
+    }
+    WORD seen = static_cast<WORD>(state->wButtons & g_buttons);
+    if (!g_menuInputOk) return seen;
+    XInputGetStateFn real = g_realXInput;
+    PadState pad = {};
+    if (real && real(index, &pad) == ERROR_SUCCESS && pad.dwPacketNumber == state->dwPacketNumber) {
+        WORD held = static_cast<WORD>(pad.wButtons & g_buttons);
+        g_withheld[index] = static_cast<WORD>((g_withheld[index] | (held & ~seen)) & held);   // set, or released
+    }
+    return static_cast<WORD>(seen & ~g_withheld[index]);
+}
+
+// one line when a suppression burst starts, one when every withheld button is released (never per frame)
+void WithheldLog() {
+    WORD any = static_cast<WORD>(g_withheld[0] | g_withheld[1] | g_withheld[2] | g_withheld[3]);
+    if (any && !g_withheldOn) {
+        g_withheldOn = true;
+        g_withheldMask = any;
+        g_withheldPolls = 0;
+        g_withheldTick = GetTickCount();
+        LONG burst = ++g_withheldBursts;
+        if (burst <= kWithheldBurstLog || g_logLevel >= 2)
+            Log(burst <= kWithheldBurstLog ? 1 : 2,
+                "pad input suppressed: buttons 0x%04x held on the pad but not passed to the game (TruMenu menu / ring / "
+                "quick bar) - the power ignores them until they are released (power %s, meter %.1f; burst %ld%s)", any,
+                (g_meter.flags & 1) ? "on" : "off", g_meter.value, burst,
+                burst == kWithheldBurstLog ? ", later bursts at LogLevel 2" : "");
+    } else if (any) {
+        g_withheldMask |= any;
+    } else if (g_withheldOn) {
+        g_withheldOn = false;
+        if (g_withheldBursts <= kWithheldBurstLog || g_logLevel >= 2)
+            Log(g_withheldBursts <= kWithheldBurstLog ? 1 : 2,
+                "pad input resumed: suppressed buttons 0x%04x released after %lu ms (%ld polls) - they count again",
+                g_withheldMask, GetTickCount() - g_withheldTick, g_withheldPolls);
+    }
+    if (g_withheldOn) ++g_withheldPolls;
+}
+
 DWORD WINAPI PadHook(DWORD index, PadState *state) {
     if (g_inPadHook) {                          // another plugin's hook called back into us: break the loop
+        XInputGetStateFn inner = g_inner;       // 0.17: we went outside that hook - continue where we sat before
+        if (inner && g_inPadHook == 1) {        // once per poll; a second call back goes to XInputGetState
+            ++g_inPadHook;
+            DWORD innerResult = inner(index, state);
+            --g_inPadHook;
+            return innerResult;
+        }
         return g_realXInput ? g_realXInput(index, state) : ERROR_DEVICE_NOT_CONNECTED;
     }
     g_inPadHook = 1;
@@ -851,7 +935,8 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     g_inPadHook = 0;
     if (index > 3) return result;
     WORD before = g_lastButtons[index];
-    g_lastButtons[index] = (result == ERROR_SUCCESS && state) ? static_cast<WORD>(state->wButtons & g_buttons) : 0;
+    g_lastButtons[index] = GameButtons(index, result, state);     // 0.17: as the game gets them (0.16: state only)
+    WithheldLog();
     if (g_lastButtons[index] != before)
         Log(3, "pad %lu buttons 0x%04x (was 0x%04x)", index, g_lastButtons[index], before);
     DWORD clock = *kGameClock;
@@ -876,13 +961,35 @@ bool InXInputModule(LONG address) {
     return _strnicmp(name, "xinput", 6) == 0;
 }
 
+// 0.17: file name of the module that holds the address ("?" if none)
+void ModuleBaseName(LONG address, char *name, size_t size) {
+    strncpy_s(name, size, "?", _TRUNCATE);
+    HMODULE module = nullptr;
+    if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            reinterpret_cast<LPCSTR>(static_cast<LONG_PTR>(address)), &module))
+        return;
+    char path[MAX_PATH] = {0};
+    if (!GetModuleFileNameA(module, path, MAX_PATH)) return;
+    const char *base = strrchr(path, '\\');
+    strncpy_s(name, size, base ? base + 1 : path, _TRUNCATE);
+}
+
 // The game fills the pad pointer itself (GetProcAddress) - wait for it and chain in front of whatever is there
 // (the real XInputGetState or another of our plugins: TruLink, TruMenu). Re-hook later only when the slot holds the
 // real XInputGetState again (the game rewrote it, e.g. after a device change) - never just because it is "not ours",
 // or two plugins would keep re-hooking each other.
+// 0.17 exception ([ShadowPower] MenuInput=1): when another hook took the slot over this plugin, wrap it once more per
+// hook generation and owner, so the power sees the pad as the game gets it (TruMenu masks / neutralises it on the way
+// back): always over TruMenu.asi; over TruLink.asi only while this plugin itself calls XInputGetState (innermost:
+// TruLink -> TruMenu -> TruShadowPower) - TruLink's loop breaker, should TruLink call this plugin directly, then only
+// switches TruLink to XInputGetState, which is what this plugin called anyway; outside of that it could drop TruMenu.
+// TruMenu re-hooks only when the slot points into xinput again and TruLink leaves foreign hooks in place, so this
+// cannot ping-pong; the call back into this plugin from inside the chain goes on to g_inner. Others: left in place.
 DWORD WINAPI HookThread(LPVOID) {
     volatile LONG *slot = reinterpret_cast<volatile LONG *>(kPadPointer);
     bool hookedOnce = false;
+    bool wrappedMenu = false, wrappedLink = false;   // 0.17: went outside that owner's hook in this generation
+    LONG lastForeign = 0;                       // 0.17: last foreign owner logged
     for (int waited = 0; !g_stop; ++waited) {
         if (!g_realXInput) {                    // resolve the real one for the re-entry guard
             const char *dlls[] = {"xinput1_3.dll", "xinput9_1_0.dll", "xinput1_4.dll"};
@@ -896,11 +1003,44 @@ DWORD WINAPI HookThread(LPVOID) {
         LONG ours = static_cast<LONG>(reinterpret_cast<LONG_PTR>(&PadHook));
         if (current != 0 && current != ours && (!hookedOnce || InXInputModule(current))) {
             if (InXInputModule(current)) g_realXInput = reinterpret_cast<XInputGetStateFn>(static_cast<LONG_PTR>(current));
+            g_inner = nullptr;                  // 0.17: a new hook generation
             g_original = reinterpret_cast<XInputGetStateFn>(static_cast<LONG_PTR>(current));
             if (InterlockedCompareExchange(slot, ours, current) == current) {
                 hookedOnce = true;
+                wrappedMenu = wrappedLink = false;
+                lastForeign = 0;
                 Log(1, "pad pointer 0x%08lx hooked (previous 0x%08lx%s)", kPadPointer, current,
                     g_realXInput && current == reinterpret_cast<LONG>(g_realXInput) ? ", XInputGetState" : ", another hook");
+            }
+        } else if (current != 0 && current != ours && g_menuInputOk && current != lastForeign) {
+            char owner[MAX_PATH];
+            ModuleBaseName(current, owner, sizeof(owner));
+            XInputGetStateFn first = g_original;
+            XInputGetStateFn innerBefore = g_inner;
+            bool menu = _stricmp(owner, "TruMenu.asi") == 0;
+            bool linkOwner = _stricmp(owner, "TruLink.asi") == 0;
+            bool link = linkOwner && first && InXInputModule(static_cast<LONG>(reinterpret_cast<LONG_PTR>(first)));
+            if (first && ((menu && !wrappedMenu) || (link && !wrappedLink))) {
+                g_inner = first;                // set before g_original: a call back from inside continues there
+                g_original = reinterpret_cast<XInputGetStateFn>(static_cast<LONG_PTR>(current));
+                if (InterlockedCompareExchange(slot, ours, current) == current) {
+                    if (menu) wrappedMenu = true;
+                    else wrappedLink = true;
+                    Log(1, "0.17 pad chain: %s (0x%08lx) took the pad pointer over this plugin - wrapped it once more "
+                           "(game -> TruShadowPower -> %s -> ...; a call back into this plugin continues to 0x%08lx): "
+                           "the power sees the pad as the game gets it", owner, current, owner,
+                        reinterpret_cast<DWORD>(first));
+                } else {
+                    g_original = first;         // the slot changed under us: try again next round
+                    g_inner = innerBefore;
+                }
+            } else {
+                lastForeign = current;
+                Log(1, "0.17 pad chain: pad pointer now 0x%08lx (%s) - left in place (%s)", current, owner,
+                    menu ? "TruMenu was wrapped once in this generation already"
+                         : linkOwner ? "TruLink is wrapped only while this plugin calls XInputGetState itself - TruLink's "
+                                       "loop breaker could otherwise drop the hook this plugin calls"
+                                     : "only TruMenu.asi / TruLink.asi are wrapped once more");
             }
         } else if (current == 0 && waited == 600) {
             Log(1, "pad pointer still empty after 60 s - still waiting");
@@ -2190,6 +2330,50 @@ void CheckTickGate() {
             static_cast<unsigned>(sizeof(kTickGateChecks) / sizeof(kTickGateChecks[0])));
 }
 
+// ================================================================================================================
+// 0.17 (project doc Befund-TruShadowPower-017-0611.md): LB / RB only as the game gets them.
+//
+// Live 2026-11-06 22:18 (DLC 2): each LB / RB page switch of TruMenu's quick bar logged "shadow power ON". The pad
+// pointer 0x00a02b8c is written once by the game (tru+0x82513, the GetProcAddress result) and called at three sites
+// (tru+0x82619 presence test every 500 ms, tru+0x84b82 the per-frame poll, tru+0x8620a); the per-frame poll passes a
+// state buffer on its own stack (lea eax,[esp+4] at tru+0x84b7c) and reads wButtons from it after the call
+// (tru+0x84bc3) - what the game got is gone after the poll returns. TruMenu, TruLink and this plugin each wrap the
+// pointer once; TruMenu's import filter (meant to hand the game its hook first) never did so in the TruMenu.log of
+// that day, so TruMenu was placed "late" on top of whatever was there - in that session this plugin. Chain: game ->
+// TruMenu -> TruShadowPower -> TruLink -> XInputGetState; TruMenu cleared LB / RB (quick bar open) only after this
+// plugin had read them. 0.17: go outside TruMenu once (HookThread) and withhold what the game does not get
+// (GameButtons, WithheldLog). The game also compares dwPacketNumber with its last one (tru+0x84b95): TruMenu keeps it
+// when it masks or neutralises, which is what GameButtons relies on for its two reads.
+const CodeCheck kPadPollChecks[] = {
+    // the only writer of the pointer: GetProcAddress (import slot 0x83e08c, "XInputGetState" 0x844b98) -> 0xa02b8c
+    {0x00482505, "8b358ce08300 68984b8400 50 ffd6 a38c2ba000"},
+    // per-frame poll: state on the stack, pad index [ebp+0x894], call through the pointer, result test
+    {0x00484b70, "83ec10 55 8be9 8b8d94080000 8d442404 50 51 ff158c2ba000 85c0 7409"},
+    // packet number against the last one ([ebp+0x890]), unless forced (arg byte); wButtons read from the stack buffer
+    {0x00484b95, "8b442404 398590080000 7507 807c242000 74e4"},
+    {0x00484bc3, "0fb74c2414"},
+    // the two other calls through the pointer: presence test (pad 0, every 500 ms) and tru+0x8620a
+    {0x00482613, "8d542408 52 56 ff158c2ba000 85c0 0f94c0"},
+    {0x00486204, "8d4c2424 51 57 ff158c2ba000 85c0 0f8538010000"},
+};
+
+void CheckPadPoll() {
+    if (!g_menuInput) {
+        Log(1, "0.17 menu input: off ([ShadowPower] MenuInput=0) - LB / RB as read in the pad chain (0.16)");
+        return;
+    }
+    for (const auto &c : kPadPollChecks)
+        if (!HexBytesAt(c.address, c.bytes)) {
+            Log(0, "0.17 menu input: pad poll code at 0x%08lx does not match - off (LB / RB as read in the pad chain, "
+                   "0.16)", c.address);
+            return;
+        }
+    g_menuInputOk = true;
+    Log(1, "0.17 menu input: %u code checks passed - LB / RB count only as the game gets them (outside TruMenu's pad "
+           "hook; a button TruMenu withholds is ignored until released)",
+        static_cast<unsigned>(sizeof(kPadPollChecks) / sizeof(kPadPollChecks[0])));
+}
+
 // ---- the TU tick 0x823d7a10 ----
 int g_lastDg = -1;
 bool g_lastPadHeld = false;
@@ -3338,6 +3522,7 @@ void ReadOptions(const char *dir) {
     g_cameraFlag = GetPrivateProfileIntA("Look", "CameraFlag", 0, ini);
     g_strikeLook = GetPrivateProfileIntA("Look", "StrikeLook", 0, ini);
     g_clothTimeStep = GetPrivateProfileIntA("Cloth", "TuTimeStep", 0, ini);     // 0.15, default 0
+    g_menuInput = GetPrivateProfileIntA("ShadowPower", "MenuInput", 1, ini);    // 0.17, default 1 (0 = 0.16)
 }
 
 void Start(HMODULE self) {
@@ -3348,13 +3533,13 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.16 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.17 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
-        "camera flag %d, strike look %d; 0.15: cloth TU time step %d)", g_enabled, g_buttons, g_hudFeed, g_fallback,
-        g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled, g_legacyPadStart, g_gameInput,
-        g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled, g_state2102Enabled, g_loopSound, g_moveEvents,
-        g_cameraFlag, g_strikeLook, g_clothTimeStep);
+        "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d)", g_enabled, g_buttons,
+        g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled, g_legacyPadStart,
+        g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled, g_state2102Enabled, g_loopSound,
+        g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -3467,6 +3652,7 @@ void Start(HMODULE self) {
     PatchStrikeLook();
     PatchClothTimeStep();               // 0.15: only with [Cloth] TuTimeStep=1 (independent of the doppelganger flag)
     CheckTickGate();                    // 0.16: main state / level change tests of the tick (player tests always on)
+    CheckPadPoll();                     // 0.17: [ShadowPower] MenuInput (before the hook thread reads g_menuInputOk)
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -3487,7 +3673,8 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.16 (translated TU meter with the TU tick gates, tick only with a player in a level, Lara "
+    return "TruShadowPower 0.17 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+           "only as the game gets them (outside TruMenu's pad hook, withheld buttons ignored until released), Lara "
            "conditions 1046 / 1047 / 1048-1056 / 2401, states 243 / 245 / 1018 / 2102, activities 1009 / 1039, shadow look = TU player events of start / stop, "
            "adrenaline look = meter flag 0x40 / camera mode 0x34, look screen effect report / switch, GlobalParams[7], "
            "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4; switches default off: loop "

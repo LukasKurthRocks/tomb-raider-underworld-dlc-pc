@@ -47,6 +47,13 @@ work/m0201_0611/
 # TruMercLang 0.1 scratch (byte-check list, smoke-test host + its binaries)
 work/merclang_0611/
 work/arachno2_0611/
+# owner's own replacement image + source photo (personal, never in the repository or a release)
+work/arachno_owner/
+# 2026-11-06 night: TruMenu 0.21, K14 damage types, TruShadowPower 0.17 scratch
+work/m021_0611/
+work/k14_0611/
+work/sp017_0611/
+TruMenu.arachno*.png
 # local profile archives (moved out of the repository folder, never committed)
 tests/profiles/archive_0311/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report

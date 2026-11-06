@@ -22,9 +22,58 @@ white-black with the look); 0.10 (look screen-effect report / switch, with the d
 never registered); 0.13 (state 2102 next to TruDataGuard) built 2026-11-04, not played; 0.14 (loop sound, movement
 events, camera flag, strike look - four switches, all default off) built 2026-11-04, not played; 0.15 (the TU's
 player cloth time step, `[Cloth] TuTimeStep`, default off) built 2026-11-06, not played; 0.16 (crash fix: the meter
-ticks only with a player in a level) built 2026-11-06, not played.** Not covered: the
+ticks only with a player in a level) built 2026-11-06, played 2026-11-06 evening (power OK; TruMenu's quick bar
+LB / RB started it); 0.17 (LB / RB only as the game gets them, `[ShadowPower] MenuInput`) built 2026-11-06, not
+played.** Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.17: LB / RB only as the game gets them - no power from TruMenu's menus (2026-11-06)
+
+Live 2026-11-06 22:18 (DLC 2): with TruMenu's quick bar open, every LB / RB page switch logged `shadow power ON`
+(and OFF ~0.13 s later). Cause: the pad pointer 0x00a02b8c is shared by TruMenu, TruLink and this plugin, each wraps it
+once, and the order depends on thread timing. TruMenu's import filter (meant to give the game TruMenu's hook first)
+never did so in that day's TruMenu.log - 44 sessions, always `PadHook set on the pointer (late load)` - so TruMenu
+often sits **outside** this plugin: `game -> TruMenu -> TruShadowPower -> TruLink -> XInputGetState` (22:18 session).
+TruMenu clears LB / RB (quick bar) or hands out a neutral pad (menu, ring) on the way back, after this plugin has read
+the real pad; the poll's state buffer lives on its stack (tru+0x84b7c), so nothing is left to read afterwards.
+
+0.17, `[ShadowPower] MenuInput=1` (default; 0 = 0.16):
+
+1. **Outside TruMenu**: when another hook took the slot over this plugin, the hook thread wraps it once more per hook
+   generation and owner (`0.17 pad chain: TruMenu.asi (0x...) took the pad pointer over this plugin - wrapped it once
+   more ...`): always TruMenu.asi; TruLink.asi only while this plugin itself calls XInputGetState (order TruLink ->
+   TruMenu -> TruShadowPower) - TruLink's loop breaker (TruLink calls XInputGetState directly once the plugin it calls
+   takes the slot) could otherwise drop TruMenu. The call back into this plugin from inside the chain goes on to the
+   function it called before (once per poll; a second one goes to XInputGetState), so every hook still runs once per
+   poll. TruMenu re-hooks only when the slot points into xinput again, TruLink leaves foreign hooks in place - no
+   ping-pong. Any other owner is left in place with one log line. All six orders of the three plugins end with this
+   plugin outside TruMenu:
+
+   | Order before (outer -> inner) | 0.17 | Order after |
+   |---|---|---|
+   | ShadowPower, TruMenu, TruLink / ShadowPower, TruLink, TruMenu | nothing to do | unchanged |
+   | TruMenu, ShadowPower, TruLink (22:18 session) | wrap TruMenu | ShadowPower, TruMenu, (ShadowPower ->) TruLink |
+   | TruMenu, TruLink, ShadowPower | wrap TruMenu; TruLink's breaker switches TruLink to XInput | ShadowPower, TruMenu, TruLink |
+   | TruLink, ShadowPower, TruMenu | left in place (already outside TruMenu) | unchanged |
+   | TruLink, TruMenu, ShadowPower | wrap TruLink (plugin innermost) | ShadowPower, TruLink, TruMenu, (ShadowPower ->) XInput |
+2. **Withheld buttons**: after the chain the plugin reads the real pad once more; when both reads carry the same
+   packet number, a button the pad holds and the game lacks is withheld until the pad releases it - also after the
+   menu / bar closes, so RB held through the close starts nothing until it was released once. With the plugin inside
+   TruMenu (TruMenu's filter worked) both views are equal - nothing to withhold, the masked pad already arrives.
+3. **Log**: `pad input suppressed: buttons 0x0200 held on the pad but not passed to the game (TruMenu menu / ring /
+   quick bar) - ...` once per burst, `pad input resumed: suppressed buttons 0x... released after T ms (N polls) - they
+   count again` at its end (first 64 bursts at LogLevel 1, later at 2); `0.17 menu input: 6 code checks passed ...` at
+   load.
+
+Byte pre-checks `work\asi\v17\prechecks_v17.txt` (6, = `kPadPollChecks`): the only writer of the pointer
+(tru+0x82505), the per-frame poll (stack buffer, pad index, call, packet number test tru+0x84b95, wButtons read
+tru+0x84bc3) and the two other calls through the pointer (tru+0x82613 presence test, tru+0x86204). A mismatch turns
+MenuInput off (0.16 behaviour). Everything else - switches, meter, tick, conditions, API v4 - is unchanged.
+
+Limits: the re-wrap runs in the hook thread (about 1 s after the last placement), so the first second after the
+pointer is filled is still 0.16; a fourth plugin on the slot is not wrapped. The order-independent fix is a small
+TruMenu export (project doc `Befund-TruShadowPower-017-0611.md` section 5) - proposed for the next TruMenu build.
 
 ## 0.16: the meter ticks only with a player in a level - crash fix (2026-11-06)
 
@@ -461,6 +510,7 @@ every `*.asi` next to `tru.exe`.
 | `[Meter] Fallback` | 1 | 1 = file values when object 858 is not loaded; 0 = no power then |
 | `[ShadowPower] LegacyPadStart` | 0 | 0.9: 1 = the 0.8 tick (every level, no doppelganger / cinematic gates) |
 | `[ShadowPower] GameInput` | 0 | 0.9: 1 = LB / RB from the game's input records +0x1a70 / +0x1b30 & 4 (the TU's source; unproven on PC) |
+| `[ShadowPower] MenuInput` | 1 | 0.17: LB / RB only as the game gets them (outside TruMenu's pad hook; a button TruMenu withholds is ignored until released); 0 = 0.16 |
 | `[Conditions] Enabled / Cond1046 / Cond1055` | 1 | see 0.4 / 0.6 / 0.7 |
 | `[States] Enabled` | 1 | see 0.5 |
 | `[Look] Enabled / Messages` | 1 | see 0.8; Enabled=0 also turns AdrenalineMode off |
