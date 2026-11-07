@@ -2091,6 +2091,32 @@ sticky.set int 0:11270 key 17287 (index 37): 3 -> 0 (src=quick; the game's set +
 phys: bodies used 301 / 405 (crossed 300; peak 301), chunkdolls 1 / 4, lock 0 - ...
 ```
 
+## TruMenu 0.21.2 (queued items outside the pad hooks of other plugins; 2026-11-07)
+
+Report `docs\Befund-Padkette-StartView-0711.md`; build `work\asi\menu0212`; no new byte check (no new game address).
+
+Live 2026-11-07 14:55 (DLC 2): from one moment on, every View + Start of the quick bar also opened the game's pause
+menu. Cause: the bar row "Fliegen" queued `cheat.flight 0`; the item runs on the game thread inside PadHook and its
+message 12 to the player makes the game poll the pad again through 0x00a02b8c. In that run TruLink sat outermost
+(`game -> TruLink -> TruShadowPower -> TruMenu -> XInputGetState`), was still on the stack and took the same-thread
+re-entry for a hook loop: `pad hook re-entered (hook chain loops back to TruLink) - calling XInputGetState directly
+from now on` (TruLink.log 14:55:07.230). TruShadowPower and TruMenu were out of the chain for the rest of the session
+(`pad: slot not polled - reading the pad in Present`, never "polled again"); the bar then worked from TruMenu's own
+reads in Present, which cannot mask - the game got Start. The same happened once before (16:14:39, also
+`cheat.flight 0`, TruLink outermost); `cheat.flight 0` in the other orders (TruMenu or TruShadowPower outermost) never
+cut the chain.
+
+0.21.2: PadHook runs a queued item only when the **game itself** called it (return address inside tru.exe - no other
+pad hook is outside PadHook on this thread); otherwise the item waits for the Present hook (same thread, between two
+polls, the path the front end has always used) - at most one frame later. One log line per caller module
+(`pad: PadHook is called through another pad hook (TruLink.asi, return 0x...) - queued items run in the Present hook
+instead ...`), later items at LogLevel 2. Without a Present hook (d3d9 code check failed) items run in PadHook as
+before. The per-frame ticks of PadHook are unchanged. The order of the three pad hooks still depends on load timing
+(the import slot is rewritten to KERNEL32's GetProcAddress after TruMenu's filter in every run - by whom is unproven);
+with this rule and TruShadowPower 0.19
+(TruMenuPadBlock, no re-wrap) no order cuts the chain (model `padchain` in `tools\trumenu_quick_check.py`, all six
+orders).
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
@@ -2355,6 +2381,12 @@ Mixed versions: TruShadowPower **0.5** (re-wraps whenever the slot is not its ow
 TruLink cut the loop by calling the real `XInputGetState` directly - PadHook is then no longer called. TruMenu notices
 that (no PadHook call for 250 ms) and reads the pad in Present, so the menu still opens, but input is not blocked.
 Use TruShadowPower **0.5.1** or later (same chaining rule) with TruLink + TruMenu.
+
+Observed since 2026-11-06 (TruMenu.log, `Befund-TruShadowPower-017-0611.md`, `Befund-Padkette-StartView-0711.md`): the
+import filter never handed out PadHook - the slot is rewritten to KERNEL32's GetProcAddress after the filter - so
+PadHook is always placed late and the order of the three hooks depends on load timing. TruLink's same-thread re-entry
+breaker also fires when an item run inside PadHook polls the pad while TruLink sits outside PadHook; since 0.21.2 such
+items run in the Present hook (section "TruMenu 0.21.2").
 
 **Front end.** If PadHook has not been called for 250 ms (main menu, loading - the game may not poll the slot
 there), the Present hook reads the pad itself (`XInputGetState` of the loaded xinput module, pad index of the last

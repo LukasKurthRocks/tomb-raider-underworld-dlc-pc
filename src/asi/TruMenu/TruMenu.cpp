@@ -13,6 +13,10 @@
 //          with TruShadowPower / TruLink): hook once, re-hook only when the slot points into xinput*.dll again,
 //          thread-local re-entry guard that calls the real XInputGetState. When the game does not poll the slot
 //          (front end, loading) the Present hook reads the pad itself after 250 ms.
+//          0.21.2: queued items run inside PadHook only when the game called PadHook itself; with another pad hook
+//          outside it (the import filter rarely wins - order by load timing) they run in the Present hook, because
+//          an item's own pad poll would re-enter that hook and TruLink then cuts the chain (docs\Befund-Padkette-
+//          StartView-0711.md).
 //   d3d9   The game's device manager is [0x00ad75e4] (created at tru+0x1239c0), its IDirect3DDevice9 at +0x20 (out
 //          parameter of the CreateDevice call tru+0x122736; +0x208 are the present parameters). A worker thread waits for that device and patches the
 //          device's own vtable entries Reset (16) and Present (17). This works with or without a d3d9.dll proxy
@@ -41,6 +45,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <intrin.h>                         // 0.21.2: _ReturnAddress (PadHook: called by the game or by another hook)
 #include <shlobj.h>                         // 0.9: SHGetFolderPathW (the save folder as tru.exe 0x78b550)
 #pragma comment(lib, "shell32.lib")
 
@@ -55,7 +60,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -1222,11 +1227,51 @@ XInputGetStateFn RealXInput() {
     return nullptr;
 }
 
+// 0.21.2 (docs\Befund-Padkette-StartView-0711.md; live 2026-11-07 14:55:07 and earlier 16:14:39): a queued item runs
+// game code, and some of it polls the pad through 0x00a02b8c again (cheat.flight 0: message 12 to the player). When
+// another pad hook sits OUTSIDE PadHook it is still on this thread's stack at that moment, so the nested poll re-enters
+// it - TruLink takes a same-thread re-entry for a hook loop and calls XInputGetState directly from then on: TruShadowPower
+// and TruMenu are out of the chain for the rest of the session (TruMenu falls back to its own reads in Present, the
+// game gets Start / View of the bar combo -> pause menu; no shadow power). So PadHook runs the queued item only when
+// the game itself called it (return address in tru.exe = no other pad hook outside); else the Present hook runs it
+// (same thread, between two polls, the path the front end already uses) - at most one frame later.
+DWORD g_exeLo = 0, g_exeHi = 0;               // tru.exe image (game thread)
+volatile LONG g_reqDeferred = 0;              // a queued item waits for the Present hook (PadHook not called by the game)
+char g_reqDeferOwner[MAX_PATH] = "";         // module of the last caller logged (one line per caller module)
+LONG g_reqDeferCount = 0;                     // items deferred
+bool CalledByGame(const void *ret) {
+    if (!g_exeHi) {
+        const BYTE *base = reinterpret_cast<const BYTE *>(GetModuleHandleA(nullptr));
+        const IMAGE_NT_HEADERS *nt = reinterpret_cast<const IMAGE_NT_HEADERS *>(
+            base + reinterpret_cast<const IMAGE_DOS_HEADER *>(base)->e_lfanew);
+        g_exeLo = reinterpret_cast<DWORD>(base);
+        g_exeHi = g_exeLo + nt->OptionalHeader.SizeOfImage;
+    }
+    const DWORD a = reinterpret_cast<DWORD>(ret);
+    return a >= g_exeLo && a < g_exeHi;
+}
+void DeferPending(const void *ret) {
+    if (InterlockedExchange(&g_reqDeferred, 1)) return;   // this item was deferred already (several polls per frame)
+    ++g_reqDeferCount;
+    char owner[MAX_PATH];
+    ModuleOf(ret, owner, sizeof(owner));
+    if (!_stricmp(owner, g_reqDeferOwner)) {
+        Log(2, "pad: item %s deferred to the Present hook (PadHook called through %s; item %ld)", g_reqId, owner,
+            g_reqDeferCount);
+        return;
+    }
+    strncpy_s(g_reqDeferOwner, sizeof(g_reqDeferOwner), owner, _TRUNCATE);
+    Log(1, "pad: PadHook is called through another pad hook (%s, return 0x%08lx) - queued items run in the Present hook "
+        "instead (0.21.2: a pad poll from inside an item would re-enter that hook; TruLink would then drop the chain); "
+        "item %s, %ld deferred so far", owner, reinterpret_cast<DWORD>(ret), g_reqId, g_reqDeferCount);
+}
+
 DWORD WINAPI PadHook(DWORD index, PadState *state) {
     if (t_padDepth > 0) {                     // re-entered through another plugin's wrapper: no second pass
         XInputGetStateFn real = RealXInput();
         return real ? real(index, state) : ERROR_DEVICE_NOT_CONNECTED;
     }
+    const void *caller = _ReturnAddress();    // 0.21.2: the game (tru.exe) or another pad hook
     ++t_padDepth;
     XInputGetStateFn original = g_padOriginal;
     DWORD result = original ? original(index, state) : ERROR_DEVICE_NOT_CONNECTED;
@@ -1249,7 +1294,10 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         }
     }
     g_lastPadHookTick = GetTickCount();
-    if (g_reqPending) RunPending();           // game thread; the game clock may stand still (front end, pause)
+    if (g_reqPending) {                       // game thread; the game clock may stand still (front end, pause)
+        if (CalledByGame(caller) || !g_presentOriginal) RunPending();   // (no Present hook: as 0.21.1)
+        else DeferPending(caller);            // 0.21.2: another pad hook is outside - the Present hook runs it
+    }
     SnTick();                                 // 0.20.1 sound list (cheap while off: one flag; else once per RefreshMs)
     SoundFreezeTick();                        // 0.10.3: every poll - the game clock stands still while paused
     ShaderClockTick();                        // 0.10.4: likewise (F7 light shaft: TimeVector held with the freeze)
@@ -26307,7 +26355,8 @@ void Render(IDirect3DDevice9 *device) {
         g_padModeIdle = padIdle;
         Log(2, padIdle ? "pad: slot not polled - reading the pad in Present" : "pad: slot polled again");
     }
-    if (padIdle && g_reqPending) RunPending();
+    // 0.21.2: also an item PadHook left here because another pad hook sat outside it (DeferPending)
+    if ((InterlockedExchange(&g_reqDeferred, 0) || padIdle) && g_reqPending) RunPending();
     if (padIdle) WeaponsTick();
     KeyboardToggle();
     RadialTick();                                // 0.10 radial menu: key / mouse hold, the open ring's input

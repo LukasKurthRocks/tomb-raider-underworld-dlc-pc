@@ -21,6 +21,15 @@ it checks that the rules themselves do what the build report claims):
 2026-11-07 TruMenu 0.21.1 changes model "labels" (only a drawn placed instance suppresses its runtime copies) and adds
 six: killpath (AkPick / the Kill outcome), sticky (StParse / RunStickySet), roomcheck (RkCheck / player.goto / unit.go),
 unitgo (the shortcut step expansion), favrecent (page 0, QbRecentAdd, [Quick] Recent), groups (QbBuild / QbGroupSet).
+2026-11-07 TruMenu 0.21.2 / TruShadowPower 0.19 add two (docs/Befund-Padkette-StartView-0711.md):
+  padchain  the three pad hooks (TruMenu PadHook, TruShadowPower PadHook, TruLink PadHook with its re-entry breaker) in
+            all six orders; a queued item that polls the pad again (cheat.flight 0): with the 0.21.1 rule (item always
+            inside PadHook) TruLink cuts the chain in the orders where it sits outermost (TruMenu then drops out, the
+            bar combo's Start reaches the game); with the 0.21.2 rule (inside PadHook only when the game called it,
+            else in Present) no order cuts the chain, the item runs once and the game never sees Start of the combo.
+  padblock  TruShadowPower 0.19 GameButtons with TruMenuPadBlock, the plugin inside and outside TruMenu: quick bar
+            LB / RB taps, RB held through the bar close, RB pressed in the long menu (neutral pad) and held through
+            its close - never counted; plain RB before / after - counted.
 2026-11-06 TruMenu 0.19 dumb AI adds three models (section "---- 0.19 dumb AI" of TruMenu.cpp):
   6. presets   RunAiDumb / AiPresetOn / RadialOn: ring and bar rows "ai.dumb <preset>" get "<preset> 0|1" from the shown
              state; one setting at a time (a group replaces the other), "<preset> 0" switches off only its own active
@@ -70,9 +79,9 @@ unitgo (the shortcut step expansion), favrecent (page 0, QbRecentAdd, [Quick] Re
  19. airemove  RunAdRemove's selection (others / nearest / all / intro id) and AdCandidate's filter.
 
 Usage (from the repository root):
-  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all nineteen, exit 1 on a failure
+  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all models, exit 1 on a failure
 """
-import math, random, sys
+import itertools, math, random, sys
 
 NEAR = 16.5
 
@@ -1536,6 +1545,171 @@ def check_groups():
     return good
 
 
+# ---- 0.21.2 / TruShadowPower 0.19 (2026-11-07, docs/Befund-Padkette-StartView-0711.md) ----
+P_START, P_VIEW, P_L3, P_R3, P_LB, P_RB = 0x0010, 0x0020, 0x0040, 0x0080, 0x0100, 0x0200
+QB_OWN = 0x030F
+
+
+class PadChain:
+    """The three hooks on 0x00a02b8c as in their sources: TruMenu PadHook (t_padDepth guard, bar combo masked, queued
+    item), TruShadowPower 0.19 PadHook (g_inPadHook guard -> XInputGetState, no re-wrap), TruLink PadHook (TLS guard: a
+    same-thread re-entry switches g_next to XInputGetState for good). order = outer -> inner."""
+
+    def __init__(self, order, rule):
+        self.order, self.rule = list(order), rule
+        self.orig = {p: (order[i + 1] if i + 1 < len(order) else 'x') for i, p in enumerate(order)}
+        self.depth = self.sp_in = self.link_tls = 0
+        self.link_cut, self.latched = False, False
+        self.pending = self.deferred = self.runs = self.menu_calls = 0
+        self.pad = 0
+
+    def call(self, who, caller):
+        return self.pad if who == 'x' else getattr(self, 'h_' + who)(caller)
+
+    def h_link(self, caller):
+        if self.link_tls:                         # "pad hook re-entered ... calling XInputGetState directly from now on"
+            self.link_cut = True
+            self.orig['link'] = 'x'
+            return self.pad
+        self.link_tls = 1
+        r = self.call(self.orig['link'], 'link')
+        self.link_tls = 0
+        return r
+
+    def h_sp(self, caller):
+        if self.sp_in: return self.pad
+        self.sp_in = 1
+        r = self.call(self.orig['sp'], 'sp')
+        self.sp_in = 0
+        return r
+
+    def h_menu(self, caller):
+        if self.depth: return self.pad
+        self.depth += 1
+        r = self.call(self.orig['menu'], 'menu')
+        self.depth -= 1
+        self.menu_calls += 1
+        combo = P_START | P_VIEW                  # QbPad: the combo poll and the latch keep both from the game
+        if r & combo == combo: self.latched = True
+        if self.latched:
+            if not r & combo: self.latched = False
+            r &= ~combo
+        if self.pending == 1:
+            if self.rule == '0.21.1' or caller == 'game': self.run_item()
+            else: self.deferred = 1               # DeferPending
+        return r
+
+    def run_item(self):                           # RunPending: cheat.flight 0 -> message 12 -> one pad poll of the game
+        self.pending = 2
+        self.runs += 1
+        self.game_poll()
+        self.pending = 0
+
+    def game_poll(self):
+        return self.call(self.order[0], 'game')
+
+    def present(self):                            # Render: (deferred || padIdle) && pending
+        if self.deferred and self.pending == 1: self.run_item()
+        self.deferred = 0
+
+
+def padchain_run(order, rule):
+    c = PadChain(order, rule)
+    c.pending = 1                                 # the bar row "Fliegen" queued cheat.flight 0
+    for _ in range(3):
+        c.game_poll()
+        c.present()
+    calls = c.menu_calls
+    c.pad = P_START | P_VIEW                      # View + Start: the bar closes / opens
+    seen = c.game_poll()
+    c.present()
+    c.pad = 0
+    c.game_poll()
+    ok = c.runs == 1 and not c.link_cut and c.menu_calls > calls and not seen & P_START
+    return ok, c
+
+
+def check_padchain():
+    orders = list(itertools.permutations(('menu', 'sp', 'link')))
+    bad_old = {o for o in orders if not padchain_run(o, '0.21.1')[0]}
+    bad_new = {o for o in orders if not padchain_run(o, '0.21.2')[0]}
+    expect_old = {('link', 'sp', 'menu'), ('link', 'menu', 'sp')}   # TruLink outermost (14:53 session: link, sp, menu)
+    good = bad_old == expect_old and not bad_new
+    live = padchain_run(('link', 'sp', 'menu'), '0.21.1')[1]
+    good &= live.link_cut and live.runs == 1                       # the live case: cut once, Start then reaches the game
+    print('padchain: 0.21.1 cuts the chain in %d of 6 orders (%s), 0.21.2 in %d; the item runs once, Start of the '
+          'combo never reaches the game with 0.21.2  %s'
+          % (len(bad_old), ', '.join('/'.join(o) for o in sorted(bad_old)), len(bad_new), 'ok' if good else 'FAIL'))
+    return good
+
+
+class MenuPad:
+    """TruMenu's pad side reduced to what TruMenuPadBlock reports: long menu (L3 + R3, [Pad] BlockInput -> neutral pad,
+    swallow until L3 / R3 are up), quick bar (View + Start; open: D-pad / LB / RB owned, one held at the close stays
+    owned until released)."""
+
+    def __init__(self):
+        self.menu = self.bar = self.swallow = False
+        self.owned = self.prev = 0
+
+    def process(self, raw):                       # OnPad + QbPad: returns what the game gets
+        down = raw & ~self.prev
+        self.prev = raw
+        if raw & (P_L3 | P_R3) == (P_L3 | P_R3) and down & (P_L3 | P_R3):
+            self.menu, self.swallow = not self.menu, True
+        if self.swallow and not raw & (P_L3 | P_R3): self.swallow = False
+        if not self.menu and raw & (P_START | P_VIEW) == (P_START | P_VIEW) and down & (P_START | P_VIEW):
+            self.bar = not self.bar
+        if self.bar and not self.menu: self.owned |= raw & QB_OWN
+        self.owned &= raw
+        if self.menu or self.swallow: return 0
+        return raw & ~self.owned & ~(P_START | P_VIEW if raw & (P_START | P_VIEW) == (P_START | P_VIEW) else 0)
+
+    def block(self):                              # TruMenuPadBlock (low word)
+        out = 0xFFFF if (self.menu or self.swallow) else 0
+        if self.bar: out |= QB_OWN
+        return out | self.owned
+
+
+def game_buttons(withheld, seen, block, held, buttons=P_LB | P_RB):   # TruShadowPower 0.19 GameButtons (same packet)
+    seen, block, held = seen & buttons, block & buttons, held & buttons
+    game = seen & ~block
+    withheld = (withheld | (held & ~game)) & held
+    return game & ~withheld, withheld
+
+
+def padblock_run(inside, use_block):
+    plain, quiet = True, False
+    steps = [(P_RB, plain)] * 3 + [(0, quiet)]                                       # A: plain RB
+    steps += [(P_START | P_VIEW, quiet), (0, quiet), (P_RB, quiet), (P_RB, quiet), (0, quiet), (P_LB, quiet),
+              (0, quiet)]                                                             # B: bar open, LB / RB taps
+    steps += [(P_RB, quiet), (P_RB, quiet), (P_RB | P_START | P_VIEW, quiet)] + [(P_RB, quiet)] * 3 + [(0, quiet)]
+    steps += [(P_RB, plain)] * 2 + [(0, quiet)]                                       # C: RB through the close; D
+    steps += [(P_L3 | P_R3, quiet), (0, quiet), (P_RB, quiet), (P_RB, quiet), (P_RB | P_L3 | P_R3, quiet)]
+    steps += [(P_RB, quiet)] * 3 + [(0, quiet)] + [(P_RB, plain)] * 2 + [(0, quiet)]  # E: long menu; F
+    m, withheld, ok = MenuPad(), 0, True
+    for raw, expect in steps:
+        if inside:                                # TruShadowPower inside TruMenu: raw pad, TruMenu's state of the last poll
+            block = m.block() if use_block else 0
+            seen = raw
+            m.process(raw)
+        else:                                     # outside: the masked pad, TruMenu's state of this poll
+            seen = m.process(raw)
+            block = m.block() if use_block else 0
+        eff, withheld = game_buttons(withheld, seen, block, raw)
+        ok &= bool(eff & P_RB or eff & P_LB) == expect
+    return ok
+
+
+def check_padblock():
+    good = padblock_run(True, True) and padblock_run(False, True)
+    good &= padblock_run(False, False) and not padblock_run(True, False)   # without the export: only outside (= 0.17)
+    print('padblock: TruShadowPower 0.19 with TruMenuPadBlock inside and outside TruMenu - bar LB / RB, RB through the '
+          'bar / menu close never counted, plain RB counted; without the export only the outside order works  %s'
+          % ('ok' if good else 'FAIL'))
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -1544,7 +1718,8 @@ def main():
                check_spiders(), check_wobble(rng), check_drawmask(), check_shake(), check_labels(),   # 0.21: + six
                check_airemove(),
                check_killpath(), check_sticky(), check_roomcheck(), check_unitgo(), check_favrecent(),   # 0.21.1: + six
-               check_groups()]
+               check_groups(),
+               check_padchain(), check_padblock()]                                    # 0.21.2 / TruShadowPower 0.19
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

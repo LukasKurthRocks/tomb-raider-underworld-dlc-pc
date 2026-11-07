@@ -23,11 +23,39 @@ never registered); 0.13 (state 2102 next to TruDataGuard) built 2026-11-04, not 
 events, camera flag, strike look - four switches, all default off) built 2026-11-04, not played; 0.15 (the TU's
 player cloth time step, `[Cloth] TuTimeStep`, default off) built 2026-11-06, not played; 0.16 (crash fix: the meter
 ticks only with a player in a level) built 2026-11-06, played 2026-11-06 evening (power OK; TruMenu's quick bar
-LB / RB started it); 0.17 (LB / RB only as the game gets them, `[ShadowPower] MenuInput`) built 2026-11-06, not
-played; 0.18 (K11: no retail adrenaline tick / bar in doppelganger mode, `[Adrenaline] Translate`) built 2026-11-07,
-not played.** Not covered: the
+LB / RB started it); 0.17 (LB / RB only as the game gets them, `[ShadowPower] MenuInput`) built 2026-11-06, played
+2026-11-07 14:44 / 14:53 (bar LB / RB suppressed); 0.18 (K11: no retail adrenaline tick / bar in doppelganger mode,
+`[Adrenaline] Translate`) built 2026-11-07, played 2026-11-07 from 15:02; 0.19 (TruMenu's `TruMenuPadBlock` instead
+of the pad-chain re-wrap) built 2026-11-07, not played.** Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.19: TruMenuPadBlock instead of the re-wrap (2026-11-07)
+
+Project doc `Befund-Padkette-StartView-0711.md`. Build `work\asi\v19`, no new byte check (`prechecks_v19.txt` = the
+0.17 table `kPadPollChecks`, unchanged).
+
+* The 0.17 re-wrap (taking the pad pointer over TruMenu's hook, and over TruLink's while innermost) is gone: the hook
+  thread follows the project rule again (hook once, re-hook only when the slot points into xinput again); a foreign
+  hook that took the slot over is left in place with one line `0.19 pad chain: pad pointer now 0x... (TruMenu.asi) -
+  left in place ...`. A call back into the plugin goes to XInputGetState (as 0.16).
+* `[ShadowPower] MenuInput=1`: the hook thread resolves TruMenu.asi's export **`TruMenuPadBlock(pad)`** (TruMenu 0.21.1
+  or later; `0.19 menu input: TruMenu.asi's TruMenuPadBlock at 0x... - ...`). GameButtons: the game's view = the pad
+  after the inner hooks minus the export's mask; the second XInputGetState read (same packet number) stays, so a button
+  the pad holds but the game does not get is still ignored until released - in either order (this plugin inside or
+  outside TruMenu). Without the export (older TruMenu) only the second read is left (one log line; then the quick bar's
+  LB / RB count again when TruMenu sits outside this plugin).
+* Why: the live case 2026-11-07 14:55 (View + Start opened the game's pause menu) was not caused by the re-wrap (it
+  did not happen in that run) but by TruLink's re-entry breaker after an item of TruMenu polled the pad (TruMenu
+  0.21.2 is the fix there). With the export this plugin no longer needs a place in the chain. Model `padblock` in
+  `tools\trumenu_quick_check.py`.
+
+| # | TO TEST 0.19 (DLC 2, with TruMenu 0.21.2) | expected |
+|---|---|---|
+| 1 | load | `TruShadowPower 0.19 loaded`, `0.19 menu input: TruMenu.asi's TruMenuPadBlock at 0x...`, no `0.17 pad chain: ... wrapped it once more` |
+| 2 | quick bar, LB / RB page switches | no `shadow power ON`; `pad input suppressed` / `resumed` pairs |
+| 3 | RB held through the bar close | nothing until RB was released once |
+| 4 | RB normally | power on / off as before |
 
 ## 0.18: K11 - no retail adrenaline in doppelganger mode, as the TU (2026-11-07)
 
@@ -542,7 +570,7 @@ every `*.asi` next to `tru.exe`.
 | `[Meter] Fallback` | 1 | 1 = file values when object 858 is not loaded; 0 = no power then |
 | `[ShadowPower] LegacyPadStart` | 0 | 0.9: 1 = the 0.8 tick (every level, no doppelganger / cinematic gates) |
 | `[ShadowPower] GameInput` | 0 | 0.9: 1 = LB / RB from the game's input records +0x1a70 / +0x1b30 & 4 (the TU's source; unproven on PC) |
-| `[ShadowPower] MenuInput` | 1 | 0.17: LB / RB only as the game gets them (outside TruMenu's pad hook; a button TruMenu withholds is ignored until released); 0 = 0.16 |
+| `[ShadowPower] MenuInput` | 1 | 0.17: LB / RB only as the game gets them (a button TruMenu withholds is ignored until released; 0.19: from TruMenu's `TruMenuPadBlock` + a second pad read, no re-wrap of the pad chain); 0 = 0.16 |
 | `[Conditions] Enabled / Cond1046 / Cond1055` | 1 | see 0.4 / 0.6 / 0.7 |
 | `[States] Enabled` | 1 | see 0.5 |
 | `[Look] Enabled / Messages` | 1 | see 0.8; Enabled=0 also turns AdrenalineMode off |
