@@ -2,7 +2,8 @@
 
 DLC 2 *Lara's Shadow*: the rock veins ("Felsrinnen") for the PC `tru.exe` - step 3.4a of bringing the Xbox title
 update to PC (see the repository README, "How the Xbox title update is brought to PC", and docs/WINDOWS_REBUILD.md
-finding 43). 0.1 played 2026-10-30 (patched, never asked - see 0.2); 0.2 built 2026-10-31, not yet played.
+finding 43). 0.1 played 2026-10-30 (patched, never asked - see 0.2); 0.2 built 2026-10-31, not yet played. Since 0.10
+also the title update's SweepAndPrune limits of the markup manager (section 0.10).
 
 ## What it does
 
@@ -160,6 +161,49 @@ geometry function: title-update type-22 branch added (...)"; hit line (chart pro
 | 1 | DLC 2, first rock vein: jump onto it, run along, jump off / fall off | load line "fifth geometry function: ... added"; at the vein "fifth geometry function (...) (1 hits)" next to the 0.8 hit lines; behaviour as 50h or better (no snap to a wrong edge) |
 | 2 | main game level with ledges | unchanged (type 22 exists only in DLC 2; no hit line) |
 
+## 0.10: SweepAndPrune limits as the title update (2026-11-08)
+
+The MarkupManager (owner `[0xdb94cc]`) keeps the markup boxes (ledges, grabs, climb lines, rock veins) in a
+SweepAndPrune collision pool. Its constructor (PC tru+0x1be3a0 = retail 0x8227eda8 = **TU 0x8227b9f0**) is run once by
+the game init tru+0x1df390 (direct call chain tru+0x1df410 -> tru+0x1d9e70 -> tru+0x1d9eb7 -> ctor, measured). The
+title update creates the pool larger (docs `Befund-SweepAndPrune-0611.md` section 3, `Befund-P5-Kleinkram-0711.md`
+row 7b, `work\sap_0611\tu_8227b9f0.txt`):
+
+| | PC / retail | title update | 0.10 on PC |
+|---|---|---|---|
+| SAP create (boxes N, pair parameter M) | (1000, 200) | (**3000, 500**) TU 0x8227ba18 / 0x8227ba20 | tru+0x1be3a7 `68 c8 00 00 00 68 e8 03 00 00` -> `68 f4 01 00 00 68 b8 0b 00 00` |
+| pair links (pool M x 16 bytes, 2 links per entry) | 400 | 1000 | 1000 |
+| copy of the pair parameter (never read) | +0x20 = 200 | +0x24 = **500** (0x8227ba3c; the TU inserted +0x1c) | tru+0x1be3c4 `c7 46 20 c8 00 00 00` -> `c7 46 20 f4 01 00 00` |
+| new field +0x1c = 3000 | - | 0 readers | not taken (would shift the owner layout) |
+| proxies +0x18 | 1000 | 1000 | unchanged |
+| core memory counter +0x20 | 207 201 | - | 620 001 (+412 800 bytes once, game allocator) |
+| box 0x50 -> 0x70 bytes + move threshold (UpdateBox) | - | yes | not taken (K2b, no capacity effect) |
+
+`PatchSweepAndPrune` (option `[SweepAndPrune] Translate`, default 1, now in the sample ini) runs first in DllMain. It
+checks the constructor entry, the bytes between and after both sites, the getter tru+0x1be390, the owner store
+tru+0x1d9ec6 and the two core-constructor stores tru+0x6c880 / +0x6c895 (`work\asi\rv10\prechecks_v10.txt`, 10 checks,
+0 mismatches against the Steam `tru.exe`), and that `[0xdb94cc]` / `[0xe7f060]` are still 0 (zero-initialised data:
+the game init has not run). An exe that already holds (3000, 500) is left alone. Control: on the first machine update
+(the 0.6 chart probe at tru+0x387ebf, now also installed when `ChartLog=0` but `Translate=1`) one line with the values
+the game really holds. With `Translate=0` the same line shows the PC values.
+
+Log lines: "SweepAndPrune: limits as the title update (TU 0x8227b9f0: create(3000, 500) = 3000 boxes, 1000 pair links,
++412800 bytes; ...)", then "SweepAndPrune control (first frame): MarkupManager 0x..., core 0x...: boxes +0x24 = 3000,
+pair parameter +0x2c = 500 (1000 pair links), memory +0x20 = 620001, owner +0x20 = 500, proxies 1000 -> as the title
+update (3000 / 500)". Errors: "... does not match - limits not changed", "MarkupManager already built ... - loaded after
+the game init", "control ... NOT as expected". TruMenu 0.21.7 `sap.status` reads N and M from the core, so it shows
+"Boxen b/3000, Paare p/1000". Built 2026-11-08 into `work\asi\rv10` (install: `Set-TruRockVein.ps1 -Install -SourceDir
+work\asi\rv10`), not loaded.
+
+**TO TEST (0.10)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | start the game with 0.10 installed, load any level | `TruRockVein.log`: "SweepAndPrune: limits as the title update ..." at load, then one "SweepAndPrune control (first frame): ... boxes +0x24 = 3000, pair parameter +0x2c = 500 (1000 pair links), memory +0x20 = 620001, owner +0x20 = 500, proxies 1000 -> as the title update (3000 / 500)" |
+| 2 | TruMenu `sap.status` in a markup-rich unit (DLC 2 rock-vein area, a main-game climbing hall) | "Boxen b/3000 ..., Paare p/1000 ..."; no "Out of space" warning |
+| 3 | `[SweepAndPrune] Translate=0`, restart | control line "... boxes +0x24 = 1000, pair parameter +0x2c = 200 (400 pair links), memory +0x20 = 207201, owner +0x20 = 200 ... -> PC limits (Translate=0)"; `sap.status` "b/1000, p/400" |
+| 4 | play a while (loading areas, DLC 2) | no change in behaviour, no crash (memory +412 800 bytes only) |
+
 ## Build, install, remove
 
 - Build: `scripts\windows\Build-TruAsi.ps1 -Name TruRockVein` (installed Visual Studio, x86, `/MT`, imports only
@@ -169,7 +213,8 @@ geometry function: title-update type-22 branch added (...)"; hit line (chart pro
 - Options: `TruRockVein.ini` - `Enabled`, `LogLevel` (0-3), `LogUnhandled`, `Type607` / `Type608`, `LogBadValues`,
   `LogDefaultConditions`, `MarkupTypes`, `MarkupSlots`, `NullBoxGuard`, `MarkupAction608`, `AttachGeometry`,
   `State420Slot1`, `ChartLog` (`ChartLogFrom` / `ChartLogTo`), `JumpGeometry`, `SkipGeometry` (0.9) - the switches from
-  `MarkupTypes` on default to 1, the chart range to 1470..1510. Log:
+  `MarkupTypes` on default to 1, the chart range to 1470..1510; section `[SweepAndPrune]`: `Translate` (0.10, default 1,
+  read at the game start). Log:
   `TruRockVein.log` next to `tru.exe`.
 
 ## Test

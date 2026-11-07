@@ -1,4 +1,84 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.5)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.6)
+
+0.6.6 (2026-11-08, **offline, not yet seen in game**): N4c - T5 (immediate death in the hit reaction) and P1c (the
+Vaulted Enter of the title update with the chain that feeds it); `docs\Befund-P1d-Begleiter-0711.md` section 2 rows T5 /
+P1c in the main workspace, disassemblies in `work\combat066_0711`. Build `work\asi\combat066`. All three switches
+(`TranslateT5`, `TranslateVaulted`, `TranslateVaultedClock`) default **1**, read again at run time (`P1dReadSwitches`, key table `kP1dKeys`, at most once per second from the hooks); the
+hooks are placed at the start whenever their byte checks pass, a switch at 0 runs exactly the PC code.
+* **T5** (`[Death] TranslateT5`): the enemy hit reaction tru+0x23ad50 (TU 0x823038d8 = retail 0x82305d40; cdecl inst,
+  hit data, a3, a4 -> float amount). The TU inserted at its start (0x8230390c..0x82303a78): with a companion, LP <=
+  hit amount (+0x4c) and ShouldRegenerate (TU 0x8235ece8 = H1's companion list + the PC tune list) no -> hit direction
+  `(data+0x70 ? data+0x10 : [data+0x30]+0x20) - (data+0x72 ? data+0 : inst+0x20)`, z = 0, normalised (TU 0x8213e838:
+  zero unless the squared length is finite and > FLT_MIN), for type 0x19 crossed with (0, 0, -1, 0), then the death
+  switch tru+0x241650 kind 7 (the same call as H7 / H8) and return the amount - no damage message, no hit animation.
+  The companion is only tested for existence: T5 reads no extension field (needs no data fix). Jump at tru+0x23ad82
+  (7 bytes) -> `T5Stub`, back at tru+0x23ad89 or the stub's own epilogue (= tru+0x23b312 without brain+0x2c50 = 0, as
+  the TU's 0x8230443c). Log `0.6.6 T5: ... lethal hit type .. -> death switch kind 7 as the TU 0x82303a74, direction ..`.
+* **P1c** (`[Death] TranslateVaulted`): the TU-only Vaulted Enter 0x8232b630 (PC tru+0x24fcf0 = retail 0x8232cb18) reads
+  a new data field +0x44 = the companion step. Six links, placed together or not at all:
+  F retail strike record (PC tru+0x31d5cc -> tru+0x245e40): +0x34 = 0 (TU 0x823e0294);
+  E finisher 1013 record (tru+0x31d895, the 0.4 site): +0x3c = 0 in every mode (TU 0x823e0e84; 0.4 did it only in
+  doppelganger mode);
+  A enemy message handler case 0xbe (tru+0x23b421 -> record copy tru+0x245de0): copy +0x3c = incoming +0x34 (TU
+  0x8230743c; the TU strike - `StrikeAt`, `[Strike] Translate` - writes its step there);
+  B Vaulted switch from a record (tru+0x223fa2 -> tru+0x20ed80): data +0x44 = record +0x3c (TU 0x823044dc);
+  D Vaulted slot 3 copier (tru+0x25a4a2 -> tru+0x24d350): copies +0x44 too (TU 0x8232300c);
+  C Enter (tru+0x24fdb9, 5 bytes -> `VaultedAnimStub`): state data +0xb8 = step; companion -> brain+0x2c7c = 0x0fffffff
+  (the PC never reads that field); step 0 = the PC's own (retail) animation choice; step != 0 = the companion's step
+  table entry `[comp+0x20] + (step - 1) * 0x14` when step <= `[comp+0x24]`, else 0 = no animation (TU 0x8232b3f8).
+  **Data guard:** the step table is read only from the FIXED extension layout (record count +0x2c <= 64, step count
+  +0x24 <= 64, table set, every entry's anim pair < 0x1000). The installed converted files fail it (0x000f0000) - one
+  line `0.6.6: extension data not fixed - install work\extfix_0711 / thrall_extension_fix ...`, the PC choice runs.
+  Log `0.6.6 vaulted: ... message 0xbe with step n ...`, `... Vaulted Enter step n: companion step table entry 0x...
+  (anim pair {a, b}) ...`.
+* **K Vaulted clock** (`[Death] TranslateVaultedClock`, needs the chain): the TU lets an enemy that enters Vaulted run
+  5 s without slow motion. Globals `[0x82efb458]` = PC 0xe7f088 (as TruShadowPower's dt translation): +0xd4 = 0xe7f15c
+  ms counter, +0x100 = 0xe7f188 time multiplier, +0x118 = 0xe7f1a0 slow motion factor (the PC player update does the
+  same at tru+0x3228e9 / +0x3229eb). Enter (TU 0x8232b698, in link C): bit 0x10 of brain+0xc clear -> set, clock = now,
+  multiplier /= slow motion. Enemy update tru+0x238d40 (TU 0x822db190): after the brain the multiplier is saved (TU
+  brain+0x5084); with bit 0x10: now - clock >= 5000 ms -> bit cleared, else multiplier *= 1 / slow motion; restored at
+  the end of the main path (TU 0x822db4e0) - not on the brain+8 bit 0x20000 exit (TU 0x822db364, as the TU). brain+0x5080
+  / +0x5084 lie in the block the TU added to the brain (TU +0x5088 = PC +0x5030), so the plugin keeps them: clock word
+  per instance in a 64-entry table keyed by instance + serial (+0x44); an entry lives only while its bit runs, ends when
+  the update clears the bit, when the serial differs (instance reused - unload / level change), or when the table is full
+  (oldest dropped, logged); a missing entry = expired. The save is one slot {instance, value, valid} (updates do not
+  nest). Sites: call tru+0x238d6f (-> `ClockStartStub`), tru+0x238e76 (11 bytes -> `ClockExitStub`), epilogue
+  tru+0x238efb (7 bytes -> `ClockEndStub`); TruMenu's byte-checked ranges tru+0x238d59..0x238d6e / 0x238ed4..0x238ee2
+  are not touched. Not translated: the two script commands 0x822d6844 / 0x822d6880 (set / clear). Log `0.6.6 clock: ...
+  Vaulted Enter: brain+0xc bit 0x10 set ...`, `... clock ended after n ms ...`.
+* **Not in 0.6.6:** Vaulted slot 10 case 0xbe (next step, TU 0x8232be54), slot 11 0x8232c068, Exit 0x8232b930,
+  the strike's step queries 0x165..0x167 (TU 0x82308850), and the rest of RegenerateDeath / Regenerate slot 10 (lying
+  animation from companion +0x10 on 0x15 / 0x8a - needs the TU's 2-byte RegenerateDeath state data +8 / +9, which the
+  PC state lacks; the subtype-2 sound 0x82399b48 (changed against retail 0x82399e98, 4 arguments) - the PC's call of
+  the same pattern in the hit reaction, tru+0x23b0cd -> tru+0x2a5dd0, passes 5; pairing not proven).
+* Byte checks: 42 used by the plugin + 6 proof-only (`work\asi\combat066\prechecks_combat066.txt`, generated from the
+  source by `work\combat066_0711\facts066.py`; 48, 0 mismatches); earlier lists combat01..combat065 545, 0 mismatches.
+  No branch of the patched PC functions lands inside a patched range (`work\combat066_0711\branch_into.py`, 9 ranges).
+  Imports unchanged (81, KERNEL32 only), exports unchanged.
+
+New writes into game memory (for the TruGuard author):
+
+| when | address | what |
+|---|---|---|
+| start, checks passed | 0x63ad82 (`.text`, 7) | `jmp rel32` -> `T5Stub` + 2 `nop` |
+| start (all six or none) | 0x71d5cc / 0x63b421 / 0x623fa2 / 0x65a4a2 (`.text`, 5 each) | `call rel32` -> `StrikeRecordHook` / `RecCopyHook` / `VaultSwitchStub` / `VaultCopyStub` (were tru+0x245e40 / +0x245de0 / +0x20ed80 / +0x24d350) |
+| start (with them) | 0x64fdb9 (`.text`, 5) | `jmp rel32` -> `VaultedAnimStub` |
+| run time | message records (ring tru+0x1c0b10) | +0x34 = 0 (F), +0x3c = 0 (E, the 0.4 hook), +0x3c = step (A) |
+| run time | Vaulted switch data / its copy | +0x44 = step (B, D) |
+| start (with the chain) | 0x638d6f (`.text`, 5) / 0x638e76 (11) / 0x638efb (7) | `call rel32` -> `ClockStartStub` (was tru+0x2e7710); `jmp rel32` + 6 `nop` -> `ClockExitStub`; `jmp rel32` + 2 `nop` -> `ClockEndStub` |
+| run time | Vaulted state data, brain | state data +0xb8 = step; brain+0x2c7c = 0x0fffffff (companion); brain+0xc bit 0x10 set (Vaulted Enter) / cleared (5 s later, enemy update) |
+| run time | 0xe7f188 (time multiplier, `.data`) | Vaulted Enter: /= [0xe7f1a0]; enemy update: saved, *= 1 / [0xe7f1a0] while the clock runs, restored at the end (every enemy update while the clock part is on) |
+| run time | - | game function calls on the game thread: death switch tru+0x241650 (T5), ShouldRegenerate tru+0x27f040, record builders tru+0x245e40 / +0x245de0, SwitchToVaulted tru+0x20ed80, copy tru+0x24d350 |
+
+| # | TO TEST 0.6.6 (hall02 tutorial thralls; **extension test tree `work\extfix_0711\testtree\mods` installed** for P1c) | expected |
+|---|---|---|
+| 1 | load, read `TruShadowCombat.log` once | `TruShadowCombat 0.6.6 (`, `0.6.6: T5 on (...), P1c Vaulted chain on (...), clock on (...)`, no "does not match" |
+| 2 | kill a tutorial thrall with a non-regenerating lethal hit (finisher 1013, a type outside the regenerate lists) while it stands | `0.6.6 T5: ... lethal hit type .. with companion, ShouldRegenerate no -> death switch kind 7 ...`; the thrall dies at once (no hit animation) |
+| 3 | lethal hit with a regenerating type (combo 18..24, heavy) | no T5 line; `0.6.3 death: ... notification 33` / RegenerateDeath as in 0.6.5 |
+| 4 | `[Strike] Translate=1`, shadow strike on a thrall | `0.6.6 vaulted: ... message 0xbe with step n`, `... Vaulted Enter step n: companion step table entry ...`; the thrall plays the step animation of its extension. With the old (unfixed) files: one `extension data not fixed` line, PC animation |
+| 5 | main game finisher / strike (no companion) | no `0.6.6 vaulted` step lines (step 0 = PC choice), finishers as before |
+| 6 | an enemy enters Vaulted (finisher / strike), shadow slow motion on | `0.6.6 clock: ... Vaulted Enter: brain+0xc bit 0x10 set ... time multiplier a -> b`; the enemy moves at normal speed for 5 s, then `... clock ended after ~5000 ms`; without slow motion (factor 1) nothing visible |
+| 7 | trouble | `[Death] TranslateVaultedClock=0`, `TranslateT5=0` / `TranslateVaulted=0` (live); send the log |
 
 0.6.5 (2026-11-07, **offline, not yet seen in game**): P1d - the thrall's companion instance (T4) and the title-update
 code that hangs on it (`docs\Befund-P1d-Begleiter-0711.md` section 3 in the main workspace; T1 / T2 of
@@ -471,6 +551,9 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Death] TranslateRegenList` | 1 | 0.6.5 (H1): companion regeneration list before the tune list in ShouldRegenerate (TU 0x8235ece8); live |
 | `[Death] TranslateLand` | 1 | 0.6.5 (H3 / H4 / H3b): T2 Land with LP <= 0 -> 33 (with TranslateNotify33) + RegenerateDeath, Land slot 13 with companion, Land exception of T3; live |
 | `[Melee] TranslateInterrupt` | 1 | 0.6.5 (H5, T-M3): Vaulted and (with companion) RegenerateDeath may interrupt MeleeAttack (TU 0x82330830); live |
+| `[Death] TranslateT5` | 1 | 0.6.6 (T5): lethal, not regenerating hit on an enemy with a companion -> death kind 7 at once in the hit reaction (TU 0x823038d8); live |
+| `[Death] TranslateVaulted` | 1 | 0.6.6 (P1c): Vaulted Enter as the TU 0x8232b630 with the step chain (records 0xbe / 0xf4, switch, copier); step table only from fixed extension data; live |
+| `[Death] TranslateVaultedClock` | 1 | 0.6.6 (P1c K): the TU's Vaulted clock - 5 s without slow motion (Enter 0x8232b698, enemy update 0x822db190); needs the chain; live |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 

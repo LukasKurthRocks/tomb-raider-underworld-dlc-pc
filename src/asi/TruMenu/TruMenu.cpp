@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -392,7 +392,8 @@ const OptDef kOpts[] = {
                                "menu close"},
     {"Favorites", "Ids", "", "item ids on the \"Quick access / Favourites\" page (comma list); empty = default list. Y on an "
                              "item in the menu\npins / unpins it and rewrites this line (TruLink: menu fav.add <id> / "
-                             "fav.del <id> / fav.list)"},
+                             "fav.del <id> / fav.list). 0.21.8: an entry may be\n<id>|<argument> (a bar row with an "
+                             "argument, e.g. sw.set|TruRockVein:SweepAndPrune:Translate, costume.set|25)"},
     {"Cmd", "Enabled", "1", "1 = command bar under the menu: type item ids as over TruLink without \"menu\" (\"time.scale 0.5\", "
                             "\"help\"); the\nkeyboard focus goes to it when the menu opens, D-pad / stick go on into the "
                             "menu, View / F2 / Tab come back"},
@@ -741,6 +742,17 @@ const OptDef kOpts[] = {
     {"Sound", "ShowSpeech", "1", "0.20.1 (snd.speech): speech lines (the group of the third slider - speech / "
                                  "cutscenes)"},
     {"Sound", "ShowOther", "1", "0.20.1 (snd.other): lines of voices in no known group"},
+    {"SoundGroups", "Ambience", "100", "0.21.8 (snd.group Ambience / snd.vol.ambience): sound group slider in percent, 0 = "
+                                       "silent, 100 = untouched;\nbar page Zeit / Test, group Ton-Gruppen. The factor goes "
+                                       "on the FMOD channel groups of the slider's sound\ngroups (docs "
+                                       "Befund-Ton-Gruppen-0611 section 4), never on the game's own volumes. Umgebung: 15"},
+    {"SoundGroups", "Steps", "100", "0.21.8: Schritte & Koerper / footsteps & body: groups 32, 78"},
+    {"SoundGroups", "Weapons", "100", "0.21.8: Waffen & Treffer / weapons & impacts: groups 58 (with 60), 51, 31"},
+    {"SoundGroups", "Enemies", "100", "0.21.8: Gegner & Tiere / enemies & creatures: groups 27, 65"},
+    {"SoundGroups", "Lara", "100", "0.21.8: Lara-Stimme & Funk / Lara voice & radio: groups 68, 70, 72, 77"},
+    {"SoundGroups", "Objects", "100", "0.21.8: Objekte & Mechanik / objects & mechanics: group 43"},
+    {"SoundGroups", "Dlc2", "100", "0.21.8: DLC 2 / Schattenkraft / shadow power: group 79"},
+    {"SoundGroups", "Hud", "100", "0.21.8: Sonstiges (HUD) / other (HUD): groups 54, 55, 56, 57"},
     {"Arachno", "Enabled", "0", "0.21 Arachnophobie (arachno.on): 1 = spiders replaced from the start - the master switch of "
                                 "Hide / Picture / Mute below;\nbar page Barrierefreiheit, menu Accessibility. Spiders = "
                                 "object names with a part of Match and none of Exclude"},
@@ -877,6 +889,12 @@ const WORD kQbX = 0x4000, kQbY = 0x8000;     // 0.21.3 (XINPUT_GAMEPAD_X / _Y)
 // line is open also A / B (kQcOwn).
 volatile LONG g_qcOpen = 0;
 const WORD kQcOwn = 0x3000;                  // A 0x1000 = run, B 0x2000 = close
+// 0.21.8: the line's on-screen keyboard (Y in the open line; the menu's 0.7 keyboard, section "0.7 on-screen keyboard",
+// target g_oskQc): open = 1 (render thread writes, the pad thread reads). While it is open the bar also keeps Start from
+// the game (Start = run the line) - kQcOskOwn, never gated as a combo tap (QbPad). kQcOskPad = the keyboard's buttons.
+volatile LONG g_qcOskOpen = 0;
+const WORD kQcOskOwn = 0x0010;               // Start
+const WORD kQcOskPad = 0xF31F;               // D-pad, Start, LB, RB, A, B, X, Y (not View, not L3 / R3)
 WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject);   // below (g_padLock not held by the caller)
 bool g_qbRunning = false;                    // a bar row runs an item (render thread): src=quick
 int g_qbLang = 0;                            // [Quick] Language: 0 de, 1 en (quick.lang)
@@ -1046,6 +1064,7 @@ void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite am
 void SaveLoadTick();   // 0.18 save.load: a confirmed request, then its progress (game thread)
 void AiTick();         // 0.19 dumb AI: purge / gate patches / brain flags (game thread, section "0.19 dumb AI")
 void SndMuteTick();    // 0.20 media.mutemusic / media.muteambient (game thread, section "0.20 collectibles")
+void SgTick();         // 0.21.8 sound group sliders (game thread, section "0.21.8 sound group sliders")
 void SnTick();         // 0.20.1 snd.list: the voice pool walk every [Sound] RefreshMs (game thread, every poll)
 void DrawSoundList();  // 0.20.1 snd.list overlay (render thread, section "0.20.1 sound list")
 void ArTick();         // 0.21 arachnophobia patches (game thread, section "0.21 arachnophobia")
@@ -1360,6 +1379,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         SaveLoadTick();                       // 0.18 save.load (cheap: one flag while idle)
         AiTick();                             // 0.19 dumb AI (cheap while everything is off: no walk)
         SndMuteTick();                        // 0.20 music / ambience mutes (cheap while off: one flag each)
+        SgTick();                             // 0.21.8 sound group sliders (cheap while all are 100 % and none is ours)
         ArTick();                             // 0.21 arachnophobia: slot 7 / sound gates (only while on in a level)
         CsTick();                             // 0.21 camera shake scale / rumble (only below 100 %)
         AkTick();                             // 0.21.1 ai.kill: one state line ~1 s after a kill (cheap while idle)
@@ -7678,9 +7698,24 @@ void NavLabelCheck() {
 }
 // ---- end of 0.21.7 navmesh labels ----
 
+// ---- 0.21.8 SweepAndPrune limits patched by TruRockVein 0.10 ([SweepAndPrune] Translate, default 1; coordinator
+// 2026-11-08) ----
+// TruRockVein 0.10 rewrites in its DllMain (before the game init; it loads after TruMenu.asi, alphabetical - a later
+// check would see its bytes): 0x5be3a7 push 0C8h / push 3E8h -> push 1F4h / push 0BB8h (SAP create(3000, 500), TU) and
+// 0x5be3c4 mov [esi+20h], 0C8h -> 1F4h. SapCheck accepts both forms of the two kSapChecks rows that hold these bytes;
+// the retail rows stay in kSapChecks (= the precheck list work\asi\menu0217\precheck_0217_sap.txt), this table holds
+// the patched form only (the bytes of src\asi\TruRockVein\TruRockVein.cpp kSapArgsNew / kSapFieldNew, not in the
+// retail exe - so no precheck list for it).
+const NavCheckBytes kSapChecksTu[] = {
+    {0x005be3a7, "68f401000068b80b0000"},                        // owner ctor: SAP create(3000, 500)
+    {0x005be3bd, "c74618e8030000c74620f4010000"},                // [this+0x18] = 1000 proxies, [this+0x20] = 500
+};
+// ---- end of 0.21.8 SweepAndPrune patched form ----
+
 // ---- 0.21.7 SweepAndPrune read-out (P6a; docs\Befund-SweepAndPrune-0611.md section 4, TODO "SweepAndPrune pruefen")
-// The MarkupManager's collision pool (markups: ledges / grabs / climb lines): boxes b / N (1000 on the PC, TU 3000), pair
-// links p / 2M (400, TU 1000), proxies u / 1000 - read only every 250 ms on the render thread with session peaks, "full"
+// The MarkupManager's collision pool (markups: ledges / grabs / climb lines): boxes b / N (1000 on the PC, TU 3000 -
+// 0.21.8: TruRockVein 0.10 [SweepAndPrune] Translate=1 creates 3000 / 500, kSapChecksTu; N and 2M are always read from the
+// core), pair links p / 2M (400, TU 1000), proxies u / 1000 - read only every 250 ms on the render thread with session peaks, "full"
 // frame counters (p == 2M: the next pair is dropped silently; b == N: the next box = the crash at [0x24]) and the warning
 // mark (the warning buffer 0xa035f0 holds "WARNING: [SweepAndPrune] Out of space for ..."). One TruMenu.log line per
 // new peak (at most every 2 s). The chain and its checks are the finding's measuring plan; the 20 byte checks are
@@ -7779,10 +7814,13 @@ void ValSap(char *o, size_t n) {
     if (!g_sapOk) { Out(o, n, "n/a (%s)", g_sapWhy); return; }
     if (!g_sapWatch) { Out(o, n, "off ([Debug] SapWatch=0)"); return; }
     if (!g_sap.valid) { Out(o, n, "n/a (%s)", g_sap.why[0] ? g_sap.why : "not read yet"); return; }
+    // 0.21.8: the limits are the core's (N / 2M) - which ones: PC 1000 / 400, TU 3000 / 1000 (TruRockVein 0.10)
+    const char *limits = g_sap.n == 3000 && g_sap.m2 == 1000 ? "TU 3000/1000 (TruRockVein 0.10)"
+                       : g_sap.n == 1000 && g_sap.m2 == 400 ? "PC 1000/400" : "gemischt";
     Out(o, n, "Boxen %ld/%ld (Spitze %ld), Paare %ld/%ld (Spitze %ld), Proxies %ld/1000 (Spitze %ld); voll: B %ld / P %ld "
-              "Bilder; Warnung: %s", g_sap.b, g_sap.n, g_sap.peakB, g_sap.p, g_sap.m2, g_sap.peakP, g_sap.u, g_sap.peakU,
-        g_sap.fullB, g_sap.fullP, g_sap.warnPairs && g_sap.warnBoxes ? "Paare + Boxen" : g_sap.warnPairs ? "Paare"
-                                                                     : g_sap.warnBoxes ? "Boxen" : "-");
+              "Bilder; Warnung: %s; Grenzen %s", g_sap.b, g_sap.n, g_sap.peakB, g_sap.p, g_sap.m2, g_sap.peakP, g_sap.u,
+        g_sap.peakU, g_sap.fullB, g_sap.fullP, g_sap.warnPairs && g_sap.warnBoxes ? "Paare + Boxen" : g_sap.warnPairs ? "Paare"
+                                                                                  : g_sap.warnBoxes ? "Boxen" : "-", limits);
 }
 bool RunSapReset(const char *, char *o, size_t n) {
     g_sap.peakB = g_sap.peakP = g_sap.peakU = g_sap.fullB = g_sap.fullP = 0;
@@ -7794,15 +7832,19 @@ bool RunSapReset(const char *, char *o, size_t n) {
 }
 void SapCheck() {
     const int total = static_cast<int>(sizeof(kSapChecks) / sizeof(kSapChecks[0]));
-    int bad = 0;
+    int bad = 0, tu = 0;
     DWORD first = 0;
-    for (const NavCheckBytes &c : kSapChecks)
-        if (!HexBytesAt(c.at, c.hex) && !bad++) first = c.at;
+    for (const NavCheckBytes &c : kSapChecks) {
+        bool ok = HexBytesAt(c.at, c.hex);
+        for (const NavCheckBytes &t : kSapChecksTu)   // 0.21.8: or the TruRockVein 0.10 form of the same row
+            if (!ok && t.at == c.at && HexBytesAt(t.at, t.hex)) { ok = true; ++tu; }
+        if (!ok && !bad++) first = c.at;
+    }
     g_sapOk = bad == 0;
     if (bad) Out(g_sapWhy, sizeof(g_sapWhy), "code check failed at 0x%08lx (%d of %d)", first, bad, total);
     else Out(g_sapWhy, sizeof(g_sapWhy), "ok");
-    Log(g_sapOk ? 1 : 0, "0.21.7 SweepAndPrune read-out: checks %s (%d rows); [Debug] SapWatch %d", g_sapWhy, total,
-        g_sapWatch);
+    Log(g_sapOk ? 1 : 0, "0.21.7 SweepAndPrune read-out: checks %s (%d rows, %d in the TruRockVein 0.10 form); [Debug] "
+        "SapWatch %d", g_sapWhy, total, tu, g_sapWatch);
 }
 // ---- end of 0.21.7 SweepAndPrune read-out ----
 // 0.21.7: a label layer of this version wants the Present draw (Render's early return)
@@ -11630,43 +11672,100 @@ void PageDebugView() {
 // ---- favourites: [Favorites] Ids in TruMenu.ini (comma list of item ids; empty = kFavDefault) ----
 bool ItemUsable(const char *id);         // defined after kItems: id exists and is not a todo item
 
-// calls fn(id) for every usable favourite
-template <typename F> void ForFavs(F fn) {
+// 0.21.8 favourites with an argument (TODO "Favoriten mit Argument + Stern"): an entry of the comma list is "<id>" (as
+// before) or "<id>|<argument>" (the argument may hold spaces, never ',' or '|', at most kFavArgMax - 1 characters) - so
+// the bar rows with an argument can be pinned (page Fixes sw.set <switch>, costume rows costume.set <id>, chapter units
+// level.load <unit>, rows such as dbg.flatpass 0x200). Old INIs stay readable: an entry without '|' is split at spaces
+// too (the 0.3 rule strtok ", "). A TruMenu before 0.21.8 reading a new INI skips "<id>|..." (no such item) and keeps
+// the rest. Pairs compare case-insensitively (id and argument).
+const size_t kFavArgMax = 96;
+void FavTrim(char *&s) {
+    while (*s == ' ' || *s == '\t') ++s;
+    size_t k = strlen(s);
+    while (k && (s[k - 1] == ' ' || s[k - 1] == '\t')) s[--k] = 0;
+}
+bool FavArgOk(const char *arg) {             // an argument the list can hold (one entry, no separator)
+    if (!arg) return false;
+    const size_t k = strlen(arg);
+    if (k >= kFavArgMax) return false;
+    for (size_t i = 0; i < k; ++i)
+        if (arg[i] == ',' || arg[i] == '|' || static_cast<unsigned char>(arg[i]) < 32 || static_cast<unsigned char>(arg[i]) > 126)
+            return false;
+    return true;
+}
+// calls fn(id, arg) for every usable favourite (arg "" = an id-only entry)
+template <typename F> void ForFavEntries(F fn) {
     char copy[sizeof(g_favs)];
     EnterCriticalSection(&g_favLock);
     strncpy_s(copy, sizeof(copy), g_favs, _TRUNCATE);
     LeaveCriticalSection(&g_favLock);
     char *context = nullptr;
-    for (char *id = strtok_s(copy, ", ", &context); id; id = strtok_s(nullptr, ", ", &context))
-        if (ItemUsable(id)) fn(id);
+    for (char *e = strtok_s(copy, ",", &context); e; e = strtok_s(nullptr, ",", &context)) {
+        char *bar = strchr(e, '|');
+        if (bar) {
+            *bar = 0;
+            char *id = e, *arg = bar + 1;
+            FavTrim(id);
+            FavTrim(arg);
+            if (id[0] && ItemUsable(id) && FavArgOk(arg)) fn(id, arg);
+            continue;
+        }
+        char *c2 = nullptr;                  // the old form: ids separated by ',' or ' '
+        for (char *id = strtok_s(e, " \t", &c2); id; id = strtok_s(nullptr, " \t", &c2))
+            if (ItemUsable(id)) fn(id, "");
+    }
 }
-bool FavHas(const char *id) {
+// calls fn(id) for every usable id-only favourite (the 0.3 view)
+template <typename F> void ForFavs(F fn) {
+    ForFavEntries([&](const char *id, const char *arg) { if (!arg[0]) fn(id); });
+}
+bool FavHasArg(const char *id, const char *arg) {
     bool found = false;
-    ForFavs([&](const char *f) { if (_stricmp(f, id) == 0) found = true; });
+    ForFavEntries([&](const char *f, const char *a) {
+        if (!_stricmp(f, id) && !_stricmp(a, arg ? arg : "")) found = true;
+    });
     return found;
 }
+bool FavHas(const char *id) { return FavHasArg(id, ""); }
 void FavSave() {
     if (g_iniPath[0] && !WritePrivateProfileStringA("Favorites", "Ids", g_favs, g_iniPath))
         Log(1, "favourites: writing %s failed (%lu)", g_iniPath, GetLastError());
 }
-bool FavSet(const char *id, bool add, char *o, size_t n) {
+bool FavSetArg(const char *id, const char *arg, bool add, char *o, size_t n) {
     if (!id || !id[0] || !ItemUsable(id)) { Out(o, n, "no such item '%s'", id ? id : ""); return false; }
+    if (!arg) arg = "";
+    if (!FavArgOk(arg)) {
+        Out(o, n, "argument '%.40s' cannot be a favourite (no ',' / '|', at most %u characters)", arg,
+            static_cast<unsigned>(kFavArgMax - 1));
+        return false;
+    }
     char rebuilt[sizeof(g_favs)] = "";
     size_t used = 0;
-    bool had = false;
-    ForFavs([&](const char *f) {
-        if (_stricmp(f, id) == 0) { had = true; if (!add) return; }
-        int w = _snprintf_s(rebuilt + used, sizeof(rebuilt) - used, _TRUNCATE, "%s%s", used ? "," : "", f);
+    bool had = false, full = false;
+    auto put = [&](const char *f, const char *a) {
+        int w = _snprintf_s(rebuilt + used, sizeof(rebuilt) - used, _TRUNCATE, "%s%s%s%s", used ? "," : "", f,
+                            a[0] ? "|" : "", a);
         if (w > 0) used += static_cast<size_t>(w);
+        else full = true;
+    };
+    ForFavEntries([&](const char *f, const char *a) {
+        if (!_stricmp(f, id) && !_stricmp(a, arg)) { had = true; if (!add) return; }
+        put(f, a);
     });
-    if (add && !had) _snprintf_s(rebuilt + used, sizeof(rebuilt) - used, _TRUNCATE, "%s%s", used ? "," : "", id);
+    if (add && !had) put(id, arg);
+    if (full) {                              // 0.21.8: never write a cut list (sizeof(g_favs) characters)
+        Out(o, n, "favourites full (%u characters) - nothing changed", static_cast<unsigned>(sizeof(g_favs) - 1));
+        return false;
+    }
     EnterCriticalSection(&g_favLock);
     strncpy_s(g_favs, sizeof(g_favs), rebuilt, _TRUNCATE);
     LeaveCriticalSection(&g_favLock);
     FavSave();
-    Out(o, n, "fav %s %s (%s)", add ? "add" : "del", id, add ? (had ? "was already in" : "added") : (had ? "removed" : "was not in"));
+    Out(o, n, "fav %s %s%s%s (%s)", add ? "add" : "del", id, arg[0] ? " " : "", arg,
+        add ? (had ? "was already in" : "added") : (had ? "removed" : "was not in"));
     return true;
 }
+bool FavSet(const char *id, bool add, char *o, size_t n) { return FavSetArg(id, "", add, o, n); }
 void FavToggle(const char *id) {
     char o[160];
     FavSet(id, !FavHas(id), o, sizeof(o));
@@ -11675,14 +11774,27 @@ void FavToggle(const char *id) {
 void ValFavList(char *o, size_t n) {
     size_t used = 0;
     o[0] = 0;
-    ForFavs([&](const char *f) {
-        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s", used ? " " : "", f);
+    ForFavEntries([&](const char *f, const char *a) {
+        int w = _snprintf_s(o + used, n - used, _TRUNCATE, "%s%s%s%s", used ? " " : "", f, a[0] ? "|" : "", a);
         if (w > 0) used += static_cast<size_t>(w);
     });
     if (!used) Out(o, n, "-");
 }
-bool RunFavAdd(const char *arg, char *o, size_t n) { return FavSet(arg, true, o, n); }
-bool RunFavDel(const char *arg, char *o, size_t n) { return FavSet(arg, false, o, n); }
+// fav.add / fav.del "<id>" or "<id> <argument>" (or "<id>|<argument>", the list's own form)
+bool RunFavArg(const char *arg, bool add, char *o, size_t n) {
+    char line[sizeof(g_favs)];
+    strncpy_s(line, sizeof(line), arg ? arg : "", _TRUNCATE);
+    char *s = line;
+    FavTrim(s);
+    char *cut = s;
+    while (*cut && *cut != ' ' && *cut != '|') ++cut;
+    char *rest = cut;
+    if (*cut) { *cut = 0; rest = cut + 1; }
+    FavTrim(rest);
+    return FavSetArg(s, rest, add, o, n);
+}
+bool RunFavAdd(const char *arg, char *o, size_t n) { return RunFavArg(arg, true, o, n); }
+bool RunFavDel(const char *arg, char *o, size_t n) { return RunFavArg(arg, false, o, n); }
 
 bool RunFavReset(const char *, char *o, size_t n) {
     EnterCriticalSection(&g_favLock);
@@ -16097,6 +16209,183 @@ void M201Check() {
 }
 // ---- end of 0.20.1 sound list ----
 
+// ---- 0.21.8 sound group sliders (TODO "Ton-Gruppen-Regler"; docs\Befund-Ton-Gruppen-0611.md sections 4 / 5) ----
+// Eight sliders of the finding's proposal (section 4), each a factor 0 .. 100 % on the FMOD channel groups of its sound
+// groups: cg = [[[0x8a80d8] + g * 0x84 + 0x64] + 0x6c] (SmGroupCg, 0.20.1), *(float *)(cg + 0x38) = factor, then FMOD's
+// own ChannelGroupI volume recompute 0x7c4774 (thiscall, no arguments: +0x3c = +0x38 x the parent's +0x3c, the child
+// groups recursively, every channel re-applied). The game's own group volume (entry +0) is never touched (the option
+// sliders, SOUND_ResetGroups and data fades write it). FMOD multiplies along the group path, so a slider acts on the
+// sub-groups too; a group whose ancestor (entry +0x68 = parent index, 0x591fe4) is in the same slider is skipped (the
+// proposal's weapons slider lists 58 and its child 60 - one factor, not two). Two sliders on one path multiply (55
+// under 51, 78 under 77: hud x weapons, steps x lara) - as the game's effects slider multiplies with every group.
+// Game thread (SndMuteTick's place in PadHook): one pass per frame, a group is written only when its factor differs
+// from what TruMenu wants (new groups after a level load: CreateGroups 0x593530 builds new channel groups - written
+// again, logged "new (level load)"). 100 % on a group TruMenu changed = its value before TruMenu (kept per group) put
+// back. [SoundGroups] <Key> = percent (kept in TruMenu.ini by snd.group). Open (finding section 6): whether the
+// factor is audible (live test: Umgebung 0 -> the waterfall goes, steps stay), whether the game writes cg + 0x38 itself
+// (static search not done). Byte checks kSgChecks (work\asi\menu0218\precheck_0218_sndgroups.txt).
+const DvCheck kSgChecks[] = {
+    {0x007c4774, "55 8bec 51 51 56 8bf1 8b461c 85c0 57 c645f800 7405 d9403c"},   // recompute: parent [cg+0x1c] +0x3c
+    {0x007c4792, "d94638 d84dfc"},                                // .. own factor +0x38 x parent
+    {0x007c47b6, "d95e3c"},                                       // .. -> +0x3c
+    {0x00591fe4, "8b4668 8b4d04 3bc1"},                           // group builder: parent index entry +0x68 < count
+    {0x00591ffe, "69c084000000 034500"},                          // .. parent entry = table + index * 0x84
+    {0x0059207f, "894664"},                                       // .. entry +0x64 = the group's object R
+};
+const DWORD kFmCgUpdateVol = 0x007c4774;
+typedef int(__fastcall *FmCgUpdateFn)(DWORD cg, void *edx);   // thiscall, no arguments, ret
+struct SgSlider { const char *key, *de, *en; int groups[4]; int n; };
+const SgSlider kSgSliders[] = {               // the finding's section 4 (8 sliders), keys = [SoundGroups] / snd.group
+    {"Ambience", "Umgebung", "Ambience", {15, 0, 0, 0}, 1},
+    {"Steps", "Schritte & Koerper", "Footsteps & body", {32, 78, 0, 0}, 2},
+    {"Weapons", "Waffen & Treffer", "Weapons & impacts", {58, 60, 51, 31}, 4},
+    {"Enemies", "Gegner & Tiere", "Enemies & creatures", {27, 65, 0, 0}, 2},
+    {"Lara", "Lara-Stimme & Funk", "Lara voice & radio", {68, 70, 72, 77}, 4},
+    {"Objects", "Objekte & Mechanik", "Objects & mechanics", {43, 0, 0, 0}, 1},
+    {"Dlc2", "DLC 2 / Schattenkraft", "DLC 2 / shadow power", {79, 0, 0, 0}, 1},
+    {"Hud", "Sonstiges (HUD)", "Other (HUD)", {54, 55, 56, 57}, 4},
+};
+const int kSgN = static_cast<int>(sizeof(kSgSliders) / sizeof(kSgSliders[0]));
+volatile LONG g_sgPct[kSgN] = {100, 100, 100, 100, 100, 100, 100, 100};
+struct SgGroupState { DWORD cg; float orig, set; bool ours; };
+SgGroupState g_sgState[kSgN][4];             // game thread
+bool g_sgOk = false;
+char g_sgWhy[96] = "not checked";
+LONG g_sgWrites = 0;
+int SgIndex(const char *key) {
+    for (int i = 0; i < kSgN; ++i)
+        if (!_stricmp(key, kSgSliders[i].key)) return i;
+    return -1;
+}
+// the group's parent index (entry +0x68), -1 = none / unreadable
+int SgParent(int g) {
+    DWORD table = 0, count = 0, p = 0;
+    if (g < 0 || !ReadDword(kSndGroups, &table) || !table || !ReadDword(kSndGroups + 4, &count) ||
+        static_cast<DWORD>(g) >= count || !ReadDword(table + static_cast<DWORD>(g) * 0x84 + 0x68, &p) || p >= count)
+        return -1;
+    return static_cast<int>(p);
+}
+// a group of slider s whose ancestor is also in s: skipped (one factor per path)
+bool SgCovered(const SgSlider &s, int g) {
+    int p = SgParent(g);
+    for (int guard = 0; p > 0 && guard < 16; ++guard, p = SgParent(p))
+        for (int k = 0; k < s.n; ++k)
+            if (s.groups[k] == p) return true;
+    return false;
+}
+bool SgWrite(DWORD cg, float v) {
+    __try {
+        *reinterpret_cast<volatile float *>(cg + 0x38) = v;
+        reinterpret_cast<FmCgUpdateFn>(kFmCgUpdateVol)(cg, nullptr);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+// game thread, every frame (SndMuteTick's place): cheap while every slider is 100 % and nothing is ours
+void SgTick() {
+    if (!g_sgOk) return;
+    for (int i = 0; i < kSgN; ++i) {
+        const SgSlider &s = kSgSliders[i];
+        const LONG pct = g_sgPct[i];
+        for (int k = 0; k < s.n; ++k) {
+            SgGroupState &st = g_sgState[i][k];
+            if (pct >= 100 && !st.ours) continue;
+            const DWORD cg = SmGroupCg(s.groups[k]);
+            if (!cg) continue;                  // no FMOD / no group yet (loading): the state stays for later
+            float cur = 1.0f;
+            if (!ReadFloats(cg + 0x38, &cur, 1)) continue;
+            if (pct >= 100) {                   // back: only the group TruMenu changed, only while it is the same object
+                if (st.cg == cg && fabsf(cur - st.set) < 0.0005f && SgWrite(cg, st.orig))
+                    Log(1, "snd.group %s: group %d back to %.2f (FMOD channel group 0x%08lx)", s.key, s.groups[k],
+                        static_cast<double>(st.orig), cg);
+                st.ours = false;
+                st.cg = 0;
+                continue;
+            }
+            if (SgCovered(s, s.groups[k])) continue;
+            const float want = static_cast<float>(pct) / 100.0f;
+            if (st.ours && st.cg == cg && fabsf(cur - want) < 0.0005f) continue;   // as wanted
+            const bool fresh = !st.ours || st.cg != cg;
+            if (fresh) st.orig = cur > 0.0f && cur <= 1.0f ? cur : 1.0f;
+            if (!SgWrite(cg, want)) continue;
+            ++g_sgWrites;
+            Log(1, "snd.group %s: %sgroup %d factor %.2f (FMOD channel group 0x%08lx +0x38, recompute 0x7c4774; was %.2f) "
+                "- the game's group volume untouched", s.key, fresh && st.ours ? "new (level load) " : "", s.groups[k],
+                static_cast<double>(want), cg, static_cast<double>(cur));
+            st.cg = cg;
+            st.set = want;
+            st.ours = true;
+        }
+    }
+}
+void ValSgGroups(char *o, size_t n) {
+    if (!g_sgOk) { Out(o, n, "n/a (%s)", g_sgWhy); return; }
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < kSgN; ++i) LabelAdd(o, n, &used, "%s%s %ld", i ? ", " : "", kSgSliders[i].key, g_sgPct[i]);
+    LabelAdd(o, n, &used, " (%ld writes)", g_sgWrites);
+}
+// snd.group <Key> <0 .. 100>: one slider (kept in TruMenu.ini [SoundGroups] <Key>); snd.group <Key> = its value
+bool RunSgGroup(const char *arg, char *o, size_t n) {
+    if (!g_sgOk) { Out(o, n, "disabled: pre-check failed (%s)", g_sgWhy); return false; }
+    char key[32] = "";
+    const char *v = TestWord(arg ? arg : "", key, sizeof(key));
+    const int i = SgIndex(key);
+    if (i < 0) {
+        Out(o, n, "usage: snd.group <Ambience|Steps|Weapons|Enemies|Lara|Objects|Dlc2|Hud> <0 .. 100>");
+        return false;
+    }
+    if (!v[0]) { Out(o, n, "snd.group %s = %ld %%", kSgSliders[i].key, g_sgPct[i]); return true; }
+    char *end = nullptr;
+    const long p = strtol(v, &end, 10);
+    if (!end || *end || p < 0 || p > 100) { Out(o, n, "snd.group %s: '%s' is not 0 .. 100", kSgSliders[i].key, v); return false; }
+    InterlockedExchange(&g_sgPct[i], p);
+    char text[16];
+    Out(text, sizeof(text), "%ld", p);
+    if (g_iniPath[0]) WritePrivateProfileStringA("SoundGroups", kSgSliders[i].key, text, g_iniPath);
+    char groups[48] = "";
+    size_t used = 0;
+    for (int k = 0; k < kSgSliders[i].n; ++k) LabelAdd(groups, sizeof(groups), &used, "%s%d", k ? " " : "", kSgSliders[i].groups[k]);
+    Log(1, "snd.group %s %ld (src=%s): sound groups %s with the next game frame", kSgSliders[i].key, p,
+        ShotSource("snd.group"), groups);
+    Out(o, n, "snd.group %s %ld %%", kSgSliders[i].key, p);
+    return true;
+}
+// one item per slider for the bar's value rows (snd.vol.<key>): value = percent, argument = percent
+template <int K> void ValSgOne(char *o, size_t n) {
+    if (!g_sgOk) { Out(o, n, "n/a"); return; }
+    Out(o, n, "%ld", g_sgPct[K]);
+}
+template <int K> bool RunSgOne(const char *arg, char *o, size_t n) {
+    char line[48];
+    Out(line, sizeof(line), "%s %s", kSgSliders[K].key, arg ? arg : "");
+    return RunSgGroup(line, o, n);
+}
+int SgPctAt(const char *id) {                // the bar row's current percent (QbActRow's step): snd.vol.<key>
+    const int i = !_strnicmp(id, "snd.vol.", 8) ? SgIndex(id + 8) : -1;
+    return i >= 0 ? static_cast<int>(g_sgPct[i]) : 100;
+}
+void SgReadOptions(const char *ini) {
+    for (int i = 0; i < kSgN; ++i) {             // [SoundGroups] <Key> (kOpts), outside 0 .. 100 = 100
+        const int v = OptInt(ini, "SoundGroups", kSgSliders[i].key);
+        InterlockedExchange(&g_sgPct[i], v >= 0 && v <= 100 ? v : 100);
+    }
+}
+void SgCheck() {
+    DWORD at = 0;
+    g_sgOk = g_smOk && DvChecks(kSgChecks, sizeof(kSgChecks) / sizeof(kSgChecks[0]), &at);
+    if (g_sgOk) Out(g_sgWhy, sizeof(g_sgWhy), "ok");
+    else Out(g_sgWhy, sizeof(g_sgWhy), !g_smOk ? "needs the FMOD group checks (0.20.1)" : "FMOD group volume differs at "
+             "0x%08lx", at);
+    Log(g_sgOk ? 1 : 0, "0.21.8 sound group sliders: checks %s (%d rows); [SoundGroups] Ambience %ld Steps %ld Weapons %ld "
+        "Enemies %ld Lara %ld Objects %ld Dlc2 %ld Hud %ld", g_sgWhy, static_cast<int>(sizeof(kSgChecks) /
+        sizeof(kSgChecks[0])), g_sgPct[0], g_sgPct[1], g_sgPct[2], g_sgPct[3], g_sgPct[4], g_sgPct[5], g_sgPct[6],
+        g_sgPct[7]);
+}
+// ---- end of 0.21.8 sound group sliders ----
+
 // ======================================================================================================================
 // ---- 0.21 arachnophobia, camera shake, labels, ai.remove (Lukas / coordinator 2026-11-06) ----
 // Plan: docs\Befund-Arachnophobie-Stufe1-Kamera-0611.md (stage 1 = 0.21-A .. E); this build: docs\Befund-TruMenu-021-
@@ -17585,7 +17874,8 @@ const DvCheck kAkChecks[] = {
     {0x0062e370, "8b542408 83faff 8bc1 7424 56 8bca 83e11f be01000000 d3e6 c1fa05 8574901c"},   // mask +0x1c absorbs
     {0x006203a3, "8b510c d1ea f6d2 f6c201 0f8483000000"},        // death check: brain+0xc bit 1 = none
     {0x006203bf, "d980642c0000 dc1db8148400 dfe0 f6c441 7a64"},  // LP <= 0
-    {0x006203e4, "e857ec0500 83c410 84c0 7417"},                 // ShouldRegenerate -> RegenerateDeath
+    {0x006203e9, "83c410 84c0 7417"},                            // ShouldRegenerate -> RegenerateDeath (0.21.8: after
+                                                                 // the call 0x6203e4 - TruShadowCombat 0.6.5 H1 owns it)
     {0x0062040c, "e82f37ffff"},                                  // death kind 0x613b40
     {0x0062042a, "e821120200"},                                  // .. 0x641650
     {0x00641701, "6804e98a00 57 8854243a e8d0bfffff"},           // EnemyState_Death 0x8ae904 -> 0x63d6e0
@@ -18692,6 +18982,44 @@ void ValFixHall02(char *o, size_t n) {
     if (!hp && !hb) { Out(o, n, "dispatcher 11270 has no sticky values (not in DLC 2 / fight not started)"); return; }
     Out(o, n, "11270: population %s%ld, deathcount %s%ld, tutorial %s%ld, broken %s%ld", hp ? "" : "-", pop, hd ? "" : "-",
         dead, ht ? "" : "-", tut, hb ? "" : "-", broken);
+}
+// ---- 0.21.8 story values (TODO "Story-Werte live"): the known sticky script values of Lara's level, read only ----
+// One table: unit (prefix; the values stay in the sticky store [0xa13f18] after the unit is left, they are shown in
+// the units they belong to), owner intro (kind 0), Symbol, type (0 int, 1 bool). Facts: hall02 dispatcher 11270 -
+// docs\Befund-Hall02-Wand-0711.md / Befund-Hall02-Zaehler-Drift-0711.md (the keys of fix.hall02); Croft Manor dispatcher
+// 4086 - docs\Befund-Manor-Prolog-0611.md row 4 (IsLevelZeroDone / IsL3_Reset_OK, the level script's own names). The
+// read is the sticky.get path (StFind / StValue: no write, no game function); "-" = no entry yet (the script has not
+// used it). Item story.values (info), bar rows page Leveldaten and Tests (hall02 group).
+struct StoryVal { const char *unit, *de, *en; DWORD owner; WORD key; int type; };
+const StoryVal kStoryVals[] = {
+    {kH2Unit, "Bev", "pop", kH2Dispatcher, kH2KeyPopulation, 0},          // population (17287)
+    {kH2Unit, "Tote", "deaths", kH2Dispatcher, kH2KeyDeaths, 0},          // deathcount (8914)
+    {kH2Unit, "Tutorial", "tutorial", kH2Dispatcher, kH2KeyTutorial, 0},  // tutorial stage (18509)
+    {kH2Unit, "Wand", "wall", kH2Dispatcher, kH2KeyBroken, 1},            // wall broken (10029)
+    {"l3_", "L0 fertig", "L0 done", 4086, 10814, 1},                      // IsLevelZeroDone
+    {"l3_", "L3-Reset", "L3 reset", 4086, 10817, 1},                      // IsL3_Reset_OK
+};
+void ValStoryValues(char *o, size_t n) {
+    const bool de = g_qbLang == 0;
+    if (!g_stOk) { Out(o, n, "n/a (%s)", g_stWhy); return; }
+    char unit[48];
+    PosLaraUnit(unit, sizeof(unit));
+    if (!unit[0]) { Out(o, n, "%s", de ? "kein Level" : "no level"); return; }
+    size_t used = 0;
+    o[0] = 0;
+    int rows = 0;
+    for (const StoryVal &s : kStoryVals) {
+        if (_strnicmp(unit, s.unit, strlen(s.unit))) continue;
+        ++rows;
+        StHit hits[3];
+        char why[96], v[32] = "-";
+        const int k = StFind(0, s.owner, s.key, hits, why, sizeof(why));
+        for (int i = 0; i < k; ++i)
+            if (hits[i].type == s.type && StValue(hits[i], v, sizeof(v))) break;
+        LabelAdd(o, n, &used, "%s%s %s", used ? ", " : "", de ? s.de : s.en, v);
+    }
+    if (!rows) Out(o, n, de ? "keine bekannten Werte fuer %s (Tabelle: hall02, l3)" : "no known values for %s (table: hall02, "
+                   "l3)", unit);
 }
 bool RunFixHall02(const char *, char *o, size_t n) {
     const bool de = g_qbLang == 0;
@@ -21038,6 +21366,28 @@ const Item kItems[] = {
     {"snd.speech", "bool", "0.20.1: speech / cutscene lines in the sound list ([Sound] ShowSpeech)", false, ValSnSpeech,
      RunSnSpeech},
     {"snd.other", "bool", "0.20.1: lines of voices in no known group ([Sound] ShowOther)", false, ValSnOther, RunSnOther},
+    // 0.21.8 sound group sliders (section "0.21.8 sound group sliders"): the game thread writes the FMOD channel groups
+    {"snd.group", "action", "0.21.8 <Key> <0 .. 100>: one sound group slider in percent (Ambience, Steps, Weapons, "
+                            "Enemies, Lara, Objects, Dlc2, Hud; kept in TruMenu.ini [SoundGroups]); <Key> alone = its "
+                            "value", false, ValSgGroups, RunSgGroup},
+    {"snd.groups", "info", "0.21.8: the eight sound group sliders (percent) and the FMOD writes so far", false, ValSgGroups,
+     nullptr},
+    {"snd.vol.ambience", "int", "0.21.8 0 .. 100: slider Umgebung / Ambience (groups 15 ..)", false, ValSgOne<0>,
+     RunSgOne<0>},
+    {"snd.vol.steps", "int", "0.21.8 0 .. 100: slider Schritte & Koerper / Footsteps & body (32, 78)", false, ValSgOne<1>,
+     RunSgOne<1>},
+    {"snd.vol.weapons", "int", "0.21.8 0 .. 100: slider Waffen & Treffer / Weapons & impacts (58, 51, 31)", false,
+     ValSgOne<2>, RunSgOne<2>},
+    {"snd.vol.enemies", "int", "0.21.8 0 .. 100: slider Gegner & Tiere / Enemies & creatures (27, 65)", false, ValSgOne<3>,
+     RunSgOne<3>},
+    {"snd.vol.lara", "int", "0.21.8 0 .. 100: slider Lara-Stimme & Funk / Lara voice & radio (68, 70, 72, 77)", false,
+     ValSgOne<4>, RunSgOne<4>},
+    {"snd.vol.objects", "int", "0.21.8 0 .. 100: slider Objekte & Mechanik / Objects & mechanics (43)", false, ValSgOne<5>,
+     RunSgOne<5>},
+    {"snd.vol.dlc2", "int", "0.21.8 0 .. 100: slider DLC 2 / Schattenkraft / shadow power (79)", false, ValSgOne<6>,
+     RunSgOne<6>},
+    {"snd.vol.hud", "int", "0.21.8 0 .. 100: slider Sonstiges (HUD) / Other (HUD) (54 .. 57)", false, ValSgOne<7>,
+     RunSgOne<7>},
     {"snd.dump", "action", "0.20.1: the whole current sound list (every voice, unfiltered, with addresses) into "
                            "TruMenu.log once", true, ValSnStatus, RunSnDump},
     {"snd.status", "info", "0.20.1: sound list - checks, voices, groups, how media.mutemusic mutes", false, ValSnStatus,
@@ -21099,6 +21449,9 @@ const Item kItems[] = {
     {"thrall.scriptval", "action", "0.21.4: the thrall-script int +8 of every tutorial thrall (object 1004) and generator "
                                    "enemy into TruMenu.log (restored 0 / generator-born 2), read only", false,
      ValThrallScript, RunThrallScript},
+    {"story.values", "info", "0.21.8: the known sticky script values of Lara's level, read only (kStoryVals: hall02 "
+                             "population / deaths / tutorial / wall, Croft Manor IsLevelZeroDone / IsL3_Reset_OK; "
+                             "'-' = not created yet)", false, ValStoryValues, nullptr},
     // 0.21.5 Fixes (section "0.21.5 Fixes"): the plugin INI switches of TruMenu.switches.txt
     {"sw.set", "action", "0.21.5: <Plugin>:<Section>:<Key> <value> - write one switch of TruMenu.switches.txt into the "
                          "plugin INI next to tru.exe (listed keys only, type / range checked, existing INI only)", false,
@@ -21436,7 +21789,11 @@ template <typename F> void CmdArgValues(const char *id, F fn) {
     } else if (!_stricmp(id, "log.level")) {
         fn("0", "all lines"); fn("1", "warnings + errors"); fn("2", "errors only");
     } else if (!_stricmp(id, "fav.del")) {
-        ForFavs([&](const char *f) { fn(f, "favourite"); });
+        ForFavEntries([&](const char *f, const char *a) {   // 0.21.8: "<id>|<argument>" for an entry with one
+            char e[160];
+            Out(e, sizeof(e), "%s%s%s", f, a[0] ? "|" : "", a);
+            fn(e, "favourite");
+        });
     }
 }
 bool CmdArgsAreIds(const char *id) { return !_stricmp(id, "get") || !_stricmp(id, "fav.add"); }
@@ -21643,6 +22000,59 @@ const char *CmdRunLine(const char *line, bool wait, const char *source) {
     LeaveCriticalSection(&g_cmdLock);
     Log(2, "cmd (%s): %s -> %.200s", source, clean, answer);
     return answer;
+}
+
+// 0.21.8 (live 2026-11-07 21:23:53: "cheat.god 0" ran from the quick command line's history by accident - TODO "Rueckfrage
+// gefaehrliche Befehle"): the lines a pad run of the quick command line asks twice for (section "0.21.6 quick command
+// line": the first A arms with a footer warning, the same line again within kQcArmMs runs). One table: an exact item id,
+// or a prefix ending in '.' = every item of that family. A read is never dangerous: help / list / get, info items, a
+// value item without an argument (CmdExecute shows its value), an unknown word (CmdExecute refuses it).
+struct CmdDanger { const char *id, *de, *en; };
+const CmdDanger kCmdDanger[] = {
+    {"cheat.", "aendert einen Cheat (Unverwundbarkeit, Flug, Munition ...)", "changes a cheat (god mode, flight, ammo ...)"},
+    {"player.invincible", "schaltet die Unverwundbarkeit", "switches god mode"},
+    {"player.die", "Lara stirbt", "Lara dies"},
+    {"level.load", "laedt ein Level (Story-Stand!)", "loads a level (story state!)"},
+    {"level.start", "startet eine Mission neu", "starts a mission"},
+    {"level.reload", "laedt das Level neu", "reloads the level"},
+    {"unit.go", "laedt evtl. einen Abschnitt", "may load a unit"},
+    {"pos.goload", "laedt evtl. einen Abschnitt", "may load a unit"},
+    {"regress.prepare", "laedt / setzt einen Teststand", "loads / sets a test state"},
+    {"save.load", "laedt einen Spielstand", "loads a save"},
+    {"save.delete", "loescht einen Spielstand", "deletes a save"},
+    {"save.restore", "ueberschreibt die Spielstaende", "overwrites the saves"},
+    {"save.import", "schreibt einen Spielstand", "writes a save"},
+    {"costume.reset", "setzt das Kostuem zurueck", "resets the costume"},
+    {"costume.choosereset", "setzt das Kostuem zurueck", "resets the costume"},
+    {"costume.setreload", "Kostuem + Abschnitt neu laden", "costume + reload the unit"},
+    {"costume.choosereload", "Kostuem + Abschnitt neu laden", "costume + reload the unit"},
+    {"sw.set", "schreibt eine Plugin-INI", "writes a plugin INI"},
+    {"sticky.set", "aendert einen Skript-Wert", "changes a script value"},
+    {"fix.hall02", "aendert den hall02-Zaehler", "changes the hall02 counter"},
+    {"ai.kill", "toetet Gegner (Story zaehlt mit)", "kills enemies (the story counts)"},
+    {"ai.remove", "entfernt Gegner (Story wartet evtl.)", "removes enemies (a script may wait)"},
+    {"instance.remove", "entfernt ein Objekt", "removes an instance"},
+    {"settings.reset", "setzt TruMenu.ini zurueck", "resets TruMenu.ini"},
+    {"fav.reset", "loescht die Favoriten", "clears the favourites"},
+    {"game.quit", "beendet das Spiel", "quits the game"},
+};
+const CmdDanger *CmdDangerOf(const char *line) {
+    char clean[kCmdLine], word[64];
+    CmdClean(line ? line : "", clean, sizeof(clean));
+    size_t w = 0;
+    while (clean[w] && clean[w] != ' ' && w + 1 < sizeof(word)) { word[w] = clean[w]; ++w; }
+    word[w] = 0;
+    const char *arg = clean + w;
+    while (*arg == ' ') ++arg;
+    const CmdKind k = CmdKindOf(word);
+    if (k == kCkUnknown || k == kCkBuiltin || k == kCkInfo || k == kCkTodo) return nullptr;
+    if (CmdIsValue(k) && !arg[0]) return nullptr;            // "<value id>" alone shows the value
+    const char *id = CmdCanonical(word);
+    for (const CmdDanger &d : kCmdDanger) {
+        const size_t n = strlen(d.id);
+        if (d.id[n - 1] == '.' ? !_strnicmp(id, d.id, n) : !_stricmp(id, d.id)) return &d;
+    }
+    return nullptr;
 }
 
 void ValCmdHistory(char *o, size_t n) {
@@ -21973,12 +22383,30 @@ void CmdPadChoose(int i) {
     }
 }
 
-void DrawCmdSuggestions(const ImVec2 &barPos, float width) {
-    if (!g_sugCount || g_pickMode != 0) return;
-    const int shown = 10;
+// 0.21.8: the suggestion rows (selected one yellow, its value, its label) - the menu bar's list window below and the
+// quick command line under its input both draw them with this (one list, one look)
+void CmdSugRows(int shown) {
     int first = g_sugSel - shown / 2;
     if (first > g_sugCount - shown) first = g_sugCount - shown;
     if (first < 0) first = 0;
+    for (int i = first; i < g_sugCount && i < first + shown; ++i) {
+        const CmdSug &s = g_sug[i];
+        bool sel = i == g_sugSel;
+        ImGui::TextColored(sel ? ImVec4(1.0f, 0.85f, 0.2f, 1.0f) : ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s %s",
+                           sel ? ">" : " ", s.show);
+        const char *value = s.valueId ? CmdCachedValue(s.valueId) : "";
+        if (value[0]) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.45f, 0.8f, 1.0f, 1.0f), "= %.48s", value);
+        }
+        if (s.note[0]) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%.80s", s.note);
+        }
+    }
+}
+void DrawCmdSuggestions(const ImVec2 &barPos, float width) {
+    if (!g_sugCount || g_pickMode != 0) return;
     ImGui::SetNextWindowPos(ImVec2(barPos.x, barPos.y - 2.0f), ImGuiCond_Always, ImVec2(0.0f, 1.0f));
     ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0.0f), ImVec2(width, FLT_MAX));
     ImGui::SetNextWindowBgAlpha(0.95f);
@@ -21987,21 +22415,7 @@ void DrawCmdSuggestions(const ImVec2 &barPos, float width) {
                              ImGuiWindowFlags_NoSavedSettings;
     if (ImGui::Begin("##TruCmdSuggestions", nullptr, flags)) {
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
-        for (int i = first; i < g_sugCount && i < first + shown; ++i) {
-            const CmdSug &s = g_sug[i];
-            bool sel = i == g_sugSel;
-            ImGui::TextColored(sel ? ImVec4(1.0f, 0.85f, 0.2f, 1.0f) : ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s %s",
-                               sel ? ">" : " ", s.show);
-            const char *value = s.valueId ? CmdCachedValue(s.valueId) : "";
-            if (value[0]) {
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.45f, 0.8f, 1.0f, 1.0f), "= %.48s", value);
-            }
-            if (s.note[0]) {
-                ImGui::SameLine();
-                ImGui::TextDisabled("%.80s", s.note);
-            }
-        }
+        CmdSugRows(10);
         ImGui::TextDisabled("%d / %d   %s", g_sugSel >= 0 ? g_sugSel + 1 : 0, g_sugCount,
                             g_cmdPadMode ? "D-pad = choose, A = run / pick, B = back, Y = pin, View = type"
                                          : "Tab / Down = choose, Enter = run");
@@ -22054,25 +22468,49 @@ DWORD g_oskFlashTick = 0;
 char g_oskHist[16][kCmdLine];                // history, newest first (suggestions of the empty line)
 int g_oskHistCount = 0;
 
-bool OskHistoryMode() { return g_cmdBuf[0] == 0; }
+// 0.21.8 (TODO "kleine Befehlszeile ausbauen" (3): "herausloesen, nicht doppelt bauen"): the keyboard edits the line of
+// its target - the menu's command bar (g_oskMenu, as 0.7) or the quick command line (section "0.21.6 quick command
+// line", g_oskQc). One keyboard: the same rows, keys, pad rules (OskInput) and drawing (DrawOsk); a target only names
+// its line buffer, what "run" / "close" do and what an edit resets. DrawOsk / OskInput take the target and set g_osk for
+// the helpers below; every other caller (DrawCmdBar) sets it first. Render thread only.
+struct OskTarget {
+    char *buf;                               // the line (kCmdLine bytes)
+    void (*run)();                           // Start / the run key: run the line (the owner's one command path)
+    void (*close)(bool byB);                 // the close key / B
+    void (*edited)();                        // after every change of the line (the owner's selection / history state)
+    const char *helpDe, *helpEn;             // the key line under the keyboard
+};
+void OskMenuRun();
+void OskMenuClose(bool byB);
+void OskMenuEdited() {
+    g_sugSel = -1;
+    g_cmdHistPos = -1;
+}
+const OskTarget g_oskMenu = {g_cmdBuf, OskMenuRun, OskMenuClose, OskMenuEdited,
+                             "A type   X backspace   Y take suggestion   Start run   B close   LB / RB rows   L3 = "
+                             "keyboard off   (a real keyboard works too)",
+                             "A type   X backspace   Y take suggestion   Start run   B close   LB / RB rows   L3 = "
+                             "keyboard off   (a real keyboard works too)"};
+const OskTarget *g_osk = &g_oskMenu;         // the target of this frame's keyboard
+
+bool OskHistoryMode() { return g_osk->buf[0] == 0; }
 int OskSugCount() { return OskHistoryMode() ? g_oskHistCount : g_sugCount; }
 const char *OskSugShow(int i) { return OskHistoryMode() ? g_oskHist[i] : g_sug[i].show; }
 
 void OskEdited() {                           // after every change of the line
-    g_sugSel = -1;
-    g_cmdHistPos = -1;
+    g_osk->edited();
     g_oskSug = 0;
     g_oskFirst = 0;
 }
 void OskAppend(const char *text) {
-    size_t used = strlen(g_cmdBuf), add = strlen(text);
-    if (used + add >= sizeof(g_cmdBuf)) return;
-    memcpy(g_cmdBuf + used, text, add + 1);
+    size_t used = strlen(g_osk->buf), add = strlen(text);
+    if (used + add >= kCmdLine) return;
+    memcpy(g_osk->buf + used, text, add + 1);
     OskEdited();
 }
 void OskBackspace() {
-    size_t used = strlen(g_cmdBuf);
-    if (used) g_cmdBuf[used - 1] = 0;
+    size_t used = strlen(g_osk->buf);
+    if (used) g_osk->buf[used - 1] = 0;
     OskEdited();
 }
 void OskTakeSuggestion(int i) {
@@ -22080,16 +22518,23 @@ void OskTakeSuggestion(int i) {
     char text[kCmdLine];
     if (OskHistoryMode()) strncpy_s(text, sizeof(text), g_oskHist[i], _TRUNCATE);
     else CmdCompletionText(i, text, sizeof(text), true);   // with a space when the id takes an argument
-    strncpy_s(g_cmdBuf, sizeof(g_cmdBuf), text, _TRUNCATE);
+    strncpy_s(g_osk->buf, kCmdLine, text, _TRUNCATE);
     OskEdited();
 }
 void OskRun() {
-    if (!g_cmdBuf[0]) return;
+    if (!g_osk->buf[0]) return;
+    g_osk->run();
+}
+void OskMenuRun() {
     char line[kCmdLine];
     strncpy_s(line, sizeof(line), g_cmdBuf, _TRUNCATE);
     CmdRunFromBar(line);
     g_cmdBuf[0] = 0;
     OskEdited();
+}
+void OskMenuClose(bool byB) {
+    g_oskOpen = false;
+    if (byB) g_oskBackClosed = true;         // 0.7.1: a second B closes the menu
 }
 
 // the key under the cursor (rows 1..6) or the chip (row 0)
@@ -22102,8 +22547,8 @@ void OskActivate(int row, int col) {
     switch (k.action) {
     case kOskType: OskAppend(k.text); break;
     case kOskBack: OskBackspace(); break;
-    case kOskClear: g_cmdBuf[0] = 0; OskEdited(); break;
-    case kOskClose: g_oskOpen = false; break;
+    case kOskClear: g_osk->buf[0] = 0; OskEdited(); break;
+    case kOskClose: g_osk->close(false); break;
     case kOskRun: OskRun(); break;
     default: break;
     }
@@ -22139,8 +22584,10 @@ void OskGoRow(int row) {
     }
 }
 
-// pad input (edges only while the bar owns the pad)
-void OskInput(WORD e) {
+// pad input (edges only while the bar owns the pad; 0.21.8: of the target's owner - CmdPadPress reads g_cmdPadEdges /
+// g_cmdPadHeld, the quick command line fills them from its own pad read before it calls this)
+void OskInput(const OskTarget &t, WORD e) {
+    g_osk = &t;
     bool sugs = OskSugCount() > 0;
     if (g_oskRow == 0 && !sugs) OskGoRow(1);
     if (CmdPadPress(0x0001)) OskGoRow(g_oskRow == 0 ? kOskRowCount - 1 : g_oskRow == 1 && !sugs ? kOskRowCount - 1
@@ -22166,11 +22613,8 @@ void OskInput(WORD e) {
     }
     if ((e & 0x8000) && sugs) OskTakeSuggestion(g_oskSug);                // Y: the highlighted suggestion
     if (e & 0x0010) OskRun();                                              // Start: run the line
-    if (e & 0x2000) {                                                      // B: keyboard closed (bar keeps the focus);
-        g_oskOpen = false;                                                 //    0.7.1: a second B closes the menu
-        g_oskBackClosed = true;
-    }
-}
+    if (e & 0x2000) g_osk->close(true);                                    // B: keyboard closed (the owner keeps the
+}                                                                          //    focus; menu: a second B closes it)
 
 // one key: rounded box in the menu's button colours, highlight = the suggestion yellow; true when clicked
 bool OskDrawKey(const char *id, const char *label, ImVec2 pos, ImVec2 size, bool cursor, bool flash, ImU32 fill,
@@ -22196,7 +22640,8 @@ bool OskDrawKey(const char *id, const char *label, ImVec2 pos, ImVec2 size, bool
     return clicked;
 }
 
-void DrawOsk() {
+void DrawOsk(const OskTarget &t) {
+    g_osk = &t;
     // history for the empty line, newest first
     EnterCriticalSection(&g_cmdLock);
     g_oskHistCount = 0;
@@ -22292,13 +22737,13 @@ void DrawOsk() {
         ImGui::TextColored(ImVec4(0.45f, 0.8f, 1.0f, 1.0f), "%s%s%.48s", s.show, value[0] ? " = " : "", value);
         if (s.note[0]) { ImGui::SameLine(); ImGui::TextDisabled("%.80s", s.note); }
     }
-    ImGui::TextDisabled("A type   X backspace   Y take suggestion   Start run   B close   LB / RB rows   L3 = keyboard "
-                        "off   (a real keyboard works too)");
+    ImGui::TextDisabled("%s", g_qbLang == 0 ? t.helpDe : t.helpEn);
 }
 
 // the bar: a window directly under the menu window (always visible, outside the menu's scrolling)
 void DrawCmdBar(bool menuJustOpened) {
     if (!g_cmdEnabled || !g_menuRectOk) { g_cmdOwnPad = false; return; }
+    g_osk = &g_oskMenu;                      // 0.21.8: the keyboard below edits this bar's line
     ImGuiIO &io = ImGui::GetIO();
     const ImGuiStyle &style = ImGui::GetStyle();
     bool barHadFocus = g_cmdOwnPad;
@@ -22536,8 +22981,8 @@ void DrawCmdBar(bool menuJustOpened) {
                                 "L3 = on-screen keyboard");
         }
         // 0.7 on-screen keyboard (0.7.1: the open keyboard owns the pad - FeedGamepad - whatever the focus / hover)
-        if (g_oskOpen) OskInput(e);
-        if (g_oskOpen) DrawOsk();
+        if (g_oskOpen) OskInput(g_oskMenu, e);
+        if (g_oskOpen) DrawOsk(g_oskMenu);
         if (leave) CmdFocusMenu();
         focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
         if (!focused) { g_cmdPadMode = false; g_oskOpen = false; g_oskBackClosed = false; }
@@ -24582,7 +25027,8 @@ enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvP
              kQvAssist, kQvAiMode,       // 0.19 kQvAiMode: ai.mode purge / gate
              kQvSndPos, kQvSndLines, kQvSndSort,     // 0.20.1 sound list: corner, lines, order
              kQvShake, kQvRumble,                    // 0.21 camera shake / rumble 0 / 50 / 100 %
-             kQvSpawnKind, kQvSpawnCount, kQvSpawnAt };   // 0.21.1 enemy spawn: kind (choice), count 1 .. 5, place
+             kQvSpawnKind, kQvSpawnCount, kQvSpawnAt,     // 0.21.1 enemy spawn: kind (choice), count 1 .. 5, place
+             kQvSndGroup };                               // 0.21.8 sound group slider 0 .. 100 % (the row's item)
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
 enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves, kQsFav, kQsTests,   // 0.21.1 kQsFav / kQsTests
@@ -24822,6 +25268,8 @@ const QbRow kQbLevel[] = {
     // 0.21.7 uber labels (gates / platforms: node + time left), read only
     {"Tore / Plattformen (Zustand)", "Gates / platforms (state)", "dbg.uber", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Tore / Plattformen ins Log", "Gates / platforms to log", "uber.dump", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
+    // 0.21.8 story values of Lara's level (kStoryVals, read only)
+    {"Story-Werte (nur lesen)", "Story values (read only)", "story.values", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
     {"Checkpoints: alle zeigen", "Checkpoints: show all", "dbg.cpall", "1", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
     {"Checkpoints: alle verbergen", "Checkpoints: hide all", "dbg.cpall", "0", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
@@ -24849,6 +25297,18 @@ const QbRow kQbTimeTest[] = {                // 0.18 Zeit / Test
     {"Ablauf: Stand", "Flow: status", "flow.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Skript-Log", "Script log", "log.script", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
     {"Tiefe: Diagnose", "Depth dump", "dbg.depthdump", "", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    // 0.21.8 sound group sliders (section "0.21.8 sound group sliders", docs\Befund-Ton-Gruppen-0611.md section 4): one
+    // factor per slider on the FMOD channel groups, left / right = 10 % steps (snd.vol.<key> = snd.group <Key> <percent>)
+    {"Ton-Gruppen (Lautstaerke)", "Sound groups (volume)", "-", "ton_gruppen", kQbGroup, -1, kQcNone, 0, kQbSound, 0},
+    {"Umgebung", "Ambience", "snd.vol.ambience", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"Schritte & Koerper", "Footsteps & body", "snd.vol.steps", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"Waffen & Treffer", "Weapons & impacts", "snd.vol.weapons", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"Gegner & Tiere", "Enemies & creatures", "snd.vol.enemies", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"Lara-Stimme & Funk", "Lara voice & radio", "snd.vol.lara", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"Objekte & Mechanik", "Objects & mechanics", "snd.vol.objects", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"DLC 2 / Schattenkraft", "DLC 2 / shadow power", "snd.vol.dlc2", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"Sonstiges (HUD)", "Other (HUD)", "snd.vol.hud", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"Ton-Gruppen: Stand", "Sound groups: state", "snd.groups", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
 };
 // 0.18 Kapitel (coordinator, stage 1 - debug: only level.load, no story value is set): the start units the game's own
 // level select uses (generalbank script (8, 119), tools/script_dis.py pp 119, logs r18_levelselect_script119.txt:
@@ -24955,6 +25415,7 @@ const QbRow kQbTests[] = {
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
     {"hall02-Zaehler (Tutorial-Kampf)", "hall02 counter (tutorial fight)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
+    {"hall02-Werte (live)", "hall02 values (live)", "story.values", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},   // 0.21.8
     {"hall02-Zaehler reparieren", "repair hall02 counter", "fix.hall02", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Thrall-Skriptwert +8 ins Log", "Thrall script value +8 to log", "thrall.scriptval", "", kQbAction, -1, kQcNone, 0,
      kQbGrey, 0},
@@ -25010,6 +25471,8 @@ const QbHelp kQbHelp[] = {
                           "(file and live)"},
     {"shader.dump", "", "Materialien um Lara: Datei gegen live ins Log|Materials around Lara: file vs live into the log"},
     {"sap.status", "", "Kanten-Kollision: Boxen / Paare / Proxies, Spitzen|Ledge collision: boxes / pairs / proxies, peaks"},
+    {"story.values", "", "Skript-Werte (Sticky) des Levels, nur lesen; - = keiner|Script (sticky) values of the level, "
+                         "read only; - = none"},   // 0.21.8
     {"dbg.flatmodels", "", "Flach-Ansicht auch fuer Lara, Gegner und Objekte|Flat view for Lara, enemies and objects too"},
     {"dbg.flatanyrt", "", "Flach-Ansicht auch in Schatten- und Neben-Zielen|Flat view in shadow and side targets too"},
     {"dbg.flatcolour", "material", "Flach-Ansicht: eine Farbe je Material|Flat view: one colour per material"},
@@ -25102,6 +25565,8 @@ WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject) {
     const WORD c = static_cast<WORD>(buttons & combo);
     const WORD down = static_cast<WORD>(c & ~s.prev), up = static_cast<WORD>(s.prev & ~c);
     s.prev = c;
+    // 0.21.8: Start belongs to the open line's keyboard (run) - not gated, so its release is never a tap for the game
+    const WORD qcOsk = static_cast<WORD>(g_qbOpen && g_qcOpen && g_qcOskOpen ? kQcOskOwn : 0);
     if (s.latched) {                         // after a toggle: the combo stays away from the game until all are up
         if (c) clear |= c;
         else s.latched = false;
@@ -25116,7 +25581,7 @@ WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject) {
         s.gateFrom = 0;
         clear |= c;
     } else {
-        WORD fresh = static_cast<WORD>(down & ~s.passed);
+        WORD fresh = static_cast<WORD>(down & ~s.passed & ~qcOsk);
         if (fresh) {
             if (!s.gated) s.gateFrom = now;
             s.gated |= fresh;
@@ -25150,6 +25615,7 @@ WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject) {
     // while the bar is open D-pad / LB / RB stay away from the game; one held at the close stays away until released
     if (g_qbOpen && active) s.owned |= static_cast<WORD>(buttons & kQbOwn);
     if (g_qbOpen && active) s.owned |= static_cast<WORD>(buttons & (g_cmdFocusButton | (g_qcOpen ? kQcOwn : 0)));   // 0.21.6
+    if (active) s.owned |= static_cast<WORD>(buttons & qcOsk);                                       // 0.21.8 Start
     s.owned &= buttons;
     clear |= s.owned;
     LeaveCriticalSection(&g_padLock);
@@ -25194,7 +25660,8 @@ int QbValueCount(int val) {
          : val == kQvBright ? 13 : val == kQvSpeed ? 5 : val == kQvPass ? kRmPassN : val == kQvLang || val == kQvAiMode ? 2
          : val == kQvSndPos || val == kQvSndLines ? 4 : val == kQvSndSort ? 3   // 0.20.1
          : val == kQvShake || val == kQvRumble ? 3                               // 0.21
-         : val == kQvSpawnCount ? 5 : val == kQvSpawnAt ? 2 : 0;                 // 0.21.1
+         : val == kQvSpawnCount ? 5 : val == kQvSpawnAt ? 2                      // 0.21.1
+         : val == kQvSndGroup ? 11 : 0;                                          // 0.21.8: 0, 10 .. 100 %
 }
 const int kQbPercent[3] = {0, 50, 100};       // 0.21 cam.shakescale / cam.rumble steps
 const int kQbSndLines[4] = {8, 16, 24, 32};   // 0.20.1 snd.lines steps
@@ -25220,6 +25687,7 @@ void QbValueArg(int val, int i, char *o, size_t n) {
     case kQvRumble: Out(o, n, "%d", kQbPercent[i]); break;
     case kQvSpawnCount: Out(o, n, "%d", i + 1); break;              // 0.21.1
     case kQvSpawnAt: Out(o, n, "%s", i ? "front" : "lara"); break;
+    case kQvSndGroup: Out(o, n, "%d", i * 10); break;               // 0.21.8
     default: o[0] = 0;
     }
 }
@@ -25524,7 +25992,8 @@ void QbActRow(int page, const QbRow &r, int dir) {
         }
         _snprintf_s(arg, sizeof(arg), _TRUNCATE, "%s%s%s", r.arg, r.arg[0] ? " " : "", want ? "1" : "0");
     } else if (r.kind == kQbValue) {
-        int next = QbValueNow(r.val) + dir;
+        // 0.21.8: a sound group slider's step comes from its item (one enum for eight rows)
+        int next = (r.val == kQvSndGroup ? (SgPctAt(r.id) + 5) / 10 : QbValueNow(r.val)) + dir;
         if (next < 0 || next >= QbValueCount(r.val)) { QbResult(false, "%s: %s", name, de ? "Ende" : "end"); return; }
         QbValueArg(r.val, next, arg, sizeof(arg));
     } else {
@@ -25583,24 +26052,47 @@ void QbExecRow(int page, const QbRow &r) {
 // 0.21.7 (live 2026-11-07 20:50, footer "Y: Favorit" on rows that refuse Y): the rule QbFavPin applies, without its
 // messages - a row Y can pin is one item without an argument (page Fixes / Kostueme rows and the special rows of the
 // positions / checkpoints / saves pages have no such row: r = nullptr)
+// 0.21.8 (TODO "Favoriten mit Argument"): a row with an argument is pinnable too ("<id>|<argument>", FavArgOk), and the
+// special rows that stand for one item + argument (QbDynFav: a switch of page Fixes, a costume, a chapter unit)
 bool QbFavOk(const QbRow *r) {
-    return r && r->kind != kQbLabel && r->kind != kQbGroup && r->kind != kQbPlanned && strcmp(r->id, "-") && !r->arg[0];
+    return r && r->kind != kQbLabel && r->kind != kQbGroup && r->kind != kQbPlanned && strcmp(r->id, "-") &&
+           FavArgOk(r->arg);
 }
-void QbFavPin(int page, const QbRow *r) {
+bool QbDynFav(int k, char *id, size_t idN, char *arg, size_t argN);   // 0.21.8, after the chapter units
+bool QbDynIsSw(int k);                                                 // 0.21.8, there too
+bool QbDynFavOk(int k) {
+    char id[64], arg[kFavArgMax];
+    return QbDynFav(k, id, sizeof(id), arg, sizeof(arg));
+}
+// dyn = the special row's index (g_qbDyn), viewName = its shown name (both only for r = nullptr)
+void QbFavPin(int page, const QbRow *r, int dyn, const char *viewName) {
     const bool de = g_qbLang == 0;
-    if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsSwitches) {   // 0.21.5 page Fixes
-        QbResult(true, "%s", de ? "Y: Fix-Schalter sind kein Favorit ([Favorites] Ids = Item-Ids ohne Argument)"
-                                : "Y: switch rows cannot be favourites ([Favorites] Ids = item ids without an argument)");
+    char o[200], dynId[64], dynArg[kFavArgMax], dynName[112];
+    if (!r && QbDynFav(dyn, dynId, sizeof(dynId), dynArg, sizeof(dynArg))) {   // 0.21.8 switch / costume / unit row
+        const char *nm = viewName && viewName[0] ? viewName : dynArg;
+        while (*nm == ' ') ++nm;
+        Out(dynName, sizeof(dynName), "%s", nm);
+        const bool had = FavHasArg(dynId, dynArg), ok = FavSetArg(dynId, dynArg, !had, o, sizeof(o));
+        _snprintf_s(g_lastAction, sizeof(g_lastAction), _TRUNCATE, "%s", o);
+        Log(1, "quick: %s / %s -> Y: %s", QbPageName(page, true), dynName, o);
+        if (!ok) { QbResult(true, "%s: %s", dynName, o); return; }
+        QbResult(false, "%s: %s", dynName, had ? (de ? "Favorit entfernt" : "favourite removed")
+                                               : (de ? "als Favorit angeheftet (Seite 1)" : "pinned as a favourite (page 1)"));
         return;
     }
-    if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsChapters) {   // 0.21.7 page Kapitel units
-        QbResult(true, "%s", de ? "Y: Abschnitt-Zeilen sind kein Favorit (level.load mit Argument)"
-                                : "Y: unit rows cannot be favourites (level.load with an argument)");
+    if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsSwitches) {   // 0.21.5 page Fixes: a group
+        QbResult(true, "%s", de ? "Y: Gruppen-Zeile - Y auf einem Schalter heftet ihn an"
+                                : "Y: group row - Y on a switch pins it");
+        return;
+    }
+    if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsChapters) {   // 0.21.7 page Kapitel: a group
+        QbResult(true, "%s", de ? "Y: Gruppen-Zeile - Y auf einem Abschnitt heftet ihn an"
+                                : "Y: group row - Y on a unit pins it");
         return;
     }
     if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsCostume) {    // 0.21.6 page Kostueme
-        QbResult(true, "%s", de ? "Y: Kostuem-Zeilen sind kein Favorit (Item mit Argument) - nur 'Naechstes Kostuem'"
-                                : "Y: costume rows cannot be favourites (item with an argument) - only 'Next costume'");
+        QbResult(true, "%s", de ? "Y: nur Listen-Zeilen und 'Naechstes Kostuem' werden Favorit (Wahl-Zeilen nicht)"
+                                : "Y: only list rows and 'Next costume' can be favourites (not the chooser rows)");
         return;
     }
     if (!r || r->kind == kQbLabel || r->kind == kQbGroup || r->kind == kQbPlanned || !strcmp(r->id, "-")) {
@@ -25609,13 +26101,12 @@ void QbFavPin(int page, const QbRow *r) {
         return;
     }
     const char *name = de ? r->de : r->en;
-    if (r->arg[0]) {
-        QbResult(true, de ? "%s: Favorit nur ohne Argument ([Favorites] Ids = Item-Ids; hier %s %s)"
-                          : "%s: favourites take no argument ([Favorites] Ids = item ids; here %s %s)", name, r->id, r->arg);
+    if (!FavArgOk(r->arg)) {
+        QbResult(true, de ? "%s: Argument '%s' passt nicht in [Favorites] Ids (kein ',' / '|')"
+                          : "%s: argument '%s' does not fit [Favorites] Ids (no ',' / '|')", name, r->arg);
         return;
     }
-    char o[160];
-    const bool had = FavHas(r->id), ok = FavSet(r->id, !had, o, sizeof(o));
+    const bool had = FavHasArg(r->id, r->arg), ok = FavSetArg(r->id, r->arg, !had, o, sizeof(o));
     _snprintf_s(g_lastAction, sizeof(g_lastAction), _TRUNCATE, "%s", o);
     Log(1, "quick: %s / %s -> Y: %s", QbPageName(page, true), r->de, o);
     if (!ok) { QbResult(true, "%s: %s", name, o); return; }
@@ -25637,6 +26128,7 @@ struct QbView {
     int square;                              // 0 none, 1 filled (on), 2 outline (off)
     bool skip;                               // a heading: up / down pass over it
     int src;                                 // 0.21.1: the page's static row of this view (-1 = a special row)
+    bool fav;                                // 0.21.8: its item + argument is a favourite (a yellow star after the name)
 };
 QbView g_qbView[kQbViewMax];
 int g_qbViewN = 0, g_qbViewPage = -1;
@@ -25722,6 +26214,7 @@ int g_qbStaticN = 0;                         // 0.21.1: views of the static rows
 // 0.21.1: a closed kQbGroup hides its rows (up to the next heading or group)
 LONG g_qbFrame = 0, g_qbBuiltFrame = -1;
 int QbSpecialBuild(int special, int base, bool de);
+void QbMarkFavs(int page);                   // 0.21.8, below
 void QbBuild(int page) {
     const bool de = g_qbLang == 0;
     const QbPage &p = kQbPages[page];
@@ -25751,8 +26244,44 @@ void QbBuild(int page) {
         for (int j = 0; j < k; ++j) g_qbView[g_qbViewN + j].src = -1;
         g_qbViewN += k;
     }
+    QbMarkFavs(page);                        // 0.21.8 star
     g_qbViewPage = page;
     g_qbBuiltFrame = g_qbFrame;
+}
+// 0.21.8 (TODO "Favoriten mit Argument + Stern"): the views whose item + argument is a favourite get the star - static
+// rows, the favourite / recent rows of page 0, and the special rows QbDynFav names (switch, costume, chapter unit). One
+// read of the list per build (ForFavEntries; at most 64 entries compared)
+void QbMarkFavs(int page) {
+    struct FavPair { char id[64], arg[kFavArgMax]; };
+    static FavPair favs[64];
+    int nf = 0;
+    ForFavEntries([&](const char *id, const char *arg) {
+        if (nf >= 64) return;
+        strncpy_s(favs[nf].id, sizeof(favs[nf].id), id, _TRUNCATE);
+        strncpy_s(favs[nf].arg, sizeof(favs[nf].arg), arg, _TRUNCATE);
+        ++nf;
+    });
+    auto has = [&](const char *id, const char *arg) {
+        for (int i = 0; i < nf; ++i)
+            if (!_stricmp(favs[i].id, id) && !_stricmp(favs[i].arg, arg)) return true;
+        return false;
+    };
+    const QbPage &p = kQbPages[page];
+    for (int i = 0; i < g_qbViewN; ++i) {
+        QbView &v = g_qbView[i];
+        v.fav = false;
+        if (v.skip || !nf) continue;
+        if (v.src >= 0) {
+            const QbRow &r = p.rows[v.src];
+            if (r.kind != kQbLabel && r.kind != kQbGroup && r.kind != kQbPlanned) v.fav = has(r.id, r.arg);
+            continue;
+        }
+        const int k = i - g_qbStaticN;
+        const QbRow *r = QbSpecialRow(k);
+        if (r) { v.fav = has(r->id, r->arg); continue; }
+        char id[64], arg[kFavArgMax];
+        if (QbDynFav(k, id, sizeof(id), arg, sizeof(arg))) v.fav = has(id, arg);
+    }
 }
 
 // 0.18 menu page "Accessibility / Barrierefreiheit": the same rows as the bar page (kQbAccess) - headings, the working
@@ -25976,11 +26505,22 @@ void PageAi() {
 // with the menu's bar and TruLink cmd.run, the same "cmd (quick): ..." log line, queued game-thread answers through
 // CmdNoteQueued / CmdPollQueued) - this section has no execution path of its own.
 // Keyboard: typing goes to the line (key messages and the game's DirectInput reads are held while it is open), Tab = the
-// first suggestion of CmdBuildSuggestions, Up / Down = history, Enter = run, Esc = close. Pad: D-pad up / down =
-// history (older / newer), A = run, B = close; FocusButton / A / B are kept from the game (QbPad), the bar's rows wait.
-// Closing the bar closes the line. Not built: the 0.7 on-screen keyboard (it lives in the long menu window: DrawOsk,
-// its focus rules) - the pad picks history lines only.
+// selected (else the first) suggestion of CmdBuildSuggestions, Up / Down = the suggestions while a typed line has some
+// (0.21.8, the menu bar's walk), else the history, Enter = run (the selected suggestion if one is selected), Esc =
+// close. Pad: D-pad up / down = history (older / newer), A = run, B = close; FocusButton / A / B are kept from the game
+// (QbPad), the bar's rows wait. Closing the bar closes the line.
+// 0.21.8 (TODO "kleine Befehlszeile ausbauen" (2) / (3), owner 2026-11-07 21:25; history accident 21:23:53):
+//  - suggestions: the menu bar's list (CmdBuildSuggestions + CmdSugRows) under the input while a typed line has some;
+//  - on-screen keyboard: Y opens the 0.7 keyboard (DrawOsk / OskInput with the target g_oskQc - the same keyboard, not
+//    a second one); its keys as in the menu (A type, X backspace, Y take suggestion, Start run, B back to the line,
+//    LB / RB rows); while it is open the bar also keeps Start from the game (kQcOskOwn, QbPad). A real key switches
+//    back to typing;
+//  - safety: the line a pad step put into the input is shown with its item label ("A runs: ...") before A runs it, and
+//    a pad run (A, the keyboard's Start / run key) of a line kCmdDanger names (cheats, god mode, level / unit / save
+//    loads, save writes, costume resets, sw.set, ...) only arms: a footer warning, a second A within kQcArmMs runs it.
+//    Enter on the real keyboard runs at once (typed on purpose).
 const int kQcOutMax = 4;
+const DWORD kQcArmMs = 3000;                 // 0.21.8: the second A of a dangerous pad run
 char g_qcBuf[kCmdLine] = "";                 // the input line (render thread)
 char g_qcSet[kCmdLine] = "";                 // text for the line, applied in the callback (history, clear after a run)
 bool g_qcSetPending = false, g_qcFocus = false;
@@ -25988,10 +26528,48 @@ int g_qcHistPos = -1;                        // browsing g_cmdHist (index), -1 =
 struct QcAnswer { char line[kCmdLine], answer[200]; };
 QcAnswer g_qcOut[kQcOutMax];                 // newest first
 int g_qcOutN = 0;
+char g_qcArmLine[kCmdLine] = "";             // 0.21.8: the dangerous line the first A armed ("" = none)
+const CmdDanger *g_qcArmWhy = nullptr;
+DWORD g_qcArmTick = 0;
+WORD g_qcPadEdges = 0, g_qcPadHeld = 0;      // 0.21.8: this frame's pad for the keyboard (QcPadTick -> DrawQuickCmd)
 void QcSetText(const char *text) {
     strncpy_s(g_qcSet, sizeof(g_qcSet), text, _TRUNCATE);
     strncpy_s(g_qcBuf, sizeof(g_qcBuf), text, _TRUNCATE);   // an inactive field reads the buffer itself
     g_qcSetPending = true;
+}
+void QcDisarm() {
+    g_qcArmLine[0] = 0;
+    g_qcArmWhy = nullptr;
+}
+bool QcArmed() { return g_qcArmLine[0] && GetTickCount() - g_qcArmTick <= kQcArmMs; }
+// the keyboard's target: this line (section "0.7 on-screen keyboard", struct OskTarget)
+void QcRun(bool pad);
+void QcOskRun() { QcRun(true); }             // Start / the run key: a pad run (asks twice for kCmdDanger lines)
+void QcOskClose(bool) {                      // the close key / B: back to the compact line, the field gets the text
+    InterlockedExchange(&g_qcOskOpen, 0);
+    QcSetText(g_qcBuf);
+    g_qcFocus = true;
+}
+void QcEdited() {
+    g_qcHistPos = -1;
+    g_sugSel = -1;
+    QcDisarm();
+}
+const OskTarget g_oskQc = {g_qcBuf, QcOskRun, QcOskClose, QcEdited,
+                           "A tippen  X loeschen  Y Vorschlag  Start ausfuehren  B zurueck  LB / RB Reihen  L3 zu",
+                           "A type  X backspace  Y suggestion  Start run  B back  LB / RB rows  L3 close"};
+void QcOskOpen() {
+    const bool de = g_qbLang == 0;
+    if (!g_cmdKeyboard) {
+        QbResult(true, "%s", de ? "Bildschirmtastatur aus ([Cmd] Keyboard=0)" : "on-screen keyboard off ([Cmd] Keyboard=0)");
+        return;
+    }
+    InterlockedExchange(&g_qcOskOpen, 1);
+    g_osk = &g_oskQc;
+    OskEdited();
+    g_oskRow = g_qcBuf[0] ? 3 : 0;           // an empty line starts on the history chips (row 0), else the letters
+    g_oskCol = 0;
+    Log(1, "quick: on-screen keyboard opened");
 }
 void QcOpen(bool open, const char *by) {
     if (open == (g_qcOpen != 0)) return;
@@ -26000,9 +26578,11 @@ void QcOpen(bool open, const char *by) {
         QbResult(true, "%s", de ? "Kommandozeile aus ([Cmd] Enabled=0)" : "command line off ([Cmd] Enabled=0)");
         return;
     }
+    InterlockedExchange(&g_qcOskOpen, 0);    // 0.21.8: the keyboard opens only from the open line (Y)
     InterlockedExchange(&g_qcOpen, open ? 1 : 0);
     g_qcFocus = open;
     g_qcHistPos = -1;
+    QcDisarm();
     Log(1, "quick: command line %s (%s)", open ? "opened" : "closed", by);
 }
 // one history step (up = older, down = newer, past the newest = an empty line) - the walk of the menu bar's CmdCallback
@@ -26017,15 +26597,29 @@ void QcHistory(bool up) {
     LeaveCriticalSection(&g_cmdLock);
     g_qcHistPos = pos;
     QcSetText(entry);
+    QcDisarm();                              // 0.21.8: another line - an armed one is off
 }
-// the line's only run: CmdRunLine (the command bar's path), the answer into the output lines (newest first)
-void QcRun() {
+// the line's only run: CmdRunLine (the command bar's path), the answer into the output lines (newest first).
+// 0.21.8: pad = A / the keyboard's Start or run key - a kCmdDanger line only arms the first time (footer warning), the
+// same line again within kQcArmMs runs; pad false = Enter on the real keyboard (runs at once)
+void QcRun(bool pad) {
     char line[kCmdLine];
     CmdClean(g_qcBuf, line, sizeof(line));
+    const bool de = g_qbLang == 0;
     if (!line[0]) {
-        QbResult(true, "%s", g_qbLang == 0 ? "leere Zeile (help = die Befehle)" : "empty line (help = the commands)");
+        QbResult(true, "%s", de ? "leere Zeile (help = die Befehle)" : "empty line (help = the commands)");
         return;
     }
+    const CmdDanger *danger = pad ? CmdDangerOf(line) : nullptr;
+    if (danger && !(QcArmed() && !strcmp(g_qcArmLine, line))) {
+        strncpy_s(g_qcArmLine, sizeof(g_qcArmLine), line, _TRUNCATE);
+        g_qcArmWhy = danger;
+        g_qcArmTick = GetTickCount();
+        Log(1, "quick: '%s' %s - armed, the same pad run within %lu ms runs it (0.21.8 safety)", line, danger->en,
+            kQcArmMs);
+        return;
+    }
+    QcDisarm();
     const char *answer = CmdRunLine(line, false, "quick");
     CmdNoteQueued(answer, line);
     if (g_qcOutN < kQcOutMax) ++g_qcOutN;
@@ -26061,13 +26655,19 @@ bool QcPadTick(WORD buttons, bool blocked) {
         if (!down) armed = false;
     }
     if (!g_qcOpen) return false;
+    if (g_qcOskOpen) {                       // 0.21.8: the keyboard has the pad - DrawQuickCmd hands it to OskInput
+        g_qcPadEdges = static_cast<WORD>(g_qcPadEdges | (edges & kQcOskPad));
+        g_qcPadHeld = static_cast<WORD>(buttons & kQcOskPad);
+        return true;
+    }
     if (edges & 0x2000) {                    // B
         QcOpen(false, "B");
         return true;
     }
-    if (edges & 0x1000) QcRun();             // A
+    if (edges & 0x1000) QcRun(true);         // A (0.21.8: asks twice for a kCmdDanger line)
     if (edges & 0x0001) QcHistory(true);     // D-pad up = older
     if (edges & 0x0002) QcHistory(false);    // D-pad down = newer
+    if (edges & kQbY) QcOskOpen();           // 0.21.8: Y = the on-screen keyboard
     return true;
 }
 int QcCallback(ImGuiInputTextCallbackData *d) {
@@ -26076,17 +26676,25 @@ int QcCallback(ImGuiInputTextCallbackData *d) {
         if (g_qcSetPending) { g_qcSetPending = false; CmdReplace(d, g_qcSet); }
         break;
     case ImGuiInputTextFlags_CallbackEdit:
-        g_qcHistPos = -1;
+        QcEdited();                          // 0.21.8: + the suggestion selection and an armed line
         break;
-    case ImGuiInputTextFlags_CallbackCompletion:   // Tab: the first suggestion (the menu bar's list)
+    case ImGuiInputTextFlags_CallbackCompletion:   // Tab: the selected (else the first) suggestion (the menu bar's list)
         CmdBuildSuggestions(d->Buf, false);
         if (g_sugCount) {
             char text[kCmdLine];
-            CmdCompletionText(0, text, sizeof(text), true);
+            CmdCompletionText(g_sugSel >= 0 && g_sugSel < g_sugCount ? g_sugSel : 0, text, sizeof(text), true);
             CmdReplace(d, text);
+            QcEdited();
         }
         break;
     case ImGuiInputTextFlags_CallbackHistory:
+        // 0.21.8: a typed line with suggestions - Up / Down choose among them (the menu bar's walk); an empty line or a
+        // line from the history - Up / Down walk the history
+        if (g_qcHistPos < 0 && d->BufTextLen > 0 && g_sugCount) {
+            if (d->EventKey == ImGuiKey_UpArrow) { if (g_sugSel >= 0) --g_sugSel; }
+            else if (g_sugSel < g_sugCount - 1) ++g_sugSel;
+            break;
+        }
         QcHistory(d->EventKey == ImGuiKey_UpArrow);
         g_qcSetPending = false;
         CmdReplace(d, g_qcSet);
@@ -26112,14 +26720,70 @@ void DrawQuickCmd() {
         ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.35f, 1.0f), "%s", de ? "Kommandozeile (wie die Befehlszeile im Menue)"
                                                                       : "Command line (the menu's command bar)");
         const ImGuiID id = ImGui::GetID("##qcline");
-        if (g_qcFocus || ImGui::GetActiveID() != id) ImGui::SetKeyboardFocusHere();
-        g_qcFocus = false;
+        const bool osk = g_qcOskOpen != 0;
+        if (osk) {
+            // 0.21.8 keyboard open: the field only shows g_qcBuf (the keys edit it); a real key switches back to typing
+            // (the characters are kept, as the menu bar's 0.7.1 rule)
+            g_osk = &g_oskQc;
+            if (ImGui::GetActiveID() == id) ImGui::ClearActiveID();
+            ImGuiIO &io = ImGui::GetIO();
+            bool typed = false;
+            for (int i = 0; i < io.InputQueueCharacters.Size; ++i) {
+                const ImWchar c = io.InputQueueCharacters[i];
+                if (c >= 32 && c < 127) { char s[2] = {static_cast<char>(c), 0}; OskAppend(s); typed = true; }
+            }
+            if (typed) io.InputQueueCharacters.resize(0);
+            if (ImGui::IsKeyPressed(ImGuiKey_Backspace, false)) { OskBackspace(); typed = true; }
+            if (typed) {
+                g_qcPadEdges = g_qcPadHeld = 0;
+                QcOskClose(false);
+                Log(3, "quick: real keyboard -> typing");
+            }
+        } else {
+            if (g_qcFocus || ImGui::GetActiveID() != id) ImGui::SetKeyboardFocusHere();
+            g_qcFocus = false;
+        }
         ImGui::SetNextItemWidth(-1.0f);
         const ImGuiInputTextFlags tf = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways |
                                        ImGuiInputTextFlags_CallbackEdit | ImGuiInputTextFlags_CallbackCompletion |
                                        ImGuiInputTextFlags_CallbackHistory;
-        if (ImGui::InputText("##qcline", g_qcBuf, sizeof(g_qcBuf), tf, QcCallback)) QcRun();
+        if (ImGui::InputText("##qcline", g_qcBuf, sizeof(g_qcBuf), tf, QcCallback)) {
+            // 0.21.8: Enter on a selected suggestion runs it (the menu bar's rule); Enter = typed on purpose, no arming
+            if (g_sugSel >= 0 && g_sugSel < g_sugCount) CmdCompletionText(g_sugSel, g_qcBuf, sizeof(g_qcBuf), false);
+            QcRun(false);
+        }
         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) QcOpen(false, "Esc");
+        // 0.21.8 suggestions under the input (the menu bar's list and rows) while a typed line has some
+        CmdBuildSuggestions(g_qcBuf, false);
+        if (g_qcOpen && !osk && g_qcHistPos < 0 && g_qcBuf[0] && g_sugCount) {
+            CmdSugRows(6);
+            ImGui::TextDisabled("%d / %d   %s", g_sugSel >= 0 ? g_sugSel + 1 : 0, g_sugCount,
+                                de ? "hoch / runter = waehlen, Tab = uebernehmen, Enter = ausfuehren"
+                                   : "up / down = choose, Tab = take, Enter = run");
+        }
+        // 0.21.8 safety: the line a pad step put into the input, with its item's label, before A runs it
+        if (g_qcOpen && g_qcBuf[0] && (g_qcHistPos >= 0 || osk)) {
+            char word[64];
+            size_t w = 0;
+            while (g_qcBuf[w] && g_qcBuf[w] != ' ' && w + 1 < sizeof(word)) { word[w] = g_qcBuf[w]; ++w; }
+            word[w] = 0;
+            const CmdKind k = CmdKindOf(word);
+            const char *label = k != kCkUnknown && k != kCkBuiltin ? CmdLabel(word) : "";
+            ImGui::TextColored(ImVec4(0.45f, 0.8f, 1.0f, 1.0f), "%s %.70s%s%.60s", osk ? (de ? "Start fuehrt aus:" :
+                               "Start runs:") : (de ? "A fuehrt aus:" : "A runs:"), g_qcBuf, label[0] ? "  - " : "", label);
+            const CmdDanger *dz = CmdDangerOf(g_qcBuf);
+            if (dz && !QcArmed())
+                ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "%s %s", de ? "Vorsicht:" : "Careful:", de ? dz->de : dz->en);
+        }
+        if (g_qcOpen && QcArmed() && g_qcArmWhy) {
+            const DWORD left = kQcArmMs - (GetTickCount() - g_qcArmTick);
+            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), de ? "ACHTUNG: %s (%s) - %s nochmal in %.1f s = ausfuehren"
+                                                                    : "WARNING: %s (%s) - %s again within %.1f s = run",
+                               g_qcArmLine, de ? g_qcArmWhy->de : g_qcArmWhy->en, osk ? "Start" : "A",
+                               static_cast<double>(left) / 1000.0);
+        } else if (g_qcArmLine[0]) {
+            QcDisarm();                          // the 3 s are over
+        }
         char last[sizeof(g_cmdResult)] = "", lastLine[kCmdLine] = "";
         EnterCriticalSection(&g_cmdLock);    // the newest line's answer may arrive later (queued game-thread item)
         strncpy_s(last, sizeof(last), g_cmdResult, _TRUNCATE);
@@ -26135,8 +26799,20 @@ void DrawQuickCmd() {
         }
         if (!g_qcOutN) ImGui::TextDisabled("%s", de ? "(noch nichts - help, list <Teil>, get <id>, <id> [Wert])"
                                                     : "(nothing yet - help, list <part>, get <id>, <id> [value])");
-        ImGui::TextDisabled("%s", de ? "Enter / A: ausfuehren   Tab: Vorschlag   hoch / runter: Verlauf   Esc / B / L3: zu"
-                                     : "Enter / A: run   Tab: suggestion   up / down: history   Esc / B / L3: close");
+        if (osk && g_qcOpen) {                   // 0.21.8: the menu's keyboard, target = this line
+            const WORD e = g_qcPadEdges;
+            g_cmdPadEdges = e;                   // CmdPadPress (repeat of a held direction / X) reads these
+            g_cmdPadHeld = g_qcPadHeld;
+            g_qcPadEdges = 0;
+            OskInput(g_oskQc, e);
+            if (g_qcOskOpen) DrawOsk(g_oskQc);
+        } else {
+            g_qcPadEdges = 0;
+            ImGui::TextDisabled("%s", de ? "Enter / A: ausfuehren   Tab: Vorschlag   hoch / runter: Verlauf   Y: Tastatur   "
+                                           "Esc / B / L3: zu"
+                                         : "Enter / A: run   Tab: suggestion   up / down: history   Y: keyboard   "
+                                           "Esc / B / L3: close");
+        }
     }
     ImGui::End();
 }
@@ -26211,12 +26887,16 @@ void QuickTick() {
     g_qbActRow = nullptr;                    // 0.21.1: only the row run now goes into the recent list
     const QbRow *src = g_qbView[row].src >= 0 ? &p.rows[g_qbView[row].src]   // 0.21.3: the row behind the view
                      : p.special ? QbSpecialRow(row - g_qbStaticN) : nullptr;
-    if (edges & kQbY) { QbFavPin(g_qbPage, src); return; }    // 0.21.3: Y = pin / unpin (section "0.21.3 X / Y")
+    if (edges & kQbY) {                      // 0.21.3: Y = pin / unpin (section "0.21.3 X / Y"); 0.21.8: special rows too
+        QbFavPin(g_qbPage, src, row - g_qbStaticN, g_qbView[row].name);
+        return;
+    }
     if (edges & kQbX) {                      // 0.21.3: X = execute (one press per frame: no right press on top)
+        const bool swRow = QbDynIsSw(row - g_qbStaticN);   // 0.21.8: a pinned switch on page 0 (X = toggle / step)
         if (src) QbExecRow(g_qbPage, *src);  // static row, or a favourite / recent row of page 0
         else if (p.special == kQsCostume) QbSpecialAct(p.special, row - g_qbStaticN, kQbXDir);   // 0.21.6: X = now
         else if (p.special == kQsChapters) QbSpecialAct(p.special, row - g_qbStaticN, kQbXDir);   // 0.21.7: X = toggle / run
-        else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, p.special == kQsSwitches ? kQbXDir : 1);
+        else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, p.special == kQsSwitches || swRow ? kQbXDir : 1);
         return;
     }
     const int d = (edges & 0x0004) ? -1 : 1;                                // left = off / step down, right = on / up
@@ -26289,7 +26969,8 @@ void DrawQuick() {
     }
     float nameW = 0.0f, stateW = 0.0f, countW = 0.0f;
     for (int i = first; i < last; ++i) {
-        float a = width(g_qbView[i].name, fs), b = width(g_qbView[i].state, fs), c = width(g_qbView[i].count, fs);
+        float a = width(g_qbView[i].name, fs) + (g_qbView[i].fav ? width(" *", fs) : 0.0f),   // 0.21.8 star
+              b = width(g_qbView[i].state, fs), c = width(g_qbView[i].count, fs);
         if (a > nameW) nameW = a;
         if (b > stateW) stateW = b;
         if (c > countW) countW = c;
@@ -26309,7 +26990,8 @@ void DrawQuick() {
         QbComboText(g_cmdFocusButton, b, sizeof(b));
         Out(l3, sizeof(l3), "  %s: %s", b, de ? "Befehlszeile" : "cmd line");
     }
-    const bool yOk = QbFavOk(QbSelRow(g_qbPage, sel));
+    const QbRow *selRow = QbSelRow(g_qbPage, sel);   // 0.21.8: + the special rows QbDynFav can pin
+    const bool yOk = QbFavOk(QbSelRow(g_qbPage, sel)) || (!selRow && QbDynFavOk(sel - g_qbStaticN));
     Out(close, sizeof(close), "%s%s   %s: %s%s", yOk ? (de ? "X: ausfuehren  Y: Favorit" : "X: run  Y: favourite")
                                                  : (de ? "X: ausfuehren  Y: -" : "X: run  Y: -"), l3, combo,
         de ? "zu" : "close", g_padModeIdle ? (de ? "   (Pad NICHT gesperrt)" : "   (pad NOT held)") : "");
@@ -26353,6 +27035,8 @@ void DrawQuick() {
             else dl->AddRect(a, b, v.col, 2.0f, 0, 1.2f);
         }
         dl->AddText(font, fs, ImVec2(nameX, y), v.col, v.name);
+        if (v.fav)                           // 0.21.8: a favourite (item + argument in [Favorites] Ids)
+            dl->AddText(font, fs, ImVec2(nameX + width(v.name, fs), y), IM_COL32(255, 220, 90, 255), " *");
         dl->AddText(font, fs, ImVec2(stateX, y), v.stateCol, v.state);
         if (v.count[0]) dl->AddText(font, fs, ImVec2(countRight - width(v.count, fs), y), v.col | 0xff000000u, v.count);
         y += rowH;
@@ -27260,7 +27944,9 @@ int QbSavesRows(QbView *v, QbDyn *d, int max, bool de) {
 }
 // 0.21.1 page 0 "Favoriten / Zuletzt": the rows of this frame (bar rows copied, or made from the item's type)
 QbRow g_qbFavRow[kQbViewMax];
-char g_qbFavText[kQbViewMax][2][64];
+char g_qbFavText[kQbViewMax][3][112];        // 0.21.8: id, argument, label of a favourite without a static row
+void QbSwView(int i, QbView &x, QbDyn &y, bool de);   // 0.21.8, section "0.21.5" page Fixes
+void CosLabel(DWORD id, char *o, size_t n);            // 0.21.6, section "0.21.6 costumes"
 void QbViewOf(int page, const QbRow &r, QbView &v, bool de);
 const QbRow *QbFindRow(const char *id, const char *arg) {   // the first static bar row of this item + argument
     for (const QbPage &p : kQbPages)
@@ -27296,16 +27982,48 @@ int QbFavRows(QbView *v, QbDyn *d, int max, bool de) {
     if (n < max) QbDynLabel(&v[n], &d[n], de ? "Favoriten (Y = anheften / loesen, hier und im Menue)"   // 0.21.3: Y in
                                              : "Favourites (Y = pin / unpin, here and in the menu)"), ++n;   // the bar too
     int favs = 0;
-    ForFavs([&](const char *id) {
+    bool swRefreshed = false;
+    ForFavEntries([&](const char *id, const char *arg) {   // 0.21.8: entries with an argument too
         ++favs;
-        const QbRow *found = QbFindRow(id, "");
+        if (arg[0] && !_stricmp(id, "sw.set") && n < max) {   // a switch of page Fixes: its own row (value, keys)
+            if (!swRefreshed) { SwRefresh(); swRefreshed = true; }
+            EnterCriticalSection(&g_swLock);
+            const int i = SwFindLocked(arg);
+            if (i >= 0) QbSwView(i, v[n], d[n], de);
+            LeaveCriticalSection(&g_swLock);
+            if (i >= 0) { ++n; return; }
+        }
+        const QbRow *found = QbFindRow(id, arg);
         if (found) { add(*found); return; }
         if (rows >= kQbViewMax) return;
         const Item *item = FindItem(id);
         const char *type = item ? item->type : "action";
-        strncpy_s(g_qbFavText[rows][0], sizeof(g_qbFavText[rows][0]), id, _TRUNCATE);
-        QbRow r = {g_qbFavText[rows][0], g_qbFavText[rows][0], g_qbFavText[rows][0], "",
-                   !strcmp(type, "bool") ? kQbBool : !strcmp(type, "info") ? kQbInfo : kQbAction, -1, kQcNone, 0, kQbWhite, 0};
+        char (&t)[3][112] = g_qbFavText[rows];
+        strncpy_s(t[0], sizeof(t[0]), id, _TRUNCATE);
+        strncpy_s(t[1], sizeof(t[1]), arg, _TRUNCATE);
+        int kind = !strcmp(type, "bool") ? kQbBool : !strcmp(type, "info") ? kQbInfo : kQbAction, flags = 0;
+        ImU32 colour = kQbWhite;
+        if (!arg[0]) {
+            Out(t[2], sizeof(t[2]), "%s", id);
+        } else if (!_stricmp(id, "costume.set") && arg[0] >= '0' && arg[0] <= '9') {   // a costume row: its label
+            char lab[100];
+            CosLabel(static_cast<DWORD>(atoi(arg)), lab, sizeof(lab));
+            Out(t[2], sizeof(t[2]), "%s %s", de ? "Kostuem" : "Costume", lab);
+            kind = kQbAction;
+            colour = kQbPlayer;
+        } else if (!_stricmp(id, "level.load")) {   // a chapter unit: the chapter rows' confirmation + backup
+            Out(t[2], sizeof(t[2]), "%s %s", de ? "Laden" : "Load", arg);
+            kind = kQbAction;
+            flags = kQfConfirm | kQfBackup;
+            colour = kQbChapter;
+        } else {
+            Out(t[2], sizeof(t[2]), "%s %s", id, arg);
+            kind = kQbAction;
+            char line[200];
+            Out(line, sizeof(line), "%s %s", id, arg);
+            if (CmdDangerOf(line)) flags = kQfConfirm;   // the bar's right-twice for kCmdDanger lines
+        }
+        QbRow r = {t[2], t[2], t[0], t[1], kind, -1, kQcNone, 0, colour, flags};
         add(r);
     });
     if (!favs && n < max) {
@@ -27321,7 +28039,7 @@ int QbFavRows(QbView *v, QbDyn *d, int max, bool de) {
     if (g_qbRecentMax <= 0) return n;
     if (n < max) QbDynLabel(&v[n], &d[n], de ? "Zuletzt" : "Recent"), ++n;
     for (int i = 0; i < g_qbRecentN; ++i) {
-        if (!g_qbRecent[i].arg[0] && FavHas(g_qbRecent[i].id)) continue;   // a favourite is not shown twice
+        if (FavHasArg(g_qbRecent[i].id, g_qbRecent[i].arg)) continue;   // a favourite is not shown twice (0.21.8: + arg)
         const QbRow *found = QbFindRow(g_qbRecent[i].id, g_qbRecent[i].arg);
         if (found) add(*found);
     }
@@ -27415,6 +28133,7 @@ int QbTestsRows(QbView *v, QbDyn *d, int max, bool de) {
 // at a time - right / X opens it and closes the others, left closes it; kept until the game ends, the file's "open" mark
 // is the start state), the open group's switches below it: name, value ("an" / "aus", "< 3 >", "< es >"), count column
 // "live" / "Neustart"; a key missing in the INI shows the default in brackets, a plugin without INI "keine INI"
+void QbSwView(int i, QbView &x, QbDyn &y, bool de);   // 0.21.8, below
 int QbSwRows(QbView *v, QbDyn *d, int max, bool de) {
     SwRefresh();
     EnterCriticalSection(&g_swLock);
@@ -27440,33 +28159,35 @@ int QbSwRows(QbView *v, QbDyn *d, int max, bool de) {
         ++n;
         if (!grp.open) continue;
         for (int i = first; i < first + grp.count && i < g_swN && n < max; ++i) {
-            const SwRow &r = g_sw[i];
-            const SwValue &val = g_swVal[i];
-            QbView &x = v[n];
-            QbDyn &y = d[n];
-            memset(&x, 0, sizeof(x));
-            memset(&y, 0, sizeof(y));
-            x.src = -1;
-            Out(x.name, sizeof(x.name), "  %s", de ? r.de : r.en);
-            const char *cur = SwEffective(r, val);
-            char text[40];
-            if (r.type == kSwBool) Out(text, sizeof(text), "%s", atoi(cur) ? (de ? "an" : "on") : (de ? "aus" : "off"));
-            else Out(text, sizeof(text), "< %s >", cur);
-            if (val.state == 2) Out(x.state, sizeof(x.state), "%s", de ? "keine INI" : "no INI");
-            else if (val.state == 1) Out(x.state, sizeof(x.state), "(%s)", text);
-            else Out(x.state, sizeof(x.state), "%s", text);
-            Out(x.count, sizeof(x.count), "%s", r.when == kSwRestart ? (de ? "Neustart" : "restart") : "live");
-            if (r.type == kSwBool && val.state != 2) x.square = atoi(cur) ? 1 : 2;
-            x.col = r.when == kSwRestart ? kQbGrey : kQbMarkup;
-            x.stateCol = val.state == 2 ? IM_COL32(125, 125, 125, 255) : val.state == 1 ? IM_COL32(255, 190, 90, 255)
-                       : r.type == kSwBool && atoi(cur) ? IM_COL32(110, 230, 120, 255) : IM_COL32(220, 220, 220, 255);
-            y.kind = kQdSw;
-            y.intro = i;
+            QbSwView(i, v[n], d[n], de);
             ++n;
         }
     }
     LeaveCriticalSection(&g_swLock);
     return n;
+}
+// one switch row (g_swLock held; page Fixes and - 0.21.8 - a pinned switch on page 0, "sw.set|<switch>")
+void QbSwView(int i, QbView &x, QbDyn &y, bool de) {
+    const SwRow &r = g_sw[i];
+    const SwValue &val = g_swVal[i];
+    memset(&x, 0, sizeof(x));
+    memset(&y, 0, sizeof(y));
+    x.src = -1;
+    Out(x.name, sizeof(x.name), "  %s", de ? r.de : r.en);
+    const char *cur = SwEffective(r, val);
+    char text[40];
+    if (r.type == kSwBool) Out(text, sizeof(text), "%s", atoi(cur) ? (de ? "an" : "on") : (de ? "aus" : "off"));
+    else Out(text, sizeof(text), "< %s >", cur);
+    if (val.state == 2) Out(x.state, sizeof(x.state), "%s", de ? "keine INI" : "no INI");
+    else if (val.state == 1) Out(x.state, sizeof(x.state), "(%s)", text);
+    else Out(x.state, sizeof(x.state), "%s", text);
+    Out(x.count, sizeof(x.count), "%s", r.when == kSwRestart ? (de ? "Neustart" : "restart") : "live");
+    if (r.type == kSwBool && val.state != 2) x.square = atoi(cur) ? 1 : 2;
+    x.col = r.when == kSwRestart ? kQbGrey : kQbMarkup;
+    x.stateCol = val.state == 2 ? IM_COL32(125, 125, 125, 255) : val.state == 1 ? IM_COL32(255, 190, 90, 255)
+               : r.type == kSwBool && atoi(cur) ? IM_COL32(110, 230, 120, 255) : IM_COL32(220, 220, 220, 255);
+    y.kind = kQdSw;
+    y.intro = i;
 }
 // page Fixes: right / left / X on a group or a switch row (dir kQbXDir = X)
 void QbSwAct(const QbDyn &q, int dir) {
@@ -28025,6 +28746,34 @@ bool ChapHelp(const QbDyn &q, bool de, char *o, size_t n) {
 }
 // ---- end of 0.21.7 chapter units ----
 
+// 0.21.8 favourites with an argument: the item + argument a special row stands for (page Fixes switch = sw.set <switch>,
+// costume list row = costume.set <object id>, chapter unit = level.load <unit>); false = not pinnable (groups, choosers,
+// positions / checkpoints / saves rows)
+bool QbDynFav(int k, char *id, size_t idN, char *arg, size_t argN) {
+    if (k < 0 || k >= g_qbDynN) return false;
+    const QbDyn &q = g_qbDyn[k];
+    if (q.kind == kQdSw) {
+        bool ok = false;
+        EnterCriticalSection(&g_swLock);
+        const int i = static_cast<int>(q.intro);
+        if (i >= 0 && i < g_swN) { Out(id, idN, "sw.set"); Out(arg, argN, "%s", g_sw[i].target + 4); ok = true; }
+        LeaveCriticalSection(&g_swLock);
+        return ok && FavArgOk(arg);
+    }
+    if (q.kind == kQdCos) {
+        Out(id, idN, "costume.set");
+        Out(arg, argN, "%ld", q.intro);
+        return true;
+    }
+    if (q.kind == kQdChap && q.intro >= 0 && q.intro < kQbViewMax) {
+        Out(id, idN, "level.load");
+        Out(arg, argN, "%s", g_chapRow[q.intro].arg);
+        return FavArgOk(arg);
+    }
+    return false;
+}
+bool QbDynIsSw(int k) { return k >= 0 && k < g_qbDynN && g_qbDyn[k].kind == kQdSw; }
+
 // ---- 0.21.7 help line / Y hint (TODO "kurze Hilfe-Zeile zum gewaehlten Punkt", "Y: -" on rows that refuse Y) ----
 // the bar row behind the selected view: a static row, a favourite / recent row of page 0, "Naechstes Kostuem"; nullptr
 // for every other special row (positions, checkpoints, saves, Tests, Fixes, costumes)
@@ -28387,10 +29136,36 @@ void ItemWidget(const char *id) {
     ImGui::PopID();
 }
 
+void SwMenuWidget(int i, char *pending, size_t pendingN, char *favReq, size_t favN);   // 0.21.8, after PageSwitches
+void SwMenuAfter(const char *pending, const char *favReq);
 void PageFavourites() {
     ImGui::TextUnformatted("Y on an item pins / unpins it ([Favorites] Ids in TruMenu.ini; fav.list / fav.add / fav.del).");
+    ImGui::TextDisabled("0.21.8: entries with an argument (\"<id>|<argument>\": bar rows such as Fixes switches, costumes, "
+                        "chapter units) - '*' marks them, Y unpins");
     int count = 0;
-    ForFavs([&](const char *id) { ItemWidget(id); ++count; });
+    char pending[160] = "", favReq[112] = "";
+    ForFavEntries([&](const char *id, const char *arg) {
+        ++count;
+        if (!arg[0]) { ItemWidget(id); return; }
+        // 0.21.8 an entry with an argument: a switch of the Fixes page as its widget, else a button "<id> <argument>"
+        if (!_stricmp(id, "sw.set")) {
+            EnterCriticalSection(&g_swLock);
+            const int i = SwFindLocked(arg);
+            if (i >= 0) SwMenuWidget(i, pending, sizeof(pending), favReq, sizeof(favReq));
+            LeaveCriticalSection(&g_swLock);
+            if (i >= 0) return;
+        }
+        const Item *item = FindItem(id);
+        char text[260];
+        Out(text, sizeof(text), "* %s  [%s %s]###wfa%d", item ? item->label : id, id, arg, count);
+        if (TmButton(text)) QueueItem(id, arg);
+        if (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp, false)) {
+            char o[200];
+            const bool ok = FavSetArg(id, arg, false, o, sizeof(o));
+            SetLastAction("fav.del", ok, o);
+        }
+    });
+    SwMenuAfter(pending, favReq);
     if (!count) ImGui::TextUnformatted("(no favourites)");
     if (ImGui::TreeNode("Add an item (A or Y on an id)")) {
         for (const Item &item : kItems) {
@@ -28564,6 +29339,7 @@ void RegNoteFromMenu(int list, const char *id, const char *note) {
     _snprintf_s(g_cmdBuf, sizeof(g_cmdBuf), _TRUNCATE, "regress.note %s:%s %s", kRegNames[list], id, note);
     strncpy_s(g_cmdSetText, sizeof(g_cmdSetText), g_cmdBuf, _TRUNCATE);   // if the text field is active already
     g_cmdSetPending = true;
+    g_osk = &g_oskMenu;                      // 0.21.8: the keyboard's target is the menu's bar
     OskEdited();
     char o[160];
     if (g_cmdKeyboard) RunCmdKeyboard("", o, sizeof(o));
@@ -28826,8 +29602,51 @@ bool ConfirmButton(const char *label, const char *key) {
 // ---- 0.21.5 long menu: section "Fixes" (TruMenu.switches.txt, the rows of the bar page Fixes) and section "Quick bar
 // pages" (every static row of every bar page from the same tables - the ring is frozen, every ring entry is a bar row,
 // so the menu reaches every ring entry too) ----
+// 0.21.8: one switch of TruMenu.switches.txt as a menu widget (page Fixes and the favourites page; g_swLock held by the
+// caller): checkbox / - + / choice buttons, the hint as tooltip, a star when pinned; *pending = the sw.set line a press
+// asks for, *favReq = the switch Y pins / unpins ("<Plugin>:<Section>:<Key>")
+void SwMenuWidget(int i, char *pending, size_t pendingN, char *favReq, size_t favN) {
+    const SwRow &r = g_sw[i];
+    const SwValue &val = g_swVal[i];
+    const char *cur = SwEffective(r, val);
+    const char *when = r.when == kSwRestart ? "restart / Neustart" : r.when == kSwLive ? "live" : "live (LiveReload=1)";
+    const char *state = val.state == 2 ? "  - no INI / keine INI" : val.state == 1 ? "  - key missing, default / fehlt" : "";
+    const char *star = FavHasArg("sw.set", r.target + 4) ? "* " : "";
+    char label[300], next[32];
+    ImGui::PushID(i);
+    if (val.state == 2) ImGui::BeginDisabled();
+    if (r.type == kSwBool) {
+        bool on = atoi(cur) != 0;
+        Out(label, sizeof(label), "%s%s / %s   [%s] %s  (%s)%s###sw", star, r.de, r.en, r.section, r.key, when, state);
+        if (TmCheckbox(label, &on)) Out(pending, pendingN, "%s %d", r.target + 4, on ? 1 : 0);
+    } else if (r.type == kSwInt) {
+        ImGui::Text("%s%s / %s   [%s] %s = %s  (%s)%s", star, r.de, r.en, r.section, r.key, cur, when, state);
+        ImGui::SameLine();
+        if (TmButton(" - ###swdown") && SwNext(r, cur, -1, next, sizeof(next))) Out(pending, pendingN, "%s %s", r.target + 4, next);
+        ImGui::SameLine();
+        if (TmButton(" + ###swup") && SwNext(r, cur, 1, next, sizeof(next))) Out(pending, pendingN, "%s %s", r.target + 4, next);
+    } else {
+        ImGui::Text("%s%s / %s   [%s] %s = %s  (%s)%s", star, r.de, r.en, r.section, r.key, cur, when, state);
+        for (int k = 0; k < SwChoiceCount(r); ++k) {
+            char c[24], id[48];
+            SwChoiceAt(r, k, c, sizeof(c));
+            Out(id, sizeof(id), "%s###swc%d", c, k);
+            ImGui::SameLine();
+            if (TmButton(id)) Out(pending, pendingN, "%s %s", r.target + 4, c);
+        }
+    }
+    if (ImGui::IsItemHovered())             // 0.21.7: the help in both languages (DE // EN of the file)
+        ImGui::SetTooltip("%s%s%s%s%s", r.hint, strcmp(r.hint, r.hintEn) ? "\n" : "",
+                          strcmp(r.hint, r.hintEn) ? r.hintEn : "", r.since[0] ? "\nrow for " : "", r.since);
+    if (ImGui::IsItemFocused() && ImGui::IsKeyPressed(ImGuiKey_GamepadFaceUp, false))   // 0.21.8: Y = pin / unpin
+        Out(favReq, favN, "%s", r.target + 4);
+    if (val.state == 2) ImGui::EndDisabled();
+    ImGui::PopID();
+}
+void SwMenuAfter(const char *pending, const char *favReq);
 void PageSwitches() {
     SwRefresh();
+    char favReq[112] = "";
     ImGui::TextWrapped("0.21.5: plugin INI switches from %s (%s). live = the plugin re-reads the key (about once a second); "
                        "restart / Neustart = read at the next game start. A change is written into <Plugin>.ini next to "
                        "tru.exe (sw.set: only keys of the file, only values of the row's type, only an existing INI). Same "
@@ -28846,49 +29665,24 @@ void PageSwitches() {
         char head[160];
         Out(head, sizeof(head), "%s / %s (%d)###swg%d", grp.de, grp.en, grp.count, g);
         if (!ImGui::TreeNodeEx(head, grp.open ? ImGuiTreeNodeFlags_DefaultOpen : 0)) continue;
-        for (int i = first; i < first + grp.count && i < g_swN; ++i) {
-            const SwRow &r = g_sw[i];
-            const SwValue &val = g_swVal[i];
-            const char *cur = SwEffective(r, val);
-            const char *when = r.when == kSwRestart ? "restart / Neustart" : r.when == kSwLive ? "live" : "live (LiveReload=1)";
-            const char *state = val.state == 2 ? "  - no INI / keine INI" : val.state == 1 ? "  - key missing, default / fehlt" : "";
-            char label[300], next[32];
-            ImGui::PushID(i);
-            if (val.state == 2) ImGui::BeginDisabled();
-            if (r.type == kSwBool) {
-                bool on = atoi(cur) != 0;
-                Out(label, sizeof(label), "%s / %s   [%s] %s  (%s)%s###sw", r.de, r.en, r.section, r.key, when, state);
-                if (TmCheckbox(label, &on)) Out(pending, sizeof(pending), "%s %d", r.target + 4, on ? 1 : 0);
-            } else if (r.type == kSwInt) {
-                ImGui::Text("%s / %s   [%s] %s = %s  (%s)%s", r.de, r.en, r.section, r.key, cur, when, state);
-                ImGui::SameLine();
-                if (TmButton(" - ###swdown") && SwNext(r, cur, -1, next, sizeof(next)))
-                    Out(pending, sizeof(pending), "%s %s", r.target + 4, next);
-                ImGui::SameLine();
-                if (TmButton(" + ###swup") && SwNext(r, cur, 1, next, sizeof(next)))
-                    Out(pending, sizeof(pending), "%s %s", r.target + 4, next);
-            } else {
-                ImGui::Text("%s / %s   [%s] %s = %s  (%s)%s", r.de, r.en, r.section, r.key, cur, when, state);
-                for (int k = 0; k < SwChoiceCount(r); ++k) {
-                    char c[24], id[48];
-                    SwChoiceAt(r, k, c, sizeof(c));
-                    Out(id, sizeof(id), "%s###swc%d", c, k);
-                    ImGui::SameLine();
-                    if (TmButton(id)) Out(pending, sizeof(pending), "%s %s", r.target + 4, c);
-                }
-            }
-            if (ImGui::IsItemHovered())             // 0.21.7: the help in both languages (DE // EN of the file)
-                ImGui::SetTooltip("%s%s%s%s%s", r.hint, strcmp(r.hint, r.hintEn) ? "\n" : "",
-                                  strcmp(r.hint, r.hintEn) ? r.hintEn : "", r.since[0] ? "\nrow for " : "", r.since);
-            if (val.state == 2) ImGui::EndDisabled();
-            ImGui::PopID();
-        }
+        for (int i = first; i < first + grp.count && i < g_swN; ++i) SwMenuWidget(i, pending, sizeof(pending), favReq,
+                                                                                 sizeof(favReq));
         ImGui::TreePop();
     }
     LeaveCriticalSection(&g_swLock);
-    if (pending[0]) {                        // outside the lock: sw.set takes it itself
+    SwMenuAfter(pending, favReq);
+}
+// 0.21.8: what a switch widget asked for, outside g_swLock: sw.set takes it itself; Y = pin / unpin "sw.set|<switch>"
+void SwMenuAfter(const char *pending, const char *favReq) {
+    char o[300];
+    if (pending[0]) {
         const bool ok = RunSwSet(pending, o, sizeof(o));
         SetLastAction("sw.set", ok, o);
+    }
+    if (favReq[0]) {
+        const bool had = FavHasArg("sw.set", favReq);
+        const bool ok = FavSetArg("sw.set", favReq, !had, o, sizeof(o));
+        SetLastAction("fav.add", ok, o);
     }
 }
 // one static bar row as a menu widget (the PageAccess way; confirmation rows = ConfirmButton, chapters back up first)
@@ -30260,6 +31054,7 @@ void ReadOptions(const char *dir) {
     AiReadOptions(ini);                                                              // 0.19 [AI]
     SnReadOptions(ini);                                                              // 0.20.1 [Sound]
     ArReadOptions(ini);                                                              // 0.21 [Arachno] / [Camera]
+    SgReadOptions(ini);                                                              // 0.21.8 [SoundGroups]
     // 0.10 [Radial]: HoldButtons / Key also as hex ("0x00C0", "0x78")
     auto number = [&](const char *key) {
         char v[32];
@@ -30585,6 +31380,7 @@ void Start(HMODULE self) {
     M20Check();                               // 0.20 collectibles / enemies / forget / mutes (precheck_020.txt; after
                                               // AiCheck, MusicCheck and DebugViewCheck)
     M201Check();                              // 0.20.1 sound list + FMOD music mute (precheck_0201.txt; after M20Check)
+    SgCheck();                                // 0.21.8 sound group sliders (precheck_0218_sndgroups.txt; after M201Check)
     M21Check();                               // 0.21 arachnophobia / camera / labels / ai.remove (precheck_021.txt)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
@@ -30726,6 +31522,7 @@ extern "C" __declspec(dllexport) DWORD __cdecl TruMenuPadBlock(DWORD pad) {
     if ((g_blockInput && menu) || ring || g_swallow[pad] || g_holdPending[pad] || g_radSwallow) out = 0xFFFF;
     if (bar) out |= kQbOwn;
     if (bar) out |= static_cast<DWORD>(g_cmdFocusButton | (g_qcOpen ? kQcOwn : 0));   // 0.21.6 quick command line
+    if (bar && g_qcOpen && g_qcOskOpen) out |= kQcOskOwn;                               // 0.21.8: its keyboard's Start
     out |= static_cast<DWORD>(g_qbPad[pad].owned | g_qbPad[pad].gated);
     out &= 0xFFFF;
     if (menu) out |= 1u << 16;

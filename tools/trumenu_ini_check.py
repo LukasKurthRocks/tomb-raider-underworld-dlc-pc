@@ -213,7 +213,9 @@ QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'chea
                   'time.scale', 'ai.mode',                                       # 0.19 ai.mode
                   'snd.pos', 'snd.lines', 'snd.sort',                            # 0.20.1 sound list
                   'cam.shakescale', 'cam.rumble',                                # 0.21 camera shake / rumble
-                  'ai.spawncount', 'ai.spawnat')                                 # 0.21.1 enemy spawn
+                  'ai.spawncount', 'ai.spawnat',                                 # 0.21.1 enemy spawn
+                  'snd.vol.ambience', 'snd.vol.steps', 'snd.vol.weapons',       # 0.21.8 sound group sliders
+                  'snd.vol.enemies', 'snd.vol.lara', 'snd.vol.objects', 'snd.vol.dlc2', 'snd.vol.hud')
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
@@ -1557,11 +1559,14 @@ def check_0213(ini_path):
         if 'QbRun(' in ex or 'InvokeCore(' in ex or 'QbConfirm(' in ex:
             problems.append('TruMenu.cpp: QbExecRow must not run items itself (only through QbActRow)')
     fav = fn_body(src, 'void QbFavPin(')
-    i_arg, i_set = fav.find('if (r->arg[0])'), fav.find('FavSet(')
+    # 0.21.8: rows with an argument are pinnable ("<id>|<argument>"); the argument passes FavArgOk before FavSetArg
+    # (0.21.3: refused before FavSet)
+    i_arg, i_set = fav.find('if (!FavArgOk(r->arg))'), fav.find('FavSetArg(r->id, r->arg')
     if not (0 <= i_arg < i_set):
-        problems.append('TruMenu.cpp: QbFavPin must refuse rows with an argument before FavSet ([Favorites] Ids = item ids)')
-    if fav and ('WritePrivateProfileString' in fav or 'g_favs' in fav or 'FavHas(r->id)' not in fav):
-        problems.append('TruMenu.cpp: QbFavPin must toggle through FavHas / FavSet only (no own write of the favourites)')
+        problems.append('TruMenu.cpp: QbFavPin must check the argument (FavArgOk) before FavSetArg ([Favorites] Ids)')
+    if fav and ('WritePrivateProfileString' in fav or 'g_favs' in fav or 'FavHasArg(r->id, r->arg)' not in fav):
+        problems.append('TruMenu.cpp: QbFavPin must toggle through FavHasArg / FavSetArg only (no own write of the '
+                        'favourites)')
     draw = fn_body(src, 'void DrawQuick(')
     for t in Q213_FOOTER:
         if t not in draw: problems.append('TruMenu.cpp: DrawQuick lacks the footer text %s' % t)
@@ -1696,6 +1701,9 @@ SW_LIVE = {
     ('TruShadowCombat', 'Death', 'TranslateRegenList'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
     ('TruShadowCombat', 'Death', 'TranslateLand'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
     ('TruShadowCombat', 'Melee', 'TranslateInterrupt'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
+    ('TruShadowCombat', 'Death', 'TranslateT5'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),            # 0.6.6
+    ('TruShadowCombat', 'Death', 'TranslateVaulted'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
+    ('TruShadowCombat', 'Death', 'TranslateVaultedClock'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
     ('TruShadowCombat', 'Strike', 'Translate'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate1013'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate1019'): 'void ReadSwitches(',
@@ -1969,13 +1977,17 @@ def check_0215(radial_path, switches_path):
     fav = fn_body(src, 'void QbFavPin(')
     if 'kQsSwitches' not in fav: problems.append('TruMenu.cpp: QbFavPin must refuse Y on page Fixes (no favourite)')
     tick = fn_body(src, 'void QuickTick(')
-    if 'p.special == kQsSwitches ? kQbXDir : 1' not in tick:
+    if 'p.special == kQsSwitches ? kQbXDir : 1' not in tick and \
+            'p.special == kQsSwitches || swRow ? kQbXDir : 1' not in tick:   # 0.21.8: + a pinned switch on page 0
         problems.append('TruMenu.cpp: QuickTick: X on page Fixes must pass kQbXDir')
     act = fn_body(src, 'void QbSwAct(')
     if 'QbRun("Fixes"' not in act or '"sw.set"' not in act:
         problems.append('TruMenu.cpp: QbSwAct must write through the item sw.set (QbRun)')
     if 'g_swGroup[g].open = false' not in act: problems.append('TruMenu.cpp: QbSwAct must keep one group open at a time')
-    if 'RunSwSet(pending' not in fn_body(src, 'void PageSwitches('):
+    # 0.21.8: the widget is SwMenuWidget (also on the favourites page), the write SwMenuAfter -> RunSwSet
+    if 'RunSwSet(pending' not in fn_body(src, 'void PageSwitches(') and not (
+            'SwMenuAfter(pending' in fn_body(src, 'void PageSwitches(') and
+            'RunSwSet(pending' in fn_body(src, 'void SwMenuAfter(')):
         problems.append('TruMenu.cpp: the menu section Fixes must write through RunSwSet')
     if 'PageSwitches();' not in src or 'PageQbAll();' not in src or 'kQbPages[p]' not in fn_body(src, 'void PageQbAll('):
         problems.append('TruMenu.cpp: the long menu needs the sections Fixes (PageSwitches) and Quick bar pages (PageQbAll '
@@ -2203,12 +2215,15 @@ def check_0217(ini_path, switches_path):
     problems = []
     name = os.path.basename(ini_path)
     src = open(CPP, encoding='utf-8').read()
-    if not src.startswith('//') or 'const char *const kVersion = "TruMenu 0.21.7 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.21.7 ("')
+    # 0.21.8: the version line keeps the 0.21.7 part (as check_0216 reads its own part)
+    if not src.startswith('//') or '0.21.7 (bar footer' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.21.7 part "0.21.7 (bar footer"')
     # 1a footer Y
     fav = fn_body(src, 'bool QbFavOk(')
-    for need in ('kQbLabel', 'kQbGroup', 'kQbPlanned', 'strcmp(r->id, "-")', '!r->arg[0]'):
+    for need in ('kQbLabel', 'kQbGroup', 'kQbPlanned', 'strcmp(r->id, "-")'):
         if need not in fav: problems.append('TruMenu.cpp: QbFavOk lacks %s (the rule of QbFavPin)' % need)
+    if '!r->arg[0]' not in fav and 'FavArgOk(r->arg)' not in fav:   # 0.21.8: an argument that fits the list
+        problems.append('TruMenu.cpp: QbFavOk lacks the argument rule (!r->arg[0] / 0.21.8 FavArgOk(r->arg))')
     dq = fn_body(src, 'void DrawQuick(')
     if 'QbFavOk(QbSelRow(g_qbPage, sel))' not in dq or '"X: ausfuehren  Y: -"' not in dq or '"X: run  Y: -"' not in dq:
         problems.append('TruMenu.cpp: DrawQuick must show "Y: -" where QbFavOk(QbSelRow(...)) refuses Y')
@@ -2262,7 +2277,8 @@ def check_0217(ini_path, switches_path):
     if 'QbHelpLine(g_qbPage, sel, de, help, sizeof(help))' not in dq or 'QbHelpText(r.id, r.arg)' not in \
             fn_body(src, 'void PageQbRow('):
         problems.append('TruMenu.cpp: the help must be the bar footer line (DrawQuick) and the menu tooltip (PageQbRow)')
-    if 'r.hintEn' not in fn_body(src, 'void PageSwitches('):
+    if 'r.hintEn' not in fn_body(src, 'void PageSwitches(') and not (   # 0.21.8: the widget is SwMenuWidget
+            'SwMenuWidget(' in fn_body(src, 'void PageSwitches(') and 'r.hintEn' in fn_body(src, 'void SwMenuWidget(')):
         problems.append('TruMenu.cpp: PageSwitches tooltip must show both halves of the hint')
     # 1e costumes the game refuses
     pad = fn_body(src, 'DWORD WINAPI PadHook(')
@@ -2377,6 +2393,162 @@ def check_0217(ini_path, switches_path):
         problems.append('TruMenu.cpp: DrawQuick must warn while the pad is read past PadHook')
     return problems, '%d help rows, umlauts, costume check on the game thread, %d chapter groups / %d units, uber / shader / ' \
                      'navmesh layers read only with %d keys' % (len(helps), len(ckeys), unit_n, len(Q217_KEYS))
+
+
+# 0.21.8 (2026-11-08 TruMenu 0.21.8, night build)
+Q218_PATCHES = ((0x006203e4, 5), (0x006824b9, 5), (0x006826d3, 5), (0x0065b181, 6),   # TruShadowCombat 0.6.5 .text
+                (0x0085b104, 4), (0x0085b0fc, 4), (0x0085b15c, 4), (0x00858c90, 4), (0x00859160, 4))   # .. vtable slots
+Q218_RV_SAP = {0x005be3a7: '68f401000068b80b0000', 0x005be3bd: 'c74618e8030000c74620f4010000'}   # TruRockVein 0.10
+Q218_DANGER = ('cheat.', 'player.invincible', 'player.die', 'level.load', 'level.start', 'level.reload', 'unit.go',
+               'pos.goload', 'save.load', 'save.delete', 'save.restore', 'save.import', 'costume.reset',
+               'costume.choosereset', 'costume.setreload', 'costume.choosereload', 'sw.set', 'sticky.set', 'game.quit')
+Q218_SG_KEYS = ('Ambience', 'Steps', 'Weapons', 'Enemies', 'Lara', 'Objects', 'Dlc2', 'Hud')
+Q218_SG_GROUPS = {'Ambience': [15], 'Steps': [32, 78], 'Weapons': [58, 60, 51, 31], 'Enemies': [27, 65],
+                  'Lara': [68, 70, 72, 77], 'Objects': [43], 'Dlc2': [79], 'Hud': [54, 55, 56, 57]}   # finding section 4
+Q218_STORY = ('kH2KeyPopulation', 'kH2KeyDeaths', 'kH2KeyTutorial', 'kH2KeyBroken')
+
+
+def check_0218(ini_path, switches_path):
+    """0.21.8: the byte check moved off TruShadowCombat 0.6.5's patch sites, the SweepAndPrune rows accept TruRockVein
+    0.10's form, the quick command line (suggestions, the one on-screen keyboard with a target, history line shown,
+    kCmdDanger asks twice), favourites with an argument + star, story values (read only), sound group sliders"""
+    problems = []
+    src = open(CPP, encoding='utf-8').read()
+    if not src.startswith('//') or 'const char *const kVersion = "TruMenu 0.21.8 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.21.8 ("')
+    # 1 byte checks vs the patch sites of TruShadowCombat 0.6.5
+    joined = re.sub(r'"\s*\n\s*"', '', src)
+    rows = [(int(a, 16), len(re.sub(r'[^0-9a-fA-F]', '', h)) // 2) for a, h in
+            re.findall(r'\{\s*(0x[0-9a-fA-F]{6,8})\s*,\s*"([0-9a-fA-F ]+)"', joined)]
+    for site, ln in Q218_PATCHES:
+        for a, n in rows:
+            if a < site + ln and site < a + n:
+                problems.append('TruMenu.cpp: byte check 0x%08x (+%d) covers the TruShadowCombat 0.6.5 patch 0x%08x (+%d) '
+                                '- it would fail once that plugin has run' % (a, n, site, ln))
+    ak = re.search(r'const DvCheck kAkChecks\[\] = \{(.*?)\n\};', src, re.S)
+    if not ak or '{0x006203e9, "83c410 84c0 7417"}' not in ak.group(1):
+        problems.append('TruMenu.cpp: kAkChecks must check the bytes after the call: {0x006203e9, "83c410 84c0 7417"}')
+    # SweepAndPrune: the TruRockVein 0.10 form accepted for the same rows (and only there)
+    tu = re.search(r'const NavCheckBytes kSapChecksTu\[\] = \{(.*?)\n\};', src, re.S)
+    got = dict((int(a, 16), h.replace(' ', '')) for a, h in re.findall(r'\{(0x[0-9a-f]{8}), "([0-9a-f ]+)"\}', tu.group(1))) \
+        if tu else {}
+    if got != Q218_RV_SAP:
+        problems.append('TruMenu.cpp: kSapChecksTu must hold exactly the TruRockVein 0.10 form of 0x5be3a7 / 0x5be3bd')
+    sap = re.search(r'const NavCheckBytes kSapChecks\[\] = \{(.*?)\n\};', src, re.S)
+    if not sap or '{0x005be3a7, "68c800000068e8030000"}' not in sap.group(1) or \
+            '{0x005be3bd, "c74618e8030000c74620c8000000"}' not in sap.group(1):
+        problems.append('TruMenu.cpp: kSapChecks must keep the retail rows (= precheck_0217_sap.txt)')
+    sc = fn_body(src, 'void SapCheck(')
+    if 'kSapChecksTu' not in sc or 't.at == c.at' not in sc:
+        problems.append('TruMenu.cpp: SapCheck must accept the kSapChecksTu form only for the same row')
+    if 'Grenzen %s' not in fn_body(src, 'void ValSap(') or 'g_sap.n == 3000 && g_sap.m2 == 1000' not in fn_body(src, 'void ValSap('):
+        problems.append('TruMenu.cpp: ValSap must name the limits read from the core (PC 1000/400, TU 3000/1000)')
+    stext = open(switches_path, encoding='utf-8', errors='replace').read()
+    if 'TruRockVein | SweepAndPrune | Translate | bool |' not in stext:
+        problems.append('%s: row TruRockVein [SweepAndPrune] Translate missing' % os.path.basename(switches_path))
+    # 2a suggestions under the small line: the menu bar's list and rows
+    qc = src[src.find('// ---- 0.21.6 quick command line'):src.find('// ---- end of 0.21.6 quick command line')]
+    if 'CmdBuildSuggestions(g_qcBuf, false)' not in qc or 'CmdSugRows(' not in qc:
+        problems.append('TruMenu.cpp: the quick command line must show CmdBuildSuggestions(g_qcBuf) with CmdSugRows')
+    if 'CmdSugRows(10)' not in fn_body(src, 'void DrawCmdSuggestions('):
+        problems.append('TruMenu.cpp: DrawCmdSuggestions must draw its rows with CmdSugRows (one list look)')
+    # 2b one keyboard with a target
+    if src.count('\nvoid DrawOsk(') != 1 or src.count('\nvoid OskInput(') != 1 or 'struct OskTarget {' not in src:
+        problems.append('TruMenu.cpp: exactly one on-screen keyboard (DrawOsk / OskInput) with an OskTarget')
+    for head in ('void OskAppend(', 'void OskBackspace(', 'void OskTakeSuggestion(', 'void OskRun(', 'void OskActivate(',
+                 'void OskInput(', 'void DrawOsk('):
+        if 'g_cmdBuf' in fn_body(src, head) or 'g_oskOpen' in fn_body(src, head):
+            problems.append('TruMenu.cpp: %s...) must edit the target (g_osk), not the menu bar' % head)
+    if 'DrawOsk(g_oskQc)' not in qc or 'OskInput(g_oskQc, e)' not in qc or 'DrawOsk(g_oskMenu)' not in \
+            fn_body(src, 'void DrawCmdBar('):
+        problems.append('TruMenu.cpp: the menu bar (g_oskMenu) and the quick command line (g_oskQc) must use the keyboard')
+    if 'g_osk = &g_oskMenu;' not in fn_body(src, 'void DrawCmdBar('):
+        problems.append('TruMenu.cpp: DrawCmdBar must set the keyboard target first')
+    if 'const WORD kQcOskOwn = 0x0010;' not in src or 'down & ~s.passed & ~qcOsk' not in fn_body(src, 'WORD QbPad(') or \
+            'kQcOskOwn' not in fn_body(src, 'extern "C" __declspec(dllexport) DWORD __cdecl TruMenuPadBlock('):
+        problems.append('TruMenu.cpp: Start must be kept from the game (never a gated tap) while the line\'s keyboard is open')
+    # 2c history safety
+    m = re.search(r'const CmdDanger kCmdDanger\[\] = \{(.*?)\n\};', src, re.S)
+    dids = re.findall(r'\{"([a-z0-9_.]+)", "', m.group(1)) if m else []
+    for d in Q218_DANGER:
+        if d not in dids: problems.append('TruMenu.cpp: kCmdDanger lacks %s' % d)
+    dg = fn_body(src, 'const CmdDanger *CmdDangerOf(')
+    for need in ('kCkInfo', 'kCkBuiltin', 'CmdIsValue(k) && !arg[0]', 'CmdCanonical('):
+        if need not in dg: problems.append('TruMenu.cpp: CmdDangerOf lacks %s (reads are never dangerous)' % need)
+    run = fn_body(src, 'void QcRun(')
+    i_d, i_r = run.find('CmdDangerOf(line)'), run.find('CmdRunLine(')
+    if not (0 <= i_d < i_r) or 'pad ? CmdDangerOf(line)' not in run or 'QcArmed()' not in run:
+        problems.append('TruMenu.cpp: QcRun must arm a kCmdDanger pad run before CmdRunLine')
+    if 'const DWORD kQcArmMs = 3000;' not in src:
+        problems.append('TruMenu.cpp: kQcArmMs must be 3000 (the owner: "a second A within 3 s")')
+    pt = fn_body(src, 'bool QcPadTick(')
+    if 'QcRun(true)' not in pt or 'QcRun(false)' not in fn_body(src, 'void DrawQuickCmd(') or 'QcRun(true)' not in \
+            fn_body(src, 'void QcOskRun('):
+        problems.append('TruMenu.cpp: pad runs (A, the keyboard\'s Start) must be QcRun(true), Enter QcRun(false)')
+    dq = fn_body(src, 'void DrawQuickCmd(')
+    if '"A fuehrt aus:"' not in dq or 'g_qcHistPos >= 0 || osk' not in dq or 'ACHTUNG: %s' not in dq:
+        problems.append('TruMenu.cpp: DrawQuickCmd must show the picked line before A and the armed warning')
+    # 3a favourites with an argument + star
+    ok = fn_body(src, 'bool FavArgOk(')
+    if "arg[i] == ','" not in ok or "arg[i] == '|'" not in ok or 'kFavArgMax' not in ok:
+        problems.append('TruMenu.cpp: FavArgOk must refuse "," and "|" and long arguments')
+    fe = src[src.find('template <typename F> void ForFavEntries('):]
+    fe = fe[:fe.find('\n}\n') + 3]
+    if "strchr(e, '|')" not in fe or '" \\t"' not in fe:
+        problems.append('TruMenu.cpp: ForFavEntries must read "<id>|<argument>" and the old space-separated ids')
+    if 'full = true' not in fn_body(src, 'bool FavSetArg(') or 'never write a cut list' not in fn_body(src, 'bool FavSetArg('):
+        problems.append('TruMenu.cpp: FavSetArg must refuse a list that does not fit (no cut write)')
+    fr = fn_body(src, 'int QbFavRows(')
+    if 'ForFavEntries(' not in fr or 'QbSwView(i, v[n], d[n], de)' not in fr or 'kQfConfirm | kQfBackup' not in fr:
+        problems.append('TruMenu.cpp: QbFavRows must show entries with an argument (switch row, level.load with backup)')
+    pin = fn_body(src, 'void QbFavPin(')
+    if 'QbDynFav(dyn' not in pin or 'FavSetArg(dynId, dynArg' not in pin:
+        problems.append('TruMenu.cpp: QbFavPin must pin the special rows QbDynFav names')
+    dyn = fn_body(src, 'bool QbDynFav(')
+    for need in ('kQdSw', 'kQdCos', 'kQdChap', '"sw.set"', '"costume.set"', '"level.load"'):
+        if need not in dyn: problems.append('TruMenu.cpp: QbDynFav lacks %s' % need)
+    if 'QbMarkFavs(page);' not in fn_body(src, 'void QbBuild(') or 'if (v.fav)' not in fn_body(src, 'void DrawQuick('):
+        problems.append('TruMenu.cpp: the star: QbBuild must mark the favourites, DrawQuick draw " *"')
+    if 'RunFavArg(arg, true' not in src or 'FavSetArg(id, arg, false' not in fn_body(src, 'void PageFavourites('):
+        problems.append('TruMenu.cpp: fav.add / fav.del and the menu page must handle entries with an argument')
+    # 3b story values: read only
+    sv = fn_body(src, 'void ValStoryValues(')
+    m = re.search(r'const StoryVal kStoryVals\[\] = \{(.*?)\n\};', src, re.S)
+    for k in Q218_STORY:
+        if not m or k not in m.group(1): problems.append('TruMenu.cpp: kStoryVals lacks %s (hall02)' % k)
+    if 'StFind(0, s.owner' not in sv or any(t in sv for t in ('StNotify', 'kStNotify', 'WriteDword(', 'PutByte(', 'QueueItem(')):
+        problems.append('TruMenu.cpp: ValStoryValues must only read (StFind / StValue)')
+    if '{"story.values", "info"' not in src:
+        problems.append('TruMenu.cpp: item story.values (info) missing')
+    # 3c sound group sliders
+    sg = src[src.find('// ---- 0.21.8 sound group sliders'):src.find('// ---- end of 0.21.8 sound group sliders')]
+    sl = re.findall(r'\{"([A-Za-z0-9]+)", "[^"]*", "[^"]*", \{([0-9, ]+)\}, (\d)\}', sg)
+    have = {k: [int(x) for x in g.split(',')][:int(c)] for k, g, c in sl}
+    if have != Q218_SG_GROUPS:
+        problems.append('TruMenu.cpp: kSgSliders must be the finding\'s eight sliders (%s)' % have)
+    tick = fn_body(src, 'void SgTick(')
+    if 'SgCovered(s, s.groups[k])' not in tick or 'st.orig' not in tick or '* 0x84' in tick:
+        problems.append('TruMenu.cpp: SgTick must skip covered groups, restore the old factor, never write the game volume')
+    wr = fn_body(src, 'bool SgWrite(')
+    if 'cg + 0x38' not in wr or 'kFmCgUpdateVol' not in wr or '__try' not in wr:
+        problems.append('TruMenu.cpp: SgWrite = cg + 0x38 then FMOD\'s recompute 0x7c4774 under __try')
+    if 'SgTick();' not in src[src.find('        SndMuteTick();'):src.find('        SndMuteTick();') + 200]:
+        problems.append('TruMenu.cpp: SgTick must run on the game thread next to SndMuteTick')
+    if 'g_sgOk = g_smOk && DvChecks(kSgChecks' not in fn_body(src, 'void SgCheck(') or 'SgCheck();' not in src:
+        problems.append('TruMenu.cpp: SgCheck must gate the sliders on the 0.20.1 group checks and kSgChecks')
+    ini = {k: v for _, k, v in ini_section(ini_path, 'SoundGroups')}
+    for k in Q218_SG_KEYS:
+        if ini.get(k) != '100': problems.append('%s: [SoundGroups] %s must be 100 (got %s)' % (os.path.basename(ini_path), k,
+                                                                                           ini.get(k)))
+        item = 'snd.vol.%s' % k.lower()
+        if '{"%s", "int"' % item not in src: problems.append('TruMenu.cpp: item %s (int) missing' % item)
+        if '"%s", "", kQbValue, -1, kQcNone, kQvSndGroup' % item not in src:
+            problems.append('TruMenu.cpp: bar value row for %s (kQvSndGroup) missing' % item)
+    if 'r.val == kQvSndGroup ? (SgPctAt(r.id) + 5) / 10' not in fn_body(src, 'void QbActRow('):
+        problems.append('TruMenu.cpp: QbActRow must step a sound group row from its item')
+    return problems, 'byte check 0x6203e9, 0 checks on the 0.6.5 sites, SAP both forms, %d danger ids, one keyboard, ' \
+                     'favourites with arguments, %d story values, %d sound sliders' % (
+                         len(dids), len(re.findall(r'\n    \{', m.group(1))) if m else 0, len(have))
 
 
 def unescape(s):
@@ -2496,6 +2668,10 @@ def main(argv):
     for p in gproblems7: print('Q0217 %s' % p)
     if not gproblems7: print('ok: 0.21.7 footer / help / umlauts / costumes / chapters / label layers: %s' % gsummary7)
     problems += gproblems7
+    gproblems8, gsummary8 = check_0218(ini_path, opt.get('--switches', SWITCHES))   # 0.21.8
+    for p in gproblems8: print('Q0218 %s' % p)
+    if not gproblems8: print('ok: 0.21.8 checks / command line / favourites / story / sound groups: %s' % gsummary8)
+    problems += gproblems8
     nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)

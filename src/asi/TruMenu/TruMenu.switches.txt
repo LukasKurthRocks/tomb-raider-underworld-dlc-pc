@@ -1,4 +1,4 @@
-# TruMenu switches (TruMenu 0.21.7) - Set-TruMenu.ps1 copies it next to tru.exe as TruMenu.switches.txt.
+# TruMenu switches (TruMenu 0.21.8) - Set-TruMenu.ps1 copies it next to tru.exe as TruMenu.switches.txt.
 # The plugin INI switches of the quick bar page "Fixes" and the long menu section "Fixes" (one source for both).
 # A row edits <Plugin>.ini next to the .asi files (WritePrivateProfileString, the TO TEST toggle path); the INI must
 # exist (a plugin that is not installed is shown "keine INI" and never written), TruMenu never creates a plugin INI.
@@ -33,6 +33,9 @@ TruShadowCombat | Death | TranslateNotify38 | bool | Finisher-Block + Meldung 38
 TruShadowCombat | Death | TranslateRegenList | bool | Begleiter-Regenerationsliste wie TU | Companion regeneration list as TU | live | 1 | Fragt zuerst die Begleiter-Liste (schwerer Treffer) // Asks the companion list first (heavy hit regenerates) | TruShadowCombat 0.6.5
 TruShadowCombat | Death | TranslateLand | bool | Land-Tod wie TU (T2) | Land death as TU (T2) | live | 1 | LP <= 0 bei der Landung mit Begleiter: 33 + RegenerateDeath // LP <= 0 at landing with companion: 33 + RegenerateDeath | TruShadowCombat 0.6.5
 TruShadowCombat | Melee | TranslateInterrupt | bool | Nahkampf-Unterbrechung wie TU (T-M3) | Melee interruption as TU (T-M3) | live | 1 | Vaulted / RegenerateDeath unterbrechen MeleeAttack // Vaulted and RegenerateDeath may interrupt MeleeAttack | TruShadowCombat 0.6.5
+TruShadowCombat | Death | TranslateT5 | bool | Sofort-Tod wie TU (T5) | Immediate death as TU (T5) | live | 1 | Tödlicher Treffer ohne Regeneration: Todesart 7 // Lethal hit, no regeneration: death kind 7 | TruShadowCombat 0.6.6
+TruShadowCombat | Death | TranslateVaulted | bool | Vaulted-Enter wie TU (P1c) | Vaulted enter as TU (P1c) | live | 1 | Stufen-Animation aus Begleiter (nur fixe Daten) // Step animation from companion (fixed data only) | TruShadowCombat 0.6.6
+TruShadowCombat | Death | TranslateVaultedClock | bool | Vaulted-Uhr wie TU | Vaulted clock as TU | live | 1 | 5 s ohne Zeitlupe nach Vaulted // 5 s without slow motion after Vaulted | TruShadowCombat 0.6.6
 TruShadowCombat | Splash | Translate | bool | K9 Splash wie TU | K9 splash as TU | live | 1 | Hauptziel ohne Extra-Splash; Typen nur mit [Damage] an // Main target without extra splash; types need [Damage]
 TruShadowCombat | Splash | Fallback | bool | K9 Splash: Xbox-Werte als Ersatz | K9 splash: Xbox values fallback | restart | 1 | Xbox-Werte, wenn die Paar-Tabelle von Objekt 858 abweicht // Xbox values when object 858's pair table differs
 TruShadowCombat | States | Translate1013 | bool | Finisher 1013 wie TU | Finisher 1013 as TU | live | 0 | Finisher 1013 im Doppel-Modus wie TU // Finisher 1013 in doppelganger mode as TU
@@ -107,6 +110,7 @@ TruRockVein | RockVein | LogUnhandled | bool | Log: fehlende Bedingungen | Log: 
 TruRockVein | RockVein | LogBadValues | bool | Log: Werte außerhalb | Log: bad values | restart | 1 | Markup-Werte außerhalb 601..628 loggen // Log markup values outside 601..628
 TruRockVein | RockVein | LogDefaultConditions | bool | Log: Standard-Bedingungen | Log: default conditions | restart | 1 | Bedingungen, die der Standard-Zweig beantwortet // Condition ids answered by the default handler
 TruRockVein | RockVein | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 3 = jeder Aufruf // 3 = every call
+TruRockVein | SweepAndPrune | Translate | bool | Kanten-Kollision: Grenzen wie TU | Ledge collision: limits as TU | restart | 1 | 3000 Boxen, 1000 Paare statt 1000/400; +412 KB // 3000 boxes, 1000 pair links instead of 1000/400 | TruRockVein 0.10
 
 group | doppel | Doppelgängerin (TruDoppelganger) | Doppelganger (TruDoppelganger)
 TruDoppelganger | Doppelganger | Enabled | bool | TruDoppelganger an | TruDoppelganger on | restart | 1 | 0 = nichts patchen // 0 = patch nothing

@@ -2791,6 +2791,224 @@ def check_shlive():
     return ok
 
 
+# ---- 0.21.8 (TruMenu 0.21.8) ----
+def q218_src():
+    import os, re
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import trumenu_ini_check as c
+    src = open(c.CPP, encoding='utf-8').read()
+    m = re.search(r'const CmdDanger kCmdDanger\[\] = \{(.*?)\n\};', src, re.S)
+    return src, c.item_types(src), re.findall(r'\{"([a-z0-9_.]+)", "', m.group(1)) if m else []
+
+
+def danger_of(line, items, dids):            # CmdDangerOf
+    words = line.split()
+    if not words: return None
+    w, arg = words[0].lower(), ' '.join(words[1:])
+    if w in ('help', 'list', 'get'): return None   # builtins
+    k = items.get(w)
+    if k is None or k in ('info', 'todo'): return None
+    if k in ('bool', 'int', 'float') and not arg: return None   # "<value id>" alone = its value
+    for d in dids:
+        if (d.endswith('.') and w.startswith(d)) or w == d: return d
+    return None
+
+
+def check_qcdanger():
+    """CmdDangerOf on the source's kCmdDanger and item kinds: the owner's accident line "cheat.god 0" asks, its read
+    "cheat.god" / "get cheat.god" / info items never; level / save / costume reset / sw.set lines ask; every exact id of
+    the table is an item"""
+    _, items, dids = q218_src()
+    cases = {'cheat.god 0': 'cheat.', 'cheat.god': None, 'get cheat.god': None, 'cheat.list': None, 'cheat.fillup': 'cheat.',
+             'player.invincible 1': 'player.invincible', 'player.invincible': None,
+             'level.load dlc_level2_start': 'level.load', 'level.reload': 'level.reload', 'save.load autosave': 'save.load',
+             'save.list': None, 'save.backup': None, 'costume.reset': 'costume.reset', 'costume.next': None,
+             'sw.set TruShadowCombat:Death:TranslateNotify33 0': 'sw.set', 'sw.list': None, 'time.scale 0.5': None,
+             'fav.add cheat.god': None, 'help': None, 'list cheat': None, 'nonsense.id 1': None, 'game.quit': 'game.quit'}
+    bad = [(l, danger_of(l, items, dids), w) for l, w in cases.items() if danger_of(l, items, dids) != w]
+    missing = [d for d in dids if not d.endswith('.') and d not in items]
+    prefixed = sum(1 for i in items if i.startswith('cheat.') and items[i] not in ('info', 'todo'))
+    ok = not bad and not missing and prefixed >= 5
+    print('qcdanger: %d lines (cheat.god 0 asks, its reads never; level / save / costume reset / sw.set ask), %d table ids '
+          'all items, %d cheat items  %s' % (len(cases), len(dids), prefixed, 'ok' if ok else 'FAIL %s %s' % (bad, missing)))
+    return ok
+
+
+def qc_arm_sim(events, items, dids, arm_ms=3000):   # QcRun(pad) + QcEdited / QcHistory (disarm)
+    armed, at, out = '', 0, []
+    for t, what, line in events:
+        if what == 'edit':
+            armed = ''
+            continue
+        pad = what == 'A'
+        d = danger_of(line, items, dids) if pad else None
+        if d and not (armed == line and t - at <= arm_ms):
+            armed, at = line, t
+            out.append('armed')
+            continue
+        armed = ''
+        out.append('run')
+    return out
+
+
+def check_qcarm():
+    """the second A: armed, then run within 3 s; after 3 s armed again; a history step / edit between disarms; another
+    dangerous line arms itself; Enter (typed) runs at once; a harmless line runs at once"""
+    _, items, dids = q218_src()
+    g = 'cheat.god 0'
+    cases = [([(0, 'A', g), (1000, 'A', g)], ['armed', 'run']),
+             ([(0, 'A', g), (3500, 'A', g), (4000, 'A', g)], ['armed', 'armed', 'run']),
+             ([(0, 'A', g), (500, 'edit', ''), (800, 'A', g)], ['armed', 'armed']),
+             ([(0, 'A', g), (300, 'A', 'level.reload')], ['armed', 'armed']),
+             ([(0, 'Enter', g)], ['run']),
+             ([(0, 'A', 'get cheat.god'), (100, 'A', 'time.scale 0.5')], ['run', 'run']),
+             ([(0, 'A', g), (1000, 'A', g), (1500, 'A', g)], ['armed', 'run', 'armed'])]   # after a run: asks again
+    bad = [ev for ev, want in cases if qc_arm_sim(ev, items, dids) != want]
+    print('qcarm: %d sequences (second A within 3 s, re-arm after 3 s, edit disarms, Enter at once, after a run asks '
+          'again)  %s' % (len(cases), 'ok' if not bad else 'FAIL %s' % bad))
+    return not bad
+
+
+FAV_MAX = 1023                                  # sizeof(g_favs) - 1
+
+
+def fav_arg_ok(arg):                            # FavArgOk
+    return len(arg) < 96 and all(32 <= ord(ch) <= 126 and ch not in ',|' for ch in arg)
+
+
+def fav_usable(i, items):                      # ItemUsable: FindItem is case-insensitive, todo items are not usable
+    return items.get(i.lower()) not in (None, 'todo')
+
+
+def fav_entries(text, items):                   # ForFavEntries
+    out = []
+    for e in text.split(','):
+        if '|' in e:
+            i, _, a = e.partition('|')
+            i, a = i.strip(), a.strip()
+            if i and fav_usable(i, items) and fav_arg_ok(a): out.append((i, a))
+            continue
+        out += [(i, '') for i in e.split() if fav_usable(i, items)]
+    return out
+
+
+def fav_set(text, items, i, a, add):            # FavSetArg: (new text, ok)
+    if not fav_usable(i, items) or not fav_arg_ok(a): return text, False
+    parts, had = [], False
+    for f, x in fav_entries(text, items):
+        if f.lower() == i.lower() and x.lower() == a.lower():
+            had = True
+            if not add: continue
+        parts.append(f + ('|' + x if x else ''))
+    if add and not had: parts.append(i + ('|' + a if a else ''))
+    new = ','.join(parts)
+    if len(new) > FAV_MAX: return text, False     # never a cut list
+    return new, True
+
+
+def old_fav_ids(text, items):                   # TruMenu < 0.21.8: strtok ", " + ItemUsable
+    return [w for w in text.replace(',', ' ').split() if fav_usable(w, items)]
+
+
+def check_favargs(rng):
+    """the favourite list with "<id>|<argument>": old lists (comma or space) read as before, pairs added / removed
+    without touching the rest, ',' / '|' refused, a list that would not fit refused unchanged, case-insensitive pairs, a
+    pre-0.21.8 TruMenu reading a new list keeps its id-only favourites and skips the rest"""
+    _, items, _ = q218_src()
+    ok = fav_entries('player.invincible time.scale,level.reload', items) == [('player.invincible', ''), ('time.scale', ''),
+                                                                           ('level.reload', '')]
+    ok &= items.get('camera.free') != 'todo' or fav_entries('camera.free', items) == []   # a todo item is not usable
+    t, a = fav_set('time.scale', items, 'sw.set', 'TruShadowCombat:Death:TranslateNotify33', True)
+    t, b = fav_set(t, items, 'costume.set', '25', True)
+    t, c2 = fav_set(t, items, 'level.load', 'dlc_yggdrasil_hall02', True)
+    ok &= a and b and c2 and t == 'time.scale,sw.set|TruShadowCombat:Death:TranslateNotify33,costume.set|25,level.load|' \
+                                   'dlc_yggdrasil_hall02'
+    t2, d = fav_set(t, items, 'COSTUME.SET', '25', False)
+    ok &= d and 'costume.set' not in t2 and t2.startswith('time.scale,sw.set|')
+    ok &= fav_set(t, items, 'level.load', 'a,b', True) == (t, False) and fav_set(t, items, 'level.load', 'a|b', True) == (t, False)
+    ok &= old_fav_ids(t, items) == ['time.scale']   # 0.21.7 skips "sw.set|..." etc. (no such item)
+    # random round trips and the size limit
+    ids = sorted(i for i in items if items[i] != 'todo')
+    text = ''
+    for _ in range(400):
+        i = rng.choice(ids)
+        arg = rng.choice(['', '1', '0x200', 'dlc_yggdrasil_hall02', 'TruRockVein:SweepAndPrune:Translate', 'a' * 90])
+        before = fav_entries(text, items)
+        new, okk = fav_set(text, items, i, arg, rng.random() < 0.7)
+        if okk:
+            after = fav_entries(new, items)
+            ok &= len(new) <= FAV_MAX and all(e in after for e in before if (e[0].lower(), e[1].lower()) != (i.lower(), arg.lower()))
+            text = new
+        else:
+            ok &= new == text
+    full, okf = fav_set('x' * 0 + ','.join(['time.scale|' + 'a' * 90] * 10), items, 'level.load', 'b' * 90, True)
+    ok &= not okf and full.count('|') == 10
+    print('favargs: old lists, pairs add / remove, separators refused, full list refused unchanged, case-insensitive, old '
+          'TruMenu keeps id-only favourites, 400 random steps  %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+
+def sg_covered(groups, g, parent):            # SgCovered
+    p = parent.get(g, -1)
+    for _ in range(16):
+        if p <= 0: return False
+        if p in groups: return True
+        p = parent.get(p, -1)
+    return False
+
+
+def check_sgcover():
+    """sound group sliders on the finding's tree (section 1.1): weapons {58, 60, 51, 31} writes 58 / 51 / 31 and skips 60
+    (child of 58 - one factor per path); a group under another slider's group is written (55 under 51: weapons x hud);
+    the factor sequence 50 -> 30 -> 100 writes twice and puts the old value back once"""
+    import os, re
+    src, _, _ = q218_src()
+    parent = {15: 14, 32: 14, 78: 77, 77: 8, 58: 14, 60: 58, 51: 14, 31: 14, 27: 14, 65: 64, 64: 9, 68: 64, 70: 57, 72: 64,
+              43: 14, 79: 53, 54: 53, 55: 51, 56: 53, 57: 53, 14: 6, 6: 5, 5: 4, 9: 8, 8: 4, 53: 4, 4: 0}
+    sg = src[src.find('// ---- 0.21.8 sound group sliders'):src.find('// ---- end of 0.21.8 sound group sliders')]
+    sliders = {k: [int(x) for x in g.split(',')][:int(c)] for k, g, c in
+               re.findall(r'\{"([A-Za-z0-9]+)", "[^"]*", "[^"]*", \{([0-9, ]+)\}, (\d)\}', sg)}
+    written = {k: [g for g in v if not sg_covered(v, g, parent)] for k, v in sliders.items()}
+    ok = written.get('Weapons') == [58, 51, 31] and written.get('Hud') == [54, 55, 56, 57] and written.get('Lara') == [68, 70, 72, 77]
+    ok &= sum(len(v) for v in written.values()) == sum(len(v) for v in sliders.values()) - 1
+    # write sequence of one group (SgTick): orig 1.0
+    st = {'ours': False, 'set': 0.0, 'orig': 0.0}
+    cur, writes, restores = 1.0, 0, 0
+    for pct in (50, 50, 30, 30, 100, 100):
+        if pct >= 100:
+            if st['ours'] and abs(cur - st['set']) < 0.0005:
+                cur, restores = st['orig'], restores + 1
+            st['ours'] = False
+            continue
+        want = pct / 100.0
+        if st['ours'] and abs(cur - want) < 0.0005: continue
+        if not st['ours']: st['orig'] = cur
+        cur, writes = want, writes + 1
+        st.update(ours=True, set=want)
+    ok &= writes == 2 and restores == 1 and cur == 1.0
+    print('sgcover: 8 sliders, weapons skips 60 (child of 58), cross-slider paths written, 50 -> 30 -> 100 = 2 writes + 1 '
+          'restore  %s' % ('ok' if ok else 'FAIL %s' % written))
+    return ok
+
+
+def check_qcsuggest():
+    """the small line's Up / Down (QcCallback): a typed line with suggestions walks the suggestions (-1 .. count-1, as the
+    menu bar), an empty line or a history line walks the history; Tab takes the selected one, else the first"""
+    def step(sel, count, up, typed, hist_pos):
+        if hist_pos < 0 and typed and count:
+            return ('sug', sel - 1 if up and sel >= 0 else sel if up else min(sel + 1, count - 1))
+        return ('hist', None)
+    ok = step(-1, 3, False, True, -1) == ('sug', 0) and step(2, 3, False, True, -1) == ('sug', 2)
+    ok &= step(0, 3, True, True, -1) == ('sug', -1) and step(-1, 3, True, True, -1) == ('sug', -1)
+    ok &= step(-1, 0, True, True, -1) == ('hist', None) and step(-1, 3, True, False, -1) == ('hist', None)
+    ok &= step(1, 3, True, True, 2) == ('hist', None)
+    tab = lambda sel, count: sel if 0 <= sel < count else 0
+    ok &= tab(-1, 4) == 0 and tab(2, 4) == 2 and tab(7, 4) == 0
+    print('qcsuggest: Up / Down walk the suggestions of a typed line, else the history; Tab = selected or first  %s'
+          % ('ok' if ok else 'FAIL'))
+    return ok
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -2807,7 +3025,8 @@ def main():
                check_cosbar(), check_cosdebounce(), check_flighthint(rng), check_quickcmd(),   # 0.21.6
                check_togglerows(),
                check_yfooter(), check_utf8cut(rng), check_cosvalid(rng), check_uber(), check_navwalk(rng),   # 0.21.7
-               check_chapters(), check_shlive()]
+               check_chapters(), check_shlive(),
+               check_qcdanger(), check_qcarm(), check_favargs(rng), check_sgcover(), check_qcsuggest()]   # 0.21.8
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

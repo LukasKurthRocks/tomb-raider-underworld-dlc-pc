@@ -101,6 +101,17 @@
 // `call 0x5c3cc0`, jmp 0x74d710). SkipGeometryStub replaces `test eax,400000h; je 0x74d4d5` at tru+0x34d4b8 (eax =
 // [esi+28h], esi = box): flag or type 22 -> 0x74d4bf, else 0x74d4d5 with eax kept for the next tests (0x8000 /
 // 0x40000000). Option SkipGeometry; hit counter 5 of the chart probe. With it 11 of 11 TU geometry functions.
+//
+// 0.10 (2026-11-08, docs Befund-SweepAndPrune-0611 section 3, Befund-P5-Kleinkram-0711 row 7b; K2 / N2b): the
+// MarkupManager's SweepAndPrune limits as the title update. The owner constructor (PC tru+0x1be3a0 = retail 0x8227eda8
+// = TU 0x8227b9f0; built once by the game init tru+0x1df390, owner [0xdb94cc]) creates its SAP core with
+// create(1000, 200) on PC / retail and create(3000, 500) in the TU: 3000 boxes, pair pool M x 16 bytes = 1000 links
+// (PC 400). The TU also writes 500 into the never-read copy of the pair parameter (TU [this+0x24] = retail / PC
+// [this+0x20]; the TU's new field +0x1c = 3000 has 0 readers and would shift the layout - not taken). PatchSweepAndPrune
+// ([SweepAndPrune] Translate, default 1) rewrites the two push immediates at tru+0x1be3a7 and the field immediate at
+// tru+0x1be3c4 in DllMain, i.e. before the game init (checked: the owner pointer must still be 0). Control: on the first
+// machine update (the chart probe, also installed for this alone) one line with core +0x24 / +0x2c / +0x20 and owner
+// +0x20 (TU: 3000 / 500 / 620001 / 500). Memory: +412 800 bytes once from the game allocator.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -268,6 +279,7 @@ int g_chartLog = 1;                     // 0.6: log the player's chart record ch
 int g_chartFrom = 1470, g_chartTo = 1510;
 int g_jumpGeometry = 1;                 // 0.8: TU type-22 branches of the jump-off / fall geometry ([RockVein] JumpGeometry)
 int g_skipGeometry = 1;                 // 0.9: TU type-22 branch of tru+0x34d390 (TU 0x8242a7c8) ([RockVein] SkipGeometry)
+int g_sapTranslate = 1;                 // 0.10: SweepAndPrune limits as the TU ([SweepAndPrune] Translate)
 DWORD g_facingNext = kFacingNext, g_facingEdge = kFacingEdge, g_moveNext = kMoveNext, g_moveWall = kMoveWall;
 DWORD g_chartTickNext = kChartTickNext;
 volatile LONG g_facingHits = 0, g_moveHits = 0, g_slot1Calls = 0, g_slot1Runs = 0, g_chartLines = 0;
@@ -549,6 +561,7 @@ void ReadOptions(const char *dir) {
     g_chartTo = GetPrivateProfileIntA("RockVein", "ChartLogTo", 1510, ini);
     g_jumpGeometry = GetPrivateProfileIntA("RockVein", "JumpGeometry", 1, ini);
     g_skipGeometry = GetPrivateProfileIntA("RockVein", "SkipGeometry", 1, ini);
+    g_sapTranslate = GetPrivateProfileIntA("SweepAndPrune", "Translate", 1, ini);   // 0.10
 }
 
 // 0.3: the title update's markup types 22 / 23 -> flag class 1 (Xbox TU 0x822a12e8 table entries 21 / 22 = li r3,1).
@@ -828,6 +841,70 @@ bool IsType22(void *box) {
 
 bool LogNow(LONG n) { return n == 1 || (g_logLevel >= 2 && (n & (n - 1)) == 0); }
 
+// ---- 0.10: SweepAndPrune limits as the title update (TU owner constructor 0x8227b9f0) ----
+// Every byte below is pinned in work\asi\rv10\prechecks_v10.txt (tools/pe_bytes_check.py on the Steam exe).
+const DWORD kSapOwnerPtr = 0x00db94cc;      // MarkupManager (zero-initialised .data; 0 until the game init builds it)
+const DWORD kSapOwnerPtr2 = 0x00e7f060;     // the same pointer, second global
+const DWORD kSapCtor = 0x005be3a0;          // owner ctor: push ebx; push esi; push edi; mov esi,ecx; xor edi,edi
+const char *const kSapCtorHex = "53 56 57 8bf1 33ff";
+const DWORD kSapArgs = 0x005be3a7;          // push 0C8h; push 3E8h = SAP create(1000, 200)
+const BYTE kSapArgsOld[] = {0x68, 0xc8, 0x00, 0x00, 0x00, 0x68, 0xe8, 0x03, 0x00, 0x00};
+const BYTE kSapArgsNew[] = {0x68, 0xf4, 0x01, 0x00, 0x00, 0x68, 0xb8, 0x0b, 0x00, 0x00};   // create(3000, 500)
+const DWORD kSapMid = 0x005be3b1;           // vtable 0x853f54; [esi+4] = 0; [esi+1Ch] = 0; [esi+18h] = 1000 proxies
+const char *const kSapMidHex = "c706543f8500 897e04 897e1c c74618e8030000";
+const DWORD kSapField = 0x005be3c4;         // mov dword ptr [esi+20h],0C8h (copy of the pair parameter, never read)
+const BYTE kSapFieldOld[] = {0xc7, 0x46, 0x20, 0xc8, 0x00, 0x00, 0x00};
+const BYTE kSapFieldNew[] = {0xc7, 0x46, 0x20, 0xf4, 0x01, 0x00, 0x00};                     // 500 (TU [this+0x24])
+const DWORD kSapCall = 0x005be3cb;          // call SAP create 0x46d180; mov [esi+4],eax (the core)
+const char *const kSapCallHex = "e8b0edeaff 894604";
+const DWORD kSapGetter = 0x005be390;        // mov eax,[0xdb94cc]; ret
+const char *const kSapGetterHex = "a1cc94db00 c3";
+const DWORD kSapOwnerStore = 0x005d9ec6;    // owner -> [0xe7f060] and [0xdb94cc] (in tru+0x1d9e70, called by tru+0x1df390)
+const char *const kSapOwnerStoreHex = "893560f0e700 8935cc94db00";
+const DWORD kSapCoreCaps = 0x0046c880;      // SAP core ctor: [core+24h] = N (boxes), [core+2Ch] = M (pair parameter)
+const char *const kSapCoreCapsHex = "897e24 89462c";
+const DWORD kSapCoreMem = 0x0046c895;       // SAP core ctor: [core+20h] = 1 (memory counter, then += each pool)
+const char *const kSapCoreMemHex = "c7462001000000";
+// 0 = PC limits kept (Translate=0), 1 = written in DllMain, 2 = the exe already has (3000, 500), -1 = checks failed
+int g_sapState = 0;
+int g_sapChecked = 0;                       // the first-frame control ran (game thread only)
+
+// first machine update (game thread, from ChartTick): one control line - the values the core and the owner really hold
+void SapControl() {
+    DWORD owner = 0, core = 0, n = 0, m = 0, mem = 0, field = 0, proxies = 0;
+    __try {
+        owner = *reinterpret_cast<const DWORD *>(kSapOwnerPtr);
+        if (!owner) return;                 // not built yet: try again on the next update
+        core = *reinterpret_cast<const DWORD *>(owner + 4);
+        if (!core) return;
+        proxies = *reinterpret_cast<const DWORD *>(owner + 0x18);
+        field = *reinterpret_cast<const DWORD *>(owner + 0x20);
+        n = *reinterpret_cast<const DWORD *>(core + 0x24);
+        m = *reinterpret_cast<const DWORD *>(core + 0x2c);
+        mem = *reinterpret_cast<const DWORD *>(core + 0x20);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        g_sapChecked = 1;
+        Log(0, "SweepAndPrune control: reading MarkupManager 0x%08lx / core 0x%08lx failed", owner, core);
+        return;
+    }
+    g_sapChecked = 1;
+    const bool tu = g_sapState == 1 || g_sapState == 2;
+    const DWORD wantN = tu ? 3000 : 1000, wantM = tu ? 500 : 200, wantField = tu ? 500 : 200;
+    const DWORD wantMem = 1 + 204 * wantN + 16 * wantM;   // 1 + 80 N (boxes) + 16 M (pairs) + 4 N + 120 N (endpoints)
+    const bool ok = n == wantN && m == wantM && mem == wantMem && field == wantField && proxies == 1000;
+    char verdict[128];
+    if (g_sapState < 0)
+        _snprintf_s(verdict, sizeof(verdict), _TRUNCATE, "load checks failed, nothing written");
+    else if (ok)
+        _snprintf_s(verdict, sizeof(verdict), _TRUNCATE, "%s", tu ? "as the title update (3000 / 500)" : "PC limits (Translate=0)");
+    else
+        _snprintf_s(verdict, sizeof(verdict), _TRUNCATE, "NOT as expected (%lu / %lu / %lu / %lu, proxies 1000)", wantN,
+                    wantM, wantMem, wantField);
+    Log(ok && g_sapState >= 0 ? 1 : 0, "SweepAndPrune control (first frame): MarkupManager 0x%08lx, core 0x%08lx: boxes "
+        "+0x24 = %lu, pair parameter +0x2c = %lu (%lu pair links), memory +0x20 = %lu, owner +0x20 = %lu, proxies %lu -> %s",
+        owner, core, n, m, 2 * m, mem, field, proxies, verdict);
+}
+
 // TU 0x824009a0..0x82400a04: before the retail default, type == 22 -> facing = manager slot +0x08(box, segment 0)
 int __stdcall FacingType22(void *box) {
     if (!IsType22(box)) return 0;
@@ -968,6 +1045,8 @@ struct ChartLast { const BYTE *machine; DWORD rec; };
 ChartLast g_chartLasts[8];
 
 void __stdcall ChartTick(const BYTE *machine) {
+    if (!g_sapChecked) SapControl();        // 0.10: once, on the first update that sees the SAP core
+    if (!g_chartLog) return;                // 0.10: the probe may run for the SweepAndPrune control alone
     ReportGeometryHits();                   // 0.8
     __try {
         const BYTE *inst = *reinterpret_cast<const BYTE *const *>(machine + 8);
@@ -1050,14 +1129,76 @@ void PatchState420() {
 
 void PatchChartLog() {
     if (!HexBytesAt(kChartTick, kChartTickHex)) {
-        Log(0, "machine update at 0x%08lx does not match - chart log off", kChartTick);
+        Log(0, "machine update at 0x%08lx does not match - chart log and SweepAndPrune control off", kChartTick);
         return;
     }
-    if (WriteJump(kChartTick, &ChartTickProbe, 6))
+    if (!WriteJump(kChartTick, &ChartTickProbe, 6))
+        Log(0, "chart log not written (VirtualProtect %lu)", GetLastError());
+    else if (g_chartLog)
         Log(1, "chart log: player record changes with an index in %d..%d are logged (diagnostic; 0x%08lx)", g_chartFrom,
             g_chartTo, kChartTick);
-    else
-        Log(0, "chart log not written (VirtualProtect %lu)", GetLastError());
+    else   // 0.10: installed for the SweepAndPrune control alone
+        Log(1, "machine-update probe for the SweepAndPrune control only (ChartLog=0; 0x%08lx)", kChartTick);
+}
+
+// 0.10: write code bytes (the caller checked the old bytes)
+bool WriteCode(DWORD at, const BYTE *bytes, size_t length) {
+    DWORD old = 0, dummy = 0;
+    if (!VirtualProtect(reinterpret_cast<void *>(at), length, PAGE_EXECUTE_READWRITE, &old)) return false;
+    memcpy(reinterpret_cast<void *>(at), bytes, length);
+    VirtualProtect(reinterpret_cast<void *>(at), length, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void *>(at), length);
+    return true;
+}
+
+// 0.10: the TU's create(3000, 500) and field 500 in the owner constructor - in DllMain, before the game init runs
+void PatchSweepAndPrune() {
+    if (!HexBytesAt(kSapCtor, kSapCtorHex) || !HexBytesAt(kSapMid, kSapMidHex) || !HexBytesAt(kSapCall, kSapCallHex) ||
+        !HexBytesAt(kSapGetter, kSapGetterHex) || !HexBytesAt(kSapOwnerStore, kSapOwnerStoreHex) ||
+        !HexBytesAt(kSapCoreCaps, kSapCoreCapsHex) || !HexBytesAt(kSapCoreMem, kSapCoreMemHex)) {
+        g_sapState = -1;
+        Log(0, "SweepAndPrune: owner constructor 0x%08lx (or the SAP core it creates) does not match - limits not changed",
+            kSapCtor);
+        return;
+    }
+    const bool argsOld = BytesAt(kSapArgs, kSapArgsOld, sizeof(kSapArgsOld));
+    const bool fieldOld = BytesAt(kSapField, kSapFieldOld, sizeof(kSapFieldOld));
+    if (BytesAt(kSapArgs, kSapArgsNew, sizeof(kSapArgsNew)) && BytesAt(kSapField, kSapFieldNew, sizeof(kSapFieldNew))) {
+        g_sapState = 2;
+        Log(1, "SweepAndPrune: the exe already creates (3000, 500) with field 500 - nothing written");
+        return;
+    }
+    if (!argsOld || !fieldOld) {
+        g_sapState = -1;
+        Log(0, "SweepAndPrune: create arguments 0x%08lx (%s) / field 0x%08lx (%s) do not match - limits not changed", kSapArgs,
+            argsOld ? "ok" : "differs", kSapField, fieldOld ? "ok" : "differs");
+        return;
+    }
+    DWORD owner = 0, owner2 = 0;
+    __try {
+        owner = *reinterpret_cast<const DWORD *>(kSapOwnerPtr);
+        owner2 = *reinterpret_cast<const DWORD *>(kSapOwnerPtr2);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        owner = owner2 = 0xffffffff;
+    }
+    if (owner || owner2) {
+        g_sapState = -1;
+        Log(0, "SweepAndPrune: MarkupManager already built (0x%08lx / 0x%08lx) - loaded after the game init, limits not "
+               "changed", owner, owner2);
+        return;
+    }
+    if (!g_sapTranslate) {
+        Log(1, "SweepAndPrune: Translate=0 - PC limits kept (1000 boxes, 400 pair links)");
+        return;
+    }
+    if (WriteCode(kSapArgs, kSapArgsNew, sizeof(kSapArgsNew)) && WriteCode(kSapField, kSapFieldNew, sizeof(kSapFieldNew))) {
+        g_sapState = 1;
+        Log(1, "SweepAndPrune: limits as the title update (TU 0x8227b9f0: create(3000, 500) = 3000 boxes, 1000 pair links, "
+               "+412800 bytes; arguments 0x%08lx, field +0x20 = 500 at 0x%08lx)", kSapArgs, kSapField);
+    } else {
+        g_sapState = -1;
+        Log(0, "SweepAndPrune: limits not written (VirtualProtect %lu)", GetLastError());
+    }
 }
 
 // ---- 0.8 stubs. The type test is the TU's inline one (0x823feab4..0x823feadc and the same block in the other
@@ -1431,21 +1572,22 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruRockVein.log", dir);
     strncpy_s(g_dir, sizeof(g_dir), dir, _TRUNCATE);
     ReadOptions(dir);
-    Log(1, "TruRockVein 0.9 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
+    Log(1, "TruRockVein 0.10 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
         "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d, attach geometry %d, state 420 slot 1 %d, "
-        "chart log %d, jump geometry %d, skip geometry %d)", g_enabled, g_logLevel, g_logUnhandled, g_logBadValues,
-        g_logDefaultConditions, g_markupTypes, g_markupSlots, g_nullBoxGuard, g_markupAction608, g_attachGeometry,
-        g_state420Slot1, g_chartLog, g_jumpGeometry, g_skipGeometry);
+        "chart log %d, jump geometry %d, skip geometry %d, SweepAndPrune translate %d)", g_enabled, g_logLevel,
+        g_logUnhandled, g_logBadValues, g_logDefaultConditions, g_markupTypes, g_markupSlots, g_nullBoxGuard,
+        g_markupAction608, g_attachGeometry, g_state420Slot1, g_chartLog, g_jumpGeometry, g_skipGeometry, g_sapTranslate);
     if (!g_enabled) { Log(1, "disabled by TruRockVein.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
+    PatchSweepAndPrune();                   // 0.10: first - it must run before the game init (checks itself)
     if (g_markupTypes) PatchMarkupTypes();
     if (g_markupSlots || g_nullBoxGuard) PatchSlots();
     if (g_markupAction608) PatchSelector();
     if (g_nullBoxGuard) PatchPointOnBox();
     if (g_attachGeometry) PatchAttachGeometry();
     if (g_state420Slot1) PatchState420();
-    if (g_chartLog) PatchChartLog();
+    if (g_chartLog || g_sapTranslate) PatchChartLog();   // 0.10: also the SweepAndPrune control's first-frame probe
     if (g_jumpGeometry) PatchJumpGeometry();
     if (g_skipGeometry) PatchSkipGeometry();
     if (!BytesAt(kDispatch, kDispatchBytes, sizeof(kDispatchBytes)) || !BytesAt(kDefault, kDefaultBytes, sizeof(kDefaultBytes)) ||
@@ -1477,4 +1619,4 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
-extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.9 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function)"; }
+extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.10 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update)"; }

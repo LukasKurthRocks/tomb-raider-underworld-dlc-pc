@@ -2431,8 +2431,97 @@ Checks: `tools\trumenu_ini_check.py` `check_0217` (+ the 0.21.7 rules of `check_
 | 6 | dlc_caverns_hall, Leveldaten "Tore / Plattformen (Zustand)" on | both gates labelled from the switches' platform; switch on: "Tor: faehrt hoch", "Tor: oben, noch 25 s" counting down, "faehrt runter", "unten, bereit in 2 s", "unten, bereit"; `uber.dump` lines |
 | 7 | `TruMenu.shaderlabel.txt` installed, dlc_yggdrasil_end, Render-Details "Shader-Etiketten" on | red labels "23164 SURR S-SS 1909/-/1910/1911 [Gelaende 20969]" at the goo tube; line 2 `live = Datei` (installed tree) or `live PART S-TS ... (Datei SURR)` with the shader test copy; `shader.dump` block in the log |
 | 8 | hall02, "Navmesh Flaechen" + "Alle Ebenen" + "Navmesh beschriften" on | legend line at the top; labels `E11.0 #n` with flag bits; the red / magenta areas show `27:1` / `26:1` |
-| 8b | big DLC 2 rooms (end, machine room) / F2 flight, page Render / KI "Kanten-Kollision (SAP)" right | "Boxen b/1000 (Spitze ..), Paare p/400 ..."; `sap: new peak` lines in the log |
+| 8b | big DLC 2 rooms (end, machine room) / F2 flight, page Render / KI "Kanten-Kollision (SAP)" right | "Boxen b/N (Spitze ..), Paare p/2M ..." with the limits read from the core (PC 1000 / 400; 3000 / 1000 with TruRockVein 0.10 `[SweepAndPrune] Translate=1` - 0.21.8 adds "Grenzen ..."); `sap: new peak` lines in the log |
 | 9 | DLC 2 mission menu: bar open, left, X | if X still starts the mission: footer "(Pad NICHT gesperrt)" and the log's "diagnosis 0.21.7" lines; if neither shows, PadHook was called and the leak is elsewhere (note the time) |
+
+## TruMenu 0.21.8 (quick command line: suggestions, keyboard, history safety; favourites with an argument; story values; sound group sliders; 2026-11-08)
+
+Night build `work\asi\menu0218` (TODO items "TruMenu 0.21.8", "kleine Befehlszeile ausbauen" (2) / (3), the history
+accident of 2026-11-07 21:23:53 - `cheat.god 0` from the quick command line's history). 6 new byte checks (sound
+groups), one check row moved, one second form accepted; no new hook, imports / exports unchanged.
+
+**Byte checks next to other plugins' patches.** TruShadowCombat 0.6.5 H1 rewrites the call at 0x6203e4 (death check ->
+`RegenListHook`); `kAkChecks` (ai.kill) now checks `{0x006203e9, "83c410 84c0 7417"}` (the bytes after the call) - it
+passed before only because TruMenu.asi loads first. No other TruMenu check touches the 0.6.5 sites 0x6824b9 / 0x6826d3 /
+0x65b181 or the vtable entries 0x85b104 / 0x85b0fc / 0x85b15c / 0x858c90 / 0x859160 (`work\m0218_0711\overlap_scan.py`).
+TruRockVein 0.10 (`[SweepAndPrune] Translate`) rewrites 0x5be3a7 (create(3000, 500)) and 0x5be3c4 (field 500):
+`SapCheck` accepts the retail row or its TruRockVein form (`kSapChecksTu`, only for the same row); `sap.status` says which
+limits the core has ("Grenzen PC 1000/400" / "TU 3000/1000 (TruRockVein 0.10)"). `TruMenu.switches.txt` has the new
+rows TruRockVein `[SweepAndPrune] Translate` and TruShadowCombat 0.6.6 `[Death] TranslateT5` / `TranslateVaulted` /
+`TranslateVaultedClock` (live, `P1dReadSwitches`) - 125 switches. TruShadowCombat 0.6.6's patch sites (0x63ad82,
+0x71d5cc, 0x63b421, 0x623fa2, 0x65a4a2, 0x64fdb9, 0x638d6f, 0x638e76, 0x638efb) touch no TruMenu check either.
+
+**Quick command line (L3 in the open bar).**
+- Suggestions: while a typed line has some, the menu bar's list (`CmdBuildSuggestions` + the shared `CmdSugRows`) is
+  shown under the input (6 rows: id / value / label). Keyboard: Up / Down choose among them (else the history), Tab takes
+  the selected (else the first), Enter on a selected one runs it - the menu bar's rules.
+- On-screen keyboard: **Y** opens the 0.7 keyboard of the long menu - the same code, now with a target (`OskTarget`: the
+  menu bar `g_oskMenu` or this line `g_oskQc`; `DrawOsk` / `OskInput` draw and steer whichever). Keys as in the menu: A
+  type, X backspace, Y take suggestion, Start run, B back to the compact line (B again closes it), LB / RB rows, L3
+  closes the line; an empty line starts on the history chips. While it is open the bar also keeps **Start** from the
+  game (`kQcOskOwn`; in `QbPad` it is never a gated combo tap, so its release is not passed to the game). A real key
+  switches back to typing (the characters are kept).
+- Safety: the line a pad step put into the input is shown with its item label (`A fuehrt aus: cheat.god 0 - ...`) and,
+  for a line of `kCmdDanger`, an orange "Vorsicht: ..." before anything runs. A pad run (A, the keyboard's Start / run
+  key) of such a line only **arms**: red footer `ACHTUNG: <line> (<why>) - A nochmal in 2.4 s = ausfuehren`; the same line
+  again within 3 s (`kQcArmMs`) runs it, any edit / history step disarms. Enter on the real keyboard runs at once (typed
+  on purpose). `kCmdDanger` (one table): `cheat.*`, `player.invincible`, `player.die`, `level.load` / `start` / `reload`,
+  `unit.go`, `pos.goload`, `regress.prepare`, `save.load` / `delete` / `restore` / `import`, `costume.reset` /
+  `choosereset` / `setreload` / `choosereload`, `sw.set`, `sticky.set`, `fix.hall02`, `ai.kill`, `ai.remove`,
+  `instance.remove`, `settings.reset`, `fav.reset`, `game.quit`. Reads never ask: `help` / `list` / `get`, info items,
+  a value item without an argument (shows its value). Log `quick: '<line>' <why> - armed ...`.
+
+**Favourites with an argument + star.** `[Favorites] Ids` entries are `<id>` or `<id>|<argument>` (argument without ',' /
+'|', < 96 characters); old lists (comma or space separated) read as before, a TruMenu before 0.21.8 skips the new
+entries. Y now pins rows with an argument: static rows (e.g. `dbg.flatpass 0x200`), page Fixes switches
+(`sw.set|<Plugin>:<Section>:<Key>` - on page 0 the switch row itself with its value, right / left / X as on Fixes),
+costume list rows (`costume.set|<id>`), chapter units (`level.load|<unit>` - on page 0 with the chapter rows' right-twice
++ backup). Group / chooser / position / checkpoint / save rows still refuse Y. A row whose item + argument is a
+favourite shows a yellow ` *` (every page). `fav.add` / `fav.del` take `<id> <argument>` (or `<id>|<argument>`); the
+long menu's favourites page lists them (switches as their widget, others as a button; Y unpins), page Fixes: Y on a
+switch pins it. A list that would not fit (1023 characters) is refused unchanged.
+
+**Story values** (`story.values`, info; bar page Leveldaten "Story-Werte (nur lesen)" and Tests / hall02 group
+"hall02-Werte (live)"): the known sticky values of Lara's level through the `sticky.get` read (`StFind` / `StValue`,
+nothing written): hall02 dispatcher 11270 population / deaths / tutorial / wall (the `fix.hall02` keys), Croft Manor
+dispatcher 4086 IsLevelZeroDone / IsL3_Reset_OK (Befund-Manor-Prolog row 4). `-` = no entry yet.
+
+**Sound group sliders** (`docs\Befund-Ton-Gruppen-0611.md` sections 4 / 5; bar page Zeit / Test, group "Ton-Gruppen
+(Lautstaerke)"; items `snd.group <Key> <0..100>`, `snd.groups`, `snd.vol.<key>`; `[SoundGroups] Ambience / Steps /
+Weapons / Enemies / Lara / Objects / Dlc2 / Hud`, default 100, kept in TruMenu.ini): the eight proposed sliders (15; 32 +
+78; 58 + 60 + 51 + 31; 27 + 65; 68 + 70 + 72 + 77; 43; 79; 54 .. 57). Game thread, next to the music mute: factor =
+`*(float *)(cg + 0x38)` of the group's FMOD channel group, then FMOD's own recompute 0x7c4774; the game's group volume
+(entry +0) is never written. A group whose ancestor (entry +0x68) is in the same slider is skipped (60 under 58); two
+sliders on one path multiply. New channel groups after a level load are written again; 100 % puts the value from before
+TruMenu back. Open (finding section 6): whether the factor is audible, whether the game writes cg + 0x38 itself.
+
+Not built: Arachno 0.22 (occlusion = picture quads in the depth path with their own render-state patch condition, glitch
+effects - `docs\Befund-Arachnophobie-Stufe1-Kamera-0611.md` 0.22-A / B; too large for this night and not testable
+offline), the front-end pad block (research only until the 0.21.7 diagnosis lines were seen live).
+
+Checks: `tools\trumenu_ini_check.py` `check_0218` (36 negatives `work\m0218_0711\make_negative.py`; the 0.21.7
+negatives adapted in `make_negative_0217.py`), `tools\trumenu_quick_check.py` models `qcdanger`, `qcarm`, `favargs`,
+`sgcover`, `qcsuggest`; byte lists `work\asi\menu0218\precheck_0218_sndgroups.txt` (6) and `precheck_0218_aikill.txt`
+(62, the 0.21.1 list with the moved row).
+
+### TO TEST 0.21.8 (owner)
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | game start | `TruMenu.log`: `TruMenu 0.21.8 (`, `0.21.1 ... checks ok`, `0.21.8 sound group sliders: checks ok (6 rows)`, `SweepAndPrune read-out: checks ok (20 rows, N in the TruRockVein 0.10 form)` (N = 0 while TruMenu.asi loads before TruRockVein.asi, as today; 2 if it ever loads after); with TruRockVein 0.10 on, `sap.status` ends "Grenzen TU 3000/1000 (TruRockVein 0.10)" |
+| 2 | bar open, L3, type `cheat.g` | suggestions under the input (`cheat.god`, `cheat.godfull` with values); Down + Enter runs the selected one |
+| 3 | D-pad up until `cheat.god 0` shows | blue `A fuehrt aus: cheat.god 0 - ...`, orange `Vorsicht: aendert einen Cheat ...` |
+| 4 | A once | nothing runs; red `ACHTUNG: cheat.god 0 ... A nochmal in 3.0 s`; log `quick: 'cheat.god 0' ... armed` |
+| 5 | A again within 3 s / after 3 s | runs (`cmd (quick): cheat.god 0`) / arms again |
+| 6 | `get cheat.god` from the history, A | runs at once (a read) |
+| 7 | Y in the open line | the menu's keyboard under the line; A types, X deletes, Start runs, B back, B again closes; Start does not pause the game |
+| 8 | page Fixes, a switch, Y | `als Favorit angeheftet (Seite 1)`; ` *` after the name; page 0 shows the switch with its value, right / left / X switch it |
+| 9 | page Kostueme list row / page Kapitel unit, Y | pinned with ` *`; on page 0 the unit row asks right twice + backup |
+| 10 | TruMenu.ini `[Favorites] Ids` | `...,sw.set|TruShadowCombat:Death:TranslateNotify33,...` style entries |
+| 11 | hall02, Leveldaten "Story-Werte (nur lesen)" | `Bev 1, Tote 0, Tutorial 1, Wand 0` (live values; kill a thrall: Tote / Bev change) |
+| 12 | Zeit / Test, "Ton-Gruppen": Umgebung left to 0 near a waterfall / wind | ambience goes, footsteps stay; log `snd.group Ambience: group 15 factor 0.00 ...`; back to 100 = `back to 1.00` |
+| 13 | Sonstiges (HUD) 0, then Lara-Stimme 0 | HUD / menu sounds off; Lara's breathing / hints off - note anything that stays (finding section 6) |
+| 14 | level load with a slider below 100 | `new (level load) group ...` lines; the factor holds |
 
 ## TO TEST (0.4)
 

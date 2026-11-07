@@ -46,6 +46,13 @@
 //    RegenerateDeath (H6), the finisher block with notification 38 in RegenerateDeath / Regenerate (H7 / H8), the
 //    companion's regeneration list in ShouldRegenerate (H1), T2 Land with LP <= 0 + Land slot 13 + T3's Land exception
 //    (H3 / H4 / H3b) and T-M3, the MeleeAttack interruption by Vaulted / RegenerateDeath (H5). All default on.
+// 13. 0.6.6 (N4c): T5 - a lethal, not regenerating hit on an enemy with a companion dies at once (death kind 7) in the
+//    hit reaction tru+0x23ad50 as the TU 0x823038d8 ([Death] TranslateT5); P1c - the Vaulted Enter of the TU
+//    (0x8232b630: companion step animation, state data +0xb8, brain+0x2c7c) with the chain that feeds its new data
+//    field +0x44 (records 0xbe / 0xf4, switch, data copier) ([Death] TranslateVaulted); the step table is read only
+//    from FIXED extension data (tools/thrall_extension_fix.py); the Vaulted clock (5 s without slow motion, brain+0xc
+//    bit 0x10 / +0x5080 / +0x5084 kept by the plugin) in the Enter and the enemy update tru+0x238d40 ([Death]
+//    TranslateVaultedClock). All default on, live.
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -62,7 +69,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.5 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.6 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -84,7 +91,12 @@ const char kVersion[] = "TruShadowCombat 0.6.5 (TU target list 7 -> 10, conditio
                         "Log), notification 34 at the RegenerateDeath exit (TranslateNotify34), finisher block + "
                         "notification 38 in RegenerateDeath / Regenerate (TranslateNotify38), companion regeneration "
                         "list (TranslateRegenList), T2 Land + Land slot 13 + Land exception (TranslateLand), T-M3 "
-                        "MeleeAttack interruption ([Melee] TranslateInterrupt), all on by default)";
+                        "MeleeAttack interruption ([Melee] TranslateInterrupt), all on by default; 0.6.6: T5 immediate "
+                        "death kind 7 in the hit reaction tru+0x23ad50 (TU 0x823038d8, [Death] TranslateT5), P1c "
+                        "Vaulted Enter as the TU 0x8232b630 with the step chain 0xbe / 0xf4 records, switch, data "
+                        "copier ([Death] TranslateVaulted; step table only from fixed extension data), Vaulted clock "
+                        "5 s without slow motion in the Enter and the enemy update tru+0x238d40 ([Death] "
+                        "TranslateVaultedClock), all on by default)";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -1655,9 +1667,18 @@ __declspec(naked) void PushClass1013() {
     }
 }
 
+// 0.6.6 P1c link E (section 0.6.6 below): with the Vaulted chain placed and [Death] TranslateVaulted=1 the record
+// gets +0x3c = 0 in every mode, as the TU 0x823e0e84 (stw r30 = 0, outside the doppelganger branch); 0.4 wrote it only
+// with the doppelganger translation. B reads +0x3c as the Vaulted step.
+int g_translateVaulted = 1;        // [Death] TranslateVaulted (0.6.6, live through P1dReadSwitches)
+int g_translateT5 = 1;             // [Death] TranslateT5 (0.6.6, live through P1dReadSwitches)
+int g_translateClock = 1;          // [Death] TranslateVaultedClock (0.6.6, live through P1dReadSwitches)
+bool g_vaultChain = false;         // 0.6.6: all six links of the Vaulted chain placed
+
 BYTE *__cdecl Record1013(BYTE *target, BYTE *player, const float *pos, const float *rot, float frames, DWORD x34,
                          BYTE *hit) {
     BYTE *rec = reinterpret_cast<Record1013Fn>(0x00645de0)(target, player, pos, rot, frames, x34, hit);
+    if (rec && g_vaultChain && g_translateVaulted) *reinterpret_cast<DWORD *>(rec + 0x3c) = 0;   // 0.6.6 link E
     if (!g_t1013Active) return rec;
     __try {
         if (rec) *reinterpret_cast<DWORD *>(rec + 0x3c) = 0;
@@ -4014,7 +4035,7 @@ DWORD g_landBackTo = kLandBack, g_landEndTo = kLandEnd;
 volatile LONG g_compLines = 0, g_p1dLines = 0;
 const LONG kCompMaxLines = 400, kP1dMaxLines = 1500;
 
-struct P1dKey { const char *section, *key; int *value; const char *on, *off; };
+struct P1dKey { const char *section, *key; int *value; const char *on, *off, *ver; };   // ver 0 = "0.6.5"
 const P1dKey kP1dKeys[] = {
     {"Companion", "Translate", &g_compTranslate, "companion lookup as the TU 0x822da918",
      "no companion (TU without one = PC)"},
@@ -4027,6 +4048,15 @@ const P1dKey kP1dKeys[] = {
      "PC ShouldRegenerate"},
     {"Death", "TranslateLand", &g_translateLand, "T2 / Land slot 13 / Land exception as the TU", "PC Land"},
     {"Melee", "TranslateInterrupt", &g_meleeInterrupt, "T-M3 as the TU 0x82330830", "PC MeleeAttack slot 13"},
+    // 0.6.6 (N4c)
+    {"Death", "TranslateT5", &g_translateT5, "T5: lethal hit, companion, no regeneration -> death kind 7 (TU 0x823038d8)",
+     "PC hit reaction", "0.6.6"},
+    {"Death", "TranslateVaulted", &g_translateVaulted,
+     "Vaulted Enter + step chain as the TU 0x8232b630 (step table only from fixed extension data)", "PC Vaulted",
+     "0.6.6"},
+    {"Death", "TranslateVaultedClock", &g_translateClock,
+     "Vaulted clock as the TU (5 s without slow motion: Enter 0x8232b698, enemy update 0x822db1e8 / 0x822db4e0)",
+     "no clock (PC)", "0.6.6"},
 };
 
 void P1dReadSwitches() {
@@ -4037,8 +4067,8 @@ void P1dReadSwitches() {
     for (const auto &k : kP1dKeys) {
         const int v = GetPrivateProfileIntA(k.section, k.key, *k.value, g_iniPath) ? 1 : 0;
         if (v == *k.value) continue;
-        Log(1, "0.6.5 switch: [%s] %s %d -> %d (read again from TruShadowCombat.ini) - %s", k.section, k.key, *k.value,
-            v, v ? k.on : k.off);
+        Log(1, "%s switch: [%s] %s %d -> %d (read again from TruShadowCombat.ini) - %s", k.ver ? k.ver : "0.6.5",
+            k.section, k.key, *k.value, v, v ? k.on : k.off);
         *k.value = v;
     }
 }
@@ -4591,6 +4621,649 @@ void SetupCompanion() {
         g_notify34, g_notify38, g_regenList, g_translateLand, g_notify33, g_meleeInterrupt);
 }
 
+// ---------------------------------------------------------------- 0.6.6 (N4c): T5 and P1c (docs
+// Befund-P1d-Begleiter-0711.md section 2 rows T5 / P1c in the main workspace; the TU / retail / PC disassemblies of this
+// section are in work\combat066_0711\).
+// T5  hit reaction TU 0x823038d8 = retail 0x82305d40 = PC tru+0x23ad50 (cdecl inst, hit data, a3, a4 -> float amount).
+//     The TU inserted at its start (0x8230390c..0x82303a78, between the brain lookup and the "[data+0x64] == 1" block
+//     that retail 0x82305d8c / PC tru+0x23ad85 begin with):
+//       comp = 0x822da918(inst); LP = brain+0x2c64; amount = data+0x4c; type = data+0x50
+//       if (comp && !(LP > amount) && !ShouldRegenerate(inst, type, data+0x64, data+0x6e != 0)) {     // 0x8235ece8
+//         v = (data+0x70 ? data+0x10 : [data+0x30]+0x20) - (data+0x72 ? data+0x00 : inst+0x20); v.z = 0 (0x8207d538)
+//         0x8213e838(&v): v / |v.xyz| (all four words), the zero vector unless |v.xyz|^2 is finite and > FLT_MIN
+//                     (0x820d7be8 -> 0x820d78a0, [0x82053664] = 0x00800000)
+//         type 0x19: v = v x (0, 0, -1, 0) ([0x8207db80]; vpermwi128 0x63 / 0x87, vmulfp128, vnmsubfp)
+//         0x823258c8(inst, 1, 0, 1, kind 7, 0, v) = PC tru+0x241650(inst, &v, 1, 0, 1, 7, 0) (as H7 / H8)
+//         return amount (0x8230443c f1 = f31; the normal end's brain+0x2c50 = 0 at 0x82304438 is skipped)
+//       }
+//     The companion is only asked "is it there" - no field of its data is read (T5 needs no extension data fix).
+//     ShouldRegenerate = the TU's (H1: companion regeneration list, then the PC function) while [Death]
+//     TranslateRegenList=1, else the PC function. PC twins of the fields: the PC's own hit vector code
+//     tru+0x23cad4..0x23cb0d (+0x70 -> +0x10 / [+0x30]+0x20, +0x72 -> +0x00 / inst+0x20), amount fld [edi+0x4c]
+//     tru+0x23adcc, epilogue tru+0x23b312. tru+0x23ad82 (mov edi, [ebp+0xc]; cmp dword [edi+0x64], 1 - 7 bytes) jumps
+//     to T5Stub. [Death] TranslateT5=1 (default, live); 0 = the PC code.
+// P1c Vaulted Enter (TU-only 0x8232b630; retail 0x8232cb18 = PC tru+0x24fcf0, vtable 0x858e14 slot 7) and the chain
+//     that feeds its new data field +0x44 (the companion step):
+//   F  the retail strike's 0xbe record (TU 0x823dffc8 = retail 0x823ddd68, PC call tru+0x31d5cc -> tru+0x245e40): the
+//      TU added record +0x34 = 0 (0x823e0294; retail / PC leave the ring-buffer word).
+//   E  the finisher 1013's 0xf4 record (TU 0x823e0e84): +0x3c = 0 in every mode (Record1013, 0.4 section).
+//   A  enemy message handler case 0xbe (TU 0x823068b8 = retail 0x82308bc0 = PC tru+0x23b330, case tru+0x23b402): its
+//      copy of the record (PC tru+0x245de0, +0x34 / +0x38 = 0) gets +0x3c = the incoming record's +0x34 (TU
+//      0x8230743c) - the step the TU strike 0x823d86a8 writes there (StrikeAt above: record +0x34 = arg).
+//   B  switch into Vaulted from a record (TU 0x82304460 = retail 0x82306770 = PC tru+0x223f50, cases 0xbe / 0xf4): the
+//      Vaulted data (EnemyVaultedSwitchData 0x85682c, 0x50 bytes) gets +0x44 = record +0x3c (TU 0x8230447c /
+//      0x823044dc); the PC data has no such field (its ctor tru+0x240010 leaves the word).
+//   D  Vaulted slot 3 (data copier, TU 0x82322f48 = retail 0x82325038 = PC tru+0x25a470): the TU copies +0x44 too
+//      (0x8232300c; its ctor sets 0 at 0x82322fa8, overwritten by the copy) - the PC copy tru+0x24d350 stops at +0x40.
+//   C  Enter: state data +0xb8 = data +0x44 (TU 0x8232b694 / 0x8232b748; state data 0xc0 bytes on both, the PC never
+//      uses +0xb8), the animation choice 0x8232b3f8(inst, data+0x3c, data+0x34, data+0x40, step = data+0x44): step 0 =
+//      the retail choice (PC inline tru+0x24fdb9..0x24fdef, left to the PC), step != 0 = the companion's step table
+//      entry [comp+0x20] + (step - 1) * 0x14 when step <= [comp+0x24], else 0 (no animation - as the TU, also without a
+//      companion); with a companion brain+0x2c7c = 0x0fffffff (0x8232b7d8; the PC writes this field (tru+0x23419c /
+//      tru+0x2375f7) but never reads it, its TU readers 0x82327594 / 0x8232bf4c are TU-only code - written here before
+//      the animation call instead of after it, nothing reads it in between). tru+0x24fdb9 (mov edx, [eax+0x3c];
+//      xor ecx, ecx - 5 bytes) jumps to VaultedAnimStub.
+//      Data guard: the step table is read only when the companion data is the FIXED layout (record count +0x2c <= 64,
+//      step count +0x24 <= 64, table pointer set, every step entry's thrall anim pair +0 / +2 < 0x1000) - the converted
+//      files (count 0x000f0000 / 0x000e0000) fail: logged once, the PC choice runs.
+//   K  the clock (the TU's "5 s without slow motion" of a vaulting enemy; [Death] TranslateVaultedClock, needs the
+//      chain): globals [0x82efb458] = PC 0xe7f088 (+0xc = the player 0xe7f094): +0xd4 = 0xe7f15c (ms counter, written
+//      by tru+0x1d3e5c), +0x100 = 0xe7f188 (time multiplier), +0x118 = 0xe7f1a0 (slow motion factor) - the PC player
+//      update uses the same idiom (tru+0x3228e9: save 0xe7f188, *= 1 / 0xe7f1a0, restored at tru+0x3229eb).
+//      Enter (TU 0x8232b698..0x8232b6dc, in VaultedAnim): if brain+0xc bit 0x10 is clear: set it, clock = [+0xd4],
+//        [+0x100] = [+0x100] / [+0x118].
+//      enemy update 0x822db190 = PC tru+0x238d40: after the brain (0x822db1e8): brain+0x5084 = [+0x100]; bit 0x10 set
+//        -> now - clock >= 5000 (unsigned): clock = 0, bit cleared; else [+0x100] *= 1.0 / [+0x118] (double 1.0
+//        [0x8206eb78]); at the end of the main path (0x822db4e0, after the health print) [+0x100] = brain+0x5084; the
+//        exit on brain+8 bit 0x20000 (0x822db364 = PC tru+0x238e7f) and the inst+0x14 bit 0x20 exit skip the restore.
+//      brain+0x5080 / +0x5084 lie in the TU brain's added block (the TU's +0x5088 is the PC's +0x5030: update 0x822db368
+//      / tru+0x238e81 before the twins 0x82311620 / tru+0x262ce0) - no PC room: the plugin keeps them.
+//      Plugin state (game thread only): the clock word per instance in g_clock[64] {instance, serial +0x44, clock}, an
+//      entry exists only while the instance's bit 0x10 runs; it ends when the update clears the bit (>= 5000 ms), when
+//      the instance's serial differs (instance reused: unload / level change / respawn - the old entry is dropped at
+//      the next look-up), or when the table is full (the oldest is dropped = its clock ends at its next update, logged).
+//      A missing entry reads 0 = expired (the TU's clock word is only ever set together with the bit). The +0x5084 save
+//      is one slot {instance, value, valid} set by the update start and used by its own end (updates do not nest; a
+//      different instance at the end = no restore, logged).
+//      Sites: tru+0x238d6f (call tru+0x2e7710 -> ClockStartStub, right after TruMenu's checked bytes tru+0x238d59..6e),
+//      tru+0x238e76 (11 bytes, the bit 0x20000 exit -> ClockExitStub), tru+0x238efb (epilogue, 7 bytes ->
+//      ClockEndStub, reached by the main path and both exits; it restores only after a start without that exit).
+//      Not translated: the two script commands of 0x822d61e0 that set / clear the clock (0x822d6844 / 0x822d6880).
+//   Not in 0.6.6: Vaulted slot 10 case 0xbe (the next step, TU 0x8232be54), slot 11 0x8232c068, Exit 0x8232b930, the
+//      step queries 0x165..0x167 (0x823093a0 -> 0x82308850).
+//   [Death] TranslateVaulted=1 (default, live): every link checks it; the six links are placed together or not at all.
+const DWORD kT5Site = 0x0063ad82, kT5Back = 0x0063ad89;
+const DWORD kT5Type = 0x19;                                  // TU 0x82303a1c cmpwi r31, 0x19
+const float kT5Axis[4] = {0.0f, 0.0f, -1.0f, 0.0f};          // TU [0x8207db80]
+const DWORD kFltMinBits = 0x00800000;                        // TU [0x82053664]
+const DWORD kVaultAnimSite = 0x0064fdb9, kVaultAnimBack = 0x0064fdbe, kVaultAnimFlow = 0x0064fdf2;
+const DWORD kRecCopyCall = 0x0063b421, kRecCopyFn = 0x00645de0;       // A
+const DWORD kVaultSwitchCall = 0x00623fa2, kVaultSwitchFn = 0x0060ed80;   // B
+const DWORD kVaultCopyCall = 0x0065a4a2, kVaultCopyFn = 0x0064d350;   // D
+const DWORD kStrikeRecCall = 0x0071d5cc;                     // F (-> kRecord tru+0x245e40)
+const DWORD kVaultCompMark = 0x0fffffff;                     // TU 0x8232b7d0 lis 0xfff / ori 0xffff
+typedef BYTE *(__cdecl *RecCopyFn)(DWORD inst, DWORD from, const BYTE *p10, const BYTE *p20, float frames, DWORD x34,
+                                   DWORD x38);
+bool g_t5 = false;
+DWORD g_t5BackTo = kT5Back, g_vaultAnimBackTo = kVaultAnimBack, g_vaultAnimFlowTo = kVaultAnimFlow;
+DWORD g_vaultSwitchTo = kVaultSwitchFn, g_vaultCopyTo = kVaultCopyFn;
+volatile LONG g_extUnfixedLogged = 0, g_n4cLines = 0;
+const LONG kN4cMaxLines = 1500;
+
+bool N4cLine() {
+    const LONG n = InterlockedIncrement(&g_n4cLines);
+    if (n > kN4cMaxLines) return false;
+    if (n == kN4cMaxLines) Log(1, "0.6.6: %ld event lines - this is the last one", kN4cMaxLines);
+    return true;
+}
+
+bool FactsOk66(const Fact *f, size_t count, const char *part) {
+    for (size_t i = 0; i < count; ++i)
+        if (!HexAt(f[i].at, f[i].hex)) {
+            Log(0, "0.6.6 %s: %s at 0x%08lx does not match - not placed (PC)", part, f[i].what, f[i].at);
+            return false;
+        }
+    return true;
+}
+
+// ---- T5
+// TU 0x8213e838 with its test 0x820d7be8: zero vector unless |xyz|^2 is a finite number > FLT_MIN; else all four
+// words times 1 / |xyz| (the TU's vrsqrtefp + one Newton step; sqrtf differs in the last bits only)
+void NormalizeChecked(float *v) {
+    const float sq = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+    DWORD bits = 0;
+    memcpy(&bits, &sq, 4);
+    float minNormal = 0.0f;
+    memcpy(&minNormal, &kFltMinBits, 4);
+    if ((bits & 0x7f800000) == 0x7f800000 || !(sq > minNormal)) { v[0] = v[1] = v[2] = v[3] = kZero; return; }
+    const float r = 1.0f / sqrtf(sq);
+    for (int i = 0; i < 4; ++i) v[i] *= r;
+}
+
+// the TU's ShouldRegenerate 0x8235ece8 as H1 has it (companion list first while TranslateRegenList, then the PC)
+DWORD ShouldRegenTu(BYTE *inst, DWORD type, DWORD sub, DWORD flag, int *entry) {
+    *entry = -1;
+    if (g_regenList) {
+        DWORD count = 0;
+        if (CompanionRegen(inst, type, sub, flag, entry, &count)) return 1;
+    }
+    return reinterpret_cast<ShouldRegenFn>(kShouldRegen)(inst, type, sub, flag) & 0xff;
+}
+
+// 1 = the TU's T5 block ran (the stub returns the amount), 0 = the PC code goes on
+int __cdecl T5Lethal(BYTE *inst, const BYTE *data) {
+    P1dReadSwitches();
+    if (!g_translateT5 || !inst || !data) return 0;
+    const BYTE *brain = P1dBrain(inst);
+    if (!brain) return 0;                     // the TU reads brain+0x2c64 unconditionally; the PC code checks
+    CompanionNote(inst, "hit reaction (T5)");
+    if (!CompanionData(inst)) return 0;
+    float lp = 0.0f, amount = 0.0f;
+    DWORD type = 0, sub = 0, flag = 0;
+    __declspec(align(16)) float v[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    __try {
+        lp = *reinterpret_cast<const float *>(brain + 0x2c64);
+        amount = *reinterpret_cast<const float *>(data + 0x4c);
+        type = *reinterpret_cast<const DWORD *>(data + 0x50);
+        sub = *reinterpret_cast<const DWORD *>(data + 0x64);
+        flag = data[0x6e] ? 1 : 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+    if (lp > amount) return 0;                // TU 0x8230398c fcmpu f29, f31 / bgt: not lethal
+    int entry = -1;
+    if (ShouldRegenTu(inst, type, sub, flag, &entry)) return 0;   // TU 0x823039c0: regenerates -> the retail path
+    bool fault = false;
+    __try {
+        const float *a = data[0x70] ? reinterpret_cast<const float *>(data + 0x10)
+                                    : reinterpret_cast<const float *>(*reinterpret_cast<const BYTE *const *>(data + 0x30) + 0x20);
+        const float *b = data[0x72] ? reinterpret_cast<const float *>(data) : reinterpret_cast<const float *>(inst + 0x20);
+        for (int i = 0; i < 4; ++i) v[i] = a[i] - b[i];
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        fault = true;
+    }
+    if (fault) {
+        if (N4cLine()) Log(0, "0.6.6 T5: access fault reading the hit vector of hit data 0x%08lx - PC code",
+                           reinterpret_cast<DWORD>(data));
+        return 0;
+    }
+    v[2] = kZero;                             // TU 0x82303a14 stfs 0 -> +8
+    NormalizeChecked(v);
+    if (type == kT5Type) {                    // TU 0x82303a24..0x82303a4c: v x (0, 0, -1, 0)
+        const float x = v[1] * kT5Axis[2] - v[2] * kT5Axis[1], y = v[2] * kT5Axis[0] - v[0] * kT5Axis[2],
+                    z = v[0] * kT5Axis[1] - v[1] * kT5Axis[0], w = v[3] * kT5Axis[3] - v[3] * kT5Axis[3];
+        v[0] = x; v[1] = y; v[2] = z; v[3] = w;
+    }
+    reinterpret_cast<DeathSwitchFn>(kDeathSwitch)(inst, v, 1, 0, 1, kTuFinisherKind, 0);
+    if (N4cLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        Log(1, "0.6.6 T5: %s lethal hit type %lu subtype %lu flag %lu (amount %.1f, LP %.1f) with companion, "
+               "ShouldRegenerate no -> death switch kind 7 as the TU 0x82303a74, direction (%.2f, %.2f, %.2f)%s", who,
+            type, sub, flag, amount, lp, v[0], v[1], v[2], type == kT5Type ? " (type 0x19: crossed with (0, 0, -1))" : "");
+    }
+    return 1;
+}
+
+// jumped to from tru+0x23ad82: esi = instance, ebx = brain, pushes ebx / esi / edi done; eax / ecx / edx are free (the
+// PC code loads them again), the FPU stack is empty
+__declspec(naked) void T5Stub() {
+    __asm {
+        mov edi, dword ptr [ebp + 0xc]
+        push edi
+        push esi
+        call T5Lethal
+        add esp, 8
+        test eax, eax
+        jne t5_done
+        cmp dword ptr [edi + 0x64], 1
+        jmp dword ptr [g_t5BackTo]
+    t5_done:
+        fld dword ptr [edi + 0x4c]
+        pop edi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// ---- P1c
+// data guard: true = the FIXED layout of tools/thrall_extension_fix.py (else logged once)
+bool ExtFixed(const BYTE *comp) {
+    DWORD recs = 0, steps = 0;
+    const BYTE *table = nullptr;
+    bool ok = false;
+    __try {
+        recs = *reinterpret_cast<const DWORD *>(comp + 0x2c);
+        steps = *reinterpret_cast<const DWORD *>(comp + 0x24);
+        table = *reinterpret_cast<const BYTE *const *>(comp + 0x20);
+        ok = recs <= 64 && steps <= 64 && (steps == 0 || table);
+        for (DWORD i = 0; ok && i < steps; ++i) {
+            const WORD *e = reinterpret_cast<const WORD *>(table + i * 0x14);
+            ok = e[0] < 0x1000 && e[1] < 0x1000;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        ok = false;
+    }
+    if (!ok && InterlockedIncrement(&g_extUnfixedLogged) == 1)
+        Log(0, "0.6.6: extension data not fixed - install work\\extfix_0711 / thrall_extension_fix (companion data "
+               "0x%08lx: record count +0x2c 0x%08lx, step count +0x24 0x%08lx, step table 0x%08lx) - the Vaulted step "
+               "table is not read, the PC animation choice runs (logged once)", reinterpret_cast<DWORD>(comp), recs, steps,
+            reinterpret_cast<DWORD>(table));
+    return ok;
+}
+
+// ---- K: the clock (TU brain+0xc bit 0x10 / +0x5080 / +0x5084)
+const DWORD kClockStartCall = 0x00638d6f, kDifficultyFn = 0x006e7710;   // call tru+0x2e7710 (no arguments)
+const DWORD kClockExitSite = 0x00638e76, kClockMain = 0x00638e81, kClockEpilogue = 0x00638efb;
+const DWORD kTimeMs = 0x00e7f15c, kTimeMult = 0x00e7f188, kSlowMo = 0x00e7f1a0;   // TU [0x82efb458] +0xd4 / +0x100 / +0x118
+const DWORD kClockBit = 0x10, kClockSpan = 5000;           // TU 0x822db1f4 / 0x822db20c cmplwi 0x1388
+struct ClockEntry { const BYTE *inst; DWORD serial, clock; };
+ClockEntry g_clock[64];
+bool g_clockPlaced = false;
+struct ClockSave { const BYTE *inst; float value; bool valid; } g_clockSave = {nullptr, 0.0f, false};
+DWORD g_clockMainTo = kClockMain, g_clockEpilogueTo = kClockEpilogue, g_clockDifficultyTo = kDifficultyFn;
+volatile LONG g_clockScaled = 0;
+
+bool ClockOn() { return g_clockPlaced && g_vaultChain && g_translateVaulted && g_translateClock; }
+
+ClockEntry *ClockFind(const BYTE *inst) {
+    const DWORD serial = Rd(inst + 0x44);
+    for (auto &e : g_clock)
+        if (e.inst == inst) {
+            if (e.serial == serial) return &e;
+            e.inst = nullptr;                                  // the instance was reused: its old clock is gone
+        }
+    return nullptr;
+}
+
+void ClockSet(const BYTE *inst, DWORD clock) {
+    ClockEntry *e = ClockFind(inst);
+    if (!e) {
+        ClockEntry *oldest = nullptr;
+        for (auto &c : g_clock) {
+            if (!c.inst) { e = &c; break; }
+            if (!oldest || static_cast<LONG>(c.clock - oldest->clock) < 0) oldest = &c;
+        }
+        if (!e) {
+            e = oldest;
+            if (N4cLine()) Log(1, "0.6.6 clock: table full (64) - the clock of 0x%08lx ends at its next update",
+                               reinterpret_cast<DWORD>(e->inst));
+        }
+    }
+    e->inst = inst;
+    e->serial = Rd(inst + 0x44);
+    e->clock = clock;
+}
+
+// TU 0x822db1e8..0x822db248 (enemy update after the brain): save the multiplier, run / end the clock
+void __cdecl ClockStart(BYTE *inst, BYTE *brain) {
+    g_clockSave.valid = false;
+    P1dReadSwitches();
+    if (!ClockOn() || !inst || !brain) return;
+    float *mult = reinterpret_cast<float *>(kTimeMult);
+    g_clockSave.inst = inst;
+    g_clockSave.value = *mult;                                 // brain+0x5084 = [+0x100]
+    g_clockSave.valid = true;
+    DWORD *flags = reinterpret_cast<DWORD *>(brain + 0xc);
+    if (!(*flags & kClockBit)) return;
+    const DWORD now = *reinterpret_cast<const DWORD *>(kTimeMs);
+    ClockEntry *e = ClockFind(inst);
+    const DWORD clock = e ? e->clock : 0;
+    if (now - clock >= kClockSpan) {                           // TU 0x822db214..0x822db224
+        if (e) e->inst = nullptr;
+        *flags &= ~kClockBit;
+        if (N4cLine()) {
+            char who[96];
+            Describe(inst, who, sizeof(who));
+            Log(1, "0.6.6 clock: %s clock ended after %lu ms (brain+0xc bit 0x10 cleared as the TU 0x822db224)%s", who,
+                now - clock, e ? "" : " - no clock entry (dropped)");
+        }
+        return;
+    }
+    const float slow = *reinterpret_cast<const float *>(kSlowMo);
+    const float inv = static_cast<float>(1.0 / static_cast<double>(slow));   // TU 0x822db23c fdiv, frsp
+    *mult = *mult * inv;                                       // TU 0x822db244 fmuls
+    InterlockedIncrement(&g_clockScaled);
+}
+
+// TU 0x822db4e0: restore at the end of the main path
+void __cdecl ClockEnd(BYTE *inst, BYTE *) {
+    if (!g_clockSave.valid) return;
+    g_clockSave.valid = false;
+    if (g_clockSave.inst != inst) {
+        if (N4cLine()) Log(0, "0.6.6 clock: update end of 0x%08lx after the start of 0x%08lx - time multiplier not "
+                              "restored", reinterpret_cast<DWORD>(inst), reinterpret_cast<DWORD>(g_clockSave.inst));
+        return;
+    }
+    *reinterpret_cast<float *>(kTimeMult) = g_clockSave.value;
+}
+
+// replaces `call tru+0x2e7710` at tru+0x238d6f: edi = instance, esi = brain (or 0); the call has no arguments, eax /
+// ecx / edx are not live before it
+__declspec(naked) void ClockStartStub() {
+    __asm {
+        push esi
+        push edi
+        call ClockStart
+        add esp, 8
+        jmp dword ptr [g_clockDifficultyTo]
+    }
+}
+
+// jumped to from tru+0x238e76 (mov ecx, [esi+8]; shr ecx, 0x11; test cl, 1; jne tru+0x238efb): the TU's exit at
+// 0x822db364 skips the restore
+__declspec(naked) void ClockExitStub() {
+    __asm {
+        mov ecx, dword ptr [esi + 8]
+        shr ecx, 0x11
+        test cl, 1
+        jne clock_exit
+        jmp dword ptr [g_clockMainTo]
+    clock_exit:
+        mov byte ptr [g_clockSave.valid], 0
+        jmp dword ptr [g_clockEpilogueTo]
+    }
+}
+
+// jumped to from tru+0x238efb (pop edi; pop esi; pop ebx; mov esp, ebp; pop ebp; ret): edi = instance, esi = brain
+__declspec(naked) void ClockEndStub() {
+    __asm {
+        push eax
+        push esi
+        push edi
+        call ClockEnd
+        add esp, 8
+        pop eax
+        pop edi
+        pop esi
+        pop ebx
+        mov esp, ebp
+        pop ebp
+        ret
+    }
+}
+
+// C: called from VaultedAnimStub (tru+0x24fdb9) with the Enter's inst, data and state data (ebx); 0xffffffff = the PC
+// choice (step 0, switch off or unfixed data), else the TU 0x8232b3f8 result for step != 0 (0 = no animation)
+DWORD __cdecl VaultedAnim(BYTE *inst, const BYTE *data, BYTE *sd) {
+    P1dReadSwitches();
+    if (!g_translateVaulted || !g_vaultChain) return 0xffffffff;
+    const DWORD step = Rd(data + 0x44);
+    *reinterpret_cast<DWORD *>(sd + 0xb8) = step;              // TU 0x8232b694 (0) / 0x8232b748 (data +0x44)
+    CompanionNote(inst, "Vaulted Enter");
+    const BYTE *comp = CompanionData(inst);
+    BYTE *brain = const_cast<BYTE *>(P1dBrain(inst));
+    if (brain && ClockOn()) {                                  // K: TU 0x8232b698..0x8232b6dc
+        DWORD *flags = reinterpret_cast<DWORD *>(brain + 0xc);
+        if (!(*flags & kClockBit)) {
+            *flags |= kClockBit;
+            const DWORD now = *reinterpret_cast<const DWORD *>(kTimeMs);
+            ClockSet(inst, now);
+            float *mult = reinterpret_cast<float *>(kTimeMult);
+            const float before = *mult, slow = *reinterpret_cast<const float *>(kSlowMo);
+            *mult = static_cast<float>(static_cast<double>(before) / static_cast<double>(slow));   // fdiv, frsp
+            if (N4cLine()) {
+                char who[96];
+                Describe(inst, who, sizeof(who));
+                Log(1, "0.6.6 clock: %s Vaulted Enter: brain+0xc bit 0x10 set, clock %lu ms, time multiplier %.4f -> "
+                       "%.4f (slow motion factor %.4f) as the TU 0x8232b6c0..0x8232b6dc", who, now, before, *mult, slow);
+            }
+        }
+    }
+    if (comp && brain) *reinterpret_cast<DWORD *>(brain + 0x2c7c) = kVaultCompMark;   // TU 0x8232b7c4..0x8232b7d8
+    if (!step) return 0xffffffff;                              // TU 0x8232b40c: step 0 = the retail choice (PC)
+    DWORD r = 0;
+    const char *how = "no companion -> no animation";
+    if (comp) {
+        if (!ExtFixed(comp)) return 0xffffffff;
+        const DWORD count = Rd(comp + 0x24);
+        if (count < step) {
+            how = "step beyond the step table -> no animation";
+        } else {
+            r = Rd(comp + 0x20) + step * 0x14 - 0x14;          // TU 0x8232b4a4..0x8232b4b8 (1-based)
+            how = "companion step table entry";
+        }
+    }
+    if (N4cLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        char pair[48] = "";
+        if (r) {
+            const DWORD w = Rd(reinterpret_cast<const void *>(r));
+            _snprintf_s(pair, sizeof(pair), _TRUNCATE, " 0x%08lx (anim pair {%lu, %lu})", r, w & 0xffff, w >> 16);
+        }
+        Log(1, "0.6.6 vaulted: %s Vaulted Enter step %lu: %s%s%s as the TU 0x8232b3f8", who, step, how, pair,
+            comp ? ", brain+0x2c7c = 0x0fffffff" : "");
+    }
+    return r;
+}
+
+// jumped to from tru+0x24fdb9: eax = data, ebx = state data, [esp+0xc] = inst, [esp+0x14] = data; edx / ecx are set by
+// the moved instructions, the FPU stack is empty
+__declspec(naked) void VaultedAnimStub() {
+    __asm {
+        push ebx
+        push eax
+        push dword ptr [esp + 0x14]
+        call VaultedAnim
+        add esp, 12
+        cmp eax, 0xffffffff
+        je va_pc
+        mov ecx, eax
+        jmp dword ptr [g_vaultAnimFlowTo]
+    va_pc:
+        mov eax, dword ptr [esp + 0x14]
+        mov edx, dword ptr [eax + 0x3c]
+        xor ecx, ecx
+        jmp dword ptr [g_vaultAnimBackTo]
+    }
+}
+
+// A: the call tru+0x23b421 -> tru+0x245de0 (cdecl inst, from, &rec[0x10], &rec[0x20], frames, 0, 0) of case 0xbe;
+// the incoming record is p10 - 0x10 (lea edx, [eax+0x10] at tru+0x23b418)
+BYTE *__cdecl RecCopyHook(DWORD inst, DWORD from, const BYTE *p10, const BYTE *p20, float frames, DWORD x34, DWORD x38) {
+    BYTE *rec = reinterpret_cast<RecCopyFn>(kRecCopyFn)(inst, from, p10, p20, frames, x34, x38);
+    P1dReadSwitches();
+    if (!rec || !g_translateVaulted || !g_vaultChain || p20 != p10 + 0x10) return rec;
+    const DWORD step = Rd(p10 - 0x10 + 0x34);
+    *reinterpret_cast<DWORD *>(rec + 0x3c) = step;           // TU 0x823073d8 / 0x8230743c
+    if (step && N4cLine()) {
+        char who[96];
+        Describe(reinterpret_cast<const BYTE *>(inst), who, sizeof(who));
+        Log(1, "0.6.6 vaulted: %s message 0xbe with step %lu (record +0x34) -> copy +0x3c as the TU 0x8230743c", who, step);
+    }
+    return rec;
+}
+
+// B: SwitchToVaulted tru+0x20ed80(inst, "Vaulted", data) from tru+0x223fa2; record = [ebp+0xc] of tru+0x223f50
+void __cdecl VaultSwitchLink(const BYTE *record, BYTE *data) {
+    P1dReadSwitches();
+    if (!g_translateVaulted || !g_vaultChain || !record || !data) return;
+    *reinterpret_cast<DWORD *>(data + 0x44) = Rd(record + 0x3c);   // TU 0x8230447c / 0x823044dc
+}
+
+__declspec(naked) void VaultSwitchStub() {
+    __asm {
+        push dword ptr [esp + 0xc]
+        push dword ptr [ebp + 0xc]
+        call VaultSwitchLink
+        add esp, 8
+        jmp dword ptr [g_vaultSwitchTo]
+    }
+}
+
+// D: the copy tru+0x24d350 (thiscall dst, src; ret 4) from Vaulted slot 3 tru+0x25a4a2
+void __cdecl VaultCopyLink(BYTE *dst, const BYTE *src) {
+    if (!g_translateVaulted || !g_vaultChain || !dst || !src) return;
+    *reinterpret_cast<DWORD *>(dst + 0x44) = Rd(src + 0x44);       // TU 0x8232300c
+}
+
+__declspec(naked) void VaultCopyStub() {
+    __asm {
+        push ecx
+        push dword ptr [esp + 8]
+        push ecx
+        call VaultCopyLink
+        add esp, 8
+        pop ecx
+        jmp dword ptr [g_vaultCopyTo]
+    }
+}
+
+// F: the retail strike's record tru+0x245e40 from tru+0x31d5cc, +0x34 = 0 as the TU 0x823e0294
+BYTE *__cdecl StrikeRecordHook(BYTE *target, BYTE *player, const float *pos, const float *rot, float frames) {
+    BYTE *rec = reinterpret_cast<RecordFn>(kRecord)(target, player, pos, rot, frames);
+    if (rec && g_translateVaulted && g_vaultChain) *reinterpret_cast<DWORD *>(rec + 0x34) = 0;
+    return rec;
+}
+
+void SetupN4c() {
+    if (HexAt(0x005bcff9, "8b0dd094db00 52 8b14c1")) g_namesOk = true;
+    const bool deathOk = FactsOk66(kDeathSwitchFacts, sizeof(kDeathSwitchFacts) / sizeof(kDeathSwitchFacts[0]), "death switch");
+    const Fact regen[] = {
+        {kShouldRegen, "8b442404 8b80d0020000 85c0 740c 8b08 8b81ec020000 85c0 7503 32c0 c3 8b9068010000 52 e8a755f9ff "
+                       "83c404 85c0 74ea",
+         "ShouldRegenerate tru+0x27f040 (cdecl inst, type, subtype, flag byte)"},
+    };
+    const bool regenOk = FactsOk66(regen, 1, "T5");
+    // T5
+    const Fact t5[] = {
+        {0x0063ad50, "55 8bec 83e4f0 81ec24010000 53 56 8b7508 8b86d0020000 85c0 57 7508 33db 895c2414 eb0e 8b00 "
+                     "8b88ec020000 894c2414 8bd9",
+         "hit reaction tru+0x23ad50: inst esi, brain ebx, pushes ebx / esi / edi"},
+        {kT5Site, "8b7d0c 837f6401 750b 8d8b902c0000 e82a50feff",
+         "tru+0x23ad82: data edi, the [data+0x64] == 1 block (= retail 0x82305d8c)"},
+        {0x0063adcc, "d9474c", "tru+0x23adcc: fld [edi+0x4c] (amount)"},
+        {0x0063b312, "d944241c 5f c686502c000000 5e 5b 8be5 5d c3", "hit reaction epilogue tru+0x23b312"},
+        {0x0063cad4, "80797000 8b4508 56 7405 8d5110 eb06 8b5130 83c220 80797200",
+         "PC hit vector tru+0x23cad4: +0x70 -> +0x10 / [+0x30]+0x20, then +0x72"},
+        {0x0063cb08, "7506 8b4d0c 83c120", "PC hit vector tru+0x23cb08: +0x72 = 0 -> inst+0x20"},
+    };
+    if (g_compOk && deathOk && regenOk && FactsOk66(t5, sizeof(t5) / sizeof(t5[0]), "T5")) {
+        BYTE j[7] = {0xe9, 0, 0, 0, 0, 0x90, 0x90};
+        const DWORD rel = reinterpret_cast<DWORD>(&T5Stub) - (kT5Site + 5);
+        memcpy(j + 1, &rel, 4);
+        if (WriteCode(kT5Site, j, sizeof(j))) g_t5 = true;
+        else Log(0, "0.6.6 T5: jump at tru+0x23ad82 failed - PC hit reaction");
+    }
+
+    // P1c: every link's facts first, then all six written (or none)
+    const Fact vault[] = {
+        // C
+        {0x00858e30, "f0fc6400", "Vaulted vtable 0x858e14 slot 7 = Enter tru+0x24fcf0"},
+        {0x0064fcf0, "55 8bec 83e4f0 83ec54 8b4508 53 89442404 8b80d0020000 85c0 56 57 7506 89442410 eb0e 8b00 "
+                     "8b88ec020000 894c2410 8bc1 8b4d0c 8b9488d4180000 8d0c4a 8b5514 69c99c010000 8d9c0173120000 83e3f0",
+         "Vaulted Enter tru+0x24fcf0: inst [esp+0xc], brain, state data ebx"},
+        {0x0064fd55, "8b02 83783800 89442414", "Vaulted Enter tru+0x24fd55: data eax = [esp+0x14]"},
+        {kVaultAnimSite, "8b503c 33c9 85d2 7430 384840 7405 8d4a2c eb26 8b4034 83e801 7414 83e801 740a 83e801 7511 "
+                         "8d4a24 eb08 8d4a20 eb03 8d4a28 85c9 7503 8d4a1c 85c9 890b 0f84cc000000",
+         "Vaulted Enter tru+0x24fdb9: the retail animation choice (= TU 0x8232b414..0x8232b474), result ecx -> [ebx]"},
+        {0x0064fdfe, "8b54240c", "Vaulted Enter tru+0x24fdfe: inst [esp+0xc]"},
+        {0x0063419c, "899e7c2c0000", "brain+0x2c7c written by tru+0x23419c (no PC reader)"},
+        {0x006375f7, "c7877c2c000000000000", "brain+0x2c7c written by tru+0x2375f7 (no PC reader)"},
+        // F
+        {0x0071d5c5, "50 56 0f29442464 e86f88f2ff 50 68be000000 56 e87361e9ff",
+         "retail strike tru+0x31d5cc: record tru+0x245e40, message 0xbe"},
+        {kRecord, "55 8bec 83e4f0 6a40 e8c3acf7ff d94518", "message record tru+0x245e40 (0x40 bytes, ring tru+0x1c0b10)"},
+        {0x00645e7f, "d95830 83c404 8be5 5d c3", "message record tru+0x245e40: last store +0x30"},
+        // A
+        {0x0063b33a, "8b8fd0020000 33db", "enemy message handler tru+0x23b330: ebx = 0"},
+        {0x0063c048, "1a", "enemy message handler: byte table 0x63bf8c, 0xbe -> index 26"},
+        {0x0063bf24, "02b46300", "enemy message handler: jump table 0x63bebc index 26 -> tru+0x23b402"},
+        {0x0063c07e, "32", "enemy message handler: byte table 0x63bf8c, 0xf4 -> index 50"},
+        {0x0063bf84, "4bb46300", "enemy message handler: jump table 0x63bebc index 50 -> tru+0x23b44b"},
+        {0x0063b402, "8b4604 8b08 3bf9 75c8 d94030 53 53 51 8d5020 d91c24 52 8d5010 8b4004 52 50 51 e8baa90000 6a01 50 57 "
+                     "e8218bfeff 8b4e04 51 68be000000 57 e8429e0100",
+         "case 0xbe tru+0x23b402: record copy tru+0x245de0, Vaulted tru+0x223f50, message 0xbe"},
+        {kRecCopyFn, "55 8bec 83e4f0 6a40 e823adf7ff", "record copy tru+0x245de0 (cdecl, 7 arguments)"},
+        {0x00645e2b, "894834 895038 8be5 5d c3", "record copy tru+0x245de0: +0x34 / +0x38 from the arguments, +0x3c left"},
+        // B
+        {0x00623f50, "55 8bec 83e4f0 8b550c 83ec5c 56 8b7508 3b32 7546", "tru+0x223f50 (inst, record [ebp+0xc], flag)"},
+        {0x00623f9b, "50 684c7d8500 56 e8d9adfeff 83c410", "tru+0x223fa2: SwitchToVaulted(inst, \"Vaulted\", data)"},
+        {kVaultSwitchFn, "8b4c2404 8b81d0020000 83ec0c", "SwitchToVaulted tru+0x20ed80"},
+        {0x0060edbd, "c74424182c688500 c744241c50000000", "SwitchToVaulted: EnemyVaultedSwitchData 0x85682c, 0x50 bytes"},
+        // D
+        {0x00858e20, "70a46500", "Vaulted vtable slot 3 = data copier tru+0x25a470"},
+        {0x0065a470, "56 57 8b7c240c 8d770f 83e6f0 7407 8bce e88b5bfeff 8b442410 c787900100002c688500 "
+                     "c7879401000050000000 8b08 51 8bce e8a92effff 5f 5e c20800",
+         "Vaulted data copier tru+0x25a470: ctor tru+0x240010, copy tru+0x24d350"},
+        {0x0064d397, "8b513c 89503c 8a4940 884840 8be5 5d c20400", "copy tru+0x24d350: last field +0x40, ret 4"},
+    };
+    bool vOk = g_t1013Patched && FactsOk66(vault, sizeof(vault) / sizeof(vault[0]), "P1c");
+    if (!g_t1013Patched) Log(0, "0.6.6 P1c: the 0.4 finisher site tru+0x31d895 is not patched (link E) - Vaulted chain off (PC)");
+    if (vOk) {
+        BYTE j[5] = {0xe9, 0, 0, 0, 0};
+        const DWORD rel = reinterpret_cast<DWORD>(&VaultedAnimStub) - (kVaultAnimSite + 5);
+        memcpy(j + 1, &rel, 4);
+        int placed = 0;
+        if (WriteCall(kStrikeRecCall, reinterpret_cast<const void *>(&StrikeRecordHook))) ++placed;
+        if (WriteCall(kRecCopyCall, reinterpret_cast<const void *>(&RecCopyHook))) ++placed;
+        if (WriteCall(kVaultSwitchCall, reinterpret_cast<const void *>(&VaultSwitchStub))) ++placed;
+        if (WriteCall(kVaultCopyCall, reinterpret_cast<const void *>(&VaultCopyStub))) ++placed;
+        if (WriteCode(kVaultAnimSite, j, sizeof(j))) ++placed;
+        if (placed == 5) {
+            g_vaultChain = true;
+        } else {
+            WriteCall(kStrikeRecCall, reinterpret_cast<const void *>(kRecord));
+            WriteCall(kRecCopyCall, reinterpret_cast<const void *>(kRecCopyFn));
+            WriteCall(kVaultSwitchCall, reinterpret_cast<const void *>(kVaultSwitchFn));
+            WriteCall(kVaultCopyCall, reinterpret_cast<const void *>(kVaultCopyFn));
+            const BYTE orig[5] = {0x8b, 0x50, 0x3c, 0x33, 0xc9};
+            WriteCode(kVaultAnimSite, orig, sizeof(orig));
+            Log(0, "0.6.6 P1c: only %d of 5 sites written - all back to the PC code", placed);
+        }
+    }
+
+    // K: the clock (only with the chain: its Enter lines live in link C)
+    const Fact clock[] = {
+        {0x00638d40, "55 8bec 83e4f0 83ec24 53 56 57 8b7d08 f6471420 0f85a2010000 8b87d0020000 85c0 7504 33f6 eb08 8b00 "
+                     "8bb0ec020000 e89ce90a00 85f6",
+         "enemy update tru+0x238d40: inst edi, bit 0x20 exit, brain esi, call tru+0x2e7710 at tru+0x238d6f"},
+        {kDifficultyFn, "a16492c500 8b8098ef0300 c3", "tru+0x2e7710 (no arguments)"},
+        {kClockExitSite, "8b4e08 c1e911 f6c101 757a 83be3050000000 7409",
+         "enemy update tru+0x238e76: brain+8 bit 0x20000 exit (TU 0x822db358..0x822db364), then brain+0x5030 (TU +0x5088)"},
+        {0x00638ed4, "803dfc1fe90000 741e", "enemy update tru+0x238ed4: health print or the epilogue (TU 0x822db4ac)"},
+        {0x00638ef3, "e80897feff 83c418", "enemy update tru+0x238ef3: health print tru+0x222600, then the epilogue"},
+        {kClockEpilogue, "5f 5e 5b 8be5 5d c3", "enemy update epilogue tru+0x238efb"},
+        {0x007228e9, "d90588f1e700 a158dbfa00 d9542404 56 d905a0f1e700 8b750c d9e8 57 def1 8b7d08 51 dec9 d91d88f1e700",
+         "player update tru+0x3228e9: time multiplier 0xe7f188 saved, *= 1 / slow motion 0xe7f1a0 (the same idiom)"},
+        {0x007229e1, "d9442414 8b0d58dbfa00 d91d88f1e700", "player update tru+0x3229e1: time multiplier restored"},
+        {0x005d3e5c, "891d5cf1e700", "tru+0x1d3e5c: ms counter 0xe7f15c (TU [0x82efb458+0xd4])"},
+    };
+    if (g_vaultChain && FactsOk66(clock, sizeof(clock) / sizeof(clock[0]), "clock")) {
+        BYTE e[7] = {0xe9, 0, 0, 0, 0, 0x90, 0x90};
+        DWORD rel = reinterpret_cast<DWORD>(&ClockEndStub) - (kClockEpilogue + 5);
+        memcpy(e + 1, &rel, 4);
+        BYTE x[11] = {0xe9, 0, 0, 0, 0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+        rel = reinterpret_cast<DWORD>(&ClockExitStub) - (kClockExitSite + 5);
+        memcpy(x + 1, &rel, 4);
+        int placed = 0;
+        if (WriteCode(kClockEpilogue, e, sizeof(e))) ++placed;
+        if (WriteCode(kClockExitSite, x, sizeof(x))) ++placed;
+        if (WriteCall(kClockStartCall, reinterpret_cast<const void *>(&ClockStartStub))) ++placed;
+        if (placed == 3) {
+            g_clockPlaced = true;
+        } else {
+            const BYTE oe[7] = {0x5f, 0x5e, 0x5b, 0x8b, 0xe5, 0x5d, 0xc3};
+            const BYTE ox[11] = {0x8b, 0x4e, 0x08, 0xc1, 0xe9, 0x11, 0xf6, 0xc1, 0x01, 0x75, 0x7a};
+            WriteCall(kClockStartCall, reinterpret_cast<const void *>(kDifficultyFn));
+            WriteCode(kClockExitSite, ox, sizeof(ox));
+            WriteCode(kClockEpilogue, oe, sizeof(oe));
+            Log(0, "0.6.6 clock: only %d of 3 sites written - all back to the PC code", placed);
+        }
+    }
+    Log(1, "0.6.6: T5 %s (tru+0x23ad82, [Death] TranslateT5 %d), P1c Vaulted chain %s (F tru+0x31d5cc, E tru+0x31d895, A "
+           "tru+0x23b421, B tru+0x223fa2, D tru+0x25a4a2, C tru+0x24fdb9; [Death] TranslateVaulted %d; step table only from "
+           "fixed extension data), clock %s (tru+0x238d6f / +0x238e76 / +0x238efb; [Death] TranslateVaultedClock %d); "
+           "read again at run time at most once per second. Not in 0.6.6: Vaulted 0xbe next step, step queries "
+           "0x165..0x167, the clock's script commands",
+        g_t5 ? "on" : "OFF", g_translateT5, g_vaultChain ? "on" : "OFF", g_translateVaulted,
+        g_clockPlaced ? "on" : "OFF", g_translateClock);
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -4683,6 +5356,7 @@ void Start(HMODULE self) {
     SetupDeath();                     // 0.6.3: notification 33 of the TU's death check (independent of the parts above)
     SetupMelee();                     // 0.6.4: MeleeAttack T-M1 / T-M2 (independent of the parts above)
     SetupCompanion();                 // 0.6.5: P1d (after SetupDeath: the Land exception H3b lives in its hook)
+    SetupN4c();                       // 0.6.6: T5 + P1c (after SetupCompanion: companion facts; after SetupTranslate1013)
 }
 
 }  // namespace
