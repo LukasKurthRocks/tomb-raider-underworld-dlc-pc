@@ -54,7 +54,8 @@ $earlierBuilds = @{
         '45dd58533ea157f19acbacdc05692711df98e74f4e3992966d89dc96c137c4dc'  # 0.4 review fixes
         '39fa6858a5bf5f1b5f24023828a0ac1211c43b1c24f974606553ea779e7870e4'  # 0.4.1
         '0e7224594f2ee130dcbddb64ce7b61b6a63edd83367502c3183973192ad6755d'  # 0.4.2, first build
-        '39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319'  # 0.4.2, current build
+        '39a6a471d0a91a90980280103176da340554048bc4eb1697f21fdcd3dadd0319'  # 0.4.2, outside logging
+        'ade03eb7b9e9fd2384ed474e21f0e271c5d969b5f551479705fccd77e66b2837'  # 0.4.2+outside-fix, current build
     )
     'TruGuard.ini' = @(
         'fc7ae32cd19ceb7b1853a9004e84072d2415e55a055ec8aa39419a1558775c6c'  # 0.1

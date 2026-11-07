@@ -31,7 +31,8 @@ produced three fatal records with dumps; the current 0.4.2 binary itself has not
 - A fatal unhandled fault **outside** `tru.exe` (FMOD/WINMM/plugin thread) gets one `TRUGUARD_OUTSIDE` marker and a
   short record: module+offset, exception, thread id and Win32 start address, registers, EBP stack, and the first
   eight `tru.exe` return addresses found in the raw stack. No automatic dump is written for an outside fault.
-  `OutsideFatal=0` turns this off.
+  `OutsideFatal=0` turns this off. The record runs under `__try` like the `tru.exe` path (a fault in the logger is
+  swallowed, the crash proceeds unchanged); a stack overflow outside `tru.exe` only writes one pre-built line.
 - Full record: `tru.exe+offset`, exception code, instruction bytes + decoded length, registers, fault address and the
   memory around the involved pointers, EBP stack chain plus raw stack words, module+offset, known-site name from the
   table taken from the findings docs, and the game context (unit name/id, cheatMode, player instance, object id/name).
@@ -54,7 +55,9 @@ produced three fatal records with dumps; the current 0.4.2 binary itself has not
   `TRUGUARD_DETAIL . state=firstchance|resumed|unhandled debugger=0|1 dump=<file>|none|earlier|failed`,
   `TRUGUARD_RESUME site=. skip=. to=.`,
   `TRUGUARD_PREV count=. newest=.`, `TRUGUARD_HANDLED site=. hits=.`,
-  `TRUGUARD_OUTSIDE module=.+0x. code=. access=. addr=. eip=. thread=. start=.`,
+  `TRUGUARD_OUTSIDE module=.+0x. code=. access=. addr=. eip=. thread=. start=. start_mod=.+0x.`
+  (stack overflow outside `tru.exe`: one pre-built line `TRUGUARD_OUTSIDE module=?+0x0 code=c00000fd stack overflow
+  outside tru.exe ...` without details),
   `TRUGUARD_DUMP kind=manual path=<file>`, `TRUGUARD_RESUME_STOP .`,
   `TRUGUARD_RAIL id=. value=. action=log|block hits=.`, `TRUGUARD_CONTEXT t=. gt=. box=. attach=. agent528=.`,
   and (at `LogLevel>=2`) `TRUGUARD_EVENT name=. a=. b=. c=.`.

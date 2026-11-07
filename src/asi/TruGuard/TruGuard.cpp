@@ -40,6 +40,9 @@
 //                      skipped concurrent faults counted in the status.
 // 0.4.2 (2026-11-05) - section 9 follow-up: UEF logs fatal faults outside tru.exe (module, thread/start, registers,
 //                      EBP frames, tru.exe stack hints); re-arm also happens for outside faults.
+// 0.4.2+outside-fix (2026-11-05, patch proposal) - outside record only: guarded by __try in the UEF (a fault in
+//                      the logger is swallowed, the crash proceeds unchanged), stack overflow outside tru.exe writes
+//                      one pre-built line (no 4 KB frame), start= also as start_mod=<module>+0x<offset>.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -1242,6 +1245,9 @@ void Describe(PEXCEPTION_POINTERS info, int site, const char *state, bool dump) 
 
 char g_stackNotice[160];   // pre-built at load time: the stack-overflow path must not format anything
 int g_stackNoticeLen = 0;
+char g_outsideStackNotice[192];   // same for a stack overflow outside tru.exe (UEF outside path)
+int g_outsideStackNoticeLen = 0;
+volatile LONG g_outsideStackNoted = 0;
 
 bool Interesting(DWORD code) {
     switch (code) {
@@ -1395,7 +1401,9 @@ LONG HandleFirstChance(PEXCEPTION_POINTERS info, DWORD code, DWORD eip) {
 
 LONG WINAPI UnhandledFilter(PEXCEPTION_POINTERS info);
 
-void LogOutsideFatal(PEXCEPTION_POINTERS info) {
+// noinline: the 4 KB record buffer must stay in this frame. Inlined into UnhandledFilter, its stack probe would run
+// on every UEF entry, including the stack-overflow paths that must not touch more stack.
+__declspec(noinline) void LogOutsideFatal(PEXCEPTION_POINTERS info) {
     if (!g_outsideFatal) return;
     const EXCEPTION_RECORD *rec = info->ExceptionRecord;
     const CONTEXT *ctx = info->ContextRecord;
@@ -1412,17 +1420,22 @@ void LogOutsideFatal(PEXCEPTION_POINTERS info) {
     if (!named) offset = 0;
     DWORD thread = GetCurrentThreadId();
     DWORD start = ThreadStartAddress();
+    char startModule[48] = "?";
+    DWORD startOffset = 0;
+    bool startNamed = start && ModuleOf(start, startModule, sizeof(startModule), &startOffset);
+    if (!startNamed) startOffset = 0;
     InterlockedIncrement(&g_outsideCount);
 
-    Log(0, "TRUGUARD_OUTSIDE module=%s+0x%lx code=%08lx access=%s addr=0x%08lx eip=0x%08lx thread=%lu start=0x%08lx",
-        module, offset, code, AccessName(access), fault, eip, thread, start);
+    Log(0, "TRUGUARD_OUTSIDE module=%s+0x%lx code=%08lx access=%s addr=0x%08lx eip=0x%08lx thread=%lu start=0x%08lx "
+           "start_mod=%s+0x%lx",
+        module, offset, code, AccessName(access), fault, eip, thread, start, startModule, startOffset);
 
     Buf b = {nullptr, 0, 0};
     char text[4096];
     b.data = text;
     b.cap = sizeof(text);
-    b.add("---- TruGuard %s: outside tru.exe %s+0x%lx %s at 0x%08lx (thread %lu start 0x%08lx, %s)\n", g_runId,
-          module, offset, AccessName(access), fault, thread, start, "unhandled");
+    b.add("---- TruGuard %s: outside tru.exe %s+0x%lx %s at 0x%08lx (thread %lu start 0x%08lx %s+0x%lx, %s)\n",
+          g_runId, module, offset, AccessName(access), fault, thread, start, startModule, startOffset, "unhandled");
     b.add("exception 0x%08lx", code);
     if (rec->ExceptionFlags & EXCEPTION_NONCONTINUABLE) b.add(" (noncontinuable)");
     b.add("; eip 0x%08lx\n", eip);
@@ -1490,7 +1503,21 @@ LONG WINAPI UnhandledFilter(PEXCEPTION_POINTERS info) {
     if (!Interesting(code)) return EXCEPTION_CONTINUE_SEARCH;
     DWORD eip = static_cast<DWORD>(info->ContextRecord->Eip);
     if (eip < g_truBase || eip >= g_truEnd) {
-        LogOutsideFatal(info);
+        // Diagnostics only, same guard as the tru.exe path below: a fault inside the logger (e.g. after heap or
+        // loader corruption) is swallowed and the original crash proceeds unchanged.
+        __try {
+            if (code == EXCEPTION_STACK_OVERFLOW) {
+                // the filter runs on the exhausted stack: one pre-built line, no formatting, no 4 KB record
+                if (g_outsideFatal) {
+                    InterlockedIncrement(&g_outsideCount);
+                    if (InterlockedCompareExchange(&g_outsideStackNoted, 1, 0) == 0)
+                        WriteRaw(g_outsideStackNotice, g_outsideStackNoticeLen);
+                }
+            } else {
+                LogOutsideFatal(info);
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+        }
         return EXCEPTION_CONTINUE_SEARCH;
     }
     // A second thread may be logging/dumping the first fatal hit. Wait briefly instead of dropping the fatal
@@ -1728,10 +1755,15 @@ void Start(HMODULE self) {
     _snprintf_s(g_stackNotice, sizeof(g_stackNotice), _TRUNCATE,
                 "TruGuard %s: stack overflow in tru.exe (no context, no dump)\n", g_runId);
     g_stackNoticeLen = static_cast<int>(strlen(g_stackNotice));
+    _snprintf_s(g_outsideStackNotice, sizeof(g_outsideStackNotice), _TRUNCATE,
+                "TruGuard %s: TRUGUARD_OUTSIDE module=?+0x0 code=%08lx stack overflow outside tru.exe "
+                "(pre-built line: no module, registers, stack or dump)\n",
+                g_runId, static_cast<DWORD>(EXCEPTION_STACK_OVERFLOW));
+    g_outsideStackNoticeLen = static_cast<int>(strlen(g_outsideStackNotice));
 
     g_log = CreateFileA(g_logPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
                         FILE_ATTRIBUTE_NORMAL, nullptr);
-    Log(1, "TruGuard 0.4.2 loaded (enabled %d, log %d, mode %d, firstChance %d/%d/%d, dump %d/%d, maxDumps %d, "
+    Log(1, "TruGuard 0.4.2+outside-fix loaded (enabled %d, log %d, mode %d, firstChance %d/%d/%d, dump %d/%d, maxDumps %d, "
            "handled %d, rules %ld, ignores %ld, maxResumes/s %d, guardRails %d/%d/%d, rails %d)",
         g_enabled, g_logLevel, g_mode, g_firstChance, g_firstChanceDetail, g_firstChanceDump, g_dump, g_dumpType,
         g_maxDumps, g_handledNote, g_ruleCount, g_ignoreCount, g_maxResumesPerSecond, g_guardRails, g_railEvents,
@@ -1791,7 +1823,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 extern "C" __declspec(dllexport) const char *TruGuardVersion() {
-    return "TruGuard 0.4.2 (outside-fatal record, GuardRails event/rail API, passive context, fault ring, on-demand dump)";
+    return "TruGuard 0.4.2+outside-fix (outside-fatal record, GuardRails event/rail API, passive context, fault ring, on-demand dump)";
 }
 
 extern "C" __declspec(dllexport) int TruGuardCount() { return static_cast<int>(g_firstChanceCount); }
