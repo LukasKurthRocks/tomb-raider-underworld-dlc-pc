@@ -15,6 +15,12 @@ Usage (from the repository root):
   ../bin/pyt -t 600 tools/tu_vs.py fetches D|X LIB SLOT        vfetch instructions, vertex element table, interpolators
   ../bin/pyt -t 900 tools/tu_vs.py show D|X LIB SLOT [--conv U:mode,...]   translated vs_3_0 text
   ../bin/pyt -t 1800 tools/tu_vs.py oracle XB/PB[,XB/PB] | random N SEED [--conv ...] [--slots ...]
+  ../bin/pyt -t 1800 tools/tu_vs.py selftest          def-clash regression (synthetic + 26584 PC 868 / Xbox 2066 slots)
+
+Merging (vsmerge, tu_vs_deform build): `def` constants are global to the merged program. Since 08.11. merge_slot checks
+collisions in both directions (twin def read by the DLC code as an engine constant, DLC def read by the twin, defs in
+a relatively addressed range, different defs on one register), moves the clashing def to a provably free register or
+refuses; check_merge / compare_outputs run every program with its OWN defs over shared engine constants.
 """
 import sys, os, json, struct, collections, random, re
 import numpy as np
@@ -296,9 +302,8 @@ def compare_vs(T, P, pct_names, N=200, seed=3):
         if key[0] == 2: a = np.floor(rng.uniform(0, 4, (N, 4))).astype(np.float32)
         ins[key] = a
     consts = {r: rng.uniform(-1, 1, 4).astype(np.float32) for r in range(256)}
-    for i in P.instrs() + T.instrs():
-        if i.op == 'def': consts[i.ops[0].num] = np.array([struct.unpack('<f', struct.pack('<I', u))[0] for u in i.imm], np.float32)
-    ot = run_vs(T, ins, consts, N); op = run_vs(P, ins, consts, N)
+    # defs are local to each program (own_consts; before 08.11. P's and T's defs shared one table)
+    ot = run_vs(T, ins, own_consts(consts, T), N); op = run_vs(P, ins, own_consts(consts, P), N)
     if ot is None or op is None: return None, ['inputs']
     wmP = out_masks(P); wmT = out_masks(T)
     worst = 0.0; miss = []
@@ -385,6 +390,7 @@ def cmd_oracle(pairs, conv, slots=None):
             except Exception as e:
                 rej[str(e)[:50]] += 1; res.append('s%d:rej' % k); continue
             Pp = F9.decode_pc(pblob)
+            T, _ = defs_out_of_rel(T, Pp)          # 08.11.: translator defs off the bone rows (as vsmerge)
             per = compare_outputs(T, Pp)
             if per is None: res.append('s%d:inputs' % k); continue
             bad = {s: e for s, e in per.items() if e >= 1e-4}
@@ -408,11 +414,11 @@ def compare_outputs(T, P, N=200, seed=3):
     for key in set(dcls(T, sm3asm.RT_INPUT).values()) | set(dcls(P, sm3asm.RT_INPUT).values()):
         a = rng.uniform(0, 1, (N, 4)).astype(np.float32)
         if key == (0, 0): a[:, :3] = rng.uniform(-50, 50, (N, 3)); a[:, 3] = 1
+        if key[0] == 2: a = game_bones(rng, N)
         ins[key] = a
     consts = {r: rng.uniform(-1, 1, 4).astype(np.float32) for r in range(256)}
-    for i in P.instrs() + T.instrs():
-        if i.op == 'def': consts[i.ops[0].num] = np.array([struct.unpack('<f', struct.pack('<I', u))[0] for u in i.imm], np.float32)
-    ot = run_vs(T, ins, consts, N); op = run_vs(P, ins, consts, N)
+    # defs are local to each program (own_consts; before 08.11. P's and T's defs shared one table)
+    ot = run_vs(T, ins, own_consts(consts, T), N); op = run_vs(P, ins, own_consts(consts, P), N)
     if ot is None or op is None: return None
     wmP = out_masks(P); wmT = out_masks(T); out = {}
     for k, v in op.items():
@@ -451,10 +457,102 @@ def realloc(prog):
     return prog
 
 
-def merge_slot(P, T, override=()):
+REL_SKIN_HI = 85 + 168 - 1          # SkinMatrices c85 / 168 (PC CTAB of every skinned slot; as tu_vs_deform.remap_defs)
+
+
+def const_use(prog):
+    """-> (defs {register: imm tuple}, registers read directly, base registers of relative reads c[a0 + n]); def /
+    dcl instructions are not reads"""
+    defs = {i.ops[0].num: tuple(i.imm) for i in prog.instrs() if i.op == 'def'}
+    reads, relb = set(), set()
+    for i in prog.instrs():
+        if i.op in ('def', 'defi', 'defb', 'dcl'): continue
+        for o in i.ops:
+            if o.rtype == sm3asm.RT_CONST: (relb if o.rel else reads).add(o.num)
+    return defs, reads, relb
+
+
+def rel_range(*progs):
+    """(lo, hi) of the constant registers a relative read of these programs may reach (bone palette: from the lowest
+    relative base, at most from c85, up to c85 + 167), or None"""
+    b = set().union(*(const_use(p)[2] for p in progs))
+    if not b: return None
+    return min(min(b), 85), max(REL_SKIN_HI, max(b))
+
+
+def rename_consts(prog, move):
+    """prog with constant registers renamed (def targets and direct reads): {old: new}. A register that is the base of a
+    relative read cannot be renamed (Reject). Pure renaming - the callers prove it in the VM (check_merge)."""
+    if not move: return prog
+    if const_use(prog)[2] & set(move): raise xenos2sm3.Reject('rename: c%s is read relatively' % sorted(const_use(prog)[2] & set(move)))
+    items = []
+    for it in prog.items:
+        if not isinstance(it, sm3asm.Instr): items.append(it); continue
+        j = sm3asm.Instr(it.op, [], it.ctrl, it.pred, list(it.imm), it.usage)
+        for o in it.ops:
+            o2 = sm3asm.Operand(o.rtype, o.num, o.isdst, o.rel, o.relop, o.wm, o.mod, o.shift, o.swz, o.smod, o.resv)
+            if o.rtype == sm3asm.RT_CONST and not o.rel and o.num in move: o2.num = move[o.num]
+            j.ops.append(o2)
+        items.append(j)
+    return sm3asm.Program(prog.kind, prog.major, prog.minor, items)
+
+
+def def_clashes(P, T):
+    """`def` constants in a merged program are global to it: a def of one part shadows the engine value (or the other
+    part's def) that the other part reads. Both directions:
+      P def r, T reads r as an engine constant (no own def)          -> P's def must move   (07.11.: 868 + 2066, c4-c6)
+      P def r inside the relative range of T but not of P             -> P's def must move
+      T def r, P reads r (engine) or P defines r with another value   -> T's def must move
+      T def r inside any relative range (P's or T's)                  -> T's def must move
+      T def r == P def r (same value, outside the relative range)     -> shared (T's def dropped)
+    -> (move_p {r: reason}, move_t {r: reason}, shared [r])"""
+    pd, pr, _ = const_use(P); td, tr, _ = const_use(T)
+    rr_all = rel_range(P, T); rr_p = rel_range(P); rr_t = rel_range(T)
+    inr = lambda n, rr: rr is not None and rr[0] <= n <= rr[1]
+    move_p, move_t, shared = {}, {}, []
+    for n in sorted(pd):
+        if n in tr and n not in td: move_p[n] = 'twin def c%d is read by the DLC code as an engine constant' % n
+        elif inr(n, rr_t) and not inr(n, rr_p): move_p[n] = 'twin def c%d inside the DLC relative range c%d-c%d' % (n, rr_t[0], rr_t[1])
+    for n in sorted(td):
+        if n in pr and n not in pd: move_t[n] = 'DLC def c%d is read by the twin as an engine constant' % n
+        elif inr(n, rr_all): move_t[n] = 'DLC def c%d inside the relative range c%d-c%d' % (n, rr_all[0], rr_all[1])
+        elif n in pd and pd[n] != td[n]: move_t[n] = 'DLC def c%d differs from the twin def c%d' % (n, n)
+        elif n in pd: shared.append(n)
+    return move_p, move_t, shared
+
+
+def merge_slot(P, T, override=(), on_clash='rename', info=None):
     """P = Nixxes' PC twin slot (kept whole: its outputs incl. position and the PC-only PSSM TEXCOORD6), T = the
     translated DLC slot; the outputs T writes that P does not are appended (T's code with renamed temps / inputs /
-    outputs; T's writes to outputs P already has go to a scratch temp). -> merged program, list of added semantics"""
+    outputs; T's writes to outputs P already has go to a scratch temp). -> merged program, list of added semantics.
+    `def` collisions in both directions (def_clashes): on_clash 'rename' (default) moves the clashing def (P's or T's,
+    with that program's direct reads) to a register that is provably free in this slot (not read or defined by P or T,
+    outside every relative range, from c255 down) - else Reject; 'reject' refuses every clash with its reason;
+    'legacy' = the behaviour before 08.11. (only T defs vs P checked; regression self-test only). info (dict, optional)
+    receives move_p / move_t / shared / reasons."""
+    if on_clash != 'legacy':
+        move_p, move_t, shared = def_clashes(P, T)
+        reasons = sorted(set(move_p.values()) | set(move_t.values()))
+        if info is not None: info.update(move_p={}, move_t={}, shared=list(shared), reasons=reasons)
+        if reasons and on_clash == 'reject': raise xenos2sm3.Reject('merge: ' + '; '.join(reasons))
+        if reasons:
+            pd, pr, _ = const_use(P); td, tr, _ = const_use(T); rr = rel_range(P, T)
+            taken = set(pd) | pr | set(td) | tr
+            free = [c for c in range(255, -1, -1) if c not in taken and not (rr and rr[0] <= c <= rr[1])]
+            mp, mt = {}, {}
+            for n in sorted(move_p):
+                if not free: raise xenos2sm3.Reject('merge: no free constant register for %s' % move_p[n])
+                mp[n] = free.pop(0)
+            for n in sorted(move_t):
+                if not free: raise xenos2sm3.Reject('merge: no free constant register for %s' % move_t[n])
+                mt[n] = free.pop(0)
+            P = rename_consts(P, mp); T = rename_consts(T, mt)
+            if info is not None: info.update(move_p=mp, move_t=mt)
+        mp_, mt_, sh_ = def_clashes(P, T)
+        if mp_ or mt_: raise xenos2sm3.Reject('merge: def clash left after renaming: %s' % sorted(set(mp_.values()) | set(mt_.values())))
+        if shared:
+            T = sm3asm.Program(T.kind, T.major, T.minor, [it for it in T.items if not (isinstance(it, sm3asm.Instr)
+                               and it.op == 'def' and it.ops[0].num in shared)])
     pin = {v: k for k, v in dcls(P, sm3asm.RT_INPUT).items()}; tin = dcls(T, sm3asm.RT_INPUT)
     pout = {v: k for k, v in dcls(P, sm3asm.RT_TEXOUT).items()}; tout = dcls(T, sm3asm.RT_TEXOUT)
     used_t = [o.num for i in P.instrs() for o in i.ops if o.rtype == sm3asm.RT_TEMP]
@@ -501,21 +599,60 @@ def merge_slot(P, T, override=()):
     M = realloc(sm3asm.parse_text(txt))
     nt = len({o.num for i in M.instrs() for o in i.ops if o.rtype == sm3asm.RT_TEMP})
     if max([o.num for i in M.instrs() for o in i.ops if o.rtype == sm3asm.RT_TEMP] + [0]) > 31: raise xenos2sm3.Reject('merge: %d temps after re-allocation' % nt)
+    if on_clash != 'legacy':
+        # structural post-check on the merged program: no def may sit on a register the twin or the DLC code reads as
+        # an engine constant (after the renaming)
+        md = set(const_use(M)[0])
+        eng = (const_use(P)[1] - set(const_use(P)[0])) | (const_use(T)[1] - set(const_use(T)[0]) - set(shared))
+        if md & eng: raise xenos2sm3.Reject('merge: merged def c%s shadows an engine constant' % sorted(md & eng))
     return M, added
 
 
+def game_bones(rng, N):
+    """BLENDINDICES as the engine stores them (UBYTE4N k / 255), bones 0..41: the bone rows stay inside SkinMatrices
+    c85 + 0..167 (as tu_vs_deform.rand_inputs; before 08.11. uniform 0..1 = bones up to 255, rows far past c255, where a
+    def at c253 / c255 looked like a bone row)"""
+    return (np.floor(rng.uniform(0, 42, (N, 4))) / 255.0).astype(np.float32)
+
+
+def defs_out_of_rel(T, P):
+    """T with its `def`s that lie inside the relatively addressed range of P or T (SkinMatrices) moved to registers that
+    are not read / defined by P or T and outside that range (from c255 down) - the translator puts its defs at
+    c218-c223, i.e. on the bone rows of bones 33 / 34 (as tu_vs_deform.remap_defs). Pure renaming of T."""
+    rr = rel_range(P, T)
+    if rr is None: return T, {}
+    pd, pr, _ = const_use(P); td, tr, _ = const_use(T)
+    taken = set(pd) | pr | set(td) | tr
+    free = [c for c in range(255, -1, -1) if c not in taken and not (rr[0] <= c <= rr[1])]
+    move = {}
+    for n in sorted(td):
+        if rr[0] <= n <= rr[1]:
+            if not free: raise xenos2sm3.Reject('no free constant register outside c%d-c%d for the DLC def c%d' % (rr[0], rr[1], n))
+            move[n] = free.pop(0)
+    return rename_consts(T, move), move
+
+
+def own_consts(base, prog):
+    """the constant registers as one program sees them: the shared (engine) values overlaid with THIS program's own
+    `def`s - defs are local to a program (before 08.11. one table held the defs of P, T and M together, so T saw P's
+    literals and a def clash in the merged program passed as 'merge 0')"""
+    c = dict(base)
+    for i in prog.instrs():
+        if i.op == 'def': c[i.ops[0].num] = np.array([struct.unpack('<f', struct.pack('<I', u))[0] for u in i.imm], np.float32)
+    return c
+
+
 def check_merge(M, P, T, override=(), N=200, seed=5):
-    """VM: M's outputs == P's for every P output, == T's for the added ones (exact)"""
+    """VM: M's outputs == P's for every P output, == T's for the added ones (exact); each program runs with the shared
+    engine constants overlaid by its own defs only"""
     rng = np.random.RandomState(seed); ins = {}
     for key in set(dcls(M, sm3asm.RT_INPUT).values()) | set(dcls(P, sm3asm.RT_INPUT).values()) | set(dcls(T, sm3asm.RT_INPUT).values()):
         a = rng.uniform(0, 1, (N, 4)).astype(np.float32)
         if key == (0, 0): a[:, :3] = rng.uniform(-50, 50, (N, 3)); a[:, 3] = 1
+        if key[0] == 2: a = game_bones(rng, N)
         ins[key] = a
     consts = {r: rng.uniform(-1, 1, 4).astype(np.float32) for r in range(256)}
-    for prog in (P, T, M):
-        for i in prog.instrs():
-            if i.op == 'def': consts[i.ops[0].num] = np.array([struct.unpack('<f', struct.pack('<I', u))[0] for u in i.imm], np.float32)
-    om, op, ot = run_vs(M, ins, consts, N), run_vs(P, ins, consts, N), run_vs(T, ins, consts, N)
+    om, op, ot = run_vs(M, ins, own_consts(consts, M), N), run_vs(P, ins, own_consts(consts, P), N), run_vs(T, ins, own_consts(consts, T), N)
     worst = 0.0
     for ref, which in ((op, 'P'), (ot, 'T')):
         for k, v in ref.items():
@@ -554,6 +691,8 @@ def cmd_vsmerge(dl, pc, xbase, outp):
             slots.append(keep); log.append('slot %3d: no DLC slot - twin kept' % k); continue
         try:
             T, t = translate(D['entries'][D['slots'][src]]['blob'], pct, 'auto')
+            # 08.11.: translator defs off the bone rows first (renaming only; every later check runs on the moved T)
+            T, _mv = defs_out_of_rel(T, P)
             if src != k: log.append('slot %3d: uses DLC slot %d (fog group)' % (k, src))
         except Exception as e:
             slots.append(keep); nskip += 1; log.append('slot %3d: DLC slot not translatable (%s) - twin kept, NO extra outputs' % (k, str(e)[:70])); continue
@@ -567,6 +706,7 @@ def cmd_vsmerge(dl, pc, xbase, outp):
             #   otherwise ambiguous -> refuse
             if src >= len(Xb['slots']) or Xb['slots'][src] == 0xffffffff: raise xenos2sm3.Reject('slot %d differs, no base slot %d' % (k, src))
             Tb, _ = translate(Xb['entries'][Xb['slots'][src]]['blob'], pct, 'auto')
+            Tb, _ = defs_out_of_rel(Tb, P)
             pb = compare_outputs(Tb, P) or {}; tb = compare_outputs(T, Tb) or {}
             amb = []
             for s in diff:
@@ -625,8 +765,95 @@ def cmd_vsapply(invp, tree, wd, specs):
             print('%s: VS %d -> %d for materials %s; %s' % (name, xvs, nid, [m for m, x in ms], buf.getvalue().strip().splitlines()[-2][:120]))
 
 
+def _check_merge_shared(M, P, T, override=(), N=200, seed=5):
+    """the check as it was before 08.11. (one constant table with the defs of P, T and M) - self-test only, to show the gap"""
+    rng = np.random.RandomState(seed); ins = {}
+    for key in set(dcls(M, sm3asm.RT_INPUT).values()) | set(dcls(P, sm3asm.RT_INPUT).values()) | set(dcls(T, sm3asm.RT_INPUT).values()):
+        a = rng.uniform(0, 1, (N, 4)).astype(np.float32)
+        if key == (0, 0): a[:, :3] = rng.uniform(-50, 50, (N, 3)); a[:, 3] = 1
+        ins[key] = a
+    consts = {r: rng.uniform(-1, 1, 4).astype(np.float32) for r in range(256)}
+    for prog in (P, T, M): consts = own_consts(consts, prog)
+    om, op, ot = run_vs(M, ins, consts, N), run_vs(P, ins, consts, N), run_vs(T, ins, consts, N)
+    worst = 0.0
+    for k, v in ot.items():
+        if (k in op and k not in override) or k[0] == 12: continue
+        if k not in om: return 1e9
+        worst = max(worst, float(np.nanmax(np.abs(om[k] - v))))
+    return worst
+
+
+SELFTEST_SLOTS = (64, 72, 80, 88, 192, 200, 208, 216)      # 26584: PC 868 defs c4-c6, DLC 2066 reads World c4-c6
+SELFTEST_CLEAN = (32, 160)                                   # same lib, no clash: merge must stay byte-identical
+
+
+def cmd_selftest():
+    """regression self-test of the def-clash handling (08.11.). Synthetic: (1) twin def read by the DLC code as an
+    engine constant, (2) DLC def read by the twin, (3) identical def in both. Real (N5 07.11., material 26584): PC twin
+    868 + translated Xbox 2066 (base 1258) in the slots SELFTEST_SLOTS must be caught (legacy merge: new check fails,
+    old shared-table check passed; reject mode refuses; rename mode passes and equals the DLC translation on the added
+    outputs), the slots SELFTEST_CLEAN must merge byte-identically to the legacy merge. Exit 1 on any failure."""
+    fails = []
+    def ok(cond, msg):
+        print(('  ok   ' if cond else '  FAIL ') + msg, flush=True)
+        if not cond: fails.append(msg)
+    hdr = 'vs_3_0\ndcl_position v0\ndcl_position o11\n'
+    syn = {
+        'twin def read by DLC as engine': (hdr.replace('vs_3_0\n', 'vs_3_0\ndef c4, 1, 2, 3, 4\n') + 'dcl_texcoord o0\nmov o11, v0\nmul o0, v0, c4\n',
+                                           hdr + 'dcl_texcoord3 o3\nmov o11, v0\nmul o3, v0, c4\n', 'p'),
+        'DLC def read by twin as engine': (hdr + 'dcl_texcoord o0\nmov o11, v0\nmul o0, v0, c10\n',
+                                           hdr.replace('vs_3_0\n', 'vs_3_0\ndef c10, 5, 6, 7, 8\n') + 'dcl_texcoord3 o3\nmov o11, v0\nmad o3, v0, c10, c4\n', 't'),
+        'identical def in both (shared)': (hdr.replace('vs_3_0\n', 'vs_3_0\ndef c9, 0.5, 2, 0, 1\n') + 'dcl_texcoord o0\nmov o11, v0\nmul o0, v0, c9\n',
+                                           hdr.replace('vs_3_0\n', 'vs_3_0\ndef c9, 0.5, 2, 0, 1\n') + 'dcl_texcoord3 o3\nmov o11, v0\nmad o3, v0, c9, c4\n', 's'),
+    }
+    print('== synthetic')
+    for name, (pt, tt, kind) in syn.items():
+        P, T = sm3asm.parse_text(pt), sm3asm.parse_text(tt)
+        info = {}; M, added = merge_slot(P, T, (), 'rename', info); w = check_merge(M, P, T)
+        ok(w <= 1e-5 and added == [(5, 3)], '%s: rename -> moved P %s T %s shared %s, check %.3g' % (name, info['move_p'], info['move_t'], info['shared'], w))
+        if kind == 'p':
+            ML, _ = merge_slot(P, T, (), 'legacy')
+            ok(check_merge(ML, P, T) > 1e-3 and _check_merge_shared(ML, P, T) <= 1e-5,
+               '%s: legacy merge caught by the new check (%.3g), passed the old one (%.3g)' % (name, check_merge(ML, P, T), _check_merge_shared(ML, P, T)))
+        if kind in 'pt':
+            try: merge_slot(P, T, (), 'reject'); ok(False, '%s: reject mode refused' % name)
+            except xenos2sm3.Reject as e: ok('def c' in str(e), '%s: reject mode refused (%s)' % (name, e))
+        else: ok(not info['move_p'] and not info['move_t'] and info['shared'] == [9], '%s: shared, nothing moved' % name)
+    print('== 26584: PC 868 + Xbox 2066 (base 1258)')
+    import tu_vs_deform as VD
+    L = libs(); D, Xp, Pp = L['D'][2066], L['X'][1258], L['P'][868]
+    for k in SELFTEST_SLOTS + SELFTEST_CLEAN:
+        P0, _ = VD.slot_prog(Pp, k); src = VD.dlc_src_slot(D, P0, k)
+        P, T, _ = VD.translate_pair(D, Xp, Pp, k, src)
+        mp, mt, sh = def_clashes(P, T)
+        ML, _ = merge_slot(P, VD.strip_shared_defs(T, P), (), 'legacy')
+        wn, wo = check_merge(ML, P, T), _check_merge_shared(ML, P, T)
+        info = {}; M, added = merge_slot(P, T, (), 'rename', info); w = check_merge(M, P, T)
+        import fade_slots_translate as FST
+        a_ok, msg = FST.SV.assemble(FST.SD.disasm(sm3asm.encode(M)))
+        # independent of check_merge: the DLC translation alone vs the merged slot on the added outputs, game-like inputs
+        keys = set(dcls(T, sm3asm.RT_INPUT).values()) | set(dcls(M, sm3asm.RT_INPUT).values()); wi = 0.0
+        for s in VD.SEEDS:
+            ins, consts = VD.rand_inputs(keys, 200, s)
+            o1, _ = VD.run_regs(T, ins, consts, 200); o2, _ = VD.run_regs(M, ins, consts, 200)
+            for kk in added: wi = max(wi, VD.relerr(o2[kk], o1[kk], out_masks(T).get(kk, 15)) if kk in o2 else 1e9)
+        if k in SELFTEST_SLOTS:
+            ok(sorted(mp) == [4, 5, 6] and not mt, 'slot %3d: clash found: twin defs %s read by the DLC code (%s)' % (k, sorted(mp), sorted(set(mp.values()))[:1]))
+            ok(wn > 1e-3 and wo <= 1e-5, 'slot %3d: legacy merge caught by the new check (%.3g), passed the old one (%.3g)' % (k, wn, wo))
+            try: merge_slot(P, T, (), 'reject'); ok(False, 'slot %3d: reject mode refused' % k)
+            except xenos2sm3.Reject as e: ok('c4' in str(e), 'slot %3d: reject mode refused' % k)
+        else:
+            ok(not mp and not mt, 'slot %3d: no clash (twin defs vs DLC reads)' % k)
+            ok(sm3asm.encode(M) == sm3asm.encode(ML), 'slot %3d: merge byte-identical to the legacy merge' % k)
+        ok(w <= 1e-5 and wi <= 1e-4 and a_ok and not msg.strip(), 'slot %3d: rename -> moved twin %s DLC %s shared %s; check %.3g, DLC added %s rel %.3g, D3DX9 %s' % (
+            k, info['move_p'], info['move_t'], info['shared'], w, ['%s%d' % (USAGE_NAME.get(s[0]), s[1]) for s in added], wi, 'ok' if a_ok and not msg.strip() else msg.strip()[:60]))
+    print('SELFTEST %s: %d failure(s)' % ('PASSED' if not fails else 'FAILED', len(fails)))
+    sys.exit(1 if fails else 0)
+
+
 def main(a):
     if not a: sys.exit(__doc__)
+    if a[0] == 'selftest': cmd_selftest(); return
     if a[0] == 'vsmerge': cmd_vsmerge(int(a[1]), int(a[2]), int(a[3]), a[4]); return
     if a[0] == 'vsapply': cmd_vsapply(a[1], a[2], a[3], a[4:]); return
     conv = parse_conv(a)

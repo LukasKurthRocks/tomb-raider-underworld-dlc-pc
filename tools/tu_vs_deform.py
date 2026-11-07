@@ -375,7 +375,9 @@ def build_slot(Dl, Xp, Pp, k, src, log, ref=None, donors=(), force_donor=False):
         w3 = check_compose(PD, P, Td1, i, r)
     if w3 > TOL: raise xenos2sm3.Reject('composition check %.3g' % w3)
     T2, mv = remap_defs(T, PD); moved.update(mv)
-    M, added = V.merge_slot(PD, strip_shared_defs(T2, PD), ())
+    # 08.11.: merge_slot shares identical defs and moves clashing ones itself (both directions); a T stripped of its
+    # shared defs would look like T reading the twin's literal as an engine constant
+    M, added = V.merge_slot(PD, T2, ())
     w4 = V.check_merge(M, PD, T2, ()) if added else 0.0
     if w4 > TOL: raise xenos2sm3.Reject('merge check %.3g' % w4)
     w5 = None
