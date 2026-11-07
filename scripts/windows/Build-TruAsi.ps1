@@ -108,7 +108,7 @@ try {
     if (Test-Path -LiteralPath $ini) { Copy-Item -LiteralPath $ini -Destination (Join-Path $outDir "$Name.ini") -Force }
     # TruMenu 0.10: the default radial menu file goes into the build folder as well (Set-TruMenu.ps1 installs it);
     # 0.10.1: the tour file (radial level Tests / Rundgang) too
-    foreach ($suffix in 'radial.txt', 'tour.txt') {
+    foreach ($suffix in 'radial.txt', 'tour.txt', 'switches.txt') {   # TruMenu 0.21.5: + the switches file (page Fixes)
         $radial = Join-Path $srcDir "$Name.$suffix"
         if (Test-Path -LiteralPath $radial) { Copy-Item -LiteralPath $radial -Destination (Join-Path $outDir "$Name.$suffix") -Force }
     }

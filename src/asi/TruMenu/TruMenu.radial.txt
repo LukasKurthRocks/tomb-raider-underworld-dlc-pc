@@ -8,6 +8,9 @@
 # Never offered (dropped with a log line): game.quit, cmd.run, save.delete, save.restore, save.import, settings.reset.
 # Unknown ids are greyed out and named in TruMenu.log. "menu radial.reload" (or the item in the command bar) reads the
 # file again; tools/trumenu_ini_check.py checks the shipped file.
+# 0.21.5 (Lukas 2026-11-07): the ring is frozen - "aktuell nicht weiter gemacht". No new entries here; new functions go
+# into the quick bar (View + Start) and the long menu. Every entry below is also a bar row (page Render-Details holds
+# the former ring-only ones) and so a row of the menu section "Quick bar pages"; trumenu_ini_check.py check_0215 keeps it.
 Cheats | Gott-Modus | cheat.god
 # 0.10.2 (F15): no flight any more (the player's no-damage bit instead of cheatMode bit 0); instant deaths still kill
 Cheats | Gott-Modus voll (ausser Sofort-Tod) | cheat.godfull

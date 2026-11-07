@@ -106,6 +106,20 @@ no H2Tick / fix.hall02restore - docs/Befund-Hall02-TU-Vergleich-0711.md: a PC da
 thralls there); the precheck table kH2Checks (whole bytes, at most 64, no foreign byte); no code patch and no direct
 store in the section (no WriteDword / VirtualProtect / volatile write).
 
+Since TruMenu 0.21.5 (2026-11-07 Fixes + frozen ring) also the switches file src/asi/TruMenu/TruMenu.switches.txt
+(first line "# TruMenu switches", ASCII, group lines "group | key | DE | EN [| open]", switch lines "Plugin | Section |
+Key | bool / int:lo..hi[:step] / choice:a,b | DE | EN | live / restart / live-if:<Key> | default | hint [| since]",
+at most 160 rows / 24 groups, no key twice): every key in its shipped plugin INI (src/asi/<Plugin>/<Plugin>.ini) with
+the default = the INI value (a row whose "since" version is newer than the plugin source may wait), the INI value
+fits the type, every live / live-if row has the plugin re-read function of SW_LIVE (body holds the section and key
+literals), no restart row is re-read, every key of the eight plugin INIs has a row (text filters excepted); the items
+sw.set / sw.list / sw.reload (not game thread), page Fixes, RunSwSet order (listed key, value fits, INI exists,
+value changed, then the one write), the marker in SwLoadLocked, Y refused on page Fixes, X with kQbXDir, the menu
+sections PageSwitches / PageQbAll, Build-TruAsi.ps1 / Set-TruMenu.ps1 copy the file; the frozen ring: its header
+says so ("aktuell nicht weiter gemacht"), at most 172 entries, every entry is a bar row (ring_parity: bool rows take
+0 / 1 / no argument, value rows their steps, choice rows their choices, other rows the same argument).
+Options: --switches FILE checks that file instead of the shipped one.
+
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
                                                          list problem; exit 1 on a mismatch
@@ -193,7 +207,8 @@ QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info'
             'dbg.cpgo': 'action', 'pos.save': 'action', 'pos.list': 'info', 'pos.go': 'action'}
 QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess',
              'kQbCoop',                                                          # 0.21 Koop (planned rows only)
-             'kQbTests')                                                         # 0.21.1 Tests (teleports + specials)
+             'kQbTests',                                                         # 0.21.1 Tests (teleports + specials)
+             'kQbRenderMore')                                                    # 0.21.5 Render-Details (ring frozen)
 QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang',
                   'time.scale', 'ai.mode',                                       # 0.19 ai.mode
                   'snd.pos', 'snd.lines', 'snd.sort',                            # 0.20.1 sound list
@@ -202,7 +217,7 @@ QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'chea
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
-QB_PAGES_MAX = 13                            # 0.21: + Koop; 0.21.1: + Favoriten / Zuletzt, Tests
+QB_PAGES_MAX = 15                            # 0.21: + Koop; 0.21.1: + Favoriten / Zuletzt, Tests; 0.21.5: + Render-Details, Fixes
 # 0.19 dumb AI: the items, the presets (kAiPresets + "filter"), the [AI] keys
 Q19_ITEMS = {'ai.dumb': 'action', 'ai.mode': 'action', 'ai.noinvestigate': 'bool', 'ai.noattack': 'bool',
              'ai.status': 'info'}
@@ -1510,7 +1525,7 @@ def check_0213(ini_path):
         yb, xb = tick[i_y:i_x], tick[i_x:i_d]
         if 'QbFavPin(' not in yb or 'return;' not in yb:
             problems.append('TruMenu.cpp: QuickTick: Y must call QbFavPin and return (no other press in that frame)')
-        if 'QbExecRow(' not in xb or 'return;' not in xb or 'QbSpecialAct(p.special, row - g_qbStaticN, 1)' not in xb:
+        if 'QbExecRow(' not in xb or 'return;' not in xb or 'QbSpecialAct(p.special, row - g_qbStaticN, ' not in xb:
             problems.append('TruMenu.cpp: QuickTick: X must call QbExecRow (special rows: QbSpecialAct dir 1) and return')
     if 'pad.wButtons & kQbOwn' not in tick:
         problems.append('TruMenu.cpp: QuickTick must read the open bar\'s buttons as pad.wButtons & kQbOwn')
@@ -1646,6 +1661,274 @@ def check_0214(ini_path, rows):
                      'address, read-only scriptval, no E3 safety net, kH2Checks'
 
 
+SWITCHES = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.switches.txt')
+PLUGINS = os.path.join(ROOT, 'src', 'asi')
+# 0.21.5 (2026-11-07 TruMenu 0.21.5 Fixes): the plugins of the switches file (never TruGuard); text keys are no switches
+SW_PLUGINS = ('TruShadowPower', 'TruShadowCombat', 'TruShadowHud', 'TruRockVein', 'TruDoppelganger', 'TruDlc2Player',
+              'TruMercLang', 'TruTrace')
+SW_TEXT_KEYS = {('TruMercLang', 'MercLang', 'PathFilter'), ('TruTrace', 'Trace', 'SpawnFilter'),
+                ('TruTrace', 'Trace', 'ProgressFilter')}
+# the run-time re-read of every live key: (plugin, section, key) -> function head in the plugin source whose body holds
+# the section and key literals (read from the plugin sources 2026-11-07; everything else is read once in DllMain)
+SW_LIVE = {
+    ('TruShadowCombat', 'Damage', 'Translate'): 'void DamageReadSwitch(',
+    ('TruShadowCombat', 'Chunk', 'Translate'): 'void ChunkReadSwitch(',
+    ('TruShadowCombat', 'Splash', 'Translate'): 'void SplashReadSwitch(',
+    ('TruShadowCombat', 'Death', 'TranslateNotify33'): 'void DeathReadSwitch(',
+    ('TruShadowCombat', 'Strike', 'Translate'): 'void ReadSwitches(',
+    ('TruShadowCombat', 'States', 'Translate1013'): 'void ReadSwitches(',
+    ('TruShadowCombat', 'States', 'Translate1019'): 'void ReadSwitches(',
+    ('TruShadowCombat', 'States', 'Translate1020'): 'void ReadSwitches(',
+    ('TruShadowCombat', 'States', 'Translate1004'): 'void ReadSwitches(',
+    ('TruShadowCombat', 'States', 'Translate231Slot0'): 'void ReadSwitches(',
+    ('TruShadowCombat', 'States', 'Translate231Slot1'): 'void ReadSwitches(',
+    ('TruShadowPower', 'Adrenaline', 'Translate'): 'void K11ReadSwitch(',
+    ('TruMercLang', 'MercLang', 'Enabled'): 'void PollIni(',
+    ('TruMercLang', 'MercLang', 'Language'): 'void PollIni(',
+}
+SW_MAX, SW_GROUP_MAX = 160, 24
+RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries
+
+
+def ring_entries(path):
+    """0.21.5: [(line, path, label, id, arg)] of a radial-format file (comments / blank lines skipped)"""
+    out = []
+    for n, line in enumerate(open(path, encoding='ascii', errors='replace').read().splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith('#'): continue
+        f = [x.strip() for x in line.split('|')]
+        if len(f) != 3: continue
+        word, _, arg = f[2].partition(' ')
+        out.append((n, f[0], f[1], word, arg.strip()))
+    return out
+
+
+def choice_args(src, table):
+    """0.21.5: the first fields of a QbChoice table (kQbWeapons / kQbMarks)"""
+    m = re.search(r'const QbChoice %s\[\] = \{(.*?)\};' % table, src, re.S)
+    return set(re.findall(r'\{"([^"]+)", "[^"]*", "[^"]*"\}', m.group(1))) if m else set()
+
+
+def row_covers(row, word, arg, src):
+    """0.21.5 ring parity rule: does a bar row (qb_rows tuple) run the ring entry (id, arg)? bool rows: the entry's
+    0 / 1 / no argument; value rows: their steps; choice rows: one of their choices; others: the same argument"""
+    table, de, rid, rarg, kind, layer = row[:6]
+    if rid != word: return False
+    if kind == 'kQbBool':
+        base = (rarg + ' ') if rarg else ''
+        return arg in (rarg, base + '0', base + '1') or (not rarg and arg in ('', '0', '1'))
+    if kind == 'kQbValue': return True
+    if kind == 'kQbChoice':
+        tab = {'weapon.give': 'kQbWeapons', 'claude.mark': 'kQbMarks'}.get(word)
+        return bool(tab) and arg in choice_args(src, tab)
+    return rarg == arg
+
+
+def ring_parity(src, radial_path):
+    """0.21.5: ring entries no bar row runs ([(line, path, label, id, arg)])"""
+    rows = qb_rows(src)
+    return [e for e in ring_entries(radial_path) if not any(row_covers(r, e[3], e[4], src) for r in rows)]
+
+
+def plugin_version(plugin):
+    """'0.6.3' from the plugin sources ("<Plugin> 0.6.3" in a string literal), '' when missing"""
+    best = ()
+    folder = os.path.join(PLUGINS, plugin)
+    for f in os.listdir(folder) if os.path.isdir(folder) else []:
+        if not f.endswith(('.cpp', '.h')): continue
+        for m in re.finditer(r'"%s (\d+(?:\.\d+)+)' % plugin, open(os.path.join(folder, f), encoding='utf-8',
+                                                                     errors='replace').read()):
+            best = max(best, tuple(int(x) for x in m.group(1).split('.')))
+    return best
+
+
+def plugin_source(plugin):
+    folder = os.path.join(PLUGINS, plugin)
+    return '\n'.join(open(os.path.join(folder, f), encoding='utf-8', errors='replace').read()
+                     for f in sorted(os.listdir(folder)) if f.endswith('.cpp'))
+
+
+def plugin_ini(plugin):
+    """{(section, key): (line, value)} of the shipped plugin INI"""
+    out, section = {}, None
+    path = os.path.join(PLUGINS, plugin, plugin + '.ini')
+    if not os.path.exists(path): return None
+    for n, line in enumerate(open(path, encoding='utf-8', errors='replace').read().splitlines(), 1):
+        line = line.strip()
+        m = re.match(r'^\[(.+)\]$', line)
+        if m:
+            section = m.group(1)
+            continue
+        if not line or line.startswith(';') or '=' not in line: continue
+        key, _, value = line.partition('=')
+        out[(section, key.strip())] = (n, value.strip())
+    return out
+
+
+def sw_value_ok(typ, v):
+    if typ == 'bool': return v in ('0', '1')
+    m = re.fullmatch(r'int:(-?\d+)\.\.(-?\d+)(?::(\d+))?', typ)
+    if m: return bool(re.fullmatch(r'-?\d{1,9}', v)) and int(m.group(1)) <= int(v) <= int(m.group(2))
+    if typ.startswith('choice:'): return v.lower() in [c.lower() for c in typ[7:].split(',')]
+    return False
+
+
+def check_switches(path):
+    """0.21.5: the switches file - format, every key in its shipped plugin INI (rows of a newer plugin version than the
+    sources may wait), default = the INI value, type fits, live = the plugin's re-read function (SW_LIVE), every INI key
+    of the plugins covered (text keys excepted); returns problems, summary, rows"""
+    problems, rows, groups, seen, gkeys = [], [], 0, set(), set()
+    name = os.path.basename(path)
+    if not os.path.exists(path): return ['%s missing' % name], '', []
+    raw = open(path, 'rb').read()
+    if any(b > 126 or (b < 32 and b not in (9, 10, 13)) for b in raw):
+        problems.append('%s: non-ASCII bytes (the menu font has no umlauts)' % name)
+    lines = raw.decode('ascii', 'replace').splitlines()
+    if not lines or not lines[0].startswith('# TruMenu switches'):
+        problems.append('%s: first line must start with "# TruMenu switches" (Set-TruMenu.ps1 / SwLoadLocked marker)' % name)
+    inis, versions, sources = {}, {}, {}
+    word = re.compile(r'[A-Za-z0-9_]+')
+    for n, line in enumerate(lines, 1):
+        s = line.strip()
+        if not s or s.startswith('#'): continue
+        where = '%s:%d' % (name, n)
+        f = [x.strip() for x in s.split('|')]
+        if f[0] == 'group':
+            if len(f) not in (4, 5) or not word.fullmatch(f[1]) or len(f[1]) > 23 or not f[2] or not f[3] or \
+                    (len(f) == 5 and f[4] != 'open'):
+                problems.append('%s: group | <key> | <DE> | <EN> [| open]' % where)
+            elif f[1] in gkeys: problems.append('%s: group key %s twice' % (where, f[1]))
+            gkeys.add(f[1])
+            groups += 1
+            continue
+        if not groups: problems.append('%s: switch line before the first group line' % where)
+        if len(f) not in (9, 10):
+            problems.append('%s: want 9 or 10 fields, got %d' % (where, len(f)))
+            continue
+        plugin, section, key, typ, de, en, when, default, hint = f[:9]
+        since = f[9] if len(f) == 10 else ''
+        if plugin not in SW_PLUGINS: problems.append('%s: plugin %s not in %s' % (where, plugin, SW_PLUGINS))
+        if not (word.fullmatch(section) and len(section) < 32 and word.fullmatch(key) and len(key) < 40):
+            problems.append('%s: section / key (letters, digits, _)' % where)
+        if not re.fullmatch(r'bool|int:-?\d+\.\.-?\d+(:\d+)?|choice:[A-Za-z0-9_]+(,[A-Za-z0-9_]+)+', typ):
+            problems.append('%s: type %s (bool | int:<lo>..<hi>[:<step>] | choice:<a>,<b>)' % (where, typ))
+        m = re.fullmatch(r'int:(-?\d+)\.\.(-?\d+)(?::(\d+))?', typ)
+        if m and (int(m.group(1)) >= int(m.group(2)) or (m.group(3) and not
+                  1 <= int(m.group(3)) <= int(m.group(2)) - int(m.group(1)))):
+            problems.append('%s: int range / step' % where)
+        if typ.startswith('choice:') and len(typ) - 7 >= 64: problems.append('%s: choice list longer than 63' % where)
+        if not de or not en or len(de) > 63 or len(en) > 63: problems.append('%s: DE / EN text empty or longer than 63' % where)
+        if len(hint) > 199: problems.append('%s: hint longer than 199' % where)
+        if when not in ('live', 'restart') and not re.fullmatch(r'live-if:[A-Za-z0-9_]+', when):
+            problems.append('%s: when %s (live | restart | live-if:<Key>)' % (where, when))
+        if not sw_value_ok(typ, default): problems.append('%s: default %s does not fit %s' % (where, default, typ))
+        if (plugin, section, key) in seen: problems.append('%s: [%s] %s of %s twice' % (where, section, key, plugin))
+        seen.add((plugin, section, key))
+        rows.append((n, plugin, section, key, typ, when, default, since))
+        if plugin not in SW_PLUGINS: continue
+        if plugin not in inis:
+            inis[plugin], versions[plugin], sources[plugin] = plugin_ini(plugin), plugin_version(plugin), \
+                plugin_source(plugin)
+        ini = inis[plugin] or {}
+        pending = False
+        if since:
+            sm = re.fullmatch(r'(Tru[A-Za-z0-9]+) (\d+(?:\.\d+)+)', since)
+            if not sm or sm.group(1) != plugin: problems.append('%s: since "%s" (<the row\'s plugin> <version>)' % (where, since))
+            else: pending = tuple(int(x) for x in sm.group(2).split('.')) > versions[plugin]
+        got = ini.get((section, key))
+        if got is None:
+            if not pending: problems.append('%s: [%s] %s is not in %s.ini' % (where, section, key, plugin))
+        else:
+            if not sw_value_ok(typ, got[1]):
+                problems.append('%s: %s.ini:%d %s=%s does not fit %s' % (where, plugin, got[0], key, got[1], typ))
+            if got[1] != default and not pending:
+                problems.append('%s: default %s, %s.ini:%d has %s' % (where, default, plugin, got[0], got[1]))
+        live = SW_LIVE.get((plugin, section, key))
+        if when == 'restart' and live:
+            problems.append('%s: [%s] %s is re-read at run time (%s) - mark it live' % (where, section, key, live.strip('(')))
+        if when != 'restart':
+            if not live: problems.append('%s: [%s] %s marked %s but %s reads it only at the start' % (where, section, key,
+                                                                                                  when, plugin))
+            else:
+                body = fn_body(sources[plugin], live)
+                if not body or '"%s"' % key not in body or '"%s"' % section not in body:
+                    problems.append('%s: %s has no read of [%s] %s' % (where, live.strip('('), section, key))
+            if when.startswith('live-if:') and (section, when[8:]) not in ini:
+                problems.append('%s: %s - [%s] %s not in %s.ini' % (where, when, section, when[8:], plugin))
+    if len(rows) > SW_MAX: problems.append('%s: %d switch lines, TruMenu keeps %d' % (name, len(rows), SW_MAX))
+    if groups > SW_GROUP_MAX: problems.append('%s: %d groups, TruMenu keeps %d' % (name, groups, SW_GROUP_MAX))
+    for plugin in SW_PLUGINS:                # every switch of the plugin INIs is a row
+        for (section, key), (line, value) in sorted((plugin_ini(plugin) or {}).items()):
+            if (plugin, section, key) not in seen and (plugin, section, key) not in SW_TEXT_KEYS:
+                problems.append('%s: %s.ini:%d [%s] %s has no row' % (name, plugin, line, section, key))
+    for (plugin, section, key) in SW_LIVE:
+        if (plugin, section, key) not in seen: problems.append('%s: live key [%s] %s of %s has no row' % (name, section,
+                                                                                                         key, plugin))
+    live_n = sum(1 for r in rows if r[5] != 'restart')
+    return problems, '%d switches (%d live / live-if) in %d groups, %d plugins' % (len(rows), live_n, groups,
+                                                                                len({r[1] for r in rows})), rows
+
+
+def check_0215(radial_path, switches_path):
+    """0.21.5 (2026-11-07 TruMenu 0.21.5 Fixes + frozen ring): see the module text"""
+    problems, summary, rows = check_switches(switches_path)
+    src = open(CPP, encoding='utf-8').read()
+    items = item_types(src)
+    for item in ('sw.set', 'sw.list', 'sw.reload'):
+        m = re.search(r'\{"%s", "action", (?:"[^"]*"\s*)+,\s*(true|false),' % re.escape(item), src)
+        if not m: problems.append('TruMenu.cpp: item %s (action) missing in kItems' % item)
+        elif m.group(1) != 'false': problems.append('TruMenu.cpp: %s must not be a game-thread item' % item)
+    if not re.search(r'\{"Fixes", "Fixes", nullptr, 0, kQsSwitches\}', src):
+        problems.append('TruMenu.cpp: kQbPages has no page Fixes (kQsSwitches)')
+    sec = src[src.find('// ---- 0.21.5 Fixes'):src.find('// ---- end of 0.21.5 Fixes')]
+    if not sec: problems.append('TruMenu.cpp: section "0.21.5 Fixes" missing')
+    if sec.count('WritePrivateProfileStringA(') != 1:
+        problems.append('TruMenu.cpp: section 0.21.5 Fixes must write the plugin INI in exactly one place (RunSwSet)')
+    rs = fn_body(src, 'bool RunSwSet(')
+    marks = [rs.find(t) for t in ('SwFindLocked(', 'SwValueOk(', 'GetFileAttributesA(', 'strcmp(old.text, v)',
+                                  'WritePrivateProfileStringA(')]
+    if not rs or -1 in marks or marks != sorted(marks):
+        problems.append('TruMenu.cpp: RunSwSet must check in this order before the write: listed key, value fits, INI '
+                        'exists, value changed (got %s)' % marks)
+    if 'TestIniTarget(' not in rs: problems.append('TruMenu.cpp: RunSwSet must build the path with TestIniTarget')
+    if 'kSwMarker' not in fn_body(src, 'void SwLoadLocked(') or '"# TruMenu switches"' not in src:
+        problems.append('TruMenu.cpp: SwLoadLocked must refuse a file without the first-line marker')
+    if not re.search(r'kSwMax = %d, kSwGroupMax = %d' % (SW_MAX, SW_GROUP_MAX), src):
+        problems.append('TruMenu.cpp: kSwMax / kSwGroupMax differ from this tool (%d / %d)' % (SW_MAX, SW_GROUP_MAX))
+    fav = fn_body(src, 'void QbFavPin(')
+    if 'kQsSwitches' not in fav: problems.append('TruMenu.cpp: QbFavPin must refuse Y on page Fixes (no favourite)')
+    tick = fn_body(src, 'void QuickTick(')
+    if 'p.special == kQsSwitches ? kQbXDir : 1' not in tick:
+        problems.append('TruMenu.cpp: QuickTick: X on page Fixes must pass kQbXDir')
+    act = fn_body(src, 'void QbSwAct(')
+    if 'QbRun("Fixes"' not in act or '"sw.set"' not in act:
+        problems.append('TruMenu.cpp: QbSwAct must write through the item sw.set (QbRun)')
+    if 'g_swGroup[g].open = false' not in act: problems.append('TruMenu.cpp: QbSwAct must keep one group open at a time')
+    if 'RunSwSet(pending' not in fn_body(src, 'void PageSwitches('):
+        problems.append('TruMenu.cpp: the menu section Fixes must write through RunSwSet')
+    if 'PageSwitches();' not in src or 'PageQbAll();' not in src or 'kQbPages[p]' not in fn_body(src, 'void PageQbAll('):
+        problems.append('TruMenu.cpp: the long menu needs the sections Fixes (PageSwitches) and Quick bar pages (PageQbAll '
+                        'over kQbPages)')
+    build = open(os.path.join(ROOT, 'scripts', 'windows', 'Build-TruAsi.ps1'), encoding='utf-8-sig').read()
+    if "'switches.txt'" not in build: problems.append('Build-TruAsi.ps1 does not copy TruMenu.switches.txt')
+    st = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if 'TruMenu.switches.txt' not in st: problems.append('Set-TruMenu.ps1 does not install TruMenu.switches.txt')
+    # the frozen ring: its header says so, no new entries, every entry is a bar row (and so a row of the menu section)
+    rtext = open(radial_path, encoding='ascii', errors='replace').read()
+    if 'aktuell nicht weiter gemacht' not in rtext or 'frozen' not in rtext:
+        problems.append('%s: the header must say the ring is frozen ("aktuell nicht weiter gemacht")' %
+                        os.path.basename(radial_path))
+    entries = ring_entries(radial_path)
+    if len(entries) > RING_FROZEN:
+        problems.append('%s: %d entries - the ring is frozen at %d (no new entries)' % (os.path.basename(radial_path),
+                                                                                       len(entries), RING_FROZEN))
+    for e in ring_parity(src, radial_path):
+        problems.append('%s:%d: ring entry %s | %s | %s %s is no bar row (ring frozen: every entry belongs in the bar)' %
+                        ((os.path.basename(radial_path),) + e))
+    return problems, '%s; items sw.*, page Fixes, RunSwSet order, Y refused, menu sections; ring %d entries all bar ' \
+                     'rows' % (summary, len(entries))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -1682,7 +1965,7 @@ def main(argv):
     if argv and argv[0] == '--print':
         sys.stdout.write(want)
         return 0
-    opt = {k: argv[i + 1] for i, k in enumerate(argv[:-1]) if k in ('--ini', '--radial', '--tour')}
+    opt = {k: argv[i + 1] for i, k in enumerate(argv[:-1]) if k in ('--ini', '--radial', '--tour', '--switches')}
     ini_path = opt.get('--ini', INI)
     problems, summary = check_lists()
     for p in problems: print('LIST %s' % p)
@@ -1751,6 +2034,10 @@ def main(argv):
     for p in hproblems: print('Q0214 %s' % p)
     if not hproblems: print('ok: 0.21.4 hall02 counter: %s' % hsummary)
     problems += hproblems
+    fproblems5, fsummary5 = check_0215(radial_path, opt.get('--switches', SWITCHES))   # 0.21.5
+    for p in fproblems5: print('Q0215 %s' % p)
+    if not fproblems5: print('ok: 0.21.5 Fixes + frozen ring: %s' % fsummary5)
+    problems += fproblems5
     nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)

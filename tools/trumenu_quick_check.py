@@ -103,6 +103,9 @@ released) and adds four (docs/Befund-TruMenu-0213-0711.md):
 
 Usage (from the repository root):
   ../bin/pyt -t 120 tools/trumenu_quick_check.py            all models, exit 1 on a failure
+0.21.5 (2026-11-07 Fixes + frozen ring): switches (SwNext / RunSwSet: bool / int / choice steps, X toggle / wrap,
+listed key, type, INI exists, unchanged = no write, live / restart / live-if), swfold (one group open at a time,
+largest page <= 64 rows), ringparity (every ring entry of the shipped file is a bar row, ring frozen at 172).
 """
 import itertools, math, random, sys
 
@@ -2159,6 +2162,122 @@ def check_sndwidth():
     return good
 
 
+def sw_value_ok(typ, lo, hi, choices, v):     # SwValueOk
+    if typ == 'bool': return v in ('0', '1')
+    if typ == 'choice': return v.lower() in [c.lower() for c in choices]
+    return v.lstrip('-').isdigit() and len(v) <= 9 and lo <= int(v) <= hi
+
+
+def sw_next(typ, lo, hi, step, choices, cur, d):   # SwNext: d -1 / +1 stop at the end, d 2 = X (toggle / wrap)
+    if typ == 'bool':
+        on = int(cur) != 0
+        want = (not on) if d == 2 else d > 0
+        return None if want == on else str(int(want))
+    if typ == 'int':
+        x = min(max(int(cur), lo), hi)
+        nxt = x + (-step if d < 0 else step)
+        if d == 2 and nxt > hi: nxt = lo
+        nxt = min(max(nxt, lo), hi)
+        return None if nxt == int(cur) else str(nxt)
+    low = [c.lower() for c in choices]
+    i = low.index(cur.lower()) if cur.lower() in low else (len(choices) if d < 0 else -1)
+    nxt = i + (-1 if d < 0 else 1)
+    if d == 2 and nxt >= len(choices): nxt = 0
+    return None if nxt < 0 or nxt >= len(choices) or nxt == i else choices[nxt]
+
+
+def sw_set(ini, listed, row, v, live_if_on=True):   # RunSwSet: ('refused', why) / ('same',) / ('written', live)
+    key, typ, lo, hi, choices, when = row
+    if key not in listed: return ('refused', 'not listed')
+    if not sw_value_ok(typ, lo, hi, choices, v): return ('refused', 'value')
+    if ini is None: return ('refused', 'no ini')
+    if ini.get(key) == v: return ('same',)
+    ini[key] = v
+    return ('written', when == 'live' or (when == 'live-if' and live_if_on))
+
+
+def check_switches():
+    good = True
+    b = ('k', 'bool', 0, 1, (), 'live')
+    good &= [sw_next('bool', 0, 1, 1, (), '0', d) for d in (-1, 1, 2)] == [None, '1', '1']
+    good &= [sw_next('bool', 0, 1, 1, (), '1', d) for d in (-1, 1, 2)] == ['0', None, '0']
+    good &= [sw_next('int', 0, 3, 1, (), '3', d) for d in (-1, 1, 2)] == ['2', None, '0']
+    good &= [sw_next('int', 0, 20000, 500, (), '4000', d) for d in (-1, 1)] == ['3500', '4500']
+    good &= sw_next('int', 0, 3, 1, (), '0', -1) is None and sw_next('int', 1, 100, 1, (), '100', 1) is None
+    good &= sw_next('int', 1, 100, 1, (), '500', -1) == '99'            # out of range in the INI: back into the range
+    good &= sw_next('int', 1, 100, 1, (), '500', 1) == '100'
+    lang = ('en', 'fr', 'de', 'it', 'es', 'off')
+    good &= [sw_next('choice', 0, 0, 1, lang, 'es', d) for d in (-1, 1, 2)] == ['it', 'off', 'off']
+    good &= sw_next('choice', 0, 0, 1, lang, 'off', 2) == 'en' and sw_next('choice', 0, 0, 1, lang, 'off', 1) is None
+    good &= sw_next('choice', 0, 0, 1, lang, 'xx', 1) == 'en' and sw_next('choice', 0, 0, 1, lang, 'xx', -1) == 'off'
+    ini = {'k': '0'}
+    good &= sw_set(ini, {'k'}, b, '1') == ('written', True) and ini['k'] == '1'
+    good &= sw_set(ini, {'k'}, b, '1') == ('same',)
+    good &= sw_set(ini, {'k'}, b, '2') == ('refused', 'value') and ini['k'] == '1'
+    good &= sw_set(ini, set(), b, '0') == ('refused', 'not listed')
+    good &= sw_set(None, {'k'}, b, '0') == ('refused', 'no ini')
+    r = ('e', 'bool', 0, 1, (), 'restart')
+    good &= sw_set({'e': '1'}, {'e'}, r, '0') == ('written', False)
+    m = ('l', 'choice', 0, 0, lang, 'live-if')
+    good &= sw_set({'l': 'es'}, {'l'}, m, 'de', False) == ('written', False)
+    good &= sw_set({'l': 'es'}, {'l'}, m, 'de', True) == ('written', True)
+    good &= sw_set({}, {'n'}, ('n', 'bool', 0, 1, (), 'live'), '1') == ('written', True)   # key missing: written
+    print('switches: SwNext (bool left / right / X toggle, int steps / ends / wrap / out-of-range INI, choice prev / next / '
+          'wrap / unknown), RunSwSet (listed key, type / range, INI exists, unchanged = no write, live / restart / '
+          'live-if)  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def sw_fold(groups, g, d):                     # QbSwAct on a group row: one group open at a time
+    open_now = groups[g]
+    want = (not open_now) if d == 2 else d > 0
+    if want == open_now: return groups
+    return [False] * len(groups) if not want else [i == g for i in range(len(groups))]
+
+
+def sw_rows(counts, groups):                   # QbSwRows: group row + the open group's rows
+    return sum(1 + (c if o else 0) for c, o in zip(counts, groups))
+
+
+def check_swfold():
+    good = True
+    counts = [14, 25, 19, 5, 7, 5, 8, 4, 28]   # the shipped file's groups
+    g = [True] + [False] * 8
+    good &= sw_rows(counts, g) == 9 + 14
+    g = sw_fold(g, 8, 1)
+    good &= g == [False] * 8 + [True] and sw_rows(counts, g) == 9 + 28
+    good &= sw_fold(g, 8, 1) == g and sw_fold(g, 3, -1) == g
+    g = sw_fold(g, 8, 2)
+    good &= g == [False] * 9
+    worst = max(sw_rows(counts, [i == k for i in range(9)]) for k in range(9))
+    good &= worst <= 64                       # kQbViewMax
+    allopen = sw_rows(counts, [True] * 9)
+    print('swfold: one group open at a time (right / X opens and closes the others, left / X closes, no change = no '
+          'action); largest page %d rows <= 64 (all open would be %d > 64)  %s' % (worst, allopen, 'ok' if good else 'FAIL'))
+    return good
+
+
+def check_ringparity():
+    """the shipped files: every ring entry is a bar row (the checker's ring_parity on TruMenu.cpp), ring = 172"""
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import trumenu_ini_check as c
+    src = open(c.CPP, encoding='utf-8').read()
+    miss = c.ring_parity(src, c.RADIAL)
+    n = len(c.ring_entries(c.RADIAL))
+    rows = c.qb_rows(src)
+    good = not miss and n == c.RING_FROZEN
+    # the rule itself: a bool row covers 0 / 1 / no argument, a value row its steps, a choice row only its choices
+    good &= c.row_covers(('t', '', 'x.b', '', 'kQbBool', '-1'), 'x.b', '1', src)
+    good &= not c.row_covers(('t', '', 'x.b', '', 'kQbBool', '-1'), 'x.b', '2', src)
+    good &= c.row_covers(('t', '', 'weapon.give', '', 'kQbChoice', '-1'), 'weapon.give', 'wp_uzi', src)
+    good &= not c.row_covers(('t', '', 'weapon.give', '', 'kQbChoice', '-1'), 'weapon.give', 'wp_none', src)
+    good &= not c.row_covers(('t', '', 'a', 'x', 'kQbAction', '-1'), 'a', 'y', src)
+    print('ringparity: %d ring entries (frozen at %d), %d bar rows, %d entries without a bar row; the rule (bool 0 / 1, '
+          'choice list, same argument)  %s' % (n, c.RING_FROZEN, len(rows), len(miss), 'ok' if good else 'FAIL'))
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -2170,7 +2289,8 @@ def main():
                check_groups(),
                check_padchain(), check_padblock(),                                    # 0.21.2 / TruShadowPower 0.19
                check_xyfav(), check_xyexec(), check_footer(), check_sndwidth(),       # 0.21.3
-               check_h2drift(), check_fixhall02(), check_scriptval(rng)]              # 0.21.4
+               check_h2drift(), check_fixhall02(), check_scriptval(rng),              # 0.21.4
+               check_switches(), check_swfold(), check_ringparity()]                  # 0.21.5
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

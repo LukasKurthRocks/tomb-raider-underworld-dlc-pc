@@ -2180,6 +2180,61 @@ real fix belongs into the data; TruMenu only rescues saves that already hold the
 Checks: `tools\trumenu_ini_check.py` `check_0214` (17 negatives), `tools\trumenu_quick_check.py` models `h2drift`,
 `fixhall02`, `scriptval`.
 
+## TruMenu 0.21.5 (page Fixes: plugin INI switches; the ring is frozen; 2026-11-07)
+
+**Bar page "Fixes" / menu section "Fixes"** - one data file `TruMenu.switches.txt` (source `src\asi\TruMenu\`,
+`Build-TruAsi.ps1` copies it into the build folder, `Set-TruMenu.ps1` installs it next to `tru.exe` with the
+first-line rule of the radial / tour files: ours = first line starts with `# TruMenu switches`; `-Remove` deletes only
+ours). Format (also in the file header):
+
+```text
+group | <key> | <DE heading> | <EN heading> [| open]
+<Plugin> | <Section> | <Key> | bool | int:<lo>..<hi>[:<step>] | choice:<a>,<b> | <DE> | <EN> | live | restart | live-if:<Key> | <default> | <hint> [| <since>]
+```
+
+- `live` = the plugin re-reads the key while the game runs (about once a second): TruShadowCombat `[Damage]`,
+  `[Chunk]`, `[Splash]` `Translate`, `[Strike] Translate`, `[States] Translate1013 / 1019 / 1020 / 1004 / 231Slot0 /
+  231Slot1`, `[Death] TranslateNotify33` (0.6.3), TruShadowPower `[Adrenaline] Translate` (K11); `live-if:LiveReload` =
+  TruMercLang `Enabled` / `Language` (live only with `LiveReload=1` at the start); every other key is read once in
+  DllMain (`restart` / "Neustart"). Some live keys only act when their hook was installed at the start (the hint says
+  so, e.g. `[Damage] Translate` needs `Translate` or `Log` = 1 at the start).
+- 112 switches in 9 groups (DLC 2 Kampf, Schattenkraft, Kampf Grundschalter / Diagnose, HUD, Felsader,
+  Doppelgaengerin, DLC 2 Spielerin / Kostuem, Soeldner-Sprache, TruTrace): every key of the eight plugin INIs except
+  the text filters (`PathFilter`, `SpawnFilter`, `ProgressFilter`). Keys that exist only in code (TruShadowPower
+  `Cond1046` / `Cond1055`, the hidden TruRockVein keys) are not listed (not in the sample INIs). TruGuard is not part
+  of it.
+- Bar: one group row per group (`[+]` / `[-]`); **one group open at a time** (right / X opens and closes the others,
+  left / X closes; kept until the game ends, the file's `open` mark = the start state) - with all groups open the page
+  would have 124 rows (`kQbViewMax` 64). Switch row: name, value (`an` / `aus`, `< 3 >`, `< es >`; a key missing in
+  the INI shows the default in brackets, a plugin without INI `keine INI`), count column `live` / `Neustart`. Right /
+  left = on / off or one step (stops at the end), **X** = toggle (bool) or one step up with wrap (int / choice). **Y**
+  is refused ("Fix-Schalter sind kein Favorit"): `[Favorites] Ids` holds item ids without an argument and a switch row
+  is `sw.set <target> <value>` - no pinning, no recent rows for these rows.
+- Long menu: section "Fixes: plugin switches / Plugin-Schalter (0.21.5)" - tree node per group, checkbox / - + /
+  choice buttons, tooltip = hint; buttons `sw.reload` / `sw.list`.
+- One write path, item `sw.set <Plugin>:<Section>:<Key> <value>` (bar, menu, TruLink): only keys listed in the file,
+  only values of the row's type / range, only into an existing `<Plugin>.ini` next to the `.asi` files (a plugin that
+  is not installed never gets an INI), never an unchanged value; `WritePrivateProfileStringA` as the TO TEST toggle
+  rows (`TestIniTarget`). The live re-reads pass the current value as their default, so a read that meets the write
+  keeps the old value one second longer. Log `sw.set <Plugin> [<Section>] <Key>: old -> new (live|restart) in <path>
+  (src=...)`. `sw.list` logs every row with its INI value, `sw.reload` reads the file again.
+
+**Ring frozen** ("aktuell nicht weiter gemacht"): `TruMenu.radial.txt` keeps its 172 entries, no new ones (header
+note). Every ring entry is now a bar row: 52 were ring-only and became rows - Notfall (Befreien (Marke), Saves
+sichern), Lara (Foto wie im Rad, Positionen: Liste, group "Objekte spawnen (Rad-Stufe R2)" with the five
+`instance.spawn` rows, right / X twice), Debug / Darstellung (Schnellschalter, Darstellung / Debug / Ton: Stand),
+Leveldaten (Checkpoints alle zeigen / verbergen / Liste), Zeit / Test (Ton mit Welt anhalten, Shader-Uhr mit anhalten,
+Musik Thailand / stoppen) and the new page **Render-Details** (groups Flach-Ansicht Farbe / Paesse, Navmesh,
+Objektnamen). The long menu got the section "Quick bar pages / Schnellleiste-Seiten (0.21.5)": every static row of
+every bar page from the same tables (confirmation rows with the menu's A-twice `ConfirmButton`, chapters back up
+first) - so the menu reaches every ring entry too. The bar now has 15 pages.
+
+Checks: `tools\trumenu_ini_check.py` `check_0215` (switches file format, every key in its plugin INI with the shipped
+default, live claims against the plugins' re-read functions, every INI key covered; ring frozen + every entry a bar
+row; 19 negatives), `tools\trumenu_quick_check.py` models `switches`, `swfold`, `ringparity`. No new game address, no
+new byte check, imports / exports unchanged. Not in 0.21.5: the SweepAndPrune read-out (P6a) and the shader labels
+(room for 0.21.6).
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -17657,6 +17657,336 @@ void M214Check() {
 }
 // ---- end of 0.21.4 hall02 counter ----
 
+// ---- 0.21.5 Fixes: plugin INI switches (Lukas 2026-11-07; TruMenu.switches.txt next to tru.exe) ----
+// One data file for the bar page "Fixes" and the long menu section "Fixes": every row is one key of a plugin INI next to
+// the .asi files (<Plugin>.ini through the TO TEST toggle path TestIniTarget / WritePrivateProfileStringA). A row shows
+// the INI's current value (read at most once a second on the render thread), writes only on an owner action (bar right
+// / left / X, a click in the menu, sw.set over TruLink), only keys listed in the file, only values of the row's type /
+// range, never an unchanged value, and only into an INI that exists (a plugin that is not installed never gets an INI).
+// "live" rows are re-read by the plugin about once a second (TruShadowCombat ReadSwitches / DamageReadSwitch /
+// ChunkReadSwitch / SplashReadSwitch, TruShadowPower K11ReadSwitch, TruMercLang PollIni with LiveReload=1); those reads
+// pass the current value as the default, so a read that meets the write keeps the old value one second longer. The
+// plugins' start reads run in DllMain, before TruMenu can show a row. "restart" rows take effect at the next start.
+// Favourites: [Favorites] Ids holds item ids without an argument and a switch row is "sw.set <target> <value>" - Y is
+// refused on these rows (footer line); no pinning, no recent rows.
+enum SwType { kSwBool = 0, kSwInt, kSwChoice };
+enum SwWhen { kSwLive = 0, kSwRestart, kSwLiveIf };
+struct SwRow {
+    char plugin[24], section[32], key[40], target[112];   // target "ini:<Plugin>:<Section>:<Key>" (TestIniTarget)
+    int type, lo, hi, step, when, group;
+    char choices[64], de[64], en[64], whenKey[40], def[24], hint[200], since[40];
+};
+struct SwGroup { char key[24], de[64], en[64]; bool open; int count; };
+struct SwValue { int state; char text[24]; };   // state 0 = the INI value, 1 = key missing, 2 = no INI
+const int kSwMax = 160, kSwGroupMax = 24;
+SwRow g_sw[kSwMax];
+SwGroup g_swGroup[kSwGroupMax];
+SwValue g_swVal[kSwMax];                     // render thread (SwRefresh)
+int g_swN = 0, g_swGroupN = 0;
+char g_swPath[MAX_PATH] = "", g_swState[160] = "not read";
+CRITICAL_SECTION g_swLock;                   // g_sw / g_swGroup (sw.reload may come over TruLink)
+volatile LONG g_swReadAt = 0;                // GetTickCount of the last SwRefresh, 0 = read again now
+const char *const kSwMarker = "# TruMenu switches";
+
+// "a | b | c" -> trimmed fields (the line is cut in place); returns the count
+int SwSplit(char *line, char **f, int max) {
+    int c = 0;
+    char *p = line;
+    while (c < max) {
+        char *bar = strchr(p, '|');
+        if (bar) *bar = 0;
+        while (*p == ' ' || *p == '\t') ++p;
+        size_t len = strlen(p);
+        while (len && (p[len - 1] == ' ' || p[len - 1] == '\t')) p[--len] = 0;
+        f[c++] = p;
+        if (!bar) break;
+        p = bar + 1;
+    }
+    return c;
+}
+bool SwWord(const char *s, size_t max) {     // letters / digits / _ only, 1 .. max - 1
+    size_t len = strlen(s);
+    if (!len || len >= max) return false;
+    for (const char *q = s; *q; ++q) if (!isalnum(static_cast<unsigned char>(*q)) && *q != '_') return false;
+    return true;
+}
+bool SwChoiceHas(const SwRow &r, const char *v, int *index) {
+    char copy[sizeof(r.choices)];
+    strncpy_s(copy, sizeof(copy), r.choices, _TRUNCATE);
+    char *context = nullptr;
+    int i = 0;
+    for (char *t = strtok_s(copy, ",", &context); t; t = strtok_s(nullptr, ",", &context), ++i)
+        if (!_stricmp(t, v)) { if (index) *index = i; return true; }
+    return false;
+}
+int SwChoiceCount(const SwRow &r) {
+    int c = r.choices[0] ? 1 : 0;
+    for (const char *p = r.choices; *p; ++p) if (*p == ',') ++c;
+    return c;
+}
+void SwChoiceAt(const SwRow &r, int index, char *o, size_t n) {
+    char copy[sizeof(r.choices)];
+    strncpy_s(copy, sizeof(copy), r.choices, _TRUNCATE);
+    char *context = nullptr;
+    int i = 0;
+    o[0] = 0;
+    for (char *t = strtok_s(copy, ",", &context); t; t = strtok_s(nullptr, ",", &context), ++i)
+        if (i == index) { strncpy_s(o, n, t, _TRUNCATE); return; }
+}
+// a value fits the row's type: bool 0 / 1, int lo .. hi (decimal), choice one of the list (exact INI text)
+bool SwValueOk(const SwRow &r, const char *v) {
+    if (r.type == kSwBool) return !strcmp(v, "0") || !strcmp(v, "1");
+    if (r.type == kSwChoice) return SwChoiceHas(r, v, nullptr);
+    if (!v[0] || strlen(v) > 9) return false;
+    for (const char *p = v[0] == '-' ? v + 1 : v; *p; ++p) if (!isdigit(static_cast<unsigned char>(*p))) return false;
+    const int x = atoi(v);
+    return x >= r.lo && x <= r.hi;
+}
+// g_swLock held: one switch line (false = bad line, why in *why)
+bool SwParseRow(char **f, int c, SwRow &r, const char **why) {
+    memset(&r, 0, sizeof(r));
+    if (c < 9 || c > 10) { *why = "want 9 or 10 fields"; return false; }
+    if (!SwWord(f[0], sizeof(r.plugin)) || _strnicmp(f[0], "Tru", 3) || !SwWord(f[1], sizeof(r.section)) ||
+        !SwWord(f[2], sizeof(r.key))) { *why = "plugin / section / key"; return false; }
+    strncpy_s(r.plugin, sizeof(r.plugin), f[0], _TRUNCATE);
+    strncpy_s(r.section, sizeof(r.section), f[1], _TRUNCATE);
+    strncpy_s(r.key, sizeof(r.key), f[2], _TRUNCATE);
+    Out(r.target, sizeof(r.target), "ini:%s:%s:%s", r.plugin, r.section, r.key);
+    r.step = 1;
+    if (!strcmp(f[3], "bool")) { r.type = kSwBool; r.lo = 0; r.hi = 1; }
+    else if (!strncmp(f[3], "int:", 4)) {
+        r.type = kSwInt;
+        int got = sscanf_s(f[3] + 4, "%d..%d:%d", &r.lo, &r.hi, &r.step);
+        if (got < 2 || r.lo >= r.hi || r.step < 1 || r.step > r.hi - r.lo) { *why = "int:<lo>..<hi>[:<step>]"; return false; }
+    } else if (!strncmp(f[3], "choice:", 7) && f[3][7] && strlen(f[3] + 7) < sizeof(r.choices)) {
+        r.type = kSwChoice;
+        strncpy_s(r.choices, sizeof(r.choices), f[3] + 7, _TRUNCATE);
+    } else { *why = "type bool | int:<lo>..<hi>[:<step>] | choice:<a>,<b>"; return false; }
+    if (!f[4][0] || !f[5][0]) { *why = "DE / EN text"; return false; }
+    strncpy_s(r.de, sizeof(r.de), f[4], _TRUNCATE);
+    strncpy_s(r.en, sizeof(r.en), f[5], _TRUNCATE);
+    if (!strcmp(f[6], "live")) r.when = kSwLive;
+    else if (!strcmp(f[6], "restart")) r.when = kSwRestart;
+    else if (!strncmp(f[6], "live-if:", 8) && SwWord(f[6] + 8, sizeof(r.whenKey))) {
+        r.when = kSwLiveIf;
+        strncpy_s(r.whenKey, sizeof(r.whenKey), f[6] + 8, _TRUNCATE);
+    } else { *why = "when live | restart | live-if:<Key>"; return false; }
+    strncpy_s(r.def, sizeof(r.def), f[7], _TRUNCATE);
+    if (!SwValueOk(r, r.def)) { *why = "default does not fit the type"; return false; }
+    strncpy_s(r.hint, sizeof(r.hint), f[8], _TRUNCATE);
+    if (c == 10) strncpy_s(r.since, sizeof(r.since), f[9], _TRUNCATE);
+    char path[MAX_PATH], sec[64], key[64];
+    if (!TestIniTarget(r.target, path, sizeof(path), sec, sizeof(sec), key, sizeof(key))) { *why = "bad ini target"; return false; }
+    return true;
+}
+// g_swLock held: (re)read TruMenu.switches.txt; a file without the first-line marker gives no rows
+void SwLoadLocked() {
+    g_swN = g_swGroupN = 0;
+    FILE *f = nullptr;
+    if (!g_swPath[0] || fopen_s(&f, g_swPath, "r") != 0 || !f) {
+        Out(g_swState, sizeof(g_swState), "missing - page Fixes is empty (Set-TruMenu.ps1 -Install copies it)");
+        Log(1, "switches: %s not found - page Fixes is empty", g_swPath[0] ? g_swPath : "TruMenu.switches.txt");
+        return;
+    }
+    char line[700];
+    int number = 0, bad = 0;
+    bool marker = false;
+    while (fgets(line, sizeof(line), f)) {
+        ++number;
+        size_t len = strlen(line);
+        while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = 0;
+        if (number == 1) { marker = !strncmp(line, kSwMarker, strlen(kSwMarker)); if (!marker) break; }
+        const char *p = line;
+        while (*p == ' ' || *p == '\t') ++p;
+        if (!*p || *p == '#') continue;
+        char *field[12];
+        const int c = SwSplit(line, field, 12);
+        const char *why = "";
+        if (!strcmp(field[0], "group")) {
+            if (c < 4 || c > 5 || !SwWord(field[1], sizeof(g_swGroup[0].key)) || !field[2][0] || !field[3][0] ||
+                (c == 5 && strcmp(field[4], "open")))
+                why = "group | <key> | <DE> | <EN> [| open]";
+            else if (g_swGroupN >= kSwGroupMax) why = "too many groups";
+            else {
+                SwGroup &g = g_swGroup[g_swGroupN++];
+                memset(&g, 0, sizeof(g));
+                strncpy_s(g.key, sizeof(g.key), field[1], _TRUNCATE);
+                strncpy_s(g.de, sizeof(g.de), field[2], _TRUNCATE);
+                strncpy_s(g.en, sizeof(g.en), field[3], _TRUNCATE);
+                g.open = c == 5;
+                continue;
+            }
+        } else if (!g_swGroupN) why = "a switch line before the first group line";
+        else if (g_swN >= kSwMax) why = "too many switch lines";
+        else if (SwParseRow(field, c, g_sw[g_swN], &why)) {
+            g_sw[g_swN].group = g_swGroupN - 1;
+            ++g_swGroup[g_swGroupN - 1].count;
+            ++g_swN;
+            continue;
+        }
+        if (++bad <= 5) Log(0, "switches: %s line %d skipped (%s)", g_swPath, number, why);
+    }
+    fclose(f);
+    if (!marker) {
+        g_swN = g_swGroupN = 0;
+        Out(g_swState, sizeof(g_swState), "not a TruMenu switches file (first line) - page Fixes is empty");
+        Log(0, "switches: %s does not start with '%s' - ignored", g_swPath, kSwMarker);
+        return;
+    }
+    bool open = false;                       // one group open at a time: the first one marked "open"
+    for (int g = 0; g < g_swGroupN; ++g) { if (open) g_swGroup[g].open = false; open = open || g_swGroup[g].open; }
+    Out(g_swState, sizeof(g_swState), "%d switches in %d groups%s", g_swN, g_swGroupN, bad ? ", lines skipped (log)" : "");
+    Log(1, "switches: %d switches in %d groups from %s (%d lines skipped)", g_swN, g_swGroupN, g_swPath, bad);
+    InterlockedExchange(&g_swReadAt, 0);
+}
+// the INI value of one row (state 0 value, 1 key missing, 2 no INI)
+void SwReadValue(const SwRow &r, SwValue &v) {
+    char path[MAX_PATH], sec[64], key[64];
+    v.text[0] = 0;
+    if (!TestIniTarget(r.target, path, sizeof(path), sec, sizeof(sec), key, sizeof(key)) ||
+        GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) { v.state = 2; return; }
+    char buf[32];
+    GetPrivateProfileStringA(sec, key, "\x01", buf, sizeof(buf), path);
+    if (buf[0] == 1) { v.state = 1; return; }
+    v.state = 0;
+    strncpy_s(v.text, sizeof(v.text), buf, _TRUNCATE);
+}
+// render thread: every row's INI value, at most once a second (or at once after a write / reload)
+void SwRefresh() {
+    const DWORD now = GetTickCount();
+    const LONG at = g_swReadAt;
+    if (at && now - static_cast<DWORD>(at) < 1000) return;
+    EnterCriticalSection(&g_swLock);
+    for (int i = 0; i < g_swN; ++i) SwReadValue(g_sw[i], g_swVal[i]);
+    LeaveCriticalSection(&g_swLock);
+    InterlockedExchange(&g_swReadAt, static_cast<LONG>(now ? now : 1));
+}
+// the value the plugin uses: the INI text, or the row's default when the key is missing
+const char *SwEffective(const SwRow &r, const SwValue &v) { return v.state == 0 ? v.text : r.def; }
+// live-if rows: live only while <whenKey> of the same section is 1 now (the plugin read it at the start)
+bool SwIsLive(const SwRow &r) {
+    if (r.when == kSwLive) return true;
+    if (r.when == kSwRestart) return false;
+    char path[MAX_PATH], sec[64], key[64];
+    if (!TestIniTarget(r.target, path, sizeof(path), sec, sizeof(sec), key, sizeof(key))) return false;
+    return GetPrivateProfileIntA(r.section, r.whenKey, 0, path) != 0;
+}
+// the next value: dir -1 / +1 (bool off / on, int one step down / up, choice the previous / next - stops at the end),
+// dir 2 = X (bool toggles, int / choice one step up and wrap to the first); false = no change ("end")
+bool SwNext(const SwRow &r, const char *cur, int dir, char *o, size_t n) {
+    if (r.type == kSwBool) {
+        const bool on = atoi(cur) != 0, want = dir == 2 ? !on : dir > 0;
+        if (want == on) return false;
+        Out(o, n, "%d", want ? 1 : 0);
+        return true;
+    }
+    if (r.type == kSwInt) {
+        int x = atoi(cur);
+        if (x < r.lo) x = r.lo;
+        if (x > r.hi) x = r.hi;
+        int next = x + (dir < 0 ? -r.step : r.step);
+        if (dir == 2 && next > r.hi) next = r.lo;
+        if (next < r.lo) next = r.lo;
+        if (next > r.hi) next = r.hi;
+        if (next == atoi(cur)) return false;
+        Out(o, n, "%d", next);
+        return true;
+    }
+    const int count = SwChoiceCount(r);
+    int i = -1;
+    if (!SwChoiceHas(r, cur, &i)) i = dir < 0 ? count : -1;
+    int next = i + (dir < 0 ? -1 : 1);
+    if (dir == 2 && next >= count) next = 0;
+    if (next < 0 || next >= count || next == i) return false;
+    SwChoiceAt(r, next, o, n);
+    return true;
+}
+// "<Plugin>:<Section>:<Key>" (also with "ini:" in front) -> row index (g_swLock held), -1 = not in the file
+int SwFindLocked(const char *name) {
+    if (!_strnicmp(name, "ini:", 4)) name += 4;
+    for (int i = 0; i < g_swN; ++i)
+        if (!_stricmp(g_sw[i].target + 4, name)) return i;
+    return -1;
+}
+// sw.set "<Plugin>:<Section>:<Key> <value>": the one write path (bar, menu, TruLink)
+bool RunSwSet(const char *arg, char *o, size_t n) {
+    const bool de = g_qbLang == 0;
+    char name[112] = "";
+    const char *value = TestWord(arg, name, sizeof(name));
+    if (!name[0] || !value[0]) { Out(o, n, "usage: sw.set <Plugin>:<Section>:<Key> <value> (sw.list)"); return false; }
+    EnterCriticalSection(&g_swLock);
+    const int i = SwFindLocked(name);
+    SwRow r;
+    if (i >= 0) r = g_sw[i];
+    LeaveCriticalSection(&g_swLock);
+    if (i < 0) { Out(o, n, "%s is not in TruMenu.switches.txt - only listed keys are written", name); return false; }
+    char v[32];
+    strncpy_s(v, sizeof(v), value, _TRUNCATE);
+    for (char *p = v + strlen(v); p > v && p[-1] == ' '; --p) p[-1] = 0;
+    if (!SwValueOk(r, v)) {
+        Out(o, n, "%s: value '%s' does not fit (%s)", name, v, r.type == kSwBool ? "0 / 1" : r.type == kSwChoice ? r.choices
+                                                                                     : "range in TruMenu.switches.txt");
+        return false;
+    }
+    char path[MAX_PATH], sec[64], key[64];
+    if (!TestIniTarget(r.target, path, sizeof(path), sec, sizeof(sec), key, sizeof(key))) { Out(o, n, "bad target"); return false; }
+    if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
+        Out(o, n, de ? "%s fehlt - %s nicht installiert, nichts geschrieben" : "%s missing - %s not installed, nothing written",
+            path, r.plugin);
+        return false;
+    }
+    SwValue old;
+    SwReadValue(r, old);
+    const char *was = old.state == 0 ? old.text : "-";
+    if (old.state == 0 && !strcmp(old.text, v)) {
+        Out(o, n, de ? "%s [%s] %s ist schon %s" : "%s [%s] %s is %s already", r.plugin, r.section, r.key, v);
+        return true;
+    }
+    if (!WritePrivateProfileStringA(r.section, r.key, v, path)) {
+        Out(o, n, "cannot write %s (%lu)", path, GetLastError());
+        return false;
+    }
+    InterlockedExchange(&g_swReadAt, 0);
+    const bool live = SwIsLive(r);
+    char note[96] = "";
+    if (old.state == 1 && r.since[0])
+        Out(note, sizeof(note), de ? " (Schalter kommt mit %s)" : " (switch comes with %s)", r.since);
+    else if (r.when == kSwLiveIf && !live)
+        Out(note, sizeof(note), de ? " (%s=0: erst nach Neustart)" : " (%s=0: only after a restart)", r.whenKey);
+    Out(o, n, "%s [%s] %s %s -> %s: %s%s", r.plugin, r.section, r.key, was, v,
+        live ? (de ? "wirkt live (~1 s)" : "live (~1 s)") : (de ? "wirkt nach Neustart" : "after a restart"), note);
+    Log(1, "sw.set %s [%s] %s: %s -> %s (%s%s%s) in %s (src=%s)", r.plugin, r.section, r.key, was, v,
+        live ? "live" : "restart", r.since[0] ? ", row for " : "", r.since, path, ShotSource("sw.set"));
+    return true;
+}
+void ValSwState(char *o, size_t n) { Out(o, n, "%s (%s)", g_swState, g_swPath[0] ? g_swPath : "-"); }
+// sw.list: every row with its INI value into TruMenu.log (read only)
+bool RunSwList(const char *, char *o, size_t n) {
+    EnterCriticalSection(&g_swLock);
+    int missing = 0, noIni = 0;
+    for (int i = 0; i < g_swN; ++i) {
+        const SwRow &r = g_sw[i];
+        SwValue v;
+        SwReadValue(r, v);
+        missing += v.state == 1;
+        noIni += v.state == 2;
+        Log(1, "sw.list %s [%s] %s = %s (%s, default %s%s%s)", r.plugin, r.section, r.key,
+            v.state == 0 ? v.text : v.state == 1 ? "missing" : "no ini",
+            r.when == kSwLive ? "live" : r.when == kSwRestart ? "restart" : "live-if", r.def, r.since[0] ? ", " : "", r.since);
+    }
+    Out(o, n, "%d switches logged (%d key(s) missing, %d without INI); %s", g_swN, missing, noIni, g_swState);
+    LeaveCriticalSection(&g_swLock);
+    return true;
+}
+bool RunSwReload(const char *, char *o, size_t n) {
+    EnterCriticalSection(&g_swLock);
+    SwLoadLocked();
+    LeaveCriticalSection(&g_swLock);
+    Out(o, n, "%s", g_swState);
+    return g_swN > 0;
+}
+// ---- end of 0.21.5 Fixes ----
+
 // ======================================================================================================================
 // 0.10.5 [Shot]: in-game screenshots and Claude marks (owner wish 2026-11-05: the main session gets named shots in the
 // run folder instead of ShareX files without names / with wrong times).
@@ -19523,6 +19853,13 @@ const Item kItems[] = {
     {"thrall.scriptval", "action", "0.21.4: the thrall-script int +8 of every tutorial thrall (object 1004) and generator "
                                    "enemy into TruMenu.log (restored 0 / generator-born 2), read only", false,
      ValThrallScript, RunThrallScript},
+    // 0.21.5 Fixes (section "0.21.5 Fixes"): the plugin INI switches of TruMenu.switches.txt
+    {"sw.set", "action", "0.21.5: <Plugin>:<Section>:<Key> <value> - write one switch of TruMenu.switches.txt into the "
+                         "plugin INI next to tru.exe (listed keys only, type / range checked, existing INI only)", false,
+     ValSwState, RunSwSet},
+    {"sw.list", "action", "0.21.5: every switch of TruMenu.switches.txt with its INI value into TruMenu.log (read only)",
+     false, ValSwState, RunSwList},
+    {"sw.reload", "action", "0.21.5: read TruMenu.switches.txt again", false, ValSwState, RunSwReload},
 };
 
 const Item *FindItem(const char *id) {
@@ -22996,7 +23333,9 @@ enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvP
              kQvSpawnKind, kQvSpawnCount, kQvSpawnAt };   // 0.21.1 enemy spawn: kind (choice), count 1 .. 5, place
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
-enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves, kQsFav, kQsTests };   // 0.21.1 kQsFav / kQsTests
+enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves, kQsFav, kQsTests,   // 0.21.1 kQsFav / kQsTests
+                 kQsSwitches };            // 0.21.5 page Fixes (TruMenu.switches.txt)
+const int kQbXDir = 2;                      // 0.21.5: X on a special row of page Fixes (QbSpecialAct dir)
 struct QbPage { const char *de, *en; const QbRow *rows; int n; int special; };
 const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230, 255, 255),
             kQbPlayer = IM_COL32(255, 205, 120, 255), kQbGrey = IM_COL32(200, 200, 200, 255),
@@ -23021,6 +23360,9 @@ const QbRow kQbEmergency[] = {               // 0.18 Notfall (Lukas: "falls man 
     {"Sterben", "Die", "player.die", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Befreien: Stand", "Safe ground state", "player.safeground", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
+    {"Befreien (Marke)", "Unstuck (mark)", "player.unstuck", "mark", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Saves sichern", "Back up saves", "save.backup", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Punkt merken", "Mark here", "player.mark", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Zum Punkt", "Back to mark", "player.recall", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Volle Gesundheit", "Full health", "player.health", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
@@ -23047,6 +23389,17 @@ const QbRow kQbLara[] = {                    // + the saved positions (special p
     {"Foto mit UI", "Shot with UI", "shot.save", "ui", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     {"Foto sauber", "Clean shot", "shot.save", "clean", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     {"Position merken", "Save position", "pos.save", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
+    {"Foto (wie im Rad)", "Shot (as in the ring)", "shot.save", "ring", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
+    {"Positionen: Liste", "Positions: list", "pos.list", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Objekte spawnen (Rad-Stufe R2)", "Spawn objects (ring stage R2)", "-", "obj_spawn", kQbGroup, -1, kQcNone, 0,
+     kQbPlayer, 0},
+    {"Medipack", "Medipack", "instance.spawn", "g_healthpack", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfConfirm},
+    {"Kiste A", "Crate A", "instance.spawn", "sh_ei_combat_crate_a", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfConfirm},
+    {"Kiste B", "Crate B", "instance.spawn", "sh_ei_combat_crate_b", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfConfirm},
+    {"Kiste C", "Crate C", "instance.spawn", "sh_ei_combat_crate_c", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfConfirm},
+    {"Schrotflinte (Objekt)", "Shotgun (object)", "instance.spawn", "wp_shotgun", kQbAction, -1, kQcNone, 0, kQbPlayer,
+     kQfConfirm},
 };
 const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Alles an / aus", "Everything", "dbg.view", "", kQbBool, -1, kQcOn, 0, kQbWhite, 0},
@@ -23062,6 +23415,10 @@ const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Kurze Namen", "Short labels", "dbg.short", "", kQbBool, -1, kQcNone, 0, kQbBlue},
     {"Lara drin", "Lara in", "dbg.larain", "", kQbBool, -1, kQcLaraIn, 0, kQbWhite},
     {"Umhuellende", "Enclosing", "dbg.enclosing", "", kQbValue, -1, kQcEncl, kQvEncl, kQbBlue},
+    // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
+    {"Schnellschalter (offen)", "Quick bar (open)", "quick.open", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
+    {"Darstellung: Stand", "Display state", "dbg.style", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Debug: Stand", "Debug state", "dbg.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     // 0.20.1 Ton-Liste (Lukas: "mit Settings im Debug Menu")
     {"Ton-Liste", "Sound list", "-", "", kQbLabel, -1, kQcNone, 0, kQbSound, 0},
     {"Ton-Liste", "Sound list", "snd.list", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
@@ -23074,6 +23431,7 @@ const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Ton: Sprache", "Sound: speech", "snd.speech", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
     {"Ton: andere", "Sound: other", "snd.other", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
     {"Ton-Liste ins Log", "Sound list to log", "snd.dump", "", kQbAction, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton: Stand", "Sound: state", "snd.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},   // 0.21.5 (ring)
 };
 const QbRow kQbRender[] = {
     {"Flach-Ansicht", "Flat view", "dbg.flat", "", kQbBool, -1, kQcFlat, 0, kQbFlat},
@@ -23138,6 +23496,48 @@ const QbRow kQbRender[] = {
     {"hall02: Tutorial = 2", "hall02: tutorial = 2", "sticky.set", "11270 18509 2", kQbAction, -1, kQcNone, 0, kQbRed,
      kQfConfirm},
 };
+// 0.21.5 Render-Details (ring frozen, the ring's Spieler/Debug/Render, KI (navmesh) and Namen levels as bar rows): three
+// groups - one group open keeps the page short; the same rows are in the long menu section "Quick bar pages"
+const QbRow kQbRenderMore[] = {
+    {"Flach-Ansicht: Farbe / Paesse", "Flat view: colour / passes", "-", "rd_flat", kQbGroup, -1, kQcNone, 0, kQbFlat, 0},
+    {"Figuren einfaerben", "Colour figures", "dbg.flatmodels", "", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Jedes Ziel (auch Schatten)", "Any target (shadows too)", "dbg.flatanyrt", "", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Farbe: Material", "Colour: material", "dbg.flatcolour", "material", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Farbe: Terrain / Figuren", "Colour: terrain / figures", "dbg.flatcolour", "class", kQbAction, -1, kQcNone, 0, kQbFlat,
+     0},
+    {"Pass 0x200", "Pass 0x200", "dbg.flatpass", "0x200", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 0x100", "Pass 0x100", "dbg.flatpass", "0x100", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 0x80", "Pass 0x80", "dbg.flatpass", "0x80", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 0x400", "Pass 0x400", "dbg.flatpass", "0x400", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 0x800", "Pass 0x800", "dbg.flatpass", "0x800", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 1", "Pass 1", "dbg.flatpass", "1", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 2", "Pass 2", "dbg.flatpass", "2", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Render: Stand", "Render state", "dbg.render", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Navmesh", "Navmesh", "-", "rd_nav", kQbGroup, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh Flaechen", "Navmesh areas", "nav.draw", "planner_areas", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh gefuellt", "Navmesh filled", "nav.draw", "planner_areas_solid", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh Verbindungen", "Navmesh links", "nav.draw", "planner_connectivity", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Flaechen-Normalen", "Area normals", "nav.draw", "planner_area_normals", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Hindernisse", "Obstacles", "nav.draw", "obstacles", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Nav-Proben", "Nav probes", "nav.draw", "recent_navprobes", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Laufweg (Flieger)", "Path (flyer)", "nav.draw", "draw_mover3d_path", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Alle Ebenen", "All layers", "nav.mask", "", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh aus", "Navmesh off", "nav.off", "", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh: Stand", "Navmesh state", "nav.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Objektnamen: Filter / Farbe / Schrift", "Object names: filter / colour / size", "-", "rd_names", kQbGroup, -1,
+     kQcNone, 0, kQbBlue, 0},
+    {"Filter: alle", "Filter: all", "dbg.namefilter", "*", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Filter: Thralls", "Filter: thralls", "dbg.namefilter", "thrall", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Filter: Trigger", "Filter: triggers", "dbg.namefilter", "trigger,volume,plane", kQbAction, -1, kQcNone, 0, kQbBlue,
+     0},
+    {"Farbe weiss", "Colour white", "dbg.namecolour", "white", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Farbe gelb", "Colour yellow", "dbg.namecolour", "yellow", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Farbe cyan", "Colour cyan", "dbg.namecolour", "cyan", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Farbe magenta", "Colour magenta", "dbg.namecolour", "magenta", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Schrift 1x", "Size 1x", "dbg.namesize", "1", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Schrift 1.5x", "Size 1.5x", "dbg.namesize", "1.5", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Schrift 2x", "Size 2x", "dbg.namesize", "2", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+};
 const QbRow kQbLevel[] = {
     {"Alle Trigger", "All triggers", "dbg.triggers", "", kQbBool, -1, kQcTriggers, 0, kQbWhite},
     {"Tod", "Death", "dbg.show", "death", kQbBool, kDvDeath, kQcLayer, 0, 0},
@@ -23152,12 +23552,22 @@ const QbRow kQbLevel[] = {
     {"Checkpoints", "Checkpoints", "dbg.checkpoints", "", kQbBool, kDvCheckpoints, kQcLayer, 0, 0},
     {"Trigger-Namen", "Labels", "dbg.show", "trglabels", kQbBool, kDvTrgLabels, kQcTrgLabels, 0, 0},
     {"Sammelgegenstaende", "Collectibles", "dbg.collect", "", kQbBool, kDvCollect, kQcLayer, 0, 0},   // 0.20
+    // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
+    {"Checkpoints: alle zeigen", "Checkpoints: show all", "dbg.cpall", "1", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Checkpoints: alle verbergen", "Checkpoints: hide all", "dbg.cpall", "0", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Checkpoints: Liste", "Checkpoints: list", "dbg.cplist", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
 };
 const QbRow kQbTimeTest[] = {                // 0.18 Zeit / Test
     {"Welt anhalten", "Pause world", "time.pause", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
     {"Zeitlupe", "Time scale", "time.scale", "", kQbValue, -1, kQcNone, kQvTime, kQbTime, 0},
     {"Ton mit anhalten", "Freeze sound too", "time.freezesound", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
     {"Ton: Stand", "Sound state", "time.sound", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
+    {"Ton mit Welt anhalten", "Sound with world pause", "time.pausesound", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
+    {"Shader-Uhr mit anhalten", "Shader clock with freeze", "time.freezeclock", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
+    {"Musik: Thailand", "Music: Thailand", "media.music.play", "l2_waters_of_thailand", kQbAction, -1, kQcNone, 0,
+     kQbTime, 0},
+    {"Musik stoppen", "Music stop", "media.music.stop", "all", kQbAction, -1, kQcNone, 0, kQbTime, 0},
     {"Musik aus", "Music off", "media.mutemusic", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},        // 0.20
     {"Ambient aus", "Ambience off", "media.muteambient", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},  // 0.20
     {"Ton-Liste", "Sound list", "snd.list", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},             // 0.20.1
@@ -23287,8 +23697,10 @@ const QbPage kQbPages[] = {
     QB_PAGE("Debug / Darstellung", "Debug / display", kQbDebug, kQsNone),
     QB_PAGE("Leveldaten", "Level data", kQbLevel, kQsNone),
     QB_PAGE("Render / KI", "Render / AI", kQbRender, kQsNone),
+    QB_PAGE("Render-Details", "Render details", kQbRenderMore, kQsNone),   // 0.21.5 (ring frozen)
     QB_PAGE("Zeit / Test", "Time / test", kQbTimeTest, kQsNone),
     QB_PAGE("Tests", "Tests", kQbTests, kQsTests),                 // 0.21.1
+    {"Fixes", "Fixes", nullptr, 0, kQsSwitches},                   // 0.21.5 plugin INI switches (TruMenu.switches.txt)
     {"Checkpoints", "Checkpoints", nullptr, 0, kQsCheckpoints},
     {"Saves", "Saves", nullptr, 0, kQsSaves},
     QB_PAGE("Kapitel (debug)", "Chapters (debug)", kQbChapters, kQsNone),
@@ -23301,6 +23713,7 @@ const int kQbStartPage = 4;                  // Leveldaten: the layers are what 
                                              // Favoriten / Zuletzt in front)
 const int kQbViewMax = 64;                   // rows of one page (static + special; 0.21.1: 64, was 40)
 int g_qbPage = kQbStartPage, g_qbRow[16] = {};  // render thread; kept over a close
+static_assert(kQbPageN <= 16, "g_qbRow holds 16 pages");   // 0.21.5: 15 pages
 int g_qbShowClosed = 1, g_qbTop = 30;        // [Quick] ShowClosed / Top (percent of the screen height)
 float g_qbScale = 1.0f;                      // [Quick] Scale
 LONG g_qbToggles = 0, g_qbTaps = 0, g_qbLate = 0, g_qbRuns = 0;   // quick.status counters
@@ -23807,6 +24220,11 @@ void QbExecRow(int page, const QbRow &r) {
 }
 void QbFavPin(int page, const QbRow *r) {
     const bool de = g_qbLang == 0;
+    if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsSwitches) {   // 0.21.5 page Fixes
+        QbResult(true, "%s", de ? "Y: Fix-Schalter sind kein Favorit ([Favorites] Ids = Item-Ids ohne Argument)"
+                                : "Y: switch rows cannot be favourites ([Favorites] Ids = item ids without an argument)");
+        return;
+    }
     if (!r || r->kind == kQbLabel || r->kind == kQbGroup || r->kind == kQbPlanned || !strcmp(r->id, "-")) {
         QbResult(true, "%s", de ? "Y: keine Item-Zeile - nur Zeilen mit einem Item werden Favorit"
                                 : "Y: not an item row - only rows with an item can be favourites");
@@ -24215,7 +24633,7 @@ void QuickTick() {
     if (edges & kQbY) { QbFavPin(g_qbPage, src); return; }    // 0.21.3: Y = pin / unpin (section "0.21.3 X / Y")
     if (edges & kQbX) {                      // 0.21.3: X = execute (one press per frame: no right press on top)
         if (src) QbExecRow(g_qbPage, *src);  // static row, or a favourite / recent row of page 0
-        else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, 1);
+        else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, p.special == kQsSwitches ? kQbXDir : 1);
         return;
     }
     const int d = (edges & 0x0004) ? -1 : 1;                                // left = off / step down, right = on / up
@@ -25059,7 +25477,8 @@ bool RunPosGoLoad(const char *arg, char *o, size_t n) {
 // ---- 0.18 quick-toggle pages (render thread): the special rows of the pages Lara (saved positions), Checkpoints and
 // Saves. Each row is a QbView (drawn by DrawQuick) plus a QbDyn (what left / right do). Rows of the last QbBuild.
 enum QbDynKind { kQdNone = 0, kQdPos, kQdCpActive, kQdCpAll, kQdCp, kQdBackupNow, kQdRescan, kQdSave, kQdBackup, kQdLabel,
-                 kQdItem, kQdPrepare, kQdStop, kQdTodo };   // 0.21.1: page 0 rows, page Tests rows
+                 kQdItem, kQdPrepare, kQdStop, kQdTodo,     // 0.21.1: page 0 rows, page Tests rows
+                 kQdSwGroup, kQdSw };                       // 0.21.5: page Fixes (group, switch)
 struct QbDyn { int kind; LONG intro; char arg[64], unit[48]; bool loaded; };
 QbDyn g_qbDyn[kQbViewMax];
 int g_qbDynN = 0;
@@ -25382,6 +25801,103 @@ int QbTestsRows(QbView *v, QbDyn *d, int max, bool de) {
     }
     return n;
 }
+// 0.21.5 page Fixes (section "0.21.5 Fixes"): the groups of TruMenu.switches.txt as group rows ("[+]" / "[-]", one open
+// at a time - right / X opens it and closes the others, left closes it; kept until the game ends, the file's "open" mark
+// is the start state), the open group's switches below it: name, value ("an" / "aus", "< 3 >", "< es >"), count column
+// "live" / "Neustart"; a key missing in the INI shows the default in brackets, a plugin without INI "keine INI"
+int QbSwRows(QbView *v, QbDyn *d, int max, bool de) {
+    SwRefresh();
+    EnterCriticalSection(&g_swLock);
+    int n = 0, first = 0, live = 0;
+    for (int i = 0; i < g_swN; ++i) live += g_sw[i].when != kSwRestart;
+    Out(g_qbHead, sizeof(g_qbHead), de ? "%d Schalter (%d live), Plugin-INIs neben tru.exe" : "%d switches (%d live), plugin "
+        "INIs next to tru.exe", g_swN, live);
+    if (!g_swN) Out(g_qbHead, sizeof(g_qbHead), "TruMenu.switches.txt: %s", g_swState);
+    for (int g = 0; g < g_swGroupN && n < max; first += g_swGroup[g].count, ++g) {
+        const SwGroup &grp = g_swGroup[g];
+        QbView &w = v[n];
+        QbDyn &q = d[n];
+        memset(&w, 0, sizeof(w));
+        memset(&q, 0, sizeof(q));
+        w.src = -1;
+        Out(w.name, sizeof(w.name), "%s %s", grp.open ? "[-]" : "[+]", de ? grp.de : grp.en);
+        if (grp.open) Out(w.state, sizeof(w.state), "%s", de ? "links = zu" : "left = close");
+        else Out(w.state, sizeof(w.state), de ? "%d Zeilen - rechts = auf" : "%d rows - right = open", grp.count);
+        w.col = kQbBlue;
+        w.stateCol = IM_COL32(170, 170, 170, 255);
+        q.kind = kQdSwGroup;
+        q.intro = g;
+        ++n;
+        if (!grp.open) continue;
+        for (int i = first; i < first + grp.count && i < g_swN && n < max; ++i) {
+            const SwRow &r = g_sw[i];
+            const SwValue &val = g_swVal[i];
+            QbView &x = v[n];
+            QbDyn &y = d[n];
+            memset(&x, 0, sizeof(x));
+            memset(&y, 0, sizeof(y));
+            x.src = -1;
+            Out(x.name, sizeof(x.name), "  %s", de ? r.de : r.en);
+            const char *cur = SwEffective(r, val);
+            char text[40];
+            if (r.type == kSwBool) Out(text, sizeof(text), "%s", atoi(cur) ? (de ? "an" : "on") : (de ? "aus" : "off"));
+            else Out(text, sizeof(text), "< %s >", cur);
+            if (val.state == 2) Out(x.state, sizeof(x.state), "%s", de ? "keine INI" : "no INI");
+            else if (val.state == 1) Out(x.state, sizeof(x.state), "(%s)", text);
+            else Out(x.state, sizeof(x.state), "%s", text);
+            Out(x.count, sizeof(x.count), "%s", r.when == kSwRestart ? (de ? "Neustart" : "restart") : "live");
+            if (r.type == kSwBool && val.state != 2) x.square = atoi(cur) ? 1 : 2;
+            x.col = r.when == kSwRestart ? kQbGrey : kQbMarkup;
+            x.stateCol = val.state == 2 ? IM_COL32(125, 125, 125, 255) : val.state == 1 ? IM_COL32(255, 190, 90, 255)
+                       : r.type == kSwBool && atoi(cur) ? IM_COL32(110, 230, 120, 255) : IM_COL32(220, 220, 220, 255);
+            y.kind = kQdSw;
+            y.intro = i;
+            ++n;
+        }
+    }
+    LeaveCriticalSection(&g_swLock);
+    return n;
+}
+// page Fixes: right / left / X on a group or a switch row (dir kQbXDir = X)
+void QbSwAct(const QbDyn &q, int dir) {
+    const bool de = g_qbLang == 0;
+    EnterCriticalSection(&g_swLock);
+    const int i = static_cast<int>(q.intro);
+    if (q.kind == kQdSwGroup) {
+        if (i < 0 || i >= g_swGroupN) { LeaveCriticalSection(&g_swLock); return; }
+        SwGroup &grp = g_swGroup[i];
+        const bool open = dir == kQbXDir ? !grp.open : dir > 0;
+        if (open == grp.open) {
+            QbResult(false, "%s: %s", de ? grp.de : grp.en, open ? (de ? "schon auf" : "already open")
+                                                             : (de ? "schon zu" : "already closed"));
+        } else {
+            for (int g = 0; g < g_swGroupN; ++g) g_swGroup[g].open = false;   // one group open at a time
+            grp.open = open;
+            QbResult(false, "%s: %s", de ? grp.de : grp.en, open ? (de ? "auf" : "open") : (de ? "zu" : "closed"));
+        }
+        LeaveCriticalSection(&g_swLock);
+        return;
+    }
+    if (i < 0 || i >= g_swN) { LeaveCriticalSection(&g_swLock); return; }
+    const SwRow r = g_sw[i];
+    const SwValue val = g_swVal[i];
+    LeaveCriticalSection(&g_swLock);
+    const char *name = de ? r.de : r.en;
+    if (val.state == 2) {
+        QbResult(true, de ? "%s: %s.ini fehlt (nicht installiert) - nichts geschrieben" : "%s: %s.ini missing (not "
+                 "installed) - nothing written", name, r.plugin);
+        return;
+    }
+    char next[32], arg[160];
+    if (!SwNext(r, SwEffective(r, val), dir, next, sizeof(next))) {
+        QbResult(false, "%s: %s", name, r.type == kSwBool ? (atoi(SwEffective(r, val)) ? (de ? "schon an" : "already on")
+                                                                                       : (de ? "schon aus" : "already off"))
+                                                          : (de ? "Ende" : "end"));
+        return;
+    }
+    Out(arg, sizeof(arg), "%s %s", r.target + 4, next);
+    QbRun("Fixes", r.de, name, "sw.set", arg);
+}
 void QbActRow(int page, const QbRow &r, int dir);
 int QbSpecialBuild(int special, int base, bool de) {
     const int max = kQbViewMax - base;
@@ -25390,6 +25906,7 @@ int QbSpecialBuild(int special, int base, bool de) {
     int n = 0;
     if (special == kQsFav) n = QbFavRows(g_qbView + base, g_qbDyn, max, de);           // 0.21.1
     else if (special == kQsTests) n = QbTestsRows(g_qbView + base, g_qbDyn, max, de);
+    else if (special == kQsSwitches) n = QbSwRows(g_qbView + base, g_qbDyn, max, de);   // 0.21.5
     if (special == kQsLara) n = QbPosRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsCheckpoints) n = QbCpPageRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsSaves) n = QbSavesRows(g_qbView + base, g_qbDyn, max, de);
@@ -25438,6 +25955,10 @@ void QbSpecialAct(int special, int row, int dir) {
         QbResult(false, "%s", g_lastAction);
         return;
     }
+    case kQdSwGroup:                         // 0.21.5 page Fixes
+    case kQdSw:
+        QbSwAct(q, dir);
+        return;
     case kQdPos:
         if (dir < 0) { QbResult(false, "%s", de ? "rechts = hin" : "right = go"); return; }
         if (q.loaded) { QbRun("Lara", "position", q.arg, "pos.go", q.arg); return; }
@@ -26112,6 +26633,176 @@ bool ConfirmButton(const char *label, const char *key) {
     return false;
 }
 
+// ---- 0.21.5 long menu: section "Fixes" (TruMenu.switches.txt, the rows of the bar page Fixes) and section "Quick bar
+// pages" (every static row of every bar page from the same tables - the ring is frozen, every ring entry is a bar row,
+// so the menu reaches every ring entry too) ----
+void PageSwitches() {
+    SwRefresh();
+    ImGui::TextWrapped("0.21.5: plugin INI switches from %s (%s). live = the plugin re-reads the key (about once a second); "
+                       "restart / Neustart = read at the next game start. A change is written into <Plugin>.ini next to "
+                       "tru.exe (sw.set: only keys of the file, only values of the row's type, only an existing INI). Same "
+                       "rows as the quick bar page Fixes. Hover a row for its hint.", g_swPath[0] ? g_swPath : "-", g_swState);
+    char o[300], pending[160] = "";
+    if (TmButton("read again / neu lesen  [sw.reload]###swreload")) {
+        const bool ok = RunSwReload("", o, sizeof(o));
+        SetLastAction("sw.reload", ok, o);
+    }
+    ImGui::SameLine();
+    if (TmButton("all into the log / alle ins Log  [sw.list]###swlist")) QueueItem("sw.list", "");
+    EnterCriticalSection(&g_swLock);
+    int first = 0;
+    for (int g = 0; g < g_swGroupN; first += g_swGroup[g].count, ++g) {
+        const SwGroup &grp = g_swGroup[g];
+        char head[160];
+        Out(head, sizeof(head), "%s / %s (%d)###swg%d", grp.de, grp.en, grp.count, g);
+        if (!ImGui::TreeNodeEx(head, grp.open ? ImGuiTreeNodeFlags_DefaultOpen : 0)) continue;
+        for (int i = first; i < first + grp.count && i < g_swN; ++i) {
+            const SwRow &r = g_sw[i];
+            const SwValue &val = g_swVal[i];
+            const char *cur = SwEffective(r, val);
+            const char *when = r.when == kSwRestart ? "restart / Neustart" : r.when == kSwLive ? "live" : "live (LiveReload=1)";
+            const char *state = val.state == 2 ? "  - no INI / keine INI" : val.state == 1 ? "  - key missing, default / fehlt" : "";
+            char label[300], next[32];
+            ImGui::PushID(i);
+            if (val.state == 2) ImGui::BeginDisabled();
+            if (r.type == kSwBool) {
+                bool on = atoi(cur) != 0;
+                Out(label, sizeof(label), "%s / %s   [%s] %s  (%s)%s###sw", r.de, r.en, r.section, r.key, when, state);
+                if (TmCheckbox(label, &on)) Out(pending, sizeof(pending), "%s %d", r.target + 4, on ? 1 : 0);
+            } else if (r.type == kSwInt) {
+                ImGui::Text("%s / %s   [%s] %s = %s  (%s)%s", r.de, r.en, r.section, r.key, cur, when, state);
+                ImGui::SameLine();
+                if (TmButton(" - ###swdown") && SwNext(r, cur, -1, next, sizeof(next)))
+                    Out(pending, sizeof(pending), "%s %s", r.target + 4, next);
+                ImGui::SameLine();
+                if (TmButton(" + ###swup") && SwNext(r, cur, 1, next, sizeof(next)))
+                    Out(pending, sizeof(pending), "%s %s", r.target + 4, next);
+            } else {
+                ImGui::Text("%s / %s   [%s] %s = %s  (%s)%s", r.de, r.en, r.section, r.key, cur, when, state);
+                for (int k = 0; k < SwChoiceCount(r); ++k) {
+                    char c[24], id[48];
+                    SwChoiceAt(r, k, c, sizeof(c));
+                    Out(id, sizeof(id), "%s###swc%d", c, k);
+                    ImGui::SameLine();
+                    if (TmButton(id)) Out(pending, sizeof(pending), "%s %s", r.target + 4, c);
+                }
+            }
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s%s%s", r.hint, r.since[0] ? " - row for " : "", r.since);
+            if (val.state == 2) ImGui::EndDisabled();
+            ImGui::PopID();
+        }
+        ImGui::TreePop();
+    }
+    LeaveCriticalSection(&g_swLock);
+    if (pending[0]) {                        // outside the lock: sw.set takes it itself
+        const bool ok = RunSwSet(pending, o, sizeof(o));
+        SetLastAction("sw.set", ok, o);
+    }
+}
+// one static bar row as a menu widget (the PageAccess way; confirmation rows = ConfirmButton, chapters back up first)
+void PageQbRow(const QbRow &r, int page, int index) {
+    char label[220], key[32], o[300];
+    if (r.kind == kQbLabel || r.kind == kQbGroup) {
+        Out(label, sizeof(label), "%s / %s", r.de, r.en);
+        ImGui::SeparatorText(label);
+        return;
+    }
+    if (r.kind == kQbPlanned) {
+        ImGui::TextDisabled("   %s / %s  (geplant / planned)", r.de, r.en);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", r.arg);
+        return;
+    }
+    const char *why = QbWhy(r);
+    if (why[0]) ImGui::BeginDisabled();
+    Out(key, sizeof(key), "qbm%d_%d", page, index);
+    if (r.kind == kQbBool) {
+        bool on = QbRowOn(r);
+        Out(label, sizeof(label), "%s / %s  [%s%s%s]###%s", r.de, r.en, r.id, r.arg[0] ? " " : "", r.arg, key);
+        if (TmCheckbox(label, &on)) {
+            char arg[96];
+            Out(arg, sizeof(arg), "%s%s%s", r.arg, r.arg[0] ? " " : "", on ? "1" : "0");
+            QueueItem(r.id, arg);
+        }
+    } else if (r.kind == kQbValue) {
+        char v[40];
+        if (!ItemValueShort(r.id, true, v, sizeof(v))) Out(v, sizeof(v), "?");
+        ImGui::Text("%s / %s  [%s]: %s", r.de, r.en, r.id, v);
+        for (int i = 0; i < QbValueCount(r.val); ++i) {
+            char arg[16];
+            QbValueArg(r.val, i, arg, sizeof(arg));
+            Out(label, sizeof(label), "%s###%s_%d", arg, key, i);
+            ImGui::SameLine();
+            if (TmButton(label)) QueueItem(r.id, arg);
+        }
+    } else if (r.kind == kQbChoice) {
+        int count = 0;
+        const QbChoice *c = QbChoices(r.val, &count);
+        ImGui::Text("%s / %s  [%s]%s", r.de, r.en, r.id, c && count ? ":" : ": (nothing to choose)");
+        for (int i = 0; c && i < count; ++i) {
+            char k2[32];
+            Out(k2, sizeof(k2), "%s_%d", key, i);
+            ImGui::SameLine();
+            if (r.flags & kQfConfirm) {
+                if (ConfirmButton(c[i].en, k2)) QueueItem(r.id, c[i].arg);
+            } else {
+                Out(label, sizeof(label), "%s###%s", c[i].en, k2);
+                if (TmButton(label)) QueueItem(r.id, c[i].arg);
+            }
+        }
+    } else if (r.kind == kQbInfo) {
+        static char shown[300] = "";
+        static char shownKey[32] = "";
+        Out(label, sizeof(label), "%s / %s  [%s]###%s", r.de, r.en, r.id, key);
+        if (TmButton(label)) {
+            if (!ItemValueText(r.id, shown, sizeof(shown))) Out(shown, sizeof(shown), "?");
+            strncpy_s(shownKey, sizeof(shownKey), key, _TRUNCATE);
+        }
+        if (!strcmp(shownKey, key)) ImGui::TextWrapped("   %s", shown);
+    } else {
+        Out(label, sizeof(label), "%s / %s  [%s%s%s]", r.de, r.en, r.id, r.arg[0] ? " " : "", r.arg);
+        if (r.flags & (kQfConfirm | kQfBackup)) {
+            if (ConfirmButton(label, key)) {
+                if (r.flags & kQfBackup) {   // chapters: save.backup first, then the item (shortcut runner)
+                    char steps[200];
+                    Out(steps, sizeof(steps), "save.backup kapitel;%s %s", r.id, r.arg);
+                    const bool ok = ShortcutStart(steps, r.en, o, sizeof(o));
+                    SetLastAction(r.id, ok, o);
+                } else {
+                    QueueItem(r.id, r.arg);
+                }
+            }
+        } else {
+            char id[260];
+            Out(id, sizeof(id), "%s###%s", label, key);
+            if (TmButton(id)) QueueItem(r.id, r.arg);
+        }
+    }
+    if (why[0]) {
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "(%s)", why);
+    }
+}
+void PageQbAll() {
+    ImGui::TextWrapped("0.21.5: every static row of the quick bar pages, from the same tables (same items, same state). The "
+                       "ring is frozen (no new entries); each of its entries is a bar row, so it is reachable here too. "
+                       "Special rows (positions, checkpoints, saves, Prepare / TO TEST, Fixes) have their own sections.");
+    for (int p = 0; p < kQbPageN; ++p) {
+        const QbPage &pg = kQbPages[p];
+        if (!pg.rows || pg.n <= 0) continue;
+        char head[96];
+        Out(head, sizeof(head), "%s / %s (%d)###qbpage%d", pg.de, pg.en, pg.n, p);
+        if (!ImGui::TreeNode(head)) continue;
+        for (int i = 0; i < pg.n; ++i) {
+            ImGui::PushID(i);
+            PageQbRow(pg.rows[i], p, i);
+            ImGui::PopID();
+        }
+        ImGui::TreePop();
+    }
+}
+// ---- end of 0.21.5 long menu ----
+
 void PageSettings() {
     Text("TruMenu.ini: %s", g_iniPath[0] ? g_iniPath : "-");
     static char all[16384];
@@ -26692,6 +27383,8 @@ void DrawMenu() {
         if (TmCollapsingHeader("Arachnophobia, camera shake / Arachnophobie, Kamera (0.21)###arachno")) PageArachno();
         if (TmCollapsingHeader("Co-op / Koop (planned / geplant, 0.21)###coop")) PageCoop();
         if (TmCollapsingHeader("AI / KI: enemies ignore Lara (0.19)###aipage")) PageAi();             // 0.19 Dumme KI
+        if (TmCollapsingHeader("Fixes: plugin switches / Plugin-Schalter (0.21.5)###fixes")) PageSwitches();   // 0.21.5
+        if (TmCollapsingHeader("Quick bar pages / Schnellleiste-Seiten (0.21.5)###qbpages")) PageQbAll();   // 0.21.5
         if (TmCollapsingHeader("Free camera")) PageCamera();
         if (TmCollapsingHeader("Cheat / flight")) PageCheat();
         if (TmCollapsingHeader("Cheats (2007 prototype evaluation)")) PageCheats();   // 0.8
@@ -27506,6 +28199,10 @@ void Start(HMODULE self) {
                HexBytesAt(0x00715eb2, "a158dbfa00 8b8800050000") && g_mainStateOk && g_playerOk;
     _snprintf_s(g_testPath, sizeof(g_testPath), _TRUNCATE, "%sTruMenu.tests.txt", g_exeDir);
     TestLoad();
+    _snprintf_s(g_swPath, sizeof(g_swPath), _TRUNCATE, "%sTruMenu.switches.txt", g_exeDir);   // 0.21.5 Fixes
+    EnterCriticalSection(&g_swLock);
+    SwLoadLocked();
+    LeaveCriticalSection(&g_swLock);
     _snprintf_s(g_cmdHistPath, sizeof(g_cmdHistPath), _TRUNCATE, "%sTruMenu.history.txt", g_exeDir);   // 0.6
     CmdHistLoad();
     Log(1, "0.7 cmd: focus button 0x%04x, keyboard %d, Up opens history %d, first pad press only focuses %d; free mouse %d",
@@ -27679,6 +28376,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_logRingLock);
         InitializeCriticalSection(&g_favLock);
         InitializeCriticalSection(&g_testLock);
+        InitializeCriticalSection(&g_swLock);         // 0.21.5 Fixes (TruMenu.switches.txt)
         InitializeCriticalSection(&g_cmdLock);
         InitializeCriticalSection(&g_mouseLock);
         InitializeCriticalSection(&g_edgeLock);       // 0.8.1 input trace
