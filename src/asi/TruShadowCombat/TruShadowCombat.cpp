@@ -41,6 +41,11 @@
 // 11. 0.6.4 (P1b, T-M1 / T-M2): the enemy state MeleeAttack as the TU - messages 0x15 / 0x8a / 0xbe end the attack only
 //    without a data pointer (message slot tru+0x266350 = TU 0x82330d40), and Enter sets brain+0xc bit 0 when record+8
 //    bit 2 is clear (tru+0x25c7b0 = TU 0x8232fb48) ([Melee] Translate=1, default on). T-M3 (interruption) needs T4.
+// 12. 0.6.5 (P1d): the thrall's companion (T4, TU-only instance 0x822da800 / reader 0x822da918) as a stateless lookup
+//    in the object table ([Companion] Translate / Log) and what the TU hangs on it: notification 34 at every exit of
+//    RegenerateDeath (H6), the finisher block with notification 38 in RegenerateDeath / Regenerate (H7 / H8), the
+//    companion's regeneration list in ShouldRegenerate (H1), T2 Land with LP <= 0 + Land slot 13 + T3's Land exception
+//    (H3 / H4 / H3b) and T-M3, the MeleeAttack interruption by Vaulted / RegenerateDeath (H5). All default on.
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -57,7 +62,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.4 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.5 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -74,7 +79,12 @@ const char kVersion[] = "TruShadowCombat 0.6.4 (TU target list 7 -> 10, conditio
                         "EnterRegenerateDeath tru+0x2203fb as the TU 0x822f6578 ([Death] TranslateNotify33, on by "
                         "default), [Damage] Translate on by default; 0.6.4: enemy MeleeAttack as the TU - messages "
                         "0x15 / 0x8a / 0xbe only without a data pointer (T-M1, TU 0x82330d40), Enter sets brain+0xc "
-                        "bit 0 unless record+8 bit 2 (T-M2, TU 0x8232fb48) ([Melee] Translate, on by default))";
+                        "bit 0 unless record+8 bit 2 (T-M2, TU 0x8232fb48) ([Melee] Translate, on by default); "
+                        "0.6.5: thrall companion (T4) as a stateless object-table lookup ([Companion] Translate / "
+                        "Log), notification 34 at the RegenerateDeath exit (TranslateNotify34), finisher block + "
+                        "notification 38 in RegenerateDeath / Regenerate (TranslateNotify38), companion regeneration "
+                        "list (TranslateRegenList), T2 Land + Land slot 13 + Land exception (TranslateLand), T-M3 "
+                        "MeleeAttack interruption ([Melee] TranslateInterrupt), all on by default)";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -3667,6 +3677,18 @@ DWORD g_deathSwitchTick = 0;
 volatile LONG g_deathLines = 0;
 const LONG kDeathMaxLines = 1000;
 
+// 0.6.5 (P1d) switches (section below SetupMelee); T3's Land exception (H3b) in LethalRegen uses [Death] TranslateLand
+int g_compTranslate = 1;           // [Companion] Translate
+int g_compLog = 1;                 // [Companion] Log
+int g_notify34 = 1;                // [Death] TranslateNotify34 (H6)
+int g_notify38 = 1;                // [Death] TranslateNotify38 (H7 / H8)
+int g_regenList = 1;               // [Death] TranslateRegenList (H1)
+int g_translateLand = 1;           // [Death] TranslateLand (H3 / H4 / H3b)
+int g_meleeInterrupt = 1;          // [Melee] TranslateInterrupt (H5)
+bool g_landHooked = false;         // H3 + H4 placed: T2 decides at the landing - only then the Land exception H3b
+void P1dReadSwitches();
+void CompanionNote(const BYTE *inst, const char *where);
+
 void DeathReadSwitch() {
     if (!g_iniPath[0]) return;
     const DWORD now = GetTickCount();
@@ -3680,26 +3702,34 @@ void DeathReadSwitch() {
 }
 
 // called instead of tru+0x282780 from tru+0x2203fb (cdecl, same arguments, the result goes back unchanged)
+// 0.6.5 (H3b): with [Death] TranslateLand=1 and T2 placed, an enemy in state Land gets notification 33 but no switch
+// (TU 0x822f6644..0x822f6660: 0x822d60d0(inst, 0, "Land") = layer-0 state brain+0x125c named Land -> return 0)
 DWORD __cdecl LethalRegen(BYTE *inst, DWORD a1, DWORD a2) {
     DeathReadSwitch();
+    P1dReadSwitches();
+    CompanionNote(inst, "lethal regenerate hit");
     const bool send = g_notify33 != 0;
+    const BYTE *b = reinterpret_cast<const BYTE *>(Rd(inst + 0x2d0));
+    const BYTE *brain = b ? reinterpret_cast<const BYTE *>(Rd(b + 0x2ec)) : nullptr;
+    const DWORD state = brain ? Rd(brain + 0x125c) : 0;
+    const bool landStay = state == kStateLand && g_translateLand && g_landHooked;
     const LONG n = InterlockedIncrement(&g_deathLines);
     if (n <= kDeathMaxLines) {
         char who[96];
         Describe(inst, who, sizeof(who));
-        const BYTE *b = reinterpret_cast<const BYTE *>(Rd(inst + 0x2d0));
-        const BYTE *brain = b ? reinterpret_cast<const BYTE *>(Rd(b + 0x2ec)) : nullptr;
-        const DWORD state = brain ? Rd(brain + 0x125c) : 0;
-        Log(1, "0.6.3 death: %s lethal hit, ShouldRegenerate yes (LP %.0f, state %s): %s; then RegenerateDeath "
-               "tru+0x282780 (PC)%s", who, brain ? RdFloat(brain + 0x2c64) : 0.0f,
-            state == kStateLand ? "Land" : state ? "not Land" : "none",
+        Log(1, "0.6.3 death: %s lethal hit, ShouldRegenerate yes (LP %.0f, state %s): %s; then %s", who,
+            brain ? RdFloat(brain + 0x2c64) : 0.0f, state == kStateLand ? "Land" : state ? "not Land" : "none",
             send ? "notification 33 sent (TU 0x822f6638)" : "no notification ([Death] TranslateNotify33=0)",
-            state == kStateLand ? " - the TU would not switch in Land (T2 at the landing, needs T4)" : "");
+            landStay ? "no switch in Land, return 0 (0.6.5 H3b, TU 0x822f6654; T2 decides at the landing)"
+            : state == kStateLand ? (g_landHooked ? "RegenerateDeath tru+0x282780 (PC; [Death] TranslateLand=0)"
+                                                  : "RegenerateDeath tru+0x282780 (PC; T2 not placed)")
+                                  : "RegenerateDeath tru+0x282780 (PC)");
         if (n == kDeathMaxLines) Log(1, "0.6.3 death: %ld lines - no more", kDeathMaxLines);
     }
     if (send)
         reinterpret_cast<PlayNotificationFn>(kPlayNotification)(
             reinterpret_cast<void *>(Rd(reinterpret_cast<const void *>(kScriptUnitMgr))), kTuNotifyRegen);
+    if (landStay) return 0;
     return reinterpret_cast<EnterRegenFn>(kEnterRegenDeath)(inst, a1, a2);
 }
 
@@ -3737,7 +3767,7 @@ void SetupDeath() {
     g_deathHooked = true;
     Log(1, "0.6.3 death: tru+0x2203fb (death check tru+0x220380 -> EnterRegenerateDeath) -> plugin - [Death] "
            "TranslateNotify33 %d (%s); read again at run time at most once per second. T2 (Land: notification 33 + "
-           "RegenerateDeath) not translated: needs the TU's companion instance (T4)", g_notify33,
+           "RegenerateDeath) and the Land exception: 0.6.5 [Death] TranslateLand (line \"0.6.5 land\")", g_notify33,
         g_notify33 ? "TU 0x822f6578: notification 33 before the switch" : "PC: no notification");
 }
 
@@ -3758,8 +3788,8 @@ void SetupDeath() {
 //      Translation: tru+0x25c9ea (mov eax, [esi+0x50]; movsx ecx, word [eax+0x1f8], 10 bytes) jumps to MeleeEnterStub,
 //      which does the TU test, then the two moved instructions, back to tru+0x25c9f4.
 // T-M3 (interruption slot 13, TU 0x82330830: Vaulted, and RegenerateDeath only with the companion instance 0x822da918)
-//      is NOT translated: the RegenerateDeath clause needs T4 (the TU's companion instance, missing on the PC), so the
-//      slot stays the PC's tru+0x242f40 (= retail).
+//      is NOT translated here: the RegenerateDeath clause needs T4 (the TU's companion instance, missing on the PC) -
+//      0.6.5 translates it with the companion lookup (H5, [Melee] TranslateInterrupt, section below).
 // [Melee] Translate=1 (default) places both at the start; 0 = nothing patched (a change needs a restart).
 const DWORD kMeleeEnterFn = 0x0065c7b0;     // slot 7, retail 0x82330a88, TU 0x8232fb48
 const DWORD kMeleeEnterSite = 0x0065c9ea;   // 10 bytes moved into MeleeEnterStub
@@ -3899,8 +3929,666 @@ void SetupMelee() {
     else Log(0, "0.6.4 melee: jump at tru+0x25c9ea failed - T-M2 off (PC)");
     Log(1, "0.6.4 melee: [Melee] Translate 1 - T-M1 %s (messages 0x15 / 0x8a / 0xbe end MeleeAttack only without a data "
            "pointer, TU 0x82330d40), T-M2 %s (Enter: record+8 bit 2 clear -> brain+0xc |= 1, TU 0x8232fb48); T-M3 "
-           "(interruption by Vaulted / RegenerateDeath, TU 0x82330830) not translated: needs T4",
+           "(interruption by Vaulted / RegenerateDeath, TU 0x82330830): 0.6.5 [Melee] TranslateInterrupt",
         g_meleeMsgHooked ? "on" : "OFF", g_meleeEnterHooked ? "on" : "OFF");
+}
+
+// ---------------------------------------------------------------- 0.6.5: P1d - the thrall's companion (T4) and what
+// the TU hangs on it (docs Befund-P1d-Begleiter-0711.md section 3 in the main workspace; T1 / T2 of
+// Befund-Thrall-Felder-0611.md 3.2, T-M3 of Befund-P1b-MeleeAttack-0711.md, notifications 34 / 38 of
+// Befund-Hall02-Tutorial-Stufe2-0711.md). TU state objects by name / offset: RegenerateDeath 0x8277a7b8 = PC 0x8afa4c,
+// Death 0x82779bf8 = 0x8ae904, Vaulted 0x82779bb0 = 0x8ae8bc, Land 0x82779afc = 0x8ae808.
+// H0 CompanionData(inst): the TU builds a companion instance in the enemy init (TU-only 0x822da800, called from
+//    0x822da970 = PC tru+0x23c190 after the brain exists): the first id of the thrall object's child list
+//    [[inst+0x10]+0x2c] (u16, 0-terminated) whose object table entry (0xdb7400 = TU 0x82979280, 0xcc entries of 0x24:
+//    +8 object, +0xc id, +0xe state == 2) has [o+0x5c] != 0, [o+0x60] != 0 and u16 [[o+0x5c]+2] == 0x3d -> instance
+//    (0x82272998 = PC tru+0x1bd270), handle brain+0x5090 / +0x5094. Its readers (0x822da918) only ask "is it there" and
+//    take its data [comp+0x50] = [o+0x5c] (PC tru+0x1ba84c / tru+0x1ba857: instance +0x50 = object +0x5c). The PC loads
+//    the same children (870 viking / tutorial viking, 932 yeti, 944 armoured yeti) but makes no instance; its brain
+//    (0x5040 bytes) has no handle. CompanionData answers 0x822da918's question from the object table on every call and
+//    keeps nothing (no lifetime): [o+0x60] is the loaded object's name pointer on the PC (tru+0x1bf0fb), set for every
+//    loaded object. Not rebuilt: the instance itself (TU: bit 0x20 of +0x14 with the thrall at death / removal), its
+//    serial check and the TU's "no instance" cases (pool full).
+// H6 RegenerateDeath slot 12 = Exit (vtable 0x85b104 = tru+0x27eeb0, retail 0x8235ea38): TU 0x8235e338 = the same body,
+//    then PlayNotification(34) (0x8235e384). No companion involved.
+// H7 / H8 RegenerateDeath / Regenerate slot 10 = messages (vtable 0x85b0fc = tru+0x282490, 0x85b15c = tru+0x282680; TU
+//    0x8235e3a8 / 0x8235e998, TU-new first block 0x8235e3ec..0x8235e470 / 0x8235e9b8..0x8235ea3c): message 0x11c (hit)
+//    with data, a companion and data+0x50 == 0x10 or (data+0x64 == 1 and data+0x50 == 1) -> death switch
+//    0x823258c8(inst, 1, 0, 1, kind 7, 0, v1 = (0, 0, 1, 0) [0x8207db00]) = tru+0x241650(inst, &v, 1, 0, 1, 7, 0), then
+//    PlayNotification(38), return 1; else the PC handler (the TU's other differences in these slots - 0x15 / 0x8a with a
+//    companion, the sound 0x82399b48 - are a later package).
+// H1 ShouldRegenerate (T1, TU 0x8235ece8 / PC tru+0x27f040 = retail): after the same preconditions (brain, tune record
+//    = first node of the list [brain+0x168] with +0x64 (tru+0x214610 = TU 0x822d3d38), not both anim words +0x22 /
+//    +0x26 = 0xffff) the TU asks the companion's regeneration list (+0x40 count, +0x44 entries of 0xc {type, -1 = any;
+//    subtype, 0 = any; flag bit 0 == the flag byte}) before the tune list (+0x64 / +0x68). The three PC calls - tru+0x2203e4
+//    (death check), tru+0x2824b9 (RegenerateDeath slot 10), tru+0x2826d3 (Regenerate slot 10) = the TU's callers
+//    0x822f6578 / 0x8235e3a8 / 0x8235e998 - go to RegenListHook; the function itself is not patched (TruMenu byte-checks
+//    its head and calls it for its kill prediction). Data (DTP of the three extensions): 1 entry {2 Heavy, 0, 0}.
+// H3 T2 Land slot 9 (tru+0x25afe0, TU 0x82328aa0): LP <= 0 (tru+0x220350) and a companion whose data byte +0x18 is 0 ->
+//    notification 33 (0x82328d4c) and RegenerateDeath with the 2-byte data {([state data+0x30] >> 1) & 1, 1} (TU
+//    0x8230c050 by name = PC tru+0x23d4a0(inst, 0x8afa4c, data, 0), the helper the Getup branch beside it uses; the PC's
+//    retail RegenerateDeath has the empty data copier tru+0x3987b0 in slot 3 and an Enter that reads no data), then the
+//    function returns; else LandDeath (PC = TU without companion). tru+0x25b181 (6 bytes) jumps to LandStub. The 33
+//    here follows [Death] TranslateNotify33 as well (33 / 34 / 38 belong together for the hall02 hint).
+// H4 Land slot 13 (tru+0x241d30, vtable 0x858c90; TU-only 0x82329060): where the PC answers -1, the TU answers 6 for
+//    RegenerateDeath and Death when the enemy has a companion. Without it the state machine (tru+0x271080: current
+//    state's slot 13 -1 = refused) would refuse H3's switch, so H3 is placed only together with H4.
+// H3b T3's Land exception (TU 0x822f6654): in LethalRegen (0.6.3 section) - 33, then no switch, return 0.
+// H5 T-M3 MeleeAttack slot 13 (tru+0x242f40, vtable 0x859160; TU 0x82330830): where the PC answers -1, the TU also lets
+//    Vaulted and - with a companion - RegenerateDeath interrupt: tru+0x270400(next) (= next ? [next+4] : 0, the same
+//    tail the PC uses for its own states, TU 0x82330920..0x8233092c).
+// Switches (start + again at run time at most once per second, from the hooks): [Companion] Translate (0 = never a
+// companion = the TU without one = PC for H1 / H3 / H4 / H7 / H8 / RegenerateDeath part of H5), [Companion] Log,
+// [Death] TranslateNotify34 / TranslateNotify38 / TranslateRegenList / TranslateLand, [Melee] TranslateInterrupt.
+// The hooks are placed at the start whenever their byte checks pass; with a switch at 0 a hook runs exactly the PC code.
+const DWORD kStateRegenDeath = 0x008afa4c;     // RegenerateDeath (vtable 0x85b0d4)
+const DWORD kStateDeath = 0x008ae904;          // Death (vtable 0x858edc)
+const DWORD kStateVaulted = 0x008ae8bc;        // Vaulted (vtable 0x858e14)
+const DWORD kRdExitSlot = 0x0085b104, kRdExitFn = 0x0067eeb0;        // RegenerateDeath slot 12 (Exit)
+const DWORD kRdMsgSlot = 0x0085b0fc, kRdMsgFn = 0x00682490;          // RegenerateDeath slot 10 (messages)
+const DWORD kRgMsgSlot = 0x0085b15c, kRgMsgFn = 0x00682680;          // Regenerate slot 10 (messages)
+const DWORD kLandIntSlot = 0x00858c90, kLandIntFn = 0x00641d30;      // Land slot 13 (interruption)
+const DWORD kMeleeIntSlot = 0x00859160, kMeleeIntFn = 0x00642f40;    // MeleeAttack slot 13 (interruption)
+const DWORD kShouldRegen = 0x0067f040;         // cdecl (inst, type, subtype, flag byte) -> al
+const DWORD kRegenCalls[3] = {0x006203e4, 0x006824b9, 0x006826d3};
+const char *const kRegenCallWhere[3] = {"death check tru+0x2203e4", "RegenerateDeath slot 10 tru+0x2824b9",
+                                        "Regenerate slot 10 tru+0x2826d3"};
+const DWORD kLandSite = 0x0065b181;            // mov eax, [edi+0x2d0] (6 bytes) - patched
+const DWORD kLandBack = 0x0065b187;            // the PC LandDeath branch after that instruction
+const DWORD kLandEnd = 0x0065b1af;             // pop edi; pop esi; pop ebx; mov esp, ebp; pop ebp; ret 8
+const DWORD kSwitchWithData = 0x0063d4a0;      // cdecl (inst, state, 2-byte data *, int) (TU 0x8230bf78)
+const DWORD kStateValue = 0x00670400;          // cdecl (state) -> state ? [state+4] : 0
+const WORD kCompanionType = 0x3d;              // TU 0x822da8a4 cmplwi r11, 0x3d
+const int kTuNotifyExit = 34;                  // TU 0x8235e384 li r4, 0x22
+const int kTuNotifyFinisher = 38;              // TU 0x8235e45c / 0x8235ea28 li r4, 0x26
+const DWORD kTuFinisherKind = 7;               // TU 0x8235e43c li r7, 7
+typedef DWORD(__thiscall *StateSlotFn)(void *state, BYTE *inst, DWORD layer, DWORD a3, DWORD a4);
+typedef DWORD(__cdecl *ShouldRegenFn)(BYTE *inst, DWORD type, DWORD subtype, DWORD flag);
+typedef DWORD(__cdecl *SwitchWithDataFn)(BYTE *inst, DWORD state, const BYTE *data, DWORD flag);
+typedef DWORD(__cdecl *StateValueFn)(DWORD state);
+bool g_compOk = false;             // object table + loader facts verified (else CompanionData answers 0)
+bool g_h6 = false, g_h7 = false, g_h8 = false, g_h4 = false, g_h5 = false;
+int g_h1 = 0;                      // H1 call sites placed (0 or 3)
+DWORD g_p1dSwitchTick = 0;
+DWORD g_landBackTo = kLandBack, g_landEndTo = kLandEnd;
+volatile LONG g_compLines = 0, g_p1dLines = 0;
+const LONG kCompMaxLines = 400, kP1dMaxLines = 1500;
+
+struct P1dKey { const char *section, *key; int *value; const char *on, *off; };
+const P1dKey kP1dKeys[] = {
+    {"Companion", "Translate", &g_compTranslate, "companion lookup as the TU 0x822da918",
+     "no companion (TU without one = PC)"},
+    {"Companion", "Log", &g_compLog, "one line per new thrall", "no companion lines"},
+    {"Death", "TranslateNotify34", &g_notify34, "notification 34 at the RegenerateDeath exit (TU 0x8235e338)",
+     "no notification 34 (PC)"},
+    {"Death", "TranslateNotify38", &g_notify38, "finisher block + notification 38 (TU 0x8235e3a8 / 0x8235e998)",
+     "PC message handlers"},
+    {"Death", "TranslateRegenList", &g_regenList, "companion regeneration list first (TU 0x8235ece8)",
+     "PC ShouldRegenerate"},
+    {"Death", "TranslateLand", &g_translateLand, "T2 / Land slot 13 / Land exception as the TU", "PC Land"},
+    {"Melee", "TranslateInterrupt", &g_meleeInterrupt, "T-M3 as the TU 0x82330830", "PC MeleeAttack slot 13"},
+};
+
+void P1dReadSwitches() {
+    if (!g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_p1dSwitchTick < 1000) return;
+    g_p1dSwitchTick = now;
+    for (const auto &k : kP1dKeys) {
+        const int v = GetPrivateProfileIntA(k.section, k.key, *k.value, g_iniPath) ? 1 : 0;
+        if (v == *k.value) continue;
+        Log(1, "0.6.5 switch: [%s] %s %d -> %d (read again from TruShadowCombat.ini) - %s", k.section, k.key, *k.value,
+            v, v ? k.on : k.off);
+        *k.value = v;
+    }
+}
+
+bool P1dLine() {
+    const LONG n = InterlockedIncrement(&g_p1dLines);
+    if (n > kP1dMaxLines) return false;
+    if (n == kP1dMaxLines) Log(1, "0.6.5: %ld event lines - this is the last one", kP1dMaxLines);
+    return true;
+}
+
+void P1dNotify(int notification) {
+    reinterpret_cast<PlayNotificationFn>(kPlayNotification)(
+        reinterpret_cast<void *>(Rd(reinterpret_cast<const void *>(kScriptUnitMgr))), notification);
+}
+
+BYTE RdByte(const void *p) {
+    __try {
+        return p ? *reinterpret_cast<const volatile BYTE *>(p) : 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+}
+
+const BYTE *P1dBrain(const BYTE *inst) {
+    const BYTE *h = reinterpret_cast<const BYTE *>(Rd(inst ? inst + 0x2d0 : nullptr));
+    const BYTE *b = h ? reinterpret_cast<const BYTE *>(Rd(h)) : nullptr;
+    return b ? reinterpret_cast<const BYTE *>(Rd(b + 0x2ec)) : nullptr;
+}
+
+// name of an object id (the name table [0xdb94d0] as Describe), "?" without
+void ObjName(DWORD id, char *out, size_t size) {
+    strcpy_s(out, size, "?");
+    if (!g_namesOk || !id) return;
+    const BYTE *table = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kObjNames)));
+    const DWORD count = table ? Rd(table) : 0;
+    const char *s = (table && count < 8192 && id <= count) ? reinterpret_cast<const char *>(Rd(table + id * 8)) : nullptr;
+    __try {
+        if (s) {
+            size_t i = 0;
+            for (; s[i] && i + 1 < size; ++i) out[i] = s[i];
+            out[i] = 0;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        strcpy_s(out, size, "?");
+    }
+}
+
+enum CompWhy { kCwFound, kCwOff, kCwNoFacts, kCwNoInst, kCwNoBrain, kCwNoObject, kCwNoList, kCwNone, kCwFault };
+const char *const kCompWhy[] = {"found", "[Companion] Translate=0", "object table / loader not verified", "no instance",
+                                "no brain", "no object", "no child list", "no child of data type 0x3d loaded",
+                                "exception while reading"};
+
+void Append(char *out, size_t size, const char *fmt, ...) {
+    if (!out || !size) return;
+    const size_t used = strlen(out);
+    if (used + 1 >= size) return;
+    va_list ap;
+    va_start(ap, fmt);
+    _vsnprintf_s(out + used, size - used, _TRUNCATE, fmt, ap);
+    va_end(ap);
+}
+
+// TU 0x822da800 (search) + 0x822da918 (data): the companion's data [o+0x5c] or 0. detail (optional): every child id
+// with the reason it was skipped. Read only, SEH-guarded, nothing kept.
+const BYTE *CompanionScan(const BYTE *inst, int *why, char *detail, size_t size, DWORD *companionId) {
+    if (detail && size) detail[0] = 0;
+    if (companionId) *companionId = 0;
+    if (!g_compTranslate) { *why = kCwOff; return nullptr; }
+    if (!g_compOk) { *why = kCwNoFacts; return nullptr; }
+    if (!inst) { *why = kCwNoInst; return nullptr; }
+    __try {
+        if (!P1dBrain(inst)) { *why = kCwNoBrain; return nullptr; }      // the TU builds it in the enemy init only
+        const BYTE *obj = *reinterpret_cast<const BYTE *const *>(inst + 0x10);
+        if (!obj) { *why = kCwNoObject; return nullptr; }
+        const WORD *ids = *reinterpret_cast<const WORD *const *>(obj + 0x2c);
+        if (!ids || !ids[0]) { *why = kCwNoList; return nullptr; }
+        for (int n = 0; ids[n] && n < 64; ++n) {
+            const WORD id = ids[n];
+            // TU 0x822da848..0x822da878: the first entry with state 2 and this id
+            const BYTE *entry = nullptr;
+            for (int i = 0; i < kObjectCount && !entry; ++i) {
+                const BYTE *e = reinterpret_cast<const BYTE *>(kObjectTable + i * 0x24);
+                if (*reinterpret_cast<const WORD *>(e + 0xe) == 2 && *reinterpret_cast<const WORD *>(e + 0xc) == id)
+                    entry = e;
+            }
+            if (!entry) { Append(detail, size, "%s%u not loaded", n ? ", " : "", id); continue; }
+            const BYTE *o = *reinterpret_cast<const BYTE *const *>(entry + 8);
+            const BYTE *data = o ? *reinterpret_cast<const BYTE *const *>(o + 0x5c) : nullptr;
+            if (!o || !data || !*reinterpret_cast<const DWORD *>(o + 0x60)) {
+                Append(detail, size, "%s%u %s", n ? ", " : "", id, !o ? "no object" : !data ? "+0x5c = 0" : "+0x60 = 0");
+                continue;
+            }
+            const WORD type = *reinterpret_cast<const WORD *>(data + 2);
+            if (type != kCompanionType) { Append(detail, size, "%s%u type 0x%x", n ? ", " : "", id, type); continue; }
+            Append(detail, size, "%s%u type 0x3d = companion", n ? ", " : "", id);
+            if (companionId) *companionId = id;
+            *why = kCwFound;
+            return data;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        *why = kCwFault;
+        return nullptr;
+    }
+    *why = kCwNone;
+    return nullptr;
+}
+
+const BYTE *CompanionData(const BYTE *inst) {
+    int why = 0;
+    return CompanionScan(inst, &why, nullptr, 0, nullptr);
+}
+
+// [Companion] Log: one line per thrall instance (instance + serial +0x44) the first time a 0.6.5 hook sees it - game
+// thread only (state machine / damage path)
+struct CompSeen { const BYTE *inst; DWORD serial; };
+CompSeen g_compSeen[256];
+int g_compSeenNext = 0;
+
+void CompanionNote(const BYTE *inst, const char *where) {
+    if (!g_compLog || !inst) return;
+    const DWORD serial = Rd(inst + 0x44);
+    for (const auto &s : g_compSeen)
+        if (s.inst == inst && s.serial == serial) return;
+    g_compSeen[g_compSeenNext].inst = inst;
+    g_compSeen[g_compSeenNext].serial = serial;
+    g_compSeenNext = (g_compSeenNext + 1) & 255;
+    const LONG n = InterlockedIncrement(&g_compLines);
+    if (n > kCompMaxLines) return;
+    char who[96], detail[320], name[64];
+    int why = 0;
+    DWORD id = 0;
+    Describe(inst, who, sizeof(who));
+    const BYTE *data = CompanionScan(inst, &why, detail, sizeof(detail), &id);
+    if (data) {
+        ObjName(id, name, sizeof(name));
+        const DWORD count = Rd(data + 0x40);
+        const BYTE *list = reinterpret_cast<const BYTE *>(Rd(data + 0x44));
+        Log(1, "0.6.5 companion: %s serial 0x%08lx (first seen: %s) - companion object %lu %s, data 0x%08lx (type 0x3d), "
+               "byte +0x18 = %u, regeneration list count %lu, entry 0 {%ld, %ld, %lu}%s; children: %s", who, serial,
+            where, id, name, reinterpret_cast<DWORD>(data), RdByte(data + 0x18), count,
+            list && count ? static_cast<LONG>(Rd(list)) : 0, list && count ? static_cast<LONG>(Rd(list + 4)) : 0,
+            list && count ? Rd(list + 8) : 0, list && count ? "" : " (no list)", detail);
+    } else {
+        Log(1, "0.6.5 companion: %s serial 0x%08lx (first seen: %s) - none: %s%s%s", who, serial, where, kCompWhy[why],
+            detail[0] ? "; children: " : "", detail);
+    }
+    if (n == kCompMaxLines) Log(1, "0.6.5 companion: %ld lines - no more", kCompMaxLines);
+}
+
+// ---- H6: RegenerateDeath Exit (thiscall state, ret 0x10)
+DWORD __fastcall RdExitHook(void *self, void *, BYTE *inst, DWORD layer, DWORD a3, DWORD a4) {
+    const DWORD r = reinterpret_cast<StateSlotFn>(kRdExitFn)(self, inst, layer, a3, a4);
+    P1dReadSwitches();
+    CompanionNote(inst, "RegenerateDeath exit");
+    if (g_notify34) P1dNotify(kTuNotifyExit);
+    if (P1dLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        Log(1, "0.6.5 death: %s leaves RegenerateDeath: %s", who,
+            g_notify34 ? "notification 34 sent (TU 0x8235e38c)" : "no notification ([Death] TranslateNotify34=0)");
+    }
+    return r;
+}
+
+// ---- H7 / H8: the TU-new first block of RegenerateDeath / Regenerate slot 10; true = done (return 1)
+bool Finisher38(BYTE *inst, DWORD message, const BYTE *data, const char *state, const char *tu) {
+    P1dReadSwitches();
+    CompanionNote(inst, state);
+    if (message != 0x11c || !data) return false;
+    const LONG type = static_cast<LONG>(Rd(data + 0x50)), sub = static_cast<LONG>(Rd(data + 0x64));
+    if (!(type == 0x10 || (sub == 1 && type == 1))) return false;
+    if (!CompanionData(inst)) return false;
+    if (!g_notify38) {
+        if (P1dLine()) {
+            char who[96];
+            Describe(inst, who, sizeof(who));
+            Log(1, "0.6.5 death: %s %s hit type %ld subtype %ld with companion - [Death] TranslateNotify38=0: PC handler "
+                   "(the TU would switch to Death kind 7 and send 38, %s)", who, state, type, sub, tu);
+        }
+        return false;
+    }
+    // TU: 0x823258c8(inst, 1, 0, 1, 7, 0, v1 = [0x8207db00] = (0, 0, 1, 0)) = PC tru+0x241650 (cdecl inst, vec16 aligned *,
+    // u8, ptr, u8, kind, u8), then PlayNotification([0x829ca684], 38)
+    __declspec(align(16)) float v[4] = {0.0f, 0.0f, 1.0f, 0.0f};
+    reinterpret_cast<DeathSwitchFn>(kDeathSwitch)(inst, v, 1, 0, 1, kTuFinisherKind, 0);
+    P1dNotify(kTuNotifyFinisher);
+    if (P1dLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        Log(1, "0.6.5 death: %s %s hit type %ld subtype %ld with companion -> death switch kind 7 and notification 38 as "
+               "the TU %s", who, state, type, sub, tu);
+    }
+    return true;
+}
+
+DWORD __fastcall RdMsgHook(void *self, void *, BYTE *inst, DWORD layer, DWORD message, DWORD data) {
+    if (Finisher38(inst, message, reinterpret_cast<const BYTE *>(data), "RegenerateDeath", "0x8235e3ec..0x8235e468"))
+        return 1;
+    return reinterpret_cast<StateSlotFn>(kRdMsgFn)(self, inst, layer, message, data);
+}
+
+DWORD __fastcall RgMsgHook(void *self, void *, BYTE *inst, DWORD layer, DWORD message, DWORD data) {
+    if (Finisher38(inst, message, reinterpret_cast<const BYTE *>(data), "Regenerate", "0x8235e9b8..0x8235ea34"))
+        return 1;
+    return reinterpret_cast<StateSlotFn>(kRgMsgFn)(self, inst, layer, message, data);
+}
+
+// ---- H1: TU 0x8235ed04..0x8235ede0 - the companion's regeneration list; 1 = an entry matches (index in *entry)
+int CompanionRegen(BYTE *inst, DWORD type, DWORD sub, DWORD flag, int *entry, DWORD *count) {
+    *entry = -1;
+    *count = 0;
+    __try {
+        const BYTE *brain = P1dBrain(inst);
+        if (!brain) return 0;
+        // tru+0x214610 (TU 0x822d3d38): first node of the list [brain+0x168] with +0x64, next +0x1c (an empty list asks
+        // the print stub tru+0x2457a0 = ret, eax 0 -> no record)
+        const BYTE *rec = nullptr;
+        const BYTE *p = *reinterpret_cast<const BYTE *const *>(brain + 0x168);
+        for (int guard = 0; p && guard < 256 && !rec; ++guard) {
+            rec = *reinterpret_cast<const BYTE *const *>(p + 0x64);
+            p = *reinterpret_cast<const BYTE *const *>(p + 0x1c);
+        }
+        if (!rec) return 0;
+        if (*reinterpret_cast<const WORD *>(rec + 0x22) == 0xffff && *reinterpret_cast<const WORD *>(rec + 0x26) == 0xffff)
+            return 0;
+        const BYTE *comp = CompanionData(inst);
+        if (!comp) return 0;
+        const DWORD n = *reinterpret_cast<const DWORD *>(comp + 0x40);
+        const BYTE *list = *reinterpret_cast<const BYTE *const *>(comp + 0x44);
+        *count = n;
+        if (!n || !list) return 0;
+        if (n > 64) return 0;                               // a misconverted count (as +0x2c of these files) - logged
+        for (DWORD i = 0; i < n; ++i) {
+            const BYTE *e = list + i * 0xc;
+            const LONG t = *reinterpret_cast<const LONG *>(e), s = *reinterpret_cast<const LONG *>(e + 4);
+            const bool typeOk = t == -1 || t == static_cast<LONG>(type);
+            const bool subOk = s == 0 || s == static_cast<LONG>(sub);
+            if (typeOk && subOk && (*reinterpret_cast<const DWORD *>(e + 8) & 1) == (flag & 0xff)) {
+                *entry = static_cast<int>(i);
+                return 1;
+            }
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+    return 0;
+}
+
+DWORD __cdecl RegenListHook(BYTE *inst, DWORD type, DWORD sub, DWORD flag) {
+    const DWORD ret = reinterpret_cast<DWORD>(_ReturnAddress()) - 5;
+    const char *where = ret == kRegenCalls[0] ? kRegenCallWhere[0] : ret == kRegenCalls[1] ? kRegenCallWhere[1]
+                                                                    : ret == kRegenCalls[2] ? kRegenCallWhere[2] : "?";
+    P1dReadSwitches();
+    CompanionNote(inst, where);
+    if (g_regenList) {
+        int entry = -1;
+        DWORD count = 0;
+        const int yes = CompanionRegen(inst, type, sub, flag, &entry, &count);
+        if (count > 64 && P1dLine()) {
+            char who[96];
+            Describe(inst, who, sizeof(who));
+            Log(0, "0.6.5 regen: %s companion regeneration list count %lu implausible (converted data?) - ignored", who,
+                count);
+        }
+        if (yes) {
+            if (P1dLine()) {
+                // log only: what the PC tune list alone says (a pure read, the same call the PC makes)
+                const DWORD pc = reinterpret_cast<ShouldRegenFn>(kShouldRegen)(inst, type, sub, flag) & 0xff;
+                char who[96];
+                Describe(inst, who, sizeof(who));
+                Log(1, "0.6.5 regen: %s %s type %lu subtype %lu flag %lu: companion regeneration list entry %d -> "
+                       "ShouldRegenerate yes as the TU 0x8235ed5c (the PC tune list says %s)", who, where, type, sub,
+                    flag & 0xff, entry, pc ? "yes too" : "no");
+            }
+            return 1;
+        }
+    }
+    return reinterpret_cast<ShouldRegenFn>(kShouldRegen)(inst, type, sub, flag);
+}
+
+// ---- H3: T2 at the landing; 1 = done (the function returns), 0 = the PC LandDeath branch
+int __cdecl LandLethal(BYTE *inst, const BYTE *stateData) {
+    P1dReadSwitches();
+    CompanionNote(inst, "Land, LP <= 0");
+    if (!g_translateLand) return 0;
+    const BYTE *comp = CompanionData(inst);
+    const BYTE b18 = comp ? RdByte(comp + 0x18) : 0;
+    char who[96];
+    if (!comp || b18 != 0) {
+        if (P1dLine()) {
+            Describe(inst, who, sizeof(who));
+            Log(1, "0.6.5 land: %s lands with LP <= 0 - %s: LandDeath (PC = TU 0x82328db0)", who,
+                comp ? "companion byte +0x18 != 0" : "no companion");
+        }
+        return 0;
+    }
+    // TU 0x82328d40..0x82328d74
+    if (g_notify33) P1dNotify(kTuNotifyRegen);
+    const BYTE data[2] = {static_cast<BYTE>((Rd(stateData + 0x30) >> 1) & 1), 1};
+    const DWORD r = reinterpret_cast<SwitchWithDataFn>(kSwitchWithData)(inst, kStateRegenDeath, data, 0);
+    if (P1dLine()) {
+        Describe(inst, who, sizeof(who));
+        Log(1, "0.6.5 land: %s lands with LP <= 0, companion byte +0x18 = 0: %s, RegenerateDeath with data {%u, 1} as the "
+               "TU 0x82328d24..0x82328d74 (switch answered %lu)", who,
+            g_notify33 ? "notification 33 sent" : "no notification 33 ([Death] TranslateNotify33=0)", data[0], r & 0xff);
+    }
+    return 1;
+}
+
+// jumped to from tru+0x25b181 (Land slot 9 after IsDead = yes): edi = instance, esi = state data, ebx = brain; eax is
+// loaded again by the moved instruction, ecx / edx are set before use on both targets, the FPU stack is empty
+__declspec(naked) void LandStub() {
+    __asm {
+        push esi
+        push edi
+        call LandLethal
+        add esp, 8
+        test eax, eax
+        jne land_done
+        mov eax, dword ptr [edi + 0x2d0]
+        jmp dword ptr [g_landBackTo]
+    land_done:
+        jmp dword ptr [g_landEndTo]
+    }
+}
+
+// ---- H4: Land slot 13 (thiscall state, (inst, layer, next, data), ret 0x10)
+DWORD __fastcall LandIntHook(void *self, void *, BYTE *inst, DWORD layer, DWORD next, DWORD data) {
+    const DWORD r = reinterpret_cast<StateSlotFn>(kLandIntFn)(self, inst, layer, next, data);
+    if (static_cast<LONG>(r) != -1 || (next != kStateRegenDeath && next != kStateDeath)) return r;
+    P1dReadSwitches();
+    CompanionNote(inst, "Land slot 13");
+    if (!g_translateLand || !CompanionData(inst)) return r;
+    if (P1dLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        Log(1, "0.6.5 land: %s in Land, %s may interrupt (companion) -> 6 as the TU 0x82329148 (PC -1)", who,
+            next == kStateDeath ? "Death" : "RegenerateDeath");
+    }
+    return 6;
+}
+
+// ---- H5: MeleeAttack slot 13 (thiscall state, (inst, layer, next, data), ret 0x10)
+DWORD __fastcall MeleeIntHook(void *self, void *, BYTE *inst, DWORD layer, DWORD next, DWORD data) {
+    const DWORD r = reinterpret_cast<StateSlotFn>(kMeleeIntFn)(self, inst, layer, next, data);
+    P1dReadSwitches();
+    CompanionNote(inst, "MeleeAttack slot 13");
+    if (static_cast<LONG>(r) != -1 || !g_meleeInterrupt) return r;
+    const bool vaulted = next == kStateVaulted;
+    if (!vaulted && !(next == kStateRegenDeath && CompanionData(inst))) return r;
+    const DWORD v = reinterpret_cast<StateValueFn>(kStateValue)(next);
+    if (P1dLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        Log(1, "0.6.5 melee: %s in MeleeAttack, %s may interrupt -> %ld as the TU 0x823308f4..0x82330908 (PC -1)", who,
+            vaulted ? "Vaulted" : "RegenerateDeath (companion)", static_cast<LONG>(v));
+    }
+    return v;
+}
+
+struct Fact { DWORD at; const char *hex; const char *what; };
+bool FactsOk(const Fact *f, size_t count, const char *part) {
+    for (size_t i = 0; i < count; ++i)
+        if (!HexAt(f[i].at, f[i].hex)) {
+            Log(0, "0.6.5 %s: %s at 0x%08lx does not match - not placed (PC)", part, f[i].what, f[i].at);
+            return false;
+        }
+    return true;
+}
+
+bool WriteSlot(DWORD slot, const void *to) {
+    const DWORD v = reinterpret_cast<DWORD>(to);
+    return WriteCode(slot, &v, 4);
+}
+
+// the PlayNotification facts of SetupDeath (also needed when that part is off)
+const Fact kNotifyFacts[] = {
+    {kPlayNotification,
+     "56 57 8b7c240c be08acdb00 eb03 8d4900 80be3cffffff02 7510 8b06 57 8d4c2410 89442410 e8e7300200 81c6d8000000 "
+     "81fe08c7db00 7cd9 5f 5e c20400",
+     "PlayNotification tru+0x37a540"},
+    {0x00768a20, "8b442408 6683780220 7513 8b4004 85c0 7e0c 8b0d80e8fa00 50 e8021b0100 c3",
+     "script event handler tru+0x368a20: PlayNotification([0xfae880], n)"},
+};
+// the death switch of 0.6.1 (checked there only when [Chunk] is on)
+const Fact kDeathSwitchFacts[] = {
+    {kDeathSwitch,
+     "55 8bec 83e4f0 83ec24 53 8b5d0c 56 8b7514 57 8b7d08 85ff 0f84ad000000 8b87d0020000 85c0 0f849f000000 8b00 "
+     "8b80ec020000 85c0 0f848f000000 d9ee 51 8d88602c0000 d91c24 e8b461ffff 8b4d1c 8bc1 83e805 7409 83e802 7404 32c0 "
+     "eb02 b001 85f6 f30f100530118400 0f280b 894c2424 8a4d10 0fc6c000 0f59c1 0f29442410 c744242000000000 884c2428 "
+     "88442429 c644242b01 7404 89742420 807d2000 7505 c644242b00 8a5518 6a00 8d442414 50 6804e98a00 57 8854243a "
+     "e8d0bfffff 83c410 5f 5e 5b 8be5 5d c3",
+     "death switch tru+0x241650 (cdecl 7 arguments, movaps from the vector)"},
+};
+
+void SetupCompanion() {
+    if (HexAt(0x005bcff9, "8b0dd094db00 52 8b14c1")) g_namesOk = true;
+    // H0: object table (g_tableOk: base / stride / count of the PC lookup tru+0x14e930) and the loader fields
+    const Fact comp[] = {
+        {0x0054e22e, "8b4748 89462c", "object loader tru+0x14e231: object +0x2c = child id list (DTP +0x48)"},
+        {0x0054e667, "8b88c8000000 3bcd 7409 8d5060 894e5c 895658",
+         "object loader tru+0x14e674: object +0x5c = data (main DTP +0xc8)"},
+        {0x005bf0ed, "8b0dd094db00 8b4314 8b04c1 8b0b 894360", "tru+0x1bf0fb: object +0x60 = its name pointer"},
+        {0x005ba84c, "8b435c 8b7c2434 8b6c2438 894650", "instance init tru+0x1ba84c: instance +0x50 = object +0x5c"},
+    };
+    g_compOk = g_tableOk && FactsOk(comp, sizeof(comp) / sizeof(comp[0]), "companion");
+    Log(1, "0.6.5 companion: %s - [Companion] Translate %d, Log %d (one line per new thrall, at most %ld)",
+        g_compOk ? "lookup ready (object table 0xdb7400, child list +0x2c, data +0x5c type 0x3d = TU 0x822da800 / "
+                   "0x822da918)"
+                 : g_tableOk ? "loader facts differ - never a companion (TU without one = PC)"
+                             : "object table lookup tru+0x14e930 differs - never a companion (TU without one = PC)",
+        g_compTranslate, g_compLog, kCompMaxLines);
+    const bool notifyOk = FactsOk(kNotifyFacts, sizeof(kNotifyFacts) / sizeof(kNotifyFacts[0]), "notification");
+    const bool deathOk = FactsOk(kDeathSwitchFacts, sizeof(kDeathSwitchFacts) / sizeof(kDeathSwitchFacts[0]), "death switch");
+    const Fact states[] = {
+        {kStateRegenDeath, "d4b08500 06000000", "state object RegenerateDeath 0x8afa4c (vtable 0x85b0d4)"},
+        {0x008afa70, "34b18500 06000000", "state object Regenerate 0x8afa70 (vtable 0x85b134)"},
+        {kStateDeath, "dc8e8500 06000000", "state object Death 0x8ae904 (vtable 0x858edc)"},
+        {kStateVaulted, "148e8500 05000000", "state object Vaulted 0x8ae8bc (vtable 0x858e14)"},
+        {kStateLand, "5c8c8500 06000000", "state object Land 0x8ae808 (vtable 0x858c5c)"},
+    };
+    const bool statesOk = FactsOk(states, sizeof(states) / sizeof(states[0]), "states");
+
+    // H6
+    const Fact h6[] = {
+        {kRdExitSlot, "b0ee6700", "RegenerateDeath vtable slot 12 0x85b104 = tru+0x27eeb0"},
+        {kRdExitFn, "56 8b742408 8b86d0020000 85c0 7408 8b00 8b80ec020000 8b8868010000 51 c680802c000001 e88658f9ff "
+                    "6a00 50 56 e80d2efaff 83c410 5e c21000",
+         "RegenerateDeath Exit tru+0x27eeb0 (= retail 0x8235ea38 / TU 0x8235e338 body, ret 0x10)"},
+    };
+    if (notifyOk && statesOk && FactsOk(h6, sizeof(h6) / sizeof(h6[0]), "H6") &&
+        WriteSlot(kRdExitSlot, reinterpret_cast<const void *>(&RdExitHook)))
+        g_h6 = true;
+
+    // H7 / H8
+    const Fact h7[] = {
+        {0x0085b0fc, "90246800", "RegenerateDeath vtable slot 10 0x85b0fc = tru+0x282490"},
+        {kRdMsgFn,
+         "817c240c1c010000 56 57 756c 8b742418 85f6 7464 807e6e00 8b4e64 8b5650 8b7c240c 0f95c0 50 51 52 57 e882cbffff "
+         "83c410 84c0 7443 56 e81517f9ff 83c404 84c0 742f 8b87d0020000 85c0 7512 8d88804b0000 e8f929f9ff 5f b001 5e c21000 "
+         "8b00 8b80ec020000 8d88804b0000 e8df29f9ff 5f b001 5e c21000 5f 32c0 5e c21000",
+         "RegenerateDeath slot 10 tru+0x282490 (inst, layer, message, data; ret 0x10)"},
+    };
+    const Fact h8[] = {
+        {kRgMsgSlot, "80266800", "Regenerate vtable slot 10 0x85b15c = tru+0x282680"},
+        {kRgMsgFn,
+         "8b44240c 83f815 56 0f848b000000 3d1c010000 757e 8b742414 85f6 7476 53 57 8b7c2410 8b87d0020000 85c0 7504 33db "
+         "eb08 8b00 8b98ec020000 80bbe80f000000 743d 807e6e00 8b5664 8b4650 0f95c1 51 52 50 57 e868c9ffff 83c410 84c0 "
+         "7420 56 e8fb14f9ff 83c404 84c0 740b 8d8b804b0000 e8e927f9ff 5f 5b b001 5e c21000 6a01 56 57 e87885fdff 83c40c "
+         "5f 5b b001 5e c21000 32c0 5e c21000",
+         "Regenerate slot 10 tru+0x282680 (inst, layer, message, data; ret 0x10)"},
+    };
+    if (notifyOk && deathOk && statesOk && FactsOk(h7, sizeof(h7) / sizeof(h7[0]), "H7") &&
+        WriteSlot(kRdMsgSlot, reinterpret_cast<const void *>(&RdMsgHook)))
+        g_h7 = true;
+    if (notifyOk && deathOk && statesOk && FactsOk(h8, sizeof(h8) / sizeof(h8[0]), "H8") &&
+        WriteSlot(kRgMsgSlot, reinterpret_cast<const void *>(&RgMsgHook)))
+        g_h8 = true;
+
+    // H1 (the function head as TruMenu checks it; the three calls with their argument pushes)
+    const Fact h1[] = {
+        {kShouldRegen, "8b442404 8b80d0020000 85c0 740c 8b08 8b81ec020000 85c0 7503 32c0 c3 8b9068010000 52 e8a755f9ff "
+                       "83c404 85c0 74ea",
+         "ShouldRegenerate tru+0x27f040: brain, tune record tru+0x214610([brain+0x168])"},
+        {0x0067f070, "b9ffff0000 66394822 7506 66394826 74d9 53 55 56 57 8b7864 33f6 85ff 7652 8a5c2420 8b6c2418 "
+                     "8d486c",
+         "ShouldRegenerate: anim words +0x22 / +0x26, tune list +0x64 / +0x68, flag byte"},
+        {0x00614610, "8b442404 85c0 7509 e883110300 85c0 740d 83786400 750a 8b401c 85c0 75f3 33c0 c3 8b4064 c3",
+         "tune record tru+0x214610: first node with +0x64, next +0x1c"},
+        {0x006457a0, "c3", "print stub tru+0x2457a0 (ret)"},
+        {0x006203dc, "8b7c2424 57 51 53 56 e857ec0500 83c410 84c0 7417", "death check: call ShouldRegenerate tru+0x2203e4"},
+        {0x006824a4, "807e6e00 8b4e64 8b5650 8b7c240c 0f95c0 50 51 52 57 e882cbffff 83c410 84c0 7443",
+         "RegenerateDeath slot 10: call ShouldRegenerate tru+0x2824b9"},
+        {0x006826c2, "807e6e00 8b5664 8b4650 0f95c1 51 52 50 57 e868c9ffff 83c410 84c0 7420",
+         "Regenerate slot 10: call ShouldRegenerate tru+0x2826d3"},
+    };
+    if (FactsOk(h1, sizeof(h1) / sizeof(h1[0]), "H1")) {
+        int placed = 0;
+        for (int i = 0; i < 3; ++i)
+            if (WriteCall(kRegenCalls[i], reinterpret_cast<const void *>(&RegenListHook))) ++placed;
+        if (placed == 3) {
+            g_h1 = 3;
+        } else {
+            for (int i = 0; i < 3; ++i) WriteCall(kRegenCalls[i], reinterpret_cast<const void *>(kShouldRegen));
+            Log(0, "0.6.5 H1: only %d of 3 calls written - all three back to tru+0x27f040 (PC)", placed);
+        }
+    }
+
+    // H4 + H3 (H3 only with H4: without it Land refuses the switch)
+    const Fact h4[] = {
+        {kLandIntSlot, "301d6400", "Land vtable slot 13 0x858c90 = tru+0x241d30"},
+        {kLandIntFn,
+         "8b44240c 3d78e78a00 750c 50 e8bfe60200 83c404 c21000 3d9ce78a00 7422 3d2ce88a00 741b 3d28e98a00 7414 "
+         "3d34ef8a00 740d 3d7cef8a00 7406 83c8ff c21000 b806000000 c21000",
+         "Land slot 13 tru+0x241d30: HostAnimation -> tru+0x270400, Fall / Getup / LandDeath / DrownDeath / "
+         "DeferredInstantDie -> 6, else -1 (= retail / TU 0x82329060 without the companion clause)"},
+    };
+    const Fact h3[] = {
+        {0x0065b174, "57 e8d651fcff 83c404 84c0 7437 8b87d0020000 85c0 7408 8b00 8b80ec020000 6a00 6a00 6828e98a00 "
+                     "8d88e0110000 51 57 8d8854120000 e8816b0100 5f 5e 5b 8be5 5d c20800",
+         "Land slot 9 tru+0x25b174: IsDead(inst edi) -> LandDeath 0x8ae928 (tru+0x271d30), return"},
+        {0x0065b1b8, "8b83a0110000 8bd0 d1ea f6c201 7434 8bc8 c1e902 f6c101 752a 8b5630 6a00 8d44241f 50 d1ea 80e201 "
+                     "682ce88a00 57 8854242b e8b122feff 83c410",
+         "Land slot 9 tru+0x25b1b8: Getup with the 2-byte data {([esi+0x30] >> 1) & 1, ..} via tru+0x23d4a0"},
+        {kSwitchWithData,
+         "8b4c2404 8b81d0020000 83ec0c 85c0 7408 8b00 8b80ec020000 8b542418 891424 8b54241c 52 8d542404 52 8b54241c 52 "
+         "8d90e0110000 52 51 8d8854120000 c744241850888500 c744241c01000000 e83e480300 83c40c c3",
+         "state switch with data tru+0x23d4a0 (cdecl inst, state, data *, int; type 0x858850)"},
+        {0x0085b0e0, "b0877900", "RegenerateDeath slot 3 = tru+0x3987b0 (empty data copier)"},
+        {0x007987b0, "c20800", "tru+0x3987b0: ret 8"},
+        {0x00620350, "8b442404 8b80d0020000 85c0 7408 8b08 8b81ec020000 d980642c0000",
+         "IsDead tru+0x220350: LP brain+0x2c64"},
+    };
+    if (statesOk && FactsOk(h4, sizeof(h4) / sizeof(h4[0]), "H4") &&
+        WriteSlot(kLandIntSlot, reinterpret_cast<const void *>(&LandIntHook))) {
+        g_h4 = true;
+        if (notifyOk && FactsOk(h3, sizeof(h3) / sizeof(h3[0]), "H3")) {
+            BYTE j[6] = {0xe9, 0, 0, 0, 0, 0x90};
+            const DWORD rel = reinterpret_cast<DWORD>(&LandStub) - (kLandSite + 5);
+            memcpy(j + 1, &rel, 4);
+            if (WriteCode(kLandSite, j, sizeof(j))) g_landHooked = true;
+            else Log(0, "0.6.5 H3: jump at tru+0x25b181 failed - T2 off (PC LandDeath)");
+        }
+    }
+
+    // H5
+    const Fact h5[] = {
+        {kMeleeIntSlot, "402f6400", "MeleeAttack vtable slot 13 0x859160 = tru+0x242f40"},
+        {kMeleeIntFn,
+         "8b442404 8b80d0020000 85c0 7408 8b08 8b81ec020000 8b4c2408 8b9488d4180000 8d0c4a 69c99c010000 "
+         "8d940173120000 83e2f0 8b4250 f6400804 8b44240c 753e 3d04e98a00 7437 3d28e98a00 7430 3d7cef8a00 7429 "
+         "3d34ef8a00 7422 3d4ce98a00 741b 3d9ce78a00 7414 3d08e88a00 740d 3d20eb8a00 7406 83c8ff c21000 50 e83bd40200 "
+         "83c404 c21000",
+         "MeleeAttack slot 13 tru+0x242f40 (= retail 0x82331750: record+8 bit 2, death states, Fall / Land / "
+         "FinishAttack -> tru+0x270400, else -1)"},
+        {kStateValue, "8b442404 85c0 7501 c3 8b4004 c3", "tru+0x270400: state ? [state+4] : 0"},
+    };
+    if (statesOk && FactsOk(h5, sizeof(h5) / sizeof(h5[0]), "H5") &&
+        WriteSlot(kMeleeIntSlot, reinterpret_cast<const void *>(&MeleeIntHook)))
+        g_h5 = true;
+
+    Log(1, "0.6.5: H6 notification 34 %s, H7 / H8 finisher 38 %s / %s, H1 regeneration list %s (%d of 3 calls), "
+           "H4 Land slot 13 %s, H3 T2 Land %s, H3b Land exception %s, H5 T-M3 %s - switches [Death] TranslateNotify34 %d, "
+           "TranslateNotify38 %d, TranslateRegenList %d, TranslateLand %d (T2's 33 also needs TranslateNotify33, now %d), "
+           "[Melee] TranslateInterrupt %d; read again at run time at most once per second",
+        g_h6 ? "on" : "OFF", g_h7 ? "on" : "OFF", g_h8 ? "on" : "OFF", g_h1 ? "on" : "OFF", g_h1, g_h4 ? "on" : "OFF",
+        g_landHooked ? "on" : "OFF",
+        g_landHooked && g_deathHooked ? "on" : "OFF (needs T2 and the 0.6.3 death hook)", g_h5 ? "on" : "OFF",
+        g_notify34, g_notify38, g_regenList, g_translateLand, g_notify33, g_meleeInterrupt);
 }
 
 // ---------------------------------------------------------------- start
@@ -3931,6 +4619,8 @@ void ReadOptions(const char *dir) {
     g_dmgTranslate = GetPrivateProfileIntA("Damage", "Translate", 1, ini) ? 1 : 0;   // 0.6 (0.6.3: default 1)
     g_notify33 = GetPrivateProfileIntA("Death", "TranslateNotify33", 1, ini) ? 1 : 0;   // 0.6.3
     g_meleeTranslate = GetPrivateProfileIntA("Melee", "Translate", 1, ini) ? 1 : 0;      // 0.6.4
+    for (const auto &k : kP1dKeys)                                                       // 0.6.5 (all default 1)
+        *k.value = GetPrivateProfileIntA(k.section, k.key, 1, ini) ? 1 : 0;
     g_dmgLog = GetPrivateProfileIntA("Damage", "Log", 1, ini) ? 1 : 0;
     g_dmgMax = GetPrivateProfileIntA("Damage", "MaxLines", 3000, ini);
     if (g_dmgMax < 0) g_dmgMax = 0;
@@ -3992,6 +4682,7 @@ void Start(HMODULE self) {
     SetupSplash();                    // 0.6.2: K9 splash as the TU (after SetupDamage: the remap follows its switch)
     SetupDeath();                     // 0.6.3: notification 33 of the TU's death check (independent of the parts above)
     SetupMelee();                     // 0.6.4: MeleeAttack T-M1 / T-M2 (independent of the parts above)
+    SetupCompanion();                 // 0.6.5: P1d (after SetupDeath: the Land exception H3b lives in its hook)
 }
 
 }  // namespace

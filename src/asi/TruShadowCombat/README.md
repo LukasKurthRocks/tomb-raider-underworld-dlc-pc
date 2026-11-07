@@ -1,4 +1,85 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.4)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.5)
+
+0.6.5 (2026-11-07, **offline, not yet seen in game**): P1d - the thrall's companion instance (T4) and the title-update
+code that hangs on it (`docs\Befund-P1d-Begleiter-0711.md` section 3 in the main workspace; T1 / T2 of
+`Befund-Thrall-Felder-0611.md`, T-M3 of `Befund-P1b-MeleeAttack-0711.md`, notifications 34 / 38 of
+`Befund-Hall02-Tutorial-Stufe2-0711.md`). Build `work\asi\combat065`. Every part default **1**, every switch read again
+at run time (at most once per second, from the hooks); the hooks are placed at the start whenever their byte checks
+pass, a switch at 0 runs exactly the PC code.
+* **H0 companion** (`[Companion] Translate` / `Log`): the TU builds a companion instance in the enemy init (TU-only
+  0x822da800): the first child of the thrall object's id list `[[inst+0x10]+0x2c]` whose object table entry (0xdb7400,
+  state 2) has data `[o+0x5c]` of type 0x3d (u16 +2) and `[o+0x60]` != 0 - 870 (viking / tutorial viking), 932 (yeti),
+  944 (armoured yeti); 1007 is type 0x3b (chunkdoll), not it. Its readers (0x822da918) only ask "is it there" and take
+  its data (= `[o+0x5c]`, PC tru+0x1ba84c). The PC loads these objects already but makes no instance. The plugin answers
+  the readers' question from the object table on every use and keeps nothing. `[o+0x60]` is the object's name pointer
+  on the PC (tru+0x1bf0fb) - set for every loaded object (the open point of the finding). Log: one line per thrall
+  instance the first time a hook sees it, `0.6.5 companion: 0x... obj 1004 viking_thrall_tutorial_dlc2_ serial ...
+  (first seen: MeleeAttack slot 13) - companion object 870 viking_thrall_dlc2_extension, data 0x... (type 0x3d), byte
+  +0x18 = 0, regeneration list count 1, entry 0 {2, 0, 0}; children: ...` or `- none: <reason>; children: <id reason,
+  ..>` (max 400).
+* **H6 notification 34** (`[Death] TranslateNotify34`): RegenerateDeath slot 12 (Exit, vtable 0x85b104 = tru+0x27eeb0,
+  retail 0x8235ea38) = TU 0x8235e338 = the same body + `PlayNotification(34)` - every time an enemy leaves
+  RegenerateDeath. No companion needed. hall02: closes the finisher hint `hint_17` (23101 f3, f4).
+* **H7 / H8 finisher 38** (`[Death] TranslateNotify38`): the TU-new first block of RegenerateDeath slot 10 (vtable
+  0x85b0fc = tru+0x282490, TU 0x8235e3a8) and Regenerate slot 10 (0x85b15c = tru+0x282680, TU 0x8235e998): hit message
+  0x11c with data, a companion and type 16 (or type 1 subtype 1) -> death switch kind 7 (tru+0x241650 with the vector
+  (0, 0, 1, 0) of TU 0x8207db00, the same switch as 0.6.1) and `PlayNotification(38)`, return 1; else the PC handler.
+* **H1 regeneration list** (`[Death] TranslateRegenList`): ShouldRegenerate (TU 0x8235ece8, PC tru+0x27f040 = retail)
+  asks the companion's list (+0x40 / +0x44, entries {type -1 any, subtype 0 any, flag bit 0}; the three extensions: 1
+  entry {2 Heavy, 0, 0}) after the same preconditions and before the tune list. The three calls tru+0x2203e4 (death
+  check), tru+0x2824b9 (RegenerateDeath slot 10), tru+0x2826d3 (Regenerate slot 10) go to the plugin; the function is
+  not patched (TruMenu byte-checks its head and calls it).
+* **H3 / H4 / H3b T2 Land** (`[Death] TranslateLand`): Land slot 9 (tru+0x25afe0, TU 0x82328aa0) with LP <= 0 and a
+  companion whose data byte +0x18 is 0 -> notification 33 (only with `[Death] TranslateNotify33=1`) and RegenerateDeath
+  with the 2-byte data {([state data+0x30] >> 1) & 1, 1} (TU 0x8230c050 = PC tru+0x23d4a0 with 0x8afa4c, the helper of
+  the Getup branch beside it; the PC's RegenerateDeath copies / reads no transition data), else LandDeath as before.
+  Jump at tru+0x25b181. Land slot 13 (vtable 0x858c90 = tru+0x241d30, TU-only 0x82329060): with a companion
+  RegenerateDeath and Death may interrupt Land (6; PC -1 - the state machine tru+0x271080 would refuse T2's switch, so
+  T2 is placed only with it). Land exception of T3 (TU 0x822f6654, in the 0.6.3 hook): a lethal regenerate hit while
+  in Land sends 33 but switches nothing (return 0) - the landing decides.
+* **H5 T-M3** (`[Melee] TranslateInterrupt`): MeleeAttack slot 13 (vtable 0x859160 = tru+0x242f40, TU 0x82330830):
+  where the PC answers -1, Vaulted (0x8ae8bc) and - with a companion - RegenerateDeath may interrupt too, answer
+  tru+0x270400(next) = `[next+4]` (read: `next ? [next+4] : 0`).
+* **33 + 34 + 38 belong together**: the shipped .ini has all three at 1. 33 alone (0.6.3 / 0.6.4) opens the finisher hint
+  and nothing closes it (hall02 run 1, 07.11.); with 34 it closes when the thrall stands up or dies, with 38 at once on
+  the finisher. Keep `TranslateNotify33=0` in the game .ini only while 34 / 38 are off.
+* **Not in this build:** T5 (TU 0x823038d8: companion + lethal + not regenerating -> death kind 7 at once), the rest of
+  RegenerateDeath / Regenerate slot 10 (0x15 / 0x8a with companion: lying animation from data +0x10; the sound
+  0x82399b48; Regenerate 0x15 only without data), P1c (Vaulted Enter 0x8232b630) - P1c / T5 read the extensions'
+  stage table +0x20 / +0x24 and the 0xc4 records +0x28 / +0x2c, which the converter got wrong (count 0x000f0000 instead
+  of 15): data fix of 870 / 932 / 944 first.
+* Byte checks: 36 used by the plugin + 9 proof-only (`work\asi\combat065\prechecks_combat065.txt`, generated from the
+  source by `work\combat065_0711\facts065.py`; 45, 0 mismatches); earlier lists combat01..combat064 500, 0 mismatches.
+  Imports unchanged (81, KERNEL32 only), exports unchanged.
+
+New writes into game memory (for the TruGuard author):
+
+| when | address | what |
+|---|---|---|
+| start, checks passed | 0x85b104 (`.rdata`, 4 bytes) | RegenerateDeath vtable slot 12: 0x67eeb0 -> `RdExitHook` |
+| start | 0x85b0fc (`.rdata`, 4) | RegenerateDeath slot 10: 0x682490 -> `RdMsgHook` |
+| start | 0x85b15c (`.rdata`, 4) | Regenerate slot 10: 0x682680 -> `RgMsgHook` |
+| start | 0x858c90 (`.rdata`, 4) | Land slot 13: 0x641d30 -> `LandIntHook` |
+| start | 0x859160 (`.rdata`, 4) | MeleeAttack slot 13: 0x642f40 -> `MeleeIntHook` |
+| start | 0x6203e4 / 0x6824b9 / 0x6826d3 (`.text`, 5 each) | `call rel32` 0x67f040 -> `RegenListHook` (all three or none) |
+| start | 0x65b181 (`.text`, 6) | `jmp rel32` -> `LandStub` + `nop` (only with the Land slot 13 entry) |
+| run time | - | no data writes; calls of game functions on the game thread: PlayNotification tru+0x37a540 (34 / 38 / 33), death switch tru+0x241650 (kind 7), state switch tru+0x23d4a0 (RegenerateDeath) |
+
+All `.rdata` / `.text` writes through `VirtualProtect` (old protection restored) + `FlushInstructionCache`, once at
+the start. Note for TruMenu: its ai.kill check list holds `{0x006203e4, "e857ec0500 ..."}` - it runs when TruMenu
+loads (before this plugin, alphabetical), so it still passes; a later re-check would see the H1 call.
+
+| # | TO TEST 0.6.5 (hall02 tutorial thralls, TruMenu `[Debug] EnemyStateLog=1`, game .ini `[Death]` 33 / 34 / 38 = 1) | expected |
+|---|---|---|
+| 1 | load, read `TruShadowCombat.log` once | `TruShadowCombat 0.6.5 (`, `0.6.5 companion: lookup ready ...`, `0.6.5: H6 notification 34 on, H7 / H8 finisher 38 on / on, H1 regeneration list on (3 of 3 calls), H4 Land slot 13 on, H3 T2 Land on, H3b Land exception on, H5 T-M3 on`, no "does not match" |
+| 2 | first tutorial thrall attacks | one `0.6.5 companion: ... obj 1004 ... companion object 870 ... type 0x3d ... byte +0x18 = 0, regeneration list count 1, entry 0 {2, 0, 0}` per thrall (or `none: <reason>` - send the line) |
+| 3 | knock a thrall down so that it regenerates (finisher hint appears) | `0.6.3 death: ... notification 33 sent`; `hint_17` shows |
+| 4 | let it stand up | `0.6.5 death: ... leaves RegenerateDeath: notification 34 sent`; the hint closes, the punch / kick hint comes back |
+| 5 | next thrall down, finisher (type 16 hit) while it lies | `0.6.5 death: ... RegenerateDeath hit type 16 ... -> death switch kind 7 and notification 38`; thrall dies, hint closes at once |
+| 6 | punch + kick afterwards | `tutorial` goes to 2 (TruMenu hall02 counter), wall opens after the next kill |
+| 7 | heavy attack as the last hit | `0.6.5 regen: ... companion regeneration list entry 0 -> ShouldRegenerate yes` - the thrall regenerates instead of dying |
+| 8 | thrall killed in the air / on landing | `0.6.5 land: ... lands with LP <= 0, companion byte +0x18 = 0: notification 33 sent, RegenerateDeath ...` (not LandDeath); with the lethal hit in Land first `0.6.3 death: ... no switch in Land` |
+| 9 | trouble | switch the part off (TruMenu Fixes page or the .ini, live): `TranslateNotify38`, `TranslateLand`, `TranslateRegenList`, `[Melee] TranslateInterrupt`, `[Companion] Translate`; send the log |
 
 0.6.4 (2026-11-07, **offline, not yet seen in game**): P1b - the title update's three small changes to the enemy state
 `MeleeAttack` (T-M1..T-M3 of `docs\Befund-Thrall-MeleeAttack-Freeze-0711.md` section 4; full proof
@@ -383,6 +464,13 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Splash] MaxLines` | 2000 | 0.6.2: cap of the splash lines |
 | `[Death] TranslateNotify33` | 1 | 0.6.3 (T3): script notification 33 before EnterRegenerateDeath in the death check tru+0x220380, as the TU 0x822f6578 (hall02: finisher hint `hint_17`); 0 = PC; read again at run time (<= 1 / s) |
 | `[Melee] Translate` | 1 | 0.6.4 (T-M1 / T-M2): enemy MeleeAttack as the TU - messages 0x15 / 0x8a / 0xbe end the attack only without a data pointer (TU 0x82330d40), Enter sets brain+0xc bit 0 unless record+8 bit 2 (TU 0x8232fb48); 0 = nothing patched; start only |
+| `[Companion] Translate` | 1 | 0.6.5 (H0): the thrall's companion (TU 0x822da800 / 0x822da918) as an object-table lookup; 0 = never a companion (TU without one = PC); live (<= 1 / s) |
+| `[Companion] Log` | 1 | 0.6.5: one line per new thrall instance (companion object, type, byte +0x18, regeneration list; or the reason for none), max 400 |
+| `[Death] TranslateNotify34` | 1 | 0.6.5 (H6): notification 34 at every RegenerateDeath exit (TU 0x8235e338); live |
+| `[Death] TranslateNotify38` | 1 | 0.6.5 (H7 / H8): finisher block of RegenerateDeath / Regenerate slot 10 - type 16 (or 1 / 1) hit with companion -> death kind 7 + notification 38 (TU 0x8235e3a8 / 0x8235e998); live |
+| `[Death] TranslateRegenList` | 1 | 0.6.5 (H1): companion regeneration list before the tune list in ShouldRegenerate (TU 0x8235ece8); live |
+| `[Death] TranslateLand` | 1 | 0.6.5 (H3 / H4 / H3b): T2 Land with LP <= 0 -> 33 (with TranslateNotify33) + RegenerateDeath, Land slot 13 with companion, Land exception of T3; live |
+| `[Melee] TranslateInterrupt` | 1 | 0.6.5 (H5, T-M3): Vaulted and (with companion) RegenerateDeath may interrupt MeleeAttack (TU 0x82330830); live |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 

@@ -1688,6 +1688,14 @@ SW_LIVE = {
     ('TruShadowCombat', 'Chunk', 'Translate'): 'void ChunkReadSwitch(',
     ('TruShadowCombat', 'Splash', 'Translate'): 'void SplashReadSwitch(',
     ('TruShadowCombat', 'Death', 'TranslateNotify33'): 'void DeathReadSwitch(',
+    # 0.6.5 (P1d): P1dReadSwitches loops over the key table kP1dKeys (once per second)
+    ('TruShadowCombat', 'Companion', 'Translate'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
+    ('TruShadowCombat', 'Companion', 'Log'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
+    ('TruShadowCombat', 'Death', 'TranslateNotify34'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
+    ('TruShadowCombat', 'Death', 'TranslateNotify38'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
+    ('TruShadowCombat', 'Death', 'TranslateRegenList'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
+    ('TruShadowCombat', 'Death', 'TranslateLand'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
+    ('TruShadowCombat', 'Melee', 'TranslateInterrupt'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
     ('TruShadowCombat', 'Strike', 'Translate'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate1013'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate1019'): 'void ReadSwitches(',
@@ -1897,10 +1905,21 @@ def check_switches(path):
                 problems.append('%s: default %s, %s.ini:%d has %s' % (where, default, plugin, got[0], got[1]))
         live = SW_LIVE.get((plugin, section, key))
         if when == 'restart' and live:
-            problems.append('%s: [%s] %s is re-read at run time (%s) - mark it live' % (where, section, key, live.strip('(')))
+            fn_name = live[0] if isinstance(live, tuple) else live
+            problems.append('%s: [%s] %s is re-read at run time (%s) - mark it live' % (where, section, key, fn_name.strip('(')))
         if when != 'restart':
             if not live: problems.append('%s: [%s] %s marked %s but %s reads it only at the start' % (where, section, key,
                                                                                                   when, plugin))
+            elif isinstance(live, tuple):
+                # 0.6.5 form: the re-read function loops over a key table - the function must use the table and the
+                # table must hold {"section", "key", ...}
+                fn, table = live
+                body = fn_body(sources[plugin], fn)
+                src = sources[plugin]
+                at = src.find(table)
+                tbl = src[at:src.find('\n};', at)] if at >= 0 else ''
+                if not body or table.split('[')[0] not in body or '{"%s", "%s"' % (section, key) not in tbl:
+                    problems.append('%s: %s / %s has no read of [%s] %s' % (where, fn.strip('('), table, section, key))
             else:
                 body = fn_body(sources[plugin], live)
                 if not body or '"%s"' % key not in body or '"%s"' % section not in body:
