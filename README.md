@@ -61,9 +61,11 @@ names. The main hall's triggers hang beside the cutscene's facade set - the walk
 
 **Still missing (short list)**
 
-- DLC 2: the shadow finisher never starts (its target list stays empty); beaten thralls get up again; a moaning sound
-  loops; Lara's ponytail stretches during the slow motion (the title update's cloth time step is not translated yet);
-  some title-update shaders are still drawn with substitutes; the achievement fix is untested in game.
+- DLC 2: the shadow finisher never starts (its target list stays empty); thralls now take damage and die with the
+  translated damage switch (`TruShadowCombat` `[Damage] Translate`, live test 07.11.), a full playthrough of the first
+  thrall fight is being tested; a moaning sound loops; Lara's ponytail stretches during the slow motion (the title
+  update's cloth time step is translated behind a switch, off by default); some title-update shaders are still drawn
+  with substitutes; the achievement fix is untested in game.
 - DLC 1: a crash while loading the dungeon in our current test builds (under investigation).
 - Costume packs: converted and checked offline (pipeline step `Costumes`), not played yet.
 - What we check after every change: [docs/Regression-DLC2.md](docs/Regression-DLC2.md) (DLC 2) and
@@ -96,12 +98,12 @@ flowchart LR
     PC --> PCA
 ```
 
-| Step | What | State (2026-11-05) |
+| Step | What | State (2026-11-07) |
 |---|---|---|
 | 1 | Match Xbox retail and PC: functions, natives, globals (`tools/xbox_pc_funcmap.py`) | 4 155 pairs, ~1 000 confirmed; names from an early 2007 build help |
-| 2 | Difference Xbox retail -> Xbox + TU (`tools/xbox_func_diff.py`, Xenia memory images) | done: of 937 "changed" functions 528 are real changes; no main-game fix found |
-| 3a | Scripts and data of the TU on PC (converted, repaired where PC differs) | loading screen with DLC titles and the hint box done (pipeline step `Generalbank`) |
-| 3b | Exe code of the TU on PC (shadow power) | slow motion, meter and HUD, power states, the rock-vein wall run and its camera, shadow combat input translated as plugins (played); finisher, thrall reactions and the cloth time step open |
+| 2 | Difference Xbox retail -> Xbox + TU (`tools/xbox_func_diff.py`, Xenia memory images) | done: of 937 "changed" functions 528 are real changes; no main-game fix found; the exe spots of the upstream comparison (K1-K14) named and sorted |
+| 3a | Scripts and data of the TU on PC (converted, repaired where PC differs) | loading screen with DLC titles and the hint box done (pipeline step `Generalbank`); the TU's player-list entry for the doppelganger costume and the localised doppelganger lines in progress |
+| 3b | Exe code of the TU on PC (shadow power) | slow motion, meter and HUD, power states, the rock-vein wall run and its camera, shadow combat input translated as plugins (played); **thralls take damage and die** (the TU's damage-type switch 0..27, played 07.11.) and shatter without the PC crash (the TU's death switch for lethal impulse hits); cloth time step translated (switch, off); splash damage / adrenaline in doppelganger mode in progress; the shadow finisher's own kill still open |
 
 **What is new here** (details on branch `windows`)
 
