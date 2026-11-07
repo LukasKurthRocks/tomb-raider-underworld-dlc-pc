@@ -18,6 +18,10 @@ Usage (from the repository root):
   --findings       print every finding line (default: counts per path and group only)
   --out FILE       also write the report to FILE (UTF-8)
 Exit code: 0 = scanned, 2 = usage error / scanner script not found.
+Since TruMenu 0.21 (2026-11-07) also the group Owner: the owner's own arachnophobia picture (any `*.arachno*.png`, e.g.
+TruMenu.arachno.png) and everything below `work/arachno_owner/` are private and never go into the repository or a release
+- such a pending path is an ERROR finding (exit code 1); .gitignore keeps them out of `git status`, so this catches a
+force-add or a changed .gitignore.
 """
 import sys, os, re, subprocess, argparse, collections
 
@@ -30,6 +34,7 @@ BINARY = ('.zip', '.7z', '.exe', '.dll', '.asi', '.bin', '.drm', '.pkl', '.npz',
           '.obj', '.lib')
 TEXT_ENC = ('.ps1', '.psm1', '.md', '.py', '.cpp', '.h', '.ini', '.txt', '.json', '.cdb', '.tsv')
 SCAN_SKIP = re.compile(r'\.(png|jpe?g|gif|zip|bin)$', re.I)    # as the scanner
+OWNER = re.compile(r'(^|/)work/arachno_owner/|(^|/)[^/]*\.arachno[^/]*\.png$', re.I)   # 0.21: the owner's picture
 
 
 def git(args, root):
@@ -177,6 +182,10 @@ def main(argv):
             cr, lf = data.count(b'\r'), data.count(b'\n')
             enc = 'BOM %s CR %d LF %d' % ('yes' if data.startswith(b'\xef\xbb\xbf') else 'no', cr, lf)
         per = collections.Counter()
+        if OWNER.search(path):                # 0.21: private, never uploaded - an error whatever the content
+            per['Owner'] += 1
+            totals['Owner'] += 1
+            findings.append('%-9s %s  [owner picture / work/arachno_owner - ERROR: never commit or release]' % ('Owner', path))
         if size >= 0 and not is_bin and ext not in MEDIA and path != SELF and path != SCANNER \
                 and not SCAN_SKIP.search(path):
             src = added_lines(root, path) if st == 'M' else file_lines(full)
@@ -201,14 +210,17 @@ def main(argv):
         say('--- findings ---')
         report.extend(sorted(findings))
     say('--- summary ---')
-    for k in list(pats.keys()) + ['flag media', 'flag binary', 'flag >1MB']:
+    for k in list(pats.keys()) + ['Owner', 'flag media', 'flag binary', 'flag >1MB']:
         say('%-12s %d' % (k, totals[k]))
-    say('total findings %d' % sum(totals[k] for k in pats.keys()))
+    say('total findings %d' % (sum(totals[k] for k in pats.keys()) + totals['Owner']))
+    if totals['Owner']:
+        say('ERROR: %d owner picture path(s) pending (*.arachno*.png / work/arachno_owner/) - remove them from the index'
+            % totals['Owner'])
     text = '\n'.join(report)
     sys.stdout.buffer.write((text + '\n').encode('utf-8', 'replace'))
     if a.out:
         open(a.out, 'w', encoding='utf-8', newline='\n').write(text + '\n')
-    return 0
+    return 1 if totals['Owner'] else 0
 
 
 if __name__ == '__main__':

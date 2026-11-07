@@ -55,9 +55,17 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.20.1 (sound list snd.list: every voice of the game's voice pool 0x8a8108 - "
-                             "music / SFX / speech group, wave id or stream, volume, state, distance - bottom left by "
-                             "default, settings [Sound] / Debug view / bar Debug / Darstellung / ring Spieler/Debug/Ton, "
+const char *const kVersion = "TruMenu 0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
+                             "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
+                             "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
+                             "spider sounds off through 6 call gates + 1 jump table word, arachno.list; camera shake "
+                             "cam.shakescale 0 .. 100 % (stub on the 2 callers of 0x5eb460), cam.rumble, cam.shakelist / "
+                             "cam.shake / cam.shakestate; ai.remove nearest / others / all / <intro> the game's despawn "
+                             "way; labels: one per reward pot (runtime children of a placed intro skipped), none on "
+                             "hidden / collected instances; sound list bottom right, right-aligned, music tracks once in "
+                             "the header; bar page Koop (planned); "
+                             "0.20.1 sound list snd.list: every voice of the game's voice pool 0x8a8108 - "
+                             "music / SFX / speech group, wave id or stream, volume, state, distance, settings [Sound] / Debug view / bar Debug / Darstellung / ring Spieler/Debug/Ton, "
                              "snd.dump into the log; media.mutemusic mutes the FMOD channel groups of the music groups "
                              "(FMOD Ex is linked into tru.exe), the option slider stays; "
                              "0.20 layers dbg.collect = collectibles (*_rw_* rewards by kind, reward pots "
@@ -680,8 +688,9 @@ const OptDef kOpts[] = {
     {"Sound", "List", "0", "0.20.1 (snd.list): 1 = the sound list from the start - every voice the game plays (group, "
                            "wave / stream, volume, state,\ndistance to Lara), built on the game thread from the voice "
                            "pool 0x8a8108; snd.dump writes it into TruMenu.log"},
-    {"Sound", "Position", "bl", "0.20.1 (snd.pos): corner of the sound list - bl bottom left, tl top left, tr top right, "
-                                "br bottom right"},
+    {"Sound", "Position", "br", "0.20.1 (snd.pos): corner of the sound list - bl bottom left, tl top left, tr top right, "
+                                "br bottom right (0.21 default: br - bottom left\nis the quick-toggle bar's side; in a "
+                                "right corner the rows are right-aligned)"},
     {"Sound", "MaxLines", "16", "0.20.1 (snd.lines): lines of the sound list below its header, 1 .. 40"},
     {"Sound", "RefreshMs", "1000", "0.20.1 (snd.refresh): one walk of the voice pool every n ms, 100 .. 10000"},
     {"Sound", "Sort", "group", "0.20.1 (snd.sort): group (music, SFX, speech, other; then the group number), volume or "
@@ -695,6 +704,37 @@ const OptDef kOpts[] = {
     {"Sound", "ShowSpeech", "1", "0.20.1 (snd.speech): speech lines (the group of the third slider - speech / "
                                  "cutscenes)"},
     {"Sound", "ShowOther", "1", "0.20.1 (snd.other): lines of voices in no known group"},
+    {"Arachno", "Enabled", "0", "0.21 Arachnophobie (arachno.on): 1 = spiders replaced from the start - the master switch of "
+                                "Hide / Picture / Mute below;\nbar page Barrierefreiheit, menu Accessibility. Spiders = "
+                                "object names with a part of Match and none of Exclude"},
+    {"Arachno", "Hide", "1", "0.21 (arachno.hide): 1 = the spider model is not drawn while Enabled (InstanceDrawable slot 7 "
+                             "0x853ad8, the draw-group mask\n+0x23c = -1 only during the spider's draw call); logic, "
+                             "collision, AI and Lara's aim stay; its shadow goes too"},
+    {"Arachno", "Picture", "1", "0.21 (arachno.picture): 1 = a picture at each spider while Enabled (size from its bones, "
+                                "wobbling, over walls / HUD until 0.22)"},
+    {"Arachno", "Mute", "1", "0.21 (arachno.mute): 1 = spider sounds are not started while Enabled (6 call gates + the "
+                             "sound-slot jump table word 0x5b6b1c)"},
+    {"Arachno", "Match", "spider,tarantula", "0.21: comma list of object name parts that make a spider (a-z 0-9 _)"},
+    {"Arachno", "Exclude", "_generator", "0.21: comma list of name parts that are never a spider (the spider generators)"},
+    {"Arachno", "Image", "TruMenu.arachno.png", "0.21: the picture - a PNG (alpha, any size up to 8192) next to tru.exe or a "
+                                                "full path; missing = a built-in picture.\nYour own image stays local: "
+                                                "the installer never copies, overwrites or removes it"},
+    {"Arachno", "Scale", "1.0", "0.21: picture size relative to the spider's projected bone box, 0.2 .. 5"},
+    {"Arachno", "MinPx", "16", "0.21: smallest picture in pixels, 4 .. 256"},
+    {"Arachno", "MaxScreen", "0.6", "0.21: largest picture as a part of the screen height, 0.1 .. 1"},
+    {"Arachno", "FadeNear", "150", "0.21: the picture fades out closer to the camera than this (units), 0 .. 2000 (0 = no "
+                                   "fade)"},
+    {"Arachno", "MaxDist", "8000", "0.21: no picture beyond this distance from the camera (units), 500 .. 50000"},
+    {"Arachno", "WobbleAmp", "0.06", "0.21: bobbing of the picture as a part of its height, 0 .. 0.5"},
+    {"Arachno", "WobbleHz", "1.6", "0.21: wobble speed in Hz, 0 .. 10"},
+    {"Arachno", "SquashAmp", "0.08", "0.21: squash / stretch, 0 .. 0.5"},
+    {"Arachno", "TiltDeg", "5", "0.21: tilting in degrees, 0 .. 45"},
+    {"Arachno", "Flip", "1", "0.21: 1 = the picture is mirrored while its spider moves to the left on screen"},
+    {"Camera", "ShakeScale", "100", "0.21 (cam.shakescale): camera shake strength in percent, 0 = off, 100 = the game's "
+                                    "own (no patch); a stub on the two\ncallers of the shake strength 0x5eb460 while "
+                                    "below 100"},
+    {"Camera", "Rumble", "100", "0.21 (cam.rumble): pad rumble in percent, 0 = off, 100 = the game's own (no patch); the "
+                                "XInputSetState pointer\n[0xa02b90] is wrapped while below 100"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -951,6 +991,13 @@ void AiTick();         // 0.19 dumb AI: purge / gate patches / brain flags (game
 void SndMuteTick();    // 0.20 media.mutemusic / media.muteambient (game thread, section "0.20 collectibles")
 void SnTick();         // 0.20.1 snd.list: the voice pool walk every [Sound] RefreshMs (game thread, every poll)
 void DrawSoundList();  // 0.20.1 snd.list overlay (render thread, section "0.20.1 sound list")
+void ArTick();         // 0.21 arachnophobia patches (game thread, section "0.21 arachnophobia")
+void CsTick();         // 0.21 camera shake scale / rumble patches (game thread)
+bool ArWantsDraw();    // 0.21: spider pictures to draw (render thread)
+void ArDrawPictures(IDirect3DDevice9 *dev);
+void ArOnReset();      // 0.21: the picture's D3DPOOL_DEFAULT texture before a Reset
+void M21Shutdown();    // 0.21: every patch back at unload
+extern CRITICAL_SECTION g_arLock;
 extern volatile LONG g_snOn;
 void NavTick();        // 0.12 Debug-Zeichnung: [Debug] NavDraw / NavMask once in the first loaded level (game thread)
 void SafeGroundTick(); // 0.8.1 player.unstuck: ring of recent safe positions (game thread)
@@ -1186,6 +1233,8 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         SaveLoadTick();                       // 0.18 save.load (cheap: one flag while idle)
         AiTick();                             // 0.19 dumb AI (cheap while everything is off: no walk)
         SndMuteTick();                        // 0.20 music / ambience mutes (cheap while off: one flag each)
+        ArTick();                             // 0.21 arachnophobia: slot 7 / sound gates (only while on in a level)
+        CsTick();                             // 0.21 camera shake scale / rumble (only below 100 %)
         NavTick();                           // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
         SafeGroundTick();                     // 0.8.1: player.unstuck ring
     }
@@ -13278,13 +13327,19 @@ struct M20Mark {
     char line1[128], line2[128];
     ImU32 colour, colour2;
     float top[3];
+    DWORD childIntro;                        // 0.21: the placed intro this runtime child carries (0 = placed / none)
 };
 M20Mark g_coMarks[65], g_enMarks[65];
+int LfNotDrawn(DWORD inst);                  // 0.21 labels, section "0.21 arachnophobia"
+DWORD LfIntro(DWORD inst, bool *placed);
+extern bool g_lfOk;
+extern char g_lfWhy[96];
+int g_lfHidden = 0, g_lfDup = 0;             // 0.21: last frame - labels skipped (not drawn by the game / pot copies)
 int g_coN = 0, g_enN = 0, g_coKindN[kCoKinds] = {}, g_enKindN[kEnKinds] = {};
 bool g_m20Fresh = false;                     // M20Draw ran this frame (M20Labels draws only then)
 DvCam g_m20Cam;                              // .. with this camera
 bool M20EnemiesOn() { return g_dvOn[kDvEnemies] != 0; }
-int M20Insert(M20Mark *arr, int count, DWORD inst, const float *p, float d2, int kind) {
+int M20Insert(M20Mark *arr, int count, DWORD inst, const float *p, float d2, int kind, DWORD childIntro = 0) {
     const int max = g_m20Max < 1 ? 1 : g_m20Max > 64 ? 64 : g_m20Max;
     int at = count;
     while (at > 0 && arr[at - 1].dist2 > d2) --at;
@@ -13296,6 +13351,7 @@ int M20Insert(M20Mark *arr, int count, DWORD inst, const float *p, float d2, int
     m.pos[0] = p[0]; m.pos[1] = p[1]; m.pos[2] = p[2];
     m.dist2 = d2;
     m.kind = kind;
+    m.childIntro = childIntro;
     return count < max ? count + 1 : count;
 }
 // the reward index of a collectible / container: intro data +0x30 (0 = none / not readable)
@@ -13336,6 +13392,10 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
     ReadDword(kPlayerPtr, &player);
     ReadDword(kFirstInstance, &inst);
     const float r2 = g_m20Radius * g_m20Radius;
+    // 0.21: the placed intros of the collectibles in this walk (a runtime child carrying one of them gets no label)
+    static DWORD placedIntro[256];
+    static int placedKind[256];
+    int placedN = 0, hidden = 0, dup = 0;
     for (int guard = 0; inst && guard < 4096; ++guard, ++walked) {
         DWORD next = 0, object = 0, oid = 0;
         float p[3], d2 = 0.0f;
@@ -13345,18 +13405,48 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
             const int ck = co ? CoKindOf(id) : -1;
             const int ek = ck < 0 && en && AiBrainOf(inst) ? EnKindOf(id) : -1;
             if (ck >= 0) {
-                ++coFound;
-                ++g_coKindN[ck];
-                if (DvVisible(c, p, 150.0f, &d2) && d2 <= r2) g_coN = M20Insert(g_coMarks, g_coN, inst, p, d2, ck);
+                bool placed = true;          // 0.21: placed intros first - also a hidden one (a broken pot's copy)
+                const DWORD intro = LfIntro(inst, &placed);
+                if (intro && placed && placedN < 256) {
+                    placedIntro[placedN] = intro;
+                    placedKind[placedN++] = ck;
+                }
+                if (LfNotDrawn(inst)) {      // 0.21: picked up / hidden / being removed: no label, not counted
+                    ++hidden;
+                } else {
+                    ++coFound;
+                    ++g_coKindN[ck];
+                    if (DvVisible(c, p, 150.0f, &d2) && d2 <= r2)
+                        g_coN = M20Insert(g_coMarks, g_coN, inst, p, d2, ck, placed ? 0 : intro);
+                }
             } else if (ek >= 0) {
-                ++enFound;
-                ++g_enKindN[ek];
-                if (DvVisible(c, p, 200.0f, &d2) && d2 <= r2) g_enN = M20Insert(g_enMarks, g_enN, inst, p, d2, ek);
+                if (LfNotDrawn(inst)) {      // 0.21: a hidden / removed enemy gets no label either
+                    ++hidden;
+                } else {
+                    ++enFound;
+                    ++g_enKindN[ek];
+                    if (DvVisible(c, p, 200.0f, &d2) && d2 <= r2) g_enN = M20Insert(g_enMarks, g_enN, inst, p, d2, ek);
+                }
             }
         }
         if (!ReadDword(inst + 8, &next)) break;
         inst = next;
     }
+    // 0.21: a runtime child (INSTANCE_BirthObject gives it the parent's intro record) is dropped when the placed instance of
+    // that intro and the same kind is in the walk - one label per reward pot
+    for (int i = 0; i < g_coN;) {
+        bool drop = false;
+        for (int k = 0; k < placedN && g_coMarks[i].childIntro && !drop; ++k)
+            drop = placedIntro[k] == g_coMarks[i].childIntro && placedKind[k] == g_coMarks[i].kind;
+        if (!drop) { ++i; continue; }
+        ++dup;
+        --coFound;
+        --g_coKindN[g_coMarks[i].kind];
+        for (int k = i; k + 1 < g_coN; ++k) g_coMarks[k] = g_coMarks[k + 1];
+        --g_coN;
+    }
+    g_lfHidden = hidden;
+    g_lfDup = dup;
     // collectibles: reward = diamond on a short post; container = ring + post ("enthaelt Artefakt")
     for (int i = 0; i < g_coN; ++i) {
         M20Mark &m = g_coMarks[i];
@@ -13424,8 +13514,9 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
     g_dvListed[kDvEnemies] = enFound;
     g_m20Cam = c;
     g_m20Fresh = true;
-    if (co) LabelAdd(state, stateSize, used, "collectibles %d of %d (radius %.0f, max %d); ", g_coN, coFound, g_m20Radius,
-                     g_m20Max);
+    if (co) LabelAdd(state, stateSize, used, "collectibles %d of %d (radius %.0f, max %d; %d copies skipped); ", g_coN,
+                     coFound, g_m20Radius, g_m20Max, g_lfDup);
+    if (g_lfHidden) LabelAdd(state, stateSize, used, "%d hidden / collected without label; ", g_lfHidden);
     if (en) LabelAdd(state, stateSize, used, "enemies %d of %d in %d instances; ", g_enN, enFound, walked);
 }
 // one label above the marker, nudged up once on overlap, else skipped
@@ -13465,7 +13556,9 @@ void M20Labels(ImDrawList *dl) {
     if (!logTick || now - logTick >= 30000) {
         logTick = now;
         Log(1, "0.20 markers: collectibles %d drawn of %d (%d labelled), enemies %d drawn of %d (%d labelled); radius "
-            "%.0f, max %d", g_coN, g_dvListed[kDvCollect], co, g_enN, g_dvListed[kDvEnemies], en, g_m20Radius, g_m20Max);
+            "%.0f, max %d; 0.21: %d hidden / collected instance(s) and %d runtime copy(ies) without label (%s)", g_coN,
+            g_dvListed[kDvCollect], co, g_enN, g_dvListed[kDvEnemies], en, g_m20Radius, g_m20Max, g_lfHidden, g_lfDup,
+            g_lfOk ? "label checks ok" : g_lfWhy);
     }
 }
 // legend: one row per kind seen in the loaded units (found count), below the layer rows
@@ -13841,7 +13934,7 @@ char g_snWhy[96] = "not checked";            // (g_smWhy: above SndMuteTick)
 
 // ---- settings ([Sound]) ----
 volatile LONG g_snOn = 0;                    // snd.list
-int g_snPos = 0;                             // 0 bl, 1 tl, 2 tr, 3 br
+int g_snPos = 3;                             // 0 bl, 1 tl, 2 tr, 3 br (0.21: br by default)
 int g_snLines = 16, g_snRefresh = 1000, g_snSort = 0, g_snOnlyPlaying = 0;   // sort 0 group, 1 volume, 2 name
 float g_snScale = 1.0f;
 int g_snShow[4] = {1, 1, 1, 1};              // music, SFX, speech, other
@@ -14082,7 +14175,7 @@ void SnVoiceText(const SnVoice &v, bool de, bool full, const char *music, char *
     LabelAdd(o, n, &used, "  %s", (de ? kSnStateDe : kSnStateEn)[st]);
     if (v.dist >= 0.0f) LabelAdd(o, n, &used, "  %.0fu", static_cast<double>(v.dist));
     else if (v.dist < -1.5f) LabelAdd(o, n, &used, "  3D");
-    if (v.cat == kSnMusic && music && music[0]) LabelAdd(o, n, &used, "  [%s]", music);
+    if (full && v.cat == kSnMusic && music && music[0]) LabelAdd(o, n, &used, "  [%s]", music);   // 0.21: dump only
     if (full)
         LabelAdd(o, n, &used, " | voice 0x%08lx ch 0x%08lx%s sample 0x%08lx params 0x%08lx cg 0x%08lx fmod vol %.3f "
                  "playing %d paused %d grp-paused %d muted %d virtual %d pending %d finished %d pos %.0f %.0f %.0f",
@@ -14129,6 +14222,17 @@ bool SnBefore(const SnVoice &a, const SnVoice &b) {
     if (a.group != b.group) return a.group < b.group;
     return a.vol > b.vol;
 }
+// 0.21: one row of the list; in a right corner flush with the window's right edge (the window is as wide as its widest
+// row, so the box stays at the screen's right edge instead of reaching into the screen)
+void SnRow(const char *text, bool right, ImU32 colour) {
+    if (right) {
+        const float w = ImGui::CalcTextSize(text).x, avail = ImGui::GetContentRegionAvail().x;
+        if (avail > w) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - w);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, colour);
+    ImGui::TextUnformatted(text);
+    ImGui::PopStyleColor();
+}
 void DrawSoundList() {
     if (!g_snOk) return;
     char music[160];
@@ -14172,19 +14276,29 @@ void DrawSoundList() {
         Out(head, sizeof(head), de ? "Ton (%d spielen)  -  %d Stimmen, %d gezeigt" : "Sound (%d playing)  -  %d voices, %d "
             "shown", audible, all, shown < g_snLines ? shown : g_snLines);
         if (!tick) Out(head, sizeof(head), de ? "Ton - noch keine Daten (Spiel-Thread)" : "Sound - no data yet (game thread)");
-        ImGui::TextUnformatted(head);
-        if (tick && age >= 3) ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), de ? "Stand vor %lu s" : "%lu s old", age);
+        SnRow(head, right, IM_COL32(255, 255, 255, 255));
         char line[400];
+        if (tick && age >= 3) {
+            Out(line, sizeof(line), de ? "Stand vor %lu s" : "%lu s old", age);
+            SnRow(line, right, IM_COL32(255, 204, 102, 255));
+        }
+        // 0.21 (Lukas live): the srmusic tracks once here - which track a music voice plays is not known (no names in
+        // memory), so the rows no longer repeat the whole slot list
+        if (music[0] && g_snShow[kSnMusic]) {
+            Out(line, sizeof(line), "%s [%s]", de ? kSnCatDe[kSnMusic] : kSnCatEn[kSnMusic], music);
+            SnRow(line, right, kSnCatColour[kSnMusic]);
+        }
         for (int k = 0; k < shown && k < g_snLines; ++k) {
             const SnVoice &v = g_snDraw[g_snOrder[k]];
             SnVoiceText(v, de, false, music, line, sizeof(line));
             ImU32 c = kSnCatColour[v.cat];
             if (SnState(v) != kSnStPlaying) c = (c & 0x00ffffff) | 0x90000000;   // dimmed: not audible
-            ImGui::PushStyleColor(ImGuiCol_Text, c);
-            ImGui::TextUnformatted(line);
-            ImGui::PopStyleColor();
+            SnRow(line, right, c);
         }
-        if (shown > g_snLines) ImGui::Text(de ? "... %d weitere" : "... %d more", shown - g_snLines);
+        if (shown > g_snLines) {
+            Out(line, sizeof(line), de ? "... %d weitere" : "... %d more", shown - g_snLines);
+            SnRow(line, right, IM_COL32(255, 255, 255, 255));
+        }
         ImGui::SetWindowFontScale(1.0f);
     }
     ImGui::End();
@@ -14395,7 +14509,7 @@ void SnReadOptions(const char *ini) {
     InterlockedExchange(&g_snOn, OptInt(ini, "Sound", "List") != 0 ? 1 : 0);
     char v[32];
     OptString(ini, "Sound", "Position", v, sizeof(v));
-    g_snPos = 0;
+    g_snPos = 3;                             // 0.21: bottom right by default (bottom left = the quick-toggle bar)
     for (int i = 0; i < 4; ++i)
         if (_stricmp(v, kSnPosNames[i]) == 0) g_snPos = i;
     g_snLines = OptInt(ini, "Sound", "MaxLines");
@@ -14592,6 +14706,1421 @@ void M201Check() {
         g_snOnlyPlaying, g_snShow[0], g_snShow[1], g_snShow[2], g_snShow[3]);
 }
 // ---- end of 0.20.1 sound list ----
+
+// ======================================================================================================================
+// ---- 0.21 arachnophobia, camera shake, labels, ai.remove (Lukas / coordinator 2026-11-06) ----
+// Plan: docs\Befund-Arachnophobie-Stufe1-Kamera-0611.md (stage 1 = 0.21-A .. E); this build: docs\Befund-TruMenu-021-
+// 0611.md; every byte check of this section is pinned in work\asi\menu021\precheck_021.txt (tools/pe_bytes_check.py on
+// the Steam exe). Research of this build: work\m021_0611 (labels\ = the pot / hidden rules, airemove\ = the removal).
+// Spiders = object name holds a part of [Arachno] Match and none of Exclude (default spider,tarantula / _generator: the
+//   dbg.enemies kind spider incl. DLC 1 giant_albino_tarantula, never the spider generators); cached per object id.
+// A arachno.list: per spider one log line - drawable [inst+0x244] and its vtable (InstanceDrawable 0x853abc expected:
+//   the generic instance init 0x5ba9de stores it), +0x14 bits 0x200 (drawn this frame) / 0x800 (hidden), the draw-group
+//   masks +0x23c / +0x240, bones, children +0x218, LP, the thread of the last spider draw against the game thread
+//   (PadHook) and the render thread (Present).
+// B model off ([Arachno] Hide): InstanceDrawable vtable slot 7 (.rdata word 0x853ad8 = 0x5bba90, thiscall (a, b), ret 8)
+//   -> ArDrawHook while the master and Hide or Picture are on in a loaded level. For a spider the game wants to draw
+//   ((+0x23c | +0x240) != -1): V1 (the draw runs on the game thread) +0x23c = -1 only during the call - the engine takes
+//   its own "all draw groups hidden" exit 0x5bbb39 after it set +0x14 |= 0x200 and counted [0xe7f17c] - and the game's
+//   value back right after (only while it is still -1); V2 (another thread draws: nothing is written into a field the
+//   logic may write at the same time) the call is skipped and the two writes the game does first are done here.
+//   Logic, collision, AI, hits and Lara's targeting stay (they never read the mask; the hide bit 0x800 would take the
+//   spider out of the game - not used).
+// C picture ([Arachno] Picture): render thread, ImGui background list (over the game and its HUD, under TruMenu's
+//   windows; walls do not hide it - the depth path is 0.22): every spider the engine wanted to draw in the last 200 ms;
+//   size and centre from the projected bones ([inst+0x90] + bone * 0x40, position +0x30; count = model +0x68 ?
+//   [[model+0x68]] : [model+4], model = [[[inst+0x230]+0x10]+0x40][s8 inst+0x235] as 0x5b956b), wobble (bob / squash /
+//   tilt, a phase per instance), flipped by the direction it moves on screen, faded closer than FadeNear, none beyond
+//   MaxDist or at LP <= 0 (brain +0x2c64). Image: TruMenu.arachno.png next to tru.exe ([Arachno] Image; PNG through
+//   stb_image, header-only, no new DLL import) - the owner's own picture: never installed, overwritten, removed or
+//   uploaded by the repository tools; without it a built-in picture drawn by code (no image file in the repository).
+// D spider sounds off ([Arachno] Mute): every instance sound start found goes through the anim-event sound branch 0x5b99c0
+//   (cdecl, 7 arguments), the random sound set 0x5b2820 (cdecl, 4) - instance = argument 2 - or the object sound-slot case
+//   0x5b69f4 of the dispatcher 0x5b69c0 (instance = argument 1). The rel32 of the 6 calls point to cdecl gates with the
+//   same arguments, the jump table word 0x5b6b1c (type 0x60 -> index 3) to a naked gate (skip = ret, as the default
+//   exit 0x5b6b0c). A spider's sound is not started; the gates return 0 = the originals' own result without payload (eax
+//   = argument 1 = 0 at 0x5b9d48 / 0x5b9fbd) - every caller reloads eax or passes it on (work\m021_0611\dis_sound_*).
+//   The call bytes 0x5b6a2f that TruTrace checks stay untouched. Patched on the game thread while master + Mute are on
+//   in a level.
+// E camera shake ([Camera] ShakeScale 0 .. 100 %): the shake strength 0x5eb460 (esi = slot, no stack argument, result
+//   in st0) has two callers - the camera apply 0x5eea55 (11 camera modes) and the shake sum 0x5eb56d; both rel32 point to
+//   a naked stub (the game's function, fmul by the scale, ret) while the scale is not 100. Shakes run on (time, end) and
+//   move nothing at 0. Rumble ([Camera] Rumble 0 .. 100 %): the resolved XInputSetState pointer [0xa02b90] (written at
+//   0x48251d, called only at 0x4849b5) points to a wrapper that scales both motors while not 100. Test helpers:
+//   cam.shakelist (the camerashakes object's table +0x5c: count, entries {DTP, duration, key}), cam.shake <n> (the
+//   game's own start by key 0x5ee940 - the player code calls it at 0x7170a5), cam.shakestate (the 8 slots at 0xe80020).
+// Labels (0.20 live test): one label per reward pot - INSTANCE_BirthObject 0x5bd270 gives a runtime child the parent's
+//   intro record ([inst+0x100]) with a runtime id (counter from 0x40000000, 0x5569db) at +0x58; only the placed instance
+//   has +0x58 = [intro+0x58] (introduce 0x5bcce9): a child whose placed instance of the same kind is in the walk gets no
+//   label. No label on an instance the game does not draw: +0x14 bit 0x800 (hide), kill flag 0x20, (+0x18 & 0x400000
+//   or [[object]] & 0x40000000) without +0x1c & 0x200 (scene entity update 0x5c6990), +0x23c | +0x240 == -1 (0x5bbb23).
+// ai.remove nearest | others | all | <intro id>: the game's despawn (EnemyBehavior_Despawn::HandleMessage 0x61cda0):
+//   +0x14 |= 0x800, CSenseManager::RemoveInstance 0x71dcb0 on [0xfadfac], the generator notification (INSTANCE_Post(
+//   generator, 0xff, &[record+8]) when the enemy came from one), +0x14 |= 0x20 - the sweep INSTANCE_CleanUpInstanceList
+//   0x5bcbb0 (twice per game frame) removes it with ReallyRemoveInstance 0x5bc4e0 (brain, processes, handles, scene).
+//   AI enemies only (brain + object family 14), never Lara, nothing already flagged (0x20 / 0x20000 / 0x400). No damage,
+//   no death, no save mark (back after a reload). Game thread, __try guarded.
+// Log: one line per switch / patch change and per item, one burst line for skipped spider sounds - never per frame.
+// ======================================================================================================================
+const DvCheck kArDrawChecks[] = {
+    {0x005bba90, "55 8bec 83e4f0 83ec74 8b4508 53 8bd9 89442420 8b4304 81481400020000 83057cf1e70001"},   // slot 7
+    {0x005bbb23, "8b4304 8bb840020000 0bb83c020000 83ffff 897c2424 0f8428030000"},   // masks -1 -> no geometry
+    {0x00853ad8, "90ba5b00"},                                    // vtable 0x853abc slot 7 = 0x5bba90
+    {0x005b93ea, "c706bc3a8500 896e04"},                         // ctor: vtable, instance at +4
+    {0x005ba9de, "56 8bc8 e8fae9ffff 85c0 740a 83c004 7405 83c0fc eb02 33c0 898644020000"},   // [inst+0x244]
+    {0x005c985f, "c1e006 038190000000 d94030 d91e d94034 d95fe6 d94038"},   // bones [inst+0x90], position +0x30
+    {0x005b956b, "8b8630020000 8b4810 0fbe9635020000 8b4140 8b0490 8b4868 85c9 7404 8b01 eb03 8b4004 8b8e90000000 "
+                 "8b9694000000 c1e006"},                         // bone count
+    {0x005b95c6, "8bb618020000 83c404 85f6 7413 56 e827ffffff 8bb61c020000"},   // children +0x218, siblings +0x21c
+};
+const DvCheck kArSoundChecks[] = {
+    {0x005b99c0, "55 8bec 83e4f0 83ec34 53 56 8b7508 85f6 57 0f845c020000 0fbe06 85c0 0f8559010000 d9ee 8b4604 51 "
+                 "d91c24 50 8d4c2420 51 8b0d00818a00 e8d49bfdff"},   // anim-event sound branch (payload, inst, ..)
+    {0x005b9a28, "8b7d0c"},                                      // .. instance = argument 2
+    {0x005b9ac0, "8b8f48020000"},
+    {0x005b2820, "56 8b742408 85f6 0f8437010000 53 8b5c2414 85db 7507 8b5c2410 83c320"},   // random sound set
+    {0x005b9d44, "6a00 56 50 e873fcffff"},                       // the 6 call sites
+    {0x005b9fb7, "56 51 83c008 50 e8fef9ffff"},
+    {0x005bc1b1, "56 55 e808d8ffff"},
+    {0x005b9d60, "6a00 56 51 e8b78affff"},
+    {0x005b9fc8, "56 51 83c008 50 e84d88ffff"},
+    {0x005bc1c1, "6a00 56 55 e85666ffff"},
+    {0x005b69f4, "8b4c2404 8b8948020000 85c9"},                  // slot case: instance = argument 1
+    {0x005b6a2f, "52 e81bd3fdff 5e c3"},                         // (TruTrace's call bytes - never written)
+    {0x005b69c0, "8b44240c 0fbf08 83c1ff 83f96b 0f8739010000 0fb689306b5b00 ff248d106b5b00"},   // dispatcher
+    {0x005b6b1c, "f4695b00"},                                    // table word of index 3
+    {0x005b6b8c, "07070703"},                                    // type 0x60 -> index 3
+    {0x005b6b0c, "c3"},                                          // default exit
+};
+const DvCheck kCsChecks[] = {
+    {0x005e86f0, "33d2 b92800e800 8379f800"},                    // pool 0xe80020, 8 slots of 0x90
+    {0x005e871a, "81f9a804e800"},
+    {0x005ee82a, "d9e8 d95e10"},                                 // start: slot +0x10 = 1.0
+    {0x005eb460, "55 8bec 83e4f0 83ec30 80be8400000000 0f84c1000000"},   // strength (esi = slot)
+    {0x005eb524, "d864240c d84e10 d95c240c d944240c 8be5 5d c3 d94610 8be5 5d c3"},   // .. result in st0, plain ret
+    {0x005eea55, "e806caffff d95c2414 f30f10442414 0f284b58 0fc6c000 0f59c8"},   // caller 1: camera apply
+    {0x005eb56d, "e8eefeffff d84f78"},                           // caller 2: shake sum
+    {0x005f33b0, "be2800e800"},
+    {0x005ee940, "51 6aff 681c5a8500 e8832efdff 8b4008 8b505c 8b0a 83c408 33c0 85c9 764a"},   // start by key
+    {0x005ee95e, "56 8b7204 8b54240c 395608 740d 83c001 83c60c 3bc1 72f1 5e 59 c3"},   // entries of 0xc, key +8
+    {0x005ee978, "8b06 83f8ff 7428 50 e8fbf5f5ff d94604 d95c2408 d9442408 d91c24 50 e857feffff"},   // DTP, duration
+    {0x00855a1c, "63616d6572617368616b657300"},                  // "camerashakes"
+    {0x007170a5, "e89678edff"},                                  // the player code calls 0x5ee940
+};
+const DvCheck kRbChecks[] = {
+    {0x0048251d, "68884b8400 50 ffd6 833d8c2ba00000 a3902ba000"},   // XInputSetState -> [0xa02b90]
+    {0x004849b5, "ff15902ba000 83c40c c3"},                      // the only call
+};
+const DvCheck kLfChecks[] = {
+    {0x005ba880, "8b442428 894e38 8b550c 894658"},               // INSTANCE_DefaultInit: +0x58 = unique id
+    {0x005ba915, "8b44242c 898ed8000000 8b550c 8b4c2430 8996dc000000 8b5620 8996f0000000 8b562c 898600010000 "
+                 "8b4624 898e04010000"},                         // .. +0x100 = intro, +0x104 = intro data
+    {0x005bcce9, "8b4f78 8b5758 804f7280 57 8d4710 50 51 57 52 6a00 53 56 e80cdbffff"},   // placed: id = [intro+0x58]
+    {0x005bd2a0, "a16492c500 8b8818020000 8b7d08 83801802000001 8b9704010000 8d5f30 53 8d4720 50 8b8700010000 52 "
+                 "8b550c 50 51 8b4d10 51 52 56 e836d5ffff"},     // BirthObject: runtime id, the parent's intro
+    {0x005bd37b, "8996e4000000 897e54"},                         // .. +0x54 = parent
+    {0x005569db, "8b0d6492c500 6a01 51 c7811802000000000040"},   // runtime ids start at 0x40000000
+    {0x005c69f1, "f7461400080000 c744241000000000 0f85ff000000 84db 0f85f7000000"},   // hidden 0x800: not drawn
+    {0x005c6a0e, "8b4618 2500004000 750d 8b4e10 8b11 f70200000040 740d f7461c00020000 0f84d3000000"},
+};
+const DvCheck kAdChecks[] = {
+    {0x005bcbb0, "8b0d548dd900 56 33f6 85c9 746d"},              // INSTANCE_CleanUpInstanceList ..
+    {0x005bcbd9, "8b4114 a900040000 740c a820 7411 83e0df 894114 eb09 a820 7405 be01000000"},   // 0x400 cancels 0x20
+    {0x005bcc10, "f6401420 8b7008 740b 6a00 50 e8bff8ffff 83c408 85f6 8bc6 75e6 5e c3"},   // .. ReallyRemoveInstance
+    {0x005dfdc8, "e8e3cdfdff"},                                  // GAMELOOP_Process calls the sweep twice
+    {0x005dfecc, "e8dfccfdff"},
+    {0x005bc6aa, "8b4614 a900000100 7411 0d00000200 56 894614 e84e8d0000"},   // family deinit (brain, processes)
+    {0x005bc6c5, "8b460c 3bc3 7408 8b5608 895008 eb08 8b4608 a3548dd900 8b4608 3bc3 7406 8b4e0c 89480c 895e44"},
+    {0x005c5410, "56 8b742408 f7461400000200 8b4610 57 8b7834"},   // OBTABLE: family = [[inst+0x10]+0x34]
+    {0x008abbb4, "30c56300 408d6300 10776200 c0876100 807a6200"},   // family 14 = the enemies
+    {0x00638d4f, "f6471420 0f85a2010000"},                       // flagged: no enemy process
+    {0x00625335, "8b4614 a820 7556 a900000200 754f"},            // flagged: messages swallowed
+    {0x005b39d0, "8b4c2404 85c9 740e 8b01 85c0 7408 8b5044 3b5104 7402 33c0 c3"},   // handle {inst, id} resolve
+    {0x0071dcb0, "53 56 57 8b7c2410 8bd9 33f6 eb03 8d4900 8b0cb3 6aff 57 e8c5feffff 83c601 83fe07 7ced 5f 5e 5b c20400"},
+    {0x0061cde5, "8b8668010000 85c0 8d9e68010000"},              // despawn: ebx = brain+0x168 ..
+    {0x0061ce38, "814f1400080000 8b0dacdffa00 57 e8650e1000"},   // .. hide, CSenseManager::RemoveInstance
+    {0x0061ce8e, "81c64c4c0000 56 e8366bf9ff 8bf0 83c404 85f6 7421 8bcb e8a6a0ffff d94008 8d4c240c d95c240c 51 "
+                 "68ff000000 56 e88f68f9ff 83c40c 834f1420"},    // .. generator post, kill flag 0x20
+    {0x00616f50, "8b01 85c0 750a e845e80200 85c0 7411 90 83b81c01000000 750a 8b401c 85c0 75f0 33c0 c3"},   // record
+    {0x005b3750, "56 8b742408 8d8610010000 85c0 7422 57 8bbe20010000 85ff 7416"},   // INSTANCE_Post
+};
+// [Arachno] / [Camera] (ArReadOptions); the switches may change on any thread (items), the hooks read them
+volatile LONG g_arOn = 0, g_arHide = 1, g_arPic = 1, g_arMute = 1;   // arachno.on / .hide / .picture / .mute
+char g_arMatch[128] = "spider,tarantula", g_arExclude[128] = "_generator", g_arImage[MAX_PATH] = "TruMenu.arachno.png";
+float g_arScale = 1.0f, g_arMaxScreen = 0.6f, g_arFadeNear = 150.0f, g_arMaxDist = 8000.0f;
+float g_arWobAmp = 0.06f, g_arWobHz = 1.6f, g_arSquash = 0.08f, g_arTilt = 5.0f;
+int g_arMinPx = 16, g_arFlip = 1;
+volatile LONG g_csShake = 100, g_rbRumble = 100;   // [Camera] ShakeScale / Rumble (percent)
+float g_csScaleF = 1.0f;                     // read by CsShakeStub (ShakeScale / 100)
+bool g_arOk = false, g_arSndOk = false, g_csOk = false, g_rbOk = false, g_lfOk = false, g_adOk = false;
+char g_arWhy[96] = "not checked", g_arSndWhy[96] = "not checked", g_csWhy[96] = "not checked", g_rbWhy[96] = "not checked",
+     g_lfWhy[96] = "not checked", g_adWhy[96] = "not checked";
+extern volatile DWORD g_renderThread;        // 0.10.5 shots, below: the thread of the game's Present call
+CRITICAL_SECTION g_arLock;                   // the picture list (draw thread writes, render thread reads)
+
+float ArOptFloat(const char *ini, const char *section, const char *key, float lo, float hi) {
+    char v[32];
+    OptString(ini, section, key, v, sizeof(v));
+    char *end = nullptr;
+    float f = static_cast<float>(strtod(v, &end));
+    if (!end || end == v || !(f >= lo && f <= hi)) f = static_cast<float>(atof(OptDefault(section, key)));
+    return f;
+}
+int ArOptInt(const char *ini, const char *section, const char *key, int lo, int hi) {
+    int v = OptInt(ini, section, key);
+    return v >= lo && v <= hi ? v : atoi(OptDefault(section, key));
+}
+void ArReadOptions(const char *ini) {
+    InterlockedExchange(&g_arOn, OptInt(ini, "Arachno", "Enabled") != 0 ? 1 : 0);
+    InterlockedExchange(&g_arHide, OptInt(ini, "Arachno", "Hide") != 0 ? 1 : 0);
+    InterlockedExchange(&g_arPic, OptInt(ini, "Arachno", "Picture") != 0 ? 1 : 0);
+    InterlockedExchange(&g_arMute, OptInt(ini, "Arachno", "Mute") != 0 ? 1 : 0);
+    char v[160];
+    OptString(ini, "Arachno", "Match", v, sizeof(v));
+    if (!AiNormList(v, g_arMatch, sizeof(g_arMatch)) || !g_arMatch[0])
+        AiNormList(OptDefault("Arachno", "Match"), g_arMatch, sizeof(g_arMatch));
+    OptString(ini, "Arachno", "Exclude", v, sizeof(v));
+    if (!AiNormList(v, g_arExclude, sizeof(g_arExclude))) g_arExclude[0] = 0;
+    OptString(ini, "Arachno", "Image", g_arImage, sizeof(g_arImage));
+    g_arScale = ArOptFloat(ini, "Arachno", "Scale", 0.2f, 5.0f);
+    g_arMinPx = ArOptInt(ini, "Arachno", "MinPx", 4, 256);
+    g_arMaxScreen = ArOptFloat(ini, "Arachno", "MaxScreen", 0.1f, 1.0f);
+    g_arFadeNear = ArOptFloat(ini, "Arachno", "FadeNear", 0.0f, 2000.0f);
+    g_arMaxDist = ArOptFloat(ini, "Arachno", "MaxDist", 500.0f, 50000.0f);
+    g_arWobAmp = ArOptFloat(ini, "Arachno", "WobbleAmp", 0.0f, 0.5f);
+    g_arWobHz = ArOptFloat(ini, "Arachno", "WobbleHz", 0.0f, 10.0f);
+    g_arSquash = ArOptFloat(ini, "Arachno", "SquashAmp", 0.0f, 0.5f);
+    g_arTilt = ArOptFloat(ini, "Arachno", "TiltDeg", 0.0f, 45.0f);
+    g_arFlip = OptInt(ini, "Arachno", "Flip") != 0 ? 1 : 0;
+    InterlockedExchange(&g_csShake, ArOptInt(ini, "Camera", "ShakeScale", 0, 100));
+    InterlockedExchange(&g_rbRumble, ArOptInt(ini, "Camera", "Rumble", 0, 100));
+}
+
+// ---- spiders: object name (any thread; a name is cached only once the object list knows it) ----
+signed char g_arKind[4096];                  // per object id: 0 not looked up, 1 spider, 3 giant spider, 2 none
+bool ArListHit(const char *low, const char *list) {
+    char copy[128];
+    strncpy_s(copy, sizeof(copy), list, _TRUNCATE);
+    char *context = nullptr;
+    for (char *part = strtok_s(copy, ",", &context); part; part = strtok_s(nullptr, ",", &context))
+        if (part[0] && strstr(low, part)) return true;
+    return false;
+}
+int ArKindOf(int id) {
+    if (id <= 0 || id >= 4096) return 2;
+    if (g_arKind[id]) return g_arKind[id];
+    char name[64];
+    if (!ObjectName(id, name, sizeof(name))) return 2;
+    _strlwr_s(name, sizeof(name));
+    const int kind = ArListHit(name, g_arMatch) && !(g_arExclude[0] && ArListHit(name, g_arExclude))
+                         ? (strstr(name, "giant") ? 3 : 1) : 2;
+    g_arKind[id] = static_cast<signed char>(kind);
+    return kind;
+}
+int ArInstKind(DWORD inst) {                 // 1 spider, 3 giant spider, 2 none
+    DWORD object = 0, oid = 0;
+    if (!inst || !ReadDword(inst + 0x10, &object) || !object || !ReadDword(object + 0x14, &oid)) return 2;
+    return ArKindOf(static_cast<int>(oid & 0xffff));
+}
+bool ArIsSpider(DWORD inst) { return ArInstKind(inst) != 2; }
+
+// ---- B: InstanceDrawable slot 7 (the draw thread; ArTick patches it on the game thread) ----
+typedef void(__fastcall *ArDrawFn)(void *self, void *edx, DWORD a, DWORD b);   // thiscall, ret 8
+const DWORD kArDrawSlot = 0x00853ad8, kArDrawGame = 0x005bba90, kArDrawCount = 0x00e7f17c, kArDrawVt = 0x00853abc;
+volatile LONG g_arHideLive = 0, g_arPicLive = 0, g_arMuteLive = 0;   // what the hooks do now (ArTick sets them)
+bool g_arSlotOn = false, g_arSlotRefused = false, g_arThreadLogged = false;   // game thread
+volatile DWORD g_arDrawThread = 0;           // thread of the last spider draw call
+volatile LONG g_arDrawCalls = 0, g_arHidden = 0, g_arV2 = 0;   // since the patch: spider draws, hidden by V1 / V2
+struct ArSeen { DWORD inst, id, tick; };
+ArSeen g_arSeen[64];                         // spiders the engine wanted to draw (g_arLock)
+void ArRemember(DWORD inst) {
+    DWORD id = 0;
+    ReadDword(inst + 0x44, &id);
+    const DWORD now = GetTickCount();
+    EnterCriticalSection(&g_arLock);
+    int k = 0, oldest = 0;
+    for (; k < 64; ++k) {
+        if (g_arSeen[k].inst == inst && g_arSeen[k].id == id) break;
+        if (!g_arSeen[k].inst) { oldest = k; continue; }
+        if (g_arSeen[oldest].inst && now - g_arSeen[k].tick > now - g_arSeen[oldest].tick) oldest = k;
+    }
+    if (k == 64) k = oldest;
+    g_arSeen[k].inst = inst;
+    g_arSeen[k].id = id;
+    g_arSeen[k].tick = now;
+    LeaveCriticalSection(&g_arLock);
+}
+void __fastcall ArDrawHook(void *self, void *edx, DWORD a, DWORD b) {
+    const ArDrawFn game = reinterpret_cast<ArDrawFn>(kArDrawGame);
+    DWORD inst = 0;
+    if ((!g_arHideLive && !g_arPicLive) || !ReadDword(reinterpret_cast<DWORD>(self) + 4, &inst) || !ArIsSpider(inst)) {
+        game(self, edx, a, b);
+        return;
+    }
+    const DWORD thread = GetCurrentThreadId();
+    g_arDrawThread = thread;
+    InterlockedIncrement(&g_arDrawCalls);
+    DWORD m23c = 0, m240 = 0;
+    ReadDword(inst + 0x23c, &m23c);
+    ReadDword(inst + 0x240, &m240);
+    const bool gameDraws = (m23c | m240) != 0xffffffffu;   // the game itself wants it visible
+    if (gameDraws && g_arPicLive) ArRemember(inst);
+    if (!gameDraws || !g_arHideLive) {
+        game(self, edx, a, b);
+        return;
+    }
+    const DWORD logic = g_snGameThread;
+    if (!logic || thread == logic) {         // V1: the engine's own "all groups hidden" exit, the mask back at once
+        if (!AiPutDword(inst + 0x23c, 0xffffffffu)) {
+            game(self, edx, a, b);
+            return;
+        }
+        game(self, edx, a, b);
+        DWORD now = 0;
+        if (ReadDword(inst + 0x23c, &now) && now == 0xffffffffu) AiPutDword(inst + 0x23c, m23c);
+        InterlockedIncrement(&g_arHidden);
+        return;
+    }
+    DWORD flags = 0, count = 0;              // V2: what the game does before its mask test, nothing else
+    if (ReadDword(inst + 0x14, &flags)) AiPutDword(inst + 0x14, flags | 0x200);
+    if (ReadDword(kArDrawCount, &count)) AiPutDword(kArDrawCount, count + 1);
+    InterlockedIncrement(&g_arV2);
+}
+// game thread: slot 7 to "want"; one log line when it changes
+void ArSlotApply(bool want, const char *why) {
+    if (want == g_arSlotOn) return;
+    const DWORD hook = reinterpret_cast<DWORD>(&ArDrawHook);
+    DWORD cur = 0;
+    if (want) {
+        if (g_arSlotRefused) return;
+        if (!ReadDword(kArDrawSlot, &cur) || (cur != kArDrawGame && cur != hook)) {
+            g_arSlotRefused = true;
+            Log(0, "arachno: InstanceDrawable slot 7 (0x853ad8) holds 0x%08lx, not the game's 0x5bba90 - left untouched "
+                "(another plugin?); model off / picture stay off until arachno.on is switched again", cur);
+            return;
+        }
+        if (cur != hook && !WriteDword(kArDrawSlot, hook)) {
+            g_arSlotRefused = true;
+            Log(0, "arachno: slot 7 (0x853ad8): VirtualProtect failed (%lu) - not patched", GetLastError());
+            return;
+        }
+        g_arSlotOn = true;
+        g_arThreadLogged = false;
+        InterlockedExchange(&g_arDrawCalls, 0);
+        InterlockedExchange(&g_arHidden, 0);
+        InterlockedExchange(&g_arV2, 0);
+        Log(1, "arachno: InstanceDrawable::Draw slot 7 (0x853ad8) -> TruMenu (%s): model off %ld, picture %ld; spiders = "
+            "'%s' without '%s'", why, g_arHide, g_arPic, g_arMatch, g_arExclude);
+        return;
+    }
+    InterlockedExchange(&g_arHideLive, 0);
+    InterlockedExchange(&g_arPicLive, 0);
+    const char *note = "";
+    if (!ReadDword(kArDrawSlot, &cur)) note = " (not readable)";
+    else if (cur != hook) note = " (changed by someone else - left)";
+    else if (!WriteDword(kArDrawSlot, kArDrawGame)) note = " (VirtualProtect failed)";
+    g_arSlotOn = false;
+    Log(1, "arachno: slot 7 put back%s (%s); %ld spider draw call(s), %ld hidden by the mask (V1), %ld skipped (V2)", note,
+        why, g_arDrawCalls, g_arHidden, g_arV2);
+}
+
+// ---- D: spider sounds (the game's sound code calls the gates; ArTick patches them on the game thread) ----
+typedef DWORD(__cdecl *ArSnd7Fn)(DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD);
+typedef DWORD(__cdecl *ArSnd4Fn)(DWORD, DWORD, DWORD, DWORD);
+const DWORD kArSndBranch = 0x005b99c0, kArSndRandom = 0x005b2820;
+DWORD g_arSlotCase = 0x005b69f4;             // the jump table's own target (the naked gate jumps there)
+volatile LONG g_arSndSkip[3] = {0, 0, 0};    // skipped starts: anim sound / random set / sound slot (since the last line)
+LONG g_arSndTotal = 0;
+DWORD __cdecl ArSndGate7(DWORD a1, DWORD inst, DWORD a3, DWORD a4, DWORD a5, DWORD a6, DWORD a7) {
+    if (g_arMuteLive && ArIsSpider(inst)) {
+        InterlockedIncrement(&g_arSndSkip[0]);
+        return 0;
+    }
+    return reinterpret_cast<ArSnd7Fn>(kArSndBranch)(a1, inst, a3, a4, a5, a6, a7);
+}
+DWORD __cdecl ArSndGate4(DWORD a1, DWORD inst, DWORD a3, DWORD a4) {
+    if (g_arMuteLive && ArIsSpider(inst)) {
+        InterlockedIncrement(&g_arSndSkip[1]);
+        return 0;
+    }
+    return reinterpret_cast<ArSnd4Fn>(kArSndRandom)(a1, inst, a3, a4);
+}
+bool __cdecl ArSlotBlocked(DWORD inst) {
+    if (!g_arMuteLive || !ArIsSpider(inst)) return false;
+    InterlockedIncrement(&g_arSndSkip[2]);
+    return true;
+}
+// jump table word 0x5b6b1c: eax = payload, [esp+4] = the instance; skip = ret (the default exit 0x5b6b0c)
+__declspec(naked) void ArSlotGate() {
+    __asm {
+        push eax
+        push ecx
+        push edx
+        push dword ptr [esp + 0x10]
+        call ArSlotBlocked
+        add esp, 4
+        test al, al
+        pop edx
+        pop ecx
+        pop eax
+        jnz skip
+        jmp dword ptr [g_arSlotCase]
+    skip:
+        ret
+    }
+}
+AiPatch g_arSndPatches[7] = {
+    {0x005b9d48, kArSndBranch, true, "S1 anim sound 0x5b9d48", 0, 0, false},
+    {0x005b9fbd, kArSndBranch, true, "S2 anim sound 0x5b9fbd", 0, 0, false},
+    {0x005bc1b3, kArSndBranch, true, "S3 anim sound 0x5bc1b3", 0, 0, false},
+    {0x005b9d64, kArSndRandom, true, "S4 random set 0x5b9d64", 0, 0, false},
+    {0x005b9fce, kArSndRandom, true, "S5 random set 0x5b9fce", 0, 0, false},
+    {0x005bc1c5, kArSndRandom, true, "S6 random set 0x5bc1c5", 0, 0, false},
+    {0x005b6b1c, 0x005b69f4, false, "S7 sound slot table 0x5b6b1c", 0, 0, false},
+};
+bool g_arSndOn = false, g_arSndRefused = false;
+// a group of patches to "want", all or nothing; one log line when it changes (refused: not tried again until the switch
+// changes - no line per frame)
+void M21PatchGroup(AiPatch *p, int n, bool want, bool *on, bool *refused, const char *what, const char *why) {
+    if (want == *on) return;
+    char text[600] = "", fail[200] = "";
+    size_t used = 0;
+    if (want) {
+        if (*refused) return;
+        for (int i = 0; i < n; ++i)
+            if (!AiPatchOn(p[i], fail, sizeof(fail))) {
+                for (int j = 0; j < n; ++j) AiPatchOff(p[j]);
+                *refused = true;
+                Log(0, "%s: patch refused - %s; nothing stays patched (switch it again to retry)", what, fail);
+                return;
+            }
+        *on = true;
+        for (int i = 0; i < n; ++i) LabelAdd(text, sizeof(text), &used, "%s%s", used ? ", " : "", p[i].name);
+        Log(1, "%s on (%s): %s -> TruMenu", what, why, text);
+        return;
+    }
+    for (int i = 0; i < n; ++i) {
+        const char *note = AiPatchOff(p[i]);
+        LabelAdd(text, sizeof(text), &used, "%s%s%s", used ? ", " : "", p[i].name, note);
+    }
+    *on = false;
+    Log(1, "%s off (%s): %s put back", what, why, text);
+}
+
+// ---- C: the picture (render thread) ----
+// stb_image (src\asi\third_party\stb, public domain / MIT, see its LICENSE.txt): PNG only, from memory - no stdio, no
+// thread-locals, no failure strings, no SIMD; it uses the C runtime TruMenu already links (malloc / realloc / free)
+#define STBI_ONLY_PNG
+#define STBI_NO_STDIO
+#define STBI_NO_HDR
+#define STBI_NO_LINEAR
+#define STBI_NO_SIMD
+#define STBI_NO_THREAD_LOCALS
+#define STBI_NO_FAILURE_STRINGS
+#define STBI_ASSERT(x) ((void)0)
+#define STB_IMAGE_IMPLEMENTATION
+#pragma warning(push, 0)
+#include "../third_party/stb/stb_image.h"
+#pragma warning(pop)
+IDirect3DTexture9 *g_arTex = nullptr;
+IDirect3DDevice9 *g_arTexDevice = nullptr, *g_arTexFail = nullptr;
+bool g_arTexDefault = false;                 // D3DPOOL_DEFAULT (released before a Reset)
+volatile LONG g_arTexReload = 0;             // menu "reload the picture" (the render thread takes it)
+float g_arU = 1.0f, g_arV = 1.0f, g_arAspect = 1.0f;
+char g_arImgWhat[200] = "not loaded yet (with the first picture)";
+int g_arDrawn = 0, g_arListed = 0;           // pictures drawn / spiders listed in the last frame
+// distances for the built-in picture (u, v in 0 .. 1): a segment, a triangle (< 0 inside), coverage with a soft edge
+float ArSeg(float px, float py, float ax, float ay, float bx, float by) {
+    const float vx = bx - ax, vy = by - ay, wx = px - ax, wy = py - ay;
+    float t = (vx * wx + vy * wy) / (vx * vx + vy * vy);
+    t = t < 0.0f ? 0.0f : t > 1.0f ? 1.0f : t;
+    const float dx = wx - t * vx, dy = wy - t * vy;
+    return sqrtf(dx * dx + dy * dy);
+}
+float ArTri(float px, float py, const float *t) {
+    float d = ArSeg(px, py, t[0], t[1], t[2], t[3]);
+    d = fminf(d, ArSeg(px, py, t[2], t[3], t[4], t[5]));
+    d = fminf(d, ArSeg(px, py, t[4], t[5], t[0], t[1]));
+    const float c0 = (t[2] - t[0]) * (py - t[1]) - (t[3] - t[1]) * (px - t[0]);
+    const float c1 = (t[4] - t[2]) * (py - t[3]) - (t[5] - t[3]) * (px - t[2]);
+    const float c2 = (t[0] - t[4]) * (py - t[5]) - (t[1] - t[5]) * (px - t[4]);
+    const bool inside = (c0 >= 0.0f && c1 >= 0.0f && c2 >= 0.0f) || (c0 <= 0.0f && c1 <= 0.0f && c2 <= 0.0f);
+    return inside ? -d : d;
+}
+float ArCover(float d, float aa) {
+    const float a = 0.5f - d / aa;
+    return a < 0.0f ? 0.0f : a > 1.0f ? 1.0f : a;
+}
+// built-in picture (no image file): a friendly cat face of circles, triangles and lines, 256 x 256 RGBA, soft edge
+unsigned char *ArBuiltIn(int *w, int *h) {
+    const int n = 256;
+    unsigned char *p = static_cast<unsigned char *>(malloc(static_cast<size_t>(n) * n * 4));
+    if (!p) return nullptr;
+    const float aa = 1.5f / n;
+    const float earL[6] = {0.15f, 0.44f, 0.22f, 0.07f, 0.45f, 0.28f}, earR[6] = {0.85f, 0.44f, 0.78f, 0.07f, 0.55f, 0.28f};
+    const float inL[6] = {0.21f, 0.39f, 0.24f, 0.15f, 0.38f, 0.30f}, inR[6] = {0.79f, 0.39f, 0.76f, 0.15f, 0.62f, 0.30f};
+    const float nose[6] = {0.465f, 0.645f, 0.535f, 0.645f, 0.5f, 0.685f};
+    const float whisk[6][4] = {{0.34f, 0.68f, 0.05f, 0.62f}, {0.34f, 0.71f, 0.04f, 0.71f}, {0.34f, 0.74f, 0.06f, 0.80f},
+                               {0.66f, 0.68f, 0.95f, 0.62f}, {0.66f, 0.71f, 0.96f, 0.71f}, {0.66f, 0.74f, 0.94f, 0.80f}};
+    for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x) {
+            const float u = (static_cast<float>(x) + 0.5f) / n, v = (static_cast<float>(y) + 0.5f) / n;
+            const float head = sqrtf((u - 0.5f) * (u - 0.5f) + (v - 0.58f) * (v - 0.58f) * 1.1f) - 0.33f;
+            const float ear = fminf(ArTri(u, v, earL), ArTri(u, v, earR));
+            const float shape = fminf(head, ear);
+            float r = 245.0f, g = 165.0f, b = 70.0f;                    // orange fur
+            if (fminf(ArTri(u, v, inL), ArTri(u, v, inR)) < 0.0f) { r = 250.0f; g = 160.0f; b = 175.0f; }   // inner ears
+            const float muzzle = sqrtf((u - 0.5f) * (u - 0.5f) + (v - 0.70f) * (v - 0.70f) * 2.6f) - 0.13f;
+            if (muzzle < 0.0f) { r = 255.0f; g = 228.0f; b = 185.0f; }
+            if (shape > -0.014f) { r = 165.0f; g = 92.0f; b = 35.0f; }  // outline
+            for (int s = 0; s < 2; ++s) {                               // eyes with a highlight
+                const float ex = s ? 0.615f : 0.385f, ey = 0.54f;
+                const float e = sqrtf(((u - ex) / 0.05f) * ((u - ex) / 0.05f) + ((v - ey) / 0.07f) * ((v - ey) / 0.07f));
+                if (e < 1.0f) { r = 35.0f; g = 30.0f; b = 30.0f; }
+                if (sqrtf((u - ex + 0.015f) * (u - ex + 0.015f) + (v - ey + 0.025f) * (v - ey + 0.025f)) < 0.016f)
+                    r = g = b = 255.0f;
+            }
+            if (ArTri(u, v, nose) < 0.0f) { r = 235.0f; g = 105.0f; b = 130.0f; }
+            for (int s = 0; s < 2; ++s) {                               // mouth: two small arcs below the nose
+                const float mx = s ? 0.53f : 0.47f;
+                const float d = fabsf(sqrtf((u - mx) * (u - mx) + (v - 0.685f) * (v - 0.685f)) - 0.03f);
+                if (d < 0.005f && v > 0.685f) { r = 70.0f; g = 45.0f; b = 40.0f; }
+            }
+            float wd = 1.0f;
+            for (const float *k : whisk) wd = fminf(wd, ArSeg(u, v, k[0], k[1], k[2], k[3]));
+            float alpha = ArCover(shape, aa);
+            const float wa = ArCover(wd - 0.004f, aa);
+            if (wa > 0.0f) {                                            // whiskers, also outside the head
+                r += (60.0f - r) * wa;
+                g += (45.0f - g) * wa;
+                b += (40.0f - b) * wa;
+                alpha = fmaxf(alpha, wa);
+            }
+            unsigned char *q = p + (static_cast<size_t>(y) * n + x) * 4;
+            q[0] = static_cast<unsigned char>(r);
+            q[1] = static_cast<unsigned char>(g);
+            q[2] = static_cast<unsigned char>(b);
+            q[3] = static_cast<unsigned char>(alpha * 255.0f);
+        }
+    *w = *h = n;
+    return p;
+}
+// TruMenu.arachno.png next to tru.exe ([Arachno] Image; a full path also works) -> RGBA, nullptr = none / unreadable
+unsigned char *ArLoadPng(int *w, int *h, char *what, size_t n) {
+    char path[MAX_PATH * 2];
+    if (!g_arImage[0]) { Out(what, n, "[Arachno] Image empty"); return nullptr; }
+    if (strchr(g_arImage, ':') || g_arImage[0] == '\\' || g_arImage[0] == '/') strncpy_s(path, sizeof(path), g_arImage, _TRUNCATE);
+    else Out(path, sizeof(path), "%s%s", g_exeDir, g_arImage);
+    FILE *f = nullptr;
+    if (fopen_s(&f, path, "rb") != 0 || !f) { Out(what, n, "no %s next to tru.exe", g_arImage); return nullptr; }
+    size_t size = 0, cap = static_cast<size_t>(1) << 20;
+    unsigned char *buf = static_cast<unsigned char *>(malloc(cap));
+    while (buf) {
+        if (size == cap) {
+            unsigned char *more = cap < (static_cast<size_t>(32) << 20) ? static_cast<unsigned char *>(realloc(buf, cap * 2))
+                                                                          : nullptr;
+            if (!more) { free(buf); buf = nullptr; break; }
+            buf = more;
+            cap *= 2;
+        }
+        const size_t got = fread(buf + size, 1, cap - size, f);
+        size += got;
+        if (!got) break;
+    }
+    fclose(f);
+    if (!buf) { Out(what, n, "%s: larger than 32 MB or out of memory", g_arImage); return nullptr; }
+    int comp = 0;
+    unsigned char *img = stbi_load_from_memory(buf, static_cast<int>(size), w, h, &comp, 4);
+    free(buf);
+    if (!img) { Out(what, n, "%s: not a PNG stb_image can read (%lu bytes)", g_arImage, static_cast<DWORD>(size)); return nullptr; }
+    if (*w < 1 || *h < 1 || *w > 8192 || *h > 8192) {
+        stbi_image_free(img);
+        Out(what, n, "%s: %d x %d is outside 1 .. 8192", g_arImage, *w, *h);
+        return nullptr;
+    }
+    Out(what, n, "%s %d x %d (own picture next to tru.exe)", g_arImage, *w, *h);
+    return img;
+}
+void ArTexRelease() {
+    if (g_arTex) g_arTex->Release();
+    g_arTex = nullptr;
+    g_arTexDevice = nullptr;
+    g_arTexDefault = false;
+}
+void ArOnReset() {                           // ResetHook: a D3DPOOL_DEFAULT texture must go before the Reset
+    if (g_arTexDefault) ArTexRelease();
+}
+int ArPow2(int v) {
+    int p = 1;
+    while (p < v && p < 1024) p <<= 1;
+    return p;
+}
+// the picture's texture on this device (created once; MANAGED, DEFAULT + DYNAMIC as the fallback of an Ex device)
+bool ArTexture(IDirect3DDevice9 *dev) {
+    if (InterlockedExchange(&g_arTexReload, 0)) {
+        ArTexRelease();
+        g_arTexFail = nullptr;
+    }
+    if (g_arTex && g_arTexDevice == dev) return true;
+    if (g_arTex) ArTexRelease();
+    if (!dev || g_arTexFail == dev) return false;
+    int w = 0, h = 0;
+    char what[200];
+    unsigned char *img = ArLoadPng(&w, &h, what, sizeof(what));
+    const bool own = img != nullptr;
+    if (!own) img = ArBuiltIn(&w, &h);
+    if (!img) {
+        g_arTexFail = dev;
+        Out(g_arImgWhat, sizeof(g_arImgWhat), "no memory for the picture");
+        Log(0, "arachno picture: no memory - no picture");
+        return false;
+    }
+    float s = 1.0f;                          // fit into 1024 x 1024, nearest sampling
+    if (w > 1024) s = 1024.0f / static_cast<float>(w);
+    if (static_cast<float>(h) * s > 1024.0f) s = 1024.0f / static_cast<float>(h);
+    int dw = static_cast<int>(static_cast<float>(w) * s), dh = static_cast<int>(static_cast<float>(h) * s);
+    if (dw < 1) dw = 1;
+    if (dh < 1) dh = 1;
+    const int tw = ArPow2(dw), th = ArPow2(dh);
+    IDirect3DTexture9 *tex = nullptr;
+    bool def = false;
+    HRESULT hr = dev->CreateTexture(static_cast<UINT>(tw), static_cast<UINT>(th), 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED,
+                                    &tex, nullptr);
+    if (FAILED(hr) || !tex) {
+        def = true;
+        tex = nullptr;
+        hr = dev->CreateTexture(static_cast<UINT>(tw), static_cast<UINT>(th), 1, D3DUSAGE_DYNAMIC, D3DFMT_A8R8G8B8,
+                                D3DPOOL_DEFAULT, &tex, nullptr);
+    }
+    D3DLOCKED_RECT lr = {};
+    if (FAILED(hr) || !tex || FAILED(tex->LockRect(0, &lr, nullptr, def ? D3DLOCK_DISCARD : 0))) {
+        if (tex) tex->Release();
+        free(img);
+        g_arTexFail = dev;
+        Out(g_arImgWhat, sizeof(g_arImgWhat), "%s - texture %d x %d not created (0x%08lx)", own ? what : "built-in picture",
+            tw, th, static_cast<DWORD>(hr));
+        Log(0, "arachno picture: %s", g_arImgWhat);
+        return false;
+    }
+    for (int y = 0; y < th; ++y) {
+        BYTE *row = static_cast<BYTE *>(lr.pBits) + static_cast<size_t>(y) * static_cast<size_t>(lr.Pitch);
+        for (int x = 0; x < tw; ++x) {
+            BYTE *q = row + x * 4;
+            if (x >= dw || y >= dh) { q[0] = q[1] = q[2] = q[3] = 0; continue; }
+            int sx = static_cast<int>(static_cast<float>(x) / s), sy = static_cast<int>(static_cast<float>(y) / s);
+            if (sx >= w) sx = w - 1;
+            if (sy >= h) sy = h - 1;
+            const unsigned char *c = img + (static_cast<size_t>(sy) * w + sx) * 4;
+            q[0] = c[2];                     // A8R8G8B8 in memory: B, G, R, A
+            q[1] = c[1];
+            q[2] = c[0];
+            q[3] = c[3];
+        }
+    }
+    tex->UnlockRect(0);
+    free(img);                               // (stbi_image_free = free)
+    g_arTex = tex;
+    g_arTexDevice = dev;
+    g_arTexDefault = def;
+    g_arU = static_cast<float>(dw) / static_cast<float>(tw);
+    g_arV = static_cast<float>(dh) / static_cast<float>(th);
+    g_arAspect = static_cast<float>(dw) / static_cast<float>(dh);
+    if (own) Out(g_arImgWhat, sizeof(g_arImgWhat), "%s", what);
+    else Out(g_arImgWhat, sizeof(g_arImgWhat), "built-in picture 256 x 256 (%s)", what);
+    Log(1, "arachno picture: %s; texture %d x %d (%s pool)", g_arImgWhat, tw, th, def ? "default" : "managed");
+    return true;
+}
+// one picture: centre / size from the projected bones (fallback: the object's size above its origin)
+struct ArPic { DWORD inst; float x, y, size, depth, alpha, phase; bool left; };
+struct ArFace { DWORD inst; float x; bool left; };
+ArFace g_arFace[64];                         // per spider: the screen x where it last turned, the direction
+bool ArFaceLeft(DWORD inst, float x) {
+    int k = 0, freeSlot = -1;
+    for (; k < 64 && g_arFace[k].inst != inst; ++k)
+        if (!g_arFace[k].inst && freeSlot < 0) freeSlot = k;
+    if (k == 64) {
+        k = freeSlot >= 0 ? freeSlot : static_cast<int>((inst >> 4) & 63);
+        g_arFace[k].inst = inst;
+        g_arFace[k].x = x;
+        g_arFace[k].left = false;
+    }
+    const float dx = x - g_arFace[k].x;
+    if (dx > 6.0f || dx < -6.0f) {           // moved 6 px since the last turn: face that way
+        g_arFace[k].left = dx < 0.0f;
+        g_arFace[k].x = x;
+    }
+    return g_arFace[k].left;
+}
+bool ArPlace(const DvCam &c, DWORD inst, int kind, float screenH, ArPic *out) {
+    float pos[3];
+    if (!ReadFloats(inst + kInstancePosition, pos, 3) || !DvFinite(pos, 3)) return false;
+    DWORD a = 0, b = 0, list = 0, model = 0, cntp = 0, cnt = 0, lod = 0, mats = 0;
+    if (ReadDword(inst + 0x230, &a) && a && ReadDword(a + 0x10, &b) && b && ReadDword(b + 0x40, &list) && list &&
+        ReadDword(inst + 0x234, &lod)) {
+        const signed char idx = static_cast<signed char>((lod >> 8) & 0xff);   // s8 [inst+0x235]
+        if (idx >= 0 && ReadDword(list + 4 * static_cast<DWORD>(idx), &model) && model) {
+            if (ReadDword(model + 0x68, &cntp) && cntp) ReadDword(cntp, &cnt);
+            else ReadDword(model + 4, &cnt);
+        }
+    }
+    float sum[3] = {0.0f, 0.0f, 0.0f}, x0 = 1.0e9f, y0 = 1.0e9f, x1 = -1.0e9f, y1 = -1.0e9f;
+    int used = 0, seen = 0;
+    if (cnt && cnt <= 200 && ReadDword(inst + 0x90, &mats) && mats) {
+        for (DWORD i = 0; i < cnt; ++i) {
+            float q[3], cq[3];
+            if (!ReadFloats(mats + i * 0x40 + 0x30, q, 3) || !DvFinite(q, 3)) continue;
+            const float dx = q[0] - pos[0], dy = q[1] - pos[1], dz = q[2] - pos[2];
+            if (dx * dx + dy * dy + dz * dz > 2500.0f * 2500.0f) continue;   // not a world position near the spider
+            for (int k = 0; k < 3; ++k) sum[k] += q[k];
+            ++used;
+            ImVec2 s;
+            DvToCam(c, q, cq);
+            if (!DvCamToScreen(c, cq, &s)) continue;
+            x0 = s.x < x0 ? s.x : x0;
+            y0 = s.y < y0 ? s.y : y0;
+            x1 = s.x > x1 ? s.x : x1;
+            y1 = s.y > y1 ? s.y : y1;
+            ++seen;
+        }
+    }
+    const float tall = kind == 3 ? 440.0f : 109.0f, longest = kind == 3 ? 612.0f : 144.0f;   // object sizes
+    float centre[3] = {pos[0], pos[1], pos[2] + tall * 0.5f}, cq[3];
+    if (used >= 3)
+        for (int k = 0; k < 3; ++k) centre[k] = sum[k] / static_cast<float>(used);
+    DvToCam(c, centre, cq);
+    ImVec2 sc;
+    if (!DvCamToScreen(c, cq, &sc)) return false;
+    const float wx = cq[0] * c.ux, wy = cq[1] * c.uy, dist = sqrtf(wx * wx + wy * wy + cq[2] * cq[2]);
+    if (dist > g_arMaxDist) return false;
+    float size = seen >= 3 ? (x1 - x0 > y1 - y0 ? x1 - x0 : y1 - y0) * 1.15f   // + the leg tips
+                           : longest / c.uy / cq[2] * c.v.f * c.v.sy;
+    size *= g_arScale;
+    if (size < static_cast<float>(g_arMinPx)) size = static_cast<float>(g_arMinPx);
+    if (size > g_arMaxScreen * screenH) size = g_arMaxScreen * screenH;
+    float alpha = 1.0f;
+    if (g_arFadeNear > 0.0f && dist < g_arFadeNear) alpha = dist / g_arFadeNear;
+    if (alpha < 0.03f) return false;
+    out->inst = inst;
+    out->x = sc.x;
+    out->y = sc.y;
+    out->size = size;
+    out->depth = cq[2];
+    out->alpha = alpha;
+    out->phase = static_cast<float>(((inst >> 4) * 2654435761u) % 6283u) * 0.001f;   // not in step with the others
+    out->left = ArFaceLeft(inst, sc.x);
+    return true;
+}
+bool ArWantsDraw() { return g_arPicLive != 0; }
+// Render, right after ImGui::NewFrame: the pictures of this frame (background draw list, far ones first)
+void ArDrawPictures(IDirect3DDevice9 *dev) {
+    g_arDrawn = g_arListed = 0;
+    if (!g_arPicLive || !g_lblProjOk) return;
+    char why[160];
+    if (!LabelWorldReady(why, sizeof(why))) return;
+    ImGuiIO &io = ImGui::GetIO();
+    DvCam c;
+    if (!DvCamRead(&c, io.DisplaySize.x, io.DisplaySize.y) || !ArTexture(dev)) return;
+    ArSeen seen[64];
+    int n = 0;
+    const DWORD now = GetTickCount();
+    EnterCriticalSection(&g_arLock);
+    for (const ArSeen &s : g_arSeen)
+        if (s.inst && now - s.tick <= 200) seen[n++] = s;
+    LeaveCriticalSection(&g_arLock);
+    g_arListed = n;
+    ArPic pics[64];
+    int np = 0;
+    for (int i = 0; i < n; ++i) {
+        const DWORD inst = seen[i].inst;
+        DWORD id = 0, flags = 0;
+        if (!ReadDword(inst + 0x44, &id) || id != seen[i].id || !ReadDword(inst + 0x14, &flags)) continue;   // gone
+        if (flags & (0x800 | 0x20)) continue;                      // hidden / being removed
+        const DWORD brain = g_aiOk ? AiBrainOf(inst) : 0;
+        float hp = 1.0f;
+        if (brain && ReadFloats(brain + 0x2c64, &hp, 1) && hp <= 0.0f) continue;   // dead: the game fades it out
+        ArPic p;
+        if (!ArPlace(c, inst, ArInstKind(inst), io.DisplaySize.y, &p)) continue;
+        int k = np++;
+        while (k > 0 && pics[k - 1].depth < p.depth) {             // far first
+            pics[k] = pics[k - 1];
+            --k;
+        }
+        pics[k] = p;
+    }
+    ImDrawList *dl = ImGui::GetBackgroundDrawList();
+    const ImTextureID tex = static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(g_arTex));
+    const float t = static_cast<float>(GetTickCount() % 600000u) * 0.001f;
+    for (int i = 0; i < np; ++i) {
+        const ArPic &p = pics[i];
+        const float w = 6.2831853f * g_arWobHz * t + p.phase;
+        const float bob = sinf(w) * g_arWobAmp * p.size;          // wobble: bob, squash / stretch, tilt
+        const float sq = sinf(2.0f * w) * g_arSquash;
+        const float tilt = g_arTilt * 0.01745329f * sinf(0.5f * w + p.phase);
+        float iw = p.size, ih = p.size;
+        if (g_arAspect >= 1.0f) ih = p.size / g_arAspect;
+        else iw = p.size * g_arAspect;
+        iw *= 1.0f + sq;
+        ih *= 1.0f - sq;
+        const float cx = p.x, cy = p.y - bob, cs = cosf(tilt), sn = sinf(tilt);
+        const float hx[4] = {-0.5f * iw, 0.5f * iw, 0.5f * iw, -0.5f * iw}, hy[4] = {-0.5f * ih, -0.5f * ih, 0.5f * ih, 0.5f * ih};
+        ImVec2 q[4];
+        for (int k = 0; k < 4; ++k) q[k] = ImVec2(cx + hx[k] * cs - hy[k] * sn, cy + hx[k] * sn + hy[k] * cs);
+        const bool mirror = g_arFlip && p.left;
+        const float u0 = mirror ? g_arU : 0.0f, u1 = mirror ? 0.0f : g_arU;
+        dl->AddImageQuad(tex, q[0], q[1], q[2], q[3], ImVec2(u0, 0.0f), ImVec2(u1, 0.0f), ImVec2(u1, g_arV),
+                         ImVec2(u0, g_arV), IM_COL32(255, 255, 255, static_cast<int>(p.alpha * 255.0f)));
+    }
+    g_arDrawn = np;
+}
+
+// ---- E: camera shake scale, rumble (patched on the game thread by CsTick) ----
+const DWORD kCsIntensity = 0x005eb460, kCsPool = 0x00e80020, kCsSlotSize = 0x90, kCsStartByKey = 0x005ee940;
+DWORD g_csIntensityFn = kCsIntensity;        // the stub calls the game's function through this
+// called by the game in place of 0x5eb460 (esi = the shake slot): the game's strength in st0, times the scale
+__declspec(naked) void CsShakeStub() {
+    __asm {
+        call dword ptr [g_csIntensityFn]
+        fmul dword ptr [g_csScaleF]
+        ret
+    }
+}
+AiPatch g_csPatches[2] = {
+    {0x005eea55, kCsIntensity, true, "C1 camera apply 0x5eea55", 0, 0, false},
+    {0x005eb56d, kCsIntensity, true, "C2 shake sum 0x5eb56d", 0, 0, false},
+};
+bool g_csOn = false, g_csRefused = false;
+LONG g_csLogged = 100;                       // the scale of the last log line
+DWORD g_csChangeTick = 0;
+// rumble: [0xa02b90] = the resolved XInputSetState (stdcall (user, XINPUT_VIBRATION *))
+struct RbVib { WORD left, right; };
+typedef DWORD(WINAPI *RbSetFn)(DWORD user, RbVib *vibration);
+const DWORD kRbSlot = 0x00a02b90;
+volatile RbSetFn g_rbGame = nullptr;
+bool g_rbOn = false, g_rbRefused = false;
+volatile LONG g_rbCalls = 0;
+DWORD WINAPI RbHook(DWORD user, RbVib *vibration) {
+    const RbSetFn game = g_rbGame;
+    if (!game) return ERROR_DEVICE_NOT_CONNECTED;
+    if (!vibration) return game(user, vibration);
+    const LONG pct = g_rbRumble;
+    RbVib v = *vibration;                    // a copy - the game's own struct is never changed
+    v.left = static_cast<WORD>(static_cast<DWORD>(v.left) * static_cast<DWORD>(pct) / 100u);
+    v.right = static_cast<WORD>(static_cast<DWORD>(v.right) * static_cast<DWORD>(pct) / 100u);
+    InterlockedIncrement(&g_rbCalls);
+    return game(user, &v);
+}
+void RbApply(bool want) {
+    const DWORD hook = reinterpret_cast<DWORD>(&RbHook);
+    DWORD cur = 0;
+    if (!ReadDword(kRbSlot, &cur)) return;
+    if (want) {
+        if (cur == hook) { g_rbOn = true; return; }
+        if (g_rbRefused || !cur) return;     // not resolved yet: next frame
+        char owner[MAX_PATH];                // the game resolved it (again): wrap what is there now
+        ModuleOf(reinterpret_cast<const void *>(cur), owner, sizeof(owner));
+        if (owner[0] == '?') {
+            g_rbRefused = true;
+            Log(0, "cam.rumble: [0xa02b90] holds 0x%08lx outside every module - left untouched", cur);
+            return;
+        }
+        g_rbGame = reinterpret_cast<RbSetFn>(cur);
+        if (!WriteDword(kRbSlot, hook)) {
+            g_rbRefused = true;
+            Log(0, "cam.rumble: [0xa02b90] VirtualProtect failed (%lu) - rumble not scaled", GetLastError());
+            return;
+        }
+        const bool again = g_rbOn;
+        g_rbOn = true;
+        Log(1, "cam.rumble %ld %%: XInputSetState pointer [0xa02b90] (0x%08lx, %s) -> TruMenu%s", g_rbRumble, cur, owner,
+            again ? " again (the game resolved it anew)" : "");
+        return;
+    }
+    if (!g_rbOn) return;
+    g_rbOn = false;
+    const char *note = "";
+    if (cur != hook) note = " (changed by someone else - left)";
+    else if (!g_rbGame || !WriteDword(kRbSlot, reinterpret_cast<DWORD>(g_rbGame))) note = " (VirtualProtect failed)";
+    Log(1, "cam.rumble: [0xa02b90] put back%s; %ld scaled call(s)", note, g_rbCalls);
+}
+// PadHook, once per game frame (the camera code runs there; outside levels too - the patches do not depend on a level)
+void CsTick() {
+    const LONG pct = g_csShake;
+    g_csScaleF = static_cast<float>(pct) / 100.0f;
+    M21PatchGroup(g_csPatches, 2, g_csOk && pct != 100, &g_csOn, &g_csRefused, "cam.shakescale: the shake strength "
+                  "0x5eb460 callers", pct != 100 ? "scale below 100 %" : "scale 100 %");
+    const DWORD now = GetTickCount();
+    if (pct != g_csLogged) {                 // a slider change: one line once it stood still for 1 s
+        if (!g_csChangeTick) g_csChangeTick = now;
+        else if (now - g_csChangeTick >= 1000) {
+            Log(1, "cam.shakescale now %ld %% (%s)", pct, g_csOn ? "stub patched" : pct == 100 ? "game's own" : g_csWhy);
+            g_csLogged = pct;
+            g_csChangeTick = 0;
+        }
+    } else {
+        g_csChangeTick = 0;
+    }
+    RbApply(g_rbOk && g_rbRumble != 100);
+}
+// the camerashakes object's table (+0x5c): +0 count, +4 entries of 0xc {+0 DTP id, +4 duration, +8 key}; 0 = none
+DWORD CsTable(DWORD *count, char *why, size_t n) {
+    *count = 0;
+    const int id = ObjectId("camerashakes");
+    if (!id) { Out(why, n, "object 'camerashakes' is not in the object list"); return 0; }
+    for (int i = 0; i < kObjectEntries; ++i) {
+        DWORD e = kObjectTable + static_cast<DWORD>(i) * 0x24, obj = 0, idState = 0, table = 0;
+        if (!ReadDword(e + 8, &obj) || !ReadDword(e + 0xc, &idState)) break;
+        if (!obj || static_cast<int>(static_cast<SHORT>(idState & 0xffff)) != id) continue;
+        if ((idState >> 16) != 2) { Out(why, n, "camerashakes not loaded (tracker state %lu)", idState >> 16); return 0; }
+        if (!ReadDword(obj + 0x5c, &table) || !table || !ReadDword(table, count) || *count > 256) {
+            Out(why, n, "camerashakes table not readable");
+            return 0;
+        }
+        return table;
+    }
+    Out(why, n, "camerashakes is not in the object tracker table (not loaded)");
+    return 0;
+}
+bool CsEntry(DWORD table, DWORD i, DWORD *dtp, float *duration, DWORD *key) {
+    DWORD entries = 0;
+    return ReadDword(table + 4, &entries) && entries && ReadDword(entries + i * 0xc, dtp) &&
+           ReadFloats(entries + i * 0xc + 4, duration, 1) && ReadDword(entries + i * 0xc + 8, key);
+}
+void ValCsState(char *o, size_t n) {
+    int active = 0;
+    float strongest = 0.0f;
+    for (DWORD i = 0; i < 8; ++i) {
+        const DWORD slot = kCsPool + i * kCsSlotSize;
+        DWORD dtp = 0, hold = 0;
+        float f[4] = {};
+        if (!ReadDword(slot, &dtp) || !dtp || !ReadFloats(slot + 4, f, 4) || !ReadDword(slot + 0x84, &hold)) continue;
+        if (f[0] < f[1] || ((hold >> 24) & 0xff)) {   // time +4 < duration +8, or the hold byte +0x87
+            ++active;
+            if (f[3] > strongest) strongest = f[3];    // +0x10
+        }
+    }
+    Out(o, n, "%d active shake slot(s) of 8 (strongest +0x10 %.2f); scale %ld %% (%s), rumble %ld %% (%s)", active,
+        static_cast<double>(strongest), g_csShake, !g_csOk ? g_csWhy : g_csOn ? "stub patched" : "game's own",
+        g_rbRumble, !g_rbOk ? g_rbWhy : g_rbOn ? "wrapped" : "game's own");
+}
+bool RunCsList(const char *, char *o, size_t n) {
+    if (!g_csOk) { Out(o, n, "disabled: pre-check failed (%s)", g_csWhy); return false; }
+    char why[120];
+    DWORD count = 0;
+    const DWORD table = CsTable(&count, why, sizeof(why));
+    if (!table) { Out(o, n, "cam.shakelist: %s", why); return false; }
+    Log(1, "cam.shakelist (src=%s): %lu camera shake(s) in the camerashakes table 0x%08lx; cam.shake <n> starts one",
+        ShotSource("cam.shakelist"), count, table);
+    for (DWORD i = 0; i < count; ++i) {
+        DWORD dtp = 0, key = 0;
+        float duration = 0.0f;
+        if (CsEntry(table, i, &dtp, &duration, &key))
+            Log(1, "cam.shakelist %2lu: key 0x%08lx, DTP %ld, duration %.2f", i, key, static_cast<LONG>(dtp),
+                static_cast<double>(duration));
+    }
+    Out(o, n, "cam.shakelist: %lu shake(s) written to TruMenu.log", count);
+    return true;
+}
+bool CsStart(DWORD key) {
+    __try {
+        reinterpret_cast<void(__cdecl *)(DWORD)>(kCsStartByKey)(key);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+bool RunCsShake(const char *arg, char *o, size_t n) {
+    if (!g_csOk) { Out(o, n, "disabled: pre-check failed (%s)", g_csWhy); return false; }
+    char why[160];
+    if (!LabelWorldReady(why, sizeof(why))) { Out(o, n, "cam.shake: %s", why); return false; }
+    char *end = nullptr;
+    const long i = arg ? strtol(arg, &end, 10) : -1;
+    DWORD count = 0;
+    const DWORD table = CsTable(&count, why, sizeof(why));
+    if (!table) { Out(o, n, "cam.shake: %s", why); return false; }
+    if (!end || end == arg || i < 0 || static_cast<DWORD>(i) >= count) {
+        Out(o, n, "usage: cam.shake <0 .. %lu> (cam.shakelist)", count ? count - 1 : 0);
+        return false;
+    }
+    DWORD dtp = 0, key = 0;
+    float duration = 0.0f;
+    if (!CsEntry(table, static_cast<DWORD>(i), &dtp, &duration, &key) || dtp == 0xffffffffu) {
+        Out(o, n, "cam.shake %ld: entry not readable / without DTP", i);
+        return false;
+    }
+    const bool ok = CsStart(key);
+    Log(1, "cam.shake %ld (src=%s): key 0x%08lx DTP %ld duration %.2f - the game's start by key 0x5ee940 %s; scale %ld %%",
+        i, ShotSource("cam.shake"), key, static_cast<LONG>(dtp), static_cast<double>(duration), ok ? "called" : "faulted",
+        g_csShake);
+    Out(o, n, "cam.shake %ld %s (scale %ld %%)", i, ok ? "started" : "faulted", g_csShake);
+    return ok;
+}
+void ValCsScale(char *o, size_t n) { Out(o, n, "%ld %%%s", g_csShake, g_csOk ? "" : " (checks failed)"); }
+bool RunCsScale(const char *arg, char *o, size_t n) {
+    if (!g_csOk) { Out(o, n, "disabled: pre-check failed (%s)", g_csWhy); return false; }
+    char *end = nullptr;
+    const long v = arg ? strtol(arg, &end, 10) : -1;
+    if (!end || end == arg || v < 0 || v > 100) { Out(o, n, "usage: cam.shakescale 0 .. 100 (percent, 0 = off)"); return false; }
+    InterlockedExchange(&g_csShake, v);
+    g_csLogged = v;
+    g_csRefused = false;
+    Log(1, "cam.shakescale %ld (src=%s): %s with the next game frame", v, ShotSource("cam.shakescale"),
+        v == 100 ? "the game's own strength (stub off)" : v ? "camera shakes scaled (stub on 0x5eea55 / 0x5eb56d)"
+                                                            : "camera shakes off (strength x 0)");
+    Out(o, n, "cam.shakescale %ld %%", v);
+    return true;
+}
+void ValRbRumble(char *o, size_t n) { Out(o, n, "%ld %%%s", g_rbRumble, g_rbOk ? "" : " (checks failed)"); }
+bool RunRbRumble(const char *arg, char *o, size_t n) {
+    if (!g_rbOk) { Out(o, n, "disabled: pre-check failed (%s)", g_rbWhy); return false; }
+    char *end = nullptr;
+    const long v = arg ? strtol(arg, &end, 10) : -1;
+    if (!end || end == arg || v < 0 || v > 100) { Out(o, n, "usage: cam.rumble 0 .. 100 (percent, 0 = off)"); return false; }
+    InterlockedExchange(&g_rbRumble, v);
+    g_rbRefused = false;
+    Log(1, "cam.rumble %ld (src=%s): %s with the next game frame", v, ShotSource("cam.rumble"),
+        v == 100 ? "the game's own rumble" : "both motors scaled (XInputSetState pointer [0xa02b90] wrapped)");
+    Out(o, n, "cam.rumble %ld %%", v);
+    return true;
+}
+
+// ---- ArTick: B / C / D patches on the game thread (PadHook, once per game frame) ----
+DWORD g_arSndLine = 0;
+void ArTick() {
+    char why[160];
+    const bool world = LabelWorldReady(why, sizeof(why));
+    const bool master = g_arOn != 0;
+    const char *reason = world ? (master ? "arachnophobia on" : "arachnophobia off") : why;
+    const bool wantSlot = g_arOk && master && (g_arHide || g_arPic) && world;
+    if (!wantSlot) {
+        InterlockedExchange(&g_arHideLive, 0);
+        InterlockedExchange(&g_arPicLive, 0);
+    }
+    ArSlotApply(wantSlot, reason);
+    InterlockedExchange(&g_arHideLive, g_arSlotOn && master && g_arHide ? 1 : 0);
+    InterlockedExchange(&g_arPicLive, g_arSlotOn && master && g_arPic ? 1 : 0);
+    const bool wantSnd = g_arSndOk && master && g_arMute && world;
+    if (!wantSnd) InterlockedExchange(&g_arMuteLive, 0);
+    M21PatchGroup(g_arSndPatches, 7, wantSnd, &g_arSndOn, &g_arSndRefused, "arachno.mute: spider sound gates", reason);
+    InterlockedExchange(&g_arMuteLive, g_arSndOn && master && g_arMute ? 1 : 0);
+    const DWORD draw = g_arDrawThread;
+    if (g_arSlotOn && !g_arThreadLogged && draw) {   // once per patch: which thread draws (V1 / V2)
+        g_arThreadLogged = true;
+        const DWORD logic = g_snGameThread, render = g_renderThread;
+        Log(1, "arachno: spider draw calls run on thread %lu - game thread (PadHook) %lu, render thread (Present) %lu -> "
+            "%s", draw, logic, render, !logic || draw == logic ? "V1 (mask +0x23c = -1 only during the call)"
+                                                                : "V2 (draw call skipped, 0x200 + counter set here)");
+    }
+    const DWORD now = GetTickCount();
+    if (now - g_arSndLine >= 10000) {        // skipped spider sounds: at most one line per 10 s
+        g_arSndLine = now;
+        const LONG a = InterlockedExchange(&g_arSndSkip[0], 0), b = InterlockedExchange(&g_arSndSkip[1], 0),
+                   c = InterlockedExchange(&g_arSndSkip[2], 0);
+        if (a || b || c) {
+            g_arSndTotal += a + b + c;
+            Log(1, "arachno.mute: %ld spider sound start(s) skipped in the last 10 s (anim sound %ld, random set %ld, sound "
+                "slot %ld; %ld in all)", a + b + c, a, b, c, g_arSndTotal);
+        }
+    }
+}
+
+// ---- labels (0.20 live test, used by M20Draw): does the game draw it, is it a runtime child of a placed intro ----
+// 0 = drawn, else why not: 1 hidden (+0x14 & 0x800), 2 kill flag 0x20, 3 scene entity off (+0x18 / object flag without
+// +0x1c & 0x200), 4 draw masks +0x23c | +0x240 == -1 (the game's own "all groups hidden" test)
+int LfNotDrawn(DWORD inst) {
+    DWORD f14 = 0, f18 = 0, f1c = 0, obj = 0, of = 0, of2 = 0, m23c = 0, m240 = 0;
+    if (!g_lfOk || !ReadDword(inst + 0x14, &f14)) return 0;
+    if (f14 & 0x800) return 1;
+    if (f14 & 0x20) return 2;
+    ReadDword(inst + 0x18, &f18);
+    ReadDword(inst + 0x1c, &f1c);
+    bool off = (f18 & 0x400000) != 0;
+    if (!off && ReadDword(inst + 0x10, &obj) && obj && ReadDword(obj, &of) && of && ReadDword(of, &of2))
+        off = (of2 & 0x40000000) != 0;
+    if (off && !(f1c & 0x200)) return 3;
+    if (g_arOk && ReadDword(inst + 0x23c, &m23c) && ReadDword(inst + 0x240, &m240) && (m23c | m240) == 0xffffffffu) return 4;
+    return 0;
+}
+// the intro record of the instance and whether it is the placed one (+0x58 = [intro+0x58]); 0 = no intro record
+DWORD LfIntro(DWORD inst, bool *placed) {
+    DWORD intro = 0, id = 0, own = 0;
+    *placed = true;
+    if (!g_lfOk || !ReadDword(inst + 0x100, &intro) || !intro) return 0;
+    if (ReadDword(inst + 0x58, &id) && ReadDword(intro + 0x58, &own)) *placed = id == own;
+    return intro;
+}
+
+// ---- ai.remove (game thread, queued) ----
+const DWORD kAdSenseMgr = 0x00fadfac, kAdSenseRemove = 0x0071dcb0, kAdHandle = 0x005b39d0, kAdGenRecord = 0x00616f50,
+            kAdPost = 0x005b3750;
+typedef void(__fastcall *AdSenseRemoveFn)(void *mgr, void *edx, DWORD inst);   // thiscall, ret 4
+typedef DWORD(__cdecl *AdHandleFn)(DWORD handle);
+typedef DWORD(__fastcall *AdGenRecFn)(void *list, void *edx);                  // thiscall, plain ret
+typedef void(__cdecl *AdPostFn)(DWORD inst, DWORD message, float *data);
+LONG g_adRemoved = 0;
+char g_adLast[160] = "none yet";
+// an AI enemy the despawn recipe may take: brain, object family 14, not Lara, not flagged yet, not the doppelganger
+bool AdCandidate(DWORD inst, DWORD player, DWORD *brain) {
+    DWORD object = 0, family = 0, flags = 0, oid = 0;
+    if (!inst || inst == player) return false;
+    const DWORD b = AiBrainOf(inst);
+    if (!b || !ReadDword(inst + 0x10, &object) || !object || !ReadDword(object + 0x34, &family) || family != 14) return false;
+    if (!ReadDword(inst + 0x14, &flags) || (flags & (0x20 | 0x20000 | 0x400))) return false;
+    char name[64];
+    if (ReadDword(object + 0x14, &oid) && ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) {
+        _strlwr_s(name, sizeof(name));
+        if (strstr(name, "doppel")) return false;
+    }
+    *brain = b;
+    return true;
+}
+// EnemyBehavior_Despawn::HandleMessage 0x61ce38 .. 0x61cec4: hide, sense manager, generator, kill flag; 0 = faulted
+int AdRemoveOne(DWORD inst, DWORD brain, bool *generator) {
+    *generator = false;
+    __try {
+        volatile DWORD *flags = reinterpret_cast<volatile DWORD *>(inst + 0x14);
+        *flags |= 0x800;
+        const DWORD mgr = *reinterpret_cast<volatile DWORD *>(kAdSenseMgr);
+        if (mgr) reinterpret_cast<AdSenseRemoveFn>(kAdSenseRemove)(reinterpret_cast<void *>(mgr), nullptr, inst);
+        const DWORD gen = reinterpret_cast<AdHandleFn>(kAdHandle)(brain + 0x4c4c);
+        if (gen) {
+            const DWORD rec = reinterpret_cast<AdGenRecFn>(kAdGenRecord)(reinterpret_cast<void *>(brain + 0x168), nullptr);
+            if (rec) {
+                float value = *reinterpret_cast<volatile float *>(rec + 8);
+                reinterpret_cast<AdPostFn>(kAdPost)(gen, 0xff, &value);
+                *generator = true;
+            }
+        }
+        *flags |= 0x20;
+        return 1;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return 0;
+    }
+}
+void ValAdRemove(char *o, size_t n) {
+    Out(o, n, "%s; %ld removed since the start", g_adOk ? g_adLast : g_adWhy, g_adRemoved);
+}
+struct AdCand { DWORD inst, brain; float d2; };
+AdCand g_adCand[256];                        // game thread only
+bool RunAdRemove(const char *arg, char *o, size_t n) {
+    if (!g_adOk) { Out(o, n, "disabled: pre-check failed (%s)", g_adWhy); return false; }
+    char a[32] = "";
+    if (arg) strncpy_s(a, sizeof(a), arg, _TRUNCATE);
+    DvTrim(a);
+    int mode = -1;                           // 0 nearest, 1 others, 2 all, 3 one intro id
+    char *end = nullptr;
+    const long want = strtol(a, &end, 10);
+    if (!_stricmp(a, "nearest")) mode = 0;
+    else if (!_stricmp(a, "others")) mode = 1;
+    else if (!_stricmp(a, "all")) mode = 2;
+    else if (a[0] && end && !*end) mode = 3;
+    if (mode < 0) { Out(o, n, "usage: ai.remove nearest|others|all|<intro id>"); return false; }
+    char why[160];
+    if (!LabelWorldReady(why, sizeof(why))) { Out(o, n, "ai.remove: %s", why); return false; }
+    DWORD player = 0, inst = 0;
+    float lara[3] = {0.0f, 0.0f, 0.0f};
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) {
+        Out(o, n, "ai.remove: no player");
+        return false;
+    }
+    int nc = 0, nearest = -1;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096 && nc < 256; ++guard) {
+        DWORD next = 0, brain = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        float p[3];
+        if (AdCandidate(inst, player, &brain) && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            const float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2];
+            g_adCand[nc].inst = inst;
+            g_adCand[nc].brain = brain;
+            g_adCand[nc].d2 = dx * dx + dy * dy + dz * dz;
+            if (nearest < 0 || g_adCand[nc].d2 < g_adCand[nearest].d2) nearest = nc;
+            ++nc;
+        }
+        inst = next;
+    }
+    char list[400] = "", kept[96] = "";
+    size_t used = 0;
+    int removed = 0, failed = 0, generators = 0;
+    for (int i = 0; i < nc; ++i) {
+        DWORD intro = 0, object = 0, oid = 0;
+        ReadDword(g_adCand[i].inst + 0x58, &intro);
+        char name[64];
+        if (!ReadDword(g_adCand[i].inst + 0x10, &object) || !ReadDword(object + 0x14, &oid) ||
+            !ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name)))
+            Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        const bool take = mode == 0 ? i == nearest : mode == 1 ? i != nearest : mode == 2 ? true
+                        : static_cast<LONG>(intro) == want;
+        if (!take) {
+            if (i == nearest)
+                Out(kept, sizeof(kept), "%s %ld (%.0fu)", name, static_cast<LONG>(intro),
+                    static_cast<double>(sqrtf(g_adCand[i].d2)));
+            continue;
+        }
+        bool gen = false;
+        if (AdRemoveOne(g_adCand[i].inst, g_adCand[i].brain, &gen)) {
+            ++removed;
+            if (gen) ++generators;
+            if (used < sizeof(list) - 60)
+                LabelAdd(list, sizeof(list), &used, "%s%s %ld", used ? ", " : "", name, static_cast<LONG>(intro));
+        } else {
+            ++failed;
+        }
+    }
+    g_adRemoved += removed;
+    Out(g_adLast, sizeof(g_adLast), "last: ai.remove %s - %d removed, %d failed, of %d AI enemies", a, removed, failed, nc);
+    Log(1, "ai.remove %s (src=%s): %d of %d AI enemy(ies) flagged for removal%s%s - %s; despawn recipe (0x61cda0): hide "
+        "0x800, CSenseManager::RemoveInstance 0x71dcb0, %d generator notification(s), kill flag 0x20 - the sweep 0x5bcbb0 "
+        "removes them with the next game frame; failed %d", a, ShotSource("ai.remove"), removed, nc,
+        kept[0] ? "; kept the nearest " : "", kept, removed ? list : "nothing removed", generators, failed);
+    if (!removed) {
+        Out(o, n, "ai.remove %s: nothing removed (%d AI enemies%s)", a, nc, mode == 3 ? ", intro id not among them" : "");
+        return mode != 3 && !failed;
+    }
+    Out(o, n, "ai.remove %s: %d removed%s%s", a, removed, kept[0] ? ", kept " : "", kept);
+    return !failed;
+}
+
+// ---- arachnophobia items ----
+void ValArStatus(char *o, size_t n) {
+    const DWORD draw = g_arDrawThread, logic = g_snGameThread;
+    Out(o, n, "arachno %ld (model off %ld, picture %ld, sounds off %ld); slot 7 %s (%s; %ld spider draws, %ld hidden V1, "
+        "%ld V2); pictures %d of %d listed (%s); sound gates %s (%ld skipped); checks: draw %s, sound %s", g_arOn, g_arHide,
+        g_arPic, g_arMute, g_arSlotOn ? "patched" : "not patched", !draw ? "no spider drawn yet"
+        : !logic || draw == logic ? "V1, game thread" : "V2, another thread", g_arDrawCalls, g_arHidden, g_arV2, g_arDrawn,
+        g_arListed, g_arImgWhat, g_arSndOn ? "patched" : "not patched",
+        g_arSndTotal + g_arSndSkip[0] + g_arSndSkip[1] + g_arSndSkip[2], g_arWhy, g_arSndWhy);
+}
+void ValArOn(char *o, size_t n) {
+    Out(o, n, "%ld (%s)", g_arOn, g_arSlotOn || g_arSndOn ? "patched" : !g_arOk && !g_arSndOk ? g_arWhy : "not patched");
+}
+void ValArHide(char *o, size_t n) { Out(o, n, "%ld%s", g_arHide, g_arOk ? "" : " (checks failed)"); }
+void ValArPic(char *o, size_t n) { Out(o, n, "%ld (%d drawn; %s)", g_arPic, g_arDrawn, g_arImgWhat); }
+void ValArMute(char *o, size_t n) { Out(o, n, "%ld%s", g_arMute, g_arSndOk ? "" : " (checks failed)"); }
+bool ArSwitch(volatile LONG *v, bool ok, const char *why, const char *item, const char *what, const char *arg, char *o,
+              size_t n) {
+    if (!ok) { Out(o, n, "disabled: pre-check failed (%s)", why); return false; }
+    const bool on = BoolArg(arg, *v != 0);
+    InterlockedExchange(v, on ? 1 : 0);
+    g_arSlotRefused = g_arSndRefused = false;   // a refused patch is tried again
+    const bool master = v == &g_arOn;
+    Log(1, "%s %d (src=%s): %s %s with the next game frame in a level%s", item, on ? 1 : 0, ShotSource(item), what,
+        on ? "on" : "off", master || g_arOn ? "" : " (arachno.on is off: no effect until it is on)");
+    Out(o, n, "%s %d", item, on ? 1 : 0);
+    return true;
+}
+bool RunArOn(const char *arg, char *o, size_t n) {
+    return ArSwitch(&g_arOn, g_arOk || g_arSndOk, g_arWhy, "arachno.on", "arachnophobia (model off / picture / sounds off "
+                    "as set)", arg, o, n);
+}
+bool RunArHide(const char *arg, char *o, size_t n) {
+    return ArSwitch(&g_arHide, g_arOk, g_arWhy, "arachno.hide", "spider model", arg, o, n);
+}
+bool RunArPic(const char *arg, char *o, size_t n) {
+    return ArSwitch(&g_arPic, g_arOk, g_arWhy, "arachno.picture", "picture instead of the spider", arg, o, n);
+}
+bool RunArMute(const char *arg, char *o, size_t n) {
+    return ArSwitch(&g_arMute, g_arSndOk, g_arSndWhy, "arachno.mute", "spider sounds off", arg, o, n);
+}
+// arachno.list (game thread): one header + one line per spider
+bool RunArList(const char *, char *o, size_t n) {
+    DWORD player = 0, inst = 0;
+    ReadDword(kPlayerPtr, &player);
+    ReadDword(kFirstInstance, &inst);
+    const DWORD draw = g_arDrawThread, logic = g_snGameThread, render = g_renderThread, now = GetTickCount();
+    Log(1, "arachno.list (src=%s): spiders = '%s' without '%s'; game thread %lu, render thread %lu, last spider draw "
+        "thread %lu (%s); slot 7 %s, sound gates %s; checks: draw %s, sound %s", ShotSource("arachno.list"), g_arMatch,
+        g_arExclude, logic, render, draw, !draw ? "no spider drawn since the patch" : !logic || draw == logic ? "V1"
+        : "V2", g_arSlotOn ? "patched" : "not patched", g_arSndOn ? "patched" : "not patched", g_arWhy, g_arSndWhy);
+    int found = 0;
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        const int kind = inst != player ? ArInstKind(inst) : 2;
+        if (kind != 2) {
+            ++found;
+            DWORD object = 0, oid = 0, intro = 0, drawable = 0, vt = 0, f14 = 0, m23c = 0, m240 = 0, id = 0;
+            DWORD a = 0, b = 0, list = 0, model = 0, cntp = 0, cnt = 0, lod = 0;
+            ReadDword(inst + 0x10, &object);
+            if (object) ReadDword(object + 0x14, &oid);
+            ReadDword(inst + 0x58, &intro);
+            ReadDword(inst + 0x44, &id);
+            if (ReadDword(inst + 0x244, &drawable) && drawable) ReadDword(drawable, &vt);
+            ReadDword(inst + 0x14, &f14);
+            ReadDword(inst + 0x23c, &m23c);
+            ReadDword(inst + 0x240, &m240);
+            if (ReadDword(inst + 0x230, &a) && a && ReadDword(a + 0x10, &b) && b && ReadDword(b + 0x40, &list) && list &&
+                ReadDword(inst + 0x234, &lod)) {
+                const signed char idx = static_cast<signed char>((lod >> 8) & 0xff);
+                if (idx >= 0 && ReadDword(list + 4 * static_cast<DWORD>(idx), &model) && model) {
+                    if (ReadDword(model + 0x68, &cntp) && cntp) ReadDword(cntp, &cnt);
+                    else ReadDword(model + 4, &cnt);
+                }
+            }
+            int children = 0;
+            DWORD child = 0;
+            for (ReadDword(inst + 0x218, &child); child && children < 32; ++children)
+                if (!ReadDword(child + 0x21c, &child)) break;
+            char name[64], hp[24] = "-";
+            if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+            const DWORD brain = g_aiOk ? AiBrainOf(inst) : 0;
+            float health = 0.0f;
+            if (brain && ReadFloats(brain + 0x2c64, &health, 1)) Out(hp, sizeof(hp), "%.0f", static_cast<double>(health));
+            int seenAgo = -1;
+            EnterCriticalSection(&g_arLock);
+            for (const ArSeen &s : g_arSeen)
+                if (s.inst == inst && s.id == id) seenAgo = static_cast<int>(now - s.tick);
+            LeaveCriticalSection(&g_arLock);
+            char seen[48] = "not drawn through the hook";
+            if (seenAgo >= 0) Out(seen, sizeof(seen), "drawn through the hook %d ms ago", seenAgo);
+            Log(1, "arachno.list %d: instance 0x%08lx %s intro %ld%s | drawable 0x%08lx vtable 0x%08lx (%s) | +0x14 0x%08lx "
+                "(0x200 %d, hidden 0x800 %d) | masks +0x23c 0x%08lx +0x240 0x%08lx | bones %lu | children %d | LP %s | %s",
+                found, inst, name, static_cast<LONG>(intro), kind == 3 ? " (giant)" : "", drawable, vt,
+                vt == kArDrawVt ? "InstanceDrawable" : "another class", f14, (f14 & 0x200) ? 1 : 0, (f14 & 0x800) ? 1 : 0,
+                m23c, m240, cnt, children, hp, seen);
+        }
+        inst = next;
+    }
+    Out(o, n, "arachno.list: %d spider(s) written to TruMenu.log", found);
+    return true;
+}
+// greyed rows (ring / bar): why an arachno.* / cam.* entry cannot run, "" = it can
+const char *M21RadWhy(const char *id) {
+    if (!_stricmp(id, "arachno.status") || !_stricmp(id, "cam.shakestate")) return "";
+    if (!_stricmp(id, "arachno.mute")) return g_arSndOk ? "" : g_arSndWhy;
+    if (!_stricmp(id, "arachno.on")) return g_arOk || g_arSndOk ? "" : g_arWhy;
+    if (!_strnicmp(id, "arachno.", 8)) return g_arOk ? "" : g_arWhy;
+    if (!_stricmp(id, "cam.rumble")) return g_rbOk ? "" : g_rbWhy;
+    if (!_strnicmp(id, "cam.", 4)) return g_csOk ? "" : g_csWhy;
+    return "";
+}
+// menu page "Arachnophobia / camera" (Accessibility group of the long menu)
+void PageArachno() {
+    char o[700];
+    ValArStatus(o, sizeof(o));
+    ImGui::TextWrapped("%s   [arachno.status]", o);
+    bool on = g_arOn != 0, hide = g_arHide != 0, pic = g_arPic != 0, mute = g_arMute != 0, flip = g_arFlip != 0;
+    if (TmCheckbox("Arachnophobia / Arachnophobie  [arachno.on]###aron", &on)) RunArOn(on ? "1" : "0", o, sizeof(o));
+    if (TmCheckbox("model off / Modell aus  [arachno.hide]###arhide", &hide)) RunArHide(hide ? "1" : "0", o, sizeof(o));
+    ImGui::SameLine();
+    if (TmCheckbox("picture / Bild  [arachno.picture]###arpic", &pic)) RunArPic(pic ? "1" : "0", o, sizeof(o));
+    ImGui::SameLine();
+    if (TmCheckbox("sounds off / Ton aus  [arachno.mute]###armute", &mute)) RunArMute(mute ? "1" : "0", o, sizeof(o));
+    ImGui::SliderFloat("picture size / Bildgroesse###arscale", &g_arScale, 0.2f, 5.0f, "%.2f");
+    ImGui::SliderFloat("wobble / Wippen###arwob", &g_arWobAmp, 0.0f, 0.5f, "%.2f");
+    ImGui::SliderFloat("wobble Hz###arhz", &g_arWobHz, 0.0f, 10.0f, "%.1f");
+    ImGui::SliderFloat("squash / Quetschen###arsq", &g_arSquash, 0.0f, 0.5f, "%.2f");
+    ImGui::SliderFloat("tilt / Kippeln (deg)###artilt", &g_arTilt, 0.0f, 45.0f, "%.0f");
+    ImGui::SliderInt("min px###armin", &g_arMinPx, 4, 256);
+    ImGui::SliderFloat("max screen part / max. Bildschirmanteil###armax", &g_arMaxScreen, 0.1f, 1.0f, "%.2f");
+    ImGui::SliderFloat("fade closer than / ausblenden unter###arnear", &g_arFadeNear, 0.0f, 2000.0f, "%.0f");
+    ImGui::SliderFloat("max distance / max. Abstand###arfar", &g_arMaxDist, 500.0f, 50000.0f, "%.0f");
+    if (TmCheckbox("flip by direction / spiegeln nach Richtung###arflip", &flip)) g_arFlip = flip ? 1 : 0;
+    if (TmButton("reload picture / Bild neu laden###arreload")) InterlockedExchange(&g_arTexReload, 1);
+    ImGui::SameLine();
+    if (TmButton("spiders into the log / Spinnen ins Log  [arachno.list]###arlist")) QueueItem("arachno.list", "");
+    ImGui::TextWrapped("picture: %s next to tru.exe ([Arachno] Image) - your own image stays local, the repository and the "
+                       "installer never ship or touch it; without it a built-in picture. Picture over walls / HUD until "
+                       "0.22 (depth).", g_arImage);
+    ImGui::SeparatorText("Camera shake / Kamera-Wackeln");
+    int shake = static_cast<int>(g_csShake), rumble = static_cast<int>(g_rbRumble);
+    if (!g_csOk) ImGui::BeginDisabled();
+    if (ImGui::SliderInt("shake % (0 = off)  [cam.shakescale]###csscale", &shake, 0, 100)) InterlockedExchange(&g_csShake, shake);
+    if (TmButton("shakes into the log  [cam.shakelist]###cslist")) QueueItem("cam.shakelist", "");
+    static int shakeN = 0;
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120.0f);
+    ImGui::InputInt("###csn", &shakeN);
+    if (shakeN < 0) shakeN = 0;
+    ImGui::SameLine();
+    char label[64], arg[16];
+    Out(label, sizeof(label), "start shake %d  [cam.shake]###csshake", shakeN);
+    Out(arg, sizeof(arg), "%d", shakeN);
+    if (TmButton(label)) QueueItem("cam.shake", arg);
+    if (!g_csOk) ImGui::EndDisabled();
+    if (!g_rbOk) ImGui::BeginDisabled();
+    if (ImGui::SliderInt("rumble % / Vibration  [cam.rumble]###rbscale", &rumble, 0, 100)) {
+        InterlockedExchange(&g_rbRumble, rumble);
+        g_rbRefused = false;
+    }
+    if (!g_rbOk) ImGui::EndDisabled();
+    ValCsState(o, sizeof(o));
+    ImGui::TextWrapped("%s   [cam.shakestate]", o);
+}
+// load: the byte checks of precheck_021.txt (after M201Check: needs the 0.19 brain checks and the 0.3 instance checks)
+void M21Check() {
+    DWORD at = 0;
+    g_arOk = g_instOk && DvChecks(kArDrawChecks, sizeof(kArDrawChecks) / sizeof(kArDrawChecks[0]), &at);
+    if (g_arOk) Out(g_arWhy, sizeof(g_arWhy), "ok");
+    else Out(g_arWhy, sizeof(g_arWhy), !g_instOk ? "instance list check failed" : "instance draw code differs at 0x%08lx", at);
+    at = 0;
+    g_arSndOk = g_instOk && DvChecks(kArSoundChecks, sizeof(kArSoundChecks) / sizeof(kArSoundChecks[0]), &at);
+    if (g_arSndOk) Out(g_arSndWhy, sizeof(g_arSndWhy), "ok");
+    else Out(g_arSndWhy, sizeof(g_arSndWhy), !g_instOk ? "instance list check failed" : "sound code differs at 0x%08lx", at);
+    at = 0;
+    g_csOk = DvChecks(kCsChecks, sizeof(kCsChecks) / sizeof(kCsChecks[0]), &at);
+    if (g_csOk) Out(g_csWhy, sizeof(g_csWhy), "ok");
+    else Out(g_csWhy, sizeof(g_csWhy), "camera shake code differs at 0x%08lx", at);
+    at = 0;
+    g_rbOk = DvChecks(kRbChecks, sizeof(kRbChecks) / sizeof(kRbChecks[0]), &at);
+    if (g_rbOk) Out(g_rbWhy, sizeof(g_rbWhy), "ok");
+    else Out(g_rbWhy, sizeof(g_rbWhy), "XInputSetState code differs at 0x%08lx", at);
+    at = 0;
+    g_lfOk = DvChecks(kLfChecks, sizeof(kLfChecks) / sizeof(kLfChecks[0]), &at);
+    if (g_lfOk) Out(g_lfWhy, sizeof(g_lfWhy), "ok");
+    else Out(g_lfWhy, sizeof(g_lfWhy), "instance id / visibility code differs at 0x%08lx", at);
+    at = 0;
+    g_adOk = g_aiOk && DvChecks(kAdChecks, sizeof(kAdChecks) / sizeof(kAdChecks[0]), &at);
+    if (g_adOk) Out(g_adWhy, sizeof(g_adWhy), "ok");
+    else Out(g_adWhy, sizeof(g_adWhy), !g_aiOk ? "needs the 0.19 brain checks" : "removal code differs at 0x%08lx", at);
+    const DWORD gates[7] = {reinterpret_cast<DWORD>(&ArSndGate7), reinterpret_cast<DWORD>(&ArSndGate7),
+                            reinterpret_cast<DWORD>(&ArSndGate7), reinterpret_cast<DWORD>(&ArSndGate4),
+                            reinterpret_cast<DWORD>(&ArSndGate4), reinterpret_cast<DWORD>(&ArSndGate4),
+                            reinterpret_cast<DWORD>(&ArSlotGate)};
+    for (int i = 0; i < 7; ++i) {
+        AiPatch &p = g_arSndPatches[i];
+        p.game = p.call ? p.target - (p.site + 5) : p.target;
+        p.hook = p.call ? gates[i] - (p.site + 5) : gates[i];
+    }
+    for (AiPatch &p : g_csPatches) {
+        p.game = p.target - (p.site + 5);
+        p.hook = reinterpret_cast<DWORD>(&CsShakeStub) - (p.site + 5);
+    }
+    if (!g_arOk && !g_arSndOk) InterlockedExchange(&g_arOn, 0);
+    if (!g_csOk) InterlockedExchange(&g_csShake, 100);
+    if (!g_rbOk) InterlockedExchange(&g_rbRumble, 100);
+    g_csLogged = g_csShake;
+    memset(g_arKind, 0, sizeof(g_arKind));
+    Log(g_arOk && g_arSndOk && g_csOk && g_rbOk && g_lfOk && g_adOk ? 1 : 0, "0.21: arachno %s (%d checks), sound gate %s "
+        "(%d checks), camera shake %s (%d checks), rumble %s (%d checks), labels %s (%d checks), ai.remove %s (%d checks); "
+        "[Arachno] Enabled %ld, Hide %ld, Picture %ld, Mute %ld, Match '%s', Exclude '%s', Image '%s', Scale %.2f; [Camera] "
+        "ShakeScale %ld, Rumble %ld", g_arWhy, static_cast<int>(sizeof(kArDrawChecks) / sizeof(kArDrawChecks[0])),
+        g_arSndWhy, static_cast<int>(sizeof(kArSoundChecks) / sizeof(kArSoundChecks[0])), g_csWhy,
+        static_cast<int>(sizeof(kCsChecks) / sizeof(kCsChecks[0])), g_rbWhy,
+        static_cast<int>(sizeof(kRbChecks) / sizeof(kRbChecks[0])), g_lfWhy,
+        static_cast<int>(sizeof(kLfChecks) / sizeof(kLfChecks[0])), g_adWhy,
+        static_cast<int>(sizeof(kAdChecks) / sizeof(kAdChecks[0])), g_arOn, g_arHide, g_arPic, g_arMute, g_arMatch,
+        g_arExclude, g_arImage, static_cast<double>(g_arScale), g_csShake, g_rbRumble);
+}
+// unload: every 0.21 patch back (only where TruMenu's value is still there; no log - the process may be ending)
+void M21Shutdown() {
+    InterlockedExchange(&g_arHideLive, 0);
+    InterlockedExchange(&g_arPicLive, 0);
+    InterlockedExchange(&g_arMuteLive, 0);
+    DWORD cur = 0;
+    if (g_arSlotOn && ReadDword(kArDrawSlot, &cur) && cur == reinterpret_cast<DWORD>(&ArDrawHook))
+        WriteDword(kArDrawSlot, kArDrawGame);
+    g_arSlotOn = false;
+    for (AiPatch &p : g_arSndPatches) AiPatchOff(p);
+    g_arSndOn = false;
+    for (AiPatch &p : g_csPatches) AiPatchOff(p);
+    g_csOn = false;
+    if (g_rbOn && g_rbGame && ReadDword(kRbSlot, &cur) && cur == reinterpret_cast<DWORD>(&RbHook))
+        WriteDword(kRbSlot, reinterpret_cast<DWORD>(g_rbGame));
+    g_rbOn = false;
+}
+// ---- end of 0.21 arachnophobia ----
 
 // ======================================================================================================================
 // 0.10.5 [Shot]: in-game screenshots and Claude marks (owner wish 2026-11-05: the main session gets named shots in the
@@ -16401,6 +17930,31 @@ const Item kItems[] = {
                            "TruMenu.log once", true, ValSnStatus, RunSnDump},
     {"snd.status", "info", "0.20.1: sound list - checks, voices, groups, how media.mutemusic mutes", false, ValSnStatus,
      nullptr},
+    // 0.21 Arachnophobie / camera / ai.remove (section "0.21 arachnophobia")
+    {"arachno.on", "bool", "0.21: Arachnophobie - spiders replaced: master switch of model off / picture / sounds off "
+                           "([Arachno] Enabled)", false, ValArOn, RunArOn},
+    {"arachno.hide", "bool", "0.21: spider model not drawn while arachno.on (InstanceDrawable slot 7, [Arachno] Hide)", false,
+     ValArHide, RunArHide},
+    {"arachno.picture", "bool", "0.21: a wobbling picture at each spider while arachno.on ([Arachno] Picture / Image)",
+     false, ValArPic, RunArPic},
+    {"arachno.mute", "bool", "0.21: spider sounds not started while arachno.on (6 call gates + 1 jump table word, [Arachno] "
+                             "Mute)", false, ValArMute, RunArMute},
+    {"arachno.list", "action", "0.21: every spider instance (drawable, flags, masks, bones, children, LP, draw thread) into "
+                               "TruMenu.log once", true, ValArStatus, RunArList},
+    {"arachno.status", "info", "0.21: arachnophobia - checks, patches, draw thread (V1 / V2), pictures, skipped sounds",
+     false, ValArStatus, nullptr},
+    {"cam.shakescale", "action", "0.21 <0 .. 100>: camera shake strength in percent, 0 = off ([Camera] ShakeScale)", false,
+     ValCsScale, RunCsScale},
+    {"cam.rumble", "action", "0.21 <0 .. 100>: pad rumble in percent, 0 = off ([Camera] Rumble)", false, ValRbRumble,
+     RunRbRumble},
+    {"cam.shakelist", "action", "0.21: the camera shakes of the camerashakes object (n, key, DTP, duration) into "
+                                "TruMenu.log", true, ValCsState, RunCsList},
+    {"cam.shake", "action", "0.21 <n>: start camera shake n of cam.shakelist (the game's start by key 0x5ee940) - tests "
+                            "cam.shakescale", true, ValCsState, RunCsShake},
+    {"cam.shakestate", "info", "0.21: active camera shake slots (pool 0xe80020), the scale, the rumble", false, ValCsState,
+     nullptr},
+    {"ai.remove", "action", "0.21 nearest|others|all|<intro id>: AI enemies out of the world the game's despawn way (others "
+                            "= every one but the nearest to Lara)", true, ValAdRemove, RunAdRemove},
 };
 
 const Item *FindItem(const char *id) {
@@ -18195,6 +19749,11 @@ const char *RadialWhy(const RadItem &e) {
     if (!_strnicmp(id, "ai.", 3)) {          // 0.19 dumb AI: byte checks (switchable outside a level: works in the next)
         const char *aiWhy = AiRadWhy(id);
         if (aiWhy[0]) return aiWhy;
+        if (!_stricmp(id, "ai.remove") && !g_adOk) return g_adWhy;   // 0.21
+    }
+    if (!_strnicmp(id, "arachno.", 8) || !_strnicmp(id, "cam.", 4)) {   // 0.21: byte checks of the part
+        const char *m21Why = M21RadWhy(id);
+        if (m21Why[0]) return m21Why;
     }
     const Item *item = FindItem(id);
     if (((item && item->gameThread) || !_stricmp(id, "time.scale")) && !g_experimental)
@@ -18246,7 +19805,12 @@ bool ItemValueShort(const char *id, bool de, char *o, size_t n) {
         else Out(o, n, "?");
     } else if (!_stricmp(id, "ai.mode")) {   // 0.19 (bar row KI-Weg)
         Out(o, n, "%s%s", g_aiGateMode ? "gate (B)" : "purge (A)", g_aiGateOn ? (de ? " aktiv" : " patched") : "");
-    } else return false;
+    } else if (!_stricmp(id, "snd.pos")) Out(o, n, "%s", de ? kSnPosDe[g_snPos] : kSnPosEn[g_snPos]);   // 0.21: the 0.20.1
+    else if (!_stricmp(id, "snd.lines")) Out(o, n, "%d", g_snLines);                                   // rows showed "?"
+    else if (!_stricmp(id, "snd.sort")) Out(o, n, "%s", de ? kSnSortDe[g_snSort] : kSnSortNames[g_snSort]);
+    else if (!_stricmp(id, "cam.shakescale")) Out(o, n, "%ld%%", g_csShake);                          // 0.21
+    else if (!_stricmp(id, "cam.rumble")) Out(o, n, "%ld%%", g_rbRumble);
+    else return false;
     return true;
 }
 // 0.17: a preset entry "<value item> <arg>" is the current value (numbers compared as numbers, words case-insensitive;
@@ -19848,7 +21412,8 @@ enum QbCount { kQcNone = 0, kQcLayer, kQcTriggers, kQcTrgLabels, kQcLaraIn, kQcE
                kQcCine, kQcAi };          // 0.19 kQcAi: enemies in the ai.dumb scope (last frame)
 enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvPass, kQvLang, kQvTime, kQvMark, kQvWeapon,
              kQvAssist, kQvAiMode,       // 0.19 kQvAiMode: ai.mode purge / gate
-             kQvSndPos, kQvSndLines, kQvSndSort };   // 0.20.1 sound list: corner, lines, order
+             kQvSndPos, kQvSndLines, kQvSndSort,     // 0.20.1 sound list: corner, lines, order
+             kQvShake, kQvRumble };                  // 0.21 camera shake / rumble 0 / 50 / 100 %
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
 enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves };
@@ -19860,7 +21425,8 @@ const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230
             kQbCheat = IM_COL32(255, 230, 120, 255), kQbClaude = IM_COL32(255, 140, 110, 255),
             kQbTime = IM_COL32(190, 200, 255, 255), kQbChapter = IM_COL32(200, 230, 170, 255),
             kQbAi = IM_COL32(255, 170, 220, 255),   // 0.19 dumb AI rows
-            kQbSound = IM_COL32(205, 180, 255, 255);   // 0.20.1 sound list rows
+            kQbSound = IM_COL32(205, 180, 255, 255),   // 0.20.1 sound list rows
+            kQbPhobia = IM_COL32(170, 235, 200, 255);  // 0.21 Arachnophobie / camera rows
 // choice rows: the arguments a choice row cycles through (claude.mark kinds as the ring level Claude, the five ring
 // weapons of Waffen)
 struct QbChoice { const char *arg, *de, *en; };
@@ -19953,6 +21519,11 @@ const QbRow kQbRender[] = {
     {"Nicht angreifen", "No attacks", "ai.noattack", "", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"KI-Weg", "AI method", "ai.mode", "", kQbValue, -1, kQcNone, kQvAiMode, kQbAi, 0},
     {"KI: Stand", "AI state", "ai.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    // 0.21 ai.remove (Lukas live: too many tutorial thralls for a finisher test): the game's despawn, right twice
+    {"KI-Gegner entfernen", "Remove AI enemies", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
+    {"Alle bis auf den naechsten", "All but the nearest", "ai.remove", "others", kQbAction, -1, kQcNone, 0, kQbRed,
+     kQfConfirm},
+    {"Den naechsten", "The nearest", "ai.remove", "nearest", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
 };
 const QbRow kQbLevel[] = {
     {"Alle Trigger", "All triggers", "dbg.triggers", "", kQbBool, -1, kQcTriggers, 0, kQbWhite},
@@ -20046,13 +21617,36 @@ const QbRow kQbAccess[] = {
     {"Reaktions-Momente", "Reaction moments", "-", "Adrenalin-Momente laenger oder automatisch|adrenaline moments longer "
      "or automatic", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Sonstige (Phobien)", "Other (phobias)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
-    {"Arachnophobie", "Arachnophobia", "-", "Spinnen als Bild / ersetzt (Befund-Arachnophobie-0611.md)|spiders as an image "
-     "/ replaced (Befund-Arachnophobie-0611.md)", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    // 0.21 Arachnophobie (was planned): the master switch and its three parts
+    {"Arachnophobie", "Arachnophobia", "arachno.on", "", kQbBool, -1, kQcNone, 0, kQbPhobia, 0},
+    {"  Spinnen-Modell aus", "  Spider model off", "arachno.hide", "", kQbBool, -1, kQcNone, 0, kQbPhobia, 0},
+    {"  Bild statt Spinne", "  Picture instead", "arachno.picture", "", kQbBool, -1, kQcNone, 0, kQbPhobia, 0},
+    {"  Spinnen-Ton aus", "  Spider sounds off", "arachno.mute", "", kQbBool, -1, kQcNone, 0, kQbPhobia, 0},
+    {"  Spinnen: Stand", "  Spiders: state", "arachno.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Spinnen ignorieren Lara", "Spiders ignore Lara", "ai.dumb", "spiders", kQbBool, -1, kQcAi, 0, kQbAi, 0},   // 0.19
     {"Thalassophobie", "Thalassophobia", "-", "tiefes Wasser heller, Weg zur Oberflaeche|deep water brighter, way to the "
      "surface", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Haie ignorieren Lara", "Sharks ignore Lara", "ai.dumb", "sharks", kQbBool, -1, kQcAi, 0, kQbAi, 0},   // 0.19 (was planned)
-    {"Kamera-Wackeln aus", "No camera shake", "-", "Kamera-Shakes aus, Blitze daempfen|camera shakes off, flashes dimmed",
+    // 0.21 (was planned "Kamera-Wackeln aus"): the shake strength 100 / 50 / 0 %, the pad rumble the same way
+    {"Kamera-Wackeln", "Camera shake", "cam.shakescale", "", kQbValue, -1, kQcNone, kQvShake, kQbPhobia, 0},
+    {"Vibration", "Rumble", "cam.rumble", "", kQbValue, -1, kQcNone, kQvRumble, kQbPhobia, 0},
+    {"Blitze daempfen", "Dim flashes", "-", "Bildschirm-Blitze daempfen (noch nicht gefunden)|dim screen flashes (not found "
+     "yet)", kQbPlanned, -1, kQcNone, 0, 0, 0},
+};
+// 0.21 placeholder (Lukas 2026-11-06): co-op - planned rows only, no item behind them yet (research: docs\Befund-Koop-
+// Stufe0-0611.md); the same rows are the menu group "Co-op / Koop (planned)"
+const QbRow kQbCoop[] = {
+    {"Koop (geplant)", "Co-op (planned)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Koop an / aus", "Co-op on / off", "-", "zweite Figur mit Controller 2|second figure on pad 2", kQbPlanned, -1, kQcNone,
+     0, 0, 0},
+    {"Figur: Lara / Doppelgaengerin", "Figure: Lara / doppelganger", "-", "Figur waehlen|choose the figure", kQbPlanned, -1,
+     kQcNone, 0, 0, 0},
+    {"Begleiterin (KI)", "Companion (AI)", "-", "Doppelgaengerin mit eigener KI neben Lara - Stufe 1|doppelganger with her "
+     "own AI next to Lara - stage 1", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Marionette (Controller 2)", "Puppet (pad 2)", "-", "zweite Figur laufen lassen, Kamera bleibt bei Lara - Stufe 2|walk "
+     "a second figure, the camera stays on Lara - stage 2", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Zu mir holen", "Bring to me", "-", "zweite Figur zu Lara|second figure to Lara", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"Controller 2: Stand", "Pad 2: state", "-", "zeigt Controller 2 (verbunden, Tasten)|shows pad 2 (connected, buttons)",
      kQbPlanned, -1, kQcNone, 0, 0, 0},
 };
 #define QB_PAGE(de, en, rows, special) {de, en, rows, static_cast<int>(sizeof(rows) / sizeof(rows[0])), special}
@@ -20067,6 +21661,7 @@ const QbPage kQbPages[] = {
     {"Saves", "Saves", nullptr, 0, kQsSaves},
     QB_PAGE("Kapitel (debug)", "Chapters (debug)", kQbChapters, kQsNone),
     QB_PAGE("Barrierefreiheit", "Accessibility", kQbAccess, kQsNone),
+    QB_PAGE("Koop", "Co-op", kQbCoop, kQsNone),                     // 0.21 placeholder (planned rows only)
 };
 #undef QB_PAGE
 const int kQbPageN = static_cast<int>(sizeof(kQbPages) / sizeof(kQbPages[0]));
@@ -20189,8 +21784,10 @@ const char *QbWhy(const QbRow &r) {
 int QbValueCount(int val) {
     return val == kQvDepth || val == kQvEncl || val == kQvTime || val == kQvAssist ? 3 : val == kQvAlpha ? 10
          : val == kQvBright ? 13 : val == kQvSpeed ? 5 : val == kQvPass ? kRmPassN : val == kQvLang || val == kQvAiMode ? 2
-         : val == kQvSndPos || val == kQvSndLines ? 4 : val == kQvSndSort ? 3 : 0;   // 0.20.1
+         : val == kQvSndPos || val == kQvSndLines ? 4 : val == kQvSndSort ? 3   // 0.20.1
+         : val == kQvShake || val == kQvRumble ? 3 : 0;                          // 0.21
 }
+const int kQbPercent[3] = {0, 50, 100};       // 0.21 cam.shakescale / cam.rumble steps
 const int kQbSndLines[4] = {8, 16, 24, 32};   // 0.20.1 snd.lines steps
 const int kQbSpeeds[5] = {5, 10, 20, 40, 80};
 const float kQbTimes[3] = {0.25f, 0.5f, 1.0f};     // 0.18 time.scale steps (as the ring's Zeit level)
@@ -20210,6 +21807,8 @@ void QbValueArg(int val, int i, char *o, size_t n) {
     case kQvSndPos: Out(o, n, "%s", kSnPosNames[i]); break;         // 0.20.1
     case kQvSndLines: Out(o, n, "%d", kQbSndLines[i]); break;
     case kQvSndSort: Out(o, n, "%s", kSnSortNames[i]); break;
+    case kQvShake:                                                  // 0.21
+    case kQvRumble: Out(o, n, "%d", kQbPercent[i]); break;
     default: o[0] = 0;
     }
 }
@@ -20233,6 +21832,13 @@ int QbValueNow(int val) {
     case kQvAiMode: v = g_aiGateMode ? 1 : 0; break;   // 0.19
     case kQvSndPos: v = g_snPos; break;                 // 0.20.1
     case kQvSndSort: v = g_snSort; break;
+    case kQvShake:                                      // 0.21: the nearest step
+    case kQvRumble: {
+        const int now = static_cast<int>(val == kQvShake ? g_csShake : g_rbRumble);
+        for (int i = 0; i < 3; ++i)
+            if (abs(now - kQbPercent[i]) < abs(now - kQbPercent[v])) v = i;
+        break;
+    }
     case kQvSndLines:
         for (int i = 0; i < 4; ++i)
             if (abs(g_snLines - kQbSndLines[i]) < abs(g_snLines - kQbSndLines[v])) v = i;
@@ -20514,7 +22120,9 @@ void PageAccess() {
     ImGui::TextWrapped("Skeleton (0.18): the five categories of the game paper 'Barrierefreiheit in Games' (game e.V., "
                        "July 2025). Only existing items work; planned functions are grey - hover for what they will do. "
                        "Quick-toggle bar: page Barrierefreiheit; ring: Spieler / Barrierefreiheit. 0.19: sharks / "
-                       "spiders ignore Lara = ai.dumb sharks / spiders (page 'AI / KI' for every setting).");
+                       "spiders ignore Lara = ai.dumb sharks / spiders (page 'AI / KI' for every setting). 0.21: "
+                       "Arachnophobie and camera shake / rumble work - their settings in the group 'Arachnophobia, camera "
+                       "shake' below.");
     char o[300];
     int index = 0;
     for (const QbRow &r : kQbAccess) {
@@ -20566,6 +22174,17 @@ void PageAccess() {
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "(%s)", why);
         }
+    }
+}
+
+// 0.21 menu group "Co-op / Koop (planned)": the planned rows of the bar page Koop (no function yet)
+void PageCoop() {
+    ImGui::TextWrapped("Placeholder (0.21): a second figure in the game - nothing works yet; hover for what each row will "
+                       "do. Bar page: Koop.");
+    for (const QbRow &r : kQbCoop) {
+        if (r.kind == kQbLabel) continue;
+        ImGui::TextDisabled("   %s / %s  (geplant / planned)", r.de, r.en);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", r.arg);
     }
 }
 
@@ -20626,6 +22245,19 @@ void PageAi() {
                        "make them turn (gate); they may still walk to noises (use 'no investigating'); scripts that wait "
                        "for an enemy to notice Lara do not fire; switching off near enemies = immediate aggro. Not AI "
                        "enemies (no effect): jellyfish, kraken, Natla, natla_thrall.");
+    // 0.21 ai.remove: the game's despawn (hide, sense manager, generator, kill flag; the game's sweep removes them)
+    ImGui::SeparatorText("Remove AI enemies / KI-Gegner entfernen  [ai.remove] (0.21)");
+    if (!g_adOk) ImGui::BeginDisabled();
+    if (TmButton("all but the nearest / alle bis auf den naechsten###adothers")) QueueItem("ai.remove", "others");
+    ImGui::SameLine();
+    if (TmButton("the nearest / den naechsten###adnearest")) QueueItem("ai.remove", "nearest");
+    ImGui::SameLine();
+    if (TmButton("all / alle###adall")) QueueItem("ai.remove", "all");
+    if (!g_adOk) ImGui::EndDisabled();
+    char rv[240];
+    ValAdRemove(rv, sizeof(rv));
+    ImGui::TextWrapped("%s. Back after a reload (no save mark); a level script waiting for these enemies to die will "
+                       "not go on.", rv);
 }
 
 // render thread, every Present (Render, before its early return): the open bar's input from the raw pad (g_pad, before
@@ -22935,6 +24567,8 @@ void DrawMenu() {
         if (TmCollapsingHeader("Settings")) PageSettings();
         if (TmCollapsingHeader("Overlay: Lara's position")) PageOverlay();
         if (TmCollapsingHeader("Accessibility / Barrierefreiheit (0.18)###access")) PageAccess();   // 0.18 skeleton
+        if (TmCollapsingHeader("Arachnophobia, camera shake / Arachnophobie, Kamera (0.21)###arachno")) PageArachno();
+        if (TmCollapsingHeader("Co-op / Koop (planned / geplant, 0.21)###coop")) PageCoop();
         if (TmCollapsingHeader("AI / KI: enemies ignore Lara (0.19)###aipage")) PageAi();             // 0.19 Dumme KI
         if (TmCollapsingHeader("Free camera")) PageCamera();
         if (TmCollapsingHeader("Cheat / flight")) PageCheat();
@@ -23089,7 +24723,7 @@ void Render(IDirect3DDevice9 *device) {
     const bool quickDraw = QuickWantsDraw();     // 0.17
     if (!quickDraw) g_qbRect = {0, 0, 0, 0};
     if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_lblOn && !g_radOpen &&
-        !flowDraw && !DvAnyOn() && !quickDraw)
+        !flowDraw && !DvAnyOn() && !quickDraw && !g_snOn && !ArWantsDraw())   // 0.21: + spider pictures
         return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
@@ -23125,6 +24759,7 @@ void Render(IDirect3DDevice9 *device) {
     TraceBegin();                                // 0.8.1 input trace: this frame's record + the edges so far
     FeedGamepad(io);
     ImGui::NewFrame();
+    if (ArWantsDraw()) ArDrawPictures(device);   // 0.21 spider pictures (background draw list, under every label)
     if (g_drawMarkup) DrawMarkup();
     if (g_lblOn) DrawLabels();                   // 0.13 Thrall-Labels (foreground draw list)
     if (DvAnyOn()) DrawDebugView();              // 0.14 debug view (background draw list)
@@ -23190,6 +24825,7 @@ HRESULT STDMETHODCALLTYPE SwapPresentHook(IDirect3DSwapChain9 *chain, const RECT
 HRESULT STDMETHODCALLTYPE ResetHook(IDirect3DDevice9 *device, D3DPRESENT_PARAMETERS *params) {
     if (g_imguiReady) ImGui_ImplDX9_InvalidateDeviceObjects();
     RenderModeOnReset();                     // 0.15: the flat view's palette shaders (created again at the next Present)
+    ArOnReset();                             // 0.21: a D3DPOOL_DEFAULT picture texture (created again when needed)
     HRESULT hr = g_resetOriginal(device, params);
     Log(hr < 0 ? 0 : 3, "d3d9: Reset 0x%08lx", static_cast<DWORD>(hr));
     return hr;                               // device objects are re-created by the next ImGui_ImplDX9_NewFrame
@@ -23502,6 +25138,7 @@ void ReadOptions(const char *dir) {
     g_slDirect = OptInt(ini, "Saves", "DirectLoad") != 0 ? 1 : 0;                   // 0.18 save.load
     AiReadOptions(ini);                                                              // 0.19 [AI]
     SnReadOptions(ini);                                                              // 0.20.1 [Sound]
+    ArReadOptions(ini);                                                              // 0.21 [Arachno] / [Camera]
     // 0.10 [Radial]: HoldButtons / Key also as hex ("0x00C0", "0x78")
     auto number = [&](const char *key) {
         char v[32];
@@ -23814,6 +25451,7 @@ void Start(HMODULE self) {
     M20Check();                               // 0.20 collectibles / enemies / forget / mutes (precheck_020.txt; after
                                               // AiCheck, MusicCheck and DebugViewCheck)
     M201Check();                              // 0.20.1 sound list + FMOD music mute (precheck_0201.txt; after M20Check)
+    M21Check();                               // 0.21 arachnophobia / camera / labels / ai.remove (precheck_021.txt)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
     _snprintf_s(g_radFilePath, sizeof(g_radFilePath), _TRUNCATE, "%sTruMenu.radial.txt", g_exeDir);
@@ -23893,6 +25531,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_edgeLock);       // 0.8.1 input trace
         InitializeCriticalSection(&g_safeLock);       // 0.8.1 player.unstuck
         InitializeCriticalSection(&g_snLock);         // 0.20.1 sound list snapshot
+        InitializeCriticalSection(&g_arLock);         // 0.21 spider picture list
         InitializeCriticalSection(&g_scLock);         // 0.8.1 regression shortcuts
         InitializeCriticalSection(&g_saveLock);       // 0.9 Saves page
         InitializeCriticalSection(&g_radLock);        // 0.10 radial menu
@@ -23905,6 +25544,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         g_stop = 1;
         RenderModeShutdown();                         // 0.15: patched vtable words back (only those still ours)
         AiShutdown();                                 // 0.19: the gate patches back (only those still ours)
+        M21Shutdown();                                // 0.21: slot 7, sound gates, shake stub, rumble back
     }
     return TRUE;
 }

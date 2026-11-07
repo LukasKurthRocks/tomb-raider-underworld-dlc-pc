@@ -173,14 +173,16 @@ OC_RANGES = {'OnCinePairs': (1, 50), 'OnCineFastPairs': (1, 50), 'OnCineInterval
 QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info', 'shot.oncine': 'bool',
             'dbg.depthdump': 'action', 'dbg.cp': 'action', 'dbg.cpall': 'action', 'dbg.cplist': 'info',
             'dbg.cpgo': 'action', 'pos.save': 'action', 'pos.list': 'info', 'pos.go': 'action'}
-QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess')
+QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess',
+             'kQbCoop')                                                          # 0.21 Koop (planned rows only)
 QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang',
                   'time.scale', 'ai.mode',                                       # 0.19 ai.mode
-                  'snd.pos', 'snd.lines', 'snd.sort')                            # 0.20.1 sound list
+                  'snd.pos', 'snd.lines', 'snd.sort',                            # 0.20.1 sound list
+                  'cam.shakescale', 'cam.rumble')                                # 0.21 camera shake / rumble
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
-QB_PAGES_MAX = 10
+QB_PAGES_MAX = 11                            # 0.21: + Koop
 # 0.19 dumb AI: the items, the presets (kAiPresets + "filter"), the [AI] keys
 Q19_ITEMS = {'ai.dumb': 'action', 'ai.mode': 'action', 'ai.noinvestigate': 'bool', 'ai.noattack': 'bool',
              'ai.status': 'info'}
@@ -213,6 +215,28 @@ Q201_BAR = (('kQbDebug', 'snd.list', 'kQbBool'), ('kQbDebug', 'snd.pos', 'kQbVal
             ('kQbTimeTest', 'snd.list', 'kQbBool'), ('kQbTimeTest', 'snd.dump', 'kQbAction'))
 Q201_TABLES = ('kSnChecks', 'kSmChecks', 'kEsChecks')
 DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
+# 0.21: Arachnophobie / camera / ai.remove - items, game-thread items, [Arachno] / [Camera] keys (key, rule), defaults,
+# bar rows (table, item, kind, arg), check tables, the planned rows they replace, the Koop page
+Q21_ITEMS = {'arachno.on': 'bool', 'arachno.hide': 'bool', 'arachno.picture': 'bool', 'arachno.mute': 'bool',
+             'arachno.list': 'action', 'arachno.status': 'info', 'cam.shakescale': 'action', 'cam.rumble': 'action',
+             'cam.shakelist': 'action', 'cam.shake': 'action', 'cam.shakestate': 'info', 'ai.remove': 'action'}
+Q21_GAME_THREAD = ('arachno.list', 'cam.shakelist', 'cam.shake', 'ai.remove')
+Q21_ARACHNO_KEYS = (('Enabled', 'bool'), ('Hide', 'bool'), ('Picture', 'bool'), ('Mute', 'bool'), ('Match', 'list'),
+                    ('Exclude', 'list0'), ('Image', 'png'), ('Scale', (0.2, 5.0)), ('MinPx', (4, 256)),
+                    ('MaxScreen', (0.1, 1.0)), ('FadeNear', (0, 2000)), ('MaxDist', (500, 50000)),
+                    ('WobbleAmp', (0.0, 0.5)), ('WobbleHz', (0.0, 10.0)), ('SquashAmp', (0.0, 0.5)), ('TiltDeg', (0, 45)),
+                    ('Flip', 'bool'))
+Q21_CAMERA_KEYS = (('ShakeScale', (0, 100)), ('Rumble', (0, 100)))
+Q21_DEFAULTS = (('Arachno', 'Enabled', '0'), ('Camera', 'ShakeScale', '100'), ('Camera', 'Rumble', '100'),
+                ('Sound', 'Position', 'br'))
+Q21_BAR = (('kQbAccess', 'arachno.on', 'kQbBool', ''), ('kQbAccess', 'arachno.hide', 'kQbBool', ''),
+           ('kQbAccess', 'arachno.picture', 'kQbBool', ''), ('kQbAccess', 'arachno.mute', 'kQbBool', ''),
+           ('kQbAccess', 'cam.shakescale', 'kQbValue', ''), ('kQbAccess', 'cam.rumble', 'kQbValue', ''),
+           ('kQbRender', 'ai.remove', 'kQbAction', 'others'))
+Q21_TABLES = ('kArDrawChecks', 'kArSoundChecks', 'kCsChecks', 'kRbChecks', 'kLfChecks', 'kAdChecks')
+Q21_REPLACED = ('Arachnophobie', 'Kamera-Wackeln aus')
+AD_ARGS = ('nearest', 'others', 'all')
+TRUTRACE_BYTES = (0x5b6a2f, 0x5b6a30)        # the call TruTrace checks - never a TruMenu patch site
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 
@@ -1139,6 +1163,131 @@ def check_0201(ini_path, radial_path):
         len(Q201_ITEMS), len(Q201_KEYS), len(Q201_BAR), sum(counts.values()), ' / '.join(Q201_TABLES))
 
 
+def q21_value_ok(rule, v):
+    if rule == 'bool': return v in ('0', '1')
+    if rule == 'list': return bool(re.fullmatch(r'[A-Za-z0-9_]+( *, *[A-Za-z0-9_]+)*', v))
+    if rule == 'list0': return not v or bool(re.fullmatch(r'[A-Za-z0-9_]+( *, *[A-Za-z0-9_]+)*', v))
+    if rule == 'png': return bool(v) and v.lower().endswith('.png') and not re.search(r'[<>"|?*]', v)
+    try:
+        x = float(v)
+    except ValueError:
+        return False
+    return rule[0] <= x <= rule[1] and (isinstance(rule[0], float) or v.isdigit())
+
+
+def check_021(ini_path, radial_path, rows):
+    """0.21 (2026-11-07 Arachnophobie / camera / labels / ai.remove): [Arachno] / [Camera] values, the new defaults
+    (Enabled 0, ShakeScale / Rumble 100, Sound Position br), the items (types, game thread), the bar rows (the planned
+    rows Arachnophobie / Kamera-Wackeln aus replaced, ai.remove with a confirmation, the Koop page with planned rows only,
+    right after Barrierefreiheit), the ring entries of these items (arguments), the precheck tables (at most 64 bytes),
+    the slot-7 hook's mask order (set -1, the game's draw, the game's value back), no patch site on TruTrace's call bytes,
+    and the owner-picture rules (.gitignore, Set-TruMenu.ps1, tools/pending_upload_scan.py)"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    for section, keys in (('Arachno', Q21_ARACHNO_KEYS), ('Camera', Q21_CAMERA_KEYS)):
+        found = {k: (n, v) for n, k, v in ini_section(ini_path, section)}
+        for key, rule in keys:
+            if key not in found:
+                problems.append('%s: [%s] %s missing' % (name, section, key))
+            elif not q21_value_ok(rule, found[key][1]):
+                problems.append('%s:%d: [%s] %s=%s (%s)' % (name, found[key][0], section, key, found[key][1],
+                                                            rule if isinstance(rule, str) else
+                                                            ' .. '.join(map(str, rule))))
+    defaults = {(sec, key): default for sec, key, default, comment in rows}
+    for sec, key, want in Q21_DEFAULTS:
+        if defaults.get((sec, key)) != want:
+            problems.append('TruMenu.cpp: kOpts [%s] %s default "%s", want "%s" (0.21)' % (sec, key, defaults.get((sec, key)),
+                                                                                       want))
+    items = item_types(src)
+    for item, typ in sorted(Q21_ITEMS.items()):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    for item in Q21_GAME_THREAD:
+        m = re.search(r'\{"%s", "action", (?:"[^"]*"\s*)+, (true|false),' % re.escape(item), src)
+        if not m or m.group(1) != 'true':
+            problems.append('TruMenu.cpp: %s must run on the game thread (gameThread true)' % item)
+    bar = qb_rows(src, True)
+    for table, item, kind, arg in Q21_BAR:
+        if not any(t == table and i == item and k == kind and a == arg for t, de, i, a, k, layer, tail in bar):
+            problems.append('TruMenu.cpp: %s has no %s row %s%s' % (table, kind, item, ' ' + arg if arg else ''))
+    for t, de, i, a, k, layer, tail in bar:
+        where = 'TruMenu.cpp: %s row "%s"' % (t, de)
+        if t == 'kQbAccess' and k == 'kQbPlanned' and de in Q21_REPLACED:
+            problems.append(where + ': still planned (0.21 built it)')
+        if i == 'ai.remove':
+            if a not in AD_ARGS: problems.append(where + ': ai.remove needs nearest / others / all')
+            if k != 'kQbAction' or 'kQfConfirm' not in tail: problems.append(where + ': ai.remove = action row with kQfConfirm')
+        if t == 'kQbCoop' and k not in ('kQbLabel', 'kQbPlanned'):
+            problems.append(where + ': the Koop page has planned rows only (no function yet)')
+    if not any(t == 'kQbCoop' and k == 'kQbPlanned' for t, de, i, a, k, layer, tail in bar):
+        problems.append('TruMenu.cpp: kQbCoop has no planned row')
+    pages = re.findall(r'QB_PAGE\("([^"]*)", "([^"]*)", (kQb[A-Za-z]+), (kQs[A-Za-z]+)\)', src)
+    tables = [p[2] for p in pages]
+    if 'kQbCoop' not in tables: problems.append('TruMenu.cpp: kQbPages has no page Koop (kQbCoop)')
+    elif 'kQbAccess' in tables and tables.index('kQbCoop') != tables.index('kQbAccess') + 1:
+        problems.append('TruMenu.cpp: page Koop must follow Barrierefreiheit')
+    counts = {}
+    if os.path.exists(radial_path):
+        rname = os.path.basename(radial_path)
+        for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.count('|') != 2: continue
+            cmd = line.split('|')[2].strip()
+            word, _, arg = cmd.partition(' ')
+            arg = arg.strip()
+            if word not in Q21_ITEMS: continue
+            counts[word] = counts.get(word, 0) + 1
+            where = '%s:%d: %s' % (rname, n, cmd)
+            if word in ('cam.shakescale', 'cam.rumble') and not (arg.isdigit() and int(arg) <= 100):
+                problems.append(where + ' (0 .. 100)')
+            elif word == 'ai.remove' and arg not in AD_ARGS and not arg.isdigit():
+                problems.append(where + ' (nearest / others / all / an intro id)')
+            elif word == 'cam.shake' and not arg.isdigit(): problems.append(where + ' (a shake number)')
+            elif Q21_ITEMS[word] in ('bool', 'info') and arg: problems.append(where + ' (no argument)')
+    for tbl in Q21_TABLES:
+        mt = re.search(r'const DvCheck %s\[\] = \{(.*?)\n\};' % tbl, src, re.S)
+        if not mt:
+            problems.append('TruMenu.cpp: %s missing' % tbl)
+            continue
+        body = re.sub(r'"\s*\n\s*"', '', mt.group(1))
+        for a, h in re.findall(r'\{(0x[0-9a-fA-F]+), "([0-9a-fA-F ]+)"\}', body):
+            hexs = h.replace(' ', '')
+            if len(hexs) % 2 or len(hexs) // 2 > 64:
+                problems.append('TruMenu.cpp: %s %s (whole bytes, at most 64; got %d)' % (tbl, a, len(hexs) // 2))
+    mh = re.search(r'\nvoid __fastcall ArDrawHook\(.*?\n\}', src, re.S)
+    body = mh.group(0) if mh else ''
+    i_set = body.find('AiPutDword(inst + 0x23c, 0xffffffffu)')
+    i_draw = body.find('game(self, edx, a, b)', i_set if i_set >= 0 else 0)
+    i_back = body.find('AiPutDword(inst + 0x23c, m23c)')
+    if not (0 <= i_set < i_draw < i_back):
+        problems.append('TruMenu.cpp: ArDrawHook must set +0x23c = -1, call the game\'s draw, then put the game\'s value back')
+    mp = re.search(r'AiPatch g_arSndPatches\[\d+\] = \{(.*?)\n\};', src, re.S)
+    sites = [int(x, 16) for x in re.findall(r'\{(0x[0-9a-fA-F]+),', mp.group(1))] if mp else []
+    if len(sites) != 7: problems.append('TruMenu.cpp: g_arSndPatches must have the 6 call sites + the table word (got %d)'
+                                        % len(sites))
+    for s in sites:
+        if s in TRUTRACE_BYTES: problems.append('TruMenu.cpp: sound gate patches 0x%x - TruTrace checks those bytes' % s)
+    gi = os.path.join(ROOT, '.gitignore')
+    gtext = open(gi, encoding='utf-8', errors='replace').read() if os.path.exists(gi) else ''
+    for want in ('TruMenu.arachno*.png', 'work/arachno_owner/'):
+        if want not in gtext.split('\n') and want + '\r' not in gtext.split('\n'):
+            problems.append('.gitignore: line %s missing (owner picture)' % want)
+    st = os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1')
+    stext = open(st, encoding='utf-8-sig', errors='replace').read() if os.path.exists(st) else ''
+    for line in stext.split('\n'):
+        if re.search(r'\b(Copy-Item|Remove-Item)\b', line) and 'Assert-NotOwnerImage' not in line:
+            problems.append('Set-TruMenu.ps1: "%s" without Assert-NotOwnerImage (owner picture rule)' % line.strip()[:80])
+    if "$ownerImagePattern = 'TruMenu.arachno*.png'" not in stext:
+        problems.append('Set-TruMenu.ps1: $ownerImagePattern = \'TruMenu.arachno*.png\' missing')
+    us = os.path.join(ROOT, 'tools', 'pending_upload_scan.py')
+    utext = open(us, encoding='utf-8', errors='replace').read() if os.path.exists(us) else ''
+    if 'arachno_owner' not in utext or r'\.arachno' not in utext:
+        problems.append('tools/pending_upload_scan.py: the Owner rule (*.arachno*.png, work/arachno_owner/) missing')
+    return problems, ('%d items, [Arachno] %d + [Camera] %d keys, %d bar rows, Koop page, %d ring entries, tables %s, '
+                      'owner-picture rules' % (len(Q21_ITEMS), len(Q21_ARACHNO_KEYS), len(Q21_CAMERA_KEYS), len(Q21_BAR),
+                                               sum(counts.values()), ' / '.join(Q21_TABLES)))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -1228,6 +1377,10 @@ def main(argv):
     for p in zproblems: print('Q020 %s' % p)
     if not zproblems: print('ok: 0.20: %s' % zsummary)
     problems += zproblems
+    xproblems, xsummary = check_021(ini_path, radial_path, rows)   # 0.21
+    for p in xproblems: print('Q021 %s' % p)
+    if not xproblems: print('ok: 0.21 arachnophobia / camera / ai.remove: %s' % xsummary)
+    problems += xproblems
     nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)

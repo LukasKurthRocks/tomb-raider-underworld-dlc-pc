@@ -1978,6 +1978,57 @@ Report `docs\Befund-TruMenu-0201-0611.md`; byte checks `work\asi\menu0201\preche
   until it stands up (`~n s` from the measured game clock rate; `(wacht)` when due). `[Debug] EnemyStateLog=1`: one log
   line per state change of a labelled enemy.
 
+## TruMenu 0.21 (Arachnophobie stage 1, camera shake, label fixes, ai.remove, Koop placeholder; 2026-11-07)
+
+Report `docs\Befund-TruMenu-021-0611.md`; plan `docs\Befund-Arachnophobie-Stufe1-Kamera-0611.md`; byte checks
+`work\asi\menu021\precheck_021.txt` (65, section "// ---- 0.21 arachnophobia" .. "// ---- end of 0.21 arachnophobia");
+analysis files `work\m021_0611` (`labels\`, `airemove\`).
+
+* **Arachnophobie** (`[Arachno] Enabled`, item `arachno.on`, default off) - the master switch of three parts (each 1 by
+  default, so switching the master on gives the whole mode):
+  * **Model off** (`Hide`, `arachno.hide`): the `InstanceDrawable` vtable slot 7 (`.rdata` word `0x853ad8` = `0x5bba90`)
+    leads through TruMenu while the mode is on in a level; for a spider the engine wants to draw, the draw-group mask
+    `+0x23c` is `-1` **only during its draw call** (the engine's own "all groups hidden" exit) and the game's value comes
+    back right after. Logic, collision, AI, hits and Lara's aim are untouched; the shadow goes with the model. If the
+    draw runs on another thread than the game logic (logged once: `arachno: spider draw calls run on thread ...`), V2
+    skips the call instead of writing the mask.
+  * **Picture** (`Picture`, `arachno.picture`): a wobbling picture (bob / squash / tilt, `WobbleAmp / WobbleHz /
+    SquashAmp / TiltDeg`) at the spider's projected bones, size relative to them (`Scale`, `MinPx`, `MaxScreen`), faded
+    closer than `FadeNear`, none beyond `MaxDist` or at LP 0, mirrored while it moves left (`Flip`). Drawn over the game
+    and its HUD (walls do not hide it yet - the depth path is 0.22).
+  * **Sounds off** (`Mute`, `arachno.mute`): spider sounds are not started - 6 call gates (anim sound `0x5b99c0`, random
+    set `0x5b2820`) + the sound-slot jump table word `0x5b6b1c`; TruTrace's checked call bytes `0x5b6a2f` stay.
+  * Spiders = object names with a part of `Match` (`spider,tarantula`) and none of `Exclude` (`_generator`).
+    `arachno.list` writes every spider (drawable class, flags, masks, bones, children, LP, draw thread) into the log;
+    `arachno.status` shows the state.
+  * **The picture file**: `TruMenu.arachno.png` next to `tru.exe` (`[Arachno] Image`, PNG with alpha, read with
+    stb_image - `src\asi\third_party\stb`, public domain / MIT, no new DLL import). **The owner's own image is local
+    only**: it is not in the repository (`.gitignore` `TruMenu.arachno*.png`, `work/arachno_owner/`), never shipped,
+    and `Set-TruMenu.ps1` never copies, overwrites or removes it (`Assert-NotOwnerImage`); `tools/pending_upload_scan.py`
+    reports a pending `*.arachno*.png` or `work/arachno_owner/` path as an error. Without the file a built-in picture
+    (a friendly cat face drawn by code) is used.
+* **Camera shake** `[Camera] ShakeScale` (`cam.shakescale 0 .. 100`, 100 = the game's own, no patch): the two callers of
+  the shake strength `0x5eb460` (camera apply `0x5eea55`, shake sum `0x5eb56d`) call a stub that multiplies the result.
+  **Rumble** `[Camera] Rumble` (`cam.rumble 0 .. 100`): the resolved `XInputSetState` pointer `[0xa02b90]` is wrapped while
+  below 100. Test helpers `cam.shakelist` (the `camerashakes` table into the log), `cam.shake <n>` (the game's start by
+  key `0x5ee940`), `cam.shakestate`.
+* **Labels** (0.20 live test): a reward pot is labelled once - a runtime copy (`INSTANCE_BirthObject` gives a child the
+  parent's intro record and a runtime id from `0x40000000`) is skipped while the placed instance (`+0x58` =
+  `[intro+0x58]`) is in the walk; instances the game does not draw (hide bit `0x800`, kill flag `0x20`, scene entity
+  off, draw masks `-1`) get no label - a picked-up artifact no longer keeps its label in mid air.
+* **`ai.remove nearest | others | all | <intro id>`** (game thread): AI enemies out of the world the way the game's
+  despawn behaviour does it (`0x61cda0`: hide `0x800`, `CSenseManager::RemoveInstance 0x71dcb0`, the generator's
+  notification, kill flag `0x20`; the game's sweep `0x5bcbb0` removes them in the next frame). No damage, no death, no
+  save mark (back after a reload). Bar Render / KI "Alle bis auf den naechsten" / "Den naechsten" (right twice), menu
+  page AI. A level script waiting for those enemies to die will not go on.
+* **Sound list**: bottom right by default (`[Sound] Position=br`; bottom left is the quick-toggle bar's side), rows
+  right-aligned in a right corner, the srmusic tracks once in a MUSIK header line (not on every music row); the bar's
+  value rows Ton: Ort / Zeilen / Sortierung show their value (0.20.1 showed `?`).
+* **Places**: bar page Barrierefreiheit (Arachnophobie + 3 parts + state, Kamera-Wackeln / Vibration 100 / 50 / 0 %;
+  the planned rows are replaced, "Blitze daempfen" stays planned), new bar page **Koop** (planned rows only, no
+  function yet), menu groups "Arachnophobia, camera shake" and "Co-op / Koop (planned)". The ring has no new entries
+  (it is at its 256-entry limit).
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

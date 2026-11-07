@@ -24,6 +24,8 @@
     0.11: the flow file TruMenu.flow.txt next to tru.exe belongs to a test profile (its "flowFile", installed by
              Invoke-TruTestRun.ps1 after this script): -Install and -Remove both delete one of ours (first line starts
              with "# TruMenu flow") so no flow of an earlier run is left; a foreign file of that name is kept.
+    0.21: the owner's own arachnophobia picture TruMenu.arachno*.png next to tru.exe is never copied, overwritten or
+             removed (-Install / -Remove); one in the build folder is not installed either (Assert-NotOwnerImage).
     The game must not be running. Every run writes <workspace>\logs\Set-TruMenu_<time>.log. -Verbose shows the
     steps, -Debug the hashes, -Trace adds a PowerShell line trace.
 
@@ -52,7 +54,7 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruMenu.asi', 'TruMenu.ini'
-# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.20) - recognised
+# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.20.1) - recognised
 # as ours for update / removal
 $earlierBuilds = @{
     'TruMenu.asi' = @('50ebd28adcf96cef7e1db673ce293b5810bd8d64d0669617d09a1250598491a3',
@@ -85,7 +87,8 @@ $earlierBuilds = @{
                       'b28bd9ccfa4bef9cf70476bb3a759dbc65c46e243f38e971de67b4a8541e3209',   # 0.17.1 depth matrices swapped (work\asi\menu0171)
                       '23d3dce1b6ba642055dce2b15612cce10b7a9ece93c1b4818fbd7ec452e645e5',   # 0.18 Lara in, bar pages, save.load (work\asi\menu018)
                       'a84e0b63f1160233286f56d0fda16afc233c6b6a6e5574bcc9d3983af5ce6afa',   # 0.19 Dumme KI (work\asi\menu019)
-                      'c1c4d958f69129d78ed478eb8c433c965d92d73f3b6144959bf6e215829f0946')   # 0.20 collectibles, enemies (work\asi\menu020)
+                      'c1c4d958f69129d78ed478eb8c433c965d92d73f3b6144959bf6e215829f0946',   # 0.20 collectibles, enemies (work\asi\menu020)
+                      '8e1338354c322fcf7cc7c8c6509aab1b04fd0ca7adb147d468aa6a187191af15')   # 0.20.1 sound list (work\asi\menu0201)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
@@ -111,7 +114,16 @@ $earlierBuilds = @{
                       '249bfa8643122a3033f63dfc2385bcd28e486ac8233e316ca2362c6a92845eea',   # 0.17 / 0.17.1 ([Quick], [Shot] OnCine*; work\asi\menu017, menu0171)
                       '825e5b8e0744fcd43c3310b333938fa48fea8444f23961d9f131040bfcd40f47',   # 0.18 ([Menu] OverlayLaraIn, [Saves] DirectLoad, ..; work\asi\menu018)
                       '47e3be93728af79f12cb90fbd62967f45e2d3e1a8cb880c623d3ec6036dfc66b',   # 0.19 ([AI]; work\asi\menu019)
-                      'a1a96bc20da75b52e4f45b4f8b94366330fe262e3e4320f1bf3dc332963a9c99')   # 0.20 ([Debug] Collect / Enemies / Mark*, [Media] Mute*; work\asi\menu020)
+                      'a1a96bc20da75b52e4f45b4f8b94366330fe262e3e4320f1bf3dc332963a9c99',   # 0.20 ([Debug] Collect / Enemies / Mark*, [Media] Mute*; work\asi\menu020)
+                      '8c5a4027c7ebad61db57efb933b4f56ff22c5d31510362ba311cb675d026fe38')   # 0.20.1 ([Sound], [Debug] EnemyStateLog; work\asi\menu0201)
+}
+# 0.21: the owner's own arachnophobia picture (TruMenu.arachno.png, also TruMenu.arachno.<kind>.png) next to tru.exe is
+# private: this script never copies, overwrites or removes it (not even one found in the build folder) - the plugin
+# falls back to its built-in picture without it
+$ownerImagePattern = 'TruMenu.arachno*.png'
+function Assert-NotOwnerImage {
+    param([string]$Path)
+    if ((Split-Path -Leaf $Path) -like $ownerImagePattern) { throw "refused: $Path is the owner's own picture ($ownerImagePattern) - never copied or removed." }
 }
 # 0.10 radial menu file and 0.10.1 tour file (next to tru.exe; the default comes from the build folder or src\asi\TruMenu)
 $radialFiles = @(
@@ -157,14 +169,14 @@ try {
                 if ($name -like '*.ini') { Write-Log "$target was edited (not a build of ours) - kept." -Level WARN; continue }
                 throw "$target exists and is not a build of ours - left untouched."
             }
-            Copy-Item -LiteralPath $source -Destination $target -Force
+            Assert-NotOwnerImage $target; Copy-Item -LiteralPath $source -Destination $target -Force
             if ($isEarlier) { Write-Log "$name updated in $GamePath (earlier build replaced)." }
             else { Write-Log "$name copied to $target." }
         }
         else {
             if (!$targetHash) { Write-Log "$name not in the game folder." -Level VERBOSE; continue }
             if ($targetHash -ne $sourceHash -and !$isEarlier) { Write-Log "$target is not a build of ours - left untouched." -Level WARN; continue }
-            Remove-Item -LiteralPath $target
+            Assert-NotOwnerImage $target; Remove-Item -LiteralPath $target
             Write-Log "$name removed from $GamePath."
         }
     }
@@ -184,13 +196,13 @@ try {
             Write-Log "$($entry.Key) source $source sha256 $(Get-Sha256 $source)" -Level DEBUG
             if ((Test-Path -LiteralPath $target) -and !$isOurs) { Write-Log "$target is not a list of ours - left untouched." -Level WARN; continue }
             if ((Test-Path -LiteralPath $target) -and ((Get-Sha256 $target) -eq (Get-Sha256 $source))) { Write-Log "$($entry.Key) already installed."; continue }
-            Copy-Item -LiteralPath $source -Destination $target -Force
+            Assert-NotOwnerImage $target; Copy-Item -LiteralPath $source -Destination $target -Force
             Write-Log "$($entry.Key) copied to $target."
         }
         else {
             if (!(Test-Path -LiteralPath $target)) { Write-Log "$($entry.Key) not in the game folder." -Level VERBOSE; continue }
             if (!$isOurs) { Write-Log "$target is not a list of ours - left untouched." -Level WARN; continue }
-            Remove-Item -LiteralPath $target
+            Assert-NotOwnerImage $target; Remove-Item -LiteralPath $target
             Write-Log "$($entry.Key) removed from $GamePath."
         }
     }
@@ -211,14 +223,14 @@ try {
         elseif ((Test-Path -LiteralPath $target) -and !$isOurs) { Write-Log "$target is not a list of ours - left untouched." -Level WARN }
         elseif ((Test-Path -LiteralPath $target) -and ((Get-Sha256 $target) -eq (Get-Sha256 $source))) { Write-Log "$mediaList already installed." }
         else {
-            Copy-Item -LiteralPath $source -Destination $target -Force
+            Assert-NotOwnerImage $target; Copy-Item -LiteralPath $source -Destination $target -Force
             Write-Log "$mediaList copied to $target."
         }
     }
     elseif (Test-Path -LiteralPath $target) {
         if (!$isOurs) { Write-Log "$target is not a list of ours - left untouched." -Level WARN }
         else {
-            Remove-Item -LiteralPath $target
+            Assert-NotOwnerImage $target; Remove-Item -LiteralPath $target
             Write-Log "$mediaList removed from $GamePath."
         }
     }
@@ -241,7 +253,7 @@ try {
                 if ((Test-Path -LiteralPath $target) -and !$isOurs) { Write-Log "$target is not a file of ours - left untouched." -Level WARN }
                 elseif ((Test-Path -LiteralPath $target) -and ((Get-Sha256 $target) -eq (Get-Sha256 $source))) { Write-Log "$radialFile already installed." }
                 else {
-                    Copy-Item -LiteralPath $source -Destination $target -Force
+                    Assert-NotOwnerImage $target; Copy-Item -LiteralPath $source -Destination $target -Force
                     Write-Log "$radialFile copied to $target."
                 }
             }
@@ -249,7 +261,7 @@ try {
         elseif (Test-Path -LiteralPath $target) {
             if (!$isOurs) { Write-Log "$target is not a file of ours - left untouched." -Level WARN }
             else {
-                Remove-Item -LiteralPath $target
+                Assert-NotOwnerImage $target; Remove-Item -LiteralPath $target
                 Write-Log "$radialFile removed from $GamePath."
             }
         }
@@ -262,10 +274,18 @@ try {
         $first = Get-Content -LiteralPath $flowTarget -TotalCount 1 -Encoding UTF8 -ErrorAction SilentlyContinue
         if ($first -and ([string]$first).TrimStart([char]0xFEFF).StartsWith('# TruMenu flow')) {
             Write-Log "TruMenu.flow.txt sha256 $(Get-Sha256 $flowTarget)" -Level DEBUG
-            Remove-Item -LiteralPath $flowTarget
+            Assert-NotOwnerImage $flowTarget; Remove-Item -LiteralPath $flowTarget
             Write-Log "TruMenu.flow.txt (a flow of an earlier run) removed from $GamePath."
         }
         else { Write-Log "$flowTarget is not a flow file of ours - left untouched." -Level WARN }
+    }
+
+    # 0.21 the owner's picture: only named in the log, never copied / removed
+    foreach ($own in @(Get-ChildItem -LiteralPath $GamePath -Filter $ownerImagePattern -File -ErrorAction SilentlyContinue)) {
+        Write-Log "$($own.Name) next to tru.exe: the owner's own arachnophobia picture - kept, never touched." -Level VERBOSE
+    }
+    foreach ($own in @(Get-ChildItem -LiteralPath $built -Filter $ownerImagePattern -File -ErrorAction SilentlyContinue)) {
+        Write-Log "$($own.FullName): an owner picture in the build folder is never installed - copy it by hand." -Level WARN
     }
 }
 catch {

@@ -52,8 +52,22 @@ it checks that the rules themselves do what the build report claims):
              records, off unmutes only TruMenu's groups and only when the channel group is the same object and still
              muted (a rebuilt group is left alone) - no volume is ever written.
 
+2026-11-07 TruMenu 0.21 adds six models (section "---- 0.21 arachnophobia" of TruMenu.cpp, M20Draw):
+ 14. spiders   ArKindOf: Match / Exclude parts on the object name (giant = its own kind, generators excluded), a name the
+             object list does not know yet is not cached, the INI list normalised as AiNormList.
+ 15. wobble    ArDrawPictures' quad: centre = spot - bob, |bob| <= amp x size, squash / stretch on the sides, the tilt
+             keeps the side lengths, the longer side = size, a still picture is axis-aligned, flip swaps only the UVs,
+             phases differ per instance.
+ 16. drawmask  ArDrawHook: V1 sets +0x23c = -1 only during the game's draw and puts the value back (one the game wrote
+             meanwhile stays), a spider the game hides is untouched, V2 writes no mask (0x200 + counter), picture-only /
+             off / other instances draw normally.
+ 17. shake     CsShakeStub = the game's strength x ShakeScale / 100; a refused patch group is tried once until switched.
+ 18. labels    one label per reward pot (runtime child with the parent's intro dropped when the placed one is in the walk,
+             the spawned artifact kept), LfNotDrawn (0x800, 0x20, scene entity off, +0x23c | +0x240 == -1).
+ 19. airemove  RunAdRemove's selection (others / nearest / all / intro id) and AdCandidate's filter.
+
 Usage (from the repository root):
-  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all thirteen, exit 1 on a failure
+  ../bin/pyt -t 120 tools/trumenu_quick_check.py            all nineteen, exit 1 on a failure
 """
 import math, random, sys
 
@@ -1007,11 +1021,258 @@ def check_mutemusic():
     return good
 
 
+# ------------------------------------------------------------------------------------------------ 0.21 arachnophobia
+def ar_norm(text):                            # AiNormList: lower case, comma list of a-z 0-9 _ *
+    parts = [p for p in ''.join(c if c.isalnum() or c in '_*' else ',' for c in text.lower()).split(',') if p]
+    return ','.join(parts)
+
+
+class ArKinds:                                # ArKindOf: 1 spider, 3 giant spider, 2 none; cached once the name is known
+    def __init__(self, match='spider,tarantula', exclude='_generator'):
+        self.match, self.exclude, self.cache = ar_norm(match), ar_norm(exclude), {}
+
+    def kind(self, oid, names):
+        if oid in self.cache: return self.cache[oid]
+        name = names.get(oid)
+        if name is None: return 2             # the object list does not know it yet: not cached
+        low = name.lower()
+        hit = any(p and p in low for p in self.match.split(','))
+        if hit and self.exclude and any(p and p in low for p in self.exclude.split(',')): hit = False
+        k = (3 if 'giant' in low else 1) if hit else 2
+        self.cache[oid] = k
+        return k
+
+
+def check_spiders():
+    names = {1: 'giant_albino_tarantula', 2: 'small_albino_spider', 3: 'small_brown_spider', 4: 'spider_generator',
+             5: 'tarantula_generator', 6: 'thrall_a', 7: 'Panther_Thrall', 8: 'bat_enemy', 9: 'ca_rw_artifact'}
+    k = ArKinds()
+    got = {oid: k.kind(oid, names) for oid in names}
+    good = got == {1: 3, 2: 1, 3: 1, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2, 9: 2}
+    late = {}
+    good &= k.kind(10, late) == 2 and 10 not in k.cache            # unknown now ...
+    late[10] = 'giant_brown_spider'
+    good &= k.kind(10, late) == 3                                    # ... a spider once the list knows it
+    k2 = ArKinds('Spider, Tarantula', '')                            # INI spelling, no exclude: generators are spiders
+    good &= k2.match == 'spider,tarantula' and k2.kind(4, names) == 1
+    print('spiders: Match / Exclude on the object name (giant = 3, generators excluded, other enemies none), cached only '
+          'once the name is known, the INI list normalised  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def ar_quad(size, aspect, amp, hz, squash, tilt_deg, phase, t, x, y, mirror, u=1.0, v=1.0):
+    """ArDrawPictures: the four corners and UVs of one picture"""
+    w = 2 * math.pi * hz * t + phase
+    bob = math.sin(w) * amp * size
+    sq = math.sin(2 * w) * squash
+    tilt = math.radians(tilt_deg) * math.sin(0.5 * w + phase)
+    iw, ih = (size, size / aspect) if aspect >= 1 else (size * aspect, size)
+    iw *= 1 + sq
+    ih *= 1 - sq
+    cx, cy, cs, sn = x, y - bob, math.cos(tilt), math.sin(tilt)
+    hx, hy = (-iw / 2, iw / 2, iw / 2, -iw / 2), (-ih / 2, -ih / 2, ih / 2, ih / 2)
+    q = [(cx + hx[k] * cs - hy[k] * sn, cy + hx[k] * sn + hy[k] * cs) for k in range(4)]
+    u0, u1 = (u, 0.0) if mirror else (0.0, u)
+    return q, [(u0, 0.0), (u1, 0.0), (u1, v), (u0, v)], bob, sq, tilt
+
+
+def check_wobble(rng):
+    good = True
+    for _ in range(2000):
+        size, aspect = rng.uniform(16, 600), rng.uniform(0.3, 3)
+        amp, hz, squash, tilt = rng.uniform(0, 0.5), rng.uniform(0, 10), rng.uniform(0, 0.5), rng.uniform(0, 45)
+        x, y, t, phase = rng.uniform(0, 1920), rng.uniform(0, 1080), rng.uniform(0, 600), rng.uniform(0, 6.283)
+        q, uv, bob, sq, tl = ar_quad(size, aspect, amp, hz, squash, tilt, phase, t, x, y, rng.random() < 0.5)
+        mx, my = sum(p[0] for p in q) / 4, sum(p[1] for p in q) / 4
+        good &= abs(mx - x) < 1e-6 and abs(my - (y - bob)) < 1e-6 and abs(bob) <= amp * size + 1e-9
+        top = math.dist(q[0], q[1])
+        side = math.dist(q[1], q[2])
+        iw, ih = (size, size / aspect) if aspect >= 1 else (size * aspect, size)
+        good &= abs(top - iw * (1 + sq)) < 1e-6 and abs(side - ih * (1 - sq)) < 1e-6   # rotation keeps the sides
+        good &= abs(sq) <= squash + 1e-12 and abs(math.degrees(tl)) <= tilt + 1e-9
+        good &= max(iw, ih) <= size + 1e-9                                           # the longer side = size
+    q, uv, *_ = ar_quad(100, 2.0, 0, 1, 0, 0, 0, 3, 500, 300, False)                 # still: axis-aligned 100 x 50
+    good &= [tuple(round(c, 6) for c in p) for p in q] == [(450, 275), (550, 275), (550, 325), (450, 325)]
+    good &= uv == [(0, 0), (1, 0), (1, 1), (0, 1)]
+    q2, uv2, *_ = ar_quad(100, 2.0, 0, 1, 0, 0, 0, 3, 500, 300, True)
+    good &= q2 == q and uv2 == [(1, 0), (0, 0), (0, 1), (1, 1)]                      # mirrored = UVs swapped only
+    ph = {((inst >> 4) * 2654435761 % (1 << 32)) % 6283 for inst in range(0x10000000, 0x10000000 + 64 * 0x40, 0x40)}
+    good &= len(ph) >= 60                                                            # phases differ per instance
+    print('wobble: centre = spot - bob (|bob| <= amp x size), squash / stretch on the sides, the tilt keeps them, '
+          'longest side = size, still picture axis-aligned, flip only swaps the UVs, phases differ  %s'
+          % ('ok' if good else 'FAIL'))
+    return good
+
+
+def ar_draw(inst, hook, thread, logic, game_writes=None):
+    """ArDrawHook: returns (geometry drawn?, mask after, 0x200 set?, counter delta, picture listed?)"""
+    m23c0, count0, listed = inst['m23c'], inst['count'], False
+    def game_draw():                          # 0x5bba90: 0x200 + counter first, then the mask exit
+        inst['f14'] |= 0x200
+        inst['count'] += 1
+        drew = (inst['m23c'] | inst['m240']) != 0xffffffff
+        if game_writes is not None: inst['m23c'] = game_writes        # the game itself writes during the call
+        return drew
+    def result(drew): return drew, inst['m23c'], bool(inst['f14'] & 0x200), inst['count'] - count0, listed
+    if not (hook['hide'] or hook['pic']) or not inst['spider']:
+        return result(game_draw())
+    game_draws = (inst['m23c'] | inst['m240']) != 0xffffffff
+    if game_draws and hook['pic']: listed = True
+    if not game_draws or not hook['hide']:
+        return result(game_draw())
+    if not logic or thread == logic:                                   # V1
+        inst['m23c'] = 0xffffffff
+        drew = game_draw()
+        if inst['m23c'] == 0xffffffff: inst['m23c'] = m23c0
+        return result(drew)
+    inst['f14'] |= 0x200                                               # V2
+    inst['count'] += 1
+    return result(False)
+
+
+def check_drawmask():
+    def spider(m23c=0, m240=0): return {'m23c': m23c, 'm240': m240, 'f14': 0, 'count': 0, 'spider': True}
+    on, pic_only, off = {'hide': True, 'pic': True}, {'hide': False, 'pic': True}, {'hide': False, 'pic': False}
+    good = ar_draw(spider(0x5), on, 7, 7) == (False, 0x5, True, 1, True)                 # V1: no geometry, mask back
+    good &= ar_draw(spider(0x5), on, 7, 7, game_writes=0x9) == (False, 0x9, True, 1, True)   # the game's write stays
+    good &= ar_draw(spider(0xffffffff, 0xffffffff), on, 7, 7) == (False, 0xffffffff, True, 1, False)   # game hides it
+    good &= ar_draw(spider(0x5), on, 9, 7) == (False, 0x5, True, 1, True)                # V2: never written
+    good &= ar_draw(spider(0x5), on, 9, 0) == (False, 0x5, True, 1, True)                # game thread not known: V1
+    good &= ar_draw(spider(0x5), pic_only, 7, 7) == (True, 0x5, True, 1, True)           # picture only: model stays
+    good &= ar_draw(spider(0x5), off, 7, 7) == (True, 0x5, True, 1, False)
+    other = {'m23c': 0, 'm240': 0, 'f14': 0, 'count': 0, 'spider': False}
+    good &= ar_draw(other, on, 7, 7) == (True, 0, True, 1, False)                        # not a spider
+    print('drawmask: V1 sets -1 only during the call and puts the game\'s value back (a value the game wrote meanwhile '
+          'stays), a spider the game hides is left alone, V2 writes no mask (0x200 + counter as the game), picture-only / '
+          'off / other instances draw normally  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def check_shake():
+    good = True
+    for game in (0.0, 0.37, 1.0, 2.5):
+        for pct in range(0, 101):
+            scale = pct / 100.0                                           # g_csScaleF
+            stub = game * scale                                           # the game's 0x5eb460, then fmul
+            good &= abs(stub - game * pct / 100.0) < 1e-12
+        good &= game * (100 / 100.0) == game and game * 0.0 == 0.0
+    group = {'on': False, 'refused': False, 'tries': 0}
+    def apply(want, ok=True):                                             # M21PatchGroup's retry rule
+        if want == group['on']: return
+        if want:
+            if group['refused']: return
+            group['tries'] += 1
+            if not ok:
+                group['refused'] = True
+                return
+            group['on'] = True
+        else:
+            group['on'] = False
+    for _ in range(60): apply(True, ok=False)                             # 60 frames of a foreign patch: one try
+    good &= group['tries'] == 1 and not group['on']
+    group['refused'] = False                                              # the item was switched again
+    apply(True)
+    apply(True)
+    apply(False)
+    good &= group['tries'] == 2 and not group['on']
+    print('shake: strength x ShakeScale / 100 (100 = the game\'s own, no patch; 0 = none), a refused patch is tried once '
+          'until switched again  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def lf_not_drawn(i):                          # LfNotDrawn
+    if i['f14'] & 0x800: return 1
+    if i['f14'] & 0x20: return 2
+    off = bool(i['f18'] & 0x400000) or bool(i['objflag'] & 0x40000000)
+    if off and not (i['f1c'] & 0x200): return 3
+    if (i['m23c'] | i['m240']) == 0xffffffff: return 4
+    return 0
+
+
+def lf_labels(insts):
+    """M20Draw 0.21: placed intros registered first (also hidden ones), hidden instances get no label, a runtime child
+    whose placed instance of the same kind is in the walk is dropped"""
+    placed, marks, hidden = [], [], 0
+    for i in insts:
+        is_placed = not i['intro'] or i['id'] == i['intro_id']
+        if i['intro'] and is_placed: placed.append((i['intro'], i['kind']))
+        if lf_not_drawn(i):
+            hidden += 1
+            continue
+        marks.append((i['name'], 0 if is_placed else i['intro'], i['kind']))
+    kept = [m for m in marks if not (m[1] and (m[1], m[2]) in placed)]
+    return [m[0] for m in kept], hidden, len(marks) - len(kept)
+
+
+def check_labels():
+    def inst(name, kind, intro, iid, intro_id, **f):
+        d = {'name': name, 'kind': kind, 'intro': intro, 'id': iid, 'intro_id': intro_id, 'f14': 0, 'f18': 0, 'f1c': 0,
+             'objflag': 0, 'm23c': 0, 'm240': 0}
+        d.update(f)
+        return d
+    pot = inst('pot 10810', 'pot', 0xA000, 10810, 10810)
+    copy = inst('pot 0x40000017', 'pot', 0xA000, 0x40000017, 10810)          # BirthObject: the parent's intro
+    spawned = inst('tp_rw_artifact_spawned', 'artifact', 0xA000, 0x40000018, 10810)
+    other = inst('pot 9854', 'pot', 0xB000, 9854, 9854)
+    good = lf_labels([pot, copy, spawned, other]) == (['pot 10810', 'tp_rw_artifact_spawned', 'pot 9854'], 0, 1)
+    good &= lf_labels([copy, pot]) == (['pot 10810'], 0, 1)                   # order in the list does not matter
+    good &= lf_labels([copy]) == (['pot 0x40000017'], 0, 0)                   # no placed one in the walk: the child stays
+    broken = dict(pot, f14=0x800)
+    good &= lf_labels([broken, copy]) == ([], 1, 1)                           # broken pot hidden: its copy not labelled
+    picked = inst('ma_rw_artifact 9856', 'artifact', 0xC000, 9856, 9856, f14=0x800)
+    good &= lf_labels([picked]) == ([], 1, 0)                                 # picked up (hidden): no label in mid air
+    cases = [({'f14': 0x800}, 1), ({'f14': 0x20}, 2), ({'f18': 0x400000}, 3), ({'objflag': 0x40000000}, 3),
+             ({'f18': 0x400000, 'f1c': 0x200}, 0), ({'m23c': 0xffffffff, 'm240': 0xffffffff}, 4),
+             ({'m23c': 0xffffffff}, 4), ({'m23c': 0xffff0000, 'm240': 0x0000ffff}, 4),   # the OR is tested (0x5bbb23)
+             ({'m23c': 0x1, 'm240': 0x2}, 0), ({}, 0)]
+    for fields, want in cases:
+        good &= lf_not_drawn(inst('x', 'artifact', 0, 1, 1, **fields)) == want
+    print('labels: one label per reward pot (the runtime copy with the parent\'s intro dropped, the spawned artifact '
+          'kept, a lone copy kept), hidden / collected / being removed / scene-entity off / masks -1 -> no label  %s'
+          % ('ok' if good else 'FAIL'))
+    return good
+
+
+def ad_select(cands, mode, want=None):        # RunAdRemove: which candidates are flagged, which one is kept
+    if not cands: return [], None
+    nearest = min(range(len(cands)), key=lambda i: cands[i]['d2'])
+    take = []
+    for i, c in enumerate(cands):
+        if mode == 'nearest': t = i == nearest
+        elif mode == 'others': t = i != nearest
+        elif mode == 'all': t = True
+        else: t = c['intro'] == want
+        if t: take.append(c['intro'])
+    kept = cands[nearest]['intro'] if mode == 'others' else None
+    return take, kept
+
+
+def check_airemove():
+    def c(intro, d): return {'intro': intro, 'd2': d * d}
+    cands = [c(101, 900), c(102, 300), c(103, 1200)]
+    good = ad_select(cands, 'others') == ([101, 103], 102) and ad_select(cands, 'nearest') == ([102], None)
+    good &= ad_select(cands, 'all') == ([101, 102, 103], None) and ad_select(cands, 'id', 103) == ([103], None)
+    good &= ad_select(cands, 'id', 999) == ([], None) and ad_select([], 'others') == ([], None)
+    good &= ad_select([c(7, 50)], 'others') == ([], 7)                        # the only one is kept
+    def candidate(e):                                                          # AdCandidate
+        return bool(e['brain'] and e['family'] == 14 and not e['lara'] and not (e['f14'] & (0x20 | 0x20000 | 0x400))
+                    and 'doppel' not in e['name'])
+    base = {'brain': 1, 'family': 14, 'lara': False, 'f14': 0, 'name': 'thrall_a'}
+    good &= candidate(base) and not candidate(dict(base, family=1)) and not candidate(dict(base, brain=0))
+    good &= not candidate(dict(base, f14=0x20)) and not candidate(dict(base, f14=0x400))
+    good &= not candidate(dict(base, lara=True)) and not candidate(dict(base, name='doppelganger_casual'))
+    print('airemove: others = all but the nearest to Lara, nearest, all, one intro id; only AI enemies of family 14, not '
+          'Lara, not flagged (0x20 / 0x20000 / 0x400), not the doppelganger  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
                check_burst(), check_bits(), check_goload(), check_waitunit(), check_forget(),   # 0.20: + three
-               check_soundlist(), check_mutemusic()]                                         # 0.20.1: + two
+               check_soundlist(), check_mutemusic(),                                         # 0.20.1: + two
+               check_spiders(), check_wobble(rng), check_drawmask(), check_shake(), check_labels(),   # 0.21: + six
+               check_airemove()]
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 
