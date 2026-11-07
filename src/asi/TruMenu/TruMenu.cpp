@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -17335,6 +17335,328 @@ bool RunHideCursor(const char *arg, char *o, size_t n) {
 }
 // ---- end of 0.21.1 ai.kill ----
 
+// ---- 0.21.4 hall02 counter (Lukas live 2026-11-07, docs\Befund-Hall02-Zaehler-Drift-0711.md E2 / E5) ----
+// Report docs\Befund-TruMenu-0214-0711.md; every byte check of this section is pinned in work\asi\menu0214\
+// precheck_0214.txt (tools/pe_bytes_check.py on the Steam exe); research dumps work\m0214_0711\dis_*.txt.
+// The drift: checkpoint 11258 stores pre-spawned tutorial thralls; a checkpoint restore builds them from their save
+// blocks (runtime intro >= 0x40000000 = save kind 1, 0x5560b6) without the generator, so the generator script 22809 f0
+// never sets their thrall-script int +8 = 2; their death message vthrall_dead carries +8 = 0 and the dispatcher 11270
+// (script 24540 f0) counts only value 2 - population (sticky 0:11270 key 17287) stays at the number of restored thralls.
+// Root cause (docs\Befund-Hall02-TU-Vergleich-0711.md): a PC data bug - the intro data of generator 10028 were
+// mis-converted (it spawns before the tutorial starts), the Xbox never has thralls in checkpoint 11258. The fix belongs
+// into the data; TruMenu only offers the rescue for saves that already hold them (fix.hall02) and the measurement
+// (thrall.scriptval) - no restore-time safety net (E3 dropped: it would imitate behaviour the Xbox does not have).
+// Where +8 lives (the game's own access path, proven):
+//   * the instance's script object reference is [inst+0x60]: the generator's spawn 0x78123c (birth helper 0x780a90 ->
+//     INSTANCE_BirthObjectNoParent 0x780abb) hands [new instance+0x60] to the OnSpawn sender 0x798770 (0x781342: the
+//     event's one argument, binder slot [0x105b754] written 0x7b4bda); the death event goes to the same [inst+0x60]
+//     (0x66c31f -> 0x4b0850).
+//   * script 22809 f0 (work\hall02wall_0711\dis_22809.txt): op0a 0 (the argument) / op7e cast to 22813 / op30 into
+//     member +4, then op10 4 (that reference R), op14 8, op03 2, op2f = "R.+8 = 2". The interpreter (dispatch 0x57ceb4,
+//     jump table 0x57e52c = opcode - 1): op14 (0x57e578 -> 0x57d04b) = address [R+0xc] + 8, 0 when R or [R+0xc] is 0
+//     (0x57d040); op2f (0x57e5e4 -> 0x57d5bb) stores the u32 only to a non-zero address; op7e (0x57e720 -> 0x57e202)
+//     walks the class chain [R+8]. So the thrall's int +8 = the u32 at [[inst+0x60]+0xc]+8 - only read by TruMenu,
+//     and only when both pointers are non-zero (as the game's op14).
+//   * thrall script 22813 (members +8 int, +12, +16 messagechannel; dis_22813.txt f0: op0e 8 -> channel.f2
+//     ("vthrall_dead", +8)) - +8 is meaningful only for object 1004 viking_thrall_tutorial_dlc2_; for other generator
+//     enemies thrall.scriptval prints the raw u32 marked "other script".
+// fix.hall02 (E2, game thread, right / X twice): only when Lara's stream unit is dlc_yggdrasil_hall02, sticky 0:11270
+//   10029 (broken) exists and is 0 and no object-1004 instance is alive (alive = present ([inst+0x44] != 0), no kill
+//   flag +0x14 & 0x20, its brain not in Death / LandDeath / DrownDeath / DeferredInstantDie - the four whose Enter fires
+//   the count event; RegenerateDeath counts as alive; no readable brain: hidden +0x14 & 0x800 = gone, else alive). Then
+//   tutorial 18509 = 2 when below 2, population 17287 = 0 - both through sticky.set (the game's write + change
+//   notification, old / new logged). The dispatcher re-checks only in f1 (arena trigger 11268 enter / leave, a counted
+//   death): the answer says to walk back / into trigger 11268 (live 15:56 / 16:20), with its distance, and switches the
+//   debug view layers Trigger + Trigger-Namen on (read-only drawing) when [Debug] Enabled.
+// thrall.scriptval (E5, read only): every object-1004 instance (and every generator AI enemy) with intro, runtime
+//   (signed [inst+0x58] >= 0x40000000, the save rule 0x5560b6) / placed, alive / state and +8 - expected live: restored
+//   0, generator-born 2. "Present" = [inst+0x44] != 0: the allocation sets it from the counter [0xd98d58]++ (0x5b2f20),
+//   ReallyRemoveInstance clears it (0x5bc6e9, ebx = 0 from 0x5bc4e6).
+// ======================================================================================================================
+const DWORD kH2Dispatcher = 11270, kH2Trigger = 11268, kH2ScriptRef = 0x60, kH2ScriptData = 0xc, kH2ThrallInt = 8;
+const LONG kH2RuntimeIntro = 0x40000000;
+const WORD kH2KeyPopulation = 17287, kH2KeyDeaths = 8914, kH2KeyTutorial = 18509, kH2KeyBroken = 10029;
+const int kH2ThrallObject = 1004;
+const char *const kH2ThrallName = "viking_thrall_tutorial_dlc2_";
+const char *const kH2Unit = "dlc_yggdrasil_hall02";
+const DvCheck kH2Checks[] = {
+    {0x0057ce95, "8b6c243c 8b450c 8b18 83c004 89450c 8bc3 c1e818"},   // interpreter: next word, opcode = word >> 24
+    {0x0057ceb4, "3d84000000 77da ff24852ce55700"},              // .. jump table 0x57e52c (opcode - 1)
+    {0x0057e578, "4bd05700"},                                    // op14 -> 0x57d04b
+    {0x0057d040, "c70000000000 e94afeffff 8b16 8b0c97 85c9 8d0497 74e9 8b490c 85c9 74e2 81e3ffffff00 03d9 8918"},   // op14
+    {0x0057e5e4, "bbd55700"},                                    // op2f -> 0x57d5bb
+    {0x0057d5bb, "8b06 8b0c87 83c0ff 8906 8b0487 85c0 7402 8908 8306ff"},   // op2f: u32 store, address 0 skipped
+    {0x0057e720, "02e25700"},                                    // op7e -> 0x57e202 (cast)
+    {0x0057e202, "8b450c 8b10 83c004 89450c 8b0e 8b048f 85c0 8d0c8f"},
+    {0x0057e21d, "8b4008 85c0 741d 3bc2 7411 8b4008 8b4018 85c0 75f2"},   // .. class [R+8], base chain
+    {0x0078123c, "53 e84ef8ffff"},                               // generator spawn -> 0x780a90
+    {0x00780abb, "e830c6e3ff"},                                  // .. INSTANCE_BirthObjectNoParent 0x5bd0f0
+    {0x00781342, "8b4650 8b4860 8b5360 894c2434 52 8d4c2438 e817740100"},   // OnSpawn(new [inst+0x60]) 0x798770
+    {0x00798792, "8b1554b70501"},                                // .. event slot [0x105b754]
+    {0x007b4bda, "891554b70501"},                                // .. bound by the generator class binder
+    {0x0066c31f, "8b4760 85c0 7409 50 e82445e4ff"},              // death event to [inst+0x60] (0x4b0850)
+    {0x005560b6, "817e5800000040 7d0e"},                         // save: intro >= 0x40000000 = spawned (kind 1)
+    {0x005b2f20, "8b15588dd900 b901000000 895044 010d588dd900 010d508dd900"},   // [inst+0x44] = counter++
+    {0x005bc4e0, "53 56 8b74240c 33db 395e60"},                  // ReallyRemoveInstance: ebx = 0 ..
+    {0x005bc6e9, "895e44"},                                      // .. [inst+0x44] = 0
+};
+bool g_h2Ok = false;
+char g_h2Why[96] = "not checked";
+// the address of the thrall-script int +8 of an instance: [[inst+0x60]+0xc]+8 (0 = no script / no member data)
+DWORD H2ValueAddr(DWORD inst) {
+    DWORD ref = 0, data = 0;
+    if (!ReadDword(inst + kH2ScriptRef, &ref) || !ref || !ReadDword(ref + kH2ScriptData, &data) || !data) return 0;
+    return data + kH2ThrallInt;
+}
+// object 1004 viking_thrall_tutorial_dlc2_ (id and name, the game's object table)
+bool H2IsThrall(DWORD inst) {
+    DWORD object = 0, oid = 0;
+    if (!ReadDword(inst + 0x10, &object) || !object || !ReadDword(object + 0x14, &oid) ||
+        static_cast<int>(oid & 0xffff) != kH2ThrallObject)
+        return false;
+    char name[64];
+    return ObjectName(kH2ThrallObject, name, sizeof(name)) && !_stricmp(name, kH2ThrallName);
+}
+// alive for the hall02 counter (see the section text); *state = a short reason / the death state's name
+bool H2Alive(DWORD inst, const char **state) {
+    DWORD own = 0, flags = 0;
+    *state = "gone";
+    if (!ReadDword(inst + 0x44, &own) || !own) return false;
+    if (ReadDword(inst + 0x14, &flags) && (flags & 0x20)) { *state = "kill flag"; return false; }
+    const DWORD brain = AiBrainOf(inst);
+    if (brain) {
+        const char *death = nullptr;
+        if (AkDying(brain, &death)) { *state = death; return false; }
+        *state = "alive";
+        return true;
+    }
+    if (flags & 0x800) { *state = "hidden, no brain"; return false; }
+    *state = "alive (no brain read)";
+    return true;
+}
+struct H2Thrall { DWORD inst, addr, value; LONG intro; bool alive; const char *state; };
+// the object-1004 instances (at most max); *alive = how many are alive
+int H2Scan(H2Thrall *out, int max, int *alive) {
+    int k = 0;
+    *alive = 0;
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096 && k < max; ++guard) {
+        DWORD next = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        if (H2IsThrall(inst)) {
+            H2Thrall &t = out[k++];
+            DWORD intro = 0;
+            ReadDword(inst + 0x58, &intro);
+            t.inst = inst;
+            t.intro = static_cast<LONG>(intro);
+            t.alive = H2Alive(inst, &t.state);
+            t.addr = H2ValueAddr(inst);
+            t.value = 0xffffffffu;
+            if (t.addr && !ReadDword(t.addr, &t.value)) t.addr = 0;
+            if (t.alive) ++*alive;
+        }
+        inst = next;
+    }
+    return k;
+}
+// one int / bool sticky of the dispatcher 11270 (existing entries only, the 0.21.1 read-only find); false = none
+bool H2Sticky(WORD key, int type, LONG *v) {
+    StHit hits[3];
+    char why[96], text[32];
+    const int k = StFind(0, kH2Dispatcher, key, hits, why, sizeof(why));
+    for (int i = 0; i < k; ++i)
+        if (hits[i].type == type && StValue(hits[i], text, sizeof(text))) { *v = atol(text); return true; }
+    return false;
+}
+// the arena trigger 11268: its live position and distance from Lara ("" when it is not loaded)
+void H2TriggerText(char *o, size_t n) {
+    o[0] = 0;
+    DWORD inst = 0, player = 0;
+    float lara[3], p[3];
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0, intro = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        if (ReadDword(inst + 0x58, &intro) && intro == kH2Trigger && ReadFloats(inst + kInstancePosition, p, 3) &&
+            DvFinite(p, 3)) {
+            const float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2];
+            Out(o, n, "%.0f / %.0f / %.0f, %.0fu", static_cast<double>(p[0]), static_cast<double>(p[1]),
+                static_cast<double>(p[2]), static_cast<double>(sqrtf(dx * dx + dy * dy + dz * dz)));
+            return;
+        }
+        inst = next;
+    }
+}
+
+// ---- fix.hall02 (E2, game thread, queued) ----
+void ValFixHall02(char *o, size_t n) {
+    LONG pop = 0, tut = 0, dead = 0, broken = 0;
+    const bool hp = H2Sticky(kH2KeyPopulation, 0, &pop), ht = H2Sticky(kH2KeyTutorial, 0, &tut),
+               hd = H2Sticky(kH2KeyDeaths, 0, &dead), hb = H2Sticky(kH2KeyBroken, 1, &broken);
+    if (!g_h2Ok) { Out(o, n, "%s", g_h2Why); return; }
+    if (!hp && !hb) { Out(o, n, "dispatcher 11270 has no sticky values (not in DLC 2 / fight not started)"); return; }
+    Out(o, n, "11270: population %s%ld, deathcount %s%ld, tutorial %s%ld, broken %s%ld", hp ? "" : "-", pop, hd ? "" : "-",
+        dead, ht ? "" : "-", tut, hb ? "" : "-", broken);
+}
+bool RunFixHall02(const char *, char *o, size_t n) {
+    const bool de = g_qbLang == 0;
+    if (!g_h2Ok) { Out(o, n, "disabled: pre-check failed (%s)", g_h2Why); return false; }
+    char why[200];
+    if (!LabelWorldReady(why, sizeof(why))) { Out(o, n, "fix.hall02: %s", why); return false; }
+    char unit[48];
+    PosLaraUnit(unit, sizeof(unit));
+    if (_stricmp(unit, kH2Unit)) {
+        Out(o, n, de ? "fix.hall02 abgelehnt: Lara ist in %s, nicht in %s" : "fix.hall02 refused: Lara is in %s, not in %s",
+            unit[0] ? unit : "-", kH2Unit);
+        Log(1, "fix.hall02 refused (src=%s): Lara's unit '%s' is not %s", ShotSource("fix.hall02"), unit, kH2Unit);
+        return false;
+    }
+    LONG pop = 0, tut = 0, dead = 0, broken = 0;
+    const bool hp = H2Sticky(kH2KeyPopulation, 0, &pop), ht = H2Sticky(kH2KeyTutorial, 0, &tut),
+               hb = H2Sticky(kH2KeyBroken, 1, &broken);
+    H2Sticky(kH2KeyDeaths, 0, &dead);
+    if (!hp || !ht || !hb) {
+        Out(o, n, de ? "fix.hall02 abgelehnt: Dispatcher 11270 hat noch keine Werte (population %s, tutorial %s, broken %s)"
+                     : "fix.hall02 refused: dispatcher 11270 has no values yet (population %s, tutorial %s, broken %s)",
+            hp ? "ok" : "-", ht ? "ok" : "-", hb ? "ok" : "-");
+        Log(1, "fix.hall02 refused (src=%s): %s", ShotSource("fix.hall02"), o);
+        return false;
+    }
+    if (broken) {
+        Out(o, n, de ? "fix.hall02 abgelehnt: Wand schon gebrochen (broken 1)" : "fix.hall02 refused: wall already broken "
+            "(broken 1)");
+        Log(1, "fix.hall02 refused (src=%s): broken 1, population %ld, deathcount %ld, tutorial %ld",
+            ShotSource("fix.hall02"), pop, dead, tut);
+        return false;
+    }
+    H2Thrall th[64];
+    int alive = 0;
+    const int k = H2Scan(th, 64, &alive);
+    if (alive) {
+        char list[300] = "";
+        size_t used = 0;
+        for (int i = 0; i < k; ++i)
+            if (th[i].alive && used < sizeof(list) - 40)
+                LabelAdd(list, sizeof(list), &used, "%s%ld (%s)", used ? ", " : "", th[i].intro, th[i].state);
+        Out(o, n, de ? "fix.hall02 abgelehnt: %d Tutorial-Thrall(s) leben noch: %s" : "fix.hall02 refused: %d tutorial "
+            "thrall(s) still alive: %s", alive, list);
+        Log(1, "fix.hall02 refused (src=%s): %d of %d object-%d thrall(s) alive (RegenerateDeath counts as alive): %s; "
+            "population %ld, deathcount %ld, tutorial %ld", ShotSource("fix.hall02"), alive, k, kH2ThrallObject, list, pop,
+            dead, tut);
+        return false;
+    }
+    char r[160] = "", tutText[64] = "", popText[64] = "";
+    bool ok = true;
+    if (tut < 2) {
+        ok = RunStickySet("int 11270 18509 2", r, sizeof(r));
+        Out(tutText, sizeof(tutText), "tutorial %ld -> 2%s", tut, ok ? "" : " FAILED");
+    } else {
+        Out(tutText, sizeof(tutText), "tutorial %ld (kept)", tut);
+    }
+    if (ok && pop != 0) {
+        ok = RunStickySet("int 11270 17287 0", r, sizeof(r));
+        Out(popText, sizeof(popText), "population %ld -> 0%s", pop, ok ? "" : " FAILED");
+    } else if (ok) {
+        Out(popText, sizeof(popText), "population 0 (kept)");
+    }
+    char trg[80];
+    H2TriggerText(trg, sizeof(trg));
+    char shown[16] = "";
+    if (ok && g_debugEnabled) {                // read-only drawing: the trigger volume and its name label
+        char d[64];
+        const bool v = DvSet(kDvVolume, true, "fix.hall02", d, sizeof(d)), l = DvSet(kDvTrgLabels, true, "fix.hall02", d,
+                                                                                      sizeof(d));
+        if (v && l) strcpy_s(shown, sizeof(shown), "shown");
+    }
+    Log(1, "fix.hall02 (src=%s): Lara in %s, broken 0, %s, %s, deathcount %ld; %d object-%d thrall(s), none alive; next: "
+        "walk back / into the arena trigger 11268 (%s) - the dispatcher checks only on enter / leave; debug view "
+        "Trigger + Trigger-Namen %s", ShotSource("fix.hall02"), kH2Unit, tutText, popText, dead, k, kH2ThrallObject,
+        trg[0] ? trg : "not loaded", shown[0] ? "switched on" : "unchanged");
+    if (!ok) { Out(o, n, "fix.hall02: sticky.set failed (%s) - %s / %s", r, tutText, popText); return false; }
+    Out(o, n, de ? "hall02-Zaehler repariert (%s, %s): jetzt einmal durch den Arena-Trigger 11268 zurueck- oder "
+                   "hineinlaufen (Pruefung nur beim Betreten / Verlassen)%s%s%s"
+                 : "hall02 counter repaired (%s, %s): now walk back through / into the arena trigger 11268 once (it "
+                   "checks only on enter / leave)%s%s%s",
+        popText, tutText, trg[0] ? (de ? "; Trigger bei " : "; trigger at ") : "", trg,
+        shown[0] ? (de ? ", sichtbar (Trigger + Trigger-Namen an)" : ", shown (Trigger + names on)") : "");
+    return true;
+}
+
+// ---- thrall.scriptval (E5, read only, any thread) ----
+void ValThrallScript(char *o, size_t n) {
+    if (!g_h2Ok) { Out(o, n, "%s", g_h2Why); return; }
+    H2Thrall th[64];
+    int alive = 0, two = 0, zero = 0, other = 0, none = 0;
+    const int k = H2Scan(th, 64, &alive);
+    for (int i = 0; i < k; ++i) {
+        if (!th[i].addr) ++none;
+        else if (th[i].value == 2) ++two;
+        else if (th[i].value == 0) ++zero;
+        else ++other;
+    }
+    LONG pop = 0;
+    const bool hp = H2Sticky(kH2KeyPopulation, 0, &pop);
+    Out(o, n, "object-%d thralls %d (alive %d): +8 = 2 x%d, 0 x%d, other x%d, no script %d; population %s%ld",
+        kH2ThrallObject, k, alive, two, zero, other, none, hp ? "" : "-", pop);
+}
+bool RunThrallScript(const char *, char *o, size_t n) {
+    if (!g_h2Ok) { Out(o, n, "disabled: pre-check failed (%s)", g_h2Why); return false; }
+    H2Thrall th[64];
+    int alive = 0;
+    const int k = H2Scan(th, 64, &alive);
+    char list[440] = "";
+    size_t used = 0;
+    for (int i = 0; i < k && used < sizeof(list) - 60; ++i) {
+        if (th[i].addr)
+            LabelAdd(list, sizeof(list), &used, "%s%ld %s %s +8=%lu", used ? ", " : "", th[i].intro,
+                     th[i].intro >= kH2RuntimeIntro ? "runtime" : "placed", th[i].state, th[i].value);
+        else
+            LabelAdd(list, sizeof(list), &used, "%s%ld %s no script", used ? ", " : "", th[i].intro, th[i].state);
+    }
+    char others[300] = "";                   // other generator enemies: raw +8 (meaning only for script 22813)
+    size_t usedO = 0;
+    DWORD player = 0, inst = 0;
+    ReadDword(kPlayerPtr, &player);
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0, brain = 0, intro = 0, object = 0, oid = 0, v = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        if (!H2IsThrall(inst) && AdCandidate(inst, player, &brain) && !strcmp(AkStory(inst, brain), "generator") &&
+            usedO < sizeof(others) - 70) {
+            ReadDword(inst + 0x58, &intro);
+            char name[64];
+            if (!ReadDword(inst + 0x10, &object) || !ReadDword(object + 0x14, &oid) ||
+                !ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name)))
+                Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+            const DWORD a = H2ValueAddr(inst);
+            if (a && ReadDword(a, &v)) LabelAdd(others, sizeof(others), &usedO, "%s%s %ld raw +8=%lu", usedO ? ", " : "",
+                                                name, static_cast<LONG>(intro), v);
+            else LabelAdd(others, sizeof(others), &usedO, "%s%s %ld no script", usedO ? ", " : "", name,
+                          static_cast<LONG>(intro));
+        }
+        inst = next;
+    }
+    char sum[200];
+    ValThrallScript(sum, sizeof(sum));
+    Log(1, "thrall.scriptval (src=%s): %s; thrall-script int +8 = [[inst+0x60]+0xc]+8 (expected: restored 0, generator-born "
+        "2): %s; other generator enemies (other script, raw): %s", ShotSource("thrall.scriptval"), sum, k ? list : "none",
+        usedO ? others : "none");
+    Out(o, n, "%s (details in TruMenu.log)", sum);
+    return true;
+}
+void M214Check() {
+    DWORD at = 0;
+    g_h2Ok = g_akOk && g_stOk && g_unitOk && DvChecks(kH2Checks, sizeof(kH2Checks) / sizeof(kH2Checks[0]), &at);
+    if (g_h2Ok) Out(g_h2Why, sizeof(g_h2Why), "ok");
+    else Out(g_h2Why, sizeof(g_h2Why), !g_akOk || !g_stOk || !g_unitOk ? "needs the 0.21.1 ai.kill / sticky / unit checks"
+                                                                        : "script / instance code differs at 0x%08lx", at);
+    Log(g_h2Ok ? 1 : 0, "0.21.4: hall02 counter %s (%d checks): fix.hall02 (rescue for saves whose checkpoint 11258 "
+        "holds tutorial thralls), thrall.scriptval", g_h2Why, static_cast<int>(sizeof(kH2Checks) / sizeof(kH2Checks[0])));
+}
+// ---- end of 0.21.4 hall02 counter ----
+
 // ======================================================================================================================
 // 0.10.5 [Shot]: in-game screenshots and Claude marks (owner wish 2026-11-05: the main session gets named shots in the
 // run folder instead of ShareX files without names / with wrong times).
@@ -19193,6 +19515,14 @@ const Item kItems[] = {
                           "the LP number ([Debug] EnemyHpBar)", false, ValHpBar, RunHpBar},
     {"menu.hidecursor", "bool", "0.21.1: no mouse cursor over the game picture while the menu is closed ([Menu] HideCursor, "
                                 "kept in TruMenu.ini)", false, ValHideCursor, RunHideCursor},
+    // 0.21.4 (section "0.21.4 hall02 counter", docs\Befund-Hall02-Zaehler-Drift-0711.md)
+    {"fix.hall02", "action", "0.21.4: hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial "
+                             "thralls (PC data bug of generator 10028) - only in dlc_yggdrasil_hall02 with the wall "
+                             "unbroken and no tutorial thrall alive: dispatcher 11270 population = 0 (tutorial 2 if "
+                             "below); then walk through the arena trigger 11268", true, ValFixHall02, RunFixHall02},
+    {"thrall.scriptval", "action", "0.21.4: the thrall-script int +8 of every tutorial thrall (object 1004) and generator "
+                                   "enemy into TruMenu.log (restored 0 / generator-born 2), read only", false,
+     ValThrallScript, RunThrallScript},
 };
 
 const Item *FindItem(const char *id) {
@@ -20993,6 +21323,7 @@ const char *RadialWhy(const RadItem &e) {
     }
     if (!_strnicmp(id, "sticky.", 7) && !g_stOk) return g_stWhy;     // 0.21.1
     if (!_strnicmp(id, "phys.", 5) && !g_phOk) return g_phWhy;
+    if ((!_stricmp(id, "fix.hall02") || !_stricmp(id, "thrall.scriptval")) && !g_h2Ok) return g_h2Why;   // 0.21.4
     if (!_strnicmp(id, "arachno.", 8) || !_strnicmp(id, "cam.", 4)) {   // 0.21: byte checks of the part
         const char *m21Why = M21RadWhy(id);
         if (m21Why[0]) return m21Why;
@@ -22941,6 +23272,12 @@ const QbRow kQbTests[] = {
     {"Letzte laden + hin", "Load the last + go", "pos.goload", "last", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Aktiver Checkpoint", "Active checkpoint", "dbg.cpgo", "active", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
+    // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
+    {"hall02-Zaehler (Tutorial-Kampf)", "hall02 counter (tutorial fight)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
+    {"hall02-Zaehler reparieren", "repair hall02 counter", "fix.hall02", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Thrall-Skriptwert +8 ins Log", "Thrall script value +8 to log", "thrall.scriptval", "", kQbAction, -1, kQcNone, 0,
+     kQbGrey, 0},
 };
 #define QB_PAGE(de, en, rows, special) {de, en, rows, static_cast<int>(sizeof(rows) / sizeof(rows[0])), special}
 const QbPage kQbPages[] = {
@@ -23800,6 +24137,19 @@ void PageAi() {
     ImGui::SameLine();
     if (TmButton("hall02: tutorial = 2  [sticky.set 11270 18509 2]###sthall2")) QueueItem("sticky.set", "11270 18509 2");
     if (!g_stOk) ImGui::EndDisabled();
+    // 0.21.4 hall02 counter (section "0.21.4 hall02 counter"): the checked rescue, the +8 values
+    ImGui::SeparatorText("hall02 counter / hall02-Zaehler  [fix.hall02, thrall.scriptval] (0.21.4)");
+    if (!g_h2Ok) ImGui::BeginDisabled();
+    if (TmButton("repair (checked) / reparieren (geprueft)###h2fix")) QueueItem("fix.hall02", "");
+    ImGui::SameLine();
+    if (TmButton("thrall script +8 -> log###h2val")) QueueItem("thrall.scriptval", "");
+    if (!g_h2Ok) ImGui::EndDisabled();
+    char h2a[200], h2b[200];
+    ValFixHall02(h2a, sizeof(h2a));
+    ValThrallScript(h2b, sizeof(h2b));
+    ImGui::TextWrapped("%s. %s. For saves whose checkpoint 11258 already holds tutorial thralls (PC data bug of "
+                       "generator 10028): after the repair walk back through / into the arena trigger 11268 (it checks "
+                       "only on enter / leave).", h2a, h2b);
     // 0.21 ai.remove: the game's despawn (hide, sense manager, generator, kill flag; the game's sweep removes them)
     ImGui::SeparatorText("Remove AI enemies / KI-Gegner entfernen  [ai.remove] (0.21)");
     if (!g_adOk) ImGui::BeginDisabled();
@@ -27255,6 +27605,8 @@ void Start(HMODULE self) {
     g_spawnOk = SpawnCheck();
     M211Check();                              // 0.21.1 ai.kill / sticky / room check / physics / spawn (precheck_0211.txt;
                                               // after SpawnCheck: the enemy spawn takes its path)
+    M214Check();                              // 0.21.4 hall02 counter (precheck_0214.txt; after M211Check: needs
+                                              // the ai.kill death states and the sticky store)
     _snprintf_s(g_radFilePath, sizeof(g_radFilePath), _TRUNCATE, "%sTruMenu.radial.txt", g_exeDir);
     _snprintf_s(g_radTourPath, sizeof(g_radTourPath), _TRUNCATE, "%sTruMenu.tour.txt", g_exeDir);   // 0.10.1
     if (g_radEnabled) {

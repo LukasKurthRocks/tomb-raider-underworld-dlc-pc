@@ -42,6 +42,17 @@ released) and adds four (docs/Befund-TruMenu-0213-0711.md):
   footer    the bar's second footer line "X: ausfuehren  Y: Favorit   View + Start: zu" (EN), kept under a result.
   sndwidth  DrawSoundList with AlwaysAutoResize: the 0.21 right-corner shift kept the widest width ever, 0.21.3 aligns
             to this frame's widest row (left corners unchanged, a too long row cut at 70 %).
+2026-11-07 TruMenu 0.21.4 adds three (docs/Befund-TruMenu-0214-0711.md, docs/Befund-Hall02-Zaehler-Drift-0711.md):
+  h2drift   the dispatcher 11270 counter (24540 f3 / f4 / f1) with the thrall int +8 (generator birth = 2, checkpoint
+            restore = 0): the live session 15:49 - 15:53 (4 pre-spawned thralls in checkpoint 11258, two deaths) ends
+            with population 4 and the wall closed - exactly the measured lines.
+  fixhall02 RunFixHall02: refused in another unit, without dispatcher values, with the wall broken, with a living
+            object-1004 thrall (alive / Regenerate / RegenerateDeath / no brain but not hidden); allowed when every one is
+            in Death / LandDeath / DrownDeath / DeferredInstantDie / kill flag / gone / hidden without a brain; tutorial
+            2 only when below 2 and before population 0; then f1 (trigger 11268 enter / leave) breaks the wall in the
+            drift case, never before the fix.
+  scriptval H2ValueAddr = the interpreter's op14 address ([R+0xc] + 8, 0 when R or [R+0xc] is 0) for 2000 random
+            memories; op2f skips a 0 address, so a read through H2ValueAddr never touches what the game would not.
 2026-11-06 TruMenu 0.19 dumb AI adds three models (section "---- 0.19 dumb AI" of TruMenu.cpp):
   6. presets   RunAiDumb / AiPresetOn / RadialOn: ring and bar rows "ai.dumb <preset>" get "<preset> 0|1" from the shown
              state; one setting at a time (a group replaces the other), "<preset> 0" switches off only its own active
@@ -1999,6 +2010,136 @@ def sn_frames(frames, right, rule, cap=1344.0):
     return out, width
 
 
+H2_DEATH4 = ('Death', 'LandDeath', 'DrownDeath', 'DeferredInstantDie')   # kAkDeathNames: their Enter fires vt 31
+
+
+class H2Dispatcher:                           # script 24540: sticky ints / bool of 11270, f1 / f3 / f4
+    def __init__(self, population=0, deathcount=0, tutorial=0, broken=0):
+        self.population, self.deathcount, self.tutorial, self.broken = population, deathcount, tutorial, broken
+        self.spawning = True
+
+    def f1(self):                             # check: trigger 11268 enter / leave, a counted death
+        if 2 <= self.tutorial and not self.broken and self.population == 0:
+            self.broken = 1                   # state 1: f7 "clear", the wall breaks
+        return self.broken
+
+    def f3(self):                             # generator OnSpawn (22809 f0 after +8 = 2)
+        self.population += 1
+
+    def message(self, value):                 # f0: channel(+24).f3(msg) && msg.value == 2 -> f4
+        if value != 2: return False
+        self.deathcount += 1
+        self.population -= 1
+        self.f1()
+        if 3 <= self.deathcount:
+            self.spawning = False             # generator f4: no more spawns
+            self.tutorial = 2
+            self.f1()
+        return True
+
+
+def check_h2drift():
+    """the live session 07.11. 15:49 - 15:53: births +8 = 2, checkpoint restores +8 = 0 (save block, no 22809 f0)"""
+    d = H2Dispatcher()
+    alive = []
+    for _ in range(4):                        # 15:49:33 - 37: pre-spawned in hall01
+        d.f3(); alive.append(2)
+    cp = (d.population, d.deathcount, d.tutorial, d.broken, len(alive))   # 15:49:39 checkpoint 11258
+    for _ in range(3):                        # 15:49:39 - 41: births 5 .. 7
+        d.f3(); alive.append(2)
+    good = cp == (4, 0, 0, 0, 4) and d.population == 7
+    counted = []
+    for new_deaths, old_deaths in ((2, 3), (3, 4)):   # rounds 2 and 3 after a restore each
+        d = H2Dispatcher(*cp[:4])
+        alive = [0] * cp[4]                   # restored: +8 = 0
+        for _ in range(3):
+            d.f3(); alive.append(2)
+        n = 0
+        for v in [2] * new_deaths + [0] * old_deaths:
+            n += d.message(v)
+        counted.append((n, d.population, d.broken))
+    good &= counted[0] == (2, 5, 0)           # round 2: only the two new ones counted (15:51:23 / 26)
+    good &= counted[1] == (3, 4, 0)           # round 3: three counted, deathcount 3 -> spawning off, population 4
+    d = H2Dispatcher(4, 3, 2, 0)
+    good &= d.f1() == 0                       # walking through 11268 does not help
+    print('h2drift: birth +8 = 2, restore +8 = 0, the dispatcher counts only 2 - the live rounds give 2 / 3 counted '
+          'deaths and population 4 with the wall closed (as measured 15:53:10)  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def h2_alive(t):                              # H2Alive
+    if not t.get('own', 1): return False
+    if t.get('flags', 0) & 0x20: return False
+    if t.get('brain', True):
+        return t.get('state', 'Idle') not in H2_DEATH4
+    return not (t.get('flags', 0) & 0x800)
+
+
+def h2_fix(unit, st, thralls):                # RunFixHall02: ('refused', why) or ('ok', [(key, value) written])
+    if unit.lower() != 'dlc_yggdrasil_hall02': return ('refused', 'unit')
+    if any(k not in st for k in ('population', 'tutorial', 'broken')): return ('refused', 'values')
+    if st['broken']: return ('refused', 'broken')
+    if any(h2_alive(t) for t in thralls if t.get('obj', 1004) == 1004): return ('refused', 'alive')
+    writes = []
+    if st['tutorial'] < 2:
+        writes.append((18509, 2)); st['tutorial'] = 2
+    if st['population'] != 0:
+        writes.append((17287, 0)); st['population'] = 0
+    return ('ok', writes)
+
+
+def check_fixhall02():
+    base = {'population': 4, 'deathcount': 3, 'tutorial': 2, 'broken': 0}
+    dead = [{'state': s} for s in H2_DEATH4] + [{'flags': 0x20}, {'own': 0}, {'brain': False, 'flags': 0x800}]
+    good = h2_fix('dlc_yggdrasil_hall01', dict(base), dead) == ('refused', 'unit')
+    good &= h2_fix('DLC_YGGDRASIL_HALL02', dict(base), dead) == ('ok', [(17287, 0)])     # case-insensitive unit
+    good &= h2_fix('dlc_yggdrasil_hall02', {'population': 4}, dead) == ('refused', 'values')
+    good &= h2_fix('dlc_yggdrasil_hall02', dict(base, broken=1), dead) == ('refused', 'broken')
+    for living in ({'state': 'Idle'}, {'state': 'Regenerate'}, {'state': 'RegenerateDeath'}, {'brain': False}):
+        good &= h2_fix('dlc_yggdrasil_hall02', dict(base), dead + [living]) == ('refused', 'alive')
+    good &= h2_fix('dlc_yggdrasil_hall02', dict(base), dead + [{'obj': 931, 'state': 'Idle'}]) == ('ok', [(17287, 0)])
+    good &= h2_fix('dlc_yggdrasil_hall02', dict(base, tutorial=0), dead) == ('ok', [(18509, 2), (17287, 0)])
+    good &= h2_fix('dlc_yggdrasil_hall02', dict(base, tutorial=1), []) == ('ok', [(18509, 2), (17287, 0)])
+    good &= h2_fix('dlc_yggdrasil_hall02', dict(base, tutorial=5), []) == ('ok', [(17287, 0)])          # kept
+    good &= h2_fix('dlc_yggdrasil_hall02', dict(base, population=0), []) == ('ok', [])
+    good &= h2_fix('dlc_yggdrasil_hall02', dict(base, population=-1), []) == ('ok', [(17287, 0)])
+    st = dict(base)
+    d = H2Dispatcher(st['population'], st['deathcount'], st['tutorial'], st['broken'])
+    good &= d.f1() == 0                       # before the fix: trigger 11268 does nothing
+    r = h2_fix('dlc_yggdrasil_hall02', st, dead)
+    d.population, d.tutorial = st['population'], st['tutorial']
+    good &= r[0] == 'ok' and d.f1() == 1      # after it: the next enter / leave breaks the wall
+    print('fixhall02: refused in another unit / without values / broken / with a living tutorial thrall (Idle, '
+          'Regenerate, RegenerateDeath, no brain), dead = the four count states, kill flag, gone, hidden; tutorial 2 '
+          'only below 2 and first; the next 11268 check breaks the wall  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def h2_value_addr(mem, inst):                 # H2ValueAddr: [[inst+0x60]+0xc]+8, 0 = none
+    ref = mem.get(inst + 0x60, 0)
+    if not ref: return 0
+    data = mem.get(ref + 0xc, 0)
+    return data + 8 if data else 0
+
+
+def vm_op14(mem, r, off):                     # interpreter op14 (0x57d04b): 0 when R or [R+0xc] is 0
+    if not r or not mem.get(r + 0xc, 0): return 0
+    return mem[r + 0xc] + off
+
+
+def check_scriptval(rng):
+    good = True
+    for _ in range(2000):
+        mem, inst = {}, rng.randrange(0x1000, 0x8000) * 16
+        ref = rng.choice((0, rng.randrange(0x10000, 0x20000) * 4))
+        mem[inst + 0x60] = ref
+        if ref: mem[ref + 0xc] = rng.choice((0, rng.randrange(0x30000, 0x40000) * 4))
+        good &= h2_value_addr(mem, inst) == vm_op14(mem, mem[inst + 0x60], 8)
+    print('scriptval: H2ValueAddr = the interpreter\'s op14 address of "R.+8" (22809 f0) for 2000 random memories, 0 '
+          'when the script or its member data is missing (op2f then stores nothing)  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
 def check_sndwidth():
     seq = [[300.0, 200.0], [500.0, 100.0], [250.0, 120.0], [250.0, 120.0], [250.0, 120.0]]
     old_r, w_old_r = sn_frames(seq, True, '0.21')
@@ -2028,7 +2169,8 @@ def main():
                check_killpath(), check_sticky(), check_roomcheck(), check_unitgo(), check_favrecent(),   # 0.21.1: + six
                check_groups(),
                check_padchain(), check_padblock(),                                    # 0.21.2 / TruShadowPower 0.19
-               check_xyfav(), check_xyexec(), check_footer(), check_sndwidth()]       # 0.21.3
+               check_xyfav(), check_xyexec(), check_footer(), check_sndwidth(),       # 0.21.3
+               check_h2drift(), check_fixhall02(), check_scriptval(rng)]              # 0.21.4
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

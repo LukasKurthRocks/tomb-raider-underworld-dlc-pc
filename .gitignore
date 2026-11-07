@@ -71,6 +71,9 @@ work/meleefix_0711/
 work/hall02drift_0711/
 work/hall02tu_0711/
 work/m0214_0711/
+work/shaderlabel_0711/
+work/tucov_0711/
+work/genfix_0711/
 # local profile archives (moved out of the repository folder, never committed)
 tests/profiles/archive_0311/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report

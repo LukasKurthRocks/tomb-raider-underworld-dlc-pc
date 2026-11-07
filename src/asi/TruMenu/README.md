@@ -2152,6 +2152,34 @@ option (only the comments of `[Quick] Enabled` / `OpenButtons` name X / Y).
 Checks: `tools\trumenu_ini_check.py` `check_0213` (14 negatives), `tools\trumenu_quick_check.py` chord (+3 X / Y cases)
 and models `xyfav`, `xyexec`, `footer`, `sndwidth`.
 
+## TruMenu 0.21.4 (hall02 counter rescue, thrall script value; 2026-11-07)
+
+Report `docs\Befund-TruMenu-0214-0711.md`; build `work\asi\menu0214`; 19 new byte checks (`precheck_0214.txt`, table
+`kH2Checks`), no new option (the sample `TruMenu.ini` is the 0.21.3 one). Background: `docs\Befund-Hall02-Zaehler-Drift-
+0711.md` (why population stays at 4) and `docs\Befund-Hall02-TU-Vergleich-0711.md` (root cause: the intro data of
+generator 10028 are mis-converted on the PC, so checkpoint 11258 stores pre-spawned thralls - the Xbox never does). The
+real fix belongs into the data; TruMenu only rescues saves that already hold them.
+
+* **`fix.hall02`** (game thread, bar page Tests "hall02-Zaehler reparieren" right / X twice, long menu page AI group
+  "Gegner entfernen / toeten"): refused unless Lara's stream unit is `dlc_yggdrasil_hall02`, the dispatcher 11270 has its
+  sticky values, `broken` (10029) is 0 and **no** object-1004 `viking_thrall_tutorial_dlc2_` is alive (alive = present
+  `[inst+0x44] != 0`, no kill flag `+0x14 & 0x20`, brain not in Death / LandDeath / DrownDeath / DeferredInstantDie -
+  RegenerateDeath counts as alive; without a readable brain: hidden = gone, else alive). Then `tutorial` (18509) = 2 if
+  below 2, `population` (17287) = 0 - both through `sticky.set` (the game's write + change notification, old / new
+  logged). The answer: "jetzt einmal durch den Arena-Trigger 11268 zurueck- oder hineinlaufen (Pruefung nur beim
+  Betreten / Verlassen)" with the trigger's live position and distance; with `[Debug] Enabled` the debug view layers
+  Trigger + Trigger-Namen are switched on (drawing only) so the trigger is visible.
+* **`thrall.scriptval`** (read only, bar page Tests, long menu): every object-1004 thrall with intro (runtime / placed),
+  state and its thrall-script int +8, plus every other generator enemy (raw +8, other script) into `TruMenu.log`;
+  expected: restored 0, generator-born 2. Address = the game's own path: `[[inst+0x60]+0xc]+8` - `[inst+0x60]` is the
+  script reference the generator hands to OnSpawn (0x781342) and the death event uses (0x66c31f); the interpreter's
+  op14 (0x57d04b) takes member data `[R+0xc]` (0 when R or the data is 0), script 22809 f0 writes "R.+8 = 2" with it.
+* Not built (coordinator, after the TU comparison): the restore-time safety net E3 (`[Fix] Hall02Restore`) - it would
+  imitate behaviour the Xbox does not have.
+
+Checks: `tools\trumenu_ini_check.py` `check_0214` (17 negatives), `tools\trumenu_quick_check.py` models `h2drift`,
+`fixhall02`, `scriptval`.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

@@ -94,6 +94,17 @@ argument refused before FavSet, no other write of the favourites), the footer "X
 the confirmation text "rechts / X nochmal", TruMenuPadBlock unchanged in meaning (kQbOwn while open, bits 16 / 17 / 18),
 the [Quick] Enabled / OpenButtons comments naming X / Y, SnRow aligned to the frame's widest row (no
 GetContentRegionAvail in SnRow; DrawSoundList measures every row before it draws one).
+Since TruMenu 0.21.4 (2026-11-07 hall02 counter) also: the items fix.hall02 (action, game thread; help text names the
+saves whose checkpoint 11258 already holds thralls) and thrall.scriptval (action, not on the game thread, read only);
+the page Tests rows (fix.hall02 = action with kQfConfirm, thrall.scriptval); RunFixHall02's guards in order (unit
+hall02, dispatcher values present, broken refused, a living object-1004 thrall refused - all before the first
+sticky.set), tutorial before population, the 18509 rule (only when below 2), exactly two sticky.set calls and no other
+write, the reply naming the arena trigger 11268 and "Betreten / Verlassen"; H2Alive (present, kill flag, AkDying = the
+four death states, RegenerateDeath not among them); H2ValueAddr ([inst+0x60] -> +0xc -> +8, zero pointers refused);
+H2IsThrall by object id 1004 and name; thrall.scriptval without any write; no E3 safety net (no [Fix] Hall02Restore,
+no H2Tick / fix.hall02restore - docs/Befund-Hall02-TU-Vergleich-0711.md: a PC data bug, the Xbox never restores
+thralls there); the precheck table kH2Checks (whole bytes, at most 64, no foreign byte); no code patch and no direct
+store in the section (no WriteDword / VirtualProtect / volatile write).
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -263,6 +274,10 @@ TRUTRACE_BYTES = (0x5b6a2f, 0x5b6a30)        # the call TruTrace checks - never 
 # 0.21.3 (2026-11-07): the bar's X / Y footer texts (DE, EN) and the confirmation text
 Q213_FOOTER = ('"X: ausfuehren  Y: Favorit"', '"X: run  Y: favourite"')
 Q213_CONFIRM = ('"rechts / X nochmal (3 s) = ausfuehren"', '"right / X again (3 s) = run"')
+# 0.21.4 (2026-11-07): hall02 counter (fix.hall02, thrall.scriptval, [Fix] Hall02Restore)
+Q214_ITEMS = {'fix.hall02': ('action', 'true'), 'thrall.scriptval': ('action', 'false')}
+Q214_DROPPED = ('Hall02Restore', 'fix.hall02restore', 'H2Tick', 'H2RestorePass')   # E3, not built (coordinator 17:30)
+Q214_REPLY = ('Arena-Trigger 11268', 'Betreten / Verlassen', 'arena trigger 11268', 'enter / leave')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 
@@ -1547,6 +1562,90 @@ def check_0213(ini_path):
                      'list width' % QB_OWN
 
 
+def check_0214(ini_path, rows):
+    """0.21.4 (2026-11-07 hall02 counter): see the module text"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    for item, (typ, thread) in sorted(Q214_ITEMS.items()):
+        m = re.search(r'\{"%s", "%s", (?:"[^"]*"\s*)+,\s*(true|false),' % (re.escape(item), typ), src)
+        if not m: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+        elif m.group(1) != thread:
+            problems.append('TruMenu.cpp: %s gameThread must be %s' % (item, thread))
+    m = re.search(r'\{"fix\.hall02", "action", ((?:"[^"]*"\s*)+),', src)
+    if not m or 'already holds tutorial' not in ''.join(re.findall(r'"([^"]*)"', m.group(1))).replace('  ', ' '):
+        problems.append('TruMenu.cpp: the fix.hall02 help text must say it is for saves whose checkpoint 11258 already '
+                        'holds tutorial thralls')
+    # E3 was dropped (docs/Befund-Hall02-TU-Vergleich-0711.md: PC data bug, the Xbox never restores thralls there)
+    ini_text = open(ini_path, encoding='utf-8', errors='replace').read()
+    for word in Q214_DROPPED:
+        if word in src: problems.append('TruMenu.cpp: %s present - the E3 safety net must not be built' % word)
+        if word in ini_text: problems.append('%s: %s present - the E3 safety net must not be built' % (name, word))
+    if any(sec == 'Fix' for sec, key, default, comment in rows):
+        problems.append('TruMenu.cpp: kOpts has a [Fix] section (E3 dropped)')
+    tests = [r for r in qb_rows(src, True) if r[0] == 'kQbTests']
+    want = {'fix.hall02': ('kQbAction', True), 'thrall.scriptval': ('kQbAction', False)}
+    for item, (kind, confirm) in want.items():
+        hit = [r for r in tests if r[2] == item]
+        if not hit: problems.append('TruMenu.cpp: page Tests has no %s row' % item)
+        elif hit[0][4] != kind or hit[0][3] or (confirm and 'kQfConfirm' not in hit[0][6]):
+            problems.append('TruMenu.cpp: page Tests row %s must be %s without argument%s' % (
+                item, kind, ' with kQfConfirm (right / X twice)' if confirm else ''))
+    fx = fn_body(src, 'bool RunFixHall02(')
+    marks = [fx.find(s) for s in ('_stricmp(unit, kH2Unit)', 'if (!hp || !ht || !hb)', 'if (broken)', 'if (alive)',
+                                  'RunStickySet(')]
+    if not fx or -1 in marks or marks != sorted(marks):
+        problems.append('TruMenu.cpp: RunFixHall02 must refuse in this order before the first sticky.set: wrong unit, '
+                        'missing dispatcher values, broken, a living thrall (got %s)' % marks)
+    i_tut, i_pop = fx.find('RunStickySet("int 11270 18509 2"'), fx.find('RunStickySet("int 11270 17287 0"')
+    if not (0 <= i_tut < i_pop): problems.append('TruMenu.cpp: RunFixHall02 sets tutorial (18509) before population (17287)')
+    if 'if (tut < 2)' not in fx: problems.append('TruMenu.cpp: RunFixHall02 sets tutorial 2 only when it is below 2')
+    if fx.count('RunStickySet(') != 2 or re.search(r'WriteDword|volatile|kStNotify', fx):
+        problems.append('TruMenu.cpp: RunFixHall02 writes only through two sticky.set calls')
+    for t in Q214_REPLY:
+        if t not in fx: problems.append('TruMenu.cpp: the fix.hall02 reply lacks "%s"' % t)
+    al = fn_body(src, 'bool H2Alive(')
+    for need in ('0x44', 'flags & 0x20', 'AkDying(brain', 'flags & 0x800'):
+        if need not in al: problems.append('TruMenu.cpp: H2Alive lacks the rule "%s"' % need)
+    mn = re.search(r'const char \*const kAkDeathNames\[4\] = \{([^}]*)\}', src)
+    if not mn or 'Regenerate' in mn.group(1):
+        problems.append('TruMenu.cpp: kAkDeathNames must be the four count-event states (RegenerateDeath = alive)')
+    va = fn_body(src, 'DWORD H2ValueAddr(')
+    i60, ic, i8 = va.find('inst + kH2ScriptRef'), va.find('ref + kH2ScriptData'), va.find('data + kH2ThrallInt')
+    if not (0 <= i60 < ic < i8) or '!ref' not in va or '!data' not in va:
+        problems.append('TruMenu.cpp: H2ValueAddr must be [[inst+0x60]+0xc]+8 with zero pointers refused')
+    for const, val in (('kH2ScriptRef', '0x60'), ('kH2ScriptData', '0xc'), ('kH2ThrallInt', '8'),
+                       ('kH2RuntimeIntro', '0x40000000'), ('kH2ThrallObject', '1004')):
+        if not re.search(r'\b%s = %s\b' % (const, val), src): problems.append('TruMenu.cpp: %s must be %s' % (const, val))
+    sc = fn_body(src, 'bool H2IsThrall(')
+    if 'kH2ThrallObject' not in sc or 'kH2ThrallName' not in sc:
+        problems.append('TruMenu.cpp: H2IsThrall must match object 1004 by id and name')
+    for fn in ('bool RunThrallScript(', 'void ValThrallScript(', 'int H2Scan(', 'DWORD H2ValueAddr(', 'bool H2Alive('):
+        b = fn_body(src, fn)
+        if not b or re.search(r'RunStickySet|kStNotify|WriteDword|volatile|values\[', b):
+            problems.append('TruMenu.cpp: %s) must only read' % fn.strip('('))
+    a, b = src.find('// ---- 0.21.4 hall02 counter'), src.find('// ---- end of 0.21.4')
+    sec = src[a:b] if 0 <= a < b else ''
+    if not sec: problems.append('TruMenu.cpp: section "0.21.4 hall02 counter" .. "end of 0.21.4" missing')
+    elif re.search(r'WriteDword|VirtualProtect|WriteProcessMemory|volatile [A-Z]+ \*>?\(?[a-z.]*\)? *=|'
+                   r'\*reinterpret_cast<volatile', sec):
+        problems.append('TruMenu.cpp: section 0.21.4 must not patch code or store directly (only sticky.set writes)')
+    mt = re.search(r'const DvCheck kH2Checks\[\] = \{(.*?)\n\};', src, re.S)
+    if not mt: problems.append('TruMenu.cpp: kH2Checks missing')
+    else:
+        body = re.sub(r'"\s*\n\s*"', '', mt.group(1))
+        for ad, h in re.findall(r'\{(0x[0-9a-fA-F]+), "([0-9a-fA-F ]+)"\}', body):
+            hexs = h.replace(' ', '')
+            if len(hexs) % 2 or len(hexs) // 2 > 64:
+                problems.append('TruMenu.cpp: kH2Checks %s (whole bytes, at most 64)' % ad)
+            lo, hi = int(ad, 16), int(ad, 16) + len(hexs) // 2
+            for f, size in Q211_FOREIGN:
+                if lo < f + size and f < hi: problems.append('TruMenu.cpp: kH2Checks %s covers 0x%x (another plugin)' % (ad, f))
+    if 'M214Check();' not in src: problems.append('TruMenu.cpp: M214Check is never called')
+    return problems, '2 items, page Tests rows, fix.hall02 help / guards / order / 18509 rule / reply, alive rule, +8 ' \
+                     'address, read-only scriptval, no E3 safety net, kH2Checks'
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -1648,6 +1747,10 @@ def main(argv):
     for p in tproblems3: print('Q0213 %s' % p)
     if not tproblems3: print('ok: 0.21.3 quick bar X / Y, sound list width: %s' % tsummary3)
     problems += tproblems3
+    hproblems, hsummary = check_0214(ini_path, rows)   # 0.21.4
+    for p in hproblems: print('Q0214 %s' % p)
+    if not hproblems: print('ok: 0.21.4 hall02 counter: %s' % hsummary)
+    problems += hproblems
     nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)
