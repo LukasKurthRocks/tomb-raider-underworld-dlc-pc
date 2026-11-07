@@ -35,6 +35,9 @@
 //    no extra splash hit (area damage tru+0x29f1e0 skips it as TU 0x8237ae88), and in doppelganger mode the splash type
 //    is remapped through object 858's pair table (0x1a -> 0x10, 0x10 -> 0x16) while the K14 switch is extended
 //    ([Splash] Translate=1, default on; [Splash] Log=1 burst lines).
+// 10. 0.6.3 (P1a, T3 of the TU's thrall death): notification 33 (TRScriptUnitManager::PlayNotification tru+0x37a540)
+//    before EnterRegenerateDeath in the death check tru+0x220380, as the TU 0x822f6578 ([Death] TranslateNotify33=1,
+//    default on); [Damage] Translate (K14) now on by default (live 07.11.: thralls die, the hall02 wall breaks).
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -51,7 +54,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.2 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.3 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -64,7 +67,9 @@ const char kVersion[] = "TruShadowCombat 0.6.2 (TU target list 7 -> 10, conditio
                         "default); 0.6.1: lethal impulse tru+0x224c60 as the TU 0x82305ba0 - death switch instead of a "
                         "chunkdoll inside the physics step ([Chunk] Translate, on by default); 0.6.2: MeleeSplashDamage "
                         "tru+0x2e68b0 as the TU 0x823e1220 - main target excluded from the splash, doppelganger type "
-                        "remap with the K14 switch ([Splash] Translate, on by default))";
+                        "remap with the K14 switch ([Splash] Translate, on by default); 0.6.3: notification 33 before "
+                        "EnterRegenerateDeath tru+0x2203fb as the TU 0x822f6578 ([Death] TranslateNotify33, on by "
+                        "default), [Damage] Translate on by default)";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -2715,7 +2720,7 @@ const BYTE kTuDamageCase[28] = {0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 1, 2, 0, 0, 2, 
                                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};                     // 18..27
 typedef DWORD(__cdecl *DamageFn)(BYTE *inst, void *vec, float amount, DWORD reset, DWORD type, DWORD sub, DWORD flags);
 DamageFn g_oDamage = nullptr;
-int g_dmgTranslate = 0;            // [Damage] Translate (read again at run time, at most once per second, while hits come)
+int g_dmgTranslate = 1;            // [Damage] Translate (0.6.3: default 1) (read again at run time, at most once per second, while hits come)
 int g_dmgLog = 1;                  // [Damage] Log
 int g_dmgMax = 3000;               // [Damage] MaxLines
 bool g_dmgHooked = false;          // entry hook placed (all checks passed)
@@ -3628,6 +3633,109 @@ void SetupSplash() {
         g_splashFallback, g_splashLog, g_splashMax, g_splashFlusher ? "" : ", no flush thread - lines only at the cap");
 }
 
+// ---------------------------------------------------------------- 0.6.3: P1a - notification 33 of the TU's lethal-hit
+// handler (T3 of docs Befund-Thrall-Felder-0611.md 3.2; docs Befund-P1a-ThrallTod-0711.md in the main workspace)
+// The enemy death check tru+0x220380 (retail 0x822f8c88, TU 0x822f6578; reached from the damage case tru+0x237630 with
+// flags bit 0) asks ShouldRegenerate tru+0x27f040 (retail 0x8235f0c8, TU 0x8235ece8) and, when it says yes, calls
+// EnterRegenerateDeath tru+0x282780 (= retail 0x8235efd8: query 0x182, then state RegenerateDeath 0x8afa4c). The TU
+// replaced that call by: TRScriptUnitManager::PlayNotification(33) (TU 0x8247b0f0 with [0x829ca684] = PC tru+0x37a540
+// with [0xfae880], the pair the script event handler TU 0x82473928 / PC tru+0x368a20 uses), then "no switch while the
+// enemy is in state Land" (T2 takes over at the landing) and its own switch into RegenerateDeath. Notification 33 goes
+// to the level scripts (hall02: 23101 f3 shows hint_17, the finisher hint, once). Only the notification is translated
+// here: the Land exception belongs to T2, which needs the companion instance of T4 (TU brain+0x5090, missing on the
+// PC), and the TU's own switch feeds the TU's changed RegenerateDeath state (2-byte data, Enter 0x8235dff8) - the PC
+// state is retail, so the PC keeps tru+0x282780. [Death] TranslateNotify33=1: the call at tru+0x2203fb goes to
+// LethalRegen, which sends 33 first (as the TU, before the query / switch) and then calls tru+0x282780 with the same
+// arguments; 0 = the call alone (PC). Read again at run time at most once per second when the site is reached.
+const DWORD kLethalFn = 0x00620380;           // retail 0x822f8c88, TU 0x822f6578
+const DWORD kLethalRegenCall = 0x006203fb;    // call tru+0x282780 (5 bytes) - patched
+const DWORD kEnterRegenDeath = 0x00682780;    // retail 0x8235efd8 (the TU inlined its own variant)
+const DWORD kPlayNotification = 0x0077a540;   // TU 0x8247b0f0, thiscall (manager, notification), ret 4
+const DWORD kScriptUnitMgr = 0x00fae880;      // TU [0x829ca684]
+const DWORD kStateLand = 0x008ae808;          // EnemyState_Land (TU 0x8206a338 "Land", T3's exception)
+const int kTuNotifyRegen = 33;                // TU 0x822f6638 li r4, 0x21
+typedef DWORD(__cdecl *EnterRegenFn)(BYTE *inst, DWORD a1, DWORD a2);
+typedef void(__thiscall *PlayNotificationFn)(void *manager, int notification);
+int g_notify33 = 1;                // [Death] TranslateNotify33 (read again at run time, at most once per second)
+bool g_deathHooked = false;
+DWORD g_deathSwitchTick = 0;
+volatile LONG g_deathLines = 0;
+const LONG kDeathMaxLines = 1000;
+
+void DeathReadSwitch() {
+    if (!g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_deathSwitchTick < 1000) return;
+    g_deathSwitchTick = now;
+    const int t = GetPrivateProfileIntA("Death", "TranslateNotify33", g_notify33, g_iniPath) ? 1 : 0;
+    if (t == g_notify33) return;
+    Log(1, "0.6.3 switch: [Death] TranslateNotify33 %d -> %d (read again from TruShadowCombat.ini) - %s", g_notify33, t,
+        t ? "notification 33 as the TU 0x822f6578" : "no notification (PC)");
+    g_notify33 = t;
+}
+
+// called instead of tru+0x282780 from tru+0x2203fb (cdecl, same arguments, the result goes back unchanged)
+DWORD __cdecl LethalRegen(BYTE *inst, DWORD a1, DWORD a2) {
+    DeathReadSwitch();
+    const bool send = g_notify33 != 0;
+    const LONG n = InterlockedIncrement(&g_deathLines);
+    if (n <= kDeathMaxLines) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        const BYTE *b = reinterpret_cast<const BYTE *>(Rd(inst + 0x2d0));
+        const BYTE *brain = b ? reinterpret_cast<const BYTE *>(Rd(b + 0x2ec)) : nullptr;
+        const DWORD state = brain ? Rd(brain + 0x125c) : 0;
+        Log(1, "0.6.3 death: %s lethal hit, ShouldRegenerate yes (LP %.0f, state %s): %s; then RegenerateDeath "
+               "tru+0x282780 (PC)%s", who, brain ? RdFloat(brain + 0x2c64) : 0.0f,
+            state == kStateLand ? "Land" : state ? "not Land" : "none",
+            send ? "notification 33 sent (TU 0x822f6638)" : "no notification ([Death] TranslateNotify33=0)",
+            state == kStateLand ? " - the TU would not switch in Land (T2 at the landing, needs T4)" : "");
+        if (n == kDeathMaxLines) Log(1, "0.6.3 death: %ld lines - no more", kDeathMaxLines);
+    }
+    if (send)
+        reinterpret_cast<PlayNotificationFn>(kPlayNotification)(
+            reinterpret_cast<void *>(Rd(reinterpret_cast<const void *>(kScriptUnitMgr))), kTuNotifyRegen);
+    return reinterpret_cast<EnterRegenFn>(kEnterRegenDeath)(inst, a1, a2);
+}
+
+void SetupDeath() {
+    struct { DWORD at; const char *hex; const char *what; } const facts[] = {
+        {kLethalFn,
+         "56 8b742408 8b86d0020000 85c0 0f84a3000000 8b08 8b89ec020000 85c9 0f8493000000 8b510c d1ea f6d2 f6c201 "
+         "0f8483000000 85c0 7408 8b00 8b80ec020000 d980642c0000 dc1db8148400 dfe0 f6c441 7a64 8b4c2418 53 8b5c2418 57 "
+         "8b7c2424 57 51 53 56 e857ec0500 83c410 84c0 7417 8b542418 8b442414 52 50 56 e880230600 83c40c 5f 5b 5e c3 "
+         "6a01 53 57 56 e82f37ffff",
+         "death check tru+0x220380: LP <= 0 -> ShouldRegenerate tru+0x27f040 -> EnterRegenerateDeath tru+0x282780 "
+         "(call at tru+0x2203fb), else death kind tru+0x213b40"},
+        {kEnterRegenDeath, "55 8bec 83e4f0 83ec28 56 8b7508 57 8b7d0c 6882010000 56 e8540ff3ff 83c408 85c0 7563",
+         "EnterRegenerateDeath tru+0x282780 (cdecl inst, vector, byte; query 0x182 first)"},
+        {0x006827d1, "684cfa8a00", "EnterRegenerateDeath: state RegenerateDeath 0x8afa4c"},
+        {kPlayNotification,
+         "56 57 8b7c240c be08acdb00 eb03 8d4900 80be3cffffff02 7510 8b06 57 8d4c2410 89442410 e8e7300200 81c6d8000000 "
+         "81fe08c7db00 7cd9 5f 5e c20400",
+         "PlayNotification tru+0x37a540 (stream table state 2 -> unit event, ret 4)"},
+        {0x00768a20, "8b442408 6683780220 7513 8b4004 85c0 7e0c 8b0d80e8fa00 50 e8021b0100 c3",
+         "script event handler tru+0x368a20: PlayNotification([0xfae880], n)"},
+        {kStateLand, "5c8c8500 06000000", "EnemyState_Land 0x8ae808 (vtable 0x858c5c)"},
+    };
+    for (const auto &f : facts)
+        if (!HexAt(f.at, f.hex)) {
+            Log(0, "0.6.3 death: %s at 0x%08lx does not match - lethal hit left to the game (no notification 33)", f.what,
+                f.at);
+            return;
+        }
+    if (HexAt(0x005bcff9, "8b0dd094db00 52 8b14c1")) g_namesOk = true;
+    if (!WriteCall(kLethalRegenCall, reinterpret_cast<const void *>(&LethalRegen))) {
+        Log(0, "0.6.3 death: call at tru+0x2203fb failed - lethal hit left to the game (no notification 33)");
+        return;
+    }
+    g_deathHooked = true;
+    Log(1, "0.6.3 death: tru+0x2203fb (death check tru+0x220380 -> EnterRegenerateDeath) -> plugin - [Death] "
+           "TranslateNotify33 %d (%s); read again at run time at most once per second. T2 (Land: notification 33 + "
+           "RegenerateDeath) not translated: needs the TU's companion instance (T4)", g_notify33,
+        g_notify33 ? "TU 0x822f6578: notification 33 before the switch" : "PC: no notification");
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -3653,7 +3761,8 @@ void ReadOptions(const char *dir) {
     g_diag2011 = GetPrivateProfileIntA("Diag", "Condition2011", 1, ini);
     g_diagMax = GetPrivateProfileIntA("Diag", "MaxLines", 4000, ini);
     g_diagSnap = GetPrivateProfileIntA("Diag", "Snapshot", 1, ini) ? 1 : 0;   // 0.5.3
-    g_dmgTranslate = GetPrivateProfileIntA("Damage", "Translate", 0, ini) ? 1 : 0;   // 0.6
+    g_dmgTranslate = GetPrivateProfileIntA("Damage", "Translate", 1, ini) ? 1 : 0;   // 0.6 (0.6.3: default 1)
+    g_notify33 = GetPrivateProfileIntA("Death", "TranslateNotify33", 1, ini) ? 1 : 0;   // 0.6.3
     g_dmgLog = GetPrivateProfileIntA("Damage", "Log", 1, ini) ? 1 : 0;
     g_dmgMax = GetPrivateProfileIntA("Damage", "MaxLines", 3000, ini);
     if (g_dmgMax < 0) g_dmgMax = 0;
@@ -3713,6 +3822,7 @@ void Start(HMODULE self) {
     SetupDamage();                    // 0.6: K14 (independent of the parts above)
     SetupChunk();                     // 0.6.1: lethal impulse as the TU (independent of the parts above)
     SetupSplash();                    // 0.6.2: K9 splash as the TU (after SetupDamage: the remap follows its switch)
+    SetupDeath();                     // 0.6.3: notification 33 of the TU's death check (independent of the parts above)
 }
 
 }  // namespace

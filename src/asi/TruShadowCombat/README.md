@@ -1,4 +1,37 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.2)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.3)
+
+0.6.3 (2026-11-07, **offline, not yet seen in game**): P1a - script notification 33 of the title update's thrall
+death (T3 of `docs\Befund-Thrall-Felder-0611.md` 3.2; full proof `docs\Befund-P1a-ThrallTod-0711.md` in the main
+workspace) and K14 on by default. Build `work\asi\combat063`.
+* The enemy death check tru+0x220380 (retail 0x822f8c88, TU 0x822f6578) runs from the damage case tru+0x237630
+  (flags bit 0): LP <= 0 -> ShouldRegenerate tru+0x27f040 -> yes: EnterRegenerateDeath tru+0x282780 (= retail
+  0x8235efd8, state RegenerateDeath 0x8afa4c). The TU sends `TRScriptUnitManager::PlayNotification(33)` (TU 0x8247b0f0
+  with `[0x829ca684]` = PC tru+0x37a540 with `[0xfae880]`, the pair of the script event handler TU 0x82473928 / PC
+  tru+0x368a20) right there, before its query 0x182 / state switch. hall02's level script 23101 f3 answers 33 with
+  the finisher hint `hint_17` (once, sticky +188); the wall does not wait for 33.
+* `[Death] TranslateNotify33=1` (default **1**, a pure TU translation): the call at tru+0x2203fb goes to the plugin,
+  which sends 33 and then calls tru+0x282780 with the same arguments (result unchanged). 0 = only the call (PC). Read
+  again at run time at most once per second when the site is reached. One log line per such hit (max 1000):
+  `0.6.3 death: 0x... obj 1004 viking_thrall_tutorial_dlc2_ lethal hit, ShouldRegenerate yes (LP -17, state not Land):
+  notification 33 sent (TU 0x822f6638); then RegenerateDeath tru+0x282780 (PC)`.
+* **Not translated (needs T4):** the TU's Land path T2 (TU 0x82328aa0, PC tru+0x25afe0) sends 33 and switches into
+  RegenerateDeath only when the thrall's companion instance (TU 0x822da918: handle brain+0x5090 / +0x5094, set up by
+  TU-only 0x822da800) exists and its data byte +0x18 is 0; without it the TU switches to LandDeath, exactly as the PC.
+  The PC brain is 0x5040 bytes, it has no companion. T3's "no switch in Land" exception only makes sense together with
+  T2, and the TU's own switch feeds its changed RegenerateDeath state (2-byte data, Enter 0x8235dff8) - both stay PC.
+  The log names the Land case (`state Land ... the TU would not switch in Land`).
+* `[Damage] Translate` (K14) now defaults to **1** (code and sample .ini): pure TU translation, live 07.11. (-40 per hit,
+  the tutorial thralls die, the hall02 wall breaks).
+* New byte checks: 6 used by the plugin + 10 proof-only (`work\asi\combat063\prechecks_combat063.txt`, 16, 0
+  mismatches on the Steam exe); the earlier lists 88 + 6 + 21 + 4 + 13 + 12 + 11 = 155 still 0 mismatches. Imports
+  unchanged (81, KERNEL32 only); exports unchanged (4).
+
+| # | TO TEST 0.6.3 (DLC 2 hall01 / hall02 tutorial thralls; TruDlc2Player `TrackerFlag=1`) | expected |
+|---|---|---|
+| 1 | load | `0.6.3 death: tru+0x2203fb ... -> plugin - [Death] TranslateNotify33 1`, `0.6 damage switch (start): extend`, no "does not match" |
+| 2 | kill a tutorial thrall with Lara's DLC 2 attacks (type 0 / 18..24 = regenerate list) | `0.6.3 death: ... ShouldRegenerate yes ... notification 33 sent`; the thrall goes to `RegenerateDeath` (TruMenu label); the finisher hint `hint_17` appears once |
+| 3 | `[Death] TranslateNotify33=0`, next thrall | `0.6.3 switch: ... 1 -> 0`, `no notification`; no hint |
+| 4 | trouble | `[Death] TranslateNotify33=0` |
 
 0.6.2 (2026-11-07, **offline, not yet seen in game**): K9 - `CombatManager::MeleeSplashDamage` tru+0x2e68b0 as the
 title update (TU 0x823e1220, retail 0x823dedc0; `docs\Befund-TU-K9-K11-0711.md` in the main workspace). Build
@@ -302,7 +335,7 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Diag] Condition2011` | 1 | 0.5.2: every evaluation of condition 2011 in doppelganger mode with its inputs |
 | `[Diag] MaxLines` | 4000 | 0.5.2: total cap of the diagnostic lines |
 | `[Diag] Snapshot` | 1 | 0.5.3: read-only export `TscTargeterSnapshot` for TruMenu's thrall labels (built only while asked) |
-| `[Damage] Translate` | 0 | 0.6: 1 = the TU damage-type switch 0..27; read again at run time (<= 1 / s while hits come) |
+| `[Damage] Translate` | 1 | 0.6: 1 = the TU damage-type switch 0..27; read again at run time (<= 1 / s while hits come); default 1 since 0.6.3 (live 07.11.) |
 | `[Damage] Log` | 1 | 0.6: burst lines of the incoming damage types (changes nothing) |
 | `[Damage] MaxLines` | 3000 | 0.6: cap of the damage lines |
 | `[Chunk] Translate` | 1 | 0.6.1: lethal impulse (message 0x91) as the TU - death switch kind 7 instead of a chunkdoll inside the physics step; 0 = PC branch; read again at run time (<= 1 / s) |
@@ -312,6 +345,7 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Splash] Fallback` | 1 | 0.6.2: the Xbox pair values when object 858's table differs from them (converted file: words unswapped); 0 = table as loaded |
 | `[Splash] Log` | 1 | 0.6.2: burst lines of the splash records (type in / out, main target, enemy switch verdict; changes nothing) |
 | `[Splash] MaxLines` | 2000 | 0.6.2: cap of the splash lines |
+| `[Death] TranslateNotify33` | 1 | 0.6.3 (T3): script notification 33 before EnterRegenerateDeath in the death check tru+0x220380, as the TU 0x822f6578 (hall02: finisher hint `hint_17`); 0 = PC; read again at run time (<= 1 / s) |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 
