@@ -2029,6 +2029,68 @@ analysis files `work\m021_0611` (`labels\`, `airemove\`).
   function yet), menu groups "Arachnophobia, camera shake" and "Co-op / Koop (planned)". The ring has no new entries
   (it is at its 256-entry limit).
 
+## TruMenu 0.21.1 (ai.kill, sticky, room check, physics bodies, enemy spawn, bar page 0 / Tests / groups; 2026-11-07)
+
+Report `docs\Befund-TruMenu-0211-0711.md`; byte checks `work\asi\menu0211\precheck_0211.txt` (62, section
+"// ---- 0.21.1 ai.kill" .. "// ---- end of 0.21.1 ai.kill"); analysis files `work\m0211_0711` (`dis_*.txt`).
+
+* **`ai.kill nearest | others | all | <intro id>`** (game thread): enemies die the game's own way - the game's "Kill"
+  `0x6376e0` (its only caller `0x63831c` passes type 6 RigidBody) = the damage function `0x637590` with amount = LP,
+  then the death check `0x620380` -> `0x641650` -> state `EnemyState_Death`, whose Enter fires the instance's script
+  event (vt 31) - level scripts count it (the hall02 wall waits for these deaths, `docs\Befund-Hall02-Wand-0711.md`).
+  Per enemy the type is picked first: 6, else 4 / 2 / 1 / 0 - the first one whose case in the live type switch is
+  "damage + death check" (TruShadowCombat's `[Damage] Translate` table is read as well), not absorbed by the health mask
+  and not on the enemy's regeneration list (the game's `ShouldRegenerate 0x67f040` asked) - so the enemy ends in
+  `Death`, not `RegenerateDeath`. Refused for an enemy with brain+8 `0x800`, brain+0xc bit 1 or already dying, and for
+  the whole call while the physics step runs or fewer than 60 of the 405 physics bodies are free (a death may build a
+  chunkdoll - the "ChunkDoll: failed to create geom" crash). One log line per call, one line ~1 s later with each
+  enemy's state.
+* **`ai.remove`** warns: an enemy from a generator or with a script is a story enemy - "zaehlt nicht als Tod - Skripte
+  warten evtl." in the log line, the answer and the bar's confirmation text.
+* **`sticky.get <owner> <key>`**, **`sticky.set [int|bool|float] <owner> <key> <value>`** (set on the game thread):
+  owner = an intro id (kind 0) or `<kind>:<id>`; the StickyManager `[0xa13f18]` stores are searched like the game's Find
+  (never appended); set writes the value as the game's setters do and calls their change notification; old and new value
+  logged. hall02 repair: `sticky.set 11270 17287 0` (population) and `sticky.set 11270 18509 2` (tutorial), then walk
+  through the arena trigger 11268 (bar Render / KI, menu AI).
+* **Room check**: `player.goto <instance> [force]` refuses a target whose stream unit (`+0xe0`) is not loaded, a
+  resident unit's template ("geparkt", parked at (32000, 32000, -32000)), one the game does not draw and one farther than
+  25000 units outside Lara's unit; `force` jumps anyway. The enemy / collectible labels say `| geparkt`. `pos.go` to a
+  unit behind a portal of Lara's own unit takes the portal path; `pos.goload` and `pos.portal` use only Lara's own
+  unit's portals for that (from a neighbour's portal the engine never requests the target). **`unit.go <unit>`** (also a
+  shortcut step): nothing when Lara is in it, `cheat.flight 1;pos.portal <unit>` when it is loaded, else `level.load` -
+  the regression Prepare "Thrall fight: hall02 + god mode" (`tests\regress\dlc2.txt` step 7) uses it. Two portals away
+  (DLC 2 start -> hall02) still needs `level.load`: the engine's unit switch is not built.
+* **Physics bodies** (read only): `phys.status` / bar Render / KI "Physik-Koerper n/405" (`[0xa037f4]+0x20a8`, lock
+  `+0x20f8`, chunkdolls `[0xecfc70]`), a log line when the used count crosses 300 / 380 / 400 (and back under 280),
+  `phys.dump` = the used list grouped by name, orphans (owner 0 or the owner's `+0x274` is another body) one by one.
+* **Enemy spawn** `ai.spawn <object> [1..5] [lara|front]`, `ai.spawncount`, `ai.spawnat`: an AI enemy object loaded in
+  this level (object tracker status 2, family 14; no generators / chunkdolls / doppelganger) through
+  `INSTANCE_BirthObjectNoParent 0x5bd0f0` at Lara or 250 units in front (the debug view's camera); `save.backup spawn`
+  before the first spawn of a session; needs `[Cheat] Experimental`. "KI dumm only for these", "model only", gear,
+  behaviour and the navmesh check are planned rows.
+* **Health bar** `dbg.hpbar` / `[Debug] EnemyHpBar=1`: the enemy labels of the layer Gegner show a bar (green -> red,
+  LP / max LP of the difficulty, the number in it) instead of `| LP n`.
+* **`menu.hidecursor`** / `[Menu] HideCursor=0`: no mouse cursor over the game picture while the menu is closed
+  (WM_SETCURSOR in the client area; no game memory).
+* **Quick-toggle bar**: page 0 **Favoriten / Zuletzt** (the favourites, then the last `[Quick] RecentMax` rows that ran,
+  kept in `[Quick] Recent`); page **Tests** after Zeit / Test (teleports, the regression Prepare shortcuts - right twice -,
+  Stop, the TO TEST rows: right = OK / done / on, left = Fehler / open / off); **collapsible groups** (row kind
+  `kQbGroup`: `[-]` open / `[+]` closed, right = open, left = close, `[Quick] Closed`); page Render / KI in the groups
+  "Dumme KI", "Gegner spawnen", "Gegner entfernen / toeten" (ai.kill rows, ai.remove rows, the hall02 repair rows),
+  "Physik-Koerper", "Lebensleiste"; the long menu's page AI has the same three groups as collapsible sections.
+* **Export `TruMenuPadBlock(DWORD pad)`**: the buttons TruMenu keeps from the game right now (0xFFFF = neutral pad; bar
+  open: D-pad / LB / RB) plus bits 16 / 17 / 18 = menu / ring / bar open - for plugins that read the pad themselves.
+  The pad import filter: while the pad pointer is still empty a rewritten import slot `0x83e08c` is logged with the
+  module that wrote it (`pad: import slot ... was rewritten ...`, diagnosis only).
+
+```text
+0.21.1: ai.kill ok (27 checks), sticky ok (16 checks), room check ok (3 checks), physics bodies ok (11 checks), enemy spawn ok (1 check), health bar ok (4 checks); [Debug] EnemyHpBar 1, [Menu] HideCursor 0, [Quick] RecentMax 8, Closed ''
+ai.kill others (src=quick): 3 of 4 AI enemy(ies) killed the game's way (...); kept the nearest ... - viking_thrall_tutorial_dlc2_ 0 (type 6 RigidBody, LP 500 -> 0, script), ...
+ai.kill: 1 s later 3 of 3 in a death state (...): viking_thrall_tutorial_dlc2_ 0 Death, ...
+sticky.set int 0:11270 key 17287 (index 37): 3 -> 0 (src=quick; the game's set + change notification 0x004af740)
+phys: bodies used 301 / 405 (crossed 300; peak 301), chunkdolls 1 / 4, lock 0 - ...
+```
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

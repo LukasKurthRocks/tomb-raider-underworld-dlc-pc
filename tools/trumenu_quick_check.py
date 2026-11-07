@@ -18,6 +18,9 @@ it checks that the rules themselves do what the build report claims):
              a cinematic object appearing after the camera signal (adopted, no new segment), a script print and the 1 s
              minimum, a unit name differing only in case (no change), the 2 s end debounce.
   5. confirm   the bar's second-press confirmation (QbConfirm / QbArmed: same key within 3 s).
+2026-11-07 TruMenu 0.21.1 changes model "labels" (only a drawn placed instance suppresses its runtime copies) and adds
+six: killpath (AkPick / the Kill outcome), sticky (StParse / RunStickySet), roomcheck (RkCheck / player.goto / unit.go),
+unitgo (the shortcut step expansion), favrecent (page 0, QbRecentAdd, [Quick] Recent), groups (QbBuild / QbGroupSet).
 2026-11-06 TruMenu 0.19 dumb AI adds three models (section "---- 0.19 dumb AI" of TruMenu.cpp):
   6. presets   RunAiDumb / AiPresetOn / RadialOn: ring and bar rows "ai.dumb <preset>" get "<preset> 0|1" from the shown
              state; one setting at a time (a group replaces the other), "<preset> 0" switches off only its own active
@@ -1190,15 +1193,16 @@ def lf_not_drawn(i):                          # LfNotDrawn
 
 
 def lf_labels(insts):
-    """M20Draw 0.21: placed intros registered first (also hidden ones), hidden instances get no label, a runtime child
-    whose placed instance of the same kind is in the walk is dropped"""
+    """M20Draw 0.21: hidden instances get no label, a runtime child whose placed instance of the same kind is in the walk
+    is dropped; 0.21.1 (live 2026-11-07, pot without a label): only a DRAWN placed instance registers its intro - of a
+    hidden template and its drawn runtime copy the copy gets the label"""
     placed, marks, hidden = [], [], 0
     for i in insts:
         is_placed = not i['intro'] or i['id'] == i['intro_id']
-        if i['intro'] and is_placed: placed.append((i['intro'], i['kind']))
         if lf_not_drawn(i):
             hidden += 1
             continue
+        if i['intro'] and is_placed: placed.append((i['intro'], i['kind']))
         marks.append((i['name'], 0 if is_placed else i['intro'], i['kind']))
     kept = [m for m in marks if not (m[1] and (m[1], m[2]) in placed)]
     return [m[0] for m in kept], hidden, len(marks) - len(kept)
@@ -1218,7 +1222,11 @@ def check_labels():
     good &= lf_labels([copy, pot]) == (['pot 10810'], 0, 1)                   # order in the list does not matter
     good &= lf_labels([copy]) == (['pot 0x40000017'], 0, 0)                   # no placed one in the walk: the child stays
     broken = dict(pot, f14=0x800)
-    good &= lf_labels([broken, copy]) == ([], 1, 1)                           # broken pot hidden: its copy not labelled
+    # 0.21.1: the placed template hidden, the runtime copy drawn (live 07.11. 11:02: "0 drawn of 6 ... 2 hidden and 2
+    # runtime copies without label") -> the copy gets the label; the 0.21 rule dropped both
+    good &= lf_labels([broken, copy]) == (['pot 0x40000017'], 1, 0)
+    good &= lf_labels([copy, broken]) == (['pot 0x40000017'], 1, 0)           # order in the walk does not matter
+    good &= lf_labels([broken, dict(copy, f14=0x800)]) == ([], 2, 0)          # both hidden: none
     picked = inst('ma_rw_artifact 9856', 'artifact', 0xC000, 9856, 9856, f14=0x800)
     good &= lf_labels([picked]) == ([], 1, 0)                                 # picked up (hidden): no label in mid air
     cases = [({'f14': 0x800}, 1), ({'f14': 0x20}, 2), ({'f18': 0x400000}, 3), ({'objflag': 0x40000000}, 3),
@@ -1228,8 +1236,8 @@ def check_labels():
     for fields, want in cases:
         good &= lf_not_drawn(inst('x', 'artifact', 0, 1, 1, **fields)) == want
     print('labels: one label per reward pot (the runtime copy with the parent\'s intro dropped, the spawned artifact '
-          'kept, a lone copy kept), hidden / collected / being removed / scene-entity off / masks -1 -> no label  %s'
-          % ('ok' if good else 'FAIL'))
+          'kept, a lone copy kept; 0.21.1: a hidden template\'s drawn copy keeps its label), hidden / collected / being '
+          'removed / scene-entity off / masks -1 -> no label  %s' % ('ok' if good else 'FAIL'))
     return good
 
 
@@ -1266,13 +1274,277 @@ def check_airemove():
     return good
 
 
+# ---- 0.21.1 (2026-11-07) ----
+PC_CASE = [0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 1, 2, 0, 0, 2, 0]   # byte table 0x6376c4, bound 0x10 (0 = A, 1 = B, 2 = C)
+TU_CASE = PC_CASE + [2] + [0] * 10                                  # TruShadowCombat [Damage] Translate: 28 entries, 0x1b
+DEATH = ('Death', 'LandDeath', 'DrownDeath', 'DeferredInstantDie')
+
+
+def ak_case(t, table, bound):                 # AkCaseOf
+    if t < 0 or t > bound: return 2
+    return table[t]
+
+
+def ak_should_regen(t, sub, flag, regen):     # ShouldRegenerate 0x67f040 on the Tune+0x64 list {type, sub, flag bit 0}
+    for et, es, ef in regen:
+        if (et == -1 or et == t) and (es == 0 or es == sub) and (ef & 1) == flag: return True
+    return False
+
+
+def ak_pick(e, table=PC_CASE, bound=0x10):    # AkPick: (type, None) or (None, why)
+    if e['f8'] & 0x800: return None, 'no damage'
+    if e['fc'] & 2: return None, 'no death check'
+    if e['state'] in DEATH: return None, 'already dying'
+    for t in (6, 4, 2, 1, 0):
+        if ak_case(t, table, bound) != 0: continue
+        if (e['mask'][t >> 5] >> (t & 31)) & 1: continue
+        if ak_should_regen(t, 0, 0, e['regen']): continue
+        return t, None
+    return None, 'none'
+
+
+def ak_outcome(e, t):                         # Kill(type t): damage case A, LP -= LP, death check 0x620380
+    lp = e['lp'] - e['lp']                    # amount = LP (absorbed types were skipped by the pick)
+    if lp > 0 or e['fc'] & 2: return e['state']
+    return 'RegenerateDeath' if ak_should_regen(t, 0, 0, e['regen']) else 'Death'
+
+
+def check_killpath():
+    thrall_regen = [(0, 1, 0)] + [(t, 0, 0) for t in range(18, 23)] + [(23, 2, 0), (24, 2, 0)]   # tutorial viking
+    yeti_regen = [(0, 0, 0)] + [(t, 0, 0) for t in range(18, 25)]
+    base = {'f8': 0, 'fc': 0, 'state': 'Getup', 'mask': [0], 'regen': thrall_regen, 'lp': 500.0}
+    good = ak_pick(base) == (6, None) and ak_outcome(base, 6) == 'Death'                 # the game's own type first
+    good &= ak_pick(dict(base, regen=yeti_regen)) == (6, None)
+    good &= ak_pick(base, TU_CASE, 0x1b) == (6, None)                                    # TruShadowCombat table: same
+    good &= ak_pick(dict(base, mask=[1 << 6])) == (4, None)                              # immune to 6: Explosion
+    good &= ak_pick(dict(base, mask=[(1 << 6) | (1 << 4)])) == (2, None)
+    good &= ak_pick(dict(base, regen=[(-1, 0, 0)])) == (None, 'none')                    # regenerates on anything
+    good &= ak_pick(dict(base, regen=[(6, 0, 0), (4, 0, 0)])) == (2, None)               # 6 / 4 would only lay it down
+    good &= ak_pick(dict(base, regen=[(-1, 0, 1)])) == (6, None)                         # flag 1 entries need reset 1
+    good &= ak_pick(dict(base, f8=0x800))[0] is None and ak_pick(dict(base, fc=2))[0] is None
+    good &= all(ak_pick(dict(base, state=s))[0] is None for s in DEATH)
+    good &= ak_pick(dict(base, state='RegenerateDeath', lp=-10.0)) == (6, None)          # a lying thrall dies for good
+    good &= ak_outcome(dict(base, state='RegenerateDeath', lp=-10.0), 6) == 'Death'
+    # every type the pick returns ends in Death (no RegenerateDeath) for any list it was checked against
+    lists = [thrall_regen, yeti_regen, [(6, 0, 0)], [(-1, 2, 0)], []]
+    for lst in lists:
+        for m in (0, 1 << 6, (1 << 6) | (1 << 4) | (1 << 2)):
+            e = dict(base, regen=lst, mask=[m])
+            t, why = ak_pick(e)
+            if t is not None: good &= ak_outcome(e, t) == 'Death' and ak_case(t, PC_CASE, 0x10) == 0
+    def guard(used, cap, lock):              # RunAkKill: no kill in the physics step or with < 60 free bodies
+        return not (lock & 1) and cap - used >= 60
+    good &= guard(0, 405, 0) and guard(345, 405, 0) and not guard(346, 405, 0) and not guard(10, 405, 1)
+    good &= not guard(405, 405, 0)                                                       # the ChunkDoll crash pool
+    print('killpath: ai.kill takes type 6 (the game\'s own Kill) unless absorbed / on the regeneration list, then 4 / 2 / '
+          '1 / 0; never with brain+8 0x800, brain+0xc bit 1 or in a death state; the TruShadowCombat table changes '
+          'nothing for these types; every pick ends in Death (counts), a lying RegenerateDeath thrall too; refused in the '
+          'physics step or with fewer than 60 of 405 bodies free  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def st_parse(text):                           # StParse: owner = intro id (kind 0) or <kind>:<id>, key u16
+    parts = text.split()
+    if len(parts) < 2: return None
+    ow, k = parts[0], parts[1]
+    kind = 0
+    if ':' in ow:
+        kind, ow = int(ow.split(':')[0]), ow.split(':')[1]
+    try:
+        owner, key = int(ow, 0), int(k, 0)
+    except ValueError:
+        return None
+    if not 0 <= kind <= 2 or key > 0xffff: return None
+    return kind, owner, key, ' '.join(parts[2:])
+
+
+def st_set(stores, text, want=None):           # RunStickySet: (store, index, value) or the refusal
+    p = st_parse(text)
+    if not p: return 'usage'
+    kind, owner, key, rest = p
+    if not rest: return 'usage'
+    hits = [(t, i) for t, ids in enumerate(stores) for i, e in enumerate(ids) if e == (owner, key, kind)]
+    hits = [h for h in hits if want is None or h[0] == want]
+    if not hits: return 'no entry'            # never created (the game's Find would append - not used)
+    if len(hits) > 1: return 'ambiguous'
+    t, i = hits[0]
+    if t == 2:
+        try:
+            v = float(rest)
+        except ValueError:
+            return 'bad value'
+    else:
+        try:
+            v = int(rest, 0)
+        except ValueError:
+            return 'bad value'
+        if t == 1 and v not in (0, 1): return 'bad value'
+    return (t, i, v)
+
+
+def check_sticky():
+    ints = [(4086, 195, 2), (11270, 8914, 0), (11270, 17287, 0), (11270, 18509, 0)]
+    bools = [(4086, 10814, 0), (11270, 10029, 0)]
+    floats = [(663, 77, 0)]
+    stores = [ints, bools, floats]
+    good = st_set(stores, '11270 17287 0') == (0, 2, 0) and st_set(stores, '11270 18509 2') == (0, 3, 2)
+    good &= st_set(stores, '11270 10029 1') == (1, 1, 1) and st_set(stores, '11270 10029 2') == 'bad value'
+    good &= st_set(stores, '663 77 0.8') == (2, 0, 0.8) and st_set(stores, '663 77 x') == 'bad value'
+    good &= st_set(stores, '11270 99 1') == 'no entry' and st_set(stores, '11270 17287') == 'usage'
+    good &= st_set(stores, '2:0x012500BA 195 4') == 'no entry'                           # kind 2 is another owner space
+    good &= st_set([ints + [(0x012500BA, 195, 2)], bools, floats], '2:0x012500BA 195 4') == (0, 4, 4)
+    dup = [ints + [(5, 5, 0)], bools + [(5, 5, 0)], floats]
+    good &= st_set(dup, '5 5 1') == 'ambiguous' and st_set(dup, '5 5 1', want=1) == (1, len(bools), 1)
+    good &= st_parse('11270') is None and st_parse('3:1 1') is None and st_parse('1 70000') is None
+    print('sticky: sticky.set finds (kind, owner, key) in the three stores without creating one, refuses an absent / '
+          'ambiguous entry and a bad value (bool 0 / 1), kind 2 owners by <kind>:<id>; the hall02 repair 11270 17287 0 / '
+          '18509 2 hits the int store  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def rk_check(inst, units, lara_unit, lara_pos, far=25000.0):   # RkCheck: 0 ok, 1 not loaded, 2 parked, 3 not drawn, 4 far
+    u = units.get(inst['unit'])
+    if not u or u['state'] != 2: return 1
+    if u['flags'] & 1: return 2
+    if inst['notdrawn']: return 3
+    d = sum((a - b) ** 2 for a, b in zip(inst['pos'], lara_pos)) ** 0.5
+    if d > far and inst['unit'] != lara_unit: return 4
+    return 0
+
+
+def goto(inst, units, lara_unit, lara_pos, force=False):   # RunGoto: jump or refuse
+    r = rk_check(inst, units, lara_unit, lara_pos)
+    return 'jump' if (r == 0 or force) else 'refused %d' % r
+
+
+def unit_go(target, lara_unit, loaded, portal_owners):    # RkUnitGoSteps
+    if target == lara_unit: return ''
+    if target in loaded and portal_owners.get(target):
+        return 'cheat.flight 1;pos.portal %s' % target
+    return 'level.load %s' % target
+
+
+def check_roomcheck():
+    units = {91: {'state': 2, 'flags': 0}, 108: {'state': 2, 'flags': 0}, 7: {'state': 2, 'flags': 1}, 5: {'state': 1, 'flags': 0}}
+    lara = (0.0, 0.0, 0.0)
+    near = {'unit': 91, 'notdrawn': 0, 'pos': (1000.0, 0.0, 0.0)}
+    good = goto(near, units, 91, lara) == 'jump'
+    spider = {'unit': 7, 'notdrawn': 0, 'pos': (43091.0, 32000.0, 0.0)}                  # live 07.11. 10:54
+    good &= goto(spider, units, 91, lara) == 'refused 2' and goto(spider, units, 91, lara, True) == 'jump'
+    good &= goto(dict(near, notdrawn=1), units, 91, lara) == 'refused 3'
+    good &= goto(dict(near, unit=5), units, 91, lara) == 'refused 1' and goto(dict(near, unit=99), units, 91, lara) == 'refused 1'
+    good &= goto(dict(near, unit=108, pos=(30000.0, 0.0, 0.0)), units, 91, lara) == 'refused 4'
+    good &= goto(dict(near, unit=91, pos=(30000.0, 0.0, 0.0)), units, 91, lara) == 'jump'   # far but in Lara's unit
+    good &= goto(dict(near, unit=108, pos=(9000.0, 0.0, 0.0)), units, 91, lara) == 'jump'   # a loaded neighbour
+    # unit.go: DLC 2 chain level2_start -> hall01 -> hall02 (docs/Befund-Unit-Streaming-0611.md)
+    loaded = {'dlc_level2_start', 'dlc_yggdrasil_hall01'}
+    owners = {'dlc_yggdrasil_hall01': 'dlc_level2_start', 'dlc_yggdrasil_hall02': 'dlc_yggdrasil_hall01'}
+    good &= unit_go('dlc_yggdrasil_hall02', 'dlc_level2_start', loaded, owners) == 'level.load dlc_yggdrasil_hall02'
+    loaded2 = {'dlc_yggdrasil_hall01', 'dlc_yggdrasil_hall02', 'dlc_level2_start'}
+    good &= unit_go('dlc_yggdrasil_hall02', 'dlc_yggdrasil_hall01', loaded2, owners) == \
+        'cheat.flight 1;pos.portal dlc_yggdrasil_hall02'
+    good &= unit_go('dlc_yggdrasil_hall02', 'dlc_yggdrasil_hall02', loaded2, owners) == ''
+    print('roomcheck: player.goto refuses a parked template (resident unit), an unloaded unit, a not drawn target and one '
+          'far outside Lara\'s unit, "force" jumps; unit.go = nothing / portal of a loaded unit / level.load (hall02 from '
+          'the DLC 2 start: level.load - two portals away)  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def sc_expand(steps, index, expansion, cap=12):   # ShortcutTick: unit.go replaced in place by its expansion
+    consumed = steps[index]
+    assert consumed.startswith('unit.go ')
+    parts = [p for p in expansion.split(';') if p]
+    if len(steps) + len(parts) - 1 > cap: return None
+    return steps[:index] + parts + steps[index + 1:]
+
+
+def check_unitgo():
+    s = ['unit.go dlc_yggdrasil_hall02', 'cheat.god 1']
+    good = sc_expand(s, 0, 'level.load dlc_yggdrasil_hall02') == ['level.load dlc_yggdrasil_hall02', 'cheat.god 1']
+    good &= sc_expand(s, 0, 'cheat.flight 1;pos.portal dlc_yggdrasil_hall02') == \
+        ['cheat.flight 1', 'pos.portal dlc_yggdrasil_hall02', 'cheat.god 1']
+    good &= sc_expand(s, 0, '') == ['cheat.god 1']                                      # Lara is in it: the step is gone
+    good &= sc_expand(['a'] * 11 + ['unit.go x'], 11, 'b;c') is None                    # 13 steps: stopped
+    good &= sc_expand(['a'] * 10 + ['unit.go x'], 10, 'b;c') == ['a'] * 10 + ['b', 'c']
+    print('unitgo: the shortcut step unit.go is replaced in place by its steps (level.load / flight + portal / nothing), '
+          'the rest keeps its order, more than 12 steps stop the run  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+def qb_recent_add(lst, row, cap):             # QbRecentAdd: (id, arg) rows, newest first, no doubles
+    if cap <= 0 or row[2] in ('label', 'planned', 'group', 'info') or row[0] == '-': return lst
+    rest = [r for r in lst if r != (row[0], row[1])]
+    return [(row[0], row[1])] + rest[:cap - 1]
+
+
+def qb_page0(favs, recent):                   # QbFavRows: favourites, then recent rows that are no favourite
+    return list(favs), [r for r in recent if not (not r[1] and r[0] in favs)]
+
+
+def check_favrecent():
+    lst = []
+    for row in [('dbg.show', 'death', 'bool'), ('cheat.flight', '', 'bool'), ('dbg.show', 'death', 'bool'),
+                ('ai.status', '', 'info'), ('-', '', 'label'), ('ai.kill', 'others', 'action')]:
+        lst = qb_recent_add(lst, row, 3)
+    good = lst == [('ai.kill', 'others'), ('dbg.show', 'death'), ('cheat.flight', '')]
+    lst = qb_recent_add(lst, ('time.scale', '', 'value'), 3)
+    good &= lst == [('time.scale', ''), ('ai.kill', 'others'), ('dbg.show', 'death')]
+    good &= qb_recent_add(lst, ('x', '', 'bool'), 0) == lst
+    favs, rec = qb_page0(['cheat.flight', 'dbg.show'], [('cheat.flight', ''), ('dbg.show', 'death'), ('ai.kill', 'others')])
+    good &= rec == [('dbg.show', 'death'), ('ai.kill', 'others')]                       # the favourite not twice
+    text = ';'.join('%s%s%s' % (i, ' ' if a else '', a) for i, a in lst)                  # [Quick] Recent round trip
+    back = [(e.split(' ', 1)[0], e.split(' ', 1)[1] if ' ' in e else '') for e in text.split(';') if e]
+    good &= back == lst and text == 'time.scale;ai.kill others;dbg.show death'
+    print('favrecent: page 0 = favourites, then the last RecentMax rows that ran (newest first, a row again moves to the '
+          'top, no info / heading / planned / group rows, no favourite twice), [Quick] Recent round trip  %s'
+          % ('ok' if good else 'FAIL'))
+    return good
+
+
+def qb_build(rows, closed):                   # QbBuild: a closed group hides its rows up to the next heading / group
+    out, hide = [], False
+    for kind, key in rows:
+        if kind in ('label', 'group'): hide = False
+        elif hide: continue
+        out.append(key)
+        if kind == 'group': hide = key in closed
+    return out
+
+
+def qb_group_set(text, key, closed):          # QbGroupSet: rewrite the comma list
+    keys = [k for k in text.split(',') if k and k != key]
+    if closed: keys.append(key)
+    return ','.join(keys)
+
+
+def check_groups():
+    rows = [('row', 'flat'), ('group', 'ki_dumm'), ('row', 'all'), ('row', 'sharks'), ('group', 'ki_spawn'), ('row', 'spawn'),
+            ('group', 'ki_weg'), ('row', 'kill'), ('label', 'other'), ('row', 'x')]
+    good = qb_build(rows, set()) == [k for _, k in rows]
+    good &= qb_build(rows, {'ki_dumm'}) == ['flat', 'ki_dumm', 'ki_spawn', 'spawn', 'ki_weg', 'kill', 'other', 'x']
+    good &= qb_build(rows, {'ki_dumm', 'ki_spawn', 'ki_weg'}) == ['flat', 'ki_dumm', 'ki_spawn', 'ki_weg', 'other', 'x']
+    good &= qb_build(rows, {'ki_weg'})[-2:] == ['other', 'x']                            # a heading ends the group
+    t = qb_group_set('', 'ki_spawn', True)
+    t = qb_group_set(t, 'ki_dumm', True)
+    good &= t == 'ki_spawn,ki_dumm' and qb_group_set(t, 'ki_spawn', False) == 'ki_dumm'
+    good &= qb_group_set(t, 'ki_dumm', True) == 'ki_spawn,ki_dumm'                      # closing twice: once
+    # the view -> row map: every shown view acts on its own row (no index shift)
+    shown = qb_build(rows, {'ki_dumm'})
+    good &= all(rows[[k for _, k in rows].index(v)][1] == v for v in shown)
+    print('groups: a closed group hides its rows up to the next heading / group, the views map to their own rows, '
+          '[Quick] Closed is rewritten as a comma list (no doubles)  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
                check_burst(), check_bits(), check_goload(), check_waitunit(), check_forget(),   # 0.20: + three
                check_soundlist(), check_mutemusic(),                                         # 0.20.1: + two
                check_spiders(), check_wobble(rng), check_drawmask(), check_shake(), check_labels(),   # 0.21: + six
-               check_airemove()]
+               check_airemove(),
+               check_killpath(), check_sticky(), check_roomcheck(), check_unitgo(), check_favrecent(),   # 0.21.1: + six
+               check_groups()]
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

@@ -55,7 +55,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
+const char *const kVersion = "TruMenu 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+                             "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
                              "spider sounds off through 6 call gates + 1 jump table word, arachno.list; camera shake "
@@ -324,6 +325,9 @@ const OptDef kOpts[] = {
     {"Menu", "FreeMouse", "1", "1 = while the menu is open the mouse belongs to the menu: a cursor is drawn, the game gets no "
                                "mouse messages (no camera\nturn, no re-centring) and its SetCursorPos / ClipCursor calls "
                                "wait until the menu closes; 0 = as before 0.7"},
+    {"Menu", "HideCursor", "0", "0.21.1 (menu.hidecursor): 1 = no mouse cursor over the game picture while the menu is "
+                                "closed (WM_SETCURSOR in the\nclient area answered with none - for pad play; the game "
+                                "memory is not touched); 0 = the game's cursor as before"},
     {"Menu", "BlockGameInput", "1", "1 = while the menu is open the game gets no keyboard: its DirectInput keyboard reads "
                                     "no key events (a key the game\nsaw going down is released once, a key still held "
                                     "at the close stays away until released) and key messages go to\nthe menu only; 0 = "
@@ -650,6 +654,9 @@ const OptDef kOpts[] = {
     {"Debug", "EnemyStateLog", "0", "0.20.1: 1 = one TruMenu.log line whenever the behaviour state of an enemy with a "
                                     "drawn label changes (dbg.enemies /\ndbg.labels; e.g. Vaulted -> Land -> Getup, "
                                     "RegenerateDeath -> Regenerate); never per frame"},
+    {"Debug", "EnemyHpBar", "1", "0.21.1 (dbg.hpbar): 1 = the enemy labels of the layer Gegner (dbg.enemies) show a health "
+                                 "bar (green -> red, LP / max LP\nof the difficulty) instead of the LP number; 0 = the "
+                                 "number as in 0.20.1"},
     {"Debug", "CheckpointHide", "", "0.17 (dbg.cp / dbg.cpall): intro ids of checkpoints whose marker is not drawn (comma "
                                     "list; written back with Persist=1);\nempty = every checkpoint drawn"},
     {"Quick", "Enabled", "1", "0.17 Schnellschalter (quick.open): 1 = OpenButtons open / close a small bar at the left "
@@ -667,6 +674,10 @@ const OptDef kOpts[] = {
     {"Quick", "Language", "de", "0.17: language of the bar, de or en (quick.lang switches it until the next start)"},
     {"Quick", "Top", "30", "0.17: top edge of the bar in percent of the screen height, 5 .. 80"},
     {"Quick", "Scale", "1.0", "0.17: text size of the bar relative to the menu font, 0.5 .. 3"},
+    {"Quick", "Closed", "", "0.21.1: keys of the closed groups of the bar (comma list; the bar rewrites it when a group is "
+                            "opened / closed:\nright = open, left = close); empty = every group open"},
+    {"Quick", "RecentMax", "8", "0.21.1: rows of 'Zuletzt' on page 0 'Favoriten / Zuletzt', 0 .. 16 (0 = no recent list)"},
+    {"Quick", "Recent", "", "0.21.1: the last bar rows that ran, newest first ('id arg;id arg'; the bar rewrites it)"},
     {"AI", "Dumb", "0", "0.19 Dumme KI (ai.dumb): enemies ignore Lara from the start - 0 = off, 1 = every AI enemy, 2 = only "
                         "the enemies whose\nobject name contains a part of DumbFilter. Switched while the game runs with "
                         "ai.dumb (ring Spieler / Debug / KI and\nSpieler / Barrierefreiheit, quick-toggle bar Render / KI "
@@ -764,6 +775,7 @@ int g_experimental = 1;
 float g_flightSpeed = 20.0f;
 int g_cmdEnabled = 1, g_cmdHistSize = 32;                                    // 0.6 [Cmd] Enabled / HistorySize
 int g_freeMouse = 1;                                                         // 0.7 [Menu] FreeMouse
+volatile LONG g_hideCursor = 0;                                              // 0.21.1 [Menu] HideCursor
 WORD g_cmdFocusButton = 0x0040;                                              // 0.7 [Cmd] FocusButton (L3)
 int g_cmdKeyboard = 1, g_cmdUpHistory = 1, g_cmdFirstPressFocus = 1;         // 0.7 [Cmd] Keyboard / UpOpensHistory /
                                                                              //     FirstPadPressOnlyFocuses
@@ -997,6 +1009,25 @@ bool ArWantsDraw();    // 0.21: spider pictures to draw (render thread)
 void ArDrawPictures(IDirect3DDevice9 *dev);
 void ArOnReset();      // 0.21: the picture's D3DPOOL_DEFAULT texture before a Reset
 void M21Shutdown();    // 0.21: every patch back at unload
+volatile LONG g_hpBar = 1;             // 0.21.1 [Debug] EnemyHpBar: a health bar on the dbg.enemies labels
+extern int g_qbRecentMax;              // 0.21.1 bar state (section "0.17 quick toggles"), for the load line
+extern char g_qbClosed[256];
+float HpMax(DWORD brain);              // 0.21.1: max LP the game's way (section "0.21.1 ai.kill"), <= 0 = unknown
+extern LONG g_phUsed, g_phCap;         // 0.21.1 physics bodies (bar count)
+extern bool g_akOk, g_stOk, g_rkOk, g_phOk;   // 0.21.1 checks (section "0.21.1 ai.kill")
+extern char g_akWhy[96], g_stWhy[96], g_rkWhy[96], g_phWhy[96];
+extern bool g_spOk;                    // 0.21.1 enemy spawn
+extern char g_spWhy[96];
+extern LONG g_spCount, g_spAt;
+int RkCheck(DWORD inst, char *unit, size_t un, int *notDrawn, float *dist);   // 0.21.1 room check
+const char *RkReason(int r, int notDrawn);
+bool RkParked(DWORD inst);
+bool RkLaraPortalTo(const char *target, float *centre);
+void RkUnitGoSteps(const char *unit, char *steps, size_t sn, char *how, size_t hn);
+const char *AkStory(DWORD inst, DWORD brain);
+const char *AdStoryHint();             // 0.21.1: the bar's confirm text for ai.remove (render thread)
+void AkTick();         // 0.21.1 ai.kill: the killed enemies' state ~1 s later (game thread, section "0.21.1 ai.kill")
+void PhTick();         // 0.21.1 physics bodies: the used count every 250 ms, threshold lines (game thread)
 extern CRITICAL_SECTION g_arLock;
 extern volatile LONG g_snOn;
 void NavTick();        // 0.12 Debug-Zeichnung: [Debug] NavDraw / NavMask once in the first loaded level (game thread)
@@ -1235,6 +1266,8 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         SndMuteTick();                        // 0.20 music / ambience mutes (cheap while off: one flag each)
         ArTick();                             // 0.21 arachnophobia: slot 7 / sound gates (only while on in a level)
         CsTick();                             // 0.21 camera shake scale / rumble (only below 100 %)
+        AkTick();                             // 0.21.1 ai.kill: one state line ~1 s after a kill (cheap while idle)
+        PhTick();                             // 0.21.1 physics bodies: one read every 250 ms
         NavTick();                           // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
         SafeGroundTick();                     // 0.8.1: player.unstuck ring
     }
@@ -1570,6 +1603,11 @@ bool IsKeyMessage(UINT msg) {
 }
 
 LRESULT CALLBACK WndProcHook(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    // 0.21.1 [Menu] HideCursor: over the game picture no cursor while the menu is closed (the borders keep theirs)
+    if (msg == WM_SETCURSOR && g_hideCursor && !g_menuOpen && LOWORD(lParam) == HTCLIENT) {
+        SetCursor(nullptr);
+        return TRUE;
+    }
     if (g_imguiReady && g_menuOpen) {           // 0.8.1 input trace: clicks and keys (no auto-repeat) as edges
         SHORT mx = static_cast<SHORT>(LOWORD(lParam)), my = static_cast<SHORT>(HIWORD(lParam));
         switch (msg) {
@@ -3725,14 +3763,43 @@ bool RunUnstuck(const char *arg, char *o, size_t n) {
         p[0], p[1], p[2]);
     return true;
 }
+// 0.21.1 room check (Lukas live 2026-11-07: player.goto of a parked small_brown_spider template put Lara into the void):
+// refused when the target's stream unit is not loaded or a resident (parked) one, when the game does not draw it, or when
+// it lies farther than kRcFar from Lara outside her unit; "player.goto <instance> force" jumps anyway
 bool RunGoto(const char *arg, char *o, size_t n) {
     DWORD player = 0;
     if (!NeedPlayer(&player, o, n)) return false;
-    DWORD inst = FindInstance(arg, o, n);
+    char a[64];
+    const char *from = arg ? arg : "";
+    while (*from == ' ') ++from;
+    strncpy_s(a, sizeof(a), from, _TRUNCATE);
+    for (size_t len = strlen(a); len && a[len - 1] == ' ';) a[--len] = 0;
+    bool force = false;
+    if (char *sp = strchr(a, ' ')) {
+        char *rest = sp + 1;
+        while (*rest == ' ') ++rest;
+        if (_stricmp(rest, "force")) { Out(o, n, "usage: player.goto <instance> [force]"); return false; }
+        force = true;
+        *sp = 0;
+    }
+    DWORD inst = FindInstance(a, o, n);
     if (!inst) return false;
+    char unit[64];
+    int notDrawn = 0;
+    float dist = 0.0f;
+    const int rc = RkCheck(inst, unit, sizeof(unit), &notDrawn, &dist);
+    if (rc && !force) {
+        Out(o, n, "refused: %s (unit %s, %.0fu from Lara) - 'player.goto %s force' jumps anyway", RkReason(rc, notDrawn),
+            unit[0] ? unit : "?", static_cast<double>(dist), a);
+        Log(1, "player.goto %s refused: %s (unit %s, %.0fu from Lara)", a, RkReason(rc, notDrawn), unit[0] ? unit : "?",
+            static_cast<double>(dist));
+        return false;
+    }
     float p[3];
     if (!ReadFloats(inst + kInstancePosition, p, 3) || !SetPosition(player, p)) { Out(o, n, "read / write failed"); return false; }
-    Out(o, n, "player at instance 0x%08lx (%.1f %.1f %.1f)", inst, p[0], p[1], p[2]);
+    if (rc) Log(1, "player.goto %s force: %s (unit %s) - jumped anyway", a, RkReason(rc, notDrawn), unit[0] ? unit : "?");
+    Out(o, n, "player at instance 0x%08lx (%.1f %.1f %.1f)%s%s", inst, p[0], p[1], p[2], rc ? " - forced: " : "",
+        rc ? RkReason(rc, notDrawn) : "");
     return true;
 }
 bool RunBring(const char *arg, char *o, size_t n) {
@@ -11350,6 +11417,29 @@ void ShortcutTick() {
         }
         if (g_scIndex >= g_scCount) { ShortcutStopLocked("done"); break; }
         const char *step = g_scSteps[g_scIndex++];
+        if (!_strnicmp(step, "unit.go ", 8)) {        // 0.21.1: decided now (portal when loaded, else level.load)
+            char unit[64], exp[200], how[200];
+            strncpy_s(unit, sizeof(unit), step + 8, _TRUNCATE);
+            RkUnitGoSteps(unit, exp, sizeof(exp), how, sizeof(how));
+            char parts[kScMaxSteps][kScStepLen];
+            int k = 0;
+            char copy[200];
+            strncpy_s(copy, sizeof(copy), exp, _TRUNCATE);
+            char *context = nullptr;
+            for (char *t = strtok_s(copy, ";", &context); t && k < kScMaxSteps; t = strtok_s(nullptr, ";", &context))
+                strncpy_s(parts[k++], kScStepLen, t, _TRUNCATE);
+            Log(1, "shortcut '%s' %d/%d: unit.go %s -> %s%s%s", g_scTitle, g_scIndex, g_scCount, unit, how, k ? " -> " : "",
+                exp);
+            if (g_scCount + k - 1 > kScMaxSteps) { ShortcutStopLocked("stopped: unit.go needs more steps than fit"); break; }
+            if (k) {                                   // the expansion takes the place of this step
+                --g_scIndex;
+                for (int j = g_scCount - 1; j > g_scIndex; --j) memcpy(g_scSteps[j + k - 1], g_scSteps[j], kScStepLen);
+                for (int j = 0; j < k; ++j) memcpy(g_scSteps[g_scIndex + j], parts[j], kScStepLen);
+                g_scCount += k - 1;
+            }
+            _snprintf_s(g_scState, sizeof(g_scState), _TRUNCATE, "%s: unit.go %s - %s", g_scTitle, unit, how);
+            break;
+        }
         if (!_strnicmp(step, "wait.unit ", 10)) {     // 0.20: a runner step, no item
             g_scWaitStream = true;
             g_scWaitStart = now;
@@ -13328,6 +13418,7 @@ struct M20Mark {
     ImU32 colour, colour2;
     float top[3];
     DWORD childIntro;                        // 0.21: the placed intro this runtime child carries (0 = placed / none)
+    float hp, hpMax;                         // 0.21.1: the health bar (hpMax <= 0 = none)
 };
 M20Mark g_coMarks[65], g_enMarks[65];
 int LfNotDrawn(DWORD inst);                  // 0.21 labels, section "0.21 arachnophobia"
@@ -13405,15 +13496,18 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
             const int ck = co ? CoKindOf(id) : -1;
             const int ek = ck < 0 && en && AiBrainOf(inst) ? EnKindOf(id) : -1;
             if (ck >= 0) {
-                bool placed = true;          // 0.21: placed intros first - also a hidden one (a broken pot's copy)
+                bool placed = true;
                 const DWORD intro = LfIntro(inst, &placed);
-                if (intro && placed && placedN < 256) {
-                    placedIntro[placedN] = intro;
-                    placedKind[placedN++] = ck;
-                }
                 if (LfNotDrawn(inst)) {      // 0.21: picked up / hidden / being removed: no label, not counted
                     ++hidden;
                 } else {
+                    // 0.21.1 (live 2026-11-07, DLC 1 pot without a label: the placed instance was the hidden template,
+                    // the drawn one its runtime copy): only a DRAWN placed instance suppresses its copies - of template
+                    // and copy the one the game draws gets the label
+                    if (intro && placed && placedN < 256) {
+                        placedIntro[placedN] = intro;
+                        placedKind[placedN++] = ck;
+                    }
                     ++coFound;
                     ++g_coKindN[ck];
                     if (DvVisible(c, p, 150.0f, &d2) && d2 <= r2)
@@ -13473,7 +13567,8 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
         else if (pot) Out(extra, sizeof(extra), " | enthaelt Artefakt");
         else if (ri) Out(extra, sizeof(extra), " | #%lu", ri);
         DvDistText(m.pos, DvOwnerUnit(m.inst), dist, sizeof(dist));
-        Out(m.line1, sizeof(m.line1), "%s %ld%s%s", name, static_cast<LONG>(intro), extra, dist);
+        Out(m.line1, sizeof(m.line1), "%s %ld%s%s%s", name, static_cast<LONG>(intro), extra, dist,
+            RkParked(m.inst) ? " | geparkt" : "");   // 0.21.1: a template in a resident (parked) unit
         if (pot && script) Out(m.line2, sizeof(m.line2), "Skript %lu (eigene Instanz)", script);
         else m.line2[0] = 0;
         m.colour = k.colour;
@@ -13498,12 +13593,21 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
         if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
         const DWORD brain = AiBrainOf(m.inst);
         float health = 0.0f;
-        if (brain && ReadFloats(brain + 0x2c64, &health, 1) && health > -1.0e6f && health < 1.0e6f)
-            Out(hp, sizeof(hp), " | LP %.0f", health);
+        m.hpMax = 0.0f;
+        if (brain && ReadFloats(brain + 0x2c64, &health, 1) && health > -1.0e6f && health < 1.0e6f) {
+            const float max = g_hpBar ? HpMax(brain) : 0.0f;   // 0.21.1: a bar instead of the number
+            if (max > 0.0f) {
+                m.hp = health;
+                m.hpMax = max;
+            } else {
+                Out(hp, sizeof(hp), " | LP %.0f", health);
+            }
+        }
         char st[64];
         EsStateText(m.inst, brain, st, sizeof(st));   // 0.20.1: behaviour state (+ rest time in RegenerateDeath)
         DvDistText(m.pos, DvOwnerUnit(m.inst), dist, sizeof(dist));
-        Out(m.line1, sizeof(m.line1), "%s %ld%s%s%s", name, static_cast<LONG>(intro), hp, st, dist);
+        Out(m.line1, sizeof(m.line1), "%s %ld%s%s%s%s", name, static_cast<LONG>(intro), hp, st, dist,
+            RkParked(m.inst) ? " | geparkt" : "");   // 0.21.1
         m.line2[0] = 0;
         m.colour = k.colour;
         m.colour2 = IM_COL32(235, 235, 235, 255);
@@ -13541,6 +13645,21 @@ bool M20Label(ImDrawList *dl, const M20Mark &m) {
     dl->AddRectFilled(ImVec2(r.x0, r.y0), ImVec2(r.x1, r.y1), IM_COL32(0, 0, 0, 170), 3.0f);
     dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 2.0f), m.colour | 0xff000000u, m.line1);
     if (m.line2[0]) dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 4.0f + fs), m.colour2 | 0xff000000u, m.line2);
+    if (m.hpMax > 0.0f) {                    // 0.21.1: health bar above the label, green -> red, the number in it
+        float f = m.hp / m.hpMax;
+        f = f < 0.0f ? 0.0f : f > 1.0f ? 1.0f : f;
+        const float bw = (w > 90.0f ? w : 90.0f), bh = fs * 0.75f, x0 = at.x - bw * 0.5f, y0 = r.y0 - bh - 3.0f;
+        const ImU32 fill = IM_COL32(static_cast<int>(230.0f * (1.0f - f) + 40.0f * f), static_cast<int>(60.0f + 160.0f * f), 50,
+                                    230);
+        dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x0 + bw, y0 + bh), IM_COL32(0, 0, 0, 190), 2.0f);
+        dl->AddRectFilled(ImVec2(x0 + 1.0f, y0 + 1.0f), ImVec2(x0 + 1.0f + (bw - 2.0f) * f, y0 + bh - 1.0f), fill, 2.0f);
+        dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + bw, y0 + bh), IM_COL32(220, 220, 220, 200), 2.0f, 0, 1.0f);
+        char num[32];
+        Out(num, sizeof(num), "%.0f / %.0f", static_cast<double>(m.hp), static_cast<double>(m.hpMax));
+        const float nfs = fs * 0.75f;
+        const ImVec2 ns = ImGui::GetFont()->CalcTextSizeA(nfs, FLT_MAX, 0.0f, num);
+        dl->AddText(ImGui::GetFont(), nfs, ImVec2(at.x - ns.x * 0.5f, y0 + (bh - ns.y) * 0.5f), IM_COL32(255, 255, 255, 255), num);
+    }
     return true;
 }
 void M20Labels(ImDrawList *dl) {
@@ -14526,6 +14645,7 @@ void SnReadOptions(const char *ini) {
     g_snOnlyPlaying = OptInt(ini, "Sound", "OnlyPlaying") != 0 ? 1 : 0;
     for (int i = 0; i < kSnCats; ++i) g_snShow[i] = OptInt(ini, "Sound", kSnShowKeys[i]) != 0 ? 1 : 0;
     g_esLog = OptInt(ini, "Debug", "EnemyStateLog") != 0 ? 1 : 0;   // enemy state lines (EsStateText)
+    g_hpBar = OptInt(ini, "Debug", "EnemyHpBar") != 0 ? 1 : 0;      // 0.21.1 health bars
 }
 // menu page Debug view, group "Ton-Liste"
 void PageSoundList() {
@@ -15842,7 +15962,7 @@ bool RunAdRemove(const char *arg, char *o, size_t n) {
     }
     char list[400] = "", kept[96] = "";
     size_t used = 0;
-    int removed = 0, failed = 0, generators = 0;
+    int removed = 0, failed = 0, generators = 0, stories = 0;
     for (int i = 0; i < nc; ++i) {
         DWORD intro = 0, object = 0, oid = 0;
         ReadDword(g_adCand[i].inst + 0x58, &intro);
@@ -15859,9 +15979,11 @@ bool RunAdRemove(const char *arg, char *o, size_t n) {
             continue;
         }
         bool gen = false;
+        const char *story = AkStory(g_adCand[i].inst, g_adCand[i].brain);   // 0.21.1: before the flags change
         if (AdRemoveOne(g_adCand[i].inst, g_adCand[i].brain, &gen)) {
             ++removed;
             if (gen) ++generators;
+            if (gen || story[0]) ++stories;
             if (used < sizeof(list) - 60)
                 LabelAdd(list, sizeof(list), &used, "%s%s %ld", used ? ", " : "", name, static_cast<LONG>(intro));
         } else {
@@ -15874,11 +15996,16 @@ bool RunAdRemove(const char *arg, char *o, size_t n) {
         "0x800, CSenseManager::RemoveInstance 0x71dcb0, %d generator notification(s), kill flag 0x20 - the sweep 0x5bcbb0 "
         "removes them with the next game frame; failed %d", a, ShotSource("ai.remove"), removed, nc,
         kept[0] ? "; kept the nearest " : "", kept, removed ? list : "nothing removed", generators, failed);
+    if (stories)                             // 0.21.1 (hall02 live 2026-11-07: the wall waits for these deaths)
+        Log(1, "ai.remove %s: WARNING %d story enemy(ies) (generator / script) removed - zaehlt nicht als Tod, Skripte "
+            "warten evtl. (a despawn never fires the death event; ai.kill kills the game's way; sticky.set repairs a "
+            "counter)", a, stories);
     if (!removed) {
         Out(o, n, "ai.remove %s: nothing removed (%d AI enemies%s)", a, nc, mode == 3 ? ", intro id not among them" : "");
         return mode != 3 && !failed;
     }
-    Out(o, n, "ai.remove %s: %d removed%s%s", a, removed, kept[0] ? ", kept " : "", kept);
+    Out(o, n, "ai.remove %s: %d removed%s%s%s", a, removed, kept[0] ? ", kept " : "", kept,
+        stories ? " - WARNUNG: Story-Gegner, zaehlt nicht als Tod - Skripte warten evtl. (ai.kill toetet)" : "");
     return !failed;
 }
 
@@ -16121,6 +16248,1015 @@ void M21Shutdown() {
     g_rbOn = false;
 }
 // ---- end of 0.21 arachnophobia ----
+
+// ---- 0.21.1 ai.kill, sticky, room check, physics bodies (Lukas live 2026-11-07, TODO.md "TruMenu 0.21.1") ----
+// Report docs\Befund-TruMenu-0211-0711.md; every byte check of this section is pinned in work\asi\menu0211\
+// precheck_0211.txt (tools/pe_bytes_check.py on the Steam exe); research dumps work\m0211_0711\dis_*.txt.
+// ai.kill nearest | others | all | <intro id> (TODO 0.21.1 item 9, docs\Befund-Hall02-Wand-0711.md): the hall02 dispatcher
+//   counts a thrall's death through the instance event vt 31, fired only by the Enter of Death / LandDeath / DrownDeath /
+//   DeferredInstantDie - an ai.remove (despawn) never counts. ai.kill takes the game's own "Kill" 0x6376e0 (cdecl (inst,
+//   vector, type, subtype); its only caller 0x63831c passes type 6 RigidBody and the vector 0xe92180) = the enemy damage
+//   function 0x637590 with amount = LP [brain+0x2c64], reset 0 and flags 3: case A of the type switch (byte table
+//   0x6376c4 -> 0x637630) takes the LP (health component 0x62e370 on brain+0x2c60; a type set in its mask +0x1c is
+//   absorbed instead), then the death check 0x620380 (skipped while brain+0xc bit 1): LP <= 0 -> ShouldRegenerate
+//   0x67f040 (Tune+0x64 list {type, -1 = any; subtype, 0 = any; flag}) = RegenerateDeath (does not count), else the
+//   death kind 0x613b40 -> 0x641650 -> 0x63d6e0(inst, EnemyState_Death 0x8ae904) = the state machine switch; the Death
+//   Enter (vtable 0x858edc slot 7 = 0x66c500) calls 0x66c310 -> 0x4b0850 = event vt 31 on the instance's script
+//   [inst+0x60]. The damage function returns at once while brain+8 & 0x800.
+//   Kill path selection per enemy (game thread, before the call): refused while brain+8 & 0x800, brain+0xc & 2 or in a
+//   death state; else the first type of 6, 4, 2, 1, 0 whose switch case is A in the live table (operand [0x637625] and
+//   bound [0x63761b] - TruShadowCombat's [Damage] Translate may point them at its own table), not absorbed by the mask
+//   and not on the enemy's regeneration list (the game's own 0x67f040 asked: a pure read). One log line per call and,
+//   about 1 s later, one line with every killed enemy's state (Death / LandDeath / ... expected).
+// ai.remove warning: an enemy from a generator (handle brain+0x4c4c) or with a script ([inst+0x60], the receiver of the
+//   death event) is a story enemy - the log line, the answer and the bar's confirm text say "zaehlt nicht als Tod".
+// sticky.get / sticky.set [int|bool|float] <owner> <key> [<value>] (docs\Befund-Saves-Sticky-0611.md section 4): owner =
+//   an intro id (kind 0) or <kind>:<id>; StickyManager impl [0xa13f18]: int store +0, bool +4, float +8; each = finder
+//   (+0 count, +8 entries of 12 bytes {u32 id, u16 key, u8 kind}, +0xc max) and values (int / float [store+0x18] + 4 k,
+//   bool bits [store+0x14], bit k & 7 of byte k >> 3). set (game thread) writes the value as the game's setters 0x4b17c0
+//   / 0x4b0900 / 0x4b1870 do and calls their change notification 0x4af740 / 0x4af6d0 / 0x4af7b0 (thiscall store, index,
+//   value: the entry's watcher); only an existing entry (never creates one); old and new value logged.
+// Room check (TODO 0.21.1 item 5): an instance's stream unit = +0xe0 (INSTANCE_SetCurrentStreamUnitID 0x5b3a56); loaded
+//   = a table entry (0xdbab40, 32 x 0xd8) with that id and state 2 (the game's lookup 0x5c1b50); entry +6 bit 0 = a
+//   resident unit, parked at (32000, 32000, -32000) and never connected (0x5d20b5): its instances are templates far
+//   outside the level ("geparkt"). player.goto refuses a parked target, one whose unit is not loaded, one the game does
+//   not draw (0.21 LfNotDrawn) and one farther than kRkFar from Lara outside her unit - "player.goto <id> force" jumps
+//   anyway. pos.go to a unit that is not loaded but a direct portal neighbour of Lara's unit starts the portal path;
+//   unit.go <unit> (also a shortcut step: the thrall-fight Prepare) = nothing when Lara is in it, flight + the portal of
+//   a loaded unit into it when it is loaded, else level.load. A target two portals away needs the engine's unit switch
+//   (docs\Befund-Unit-Streaming-0611.md H1) - not built, so level.load stays for it.
+// Physics bodies (docs\Befund-ChunkDoll-Absturz-0711.md section 6; read only, no behaviour change): PhysicsSystem
+//   [0xa037f4] (written 0x4963ba), 405 bodies (0x496373) - AllocBody 0x4e9590: free list +0x2028, lock +0x20f8 bit 0
+//   (set only in Step), used list +0x2040 (next body+0x138), used count +0x20a8; body name char[0x20] +0x110 (0x4d8c4a),
+//   owner +0x148 (0x4d8c24), an instance's body = [inst+0x274] (0x49731a). phys.status / the bar count, one log line
+//   when the used count crosses 300 / 380 / 400 (and back under 280), phys.dump = the used list grouped by name, orphans
+//   (owner 0 or [owner+0x274] != body) listed.
+// ======================================================================================================================
+struct QbChoice { const char *arg, *de, *en; };   // the bar's choice rows (moved up from the bar section in 0.21.1)
+const DWORD kAkKill = 0x006376e0, kAkVector = 0x00e92180, kAkRegen = 0x0067f040, kAkCaseOperand = 0x00637625,
+            kAkCaseBound = 0x0063761b;
+const DWORD kAkDeathStates[4] = {0x008ae904, 0x008ae928, 0x008aef34, 0x008aef7c};   // Death, LandDeath, DrownDeath,
+                                                                                     // DeferredInstantDie
+const char *const kAkDeathNames[4] = {"Death", "LandDeath", "DrownDeath", "DeferredInstantDie"};
+const int kAkTypes[5] = {6, 4, 2, 1, 0};     // 6 RigidBody (the game's own Kill), 4 Explosion, 2 Heavy, 1 Medium, 0 Light
+typedef void(__cdecl *AkKillFn)(DWORD inst, DWORD vector, int type, int subtype);
+typedef unsigned char(__cdecl *AkRegenFn)(DWORD inst, int type, int subtype, int flag);
+const DvCheck kAkChecks[] = {
+    {0x006376e0, "8b542404 8b82d0020000 85c0 7504 33c9 eb08 8b00 8b88ec020000 51 8bc4 c70003000000 d981642c0000"},   // Kill
+    {0x00637709, "8b4c2414 d95c2408 8b442410 d9442408 51 50 6a00 51 8b4c241c d91c24 51 52 e864feffff 83c41c c3"},   // ..
+    {0x0063830f, "8b4508 6a00 6a06 688021e900 50 e8bff3ffff"},   // the game's caller: type 6, vector 0xe92180
+    {0x00637595, "8b85d0020000 85c0 57 7504 33ff eb08 8b00 8bb8ec020000 8b4f08 c1e90b f6c101 0f85f7000000"},   // 0x800
+    {0x00637614, "56 8b742420 83fe"},                            // type in esi (the bound byte 0x63761b: TruShadowCombat)
+    {0x0063761c, "0f878f000000 0fb696"},                         // .. the table operand 0x637625: TruShadowCombat
+    {0x00637629, "ff2495b8766300 d9442418 56 51 8d8f602c0000 d91c24 e82c6dffff 83fe06 740a 83fe08"},   // case A
+    {0x00637658, "f644242801 7452"},                             // flags bit 0 = death check
+    {0x00637679, "e8028dfeff"},                                  // .. 0x620380
+    {0x006376b8, "30766300 85766300 b1766300 00000002 00020002 00020001 02000002 00"},   // jump table, type table
+    {0x0062e370, "8b542408 83faff 8bc1 7424 56 8bca 83e11f be01000000 d3e6 c1fa05 8574901c"},   // mask +0x1c absorbs
+    {0x006203a3, "8b510c d1ea f6d2 f6c201 0f8483000000"},        // death check: brain+0xc bit 1 = none
+    {0x006203bf, "d980642c0000 dc1db8148400 dfe0 f6c441 7a64"},  // LP <= 0
+    {0x006203e4, "e857ec0500 83c410 84c0 7417"},                 // ShouldRegenerate -> RegenerateDeath
+    {0x0062040c, "e82f37ffff"},                                  // death kind 0x613b40
+    {0x0062042a, "e821120200"},                                  // .. 0x641650
+    {0x00641701, "6804e98a00 57 8854243a e8d0bfffff"},           // EnemyState_Death 0x8ae904 -> 0x63d6e0
+    {0x0063d716, "51 8d8854120000"},                             // .. the state machine brain+0x1254
+    {0x0067f040, "8b442404 8b80d0020000 85c0 740c 8b08 8b81ec020000 85c0 7503 32c0 c3 8b9068010000 52 e8a755f9ff"},
+    {0x0067f0a0, "8b41fc 83f8ff 7408 3bc5"},                     // regeneration list: type -1 = any
+    {0x008ae904, "dc8e8500"},                                    // Death (vtable 0x858edc)
+    {0x008ae928, "348f8500"},                                    // LandDeath
+    {0x008aef34, "a49e8500"},                                    // DrownDeath
+    {0x008aef7c, "649f8500"},                                    // DeferredInstantDie
+    {0x00858ef8, "00c56600"},                                    // Death slot 7 = Enter 0x66c500
+    {0x0066c833, "8b7c241c 57 e8d3faffff"},                      // .. 0x66c310
+    {0x0066c31f, "8b4760 85c0 7409 50 e82445e4ff"},              // .. script [inst+0x60] -> event 0x4b0850
+};
+const DvCheck kStChecks[] = {
+    {0x004b1458, "a3183fa100"},                                  // StickyManager impl [0xa13f18]
+    {0x004ad560, "a1183fa100 8b00 8b481c 8b5018"},               // int store impl+0, values +0x18, size +0x1c
+    {0x004ab040, "a1183fa100 8b4004 8b4818 8b5014"},             // bool store impl+4, bits +0x14, size +0x18
+    {0x004ad580, "a1183fa100 8b4008 8b481c 8b5018"},             // float store impl+8
+    {0x004aee30, "53 668b5c240c 55 56 8bf1 33ed 392e 57 764e 8b4608"},   // Find: count +0, entries +8
+    {0x004aee50, "66395804 752f 8a4806 3a4c241a 7526 84c9 7405 80f901 7508 8b10 3b542414 744b"},   // key, kind, id
+    {0x004aee85, "83c501 83c00c 3b2e 72c1 3b6e0c"},              // 12-byte entries, max +0xc
+    {0x004b17f7, "8b4c2404 8b7118 8b442414 8b542408 890496 5e 83c408 89442408 89542404 e926dfffff"},   // int set
+    {0x004b0941, "8b7e14 8b54241c 8bc8 c1e903 03f9 8bc8 83e107 b301 d2e3 84d2 7414 081f 52 50 8bce e869edffff"},   // bool
+    {0x004b18a5, "d9442410 8b0c24 8b442404 8b5118 51 d91482 d91c24 50 e8f0deffff"},   // float set
+    {0x004af6d0, "8b442404 53 56 8d3440 57 03f6 8bf9 8b4708 03f6 8b5c3008 85db 744b"},   // notify bool ..
+    {0x004af733, "c20800"},
+    {0x004af740, "8b442404 53 56 8d3440 57 03f6 8bf9 8b4708 03f6 8b5c3008 85db 744b"},   // .. int
+    {0x004af7a3, "c20800"},
+    {0x004af7b0, "8b442404 53 56 8d3440 57 03f6 8bf9 8b4708 03f6 8b5c3008 85db 744e"},   // .. float
+    {0x004af816, "c20800"},
+};
+const DvCheck kRkChecks[] = {
+    {0x005b3a56, "899fe0000000"},                                // instance +0xe0 = stream unit id
+    {0x005c1b50, "56 8b742408 33c0 33d2 b940abdb00 8bff 80790402 7504 3931 7413 81c1d8000000"},   // lookup: state 2
+    {0x005d20b5, "f6470601 7448 f30f10051c118400"},              // +6 bit 0: resident, parked
+};
+const DvCheck kPhChecks[] = {
+    {0x004963ba, "a3f437a000"},                                  // PhysicsSystem [0xa037f4]
+    {0x00496373, "c744242895010000"},                            // 405 bodies
+    {0x004e9594, "8bbe28200000 85ff 7512"},                      // AllocBody: free list +0x2028 ..
+    {0x004e95b0, "f686f820000001 75f2 8b8738010000"},            // .. lock +0x20f8, next +0x138
+    {0x004e95d7, "8b8e40200000 898f38010000"},                   // .. used list +0x2040
+    {0x004e95f9, "8386a820000001"},                              // .. used count +0x20a8
+    {0x004d8c24, "898148010000"},                                // owner +0x148
+    {0x004d8c47, "6a20 50 8d8e10010000"},                        // name char[0x20] +0x110
+    {0x0049731a, "89be74020000"},                                // instance body [inst+0x274]
+    {0x00696cbc, "684ccf8500"},                                  // "ChunkDoll: failed to create geom"
+    {0x00696fa8, "833d70fcec0004"},                              // at most 4 chunkdolls [0xecfc70]
+};
+bool g_akOk = false, g_stOk = false, g_rkOk = false, g_phOk = false;
+char g_akWhy[96] = "not checked", g_stWhy[96] = "not checked", g_rkWhy[96] = "not checked", g_phWhy[96] = "not checked";
+
+// ---- ai.kill (game thread, queued) ----
+bool PhRead(DWORD *phys, LONG *used, LONG *cap, DWORD *lock, LONG *chunk);   // physics bodies, below
+const LONG kAkMinFreeBodies = 60;            // a death may build a chunkdoll: up to 14 bodies, at most 4 at once
+LONG g_akKilled = 0;
+char g_akLast[200] = "none yet";
+struct AkPend { DWORD inst, brain; LONG intro; char name[40]; };
+AkPend g_akPend[32];                         // game thread: the enemies of the last ai.kill, their state ~1 s later
+int g_akPendN = 0;
+DWORD g_akPendTick = 0;
+// the live type switch: 0 = case A (damage + death check), 1 = B, 2 = C / above the bound, -1 = unreadable
+int AkCaseOf(int type) {
+    DWORD table = 0;
+    BYTE bound = 0, c = 0;
+    if (!ReadDword(kAkCaseOperand, &table) || !ReadByte(kAkCaseBound, &bound)) return -1;
+    if (type < 0 || type > static_cast<int>(bound)) return 2;
+    if (!ReadByte(table + static_cast<DWORD>(type), &c)) return -1;
+    return c;
+}
+bool AkDying(DWORD brain, const char **name) {
+    DWORD st = 0;
+    if (!ReadDword(brain + 0x125c, &st)) return false;
+    for (int i = 0; i < 4; ++i)
+        if (st == kAkDeathStates[i]) { if (name) *name = kAkDeathNames[i]; return true; }
+    return false;
+}
+// the kill path for one enemy: nullptr + *type, or why not
+const char *AkPick(DWORD inst, DWORD brain, int *type) {
+    DWORD f8 = 0, fc = 0;
+    if (!ReadDword(brain + 8, &f8) || !ReadDword(brain + 0xc, &fc)) return "brain unreadable";
+    if (f8 & 0x800) return "takes no damage now (brain+8 0x800)";
+    if (fc & 2) return "no death check now (brain+0xc bit 1)";
+    if (AkDying(brain, nullptr)) return "already dying";
+    for (int t : kAkTypes) {
+        if (AkCaseOf(t) != 0) continue;
+        DWORD mask = 0;
+        if (!ReadDword(brain + 0x2c60 + 0x1c + static_cast<DWORD>(t >> 5) * 4, &mask) || ((mask >> (t & 31)) & 1)) continue;
+        unsigned char regen = 1;
+        __try {
+            regen = reinterpret_cast<AkRegenFn>(kAkRegen)(inst, t, 0, 0);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            InterlockedIncrement(&g_ownExceptions);
+            return "exception in ShouldRegenerate 0x67f040";
+        }
+        if (regen) continue;
+        *type = t;
+        return nullptr;
+    }
+    return "every type is absorbed or only lays it down (regeneration list)";
+}
+int AkKillOne(DWORD inst, int type) {
+    __try {
+        reinterpret_cast<AkKillFn>(kAkKill)(inst, kAkVector, type, 0);
+        return 1;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return 0;
+    }
+}
+// story enemy: from a generator (handle {inst, id} at brain+0x4c4c, the game's test 0x5b39d0) or with a script
+// ([inst+0x60] - the receiver of the death event); text for the log, "" = none
+const char *AkStory(DWORD inst, DWORD brain) {
+    DWORD gen = 0, genId = 0, own = 0, script = 0;
+    if (brain && ReadDword(brain + 0x4c4c, &gen) && gen && ReadDword(brain + 0x4c50, &genId) &&
+        ReadDword(gen + 0x44, &own) && own == genId)
+        return "generator";
+    if (ReadDword(inst + 0x60, &script) && script) return "script";
+    return "";
+}
+// render thread (reads only): the bar's confirm text for ai.remove - how many AI enemies are story enemies
+const char *AdStoryHint() {
+    static char text[160];
+    DWORD player = 0, inst = 0;
+    int all = 0, story = 0;
+    if (!g_adOk || !ReadDword(kPlayerPtr, &player) || !player) return nullptr;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0, brain = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        if (AdCandidate(inst, player, &brain)) {
+            ++all;
+            if (AkStory(inst, brain)[0]) ++story;
+        }
+        inst = next;
+    }
+    if (!story) return nullptr;
+    Out(text, sizeof(text), g_qbLang == 0 ? "%d von %d Gegnern sind Story-Gegner (Generator / Skript): entfernen zaehlt "
+                                            "nicht als Tod - Skripte warten evtl.; 'Toeten' zaehlt"
+                                          : "%d of %d enemies are story enemies (generator / script): removing is no death "
+                                            "- scripts may wait; 'Kill' counts", story, all);
+    return text;
+}
+const char *AkTypeName(int t) {
+    return t == 6 ? "RigidBody" : t == 4 ? "Explosion" : t == 2 ? "Heavy" : t == 1 ? "Medium" : t == 0 ? "Light" : "?";
+}
+void ValAkKill(char *o, size_t n) {
+    Out(o, n, "%s; %ld killed since the start", g_akOk ? g_akLast : g_akWhy, g_akKilled);
+}
+bool RunAkKill(const char *arg, char *o, size_t n) {
+    if (!g_akOk) { Out(o, n, "disabled: pre-check failed (%s)", g_akWhy); return false; }
+    char a[32] = "";
+    if (arg) strncpy_s(a, sizeof(a), arg, _TRUNCATE);
+    DvTrim(a);
+    int mode = -1;                           // 0 nearest, 1 others, 2 all, 3 one intro id
+    char *end = nullptr;
+    const long want = strtol(a, &end, 10);
+    if (!_stricmp(a, "nearest")) mode = 0;
+    else if (!_stricmp(a, "others")) mode = 1;
+    else if (!_stricmp(a, "all")) mode = 2;
+    else if (a[0] && end && !*end) mode = 3;
+    if (mode < 0) { Out(o, n, "usage: ai.kill nearest|others|all|<intro id>"); return false; }
+    char why[160];
+    if (!LabelWorldReady(why, sizeof(why))) { Out(o, n, "ai.kill: %s", why); return false; }
+    DWORD phys = 0, lock = 0;                // the ChunkDoll crash: never with a nearly empty body pool / in the step
+    LONG bodies = 0, cap = 0, chunk = 0;
+    if (PhRead(&phys, &bodies, &cap, &lock, &chunk) && ((lock & 1) || cap - bodies < kAkMinFreeBodies)) {
+        Out(o, n, "ai.kill refused: physics bodies %ld / %ld used%s - a death may need up to 14 for its pieces (the game's "
+            "fatal \"ChunkDoll: failed to create geom\")", bodies, cap, (lock & 1) ? ", physics step running" : "");
+        Log(1, "ai.kill %s refused: physics bodies %ld / %ld used (lock %lu, chunkdolls %ld) - fewer than %ld free", a, bodies,
+            cap, lock & 1, chunk, kAkMinFreeBodies);
+        return false;
+    }
+    DWORD player = 0, inst = 0;
+    float lara[3] = {0.0f, 0.0f, 0.0f};
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) {
+        Out(o, n, "ai.kill: no player");
+        return false;
+    }
+    int nc = 0, nearest = -1;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096 && nc < 256; ++guard) {
+        DWORD next = 0, brain = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        float p[3];
+        if (AdCandidate(inst, player, &brain) && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            const float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2];
+            g_adCand[nc].inst = inst;
+            g_adCand[nc].brain = brain;
+            g_adCand[nc].d2 = dx * dx + dy * dy + dz * dz;
+            if (nearest < 0 || g_adCand[nc].d2 < g_adCand[nearest].d2) nearest = nc;
+            ++nc;
+        }
+        inst = next;
+    }
+    char list[400] = "", skipped[300] = "", kept[96] = "";
+    size_t used = 0, usedSkip = 0;
+    int killed = 0, refused = 0, failed = 0;
+    g_akPendN = 0;
+    for (int i = 0; i < nc; ++i) {
+        DWORD intro = 0, object = 0, oid = 0;
+        ReadDword(g_adCand[i].inst + 0x58, &intro);
+        char name[64];
+        if (!ReadDword(g_adCand[i].inst + 0x10, &object) || !ReadDword(object + 0x14, &oid) ||
+            !ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name)))
+            Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        const bool take = mode == 0 ? i == nearest : mode == 1 ? i != nearest : mode == 2 ? true
+                        : static_cast<LONG>(intro) == want;
+        if (!take) {
+            if (i == nearest)
+                Out(kept, sizeof(kept), "%s %ld (%.0fu)", name, static_cast<LONG>(intro),
+                    static_cast<double>(sqrtf(g_adCand[i].d2)));
+            continue;
+        }
+        int type = -1;
+        const char *no = AkPick(g_adCand[i].inst, g_adCand[i].brain, &type);
+        if (no) {
+            ++refused;
+            if (usedSkip < sizeof(skipped) - 80)
+                LabelAdd(skipped, sizeof(skipped), &usedSkip, "%s%s %ld (%s)", usedSkip ? ", " : "", name,
+                         static_cast<LONG>(intro), no);
+            continue;
+        }
+        float lp = 0.0f;
+        ReadFloats(g_adCand[i].brain + 0x2c64, &lp, 1);
+        if (!AkKillOne(g_adCand[i].inst, type)) { ++failed; continue; }
+        ++killed;
+        float after = 0.0f;
+        ReadFloats(g_adCand[i].brain + 0x2c64, &after, 1);
+        if (used < sizeof(list) - 90)
+            LabelAdd(list, sizeof(list), &used, "%s%s %ld (type %d %s, LP %.0f -> %.0f%s%s)", used ? ", " : "", name,
+                     static_cast<LONG>(intro), type, AkTypeName(type), static_cast<double>(lp), static_cast<double>(after),
+                     AkStory(g_adCand[i].inst, g_adCand[i].brain)[0] ? ", " : "",
+                     AkStory(g_adCand[i].inst, g_adCand[i].brain));
+        if (g_akPendN < 32) {
+            AkPend &p = g_akPend[g_akPendN++];
+            p.inst = g_adCand[i].inst;
+            p.brain = g_adCand[i].brain;
+            p.intro = static_cast<LONG>(intro);
+            strncpy_s(p.name, sizeof(p.name), name, _TRUNCATE);
+        }
+    }
+    g_akPendTick = GetTickCount();
+    g_akKilled += killed;
+    Out(g_akLast, sizeof(g_akLast), "last: ai.kill %s - %d killed, %d refused, %d failed, of %d AI enemies", a, killed,
+        refused, failed, nc);
+    Log(1, "ai.kill %s (src=%s): %d of %d AI enemy(ies) killed the game's way (Kill 0x6376e0 -> damage 0x637590 -> death "
+        "check 0x620380 -> EnemyState_Death: the death event vt 31 counts in scripts)%s%s - %s; refused %d%s%s; failed %d",
+        a, ShotSource("ai.kill"), killed, nc, kept[0] ? "; kept the nearest " : "", kept, killed ? list : "nothing killed",
+        refused, refused ? ": " : "", skipped, failed);
+    if (!killed) {
+        Out(o, n, "ai.kill %s: nothing killed (%d AI enemies%s%s%s)", a, nc, mode == 3 && !refused ? ", intro id not among them"
+            : "", refused ? "; refused: " : "", skipped);
+        return false;
+    }
+    Out(o, n, "ai.kill %s: %d killed%s%s%s%s", a, killed, kept[0] ? ", kept " : "", kept, refused ? "; refused: " : "", skipped);
+    return !failed;
+}
+// game thread, every game frame: ~1 s after an ai.kill one line with the state of each killed enemy
+void AkTick() {
+    if (!g_akPendN || GetTickCount() - g_akPendTick < 1000) return;
+    char list[600] = "";
+    size_t used = 0;
+    int dying = 0;
+    for (int i = 0; i < g_akPendN; ++i) {
+        const AkPend &p = g_akPend[i];
+        const char *state = nullptr;
+        char other[32] = "?";
+        DWORD own = 0, st = 0, namePtr = 0;
+        if (!ReadDword(p.inst + 0x44, &own) || !own) {
+            state = "removed";
+        } else if (AkDying(p.brain, &state)) {
+            ++dying;
+        } else if (ReadDword(p.brain + 0x125c, &st) && st && EsInImage(st) && ReadDword(st + 8, &namePtr) &&
+                   EsInImage(namePtr) && ReadString(namePtr, other, sizeof(other))) {
+            state = other;
+        } else {
+            state = "?";
+        }
+        LabelAdd(list, sizeof(list), &used, "%s%s %ld %s", used ? ", " : "", p.name, p.intro, state);
+    }
+    Log(1, "ai.kill: 1 s later %d of %d in a death state (Death / LandDeath / DrownDeath / DeferredInstantDie fire the "
+        "count event): %s", dying, g_akPendN, list);
+    g_akPendN = 0;
+}
+
+// ---- sticky.get / sticky.set ----
+const DWORD kStImpl = 0x00a13f18, kStNotify[3] = {0x004af740, 0x004af6d0, 0x004af7b0};   // int, bool, float
+typedef unsigned char(__fastcall *StNotifyFn)(void *store, void *edx, DWORD index, DWORD value);
+typedef unsigned char(__fastcall *StNotifyFloatFn)(void *store, void *edx, DWORD index, float value);
+const char *const kStTypes[3] = {"int", "bool", "float"};
+const DWORD kStImplSlot[3] = {0, 4, 8};
+struct StHit { int type; DWORD store, index; };
+// "<owner> <key>": owner = intro id (kind 0) or <kind>:<id> (id decimal or 0x hex); false + usage text
+bool StParse(char *text, int *kind, DWORD *owner, WORD *key, char **rest, char *o, size_t n) {
+    char *context = nullptr;
+    char *ow = strtok_s(text, " ", &context), *k = strtok_s(nullptr, " ", &context);
+    *rest = strtok_s(nullptr, "", &context);
+    if (!ow || !k) { Out(o, n, "give <owner> <key>: owner = intro id (kind 0) or <kind>:<id>, key = the Symbol"); return false; }
+    *kind = 0;
+    if (char *colon = strchr(ow, ':')) {
+        *colon = 0;
+        *kind = atoi(ow);
+        ow = colon + 1;
+    }
+    char *end = nullptr;
+    *owner = strtoul(ow, &end, 0);
+    if (*kind < 0 || *kind > 2 || !end || *end) { Out(o, n, "owner '%s' is not a number (kind 0..2)", ow); return false; }
+    const unsigned long kv = strtoul(k, &end, 0);
+    if (!end || *end || kv > 0xffff) { Out(o, n, "key '%s' is not a u16 Symbol", k); return false; }
+    *key = static_cast<WORD>(kv);
+    return true;
+}
+// every store that has (kind, owner, key) - linear like StickyFinder::Find 0x4aee30, never appends
+int StFind(int kind, DWORD owner, WORD key, StHit *hits, char *why, size_t wn) {
+    DWORD impl = 0;
+    why[0] = 0;
+    if (!ReadDword(kStImpl, &impl) || !impl) { Out(why, wn, "no sticky store yet ([0xa13f18] = 0: title screen?)"); return -1; }
+    int found = 0;
+    for (int t = 0; t < 3; ++t) {
+        DWORD store = 0, count = 0, entries = 0, max = 0;
+        if (!ReadDword(impl + kStImplSlot[t], &store) || !store || !ReadDword(store, &count) ||
+            !ReadDword(store + 8, &entries) || !ReadDword(store + 0xc, &max) || !entries || count > max || max > 0x1000)
+            continue;
+        for (DWORD i = 0; i < count; ++i) {
+            DWORD id = 0;
+            WORD k = 0;
+            BYTE kd = 0;
+            const DWORD e = entries + i * 12;
+            if (!ReadDword(e, &id) || !ReadWord(e + 4, &k) || !ReadByte(e + 6, &kd)) break;
+            if (k == key && kd == kind && id == owner) {
+                hits[found].type = t;
+                hits[found].store = store;
+                hits[found++].index = i;
+                break;
+            }
+        }
+    }
+    return found;
+}
+bool StValue(const StHit &h, char *o, size_t n) {
+    DWORD base = 0, size = 0;
+    if (h.type == 1) {
+        BYTE b = 0;
+        if (!ReadDword(h.store + 0x14, &base) || !ReadDword(h.store + 0x18, &size) || (h.index >> 3) >= size ||
+            !ReadByte(base + (h.index >> 3), &b))
+            return false;
+        Out(o, n, "%d", (b >> (h.index & 7)) & 1);
+        return true;
+    }
+    if (!ReadDword(h.store + 0x18, &base) || !ReadDword(h.store + 0x1c, &size) || h.index * 4 >= size) return false;
+    if (h.type == 0) {
+        DWORD v = 0;
+        if (!ReadDword(base + h.index * 4, &v)) return false;
+        Out(o, n, "%ld", static_cast<LONG>(v));
+    } else {
+        float f = 0.0f;
+        if (!ReadFloats(base + h.index * 4, &f, 1)) return false;
+        Out(o, n, "%g", static_cast<double>(f));
+    }
+    return true;
+}
+void ValSticky(char *o, size_t n) {
+    DWORD impl = 0;
+    ReadDword(kStImpl, &impl);
+    Out(o, n, "%s; store [0xa13f18] %s", g_stOk ? "checks ok" : g_stWhy, impl ? "present" : "not created yet");
+}
+// sticky.get <owner> <key>: every store with that entry, its index and value
+bool RunStickyGet(const char *arg, char *o, size_t n) {
+    if (!g_stOk) { Out(o, n, "disabled: pre-check failed (%s)", g_stWhy); return false; }
+    char text[96];
+    strncpy_s(text, sizeof(text), arg ? arg : "", _TRUNCATE);
+    int kind = 0;
+    DWORD owner = 0;
+    WORD key = 0;
+    char *rest = nullptr, why[96];
+    if (!StParse(text, &kind, &owner, &key, &rest, o, n)) return false;
+    StHit hits[3];
+    const int k = StFind(kind, owner, key, hits, why, sizeof(why));
+    if (k < 0) { Out(o, n, "%s", why); return false; }
+    if (!k) { Out(o, n, "sticky %d:%lu key %u: no entry (not created yet - the script has not used it)", kind, owner, key); return false; }
+    size_t used = 0;
+    o[0] = 0;
+    for (int i = 0; i < k; ++i) {
+        char v[32];
+        if (!StValue(hits[i], v, sizeof(v))) Out(v, sizeof(v), "?");
+        LabelAdd(o, n, &used, "%ssticky %d:%lu key %u = %s %s (index %lu)", i ? "; " : "", kind, owner, key, kStTypes[hits[i].type],
+                 v, hits[i].index);
+    }
+    return true;
+}
+// sticky.set [int|bool|float] <owner> <key> <value> (game thread)
+bool RunStickySet(const char *arg, char *o, size_t n) {
+    if (!g_stOk) { Out(o, n, "disabled: pre-check failed (%s)", g_stWhy); return false; }
+    char text[128];
+    strncpy_s(text, sizeof(text), arg ? arg : "", _TRUNCATE);
+    DvTrim(text);
+    char *p = text;
+    int want = -1;
+    for (int t = 0; t < 3; ++t) {
+        const size_t len = strlen(kStTypes[t]);
+        if (!_strnicmp(p, kStTypes[t], len) && p[len] == ' ') { want = t; p += len + 1; break; }
+    }
+    int kind = 0;
+    DWORD owner = 0;
+    WORD key = 0;
+    char *rest = nullptr, why[96];
+    if (!StParse(p, &kind, &owner, &key, &rest, o, n)) return false;
+    if (!rest || !rest[0]) { Out(o, n, "usage: sticky.set [int|bool|float] <owner> <key> <value>"); return false; }
+    StHit hits[3];
+    const int k = StFind(kind, owner, key, hits, why, sizeof(why));
+    if (k < 0) { Out(o, n, "%s", why); return false; }
+    int pick = -1;
+    for (int i = 0; i < k; ++i)
+        if (want < 0 || hits[i].type == want) { if (pick >= 0) { pick = -2; break; } pick = i; }
+    if (pick == -2) { Out(o, n, "sticky %d:%lu key %u is in more than one store - say int / bool / float first", kind, owner, key); return false; }
+    if (pick < 0) { Out(o, n, "sticky %d:%lu key %u: no %s entry (never created - not set)", kind, owner, key, want >= 0 ? kStTypes[want] : ""); return false; }
+    const StHit &h = hits[pick];
+    char *end = nullptr;
+    DWORD value = 0;
+    float fv = 0.0f;
+    if (h.type == 2) {
+        const double d = strtod(rest, &end);
+        if (!end || *end || !(d > -1.0e9 && d < 1.0e9)) { Out(o, n, "value '%s' is not a float", rest); return false; }
+        fv = static_cast<float>(d);
+    } else {
+        const long v = strtol(rest, &end, 0);
+        if (!end || *end || (h.type == 1 && v != 0 && v != 1)) {
+            Out(o, n, "value '%s' is not %s", rest, h.type == 1 ? "0 / 1" : "an integer");
+            return false;
+        }
+        value = static_cast<DWORD>(v);
+    }
+    char before[32], after[32];
+    if (!StValue(h, before, sizeof(before))) { Out(o, n, "the value cannot be read (index %lu)", h.index); return false; }
+    bool ok = false;
+    __try {
+        if (h.type == 1) {
+            volatile BYTE *bits = reinterpret_cast<volatile BYTE *>(*reinterpret_cast<volatile DWORD *>(h.store + 0x14) +
+                                                                    (h.index >> 3));
+            const BYTE bit = static_cast<BYTE>(1u << (h.index & 7));
+            if (value) *bits = static_cast<BYTE>(*bits | bit);
+            else *bits = static_cast<BYTE>(*bits & ~bit);
+            reinterpret_cast<StNotifyFn>(kStNotify[1])(reinterpret_cast<void *>(h.store), nullptr, h.index, value);
+        } else {
+            volatile DWORD *values = reinterpret_cast<volatile DWORD *>(*reinterpret_cast<volatile DWORD *>(h.store + 0x18));
+            if (h.type == 0) {
+                values[h.index] = value;
+                reinterpret_cast<StNotifyFn>(kStNotify[0])(reinterpret_cast<void *>(h.store), nullptr, h.index, value);
+            } else {
+                reinterpret_cast<volatile float *>(values)[h.index] = fv;
+                reinterpret_cast<StNotifyFloatFn>(kStNotify[2])(reinterpret_cast<void *>(h.store), nullptr, h.index, fv);
+            }
+        }
+        ok = true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+    }
+    if (!ok) { Out(o, n, "exception while setting sticky %d:%lu key %u", kind, owner, key); return false; }
+    if (!StValue(h, after, sizeof(after))) Out(after, sizeof(after), "?");
+    Log(1, "sticky.set %s %d:%lu key %u (index %lu): %s -> %s (src=%s; the game's set + change notification 0x%08lx)",
+        kStTypes[h.type], kind, owner, key, h.index, before, after, ShotSource("sticky.set"), kStNotify[h.type]);
+    Out(o, n, "sticky %d:%lu key %u (%s): %s -> %s", kind, owner, key, kStTypes[h.type], before, after);
+    return true;
+}
+
+// ---- room check (player.goto, pos.go, labels "geparkt", unit.go) ----
+const float kRkFar = 25000.0f;               // farther from Lara and outside her unit: "outside the level?" (force)
+DWORD RkUnitEntry(DWORD id) {                // the loaded table entry of a stream unit id (as 0x5c1b50), 0 = none
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD uid = 0;
+        BYTE state = 0;
+        if (ReadByte(e + 4, &state) && state == 2 && ReadDword(e, &uid) && uid == id) return e;
+    }
+    return 0;
+}
+// 0 ok, 1 its unit is not loaded, 2 parked (resident unit), 3 not drawn (LfNotDrawn), 4 far outside Lara's unit
+int RkCheck(DWORD inst, char *unit, size_t un, int *notDrawn, float *dist) {
+    unit[0] = 0;
+    *notDrawn = 0;
+    *dist = 0.0f;
+    if (!g_rkOk) return 0;
+    DWORD id = 0, player = 0, laraId = 0;
+    if (!ReadDword(inst + 0xe0, &id)) return 1;
+    const DWORD e = RkUnitEntry(id);
+    if (!e) { Out(unit, un, "id %lu", id); return 1; }
+    ReadString(e + 0xc, unit, un);
+    WORD f6 = 0;
+    if (ReadWord(e + 6, &f6) && (f6 & 1)) return 2;
+    *notDrawn = LfNotDrawn(inst);
+    if (*notDrawn) return 3;
+    float p[3], l[3];
+    if (ReadDword(kPlayerPtr, &player) && player && ReadFloats(player + kInstancePosition, l, 3) &&
+        ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+        const float dx = p[0] - l[0], dy = p[1] - l[1], dz = p[2] - l[2];
+        *dist = sqrtf(dx * dx + dy * dy + dz * dz);
+        ReadDword(player + 0xe0, &laraId);
+        if (*dist > kRkFar && laraId != id) return 4;
+    }
+    return 0;
+}
+bool RkParked(DWORD inst) {                  // labels: the instance's unit is a resident (parked) one
+    DWORD id = 0;
+    WORD f6 = 0;
+    if (!g_rkOk || !ReadDword(inst + 0xe0, &id)) return false;
+    const DWORD e = RkUnitEntry(id);
+    return e && ReadWord(e + 6, &f6) && (f6 & 1);
+}
+const char *RkReason(int r, int notDrawn) {
+    if (r == 1) return "its stream unit is not loaded";
+    if (r == 2) return "parked: a template in a resident unit far outside the level (geparkt)";
+    if (r == 4) return "far outside Lara's unit (outside the level?)";
+    if (r == 3) return notDrawn == 1 ? "not drawn: hidden (+0x14 0x800)" : notDrawn == 2 ? "not drawn: being removed (kill flag)"
+                     : notDrawn == 3 ? "not drawn: scene entity off" : "not drawn: every draw group hidden";
+    return "ok";
+}
+// Lara's own unit has a stream portal towards <target>: its centre (the 0.20 portal read of PosPortalTo, owner = Lara)
+bool RkLaraPortalTo(const char *target, float *centre) {
+    if (!g_dvPortalOk || !g_unitOk) return false;
+    DWORD player = 0, laraId = 0;
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadDword(player + 0xe0, &laraId)) return false;
+    const DWORD e = RkUnitEntry(laraId);
+    DWORD level = 0, terrain = 0, arr = 0;
+    WORD count = 0;
+    if (!e || !ReadDword(e + 8, &level) || !level || !ReadDword(level, &terrain) || !terrain ||
+        !ReadWord(terrain + 2, &count) || count > 64 || !ReadDword(terrain + 4, &arr) || !arr)
+        return false;
+    for (DWORD i = 0; i < count; ++i) {
+        const DWORD p = arr + i * 0x100;
+        char name[48];
+        float q[4][4];
+        if (!ReadString(p, name, sizeof(name)) || _stricmp(name, target)) continue;
+        if (!ReadFloats(p + 0xb0, &q[0][0], 16) || !DvFinite(&q[0][0], 16)) continue;
+        for (int b = 0; b < 3; ++b) centre[b] = (q[0][b] + q[1][b] + q[2][b] + q[3][b]) * 0.25f;
+        return true;
+    }
+    return false;
+}
+bool PosUnitLoaded(const char *unit);        // 0.20, section "0.17 position bookmarks"
+void PosLaraUnit(char *o, size_t n);
+bool PosPortalTo(const char *target, float *centre, char *from, size_t fromSize);
+// unit.go: the steps for <unit> ("" = Lara is in it already); how = a short reason for the log
+void RkUnitGoSteps(const char *unit, char *steps, size_t sn, char *how, size_t hn) {
+    char lara[48], from[48] = "";
+    float centre[3];
+    PosLaraUnit(lara, sizeof(lara));
+    steps[0] = 0;
+    if (lara[0] && !_stricmp(lara, unit)) { Out(how, hn, "Lara is in %s already", unit); return; }
+    if (PosUnitLoaded(unit) && PosPortalTo(unit, centre, from, sizeof(from))) {
+        Out(steps, sn, "cheat.flight 1;pos.portal %s", unit);
+        Out(how, hn, "loaded - flight + the stream portal of %s into it (no level.load)", from);
+        return;
+    }
+    Out(steps, sn, "level.load %s", unit);
+    Out(how, hn, "not loaded%s - level.load (two portals away needs the engine's unit switch, not built)",
+        RkLaraPortalTo(unit, centre) ? " (a portal of Lara's unit leads there: it streams in by walking)" : "");
+}
+void ValUnitGo(char *o, size_t n) {
+    char lara[48];
+    PosLaraUnit(lara, sizeof(lara));
+    Out(o, n, "Lara's unit %s; room check %s", lara[0] ? lara : "-", g_rkOk ? "ok" : g_rkWhy);
+}
+bool RunUnitGo(const char *arg, char *o, size_t n) {
+    char unit[64];
+    strncpy_s(unit, sizeof(unit), arg ? arg : "", _TRUNCATE);
+    DvTrim(unit);
+    if (!unit[0]) { Out(o, n, "usage: unit.go <unit> (portal when loaded, else level.load)"); return false; }
+    if (!InLevel()) { Out(o, n, "needs a level"); return false; }
+    char why[200];
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: level change pending (%s)", why); return false; }
+    char steps[200], how[200], title[80];
+    RkUnitGoSteps(unit, steps, sizeof(steps), how, sizeof(how));
+    Log(1, "unit.go %s: %s%s%s (src=%s)", unit, how, steps[0] ? " -> " : "", steps, ShotSource("unit.go"));
+    if (!steps[0]) { Out(o, n, "unit.go %s: %s", unit, how); return true; }
+    Out(title, sizeof(title), "unit.go %s", unit);
+    return ShortcutStart(steps, title, o, n);
+}
+
+// ---- physics bodies (read only) ----
+const DWORD kPhSystem = 0x00a037f4, kPhChunkdolls = 0x00ecfc70;
+const LONG kPhBodies = 405;
+LONG g_phUsed = -1, g_phPeak = 0, g_phLock = 0, g_phCap = 0;   // last read (game thread tick / any reader)
+int g_phLevel = 0;                           // thresholds crossed: 0 none, 1 >= 300, 2 >= 380, 3 >= 400
+DWORD g_phTick = 0;
+bool PhRead(DWORD *phys, LONG *used, LONG *cap, DWORD *lock, LONG *chunk) {
+    DWORD p = 0, u = 0, c = 0, l = 0, k = 0;
+    if (!g_phOk || !ReadDword(kPhSystem, &p) || !p || !ReadDword(p + 0x20a8, &u) || !ReadDword(p, &c) ||
+        !ReadDword(p + 0x20f8, &l))
+        return false;
+    ReadDword(kPhChunkdolls, &k);
+    *phys = p;
+    *used = static_cast<LONG>(u);
+    *cap = static_cast<LONG>(c);
+    *lock = l;
+    *chunk = static_cast<LONG>(k);
+    return true;
+}
+void ValPhStatus(char *o, size_t n) {
+    DWORD phys = 0, lock = 0;
+    LONG used = 0, cap = 0, chunk = 0;
+    if (!g_phOk) { Out(o, n, "disabled: pre-check failed (%s)", g_phWhy); return; }
+    if (!PhRead(&phys, &used, &cap, &lock, &chunk)) { Out(o, n, "no physics system yet ([0xa037f4] = 0)"); return; }
+    Out(o, n, "bodies %ld / %ld used (%ld free; peak %ld this session), lock %lu, chunkdolls %ld / 4; PhysicsSystem 0x%08lx",
+        used, cap, cap - used, g_phPeak, lock & 1, chunk, phys);
+}
+// game thread, every game frame (cheap: one read every 250 ms): one line when the used count crosses 300 / 380 / 400
+void PhTick() {
+    if (!g_phOk) return;
+    const DWORD now = GetTickCount();
+    if (g_phTick && now - g_phTick < 250) return;
+    g_phTick = now;
+    DWORD phys = 0, lock = 0;
+    LONG used = 0, cap = 0, chunk = 0;
+    if (!PhRead(&phys, &used, &cap, &lock, &chunk)) return;
+    g_phUsed = used;
+    g_phCap = cap;
+    g_phLock = static_cast<LONG>(lock & 1);
+    if (used > g_phPeak) g_phPeak = used;
+    const int level = used >= 400 ? 3 : used >= 380 ? 2 : used >= 300 ? 1 : 0;
+    if (level > g_phLevel) {
+        Log(1, "phys: bodies used %ld / %ld (crossed %d; peak %ld), chunkdolls %ld / 4, lock %lu - an empty pool is the "
+            "\"ChunkDoll: failed to create geom\" crash; phys.dump lists the owners", used, cap,
+            level == 3 ? 400 : level == 2 ? 380 : 300, g_phPeak, chunk, lock & 1);
+        g_phLevel = level;
+    } else if (g_phLevel && used < 280) {
+        Log(1, "phys: bodies used %ld / %ld - back under 280 (peak %ld)", used, cap, g_phPeak);
+        g_phLevel = 0;
+    }
+}
+// phys.dump (game thread): the used list grouped by name (the two digits off), orphans listed one by one
+bool RunPhDump(const char *, char *o, size_t n) {
+    if (!g_phOk) { Out(o, n, "disabled: pre-check failed (%s)", g_phWhy); return false; }
+    DWORD phys = 0, lock = 0;
+    LONG used = 0, cap = 0, chunk = 0;
+    if (!PhRead(&phys, &used, &cap, &lock, &chunk)) { Out(o, n, "no physics system yet"); return false; }
+    struct Group { char name[32]; int count, orphans; };
+    static Group groups[96];
+    int gn = 0, walked = 0, orphans = 0, instances = 0;
+    DWORD body = 0;
+    ReadDword(phys + 0x2040, &body);
+    Log(1, "phys.dump (src=%s): bodies used %ld / %ld, lock %lu, chunkdolls %ld / 4 - used list [0x%08lx+0x2040]:",
+        ShotSource("phys.dump"), used, cap, lock & 1, chunk, phys);
+    for (; body && walked < kPhBodies + 5; ++walked) {
+        char name[33] = "";
+        DWORD owner = 0, ownBody = 0, next = 0;
+        ReadString(body + 0x110, name, sizeof(name));
+        ReadDword(body + 0x148, &owner);
+        const bool isInst = owner && ReadDword(owner + 0x274, &ownBody) && ownBody == body;
+        if (isInst) ++instances;
+        const size_t whole = strlen(name);   // "%s%02d" (0x497375): the object name + two digits
+        size_t len = whole;
+        while (len && name[len - 1] >= '0' && name[len - 1] <= '9' && whole - len < 2) name[--len] = 0;
+        int g = 0;
+        for (; g < gn && strcmp(groups[g].name, name); ++g) {}
+        if (g == gn && gn < 96) {
+            strncpy_s(groups[gn].name, sizeof(groups[gn].name), name[0] ? name : "(no name)", _TRUNCATE);
+            groups[gn].count = groups[gn].orphans = 0;
+            ++gn;
+        }
+        if (g < gn) ++groups[g].count;
+        if (!isInst) {
+            ++orphans;
+            if (g < gn) ++groups[g].orphans;
+            if (orphans <= 40) {
+                char raw[33] = "";
+                ReadString(body + 0x110, raw, sizeof(raw));
+                Log(1, "phys.dump: orphan body 0x%08lx '%s' owner 0x%08lx (%s)", body, raw, owner,
+                    !owner ? "no owner" : "owner's +0x274 is another body / not an instance");
+            }
+        }
+        if (!ReadDword(body + 0x138, &next)) break;
+        body = next;
+    }
+    char line[900] = "";
+    size_t u = 0;
+    for (int g = 0; g < gn; ++g)
+        LabelAdd(line, sizeof(line), &u, "%s%s x%d%s", u ? ", " : "", groups[g].name, groups[g].count,
+                 groups[g].orphans ? " (orphans)" : "");
+    Log(1, "phys.dump: %d bodies walked (count says %ld), %d owned by an instance, %d orphan(s); by name: %s", walked, used,
+        instances, orphans, line);
+    Out(o, n, "phys.dump: %d bodies (%d instance-owned, %d orphans) - TruMenu.log", walked, instances, orphans);
+    return true;
+}
+
+// ---- enemy health bar (TODO 0.21 item e; dbg.enemies labels) ----
+// max LP the game's way: 0x620cc0 (Tune [brain+0x168], walk +0x1c until a health record +0x3c, else 1.0) -> 0x6e77b0
+// (record float [difficulty], difficulty = [[0xc59264]+0x3ef98] (0x6e7710): 0 / 1 / 2, other or <= 0 -> record +4)
+const DvCheck kHpChecks[] = {
+    {0x00620cc0, "8b01 8b80d0020000 85c0 7408 8b08 8b81ec020000 8b8068010000 85c0 7505 e8bd4a0200 85c0 56 740d 83783c00 "
+                 "750b 8b401c 85c0 75f3"},
+    {0x00620cf9, "8b703c 85f6 74f5 e80b6a0c00 50 56 e8a46a0c00"},
+    {0x006e7710, "a16492c500 8b8098ef0300 c3"},
+    {0x006e77b0, "8b442408 83e800 8b4c2404 7414 83e801 740a 83e801 7523 d94108 eb07 d94104 eb02 d901"},
+};
+bool g_hpOk = false;
+char g_hpWhy[96] = "not checked";
+float HpMax(DWORD brain) {
+    DWORD tune = 0, rec = 0, save = 0, diff = 1;
+    if (!g_hpOk || !ReadDword(brain + 0x168, &tune) || !tune) return 0.0f;
+    for (int guard = 0; tune && guard < 16; ++guard) {
+        if (ReadDword(tune + 0x3c, &rec) && rec) break;
+        if (!ReadDword(tune + 0x1c, &tune)) return 0.0f;
+    }
+    if (!rec) return 0.0f;
+    if (ReadDword(0x00c59264, &save) && save) ReadDword(save + 0x3ef98, &diff);
+    float v[3] = {0.0f, 0.0f, 0.0f};
+    if (!ReadFloats(rec, v, 3)) return 0.0f;
+    float max = diff <= 2 ? v[diff] : v[1];
+    if (!(max > 0.0f)) max = v[1];
+    return max > 0.0f && max < 1.0e6f ? max : 0.0f;
+}
+void ValHpBar(char *o, size_t n) { Out(o, n, "%ld", g_hpBar); }
+bool RunHpBar(const char *arg, char *o, size_t n) {
+    if (!g_hpOk) { Out(o, n, "disabled: pre-check failed (%s)", g_hpWhy); return false; }
+    const bool on = BoolArg(arg, g_hpBar != 0);
+    InterlockedExchange(&g_hpBar, on ? 1 : 0);
+    if (g_iniPath[0]) WritePrivateProfileStringA("Debug", "EnemyHpBar", on ? "1" : "0", g_iniPath);
+    Log(1, "dbg.hpbar %d (src=%s): %s", on ? 1 : 0, ShotSource("dbg.hpbar"),
+        on ? "health bars on the enemy labels (layer Gegner / dbg.enemies)" : "LP as a number on the enemy labels");
+    Out(o, n, "dbg.hpbar %d%s", on ? 1 : 0, on && !g_dvOn[kDvEnemies] ? " - shows with the layer Gegner (dbg.enemies)" : "");
+    return true;
+}
+// ---- enemy spawn (TODO 0.21.1 item 6) ----
+// The 0.10 stage R2 path of instance.spawn, for an AI enemy object that is already loaded (no DRM load / poll here):
+// INSTANCE_BirthObjectNoParent 0x5bd0f0(StreamUnitID [0xe7f148], &pos, &rot, NULL, object, 0, 1) on the game thread.
+// Kinds = the object tracker entries (0xdb7400, 0xcc x 0x24: +8 Object*, +0xc id, +0xe status 2) whose family
+// [object+0x34] is 14 (the enemy functions - 0.21 kAdChecks 0x5c5410 / 0x8abbb4), without generators, chunkdolls, the
+// doppelganger and Lara's own objects. Place: at Lara, or 250 units in front of her along the camera's look (the 0.14
+// camera position, so only while the debug view draws; else at Lara, said in the answer); count 1 .. 5 side by side,
+// 90 units apart; Lara's rotation. Before the first spawn of a session save.backup "spawn" runs (refused if it fails).
+// Needs [Cheat] Experimental and the 0.10 spawn checks, not [Radial] Spawn (that switch keeps the ring's free-object
+// spawn). Refused while fewer than 24 instances stay free (live instances [0xd98d50], pool 1020 as 0x696fe9).
+// The spawned enemy gets no intro (no patrol / behaviour data) and its AI as the object brings it; "KI dumm only for
+// these", "model only", gear and the navmesh check are planned rows (not proven).
+const DvCheck kSpChecks[] = {
+    {0x00696fe9, "b8fc030000 2b05508dd900"},                     // live instances [0xd98d50] against 0x3fc
+};
+bool g_spOk = false;
+char g_spWhy[96] = "not checked";
+LONG g_spCount = 1, g_spAt = 0, g_spSpawned = 0;   // ai.spawncount 1 .. 5, ai.spawnat 0 lara / 1 front
+bool g_spBackedUp = false;                   // game thread: save.backup ran this session
+struct SpKind { int id; char name[48]; };
+SpKind g_spKinds[32];
+QbChoice g_spChoices[32];
+int g_spKindN = 0;
+DWORD g_spKindTick = 0;
+extern float g_dvCamPos[3];
+extern bool g_dvCamOk;
+bool SpKindName(const char *lower) {         // object names that are no enemy to place by hand
+    return !strstr(lower, "generator") && !strstr(lower, "chunkdoll") && !strstr(lower, "doppel") &&
+           strncmp(lower, "lara", 4) != 0;
+}
+// render thread, at most once a second: the AI enemy objects loaded now (the choice list of the bar row)
+void SpKindsRefresh() {
+    const DWORD now = GetTickCount();
+    if (g_spKindTick && now - g_spKindTick < 1000) return;
+    g_spKindTick = now ? now : 1;
+    int k = 0;
+    for (int i = 0; i < kObjectEntries && k < 32; ++i) {
+        const DWORD e = kObjectTable + static_cast<DWORD>(i) * 0x24;
+        WORD status = 0, oid = 0;
+        DWORD object = 0, family = 0;
+        if (!ReadWord(e + 0xe, &status) || status != 2 || !ReadWord(e + 0xc, &oid) || !ReadDword(e + 8, &object) ||
+            !object || !ReadDword(object + 0x34, &family) || family != 14)
+            continue;
+        char name[48];
+        if (!ObjectName(static_cast<int>(oid), name, sizeof(name))) continue;
+        _strlwr_s(name, sizeof(name));
+        if (!SpKindName(name)) continue;
+        g_spKinds[k].id = static_cast<int>(oid);
+        strncpy_s(g_spKinds[k].name, sizeof(g_spKinds[k].name), name, _TRUNCATE);
+        g_spChoices[k].arg = g_spChoices[k].de = g_spChoices[k].en = g_spKinds[k].name;
+        ++k;
+    }
+    g_spKindN = k;
+}
+void ValSpawnEnemy(char *o, size_t n) {
+    Out(o, n, "%s; count %ld, place %s, %ld spawned this session; %d enemy kind(s) loaded", g_spOk ? "checks ok" : g_spWhy,
+        g_spCount, g_spAt ? "front" : "lara", g_spSpawned, g_spKindN);
+}
+bool RunSpawnCount(const char *arg, char *o, size_t n) {
+    const long v = arg && arg[0] ? strtol(arg, nullptr, 10) : g_spCount % 5 + 1;
+    if (v < 1 || v > 5) { Out(o, n, "usage: ai.spawncount 1 .. 5"); return false; }
+    g_spCount = v;
+    Out(o, n, "ai.spawncount %ld", v);
+    return true;
+}
+bool RunSpawnAt(const char *arg, char *o, size_t n) {
+    char a[16] = "";
+    if (arg) strncpy_s(a, sizeof(a), arg, _TRUNCATE);
+    DvTrim(a);
+    if (!_stricmp(a, "lara")) g_spAt = 0;
+    else if (!_stricmp(a, "front")) g_spAt = 1;
+    else if (!a[0]) g_spAt = !g_spAt;
+    else { Out(o, n, "usage: ai.spawnat lara|front"); return false; }
+    Out(o, n, "ai.spawnat %s", g_spAt ? "front" : "lara");
+    return true;
+}
+bool RunSaveBackup(const char *arg, char *o, size_t n);   // 0.9 saves
+// ai.spawn <object> [count] [lara|front] (game thread)
+bool RunAiSpawn(const char *arg, char *o, size_t n) {
+    if (!g_spOk) { Out(o, n, "disabled: pre-check failed (%s)", g_spWhy); return false; }
+    if (!g_experimental) { Out(o, n, "experimental actions off ([Cheat] Experimental=0)"); return false; }
+    char a[96] = "";
+    if (arg) strncpy_s(a, sizeof(a), arg, _TRUNCATE);
+    char *context = nullptr, *name = strtok_s(a, " ", &context);
+    long count = g_spCount, at = g_spAt;
+    for (char *t = strtok_s(nullptr, " ", &context); t; t = strtok_s(nullptr, " ", &context)) {
+        if (!_stricmp(t, "lara")) at = 0;
+        else if (!_stricmp(t, "front")) at = 1;
+        else if (t[0] >= '1' && t[0] <= '5' && !t[1]) count = t[0] - '0';
+        else { Out(o, n, "usage: ai.spawn <object> [1..5] [lara|front]"); return false; }
+    }
+    if (!name || !name[0]) { Out(o, n, "usage: ai.spawn <object> [1..5] [lara|front] (an AI enemy loaded in this level)"); return false; }
+    _strlwr_s(name, strlen(name) + 1);
+    DWORD state = 0, player = 0, live = 0;
+    ReadDword(kMainState, &state);
+    if (!InLevel() || state != 1 || !ReadDword(kPlayerPtr, &player) || !player) {
+        Out(o, n, "in a level only (main state %lu, needs 1)", state);
+        return false;
+    }
+    char why[160];
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: %s", why); return false; }
+    const int id = ObjectId(name);
+    int freeCount = 0;
+    const int entry = id ? TrackerScan(id, &freeCount) : -1;
+    DWORD object = 0, family = 0;
+    WORD status = 0;
+    const DWORD e = entry >= 0 ? kObjectTable + static_cast<DWORD>(entry) * 0x24 : 0;
+    if (!e || !ReadWord(e + 0xe, &status) || status != 2 || !ReadDword(e + 8, &object) || !object ||
+        !ReadDword(object + 0x34, &family) || family != 14 || !SpKindName(name)) {
+        Out(o, n, "refused: %s is no AI enemy object loaded in this level (bar: the kind list)", name);
+        return false;
+    }
+    if (ReadDword(0x00d98d50, &live) && live + static_cast<DWORD>(count) > 0x3fc - 24) {
+        Out(o, n, "refused: %lu live instances - fewer than 24 would stay free of 1020", live);
+        return false;
+    }
+    if (!g_spBackedUp) {                     // once per session, before the first spawn
+        char b[300];
+        if (!RunSaveBackup("spawn", b, sizeof(b))) { Out(o, n, "refused: save.backup before the first spawn failed (%s)", b); return false; }
+        g_spBackedUp = true;
+        Log(1, "ai.spawn: save.backup before the first spawn of this session: %s", b);
+    }
+    __declspec(align(16)) float lara[4] = {0, 0, 0, 0}, rot[4] = {0, 0, 0, 0};
+    ReadFloats(player + kInstancePosition, lara, 3);
+    ReadFloats(player + kInstanceRotation, rot, 3);
+    float dir[2] = {0.0f, 0.0f};
+    bool front = false;
+    if (at && g_dvCamOk) {                   // the camera's look, flat
+        const float dx = lara[0] - g_dvCamPos[0], dy = lara[1] - g_dvCamPos[1], len = sqrtf(dx * dx + dy * dy);
+        if (len > 1.0f) { dir[0] = dx / len; dir[1] = dy / len; front = true; }
+    }
+    DWORD unitId = 0;
+    ReadDword(kUnitId, &unitId);
+    int born = 0;
+    char list[200] = "";
+    size_t used = 0;
+    for (long i = 0; i < count; ++i) {
+        __declspec(align(16)) float pos[4] = {lara[0], lara[1], lara[2], 0.0f};
+        const float side = (static_cast<float>(i) - static_cast<float>(count - 1) * 0.5f) * 90.0f;
+        if (front) {
+            pos[0] += dir[0] * 250.0f - dir[1] * side;
+            pos[1] += dir[1] * 250.0f + dir[0] * side;
+        } else {
+            pos[0] += side;
+        }
+        DWORD inst = 0;
+        __try {
+            inst = reinterpret_cast<BirthObjectFn>(kBirthObject)(unitId, pos, rot, nullptr, object, 0, 1);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            InterlockedIncrement(&g_ownExceptions);
+            Out(o, n, "exception while spawning %s (object 0x%08lx)", name, object);
+            Log(0, "ai.spawn: exception (%s, object 0x%08lx, %d born before)", name, object, born);
+            return false;
+        }
+        if (!inst) break;
+        ++born;
+        LabelAdd(list, sizeof(list), &used, "%s0x%08lx", used ? ", " : "", inst);
+    }
+    g_spSpawned += born;
+    InterlockedExchangeAdd(&g_spawnCount, born);
+    Log(1, "ai.spawn %s x%ld (src=%s): %d born %s Lara (%.0f %.0f %.0f), unit %lu: %s%s", name, count, ShotSource("ai.spawn"),
+        born, front ? "250u in front of" : "at", lara[0], lara[1], lara[2], unitId, born ? list : "none",
+        at && !front ? " - 'front' needs the debug view's camera (placed at Lara)" : "");
+    if (!born) { Out(o, n, "INSTANCE_BirthObjectNoParent returned 0 for %s", name); return false; }
+    Out(o, n, "%d x %s %s Lara%s (remove: ai.remove / kill: ai.kill)", born, name, front ? "in front of" : "at",
+        at && !front ? " (front needs the debug view's camera)" : "");
+    return true;
+}
+
+void M211Check() {
+    DWORD at = 0;
+    g_akOk = g_aiOk && g_adOk && DvChecks(kAkChecks, sizeof(kAkChecks) / sizeof(kAkChecks[0]), &at);
+    if (g_akOk) Out(g_akWhy, sizeof(g_akWhy), "ok");
+    else Out(g_akWhy, sizeof(g_akWhy), !g_aiOk || !g_adOk ? "needs the 0.19 brain / 0.21 ai.remove checks"
+                                                          : "kill / death code differs at 0x%08lx", at);
+    at = 0;
+    g_stOk = DvChecks(kStChecks, sizeof(kStChecks) / sizeof(kStChecks[0]), &at);
+    if (g_stOk) Out(g_stWhy, sizeof(g_stWhy), "ok");
+    else Out(g_stWhy, sizeof(g_stWhy), "sticky store code differs at 0x%08lx", at);
+    at = 0;
+    g_rkOk = g_unitOk && DvChecks(kRkChecks, sizeof(kRkChecks) / sizeof(kRkChecks[0]), &at);
+    if (g_rkOk) Out(g_rkWhy, sizeof(g_rkWhy), "ok");
+    else Out(g_rkWhy, sizeof(g_rkWhy), !g_unitOk ? "needs the stream unit checks" : "stream unit code differs at 0x%08lx", at);
+    at = 0;
+    g_spOk = g_spawnOk && g_aiOk && DvChecks(kSpChecks, sizeof(kSpChecks) / sizeof(kSpChecks[0]), &at);
+    if (g_spOk) Out(g_spWhy, sizeof(g_spWhy), "ok");
+    else Out(g_spWhy, sizeof(g_spWhy), !g_spawnOk || !g_aiOk ? "needs the 0.10 spawn / 0.19 brain checks"
+                                                             : "instance budget code differs at 0x%08lx", at);
+    at = 0;
+    g_hpOk = DvChecks(kHpChecks, sizeof(kHpChecks) / sizeof(kHpChecks[0]), &at);
+    if (g_hpOk) Out(g_hpWhy, sizeof(g_hpWhy), "ok");
+    else Out(g_hpWhy, sizeof(g_hpWhy), "max health code differs at 0x%08lx", at);
+    at = 0;
+    g_phOk = DvChecks(kPhChecks, sizeof(kPhChecks) / sizeof(kPhChecks[0]), &at);
+    if (g_phOk) Out(g_phWhy, sizeof(g_phWhy), "ok");
+    else Out(g_phWhy, sizeof(g_phWhy), "physics body code differs at 0x%08lx", at);
+    Log(g_akOk && g_stOk && g_rkOk && g_phOk && g_spOk ? 1 : 0, "0.21.1: ai.kill %s (%d checks), sticky %s (%d checks), "
+        "room check %s (%d checks), physics bodies %s (%d checks), enemy spawn %s (%d check), health bar %s (%d checks); "
+        "[Debug] EnemyHpBar %ld, [Menu] HideCursor %ld, [Quick] RecentMax %d, Closed '%s'", g_akWhy,
+        static_cast<int>(sizeof(kAkChecks) / sizeof(kAkChecks[0])), g_stWhy,
+        static_cast<int>(sizeof(kStChecks) / sizeof(kStChecks[0])), g_rkWhy,
+        static_cast<int>(sizeof(kRkChecks) / sizeof(kRkChecks[0])), g_phWhy,
+        static_cast<int>(sizeof(kPhChecks) / sizeof(kPhChecks[0])), g_spWhy,
+        static_cast<int>(sizeof(kSpChecks) / sizeof(kSpChecks[0])), g_hpWhy,
+        static_cast<int>(sizeof(kHpChecks) / sizeof(kHpChecks[0])), g_hpBar, g_hideCursor, g_qbRecentMax, g_qbClosed);
+}
+// ---- menu.hidecursor (no game memory: the window procedure answers WM_SETCURSOR) ----
+void ValHideCursor(char *o, size_t n) { Out(o, n, "%ld", g_hideCursor); }
+bool RunHideCursor(const char *arg, char *o, size_t n) {
+    const bool on = BoolArg(arg, g_hideCursor != 0);
+    InterlockedExchange(&g_hideCursor, on ? 1 : 0);
+    if (g_iniPath[0]) WritePrivateProfileStringA("Menu", "HideCursor", on ? "1" : "0", g_iniPath);
+    Log(1, "menu.hidecursor %d (src=%s): %s", on ? 1 : 0, ShotSource("menu.hidecursor"),
+        on ? "no cursor over the game picture while the menu is closed" : "the game's cursor as before");
+    Out(o, n, "menu.hidecursor %d", on ? 1 : 0);
+    return true;
+}
+// ---- end of 0.21.1 ai.kill ----
 
 // ======================================================================================================================
 // 0.10.5 [Shot]: in-game screenshots and Claude marks (owner wish 2026-11-05: the main session gets named shots in the
@@ -17955,6 +19091,30 @@ const Item kItems[] = {
      nullptr},
     {"ai.remove", "action", "0.21 nearest|others|all|<intro id>: AI enemies out of the world the game's despawn way (others "
                             "= every one but the nearest to Lara)", true, ValAdRemove, RunAdRemove},
+    // 0.21.1 (section "0.21.1 ai.kill")
+    {"ai.kill", "action", "0.21.1 nearest|others|all|<intro id>: AI enemies killed the game's way (Kill 0x6376e0: death "
+                          "state, scripts count it - unlike ai.remove)", true, ValAkKill, RunAkKill},
+    {"sticky.get", "action", "0.21.1 <owner> <key>: a sticky script value (owner = intro id or <kind>:<id>, key = Symbol)",
+     false, ValSticky, RunStickyGet},
+    {"sticky.set", "action", "0.21.1 [int|bool|float] <owner> <key> <value>: set an existing sticky value the game's way "
+                             "(old / new value logged) - e.g. 11270 17287 0 (hall02 population)", true, ValSticky,
+     RunStickySet},
+    {"unit.go", "action", "0.21.1 <unit>: Lara into a unit - the stream portal of a loaded unit when it is loaded, else "
+                          "level.load (also a shortcut step)", false, ValUnitGo, RunUnitGo},
+    {"phys.status", "info", "0.21.1: physics bodies used / 405 (the ChunkDoll crash pool), peak, lock, chunkdolls", false,
+     ValPhStatus, nullptr},
+    {"phys.dump", "action", "0.21.1: the used physics bodies by name, orphans listed, into TruMenu.log", true, ValPhStatus,
+     RunPhDump},
+    {"ai.spawn", "action", "0.21.1 <object> [1..5] [lara|front]: AI enemies of a kind loaded in this level at / in front of "
+                           "Lara (INSTANCE_BirthObjectNoParent; save.backup before the first)", true, ValSpawnEnemy,
+     RunAiSpawn},
+    {"ai.spawncount", "action", "0.21.1 <1..5>: how many ai.spawn places (bar row Anzahl)", false, ValSpawnEnemy,
+     RunSpawnCount},
+    {"ai.spawnat", "action", "0.21.1 lara|front: where ai.spawn places (bar row Ort)", false, ValSpawnEnemy, RunSpawnAt},
+    {"dbg.hpbar", "bool", "0.21.1: health bars (green -> red, LP / max LP) on the enemy labels of the layer Gegner instead of "
+                          "the LP number ([Debug] EnemyHpBar)", false, ValHpBar, RunHpBar},
+    {"menu.hidecursor", "bool", "0.21.1: no mouse cursor over the game picture while the menu is closed ([Menu] HideCursor, "
+                                "kept in TruMenu.ini)", false, ValHideCursor, RunHideCursor},
 };
 
 const Item *FindItem(const char *id) {
@@ -19750,7 +20910,11 @@ const char *RadialWhy(const RadItem &e) {
         const char *aiWhy = AiRadWhy(id);
         if (aiWhy[0]) return aiWhy;
         if (!_stricmp(id, "ai.remove") && !g_adOk) return g_adWhy;   // 0.21
+        if (!_stricmp(id, "ai.kill") && !g_akOk) return g_akWhy;     // 0.21.1
+        if (!_stricmp(id, "ai.spawn") && !g_spOk) return g_spWhy;
     }
+    if (!_strnicmp(id, "sticky.", 7) && !g_stOk) return g_stWhy;     // 0.21.1
+    if (!_strnicmp(id, "phys.", 5) && !g_phOk) return g_phWhy;
     if (!_strnicmp(id, "arachno.", 8) || !_strnicmp(id, "cam.", 4)) {   // 0.21: byte checks of the part
         const char *m21Why = M21RadWhy(id);
         if (m21Why[0]) return m21Why;
@@ -19810,6 +20974,8 @@ bool ItemValueShort(const char *id, bool de, char *o, size_t n) {
     else if (!_stricmp(id, "snd.sort")) Out(o, n, "%s", de ? kSnSortDe[g_snSort] : kSnSortNames[g_snSort]);
     else if (!_stricmp(id, "cam.shakescale")) Out(o, n, "%ld%%", g_csShake);                          // 0.21
     else if (!_stricmp(id, "cam.rumble")) Out(o, n, "%ld%%", g_rbRumble);
+    else if (!_stricmp(id, "ai.spawncount")) Out(o, n, "%ld", g_spCount);                               // 0.21.1
+    else if (!_stricmp(id, "ai.spawnat")) Out(o, n, "%s", g_spAt ? (de ? "vor Lara" : "in front") : (de ? "bei Lara" : "at Lara"));
     else return false;
     return true;
 }
@@ -21406,17 +22572,20 @@ void PageMarkup() {
 // Pages with special rows (positions, checkpoints, saves) are built in the section "0.18 quick-toggle pages" below.
 // kQbLabel = a group heading (id "-"), kQbPlanned = a planned function (id "-", greyed, right = what it will do; arg =
 // "German text|English text")
-enum QbKind { kQbBool = 0, kQbValue, kQbAction, kQbInfo, kQbChoice, kQbLabel, kQbPlanned };
+enum QbKind { kQbBool = 0, kQbValue, kQbAction, kQbInfo, kQbChoice, kQbLabel, kQbPlanned,
+              kQbGroup };                  // 0.21.1: a collapsible group heading (arg = its key in [Quick] Closed)
 enum QbFlag { kQfConfirm = 1, kQfBackup = 2 };
 enum QbCount { kQcNone = 0, kQcLayer, kQcTriggers, kQcTrgLabels, kQcLaraIn, kQcEncl, kQcLabels, kQcMarkup, kQcFlat, kQcOn,
-               kQcCine, kQcAi };          // 0.19 kQcAi: enemies in the ai.dumb scope (last frame)
+               kQcCine, kQcAi,            // 0.19 kQcAi: enemies in the ai.dumb scope (last frame)
+               kQcPhys };                 // 0.21.1: physics bodies used / capacity
 enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvPass, kQvLang, kQvTime, kQvMark, kQvWeapon,
              kQvAssist, kQvAiMode,       // 0.19 kQvAiMode: ai.mode purge / gate
              kQvSndPos, kQvSndLines, kQvSndSort,     // 0.20.1 sound list: corner, lines, order
-             kQvShake, kQvRumble };                  // 0.21 camera shake / rumble 0 / 50 / 100 %
+             kQvShake, kQvRumble,                    // 0.21 camera shake / rumble 0 / 50 / 100 %
+             kQvSpawnKind, kQvSpawnCount, kQvSpawnAt };   // 0.21.1 enemy spawn: kind (choice), count 1 .. 5, place
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
-enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves };
+enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves, kQsFav, kQsTests };   // 0.21.1 kQsFav / kQsTests
 struct QbPage { const char *de, *en; const QbRow *rows; int n; int special; };
 const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230, 255, 255),
             kQbPlayer = IM_COL32(255, 205, 120, 255), kQbGrey = IM_COL32(200, 200, 200, 255),
@@ -21429,7 +22598,6 @@ const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230
             kQbPhobia = IM_COL32(170, 235, 200, 255);  // 0.21 Arachnophobie / camera rows
 // choice rows: the arguments a choice row cycles through (claude.mark kinds as the ring level Claude, the five ring
 // weapons of Waffen)
-struct QbChoice { const char *arg, *de, *en; };
 const QbChoice kQbMarks[] = {{"now", "Jetzt", "now"}, {"good", "Gut", "good"}, {"bug", "Fehler", "bug"},
                              {"gfx", "Grafik", "graphics"}, {"sound", "Ton", "sound"}, {"stutter", "Ruckler", "stutter"}};
 const QbChoice kQbWeapons[] = {{"wp_shotgun", "Schrotflinte", "shotgun"}, {"wp_uzi", "Uzis", "Uzis"},
@@ -21474,6 +22642,7 @@ const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Legende", "Legend", "dbg.legend", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
     {"Zwischensequenz-Fotos", "Cutscene shots", "shot.oncine", "", kQbBool, -1, kQcCine, 0, kQbPlayer, 0},
     {"Sprache", "Language", "quick.lang", "", kQbValue, -1, kQcNone, kQvLang, kQbGrey, 0},
+    {"Mauszeiger aus", "Mouse cursor off", "menu.hidecursor", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},   // 0.21.1
     {"Tiefe", "Depth", "dbg.depth", "", kQbValue, -1, kQcNone, kQvDepth, kQbBlue},
     {"Deckkraft", "Opacity", "dbg.alpha", "", kQbValue, -1, kQcNone, kQvAlpha, kQbBlue},
     {"Helligkeit", "Brightness", "dbg.bright", "", kQbValue, -1, kQcNone, kQvBright, kQbBlue},
@@ -21504,12 +22673,18 @@ const QbRow kQbRender[] = {
     {"Gegner-Kollision", "Enemy collision", "dbg.enemycoll", "", kQbBool, kDvEnemyColl, kQcLayer, 0, 0},
     {"Gegner", "Enemies", "dbg.enemies", "", kQbBool, kDvEnemies, kQcLayer, 0, 0},              // 0.20
     {"Gegner-Leben zeigen", "Enemy health", "cheat.enemyhealth", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},   // 0.20
+    {"Lebensleiste (Gegner)", "Health bar (enemies)", "dbg.hpbar", "", kQbBool, -1, kQcNone, 0, kQbThrall, 0},   // 0.21.1
     {"Thrall-Labels", "Thrall labels", "dbg.labels", "", kQbBool, -1, kQcLabels, 0, kQbThrall},   // 0.17 KI / Namen
     {"Objektnamen", "Object names", "dbg.names", "", kQbBool, kDvNames, kQcLayer, 0, 0},
     {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},
     {"Nur Kanten", "Ledges only", "draw.ledges", "", kQbBool, -1, kQcNone, 0, kQbMarkup},
-    // 0.19 Dumme KI: one setting at a time (switching a group on replaces the other); the count = enemies in scope
-    {"KI: Gegner ignorieren Lara", "AI: enemies ignore Lara", "-", "", kQbLabel, -1, kQcNone, 0, kQbAi, 0},
+    // 0.21.1 (ChunkDoll crash, docs\Befund-ChunkDoll-Absturz-0711.md): physics bodies used / 405, read only
+    {"Physik-Koerper", "Physics bodies", "phys.status", "", kQbInfo, -1, kQcPhys, 0, kQbFlat, 0},
+    {"Physik-Koerper ins Log", "Physics bodies to log", "phys.dump", "", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    // 0.19 Dumme KI: one setting at a time (switching a group on replaces the other); the count = enemies in scope.
+    // 0.21.1 (TODO 0.21.1 items 6 / 7): the KI rows in three collapsible groups
+    {"Dumme KI (Gegner ignorieren Lara)", "Dumb AI (enemies ignore Lara)", "-", "ki_dumm", kQbGroup, -1, kQcNone, 0,
+     kQbAi, 0},
     {"Alle Gegner", "Every enemy", "ai.dumb", "all", kQbBool, -1, kQcAi, 0, kQbAi, 0},
     {"Haie", "Sharks", "ai.dumb", "sharks", kQbBool, -1, kQcAi, 0, kQbAi, 0},
     {"Spinnen", "Spiders", "ai.dumb", "spiders", kQbBool, -1, kQcAi, 0, kQbAi, 0},
@@ -21519,11 +22694,38 @@ const QbRow kQbRender[] = {
     {"Nicht angreifen", "No attacks", "ai.noattack", "", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"KI-Weg", "AI method", "ai.mode", "", kQbValue, -1, kQcNone, kQvAiMode, kQbAi, 0},
     {"KI: Stand", "AI state", "ai.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
-    // 0.21 ai.remove (Lukas live: too many tutorial thralls for a finisher test): the game's despawn, right twice
-    {"KI-Gegner entfernen", "Remove AI enemies", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
-    {"Alle bis auf den naechsten", "All but the nearest", "ai.remove", "others", kQbAction, -1, kQcNone, 0, kQbRed,
+    // 0.21.1 Gegner spawnen (section "0.21.1 enemy spawn"): kind = an AI enemy object loaded in this level
+    {"Gegner spawnen", "Spawn enemies", "-", "ki_spawn", kQbGroup, -1, kQcNone, 0, kQbAi, 0},
+    {"Spawnen", "Spawn", "ai.spawn", "", kQbChoice, -1, kQcNone, kQvSpawnKind, kQbAi, kQfConfirm},
+    {"  Anzahl", "  Count", "ai.spawncount", "", kQbValue, -1, kQcNone, kQvSpawnCount, kQbAi, 0},
+    {"  Ort", "  Place", "ai.spawnat", "", kQbValue, -1, kQcNone, kQvSpawnAt, kQbAi, 0},
+    {"  Modus: KI dumm (nur diese)", "  Mode: dumb AI (only these)", "-", "nur die gespawnten ignorieren Lara (eigene "
+     "Liste fuer ai.dumb) - geplant|only the spawned ones ignore Lara (own list for ai.dumb) - planned", kQbPlanned, -1,
+     kQcNone, 0, 0, 0},
+    {"  Modus: nur Modell", "  Mode: model only", "-", "Gehirn angehalten - sicherer Weg nicht belegt|brain stopped - no "
+     "proven safe way yet", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"  Ausruestung / Verhalten", "  Gear / behaviour", "-", "Waffe / Items menschlicher Gegner, Patrouille / Wache aus "
+     "den Intro-Daten - erst klaeren|weapon / items of human enemies, patrol / guard from the intro data - research first",
+     kQbPlanned, -1, kQcNone, 0, 0, 0},
+    {"  Navmesh-Pruefung", "  Navmesh check", "-", "Spawn-Ort auf dem Navmesh pruefen (sonst steckt die KI fest)|check the "
+     "spawn spot on the navmesh (else the AI gets stuck)", kQbPlanned, -1, kQcNone, 0, 0, 0},
+    // 0.21 ai.remove (Lukas live: too many tutorial thralls for a finisher test): the game's despawn, right twice;
+    // 0.21.1 ai.kill (hall02 wall: a despawn never counts as a death) - the game's own kill, right twice
+    {"Gegner entfernen / toeten", "Remove / kill enemies", "-", "ki_weg", kQbGroup, -1, kQcNone, 0, kQbRed, 0},
+    {"Toeten: alle bis auf den naechsten", "Kill: all but the nearest", "ai.kill", "others", kQbAction, -1, kQcNone, 0,
+     kQbRed, kQfConfirm},
+    {"Toeten: den naechsten", "Kill: the nearest", "ai.kill", "nearest", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Toeten: alle", "Kill: all", "ai.kill", "all", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Entfernen: alle bis auf den naechsten", "Remove: all but the nearest", "ai.remove", "others", kQbAction, -1, kQcNone,
+     0, kQbRed, kQfConfirm},
+    {"Entfernen: den naechsten", "Remove: the nearest", "ai.remove", "nearest", kQbAction, -1, kQcNone, 0, kQbRed,
      kQfConfirm},
-    {"Den naechsten", "The nearest", "ai.remove", "nearest", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    // 0.21.1 hall02 wall (docs\Befund-Hall02-Wand-0711.md): dispatcher 11270 population = 0, tutorial = 2 (sticky.set,
+    // right twice); then walk through the arena trigger 11268
+    {"hall02: Population = 0", "hall02: population = 0", "sticky.set", "11270 17287 0", kQbAction, -1, kQcNone, 0, kQbRed,
+     kQfConfirm},
+    {"hall02: Tutorial = 2", "hall02: tutorial = 2", "sticky.set", "11270 18509 2", kQbAction, -1, kQcNone, 0, kQbRed,
+     kQfConfirm},
 };
 const QbRow kQbLevel[] = {
     {"Alle Trigger", "All triggers", "dbg.triggers", "", kQbBool, -1, kQcTriggers, 0, kQbWhite},
@@ -21613,6 +22815,8 @@ const QbRow kQbAccess[] = {
     {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Befreien: Stand", "Safe ground state", "player.safeground", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Unverwundbar (Hilfe)", "Invincible (assist)", "player.invincible", "", kQbBool, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Mauszeiger aus (Pad-Spiel)", "Mouse cursor off (pad play)", "menu.hidecursor", "", kQbBool, -1, kQcNone, 0, kQbGrey,
+     0},                                     // 0.21.1
     {"Gott voll (Hilfe)", "Full god mode (assist)", "cheat.godfull", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Reaktions-Momente", "Reaction moments", "-", "Adrenalin-Momente laenger oder automatisch|adrenaline moments longer "
      "or automatic", kQbPlanned, -1, kQcNone, 0, 0, 0},
@@ -21649,14 +22853,25 @@ const QbRow kQbCoop[] = {
     {"Controller 2: Stand", "Pad 2: state", "-", "zeigt Controller 2 (verbunden, Tasten)|shows pad 2 (connected, buttons)",
      kQbPlanned, -1, kQcNone, 0, 0, 0},
 };
+// 0.21.1 page "Tests" (TODO 0.21 / 0.21.1 item 2): teleports, then the Prepare shortcuts of the regression lists (the
+// ring's Tests / Prepare - right twice), Stop, and the TO TEST rows (right = OK / done / on, left = Fehler / open / off)
+const QbRow kQbTests[] = {
+    {"Teleport", "Teleport", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Zur letzten Position", "To the last position", "pos.go", "last", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Letzte laden + hin", "Load the last + go", "pos.goload", "last", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Aktiver Checkpoint", "Active checkpoint", "dbg.cpgo", "active", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+};
 #define QB_PAGE(de, en, rows, special) {de, en, rows, static_cast<int>(sizeof(rows) / sizeof(rows[0])), special}
 const QbPage kQbPages[] = {
+    {"Favoriten / Zuletzt", "Favourites / recent", nullptr, 0, kQsFav},   // 0.21.1 page 0 (TODO 0.21.1 item 4)
     QB_PAGE("Notfall / Cheats", "Emergency / cheats", kQbEmergency, kQsNone),
     QB_PAGE("Lara", "Lara", kQbLara, kQsLara),
     QB_PAGE("Debug / Darstellung", "Debug / display", kQbDebug, kQsNone),
     QB_PAGE("Leveldaten", "Level data", kQbLevel, kQsNone),
     QB_PAGE("Render / KI", "Render / AI", kQbRender, kQsNone),
     QB_PAGE("Zeit / Test", "Time / test", kQbTimeTest, kQsNone),
+    QB_PAGE("Tests", "Tests", kQbTests, kQsTests),                 // 0.21.1
     {"Checkpoints", "Checkpoints", nullptr, 0, kQsCheckpoints},
     {"Saves", "Saves", nullptr, 0, kQsSaves},
     QB_PAGE("Kapitel (debug)", "Chapters (debug)", kQbChapters, kQsNone),
@@ -21665,8 +22880,9 @@ const QbPage kQbPages[] = {
 };
 #undef QB_PAGE
 const int kQbPageN = static_cast<int>(sizeof(kQbPages) / sizeof(kQbPages[0]));
-const int kQbStartPage = 3;                  // Leveldaten: the layers are what the bar is mostly for
-const int kQbViewMax = 40;                   // rows of one page (static + special)
+const int kQbStartPage = 4;                  // Leveldaten: the layers are what the bar is mostly for (0.21.1: page 0
+                                             // Favoriten / Zuletzt in front)
+const int kQbViewMax = 64;                   // rows of one page (static + special; 0.21.1: 64, was 40)
 int g_qbPage = kQbStartPage, g_qbRow[16] = {};  // render thread; kept over a close
 int g_qbShowClosed = 1, g_qbTop = 30;        // [Quick] ShowClosed / Top (percent of the screen height)
 float g_qbScale = 1.0f;                      // [Quick] Scale
@@ -21785,7 +23001,8 @@ int QbValueCount(int val) {
     return val == kQvDepth || val == kQvEncl || val == kQvTime || val == kQvAssist ? 3 : val == kQvAlpha ? 10
          : val == kQvBright ? 13 : val == kQvSpeed ? 5 : val == kQvPass ? kRmPassN : val == kQvLang || val == kQvAiMode ? 2
          : val == kQvSndPos || val == kQvSndLines ? 4 : val == kQvSndSort ? 3   // 0.20.1
-         : val == kQvShake || val == kQvRumble ? 3 : 0;                          // 0.21
+         : val == kQvShake || val == kQvRumble ? 3                               // 0.21
+         : val == kQvSpawnCount ? 5 : val == kQvSpawnAt ? 2 : 0;                 // 0.21.1
 }
 const int kQbPercent[3] = {0, 50, 100};       // 0.21 cam.shakescale / cam.rumble steps
 const int kQbSndLines[4] = {8, 16, 24, 32};   // 0.20.1 snd.lines steps
@@ -21809,6 +23026,8 @@ void QbValueArg(int val, int i, char *o, size_t n) {
     case kQvSndSort: Out(o, n, "%s", kSnSortNames[i]); break;
     case kQvShake:                                                  // 0.21
     case kQvRumble: Out(o, n, "%d", kQbPercent[i]); break;
+    case kQvSpawnCount: Out(o, n, "%d", i + 1); break;              // 0.21.1
+    case kQvSpawnAt: Out(o, n, "%s", i ? "front" : "lara"); break;
     default: o[0] = 0;
     }
 }
@@ -21830,6 +23049,8 @@ int QbValueNow(int val) {
         break;
     case kQvLang: v = g_qbLang; break;
     case kQvAiMode: v = g_aiGateMode ? 1 : 0; break;   // 0.19
+    case kQvSpawnCount: v = static_cast<int>(g_spCount) - 1; break;   // 0.21.1
+    case kQvSpawnAt: v = g_spAt ? 1 : 0; break;
     case kQvSndPos: v = g_snPos; break;                 // 0.20.1
     case kQvSndSort: v = g_snSort; break;
     case kQvShake:                                      // 0.21: the nearest step
@@ -21896,6 +23117,9 @@ void QbCountText(const QbRow &r, bool on, char *o, size_t n) {
     case kQcOn: v = QbLayersOn(); break;
     case kQcCine: if (g_ocBursts || g_oc.active) v = static_cast<int>(g_ocBursts); break;
     case kQcAi: if (on && g_aiMatched >= 0) v = g_aiMatched; break;   // 0.19: enemies in the ai.dumb scope
+    case kQcPhys:                            // 0.21.1: "used/405" (the game thread's last read)
+        if (g_phUsed >= 0) { Out(o, n, "%ld/%ld", g_phUsed, g_phCap); return; }
+        break;
     default: break;
     }
     if (v >= 0) Out(o, n, "%d", v);
@@ -21907,6 +23131,81 @@ void QbResult(bool err, const char *fmt, ...) {
     va_end(ap);
     g_qbResultErr = err;
     g_qbResultTick = GetTickCount();
+}
+const char *QbPageName(int page, bool de);  // below
+// 0.21.1 collapsible groups (TODO 0.21.1 item 7): a kQbGroup row ("[-] name" open, "[+] name" closed; right = open, left
+// = close) hides the rows after it up to the next heading or group; the closed groups are [Quick] Closed in TruMenu.ini
+// (comma list of the rows' keys = their arg), rewritten at each change
+char g_qbClosed[256] = "";                   // render thread (and the INI read at start)
+bool QbGroupClosed(const char *key) {
+    char copy[sizeof(g_qbClosed)];
+    strncpy_s(copy, sizeof(copy), g_qbClosed, _TRUNCATE);
+    char *context = nullptr;
+    for (char *t = strtok_s(copy, ", ", &context); t; t = strtok_s(nullptr, ", ", &context))
+        if (!_stricmp(t, key)) return true;
+    return false;
+}
+void QbGroupSet(const char *key, bool closed) {
+    char rebuilt[sizeof(g_qbClosed)] = "", copy[sizeof(g_qbClosed)];
+    size_t used = 0;
+    strncpy_s(copy, sizeof(copy), g_qbClosed, _TRUNCATE);
+    char *context = nullptr;
+    for (char *t = strtok_s(copy, ", ", &context); t; t = strtok_s(nullptr, ", ", &context))
+        if (_stricmp(t, key)) LabelAdd(rebuilt, sizeof(rebuilt), &used, "%s%s", used ? "," : "", t);
+    if (closed) LabelAdd(rebuilt, sizeof(rebuilt), &used, "%s%s", used ? "," : "", key);
+    strncpy_s(g_qbClosed, sizeof(g_qbClosed), rebuilt, _TRUNCATE);
+    if (g_iniPath[0] && !WritePrivateProfileStringA("Quick", "Closed", g_qbClosed, g_iniPath))
+        Log(1, "quick: writing [Quick] Closed to %s failed (%lu)", g_iniPath, GetLastError());
+}
+// 0.21.1 page 0 "Favoriten / Zuletzt" (TODO 0.21.1 item 4): the favourites ([Favorites] Ids - pinned with Y in the menu or
+// fav.add) and the last [Quick] RecentMax bar rows that ran (newest first, no doubles, no favourite again), kept as
+// [Quick] Recent ("id arg;id arg") over restarts. A recent row is the bar row it came from (its labels and kind); a
+// favourite takes the first bar row of that item without an argument, else one made from the item's type.
+const int kQbRecentCap = 16;
+struct QbRecent { char id[48], arg[64]; };
+QbRecent g_qbRecent[kQbRecentCap];
+int g_qbRecentN = 0, g_qbRecentMax = 8;      // render thread; [Quick] RecentMax 0 .. 16
+const QbRow *g_qbActRow = nullptr;           // the row QbActRow runs (QbRun records it)
+bool FavHas(const char *id);                 // 0.3 favourites, above
+void QbRecentSave() {
+    char text[kQbRecentCap * 112] = "";
+    size_t used = 0;
+    for (int i = 0; i < g_qbRecentN; ++i)
+        LabelAdd(text, sizeof(text), &used, "%s%s%s%s", used ? ";" : "", g_qbRecent[i].id, g_qbRecent[i].arg[0] ? " " : "",
+                 g_qbRecent[i].arg);
+    if (g_iniPath[0] && !WritePrivateProfileStringA("Quick", "Recent", text, g_iniPath))
+        Log(1, "quick: writing [Quick] Recent to %s failed (%lu)", g_iniPath, GetLastError());
+}
+void QbRecentLoad(const char *text) {        // start: "id arg;id arg" (bad entries are dropped)
+    char copy[kQbRecentCap * 112];
+    strncpy_s(copy, sizeof(copy), text ? text : "", _TRUNCATE);
+    g_qbRecentN = 0;
+    char *context = nullptr;
+    for (char *t = strtok_s(copy, ";", &context); t && g_qbRecentN < kQbRecentCap && g_qbRecentN < g_qbRecentMax;
+         t = strtok_s(nullptr, ";", &context)) {
+        while (*t == ' ') ++t;
+        if (!*t) continue;
+        QbRecent &r = g_qbRecent[g_qbRecentN];
+        char *sp = strchr(t, ' ');
+        if (sp) *sp = 0;
+        strncpy_s(r.id, sizeof(r.id), t, _TRUNCATE);
+        strncpy_s(r.arg, sizeof(r.arg), sp ? sp + 1 : "", _TRUNCATE);
+        ++g_qbRecentN;
+    }
+}
+void QbRecentAdd(const QbRow &r) {
+    if (g_qbRecentMax <= 0 || r.kind == kQbLabel || r.kind == kQbPlanned || r.kind == kQbGroup || r.kind == kQbInfo ||
+        !strcmp(r.id, "-"))
+        return;
+    int k = 0;
+    for (int i = 0; i < g_qbRecentN; ++i)    // the same row again: it moves to the top
+        if (_stricmp(g_qbRecent[i].id, r.id) || strcmp(g_qbRecent[i].arg, r.arg)) g_qbRecent[k++] = g_qbRecent[i];
+    g_qbRecentN = k < g_qbRecentMax - 1 ? k : g_qbRecentMax - 1;
+    for (int i = g_qbRecentN; i > 0; --i) g_qbRecent[i] = g_qbRecent[i - 1];
+    strncpy_s(g_qbRecent[0].id, sizeof(g_qbRecent[0].id), r.id, _TRUNCATE);
+    strncpy_s(g_qbRecent[0].arg, sizeof(g_qbRecent[0].arg), r.arg, _TRUNCATE);
+    ++g_qbRecentN;
+    QbRecentSave();
 }
 // 0.18 confirm (kQfConfirm rows, position / checkpoint go): the first right press arms that row's key for 3 s and says
 // so in the footer, a second one on the same key runs it; any other key or the time out disarms
@@ -21936,26 +23235,52 @@ void QbRun(const char *page, const char *rowName, const char *label, const char 
     const char *answer = InvokeCore(id, arg, false);
     g_qbRunning = false;
     ++g_qbRuns;
+    if (g_qbActRow) {                        // 0.21.1: the row that ran -> page 0 "Zuletzt"
+        QbRecentAdd(*g_qbActRow);
+        g_qbActRow = nullptr;
+    }
     Log(1, "quick: %s / %s -> %s%s%s: %.200s", page, rowName, id, arg && arg[0] ? " " : "", arg ? arg : "", answer);
     bool ok = !strncmp(answer, "ok", 2);
     const char *text = answer + (ok ? 2 : 3);
     while (*text == ' ') ++text;
     QbResult(!ok, "%s: %s", label, text);
 }
+void SpKindsRefresh();                       // 0.21.1 enemy spawn: the loaded kinds (render thread, 1 / s)
+extern QbChoice g_spChoices[32];
+extern int g_spKindN;
+int g_qbSpawnChoice = 0;                     // 0.21.1: the kind chosen in the bar
 const QbChoice *QbChoices(int val, int *count) {
+    if (val == kQvSpawnKind) {
+        SpKindsRefresh();
+        *count = g_spKindN;
+        return g_spKindN ? g_spChoices : nullptr;
+    }
     if (val == kQvMark) { *count = static_cast<int>(sizeof(kQbMarks) / sizeof(kQbMarks[0])); return kQbMarks; }
     if (val == kQvWeapon) { *count = static_cast<int>(sizeof(kQbWeapons) / sizeof(kQbWeapons[0])); return kQbWeapons; }
     *count = 0;
     return nullptr;
 }
-int &QbChoiceIndex(int val) { return g_qbChoice[val == kQvWeapon ? 1 : 0]; }
+int &QbChoiceIndex(int val) { return val == kQvSpawnKind ? g_qbSpawnChoice : g_qbChoice[val == kQvWeapon ? 1 : 0]; }
 
 // one row, left (dir -1) or right (+1): the item with the target state / the next value / the action (right only)
-void QbAct(int page, int row, int dir) {
-    const QbRow &r = kQbPages[page].rows[row];
+// 0.21.1: one row of any page (also a favourite / recent row of page 0), the old QbAct(page, row, dir) below
+void QbActRow(int page, const QbRow &r, int dir) {
     const bool de = g_qbLang == 0;
     const char *name = de ? r.de : r.en;
     if (r.kind == kQbLabel) return;          // 0.18: a group heading
+    if (r.kind == kQbGroup) {                // 0.21.1: right = open, left = close ([Quick] Closed)
+        const bool close = dir < 0;
+        if (QbGroupClosed(r.arg) == close) {
+            QbResult(false, "%s: %s", name, close ? (de ? "schon zu" : "already closed") : (de ? "schon auf" : "already open"));
+            return;
+        }
+        QbGroupSet(r.arg, close);
+        Log(1, "quick: %s / group %s %s ([Quick] Closed=%s)", QbPageName(page, true), r.de, close ? "closed" : "opened",
+            g_qbClosed);
+        QbResult(false, "%s: %s", name, close ? (de ? "zu" : "closed") : (de ? "auf" : "open"));
+        return;
+    }
+    g_qbActRow = &r;                         // 0.21.1: QbRun records it in the recent list
     if (r.kind == kQbPlanned) {              // 0.18: what the planned function will do ("de|en")
         char text[200];
         strncpy_s(text, sizeof(text), r.arg, _TRUNCATE);
@@ -21981,15 +23306,20 @@ void QbAct(int page, int row, int dir) {
         if (dir < 0) { QbResult(false, "%s: %s", name, de ? "rechts = anzeigen" : "right = show"); return; }
         char v[240];
         if (!ItemValueText(r.id, v, sizeof(v))) Out(v, sizeof(v), "?");
-        Log(1, "quick: %s / %s -> %s: %.200s", kQbPages[page].de, r.de, r.id, v);
+        Log(1, "quick: %s / %s -> %s: %.200s", QbPageName(page, true), r.de, r.id, v);
         QbResult(false, "%s: %s", name, v);
         return;
     }
     if (r.kind == kQbChoice) {               // right = run with the current choice
         int count = 0;
         const QbChoice *c = QbChoices(r.val, &count);
-        if (!c || !count) return;
-        QbRun(kQbPages[page].de, r.de, name, r.id, c[QbChoiceIndex(r.val) % count].arg);
+        if (!c || !count) { QbResult(true, "%s: %s", name, de ? "keine Auswahl (nichts geladen)" : "nothing to choose"); return; }
+        if (r.flags & kQfConfirm) {          // 0.21.1 (spawn): a second right press within 3 s
+            char key[160];
+            Out(key, sizeof(key), "%d/%s %s", page, r.id, c[QbChoiceIndex(r.val) % count].arg);
+            if (!QbConfirm(key, name, c[QbChoiceIndex(r.val) % count].arg)) return;
+        }
+        QbRun(QbPageName(page, true), r.de, name, r.id, c[QbChoiceIndex(r.val) % count].arg);
         return;
     }
     if (r.kind == kQbBool) {
@@ -22008,21 +23338,23 @@ void QbAct(int page, int row, int dir) {
         strncpy_s(arg, sizeof(arg), r.arg, _TRUNCATE);
         char key[160];
         Out(key, sizeof(key), "%d/%s %s", page, r.id, r.arg);
-        if ((r.flags & kQfConfirm) && !QbConfirm(key, name, nullptr)) return;
+        if ((r.flags & kQfConfirm) && !QbConfirm(key, name, !_stricmp(r.id, "ai.remove") ? AdStoryHint() : nullptr))
+            return;                          // 0.21.1: ai.remove says when story enemies would not count
         if (r.flags & kQfBackup) {           // 0.18 chapters: save.backup first, then the item (shortcut runner)
             char steps[200], title[64], o[300];
             Out(steps, sizeof(steps), "save.backup kapitel;%s %s", r.id, r.arg);
             Out(title, sizeof(title), "%s", r.en);
             bool ok = ShortcutStart(steps, title, o, sizeof(o));
             ++g_qbRuns;
-            Log(1, "quick: %s / %s -> shortcut '%s': %s%s", kQbPages[page].de, r.de, steps, ok ? "" : "err ", o);
+            Log(1, "quick: %s / %s -> shortcut '%s': %s%s", QbPageName(page, true), r.de, steps, ok ? "" : "err ", o);
             QbResult(!ok, "%s: %s", name, ok ? (de ? "Sicherung, dann laden (debug, keine Story-Werte)"
                                                    : "backup, then load (debug, no story values)") : o);
             return;
         }
     }
-    QbRun(kQbPages[page].de, r.de, name, r.id, arg);
+    QbRun(QbPageName(page, true), r.de, name, r.id, arg);
 }
+void QbAct(int page, int row, int dir) { QbActRow(page, kQbPages[page].rows[row], dir); }
 
 // 0.18: 9 fixed pages (0.17: the checkpoint page only while its checks passed)
 int QbPageCount() { return kQbPageN; }
@@ -22036,6 +23368,7 @@ struct QbView {
     ImU32 col, stateCol;
     int square;                              // 0 none, 1 filled (on), 2 outline (off)
     bool skip;                               // a heading: up / down pass over it
+    int src;                                 // 0.21.1: the page's static row of this view (-1 = a special row)
 };
 QbView g_qbView[kQbViewMax];
 int g_qbViewN = 0, g_qbViewPage = -1;
@@ -22044,72 +23377,105 @@ int g_qbSavesPageSeen = 0;                   // the Saves page was built in the 
 int QbSpecialBuild(int special, int base, bool de);   // section "0.18 quick-toggle pages" (after the positions)
 void QbSpecialAct(int special, int row, int dir);
 
-// 0.18: the rows of a page for this frame - static rows the 0.17 way (state, colour, count), then the special rows
+// 0.18 / 0.21.1: one row's view (state, colour, count) - static rows and the favourite / recent rows of page 0
+void QbViewOf(int page, const QbRow &r, QbView &v, bool de) {
+    v.src = -1;
+    if (r.kind == kQbGroup) {                // 0.21.1: group heading (QbBuild writes name / state)
+        v.name[0] = v.state[0] = v.count[0] = 0;
+        v.square = 0;
+        v.col = r.colour ? r.colour : kQbBlue;
+        v.stateCol = IM_COL32(170, 170, 170, 255);
+        v.skip = false;
+        return;
+    }
+    if (r.kind == kQbLabel || r.kind == kQbPlanned) {   // 0.18: heading / planned (no item)
+        const bool label = r.kind == kQbLabel;
+        Out(v.name, sizeof(v.name), "%s%s", label ? "-- " : "   ", de ? r.de : r.en);
+        Out(v.state, sizeof(v.state), "%s", label ? "" : de ? "geplant" : "planned");
+        v.count[0] = 0;
+        v.square = 0;
+        v.col = label ? (r.colour ? r.colour : kQbBlue) : IM_COL32(125, 125, 125, 255);
+        v.stateCol = IM_COL32(125, 125, 125, 255);
+        v.skip = label;
+        return;
+    }
+    const char *why = QbWhy(r);
+    const bool grey = why[0] != 0;
+    bool on = false;
+    v.square = 0;
+    v.skip = false;
+    Out(v.name, sizeof(v.name), "%s", de ? r.de : r.en);
+    if (r.kind == kQbBool) {
+        on = QbRowOn(r);
+        Out(v.state, sizeof(v.state), "%s", grey ? (de ? "gesperrt" : "n/a") : on ? (de ? "an" : "on") : (de ? "aus" : "off"));
+        v.square = on && !grey ? 1 : 2;
+    } else if (r.kind == kQbValue) {
+        char val[40];
+        if (!ItemValueShort(r.id, de, val, sizeof(val))) Out(val, sizeof(val), "?");
+        Out(v.state, sizeof(v.state), "< %s >", val);
+    } else if (r.kind == kQbChoice) {
+        int count = 0;
+        const QbChoice *c = QbChoices(r.val, &count);
+        const int k = count ? QbChoiceIndex(r.val) % count : 0;
+        Out(v.state, sizeof(v.state), "< %s >", c ? (de ? c[k].de : c[k].en) : "?");
+    } else if (r.kind == kQbInfo) {
+        Out(v.state, sizeof(v.state), "%s", de ? "rechts = zeigen" : "right = show");
+    } else if (!_stricmp(r.id, "dbg.census")) {   // idle / requested / running
+        Out(v.state, sizeof(v.state), "%s", g_rmCsRun ? (de ? "laeuft" : "running")
+                                            : g_rmCensusReq ? (de ? "angefordert" : "requested")
+                                            : (de ? "rechts = start" : "right = start"));
+    } else {
+        char key[160];
+        Out(key, sizeof(key), "%d/%s %s", page, r.id, r.arg);
+        const bool armed = (r.flags & kQfConfirm) && QbArmed(key);
+        Out(v.state, sizeof(v.state), "%s", armed ? (de ? "nochmal rechts!" : "right again!")
+                                            : (r.flags & kQfConfirm) ? (de ? "rechts 2x" : "right 2x")
+                                            : (de ? "rechts" : "right"));
+    }
+    QbCountText(r, on || r.kind != kQbBool, v.count, sizeof(v.count));
+    ImU32 col = r.colour ? r.colour : r.layer >= 0 ? kDvLayers[r.layer].colour : kQbWhite;
+    if (grey) col = IM_COL32(130, 130, 130, 255);
+    else if (r.kind == kQbBool && !on) col = (col & 0x00ffffffu) | (150u << 24);   // off: the colour, fainter
+    v.col = col;
+    v.stateCol = grey ? IM_COL32(220, 120, 100, 255) : r.kind == kQbBool ? (on ? IM_COL32(110, 230, 120, 255)
+                                                                               : IM_COL32(170, 170, 170, 255))
+               : !strncmp(v.state, "nochmal", 7) || !strncmp(v.state, "right again", 11) ? IM_COL32(255, 110, 90, 255)
+               : IM_COL32(235, 235, 235, 255);
+}
+int g_qbStaticN = 0;                         // 0.21.1: views of the static rows (the special rows follow)
+// 0.18: the rows of a page for this frame - static rows the 0.17 way (state, colour, count), then the special rows;
+// 0.21.1: a closed kQbGroup hides its rows (up to the next heading or group)
 LONG g_qbFrame = 0, g_qbBuiltFrame = -1;
+int QbSpecialBuild(int special, int base, bool de);
 void QbBuild(int page) {
     const bool de = g_qbLang == 0;
     const QbPage &p = kQbPages[page];
     g_qbViewN = 0;
     g_qbHead[0] = 0;
     if (p.special != kQsSaves) g_qbSavesPageSeen = 0;   // entering the Saves page again re-reads the files
+    bool hide = false;
     for (int i = 0; i < p.n && g_qbViewN < kQbViewMax; ++i) {
         const QbRow &r = p.rows[i];
+        if (r.kind == kQbLabel || r.kind == kQbGroup) hide = false;
+        else if (hide) continue;
         QbView &v = g_qbView[g_qbViewN++];
-        if (r.kind == kQbLabel || r.kind == kQbPlanned) {   // 0.18: heading / planned (no item)
-            const bool label = r.kind == kQbLabel;
-            Out(v.name, sizeof(v.name), "%s%s", label ? "-- " : "   ", de ? r.de : r.en);
-            Out(v.state, sizeof(v.state), "%s", label ? "" : de ? "geplant" : "planned");
-            v.count[0] = 0;
-            v.square = 0;
-            v.col = label ? (r.colour ? r.colour : kQbBlue) : IM_COL32(125, 125, 125, 255);
-            v.stateCol = IM_COL32(125, 125, 125, 255);
-            v.skip = label;
-            continue;
+        QbViewOf(page, r, v, de);
+        v.src = i;
+        if (r.kind == kQbGroup) {
+            hide = QbGroupClosed(r.arg);
+            int inside = 0;
+            for (int j = i + 1; j < p.n && p.rows[j].kind != kQbLabel && p.rows[j].kind != kQbGroup; ++j) ++inside;
+            Out(v.name, sizeof(v.name), "%s %s", hide ? "[+]" : "[-]", de ? r.de : r.en);
+            if (hide) Out(v.state, sizeof(v.state), de ? "%d Zeilen - rechts = auf" : "%d rows - right = open", inside);
+            else Out(v.state, sizeof(v.state), "%s", de ? "links = zu" : "left = close");
         }
-        const char *why = QbWhy(r);
-        const bool grey = why[0] != 0;
-        bool on = false;
-        v.square = 0;
-        v.skip = false;
-        Out(v.name, sizeof(v.name), "%s", de ? r.de : r.en);
-        if (r.kind == kQbBool) {
-            on = QbRowOn(r);
-            Out(v.state, sizeof(v.state), "%s", grey ? (de ? "gesperrt" : "n/a") : on ? (de ? "an" : "on") : (de ? "aus" : "off"));
-            v.square = on && !grey ? 1 : 2;
-        } else if (r.kind == kQbValue) {
-            char val[40];
-            if (!ItemValueShort(r.id, de, val, sizeof(val))) Out(val, sizeof(val), "?");
-            Out(v.state, sizeof(v.state), "< %s >", val);
-        } else if (r.kind == kQbChoice) {
-            int count = 0;
-            const QbChoice *c = QbChoices(r.val, &count);
-            const int k = count ? QbChoiceIndex(r.val) % count : 0;
-            Out(v.state, sizeof(v.state), "< %s >", c ? (de ? c[k].de : c[k].en) : "?");
-        } else if (r.kind == kQbInfo) {
-            Out(v.state, sizeof(v.state), "%s", de ? "rechts = zeigen" : "right = show");
-        } else if (!_stricmp(r.id, "dbg.census")) {   // idle / requested / running
-            Out(v.state, sizeof(v.state), "%s", g_rmCsRun ? (de ? "laeuft" : "running")
-                                                : g_rmCensusReq ? (de ? "angefordert" : "requested")
-                                                : (de ? "rechts = start" : "right = start"));
-        } else {
-            char key[160];
-            Out(key, sizeof(key), "%d/%s %s", page, r.id, r.arg);
-            const bool armed = (r.flags & kQfConfirm) && QbArmed(key);
-            Out(v.state, sizeof(v.state), "%s", armed ? (de ? "nochmal rechts!" : "right again!")
-                                                : (r.flags & kQfConfirm) ? (de ? "rechts 2x" : "right 2x")
-                                                : (de ? "rechts" : "right"));
-        }
-        QbCountText(r, on || r.kind != kQbBool, v.count, sizeof(v.count));
-        ImU32 col = r.colour ? r.colour : r.layer >= 0 ? kDvLayers[r.layer].colour : kQbWhite;
-        if (grey) col = IM_COL32(130, 130, 130, 255);
-        else if (r.kind == kQbBool && !on) col = (col & 0x00ffffffu) | (150u << 24);   // off: the colour, fainter
-        v.col = col;
-        v.stateCol = grey ? IM_COL32(220, 120, 100, 255) : r.kind == kQbBool ? (on ? IM_COL32(110, 230, 120, 255)
-                                                                                   : IM_COL32(170, 170, 170, 255))
-                   : !strncmp(v.state, "nochmal", 7) || !strncmp(v.state, "right again", 11) ? IM_COL32(255, 110, 90, 255)
-                   : IM_COL32(235, 235, 235, 255);
     }
-    if (p.special) g_qbViewN += QbSpecialBuild(p.special, g_qbViewN, de);
+    g_qbStaticN = g_qbViewN;
+    if (p.special) {
+        const int k = QbSpecialBuild(p.special, g_qbViewN, de);
+        for (int j = 0; j < k; ++j) g_qbView[g_qbViewN + j].src = -1;
+        g_qbViewN += k;
+    }
     g_qbViewPage = page;
     g_qbBuiltFrame = g_qbFrame;
 }
@@ -22195,6 +23561,9 @@ void PageAi() {
     ValAiStatus(o, sizeof(o));
     ImGui::TextWrapped("%s", o);
     if (!g_aiOk) { ImGui::TextWrapped("disabled: %s", g_aiWhy); return; }
+    // 0.21.1 (TODO 0.21.1 item 7): the same three groups as the bar page Render / KI, as collapsible sections
+    if (ImGui::CollapsingHeader("Dumme KI / Dumb AI - enemies ignore Lara  [ai.dumb, ai.mode, ai.noinvestigate, "
+                                "ai.noattack]###grp_ki_dumm", ImGuiTreeNodeFlags_DefaultOpen)) {
     ImGui::SeparatorText("Enemies ignore Lara / Gegner ignorieren Lara  [ai.dumb]");
     const char *const names[5] = {"all", "sharks", "spiders", "thralls", "filter"};
     const char *const de[5] = {"alle Gegner", "Haie (shark)", "Spinnen (spider, tarantula)", "Thralls (thrall)",
@@ -22245,6 +23614,56 @@ void PageAi() {
                        "make them turn (gate); they may still walk to noises (use 'no investigating'); scripts that wait "
                        "for an enemy to notice Lara do not fire; switching off near enemies = immediate aggro. Not AI "
                        "enemies (no effect): jellyfish, kraken, Natla, natla_thrall.");
+    }                                        // 0.21.1: end of the group "Dumme KI"
+    if (ImGui::CollapsingHeader("Gegner spawnen / Spawn enemies  [ai.spawn] (0.21.1)###grp_ki_spawn")) {
+        char sv[240];
+        ValSpawnEnemy(sv, sizeof(sv));
+        ImGui::TextWrapped("%s. An AI enemy object loaded in this level, at Lara or in front of her (the debug view's "
+                           "camera); save.backup before the first spawn of a session; needs [Cheat] Experimental.", sv);
+        SpKindsRefresh();
+        static int kind = 0;
+        if (kind >= g_spKindN) kind = 0;
+        if (!g_spKindN) ImGui::TextDisabled("no AI enemy object loaded");
+        for (int i = 0; i < g_spKindN; ++i) {
+            char label[80];
+            Out(label, sizeof(label), "%s###spk%d", g_spKinds[i].name, i);
+            if (ImGui::RadioButton(label, kind == i)) kind = i;
+            if (i % 3 != 2 && i + 1 < g_spKindN) ImGui::SameLine();
+        }
+        int count = static_cast<int>(g_spCount);
+        if (ImGui::SliderInt("count / Anzahl###spcount", &count, 1, 5)) g_spCount = count;
+        if (ImGui::RadioButton("at Lara / bei Lara###spat0", g_spAt == 0)) g_spAt = 0;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("in front / vor Lara###spat1", g_spAt == 1)) g_spAt = 1;
+        if (!g_spOk || !g_spKindN) ImGui::BeginDisabled();
+        if (TmButton("spawn / spawnen###spgo") && g_spKindN) QueueItem("ai.spawn", g_spKinds[kind].name);
+        if (!g_spOk || !g_spKindN) ImGui::EndDisabled();
+        ImGui::TextDisabled("planned / geplant: mode 'dumb AI only for these', 'model only', gear of human enemies, "
+                            "behaviour from intro data, navmesh check");
+    }
+    if (!ImGui::CollapsingHeader("Gegner entfernen / toeten / Remove / kill enemies  [ai.kill, ai.remove, sticky.set] "
+                                 "(0.21 / 0.21.1)###grp_ki_weg", ImGuiTreeNodeFlags_DefaultOpen))
+        return;
+    // 0.21.1 ai.kill: the game's own kill - the death state fires the script event (counts like a death in the game)
+    ImGui::SeparatorText("Kill AI enemies / KI-Gegner toeten  [ai.kill] (0.21.1)");
+    if (!g_akOk) ImGui::BeginDisabled();
+    if (TmButton("all but the nearest / alle bis auf den naechsten###akothers")) QueueItem("ai.kill", "others");
+    ImGui::SameLine();
+    if (TmButton("the nearest / den naechsten###aknearest")) QueueItem("ai.kill", "nearest");
+    ImGui::SameLine();
+    if (TmButton("all / alle###akall")) QueueItem("ai.kill", "all");
+    if (!g_akOk) ImGui::EndDisabled();
+    char kv[240];
+    ValAkKill(kv, sizeof(kv));
+    ImGui::TextWrapped("%s. Kill 0x6376e0 (type 6 RigidBody first, the enemy's regeneration list avoided): Death / "
+                       "LandDeath / ... fire the script's death event - level scripts count it.", kv);
+    // 0.21.1 sticky.set: the hall02 wall (docs\Befund-Hall02-Wand-0711.md) - dispatcher 11270: population 17287 = 0,
+    // tutorial 18509 = 2; then walk through trigger 11268 (only existing entries are set)
+    if (!g_stOk) ImGui::BeginDisabled();
+    if (TmButton("hall02: population = 0  [sticky.set 11270 17287 0]###sthall1")) QueueItem("sticky.set", "11270 17287 0");
+    ImGui::SameLine();
+    if (TmButton("hall02: tutorial = 2  [sticky.set 11270 18509 2]###sthall2")) QueueItem("sticky.set", "11270 18509 2");
+    if (!g_stOk) ImGui::EndDisabled();
     // 0.21 ai.remove: the game's despawn (hide, sense manager, generator, kill flag; the game's sweep removes them)
     ImGui::SeparatorText("Remove AI enemies / KI-Gegner entfernen  [ai.remove] (0.21)");
     if (!g_adOk) ImGui::BeginDisabled();
@@ -22303,8 +23722,10 @@ void QuickTick() {
     if (!(edges & 0x000C)) return;
     const int d = (edges & 0x0004) ? -1 : 1;                                // left = off / step down, right = on / up
     const QbPage &p = kQbPages[g_qbPage];
-    if (row < p.n) QbAct(g_qbPage, row, d);
-    else if (p.special) QbSpecialAct(p.special, row - p.n, d);
+    if (row >= g_qbViewN) return;
+    g_qbActRow = nullptr;                    // 0.21.1: only the row run now goes into the recent list
+    if (g_qbView[row].src >= 0) QbAct(g_qbPage, g_qbView[row].src, d);   // 0.21.1: groups hide rows - map the view
+    else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, d);
 }
 
 // the closed line ([Quick] ShowClosed) only with the debug view enabled and in a level; the open bar always
@@ -22999,6 +24420,15 @@ bool RunPosGo(const char *arg, char *o, size_t n) {
     char lara[48];
     PosLaraUnit(lara, sizeof(lara));
     if (!PosUnitFrame(r.unit, shift, origin)) {
+        float centre[3];
+        if (RkLaraPortalTo(r.unit, centre)) {   // 0.21.1: behind a portal of Lara's own unit - the 0.20 portal path
+            char steps[300], title[64];
+            Out(steps, sizeof(steps), "cheat.flight 1;pos.portal %s;wait.unit %s;pos.go %s", r.unit, r.unit, r.name);
+            Out(title, sizeof(title), "pos.go %s", r.name);
+            Log(1, "pos.go %s: unit %s not loaded, a portal of Lara's unit %s leads there -> %s", r.name, r.unit,
+                lara[0] ? lara : "-", steps);
+            return ShortcutStart(steps, title, o, n);
+        }
         Out(o, n, "refused: unit %s is not loaded (Lara is in %s) - pos.goload %s loads it and goes there (bar / menu: "
             "'laden + hin'; a level.load may change story state)", r.unit, lara[0] ? lara : "-", r.name);
         Log(1, "pos.go %s refused: unit %s not loaded (Lara in %s)", r.name, r.unit, lara[0] ? lara : "-");
@@ -23073,7 +24503,9 @@ bool RunPosPortal(const char *arg, char *o, size_t n) {
     DvTrim(unit);
     if (!unit[0]) { Out(o, n, "usage: pos.portal <unit> (a stream portal of a loaded unit towards it)"); return false; }
     float centre[3];
-    if (!PosPortalTo(unit, centre, from, sizeof(from))) {
+    if (RkLaraPortalTo(unit, centre)) {      // 0.21.1: Lara's own unit first (only its portals switch her unit)
+        PosLaraUnit(from, sizeof(from));
+    } else if (!PosPortalTo(unit, centre, from, sizeof(from))) {
         Out(o, n, "no loaded unit has a stream portal towards %s", unit);
         return false;
     }
@@ -23110,7 +24542,10 @@ bool RunPosGoLoad(const char *arg, char *o, size_t n) {
     float shift[3], origin[3], centre[3];
     const bool loaded = PosUnitFrame(r.unit, shift, origin);
     char steps[300], title[64], from[48] = "", how[96];
-    const bool portal = !loaded && !forceLoad && PosPortalTo(r.unit, centre, from, sizeof(from));
+    // 0.21.1: only a portal of Lara's own unit - from a neighbour's portal the engine never requests the target
+    // (docs\Befund-Unit-Streaming-0611.md section 6: only the signals of Lara's unit count, wait.unit would time out)
+    const bool portal = !loaded && !forceLoad && RkLaraPortalTo(r.unit, centre);
+    if (portal) PosLaraUnit(from, sizeof(from));
     if (loaded) {
         Out(steps, sizeof(steps), "cheat.flight 1;pos.go %s", r.name);
         Out(how, sizeof(how), "loaded");
@@ -23127,7 +24562,8 @@ bool RunPosGoLoad(const char *arg, char *o, size_t n) {
 }
 // ---- 0.18 quick-toggle pages (render thread): the special rows of the pages Lara (saved positions), Checkpoints and
 // Saves. Each row is a QbView (drawn by DrawQuick) plus a QbDyn (what left / right do). Rows of the last QbBuild.
-enum QbDynKind { kQdNone = 0, kQdPos, kQdCpActive, kQdCpAll, kQdCp, kQdBackupNow, kQdRescan, kQdSave, kQdBackup, kQdLabel };
+enum QbDynKind { kQdNone = 0, kQdPos, kQdCpActive, kQdCpAll, kQdCp, kQdBackupNow, kQdRescan, kQdSave, kQdBackup, kQdLabel,
+                 kQdItem, kQdPrepare, kQdStop, kQdTodo };   // 0.21.1: page 0 rows, page Tests rows
 struct QbDyn { int kind; LONG intro; char arg[64], unit[48]; bool loaded; };
 QbDyn g_qbDyn[kQbViewMax];
 int g_qbDynN = 0;
@@ -23298,11 +24734,165 @@ int QbSavesRows(QbView *v, QbDyn *d, int max, bool de) {
     }
     return n;
 }
+// 0.21.1 page 0 "Favoriten / Zuletzt": the rows of this frame (bar rows copied, or made from the item's type)
+QbRow g_qbFavRow[kQbViewMax];
+char g_qbFavText[kQbViewMax][2][64];
+void QbViewOf(int page, const QbRow &r, QbView &v, bool de);
+const QbRow *QbFindRow(const char *id, const char *arg) {   // the first static bar row of this item + argument
+    for (const QbPage &p : kQbPages)
+        for (int i = 0; i < p.n; ++i) {
+            const QbRow &r = p.rows[i];
+            if (r.kind != kQbLabel && r.kind != kQbPlanned && r.kind != kQbGroup && !_stricmp(r.id, id) && !strcmp(r.arg, arg))
+                return &r;
+        }
+    return nullptr;
+}
+void QbDynLabel(QbView *v, QbDyn *d, const char *text) {
+    memset(v, 0, sizeof(*v));
+    Out(v->name, sizeof(v->name), "-- %s", text);
+    v->col = kQbBlue;
+    v->stateCol = IM_COL32(125, 125, 125, 255);
+    v->skip = true;
+    v->src = -1;
+    memset(d, 0, sizeof(*d));
+    d->kind = kQdLabel;
+}
+int QbFavRows(QbView *v, QbDyn *d, int max, bool de) {
+    int n = 0, rows = 0;
+    auto add = [&](const QbRow &r) {
+        if (n >= max || rows >= kQbViewMax) return;
+        g_qbFavRow[rows] = r;
+        QbViewOf(0, g_qbFavRow[rows], v[n], de);
+        memset(&d[n], 0, sizeof(d[n]));
+        d[n].kind = kQdItem;
+        d[n].intro = rows++;
+        ++n;
+    };
+    if (n < max) QbDynLabel(&v[n], &d[n], de ? "Favoriten (Y im Menue / fav.add)" : "Favourites (Y in the menu / fav.add)"), ++n;
+    int favs = 0;
+    ForFavs([&](const char *id) {
+        ++favs;
+        const QbRow *found = QbFindRow(id, "");
+        if (found) { add(*found); return; }
+        if (rows >= kQbViewMax) return;
+        const Item *item = FindItem(id);
+        const char *type = item ? item->type : "action";
+        strncpy_s(g_qbFavText[rows][0], sizeof(g_qbFavText[rows][0]), id, _TRUNCATE);
+        QbRow r = {g_qbFavText[rows][0], g_qbFavText[rows][0], g_qbFavText[rows][0], "",
+                   !strcmp(type, "bool") ? kQbBool : !strcmp(type, "info") ? kQbInfo : kQbAction, -1, kQcNone, 0, kQbWhite, 0};
+        add(r);
+    });
+    if (!favs && n < max) {
+        memset(&v[n], 0, sizeof(v[n]));
+        Out(v[n].name, sizeof(v[n].name), "   %s", de ? "(keine)" : "(none)");
+        v[n].col = IM_COL32(150, 150, 150, 255);
+        v[n].skip = true;
+        v[n].src = -1;
+        memset(&d[n], 0, sizeof(d[n]));
+        d[n].kind = kQdLabel;
+        ++n;
+    }
+    if (g_qbRecentMax <= 0) return n;
+    if (n < max) QbDynLabel(&v[n], &d[n], de ? "Zuletzt" : "Recent"), ++n;
+    for (int i = 0; i < g_qbRecentN; ++i) {
+        if (!g_qbRecent[i].arg[0] && FavHas(g_qbRecent[i].id)) continue;   // a favourite is not shown twice
+        const QbRow *found = QbFindRow(g_qbRecent[i].id, g_qbRecent[i].arg);
+        if (found) add(*found);
+    }
+    return n;
+}
+// 0.21.1 page Tests: the Prepare shortcuts of both regression lists (one row per distinct shortcut, as the ring's Tests /
+// Prepare), Stop while one runs, then the TO TEST rows
+int QbTestsRows(QbView *v, QbDyn *d, int max, bool de) {
+    static TestRow rows[kRegLists + 1][kTestMax];
+    static char cuts[kRegLists][kTestMax][kShortcutLen];
+    int count[kRegLists + 1];
+    EnterCriticalSection(&g_testLock);
+    for (int l = 0; l < kRegLists; ++l) {
+        count[l] = g_regCount[l];
+        memcpy(rows[l], g_reg[l], sizeof(TestRow) * static_cast<size_t>(count[l]));
+        memcpy(cuts[l], g_regShortcut[l], kShortcutLen * static_cast<size_t>(count[l]));
+    }
+    count[2] = g_testCount;
+    memcpy(rows[2], g_tests, sizeof(TestRow) * static_cast<size_t>(count[2]));
+    LeaveCriticalSection(&g_testLock);
+    int n = 0;
+    if (n < max) QbDynLabel(&v[n], &d[n], de ? "Vorbereiten (rechts 2x)" : "Prepare (right 2x)"), ++n;
+    for (int l = 0; l < kRegLists; ++l)
+        for (int i = 0; i < count[l] && n < max; ++i) {
+            if (!cuts[l][i][0]) continue;
+            bool dup = false;
+            for (int j = 0; j < i && !dup; ++j) dup = !strcmp(cuts[l][j], cuts[l][i]);
+            if (dup) continue;
+            char title[96] = "", steps[kScMaxSteps][kScStepLen], o[80];
+            int c = 0;
+            ShortcutParse(cuts[l][i], title, sizeof(title), steps, &c, o, sizeof(o));
+            QbView &w = v[n];
+            QbDyn &q = d[n];
+            memset(&w, 0, sizeof(w));
+            memset(&q, 0, sizeof(q));
+            w.src = -1;
+            Out(w.name, sizeof(w.name), "%s", title[0] ? title : rows[l][i].id);
+            Out(q.arg, sizeof(q.arg), "%s:%s", kRegNames[l], rows[l][i].id);
+            char key[160];
+            Out(key, sizeof(key), "prepare %s", q.arg);
+            const bool armed = QbArmed(key);
+            Out(w.state, sizeof(w.state), "%s", armed ? (de ? "nochmal rechts!" : "right again!") : (de ? "rechts 2x" : "right 2x"));
+            w.col = kQbClaude;
+            w.stateCol = armed ? IM_COL32(255, 110, 90, 255) : IM_COL32(235, 235, 235, 255);
+            q.kind = kQdPrepare;
+            ++n;
+        }
+    if (g_scActive && n < max) {
+        QbView &w = v[n];
+        QbDyn &q = d[n];
+        memset(&w, 0, sizeof(w));
+        memset(&q, 0, sizeof(q));
+        w.src = -1;
+        Out(w.name, sizeof(w.name), "%s", de ? "Vorbereiten stoppen" : "Stop the prepare");
+        Out(w.state, sizeof(w.state), "%s", de ? "rechts" : "right");
+        w.col = kQbRed;
+        w.stateCol = IM_COL32(235, 235, 235, 255);
+        q.kind = kQdStop;
+        ++n;
+    }
+    if (n < max) QbDynLabel(&v[n], &d[n], de ? "TO TEST (rechts = OK / erledigt / an, links = Fehler / offen / aus)"
+                                            : "TO TEST (right = ok / done / on, left = fail / open / off)"), ++n;
+    for (int i = 0; i < count[2] && n < max; ++i) {
+        const TestRow &t = rows[2][i];
+        QbView &w = v[n];
+        QbDyn &q = d[n];
+        memset(&w, 0, sizeof(w));
+        memset(&q, 0, sizeof(q));
+        w.src = -1;
+        char hint[72];
+        strncpy_s(hint, sizeof(hint), t.hint, _TRUNCATE);
+        Out(w.name, sizeof(w.name), "%s: %s", t.id, hint);
+        const bool toggle = !strcmp(t.kind, "toggle"), step = !strcmp(t.kind, "step");
+        const char *st = t.state;
+        Out(w.state, sizeof(w.state), "%s", !strcmp(st, "ok") ? "OK" : !strcmp(st, "fail") ? (de ? "Fehler" : "fail")
+                                            : !strcmp(st, "skip") ? (de ? "uebersprungen" : "skipped")
+                                            : !strcmp(st, "done") ? (de ? "erledigt" : "done")
+                                            : !strcmp(st, "on") ? (de ? "an" : "on") : !strcmp(st, "off") ? (de ? "aus" : "off")
+                                            : (de ? "offen" : "open"));
+        w.col = toggle ? kQbAi : step ? kQbPlayer : kQbWhite;
+        w.stateCol = !strcmp(st, "ok") || !strcmp(st, "done") || !strcmp(st, "on") ? IM_COL32(110, 230, 120, 255)
+                   : !strcmp(st, "fail") ? IM_COL32(255, 110, 90, 255) : IM_COL32(200, 200, 200, 255);
+        q.kind = kQdTodo;
+        strncpy_s(q.arg, sizeof(q.arg), t.id, _TRUNCATE);
+        strncpy_s(q.unit, sizeof(q.unit), t.kind, _TRUNCATE);
+        ++n;
+    }
+    return n;
+}
+void QbActRow(int page, const QbRow &r, int dir);
 int QbSpecialBuild(int special, int base, bool de) {
     const int max = kQbViewMax - base;
     g_qbDynN = 0;
     if (max <= 0) return 0;
     int n = 0;
+    if (special == kQsFav) n = QbFavRows(g_qbView + base, g_qbDyn, max, de);           // 0.21.1
+    else if (special == kQsTests) n = QbTestsRows(g_qbView + base, g_qbDyn, max, de);
     if (special == kQsLara) n = QbPosRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsCheckpoints) n = QbCpPageRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsSaves) n = QbSavesRows(g_qbView + base, g_qbDyn, max, de);
@@ -23316,6 +24906,36 @@ void QbSpecialAct(int special, int row, int dir) {
     const QbDyn &q = g_qbDyn[row];
     char arg[96], key[160];
     switch (q.kind) {
+    case kQdItem:                            // 0.21.1 page 0: the favourite / recent row as its bar row
+        if (q.intro >= 0 && q.intro < kQbViewMax) QbActRow(0, g_qbFavRow[q.intro], dir);
+        return;
+    case kQdPrepare: {                       // 0.21.1 page Tests: the regression shortcut, right twice
+        if (dir < 0) { QbResult(false, "%s", de ? "rechts 2x = vorbereiten" : "right 2x = prepare"); return; }
+        Out(key, sizeof(key), "prepare %s", q.arg);
+        if (!QbConfirm(key, q.arg, de ? "laedt / teleportiert (Story-Werte?)" : "loads / teleports (story values?)")) return;
+        char o[300];
+        const bool ok = RunRegressPrepare(q.arg, o, sizeof(o));
+        SetLastAction("regress.prepare", ok, o);
+        ++g_qbRuns;
+        Log(1, "quick: Tests / Prepare %s: %s%s", q.arg, ok ? "" : "err ", o);
+        QbResult(!ok, "Prepare %s: %s", q.arg, o);
+        return;
+    }
+    case kQdStop: {
+        char o[200];
+        const bool ok = RunRegressPrepare("stop", o, sizeof(o));
+        SetLastAction("regress.prepare", ok, o);
+        QbResult(!ok, "%s", o);
+        return;
+    }
+    case kQdTodo: {                          // 0.21.1 page Tests: TO TEST state as the ring's OK / Fail / Done / toggle
+        const bool toggle = !strcmp(q.unit, "toggle"), step = !strcmp(q.unit, "step");
+        const char *state = toggle ? (dir > 0 ? "on" : "off") : step ? (dir > 0 ? "done" : "open") : (dir > 0 ? "ok" : "fail");
+        TestMarkFromMenu(q.arg, state);
+        Log(1, "quick: Tests / TO TEST %s -> %s", q.arg, state);
+        QbResult(false, "%s", g_lastAction);
+        return;
+    }
     case kQdPos:
         if (dir < 0) { QbResult(false, "%s", de ? "rechts = hin" : "right = go"); return; }
         if (q.loaded) { QbRun("Lara", "position", q.arg, "pos.go", q.arg); return; }
@@ -24896,10 +26516,30 @@ void TakePointerLate(DWORD current) {
         kPadPointer);
 }
 
+// 0.21.1 (docs\Befund-TruShadowPower-017-0611.md: in 44 sessions the filter never handed out PadHook - the game wrote
+// the real XInputGetState although the slot had been filtered 6 s before): while the pad pointer is still empty, an import
+// slot that no longer holds GetProcHook was rewritten by someone else (another module's IAT hook, the ASI loader) - log
+// who (at most 3 lines, read only). Filtering again is NOT done: a hook that took GetProcHook as its original would then
+// call it in a loop - the diagnosis comes first.
+int g_padSlotSeen = 0;
+DWORD g_padSlotLast = 0;
+void CheckImportSlot() {
+    DWORD slot = 0;
+    if (!g_getProcOriginal || g_padSlotSeen >= 3 || !ReadDword(kGetProcSlot, &slot) || !slot ||
+        slot == reinterpret_cast<DWORD>(&GetProcHook) || slot == g_padSlotLast)
+        return;
+    char owner[MAX_PATH];
+    ModuleOf(reinterpret_cast<const void *>(slot), owner, sizeof(owner));
+    g_padSlotLast = slot;
+    ++g_padSlotSeen;
+    Log(1, "pad: import slot 0x%08lx was rewritten to 0x%08lx (%s) after TruMenu's filter - the game will resolve "
+        "XInputGetState past PadHook (0.21.1 diagnosis, no re-filter)", kGetProcSlot, slot, owner);
+}
 // chaining rule: re-hook only when the slot points into the real XInputGetState again (game re-loaded XInput)
 void CheckPadSlot() {
     DWORD current = 0;
-    if (!ReadDword(kPadPointer, &current) || !current) return;
+    if (!ReadDword(kPadPointer, &current)) return;
+    if (!current) { CheckImportSlot(); return; }   // 0.21.1: the game has not resolved XInput yet
     // never placed yet (the game took XInput past our import filter and other plugins chained first): go on top once
     if (!g_padOriginal && current != reinterpret_cast<DWORD>(&PadHook)) {
         TakePointerLate(current);
@@ -24981,6 +26621,7 @@ void ReadOptions(const char *dir) {
     if (g_cmdHistSize < 1 || g_cmdHistSize > 64) g_cmdHistSize = atoi(OptDefault("Cmd", "HistorySize"));
     // 0.7
     g_freeMouse = OptInt(ini, "Menu", "FreeMouse");
+    g_hideCursor = OptInt(ini, "Menu", "HideCursor") ? 1 : 0;   // 0.21.1
     g_cmdFocusButton = static_cast<WORD>(OptInt(ini, "Cmd", "FocusButton"));
     g_cmdKeyboard = OptInt(ini, "Cmd", "Keyboard");
     g_cmdUpHistory = OptInt(ini, "Cmd", "UpOpensHistory");
@@ -25226,6 +26867,11 @@ void ReadOptions(const char *dir) {
         OptString(ini, "Quick", "Scale", v, sizeof(v));
         float s = static_cast<float>(atof(v));
         g_qbScale = s >= 0.5f && s <= 3.0f ? s : static_cast<float>(atof(OptDefault("Quick", "Scale")));
+        g_qbRecentMax = quick("RecentMax", 0, kQbRecentCap);   // 0.21.1
+        OptString(ini, "Quick", "Closed", g_qbClosed, sizeof(g_qbClosed));
+        char recent[kQbRecentCap * 112];
+        OptString(ini, "Quick", "Recent", recent, sizeof(recent));
+        QbRecentLoad(recent);
     }
     {                                        // 0.11 [Flow]
         char v[MAX_PATH];
@@ -25454,6 +27100,8 @@ void Start(HMODULE self) {
     M21Check();                               // 0.21 arachnophobia / camera / labels / ai.remove (precheck_021.txt)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
+    M211Check();                              // 0.21.1 ai.kill / sticky / room check / physics / spawn (precheck_0211.txt;
+                                              // after SpawnCheck: the enemy spawn takes its path)
     _snprintf_s(g_radFilePath, sizeof(g_radFilePath), _TRUNCATE, "%sTruMenu.radial.txt", g_exeDir);
     _snprintf_s(g_radTourPath, sizeof(g_radTourPath), _TRUNCATE, "%sTruMenu.tour.txt", g_exeDir);   // 0.10.1
     if (g_radEnabled) {
@@ -25570,3 +27218,24 @@ extern "C" __declspec(dllexport) int __cdecl TruMenuShot(const char *name) { ret
 // 0.10.5: a Claude mark as the ring level Claude / claude.mark <kind> (NULL / "" = now): the TruMenu.log line
 // "claude.mark <kind>: ... src=TruMenuMark" + a clean shot; never waits. 1 = marked, 0 = refused (MaxPerMinute).
 extern "C" __declspec(dllexport) int __cdecl TruMenuMark(const char *kind) { return MarkExport(kind); }
+
+// 0.21.1 (docs\Befund-TruShadowPower-017-0611.md section 5): which pad buttons TruMenu keeps from the game right now - for
+// plugins that read the pad themselves (TruShadowPower: RB). Any thread, no lock, never blocks; pad 0..3, other values
+// -> 0. Low word: buttons the game does not get - 0xFFFF = a neutral pad (menu with [Pad] BlockInput, ring, swallow after
+// a toggle, hold pending, radial swallow); quick bar open: kQbOwn (D-pad / LB / RB) as a whole (not only the buttons
+// already owned, so a press is covered in the same poll whatever the chain order) plus g_qbPad[pad].owned (held at the
+// close) and .gated (chord window). Bit 16 long menu open, bit 17 ring open, bit 18 quick bar open; other bits 0. Built
+// only from fields TruMenu already has (no new state, no write).
+extern "C" __declspec(dllexport) DWORD __cdecl TruMenuPadBlock(DWORD pad) {
+    if (pad > 3) return 0;
+    const bool menu = g_menuOpen != 0, ring = g_radOpen != 0, bar = g_qbOpen != 0;
+    DWORD out = 0;
+    if ((g_blockInput && menu) || ring || g_swallow[pad] || g_holdPending[pad] || g_radSwallow) out = 0xFFFF;
+    if (bar) out |= kQbOwn;
+    out |= static_cast<DWORD>(g_qbPad[pad].owned | g_qbPad[pad].gated);
+    out &= 0xFFFF;
+    if (menu) out |= 1u << 16;
+    if (ring) out |= 1u << 17;
+    if (bar) out |= 1u << 18;
+    return out;
+}

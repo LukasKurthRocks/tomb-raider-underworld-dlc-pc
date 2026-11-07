@@ -174,15 +174,17 @@ QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info'
             'dbg.depthdump': 'action', 'dbg.cp': 'action', 'dbg.cpall': 'action', 'dbg.cplist': 'info',
             'dbg.cpgo': 'action', 'pos.save': 'action', 'pos.list': 'info', 'pos.go': 'action'}
 QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess',
-             'kQbCoop')                                                          # 0.21 Koop (planned rows only)
+             'kQbCoop',                                                          # 0.21 Koop (planned rows only)
+             'kQbTests')                                                         # 0.21.1 Tests (teleports + specials)
 QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang',
                   'time.scale', 'ai.mode',                                       # 0.19 ai.mode
                   'snd.pos', 'snd.lines', 'snd.sort',                            # 0.20.1 sound list
-                  'cam.shakescale', 'cam.rumble')                                # 0.21 camera shake / rumble
+                  'cam.shakescale', 'cam.rumble',                                # 0.21 camera shake / rumble
+                  'ai.spawncount', 'ai.spawnat')                                 # 0.21.1 enemy spawn
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
-QB_PAGES_MAX = 11                            # 0.21: + Koop
+QB_PAGES_MAX = 13                            # 0.21: + Koop; 0.21.1: + Favoriten / Zuletzt, Tests
 # 0.19 dumb AI: the items, the presets (kAiPresets + "filter"), the [AI] keys
 Q19_ITEMS = {'ai.dumb': 'action', 'ai.mode': 'action', 'ai.noinvestigate': 'bool', 'ai.noattack': 'bool',
              'ai.status': 'info'}
@@ -236,6 +238,20 @@ Q21_BAR = (('kQbAccess', 'arachno.on', 'kQbBool', ''), ('kQbAccess', 'arachno.hi
 Q21_TABLES = ('kArDrawChecks', 'kArSoundChecks', 'kCsChecks', 'kRbChecks', 'kLfChecks', 'kAdChecks')
 Q21_REPLACED = ('Arachnophobie', 'Kamera-Wackeln aus')
 AD_ARGS = ('nearest', 'others', 'all')
+# 0.21.1 (2026-11-07): ai.kill, sticky, room check, physics bodies, enemy spawn, bar groups / page 0 / Tests page
+Q211_ITEMS = {'ai.kill': 'action', 'sticky.get': 'action', 'sticky.set': 'action', 'unit.go': 'action',
+              'phys.status': 'info', 'phys.dump': 'action', 'ai.spawn': 'action', 'ai.spawncount': 'action',
+              'ai.spawnat': 'action', 'dbg.hpbar': 'bool', 'menu.hidecursor': 'bool'}
+Q211_GAME_THREAD = ('ai.kill', 'sticky.set', 'phys.dump', 'ai.spawn')
+Q211_NOT_GAME_THREAD = ('unit.go', 'sticky.get')   # unit.go starts a shortcut (render side); get only reads
+Q211_QUICK_KEYS = (('Closed', 'groups'), ('RecentMax', (0, 16)), ('Recent', 'recent'))
+Q211_GROUPS = (('ki_dumm', 'ai.dumb'), ('ki_spawn', 'ai.spawn'), ('ki_weg', 'ai.kill'))   # key, an item inside
+Q211_TABLES = ('kAkChecks', 'kStChecks', 'kRkChecks', 'kPhChecks', 'kSpChecks', 'kHpChecks')
+Q211_SWITCHES = (('Debug', 'EnemyHpBar', '1'), ('Menu', 'HideCursor', '0'))   # 0 / 1 keys and their defaults
+# bytes other plugins patch at run time - never a TruMenu byte check: TruShadowCombat 0.6 (damage entry, switch bound,
+# table operand), TruTrace's call bytes
+Q211_FOREIGN = [(0x637590, 5), (0x63761b, 1), (0x637625, 4), (0x5b6a2f, 2)]
+Q211_KILL_TYPES = '{6, 4, 2, 1, 0}'          # 6 RigidBody = the game's own Kill (0x63831c) first
 TRUTRACE_BYTES = (0x5b6a2f, 0x5b6a30)        # the call TruTrace checks - never a TruMenu patch site
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -880,15 +896,16 @@ def check_018(ini_path, radial_path):
     for table, de, item, arg, kind, layer, tail in qb_rows(src, True):
         where = 'TruMenu.cpp: %s row "%s" (%s %s)' % (table, de, item, arg)
         flags = 'kQfConfirm' in tail or 'kQfBackup' in tail
-        if (item == '-') != (kind in ('kQbLabel', 'kQbPlanned')):
-            problems.append(where + ': id "-" exactly on label / planned rows')
+        if (item == '-') != (kind in ('kQbLabel', 'kQbPlanned', 'kQbGroup')):   # 0.21.1 kQbGroup
+            problems.append(where + ': id "-" exactly on label / planned / group rows')
         if kind == 'kQbPlanned':
             planned += 1
             if arg.count('|') != 1 or not all(arg.split('|')): problems.append(where + ': planned text "German|English"')
         if kind == 'kQbLabel': labels += 1
         if flags:
             confirm += 1
-            if kind != 'kQbAction': problems.append(where + ': kQfConfirm / kQfBackup only on action rows')
+            if kind != 'kQbAction' and not (kind == 'kQbChoice' and 'kQfBackup' not in tail):   # 0.21.1 spawn
+                problems.append(where + ': kQfConfirm / kQfBackup only on action rows (kQfConfirm also on choice rows)')
         if item == 'level.load' and not re.fullmatch(r'[a-z0-9_]+', arg):
             problems.append(where + ': level.load takes one unit name a-z 0-9 _')
         if item == 'level.load' and 'kQfConfirm' not in tail: problems.append(where + ': level.load rows need kQfConfirm')
@@ -1288,6 +1305,162 @@ def check_021(ini_path, radial_path, rows):
                                                sum(counts.values()), ' / '.join(Q21_TABLES)))
 
 
+def check_0211(ini_path, radial_path, rows):
+    """0.21.1 (2026-11-07 ai.kill / sticky / room check / physics / spawn / bar): the items (types, threads), [Quick]
+    Closed / RecentMax / Recent, the bar (page 0 Favoriten / Zuletzt = kQsFav, page Tests = kQbTests + kQsTests after
+    Zeit / Test, the three KI groups on Render / KI with their keys unique and an item inside, ai.kill rows with a
+    confirmation and nearest / others / all, the hall02 repair rows), the ring entries of the new items, the precheck
+    tables (whole bytes, at most 64, none on a byte another plugin patches), the kill path (types in order, the pick
+    before the call, the game's own kill), sticky.set never creates an entry, player.goto takes the room check, the pot
+    rule (placed intros only from drawn instances), the thrall-fight Prepare takes unit.go"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    items = item_types(src)
+    for item, typ in sorted(Q211_ITEMS.items()):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    for item in Q211_GAME_THREAD + Q211_NOT_GAME_THREAD:
+        m = re.search(r'\{"%s", "(?:action|info)", (?:"[^"]*"\s*)+,\s*(true|false),' % re.escape(item), src)
+        want = 'true' if item in Q211_GAME_THREAD else 'false'
+        if not m or m.group(1) != want:
+            problems.append('TruMenu.cpp: %s must %srun on the game thread (gameThread %s)'
+                            % (item, '' if want == 'true' else 'not ', want))
+    found = {k: (n, v) for n, k, v in ini_section(ini_path, 'Quick')}
+    for key, rule in Q211_QUICK_KEYS:
+        if key not in found:
+            problems.append('%s: [Quick] %s missing' % (name, key))
+            continue
+        n, v = found[key]
+        if rule == 'groups': ok = not v or bool(re.fullmatch(r'[a-z0-9_]+(,[a-z0-9_]+)*', v))
+        elif rule == 'recent': ok = not v or all(re.fullmatch(r'[a-z][a-z0-9_.]*( [^;]+)?', e) for e in v.split(';'))
+        else: ok = v.isdigit() and rule[0] <= int(v) <= rule[1]
+        if not ok: problems.append('%s:%d: [Quick] %s=%s (%s)' % (name, n, key, v, rule))
+    defaults = {(sec, key): default for sec, key, default, comment in rows}
+    for sec, key, want in Q211_SWITCHES:
+        fs = {k: (n, v) for n, k, v in ini_section(ini_path, sec)}
+        if key not in fs: problems.append('%s: [%s] %s missing' % (name, sec, key))
+        elif fs[key][1] not in ('0', '1'): problems.append('%s:%d: [%s] %s=%s (0 / 1)' % (name, fs[key][0], sec, key, fs[key][1]))
+    for sec, key, want in (('Quick', 'Closed', ''), ('Quick', 'RecentMax', '8'), ('Quick', 'Recent', '')) + Q211_SWITCHES:
+        if defaults.get((sec, key)) != want:
+            problems.append('TruMenu.cpp: kOpts [%s] %s default "%s", want "%s" (0.21.1)' % (sec, key, defaults.get((sec, key)),
+                                                                                         want))
+    block = src[src.index('const QbPage kQbPages[] = {'):]
+    block = block[:block.index('\n};')]
+    order = re.findall(r'(?:QB_PAGE\("([^"]*)", "[^"]*", (kQb[A-Za-z]+), (kQs[A-Za-z]+)\)|\{"([^"]*)", "[^"]*", nullptr, 0, '
+                       r'(kQs[A-Za-z]+)\})', block)
+    pages = [(a or d, b or None, c or e) for a, b, c, d, e in order]
+    if not pages or pages[0][2] != 'kQsFav': problems.append('TruMenu.cpp: page 0 must be Favoriten / Zuletzt (kQsFav)')
+    tables = [p[1] for p in pages]
+    if 'kQbTests' not in tables: problems.append('TruMenu.cpp: kQbPages has no page Tests (kQbTests)')
+    elif pages[tables.index('kQbTests')][2] != 'kQsTests': problems.append('TruMenu.cpp: page Tests needs kQsTests')
+    elif 'kQbTimeTest' in tables and tables.index('kQbTests') != tables.index('kQbTimeTest') + 1:
+        problems.append('TruMenu.cpp: page Tests must follow Zeit / Test')
+    ms = re.search(r'const int kQbStartPage = (\d+);', src)
+    if not ms or int(ms.group(1)) >= len(pages) or pages[int(ms.group(1))][1] != 'kQbLevel':
+        problems.append('TruMenu.cpp: kQbStartPage must point at Leveldaten (kQbLevel)')
+    bar = qb_rows(src, True)
+    keys = {}
+    group = None
+    inside = {}
+    for t, de, i, a, k, layer, tail in bar:
+        where = 'TruMenu.cpp: %s row "%s"' % (t, de)
+        if k == 'kQbGroup':
+            if not re.fullmatch(r'[a-z0-9_]+', a): problems.append(where + ': a group needs a key a-z 0-9 _ (arg)')
+            if a in keys: problems.append(where + ': group key %s twice (also %s)' % (a, keys[a]))
+            keys[a] = de
+            group = a
+            inside[a] = []
+            continue
+        if k == 'kQbLabel': group = None
+        elif group: inside[group].append(i)
+        if i == 'ai.kill':
+            if a not in AD_ARGS: problems.append(where + ': ai.kill needs nearest / others / all')
+            if k != 'kQbAction' or 'kQfConfirm' not in tail: problems.append(where + ': ai.kill = action row with kQfConfirm')
+        if i == 'sticky.set' and (k != 'kQbAction' or 'kQfConfirm' not in tail or not re.fullmatch(r'\d+ \d+ -?\d+', a)):
+            problems.append(where + ': sticky.set = action row "<owner> <key> <value>" with kQfConfirm')
+        if i == 'ai.spawn' and (k != 'kQbChoice' or 'kQfConfirm' not in tail or 'kQvSpawnKind' not in tail):
+            problems.append(where + ': ai.spawn = choice row (kQvSpawnKind) with kQfConfirm')
+    for key, item in Q211_GROUPS:
+        if key not in keys: problems.append('TruMenu.cpp: group %s missing (KI page)' % key)
+        elif item not in inside.get(key, []): problems.append('TruMenu.cpp: group %s has no %s row' % (key, item))
+    renders = [k for k in keys if any(t == 'kQbRender' and kk == 'kQbGroup' and a == k for t, de, i, a, kk, layer, tail in bar)]
+    if len(renders) != 3: problems.append('TruMenu.cpp: Render / KI needs the three KI groups (got %d)' % len(renders))
+    for want in ('11270 17287 0', '11270 18509 2'):
+        if not any(i == 'sticky.set' and a == want for t, de, i, a, k, layer, tail in bar):
+            problems.append('TruMenu.cpp: no bar row sticky.set %s (hall02 repair)' % want)
+    if not any(i == 'phys.status' and k == 'kQbInfo' and 'kQcPhys' in layer + tail for t, de, i, a, k, layer, tail in bar):
+        problems.append('TruMenu.cpp: no info row phys.status with the count kQcPhys')
+    counts = {}
+    if os.path.exists(radial_path):
+        rname = os.path.basename(radial_path)
+        for n, line in enumerate(open(radial_path, encoding='ascii', errors='replace').read().splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#') or line.count('|') != 2: continue
+            cmd = line.split('|')[2].strip()
+            word, _, arg = cmd.partition(' ')
+            arg = arg.strip()
+            if word not in Q211_ITEMS: continue
+            counts[word] = counts.get(word, 0) + 1
+            where = '%s:%d: %s' % (rname, n, cmd)
+            if word == 'ai.kill' and arg not in AD_ARGS and not arg.isdigit():
+                problems.append(where + ' (nearest / others / all / an intro id)')
+            elif word == 'sticky.set' and not re.fullmatch(r'((int|bool|float) )?(\d:)?\w+ \d+ \S+', arg):
+                problems.append(where + ' ([type] <owner> <key> <value>)')
+            elif word == 'unit.go' and not re.fullmatch(r'[A-Za-z0-9_]+', arg): problems.append(where + ' (one unit name)')
+            elif Q211_ITEMS[word] == 'info' and arg: problems.append(where + ' (no argument)')
+    for tbl in Q211_TABLES:
+        mt = re.search(r'const DvCheck %s\[\] = \{(.*?)\n\};' % tbl, src, re.S)
+        if not mt:
+            problems.append('TruMenu.cpp: %s missing' % tbl)
+            continue
+        body = re.sub(r'"\s*\n\s*"', '', mt.group(1))
+        for a, h in re.findall(r'\{(0x[0-9a-fA-F]+), "([0-9a-fA-F ]+)"\}', body):
+            hexs = h.replace(' ', '')
+            if len(hexs) % 2 or len(hexs) // 2 > 64:
+                problems.append('TruMenu.cpp: %s %s (whole bytes, at most 64; got %d)' % (tbl, a, len(hexs) // 2))
+            lo, hi = int(a, 16), int(a, 16) + len(hexs) // 2
+            for f, size in Q211_FOREIGN:
+                if lo < f + size and f < hi:
+                    problems.append('TruMenu.cpp: %s %s covers 0x%x - another plugin patches it' % (tbl, a, f))
+    if Q211_KILL_TYPES not in src: problems.append('TruMenu.cpp: kAkTypes must be %s (the game\'s own type first)' % Q211_KILL_TYPES)
+    mk = re.search(r'\nbool RunAkKill\([^;{]*\) \{.*?\n\}', src, re.S)
+    body = mk.group(0) if mk else ''
+    i_pick, i_call = body.find('AkPick('), body.find('AkKillOne(')
+    if not (0 <= i_pick < i_call): problems.append('TruMenu.cpp: RunAkKill must pick the kill path (AkPick) before AkKillOne')
+    if 'kAkKill = 0x006376e0' not in src: problems.append('TruMenu.cpp: ai.kill must call the game\'s Kill 0x6376e0')
+    ma = re.search(r'\nconst char \*AkPick\([^;{]*\) \{.*?\n\}', src, re.S)
+    pick = ma.group(0) if ma else ''
+    for need in ('0x800', 'fc & 2', 'AkDying', 'AkCaseOf(t) != 0', '0x2c60 + 0x1c', 'kAkRegen'):
+        if need not in pick: problems.append('TruMenu.cpp: AkPick lacks the rule "%s"' % need)
+    mset = re.search(r'\nbool RunStickySet\([^;{]*\) \{.*?\n\}', src, re.S)
+    sbody = mset.group(0) if mset else ''
+    if '0x4aee30' in sbody or '0x4b16a0' in sbody or 'StFind(' not in sbody:
+        problems.append('TruMenu.cpp: sticky.set must find the entry itself (StFind) and never call Find / create 0x4aee30 / '
+                        '0x4b16a0')
+    mf = re.search(r'\nint StFind\([^;{]*\) \{.*?\n\}', src, re.S)
+    if not mf or re.search(r'WriteDword|AiPutDword|volatile|\(\*reinterpret_cast', mf.group(0)):
+        problems.append('TruMenu.cpp: StFind must only read (ReadDword / ReadWord / ReadByte)')
+    mg = re.search(r'\nbool RunGoto\([^;{]*\) \{.*?\n\}', src, re.S)
+    gbody = mg.group(0) if mg else ''
+    i_rk, i_set = gbody.find('RkCheck('), gbody.find('SetPosition(')
+    if not (0 <= i_rk < i_set) or 'force' not in gbody:
+        problems.append('TruMenu.cpp: player.goto must run the room check (RkCheck, "force") before SetPosition')
+    mm = re.search(r'\nvoid M20Draw\([^;{]*\) \{.*?\n\}', src, re.S)
+    mbody = mm.group(0) if mm else ''
+    i_nd = mbody.find('if (LfNotDrawn(inst)) {      // 0.21: picked up')
+    i_reg = mbody.find('placedIntro[placedN] = intro;')
+    i_else = mbody.find('} else {', i_nd)
+    if not (0 <= i_nd < i_else < i_reg): problems.append('TruMenu.cpp: M20Draw must register placed intros only for drawn '
+                                                         'instances (0.21.1 pot rule)')
+    reg = os.path.join(ROOT, 'tests', 'regress', 'dlc2.txt')
+    rtext = open(reg, encoding='ascii', errors='replace').read() if os.path.exists(reg) else ''
+    if '#Thrall fight: hall02 + god mode;unit.go dlc_yggdrasil_hall02;' not in rtext:
+        problems.append('tests/regress/dlc2.txt: the thrall-fight Prepare must take unit.go dlc_yggdrasil_hall02')
+    return problems, ('%d items, [Quick] %d keys, pages 0 / Tests, %d groups, %d ring entries, tables %s, kill path, sticky, '
+                      'room check, pot rule, Prepare' % (len(Q211_ITEMS), len(Q211_QUICK_KEYS), len(keys),
+                                                        sum(counts.values()), ' / '.join(Q211_TABLES)))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -1381,6 +1554,10 @@ def main(argv):
     for p in xproblems: print('Q021 %s' % p)
     if not xproblems: print('ok: 0.21 arachnophobia / camera / ai.remove: %s' % xsummary)
     problems += xproblems
+    wproblems, wsummary = check_0211(ini_path, radial_path, rows)   # 0.21.1
+    for p in wproblems: print('Q0211 %s' % p)
+    if not wproblems: print('ok: 0.21.1 ai.kill / sticky / room check / physics / spawn / bar: %s' % wsummary)
+    problems += wproblems
     nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)

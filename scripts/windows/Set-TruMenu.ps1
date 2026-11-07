@@ -54,7 +54,7 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruMenu.asi', 'TruMenu.ini'
-# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.20.1) - recognised
+# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.21) - recognised
 # as ours for update / removal
 $earlierBuilds = @{
     'TruMenu.asi' = @('50ebd28adcf96cef7e1db673ce293b5810bd8d64d0669617d09a1250598491a3',
@@ -88,7 +88,8 @@ $earlierBuilds = @{
                       '23d3dce1b6ba642055dce2b15612cce10b7a9ece93c1b4818fbd7ec452e645e5',   # 0.18 Lara in, bar pages, save.load (work\asi\menu018)
                       'a84e0b63f1160233286f56d0fda16afc233c6b6a6e5574bcc9d3983af5ce6afa',   # 0.19 Dumme KI (work\asi\menu019)
                       'c1c4d958f69129d78ed478eb8c433c965d92d73f3b6144959bf6e215829f0946',   # 0.20 collectibles, enemies (work\asi\menu020)
-                      '8e1338354c322fcf7cc7c8c6509aab1b04fd0ca7adb147d468aa6a187191af15')   # 0.20.1 sound list (work\asi\menu0201)
+                      '8e1338354c322fcf7cc7c8c6509aab1b04fd0ca7adb147d468aa6a187191af15',   # 0.20.1 sound list (work\asi\menu0201)
+                      '49b71f00bc75bca2cb628e6b543ff23498da8265a19d18115b4d563bcc14af24')   # 0.21 Arachnophobie, ai.remove (work\asi\menu021)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
@@ -115,7 +116,8 @@ $earlierBuilds = @{
                       '825e5b8e0744fcd43c3310b333938fa48fea8444f23961d9f131040bfcd40f47',   # 0.18 ([Menu] OverlayLaraIn, [Saves] DirectLoad, ..; work\asi\menu018)
                       '47e3be93728af79f12cb90fbd62967f45e2d3e1a8cb880c623d3ec6036dfc66b',   # 0.19 ([AI]; work\asi\menu019)
                       'a1a96bc20da75b52e4f45b4f8b94366330fe262e3e4320f1bf3dc332963a9c99',   # 0.20 ([Debug] Collect / Enemies / Mark*, [Media] Mute*; work\asi\menu020)
-                      '8c5a4027c7ebad61db57efb933b4f56ff22c5d31510362ba311cb675d026fe38')   # 0.20.1 ([Sound], [Debug] EnemyStateLog; work\asi\menu0201)
+                      '8c5a4027c7ebad61db57efb933b4f56ff22c5d31510362ba311cb675d026fe38',   # 0.20.1 ([Sound], [Debug] EnemyStateLog; work\asi\menu0201)
+                      '911689e3d15f986ff71f2b28d0a751717a2f0bafa294523fbad0e62fdc6687bf')   # 0.21 ([Arachno], [Camera]; work\asi\menu021)
 }
 # 0.21: the owner's own arachnophobia picture (TruMenu.arachno.png, also TruMenu.arachno.<kind>.png) next to tru.exe is
 # private: this script never copies, overwrites or removes it (not even one found in the build folder) - the plugin
