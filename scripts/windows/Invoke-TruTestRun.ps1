@@ -406,7 +406,10 @@ function Find-GuardFaults {
             $truStack = New-Object System.Collections.Generic.List[string]
             for ($j = $i + 1; $j -lt $lines.Count -and $j -le $i + 64; $j++) {
                 if ($lines[$j] -match 'TRUGUARD_') { break }
-                foreach ($t in [regex]::Matches($lines[$j], '(?i)\btru(?:\.exe)?\+0x([0-9a-f]+)')) {
+                # TruGuard 0.4.2+outside-fix: the block header names the thread start (start= / start_mod=tru.exe+0x...);
+                # that is not a stack hint - drop those fields before collecting (review 2026-11-07)
+                $scan = $lines[$j] -replace '(?i)\bstart(?:_mod)?=\S+', ''
+                foreach ($t in [regex]::Matches($scan, '(?i)\btru(?:\.exe)?\+0x([0-9a-f]+)')) {
                     $hint = 'tru+0x' + $t.Groups[1].Value.ToLowerInvariant()
                     if (!$truStack.Contains($hint)) { $truStack.Add($hint) }
                 }
