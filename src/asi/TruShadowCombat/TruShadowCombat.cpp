@@ -57,7 +57,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.3 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.4 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
