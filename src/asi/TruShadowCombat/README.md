@@ -1,4 +1,36 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.1)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.2)
+
+0.6.2 (2026-11-07, **offline, not yet seen in game**): K9 - `CombatManager::MeleeSplashDamage` tru+0x2e68b0 as the
+title update (TU 0x823e1220, retail 0x823dedc0; `docs\Befund-TU-K9-K11-0711.md` in the main workspace). Build
+`work\asi\combat062`.
+* The function (event dispatcher tru+0x316f30 case 75) calls the area damage tru+0x29f1e0 (TU 0x8237ae88) once per
+  splash record of the current attack; argument 13 is the damage type (`[CM+0xc4]+0x0c`), which becomes +0x50 of the
+  hit message 0x11c and so the type K14's switch sees. The TU added (a) in doppelganger mode (gameTracker+0x1244) the
+  type remap through the extension's pair table (object 858, DTP 22497 +0xf0 +0x78 -> +0x1b0: **0x1a -> 0x10,
+  0x10 -> 0x16**) and (b) always the main target (handle CM+0x48) as an 18th argument, which the area function skips
+  right after its self test (TU 0x8237af64). Both are missing on the PC and in the upstream build.
+* `[Splash] Translate=1` (default **1**): the call at tru+0x2e692d goes to the plugin (remap argument 13 in place, note
+  the main target via the game's handle resolver tru+0x1b39d0, then jump into tru+0x29f1e0 with the original return
+  address); the loop test tru+0x29f224 (`cmp esi, edi; je next`, 8 bytes) goes to a stub that also skips the noted
+  target, only in calls returning to tru+0x2e6932 - the nine other callers of tru+0x29f1e0 stay unchanged (the TU's
+  other callers pass 0). The remap runs only while the K14 switch is extended (`[Damage] Translate=1`): 22 is a type
+  only the TU switch accepts. Without it the doppelganger records keep their type (`HELD BACK` in the log).
+* The pair table comes from the loaded object 858 (PC twin of the TU's extension instance data, as the target list /
+  TruShadowPower). The converted file holds three of the four words unswapped (+0x1b0 / +0x1b8 / +0x1bc read
+  0x1a000000 / 0x10000000 / 0x16000000 in every PC tree); `[Splash] Fallback=1` (default) then uses the Xbox values and
+  logs it (`0.6.2 splash table: ... FALLBACK`). Data fix pending (converter).
+* `[Splash] Log=1`: burst lines every 2 s, e.g. `0.6.2 splash: x2 record type 26 -> 16 - doppelganger mode: REMAPPED
+  as TU 0x823e1220, table Xbox values (FALLBACK ...); main target 0x... obj 1004 viking_thrall_tutorial_dlc2_; enemy
+  switch as TU (0..27): damage + death check` and `... area hit(s) on the main target held back`.
+* New byte checks: 11 (`work\asi\combat062\prechecks_combat062.txt`); with 88 + 6 + 21 + 4 + 13 + 12: 155, 0
+  mismatches on the Steam exe. Imports unchanged (81, KERNEL32 only); exports unchanged (4).
+
+| # | TO TEST 0.6.2 (DLC 2 hall01 / hall02 tutorial thralls; TruDlc2Player 0.4 `TrackerFlag=1`) | expected |
+|---|---|---|
+| 1 | load | `0.6.2 splash: tru+0x2e692d (...) and tru+0x29f224 (...) -> plugin - [Splash] Translate 1`, no "does not match" |
+| 2 | `[Damage] Translate=0`: shadow moves (1018) / 1015 near several thralls | `0.6.2 splash:` lines `HELD BACK - damage switch is the PC's`, types unchanged; `held back` lines when the main target stood in the radius |
+| 3 | `[Damage] Translate=1`: the same | `0.6.2 splash table: ...` once; `type 26 -> 16` / `type 16 -> 22` `REMAPPED`; K14 lines `type 22 ... switch as TU: damage + death check` for the splash victims |
+| 4 | trouble | `[Splash] Translate=0` (PC splash at the next splash) |
 
 0.6.1 (2026-11-07, **offline, not yet seen in game**): the fatal `ChunkDoll: failed to create geom` after a thrall
 death with `[Damage] Translate=1` (`docs\Befund-ChunkDoll-Physikschritt-0711.md` in the main workspace). Build
@@ -276,6 +308,10 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Chunk] Translate` | 1 | 0.6.1: lethal impulse (message 0x91) as the TU - death switch kind 7 instead of a chunkdoll inside the physics step; 0 = PC branch; read again at run time (<= 1 / s) |
 | `[Chunk] Log` | 1 | 0.6.1: burst lines of the lethal impulses with the physics lock (changes nothing) |
 | `[Chunk] MaxLines` | 2000 | 0.6.1: cap of the chunk lines |
+| `[Splash] Translate` | 1 | 0.6.2 (K9): MeleeSplashDamage as the TU - main target excluded from the splash; doppelganger remap 0x1a -> 0x10 / 0x10 -> 0x16 while `[Damage] Translate=1`; 0 = PC splash; read again at run time (<= 1 / s) |
+| `[Splash] Fallback` | 1 | 0.6.2: the Xbox pair values when object 858's table differs from them (converted file: words unswapped); 0 = table as loaded |
+| `[Splash] Log` | 1 | 0.6.2: burst lines of the splash records (type in / out, main target, enemy switch verdict; changes nothing) |
+| `[Splash] MaxLines` | 2000 | 0.6.2: cap of the splash lines |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 

@@ -31,6 +31,10 @@
 //    callback inside the physics step) as the TU 0x82305ba0: death switch kind 7 instead of creating the chunkdoll at
 //    once (whose rigid bodies the locked physics step refuses -> fatal "ChunkDoll: failed to create geom")
 //    ([Chunk] Translate=1, default on; [Chunk] Log=1 burst lines).
+// 9. 0.6.2 (K9): CombatManager::MeleeSplashDamage tru+0x2e68b0 as the TU 0x823e1220 - the main target (CM+0x48) gets
+//    no extra splash hit (area damage tru+0x29f1e0 skips it as TU 0x8237ae88), and in doppelganger mode the splash type
+//    is remapped through object 858's pair table (0x1a -> 0x10, 0x10 -> 0x16) while the K14 switch is extended
+//    ([Splash] Translate=1, default on; [Splash] Log=1 burst lines).
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -47,7 +51,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.1 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.2 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -58,7 +62,9 @@ const char kVersion[] = "TruShadowCombat 0.6.1 (TU target list 7 -> 10, conditio
                         "WHY walks the rejected list by its next link +4; 0.6: K14 damage-type switch tru+0x237590 - burst log of "
                         "the incoming damage types ([Damage] Log) and the TU switch 0..27 ([Damage] Translate, off by "
                         "default); 0.6.1: lethal impulse tru+0x224c60 as the TU 0x82305ba0 - death switch instead of a "
-                        "chunkdoll inside the physics step ([Chunk] Translate, on by default))";
+                        "chunkdoll inside the physics step ([Chunk] Translate, on by default); 0.6.2: MeleeSplashDamage "
+                        "tru+0x2e68b0 as the TU 0x823e1220 - main target excluded from the splash, doppelganger type "
+                        "remap with the K14 switch ([Splash] Translate, on by default))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -3270,6 +3276,358 @@ void SetupChunk() {
         g_chunkLog, g_chunkMax, g_chunkFlusher ? "" : ", no flush thread - lines only at the cap");
 }
 
+// ---------------------------------------------------------------- 0.6.2: K9 - CombatManager::MeleeSplashDamage as the
+// title update (docs Befund-TU-K9-K11-0711.md in the main workspace; K9 in Befund-Exe-Stellen-K8-K14-0611.md)
+// PC tru+0x2e68b0 (thiscall, this = CombatManager [[0xfadb58]+0x504]; called by the event dispatcher tru+0x316f30
+// case 75 at tru+0x316fbb) = retail 0x823dedc0 = TU 0x823e1220 (name from the TU debug string 0x820721f0
+// "[CombatManager::MeleeSplashDamage] Applying Splash Damage (%f)"). For every splash record of the current attack
+// ([CM+0xc4]: +0x0c type, +0x20 count, +0x24 records of 0x1c bytes) it calls the area damage function tru+0x29f1e0
+// (retail 0x8237b2a8, TU 0x8237ae88; cdecl, 17 arguments; argument 13 = the damage type, which becomes +0x50 of the hit
+// message 0x11c, the type K14's switch tru+0x237590 sees). The TU added two things:
+//  (a) doppelganger mode (gameTracker+0x1244) and a valid extension handle gameTracker+0x1314 (instance of object 858,
+//      spawned by the TU-only 0x82412ab0): the type is replaced through the pair table [inst+0x50]+0x78 (count +0x7c,
+//      8-byte entries {from, to}, signed compare, the first match wins). Data: player_tru_dlc2_extension DTP 22497,
+//      block +0xf0 (= the tuning TU 0x82415518 returns) +0x78 -> +0x1b0, count 2: {0x1a -> 0x10}, {0x10 -> 0x16}.
+//  (b) always (also outside doppelganger mode): the main target (handle CM+0x48, resolved inline as the PC's
+//      tru+0x1b39d0: instance != 0 and [instance+0x44] == handle+4) is passed as an 18th argument, and the area function
+//      skips that instance right after its self test (TU 0x8237af64..0x8237af6c; retail / PC test only instance ==
+//      source). The nine other TU callers of 0x8237ae88 store their zero register there (no exclusion).
+// PC twins: the doppelganger byte is the same field ([[0xfadb58]+0x1244], read by larabase f36 tru+0x377dc0, written by
+// TruDlc2Player 0.4 as the TU's DoppelgangerInit); the PC has no extension instance, so the table comes from the loaded
+// object 858 (Tuning(), the same data TruShadowPower / the target list read for TU 0x82415518); the handle resolver
+// tru+0x1b39d0; the area function's loop test tru+0x29f224 (cmp esi, edi; je tru+0x29f7ed = next instance) is the place
+// of the TU's added test.
+// Port: the call at tru+0x2e692d goes to SplashCallStub (remap argument 13 in place, note the main target, then JUMP to
+// tru+0x29f1e0, so its return address stays tru+0x2e6932); tru+0x29f224 jumps to AreaLoopStub, which skips the noted
+// target only in a call that returns to tru+0x2e6932 ([ebp+4]) - the nine other callers of tru+0x29f1e0 are unchanged,
+// as on the TU.
+// The remap runs only while the K14 switch is extended (0.6 [Damage] Translate=1): 0x16 = 22 is a type only the TU switch
+// accepts, so the remap without it would drop the 1015 splash (16 -> 22) - a state neither the TU nor the PC has. With
+// [Damage] Translate=0 the doppelganger records keep their type (logged as "held back").
+// Data note (converter): the PC trees hold the four pair words partly unswapped (+0x1b0 / +0x1b8 / +0x1bc read
+// 0x1a000000 / 0x10000000 / 0x16000000), so the loaded table is compared with the Xbox values; [Splash] Fallback=1
+// (default) uses the Xbox values then and says so (as TruShadowPower's tuning fallback).
+const DWORD kSplashFn = 0x006e68b0;           // retail 0x823dedc0, TU 0x823e1220
+const DWORD kSplashCall = 0x006e692d;         // call tru+0x29f1e0 (e8 rel32) - patched
+const DWORD kSplashRet = 0x006e6932;          // its return address (AreaLoopStub compares [ebp+4] with it)
+const DWORD kAreaFn = 0x0069f1e0;             // retail 0x8237b2a8, TU 0x8237ae88
+const DWORD kAreaLoop = 0x0069f224;           // cmp esi, edi; je 0x69f7ed (8 bytes) - patched
+const DWORD kAreaLoopGo = 0x0069f22c;         // the instance is processed
+const DWORD kAreaNext = 0x0069f7ed;           // mov edi, [edi+8] (next instance)
+const DWORD kHandleFn = 0x005b39d0;           // cdecl instance(handle *): inst && [inst+0x44] == handle+4
+const LONG kXboxSplashPairs[2][2] = {{0x1a, 0x10}, {0x10, 0x16}};   // x_player_tru_dlc2_extension DTP 22497 +0x1b0
+typedef BYTE *(__cdecl *HandleFn)(const void *handle);
+int g_splashTranslate = 1;         // [Splash] Translate (read again at run time, at most once per second, while splashes come)
+int g_splashFallback = 1;          // [Splash] Fallback: Xbox pair values when the loaded table differs from them
+int g_splashLog = 1;               // [Splash] Log
+int g_splashMax = 2000;            // [Splash] MaxLines
+bool g_splashHooked = false;
+bool g_splashFlusher = false;
+DWORD g_splashSwitchTick = 0;
+volatile DWORD g_splashTarget = 0; // main target of the running splash call (0 = none); read by AreaLoopStub
+volatile LONG g_splashSkips = 0;   // area hits held back from the main target (AreaLoopStub)
+volatile LONG g_splashLines = 0;
+DWORD g_areaFnTo = kAreaFn, g_areaGoTo = kAreaLoopGo, g_areaNextTo = kAreaNext;
+int g_splashTableSource = -1;      // last logged table source
+CRITICAL_SECTION g_splashLock;
+
+enum { kSOff = 0, kSNotDg, kSNoTable, kSNoMatch, kSRemap, kSHeld };
+const char *const kSplashHow[6] = {
+    "[Splash] Translate=0: PC (type kept, main target not excluded)",
+    "not in doppelganger mode (gameTracker+0x1244 = 0): type kept",
+    "doppelganger mode, no pair table (object 858 not loaded or table empty - TU: no extension, type kept)",
+    "doppelganger mode, no pair for this type: kept",
+    "doppelganger mode: REMAPPED as TU 0x823e1220",
+    "doppelganger mode: the TU remaps it, HELD BACK - damage switch is the PC's ([Damage] Translate=0)"};
+enum { kTNone = 0, kTObject = 1, kTFallback = 2, kTLoaded = 3, kTEmpty = 4 };
+const char *const kTableSource[5] = {"none (object 858 not loaded)", "object 858 (= the Xbox values)",
+                                     "Xbox values (FALLBACK: the loaded table differs)",
+                                     "object 858 as loaded (differs from the Xbox values, [Splash] Fallback=0)",
+                                     "object 858: table pointer / count 0"};
+
+// the pair table the remap uses now: TU [inst+0x50]+0x78 / +0x7c = here Tuning() +0x78 / +0x7c
+int SplashTable(const LONG **pairs, DWORD *count) {
+    *pairs = nullptr;
+    *count = 0;
+    const BYTE *tuning = Tuning();
+    if (!tuning) return kTNone;
+    const LONG *table = reinterpret_cast<const LONG *>(Rd(tuning + 0x78));
+    const DWORD n = Rd(tuning + 0x7c);
+    if (!table || !n) return kTEmpty;
+    bool same = n == 2;
+    for (DWORD i = 0; same && i < 2; ++i)
+        same = static_cast<LONG>(Rd(table + 2 * i)) == kXboxSplashPairs[i][0] &&
+               static_cast<LONG>(Rd(table + 2 * i + 1)) == kXboxSplashPairs[i][1];
+    int source = same ? kTObject : (g_splashFallback ? kTFallback : kTLoaded);
+    if (source != g_splashTableSource) {
+        g_splashTableSource = source;
+        char loaded[160] = "";
+        int w = 0;
+        for (DWORD i = 0; i < n && i < 4 && w >= 0 && w < static_cast<int>(sizeof(loaded)) - 40; ++i)
+            w += _snprintf_s(loaded + w, sizeof(loaded) - w, _TRUNCATE, "%s{0x%lx -> 0x%lx}", i ? ", " : "",
+                             Rd(table + 2 * i), Rd(table + 2 * i + 1));
+        Log(1, "0.6.2 splash table: object 858 tuning 0x%08lx +0x78 -> 0x%08lx, count %lu: %s%s - used: %s",
+            reinterpret_cast<DWORD>(tuning), reinterpret_cast<DWORD>(table), n, loaded, n > 4 ? " ..." : "",
+            source == kTObject ? "these (= Xbox DTP 22497 +0x1b0)"
+            : source == kTFallback ? "the Xbox values {0x1a -> 0x10}, {0x10 -> 0x16} (DTP 22497 +0x1b0; the converted "
+                                     "file holds words unswapped - converter fix pending)"
+                                   : "these as loaded ([Splash] Fallback=0)");
+    }
+    if (source == kTFallback) {
+        *pairs = &kXboxSplashPairs[0][0];
+        *count = 2;
+    } else {
+        *pairs = table;
+        *count = n > 64 ? 64 : n;
+    }
+    return source;
+}
+
+struct SplashSlot { DWORD typeIn, typeOut, target, count; int how, source; bool applied; char who[96]; };
+const int kSplashSlots = 16;
+SplashSlot g_splashSlot[kSplashSlots];
+int g_splashUsed = 0;
+LONG g_splashMissed = 0;
+DWORD g_splashStart = 0;
+
+void SplashLine(const SplashSlot &s) {
+    LONG n = InterlockedIncrement(&g_splashLines);
+    if (n > g_splashMax) {
+        if (n == g_splashMax + 1) Log(1, "0.6.2 splash: [Splash] MaxLines %d reached - no more lines", g_splashMax);
+        return;
+    }
+    char type[96];
+    if (s.typeOut != s.typeIn)
+        _snprintf_s(type, sizeof(type), _TRUNCATE, "type %lu -> %lu", s.typeIn, s.typeOut);
+    else if (s.how == kSHeld)
+        _snprintf_s(type, sizeof(type), _TRUNCATE, "type %lu (TU: -> %lu)", s.typeIn, s.target);
+    else
+        _snprintf_s(type, sizeof(type), _TRUNCATE, "type %lu", s.typeIn);
+    const int verdict = DamageCase(s.typeOut, s.applied);
+    Log(1, "0.6.2 splash: x%lu record %s - %s%s%s; main target %s; enemy switch %s: %s", s.count, type, kSplashHow[s.how],
+        s.how == kSRemap || s.how == kSHeld || s.how == kSNoMatch ? ", table " : "",
+        s.how == kSRemap || s.how == kSHeld || s.how == kSNoMatch ? kTableSource[s.source] : "",
+        s.how == kSOff ? "not excluded" : s.who, s.applied ? "as TU (0..27)" : "PC (0..16)", kVerdict[verdict]);
+}
+
+void SplashFlush(bool force) {
+    SplashSlot copy[kSplashSlots];
+    int n = 0;
+    LONG missed = 0, skips = 0;
+    EnterCriticalSection(&g_splashLock);
+    if (g_splashUsed && (force || GetTickCount() - g_splashStart >= 2000)) {
+        n = g_splashUsed;
+        memcpy(copy, g_splashSlot, sizeof(SplashSlot) * static_cast<size_t>(n));
+        missed = g_splashMissed;
+        g_splashUsed = 0;
+        g_splashMissed = 0;
+        skips = InterlockedExchange(&g_splashSkips, 0);
+    }
+    LeaveCriticalSection(&g_splashLock);
+    for (int k = 0; k < n; ++k) SplashLine(copy[k]);
+    if (skips && InterlockedCompareExchange(&g_splashLines, 0, 0) <= g_splashMax)
+        Log(1, "0.6.2 splash: %ld area hit(s) on the main target held back in this window (TU 0x8237af64: the main "
+               "target gets no extra splash hit)", skips);
+    if (missed) Log(1, "0.6.2 splash: %ld more splash records in this window not counted", missed);
+}
+
+// writes the burst lines every 250 ms once their window is 2 s old (no game memory read or written here)
+DWORD WINAPI SplashFlushThread(LPVOID) {
+    for (;;) {
+        Sleep(250);
+        SplashFlush(false);
+    }
+}
+
+// game thread: count one splash record (names resolved once per new slot, every read SEH-guarded)
+void SplashRecord(DWORD typeIn, DWORD typeOut, DWORD tuTo, int how, int source, BYTE *target) {
+    EnterCriticalSection(&g_splashLock);
+    if (!g_splashUsed) g_splashStart = GetTickCount();
+    const DWORD key = how == kSHeld ? tuTo : reinterpret_cast<DWORD>(target);
+    int k = 0;
+    for (; k < g_splashUsed; ++k) {
+        const SplashSlot &s = g_splashSlot[k];
+        if (s.typeIn == typeIn && s.typeOut == typeOut && s.how == how && s.source == source &&
+            s.applied == g_dmgApplied && s.target == key)
+            break;
+    }
+    if (k == g_splashUsed) {
+        if (g_splashUsed < kSplashSlots) {
+            SplashSlot &s = g_splashSlot[g_splashUsed++];
+            memset(&s, 0, sizeof(s));
+            s.typeIn = typeIn; s.typeOut = typeOut; s.how = how; s.source = source; s.applied = g_dmgApplied;
+            s.target = key;                       // kSHeld: the TU's type (shown in the line); else the target
+            if (target) Describe(target, s.who, sizeof(s.who));
+            else strcpy_s(s.who, sizeof(s.who), "none (handle CM+0x48 empty / stale)");
+        } else {
+            ++g_splashMissed;
+            k = -1;
+        }
+    }
+    if (k >= 0) ++g_splashSlot[k].count;
+    const bool flushNow = !g_splashFlusher && GetTickCount() - g_splashStart >= 2000;
+    LeaveCriticalSection(&g_splashLock);
+    if (flushNow) SplashFlush(false);
+}
+
+// [Splash] Translate again from the INI, at most once per second, on the game thread (from SplashPrepare)
+void SplashReadSwitch() {
+    if (!g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_splashSwitchTick < 1000) return;
+    g_splashSwitchTick = now;
+    const int t = GetPrivateProfileIntA("Splash", "Translate", g_splashTranslate, g_iniPath) ? 1 : 0;
+    if (t == g_splashTranslate) return;
+    Log(1, "0.6.2 switch: [Splash] Translate %d -> %d (read again from TruShadowCombat.ini) - %s", g_splashTranslate, t,
+        t ? "splash as the TU (main target excluded, doppelganger remap)" : "the PC splash");
+    g_splashTranslate = t;
+}
+
+// TU 0x823e1220 per record, before the area call: (a) remap argument 13, (b) note the main target for AreaLoopStub
+void __cdecl SplashPrepare(BYTE *cm, DWORD *args) {
+    SplashReadSwitch();
+    g_splashTarget = 0;
+    const DWORD typeIn = args[13];
+    DWORD typeOut = typeIn, tuTo = typeIn;
+    int how = kSOff, source = kTNone;
+    BYTE *target = nullptr;
+    if (g_splashTranslate) {
+        __try {
+            target = reinterpret_cast<HandleFn>(kHandleFn)(cm + 0x48);          // TU 0x823e1324..0x823e1348
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            target = nullptr;
+        }
+        g_splashTarget = reinterpret_cast<DWORD>(target);
+        const BYTE *gt = GameTracker();
+        const bool dg = gt && (Rd(gt + 0x1244) & 0xff) != 0;                   // TU 0x823e1270 lbz 0x1244
+        if (!dg) {
+            how = kSNotDg;
+        } else {
+            const LONG *pairs = nullptr;
+            DWORD n = 0;
+            source = SplashTable(&pairs, &n);
+            if (!pairs || !n) {
+                how = kSNoTable;
+            } else {
+                how = kSNoMatch;
+                for (DWORD i = 0; i < n; ++i)                                  // TU 0x823e12f8..0x823e1320
+                    if (static_cast<LONG>(Rd(pairs + 2 * i)) == static_cast<LONG>(typeIn)) {
+                        tuTo = Rd(pairs + 2 * i + 1);
+                        how = g_dmgApplied ? kSRemap : kSHeld;
+                        break;
+                    }
+                if (how == kSRemap) {
+                    typeOut = tuTo;
+                    args[13] = typeOut;
+                }
+            }
+        }
+    }
+    if (g_splashLog) SplashRecord(typeIn, typeOut, tuTo, how, source, target);
+}
+
+// called from tru+0x2e692d instead of tru+0x29f1e0: [esp] = tru+0x2e6932, [esp+4..] = the 17 arguments, edi =
+// CombatManager (tru+0x2e68b2). The FPU stack is empty there; eax / ecx / edx are not used after the call.
+__declspec(naked) void SplashCallStub() {
+    __asm {
+        lea eax, [esp + 4]
+        push eax
+        push edi
+        call SplashPrepare
+        add esp, 8
+        jmp dword ptr [g_areaFnTo]
+    }
+}
+
+// jumped to from tru+0x29f224 (area function loop, esi = source instance, edi = candidate, ebp = its frame): the PC
+// self test, then the TU's main-target test - only for the splash call (return address tru+0x2e6932). The flags are
+// not used by either target (both set them again before any branch).
+__declspec(naked) void AreaLoopStub() {
+    __asm {
+        cmp esi, edi
+        je area_next
+        cmp dword ptr [ebp + 4], 0x006e6932
+        jne area_go
+        cmp edi, dword ptr [g_splashTarget]
+        jne area_go
+        lock inc dword ptr [g_splashSkips]
+    area_next:
+        jmp dword ptr [g_areaNextTo]
+    area_go:
+        jmp dword ptr [g_areaGoTo]
+    }
+}
+
+void SetupSplash() {
+    if (!g_splashTranslate && !g_splashLog) {
+        Log(1, "0.6.2 splash: [Splash] Translate=0 and Log=0 - tru+0x2e68b0 / tru+0x29f1e0 untouched (a later "
+               "Translate=1 needs a restart)");
+        return;
+    }
+    // everything the two patches rely on (read only); a mismatch leaves the game untouched
+    struct { DWORD at; const char *hex; const char *what; } const facts[] = {
+        {kSplashFn,
+         "53 57 8bf9 8b87c4000000 33db 395820 0f8683000000 55 56 33ed 8da42400000000 8b87c4000000 8b7024 d9042e 8b480c "
+         "83ec0c d95c2408 03f5 d94610 d95c2404 d94608 d91c24 51 d94618 6a00 6a00 6a00 e81ce41200 d94614 50 e813e41200 "
+         "d94604 8b1594f0e700 50 6a00 6a00 6a00 51 d91c24 6a00 d9460c 6a00 51 d91c24 52 e8ae88fbff 8b87c4000000 83c301 "
+         "83c444 83c51c 3b5820 728a 5e 5d 5f 5b c3",
+         "MeleeSplashDamage tru+0x2e68b0: CM in edi, records [CM+0xc4]+0x24 (0x1c each), type +0x0c = argument 13, call "
+         "tru+0x29f1e0 at tru+0x2e692d (17 arguments, add esp 0x44)"},
+        {0x00716fb5, "8b8904050000 e8f0f8fcff", "event dispatcher case 75: tru+0x2e68b0 on [gameTracker+0x504]"},
+        {kAreaFn,
+         "55 8bec 83e4f0 d9ee 81ec84000000 d85d0c 53 56 8b7508 33db 57 dfe0 f6c405 0f8af4050000 d94518 8b3d548dd900 3bfb "
+         "dcc8 d95c2428 d94548 dcc8 d95c242c 0f84d4050000 3bf7 0f84c1050000",
+         "area damage tru+0x29f1e0: ebp frame, source esi = argument 0, instance list [0xd98d54] in edi, ebx = 0, loop "
+         "test tru+0x29f224 cmp esi, edi / je tru+0x29f7ed"},
+        {kAreaNext, "8b7f08 3bfb 0f852cfaffff", "area damage: next instance tru+0x29f7ed, back to the loop test"},
+        {0x0069f82f, "5f 5e 5b 8be5 5d c3", "area damage epilogue (no float result)"},
+        {0x0069f584, "8b553c", "area damage: argument 13 (type) -> hit message (static path)"},
+        {0x0069f597, "8915e033ed00", "area damage: type -> message 0xed3390 +0x50"},
+        {0x0069f4ab, "8b453c", "area damage: argument 13 (type) -> message build tru+0x23c9b0 (player path)"},
+        {kHandleFn, "8b4c2404 85c9 740e 8b01 85c0 7408 8b5044 3b5104 7402 33c0 c3",
+         "handle resolver tru+0x1b39d0 (= TU inline 0x823e1324..0x823e1348)"},
+        {0x006e6843, "8d4648 57 50 e883d1ecff", "main target = handle CM+0x48 (tru+0x2e6840 resolves it the same way)"},
+        {0x00777dc0, "a158dbfa00 8a8044120000 c3", "doppelganger byte [[0xfadb58]+0x1244] (larabase f36 tru+0x377dc0)"},
+    };
+    for (const auto &f : facts)
+        if (!HexAt(f.at, f.hex)) {
+            Log(0, "0.6.2 splash: %s at 0x%08lx does not match - splash left to the game", f.what, f.at);
+            return;
+        }
+    if (!g_tableOk)
+        Log(0, "0.6.2 splash: object table lookup not verified - no pair table (the remap keeps the type; the main "
+               "target is still excluded)");
+    if (HexAt(0x005bcff9, "8b0dd094db00 52 8b14c1")) g_namesOk = true;
+    InitializeCriticalSection(&g_splashLock);
+    BYTE call[5] = {0xe8};
+    DWORD rel = reinterpret_cast<DWORD>(&SplashCallStub) - (kSplashCall + 5);
+    memcpy(call + 1, &rel, 4);
+    BYTE jump[8] = {0xe9, 0, 0, 0, 0, 0x90, 0x90, 0x90};
+    rel = reinterpret_cast<DWORD>(&AreaLoopStub) - (kAreaLoop + 5);
+    memcpy(jump + 1, &rel, 4);
+    // the loop test first: with no target noted it does exactly the PC test, so it is safe before the call site
+    if (!WriteCode(kAreaLoop, jump, sizeof(jump))) {
+        Log(0, "0.6.2 splash: jump at tru+0x29f224 failed - splash left to the game");
+        return;
+    }
+    if (!WriteCode(kSplashCall, call, sizeof(call))) {
+        Log(0, "0.6.2 splash: call at tru+0x2e692d failed - splash left to the game (the loop test stays: no target is "
+               "ever noted, so it is the PC test)");
+        return;
+    }
+    g_splashHooked = true;
+    if (g_splashLog) {
+        HANDLE t = CreateThread(nullptr, 0, &SplashFlushThread, nullptr, 0, nullptr);
+        if (t) { g_splashFlusher = true; CloseHandle(t); }
+    }
+    Log(1, "0.6.2 splash: tru+0x2e692d (MeleeSplashDamage -> area damage) and tru+0x29f224 (area loop test) -> plugin - "
+           "[Splash] Translate %d (%s), fallback %d, log %d (burst lines every 2 s, max %d%s); read again at run time "
+           "at most once per second", g_splashTranslate,
+        g_splashTranslate ? "TU 0x823e1220 / 0x8237ae88: main target excluded; doppelganger remap 0x1a -> 0x10, 0x10 -> "
+                            "0x16 while [Damage] Translate=1" : "PC splash",
+        g_splashFallback, g_splashLog, g_splashMax, g_splashFlusher ? "" : ", no flush thread - lines only at the cap");
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -3303,6 +3661,11 @@ void ReadOptions(const char *dir) {
     g_chunkLog = GetPrivateProfileIntA("Chunk", "Log", 1, ini) ? 1 : 0;
     g_chunkMax = GetPrivateProfileIntA("Chunk", "MaxLines", 2000, ini);
     if (g_chunkMax < 0) g_chunkMax = 0;
+    g_splashTranslate = GetPrivateProfileIntA("Splash", "Translate", 1, ini) ? 1 : 0;   // 0.6.2
+    g_splashFallback = GetPrivateProfileIntA("Splash", "Fallback", 1, ini) ? 1 : 0;
+    g_splashLog = GetPrivateProfileIntA("Splash", "Log", 1, ini) ? 1 : 0;
+    g_splashMax = GetPrivateProfileIntA("Splash", "MaxLines", 2000, ini);
+    if (g_splashMax < 0) g_splashMax = 0;
     if (g_diagMax < 0) g_diagMax = 0;
 }
 
@@ -3349,6 +3712,7 @@ void Start(HMODULE self) {
     SetupDiag();                      // 0.5.2: after every other byte check of this plugin
     SetupDamage();                    // 0.6: K14 (independent of the parts above)
     SetupChunk();                     // 0.6.1: lethal impulse as the TU (independent of the parts above)
+    SetupSplash();                    // 0.6.2: K9 splash as the TU (after SetupDamage: the remap follows its switch)
 }
 
 }  // namespace

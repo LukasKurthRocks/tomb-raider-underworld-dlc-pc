@@ -24,9 +24,41 @@ events, camera flag, strike look - four switches, all default off) built 2026-11
 player cloth time step, `[Cloth] TuTimeStep`, default off) built 2026-11-06, not played; 0.16 (crash fix: the meter
 ticks only with a player in a level) built 2026-11-06, played 2026-11-06 evening (power OK; TruMenu's quick bar
 LB / RB started it); 0.17 (LB / RB only as the game gets them, `[ShadowPower] MenuInput`) built 2026-11-06, not
-played.** Not covered: the
+played; 0.18 (K11: no retail adrenaline tick / bar in doppelganger mode, `[Adrenaline] Translate`) built 2026-11-07,
+not played.** Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.18: K11 - no retail adrenaline in doppelganger mode, as the TU (2026-11-07)
+
+Project doc `Befund-TU-K9-K11-0711.md` (K11 in `Befund-Exe-Stellen-K8-K14-0611.md`). Build `work\asi\v18`.
+
+* `CombatManager::Update` tru+0x3227d0 (once per frame from the player update tru+0x3228ae) = retail 0x823daa58 =
+  TU 0x823dca00, same call order on all three. Its 2nd call is the **adrenaline tick** tru+0x318bd0 (TU 0x823defa8;
+  R3 start / stop of the retail adrenaline mode, message 0x3b) and its tail call the **adrenaline bar** tru+0x2f2930
+  (TU 0x823dfea8), which drains CM+0x3c and writes the HUD value **`[0xfae8d4]` = CM+0x3c / [0xfad764]+0x2d0 on every
+  frame** plus HUD group 1. The TU calls both only while `gameTracker+0x1244 == 0` (0x823dca18 / 0x823dcae0); retail
+  calls them always. The shadow meter drives the same HUD value (hudscreenmgr native 36) - on the PC the bar
+  overwrote this plugin's value after every tick.
+* `[Adrenaline] Translate=1` (default **1**, a pure translation of the TU's two tests): the call at tru+0x3227da and the
+  tail jump at tru+0x322865 go to two stubs that test the same byte `[[0xfadb58]+0x1244]` (written by TruDlc2Player
+  0.4, `[Dlc2Player] TrackerFlag=1`, as the TU's DoppelgangerInit) and return at once when it is set, else continue into
+  the game's function. Read again at run time at most once per second. `[Adrenaline] Log=1`: one line per change of the
+  decision per site (`0.18 K11: adrenaline bar tru+0x2f2930 (...) SKIPPED - doppelganger mode ...`).
+* 6 new byte checks (`work\asi\v18\prechecks_v18.txt`); v09-v17 lists unchanged, 0 mismatches. Imports unchanged.
+* The 0.9 stubs inside the tick (adrenaline start tru+0x3189c6 - only caller the tick -, tick tru+0x318bf3 / +0x318c5d /
+  +0x318cda) are then no longer reached in doppelganger mode (the TU's own doppelganger branches there are dead code
+  for the same reason). They stay patched (outside doppelganger mode they answer the PC bit; with
+  `[Adrenaline] Translate=0` or TruDlc2Player `TrackerFlag=0` they are needed again). Still in use: the stop stub
+  tru+0x318ad6 (also called from tru+0x1d4864 / tru+0x31eff9), the camera chooser tru+0x1e80a9, condition 1047.
+
+| # | TO TEST 0.18 (DLC 2, TruDlc2Player 0.4 with `TrackerFlag=1`) | expected |
+|---|---|---|
+| 1 | load, DLC 2 start | `TruShadowPower 0.18 loaded (... 0.18: adrenaline K11 1, log 1)`, `0.18 K11: tru+0x3227da ... -> plugin`, then `0.18 K11: adrenaline tick ... SKIPPED - doppelganger mode` and the same for the bar; no "does not match" |
+| 2 | shadow power (RB) on / off, fights | the silhouette follows the meter only (no jumping back to the adrenaline value), drains / refills as before |
+| 3 | R3 (also L3 + R3 for TruMenu) in DLC 2 | no retail adrenaline mode (no slow motion / camera of the base game) |
+| 4 | main game / DLC 1 | `... runs - not in doppelganger mode`, adrenaline as before |
+| 5 | trouble | `[Adrenaline] Translate=0` (PC at once) |
 
 ## 0.17: LB / RB only as the game gets them - no power from TruMenu's menus (2026-11-06)
 
@@ -520,6 +552,8 @@ every `*.asi` next to `tru.exe`.
 | `[Sound] LoopSound` | 0 | 0.14: the TU's looping sound of the power |
 | `[Look] MoveEvents / CameraFlag / StrikeLook` | 0 | 0.14: movement events 0x83 / 0x84, camera flag of Start, the shadow-strike look |
 | `[Cloth] TuTimeStep` | 0 | 0.15: the TU's player cloth time step (TU 0x82278120): the ponytail gets the frame time / world scale, so it keeps real time in slow motion |
+| `[Adrenaline] Translate` | 1 | 0.18 (K11): CombatManager::Update skips the adrenaline tick tru+0x318bd0 and bar tru+0x2f2930 while gameTracker+0x1244 is set (TU 0x823dca00); 0 = PC; read again at run time (<= 1 / s) |
+| `[Adrenaline] Log` | 1 | 0.18: one line per change of the K11 decision per site |
 
 The 0.2 options `WorldScale`, `PlayerScale`, `RampSeconds`, `[Meter] Enabled`, `DrainSeconds`, `RefillSeconds`,
 `RefillDelay`, `MinStart` are gone - those values now come from the data / the TU constants.

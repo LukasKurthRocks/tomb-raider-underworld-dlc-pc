@@ -9,7 +9,7 @@
              ships as binkw32.dll loads every *.asi there.
     -Remove  deletes them again - only if they are ours: the same SHA-256 as a TruShadowCombat.asi / .ini built
              anywhere below <workspace>\work\asi (e.g. work\asi\combat01) or one of our released builds listed in
-             $earlierBuilds (0.1 - 0.3, 0.5.3, 0.6); a foreign file of the same name is never overwritten or removed.
+             $earlierBuilds (0.1 - 0.3, 0.5.3, 0.6, 0.6.1); a foreign file of the same name is never overwritten or removed.
              TruShadowCombat.log is left in place. Nothing installed = nothing to do (no error), so the test harness
              may call -Remove for every profile.
     -Install over an earlier build of ours replaces it (update); an .ini the owner edited is not ours and is kept
@@ -54,12 +54,14 @@ $earlierBuilds = @{
                               'f692be359d1f6f00989b5685d875c9505b8e6e641f80e525f0718a6d43db27e5',    # 0.2 (work\asi\combat02)
                               'f65fe474cf0a930400196a4e46d62a0c976f6fc01361e31782dbce5cfb69bca7',    # 0.3 (work\asi\combat03)
                               '04933c30edd488254eec22f3815fda669d4442c5e119f12f896420ca60e00ef0',    # 0.5.3 (work\asi\combat053)
-                              '78aec9a1652ead192a9e41a90fd03621d4881387a7605c1a393261ee3e579bc6')    # 0.6 (work\asi\combat06)
+                              '78aec9a1652ead192a9e41a90fd03621d4881387a7605c1a393261ee3e579bc6',    # 0.6 (work\asi\combat06)
+                              'acc4aeb17988d236502e1f352f4a9475b4a0e114bf986707b07e5f4ac031a891')    # 0.6.1 (work\asi\combat061)
     'TruShadowCombat.ini' = @('d909de94f1af40861e3e3bb3e183785af75e6f0be2167bc208aa051cfcc85ce0',    # 0.1 sample .ini
                               '4141f31f35f6e3631c5895fb2a1799963a435c2d82dc9f744ca1c8f65468fdae',    # 0.2 sample .ini
                               '8c9be2daf9e926a3d0c26d559c08bf8ee77e817cedcd3b8ebfe56f22d65645f4',    # 0.3 sample .ini
                               '74e55129c6628bc7e73ebcf0bc47e7c0c7bca3831e96ffafa305e43180233fec',    # 0.5.3 sample .ini
-                              '97d06bffd3a4b05c47b8085269377cf4556fa49596290a7b6ee81afd266419da')    # 0.6 sample .ini
+                              '97d06bffd3a4b05c47b8085269377cf4556fa49596290a7b6ee81afd266419da',    # 0.6 sample .ini
+                              'fec519abee98446a8dad48dbe27e2009ea3972c011d704992a1ad89d2010f18f')    # 0.6.1 sample .ini
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

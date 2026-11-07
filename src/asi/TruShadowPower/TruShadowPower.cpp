@@ -132,6 +132,11 @@
 // (2) a button the real pad holds but the game does not get (read again from XInputGetState with the same packet
 // number) is ignored until it is released - also after the menu / bar closes (no start with RB still held). One log
 // line per suppression burst and one at the resume. Section "0.17" below.
+//
+// 0.18 (2026-11-07, project doc Befund-TU-K9-K11-0711.md): K11. CombatManager::Update tru+0x3227d0 (TU 0x823dca00)
+// runs the retail adrenaline tick tru+0x318bd0 and, as its tail call, the adrenaline bar tru+0x2f2930, which writes the
+// HUD value [0xfae8d4] every frame - over this plugin's meter. The TU calls both only while gameTracker+0x1244 is 0.
+// [Adrenaline] Translate=1 (default) does the same at the PC call sites; [Adrenaline] Log=1. Section "0.18" below.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -3438,6 +3443,166 @@ void PatchClothTimeStep() {
            "(component 14) gets dt [0xe7f188] / world scale [0xe7f1a0] when the instance is [0xe7f094]");
 }
 
+// ================================================================================================================
+// 0.18 (K11, project doc Befund-TU-K9-K11-0711.md; K11 in Befund-Exe-Stellen-K8-K14-0611.md): CombatManager::Update
+// tru+0x3227d0 (thiscall, ecx = [gameTracker+0x504], called once per frame by the player update at tru+0x3228ae) =
+// retail 0x823daa58 = TU 0x823dca00. Same call order on all three: 0x7216b0, ADRENALINE TICK tru+0x318bd0 (retail
+// 0x823dceb0, TU 0x823defa8), 0x7213a0, 0x71e490, 0x70d2a0, two handle releases with 0x70d810, 0x71d0f0, and as tail
+// call the ADRENALINE BAR tru+0x2f2930 (retail 0x823ddc70, TU 0x823dfea8). The TU wraps exactly those two calls in
+// `if (gameTracker+0x1244 == 0)` (0x823dca18..0x823dca2c and 0x823dcae0..0x823dcaf4; retail calls both always): in
+// doppelganger mode the retail adrenaline neither ticks (R3 start / stop, message 0x3b) nor drains CM+0x3c nor writes
+// the HUD value [0xfae8d4] (= meter value / [0xfad764]+0x2d0 every frame) and HUD group 1. The DLC 2 shadow meter
+// drives the same HUD value (hudscreenmgr native 36), so on the PC the bar overwrote this plugin's meter every frame.
+// Port: the call at tru+0x3227da and the tail jump at tru+0x322865 go to K11TickStub / K11BarStub, which test the same
+// byte [[0xfadb58]+0x1244] (written by TruDlc2Player 0.4 as the TU's DoppelgangerInit) and return at once when it is
+// set, else continue into the game's function. [Adrenaline] Translate=1 (default: a pure translation of the TU's two
+// tests), read again at run time at most once per second; [Adrenaline] Log=1: one line per change of the decision.
+// With it the adrenaline stubs of 0.9 inside the tick (tru+0x3189c6 start - only caller the tick -, tru+0x318bf3,
+// tru+0x318c5d, tru+0x318cda) are no longer reached in doppelganger mode, as the TU's own doppelganger branches in
+// 0x823defa8 / 0x823ded18 are dead code there; they stay patched (see the report) - stop tru+0x318ad6 is still called
+// from tru+0x1d4864 / tru+0x31eff9, the camera chooser tru+0x1e80a9 and condition 1047 do not depend on the tick.
+const DWORD kCmUpdate = 0x007227d0;           // retail 0x823daa58, TU 0x823dca00
+const DWORD kCmTickCall = 0x007227da;         // call tru+0x318bd0 (5 bytes) - patched
+const DWORD kCmBarJump = 0x00722865;          // jmp tru+0x2f2930 (5 bytes, tail call) - patched
+const DWORD kAdrTickFn = 0x00718bd0;          // adrenaline tick, retail 0x823dceb0, TU 0x823defa8
+const DWORD kAdrBarFn = 0x006f2930;           // adrenaline bar, retail 0x823ddc70, TU 0x823dfea8
+int g_k11 = 1;                                // [Adrenaline] Translate
+int g_k11Log = 1;                             // [Adrenaline] Log
+bool g_k11Hooked = false;
+char g_iniPath[MAX_PATH];                     // 0.18: for the run-time read of [Adrenaline] Translate
+DWORD g_k11SwitchTick = 0;
+DWORD g_adrTickTo = kAdrTickFn, g_adrBarTo = kAdrBarFn;
+volatile LONG g_k11Count[2][2];               // [tick / bar][run / skipped]
+int g_k11Last[2] = {-1, -1};                  // last decision per site (log on change)
+
+void K11ReadSwitch() {
+    if (!g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_k11SwitchTick < 1000) return;
+    g_k11SwitchTick = now;
+    const int t = GetPrivateProfileIntA("Adrenaline", "Translate", g_k11, g_iniPath) ? 1 : 0;
+    if (t == g_k11) return;
+    Log(1, "0.18 switch: [Adrenaline] Translate %d -> %d (read again from TruShadowPower.ini) - %s", g_k11, t,
+        t ? "adrenaline tick / bar skipped in doppelganger mode as the TU" : "the PC runs them always");
+    g_k11 = t;
+}
+
+// game thread, from the two stubs: 1 = skip the call (TU: gameTracker+0x1244 != 0), 0 = run the game's function
+int __cdecl K11Skip(int site) {
+    K11ReadSwitch();
+    int skip = 0;
+    if (g_k11) {
+        __try {
+            const BYTE *gt = GameTracker();
+            skip = (gt && gt[0x1244] != 0) ? 1 : 0;
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            skip = 0;
+        }
+    }
+    const LONG n = InterlockedIncrement(&g_k11Count[site][skip]);
+    const int state = g_k11 ? skip : 2;
+    if (g_k11Log && state != g_k11Last[site]) {
+        g_k11Last[site] = state;
+        static const char *const what[2] = {"adrenaline tick tru+0x318bd0 (call tru+0x3227da, TU 0x823dca1c)",
+                                            "adrenaline bar tru+0x2f2930 (tail jump tru+0x322865, TU 0x823dcae0)"};
+        Log(1, "0.18 K11: %s %s (call %ld of this kind; totals run %ld / skipped %ld)%s", what[site],
+            state == 2 ? "RUNS - [Adrenaline] Translate=0 (PC)"
+            : skip ? "SKIPPED - doppelganger mode (gameTracker+0x1244 set), as the TU"
+                   : "runs - not in doppelganger mode",
+            n, g_k11Count[site][0], g_k11Count[site][1],
+            site == 1 && skip ? " - HUD value [0xfae8d4] / group 1 now only from the meter (Refill / Drain)" : "");
+    }
+    return skip;
+}
+
+// called from tru+0x3227da instead of tru+0x318bd0: ecx = CombatManager, [esp] = tru+0x3227df; eax / edx are not used
+// by the caller afterwards (the next instructions reload ecx and call), the FPU stack is empty
+__declspec(naked) void K11TickStub() {
+    __asm {
+        push ecx
+        push 0
+        call K11Skip
+        add esp, 4
+        pop ecx
+        test eax, eax
+        jnz k11_tick_skip
+        jmp dword ptr [g_adrTickTo]
+    k11_tick_skip:
+        ret
+    }
+}
+
+// jumped to from tru+0x322865 instead of tru+0x2f2930 (tail call: esi already popped, [esp] = the return address into
+// the player update tru+0x3228b3, which reloads ecx and uses no result); skip = return to it at once
+__declspec(naked) void K11BarStub() {
+    __asm {
+        push ecx
+        push 1
+        call K11Skip
+        add esp, 4
+        pop ecx
+        test eax, eax
+        jnz k11_bar_skip
+        jmp dword ptr [g_adrBarTo]
+    k11_bar_skip:
+        ret
+    }
+}
+
+void PatchK11() {
+    if (!g_k11 && !g_k11Log) {
+        Log(1, "0.18 K11: [Adrenaline] Translate=0 and Log=0 - CombatManager::Update tru+0x3227d0 untouched (a later "
+               "Translate=1 needs a restart)");
+        return;
+    }
+    struct { DWORD at; const char *hex; const char *what; } const facts[] = {
+        {kCmUpdate,
+         "56 8bf1 e8d8eeffff 8bce e8f163ffff 8bce e8baebffff 8bce e8a3bcffff 8bce e8acaafeff 8b460c 85c0 7424 8b08 85c9 "
+         "7404 8bc1 eb1c 834004ff 750d 8b0dc4a0cd00 8908 a3c4a0cd00 c7460c00000000 33c0 8b0e 50 e8e7affeff 8b4610 85c0 "
+         "7420 8b08 85c9 751c 834004ff 750d 8b15c4a0cd00 8910 a3c4a0cd00 c7461000000000 33c9 51 8b4e04 e8b5affeff 8bce "
+         "e88ea8ffff 8bce 5e e9c600fdff",
+         "CombatManager::Update tru+0x3227d0: 5 calls (2nd = adrenaline tick tru+0x318bd0), handles, tru+0x31d0f0, tail "
+         "jump to the adrenaline bar tru+0x2f2930"},
+        {0x007228a8, "8b8b04050000 e81dffffff 8b8b08050000",
+         "player update: CombatManager::Update on [gameTracker+0x504] at tru+0x3228ae"},
+        {kAdrTickFn, "d9ee 56 8bf1 d85e3c dfe0 f6c405 0f8a8e000000", "adrenaline tick tru+0x318bd0 (thiscall, CM+0x3c)"},
+        {kAdrBarFn, "8b91fc010000 d9ee 83ec08 f7c200004000 756f", "adrenaline bar tru+0x2f2930 (thiscall, player +0x1fc)"},
+        {0x006f29b2,
+         "d9413c a164d7fa00 d8b0d0020000 d91dd4e8fa00 f781fc01000000004000 7519 d8593c dfe0 f6c405 7a11 6a01 e8edaf0800 "
+         "83c40c e985b00800 ddd8 83c408 c3",
+         "adrenaline bar: [0xfae8d4] = CM+0x3c / [0xfad764]+0x2d0 every call, HUD group 1 (tru+0x37d9d0 / tru+0x37da70)"},
+        {0x00777dc0, "a158dbfa00 8a8044120000 c3", "doppelganger byte [[0xfadb58]+0x1244] (larabase f36 tru+0x377dc0)"},
+    };
+    for (const auto &f : facts)
+        if (!HexBytesAt(f.at, f.hex)) {
+            Log(0, "0.18 K11: %s at 0x%08lx does not match - CombatManager::Update left to the game", f.what, f.at);
+            return;
+        }
+    BYTE call[5] = {0xe8}, jump[5] = {0xe9};
+    DWORD rel = reinterpret_cast<DWORD>(&K11TickStub) - (kCmTickCall + 5);
+    memcpy(call + 1, &rel, 4);
+    rel = reinterpret_cast<DWORD>(&K11BarStub) - (kCmBarJump + 5);
+    memcpy(jump + 1, &rel, 4);
+    DWORD old = 0, dummy = 0;
+    void *p = reinterpret_cast<void *>(kCmTickCall);
+    const DWORD length = kCmBarJump + 5 - kCmTickCall;
+    if (!VirtualProtect(p, length, PAGE_EXECUTE_READWRITE, &old)) {
+        Log(0, "0.18 K11: VirtualProtect failed (%lu) - CombatManager::Update left to the game", GetLastError());
+        return;
+    }
+    memcpy(reinterpret_cast<void *>(kCmTickCall), call, 5);
+    memcpy(reinterpret_cast<void *>(kCmBarJump), jump, 5);
+    VirtualProtect(p, length, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), p, length);
+    g_k11Hooked = true;
+    Log(1, "0.18 K11: tru+0x3227da (adrenaline tick) and tru+0x322865 (adrenaline bar) -> plugin - [Adrenaline] Translate "
+           "%d (%s), log %d; read again at run time at most once per second. In doppelganger mode the 0.9 stubs inside "
+           "the tick (tru+0x3189c6 / +0x318bf3 / +0x318c5d / +0x318cda) are then not reached (TU: its own branches there "
+           "are dead code as well); tru+0x318ad6 (stop, also from tru+0x1d4864 / tru+0x31eff9), tru+0x1e80a9 and "
+           "condition 1047 stay in use", g_k11,
+        g_k11 ? "TU 0x823dca00: both skipped while gameTracker+0x1244 is set" : "PC: both always", g_k11Log);
+}
+
 // ---- meter interface (docs Befund-Schattenkampf.md section 5; version 1 = TruShadowCombat's proposal, version 2
 // appends the HUD natives f70-f73 of larabase, TU 0x824aa060 / 0x824aa0a0 / 0x824aa120 / 0x824aa150, for a later HUD
 // plugin - Plan-Nacht-Analysen-2026-11-03.md section 2). Fields are only appended; check version / size.
@@ -3523,6 +3688,9 @@ void ReadOptions(const char *dir) {
     g_strikeLook = GetPrivateProfileIntA("Look", "StrikeLook", 0, ini);
     g_clothTimeStep = GetPrivateProfileIntA("Cloth", "TuTimeStep", 0, ini);     // 0.15, default 0
     g_menuInput = GetPrivateProfileIntA("ShadowPower", "MenuInput", 1, ini);    // 0.17, default 1 (0 = 0.16)
+    strcpy_s(g_iniPath, sizeof(g_iniPath), ini);                                 // 0.18: run-time read
+    g_k11 = GetPrivateProfileIntA("Adrenaline", "Translate", 1, ini) ? 1 : 0;    // 0.18 (K11), default 1
+    g_k11Log = GetPrivateProfileIntA("Adrenaline", "Log", 1, ini) ? 1 : 0;
 }
 
 void Start(HMODULE self) {
@@ -3533,13 +3701,14 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.17 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.18 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
-        "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d)", g_enabled, g_buttons,
+        "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
+        "log %d)", g_enabled, g_buttons,
         g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled, g_legacyPadStart,
         g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled, g_state2102Enabled, g_loopSound,
-        g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput);
+        g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11, g_k11Log);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -3653,6 +3822,7 @@ void Start(HMODULE self) {
     PatchClothTimeStep();               // 0.15: only with [Cloth] TuTimeStep=1 (independent of the doppelganger flag)
     CheckTickGate();                    // 0.16: main state / level change tests of the tick (player tests always on)
     CheckPadPoll();                     // 0.17: [ShadowPower] MenuInput (before the hook thread reads g_menuInputOk)
+    PatchK11();                         // 0.18: K11 - adrenaline tick / bar skipped in doppelganger mode as the TU
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -3673,8 +3843,9 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.17 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
-           "only as the game gets them (outside TruMenu's pad hook, withheld buttons ignored until released), Lara "
+    return "TruShadowPower 0.18 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+           "only as the game gets them (outside TruMenu's pad hook, withheld buttons ignored until released), "
+           "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
            "conditions 1046 / 1047 / 1048-1056 / 2401, states 243 / 245 / 1018 / 2102, activities 1009 / 1039, shadow look = TU player events of start / stop, "
            "adrenaline look = meter flag 0x40 / camera mode 0x34, look screen effect report / switch, GlobalParams[7], "
            "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4; switches default off: loop "

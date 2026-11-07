@@ -68,7 +68,8 @@ $earlierBuilds = @{
                              'a3961fb70975d8436a032250203df6ef6577987429b1529993bdfd415493fb1b',   # 0.13 2102 check next to TruDataGuard (work\asi\v13)
                              'e8746362890d87be6139d297feb3dbb4978fc05a88698ced5969c846c0619bd6',   # 0.14 loop sound / move events / camera flag / strike look (work\asi\v14)
                              'b0432e31f71cd3ab9b4cdcfa7ab3ecc69d86155f2fea4f7c2da53f13b4ed42ab',   # 0.15 cloth TU time step (work\asi\v15)
-                             '1dbf267a5f8cbe048e9e0c16990486b4f594fb28d698e614ad6606e8c6609732')   # 0.16 tick only with a player in a level (work\asi\v16, md5 9eec75eb04b71601b2d74d1468050801)
+                             '1dbf267a5f8cbe048e9e0c16990486b4f594fb28d698e614ad6606e8c6609732',   # 0.16 tick only with a player in a level (work\asi\v16, md5 9eec75eb04b71601b2d74d1468050801)
+                             '0229e49c771a8f55c2e19ef8617648a1a8887c1f85554b1d52b849f3e2ce11ff')   # 0.17 LB / RB only as the game gets them (work\asi\v17, md5 f01010291dfe09ff325a6e8ab40be834)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
@@ -80,7 +81,8 @@ $earlierBuilds = @{
                              'dab30d022a0067b58b8d6e1c20fab323f3e71d1fb6ed358fa4cf86437b95c0cd',   # 0.11 sample .ini (GlobalParams7, State2102)
                              'd8467e122ed50150aeac292075e6ec3ee6c634295e6867a3ab91355e521bf132',   # 0.12 / 0.13 sample .ini
                              '5bf019742d81fe897bbc08fe145cccde0b45468c603852c469798f468b2d0c50',   # 0.14 sample .ini ([Sound] LoopSound, [Look] MoveEvents / CameraFlag / StrikeLook)
-                             '4109ea03592cbb70cc1cf96158336d8045d8ddebbba8da87b9548a8add1cbea3')   # 0.15 / 0.16 sample .ini ([Cloth] TuTimeStep)
+                             '4109ea03592cbb70cc1cf96158336d8045d8ddebbba8da87b9548a8add1cbea3',   # 0.15 / 0.16 sample .ini ([Cloth] TuTimeStep)
+                             '891e2d9c554239f9a1d1202c7e90511ef15954ac09b3ac9ccfb8778604d1d9ad')   # 0.17 sample .ini ([ShadowPower] MenuInput)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
