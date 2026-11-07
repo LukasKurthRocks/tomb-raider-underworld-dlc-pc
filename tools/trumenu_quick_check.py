@@ -30,6 +30,18 @@ unitgo (the shortcut step expansion), favrecent (page 0, QbRecentAdd, [Quick] Re
   padblock  TruShadowPower 0.19 GameButtons with TruMenuPadBlock, the plugin inside and outside TruMenu: quick bar
             LB / RB taps, RB held through the bar close, RB pressed in the long menu (neutral pad) and held through
             its close - never counted; plain RB before / after - counted.
+2026-11-07 TruMenu 0.21.3 extends chord (X / Y owned by the open bar, passed while closed, one held at the close kept until
+released) and adds four (docs/Befund-TruMenu-0213-0711.md):
+  xyfav     Y = QbFavPin / FavSet: pin / unpin toggled by item id (two rows of one item, 500 random presses: never twice;
+            a hand-edited double goes as a whole), page 0 refreshed at once (into Favoriten, out of Zuletzt and back),
+            rows with an argument / headings / groups / planned / special rows refused, Y beats X / right in one frame.
+  xyexec    X = QbExecRow: action / choice / info / special rows = the right press, so every confirmation row (ai.kill,
+            ai.remove, level.reload, sticky.set, chapters, spawn, checkpoint go) needs X X / X right / right X within 3 s;
+            X + right in one frame counts once; game.quit arms itself (10 s); bool rows toggle; value rows nothing;
+            groups open / close.
+  footer    the bar's second footer line "X: ausfuehren  Y: Favorit   View + Start: zu" (EN), kept under a result.
+  sndwidth  DrawSoundList with AlwaysAutoResize: the 0.21 right-corner shift kept the widest width ever, 0.21.3 aligns
+            to this frame's widest row (left corners unchanged, a too long row cut at 70 %).
 2026-11-06 TruMenu 0.19 dumb AI adds three models (section "---- 0.19 dumb AI" of TruMenu.cpp):
   6. presets   RunAiDumb / AiPresetOn / RadialOn: ring and bar rows "ai.dumb <preset>" get "<preset> 0|1" from the shown
              state; one setting at a time (a group replaces the other), "<preset> 0" switches off only its own active
@@ -287,7 +299,7 @@ def check_depth(rng):
 
 
 # ---------------------------------------------------------------------------------------------------------------- chord
-OWN = 0x030F
+OWN = 0xC30F                            # D-pad + LB + RB (0.17) + X / Y (0.21.3)
 
 
 class Pad:                              # QbPad's per-pad state (one pad), times in ms
@@ -385,6 +397,20 @@ def check_chord():
     seen = [pad.poll(t, V | S, active=False) for t in range(0, 300, 16)]
     r = not pad.open and all(g == V | S for g in seen)
     lines.append(('menu / ring open: no toggle, the pad unchanged (their own neutral pad applies)', r)); ok &= r
+    # 0.21.3: X (0x4000) / Y (0x8000) belong to the open bar; closed they pass; one held at the close stays away
+    X, Y, A = 0x4000, 0x8000, 0x1000
+    out, pad = run([(0, 100, V | S), (100, 200, 0), (200, 300, X | Y | A), (300, 400, 0)])
+    mid = [g for t, g, _ in out if 200 <= t < 300]
+    r = pad.open and all(g & (X | Y) == 0 and g & A for g in mid)
+    lines.append(('0.21.3 open: X / Y kept from the game, A passes', r)); ok &= r
+    out, pad = run([(0, 100, X | Y), (100, 200, 0)])
+    r = not pad.open and all(g & (X | Y) == X | Y for t, g, _ in out if t < 100)
+    lines.append(('0.21.3 closed: X / Y reach the game unchanged', r)); ok &= r
+    out, pad = run([(0, 100, V | S), (100, 200, 0), (200, 600, Y), (300, 400, V | S), (600, 700, 0), (700, 800, Y)])
+    held = [g for t, g, _ in out if 400 <= t < 600]
+    again = [g for t, g, _ in out if 700 <= t < 800]
+    r = not pad.open and all(g & Y == 0 for g in held) and all(g & Y for g in again)
+    lines.append(('0.21.3 closed with Y held: kept until released, the next press passes', r)); ok &= r
     for text, good in lines: print('chord: %-75s %s' % (text, 'ok' if good else 'FAIL'))
     return ok
 
@@ -1547,7 +1573,7 @@ def check_groups():
 
 # ---- 0.21.2 / TruShadowPower 0.19 (2026-11-07, docs/Befund-Padkette-StartView-0711.md) ----
 P_START, P_VIEW, P_L3, P_R3, P_LB, P_RB = 0x0010, 0x0020, 0x0040, 0x0080, 0x0100, 0x0200
-QB_OWN = 0x030F
+QB_OWN = 0xC30F                                   # 0.21.3: + X / Y (the padblock model stays the same for LB / RB)
 
 
 class PadChain:
@@ -1710,6 +1736,288 @@ def check_padblock():
     return good
 
 
+# ---- 0.21.3 X / Y in the quick bar, the sound list width (2026-11-07, docs/Befund-TruMenu-0213-0711.md) ----
+B_LEFT, B_RIGHT, B_X, B_Y = 0x0004, 0x0008, 0x4000, 0x8000
+
+
+class QRow:                                       # QbRow reduced to what QbActRow / QbExecRow / QbFavPin read
+    def __init__(self, id, arg='', kind='action', confirm=False, grey=False):
+        self.id, self.arg, self.kind, self.confirm, self.grey = id, arg, kind, confirm, grey
+
+
+class QBar:
+    """QuickTick after the row choice (one of Y / X / left-right per frame, Y first) -> QbFavPin / QbExecRow / QbActRow,
+    QbConfirm (3 s, one key), game.quit arming itself in its item (10 s), FavSet on [Favorites] Ids (toggled by item id,
+    case-insensitive; the rewrite keeps only usable ids, every copy of the id goes on a removal)"""
+
+    def __init__(self, favs=(), usable=None):
+        self.favs, self.usable = list(favs), usable
+        self.arm_key, self.arm_t, self.quit_t, self.quit = '', 0, 0, False
+        self.on, self.closed, self.values = {}, set(), {}
+        self.runs, self.footer, self.marks = [], '', []
+
+    def confirm(self, key, t):                    # QbConfirm
+        if self.arm_t and t - self.arm_t <= 3000 and self.arm_key == key:
+            self.arm_key, self.arm_t = '', 0
+            return True
+        self.arm_key, self.arm_t = key, t or 1
+        self.footer = 'rechts / X nochmal (3 s) = ausfuehren'
+        return False
+
+    def run(self, row, arg, t):                   # QbRun -> InvokeCore
+        if row.id == 'game.quit':                 # RunQuit: arms itself, a second run within 10 s quits
+            if self.quit_t and t - self.quit_t <= 10000: self.quit = True
+            else: self.quit_t = t or 1
+        self.runs.append((row.id, arg))
+
+    def act(self, page, row, d, t):               # QbActRow
+        if row.kind == 'label': return
+        if row.kind == 'group':
+            close = d < 0
+            if (row.arg in self.closed) != close:
+                if close: self.closed.add(row.arg)
+                else: self.closed.discard(row.arg)
+            return
+        if row.kind == 'planned': self.footer = 'geplant'; return
+        if row.kind == 'choice' and d < 0: self.footer = 'next choice'; return
+        if row.grey: self.footer = 'why'; return
+        if row.kind == 'info':
+            self.footer = 'rechts = anzeigen' if d < 0 else 'value shown'
+            return
+        key = '%d/%s %s' % (page, row.id, row.arg)
+        if row.kind == 'choice':
+            if row.confirm and not self.confirm(key + ' kind', t): return
+            self.run(row, 'kind', t)
+            return
+        if row.kind == 'bool':
+            want, on = d > 0, self.on.get(row.id, False)
+            if on == want: return
+            self.on[row.id] = want
+            self.run(row, '1' if want else '0', t)
+            return
+        if row.kind == 'value':
+            self.values[row.id] = self.values.get(row.id, 1) + d
+            return
+        if d < 0: self.footer = 'rechts = starten'; return
+        if row.confirm and not self.confirm(key, t): return
+        self.run(row, row.arg, t)
+
+    def special(self, kind, d, t):                # QbSpecialAct (two kinds: checkpoint go, TO TEST)
+        if kind == 'cp':
+            if d < 0: self.marks.append('marker'); return
+            if self.confirm('dbg.cpgo 123', t): self.runs.append(('dbg.cpgo', '123'))
+        elif kind == 'todo':
+            self.marks.append('ok' if d > 0 else 'fail')
+
+    def exec(self, page, row, t):                 # QbExecRow
+        k = row.kind
+        if k == 'label': return
+        if k == 'group': return self.act(page, row, 1 if row.arg in self.closed else -1, t)
+        if k == 'bool': return self.act(page, row, -1 if not row.grey and self.on.get(row.id, False) else 1, t)
+        if k == 'value':
+            self.footer = 'Wert mit links / rechts (X: nichts)'
+            return
+        return self.act(page, row, 1, t)
+
+    def fav_pin(self, row):                       # QbFavPin -> FavSet
+        if row is None or row.kind in ('label', 'group', 'planned') or row.id == '-':
+            self.footer = 'Y: keine Item-Zeile'
+            return 'refused'
+        if row.arg:
+            self.footer = 'Favorit nur ohne Argument'
+            return 'arg'
+        ok = (lambda f: self.usable is None or f.lower() in {u.lower() for u in self.usable})   # FindItem: _stricmp
+        if not ok(row.id): return 'err'
+        had = any(f.lower() == row.id.lower() for f in self.favs if ok(f))
+        keep = [f for f in self.favs if ok(f) and not (had and f.lower() == row.id.lower())]
+        self.favs = keep if had else keep + [row.id]
+        return 'del' if had else 'add'
+
+    def frame(self, page, row, edges, t, special=None):   # QuickTick: Y, else X, else left / right
+        if edges & B_Y: return self.fav_pin(row)
+        if edges & B_X:
+            if row is not None: return self.exec(page, row, t)
+            if special: return self.special(special, 1, t)
+            return None
+        if edges & (B_LEFT | B_RIGHT):
+            d = -1 if edges & B_LEFT else 1
+            if row is not None: return self.act(page, row, d, t)
+            if special: return self.special(special, d, t)
+        return None
+
+
+def check_xyfav():
+    usable = {'cheat.flight', 'player.health', 'player.unstuck', 'dbg.show', 'ai.kill', 'weapon.give', 'time.scale'}
+    ok, lines = True, []
+    b = QBar(['player.health'], usable)
+    recent = [('cheat.flight', ''), ('dbg.show', 'death'), ('player.unstuck', '')]
+    flight = QRow('cheat.flight', kind='bool')
+    r = b.frame(2, flight, B_Y, 1000) == 'add' and b.favs == ['player.health', 'cheat.flight']
+    favs, rec = qb_page0(b.favs, recent)
+    r &= favs == ['player.health', 'cheat.flight'] and rec == [('dbg.show', 'death'), ('player.unstuck', '')]
+    lines.append(('Y on a bool row: pinned, page 0 at once (out of Zuletzt, into Favoriten)', r)); ok &= r
+    r = b.frame(0, flight, B_Y, 1200) == 'del' and b.favs == ['player.health']
+    r &= qb_page0(b.favs, recent)[1] == recent
+    lines.append(('Y again (also from page 0): unpinned, back in Zuletzt', r)); ok &= r
+    unstuck_a, unstuck_b = QRow('player.unstuck'), QRow('Player.Unstuck')   # the same item on two pages (Notfall, Tests)
+    seq = [b.frame(1, unstuck_a, B_Y, 0), b.frame(7, unstuck_b, B_Y, 0), b.frame(1, unstuck_a, B_Y, 0)]
+    r = seq == ['add', 'del', 'add'] and sum(1 for f in b.favs if f.lower() == 'player.unstuck') == 1
+    lines.append(('the same item from two rows: toggled by id, never twice in [Favorites] Ids', r)); ok &= r
+    rng = random.Random(213)
+    rows = [flight, unstuck_a, unstuck_b, QRow('time.scale', kind='value'), QRow('weapon.give', kind='choice')]
+    worst = 0
+    for _ in range(500):
+        b.frame(rng.randrange(13), rng.choice(rows), B_Y, 0)
+        worst = max([worst] + [sum(1 for f in b.favs if f.lower() == x.id.lower()) for x in rows])
+    r = worst <= 1
+    lines.append(('500 random Y presses on 5 rows: no id ever twice (max %d)' % worst, r)); ok &= r
+    d = QBar(['player.health', 'player.health', 'gone.item'], usable)   # a hand-edited list with a double / unknown id
+    r = d.frame(1, QRow('player.health'), B_Y, 0) == 'del' and d.favs == []
+    r &= d.frame(1, QRow('player.health'), B_Y, 0) == 'add' and d.favs == ['player.health']
+    lines.append(('hand-edited double: Y removes every copy, the next Y adds one (unknown ids dropped as FavSet)', r)); ok &= r
+    e = QBar(['player.health'], usable)
+    refused = [e.frame(4, QRow('dbg.show', 'death', 'bool'), B_Y, 0), e.frame(5, QRow('ai.kill', 'others', confirm=True), B_Y, 0),
+               e.frame(5, QRow('-', 'ki_weg', 'group'), B_Y, 0), e.frame(3, QRow('-', '', 'label'), B_Y, 0),
+               e.frame(11, QRow('-', 'x|y', 'planned'), B_Y, 0), e.frame(8, None, B_Y, 0, special='cp')]
+    r = refused == ['arg', 'arg', 'refused', 'refused', 'refused', 'refused'] and e.favs == ['player.health'] and not e.runs
+    lines.append(('rows with an argument / heading / group / planned / special rows: refused, nothing changed', r)); ok &= r
+    f = QBar([], usable)
+    r = f.frame(1, QRow('weapon.give', kind='choice'), B_Y | B_X | B_RIGHT, 0) == 'add' and not f.runs
+    lines.append(('Y with X / right in the same frame: only the pin', r)); ok &= r
+    r = ','.join(QBar(['player.health'], usable).favs + ['cheat.flight']) == 'player.health,cheat.flight'
+    lines.append(('[Favorites] Ids written as today (comma list of item ids)', r)); ok &= r
+    for text, good in lines: print('xyfav: %-90s %s' % (text, 'ok' if good else 'FAIL'))
+    return ok
+
+
+def check_xyexec():
+    ok, lines = True, []
+    act = QRow('player.health')
+    b = QBar()
+    b.frame(1, act, B_X, 1000)
+    r = b.runs == [('player.health', '')]
+    lines.append(('action row: X runs it once (= right)', r)); ok &= r
+    for rid, arg in (('ai.kill', 'others'), ('ai.kill', 'all'), ('ai.remove', 'others'), ('level.reload', ''),
+                     ('sticky.set', '11270 17287 0'), ('level.load', 'l1_seatop')):
+        row = QRow(rid, arg, confirm=True)
+        cases = [([(B_X, 1000), (B_X, 2500)], 1), ([(B_X, 1000), (B_RIGHT, 2000)], 1), ([(B_RIGHT, 1000), (B_X, 2000)], 1),
+                 ([(B_X, 1000), (B_X, 4100)], 0), ([(B_X, 1000), (B_X | B_RIGHT, 1500)], 1),
+                 ([(B_X | B_RIGHT, 1000)], 0), ([(B_X, 1000), (B_LEFT, 1500)], 0)]
+        good = 0
+        for presses, runs in cases:
+            c = QBar()
+            for edges, t in presses: c.frame(5, row, edges, t)
+            good += 1 if len(c.runs) == runs else 0
+        other = QBar()
+        other.frame(5, row, B_X, 1000)
+        other.frame(5, QRow('ai.kill', 'nearest', confirm=True), B_X, 1500)
+        other.frame(5, row, B_X, 2000)
+        r = good == len(cases) and not other.runs
+        lines.append(('confirm row %s %s: X arms, X / right within 3 s runs, late / other row / X+right once: no' % (rid, arg),
+                      r)); ok &= r
+    q = QBar()
+    for t in (1000, 2000): q.frame(1, QRow('game.quit'), B_X, t)
+    late = QBar()
+    for t in (1000, 12000): late.frame(1, QRow('game.quit'), B_X, t)
+    r = q.quit and not late.quit and late.quit_t == 12000
+    lines.append(('game.quit: X arms (its own 10 s), a second X within 10 s quits, later re-arms', r)); ok &= r
+    flight = QRow('cheat.flight', kind='bool')
+    c = QBar()
+    for t in (0, 100, 200): c.frame(2, flight, B_X, t)
+    r = c.runs == [('cheat.flight', '1'), ('cheat.flight', '0'), ('cheat.flight', '1')] and c.on['cheat.flight']
+    g = QBar()
+    g.frame(2, QRow('dbg.flat', kind='bool', grey=True), B_X, 0)
+    r &= not g.runs and g.footer == 'why'
+    lines.append(('bool row: X toggles off -> on -> off -> on; greyed: says why, runs nothing', r)); ok &= r
+    v = QBar()
+    v.frame(3, QRow('dbg.alpha', kind='value'), B_X, 0)
+    r = not v.runs and not v.values and v.footer.startswith('Wert')
+    lines.append(('value row: X does nothing (footer hint), left / right unchanged', r)); ok &= r
+    grp = QRow('-', 'ki_dumm', 'group')
+    h = QBar()
+    h.frame(5, grp, B_X, 0)
+    shut = 'ki_dumm' in h.closed
+    h.frame(5, grp, B_X, 100)
+    r = shut and 'ki_dumm' not in h.closed and not h.runs
+    lines.append(('group row: X closes an open group, opens a closed one', r)); ok &= r
+    k = QBar()
+    k.frame(5, QRow('ai.spawn', kind='choice', confirm=True), B_X, 0)
+    k.frame(5, QRow('ai.spawn', kind='choice', confirm=True), B_X, 900)
+    k.frame(1, QRow('weapon.give', kind='choice'), B_X, 2000)
+    k.frame(5, QRow('ai.status', kind='info'), B_X, 2100)
+    k.frame(3, QRow('-', '', 'label'), B_X, 2200)
+    k.frame(11, QRow('-', 'a|b', 'planned'), B_X, 2300)
+    r = k.runs == [('ai.spawn', 'kind'), ('weapon.give', 'kind')] and k.footer == 'geplant'
+    lines.append(('choice rows run with the current choice (spawn: X twice), info shows, heading / planned nothing', r))
+    ok &= r
+    s = QBar()
+    s.frame(8, None, B_X, 0, special='cp')
+    s.frame(8, None, B_X, 500, special='cp')
+    s.frame(7, None, B_X, 600, special='todo')
+    r = s.runs == [('dbg.cpgo', '123')] and s.marks == ['ok']
+    lines.append(('special rows: X = right (checkpoint go X twice, TO TEST = ok)', r)); ok &= r
+    for text, good in lines: print('xyexec: %-104s %s' % (text, 'ok' if good else 'FAIL'))
+    return ok
+
+
+def qb_footer(de, combo='View + Start', result=None):   # DrawQuick: line 1 hint (or a result for 5 s), line 2 always
+    hint = ('hoch / runter: Zeile   links / rechts: aus / an   LB / RB: Seite' if de
+            else 'up / down: row   left / right: off / on   LB / RB: page')
+    close = '%s   %s: %s' % ('X: ausfuehren  Y: Favorit' if de else 'X: run  Y: favourite', combo, 'zu' if de else 'close')
+    return (result or hint), close
+
+
+def check_footer():
+    de, en = qb_footer(True), qb_footer(False)
+    r = de[1] == 'X: ausfuehren  Y: Favorit   View + Start: zu' and en[1] == 'X: run  Y: favourite   View + Start: close'
+    r &= 'X: ausfuehren  Y: Favorit' in de[1] and qb_footer(True, result='Fliegen: an')[1] == de[1]
+    r &= all(len(x[1]) < 112 and len(x[1]) <= len(x[0]) for x in (de, en))   # buffer; never wider than the hint line
+    r &= de[0].startswith('hoch / runter') and en[0].startswith('up / down')
+    print('footer: second line "X: ausfuehren  Y: Favorit   View + Start: zu" (EN "X: run  Y: favourite ..."), kept while '
+          'a result replaces line 1, not wider than the hint line (%d / %d chars)  %s'
+          % (len(de[1]), len(de[0]), 'ok' if r else 'FAIL'))
+    return r
+
+
+def sn_frames(frames, right, rule, cap=1344.0):
+    """DrawSoundList + ImGui AlwaysAutoResize, one window: the window's content width of a frame = the furthest right end
+    of its rows; the next frame's window (and its content region, 'avail') is that width, capped at 70 % of the screen.
+    0.21: a right-corner row is shifted by avail - w (ends at the window edge); 0.21.3: by edge - w, edge = this frame's
+    widest row, at most avail. Returns [(avail, row right ends)] per frame and the final window width."""
+    width, out = 0.0, []
+    for rows in frames:
+        avail = width
+        if not right: ends = list(rows)
+        elif rule == '0.21':
+            ends = [avail if avail > w else w for w in rows]
+        else:
+            edge = max(rows)
+            if avail > 0 and edge > avail: edge = avail
+            ends = [edge if edge > w else w for w in rows]
+        out.append((avail, ends))
+        width = min(max(ends), cap)
+    return out, width
+
+
+def check_sndwidth():
+    seq = [[300.0, 200.0], [500.0, 100.0], [250.0, 120.0], [250.0, 120.0], [250.0, 120.0]]
+    old_r, w_old_r = sn_frames(seq, True, '0.21')
+    new_r, w_new_r = sn_frames(seq, True, '0.21.3')
+    _, w_old_l = sn_frames(seq, False, '0.21')
+    _, w_new_l = sn_frames(seq, False, '0.21.3')
+    good = w_old_r == 500.0 and w_new_r == 250.0                     # the bug (right corners) and the fix
+    good &= w_old_l == 250.0 and w_new_l == 250.0                    # left corners: unchanged, they always followed
+    good &= new_r[-1][1] == [250.0, 250.0]                           # right alignment kept: every row ends at the edge
+    grow, _ = sn_frames([[200.0], [400.0, 100.0], [400.0, 100.0]], True, '0.21.3')
+    good &= grow[2][1] == [400.0, 400.0]                             # growing: aligned again one frame later
+    cap, w_cap = sn_frames([[2000.0, 300.0]] * 3, True, '0.21.3')
+    good &= w_cap == 1344.0 and cap[-1][1] == [2000.0, 1344.0]       # too long: cut, the others at the visible edge
+    print('sndwidth: right corner 0.21 keeps the widest width ever (%.0f), 0.21.3 follows this frame (%.0f); left corners '
+          '%.0f / %.0f; rows stay right-aligned, a growing list re-aligns one frame later, a row over 70 %% is cut  %s'
+          % (w_old_r, w_new_r, w_old_l, w_new_l, 'ok' if good else 'FAIL'))
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -1719,7 +2027,8 @@ def main():
                check_airemove(),
                check_killpath(), check_sticky(), check_roomcheck(), check_unitgo(), check_favrecent(),   # 0.21.1: + six
                check_groups(),
-               check_padchain(), check_padblock()]                                    # 0.21.2 / TruShadowPower 0.19
+               check_padchain(), check_padblock(),                                    # 0.21.2 / TruShadowPower 0.19
+               check_xyfav(), check_xyexec(), check_footer(), check_sndwidth()]       # 0.21.3
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

@@ -54,8 +54,9 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruMenu.asi', 'TruMenu.ini'
-# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.21.1) -
-# recognised as ours for update / removal. 0.21.2 (work\asi\menu0212, 2026-11-07) ships the unchanged 0.21.1 sample .ini.
+# SHA-256 of earlier builds of ours (0.1.3 .. 0.4 2026-10-31, 0.5, 0.6, 0.7.x, 0.8.x, 0.9, 0.10.x, 0.11 .. 0.21.2) -
+# recognised as ours for update / removal. 0.21.2 (work\asi\menu0212, 2026-11-07) shipped the unchanged 0.21.1 sample
+# .ini; 0.21.3 (work\asi\menu0213) changes only two comments of it ([Quick] Enabled / OpenButtons: X / Y).
 $earlierBuilds = @{
     'TruMenu.asi' = @('50ebd28adcf96cef7e1db673ce293b5810bd8d64d0669617d09a1250598491a3',
                       'cd1b8796e40fccb09ab063d7e9f955b9029a230e37b21dce9bb570c1a3cb1892',
@@ -90,7 +91,8 @@ $earlierBuilds = @{
                       'c1c4d958f69129d78ed478eb8c433c965d92d73f3b6144959bf6e215829f0946',   # 0.20 collectibles, enemies (work\asi\menu020)
                       '8e1338354c322fcf7cc7c8c6509aab1b04fd0ca7adb147d468aa6a187191af15',   # 0.20.1 sound list (work\asi\menu0201)
                       '49b71f00bc75bca2cb628e6b543ff23498da8265a19d18115b4d563bcc14af24',   # 0.21 Arachnophobie, ai.remove (work\asi\menu021)
-                      '17dc191bbe3a719c6bb12b3a68aeedf8421b5f9c09704e3b5727fd1a9e1cb89b')   # 0.21.1 ai.kill, sticky, TruMenuPadBlock (work\asi\menu0211)
+                      '17dc191bbe3a719c6bb12b3a68aeedf8421b5f9c09704e3b5727fd1a9e1cb89b',   # 0.21.1 ai.kill, sticky, TruMenuPadBlock (work\asi\menu0211)
+                      '612689b58e8e0839aaef6869f8fc98c5385f6856846fd60b01a4584f446a35e2')   # 0.21.2 pad chain: items in Present (work\asi\menu0212)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

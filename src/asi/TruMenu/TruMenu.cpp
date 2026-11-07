@@ -17,6 +17,8 @@
 //          outside it (the import filter rarely wins - order by load timing) they run in the Present hook, because
 //          an item's own pad poll would re-enter that hook and TruLink then cuts the chain (docs\Befund-Padkette-
 //          StartView-0711.md).
+//          0.21.3: while the quick bar is open X and Y are kept from the game as well (kQbOwn 0xC30F): Y pins / unpins
+//          the selected row as a favourite, X runs it (docs\Befund-TruMenu-0213-0711.md).
 //   d3d9   The game's device manager is [0x00ad75e4] (created at tru+0x1239c0), its IDirect3DDevice9 at +0x20 (out
 //          parameter of the CreateDevice call tru+0x122736; +0x208 are the present parameters). A worker thread waits for that device and patches the
 //          device's own vtable entries Reset (16) and Present (17). This works with or without a d3d9.dll proxy
@@ -60,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -666,11 +668,12 @@ const OptDef kOpts[] = {
                                     "list; written back with Persist=1);\nempty = every checkpoint drawn"},
     {"Quick", "Enabled", "1", "0.17 Schnellschalter (quick.open): 1 = OpenButtons open / close a small bar at the left "
                               "screen edge while the game\nkeeps running: D-pad up / down = row, left / right = off / on "
-                              "(value rows: one step), LB / RB = page; only D-pad, LB\nand RB are kept from the game while "
-                              "it is open; 0 = off (the buttons reach the game as before 0.17)"},
+                              "(value rows: one step), LB / RB = page, X = run\nthe row, Y = pin / unpin it as a favourite "
+                              "(0.21.3); only D-pad, LB, RB, X and Y are kept from the game while it is\nopen; 0 = off (the "
+                              "buttons reach the game as before 0.17)"},
     {"Quick", "OpenButtons", "0x0030", "0.17: XInput buttons pressed together that open / close the bar (hex or decimal): "
                                        "0x0030 = View (Back) + Start -\nmenu buttons of the game (pause / PDA), never "
-                                       "pressed together by it; do not use D-pad, LB or RB here"},
+                                       "pressed together by it; do not use D-pad, LB, RB, X or Y here"},
     {"Quick", "ChordMs", "250", "0.17: milliseconds a lone OpenButtons button is kept from the game waiting for the other "
                                 "one, 50 .. 1000; released\nearlier the game gets it as a short tap, held longer it gets "
                                 "it (late)"},
@@ -835,9 +838,11 @@ bool RadMenuOpen() { return g_radOpen != 0 && g_radMode == kRadModeMenu; }   // 
 // on the render thread (QuickTick / DrawQuick)
 int g_qbEnabled = 1, g_qbChordMs = 250;      // [Quick] Enabled / ChordMs
 WORD g_qbButtons = 0x0030;                   // [Quick] OpenButtons: View (Back) 0x0020 + Start 0x0010
-volatile LONG g_qbOpen = 0;                  // the bar is open: D-pad / LB / RB belong to it
+volatile LONG g_qbOpen = 0;                  // the bar is open: D-pad / LB / RB / X / Y belong to it
 volatile LONG g_qbJust = 0;                  // opened since the last frame (buttons held at the open are no edges)
-const WORD kQbOwn = 0x030F;                  // D-pad + LB + RB: kept from the game while the bar is open
+// D-pad + LB + RB (0.17) + X 0x4000 / Y 0x8000 (0.21.3: X = run, Y = favourite): kept from the game while the bar is open
+const WORD kQbOwn = 0xC30F;
+const WORD kQbX = 0x4000, kQbY = 0x8000;     // 0.21.3 (XINPUT_GAMEPAD_X / _Y)
 WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject);   // below (g_padLock not held by the caller)
 bool g_qbRunning = false;                    // a bar row runs an item (render thread): src=quick
 int g_qbLang = 0;                            // [Quick] Language: 0 de, 1 en (quick.lang)
@@ -14389,16 +14394,29 @@ bool SnBefore(const SnVoice &a, const SnVoice &b) {
     if (a.group != b.group) return a.group < b.group;
     return a.vol > b.vol;
 }
-// 0.21: one row of the list; in a right corner flush with the window's right edge (the window is as wide as its widest
-// row, so the box stays at the screen's right edge instead of reaching into the screen)
-void SnRow(const char *text, bool right, ImU32 colour) {
+// 0.21: one row of the list; in a right corner flush with the right edge of the box (the window is as wide as its widest
+// row, so the box stays at the screen's right edge instead of reaching into the screen).
+// 0.21.3 (Lukas 2026-11-07: the box kept the width of the widest row ever shown): the rows are right-aligned to the widest
+// row of THIS frame (edge = its width, at most the window's content width), no longer to the window's own right edge -
+// that cursor shift had made the content always as wide as the window, so AlwaysAutoResize could never shrink it
+void SnRow(const char *text, bool right, ImU32 colour, float edge) {
     if (right) {
-        const float w = ImGui::CalcTextSize(text).x, avail = ImGui::GetContentRegionAvail().x;
-        if (avail > w) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - w);
+        const float w = ImGui::CalcTextSize(text).x;
+        if (edge > w) ImGui::SetCursorPosX(ImGui::GetCursorPosX() + edge - w);
     }
     ImGui::PushStyleColor(ImGuiCol_Text, colour);
     ImGui::TextUnformatted(text);
     ImGui::PopStyleColor();
+}
+// 0.21.3: the rows of one frame, gathered first (their widest one sets the box width), then drawn
+const int kSnRowsMax = 48;                   // head, age, music, [Sound] MaxLines (at most 40), "... more"
+struct SnLine { char text[400]; ImU32 colour; };
+SnLine g_snRowBuf[kSnRowsMax];               // render thread
+int g_snLineN = 0;
+void SnLineAdd(const char *text, ImU32 colour) {
+    if (g_snLineN >= kSnRowsMax) return;
+    strncpy_s(g_snRowBuf[g_snLineN].text, sizeof(g_snRowBuf[g_snLineN].text), text, _TRUNCATE);
+    g_snRowBuf[g_snLineN++].colour = colour;
 }
 void DrawSoundList() {
     if (!g_snOk) return;
@@ -14443,29 +14461,40 @@ void DrawSoundList() {
         Out(head, sizeof(head), de ? "Ton (%d spielen)  -  %d Stimmen, %d gezeigt" : "Sound (%d playing)  -  %d voices, %d "
             "shown", audible, all, shown < g_snLines ? shown : g_snLines);
         if (!tick) Out(head, sizeof(head), de ? "Ton - noch keine Daten (Spiel-Thread)" : "Sound - no data yet (game thread)");
-        SnRow(head, right, IM_COL32(255, 255, 255, 255));
+        g_snLineN = 0;                       // 0.21.3: gather this frame's rows first (SnLineAdd), draw them below
+        SnLineAdd(head, IM_COL32(255, 255, 255, 255));
         char line[400];
         if (tick && age >= 3) {
             Out(line, sizeof(line), de ? "Stand vor %lu s" : "%lu s old", age);
-            SnRow(line, right, IM_COL32(255, 204, 102, 255));
+            SnLineAdd(line, IM_COL32(255, 204, 102, 255));
         }
         // 0.21 (Lukas live): the srmusic tracks once here - which track a music voice plays is not known (no names in
         // memory), so the rows no longer repeat the whole slot list
         if (music[0] && g_snShow[kSnMusic]) {
             Out(line, sizeof(line), "%s [%s]", de ? kSnCatDe[kSnMusic] : kSnCatEn[kSnMusic], music);
-            SnRow(line, right, kSnCatColour[kSnMusic]);
+            SnLineAdd(line, kSnCatColour[kSnMusic]);
         }
         for (int k = 0; k < shown && k < g_snLines; ++k) {
             const SnVoice &v = g_snDraw[g_snOrder[k]];
             SnVoiceText(v, de, false, music, line, sizeof(line));
             ImU32 c = kSnCatColour[v.cat];
             if (SnState(v) != kSnStPlaying) c = (c & 0x00ffffff) | 0x90000000;   // dimmed: not audible
-            SnRow(line, right, c);
+            SnLineAdd(line, c);
         }
         if (shown > g_snLines) {
             Out(line, sizeof(line), de ? "... %d weitere" : "... %d more", shown - g_snLines);
-            SnRow(line, right, IM_COL32(255, 255, 255, 255));
+            SnLineAdd(line, IM_COL32(255, 255, 255, 255));
         }
+        // 0.21.3: the widest row of this frame (with the font scale above) is the right edge of every row; capped at the
+        // window's content width (the size constraint 70 % of the screen) so a too long row is cut as before
+        float edge = 0.0f;
+        for (int i = 0; i < g_snLineN; ++i) {
+            const float w = ImGui::CalcTextSize(g_snRowBuf[i].text).x;
+            if (w > edge) edge = w;
+        }
+        const float avail = ImGui::GetContentRegionAvail().x;
+        if (right && avail > 0.0f && edge > avail) edge = avail;
+        for (int i = 0; i < g_snLineN; ++i) SnRow(g_snRowBuf[i].text, right, g_snRowBuf[i].colour, edge);
         ImGui::SetWindowFontScale(1.0f);
     }
     ImGui::End();
@@ -19034,7 +19063,8 @@ const Item kItems[] = {
                                 "+0x1fc as floats, the 0.14 camera, both test points against every view form (needs "
                                 "dbg.depth on / dim and a layer on)", false, ValDpDump, RunDpDump},
     {"quick.open", "bool", "0.17: Schnellschalter - the quick-toggle bar at the left edge ([Quick] OpenButtons, default View "
-                           "+ Start); the game keeps running, only D-pad / LB / RB belong to the bar while it is open",
+                           "+ Start); the game keeps running, only D-pad / LB / RB / X / Y belong to the bar while it is "
+                           "open (0.21.3: X = run the row, Y = pin / unpin it as a favourite)",
      false, ValQuickOpen, RunQuickOpen},
     {"quick.lang", "action", "0.17 de|en: language of the bar ([Quick] Language; until the next start)", false, ValQuickLang,
      RunQuickLang},
@@ -22602,6 +22632,8 @@ void PageMarkup() {
 // (default View + Start = 0x0030) opens / closes it; while it is open D-pad up / down picks a row, left / right switches
 // off / on (a value row: one step down / up), LB / RB changes the page. Only those buttons are kept from the game while
 // it is open (OnPad -> QbPad: masked in the state the game gets; a button held at the close stays away until released).
+// 0.21.3 (Lukas 2026-11-07): X and Y belong to the open bar too (kQbOwn 0xC30F) - Y pins / unpins the selected row as a
+// favourite ([Favorites] Ids, as Y in the menu / fav.add), X runs it (section "0.21.3 X / Y" after QbAct).
 // The combo itself never reaches the game: a lone combo button is held back for [Quick] ChordMs (the other one may
 // follow); released inside that window the game gets it as a 100 ms tap at once, held longer it gets it late (as held).
 // Why View + Start: every pad button is bound in the PC input map (generalbank DTP 47, tools/input_map_find.py, logs
@@ -23209,6 +23241,7 @@ void QbGroupSet(const char *key, bool closed) {
 // fav.add) and the last [Quick] RecentMax bar rows that ran (newest first, no doubles, no favourite again), kept as
 // [Quick] Recent ("id arg;id arg") over restarts. A recent row is the bar row it came from (its labels and kind); a
 // favourite takes the first bar row of that item without an argument, else one made from the item's type.
+// 0.21.3: Y in the open bar pins / unpins the selected row too (QbFavPin, section "0.21.3 X / Y").
 const int kQbRecentCap = 16;
 struct QbRecent { char id[48], arg[64]; };
 QbRecent g_qbRecent[kQbRecentCap];
@@ -23256,7 +23289,8 @@ void QbRecentAdd(const QbRow &r) {
     QbRecentSave();
 }
 // 0.18 confirm (kQfConfirm rows, position / checkpoint go): the first right press arms that row's key for 3 s and says
-// so in the footer, a second one on the same key runs it; any other key or the time out disarms
+// so in the footer, a second one on the same key runs it; any other key or the time out disarms. 0.21.3: X is the same
+// press as right (QbExecRow), so X X, X right and right X all run it - one key, one 3 s window
 char g_qbArmKey[160] = "";
 DWORD g_qbArmTick = 0;
 const DWORD kQbConfirmMs = 3000;
@@ -23274,7 +23308,7 @@ bool QbConfirm(const char *key, const char *name, const char *what) {
     g_qbArmTick = GetTickCount();
     if (!g_qbArmTick) g_qbArmTick = 1;
     QbResult(true, "%s: %s%s%s", name, what && what[0] ? what : "", what && what[0] ? " - " : "",
-             de ? "rechts nochmal (3 s) = ausfuehren" : "right again (3 s) = run");
+             de ? "rechts / X nochmal (3 s) = ausfuehren" : "right / X again (3 s) = run");   // 0.21.3: + X
     return false;
 }
 // run an item from the bar: one log line, the answer in the footer
@@ -23404,6 +23438,59 @@ void QbActRow(int page, const QbRow &r, int dir) {
 }
 void QbAct(int page, int row, int dir) { QbActRow(page, kQbPages[page].rows[row], dir); }
 
+// ---- 0.21.3 X / Y in the quick bar (Lukas 2026-11-07) ----
+// Both buttons belong to the open bar (kQbOwn), so the game never sees them while it is open. Edges only (no repeat);
+// one of Y, X, left / right per frame (Y first, then X) - an X and a right press in the same frame never count twice.
+// X = execute: action / choice / info / planned rows and every special row = exactly the right press (QbActRow dir +1 /
+// QbSpecialAct dir +1), so the confirmation rows keep their safety unchanged: the first X arms (footer "rechts / X
+// nochmal"), a second X (or right) on the same row within 3 s runs it; game.quit arms itself (10 s) and the Saves rows
+// ask twice (10 s) inside their items as before. bool rows: X toggles (off -> on, on -> off). Group rows: X toggles open /
+// closed. Value rows: X does nothing (a hint in the footer) - they have no "default" step of their own, left / right
+// stay the way to change them. Heading rows: nothing.
+// Y = favourite: pins / unpins the row's item in [Favorites] Ids (FavSet, as Y in the long menu / fav.add / fav.del -
+// toggled by item id, so an item is never in the list twice and every bar row of that item shows the same state). Only
+// rows that are one item without an argument can be favourites ([Favorites] Ids holds item ids; a row such as
+// "dbg.show death" or "ai.kill others" is refused with a footer line). Page 0 "Favoriten / Zuletzt" is rebuilt every
+// frame, so a pinned row moves there at once. One "quick: <page> / <row> -> Y: fav add|del <id> (...)" log line.
+void QbExecRow(int page, const QbRow &r) {
+    const bool de = g_qbLang == 0;
+    switch (r.kind) {
+    case kQbLabel: return;
+    case kQbGroup: QbActRow(page, r, QbGroupClosed(r.arg) ? 1 : -1); return;
+    case kQbBool: {
+        const char *why = QbWhy(r);
+        QbActRow(page, r, !why[0] && QbRowOn(r) ? -1 : 1);   // greyed: QbActRow says why
+        return;
+    }
+    case kQbValue:
+        QbResult(false, "%s: %s", de ? r.de : r.en, de ? "Wert mit links / rechts (X: nichts)" : "value: left / right (X: nothing)");
+        return;
+    default: QbActRow(page, r, 1); return;   // action, choice, info, planned
+    }
+}
+void QbFavPin(int page, const QbRow *r) {
+    const bool de = g_qbLang == 0;
+    if (!r || r->kind == kQbLabel || r->kind == kQbGroup || r->kind == kQbPlanned || !strcmp(r->id, "-")) {
+        QbResult(true, "%s", de ? "Y: keine Item-Zeile - nur Zeilen mit einem Item werden Favorit"
+                                : "Y: not an item row - only rows with an item can be favourites");
+        return;
+    }
+    const char *name = de ? r->de : r->en;
+    if (r->arg[0]) {
+        QbResult(true, de ? "%s: Favorit nur ohne Argument ([Favorites] Ids = Item-Ids; hier %s %s)"
+                          : "%s: favourites take no argument ([Favorites] Ids = item ids; here %s %s)", name, r->id, r->arg);
+        return;
+    }
+    char o[160];
+    const bool had = FavHas(r->id), ok = FavSet(r->id, !had, o, sizeof(o));
+    _snprintf_s(g_lastAction, sizeof(g_lastAction), _TRUNCATE, "%s", o);
+    Log(1, "quick: %s / %s -> Y: %s", QbPageName(page, true), r->de, o);
+    if (!ok) { QbResult(true, "%s: %s", name, o); return; }
+    QbResult(false, "%s: %s", name, had ? (de ? "Favorit entfernt" : "favourite removed")
+                                        : (de ? "als Favorit angeheftet (Seite 1)" : "pinned as a favourite (page 1)"));
+}
+// ---- end of 0.21.3 X / Y ----
+
 // 0.18: 9 fixed pages (0.17: the checkpoint page only while its checks passed)
 int QbPageCount() { return kQbPageN; }
 const char *QbPageName(int page, bool de) {
@@ -23424,6 +23511,7 @@ char g_qbHead[160] = "";                     // a second header line of a specia
 int g_qbSavesPageSeen = 0;                   // the Saves page was built in the last frame (a fresh scan on entering)
 int QbSpecialBuild(int special, int base, bool de);   // section "0.18 quick-toggle pages" (after the positions)
 void QbSpecialAct(int special, int row, int dir);
+const QbRow *QbSpecialRow(int row);          // 0.21.3: the bar row behind a special row (page 0), else nullptr
 
 // 0.18 / 0.21.1: one row's view (state, colour, count) - static rows and the favourite / recent rows of page 0
 void QbViewOf(int page, const QbRow &r, QbView &v, bool de) {
@@ -23728,7 +23816,8 @@ void PageAi() {
 }
 
 // render thread, every Present (Render, before its early return): the open bar's input from the raw pad (g_pad, before
-// QbPad masks it for the game) - edges of D-pad / LB / RB, a held D-pad direction repeats after 400 ms every 120 ms
+// QbPad masks it for the game) - edges of D-pad / LB / RB (0.21.3: + X / Y), a held D-pad direction repeats after 400 ms
+// every 120 ms
 void QuickTick() {
     static WORD prev = 0;
     static DWORD repeatAt = 0;
@@ -23767,11 +23856,19 @@ void QuickTick() {
     if (edges & 0x0002) row = (row + 1) % n;                                // down
     for (int k = 0; k < n && row < g_qbViewN && g_qbView[row].skip; ++k)   // 0.18: headings are passed over
         row = (edges & 0x0001) ? (row + n - 1) % n : (row + 1) % n;
-    if (!(edges & 0x000C)) return;
-    const int d = (edges & 0x0004) ? -1 : 1;                                // left = off / step down, right = on / up
+    if (!(edges & (0x000C | kQbX | kQbY))) return;
     const QbPage &p = kQbPages[g_qbPage];
     if (row >= g_qbViewN) return;
     g_qbActRow = nullptr;                    // 0.21.1: only the row run now goes into the recent list
+    const QbRow *src = g_qbView[row].src >= 0 ? &p.rows[g_qbView[row].src]   // 0.21.3: the row behind the view
+                     : p.special ? QbSpecialRow(row - g_qbStaticN) : nullptr;
+    if (edges & kQbY) { QbFavPin(g_qbPage, src); return; }    // 0.21.3: Y = pin / unpin (section "0.21.3 X / Y")
+    if (edges & kQbX) {                      // 0.21.3: X = execute (one press per frame: no right press on top)
+        if (src) QbExecRow(g_qbPage, *src);  // static row, or a favourite / recent row of page 0
+        else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, 1);
+        return;
+    }
+    const int d = (edges & 0x0004) ? -1 : 1;                                // left = off / step down, right = on / up
     if (g_qbView[row].src >= 0) QbAct(g_qbPage, g_qbView[row].src, d);   // 0.21.1: groups hide rows - map the view
     else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, d);
 }
@@ -23845,8 +23942,9 @@ void DrawQuick() {
     if (result) Out(foot, sizeof(foot), "%s", g_qbResult);
     else Out(foot, sizeof(foot), "%s", de ? "hoch / runter: Zeile   links / rechts: aus / an   LB / RB: Seite"
                                           : "up / down: row   left / right: off / on   LB / RB: page");
-    char close[64];
-    Out(close, sizeof(close), "%s: %s", combo, de ? "zu" : "close");
+    char close[112];                         // 0.21.3: the X / Y hint on the line that a result never replaces
+    Out(close, sizeof(close), "%s   %s: %s", de ? "X: ausfuehren  Y: Favorit" : "X: run  Y: favourite", combo,
+        de ? "zu" : "close");
     float w = pad + sq + pad + nameW + gap + stateW + gap + countW + pad;
     float tw = width(title, fs) + 2.0f * pad, fw = width(foot, fsSmall) + 2.0f * pad, cw = width(close, fsSmall) + 2.0f * pad;
     float hw = g_qbHead[0] ? width(g_qbHead, fs) + 2.0f * pad : 0.0f;
@@ -24816,7 +24914,8 @@ int QbFavRows(QbView *v, QbDyn *d, int max, bool de) {
         d[n].intro = rows++;
         ++n;
     };
-    if (n < max) QbDynLabel(&v[n], &d[n], de ? "Favoriten (Y im Menue / fav.add)" : "Favourites (Y in the menu / fav.add)"), ++n;
+    if (n < max) QbDynLabel(&v[n], &d[n], de ? "Favoriten (Y = anheften / loesen, hier und im Menue)"   // 0.21.3: Y in
+                                             : "Favourites (Y = pin / unpin, here and in the menu)"), ++n;   // the bar too
     int favs = 0;
     ForFavs([&](const char *id) {
         ++favs;
@@ -24946,6 +25045,11 @@ int QbSpecialBuild(int special, int base, bool de) {
     else if (special == kQsSaves) n = QbSavesRows(g_qbView + base, g_qbDyn, max, de);
     g_qbDynN = n;
     return n;
+}
+const QbRow *QbSpecialRow(int row) {         // 0.21.3: X / Y on page 0 act on the favourite / recent row itself
+    if (row < 0 || row >= g_qbDynN || g_qbDyn[row].kind != kQdItem) return nullptr;
+    const int k = static_cast<int>(g_qbDyn[row].intro);
+    return k >= 0 && k < kQbViewMax ? &g_qbFavRow[k] : nullptr;
 }
 void QbSpecialAct(int special, int row, int dir) {
     (void)special;
@@ -26360,7 +26464,7 @@ void Render(IDirect3DDevice9 *device) {
     if (padIdle) WeaponsTick();
     KeyboardToggle();
     RadialTick();                                // 0.10 radial menu: key / mouse hold, the open ring's input
-    QuickTick();                                 // 0.17 quick-toggle bar: the open bar's D-pad / LB / RB
+    QuickTick();                                 // 0.17 quick-toggle bar: the open bar's D-pad / LB / RB (0.21.3: X / Y)
     OnCineTick();                                // 0.17 shot.oncine: shot pairs at a cutscene start (every 50 ms)
     MouseTick();                                 // 0.7: hold / release the game's cursor calls with the menu
     PauseTick();                                 // 0.7.1 [Menu] PauseGame
@@ -27271,10 +27375,11 @@ extern "C" __declspec(dllexport) int __cdecl TruMenuMark(const char *kind) { ret
 // 0.21.1 (docs\Befund-TruShadowPower-017-0611.md section 5): which pad buttons TruMenu keeps from the game right now - for
 // plugins that read the pad themselves (TruShadowPower: RB). Any thread, no lock, never blocks; pad 0..3, other values
 // -> 0. Low word: buttons the game does not get - 0xFFFF = a neutral pad (menu with [Pad] BlockInput, ring, swallow after
-// a toggle, hold pending, radial swallow); quick bar open: kQbOwn (D-pad / LB / RB) as a whole (not only the buttons
-// already owned, so a press is covered in the same poll whatever the chain order) plus g_qbPad[pad].owned (held at the
-// close) and .gated (chord window). Bit 16 long menu open, bit 17 ring open, bit 18 quick bar open; other bits 0. Built
-// only from fields TruMenu already has (no new state, no write).
+// a toggle, hold pending, radial swallow); quick bar open: kQbOwn (D-pad / LB / RB; 0.21.3 also X / Y) as a whole (not
+// only the buttons already owned, so a press is covered in the same poll whatever the chain order) plus
+// g_qbPad[pad].owned (held at the close) and .gated (chord window). Bit 16 long menu open, bit 17 ring open, bit 18 quick
+// bar open; other bits 0. Built only from fields TruMenu already has (no new state, no write). 0.21.3: the meaning is
+// unchanged (the buttons the game does not get) - the open bar simply keeps two more of them.
 extern "C" __declspec(dllexport) DWORD __cdecl TruMenuPadBlock(DWORD pad) {
     if (pad > 3) return 0;
     const bool menu = g_menuOpen != 0, ring = g_radOpen != 0, bar = g_qbOpen != 0;

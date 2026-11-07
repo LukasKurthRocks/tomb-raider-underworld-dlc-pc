@@ -87,6 +87,13 @@ snd.pos / snd.lines / snd.sort as value rows, the bar rows on Debug / Darstellun
 snd.dump once, snd.sort group / volume / name, snd.lines 1 .. 40, bool / info / dump entries without argument), the
 precheck tables kSnChecks / kSmChecks / kEsChecks with at most 64 bytes per check, and SndMuteTick trying the FMOD group
 mute (g_smOk / SmMuteOn) before the 0.20 SOUND_SetMusicVolume path.
+Since TruMenu 0.21.3 (2026-11-07 quick bar X / Y, sound list width) also: kQbOwn = 0xC30F (D-pad / LB / RB + X / Y; a
+[Quick] OpenButtons holding X or Y is refused like D-pad / LB / RB), QuickTick takes Y before X before left / right,
+QbExecRow (value rows never run, bool rows toggle from QbRowOn, the rest = the right press), QbFavPin (rows with an
+argument refused before FavSet, no other write of the favourites), the footer "X: ausfuehren  Y: Favorit" (DE / EN) and
+the confirmation text "rechts / X nochmal", TruMenuPadBlock unchanged in meaning (kQbOwn while open, bits 16 / 17 / 18),
+the [Quick] Enabled / OpenButtons comments naming X / Y, SnRow aligned to the frame's widest row (no
+GetContentRegionAvail in SnRow; DrawSoundList measures every row before it draws one).
 
 Usage (from the repository root):
   ../bin/pyt -t 60 tools/trumenu_ini_check.py            compare + list check, print the first difference / every
@@ -167,7 +174,7 @@ DV_LAYER_COUNT = 17                          # 0.20: + collect, enemies
 # tables of the bar and the items a value row may use
 QB_KEYS = ('Enabled', 'OpenButtons', 'ChordMs', 'ShowClosed', 'Language', 'Top', 'Scale')
 QB_RANGES = {'ChordMs': (50, 1000), 'Top': (5, 80), 'Scale': (0.5, 3)}
-QB_OWN = 0x030F
+QB_OWN = 0xC30F                              # D-pad / LB / RB (0.17) + X / Y (0.21.3)
 OC_RANGES = {'OnCinePairs': (1, 50), 'OnCineFastPairs': (1, 50), 'OnCineIntervalMs': (250, 10000),
              'OnCineSlowMs': (250, 60000)}
 QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info', 'shot.oncine': 'bool',
@@ -253,6 +260,9 @@ Q211_SWITCHES = (('Debug', 'EnemyHpBar', '1'), ('Menu', 'HideCursor', '0'))   # 
 Q211_FOREIGN = [(0x637590, 5), (0x63761b, 1), (0x637625, 4), (0x5b6a2f, 2)]
 Q211_KILL_TYPES = '{6, 4, 2, 1, 0}'          # 6 RigidBody = the game's own Kill (0x63831c) first
 TRUTRACE_BYTES = (0x5b6a2f, 0x5b6a30)        # the call TruTrace checks - never a TruMenu patch site
+# 0.21.3 (2026-11-07): the bar's X / Y footer texts (DE, EN) and the confirmation text
+Q213_FOOTER = ('"X: ausfuehren  Y: Favorit"', '"X: run  Y: favourite"')
+Q213_CONFIRM = ('"rechts / X nochmal (3 s) = ausfuehren"', '"right / X again (3 s) = run"')
 LIT =re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 
@@ -782,8 +792,8 @@ def check_quick(ini_path, radial_path):
             except ValueError:
                 v = -1
             if not 1 <= v <= 0xFFFF: problems.append(where + ' (an XInput button mask 1 .. 0xFFFF)')
-            elif v & QB_OWN: problems.append(where + ' (must not hold D-pad / LB / RB = 0x%04X: the open bar owns them)'
-                                             % QB_OWN)
+            elif v & QB_OWN: problems.append(where + ' (must not hold D-pad / LB / RB / X / Y = 0x%04X: the open bar '
+                                             'owns them)' % QB_OWN)
         elif key in QB_RANGES:
             lo, hi = QB_RANGES[key]
             try:
@@ -1461,6 +1471,82 @@ def check_0211(ini_path, radial_path, rows):
                                                         sum(counts.values()), ' / '.join(Q211_TABLES)))
 
 
+def fn_body(src, head):
+    """the text of a top-level function (head = the start of its line, e.g. 'void QuickTick('), '' when missing"""
+    m = re.search(r'\n' + re.escape(head) + r'[^;{]*\) \{.*?\n\}', src, re.S)
+    return m.group(0) if m else ''
+
+
+def check_0213(ini_path):
+    """0.21.3 (2026-11-07 quick bar X / Y, sound list width): see the module text"""
+    problems = []
+    src = open(CPP, encoding='utf-8').read()
+    m = re.search(r'const WORD kQbOwn = (0x[0-9A-Fa-f]+);', src)
+    if not m or int(m.group(1), 16) != QB_OWN:
+        problems.append('TruMenu.cpp: kQbOwn must be 0x%04X (D-pad / LB / RB + X / Y), got %s' % (QB_OWN, m.group(1) if m
+                                                                                                     else 'none'))
+    if not re.search(r'const WORD kQbX = 0x4000, kQbY = 0x8000;', src):
+        problems.append('TruMenu.cpp: kQbX / kQbY must be 0x4000 / 0x8000 (XINPUT_GAMEPAD_X / _Y)')
+    tick = fn_body(src, 'void QuickTick(')
+    i_y, i_x, i_d = tick.find('if (edges & kQbY)'), tick.find('if (edges & kQbX)'), tick.find('QbAct(g_qbPage')
+    if not (0 <= i_y < i_x < i_d):
+        problems.append('TruMenu.cpp: QuickTick must take Y (QbFavPin) before X (QbExecRow) before left / right (QbAct)')
+    else:
+        yb, xb = tick[i_y:i_x], tick[i_x:i_d]
+        if 'QbFavPin(' not in yb or 'return;' not in yb:
+            problems.append('TruMenu.cpp: QuickTick: Y must call QbFavPin and return (no other press in that frame)')
+        if 'QbExecRow(' not in xb or 'return;' not in xb or 'QbSpecialAct(p.special, row - g_qbStaticN, 1)' not in xb:
+            problems.append('TruMenu.cpp: QuickTick: X must call QbExecRow (special rows: QbSpecialAct dir 1) and return')
+    if 'pad.wButtons & kQbOwn' not in tick:
+        problems.append('TruMenu.cpp: QuickTick must read the open bar\'s buttons as pad.wButtons & kQbOwn')
+    ex = fn_body(src, 'void QbExecRow(')
+    mv = re.search(r'case kQbValue:(.*?)return;', ex, re.S)
+    if not ex: problems.append('TruMenu.cpp: QbExecRow missing')
+    else:
+        if not mv or 'QbActRow' in mv.group(1) or 'QbRun' in mv.group(1):
+            problems.append('TruMenu.cpp: QbExecRow: X on a value row must do nothing (no QbActRow / QbRun)')
+        mb = re.search(r'case kQbBool:(.*?)return;', ex, re.S)
+        if not mb or 'QbRowOn(r)' not in mb.group(1) or '? -1 : 1' not in mb.group(1):
+            problems.append('TruMenu.cpp: QbExecRow: X on a bool row must toggle from QbRowOn (on -> -1, off -> +1)')
+        if 'default: QbActRow(page, r, 1);' not in ex:
+            problems.append('TruMenu.cpp: QbExecRow: action / choice / info / planned rows = the right press '
+                            '(QbActRow(page, r, 1)) - keeps the confirmation rows')
+        if 'QbRun(' in ex or 'InvokeCore(' in ex or 'QbConfirm(' in ex:
+            problems.append('TruMenu.cpp: QbExecRow must not run items itself (only through QbActRow)')
+    fav = fn_body(src, 'void QbFavPin(')
+    i_arg, i_set = fav.find('if (r->arg[0])'), fav.find('FavSet(')
+    if not (0 <= i_arg < i_set):
+        problems.append('TruMenu.cpp: QbFavPin must refuse rows with an argument before FavSet ([Favorites] Ids = item ids)')
+    if fav and ('WritePrivateProfileString' in fav or 'g_favs' in fav or 'FavHas(r->id)' not in fav):
+        problems.append('TruMenu.cpp: QbFavPin must toggle through FavHas / FavSet only (no own write of the favourites)')
+    draw = fn_body(src, 'void DrawQuick(')
+    for t in Q213_FOOTER:
+        if t not in draw: problems.append('TruMenu.cpp: DrawQuick lacks the footer text %s' % t)
+    conf = fn_body(src, 'bool QbConfirm(')
+    for t in Q213_CONFIRM:
+        if t not in conf: problems.append('TruMenu.cpp: QbConfirm lacks %s (X arms / confirms as right)' % t)
+    pb = fn_body(src, 'extern "C" __declspec(dllexport) DWORD __cdecl TruMenuPadBlock(')
+    for need in ('if (bar) out |= kQbOwn;', 'out |= static_cast<DWORD>(g_qbPad[pad].owned | g_qbPad[pad].gated);',
+                 'out &= 0xFFFF;', 'out |= 1u << 16;', 'out |= 1u << 17;', 'out |= 1u << 18;'):
+        if need not in pb: problems.append('TruMenu.cpp: TruMenuPadBlock changed its meaning (missing "%s")' % need)
+    opts = {(s, k): c for s, k, d, c in table(src)[1]}
+    if 'X = run' not in opts.get(('Quick', 'Enabled'), '') or 'X and Y are kept' not in opts.get(('Quick', 'Enabled'), ''):
+        problems.append('TruMenu.cpp: kOpts [Quick] Enabled comment must name X / Y (run, favourite, kept from the game)')
+    if 'X or Y' not in opts.get(('Quick', 'OpenButtons'), ''):
+        problems.append('TruMenu.cpp: kOpts [Quick] OpenButtons comment must forbid X / Y')
+    sr = fn_body(src, 'void SnRow(')
+    if not sr or 'float edge' not in sr or 'GetContentRegionAvail' in sr:
+        problems.append('TruMenu.cpp: SnRow must align to the frame\'s widest row (edge), not the window\'s content width')
+    sd = fn_body(src, 'void DrawSoundList(')
+    i_meas, i_row = sd.find('CalcTextSize(g_snRowBuf[i].text)'), sd.find('SnRow(')
+    if not (0 <= i_meas < i_row):
+        problems.append('TruMenu.cpp: DrawSoundList must measure every row (CalcTextSize) before it draws one (SnRow)')
+    if 'ImGuiWindowFlags_AlwaysAutoResize' not in sd:
+        problems.append('TruMenu.cpp: DrawSoundList: the box must stay AlwaysAutoResize')
+    return problems, 'kQbOwn 0x%04X, Y > X > left / right, X / Y rules, footer + confirm texts, TruMenuPadBlock, sound ' \
+                     'list width' % QB_OWN
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -1558,6 +1644,10 @@ def main(argv):
     for p in wproblems: print('Q0211 %s' % p)
     if not wproblems: print('ok: 0.21.1 ai.kill / sticky / room check / physics / spawn / bar: %s' % wsummary)
     problems += wproblems
+    tproblems3, tsummary3 = check_0213(ini_path)   # 0.21.3
+    for p in tproblems3: print('Q0213 %s' % p)
+    if not tproblems3: print('ok: 0.21.3 quick bar X / Y, sound list width: %s' % tsummary3)
+    problems += tproblems3
     nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)

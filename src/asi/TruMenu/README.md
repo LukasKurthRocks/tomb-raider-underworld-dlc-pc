@@ -2117,6 +2117,41 @@ with this rule and TruShadowPower 0.19
 (TruMenuPadBlock, no re-wrap) no order cuts the chain (model `padchain` in `tools\trumenu_quick_check.py`, all six
 orders).
 
+## TruMenu 0.21.3 (quick bar: X runs, Y pins; sound list width; 2026-11-07)
+
+Report `docs\Befund-TruMenu-0213-0711.md`; build `work\asi\menu0213`; no new byte check (no new game address), no new
+option (only the comments of `[Quick] Enabled` / `OpenButtons` name X / Y).
+
+* **X and Y belong to the open bar.** Before 0.21.3 the bar kept only D-pad / LB / RB from the game (`kQbOwn 0x030F`) -
+  X and Y reached the game while the bar was open. Now `kQbOwn = 0xC30F`: QbPad masks X / Y in the state the game gets
+  while the bar is open, a button held at the close stays away until it is released (as the D-pad), and the export
+  `TruMenuPadBlock` reports them while the bar is open (same meaning: the buttons the game does not get).
+* **Y = favourite** (as Y in the long menu / `fav.add` / `fav.del`): pins / unpins the selected row's item in
+  `[Favorites] Ids` (toggled by item id, so an item is never in the list twice and every row of that item shares the
+  state); the footer says "als Favorit angeheftet (Seite 1)" / "Favorit entfernt", page 0 "Favoriten / Zuletzt" is
+  rebuilt every frame (a pinned row moves out of "Zuletzt" at once). Only rows that are one item **without an
+  argument** can be favourites - `[Favorites] Ids` holds item ids; `dbg.show death`, `ai.dumb sharks`, `shot.save ui`,
+  `ai.kill others`, the chapter rows etc. are refused with a footer line. Headings, groups, planned rows and the special
+  rows (positions, checkpoints, saves, Prepare, TO TEST) say "keine Item-Zeile". Log: `quick: <page> / <row> -> Y: fav
+  add|del <id> (...)`.
+* **X = execute.** Action, choice, info and planned rows and every special row: exactly the right press - so every
+  confirmation row keeps its safety: the first X arms (footer "rechts / X nochmal (3 s) = ausfuehren"), a second X **or**
+  right on the same row within 3 s runs it (Spiel beenden arms itself for 10 s; the Saves rows ask twice inside their
+  items as before). bool rows: X toggles. Group rows: X opens / closes. **Value rows: X does nothing** (footer "Wert mit
+  links / rechts (X: nichts)") - a value row has no default step of its own; left / right stay the way. One of Y, X,
+  left / right per frame (Y first): an X and a right press in the same frame never count twice.
+* **Footer**: the second line (never replaced by a result) reads `X: ausfuehren  Y: Favorit   View + Start: zu`
+  (EN `X: run  Y: favourite   View + Start: close`); the page-0 heading `Favoriten (Y = anheften / loesen, hier und im
+  Menue)`.
+* **Sound list width** (`snd.list`): the box now follows the rows of the current frame. Cause of the old behaviour: in a
+  right corner every row was shifted to end at the window's right edge (`avail - w`), which made the content always as
+  wide as the window, so `AlwaysAutoResize` could only grow it. Now the rows are gathered first, the widest one of this
+  frame sets the right edge (at most the window's content width), right alignment in the right corners stays; left
+  corners were not affected.
+
+Checks: `tools\trumenu_ini_check.py` `check_0213` (14 negatives), `tools\trumenu_quick_check.py` chord (+3 X / Y cases)
+and models `xyfav`, `xyexec`, `footer`, `sndwidth`.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
