@@ -91,7 +91,7 @@ The menu window holds collapsible pages. The id in brackets is the item that the
 | Outfits (next level load) | the same costume facts, then one button per **player record of the game's type table** (index, name, object id; `[chosen]` / `[current]` marked), "Reset chosen costume", checkbox "reload the current unit after choosing" | `costume.records`, `costume.current`, `costume.choose <index\|name> [20c\|210]`, `costume.choosereload <index\|name>`, `costume.choosereset`; the 0.2 ids `costume.setreload` / `costume.reset` still work. **0.3 changed** `costume.list` (now the live cycle list; the 0.2 list = `costume.records`) and `costume.set` (now the live switch; the 0.2 meaning = `costume.choose`) |
 | Overlay: Lara's position | checkbox for a small top-left overlay with Lara's position and heading; position / rotation in the page | `overlay.position`, `player.position` |
 | Free camera | known facts; experimental `CAMERA_SetMode(mode)` with a mode slider (TRLAU enters its free camera with mode 11; TruLink notes that retail switches only for 6, 11, 12) and "Restore game camera". **TODO** own free camera (moving the camera transform with the sticks) | `camera.current`, `camera.mode <n>`, `camera.restore`, `camera.free` (todo) |
-| Cheat / flight | `GameTracker.cheatMode` + player message 12 (TRLAU "skew" cheat); while on and the menu is closed **RT lifts, LT lowers** Lara (`[Cheat] FlightSpeed` per 30 fps frame) | `cheat.flight [0/1]`, `cheat.speed <v>` |
+| Cheat / flight | `GameTracker.cheatMode` + player message 12 (TRLAU "skew" cheat); while on and the menu is closed **RT lifts, LT lowers** Lara (`[Cheat] FlightSpeed` per 30 fps frame); 0.21.6: a key line bottom right while flying (`[Cheat] FlightHint`) | `cheat.flight [0/1]`, `cheat.speed <v>` |
 | Markup / collision draw | 0.3: experimental markup drawing (boxes / poly lines of the MarkupManager projected with the game's view matrix into ImGui's background draw list), "ledges only", projected-space size. `draw.debugflag` was **removed** (debugFlags2 0x100 is the TR7 / TRAE path, catalog section 7) | `draw.markup [0/1]`, `draw.ledges [0/1]`, `draw.scale <w> <h>` |
 | Quick access / Favourites | 0.3, **first page, open when the menu opens** (Status is now collapsed): one widget per favourite id (bool = checkbox, info = value, other = button that runs the item with its default argument); **Y** on an item pins / unpins it (on this page, in "Add an item" and on the Developer menu rows - other pages: use "Add an item" or TruLink); saved in `[Favorites] Ids`; default list (empty `Ids`): `player.invincible, player.health, time.scale, time.pause, level.reload, overlay.position, log.overlay, costume.next` (`camera.free` is skipped while it is a todo) | `fav.list`, `fav.add <id>`, `fav.del <id>` |
 | Developer menu (original) | 0.3: Crystal's own debug menu, read at load from the tables in `.data` and drawn row by row: page links switch pages, flags / bools as checkboxes, ints as sliders / inputs with the table's limits, actions as buttons; the table's callbacks / functions run on the game thread. Every row shows its static facts (who reads the target in retail, empty functions) in blue; "All pages" lists every page, also those the retail root no longer links | `dev.list`, `dev.<label slug>` (42 ids, list below) |
@@ -2235,6 +2235,104 @@ row; 19 negatives), `tools\trumenu_quick_check.py` models `switches`, `swfold`, 
 new byte check, imports / exports unchanged. Not in 0.21.5: the SweepAndPrune read-out (P6a) and the shader labels
 (room for 0.21.6).
 
+## TruMenu 0.21.6 (bar page Kostueme, flight key line, quick command line; 2026-11-07)
+
+Owner wishes 2026-11-07: "Kostuem-Wechsel in der Leiste waere auch gut" (a list or one row switched with left / right -
+both), "beim Fliegen anzeigen, mit welchen Tasten man fliegt, die stehen ja nicht da", and the TODO item "Kleine
+Kommandozeile in der Leiste" ("bau das direkt mit"). Build `work\asi\menu0216`; no new game address, no new byte check;
+one new option `[Cheat] FlightHint`.
+
+**Bar page "Kostueme"** (page 4 of 16, right after Lara - its own page: with the list open it has 4 + N rows, N = the
+outfit cycle list, about 36; on the Lara page that would be 15 + 8 positions + 4 + N > 64 = `kQbViewMax`; the bar is now
+at its 16-page limit, `kQbStartPage` = 5 = Leveldaten). Every row runs the existing items on the data of the long menu
+sections "Outfits (live switch)" / "Outfits (next level load)" - no new write path:
+
+| Row | Keys | Item |
+|---|---|---|
+| `Kostuem: < name >` | left / right = previous / next entry of the cycle list GlobalInfo `[0xe7ee50]+4`, **wraps** at both ends; only the shown name changes, the switch runs once the choice stood still **0.5 s** (`kCosSettleMs`; `QbCosTick` every frame, also with the bar closed) - holding or tapping quickly never switches on every step; one switch = one `quick: Kostueme / Kostuem -> costume.set <id>` line; **X** = the shown entry now; the entry worn already = "schon an", nothing runs | `costume.set <object id>` (live, 0x6f0a90) |
+| `Naechstes Kostuem` | right / X | `costume.next` (the game's own cycle step) - kept: the only costume row **Y** can pin as a favourite (no argument) |
+| `Fuers naechste Laden + neu laden` | left / right = a player record of the type table (wraps, only records whose name is in the object list), **X** arms, X or right within 3 s runs (the confirmation of the other reload rows) | `costume.choosereload <record index>` (choose + reload the unit) |
+| `[+] Alle Kostueme (N)` | closed at the start; right / X open, left / X close (as a Fixes group; kept until the game ends) | - |
+| one row per cycle entry | right / X = this costume now; the worn one is marked (green square, "aktuell") | `costume.set <object id>` |
+
+Head line: the current costume `[0xe7f1c8]`, the list / record counts. Labels: `dlc_costume_<a..p>` = `<slot> <the game's
+outfit text> (<object name>)`, e.g. `f Casual Explorer (dlc_costume_f)` - the texts are PC locals ids 83 + slot (B138
+`locals.bin_001`, measured in `work\rebuild\costumes_0311\logs\check_names.txt`, `docs\Befund-Kostueme-Port.md`; g, n and
+o all read "Grey Jungle Shorts"). Every other costume (`lara_*`, `dlc_doppel_costume_a..d`, `doppelganger_casual`) shows
+its object name only - no text mapping is known for them. Without a level (or with `[Cheat] Experimental=0`, or a failed
+costume code check) the rows are grey with the reason in the right column ("braucht ein Level") and refuse with it. **Y**
+on a costume row other than "Naechstes Kostuem" is refused ("Kostuem-Zeilen sind kein Favorit"): `[Favorites] Ids` holds
+item ids without an argument (as page Fixes in 0.21.5). The footer's first line names the selected row's keys.
+
+**Flight key line** (`[Cheat] FlightHint`, default 1): while `cheat.flight` is on, in a level, and the menu is closed,
+one line bottom right: `Fliegen: RT hoch | LT runter | Stick bewegt | Tempo 20` (EN `Flight: RT up | LT down | stick
+moves | speed 20`, the bar's language `[Quick] Language` / `quick.lang`). The bottom-right corner may already hold the
+sound list (`[Sound] Position` br, the default) and the flow status line (`[Flow] Position` br): the line is drawn after
+them and goes above whichever of their windows of this frame reaches into the bottom-right quarter - it never covers
+them. The same text is the footer of the bar rows "Fliegen" / "Flug-Tempo" while selected and the tooltip of the menu's
+flight button (Cheat page) and of the row in the section "Quick bar pages". Keyboard: FlightTick reads the pad only -
+there is **no** key for up / down (horizontal movement = the game's walking keys); "Tastatur: nicht belegt" did not fit
+the short line, it is in the tooltip ("pad only - no keyboard key for up / down").
+
+**Quick command line** (TODO "Kleine Kommandozeile in der Leiste"): in the open bar `[Cmd] FocusButton` (**L3**, the
+button that focuses the menu's command bar) pressed and released **alone** opens / closes a compact command line right
+of the bar: one input line, the last 4 answers (newest first, coloured ok / err), a key line. L3 is free in the bar (the
+bar owns D-pad / LB / RB / X / Y, View + Start toggle it); a press that becomes part of L3 + R3 (long menu / ring hold:
+`[Menu] ToggleButtons`, `[Radial] HoldButtons`) is not one - R3 down while L3 is held cancels it, as the 0.7 FocusButton
+rule. It is the 0.6 command bar's line, **one command path**: every run goes through `CmdRunLine` (same parser `help` /
+`list` / `get` / `<id> [arg]`, same items, the history shared with the menu's bar and TruLink `cmd.run`, the log line
+`cmd (quick): <line> -> <answer>`, queued game-thread answers via `CmdNoteQueued` / `CmdPollQueued`).
+
+- Keyboard: typing goes to the line - key messages go to ImGui only and the game's DirectInput keyboard gets no events
+  while it is open (as the menu with `[Menu] BlockGameInput=1`); Tab = the first suggestion of the command bar's list,
+  Up / Down = history, Enter = run, Esc = close.
+- Pad: D-pad up / down = history (older / newer), **A** = run, **B** = close, L3 = close. While the bar is open L3 is
+  kept from the game, while the line is open A and B too (`QbPad`; `TruMenuPadBlock` reports them); the bar's rows wait.
+- Closing the bar, opening the long menu or the ring closes the line. `[Cmd] Enabled=0` = refused. Log `quick: command
+  line opened / closed (<why>)`.
+- Not built: the 0.7 on-screen keyboard (it lives inside the long menu window - DrawOsk and its focus rules); with the
+  pad only history lines can be run.
+
+**Toggle rows show their state** (owner live test 2026-11-07 20:52: the Navmesh rows only said "rechts"): the rows that
+flip a flag per argument are bool rows now - page Render-Details, group Navmesh (`nav.draw planner_areas` /
+`planner_areas_solid` / `planner_connectivity` / `planner_area_normals` / `obstacles` / `recent_navprobes` /
+`draw_mover3d_path`) and group Flach-Ansicht (`dbg.flatpass 0x200` / `0x100` / `0x80` / `0x400` / `0x800` / `1` / `2`).
+State `an` / `aus` from the ring's `RadialOn` (the NavPower switch byte the item writes, e.g. `0x008bf2e5`; the pass bit
+of the flat view's mask); right = on, left = off (no blind flip; "schon an" writes nothing), X = toggle; the item gets
+`<switch> 1|0` (no new write path). A Navmesh row that is on but cannot draw shows `an` in orange with the reason in the
+right column - `(Ebene fehlt)` when no layer that holds a navgraph is in the layer mask `[0x88e454]` (nav.mask 1),
+`(nur mit Flaechen)` for connectivity / normals without planner_areas(_solid) - the conditions of NavSet's log notes,
+read only (`NavRowNote`). The other action rows of the bar were checked: none else flips a readable flag (setters with a
+fixed value - `dbg.flatcolour`, `dbg.namefilter` / `namecolour` / `namesize`, `dbg.cpall 0` / `1` - stay action rows).
+
+Checks: `tools\trumenu_ini_check.py` `check_0216` (FlightHint key, page / row limits, costume rows from the cycle list
+and the records, debounce + wrap, refusal without a level, Y refused, flight line rule, one command path, toggle rows =
+bool rows with a RadialOn state, NavRowNote read only; 22 negatives in `work\m0216_0711\make_negative.py`),
+`tools\trumenu_quick_check.py` models `cosbar`, `cosdebounce`, `flighthint`, `quickcmd`, `togglerows`.
+
+### TO TEST 0.21.6 (owner)
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | game start | `TruMenu.log`: `TruMenu 0.21.6 (` |
+| 2 | main menu: bar (View + Start), RB to page **Kostueme** | rows grey, right column "braucht ein Level"; right on "Kostuem" = refused with the reason |
+| 3 | in a level: page Kostueme, head line | "aktuell: <costume> - N im Wechsel, M Spieler-Records" |
+| 4 | "Kostuem": right 5 x quickly | the name steps (wraps at the end), Lara changes **once** about 0.5 s after the last press; `TruMenu.log` one `quick: Kostueme / Kostuem -> costume.set` line |
+| 5 | "Kostuem": left once, then X at once | switches at once (no 0.5 s wait) |
+| 6 | "[+] Alle Kostueme": right, then right on a DLC costume | list opens (`f Casual Explorer (dlc_costume_f)` style names), the costume is worn, marked "aktuell" |
+| 7 | Y on a list row / on "Naechstes Kostuem" | refused "Kostuem-Zeilen sind kein Favorit" / pinned (page 1) |
+| 8 | "Fuers naechste Laden + neu laden": right to a record, X, X | unit reloads with that costume |
+| 9 | Lara page "Fliegen" on, close the bar | bottom right: "Fliegen: RT hoch \| LT runter \| Stick bewegt \| Tempo 20"; with the sound list on (br) the line sits above it |
+| 10 | open the long menu | the line disappears; Cheat page: hover the flight button = the keys as tooltip |
+| 11 | `[Cheat] FlightHint=0`, restart, fly | no line |
+| 12 | bar open, L3 alone; type `get cheat.speed`, Enter | command line right of the bar; answer `ok cheat.speed = 20`; `cmd (quick):` line in the log |
+| 13 | D-pad up, A | the last line again from the history, runs |
+| 14 | L3 + R3 with the bar open | long menu opens, the command line does **not** toggle (and closes) |
+| 15 | B | command line closes, the game never saw A / B / L3 |
+| 16 | page Render-Details, group Navmesh: "Navmesh Flaechen" right, right, left | `an`, "schon an", `aus`; X toggles |
+| 17 | "Navmesh Flaechen" on with "Alle Ebenen" off in a level whose navgraph layer is not in the mask | `an` orange, right column "(Ebene fehlt)"; "Alle Ebenen" on = white `an`, no reason |
+| 18 | group Flach-Ansicht: "Pass 0x200" left / right | `aus` / `an` as the flat view's mask (`dbg.render`) |
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
@@ -2565,6 +2663,7 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Pad] BlockInput` | 1 | 0 = the game sees the pad while the menu is open |
 | `[Cheat] Experimental` | 1 | 0 = no game-changing actions (pages read-only) |
 | `[Cheat] FlightSpeed` | 20 | units per 30 fps frame at full trigger |
+| `[Cheat] FlightHint` | 1 | 0.21.6: 1 = while flight is on and the menu is closed one line bottom right names the keys (RT up, LT down, stick moves, the speed); 0 = no line |
 | `[Cheats] Enabled` | 1 | 0.8: 1 = the Cheats page can switch (also needs `[Cheat] Experimental=1`); 0 = list only |
 | `[Cheats] Persist` | 0 | 0.8: 0 = every cheat off at each game start; 1 = the ids that are on are kept in `State` and switched on again in the first level of the next start |
 | `[Cheats] State` | (empty) | 0.8: written by TruMenu when `Persist=1` (comma list of cheat ids) |

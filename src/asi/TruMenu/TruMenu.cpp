@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -349,6 +349,8 @@ const OptDef kOpts[] = {
     {"Cheat", "Experimental", "1", "1 = show the experimental actions (cheat / flight, camera mode, level load, costumes, "
                                    "developer menu rows, time /\nplayer / instance / video items); 0 = read-only"},
     {"Cheat", "FlightSpeed", "20", "flight: units per 30 fps frame at full trigger (RT up, LT down) while cheat mode is on"},
+    {"Cheat", "FlightHint", "1", "0.21.6: 1 = while flight is on and the menu is closed, one line bottom right names the "
+                                 "keys (RT up, LT down,\nstick moves, the speed); 0 = no line"},
     {"Cheats", "Enabled", "1", "0.8: 1 = the Cheats page (god mode, one-hit kill, enemy health, infinite ammo, fill 'er up, "
                                "cheat codes) can switch;\n0 = the page only lists them (also needs [Cheat] "
                                "Experimental=1)"},
@@ -781,6 +783,7 @@ volatile LONG g_logCollapse = 1, g_logHideReads = 1;                         // 
 int g_logMinLevel = 0, g_logRate = 40;                                       // 0.4 [Log] MinLevel / MaxLinesPerSecond
 int g_experimental = 1;
 float g_flightSpeed = 20.0f;
+int g_flightHint = 1;                                                        // 0.21.6 [Cheat] FlightHint
 int g_cmdEnabled = 1, g_cmdHistSize = 32;                                    // 0.6 [Cmd] Enabled / HistorySize
 int g_freeMouse = 1;                                                         // 0.7 [Menu] FreeMouse
 volatile LONG g_hideCursor = 0;                                              // 0.21.1 [Menu] HideCursor
@@ -843,6 +846,11 @@ volatile LONG g_qbJust = 0;                  // opened since the last frame (but
 // D-pad + LB + RB (0.17) + X 0x4000 / Y 0x8000 (0.21.3: X = run, Y = favourite): kept from the game while the bar is open
 const WORD kQbOwn = 0xC30F;
 const WORD kQbX = 0x4000, kQbY = 0x8000;     // 0.21.3 (XINPUT_GAMEPAD_X / _Y)
+// 0.21.6 quick command line (section "0.21.6 quick command line"): open = 1 (render thread writes; the pad thread and the
+// window procedure read it). While the bar is open its [Cmd] FocusButton (L3) is kept from the game as well, while the
+// line is open also A / B (kQcOwn).
+volatile LONG g_qcOpen = 0;
+const WORD kQcOwn = 0x3000;                  // A 0x1000 = run, B 0x2000 = close
 WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject);   // below (g_padLock not held by the caller)
 bool g_qbRunning = false;                    // a bar row runs an item (render thread): src=quick
 int g_qbLang = 0;                            // [Quick] Language: 0 de, 1 en (quick.lang)
@@ -1069,6 +1077,13 @@ void FlightTick(const PadState &pad) {
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         g_flight = false;
     }
+}
+// 0.21.6 (owner 2026-11-07 "beim Fliegen anzeigen, mit welchen Tasten man fliegt"): the keys of FlightTick in one line -
+// the flight hint overlay, the bar row's footer, the menu's tooltip. Only the pad: FlightTick reads no key for up /
+// down (horizontal movement = the game's own controls, left stick or the walking keys).
+void FlightHintText(bool de, char *o, size_t n) {
+    _snprintf_s(o, n, _TRUNCATE, de ? "Fliegen: RT hoch | LT runter | Stick bewegt | Tempo %.0f"
+                                    : "Flight: RT up | LT down | stick moves | speed %.0f", g_flightSpeed);
 }
 
 // ---- 0.8.1 input trace ([Log] InputTrace; owner wish 2026-11-02 after the game.quit case) ----
@@ -1578,8 +1593,10 @@ int __fastcall KbdReadHook(void *self, void *edx, KbdEvent *events, int room, in
     for (int i = 0; i < n; ++i)
         if (events[i].type == 1 && events[i].key < 256) g_kbdRealDown[events[i].key] = events[i].value > 0.5f ? 1 : 0;
     // 0.10.1: the radial menu in Mode=menu holds the keyboard like the menu (Enter / Backspace / Esc / arrows are its keys)
-    if (g_blockGameInput && (g_menuOpen || RadMenuOpen())) {
-        if (!g_kbdWasBlocked) Log(2, "keyboard: held (%s open)", g_menuOpen ? "menu" : "radial menu");
+    // 0.21.6: also while the quick bar's command line is open (typing goes to its input line)
+    if (g_blockGameInput && (g_menuOpen || RadMenuOpen() || g_qcOpen)) {
+        if (!g_kbdWasBlocked) Log(2, "keyboard: held (%s open)", g_menuOpen ? "menu" : g_qcOpen ? "quick command line"
+                                                                                       : "radial menu");
         g_kbdWasBlocked = true;
         g_kbdHeldEvents += n;
         int out = 0;
@@ -1704,6 +1721,13 @@ LRESULT CALLBACK WndProcHook(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         // Key-up messages still do, so a key the game saw going down before the focus moved is released there too.
         if (g_cmdWantText && (msg == WM_KEYDOWN || msg == WM_CHAR || msg == WM_DEADCHAR || msg == WM_SYSCHAR))
             return 0;
+    } else if (g_imguiReady && g_qcOpen && IsKeyMessage(msg)) {
+        // 0.21.6 quick-bar command line (menu closed): every key message goes to ImGui (its input line) and never to the
+        // game's window procedure; a key that went down meanwhile keeps its key-up away after the close (g_msgKeyHeld)
+        ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+        if (g_blockGameInput && msg == WM_KEYDOWN && wParam < 256) g_msgKeyHeld[wParam] = 1;
+        if (msg == WM_KEYUP && wParam < 256) g_msgKeyHeld[wParam] = 0;
+        return 0;
     } else if (g_blockGameInput && RadMenuOpen() && IsKeyMessage(msg)) {
         // 0.10.1 [Radial] Mode=menu: no key message reaches the game while the ring is open (the ring reads Enter /
         // Backspace / Esc / arrows with GetAsyncKeyState); a key that went down meanwhile keeps its key-up away after the
@@ -6036,6 +6060,20 @@ bool NavSet(int i, bool on, const char *src, char *o, size_t n) {
     Out(o, n, "nav.draw %s %d (%s; byte 0x%08lx %u -> %u, mask 0x%08lx, layers %s)%s", s.name, on ? 1 : 0, s.draws, s.byte,
         before, after, mask, layers, note);
     return after == (on ? 1 : 0);
+}
+// 0.21.6 (owner live test 2026-11-07 20:52): the quick bar's note for a nav.draw row that is on but cannot draw - the
+// conditions of NavSet's log notes, read only (the switch bytes, the layer mask [0x88e454], the layers holding a
+// navgraph); "" = nothing to say
+const char *NavRowNote(const char *arg, bool de) {
+    const int i = NavFind(arg);
+    if (i < 0 || !NavByteOn(i) || kNavSwitches[i].kind > 1) return "";
+    if (kNavSwitches[i].kind == 1 && !NavByteOn(0) && !NavByteOn(1)) return de ? "(nur mit Flaechen)" : "(needs areas)";
+    DWORD mask = 0;
+    ReadDword(kNavMask, &mask);
+    char layers[120];
+    const DWORD bits = NavLayers(layers, sizeof(layers));
+    if (!mask || (bits && !(mask & bits))) return de ? "(Ebene fehlt)" : "(layer missing)";
+    return "";
 }
 
 // nav.mask on / off (gate passed): on = kNavMaskAll (the value before is kept), off = the value before - only when the
@@ -23267,9 +23305,15 @@ void PageCheat() {
     // both labels (the focus stays on the button when its label changes)
     if (TmButton(cheat ? "Cheat / flight OFF  [cheat.flight]###flight" : "Cheat / flight ON  [cheat.flight]###flight"))
         QueueItem("cheat.flight", cheat ? "0" : "1");
+    if (ImGui::IsItemHovered()) {            // 0.21.6: the keys (as the flight hint line)
+        char hint[96];
+        FlightHintText(false, hint, sizeof(hint));
+        ImGui::SetTooltip("%s\n(pad only - no keyboard key for up / down)", hint);
+    }
     ImGui::TextWrapped("Toggles cheatMode and posts message 12 to the player (TRLAU Skew.cpp). While on and the menu "
-                       "is closed: RT moves Lara up, LT down (speed %.0f per 30 fps frame, [Cheat] FlightSpeed).",
-                       g_flightSpeed);
+                       "is closed: RT moves Lara up, LT down (speed %.0f per 30 fps frame, [Cheat] FlightSpeed), the "
+                       "left stick / the walking keys move her as usual; no keyboard key for up / down. 0.21.6: a line "
+                       "bottom right names the keys while flying ([Cheat] FlightHint).", g_flightSpeed);
     Todo("PSCCF_IsInCheatMode (bit 30 of [[0xfadb58]+0x68], player message 0x9f) is a different switch - not used yet.");
 }
 
@@ -23334,7 +23378,8 @@ enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvP
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
 enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves, kQsFav, kQsTests,   // 0.21.1 kQsFav / kQsTests
-                 kQsSwitches };            // 0.21.5 page Fixes (TruMenu.switches.txt)
+                 kQsSwitches,              // 0.21.5 page Fixes (TruMenu.switches.txt)
+                 kQsCostume };             // 0.21.6 page Kostueme (section "0.21.6 costumes")
 const int kQbXDir = 2;                      // 0.21.5: X on a special row of page Fixes (QbSpecialAct dir)
 struct QbPage { const char *de, *en; const QbRow *rows; int n; int special; };
 const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230, 255, 255),
@@ -23401,6 +23446,8 @@ const QbRow kQbLara[] = {                    // + the saved positions (special p
     {"Schrotflinte (Objekt)", "Shotgun (object)", "instance.spawn", "wp_shotgun", kQbAction, -1, kQcNone, 0, kQbPlayer,
      kQfConfirm},
 };
+// 0.21.6 page Kostueme: the one row of that page that is a plain item (a dynamic row kQdCosNext shows it, Y can pin it)
+const QbRow kQbCosNext = {"Naechstes Kostuem", "Next costume", "costume.next", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0};
 const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Alles an / aus", "Everything", "dbg.view", "", kQbBool, -1, kQcOn, 0, kQbWhite, 0},
     {"Legende", "Legend", "dbg.legend", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
@@ -23505,22 +23552,24 @@ const QbRow kQbRenderMore[] = {
     {"Farbe: Material", "Colour: material", "dbg.flatcolour", "material", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
     {"Farbe: Terrain / Figuren", "Colour: terrain / figures", "dbg.flatcolour", "class", kQbAction, -1, kQcNone, 0, kQbFlat,
      0},
-    {"Pass 0x200", "Pass 0x200", "dbg.flatpass", "0x200", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
-    {"Pass 0x100", "Pass 0x100", "dbg.flatpass", "0x100", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
-    {"Pass 0x80", "Pass 0x80", "dbg.flatpass", "0x80", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
-    {"Pass 0x400", "Pass 0x400", "dbg.flatpass", "0x400", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
-    {"Pass 0x800", "Pass 0x800", "dbg.flatpass", "0x800", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
-    {"Pass 1", "Pass 1", "dbg.flatpass", "1", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
-    {"Pass 2", "Pass 2", "dbg.flatpass", "2", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    // 0.21.6 (owner live test 2026-11-07 20:52): the pass and Navmesh rows flip a flag - bool rows now (state an / aus
+    // from RadialOn: the pass bit of g_rmPassMask / the NavPower switch byte; right = on, left = off, X = toggle)
+    {"Pass 0x200", "Pass 0x200", "dbg.flatpass", "0x200", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 0x100", "Pass 0x100", "dbg.flatpass", "0x100", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 0x80", "Pass 0x80", "dbg.flatpass", "0x80", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 0x400", "Pass 0x400", "dbg.flatpass", "0x400", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 0x800", "Pass 0x800", "dbg.flatpass", "0x800", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 1", "Pass 1", "dbg.flatpass", "1", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Pass 2", "Pass 2", "dbg.flatpass", "2", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
     {"Render: Stand", "Render state", "dbg.render", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Navmesh", "Navmesh", "-", "rd_nav", kQbGroup, -1, kQcNone, 0, kQbAi, 0},
-    {"Navmesh Flaechen", "Navmesh areas", "nav.draw", "planner_areas", kQbAction, -1, kQcNone, 0, kQbAi, 0},
-    {"Navmesh gefuellt", "Navmesh filled", "nav.draw", "planner_areas_solid", kQbAction, -1, kQcNone, 0, kQbAi, 0},
-    {"Navmesh Verbindungen", "Navmesh links", "nav.draw", "planner_connectivity", kQbAction, -1, kQcNone, 0, kQbAi, 0},
-    {"Flaechen-Normalen", "Area normals", "nav.draw", "planner_area_normals", kQbAction, -1, kQcNone, 0, kQbAi, 0},
-    {"Hindernisse", "Obstacles", "nav.draw", "obstacles", kQbAction, -1, kQcNone, 0, kQbAi, 0},
-    {"Nav-Proben", "Nav probes", "nav.draw", "recent_navprobes", kQbAction, -1, kQcNone, 0, kQbAi, 0},
-    {"Laufweg (Flieger)", "Path (flyer)", "nav.draw", "draw_mover3d_path", kQbAction, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh Flaechen", "Navmesh areas", "nav.draw", "planner_areas", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh gefuellt", "Navmesh filled", "nav.draw", "planner_areas_solid", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh Verbindungen", "Navmesh links", "nav.draw", "planner_connectivity", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Flaechen-Normalen", "Area normals", "nav.draw", "planner_area_normals", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Hindernisse", "Obstacles", "nav.draw", "obstacles", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Nav-Proben", "Nav probes", "nav.draw", "recent_navprobes", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Laufweg (Flieger)", "Path (flyer)", "nav.draw", "draw_mover3d_path", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"Alle Ebenen", "All layers", "nav.mask", "", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"Navmesh aus", "Navmesh off", "nav.off", "", kQbAction, -1, kQcNone, 0, kQbAi, 0},
     {"Navmesh: Stand", "Navmesh state", "nav.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
@@ -23694,6 +23743,7 @@ const QbPage kQbPages[] = {
     {"Favoriten / Zuletzt", "Favourites / recent", nullptr, 0, kQsFav},   // 0.21.1 page 0 (TODO 0.21.1 item 4)
     QB_PAGE("Notfall / Cheats", "Emergency / cheats", kQbEmergency, kQsNone),
     QB_PAGE("Lara", "Lara", kQbLara, kQsLara),
+    {"Kostueme", "Costumes", nullptr, 0, kQsCostume},              // 0.21.6 (own page: the list would overfill Lara)
     QB_PAGE("Debug / Darstellung", "Debug / display", kQbDebug, kQsNone),
     QB_PAGE("Leveldaten", "Level data", kQbLevel, kQsNone),
     QB_PAGE("Render / KI", "Render / AI", kQbRender, kQsNone),
@@ -23709,11 +23759,11 @@ const QbPage kQbPages[] = {
 };
 #undef QB_PAGE
 const int kQbPageN = static_cast<int>(sizeof(kQbPages) / sizeof(kQbPages[0]));
-const int kQbStartPage = 4;                  // Leveldaten: the layers are what the bar is mostly for (0.21.1: page 0
-                                             // Favoriten / Zuletzt in front)
+const int kQbStartPage = 5;                  // Leveldaten: the layers are what the bar is mostly for (0.21.1: page 0
+                                             // Favoriten / Zuletzt in front; 0.21.6: page Kostueme after Lara)
 const int kQbViewMax = 64;                   // rows of one page (static + special; 0.21.1: 64, was 40)
 int g_qbPage = kQbStartPage, g_qbRow[16] = {};  // render thread; kept over a close
-static_assert(kQbPageN <= 16, "g_qbRow holds 16 pages");   // 0.21.5: 15 pages
+static_assert(kQbPageN <= 16, "g_qbRow holds 16 pages");   // 0.21.5: 15 pages; 0.21.6: 16 (Kostueme) - full
 int g_qbShowClosed = 1, g_qbTop = 30;        // [Quick] ShowClosed / Top (percent of the screen height)
 float g_qbScale = 1.0f;                      // [Quick] Scale
 LONG g_qbToggles = 0, g_qbTaps = 0, g_qbLate = 0, g_qbRuns = 0;   // quick.status counters
@@ -23795,6 +23845,7 @@ WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject) {
     }
     // while the bar is open D-pad / LB / RB stay away from the game; one held at the close stays away until released
     if (g_qbOpen && active) s.owned |= static_cast<WORD>(buttons & kQbOwn);
+    if (g_qbOpen && active) s.owned |= static_cast<WORD>(buttons & (g_cmdFocusButton | (g_qcOpen ? kQcOwn : 0)));   // 0.21.6
     s.owned &= buttons;
     clear |= s.owned;
     LeaveCriticalSection(&g_padLock);
@@ -23825,6 +23876,13 @@ const char *QbWhy(const QbRow &r) {
     RadItem e;
     QbEntry(r, &e);
     return RadialWhy(e);
+}
+// 0.21.6: a row's key hint - the bar's footer while the row is selected, the menu's tooltip (flight: the trigger keys)
+bool QbRowHint(const QbRow &r, bool de, char *o, size_t n) {
+    o[0] = 0;
+    if (_stricmp(r.id, "cheat.flight") && _stricmp(r.id, "cheat.speed")) return false;
+    FlightHintText(de, o, n);
+    return true;
 }
 // value rows: the steps left / right walk through (as the item's argument), the step of the current value
 int QbValueCount(int val) {
@@ -24225,6 +24283,11 @@ void QbFavPin(int page, const QbRow *r) {
                                 : "Y: switch rows cannot be favourites ([Favorites] Ids = item ids without an argument)");
         return;
     }
+    if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsCostume) {    // 0.21.6 page Kostueme
+        QbResult(true, "%s", de ? "Y: Kostuem-Zeilen sind kein Favorit (Item mit Argument) - nur 'Naechstes Kostuem'"
+                                : "Y: costume rows cannot be favourites (item with an argument) - only 'Next costume'");
+        return;
+    }
     if (!r || r->kind == kQbLabel || r->kind == kQbGroup || r->kind == kQbPlanned || !strcmp(r->id, "-")) {
         QbResult(true, "%s", de ? "Y: keine Item-Zeile - nur Zeilen mit einem Item werden Favorit"
                                 : "Y: not an item row - only rows with an item can be favourites");
@@ -24296,10 +24359,12 @@ void QbViewOf(int page, const QbRow &r, QbView &v, bool de) {
     v.square = 0;
     v.skip = false;
     Out(v.name, sizeof(v.name), "%s", de ? r.de : r.en);
+    const char *note = "";                   // 0.21.6: a nav.draw row that is on but cannot draw (NavRowNote)
     if (r.kind == kQbBool) {
         on = QbRowOn(r);
         Out(v.state, sizeof(v.state), "%s", grey ? (de ? "gesperrt" : "n/a") : on ? (de ? "an" : "on") : (de ? "aus" : "off"));
         v.square = on && !grey ? 1 : 2;
+        if (on && !grey && !_stricmp(r.id, "nav.draw")) note = NavRowNote(r.arg, de);
     } else if (r.kind == kQbValue) {
         char val[40];
         if (!ItemValueShort(r.id, de, val, sizeof(val))) Out(val, sizeof(val), "?");
@@ -24332,6 +24397,10 @@ void QbViewOf(int page, const QbRow &r, QbView &v, bool de) {
                                                                                : IM_COL32(170, 170, 170, 255))
                : !strncmp(v.state, "nochmal", 7) || !strncmp(v.state, "right again", 11) ? IM_COL32(255, 110, 90, 255)
                : IM_COL32(235, 235, 235, 255);
+    if (note[0]) {                           // 0.21.6: the value in orange, the reason in the count column
+        Out(v.count, sizeof(v.count), "%s", note);
+        v.stateCol = IM_COL32(255, 190, 90, 255);
+    }
 }
 int g_qbStaticN = 0;                         // 0.21.1: views of the static rows (the special rows follow)
 // 0.18: the rows of a page for this frame - static rows the 0.17 way (state, colour, count), then the special rows;
@@ -24583,6 +24652,181 @@ void PageAi() {
                        "not go on.", rv);
 }
 
+// ---- 0.21.6 quick command line (owner 2026-11-07 "bau das direkt mit", TODO "Kleine Kommandozeile in der Leiste") ----
+// In the open quick bar [Cmd] FocusButton (L3 by default - the button that focuses the menu's command bar) pressed and
+// released alone opens / closes a compact command line at the bar's right edge: one input line and the last kQcOutMax
+// answers. A press that becomes part of the open / close combo or the ring hold (L3 + R3) is not one (the other combo
+// button down while it is held cancels - the rule of FeedGamepad's FocusButton). It is the 0.6 command bar's line: every
+// run goes through CmdRunLine (same parser: help / list / get / <id> [arg], same items, the history g_cmdHist shared
+// with the menu's bar and TruLink cmd.run, the same "cmd (quick): ..." log line, queued game-thread answers through
+// CmdNoteQueued / CmdPollQueued) - this section has no execution path of its own.
+// Keyboard: typing goes to the line (key messages and the game's DirectInput reads are held while it is open), Tab = the
+// first suggestion of CmdBuildSuggestions, Up / Down = history, Enter = run, Esc = close. Pad: D-pad up / down =
+// history (older / newer), A = run, B = close; FocusButton / A / B are kept from the game (QbPad), the bar's rows wait.
+// Closing the bar closes the line. Not built: the 0.7 on-screen keyboard (it lives in the long menu window: DrawOsk,
+// its focus rules) - the pad picks history lines only.
+const int kQcOutMax = 4;
+char g_qcBuf[kCmdLine] = "";                 // the input line (render thread)
+char g_qcSet[kCmdLine] = "";                 // text for the line, applied in the callback (history, clear after a run)
+bool g_qcSetPending = false, g_qcFocus = false;
+int g_qcHistPos = -1;                        // browsing g_cmdHist (index), -1 = typing
+struct QcAnswer { char line[kCmdLine], answer[200]; };
+QcAnswer g_qcOut[kQcOutMax];                 // newest first
+int g_qcOutN = 0;
+void QcSetText(const char *text) {
+    strncpy_s(g_qcSet, sizeof(g_qcSet), text, _TRUNCATE);
+    strncpy_s(g_qcBuf, sizeof(g_qcBuf), text, _TRUNCATE);   // an inactive field reads the buffer itself
+    g_qcSetPending = true;
+}
+void QcOpen(bool open, const char *by) {
+    if (open == (g_qcOpen != 0)) return;
+    const bool de = g_qbLang == 0;
+    if (open && !g_cmdEnabled) {
+        QbResult(true, "%s", de ? "Kommandozeile aus ([Cmd] Enabled=0)" : "command line off ([Cmd] Enabled=0)");
+        return;
+    }
+    InterlockedExchange(&g_qcOpen, open ? 1 : 0);
+    g_qcFocus = open;
+    g_qcHistPos = -1;
+    Log(1, "quick: command line %s (%s)", open ? "opened" : "closed", by);
+}
+// one history step (up = older, down = newer, past the newest = an empty line) - the walk of the menu bar's CmdCallback
+void QcHistory(bool up) {
+    char entry[kCmdLine] = "";
+    EnterCriticalSection(&g_cmdLock);
+    const int count = g_cmdHistCount;
+    int pos = g_qcHistPos >= count ? count - 1 : g_qcHistPos;
+    if (up) pos = pos < 0 ? count - 1 : pos > 0 ? pos - 1 : 0;
+    else pos = pos < 0 || pos + 1 >= count ? -1 : pos + 1;
+    if (pos >= 0) strncpy_s(entry, sizeof(entry), g_cmdHist[pos], _TRUNCATE);
+    LeaveCriticalSection(&g_cmdLock);
+    g_qcHistPos = pos;
+    QcSetText(entry);
+}
+// the line's only run: CmdRunLine (the command bar's path), the answer into the output lines (newest first)
+void QcRun() {
+    char line[kCmdLine];
+    CmdClean(g_qcBuf, line, sizeof(line));
+    if (!line[0]) {
+        QbResult(true, "%s", g_qbLang == 0 ? "leere Zeile (help = die Befehle)" : "empty line (help = the commands)");
+        return;
+    }
+    const char *answer = CmdRunLine(line, false, "quick");
+    CmdNoteQueued(answer, line);
+    if (g_qcOutN < kQcOutMax) ++g_qcOutN;
+    for (int i = g_qcOutN - 1; i > 0; --i) g_qcOut[i] = g_qcOut[i - 1];
+    strncpy_s(g_qcOut[0].line, sizeof(g_qcOut[0].line), line, _TRUNCATE);
+    strncpy_s(g_qcOut[0].answer, sizeof(g_qcOut[0].answer), answer, _TRUNCATE);
+    g_qcHistPos = -1;
+    QcSetText("");
+}
+// QuickTick, every frame (also with the bar closed): buttons = the raw pad; blocked = bar closed, menu or ring open.
+// true while the line has the pad (the bar's rows wait)
+bool QcPadTick(WORD buttons, bool blocked) {
+    static WORD prev = 0;
+    static bool armed = false;
+    const WORD edges = static_cast<WORD>(buttons & ~prev);
+    prev = buttons;
+    if (blocked) {                           // bar closed, menu or ring open: the line closes too
+        armed = false;
+        QcOpen(false, !g_qbOpen ? "bar closed" : g_menuOpen ? "menu opened" : "ring opened");
+        return false;
+    }
+    const WORD fb = g_cmdFocusButton;
+    if (fb) {
+        const WORD others = static_cast<WORD>((g_toggleButtons | g_radHold) & ~fb);
+        const bool down = (buttons & fb) == fb;
+        if (down && (edges & fb)) armed = true;
+        if (down && (buttons & others)) armed = false;   // part of L3 + R3 (menu / ring): not ours
+        if (!down && armed) {
+            armed = false;
+            QcOpen(!g_qcOpen, "FocusButton");
+            return true;
+        }
+        if (!down) armed = false;
+    }
+    if (!g_qcOpen) return false;
+    if (edges & 0x2000) {                    // B
+        QcOpen(false, "B");
+        return true;
+    }
+    if (edges & 0x1000) QcRun();             // A
+    if (edges & 0x0001) QcHistory(true);     // D-pad up = older
+    if (edges & 0x0002) QcHistory(false);    // D-pad down = newer
+    return true;
+}
+int QcCallback(ImGuiInputTextCallbackData *d) {
+    switch (d->EventFlag) {
+    case ImGuiInputTextFlags_CallbackAlways:
+        if (g_qcSetPending) { g_qcSetPending = false; CmdReplace(d, g_qcSet); }
+        break;
+    case ImGuiInputTextFlags_CallbackEdit:
+        g_qcHistPos = -1;
+        break;
+    case ImGuiInputTextFlags_CallbackCompletion:   // Tab: the first suggestion (the menu bar's list)
+        CmdBuildSuggestions(d->Buf, false);
+        if (g_sugCount) {
+            char text[kCmdLine];
+            CmdCompletionText(0, text, sizeof(text), true);
+            CmdReplace(d, text);
+        }
+        break;
+    case ImGuiInputTextFlags_CallbackHistory:
+        QcHistory(d->EventKey == ImGuiKey_UpArrow);
+        g_qcSetPending = false;
+        CmdReplace(d, g_qcSet);
+        break;
+    default:
+        break;
+    }
+    return 0;
+}
+// render thread, after DrawQuick while the line is open: an ImGui window right of the bar
+void DrawQuickCmd() {
+    const bool de = g_qbLang == 0;
+    CmdPollQueued();                         // a queued game-thread item's answer (as the menu bar)
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    const float x = g_qbRect.x1 > g_qbRect.x0 ? g_qbRect.x1 + 8.0f : vp->WorkPos.x + 12.0f;
+    const float y = g_qbRect.y1 > g_qbRect.y0 ? g_qbRect.y0 : vp->WorkPos.y + vp->WorkSize.y * 0.3f;
+    ImGui::SetNextWindowPos(ImVec2(x, y), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(vp->WorkSize.x * 0.42f, 0.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.8f);
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize;
+    if (ImGui::Begin("##TruQuickCmd", nullptr, flags)) {
+        ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.35f, 1.0f), "%s", de ? "Kommandozeile (wie die Befehlszeile im Menue)"
+                                                                      : "Command line (the menu's command bar)");
+        const ImGuiID id = ImGui::GetID("##qcline");
+        if (g_qcFocus || ImGui::GetActiveID() != id) ImGui::SetKeyboardFocusHere();
+        g_qcFocus = false;
+        ImGui::SetNextItemWidth(-1.0f);
+        const ImGuiInputTextFlags tf = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackAlways |
+                                       ImGuiInputTextFlags_CallbackEdit | ImGuiInputTextFlags_CallbackCompletion |
+                                       ImGuiInputTextFlags_CallbackHistory;
+        if (ImGui::InputText("##qcline", g_qcBuf, sizeof(g_qcBuf), tf, QcCallback)) QcRun();
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) QcOpen(false, "Esc");
+        char last[sizeof(g_cmdResult)] = "", lastLine[kCmdLine] = "";
+        EnterCriticalSection(&g_cmdLock);    // the newest line's answer may arrive later (queued game-thread item)
+        strncpy_s(last, sizeof(last), g_cmdResult, _TRUNCATE);
+        strncpy_s(lastLine, sizeof(lastLine), g_cmdResultLine, _TRUNCATE);
+        LeaveCriticalSection(&g_cmdLock);
+        if (g_qcOutN && !strcmp(lastLine, g_qcOut[0].line))
+            strncpy_s(g_qcOut[0].answer, sizeof(g_qcOut[0].answer), last, _TRUNCATE);
+        for (int i = 0; i < g_qcOutN; ++i) {
+            const bool ok = !strncmp(g_qcOut[i].answer, "ok", 2);
+            ImGui::TextColored(i ? ImVec4(0.7f, 0.7f, 0.7f, 1.0f) : ok ? ImVec4(0.55f, 0.9f, 0.6f, 1.0f)
+                                                                       : ImVec4(1.0f, 0.55f, 0.45f, 1.0f),
+                               "> %.60s  %.130s", g_qcOut[i].line, g_qcOut[i].answer);
+        }
+        if (!g_qcOutN) ImGui::TextDisabled("%s", de ? "(noch nichts - help, list <Teil>, get <id>, <id> [Wert])"
+                                                    : "(nothing yet - help, list <part>, get <id>, <id> [value])");
+        ImGui::TextDisabled("%s", de ? "Enter / A: ausfuehren   Tab: Vorschlag   hoch / runter: Verlauf   Esc / B / L3: zu"
+                                     : "Enter / A: run   Tab: suggestion   up / down: history   Esc / B / L3: close");
+    }
+    ImGui::End();
+}
+// ---- end of 0.21.6 quick command line ----
+
 // render thread, every Present (Render, before its early return): the open bar's input from the raw pad (g_pad, before
 // QbPad masks it for the game) - edges of D-pad / LB / RB (0.21.3: + X / Y), a held D-pad direction repeats after 400 ms
 // every 120 ms
@@ -24597,6 +24841,8 @@ void QuickTick() {
     LeaveCriticalSection(&g_padLock);
     const WORD b = have ? static_cast<WORD>(pad.wButtons & kQbOwn) : 0;
     if (!g_qbOpen) g_qbSavesPageSeen = 0;    // 0.18: reopened on the Saves page = a fresh scan
+    // 0.21.6 quick command line: FocusButton (L3) alone opens / closes it; while open it has D-pad up / down, A, B
+    const bool qcHasPad = QcPadTick(have ? pad.wButtons : static_cast<WORD>(0), !g_qbOpen || g_menuOpen || g_radOpen);
     if (!g_qbOpen || g_menuOpen || g_radOpen || InterlockedExchange(&g_qbJust, 0)) {
         prev = b;                            // buttons held at the open (or while the menu / ring had them) are no edges
         repeatAt = 0;
@@ -24604,6 +24850,10 @@ void QuickTick() {
     }
     WORD edges = static_cast<WORD>(b & ~prev);
     prev = b;
+    if (qcHasPad) {                          // 0.21.6: the rows wait while the command line has the pad
+        repeatAt = 0;
+        return;
+    }
     const DWORD now = GetTickCount();
     const WORD dir = static_cast<WORD>(b & 0x000F);
     if (edges & 0x000F) repeatAt = now + 400;
@@ -24633,6 +24883,7 @@ void QuickTick() {
     if (edges & kQbY) { QbFavPin(g_qbPage, src); return; }    // 0.21.3: Y = pin / unpin (section "0.21.3 X / Y")
     if (edges & kQbX) {                      // 0.21.3: X = execute (one press per frame: no right press on top)
         if (src) QbExecRow(g_qbPage, *src);  // static row, or a favourite / recent row of page 0
+        else if (p.special == kQsCostume) QbSpecialAct(p.special, row - g_qbStaticN, kQbXDir);   // 0.21.6: X = now
         else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, p.special == kQsSwitches ? kQbXDir : 1);
         return;
     }
@@ -24646,6 +24897,8 @@ bool QuickWantsDraw() {
     if (!g_qbEnabled) return false;
     return g_qbOpen || (g_qbShowClosed && g_debugEnabled && InLevel());
 }
+
+bool QbFootHint(int page, int sel, bool de, char *o, size_t n);   // 0.21.6, section "0.21.6 costumes"
 
 // foreground draw list, left edge at [Quick] Top % of the screen height; g_qbRect = the panel (labels keep out of it)
 void DrawQuick() {
@@ -24708,7 +24961,8 @@ void DrawQuick() {
     char foot[240];
     bool result = g_qbResult[0] && GetTickCount() - g_qbResultTick < 5000;
     if (result) Out(foot, sizeof(foot), "%s", g_qbResult);
-    else Out(foot, sizeof(foot), "%s", de ? "hoch / runter: Zeile   links / rechts: aus / an   LB / RB: Seite"
+    else if (!QbFootHint(g_qbPage, sel, de, foot, sizeof(foot)))   // 0.21.6: else the selected row's keys (flight, costumes)
+        Out(foot, sizeof(foot), "%s", de ? "hoch / runter: Zeile   links / rechts: aus / an   LB / RB: Seite"
                                           : "up / down: row   left / right: off / on   LB / RB: page");
     char close[112];                         // 0.21.3: the X / Y hint on the line that a result never replaces
     Out(close, sizeof(close), "%s   %s: %s", de ? "X: ausfuehren  Y: Favorit" : "X: run  Y: favourite", combo,
@@ -25478,7 +25732,8 @@ bool RunPosGoLoad(const char *arg, char *o, size_t n) {
 // Saves. Each row is a QbView (drawn by DrawQuick) plus a QbDyn (what left / right do). Rows of the last QbBuild.
 enum QbDynKind { kQdNone = 0, kQdPos, kQdCpActive, kQdCpAll, kQdCp, kQdBackupNow, kQdRescan, kQdSave, kQdBackup, kQdLabel,
                  kQdItem, kQdPrepare, kQdStop, kQdTodo,     // 0.21.1: page 0 rows, page Tests rows
-                 kQdSwGroup, kQdSw };                       // 0.21.5: page Fixes (group, switch)
+                 kQdSwGroup, kQdSw,                         // 0.21.5: page Fixes (group, switch)
+                 kQdCosPick, kQdCosNext, kQdCosRec, kQdCosGroup, kQdCos };   // 0.21.6: page Kostueme
 struct QbDyn { int kind; LONG intro; char arg[64], unit[48]; bool loaded; };
 QbDyn g_qbDyn[kQbViewMax];
 int g_qbDynN = 0;
@@ -25660,6 +25915,7 @@ const QbRow *QbFindRow(const char *id, const char *arg) {   // the first static 
             if (r.kind != kQbLabel && r.kind != kQbPlanned && r.kind != kQbGroup && !_stricmp(r.id, id) && !strcmp(r.arg, arg))
                 return &r;
         }
+    if (!_stricmp(kQbCosNext.id, id) && !strcmp(kQbCosNext.arg, arg)) return &kQbCosNext;   // 0.21.6 page Kostueme
     return nullptr;
 }
 void QbDynLabel(QbView *v, QbDyn *d, const char *text) {
@@ -25899,6 +26155,323 @@ void QbSwAct(const QbDyn &q, int dir) {
     QbRun("Fixes", r.de, name, "sw.set", arg);
 }
 void QbActRow(int page, const QbRow &r, int dir);
+// ---- 0.21.6 costumes (quick bar page Kostueme) ----
+// Owner 2026-11-07: "Kostuem-Wechsel in der Leiste waere auch gut", then: a list or one row switched with left / right -
+// both. Own page after Lara: with the list open it has 4 + N rows (N = the outfit cycle list, about 36); on the Lara page
+// that would be 15 static rows + 8 positions + 4 + N, more than kQbViewMax (64). Every row is built from the data of the
+// long menu sections "Outfits (live switch)" (GlobalInfo [0xe7ee50]+4, costume.set / costume.next) and "Outfits (next
+// level load)" (player records of the type table, costume.choosereload) and runs those items - no new write path:
+//   Kostuem: < name >       left / right = previous / next entry of the cycle list (wraps at both ends); only the shown
+//                           name changes - costume.set <id> runs once the choice stood still kCosSettleMs (QbCosTick:
+//                           one switch, one "quick:" line); X = the shown entry now
+//   Naechstes Kostuem       costume.next (the game's own cycle step 0x6f0a90 with altPlayerObjectID 0); the one costume
+//                           row Y can pin as a favourite (an item without an argument)
+//   Fuers naechste Laden    left / right = a player record (wraps), X arms, X / right within 3 s = costume.choosereload
+//   + neu laden             <record index> (the unit is reloaded - the confirmation of the other reload rows)
+//   [+] Alle Kostueme (N)   one group, closed at the start (right / X open, left / X close - as a Fixes group); one row
+//                           per cycle entry, right / X = costume.set <id> at once
+// The current costume [0xe7f1c8] is marked in every row. Labels: dlc_costume_<a..p> = "<slot> <the game's outfit text>
+// (<object name>)"; every other costume (lara_*, dlc_doppel_costume_*, doppelganger_casual) only its object name - no
+// text mapping is known for them. Rows are refused with the long menu's reason without a level / costume check /
+// [Cheat] Experimental; Y on a costume row other than "Naechstes Kostuem" is refused (QbFavPin, as page Fixes).
+const DWORD kCosSettleMs = 500;              // the choice row switches once its entry stood still this long
+// the outfit texts of the DLC costume slots a .. p: PC locals id 83 + slot (B138 locals.bin_001), measured in
+// work/rebuild/costumes_0311/logs/check_names.txt (docs/Befund-Kostueme-Port.md: Xbox index 61 + slot -> PC 83 .. 98; the
+// Xbox packs have the same texts except slot o = "Extra Costume 15" in pack1 / pack2)
+const char *const kCosSlotNames[16] = {"Classic Lara", "Blue Bikini", "Black and White Bikini", "Red Bikini",
+                                       "Camo Bikini", "Casual Explorer", "Grey Jungle Shorts", "Legend Lara",
+                                       "Bright Blue Bikini", "Gold Bikini", "Red Drysuit", "Fashion Winner",
+                                       "People's Choice", "Grey Jungle Shorts", "Grey Jungle Shorts", "Blue Wetsuit"};
+struct CosBar {
+    WORD ids[128];                           // the outfit cycle list of this frame
+    int n;                                   // its entries (-1 = no list)
+    DWORD now;                               // current costume [0xe7f1c8]
+    WORD pickId;                             // the entry the choice row shows while a switch waits
+    DWORD pickTick;                          // when it was picked (left / right)
+    bool pending;                            // a switch waits until the pick stood still kCosSettleMs
+    bool listOpen;                           // group "Alle Kostueme" (closed at the start, kept until the game ends)
+    int rec;                                 // the record the next-load row shows (index into g_cosRec, -1 = current)
+};
+CosBar g_cos = {{}, -1, 0, 0, 0, false, false, -1};   // render thread
+struct CosRec { int index, id; char name[48]; };   // a player record of the type table with its object id
+CosRec g_cosRec[64];
+int g_cosRecN = 0;
+void CosLabelOf(const char *obj, char *o, size_t n) {   // "<slot> <outfit text> (<object name>)" or the object name
+    const size_t k = 12;                     // strlen("dlc_costume_")
+    if (!_strnicmp(obj, "dlc_costume_", k) && obj[k] >= 'a' && obj[k] <= 'p' && !obj[k + 1])
+        Out(o, n, "%c %s (%s)", obj[k], kCosSlotNames[obj[k] - 'a'], obj);
+    else Out(o, n, "%s", obj);
+}
+void CosLabel(DWORD id, char *o, size_t n) {
+    char name[64];
+    if (!id) Out(o, n, "-");
+    else if (ObjectName(static_cast<int>(id), name, sizeof(name))) CosLabelOf(name, o, n);
+    else Out(o, n, "%lu ?", id);
+}
+// this frame's cycle list and current costume; the player records again only when the object name table or the type
+// table moved (the long menu's rule: ObjectId walks ~1000 names)
+void CosRefresh() {
+    g_cos.n = GlobalCostumes(g_cos.ids, 128);
+    g_cos.now = 0;
+    ReadDword(kCostumeNow, &g_cos.now);
+    static DWORD names = 1, types = 1;
+    DWORD nm = 0;
+    ReadDword(kObjNames, &nm);
+    const DWORD tt = TypeTable();
+    if (nm == names && tt == types) return;
+    names = nm;
+    types = tt;
+    g_cosRecN = 0;
+    char name[48];
+    bool player = false;
+    for (int i = 0; i < 64 && TypeRecord(i, name, sizeof(name), &player); ++i) {
+        if (!player) continue;
+        const int id = ObjectId(name);
+        if (!id) continue;                   // not in the object list (the long menu greys it): not offered here
+        CosRec &r = g_cosRec[g_cosRecN++];
+        r.index = i;
+        r.id = id;
+        strncpy_s(r.name, sizeof(r.name), name, _TRUNCATE);
+    }
+}
+int CosIndexOf(DWORD id) {
+    for (int i = 0; i < g_cos.n; ++i)
+        if (static_cast<DWORD>(g_cos.ids[i]) == id) return i;
+    return -1;
+}
+// left / right: the neighbour, wrapping at both ends; from outside the list (-1) right starts at the first entry, left
+// at the last
+int CosStep(int i, int dir, int n) {
+    if (n <= 0) return -1;
+    if (i < 0 || i >= n) return dir < 0 ? n - 1 : 0;
+    return (i + (dir < 0 ? n - 1 : 1)) % n;
+}
+// the long menu's conditions (PageCostumeLive / PageOutfits, SwitchCostume / SetCostume), short for the count column
+const char *CosWhy(bool live, bool de) {
+    if (!g_experimental) return "Experimental=0";
+    if (live ? !(g_switchOk && g_postOk) : !g_costumeOk) return de ? "Pruefung fehlgeschl." : "code check failed";
+    if (!InLevel()) return de ? "braucht ein Level" : "needs a level";
+    return "";
+}
+int CosRecShown() {                          // the record the next-load row shows: the picked one, else the current
+    if (g_cosRecN <= 0) return -1;
+    if (g_cos.rec >= 0 && g_cos.rec < g_cosRecN) return g_cos.rec;
+    for (int i = 0; i < g_cosRecN; ++i)
+        if (static_cast<DWORD>(g_cosRec[i].id) == g_cos.now) return i;
+    return 0;
+}
+// the one place this page switches live: costume.set <object id> through QbRun (the item's own line + one "quick:"
+// line); the costume already worn = nothing
+void CosApply(WORD id) {
+    const bool de = g_qbLang == 0;
+    char label[112], arg[16];
+    CosLabel(id, label, sizeof(label));
+    if (static_cast<DWORD>(id) == g_cos.now) {
+        QbResult(false, "%s: %s - %s", de ? "Kostuem" : "Costume", label, de ? "schon an" : "already on");
+        return;
+    }
+    Out(arg, sizeof(arg), "%u", static_cast<unsigned>(id));
+    g_qbActRow = nullptr;                    // no static row: nothing for the recent list
+    QbRun("Kostueme", "Kostuem", label, "costume.set", arg);
+}
+// every frame (Render, also while the bar is closed): the waiting switch of the choice row once it stood still
+void QbCosTick() {
+    if (!g_cos.pending || GetTickCount() - g_cos.pickTick < kCosSettleMs) return;
+    g_cos.pending = false;
+    const bool de = g_qbLang == 0;
+    const char *why = CosWhy(true, de);
+    if (why[0]) { QbResult(true, "%s: %s", de ? "Kostuem" : "Costume", why); return; }
+    g_cos.now = 0;
+    ReadDword(kCostumeNow, &g_cos.now);
+    CosApply(g_cos.pickId);
+}
+int QbCosRows(QbView *v, QbDyn *d, int max, bool de) {
+    CosRefresh();
+    const char *whyLive = CosWhy(true, de), *whyRec = CosWhy(false, de);
+    char cur[112];
+    CosLabel(g_cos.now, cur, sizeof(cur));
+    const int listN = g_cos.n < 0 ? 0 : g_cos.n;
+    Out(g_qbHead, sizeof(g_qbHead), de ? "aktuell: %s - %d im Wechsel, %d Spieler-Records%s"
+                                       : "current: %s - %d in the cycle, %d player records%s", cur, listN, g_cosRecN,
+        g_cos.listOpen && 4 + listN > max ? (de ? " (Liste gekuerzt)" : " (list cut)") : "");
+    const ImU32 grey = IM_COL32(130, 130, 130, 255), red = IM_COL32(220, 120, 100, 255), green = IM_COL32(110, 230, 120, 255),
+                white = IM_COL32(235, 235, 235, 255), orange = IM_COL32(255, 190, 90, 255);
+    int n = 0;
+    auto add = [&](int kind, LONG intro) -> QbView & {
+        QbView &w = v[n];
+        QbDyn &q = d[n];
+        ++n;
+        memset(&w, 0, sizeof(w));
+        memset(&q, 0, sizeof(q));
+        w.src = -1;
+        q.kind = kind;
+        q.intro = intro;
+        return w;
+    };
+    char lab[112];
+    if (n < max) {                           // Kostuem: < name >
+        QbView &w = add(kQdCosPick, 0);
+        CosLabel(g_cos.pending ? g_cos.pickId : g_cos.now, lab, sizeof(lab));
+        Out(w.name, sizeof(w.name), "%s", de ? "Kostuem" : "Costume");
+        Out(w.state, sizeof(w.state), "< %s >", lab);
+        Out(w.count, sizeof(w.count), "%s", whyLive[0] ? whyLive : g_cos.pending ? (de ? "wechselt gleich" : "switching")
+                                            : (de ? "aktuell" : "current"));
+        w.col = whyLive[0] ? grey : kQbPlayer;
+        w.stateCol = whyLive[0] ? red : g_cos.pending ? orange : green;
+    }
+    if (n < max) {                           // Naechstes Kostuem (the static row's view)
+        QbView &w = add(kQdCosNext, 0);
+        QbViewOf(g_qbPage, kQbCosNext, w, de);
+    }
+    if (n < max) {                           // Fuers naechste Laden + neu laden
+        QbView &w = add(kQdCosRec, 0);
+        const int k = CosRecShown();
+        Out(w.name, sizeof(w.name), "%s", de ? "Fuers naechste Laden + neu laden" : "For the next load + reload");
+        char key[64] = "";
+        if (k >= 0) {
+            char l2[100];
+            CosLabelOf(g_cosRec[k].name, l2, sizeof(l2));
+            Out(lab, sizeof(lab), "%d %s", g_cosRec[k].index, l2);
+            Out(key, sizeof(key), "costume.choosereload %d", g_cosRec[k].index);
+        } else {
+            Out(lab, sizeof(lab), "-");
+        }
+        CostumeState s;
+        ReadCostumeState(&s);
+        const bool armed = key[0] && QbArmed(key);
+        const bool chosen = k >= 0 && g_cosRec[k].id == static_cast<int>(s.mode ? s.chosen2 : s.chosen0);
+        Out(w.state, sizeof(w.state), "< %s >", lab);
+        Out(w.count, sizeof(w.count), "%s", whyRec[0] ? whyRec : armed ? (de ? "X nochmal!" : "X again!")
+                                            : chosen ? (de ? "gewaehlt, X 2x" : "chosen, X 2x") : "X 2x");
+        w.col = whyRec[0] ? grey : kQbRed;
+        w.stateCol = whyRec[0] ? red : armed ? IM_COL32(255, 110, 90, 255) : white;
+    }
+    if (n < max) {                           // [+] Alle Kostueme (N)
+        QbView &w = add(kQdCosGroup, 0);
+        Out(w.name, sizeof(w.name), "%s %s (%d)", g_cos.listOpen ? "[-]" : "[+]", de ? "Alle Kostueme" : "All costumes", listN);
+        Out(w.state, sizeof(w.state), "%s", g_cos.listOpen ? (de ? "links = zu" : "left = close")
+                                                           : (de ? "rechts = auf" : "right = open"));
+        w.col = kQbBlue;
+        w.stateCol = IM_COL32(170, 170, 170, 255);
+    }
+    for (int i = 0; g_cos.listOpen && i < listN && n < max; ++i) {
+        const bool now = static_cast<DWORD>(g_cos.ids[i]) == g_cos.now;
+        QbView &w = add(kQdCos, g_cos.ids[i]);
+        CosLabel(g_cos.ids[i], lab, sizeof(lab));
+        Out(w.name, sizeof(w.name), "  %s", lab);
+        Out(w.state, sizeof(w.state), "%s", whyLive[0] ? (de ? "gesperrt" : "n/a") : now ? (de ? "aktuell" : "current")
+                                            : (de ? "rechts = an" : "right = wear"));
+        w.square = now ? 1 : 0;
+        w.col = whyLive[0] ? grey : now ? green : kQbPlayer;
+        w.stateCol = whyLive[0] ? red : now ? green : white;
+    }
+    return n;
+}
+// page Kostueme: right / left / X (dir kQbXDir) on a costume row ("Naechstes Kostuem" goes through QbActRow / QbExecRow)
+void QbCosAct(const QbDyn &q, int dir) {
+    const bool de = g_qbLang == 0, x = dir == kQbXDir;
+    const char *cos = de ? "Kostuem" : "Costume";
+    char lab[112];
+    switch (q.kind) {
+    case kQdCosPick: {
+        const char *why = CosWhy(true, de);
+        if (why[0]) { QbResult(true, "%s: %s", cos, why); return; }
+        if (g_cos.n <= 0) {
+            QbResult(true, "%s: %s", cos, de ? "keine Wechsel-Liste (GlobalInfo [0xe7ee50]+4)" : "no cycle list (GlobalInfo "
+                     "[0xe7ee50]+4)");
+            return;
+        }
+        const WORD shown = g_cos.pending ? g_cos.pickId : static_cast<WORD>(g_cos.now);
+        if (x) {                             // X = the shown entry now (no wait)
+            g_cos.pending = false;
+            CosApply(shown);
+            return;
+        }
+        const int next = CosStep(CosIndexOf(shown), dir, g_cos.n);
+        g_cos.pickId = g_cos.ids[next];      // only the shown name changes - QbCosTick switches after kCosSettleMs
+        g_cos.pickTick = GetTickCount();
+        g_cos.pending = true;
+        CosLabel(g_cos.pickId, lab, sizeof(lab));
+        QbResult(false, "%s: %s (%d/%d) - %s", cos, lab, next + 1, g_cos.n, de ? "wechselt nach 0,5 s Ruhe, X = sofort"
+                                                                             : "switches after 0.5 s, X = now");
+        return;
+    }
+    case kQdCosNext:
+        QbActRow(g_qbPage, kQbCosNext, dir);
+        return;
+    case kQdCosRec: {
+        const char *name = de ? "Fuers naechste Laden" : "For the next load";
+        const char *why = CosWhy(false, de);
+        if (why[0]) { QbResult(true, "%s: %s", name, why); return; }
+        const int k = CosRecShown();
+        if (k < 0) {
+            QbResult(true, "%s: %s", name, de ? "keine Spieler-Records im Objektverzeichnis" : "no player record in the "
+                     "object list");
+            return;
+        }
+        char key[64], arg[16];
+        Out(arg, sizeof(arg), "%d", g_cosRec[k].index);
+        Out(key, sizeof(key), "costume.choosereload %s", arg);
+        if (!x && !(dir > 0 && QbArmed(key))) {   // left / right = another record (right while armed = the confirmation)
+            g_cos.rec = CosStep(k, dir, g_cosRecN);
+            CosLabelOf(g_cosRec[g_cos.rec].name, lab, sizeof(lab));
+            QbResult(false, "%s: %d %s - %s", name, g_cosRec[g_cos.rec].index, lab, de ? "X 2x = waehlen + Unit neu laden"
+                                                                                     : "X twice = choose + reload the unit");
+            return;
+        }
+        CosLabelOf(g_cosRec[k].name, lab, sizeof(lab));
+        if (!QbConfirm(key, name, de ? "laedt die Unit neu (Story-Werte?)" : "reloads the unit (story values?)")) return;
+        g_qbActRow = nullptr;
+        QbRun("Kostueme", "Fuers naechste Laden", lab, "costume.choosereload", arg);
+        return;
+    }
+    case kQdCosGroup: {
+        const bool open = x ? !g_cos.listOpen : dir > 0;
+        const char *name = de ? "Alle Kostueme" : "All costumes";
+        if (open == g_cos.listOpen) {
+            QbResult(false, "%s: %s", name, open ? (de ? "schon auf" : "already open") : (de ? "schon zu" : "already closed"));
+            return;
+        }
+        g_cos.listOpen = open;
+        QbResult(false, "%s: %s", name, open ? (de ? "auf" : "open") : (de ? "zu" : "closed"));
+        return;
+    }
+    case kQdCos: {
+        const char *why = CosWhy(true, de);
+        if (why[0]) { QbResult(true, "%s: %s", cos, why); return; }
+        if (dir < 0) { QbResult(false, "%s", de ? "rechts / X = dieses Kostuem" : "right / X = wear this one"); return; }
+        g_cos.pending = false;               // an explicit pick replaces a waiting one
+        CosApply(static_cast<WORD>(q.intro));
+        return;
+    }
+    default: return;
+    }
+}
+// the footer's first line while a row is selected and no answer is shown: the row's keys (static rows: QbRowHint)
+bool QbFootHint(int page, int sel, bool de, char *o, size_t n) {
+    if (page < 0 || page >= kQbPageN || sel < 0 || sel >= g_qbViewN) return false;
+    const QbPage &p = kQbPages[page];
+    const int src = g_qbView[sel].src, k = sel - g_qbStaticN;
+    if (src >= 0) return src < p.n && QbRowHint(p.rows[src], de, o, n);
+    if (p.special == kQsFav) {
+        const QbRow *r = QbSpecialRow(k);
+        return r && QbRowHint(*r, de, o, n);
+    }
+    if (p.special != kQsCostume || k < 0 || k >= g_qbDynN) return false;
+    const char *t = nullptr;
+    switch (g_qbDyn[k].kind) {
+    case kQdCosPick: t = de ? "links / rechts: Kostuem (wechselt nach 0,5 s Ruhe)   X: sofort"
+                            : "left / right: costume (switches after 0.5 s)   X: now"; break;
+    case kQdCosRec: t = de ? "links / rechts: Record   X 2x: waehlen + Unit neu laden"
+                           : "left / right: record   X twice: choose + reload the unit"; break;
+    case kQdCosGroup: t = de ? "rechts: auf   links: zu   X: auf / zu" : "right: open   left: close   X: open / close"; break;
+    case kQdCos: t = de ? "rechts / X: dieses Kostuem jetzt" : "right / X: wear this one now"; break;
+    default: return false;
+    }
+    Out(o, n, "%s", t);
+    return true;
+}
+// ---- end of 0.21.6 costumes ----
 int QbSpecialBuild(int special, int base, bool de) {
     const int max = kQbViewMax - base;
     g_qbDynN = 0;
@@ -25907,6 +26480,7 @@ int QbSpecialBuild(int special, int base, bool de) {
     if (special == kQsFav) n = QbFavRows(g_qbView + base, g_qbDyn, max, de);           // 0.21.1
     else if (special == kQsTests) n = QbTestsRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsSwitches) n = QbSwRows(g_qbView + base, g_qbDyn, max, de);   // 0.21.5
+    else if (special == kQsCostume) n = QbCosRows(g_qbView + base, g_qbDyn, max, de);   // 0.21.6
     if (special == kQsLara) n = QbPosRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsCheckpoints) n = QbCpPageRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsSaves) n = QbSavesRows(g_qbView + base, g_qbDyn, max, de);
@@ -25914,6 +26488,7 @@ int QbSpecialBuild(int special, int base, bool de) {
     return n;
 }
 const QbRow *QbSpecialRow(int row) {         // 0.21.3: X / Y on page 0 act on the favourite / recent row itself
+    if (row >= 0 && row < g_qbDynN && g_qbDyn[row].kind == kQdCosNext) return &kQbCosNext;   // 0.21.6
     if (row < 0 || row >= g_qbDynN || g_qbDyn[row].kind != kQdItem) return nullptr;
     const int k = static_cast<int>(g_qbDyn[row].intro);
     return k >= 0 && k < kQbViewMax ? &g_qbFavRow[k] : nullptr;
@@ -25958,6 +26533,13 @@ void QbSpecialAct(int special, int row, int dir) {
     case kQdSwGroup:                         // 0.21.5 page Fixes
     case kQdSw:
         QbSwAct(q, dir);
+        return;
+    case kQdCosPick:                         // 0.21.6 page Kostueme
+    case kQdCosNext:
+    case kQdCosRec:
+    case kQdCosGroup:
+    case kQdCos:
+        QbCosAct(q, dir);
         return;
     case kQdPos:
         if (dir < 0) { QbResult(false, "%s", de ? "rechts = hin" : "right = go"); return; }
@@ -26777,6 +27359,9 @@ void PageQbRow(const QbRow &r, int page, int index) {
             if (TmButton(id)) QueueItem(r.id, r.arg);
         }
     }
+    char hint[128];                          // 0.21.6: the row's key hint (flight) as the tooltip
+    if (QbRowHint(r, false, hint, sizeof(hint)) && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s", hint);
     if (why[0]) {
         ImGui::EndDisabled();
         ImGui::SameLine();
@@ -27489,6 +28074,39 @@ void DrawGuardOverlay() {
     ImGui::End();
 }
 
+// ---- 0.21.6 flight hint (owner 2026-11-07: "beim Fliegen anzeigen, mit welchen Tasten man fliegt, die stehen ja nicht
+// da") ----
+// One line bottom right while cheat.flight is on and the menu is closed ([Cheat] FlightHint=1, the default): the keys of
+// FlightTick (RT up, LT down - the pad only, there is no keyboard key for up / down) and the speed, in the bar's
+// language ([Quick] Language / quick.lang). The bottom-right corner may already hold the sound list ([Sound] Position
+// br, the default) and the flow status line ([Flow] Position br, the default): drawn after them, the line goes above
+// whichever of their windows of this frame reaches into that corner - it never covers them.
+bool FlightHintWanted() { return g_flightHint && g_flight && !g_menuOpen && InLevel(); }
+void DrawFlightHint() {
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    const float right = vp->WorkPos.x + vp->WorkSize.x - 10.0f;
+    float bottom = vp->WorkPos.y + vp->WorkSize.y - 10.0f;
+    const char *const below[] = {"##TruSoundList", "##TruMenuFlow"};
+    for (const char *name : below) {
+        ImGuiWindow *w = ImGui::FindWindowByName(name);
+        if (!w || !w->Active || w->Pos.x + w->Size.x < vp->WorkPos.x + vp->WorkSize.x * 0.5f ||
+            w->Pos.y + w->Size.y < vp->WorkPos.y + vp->WorkSize.y * 0.5f)
+            continue;                        // not drawn this frame, or not in the bottom-right quarter
+        if (w->Pos.y - 6.0f < bottom) bottom = w->Pos.y - 6.0f;
+    }
+    char line[96];
+    FlightHintText(g_qbLang == 0, line, sizeof(line));
+    ImGui::SetNextWindowPos(ImVec2(right, bottom), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+    ImGui::SetNextWindowBgAlpha(0.45f);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
+                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
+                             ImGuiWindowFlags_NoSavedSettings;
+    if (ImGui::Begin("##TruFlightHint", nullptr, flags))
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.47f, 1.0f), "%s", line);
+    ImGui::End();
+}
+// ---- end of 0.21.6 flight hint ----
+
 void Render(IDirect3DDevice9 *device) {
     // front end / loading: if the game has not polled the pad slot for 250 ms, read the pad here (toggle +
     // navigation) and run queued requests from this hook (the game's Present call)
@@ -27508,7 +28126,8 @@ void Render(IDirect3DDevice9 *device) {
     KeyboardToggle();
     RadialTick();                                // 0.10 radial menu: key / mouse hold, the open ring's input
     QuickTick();                                 // 0.17 quick-toggle bar: the open bar's D-pad / LB / RB (0.21.3: X / Y)
-    OnCineTick();                                // 0.17 shot.oncine: shot pairs at a cutscene start (every 50 ms)
+    QbCosTick();                                 // 0.21.6 page Kostueme: the choice row's switch after 0.5 s still
+    OnCineTick();                               // 0.17 shot.oncine: shot pairs at a cutscene start (every 50 ms)
     MouseTick();                                 // 0.7: hold / release the game's cursor calls with the menu
     PauseTick();                                 // 0.7.1 [Menu] PauseGame
     AutoStartTick();                             // 0.7.1 [Test] AutoStart
@@ -27520,6 +28139,11 @@ void Render(IDirect3DDevice9 *device) {
     // run 224047, 22:47:45-53, an empty line every 100 ms); the close writes the input summary
     static bool wasOpen = false;
     static bool clearKeys = false;
+    static bool qcWas = false;                   // 0.21.6: the quick command line's open / close releases them too
+    if ((g_qcOpen != 0) != qcWas) {
+        qcWas = g_qcOpen != 0;
+        clearKeys = true;
+    }
     bool openNow = g_menuOpen != 0;
     if (openNow != wasOpen) {
         wasOpen = openNow;
@@ -27538,8 +28162,9 @@ void Render(IDirect3DDevice9 *device) {
     // 0.15: DvAnyOn() added - in 0.14 a debug view layer drew only while the menu / ring was open (or labels / markup on)
     const bool quickDraw = QuickWantsDraw();     // 0.17
     if (!quickDraw) g_qbRect = {0, 0, 0, 0};
+    const bool flightHint = FlightHintWanted();  // 0.21.6
     if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_lblOn && !g_radOpen &&
-        !flowDraw && !DvAnyOn() && !quickDraw && !g_snOn && !ArWantsDraw())   // 0.21: + spider pictures
+        !flowDraw && !DvAnyOn() && !quickDraw && !g_snOn && !ArWantsDraw() && !flightHint)   // 0.21: + spider pictures
         return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
@@ -27581,11 +28206,13 @@ void Render(IDirect3DDevice9 *device) {
     if (DvAnyOn()) DrawDebugView();              // 0.14 debug view (background draw list)
     if (g_dvOn[kDvLegend]) DrawDebugLegend();    // 0.14 legend (foreground, top right)
     if (quickDraw) DrawQuick();                  // 0.17 quick-toggle bar (foreground, left edge)
+    if (quickDraw && g_qcOpen && !g_menuOpen) DrawQuickCmd();   // 0.21.6 quick command line (right of the bar)
     if (g_overlay) DrawOverlay();
     if (g_logOverlay) DrawLogOverlay();
     if (g_guardOverlay) DrawGuardOverlay();
     if (g_snOn) DrawSoundList();                 // 0.20.1 sound list ([Sound] Position, default bottom left)
     if (flowDraw) DrawFlowOverlay();             // 0.11
+    if (flightHint) DrawFlightHint();            // 0.21.6: after the sound list / flow line (it keeps above them)
     if (g_menuOpen) DrawMenu();
     if (g_menuOpen) TraceEnd();
     if (g_radOpen && !g_menuOpen) DrawRadial();  // 0.10: foreground draw list, no ImGui window
@@ -27795,6 +28422,7 @@ void ReadOptions(const char *dir) {
     g_flightSpeed = static_cast<float>(atof(text));
     if (!(g_flightSpeed > 0.0f && g_flightSpeed < 1000.0f))
         g_flightSpeed = static_cast<float>(atof(OptDefault("Cheat", "FlightSpeed")));
+    g_flightHint = OptInt(ini, "Cheat", "FlightHint") != 0 ? 1 : 0;   // 0.21.6
     OptString(ini, "Levels", "List", g_levelList, sizeof(g_levelList));
     strncpy_s(g_iniPath, sizeof(g_iniPath), ini, _TRUNCATE);
     OptString(ini, "Favorites", "Ids", g_favs, sizeof(g_favs));
@@ -28436,6 +29064,7 @@ extern "C" __declspec(dllexport) DWORD __cdecl TruMenuPadBlock(DWORD pad) {
     DWORD out = 0;
     if ((g_blockInput && menu) || ring || g_swallow[pad] || g_holdPending[pad] || g_radSwallow) out = 0xFFFF;
     if (bar) out |= kQbOwn;
+    if (bar) out |= static_cast<DWORD>(g_cmdFocusButton | (g_qcOpen ? kQcOwn : 0));   // 0.21.6 quick command line
     out |= static_cast<DWORD>(g_qbPad[pad].owned | g_qbPad[pad].gated);
     out &= 0xFFFF;
     if (menu) out |= 1u << 16;

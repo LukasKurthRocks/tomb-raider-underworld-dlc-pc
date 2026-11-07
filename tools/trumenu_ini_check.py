@@ -217,7 +217,16 @@ QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'chea
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
-QB_PAGES_MAX = 15                            # 0.21: + Koop; 0.21.1: + Favoriten / Zuletzt, Tests; 0.21.5: + Render-Details, Fixes
+QB_PAGES_MAX = 16                            # 0.21: + Koop; 0.21.1: + Favoriten / Zuletzt, Tests; 0.21.5: + Render-Details, Fixes;
+                                             # 0.21.6: + Kostueme (= g_qbRow[16], the limit)
+# 0.21.6 (2026-11-07): bar page Kostueme, flight key line ([Cheat] FlightHint), quick command line
+Q216_COS_NAMES = ('Classic Lara', 'Blue Bikini', 'Black and White Bikini', 'Red Bikini', 'Camo Bikini', 'Casual Explorer',
+                  'Grey Jungle Shorts', 'Legend Lara', 'Bright Blue Bikini', 'Gold Bikini', 'Red Drysuit',
+                  'Fashion Winner', "People's Choice", 'Grey Jungle Shorts', 'Grey Jungle Shorts', 'Blue Wetsuit')
+Q216_COS_ITEMS = ('costume.set', 'costume.next', 'costume.choosereload')   # the only items the page runs
+Q216_SETTLE = (300, 1000)                   # kCosSettleMs: "about 0.5 s" (owner / coordinator spec)
+Q216_TOGGLE_ITEMS = ('nav.draw', 'dbg.flatpass', 'dbg.show', 'ai.dumb')   # "<item> <one word>" flips a flag
+Q216_EXEC = ('InvokeCore(', 'CmdExecute(', 'QueueItem(', 'InvokeItem(', 'QbRun(', 'RunPending(', 'ShortcutStart(')
 # 0.19 dumb AI: the items, the presets (kAiPresets + "filter"), the [AI] keys
 Q19_ITEMS = {'ai.dumb': 'action', 'ai.mode': 'action', 'ai.noinvestigate': 'bool', 'ai.noattack': 'bool',
              'ai.status': 'info'}
@@ -868,6 +877,10 @@ def check_quick(ini_path, radial_path):
                 reach.add(arg)
             elif item == 'ai.dumb':          # 0.19: "ai.dumb <preset>" (the bar adds 0 / 1)
                 if arg not in AI_SETTINGS: problems.append(where + ': ai.dumb needs one of %s' % ' / '.join(AI_SETTINGS))
+            elif item == 'nav.draw':         # 0.21.6: "nav.draw <switch>" (RadialOn: the switch byte)
+                if arg not in nav_switches(src): problems.append(where + ': nav.draw needs a switch of kNavSwitches')
+            elif item == 'dbg.flatpass':     # 0.21.6: "dbg.flatpass <pass>" (RadialOn: the pass bit)
+                if arg not in RM_PASSES: problems.append(where + ': dbg.flatpass needs one of %s' % ' / '.join(RM_PASSES))
             elif items[item] != 'bool' or arg: problems.append(where + ': a bool row needs a bool item without argument')
         elif kind == 'kQbValue' and item not in QB_VALUE_ITEMS:
             problems.append(where + ': a value row needs one of %s' % ', '.join(QB_VALUE_ITEMS))
@@ -1929,6 +1942,183 @@ def check_0215(radial_path, switches_path):
                      'rows' % (summary, len(entries))
 
 
+def check_0216(ini_path):
+    """0.21.6 (2026-11-07 TruMenu 0.21.6): bar page Kostueme (own page after Lara, page limit 16 / row limit 64; rows from
+    the cycle list and the player records, the current costume marked, refused without a level; the choice row switches
+    only after kCosSettleMs without a new step, wraps, X = now; Y refused; the only items costume.set / .next /
+    .choosereload), the flight key line ([Cheat] FlightHint 0 / 1 default 1, drawn only while flight is on + menu closed +
+    the INI switch on, above the bottom-right sound list / flow line, the same text as footer / tooltip) and the quick
+    command line (L3 alone, not as part of L3 + R3; one command path = CmdRunLine only; keys held from the game)"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    if not src.startswith('//') or 'const char *const kVersion = "TruMenu 0.21.6 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.21.6 ("')
+    # [Cheat] FlightHint
+    opts = {(s, k): d for s, k, d, c in table(src)[1]}
+    if opts.get(('Cheat', 'FlightHint')) != '1':
+        problems.append('TruMenu.cpp: kOpts [Cheat] FlightHint missing or default not 1')
+    found = [(n, v) for n, k, v in ini_section(ini_path, 'Cheat') if k == 'FlightHint']
+    if len(found) != 1: problems.append('%s: [Cheat] FlightHint missing' % name)
+    elif found[0][1] not in ('0', '1'): problems.append('%s:%d: [Cheat] FlightHint=%s (0 / 1)' % ((name,) + found[0]))
+    if 'g_flightHint = OptInt(ini, "Cheat", "FlightHint")' not in src:
+        problems.append('TruMenu.cpp: [Cheat] FlightHint is never read (g_flightHint = OptInt(...))')
+    # pages / rows
+    block = src[src.index('const QbPage kQbPages[] = {'):]
+    block = block[:block.index('\n};')]
+    order = re.findall(r'(?:QB_PAGE\("([^"]*)", "[^"]*", (kQb[A-Za-z]+), (kQs[A-Za-z]+)\)|\{"([^"]*)", "[^"]*", nullptr, 0, '
+                       r'(kQs[A-Za-z]+)\})', block)
+    pages = [(a or d, b or None, c or e) for a, b, c, d, e in order]
+    if len(pages) > 16: problems.append('TruMenu.cpp: kQbPages has %d pages - g_qbRow holds 16' % len(pages))
+    specials = [p[2] for p in pages]
+    if specials.count('kQsCostume') != 1:
+        problems.append('TruMenu.cpp: kQbPages needs exactly one page Kostueme (kQsCostume), found %d'
+                        % specials.count('kQsCostume'))
+    elif pages[specials.index('kQsCostume') - 1][1] != 'kQbLara':
+        problems.append('TruMenu.cpp: page Kostueme must follow page Lara')
+    if 'static_assert(kQbPageN <= 16' not in src or 'const int kQbViewMax = 64;' not in src:
+        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= 16, kQbViewMax 64) changed')
+    sec = src[src.find('// ---- 0.21.6 costumes'):src.find('// ---- end of 0.21.6 costumes')]
+    if len(sec) < 100: problems.append('TruMenu.cpp: section "0.21.6 costumes" missing')
+    m = re.search(r'const DWORD kCosSettleMs = (\d+);', sec)
+    if not m or not Q216_SETTLE[0] <= int(m.group(1)) <= Q216_SETTLE[1]:
+        problems.append('TruMenu.cpp: kCosSettleMs must be %d .. %d ms (the choice row waits about 0.5 s)' % Q216_SETTLE)
+    mn = re.search(r'kCosSlotNames\[16\] = \{(.*?)\};', sec, re.S)
+    names = tuple(x.replace('\\"', '"') for x in re.findall(r'"((?:[^"\\]|\\.)*)"', mn.group(1))) if mn else ()
+    if names != Q216_COS_NAMES:
+        problems.append('TruMenu.cpp: kCosSlotNames differ from the game texts (PC locals 83 + slot, '
+                        'work/rebuild/costumes_0311/logs/check_names.txt)')
+    names_log = os.path.join(ROOT, 'work', 'rebuild', 'costumes_0311', 'logs', 'check_names.txt')
+    if os.path.isfile(names_log):              # the measured texts (the log is local work data, not in the repository)
+        log = dict(re.findall(r"^slot ([a-p]) xbox \d+ -> pc \d+ b['\"](.*?)['\"]\s", open(names_log, encoding='utf-8',
+                                                                                          errors='replace').read(), re.M))
+        for i, want in enumerate(Q216_COS_NAMES):
+            got = log.get(chr(97 + i))
+            if got is not None and got != want:
+                problems.append('Q216_COS_NAMES slot %s "%s" != check_names.txt "%s"' % (chr(97 + i), want, got))
+    refresh = fn_body(src, 'void CosRefresh(')
+    for need in ('GlobalCostumes(g_cos.ids, 128)', 'TypeRecord(', 'ObjectId(', 'ReadDword(kCostumeNow'):
+        if need not in refresh: problems.append('TruMenu.cpp: CosRefresh must read %s (the long menu\'s data)' % need)
+    rows = fn_body(src, 'int QbCosRows(')
+    for need in ('CosRefresh();', 'add(kQdCosPick', 'add(kQdCosNext', 'add(kQdCosRec', 'add(kQdCosGroup', 'add(kQdCos, g_cos.ids[i])',
+                 'static_cast<DWORD>(g_cos.ids[i]) == g_cos.now', 'g_cos.listOpen && i < listN && n < max'):
+        if need not in rows: problems.append('TruMenu.cpp: QbCosRows lacks %s (rows from the list, current marked, '
+                                             'limit)' % need)
+    why = fn_body(src, 'const char *CosWhy(')
+    if '!InLevel()' not in why or '!g_experimental' not in why:
+        problems.append('TruMenu.cpp: CosWhy must refuse without a level / with Experimental=0 (the long menu\'s rule)')
+    act = fn_body(src, 'void QbCosAct(')
+    cases = dict(re.findall(r'case (kQdCos[A-Za-z]*): \{?(.*?)(?=\n    case |\n    default:)', act, re.S))
+    pick = cases.get('kQdCosPick', '')
+    i_why, i_x, i_step = pick.find('CosWhy(true'), pick.find('if (x)'), pick.find('CosStep(')
+    if not (0 <= i_why < i_x < i_step):
+        problems.append('TruMenu.cpp: QbCosAct kQdCosPick: CosWhy first, then X (= now), then the step')
+    else:
+        step = pick[i_step:]
+        if 'g_cos.pending = true' not in step or 'CosApply(' in step or 'QbRun(' in step:
+            problems.append('TruMenu.cpp: QbCosAct: a left / right step must only pick (pending) - the switch belongs to '
+                            'QbCosTick after kCosSettleMs (no switch on every step)')
+        if 'CosApply(shown)' not in pick[i_x:i_step]: problems.append('TruMenu.cpp: QbCosAct: X must apply the shown entry')
+    for case, rule in (('kQdCos', 'CosWhy(true'), ('kQdCosRec', 'CosWhy(false')):
+        body = cases.get(case, '')
+        run = max(body.find('CosApply('), body.find('QbRun('))
+        if not (0 <= body.find(rule) < body.find('if (why[0]) {') < run):
+            problems.append('TruMenu.cpp: QbCosAct %s must check %s and refuse before it runs' % (case, rule))
+    if 'QbConfirm(' not in cases.get('kQdCosRec', ''):
+        problems.append('TruMenu.cpp: QbCosAct kQdCosRec (reloads the unit) must confirm (QbConfirm)')
+    tick = fn_body(src, 'void QbCosTick(')
+    marks = [tick.find(t) for t in ('kCosSettleMs', 'g_cos.pending = false', 'CosWhy(true', 'CosApply(g_cos.pickId)')]
+    if not tick or -1 in marks or marks != sorted(marks):
+        problems.append('TruMenu.cpp: QbCosTick must wait kCosSettleMs, clear the pick, check CosWhy, then CosApply')
+    step = fn_body(src, 'int CosStep(')
+    if '% n' not in step or 'n - 1' not in step:
+        problems.append('TruMenu.cpp: CosStep must wrap at both ends (% n, n - 1)')
+    runs = re.findall(r'QbRun\("Kostueme", [^;]*?"(costume\.[a-z]+)"', sec)
+    if sorted(runs) != ['costume.choosereload', 'costume.set'] or 'kQbCosNext = {"Naechstes Kostuem", "Next costume", ' \
+                                                                  '"costume.next", ""' not in src:
+        problems.append('TruMenu.cpp: page Kostueme must run costume.set (CosApply, once), costume.choosereload and the '
+                        'row kQbCosNext = costume.next - nothing else (got %s)' % runs)
+    items = item_types(src)
+    for item in Q216_COS_ITEMS:
+        if items.get(item) != 'action': problems.append('TruMenu.cpp: item %s missing in kItems' % item)
+    if 'QbCosTick();' not in fn_body(src, 'void Render('):
+        problems.append('TruMenu.cpp: Render must call QbCosTick every frame (the waiting switch also with the bar closed)')
+    if 'kQsCostume' not in fn_body(src, 'void QbFavPin('):
+        problems.append('TruMenu.cpp: QbFavPin must refuse Y on the costume rows (no favourite with an argument)')
+    if 'p.special == kQsCostume) QbSpecialAct(p.special, row - g_qbStaticN, kQbXDir)' not in fn_body(src, 'void QuickTick('):
+        problems.append('TruMenu.cpp: QuickTick: X on page Kostueme must pass kQbXDir')
+    if 'kQsCostume) n = QbCosRows(' not in fn_body(src, 'int QbSpecialBuild('):
+        problems.append('TruMenu.cpp: QbSpecialBuild does not build page Kostueme')
+    # flight key line
+    mw = re.search(r'bool FlightHintWanted\(\) \{ return ([^;]*); \}', src)
+    want = mw.group(1).replace(' ', '') if mw else ''
+    for need in ('g_flightHint', 'g_flight', '!g_menuOpen', 'InLevel()'):
+        if need not in want.split('&&'):
+            problems.append('TruMenu.cpp: FlightHintWanted must be g_flightHint && g_flight && !g_menuOpen && InLevel() '
+                            '(missing %s)' % need)
+    render = fn_body(src, 'void Render(')
+    if 'const bool flightHint = FlightHintWanted();' not in render or '!flightHint)' not in render or \
+            'if (flightHint) DrawFlightHint();' not in render:
+        problems.append('TruMenu.cpp: Render must draw the flight line only when FlightHintWanted()')
+    elif render.find('if (flowDraw) DrawFlowOverlay();') > render.find('if (flightHint) DrawFlightHint();') or \
+            render.find('if (g_snOn) DrawSoundList();') > render.find('if (flightHint) DrawFlightHint();'):
+        problems.append('TruMenu.cpp: the flight line must be drawn after the sound list and the flow line (keeps above)')
+    dh = fn_body(src, 'void DrawFlightHint(')
+    for need in ('"##TruSoundList"', '"##TruMenuFlow"', 'w->Pos.y - 6.0f', 'FlightHintText(g_qbLang == 0'):
+        if need not in dh: problems.append('TruMenu.cpp: DrawFlightHint lacks %s (above the bottom-right windows, the '
+                                           'bar\'s language)' % need)
+    ft = fn_body(src, 'void FlightHintText(')
+    for need in ('RT hoch', 'LT runter', 'Stick bewegt', 'Tempo', 'RT up', 'LT down', 'g_flightSpeed'):
+        if need not in ft: problems.append('TruMenu.cpp: FlightHintText lacks "%s"' % need)
+    if 'FlightHintText(' not in fn_body(src, 'void PageCheat(') or 'cheat.flight' not in fn_body(src, 'bool QbRowHint('):
+        problems.append('TruMenu.cpp: the keys must be the menu flight button\'s tooltip and the bar row\'s hint')
+    # quick command line
+    qc = src[src.find('// ---- 0.21.6 quick command line'):src.find('// ---- end of 0.21.6 quick command line')]
+    if len(qc) < 100: problems.append('TruMenu.cpp: section "0.21.6 quick command line" missing')
+    if qc.count('CmdRunLine(') != 1:
+        problems.append('TruMenu.cpp: the quick command line must run every line through exactly one CmdRunLine call '
+                        '(found %d)' % qc.count('CmdRunLine('))
+    for t in Q216_EXEC:
+        if t in qc: problems.append('TruMenu.cpp: second exec path: the quick command line calls %s (one command path: '
+                                    'CmdRunLine only)' % t)
+    pt = fn_body(src, 'bool QcPadTick(')
+    for need in ('(g_toggleButtons | g_radHold) & ~fb', 'if (down && (buttons & others)) armed = false;',
+                 'QcOpen(false, !g_qbOpen'):
+        if need not in pt: problems.append('TruMenu.cpp: QcPadTick lacks %s (L3 alone only, closes with the bar / menu / '
+                                           'ring)' % need)
+    qt = fn_body(src, 'void QuickTick(')
+    i_qc, i_ret = qt.find('QcPadTick('), qt.find('InterlockedExchange(&g_qbJust, 0)')
+    if not (0 <= i_qc < i_ret) or 'if (qcHasPad) {' not in qt:
+        problems.append('TruMenu.cpp: QuickTick must call QcPadTick before its early return and let the rows wait')
+    if 'g_imguiReady && g_qcOpen && IsKeyMessage(msg)' not in fn_body(src, 'LRESULT CALLBACK WndProcHook(') or \
+            'RadMenuOpen() || g_qcOpen' not in fn_body(src, 'int __fastcall KbdReadHook('):
+        problems.append('TruMenu.cpp: the command line must hold the keys from the game (WndProcHook + KbdReadHook)')
+    if not re.search(r'const WORD kQcOwn = 0x3000;', src) or 'g_cmdFocusButton | (g_qcOpen ? kQcOwn : 0)' not in \
+            fn_body(src, 'WORD QbPad('):
+        problems.append('TruMenu.cpp: QbPad must keep FocusButton (bar open) and A / B (line open) from the game')
+    if 'if (quickDraw && g_qcOpen && !g_menuOpen) DrawQuickCmd();' not in render:
+        problems.append('TruMenu.cpp: Render must draw the command line only with the bar open and the menu closed')
+    # toggle rows (owner live test 20:52): an item that flips a flag per argument has a state function in RadialOn - its
+    # bar rows must be bool rows (an / aus, right on, left off, X toggle), never action rows ("rechts", a blind flip)
+    ron = fn_body(src, 'bool RadialOn(')
+    toggles = 0
+    for tab, de, item, arg, kind, _ in qb_rows(src):
+        if item not in Q216_TOGGLE_ITEMS or not arg or ' ' in arg: continue
+        toggles += 1
+        if kind != 'kQbBool':
+            problems.append('TruMenu.cpp: %s row "%s" (%s %s) flips a flag - toggle rows must be bool rows with a value '
+                            'function (RadialOn), not %s' % (tab, de, item, arg, kind))
+    for item in Q216_TOGGLE_ITEMS:
+        if '!_stricmp(e.id, "%s")' % item not in ron:
+            problems.append('TruMenu.cpp: RadialOn has no state (value function) for the toggle item %s' % item)
+    nn = fn_body(src, 'const char *NavRowNote(')
+    if not nn or 'NavRowNote(r.arg, de)' not in fn_body(src, 'void QbViewOf(') or \
+            any(t in nn for t in ('PutByte(', 'WriteDword(', 'WriteByte(', 'NavSet(')):
+        problems.append('TruMenu.cpp: a nav.draw row that is on but cannot draw needs NavRowNote (read only) in QbViewOf')
+    return problems, 'FlightHint key, page Kostueme after Lara (%d pages), settle %s ms, %d slot names, flight line rule, ' \
+                     'one command path, %d toggle rows all bool' % (len(pages), m.group(1) if m else '?', len(names), toggles)
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -2038,6 +2228,10 @@ def main(argv):
     for p in fproblems5: print('Q0215 %s' % p)
     if not fproblems5: print('ok: 0.21.5 Fixes + frozen ring: %s' % fsummary5)
     problems += fproblems5
+    gproblems6, gsummary6 = check_0216(ini_path)   # 0.21.6
+    for p in gproblems6: print('Q0216 %s' % p)
+    if not gproblems6: print('ok: 0.21.6 costumes / flight line / quick command line: %s' % gsummary6)
+    problems += gproblems6
     nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)

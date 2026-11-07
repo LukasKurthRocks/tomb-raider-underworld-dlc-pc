@@ -106,6 +106,16 @@ Usage (from the repository root):
 0.21.5 (2026-11-07 Fixes + frozen ring): switches (SwNext / RunSwSet: bool / int / choice steps, X toggle / wrap,
 listed key, type, INI exists, unchanged = no write, live / restart / live-if), swfold (one group open at a time,
 largest page <= 64 rows), ringparity (every ring entry of the shipped file is a bar row, ring frozen at 172).
+0.21.6 (2026-11-07 costumes / flight line / quick command line): cosbar (QbCosRows: 4 rows + the open list from the
+cycle list, the current costume marked, every row refused without a level, labels "<slot> <text> (<object>)" only for
+dlc_costume_a..p, records only with an object id; page / row limits: own page <= 64 rows for any list up to 60, the
+Lara page would overflow, 16 pages), cosdebounce (QbCosAct / QbCosTick: a step only picks, the switch runs once the
+pick stood 0.5 s - tapping / holding switches once; X = now; wraps at both ends; the negative model "switch on every
+step" is caught), flighthint (FlightHintWanted truth table, the line above the bottom-right windows, never overlapping),
+quickcmd (QcPadTick: L3 alone toggles, L3 + R3 / ring hold never, bar / menu / ring close it, A runs once per press,
+B closes, D-pad history = the menu bar's walk, 4 answers newest first, one run path), togglerows (the pass / Navmesh
+rows are bool rows: right = on, left = off, X flips; NavRowNote's "(Ebene fehlt)" / "(nur mit Flaechen)" rule; every
+shipped toggle row is a bool row).
 """
 import itertools, math, random, sys
 
@@ -2278,6 +2288,287 @@ def check_ringparity():
     return good
 
 
+# ---- 0.21.6 page Kostueme, flight line, quick command line ----
+def cos_label(obj, slots):                    # CosLabelOf
+    p = 'dlc_costume_'
+    if obj[:len(p)].lower() == p and len(obj) == len(p) + 1 and 'a' <= obj[-1] <= 'p':
+        return '%s %s (%s)' % (obj[-1], slots[ord(obj[-1]) - 97], obj)
+    return obj
+
+
+def cos_why(level, experimental=True, code=True):   # CosWhy
+    if not experimental: return 'Experimental=0'
+    if not code: return 'code check failed'
+    return '' if level else 'needs a level'
+
+
+def cos_rows(ids, now, list_open, level, max_rows=64):   # QbCosRows: [(kind, id, marked, why)]
+    why = cos_why(level)
+    rows = [('pick', now, True, why), ('next', 0, False, why), ('rec', 0, False, why), ('group', 0, False, '')]
+    for i in ids if list_open else ():
+        if len(rows) >= max_rows: break
+        rows.append(('cos', i, i == now, why))
+    return rows
+
+
+def cos_records(records, names):            # CosRefresh: player records whose name is in the object list
+    return [(i, names[n]) for i, (n, player) in enumerate(records) if player and names.get(n, 0)]
+
+
+def check_cosbar():
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import trumenu_ini_check as c
+    slots = c.Q216_COS_NAMES
+    good = len(slots) == 16
+    ids = list(range(100, 136))                # a cycle list of 36 (the size of the player records)
+    closed = cos_rows(ids, 105, False, True)
+    good &= len(closed) == 4 and [r[0] for r in closed] == ['pick', 'next', 'rec', 'group']
+    opened = cos_rows(ids, 105, True, True)
+    good &= len(opened) == 40 and [r[1] for r in opened[4:]] == ids
+    good &= [r[1] for r in opened if r[0] == 'cos' and r[2]] == [105]          # exactly the current one marked
+    good &= cos_rows(ids, 999, True, True)[0][2] and not any(r[2] for r in cos_rows(ids, 999, True, True)[4:])
+    nolevel = cos_rows(ids, 105, True, False)
+    good &= all(r[3] == 'needs a level' for r in nolevel if r[0] != 'group')   # every row refuses with the reason
+    good &= cos_why(True, experimental=False) == 'Experimental=0' and cos_why(True, code=False) == 'code check failed'
+    good &= cos_label('dlc_costume_f', slots) == 'f Casual Explorer (dlc_costume_f)'
+    good &= cos_label('dlc_costume_m', slots) == "m People's Choice (dlc_costume_m)"
+    good &= all(cos_label(o, slots) == o for o in ('lara_casual', 'dlc_doppel_costume_a', 'doppelganger_casual',
+                                                     'dlc_costume_q', 'dlc_costume_ff'))   # no mapping known: the name
+    recs = cos_records([('lara', True), ('x', False), ('lara_bikini', True), ('dlc_costume_d', True)],
+                       {'lara': 7, 'lara_bikini': 8, 'x': 9})
+    good &= recs == [(0, 7), (2, 8)]          # not a player record / not in the object list (d never built): left out
+    # limits: own page 4 + N <= 64 up to N = 60 (cut beyond, the head says so); the Lara page would be 15 static rows +
+    # 8 positions + 4 + N - over 64 from N = 38 on (TruDlc2Player's 37th record is already close)
+    good &= all(len(cos_rows(list(range(n)), 0, True, True)) == min(4 + n, 64) for n in range(0, 129))
+    lara_first_over = min(n for n in range(200) if 15 + 8 + 4 + n > 64)
+    src = open(c.CPP, encoding='utf-8').read()
+    block = src[src.index('const QbPage kQbPages[] = {'):]
+    pages = block[:block.index('\n};')].count('\n    ')
+    good &= pages == 16 and lara_first_over == 38
+    print('cosbar: 4 rows + the open list (36 -> 40 rows), only the current one marked, no level = every row refused, '
+          'labels for dlc_costume_a..p only, records with an object id; own page <= 64 rows (list cut after 60), Lara '
+          'page over 64 from N = %d, %d pages  %s' % (lara_first_over, pages, 'ok' if good else 'FAIL'))
+    return good
+
+
+def cos_step(i, d, n):                        # CosStep
+    if n <= 0: return -1
+    if i < 0 or i >= n: return n - 1 if d < 0 else 0
+    return (i + (n - 1 if d < 0 else 1)) % n
+
+
+def cos_sim(events, n, start, settle=500, debounce=True, end=3000):
+    """QbCosAct / QbCosTick at 60 fps: events = [(ms, 'L' | 'R' | 'X')]; returns the switches [(ms, index)]"""
+    now, pick, pending, tick, out = start, None, False, 0, []
+    ev = sorted(events)
+
+    def apply(t, i):
+        nonlocal now
+        if i != now:                          # CosApply: the costume worn already = nothing
+            out.append((t, i))
+            now = i
+    for t in range(0, end, 16):
+        while ev and ev[0][0] <= t:
+            _, k = ev.pop(0)
+            shown = pick if pending else now
+            if k == 'X':
+                pending = False
+                apply(t, shown)
+                continue
+            pick, pending, tick = cos_step(shown, -1 if k == 'L' else 1, n), True, t
+            if not debounce:                  # the negative model: a switch on every step
+                pending = False
+                apply(t, pick)
+        if pending and t - tick >= settle:
+            pending = False
+            apply(t, pick)
+    return out
+
+
+def burst_ok(events, switches, settle=500):   # the owner's rule: one switch per burst of steps (gaps < settle)
+    steps = sorted(t for t, k in events if k != 'X')
+    bursts = 1 + sum(1 for a, b in zip(steps, steps[1:]) if b - a >= settle) if steps else 0
+    return len(switches) <= bursts
+
+
+def check_cosdebounce():
+    good = True
+    taps = [(100 * k, 'R') for k in range(5)]                     # 5 quick taps
+    s = cos_sim(taps, 10, 0)
+    good &= len(s) == 1 and s[0][1] == 5 and 900 <= s[0][0] <= 920 and burst_ok(taps, s)
+    held = [(0, 'R')] + [(400 + 120 * k, 'R') for k in range(9)]   # held right: QuickTick repeat 400 / 120 ms
+    s = cos_sim(held, 36, 3)
+    good &= len(s) == 1 and s[0][1] == 13 and burst_ok(held, s)
+    two = [(0, 'R'), (700, 'R')]
+    good &= [i for _, i in cos_sim(two, 10, 0)] == [1, 2]
+    good &= cos_sim([(0, 'R')], 10, 9) [0][1] == 0 and cos_sim([(0, 'L')], 10, 0)[0][1] == 9   # wraps at both ends
+    good &= cos_step(-1, 1, 10) == 0 and cos_step(-1, -1, 10) == 9 and cos_step(3, 1, 0) == -1
+    x = cos_sim([(0, 'L'), (50, 'X')], 10, 4)
+    good &= x == [(64, 3)]                    # X = at once, no second switch later
+    circle = [(60 * k, 'R') for k in range(10)]
+    good &= cos_sim(circle, 10, 2) == []      # all the way round: back on the worn one, nothing runs
+    bad = cos_sim(taps, 10, 0, debounce=False)
+    caught = len(bad) == 5 and not burst_ok(taps, bad)
+    good &= caught
+    print('cosdebounce: 5 taps / a held right switch once 0.5 s after the last step, two steps 0.7 s apart twice, wraps '
+          'at both ends, X at once, full circle = nothing; negative model (switch on every step: %d switches) caught  %s'
+          % (len(bad), 'ok' if good else 'FAIL'))
+    return good
+
+
+def hint_wanted(ini, flight, menu, level):   # FlightHintWanted
+    return bool(ini and flight and not menu and level)
+
+
+def hint_bottom(w, h, windows):              # DrawFlightHint: above the bottom-right windows of this frame
+    bottom = h - 10.0
+    for x0, y0, x1, y1 in windows:
+        if x1 < w * 0.5 or y1 < h * 0.5: continue
+        bottom = min(bottom, y0 - 6.0)
+    return bottom
+
+
+def check_flighthint(rng):
+    combos = [c for c in itertools.product((0, 1), repeat=4) if hint_wanted(*c)]
+    good = combos == [(1, 1, 0, 1)]
+    w, h, line = 1920.0, 1080.0, 22.0
+    for _ in range(2000):
+        wins = []
+        for _ in range(rng.randint(0, 2)):    # sound list / flow line in a random corner, random size
+            ww, wh = rng.uniform(100, 900), rng.uniform(20, 700)
+            right, low = rng.random() < 0.6, rng.random() < 0.6
+            x0 = w - 10 - ww if right else 10.0
+            y0 = h - 10 - wh if low else 10.0
+            wins.append((x0, y0, x0 + ww, y0 + wh))
+        b = hint_bottom(w, h, wins)
+        top = b - line
+        for x0, y0, x1, y1 in wins:
+            if x1 >= w * 0.5 and y1 >= h * 0.5: good &= b <= y0 - 6.0 and not (top < y1 and b > y0)
+    print('flighthint: shown only with FlightHint=1 + flight on + menu closed + a level (1 of 16 cases); 2000 random '
+          'corner layouts: the line never overlaps a bottom-right window  %s' % ('ok' if good else 'FAIL'))
+    return good
+
+
+QC_PAD = (0x0040, 0x0080, 0x1000, 0x2000, 0x0001, 0x0002)   # L3, R3, A, B, D-pad up, down
+
+
+def qc_sim(frames, toggle=0x00C0, hold=0x00C0, fb=0x0040):
+    """QcPadTick: frames = [(buttons, blocked)]; returns the events"""
+    _, _, A_, B_, UP, DOWN = QC_PAD
+    prev, armed, open_, ev = 0, False, False, []
+    for buttons, blocked in frames:
+        edges = buttons & ~prev
+        prev = buttons
+        if blocked:
+            armed = False
+            if open_: ev.append('close')
+            open_ = False
+            continue
+        others = (toggle | hold) & ~fb
+        down = (buttons & fb) == fb
+        if down and edges & fb: armed = True
+        if down and buttons & others: armed = False
+        if not down and armed:
+            armed = False
+            open_ = not open_
+            ev.append('open' if open_ else 'close')
+            continue
+        if not down: armed = False
+        if not open_: continue
+        if edges & B_:
+            open_ = False
+            ev.append('close')
+            continue
+        if edges & A_: ev.append('run')
+        if edges & UP: ev.append('up')
+        if edges & DOWN: ev.append('down')
+    return ev
+
+
+def qc_history(hist, pos, up):               # QcHistory: (new pos, text)
+    count = len(hist)
+    pos = count - 1 if pos >= count else pos
+    if up: pos = count - 1 if pos < 0 else pos - 1 if pos > 0 else 0
+    else: pos = -1 if pos < 0 or pos + 1 >= count else pos + 1
+    return pos, hist[pos] if pos >= 0 else ''
+
+
+def check_quickcmd():
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import trumenu_ini_check as c
+    L3, R3, A_, B_, UP, DOWN = QC_PAD
+    f = lambda *b: [(x, False) for x in b]
+    good = qc_sim(f(L3, 0)) == ['open'] and qc_sim(f(L3, 0, L3, 0)) == ['open', 'close']
+    good &= qc_sim(f(L3, L3 | R3, R3, 0)) == [] and qc_sim(f(R3, L3 | R3, L3, 0)) == []   # L3 + R3 = menu / ring
+    good &= qc_sim(f(L3, L3 | R3, L3, 0)) == []                   # R3 released first: still not a lone L3
+    good &= qc_sim([(L3, False), (L3, True), (0, False)]) == []   # the menu opened while L3 was held
+    good &= qc_sim(f(L3, 0) + [(0, True)]) == ['open', 'close']   # bar closed / menu / ring = closed
+    good &= qc_sim(f(L3, 0, A_, A_, A_, 0, A_, 0)) == ['open', 'run', 'run']   # one run per press
+    good &= qc_sim(f(L3, 0, B_, 0, A_, 0)) == ['open', 'close']   # B closes, A then belongs to the game again
+    good &= qc_sim(f(L3, 0, UP, 0, UP, DOWN)) == ['open', 'up', 'up', 'down']
+    good &= qc_sim(f(A_, 0, UP, 0)) == []                          # closed: A / D-pad are not the line's
+    hist, pos, seen = ['a', 'b', 'c'], -1, []
+    for up in (True, True, True, True, False, False, False, False):
+        pos, t = qc_history(hist, pos, up)
+        seen.append(t)
+    good &= seen == ['c', 'b', 'a', 'a', 'b', 'c', '', '']
+    good &= qc_history([], -1, True) == (-1, '')
+    outs = []
+    for k in range(6):                        # QcRun: the last 4 answers, newest first
+        outs = ([k] + outs)[:4]
+    good &= outs == [5, 4, 3, 2]
+    src = open(c.CPP, encoding='utf-8').read()
+    sec = src[src.find('// ---- 0.21.6 quick command line'):src.find('// ---- end of 0.21.6 quick command line')]
+    good &= sec.count('CmdRunLine(') == 1 and not any(t in sec for t in c.Q216_EXEC)
+    print('quickcmd: L3 alone opens / closes, L3 + R3 (either order) never, menu / bar close it, A runs once per press, '
+          'B closes, D-pad = history (the menu bar\'s walk), 4 answers newest first, one run path (CmdRunLine)  %s'
+          % ('ok' if good else 'FAIL'))
+    return good
+
+
+def tog_press(flag, kind, key):               # QbActRow / QbExecRow on a toggle row: (new flag, written?)
+    if kind == 'action': return (not flag, True)   # 0.21.5: every right press flipped it blind ("rechts")
+    want = (not flag) if key == 'X' else key == 'R'
+    return (want, True) if want != flag else (flag, False)
+
+
+def nav_note(kind, on, areas_on, mask, bits):   # NavRowNote
+    if not on or kind > 1: return ''
+    if kind == 1 and not areas_on: return '(nur mit Flaechen)'
+    if not mask or (bits and not mask & bits): return '(Ebene fehlt)'
+    return ''
+
+
+def check_togglerows():
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import trumenu_ini_check as c
+    good = True
+    f, w = False, 0                            # bool row: right twice = on once, left = off, X flips
+    for key in ('R', 'R', 'L', 'L', 'X', 'X'):
+        f, wrote = tog_press(f, 'bool', key)
+        w += wrote
+    good &= f is False and w == 4
+    f, _ = tog_press(False, 'action', 'R')
+    f, _ = tog_press(f, 'action', 'R')
+    good &= f is False                        # the old action row: two "right = on" presses ended off
+    good &= nav_note(0, True, True, 0x1, 0x2) == '(Ebene fehlt)' and nav_note(0, True, True, 0, 0x2) == '(Ebene fehlt)'
+    good &= nav_note(0, True, True, 0x3, 0x2) == '' and nav_note(0, True, True, 0x1, 0) == ''   # no graph: no claim
+    good &= nav_note(1, True, False, 0x3, 0x2) == '(nur mit Flaechen)' and nav_note(2, True, True, 0, 0x2) == ''
+    good &= nav_note(0, False, True, 0, 0x2) == ''                             # off: nothing to say
+    src = open(c.CPP, encoding='utf-8').read()
+    rows = [r for r in c.qb_rows(src) if r[2] in c.Q216_TOGGLE_ITEMS and r[3] and ' ' not in r[3]]
+    nav = [r for r in rows if r[2] in ('nav.draw', 'dbg.flatpass')]
+    good &= len(nav) == 14 and all(r[4] == 'kQbBool' for r in rows)
+    print('togglerows: bool rows right = on (no second write), left = off, X flips (the old action row ended off after '
+          'two rights); NavRowNote "(Ebene fehlt)" only with a graph layer outside the mask, "(nur mit Flaechen)" for '
+          'the area-loop switches; shipped bar: %d toggle rows all bool (%d nav.draw / dbg.flatpass)  %s'
+          % (len(rows), len(nav), 'ok' if good else 'FAIL'))
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -2290,7 +2581,9 @@ def main():
                check_padchain(), check_padblock(),                                    # 0.21.2 / TruShadowPower 0.19
                check_xyfav(), check_xyexec(), check_footer(), check_sndwidth(),       # 0.21.3
                check_h2drift(), check_fixhall02(), check_scriptval(rng),              # 0.21.4
-               check_switches(), check_swfold(), check_ringparity()]                  # 0.21.5
+               check_switches(), check_swfold(), check_ringparity(),                  # 0.21.5
+               check_cosbar(), check_cosdebounce(), check_flighthint(rng), check_quickcmd(),   # 0.21.6
+               check_togglerows()]
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 
