@@ -63,6 +63,8 @@ work/trypo_0711/
 work/m0211_0711/
 work/datafix_0711/
 work/tu_k9k11_0711/
+work/reloadcrash_0711/
+work/padchain_0711/
 # local profile archives (moved out of the repository folder, never committed)
 tests/profiles/archive_0311/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report
