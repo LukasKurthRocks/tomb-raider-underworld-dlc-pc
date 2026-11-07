@@ -56,6 +56,11 @@ work/sp017_0611/
 TruMenu.arachno*.png
 work/coop_0611/
 work/sndgroups_0611/
+# 2026-11-07: hall02 wall, ChunkDoll crash, trypophobia, TruMenu 0.21.1 scratch
+work/hall02wall_0711/
+work/chunkdoll_0711/
+work/trypo_0711/
+work/m0211_0711/
 # local profile archives (moved out of the repository folder, never committed)
 tests/profiles/archive_0311/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report
