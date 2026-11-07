@@ -50,9 +50,10 @@ $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # 2026-11-02; 0.10 = look screen effect (work\asi\v10), 0.11 = GlobalParams[7] / state 2102 / meter API v2
 # (work\asi\v11), 2026-11-03; 0.12 - 0.16 (work\asi\v12 .. v16), 2026-11-03 .. 2026-11-06; 0.16 shipped the
 # unchanged 0.15 sample .ini; 0.17 LB / RB only as the game gets them, [ShadowPower] MenuInput (work\asi\v17,
-# 2026-11-06); 0.18 K11 adrenaline (work\asi\v18, 2026-11-07)) - recognised as ours for update / removal. The current
-# build 0.19 (TruMenu's TruMenuPadBlock instead of the pad-chain re-wrap, work\asi\v19, 2026-11-07) ships a new sample
-# .ini (comment of MenuInput only).
+# 2026-11-06); 0.18 K11 adrenaline (work\asi\v18, 2026-11-07); 0.19 TruMenu's TruMenuPadBlock instead of the pad-chain
+# re-wrap (work\asi\v19, 2026-11-07, new sample .ini: comment of MenuInput)) - recognised as ours for update / removal.
+# The current build 0.20 ([Look] CameraFlag default 1 = TU, camera reader checked, work\asi\v20, 2026-11-07) ships a
+# new sample .ini (CameraFlag=1).
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
@@ -72,7 +73,8 @@ $earlierBuilds = @{
                              'b0432e31f71cd3ab9b4cdcfa7ab3ecc69d86155f2fea4f7c2da53f13b4ed42ab',   # 0.15 cloth TU time step (work\asi\v15)
                              '1dbf267a5f8cbe048e9e0c16990486b4f594fb28d698e614ad6606e8c6609732',   # 0.16 tick only with a player in a level (work\asi\v16, md5 9eec75eb04b71601b2d74d1468050801)
                              '0229e49c771a8f55c2e19ef8617648a1a8887c1f85554b1d52b849f3e2ce11ff',   # 0.17 LB / RB only as the game gets them (work\asi\v17, md5 f01010291dfe09ff325a6e8ab40be834)
-                             'fc56e3b72d7cb2a0dcf7b9a3a512b9e3595198853304f14c2e2d11a3d57c4b0f')   # 0.18 K11 adrenaline (work\asi\v18, md5 0ee7c5fca49716f2637ade50e37a7032)
+                             'fc56e3b72d7cb2a0dcf7b9a3a512b9e3595198853304f14c2e2d11a3d57c4b0f',   # 0.18 K11 adrenaline (work\asi\v18, md5 0ee7c5fca49716f2637ade50e37a7032)
+                             '06f80b26ebd103348a05eec0c79cf9f2d7b6ba16ee6eb140940190470dcb5b73')   # 0.19 TruMenuPadBlock (work\asi\v19, md5 02a8e389028c1c78e0662b412be4aeb4)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
@@ -86,7 +88,8 @@ $earlierBuilds = @{
                              '5bf019742d81fe897bbc08fe145cccde0b45468c603852c469798f468b2d0c50',   # 0.14 sample .ini ([Sound] LoopSound, [Look] MoveEvents / CameraFlag / StrikeLook)
                              '4109ea03592cbb70cc1cf96158336d8045d8ddebbba8da87b9548a8add1cbea3',   # 0.15 / 0.16 sample .ini ([Cloth] TuTimeStep)
                              '891e2d9c554239f9a1d1202c7e90511ef15954ac09b3ac9ccfb8778604d1d9ad',   # 0.17 sample .ini ([ShadowPower] MenuInput)
-                             '6acc71004ab8c0e2ef7898e0a2feec25e0b093afaf5c071a5fde4a87710a2c26')   # 0.18 sample .ini ([Adrenaline])
+                             '6acc71004ab8c0e2ef7898e0a2feec25e0b093afaf5c071a5fde4a87710a2c26',   # 0.18 sample .ini ([Adrenaline])
+                             '0b056fc3baac70cf0571aa82a5933fd0bbcdd4fd17ee5b64433b2a89225726c4')   # 0.19 sample .ini (MenuInput comment)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

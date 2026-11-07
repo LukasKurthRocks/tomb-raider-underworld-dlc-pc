@@ -26,9 +26,45 @@ ticks only with a player in a level) built 2026-11-06, played 2026-11-06 evening
 LB / RB started it); 0.17 (LB / RB only as the game gets them, `[ShadowPower] MenuInput`) built 2026-11-06, played
 2026-11-07 14:44 / 14:53 (bar LB / RB suppressed); 0.18 (K11: no retail adrenaline tick / bar in doppelganger mode,
 `[Adrenaline] Translate`) built 2026-11-07, played 2026-11-07 from 15:02; 0.19 (TruMenu's `TruMenuPadBlock` instead
-of the pad-chain re-wrap) built 2026-11-07, not played.** Not covered: the
+of the pad-chain re-wrap) built 2026-11-07, not played; 0.20 (`[Look] CameraFlag` default 1 = TU, the PC reader of
+the camera bit found) built 2026-11-07, not played.** Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.20: the camera flag of the start as the TU (P5b, 2026-11-07)
+
+Build `work\asi\v20`; byte pre-checks `work\asi\v20\prechecks_v20.txt` (9 checks, 0 mismatches against the installed
+`tru.exe` md5 `5560abac...`; the lists of v09..v19 still 0 mismatches). Only the default and the check list change - the
+call itself is the 0.14 code.
+
+* **TU:** the power's Start 0x823d7f00..0x823d7f14 calls `(*0x82efc780)->vtbl[0xa4]` = 0x822a9e58, camera manager
+  `+0x7c |= 2`. All TU sites of bit 2 (static manager object, found with `work\p5_0711\cam_slot_static_scan.py`): set
+  in Start 0x823d7f0c and in the main-game strike look 0x823e0308 (site 0x823e0514), cleared only by its off
+  0x823e07e8 (site 0x823e0904) - neither runs in doppelganger mode (the TU switch 0x8240a430 sends anim events 5 / 4
+  to 0x823d8a80 / 0x823d9050, which neither set nor clear it) - and tested only at **0x822a9a7c** (vtbl[0xac]) in
+  0x822a9888 (= retail 0x822ac840).
+* **PC reader found** (the 0.14 search looked for `call [reg+0xac]`; the PC calls `mov eax, [edx+0xac]; call eax`):
+  **tru+0x1e5e8e** in tru+0x1e5bc0 - getter tru+0x1e7770, vtbl[0xac] = tru+0x1eb220 (`[+0x80] >> 1 & 1`), then the
+  second curve set `+0x9c` / `+0xe8` of the camera's tuning object when the bit is set, else `+0x4` / `+0x50`, each
+  through tru+0x1f20a0 - the same code as TU 0x822a9a7c..0x822a9abc (`addi r3, r30, 0x9c` / `0xe8` vs `4` / `0x50`,
+  `bl 0x822b6840`). So on the PC the bit does what it does on the Xbox.
+* **Lifetime:** the camera reset tru+0x1edf50 (vtable 0x855ae4 slot 0x20, tail call of the camera init tru+0x1f2440
+  from tru+0x1d4318 / tru+0x1de18a / tru+0x32249c) writes `+0x80 = 0`; a second init path (store at tru+0x1f3c48) too.
+  So the bit lives from the first power start until the next camera reset (level / player init; whether the TU's reset
+  is the same was not diffed here) - matching the Xenia snapshots (0 before the first power, 2 after).
+* **Remaining difference (not this switch):** with `[Look] StrikeLook=0` (default) a PC strike in doppelganger mode
+  runs the retail look tru+0x315020 / tru+0x318ea0, which sets and **clears** the bit; the TU never clears it there.
+  `StrikeLook=1` routes both to the TU translation (no camera call), as the TU.
+* New checks (all must match, else `camera flag: <check> does not match - off`): vtable slot 0xac = tru+0x1eb220
+  (`8b8180000000 d1e8 2401 c3`), the reader tru+0x1e5e8e (40 bytes incl. both curve offsets); the 0.14 checks stay.
+
+| # | TO TEST 0.20 (DLC 2, sample ini) | expected |
+|---|---|---|
+| 1 | load | `TruShadowPower 0.20 loaded (... camera flag 1 ...)`, `camera flag: [Look] CameraFlag=1 - Start calls ... reader tru+0x1e5e8e ... checked` |
+| 2 | hold RB once (power on) | `camera flag: TU 0x823d7f14 ... +0x80 0x........ -> 0x........ (bit 2 added), first time - the camera reader ... second curve set ...`; describe the camera (distance / follow speed) before and after the first power use |
+| 3 | release, power again | no further line at LogLevel 1 (LogLevel 2: one per start, value stays) |
+| 4 | death / reload or level change, then the power | after the reload `+0x80` starts without bit 2 again (`before` without 2 on the next start at LogLevel 2) |
+| 5 | `[Look] CameraFlag=0` | no `camera flag` lines (= 0.19) |
 
 ## 0.19: TruMenuPadBlock instead of the re-wrap (2026-11-07)
 
@@ -578,7 +614,8 @@ every `*.asi` next to `tru.exe`.
 | `[Look] ScreenEffect / GlobalParams7 / CinematicParam` | 1 | see 0.10 / 0.11 / 0.12 |
 | `[States] State2102` | 1 | see 0.11 |
 | `[Sound] LoopSound` | 0 | 0.14: the TU's looping sound of the power |
-| `[Look] MoveEvents / CameraFlag / StrikeLook` | 0 | 0.14: movement events 0x83 / 0x84, camera flag of Start, the shadow-strike look |
+| `[Look] MoveEvents / StrikeLook` | 0 | 0.14: movement events 0x83 / 0x84, the shadow-strike look |
+| `[Look] CameraFlag` | 1 | 0.14: camera flag of Start (camera +0x80 \|= 2 -> second camera curve set, reader tru+0x1e5e8e); 0.20: default 1 = TU (0.14-0.19: 0) |
 | `[Cloth] TuTimeStep` | 0 | 0.15: the TU's player cloth time step (TU 0x82278120): the ponytail gets the frame time / world scale, so it keeps real time in slow motion |
 | `[Adrenaline] Translate` | 1 | 0.18 (K11): CombatManager::Update skips the adrenaline tick tru+0x318bd0 and bar tru+0x2f2930 while gameTracker+0x1244 is set (TU 0x823dca00); 0 = PC; read again at run time (<= 1 / s) |
 | `[Adrenaline] Log` | 1 | 0.18: one line per change of the K11 decision per site |

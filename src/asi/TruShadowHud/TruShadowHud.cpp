@@ -23,8 +23,18 @@
 //     ctor tru+0x174b60("game/script/game/game", "dlc2data", 4, 4, 0) (the PC twin of the TU field stores; the PC
 //     `globaleffect` type is registered with exactly these arguments), vtable = copy of the PC `globaleffect` type
 //     vtable 0x86279c (its TU twin 0x8207a148 equals the TU dlc2data vtable in all 13 slots but the binder) with slot 3
-//     = Dlc2BinderHook: base bind tru+0x174bc0, then funcs[0] = f0. f1 (TU: byte 0x829ca67c = arg != 0, read by TU
-//     0x8248cea8) is not bound: its PC twin is unknown and no PC script calls it (PC script 9's calls are removed).
+//     = Dlc2BinderHook: base bind tru+0x174bc0, then funcs[0] = f0 and (0.2) funcs[1] = f1.
+//   * 0.2 (2026-11-07, P5d): dlc2data f1 0x824a11a0 = `byte 0x829ca67c = (s8)args[0] != 0`. Its only caller is the TU
+//     hint-box script 10 (f8: 1 when the modal DLC 2 box opens; f7 on "paused" and f9: 0 - tu_native_coverage.py,
+//     script_dis.py xt 10); its only reader (ppc_hilo_refs.py: 1 load, 1 store) is TU 0x8248cea8 = the Xbox system
+//     notification listener (retail 0x824873d8): on XN_SYS_UI (9, the Guide opens) in main state "playgame" and not
+//     quitting it pauses the game (TU 0x8229a118 = retail 0x8229d6d0 = PC tru+0x1d4780) when gameTrackerX+0xbb != 6
+//     and !(+0x2c & 0x80) - the retail rule - and, new in the TU, also in those two states when the byte is set. The
+//     PC has no Guide and no twin of that listener (the PC callers of tru+0x1d4780, tru+0x1d4891 / +0x1d4981 /
+//     +0x38bb1e, never test +0x2c & 0x80), so the byte has no PC reader; f1 is bound 1:1 as the TU's store into the
+//     plugin's byte (export TruShadowHudDlc2F1)
+//     so that the TU script can call it. PC script 9 (the port of script 10) still has its calls replaced by
+//     tools/script_dlc2_flag_stub.py. [ShadowHud] TranslateDlc2F1 (default 1 = TU; 0 = f1 left unbound as 0.1).
 //   * the natives' bodies are TruShadowPower's translation (TruShadowPowerMeterApi version 2: delayStart / strikeReady
 //     / canStart / delayLeft = f70..f73, the plugin owns the meter); dlc2data f0 = TruDlc2PlayerDoppelganger(). Both
 //     are looked up at the first call (GetProcAddress); when absent the natives answer as the TU does without the
@@ -46,7 +56,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowHud 0.1";
+const char kVersion[] = "TruShadowHud 0.2";
 const DWORD kImageBase = 0x00400000;
 
 // ---- larabase binder (TU 0x824a7d28 / PC tru+0x3b5490) ----
@@ -82,6 +92,8 @@ const char kDlc2Name[] = "dlc2data";
 
 // options (TruShadowHud.ini, section [ShadowHud])
 int g_enabled = 1, g_logLevel = 1, g_laraNatives = 1, g_dlc2Data = 1, g_meterApi = 1;
+int g_dlc2F1 = 1;                          // 0.2 [ShadowHud] TranslateDlc2F1: bind dlc2data f1 (TU 0x824a11a0)
+volatile char g_dlc2F1Byte = 0;            // 0.2: the TU's byte 0x829ca67c (no PC reader; export TruShadowHudDlc2F1)
 
 char g_logPath[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -225,9 +237,9 @@ struct Watch {
     LONG calls;
     int last;
 };
-Watch g_watch[5] = {{"larabase f70 (TU 0x824aa060)", 0, -1}, {"larabase f71 (TU 0x824aa0a0)", 0, -1},
+Watch g_watch[6] = {{"larabase f70 (TU 0x824aa060)", 0, -1}, {"larabase f71 (TU 0x824aa0a0)", 0, -1},
                     {"larabase f72 (TU 0x824aa120)", 0, -1}, {"larabase f73 (TU 0x824aa150)", 0, -1},
-                    {"dlc2data f0 (TU 0x824a1188)", 0, -1}};
+                    {"dlc2data f0 (TU 0x824a1188)", 0, -1}, {"dlc2data f1 (TU 0x824a11a0)", 0, -1}};
 
 void Seen(int k, int value, const char *shown) {
     Watch &w = g_watch[k];
@@ -271,6 +283,19 @@ void __cdecl NativeDlc2F0(void *, void *, void *, void *result) {   // bool: gam
     char r = Doppelganger() ? 1 : 0;
     if (result) *static_cast<char *>(result) = r;
     Seen(4, r, r ? "1 (doppelganger player)" : "0");
+}
+
+// 0.2: TU 0x824a11a0: lbz r11, 0(r5); extsb; cntlzw; >> 5; xori 1 -> stb 0x829ca67c (= the bool argument != 0). PC
+// natives read a bool argument the same way (tru+0x399f70: mov eax, [esp+0xc]; cmp byte [eax], 0; setne cl).
+void __cdecl NativeDlc2F1(void *, void *, void *args, void *) {
+    char v = 0;
+    __try {
+        v = args && *static_cast<const signed char *>(args) != 0 ? 1 : 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        v = 0;
+    }
+    g_dlc2F1Byte = v;
+    Seen(5, v, v ? "1 (TU byte 0x829ca67c set: modal DLC 2 hint box open)" : "0 (TU byte 0x829ca67c cleared)");
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -359,8 +384,19 @@ extern "C" void __cdecl Dlc2Bound(void *type) {
         return;
     }
     Bind(type, 0, &NativeDlc2F0);
-    Log(1, "dlc2data bind %ld: %lu functions - f0 bound (TU 0x824a1188), f1 left unbound (TU 0x824a11a0: no PC twin, "
-           "no PC caller)", n, count);
+    if (!g_dlc2F1) {
+        Log(1, "dlc2data bind %ld: %lu functions - f0 bound (TU 0x824a1188), f1 left unbound ([ShadowHud] "
+               "TranslateDlc2F1=0)", n, count);
+        return;
+    }
+    if (count < 2 || !FreeNative(table, 1)) {
+        Log(0, "dlc2data bind %ld: %lu functions - f0 bound (TU 0x824a1188); entry 1 missing or not a free native - f1 "
+               "not bound", n, count);
+        return;
+    }
+    Bind(type, 1, &NativeDlc2F1);
+    Log(1, "dlc2data bind %ld: %lu functions - f0 bound (TU 0x824a1188), f1 bound (TU 0x824a11a0: byte 0x829ca67c = "
+           "arg != 0; its TU reader 0x8248cea8, the Guide pause, has no PC twin)", n, count);
 }
 
 // slot 3 of the dlc2data type (TU 0x824a1140): base bind, natives, return byte +0x20 (TU: lbz r3, 0x20(r3))
@@ -510,6 +546,7 @@ void ReadOptions(const char *dir) {
     g_laraNatives = GetPrivateProfileIntA("ShadowHud", "LaraNatives", 1, ini);
     g_dlc2Data = GetPrivateProfileIntA("ShadowHud", "Dlc2Data", 1, ini);
     g_meterApi = GetPrivateProfileIntA("ShadowHud", "MeterApi", 1, ini);
+    g_dlc2F1 = GetPrivateProfileIntA("ShadowHud", "TranslateDlc2F1", 1, ini);    // 0.2, default 1 = TU
 }
 
 void Start(HMODULE self) {
@@ -519,8 +556,8 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowHud.log", dir);
     ReadOptions(dir);
-    Log(1, "%s loaded (enabled %d, log level %d, larabase natives %d, dlc2data %d, meter interface %d)", kVersion,
-        g_enabled, g_logLevel, g_laraNatives, g_dlc2Data, g_meterApi);
+    Log(1, "%s loaded (enabled %d, log level %d, larabase natives %d, dlc2data %d, meter interface %d; 0.2: dlc2data "
+        "f1 %d)", kVersion, g_enabled, g_logLevel, g_laraNatives, g_dlc2Data, g_meterApi, g_dlc2F1);
     if (!g_enabled) { Log(1, "disabled by TruShadowHud.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -542,6 +579,12 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 extern "C" __declspec(dllexport) const char *TruShadowHudVersion() {
-    return "TruShadowHud 0.1 (TU larabase natives f70-f73 and dlc2data f0 for the TU HUD script, bodies from "
-           "TruShadowPowerMeterApi v2 / TruDlc2PlayerDoppelganger)";
+    return "TruShadowHud 0.2 (TU larabase natives f70-f73 and dlc2data f0 for the TU HUD script, bodies from "
+           "TruShadowPowerMeterApi v2 / TruDlc2PlayerDoppelganger; dlc2data f1 = the TU's hint-box byte 0x829ca67c)";
+}
+
+// 0.2: the value dlc2data f1 last stored (TU byte 0x829ca67c: 1 while the TU hint-box script's modal DLC 2 box is
+// open). The PC has no reader of it (the TU reader is the Xbox Guide listener 0x8248cea8); for diagnostics / TruMenu.
+extern "C" __declspec(dllexport) int __cdecl TruShadowHudDlc2F1() {
+    return g_dlc2F1Byte ? 1 : 0;
 }

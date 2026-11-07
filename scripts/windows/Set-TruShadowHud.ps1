@@ -10,7 +10,7 @@
              as binkw32.dll loads every *.asi there.
     -Remove  deletes them again - only if they are ours: the same SHA-256 as a TruShadowHud.asi / .ini built anywhere
              below <workspace>\work\asi (e.g. work\asi\hud01) or one of our released builds listed in
-             $earlierBuilds (none yet); a foreign file of the same name is never
+             $earlierBuilds (0.1); a foreign file of the same name is never
              overwritten or removed. TruShadowHud.log is left in place. Nothing installed = nothing to do (no error),
              so the test harness may call -Remove for every profile.
     -Install over an earlier build of ours replaces it (update); an .ini the owner edited is not ours and is kept
@@ -25,7 +25,7 @@
     Folder with the built TruShadowHud.asi / .ini (default <workspace>\work\asi).
 
 .EXAMPLE
-    .\Set-TruShadowHud.ps1 -Install -SourceDir ..\..\work\asi\hud01 -Verbose
+    .\Set-TruShadowHud.ps1 -Install -SourceDir ..\..\work\asi\hud02 -Verbose
     .\Set-TruShadowHud.ps1 -Remove
 #>
 [CmdletBinding(DefaultParameterSetName = 'Install')]
@@ -48,9 +48,10 @@ $asiRoot = Join-Path $repo 'work\asi'
 $built   = if ($SourceDir) { $SourceDir } else { $asiRoot }
 $names   = 'TruShadowHud.asi', 'TruShadowHud.ini'
 # released builds of ours (SHA-256), recognised even when their output folder below work\asi is gone
+# (the current build 0.2, dlc2data f1, work\asi\hud02, 2026-11-07, is found below work\asi like every other build)
 $earlierBuilds = @{
-    'TruShadowHud.asi' = @()   # 0.1 (work\asi\hud01) is found below work\asi
-    'TruShadowHud.ini' = @()
+    'TruShadowHud.asi' = @('8d664b7fbec2df33d67b6f9f89a0835de7e070c52469d8312b398901b2d2e1cb')   # 0.1 (work\asi\hud01, md5 a31308dd4b4be496e54e0d0b3fb646a7)
+    'TruShadowHud.ini' = @('316082b8bf6018a110cdcb8b85fc95aff46c138e6de21ac88de896202ed6eaa7')   # 0.1 sample .ini
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

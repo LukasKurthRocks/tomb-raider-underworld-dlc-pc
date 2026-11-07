@@ -147,6 +147,16 @@
 // second XInputGetState read of 0.17 (still needed when this plugin sits outside TruMenu: a neutral pad hides which
 // buttons the real pad holds). Withheld buttons stay ignored until they are released, as in 0.17. Without the export
 // (TruMenu older than 0.21.1) only the second read is left (= 0.17 without the re-wrap; one log line).
+//
+// 0.20 (2026-11-07, P5b): [Look] CameraFlag default 1 = the TU. The reader of the camera manager's bit 2 is found on
+// the PC: tru+0x1e5e8e in tru+0x1e5bc0 (= TU 0x822a9888 / retail 0x822ac840) calls the getter tru+0x1e7770, then
+// `mov eax, [edx+0xac]; call eax` (= TU 0x822a9a7c vtbl[0xac], test bit 2) and picks the second camera curve set
+// (+0x9c / +0xe8 instead of +0x4 / +0x50, evaluator tru+0x1f20a0 = TU 0x822b6840) - the same code as the TU's. The
+// earlier search missed it (it looked for `call [reg+0xac]`). TU sites of the bit (cam_slot_static_scan.py): set in
+// Start 0x823d7f0c and in the main-game strike look 0x823e0308 (site 0x823e0514), cleared only by its off 0x823e07e8
+// (site 0x823e0904) - neither runs in doppelganger mode; on the PC the camera reset tru+0x1edf50 (vtable slot 0x20,
+// from the camera init tru+0x1f2440 at level / player init) clears +0x80. The reader site and the bit-2 test slot are
+// byte-checked too; the flag call itself is unchanged.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -739,8 +749,8 @@ void StartPower(const BYTE *tuning) {
     float high = Tune(tuning, 0x70) * kPercent * max;           // tuning +0x70 x [0x820536ec] x tuning +0x10
     if (!(g_meter.value < high)) fire(0x87);
     else fire(0x88);
-    // 0x823d7f00..0x823d7f14: (*0x82efc780)->vtbl[0xa4]() = camera manager +0x7c |= 2. 0.14 [Look] CameraFlag (default
-    // 0 = as 0.13: not called): PC manager 0xe804f0, its vtable slot 0xa4 = tru+0x1eb200 (+0x80 |= 2)
+    // 0x823d7f00..0x823d7f14: (*0x82efc780)->vtbl[0xa4]() = camera manager +0x7c |= 2. 0.14 [Look] CameraFlag (0.20:
+    // default 1 = TU; 0 = not called as 0.13-0.19): PC manager 0xe804f0, its vtable slot 0xa4 = tru+0x1eb200 (+0x80 |= 2)
     if (g_cameraFlag) StartCameraFlag();
     g_meter.startValue = g_meter.value;
     g_meter.flags |= 1;
@@ -3068,12 +3078,19 @@ void CheckMoveEvents() {
 // 0x822a9e78 on +0x7c, PC tru+0x1eb1a0..0x1eb220 on +0x80); slot 0xa4 = TU 0x822a9e58 = PC tru+0x1eb200 (+0x80 |= 2).
 // The PC retail strike look (tru+0x315020 = retail 0x823e0308) makes the same call (`call 0x5e7770(0)` -> vtbl[0xa4]);
 // the TU moved it into Start. Reader of the bit (TU 0x822a9a7c in 0x822a9888 = retail 0x822ac840: other camera curves)
-// - PC partner not found (as docs L9).
+// = PC tru+0x1e5e8e in tru+0x1e5bc0 (0.20): getter, vtbl[0xac] = tru+0x1eb220 (`[+0x80] >> 1 & 1`), then curve set
+// +0x9c / +0xe8 (bit set) or +0x4 / +0x50 through tru+0x1f20a0 (= TU 0x822b6840) - checked below, not patched.
 const DWORD kCamSlotA4 = 0x00855ae4 + 0xa4;
 const DWORD kCamSet2 = 0x005eb200;
 const char *const kCamSet2Hex = "83898000000002 c3";
 const DWORD kCamRetailCall = 0x00715103;            // tru+0x315020: push 0; call 0x5e7770; ...; call [edx+0xa4]
 const char *const kCamRetailCallHex = "6a00 e86626edff 8b10 8bc8 8b82a4000000 83c414 ffd0";
+const DWORD kCamSlotAC = 0x00855ae4 + 0xac;         // 0.20: the bit-2 test the reader calls
+const DWORD kCamTest2 = 0x005eb220;
+const char *const kCamTest2Hex = "8b8180000000 d1e8 2401 c3";
+const DWORD kCamReader = 0x005e5e8e;                // 0.20: tru+0x1e5bc0's test of the bit and the curve choice
+const char *const kCamReaderHex = "e8dd180000 8b10 8bc8 8b82ac000000 83c404 ffd0 d944242c 84c0 51 d91c24 7414 "
+                                  "8d8f9c000000 51 e8e6c10000 8d9fe8000000 eb0c 8d5704 52 e8d5c10000 8d5f50";
 bool g_camFlagOk = false;
 volatile LONG g_camFlagCalls = 0;
 
@@ -3092,7 +3109,8 @@ void StartCameraFlag() {
         DWORD after = *reinterpret_cast<const DWORD *>(mgr + 0x80);
         if (k == 1 || g_logLevel >= 2)
             Log(k == 1 ? 1 : 2, "camera flag: TU 0x823d7f14 (*0x82efc780)->vtbl[0xa4] = tru+0x1eb200 on 0x%08lx: +0x80 0x%08lx "
-                "-> 0x%08lx%s", kCamMgr, before, after, k == 1 ? ", first time" : "");
+                "-> 0x%08lx%s", kCamMgr, before, after, k == 1 ? ", first time - the camera reader tru+0x1e5e8e (TU "
+                "0x822a9a7c) now takes the second curve set +0x9c / +0xe8 until the next camera reset" : "");
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         Log(0, "camera flag: access fault - off");
         g_camFlagOk = false;
@@ -3101,13 +3119,20 @@ void StartCameraFlag() {
 
 void CheckCameraFlag() {
     if (!g_cameraFlag) return;
-    g_camFlagOk = *reinterpret_cast<const DWORD *>(kCamSlotA4) == kCamSet2 && HexBytesAt(kCamSet2, kCamSet2Hex) &&
-                  HexBytesAt(kCamRetailCall, kCamRetailCallHex) && HexBytesAt(kCamMgrDtor, kCamMgrDtorHex);
+    const char *bad = nullptr;
+    if (*reinterpret_cast<const DWORD *>(kCamSlotA4) != kCamSet2 || !HexBytesAt(kCamSet2, kCamSet2Hex))
+        bad = "vtable 0x855ae4 slot 0xa4 / tru+0x1eb200";
+    else if (!HexBytesAt(kCamRetailCall, kCamRetailCallHex)) bad = "retail strike look call tru+0x315103";
+    else if (!HexBytesAt(kCamMgrDtor, kCamMgrDtorHex)) bad = "camera manager tru+0x43cee0";
+    else if (*reinterpret_cast<const DWORD *>(kCamSlotAC) != kCamTest2 || !HexBytesAt(kCamTest2, kCamTest2Hex))
+        bad = "vtable 0x855ae4 slot 0xac / tru+0x1eb220";                            // 0.20
+    else if (!HexBytesAt(kCamReader, kCamReaderHex)) bad = "camera reader tru+0x1e5e8e";   // 0.20
+    g_camFlagOk = bad == nullptr;
     if (!g_camFlagOk)
-        Log(0, "camera flag: vtable 0x855ae4 slot 0xa4 / tru+0x1eb200 / the manager does not match - off");
+        Log(0, "camera flag: %s does not match - off", bad);
     else
         Log(1, "camera flag: [Look] CameraFlag=1 - Start calls the camera manager 0x%08lx vtbl[0xa4] (+0x80 |= 2, TU "
-               "0x823d7f00)", kCamMgr);
+               "0x823d7f00); reader tru+0x1e5e8e (TU 0x822a9a7c, vtbl[0xac] = tru+0x1eb220) checked", kCamMgr);
 }
 
 // ---- [Look] StrikeLook: the shadow-strike look, TU 0x823d8a80 (anim event 5) / 0x823d9050 (anim event 4) ----
@@ -3691,7 +3716,7 @@ void ReadOptions(const char *dir) {
     g_state2102Enabled = GetPrivateProfileIntA("States", "State2102", 1, ini);
     g_loopSound = GetPrivateProfileIntA("Sound", "LoopSound", 0, ini);           // 0.14, all default 0
     g_moveEvents = GetPrivateProfileIntA("Look", "MoveEvents", 0, ini);
-    g_cameraFlag = GetPrivateProfileIntA("Look", "CameraFlag", 0, ini);
+    g_cameraFlag = GetPrivateProfileIntA("Look", "CameraFlag", 1, ini);         // 0.20: default 1 = TU (0.14-0.19: 0)
     g_strikeLook = GetPrivateProfileIntA("Look", "StrikeLook", 0, ini);
     g_clothTimeStep = GetPrivateProfileIntA("Cloth", "TuTimeStep", 0, ini);     // 0.15, default 0
     g_menuInput = GetPrivateProfileIntA("ShadowPower", "MenuInput", 1, ini);    // 0.17, default 1 (0 = 0.16)
@@ -3708,7 +3733,7 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.19 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.20 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
@@ -3850,15 +3875,15 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.19 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.20 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
            "conditions 1046 / 1047 / 1048-1056 / 2401, states 243 / 245 / 1018 / 2102, activities 1009 / 1039, shadow look = TU player events of start / stop, "
            "adrenaline look = meter flag 0x40 / camera mode 0x34, look screen effect report / switch, GlobalParams[7], "
-           "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4; switches default off: loop "
-           "sound, move events 0x83 / 0x84, camera flag, strike look 0x823d8a80 / 0x823d9050, cloth TU time step "
-           "0x82278120)";
+           "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4, camera flag of the start "
+           "(camera bit 2, reader tru+0x1e5e8e); switches default off: loop sound, move events 0x83 / 0x84, strike "
+           "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120)";
 }
 
 // 0.11: the TU meter object for other plugins (TruShadowCombat: condition 538, the shadow strike) - interface version
