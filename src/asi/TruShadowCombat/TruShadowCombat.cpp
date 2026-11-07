@@ -38,6 +38,9 @@
 // 10. 0.6.3 (P1a, T3 of the TU's thrall death): notification 33 (TRScriptUnitManager::PlayNotification tru+0x37a540)
 //    before EnterRegenerateDeath in the death check tru+0x220380, as the TU 0x822f6578 ([Death] TranslateNotify33=1,
 //    default on); [Damage] Translate (K14) now on by default (live 07.11.: thralls die, the hall02 wall breaks).
+// 11. 0.6.4 (P1b, T-M1 / T-M2): the enemy state MeleeAttack as the TU - messages 0x15 / 0x8a / 0xbe end the attack only
+//    without a data pointer (message slot tru+0x266350 = TU 0x82330d40), and Enter sets brain+0xc bit 0 when record+8
+//    bit 2 is clear (tru+0x25c7b0 = TU 0x8232fb48) ([Melee] Translate=1, default on). T-M3 (interruption) needs T4.
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -69,7 +72,9 @@ const char kVersion[] = "TruShadowCombat 0.6.3 (TU target list 7 -> 10, conditio
                         "tru+0x2e68b0 as the TU 0x823e1220 - main target excluded from the splash, doppelganger type "
                         "remap with the K14 switch ([Splash] Translate, on by default); 0.6.3: notification 33 before "
                         "EnterRegenerateDeath tru+0x2203fb as the TU 0x822f6578 ([Death] TranslateNotify33, on by "
-                        "default), [Damage] Translate on by default)";
+                        "default), [Damage] Translate on by default; 0.6.4: enemy MeleeAttack as the TU - messages "
+                        "0x15 / 0x8a / 0xbe only without a data pointer (T-M1, TU 0x82330d40), Enter sets brain+0xc "
+                        "bit 0 unless record+8 bit 2 (T-M2, TU 0x8232fb48) ([Melee] Translate, on by default))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -3736,6 +3741,168 @@ void SetupDeath() {
         g_notify33 ? "TU 0x822f6578: notification 33 before the switch" : "PC: no notification");
 }
 
+// ---------------------------------------------------------------- 0.6.4: P1b - the TU's changes to the enemy state
+// MeleeAttack (T-M1 / T-M2 of docs Befund-Thrall-MeleeAttack-Freeze-0711.md section 4; docs Befund-P1b-MeleeAttack-0711.md
+// in the main workspace). State object 0x8aea00 "MeleeAttack", vtable 0x85912c (retail 0x82779a74 -> vtable 0x8206d160,
+// TU 0x82779cf4 -> vtable 0x8206d450). State data = (brain+0x1273 + ([brain+0x18d4+4i] + 2i) * 0x19c) & ~0xf on all
+// three exes (TU: brain+0x1254 + 0x680 / +0x1f), record = [data+0x50]; brain = [[inst+0x2d0]]+0x2ec.
+// T-M1 message slot 10 (PC tru+0x266350, retail 0x82331c28, TU 0x82330d40): messages 0x15 / 0x8a (anim end / anim kind
+//      8) and 0xbe set data+0xa4 = 2 (the update tru+0x265f10 then leaves the state). Retail = PC: 0x15 / 0x8a always,
+//      0xbe unless the data pointer points at the instance itself. TU 0x82331164..0x8233117c: all three only when the
+//      message data pointer is 0. Translation: jump table tru+0x26672c entries 0 (cases 0x15 / 0x8a -> tru+0x2663c7) and
+//      5 (case 0xbe -> tru+0x2663b8) go to MeleeMsgStub: data != 0 -> the switch default tru+0x266721 (return 0, as the
+//      TU's 0x82331578 li r3, 0), data == 0 -> tru+0x2663c7 (+0xa4 = 2 and the PC code behind it, unchanged).
+// T-M2 Enter slot 7 (PC tru+0x25c7b0, retail 0x82330a88, TU 0x8232fb48): after "record+8 bit 24 -> brain+8 |= 0x800000"
+//      (PC tru+0x25c9da / tru+0x2224c0, retail 0x82330ca4 / 0x82330ca8) the TU added (0x8232fd6c..0x8232fd8c)
+//      "if (!(record+8 & 4)) brain+0xc |= 1" - the same bit message 0xcb sets (PC tru+0x26670e, TU 0x8233155c).
+//      Translation: tru+0x25c9ea (mov eax, [esi+0x50]; movsx ecx, word [eax+0x1f8], 10 bytes) jumps to MeleeEnterStub,
+//      which does the TU test, then the two moved instructions, back to tru+0x25c9f4.
+// T-M3 (interruption slot 13, TU 0x82330830: Vaulted, and RegenerateDeath only with the companion instance 0x822da918)
+//      is NOT translated: the RegenerateDeath clause needs T4 (the TU's companion instance, missing on the PC), so the
+//      slot stays the PC's tru+0x242f40 (= retail).
+// [Melee] Translate=1 (default) places both at the start; 0 = nothing patched (a change needs a restart).
+const DWORD kMeleeEnterFn = 0x0065c7b0;     // slot 7, retail 0x82330a88, TU 0x8232fb48
+const DWORD kMeleeEnterSite = 0x0065c9ea;   // 10 bytes moved into MeleeEnterStub
+const DWORD kMeleeEnterBack = 0x0065c9f4;   // push ecx (record+0x1f8) / push ebx / call tru+0x218ee0
+const DWORD kMeleeMsgFn = 0x00666350;       // slot 10, retail 0x82331c28, TU 0x82330d40
+const DWORD kMeleeByteTable = 0x00666764;   // byte index per (message - 0x15), 0xe3 entries
+const DWORD kMeleeJumpTable = 0x0066672c;   // 14 targets
+const DWORD kMeleeCaseSet = 0x006663c7;     // +0xa4 = 2 (cases 0x15 / 0x8a; 0xbe after its self check)
+const DWORD kMeleeCaseBe = 0x006663b8;      // case 0xbe: self check
+const DWORD kMeleeDefault = 0x00666721;     // switch default: return 0
+int g_meleeTranslate = 1;                   // [Melee] Translate (0.6.4, start only)
+bool g_meleeMsgHooked = false, g_meleeEnterHooked = false;
+DWORD g_meleeSetTo = kMeleeCaseSet, g_meleeDefaultTo = kMeleeDefault, g_meleeEnterBackTo = kMeleeEnterBack;
+volatile LONG g_meleeMsgLines = 0, g_meleeEnterLines = 0;
+const LONG kMeleeMaxLines = 300;
+
+// T-M1: called on the skip path only (message 0x15 / 0x8a / 0xbe with a data pointer) - log line, nothing else
+void __cdecl MeleeMsgSkipped(BYTE *inst, DWORD message, DWORD data) {
+    const LONG n = InterlockedIncrement(&g_meleeMsgLines);
+    if (n > kMeleeMaxLines) return;
+    char who[96];
+    Describe(inst, who, sizeof(who));
+    const bool self = message == 0xbe && Rd(reinterpret_cast<const void *>(data)) == reinterpret_cast<DWORD>(inst);
+    Log(1, "0.6.4 melee: %s MeleeAttack message 0x%02lx with data 0x%08lx ignored as the TU 0x82331164%s", who, message,
+        data, self ? " (data = the instance: the PC ignores it too)" : " (the PC would set +0xa4 = 2 and end the attack)");
+    if (n == kMeleeMaxLines) Log(1, "0.6.4 melee: %ld message lines - no more", kMeleeMaxLines);
+}
+
+// T-M2: TU 0x8232fd80..0x8232fd8c (the stub has tested record+8 bit 2 = 0)
+void __cdecl MeleeEnterSet(BYTE *inst, BYTE *brain) {
+    DWORD *flags = reinterpret_cast<DWORD *>(brain + 0xc);
+    const DWORD before = *flags;
+    *flags = before | 1;
+    const LONG n = InterlockedIncrement(&g_meleeEnterLines);
+    if (n > kMeleeMaxLines) return;
+    char who[96];
+    Describe(inst, who, sizeof(who));
+    Log(1, "0.6.4 melee: %s MeleeAttack Enter, record+8 bit 2 clear -> brain+0xc |= 1 as the TU 0x8232fd8c (bit was %lu)",
+        who, before & 1);
+    if (n == kMeleeMaxLines) Log(1, "0.6.4 melee: %ld Enter lines - no more", kMeleeMaxLines);
+}
+
+// jump table entries 0 / 5 of the message switch: ebp frame of tru+0x266350 ([ebp+8] inst, [ebp+0x10] message,
+// [ebp+0x14] data), ecx = inst, esi = state data, edi = record, ebx = brain; eax / edx are free (index registers)
+__declspec(naked) void MeleeMsgStub() {
+    __asm {
+        cmp dword ptr [ebp + 0x14], 0
+        jne melee_skip
+        jmp dword ptr [g_meleeSetTo]
+    melee_skip:
+        push dword ptr [ebp + 0x14]
+        push dword ptr [ebp + 0x10]
+        push dword ptr [ebp + 8]
+        call MeleeMsgSkipped
+        add esp, 12
+        jmp dword ptr [g_meleeDefaultTo]
+    }
+}
+
+// jumped to from tru+0x25c9ea: esi = state data, edi = brain, ebx = inst; eax / ecx / edx are loaded again by the moved
+// instructions and by tru+0x25c9fb, flags are not live
+__declspec(naked) void MeleeEnterStub() {
+    __asm {
+        mov eax, dword ptr [esi + 0x50]
+        test dword ptr [eax + 8], 4
+        jne enter_moved
+        push edi
+        push ebx
+        call MeleeEnterSet
+        add esp, 8
+    enter_moved:
+        mov eax, dword ptr [esi + 0x50]
+        movsx ecx, word ptr [eax + 0x1f8]
+        jmp dword ptr [g_meleeEnterBackTo]
+    }
+}
+
+void SetupMelee() {
+    if (!g_meleeTranslate) {
+        Log(1, "0.6.4 melee: [Melee] Translate=0 - MeleeAttack tru+0x25c7b0 / tru+0x266350 untouched (PC = retail)");
+        return;
+    }
+    struct { DWORD at; const char *hex; const char *what; } const facts[] = {
+        {0x00859148, "b0c76500 b0877900 105f6600 50636600", "MeleeAttack vtable 0x85912c slots 7 / 8 / 9 / 10"},
+        {0x008aea00, "2c918500", "state object MeleeAttack 0x8aea00 (vtable 0x85912c)"},
+        {kMeleeMsgFn,
+         "55 8bec 83e4f0 83ec74 8b4d08 8b81d0020000 85c0 53 56 57 894c2418 7504 33db eb08 8b00 8b98ec020000 8b450c "
+         "8b9483d4180000 8d0442 69c09c010000 8db41873120000 8b4510 83e6f0 8b7e50 83c0eb 3de2000000 0f8777030000 "
+         "0fb69064676600 ff24952c676600",
+         "message slot tru+0x266350: brain ebx, state data esi, record edi, switch (message - 0x15) <= 0xe2"},
+        {kMeleeCaseBe, "8b4514 85c0 7408 3b08 0f845a030000 c786a400000002000000",
+         "case 0xbe tru+0x2663b8: self check, then tru+0x2663c7 +0xa4 = 2"},
+        {kMeleeDefault, "5f 5e 32c0 5b 8be5 5d c21000", "switch default tru+0x266721: return 0"},
+        {kMeleeJumpTable, "c7636600", "jump table entry 0 -> tru+0x2663c7"},
+        {kMeleeJumpTable + 5 * 4, "b8636600", "jump table entry 5 -> tru+0x2663b8"},
+        {0x0066670e, "834b0c01", "case 0xcb: brain+0xc |= 1 (TU 0x8233155c)"},
+        {kMeleeEnterFn,
+         "55 8bec 83e4f0 81ec84000000 53 8b5d08 8b83d0020000 85c0 56 57 895c241c 7504 33ff eb08 8b00 8bb8ec020000 "
+         "8b450c 8b8c87d4180000 8d1441 8b4514 69d29c010000 8db43a73120000 83e6f0",
+         "Enter slot tru+0x25c7b0: inst ebx, brain edi, state data esi"},
+        {0x0065c9da, "8b5650 f6420b01 7407 8bcf e8d65afcff 8b4650 0fbf88f8010000 51 53 e8e5c4fbff",
+         "Enter tru+0x25c9da: record+8 bit 24 -> tru+0x2224c0(brain), then record+0x1f8 -> tru+0x218ee0"},
+        {0x006224c0, "81490800008000 c3", "tru+0x2224c0: brain+8 |= 0x800000 (retail 0x82330ca8 stw 8(r27))"},
+    };
+    for (const auto &f : facts)
+        if (!HexAt(f.at, f.hex)) {
+            Log(0, "0.6.4 melee: %s at 0x%08lx does not match - MeleeAttack left to the game (PC)", f.what, f.at);
+            return;
+        }
+    // index 0 must belong to exactly the cases 0x15 / 0x8a, index 5 to exactly 0xbe (tools/pe_switch.py; same case
+    // sets in the retail / TU tables 0x82331cbc / 0x82330dd8)
+    const BYTE *bt = reinterpret_cast<const BYTE *>(kMeleeByteTable);
+    int odd = 0;
+    for (int m = 0x15; m <= 0xf7; ++m) {
+        const BYTE k = bt[m - 0x15];
+        const bool want0 = m == 0x15 || m == 0x8a, want5 = m == 0xbe;
+        if ((k == 0) != want0 || (k == 5) != want5) ++odd;
+    }
+    if (odd) {
+        Log(0, "0.6.4 melee: byte table tru+0x266764 differs in %d entries - MeleeAttack left to the game (PC)", odd);
+        return;
+    }
+    if (HexAt(0x005bcff9, "8b0dd094db00 52 8b14c1")) g_namesOk = true;
+    const DWORD stub = reinterpret_cast<DWORD>(&MeleeMsgStub);
+    if (WriteCode(kMeleeJumpTable, &stub, 4) && WriteCode(kMeleeJumpTable + 5 * 4, &stub, 4)) {
+        g_meleeMsgHooked = true;
+    } else {
+        const DWORD set = kMeleeCaseSet, be = kMeleeCaseBe;
+        WriteCode(kMeleeJumpTable, &set, 4);
+        WriteCode(kMeleeJumpTable + 5 * 4, &be, 4);
+        Log(0, "0.6.4 melee: jump table tru+0x26672c could not be written - T-M1 off (PC)");
+    }
+    BYTE j[10] = {0xe9, 0, 0, 0, 0, 0x90, 0x90, 0x90, 0x90, 0x90};
+    const DWORD rel = reinterpret_cast<DWORD>(&MeleeEnterStub) - (kMeleeEnterSite + 5);
+    memcpy(j + 1, &rel, 4);
+    if (WriteCode(kMeleeEnterSite, j, sizeof(j))) g_meleeEnterHooked = true;
+    else Log(0, "0.6.4 melee: jump at tru+0x25c9ea failed - T-M2 off (PC)");
+    Log(1, "0.6.4 melee: [Melee] Translate 1 - T-M1 %s (messages 0x15 / 0x8a / 0xbe end MeleeAttack only without a data "
+           "pointer, TU 0x82330d40), T-M2 %s (Enter: record+8 bit 2 clear -> brain+0xc |= 1, TU 0x8232fb48); T-M3 "
+           "(interruption by Vaulted / RegenerateDeath, TU 0x82330830) not translated: needs T4",
+        g_meleeMsgHooked ? "on" : "OFF", g_meleeEnterHooked ? "on" : "OFF");
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -3763,6 +3930,7 @@ void ReadOptions(const char *dir) {
     g_diagSnap = GetPrivateProfileIntA("Diag", "Snapshot", 1, ini) ? 1 : 0;   // 0.5.3
     g_dmgTranslate = GetPrivateProfileIntA("Damage", "Translate", 1, ini) ? 1 : 0;   // 0.6 (0.6.3: default 1)
     g_notify33 = GetPrivateProfileIntA("Death", "TranslateNotify33", 1, ini) ? 1 : 0;   // 0.6.3
+    g_meleeTranslate = GetPrivateProfileIntA("Melee", "Translate", 1, ini) ? 1 : 0;      // 0.6.4
     g_dmgLog = GetPrivateProfileIntA("Damage", "Log", 1, ini) ? 1 : 0;
     g_dmgMax = GetPrivateProfileIntA("Damage", "MaxLines", 3000, ini);
     if (g_dmgMax < 0) g_dmgMax = 0;
@@ -3823,6 +3991,7 @@ void Start(HMODULE self) {
     SetupChunk();                     // 0.6.1: lethal impulse as the TU (independent of the parts above)
     SetupSplash();                    // 0.6.2: K9 splash as the TU (after SetupDamage: the remap follows its switch)
     SetupDeath();                     // 0.6.3: notification 33 of the TU's death check (independent of the parts above)
+    SetupMelee();                     // 0.6.4: MeleeAttack T-M1 / T-M2 (independent of the parts above)
 }
 
 }  // namespace

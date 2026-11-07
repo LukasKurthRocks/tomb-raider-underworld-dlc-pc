@@ -1,4 +1,40 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.3)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.4)
+
+0.6.4 (2026-11-07, **offline, not yet seen in game**): P1b - the title update's three small changes to the enemy state
+`MeleeAttack` (T-M1..T-M3 of `docs\Befund-Thrall-MeleeAttack-Freeze-0711.md` section 4; full proof
+`docs\Befund-P1b-MeleeAttack-0711.md` in the main workspace), T-M1 and T-M2 translated. Build `work\asi\combat064`.
+The thrall freeze in MeleeAttack itself was a data bug (combo link record, `tools\melee_link_record_fix.py`); this
+version does not touch it.
+* State object 0x8aea00 "MeleeAttack", vtable 0x85912c = retail vtable 0x8206d160 / TU 0x8206d450 (18 slots). State
+  data `(brain+0x1273 + ([brain+0x18d4+4i] + 2i) * 0x19c) & ~0xf` on all three exes (TU writes it as brain+0x1254 +
+  0x680 / +0x1f), record = `[data+0x50]`. Update tru+0x265f10 and the follow-up helper tru+0x25bc10 are TU = retail =
+  PC; the anim callback tru+0x225c60 sends 0x15 with data 0.
+* **T-M1** message slot tru+0x266350 (retail 0x82331c28, TU 0x82330d40): retail / PC set data+0xa4 = 2 (= leave the
+  attack) on 0x15 / 0x8a always and on 0xbe unless its data points at the instance; the TU (0x82331164..0x8233117c)
+  only when the message data pointer is 0. The plugin points jump table tru+0x26672c entries 0 (0x15 / 0x8a) and 5
+  (0xbe) at a stub: data != 0 -> switch default tru+0x266721 (return 0 = TU 0x82331578), data == 0 -> tru+0x2663c7
+  (PC code unchanged). The byte table is checked: index 0 = exactly 0x15 / 0x8a, index 5 = exactly 0xbe.
+* **T-M2** Enter slot tru+0x25c7b0 (retail 0x82330a88, TU 0x8232fb48): the TU added after the "record+8 bit 24 ->
+  brain+8 |= 0x800000" step (PC tru+0x25c9da -> tru+0x2224c0) `if (!(record+8 & 4)) brain+0xc |= 1`
+  (0x8232fd6c..0x8232fd8c) - the bit message 0xcb sets (PC tru+0x26670e = TU 0x8233155c) and 0xd1 clears. The plugin
+  jumps from tru+0x25c9ea (10 bytes moved) into a stub with that test, back at tru+0x25c9f4.
+* **Not translated: T-M3** (interruption slot 13, TU 0x82330830 / PC tru+0x242f40): the TU also lets Vaulted (TU
+  0x82779bb0 = PC 0x8ae8bc) and RegenerateDeath interrupt - the latter only with the companion instance (TU
+  0x822da918 = T4, missing on the PC). Belongs to the finisher / regeneration package T1-T4.
+* `[Melee] Translate=1` (default **1**, a pure TU translation with proven twins); 0 = nothing patched. Read at the start
+  only. Log lines (max 300 each): `0.6.4 melee: ... MeleeAttack message 0x15 with data 0x... ignored as the TU
+  0x82331164 ...` and `0.6.4 melee: ... MeleeAttack Enter, record+8 bit 2 clear -> brain+0xc |= 1 as the TU 0x8232fd8c
+  (bit was 0)`.
+* New byte checks: 12 used by the plugin + 6 proof-only (`work\asi\combat064\prechecks_combat064.txt`, 18, 0 mismatches
+  on the Steam exe); the earlier lists (combat01..combat063, 482 checks) still 0 mismatches. Imports unchanged (81,
+  KERNEL32 only).
+
+| # | TO TEST 0.6.4 (DLC 2 `dlc_yggdrasil_end` or hall02, God Mode; TruMenu `[Debug] EnemyStateLog=1`) | expected |
+|---|---|---|
+| 1 | load | `0.6.4 melee: [Melee] Translate 1 - T-M1 on ..., T-M2 on ...`, no "does not match" |
+| 2 | let thralls attack (MeleeWindup -> MeleeAttack) | each attack ends with `FinishAttack` as before; `0.6.4 melee: ... MeleeAttack Enter, record+8 bit 2 clear ...` lines for records without flag bit 2 |
+| 3 | watch for `message 0x.. with data` lines | note count / message (which PC sender passes data is not known; the normal anim end has data 0) |
+| 4 | trouble | `[Melee] Translate=0`, restart |
 
 0.6.3 (2026-11-07, **offline, not yet seen in game**): P1a - script notification 33 of the title update's thrall
 death (T3 of `docs\Befund-Thrall-Felder-0611.md` 3.2; full proof `docs\Befund-P1a-ThrallTod-0711.md` in the main
@@ -346,6 +382,7 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Splash] Log` | 1 | 0.6.2: burst lines of the splash records (type in / out, main target, enemy switch verdict; changes nothing) |
 | `[Splash] MaxLines` | 2000 | 0.6.2: cap of the splash lines |
 | `[Death] TranslateNotify33` | 1 | 0.6.3 (T3): script notification 33 before EnterRegenerateDeath in the death check tru+0x220380, as the TU 0x822f6578 (hall02: finisher hint `hint_17`); 0 = PC; read again at run time (<= 1 / s) |
+| `[Melee] Translate` | 1 | 0.6.4 (T-M1 / T-M2): enemy MeleeAttack as the TU - messages 0x15 / 0x8a / 0xbe end the attack only without a data pointer (TU 0x82330d40), Enter sets brain+0xc bit 0 unless record+8 bit 2 (TU 0x8232fb48); 0 = nothing patched; start only |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 
