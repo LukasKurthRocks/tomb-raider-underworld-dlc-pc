@@ -27,6 +27,10 @@
 //    set, remove, the target list array build / destroy - and every evaluation of condition 2011 with its inputs.
 // 7. 0.6 (K14): the enemy damage function tru+0x237590 - entry probe counting the incoming damage types ([Damage]
 //    Log=1, changes nothing) and the TU's extension of its type switch 0..16 -> 0..27 ([Damage] Translate=1).
+// 8. 0.6.1: the LP <= 0 branch of the enemy impulse handler tru+0x224c60 (message 0x91, sent from Lara's contact
+//    callback inside the physics step) as the TU 0x82305ba0: death switch kind 7 instead of creating the chunkdoll at
+//    once (whose rigid bodies the locked physics step refuses -> fatal "ChunkDoll: failed to create geom")
+//    ([Chunk] Translate=1, default on; [Chunk] Log=1 burst lines).
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -43,7 +47,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.1 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -53,7 +57,8 @@ const char kVersion[] = "TruShadowCombat 0.6 (TU target list 7 -> 10, conditions
                         "rejected with reason / target, hit list, last condition 2011) for TruMenu's thrall labels, "
                         "WHY walks the rejected list by its next link +4; 0.6: K14 damage-type switch tru+0x237590 - burst log of "
                         "the incoming damage types ([Damage] Log) and the TU switch 0..27 ([Damage] Translate, off by "
-                        "default))";
+                        "default); 0.6.1: lethal impulse tru+0x224c60 as the TU 0x82305ba0 - death switch instead of a "
+                        "chunkdoll inside the physics step ([Chunk] Translate, on by default))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -3002,6 +3007,269 @@ void SetupDamage() {
     else Log(1, "0.6 damage switch (start): the game's (0..16, types 17..27 dropped) - [Damage] Translate=0");
 }
 
+// ---------------------------------------------------------------- 0.6.1: lethal impulse -> Death state (TU), no
+// chunkdoll inside the physics step (docs Befund-ChunkDoll-Physikschritt-0711.md)
+// Chain (PC, static + live stack 07.11.): PhysicsSystem::Step tru+0xf0ab0 sets the lock [phys+0x20f8] = 3 ->
+// tru+0x70530 -> contact pairs tru+0x6d200 -> pair callback [phys+0x20+(a*32+b)*8] = tru+0x92980 (geometry types 3 / 9,
+// registered tru+0x96b8f) -> message 0x26 to Lara -> CombatManager contact hit tru+0x319050: message 0x11c (damage,
+// with [Damage] Translate=1 Lara's types 18..27 bring LP <= 0) and message 0x91 (impulse) to the enemy -> enemy handler
+// tru+0x227a80 -> tru+0x2254b0 -> default handler brain+0x1c44 = tru+0x23b330, case 0x91 -> tru+0x224c60.
+// tru+0x224c60 = retail 0x82307ea8: LP <= 0 and a chunk record (+0x46) -> chunkdoll create tru+0x296f90 at once ->
+// rigid body tru+0x97270 -> AllocBody refuses while the lock bit 0 is set -> fatal "ChunkDoll: failed to create geom".
+// The TU (0x82305ba0, same size) removed that block: LP <= 0 -> if not IsInDeathState(inst) (0x82324700: brain+0x125c
+// is Death / LandDeath / DeferredInstantDie / DrownDeath / Fade) {v = 0; 0x8230e5c0(&v, inst, msg); death switch
+// 0x823258c8(inst, 1, 0, 1, kind 7, 1, v); return} else the hit-reaction path. The chunkdoll then comes from the Death
+// state's per-frame slot 8 (tru+0x26c950 = TU 0x8232cd50, same record +0x46 check) - in the enemy update, outside the
+// physics step. PC twins: IsDeathState tru+0x240e90 on [brain+0x125c] (the game does the same at tru+0x21f17c),
+// tru+0x256430 = retail 0x82310710 = TU 0x8230e5c0 (equal), death switch tru+0x241650 = retail 0x82327a18 / TU
+// 0x823258c8 (cdecl inst, vec16*, u8 -> data +0x18, ptr -> +0x10, u8 -> +0x1a, kind -> +0x14, u8 -> +0x1b).
+// [Chunk] Translate=1 (default): the first instruction of the PC branch (tru+0x224caa, mov eax, [edi+0x168], 6 bytes)
+// jumps to ChunkStub; Translate=0 at run time runs that instruction and the PC branch unchanged. [Chunk] Log=1: burst
+// lines (every 2 s, own thread) with the physics lock read at the moment.
+const DWORD kImpulseFn = 0x00624c60;          // retail 0x82307ea8, TU 0x82305ba0
+const DWORD kImpulseLethal = 0x00624caa;      // LP <= 0 branch: mov eax, [edi+0x168] (6 bytes) - patched
+const DWORD kImpulseLethalNext = 0x00624cb0;  // PC branch after that instruction
+const DWORD kImpulseAlive = 0x00624ccd;       // hit-reaction path (retail 0x82307f88, TU 0x82305c80)
+const DWORD kImpulseReturn = 0x00624cf1;      // pop edi; pop esi; mov esp, ebp; pop ebp; ret
+const DWORD kIsDeathState = 0x00640e90;       // cdecl int(state)
+const DWORD kHitVector = 0x00656430;          // cdecl (out vec16 aligned, inst, message)
+const DWORD kDeathSwitch = 0x00641650;        // cdecl (inst, vec16 aligned *, u8, ptr, u8, kind, u8)
+const DWORD kPhysPtr = 0x00a037f4;            // physics system; +0x20f8 lock (bit 0 = inside Step tru+0xf0ab0)
+const DWORD kTuDeathKind = 7;                 // TU 0x82305c58 li r7, 7
+typedef int(__cdecl *IsDeathStateFn)(DWORD state);
+typedef void(__cdecl *HitVectorFn)(float *out, BYTE *inst, void *message);
+typedef DWORD(__cdecl *DeathSwitchFn)(BYTE *inst, const float *vec, DWORD a2, DWORD a3, DWORD a4, DWORD kind, DWORD a6);
+int g_chunkTranslate = 1;          // [Chunk] Translate (read again at run time, at most once per second, while it is hit)
+int g_chunkLog = 1;                // [Chunk] Log
+int g_chunkMax = 2000;             // [Chunk] MaxLines
+bool g_chunkHooked = false;
+bool g_chunkFlusher = false;
+DWORD g_chunkSwitchTick = 0;
+DWORD g_chunkAliveTo = kImpulseAlive, g_chunkReturnTo = kImpulseReturn, g_chunkNextTo = kImpulseLethalNext;
+volatile LONG g_chunkLines = 0;
+CRITICAL_SECTION g_chunkLock;
+
+enum { kCDeath = 0, kCDying = 1, kCPc = 2 };
+struct ChunkSlot { BYTE *inst; int outcome, record; DWORD lock, count; float lp; char who[96]; };
+const int kChunkSlots = 16;
+ChunkSlot g_chunkSlot[kChunkSlots];
+int g_chunkUsed = 0;
+LONG g_chunkMissed = 0;
+DWORD g_chunkStart = 0;
+
+// read only, as tru+0x214610 / the inlined loop at tru+0x224caa: first entry of the list [brain+0x168] with +0x64,
+// its record word +0x46 (0 = no chunkdoll); -1 = no list (the game then asks the print stub tru+0x2457a0)
+int ChunkRecord(const BYTE *brain) {
+    const BYTE *e = brain ? reinterpret_cast<const BYTE *>(Rd(brain + 0x168)) : nullptr;
+    if (!e) return -1;
+    for (int i = 0; e && i < 64; ++i) {
+        const BYTE *r = reinterpret_cast<const BYTE *>(Rd(e + 0x64));
+        if (r) return (Rd(r + 0x44) >> 16) != 0 ? 1 : 0;
+        e = reinterpret_cast<const BYTE *>(Rd(e + 0x1c));
+    }
+    return 0;
+}
+
+void ChunkLine(const ChunkSlot &s) {
+    LONG n = InterlockedIncrement(&g_chunkLines);
+    if (n > g_chunkMax) {
+        if (n == g_chunkMax + 1) Log(1, "0.6.1 chunk: [Chunk] MaxLines %d reached - no more lines", g_chunkMax);
+        return;
+    }
+    char lock[64];
+    if (s.lock == 0xffffffff) strcpy_s(lock, sizeof(lock), "physics lock unread");
+    else _snprintf_s(lock, sizeof(lock), _TRUNCATE, "physics lock 0x%lx (%s)", s.lock,
+                     (s.lock & 1) ? "INSIDE the physics step" : "outside the step");
+    const char *rec = s.record > 0 ? "chunk record yes" : s.record == 0 ? "chunk record no" : "no record list";
+    const char *pc = s.record > 0 ? ((s.lock != 0xffffffff && (s.lock & 1))
+                                         ? "PC alone: chunkdoll NOW, bodies refused in the step -> fatal"
+                                         : "PC alone: chunkdoll now")
+                                  : "PC alone: hit reaction";
+    const char *what = s.outcome == kCDeath ? "TU: death switch (Death, kind 7) - chunkdoll left to the Death state"
+                     : s.outcome == kCDying ? "TU: already in a death state -> hit-reaction path"
+                                            : "PC branch ([Chunk] Translate=0)";
+    Log(1, "0.6.1 chunk: %s x%lu lethal impulse (message 0x91, tru+0x224c60) at LP %.0f, %s, %s: %s (%s)", s.who, s.count,
+        s.lp, lock, rec, what, pc);
+}
+
+void ChunkFlush(bool force) {
+    ChunkSlot copy[kChunkSlots];
+    int n = 0;
+    LONG missed = 0;
+    EnterCriticalSection(&g_chunkLock);
+    if (g_chunkUsed && (force || GetTickCount() - g_chunkStart >= 2000)) {
+        n = g_chunkUsed;
+        memcpy(copy, g_chunkSlot, sizeof(ChunkSlot) * static_cast<size_t>(n));
+        missed = g_chunkMissed;
+        g_chunkUsed = 0;
+        g_chunkMissed = 0;
+    }
+    LeaveCriticalSection(&g_chunkLock);
+    for (int k = 0; k < n; ++k) ChunkLine(copy[k]);
+    if (missed) Log(1, "0.6.1 chunk: %ld more lethal impulses in this window not counted", missed);
+}
+
+// writes the burst lines every 250 ms once their window is 2 s old (no game memory read or written here)
+DWORD WINAPI ChunkFlushThread(LPVOID) {
+    for (;;) {
+        Sleep(250);
+        ChunkFlush(false);
+    }
+}
+
+// game thread: count the event (name resolved once per new slot, every read SEH-guarded)
+void ChunkRecordEvent(BYTE *inst, const BYTE *brain, int outcome) {
+    const BYTE *phys = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kPhysPtr)));
+    const DWORD lock = phys ? Rd(phys + 0x20f8) : 0xffffffff;
+    const int record = ChunkRecord(brain);
+    const float lp = brain ? RdFloat(brain + 0x2c64) : 0.0f;
+    EnterCriticalSection(&g_chunkLock);
+    if (!g_chunkUsed) g_chunkStart = GetTickCount();
+    int k = 0;
+    for (; k < g_chunkUsed; ++k) {
+        const ChunkSlot &s = g_chunkSlot[k];
+        if (s.inst == inst && s.outcome == outcome && s.lock == lock && s.record == record) break;
+    }
+    if (k == g_chunkUsed) {
+        if (g_chunkUsed < kChunkSlots) {
+            ChunkSlot &s = g_chunkSlot[g_chunkUsed++];
+            memset(&s, 0, sizeof(s));
+            s.inst = inst; s.outcome = outcome; s.lock = lock; s.record = record;
+            Describe(inst, s.who, sizeof(s.who));
+        } else {
+            ++g_chunkMissed;
+            k = -1;
+        }
+    }
+    if (k >= 0) {
+        ++g_chunkSlot[k].count;
+        g_chunkSlot[k].lp = lp;
+    }
+    LeaveCriticalSection(&g_chunkLock);
+}
+
+// [Chunk] Translate again from the INI, at most once per second, on the game thread (when the branch is reached)
+void ChunkReadSwitch() {
+    if (!g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_chunkSwitchTick < 1000) return;
+    g_chunkSwitchTick = now;
+    const int t = GetPrivateProfileIntA("Chunk", "Translate", g_chunkTranslate, g_iniPath) ? 1 : 0;
+    if (t == g_chunkTranslate) return;
+    Log(1, "0.6.1 switch: [Chunk] Translate %d -> %d (read again from TruShadowCombat.ini) - %s", g_chunkTranslate, t,
+        t ? "lethal impulse as the TU (death switch kind 7)" : "the PC branch (chunkdoll at once)");
+    g_chunkTranslate = t;
+}
+
+// the TU's LP <= 0 branch of 0x82305ba0 on the PC; returns 1 = done (function returns), 0 = hit-reaction path,
+// 2 = run the PC branch (Translate=0)
+int __cdecl ChunkLethal(BYTE *brain, BYTE *inst, void *message) {
+    ChunkReadSwitch();
+    if (!g_chunkTranslate) {
+        if (g_chunkLog) ChunkRecordEvent(inst, brain, kCPc);
+        return 2;
+    }
+    // TU 0x82305c18: IsInDeathState(inst) = the layer-0 state brain+0x125c is one of the five death states
+    if (reinterpret_cast<IsDeathStateFn>(kIsDeathState)(*reinterpret_cast<const DWORD *>(brain + 0x125c)) != 0) {
+        if (g_chunkLog) ChunkRecordEvent(inst, brain, kCDying);
+        return 0;
+    }
+    if (g_chunkLog) ChunkRecordEvent(inst, brain, kCDeath);    // before the switch: LP / record as the hit left them
+    // TU 0x82305c2c..0x82305c70: v = 0 vector (0x8207db30 = PC [0x84111c] 0.0), 0x8230e5c0(&v, inst, msg),
+    // 0x823258c8(inst, 1, 0, 1, 7, 1, v)
+    __declspec(align(16)) float v[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    reinterpret_cast<HitVectorFn>(kHitVector)(v, inst, message);
+    reinterpret_cast<DeathSwitchFn>(kDeathSwitch)(inst, v, 1, 0, 1, kTuDeathKind, 1);
+    return 1;
+}
+
+// jumped to from tru+0x224caa: esi = instance, edi = brain, [ebp+0xc] = message (as the PC code at tru+0x224d39 /
+// tru+0x224c69); FPU stack empty (fcomp popped the LP); eax / ecx / edx are free (reloaded by every target)
+__declspec(naked) void ChunkStub() {
+    __asm {
+        push dword ptr [ebp + 0xc]
+        push esi
+        push edi
+        call ChunkLethal
+        add esp, 12
+        cmp eax, 1
+        je chunk_done
+        cmp eax, 2
+        je chunk_pc
+        jmp dword ptr [g_chunkAliveTo]
+    chunk_done:
+        jmp dword ptr [g_chunkReturnTo]
+    chunk_pc:
+        mov eax, dword ptr [edi + 0x168]
+        jmp dword ptr [g_chunkNextTo]
+    }
+}
+
+void SetupChunk() {
+    if (!g_chunkTranslate && !g_chunkLog) {
+        Log(1, "0.6.1 chunk: [Chunk] Translate=0 and Log=0 - tru+0x224c60 untouched (a later Translate=1 needs a restart)");
+        return;
+    }
+    // everything the branch and the replacement rely on (read only); a mismatch leaves the game untouched
+    struct { DWORD at; const char *hex; const char *what; } const facts[] = {
+        {kImpulseFn,
+         "55 8bec 83e4f0 83ec78 8b450c 56 8b7508 89442408 8b86d0020000 85c0 57 7504 33ff eb08 8b08 8bb9ec020000 85c0 7408 "
+         "8b10 8b82ec020000 d980642c0000 dc1db8148400 dfe0 f6c441 7a23 8b8768010000 85c0 750c e8e70a0200 85c0 7410 8d4900 "
+         "83786400 7531 8b401c 85c0 75f3 8b8768010000 85c0 750d e8c40a0200 85c0 0f8455010000 83785000 754f 8b401c 85c0 "
+         "75f3 5f 5e 8be5 5d c3 8b4064 85c0 74cf 6683784600 74c8 56 e885220700 83c404 84c0 74bb d905ac3c8400 51 8d4620 "
+         "d91c24 50 56 e8aa230700 56 e8e4750400 83c410 834e1420 5f 5e 8be5 5d c3",
+         "tru+0x224c60: brain in edi, LP <= 0.0 -> record +0x64 / +0x46 -> chunkdoll tru+0x296f90, else hit reaction "
+         "tru+0x224ccd, return tru+0x224cf1"},
+        {0x00624d39, "8b4c240c f30f10051c118400 51 8d542414",
+         "hit-reaction path: message = [esp+0xc], zero vector [0x84111c]"},
+        {0x00624d6a, "56 52 c787c811000000000000 c787cc11000000000000 0f2944241c e8a6160300 83c40c",
+         "hit-reaction path: tru+0x256430(&v, inst, message)"},
+        {0x0084111c, "00000000", "0.0f at 0x84111c"},
+        {0x0063b3dd, "6a17 8d4d08 e819b2fdff 84c0 74e8 8b5604 52 57 e86b98feff 83c408",
+         "enemy handler tru+0x23b330 case 0x91 -> tru+0x224c60(inst, message)"},
+        {kIsDeathState, "8b442404 3d04e98a00 741f 3d28e98a00 7418 3d7cef8a00 7411 3d34ef8a00 740a 3d4ce98a00 7403 33c0 c3 "
+                        "b801000000 c3",
+         "IsDeathState tru+0x240e90: Death, LandDeath, DeferredInstantDie, DrownDeath, Fade (= TU 0x82324700 order)"},
+        {0x0061f17c, "8b865c120000 50 e8081d0200", "the game's own IsDeathState([brain+0x125c]) at tru+0x21f17c"},
+        {kHitVector, "55 8bec 83e4f0 81ecc4000000 8b4508 8b4d0c 53 56 8b7510 0f57c0 0f2900",
+         "tru+0x256430(out, inst, message): out zeroed with movaps (16-byte aligned)"},
+        {kDeathSwitch,
+         "55 8bec 83e4f0 83ec24 53 8b5d0c 56 8b7514 57 8b7d08 85ff 0f84ad000000 8b87d0020000 85c0 0f849f000000 8b00 "
+         "8b80ec020000 85c0 0f848f000000 d9ee 51 8d88602c0000 d91c24 e8b461ffff 8b4d1c 8bc1 83e805 7409 83e802 7404 32c0 "
+         "eb02 b001 85f6 f30f100530118400 0f280b 894c2424 8a4d10 0fc6c000 0f59c1 0f29442410 c744242000000000 884c2428 "
+         "88442429 c644242b01 7404 89742420 807d2000 7505 c644242b00 8a5518 6a00 8d442414 50 6804e98a00 57 8854243a "
+         "e8d0bfffff 83c410 5f 5e 5b 8be5 5d c3",
+         "death switch tru+0x241650 (cdecl 7 arguments, EnemyState_Death 0x8ae904 via tru+0x23d6e0)"},
+        {0x004963ba, "a3f437a000", "physics system pointer [0xa037f4] (log only)"},
+        {0x004f0ab4, "c786f820000003000000", "Step tru+0xf0ab0: lock [phys+0x20f8] = 3 (log only)"},
+    };
+    for (const auto &f : facts)
+        if (!HexAt(f.at, f.hex)) {
+            Log(0, "0.6.1 chunk: %s at 0x%08lx does not match - lethal impulse left to the game (PC branch)", f.what, f.at);
+            return;
+        }
+    if (HexAt(0x005bcff9, "8b0dd094db00 52 8b14c1")) g_namesOk = true;
+    InitializeCriticalSection(&g_chunkLock);
+    BYTE j[6] = {0xe9, 0, 0, 0, 0, 0x90};
+    const DWORD rel = reinterpret_cast<DWORD>(&ChunkStub) - (kImpulseLethal + 5);
+    memcpy(j + 1, &rel, 4);
+    if (!WriteCode(kImpulseLethal, j, sizeof(j))) {
+        Log(0, "0.6.1 chunk: jump at tru+0x224caa failed - lethal impulse left to the game (PC branch)");
+        return;
+    }
+    g_chunkHooked = true;
+    if (g_chunkLog) {
+        HANDLE t = CreateThread(nullptr, 0, &ChunkFlushThread, nullptr, 0, nullptr);
+        if (t) { g_chunkFlusher = true; CloseHandle(t); }
+    }
+    Log(1, "0.6.1 chunk: tru+0x224caa (LP <= 0 branch of the impulse handler tru+0x224c60, message 0x91) -> plugin - "
+           "[Chunk] Translate %d (%s), log %d (burst lines every 2 s, max %d%s); read again at run time at most once per "
+           "second", g_chunkTranslate,
+        g_chunkTranslate ? "TU 0x82305ba0: death switch kind 7, the chunkdoll comes from the Death state outside the "
+                           "physics step" : "PC branch: chunkdoll at once",
+        g_chunkLog, g_chunkMax, g_chunkFlusher ? "" : ", no flush thread - lines only at the cap");
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -3031,6 +3299,10 @@ void ReadOptions(const char *dir) {
     g_dmgLog = GetPrivateProfileIntA("Damage", "Log", 1, ini) ? 1 : 0;
     g_dmgMax = GetPrivateProfileIntA("Damage", "MaxLines", 3000, ini);
     if (g_dmgMax < 0) g_dmgMax = 0;
+    g_chunkTranslate = GetPrivateProfileIntA("Chunk", "Translate", 1, ini) ? 1 : 0;   // 0.6.1
+    g_chunkLog = GetPrivateProfileIntA("Chunk", "Log", 1, ini) ? 1 : 0;
+    g_chunkMax = GetPrivateProfileIntA("Chunk", "MaxLines", 2000, ini);
+    if (g_chunkMax < 0) g_chunkMax = 0;
     if (g_diagMax < 0) g_diagMax = 0;
 }
 
@@ -3076,6 +3348,7 @@ void Start(HMODULE self) {
     SetupRegistration();
     SetupDiag();                      // 0.5.2: after every other byte check of this plugin
     SetupDamage();                    // 0.6: K14 (independent of the parts above)
+    SetupChunk();                     // 0.6.1: lethal impulse as the TU (independent of the parts above)
 }
 
 }  // namespace

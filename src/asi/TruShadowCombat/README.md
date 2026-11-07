@@ -1,4 +1,40 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.1)
+
+0.6.1 (2026-11-07, **offline, not yet seen in game**): the fatal `ChunkDoll: failed to create geom` after a thrall
+death with `[Damage] Translate=1` (`docs\Befund-ChunkDoll-Physikschritt-0711.md` in the main workspace). Build
+`work\asi\combat061`.
+* Chain (PC, code + live stack 07.11.): `PhysicsSystem::Step` tru+0xf0ab0 sets the lock `[phys+0x20f8] = 3` -> contact
+  pairs tru+0x6d200 -> pair callback tru+0x92980 (geometry types 3 / 9) -> message 0x26 to Lara -> CombatManager contact
+  hit tru+0x319050 sends the damage message 0x11c (with K14 the thrall's LP drops to <= 0) and then the impulse message
+  **0x91** to the enemy -> enemy handler tru+0x23b330 case 0x91 -> **tru+0x224c60**: LP <= 0 and a chunk record ->
+  chunkdoll create tru+0x296f90 **at once** -> rigid body tru+0x97270 -> `AllocBody` refuses inside the step (lock bit
+  0) -> fatal. Live 12:12 the lock read 3, 13 of 405 bodies used.
+* The TU changed exactly this branch (retail 0x82307ea8 -> TU 0x82305ba0, same size): no chunkdoll there any more;
+  unless the enemy is already in a death state (TU 0x82324700: Death, LandDeath, DeferredInstantDie, DrownDeath, Fade =
+  PC tru+0x240e90 on `[brain+0x125c]`) it computes the hit vector (TU 0x8230e5c0 = PC tru+0x256430, from a zero
+  vector) and calls the death switch (TU 0x823258c8 = PC tru+0x241650) with (1, 0, 1, **kind 7**, 1); otherwise the
+  hit-reaction path. The chunkdoll then comes from the Death state's per-frame slot 8 (tru+0x26c950 = TU 0x8232cd50,
+  same record check) in the enemy update - outside the physics step.
+* `[Chunk] Translate=1` (default **1**, a pure TU translation): the first instruction of the PC branch (tru+0x224caa,
+  `mov eax, [edi+0x168]`, 6 bytes) jumps into the plugin, which runs the TU branch with the game's own functions and
+  continues at the hit-reaction path tru+0x224ccd or the function's epilogue tru+0x224cf1. `Translate=0` (read again at
+  run time at most once per second when the branch is reached) runs the moved instruction and the PC branch unchanged.
+* `[Chunk] Log=1` (default, changes nothing): burst lines every 2 s from an own thread, per enemy / outcome:
+  `0.6.1 chunk: 0x... obj 1004 viking_thrall_tutorial_dlc2_ x1 lethal impulse (message 0x91, tru+0x224c60) at LP -17,
+  physics lock 0x3 (INSIDE the physics step), chunk record yes: TU: death switch (Death, kind 7) - chunkdoll left to
+  the Death state (PC alone: chunkdoll NOW, bodies refused in the step -> fatal)`. `[Chunk] MaxLines=2000`. With
+  `Translate=0` and `Log=0` nothing is patched.
+* New byte checks: 12 (`work\asi\combat061\prechecks_combat061.txt`); with 88 + 6 + 21 + 4 + 13: 144, 0 mismatches on
+  the Steam exe. Imports unchanged (81, KERNEL32 only); exports unchanged (4).
+* Not here: the swapped piece records of `viking_thrall_chunkdoll_dlc2_` (DTP 24559 +0x130 / +0x158) and
+  `yeti_thrall_armored_chunkdoll_dlc_2_` (DTP 26190 +0x150) are a converter fix.
+
+| # | TO TEST 0.6.1 (fresh start, DLC 2 hall01 / hall02 tutorial thralls, `[Damage] Translate=1`) | expected |
+|---|---|---|
+| 1 | load | `0.6.1 chunk: tru+0x224caa (...) -> plugin - [Chunk] Translate 1 (...)`, no "does not match" |
+| 2 | kill every tutorial thrall (combo / shadow moves) | no fatal; `0.6.1 chunk:` lines with `physics lock 0x3 (INSIDE the physics step)` and `TU: death switch`; pieces appear (TruTrace births, caller 0x00696bde) shortly after the death |
+| 3 | population 0 | the hall02 wall breaks |
+| 4 | trouble | `[Chunk] Translate=0` (PC branch at the next lethal impulse) |
 
 0.6 (2026-11-06, **offline, not yet seen in game**): K14 - the damage-type switch of the enemy damage function
 tru+0x237590 (TU 0x822f60e0, retail 0x822f87d8; `docs\Befund-K14-Schadensarten-0611.md` in the main workspace).
@@ -234,6 +270,12 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Diag] Condition2011` | 1 | 0.5.2: every evaluation of condition 2011 in doppelganger mode with its inputs |
 | `[Diag] MaxLines` | 4000 | 0.5.2: total cap of the diagnostic lines |
 | `[Diag] Snapshot` | 1 | 0.5.3: read-only export `TscTargeterSnapshot` for TruMenu's thrall labels (built only while asked) |
+| `[Damage] Translate` | 0 | 0.6: 1 = the TU damage-type switch 0..27; read again at run time (<= 1 / s while hits come) |
+| `[Damage] Log` | 1 | 0.6: burst lines of the incoming damage types (changes nothing) |
+| `[Damage] MaxLines` | 3000 | 0.6: cap of the damage lines |
+| `[Chunk] Translate` | 1 | 0.6.1: lethal impulse (message 0x91) as the TU - death switch kind 7 instead of a chunkdoll inside the physics step; 0 = PC branch; read again at run time (<= 1 / s) |
+| `[Chunk] Log` | 1 | 0.6.1: burst lines of the lethal impulses with the physics lock (changes nothing) |
+| `[Chunk] MaxLines` | 2000 | 0.6.1: cap of the chunk lines |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 
