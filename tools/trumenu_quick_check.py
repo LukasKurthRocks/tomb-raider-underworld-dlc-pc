@@ -2569,6 +2569,228 @@ def check_togglerows():
     return good
 
 
+# ---- 0.21.7 (2026-11-07/08 night build): footer Y, help line, UTF-8 cut, refused costumes, uber text, navmesh walk,
+# chapter units, shader live letters ----
+def fav_ok(row):                                  # QbFavOk: the rule of QbFavPin without its messages
+    return row is not None and row.kind not in ('label', 'group', 'planned') and row.id != '-' and not row.arg
+
+
+def check_yfooter():
+    """the footer's "Y: Favorit" / "Y: -" (QbFavOk) agrees with what Y does (QbFavPin in the 0.21.3 model QBar) for every
+    row kind, with / without an argument, special rows (None) - and the footer line stays within 64 characters"""
+    usable = {'cheat.flight', 'player.health', 'dbg.show', 'ai.kill', 'weapon.give', 'time.scale', 'level.load'}
+    rows = [QRow('cheat.flight', kind='bool'), QRow('player.health'), QRow('dbg.show', 'death', 'bool'),
+            QRow('ai.kill', 'others', confirm=True), QRow('-', 'ki_weg', 'group'), QRow('-', '', 'label'),
+            QRow('-', 'x|y', 'planned'), QRow('weapon.give', kind='choice'), QRow('time.scale', kind='value'),
+            QRow('level.load', 'dlc2_goo_room', confirm=True), None]
+    ok = True
+    for r in rows:
+        b = QBar([], usable)
+        got = b.frame(1, r, B_Y, 0, special='cp')
+        ok &= (got in ('add', 'del')) == fav_ok(r)
+    lines = []
+    for de in (True, False):
+        full = '%s  %s   %s' % ('X: ausfuehren  Y: Favorit' if de else 'X: run  Y: favourite',
+                                'L3: Befehlszeile' if de else 'L3: cmd line', 'View + Start: zu' if de else 'View + Start: close')
+        lines += [full, 'X: ausfuehren  Y: -' if de else 'X: run  Y: -']
+    ok &= all(len(l) <= 64 for l in lines)
+    print('yfooter: "Y: -" exactly where Y is refused (11 row kinds incl. special rows), footer <= 64 chars (%d)  %s'
+          % (max(len(l) for l in lines), 'ok' if ok else 'FAIL'))
+    return ok
+
+
+def utf8_trim(b):                                 # Utf8TrimTail on bytes
+    lead = len(b)
+    while lead > 0 and (b[lead - 1] & 0xc0) == 0x80: lead -= 1
+    if lead == 0: return b
+    c = b[lead - 1]
+    need = 4 if c >= 0xf0 else 3 if c >= 0xe0 else 2 if c >= 0xc0 else 1
+    return b[:lead - 1] if lead - 1 + need > len(b) else b
+
+
+def check_utf8cut(rng):
+    """SwCopyText: a German text cut at any byte length (strncpy_s _TRUNCATE into char[n]) and trimmed is valid UTF-8 and a
+    prefix of the text, at most one character lost"""
+    words = ['Doppelgängerin', 'Kostüm', 'Söldner-Sprache', 'Zustände 243-245', 'Tödlicher Stoß', 'außerhalb', 'Ä Ö Ü ß €']
+    ok, n = True, 0
+    for _ in range(3000):
+        text = ' '.join(rng.choice(words) for _ in range(rng.randrange(1, 6))).encode('utf-8')
+        size = rng.randrange(1, 70)
+        cut = utf8_trim(text[:size - 1])          # strncpy_s keeps size - 1 bytes + NUL
+        try:
+            s = cut.decode('utf-8')
+        except UnicodeDecodeError:
+            ok = False
+            continue
+        ok &= text.decode('utf-8').startswith(s) and len(text[:size - 1]) - len(cut) <= 3
+        n += 1
+    print('utf8cut: %d random German texts cut at random sizes: valid UTF-8, a prefix, at most one character lost  %s'
+          % (n, 'ok' if ok else 'FAIL'))
+    return ok
+
+
+def cos_pick(i, d, offered):                     # QbCosAct kQdCosPick with the 0.21.7 skip (None = every entry refused)
+    n = len(offered)
+    nxt = i
+    for _ in range(n):
+        nxt = cos_step(nxt, d, n)
+        if offered[nxt] != 0: break
+    return None if offered[nxt] == 0 else nxt
+
+
+def check_cosvalid(rng):
+    """refused cycle-list entries (the game's check 0x5c54e0 = 0) are never picked by left / right, the offered ones are all
+    reached in both directions (wrap), unknown (-1, not checked yet) counts as offered, all refused = refusal"""
+    ok = True
+    for _ in range(400):
+        n = rng.randrange(1, 40)
+        offered = [rng.choice((1, 1, 1, 0, -1)) for _ in range(n)]
+        good = {k for k in range(n) if offered[k] != 0}
+        for d in (-1, 1):
+            i, seen = rng.randrange(-1, n), set()
+            for _ in range(2 * n + 2):
+                i2 = cos_pick(i, d, offered)
+                if i2 is None:
+                    ok &= not good
+                    break
+                ok &= offered[i2] != 0
+                seen.add(i2)
+                i = i2
+            ok &= seen == good
+    print('cosvalid: 400 random lists: left / right never land on a refused entry, every offered one reached both ways, '
+          'all refused = refused  %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+
+GATE = {'nodes': ['closed', 'open', 'reset'], 'trans': {0: [(1, 2.0, 2)], 1: [(16, 1, 0), (1, 25.0, 0)], 2: [(16, 0, 1)]}}
+
+
+def uber_text(node, trans_target, t, wait):      # UberText on the gate graph DTP 20851 (gate-like, German)
+    names = GATE['nodes']
+    word = {'open': 'oben', 'closed': 'unten', 'reset': 'unten, bereit'}
+
+    def secs(s): return ('%.0f s' % s) if s >= 9.95 else ('%.1f s' % max(s, 0.0))
+    if trans_target is not None:
+        tgt = names[trans_target]
+        s = 'faehrt hoch' if tgt == 'open' else 'faehrt runter' if tgt == 'closed' else 'wechselt -> ' + word.get(tgt, tgt)
+        return s + (' (Animation)' if wait & 1 else '')
+    best, to = None, None
+    for cond, arg, target in GATE['trans'].get(node, []):
+        if cond != 1: continue
+        rest = max(arg - t, 0.0)
+        if best is None or rest < best: best, to = rest, target
+    name = names[node]
+    if best is None: return word.get(name, name)
+    if name == 'closed' and names[to] == 'reset': return 'unten, bereit in %s' % secs(best)
+    return '%s, noch %s' % (word.get(name, name), secs(best))
+
+
+def check_uber():
+    """UberText on the gate graph of docs/Befund-Tore-CavernsHall-0711.md section 3 (open -> closed after 25.0 s, closed ->
+    reset after 2.0 s, commands 16 never timed): the owner's wording, the countdown over a whole cycle"""
+    cases = [((1, None, 13.0, 0), 'oben, noch 12 s'), ((1, None, 24.2, 0), 'oben, noch 0.8 s'),
+             ((0, None, 0.5, 0), 'unten, bereit in 1.5 s'), ((2, None, 40.0, 0), 'unten, bereit'),
+             ((-1, 1, 0.0, 1), 'faehrt hoch (Animation)'), ((-1, 0, 0.0, 0), 'faehrt runter')]
+    ok = all(uber_text(*a) == want for a, want in cases)
+    last, mono = 99.0, True                       # the open node: the time left falls over the 25 s
+    for k in range(0, 251):
+        v = float(uber_text(1, None, k / 10.0, 0).split('noch ')[1].split(' s')[0])
+        mono &= v <= last + 1e-6
+        last = v
+    ok &= mono and last == 0.0
+    print('uber: gate texts "oben, noch 12 s" / "unten, bereit in 1.5 s" / "unten, bereit" / "faehrt hoch|runter", the '
+          'countdown falls 25 -> 0 s  %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+
+def check_navwalk(rng):
+    """NlCollect's walk of one graph's area block (0x41290b): area + 0x38 + 0x14 * (flags & 0x7f) visits every area of a
+    packed block exactly once and stops at the block end (random blocks, flag bits 26 / 27 / others do not disturb it);
+    the filled colour rule of 0x40c69a (red > magenta > yellow > green)"""
+    ok = True
+    for _ in range(300):
+        n = rng.randrange(1, 60)
+        edges = [rng.randrange(3, 12) for _ in range(n)]
+        flags = [e | (rng.randrange(2) << 26) | (rng.randrange(2) << 27) | (rng.randrange(0, 16) << 7) for e in edges]
+        starts, a = [], 0
+        for e in edges:
+            starts.append(a)
+            a += 0x38 + 0x14 * e
+        size, seen, a, k = a, [], 0, 0
+        while a < size and k < 20000:
+            seen.append(a)
+            a += 0x38 + 0x14 * (flags[starts.index(a)] & 0x7f)
+            k += 1
+        ok &= seen == starts and a == size
+
+    def fill(f, v): return 1 if f & (1 << 27) else 2 if f & (1 << 26) else 3 if ((v >> 12) & 0xf) > 1 else 0
+    ok &= [fill(1 << 27 | 1 << 26, 0), fill(1 << 26, 0x2000), fill(0, 0x2000), fill(0, 0x1000), fill(0, 0x0f00)] == [1, 2, 3, 0, 0]
+    print('navwalk: 300 random area blocks walked area by area to the exact end; fill colour red > magenta > yellow > '
+          'green  %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+
+def check_chapters():
+    """page Kapitel: the groups of the level list kUnits (TruMenu.cpp) in order, one open at a time; with any one group
+    open the page stays within 64 rows; DLC 2 units other than dlc_level2_start carry the note"""
+    import os, re
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'asi', 'TruMenu',
+                            'TruMenu.cpp'), encoding='utf-8').read()
+    block = src[src.index('const UnitRow kUnits[] = {'):]
+    units = re.findall(r'\{"([^"]+)", "([^"]+)", "[^"]+"\}', block[:block.index('\n};')])
+    groups = []
+    for g, _ in units:
+        if g not in groups: groups.append(g)
+    sizes = [sum(1 for x, _ in units if x == g) for g in groups]
+    ok = len(units) == 111 and len(groups) == 10
+    open_g = -1
+    for g in [3, 3, 8, -1, 9, 0, 6]:              # open 3, again, 8 (3 closes), close, 9, 0, 6 (the largest: l1? no - any)
+        open_g = g
+        ok &= 10 + len(groups) + (sizes[open_g] if open_g >= 0 else 0) <= 64
+    ok &= 10 + len(groups) + max(sizes) <= 64
+    notes = [u for g, u in units if g == 'DLC 2' and u != 'dlc_level2_start']
+    ok &= len(notes) == 10 and 'dlc_yggdrasil_hall02' in notes
+    print('chapters: %d units in %d groups from kUnits, one group open, page <= 64 rows (largest group %d), %d DLC 2 units '
+          'with the note  %s' % (len(units), len(groups), max(sizes), len(notes), 'ok' if ok else 'FAIL'))
+    return ok
+
+
+def sh_live(file_slots, pc, sur, live, first_new=2047, file_status='SURR'):   # ShLive: letters + status
+    letters = []
+    for k in range(4):
+        lid = live[k]
+        if lid is None:
+            letters.append('-')
+            continue
+        c = '?'
+        if lid and lid == pc[k]: c = file_slots[k]
+        elif lid and lid == sur[k]: c = 'S'
+        elif lid >= first_new: c = 'T'
+        letters.append(c)
+    s = ''.join(letters)
+    if all(x is None for x in live): return s, 'LEER'
+    if s == file_slots: return s, file_status
+    if s[2] == 'S': return s, 'SURR'
+    if 'S' in s: return s, 'PART'
+    if '?' in s: return s, 'UNK'
+    if 'T' in s: return s, 'TU'
+    return s, file_status
+
+
+def check_shlive():
+    """ShLive on material 23164 (docs/Befund-Shader-Etiketten-0711.md 1.3): installed = file (SURR S-SS), the 50m / 50o
+    test copy (PS2 2851) = S-TS PART, 51x (2988) = S-TS, a full translation T-TT = TU, cleared slots = LEER, an unknown
+    base-game lib = ?"""
+    pc, sur, slots = (1909, None, 1910, 1911), (1909, None, 1910, 1911), 'S-SS'
+    cases = [((1909, None, 1910, 1911), ('S-SS', 'SURR')), ((1909, None, 2851, 1911), ('S-TS', 'PART')),
+             ((1909, None, 2988, 1911), ('S-TS', 'PART')), ((2491, None, 2851, 2900), ('T-TT', 'TU')),
+             ((None, None, None, None), ('----', 'LEER')), ((1909, None, 1090, 1911), ('S-?S', 'PART'))]
+    ok = all(sh_live(slots, pc, sur, live) == want for live, want in cases)
+    print('shlive: 23164 installed S-SS SURR, test copy 2851 / 2988 S-TS PART, full T-TT TU, cleared LEER, foreign lib ?  %s'
+          % ('ok' if ok else 'FAIL'))
+    return ok
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -2583,7 +2805,9 @@ def main():
                check_h2drift(), check_fixhall02(), check_scriptval(rng),              # 0.21.4
                check_switches(), check_swfold(), check_ringparity(),                  # 0.21.5
                check_cosbar(), check_cosdebounce(), check_flighthint(rng), check_quickcmd(),   # 0.21.6
-               check_togglerows()]
+               check_togglerows(),
+               check_yfooter(), check_utf8cut(rng), check_cosvalid(rng), check_uber(), check_navwalk(rng),   # 0.21.7
+               check_chapters(), check_shlive()]
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

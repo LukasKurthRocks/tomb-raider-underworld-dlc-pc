@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -534,6 +534,14 @@ const OptDef kOpts[] = {
                              "planner_connectivity, planner_area_normals, obstacles,\nrecent_navprobes, draw_mover3d_path"},
     {"Debug", "NavMask", "0", "0.12: 1 = together with NavDraw also nav.mask 1 (planner layer mask [0x88e454] = 0xffffffff: "
                               "every layer is drawn);\n0 = the game's mask"},
+    {"Debug", "NavLabels", "0", "0.21.7: 1 = navmesh labels on from the start (nav.labels): layer / graph / area number and "
+                                "the flag bits the engine\ncolours by, at the areas of the drawn layers near Lara, plus the "
+                                "colour legend (read only)"},
+    {"Debug", "NavLabelRadius", "3000", "0.21.7: navmesh labels only up to this distance from Lara to the area centre (game "
+                                        "units, 500 .. 30000)"},
+    {"Debug", "NavLabelMax", "40", "0.21.7: at most this many navmesh labels, the nearest first, 1 .. 64"},
+    {"Debug", "SapWatch", "1", "0.21.7: 1 = read the SweepAndPrune pool of the markup collision every 250 ms (boxes / pair "
+                               "links / proxies,\npeaks, full frames; sap.status, a log line per new peak); 0 = off"},
     {"Debug", "Labels", "0", "0.13: 1 = Thrall-Labels on from the start (needs Enabled=1; item dbg.labels, ring Spieler / "
                              "Debug): a text label at each\nthrall near Lara - name, intro id, distance, health, "
                              "targeter 9 / hit list / condition 2011 from TruShadowCombat 0.5.3\n(read-only, in a loaded "
@@ -544,6 +552,14 @@ const OptDef kOpts[] = {
                                       "instance in the radius"},
     {"Debug", "LabelCross", "1", "0.13: 1 = a magenta cross at Lara's position (+0x20) projected the same way - the live "
                                  "check of the projection; 0 = none"},
+    {"Debug", "UberLabels", "0", "0.21.7: 1 = uber labels on from the start (dbg.uber): gates / platforms / switches near "
+                                 "Lara with their state\nand the time left (\"Tor: oben, noch 12 s\"); read only"},
+    {"Debug", "UberRadius", "8000", "0.21.7: uber labels only up to this distance from Lara (game units, 500 .. 50000; "
+                                    "live 2026-11-07 the\ndlc_caverns_hall gates stood 3165 / 3357 units away - beyond "
+                                    "LabelRadius 3000)"},
+    {"Debug", "UberMax", "12", "0.21.7: at most this many uber labels, the nearest first, 1 .. 32"},
+    {"Debug", "UberMatch", "switch,lever", "0.21.7: comma list of object name parts that get an uber label without an "
+                                           "uber state too (switches);\nempty = uber states only"},
     {"Debug", "View", "0", "0.14: 1 = the whole debug view on from the start (dbg.view: every layer below, Labels, Markup, "
                            "and ViewNav as NavDraw when\nNavDraw is empty; needs Enabled=1); 0 = only the single keys"},
     {"Debug", "ViewNav", "planner_areas,planner_connectivity,obstacles", "0.14: the NavPower switches dbg.view turns on "
@@ -756,6 +772,16 @@ const OptDef kOpts[] = {
                                     "below 100"},
     {"Camera", "Rumble", "100", "0.21 (cam.rumble): pad rumble in percent, 0 = off, 100 = the game's own (no patch); the "
                                 "XInputSetState pointer\n[0xa02b90] is wrapped while below 100"},
+    {"Shader", "Labels", "0", "0.21.7: 1 = shader labels on from the start (shader.labels): terrain batches near Lara with "
+                              "material id,\nfile status / slots and the live shader libs (read only; needs File)"},
+    {"Shader", "File", "TruMenu.shaderlabel.txt", "0.21.7: the label data next to tru.exe (tools/shader_labels.py build "
+                                                  "MODS OUT, then\nOUT\\shaderlabel.txt copied as this name)"},
+    {"Shader", "LabelRadius", "15000", "0.21.7: batches only up to this distance from Lara to their box (game units, 1000 "
+                                       ".. 100000)"},
+    {"Shader", "LabelMax", "40", "0.21.7: at most this many shader labels, the nearest first (one per material within 2000 "
+                                 "units),\n1 .. 64"},
+    {"Shader", "ShowOrig", "0", "0.21.7: 1 = also batches whose material is original (ORIG / BASE in the file); 0 = only "
+                                "surrogate /\npartial / translated / unknown"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -1014,6 +1040,7 @@ bool WriteDword(DWORD address, DWORD value) {
 void RunPending();     // items section below
 bool InLevel();
 void WeaponsTick();    // 0.3 costume switch: player message 35 a frame later
+void CosValidTick();   // 0.21.7 bar page Kostueme: the game's costume check per cycle-list entry (game thread)
 void InvincibleTick(); // 0.3 player.invincible: health = MaxHealth once per game frame
 void CheatsTick();     // 0.8 Cheats page: [Cheats] Persist restore, infinite ammo re-apply (game thread)
 void SaveLoadTick();   // 0.18 save.load: a confirmed request, then its progress (game thread)
@@ -1326,6 +1353,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         g_lastClock = clock;
         if (!g_menuOpen && connected) FlightTick(copy);
         WeaponsTick();
+        CosValidTick();                       // 0.21.7: only while page Kostueme is shown and the list changed
         InvincibleTick();
         NoDamageTick();                       // 0.10.2: cheat.godfull no-damage bit [0xfada74] & 0x20000
         CheatsTick();                         // 0.8: [Cheats] Persist restore, infinite ammo re-apply
@@ -6652,6 +6680,1133 @@ const char *LabelRadWhy() {
     if (!g_lblOk) return g_lblWhy;
     return "";
 }
+
+// ---- 0.21.7 uber labels (Lukas 2026-11-07 "Tor 1: oben, noch 12 s / faehrt runter / unten, bereit"; TODO "Uber-Objekt-
+// Anzeige (Tore, Plattformen)"; docs\Befund-Tore-CavernsHall-0711.md section 4) ----
+// A label at each uberobject instance near Lara - gates, platforms, every instance with an uber state, plus instances
+// whose object name holds a part of [Debug] UberMatch (switches) - with the state-graph node and the time left in it.
+// The read path is the engine's own; every instruction it relies on is a byte check (kUbChecks, pinned in
+// work\asi\menu0217\precheck_0217.txt):
+//   0x4d5d59 .. 0x4d5d82  p = [inst+0x2d0], u = [[p]+0x2ec], state b = u - 0x10, valid only when [b+0x70] == 0xF0012345
+//   0x4d4b60              node k = [[b+0x78]+8] + 28 * [b+0x84]; its transitions: count [node+0xc], pointers [node+0x10]
+//   0x4d31e0 / 0x4d3204   condition [trans+0x18] (table 0x4d327c by the byte 0x4d3294[cond - 1]); condition 1 = "time in
+//                         the node": float [b+0x88] >= float [trans+0x1c] - 0.001 -> time left = [trans+0x1c] - [b+0x88]
+//   0x4d7607 .. 0x4d764c  a running transition [b+0x80] (node -1) waits while [b+0x8c] != 0 (bit 0 = the animation),
+//                         then node = [trans+4]; in a node the update checks the transitions and adds dt to [b+0x88]
+// Node names come from the DTP data (DESC +4 node count, node +8 char* name; tools/dtp_schema.py tag D, work\gates_0711\
+// uber_gate.txt: gate 20851 nodes closed / open / reset, open -> closed after 25.0 s) - display only (ReadString). Read
+// only: nothing is written, no game function is called. Independent of dbg.labels (LabelMatch "thrall", LabelRadius
+// 3000 - the dlc_caverns_hall gates stood 3165 / 3357 units away): own radius [Debug] UberRadius from Lara (default
+// 8000) and [Debug] UberMax (the nearest first). Cost: one walk of the instance list per frame while on, the radius test
+// first, four reads per instance in the radius.
+const NavCheckBytes kUbChecks[] = {          // (the 0.12 {address, hex} row type; checked in UberCheck)
+    {0x004d5d59, "8b87d0020000 85c0 0f84ab000000 8b00 8b80ec020000 85c0 0f849b000000 8d48f0 85c9 0f8490000000 "
+                 "817970452301f0"},                                  // inst -> uber state, magic 0xF0012345 at +0x70
+    {0x004d4b60, "53 55 57 8bf9 8b8784000000 8b5778 8d0cc500000000 2bc8 8b4208 8d1c88 33ed 396b0c 7657 56 8b4b10 8b34a9"},
+    {0x004d31e0, "56 8b742408 8b5618 83c2ff 32c0 83fa0b 0f8780000000 0fb69294324d00 ff24957c324d00 d98188000000 d9461c"},
+    {0x004d327c, "04324d00"},                                        // condition table [0] = 0x4d3204 (time in node)
+    {0x004d3294, "00"},                                              // .. condition 1 -> table entry 0
+    {0x004d7607, "8b8e80000000 85c9 7434 8b868c000000 a801"},        // running transition +0x80, wait bits +0x8c
+    {0x004d762d, "83be8c00000000 7526 8b4904"},                      // .. done: node = [trans+4]
+    {0x004d764c, "d98688000000 d8442408 d99e88000000"},              // in a node: +0x88 += dt
+};
+const DWORD kUbMagic = 0xf0012345;
+bool g_ubOk = false;
+char g_ubWhy[96] = "not checked";
+volatile LONG g_ubOn = 0;                    // dbg.uber ([Debug] UberLabels)
+float g_ubRadius = 8000.0f;                  // [Debug] UberRadius (from Lara)
+int g_ubMax = 12;                            // [Debug] UberMax
+char g_ubMatch[96] = "switch,lever";         // [Debug] UberMatch: name parts labelled without an uber state too
+int g_ubShown = 0, g_ubFound = 0;            // last frame: labels drawn / uber instances in the radius
+char g_ubState[160] = "off";
+// start: every row of kUbChecks (one log line; a mismatch keeps dbg.uber / uber.dump off)
+void UberCheck() {
+    const int total = static_cast<int>(sizeof(kUbChecks) / sizeof(kUbChecks[0]));
+    int bad = 0;
+    DWORD first = 0;
+    for (const NavCheckBytes &c : kUbChecks)
+        if (!HexBytesAt(c.at, c.hex) && !bad++) first = c.at;
+    g_ubOk = bad == 0;
+    if (bad) Out(g_ubWhy, sizeof(g_ubWhy), "code check failed at 0x%08lx (%d of %d)", first, bad, total);
+    else Out(g_ubWhy, sizeof(g_ubWhy), "ok");
+    Log(g_ubOk ? 1 : 0, "0.21.7 uber labels: checks %s (%d rows); [Debug] UberLabels %ld, UberRadius %.0f, UberMax %d, "
+        "UberMatch '%s'", g_ubWhy, total, g_ubOn, g_ubRadius, g_ubMax, g_ubMatch);
+}
+// the uber state of an instance (0 = none): the engine's path 0x4d5d59 .. 0x4d5d82
+DWORD UberStateOf(DWORD inst) {
+    DWORD p = 0, a = 0, u = 0, magic = 0;
+    if (!ReadDword(inst + 0x2d0, &p) || !p || !ReadDword(p, &a) || !a || !ReadDword(a + 0x2ec, &u) || u < 0x10) return 0;
+    const DWORD b = u - 0x10;
+    return ReadDword(b + 0x70, &magic) && magic == kUbMagic ? b : 0;
+}
+// the name of node k of the state's DESC ("" = none / out of range)
+void UberNodeName(DWORD b, LONG k, char *o, size_t n) {
+    o[0] = 0;
+    DWORD desc = 0, count = 0, nodes = 0, name = 0;
+    if (k < 0 || !ReadDword(b + 0x78, &desc) || !desc || !ReadDword(desc + 4, &count) || count > 64 ||
+        static_cast<DWORD>(k) >= count || !ReadDword(desc + 8, &nodes) || !nodes)
+        return;
+    if (!ReadDword(nodes + 28 * static_cast<DWORD>(k) + 8, &name) || !name || !ReadString(name, o, n)) o[0] = 0;
+    for (char *c = o; *c; ++c) if (static_cast<unsigned char>(*c) < 32 || static_cast<unsigned char>(*c) > 126) *c = '?';
+}
+// "12 s" / "1.5 s"
+void UberSeconds(float s, char *o, size_t n) {
+    if (s >= 9.95f) Out(o, n, "%.0f s", static_cast<double>(s));
+    else Out(o, n, "%.1f s", static_cast<double>(s < 0.0f ? 0.0f : s));
+}
+// a node name in words: gate-like objects (name holds "gate") read open / closed / reset as up / down / ready
+const char *UberWord(const char *node, bool gate, bool de) {
+    if (gate && !_stricmp(node, "open")) return de ? "oben" : "up";
+    if (gate && !_stricmp(node, "closed")) return de ? "unten" : "down";
+    if (gate && !_stricmp(node, "reset")) return de ? "unten, bereit" : "down, ready";
+    return node[0] ? node : "?";
+}
+// the state line of uber state b: node + time left, or the running transition
+void UberText(DWORD b, bool gate, bool de, char *o, size_t n) {
+    DWORD trans = 0, wait = 0, node = 0;
+    float t = 0.0f;
+    ReadDword(b + 0x80, &trans);
+    ReadDword(b + 0x84, &node);
+    ReadDword(b + 0x8c, &wait);
+    if (!ReadFloats(b + 0x88, &t, 1) || !(t > -1.0e6f && t < 1.0e6f)) t = 0.0f;
+    char name[48], target[48];
+    if (trans) {                             // running transition: the engine waits for the animation (+0x8c)
+        DWORD to = 0;
+        ReadDword(trans + 4, &to);
+        UberNodeName(b, static_cast<LONG>(to), target, sizeof(target));
+        if (gate && !_stricmp(target, "open")) Out(o, n, "%s", de ? "faehrt hoch" : "moving up");
+        else if (gate && !_stricmp(target, "closed")) Out(o, n, "%s", de ? "faehrt runter" : "moving down");
+        else Out(o, n, "%s -> %s", de ? "wechselt" : "moving", UberWord(target, gate, de));
+        if (wait & 1) strncat_s(o, n, de ? " (Animation)" : " (animation)", _TRUNCATE);
+        return;
+    }
+    const LONG k = static_cast<LONG>(node);
+    UberNodeName(b, k, name, sizeof(name));
+    float best = -1.0f;                      // the soonest timed transition of this node (condition 1)
+    LONG bestTo = -1;
+    DWORD desc = 0, nodes = 0, nt = 0, arr = 0;
+    if (k >= 0 && ReadDword(b + 0x78, &desc) && desc && ReadDword(desc + 8, &nodes) && nodes &&
+        ReadDword(nodes + 28 * static_cast<DWORD>(k) + 0xc, &nt) && nt <= 16 &&
+        ReadDword(nodes + 28 * static_cast<DWORD>(k) + 0x10, &arr) && arr) {
+        for (DWORD j = 0; j < nt; ++j) {
+            DWORD tr = 0, cond = 0, to = 0;
+            float arg = 0.0f;
+            if (!ReadDword(arr + 4 * j, &tr) || !tr || !ReadDword(tr + 0x18, &cond) || cond != 1 ||
+                !ReadFloats(tr + 0x1c, &arg, 1) || !(arg >= 0.0f && arg < 1.0e6f))
+                continue;
+            ReadDword(tr + 4, &to);
+            const float rest = arg - t;
+            if (best < 0.0f || rest < best) { best = rest < 0.0f ? 0.0f : rest; bestTo = static_cast<LONG>(to); }
+        }
+    }
+    char secs[24];
+    if (best < 0.0f) { Out(o, n, "%s", UberWord(name, gate, de)); return; }
+    UberSeconds(best, secs, sizeof(secs));
+    UberNodeName(b, bestTo, target, sizeof(target));
+    if (gate && !_stricmp(name, "closed") && !_stricmp(target, "reset"))
+        Out(o, n, de ? "unten, bereit in %s" : "down, ready in %s", secs);
+    else if (gate) Out(o, n, de ? "%s, noch %s" : "%s, %s left", UberWord(name, gate, de), secs);
+    else Out(o, n, de ? "%s, noch %s -> %s" : "%s, %s left -> %s", UberWord(name, gate, de), secs, UberWord(target, gate, de));
+}
+// does the object name hold a part of [Debug] UberMatch
+bool UberNameMatch(const char *name) {
+    char low[64], list[sizeof(g_ubMatch)];
+    strncpy_s(low, sizeof(low), name, _TRUNCATE);
+    _strlwr_s(low, sizeof(low));
+    strncpy_s(list, sizeof(list), g_ubMatch, _TRUNCATE);
+    _strlwr_s(list, sizeof(list));
+    char *context = nullptr;
+    for (char *part = strtok_s(list, ", ", &context); part; part = strtok_s(nullptr, ", ", &context))
+        if (strstr(low, part)) return true;
+    return false;
+}
+struct UbCand { DWORD inst, state; float pos[3], dist2; };
+UbCand g_ubCand[33];
+// the nearest uber / matching instances within UberRadius of Lara (count = filled), *found = uber states in the radius
+int UberCollect(UbCand *out, int max, const float *lara, DWORD player, int *found) {
+    const float r2 = g_ubRadius * g_ubRadius;
+    int count = 0;
+    *found = 0;
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0;
+        float p[3];
+        if (inst != player && ReadFloats(inst + kInstancePosition, p, 3)) {
+            const float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2], d2 = dx * dx + dy * dy + dz * dz;
+            if (d2 <= r2) {                  // the radius first: four reads only for instances near Lara
+                const DWORD b = UberStateOf(inst);
+                bool take = b != 0;
+                if (b) ++*found;
+                else if (g_ubMatch[0]) {
+                    DWORD object = 0, oid = 0;
+                    char name[64];
+                    take = ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid) &&
+                           ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name)) && UberNameMatch(name);
+                }
+                if (take) {
+                    int at = count;
+                    while (at > 0 && out[at - 1].dist2 > d2) --at;
+                    if (at < max) {
+                        const int last = count < max ? count : max - 1;
+                        for (int k = last; k > at; --k) out[k] = out[k - 1];
+                        out[at].inst = inst;
+                        out[at].state = b;
+                        out[at].pos[0] = p[0]; out[at].pos[1] = p[1]; out[at].pos[2] = p[2];
+                        out[at].dist2 = d2;
+                        if (count < max) ++count;
+                    }
+                }
+            }
+        }
+        if (!ReadDword(inst + 8, &next)) break;
+        inst = next;
+    }
+    return count;
+}
+// Present, every frame while dbg.uber is on (the 0.13 projection and label box)
+void DrawUberLabels() {
+    char why[160];
+    g_ubShown = g_ubFound = 0;
+    if (!g_debugEnabled || !g_lblOk || !g_ubOk) {
+        Out(g_ubState, sizeof(g_ubState), "%s", !g_debugEnabled ? "[Debug] Enabled=0" : !g_lblOk ? g_lblWhy : g_ubWhy);
+        return;
+    }
+    if (!LabelWorldReady(why, sizeof(why))) { Out(g_ubState, sizeof(g_ubState), "waits: %s", why); return; }
+    ImGuiIO &io = ImGui::GetIO();
+    View v;
+    if (!ReadView(&v, io.DisplaySize.x, io.DisplaySize.y) || !ReadFloats(kLblMatrix, v.m, 16)) return;
+    DWORD player = 0;
+    float lara[3];
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
+    const int max = g_ubMax < 1 ? 1 : g_ubMax > 32 ? 32 : g_ubMax;
+    const int count = UberCollect(g_ubCand, max, lara, player, &g_ubFound);
+    const bool de = g_qbLang == 0;
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    for (int i = 0; i < count; ++i) {
+        const UbCand &c = g_ubCand[i];
+        ImVec2 at;
+        if (!Project(v, c.pos, &at)) continue;
+        DWORD object = 0, oid = 0, intro = 0;
+        ReadDword(c.inst + 0x10, &object);
+        if (object) ReadDword(object + 0x14, &oid);
+        ReadDword(c.inst + 0x58, &intro);
+        char name[64], low[64], line1[160], line2[160];
+        if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        strncpy_s(low, sizeof(low), name, _TRUNCATE);
+        _strlwr_s(low, sizeof(low));
+        const bool gate = strstr(low, "gate") != nullptr;
+        Out(line1, sizeof(line1), "%s %ld | %.0f", name, static_cast<LONG>(intro), sqrtf(c.dist2));
+        if (c.state) UberText(c.state, gate, de, line2, sizeof(line2));
+        else Out(line2, sizeof(line2), "%s", de ? "(kein Uber-Zustand)" : "(no uber state)");
+        if (c.state && gate) {               // "Tor: oben, noch 12 s"
+            char t[160];
+            Out(t, sizeof(t), "%s: %s", de ? "Tor" : "Gate", line2);
+            strncpy_s(line2, sizeof(line2), t, _TRUNCATE);
+        }
+        LabelDraw(dl, at, line1, line2, c.state ? IM_COL32(255, 210, 90, 255) : IM_COL32(200, 200, 200, 255));
+        ++g_ubShown;
+    }
+    Out(g_ubState, sizeof(g_ubState), "%d shown, %d uber states in %.0f units (UberMatch '%s')", g_ubShown, g_ubFound,
+        g_ubRadius, g_ubMatch);
+}
+void ValUber(char *o, size_t n) { Out(o, n, "%ld (%s)", g_ubOn, g_ubState); }
+bool RunUber(const char *arg, char *o, size_t n) {
+    if (!g_ubOk) { Out(o, n, "disabled: pre-check failed (%s)", g_ubWhy); return false; }
+    const bool on = BoolArg(arg, g_ubOn != 0);
+    InterlockedExchange(&g_ubOn, on ? 1 : 0);
+    Log(1, "dbg.uber %d (src=%s): radius %.0f, max %d, UberMatch '%s'", on ? 1 : 0, ShotSource("dbg.uber"), g_ubRadius,
+        g_ubMax, g_ubMatch);
+    Out(o, n, "dbg.uber %d%s", on ? 1 : 0, on && !g_lblOk ? " - needs the 0.13 label checks" : "");
+    return true;
+}
+// uber.dump: every uber instance within UberRadius of Lara with its state into TruMenu.log (read only)
+bool RunUberDump(const char *, char *o, size_t n) {
+    if (!g_ubOk) { Out(o, n, "disabled: pre-check failed (%s)", g_ubWhy); return false; }
+    DWORD player = 0;
+    float lara[3];
+    if (!InLevel() || !ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) {
+        Out(o, n, "needs a level");
+        return false;
+    }
+    UbCand cand[33];
+    int found = 0;
+    const int count = UberCollect(cand, 32, lara, player, &found);
+    for (int i = 0; i < count; ++i) {
+        DWORD object = 0, oid = 0, intro = 0, node = 0, trans = 0, wait = 0;
+        float t = 0.0f;
+        ReadDword(cand[i].inst + 0x10, &object);
+        if (object) ReadDword(object + 0x14, &oid);
+        ReadDword(cand[i].inst + 0x58, &intro);
+        char name[64], low[64], text[160] = "-";
+        if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        strncpy_s(low, sizeof(low), name, _TRUNCATE);
+        _strlwr_s(low, sizeof(low));
+        if (cand[i].state) {
+            UberText(cand[i].state, strstr(low, "gate") != nullptr, true, text, sizeof(text));
+            ReadDword(cand[i].state + 0x84, &node);
+            ReadDword(cand[i].state + 0x80, &trans);
+            ReadDword(cand[i].state + 0x8c, &wait);
+            ReadFloats(cand[i].state + 0x88, &t, 1);
+        }
+        Log(1, "uber.dump %s %ld at %.0f units: %s (state 0x%08lx node %ld trans 0x%08lx t %.2f wait 0x%lx)", name,
+            static_cast<LONG>(intro), sqrtf(cand[i].dist2), text, cand[i].state, static_cast<LONG>(node), trans,
+            static_cast<double>(t), wait);
+    }
+    Out(o, n, "%d logged (%d uber states within %.0f units of Lara)", count, found, g_ubRadius);
+    return true;
+}
+// ---- end of 0.21.7 uber labels ----
+
+// ---- 0.21.7 shader labels (stage S1 of docs\Befund-Shader-Etiketten-0711.md section 4; owner 2026-11-07 22:3x: the
+// light columns of dlc_yggdrasil_end - material 23164 "Goo-Roehre", terrain 20969 / 20273 - with material + shader
+// status; "the label must read the live state ... or show both") ----
+// Data: TruMenu.shaderlabel.txt next to tru.exe ([Shader] File; written by tools/shader_labels.py build - game ids,
+// status and box centres only, generated locally, not in the repository): M lines (material, file status, slot letters,
+// PC libs, surrogate libs, note), B lines (terrain batches: drm, owner unit, section, material, status, box centre / size
+// in the data frame), U / G / O lines are not used here. Live (read only, every row a byte check kShChecks, the list of
+// work\shaderlabel_0711\precheck_shaderlabel.txt, pinned again in work\asi\menu0217\precheck_0217.txt):
+//   material id -> PCMaterial*: MaterialSection hash map {u32 buckets [0x8a6ebc], node** [0x8a6ec4]}, bucket = id %
+//     buckets, node {+0 next, +4 id, +8 PCMaterial*} (0x550ae0 / 0x550b00, insert 0x551e84); PCMaterial vtable 0x849018
+//   PCMaterial -> its 4 shader libs: [mat+4] = data, +0x28 / +0x2c / +0x30 / +0x34 = PCShaderLib* PS0 / PS1 / PS2 / VS
+//     (0x5059a0 .. 0x5059d0; 0 = the engine cleared the slot)
+//   lib pointer -> lib id: ShaderLibSection hash map {u32 buckets [0x8a6ef0], node** [0x8a6ef8]}, node {+0 next, +4 id,
+//     +8 PCShaderLib*} (0x551650 / 0x551689, insert 0x55250d), vtable 0x849a78 - walked into a sorted pointer table
+//     every 2 s while the layer is on
+//   loaded streamgroups: vector {count [0x8aa5cc], entries [0x8aa5d4]}, 12-byte entries, [entry] = record, record +0xc =
+//     char* name (0x5b8dc0 .. 0x5b8e54)
+//   units: kStreamUnits (state 2, +8 Level, +0xc name), Level +0x80 = origin; live = data - origin
+// Live letters per slot: the lib id of the file's PC lib = the file's letter, the surrogate lib = S, a lib id >= the
+// file's firstnewlib (2047) = T (our translation), 0 = '-' (empty), else ?. The label shows the file status and slots,
+// and the live ones when they differ ("Datei SURR S-SS, live TU S-TS 1909/-/2851/1911") - so a test tree's material
+// (the shader test copy of dlc_yggdrasil_end) shows what the game really uses. Colours by the live status: SURR red,
+// PART orange, UNK violet, TU green, ORIG / BASE yellow (ORIG / BASE only with [Shader] ShowOrig=1). A batch is a box:
+// distance = Lara to the box, the label sits at the box point nearest Lara (columns are tall), the same material within
+// 2000 units once, at most [Shader] LabelMax within [Shader] LabelRadius.
+bool DvFinite(const float *p, int count);    // 0.14, below
+const NavCheckBytes kShChecks[] = {          // work\shaderlabel_0711\precheck_shaderlabel.txt (27 rows)
+    {0x0084c904, "e00a5500"},                // MaterialSection slot 12 = 0x550ae0 (resolve -> node+8)
+    {0x0084c908, "200b5500"},                // .. slot 13 = 0x550b20 (node+0xc)
+    {0x00550ae0, "8b4c2404 33d2 8bc1 f735bc6e8a00 a1c46e8a00"},   // id % [0x8a6ebc], table [0x8a6ec4]
+    {0x00550b00, "394a04 7406 8b12 85d2 75f5 8b4208 c20400"},     // chain: +4 id, +0 next, +8 PCMaterial*
+    {0x00550b4b, "8b420c c20400"},
+    {0x00551e84, "8930 895804 896808 89780c"},                    // node insert +0 / +4 / +8 / +0xc
+    {0x0084936c, "80715000"},                // RenderDevice +0xa0 = 0x507180 (create material)
+    {0x0050719d, "e84eebffff"},              // .. ctor 0x505cf0
+    {0x00505d17, "c70618908400"},            // vtable 0x849018 at +0
+    {0x005059a0, "894704 8b4834"},           // [mat+4] = data; data +0x34 (VS)
+    {0x005059b2, "8b4828"},                  // data +0x28 (PS0)
+    {0x005059c1, "8b482c"},                  // data +0x2c (PS1)
+    {0x005059d0, "8b4830"},                  // data +0x30 (PS2)
+    {0x0084c8a4, "50165500"},                // ShaderLibSection slot 12 = 0x551650
+    {0x00551650, "8b4c2404 33d2 8bc1 f735f06e8a00 a1f86e8a00"},   // id % [0x8a6ef0], table [0x8a6ef8]
+    {0x00551689, "8b4208 c20400"},           // node +8 = PCShaderLib*
+    {0x0055250d, "8918 896804 897808"},      // node insert +0 / +4 / +8
+    {0x005155fc, "c706789a8400"},            // PCShaderLib vtable 0x849a78
+    {0x00849374, "f0715000"},                // RenderDevice +0xa8 = 0x5071f0 (create lib)
+    {0x00506b80, "89358841a100"},            // [0xa14188] = current material (apply paths)
+    {0x005066e0, "890d8841a100"},
+    {0x005b8dc0, "8b470c"},                  // streamgroup record +0xc = name
+    {0x005b8dd1, "68ec3a8500"},              // .. "Loading streamgroup %s"
+    {0x005b8ddc, "8b35d4a58a00 8b0dcca58a00"},   // vector entries [0x8aa5d4], count [0x8aa5cc]
+    {0x005b8e54, "8938 894804 895008"},      // 12-byte entry {record, u32, keep}
+    {0x005b9076, "8b0dcca58a00 a1d4a58a00"},
+    {0x005b9090, "c6400800"},
+};
+const DWORD kShMatBuckets = 0x008a6ebc, kShMatTable = 0x008a6ec4, kShLibBuckets = 0x008a6ef0, kShLibTable = 0x008a6ef8,
+            kShMatVtbl = 0x00849018, kShLibVtbl = 0x00849a78, kShSgCount = 0x008aa5cc, kShSgEntries = 0x008aa5d4;
+enum ShStatus { kShSurr = 0, kShPart, kShUnk, kShTu, kShOrig, kShBase, kShEmpty, kShNone };
+const char *const kShStatusNames[] = {"SURR", "PART", "UNK", "TU", "ORIG", "BASE", "LEER", "?"};
+const ImU32 kShColours[] = {IM_COL32(255, 90, 80, 255), IM_COL32(255, 170, 70, 255), IM_COL32(200, 130, 255, 255),
+                            IM_COL32(110, 230, 120, 255), IM_COL32(255, 230, 110, 255), IM_COL32(255, 230, 110, 255),
+                            IM_COL32(170, 170, 170, 255), IM_COL32(170, 170, 170, 255)};
+struct ShMat { int id, status, pc[4], sur[4]; char slots[5], note[80]; };
+struct ShBatch { short drm, owner; int section, mat; float c[3], s[3]; int indices, status; };
+struct ShLib { DWORD ptr; int id; };
+const int kShNameMax = 512, kShLibMax = 16384;
+ShMat *g_shMats = nullptr;                   // sorted by id (render thread; loaded at the first switch-on / shader.reload)
+ShBatch *g_shBatches = nullptr;
+char (*g_shNames)[64] = nullptr;             // drm / unit names of the B lines
+int g_shMatN = 0, g_shBatchN = 0, g_shNameN = 0, g_shFirstNew = 2047;
+ShLib *g_shLibs = nullptr;                   // the live lib table, sorted by pointer
+int g_shLibN = 0;
+DWORD g_shLibTick = 0, g_shSetTick = 0;
+bool g_shOk = false, g_shLoaded = false;
+char g_shWhy[96] = "not checked", g_shFile[MAX_PATH] = "", g_shFileState[160] = "not read";
+volatile LONG g_shOn = 0;                    // shader.labels ([Shader] Labels)
+float g_shRadius = 15000.0f;                 // [Shader] LabelRadius (from Lara to the batch box)
+int g_shMax = 40, g_shShowOrig = 0;          // [Shader] LabelMax / ShowOrig
+int g_shShown = 0, g_shNear = 0;
+char g_shState[200] = "off";
+int ShStatusOf(const char *s) {
+    for (int i = 0; i < kShNone; ++i) if (!strcmp(kShStatusNames[i], s)) return i;
+    return kShNone;
+}
+int ShNameIndex(const char *name) {
+    for (int i = 0; i < g_shNameN; ++i) if (!strcmp(g_shNames[i], name)) return i;
+    if (g_shNameN >= kShNameMax) return -1;
+    strncpy_s(g_shNames[g_shNameN], 64, name, _TRUNCATE);
+    return g_shNameN++;
+}
+// "1909/-/1910/1911" -> 4 ids (-1 = none)
+void ShLibs(const char *s, int *out) {
+    for (int k = 0; k < 4; ++k) out[k] = -1;
+    int k = 0;
+    for (const char *p = s; *p && k < 4; ++k) {
+        out[k] = *p == '-' ? -1 : atoi(p);
+        while (*p && *p != '/') ++p;
+        if (*p == '/') ++p;
+    }
+}
+int ShMatCmp(const void *a, const void *b) {
+    const int x = static_cast<const ShMat *>(a)->id, y = static_cast<const ShMat *>(b)->id;
+    return x < y ? -1 : x > y;
+}
+int ShLibCmp(const void *a, const void *b) {
+    const DWORD x = static_cast<const ShLib *>(a)->ptr, y = static_cast<const ShLib *>(b)->ptr;
+    return x < y ? -1 : x > y;
+}
+// (re)read the data file; false = no usable file (the reason in g_shFileState)
+bool ShLoad() {
+    g_shLoaded = true;
+    g_shMatN = g_shBatchN = g_shNameN = 0;
+    if (!g_shMats) g_shMats = static_cast<ShMat *>(calloc(4096, sizeof(ShMat)));
+    if (!g_shBatches) g_shBatches = static_cast<ShBatch *>(calloc(32768, sizeof(ShBatch)));
+    if (!g_shNames) g_shNames = static_cast<char (*)[64]>(calloc(kShNameMax, 64));
+    if (!g_shLibs) g_shLibs = static_cast<ShLib *>(calloc(kShLibMax, sizeof(ShLib)));
+    if (!g_shMats || !g_shBatches || !g_shNames || !g_shLibs) { Out(g_shFileState, sizeof(g_shFileState), "out of memory"); return false; }
+    FILE *f = nullptr;
+    if (!g_shFile[0] || fopen_s(&f, g_shFile, "r") != 0 || !f) {
+        Out(g_shFileState, sizeof(g_shFileState), "%s missing (tools/shader_labels.py build, then next to tru.exe)",
+            g_shFile[0] ? g_shFile : "TruMenu.shaderlabel.txt");
+        Log(1, "shader labels: %s", g_shFileState);
+        return false;
+    }
+    char line[1024];
+    int number = 0, bad = 0;
+    bool marker = false;
+    while (fgets(line, sizeof(line), f)) {
+        if (++number == 1) marker = !strncmp(line, "# shaderlabel v1", 16);
+        char *t[16];
+        int c = 0;
+        char *context = nullptr;
+        for (char *w = strtok_s(line, " \t\r\n", &context); w && c < 16; w = strtok_s(nullptr, " \t\r\n", &context)) t[c++] = w;
+        if (!c || t[0][0] == '#') continue;
+        if (!strcmp(t[0], "L") && c >= 3 && !strcmp(t[1], "firstnewlib")) g_shFirstNew = atoi(t[2]);
+        else if (!strcmp(t[0], "M") && c >= 10 && g_shMatN < 4096) {
+            ShMat &m = g_shMats[g_shMatN++];
+            m.id = atoi(t[1]);
+            m.status = ShStatusOf(t[2]);
+            strncpy_s(m.slots, sizeof(m.slots), t[3], _TRUNCATE);
+            ShLibs(t[4], m.pc);
+            ShLibs(t[7], m.sur);
+            strncpy_s(m.note, sizeof(m.note), c >= 10 ? t[9] : "", _TRUNCATE);
+            for (char *q = m.note; *q; ++q) if (*q == '_') *q = ' ';
+        } else if (!strcmp(t[0], "B") && c >= 13 && g_shBatchN < 32768) {
+            ShBatch &b = g_shBatches[g_shBatchN];
+            const int drm = ShNameIndex(t[1]), owner = ShNameIndex(t[2]);
+            if (drm < 0 || owner < 0) { ++bad; continue; }
+            b.drm = static_cast<short>(drm);
+            b.owner = static_cast<short>(owner);
+            b.section = atoi(t[3]);
+            b.mat = atoi(t[4]);
+            b.status = ShStatusOf(t[5]);
+            for (int k = 0; k < 3; ++k) {
+                b.c[k] = static_cast<float>(atof(t[6 + k]));
+                b.s[k] = static_cast<float>(atof(t[9 + k]));
+            }
+            b.indices = atoi(t[12]);
+            ++g_shBatchN;
+        } else if (strcmp(t[0], "U") && strcmp(t[0], "G") && strcmp(t[0], "O") && strcmp(t[0], "M") && strcmp(t[0], "B")) {
+            ++bad;
+        }
+    }
+    fclose(f);
+    if (!marker) {
+        g_shMatN = g_shBatchN = 0;
+        Out(g_shFileState, sizeof(g_shFileState), "%s: first line is not '# shaderlabel v1' - ignored", g_shFile);
+        Log(0, "shader labels: %s", g_shFileState);
+        return false;
+    }
+    qsort(g_shMats, static_cast<size_t>(g_shMatN), sizeof(ShMat), ShMatCmp);
+    Out(g_shFileState, sizeof(g_shFileState), "%d materials, %d batches, %d names, firstnewlib %d%s", g_shMatN, g_shBatchN,
+        g_shNameN, g_shFirstNew, bad ? " (lines skipped)" : "");
+    Log(1, "shader labels: %s from %s (%d lines skipped)", g_shFileState, g_shFile, bad);
+    return g_shMatN > 0;
+}
+const ShMat *ShFindMat(int id) {
+    int lo = 0, hi = g_shMatN - 1;
+    while (lo <= hi) {
+        const int mid = (lo + hi) / 2;
+        if (g_shMats[mid].id == id) return &g_shMats[mid];
+        if (g_shMats[mid].id < id) lo = mid + 1; else hi = mid - 1;
+    }
+    return nullptr;
+}
+// the live lib table (pointer -> id), every 2 s while the layer is on
+void ShLibRefresh() {
+    const DWORD now = GetTickCount();
+    if (g_shLibTick && now - g_shLibTick < 2000) return;
+    g_shLibTick = now ? now : 1;
+    g_shLibN = 0;
+    DWORD buckets = 0, table = 0;
+    if (!ReadDword(kShLibBuckets, &buckets) || !buckets || buckets > 65536 || !ReadDword(kShLibTable, &table) || !table) return;
+    for (DWORD i = 0; i < buckets && g_shLibN < kShLibMax; ++i) {
+        DWORD node = 0;
+        if (!ReadDword(table + 4 * i, &node)) break;
+        for (int guard = 0; node && guard < 4096 && g_shLibN < kShLibMax; ++guard) {
+            DWORD id = 0, lib = 0, vt = 0, next = 0;
+            if (!ReadDword(node + 4, &id) || !ReadDword(node + 8, &lib) || !ReadDword(node, &next)) break;
+            if (lib && ReadDword(lib, &vt) && vt == kShLibVtbl) {
+                g_shLibs[g_shLibN].ptr = lib;
+                g_shLibs[g_shLibN].id = static_cast<int>(id);
+                ++g_shLibN;
+            }
+            node = next;
+        }
+    }
+    qsort(g_shLibs, static_cast<size_t>(g_shLibN), sizeof(ShLib), ShLibCmp);
+}
+int ShLibId(DWORD ptr) {
+    int lo = 0, hi = g_shLibN - 1;
+    while (lo <= hi) {
+        const int mid = (lo + hi) / 2;
+        if (g_shLibs[mid].ptr == ptr) return g_shLibs[mid].id;
+        if (g_shLibs[mid].ptr < ptr) lo = mid + 1; else hi = mid - 1;
+    }
+    return 0;
+}
+// the live PCMaterial* of a material id (0 = not loaded)
+DWORD ShMatPtr(int id) {
+    DWORD buckets = 0, table = 0, node = 0;
+    if (id <= 0 || !ReadDword(kShMatBuckets, &buckets) || !buckets || buckets > 65536 || !ReadDword(kShMatTable, &table) ||
+        !table || !ReadDword(table + 4 * (static_cast<DWORD>(id) % buckets), &node))
+        return 0;
+    for (int guard = 0; node && guard < 4096; ++guard) {
+        DWORD nid = 0, mat = 0, vt = 0, next = 0;
+        if (!ReadDword(node + 4, &nid) || !ReadDword(node, &next)) return 0;
+        if (nid == static_cast<DWORD>(id))
+            return ReadDword(node + 8, &mat) && mat && ReadDword(mat, &vt) && vt == kShMatVtbl ? mat : 0;
+        node = next;
+    }
+    return 0;
+}
+// live letters / lib ids / status of material id (m = its M line, may be null); false = not loaded
+bool ShLive(int id, const ShMat *m, char *letters, int *libs, int *status) {
+    strcpy_s(letters, 5, "????");
+    for (int k = 0; k < 4; ++k) libs[k] = -1;
+    *status = kShNone;
+    DWORD mat = ShMatPtr(id), data = 0;
+    if (!mat || !ReadDword(mat + 4, &data) || !data) return false;
+    bool any = false, anyS = false, anyT = false, anyQ = false;
+    for (int k = 0; k < 4; ++k) {
+        DWORD lib = 0;
+        ReadDword(data + 0x28 + 4 * static_cast<DWORD>(k), &lib);
+        if (!lib) { letters[k] = '-'; continue; }
+        any = true;
+        const int lid = ShLibId(lib);
+        libs[k] = lid ? lid : 0;
+        char c = '?';
+        if (lid && m && lid == m->pc[k]) c = m->slots[k] ? m->slots[k] : '?';
+        else if (lid && m && lid == m->sur[k]) c = 'S';
+        else if (lid >= g_shFirstNew) c = 'T';
+        letters[k] = c;
+        anyS |= c == 'S';
+        anyT |= c == 'T';
+        anyQ |= c == '?';
+    }
+    if (!any) *status = kShEmpty;
+    else if (m && !strcmp(letters, m->slots)) *status = m->status;
+    else if (letters[2] == 'S') *status = kShSurr;
+    else if (anyS) *status = kShPart;
+    else if (anyQ) *status = kShUnk;
+    else if (anyT) *status = kShTu;
+    else *status = m ? m->status : kShOrig;
+    return true;
+}
+// which names of the B lines are loaded now (once a second, one walk of the unit table and of the streamgroup vector):
+// an owner unit = a loaded stream unit (its origin Level+0x80); a streamgroup DRM ("streamgroups/<name>") = a record of
+// the loaded streamgroup vector whose name equals the end of the DRM name or the other way round (the record name format
+// is checked live), 2 = the vector is not readable (shown, marked)
+bool g_shNameUnit[kShNameMax];
+float g_shNameOrigin[kShNameMax][3];
+signed char g_shNameSg[kShNameMax];          // 0 not loaded, 1 loaded, 2 unknown
+void ShRefreshLoaded() {
+    memset(g_shNameUnit, 0, sizeof(g_shNameUnit));
+    memset(g_shNameSg, 0, sizeof(g_shNameSg));
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD state = 0, level = 0;
+        char name[48];
+        float origin[3];
+        if (!ReadDword(e + 4, &state) || (state & 0xff) != 2 || !ReadString(e + 0xc, name, sizeof(name)) ||
+            !ReadDword(e + 8, &level) || !level || !ReadFloats(level + 0x80, origin, 3) || !DvFinite(origin, 3))
+            continue;
+        for (int i = 0; i < g_shNameN; ++i)
+            if (!_stricmp(g_shNames[i], name)) {
+                g_shNameUnit[i] = true;
+                memcpy(g_shNameOrigin[i], origin, sizeof(origin));
+            }
+    }
+    static char sg[256][96];
+    int sgN = 0;
+    DWORD count = 0, entries = 0;
+    const bool vec = ReadDword(kShSgCount, &count) && count <= 512 && ReadDword(kShSgEntries, &entries) && entries;
+    for (DWORD i = 0; vec && i < count && sgN < 256; ++i) {
+        DWORD rec = 0, np = 0;
+        if (ReadDword(entries + 12 * i, &rec) && rec && ReadDword(rec + 0xc, &np) && ReadString(np, sg[sgN], sizeof(sg[0])) &&
+            sg[sgN][0])
+            ++sgN;
+    }
+    for (int i = 0; i < g_shNameN; ++i) {
+        if (_strnicmp(g_shNames[i], "streamgroups/", 13)) continue;
+        if (!vec) { g_shNameSg[i] = 2; continue; }
+        const char *drm = g_shNames[i] + 13;
+        const size_t dl = strlen(drm);
+        for (int k = 0; k < sgN && !g_shNameSg[i]; ++k) {
+            const size_t sl = strlen(sg[k]);
+            if ((sl <= dl && !_stricmp(drm + dl - sl, sg[k])) || (dl <= sl && !_stricmp(sg[k] + sl - dl, drm))) g_shNameSg[i] = 1;
+        }
+    }
+}
+// is a B line's terrain loaded now (owner unit loaded; a streamgroup DRM also in the vector); origin = the owner's
+bool ShBatchLoaded(const ShBatch &b, float *origin, bool *sgUnknown) {
+    *sgUnknown = false;
+    if (!g_shNameUnit[b.owner]) return false;
+    memcpy(origin, g_shNameOrigin[b.owner], sizeof(float) * 3);
+    if (_strnicmp(g_shNames[b.drm], "streamgroups/", 13)) return true;
+    *sgUnknown = g_shNameSg[b.drm] == 2;
+    return g_shNameSg[b.drm] != 0;
+}
+struct ShCand { int batch; float at[3], d2; };
+ShCand g_shCand[65];
+int g_shLoadedIdx[32768 / 4];                // batches of loaded terrain (refreshed every second)
+int g_shLoadedN = 0;
+float g_shLoadedOrigin[32768 / 4][3];
+// the nearest batches to Lara (box distance), one per material within 2000 units; returns the count
+int ShCollect(const float *lara, ShCand *out, int max) {
+    const DWORD now = GetTickCount();
+    if (!g_shSetTick || now - g_shSetTick >= 1000) {   // the loaded set once a second
+        g_shSetTick = now ? now : 1;
+        g_shLoadedN = 0;
+        ShRefreshLoaded();
+        for (int i = 0; i < g_shBatchN && g_shLoadedN < 32768 / 4; ++i) {
+            float origin[3];
+            bool q = false;                  // (a streamgroup of an unreadable vector: ShLabelText marks it "sg?")
+            if (!ShBatchLoaded(g_shBatches[i], origin, &q)) continue;
+            g_shLoadedIdx[g_shLoadedN] = i;
+            memcpy(g_shLoadedOrigin[g_shLoadedN], origin, sizeof(origin));
+            ++g_shLoadedN;
+        }
+    }
+    const float r2 = g_shRadius * g_shRadius;
+    int count = 0;
+    g_shNear = 0;
+    for (int j = 0; j < g_shLoadedN; ++j) {
+        const ShBatch &b = g_shBatches[g_shLoadedIdx[j]];
+        if (!g_shShowOrig && (b.status == kShOrig || b.status == kShBase)) continue;   // live check below for shown ones
+        float at[3], d2 = 0.0f;
+        for (int k = 0; k < 3; ++k) {        // the box point nearest Lara (live frame)
+            const float c = b.c[k] - g_shLoadedOrigin[j][k], h = b.s[k] * 0.5f;
+            at[k] = lara[k] < c - h ? c - h : lara[k] > c + h ? c + h : lara[k];
+            d2 += (at[k] - lara[k]) * (at[k] - lara[k]);
+        }
+        if (d2 > r2) continue;
+        ++g_shNear;
+        bool dup = false;                    // the same material within 2000 units: only the nearer one
+        for (int k = 0; k < count && !dup; ++k) {
+            if (g_shBatches[out[k].batch].mat != b.mat) continue;
+            const float dx = out[k].at[0] - at[0], dy = out[k].at[1] - at[1], dz = out[k].at[2] - at[2];
+            if (dx * dx + dy * dy + dz * dz < 2000.0f * 2000.0f) {
+                dup = true;
+                if (d2 < out[k].d2) { out[k].batch = g_shLoadedIdx[j]; memcpy(out[k].at, at, sizeof(at)); out[k].d2 = d2; }
+            }
+        }
+        if (dup) continue;
+        int pos = count;
+        while (pos > 0 && out[pos - 1].d2 > d2) --pos;
+        if (pos >= max) continue;
+        const int last = count < max ? count : max - 1;
+        for (int k = last; k > pos; --k) out[k] = out[k - 1];
+        out[pos].batch = g_shLoadedIdx[j];
+        memcpy(out[pos].at, at, sizeof(at));
+        out[pos].d2 = d2;
+        if (count < max) ++count;
+    }
+    return count;
+}
+// the two label lines of a batch; returns the colour (the live status, else the file's)
+ImU32 ShLabelText(const ShBatch &b, bool de, char *l1, size_t n1, char *l2, size_t n2) {
+    const ShMat *m = ShFindMat(b.mat);
+    const int fileStatus = m ? m->status : b.status;
+    char lib[48] = "-";
+    if (m) Out(lib, sizeof(lib), "%d/%d/%d/%d", m->pc[0], m->pc[1], m->pc[2], m->pc[3]);
+    for (char *p = strstr(lib, "-1"); p; p = strstr(lib, "-1")) memmove(p + 1, p + 2, strlen(p + 2) + 1);   // -1 -> -
+    Out(l1, n1, "%d %s %s %s [%s %d]%s", b.mat, kShStatusNames[fileStatus], m ? m->slots : "????", lib,
+        de ? "Gelaende" : "terrain", b.section, g_shNameSg[b.drm] == 2 ? " sg?" : "");
+    char letters[5];
+    int libs[4], status = kShNone;
+    if (!ShLive(b.mat, m, letters, libs, &status)) {
+        Out(l2, n2, "%s", de ? "live: Material nicht geladen" : "live: material not loaded");
+        return kShColours[fileStatus];
+    }
+    if (status == fileStatus && m && !strcmp(letters, m->slots)) {
+        Out(l2, n2, "%s %s", de ? "live = Datei" : "live = file", g_shNames[b.drm]);
+        return kShColours[status];
+    }
+    char live[48];
+    Out(live, sizeof(live), "%d/%d/%d/%d", libs[0], libs[1], libs[2], libs[3]);
+    for (char *p = strstr(live, "-1"); p; p = strstr(live, "-1")) memmove(p + 1, p + 2, strlen(p + 2) + 1);
+    Out(l2, n2, "live %s %s %s (%s %s)", kShStatusNames[status], letters, live, de ? "Datei" : "file", kShStatusNames[fileStatus]);
+    return kShColours[status];
+}
+void ShEnsure() {
+    if (!g_shLoaded) ShLoad();
+    ShLibRefresh();
+}
+// Present, every frame while shader.labels is on
+void DrawShaderLabels() {
+    char why[160];
+    g_shShown = 0;
+    if (!g_debugEnabled || !g_lblOk || !g_shOk) {
+        Out(g_shState, sizeof(g_shState), "%s", !g_debugEnabled ? "[Debug] Enabled=0" : !g_lblOk ? g_lblWhy : g_shWhy);
+        return;
+    }
+    if (!LabelWorldReady(why, sizeof(why))) { Out(g_shState, sizeof(g_shState), "waits: %s", why); return; }
+    ShEnsure();
+    if (!g_shMatN) { Out(g_shState, sizeof(g_shState), "%s", g_shFileState); return; }
+    ImGuiIO &io = ImGui::GetIO();
+    View v;
+    if (!ReadView(&v, io.DisplaySize.x, io.DisplaySize.y) || !ReadFloats(kLblMatrix, v.m, 16)) return;
+    DWORD player = 0;
+    float lara[3];
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
+    const int max = g_shMax < 1 ? 1 : g_shMax > 64 ? 64 : g_shMax;
+    const int count = ShCollect(lara, g_shCand, max);
+    const bool de = g_qbLang == 0;
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    for (int i = 0; i < count; ++i) {
+        ImVec2 at;
+        if (!Project(v, g_shCand[i].at, &at)) continue;
+        char l1[160], l2[160];
+        const ImU32 colour = ShLabelText(g_shBatches[g_shCand[i].batch], de, l1, sizeof(l1), l2, sizeof(l2));
+        LabelDraw(dl, at, l1, l2, colour);
+        ++g_shShown;
+    }
+    Out(g_shState, sizeof(g_shState), "%d shown, %d batches in %.0f units, %d of %d batches loaded, %d live libs; %s",
+        g_shShown, g_shNear, g_shRadius, g_shLoadedN, g_shBatchN, g_shLibN, g_shFileState);
+}
+void ValShader(char *o, size_t n) { Out(o, n, "%ld (%s)", g_shOn, g_shState); }
+bool RunShader(const char *arg, char *o, size_t n) {
+    if (!g_shOk) { Out(o, n, "disabled: pre-check failed (%s)", g_shWhy); return false; }
+    const bool on = BoolArg(arg, g_shOn != 0);
+    if (on && !g_shLoaded) ShLoad();
+    InterlockedExchange(&g_shOn, on ? 1 : 0);
+    Log(1, "shader.labels %d (src=%s): radius %.0f, max %d, ShowOrig %d; %s", on ? 1 : 0, ShotSource("shader.labels"),
+        g_shRadius, g_shMax, g_shShowOrig, g_shFileState);
+    Out(o, n, "shader.labels %d - %s", on ? 1 : 0, g_shFileState);
+    return true;
+}
+bool RunShaderReload(const char *, char *o, size_t n) {
+    const bool ok = ShLoad();
+    g_shSetTick = g_shLibTick = 0;
+    Out(o, n, "%s", g_shFileState);
+    return ok;
+}
+// shader.dump: the materials of the batches within LabelRadius of Lara (file vs live) into TruMenu.log (read only)
+bool RunShaderDump(const char *, char *o, size_t n) {
+    if (!g_shOk) { Out(o, n, "disabled: pre-check failed (%s)", g_shWhy); return false; }
+    DWORD player = 0;
+    float lara[3];
+    if (!InLevel() || !ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) {
+        Out(o, n, "needs a level");
+        return false;
+    }
+    g_shLibTick = 0;
+    ShEnsure();
+    if (!g_shMatN) { Out(o, n, "%s", g_shFileState); return false; }
+    static ShCand cand[65];
+    const int keep = g_shShowOrig;
+    g_shShowOrig = 1;
+    const int count = ShCollect(lara, cand, 64);
+    g_shShowOrig = keep;
+    int differ = 0;
+    for (int i = 0; i < count; ++i) {
+        const ShBatch &b = g_shBatches[cand[i].batch];
+        char l1[160], l2[160];
+        ShLabelText(b, false, l1, sizeof(l1), l2, sizeof(l2));
+        differ += strncmp(l2, "live =", 6) != 0;
+        const ShMat *m = ShFindMat(b.mat);
+        Log(1, "shader.dump %s | %s | %s / %s at %.0f units%s%s", l1, l2, g_shNames[b.drm], g_shNames[b.owner],
+            sqrtf(cand[i].d2), m && m->note[0] ? " | note: " : "", m ? m->note : "");
+    }
+    Out(o, n, "%d materials logged (nearest first, one per material within 2000 units), %d differ from the file; %d live "
+              "libs, %d of %d batches loaded", count, differ, g_shLibN, g_shLoadedN, g_shBatchN);
+    return true;
+}
+void ShaderCheck() {
+    const int total = static_cast<int>(sizeof(kShChecks) / sizeof(kShChecks[0]));
+    int bad = 0;
+    DWORD first = 0;
+    for (const NavCheckBytes &c : kShChecks)
+        if (!HexBytesAt(c.at, c.hex) && !bad++) first = c.at;
+    g_shOk = bad == 0;
+    if (bad) Out(g_shWhy, sizeof(g_shWhy), "code check failed at 0x%08lx (%d of %d)", first, bad, total);
+    else Out(g_shWhy, sizeof(g_shWhy), "ok");
+    Log(g_shOk ? 1 : 0, "0.21.7 shader labels: checks %s (%d rows); [Shader] Labels %ld, File %s, LabelRadius %.0f, "
+        "LabelMax %d, ShowOrig %d", g_shWhy, total, g_shOn, g_shFile, g_shRadius, g_shMax, g_shShowOrig);
+    if (g_shOk && g_shOn) ShLoad();
+}
+// ---- end of 0.21.7 shader labels ----
+
+// ---- 0.21.7 navmesh labels (stage 1 of TODO "Navmesh beschriften", Lukas 2026-11-07 21:59 / 22:00) ----
+// A small label per navmesh area near Lara - "E<layer>.<graph> #<area> <unit>" and the flag bits the engine colours by -
+// plus a one-line legend of the engine's edge colours. Only the layers the planner draws (bit i of the mask [0x88e454],
+// "Alle Ebenen" = nav.mask 1). Read path (static, work\m0217_0711\dis\*.txt; byte checks kNlChecks):
+//   planner [0x8bf310] (0x418870): 32 layer pointers; 0x4186b2 .. 0x4186d3: layer i drawn when bit i of the mask is set,
+//     [planner + 4i] != 0 and [layer + 8] != 0 (TruMenu's NavLayers)
+//   layer: up to 8 graphs [layer + 0xc + 4k] (0x416781 .. 0x4167a4, each to 0x413250)
+//   graph g (0x413250): the area block [g+0x1c] .. [g+0x1c] + [[g+0x18]+8]
+//   area: +0x00 centre (3 floats), +0x30 flags (low 7 bits = edge count, 0x40c3c7), +0x34 two 4-bit values (bits 8..11 /
+//     12..15); next area = area + 0x38 + 0x14 * edges (0x41290b); edge {x, y, z, +0xc neighbour area*, +0x10 type}
+//   edge colour (0x40c3a0, first match): (type & 0xe00) == 0x200 light blue (0.6, 0.6, 1; 0x841bd0); bit 27 of +0x30 on
+//     this area or the neighbour red [0x88e484]; bits 8..11 of +0x34 > 1 on either orange [0x88e504]; bits 12..15 > 1 on
+//     either yellow [0x88e4d4]; a neighbour whose bit 26 differs blue [0x88e4a4]; bit 26 set magenta [0x88e4c4]; else
+//     green [0x88e494]. Filled area (0x40c69a): bit 27 red, bit 26 magenta, bits 12..15 > 1 yellow, else green - the
+//     label's colour. The meaning of the bits is NavPower's (open).
+// The planner's area data are live coordinates: the level load (0x48c407 .. 0x48c499) hands the image Level+0x60 (+4,
+// first dword -1) with the offset -1.0 * Level+0x80 to AddResource 0x42e990. Unit name: the loaded stream unit whose image
+// range [img, img + 0x10 + [img+8]) holds the area block (an address test, shown only when it matches). Areas an obstacle
+// cut ([area+0x20], 0x40b3c0) are labelled as their static area. Read only.
+const NavCheckBytes kNlChecks[] = {
+    {0x00418870, "8b0d10f38b00 e805feffff"},                      // planner [0x8bf310] -> planner draw 0x418680
+    {0x004186b2, "8bce b801000000 d3e0 8b0d54e48800 85c1 7416 8b4cb500 85c9 740e 83790800 7408 e878e0ffff"},
+    {0x00416781, "83c601 837cb70c00 7508 83fe08 7cf1"},           // graphs [layer + 0xc + 4k], k < 8
+    {0x004167a0, "8b4cb70c e8a7caffff"},                          // .. each to 0x413250
+    {0x00413250, "83ec20 8b411c 8b5118 8b5208 03d0"},             // area block [g+0x1c], size [[g+0x18]+8]
+    {0x0041290b, "8b4230 83e07f 8d0480 8d548238 8911"},           // next area = area + 0x38 + 0x14 * (flags & 0x7f)
+    {0x0040c3c7, "8b5f30 33c0 83e37f"},                           // edge count = +0x30 & 0x7f
+    {0x0040c454, "8b50fc d905d01b8400 8b00 25000e0000 3d00020000 751e"},   // neighbour edge+0xc, type 0x200
+    {0x0040c489, "8b4730 ddd8 c1e81b a801 0f8593010000 85d2 740f 8b4a30 c1e91b f6c101 0f8580010000"},   // bit 27 -> red
+    {0x0040c4ac, "8b4f34 8bc1 c1e808 83e00f"},                    // +0x34 bits 8..11
+    {0x0040c506, "c1e90c 83e10f"},                                // +0x34 bits 12..15
+    {0x0040c562, "8b4030 8b4f30 c1e81a c1e91a 32c1 a801 7423"},   // bit 26 differs -> blue
+    {0x0040c579, "68a4e48800"},                                   // blue
+    {0x0040c5a5, "68c4e48800"},                                   // magenta (bit 26)
+    {0x0040c5c5, "6894e48800"},                                   // green
+    {0x0040c5e7, "68d4e48800"},                                   // yellow (bits 12..15)
+    {0x0040c61b, "6804e58800"},                                   // orange (bits 8..11)
+    {0x0040c62c, "6884e48800"},                                   // red (bit 27)
+    {0x0088e484, "0000803f 00000000 00000000 0000803f"},          // red (1, 0, 0, 1)
+    {0x0088e494, "00000000 0000803f 00000000 0000803f"},          // green
+    {0x0088e4a4, "00000000 00000000 0000803f 0000803f"},          // blue
+    {0x0088e4c4, "0000803f 00000000 0000803f 0000803f"},          // magenta
+    {0x0088e4d4, "0000803f 0000803f 00000000 0000803f"},          // yellow
+    {0x0088e504, "0000803f 0000003f 00000000 0000803f"},          // orange (1, 0.5, 0, 1)
+    {0x00841bd0, "9a99193f"},                                     // 0.6 (edge type 0x200: light blue)
+    {0x0048c407, "8b7d08 8b7708 0f288e80000000"},                 // level load: Level = [unit+8], origin Level+0x80
+    {0x0048c41e, "8b4660 33db 3bc3 0f58c1 0f29442440 7472 8338ff 756d"},   // image Level+0x60, first dword -1
+    {0x0048c48d, "83c004 50"},                                    // .. image + 4
+    {0x0048c499, "e8f224faff"},                                   // .. AddResource 0x42e990
+    {0x00841130, "000080bf"},                                     // -1.0 (offset = -origin)
+};
+bool g_nlOk = false;
+char g_nlWhy[96] = "not checked";
+volatile LONG g_nlOn = 0;                    // nav.labels ([Debug] NavLabels)
+float g_nlRadius = 3000.0f;                  // [Debug] NavLabelRadius (from Lara to the area centre)
+int g_nlMax = 40;                            // [Debug] NavLabelMax
+int g_nlShown = 0, g_nlAreas = 0;
+char g_nlState[200] = "off";
+struct NlCand { DWORD area; int layer, graph, index; float c[3], d2; };
+NlCand g_nlCand[65];
+// the filled-area colour rule of 0x40c69a: 0 green, 1 red (bit 27), 2 magenta (bit 26), 3 yellow (bits 12..15 > 1)
+int NlFill(DWORD flags, DWORD values) {
+    if (flags & (1u << 27)) return 1;
+    if (flags & (1u << 26)) return 2;
+    return ((values >> 12) & 0xf) > 1 ? 3 : 0;
+}
+const ImU32 kNlColours[4] = {IM_COL32(90, 235, 110, 255), IM_COL32(255, 80, 70, 255), IM_COL32(255, 90, 255, 255),
+                             IM_COL32(255, 240, 80, 255)};
+// the unit whose NavPower image holds an address ("" = none matched)
+void NlUnitOf(DWORD at, char *o, size_t n) {
+    o[0] = 0;
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD state = 0, level = 0, raw = 0, first = 0, size = 0;
+        if (!ReadDword(e + 4, &state) || (state & 0xff) != 2 || !ReadDword(e + 8, &level) || !level ||
+            !ReadDword(level + 0x60, &raw) || !raw || !ReadDword(raw, &first) || first != 0xffffffff ||
+            !ReadDword(raw + 4 + 8, &size) || size > 0x4000000)
+            continue;
+        const DWORD img = raw + 4;
+        if (at >= img && at < img + 0x10 + size) {
+            if (!ReadString(e + 0xc, o, n)) o[0] = 0;
+            return;
+        }
+    }
+}
+// the nearest areas of the drawn layers within NavLabelRadius of Lara; *areas = every area walked
+int NlCollect(const float *lara, NlCand *out, int max, int *areas) {
+    *areas = 0;
+    DWORD planner = 0, mask = 0;
+    if (!ReadDword(kNavPlanner, &planner) || !planner || !ReadDword(kNavMask, &mask)) return 0;
+    const float r2 = g_nlRadius * g_nlRadius;
+    int count = 0;
+    for (DWORD i = 0; i < 32; ++i) {
+        DWORD layer = 0, has = 0;
+        if (!(mask & (1ul << i)) || !ReadDword(planner + 4 * i, &layer) || !layer || !ReadDword(layer + 8, &has) || !has)
+            continue;
+        for (DWORD k = 0; k < 8; ++k) {
+            DWORD g = 0, start = 0, head = 0, size = 0;
+            if (!ReadDword(layer + 0xc + 4 * k, &g) || !g || !ReadDword(g + 0x1c, &start) || !start ||
+                !ReadDword(g + 0x18, &head) || !head || !ReadDword(head + 8, &size) || !size || size > 0x2000000)
+                continue;
+            DWORD a = start;
+            for (int index = 0; a < start + size && index < 20000; ++index) {
+                DWORD flags = 0;
+                float c[3];
+                if (!ReadDword(a + 0x30, &flags) || !ReadFloats(a, c, 3)) break;
+                ++*areas;
+                const float dx = c[0] - lara[0], dy = c[1] - lara[1], dz = c[2] - lara[2], d2 = dx * dx + dy * dy + dz * dz;
+                if (d2 <= r2 && DvFinite(c, 3)) {
+                    int at = count;
+                    while (at > 0 && out[at - 1].d2 > d2) --at;
+                    if (at < max) {
+                        const int last = count < max ? count : max - 1;
+                        for (int m = last; m > at; --m) out[m] = out[m - 1];
+                        out[at] = {a, static_cast<int>(i), static_cast<int>(k), index, {c[0], c[1], c[2]}, d2};
+                        if (count < max) ++count;
+                    }
+                }
+                a += 0x38 + 0x14 * (flags & 0x7f);
+            }
+        }
+    }
+    return count;
+}
+// the one-line legend of the engine's edge colours (top centre)
+void NlLegend(bool de) {
+    struct Part { ImU32 c; const char *de, *en; };
+    const Part parts[] = {{kNlColours[0], "gruen normal", "green plain"},
+                          {kNlColours[1], "rot Bit 27 (eine Seite)", "red bit 27 (either side)"},
+                          {IM_COL32(255, 160, 60, 255), "orange +0x34 b8-11 > 1", "orange +0x34 b8-11 > 1"},
+                          {kNlColours[3], "gelb +0x34 b12-15 > 1", "yellow +0x34 b12-15 > 1"},
+                          {IM_COL32(90, 140, 255, 255), "blau Bit 26 verschieden", "blue bit 26 differs"},
+                          {kNlColours[2], "magenta Bit 26", "magenta bit 26"},
+                          {IM_COL32(155, 155, 255, 255), "hellblau Kante 0x200", "light blue edge 0x200"}};
+    ImGuiIO &io = ImGui::GetIO();
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    const float gap = 14.0f;
+    float w = 0.0f;
+    for (const Part &p : parts) w += ImGui::CalcTextSize(de ? p.de : p.en).x + gap;
+    float x = (io.DisplaySize.x - w) * 0.5f;
+    const float y = io.DisplaySize.y * 0.06f, h = ImGui::GetFontSize() + 6.0f;
+    dl->AddRectFilled(ImVec2(x - 6.0f, y - 3.0f), ImVec2(x + w, y + h), IM_COL32(0, 0, 0, 160), 4.0f);
+    for (const Part &p : parts) {
+        dl->AddText(ImVec2(x, y), p.c, de ? p.de : p.en);
+        x += ImGui::CalcTextSize(de ? p.de : p.en).x + gap;
+    }
+}
+// Present, every frame while nav.labels is on
+void DrawNavLabels() {
+    char why[160];
+    g_nlShown = 0;
+    if (!g_debugEnabled || !g_lblOk || !g_nlOk || !g_navCoreOk) {
+        Out(g_nlState, sizeof(g_nlState), "%s", !g_debugEnabled ? "[Debug] Enabled=0" : !g_lblOk ? g_lblWhy
+                                                : !g_nlOk ? g_nlWhy : g_navCoreWhy);
+        return;
+    }
+    if (!LabelWorldReady(why, sizeof(why))) { Out(g_nlState, sizeof(g_nlState), "waits: %s", why); return; }
+    ImGuiIO &io = ImGui::GetIO();
+    View v;
+    if (!ReadView(&v, io.DisplaySize.x, io.DisplaySize.y) || !ReadFloats(kLblMatrix, v.m, 16)) return;
+    DWORD player = 0;
+    float lara[3];
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
+    const bool de = g_qbLang == 0;
+    NlLegend(de);
+    const int max = g_nlMax < 1 ? 1 : g_nlMax > 64 ? 64 : g_nlMax;
+    const int count = NlCollect(lara, g_nlCand, max, &g_nlAreas);
+    ImDrawList *dl = ImGui::GetForegroundDrawList();
+    char unit[48] = "";
+    DWORD unitFor = 0;
+    for (int i = 0; i < count; ++i) {
+        const NlCand &c = g_nlCand[i];
+        ImVec2 at;
+        if (!Project(v, c.c, &at)) continue;
+        DWORD flags = 0, values = 0, g = 0, start = 0;
+        ReadDword(c.area + 0x30, &flags);
+        ReadDword(c.area + 0x34, &values);
+        DWORD planner = 0, layer = 0;
+        if (ReadDword(kNavPlanner, &planner) && planner && ReadDword(planner + 4 * static_cast<DWORD>(c.layer), &layer) &&
+            layer && ReadDword(layer + 0xc + 4 * static_cast<DWORD>(c.graph), &g) && g)
+            ReadDword(g + 0x1c, &start);
+        if (start != unitFor) { unitFor = start; NlUnitOf(start, unit, sizeof(unit)); }
+        char l1[120], l2[120];
+        Out(l1, sizeof(l1), "E%d.%d #%d%s%s", c.layer, c.graph, c.index, unit[0] ? " " : "", unit);
+        Out(l2, sizeof(l2), "27:%lu 26:%lu b8:%lu b12:%lu | %lu %s", (flags >> 27) & 1, (flags >> 26) & 1, (values >> 8) & 0xf,
+            (values >> 12) & 0xf, flags & 0x7f, de ? "Kanten" : "edges");
+        LabelDraw(dl, at, l1, l2, kNlColours[NlFill(flags, values)]);
+        ++g_nlShown;
+    }
+    DWORD mask = 0;
+    ReadDword(kNavMask, &mask);
+    Out(g_nlState, sizeof(g_nlState), "%d shown, %d areas walked in the drawn layers (mask 0x%08lx), radius %.0f",
+        g_nlShown, g_nlAreas, mask, g_nlRadius);
+}
+void ValNavLabels(char *o, size_t n) { Out(o, n, "%ld (%s)", g_nlOn, g_nlState); }
+bool RunNavLabels(const char *arg, char *o, size_t n) {
+    if (!g_nlOk) { Out(o, n, "disabled: pre-check failed (%s)", g_nlWhy); return false; }
+    const bool on = BoolArg(arg, g_nlOn != 0);
+    InterlockedExchange(&g_nlOn, on ? 1 : 0);
+    DWORD mask = 0;
+    ReadDword(kNavMask, &mask);
+    Log(1, "nav.labels %d (src=%s): radius %.0f, max %d, layer mask 0x%08lx", on ? 1 : 0, ShotSource("nav.labels"),
+        g_nlRadius, g_nlMax, mask);
+    Out(o, n, "nav.labels %d%s", on ? 1 : 0, on && mask != kNavMaskAll ? " - only the drawn layers ('Alle Ebenen' = "
+                                                                         "nav.mask 1 for all)" : "");
+    return true;
+}
+void NavLabelCheck() {
+    const int total = static_cast<int>(sizeof(kNlChecks) / sizeof(kNlChecks[0]));
+    int bad = 0;
+    DWORD first = 0;
+    for (const NavCheckBytes &c : kNlChecks)
+        if (!HexBytesAt(c.at, c.hex) && !bad++) first = c.at;
+    g_nlOk = bad == 0;
+    if (bad) Out(g_nlWhy, sizeof(g_nlWhy), "code check failed at 0x%08lx (%d of %d)", first, bad, total);
+    else Out(g_nlWhy, sizeof(g_nlWhy), "ok");
+    Log(g_nlOk ? 1 : 0, "0.21.7 navmesh labels: checks %s (%d rows); [Debug] NavLabels %ld, NavLabelRadius %.0f, "
+        "NavLabelMax %d", g_nlWhy, total, g_nlOn, g_nlRadius, g_nlMax);
+}
+// ---- end of 0.21.7 navmesh labels ----
+
+// ---- 0.21.7 SweepAndPrune read-out (P6a; docs\Befund-SweepAndPrune-0611.md section 4, TODO "SweepAndPrune pruefen")
+// The MarkupManager's collision pool (markups: ledges / grabs / climb lines): boxes b / N (1000 on the PC, TU 3000), pair
+// links p / 2M (400, TU 1000), proxies u / 1000 - read only every 250 ms on the render thread with session peaks, "full"
+// frame counters (p == 2M: the next pair is dropped silently; b == N: the next box = the crash at [0x24]) and the warning
+// mark (the warning buffer 0xa035f0 holds "WARNING: [SweepAndPrune] Out of space for ..."). One TruMenu.log line per
+// new peak (at most every 2 s). The chain and its checks are the finding's measuring plan; the 20 byte checks are
+// work\sap_0611\precheck.txt (pinned again in work\asi\menu0217\precheck_0217_sap.txt). [Debug] SapWatch (default 1).
+const NavCheckBytes kSapChecks[] = {
+    {0x005be390, "a1cc94db00c3"},                                // getter: mov eax, [0xdb94cc]; ret (MarkupManager)
+    {0x005be3a7, "68c800000068e8030000"},                        // owner ctor: SAP create(1000, 200)
+    {0x005be3bd, "c74618e8030000c74620c8000000"},                // [this+0x18] = 1000 proxies, [this+0x20] = 200
+    {0x005be3cb, "e8b0edeaff894604"},                            // [this+4] = SAP core
+    {0x005d9ea9, "6a006a24"},                                    // owner allocation 0x24 bytes
+    {0x005d9ebc, "c70614528500"},                                // derived vtable 0x855214
+    {0x005d9ec6, "893560f0e7008935cc94db00"},                    // owner -> [0xe7f060] and [0xdb94cc]
+    {0x0046c880, "897e2489462c"},                                // core: +0x24 = box capacity N, +0x2c = M
+    {0x0046c8cb, "8d7850897828"},                                // box stride 0x50, free chain box+0x28
+    {0x004633db, "8b410c85c07422"},                              // AddPair: free link [core+0xc], none -> warning
+    {0x004633f0, "83413001"},                                    // AddPair: [core+0x30] += 1
+    {0x00463404, "68143e8400e8f2ad0200"},                        // "Out of space for pairs!" -> warning 0x48e200
+    {0x0046344c, "834130ff"},                                    // RemovePair: [core+0x30] -= 1
+    {0x004635f3, "837b040057"},                                  // AddBox: free box list empty?
+    {0x004635fd, "68483e8400e8f9ab0200"},                        // "Out of space for boxes!" -> warning, return 0
+    {0x0046395e, "8343280183433402"},                            // AddBox: [core+0x28] += 1, [core+0x34] += 2
+    {0x00463ba4, "834634fe83cdff016e28"},                        // RemoveBox: [core+0x34] -= 2, [core+0x28] -= 1
+    {0x005be5b9, "895024"},                                      // CreateProxy: [box+0x24] (box 0 after an overflow)
+    {0x0048e20a, "68f035a000"},                                  // warning: vsprintf into 0xa035f0
+    {0x0048e217, "c705fc37a00001000000"},                        // warning: [0xa037fc] = 1
+};
+void PosLaraUnit(char *o, size_t n);         // 0.17, below
+const DWORD kSapMgr = 0x00db94cc, kSapMgr2 = 0x00e7f060, kSapVtbl = 0x00855214, kSapWarnBuf = 0x00a035f0,
+            kSapWarnTimer = 0x00a037fc;
+bool g_sapOk = false;
+char g_sapWhy[96] = "not checked";
+int g_sapWatch = 1;                          // [Debug] SapWatch
+struct SapState { long b, n, p, m2, u, peakB, peakP, peakU, fullB, fullP; bool warnPairs, warnBoxes, valid; char why[80]; };
+SapState g_sap = {};
+DWORD g_sapTick = 0, g_sapLogTick = 0;
+long g_sapLoggedB = 0, g_sapLoggedP = 0, g_sapLoggedU = 0;
+// one read of the chain (the finding's steps 1 .. 8); false = n/a (the reason in s.why)
+bool SapRead(SapState &s) {
+    DWORD mgr = 0, mgr2 = 0, vt = 0, proxies = 0, core = 0, n = 0, m = 0, mem = 0, b = 0, ends = 0, p = 0;
+    if (!ReadDword(kSapMgr, &mgr) || !mgr || !ReadDword(kSapMgr2, &mgr2) || mgr2 != mgr) { Out(s.why, sizeof(s.why), "no MarkupManager"); return false; }
+    if (!ReadDword(mgr, &vt) || vt != kSapVtbl || !ReadDword(mgr + 0x18, &proxies) || proxies != 1000) {
+        Out(s.why, sizeof(s.why), "MarkupManager vtable 0x%08lx / proxies %lu", vt, proxies);
+        return false;
+    }
+    if (!ReadDword(mgr + 4, &core) || !core || !ReadDword(core + 0x24, &n) || !ReadDword(core + 0x2c, &m) ||
+        !ReadDword(core + 0x20, &mem) || !(n == 1000 || n == 3000) || !(m == 200 || m == 500) || mem != 1 + 204 * n + 16 * m) {
+        Out(s.why, sizeof(s.why), "SAP core N %lu M %lu memory %lu", n, m, mem);
+        return false;
+    }
+    if (!ReadDword(core + 0x28, &b) || b > n || !ReadDword(core + 0x34, &ends) || ends != 2 * b || !ReadDword(core + 0x30, &p) ||
+        p > 2 * m) {
+        Out(s.why, sizeof(s.why), "counts out of range (b %lu, ends %lu, p %lu)", b, ends, p);
+        return false;
+    }
+    long u = 0;
+    DWORD node = 0;
+    ReadDword(mgr + 0x14, &node);
+    for (; node && u <= 1000; ++u) if (!ReadDword(node + 4, &node)) break;
+    s.b = static_cast<long>(b); s.n = static_cast<long>(n); s.p = static_cast<long>(p); s.m2 = static_cast<long>(2 * m);
+    s.u = u;
+    s.why[0] = 0;
+    return true;
+}
+// render thread, every Present: one read every 250 ms (peaks, full frames, warning mark, a log line per new peak)
+void SapTick() {
+    if (!g_sapOk || !g_sapWatch) return;
+    const DWORD now = GetTickCount();
+    if (g_sapTick && now - g_sapTick < 250) return;
+    g_sapTick = now ? now : 1;
+    g_sap.valid = SapRead(g_sap);
+    if (!g_sap.valid) return;
+    if (g_sap.b > g_sap.peakB) g_sap.peakB = g_sap.b;
+    if (g_sap.p > g_sap.peakP) g_sap.peakP = g_sap.p;
+    if (g_sap.u > g_sap.peakU) g_sap.peakU = g_sap.u;
+    if (g_sap.b >= g_sap.n) ++g_sap.fullB;
+    if (g_sap.p >= g_sap.m2) ++g_sap.fullP;
+    DWORD timer = 0;
+    char warn[48] = "";
+    if (ReadDword(kSapWarnTimer, &timer) && timer && ReadString(kSapWarnBuf, warn, sizeof(warn)) &&
+        !strncmp(warn, "WARNING: [SweepAndPrune] Out of space for ", 42)) {
+        if (warn[42] == 'p') g_sap.warnPairs = true;
+        if (warn[42] == 'b') g_sap.warnBoxes = true;
+    }
+    if ((g_sap.peakB > g_sapLoggedB || g_sap.peakP > g_sapLoggedP || g_sap.peakU > g_sapLoggedU) &&
+        (!g_sapLogTick || now - g_sapLogTick >= 2000)) {
+        g_sapLogTick = now ? now : 1;
+        g_sapLoggedB = g_sap.peakB; g_sapLoggedP = g_sap.peakP; g_sapLoggedU = g_sap.peakU;
+        char unit[48];
+        PosLaraUnit(unit, sizeof(unit));
+        Log(1, "sap: new peak in %s - boxes %ld/%ld (peak %ld), pair links %ld/%ld (peak %ld), proxies %ld/1000 (peak %ld); "
+               "full frames boxes %ld / pairs %ld", unit[0] ? unit : "-", g_sap.b, g_sap.n, g_sap.peakB, g_sap.p, g_sap.m2,
+            g_sap.peakP, g_sap.u, g_sap.peakU, g_sap.fullB, g_sap.fullP);
+    }
+}
+void ValSap(char *o, size_t n) {
+    if (!g_sapOk) { Out(o, n, "n/a (%s)", g_sapWhy); return; }
+    if (!g_sapWatch) { Out(o, n, "off ([Debug] SapWatch=0)"); return; }
+    if (!g_sap.valid) { Out(o, n, "n/a (%s)", g_sap.why[0] ? g_sap.why : "not read yet"); return; }
+    Out(o, n, "Boxen %ld/%ld (Spitze %ld), Paare %ld/%ld (Spitze %ld), Proxies %ld/1000 (Spitze %ld); voll: B %ld / P %ld "
+              "Bilder; Warnung: %s", g_sap.b, g_sap.n, g_sap.peakB, g_sap.p, g_sap.m2, g_sap.peakP, g_sap.u, g_sap.peakU,
+        g_sap.fullB, g_sap.fullP, g_sap.warnPairs && g_sap.warnBoxes ? "Paare + Boxen" : g_sap.warnPairs ? "Paare"
+                                                                     : g_sap.warnBoxes ? "Boxen" : "-");
+}
+bool RunSapReset(const char *, char *o, size_t n) {
+    g_sap.peakB = g_sap.peakP = g_sap.peakU = g_sap.fullB = g_sap.fullP = 0;
+    g_sap.warnPairs = g_sap.warnBoxes = false;
+    g_sapLoggedB = g_sapLoggedP = g_sapLoggedU = 0;
+    Log(1, "sap: peaks reset (src=%s)", ShotSource("sap.reset"));
+    Out(o, n, "SweepAndPrune peaks reset");
+    return true;
+}
+void SapCheck() {
+    const int total = static_cast<int>(sizeof(kSapChecks) / sizeof(kSapChecks[0]));
+    int bad = 0;
+    DWORD first = 0;
+    for (const NavCheckBytes &c : kSapChecks)
+        if (!HexBytesAt(c.at, c.hex) && !bad++) first = c.at;
+    g_sapOk = bad == 0;
+    if (bad) Out(g_sapWhy, sizeof(g_sapWhy), "code check failed at 0x%08lx (%d of %d)", first, bad, total);
+    else Out(g_sapWhy, sizeof(g_sapWhy), "ok");
+    Log(g_sapOk ? 1 : 0, "0.21.7 SweepAndPrune read-out: checks %s (%d rows); [Debug] SapWatch %d", g_sapWhy, total,
+        g_sapWatch);
+}
+// ---- end of 0.21.7 SweepAndPrune read-out ----
+// 0.21.7: a label layer of this version wants the Present draw (Render's early return)
+bool LabelLayersOn() { return g_ubOn || g_shOn || g_nlOn; }
 
 // ---- 0.14 Debug view (debug view stage S3, owner order 2026-11-06): trigger wireframes by kind, stream portals
 // (loading areas), checkpoint objects, legend, master switch dbg.view ----
@@ -17709,10 +18864,14 @@ void M214Check() {
 // refused on these rows (footer line); no pinning, no recent rows.
 enum SwType { kSwBool = 0, kSwInt, kSwChoice };
 enum SwWhen { kSwLive = 0, kSwRestart, kSwLiveIf };
+// 0.21.7: the file is UTF-8 (umlauts in the DE / EN texts - the bar's font, ImGui's ProggyClean, has the Latin-1 glyphs;
+// work\m0217_0711\font_glyphs.py); the hint column is "<DE help> // <EN help>" (each at most ~60 characters: the bar's
+// help line while the row is selected, the menu's tooltip); keys stay ASCII (SwWord)
 struct SwRow {
     char plugin[24], section[32], key[40], target[112];   // target "ini:<Plugin>:<Section>:<Key>" (TestIniTarget)
     int type, lo, hi, step, when, group;
     char choices[64], de[64], en[64], whenKey[40], def[24], hint[200], since[40];
+    char hintEn[200];                        // 0.21.7: the EN half of the hint column (hint = the DE half)
 };
 struct SwGroup { char key[24], de[64], en[64]; bool open; int count; };
 struct SwValue { int state; char text[24]; };   // state 0 = the INI value, 1 = key missing, 2 = no INI
@@ -17741,6 +18900,20 @@ int SwSplit(char *line, char **f, int max) {
         p = bar + 1;
     }
     return c;
+}
+// 0.21.7: a UTF-8 text cut by strncpy_s(_TRUNCATE) may end inside a multi-byte sequence - drop that partial character
+void Utf8TrimTail(char *s) {
+    size_t len = strlen(s), lead = len;
+    while (lead > 0 && (static_cast<unsigned char>(s[lead - 1]) & 0xc0) == 0x80) --lead;   // continuation bytes
+    if (lead == 0) return;
+    const unsigned char c = static_cast<unsigned char>(s[lead - 1]);
+    const size_t need = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1;
+    if (lead - 1 + need > len) s[lead - 1] = 0;   // the last character is incomplete
+}
+// copy a UTF-8 text field (cut at a character boundary)
+void SwCopyText(char *o, size_t n, const char *s) {
+    strncpy_s(o, n, s, _TRUNCATE);
+    Utf8TrimTail(o);
 }
 bool SwWord(const char *s, size_t max) {     // letters / digits / _ only, 1 .. max - 1
     size_t len = strlen(s);
@@ -17801,8 +18974,8 @@ bool SwParseRow(char **f, int c, SwRow &r, const char **why) {
         strncpy_s(r.choices, sizeof(r.choices), f[3] + 7, _TRUNCATE);
     } else { *why = "type bool | int:<lo>..<hi>[:<step>] | choice:<a>,<b>"; return false; }
     if (!f[4][0] || !f[5][0]) { *why = "DE / EN text"; return false; }
-    strncpy_s(r.de, sizeof(r.de), f[4], _TRUNCATE);
-    strncpy_s(r.en, sizeof(r.en), f[5], _TRUNCATE);
+    SwCopyText(r.de, sizeof(r.de), f[4]);    // 0.21.7: UTF-8, cut at a character boundary
+    SwCopyText(r.en, sizeof(r.en), f[5]);
     if (!strcmp(f[6], "live")) r.when = kSwLive;
     else if (!strcmp(f[6], "restart")) r.when = kSwRestart;
     else if (!strncmp(f[6], "live-if:", 8) && SwWord(f[6] + 8, sizeof(r.whenKey))) {
@@ -17811,7 +18984,15 @@ bool SwParseRow(char **f, int c, SwRow &r, const char **why) {
     } else { *why = "when live | restart | live-if:<Key>"; return false; }
     strncpy_s(r.def, sizeof(r.def), f[7], _TRUNCATE);
     if (!SwValueOk(r, r.def)) { *why = "default does not fit the type"; return false; }
-    strncpy_s(r.hint, sizeof(r.hint), f[8], _TRUNCATE);
+    const char *split = strstr(f[8], " // ");  // 0.21.7: "<DE help> // <EN help>" (one text = both languages)
+    if (split) {
+        const size_t k = static_cast<size_t>(split - f[8]);
+        SwCopyText(r.hint, k + 1 < sizeof(r.hint) ? k + 1 : sizeof(r.hint), f[8]);
+        SwCopyText(r.hintEn, sizeof(r.hintEn), split + 4);
+    } else {
+        SwCopyText(r.hint, sizeof(r.hint), f[8]);
+        SwCopyText(r.hintEn, sizeof(r.hintEn), f[8]);
+    }
     if (c == 10) strncpy_s(r.since, sizeof(r.since), f[9], _TRUNCATE);
     char path[MAX_PATH], sec[64], key[64];
     if (!TestIniTarget(r.target, path, sizeof(path), sec, sizeof(sec), key, sizeof(key))) { *why = "bad ini target"; return false; }
@@ -17833,7 +19014,11 @@ void SwLoadLocked() {
         ++number;
         size_t len = strlen(line);
         while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = 0;
-        if (number == 1) { marker = !strncmp(line, kSwMarker, strlen(kSwMarker)); if (!marker) break; }
+        if (number == 1) {                   // 0.21.7: an editor's UTF-8 BOM in front of the marker is skipped
+            if (!strncmp(line, "\xef\xbb\xbf", 3)) memmove(line, line + 3, strlen(line + 3) + 1);
+            marker = !strncmp(line, kSwMarker, strlen(kSwMarker));
+            if (!marker) break;
+        }
         const char *p = line;
         while (*p == ' ' || *p == '\t') ++p;
         if (!*p || *p == '#') continue;
@@ -17849,8 +19034,8 @@ void SwLoadLocked() {
                 SwGroup &g = g_swGroup[g_swGroupN++];
                 memset(&g, 0, sizeof(g));
                 strncpy_s(g.key, sizeof(g.key), field[1], _TRUNCATE);
-                strncpy_s(g.de, sizeof(g.de), field[2], _TRUNCATE);
-                strncpy_s(g.en, sizeof(g.en), field[3], _TRUNCATE);
+                SwCopyText(g.de, sizeof(g.de), field[2]);   // 0.21.7: UTF-8
+                SwCopyText(g.en, sizeof(g.en), field[3]);
                 g.open = c == 5;
                 continue;
             }
@@ -19685,6 +20870,29 @@ const Item kItems[] = {
     // 0.13 Thrall-Labels ([Debug] Enabled; read-only, drawn at Present in a loaded level)
     {"dbg.labels", "bool", "0.13: Thrall-Labels - name, intro id, distance, health, targeter 9 / hit list / condition 2011 "
                            "(TruShadowCombat 0.5.3) at each thrall near Lara", false, ValLabels, RunLabels},
+    // 0.21.7 uber labels (section "0.21.7 uber labels"; read only, drawn at Present in a loaded level)
+    {"dbg.uber", "bool", "0.21.7: uber labels - gates / platforms / switches near Lara with their state-graph node and the "
+                         "time left ('Tor: oben, noch 12 s'; [Debug] UberRadius / UberMax / UberMatch)", false, ValUber,
+     RunUber},
+    {"uber.dump", "action", "0.21.7: every uber instance within [Debug] UberRadius of Lara with node / transition / time "
+                            "into TruMenu.log (read only)", false, ValUber, RunUberDump},
+    // 0.21.7 shader labels (section "0.21.7 shader labels"; read only, data file [Shader] File)
+    {"shader.labels", "bool", "0.21.7: shader labels - terrain batches near Lara: material id, file status / slots / libs "
+                              "and the live shader libs of the material (red SURR, orange PART, green TU)", false, ValShader,
+     RunShader},
+    {"shader.reload", "action", "0.21.7: read [Shader] File (TruMenu.shaderlabel.txt) again", false, ValShader,
+     RunShaderReload},
+    {"shader.dump", "action", "0.21.7: the materials of the batches near Lara (file vs live libs, note) into TruMenu.log",
+     false, ValShader, RunShaderDump},
+    // 0.21.7 SweepAndPrune read-out (section "0.21.7 SweepAndPrune"; read only)
+    {"sap.status", "info", "0.21.7: the markup collision pool (SweepAndPrune): boxes / pair links / proxies now, session "
+                           "peaks, full frames, warning mark ([Debug] SapWatch)", false, ValSap, nullptr},
+    {"sap.reset", "action", "0.21.7: reset the SweepAndPrune peaks / full counters / warning mark", false, ValSap,
+     RunSapReset},
+    // 0.21.7 navmesh labels (section "0.21.7 navmesh labels"; read only)
+    {"nav.labels", "bool", "0.21.7: navmesh labels - layer.graph #area, unit, flag bits 27 / 26 of +0x30 and the 4-bit "
+                           "values of +0x34 at the areas of the drawn layers near Lara, plus the engine's colour legend",
+     false, ValNavLabels, RunNavLabels},
     // 0.14 Debug view ([Debug] Enabled; read-only, drawn at Present in a loaded level, also during the flight)
     {"dbg.view", "bool", "0.14: master switch - every 0.14 layer + dbg.labels + draw.markup + the [Debug] ViewNav "
                          "switches on / off (nav.off); each one stays switchable alone", false, ValDvView, RunDvView},
@@ -23379,7 +24587,8 @@ enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvP
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
 enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves, kQsFav, kQsTests,   // 0.21.1 kQsFav / kQsTests
                  kQsSwitches,              // 0.21.5 page Fixes (TruMenu.switches.txt)
-                 kQsCostume };             // 0.21.6 page Kostueme (section "0.21.6 costumes")
+                 kQsCostume,               // 0.21.6 page Kostueme (section "0.21.6 costumes")
+                 kQsChapters };            // 0.21.7 page Kapitel: the units per chapter (section "0.21.7 chapter units")
 const int kQbXDir = 2;                      // 0.21.5: X on a special row of page Fixes (QbSpecialAct dir)
 struct QbPage { const char *de, *en; const QbRow *rows; int n; int special; };
 const ImU32 kQbWhite = IM_COL32(235, 235, 235, 255), kQbBlue = IM_COL32(160, 230, 255, 255),
@@ -23497,6 +24706,9 @@ const QbRow kQbRender[] = {
     // 0.21.1 (ChunkDoll crash, docs\Befund-ChunkDoll-Absturz-0711.md): physics bodies used / 405, read only
     {"Physik-Koerper", "Physics bodies", "phys.status", "", kQbInfo, -1, kQcPhys, 0, kQbFlat, 0},
     {"Physik-Koerper ins Log", "Physics bodies to log", "phys.dump", "", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    // 0.21.7 SweepAndPrune read-out (P6a): the markup collision pool, read only
+    {"Kanten-Kollision (SAP)", "Ledge collision (SAP)", "sap.status", "", kQbInfo, -1, kQcNone, 0, kQbFlat, 0},
+    {"SAP-Spitzen zuruecksetzen", "Reset SAP peaks", "sap.reset", "", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
     // 0.19 Dumme KI: one setting at a time (switching a group on replaces the other); the count = enemies in scope.
     // 0.21.1 (TODO 0.21.1 items 6 / 7): the KI rows in three collapsible groups
     {"Dumme KI (Gegner ignorieren Lara)", "Dumb AI (enemies ignore Lara)", "-", "ki_dumm", kQbGroup, -1, kQcNone, 0,
@@ -23571,8 +24783,14 @@ const QbRow kQbRenderMore[] = {
     {"Nav-Proben", "Nav probes", "nav.draw", "recent_navprobes", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"Laufweg (Flieger)", "Path (flyer)", "nav.draw", "draw_mover3d_path", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"Alle Ebenen", "All layers", "nav.mask", "", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh beschriften", "Navmesh labels", "nav.labels", "", kQbBool, -1, kQcNone, 0, kQbAi, 0},   // 0.21.7
     {"Navmesh aus", "Navmesh off", "nav.off", "", kQbAction, -1, kQcNone, 0, kQbAi, 0},
     {"Navmesh: Stand", "Navmesh state", "nav.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    // 0.21.7 shader labels (owner 22:3x: the light columns of dlc_yggdrasil_end with material + shader status)
+    {"Shader-Etiketten", "Shader labels", "-", "rd_shader", kQbGroup, -1, kQcNone, 0, kQbRed, 0},
+    {"Shader-Etiketten", "Shader labels", "shader.labels", "", kQbBool, -1, kQcNone, 0, kQbRed, 0},
+    {"Shader: Liste ins Log", "Shader: list to log", "shader.dump", "", kQbAction, -1, kQcNone, 0, kQbRed, 0},
+    {"Shader: Datei neu lesen", "Shader: read file again", "shader.reload", "", kQbAction, -1, kQcNone, 0, kQbRed, 0},
     {"Objektnamen: Filter / Farbe / Schrift", "Object names: filter / colour / size", "-", "rd_names", kQbGroup, -1,
      kQcNone, 0, kQbBlue, 0},
     {"Filter: alle", "Filter: all", "dbg.namefilter", "*", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
@@ -23601,6 +24819,9 @@ const QbRow kQbLevel[] = {
     {"Checkpoints", "Checkpoints", "dbg.checkpoints", "", kQbBool, kDvCheckpoints, kQcLayer, 0, 0},
     {"Trigger-Namen", "Labels", "dbg.show", "trglabels", kQbBool, kDvTrgLabels, kQcTrgLabels, 0, 0},
     {"Sammelgegenstaende", "Collectibles", "dbg.collect", "", kQbBool, kDvCollect, kQcLayer, 0, 0},   // 0.20
+    // 0.21.7 uber labels (gates / platforms: node + time left), read only
+    {"Tore / Plattformen (Zustand)", "Gates / platforms (state)", "dbg.uber", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
+    {"Tore / Plattformen ins Log", "Gates / platforms to log", "uber.dump", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
     // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
     {"Checkpoints: alle zeigen", "Checkpoints: show all", "dbg.cpall", "1", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
     {"Checkpoints: alle verbergen", "Checkpoints: hide all", "dbg.cpall", "0", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
@@ -23753,12 +24974,95 @@ const QbPage kQbPages[] = {
     {"Fixes", "Fixes", nullptr, 0, kQsSwitches},                   // 0.21.5 plugin INI switches (TruMenu.switches.txt)
     {"Checkpoints", "Checkpoints", nullptr, 0, kQsCheckpoints},
     {"Saves", "Saves", nullptr, 0, kQsSaves},
-    QB_PAGE("Kapitel (debug)", "Chapters (debug)", kQbChapters, kQsNone),
+    QB_PAGE("Kapitel (debug)", "Chapters (debug)", kQbChapters, kQsChapters),   // 0.21.7: + units per chapter
     QB_PAGE("Barrierefreiheit", "Accessibility", kQbAccess, kQsNone),
     QB_PAGE("Koop", "Co-op", kQbCoop, kQsNone),                     // 0.21 placeholder (planned rows only)
 };
 #undef QB_PAGE
 const int kQbPageN = static_cast<int>(sizeof(kQbPages) / sizeof(kQbPages[0]));
+// 0.21.7 short help (owner 2026-11-07 "kleine kurze Saetze als Hilfe, nur falls ein Punkt nicht eindeutig ist, nicht zu
+// lange"): one line per row that is not self-explanatory, "DE|EN", each half at most kQbHelpMax characters - the bar's
+// footer while the row is selected (QbHelpLine), the long menu's tooltip (PageQbRow). Keyed by item + argument ("*" = any
+// argument), so the same item on two pages has the same help; rows without an entry have none. The rows of page Fixes
+// take the hint column of TruMenu.switches.txt ("DE // EN"), the costume rows theirs in QbHelpLine.
+const int kQbHelpMax = 60;
+struct QbHelp { const char *id, *arg, *text; };
+const QbHelp kQbHelp[] = {
+    {"nav.draw", "planner_areas", "Umrisse der Gegner-Laufflaechen - braucht 'Alle Ebenen'|Outlines of the enemy walk "
+                                  "areas - needs 'All layers'"},
+    {"nav.draw", "planner_areas_solid", "Laufflaechen gefuellt (Farben wie die Umrisse)|Walk areas filled (colours as the "
+                                        "outlines)"},
+    {"nav.draw", "planner_connectivity", "Linie zu jeder Nachbarflaeche - nur mit Flaechen an|Line to each neighbour area - "
+                                         "only with areas on"},
+    {"nav.draw", "planner_area_normals", "Normale jeder Laufflaeche - nur mit Flaechen an|Normal of each walk area - only "
+                                         "with areas on"},
+    {"nav.draw", "obstacles", "Bewegliche Hindernisse, um die die KI herumgeht|Moving obstacles the AI walks around"},
+    {"nav.draw", "recent_navprobes", "Letzte Weg-Abfragen der KI als Linien|Latest AI path queries as lines"},
+    {"nav.draw", "draw_mover3d_path", "Flugweg fliegender Gegner (Mover3D)|Flight path of flying enemies (Mover3D)"},
+    {"nav.mask", "", "Alle Navmesh-Ebenen zeichnen - sonst oft nichts zu sehen|Draw every navmesh layer - else often "
+                     "nothing shows"},
+    {"nav.off", "", "Navmesh-Zeichnung aus, Ebenen-Maske wie vorher|Navmesh drawing off, layer mask as before"},
+    {"nav.labels", "", "Nummer + Flags je Laufflaeche, Farben in der Legende|Number + flags per walk area, colours in the "
+                       "legend"},
+    {"dbg.uber", "", "Tore / Plattformen: Zustand und Restzeit am Objekt|Gates / platforms: state and time left at the "
+                     "object"},
+    {"shader.labels", "", "Material + Shader-Status am Gelaende (Datei und live)|Material + shader status on the terrain "
+                          "(file and live)"},
+    {"shader.dump", "", "Materialien um Lara: Datei gegen live ins Log|Materials around Lara: file vs live into the log"},
+    {"sap.status", "", "Kanten-Kollision: Boxen / Paare / Proxies, Spitzen|Ledge collision: boxes / pairs / proxies, peaks"},
+    {"dbg.flatmodels", "", "Flach-Ansicht auch fuer Lara, Gegner und Objekte|Flat view for Lara, enemies and objects too"},
+    {"dbg.flatanyrt", "", "Flach-Ansicht auch in Schatten- und Neben-Zielen|Flat view in shadow and side targets too"},
+    {"dbg.flatcolour", "material", "Flach-Ansicht: eine Farbe je Material|Flat view: one colour per material"},
+    {"dbg.flatcolour", "class", "Flach-Ansicht: Gelaende und Figuren getrennt gefaerbt|Flat view: terrain and figures "
+                                "coloured apart"},
+    {"dbg.flatpass", "*", "Diesen Render-Pass in der Flach-Ansicht ein / aus|This render pass in the flat view on / off"},
+    {"dbg.flatedges", "", "Jede flache Flaeche zusaetzlich als dunkles Gitter|Each flat face again as a dark wireframe"},
+    {"dbg.flatpasses", "", "Welche Render-Paesse die Flach-Ansicht faerbt|Which render passes the flat view colours"},
+    {"dbg.census", "", "Zaehlt Zeichenaufrufe je Pass ins Log (einmal)|Counts draw calls per pass into the log (once)"},
+    {"dbg.slide", "", "Rutschflaechen: rot = steiler als Laras Grenze|Slide faces: red = steeper than Lara's limit"},
+    {"dbg.enemycoll", "", "Kollision nur fuer Gegner (violett)|Collision for enemies only (violet)"},
+    {"draw.ledges", "", "Nur die Greif-Kanten aus dem Markup|Only the grab ledges of the markup"},
+    {"ai.mode", "", "Wie 'KI dumm' wirkt: purge (ohne Patch) / gate|How 'dumb AI' works: purge (no patch) / gate"},
+    {"dbg.namefilter", "*", "Objektnamen nur fuer Namen mit diesem Teil|Object names only for names with this part"},
+    {"dbg.depth", "", "Linien hinter Waenden: zeigen / verstecken / gedimmt|Lines behind walls: show / hide / dimmed"},
+    {"dbg.enclosing", "", "Grosse Kaesten um Kamera / Lara: normal / blass / weg|Big boxes around camera / Lara: normal / "
+                          "dim / hide"},
+    {"dbg.larain", "", "Trigger, in denen Lara steht: fett und pulsierend|Triggers Lara stands in: bold and pulsing"},
+    {"dbg.fade", "", "Ferne Objekte blasser zeichnen|Draw far objects fainter"},
+    {"dbg.short", "", "Kurze Namen an Triggern (der naechste voll)|Short trigger labels (the nearest in full)"},
+    {"dbg.show", "trglabels", "Namen an den Triggern (Objekt, Intro-Id, Form)|Trigger names (object, intro id, shape)"},
+    {"dbg.show", "unknown", "Trigger, deren Art TruMenu nicht kennt (grau)|Triggers of a kind TruMenu does not know (grey)"},
+    {"dbg.portals", "", "Lade-Bereiche zwischen den Abschnitten (weiss)|Loading areas between the units (white)"},
+    {"shot.oncine", "", "Foto-Paare beim Start jeder Zwischensequenz|Shot pairs at the start of each cutscene"},
+    {"menu.hidecursor", "", "Kein Mauszeiger ueber dem Spielbild|No mouse cursor over the game picture"},
+    {"cheat.flight", "", "Frei fliegen ohne Schwerkraft - Tasten in der Zeile oben|Fly freely without gravity - keys in "
+                         "the line above"},
+    {"overlay.larain", "", "Zeile 'Lara in: <Trigger>' in der Positions-Anzeige|Line 'Lara in: <trigger>' in the position "
+                           "overlay"},
+    {"player.unstuck", "mark", "Zur zuletzt gemerkten Marke statt zu sicherem Boden|To the last mark instead of safe "
+                               "ground"},
+    {"player.safeground", "", "Stand von 'Befreien': sichere Stellen und Gruende|State of 'Unstuck': safe spots and reasons"},
+    {"time.freezesound", "", "Ton pausiert, solange das Rad die Welt anhaelt|Sound pauses while the ring holds the world"},
+    {"time.pausesound", "", "Ton pausiert bei jeder Welt-Pause|Sound pauses with every world pause"},
+    {"time.freezeclock", "", "Shader-Uhr steht mit der Welt (Wasser, Licht)|Shader clock stops with the world (water, "
+                             "light)"},
+    {"costume.next", "", "Naechstes Kostuem der Wechsel-Liste des Spiels|Next costume of the game's cycle list"},
+    {"level.load", "*", "Sicherung, dann Kapitel-Start laden (debug, keine Story)|Backup, then load the chapter start "
+                        "(debug, no story values)"},
+};
+// the help of an item + argument ("DE|EN"), nullptr = none
+const char *QbHelpText(const char *id, const char *arg) {
+    for (const QbHelp &h : kQbHelp)
+        if (!_stricmp(h.id, id) && (!strcmp(h.arg, "*") || !strcmp(h.arg, arg ? arg : ""))) return h.text;
+    return nullptr;
+}
+// one language of a "DE|EN" text
+void QbHelpPart(const char *text, bool de, char *o, size_t n) {
+    const char *bar = strchr(text, '|');
+    if (!bar) { Out(o, n, "%s", text); return; }
+    if (de) Out(o, n, "%.*s", static_cast<int>(bar - text), text);
+    else Out(o, n, "%s", bar + 1);
+}
 const int kQbStartPage = 5;                  // Leveldaten: the layers are what the bar is mostly for (0.21.1: page 0
                                              // Favoriten / Zuletzt in front; 0.21.6: page Kostueme after Lara)
 const int kQbViewMax = 64;                   // rows of one page (static + special; 0.21.1: 64, was 40)
@@ -24276,11 +25580,22 @@ void QbExecRow(int page, const QbRow &r) {
     default: QbActRow(page, r, 1); return;   // action, choice, info, planned
     }
 }
+// 0.21.7 (live 2026-11-07 20:50, footer "Y: Favorit" on rows that refuse Y): the rule QbFavPin applies, without its
+// messages - a row Y can pin is one item without an argument (page Fixes / Kostueme rows and the special rows of the
+// positions / checkpoints / saves pages have no such row: r = nullptr)
+bool QbFavOk(const QbRow *r) {
+    return r && r->kind != kQbLabel && r->kind != kQbGroup && r->kind != kQbPlanned && strcmp(r->id, "-") && !r->arg[0];
+}
 void QbFavPin(int page, const QbRow *r) {
     const bool de = g_qbLang == 0;
     if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsSwitches) {   // 0.21.5 page Fixes
         QbResult(true, "%s", de ? "Y: Fix-Schalter sind kein Favorit ([Favorites] Ids = Item-Ids ohne Argument)"
                                 : "Y: switch rows cannot be favourites ([Favorites] Ids = item ids without an argument)");
+        return;
+    }
+    if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsChapters) {   // 0.21.7 page Kapitel units
+        QbResult(true, "%s", de ? "Y: Abschnitt-Zeilen sind kein Favorit (level.load mit Argument)"
+                                : "Y: unit rows cannot be favourites (level.load with an argument)");
         return;
     }
     if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsCostume) {    // 0.21.6 page Kostueme
@@ -24843,6 +26158,17 @@ void QuickTick() {
     if (!g_qbOpen) g_qbSavesPageSeen = 0;    // 0.18: reopened on the Saves page = a fresh scan
     // 0.21.6 quick command line: FocusButton (L3) alone opens / closes it; while open it has D-pad up / down, A, B
     const bool qcHasPad = QcPadTick(have ? pad.wButtons : static_cast<WORD>(0), !g_qbOpen || g_menuOpen || g_radOpen);
+    // 0.21.7 diagnosis (live 2026-11-07 20:45, DLC 2 mission menu: the bar's "left" ran, the next X started the mission):
+    // the bar can keep its buttons from the game only through PadHook (QbPad's clear); while PadHook is not called the
+    // pad is read in Present and every bar button reaches the game too - one line per bar opening, one per pressed
+    // button set (read only: nothing here changes the pad)
+    static bool idleLogged = false, idleEdgeLogged = false;
+    if (!g_qbOpen) idleLogged = idleEdgeLogged = false;
+    else if (g_padModeIdle && !idleLogged) {
+        idleLogged = true;
+        Log(1, "quick: bar open while PadHook is not called (250 ms, the pad is read in Present) - the bar cannot keep its "
+               "buttons from the game (footer 'Pad NICHT gesperrt') - diagnosis 0.21.7");
+    }
     if (!g_qbOpen || g_menuOpen || g_radOpen || InterlockedExchange(&g_qbJust, 0)) {
         prev = b;                            // buttons held at the open (or while the menu / ring had them) are no edges
         repeatAt = 0;
@@ -24850,6 +26176,11 @@ void QuickTick() {
     }
     WORD edges = static_cast<WORD>(b & ~prev);
     prev = b;
+    if (g_padModeIdle && edges && !idleEdgeLogged) {   // 0.21.7 diagnosis (see above)
+        idleEdgeLogged = true;
+        Log(1, "quick: bar buttons 0x%04x pressed while PadHook is not called - the game reads them too (diagnosis 0.21.7)",
+            edges);
+    }
     if (qcHasPad) {                          // 0.21.6: the rows wait while the command line has the pad
         repeatAt = 0;
         return;
@@ -24884,6 +26215,7 @@ void QuickTick() {
     if (edges & kQbX) {                      // 0.21.3: X = execute (one press per frame: no right press on top)
         if (src) QbExecRow(g_qbPage, *src);  // static row, or a favourite / recent row of page 0
         else if (p.special == kQsCostume) QbSpecialAct(p.special, row - g_qbStaticN, kQbXDir);   // 0.21.6: X = now
+        else if (p.special == kQsChapters) QbSpecialAct(p.special, row - g_qbStaticN, kQbXDir);   // 0.21.7: X = toggle / run
         else if (p.special) QbSpecialAct(p.special, row - g_qbStaticN, p.special == kQsSwitches ? kQbXDir : 1);
         return;
     }
@@ -24899,6 +26231,8 @@ bool QuickWantsDraw() {
 }
 
 bool QbFootHint(int page, int sel, bool de, char *o, size_t n);   // 0.21.6, section "0.21.6 costumes"
+bool QbHelpLine(int page, int sel, bool de, char *o, size_t n);   // 0.21.7, after QbFootHint
+const QbRow *QbSelRow(int page, int sel);                          // 0.21.7, after QbFootHint
 
 // foreground draw list, left edge at [Quick] Top % of the screen height; g_qbRect = the panel (labels keep out of it)
 void DrawQuick() {
@@ -24933,7 +26267,9 @@ void DrawQuick() {
     if (sel < 0 || sel >= (n ? n : 1)) sel = 0;
     // 0.18: pages longer than the screen scroll with the selection (the rows above / below are counted in the title)
     const float fsSmall = fs * 0.8f;
-    const float fixedH = pad + rowH + (g_qbHead[0] ? rowH : 0.0f) + 2.0f * (fsSmall + 3.0f) + pad;
+    char help[160] = "";                     // 0.21.7: the selected row's help line (one more footer line when it has one)
+    const bool hasHelp = QbHelpLine(g_qbPage, sel, de, help, sizeof(help));
+    const float fixedH = pad + rowH + (g_qbHead[0] ? rowH : 0.0f) + (hasHelp ? 3.0f : 2.0f) * (fsSmall + 3.0f) + pad;
     int visible = static_cast<int>((io.DisplaySize.y * 0.97f - y0 - fixedH) / rowH);
     if (visible < 6) visible = 6;
     int first = 0;
@@ -24964,11 +26300,23 @@ void DrawQuick() {
     else if (!QbFootHint(g_qbPage, sel, de, foot, sizeof(foot)))   // 0.21.6: else the selected row's keys (flight, costumes)
         Out(foot, sizeof(foot), "%s", de ? "hoch / runter: Zeile   links / rechts: aus / an   LB / RB: Seite"
                                           : "up / down: row   left / right: off / on   LB / RB: page");
-    char close[112];                         // 0.21.3: the X / Y hint on the line that a result never replaces
-    Out(close, sizeof(close), "%s   %s: %s", de ? "X: ausfuehren  Y: Favorit" : "X: run  Y: favourite", combo,
-        de ? "zu" : "close");
+    // 0.21.3: the X / Y hint on the line that a result never replaces; 0.21.7: "Y: -" where Y is refused (QbFavOk, the
+    // rule of QbFavPin), the command line key (L3) when [Cmd] Enabled, and a warning while the game polls the pad past
+    // PadHook (front end: the bar cannot keep its buttons from the game then - TODO "Leiste sperrt das Pad ...")
+    char close[200], l3[48] = "";
+    if (g_cmdEnabled && g_cmdFocusButton) {
+        char b[32];
+        QbComboText(g_cmdFocusButton, b, sizeof(b));
+        Out(l3, sizeof(l3), "  %s: %s", b, de ? "Befehlszeile" : "cmd line");
+    }
+    const bool yOk = QbFavOk(QbSelRow(g_qbPage, sel));
+    Out(close, sizeof(close), "%s%s   %s: %s%s", yOk ? (de ? "X: ausfuehren  Y: Favorit" : "X: run  Y: favourite")
+                                                 : (de ? "X: ausfuehren  Y: -" : "X: run  Y: -"), l3, combo,
+        de ? "zu" : "close", g_padModeIdle ? (de ? "   (Pad NICHT gesperrt)" : "   (pad NOT held)") : "");
     float w = pad + sq + pad + nameW + gap + stateW + gap + countW + pad;
     float tw = width(title, fs) + 2.0f * pad, fw = width(foot, fsSmall) + 2.0f * pad, cw = width(close, fsSmall) + 2.0f * pad;
+    const float pw = hasHelp ? width(help, fsSmall) + 2.0f * pad : 0.0f;   // 0.21.7 help line
+    if (pw > w) w = pw < io.DisplaySize.x * 0.45f ? pw : io.DisplaySize.x * 0.45f;
     float hw = g_qbHead[0] ? width(g_qbHead, fs) + 2.0f * pad : 0.0f;
     if (tw > w) w = tw;
     if (cw > w) w = cw;
@@ -25012,7 +26360,12 @@ void DrawQuick() {
     dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + 2.0f), result ? (g_qbResultErr ? IM_COL32(255, 130, 110, 255)
                                                                                : IM_COL32(130, 230, 140, 255))
                                                                : IM_COL32(190, 190, 190, 230), foot);
-    dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + fsSmall + 5.0f), IM_COL32(150, 150, 150, 230), close);
+    if (hasHelp) {                           // 0.21.7: the help line between the answer / keys line and the X / Y line
+        y += fsSmall + 3.0f;
+        dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + 2.0f), IM_COL32(150, 215, 255, 240), help);
+    }
+    dl->AddText(font, fsSmall, ImVec2(x0 + pad, y + fsSmall + 5.0f), g_padModeIdle ? IM_COL32(255, 170, 90, 240)
+                                                                                    : IM_COL32(150, 150, 150, 230), close);
     dl->PopClipRect();
 }
 
@@ -25733,7 +27086,8 @@ bool RunPosGoLoad(const char *arg, char *o, size_t n) {
 enum QbDynKind { kQdNone = 0, kQdPos, kQdCpActive, kQdCpAll, kQdCp, kQdBackupNow, kQdRescan, kQdSave, kQdBackup, kQdLabel,
                  kQdItem, kQdPrepare, kQdStop, kQdTodo,     // 0.21.1: page 0 rows, page Tests rows
                  kQdSwGroup, kQdSw,                         // 0.21.5: page Fixes (group, switch)
-                 kQdCosPick, kQdCosNext, kQdCosRec, kQdCosGroup, kQdCos };   // 0.21.6: page Kostueme
+                 kQdCosPick, kQdCosNext, kQdCosRec, kQdCosGroup, kQdCos,     // 0.21.6: page Kostueme
+                 kQdChapGroup, kQdChap };                   // 0.21.7: page Kapitel (units per chapter)
 struct QbDyn { int kind; LONG intro; char arg[64], unit[48]; bool loaded; };
 QbDyn g_qbDyn[kQbViewMax];
 int g_qbDynN = 0;
@@ -26239,6 +27593,64 @@ int CosIndexOf(DWORD id) {
         if (static_cast<DWORD>(g_cos.ids[i]) == id) return i;
     return -1;
 }
+// 0.21.7 (live 2026-11-07 21:14: a cycle-list entry was refused only when worn - "object 33 refused by the game's check
+// 0x005c54e0 (no .drm?)"): the same check before a row is offered. kCostumeValid is game code (id within the object list
+// and <name>.drm present through the game's file system - the check costume.set runs first), so CosValidTick calls it on
+// the game thread (the pad hook's once-per-frame block, where queued items such as costume.set run) - only while page
+// Kostueme was built in the last 2 s, only when the cycle list changed, never a write. The rows read the results.
+const int kCosValidMax = 128;
+CRITICAL_SECTION g_cosValidLock;             // g_cosValidIds / Ok / N (game thread writes, render thread reads)
+WORD g_cosValidIds[kCosValidMax];
+signed char g_cosValidOk[kCosValidMax];      // 1 = offered, 0 = refused by 0x5c54e0
+int g_cosValidN = -1;                        // -1 = not checked yet
+volatile LONG g_cosValidWant = 0;            // GetTickCount of the last QbCosRows (render thread)
+LONG g_cosValidRuns = 0;
+// one call of the game's check, an exception = refused
+bool CosValidCall(WORD id) {
+    __try {
+        return reinterpret_cast<CostumeValidFn>(kCostumeValid)(static_cast<int>(id));
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+// game thread, once per game frame (cheap while page Kostueme is not shown: one read)
+void CosValidTick() {
+    const LONG want = g_cosValidWant;
+    if (!want || GetTickCount() - static_cast<DWORD>(want) > 2000) return;
+    if (!g_costumeOk || !g_experimental || !InLevel()) return;
+    WORD ids[kCosValidMax];
+    const int n = GlobalCostumes(ids, kCosValidMax);
+    if (n <= 0) return;
+    EnterCriticalSection(&g_cosValidLock);
+    const bool same = n == g_cosValidN && !memcmp(ids, g_cosValidIds, sizeof(WORD) * static_cast<size_t>(n));
+    LeaveCriticalSection(&g_cosValidLock);
+    if (same) return;
+    signed char ok[kCosValidMax];
+    char refused[200] = "";
+    size_t used = 0;
+    int bad = 0;
+    for (int i = 0; i < n; ++i) {
+        ok[i] = CosValidCall(ids[i]) ? 1 : 0;
+        if (!ok[i] && ++bad <= 12) LabelAdd(refused, sizeof(refused), &used, "%s%u", used ? " " : "", ids[i]);
+    }
+    EnterCriticalSection(&g_cosValidLock);
+    memcpy(g_cosValidIds, ids, sizeof(WORD) * static_cast<size_t>(n));
+    memcpy(g_cosValidOk, ok, static_cast<size_t>(n));
+    g_cosValidN = n;
+    LeaveCriticalSection(&g_cosValidLock);
+    ++g_cosValidRuns;
+    Log(1, "costumes: %d cycle-list entries checked with the game's check 0x%08lx, %d refused (no .drm?)%s%s", n,
+        kCostumeValid, bad, bad ? ": " : "", refused);
+}
+// render thread: 1 offered, 0 refused by the game's check, -1 not checked (yet)
+int CosOffered(WORD id) {
+    int r = -1;
+    EnterCriticalSection(&g_cosValidLock);
+    for (int i = 0; i < g_cosValidN; ++i)
+        if (g_cosValidIds[i] == id) { r = g_cosValidOk[i]; break; }
+    LeaveCriticalSection(&g_cosValidLock);
+    return r;
+}
 // left / right: the neighbour, wrapping at both ends; from outside the list (-1) right starts at the first entry, left
 // at the last
 int CosStep(int i, int dir, int n) {
@@ -26287,13 +27699,19 @@ void QbCosTick() {
 }
 int QbCosRows(QbView *v, QbDyn *d, int max, bool de) {
     CosRefresh();
+    const DWORD tick = GetTickCount();
+    InterlockedExchange(&g_cosValidWant, static_cast<LONG>(tick ? tick : 1));   // 0.21.7: CosValidTick checks the list
     const char *whyLive = CosWhy(true, de), *whyRec = CosWhy(false, de);
     char cur[112];
     CosLabel(g_cos.now, cur, sizeof(cur));
     const int listN = g_cos.n < 0 ? 0 : g_cos.n;
-    Out(g_qbHead, sizeof(g_qbHead), de ? "aktuell: %s - %d im Wechsel, %d Spieler-Records%s"
-                                       : "current: %s - %d in the cycle, %d player records%s", cur, listN, g_cosRecN,
-        g_cos.listOpen && 4 + listN > max ? (de ? " (Liste gekuerzt)" : " (list cut)") : "");
+    int refused = 0;
+    for (int i = 0; i < listN; ++i) refused += CosOffered(g_cos.ids[i]) == 0;
+    char refusedText[48] = "";
+    if (refused) Out(refusedText, sizeof(refusedText), de ? ", %d vom Spiel abgelehnt" : ", %d refused by the game", refused);
+    Out(g_qbHead, sizeof(g_qbHead), de ? "aktuell: %s - %d im Wechsel%s, %d Spieler-Records%s"
+                                       : "current: %s - %d in the cycle%s, %d player records%s", cur, listN, refusedText,
+        g_cosRecN, g_cos.listOpen && 4 + listN > max ? (de ? " (Liste gekuerzt)" : " (list cut)") : "");
     const ImU32 grey = IM_COL32(130, 130, 130, 255), red = IM_COL32(220, 120, 100, 255), green = IM_COL32(110, 230, 120, 255),
                 white = IM_COL32(235, 235, 235, 255), orange = IM_COL32(255, 190, 90, 255);
     int n = 0;
@@ -26359,11 +27777,13 @@ int QbCosRows(QbView *v, QbDyn *d, int max, bool de) {
         QbView &w = add(kQdCos, g_cos.ids[i]);
         CosLabel(g_cos.ids[i], lab, sizeof(lab));
         Out(w.name, sizeof(w.name), "  %s", lab);
+        const bool off = !now && CosOffered(g_cos.ids[i]) == 0;   // 0.21.7: refused by the game's check 0x5c54e0
         Out(w.state, sizeof(w.state), "%s", whyLive[0] ? (de ? "gesperrt" : "n/a") : now ? (de ? "aktuell" : "current")
+                                            : off ? (de ? "abgelehnt (keine .drm?)" : "refused (no .drm?)")
                                             : (de ? "rechts = an" : "right = wear"));
         w.square = now ? 1 : 0;
-        w.col = whyLive[0] ? grey : now ? green : kQbPlayer;
-        w.stateCol = whyLive[0] ? red : now ? green : white;
+        w.col = whyLive[0] || off ? grey : now ? green : kQbPlayer;
+        w.stateCol = whyLive[0] || off ? red : now ? green : white;
     }
     return n;
 }
@@ -26387,7 +27807,16 @@ void QbCosAct(const QbDyn &q, int dir) {
             CosApply(shown);
             return;
         }
-        const int next = CosStep(CosIndexOf(shown), dir, g_cos.n);
+        int next = CosIndexOf(shown);         // 0.21.7: entries the game refuses (0x5c54e0) are passed over
+        for (int k = 0; k < g_cos.n; ++k) {
+            next = CosStep(next, dir, g_cos.n);
+            if (CosOffered(g_cos.ids[next]) != 0) break;
+        }
+        if (CosOffered(g_cos.ids[next]) == 0) {
+            QbResult(true, "%s: %s", cos, de ? "alle Eintraege vom Spiel abgelehnt (0x5c54e0)" : "every entry refused by the "
+                     "game (0x5c54e0)");
+            return;
+        }
         g_cos.pickId = g_cos.ids[next];      // only the shown name changes - QbCosTick switches after kCosSettleMs
         g_cos.pickTick = GetTickCount();
         g_cos.pending = true;
@@ -26440,6 +27869,12 @@ void QbCosAct(const QbDyn &q, int dir) {
         const char *why = CosWhy(true, de);
         if (why[0]) { QbResult(true, "%s: %s", cos, why); return; }
         if (dir < 0) { QbResult(false, "%s", de ? "rechts / X = dieses Kostuem" : "right / X = wear this one"); return; }
+        if (CosOffered(static_cast<WORD>(q.intro)) == 0) {   // 0.21.7: the game's check said no - nothing runs
+            CosLabel(static_cast<DWORD>(q.intro), lab, sizeof(lab));
+            QbResult(true, "%s: %s - %s", cos, lab, de ? "vom Spiel abgelehnt (Pruefung 0x5c54e0, keine .drm?)"
+                                                       : "refused by the game's check 0x5c54e0 (no .drm?)");
+            return;
+        }
         g_cos.pending = false;               // an explicit pick replaces a waiting one
         CosApply(static_cast<WORD>(q.intro));
         return;
@@ -26472,6 +27907,174 @@ bool QbFootHint(int page, int sel, bool de, char *o, size_t n) {
     return true;
 }
 // ---- end of 0.21.6 costumes ----
+
+// ---- 0.21.7 chapter units (TODO "Abschnitte je Level auf der Seite Kapitel", Lukas 2026-11-07 21:5x: "Haben wir die
+// Abschnitte wie hall02 schon drin?") ----
+// Page Kapitel keeps its chapter-start rows; below them one foldable group per chapter / DLC with its units from the
+// level list kUnits (the 111 units of the long menu's Levels page and the command bar's level.load values). One group
+// open at a time (as page Fixes; kept until the game ends). A unit row runs exactly what a chapter row runs: right / X
+// twice within 3 s = save.backup kapitel, then level.load <unit> (QbActRow, kQfConfirm | kQfBackup - no new path, debug:
+// no story value is set). DLC 2 units other than dlc_level2_start carry a note: a direct load may not set up the
+// doppelganger state (TruDlc2Player / the DLC 2 start sets it) - "besser DLC-2-Start + laufen".
+struct ChapGroup { const char *key, *de, *en; };
+const ChapGroup kChapGroups[] = {                // key = UnitRow::group (every group of kUnits, in its order)
+    {"Base game l1", "Abschnitte 1 Mittelmeer (l1)", "Units 1 Mediterranean Sea (l1)"},
+    {"Base game l2", "Abschnitte 2 Thailand (l2)", "Units 2 Coastal Thailand (l2)"},
+    {"Base game l3", "Abschnitte 3 Croft Manor + Prolog (l3)", "Units 3 Croft Manor + prologue (l3)"},
+    {"Base game l4", "Abschnitte 4 Mexiko (l4)", "Units 4 Southern Mexico (l4)"},
+    {"Base game l5", "Abschnitte 5 Jan Mayen (l5)", "Units 5 Jan Mayen Island (l5)"},
+    {"Base game l6", "Abschnitte 6 Andamanensee (l6)", "Units 6 Andaman Sea (l6)"},
+    {"Base game l7", "Abschnitte 7 Arktisches Meer (l7)", "Units 7 Arctic Sea (l7)"},
+    {"DLC 1", "Abschnitte DLC 1 Unter der Asche", "Units DLC 1 Beneath the Ashes"},
+    {"DLC 2", "Abschnitte DLC 2 Laras Schatten", "Units DLC 2 Lara's Shadow"},
+    {"DLC other starts", "Weitere DLC-Starts (3 - 6)", "Other DLC starts (3 - 6)"},
+};
+const int kChapGroupN = static_cast<int>(sizeof(kChapGroups) / sizeof(kChapGroups[0]));
+const char *const kChapDlc2Start = "dlc_level2_start";
+int g_chapOpen = -1;                         // the open group (-1 = none; render thread, kept until the game ends)
+QbRow g_chapRow[kQbViewMax];                 // the unit rows of this frame (level.load <unit>, confirm + backup)
+// a DLC 2 unit that is not the DLC 2 start: a direct load may skip the doppelganger setup
+bool ChapDlc2Note(int unit) {
+    return unit >= 0 && unit < kUnitCount && !strcmp(kUnits[unit].group, "DLC 2") && _stricmp(kUnits[unit].unit, kChapDlc2Start);
+}
+int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
+    char lara[48];
+    PosLaraUnit(lara, sizeof(lara));
+    int n = 0, rows = 0;
+    for (int g = 0; g < kChapGroupN && n < max; ++g) {
+        int count = 0;
+        for (int i = 0; i < kUnitCount; ++i) count += !strcmp(kUnits[i].group, kChapGroups[g].key);
+        const bool open = g_chapOpen == g;
+        QbView &w = v[n];
+        QbDyn &q = d[n];
+        memset(&w, 0, sizeof(w));
+        memset(&q, 0, sizeof(q));
+        w.src = -1;
+        Out(w.name, sizeof(w.name), "%s %s (%d)", open ? "[-]" : "[+]", de ? kChapGroups[g].de : kChapGroups[g].en, count);
+        Out(w.state, sizeof(w.state), "%s", open ? (de ? "links = zu" : "left = close") : (de ? "rechts = auf" : "right = open"));
+        if (!strcmp(kChapGroups[g].key, "DLC 2"))
+            Out(w.count, sizeof(w.count), "%s", de ? "besser Start + laufen" : "better start + walk");
+        w.col = kQbChapter;
+        w.stateCol = IM_COL32(170, 170, 170, 255);
+        q.kind = kQdChapGroup;
+        q.intro = g;
+        ++n;
+        if (!open) continue;
+        for (int i = 0; i < kUnitCount && n < max && rows < kQbViewMax; ++i) {
+            if (strcmp(kUnits[i].group, kChapGroups[g].key)) continue;
+            QbRow &r = g_chapRow[rows];
+            r = {kUnits[i].unit, kUnits[i].unit, "level.load", kUnits[i].unit, kQbAction, -1, kQcNone, 0, kQbChapter,
+                 kQfConfirm | kQfBackup};
+            QbView &x = v[n];
+            QbDyn &y = d[n];
+            memset(&x, 0, sizeof(x));
+            memset(&y, 0, sizeof(y));
+            x.src = -1;
+            char key[160];
+            Out(key, sizeof(key), "%d/%s %s", g_qbPage, r.id, r.arg);   // QbActRow's confirmation key
+            const bool armed = QbArmed(key), note = ChapDlc2Note(i), here = lara[0] && !_stricmp(lara, kUnits[i].unit);
+            Out(x.name, sizeof(x.name), "  %s", kUnits[i].unit);
+            Out(x.state, sizeof(x.state), "%s", armed ? (de ? "nochmal rechts!" : "right again!") : (de ? "rechts 2x" : "right 2x"));
+            Out(x.count, sizeof(x.count), "%s", here ? (de ? "Lara hier" : "Lara here") : note ? (de ? "Doppel-Zustand?" : "doppel state?") : "");
+            x.col = here ? IM_COL32(150, 240, 150, 255) : kQbChapter;
+            x.stateCol = armed ? IM_COL32(255, 110, 90, 255) : note ? IM_COL32(255, 190, 90, 255) : IM_COL32(235, 235, 235, 255);
+            y.kind = kQdChap;
+            y.intro = rows++;
+            y.loaded = note;
+            strncpy_s(y.unit, sizeof(y.unit), kUnits[i].unit, _TRUNCATE);
+            ++n;
+        }
+    }
+    return n;
+}
+// page Kapitel: right / left / X (dir kQbXDir) on a group or a unit row
+void QbChapAct(const QbDyn &q, int dir) {
+    const bool de = g_qbLang == 0;
+    if (q.kind == kQdChapGroup) {
+        const int g = static_cast<int>(q.intro);
+        if (g < 0 || g >= kChapGroupN) return;
+        const char *name = de ? kChapGroups[g].de : kChapGroups[g].en;
+        const bool open = dir == kQbXDir ? g_chapOpen != g : dir > 0;
+        if (open == (g_chapOpen == g)) {
+            QbResult(false, "%s: %s", name, open ? (de ? "schon auf" : "already open") : (de ? "schon zu" : "already closed"));
+            return;
+        }
+        g_chapOpen = open ? g : -1;          // one group open at a time
+        QbResult(false, "%s: %s", name, open ? (de ? "auf" : "open") : (de ? "zu" : "closed"));
+        return;
+    }
+    const int k = static_cast<int>(q.intro);
+    if (k < 0 || k >= kQbViewMax) return;
+    const QbRow &r = g_chapRow[k];
+    char key[160];
+    Out(key, sizeof(key), "%d/%s %s", g_qbPage, r.id, r.arg);
+    const bool first = dir != -1 && !QbArmed(key);
+    QbActRow(g_qbPage, r, dir == kQbXDir ? 1 : dir);   // the chapter rows' path: confirm, save.backup, level.load
+    if (first && q.loaded)                   // DLC 2 unit: the note with the confirmation
+        QbResult(true, "%s: %s", r.arg, de ? "Doppelgaengerin evtl. nicht aufgesetzt (besser DLC-2-Start + laufen) - "
+                                             "rechts / X nochmal = laden" : "doppelganger state may be missing (better the "
+                                             "DLC 2 start + walk) - right / X again = load");
+}
+// the help line of a unit row
+bool ChapHelp(const QbDyn &q, bool de, char *o, size_t n) {
+    if (q.loaded) Out(o, n, "%s", de ? "Direkt laden setzt die Doppelgaengerin evtl. nicht auf" : "A direct load may not set "
+                                      "up the doppelganger state");
+    else Out(o, n, "%s", de ? "Sicherung, dann diese Unit laden (debug, keine Story-Werte)" : "Backup, then load this unit "
+                              "(debug, no story values)");
+    return true;
+}
+// ---- end of 0.21.7 chapter units ----
+
+// ---- 0.21.7 help line / Y hint (TODO "kurze Hilfe-Zeile zum gewaehlten Punkt", "Y: -" on rows that refuse Y) ----
+// the bar row behind the selected view: a static row, a favourite / recent row of page 0, "Naechstes Kostuem"; nullptr
+// for every other special row (positions, checkpoints, saves, Tests, Fixes, costumes)
+const QbRow *QbSelRow(int page, int sel) {
+    if (page < 0 || page >= kQbPageN || sel < 0 || sel >= g_qbViewN) return nullptr;
+    const QbPage &p = kQbPages[page];
+    const int src = g_qbView[sel].src;
+    if (src >= 0) return src < p.n ? &p.rows[src] : nullptr;
+    return p.special ? QbSpecialRow(sel - g_qbStaticN) : nullptr;
+}
+// the selected row's help line (one language, kQbHelpMax characters): kQbHelp for item rows, the hint column of
+// TruMenu.switches.txt on page Fixes, the costume rows' own lines (a refused entry says why); false = no help
+bool QbHelpLine(int page, int sel, bool de, char *o, size_t n) {
+    o[0] = 0;
+    if (page < 0 || page >= kQbPageN || sel < 0 || sel >= g_qbViewN) return false;
+    const QbRow *r = QbSelRow(page, sel);
+    if (r) {
+        const char *t = QbHelpText(r->id, r->arg);
+        if (!t) return false;
+        QbHelpPart(t, de, o, n);
+        return o[0] != 0;
+    }
+    const int k = sel - g_qbStaticN;
+    if (k < 0 || k >= g_qbDynN) return false;
+    const QbDyn &q = g_qbDyn[k];
+    if (q.kind == kQdSw) {                   // page Fixes: "<DE> // <EN>" of the file
+        EnterCriticalSection(&g_swLock);
+        const int i = static_cast<int>(q.intro);
+        if (i >= 0 && i < g_swN) Out(o, n, "%s", de ? g_sw[i].hint : g_sw[i].hintEn);
+        LeaveCriticalSection(&g_swLock);
+        return o[0] != 0;
+    }
+    if (q.kind == kQdChap) return ChapHelp(q, de, o, n);   // 0.21.7 page Kapitel: the unit notes
+    const char *t = nullptr;
+    switch (q.kind) {
+    case kQdCosPick: t = de ? "Kostuem live wechseln, ohne die Unit neu zu laden" : "Switch the costume live, no unit reload";
+        break;
+    case kQdCosRec: t = de ? "Kostuem fuers naechste Laden waehlen; laedt die Unit neu"
+                           : "Choose the costume for the next load; reloads the unit"; break;
+    case kQdCos:
+        t = CosOffered(static_cast<WORD>(q.intro)) == 0
+                ? (de ? "Vom Spiel abgelehnt (Pruefung 0x5c54e0, keine .drm?)" : "Refused by the game's check (no .drm?)")
+                : (de ? "Dieses Kostuem jetzt anziehen (live)" : "Wear this costume now (live)");
+        break;
+    default: return false;
+    }
+    Out(o, n, "%s", t);
+    return true;
+}
+// ---- end of 0.21.7 help line ----
 int QbSpecialBuild(int special, int base, bool de) {
     const int max = kQbViewMax - base;
     g_qbDynN = 0;
@@ -26481,6 +28084,7 @@ int QbSpecialBuild(int special, int base, bool de) {
     else if (special == kQsTests) n = QbTestsRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsSwitches) n = QbSwRows(g_qbView + base, g_qbDyn, max, de);   // 0.21.5
     else if (special == kQsCostume) n = QbCosRows(g_qbView + base, g_qbDyn, max, de);   // 0.21.6
+    else if (special == kQsChapters) n = QbChapRows(g_qbView + base, g_qbDyn, max, de);   // 0.21.7
     if (special == kQsLara) n = QbPosRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsCheckpoints) n = QbCpPageRows(g_qbView + base, g_qbDyn, max, de);
     else if (special == kQsSaves) n = QbSavesRows(g_qbView + base, g_qbDyn, max, de);
@@ -26540,6 +28144,10 @@ void QbSpecialAct(int special, int row, int dir) {
     case kQdCosGroup:
     case kQdCos:
         QbCosAct(q, dir);
+        return;
+    case kQdChapGroup:                       // 0.21.7 page Kapitel (X = kQbXDir: a group toggles, a unit = right)
+    case kQdChap:
+        QbChapAct(q, dir);
         return;
     case kQdPos:
         if (dir < 0) { QbResult(false, "%s", de ? "rechts = hin" : "right = go"); return; }
@@ -27269,7 +28877,9 @@ void PageSwitches() {
                     if (TmButton(id)) Out(pending, sizeof(pending), "%s %s", r.target + 4, c);
                 }
             }
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s%s%s", r.hint, r.since[0] ? " - row for " : "", r.since);
+            if (ImGui::IsItemHovered())             // 0.21.7: the help in both languages (DE // EN of the file)
+                ImGui::SetTooltip("%s%s%s%s%s", r.hint, strcmp(r.hint, r.hintEn) ? "\n" : "",
+                                  strcmp(r.hint, r.hintEn) ? r.hintEn : "", r.since[0] ? "\nrow for " : "", r.since);
             if (val.state == 2) ImGui::EndDisabled();
             ImGui::PopID();
         }
@@ -27360,8 +28970,16 @@ void PageQbRow(const QbRow &r, int page, int index) {
         }
     }
     char hint[128];                          // 0.21.6: the row's key hint (flight) as the tooltip
-    if (QbRowHint(r, false, hint, sizeof(hint)) && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("%s", hint);
+    const bool hasHint = QbRowHint(r, false, hint, sizeof(hint));
+    const char *help = QbHelpText(r.id, r.arg);   // 0.21.7: + the short help (both languages)
+    if ((hasHint || help) && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        char hde[96] = "", hen[96] = "";
+        if (help) {
+            QbHelpPart(help, true, hde, sizeof(hde));
+            QbHelpPart(help, false, hen, sizeof(hen));
+        }
+        ImGui::SetTooltip("%s%s%s%s%s", hasHint ? hint : "", hasHint && help ? "\n" : "", hde, help ? "\n" : "", hen);
+    }
     if (why[0]) {
         ImGui::EndDisabled();
         ImGui::SameLine();
@@ -28127,6 +29745,7 @@ void Render(IDirect3DDevice9 *device) {
     RadialTick();                                // 0.10 radial menu: key / mouse hold, the open ring's input
     QuickTick();                                 // 0.17 quick-toggle bar: the open bar's D-pad / LB / RB (0.21.3: X / Y)
     QbCosTick();                                 // 0.21.6 page Kostueme: the choice row's switch after 0.5 s still
+    SapTick();                                   // 0.21.7 SweepAndPrune read-out (one read every 250 ms, read only)
     OnCineTick();                               // 0.17 shot.oncine: shot pairs at a cutscene start (every 50 ms)
     MouseTick();                                 // 0.7: hold / release the game's cursor calls with the menu
     PauseTick();                                 // 0.7.1 [Menu] PauseGame
@@ -28164,7 +29783,8 @@ void Render(IDirect3DDevice9 *device) {
     if (!quickDraw) g_qbRect = {0, 0, 0, 0};
     const bool flightHint = FlightHintWanted();  // 0.21.6
     if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_lblOn && !g_radOpen &&
-        !flowDraw && !DvAnyOn() && !quickDraw && !g_snOn && !ArWantsDraw() && !flightHint)   // 0.21: + spider pictures
+        !flowDraw && !DvAnyOn() && !quickDraw && !g_snOn && !ArWantsDraw() && !LabelLayersOn() &&   // 0.21.7: + uber,
+        !flightHint)                                                                           // shader, navmesh labels
         return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
@@ -28203,6 +29823,9 @@ void Render(IDirect3DDevice9 *device) {
     if (ArWantsDraw()) ArDrawPictures(device);   // 0.21 spider pictures (background draw list, under every label)
     if (g_drawMarkup) DrawMarkup();
     if (g_lblOn) DrawLabels();                   // 0.13 Thrall-Labels (foreground draw list)
+    if (g_ubOn) DrawUberLabels();                // 0.21.7 uber labels (gates / platforms: state + time left)
+    if (g_shOn) DrawShaderLabels();              // 0.21.7 shader labels (terrain batches: file vs live status)
+    if (g_nlOn) DrawNavLabels();                 // 0.21.7 navmesh labels (areas of the drawn layers + legend)
     if (DvAnyOn()) DrawDebugView();              // 0.14 debug view (background draw list)
     if (g_dvOn[kDvLegend]) DrawDebugLegend();    // 0.14 legend (foreground, top right)
     if (quickDraw) DrawQuick();                  // 0.17 quick-toggle bar (foreground, left edge)
@@ -28481,6 +30104,39 @@ void ReadOptions(const char *dir) {
         g_lblRadius = (r >= 100.0f && r <= 50000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "LabelRadius")));
     }
     OptString(ini, "Debug", "LabelMatch", g_lblMatch, sizeof(g_lblMatch));
+    {                                        // 0.21.7 uber labels
+        g_ubOn = OptInt(ini, "Debug", "UberLabels") != 0 ? 1 : 0;
+        char radius[32];
+        OptString(ini, "Debug", "UberRadius", radius, sizeof(radius));
+        const float r = static_cast<float>(atof(radius));
+        g_ubRadius = (r >= 500.0f && r <= 50000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "UberRadius")));
+        g_ubMax = OptInt(ini, "Debug", "UberMax");
+        if (g_ubMax < 1 || g_ubMax > 32) g_ubMax = atoi(OptDefault("Debug", "UberMax"));
+        OptString(ini, "Debug", "UberMatch", g_ubMatch, sizeof(g_ubMatch));
+    }
+    g_sapWatch = OptInt(ini, "Debug", "SapWatch") != 0 ? 1 : 0;   // 0.21.7 SweepAndPrune read-out
+    {                                        // 0.21.7 navmesh labels
+        g_nlOn = OptInt(ini, "Debug", "NavLabels") != 0 ? 1 : 0;
+        char radius[32];
+        OptString(ini, "Debug", "NavLabelRadius", radius, sizeof(radius));
+        const float r = static_cast<float>(atof(radius));
+        g_nlRadius = (r >= 500.0f && r <= 30000.0f) ? r : static_cast<float>(atof(OptDefault("Debug", "NavLabelRadius")));
+        g_nlMax = OptInt(ini, "Debug", "NavLabelMax");
+        if (g_nlMax < 1 || g_nlMax > 64) g_nlMax = atoi(OptDefault("Debug", "NavLabelMax"));
+    }
+    {                                        // 0.21.7 shader labels
+        g_shOn = OptInt(ini, "Shader", "Labels") != 0 ? 1 : 0;
+        char file[MAX_PATH], radius[32];
+        OptString(ini, "Shader", "File", file, sizeof(file));
+        if (!file[0] || strchr(file, ':') || strstr(file, "..")) strcpy_s(file, sizeof(file), OptDefault("Shader", "File"));
+        _snprintf_s(g_shFile, sizeof(g_shFile), _TRUNCATE, "%s%s", g_exeDir, file);
+        OptString(ini, "Shader", "LabelRadius", radius, sizeof(radius));
+        const float r = static_cast<float>(atof(radius));
+        g_shRadius = (r >= 1000.0f && r <= 100000.0f) ? r : static_cast<float>(atof(OptDefault("Shader", "LabelRadius")));
+        g_shMax = OptInt(ini, "Shader", "LabelMax");
+        if (g_shMax < 1 || g_shMax > 64) g_shMax = atoi(OptDefault("Shader", "LabelMax"));
+        g_shShowOrig = OptInt(ini, "Shader", "ShowOrig") != 0 ? 1 : 0;
+    }
     // 0.14 debug view
     g_dvViewAtStart = OptInt(ini, "Debug", "View") != 0 ? 1 : 0;
     g_dvTrgAtStart = OptInt(ini, "Debug", "Triggers") != 0 ? 1 : 0;
@@ -28874,7 +30530,11 @@ void Start(HMODULE self) {
     CheatsCheck();
     NavCheck();                               // 0.12 Debug-Zeichnung: NavPower switches (precheck_012.txt)
     LabelCheck();                             // 0.13 Thrall-Labels (precheck_013.txt)
-    RenderModeCheck();                        // 0.15 render mode (precheck_015.txt) - before 0.14: the R2 layers' check
+    UberCheck();                              // 0.21.7 uber labels (precheck_0217.txt)
+    ShaderCheck();                            // 0.21.7 shader labels (precheck_0217.txt = precheck_shaderlabel.txt rows)
+    NavLabelCheck();                          // 0.21.7 navmesh labels (precheck_0217.txt)
+    SapCheck();                               // 0.21.7 SweepAndPrune read-out (precheck_0217_sap.txt)
+    RenderModeCheck();                       // 0.15 render mode (precheck_015.txt) - before 0.14: the R2 layers' check
     DebugViewCheck();                         // 0.14 debug view (precheck_014.txt)
     ReadabilityCheck();                       // 0.16 depth / Lara in / owner units (precheck_016.txt) - after 0.15 / 0.14
     g_camLogOk = HexBytesAt(0x005f3e0c, "b9f004e800 e85afeffff") && HexBytesAt(0x005f3d12, "8bce d91c24 e8c442ffff") &&
@@ -29005,6 +30665,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         InitializeCriticalSection(&g_favLock);
         InitializeCriticalSection(&g_testLock);
         InitializeCriticalSection(&g_swLock);         // 0.21.5 Fixes (TruMenu.switches.txt)
+        InitializeCriticalSection(&g_cosValidLock);   // 0.21.7 costume rows: the game's check per cycle-list entry
         InitializeCriticalSection(&g_cmdLock);
         InitializeCriticalSection(&g_mouseLock);
         InitializeCriticalSection(&g_edgeLock);       // 0.8.1 input trace

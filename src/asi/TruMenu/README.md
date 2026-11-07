@@ -2333,6 +2333,107 @@ bool rows with a RadialOn state, NavRowNote read only; 22 negatives in `work\m02
 | 17 | "Navmesh Flaechen" on with "Alle Ebenen" off in a level whose navgraph layer is not in the mask | `an` orange, right column "(Ebene fehlt)"; "Alle Ebenen" on = white `an`, no reason |
 | 18 | group Flach-Ansicht: "Pass 0x200" left / right | `aus` / `an` as the flat view's mask (`dbg.render`) |
 
+## TruMenu 0.21.7 (footer / help, umlauts, refused costumes, chapter units, uber / shader / navmesh labels; 2026-11-07)
+
+Night build after the owner's live test of 0.21.5 / 0.21.6 (`docs\Autopilot-2026-11-07.md` from 20:38). Build
+`work\asi\menu0217`; 85 new byte checks (three read-only label layers, the SweepAndPrune read-out), no new hook,
+imports / exports unchanged.
+
+**Bar footer.** The X / Y line says `Y: -` where Y is refused (`QbFavOk` = the rule of `QbFavPin`: one item without an
+argument - page Fixes, costume, chapter-unit, position / checkpoint / save rows and rows with an argument), adds
+`L3: Befehlszeile` (EN `cmd line`; the `[Cmd] FocusButton` name, only with `[Cmd] Enabled=1`) and, while the game is
+not calling PadHook (the pad is read in Present: front end / loading), `(Pad NICHT gesperrt)` in orange.
+
+**Help line** (TODO "kurze Hilfe-Zeile"): rows that are not self-explanatory have one line "DE|EN" of at most 60
+characters per language - the bar's footer (a third line while the row is selected) and the long menu's tooltip. Bar
+rows: table `kQbHelp` keyed by item + argument (`*` = any argument; 46 rows: Navmesh / Render-Details / flat view,
+debug view, flight, triggers, time / sound, costume.next, chapter starts, the new label layers). Page Fixes: the hint
+column of `TruMenu.switches.txt` is now `<DE help> // <EN help>` (each at most 60 characters). Costume and chapter-unit
+rows have their own lines (a refused costume says why).
+
+**`TruMenu.switches.txt` with umlauts.** UTF-8 without BOM (a BOM is skipped anyway); the German texts use their umlauts
+(`Doppelgängerin`, `Kostüm`, `Söldner`, `Zustände` ...), plugin / section / key / type / when / default stay ASCII. The
+bar font (ImGui's built-in ProggyClean, range 0x20 .. 0xFF) has the glyphs - `work\m0217_0711\font_glyphs.py`
+decompresses the embedded font and finds outlines for ä ö ü Ä Ö Ü ß. Texts cut by a field limit lose at most the
+partial last character (`SwCopyText` / `Utf8TrimTail`). 114 switches now (+ TruShadowHud 0.2 `TranslateDlc2F1`;
+TruShadowPower 0.20 `CameraFlag` default 1 - both from tonight's plugin builds, rows from the coordinator). The code's own texts stay ASCII (no `/utf-8` in the build).
+
+**Costumes the game refuses** (live 21:14: object 33 "refused by the game's check 0x005c54e0 (no .drm?)"): while page
+Kostueme is shown, `CosValidTick` runs that check once per changed cycle list on the game thread (the pad hook's
+once-per-frame block, where `costume.set` runs it too); refused entries are grey ("abgelehnt (keine .drm?)"), the
+`Kostuem` row's left / right passes over them, right / X on one is refused, the head line counts them, one log line
+`costumes: N cycle-list entries checked ..., K refused`. No new write path.
+
+**Page Kapitel: units per chapter** (TODO "Abschnitte je Level"): below the chapter starts one foldable group per chapter
+/ DLC with its units from the level list (`kUnits`, 111 units in 10 groups; one group open at a time). A unit row runs
+exactly what a chapter row runs - right / X twice within 3 s = `save.backup kapitel`, then `level.load <unit>` (debug, no
+story values). DLC 2 units other than `dlc_level2_start` are orange with "Doppel-Zustand?" and the confirmation says
+"Doppelgaengerin evtl. nicht aufgesetzt (besser DLC-2-Start + laufen)". Lara's unit is marked "Lara hier".
+
+**Uber labels** (`dbg.uber`, bar page Leveldaten "Tore / Plattformen (Zustand)"; `uber.dump`; `[Debug] UberLabels /
+UberRadius 8000 / UberMax 12 / UberMatch switch,lever`): every instance with an uber state (the engine's path 0x4d5d59:
+`[[inst+0x2d0]]+0x2ec - 0x10`, magic 0xF0012345) within UberRadius of Lara - independent of LabelMatch / LabelRadius
+(the dlc_caverns_hall gates stood 3165 / 3357 units away, LabelRadius was 3000) - gets "<object> <intro> | <distance>"
+and its state: the node name, for a timed transition (condition 1 = time in node, 0x4d3204) the time left, for a running
+transition the target. Gates (object name holds "gate"): `Tor: oben, noch 12 s` / `Tor: faehrt runter` / `Tor: unten,
+bereit in 1.5 s` / `Tor: unten, bereit`. Instances matching UberMatch without an uber state get a plain label.
+
+**Shader labels** (`shader.labels`, `shader.dump`, `shader.reload`; bar page Render-Details group "Shader-Etiketten";
+`[Shader] Labels / File / LabelRadius 15000 / LabelMax 40 / ShowOrig`; stage S1 of `docs\Befund-Shader-Etiketten-0711.md`
+section 4): terrain batches of `TruMenu.shaderlabel.txt` (written by `tools\shader_labels.py build`, generated locally,
+`Set-TruMenu.ps1` installs it from the build folder when present) whose owner unit / streamgroup is loaded, nearest to
+Lara by box distance, one per material within 2000 units. Line 1: material, file status, slots, PC libs, terrain section;
+line 2: the **live** state - the material's `PCMaterial` from the game's hash map, its four lib pointers, their ids from
+the lib hash map: `live = Datei` or `live PART S-TS 1909/-/2851/1911 (Datei SURR)`. Colour by the live status (SURR red,
+PART orange, UNK violet, TU green, ORIG / BASE yellow; ORIG / BASE only with ShowOrig=1). Not built: the red tint per draw
+(S2), `shader.pick` / `shader.aim`, object (O) and streamgroup (G) labels.
+
+**Navmesh labels** (`nav.labels`, Render-Details group Navmesh "Navmesh beschriften"; `[Debug] NavLabels /
+NavLabelRadius 3000 / NavLabelMax 40`; stage 1 of TODO "Navmesh beschriften"): at each area of the layers the planner
+draws (the mask: "Alle Ebenen" = `nav.mask 1`) near Lara: `E<layer>.<graph> #<area> <unit>` and `27:x 26:x b8:x b12:x | n
+Kanten` in the area's fill colour, plus one legend line of the engine's edge colours (0x40c3a0: light blue edge type
+0x200, red bit 27 on either side, orange +0x34 bits 8..11 > 1, yellow bits 12..15 > 1, blue bit 26 differs, magenta bit 26,
+green). Path: planner [0x8bf310] -> 32 layers -> 8 graphs -> area block `[g+0x1c]`, size `[[g+0x18]+8]`, stride 0x38 +
+0x14 * edges. The unit name comes from an address test against the units' NavPower images (Level+0x60) - shown only when
+it matches. Areas cut by obstacles are labelled as their static area. Not built: stage 2 (the NavPower text stub
+0x6457a0), islands.
+
+**SweepAndPrune read-out** (P6a; `sap.status` info, `sap.reset`; bar page Render / KI "Kanten-Kollision (SAP)";
+`[Debug] SapWatch` default 1; `docs\Befund-SweepAndPrune-0611.md` section 4): the markup collision pool of the
+MarkupManager `[0xdb94cc]` read every 250 ms (render thread, read only, the finding's chain with all its plausibility
+checks - N 1000 / 3000, M 200 / 500, memory 1 + 204 N + 16 M, endpoints 2 b): boxes b / N, pair links p / 2M, proxies u /
+1000 (list walk), session peaks, frames with a full pool, the warning mark ("Out of space for pairs / boxes" in 0xa035f0).
+One `sap: new peak in <unit> - boxes ... pair links ... proxies ...` line per new peak (at most every 2 s). Decision rule of
+the finding: boxes >= 800 or pairs >= 320 (80 %) or any full frame -> translate the TU constants.
+
+**Front-end pad (research, not blocked):** the game reads the pad only through the XInputGetState pointer 0x00a02b8c (3
+call sites: 0x482619 / 0x48620a device checks, 0x484b82 the per-frame poll) - no second input path. The miss in the DLC 2
+mission menu is most likely PadHook not being called there (unproven - an archived run's main menu did call it; in the
+Present fallback `QbPad`'s clear never reaches the game - the footer now says "(Pad NICHT gesperrt)"); 0.21.7 logs `quick: bar open while PadHook is not called ...`
+and `quick: bar buttons 0x.... pressed while PadHook is not called - the game reads them too (diagnosis 0.21.7)` once per
+bar opening - read only, nothing blocked yet (a block needs the live answer which hook chain the front end runs).
+
+Checks: `tools\trumenu_ini_check.py` `check_0217` (+ the 0.21.7 rules of `check_switches`: UTF-8 / umlauts / hint halves;
+33 negatives in `work\m0217_0711\make_negative.py`), `tools\trumenu_quick_check.py` models `yfooter`, `utf8cut`,
+`cosvalid`, `uber`, `navwalk`, `chapters`, `shlive`; byte lists `work\asi\menu0217\precheck_0217_uber.txt` (8) /
+`_shader.txt` (27, = `work\shaderlabel_0711\precheck_shaderlabel.txt`) / `_nav.txt` (30) / `_sap.txt` (20, =
+`work\sap_0611\precheck.txt`).
+
+### TO TEST 0.21.7 (owner)
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | game start | `TruMenu.log`: `TruMenu 0.21.7 (`, `0.21.7 uber labels: checks ok (8 rows)`, `shader labels: checks ok (27 rows)`, `navmesh labels: checks ok (30 rows)` |
+| 2 | bar, page Fixes, a switch row | footer `X: ausfuehren  Y: -  L3: Befehlszeile`, help line in blue (e.g. "Schadensarten 17-27 wie TU ..."); group names with umlauts (Doppelgängerin, Söldner) |
+| 3 | page Render-Details, "Navmesh Flaechen" | help "Umrisse der Gegner-Laufflaechen - braucht 'Alle Ebenen'"; on a plain item row (e.g. "Alle Ebenen") `Y: Favorit` |
+| 4 | page Kostueme in a level, open "Alle Kostueme" | refused entries grey "abgelehnt (keine .drm?)"; head line "N vom Spiel abgelehnt"; `TruMenu.log` one `costumes: ... refused` line; "Kostuem" left / right skips them |
+| 5 | page Kapitel, group "Abschnitte DLC 2 ...", right on dlc_yggdrasil_hall02 | orange "Doppel-Zustand?", footer note "besser DLC-2-Start + laufen"; second right = backup + load |
+| 6 | dlc_caverns_hall, Leveldaten "Tore / Plattformen (Zustand)" on | both gates labelled from the switches' platform; switch on: "Tor: faehrt hoch", "Tor: oben, noch 25 s" counting down, "faehrt runter", "unten, bereit in 2 s", "unten, bereit"; `uber.dump` lines |
+| 7 | `TruMenu.shaderlabel.txt` installed, dlc_yggdrasil_end, Render-Details "Shader-Etiketten" on | red labels "23164 SURR S-SS 1909/-/1910/1911 [Gelaende 20969]" at the goo tube; line 2 `live = Datei` (installed tree) or `live PART S-TS ... (Datei SURR)` with the shader test copy; `shader.dump` block in the log |
+| 8 | hall02, "Navmesh Flaechen" + "Alle Ebenen" + "Navmesh beschriften" on | legend line at the top; labels `E11.0 #n` with flag bits; the red / magenta areas show `27:1` / `26:1` |
+| 8b | big DLC 2 rooms (end, machine room) / F2 flight, page Render / KI "Kanten-Kollision (SAP)" right | "Boxen b/1000 (Spitze ..), Paare p/400 ..."; `sap: new peak` lines in the log |
+| 9 | DLC 2 mission menu: bar open, left, X | if X still starts the mission: footer "(Pad NICHT gesperrt)" and the log's "diagnosis 0.21.7" lines; if neither shows, PadHook was called and the leak is elsewhere (note the time) |
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

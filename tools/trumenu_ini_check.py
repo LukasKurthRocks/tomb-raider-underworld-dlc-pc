@@ -1786,6 +1786,20 @@ def sw_value_ok(typ, v):
     return False
 
 
+Q217_HELP_MAX = 60                           # 0.21.7: a help line (bar footer / tooltip), characters per language
+# 0.21.7: German words that must be written with their umlaut in the DE texts of the switches file (Lukas: "Umlaute
+# spaeter nachziehen") - an ASCII transliteration of one of them is a problem
+Q217_TRANSLIT = ('Doppelgaengerin', 'Kostuem', 'Soeldner', 'Zustaende', 'Aktivitaeten', 'fuer', 'ueber', 'ausserhalb',
+                 'zurueck', 'Aenderung', 'anhaengen', 'Uebersetzung', 'Toedlich', 'loescht', 'Spruenge', 'Uebergaenge',
+                 'Empfaenger', 'Geaendert', 'waehrend', 'Fuellt', 'behaelt', 'pruef', 'Pruef')
+
+
+def sw_translit(where, text):
+    """0.21.7: ASCII transliterations (ae / oe / ue / ss) of Q217_TRANSLIT words in a DE text"""
+    low = text.lower()
+    return ['%s: write "%s" with its umlaut (DE text "%s")' % (where, w, text) for w in Q217_TRANSLIT if w.lower() in low]
+
+
 def check_switches(path):
     """0.21.5: the switches file - format, every key in its shipped plugin INI (rows of a newer plugin version than the
     sources may wait), default = the INI value, type fits, live = the plugin's re-read function (SW_LIVE), every INI key
@@ -1794,9 +1808,19 @@ def check_switches(path):
     name = os.path.basename(path)
     if not os.path.exists(path): return ['%s missing' % name], '', []
     raw = open(path, 'rb').read()
-    if any(b > 126 or (b < 32 and b not in (9, 10, 13)) for b in raw):
-        problems.append('%s: non-ASCII bytes (the menu font has no umlauts)' % name)
-    lines = raw.decode('ascii', 'replace').splitlines()
+    # 0.21.7 (TODO "Umlaute in TruMenu.switches.txt"): UTF-8 without BOM, umlauts in the texts (the bar's font, ImGui's
+    # ProggyClean, has the Latin-1 glyphs - work/m0217_0711/font_glyphs.py); was: ASCII only
+    if raw.startswith(b'\xef\xbb\xbf'): problems.append('%s: UTF-8 BOM (write the file without BOM)' % name)
+    if any(b == 127 or (b < 32 and b not in (9, 10, 13)) for b in raw):
+        problems.append('%s: control bytes' % name)
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError as e:
+        problems.append('%s: not UTF-8 (%s)' % (name, e))
+        text = raw.decode('utf-8', 'replace')
+    bad_chars = sorted({c for c in text if ord(c) > 0xff})
+    if bad_chars: problems.append('%s: characters outside Latin-1 (no glyph in the bar font): %s' % (name, ''.join(bad_chars)))
+    lines = text.lstrip('﻿').splitlines()
     if not lines or not lines[0].startswith('# TruMenu switches'):
         problems.append('%s: first line must start with "# TruMenu switches" (Set-TruMenu.ps1 / SwLoadLocked marker)' % name)
     inis, versions, sources = {}, {}, {}
@@ -1811,6 +1835,9 @@ def check_switches(path):
                     (len(f) == 5 and f[4] != 'open'):
                 problems.append('%s: group | <key> | <DE> | <EN> [| open]' % where)
             elif f[1] in gkeys: problems.append('%s: group key %s twice' % (where, f[1]))
+            if len(f) >= 4 and (len(f[2].encode('utf-8')) > 63 or len(f[3].encode('utf-8')) > 63):
+                problems.append('%s: group DE / EN longer than 63 bytes (SwGroup)' % where)
+            if len(f) >= 3: problems += sw_translit(where, f[2])
             gkeys.add(f[1])
             groups += 1
             continue
@@ -1830,8 +1857,20 @@ def check_switches(path):
                   1 <= int(m.group(3)) <= int(m.group(2)) - int(m.group(1)))):
             problems.append('%s: int range / step' % where)
         if typ.startswith('choice:') and len(typ) - 7 >= 64: problems.append('%s: choice list longer than 63' % where)
-        if not de or not en or len(de) > 63 or len(en) > 63: problems.append('%s: DE / EN text empty or longer than 63' % where)
-        if len(hint) > 199: problems.append('%s: hint longer than 199' % where)
+        if not de or not en or len(de.encode('utf-8')) > 63 or len(en.encode('utf-8')) > 63:
+            problems.append('%s: DE / EN text empty or longer than 63 bytes' % where)
+        if len(hint.encode('utf-8')) > 199: problems.append('%s: hint longer than 199 bytes' % where)
+        # 0.21.7: the hint column = "<DE help> // <EN help>", each half the bar's help line (at most Q217_HELP_MAX)
+        halves = hint.split(' // ')
+        if len(halves) != 2 or not halves[0].strip() or not halves[1].strip():
+            problems.append('%s: hint must be "<DE help> // <EN help>" (got %r)' % (where, hint[:50]))
+        else:
+            for lang, h in zip(('DE', 'EN'), halves):
+                if len(h) > Q217_HELP_MAX: problems.append('%s: %s help %d characters > %d' % (where, lang, len(h), Q217_HELP_MAX))
+        for label, v in (('plugin', plugin), ('section', section), ('key', key), ('type', typ), ('when', when),
+                         ('default', default), ('since', since)):
+            if any(ord(c) > 126 for c in v): problems.append('%s: %s must stay ASCII' % (where, label))
+        problems += sw_translit(where, de) + sw_translit(where, halves[0])
         if when not in ('live', 'restart') and not re.fullmatch(r'live-if:[A-Za-z0-9_]+', when):
             problems.append('%s: when %s (live | restart | live-if:<Key>)' % (where, when))
         if not sw_value_ok(typ, default): problems.append('%s: default %s does not fit %s' % (where, default, typ))
@@ -1952,8 +1991,8 @@ def check_0216(ini_path):
     problems = []
     name = os.path.basename(ini_path)
     src = open(CPP, encoding='utf-8').read()
-    if not src.startswith('//') or 'const char *const kVersion = "TruMenu 0.21.6 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.21.6 ("')
+    if not src.startswith('//') or '0.21.6 (bar page Kostueme' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must keep the 0.21.6 text (0.21.7: the version check moved to check_0217)')
     # [Cheat] FlightHint
     opts = {(s, k): d for s, k, d, c in table(src)[1]}
     if opts.get(('Cheat', 'FlightHint')) != '1':
@@ -2119,6 +2158,208 @@ def check_0216(ini_path):
                      'one command path, %d toggle rows all bool' % (len(pages), m.group(1) if m else '?', len(names), toggles)
 
 
+Q217_ITEMS = {'dbg.uber': 'bool', 'uber.dump': 'action', 'shader.labels': 'bool', 'shader.reload': 'action',
+              'shader.dump': 'action', 'nav.labels': 'bool',                   # 0.21.7: all render-thread, read only
+              'sap.status': 'info', 'sap.reset': 'action'}
+Q217_KEYS = {('Debug', 'UberLabels'): '0', ('Debug', 'UberRadius'): '8000', ('Debug', 'UberMax'): '12',
+             ('Debug', 'UberMatch'): 'switch,lever', ('Debug', 'NavLabels'): '0', ('Debug', 'NavLabelRadius'): '3000',
+             ('Debug', 'NavLabelMax'): '40', ('Shader', 'Labels'): '0', ('Shader', 'File'): 'TruMenu.shaderlabel.txt',
+             ('Shader', 'LabelRadius'): '15000', ('Shader', 'LabelMax'): '40', ('Shader', 'ShowOrig'): '0',
+             ('Debug', 'SapWatch'): '1'}
+Q217_GATES = (3165, 3357)                    # live 2026-11-07: the dlc_caverns_hall gates' distances (not labelled)
+Q217_WRITES = ('WriteDword(', 'PutByte(', 'WriteByte(', 'NavPutDword(', 'VirtualProtect(', 'WritePrivateProfileString',
+               'QueueItem(', 'InvokeCore(', 'Fn>(')          # nothing of these in the three read-only label sections
+Q217_SECTIONS = ('uber labels', 'shader labels', 'navmesh labels', 'SweepAndPrune read-out')
+Q217_UMLAUT_WORDS = ('Doppelgängerin', 'Kostüm', 'Söldner', 'Zustände')   # the owner's examples, now with umlauts
+
+
+def check_0217(ini_path, switches_path):
+    """0.21.7 (2026-11-07/08 TruMenu 0.21.7, night build): footer "Y: -" where QbFavPin refuses (QbFavOk), "L3:
+    Befehlszeile", the help line (kQbHelp "DE|EN" <= 60 characters per half, keys = bar rows, the Fixes hint column, the
+    costume / chapter rows), the switches file with umlauts (UTF-8, the parser cuts at a character boundary), costume
+    rows the game refuses (0x5c54e0 on the game thread, grey, skipped, refused), page Kapitel units per chapter (the
+    level list's groups, level.load through QbActRow with confirm + backup, the DLC 2 note), the pad diagnosis (log /
+    footer only), and the three read-only label layers (uber / shader / navmesh: byte-check tables, no writes, INI keys,
+    items, bar rows, Render)"""
+    problems = []
+    name = os.path.basename(ini_path)
+    src = open(CPP, encoding='utf-8').read()
+    if not src.startswith('//') or 'const char *const kVersion = "TruMenu 0.21.7 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.21.7 ("')
+    # 1a footer Y
+    fav = fn_body(src, 'bool QbFavOk(')
+    for need in ('kQbLabel', 'kQbGroup', 'kQbPlanned', 'strcmp(r->id, "-")', '!r->arg[0]'):
+        if need not in fav: problems.append('TruMenu.cpp: QbFavOk lacks %s (the rule of QbFavPin)' % need)
+    dq = fn_body(src, 'void DrawQuick(')
+    if 'QbFavOk(QbSelRow(g_qbPage, sel))' not in dq or '"X: ausfuehren  Y: -"' not in dq or '"X: run  Y: -"' not in dq:
+        problems.append('TruMenu.cpp: DrawQuick must show "Y: -" where QbFavOk(QbSelRow(...)) refuses Y')
+    pin = fn_body(src, 'void QbFavPin(')
+    if 'kQsChapters' not in pin: problems.append('TruMenu.cpp: QbFavPin must refuse Y on the chapter unit rows')
+    # 1b L3 hint
+    if 'QbComboText(g_cmdFocusButton' not in dq or '"Befehlszeile"' not in dq or 'g_cmdEnabled && g_cmdFocusButton' not in dq:
+        problems.append('TruMenu.cpp: DrawQuick lacks the footer hint "<FocusButton>: Befehlszeile" (only with [Cmd] Enabled)')
+    # 1c umlauts
+    pr = fn_body(src, 'bool SwParseRow(')
+    if 'SwCopyText(r.de' not in pr or 'SwCopyText(r.en' not in pr or '" // "' not in pr or 'r.hintEn' not in pr:
+        problems.append('TruMenu.cpp: SwParseRow must copy the texts with SwCopyText and split the hint at " // "')
+    if 'Utf8TrimTail(o)' not in fn_body(src, 'void SwCopyText(') or '"\\xef\\xbb\\xbf"' not in fn_body(src, 'void SwLoadLocked('):
+        problems.append('TruMenu.cpp: SwCopyText must cut at a UTF-8 character boundary, SwLoadLocked skip a BOM')
+    stext = open(switches_path, encoding='utf-8', errors='replace').read()
+    for w in Q217_UMLAUT_WORDS:
+        if w not in stext: problems.append('%s: "%s" missing (German texts with umlauts)' % (os.path.basename(switches_path), w))
+    # 1d help
+    m = re.search(r'const QbHelp kQbHelp\[\] = \{(.*?)\n\};', src, re.S)
+    helps = [(a, b, unescape(''.join(LIT.findall(t)))) for a, b, t in
+             re.findall(r'\{"([a-z][a-z0-9_.]*)", "([^"]*)", ((?:"(?:[^"\\]|\\.)*"\s*)+)\}', m.group(1))] if m else []
+    if not helps: problems.append('TruMenu.cpp: kQbHelp missing')
+    if 'const int kQbHelpMax = %d;' % Q217_HELP_MAX not in src:
+        problems.append('TruMenu.cpp: kQbHelpMax must be %d (the owner: "nicht zu lange")' % Q217_HELP_MAX)
+    rows = qb_rows(src) + [('kQbCosNext', 'Naechstes Kostuem', 'costume.next', '', 'kQbAction', '-1')]
+    keys = set()
+    for hid, harg, text in helps:
+        halves = text.split('|')
+        if len(halves) != 2 or not halves[0] or not halves[1]:
+            problems.append('TruMenu.cpp: kQbHelp %s %s: "DE|EN" (got %r)' % (hid, harg, text[:40]))
+        for lang, h in zip(('DE', 'EN'), halves):
+            if len(h) > Q217_HELP_MAX:
+                problems.append('TruMenu.cpp: kQbHelp %s %s: %s %d characters > %d' % (hid, harg, lang, len(h), Q217_HELP_MAX))
+        if (hid, harg) in keys: problems.append('TruMenu.cpp: kQbHelp %s %s twice' % (hid, harg))
+        keys.add((hid, harg))
+        if not any(r[2] == hid and (harg == '*' or r[3] == harg) for r in rows):
+            problems.append('TruMenu.cpp: kQbHelp %s %s is no bar row (help without a row)' % (hid, harg))
+    for need in (('nav.draw', 'planner_areas'), ('nav.mask', ''), ('cheat.flight', ''), ('dbg.uber', ''),
+                 ('shader.labels', ''), ('nav.labels', '')):
+        if need not in keys: problems.append('TruMenu.cpp: kQbHelp lacks %s %s' % need)
+    if not any(h[0] == 'nav.draw' and h[1] == 'planner_areas' and 'Alle Ebenen' in h[2] for h in helps):
+        problems.append('TruMenu.cpp: the help of "Navmesh Flaechen" must name "Alle Ebenen" (live 2026-11-07 21:57)')
+    hl = fn_body(src, 'bool QbHelpLine(')
+    for need in ('QbHelpText(r->id, r->arg)', 'g_sw[i].hint', 'g_sw[i].hintEn', 'kQdCosPick', 'kQdCosRec', 'kQdCos:',
+                 'ChapHelp('):
+        if need not in hl: problems.append('TruMenu.cpp: QbHelpLine lacks %s' % need)
+    for body in (hl, fn_body(src, 'bool ChapHelp(')):
+        for t in LIT.findall(body):
+            if len(unescape(t)) > Q217_HELP_MAX + 2 and ' ' in t:
+                problems.append('TruMenu.cpp: help text longer than %d: "%s"' % (Q217_HELP_MAX, unescape(t)[:50]))
+    if 'QbHelpLine(g_qbPage, sel, de, help, sizeof(help))' not in dq or 'QbHelpText(r.id, r.arg)' not in \
+            fn_body(src, 'void PageQbRow('):
+        problems.append('TruMenu.cpp: the help must be the bar footer line (DrawQuick) and the menu tooltip (PageQbRow)')
+    if 'r.hintEn' not in fn_body(src, 'void PageSwitches('):
+        problems.append('TruMenu.cpp: PageSwitches tooltip must show both halves of the hint')
+    # 1e costumes the game refuses
+    pad = fn_body(src, 'DWORD WINAPI PadHook(')
+    clk = pad[pad.find('if (clock != g_lastClock)'):]
+    if 'CosValidTick();' not in clk or 'CosValidTick();' in fn_body(src, 'void Render('):
+        problems.append('TruMenu.cpp: CosValidTick must run in the pad hook\'s once-per-game-frame block (game thread), '
+                        'not in Render')
+    cvt = fn_body(src, 'void CosValidTick(')
+    if 'CosValidCall(' not in cvt or 'g_cosValidWant' not in cvt or '!same' not in cvt.replace('if (same) return;', '!same'):
+        problems.append('TruMenu.cpp: CosValidTick must call the check only while the page is shown and the list changed')
+    if 'kCostumeValid' not in fn_body(src, 'bool CosValidCall(') or any(t in cvt for t in Q217_WRITES[:5]):
+        problems.append('TruMenu.cpp: CosValidCall = the game\'s check 0x5c54e0 only, CosValidTick writes nothing')
+    cr = fn_body(src, 'int QbCosRows(')
+    if 'CosOffered(g_cos.ids[i]) == 0' not in cr or 'g_cosValidWant' not in cr:
+        problems.append('TruMenu.cpp: QbCosRows must mark the refused entries and ask CosValidTick for the check')
+    act = fn_body(src, 'void QbCosAct(')
+    cases = dict(re.findall(r'case (kQdCos[A-Za-z]*): \{?(.*?)(?=\n    case |\n    default:)', act, re.S))
+    pick, one = cases.get('kQdCosPick', ''), cases.get('kQdCos', '')
+    i_off, i_pend = pick.find('CosOffered(g_cos.ids[next]) != 0'), pick.find('g_cos.pending = true')
+    if not (0 <= i_off < i_pend): problems.append('TruMenu.cpp: QbCosAct kQdCosPick must skip refused entries before it picks')
+    i_ref, i_apply = one.find('CosOffered(static_cast<WORD>(q.intro)) == 0'), one.find('CosApply(')
+    if not (0 <= i_ref < i_apply): problems.append('TruMenu.cpp: QbCosAct kQdCos must refuse a refused entry before CosApply')
+    # 1f / 3 uber labels; 4 navmesh; 5 shader: read only, tables, INI keys
+    for sec in Q217_SECTIONS:
+        body = src[src.find('// ---- 0.21.7 %s' % sec):src.find('// ---- end of 0.21.7 %s' % sec)]
+        if len(body) < 500: problems.append('TruMenu.cpp: section "0.21.7 %s" missing' % sec); continue
+        for t in Q217_WRITES:
+            if t in body: problems.append('TruMenu.cpp: section 0.21.7 %s calls %s (read only)' % (sec, t))
+        if 'HexBytesAt(c.at, c.hex)' not in body: problems.append('TruMenu.cpp: section 0.21.7 %s has no byte-check loop' % sec)
+    us = fn_body(src, 'DWORD UberStateOf(')
+    for need in ('inst + 0x2d0', 'a + 0x2ec', 'u - 0x10', 'b + 0x70', 'kUbMagic'):
+        if need not in us: problems.append('TruMenu.cpp: UberStateOf lacks %s (the engine path 0x4d5d59)' % need)
+    if 'const DWORD kUbMagic = 0xf0012345;' not in src: problems.append('TruMenu.cpp: kUbMagic must be 0xf0012345')
+    ut = fn_body(src, 'void UberText(')
+    for need in ('cond != 1', 'tr + 0x1c', 'b + 0x88', 'b + 0x80', 'b + 0x8c', 'faehrt hoch', 'faehrt runter', 'noch %s'):
+        if need not in ut: problems.append('TruMenu.cpp: UberText lacks %s' % need)
+    opts = {(s, k): d for s, k, d, c in table(src)[1]}
+    for key, want in Q217_KEYS.items():
+        if opts.get(key) != want: problems.append('TruMenu.cpp: kOpts [%s] %s default must be %s (got %s)' % (key + (want,
+                                                                                                    opts.get(key))))
+        sec_rows = [(n, v) for n, k, v in ini_section(ini_path, key[0]) if k == key[1]]
+        if len(sec_rows) != 1: problems.append('%s: [%s] %s missing' % ((name,) + key))
+    if not all(float(opts.get(('Debug', 'UberRadius'), '0')) > g for g in Q217_GATES):
+        problems.append('TruMenu.cpp: [Debug] UberRadius must reach the gates of the live test (%d / %d)' % Q217_GATES)
+    sl = fn_body(src, 'ImU32 ShLabelText(')
+    for need in ('ShLive(', 'kShStatusNames[fileStatus]', 'live = file', 'live %s %s %s'):
+        if need not in sl: problems.append('TruMenu.cpp: ShLabelText must show file and live (lacks %s)' % need)
+    lv = fn_body(src, 'bool ShLive(')
+    for need in ('data + 0x28', 'ShLibId(', 'm->pc[k]', 'm->sur[k]', 'g_shFirstNew'):
+        if need not in lv: problems.append('TruMenu.cpp: ShLive lacks %s (live lib ids per slot)' % need)
+    nc = fn_body(src, 'int NlCollect(')
+    for need in ('mask & (1ul << i)', 'layer + 0xc + 4 * k', 'g + 0x1c', 'head + 8', '0x38 + 0x14 * (flags & 0x7f)'):
+        if need not in nc: problems.append('TruMenu.cpp: NlCollect lacks %s (the planner path)' % need)
+    lg = fn_body(src, 'void NlLegend(')
+    for need in ('gruen normal', 'rot Bit 27', 'orange +0x34 b8-11', 'gelb +0x34 b12-15', 'blau Bit 26 verschieden',
+                 'magenta Bit 26', 'hellblau Kante 0x200'):
+        if need not in lg: problems.append('TruMenu.cpp: NlLegend lacks "%s"' % need)
+    items = item_types(src)
+    for item, typ in Q217_ITEMS.items():
+        mm = re.search(r'\{"%s", "%s", (?:"[^"]*"\s*)+,\s*(true|false),' % (re.escape(item), typ), src)
+        if not mm: problems.append('TruMenu.cpp: item %s (%s) missing' % (item, typ))
+        elif mm.group(1) != 'false': problems.append('TruMenu.cpp: %s must not be a game-thread item' % item)
+        if not any(r[2] == item for r in rows): problems.append('TruMenu.cpp: item %s has no bar row' % item)
+    render = fn_body(src, 'void Render(')
+    for need in ('!LabelLayersOn()', 'if (g_ubOn) DrawUberLabels();', 'if (g_shOn) DrawShaderLabels();',
+                 'if (g_nlOn) DrawNavLabels();'):
+        if need not in render: problems.append('TruMenu.cpp: Render lacks %s' % need)
+    if not (0 <= render.find('SapTick();') < render.find('!LabelLayersOn()')):
+        problems.append('TruMenu.cpp: Render must call SapTick before its early return (the read-out runs without a draw)')
+    sr = fn_body(src, 'bool SapRead(')
+    for need in ('kSapMgr2', 'kSapVtbl', 'mgr + 0x18', 'core + 0x24', 'core + 0x2c', '1 + 204 * n + 16 * m', 'core + 0x28',
+                 'ends != 2 * b', 'core + 0x30', 'p > 2 * m', 'u <= 1000'):
+        if need not in sr: problems.append('TruMenu.cpp: SapRead lacks %s (the measuring plan of Befund-SweepAndPrune)' % need)
+    st = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '5d6dd6301472d6139706af928b6673679b04d4c2941ef89fb69e6f0f631a14b4' not in st or 'TruMenu.shaderlabel.txt' not in st:
+        problems.append('Set-TruMenu.ps1: the 0.21.6 build in $earlierBuilds / the shader label data install missing')
+    # 2 chapter units
+    if not re.search(r'QB_PAGE\("Kapitel \(debug\)", "Chapters \(debug\)", kQbChapters, kQsChapters\)', src):
+        problems.append('TruMenu.cpp: page Kapitel must be kQsChapters (the units per chapter)')
+    ub = src[src.index('const UnitRow kUnits[] = {'):]
+    ub = ub[:ub.index('\n};')]
+    groups = []
+    for g in re.findall(r'\{"([^"]+)", "[^"]+", "[^"]+"\}', ub):
+        if g not in groups: groups.append(g)
+    unit_n = len(re.findall(r'\{"[^"]+", "[^"]+", "[^"]+"\}', ub))
+    cg = re.search(r'const ChapGroup kChapGroups\[\] = \{(.*?)\n\};', src, re.S)
+    ckeys = re.findall(r'\{"([^"]+)", "[^"]+", "[^"]+"\}', cg.group(1)) if cg else []
+    if ckeys != groups: problems.append('TruMenu.cpp: kChapGroups keys %s != the groups of kUnits %s' % (ckeys, groups))
+    biggest = max((len(re.findall(r'\{"%s", ' % re.escape(g), ub)) for g in groups), default=0)
+    static_n = len([r for r in qb_rows(src) if r[0] == 'kQbChapters'])
+    if static_n + len(groups) + biggest > 64:
+        problems.append('TruMenu.cpp: page Kapitel with the biggest group open has %d rows > 64' % (static_n + len(groups) + biggest))
+    qr = fn_body(src, 'int QbChapRows(')
+    if '"level.load", kUnits[i].unit, kQbAction' not in qr or 'kQfConfirm | kQfBackup' not in qr:
+        problems.append('TruMenu.cpp: a unit row must be level.load <unit> with kQfConfirm | kQfBackup (the chapter rows\' '
+                        'path)')
+    ca = fn_body(src, 'void QbChapAct(')
+    if 'QbActRow(g_qbPage, r,' not in ca or any(t in ca for t in ('LoadUnit(', 'InvokeCore(', 'ShortcutStart(', 'QbRun(')):
+        problems.append('TruMenu.cpp: QbChapAct must run a unit only through QbActRow (confirm, backup, one path)')
+    if 'g_chapOpen = open ? g : -1' not in ca: problems.append('TruMenu.cpp: page Kapitel keeps one group open at a time')
+    if 'besser DLC-2-Start + laufen' not in ca or '"DLC 2"' not in fn_body(src, 'bool ChapDlc2Note('):
+        problems.append('TruMenu.cpp: the DLC 2 units need the note "besser DLC-2-Start + laufen"')
+    if 'p.special == kQsChapters) QbSpecialAct(p.special, row - g_qbStaticN, kQbXDir)' not in fn_body(src, 'void QuickTick('):
+        problems.append('TruMenu.cpp: QuickTick: X on page Kapitel must pass kQbXDir')
+    # 1g pad diagnosis: log and footer only - QbPad (the only place that keeps bar buttons from the game) is unchanged
+    qt = fn_body(src, 'void QuickTick(')
+    if 'diagnosis 0.21.7' not in qt or 'g_padModeIdle && edges && !idleEdgeLogged' not in qt:
+        problems.append('TruMenu.cpp: QuickTick must log the bar buttons pressed while PadHook is not called (diagnosis)')
+    if 'diagnosis' in fn_body(src, 'WORD QbPad(') or 'g_qcOpen ? kQcOwn : 0' not in fn_body(src, 'WORD QbPad('):
+        problems.append('TruMenu.cpp: the 0.21.7 pad diagnosis must not touch QbPad (the 0.21.6 cleared buttons stay)')
+    if 'g_padModeIdle ? (de ? "   (Pad NICHT gesperrt)"' not in dq:
+        problems.append('TruMenu.cpp: DrawQuick must warn while the pad is read past PadHook')
+    return problems, '%d help rows, umlauts, costume check on the game thread, %d chapter groups / %d units, uber / shader / ' \
+                     'navmesh layers read only with %d keys' % (len(helps), len(ckeys), unit_n, len(Q217_KEYS))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -2232,6 +2473,10 @@ def main(argv):
     for p in gproblems6: print('Q0216 %s' % p)
     if not gproblems6: print('ok: 0.21.6 costumes / flight line / quick command line: %s' % gsummary6)
     problems += gproblems6
+    gproblems7, gsummary7 = check_0217(ini_path, opt.get('--switches', SWITCHES))   # 0.21.7
+    for p in gproblems7: print('Q0217 %s' % p)
+    if not gproblems7: print('ok: 0.21.7 footer / help / umlauts / costumes / chapters / label layers: %s' % gsummary7)
+    problems += gproblems7
     nproblems, nsummary = check_0201(ini_path, radial_path)   # 0.20.1
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)

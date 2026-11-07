@@ -1,4 +1,4 @@
-# TruMenu switches (TruMenu 0.21.5) - Set-TruMenu.ps1 copies it next to tru.exe as TruMenu.switches.txt.
+# TruMenu switches (TruMenu 0.21.7) - Set-TruMenu.ps1 copies it next to tru.exe as TruMenu.switches.txt.
 # The plugin INI switches of the quick bar page "Fixes" and the long menu section "Fixes" (one source for both).
 # A row edits <Plugin>.ini next to the .asi files (WritePrivateProfileString, the TO TEST toggle path); the INI must
 # exist (a plugin that is not installed is shown "keine INI" and never written), TruMenu never creates a plugin INI.
@@ -12,140 +12,143 @@
 #              restart = read once at the game start (takes effect at the next start);
 #              live-if:<Key> = live only while <Key> of the same section is 1 at the start, else restart
 #   default    the value of the shipped plugin INI (the plugin's default)
-#   hint       one short line (footer / tooltip), ASCII
+#   hint       "<DE help> // <EN help>", each at most 60 characters: the bar's help line while the row is selected,
+#              the long menu's tooltip (TruMenu 0.21.7; before: one English line)
 #   since      optional "<Plugin> <version>": the row belongs to that plugin version (key / default may be missing or
 #              differ in the installed INI until it is installed)
-# ASCII only (the menu font has no umlauts), at most 160 switch lines and 24 groups. Text values (PathFilter,
-# SpawnFilter, ProgressFilter) are no switches and are not listed. tools/trumenu_ini_check.py checks every key against
-# the shipped plugin INIs and every "live" claim against the plugin's re-read function.
+# UTF-8 without BOM (0.21.7: German texts with umlauts - the menu font, ImGui's ProggyClean, has the Latin-1 glyphs);
+# plugin / section / key / type / when / default stay ASCII. At most 160 switch lines and 24 groups. Text values
+# (PathFilter, SpawnFilter, ProgressFilter) are no switches and are not listed. tools/trumenu_ini_check.py checks every
+# key against the shipped plugin INIs and every "live" claim against the plugin's re-read function.
 
 group | dlc2kampf | DLC 2 Kampf (TruShadowCombat) | DLC 2 combat (TruShadowCombat) | open
-TruShadowCombat | Damage | Translate | bool | K14 Schaden 17-27 wie TU | K14 damage types 17-27 as TU | live | 1 | K14: types 17-27 as TU (0.6.3 ships 1, 0.6.2 had 0); live only if hooked at start (Translate or Log = 1) | TruShadowCombat 0.6.3
-TruShadowCombat | Death | TranslateNotify33 | bool | Tod-Meldung 33 wie TU (Finisher-Hinweis) | Death notify 33 as TU (finisher hint) | live | 1 | lethal regenerate hit sends script notification 33 before RegenerateDeath (hall02: hint_17) | TruShadowCombat 0.6.3
-TruShadowCombat | Chunk | Translate | bool | Chunk: Tod statt Sofort-Chunkdoll | Chunk: death instead of chunkdoll | live | 1 | lethal impulse in the physics step -> Death state (ChunkDoll crash fix)
-TruShadowCombat | Melee | Translate | bool | Nahkampf-Angriff wie TU (T-M1/T-M2) | Melee attack as TU (T-M1/T-M2) | restart | 1 | MeleeAttack: msgs 0x15/0x8a/0xbe end only without data; Enter sets brain+0xc bit 0 | TruShadowCombat 0.6.4
-TruShadowCombat | Splash | Translate | bool | K9 Splash wie TU | K9 splash as TU | live | 1 | main target gets no extra splash; type remap only with [Damage] Translate=1
-TruShadowCombat | Splash | Fallback | bool | K9 Splash: Xbox-Werte als Ersatz | K9 splash: Xbox values fallback | restart | 1 | use the Xbox values when object 858's pair table differs
-TruShadowCombat | States | Translate1013 | bool | Finisher 1013 wie TU | Finisher 1013 as TU | live | 0 | finisher 1013 in doppelganger mode as TU
-TruShadowCombat | States | Translate1019 | bool | Zustand 1019 (Kampf-Hub) | State 1019 (combat hub) | live | 0 | state 1019 acts (0 = log only)
-TruShadowCombat | States | Translate1020 | bool | Zustand 1020 (nach Finisher) | State 1020 (after finisher) | live | 0 | state 1020 after the finisher acts
-TruShadowCombat | States | Translate1004 | bool | Zustand 1004 Trefferliste | State 1004 hit list | live | 0 | 1004 keeps the finisher hit list (param 0x415), also slot 1
-TruShadowCombat | States | Translate231Slot0 | bool | Zustand 231 Slot 0 | State 231 slot 0 | live | 0 | state 231 slot 0 with the TU doppelganger helper
-TruShadowCombat | States | Translate231Slot1 | bool | Zustand 231 Slot 1 | State 231 slot 1 | live | 0 | state 231 slot 1 as TU
-TruShadowCombat | Strike | Translate | bool | Schattenschlag wie TU | Shadow strike as TU | live | 0 | TU shadow strike (TruShadowPower meter API); waits while a strike runs; needs Gate or Translate = 1 at start
-TruShadowCombat | Strike | Gate | bool | Schattenschlag-Sperre | Shadow strike gate | restart | 1 | 1014 in doppelganger mode without translation: 1 = do nothing
+TruShadowCombat | Damage | Translate | bool | K14 Schaden 17-27 wie TU | K14 damage types 17-27 as TU | live | 1 | Schadensarten 17-27 wie TU; live nur mit Hook beim Start // Damage types 17-27 as TU; live only if hooked at start | TruShadowCombat 0.6.3
+TruShadowCombat | Death | TranslateNotify33 | bool | Tod-Meldung 33 wie TU (Finisher-Hinweis) | Death notify 33 as TU (finisher hint) | live | 1 | Tödlicher Treffer schickt Meldung 33 (hall02: hint_17) // Lethal hit sends notification 33 (hall02: hint_17) | TruShadowCombat 0.6.3
+TruShadowCombat | Chunk | Translate | bool | Chunk: Tod statt Sofort-Chunkdoll | Chunk: death instead of chunkdoll | live | 1 | Tödlicher Stoß im Physik-Schritt -> Tod (ChunkDoll-Fix) // Lethal impulse in the physics step -> death (ChunkDoll fix)
+TruShadowCombat | Melee | Translate | bool | Nahkampf-Angriff wie TU (T-M1/T-M2) | Melee attack as TU (T-M1/T-M2) | restart | 1 | Nahkampf-Meldungen 0x15/0x8a/0xbe wie TU, Hirn-Bit 0 // Melee messages 0x15/0x8a/0xbe as TU, brain bit 0 | TruShadowCombat 0.6.4
+TruShadowCombat | Splash | Translate | bool | K9 Splash wie TU | K9 splash as TU | live | 1 | Hauptziel ohne Extra-Splash; Typen nur mit [Damage] an // Main target without extra splash; types need [Damage]
+TruShadowCombat | Splash | Fallback | bool | K9 Splash: Xbox-Werte als Ersatz | K9 splash: Xbox values fallback | restart | 1 | Xbox-Werte, wenn die Paar-Tabelle von Objekt 858 abweicht // Xbox values when object 858's pair table differs
+TruShadowCombat | States | Translate1013 | bool | Finisher 1013 wie TU | Finisher 1013 as TU | live | 0 | Finisher 1013 im Doppel-Modus wie TU // Finisher 1013 in doppelganger mode as TU
+TruShadowCombat | States | Translate1019 | bool | Zustand 1019 (Kampf-Hub) | State 1019 (combat hub) | live | 0 | Zustand 1019 wirkt (0 = nur Log) // State 1019 acts (0 = log only)
+TruShadowCombat | States | Translate1020 | bool | Zustand 1020 (nach Finisher) | State 1020 (after finisher) | live | 0 | Zustand 1020 nach dem Finisher wirkt // State 1020 after the finisher acts
+TruShadowCombat | States | Translate1004 | bool | Zustand 1004 Trefferliste | State 1004 hit list | live | 0 | 1004 behält die Finisher-Trefferliste (auch Slot 1) // 1004 keeps the finisher hit list (also slot 1)
+TruShadowCombat | States | Translate231Slot0 | bool | Zustand 231 Slot 0 | State 231 slot 0 | live | 0 | Zustand 231 Slot 0 mit dem TU-Doppel-Helfer // State 231 slot 0 with the TU doppelganger helper
+TruShadowCombat | States | Translate231Slot1 | bool | Zustand 231 Slot 1 | State 231 slot 1 | live | 0 | Zustand 231 Slot 1 wie TU // State 231 slot 1 as TU
+TruShadowCombat | Strike | Translate | bool | Schattenschlag wie TU | Shadow strike as TU | live | 0 | TU-Schattenschlag; braucht Gate oder Translate beim Start // TU shadow strike; needs Gate or Translate at start
+TruShadowCombat | Strike | Gate | bool | Schattenschlag-Sperre | Shadow strike gate | restart | 1 | 1014 im Doppel-Modus ohne Übersetzung: 1 = nichts tun // 1014 in doppelganger mode untranslated: 1 = do nothing
 
 group | schattenkraft | Schattenkraft (TruShadowPower) | Shadow power (TruShadowPower)
-TruShadowPower | Adrenaline | Translate | bool | K11 Adrenalin aus im Doppel-Modus | K11 adrenaline off (doppelganger) | live | 1 | K11: skip the adrenaline tick and bar in doppelganger mode; live only if hooked at start (Translate or Log = 1)
-TruShadowPower | Adrenaline | Log | bool | K11 Log | K11 log | restart | 1 | one line per change of the K11 decision
-TruShadowPower | ShadowPower | MenuInput | bool | LB / RB der Leiste ignorieren | Ignore the bar's LB / RB | restart | 1 | ignore LB / RB that TruMenu keeps from the game (TruMenuPadBlock)
-TruShadowPower | ShadowPower | GameInput | bool | LB / RB aus Spiel-Eingabe | LB / RB from game input | restart | 0 | 1 = LB / RB from the game's input records, 0 = XInput poll
-TruShadowPower | ShadowPower | LegacyPadStart | bool | Alter 0.8-Start | Legacy 0.8 start | restart | 0 | 1 = the 0.8 tick (every level, no gates)
-TruShadowPower | ShadowPower | Buttons | choice:768,256,512 | Kraft-Tasten (768 LB/RB) | Power buttons (768 LB/RB) | restart | 768 | XInput mask: 256 LB, 512 RB, 768 either
-TruShadowPower | Look | Enabled | bool | Kraft-Blick | Power look | restart | 1 | power look start / stop player events
-TruShadowPower | Look | ScreenEffect | bool | Blick: Bildschirm-Effekt | Look: screen effect | restart | 1 | keep the full-screen effect of event 0x32 (0 = remove it)
-TruShadowPower | Look | Messages | bool | Blick: Meldungen 0x1f4/0x1f5 | Look: messages 0x1f4/0x1f5 | restart | 1 | send 0x1f4 / 0x1f5 to instances answering query 0x172
-TruShadowPower | Look | AdrenalineMode | bool | Blick: Adrenalin-Modus TU | Look: TU adrenaline mode | restart | 1 | meter flag 0x40, camera mode 0x34, condition 1047
-TruShadowPower | Look | GlobalParams7 | bool | Blick: Shader c147 | Look: shader c147 | restart | 1 | set pixel shader constant c147 every frame
-TruShadowPower | Look | CinematicParam | bool | Blick: Zwischensequenz-Param | Look: cinematic param | restart | 1 | InstanceParams[1] = 1 during a cinematic
-TruShadowPower | Look | MoveEvents | bool | Blick: Bewegungs-Ereignisse | Look: move events | restart | 0 | TU movement events 0x84 / 0x83
-TruShadowPower | Look | CameraFlag | bool | Blick: Kamera-Flag | Look: camera flag | restart | 0 | start calls camera vtbl[0xa4] (sticky camera +0x80 or 2)
-TruShadowPower | Look | StrikeLook | bool | Blick beim Schattenschlag | Strike look | restart | 0 | shadow strike look; needs TruShadowCombat [Strike] Translate=1
-TruShadowPower | Sound | LoopSound | bool | Kraft-Ton Schleife | Power loop sound | restart | 0 | looping power sound (SoundPlex, tuning +0x5c)
-TruShadowPower | Cloth | TuTimeStep | bool | Zopf: TU-Zeitschritt | Ponytail: TU time step | restart | 0 | ponytail cloth uses frame time / world time scale
-TruShadowPower | Meter | HudBar | bool | Gelbe Leiste im HUD | Yellow HUD bar | restart | 1 | feed the HUD's yellow second bar
-TruShadowPower | Meter | Fallback | bool | Leiste: Ersatzwerte | Meter: fallback values | restart | 1 | built-in copy of the object values if the extension object is missing
-TruShadowPower | Conditions | Enabled | bool | TU-Bedingungen 1049-1056 | TU conditions 1049-1056 | restart | 1 | add the TU conditions 1049-1054 / 1056 to Lara's table
-TruShadowPower | States | Enabled | bool | TU-Zustaende 243/245/1018 | TU states 243/245/1018 | restart | 1 | states 243 / 245 / 1018, conditions 1048 / 2401, activities 1009 / 1039
-TruShadowPower | States | State2102 | bool | Wandlauf 2102 | Wall run 2102 | restart | 1 | wall-run state 2102 (camera blend jump)
-TruShadowPower | ShadowPower | Enabled | bool | TruShadowPower an | TruShadowPower on | restart | 1 | 0 = load but hook nothing
-TruShadowPower | ShadowPower | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 0 errors, 1 info, 2 every start / stop, 3 debug
+TruShadowPower | Adrenaline | Translate | bool | K11 Adrenalin aus im Doppel-Modus | K11 adrenaline off (doppelganger) | live | 1 | Kein Adrenalin-Takt im Doppel-Modus; live nur mit Hook // No adrenaline tick in doppelganger mode; live if hooked
+TruShadowPower | Adrenaline | Log | bool | K11 Log | K11 log | restart | 1 | Eine Zeile je Änderung der K11-Entscheidung // One line per change of the K11 decision
+TruShadowPower | ShadowPower | MenuInput | bool | LB / RB der Leiste ignorieren | Ignore the bar's LB / RB | restart | 1 | LB / RB ignorieren, die TruMenu dem Spiel vorenthält // Ignore LB / RB that TruMenu keeps from the game
+TruShadowPower | ShadowPower | GameInput | bool | LB / RB aus Spiel-Eingabe | LB / RB from game input | restart | 0 | 1 = LB / RB aus der Spiel-Eingabe, 0 = XInput-Abfrage // 1 = LB / RB from the game's input, 0 = XInput poll
+TruShadowPower | ShadowPower | LegacyPadStart | bool | Alter 0.8-Start | Legacy 0.8 start | restart | 0 | 1 = der Takt von 0.8 (jedes Level, keine Sperren) // 1 = the 0.8 tick (every level, no gates)
+TruShadowPower | ShadowPower | Buttons | choice:768,256,512 | Kraft-Tasten (768 LB/RB) | Power buttons (768 LB/RB) | restart | 768 | XInput-Maske: 256 LB, 512 RB, 768 beide // XInput mask: 256 LB, 512 RB, 768 either
+TruShadowPower | Look | Enabled | bool | Kraft-Blick | Power look | restart | 1 | Kraft-Blick startet / stoppt per Spieler-Ereignis // Power look start / stop player events
+TruShadowPower | Look | ScreenEffect | bool | Blick: Bildschirm-Effekt | Look: screen effect | restart | 1 | Vollbild-Effekt von Ereignis 0x32 behalten (0 = weg) // Keep the full-screen effect of event 0x32 (0 = remove)
+TruShadowPower | Look | Messages | bool | Blick: Meldungen 0x1f4/0x1f5 | Look: messages 0x1f4/0x1f5 | restart | 1 | 0x1f4 / 0x1f5 an Instanzen, die auf 0x172 antworten // 0x1f4 / 0x1f5 to instances answering query 0x172
+TruShadowPower | Look | AdrenalineMode | bool | Blick: Adrenalin-Modus TU | Look: TU adrenaline mode | restart | 1 | Leisten-Flag 0x40, Kamera-Modus 0x34, Bedingung 1047 // Meter flag 0x40, camera mode 0x34, condition 1047
+TruShadowPower | Look | GlobalParams7 | bool | Blick: Shader c147 | Look: shader c147 | restart | 1 | Pixel-Shader-Konstante c147 in jedem Bild setzen // Set pixel shader constant c147 every frame
+TruShadowPower | Look | CinematicParam | bool | Blick: Zwischensequenz-Param | Look: cinematic param | restart | 1 | InstanceParams[1] = 1 während einer Zwischensequenz // InstanceParams[1] = 1 during a cinematic
+TruShadowPower | Look | MoveEvents | bool | Blick: Bewegungs-Ereignisse | Look: move events | restart | 0 | TU-Bewegungs-Ereignisse 0x84 / 0x83 // TU movement events 0x84 / 0x83
+TruShadowPower | Look | CameraFlag | bool | Blick: Kamera-Flag wie TU | Look: camera flag as TU | restart | 1 | Start setzt Kamera-Bit 2: zweiter Kurvensatz // Start sets camera bit 2: second curve set | TruShadowPower 0.20
+TruShadowPower | Look | StrikeLook | bool | Blick beim Schattenschlag | Strike look | restart | 0 | Blick beim Schattenschlag; braucht [Strike] Translate=1 // Shadow strike look; needs [Strike] Translate=1
+TruShadowPower | Sound | LoopSound | bool | Kraft-Ton Schleife | Power loop sound | restart | 0 | Kraft-Ton in Schleife (SoundPlex, Tuning +0x5c) // Looping power sound (SoundPlex, tuning +0x5c)
+TruShadowPower | Cloth | TuTimeStep | bool | Zopf: TU-Zeitschritt | Ponytail: TU time step | restart | 0 | Zopf nutzt Bildzeit / Welt-Zeitfaktor wie TU // Ponytail uses frame time / world time scale as TU
+TruShadowPower | Meter | HudBar | bool | Gelbe Leiste im HUD | Yellow HUD bar | restart | 1 | Füllt die zweite, gelbe Leiste im HUD // Feeds the HUD's second, yellow bar
+TruShadowPower | Meter | Fallback | bool | Leiste: Ersatzwerte | Meter: fallback values | restart | 1 | Eingebaute Objektwerte, wenn das Zusatz-Objekt fehlt // Built-in object values if the extension object is missing
+TruShadowPower | Conditions | Enabled | bool | TU-Bedingungen 1049-1056 | TU conditions 1049-1056 | restart | 1 | TU-Bedingungen 1049-1054 / 1056 in Laras Tabelle // TU conditions 1049-1054 / 1056 in Lara's table
+TruShadowPower | States | Enabled | bool | TU-Zustände 243/245/1018 | TU states 243/245/1018 | restart | 1 | Zustände 243 / 245 / 1018 samt Bedingungen, Aktivitäten // States 243 / 245 / 1018 with conditions, activities
+TruShadowPower | States | State2102 | bool | Wandlauf 2102 | Wall run 2102 | restart | 1 | Wandlauf-Zustand 2102 (Kamera-Übergang beim Sprung) // Wall-run state 2102 (camera blend jump)
+TruShadowPower | ShadowPower | Enabled | bool | TruShadowPower an | TruShadowPower on | restart | 1 | 0 = laden, aber nichts einhaken // 0 = load but hook nothing
+TruShadowPower | ShadowPower | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 0 Fehler, 1 Info, 2 jeder Start / Stopp, 3 Debug // 0 errors, 1 info, 2 every start / stop, 3 debug
 
 group | kampfbasis | Kampf: Grundschalter / Diagnose | Combat: base switches / diagnosis
-TruShadowCombat | ShadowCombat | Enabled | bool | TruShadowCombat an | TruShadowCombat on | restart | 1 | 0 = patch nothing
-TruShadowCombat | ShadowCombat | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 0 errors .. 3 a line every 2 s per condition
-TruShadowCombat | TargetList | Enabled | bool | 10 Zielsucher (TU) | 10 targeters (TU) | restart | 1 | TU's 10 targeters instead of 7
-TruShadowCombat | Conditions | Enabled | bool | Bedingungen 2005/2006/2013 | Conditions 2005/2006/2013 | restart | 1 | conditions 2005 / 2006 / 2013, 2011 / 538 doppelganger branch
-TruShadowCombat | States | Enabled | bool | TU-Zustaende 1017/244/1007 | TU states 1017/244/1007 | restart | 1 | TU states 1017, 244, 1007 slots 4 / 5
-TruShadowCombat | Probe | State1013 | bool | Probe: Finisher 1013 | Probe: finisher 1013 | restart | 1 | log PC vs TU target of finisher 1013
-TruShadowCombat | Probe | States1019 | bool | Probe: Zustaende 1019/1020 | Probe: states 1019/1020 | restart | 1 | register states 1019 / 1020 at all
-TruShadowCombat | Probe | States231And1004 | bool | Probe: Zustaende 231/1004 | Probe: states 231/1004 | restart | 1 | wrap states 231 / 1004 at all
-TruShadowCombat | Diag | Targeter9 | bool | Diagnose: Zielsucher 9 | Diag: targeter 9 | restart | 1 | log who fills / clears targeter 9
-TruShadowCombat | Diag | Targeter9Why | bool | Diagnose: Zielsucher 9 warum | Diag: targeter 9 why | restart | 1 | 1 / s eligibility test of rejected candidates
-TruShadowCombat | Diag | Condition2011 | bool | Diagnose: Bedingung 2011 | Diag: condition 2011 | restart | 1 | log every evaluation of condition 2011
-TruShadowCombat | Diag | Snapshot | bool | Zielsucher-Bild fuer TruMenu | Targeter snapshot for TruMenu | restart | 1 | export TscTargeterSnapshot (TruMenu labels)
-TruShadowCombat | Diag | MaxLines | int:0..20000:500 | Diagnose: max. Zeilen | Diag: max lines | restart | 4000 | cap of the diagnostic lines
-TruShadowCombat | Damage | Log | bool | K14 Log | K14 log | restart | 1 | per-target damage type counts every 2 s
-TruShadowCombat | Damage | MaxLines | int:0..20000:500 | K14: max. Zeilen | K14: max lines | restart | 3000 | cap of the damage lines
-TruShadowCombat | Chunk | Log | bool | Chunk Log | Chunk log | restart | 1 | burst line every 2 s per enemy
-TruShadowCombat | Chunk | MaxLines | int:0..20000:500 | Chunk: max. Zeilen | Chunk: max lines | restart | 2000 | cap of the chunk lines
-TruShadowCombat | Splash | Log | bool | K9 Splash Log | K9 splash log | restart | 1 | splash burst lines every 2 s
-TruShadowCombat | Splash | MaxLines | int:0..20000:500 | K9 Splash: max. Zeilen | K9 splash: max lines | restart | 2000 | cap of the splash lines
+TruShadowCombat | ShadowCombat | Enabled | bool | TruShadowCombat an | TruShadowCombat on | restart | 1 | 0 = nichts patchen // 0 = patch nothing
+TruShadowCombat | ShadowCombat | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 0 Fehler .. 3 eine Zeile je 2 s und Bedingung // 0 errors .. 3 a line every 2 s per condition
+TruShadowCombat | TargetList | Enabled | bool | 10 Zielsucher (TU) | 10 targeters (TU) | restart | 1 | 10 Zielsucher wie TU statt 7 // TU's 10 targeters instead of 7
+TruShadowCombat | Conditions | Enabled | bool | Bedingungen 2005/2006/2013 | Conditions 2005/2006/2013 | restart | 1 | Bedingungen 2005 / 2006 / 2013, Doppel-Zweig 2011 / 538 // Conditions 2005 / 2006 / 2013, doppel branch 2011 / 538
+TruShadowCombat | States | Enabled | bool | TU-Zustände 1017/244/1007 | TU states 1017/244/1007 | restart | 1 | TU-Zustände 1017, 244, 1007 in Slot 4 / 5 // TU states 1017, 244, 1007 slots 4 / 5
+TruShadowCombat | Probe | State1013 | bool | Probe: Finisher 1013 | Probe: finisher 1013 | restart | 1 | Ziel von Finisher 1013 PC gegen TU ins Log // Log PC vs TU target of finisher 1013
+TruShadowCombat | Probe | States1019 | bool | Probe: Zustände 1019/1020 | Probe: states 1019/1020 | restart | 1 | Zustände 1019 / 1020 überhaupt anmelden // Register states 1019 / 1020 at all
+TruShadowCombat | Probe | States231And1004 | bool | Probe: Zustände 231/1004 | Probe: states 231/1004 | restart | 1 | Zustände 231 / 1004 überhaupt einhüllen // Wrap states 231 / 1004 at all
+TruShadowCombat | Diag | Targeter9 | bool | Diagnose: Zielsucher 9 | Diag: targeter 9 | restart | 1 | Loggt, wer Zielsucher 9 füllt / leert // Log who fills / clears targeter 9
+TruShadowCombat | Diag | Targeter9Why | bool | Diagnose: Zielsucher 9 warum | Diag: targeter 9 why | restart | 1 | 1x pro s: warum Kandidaten abgelehnt wurden // 1 / s eligibility test of rejected candidates
+TruShadowCombat | Diag | Condition2011 | bool | Diagnose: Bedingung 2011 | Diag: condition 2011 | restart | 1 | Jede Auswertung von Bedingung 2011 ins Log // Log every evaluation of condition 2011
+TruShadowCombat | Diag | Snapshot | bool | Zielsucher-Bild für TruMenu | Targeter snapshot for TruMenu | restart | 1 | Exportiert TscTargeterSnapshot (TruMenu-Etiketten) // Export TscTargeterSnapshot (TruMenu labels)
+TruShadowCombat | Diag | MaxLines | int:0..20000:500 | Diagnose: max. Zeilen | Diag: max lines | restart | 4000 | Obergrenze der Diagnose-Zeilen // Cap of the diagnostic lines
+TruShadowCombat | Damage | Log | bool | K14 Log | K14 log | restart | 1 | Schadensarten je Ziel alle 2 s // Per-target damage type counts every 2 s
+TruShadowCombat | Damage | MaxLines | int:0..20000:500 | K14: max. Zeilen | K14: max lines | restart | 3000 | Obergrenze der Schadens-Zeilen // Cap of the damage lines
+TruShadowCombat | Chunk | Log | bool | Chunk Log | Chunk log | restart | 1 | Eine Stoß-Zeile alle 2 s je Gegner // Burst line every 2 s per enemy
+TruShadowCombat | Chunk | MaxLines | int:0..20000:500 | Chunk: max. Zeilen | Chunk: max lines | restart | 2000 | Obergrenze der Chunk-Zeilen // Cap of the chunk lines
+TruShadowCombat | Splash | Log | bool | K9 Splash Log | K9 splash log | restart | 1 | Splash-Zeilen alle 2 s // Splash burst lines every 2 s
+TruShadowCombat | Splash | MaxLines | int:0..20000:500 | K9 Splash: max. Zeilen | K9 splash: max lines | restart | 2000 | Obergrenze der Splash-Zeilen // Cap of the splash lines
 
 group | hud | HUD (TruShadowHud) | HUD (TruShadowHud)
-TruShadowHud | ShadowHud | Enabled | bool | TruShadowHud an | TruShadowHud on | restart | 1 | 0 = patch nothing
-TruShadowHud | ShadowHud | LaraNatives | bool | Lara-Natives f70-f73 | Lara natives f70-f73 | restart | 1 | bind the TU larabase natives f70 - f73
-TruShadowHud | ShadowHud | Dlc2Data | bool | Native dlc2data | Native dlc2data | restart | 1 | register native type dlc2data, bind f0 (doppelganger flag)
-TruShadowHud | ShadowHud | MeterApi | bool | Leiste ueber Meter-API | Bar via meter API | restart | 1 | f70 - f73 via TruShadowPowerMeterApi v2; 0 = TU answers without tuning object
-TruShadowHud | ShadowHud | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = every change of a native's result
+TruShadowHud | ShadowHud | Enabled | bool | TruShadowHud an | TruShadowHud on | restart | 1 | 0 = nichts patchen // 0 = patch nothing
+TruShadowHud | ShadowHud | LaraNatives | bool | Lara-Natives f70-f73 | Lara natives f70-f73 | restart | 1 | Bindet die TU-larabase-Natives f70 - f73 // Bind the TU larabase natives f70 - f73
+TruShadowHud | ShadowHud | Dlc2Data | bool | Native dlc2data | Native dlc2data | restart | 1 | Native-Typ dlc2data, f0 = Doppel-Flag // Native type dlc2data, f0 = doppelganger flag
+TruShadowHud | ShadowHud | MeterApi | bool | Leiste über Meter-API | Bar via meter API | restart | 1 | f70 - f73 über die Meter-API v2; 0 = TU-Antworten // f70 - f73 via the meter API v2; 0 = TU answers
+TruShadowHud | ShadowHud | TranslateDlc2F1 | bool | dlc2data f1 wie TU (Hinweisbox) | dlc2data f1 as TU (hint box) | restart | 1 | Bindet TU-Native dlc2data f1 (Byte, am PC ohne Leser) // Binds TU native dlc2data f1 (byte, no PC reader) | TruShadowHud 0.2
+TruShadowHud | ShadowHud | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = jede Änderung eines Native-Ergebnisses // 2 = every change of a native's result
 
 group | felsader | Felsader (TruRockVein) | Rock vein (TruRockVein)
-TruRockVein | RockVein | Enabled | bool | TruRockVein an | TruRockVein on | restart | 1 | 0 = patch nothing
-TruRockVein | RockVein | Type607 | int:0..63 | Markup-Typ fuer 607 | Markup type for 607 | restart | 23 | markup type tested by condition 607
-TruRockVein | RockVein | Type608 | int:0..63 | Markup-Typ fuer 608 | Markup type for 608 | restart | 22 | markup type tested by condition 608
-TruRockVein | RockVein | LogUnhandled | bool | Log: fehlende Bedingungen | Log: unhandled conditions | restart | 1 | log the other unimplemented markup conditions
-TruRockVein | RockVein | LogBadValues | bool | Log: Werte ausserhalb | Log: bad values | restart | 1 | log markup values outside 601..628
-TruRockVein | RockVein | LogDefaultConditions | bool | Log: Standard-Bedingungen | Log: default conditions | restart | 1 | log condition ids answered by the default handler
-TruRockVein | RockVein | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 3 = every call
+TruRockVein | RockVein | Enabled | bool | TruRockVein an | TruRockVein on | restart | 1 | 0 = nichts patchen // 0 = patch nothing
+TruRockVein | RockVein | Type607 | int:0..63 | Markup-Typ für 607 | Markup type for 607 | restart | 23 | Markup-Typ, den Bedingung 607 prüft // Markup type tested by condition 607
+TruRockVein | RockVein | Type608 | int:0..63 | Markup-Typ für 608 | Markup type for 608 | restart | 22 | Markup-Typ, den Bedingung 608 prüft // Markup type tested by condition 608
+TruRockVein | RockVein | LogUnhandled | bool | Log: fehlende Bedingungen | Log: unhandled conditions | restart | 1 | Die übrigen fehlenden Markup-Bedingungen loggen // Log the other unimplemented markup conditions
+TruRockVein | RockVein | LogBadValues | bool | Log: Werte außerhalb | Log: bad values | restart | 1 | Markup-Werte außerhalb 601..628 loggen // Log markup values outside 601..628
+TruRockVein | RockVein | LogDefaultConditions | bool | Log: Standard-Bedingungen | Log: default conditions | restart | 1 | Bedingungen, die der Standard-Zweig beantwortet // Condition ids answered by the default handler
+TruRockVein | RockVein | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 3 = jeder Aufruf // 3 = every call
 
-group | doppel | Doppelgaengerin (TruDoppelganger) | Doppelganger (TruDoppelganger)
-TruDoppelganger | Doppelganger | Enabled | bool | TruDoppelganger an | TruDoppelganger on | restart | 1 | 0 = patch nothing
-TruDoppelganger | Doppelganger | AddConditions | bool | Bedingungen 1048-1056 ... | Conditions 1048-1056 ... | restart | 1 | register the TU conditions 1048 - 1056, 2005, 2006, 2013, 2401
-TruDoppelganger | Doppelganger | AddActivities | bool | Aktivitaeten 286, 1009, 1039-1045 | Activities 286, 1009, 1039-1045 | restart | 1 | register activities 286, 1009, 1039 - 1045
-TruDoppelganger | Doppelganger | AddStates | bool | Zustaende 243-245, 1017-1020, 2102 | States 243-245, 1017-1020, 2102 | restart | 1 | register states 243 - 245, 1017 - 1020, 2102
-TruDoppelganger | Doppelganger | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 2 = every registered id, 3 = check details
+group | doppel | Doppelgängerin (TruDoppelganger) | Doppelganger (TruDoppelganger)
+TruDoppelganger | Doppelganger | Enabled | bool | TruDoppelganger an | TruDoppelganger on | restart | 1 | 0 = nichts patchen // 0 = patch nothing
+TruDoppelganger | Doppelganger | AddConditions | bool | Bedingungen 1048-1056 ... | Conditions 1048-1056 ... | restart | 1 | TU-Bedingungen 1048-1056, 2005, 2006, 2013, 2401 // TU conditions 1048-1056, 2005, 2006, 2013, 2401
+TruDoppelganger | Doppelganger | AddActivities | bool | Aktivitäten 286, 1009, 1039-1045 | Activities 286, 1009, 1039-1045 | restart | 1 | Aktivitäten 286, 1009, 1039 - 1045 anmelden // Register activities 286, 1009, 1039 - 1045
+TruDoppelganger | Doppelganger | AddStates | bool | Zustände 243-245, 1017-1020, 2102 | States 243-245, 1017-1020, 2102 | restart | 1 | Zustände 243-245, 1017-1020, 2102 anmelden // Register states 243-245, 1017-1020, 2102
+TruDoppelganger | Doppelganger | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 2 = jede angemeldete Id, 3 = Prüf-Details // 2 = every registered id, 3 = check details
 
-group | kostuem | DLC 2 Spielerin / Kostuem (TruDlc2Player) | DLC 2 player / costume (TruDlc2Player)
-TruDlc2Player | Dlc2Player | Enabled | bool | TruDlc2Player an | TruDlc2Player on | restart | 1 | 0 = patch nothing
-TruDlc2Player | Dlc2Player | Costume | bool | Kostuem doppelganger_casual | Costume doppelganger_casual | restart | 1 | level load: lara_doppelganger -> doppelganger_casual (needs TypeRecord)
-TruDlc2Player | Dlc2Player | TypeRecord | bool | Typ-Eintrag anhaengen | Append type record | restart | 1 | append the player type record doppelganger_casual
-TruDlc2Player | Dlc2Player | FlagReset | bool | Neues Spiel: Doppel-Flag aus | New game: clear doppel flag | restart | 1 | the new game tracker clears the doppelganger flag
-TruDlc2Player | Dlc2Player | CostumeReset | bool | Kostuem ausserhalb DLC 2 zurueck | Costume reset outside DLC 2 | restart | 1 | DLC 2 costume in a non-DLC 2 unit -> the unit default
-TruDlc2Player | Dlc2Player | TrackerFlag | bool | Tracker-Flag +0x1244 | Tracker flag +0x1244 | restart | 1 | DoppelgangerInit sets gameTracker+0x1244 = 1
-TruDlc2Player | Costume | TuMapping | bool | TU-Kostuem-Abbildung 857/11 | TU costume map 857/11 | restart | 0 | TU costume map 857 <-> 11 in save / load / spawn (all 4 sites or none)
-TruDlc2Player | Dlc2Player | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = every new game tracker
+group | kostuem | DLC 2 Spielerin / Kostüm (TruDlc2Player) | DLC 2 player / costume (TruDlc2Player)
+TruDlc2Player | Dlc2Player | Enabled | bool | TruDlc2Player an | TruDlc2Player on | restart | 1 | 0 = nichts patchen // 0 = patch nothing
+TruDlc2Player | Dlc2Player | Costume | bool | Kostüm doppelganger_casual | Costume doppelganger_casual | restart | 1 | Laden: lara_doppelganger -> doppelganger_casual // Load: lara_doppelganger -> doppelganger_casual
+TruDlc2Player | Dlc2Player | TypeRecord | bool | Typ-Eintrag anhängen | Append type record | restart | 1 | Spieler-Typ-Eintrag doppelganger_casual anhängen // Append the player type record doppelganger_casual
+TruDlc2Player | Dlc2Player | FlagReset | bool | Neues Spiel: Doppel-Flag aus | New game: clear doppel flag | restart | 1 | Neues Spiel löscht das Doppelgängerin-Flag // The new game tracker clears the doppelganger flag
+TruDlc2Player | Dlc2Player | CostumeReset | bool | Kostüm außerhalb DLC 2 zurück | Costume reset outside DLC 2 | restart | 1 | DLC-2-Kostüm außerhalb von DLC 2 -> Unit-Standard // DLC 2 costume outside DLC 2 -> the unit default
+TruDlc2Player | Dlc2Player | TrackerFlag | bool | Tracker-Flag +0x1244 | Tracker flag +0x1244 | restart | 1 | DoppelgangerInit setzt gameTracker+0x1244 = 1 // DoppelgangerInit sets gameTracker+0x1244 = 1
+TruDlc2Player | Costume | TuMapping | bool | TU-Kostüm-Abbildung 857/11 | TU costume map 857/11 | restart | 0 | Kostüm 857 <-> 11 beim Speichern / Laden / Spawnen // Costume 857 <-> 11 in save / load / spawn
+TruDlc2Player | Dlc2Player | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = jeder neue Game-Tracker // 2 = every new game tracker
 
-group | merclang | Soeldner-Sprache (TruMercLang) | Mercenary language (TruMercLang)
-TruMercLang | MercLang | Enabled | bool | Soeldner in anderer Sprache | Mercs in another language | live-if:LiveReload | 0 | the hook is only installed when Enabled = 1 at the start
-TruMercLang | MercLang | Language | choice:en,fr,de,it,es,off | Sprache der Soeldner | Mercenary language | live-if:LiveReload | es | Lara, story and subtitles keep the game language
-TruMercLang | MercLang | LiveReload | bool | Aenderungen live lesen | Live reload | restart | 0 | re-read Enabled / Language when the INI changes
-TruMercLang | MercLang | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 3 = every byte check
+group | merclang | Söldner-Sprache (TruMercLang) | Mercenary language (TruMercLang)
+TruMercLang | MercLang | Enabled | bool | Söldner in anderer Sprache | Mercs in another language | live-if:LiveReload | 0 | Hook nur, wenn Enabled = 1 beim Start // Hooked only when Enabled = 1 at the start
+TruMercLang | MercLang | Language | choice:en,fr,de,it,es,off | Sprache der Söldner | Mercenary language | live-if:LiveReload | es | Lara, Story und Untertitel bleiben in der Spielsprache // Lara, story and subtitles keep the game language
+TruMercLang | MercLang | LiveReload | bool | Änderungen live lesen | Live reload | restart | 0 | Enabled / Language neu lesen, wenn die INI sich ändert // Re-read Enabled / Language when the INI changes
+TruMercLang | MercLang | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 3 = jede Byte-Prüfung // 3 = every byte check
 
 group | trace | TruTrace (nur Log) | TruTrace (log only)
-TruTrace | Trace | Enabled | bool | TruTrace an | TruTrace on | restart | 1 | 0 = no hooks, no poll thread
-TruTrace | Trace | Sound | bool | Kanal Ton | Channel sound | restart | 1 | F5 sound starts / ends / slot stops
-TruTrace | Trace | SoundSlots | bool | Kanal Ton-Slots | Channel sound slots | restart | 1 | object sound-slot play (needs Sound = 1)
-TruTrace | Trace | Teleport | bool | Kanal Teleport | Channel teleport | restart | 1 | F6 position jump detection
-TruTrace | Trace | Chart | bool | Kanal Chart | Channel chart | restart | 1 | chart transition / reset / start hooks
-TruTrace | Trace | PowerMessages | bool | Kanal Kraft-Meldungen | Channel power messages | restart | 1 | receivers of 0x1f4 / 0x1f5
-TruTrace | Trace | Spawn | bool | Kanal Spawn | Channel spawn | restart | 1 | F4 intro / birth requests (SpawnFilter in the INI)
-TruTrace | Trace | Object858 | bool | Kanal Objekt 858 | Channel object 858 | restart | 1 | object table entry watch (ObjectId)
-TruTrace | Trace | TimeVector | bool | Kanal TimeVector | Channel time vector | restart | 1 | F7 RenderDevice TimeVector
-TruTrace | Trace | Level | bool | Kanal Level | Channel level | restart | 1 | level change / load / placement
-TruTrace | Trace | Portal | bool | Kanal Portale | Channel portals | restart | 1 | stream portal hits
-TruTrace | Trace | StreamUnits | bool | Kanal Stream-Units | Channel stream units | restart | 1 | stream unit slot load / unload / state
-TruTrace | Trace | Save | bool | Kanal Speichern | Channel save | restart | 1 | SAVE_SaveGame / RestoreGame, checkpoint fields
-TruTrace | Trace | Progress | bool | Kanal Fortschritt | Channel progress | restart | 1 | births / removals / flags of ProgressFilter objects
-TruTrace | Trace | Messages | bool | Kanal Meldungen | Channel messages | restart | 1 | INSTANCE_Post to such instances
-TruTrace | Trace | GameData | bool | Kanal Spieldaten | Channel game data | restart | 1 | changed byte ranges of the save buffer
-TruTrace | Trace | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = every sound start / end and chart change
-TruTrace | Trace | MaxLinesPerSecond | int:0..1000:10 | Zeilen je Sekunde | Lines per second | restart | 40 | rate limit per category
-TruTrace | Trace | MaxLinesPerCategory | int:0..500000:10000 | Zeilen je Kategorie | Lines per category | restart | 50000 | total cap per category
-TruTrace | Trace | PollMs | int:1..100 | Abfrage ms | Poll ms | restart | 5 | poll thread interval (1 .. 100)
-TruTrace | Trace | SoundLiveMs | int:0..60000:500 | Ton LONG ab ms | Sound LONG from ms | restart | 4000 | "sound LONG" threshold
-TruTrace | Trace | SoundRepeat | int:0..20 | Ton REPEAT Anzahl | Sound REPEAT count | restart | 3 | "sound REPEAT" count within 10 s (0 = off)
-TruTrace | Trace | TeleportUnits | int:0..10000:50 | Teleport ab Einheiten | Teleport from units | restart | 300 | jump threshold
-TruTrace | Trace | TeleportWindowMs | int:0..60000:500 | Teleport-Fenster ms | Teleport window ms | restart | 3000 | chart changes logged at level 1 after a jump
-TruTrace | Trace | ObjectId | int:0..9999 | Objekt-Id (858) | Object id (858) | restart | 858 | which object id the Object858 channel watches
-TruTrace | Trace | TimeVectorMs | int:100..60000:100 | TimeVector ms | Time vector ms | restart | 1000 | interval (at least 100)
-TruTrace | Trace | GameDataMs | int:50..60000:50 | Spieldaten ms | Game data ms | restart | 250 | GameData poll interval (at least 50)
+TruTrace | Trace | Enabled | bool | TruTrace an | TruTrace on | restart | 1 | 0 = keine Hooks, kein Abfrage-Thread // 0 = no hooks, no poll thread
+TruTrace | Trace | Sound | bool | Kanal Ton | Channel sound | restart | 1 | F5: Ton-Starts / -Enden / Slot-Stopps // F5 sound starts / ends / slot stops
+TruTrace | Trace | SoundSlots | bool | Kanal Ton-Slots | Channel sound slots | restart | 1 | Ton-Slots der Objekte (braucht Sound = 1) // Object sound-slot play (needs Sound = 1)
+TruTrace | Trace | Teleport | bool | Kanal Teleport | Channel teleport | restart | 1 | F6: Positions-Sprünge erkennen // F6 position jump detection
+TruTrace | Trace | Chart | bool | Kanal Chart | Channel chart | restart | 1 | Chart-Übergänge / -Resets / -Starts // Chart transition / reset / start hooks
+TruTrace | Trace | PowerMessages | bool | Kanal Kraft-Meldungen | Channel power messages | restart | 1 | Empfänger von 0x1f4 / 0x1f5 // Receivers of 0x1f4 / 0x1f5
+TruTrace | Trace | Spawn | bool | Kanal Spawn | Channel spawn | restart | 1 | F4: Intro- / Geburts-Anfragen (SpawnFilter in der INI) // F4 intro / birth requests (SpawnFilter in the INI)
+TruTrace | Trace | Object858 | bool | Kanal Objekt 858 | Channel object 858 | restart | 1 | Eintrag der Objekt-Tabelle beobachten (ObjectId) // Object table entry watch (ObjectId)
+TruTrace | Trace | TimeVector | bool | Kanal TimeVector | Channel time vector | restart | 1 | F7: TimeVector des Render-Geräts // F7 RenderDevice TimeVector
+TruTrace | Trace | Level | bool | Kanal Level | Channel level | restart | 1 | Level-Wechsel / -Laden / -Platzierung // Level change / load / placement
+TruTrace | Trace | Portal | bool | Kanal Portale | Channel portals | restart | 1 | Treffer an Stream-Portalen // Stream portal hits
+TruTrace | Trace | StreamUnits | bool | Kanal Stream-Units | Channel stream units | restart | 1 | Stream-Unit-Slots laden / entladen / Zustand // Stream unit slot load / unload / state
+TruTrace | Trace | Save | bool | Kanal Speichern | Channel save | restart | 1 | SAVE_SaveGame / RestoreGame, Checkpoint-Felder // SAVE_SaveGame / RestoreGame, checkpoint fields
+TruTrace | Trace | Progress | bool | Kanal Fortschritt | Channel progress | restart | 1 | Geburten / Entfernen / Flags der ProgressFilter-Objekte // Births / removals / flags of ProgressFilter objects
+TruTrace | Trace | Messages | bool | Kanal Meldungen | Channel messages | restart | 1 | INSTANCE_Post an solche Instanzen // INSTANCE_Post to such instances
+TruTrace | Trace | GameData | bool | Kanal Spieldaten | Channel game data | restart | 1 | Geänderte Byte-Bereiche des Spielstand-Puffers // Changed byte ranges of the save buffer
+TruTrace | Trace | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = jeder Ton-Start / -Ende und Chart-Wechsel // 2 = every sound start / end and chart change
+TruTrace | Trace | MaxLinesPerSecond | int:0..1000:10 | Zeilen je Sekunde | Lines per second | restart | 40 | Grenze je Kategorie und Sekunde // Rate limit per category
+TruTrace | Trace | MaxLinesPerCategory | int:0..500000:10000 | Zeilen je Kategorie | Lines per category | restart | 50000 | Obergrenze je Kategorie insgesamt // Total cap per category
+TruTrace | Trace | PollMs | int:1..100 | Abfrage ms | Poll ms | restart | 5 | Takt des Abfrage-Threads (1 .. 100) // Poll thread interval (1 .. 100)
+TruTrace | Trace | SoundLiveMs | int:0..60000:500 | Ton LONG ab ms | Sound LONG from ms | restart | 4000 | Schwelle für "sound LONG" // "sound LONG" threshold
+TruTrace | Trace | SoundRepeat | int:0..20 | Ton REPEAT Anzahl | Sound REPEAT count | restart | 3 | "sound REPEAT"-Anzahl in 10 s (0 = aus) // "sound REPEAT" count within 10 s (0 = off)
+TruTrace | Trace | TeleportUnits | int:0..10000:50 | Teleport ab Einheiten | Teleport from units | restart | 300 | Sprung-Schwelle // Jump threshold
+TruTrace | Trace | TeleportWindowMs | int:0..60000:500 | Teleport-Fenster ms | Teleport window ms | restart | 3000 | Chart-Wechsel nach einem Sprung auf Stufe 1 loggen // Chart changes logged at level 1 after a jump
+TruTrace | Trace | ObjectId | int:0..9999 | Objekt-Id (858) | Object id (858) | restart | 858 | Welche Objekt-Id der Kanal Object858 beobachtet // Which object id the Object858 channel watches
+TruTrace | Trace | TimeVectorMs | int:100..60000:100 | TimeVector ms | Time vector ms | restart | 1000 | Abstand (mindestens 100) // Interval (at least 100)
+TruTrace | Trace | GameDataMs | int:50..60000:50 | Spieldaten ms | Game data ms | restart | 250 | Abfrage-Abstand der Spieldaten (mindestens 50) // GameData poll interval (at least 50)
