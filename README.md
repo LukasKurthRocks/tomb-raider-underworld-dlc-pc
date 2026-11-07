@@ -49,15 +49,10 @@ testing in the game. You need your own copy of the game and your own Xbox DLC fi
   in-game controller menu with a radial menu and a guided test flow (`TruMenu`), a local link for scripted checks
   (`TruLink`) and a log-only trace of sounds, state changes, spawns and level loads (`TruTrace`).
 
-![Development build: Lara's Shadow, Yggdrasil hall 02](assets/dev-dlc2-hall02-thralls-2026-11-02.jpg)
-*Development build, 2 Nov 2026: DLC 2 in the second Yggdrasil hall with the test menu's log overlay. The thralls
-still use substitute shaders here (translated since).*
-
-![Development build: TruMenu debug view, Croft Manor forecourt](assets/dev-debugview-manor-forecourt-2026-11-06.jpg)
-*Development build, 6 Nov 2026: the test menu's debug view (TruMenu 0.15) in the base game, on the forecourt at
-Croft Manor's entrance during the end-of-chapter cutscene. Trigger volumes by kind (red: fire that kills, yellow:
-plain, cyan: planes), the loading area between the main hall and the exterior, the active checkpoint and object
-names. The main hall's triggers hang beside the cutscene's facade set - the walkable interior is not behind it.*
+![Current development build: TruMenu quick bar, costume page, at the start of Lara's Shadow](docs/screenshots/dev-quickbar-costumes-2026-11-07.jpg)
+*Current development build (7 Nov 2026): the start of Lara's Shadow with the test menu's quick bar, page "Kostueme"
+(TruMenu 0.21.6) - every outfit of the game's cycle list, here the DLC costume f "Casual Explorer". Older snapshots and
+the story behind them: [docs/DEVLOG.md](docs/DEVLOG.md).*
 
 **Still missing (short list)**
 
