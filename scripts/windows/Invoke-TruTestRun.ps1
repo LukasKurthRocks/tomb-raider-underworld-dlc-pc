@@ -159,7 +159,7 @@ Set-TruLogFile -Path $logFile
 
 # our plugins: name -> install script; every one has -Install / -Remove / -SourceDir / -GamePath
 $knownAsis = 'TruDlc2Player', 'TruDoppelganger', 'TruRockVein', 'TruShadowPower', 'TruLink', 'TruGuard', 'TruMenu',
-              'TruDataGuard', 'TruShadowCombat', 'TruShadowHud', 'TruTrace'
+              'TruDataGuard', 'TruShadowCombat', 'TruShadowHud', 'TruTrace', 'TruQoL'
 # cdb markers (the session file echoes them on a line of their own)
 $markerNames = 'D3DFAIL', 'AV2NDCHANCE', 'FASTFAIL', 'STACKOVERFLOW', 'EXITPROCESS', 'TERMINATEPROCESS', 'MESSAGEBOX_A',
                'MESSAGEBOX_W'
