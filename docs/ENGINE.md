@@ -58,7 +58,9 @@ Full table with 104 rows: `TU-Abdeckung.md` (findings folder). "Data" = fixed in
 | Input map set 17 (K8) | 6 extra bindings | missing | data fix `input_map_tu_fix.py` ✅ |
 | Chunkdoll limit | 8 | 4 | not ported (deliberate) |
 | Sound-slot 5th argument | TU 0x8226de00 | retail | ⬜ not ported |
-| Main-game bug fixes in the TU | none proven in code (528 real changes reviewed in part). Published list (Eidos via TeamXbox 09.03.2009, read by the 17u agent in the Wayback copy; the coordinator could not re-fetch it, no second source with the details): improved jump targeting for pillar jumps; ledge-corner transition (Lara stuck on a ledge); improved edge detection; crash when the PDA is opened during the transition to the main menu; CPU work - fewer cache misses and faster trigger-volume detection ("significant for LS"); small memory leaks fragmenting the heap (crashes in very long sessions); Legend cheats disabled. Search targets for the TU review (assumed = our TU 0.0.2.3, unchecked); PC patch 1.1 (Dec 2008) predates it | 🔶 list / ⬜ code | `docs/Recherche-QoL-Beschwerden-0811.md` (local, 17u) |
+| Main-game bug fixes in the TU | Published list (Eidos via TeamXbox 09.03.2009, Wayback copy read by 17u, not re-fetched 🔶) located in code by 17w: jump targeting = ParabolaVsSegment `fabs(t)` + refine through ParabolaVsPoint (TU 0x823f6b08), moving-target > 500 u/s skip (TU 0x823fa8b0); ledge corner = same-box / same-segment nudge (TU 0x8242ecd8); edge probe = stick direction gated > 0.1 and probed separately (TU 0x82294f90); trigger volumes = sphere fast path / box bounding-sphere reject (TU 0x8228d8c8, same results); Legend cheat poll removed (TU 0x82291c40). PDA-transition crash and heap-leak fixes not found. That these blocks are exactly the listed fixes is inferred (🔶) | jump 500 filter already in PC 1.1 (0x70f6c0); the rest = retail (sections 11, 14, 23) | not ported (17w proposals: ledge corner hook 0x74e814 ~½ day, edge probe ~1 day, parabola ~1 day; trigger fast path optional; cheats kept for TruMenu) |
+| Depth of field | on | complete in the exe, off when the registry value `EnableDepthOfField` is missing or 0 (section 16) | registry (`Set-TruDisplay.ps1 -DepthOfField On`); TruMenu live switch possible with a guard ⬜ |
+| Motion blur (per object + camera) | pass 0x10 (0x821c3280, scene list +0x74c) + post-effect object [5] (EndScene 0x821c4fe8, post-fx slot 14) | absent (opaque mask 0x50fa9d writes 0x201 only, no list, no shaders) | ⬜ port (large; shaders are built into the Xbox exe) |
 
 ---
 
@@ -491,6 +493,7 @@ fix: tutorial first ✅. Open: +0x0c / +0x32 / +0x5e meaning ⬜. Sources: `Befu
 | Plane (0x5ccc20) | w +0x34, h +0x3c, byte +0x44 = 0 one-sided; segment vs two triangles 0x461640; script base `triggerplanebase` 3587 events vt54 / vt55 | ✅ |
 | Stream portals | 0x5d295f / 0x5d2ab5 / 0x5d2a48 (section 4.2) | ✅ |
 | Water volumes | object 7, intro data type 11, extents +0x54 / +0x58 / +0x5c 🔶; not in these lists | 🔶 |
+| Volume test (Xbox pair) | retail 0x82290c58 / TU 0x8228d8c8 = PC 0x5cd1b0: PC / retail build both matrices (0x5cd2d4..0x5cd3d8) before the shape switch 0x5cd437; the TU tests spheres without matrices and rejects boxes by a bounding sphere first (same results, only faster). The xmap pair 0x82254110 <-> 0x5cd520 is wrong (0x82254110 = a script-event queue; partner of 0x5cd520 ⬜) | ✅ static (17w) |
 
 Base script 3484 (trigger volume) +4 = sticky key 1724. Trigger kind is only known from the object name ⬜.
 Plugin: TruMenu 0.14 `dbg.triggers` / `dbg.portals` / `dbg.checkpoints` draw exactly this test. Source: `Befund-TruMenu-Trigger-0611.md`.
@@ -717,6 +720,9 @@ Plugin TruMenu 0.19 "dumb AI" `[AI] Dumb` / `NoInvestigate` / `NoAttack`. Source
 | SAP core (64 B) | ctor 0x46c870: +0x24 box capacity N = 1000, +0x28 used, +0x2c M = 200 -> **2M = 400 pair links**, +0x30 used, +0x20 memory 1 + 204N + 16M = 207201. Box 0x50 B. AddPair 0x4633c0, AddBox 0x4635e0, UpdateBox 0x46c9d0, RemovePair 0x463420 | ✅ |
 | Overflow | pairs: "Out of space for pairs!" (0x843e14), pair silently dropped; boxes: AddBox returns 0 -> crash at 0x5be5b9 / 0x5c4573 / 0x5c4818 / 0x5c4b7e; proxies: crash 0x597678 | ✅ static |
 | TU | ctor 0x8227b9f0: create(**3000, 500**) -> 3000 boxes, **1000 pair links**, proxies stay 1000; owner field +0x1c = 3000 (no reader); box 0x70 B with 0.1-unit move threshold | ✅ |
+| Jump targeting | SolveCubic 0x6ebbe0 (retail 0x823f3fc8), ParabolaVsPoint 0x6f96c0 (0x823f4220), ParabolaVsSegment 0x6f9940 (0x823f43d8 / TU 0x823f6b08; general case 0x6fa83f..0x6fa91d = retail: `max(t,0)`, `min(t,tMax)`, returns the segment point; TU: `fabs(t)` then refine via ParabolaVsPoint), target search 0x70f260 (0x823f8168 / TU 0x823fa8b0; owner speed > 500 skip at 0x70f6c0, double 500 at 0x855cf8 = TU already); xmap partner 0x6fcb10 of 0x823f8168 is wrong | ✅ static (17w) |
+| Ledge corner | 0x74e5a0 (retail 0x8242bc30 / TU 0x8242ecd8); player tracker `[0xfadb58]` +0xc94 / +0xc98 box / t, +0xeac / +0xeb0 partner box / t; TU block 0x8242eeac: partner box == box and `floorf` of both t equal -> t = floor - 0.001 (look-ahead direction 4) or floor + 1.01; PC 0x74e7b9..0x74e814 = retail (floorf 0x813510, segment endpoints 0x5c3aa0); look-ahead direction 0x787ef0 (site 0x74eaed, == 4); port hook 0x74e814 | ✅ static (0x787ef0 side effects 🔶) |
+| Edge probe | PhysicsCheckEdgesAndWalls 0x5d7fa0 (retail 0x82298780 / TU 0x82294f90): tuning `[0xfad764]` +0x628 bit 0x4000 (0x5d84b4), +0x600 probe count, fan 0x5d84ad..0x5d8578, stick-direction merge 0x5d8596..0x5d865c (retail: merged into the fan even with the stick at rest); TU: only with stick magnitude > 0.1 (0x8229545c) and as one separate probe i = -1 (0x82295534) | ✅ static (17w) |
 
 Plugin: TruRockVein 0.10 `[SweepAndPrune] Translate=1` patches 0x5be3a7 `68 c8 00 00 00 68 e8 03 00 00` -> `68 f4 01 00
 00 68 b8 0b 00 00` and the unread copy at 0x5be3c4 (`c7 46 20 c8 00 00 00` -> `... f4 01 00 00`, owner +0x20 = 500) in
@@ -776,6 +782,10 @@ is not valid yet (per-TerrainGroup offsets missing in `unit_frames.terrain_trian
 | Cheat "no texture" flags | 0xe7edac / 0xe7edb0 toggled, 0 readers | ✅ |
 | Projected light binding | 0x50a5f0 / 0x5076e0: `X+0x418` sometimes holds a pointer to a render view instead of the texture -> AV 0x5076fa; the B138 exe's `light_tex_guard` restores it when it differs from the invariant of `FinalizeInitialization` | ✅ (from FINDINGS.md) |
 | D3D device creation | 0x7c493d: a boot crash at 0x7c4984 (sources write tru+0x3c4984) is infrastructure (driver / VM), not data | ✅ (from FINDINGS.md) |
+| Graphics settings | global 0x890388 (0x54 B): +0x25 FullscreenEffects, +0x26 EnableDepthOfField, +0x27 UseLowResDepthOfField, +0x28 EnableShadows; registry read 0x51e120 (call 0x479441; a **missing value reads 0**, any non-zero DWORD 1), write 0x51da80, code defaults 0x477a30 only when the key is missing; active copy `[0xad75e4]` (device manager) +0x15c via ApplySettings 0x522a10: DoF byte +0x182, FS +0x181, Shadows +0x184; +0x183 (low-res DoF) has no reader | ✅ static (17t) |
+| Post-effect manager / DoF | ctor 0x519130 (device init 0x507fb0, device+0xfdd0); 2x PCColorDOFEffect (vtable 0x849c2c, ctor 0x517470) at +0xc / +0x10; built-in PS lib .shad 0x10d8fc0 (`BackBuffer s1, ColorDOFDepthScaleOffset c79, DepthBuffer s0, DepthFactors c3, DepthToW c77, Palette s2`); per frame AddParameters 0x517d60 -> update 0x516e70 (gates params+0x130e, [dm+0x182], [dm+0x181], DoF also params+0x130c; lens model 0x4545c0: near / far +0x1310 / +0x1314 + 256-byte blur curve); EndScene 0x517de0 -> 0x517570 -> drawable 0x5173c0 -> Draw 0x5177e0 (LUT effect+0x1534, quad 0x518dd0). LUT (ctor 0x523d70) and the second full-res RT (pool 0x51cd90) exist only when DoF was on at start: turning it on live after a start with 0 crashes at 0x523ae6 -> a live switch must check +0x1534 != 0. Xbox: ColorDOF drawable ctor retail 0x821c6300 / TU 0x821c41f0, Draw 0x821c4588 | ✅ static / ⬜ live (17t) |
+| Shadow maps | PCShadowMap ctor 0x5156e0, created in 0x504400 (4096 x 3072 with EnableShadows, else 1024 x 1024); slice allocator 0x504f30 (<= 2048, <= 16 slices); RenderShadowMaps 0x5050c0 (= retail 0x821b3618): light type byte +0xc0 == 2 first; with EnableShadows all lights with flags +0x64 / +0x65, else only the first whose resource has +0x144d; deferred light ctor 0x50b910 (= retail 0x821b8228): +0x42c 1 = perspective (spot), 2 = ortho. PC material shaders: 3 shadowed lights (`ShadowLights c178 x15`, `WorldToShadowMap c158 x12`, b0..b2, s14) + 3 unshadowed + PSSM; Xbox: 7 lights each with a shadow bool, ShadowNoiseTexture, VSM blur (post-fx slots 12 / 13). Why Lara's flashlight casts no shadow on PC ⬜ (light-resource flags PC vs Xbox not compared) | ✅ static (17t) |
+| Pass list Xbox vs PC | Xbox model add 0x821b9df0: opaque groups 0x201 or 0x211 (+0x10 = motion blur) when instance data byte +0x88 != 0 and float +0x84 > 0; AddDrawable 0x821b3530 files bit 0x10 into scene list +0x74c; scene draw 0x821c25e8 -> 0x821c3280 (back buffer s12, depth s13, pass 0x10, then 0x400); model draw 0x821b97d8 case 0x10. PC: opaque mask 0x50fa9d writes 0x201 only, Draw 0x50f4a0 has no 0x10 case, scene struct 16 B shorter (Xbox +0x6ec..+0x73c = PC +0x608..+0x658, +0x75c.. = PC +0x668..). Camera motion blur: Xbox effect manager ctor 0x821c4bd0 object [5] (0x14 B, enable +4, strength +0xc), EndScene 0x821c4fe8 -> 0x821c7698 -> Draw 0x821c6798; the PC manager has 5 objects. Who writes +0x84 / +0x88 and [5]+4 ⬜ | ✅ static (17t) |
 
 TruMenu 0.15-0.17 debug render modes (`dbg.census`, `dbg.flat`, `dbg.flatedges`, depth path hooking 0x849a2c, live 06.11.).
 Sources: `Befund-Debug-Rendermodus-0611.md`, `Befund-TruMenu-Rendermodus-0611.md`, `Befund-Debug-Ansicht-0511.md`,
@@ -840,6 +850,12 @@ fixed). ✅ (from FINDINGS.md, `Befund-Wasserfall.md`, `Befund-N5-Materialien-07
 * Slots: pass-2 PS Xbox 2 -> PC 8 (PC k <- Xbox k&1); pass-0 PS Xbox 2 -> PC 4 (PC 2 = depth permutation c78, PC 3 empty);
   VS 256 permutations, PC lacks Xbox 40-42 / 104-106 / 168-170 / 232-234 and adds PSSM in 32 / 96 / 160 / 224; PC depth VS
   slots write z/w to TEXCOORD6. Which of lib 242's 8 slots a draw selects ⬜. ✅
+* Built-in exe shader libs (17t): PC .shad blobs in tru.exe (e.g. ColorDOF 0x10d8fc0; 13 constant tables); Xbox render
+  device fields rd+0xfd84..+0xfdb0 (ctor 0x821afd78): motion-blur VS lib 0x8272fc20 (4 shaders: `MotionBlurStrength c160,
+  PrevViewProject c156[4], ViewProject c12`, one also `World c4, WVP c0`), velocity PS lib 0x82730e80 (`BackBufferSampler
+  s12, DepthBufferSampler s13, DepthToW c36, VelocityScale c5`), post-fx lib 0x82710530 (22 shaders vs PC 4; slot 14 =
+  camera motion blur, slots 12 / 13 = VSM blur); retail copies 0x8272e220 / 0x8272f480. Not in any DRM: a port takes them
+  from the exe image through xenos2sm3. ✅ static
 
 ### 17.4 Translation pipeline (our tools)
 
@@ -1058,6 +1074,7 @@ TuTimeStep` (default 0): built. Source: `Befund-F20-Zopf-0611.md`.
 | Input map | GlobalInfo +0x1c -> PC generalbank DTP 47 (Xbox 48); bindings {u8 action, player, srcA, srcB} in 0x18 B records; action records 0x30 B, 256 per player at 0x9fcb68 + player*0x3000 (8 up, 4 held, 0x10 pressed, 0x20 released); ctors 0x4868b0 / 0x480bc0 | ✅ |
 | Pad codes | A 3, B 2, X 1, Y 0, LB 6, RB 7, D-pad 0xc..0xf, Start 0xa (-> action 9 pause), View 0xb (-> 10 / 71 / 89), L3 8, R3 9 | ✅ |
 | TU set 17 (K8) | 6 extra bindings (141 <- 32, 142 <- 3, 143 <- 2, 145 <- 33, 146 <- 2, 147 <- 3), tested by chart conditions 150-153; `tools/input_map_tu_fix.py` | ✅ |
+| FilteredInput | PC `[0xfadfb0]` (TU 0x829ca64c): +0xb0 -> +0x18 stick magnitude, +0xc stick angle, +0x100 mode | ✅ static (17w) |
 
 **PadHook chain** ✅ live: the import slot is rewritten to KERNEL32 ~0.44 s after start, so every plugin hooks the pointer late
 and the order is timing-dependent. TruMenu 0.21.2 runs queued items in PadHook only when the return address is in tru.exe;
@@ -1095,6 +1112,7 @@ Plugins: TruShadowPower 0.20 `[Look] CameraFlag=1` (TU default), TruMenu `cam.sh
 | Cheats | one-hit kill 0xe91ffd; cheatMode 0xe7f144; "no texture" flags without readers | ✅ |
 | debugFlags 0xe7f098 | most masks without readers | ⬜ |
 | FMOD profiler | port 9264 when init flag 0x20 is set | ✅ (not a dev channel) |
+| Legend cheat poll | 0x5d74d0 (retail 0x82295458; xmap's partner "CINVIEW_Process" 0x8229d7b0 is wrong): matcher 0x5d33e0 -> dispatcher 0x5d3520 (TruMenu `cheat.code`); the TU (0x82291c40) removed the call - kept on PC on purpose | ✅ (17w) |
 
 Our debug plugins: TruMenu (menu, labels, debug views), TruTrace 0.3 (log-only hooks: chart transitions 0x787890, level
 0x5df8c0 / 0x5d30d0 / 0x5d40c0, portal 0x5d2aa0, save, INSTANCE_Post, sound emitter 0x5935d0, slot play 0x593d50),
@@ -1132,6 +1150,9 @@ Sources: `Befund-Thalassophobie-0611.md`, `Befund-Arachnophobie-0611.md`, `Befun
 | 10 | How front-end menus poll the pad | 21 |
 | 11 | Uber events per node; generator +0x0c / +0x32 / +0x5e | 9, 10 |
 | 12 | Sources writing `tru+0x7973c0`, `tru+0x7a0d00`, `tru+0x43e28b` (probably absolute VAs) | 7.2, 7.4, 8.2 |
+| 13 | TU fixes not found in code: crash when the PDA opens during the transition to the main menu; heap-leak fix (17w: G2 native binders, PDA scripts and cdc heaps not compared yet) | 1 |
+| 14 | Motion blur data: who writes Xbox instance +0x84 / +0x88 and post-effect object [5]+4; which previous transform the 4 MB VS variants use | 1, 16 |
+| 15 | Flashlight shadow: light-resource flags of Lara's flashlight PC vs Xbox (data flag or missing VSM / 7-light path?) | 16 |
 
 ---
 
