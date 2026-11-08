@@ -406,7 +406,7 @@ def abs_const_operands(bc):
 
 
 def fix_abs_native(bc):
-    """Windows' own D3D9 (AMD RX 9070 XT, native test 20.10.2026, form ABS_CONST) refuses an abs / -abs source
+    """Windows' own D3D9 (an AMD driver, native test 20.10.2026, form ABS_CONST) refuses an abs / -abs source
     modifier on a constant register, e.g. `cmp r8, -|c221.xxxy|, r5.zxyy, |c221.y|` (what fix_abs_consts leaves for
     an Xbox cndge on a literal; the original PC game never uses the form). Rewrite, bit-equivalent (17r, 08.11.2026):
     per instruction and per constant register that the instruction reads with abs, `mov rT, cN` (all four components,
