@@ -20,6 +20,8 @@ blobs identical, a second plan on the output plans 0 words.
 
 Usage (from the repository root):
   ../bin/pyt -t 900 tools/soundplex_dsp_kind_fix.py SRC_MODS OUT_MODS [--check]
+Library (step `dspkind` of tools/dlc_struct_fixes.py, 2026-11-08): fix_drm(raw, rel) -> (new raw or None, changes,
+  report lines, Xbox source), proven like main
 """
 import sys, os, struct, hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -65,6 +67,41 @@ def plan_file(rel, D, xs, lines):
         lines.append('  DTP %d +0x%x: Xbox %s, PC %s (u16 %d) -> %s (u16 kind %d)' % (
             sid, o, xw.hex(), old.hex(), struct.unpack_from('<H', old, 0)[0], new.hex(), kind))
     return ch
+
+
+def fix_drm(raw, rel):
+    """library for the step `dspkind` of tools/dlc_struct_fixes.py (2026-11-08): -> (new raw or None, changes
+    [(section index, offset, old, new, section id)], report lines, Xbox source); only the DRMs of PLAN (others:
+    (None, [], [], None)). The written bytes are proven as in main (decoded bytes differ only in the planned bytes,
+    section headers + relocation blobs identical, re-plan 0): an AssertionError leaves the caller's DRM unchanged."""
+    name = os.path.basename(rel.replace(chr(92), '/')).lower()
+    if name not in PLAN: return None, [], [], None
+    order = TA.ORDER
+    try:
+        xs, xsrc = xbox(name)
+    finally:
+        TA.ORDER = order
+    D = DW.read(raw, 'le'); lines = []
+    ch = plan_file(name, D, xs, lines)
+    if not ch: return None, [], lines, xsrc
+    ids = {k: D.sections[k].id for k, o in ch}
+    for (k, o), (old, new) in ch.items():
+        s = D.sections[k]; d = bytearray(s.data); d[o:o + 4] = new; s.data = bytes(d)
+    out = D.write('le')
+    if raw[:4] == b'CDRM': out = DW.cdrm_encode(out, 'le')
+    D0 = DW.read(raw, 'le'); dec0 = DW.cdrm_decode(raw, 'le'); dec1 = DW.cdrm_decode(out, 'le')
+    assert D0.write('le') == bytes(dec0), 'writer not lossless'
+    D1 = DW.read(out, 'le')
+    assert len(dec0) == len(dec1) and len(D0.sections) == len(D1.sections), 'decoded size / section count changed'
+    for x, y in zip(D0.sections, D1.sections):
+        assert (x.type, x.id, x.flags, x.ver, x.spec, x.pad, x.reloc, len(x.data)) == \
+               (y.type, y.id, y.flags, y.ver, y.spec, y.pad, y.reloc, len(y.data)), 'header / reloc changed'
+    bases = data_bases(D0)
+    planned = {bases[k] + o + j for (k, o), (old, new) in ch.items() for j in range(4) if old[j] != new[j]}
+    diff = {i for i in range(len(dec0)) if dec0[i] != dec1[i]}
+    assert diff == planned, 'byte diff %d != planned %d' % (len(diff), len(planned))
+    assert not plan_file(name, D1, xs, []), 're-plan not empty'
+    return out, [(k, o, old, new, ids[k]) for (k, o), (old, new) in sorted(ch.items())], lines, xsrc
 
 
 def main(a):

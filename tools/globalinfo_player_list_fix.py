@@ -159,6 +159,7 @@ def main(argv):
     if info['status'] == 'done':
         print('the PC list already equals the TU list - nothing to do')
         if done_ok and dst and not check:
+            os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)     # as the write path below (2026-11-08)
             shutil.copyfile(src, dst); print('copied %s -> %s unchanged' % (src, dst)); return 0
         return 3
     for i in info['added']:

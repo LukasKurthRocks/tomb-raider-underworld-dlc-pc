@@ -23,6 +23,26 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              = one u32 where the converter wrote two u16 and the Xbox u32 names a section of the same file (N8
              2026-11-04: doppelganger_casual DTP 20212 0x68f40000 -> 26868, TruDataGuard 'invalid id' at tru+0x194cad);
              the generic u16-pair candidates of objdata_idword_fix scan are NOT repaired
+  chunkrec   tools/chunkdoll_record_fix.py  chunkdoll piece records {u8, u8, s16 | s16, s16 | f32 | ptr | u32} of every
+             chunkdoll DRM (name + structure; base proof 2 pairs / 108 words; DLC 2 viking / armored yeti: model byte of
+             record #0 / #2 swapped = model 0; 2026-11-07, docs Befund-Datenfixes-0711.md 1)
+  exttuning  tools/player_ext_tuning_fix.py DLC 2 player tuning DTP 22497 (player_tru_dlc2_extension.drm): the 46
+             targeter words + the K9 splash pair table typed by their TU / PC readers (2026-11-07, Befund-Datenfixes 5 / 6)
+  thrallext  tools/thrall_extension_fix.py  thrall extension objects (data type 0x3d: 870 / 932 / 944) typed by their TU
+             readers and the hit reaction struct by 209 base pairs (N4b 2026-11-07, docs Befund-N4b-Extensions-0711.md);
+             an unpaired / other-layout extension section fails the check
+  meleelink  tools/melee_link_record_fix.py every melee record of an enemy data block incl. the ones reached only through
+             the follow-up link +0x1c8, by the per-field byte-order table of 22 base pairs (melee combo freeze 2026-11-07,
+             docs Befund-Melee-Kombo-Datenfix-0711.md); an UNEXPECTED / AMBIGUOUS word stops the step (SystemExit)
+  genintro   tools/generator_intro_fix.py   pool generator intro data (header +0x00..+0x6f, spawn list) by the table of
+             22 retail pairs (hall02 softlock 2026-11-07, docs Befund-Generator-Datenfix-0711.md; DLC 1 too: our own
+             route had 58 wrong words in 15 generators); the Xbox object list label = the pack raw_dlc took the DRM from;
+             a unit whose generator-named intros cannot be paired fails the check
+  costumedtp tools/costume_dtp_fix.py       dlc_costume_*.drm: model DTP u16 arrays (MESH16) and costume list counts
+             (LISTCOUNT) from the Xbox bytes (P4a 2026-11-07, docs Befund-P4a-Kostueme-0711.md: DLC 1 b c e f j o
+             2 023 words, costume packs a h k l m)
+  dspkind    tools/soundplex_dsp_kind_fix.py SoundPlex DSP node (type 12) kind u16 of dlc_caverns_hall DTP 23469 +0x74
+             (P4c 2026-11-07, docs Befund-P4c-Caverns-0711.md: Xbox word copied raw = kind 1792, no DSP)
   seqrepeat  tools/soundplex_sequence_fix.py SoundPlex Sequence nodes (type 10): the word data +0xc (s8 repeat + 3 bytes)
              raw = the Xbox bytes, as on every informative base pair (`soundplex_sequence_fix.py proof`; F5 2026-11-05:
              the converter u32-swapped `01 00 00 00` to `00 00 00 01` = repeat 0 = endless, the doppelganger's
@@ -41,15 +61,22 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              proven transition / record layouts (2026-11-02: 134 records such as {800,501}, {500,1} left u32-swapped
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
-eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, seqrepeat, navraw, vmliteral (objtex / objrec / objid
+eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, chunkrec, exttuning, thrallext, meleelink, genintro,
+costumedtp, dspkind, seqrepeat, navraw, vmliteral (objtex / objrec / objid
 since 2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
 dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
 steps, docs Befund-Pipeline-Integration-0411.md; seqrepeat since 2026-11-05, WINDOWS_REBUILD finding 49: it touches
 only the word +0xc of SoundPlex Sequence nodes, no other step writes it; it reproduces the test tree dlc_test51p_moan;
-navraw since 2026-11-06, finding 50: only the NavGraph image of a unit, no other step writes it).
+navraw since 2026-11-06, finding 50: only the NavGraph image of a unit, no other step writes it;
+chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind since 2026-11-08 (agent P2 / N8): the data
+fixes of 2026-11-07, after objid and the base-twin / statechart steps (a proven typed rule has the last word), before
+seqrepeat; each touches only its own records - chunkdoll piece records, DTP 22497 tuning words, type-0x3d extension data,
+melee records, generator intro data, costume model u16 arrays / list counts, one SoundPlex DSP kind word - which no later
+structure step writes; they reproduce the test trees work/datafix_0711 (chunkdoll / exttuning p0711), extfix_0711,
+meleefix_0711 p0711, genfix_0711 p0711, costumefix_0711, caverns74_0711 word for word).
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
-Check mode (objtex / objrec / objid / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after
-Fixes and per costume pack):
+Check mode (objtex / objrec / objid / chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind /
+seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
   ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
         TREE may be 'A,B' (overlay, the later folder wins - e.g. a pipeline tree with a fix tree on top);
@@ -72,7 +99,9 @@ import drm_write as DW, drm_reloc as R
 
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
-       'objtex', 'objrec', 'objid', 'seqrepeat', 'navraw', 'vmliteral')
+       'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
+       'seqrepeat', 'navraw', 'vmliteral')
+DATAFIX_STEPS = ('chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind')   # 2026-11-08
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (markup_level.py --objects; 23 = TU type)
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -96,6 +125,7 @@ class Steps:
     def __init__(self, tmp, objlist=None):
         self.tmp = tmp; self._oe = self._af = None; self._refs = None; self._ids = None
         self.objlist = objlist; self._objrules = None
+        self.xpack = None             # pack label of the current DRM's Xbox source (process; genintro's object list)
 
     # ---- shared inputs, built once per run
     def oe_table(self):
@@ -386,6 +416,141 @@ class Steps:
                     're-check 0' % (rel, len(changes), ', '.join('DTP %d +0x%x %s -> %s' % (
                         PD.sections[k].id, o, a.hex(), b.hex()) for k, o, a, b in changes), len(got))
 
+    # ---- data fixes of 2026-11-07 (steps since 2026-11-08, agent P2 / N8). Each tool's fix_drm proves its write (the
+    # decoded DRM differs only in the planned bytes, headers + relocations identical, re-plan 0) and raises
+    # AssertionError otherwise (-> nothing changed, logged as 'proof failed'); an UNEXPECTED word (no byte order of the
+    # Xbox word) raises SystemExit in the tool: nothing is guessed
+    PROOF_NOTE = 'proof: only the planned bytes differ, headers + relocations identical, re-check 0'
+
+    @staticmethod
+    def _wlist(items, n=12):
+        items = list(items)
+        return ', '.join(items[:n]) + (', ... %d more' % (len(items) - n) if len(items) > n else '')
+
+    def s_chunkrec(self, rel, xf, XD, cur):
+        """chunkdoll piece records {u8,u8,s16 | s16,s16 | f32 | ptr | u32} (tools/chunkdoll_record_fix.fix_drm,
+        2026-11-07, docs Befund-Datenfixes-0711.md 1); only chunkdoll DRMs"""
+        import chunkdoll_record_fix as CR
+        if not CR.is_chunkdoll(rel): return None, None
+        try:
+            new, changes, info = CR.fix_drm(XD, cur, rel)
+        except AssertionError as e:
+            return None, 'chunkrec %s: proof failed (%s) - nothing changed' % (rel, e)
+        if new is None: return None, ('chunkrec %s: 0 words; %s' % (rel, info['skip'])) if info['skip'] else None
+        return new, 'chunkrec %s: %d words (%s); %s' % (rel, len(changes), self._wlist(
+            'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes), self.PROOF_NOTE)
+
+    def s_exttuning(self, rel, xf, XD, cur):
+        """DLC 2 player tuning DTP 22497: targeter table + K9 pair table (tools/player_ext_tuning_fix.fix_drm,
+        2026-11-07, docs Befund-Datenfixes-0711.md 5 / 6); only player_tru_dlc2_extension.drm"""
+        import player_ext_tuning_fix as PX
+        if os.path.basename(rel.replace('\\', '/')).lower() != PX.NAME: return None, None
+        try:
+            new, changes, info = PX.fix_drm(XD, cur, rel)
+        except AssertionError as e:
+            return None, 'exttuning %s: proof failed (%s) - nothing changed' % (rel, e)
+        if new is None:
+            return None, ('exttuning %s: 0 words; %s' % (rel, info['skip'])) if info['skip'] else None
+        return new, 'exttuning %s: %d words (%s); %s' % (rel, len(changes), self._wlist(
+            ['+0x%x %s -> %s' % (q, a.hex(), b.hex()) for k, q, a, b, sid in changes], 20), self.PROOF_NOTE)
+
+    def s_thrallext(self, rel, xf, XD, cur):
+        """thrall extension objects (object data type 0x3d) typed by their TU readers (tools/thrall_extension_fix.fix_drm,
+        N4b 2026-11-07, docs Befund-N4b-Extensions-0711.md); only DRMs with such a section; an extension section the
+        tool cannot pair / whose layout differs is reported NOT PAIRED (the check fails on it)"""
+        import thrall_extension_fix as TE
+        if not TE.interesting(DW.read(cur, 'le'), False): return None, None
+        try:
+            new, changes, info = TE.fix_drm(XD, cur)
+        except AssertionError as e:
+            return None, 'thrallext %s: proof failed (%s) - nothing changed' % (rel, e)
+        odd = info['unpaired'] + info['layout']
+        unj = sum(1 for r in info['rows'] if r[7] == 'UNJUDGED')
+        tail = '%s%s' % ((', %d unjudged left alone' % unj) if unj else '',
+                         ('; NOT PAIRED: %s' % ', '.join(odd)) if odd else '')
+        if new is None:
+            return None, ('thrallext %s: 0 words%s' % (rel, tail)) if tail else None
+        cl = collections.Counter(c[5] for c in changes)
+        return new, 'thrallext %s: %d words in %d extension section(s) (%s)%s; %s' % (
+            rel, len(changes), len(info['exts']), self._wlist('%s %d' % kv for kv in sorted(cl.items())), tail,
+            self.PROOF_NOTE)
+
+    def s_meleelink(self, rel, xf, XD, cur):
+        """melee attack records incl. those reached only through the follow-up link +0x1c8: typed byte order per field
+        (tools/melee_link_record_fix.fix_drm, 2026-11-07, docs Befund-Melee-Kombo-Datenfix-0711.md); only DRMs with
+        enemy data; SystemExit on an UNEXPECTED / AMBIGUOUS word"""
+        import melee_link_record_fix as ML
+        try:
+            new, changes, info = ML.fix_drm(XD, cur, rel)
+        except AssertionError as e:
+            return None, 'meleelink %s: proof failed (%s) - nothing changed' % (rel, e)
+        if info['skip'] == 'no enemy data': return None, None
+        skipped = ['DTP %d %s' % (d['dtp'], d['skip']) for d in info['dtps'] if 'skip' in d]
+        unj = sum(1 for r in info['rows'] if r[8] == 'UNJUDGED')
+        tail = '%s%s' % ((', %d unjudged left alone' % unj) if unj else '', ('; %s' % ', '.join(skipped)) if skipped else '')
+        if new is None:
+            return None, ('meleelink %s: 0 words; %s' % (rel, info['skip'])) if info['skip'] else None
+        return new, 'meleelink %s: %d words (%s)%s; %s' % (rel, len(changes), self._wlist(
+            'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes), tail, self.PROOF_NOTE)
+
+    def s_genintro(self, rel, xf, XD, cur):
+        """pool generator intro data (header +0x00..+0x6f, spawn list): typed byte order per field proven on 22 retail
+        pairs (tools/generator_intro_fix.fix_drm, 2026-11-07, docs Befund-Generator-Datenfix-0711.md); the Xbox object
+        list = the pack of this DRM's Xbox source (process); a unit with generator-named intros the rule cannot pair
+        is reported NOT PAIRED (the check fails on it); SystemExit on an UNEXPECTED word"""
+        import generator_intro_fix as GI
+        pack = self.xpack or os.environ.get('TRUDLC_PACK_FIRST') or 'pack10'
+        try:
+            new, changes, info = GI.fix_drm(XD, cur, rel, pack)
+        except AssertionError as e:
+            return None, 'genintro %s: proof failed (%s) - nothing changed' % (rel, e)
+        if info['skip'] == 'no unit': return None, None
+        if info['skip'] or info['mismatch']:
+            if GI.has_generators(DW.read(cur, 'le')) is None: return None, None      # no generator-named intro at all
+            return None, 'genintro %s: NOT PAIRED (%s, Xbox %s) - nothing changed' % (
+                rel, info['skip'] or 'one side without the layout: intro %s' % info['mismatch'], pack)
+        if new is None: return None, None
+        unj = sum(1 for r in info['rows'] if r[9] == 'UNJUDGED')
+        return new, 'genintro %s: %d words in %d of %d generator(s) (%s)%s; %s' % (
+            rel, len(changes), len({c[6] for c in changes}), len(info['gens']), self._wlist(
+                'intro %d %s %s -> %s' % (uid, key, a.hex(), b.hex()) for k, q, a, b, sid, key, uid in changes),
+            (', %d unjudged left alone' % unj) if unj else '', self.PROOF_NOTE)
+
+    def s_costumedtp(self, rel, xf, XD, cur):
+        """dlc_costume_*.drm: model DTP u16 arrays (MESH16) and costume list counts (LISTCOUNT) from the Xbox bytes
+        (tools/costume_dtp_fix.fix_drm, P4a 2026-11-07, docs Befund-P4a-Kostueme-0711.md); the Xbox source is the
+        tool's own (costume_dtp_fix.XORDER)"""
+        import costume_dtp_fix as CD
+        if not CD.is_costume(rel): return None, None
+        try:
+            new, changes, rep, src = CD.fix_drm(cur, rel)
+        except AssertionError as e:
+            return None, 'costumedtp %s: proof failed (%s) - nothing changed' % (rel, e)
+        except SystemExit as e:
+            return None, 'costumedtp %s: NOT PAIRED (no Xbox source: %s) - nothing changed' % (rel, e)
+        kept = [l for l in rep if 'kept' in l or 'not provable' in l]
+        tail = ('; %d word(s) kept / not provable: %s' % (len(kept), self._wlist(kept, 3))) if kept else ''
+        if new is None: return None, ('costumedtp %s: 0 words%s' % (rel, tail)) if kept else None
+        cl = collections.Counter('%s DTP %d' % (c[5], c[4]) for c in changes)
+        return new, 'costumedtp %s: %d words (%s; Xbox %s)%s; %s' % (
+            rel, len(changes), ', '.join('%s %d' % kv for kv in sorted(cl.items())), src, tail, self.PROOF_NOTE)
+
+    def s_dspkind(self, rel, xf, XD, cur):
+        """SoundPlex DSP node kind u16 (type-12 record +4) of dlc_caverns_hall DTP 23469 +0x74 from the Xbox word
+        (tools/soundplex_dsp_kind_fix.fix_drm, P4c 2026-11-07, docs Befund-P4c-Caverns-0711.md)"""
+        import soundplex_dsp_kind_fix as DK
+        try:
+            new, changes, lines, src = DK.fix_drm(cur, rel)
+        except AssertionError as e:
+            return None, 'dspkind %s: proof failed (%s) - nothing changed' % (rel, e)
+        except SystemExit as e:
+            return None, 'dspkind %s: NOT PAIRED (no Xbox source: %s) - nothing changed' % (rel, e)
+        if new is None:
+            odd = [l.strip() for l in lines if 'skipped' in l or 'left' in l]
+            return None, ('dspkind %s: 0 words; %s' % (rel, '; '.join(odd))) if odd else None
+        return new, 'dspkind %s: %d words (%s; Xbox %s); %s' % (rel, len(changes), ', '.join(
+            'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes), src, self.PROOF_NOTE)
+
     def s_seqrepeat(self, rel, xf, XD, cur):
         """SoundPlex Sequence nodes: data +0xc raw (tools/soundplex_sequence_fix.fix_drm, F5 2026-11-05, finding 49).
         Proof per DRM (in fix_drm): the decoded DRM differs only in the planned bytes, headers / relocations identical,
@@ -462,9 +627,11 @@ class Steps:
     def process(self, rel, path, steps, log, st):
         from convert_dlc import raw_dlc
         from drm import cdrm_decode
-        raw, _ = raw_dlc(rel.replace('/', '\\'))
-        if raw is None: raw, _ = raw_dlc(os.path.basename(rel))
+        raw, pk = raw_dlc(rel.replace('/', '\\'))
+        if raw is None: raw, pk = raw_dlc(os.path.basename(rel))
         if raw is None: return None
+        # pack label of the Xbox source ('.../pack11.000' -> 'pack11'; genintro reads that pack's object list)
+        self.xpack = os.path.basename(pk.replace('\\', '/')).split('.')[0]
         xraw = cdrm_decode(raw, 'be'); XD = DW.read(xraw, 'be')
         xf = os.path.join(self.tmp, 'x_' + os.path.basename(rel)); open(xf, 'wb').write(xraw)
         cur = open(path, 'rb').read(); orig = cur
@@ -532,8 +699,9 @@ def run_twins(srcs, out, names, tmp):
     return files, log
 
 
-CHECK_STEPS = ('objtex', 'objrec', 'objid', 'seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass)
-CHECK_ALLOWED = CHECK_STEPS   # navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS)
+CHECK_STEPS = ('objtex', 'objrec', 'objid') + DATAFIX_STEPS + ('seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass)
+CHECK_ALLOWED = CHECK_STEPS   # navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS); the
+                              # 2026-11-07 data fixes (DATAFIX_STEPS) since 2026-11-08
 
 
 def run_check(tree, steps, names=None, report=None):
@@ -569,8 +737,10 @@ def run_check(tree, steps, names=None, report=None):
                 log = []
                 if S.process(rel, path, [s], log, collections.Counter()) is not None and rel not in rep[s]['files']:
                     rep[s]['files'].append(rel)
-                # navraw: a unit the rule cannot pair or whose proof failed is not "ok" either (nothing is assumed)
-                if s == 'navraw' and any('NOT PAIRED' in l or 'proof failed' in l for l in log) and rel not in rep[s]['files']:
+                # navraw: a unit the rule cannot pair or whose proof failed is not "ok" either (nothing is assumed);
+                # the same for the data fix steps (2026-11-08)
+                if (s == 'navraw' or s in DATAFIX_STEPS) and any('NOT PAIRED' in l or 'proof failed' in l for l in log) \
+                        and rel not in rep[s]['files']:
                     rep[s]['files'].append(rel)
                 rep[s]['lines'] += log
     finally:

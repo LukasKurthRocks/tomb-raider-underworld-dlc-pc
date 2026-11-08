@@ -64,6 +64,20 @@
                afterwards (navgraph_raw_fix scan: exit 1 on a wrong, unexplained or unpaired word, report
                <tree>\navgraph_check.json; dlc_struct_fixes check covers navraw too). The costume packs hold no unit
                (no NavGraph): the step and the check leave them alone;
+               chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind (2026-11-08, after objid,
+               before seqrepeat; the data fixes of 2026-11-07) type, each by its proven rule, the chunkdoll piece
+               records (chunkdoll_record_fix), the DLC 2 player tuning DTP 22497 targeter + K9 pair words
+               (player_ext_tuning_fix), the thrall extension objects 870 / 932 / 944 (thrall_extension_fix), the melee
+               records incl. the link-only combo records (melee_link_record_fix), the pool generator intro data
+               (generator_intro_fix, DLC 1 too), the costume model u16 arrays / list counts (costume_dtp_fix) and the
+               SoundPlex DSP kind of dlc_caverns_hall DTP 23469 (soundplex_dsp_kind_fix); the rules are proven first
+               (chunkdoll_record_fix / melee_link_record_fix / generator_intro_fix / thrall_extension_fix proof,
+               costume_dtp_fix prove: exit 1 on a contradicting base word) and each output tree is gated afterwards
+               (the tools' scans: exit 1 on a wrong or unexplained word, reports <tree>\chunkdoll_check.json,
+               melee_link_check.json, genintro_check.json, DLC 2 also exttuning_check.json / thrall_extension_check.json;
+               dlc_struct_fixes check covers all seven steps); DLC 2 additionally gets the doppelganger language
+               variants (vo_lang_variants build: <stream>.mul_NNN of the 4 localised voice streams, 20 files, then
+               vo_lang_variants check --expect <tree>\vo_lang_md5.tsv, report <tree>\vo_lang_check.json);
                objevent / idword / animlist / fxnode / statevm / chartid (2026-11-03, finding 44) set the converter
                fault families that crash dumps of tests 50d-50j uncovered (tools/converter_faults_fix.py: event list
                words and sub-0x32 ids, anim event list words, effect node headers / type-1 ids, state-VM code words,
@@ -82,7 +96,8 @@
       Costumes the three Xbox costume packs (2026-11-03; pack1 Wetsuit k / p, pack2 Classic a / h, pack20 Designer
                l / m), after Assemble (render tables) and Fixes' proof: verify_ids extend (adds the packs' ids to
                dlc_idmap.json, existing entries never change; second run adds nothing), converter_faults_fix proof,
-               soundplex_sequence_fix proof (2026-11-05), then per pack the DLC 2 route: dlc_media_build,
+               soundplex_sequence_fix proof (2026-11-05), costume_dtp_fix prove (2026-11-08, rule of the step
+               costumedtp: costumes a h k l m), then per pack the DLC 2 route: dlc_media_build,
                dlc_assemble_build --pack, dlc_audio_build --pack, tree_check, dlc_fixes_build --pack,
                converter_faults_fix check --pack, script_clash_fix check, dlc_struct_fixes check --pack (objtex / objrec
                / objid / seqrepeat), soundplex_sequence_fix scan --pack, costume_scope_check tree (E4: no
@@ -100,7 +115,11 @@
                B138 mods, verified against the kit manifest, from the game folder and the Install-TruTree backups),
                generalbank_build (see Generalbank), b138_fix_tree (shader constant fix, grapple ring shaders, DLC 1 UI
                paths / texts, DLC 1 state charts, DLC 1 structure fixes (anim event lists of the costumes, pillar
-               markup; step struct), the DLC 1 achievement call, cinematic languages of both DLCs, our generalbank.drm)
+               markup, since 2026-11-08 costumedtp / dspkind; step struct), the DLC 1 achievement call, cinematic
+               languages of both DLCs, our generalbank.drm - since 2026-11-08 the K12 one, k12\mods\generalbank.drm);
+               gates afterwards: input_map_tu_fix / globalinfo_player_list_fix --verify (player_list_check.json),
+               vo_lang_variants check pack11 (doppelganger language variants, vo_lang_check.json), generator_intro_fix
+               scan (genintro_check.json), dlc_struct_fixes check --steps costumedtp,dspkind (datafix_check.json)
                -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
       Generalbank  our generalbank.drm alone (after Repair's snapshot): B138's + mission screen style + the title
                update's loading screen (script 6, DLC titles) and hint box (script 10 -> 9), 21 steps with the
@@ -111,7 +130,10 @@
                (also in Repair, on b138_fixes), report <dir>\input_map_check.json; step 23 (2026-11-05, S104):
                mission screen script 104 starts DLC 2 like the title update, without costume / weapon selection
                (tools/dlc2_player_fix.py gb; result = dlc_test50l_input, md5 66efd71d...), gate
-               dlc2_player_fix verify (every changed word explained), report <dir>\script104_check.json
+               dlc2_player_fix verify (every changed word explained), report <dir>\script104_check.json; K12
+               (2026-11-08): globalinfo_player_list_fix appends 857 doppelganger_casual to the DTP 2 player list as the
+               title update (28 -> 29 ids) -> <dir>\k12\mods\generalbank.drm (the file to install; mods\ stays the S104
+               result), gates globalinfo_player_list_fix --verify (player_list_check.json) and input_map_tu_fix --verify
                -FixesOut DIR (2026-11-04, check runs): Generalbank writes DIR\generalbank_build; Repair writes
                DIR\b138_pristine\mods, DIR\generalbank_build (--base = that snapshot's generalbank.drm) and
                DIR\b138_fixes\mods instead of the usual work\rebuild\b138_pristine / generalbank_build / b138_fixes
@@ -186,6 +208,17 @@ $seq1 = (Split-Path -Parent $fix1) + '/soundplex_sequence_check.json'
 $seq2 = (Split-Path -Parent $fix2) + '/soundplex_sequence_check.json'
 $nav1 = (Split-Path -Parent $fix1) + '/navgraph_check.json'
 $nav2 = (Split-Path -Parent $fix2) + '/navgraph_check.json'
+# gates of the 2026-11-07 data fixes (steps since 2026-11-08)
+$chunk1 = (Split-Path -Parent $fix1) + '/chunkdoll_check.json'
+$chunk2 = (Split-Path -Parent $fix2) + '/chunkdoll_check.json'
+$melee1 = (Split-Path -Parent $fix1) + '/melee_link_check.json'
+$melee2 = (Split-Path -Parent $fix2) + '/melee_link_check.json'
+$gen1 = (Split-Path -Parent $fix1) + '/genintro_check.json'
+$gen2 = (Split-Path -Parent $fix2) + '/genintro_check.json'
+$ext2 = (Split-Path -Parent $fix2) + '/exttuning_check.json'
+$thrall2 = (Split-Path -Parent $fix2) + '/thrall_extension_check.json'
+$voMd5 = (Split-Path -Parent $fix2) + '/vo_lang_md5.tsv'
+$vo2 = (Split-Path -Parent $fix2) + '/vo_lang_check.json'
 $gbOut = 'work/rebuild/generalbank_build'
 $repPristine = 'work/rebuild/b138_pristine/mods'
 $repFixes = 'work/rebuild/b138_fixes/mods'
@@ -204,7 +237,9 @@ $costumeTools = @(
     @('tools\costume_scope_check.py', 'selftest'),
     @('tools\verify_ids.py', 'extend'),
     @('tools\converter_faults_fix.py', 'proof'),
-    @('tools\soundplex_sequence_fix.py', 'proof')
+    @('tools\soundplex_sequence_fix.py', 'proof'),
+    # rule MESH16 / LISTCOUNT of step costumedtp (2026-11-08): base Lara model DTPs, exit 1 on any exception
+    @('tools\costume_dtp_fix.py', 'prove')
 )
 foreach ($pk in 'pack1', 'pack2', 'pack20') {
     $o = "$costRoot/$pk"
@@ -312,6 +347,13 @@ $steps = @{
         @('tools\converter_faults_fix.py', 'proof'),
         @('tools\soundplex_sequence_fix.py', 'proof'),
         @('tools\navgraph_raw_fix.py', 'proof'),
+        # 2026-11-08: the rules of the data fix steps chunkrec / meleelink / genintro / thrallext / costumedtp, proven on
+        # the base / retail pairs first (exit 1 on a contradicting word or another count than pinned)
+        @('tools\chunkdoll_record_fix.py', 'proof'),
+        @('tools\melee_link_record_fix.py', 'proof'),
+        @('tools\generator_intro_fix.py', 'proof'),
+        @('tools\thrall_extension_fix.py', 'proof'),
+        @('tools\costume_dtp_fix.py', 'prove'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
         @('tools\converter_faults_fix.py', 'check', $fix1, '--report', $chk1),
         @('tools\script_clash_fix.py', 'check', $fix1, '--report', $clash1),
@@ -319,27 +361,55 @@ $steps = @{
         # DLC 1 = pack10 first, the same Xbox sources as dlc_fixes_build without --pack
         @('tools\soundplex_sequence_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $seq1),
         @('tools\navgraph_raw_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $nav1),
+        # data fix gates (2026-11-08; costumedtp / dspkind are gated by dlc_struct_fixes check above)
+        @('tools\chunkdoll_record_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $chunk1),
+        @('tools\melee_link_record_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $melee1),
+        @('tools\generator_intro_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $gen1),
         @('tools\compare_b138.py', $fix1, $cmp1),
         @('tools\dlc_fixes_build.py', 'work/rebuild/dlc2_asm_stage2a/mods', $fix2, '--pack', 'pack11'),
+        # doppelganger language variants (2026-11-08, no DRM step): <stream>.mul_NNN of the 4 localised DLC 2 voice
+        # streams (20 files + the plain English names), vo_lang_md5.tsv next to the mods folder
+        @('tools\vo_lang_variants.py', 'build', $fix2, 'pack11'),
         @('tools\converter_faults_fix.py', 'check', $fix2, '--pack', 'pack11', '--report', $chk2),
         @('tools\script_clash_fix.py', 'check', $fix2, '--report', $clash2),
         @('tools\dlc_struct_fixes.py', 'check', $fix2, '--pack', 'pack11', '--report', $obj2),
         @('tools\soundplex_sequence_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $seq2),
-        @('tools\navgraph_raw_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $nav2)
+        @('tools\navgraph_raw_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $nav2),
+        @('tools\chunkdoll_record_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $chunk2),
+        @('tools\player_ext_tuning_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $ext2),
+        @('tools\thrall_extension_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $thrall2),
+        @('tools\melee_link_record_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $melee2),
+        @('tools\generator_intro_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $gen2),
+        @('tools\vo_lang_variants.py', 'check', $fix2, 'pack11', '--expect', $voMd5, '--report', $vo2)
     )
     Costumes = $costumeTools
     Repair = @(
         @('tools\b138_snapshot.py', '../release/B138/kit/manifest.json', '../data/pc/mods', '../backup', $repPristine, '../backup/mods', 'work/rebuild/base_b138'),
         (@('tools\generalbank_build.py', $gbOut) + $gbBase),
         @('tools\input_map_tu_fix.py', '--verify', "$gbOut/mods/generalbank.drm", '--report', "$gbOut/input_map_check.json"),
-        @('tools\b138_fix_tree.py', $repPristine, $repFixes, '--dlc2', '--replace', '--generalbank', "$gbOut/mods/generalbank.drm"),
-        @('tools\input_map_tu_fix.py', '--verify', "$repFixes/generalbank.drm", '--report', ((Split-Path -Parent $repFixes) + '/input_map_check.json'))
+        # K12 (2026-11-08): the title update's player list (29 ids, + 857) into DTP 2, idempotent (--done-ok), then gate
+        @('tools\globalinfo_player_list_fix.py', "$gbOut/mods/generalbank.drm", "$gbOut/k12/mods/generalbank.drm", '--done-ok'),
+        @('tools\globalinfo_player_list_fix.py', '--verify', "$gbOut/k12/mods/generalbank.drm", '--report', "$gbOut/player_list_check.json"),
+        @('tools\b138_fix_tree.py', $repPristine, $repFixes, '--dlc2', '--replace', '--generalbank', "$gbOut/k12/mods/generalbank.drm"),
+        @('tools\input_map_tu_fix.py', '--verify', "$repFixes/generalbank.drm", '--report', ((Split-Path -Parent $repFixes) + '/input_map_check.json')),
+        # data fix gates on the repair tree (2026-11-08): K12 list, doppelganger language variants (mul_lang_build --dlc2),
+        # generator intro data (B138: 0 words), costume DTPs / caverns DSP kind (steps costumedtp / dspkind of b138_fix_tree)
+        @('tools\globalinfo_player_list_fix.py', '--verify', "$repFixes/generalbank.drm", '--report', ((Split-Path -Parent $repFixes) + '/player_list_check.json')),
+        @('tools\vo_lang_variants.py', 'check', $repFixes, 'pack11', '--report', ((Split-Path -Parent $repFixes) + '/vo_lang_check.json')),
+        @('tools\generator_intro_fix.py', 'scan', "$repPristine,$repFixes", '--pack', 'pack10', '--report', ((Split-Path -Parent $repFixes) + '/genintro_check.json')),
+        @('tools\dlc_struct_fixes.py', 'check', "$repPristine,$repFixes", '--steps', 'costumedtp,dspkind', '--pack', 'pack10', '--report', ((Split-Path -Parent $repFixes) + '/datafix_check.json'))
     )
     Generalbank = @(
         @('tools\generalbank_build.py', $gbOut),
         @('tools\input_map_tu_fix.py', '--verify', "$gbOut/mods/generalbank.drm", '--report', "$gbOut/input_map_check.json"),
         # gate S104 (2026-11-05): the result = step 22 + exactly the script 104 fix of step 23, block = TU script 134 test
-        @('tools\dlc2_player_fix.py', 'verify', "$gbOut/steps/22_input.drm", "$gbOut/mods/generalbank.drm", '--tu', "$gbOut/steps/10_tu_be.drm", '--report', "$gbOut/script104_check.json")
+        @('tools\dlc2_player_fix.py', 'verify', "$gbOut/steps/22_input.drm", "$gbOut/mods/generalbank.drm", '--tu', "$gbOut/steps/10_tu_be.drm", '--report', "$gbOut/script104_check.json"),
+        # K12 (2026-11-08, docs Befund-Datenfixes-0711.md 2): DTP 2 player list = the title update's 29 ids (+ 857
+        # doppelganger_casual); mods\generalbank.drm stays the S104 result (its md5 66efd71d... gate above), the file to
+        # install is k12\mods\generalbank.drm
+        @('tools\globalinfo_player_list_fix.py', "$gbOut/mods/generalbank.drm", "$gbOut/k12/mods/generalbank.drm", '--done-ok'),
+        @('tools\globalinfo_player_list_fix.py', '--verify', "$gbOut/k12/mods/generalbank.drm", '--report', "$gbOut/player_list_check.json"),
+        @('tools\input_map_tu_fix.py', '--verify', "$gbOut/k12/mods/generalbank.drm", '--report', "$gbOut/k12/input_map_check.json")
     )
 }
 $outputDirs = @{

@@ -20,7 +20,9 @@ folder with only the changed / added files, to install with scripts/windows/Inst
                tools/dlc_struct_fixes.py) over the B138 files: object event lists, model record list stride, anim
                event lists, object markup records, VM literals by the layouts proven on the base pairs (2026-11-01/02;
                DLC 1: anim event list values of the dlc_costume_* files). The DLC 2 player steps (twins, childids,
-               translist, actlist, fadeslots) are for the DLC 2 player files only
+               translist, actlist, fadeslots) are for the DLC 2 player files only. Since 2026-11-08 also `costumedtp`
+               (costume model u16 arrays + list counts of b c e f j o, tools/costume_dtp_fix.py) and `dspkind`
+               (dlc_caverns_hall DTP 23469 +0x74, tools/soundplex_dsp_kind_fix.py), after markup
   3c. achievement stage-2b fix `achievement` (tools/dlc_fixes_build.fix_achievement) over the B138 files: the call of
                `dlc_treasureroom` script 23210 into the title update's achievement native f16 (+0x214), which the PC
                exe lacks, becomes its line marker (test 40; docs: Befund-Erfolge.md in the workspace)
@@ -109,7 +111,11 @@ def main(argv):
         import dlc_fixes_build as FB
         print('== struct')
         os.environ['TRUDLC_PACK_FIRST'] = 'pack10'
-        for fx in (FB.fix_eventlist, FB.fix_reclist, FB.fix_animfx, FB.fix_markup, FB.fix_vmliteral):
+        # costumedtp / dspkind (2026-11-08): the 2026-11-07 data fixes that B138 needs (costume b c e f j o 2 023 words,
+        # dlc_caverns_hall DTP 23469 +0x74); B138 has no wrong chunkdoll / melee / generator word (gated by
+        # Invoke-TruPipeline.ps1 Repair with the tools' scans)
+        for fx in (FB.fix_eventlist, FB.fix_reclist, FB.fix_animfx, FB.fix_markup, FB.fix_costumedtp, FB.fix_dspkind,
+                   FB.fix_vmliteral):
             r = fx(out, srcs=[src, out])
             for l in r['log']: print(l)
             print('%s: %d files' % (fx.__name__, len(r['files'])))

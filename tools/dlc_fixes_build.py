@@ -34,6 +34,14 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          proven byte classes (F3 / B24 crash tru+0x42e62), the player data breath-sound ids +0x94 / +0x98 as one u32
          (doppelganger_casual 0x68f40000); only words whose PC bytes are another byte order of the Xbox word, each
          written DRM proven (only the planned bytes differ, headers / relocations identical, re-check 0)
+  chunkrec, exttuning, thrallext, meleelink, genintro, costumedtp, dspkind (ours, 2026-11-08: the data fixes of
+         2026-11-07) after objid, also tools/dlc_struct_fixes.py: chunkdoll piece records (chunkdoll_record_fix), the DLC 2
+         player tuning DTP 22497 targeter + K9 pair words (player_ext_tuning_fix), the thrall extension objects of data
+         type 0x3d (thrall_extension_fix), melee attack records incl. the link-only combo records (melee_link_record_fix),
+         pool generator intro data (generator_intro_fix; DLC 1 too), costume model u16 arrays / list counts
+         (costume_dtp_fix; DLC 1 and the costume packs), the SoundPlex DSP kind of dlc_caverns_hall DTP 23469
+         (soundplex_dsp_kind_fix); each typed by its proven rule, only words whose PC bytes are another byte order of
+         the Xbox word, each written DRM proven; an UNEXPECTED word stops the build
   seqrepeat (ours, 2026-11-05, finding 49) after objid, also tools/dlc_struct_fixes.py: the word data +0xc of SoundPlex
          Sequence nodes (s8 repeat + 3 bytes) raw = the Xbox bytes (tools/soundplex_sequence_fix.py; the converter
          u32-swapped repeat 1 to 0 = endless, the DLC 2 doppelganger's groan); a word that is no byte order of the
@@ -346,10 +354,17 @@ def _struct_fix(step):
 # navraw (2026-11-06, finding 50): NavPower NavGraph image raw, after seqrepeat (no other step writes the image);
 # before, Invoke-TruPipeline.ps1 ran it in place after dlc_fixes_build; the gates stay (navgraph_raw_fix.py scan +
 # dlc_struct_fixes.py check)
+# chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind (2026-11-08, agent P2 / N8): the typed data
+# fixes of 2026-11-07 after objid, before seqrepeat (each writes only its own records, which no later structure step
+# touches; twins / statechart run before, so the proven rule has the last word); Invoke-TruPipeline.ps1 proves the
+# rules first (chunkdoll_record_fix / melee_link_record_fix / generator_intro_fix / thrall_extension_fix proof,
+# costume_dtp_fix prove) and gates every tree afterwards (the tools' scans + dlc_struct_fixes.py check)
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
-                'markup', 'objtex', 'objrec', 'objid', 'seqrepeat', 'navraw', 'vmliteral')
+                'markup', 'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro',
+                'costumedtp', 'dspkind', 'seqrepeat', 'navraw', 'vmliteral')
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
- fix_markup, fix_objtex, fix_objrec, fix_objid, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+ fix_markup, fix_objtex, fix_objrec, fix_objid, fix_chunkrec, fix_exttuning, fix_thrallext, fix_meleelink, fix_genintro,
+ fix_costumedtp, fix_dspkind, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 def _fault_fix(step):

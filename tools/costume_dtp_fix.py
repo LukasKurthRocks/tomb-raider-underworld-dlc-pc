@@ -27,6 +27,8 @@ Usage (from the repository root):
   ../bin/pyt -t 1800 tools/costume_dtp_fix.py scan DIR[,DIR..] [--his HIS_MODS] [-v]
   ../bin/pyt -t 1800 tools/costume_dtp_fix.py fix DIR[,DIR..] OUT_MODS [--check] [--his HIS_MODS]
       DIR[,DIR..] = overlay (later folder wins); every dlc_costume_*.drm found is handled; OUT_MODS gets only changed DRMs
+Library (step `costumedtp` of tools/dlc_struct_fixes.py, 2026-11-08): fix_drm(raw, rel) -> (new raw or None, changes,
+  report lines, Xbox source), proven like `fix` (prove_write)
 """
 import sys, os, struct, hashlib, collections, bisect
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -145,6 +147,54 @@ def plan_file(xs, D, his=None):
                 x['id'], D.sections[k].id, note, '-' if hw is None else ('same' if hw == new else hw.hex())))
         rep += ['Xbox DTP %d / PC %d: %s' % (x['id'], D.sections[k].id, l) for l in r]
     return ch, rep
+
+
+def is_costume(rel):
+    b = os.path.basename(rel.replace(chr(92), '/')).lower()
+    return b.startswith('dlc_costume_') and b.endswith('.drm')
+
+
+def prove_write(orig, raw, ch, xs):
+    """the proofs of `fix` on a written DRM: decoded DRM differs from the input only in the planned bytes, same section
+    count, section headers + relocation blobs identical, a second plan finds 0 words -> number of differing bytes"""
+    D0 = DW.read(orig, 'le'); dec0 = DW.cdrm_decode(orig, 'le'); dec1 = DW.cdrm_decode(raw, 'le')
+    assert D0.write('le') == bytes(dec0), 'writer not lossless'
+    D1 = DW.read(raw, 'le')
+    assert len(dec0) == len(dec1) and len(D0.sections) == len(D1.sections), 'decoded size / section count changed'
+    for x, y in zip(D0.sections, D1.sections):
+        assert (x.type, x.id, x.flags, x.ver, x.spec, x.pad, x.reloc, len(x.data)) == \
+               (y.type, y.id, y.flags, y.ver, y.spec, y.pad, y.reloc, len(y.data)), 'header / reloc changed'
+    bases = data_bases(D0)
+    planned = {bases[k] + o + j for (k, o), v in ch.items() for j in range(4) if v[0][j] != v[1][j]}
+    diff = {i for i in range(len(dec0)) if dec0[i] != dec1[i]}
+    assert diff == planned, 'byte diff %d != planned %d' % (len(diff), len(planned))
+    again, _ = plan_file(xs, D1)
+    assert not again, 're-plan not empty: %d' % len(again)
+    return len(diff)
+
+
+def fix_drm(raw, rel):
+    """library for the step `costumedtp` of tools/dlc_struct_fixes.py (2026-11-08): one dlc_costume_*.drm ->
+    (new raw or None, changes [(section index, offset, old, new, PC section id, rule)], report lines, Xbox source).
+    The Xbox source is looked up as in `scan` / `fix` (XORDER, lower-case file name); the written bytes are proven
+    (prove_write: an AssertionError leaves the caller's DRM unchanged). Not a costume DRM -> (None, [], [], None)."""
+    if not is_costume(rel): return None, [], [], None
+    order = TA.ORDER
+    try:
+        xs, src = load_xbox(os.path.basename(rel.replace(chr(92), '/')).lower())
+    finally:
+        TA.ORDER = order
+    D = DW.read(raw, 'le')
+    ch, rep = plan_file(xs, D)
+    if not ch: return None, [], rep, src
+    ids = {k: D.sections[k].id for k, o in ch}
+    for (k, o), (old, new, _, _) in ch.items():
+        s = D.sections[k]; d = bytearray(s.data); d[o:o + 4] = new; s.data = bytes(d)
+    out = D.write('le')
+    if raw[:4] == b'CDRM': out = DW.cdrm_encode(out, 'le')
+    prove_write(raw, out, ch, xs)
+    changes = [(k, o, old, new, ids[k], rule) for (k, o), (old, new, rule, _) in sorted(ch.items())]
+    return out, changes, rep, src
 
 
 def overlay(dirs):
