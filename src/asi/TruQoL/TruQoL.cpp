@@ -60,6 +60,22 @@
 // run on the game thread, as TruMenu's own run-time patch of the same sites (M21PatchGroup from PadHook) and
 // TruShadowCombat's [Damage] Translate switch do. Without the clock hook (bytes differ) there is no tick: every key
 // then takes effect at the next start (logged once).
+//
+// 0.1.2 (2026-11-08, package 18c) [Startup] SkipIntro (restart, default 0) - skips the start-up intro movie. Static
+// proof (work\skip18c_0811): the front-end script plays it with the uigamedata native f21 0x7a0cf0 (binder 0x7af0c0
+// idx 0x15) -> PlayMovie 0x77bc60 (its only caller; 0x6457a0 = an empty log stub, 0x5f6420 = mov eax, 1) -> the video
+// player 0x4a12b0(name, loop 0). The player is BLOCKING: it opens the Bink file (0x4a0c70; cannot open -> returns 0 at
+// 0x4a12df) and runs its own frame loop until the last frame (0x4a0ae0: handle +0xc == +0x8), the stop byte 0xa039b8
+// (native f22 0x4a0f10), a skip press or a lost device, then BinkClose and handle 0xa039bc = 0. The handle and the
+// "finished" test are used only inside the video code 0x4a0a00..0x4a15ff, the native writes no result and PlayMovie
+// drops eax: the script learns the end only by the native RETURNING - there is no "movie finished" event to fake.
+// MovieHook replaces the rel32 of `call 0x4a12b0` at 0x77bc7b (patched once in DllMain) and, while the front-end state
+// 0xfae8da is 0 (LegalScreens) or 1 (IntroMovie), the main state 0xe7ed60 is not 1 / 2 / 9 (level, level load, outfit
+// selection) and state 2 or higher was never seen in this run, returns as the game's own "file cannot be opened" path
+// (the player's entry writes 0xa039b8 = 0, 0xa039dc = loop, 0xa039dd = 0, result 0). The game's code-played movies
+// (attract "intro" 0x5d5520, menu loop "medsea_loop" 0x5daf3e, state-8 "explode" 0x5db008, the queue 0xe7ece0) call
+// 0x4a12b0 directly and are never touched; the state-1 handler 0x5dae86 sets state 2 by itself. The legal screens are
+// no movie (no logo .bik in Movies\; state 0 is not in the code switch 0x5dae7f, i.e. script-drawn): not skipped.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -74,7 +90,7 @@
 
 namespace {
 
-const char kVersion[] = "TruQoL 0.1.1";
+const char kVersion[] = "TruQoL 0.1.2";
 const DWORD kImageBase = 0x00400000;
 
 // ---- 1. frame limiter: the frame-time function 0x5da230 and its two clock reads ----
@@ -119,6 +135,26 @@ const char *const kCpuOverflowHex = "88843d84020000";
 const DWORD kCpuCountCall = 0x0047a0bb;     // WinMain 0x479c80 -> 0x4a28e0; then SetThreadAffinityMask(thread, 1)
 const char *const kCpuCountCallHex = "e820880200 6a01 ff1584e08300 50 ff1578e08300";
 
+// ---- 4. start-up intro: the script native PlayMovie and the blocking video player (0.1.2) ----
+const DWORD kPlayMovie = 0x0077bc60;        // PlayMovie(&name): log stub, 0x5f6420, call 0x4a12b0(name, 0), log stub
+const char *const kPlayMovieHex = "56 8b742408 8b06 85c0 741e 50 e82f9becff e8aaa7e7ff 8b06 6a00 50 e83056d2ff 83c40c 5e e9179becff 5e c3";
+const DWORD kPlayMovieCall = 0x0077bc7b;    // call 0x4a12b0 - the patched rel32
+const DWORD kVideoPlay = 0x004a12b0;        // entry writes, open 0x4a0c70, open failed -> return 0 (0x4a12df)
+const char *const kVideoPlayHex = "8b4c2404 8a442408 83ec20 53 55 33db 51 881db839a000 a2dc39a000 881ddd39a000 33ed e898f9ffff 83c404 85c0 7506 5d 5b 83c420 c3";
+const DWORD kMovieNative = 0x007a0cf0;      // uigamedata f21: push the argument pointer, call 0x77bc60, no result
+const char *const kMovieNativeHex = "8b44240c 50 e866affdff 59 c3";
+const DWORD kMovieBind = 0x007af1f3;        // binder 0x7af0c0: push 0x7a0cf0; push 0x15
+const char *const kMovieBindHex = "68f00c7a00 6a15";
+const DWORD kFrontEndGet = 0x0077bbe0;      // mov al, [0xfae8da]
+const char *const kFrontEndGetHex = "a0dae8fa00 c3";
+const DWORD kIntroCase = 0x005dae86;        // front-end state 1 in 0x5dae20: log stub, SetFrontEndState(2)
+const char *const kIntroCaseHex = "51 e814a90600 6a02 e82d0d1a00";
+const DWORD kFrontEndState = 0x00fae8da;    // byte: 0 LegalScreens, 1 IntroMovie, 2 PressStart, 3 MainMenu, ...
+const DWORD kMainState = 0x00e7ed60;        // dword: 1 level, 2 level load, 9 outfit selection, 10 front end
+const DWORD kMovieStop = 0x00a039b8;        // the player's stop byte (native f22 0x4a0f10 sets 1)
+const DWORD kMovieLoop = 0x00a039dc;        // the player's loop byte
+const DWORD kMoviePause = 0x00a039dd;       // the player's pause byte
+
 // ---- options (TruQoL.ini) ----
 int g_enabled = 1, g_logLevel = 1;
 int g_limitEnabled = 1, g_maxFps = 60, g_autoOff = 1, g_spinUs = 0;
@@ -126,6 +162,7 @@ float g_fov = 0.0f;                         // factor; 0 (or 1) = game
 int g_fovCutscenes = 0;
 float g_shakeScale = 1.0f;                  // read by ShakeStub
 int g_threadCap = 31;
+int g_skipIntro = 0;                        // 0.1.2: [Startup] SkipIntro (restart)
 
 char g_logPath[MAX_PATH], g_dir[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -270,6 +307,11 @@ bool g_otherLimiter = false;                // DetectLimiter: DXVK / dxwrapper l
 char g_otherWhat[24] = "";                  // "DXVK" / "dxwrapper" (for the log lines)
 bool g_detectPending = false, g_waitReady = false;
 void LiveTick();                            // 0.1.1, below
+// 0.1.2 SkipIntro (section 4 below): LimiterWait also runs its start-up latch once per frame
+bool g_movieHooked = false;                  // the call 0x77bc7b goes to MovieHook (patched once in DllMain)
+volatile LONG g_bootOver = 0;                // front-end state 2 or higher seen: no skip any more in this run
+volatile LONG g_moviesSkipped = 0;
+void BootCheck(BYTE frontEnd);
 DWORD g_clockFn = kClock;                   // ClockStub jumps here (the game's clock)
 // LogLevel 2: a line every 10 s
 LONGLONG g_statStart = 0, g_statWait = 0;
@@ -488,6 +530,7 @@ void SleepUntil(LONGLONG target) {
 // limiter is active; while it is not, the next active frame starts a new cadence (no wait for a slot of long ago)
 extern "C" void __cdecl LimiterWait() {
     LiveTick();
+    if (g_movieHooked && !g_bootOver) BootCheck(*reinterpret_cast<const volatile BYTE *>(kFrontEndState));
     if (g_detectPending) DetectLimiter();
     if (!LimitActive()) {
         g_next = 0;
@@ -752,6 +795,81 @@ void StartThreadCap() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// 4. start-up intro (0.1.2): [Startup] SkipIntro
+typedef int(__cdecl *VideoPlayFn)(const char *, int);
+VideoPlayFn g_videoPlay = reinterpret_cast<VideoPlayFn>(kVideoPlay);
+
+// the movie name for the log (script data: copied under SEH, at most 63 characters)
+void MovieName(const char *name, char *out, size_t n) {
+    out[0] = 0;
+    if (!name) { strcpy_s(out, n, "(null)"); return; }
+    __try {
+        size_t k = 0;
+        while (k + 1 < n && name[k]) {
+            const char c = name[k];
+            out[k] = (c >= 0x20 && c < 0x7f) ? c : '?';
+            ++k;
+        }
+        out[k] = 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        strcpy_s(out, n, "(unreadable)");
+    }
+}
+
+// game thread: the latch - once the front end has reached PressStart (2) or later, the start-up is over for good
+void BootCheck(BYTE frontEnd) {
+    if (frontEnd >= 2 && InterlockedExchange(&g_bootOver, 1) == 0)
+        Log(1, "SkipIntro: front-end state %u reached - start-up over, no more movies skipped in this run (%ld skipped)",
+            frontEnd, g_moviesSkipped);
+}
+
+// in place of `call 0x4a12b0` at 0x77bc7b (PlayMovie 0x77bc60, the script native f21; cdecl, the caller drops eax)
+int __cdecl MovieHook(const char *name, int loop) {
+    const BYTE frontEnd = *reinterpret_cast<const volatile BYTE *>(kFrontEndState);
+    const DWORD mainState = *reinterpret_cast<const volatile DWORD *>(kMainState);
+    BootCheck(frontEnd);
+    char movie[64];
+    if (!g_skipIntro || g_bootOver || frontEnd > 1 || mainState == 1 || mainState == 2 || mainState == 9) {
+        if (g_skipIntro && !g_bootOver && frontEnd <= 1) {
+            MovieName(name, movie, sizeof(movie));
+            Log(1, "SkipIntro: movie '%s' played - front-end state %u but main state %lu (level / load / selection)",
+                movie, frontEnd, mainState);
+        }
+        return g_videoPlay(name, loop);
+    }
+    // the player's own entry writes (0x4a12c0 .. 0x4a12cb), then its "cannot open" return (0x4a12df): the native
+    // returns at once, as after the last frame - the script goes on with its next line
+    *reinterpret_cast<volatile BYTE *>(kMovieStop) = 0;
+    *reinterpret_cast<volatile BYTE *>(kMovieLoop) = static_cast<BYTE>(loop);
+    *reinterpret_cast<volatile BYTE *>(kMoviePause) = 0;
+    InterlockedIncrement(&g_moviesSkipped);
+    MovieName(name, movie, sizeof(movie));
+    Log(1, "SkipIntro: movie '%s' skipped (front-end state %u = %s, main state %lu) - PlayMovie returns as for a file "
+           "that cannot be opened", movie, frontEnd, frontEnd ? "IntroMovie" : "LegalScreens", mainState);
+    return 0;
+}
+
+void StartSkipIntro() {
+    if (!g_skipIntro) {
+        Log(1, "Startup SkipIntro: off (SkipIntro=0) - the start-up intro movie plays (restart key)");
+        return;
+    }
+    if (!HexBytesAt(kPlayMovie, kPlayMovieHex) || !HexBytesAt(kVideoPlay, kVideoPlayHex) ||
+        !HexBytesAt(kMovieNative, kMovieNativeHex) || !HexBytesAt(kMovieBind, kMovieBindHex) ||
+        !HexBytesAt(kFrontEndGet, kFrontEndGetHex) || !HexBytesAt(kIntroCase, kIntroCaseHex)) {
+        Log(0, "Startup SkipIntro: off - PlayMovie 0x%08lx / video player 0x%08lx / front-end code do not match this "
+               "tru.exe (or another plugin patched them)", kPlayMovie, kVideoPlay);
+        return;
+    }
+    const DWORD site = kPlayMovieCall;
+    g_movieHooked = RedirectCalls(&site, 1, kVideoPlay, reinterpret_cast<DWORD>(&MovieHook), "Startup SkipIntro");
+    if (g_movieHooked)
+        Log(1, "Startup SkipIntro: on - the script's PlayMovie call 0x%08lx -> TruQoL: movies skipped only while the "
+               "front-end state 0x%08lx is 0 / 1 (before PressStart), never in a level; the legal screens stay",
+            kPlayMovieCall, kFrontEndState);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // 0.1.1 live keys (TruMenu page Fixes / TruMenu.switches.txt "live"): game thread, from LiveTick. Every read passes the
 // current value as its default (a missing key keeps it); one log line per change. Not here (restart): [TruQoL] Enabled,
 // [Startup] ThreadCap.
@@ -873,6 +991,7 @@ void ReadOptions() {
     g_fovCutscenes = IniInt("Camera", "FovCutscenes", 0, 0, 1);
     g_shakeScale = IniFloat("Camera", "ShakeScale", 1.0f, 0.0f, 1.0f);
     g_threadCap = IniInt("Startup", "ThreadCap", 31, 0, 31);
+    g_skipIntro = IniInt("Startup", "SkipIntro", 0, 0, 1);
 }
 
 void Start(HMODULE self) {
@@ -880,18 +999,20 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruQoL.log", g_dir);
     ReadOptions();
     Log(1, "%s loaded (enabled %d, log level %d; FrameLimit %d / %d fps / AutoOff %d, Fov %g / cutscenes %d, ShakeScale "
-           "%g, ThreadCap %d)", kVersion, g_enabled, g_logLevel, g_limitEnabled, g_maxFps, g_autoOff, g_fov,
-        g_fovCutscenes, g_shakeScale, g_threadCap);
+           "%g, ThreadCap %d, SkipIntro %d)", kVersion, g_enabled, g_logLevel, g_limitEnabled, g_maxFps, g_autoOff, g_fov,
+        g_fovCutscenes, g_shakeScale, g_threadCap, g_skipIntro);
     if (!g_enabled) { Log(1, "disabled by TruQoL.ini ([TruQoL] Enabled=0) - nothing patched"); return; }
     const DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - nothing patched", base, kImageBase); return; }
     StartThreadCap();                        // first: the CPU count runs in WinMain, soon after the plugins are loaded
     StartFrameLimit();
     StartCamera();
+    StartSkipIntro();                        // 0.1.2: before WinMain, so no movie can be playing yet
     g_iniTimeOk = IniTime(&g_iniTime);       // 0.1.1: the live tick reads again only after a change of TruQoL.ini
     if (g_limitHooked)
         Log(1, "live: TruQoL.ini is read again at most once a second when it changes (LogLevel, FrameLimit Enabled / "
-               "MaxFps / AutoOff / SpinUs, Camera Fov / FovCutscenes / ShakeScale; restart: Enabled, ThreadCap)");
+               "MaxFps / AutoOff / SpinUs, Camera Fov / FovCutscenes / ShakeScale; restart: Enabled, ThreadCap, "
+               "SkipIntro)");
 }
 
 }  // namespace
@@ -906,7 +1027,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 extern "C" __declspec(dllexport) const char *TruQoLVersion() {
-    return "TruQoL 0.1.1 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
-           "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0; live "
-           "INI re-read once a second for TruMenu page Fixes)";
+    return "TruQoL 0.1.2 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
+           "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0, start-up "
+           "intro skip at the script's PlayMovie call 0x77bc7b; live INI re-read once a second for TruMenu page Fixes)";
 }

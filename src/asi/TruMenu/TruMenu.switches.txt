@@ -178,3 +178,5 @@ TruQoL | Camera | Fov | choice:0,0.9,1.0,1.1,1.15,1.2,1.3 | Sichtfeld-Faktor | F
 TruQoL | Camera | FovCutscenes | bool | Sichtfeld auch in Zwischensequenzen | FOV in cutscenes too | live | 0 | 0 = nur Spielkamera, Sequenzen unverändert // 0 = gameplay camera only, cutscenes unchanged | TruQoL 0.1.1
 TruQoL | Camera | ShakeScale | choice:0,0.25,0.5,0.75,1.0 | Kamera-Wackeln (1.0 = Spiel) | Camera shake (1.0 = game) | live | 1.0 | Unter 1.0 ist TruMenus Wackel-Regler gesperrt // Below 1.0 TruMenu's shake slider is refused | TruQoL 0.1.1
 TruQoL | Startup | ThreadCap | int:0..31 | Start-Fix über 31 CPU-Threads | Start fix above 31 CPU threads | restart | 31 | Wirkt nur mit mehr Threads; 0 = aus (Absturz) // Acts only with more threads; 0 = off (start-up crash) | TruQoL 0.1.1
+# 2026-11-08 (18c): TruQoL 0.1.2 - SkipIntro is patched once at the start (restart); default 0 until seen in the game
+TruQoL | Startup | SkipIntro | bool | Start-Intro überspringen | Skip start-up intro | restart | 0 | Nur Intro-Film vor Press Start; Rechtstexte bleiben // Intro movie before Press Start only; legal screens stay | TruQoL 0.1.2

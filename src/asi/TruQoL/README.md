@@ -2,16 +2,17 @@
 
 A small ASI plugin for the **PC** `tru.exe` (Steam, Tomb Raider: Underworld 1.1, unpacked) with **comfort options for
 players**: a frame limiter, a field-of-view factor, a camera-shake factor (motion sickness) and the fix for the
-start-up crash on PCs with more than 31 CPU threads. TruMenu stays the debug tool; TruQoL holds only switches a player
+start-up crash on PCs with more than 31 CPU threads; 0.1.2: an optional skip of the start-up intro movie. TruMenu stays the debug tool; TruQoL holds only switches a player
 wants, each with its own INI key (owner decision 2026-11-08). Defaults: **frame limiter on at 60 fps**, the camera
 options neutral (= the game's behaviour), the thread cap on at 31 (it only acts on PCs where the game would crash).
 
-**Status TruQoL 0.1.1: built 2026-11-08 (`work\asi\qol011`), not installed, not played.** 0.1 (`work\asi\qol01`) was
-the first build; 0.1.1 reads the live keys again while the game runs (TruMenu page "Fixes", group "Komfort (TruQoL)").
+**Status TruQoL 0.1.2: built 2026-11-08 (`work\asi\qol012`), not installed, not played.** 0.1 (`work\asi\qol01`) was
+the first build; 0.1.1 (`work\asi\qol011`) reads the live keys again while the game runs (TruMenu page "Fixes", group
+"Komfort (TruQoL)"); 0.1.2 adds `[Startup] SkipIntro` (skip the start-up intro movie, default off - see below).
 Everything below is proven statically (disassembly of the installed `tru.exe`, md5 `5560abac...`, and `binkw32.dll`);
 nothing is seen in game yet.
 
-Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\qol011` (check first with `-Check`, remove with
+Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\qol012` (check first with `-Check`, remove with
 `-Remove` / `-Restore`). The Ultimate ASI Loader the game ships as `binkw32.dll` loads every `*.asi` next to `tru.exe`;
 ModLoader.asi is just another plugin of that loader. Log: `TruQoL.log` next to `tru.exe`, one line per feature (on /
 off / why).
@@ -30,6 +31,7 @@ off / why).
 | `[Camera]` | `FovCutscenes` | 0 | 0 / 1 | live | 0 = only the gameplay camera, cutscenes keep their framing; 1 = every camera |
 | `[Camera]` | `ShakeScale` | 1.0 | 0 .. 1.0 | live | camera shake strength: 1.0 = the game's, 0 = no camera shakes |
 | `[Startup]` | `ThreadCap` | 31 | 0 .. 31 | restart | the game's CPU count sees at most this many threads (only when the PC has more); 0 = off - acts once, before WinMain |
+| `[Startup]` | `SkipIntro` | 0 | 0 / 1 | restart | 0.1.2: 1 = skip the start-up intro movie (only before the "press start" screen, never in a level; the legal screens stay); patched once at the start |
 
 Invalid values are logged and replaced by the default (at the start) or keep the current value (live). Every engine
 address is byte-checked before it is patched; on a mismatch that feature stays off and the log says why.
@@ -51,7 +53,7 @@ keeps it); **one log line per change** (`live: [Section] Key old -> new ...`).
 | `[Camera] Fov` / `FovCutscenes` | the FOV call 0x5cb0a8 is patched **once at the start** whenever its code matches (also `Fov=0`); `FovHook` returns the game's value while the factor is 0 or 1. Not patched at run time: it is render code and its thread is not proven |
 | `[Camera] ShakeScale` | the 0.1 rule kept live: TruQoL owns the shake calls 0x5eea55 / 0x5eb56d **only while ShakeScale < 1.0**. A change to < 1.0 points both to `ShakeStub` - only while both still call the game's 0x5eb460 (TruMenu's `cam.shakescale` below 100 % holds them: refused with one line, tried again at the next change of the key); a change to 1.0 puts the game's target back (only while both still call `ShakeStub`) and TruMenu's slider may take them again (move it once more: TruMenu retries only after a change). These two rel32 writes run on the game thread, as TruMenu's own run-time patch of the same two sites (`M21PatchGroup` from its pad hook) and TruShadowCombat's `[Damage] Translate` switch |
 | `[TruQoL] LogLevel` | the next line uses the new level; the change line itself is always written |
-| `[TruQoL] Enabled`, `[Startup] ThreadCap` | **restart**: `Enabled=0` patches nothing (no tick); the CPU count runs once in WinMain |
+| `[TruQoL] Enabled`, `[Startup] ThreadCap`, `[Startup] SkipIntro` (0.1.2) | **restart**: `Enabled=0` patches nothing (no tick); the CPU count runs once in WinMain; the intro plays once, right after the start, so the movie call is patched in DllMain or not at all |
 
 Without the clock hook (bytes differ, another plugin owns the calls) there is no tick: every key takes effect at the
 next start (logged once).
@@ -68,6 +70,37 @@ next start (logged once).
 | ThreadCap | **0x4a2238** `call [0x83e0a8]` (GetProcessAffinityMask, its only use in tru.exe) -> `call CappedAffinity; nop` | CPU topology count **0x4a21d0**: unequal process / system mask -> returns 8 at once (0x4a2244, why `start /affinity FFFF` helps); else for mask = 1 << i while mask <= system mask: SetThreadAffinityMask, APIC ids into 256-byte stack arrays; step 0x4a2455 `shl eax, cl` shifts modulo 32 -> with bit 31 set (>= 32 threads; a 32-bit process sees 0xffffffff) the loop never ends and **0x4a235d** `mov [ebp+edi+0x284], al` writes past the array (0xc0000409, `tru+0xa235d` in `scripts\windows\README.md`) | both masks are capped to `(1 << ThreadCap) - 1` only when the system mask has a higher bit, so the loop ends at bit ThreadCap; after the count WinMain pins the main thread to CPU 0 (0x47a0c9), so the capped mask the count restores (0x4a2477) does not last |
 | ThreadCap: early enough? | DllMain of TruQoL | the count runs once: WinMain 0x479c80 -> 0x47a0bb -> 0x4a28e0 -> 0x4a2904 -> 0x4a21d0. The CRT start 0x818241 calls GetStartupInfoA at **0x818255** before it calls WinMain at 0x8183b3 (-> 0x47a280 -> 0x479c80). `binkw32.dll` = Ultimate ASI Loader: `dontloadfromdllmain` defaults to 1 (`mov edx, 1` at 0x1001ade8 before the key), then 0x1001a570 hooks the exe's imports GetStartupInfoA/W, GetModuleHandle, GetProcAddress, ... and loads the plugins at the first such call; no loader `.ini` in the game folder | the plugins (and TruQoL's patch) are in place before WinMain - **implemented**; the launcher work-around stays documented for ThreadCap=0 |
 
+## SkipIntro (0.1.2): how the script learns that a movie ended
+
+Question of package 18b: does the front-end script wait for a "movie finished" signal, so that an early return must
+fake it? Answer (static, `work\skip18c_0811`): **no signal exists - the movie call is synchronous.** The script's
+native returns only when the movie is over, so a native that returns at once is, for the script, a movie that ended at
+once. TruQoL returns exactly as the game does for a movie file that cannot be opened.
+
+| What | Address | Proof | St |
+|---|---|---|---|
+| Script native PlayMovie | uigamedata f21 **0x7a0cf0** (binder 0x7af0c0 `push 0x7a0cf0; push 0x15` at 0x7af1f3) | `mov eax, [esp+0xc]; push eax; call 0x77bc60; pop ecx; ret` - no write to the result pointer `[esp+0x10]` (natives with a result write it, e.g. f13 GetFrontEndState 0x7a0c40) | ✅ static |
+| PlayMovie | **0x77bc60** (only caller 0x7a0cf5; no other reference) | name pointer != 0 -> 0x6457a0 (= `ret`, a log stub), 0x5f6420 (= `mov eax, 1; ret`), **`call 0x4a12b0` at 0x77bc7b** (name, loop 0), `add esp, 0xc`, tail jump to the log stub: the player's result is dropped | ✅ static |
+| Video player | **0x4a12b0** (name, loop) | entry writes stop byte 0xa039b8 = 0, loop byte 0xa039dc, pause byte 0xa039dd = 0; open 0x4a0c70 (4:3 name variant, then the plain name via 0x4a0b00) -> **cannot open: return 0 at 0x4a12df**; else its OWN frame loop 0x4a13c0 .. 0x4a14fb (frame time 0x5da230, UI 0x5cebc0 / 0x5c5a30, BinkDoFrame / BinkNextFrame) until the last frame (0x4a0ae0: handle +0xc == +0x8, not looping), the stop byte (f22 0x4a0f10 sets 1), a skip press (ebp = 1, 0x4a1492 .. 0x4a14cf) or a lost device (0x47afd0); then BinkClose (0x83e404), handle 0xa039bc = 0, result 1 / 0 | ✅ static |
+| Who else reads the movie state | 0xa039bc, 0x4a0ae0, 0xa039dc, 0xa039dd | every use lies inside the video code 0x4a0a00 .. 0x4a15ff (tools/pe_abs_uses.py): nothing outside polls "movie playing / finished" | ✅ static |
+| Code-played movies (untouched) | 0x5d5554 (attract list 0x8abef4 = "intro", state 6 -> 7, then 2), 0x5daf3e (states 2 / 3: menu loop [0x8abf20] = "medsea_loop", loop 1), 0x5db008 (state 8: "explode"), 0x5d6b39 / 0x5dab0f (queue 0xe7ece0, extras / level) | they call 0x4a12b0 directly, not through 0x77bc7b | ✅ static |
+| Front-end state 1 | handler 0x5dae86 in 0x5dae20 | `push ecx; call 0x6457a0; push 2; call 0x77bbc0`: the code moves IntroMovie -> PressStart by itself; state 0 is not in the code switch (0x5dae7f: index state - 1, 8 cases), i.e. the script runs the legal screens | ✅ static |
+| Movies on disk | `Movies\` of the game: intro, medsea_loop, credits, credits_DLC1, explode, prevontr (.bik) | no logo / legal movie -> the legal screens are no movie and are **not** skipped (setting the state from outside does not stop the script's own screen timer - not proven safe) | ✅ (file list) |
+
+The hook: the rel32 of `call 0x4a12b0` at **0x77bc7b** -> `MovieHook(name, loop)` (patched once in DllMain, only with
+`SkipIntro=1`, after a byte check of PlayMovie, the player's entry, the native, its binder entry, the front-end getter
+and the state-1 handler; the call must still go to 0x4a12b0). `MovieHook` skips only while **all** hold: front-end
+state `[0xfae8da]` is 0 or 1, main state `[0xe7ed60]` is not 1 / 2 / 9 (level, level load, outfit selection) and
+state 2 or higher was never seen in this run (latch, checked at each movie call and once per frame in the clock hook).
+A skip writes the player's three entry bytes as the player would and returns 0 - the game's "cannot open" path. Every
+other call goes to 0x4a12b0 unchanged. Log: one line per skipped movie with its name and both states, one line when the
+latch closes.
+
+Why default 0: everything above is static; the intro movie has not been skipped in the game yet (TO TEST 12). Open
+points it may show: whether the script plays the intro in state 0 or 1 (both are covered), whether the main state at
+that time is one of 1 / 2 / 9 (then nothing is skipped and the log says why), and whether the front end loads
+something behind the intro (then "press start" comes a little later, as with a missing intro.bik).
+
 Coexistence: TruQoL hooks no D3D9 function (TruMenu's Present / Reset hook, TRAWindowed / DXVK / dxwrapper as
 `d3d9.dll` are not touched). TruShadowPower checks 0x5da3f4 / 0x5da40c and TruMenu 0x5da40c in the same function; TruQoL
 changes only the two clock calls. With `ShakeScale` below 1.0 TruQoL owns the two shake calls and TruMenu's
@@ -81,9 +114,10 @@ with 0.1.1 (TruMenu.switches.txt, group "Komfort (TruQoL)").
 
 ## TO TEST
 
-1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol011`; start the game (affinity work-around still in the
-   launch options for the first run); `TruQoL.log`: the loaded line (`TruQoL 0.1.1`), `Startup ThreadCap: on, 31`,
-   `FrameLimit: on, 60 fps`, `Camera Fov: off ... pass-through`, `Camera ShakeScale: off`, `live: TruQoL.ini is read
+1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol012`; start the game (affinity work-around still in the
+   launch options for the first run); `TruQoL.log`: the loaded line (`TruQoL 0.1.2`), `Startup ThreadCap: on, 31`,
+   `FrameLimit: on, 60 fps`, `Camera Fov: off ... pass-through`, `Camera ShakeScale: off`, `Startup SkipIntro: off`,
+   `live: TruQoL.ini is read
    again ...`, then `FrameLimit: d3d9.dll = ...TRAWindowed...` (TRAWindowed installed) and `Startup ThreadCap: CPU count
    1 - ... unchanged` (fewer than 32 threads here).
 2. Frame rate: `LogLevel=2`; in a level and in the main menu about 60 fps in the 10 s lines (`waited ... ms per frame`
@@ -110,12 +144,21 @@ with 0.1.1 (TruMenu.switches.txt, group "Komfort (TruQoL)").
     (line names the foreign target); slider back to 100 %, `ShakeScale` 0.25: patched. After `ShakeScale` 1.0 TruMenu's
     slider works again (move it once). `[TruQoL] Enabled` / `ThreadCap` in the page show "Neustart" and do nothing live.
 11. With DXVK as `d3d9.dll`: `AutoOff` 1 -> 0 -> 1 live: TruQoL's limiter waits as well / stops again.
+12. SkipIntro (0.1.2): first with `SkipIntro=0`: the log has `Startup SkipIntro: off`, the intro plays as before. Then
+    `SkipIntro=1` (TruMenu page Fixes shows "Neustart"; restart the game): log `Startup SkipIntro: on`, then `SkipIntro:
+    movie 'intro' skipped (front-end state 1 = IntroMovie, main state N)` (note N and the name) and `front-end state 2
+    reached`; the legal screens still show, then "press start" without the intro, the menu background movie
+    (medsea_loop) runs; music / sound normal; New Game and Load work. Back to the main menu from a level and wait for the
+    attract mode: the attract "intro" plays (not skipped). If instead a line says `played - ... main state N`, the gate
+    was too strict (report N).
 
 ## Files
 
 `TruQoL.cpp` (source; the comment block at the top holds the evidence in short), `TruQoL.ini` (sample with the
-defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol011`. Offline checks:
+defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol012`. Offline checks:
 `work\qol17x_0811\check_qol01.py` (0.1: bytes, call targets, the start-up order, the loader default, the build, INI,
 README, install script) with negative tests `work\qol17x_0811\make_negative_qol01.py`; for 0.1.1
 `work\qol17y_0811\check_qol011.py` (the same plus the live logic: tick, gates, ShakeApply, the switches rows) with
-`work\qol17y_0811\make_negative_qol011.py`.
+`work\qol17y_0811\make_negative_qol011.py`; for 0.1.2 `work\skip18c_0811\check_qol012.py` (the same plus SkipIntro:
+the movie chain, the player's open-failure path, the gates, the restart row) with
+`work\skip18c_0811\make_negative_qol012.py`.
