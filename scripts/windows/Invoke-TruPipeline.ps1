@@ -150,6 +150,10 @@
     (audio, comparisons) -LightJobs. 0 = automatic: Jobs = (free RAM - 8 GB) / 18 GB, between 1 and 3;
     LightJobs = logical CPUs - 4, at most 24 (cores left for other work). Passed as TRUDLC_JOBS / TRUDLC_JOBS_LIGHT.
 
+    -ShaderGate (2026-11-08): steps Fixes and Repair run tools\shader_form_gate.py on each output tree (ABS_CONST,
+    SINCOS_SAME, X5584, ERR in port shaders; report <tree>\shader_form_check.json). Report (default for now) only
+    lists them, Enforce makes a hard form fail the step (exit 1).
+
     -Verbose shows steps, -Debug the command lines, -Trace adds a PowerShell line trace.
 
 .EXAMPLE
@@ -171,6 +175,7 @@ param(
     # (Costumes: work/rebuild/costumes; Generalbank / Repair: work/rebuild/generalbank_build, b138_pristine, b138_fixes)
     # (one folder directly below work/rebuild; never a test tree dlc_test*)
     [ValidatePattern('^work[\\/]rebuild[\\/](?!dlc_test)[\w\-\.]+[\\/]?$')][string]$FixesOut,
+    [ValidateSet('Report', 'Enforce')][string]$ShaderGate = 'Report',
     [switch]$Trace
 )
 
@@ -217,6 +222,9 @@ $gen1 = (Split-Path -Parent $fix1) + '/genintro_check.json'
 $gen2 = (Split-Path -Parent $fix2) + '/genintro_check.json'
 $ext2 = (Split-Path -Parent $fix2) + '/exttuning_check.json'
 $thrall2 = (Split-Path -Parent $fix2) + '/thrall_extension_check.json'
+$sg1 = (Split-Path -Parent $fix1) + '/shader_form_check.json'
+$sg2 = (Split-Path -Parent $fix2) + '/shader_form_check.json'
+$sgEnforce = if ($ShaderGate -eq 'Enforce') { @('--enforce') } else { @() }
 $voMd5 = (Split-Path -Parent $fix2) + '/vo_lang_md5.tsv'
 $vo2 = (Split-Path -Parent $fix2) + '/vo_lang_check.json'
 $gbOut = 'work/rebuild/generalbank_build'
@@ -365,6 +373,8 @@ $steps = @{
         @('tools\chunkdoll_record_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $chunk1),
         @('tools\melee_link_record_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $melee1),
         @('tools\generator_intro_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $gen1),
+        # shader form gate (2026-11-08): the forms Windows' D3D9 or a GPU driver refuses (-ShaderGate)
+        (@('tools\shader_form_gate.py', 'check', $fix1, '--list', '3', '--report', $sg1) + $sgEnforce),
         @('tools\compare_b138.py', $fix1, $cmp1),
         @('tools\dlc_fixes_build.py', 'work/rebuild/dlc2_asm_stage2a/mods', $fix2, '--pack', 'pack11'),
         # doppelganger language variants (2026-11-08, no DRM step): <stream>.mul_NNN of the 4 localised DLC 2 voice
@@ -380,7 +390,8 @@ $steps = @{
         @('tools\thrall_extension_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $thrall2),
         @('tools\melee_link_record_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $melee2),
         @('tools\generator_intro_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $gen2),
-        @('tools\vo_lang_variants.py', 'check', $fix2, 'pack11', '--expect', $voMd5, '--report', $vo2)
+        @('tools\vo_lang_variants.py', 'check', $fix2, 'pack11', '--expect', $voMd5, '--report', $vo2),
+        (@('tools\shader_form_gate.py', 'check', $fix2, '--list', '3', '--report', $sg2) + $sgEnforce)
     )
     Costumes = $costumeTools
     Repair = @(
@@ -397,7 +408,8 @@ $steps = @{
         @('tools\globalinfo_player_list_fix.py', '--verify', "$repFixes/generalbank.drm", '--report', ((Split-Path -Parent $repFixes) + '/player_list_check.json')),
         @('tools\vo_lang_variants.py', 'check', $repFixes, 'pack11', '--report', ((Split-Path -Parent $repFixes) + '/vo_lang_check.json')),
         @('tools\generator_intro_fix.py', 'scan', "$repPristine,$repFixes", '--pack', 'pack10', '--report', ((Split-Path -Parent $repFixes) + '/genintro_check.json')),
-        @('tools\dlc_struct_fixes.py', 'check', "$repPristine,$repFixes", '--steps', 'costumedtp,dspkind', '--pack', 'pack10', '--report', ((Split-Path -Parent $repFixes) + '/datafix_check.json'))
+        @('tools\dlc_struct_fixes.py', 'check', "$repPristine,$repFixes", '--steps', 'costumedtp,dspkind', '--pack', 'pack10', '--report', ((Split-Path -Parent $repFixes) + '/datafix_check.json')),
+        (@('tools\shader_form_gate.py', 'check', $repFixes, '--list', '3', '--report', ((Split-Path -Parent $repFixes) + '/shader_form_check.json')) + $sgEnforce)
     )
     Generalbank = @(
         @('tools\generalbank_build.py', $gbOut),

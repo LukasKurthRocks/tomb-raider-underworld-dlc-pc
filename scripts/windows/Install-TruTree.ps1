@@ -20,6 +20,11 @@
     -Force   with -Restore: restore even when installed files were changed; the changed files are first saved
              to <backup>\overwritten_<time>\<path> (+ forced_restore.json) and the override is logged as WARN.
 
+    -ShaderGate (2026-11-08) checks the shader libraries of the source tree with tools\shader_form_gate.py before
+             -Check returns and before anything is copied: ABS_CONST, SINCOS_SAME, X5584 and ERR in port shaders.
+             Report (default for now) logs them as WARN, Enforce refuses the install, Off skips the check. Needs
+             <workspace>\bin\venv; the counts also go to logs\Install-TruTree_<time>_shader_gate.json.
+
     -Exclude defaults to 'local','padshock': the installed string tables carry the DLC menu text fix
     (docs/DLC_MENU.md) and would be overwritten by tables without it; padshock is the same file.
     The game folder is taken from the Steam libraries (app 8140) unless -GamePath is given.
@@ -44,6 +49,7 @@ param(
     [string]$BackupName,
     [string]$GamePath,
     [switch]$Force,
+    [ValidateSet('Report', 'Enforce', 'Off')][string]$ShaderGate = 'Report',
     [switch]$Trace
 )
 
@@ -169,6 +175,36 @@ try {
         $files.Count, $nAdd, $nRep, $same, $skipped, ($Exclude -join ', '))
     foreach ($p in ($plan | Where-Object { $_.Action -eq 'replace' })) { Write-Log "replace   mods\$($p.Rel)" }
     foreach ($p in ($plan | Where-Object { $_.Action -eq 'add' })) { Write-Log "add       mods\$($p.Rel)" -Level VERBOSE }
+
+    # shader form gate (2026-11-08): the forms Windows' D3D9 or a GPU driver refuses, in the shaders of this tree
+    if ($ShaderGate -ne 'Off' -and @($files | Where-Object { $_.Extension -eq '.drm' }).Count) {
+        $gatePy = Join-Path $root 'bin\venv\Scripts\python.exe'
+        $gateTool = Join-Path $paths.Repository 'tools\shader_form_gate.py'
+        $gateReport = Join-Path $logDir ('Install-TruTree_{0}_shader_gate.json' -f $stamp)
+        if (!(Test-Path -LiteralPath $gatePy) -or !(Test-Path -LiteralPath $gateTool)) {
+            $msg = "Shader gate: $gatePy or $gateTool missing - shaders not checked."
+            if ($ShaderGate -eq 'Enforce') { throw $msg }
+            Write-Log $msg -Level WARN
+        } else {
+            $gateArgs = @('-u', '-I', '-X', 'utf8', $gateTool, 'check', $src, '--list', '3', '--report', $gateReport)
+            if ($ShaderGate -eq 'Enforce') { $gateArgs += '--enforce' }
+            Write-Log ('python {0}' -f ($gateArgs -join ' ')) -Level DEBUG
+            # PowerShell 5.1 turns stderr lines of a native command into error records - not fatal here
+            $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            try { $gateOut = @(& $gatePy @gateArgs 2>&1 | ForEach-Object { "$_" }); $gateExit = $LASTEXITCODE }
+            finally { $ErrorActionPreference = $eap }
+            foreach ($line in $gateOut) { Write-Log "  gate: $line" -Level VERBOSE }
+            $verdict = @($gateOut | Where-Object { $_ -like 'gate: *' }) | Select-Object -Last 1
+            if ($gateExit -eq 0 -and $verdict -like 'gate: PASS*') {
+                Write-Log "Shader gate ($ShaderGate): $verdict"
+            } elseif ($ShaderGate -eq 'Enforce') {
+                throw "Shader gate refused the tree (exit $gateExit): $verdict - see $gateReport"
+            } else {
+                Write-Log "Shader gate ($ShaderGate, exit $gateExit): $verdict - see $gateReport" -Level WARN
+            }
+        }
+    }
+
     if ($Check) { Write-Log 'Check only - nothing changed.'; return }
     if (!$plan.Count) { Write-Log 'Nothing to install.'; return }
     $open = @(Get-ChildItem -LiteralPath $backupDir -Directory -Filter 'tree_*' | Where-Object { $_.Name -notlike '*.restored' })
