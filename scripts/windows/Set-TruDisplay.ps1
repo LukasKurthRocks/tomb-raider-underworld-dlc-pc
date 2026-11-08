@@ -24,8 +24,21 @@
     Every run writes <workspace>\logs\Set-TruDisplay_<time>.log. -Verbose shows steps, -Debug the values before/after,
     -Trace adds a PowerShell line trace.
 
+    Graphics options (2026-11-08, player reports collected in the QoL research; registry values of the Graphics key, all
+    DWORD; without -Windowed / -Fullscreen only these values change, the display mode and d3d9.dll stay as they are):
+    -DepthOfField On|Off       EnableDepthOfField (in the PC game, but the options menu has no switch for it)
+    -FullscreenEffects On|Off  EnableFullscreenEffects (the in-game "fullscreen effects" option)
+    -AspectRatio Auto|W:H      AspectRatio = width / height x 10000 (16:9 = 17777); Auto = the primary screen. Needed for
+                               21:9 / 32:9 / multi-screen; the in-game options overwrite it again; a display width of
+                               4096 or more is reported not to start (warning only)
+    -StutterFix                DontDeferShaderCreation = 0 and DisableDynamicTextures = 0 (stutter / slow loading fix
+                               from PCGamingWiki and Steam guides)
+    -Check                     dry run: logs the planned values, writes nothing (no backup, no d3d9.dll change)
+
 .EXAMPLE
     .\Set-TruDisplay.ps1 -Windowed -Verbose
+.EXAMPLE
+    .\Set-TruDisplay.ps1 -DepthOfField On -AspectRatio Auto -StutterFix -Check -Verbose
 #>
 [CmdletBinding(DefaultParameterSetName = 'Windowed')]
 param(
@@ -36,6 +49,14 @@ param(
     [Parameter(ParameterSetName = 'Restore', Mandatory)][switch]$Restore,
     [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
     [ValidateSet('English', 'French', 'German', 'Italian', 'Spanish', 'Dutch')][string]$Language,
+    [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
+    [ValidateSet('On', 'Off')][string]$DepthOfField,
+    [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
+    [ValidateSet('On', 'Off')][string]$FullscreenEffects,
+    [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
+    [ValidatePattern('^(Auto|\d{1,5}:\d{1,5})$')][string]$AspectRatio,
+    [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')][switch]$StutterFix,
+    [switch]$Check,
     [string]$GamePath,
     [switch]$Trace
 )
@@ -56,7 +77,8 @@ $languageIds = @{ English = 0; French = 1; German = 2; Italian = 3; Spanish = 4;
 $backupDir = Join-Path $root 'backup'
 $logDir    = $paths.Logs
 $stamp    = Get-Date -Format 'yyyyMMdd_HHmmss'
-$valueNames = 'Fullscreen', 'LockWindowSize', 'LockWindowResolution', 'LockWindowAspect', 'LockedWindowWidth', 'LockedWindowHeight', 'EnableVSync', 'AdapterID'
+$valueNames = 'Fullscreen', 'LockWindowSize', 'LockWindowResolution', 'LockWindowAspect', 'LockedWindowWidth', 'LockedWindowHeight', 'EnableVSync', 'AdapterID',
+    'EnableDepthOfField', 'EnableFullscreenEffects', 'AspectRatio', 'DontDeferShaderCreation', 'DisableDynamicTextures'
 # TRAWindowed as downloaded by Get-Tools.ps1
 $windowerDll = Join-Path $root 'bin\trawindowed-1.9.0\d3d9.dll'
 
@@ -81,6 +103,36 @@ function Set-GameLanguage {
     $id = $languageIds[$Language]
     Set-ItemProperty -LiteralPath $rootPath -Name 'Language' -Value $id -Type DWord
     Write-Log "Language set to $Language ($id)."
+}
+
+# graphics options -> ordered list of (value name, DWORD); empty when none was given
+function Get-GraphicsPlan {
+    $plan = [ordered]@{}
+    if ($DepthOfField) { $plan['EnableDepthOfField'] = [int]($DepthOfField -eq 'On') }
+    if ($FullscreenEffects) { $plan['EnableFullscreenEffects'] = [int]($FullscreenEffects -eq 'On') }
+    if ($AspectRatio) {
+        if ($AspectRatio -eq 'Auto') {
+            Add-Type -AssemblyName System.Windows.Forms
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $w = $bounds.Width; $h = $bounds.Height
+        } else {
+            $w = [int]($AspectRatio -split ':')[0]; $h = [int]($AspectRatio -split ':')[1]
+        }
+        if ($h -le 0 -or $w -le 0) { throw "AspectRatio: width and height must be above 0 ($AspectRatio)." }
+        if ($w -ge 4096) { Write-Log "Display width $w >= 4096: the game is reported not to start at such widths." -Level WARN }
+        $plan['AspectRatio'] = [int][math]::Floor($w * 10000.0 / $h)
+        Write-Log ('AspectRatio {0} -> {1} x {2} -> {3}' -f $AspectRatio, $w, $h, $plan['AspectRatio']) -Level VERBOSE
+    }
+    if ($StutterFix) { $plan['DontDeferShaderCreation'] = 0; $plan['DisableDynamicTextures'] = 0 }
+    return $plan
+}
+
+function Set-GraphicsOptions {
+    param($Plan)
+    foreach ($name in $Plan.Keys) {
+        Set-ItemProperty -LiteralPath $regPath -Name $name -Value $Plan[$name] -Type DWord
+        Write-Log ('{0} = {1}' -f $name, $Plan[$name])
+    }
 }
 
 function Get-Sha256 {
@@ -142,6 +194,7 @@ try {
     Write-Log "Game folder: $GamePath" -Level VERBOSE
 
     if ($Restore) {
+        if ($Check) { Write-Log 'Check: -Restore would remove TRAWindowed and re-import the first backup .reg - nothing changed.'; return }
         Remove-Windower
         $first = Get-ChildItem -LiteralPath $backupDir -Filter 'TRU-Graphics_*.reg' | Sort-Object Name | Select-Object -First 1
         if (!$first) { throw "No TRU-Graphics_*.reg backup in $backupDir." }
@@ -158,6 +211,19 @@ try {
     }
 
     Write-Values 'before'
+    $graphicsPlan = Get-GraphicsPlan
+    $modeGiven = [bool]($Windowed -or $Fullscreen)
+    if ($Check) {
+        if ($modeGiven) { Write-Log ('Check: display mode would be set: {0}' -f $(if ($Fullscreen) { 'fullscreen' } else { "windowed $Width x $Height" })) }
+        if ($Language) { Write-Log "Check: language would be set to $Language." }
+        $current = Get-ItemProperty -LiteralPath $regPath
+        foreach ($name in $graphicsPlan.Keys) {
+            Write-Log ('Check: {0} {1} -> {2}' -f $name, $current.$name, $graphicsPlan[$name])
+        }
+        if (!$modeGiven -and !$Language -and !$graphicsPlan.Count) { Write-Log 'Check: nothing given.' }
+        Write-Log 'Check only - nothing changed.'
+        return
+    }
     $backupFile = Join-Path $backupDir "TRU-Graphics_$stamp.reg"
     Invoke-Reg @('export', $regNative, $backupFile, '/y')
     Write-Log "Backup: $backupFile" -Level VERBOSE
@@ -167,6 +233,7 @@ try {
         Write-Log "Backup: $rootBackup" -Level VERBOSE
     }
     Set-GameLanguage
+    Set-GraphicsOptions $graphicsPlan
 
     if ($Fullscreen) {
         Remove-Windower
@@ -175,8 +242,8 @@ try {
         Write-Log 'Fullscreen mode set.'
         return
     }
-    if (!$Windowed -and $Language) {
-        # only -Language given (default parameter set): change the language, leave the display mode and d3d9.dll alone
+    if (!$Windowed -and ($Language -or $graphicsPlan.Count)) {
+        # only -Language / graphics options given (default parameter set): leave the display mode and d3d9.dll alone
         Write-Values 'after'
         Write-Log 'Display mode unchanged (no -Windowed / -Fullscreen).'
         return

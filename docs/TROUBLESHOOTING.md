@@ -8,7 +8,11 @@ boxes, ragdolls and physics puzzles can break, in the base game and even more in
 - in-game V-Sync on a 60 Hz display;
 - the frame limiter of your GPU driver (NVIDIA Control Panel → *Max Frame Rate*, AMD *Frame Rate Target Control*) or RTSS;
 - [dxwrapper](https://github.com/elishacloud/dxwrapper) with `LimitPerFrameFPS = 60`;
-- dgVoodoo2 (see below), which also has an `FPSLimit` option.
+- dgVoodoo2 (see below), which also has an `FPSLimit` option;
+- DXVK (see below) already caps this game at 60 fps by itself: its built-in profile for `tru.exe` sets `d3d9.maxFrameRate = -60`.
+
+V-Sync alone is not enough on a 120 / 144 Hz display. The GOG version of the game ships a 60 fps cap since March 2025; the
+Steam version does not. A player-side plugin with a built-in 60 fps cap (`TruQoL`) is in progress on the `windows` branch.
 
 ## "A problem has occurred with your display driver"
 
@@ -63,6 +67,27 @@ If the test reports 0 rejected port shaders and the box still appears, run `RUN_
 
 - It also draws with every shader and can reset the screen once.
 - If the driver resets, `native_progress.txt` names the shader that was being drawn.
+
+## Known problems of the original PC game
+
+Collected from player reports (PCGamingWiki, Steam discussions and guides, Tomb Raider Chronicles; 8 Nov 2026). They are
+problems of Tomb Raider: Underworld itself, not of the DLC port. Most need no tool; the registry values below can be set
+with `scripts/windows/Set-TruDisplay.ps1` (it saves a backup first; add `-Check` to see the change without writing it).
+
+| Problem | What helps |
+|---|---|
+| Crash at start-up on CPUs with more than 31 threads | Steam launch option `cmd /c start "" /affinity FFFF %command%` (see `scripts/windows/README.md`) |
+| White screen or hang in the first cutscene / at the end of the tutorial | registry `DontDeferShaderCreation` = 0 and `DisableDynamicTextures` = 0 (`Set-TruDisplay.ps1 -StutterFix`); Steam overlay off; reports differ, one player only needed the affinity option |
+| Stutter, slow loading, frame rate dropping after 10-15 minutes | the same two registry values; some players also set `EnableWaterFX` = 0 |
+| Crash with DEP (Data Execution Prevention) | add `tru.exe` as a DEP exception in Windows (the GOG version turns DEP off at run time) |
+| Steam overlay crashes or does not show | turn the Steam overlay off for this game |
+| Controller does nothing or the camera stutters | turn **Steam Input** off for this game (Properties → Controller) |
+| Crackling sound | set the audio output to 96 kHz or less |
+| Saving fails or crashes | allow the game to write to its save folder in your security software |
+| Only 4:3 / 16:9 / 16:10 offered | registry `AspectRatio` = width / height x 10000 (`Set-TruDisplay.ps1 -AspectRatio Auto` or `-AspectRatio 21:9`); the in-game options overwrite it again; widths of 4096 pixels or more are reported not to start |
+| Depth of field missing | it is in the PC game but off: registry `EnableDepthOfField` = 1 (`Set-TruDisplay.ps1 -DepthOfField On`); a missing value counts as off |
+| Default key Q is both "centre camera" and the grapple | assign one of them to another key in the options |
+| Linux / Steam Deck (Proton) | reported to need at most 4 CPU cores and Steam Input off |
 
 ---
 
