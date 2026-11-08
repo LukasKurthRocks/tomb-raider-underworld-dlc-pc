@@ -20,10 +20,21 @@ Usage (from the repository root):
       effective PC files = installed mods overlaid by the TREEs (later wins); per material: Xbox pass-2 lib, class,
       lit, surrogate, DRMs (effective path), units loading them (objlist.dat of pack10 / pack11; a level DRM counts
       as its own unit), visibility group; ranked list (OUT.json + OUT.txt)
-  ../bin/pyt -t 7200 tools/tu_batch.py run INV.json XDIR TREE WORKDIR IDS_FROM [--max N] [--only XLIB,XLIB]
+  ../bin/pyt -t 7200 tools/tu_batch.py run INV.json XDIR TREE WORKDIR IDS_FROM [--max N] [--only XLIB,XLIB] [--reuse WD,WD]
       translates the groups in rank order, writes the changed DRMs into TREE/mods (copying the effective file first),
-      logs to WORKDIR/run.txt, updates TREE/PROGRESS.md after every group (refused groups are retried on the next run)
+      logs to WORKDIR/run.txt, updates TREE/PROGRESS.md after every group (refused groups are retried on the next run);
+      --reuse: a group whose packed lib is byte-identical to a done group of an earlier WORKDIR (same Xbox lib, same
+      materials) keeps that lib id, all others get new ids from IDS_FROM
   ../bin/pyt -t 3600 tools/tu_batch.py verify INV.json WORKDIR TREE      independent re-check of every done group in the tree files
+  ../bin/pyt -t 3600 tools/tu_batch.py vcheck MODS XDIR [--libs A-B,C] [--no-vm]
+      binding_check of every translated pass-2 lib in any mods tree (no tu_batch state needed)
+  ../bin/pyt -t 1800 tools/tu_batch.py selftest      sampler pairing + binding_check regression cases (exit 1 on failure)
+
+Sampler map (08.11., n6b): ALL texture records of a material are paired - the ordinary ones by position, the
+per-instance ones (terrain atlases, [+0x52, +0x52 + byte +0x50)) by kind byte (TLT.sampler_map). verify / vcheck
+check the translated code without any sampler map: the Xbox reference keeps the Xbox sampler numbers and every VM
+texture is keyed by the record role behind its register (binding_check), so the per-instance gap of N6 (3410 read
+PC s9 for Xbox s9 = PC s8) now fails.
 """
 import sys, os, json, struct, hashlib, collections, pickle, math, time, shutil, glob
 import numpy as np
@@ -31,6 +42,7 @@ HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 ROOT = os.path.normpath(os.path.join(HERE, '..'))
 import tu_light_transplant as TLT
 from tu_light_transplant import F9, sm3asm, XL, libs
+import sm3vm                         # work/ws/shader4 (on the path via tu_light_transplant)
 import tu_perlight as TP
 import tu_unlit as TU
 import tu_shader_night as TN
@@ -215,15 +227,17 @@ def cmd_inv(xdir, outp, trees):
 
 
 # ---------------------------------------------------------------------------------------------------- run
+def recs_full(Pd, Xd, pm, xm):
+    """TLT.sampler_map of the material: ALL records (ordinary by position, per-instance by kind). Before 08.11. only
+    the byte(+0x52) ordinary records entered the map, so a translation sampled a per-instance Xbox register under its
+    Xbox number (25057: Xbox s9 = per-instance kind 2 sits on PC s8; N6 lib 3410 read PC s9)."""
+    return TLT.sampler_map(Pd[(10, pm)], Xd[(10, xm)], Xd)
+
+
 def recs_of(Pd, Xd, pm, xm):
-    pr, xr = TLT.records(Pd[(10, pm)], 'le'), TLT.records(Xd[(10, xm)], 'be')
-    if len(pr) != len(xr): return None
-    smap = {}
-    for p, x in zip(pr, xr):
-        if smap.get(x[3], p[3]) != p[3]: return None
-        smap[x[3]] = p[3]
-    dxn = {p[3] for p, x in zip(pr, xr) if (5, x[0]) in Xd and struct.unpack_from('>I', Xd[(5, x[0])].data, 4)[0] & 0x3f == 0x31}
-    return smap, dxn
+    """-> (smap {Xbox reg: PC reg}, dxn {PC regs}) or None when the records do not pair (recs_full)"""
+    r = recs_full(Pd, Xd, pm, xm)
+    return None if r is None else (r['smap'], r['dxn'])
 
 
 def ps_inputs(prog):
@@ -262,11 +276,14 @@ def fix_sincos(T):
     return (sm3asm.Program(T.kind, T.major, T.minor, out), n) if n else (T, 0)
 
 
-def build_group(xid, pd, smap, dxn, XP, lit, outd, log):
-    """-> {slot: bytecode} (8 slots) or raises with the reason"""
+def build_group(xid, pd, smap, dxn, XP, lit, outd, log, unpaired=()):
+    """-> {slot: bytecode} (8 slots) or raises with the reason. unpaired: Xbox registers of records without a PC
+    partner (TLT.sampler_map) - a shader that declares such a sampler is refused (it would keep the Xbox number)"""
     L = libs(); lib = TLT.tu_lib(xid); P = L['P']
     if pd not in P: raise TP.Fail('donor / surrogate %s not a base PC lib' % pd)
     xnames = TLT.xbox_sampler_names(lib)
+    bad = sorted(r for r in xnames if r in set(unpaired))
+    if bad: raise TP.Fail('Xbox samplers %s have a record without a PC partner (per-instance kind differs)' % ['s%d %s' % (r, xnames[r]) for r in bad])
     names = {n: smap[r] for r, n in xnames.items() if r in smap}
     slots = P[pd]['slots']; nsl = 8 if lit else len(slots)
     if lit and len(slots) != 8: raise TP.Fail('lit surrogate %d has %d slots' % (pd, len(slots)))
@@ -345,8 +362,23 @@ def progress(tree, state):
     open(p, 'w', newline='\r\n').write('\n'.join(lines))
 
 
-def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
+def reuse_table(wds):
+    """done groups of earlier runs (WORKDIRs): [{xlib, mats, id, data, wd}] - a group of this run whose packed lib is
+    byte-identical to one of them (same Xbox lib, same materials) keeps that lib id (--reuse, n6b 08.11.)"""
+    out = []
+    for w in wds:
+        st = json.load(open(os.path.join(w, 'state.json')))
+        for g in st['groups']:
+            if g['status'] != 'done': continue
+            p = os.path.join(w, 'p', str(g['new']), '%d.lib' % g['new'])
+            if os.path.exists(p):
+                out.append(dict(xlib=g['xlib'], mats=frozenset(g['mats']), id=g['new'], data=open(p, 'rb').read(), wd=w))
+    return out
+
+
+def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only, reuse=()):
     inv = json.load(open(invp)); os.makedirs(wd, exist_ok=True)
+    RU = reuse_table(reuse); reuse_ids = {u['id'] for u in RU}
     logf = open(os.path.join(wd, 'run.txt'), 'a')
     def log(s): print(s, flush=True); logf.write(s + '\n'); logf.flush()
     stp = os.path.join(wd, 'state.json')
@@ -371,9 +403,9 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
         for f in r['files']:
             pcp = tree_dst(tree, f['pc']) if os.path.exists(tree_dst(tree, f['pc'])) else f['pc']
             Pd = load(pcp, 'le'); Xd = load(f['xbox'], 'be')
-            rr = recs_of(Pd, Xd, r['mat'], f['xmat'])
+            rr = recs_full(Pd, Xd, r['mat'], f['xmat'])
             if rr is None: bad = 'records do not pair (%s)' % f['name']; break
-            s = (r['xlib'], tuple(sorted(rr[0].items())), tuple(sorted(rr[1])))
+            s = (r['xlib'], tuple(sorted(rr['smap'].items())), tuple(sorted(rr['dxn'])), tuple(sorted(rr['unpaired'])))
             bysig.setdefault(s, []).append(f)
         if bad or not bysig:
             g = groups.setdefault(('bad', r['mat']), dict(xlib=r['xlib'], lit=r['lit'], mats=[], rows=[], score=r['score'], bad=bad or 'no files'))
@@ -407,12 +439,12 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
             r0 = g['rows'][0]; f0 = r0['files'][0]
             pcp0 = tree_dst(tree, f0['pc']) if os.path.exists(tree_dst(tree, f0['pc'])) else f0['pc']
             Pd0 = load(pcp0, 'le'); Xd0 = load(f0['xbox'], 'be')
-            smap, dxn = recs_of(Pd0, Xd0, r0['mat'], f0['xmat'])
+            rf = recs_full(Pd0, Xd0, r0['mat'], f0['xmat']); smap, dxn = rf['smap'], rf['dxn']
             XPs = {tuple(map(tuple, TLT.mparams(load(rr['files'][0]['xbox'], 'be')[(10, rr['files'][0]['xmat'])], 'be'))) for rr in g['rows']}
             XP = TLT.mparams(Xd0[(10, f0['xmat'])], 'be')
             pd = r0['surrogate']
             lg = []
-            res = build_group(g['xlib'], pd, smap, dxn, XP, g['lit'], os.path.join(wd, 'b', '%d_%d' % (g['xlib'], r0['mat'])), lg)
+            res = build_group(g['xlib'], pd, smap, dxn, XP, g['lit'], os.path.join(wd, 'b', '%d_%d' % (g['xlib'], r0['mat'])), lg, rf['unpaired'])
             # other MaterialParams of the group's materials: the lit xref / unlit check once more with each
             if len(XPs) > 1: lg.append('%d different MaterialParams sets in the group (shader is params-independent code; checks used the first)' % len(XPs))
             need = set()
@@ -426,21 +458,28 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
                     if outs is None: raise TP.Fail('VS %d of material %d not found' % (vid, rr['mat']))
                     miss = need - outs
                     if miss: raise TP.Fail('PS reads %s, PC VS %d (material %d, %s) never writes them - needs a VS translation' % (sorted(miss), vid, rr['mat'], f['name']))
-            while nid in used_ids: nid += 1
             data = pack_lib(res, nid, taken, len(res))
-            used_ids.add(nid)
+            run_ids = {g_['new'] for g_ in state['groups'] if g_['status'] == 'done'}
+            u = next((u for u in RU if u['xlib'] == g['xlib'] and u['mats'] == frozenset(g['mats']) and u['data'] == data
+                      and u['id'] not in run_ids), None)
+            if u is not None:
+                gid = u['id']; lg.append('lib byte-identical to %s lib %d: id kept' % (u['wd'], gid))
+            else:
+                while nid in used_ids or nid in reuse_ids: nid += 1
+                gid = nid
+            used_ids.add(gid)
             # apply per file: all group materials present in that file
             perfile = collections.defaultdict(list)
             for rr in g['rows']:
                 for f in rr['files']: perfile[f['name']].append((rr['mat'], f['xmat'], f))
-            pk = os.path.join(wd, 'p', str(nid)); os.makedirs(pk, exist_ok=True)
-            open(os.path.join(pk, '%d.lib' % nid), 'wb').write(data)
+            pk = os.path.join(wd, 'p', str(gid)); os.makedirs(pk, exist_ok=True)
+            open(os.path.join(pk, '%d.lib' % gid), 'wb').write(data)
             for fname, ms in perfile.items():
                 f = ms[0][2]
                 dst = tree_dst(tree, f['pc'])
                 if not os.path.exists(dst):
                     os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.copyfile(f['pc'], dst)
-                json.dump({str(g['xlib']): dict(new=nid, mats=[(m, x) for m, x, _ in ms])}, open(os.path.join(pk, 'map.json'), 'w'))
+                json.dump({str(g['xlib']): dict(new=gid, mats=[(m, x) for m, x, _ in ms])}, open(os.path.join(pk, 'map.json'), 'w'))
                 tmp = dst + '.tmp50m'
                 import io, contextlib
                 buf = io.StringIO()
@@ -448,8 +487,10 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
                     TU.cmd_apply(dst, f['xbox'], tmp, pk, 2)
                 os.replace(tmp, dst); cache.pop(dst, None)
                 lg.append('apply %s: %s' % (fname, buf.getvalue().strip().splitlines()[-1]))
-            ent.update(status='done', new=nid, files=list(perfile), md5=hashlib.md5(data).hexdigest(),
-                       note='%d slots, %.0f s' % (len(res), time.time() - t0)); nd += 1; nid += 1
+            ent.update(status='done', new=gid, files=list(perfile), md5=hashlib.md5(data).hexdigest(),
+                       note='%d slots, %.0f s%s' % (len(res), time.time() - t0, ', id kept (byte-identical)' if u is not None else ''))
+            nd += 1
+            if u is None: nid += 1
         except (TP.Fail, F9.Fail, Exception) as e:
             ent['note'] = ('%s: %s' % (type(e).__name__, str(e)))[:200].replace('|', '/')
             ent['files'] = sorted({f['name'] for rr in g['rows'] for f in rr['files']})
@@ -461,10 +502,120 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only):
     log('== end %s: %d translated groups this run' % (time.strftime('%H:%M:%S'), nd))
 
 
+def sampled_regs(prog):
+    """sampler registers a program samples (texld / texldl / texldb / texldd operands)"""
+    return {o.num for i in prog.instrs() if i.op.startswith('tex') for o in i.ops if o.rtype == sm3asm.RT_SAMPLER}
+
+
+def record_roles(recs):
+    """{sampler register: role} straight from a material's raw records (TLT.records_all), no sampler map: role
+    ('ord', position, kind) for the ordinary records, ('inst', kind) for the per-instance ones - the texture that the
+    engine binds to that register. Verify keys its VM textures by these roles on either side (n6b 08.11.)."""
+    out = {}; j = 0
+    for r in recs:
+        if r[4]: key = ('inst', r[2])
+        else: key = ('ord', j, r[2]); j += 1
+        out.setdefault(r[3], key)
+    return out
+
+
+def _role_tex(roles, dxn):
+    def key(s): return roles.get(s, ('engine', s))
+    return TN.game_dxn_tex(sm3vm.det_tex(key), dxn)
+
+
+def _cmp_lit(R_, LX, T, XP, PP, seed, rangew, xtex, ptex):
+    """TN.compare with one texture function per side (Xbox reference / PC translation)"""
+    rng = np.random.RandomState(seed + 100); Lt = PX.light(rng, rangew)
+    ex = F9.Env(seed, XP); ep = F9.Env(seed, PP)
+    for r in range(224):
+        if not 100 <= r < 132: ep.consts[r] = ex.consts[r]
+    worst = 1.0
+    for on in (False, True):
+        cx = dict(ex.consts); cp = dict(ep.consts)
+        Lc = Lt if on else (Lt[0], Lt[1], Lt[2], Lt[3], Lt[4], np.float32([0, 0, 0]))
+        PX.set_x(cx, LX, Lc); PX.set_pc(cp, Lc)
+        a = F9.run_state(R_, F9.body(R_), ex.state0(R_), cx, xtex, ex.N, {})
+        b = F9.run_state(T, F9.body(T), ep.state0(T), cp, ptex, ep.N, {3: True} if on else {})
+        ca, cb = a[0].get((sm3asm.RT_COLOROUT, 0)), b[0].get((sm3asm.RT_COLOROUT, 0))
+        if ca is None or cb is None: return 0.0
+        worst = min(worst, float((np.isclose(ca, cb, **F9.TOL).all(axis=1) & (a[1] == b[1]) | (a[1] & b[1])).mean()))
+    return worst
+
+
+def binding_check(Pd, Xd, m, xm, xlib, data, lit, pct=None, vm=True):
+    """sampler-binding check of a translated pass-2 PC lib (bytes `data`) for PC material m / Xbox material xm, built
+    WITHOUT any sampler map (n6b 08.11.: the old verify translated its reference with the build's own map and so
+    said 1.000 for the per-instance gap). Roles = record_roles of each side's raw records.
+      static, per slot: every record role the Xbox shader (Xbox register numbers) samples must be sampled by the PC
+        slot and vice versa; an Xbox sampler without a record (engine: s15 attenuation ...) must not land on a PC
+        record register;
+      VM (vm=True): the Xbox reference keeps the XBOX sampler numbers, every texture is keyed by the role behind the
+        register on its own side (DXN by the Xbox texture), so a wrong / missing / swapped sampler register changes the
+        fetched values: lit = Xbox-lit reference (2 seeds, lights off / on), unlit = Xbox registers reference.
+    -> (worst VM match or None, [problems])"""
+    prec, xrec = TLT.records_all(Pd[(10, m)], 'le'), TLT.records_all(Xd[(10, xm)], 'be')
+    proles, xroles = record_roles(prec), record_roles(xrec)
+    xdxn = {r[3] for r in xrec if TLT.is_dxn(Xd, r[0])}
+    pdxn = {p for p, ro in proles.items() if ro in {xroles[r] for r in xdxn if r in xroles}}
+    xtex, ptex = _role_tex(xroles, xdxn), _role_tex(proles, pdxn)
+    xopts = {'dxn': set(xdxn), 'dxn_full': set(xdxn)} if xdxn else {}
+    lib = TLT.tu_lib(xlib); PL = SL.parse(data, 'le')
+    XP = TLT.mparams(Xd[(10, xm)], 'be'); PP = TLT.mparams(Pd[(10, m)], 'le')
+    probs = []; worst = 1.0 if vm else None
+    import io, contextlib
+    nsl = len(PL['slots'])
+    for k in range(nsl):
+        if PL['slots'][k] == 0xffffffff: continue
+        T = F9.decode_pc(PL['entries'][PL['slots'][k]]['blob'])
+        xs = lib['slots'][k & 1] if lib['slots'][k & 1] != 0xffffffff else lib['slots'][0]
+        xblob = lib['entries'][xs]['blob']
+        if lit:
+            with contextlib.redirect_stdout(io.StringIO()):
+                R_, LX = PX.xref_translate(xblob, F9.xsamp(xblob, None), xopts)
+        else:
+            R_, regs = TU.translate_xregs(xblob, None, xdxn)
+        XR, TR = sampled_regs(R_), sampled_regs(T)
+        xr_roles = {xroles[r]: r for r in XR if r in xroles}
+        pr_roles = {proles[p]: p for p in TR if p in proles}
+        exp = {ro: p for p, ro in proles.items()}
+        for ro, r in sorted(xr_roles.items(), key=lambda t: t[1]):
+            if ro not in pr_roles:
+                probs.append('slot %d: Xbox s%d %s not sampled (PC record on %s)' % (k, r, ro, 's%d' % exp[ro] if ro in exp else 'no register'))
+        for ro, p in sorted(pr_roles.items(), key=lambda t: t[1]):
+            if ro not in xr_roles: probs.append('slot %d: PC s%d %s sampled, the Xbox shader does not sample it' % (k, p, ro))
+        for r in sorted(XR):
+            if r not in xroles and r in proles: probs.append('slot %d: Xbox engine sampler s%d lands on PC record %s' % (k, r, proles[r]))
+        if not vm: continue
+        if lit:
+            if nsl != 8: probs.append('lit lib with %d slots' % nsl); vm = False; worst = None; continue
+            for seed, rw in ((5, -100.0), (11, 0.3)):
+                worst = min(worst, _cmp_lit(R_, LX, T, XP, PP, seed, rw, xtex, ptex))
+        else:
+            if pct is None: worst = None; vm = False; continue
+            ex = F9.Env(7 + k, XP); ep = F9.Env(7 + k, PP); K = F9.Consts(pct)
+            for nme, r in regs.items():
+                c = next(c for c in XL.parse(xblob).ctab if c['set'] == 2 and c['name'] == nme)
+                for j in range(max(1, c['count'])):
+                    pr_ = K.fn(nme, j, c['count'])
+                    if pr_ is not None: ep.consts[pr_] = ex.consts[r + j]
+            for j, v in enumerate(PP): ep.consts[100 + j] = np.array(v, np.float32)
+            if 'MaterialParams' in regs:
+                for j, v in enumerate(XP): ex.consts[regs['MaterialParams'] + j] = np.array(v, np.float32)
+            a = F9.run_state(T, F9.body(T), ep.state0(T), ep.consts, ptex, ep.N, {})
+            b = F9.run_state(R_, F9.body(R_), ex.state0(R_), ex.consts, xtex, ex.N, {})
+            ca, cb = a[0].get((sm3asm.RT_COLOROUT, 0)), b[0].get((sm3asm.RT_COLOROUT, 0))
+            if ca is None or cb is None: v_ = 0.0 if (ca is None) != (cb is None) else 1.0
+            else: v_ = float((np.isclose(ca, cb, **F9.TOL).all(axis=1) & (a[1] == b[1]) | (a[1] & b[1])).mean())
+            worst = min(worst, v_)
+    return worst, probs
+
+
 def cmd_verify(invp, wd, tree):
     """independent re-check on the FINISHED tree files: every material of every done group, in every file copy:
-    pass-2 lib == the group's new lib, the lib bytes == the packed lib; lit: Xbox-lit reference (2 seeds, 8 slots);
-    unlit: each slot == the Xbox shader with Xbox registers (VM)"""
+    pass-2 lib == the group's new lib, the lib bytes == the packed lib; unlit: PC MaterialParams start with the Xbox
+    ones; then binding_check (no sampler map: static role check + VM with role-keyed textures; lit: Xbox-lit
+    reference, 2 seeds, 8 slots; unlit: Xbox registers reference). FAIL on any problem or VM < 0.999."""
     inv = {r['mat']: r for r in json.load(open(invp))}
     state = json.load(open(os.path.join(wd, 'state.json')))
     tot = ok = 0
@@ -477,46 +628,144 @@ def cmd_verify(invp, wd, tree):
                 _, Pd = TLT.load(p, 'le'); _, Xd = TLT.load(f['xbox'], 'be')
                 cur = struct.unpack_from('<4I', Pd[(10, m)].data, 0x28)[2]
                 good = cur == g['new'] and Pd[(9, cur)].data == data
-                worst = 1.0
-                if good and g['lit']:
-                    smap, dxn = recs_of(Pd, Xd, m, f['xmat'])
-                    lib = TLT.tu_lib(g['xlib']); names = {n: smap[r] for r, n in TLT.xbox_sampler_names(lib).items() if r in smap}
-                    XP = TLT.mparams(Xd[(10, f['xmat'])], 'be'); PP = TLT.mparams(Pd[(10, m)], 'le')
-                    PL = SL.parse(data, 'le'); opts = {'dxn': dxn, 'dxn_full': dxn} if dxn else {}
-                    import io, contextlib
-                    for k in range(8):
-                        T = F9.decode_pc(PL['entries'][PL['slots'][k]]['blob'])
-                        xblob = lib['entries'][lib['slots'][k & 1] if lib['slots'][k & 1] != 0xffffffff else lib['slots'][0]]['blob']
-                        R_, LX = PX.xref_translate(xblob, F9.xsamp(xblob, names), opts)
-                        for seed, rw in ((5, -100.0), (11, 0.3)):
-                            with contextlib.redirect_stdout(io.StringIO()):
-                                o = TN.compare(R_, LX, T, XP, PP, seed, rw, set(dxn), '')
-                            worst = min(worst, o['off'], o['on'])
-                elif good:
-                    smap, dxn = recs_of(Pd, Xd, m, f['xmat'])
-                    lib = TLT.tu_lib(g['xlib']); names = {n: smap[r] for r, n in TLT.xbox_sampler_names(lib).items() if r in smap}
-                    XP = TLT.mparams(Xd[(10, f['xmat'])], 'be'); PP = TLT.mparams(Pd[(10, m)], 'le')
-                    if [tuple(v) for v in XP] != [tuple(v) for v in PP[:len(XP)]]: worst = 0.0   # PC may keep extra vec4 behind the Xbox ones (unread)
-                    PL = SL.parse(data, 'le'); pd = inv[m]['surrogate']; P = libs()['P']
-                    pct = F9.pc_ctab(P[pd]['entries'][next(o for o in P[pd]['slots'] if o != 0xffffffff)]['blob'])
-                    for k in range(len(PL['slots'])):
-                        T = F9.decode_pc(PL['entries'][PL['slots'][k]]['blob'])
-                        xblob = lib['entries'][lib['slots'][k & 1] if lib['slots'][k & 1] != 0xffffffff else lib['slots'][0]]['blob']
-                        Rx, regs = TU.translate_xregs(xblob, names, dxn)
-                        ex = F9.Env(7 + k, XP); ep = F9.Env(7 + k, PP); K = F9.Consts(pct)
-                        for nme, r in regs.items():
-                            c = next(c for c in XL.parse(xblob).ctab if c['set'] == 2 and c['name'] == nme)
-                            for j in range(max(1, c['count'])):
-                                pr_ = K.fn(nme, j, c['count'])
-                                if pr_ is not None: ep.consts[pr_] = ex.consts[r + j]
-                        for j, v in enumerate(PP): ep.consts[100 + j] = np.array(v, np.float32)
-                        if 'MaterialParams' in regs:
-                            for j, v in enumerate(XP): ex.consts[regs['MaterialParams'] + j] = np.array(v, np.float32)
-                        worst = min(worst, TU.vm_cmp(T, Rx, ep, ex, TN.game_dxn_tex(ex.tex, dxn)))
-                tot += 1; ok += good and worst >= 0.999
-                print('%s mat %5d %-40s lib %s (%s) %s worst %.3f' % ('OK  ' if good and worst >= 0.999 else 'FAIL', m, f['name'], cur,
-                      'lit' if g['lit'] else 'unlit', 'bytes ok' if good else 'LIB / BYTES WRONG', worst), flush=True)
+                worst = 1.0; probs = []
+                if good:
+                    pct = None
+                    if not g['lit']:
+                        XP = TLT.mparams(Xd[(10, f['xmat'])], 'be'); PP = TLT.mparams(Pd[(10, m)], 'le')
+                        if [tuple(v) for v in XP] != [tuple(v) for v in PP[:len(XP)]]: probs.append('PC MaterialParams != Xbox')   # PC may keep extra vec4 behind the Xbox ones (unread)
+                        pd = inv[m]['surrogate']; P = libs()['P']
+                        pct = F9.pc_ctab(P[pd]['entries'][next(o for o in P[pd]['slots'] if o != 0xffffffff)]['blob'])
+                    worst, pb = binding_check(Pd, Xd, m, f['xmat'], g['xlib'], data, g['lit'], pct)
+                    probs += pb
+                    if worst is None: worst = 0.0; probs.append('no VM check')
+                passed = good and worst >= 0.999 and not probs
+                tot += 1; ok += passed
+                print('%s mat %5d %-40s lib %s (%s) %s worst %.3f%s' % ('OK  ' if passed else 'FAIL', m, f['name'], cur,
+                      'lit' if g['lit'] else 'unlit', 'bytes ok' if good else 'LIB / BYTES WRONG', worst,
+                      (' | ' + '; '.join(probs[:6])) if probs else ''), flush=True)
     print('SUMMARY verify: %d of %d material copies ok' % (ok, tot))
+
+
+def cmd_vcheck(mods, xdir, ranges, vm):
+    """binding_check for every translated pass-2 lib in a mods tree (top + streamgroups) whose DRM has an Xbox twin in
+    XDIR/ack10|ack11: materials whose PC pass-2 lib is in RANGES (a-b,c,...) or, without RANGES, is not a base PC
+    lib / fade copy. Unlit libs: constants mapped with the PC CTAB of the shader map's surrogate. Prints one line per
+    copy and a FAIL list; identical (lib bytes, records, params) combinations are checked once."""
+    want = None
+    if ranges:
+        want = set()
+        for t in ranges.split(','):
+            a_, _, b_ = t.partition('-'); want |= set(range(int(a_), int(b_ or a_) + 1))
+    names = []
+    for sub in SUBDIRS:
+        d = os.path.join(mods, sub)
+        if os.path.isdir(d): names += [os.path.join(sub, n) if sub else n for n in sorted(os.listdir(d)) if n.lower().endswith('.drm')]
+    cache = {}; tot = nfail = 0; fails = []
+    for rel in names:
+        base = os.path.basename(rel).lower()
+        xp = next((os.path.join(xdir, p, base) for p in ('ack11', 'ack10') if os.path.exists(os.path.join(xdir, p, base))), None)
+        if xp is None: continue
+        _, Pd = TLT.load(os.path.join(mods, rel), 'le'); _, Xd = TLT.load(xp, 'be')
+        for (t, mid), ps in sorted(Pd.items()):
+            if t != 10 or (10, mid) not in Xd or len(ps.data) < 0x38: continue
+            pl = struct.unpack_from('<4I', ps.data, 0x28)[2]; xl = struct.unpack_from('>4I', Xd[(10, mid)].data, 0x28)[2]
+            if pl == 0 or (want is not None and pl not in want) or (want is None and is_surrogate_lib(pl)): continue
+            if (9, pl) not in Pd or xl not in libs()['D']: continue
+            lit = bool(lit_lib(xl)); data = Pd[(9, pl)].data
+            key = (hashlib.md5(data).hexdigest(), xl, tuple(TLT.records_all(ps, 'le')), tuple(TLT.records_all(Xd[(10, mid)], 'be')),
+                   tuple(map(tuple, TLT.mparams(ps, 'le'))), tuple(map(tuple, TLT.mparams(Xd[(10, mid)], 'be'))))
+            if key not in cache:
+                pct = None
+                sur = SMAP.get(xl, {}).get('pc'); P = libs()['P']
+                if not lit and sur in P:
+                    pct = F9.pc_ctab(P[sur]['entries'][next(o for o in P[sur]['slots'] if o != 0xffffffff)]['blob'])
+                try: cache[key] = binding_check(Pd, Xd, mid, mid, xl, data, lit, pct, vm)
+                except Exception as e: cache[key] = (None, ['check error %s: %s' % (type(e).__name__, str(e)[:120])])
+            worst, probs = cache[key]
+            tot += 1; bad = bool(probs)
+            if bad: nfail += 1; fails.append('%s mat %d lib %d' % (rel, mid, pl))
+            print('%s mat %5d %-62s lib %4d xlib %4d %-5s VM %s%s' % ('FAIL' if bad else 'ok  ', mid, rel, pl, xl, 'lit' if lit else 'unlit',
+                  '-' if worst is None else '%.3f' % worst, (' | ' + '; '.join(probs[:6])) if probs else ''), flush=True)
+    print('SUMMARY vcheck %s: %d translated material copies, %d with binding problems' % (mods, tot, nfail))
+    for l in fails: print('  FAIL ' + l)
+
+
+def cmd_selftest():
+    """regression self-test of the sampler pairing (TLT.pair_records / sampler_map) and of binding_check (n6b 08.11.).
+    Synthetic record lists (always) + real data when the files exist (TRUDLC_GAME_MODS not needed): 25057
+    (`dlc_yggdrasil_end`, Xbox per-instance kind 2 s9 -> PC s8), 25520 (swapped kinds), 23303 (identity), 20265
+    (per-instance kind differs -> unpaired); binding_check must FAIL the N6 lib 3410 on 25057 and pass the floor proof
+    lib 3460. Exit 1 on any failure."""
+    fails = []; nok = [0]
+    def ok(c, msg):
+        print(('  ok   ' if c else '  FAIL ') + msg, flush=True)
+        if c: nok[0] += 1
+        else: fails.append(msg)
+    def rec(tid, typ, kind, reg, inst=False): return (tid, typ, kind, reg, inst)
+    # 1 synthetic: 25057-like records (Xbox s8/s2/s3/s4 ordinary + per-instance kinds 1 / 3 / 2 on s0 / s1 / s9)
+    X = [rec(7349, 1, 0, 8), rec(7350, 5, 0, 2), rec(7351, 1, 0, 3), rec(7352, 3, 0, 4),
+         rec(119, 6, 1, 0, True), rec(147, 6, 3, 1, True), rec(288, 6, 2, 9, True)]
+    P = [rec(7349, 1, 0, 9), rec(7350, 5, 0, 3), rec(7351, 1, 0, 4), rec(7352, 3, 0, 2),
+         rec(121, 6, 1, 0, True), rec(719, 6, 3, 1, True), rec(255, 6, 2, 8, True)]
+    pairs, un, pb = TLT.pair_records(P, X); sm = {x[3]: p[3] for x, p in pairs}
+    ok(not pb and not un and sm == {8: 9, 2: 3, 3: 4, 4: 2, 0: 0, 1: 1, 9: 8}, 'synthetic 25057: map %s (Xbox s9 kind 2 -> PC s8)' % sm)
+    old = {x[3]: p[3] for p, x in zip([r for r in P if not r[4]], [r for r in X if not r[4]])}
+    ok(9 not in old, 'synthetic 25057: the old ordinary-only map has no Xbox s9 (the gap the fix closes)')
+    # 2 synthetic: swapped per-instance kinds, stored in different order (25520 / 26120: kind 1 s2 -> s1, kind 2 s1 -> s2)
+    X2 = [rec(10, 1, 0, 0), rec(119, 6, 1, 2, True), rec(288, 6, 2, 1, True)]
+    P2 = [rec(10, 1, 0, 0), rec(255, 6, 2, 2, True), rec(121, 6, 1, 1, True)]
+    pairs, un, pb = TLT.pair_records(P2, X2); sm = {x[3]: p[3] for x, p in pairs}
+    ok(not pb and sm == {0: 0, 2: 1, 1: 2}, 'synthetic swapped kinds (other order on PC): paired by kind %s' % sm)
+    # 3 synthetic: per-instance kind only on one side (20265: Xbox kind 1, PC kind 2) -> unpaired, no guess
+    X3 = [rec(10, 1, 0, 1), rec(119, 6, 1, 0, True)]; P3 = [rec(10, 1, 0, 0), rec(255, 7, 2, 1, True)]
+    pairs, un, pb = TLT.pair_records(P3, X3)
+    ok(not pb and [u[3] for u in un] == [0] and {x[3]: p[3] for x, p in pairs} == {1: 0}, 'synthetic kind only on one side: Xbox s0 unpaired %s' % un)
+    # 4 synthetic: ordinary count / kind differ -> not pairable (old rule kept)
+    ok(bool(TLT.pair_records(P3[:1], X3[:1] + [rec(5, 1, 0, 5)])[2]), 'synthetic ordinary count differs -> problem')
+    ok(bool(TLT.pair_records([rec(1, 0, 9, 2)], [rec(1, 0, 0, 2)])[2]), 'synthetic ordinary kind differs -> problem')
+    # 5 role keys: identical on both sides exactly when the pairing holds
+    xr_, pr_ = record_roles(X), record_roles(P)
+    ok(xr_[9] == pr_[8] == ('inst', 2) and xr_[8] == pr_[9] == ('ord', 0, 0), 'record_roles: Xbox s9 / PC s8 = inst 2, Xbox s8 / PC s9 = ord 0')
+    # 6 real data
+    xd = os.path.join(ROOT, 'work', 'sg_audit_0511', 'xbox', 'ack11')
+    cases = [('floor 3460', os.path.join(ROOT, 'work', 'floor_0811', 'testtree', 'mods', 'dlc_yggdrasil_end.drm'), 25057, 3460, True),
+             ('N6 3410', os.path.join(ROOT, 'work', 'n6shaders_0711', 'testtree', 'mods', 'dlc_yggdrasil_end.drm'), 25057, 3410, False)]
+    xf = os.path.join(xd, 'dlc_yggdrasil_end.drm')
+    if not os.path.exists(xf) or not all(os.path.exists(c[1]) for c in cases):
+        print('  skip real-data cases (files missing)')
+    else:
+        _, Xd = TLT.load(xf, 'be')
+        for tag, pf, mat, lid, want in cases:
+            _, Pd = TLT.load(pf, 'le')
+            r = TLT.sampler_map(Pd[(10, mat)], Xd[(10, mat)], Xd)
+            if tag.startswith('floor'):
+                ok(r is not None and r['smap'].get(9) == 8 and not r['unpaired'], 'real 25057: sampler_map Xbox s9 -> PC s%s' % (r and r['smap'].get(9)))
+                o = TLT.records(Pd[(10, mat)], 'le'), TLT.records(Xd[(10, mat)], 'be')
+                ok(9 not in {x[3]: p[3] for p, x in zip(*o)}, 'real 25057: old TLT.records map leaves Xbox s9 out')
+                if (10, 23303) in Pd and (10, 23303) in Xd:
+                    r2 = TLT.sampler_map(Pd[(10, 23303)], Xd[(10, 23303)], Xd)
+                    ok(r2 is not None and all(r2['smap'][x] == x for x in (0, 1, 8) if x in r2['smap']), 'real 23303: per-instance registers identity %s' % (r2 and r2['smap']))
+            cur = struct.unpack_from('<4I', Pd[(10, mat)].data, 0x28)[2]
+            ok(cur == lid, '%s: material %d pass-2 lib = %d' % (tag, mat, cur))
+            w, pb = binding_check(Pd, Xd, mat, mat, 2346, Pd[(9, lid)].data, True)
+            passed = w is not None and w >= 0.999 and not pb
+            ok(passed == want, '%s on 25057: binding_check %s (VM %.3f, %s)' % (tag, 'passes' if passed else 'fails', w if w is not None else -1, '; '.join(pb[:2]) or 'no static problem'))
+        sgx = os.path.join(xd, 'dlc2_uo_piston_a.drm'); sgp = os.path.join(ROOT, 'work', 'n6shaders_0711', 'testtree', 'mods', 'dlc2_uo_piston_a.drm')
+        if os.path.exists(sgx) and os.path.exists(sgp):
+            _, Xd = TLT.load(sgx, 'be'); _, Pd = TLT.load(sgp, 'le')
+            r = TLT.sampler_map(Pd[(10, 25520)], Xd[(10, 25520)], Xd)
+            ok(r is not None and r['smap'].get(2) == 1 and r['smap'].get(1) == 2, 'real 25520: per-instance kind 1 Xbox s2 -> PC s1, kind 2 Xbox s1 -> PC s2 (%s)' % (r and r['smap']))
+            w, pb = binding_check(Pd, Xd, 25520, 25520, 2591, Pd[(9, 3408)].data, True)
+            ok(w is not None and w < 0.999, 'N6 3408 on 25520 (swapped kinds): VM catches it (%.3f; static: %s)' % (w if w is not None else -1, '; '.join(pb[:1]) or 'none - the sets agree'))
+        dgx = os.path.join(ROOT, 'work', 'sg_audit_0511', 'xbox', 'ack10', 'dlc_dungeon_dungeon_main.drm')
+        dgp = os.path.join(ROOT, 'work', 'n5mats_0711', 'testtree', 'mods', 'streamgroups', 'dlc_dungeon_dungeon_main.drm')
+        if os.path.exists(dgx) and os.path.exists(dgp):
+            _, Xd = TLT.load(dgx, 'be'); _, Pd = TLT.load(dgp, 'le')
+            r = TLT.sampler_map(Pd[(10, 20265)], Xd[(10, 20265)], Xd)
+            ok(r is not None and r['unpaired'] == {0}, 'real 20265: per-instance Xbox kind 1 (s0) has no PC partner (PC kind 2) -> unpaired %s' % (r and r['unpaired']))
+    print('SELFTEST %s: %d ok, %d failed' % ('PASSED' if not fails else 'FAILED', nok[0], len(fails)))
+    if fails: sys.exit(1)
 
 
 def main(a):
@@ -535,7 +784,14 @@ def main(a):
                 j = a.index(k); v = a[j + 1]; del a[j:j + 2]; return v
             return d
         mx = int(opt('--max', 0)); only = opt('--only'); only = {int(x) for x in only.split(',')} if only else None
-        cmd_run(a[1], a[2], a[3], a[4], int(a[5]), mx, only); return
+        reuse = opt('--reuse'); reuse = reuse.split(',') if reuse else ()
+        cmd_run(a[1], a[2], a[3], a[4], int(a[5]), mx, only, reuse); return
+    if a[0] == 'vcheck':
+        novm = '--no-vm' in a; a = [x for x in a if x != '--no-vm']
+        rg = None
+        if '--libs' in a: j = a.index('--libs'); rg = a[j + 1]; a = a[:j] + a[j + 2:]
+        cmd_vcheck(a[1], a[2], rg, not novm); return
+    if a[0] == 'selftest': cmd_selftest(); return
     sys.exit(__doc__)
 
 

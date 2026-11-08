@@ -135,6 +135,9 @@ def load(path, e):
 
 
 def records(s, e):
+    """the byte(+0x52) ORDINARY texture records only: [(tex id, type, kind byte, sampler register)]. Not enough for a
+    sampler map - the per-instance records behind them are missing (ENGINE.md 17.4, per-instance sampler gap 08.11.);
+    use sampler_map() for that."""
     r = R.parse(s.reloc, e); tp = dict(r.internal).get(0x54)
     f = '>' if e == 'be' else '<'
     out = []
@@ -143,6 +146,62 @@ def records(s, e):
         tid, u1, typ = struct.unpack_from(f + 'III', s.data, tp + 16 * k)
         out.append((tid, typ, s.data[tp + 16 * k + 12], s.data[tp + 16 * k + 13]))
     return out
+
+
+def records_all(s, e):
+    """every texture record of a material section: the byte(+0x52) ordinary ones, then the byte(+0x50) per-instance
+    ones (terrain atlases, ENGINE.md 17.1) -> [(tex id, type, kind byte, sampler register, per_instance)]"""
+    r = R.parse(s.reloc, e); tp = dict(r.internal).get(0x54)
+    f = '>' if e == 'be' else '<'
+    out = []
+    if tp is None: return out
+    n_ord, n_inst = s.data[0x52], s.data[0x50]
+    for k in range(n_ord + n_inst):
+        tid, u1, typ = struct.unpack_from(f + 'III', s.data, tp + 16 * k)
+        out.append((tid, typ, s.data[tp + 16 * k + 12], s.data[tp + 16 * k + 13], k >= n_ord))
+    return out
+
+
+def pair_records(pr, xr):
+    """pair the PC and Xbox records of one material (records_all tuples). Ordinary records: by position (the
+    converter keeps their order; the kind byte must agree - 9 back buffer / 10 depth / 0 texture). Per-instance
+    records: by kind byte (1 / 2 / 3 = the terrain instance's texture index; the converter re-slots them, 25057:
+    Xbox kind 2 s9 -> PC s8, 25520: kind 1 s2 -> s1 and kind 2 s1 -> s2), same kind several times in order.
+    -> (pairs [(xrec, prec)], unpaired_x [xrec without a PC partner], problems [str]); problems = not pairable"""
+    po = [r for r in pr if not r[4]]; xo = [r for r in xr if not r[4]]
+    pi = [r for r in pr if r[4]]; xi = [r for r in xr if r[4]]
+    probs = []; pairs = []; unpaired = []
+    if len(po) != len(xo): probs.append('%d PC / %d Xbox ordinary records' % (len(po), len(xo)))
+    else:
+        for j, (p, x) in enumerate(zip(po, xo)):
+            if p[2] != x[2]: probs.append('ordinary record %d: kind PC %d / Xbox %d' % (j, p[2], x[2]))
+            pairs.append((x, p))
+    byk = collections.defaultdict(list)
+    for p in pi: byk[p[2]].append(p)
+    for x in xi:
+        if byk.get(x[2]): pairs.append((x, byk[x[2]].pop(0)))
+        else: unpaired.append(x)
+    return pairs, unpaired, probs
+
+
+def is_dxn(Xd, tid):
+    return (5, tid) in Xd and struct.unpack_from('>I', Xd[(5, tid)].data, 4)[0] & 0x3f == 0x31
+
+
+def sampler_map(ps, xs, Xd):
+    """Xbox -> PC sampler map of a material from ALL its records (ordinary + per-instance, pair_records).
+    -> None (records do not pair) or dict(smap {Xbox reg: PC reg}, dxn {PC regs whose Xbox texture is DXN},
+    unpaired {Xbox regs of records without a PC partner - a shader that samples them cannot be translated},
+    type_diff [ordinary pairs whose type word differs - B138 record variants, reported only])"""
+    pairs, unpaired, probs = pair_records(records_all(ps, 'le'), records_all(xs, 'be'))
+    if probs: return None
+    smap = {}
+    for x, p in pairs:
+        if smap.get(x[3], p[3]) != p[3]: return None          # one Xbox register on two PC registers
+        smap[x[3]] = p[3]
+    dxn = {p[3] for x, p in pairs if is_dxn(Xd, x[0])}
+    return dict(smap=smap, dxn=dxn, unpaired={x[3] for x in unpaired} - set(smap),
+                type_diff=[(x, p) for x, p in pairs if x[1] != p[1]])
 
 
 def mparams(s, e):

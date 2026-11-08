@@ -104,10 +104,10 @@ def cmd_oracle(pairs):
 
 # ---------------------------------------------------------------------------------------------------- build
 def mat_recs(Pd, Xd, pm, xm):
-    pr, xr = TLT.records(Pd[(10, pm)], 'le'), TLT.records(Xd[(10, xm)], 'be')
-    smap = {x[3]: p[3] for p, x in zip(pr, xr)}
-    dxn = {p[3] for p, x in zip(pr, xr) if (5, x[0]) in Xd and struct.unpack_from('>I', Xd[(5, x[0])].data, 4)[0] & 0x3f == 0x31}
-    return smap, dxn
+    """sampler map + DXN registers from ALL records (TLT.sampler_map; 08.11.: the per-instance records were missing)"""
+    r = TLT.sampler_map(Pd[(10, pm)], Xd[(10, xm)], Xd)
+    if r is None: raise SystemExit('material %d: PC / Xbox texture records do not pair' % pm)
+    return r['smap'], r['dxn']
 
 
 def cmd_build(pcf, xf, out, pas, mats):

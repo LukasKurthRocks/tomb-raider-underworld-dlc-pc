@@ -156,10 +156,10 @@ def cmd_xref(pcf, xf, mat, slots, seed, rangew, lib_override, bindir, gamedxn):
     xid = struct.unpack_from('>4I', xm.data, 0x28)[2]
     plib = lib_override or struct.unpack_from('<4I', pm.data, 0x28)[2]
     lib = TLT.tu_lib(xid)
-    pr, xr = TLT.records(pm, 'le'), TLT.records(xm, 'be')
-    smap = {x[3]: p[3] for p, x in zip(pr, xr)}
+    rm = TLT.sampler_map(pm, xm, Xd)      # ALL records (08.11.: per-instance ones were missing)
+    if rm is None: raise SystemExit('material %d: PC / Xbox texture records do not pair' % mat)
+    smap, dxn = rm['smap'], rm['dxn']
     names = {n: smap[r] for r, n in TLT.xbox_sampler_names(lib).items() if r in smap}
-    dxn = {p[3] for p, x in zip(pr, xr) if (5, x[0]) in Xd and struct.unpack_from('>I', Xd[(5, x[0])].data, 4)[0] & 0x3f == 0x31}
     opts = {'dxn': dxn, 'dxn_full': dxn} if dxn else {}
     XP = TLT.mparams(xm, 'be'); PP = TLT.mparams(pm, 'le')
     if bindir: PP = XP   # a new build is applied with the PC MaterialParams := the Xbox ones (tu_light_transplant apply)

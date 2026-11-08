@@ -526,18 +526,17 @@ def cmd_build(pcf, xf, out, mesh, ids, donor, only_mats=None):
         if not mats: raise SystemExit('d%d: no material of mesh %d uses it%s' % (xid, mesh, ' (--mats %s)' % sorted(only_mats) if only_mats else ''))
         # the materials of one build must agree on the sampler map and the DXN registers (both are compiled in)
         def recs(pm, xm):
-            pr_, xr_ = TLT.records(Pd_[(10, pm)], 'le'), TLT.records(Xd[(10, xm)], 'be')
-            return ({x[3]: p[3] for p, x in zip(pr_, xr_)},
-                    {p[3] for p, x in zip(pr_, xr_) if (5, x[0]) in Xd and struct.unpack_from('>I', Xd[(5, x[0])].data, 4)[0] & 0x3f == 0x31})
+            # ALL records, per-instance ones paired by kind (TLT.sampler_map; 08.11.: they were missing)
+            r_ = TLT.sampler_map(Pd_[(10, pm)], Xd[(10, xm)], Xd)
+            if r_ is None: raise SystemExit('d%d: material %d: PC / Xbox texture records do not pair' % (xid, pm))
+            return r_['smap'], r_['dxn']
         r0 = recs(*mats[0])
         for m in mats[1:]:
             if recs(*m) != r0: raise SystemExit('d%d: materials %s and %s differ in sampler map / DXN registers %s vs %s - build them separately (--mats)' % (xid, mats[0][0], m[0], r0, recs(*m)))
         pm0, xm0 = mats[0]
-        pr, xr = TLT.records(Pd_[(10, pm0)], 'le'), TLT.records(Xd[(10, xm0)], 'be')
-        smap = {x[3]: p[3] for p, x in zip(pr, xr)}
+        smap, dxn = r0
         names = {n: smap[r] for r, n in TLT.xbox_sampler_names(lib).items() if r in smap}
         XP = TLT.mparams(Xd[(10, xm0)], 'be')
-        dxn = {p[3] for p, x in zip(pr, xr) if (5, x[0]) in Xd and struct.unpack_from('>I', Xd[(5, x[0])].data, 4)[0] & 0x3f == 0x31}
         TLT.EXTRA_OPTS.clear(); TLT.EXTRA_OPTS.update({'dxn': dxn, 'dxn_full': dxn} if dxn else {})
         print('   Xbox DXN textures on PC registers %s (translator: y from alpha, z = 0, w = 1)' % sorted(dxn), flush=True)
         pd = donor or struct.unpack_from('<4I', Pd_[(10, pm0)].data, 0x28)[2]
