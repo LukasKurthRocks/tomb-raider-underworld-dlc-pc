@@ -2799,6 +2799,49 @@ as for 0.21.9 if wanted).
 | 9 | Rettung "Sicherung zurueck ..." | line `save.restore `; type a folder of "Sicherungen (Liste)"; A asks twice (kCmdDanger), then the restore's own confirmation |
 | 10 | long menu, Quick bar pages, "Rettung / Rescue" | same rows; the "..." buttons fill the command bar |
 
+## TruMenu 0.22 (cutscene pause: cine.pause / cine.step / cine.status; 2026-11-08)
+
+Build `work\asi\menu0223` (TODO N12; facts: `docs\Befund-Szenenpause-0811.md` of the workspace, ENGINE.md section 3
+"Cinematic stream clock"). Asked for to look at the flicker at the throne in the DLC 2 end cutscene: hold the cutscene
+only, while the world goes on. `TruMenu.ini` unchanged, ring untouched, no new import.
+
+**How (section "0.22 cutscene pause").** Every multiplex stream (a cutscene is one: animation and sound in one stream
+object) is advanced once per frame by a list walk: head `[0xccdc64]`, update 0x5901a0 (thiscall, float dt) returns the
+next stream `[obj+0x14]`; the walk exists twice, its calls are 0x5904e3 / 0x5954f8. For a cutscene stream
+(`[obj+0x77c]` = its cinematic handler, `[obj+0x18]` = 4 playing) the update reads the stream file, feeds the sound
+ring (its sample counter is the cutscene clock), sets the cutscene time `[obj+0x384]`, plays the keys between the old
+and the new time and runs the handler update. While `cine.pause` is on, the rel32 of both calls point to a gate that
+skips the update of a playing cutscene stream only and returns its next pointer: cutscene time, actors and camera
+stand still; world time, particles, shader time and lights run on; other streams (music, ambience) are untouched.
+Patched on the game thread while the pause is on, put back when it is off; **off by itself** when the main state
+`[0xe7ed60]` leaves 1 (a load). Before the first use 7 byte patterns are checked (a mismatch = "disabled: pre-check
+failed"). Not used on purpose: the pause bit 0xe7f0b8 & 0x1000 (stops the instance updates, so the effects too) and
+the capture mode 0xe7f0a4 & 4 (a fixed 1/30 s per frame, so double speed at 60 fps).
+
+| Item | Kind | What |
+|---|---|---|
+| `cine.pause [0\|1]` | bool | hold / release a playing cutscene (no argument = toggle); needs a loaded level |
+| `cine.step [n]` | action | let n frames (default 1, at most 600) of the held cutscene through |
+| `cine.status` | info | the stream list: the cutscene stream (state, time, handler, sound), GameTracker cinematic `[0xe7f1c0]`, the pause |
+
+Bar page **Tests**, group "Zwischensequenz": Szene anhalten (bool), Ein Bild weiter, Szenen-Strom (live). Log lines:
+on / off, one "holds cutscene stream 0x... at time ..." per held stream, the held frames when it is released.
+
+Open (live): what the sound does while held - the sound ring is not fed, so FMOD may play silence or repeat the ring;
+whether the cinematic handler counts its own times that would jump on release.
+
+### TO TEST 0.22
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | log after the first `cine.status` | `0.22 cine.pause: 7 checks ok` |
+| 2 | in a level without a cutscene: `cine.status` | "no cutscene stream", a few streams (music / ambience) |
+| 3 | DLC 2 end cutscene `020_ghoul` (bar Tests "End-Szene"), while it plays: `cine.pause 1` | picture of the scene stands, particles / lights move on; log "holds cutscene stream" |
+| 4 | `cine.step` a few times, then `cine.step 30` | one frame / half a second of the scene each time |
+| 5 | listen while held | note: silence or a repeating sound |
+| 6 | `cine.pause 0` | the scene goes on from where it stood, sound in sync |
+| 7 | held, then a load (level.load / checkpoint) | log "off by itself"; the load works |
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

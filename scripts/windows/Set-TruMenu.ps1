@@ -117,7 +117,8 @@ $earlierBuilds = @{
                       '4a5b60b397c0e74af0a36d24514fb7ef68d7fd20933e3d0f7edf08ad81b69a59',   # 0.21.7 help lines, label layers (work\asi\menu0217)
                       '9d1e487dde97a362dd2cc1d9228594fdfaeb0fb7cd6d071556770fef498519f5',   # 0.21.8 command line, favourites with argument (work\asi\menu0218)
                       'cf4f387174adb115be9df5c5f31adb3733f58cab9b03a146164b66be7aaf715b',   # 0.21.9 test spots, CP rows, units without a DRM (work\asi\menu0219)
-                      '148066e8a7d1bcc197e9febd04181ba464056a2132aa3cfb66ae828cacb9183d')   # 0.21.10 unused DLC slots (work\asi\menu0220 / menu0221)
+                      '148066e8a7d1bcc197e9febd04181ba464056a2132aa3cfb66ae828cacb9183d',   # 0.21.10 unused DLC slots (work\asi\menu0220 / menu0221)
+                      '35fc734773c461ef55521534f513d53b0019c4d8761a920a921c2e65361f5707')   # 0.21.11 light.list, page Rettung (work\asi\menu0222)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
