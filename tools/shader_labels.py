@@ -12,7 +12,8 @@ Inputs:
   * work/render/dlc_shader_map.json: per DLC Xbox lib its class (A / B = byte-identical base lib -> PC twin,
     C1..C3 / D = surrogate chosen by similarity) and the PC lib the converter used ("pc")
 Slot status (per material and slot 0..3 = PS pass 0, PS pass 1, PS pass 2 (colour), VS):
-  O  original     Xbox lib class A / B and the PC copy uses its PC twin
+  O  original     Xbox lib class A / B and the PC copy uses its PC twin, or the PC copy uses a base PC lib that is a
+                  PROVEN 1:1 equivalent of the Xbox lib (table EQUIV below; e.g. VS 1911 for Xbox VS 2456, 23164)
   T  translated   the PC copy uses a lib id that is no base PC lib (a lib our TU translation added, e.g. 2842..2994)
   S  surrogate    Xbox lib class C* / D (no byte-identical base twin) and the PC copy uses a base PC lib (the
                   converter's surrogate, or B138's own donor in DLC 1) or a renumbered copy of the surrogate
@@ -42,6 +43,10 @@ Usage (from the repository root):
       Xbox lib | ... | 51x |") whose last column becomes the material's note; --trees: test-tree mods folders scanned
       for a translated copy of each SURR / PART material (note "fix in <tree> (libs ...)"); --grid: batch clustering
       cell in units (default 4096): draws of one material in one terrain section are merged per grid cell
+  ../bin/pyt -t 900 tools/shader_labels.py selftest
+      the EQUIV table is well-formed and acts only on its pairs (23164: installed S-SS -> S-SO, test tree T-TS -> T-TO
+      = TU; an unproven pair such as Xbox 2371 / PC 1911 stays S; with --no-equiv the letters of the tool before)
+  --no-equiv (mats / near / build): classify without the EQUIV table (the letters of the tool before 08.11.)
 """
 import sys, os, struct, json, pickle, re, collections
 import numpy as np
@@ -51,6 +56,27 @@ import drm_write as DW, drm_reloc as R, terrain_convert as TC
 
 W = os.path.join(ROOT, 'work', 'render')
 _REF = None
+
+# PROVEN 1:1 equivalents: {Xbox DLC lib id: {base PC lib id: proof}}. A slot whose Xbox lib has no byte-identical base
+# twin (class C* / D) but whose PC lib is listed here counts as O, not S. Only pairs with a proof go in, never a
+# similarity guess. Proof standard (work/n6shaders_0711/vs_twin_cmp.py): a BASE Xbox lib X whose PC twin is P has the
+# byte-identical entry in every slot P occupies; PC libs with the same D3D code and entry hash in every slot count as P.
+EQUIV = {
+    2456: {   # VS of 23164 (end-room light column): d2456 = x1067 in all 60 PC slots (differs only in 41 / 42 / 105 /
+              # 106 / 169 / 170 / 233 / 234, which the PC has not); x2p(1067) = 1911; x1067 = x2028 in all 72 slots;
+              # PC 1911 = 1737 = 1718 = 1689 in all 60 slots (D3D body and entry hash; only the lib word0 differs)
+        1911: 'work/n6shaders_0711/vs_twin_cmp.txt + work/endcolumn_0711/vs_slot_cmp.txt',
+        1737: 'work/endcolumn_0711/vs_slot_cmp.txt (body / hash 60 / 60 = 1911)',
+        1718: 'work/endcolumn_0711/vs_slot_cmp.txt (body / hash 60 / 60 = 1737)',
+        1689: 'work/endcolumn_0711/vs_slot_cmp.txt (body / hash 60 / 60 = 1718)',
+    },
+}
+USE_EQUIV = True
+
+
+def equivalent(x, p):
+    """True when base PC lib p is a proven 1:1 equivalent of Xbox DLC lib x (EQUIV, unless --no-equiv)"""
+    return USE_EQUIV and p in EQUIV.get(x, ())
 
 
 def ref():
@@ -137,6 +163,8 @@ def classify(mid, pc, libs=None):
             else:
                 letters.append('T')
             continue
+        if equivalent(x, p):
+            letters.append('O'); continue    # base PC lib proven 1:1 equal to the Xbox lib (EQUIV)
         if e['cls'] in ('A', 'B'):
             letters.append('O' if p == e['pc'] else '?')
         else:
@@ -210,8 +238,15 @@ def fmt_t(t):
     return '/'.join('-' if v is None or v == 0 else str(v) for v in t)
 
 
+def equiv_opt(argv):
+    """--no-equiv: classify without the EQUIV table (removed from argv)"""
+    global USE_EQUIV
+    if '--no-equiv' in argv: argv.remove('--no-equiv'); USE_EQUIV = False
+
+
 # ------------------------------------------------------------------------------------------------------------ mats
 def cmd_mats(argv):
+    equiv_opt(argv)
     for p in argv:
         D = read(p); M = pc_mats(D); LB = pc_libs(D)
         print('== %s: %d materials' % (os.path.basename(p), len(M)))
@@ -223,6 +258,7 @@ def cmd_mats(argv):
 
 # ------------------------------------------------------------------------------------------------------------ near
 def cmd_near(argv):
+    equiv_opt(argv)
     live = '--live' in argv
     if live: argv.remove('--live')
     bad = '--bad' in argv
@@ -299,6 +335,7 @@ def clean(s):
 
 
 def cmd_build(argv):
+    equiv_opt(argv)
     units = None; reasons = {}; trees = []; grid = 4096.0
     if '--units' in argv: k = argv.index('--units'); units = [u.lower() for u in argv[k + 1].split(',')]; del argv[k:k + 2]
     if '--reasons' in argv: k = argv.index('--reasons'); reasons = reasons_from(argv[k + 1]); del argv[k:k + 2]
@@ -387,6 +424,9 @@ def write_out(outd, mats, origins, batches, files, mods, objects=None):
         f.write('#   M <material> <status> <slots> <pc libs a/b/c/d> <xbox libs> <xbox classes> <surrogate pc libs> <mixed 0|1> <note>\n')
         f.write('#      status SURR / PART / UNK / TU / ORIG / BASE; slots = 4 letters (PS0 PS1 PS2 VS): O original, T translated,\n')
         f.write('#      S surrogate, ? unknown, - empty; mixed 1 = copies in different DRMs differ (load order decides)\n')
+        if USE_EQUIV:
+            f.write('#      O also = a base PC lib PROVEN 1:1 equal to the Xbox lib (xbox=pc,pc..): %s\n' % ' '.join(
+                '%d=%s' % (x, ','.join(str(p) for p in sorted(ps))) for x, ps in sorted(EQUIV.items())))
         f.write('#   B <drm> <owner unit> <section> <material> <status> <cx> <cy> <cz> <sx> <sy> <sz> <indices> <draws> <y list>\n')
         f.write('#      batch = draws of one material in one render terrain section, merged per grid cell; centre / size in\n')
         f.write('#      the DRM data frame (subtract the owner unit origin for live coordinates)\n')
@@ -448,7 +488,49 @@ def write_out(outd, mats, origins, batches, files, mods, objects=None):
         len(mats), ' '.join('%s=%d' % kv for kv in sorted(stat.items())), len(batches), len(origins), outd))
 
 
+# -------------------------------------------------------------------------------------------------------- selftest
+def cmd_selftest(argv):
+    """EQUIV well-formed and acting only on its pairs; 23164 letters with and without the table"""
+    global USE_EQUIV
+    dm, sm, base = ref(); bad = []; n = 0
+
+    def ok(cond, what):
+        nonlocal n
+        n += 1
+        print('  %-4s %s' % ('ok' if cond else 'FAIL', what))
+        if not cond: bad.append(what)
+    for x, ps in sorted(EQUIV.items()):
+        e = sm.get(x)
+        ok(e is not None and e['cls'] not in ('A', 'B'), 'EQUIV key %d is a DLC Xbox lib without byte-identical twin (cls %s)' % (x, e and e['cls']))
+        for p in sorted(ps):
+            ok(p in base, 'EQUIV %d -> %d is a base PC lib' % (x, p))
+            ok(bool(ps[p]), 'EQUIV %d -> %d names its proof' % (x, p))
+    ok(dm.get(23164) == (2454, 0, 2455, 2456), '23164 Xbox tuple 2454/-/2455/2456 (got %s)' % (dm.get(23164),))
+    save = USE_EQUIV
+    try:
+        for use, inst, tree in ((True, ('SURR', 'S-SO'), ('TU', 'T-TO')), (False, ('SURR', 'S-SS'), ('PART', 'T-TS'))):
+            USE_EQUIV = use
+            r1 = classify(23164, (1909, None, 1910, 1911))[:2]; r2 = classify(23164, (2491, None, 2851, 1911))[:2]
+            ok(r1 == inst, 'equiv %s: installed 23164 1909/-/1910/1911 -> %s %s (want %s %s)' % (use, *r1, *inst))
+            ok(r2 == tree, 'equiv %s: test tree 23164 2491/-/2851/1911 -> %s %s (want %s %s)' % (use, *r2, *tree))
+        USE_EQUIV = True
+        ok(not equivalent(2456, 1910) and not equivalent(2455, 1911) and not equivalent(2371, 1911),
+           'pairs outside the table are not equivalent (2456/1910, 2455/1911, 2371/1911)')
+        m2371 = sorted(m for m, t in dm.items() if t[3] == 2371)
+        if m2371:
+            m = m2371[0]; pc = tuple(sm[x]['pc'] if x and x in sm else None for x in dm[m][:3]) + (1911,)
+            lt = classify(m, pc)[1]
+            ok(lt[3] == 'S', 'unproven pair Xbox VS 2371 / PC 1911 (material %d) stays S (got %s)' % (m, lt))
+        else:
+            ok(False, 'a material with Xbox VS 2371 exists for the negative case')
+    finally:
+        USE_EQUIV = save
+    print('%d checks, %d failed: %s' % (n, len(bad), 'SELFTEST PASSED' if not bad else 'SELFTEST FAILED'))
+    if bad: sys.exit(1)
+
+
 if __name__ == '__main__':
-    if len(sys.argv) < 3: sys.exit(__doc__)
+    if len(sys.argv) < 2 or (len(sys.argv) < 3 and sys.argv[1] != 'selftest'): sys.exit(__doc__)
     cmd, a = sys.argv[1], sys.argv[2:]
-    {'mats': cmd_mats, 'near': cmd_near, 'intros': cmd_intros, 'build': cmd_build}.get(cmd, lambda a: sys.exit(__doc__))(a)
+    {'mats': cmd_mats, 'near': cmd_near, 'intros': cmd_intros, 'build': cmd_build,
+     'selftest': cmd_selftest}.get(cmd, lambda a: sys.exit(__doc__))(a)
