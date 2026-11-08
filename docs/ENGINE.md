@@ -81,6 +81,8 @@ Xbox / PC pairs, decompiled code or the running game when that file was written.
 | The **installed** `doppelganger_casual.drm` predates the twins step: 392 words in 34 SoundPlex DTPs (incl. the moan trees) are still in the converter's byte order; a fresh pipeline run fixes them (test tree in progress) | ✅ data | section 18.1, `work/moan_0711` |
 | Cutscene command lists: records `{u16 type, u16 frame}{u32 uid}{u16, u8, u8}{u16 msg, u16 par}[extra]`, length = 12 + 4 * (type >> 12) (format A) or 8 + ... (format B, with an initial DTP id); terminator `ffff0000`. Converted as plain u32 words, type / frame swap and the cinematic never gets `Cine_Start` | ✅ | (from FINDINGS.md) |
 | Physics records of custom-range grapple rings (tag 0x404): the enable byte at +4 must stay raw | ✅ | (from FINDINGS.md) |
+| **Fade-record DTP** (card / flash / key-glow objects: `co_white_flash`, `co_dlc_black_card` 22651, `co_dlc_white_card` 26832, keys, gems, g_pda): +0x04 / +0x08 and +0x44 / +0x48 = {u16 count, u16 0} / pointer to the records at +0x90, 12 B each {u16 from, u16 to}{u16 frames, u16 word2}{u8 r, g, b, a}; PC word classes s16, s16, raw (42 of 42 base records in 14 DTPs). The learned type-7 table broke them in the installed DLC 2 cards: black card 17 / white card 3 words in the wrong byte order (pod fade-in 6400 instead of 25 frames, finale from / to reversed, ghoul record 5 colour `ffff00ff`); B270 is right. Fix test tree `work/endcine_0811` (= B270 md5); pipeline step `fadecard` ⬜ | ✅ | 17h-B 08.11. (`work/endcine_0811/fade_layout_scan.py`, `fade_fix.py`) |
+| Cine command type 0x2001 msg 34 (0x22): par = fade-record index of the target object; fade 0x1000 = invisible, 0 = opaque (ghoul f0 rec 5 / f833 rec 4, pod f0 rec 0, podon, finale, crush); meaning of word2 ⬜ | 🔶 data | `work/endcine_0811/cine_drm_cmp.py` |
 | Each translated material gets its own shader lib id (2756-2774, 2775-2781, 2782; 975 / 976 are VS / PS donors copied into streamgroups), because of the first-copy-wins rule below | ✅ | (from FINDINGS.md), [LINEAGE.md](LINEAGE.md) |
 | Language variants: `ArchiveFileSystem::FindEntry` 0x4726e0 takes the first record with `(spec & mask) == mask`; English loads `<name>_001` (spec 0xffffffe1) before the base name | ✅ | section 18.5 |
 
@@ -293,6 +295,7 @@ against resident 12433 (3300 B) crashed the unload at 0x5976a3 (`script_base_cla
 | Who sends the death event (vt31) | Death Enter 0x66c500 (via 0x66c310), LandDeath 0x66ccf0, DrownDeath 0x66d890, DeferredInstantDie 0x652630, 0x624c60, 0x6d3080. **Not**: Despawn 0x61cda0, ReallyRemoveInstance 0x5bc4e0, RegenerateDeath | | ✅ |
 | `PlayNotification` | **0x77a540** (`ret 4`, this `[0xfae880]`); loops the stream table from 0xdbac08 (state 2), unit event vt23 via `[0x105b8e0]`, sender 0x79d650 | 0x8247b0f0, this `[0x829ca684]` | ✅ |
 | Script message 0x20 -> PlayNotification | 0x768a20 (call 0x768a39 = the only native PC caller) | 0x82473928; the TU drops a repeat of the last id (+0x4f0), PC does not ⬜ | ✅ |
+| Instance message switch | 0x5b6ba0 (needs inst+0x280): index msg-3 (3..0x23), byte map 0x5b6d98, targets 0x5b6d74, default 0x5b6d43; msg 34 (cine fade) is not handled there, its reader is not found ⬜ | | ✅ static |
 
 **Notification ids** (receiver in DLC 2: level script 23101 f3 "OnNotification"):
 
@@ -369,6 +372,7 @@ Plugin: TruMenu 0.21.4 `fix.hall02` (only when no live 1004 thrall: tutorial 185
 | PlayCinematic | base script 3523 f0 (prototype +0x2410, vtable slot 57, Symbol 6016) | ✅ |
 | Extended ending | `l7_himalaya_end` (unit 78) level script 18330 -> 18332 -> 3523 f0 plays `343_hel_engame` (59.03 s); the shipped monastery script 18497 ends the game first | ✅ data / ⬜ live |
 | Direct start | `uigamedata` f27(unit, 1, 0, 1) after f22, then `stdscreenmgr` f19 + f7; script 60 = AttractTimer (test 41e: `script_directstart_stub.py`) | ✅ |
+| DLC 2 cinematics | `000_fight` level2_start -> `020_ghoul` yggdrasil_end (32.37 s; actors 9641 / 9642 co_wp_handgun, 9639 co_lights, 10038 black card; Natla 10155 via the command list DTP 24350; Xbox unit 105 -> PC 106) -> level change -> `030_pod` / `040_podon` ceremony_room -> `045_finale` / `050_crush` treasure_room_cine. Ghoul end: Cine_End, checkpoint by cinematic_object 9611, level change by name to `dlc2_ceremony_room` (0x5dfb20, doneType 4), where placement finds no intro 9611 and falls back (0x5d4330; Xbox the same? 🔶). Order and .mul (5 languages) = Xbox | ✅ data + live log 08.11. |
 | Golden shotgun (884) | pickup in `dlc_dungeon` (intro 9475, script 20313 -> UI 23339); weapon-name case 5 (TU 0x8247dbc0) / reward code 0x8229fc08 missing on PC | ⬜ |
 
 Sources: `Befund-Hall02-Wand-0711.md`, `Befund-Hall02-Zaehler-Drift-0711.md`, `Befund-Hall02-TU-Vergleich-0711.md`,
