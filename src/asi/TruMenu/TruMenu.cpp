@@ -21496,49 +21496,96 @@ bool CnHeldNow() {
     // and resumed every 30 - 130 ms, the badge flickered, the cutscene line looped)
     return g_cnOn && g_cnPause && tick && static_cast<LONG>(GetTickCount() - tick) < 500;
 }
-// game thread: the master group follows the hold (paused), a step (running muted) and the release (running, the
-// mute TruMenu set taken back after the pause - so the release starts the sound before the stream moves on)
+// The groups to hold: the master group and the ROOT of every sound category's group tree. Live 0.22.1 (2026-11-08
+// 20:52): the master group (0x19740dc8) had 12 plain channels and no child group (+0x20 = 0) - the category groups
+// (music / SFX / speech / ..., 0x583260 adds each under its parent node's group) form their own tree, and the cutscene
+// line went on in a loop while the master group was paused. ChannelI::setPaused 0x7c9beb only follows the channel's
+// own chain (group +0x8c, parent +0x1c, flag +0x59), so every root is paused once.
+struct CnSnd { DWORD cg; bool paused, muted, wasMuted; };
+CnSnd g_cnSnd[8];
+int g_cnSndN = 0;
+int CnSndRoots(DWORD out[8]) {
+    int n = 0;
+    const DWORD master = CnMaster();
+    if (master) out[n++] = master;
+    int cats[5];
+    if (!SnCats(cats)) return n;
+    for (int i = 0; i < 5; ++i) {
+        DWORD cg = SmGroupCg(cats[i]);
+        for (int depth = 0; cg && depth < 16; ++depth) {   // up to the root (parent +0x1c = 0)
+            DWORD parent = 0;
+            if (!ReadDword(cg + 0x1c, &parent) || !parent) break;
+            cg = parent;
+        }
+        bool known = !cg;
+        for (int j = 0; j < n && !known; ++j) known = out[j] == cg;
+        if (!known && n < 8) out[n++] = cg;
+    }
+    return n;
+}
+// game thread: the root groups follow the hold (paused), a step (running muted) and the release (running, the mute
+// TruMenu set taken back after the pause - so the release starts the sound before the stream moves on). Only what
+// TruMenu paused / muted is given back; a group the game paused again (its pause screen) stays the game's.
 void CnSoundTick() {
     const bool held = CnHeldNow();
     const bool want = g_cnSndOk && (held || g_cnStepping);
-    if (!want && !g_cnSndOurs && !g_cnSndMuted) return;
-    const DWORD group = CnMaster();
-    DWORD flags = 0;                             // byte 0 = +0x58 muted, byte 1 = +0x59 paused
-    if (!group || !ReadDword(group + 0x58, &flags)) return;
-    const bool muted = (flags & 0xff) != 0, paused = (flags & 0xff00) != 0;
-    if (want && g_cnStepping) {
-        if (!g_cnSndMuted) {
-            g_cnSndWasMuted = muted;
-            if (!muted) CnSndMute(group, true);
-            g_cnSndMuted = true;
+    bool any = false;
+    for (int i = 0; i < g_cnSndN; ++i) any = any || g_cnSnd[i].paused || g_cnSnd[i].muted;
+    if (!want && !any) { g_cnSndN = 0; g_cnSndOurs = g_cnSndMuted = false; return; }
+    if (want) {                                  // groups created since (a new category) join the list
+        DWORD roots[8];
+        const int n = CnSndRoots(roots);
+        for (int r = 0; r < n; ++r) {
+            bool known = false;
+            for (int i = 0; i < g_cnSndN && !known; ++i) known = g_cnSnd[i].cg == roots[r];
+            if (!known && g_cnSndN < 8) g_cnSnd[g_cnSndN++] = {roots[r], false, false, false};
         }
-        if (g_cnSndOurs) {
-            CnSndPause(group, false);
-            g_cnSndOurs = false;
+    }
+    int pausedNow = 0, newlyPaused = 0, released = 0;
+    for (int i = 0; i < g_cnSndN; ++i) {
+        CnSnd &e = g_cnSnd[i];
+        DWORD flags = 0;                         // byte 0 = +0x58 muted, byte 1 = +0x59 paused
+        if (!ReadDword(e.cg + 0x58, &flags)) continue;
+        const bool muted = (flags & 0xff) != 0, paused = (flags & 0xff00) != 0;
+        if (want && g_cnStepping) {
+            if (!e.muted) {
+                e.wasMuted = muted;
+                if (!muted) CnSndMute(e.cg, true);
+                e.muted = true;
+            }
+            if (e.paused) {
+                CnSndPause(e.cg, false);
+                e.paused = false;
+            }
+        } else if (want) {
+            // not paused (yet, or again: the game's pause screen resumes its groups when it closes) -> pause it
+            if (!paused && CnSndPause(e.cg, true)) {
+                if (!e.paused) ++newlyPaused;
+                e.paused = true;
+            }
+            if (e.muted && (e.paused || paused)) {
+                if (!e.wasMuted) CnSndMute(e.cg, false);
+                e.muted = false;
+            }
+        } else {
+            if (e.paused) {
+                CnSndPause(e.cg, false);
+                e.paused = false;
+                ++released;
+            }
+            if (e.muted) {
+                if (!e.wasMuted) CnSndMute(e.cg, false);
+                e.muted = false;
+            }
         }
-        return;
+        if (e.paused) ++pausedNow;
     }
-    if (want) {
-        // not paused (yet, or again: the game's pause screen resumes the master group when it closes) -> pause it
-        if (!paused && CnSndPause(group, true)) {
-            if (!g_cnSndOurs) Log(1, "cine.pause: master channel group 0x%08lx paused (the cutscene sound with it)", group);
-            g_cnSndOurs = true;
-        }
-        if (g_cnSndMuted && (g_cnSndOurs || paused)) {
-            if (!g_cnSndWasMuted) CnSndMute(group, false);
-            g_cnSndMuted = false;
-        }
-        return;
-    }
-    if (g_cnSndOurs) {
-        CnSndPause(group, false);
-        g_cnSndOurs = false;
-        Log(1, "cine.pause: master channel group 0x%08lx running again", group);
-    }
-    if (g_cnSndMuted) {
-        if (!g_cnSndWasMuted) CnSndMute(group, false);
-        g_cnSndMuted = false;
-    }
+    if (newlyPaused) Log(1, "cine.pause: %d channel group(s) paused (master + the roots of the sound categories; %d held)",
+                         newlyPaused, pausedNow);
+    if (released) Log(1, "cine.pause: %d channel group(s) running again", released);
+    g_cnSndOurs = pausedNow > 0;
+    g_cnSndMuted = false;
+    for (int i = 0; i < g_cnSndN; ++i) g_cnSndMuted = g_cnSndMuted || g_cnSnd[i].muted;
 }
 // PadHook, once per game frame: the patches follow the switch; off by itself outside a level; steps, sound, pauseat
 void CnTick() {

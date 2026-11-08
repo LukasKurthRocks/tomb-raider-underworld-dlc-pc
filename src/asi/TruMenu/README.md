@@ -2871,6 +2871,12 @@ Build `work\asi\menu0224`, live wishes of the 0.22 test. `TruMenu.ini` unchanged
 - Byte checks: 4 more (`kCnSndChecks`); without them the picture pause still works and the badge says "Ton: Schleife".
 - Bar page Tests, group "Zwischensequenz": + Stelle merken, Bei Marke anhalten.
 
+Live 2026-11-08 (20:44 - 21:08): the first build released and paused the sound every 30 - 130 ms (unsigned tick
+difference, fixed); the master group alone did not hold the cutscene line - the sound category groups form their own
+tree (master: 12 plain channels, no child group). The final build pauses the master group and the root of every
+category tree (log: "2 channel group(s) paused"): silence while held, the line goes on exactly where it stopped, in
+sync. Steps and `cine.pauseat` not yet tried live.
+
 ### TO TEST 0.22.1
 
 | # | Step | Expected |
