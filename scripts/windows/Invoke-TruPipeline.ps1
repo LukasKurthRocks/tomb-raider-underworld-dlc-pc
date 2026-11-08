@@ -143,7 +143,8 @@
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
-    progress bar, "tool N/M").
+    progress bar, "tool N/M"); -ToTool N (2026-11-08) stops after the N-th tool, so a long step can be split
+    (e.g. Repair -ToTool 5 = snapshot + generalbank + K12, later -FromTool 6 = b138_fix_tree + checks).
 
     Progress: a progress bar (Write-Progress) shows the running tool and its time; steps with a known number of
     output files (Convert: 300 DRM files) also show percent and an estimate. Every 30 s a "still running" line is
@@ -172,6 +173,7 @@
 param(
     [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
+    [ValidateRange(1, 99)][int]$ToTool = 99,
     [ValidateRange(0, 16)][int]$Jobs = 0,
     [ValidateRange(0, 64)][int]$LightJobs = 0,
     # steps Fixes / Costumes / Generalbank / Repair: output folder below the repository instead of work/rebuild/asm_stage2b + dlc2_asm_stage2b
@@ -573,6 +575,10 @@ try {
         $toolIndex++
         if ($toolIndex -lt $FromTool) {
             Write-Log ('== skipped (FromTool {0}): {1}' -f $FromTool, ($toolArgs -join ' ')) -Level VERBOSE
+            continue
+        }
+        if ($toolIndex -gt $ToTool) {
+            Write-Log ('== skipped (ToTool {0}): {1}' -f $ToTool, ($toolArgs -join ' ')) -Level VERBOSE
             continue
         }
         $t0 = Get-Date

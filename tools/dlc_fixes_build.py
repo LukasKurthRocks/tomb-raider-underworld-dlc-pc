@@ -49,6 +49,9 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          is the base Xbox DTP of the same id (= the PC base copy, e.g. the colour LUT 18577); each rule proven on the
          base pairs once per run, only words whose PC bytes are another byte order of the Xbox word, each written DRM
          proven
+  fxrecread (ours, 2026-11-08, 18e) after basecopy, also tools/typed_family_fix.py: the 0x17c particle record words of
+         the object data DTP at the 12 offsets objrec does not rule, by the reads of tru.exe 0x543f70 (u8 fields in
+         place, +0x58 / +0x5c / +0x160 u16); introtyped takes the unit-DTP pointer-path table of 77 base units since 18e
   seqrepeat (ours, 2026-11-05, finding 49) after objid, also tools/dlc_struct_fixes.py: the word data +0xc of SoundPlex
          Sequence nodes (s8 repeat + 3 bytes) raw = the Xbox bytes (tools/soundplex_sequence_fix.py; the converter
          u32-swapped repeat 1 to 0 = endless, the DLC 2 doppelganger's groan); a word that is no byte order of the
@@ -370,14 +373,16 @@ def _struct_fix(step):
 # night 07./08.11. (tools/typed_family_fix.py) after dspkind, before seqrepeat (none writes a word of the earlier data
 # fixes, seqrepeat or the NavGraph image; basecopy last - the PC base copy has the last word); Invoke-TruPipeline.ps1
 # proves the rules first (typed_family_fix.py proof) and gates every tree afterwards (dlc_struct_fixes.py check)
+# fxrecread (2026-11-08, 18e): the 0x17c particle record words objrec does not rule, by the reads of tru.exe 0x543f70,
+# after basecopy, before seqrepeat (introtyped takes the unit-DTP path table since 18e as well)
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
                 'markup', 'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro',
                 'costumedtp', 'dspkind', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
-                'seqrepeat', 'navraw', 'vmliteral')
+                'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
  fix_markup, fix_objtex, fix_objrec, fix_objid, fix_chunkrec, fix_exttuning, fix_thrallext, fix_meleelink, fix_genintro,
  fix_costumedtp, fix_dspkind, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh, fix_introtyped, fix_leveltwin,
- fix_basecopy, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+ fix_basecopy, fix_fxrecread, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 def _fault_fix(step):

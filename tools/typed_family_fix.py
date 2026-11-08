@@ -30,6 +30,20 @@ Rules (step names of tools/dlc_struct_fixes.py):
              -> raw (17j-b pattern_twins.py: DTP 22819 of dlc2_checkpoint, 13 DRMs)
   sgmesh     streamgroup mesh-list DTPs {u32 n, n x {u32 mesh id (idref 12), u32, u32, u32}}: every word s32 (the id
              words are left to the converter's id map) (17j-b sg_mesh_list.py)
+  fxrecread  the 0x17c particle records of the object data DTP (object +8 -> DTP, u16 count +0x0c, records at [+0x10];
+             reader tru.exe 0x543f70, record = [objdata+0x10] + i * 0x17c at 0x543fc2) at the 12 offsets objrec does
+             not rule (tools/objdata_rec_classes.py): the reader reads +0x40 / +0x90 bytes 0-2, +0x68 / +0x88 bytes
+             0-1, +0x7c / +0x12c / +0x14c byte 0, +0x11c / +0x174 bytes 0-3 as u8 -> raw (bytes read in place);
+             +0x58 {u8, u8, u16} -> b2s16, +0x5c u16 at byte 0 -> s16b2, +0x160 {u16, u16} -> s16 (17o p2_fields /
+             p3_bytes, 18e)
+introtyped also takes, since 18e (2026-11-08), the words of the unit-DTP pointer-path table (17o d4_table): every
+  pointer-target region of the unit DTP labelled by its pointer path from the root (intros by object name), base samples
+  of all base units with an Xbox + PC unit DTP of the same intro count / names (77), tiers K1 exact (label, size, offset)
+  -> KS root/+1a4 stride 0x100 -> KA alias -> K3 last step wild (17o's size-only tier KZ is not used: on the 0812
+  pipeline copies it typed DLC 1 float records as u16 pairs); a tier decides when the intersection of its samples'
+  byte orders gives ONE wanted word for this Xbox word, no sample is 'other' and >= 10 votes come from base samples of
+  the same zero / non-zero byte shape as the DLC word; the 17j-b rules above win where they speak. NOT the word unit DTP 23100 +0x6268 (dlc_yggdrasil_hall02: the
+  17l fp rule says s32, the table s16 - owner decision open).
 Not built here (owner decision pending, 17l / 17m): odtwin (aligned thrall object data), fpkeys (dtp_audit keys),
 the DTP 24392 re-spacing + twin step, class-d words.
 
@@ -41,13 +55,24 @@ Usage (from the repository root):
 Library (steps of tools/dlc_struct_fixes.py): fix_drm(rule, XD, raw, rel) -> (new raw or None, changes [(section index,
   offset, old, new, section id, tag)], info dict(rows, kept, notes)); proven(rule) -> (ok, lines) once per process.
 """
-import sys, os, struct, collections, json, io, contextlib
+import sys, os, struct, collections, json, io, contextlib, pickle
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import drm_reloc as R, drm_write as DW
 
-RULES = ('fadecard', 'uberanim', 'basecopy', 'leveltwin', 'introtyped', 'fxrec', 'sgmesh')
+RULES = ('fadecard', 'uberanim', 'basecopy', 'leveltwin', 'introtyped', 'fxrec', 'sgmesh', 'fxrecread')
 PERMS = {'s32': (3, 2, 1, 0), 's16': (1, 0, 3, 2), 'raw': (0, 1, 2, 3)}
+# u16 / u8 mixes (unit-DTP path table and fxrecread): b2s16 = bytes 0, 1 in place + u16 at byte 2, s16b2 = u16 at byte 0
+XPERMS = dict(PERMS, b2s16=(0, 1, 3, 2), s16b2=(1, 0, 2, 3))
+# fxrecread: record offset -> byte order, from the reads of tru.exe 0x543f70 (offsets that objrec does not rule)
+FXREAD = {0x40: 'raw', 0x68: 'raw', 0x7c: 'raw', 0x88: 'raw', 0x90: 'raw', 0x11c: 'raw', 0x12c: 'raw', 0x14c: 'raw',
+          0x174: 'raw', 0x58: 'b2s16', 0x5c: 's16b2', 0x160: 's16'}
+FX_REC = 0x17c
+# introtyped path table
+TABLE_MIN = 10                     # votes a tier key needs
+TABLE_EXCLUDE = {(23100, 0x6268): 'rule conflict (17l fp rule s32, path table K1 s16) - owner decision open'}
+PC_FILELIST = os.path.join(HERE, '..', 'ref', 'yura-release', 'FileLists', 'Tomb Raider Underworld (PC).txt')
+LISTS = os.path.join(HERE, '..', 'work', 'generic', 'lists')
 BEEB = b'\xbe\xeb\xbe\xeb'
 UBER_MAGIC = 0x8080b00b
 FX_ANCHOR = b'\xbf\x80\x00\x00' * 3 + b'\xc0\x4a\x46\x8e' * 2
@@ -72,9 +97,15 @@ PROOF_EXPECT = {
     'basecopy': {'ids_one_xbox_content': 8979, 'ok': 8979, 'contra': 0},
     'leveltwin': {'units': 13, 'ok': 299, 'not_perm': 3, 'contra': 0},
     'introtyped': {'units': 4, 'intros': 595, 'keys': 10, 'keys_with_rules': 10, 'rule_words': 181, 'i7c_u32': 595,
-                   'contra': 0, 'root_block_not_one_order': 1, 'string_raw': 1167},
+                   'contra': 0, 'root_block_not_one_order': 1, 'string_raw': 1167,
+                   # unit-DTP path table (18e = 17o d4_table: 81 base units, 77 with equal intro count / names)
+                   'tbl_units_all': 81, 'tbl_units': 77, 'tbl_samples': 774257, 'tbl_keys_K1': 254442, 'tbl_keys_KS': 64,
+                   'tbl_keys_K3': 186022, 'loo_K1_n': 315349, 'loo_K1_wrong': 3,
+                   'loo_K3_n': 203862, 'loo_K3_wrong': 21, 'loo_KS_n': 19526, 'loo_KS_wrong': 0},
     'fxrec': {'records': 4695, 'ok': 228, 'contra': 0},
     'sgmesh': {'dtps': 84, 'ok': 188, 'amb': 178, 'contra': 0},
+    # 18e: 11 032 base particle records (17o p1_base), 12 offsets x records, 0 slots
+    'fxrecread': {'objrec_overlap': 0, 'objects': 471, 'records': 11032, 'ok': 64929, 'amb': 67455, 'contra': 0},
 }
 
 
@@ -351,6 +382,286 @@ def level_twin(lx):
     return best
 
 
+# ------------------------------------------------------------------------------------------------ unit-DTP path table
+def xperm(w, c): return bytes(w[i] for i in XPERMS[c])
+
+
+def fits(x, p):
+    """the byte orders of XPERMS that turn the Xbox word x into the PC word p (empty = 'other')"""
+    return frozenset(c for c in XPERMS if xperm(x, c) == p)
+
+
+def objlist(n):
+    d = {}
+    for l in open(os.path.join(LISTS, n), encoding='latin-1').read().splitlines()[1:]:
+        if ',' in l:
+            i, s = l.split(',', 1); d[int(i)] = s.strip()
+    return d
+
+
+def dlc_names():
+    """object id -> name for DLC units: Xbox base list + pack10 + pack11 (they agree on every common id)"""
+    if 'dn' not in _ST:
+        d = objlist('xbox_objectlist.txt')
+        for n in ('dlc_pack10_objectlist.txt', 'dlc_pack11_objectlist.txt'):
+            if os.path.exists(os.path.join(LISTS, n)): d.update(objlist(n))
+        _ST['dn'] = d
+    return _ST['dn']
+
+
+def labels(data, ptr, intr, name_of):
+    """{region start: (label, size)}, start(o): every pointer-target region of a unit DTP labelled by its pointer path
+    (BFS from the root; the intro array = ('intros',); a region reached from intro k at intro offset r = (object name of
+    intro k, 'i+r'); from region L at offset r = L + ('+r',)) - 17o regions.labels"""
+    import bisect
+    T = sorted(set(ptr.values()) | {0})
+    T = [t for t in T if t < len(data)]
+    size = {t: (T[i + 1] if i + 1 < len(T) else len(data)) - t for i, t in enumerate(T)}
+
+    def start(o):
+        i = bisect.bisect_right(T, o) - 1
+        return T[i] if i >= 0 else 0
+    ia = ptr.get(0x10); n = len(intr)
+    lab = {0: ('root',)}
+    if ia is not None: lab[ia] = ('intros',)
+    src = collections.defaultdict(list)
+    for s, t in ptr.items(): src[start(s)].append((s, t))
+    q = collections.deque([0] + ([ia] if ia is not None else []))
+    while q:
+        rs = q.popleft(); L = lab[rs]
+        for s, t in sorted(src.get(rs, [])):
+            if t not in size or t in lab: continue
+            if L == ('intros',) and ia is not None and ia <= s < ia + 0x90 * n:
+                k, r = divmod(s - ia, 0x90); lab[t] = (name_of(k), 'i+%x' % r)
+            else:
+                lab[t] = L + ('+%x' % (s - rs),)
+            q.append(t)
+    return {t: (lab.get(t, ('unreached',)), size[t]) for t in T}, start
+
+
+def alias(n):
+    for a, b in (('_dlc2_', ''), ('_dlc1_', ''), ('_dlc_', ''), ('dlc2_', ''), ('dlc1_', ''), ('dlc_', '')):
+        if a in n: n = n.replace(a, b)
+    return n.strip('_')
+
+
+def shape(w):
+    """zero / non-zero mask of the four bytes (the table's votes come only from base samples of the DLC word's shape)"""
+    return (w[0] != 0, w[1] != 0, w[2] != 0, w[3] != 0)
+
+
+class Votes:
+    """byte-order votes of one table key (17o stat2.Stat2, strict, 18e: shape votes): decided for an Xbox word when the
+    intersection of all sample sets gives one wanted word, no sample is 'other' and >= TABLE_MIN samples OF THE SAME
+    BYTE SHAPE as the word alone fix that word (18e: without the shape condition the table typed DLC words the base
+    never showed in that shape - triggervolume +0x24 / +0x3c 01000000 from base 00000001 samples)"""
+    __slots__ = ('f', 'units', 'other')
+
+    def __init__(self): self.f = collections.Counter(); self.units = set(); self.other = 0
+
+    def add(self, f, unit, sh):
+        self.units.add(unit)
+        if not f: self.other += 1
+        else: self.f[(f, sh)] += 1
+
+    def decide_for(self, xw):
+        if not self.f and not self.other: return None, 'no sample'
+        C = None
+        for f, sh in self.f: C = set(f) if C is None else C & f
+        if self.other or not C: return None, 'contradictory'
+        if len({xperm(xw, c) for c in C}) != 1: return None, 'ambiguous for this word'
+        mx = shape(xw)
+        v = sum(n for (f, sh), n in self.f.items() if sh == mx and len({xperm(xw, c) for c in f}) == 1)
+        if v < TABLE_MIN: return None, 'too few'
+        return sorted(C)[0], 'votes %d' % v
+
+
+def tier_keys(lab, sz, ro):
+    """17o tiers K1 / KS / KA / K3; the size-only tier KZ is NOT used (18e: it typed the float records of DLC 1
+    dlc_caverns 20872 root/+20/+14/+68/+4/+b8 (0x160) and dlc_dungeon 20258 as u16 pairs from unrelated base regions
+    of the same size)"""
+    if lab == ('intros',): return [('K1', (lab, 0x90, ro % 0x90))]
+    k = [('K1', (lab, sz, ro))]
+    if lab == ('root', '+1a4') and sz % 0x100 == 0: k.append(('KS', ro % 0x100))   # as the base side (0x100 records)
+    if lab[0] not in ('root', 'intros') and alias(lab[0]) != lab[0]: k.append(('KA', ((alias(lab[0]),) + lab[1:], sz, ro)))
+    if len(lab) >= 2: k.append(('K3', (lab[:-1] + ('*',), sz, ro)))
+    return k
+
+
+def judge(T, lab, sz, ro, xw):
+    """(tier, byte order or None, why): the first tier with a sample decides; a contradictory / ambiguous tier stops"""
+    for tn, k in tier_keys(lab, sz, ro):
+        s = T[tn].get(k)
+        if s is None: continue
+        c, why = s.decide_for(xw)
+        if c: return tn, c, why
+        if why in ('too few', 'no sample'): continue
+        return tn, None, why
+    return '-', None, 'no base key with votes'
+
+
+def table_units():
+    """[(name, Xbox unit DTP, Xbox ptr, Xbox intros, PC unit DTP, PC ptr, PC intros)] of every base unit (PC file list
+    pc-w\\*.drm with a Level+0x74 unit DTP, Xbox DRM of the same name from layer1 / layer2) - 17o base_units.py"""
+    if 'tu' in _ST: return _ST['tu']
+    from archive import Archive
+    from names import crc
+    names = [l.strip()[5:] for l in open(PC_FILELIST, encoding='utf-8', errors='ignore')
+             if l.lower().startswith('pc-w\\') and l.strip().lower().endswith('.drm') and '\\' not in l.strip()[5:]]
+    P = Archive(PCBIG, 'le'); XA = [Archive(p, 'be') for p in XLAYERS]
+
+    def unit_of(raw, e):
+        D = DW.read(raw, e)
+        k = unit_dtp(D, e)
+        if k is None: return None
+        u = D.sections[k]
+        I, ptr = intros(u, e)
+        return u, ptr, I
+    out = []
+    for n in names:
+        r = P.find(crc('pc-w\\' + n), 0xffffffff) or P.find(crc('pc-w\\' + n))
+        if not r: continue
+        try: pu = unit_of(P.read(r[0]), 'le')
+        except Exception: continue
+        if pu is None: continue
+        xu = None
+        for A in XA:
+            q = A.find(crc('xenon-w\\' + n), 0xffffffff) or A.find(crc('xenon-w\\' + n))
+            if q:
+                try: xu = unit_of(A.read(q[0]), 'be')
+                except Exception: pass
+                break
+        if xu is None: continue
+        out.append((n, xu[0], xu[1], xu[2], pu[0], pu[1], pu[2]))
+    _ST['tu'] = out
+    return out
+
+
+def table_samples():
+    """[(unit, label, region size, region offset, Xbox word, fit set)] of the base units with the same intro count and
+    the same intro object names on both sides; region pairs = same label + size; pointer words skipped"""
+    if 'ts' in _ST: return _ST['ts']
+    xn, pn = objlist('xbox_objectlist.txt'), objlist('pc_objectlist.txt')
+    out = []
+    for name, ux, px, IX, up, pp, IP in table_units():
+        if len(IX) != len(IP) or any(xn.get(a[1]) != pn.get(b[1]) for a, b in zip(IX, IP)): continue
+        xd, pd = bytes(ux.data), bytes(up.data)
+        LX, _ = labels(xd, px, IX, lambda k: xn.get(IX[k][1], '?'))
+        LP, _ = labels(pd, pp, IP, lambda k: pn.get(IP[k][1], '?'))
+        bx = {v[0]: (t, v[1]) for t, v in LX.items()}; bp = {v[0]: (t, v[1]) for t, v in LP.items()}
+        for lab in set(bx) & set(bp):
+            (tx, zx), (tp, zp) = bx[lab], bp[lab]
+            if zx != zp or lab == ('unreached',): continue
+            for w in range(0, zp - 3, 4):
+                if tx + w in px or tp + w in pp: continue
+                xw = xd[tx + w:tx + w + 4]
+                out.append((name, lab, zp, w, xw, fits(xw, pd[tp + w:tp + w + 4])))
+    _ST['ts'] = out
+    return out
+
+
+def path_table():
+    """{tier: {key: Votes}} over all base samples"""
+    if 'pt' in _ST: return _ST['pt']
+    T = {k: collections.defaultdict(Votes) for k in ('K1', 'KS', 'K3')}
+    for un, lab, zp, w, xw, f in table_samples():
+        sh = shape(xw)
+        if lab == ('intros',): T['K1'][(lab, 0x90, w % 0x90)].add(f, un, sh); continue
+        T['K1'][(lab, zp, w)].add(f, un, sh)
+        if lab == ('root', '+1a4') and zp % 0x100 == 0: T['KS'][w % 0x100].add(f, un, sh)
+        if len(lab) >= 2: T['K3'][(lab[:-1] + ('*',), zp, w)].add(f, un, sh)
+    T = {k: dict(v) for k, v in T.items()}
+    T['KA'] = T['K1']
+    _ST['pt'] = T
+    return T
+
+
+def table_loo():
+    """leave-one-unit-out per tier: {tier: (held-out decided samples, wrong)} (17o d4_table.loo)"""
+    idx = {k: collections.defaultdict(lambda: collections.defaultdict(list)) for k in ('K1', 'KS', 'K3')}
+    for un, lab, zp, w, xw, f in table_samples():
+        ks = [('K1', (lab, 0x90, w % 0x90))] if lab == ('intros',) else [('K1', (lab, zp, w))]
+        if lab == ('root', '+1a4') and zp % 0x100 == 0: ks.append(('KS', w % 0x100))
+        if lab != ('intros',) and len(lab) >= 2: ks.append(('K3', (lab[:-1] + ('*',), zp, w)))
+        for tn, k in ks: idx[tn][k][un].append((xw, f))
+    res = {}
+    for tn, K in idx.items():
+        right = wrong = 0
+        for k, byu in K.items():
+            if len(byu) < 2: continue
+            for un, mine in byu.items():
+                st = Votes()
+                for o, lst in byu.items():
+                    if o != un:
+                        for xw, f in lst: st.add(f, o, shape(xw))
+                for xw, f in mine:
+                    if f and len({xperm(xw, c) for c in f}) != 1: continue      # held-out sample not informative
+                    c, why = st.decide_for(xw)
+                    if not c: continue
+                    if f and xperm(xw, c) == xperm(xw, next(iter(f))): right += 1
+                    else: wrong += 1
+        res[tn] = (right + wrong, wrong)
+    return res
+
+
+def table_words(XD, PD, kx, kp, IX, px, IP, pp):
+    """{offset: wanted PC word} of the unit DTP by the path table (labels from the PC section, intro names from the
+    Xbox intros), {tier: n}, notes"""
+    T = path_table(); nm = dlc_names()
+    u, ux = PD.sections[kp], XD.sections[kx]
+    pd, xd = bytes(u.data), bytes(ux.data)
+    L, start = labels(pd, pp, IP, lambda k: nm.get(IX[k][1], '?x%d' % IX[k][1]))
+    out = {}; tiers = collections.Counter(); notes = []
+    for o in range(0, len(pd) - 3, 4):
+        if o in pp: continue
+        rs = start(o); lab, sz = L[rs]
+        if lab == ('unreached',): continue
+        xw = xd[o:o + 4]
+        tn, c, why = judge(T, lab, sz, o - rs, xw)
+        if not c: continue
+        if (u.id, o) in TABLE_EXCLUDE:
+            notes.append('unit DTP %d +%#x: %s - left alone' % (u.id, o, TABLE_EXCLUDE[(u.id, o)])); continue
+        out[o] = xperm(xw, c); tiers[tn] += 1
+    return out, tiers, notes
+
+
+# ------------------------------------------------------------------------------------------------ particle records
+def fx_base_records():
+    """[(object, Xbox record bytes, PC record bytes, slot offsets)] of the base objects (PC objectlist ids 1..821, Xbox /
+    PC object data DTP named at object +8, same record count) - 17o p1_base.py / objdata_rec_classes calibrate"""
+    if 'fb' in _ST: return _ST['fb']
+    import objdata_rec_classes as RC
+    import pairs as P
+    names = []
+    for ln in open(os.path.join(LISTS, 'pc_objectlist.txt'), encoding='latin-1').read().splitlines()[1:]:
+        if ',' in ln:
+            i, n = ln.split(',', 1)
+            if int(i) <= 821: names.append(n.strip())
+    get = lambda s: (s['type'], s['data'], s['reloc'], s['id'])
+    out = []
+    for n in names:
+        try:
+            xd_ = P.xbox_drm(n + '.drm'); pd_ = P.pc_drm(n + '.drm')
+        except Exception:
+            continue
+        if not xd_ or not pd_: continue
+        xs, ps = xd_[1], pd_[1]
+        xi, pi = RC.objdata_dtps(xs, 'be', get), RC.objdata_dtps(ps, 'le', get)
+        if not xi or not pi: continue
+        xsec = [s for s in xs if s['type'] == 7 and s['id'] == xi[0]]
+        psec = [s for s in ps if s['type'] == 7 and s['id'] == pi[0]]
+        if not xsec or not psec: continue
+        xr, xsl = RC.records(xsec[0]['data'], 'be', xsec[0]['reloc'])
+        pr, psl = RC.records(psec[0]['data'], 'le', psec[0]['reloc'])
+        if not xr or not pr or len(xr) != len(pr): continue
+        xd, pd = xsec[0]['data'], psec[0]['data']
+        for bx, bp in zip(xr, pr):
+            sl = {o for o in range(0, FX_REC, 4) if (bx + o) in xsl or (bp + o) in psl}
+            out.append((n, xd[bx:bx + FX_REC], pd[bp:bp + FX_REC], sl))
+    _ST['fb'] = out
+    return out
+
+
 # ------------------------------------------------------------------------------------------------ proofs
 def proof_counts(rule):
     """base-pair statistics of one rule -> dict (contra = base words that contradict the rule)"""
@@ -421,6 +732,29 @@ def proof_counts(rule):
         # root +0xa4 block +0x90 / +0x94: no rule (the base units disagree) - counted for the record only
         got['root_block_not_one_order'] = int(len({k for k in root if k != 'amb'}) > 1)
         got['string_raw'] = strs['raw'] + strs['amb']; got['contra'] += sum(v for k, v in strs.items() if k not in ('raw', 'amb'))
+        # unit-DTP path table (18e, 17o d4_table): base units / samples / keys and the leave-one-unit-out result per
+        # tier (held-out decided samples, wrong) - pinned like every other count
+        got['tbl_units_all'] = len(table_units())
+        S = table_samples(); got['tbl_units'] = len({s[0] for s in S}); got['tbl_samples'] = len(S)
+        T = path_table()
+        for tn in ('K1', 'KS', 'K3'): got['tbl_keys_' + tn] = len(T[tn])
+        for tn, (n, bad) in sorted(table_loo().items()): got['loo_%s_n' % tn] = n; got['loo_%s_wrong' % tn] = bad
+    elif rule == 'fxrecread':
+        # every base particle record word at an FXREAD offset: PC word == the reader's byte order of the Xbox word
+        # (ok; amb = the Xbox word reads the same in every byte order), else contra; objrec must not rule the offset
+        import objdata_rec_classes as RC
+        ruled = pickle.load(open(RC.RULES, 'rb')) if os.path.exists(RC.RULES) else None
+        got['objrec_overlap'] = len(set(FXREAD) & set(ruled)) if ruled is not None else -1
+        if got['objrec_overlap'] > 0: got['contra'] += got['objrec_overlap']
+        B = fx_base_records()
+        got['objects'] = len({b[0] for b in B}); got['records'] = len(B)
+        for n, xr, pr, sl in B:
+            for o, c in FXREAD.items():
+                if o in sl: got['slot'] += 1; continue
+                xw, pw = xr[o:o + 4], pr[o:o + 4]
+                if pw != xperm(xw, c): got['contra'] += 1
+                elif len({xperm(xw, k) for k in XPERMS}) == 1: got['amb'] += 1
+                else: got['ok'] += 1
     got.setdefault('contra', 0)
     return dict(got)
 
@@ -556,7 +890,39 @@ def plan(rule, XD, PD, rel=''):
             w[o + 0x7c] = 's32'
             for q, c in rules.get((obj, sz), {}).items(): w.setdefault(dp + q, c)
         for q in name_strings(bytes(ux.data), px): w.setdefault(q, 'raw')
-        _want_rows(kp, ux, u, w, rows, kept, 'introtyped DTP %d' % u.id, slots(ux, 'be') | slots(u, 'le'))
+        sl = slots(ux, 'be') | slots(u, 'le')
+        _want_rows(kp, ux, u, w, rows, kept, 'introtyped DTP %d' % u.id, sl)
+        # the unit-DTP path table (18e) where the rules above do not speak
+        tw, tiers, tn = table_words(XD, PD, kx, kp, IX, px, IP, pp)
+        notes.extend(tn)
+        tw = {o: v for o, v in tw.items() if o not in w}
+        _want_rows(kp, ux, u, tw, rows, kept, 'introtyped DTP %d table' % u.id, sl)
+    elif rule == 'fxrecread':
+        import objdata_fx_fix as OF, objdata_rec_classes as RC
+        ids = sorted(set(OF.od_ids(PD, 'le')) & set(OF.od_ids(XD, 'be')))
+        idx = {id(s): k for k, s in enumerate(PD.sections)}
+        for did in ids:
+            pc = OF.pair_copies(OF.copies(XD, did), OF.copies(PD, did))
+            if pc is None:
+                notes.append('DTP %d: copies Xbox %d / PC %d cannot be paired - skipped' % (
+                    did, len(OF.copies(XD, did)), len(OF.copies(PD, did)))); continue
+            for c, (xs, ps) in enumerate(pc):
+                k = idx[id(ps)]
+                xr, xsl = RC.records(bytes(xs.data), 'be', bytes(xs.reloc))
+                pr, psl = RC.records(bytes(ps.data), 'le', bytes(ps.reloc))
+                if not xr and not pr: continue
+                if not xr or not pr or len(xr) != len(pr):
+                    notes.append('DTP %d copy %d: record lists differ (Xbox %s, PC %s) - skipped' % (
+                        did, c, None if xr is None else len(xr), None if pr is None else len(pr))); continue
+                xd, pd = bytes(xs.data), bytes(ps.data)
+                for j, (bx, bp) in enumerate(zip(xr, pr)):
+                    for o, cl in sorted(FXREAD.items()):
+                        if (bx + o) in xsl or (bp + o) in psl or bx + o + 4 > len(xd) or bp + o + 4 > len(pd): continue
+                        xw, pw = xd[bx + o:bx + o + 4], pd[bp + o:bp + o + 4]
+                        want = xperm(xw, cl)
+                        if pw == want: continue
+                        t = (k, bp + o, xw, pw, want, 'fxrecread DTP %d copy %d rec %d +%#x %s' % (did, c, j, o, cl))
+                        (rows if byteorder(xw, pw) and byteorder(xw, want) else kept).append(t)
     else:
         raise SystemExit('rule? %s' % rule)
     return dict(rows=rows, kept=kept, notes=notes)

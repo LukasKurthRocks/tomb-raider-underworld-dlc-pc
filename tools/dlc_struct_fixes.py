@@ -52,13 +52,19 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
   sgmesh     tools/typed_family_fix.py      streamgroup mesh-list DTPs {n, n x {mesh id, u32, u32, u32}} all u32 (17j-b:
              dlc2_machine_room_machine_room_all DTP 25512)
   introtyped tools/typed_family_fix.py      unit DTP intro data: intro +0x7c u32, intro data blocks by (object, size)
-             from the intros of four base units, name strings raw (17j-b / 17l)
+             from the intros of four base units, name strings raw (17j-b / 17l); since 18e (2026-11-08) also the
+             unit-DTP pointer-path table of 77 base units (17o: tiers K1 exact / KS stride / KA alias / K3 last-wild,
+             >= 10 votes of the word's byte shape, no contradicting sample; 17o's size-only tier not used) where those
+             rules do not speak; not DTP 23100 +0x6268 (rule conflict open)
   leveltwin  tools/typed_family_fix.py      Level section of a unit without a same-size base twin: words whose Xbox word
              equals the l7 twin's Xbox word at the same offset = the twin's PC word (byte permutations only; the
              NavGraph image stays navraw's) (17j-b: dlc_yggdrasil_end)
   basecopy   tools/typed_family_fix.py      DTPs whose Xbox payload equals the base Xbox DTP of the same id = the PC base
              copy (payload relocations equal; DLC trailer kept) (17j-b / 17l: colour LUT 18577, 19397, 4190)
-             The seven typed_family_fix rules re-derive their truth from the base pairs once per process
+  fxrecread  tools/typed_family_fix.py      0x17c particle records of the object data DTP at the 12 offsets objrec does
+             not rule, by the reads of tru.exe 0x543f70: u8 fields in place (raw), +0x58 b2s16, +0x5c s16b2, +0x160
+             s16 (17o / 18e 2026-11-08: 11 032 base records)
+             The eight typed_family_fix rules re-derive their truth from the base pairs once per process
              (typed_family_fix.proven: pinned counts, 0 contradicting words) and refuse to write or check without it.
   seqrepeat  tools/soundplex_sequence_fix.py SoundPlex Sequence nodes (type 10): the word data +0xc (s8 repeat + 3 bytes)
              raw = the Xbox bytes, as on every informative base pair (`soundplex_sequence_fix.py proof`; F5 2026-11-05:
@@ -79,8 +85,8 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
 eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, chunkrec, exttuning, thrallext, meleelink, genintro,
-costumedtp, dspkind, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy, seqrepeat, navraw, vmliteral
-(objtex / objrec / objid
+costumedtp, dspkind, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy, fxrecread, seqrepeat, navraw,
+vmliteral (objtex / objrec / objid
 since 2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
 dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
 steps, docs Befund-Pipeline-Integration-0411.md; seqrepeat since 2026-11-05, WINDOWS_REBUILD finding 49: it touches
@@ -97,10 +103,12 @@ night 07./08.11.): after dspkind (the earlier data fixes keep their words; none 
 extension, melee, generator, costume or DSP word - checked: those steps change 0 words on the outputs), before
 seqrepeat / navraw (they do not write SoundPlex nodes; leveltwin leaves the NavGraph image to navraw); basecopy last of
 the seven (the PC base copy is the game's own byte image of that DTP id, so it has the last word); they reproduce the
-test trees work/endcine_0811, crash_0811, endb270_0811 and the 17l family words of work/b270cmp_0811/tree).
+test trees work/endcine_0811, crash_0811, endb270_0811 and the 17l family words of work/b270cmp_0811/tree);
+fxrecread since 2026-11-08 (18e) after basecopy, before seqrepeat: it writes only particle record words at offsets that
+objrec does not rule (proof: objrec_overlap 0) and no other typed step reads them.
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
 Check mode (objtex / objrec / objid / chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind /
-fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
+fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
   ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
         TREE may be 'A,B' (overlay, the later folder wins - e.g. a pipeline tree with a fix tree on top);
@@ -124,10 +132,11 @@ import drm_write as DW, drm_reloc as R
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
        'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
-       'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
+       'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy', 'fxrecread',
        'seqrepeat', 'navraw', 'vmliteral')
 DATAFIX_STEPS = ('chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind')   # 2026-11-08
-TYPED_STEPS = ('fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy')   # 2026-11-08 (17n)
+TYPED_STEPS = ('fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
+               'fxrecread')   # 2026-11-08 (17n; fxrecread 18e)
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (markup_level.py --objects; 23 = TU type)
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -624,6 +633,10 @@ class Steps:
     def s_basecopy(self, rel, xf, XD, cur):
         """DTPs whose Xbox payload is the base Xbox DTP of the same id = the PC base copy, trailer kept (17j-b / 17l)"""
         return self._typed('basecopy', rel, XD, cur)
+
+    def s_fxrecread(self, rel, xf, XD, cur):
+        """0x17c particle records at the offsets objrec does not rule, by the reads of tru.exe 0x543f70 (17o / 18e)"""
+        return self._typed('fxrecread', rel, XD, cur)
 
     def s_seqrepeat(self, rel, xf, XD, cur):
         """SoundPlex Sequence nodes: data +0xc raw (tools/soundplex_sequence_fix.fix_drm, F5 2026-11-05, finding 49).
