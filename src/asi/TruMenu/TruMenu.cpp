@@ -21491,7 +21491,10 @@ bool CnSndMute(DWORD group, bool mute) {
 }
 bool CnHeldNow() {
     const DWORD tick = g_cnHeldTick;
-    return g_cnOn && g_cnPause && tick && GetTickCount() - tick < 500;
+    // signed: the gate stores GetTickCount() | 1, which is 1 ms ahead on an even tick - unsigned "now - tick" was then
+    // 0xffffffff, so the hold counted as stale every few frames (live 0.22.1, 2026-11-08 20:46: the master group paused
+    // and resumed every 30 - 130 ms, the badge flickered, the cutscene line looped)
+    return g_cnOn && g_cnPause && tick && static_cast<LONG>(GetTickCount() - tick) < 500;
 }
 // game thread: the master group follows the hold (paused), a step (running muted) and the release (running, the
 // mute TruMenu set taken back after the pause - so the release starts the sound before the stream moves on)
