@@ -787,6 +787,9 @@ fixed). ✅ (from FINDINGS.md, `Befund-Wasserfall.md`, `Befund-N5-Materialien-07
 | Earlier merges | 2876-2879 have the same c4 clash in 8 unskinned slots (probably invisible: objects draw skinned) and translator defs on bones 33 / 34 in 21 skinned slots (harmless at <= 15 bones); 2880 bone rows only; 2888 / 2889 rebuild identical | | ✅ / ⬜ visibility |
 | Refused patterns | sampler used as 2D and cube (2666 / 2673 / 2694 / 2706 / 2715), L-lane 2057, lint 2106 / 2387, record mismatch 2052 / 2118, light block "L None" 2195; upstream kill bug (vector kill with zero write mask dropped) worked around | `column_shader_translate.py` | ✅ |
 | DXN normals | Xbox DXN -> PC DXT5 with x in R, y in A (`dxn` option) | | ✅ |
+| VS equality proof (C1 Xbox VS kept as PC VS) | PC VS P is a 1:1 equivalent of DLC VS D when a base Xbox VS X with x2p(X) = P has the byte-identical entry in every slot P occupies: holds for 2456 / 1911 (23164); fails for 2371 / 1911, 2633 / 802, 2274 / 114, 2062 / 831, 2713 / 1595, 2462 / 1908 (30-60 PC slots differ) -> those materials stay PART | `work/n6shaders_0711/vs_twin_cmp.py` | ✅ |
+| MaterialParams longer on PC | `tu_unlit apply` keeps a PC params block that is longer than the Xbox one (32 copies in n6); harmless per copy: the new PS reads no c100+j with j >= Xbox count | `verify_n6.py` | ✅ |
+| ABS_CONST in lit translations | `fix_abs_consts` makes abs uniform per register (X6045) but leaves `-\|cN\|` forms; 41 lit libs carry them (22 installed: 2527-2584, 2810-2815); NVIDIA accepts, the AMD driver rejected the form on 20.10. | native D3D9 test | ⬜ AMD |
 
 ### 17.5 Known material cases
 
@@ -799,6 +802,8 @@ fixed). ✅ (from FINDINGS.md, `Befund-Wasserfall.md`, `Befund-N5-Materialien-07
 | 20744 shadow-power look | full-screen quad (event 0x32 -> 0x535cc0 -> effect 0x85 -> 0x547220 -> 0x548bf0 -> 0x546340 -> quad 0x53ef30); black because of surrogate PS 2517 + 0 MaterialParams; fixed PS 2943 / VS 2944 | ✅ |
 | Streamgroups | contain only materials, shader libs, textures, terrain, tiny DTPs; 80 materials drew with surrogates (71 only in streamgroups; 19 half translated - load order decides) | ✅ |
 | Coverage (installed) | 770 materials: SURR 130, PART 89, TU 38, ORIG 308, BASE 205; no shader translation installed in the kit (owner decision 07.11.; only the end-column test tree was installed for the live test) | ✅ |
+| Coverage after n6 (test tree 08.11.) | installed + n5mats / n5b / extfix + n6: SURR 16 / PART 143 / TU 98 / ORIG 308 / BASE 205; end-room surrogate terrain 0 %; PART left = pass 0 / 1 (not translated by rule) or a C1 VS not proven equal; 16 SURR = refused patterns (17.4) + 24275 tail probe; PS 3400-3458, VS 3480-3486 | ✅ static / ⬜ live |
+| Same id, different translations | 24299 / 24690: installed `dlc_level2_start` copy = lib 2675, n6 copies = 3407 (different code); 23552 `co_dlc_lara_f` (3411 / VS 114) vs `dlc_costume_f` (2754 / VS 122) - the first loaded copy wins, unify before install | ⬜ decision |
 
 Plugin: TruMenu 0.21.7 shader labels (`shader.labels`, data `shaderlabel.txt` from `tools/shader_labels.py`; slot letters O
 twin / T translation / S surrogate; file state vs. live state from the current material `[0xa14188]`): ✅ **live 07.11.**
