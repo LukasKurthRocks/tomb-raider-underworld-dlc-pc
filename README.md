@@ -10,6 +10,12 @@ project that first converted the DLC for the PC. You need your own copy of the g
 ![AI-assisted](https://img.shields.io/badge/AI--assisted-Claude%20(Anthropic)-8A2BE2)
 ![Upstream](https://img.shields.io/badge/upstream-andrearicci93%2Ftrudlcport%20B270%20merged-blue)
 
+![The throne in the end-room cutscene of Lara's Shadow, held with TruMenu's cutscene pause - its shadow light still flickers](docs/screenshots/dev-throne-flicker-closeup-2026-11-08.gif)
+
+*Work in progress (8 Nov 2026): the end-room cutscene of Lara's Shadow on PC, held with TruMenu's cutscene pause. The
+scene stands still, yet the throne keeps flickering - the shadows of three cutscene lights, traced live into the
+engine's shadow atlas ([DEVLOG](docs/DEVLOG.md), [ENGINE.md](docs/ENGINE.md) section 16).*
+
 > [!WARNING]
 > **This is a personal fork, not the original project.** For installing the DLC port, releases and reporting
 > problems, use the original: **[andrearicci93/trudlcport](https://github.com/andrearicci93/trudlcport)**.
