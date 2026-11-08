@@ -18,7 +18,7 @@ from one failing `IDirect3DDevice9::CreatePixelShader` (`D3DERR_INVALIDCALL`) wh
 shader model 3 does not) - a third form, besides the two below. `tools/shader_const_fix.py` rewrites them (24 B138
 files); with them DLC 1 starts on that PC. Details: [WINDOWS_REBUILD.md](WINDOWS_REBUILD.md), finding 43.
 
-**Fork check (8 Nov 2026, NVIDIA RTX 3080 Ti):** the native test v3 on the installed `windows` tree refused no port
+**Fork check (8 Nov 2026, NVIDIA):** the native test v3 on the installed `windows` tree refused no port
 shader (2919 shaders, negative controls refused as they should be). The newer translations still contain 272 pixel
 shaders with the `cmp ... -|c221| ...` form that the AMD driver refused on 20 Oct; NVIDIA accepts it, so AMD stays
 unconfirmed. A rewrite of that form is in progress; until it is released, AMD players should use DXVK (below).

@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -2984,6 +2984,7 @@ bool RunSpeed(const char *arg, char *o, size_t n) {
 }
 bool LevelChangePending(char *why, size_t n);   // 0.7.2, in the level.start section
 bool UnitNameNoDrm(const char *unit);        // 0.21.9, section "0.21.9 units without a DRM"
+void UnitRefusal(const char *unit, char *o, size_t n);   // 0.21.10, same section
 bool LoadUnit(const char *unit, char *o, size_t n) {
     if (!g_levelOk || !g_experimental) { Out(o, n, "level change code not verified / experimental off"); return false; }
     size_t len = unit ? strlen(unit) : 0;
@@ -2994,7 +2995,7 @@ bool LoadUnit(const char *unit, char *o, size_t n) {
             return false;
         }
     if (UnitNameNoDrm(unit)) {               // 0.21.9: in unitlist.txt, but no mods\<unit>.drm (Befund 17i)
-        Out(o, n, "refused: %s has no .drm in mods (listed in unitlist.txt only - the load would fail)", unit);
+        UnitRefusal(unit, o, n);             // 0.21.10: the six unused slots name the engine's reaction (17s)
         return false;
     }
     // 0.7.2: also refused during a mission start (main state 2 / 9 - live 2026-11-02 20:29:17: a level.load during the
@@ -3438,11 +3439,29 @@ char g_exeDir[MAX_PATH], g_asiDir[MAX_PATH];
 // A DLC 1 / DLC 2 unit of kUnits loads from <tru.exe folder>\mods\<unit>.drm (the installed tree is flat:
 // mods\dlc_level1_start.drm, mods\dlc_yggdrasil_end.drm). One file test per unit at start (UnitDrmScan; the tree does not
 // change while the game runs): a missing file = grey "keine .drm" on page Kapitel and in the long menu, and level.load
-// refuses the unit. Base-game units live in bigfile.000 and the other DLC starts (3 - 6) have no file to look at - both
-// are never marked.
+// refuses the unit. Base-game units live in bigfile.000 and are never marked.
+// 0.21.10 (work\units17s_0811\PROGRESS.md, 17p Q4 / 17s task 1): dlc_level3_start .. dlc_level6_start (group "DLC other
+// starts") and dlc_level1_left / _right have data nowhere - no archive holds them (PC bigfile / patch, Xbox layer1 / 2 /
+// TU, packs 10 / 11 / 1 / 2 / 20: name hash with positive controls + a plain search through every record), they are only
+// named in unitlist.txt, objlist.dat and generalbank scripts 6 / 104. So the "DLC other starts" group is file-tested too
+// (a mods\<unit>.drm is the only place one could ever come from), and the six proven ones get the text "ungenutzt - keine
+// Daten (17p/17s)" instead of "keine .drm". A load would not fail softly: STREAM_LoadLevel 0x5d23f0 has no exists test,
+// the file system routes the missing name to its first archive (MultiFS 0x473560 -> slot 0), whose RequestRead 0x472890
+// finds nothing (0x4726e0) and calls the fatal-error path 0x596cb0 "Can't open file %s" -> error dialog
+// (DialogBoxParamW, template 0x7d) and ExitProcess (0x478a10) - section "0.21.10" of the README.
+const char *const kUnitsNoData[] = {"dlc_level3_start", "dlc_level4_start", "dlc_level5_start", "dlc_level6_start",
+                                    "dlc_level1_left", "dlc_level1_right"};
+const char *const kUnitsNoDataGroup = "DLC other starts";   // page Kapitel: the group that lists all six
 signed char g_unitDrm[kUnitCount];           // 0 = not checked, 1 = mods\<unit>.drm present, -1 = missing
-bool UnitDrmChecked(int i) {                 // a DLC 1 / DLC 2 unit (the only ones that load from mods)
-    return i >= 0 && i < kUnitCount && (!strcmp(kUnits[i].group, "DLC 1") || !strcmp(kUnits[i].group, "DLC 2"));
+bool UnitDrmChecked(int i) {                 // a DLC unit (DLC 1 / DLC 2, 0.21.10: + the slots 3 - 6; they load from mods)
+    return i >= 0 && i < kUnitCount && (!strcmp(kUnits[i].group, "DLC 1") || !strcmp(kUnits[i].group, "DLC 2") ||
+                                        !strcmp(kUnits[i].group, kUnitsNoDataGroup));
+}
+bool UnitInNoDataList(int i) {               // 0.21.10: one of the six proven units (whether or not a file showed up)
+    if (i < 0 || i >= kUnitCount) return false;
+    for (const char *u : kUnitsNoData)
+        if (!_stricmp(kUnits[i].unit, u)) return true;
+    return false;
 }
 bool UnitNoDrm(int i) {
     if (!UnitDrmChecked(i)) return false;
@@ -3460,7 +3479,18 @@ int UnitIndexOf(const char *unit) {
     return -1;
 }
 bool UnitNameNoDrm(const char *unit) { return UnitNoDrm(UnitIndexOf(unit)); }
-// start: every DLC 1 / DLC 2 unit once, one log line with the missing ones
+// 0.21.10: an unused slot = a proven no-data unit that also has no mods\<unit>.drm (a file built later would load)
+bool UnitUnused(int i) { return UnitInNoDataList(i) && UnitNoDrm(i); }
+bool UnitNameUnused(const char *unit) { return UnitUnused(UnitIndexOf(unit)); }
+// the refusal of level.load / level.start for a unit without a DRM (0.21.10: with the engine's reaction for the six)
+void UnitRefusal(const char *unit, char *o, size_t n) {
+    if (UnitNameUnused(unit))
+        Out(o, n, "refused: %s is an unused slot - no data in any archive or in mods (17p / 17s); the engine would stop with "
+            "\"Can't open file pc-w\\%s.drm\" (error box, then the game exits)", unit, unit);
+    else
+        Out(o, n, "refused: %s has no .drm in mods (listed in unitlist.txt only - the load would fail)", unit);
+}
+// start: every DLC unit once (0.21.10: + slots 3 - 6), one log line with the missing ones
 void UnitDrmScan() {
     char missing[400] = "";
     int checked = 0, bad = 0;
@@ -3472,8 +3502,11 @@ void UnitDrmScan() {
         strncat_s(missing, sizeof(missing), bad > 1 ? ", " : "", _TRUNCATE);
         strncat_s(missing, sizeof(missing), kUnits[i].unit, _TRUNCATE);
     }
-    Log(1, "0.21.9 units: %d DLC 1 / DLC 2 units checked against %smods\\<unit>.drm, %d without a .drm%s%s (grey, "
-        "level.load refuses them)", checked, g_exeDir, bad, bad ? ": " : "", missing);
+    int unused = 0;
+    for (int i = 0; i < kUnitCount; ++i) unused += UnitUnused(i) ? 1 : 0;
+    Log(1, "0.21.10 units: %d DLC units (DLC 1 / DLC 2 / slots 3 - 6) checked against %smods\\<unit>.drm, %d without a "
+        ".drm%s%s, %d of them unused slots without data (17p / 17s; grey, level.load / level.start refuse them)", checked,
+        g_exeDir, bad, bad ? ": " : "", missing, unused);
 }
 // ---- end of 0.21.9 units without a DRM ----
 
@@ -4823,6 +4856,10 @@ bool LevelChangePending(char *why, size_t n) {
 // +0x257c..+0x2608): unit == dlc_level4_start || dlc_level5_start || dlc_level6_start || dlc_level2_start ->
 // uigamedata f26(unit, 0, 0, 1), else f26(unit, 1, 0, 1) (the TU's MainTracker_UILoadLevel = PC f27 0x77e170). The PC
 // script 104 function 9 (dis pp 104, +0x23c0..+0x2438) tests only levels 4 / 5 / 6, so DLC 2 gets the selection.
+// 0.21.10 (17s, TU exe only): the TU's yes / no dialog accept path (ScriptDialogYesNo::RegisterAcceptChanges, code
+// 0x8247f3b8..0x8247f510: "Attempting to load level: %s", then MainTracker_UILoadLevel 0x8247d818) skips the selection for
+// dlc_level2_start .. dlc_level6_start - level 3 included (string table 0x820760f8). Not copied here: level 3 has no data
+// (level.start refuses it), and the PC exe has none of these strings.
 // Returns f27's 2nd argument: 1 = outfit / weapon selection (main state 9), 0 = none.
 int MissionSelectArg(const char *unit) {
     if (!g_outfitRule || !g_outfitRuleOk) return 1;
@@ -4868,6 +4905,7 @@ bool RunLevelStart(const char *arg, char *o, size_t n) {
     static DWORD args[4];                        // DataValue block of f27: unit, 1, 0, 1
     char name[64];
     if (!StartUnitName(arg, name, sizeof(name))) { Out(o, n, "usage: level.start [dlc2|dlc1|<unit name a-z 0-9 _ ->]"); return false; }
+    if (UnitNameNoDrm(name)) { UnitRefusal(name, o, n); return false; }   // 0.21.10: f27 ends in the same STREAM_LoadLevel
     char why[200];                               // 0.7.2: first, so a second start during the first one says why
     if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: level change pending (%s)", why); return false; }
     DWORD state = 0;
@@ -21940,7 +21978,8 @@ DWORD g_cmdVideosTick = 0;
 template <typename F> void CmdArgValues(const char *id, F fn) {
     if (CmdKindOf(id) == kCkBool) { fn("1", "on"); fn("0", "off"); return; }
     if (!_stricmp(id, "level.load")) {
-        for (int i = 0; i < kUnitCount; ++i) fn(kUnits[i].unit, UnitNoDrm(i) ? "no .drm in mods" : kUnits[i].group);
+        for (int i = 0; i < kUnitCount; ++i)    // 0.21.10: the unused slots say so
+            fn(kUnits[i].unit, UnitUnused(i) ? "unused slot - no data (17s)" : UnitNoDrm(i) ? "no .drm in mods" : kUnits[i].group);
     } else if (!_stricmp(id, "level.start")) {          // 0.7.1
         fn("dlc2", "dlc_level2_start, intro plays");
         fn("dlc1", "dlc_level1_start, intro plays");
@@ -25018,7 +25057,15 @@ void PageLevel() {
             for (int k = i; k < i + count; ++k) {
                 char label[96];
                 if (UnitNoDrm(k)) {          // 0.21.9: no mods\<unit>.drm - grey, not loadable
-                    ImGui::TextDisabled("%s  (keine .drm / no .drm in mods)", kUnits[k].unit);
+                    if (UnitUnused(k)) {     // 0.21.10: the six proven slots (17p / 17s)
+                        ImGui::TextDisabled("%s  (ungenutzt - keine Daten / unused - no data, 17p/17s)", kUnits[k].unit);
+                        if (ImGui::IsItemHovered())
+                            ImGui::SetTooltip("In no archive and not in mods. A load would end with the game's error box "
+                                              "\"Can't open file pc-w\\%s.drm\" and the game exits - level.load refuses it.",
+                                              kUnits[k].unit);
+                    } else {
+                        ImGui::TextDisabled("%s  (keine .drm / no .drm in mods)", kUnits[k].unit);
+                    }
                     continue;
                 }
                 _snprintf_s(label, sizeof(label), _TRUNCATE, "%s##unit%d", kUnits[k].unit, k);
@@ -28894,7 +28941,9 @@ const ChapGroup kChapGroups[] = {                // key = UnitRow::group (every 
     {"Base game l7", "Abschnitte 7 Arktisches Meer (l7)", "Units 7 Arctic Sea (l7)"},
     {"DLC 1", "Abschnitte DLC 1 Unter der Asche", "Units DLC 1 Beneath the Ashes"},
     {"DLC 2", "Abschnitte DLC 2 Laras Schatten", "Units DLC 2 Lara's Shadow"},
-    {"DLC other starts", "Weitere DLC-Starts (3 - 6)", "Other DLC starts (3 - 6)"},
+    // 0.21.10: the unused DLC slots 3 - 6 of the retail mission screen + dlc_level1_left / _right (kUnitsNoData): no
+    // data anywhere (17p / 17s), grey rows, never loadable
+    {"DLC other starts", "Ungenutzte DLC-Plaetze 3 - 6 + left / right", "Unused DLC slots 3 - 6 + left / right"},
 };
 const int kChapGroupN = static_cast<int>(sizeof(kChapGroups) / sizeof(kChapGroups[0]));
 const char *const kChapDlc2Start = "dlc_level2_start";
@@ -28965,6 +29014,13 @@ int ChapUnits(int g, int *out, int max) {
         for (int j = 0; j < n && !have; ++j) have = out[j] == i;
         if (!have) out[n++] = i;
     }
+    if (!strcmp(key, kUnitsNoDataGroup))     // 0.21.10: the unused-slot group also lists left / right (they stay in DLC 1)
+        for (const char *u : kUnitsNoData) {
+            const int i = UnitIndexOf(u);
+            bool have = i < 0;
+            for (int j = 0; j < n && !have; ++j) have = out[j] == i;
+            if (!have && n < max) out[n++] = i;
+        }
     return n;
 }
 // a DLC 2 unit that is not the DLC 2 start: a direct load may skip the doppelganger setup
@@ -28988,6 +29044,8 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
         Out(w.state, sizeof(w.state), "%s", open ? (de ? "links = zu" : "left = close") : (de ? "rechts = auf" : "right = open"));
         if (!strcmp(kChapGroups[g].key, "DLC 2"))
             Out(w.count, sizeof(w.count), "%s", de ? "besser Start + laufen" : "better start + walk");
+        else if (!strcmp(kChapGroups[g].key, kUnitsNoDataGroup))   // 0.21.10
+            Out(w.count, sizeof(w.count), "%s", de ? "keine Daten (17p/17s)" : "no data (17p/17s)");
         w.col = kQbChapter;
         w.stateCol = IM_COL32(170, 170, 170, 255);
         q.kind = kQdChapGroup;
@@ -29015,14 +29073,17 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
             Out(key, sizeof(key), "%d/%s %s", g_qbPage, r.id, r.arg);   // QbActRow's confirmation key
             const bool armed = QbArmed(key), note = ChapDlc2Note(i), here = lara[0] && !_stricmp(lara, kUnits[i].unit);
             const bool noDrm = UnitNoDrm(i);     // 0.21.9: grey, not loadable
+            const bool unused = UnitUnused(i);   // 0.21.10: one of the six slots without data (17p / 17s)
             const int cps = ChapCpCount(co);
             const bool cpOpen = cps > 0 && g_chapCpOpen == i;
             char more[48] = "";
             if (cps) Out(more, sizeof(more), "  %s %d CP", cpOpen ? "[-]" : "[+]", cps);
             Out(x.name, sizeof(x.name), "  %s%s%s", kUnits[i].unit, co && co->ring ? (de ? " (Rundweg)" : " (loop)") : "", more);
-            Out(x.state, sizeof(x.state), "%s", noDrm ? (de ? "keine .drm" : "no .drm") : armed ? (de ? "nochmal rechts!" : "right again!")
+            Out(x.state, sizeof(x.state), "%s", unused ? (de ? "ungenutzt" : "unused") : noDrm ? (de ? "keine .drm" : "no .drm")
+                                                : armed ? (de ? "nochmal rechts!" : "right again!")
                                                 : cps ? (de ? "rechts 2x, links: CP" : "right 2x, left: CP") : (de ? "rechts 2x" : "right 2x"));
-            Out(x.count, sizeof(x.count), "%s", here ? (de ? "Lara hier" : "Lara here") : noDrm ? (de ? "nicht ladbar" : "not loadable")
+            Out(x.count, sizeof(x.count), "%s", unused ? (de ? "keine Daten (17p/17s)" : "no data (17p/17s)")
+                                                : here ? (de ? "Lara hier" : "Lara here") : noDrm ? (de ? "nicht ladbar" : "not loadable")
                                                 : note ? (de ? "Doppel-Zustand?" : "doppel state?") : "");
             x.col = noDrm ? IM_COL32(130, 130, 130, 255) : here ? IM_COL32(150, 240, 150, 255) : kQbChapter;
             x.stateCol = noDrm ? IM_COL32(130, 130, 130, 255) : armed ? IM_COL32(255, 110, 90, 255) : note ? IM_COL32(255, 190, 90, 255)
@@ -29072,6 +29133,7 @@ bool ChapFootHint(const QbDyn &q, bool de, char *o, size_t n) {
     const char *t = nullptr;
     if (q.kind == kQdChapCp) t = de ? "rechts 2x: Sicherung, Unit, Flug + Checkpoint" : "right 2x: backup, unit, flight + checkpoint";
     else if (q.kind != kQdChap) return false;
+    else if (UnitUnused(u)) t = de ? "ungenutzt - keine Daten (17p/17s), nicht ladbar" : "unused - no data (17p/17s), not loadable";
     else if (UnitNoDrm(u)) t = de ? "keine .drm in mods - nicht ladbar" : "no .drm in mods - not loadable";
     else if (ChapCpCount(ChapOrderOf(u))) t = de ? "rechts 2x: Sicherung + laden   links: Checkpoints auf / zu"
                                                  : "right 2x: backup + load   left: checkpoints open / close";
@@ -29100,6 +29162,13 @@ void QbChapAct(const QbDyn &q, int dir) {
     const QbRow &r = g_chapRow[k];
     if (q.kind == kQdChap) {                 // 0.21.9: units without a DRM; left = the unit's checkpoints
         const int u = UnitIndexOf(q.unit);
+        if (UnitUnused(u)) {                 // 0.21.10: the proven result + the engine's reaction (17s)
+            QbResult(true, "%s: %s", q.unit, de ? "ungenutzt - in keinem Archiv und nicht in mods (17p/17s); Laden = "
+                                                  "Fehlerfenster \"Can't open file\" + Spielende - nicht angeboten"
+                                                : "unused - in no archive and not in mods (17p/17s); a load = error box "
+                                                  "\"Can't open file\" + the game exits - not offered");
+            return;
+        }
         if (UnitNoDrm(u)) {
             QbResult(true, "%s: %s", q.unit, de ? "keine .drm in mods - nicht ladbar" : "no .drm in mods - not loadable");
             return;
@@ -29131,7 +29200,10 @@ bool ChapHelp(const QbDyn &q, bool de, char *o, size_t n) {
                                   "and to the checkpoint (flight on)");
         return true;
     }
-    if (UnitNameNoDrm(q.unit))               // 0.21.9
+    if (UnitNameUnused(q.unit))              // 0.21.10 (17s): proven result + engine reaction, at most 60 characters each
+        Out(o, n, "%s", de ? "In keinem Archiv (17s); Laden: Fehlerfenster + Spielende" : "In no archive (17s); a load: error "
+                             "box + the game exits");
+    else if (UnitNameNoDrm(q.unit))          // 0.21.9
         Out(o, n, "%s", de ? "Keine .drm in mods: nur in unitlist.txt, nicht ladbar" : "No .drm in mods: in unitlist.txt "
                              "only, not loadable");
     else if (q.loaded) Out(o, n, "%s", de ? "Direkt laden setzt die Doppelgaengerin evtl. nicht auf" : "A direct load may not set "

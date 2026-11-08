@@ -2548,7 +2548,7 @@ exists): at start every DLC 1 / DLC 2 unit of the level list is checked once aga
 (log `0.21.9 units: 23 DLC 1 / DLC 2 units checked ..., 2 without a .drm: dlc_level1_left, dlc_level1_right`). Such a
 unit is grey "keine .drm / nicht ladbar" on page Kapitel and in the long menu's level list, its command-line value says
 "no .drm in mods", Y does not pin it, and `level.load` refuses it (`LoadUnit`). Base-game units (bigfile) and the other
-DLC starts are never marked.
+DLC starts are never marked (0.21.10: the other DLC starts are marked too - section "TruMenu 0.21.10").
 
 **Page Kapitel: DLC 1 / DLC 2 in play order with checkpoints** (`kChapOrder`, every id from `dlc_intros_all.txt`,
 objects 83 `checkpoint` / 1036 `dlc2_checkpoint`, ordered by their +0x52 index): DLC 2 level2_start (4 CP) -> hall01 (1)
@@ -2613,6 +2613,85 @@ Install: `.\scripts\windows\Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu0
 | 9 | `menu test.toggle x ini:TruShadowCombat:Death:TranslateT5 x` (any live row of page Fixes) | TO TEST row note "INI: live (~1 s, TruMenu.switches.txt)" instead of "takes effect at the next start"; a restart row says "after a restart" |
 | 10 | bar open on a row without its own key line; page Lara "Foto sauber" | key line ends with `F11: Foto + Marke`; help line "Foto jetzt; Taste F11 ..."; F11 = a Claude mark + clean shot as before |
 | 11 | shader labels in end (Render-Details "Shader-Etiketten") | labels from the variant given to `-ShaderLabelFile` (compare a `shader.dump` block with the variant's notes) |
+
+## TruMenu 0.21.10 (unused DLC slots 3 - 6 and left / right: proven without data, grey, refused with the engine's reaction; 2026-11-08)
+
+Build `work\asi\menu0220` from package 17s (`work\units17s_0811\PROGRESS.md`; 17p Q4 `work\q17p_0811\PROGRESS.md`). No new
+hook, no new byte check (the start-up scan is file tests only), imports / exports = 0.21.9, `TruMenu.ini` unchanged (=
+the 0.21.8 sample).
+
+**Why these six are grey.** `dlc_level3_start` .. `dlc_level6_start` and `dlc_level1_left` / `_right` have **no data
+anywhere**: no archive index holds them (PC bigfile / patch, Xbox layer1 / layer2 / TU, packs 10 / 11 / 1 / 2 / 20; 6
+units x 8 path forms x 4 prefixes by name hash, with positive controls `l1_seatop`, `dlc_level1_start` /
+`dlc_level2_start`, `dlc_levelN_preview.raw`), and a plain search through every record (25.2 GB decoded) plus the
+installed mods tree, the B270 kit, tru.exe and the Xbox exe images finds the names only in generalbank (scripts 6 / 104),
+`objlist.dat`, `unitlist.txt`, the kit manifest (preview image names) and the TU exe. Every unit DRM names itself (2 - 10
+times), so a renamed copy would have been found. The retail mission screen (generalbank script 104) only adds a slot when
+`dlcsystem` f1 finds `dlc_levelN_start.drm` (function 7, `uimenu` f25), so slots 3 - 6 never appear; their data in the
+game are placeholders only: names 452 - 455 "DLC Mission 3" .. "6", descriptions 458 - 461 "Unavailable", preview
+images `image\dlc_level3_preview.raw` .. `6` = 64 x 36 "M 3" .. "M 6" (Xbox 64 x 64), error text 464 "ERROR : Cannot find
+selected DLC level pack." (DE "FEHLER: Das ausgewählte herunterladbare Level Pack konnte nicht gefunden werden.").
+
+**What the engine would do on a load (static, tru.exe, 17s task 2).** `level.load` (`GAMELOOP_RequestLevelChangeByName`
+0x5df8c0) and the mission start (`uigamedata` f27 0x77e170 -> 0x5dfb20) both end in 0x5dded0 -> `STREAM_LevelLoadAndInit`
+0x5d30d0 -> `STREAM_LoadLevel` 0x5d23f0, which builds `pc-w\<unit>.drm` (0x477970, `%s%s.drm`) and requests it (0x551470)
+**without an exists test** (only `STREAM_LoadOverlayUnit` 0x5d2610 has one). The file system (MultiFS, vtable 0x8440ec)
+sends a name no archive has to its slot 0 (`GetFS` 0x473560: miss -> index 0; the patch archive is mounted at the front,
+0x478997), whose `RequestRead` 0x472890 finds nothing (lookup 0x4726e0 -> 0) and calls the fatal-error path 0x596cb0
+with **"Can't open file pc-w\<unit>.drm"** -> 0x478b00: window hidden in full screen, the game's error dialog
+(`DialogBoxParamW`, template 0x7d) -> 0x478a10: `ExitProcess(0)` (main thread) / `TerminateProcess` (other threads).
+So: no fallback to the menu, no hang, no crash dump - an error box, then the game is gone (unsaved progress lost).
+ModLoader's own file system layer is not read (it hooks 0x472c50 / 0x472b31 / 0x478930 / 0x49a84f by signature); if it
+answered a miss itself the message could differ (🔶). No safe load path exists, so nothing is offered behind a
+confirmation.
+
+**Changes.**
+- `kUnitsNoData` (the six) and `UnitUnused` (one of the six **and** no `mods\<unit>.drm` - a file built later would load).
+  `UnitDrmChecked` also file-tests the group "DLC other starts" (dlc_level3..6_start), so the start-up line is now
+  `0.21.10 units: 27 DLC units (DLC 1 / DLC 2 / slots 3 - 6) checked against ...mods\<unit>.drm, 6 without a .drm:
+  dlc_level1_left, dlc_level1_right, dlc_level3_start, dlc_level4_start, dlc_level5_start, dlc_level6_start, 6 of them
+  unused slots without data (17p / 17s; grey, level.load / level.start refuse them)`.
+- **Page Kapitel**: the last group is now "Ungenutzte DLC-Plaetze 3 - 6 + left / right" ("Unused DLC slots 3 - 6 + left /
+  right", head column "keine Daten (17p/17s)") with six grey rows `dlc_level3_start` .. `dlc_level6_start`,
+  `dlc_level1_left`, `dlc_level1_right` - state "ungenutzt", column "keine Daten (17p/17s)"; left / right stay at the end
+  of the DLC 1 group with the same text. Help line (the footer's third line): "In keinem Archiv (17s); Laden:
+  Fehlerfenster + Spielende" / "In no archive (17s); a load: error box + the game exits"; key line "ungenutzt - keine
+  Daten (17p/17s), nicht ladbar"; right / X answers "ungenutzt - in keinem Archiv und nicht in mods (17p/17s); Laden =
+  Fehlerfenster "Can't open file" + Spielende - nicht angeboten". Y does not pin them (0.21.9 rule).
+- Long menu level list: the six are grey "(ungenutzt - keine Daten / unused - no data, 17p/17s)" with a tooltip naming the
+  error box; command-line value "unused slot - no data (17s)".
+- `level.load` and now also **`level.start`** refuse a unit without a DRM; for the six the answer is `refused:
+  dlc_level3_start is an unused slot - no data in any archive or in mods (17p / 17s); the engine would stop with "Can't
+  open file pc-w\dlc_level3_start.drm" (error box, then the game exits)`.
+- Comment at `MissionSelectArg`: the TU exe's yes / no dialog accept path (`ScriptDialogYesNo::RegisterAcceptChanges`,
+  0x8247f3b8 .. 0x8247f510, "Attempting to load level: %s") skips the outfit selection for `dlc_level2_start` ..
+  `dlc_level6_start` (level 3 included, table 0x820760f8); not copied (no data for 3, the PC exe has no such strings).
+- `Set-TruMenu.ps1`: `$earlierBuilds` knows the 0.21.9 asi (sha256 cf4f3871...), example `-SourceDir .\work\asi\menu0220`.
+
+Checks: `tools\trumenu_ini_check.py` green (exit 0), `tools\trumenu_quick_check.py` all ok, `work\asi\menu0219\check_0219.py`
+all ok (its version test now reads the 0.21.9 part), `work\asi\menu0220\check_0220.py` all ok (proof files, the table, the
+mods tree, the exe bytes of the load / error chain, source rules) with 11 / 11 negatives caught
+(`make_negative_0220.py`).
+
+### TO TEST 0.21.10 (owner)
+
+Install: `.\scripts\windows\Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu0220` (game closed; add `-ShaderLabelFile`
+as for 0.21.9 if wanted).
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | game start | `TruMenu.log`: `TruMenu 0.21.10 (`, `0.21.10 units: 27 DLC units ... 6 without a .drm: dlc_level1_left, dlc_level1_right, dlc_level3_start, ... 6 of them unused slots` |
+| 2 | bar, page Kapitel, last group "Ungenutzte DLC-Plaetze 3 - 6 + left / right" | 6 grey rows "ungenutzt" / "keine Daten (17p/17s)"; help line "In keinem Archiv (17s); Laden: Fehlerfenster + Spielende"; right = the refusal text, nothing loads |
+| 3 | group "Abschnitte DLC 1", last two rows | `dlc_level1_left` / `_right` grey with the same texts |
+| 4 | `menu level.load dlc_level4_start`, `menu level.start dlc_level5_start` (main menu) | both `refused: ... unused slot ... "Can't open file pc-w\..."`; the game keeps running |
+| 5 | long menu, Levels, group "DLC other starts" | the four grey with "(ungenutzt - keine Daten ...)" and the tooltip |
+| 6 | DLC mission menu (retail screen) | only "UNTER DER ASCHE" and "LARAS SCHATTEN" listed (slots 3 - 6 are never added) |
+
+Not to test: a real load of one of the six - it would end the game (see above). If the owner wants the engine's reaction
+seen once: a throw-away session, windowed (TRAWindowed), save backed up, TruTrace on (it logs `STREAM_LevelLoadAndInit`
+0x5d30d0 before the box), cdb with breakpoints on 0x596cb0 (log the format + name) and 0x478a10; load through the 0.21.8
+asi (no refusal) or `GAMELOOP_RequestLevelChangeByName` from cdb. Expected: the box "Can't open file pc-w\dlc_level3_start.drm"
+(note its title / buttons), then the process ends with exit code 0.
 
 ## TO TEST (0.4)
 
