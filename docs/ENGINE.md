@@ -5,8 +5,8 @@ state flows, where it lives in the PC executable, how the Xbox title update (TU)
 do about it. The aim is that with this file everything only has to be *rebuilt*, never *re-discovered*.
 
 This file is the **index and summary**. Details, disassembly and test logs stay in the sources it names. Conversion
-pipeline: [ARCHITECTURE.md](ARCHITECTURE.md), [PIPELINE.md](PIPELINE.md). Older short facts: [FINDINGS.md](FINDINGS.md)
-(merged in here by reference). DLC 2 notes: [DLC2.md](DLC2.md). Costumes: [COSTUMES.md](COSTUMES.md). Open work list:
+pipeline: [ARCHITECTURE.md](ARCHITECTURE.md), [PIPELINE.md](PIPELINE.md). The older short-facts file
+[FINDINGS.md](FINDINGS.md) is only a pointer here since 08.11. (its content is merged in, marked "from FINDINGS.md"). DLC 2 notes: [DLC2.md](DLC2.md). Costumes: [COSTUMES.md](COSTUMES.md). Open work list:
 [INVESTIGATION.md](INVESTIGATION.md), [STATUS.md](STATUS.md).
 
 ## Conventions
@@ -37,11 +37,13 @@ Full table with 104 rows: `TU-Abdeckung.md` (findings folder). "Data" = fixed in
 | Rock vein markup types 22 / 23, conditions 607 / 608, 5th geometry function | TU | missing | TruRockVein |
 | Damage types | 0..27 (18..27 = DLC 2 hits) | 0..16, DLC 2 hits dropped | TruShadowCombat `[Damage] Translate` ✅ live 07.11. |
 | Chunkdoll on lethal impulse | deferred to the Death state | created inside the physics step -> fatal | TruShadowCombat `[Chunk] Translate` (built) |
-| Thrall companion instance (T4) + T1/T2/T3 death / regeneration | TU-only code | absent | TruShadowCombat 0.6.5 (built) |
-| Script notifications 33 / 34 / 38 | sent by enemy states | never sent | TruShadowCombat 0.6.3 / 0.6.5 (33 live, 34 / 38 built) |
+| Thrall companion instance (T4) + T1/T2/T3 death / regeneration | TU-only code | absent | TruShadowCombat 0.6.5 (companion lookup ✅ live 08.11., object 870; T1-T3 built) |
+| T5 immediate death in the hit reaction; Vaulted Enter step chain (P1c) + Vaulted clock | TU-only code | absent | TruShadowCombat 0.6.6 `[Death] TranslateT5` / `TranslateVaulted` / `TranslateVaultedClock` (built) |
+| Script notifications 33 / 34 / 38 | sent by enemy states | never sent | TruShadowCombat 0.6.3 / 0.6.5 (33 live 07.11. + 08.11., 34 / 38 built) |
 | MeleeAttack end / interrupt (T-M1..T-M3) | changed | retail | TruShadowCombat 0.6.4 / 0.6.5 (built) |
 | MeleeSplashDamage (K9), adrenaline in doppelganger mode (K11) | changed | retail | TruShadowCombat `[Splash]`, TruShadowPower `[Adrenaline]` (built) |
-| SweepAndPrune pool | create(3000, 500): 3000 boxes, 1000 pair links | create(1000, 200): 1000 boxes, 400 links | TruRockVein 0.10 `[SweepAndPrune] Translate` (built) |
+| SweepAndPrune pool | create(3000, 500): 3000 boxes, 1000 pair links | create(1000, 200): 1000 boxes, 400 links | TruRockVein 0.10 `[SweepAndPrune] Translate` (built, not yet loaded in the game) |
+| Brain size | 0x50a0 B; the TU-added block shifts the tail by 0x58 (TU +0x5088 = PC +0x5030) | 0x5040 B | plugins keep TU-only fields in their own tables (TruShadowCombat 0.6.6 clock) |
 | Cloth / braid time step (K1) | dt / world time scale for the player | plain dt | TruShadowPower `[Cloth] TuTimeStep` (built, default 0) |
 | Camera flag bit 2 on power start | set, never cleared | set / cleared by strike look | TruShadowPower 0.20 `[Look] CameraFlag=1` (built) |
 | Doppelganger flag gameTracker+0x1244 | DoppelgangerInit sets it | nobody writes it | TruDlc2Player `TrackerFlag` / `FlagReset` |
@@ -52,7 +54,7 @@ Full table with 104 rows: `TU-Abdeckung.md` (findings folder). "Data" = fixed in
 | Native type `dlc2data` in scripts | bound | not in the exe -> null call | script stub `script_dlc2_flag_stub.py` ✅ |
 | Achievements f16-f20 | Live award | `achievement` has 16 natives (all `ret`) | calls NOPed (`script_missing_native_fix.py`) ✅ |
 | GlobalInfo player list | 29 ids (857 included) | 28 | data fix `globalinfo_player_list_fix.py` (K12) |
-| Sound groups | 80 (77-79 new) | 77 | TU `globalsoundinfo.drm` installed ✅ |
+| Sound groups | 80 (77-79 new) | 77 | TU `globalsoundinfo.drm` installed ✅; TruMenu 0.21.8 group volume sliders (built) |
 | Input map set 17 (K8) | 6 extra bindings | missing | data fix `input_map_tu_fix.py` ✅ |
 | Chunkdoll limit | 8 | 4 | not ported (deliberate) |
 | Sound-slot 5th argument | TU 0x8226de00 | retail | ⬜ not ported |
@@ -62,18 +64,24 @@ Full table with 104 rows: `TU-Abdeckung.md` (findings folder). "Data" = fixed in
 
 ## 2. Containers, sections, ids, relocations
 
-Short; the converter side is in [ARCHITECTURE.md](ARCHITECTURE.md) section 3 and [FINDINGS.md](FINDINGS.md) "Containers and ids".
+Short; the converter side is in [ARCHITECTURE.md](ARCHITECTURE.md) section 3. "From FINDINGS.md" = checked against base-game
+Xbox / PC pairs, decompiled code or the running game when that file was written.
 
 | Fact | St | Proof |
 |---|---|---|
-| DRM = list of typed sections; CDRM = compressed DRM. Xbox big-endian, PC little-endian. Types: 0 / 2 / 7 (DTP) / 8 (script) / 11 (object), 5 texture, 6 wave, 9 shader lib, 10 material, 12 mesh / terrain, 13 map, 100 symbols | ✅ | FINDINGS.md |
-| Internal relocations = pointers inside a section; external = section-index references; `idref`s resolve by (type, id) across the loaded set. Adding / removing sections needs external-reloc remapping; appending is safe only if no reloc targets an index >= the old count | ✅ | FINDINGS.md |
-| One **global texture cache** keyed by id, per-DRM refcount: a material may use a texture from another DRM only while that DRM is resident (else R6025) | ✅ | FINDINGS.md, `work/crash/B84_r6025/tex_lifetime_check.py` |
+| DRM = list of typed sections; CDRM = compressed DRM. Xbox big-endian, PC little-endian. Types: 0 / 2 / 7 (DTP) / 8 (script) / 11 (object), 5 texture, 6 wave, 9 shader lib, 10 material, 12 mesh / terrain, 13 map, 100 symbols | ✅ | from FINDINGS.md |
+| Internal relocations = pointers inside a section; external = section-index references; `idref`s resolve by (type, id) across the loaded set. Adding / removing sections needs external-reloc remapping; appending is safe only if no reloc targets an index >= the old count | ✅ | from FINDINGS.md |
+| One **global texture cache** keyed by id, per-DRM refcount: a material may use a texture from another DRM only while that DRM is resident (else R6025) | ✅ | from FINDINGS.md, `work/crash/B84_r6025/tex_lifetime_check.py` |
 | Texture ids in object lists are masked with 0x1fff by 0x52b360 (caller 0x54e89c in the object reload handler 0x54e200): new texture ids must stay < 8192. A garbage count there (DTP 26321 +0xd4 = 0x03000000) masked ~40 MB and wiped FMOD's mixer (crash shows in the WINMM timer thread) | ✅ | `Befund-Ton-und-Abstuerze-0411.md`, fix `objdata_fx_fix.py texcount` |
 | Material / shader lib **first loaded copy of an id wins** (hash table, refcount +1 for a second copy, 0x551ec9): every DRM copy of the same id must be byte-identical | ✅ | section 17, gate `gate_stesso_id` |
-| **Dead bits**: 16352 unique-id bits; uids >= 16352 are no-ops on set and read as alive. DLC intro uids were shifted by +20000 for 5 uids | ✅ | FINDINGS.md, INVESTIGATION.md 6 |
+| **Dead bits**: 16352 unique-id bits; uids >= 16352 are no-ops on set and read as alive. DLC intro uids were shifted by +20000 for 5 uids | ✅ | from FINDINGS.md, INVESTIGATION.md 6 |
 | Runtime-spawned instances get intro ids >= 0x40000000 (children inherit the parent's intro) | ✅ | section 5 |
 | Word classes (s32 / s16 / raw / id fields) are learned from paired base-game sections; most data bugs in this file are converter word-class errors (u16 pairs swapped as u32, raw bytes swapped, counts remapped as ids) | ✅ | ARCHITECTURE.md 3 |
+| **Fault class "learned type-7 table"** (08.11.): every DTP without a same-size base twin takes the generic `convert` route (generic_type0 with the learned type-7 table: class per word from label key + Xbox value shape). Seven unrelated record families came out with the same fault - the right bytes in the wrong order for the field width (u16 pair <-> u32 <-> raw): chunkdoll piece records (13.6), DTP 22497 player tuning (targeter / K9 pair table, 20.1), type-0x3d thrall extension data (13.4), melee records reached only via the +0x1c8 link (13.5), pool generator intro data (10; also our DLC 1 route), costume model u16 arrays + list counts (count remapped like a DTP id, 19), the SoundPlex type-12 DSP kind u16 (18.1). The pipeline fixes them after conversion with typed rules: steps `chunkrec`, `exttuning`, `thrallext`, `meleelink`, `genintro`, `costumedtp`, `dspkind` in `tools/dlc_struct_fixes.py` (after `objid`, before `seqrepeat`), only where the PC word is another byte order of the Xbox word; twins / statechart run before, the `converter_faults_fix` families after and leave these words alone (check: 0 on the 0711 copies) | ✅ | P2 / N8 report 08.11., `tools/dlc_struct_fixes.py` docstring |
+| The **installed** `doppelganger_casual.drm` predates the twins step: 392 words in 34 SoundPlex DTPs (incl. the moan trees) are still in the converter's byte order; a fresh pipeline run fixes them (test tree in progress) | ✅ data | section 18.1, `work/moan_0711` |
+| Cutscene command lists: records `{u16 type, u16 frame}{u32 uid}{u16, u8, u8}{u16 msg, u16 par}[extra]`, length = 12 + 4 * (type >> 12) (format A) or 8 + ... (format B, with an initial DTP id); terminator `ffff0000`. Converted as plain u32 words, type / frame swap and the cinematic never gets `Cine_Start` | ✅ | (from FINDINGS.md) |
+| Physics records of custom-range grapple rings (tag 0x404): the enable byte at +4 must stay raw | ✅ | (from FINDINGS.md) |
+| Each translated material gets its own shader lib id (2756-2774, 2775-2781, 2782; 975 / 976 are VS / PS donors copied into streamgroups), because of the first-copy-wins rule below | ✅ | (from FINDINGS.md), [LINEAGE.md](LINEAGE.md) |
 | Language variants: `ArchiveFileSystem::FindEntry` 0x4726e0 takes the first record with `(spec & mask) == mask`; English loads `<name>_001` (spec 0xffffffe1) before the base name | ✅ | section 18.5 |
 
 ---
@@ -246,7 +254,6 @@ calls watcher 0x4af740). Sources: `Befund-Saves-Sticky-0611.md`, `Befund-Hall02-
 | Native call op65 | 0x57de34; pops object + argument slots, pushes nothing; results via pointer arguments | | ✅ |
 | Null native | call through null pointer at 0x57dea3 / 0x57deae = an unbound native type | | ✅ |
 | Script manager | `[0xcc4f5c]`; `ScriptObject` +8 type, +0xc instance data; `CallFunction` 0x57b380 | | 🔶 (external menu-hook source) |
-
 Opcodes (✅): op00 nop / line marker (patch hook point); op01 pop; op02 / op05 push word (op05 relocated pointer);
 op03 push s24; op04 push byte; op06 / 07 / 08 / 0a push local u8 / u16 / u32; op09 address of local; op0c / 0d / 0e / 10
 push member; op0f address of member; op14 `[R+0xc]` + offset (null-safe, 0x57d040..0x57d066); op2e / op2f store byte /
@@ -294,8 +301,8 @@ against resident 12433 (3300 B) crashed the unload at 0x5976a3 (`script_base_cla
 | 25, 26, 35, 36, 37 | player moves (which ones ⬜) | 25 + one of 26 / 35-37 closes `hint_08` -> tutorial stage 2 | none needed? ⬜ | 🔶 |
 | 27 / 28 / 30 / 31 / 32 | player moves | close hint_18 / hint_09 / hint_10 / hint_11 / hint_12 | | 🔶 |
 | 29 | ? | closes hint_17 | | ⬜ |
-| **33** | Land slot 9 (T2) / death check (T3): lethal hit on a regenerating enemy | shows `hint_17` (finisher hint) once | TruShadowCombat 0.6.3 `[Death] TranslateNotify33` (call at 0x6203fb) ✅ live | ✅ |
-| **34** | RegenerateDeath Exit (slot 12, TU 0x8235e338) on every exit | closes hint_17 | `[Death] TranslateNotify34` (vtable 0x85b104), built | ✅ static |
+| **33** | Land slot 9 (T2) / death check (T3): lethal hit on a regenerating enemy | shows `hint_17` (finisher hint) once | TruShadowCombat 0.6.3 `[Death] TranslateNotify33` (call at 0x6203fb) ✅ live (07.11.; 08.11. with 0.6.5: hint shown, thrall then chunk-killed, nothing stuck) | ✅ |
+| **34** | RegenerateDeath Exit (slot 12, TU 0x8235e338) on every exit | closes hint_17 | `[Death] TranslateNotify34` (vtable 0x85b104), built; not yet triggered live (08.11.: no thrall lay in RegenerateDeath) | ✅ static |
 | **38** | RegenerateDeath / Regenerate slot 10 (TU 0x8235e3a8 / 0x8235e998): type 16 (or 1 / sub 1) hit on a lying thrall with companion -> death kind 7 | closes hint_17 | `[Death] TranslateNotify38` (0x85b0fc / 0x85b15c), built | ✅ static |
 | 31 / 27 (TU 0x823a3d20 / 0x823de858) | not read | | | ⬜ |
 
@@ -378,7 +385,7 @@ Sources: `Befund-Hall02-Wand-0711.md`, `Befund-Hall02-Zaehler-Drift-0711.md`, `B
 | Conditions | 0x4d31e0, table 0x4d3294. 1 = time in node `+0x88 >= arg - 0.001` (0x4d3204); 0x10 = uber command (0x4d5bb0, `+0x1c == command`, from switch 0x4d7680 kind 4) | ✅ |
 | Set node | 0x4d7440: `+0x84` = node, run actions 0x4d5c60, clear +0x80 / +0x88 | ✅ |
 | Start transition | 0x4d4a00: `+0x80` = trans, `+0x84 = -1`; flag 1 = play anim (TRANS +0x28 / +0x2a), flag 2 = wait for `+0x8c` | ✅ |
-| Command list | `FUN_004d7680`, `FUN_004d4be0`, `FUN_004d4a00` | ✅ (FINDINGS.md) |
+| Command list | `FUN_004d7680`, `FUN_004d4be0`, `FUN_004d4a00` (command list / transition; used to trace gate and bridge logic) | ✅ (from FINDINGS.md) |
 | Live read path | `p = [inst+0x2d0]; u = [[p]+0x2ec]; b = u - 0x10`; valid if `[b+0x70] == 0xF0012345`; +0x78 DESC, +0x80 TRANS, +0x84 node, +0x88 time in node (f32), +0x8c bit 0 waiting for anim; node name `*(char**)([[b+0x78]+8]+28k+8)` (`tools/vm_uber_state.ps1`) | ✅ |
 | Schema | `dtp_schema.py` sizes TRANS as 0x28 B, the engine reads up to +0x34 | ✅ |
 | Script classes | `uberobjectcommand` (850; commands 0 / 1), `uberobjectevent`, base 3592 | ✅ |
@@ -387,7 +394,10 @@ Sources: `Befund-Hall02-Wand-0711.md`, `Befund-Hall02-Zaehler-Drift-0711.md`, `B
 20839 / 20840): reset (2) -> open (1) on command 0; open -> closed (0) on command 1 (sent only on load) or after **25.0 s**
 (f32 0x41c80000 at DTP +0x860); closed -> reset after 2.0 s. The switch has its own `wait 30`. Xbox = PC word for word:
 original behaviour ✅ (live 29.995 s + ~1.85 s anim). Open: which uber event fires per node, anim lengths ⬜.
-TruMenu 0.21.7 shows gate labels (`[Debug] LabelRadius` 3000 limit). Sources: `Befund-Tore-CavernsHall-0711.md`.
+TruMenu 0.21.7 shows uber labels (node name per instance through the live read path above; `[Debug] LabelRadius` 3000
+limit): ✅ live 07.11. (`dlc2_uo_goo_drips` and its runtime copies at the foot of the end-room light columns, node
+"goo_off"). The caverns gates got no label in the live test because they were 3165 / 3357 units away. Sources:
+`Befund-Tore-CavernsHall-0711.md`.
 
 ---
 
@@ -412,7 +422,7 @@ uses another layout. ✅
 
 **Converter fault** ✅: 24 of 46 DLC 2 generators (75 words) had +0x30 raw (1 -> 256), +0x38 / +0x5c as u32 (bit 0 lands in
 +0x5e), floats / bytes swapped -> 16 generators spawned on unit load (hall02 softlock). Fix `tools/generator_intro_fix.py`
-(proof on 84 generators / 2688 words, 0 contradictions); planned pipeline step `genintro` (not wired). Live 07.11. with the
+(proof on 84 generators / 2688 words, 0 contradictions); pipeline step `genintro` since 08.11. (section 2). Live 07.11. with the
 fix: tutorial first ✅. Open: +0x0c / +0x32 / +0x5e meaning ⬜. Sources: `Befund-Generator-Datenfix-0711.md`.
 
 ---
@@ -472,7 +482,11 @@ Sources: [TruDoppelganger README](../src/asi/TruDoppelganger/README.md), [TruRoc
 +0x168 current tune, +0x16c tune id; +0x170 EnemySensesControl; +0x1a0 12 sense slots of 0xe0; +0x11a0 bits 1 / 2 Getup
 decision; +0x11e0 behaviour tree; +0x1254 state machine; +0x125c / +0x1260 current state object layer 0 / 1; +0x18d4+4*layer
 active data slot; +0x18f8 / +0x18fc requested state; +0x1c44 / +0x1c48 handlers; +0x2c60 health component (+0x2c64 LP,
-+0x2c6c health from tune+0x3c); +0x4e10 EnemyTargeting. TU only: +0x2c7c, +0x5080, +0x5090 / +0x5094 companion handle.
++0x2c6c health from tune+0x3c); +0x4e10 EnemyTargeting. TU only: +0x2c7c (Vaulted Enter writes 0x0fffffff with a
+companion; no PC reader), +0x5080 Vaulted clock start (ms), +0x5084 saved time multiplier, +0x5090 / +0x5094 companion
+handle. The TU block sits before the brain's tail: **TU +0x5088 = PC +0x5030** (shift 0x58), so TU fields from about
++0x5030 on have no PC room and plugins keep them outside the brain (TruShadowCombat 0.6.6: 64-entry table keyed by
+instance + serial +0x44). ✅ static (`Befund-P1d-Begleiter-0711.md`, TruShadowCombat README 0.6.6)
 
 **Tune** (enemy data +0x1c array, count +0x18, default +0x20; names from the 69 retail getters
 `EnemyObjectDataControl::get_*`; the 2007 prototype order is different, do not use it) ✅: +0x30 senses, +0x3c health,
@@ -490,15 +504,15 @@ Vtable slots (18): 7 Enter, 8 / 9 per frame, 10 message, 11 query, 12 Exit, 13 i
 |---|---|---|---|---|
 | Land | 0x8ae808 | 0x858c5c; slot 9 0x65afe0 (LP <= 0 -> LandDeath at 0x65b1aa; LP > 0 + brain+0x11a0 bit 1 & !bit 2 -> Getup); slot 13 at 0x858c90 | slot 9 0x82328aa0 (T2), TU-only slot 13 0x82329060 | ✅ |
 | Getup | 0x8ae82c | | 0x82779b20 | ✅ |
-| Vaulted | 0x8ae8bc | 0x858e14; Enter 0x64fcf0, anim end 0x64ff30 (calls death check), msg 0x64ffe0 (0x15..0x8a only) | 0x82779bb0; Enter wrapper 0x8232b630; TU-only msg case 0xbe 0x8232be54 (staged LP loss) | ✅ |
+| Vaulted | 0x8ae8bc | 0x858e14; Enter 0x64fcf0 (= retail 0x8232cb18), anim end 0x64ff30 (calls death check), msg 0x64ffe0 (0x15..0x8a only) | 0x82779bb0; TU-only Enter 0x8232b630 (step chain, clock - 13.7); TU-only msg case 0xbe 0x8232be54 (next step / staged LP loss), slot 11 0x8232c068, Exit 0x8232b930 (not ported) | ✅ |
 | Death | 0x8ae904 🔶 | 0x858edc; slot 7 0x66c500 (death event 31 via 0x66c310); slot 8 0x66c950 builds the chunkdoll | 0x8232cd50 | ✅ |
 | LandDeath | 0x8ae928 | slot 7 0x66ccf0 | 0x82779c1c | ✅ |
 | DrownDeath | | 0x66da90 | | ✅ |
 | Attack / FinishAttack | 0x8ae970 / 0x8aeb20 | FinishAttack via 0x65c660 | | ✅ |
 | MeleeAttack | 0x8aea00 | 0x85912c (13.5) | 0x82779cf4 | ✅ |
 | Fall | 0x8ae79c | 0x858b34, slot 9 0x65adb0 (damage type 8) | | ✅ |
-| RegenerateDeath | 0x8afa4c | 0x85b0d4; Enter 0x67ed20; slot 9 0x67ee20 (clock >= wake -> Regenerate); slot 10 at 0x85b0fc = 0x682490 (only msg 0x11c, re-checks the list); slot 11 0x682510 (queries 0x184 / 0x183); slot 12 Exit at 0x85b104 = 0x67eeb0 | vtable 0x8206ea40, Enter 0x8235dff8, slot 10 0x8235e3a8 (TU-only), slot 12 0x8235e338 | ✅ (Enter: 0x67ed20 vs 0x67edf8 conflict ⬜) |
-| Regenerate | 0x8afa70 | slot 10 at 0x85b15c = 0x682680 | 0x8235e998 (one source maps it to PC 0x684b80 ⬜) | ✅ |
+| RegenerateDeath | 0x8afa4c (object +0 = vtable 0x85b0d4) | 0x85b0d4; slot 7 Enter at 0x85b0f0 = **0x67ed20**; slot 9 0x67ee20 (clock >= wake -> Regenerate); slot 10 at 0x85b0fc = 0x682490 (only msg 0x11c, re-checks the list); slot 11 0x682510 (queries 0x184 / 0x183); slot 12 Exit at 0x85b104 = 0x67eeb0 | vtable 0x8206ea40, Enter 0x8235dff8, slot 10 0x8235e3a8 (TU-only), slot 12 0x8235e338 | ✅ (vtable read 08.11.: 0x67ed20 is the only reference, from 0x85b0f0. 0x67edf8 is not a function: it is the instruction inside Enter that passes tune+0x64 record +0x50 to 0x621cf0 - `Befund-Thrall-Felder-0611.md` called that site "Enter") |
+| Regenerate | 0x8afa70 (object +0 = vtable 0x85b134) | 0x85b134; slot 7 Enter 0x67eef0; slot 10 at 0x85b15c = **0x682680** (msg 0x11c: brain+0xfe8 set and ShouldRegenerate 0x67f040 (call 0x6826d3) yes -> 0x614ee0 when 0x613be0(msg), else 0x65ac80(inst, msg, 1); msg 0x15: state flag + 0x671c10); slot 11 0x67efe0; slot 12 Exit 0x67ef80 | slot 10 0x8235e998 | ✅ (vtable read 08.11.; the mapping "TU 0x8235e998 = PC 0x684b80" in `Befund-Thrall-Felder-0611.md` is wrong: 0x684b80 is a function pointer stored by a table selector at 0x684e42 (next to 0x6848d0), not referenced from any state vtable) |
 
 `IsInDeathState` 0x640e90 (Death, LandDeath, DeferredInstantDie, DrownDeath, Fade; TU 0x82324700). Death switch 0x641650
 (cdecl, 7 args, `EnemyDeathSwitchData` 0x20 B, +0x14 kind; TU 0x823258c8); death kind from 0x613b40 (type 4 -> 7, 0xe -> 0,
@@ -530,8 +544,11 @@ Hits while lying: RegenerateDeath slot 10 -> 0x614ee0 sends msg 0x3e to up to 4 
 
 TU changes ✅ static: **T1** ShouldRegenerate checks the companion list first; **T2** Land with LP <= 0 + companion +
 extension byte +0x18 == 0 -> notify 33 + RegenerateDeath (TU 0x82328d24..d78), else LandDeath as PC; **T3** notify 33 in
-the death check, no switch while in Land (0x822f6654); **T4** the companion instance; **T5** 0x823038d8 companion + lethal
-+ not regenerating -> death kind 7 (PC site 0x63ad50) ⬜ not built.
+the death check, no switch while in Land (0x822f6654); **T4** the companion instance; **T5** hit reaction 0x823038d8
+(= retail 0x82305d40, PC 0x63ad50, cdecl inst, hit data, a3, a4 -> float amount): the TU inserted at 0x8230390c..0x82303a78
+"companion exists + LP <= amount (+0x4c) + ShouldRegenerate no" -> hit direction (normalised, z = 0; type 0x19 crossed with
+(0, 0, -1)) -> death switch 0x641650 kind 7, return the amount (no damage message, no hit animation); reads no extension
+field. TruShadowCombat 0.6.6 `[Death] TranslateT5` (jmp at 0x63ad82, 7 bytes): built, live ⬜.
 
 **Companion instance (T4)**: TU-only 0x822da800(inst, brain) from the enemy init 0x822da970 (PC twin 0x63c190, after
 `call 0x615850` at 0x63c21b) walks the object's child id list through the object table, takes the first object with data
@@ -540,15 +557,16 @@ brain+0x5090 / +0x5094. Reader 0x822da918 (47 uses in 38 TU functions) returns `
 no instance exists. Companion objects: 870 (viking + tutorial viking), 932 (yeti), 944 (armoured yeti); 1007 is a
 chunkdoll, not a companion. ✅ Plugin: TruShadowCombat 0.6.5 `[Companion] Translate` (stateless lookup in 0xdb7400 on every
 use), `[Death] TranslateRegenList` (calls 0x6203e4 / 0x6824b9 / 0x6826d3), `TranslateLand` (jmp 0x65b181, slot 0x858c90),
-`TranslateNotify34` / `TranslateNotify38`: built, live ⬜. The 6 places that use the companion instance itself (bit 0x20 in
+`TranslateNotify34` / `TranslateNotify38`: built; the companion lookup is ✅ **live 08.11.** (870 found for a hall02
+tutorial thrall), the rest live ⬜. The 6 places that use the companion instance itself (bit 0x20 in
 +0x14 on death / removal) are not rebuilt ⬜.
 
 **Extension data (type 0x3d)**, root DTP+0xc8 -> +0xf0 ✅: +0 {u16 1, u16 0x3d}; +4 u16 0xb00b; +0xc u8; +0x10 / +0x14
 anim pairs; +0x18 u8 (T2); +0x1c u8; +0x20 / +0x24 step table (0x14 B entries); +0x28 / +0x2c hit records of 0xc4 B per
 damage type (extra f32 at +0x40); +0x30 / +0x34 {kind, f32} pairs; +0x38 u8; +0x3a / +0x3c anim pair; +0x40 / +0x44
 regeneration list. Converter errors (u32-typed u16 pairs, counts 0x000f0000, anim id 108 remapped as object id -> 124):
-`tools/thrall_extension_fix.py` (proof on 61 TU + 5 PC instructions, 9405 words, 0 contradictions; 771 words fixed). Not
-in the pipeline yet. Sources: `Befund-P1a-ThrallTod-0711.md`, `Befund-P1d-Begleiter-0711.md`, `Befund-N4b-Extensions-0711.md`,
+`tools/thrall_extension_fix.py` (proof on 61 TU + 5 PC instructions, 9405 words, 0 contradictions; 771 words fixed); pipeline
+step `thrallext` since 08.11. (section 2). Sources: `Befund-P1a-ThrallTod-0711.md`, `Befund-P1d-Begleiter-0711.md`, `Befund-N4b-Extensions-0711.md`,
 `Befund-Thrall-Felder-0611.md`.
 
 ### 13.5 MeleeAttack and combo link records
@@ -573,7 +591,7 @@ record+8 bit 2 is clear (PC site 0x65c9ea); **T-M3** Vaulted and (with companion
 TruShadowCombat 0.6.4 `[Melee] Translate`, 0.6.5 `TranslateInterrupt` (slot 0x859160): built. Meaning of brain+0xc bit 0 ⬜.
 **Freeze = data bug** ✅ data: link-only records typed u32 (viking DTP 24426 +0x4290 anim {50, 1} instead of {1, 50}; yeti
 24577 / armoured 24890 +0x493c); `tools/melee_link_record_check.py` / `melee_link_record_fix.py` (22 base pairs, 0
-contradictions); planned step `meleelink`. Sources: `Befund-P1b-MeleeAttack-0711.md`, `Befund-Thrall-MeleeAttack-Freeze-0711.md`,
+contradictions); pipeline step `meleelink` since 08.11. Sources: `Befund-P1b-MeleeAttack-0711.md`, `Befund-Thrall-MeleeAttack-Freeze-0711.md`,
 `Befund-Melee-Kombo-Datenfix-0711.md`.
 
 ### 13.6 Chunkdoll (type 0x3b) and the physics pool
@@ -588,7 +606,7 @@ contradictions); planned step `meleelink`. Sources: `Befund-P1b-MeleeAttack-0711
 | Leak | 0x48ea80 clears inst+0x274 even when FreeBody refused | | 🔶 |
 
 Plugin TruShadowCombat 0.6.1 `[Chunk] Translate` (6-byte jmp at 0x624caa): built. Data errors (model bytes in DTP 24559
-/ 26190): `tools/chunkdoll_records.py`, `chunkdoll_record_fix.py`. Limit 4 -> 8 deliberately not ported.
+/ 26190): `tools/chunkdoll_records.py`, `chunkdoll_record_fix.py` (pipeline step `chunkrec` since 08.11.). Limit 4 -> 8 deliberately not ported.
 Sources: `Befund-ChunkDoll-Absturz-0711.md`, `Befund-ChunkDoll-Physikschritt-0711.md`.
 
 ### 13.7 Finisher, Vaulted, shadow strike, splash
@@ -602,8 +620,25 @@ Sources: `Befund-ChunkDoll-Absturz-0711.md`, `Befund-ChunkDoll-Physikschritt-071
 | MeleeSplashDamage (K9) | 0x6e68b0 (TU 0x823e1220): doppelganger mode remaps 0x1a -> 0x10, 0x10 -> 0x16 via the 858 table (+0x78 / +0x7c); always skips the main target CM+0x48 in area function 0x69f1e0. TruShadowCombat 0.6.2 `[Splash]` (0x6e692d, 0x69f224): built | ✅ static |
 | Adrenaline (K11) | CombatManager::Update 0x7227d0 skips adrenaline tick 0x718bd0 and bar 0x6f2930 in doppelganger mode; TruShadowPower 0.18 `[Adrenaline] Translate`: built | ✅ static |
 
-Plugin switches (off by default): `[States] Translate1013`, `[Strike] Translate`, `[Strike] Gate`. TU Vaulted Enter wrapper
-(brain+0x2c7c = 0x0fffffff) not ported (P1c) ⬜. Sources: `Befund-15h-Absturz-Finisher-0611.md`, `Befund-TU-K9-K11-0711.md`,
+Plugin switches (off by default): `[States] Translate1013`, `[Strike] Translate`, `[Strike] Gate`.
+
+**Vaulted step chain (P1c)** ✅ static: the TU-only Vaulted Enter 0x8232b630 reads a new switch-data field **+0x44 =
+companion step**, fed by six links: F retail strike record (PC 0x71d5cc -> 0x645e40) +0x34 = 0 (TU 0x823e0294); E finisher
+1013 record (0x71d895) +0x3c = 0 in every mode (TU 0x823e0e84); A enemy message case 0xbe (0x63b421 -> record copy
+0x645de0) copies incoming +0x34 to +0x3c (TU 0x8230743c; the TU shadow strike writes its step there); B Vaulted switch
+from a record (0x623fa2 -> 0x60ed80) data +0x44 = record +0x3c (TU 0x823044dc); D Vaulted slot 3 copier (0x65a4a2 ->
+0x64d350) copies +0x44 (TU 0x8232300c); C Enter (0x64fdb9): state data +0xb8 = step, companion -> brain+0x2c7c =
+0x0fffffff; step 0 = the PC's own animation choice, step n = companion step table entry `[comp+0x20] + (n - 1) * 0x14`
+when n <= `[comp+0x24]`, else no animation (TU 0x8232b3f8). The step table is only valid in the fixed extension layout
+(13.4); the installed converted files fail it (count 0x000f0000).
+**Vaulted clock** ✅ static: Enter (TU 0x8232b698) sets brain+0xc bit 0x10, clock = ms counter 0xe7f15c, time multiplier
+0xe7f188 /= slow-motion factor 0xe7f1a0; the enemy update (PC 0x638d40, TU 0x822db190) saves the multiplier, keeps
+multiplying by 1 / factor while the bit is set and clears it after **5000 ms**, restores at the end of the main path (TU
+0x822db4e0, not on the brain+8 bit 0x20000 exit 0x822db364): an enemy knocked into Vaulted runs 5 s at normal speed during
+shadow slow motion. Not ported: script commands 0x822d6844 / 0x822d6880, Vaulted slot 10 case 0xbe, slot 11, Exit, the
+strike's step queries 0x165..0x167 (TU 0x82308850), the rest of RegenerateDeath / Regenerate slot 10 (needs the TU's
+2-byte state data +8 / +9 that the PC state lacks). Plugin TruShadowCombat 0.6.6 `[Death] TranslateVaulted` (all six links
+or none) / `TranslateVaultedClock` (default 1, read again at run time): built, live ⬜. Sources: `Befund-15h-Absturz-Finisher-0611.md`, `Befund-TU-K9-K11-0711.md`,
 `Befund-Finisher-Thralls-0511.md`, `Befund-Schattenkampf-0411b.md`.
 
 ### 13.8 Perception and brain+8 gate bits
@@ -631,8 +666,12 @@ Plugin TruMenu 0.19 "dumb AI" `[AI] Dumb` / `NoInvestigate` / `NoAttack`. Source
 | TU | ctor 0x8227b9f0: create(**3000, 500**) -> 3000 boxes, **1000 pair links**, proxies stay 1000; owner field +0x1c = 3000 (no reader); box 0x70 B with 0.1-unit move threshold | ✅ |
 
 Plugin: TruRockVein 0.10 `[SweepAndPrune] Translate=1` patches 0x5be3a7 `68 c8 00 00 00 68 e8 03 00 00` -> `68 f4 01 00
-00 68 b8 0b 00 00` in DllMain (must run before init 0x5df390), control `[0xdb94cc]+4` -> core +0x24 == 3000, +0x2c == 500
-(+412800 B): built, live ⬜. TruMenu 0.21.7 `sap.status` (read-only, `[Debug] SapWatch`). Tools `tools/sap_precheck.py`,
+00 68 b8 0b 00 00` and the unread copy at 0x5be3c4 (`c7 46 20 c8 00 00 00` -> `... f4 01 00 00`, owner +0x20 = 500) in
+DllMain (must run before init 0x5df390 -> 0x5df410 -> 0x5d9e70 -> 0x5d9eb7 -> ctor; refuses when `[0xdb94cc]` / `[0xe7f060]`
+are already set), control on the first chart-machine update: `[0xdb94cc]+4` -> core +0x24 == 3000, +0x2c == 500, memory
++0x20 = 620001 (+412800 B), proxies 1000. TU field +0x1c and the 0x70-byte box are not taken. Built 08.11., **not yet
+loaded in the game** ⬜. TruMenu 0.21.7 `sap.status` (read-only, `[Debug] SapWatch`); 0.21.8 accepts the patched row in
+its byte check and shows "Grenzen PC 1000/400" or "TU 3000/1000 (TruRockVein 0.10)". Tools `tools/sap_precheck.py`,
 `sap_owner_field_users.py`, `sap_xbox_core_diff.py`. In-game peaks ⬜. Markup K13 (B270 patches 0x5d593f / 0x759b74) not
 taken. Sources: `Befund-SweepAndPrune-0611.md`, `Befund-P5-Kleinkram-0711.md`, `Befund-Markup-Massstab-0611.md`.
 
@@ -653,7 +692,10 @@ taken. Sources: `Befund-SweepAndPrune-0611.md`, `Befund-P5-Kleinkram-0711.md`, `
 
 Converter defect ✅: COUNT swapped like the payload -> 5187 bad words in 10 DLC 2 units (and 1670 in our DLC 1 route);
 rule `navraw` (`tools/navgraph_raw_fix.py`, step in `dlc_struct_fixes.py`). Effect on thrall pathing 🔶. Plugin TruMenu 0.12
-`nav.draw` / `nav.mask` / `nav.status`, 0.21.7 `nav.labels`. Sources: `Befund-Navmesh-Kombi-0511.md`, `Befund-Debug-Ansicht-0511.md`.
+`nav.draw` / `nav.mask` / `nav.status`, 0.21.7 `nav.labels`. Drawing ✅ **live 07.11.** (corridor hall02 <-> end): it needs
+"Navmesh Flaechen" on **and** a navgraph layer in the mask (`nav.mask 1`), else nothing is drawn. Seen: red edges (bit 27,
+installed navgraphs = Xbox, 0 differences), a magenta ramp where thralls jump up (bit 26? 🔶), areas floating over water /
+without floor near the end-room waterfall (main-game leftovers? ⬜). Sources: `Befund-Navmesh-Kombi-0511.md`, `Befund-Debug-Ansicht-0511.md`.
 
 ---
 
@@ -669,6 +711,8 @@ rule `navraw` (`tools/navgraph_raw_fix.py`, step in `dlc_struct_fixes.py`). Effe
 | Passes | 1, 2, 0x80, 0x100, 0x200, 0x400, 0x800; material apply: 1 -> 0x5064f0, 2 -> 0x505d80, 0x800 -> 0x505f40, else 0x506880; current pass `[0x8a2340]`. Meaning of each pass ⬜ (colour pass probably 0x200) | ✅ / ⬜ |
 | Camera / scene | camera getters 0x5e7850 (transform), 0x5e7870 (inverse), 0x5e78a0 (position), 0x5e78d0 (FOV), matrix 0xe804a0; scene block 0xe496e0 (0x5caff0; row 1 negated), near 16.0, far 12000.0 (`[0x8aa764]`); projection `TRANS_RotTransPersVectorf` 0x49f630 | ✅ |
 | Cheat "no texture" flags | 0xe7edac / 0xe7edb0 toggled, 0 readers | ✅ |
+| Projected light binding | 0x50a5f0 / 0x5076e0: `X+0x418` sometimes holds a pointer to a render view instead of the texture -> AV 0x5076fa; the B138 exe's `light_tex_guard` restores it when it differs from the invariant of `FinalizeInitialization` | ✅ (from FINDINGS.md) |
+| D3D device creation | 0x7c493d: a boot crash at 0x7c4984 (sources write tru+0x3c4984) is infrastructure (driver / VM), not data | ✅ (from FINDINGS.md) |
 
 TruMenu 0.15-0.17 debug render modes (`dbg.census`, `dbg.flat`, `dbg.flatedges`, depth path hooking 0x849a2c, live 06.11.).
 Sources: `Befund-Debug-Rendermodus-0611.md`, `Befund-TruMenu-Rendermodus-0611.md`, `Befund-Debug-Ansicht-0511.md`,
@@ -691,10 +735,12 @@ Sources: `Befund-Debug-Rendermodus-0611.md`, `Befund-TruMenu-Rendermodus-0611.md
 | +0x68 / +0x6c | VS MaterialParams count / pointer -> **VS c25** (0x505c2a, `0x5269b0(25, ...)`); +0x3c is not a VS count | ✅ |
 | texture record | {u32 id, f32, u32 type, u8 kind, u8 slot, u16 filter}; kind 9 = back buffer, 10 = depth buffer (texture from `[[renderer+0xfa50]+0x46c+kind*4]`); a sampler without a record keeps the previous draw's texture. Setup 0x505ad4..0x505bb2, bind 0x5076e0 (mip bias via 0x527840) | ✅ (who fills +0x490 / +0x494 ⬜) |
 
-MaterialParams layouts differ between Xbox and PC per shader family (permutation / compaction, `param_rules`); blind
-scaling gave neon-green / red tints (B41). When a PS is replaced by a translation, the PS MaterialParams become the Xbox
+MaterialParams layouts differ between Xbox and PC per shader family (a per-lib-pair permutation / compaction derived by
+role signatures: `param_rules`, `work/ws/visual2/rolefix*.py`, `work/ws/contratti`); blind scaling gave neon-green planks
+and red tints (B41). (FINDINGS.md read the per-pass bytes +0x50..+0x52 as indices of the 16-byte MaterialParams records;
+the table above, from the later N5 reading, has them as texture-record counts.) When a PS is replaced by a translation, the PS MaterialParams become the Xbox
 values (missing vec4s appended, block grows, relocations behind it shift; empty PC block n = 0 was a `grow_params` bug,
-fixed). ✅ ([FINDINGS.md](FINDINGS.md), `Befund-Wasserfall.md`, `Befund-N5-Materialien-0711.md`)
+fixed). ✅ (from FINDINGS.md, `Befund-Wasserfall.md`, `Befund-N5-Materialien-0711.md`)
 
 ### 17.2 Runtime objects
 
@@ -711,8 +757,14 @@ fixed). ✅ ([FINDINGS.md](FINDINGS.md), `Befund-Wasserfall.md`, `Befund-N5-Mate
 * Xbox entry: `0xbaadf00d`, size, 8-byte hash, Xenos container (0x102a1100 PS / 0x102a1101 VS), CTAB, microcode. PC entry:
   u32 word0 (translated libs may use 0), u32 size, hash, D3D9 tokens. **PC size word = (16 + code bytes) | (dcl_cube sampler
   mask << 16)** (6139 / 6139). ✅
-* Samplers: dcl >= s16 broke the driver at start-up (B75), stay in s0..s15; s15 = fog / attenuation lookup
-  `texld (v4.w, c54.z)`; final colour `lerp(color, c0, fog)`. Xbox `p_Lights` uses 13 registers per light. ✅
+* Samplers: dcl >= s16 broke the driver at start-up (B75), stay in s0..s15 and check with `vm_ps_validate.ps1` +
+  `vm_ps_draw.ps1`; s15 = fog / attenuation lookup `texld (v4.w, c54.z)` (the Xbox shaders read their
+  `AttenuationSampler` s15 the same way); final colour `lerp(color, c0, fog)`. Xbox `p_Lights` uses 13 registers per
+  light. ✅
+* **Harness rules** (from FINDINGS.md): constants are random unless set; the fog read must return 0; the attenuation
+  sampler s15 is marked by the 'ATT' sentinel `c54.z = 0.987654`; the direct-light share is only 50 % / 33 %, so harness
+  results about direct lighting are weak. Several earlier conclusions were retracted because a harness was wrong (cobweb
+  fog lookup): check that changing an input that should matter moves the output. ✅
 * PS register map Xbox -> PC: MaterialParams c100 -> c100; MaterialOpacity c1 -> c98; TimeVector c33 -> c53;
   CameraPosition c35 -> c1; AlphaThreshold c4 -> c2; ScreenExtents c16 -> c51; DepthToW c36 -> c77; GlobalParams[7] c147;
   InstanceParams c132. ✅
@@ -728,7 +780,7 @@ fixed). ✅ ([FINDINGS.md](FINDINGS.md), `Befund-Wasserfall.md`, `Befund-N5-Mate
 | Part | Rule | Tool | St |
 |---|---|---|---|
 | Map | 1028 DLC libs: class A 489 / B 234 have a byte-identical base twin; C1 120 / C2 47 / C3 81 / D 57 use a **surrogate** (base PC lib chosen by constant / sampler similarity) | `shader_map.py` -> `dlc_shader_map.json` | ✅ |
-| Two regimes, never mixed in one material | lit: Xbox shader + PC light block transplanted (`tu_light_transplant.py`, `tu_perlight.py`, oracle `perlight_xref.py`, accept >= 0.999); unlit: direct translation (`tu_unlit.py`). Pass 0 is not translated | `work/ws/shader4/xenos2sm3.py`, VM `sm3vm` | ✅ |
+| Two regimes, never mixed in one material | lit: the Xbox light model differs from PC's, so the PC light block is transplanted into the translated Xbox shader with numerically matched inputs / outputs (`tu_light_transplant.py`, `tu_perlight.py`, oracle `perlight_xref.py` on base-game pairs, self-test 300 / 300, accept >= 0.999); unlit: direct translation (`tu_unlit.py`). Pass 0 is not translated | `work/ws/shader4/xenos2sm3.py`, VM `sm3vm` | ✅ |
 | VS translation | `tu_vs.py`: vfetch -> dcl, export 62 = position, rigid skinning index floor(BI*255+0.5)*4, constants by name, NormalScaleOffset only where the CTAB has it | `tu_vs.py` | ✅ |
 | **VS merge rules** | keep the PC twin slot P whole; append outputs the DLC translation T adds (no DEPTH); PC fog slots take Xbox fog group 40 / 104 / 168 / 232; on common outputs the base twin decides; deforming VS: prove T = Tb o D, build P o D (`tu_vs_deform.py`); checks VM <= 1e-5 + D3DX9 valid | `tu_vs.py vsmerge`, `tu_vs_deform.py` | ✅ |
 | **Def clashes (07.11.)** | a `def` in a merged program is global: PC 868 defines c4..c6 as literals in 8 unskinned slots (64, 72, 80, 88, 192, 200, 208, 216) while appended Xbox-2066 code reads c4..c6 as engine World rows -> wrong TEXCOORD3 / 4. Rule now: move a P def that T reads as an engine constant or that lies in T's relative range; move a T def that P reads, that lies in any relative range (c85..c252) or that differs from P's; share identical defs; moved defs go to provably free registers from c255 down; `check_merge` runs every program with its own defs; `selftest` 45 / 45 | `tu_vs.py def_clashes / selftest` (commit 0859f18) | ✅ |
@@ -740,15 +792,18 @@ fixed). ✅ ([FINDINGS.md](FINDINGS.md), `Befund-Wasserfall.md`, `Befund-N5-Mate
 
 | Material | Fact | St |
 |---|---|---|
-| 23164 end-room light column (`dlc_yggdrasil_end`, terrain 20969) | installed surrogate PS 1910 (refraction) reads s2 = back buffer, s3 = depth -> shows the room behind it. Fix tree `work/endcolumn_0711`: PS 2851 / 2988, PS0 2491, VS 1911 kept (proven equal to 1737); not installed | ✅ static / ⬜ Xenia image |
+| 23164 end-room light column (`dlc_yggdrasil_end`, terrain 20969) | installed surrogate PS 1910 (refraction) reads s2 = back buffer, s3 = depth -> shows the room behind it. Fix tree `work/endcolumn_0711`: PS 2851 / 2988, PS0 2491, VS 1911 kept (proven equal to 1737); installed 07.11. 23:39 for the test: translucent, blue, flowing | ✅ **live 07.11.** (first live shader translation) / ⬜ Xenia image |
+| End-room tower / column on the right (23153 / 23155 / 23163) | surrogates without a refraction shader; showed rainbow fringes for a while after shadow power (afterglow of the power's look? 🔶) | ⬜ |
 | 26584 DLC 2 treasure room | VS 2066 = Xbox 1258 + TEXCOORD3 / 4 -> correct VS = PC 868 + TEXCOORD3 / 4 (the def-clash case); PS 830 -> 3090, VS 831 -> 3091 in `work/n5b_0711` | ✅ / not installed |
 | 8 DLC 1 streamgroup copies (23211, 20270, 23462, 20773, 21259, 20548, 20268) | translated PS libs 2961-2966 | ✅ built |
 | 20744 shadow-power look | full-screen quad (event 0x32 -> 0x535cc0 -> effect 0x85 -> 0x547220 -> 0x548bf0 -> 0x546340 -> quad 0x53ef30); black because of surrogate PS 2517 + 0 MaterialParams; fixed PS 2943 / VS 2944 | ✅ |
 | Streamgroups | contain only materials, shader libs, textures, terrain, tiny DTPs; 80 materials drew with surrogates (71 only in streamgroups; 19 half translated - load order decides) | ✅ |
-| Coverage (installed) | 770 materials: SURR 130, PART 89, TU 38, ORIG 308, BASE 205; no shader translation installed yet (owner decision 07.11.) | ✅ |
+| Coverage (installed) | 770 materials: SURR 130, PART 89, TU 38, ORIG 308, BASE 205; no shader translation installed in the kit (owner decision 07.11.; only the end-column test tree was installed for the live test) | ✅ |
 
 Plugin: TruMenu 0.21.7 shader labels (`shader.labels`, data `shaderlabel.txt` from `tools/shader_labels.py`; slot letters O
-twin / T translation / S surrogate). Sources: `Befund-Shader-Etiketten-0711.md`, `Befund-Saeulen-Shader-End-0711.md`,
+twin / T translation / S surrogate; file state vs. live state from the current material `[0xa14188]`): ✅ **live 07.11.**
+(column 1: file "23164 SURR S-SS 1909/-/1910/1911", live "PART T-TS 2491/-/2851/1911"; VS 1911 = 1737 should count as
+equivalent, else the label says PART instead of TU). Sources: `Befund-Shader-Etiketten-0711.md`, `Befund-Saeulen-Shader-End-0711.md`,
 `Befund-N5-Materialien-0711.md`, `Befund-Streamgroups-Shader-0511.md`, `Befund-Shader-Nacht.md`, `Befund-Look.md`,
 `Befund-Wasserfall.md`, `Befund-Materialien-B270-0511.md`; [PIPELINE.md](PIPELINE.md) stage 3.
 
@@ -760,19 +815,24 @@ twin / T translation / S surrogate). Sources: `Befund-Shader-Etiketten-0711.md`,
 
 | Node | Handler / layout | St |
 |---|---|---|
-| Walker | `FUN_005920b0`, jump table 0x5923cc, 14 types; node {u32 type, ptr data}. Null data on type 0 -> AV 0x592218; u16-swapped type words (e.g. 0xb0000) fall to the default and return NULL harmlessly | ✅ |
-| 0 | allocates 0x1c B, `fld [data]` | ✅ |
+| Walker | `FUN_005920b0`, jump table 0x5923cc, 14 types; node {u32 type, ptr data}. Null data on type 0 -> AV 0x592218; u16-swapped type words (e.g. 0xb0000) fall to the default and return NULL harmlessly (seen in costume DTPs, knight_thrall, adren_trap) | ✅ |
+| 0 TimeIn | walker case 0x5921f9: allocates 0x1c B, reads **only the f32 at data+0** (`fld [data]`), ctor 0x583bf0 | ✅ |
 | 1 Indirect | data -> DTP id | ✅ |
-| 2 wave leaf | 0x591220, group table `[0x8a80d8]` indexed by params+0x14; the bounds check 0x591281 only logs -> a raw group value is an AV | ✅ |
+| 2 Wave (leaf) | 0x591220: data {+0 u32 wave id, +4 u8 (passed to 0x5825e0), +6 u16 (non-zero runs an extra channel-mode branch 0x7b9f6f / 0x7b9f4b with \|0x80000000)}. Group table `[0x8a80d8]` indexed by params+0x14; the bounds check 0x591281 only logs -> a raw group value is an AV. A u32-swapped +4 word turns the byte into 0 and +6 non-zero | ✅ |
 | 4 Assign | 0x590970, 0x48 B: +0 child, +4..+0x3c s32 / f32, +0x40 s32 sound group (0 / -1 inherit), +0x44 {u8 max instances, u8 counter, u16} | ✅ |
-| 5 | 0x590ce0 {child, u32 COUNT, ptr, ptr}; allocates 16*COUNT (a raw count gave a 256 MB OOM) | ✅ |
+| 5 Envelope | 0x590ce0: data {+0 ptr child node, +4 u32 track count, +8 ptr -> track ptrs, +0xc ptr}; allocates 16 * count (a raw count gave a 256 MB OOM). Track {u16 parameter index, u16, ptr curve}. Curve {s32 loop / hold start, s32 loop / hold end (-1 = none), u32 point count, points of 12 B {f32, f32 value, flags}}. The ctor tests BYTE [point+8]: bit 1 -> curve+0 = point index, bit 2 -> curve+4 = point index | ✅ |
 | 8 | data word is an id (surface variant) | ✅ |
 | 10 Sequence | ctor 0x58e070 (vtable 0x85127c), update 0x593720; data {u32 count, children, ptr, **s8 repeat** + 3 B}; **repeat 0 = endless**; the +0xc word must stay raw | ✅ |
 | 12 DSP | {child, u16 DSP kind, u16 0, params, 0}; chain 0x59219f -> 0x58def0 -> 0x58dad0 -> 0x587620 (kinds 1..11, table 0x5876fc) -> FMOD createDSPByType 0x7b98ea; kind 7 -> FMOD type 5 (highpass 🔶), params 0x582ec0 (2200.0, 1.3334); out-of-range kind = no DSP, no crash | ✅ |
 
 Data bugs: endless groans = Sequence +0xc swapped as u32 (43 words in 13 files; step `seqrepeat`,
 `soundplex_sequence_fix.py`); `dlc_caverns_hall` DTP 23469 +0x74 DSP kind raw (0x0700) -> no highpass
-(`soundplex_dsp_kind_fix.py`). ✅ Sources: `Befund-Stoehnen-0511.md`, `Befund-P4c-Caverns-0711.md`, [FINDINGS.md](FINDINGS.md).
+(`soundplex_dsp_kind_fix.py`, step `dspkind` since 08.11.). ✅ Envelope flags word u32-swapped in `player_tru_dlc2_extension.drm` DTP 22864 +0x1e4
+(shadow-power loop sound): no hold point; the twins truth is the u16 pair (Xbox `00 03 00 00` -> PC `03 00 00 00`, the
+converter wrote `00 00 03 00`). The installed `doppelganger_casual.drm` lacks the twins words (392 in 34 SoundPlex DTPs,
+incl. the moan trees, section 2); test tree in progress ⬜. ✅ static (`work/moan_0711`: `pc_envelope_590ce0.txt`,
+`pc_wave_591220*.txt`, `twins_report_*.txt`). Sources: `Befund-Stoehnen-0511.md`, `Befund-P4c-Caverns-0711.md`, N3 report
+08.11., from FINDINGS.md.
 
 ### 18.2 Emitters and object sound slots
 
@@ -791,6 +851,11 @@ death list 70 / 76, pause list 6 / 25 / 3 / 9 / 79 (handler 0x5874b0), category 
 7, [3] srmusic 10, [4] default 14, [5] cinstream 25, [6] 53 (reader ⬜). Entry 0x84 B: +0 f32 volume (sliders 0x587171,
 SetVolume 0x587770), +0x10 flags (bit 0 paused), +0x68 parent; R+0x6c = FMOD ChannelGroupI. `SOUND_ResetGroups` 0x5895f0.
 Mute `ChannelGroupI::setMute` 0x7c48cd (TruMenu `media.mutemusic`). ✅ Tool `tools/sound_groups.py`.
+Per-group factor without touching the game's volume (entry +0 stays): `*(float *)(cg + 0x38)` of the group's FMOD
+ChannelGroupI, then FMOD's own recompute 0x7c4774; a group whose ancestor (+0x68) is in the same set is skipped, two
+factors on one path multiply; new channel groups after a level load must be written again. TruMenu 0.21.8 `snd.group`
+sliders (8 sets of groups, `[SoundGroups]`): built (6 byte checks); audible effect and whether the game writes cg + 0x38
+itself ⬜.
 Source: `Befund-Ton-Gruppen-0611.md`.
 
 ### 18.4 Streams (.mul) and music
@@ -799,6 +864,8 @@ Source: `Befund-Ton-Gruppen-0611.md`.
   0x8a9588 is **capped at 0x1fff** (max per-sample delta 15358); FMOD's own IMA decoder is used for DRM wave sections only.
   The S-sound fizz came from an encoder that did not know the cap: `tools/mul_audio_nch.py` encodes against the exact
   decoder model. ✅ (`Befund-S-Laute.md`)
+* History: all DLC audio was first emitted as silence on purpose; real audio = Xbox XMA decoded and re-encoded as IMA
+  ADPCM into the same-size wave sections / `.mul` streams. ✅ (from FINDINGS.md)
 * .mus version check 0x580eac `cmp [edi+8], 0x114`; music start 0x593eb0 (= retail 0x82248760); stream path builder 0x58aa40
   (`"%s%s.mul"`). All 25 DLC tracks are real audio. ✅ (`Befund-DLC-Musik.md`)
 
@@ -811,7 +878,10 @@ first record with `(spec & mask) == mask`). Spec words EN 0xffffffe1, FR 0xffffe
 (second FindEntry search with another mask; built). Doppelganger lines: only English installed, 20 variants built by
 `tools/vo_lang_variants.py`. ✅ Source: `Befund-Tonspuren-Soeldner-0611.md`, [TruMercLang README](../src/asi/TruMercLang/README.md).
 
-Crash guards in this area (B138 exe): `fmod_init_guard` 0x582200, `soundplex_guard` 0x5920d5 ([FINDINGS.md](FINDINGS.md)).
+Crash guards in this area (B138 exe, from FINDINGS.md): `fmod_init_guard` - audio init 0x582200: a failed FMOD
+`System::init` leaves three locals uninitialised -> AV 0x7b92fb; the guard zeroes them. `soundplex_guard` hooks 0x5920d5
+and returns NULL for null-data nodes (not for types 2 and 8, which handle it themselves). The exact bytes are in
+`tools/*_guard.py`.
 
 ---
 
@@ -834,7 +904,7 @@ script 6 function 26): `dlcsystem` f1 per name, offered only if its DRM exists -
 Plugins: TruDlc2Player 0.1 `Costume` (name substitution at 0x5de3a3), `TypeRecord` (record 39 appended), 0.3
 `CostumeReset`, 0.5 `[Costume] TuMapping` (all four sites or none; default 0): built, live ⬜. Without the mapping PC saves
 from DLC 2 hold 857. Not ported: the altPlayerObjectID store and the TU spawn fallback ⬜.
-Data: costume model u16 arrays and list counters (`tools/costume_dtp_fix.py`; costume f missing 586 words installed; our
+Data: costume model u16 arrays and list counters (`tools/costume_dtp_fix.py`, pipeline step `costumedtp` since 08.11.; costume f missing 586 words installed; our
 own costume chain a / h / k / l / m has the same fault). Slots g / n and `dlc_costumes4` never shipped (owner decision E4).
 Sources: `Befund-Kostuem-Reset-DLC1.md`, `Befund-Kostueme-Port.md`, `Befund-P4a-Kostueme-0711.md`,
 `Befund-Menue-Dlc2Player-0411b.md`; [COSTUMES.md](COSTUMES.md), [TruDlc2Player README](../src/asi/TruDlc2Player/README.md).
@@ -849,7 +919,7 @@ Sources: `Befund-Kostuem-Reset-DLC1.md`, `Befund-Kostueme-Port.md`, `Befund-P4a-
 |---|---|---|
 | Doppelganger flag | player tracker +0x1244; only TU writer 0x82412c84 in DoppelgangerInit 0x82412c48 (reset = new tracker memset). PC readers: larabase f36, 0x7200d6 / 0x7200df | ✅ |
 | 858 `player_tru_dlc2_extension` | child of 857, data type 60; created only by TU-only 0x82412ab0 into tracker+0x1314; unloaded with 857 on reload | ✅ |
-| 858 tuning | DTP 22497 block +0xf0: meter max 1000, drain 200 / s, refill 200 / s, restart 150, world scale 0.3, player scale 1.2; target-finder params +0x90 / +0x94; K9 pairs +0x1b0..+0x1bc (`tools/player_ext_tuning_fix.py`, not in the pipeline) | ✅ |
+| 858 tuning | DTP 22497 block +0xf0: meter max 1000, drain 200 / s, refill 200 / s, restart 150, world scale 0.3, player scale 1.2; target-finder params +0x90 / +0x94; K9 pairs +0x1b0..+0x1bc (`tools/player_ext_tuning_fix.py`, pipeline step `exttuning` since 08.11.) | ✅ |
 | Player list (K12) | 857 must be in GlobalInfo DTP 2 (PC 28 -> 29), else unit unload 0x5c1900 dumps the object (`STREAM_DumpObject` 0x5c16d0), the reload spawn returns 0 and the camera crashes at 0x5ff851. Fix `globalinfo_player_list_fix.py` ✅ live (no crash on reload) | ✅ |
 
 Plugins: TruDlc2Player (`FlagReset` hook at 0x722445, `TrackerFlag`), TruShadowPower (object search in 0xdb7400 instead of
@@ -954,12 +1024,13 @@ Sources: `Befund-Thalassophobie-0611.md`, `Befund-Arachnophobie-0611.md`, `Befun
 |---|---|---|
 | 1 | ~~Which register World really occupies~~ - answered statically 07.11.: c4..c7 = World, c0..c3 = WVP at every draw (0x526b90, section 16); only a live check of D3D9 `def` scoping is left | 16 |
 | 2 | Meaning of navmesh area bits 26 / 27 and of the render passes | 15, 16 |
-| 3 | Live result of TruShadowCombat 0.6.1-0.6.5 (chunkdoll, melee, companion, 34 / 38); only K14 and 33 are live | 13 |
-| 4 | brain+0xc bit 0, other brain+8 bits, TU brain +0x2c7c / +0x5080; seconds per enemy tick | 13 |
-| 5 | Address conflicts: RegenerateDeath Enter 0x67ed20 vs 0x67edf8; Regenerate slot 10 0x682680 vs 0x684b80 | 13.2 |
+| 3 | Live result of TruShadowCombat 0.6.1-0.6.6 (chunkdoll, melee, 34 / 38, T5, Vaulted chain / clock); live so far: K14, 33, the companion lookup | 13 |
+| 4 | brain+0xc bit 0, other brain+8 bits; seconds per enemy tick (TU +0x2c7c / +0x5080 answered statically 08.11., 13.1) | 13 |
+| 5 | ~~Address conflicts RegenerateDeath Enter / Regenerate slot 10~~ - resolved 08.11. from the vtables: Enter 0x67ed20 (0x67edf8 is a site inside it), Regenerate slot 10 0x682680 (0x684b80 was a wrong mapping) | 13.2 |
 | 6 | Which player moves send notifications 25 / 26 / 29 / 35-37 | 7.3 |
 | 7 | Game block ranges beyond the known fields, inventory / unlocks location, sticky owner kind 1 id | 6 |
-| 8 | SweepAndPrune peaks in DLC 2 and whether 0.10 holds them | 14 |
+| 8 | SweepAndPrune peaks in DLC 2 and whether 0.10 holds them (0.10 not yet loaded in the game) | 14 |
+| 13 | Is the TruMenu 0.21.8 sound group factor (cg + 0x38) audible; does the game write it itself | 18.3 |
 | 9 | Units per metre (Lara's real height) | 4.3 |
 | 10 | How front-end menus poll the pad | 21 |
 | 11 | Uber events per node; generator +0x0c / +0x32 / +0x5e | 9, 10 |
@@ -979,7 +1050,10 @@ Sources: `Befund-Thalassophobie-0611.md`, `Befund-Arachnophobie-0611.md`, `Befun
 4. **Agent reports bring an "ENGINE.md addition" block**: section number, the rows to add or change, and the source file.
    The coordinator merges it in with the agent's commit.
 5. **End-of-session cross-check.** Compare the new `Befund-*.md` files and `git log` of the session with this file; every new
-   engine fact must have its row, every closed question must lose its ⬜ in section 25.
+   engine fact must have its row, every closed question must lose its ⬜ in section 25. `tools/engine_md_check.py
+   <finding files>` lists the PC (`tru+0x...`, 0x5xxxxx-0x8xxxxx) and TU (0x82xxxxxx) addresses of those files that this
+   file does not mention - a reading aid: most hits are sites inside known functions and stay out. Same rule for agents:
+   [AGENT_GUIDE.md](AGENT_GUIDE.md) ground rule 7.
 6. **Addresses**: always absolute VAs (image base 0x400000); convert `tru+X` when copying from a source. Xbox addresses are TU
    unless marked retail.
 7. **No duplication.** Pipeline facts belong in [ARCHITECTURE.md](ARCHITECTURE.md) / [PIPELINE.md](PIPELINE.md), plugin INI

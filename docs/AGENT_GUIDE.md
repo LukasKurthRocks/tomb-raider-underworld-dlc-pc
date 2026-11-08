@@ -15,6 +15,7 @@ the user's files: the installer keeps `mods_backup_*` and `tru.exe.steam_origina
 4. Gate before testing: run the static gates for any new `mods/` tree before asking the user to play it. Do not use the VM/game for blind exploration; read code and build an offline oracle first.
 5. Report faithfully: say what was verified in-game, what only offline, and what is a hypothesis. Several earlier conclusions had to be retracted because a harness was wrong (e.g. the cobweb fog lookup) — sanity-check harness outputs against sensitivities (does changing an input you expect to matter move the output?).
 6. Use a venv: `python3 -m venv tools/venv && tools/venv/bin/pip install -r requirements.txt`, run tools as `tools/venv/bin/python -I tools/<x>.py`.
+7. **Keep `docs/ENGINE.md` current.** Every agent report brings an **"ENGINE.md addition"** block (section number, the rows to add or change in the file's style - what / layout / PC address / TU counterpart / plugin or tool / source / status ✅ 🔶 ⬜ - and the source file). Every commit with new engine knowledge (an address, a layout, a state flow, a TU difference, a proof, a live result) updates ENGINE.md **in the same commit**. Before handing in, run `tools/engine_md_check.py <your finding files>` and say which listed addresses you added and why the rest stay out (ENGINE.md section 26).
 
 ## Task A — set up and verify inputs
 ```
@@ -46,7 +47,7 @@ Pick from `docs/INVESTIGATION.md`. Start with item 1 (ask the user for the exact
 | Static gate for a tree | `tools/dlc1_gate.py <mods> --scope overlay --baseline … --compare`, `work/ws/giro6/idref_selfcont.py`, `work/ws/shader4/gate_stesso_id.py`, `work/crash/B84_r6025/tex_lifetime_check.py` |
 | Which texture/lib/material is where | `work/ws/giro6/mat_rows.py`, `mat_libs.py`, `tex_selfcont.py`, `uid_refs_all.py` |
 | Shader harness | `work/ws/shader4/f9_common.py` (Env, run), `work/ws/giro5/hall_lit.py`, `web_eval2.py`, `work/ws/giro6/web_calib.py` |
-| Engine function map / patches | `tools/*_guard.py` (each documents the exact bytes), `docs/FINDINGS.md` |
+| Engine function map / patches | `docs/ENGINE.md` (engine reference by topic), `tools/*_guard.py` (each documents the exact bytes), `tools/engine_md_check.py` (finding addresses not yet in ENGINE.md) |
 | Crash dump reading | `tools/minidump_read.py`, `tools/vm_crash_watch.ps1` |
 
 ## Suggested prompt for the user to paste
