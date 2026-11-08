@@ -1101,7 +1101,8 @@ FOV camera +0xb0 = vertical radians (section 16), rewritten every frame by about
 0x5e338b / 0x5e348d) - a player FOV option must scale, not set it.
 Plugins: TruShadowPower 0.20 `[Look] CameraFlag=1` (TU default), TruMenu `cam.shakescale` / `cam.rumble`, TruQoL 0.1
 `[Camera] Fov` (factor at 0x5cb0a8, gameplay camera only unless `FovCutscenes`) and `ShakeScale` (the same two shake
-callers 0x5eea55 / 0x5eb56d as TruMenu; below 1 TruMenu refuses its slider). Sources:
+callers 0x5eea55 / 0x5eb56d as TruMenu; below 1 TruMenu refuses its slider); 0.1.1 reads them live (game thread, at most
+once a second after a change of TruQoL.ini; the shake sites are owned only while ShakeScale < 1 and given back at 1.0). Sources:
 `Befund-P5-Kleinkram-0711.md`, `Befund-Arachnophobie-Stufe1-Kamera-0611.md`, `Befund-Absturz-Neuladen-0711.md`.
 
 ---

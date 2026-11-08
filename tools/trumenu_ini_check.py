@@ -1683,7 +1683,7 @@ SWITCHES = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.switches.txt')
 PLUGINS = os.path.join(ROOT, 'src', 'asi')
 # 0.21.5 (2026-11-07 TruMenu 0.21.5 Fixes): the plugins of the switches file (never TruGuard); text keys are no switches
 SW_PLUGINS = ('TruShadowPower', 'TruShadowCombat', 'TruShadowHud', 'TruRockVein', 'TruDoppelganger', 'TruDlc2Player',
-              'TruMercLang', 'TruTrace')
+              'TruMercLang', 'TruTrace', 'TruQoL')   # 2026-11-08 (17y): + the player plugin TruQoL 0.1.1
 SW_TEXT_KEYS = {('TruMercLang', 'MercLang', 'PathFilter'), ('TruTrace', 'Trace', 'SpawnFilter'),
                 ('TruTrace', 'Trace', 'ProgressFilter')}
 # the run-time re-read of every live key: (plugin, section, key) -> function head in the plugin source whose body holds
@@ -1714,6 +1714,15 @@ SW_LIVE = {
     ('TruShadowPower', 'Adrenaline', 'Translate'): 'void K11ReadSwitch(',
     ('TruMercLang', 'MercLang', 'Enabled'): 'void PollIni(',
     ('TruMercLang', 'MercLang', 'Language'): 'void PollIni(',
+    # TruQoL 0.1.1 (17y): LiveTick (game thread, once a second after a change of the file time) -> LiveReadOptions
+    ('TruQoL', 'TruQoL', 'LogLevel'): 'void LiveReadOptions(',
+    ('TruQoL', 'FrameLimit', 'Enabled'): 'void LiveReadOptions(',
+    ('TruQoL', 'FrameLimit', 'MaxFps'): 'void LiveReadOptions(',
+    ('TruQoL', 'FrameLimit', 'AutoOff'): 'void LiveReadOptions(',
+    ('TruQoL', 'FrameLimit', 'SpinUs'): 'void LiveReadOptions(',
+    ('TruQoL', 'Camera', 'Fov'): 'void LiveReadOptions(',
+    ('TruQoL', 'Camera', 'FovCutscenes'): 'void LiveReadOptions(',
+    ('TruQoL', 'Camera', 'ShakeScale'): 'void LiveReadOptions(',
 }
 SW_MAX, SW_GROUP_MAX = 160, 24
 RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries
@@ -1866,7 +1875,8 @@ def check_switches(path):
         if plugin not in SW_PLUGINS: problems.append('%s: plugin %s not in %s' % (where, plugin, SW_PLUGINS))
         if not (word.fullmatch(section) and len(section) < 32 and word.fullmatch(key) and len(key) < 40):
             problems.append('%s: section / key (letters, digits, _)' % where)
-        if not re.fullmatch(r'bool|int:-?\d+\.\.-?\d+(:\d+)?|choice:[A-Za-z0-9_]+(,[A-Za-z0-9_]+)+', typ):
+        # 17y: choice values may hold a dot (TruQoL Fov / ShakeScale floats as their exact INI text)
+        if not re.fullmatch(r'bool|int:-?\d+\.\.-?\d+(:\d+)?|choice:[A-Za-z0-9_.]+(,[A-Za-z0-9_.]+)+', typ):
             problems.append('%s: type %s (bool | int:<lo>..<hi>[:<step>] | choice:<a>,<b>)' % (where, typ))
         m = re.fullmatch(r'int:(-?\d+)\.\.(-?\d+)(?::(\d+))?', typ)
         if m and (int(m.group(1)) >= int(m.group(2)) or (m.group(3) and not

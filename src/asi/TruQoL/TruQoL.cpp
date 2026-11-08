@@ -39,6 +39,27 @@
 //    0x1001a570), before WinMain is called at 0x8183b3; this plugin patches in DllMain. After the count WinMain pins
 //    the main thread to CPU 0 (0x47a0c9), so the capped mask the count restores at 0x4a2477 has no lasting effect.
 // Every engine address is byte-checked before it is patched; on a mismatch that feature stays off and the log says why.
+//
+// 0.1.1 (2026-11-08, TruMenu page Fixes): the live keys are read again while the game runs - LiveTick, at most once a
+// second and only when the last-write time of TruQoL.ini changed (cheap file-time check first, as TruMercLang PollIni),
+// on the game thread: from ClockStub, i.e. the frame-time function 0x5da230 that every main-state handler calls once
+// per frame (like TruShadowCombat's switches, read from the code they switch). A read passes the current value as its
+// default (a missing key keeps it, an invalid one is logged and keeps it). One log line per change.
+//   live:    [TruQoL] LogLevel; [FrameLimit] Enabled, MaxFps, AutoOff, SpinUs; [Camera] Fov, FovCutscenes, ShakeScale
+//   restart: [TruQoL] Enabled (0 = nothing patched, so nothing to switch), [Startup] ThreadCap (acts once, before WinMain)
+// Hooks: the two clock calls and the FOV call are patched ONCE at the start whenever TruQoL is enabled and their bytes
+// match - also with [FrameLimit] Enabled=0 / Fov=0 (then a pass-through: ClockStub = the game's clock, FovHook = the
+// game's value) - and gated at run time; the hook sites are the 0.1 ones. Reason: the FOV call 0x5cb0a8 is render code
+// (no proof of its thread) and the clock calls sit in the function that runs the tick, so no code there is rewritten
+// while the game runs. AutoOff is live because the limiter detection (DXVK / dxwrapper) runs once, read-only, whatever
+// AutoOff says (d3d9.dll is loaded once per process) - AutoOff only decides whether that result gates the limiter.
+// ShakeScale keeps the 0.1 rule live: TruQoL owns the two shake calls only while its ShakeScale is below 1.0. A change
+// to < 1.0 points them to ShakeStub (only while both still call the game's 0x5eb460 - TruMenu's cam.shakescale below
+// 100 % holds them: refused with one line, tried again at the next change of the key), a change to 1.0 puts the game's
+// target back (only while both still call ShakeStub) so TruMenu's slider may take them again. These two rel32 writes
+// run on the game thread, as TruMenu's own run-time patch of the same sites (M21PatchGroup from PadHook) and
+// TruShadowCombat's [Damage] Translate switch do. Without the clock hook (bytes differ) there is no tick: every key
+// then takes effect at the next start (logged once).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -53,7 +74,7 @@
 
 namespace {
 
-const char kVersion[] = "TruQoL 0.1";
+const char kVersion[] = "TruQoL 0.1.1";
 const DWORD kImageBase = 0x00400000;
 
 // ---- 1. frame limiter: the frame-time function 0x5da230 and its two clock reads ----
@@ -217,7 +238,7 @@ int IniInt(const char *section, const char *key, int def, int lo, int hi) {
     long x = strtol(v, &end, 10);
     while (end && (*end == ' ' || *end == '\t')) ++end;
     if (!end || end == v || *end || x < lo || x > hi) {
-        Log(0, "[%s] %s=%s is not a whole number in %d .. %d - default %d used", section, key, v, lo, hi, def);
+        Log(0, "[%s] %s=%s is not a whole number in %d .. %d - %d used", section, key, v, lo, hi, def);
         return def;
     }
     return static_cast<int>(x);
@@ -232,7 +253,7 @@ float IniFloat(const char *section, const char *key, float def, float lo, float 
     double x = strtod(v, &end);
     while (end && (*end == ' ' || *end == '\t')) ++end;
     if (!end || end == v || *end || !(x >= lo && x <= hi)) {
-        Log(0, "[%s] %s=%s is not a number in %.2f .. %.2f - default %.2f used", section, key, v, lo, hi, def);
+        Log(0, "[%s] %s=%s is not a number in %.2f .. %.2f - %.2f used", section, key, v, lo, hi, def);
         return def;
     }
     return static_cast<float>(x);
@@ -243,8 +264,12 @@ float IniFloat(const char *section, const char *key, float def, float lo, float 
 LONGLONG g_qpf = 0, g_period = 0, g_next = 0, g_spinTicks = 0;
 HANDLE g_timer = nullptr;
 bool g_hiRes = false;
-volatile LONG g_limitLive = 0;              // 1 = waiting, 0 = pass-through (auto-off or not patched)
+// 0.1.1: the clock calls are patched once (g_limitHooked); whether a frame waits is decided per frame (LimitActive)
+bool g_limitHooked = false;
+bool g_otherLimiter = false;                // DetectLimiter: DXVK / dxwrapper limits the frame rate itself
+char g_otherWhat[24] = "";                  // "DXVK" / "dxwrapper" (for the log lines)
 bool g_detectPending = false, g_waitReady = false;
+void LiveTick();                            // 0.1.1, below
 DWORD g_clockFn = kClock;                   // ClockStub jumps here (the game's clock)
 // LogLevel 2: a line every 10 s
 LONGLONG g_statStart = 0, g_statWait = 0;
@@ -331,7 +356,18 @@ void ModuleDir(HMODULE m, char *out, size_t n) {
     out[len] = 0;
 }
 
-// decides once, as soon as d3d9.dll is loaded, whether a known limiter already caps the game (main thread)
+// game thread, every frame: the limiter waits only while [FrameLimit] Enabled=1 and no other limiter takes over
+bool LimitActive() { return g_limitHooked && g_limitEnabled && !(g_autoOff && g_otherLimiter); }
+
+// the effect of a detected limiter now (for the detection line and the live lines)
+const char *OtherNote() {
+    if (!g_otherLimiter) return "";
+    return g_autoOff ? " - auto-off (AutoOff=1): TruQoL's limiter does not wait"
+                     : " - AutoOff=0: TruQoL's limiter waits as well (the lower rate wins)";
+}
+
+// decides once, as soon as d3d9.dll is loaded, whether a known limiter already caps the game (game thread). 0.1.1: runs
+// whatever AutoOff says (read only) and stores the result; AutoOff (live) decides at every frame whether it gates.
 void DetectLimiter() {
     HMODULE d3d9 = GetModuleHandleA("d3d9.dll");
     if (!d3d9) return;                       // the game loads d3d9.dll itself (no static import); ask again next frame
@@ -363,13 +399,14 @@ void DetectLimiter() {
         }
         const long v = strtol(value, nullptr, 10);
         if (v != 0) {
-            InterlockedExchange(&g_limitLive, 0);
-            Log(1, "FrameLimit: auto-off - d3d9.dll is DXVK (%s) and DXVK limits the frame rate itself (%s = %s); "
-                   "AutoOff=0 keeps TruQoL's limiter as well", path, source, value);
+            g_otherLimiter = true;
+            strcpy_s(g_otherWhat, sizeof(g_otherWhat), "DXVK");
+            Log(1, "FrameLimit: d3d9.dll is DXVK (%s) and DXVK limits the frame rate itself (%s = %s)%s", path, source,
+                value, OtherNote());
             return;
         }
-        Log(1, "FrameLimit: d3d9.dll is DXVK (%s) with its limiter off (%s = %s) - TruQoL's limiter stays on (%d fps)",
-            path, source, value, g_maxFps);
+        Log(1, "FrameLimit: d3d9.dll is DXVK (%s) with its limiter off (%s = %s) - TruQoL's limiter is the only one "
+               "(%s, %d fps)", path, source, value, g_limitEnabled ? "on" : "Enabled=0", g_maxFps);
         return;
     }
     if (dxwrapper) {
@@ -383,13 +420,15 @@ void DetectLimiter() {
         }
         const long v = found ? strtol(value, nullptr, 10) : 0;
         if (v > 0) {
-            InterlockedExchange(&g_limitLive, 0);
-            Log(1, "FrameLimit: auto-off - dxwrapper is loaded (%s) and limits the frame rate (LimitPerFrameFPS = %ld in "
-                   "%s); AutoOff=0 keeps TruQoL's limiter as well", dxw ? "dxwrapper.dll" : path, v, ini);
+            g_otherLimiter = true;
+            strcpy_s(g_otherWhat, sizeof(g_otherWhat), "dxwrapper");
+            Log(1, "FrameLimit: dxwrapper is loaded (%s) and limits the frame rate (LimitPerFrameFPS = %ld in %s)%s",
+                dxw ? "dxwrapper.dll" : path, v, ini, OtherNote());
             return;
         }
-        Log(1, "FrameLimit: dxwrapper is loaded (%s) without LimitPerFrameFPS > 0 (%s) - TruQoL's limiter stays on (%d "
-               "fps)", dxw ? "dxwrapper.dll" : path, found ? value : "key not found", g_maxFps);
+        Log(1, "FrameLimit: dxwrapper is loaded (%s) without LimitPerFrameFPS > 0 (%s) - TruQoL's limiter is the only "
+               "one (%s, %d fps)", dxw ? "dxwrapper.dll" : path, found ? value : "key not found",
+            g_limitEnabled ? "on" : "Enabled=0", g_maxFps);
         return;
     }
     char sys[MAX_PATH] = "";
@@ -397,9 +436,12 @@ void DetectLimiter() {
     const bool system = _strnicmp(path, sys, strlen(sys)) == 0;
     char wow[MAX_PATH] = "";
     const bool wow64 = GetSystemWow64DirectoryA(wow, MAX_PATH) > 0 && _strnicmp(path, wow, strlen(wow)) == 0;
-    Log(1, "FrameLimit: d3d9.dll = %s (%s, no known limiter) - TruQoL's limiter stays on (%d fps)", path,
-        system || wow64 ? "the system's" : "a wrapper, e.g. TRAWindowed", g_maxFps);
+    Log(1, "FrameLimit: d3d9.dll = %s (%s, no known limiter) - TruQoL's limiter is the only one (%s, %d fps)", path,
+        system || wow64 ? "the system's" : "a wrapper, e.g. TRAWindowed", g_limitEnabled ? "on" : "Enabled=0", g_maxFps);
 }
+
+// the pause-loop share of a wait (SpinUs; 0 = automatic) - at the first wait and on a live change
+int SpinUsNow() { return g_spinUs > 0 ? g_spinUs : (g_hiRes ? 600 : 2000); }
 
 void PrepareWait() {
     g_waitReady = true;
@@ -412,7 +454,7 @@ void PrepareWait() {
         PeriodFn begin = winmm ? reinterpret_cast<PeriodFn>(GetProcAddress(winmm, "timeBeginPeriod")) : nullptr;
         if (begin) begin(1);
     }
-    const int spinUs = g_spinUs > 0 ? g_spinUs : (g_hiRes ? 600 : 2000);
+    const int spinUs = SpinUsNow();
     g_spinTicks = g_qpf * spinUs / 1000000;
     Log(1, "FrameLimit: waiting with %s, last %d us as a short pause loop", g_hiRes ? "a high-resolution waitable timer"
                                                                                      : g_timer ? "timeBeginPeriod(1) + a waitable timer"
@@ -442,11 +484,14 @@ void SleepUntil(LONGLONG target) {
     while (Qpc() < target) YieldProcessor();
 }
 
+// game thread, once per frame (ClockStub): 0.1.1 the live tick, the one-time detection, then the wait - only while the
+// limiter is active; while it is not, the next active frame starts a new cadence (no wait for a slot of long ago)
 extern "C" void __cdecl LimiterWait() {
-    if (!g_limitLive) return;
-    if (g_detectPending) {
-        DetectLimiter();
-        if (!g_limitLive) return;
+    LiveTick();
+    if (g_detectPending) DetectLimiter();
+    if (!LimitActive()) {
+        g_next = 0;
+        return;
     }
     if (!g_waitReady) PrepareWait();
     LONGLONG now = Qpc();
@@ -486,12 +531,13 @@ __declspec(naked) void ClockStub() {
     }
 }
 
+// 0.1.1: the clock calls are patched whenever TruQoL is enabled and the bytes match - also with [FrameLimit] Enabled=0
+// (then ClockStub is a pass-through until Enabled=1 is read live); they also carry the live tick
 void StartFrameLimit() {
-    if (!g_limitEnabled) { Log(1, "FrameLimit: off ([FrameLimit] Enabled=0) - the game's own frame rate"); return; }
     if (!HexBytesAt(kFrameTimer, kFrameTimerHex) || !HexBytesAt(kClockCallPause, kClockCallPauseHex) ||
         !HexBytesAt(kClock, kClockHex) || !HexBytesAt(kFrameStore, kFrameStoreHex)) {
-        Log(0, "FrameLimit: off - the frame-time function 0x%08lx / clock 0x%08lx do not match this tru.exe",
-            kFrameTimer, kClock);
+        Log(0, "FrameLimit: off - the frame-time function 0x%08lx / clock 0x%08lx do not match this tru.exe; no live "
+               "tick either: every TruQoL.ini change takes effect at the next start", kFrameTimer, kClock);
         return;
     }
     LARGE_INTEGER f;
@@ -499,14 +545,21 @@ void StartFrameLimit() {
     g_qpf = f.QuadPart;
     g_period = g_qpf / g_maxFps;
     const DWORD sites[2] = {kClockCallRun, kClockCallPause};
-    if (!RedirectCalls(sites, 2, kClock, reinterpret_cast<DWORD>(&ClockStub), "FrameLimit")) return;
-    g_detectPending = g_autoOff != 0;
-    InterlockedExchange(&g_limitLive, 1);
-    Log(1, "FrameLimit: on, %d fps - the clock calls 0x%08lx / 0x%08lx of the frame-time function 0x%08lx wait for the "
-           "next frame slot (the game measures the limited frame: dt 0xe7f190 = %.3f x 1/30 s); %s", g_maxFps,
-        kClockCallRun, kClockCallPause, kFrameTimer, 30.0 / g_maxFps,
-        g_autoOff ? "auto-off check (DXVK / dxwrapper) when d3d9.dll is loaded"
-                  : "AutoOff=0: no check for other limiters");
+    if (!RedirectCalls(sites, 2, kClock, reinterpret_cast<DWORD>(&ClockStub), "FrameLimit")) {
+        Log(0, "FrameLimit: no live tick - every TruQoL.ini change takes effect at the next start");
+        return;
+    }
+    g_limitHooked = true;
+    g_detectPending = true;                  // read only, whatever AutoOff says (AutoOff is live)
+    if (!g_limitEnabled)
+        Log(1, "FrameLimit: off ([FrameLimit] Enabled=0) - the game's own frame rate; the clock calls 0x%08lx / 0x%08lx "
+               "of 0x%08lx go through TruQoL as a pass-through (Enabled=1 in TruQoL.ini takes effect within a second)",
+            kClockCallRun, kClockCallPause, kFrameTimer);
+    else
+        Log(1, "FrameLimit: on, %d fps - the clock calls 0x%08lx / 0x%08lx of the frame-time function 0x%08lx wait for "
+               "the next frame slot (the game measures the limited frame: dt 0xe7f190 = %.3f x 1/30 s); check for other "
+               "limiters (DXVK / dxwrapper) when d3d9.dll is loaded, AutoOff=%d", g_maxFps, kClockCallRun,
+            kClockCallPause, kFrameTimer, 30.0 / g_maxFps, g_autoOff);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -517,15 +570,19 @@ const float kFovMin = 0.05f, kFovMax = 2.8f;        // radians (about 3 .. 160 d
 volatile LONG g_fovFrames = 0;
 
 // in place of `call 0x5e78d0` at 0x5cb0a8 (cdecl, result st0)
+bool g_fovHooked = false;                    // 0.1.1: the call 0x5cb0a8 goes to FovHook (patched once at the start)
+
 float __cdecl FovHook() {
     float f = g_fovGetter();
+    const float factor = g_fov;              // 0.1.1: live; 0 / 1 = the game's value (pass-through)
+    if (factor == 0.0f || factor == 1.0f) return f;
     if (!g_fovCutscenes) {
         const DWORD cur = *reinterpret_cast<const volatile DWORD *>(kCamCurrent);
         const DWORD game = *reinterpret_cast<const volatile DWORD *>(kCamGameplay);
         if (!cur || cur != game) return f;
     }
     if (!(f > 0.0f)) return f;
-    float g = f * g_fov;
+    float g = f * factor;
     if (g < kFovMin) g = kFovMin;
     if (g > kFovMax) g = kFovMax;
     if (InterlockedIncrement(&g_fovFrames) == 1)
@@ -545,36 +602,91 @@ __declspec(naked) void ShakeStub() {
     }
 }
 
+// 0.1.1 ShakeScale ownership (the 0.1 rule, kept live): TruQoL's ShakeStub sits in the two shake calls only while
+// ShakeScale < 1.0. g_shakeOk = the shake code matched at the start; g_shakeOn = both calls go to ShakeStub;
+// g_shakeRefused = the last attempt met a foreign target (not tried again until the key changes - no line per second).
+bool g_shakeOk = false, g_shakeOn = false, g_shakeRefused = false;
+const DWORD kShakeSites[2] = {kShakeCall1, kShakeCall2};
+
+// game thread (start: DllMain; live: LiveTick in ClockStub): both shake calls to ShakeStub (want) or back to the game's
+// 0x5eb460, all or nothing, only over the expected target (the game's when patching, ours when restoring); the result in
+// `note` for the caller's one log line
+void ShakeApply(bool want, char *note, size_t n) {
+    note[0] = 0;
+    if (!g_shakeOk) { _snprintf_s(note, n, _TRUNCATE, " - the shake code did not match at the start: no effect in this run"); return; }
+    if (want == g_shakeOn) return;
+    const DWORD hook = reinterpret_cast<DWORD>(&ShakeStub);
+    const DWORD from = want ? kShakeFn : hook, to = want ? hook : kShakeFn;
+    if (want && g_shakeRefused) { _snprintf_s(note, n, _TRUNCATE, " - still refused (foreign calls), not tried again"); return; }
+    for (int i = 0; i < 2; ++i) {
+        const DWORD t = CallTarget(kShakeSites[i]);
+        if (t == from) continue;
+        if (want) {
+            g_shakeRefused = true;
+            _snprintf_s(note, n, _TRUNCATE, " - refused: the call at 0x%08lx goes to 0x%08lx, not the game's 0x%08lx "
+                        "(TruMenu cam.shakescale below 100 %%? set it to 100); nothing patched, tried again at the next "
+                        "change", kShakeSites[i], t, kShakeFn);
+        } else {
+            g_shakeOn = false;           // someone else holds the calls now: ShakeStub is not called any more
+            _snprintf_s(note, n, _TRUNCATE, " - the call at 0x%08lx goes to 0x%08lx now (another plugin) - left as it is",
+                        kShakeSites[i], t);
+        }
+        return;
+    }
+    for (int i = 0; i < 2; ++i) {
+        const DWORD rel = to - (kShakeSites[i] + 5);
+        if (!WriteCode(kShakeSites[i] + 1, &rel, 4)) {
+            for (int j = 0; j < i; ++j) {    // put back what was already written
+                const DWORD back = from - (kShakeSites[j] + 5);
+                WriteCode(kShakeSites[j] + 1, &back, 4);
+            }
+            if (want) g_shakeRefused = true;
+            _snprintf_s(note, n, _TRUNCATE, " - patch failed at 0x%08lx - nothing changed", kShakeSites[i]);
+            return;
+        }
+    }
+    g_shakeOn = want;
+    _snprintf_s(note, n, _TRUNCATE, want ? " - the shake calls 0x%08lx / 0x%08lx -> TruQoL (TruMenu cam.shakescale is "
+                                           "refused while ShakeScale < 1.0)"
+                                         : " - the shake calls 0x%08lx / 0x%08lx back to the game's 0x5eb460 (free for "
+                                           "TruMenu cam.shakescale again)",
+                kShakeCall1, kShakeCall2);
+}
+
 void StartCamera() {
-    if (g_fov == 0.0f || g_fov == 1.0f) {
-        Log(1, "Camera Fov: off (Fov=%g = the game's field of view)", g_fov);
-    } else if (!HexBytesAt(kFovCall, kFovCallHex) || !HexBytesAt(kFovGetter, kFovGetterHex) ||
-               !HexBytesAt(kFovReader, kFovReaderHex) || !HexBytesAt(kPerspective, kPerspectiveHex)) {
+    // 0.1.1: the FOV call is patched whenever its code matches (Fov 0 / 1 = pass-through), so Fov / FovCutscenes are live
+    if (!HexBytesAt(kFovCall, kFovCallHex) || !HexBytesAt(kFovGetter, kFovGetterHex) ||
+        !HexBytesAt(kFovReader, kFovReaderHex) || !HexBytesAt(kPerspective, kPerspectiveHex)) {
         Log(0, "Camera Fov: off - the projection code 0x%08lx / 0x%08lx / 0x%08lx does not match this tru.exe", kFovCall,
             kFovReader, kPerspective);
     } else {
         const DWORD site = kFovCall;
-        if (RedirectCalls(&site, 1, kFovGetter, reinterpret_cast<DWORD>(&FovHook), "Camera Fov"))
+        g_fovHooked = RedirectCalls(&site, 1, kFovGetter, reinterpret_cast<DWORD>(&FovHook), "Camera Fov");
+        if (g_fovHooked && (g_fov == 0.0f || g_fov == 1.0f))
+            Log(1, "Camera Fov: off (Fov=%g = the game's field of view) - render projection call 0x%08lx goes through "
+                   "TruQoL as a pass-through (a factor in TruQoL.ini takes effect within a second)", g_fov, kFovCall);
+        else if (g_fovHooked)
             Log(1, "Camera Fov: on, factor %.3f on the game's vertical FOV (radians; %s) - render projection call "
                    "0x%08lx -> TruQoL (getter 0x%08lx, scene FOV 0xe49700, perspective 0x%08lx)", g_fov,
                 g_fovCutscenes ? "every camera incl. cutscenes" : "gameplay camera only, cutscenes unchanged", kFovCall,
                 kFovGetter, kPerspective);
     }
-    if (g_shakeScale == 1.0f) {
-        Log(1, "Camera ShakeScale: off (1.0 = the game's own camera shakes; TruMenu cam.shakescale keeps the sites)");
-        return;
-    }
-    if (!HexBytesAt(kShakeFn, kShakeFnHex) || !HexBytesAt(kShakeCall1, kShakeCall1Hex) ||
-        !HexBytesAt(kShakeCall2, kShakeCall2Hex)) {
+    g_shakeOk = HexBytesAt(kShakeFn, kShakeFnHex) && HexBytesAt(kShakeCall1, kShakeCall1Hex) &&
+                HexBytesAt(kShakeCall2, kShakeCall2Hex);
+    if (!g_shakeOk) {
         Log(0, "Camera ShakeScale: off - the shake code 0x%08lx / 0x%08lx / 0x%08lx does not match this tru.exe "
                "(or another plugin patched it)", kShakeFn, kShakeCall1, kShakeCall2);
         return;
     }
-    const DWORD sites[2] = {kShakeCall1, kShakeCall2};
-    if (RedirectCalls(sites, 2, kShakeFn, reinterpret_cast<DWORD>(&ShakeStub), "Camera ShakeScale"))
-        Log(1, "Camera ShakeScale: on, factor %.2f%s - the callers 0x%08lx / 0x%08lx of the shake strength 0x%08lx -> "
-               "TruQoL (TruMenu's cam.shakescale is refused while this is on)", g_shakeScale,
-            g_shakeScale == 0.0f ? " (no camera shakes)" : "", kShakeCall1, kShakeCall2, kShakeFn);
+    if (g_shakeScale == 1.0f) {
+        Log(1, "Camera ShakeScale: off (1.0 = the game's own camera shakes; TruMenu cam.shakescale keeps the sites; a "
+               "value below 1.0 in TruQoL.ini patches them within a second)");
+        return;
+    }
+    char note[300];
+    ShakeApply(true, note, sizeof(note));
+    Log(g_shakeOn ? 1 : 0, "Camera ShakeScale: %s, factor %.2f%s%s", g_shakeOn ? "on" : "off", g_shakeScale,
+        g_shakeScale == 0.0f ? " (no camera shakes)" : "", note);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -640,6 +752,112 @@ void StartThreadCap() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// 0.1.1 live keys (TruMenu page Fixes / TruMenu.switches.txt "live"): game thread, from LiveTick. Every read passes the
+// current value as its default (a missing key keeps it); one log line per change. Not here (restart): [TruQoL] Enabled,
+// [Startup] ThreadCap.
+void LiveReadOptions() {
+    char note[300];
+    const int logLevel = IniInt("TruQoL", "LogLevel", g_logLevel, 0, 2);
+    if (logLevel != g_logLevel) {
+        Log(0, "live: [TruQoL] LogLevel %d -> %d", g_logLevel, logLevel);
+        g_logLevel = logLevel;
+        g_statStart = 0;                     // LogLevel 2: the 10 s frame-rate lines start anew
+        g_statFrames = g_statLate = 0;
+        g_statWait = 0;
+    }
+    const char *const noHook = g_limitHooked ? "" : " - the clock calls are not hooked: no effect in this run";
+    const int limit = IniInt("FrameLimit", "Enabled", g_limitEnabled, 0, 1);
+    if (limit != g_limitEnabled) {
+        g_limitEnabled = limit;
+        Log(1, "live: [FrameLimit] Enabled %d -> %d - %s%s%s", !limit, limit,
+            limit ? "the limiter waits from the next frame" : "the game's own frame rate from the next frame",
+            limit ? OtherNote() : "", noHook);
+    }
+    const int fps = IniInt("FrameLimit", "MaxFps", g_maxFps, 20, 500);
+    if (fps != g_maxFps) {
+        Log(1, "live: [FrameLimit] MaxFps %d -> %d (dt 0xe7f190 = %.3f x 1/30 s; new cadence from the next frame)%s",
+            g_maxFps, fps, 30.0 / fps, noHook);
+        g_maxFps = fps;
+        if (g_qpf) g_period = g_qpf / g_maxFps;
+        g_next = 0;
+    }
+    const int autoOff = IniInt("FrameLimit", "AutoOff", g_autoOff, 0, 1);
+    if (autoOff != g_autoOff) {
+        g_autoOff = autoOff;
+        Log(1, "live: [FrameLimit] AutoOff %d -> %d%s%s", !autoOff, autoOff,
+            g_otherLimiter ? OtherNote() : g_detectPending ? " (d3d9.dll not loaded yet: no other limiter known)"
+                                                           : " (no other limiter found: no change)", noHook);
+    }
+    const int spin = IniInt("FrameLimit", "SpinUs", g_spinUs, 0, 5000);
+    if (spin != g_spinUs) {
+        g_spinUs = spin;
+        if (g_waitReady) g_spinTicks = g_qpf * SpinUsNow() / 1000000;
+        Log(1, "live: [FrameLimit] SpinUs -> %d (last %d us of a wait as a pause loop)%s", spin, SpinUsNow(), noHook);
+    }
+    float fov = IniFloat("Camera", "Fov", g_fov, 0.0f, 2.0f);
+    if (fov != 0.0f && fov < 0.5f) {
+        Log(0, "live: [Camera] Fov=%g is below 0.5 - %g kept", fov, g_fov);
+        fov = g_fov;
+    }
+    if (fov != g_fov) {
+        Log(1, "live: [Camera] Fov %g -> %g%s%s", g_fov, fov,
+            fov == 0.0f || fov == 1.0f ? " (the game's field of view)" : "",
+            g_fovHooked ? "" : " - the FOV call is not hooked: no effect in this run");
+        g_fov = fov;
+    }
+    const int cuts = IniInt("Camera", "FovCutscenes", g_fovCutscenes, 0, 1);
+    if (cuts != g_fovCutscenes) {
+        g_fovCutscenes = cuts;
+        Log(1, "live: [Camera] FovCutscenes %d -> %d (%s)%s", !cuts, cuts,
+            cuts ? "the factor applies to every camera" : "gameplay camera only, cutscenes unchanged",
+            g_fovHooked ? "" : " - the FOV call is not hooked: no effect in this run");
+    }
+    const float shake = IniFloat("Camera", "ShakeScale", g_shakeScale, 0.0f, 1.0f);
+    if (shake != g_shakeScale) {
+        const float was = g_shakeScale;
+        g_shakeRefused = false;              // a change of the key = a new attempt
+        if (shake < 1.0f) {
+            g_shakeScale = shake;            // first the factor, then the calls (ShakeStub reads it)
+            ShakeApply(true, note, sizeof(note));
+        } else {
+            ShakeApply(false, note, sizeof(note));
+            g_shakeScale = shake;
+        }
+        Log(1, "live: [Camera] ShakeScale %.2f -> %.2f%s", was, shake, note);
+    }
+}
+
+// game thread, every frame (LimiterWait): at most once a second, and only when TruQoL.ini's last-write time changed,
+// the live keys again. The time is kept only when it did not change during the read (a write that met the read is
+// read again a second later).
+DWORD g_liveTick = 0;
+FILETIME g_iniTime = {0, 0};
+bool g_iniTimeOk = false;
+
+bool IniTime(FILETIME *t) {
+    char ini[MAX_PATH];
+    IniPath(ini, sizeof(ini));
+    WIN32_FILE_ATTRIBUTE_DATA d;
+    if (!GetFileAttributesExA(ini, GetFileExInfoStandard, &d)) return false;
+    *t = d.ftLastWriteTime;
+    return true;
+}
+
+void LiveTick() {
+    const DWORD now = GetTickCount();
+    if (now - g_liveTick < 1000) return;
+    g_liveTick = now;
+    FILETIME before, after;
+    if (!IniTime(&before)) return;           // no TruQoL.ini: keep every value
+    if (g_iniTimeOk && CompareFileTime(&before, &g_iniTime) == 0) return;
+    LiveReadOptions();
+    if (IniTime(&after) && CompareFileTime(&before, &after) == 0) {
+        g_iniTime = before;
+        g_iniTimeOk = true;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 void ReadOptions() {
     g_enabled = IniInt("TruQoL", "Enabled", 1, 0, 1);
     g_logLevel = IniInt("TruQoL", "LogLevel", 1, 0, 2);
@@ -670,6 +888,10 @@ void Start(HMODULE self) {
     StartThreadCap();                        // first: the CPU count runs in WinMain, soon after the plugins are loaded
     StartFrameLimit();
     StartCamera();
+    g_iniTimeOk = IniTime(&g_iniTime);       // 0.1.1: the live tick reads again only after a change of TruQoL.ini
+    if (g_limitHooked)
+        Log(1, "live: TruQoL.ini is read again at most once a second when it changes (LogLevel, FrameLimit Enabled / "
+               "MaxFps / AutoOff / SpinUs, Camera Fov / FovCutscenes / ShakeScale; restart: Enabled, ThreadCap)");
 }
 
 }  // namespace
@@ -684,6 +906,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 extern "C" __declspec(dllexport) const char *TruQoLVersion() {
-    return "TruQoL 0.1 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
-           "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0)";
+    return "TruQoL 0.1.1 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
+           "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0; live "
+           "INI re-read once a second for TruMenu page Fixes)";
 }

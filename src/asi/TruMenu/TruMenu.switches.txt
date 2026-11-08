@@ -1,4 +1,4 @@
-# TruMenu switches (TruMenu 0.21.8) - Set-TruMenu.ps1 copies it next to tru.exe as TruMenu.switches.txt.
+# TruMenu switches (TruMenu 0.21.8; group TruQoL 2026-11-08, work\asi\menu0221) - Set-TruMenu.ps1 copies it next to tru.exe as TruMenu.switches.txt.
 # The plugin INI switches of the quick bar page "Fixes" and the long menu section "Fixes" (one source for both).
 # A row edits <Plugin>.ini next to the .asi files (WritePrivateProfileString, the TO TEST toggle path); the INI must
 # exist (a plugin that is not installed is shown "keine INI" and never written), TruMenu never creates a plugin INI.
@@ -7,7 +7,7 @@
 #   key        letters / digits / _ (at most 23); "open" = the group starts open. One group is open at a time.
 # Switch line: <Plugin> | <Section> | <Key> | <type> | <DE text> | <EN text> | <when> | <default> | <hint> [| <since>]
 #   Plugin     Tru + letters / digits (its INI = <Plugin>.ini next to tru.exe); Section / Key letters / digits / _
-#   type       bool (0 / 1) | int:<lo>..<hi>[:<step>] | choice:<a>,<b>,... (exact INI values)
+#   type       bool (0 / 1) | int:<lo>..<hi>[:<step>] | choice:<a>,<b>,... (exact INI values; letters / digits / _ / .)
 #   when       live = the plugin re-reads the key while the game runs (about once a second);
 #              restart = read once at the game start (takes effect at the next start);
 #              live-if:<Key> = live only while <Key> of the same section is 1 at the start, else restart
@@ -163,3 +163,17 @@ TruTrace | Trace | TeleportWindowMs | int:0..60000:500 | Teleport-Fenster ms | T
 TruTrace | Trace | ObjectId | int:0..9999 | Objekt-Id (858) | Object id (858) | restart | 858 | Welche Objekt-Id der Kanal Object858 beobachtet // Which object id the Object858 channel watches
 TruTrace | Trace | TimeVectorMs | int:100..60000:100 | TimeVector ms | Time vector ms | restart | 1000 | Abstand (mindestens 100) // Interval (at least 100)
 TruTrace | Trace | GameDataMs | int:50..60000:50 | Spieldaten ms | Game data ms | restart | 250 | Abfrage-Abstand der Spieldaten (mindestens 50) // GameData poll interval (at least 50)
+
+# 2026-11-08 (17y): the player plugin TruQoL 0.1.1 - live keys are read again about once a second (file time first);
+# Fov / ShakeScale are floats: choice lists of exact INI values (the INI text is compared, 1.0 is not 1)
+group | truqol | Komfort (TruQoL) | Comfort (TruQoL)
+TruQoL | TruQoL | Enabled | bool | TruQoL an | TruQoL on | restart | 1 | 0 = laden, aber nichts patchen // 0 = load but patch nothing | TruQoL 0.1.1
+TruQoL | TruQoL | LogLevel | int:0..2 | Log-Stufe | Log level | live | 1 | 2 = alle 10 s eine Bildraten-Zeile // 2 = a frame-rate line every 10 s | TruQoL 0.1.1
+TruQoL | FrameLimit | Enabled | bool | Bildraten-Begrenzer | Frame limiter | live | 1 | Begrenzt die Bildrate (Physik spinnt über 60 fps) // Caps the frame rate (physics misbehave above 60 fps) | TruQoL 0.1.1
+TruQoL | FrameLimit | MaxFps | choice:30,45,50,60,75,90,120,144 | Bilder je Sekunde | Frames per second | live | 60 | Über 60 können Kisten / Physik spinnen // Above 60 cubes / physics may misbehave | TruQoL 0.1.1
+TruQoL | FrameLimit | AutoOff | bool | Aus bei DXVK / dxwrapper | Off with DXVK / dxwrapper | live | 1 | Aus, wenn DXVK / dxwrapper schon begrenzt // Off when DXVK / dxwrapper already limits | TruQoL 0.1.1
+TruQoL | FrameLimit | SpinUs | int:0..5000:100 | Warte-Schleife us (0 = auto) | Spin wait us (0 = auto) | live | 0 | Letzte us vor dem Bild als Schleife; 0 = automatisch // Last us before a frame as a pause loop; 0 = automatic | TruQoL 0.1.1
+TruQoL | Camera | Fov | choice:0,0.9,1.0,1.1,1.15,1.2,1.3 | Sichtfeld-Faktor | Field of view factor | live | 0 | 0 / 1.0 = wie im Spiel; 1.2 = 20 % weiter // 0 / 1.0 = the game's; 1.2 = 20 % wider | TruQoL 0.1.1
+TruQoL | Camera | FovCutscenes | bool | Sichtfeld auch in Zwischensequenzen | FOV in cutscenes too | live | 0 | 0 = nur Spielkamera, Sequenzen unverändert // 0 = gameplay camera only, cutscenes unchanged | TruQoL 0.1.1
+TruQoL | Camera | ShakeScale | choice:0,0.25,0.5,0.75,1.0 | Kamera-Wackeln (1.0 = Spiel) | Camera shake (1.0 = game) | live | 1.0 | Unter 1.0 ist TruMenus Wackel-Regler gesperrt // Below 1.0 TruMenu's shake slider is refused | TruQoL 0.1.1
+TruQoL | Startup | ThreadCap | int:0..31 | Start-Fix über 31 CPU-Threads | Start fix above 31 CPU threads | restart | 31 | Wirkt nur mit mehr Threads; 0 = aus (Absturz) // Acts only with more threads; 0 = off (start-up crash) | TruQoL 0.1.1

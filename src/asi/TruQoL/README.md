@@ -6,31 +6,55 @@ start-up crash on PCs with more than 31 CPU threads. TruMenu stays the debug too
 wants, each with its own INI key (owner decision 2026-11-08). Defaults: **frame limiter on at 60 fps**, the camera
 options neutral (= the game's behaviour), the thread cap on at 31 (it only acts on PCs where the game would crash).
 
-**Status TruQoL 0.1: built 2026-11-08 (`work\asi\qol01`), not installed, not played.** Everything below is proven
-statically (disassembly of the installed `tru.exe`, md5 `5560abac...`, and `binkw32.dll`); nothing is seen in game yet.
+**Status TruQoL 0.1.1: built 2026-11-08 (`work\asi\qol011`), not installed, not played.** 0.1 (`work\asi\qol01`) was
+the first build; 0.1.1 reads the live keys again while the game runs (TruMenu page "Fixes", group "Komfort (TruQoL)").
+Everything below is proven statically (disassembly of the installed `tru.exe`, md5 `5560abac...`, and `binkw32.dll`);
+nothing is seen in game yet.
 
-Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\qol01` (check first with `-Check`, remove with
+Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\qol011` (check first with `-Check`, remove with
 `-Remove` / `-Restore`). The Ultimate ASI Loader the game ships as `binkw32.dll` loads every `*.asi` next to `tru.exe`;
 ModLoader.asi is just another plugin of that loader. Log: `TruQoL.log` next to `tru.exe`, one line per feature (on /
 off / why).
 
 ## INI reference (`TruQoL.ini`)
 
-| Section | Key | Default | Range | Meaning |
-|---|---|---|---|---|
-| `[TruQoL]` | `Enabled` | 1 | 0 / 1 | 0 = load but patch nothing |
-| `[TruQoL]` | `LogLevel` | 1 | 0 .. 2 | 0 errors, 1 one line per feature, 2 also a frame-rate line every 10 s |
-| `[FrameLimit]` | `Enabled` | 1 | 0 / 1 | cap the frame rate (physics / cubes misbehave above 60 fps; GOG ships a 60 fps cap since 2025) |
-| `[FrameLimit]` | `MaxFps` | 60 | 20 .. 500 | frames per second |
-| `[FrameLimit]` | `AutoOff` | 1 | 0 / 1 | 1 = off by itself when DXVK or dxwrapper already limits (see below); 0 = keep it anyway |
-| `[FrameLimit]` | `SpinUs` | 0 | 0 .. 5000 | advanced: microseconds before a frame waited in a pause loop (0 = 600 with a high-resolution timer, 2000 without) |
-| `[Camera]` | `Fov` | 0 | 0, 0.5 .. 2.0 | **factor** on the game's vertical field of view; 0 or 1 = the game's, 1.15 = 15 % wider |
-| `[Camera]` | `FovCutscenes` | 0 | 0 / 1 | 0 = only the gameplay camera, cutscenes keep their framing; 1 = every camera |
-| `[Camera]` | `ShakeScale` | 1.0 | 0 .. 1.0 | camera shake strength: 1.0 = the game's, 0 = no camera shakes |
-| `[Startup]` | `ThreadCap` | 31 | 0 .. 31 | the game's CPU count sees at most this many threads (only when the PC has more); 0 = off |
+| Section | Key | Default | Range | When (0.1.1) | Meaning |
+|---|---|---|---|---|---|
+| `[TruQoL]` | `Enabled` | 1 | 0 / 1 | restart | 0 = load but patch nothing (so there is nothing to switch live) |
+| `[TruQoL]` | `LogLevel` | 1 | 0 .. 2 | live | 0 errors, 1 one line per feature, 2 also a frame-rate line every 10 s |
+| `[FrameLimit]` | `Enabled` | 1 | 0 / 1 | live | cap the frame rate (physics / cubes misbehave above 60 fps; GOG ships a 60 fps cap since 2025) |
+| `[FrameLimit]` | `MaxFps` | 60 | 20 .. 500 | live | frames per second (a change starts a new frame cadence) |
+| `[FrameLimit]` | `AutoOff` | 1 | 0 / 1 | live | 1 = off by itself when DXVK or dxwrapper already limits (see below); 0 = keep it anyway |
+| `[FrameLimit]` | `SpinUs` | 0 | 0 .. 5000 | live | advanced: microseconds before a frame waited in a pause loop (0 = 600 with a high-resolution timer, 2000 without) |
+| `[Camera]` | `Fov` | 0 | 0, 0.5 .. 2.0 | live | **factor** on the game's vertical field of view; 0 or 1 = the game's, 1.15 = 15 % wider |
+| `[Camera]` | `FovCutscenes` | 0 | 0 / 1 | live | 0 = only the gameplay camera, cutscenes keep their framing; 1 = every camera |
+| `[Camera]` | `ShakeScale` | 1.0 | 0 .. 1.0 | live | camera shake strength: 1.0 = the game's, 0 = no camera shakes |
+| `[Startup]` | `ThreadCap` | 31 | 0 .. 31 | restart | the game's CPU count sees at most this many threads (only when the PC has more); 0 = off - acts once, before WinMain |
 
-Invalid values are logged and replaced by the default. Every engine address is byte-checked before it is patched; on
-a mismatch that feature stays off and the log says why.
+Invalid values are logged and replaced by the default (at the start) or keep the current value (live). Every engine
+address is byte-checked before it is patched; on a mismatch that feature stays off and the log says why.
+
+## Live keys (0.1.1)
+
+TruMenu's page "Fixes" (`TruMenu.switches.txt`, group `truqol` "Komfort (TruQoL)") writes `TruQoL.ini` with
+`WritePrivateProfileString`. TruQoL reads the live keys again in `LiveTick`: on the **game thread**, from `ClockStub`
+(the clock calls of the frame-time function 0x5da230, once per frame in every main state), **at most once a second**
+and only when the **last-write time** of `TruQoL.ini` changed (cheap file-time check first, as TruMercLang's
+`PollIni`). The time is kept only if it did not change during the read (a write that met the read is read again a
+second later). Each read passes the current value as its default (a missing key keeps it, an invalid one is logged and
+keeps it); **one log line per change** (`live: [Section] Key old -> new ...`).
+
+| Key | How a live change acts (hook sites unchanged from 0.1) |
+|---|---|
+| `[FrameLimit] Enabled` / `MaxFps` / `SpinUs` | the clock calls 0x5da247 / 0x5da684 are patched **once at the start** whenever TruQoL is enabled and the bytes match - also with `Enabled=0` (then `ClockStub` only runs the tick and jumps to the game's clock 0x597f10). The wait is gated per frame (`LimitActive`); a switch-on or a new `MaxFps` starts a new cadence (no wait for an old slot) |
+| `[FrameLimit] AutoOff` | the DXVK / dxwrapper detection now runs once whatever `AutoOff` says (read only, when `d3d9.dll` is loaded - once per process) and keeps its result; `AutoOff` decides per frame whether that result stops the wait |
+| `[Camera] Fov` / `FovCutscenes` | the FOV call 0x5cb0a8 is patched **once at the start** whenever its code matches (also `Fov=0`); `FovHook` returns the game's value while the factor is 0 or 1. Not patched at run time: it is render code and its thread is not proven |
+| `[Camera] ShakeScale` | the 0.1 rule kept live: TruQoL owns the shake calls 0x5eea55 / 0x5eb56d **only while ShakeScale < 1.0**. A change to < 1.0 points both to `ShakeStub` - only while both still call the game's 0x5eb460 (TruMenu's `cam.shakescale` below 100 % holds them: refused with one line, tried again at the next change of the key); a change to 1.0 puts the game's target back (only while both still call `ShakeStub`) and TruMenu's slider may take them again (move it once more: TruMenu retries only after a change). These two rel32 writes run on the game thread, as TruMenu's own run-time patch of the same two sites (`M21PatchGroup` from its pad hook) and TruShadowCombat's `[Damage] Translate` switch |
+| `[TruQoL] LogLevel` | the next line uses the new level; the change line itself is always written |
+| `[TruQoL] Enabled`, `[Startup] ThreadCap` | **restart**: `Enabled=0` patches nothing (no tick); the CPU count runs once in WinMain |
+
+Without the clock hook (bytes differ, another plugin owns the calls) there is no tick: every key takes effect at the
+next start (logged once).
 
 ## How each feature works (evidence)
 
@@ -46,20 +70,22 @@ a mismatch that feature stays off and the log says why.
 
 Coexistence: TruQoL hooks no D3D9 function (TruMenu's Present / Reset hook, TRAWindowed / DXVK / dxwrapper as
 `d3d9.dll` are not touched). TruShadowPower checks 0x5da3f4 / 0x5da40c and TruMenu 0x5da40c in the same function; TruQoL
-changes only the two clock calls. With `ShakeScale` below 1.0 TruQoL owns the two shake calls from load time on and
-TruMenu's `cam.shakescale` is refused (TruMenu logs "another plugin?"); with the default 1.0 TruQoL patches nothing
-there. TruMenu `camera.fov` writes camera +0xb0; TruQoL's factor applies on top. Every redirect is made only when the
-call still goes to the game's function.
+changes only the two clock calls. With `ShakeScale` below 1.0 TruQoL owns the two shake calls and TruMenu's
+`cam.shakescale` is refused (TruMenu logs "another plugin?"); with 1.0 TruQoL leaves them to the game (0.1.1: also when
+the value changes live, see "Live keys"). TruMenu `camera.fov` writes camera +0xb0; TruQoL's factor applies on top.
+Every redirect is made only when the call still goes to the game's function.
 
-Not done in 0.1: an INI value in degrees (the game's base FOV is camera tuning data, not a constant in the exe; read it
-with TruMenu `camera.fov` in the gameplay camera to translate a degree wish into a factor), a hot-key, a TruMenu page.
+Not done: an INI value in degrees (the game's base FOV is camera tuning data, not a constant in the exe; read it with
+TruMenu `camera.fov` in the gameplay camera to translate a degree wish into a factor), a hot-key. The TruMenu page came
+with 0.1.1 (TruMenu.switches.txt, group "Komfort (TruQoL)").
 
 ## TO TEST
 
-1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol01`; start the game (affinity work-around still in the
-   launch options for the first run); `TruQoL.log`: the loaded line, `Startup ThreadCap: on, 31`, `FrameLimit: on, 60
-   fps`, `Camera Fov: off`, `Camera ShakeScale: off`, then `FrameLimit: d3d9.dll = ...TRAWindowed...` (TRAWindowed
-   installed) and `Startup ThreadCap: CPU count 1 - ... unchanged` (fewer than 32 threads here).
+1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol011`; start the game (affinity work-around still in the
+   launch options for the first run); `TruQoL.log`: the loaded line (`TruQoL 0.1.1`), `Startup ThreadCap: on, 31`,
+   `FrameLimit: on, 60 fps`, `Camera Fov: off ... pass-through`, `Camera ShakeScale: off`, `live: TruQoL.ini is read
+   again ...`, then `FrameLimit: d3d9.dll = ...TRAWindowed...` (TRAWindowed installed) and `Startup ThreadCap: CPU count
+   1 - ... unchanged` (fewer than 32 threads here).
 2. Frame rate: `LogLevel=2`; in a level and in the main menu about 60 fps in the 10 s lines (`waited ... ms per frame`
    > 0 on a fast PC); no stutter; the game speed is normal (dt about 0.5 in 30 fps units). `MaxFps=30`: 30 fps.
 3. Cubes / physics objects and the camera behave as at 60 fps with VSync; loading screens not noticeably slower than
@@ -76,9 +102,20 @@ with TruMenu `camera.fov` in the gameplay camera to translate a degree wish into
 9. With DXVK as `d3d9.dll` (instead of TRAWindowed): log line `auto-off - d3d9.dll is DXVK`; with `dxvk.conf`
    `d3d9.maxFrameRate = 0`: TruQoL stays on. With dxwrapper (`LimitPerFrameFPS = 60`): auto-off.
 
+10. Live (0.1.1, TruMenu page Fixes, group "Komfort (TruQoL)", or an editor on `TruQoL.ini`), each within about a
+    second, one `live:` line each in `TruQoL.log`: `MaxFps` 60 -> 30 -> 60 (LogLevel 2 lines follow); `[FrameLimit]
+    Enabled` 1 -> 0 -> 1 (the frame rate free and capped again, no burst); `Fov` 0 -> 1.2 -> 0 (wider / back) and
+    `FovCutscenes`; `LogLevel` 1 -> 2 (10 s lines start). `ShakeScale` 1.0 -> 0.5 -> 0 -> 1.0: the line names the shake
+    calls -> TruQoL, then back to the game's; with TruMenu's shake slider at 50 % first, `ShakeScale` 0.5 is refused
+    (line names the foreign target); slider back to 100 %, `ShakeScale` 0.25: patched. After `ShakeScale` 1.0 TruMenu's
+    slider works again (move it once). `[TruQoL] Enabled` / `ThreadCap` in the page show "Neustart" and do nothing live.
+11. With DXVK as `d3d9.dll`: `AutoOff` 1 -> 0 -> 1 live: TruQoL's limiter waits as well / stops again.
+
 ## Files
 
 `TruQoL.cpp` (source; the comment block at the top holds the evidence in short), `TruQoL.ini` (sample with the
-defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol01`. Offline checks:
-`work\qol17x_0811\check_qol01.py` (bytes, call targets, the start-up order, the loader default, the build, INI, README,
-install script) with negative tests `work\qol17x_0811\make_negative_qol01.py`.
+defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol011`. Offline checks:
+`work\qol17x_0811\check_qol01.py` (0.1: bytes, call targets, the start-up order, the loader default, the build, INI,
+README, install script) with negative tests `work\qol17x_0811\make_negative_qol01.py`; for 0.1.1
+`work\qol17y_0811\check_qol011.py` (the same plus the live logic: tick, gates, ShakeApply, the switches rows) with
+`work\qol17y_0811\make_negative_qol011.py`.

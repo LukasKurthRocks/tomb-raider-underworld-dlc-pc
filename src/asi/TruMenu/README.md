@@ -2693,6 +2693,24 @@ seen once: a throw-away session, windowed (TRAWindowed), save backed up, TruTrac
 asi (no refusal) or `GAMELOOP_RequestLevelChangeByName` from cdb. Expected: the box "Can't open file pc-w\dlc_level3_start.drm"
 (note its title / buttons), then the process ends with exit code 0.
 
+## Switches data 2026-11-08: group "Komfort (TruQoL)" (TruMenu binary unchanged 0.21.10; `work\asi\menu0221`)
+
+Data only: `TruMenu.switches.txt` gets the group `truqol` "Komfort (TruQoL)" / "Comfort (TruQoL)" with the 10 keys of
+the player plugin TruQoL 0.1.1 - live: `[TruQoL] LogLevel`, `[FrameLimit] Enabled` / `MaxFps` (choice 30 .. 144) /
+`AutoOff` / `SpinUs`, `[Camera] Fov` (choice `0,0.9,1.0,1.1,1.15,1.2,1.3`) / `FovCutscenes` / `ShakeScale` (choice
+`0,0.25,0.5,0.75,1.0`); restart: `[TruQoL] Enabled`, `[Startup] ThreadCap`. Float keys are `choice:` rows of exact INI
+texts - `SwChoiceHas` compares text, so `1.0` is a value of its own (an INI holding `1` shows `1`; right / X then goes
+to the first choice, left to the last). No code change: the parser takes any `Tru<name>` plugin with an INI next to tru.exe; now 135
+switches in 10 groups (limits 160 / 24), page Fixes at most 37 rows (`kQbViewMax` 64); the ring stays frozen.
+`tools\trumenu_ini_check.py` knows TruQoL (`SW_PLUGINS`, `SW_LIVE` -> `LiveReadOptions`) and accepts a dot in choice
+values. `work\asi\menu0221` = the menu0220 files + the new switches file; checks `work\qol17y_0811\check_0221.py`
+(+ 14 negatives). TruQoL's `[Camera] ShakeScale` below 1.0 makes TruMenu's own `cam.shakescale` refuse ("another
+plugin?"); back at 1.0 TruQoL gives the two calls back - move TruMenu's slider once more to retry.
+
+TO TEST (owner, with TruQoL 0.1.1 installed): page Fixes, group "Komfort (TruQoL)": `MaxFps` 60 -> 30 and back, `Fov`
+1.2, `ShakeScale` 0.5 -> 1.0 - each takes effect within about a second (`TruQoL.log` one `live:` line each); the rows
+`TruQoL an` / `Start-Fix ...` show "Neustart". Without TruQoL installed the group shows "keine INI" and writes nothing.
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.
