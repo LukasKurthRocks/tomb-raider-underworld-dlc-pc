@@ -41,7 +41,9 @@ testing in the game. You need your own copy of the game and your own Xbox DLC fi
   hint boxes like on the Xbox; the Doppelgänger's original look (title-update shaders translated); the shadow power
   (slow motion, meter and its HUD); the wall run on the rock veins with its camera; the shadow combat moves; the
   waterfall. The crash when thralls were unloaded is fixed, dying around the wall run no longer crashes. The end area
-  was reached by a level change, not yet played through in one go.
+  was reached by a level change, not yet played through in one go. Test evening 8 Nov 2026: the end cutscene is
+  visible (it was black), the ceremony room no longer crashes while the goo cannonballs fly, the end-room floor is
+  textured and the goo particles look right (soft drips instead of square dots).
 - Both DLC: the data fixes found through crash dumps are pipeline steps (WINDOWS_REBUILD.md findings 44-48); our
   `generalbank` (the title update's loading-screen and hint-box scripts ported to PC) is built by the pipeline step
   `Generalbank`.
@@ -56,6 +58,9 @@ the story behind them: [docs/DEVLOG.md](docs/DEVLOG.md).*
 
 **Still missing (short list)**
 
+- DLC 2, **where manual play stops now (8 Nov 2026):** jumping from a ledge to a rock vein - Lara reaches the vein's
+  attach state, then turns back to the ledge within half a second (state-chart log taken, analysis pending). Getting
+  further needs the test menu's teleports.
 - DLC 2: the shadow finisher never starts (its target list stays empty); thralls now take damage and die with the
   translated damage switch (`TruShadowCombat` `[Damage] Translate`, live test 07.11.), a full playthrough of the first
   thrall fight is being tested; a moaning sound loops; Lara's ponytail stretches during the slow motion (the title
