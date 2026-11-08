@@ -834,8 +834,14 @@ Data bugs: endless groans = Sequence +0xc swapped as u32 (43 words in 13 files; 
 `soundplex_sequence_fix.py`); `dlc_caverns_hall` DTP 23469 +0x74 DSP kind raw (0x0700) -> no highpass
 (`soundplex_dsp_kind_fix.py`, step `dspkind` since 08.11.). ✅ Envelope flags word u32-swapped in `player_tru_dlc2_extension.drm` DTP 22864 +0x1e4
 (shadow-power loop sound): no hold point; the twins truth is the u16 pair (Xbox `00 03 00 00` -> PC `03 00 00 00`, the
-converter wrote `00 00 03 00`). The installed `doppelganger_casual.drm` lacks the twins words (392 in 34 SoundPlex DTPs,
-incl. the moan trees, section 2); test tree in progress ⬜. ✅ static (`work/moan_0711`: `pc_envelope_590ce0.txt`,
+converter wrote `00 00 03 00`). The installed `doppelganger_casual.drm` lacks the twins words (391 wrong words in 35
+SoundPlex DTPs, incl. the moan trees 26086 / 24556 / 22718 / 26183 / 22713 / 22711 / 22961): 299 Wave +4 words u32-swapped
+(`0000005a`: the PC reads +4 = 0 and +6 = 0x5a00 and takes the extra 0x7b9f6f / 0x7b9f4b branch; meaning of bit 31 🔶),
+41 List +0xc, 10 Assign +0x44 (u32-swapped `00000001` gives max instances 0, effect 🔶), Reaction / Overlap / Indirect.
+Test tree `work/dopp_0711` (08.11.): 390 words set from the twins truth, DTP 20212 +0x4c550 kept as installed (the proven
+translist layout runs after the twins and wins); the installed file was built from the 51v fix chain, so the pipeline
+file must not be copied over it (31 type-9 libs incl. 2943 / 2944 and 25 materials only exist installed) ⬜ live. Open:
+4 Chart 20212 words (+0x49754 / +0x49874 / +0x498e4 / +0x49b14) raw installed vs swapped in the full run 0711 ⬜. ✅ static (`work/moan_0711`: `pc_envelope_590ce0.txt`,
 `pc_wave_591220*.txt`, `twins_report_*.txt`). Sources: `Befund-Stoehnen-0511.md`, `Befund-P4c-Caverns-0711.md`, N3 report
 08.11., from FINDINGS.md.
 
