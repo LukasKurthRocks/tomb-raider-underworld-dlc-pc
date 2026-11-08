@@ -2711,6 +2711,94 @@ TO TEST (owner, with TruQoL 0.1.1 installed): page Fixes, group "Komfort (TruQoL
 1.2, `ShakeScale` 0.5 -> 1.0 - each takes effect within about a second (`TruQoL.log` one `live:` line each); the rows
 `TruQoL an` / `Start-Fix ...` show "Neustart". Without TruQoL installed the group shows "keine INI" and writes nothing.
 
+## TruMenu 0.21.11 (light.list / light.shadow for the flashlight shadow; page Rettung for players; 2026-11-08)
+
+Build `work\asi\menu0222` from package 18d (`work\menu18d_0811\PROGRESS.md`, `finding_18d.md`; facts of 18b
+`work\research18b_0811\finding_18b.md`, ENGINE.md section 16 "Shadow caster gate"). No new hook, imports / exports =
+0.21.10, `TruMenu.ini` unchanged (= the 0.21.8 sample), ring untouched (`kRadMaxItems` 256 frozen, radial / tour files
+unchanged). `TruMenu.switches.txt` = the source file at build time.
+
+**Lights (section "0.21.11 lights").** The scene light list is proven statically (tru.exe 5560abac): `[0xa1407c]` = the
+PCRenderDevice (vtable 0x8492cc), scene = device + 0xfdfc, every PCRenderLight sits in the array count `[scene+0x14]` /
+data `[scene+0x1c]` from its ctor (0x50b120 -> push_back 0x5054f0) to its dtor (0x50b1e0 -> remove 0x504a10). 18b's
+"scene+0x20, count +0x1020" is the per-frame list of light **instances** (`[E]` = the light, E+0x64 / +0x65 run-time
+flags; reset to 0 by 0x504c50, so outside the device frame it may be empty). 18b's "device" `[L+0x1c]` is the light's
+**PCLightResource** (vtable 0x8494ec): CastsShadow 0x50a080 = `(L+0xc5 & 4) && res+0x1878`, and RenderShadowMaps'
+`vf1c()+0x144d` is res+0x1879 (res vf+0x1c 0x50a030 = res+0x42c). Before the first read TruMenu checks 13 byte patterns
+and 4 vtable slots (`LtCheck`; a mismatch = "disabled: bytes differ at ...").
+- **`light.list`** (action, game thread, read only): one `TruMenu.log` line per light - `light.list #3 0x0a1b2c40 type 1
+  +0xc5 0x05 (bit 2 1) +0xc4 0 | res 0x0c3d4e00 +0x42c 1 +0x1878 1 +0x1879 (vf1c+0x144d) 0 -> CastsShadow 1 | frame E
+  0x... +0x64 1 +0x65 1 | pos 120.0 -40.5 310.0 (Lara 85u) NEW` - plus a head line (count, frame list count, +0x1240 list
+  count, EnableShadows `[[0xad75e4]+0x184]`). The answer is short: `#3 t1 s1 85u NEW; ... | 12 lights, 3 cast (s1), 1 NEW,
+  frame 0, EnableShadows 1`. **NEW** = not in the previous `light.list`: list with the flashlight off, switch it on, list
+  again - the NEW light near Lara is the flashlight. Position = row 3 of the light transform L+0x20 (L+0x50, 🔶 live).
+- **`light.shadow <n|0x<light>> 0|1`** (action, game thread): SetCastShadows vf+0x4c 0x50a3a0 of light `n` of
+  `light.list` (or its address); refuses an index out of range, an address not in the array, a vtable other than
+  PCRenderLight 0x849594 and any value but 0 / 1; logs +0xc5 and CastsShadow before / after and says when res+0x1878 = 0
+  keeps the light unshadowed anyway.
+- What the result means (18b): bit 2 clear on the flashlight -> data / setter; bit 2 set and res+0x1878 = 0 -> the light
+  resource (res+0x42c kind 0 clears +0x1878 in 0x50afb0); both set -> slice / budget (0x504f30, <= 16 slices) or
+  EnableShadows 0 (then only the first light with res+0x1879 is shadowed).
+- Bar page Render-Details, group "Lichter (Schatten)": "Lichter ins Log" (`light.list`), "Licht-Schatten ..." (opens the
+  quick command line with `light.shadow `).
+
+**Page Rettung / Rescue** (bar page 1, right after Favoriten / Zuletzt; long menu: section "Quick bar pages"): the
+existing soft-lock helpers of finding 18b part D in one place, every row an item of 0.21.10 - no new game logic.
+
+| Group | Row (DE / EN) | Item | Note |
+|---|---|---|---|
+| Festgesteckt / Stuck | Befreien / Unstuck | `player.unstuck` | |
+| | Befreien (Marke) / Unstuck (mark) | `player.unstuck mark` | |
+| | Befreien: Stand / Safe ground state | `player.safeground` | info |
+| | Punkt merken / Mark here | `player.mark` | |
+| | Zum Punkt / Back to mark | `player.recall` | |
+| | Unit neu laden / Reload unit | `level.reload` | right / X twice (kQfConfirm; kCmdDanger) |
+| Spielstaende / Saves | Saves sichern / Back up saves | `save.backup rettung` | folder `<time>_rettung` |
+| | Sicherungen (Liste) / Backups (list) | `save.backups` | info |
+| | Sicherung zurueck ... / Restore a backup ... | `save.restore` | line; kCmdDanger + its own double confirm |
+| Objekte / Objects | Objekte suchen ... / Find objects ... | `instance.list` | line (name filter) |
+| | Objekt zu Lara ... / Bring object ... | `instance.bring` | line (#index / intro id) |
+| | Objekt einblenden ... / Unhide object ... | `instance.unhide` | line |
+| Ausruestung / Gear | Gegenstand geben ... / Give item ... | `gear.give` | line (object name) |
+| | Medipack geben / Give medipack | `gear.give g_healthpack` | |
+| | Waffe geben / Give weapon | `weapon.give` | choice (the five ring weapons) |
+| | Munition voll / Ammo fill | `ammo.fill` | |
+
+Rows marked "line" (new row flag `kQfLine`; the label ends in "...") need a typed argument: right / X puts `<item> ` into
+the quick command line and opens it (type the argument, A runs it through `CmdExecute` - `kCmdDanger` asks twice for
+`save.restore` / `level.reload` as for every line); in the long menu the button puts the line into the command bar and
+focuses it. Y refuses them (a favourite without its argument would only answer "usage"). Every row has a help line
+(`kQbHelp`, DE / EN <= 60 characters each).
+Limits: 17 bar pages now (`g_qbRow[17]`, `static_assert(kQbPageN <= 17)`; was 16 - full), `kQbStartPage` 6 = still
+Leveldaten; page Rettung 20 rows, Render-Details 43 (`kQbViewMax` 64); `tools\trumenu_ini_check.py` (`QB_PAGES_MAX` 17,
+`kQbRescue` in `QB_TABLES`) and `tools\trumenu_quick_check.py` (cosbar: 17 pages) follow the new limit.
+
+`Set-TruMenu.ps1`: `$earlierBuilds` knows the 0.21.10 asi (sha256 148066e8...), example `-SourceDir .\work\asi\menu0222`.
+
+Checks: build 0 warnings (/W4, TruMenu.cpp; the 2 C4100 of imgui_demo as before), `tools\trumenu_ini_check.py` exit 0,
+`tools\trumenu_quick_check.py` all ok, `work\menu18d_0811\check_0222.py` all ok (exe proof + LtCheck patterns / slots
+against the exe, light rules, page Rettung, ring, source, folder) with 22 / 22 negatives caught (`make_negative_0222.py`);
+`work\asi\menu0220\check_0220.py` / `menu0219\check_0219.py` all ok (0220's version test and its negative now read the
+0.21.10 part).
+
+### TO TEST 0.21.11 (owner)
+
+Install: `.\scripts\windows\Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu0222` (game closed; add `-ShaderLabelFile`
+as for 0.21.9 if wanted).
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | game start | `TruMenu.log`: `TruMenu 0.21.11 (` |
+| 2 | in a level, flashlight OFF: `menu light.list` (or bar Render-Details "Lichter ins Log") | answer `... N lights, S cast (s1) ...`; per light a `light.list #i ...` line; no "disabled: bytes differ" |
+| 3 | flashlight ON, `light.list` again | one (or more) light marked `NEW`, a few units from Lara (`(Lara <d>u)`); note its line: +0xc5 bit 2, res+0x1878, +0x1879, CastsShadow, frame flags |
+| 4 | `menu light.shadow <n of the NEW light> 1` | `cast bit 1 (+0xc5 0x.. -> 0x..), CastsShadow x -> y`; does a flashlight shadow appear? (if "res+0x1878 is 0" - resource side, note it) |
+| 5 | `light.shadow <n> 0`, then `light.shadow 999 1`, `light.shadow 0x12345678 1` | shadow gone again (if it came); refused: "index 999 out of range" / "not in the scene's light array" |
+| 6 | bar: RB once from page 0 | page "Rettung" with the four groups; help line under each row |
+| 7 | Rettung "Objekt zu Lara ..." right | quick command line opens with `instance.bring `; type `#<n>` from "Objekte suchen ...", A = object at Lara |
+| 8 | Rettung "Unit neu laden" right once / twice | first: arms (footer), second within 3 s: reload |
+| 9 | Rettung "Sicherung zurueck ..." | line `save.restore `; type a folder of "Sicherungen (Liste)"; A asks twice (kCmdDanger), then the restore's own confirmation |
+| 10 | long menu, Quick bar pages, "Rettung / Rescue" | same rows; the "..." buttons fill the command bar |
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

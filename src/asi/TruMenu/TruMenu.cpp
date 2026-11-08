@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -21106,6 +21106,246 @@ bool RunPosPortal(const char *arg, char *o, size_t n);   // 0.20, defined below
 void ValSaveLoad(char *o, size_t n);
 bool RunSaveLoad(const char *arg, char *o, size_t n);
 
+// ---- 0.21.11 lights (package 18d; docs\ENGINE.md section 16 "Shadow caster gate"; work\menu18d_0811\finding_18d.md)
+// light.list (read only) / light.shadow <n> 0|1: the PCRenderLights of the scene with the fields of the shadow gate, so the
+// owner can switch Lara's flashlight on / off and see which light appears. Proven statically (tru.exe md5 5560abac):
+//   PCRenderDevice = [0xa1407c] (vtable 0x8492cc; stored by 0x509aa3 after new(0x11828) + ctor 0x5088a0)
+//   scene = device + 0xfdfc (the PCRenderLight ctor 0x50b120 adds itself there: 0x50b1be lea ecx, [ebp+0xfdfc]; call 0x5054f0)
+//   every light: count [scene+0x14], capacity +0x18, data [scene+0x1c] (0x5054f0 push_back; the dtor 0x50b1e0 removes
+//   with 0x504a10 = swap with the last) - a light lives in this array from its ctor to its dtor
+//   frame list: light instances E at scene+0x20 (0x400 slots), count [scene+0x1020] (RenderShadowMaps 0x505139 / 0x505149);
+//   [E+0] = the light (instance ctor 0x50b910: mov [ebx], esi), E+0x64 / +0x65 run-time flags (0x504d40 / 0x50b23d);
+//   cleared by 0x504c50 (count = 0 at 0x504c97), so outside the device frame the count may be 0
+//   L+0xc0 type (ctor 0), L+0xc4 dirty, L+0xc5 bit 2 = casts shadow (ctor 0x50b197 .. 0x50b1a5 sets it)
+//   [L+0x1c] = the light's PCLightResource (vtable 0x8494ec; ctor arg 2 = CreateLight's argument, 0x50b14b) - NOT the
+//   render device (18b's wording); CastsShadow vf+0x50 0x50a080 = (L+0xc5 & 4) && res+0x1878; res->vf1c = 0x50a030
+//   (lea eax, [ecx+0x42c]) so RenderShadowMaps' "vf1c()+0x144d" (0x5051aa .. 0x5051b6) is res+0x1879; res+0x42c = the
+//   kind the resource's slot 4 0x50afb0 tests (0 -> res+0x1878 = 0 at 0x50b07c; 2 -> +0x1880 size <= 0x400)
+//   SetCastShadows vf+0x4c 0x50a3a0 (bit 2 of +0xc5 = arg, +0xc4 = 1); position = row 3 of the transform L+0x20 (set by
+//   vf+0x28 0x50a210: copy into L+0x20) = L+0x50 / +0x54 / +0x58 (row-major cdc matrix - to be confirmed live)
+const DWORD kLtDevicePtr = 0x00a1407c, kLtDeviceVt = 0x008492cc, kLtScene = 0xfdfc;
+const DWORD kLtVt = 0x00849594, kLtResVt = 0x008494ec, kLtSetCast = 0x0050a3a0, kLtCastsShadow = 0x0050a080;
+const DWORD kLtResVf1c = 0x0050a030, kLtSetXform = 0x0050a210, kLtEnableShadows = 0x00ad75e4;
+const int kLtMax = 256;                      // lights shown / remembered (the array has no fixed limit)
+const DWORD kLtFrameMax = 0x400;             // slots of the frame list scene+0x20 .. +0x1020
+DWORD g_ltPrev[kLtMax] = {};                 // game thread: the lights of the previous light.list (NEW marks)
+int g_ltPrevN = -1;
+int g_ltChecked = 0;                         // 0 = not yet, 1 = ok, -1 = failed (g_ltWhy)
+char g_ltWhy[96] = "";
+typedef void(__thiscall *LtSetCastFn)(void *light, int on);
+
+// the byte checks of the read path and the setter (once; tru.exe 5560abac)
+bool LtCheck() {
+    if (g_ltChecked) return g_ltChecked > 0;
+    struct { DWORD at; const char *hex; const char *what; } k[] = {
+        {0x00509aa3, "a37c40a100", "device store 0x509aa3"},
+        {0x0050b1be, "8d8dfcfd0000e827a3ffff", "light ctor add 0x50b1be"},
+        {0x005054f0, "8b4118394114568d7114", "push_back 0x5054f0"},
+        {0x00505511, "8b068b4e088d0481", "push_back data +0x1c"},
+        {0x00505139, "8b9f20100000", "frame count 0x505139"},
+        {0x00505149, "8d7720", "frame list 0x505149"},
+        {0x0050b93a, "8933", "instance [E] = light 0x50b93a"},
+        {kLtCastsShadow, "f681c5000000047412", "CastsShadow 0x50a080"},
+        {0x0050a089, "8b411c80b878180000", "CastsShadow res+0x1878"},
+        {kLtSetCast, "8a44240402c002c03281c5000000c681c400000001", "SetCastShadows 0x50a3a0"},
+        {kLtResVf1c, "8d812c040000c3", "resource vf1c 0x50a030"},
+        {kLtSetXform, "8b442404568bf1508d4e20", "SetTransform 0x50a210"},
+        {0x00505109, "8b0de475ad008a8184010000", "EnableShadows read 0x505109"},
+    };
+    for (const auto &c : k)
+        if (!HexBytesAt(c.at, c.hex)) {
+            Out(g_ltWhy, sizeof(g_ltWhy), "bytes differ at %s", c.what);
+            g_ltChecked = -1;
+            return false;
+        }
+    DWORD s4c = 0, s50 = 0, s28 = 0, r1c = 0;
+    if (!ReadDword(kLtVt + 0x4c, &s4c) || s4c != kLtSetCast || !ReadDword(kLtVt + 0x50, &s50) || s50 != kLtCastsShadow ||
+        !ReadDword(kLtVt + 0x28, &s28) || s28 != kLtSetXform || !ReadDword(kLtResVt + 0x1c, &r1c) || r1c != kLtResVf1c) {
+        Out(g_ltWhy, sizeof(g_ltWhy), "vtable slots differ (0x849594 +0x4c / +0x50 / +0x28, 0x8494ec +0x1c)");
+        g_ltChecked = -1;
+        return false;
+    }
+    g_ltChecked = 1;
+    return true;
+}
+// the scene's light array: count, data; false (with the reason) without a render device
+bool LtArray(DWORD *scene, DWORD *count, DWORD *data, char *o, size_t n) {
+    DWORD dev = 0, vt = 0;
+    if (!LtCheck()) { Out(o, n, "disabled: %s", g_ltWhy); return false; }
+    if (!ReadDword(kLtDevicePtr, &dev) || !dev) { Out(o, n, "no render device ([0x%08lx] = 0)", kLtDevicePtr); return false; }
+    if (!ReadDword(dev, &vt) || vt != kLtDeviceVt) {
+        Out(o, n, "[0x%08lx] = 0x%08lx is no PCRenderDevice (vtable 0x%08lx)", kLtDevicePtr, dev, vt);
+        return false;
+    }
+    *scene = dev + kLtScene;
+    if (!ReadDword(*scene + 0x14, count) || !ReadDword(*scene + 0x1c, data)) { Out(o, n, "scene read failed"); return false; }
+    if (*count > 4096 || (*count && !*data)) { Out(o, n, "light array implausible (count %lu, data 0x%08lx)", *count, *data); return false; }
+    return true;
+}
+struct LtInfo {
+    DWORD addr, vt, res, resVt, kind, frameE;
+    BYTE type, dirty, c5, r1878, r1879, e64, e65;
+    bool casts, posOk, inFrame;
+    float pos[3];
+};
+void LtRead(DWORD scene, DWORD light, LtInfo *x) {
+    memset(x, 0, sizeof(*x));
+    x->addr = light;
+    ReadDword(light, &x->vt);
+    ReadByte(light + 0xc0, &x->type);
+    ReadByte(light + 0xc4, &x->dirty);
+    ReadByte(light + 0xc5, &x->c5);
+    ReadDword(light + 0x1c, &x->res);
+    if (x->res) {
+        ReadDword(x->res, &x->resVt);
+        ReadDword(x->res + 0x42c, &x->kind);
+        ReadByte(x->res + 0x1878, &x->r1878);
+        ReadByte(x->res + 0x1879, &x->r1879);      // = res->vf1c() (0x50a030: res+0x42c) + 0x144d
+    }
+    x->casts = (x->c5 & 4) && x->r1878;            // CastsShadow 0x50a080
+    x->posOk = ReadFloats(light + 0x50, x->pos, 3);
+    DWORD fn = 0, e = 0, l = 0;
+    if (ReadDword(scene + 0x1020, &fn) && fn <= kLtFrameMax)
+        for (DWORD i = 0; i < fn; ++i)
+            if (ReadDword(scene + 0x20 + 4 * i, &e) && e && ReadDword(e, &l) && l == light) {
+                x->inFrame = true;
+                x->frameE = e;
+                ReadByte(e + 0x64, &x->e64);
+                ReadByte(e + 0x65, &x->e65);
+                break;
+            }
+}
+void ValLight(char *o, size_t n) {
+    DWORD scene = 0, count = 0, data = 0, frame = 0, light = 0, es = 0;
+    if (!LtArray(&scene, &count, &data, o, n)) return;
+    int casts = 0;
+    for (DWORD i = 0; i < count && i < static_cast<DWORD>(kLtMax); ++i) {
+        BYTE c5 = 0, r = 0;
+        DWORD res = 0;
+        if (ReadDword(data + 4 * i, &light) && light && ReadByte(light + 0xc5, &c5) && (c5 & 4) &&
+            ReadDword(light + 0x1c, &res) && res && ReadByte(res + 0x1878, &r) && r)
+            ++casts;
+    }
+    ReadDword(scene + 0x1020, &frame);
+    if (ReadDword(kLtEnableShadows, &es) && es) ReadDword(es + 0x184, &es);
+    Out(o, n, "%lu lights, %d cast a shadow (+0xc5 bit 2 and res+0x1878), frame list %lu, EnableShadows %lu", count, casts,
+        frame, es & 0xff);
+}
+// light.list (game thread, read only): one TruMenu.log line per light, a short list in the answer; NEW = not in the
+// previous light.list (toggle the flashlight between two lists to see which light it is)
+bool RunLightList(const char *, char *o, size_t n) {
+    DWORD scene = 0, count = 0, data = 0, frame = 0, es = 0, player = 0, l1240 = 0;
+    if (!LtArray(&scene, &count, &data, o, n)) return false;
+    ReadDword(scene + 0x1020, &frame);
+    ReadDword(scene + 0x1240, &l1240);
+    if (ReadDword(kLtEnableShadows, &es) && es) ReadDword(es + 0x184, &es);
+    float lara[3] = {};
+    const bool laraOk = ReadDword(kPlayerPtr, &player) && player && ReadFloats(player + kInstancePosition, lara, 3);
+    Log(1, "light.list (src=%s): %lu lights in scene 0x%08lx (array [+0x1c], count +0x14), frame list %lu (+0x1020), "
+        "+0x1240 list %lu, EnableShadows [[0x%08lx]+0x184] %lu", ShotSource("light.list"), count, scene, frame, l1240,
+        kLtEnableShadows, es & 0xff);
+    static DWORD now[kLtMax];
+    int shown = 0, casts = 0, fresh = 0, filled = 0;
+    size_t used = 0;
+    o[0] = 0;
+    for (DWORD i = 0; i < count && i < static_cast<DWORD>(kLtMax); ++i) {
+        DWORD light = 0;
+        if (!ReadDword(data + 4 * i, &light)) break;
+        now[i] = light;
+        LtInfo x;
+        LtRead(scene, light, &x);
+        bool isNew = g_ltPrevN >= 0;
+        for (int p = 0; p < g_ltPrevN && isNew; ++p) isNew = g_ltPrev[p] != light;
+        if (isNew) ++fresh;
+        if (x.casts) ++casts;
+        float d = -1.0f;
+        if (laraOk && x.posOk) {
+            const float dx = x.pos[0] - lara[0], dy = x.pos[1] - lara[1], dz = x.pos[2] - lara[2];
+            d = sqrtf(dx * dx + dy * dy + dz * dz);
+        }
+        char frameText[64] = "not in the frame list";
+        if (x.inFrame) Out(frameText, sizeof(frameText), "frame E 0x%08lx +0x64 %u +0x65 %u", x.frameE, x.e64, x.e65);
+        Log(1, "light.list #%lu 0x%08lx%s type %u +0xc5 0x%02x (bit 2 %u) +0xc4 %u | res 0x%08lx%s +0x42c %lu +0x1878 %u "
+            "+0x1879 (vf1c+0x144d) %u -> CastsShadow %d | %s | pos %.1f %.1f %.1f (Lara %.0fu)%s", i, light,
+            x.vt == kLtVt ? "" : " (vtable not PCRenderLight)", x.type, x.c5, (x.c5 >> 2) & 1, x.dirty, x.res,
+            x.resVt == kLtResVt ? "" : " (vtable not PCLightResource)", x.kind, x.r1878, x.r1879, x.casts ? 1 : 0,
+            frameText, static_cast<double>(x.pos[0]), static_cast<double>(x.pos[1]), static_cast<double>(x.pos[2]),
+            static_cast<double>(d), isNew ? " NEW" : "");
+        char e[64];
+        const int w = _snprintf_s(e, sizeof(e), _TRUNCATE, "%s#%lu t%u s%d%s %.0fu%s", used ? "; " : "", i, x.type,
+                                  x.casts ? 1 : 0, (x.c5 & 4) && !x.r1878 ? "(bit2,res0)" : "", static_cast<double>(d),
+                                  isNew ? " NEW" : "");
+        if (w > 0 && used + static_cast<size_t>(w) + 100 < n) {   // room left for the summary
+            memcpy(o + used, e, static_cast<size_t>(w) + 1);
+            used += static_cast<size_t>(w);
+            ++shown;
+        }
+        ++filled;
+    }
+    const int kept = filled;
+    memcpy(g_ltPrev, now, sizeof(DWORD) * static_cast<size_t>(kept));
+    const bool first = g_ltPrevN < 0;
+    g_ltPrevN = kept;
+    Log(1, "light.list: %lu lights, %d cast a shadow%s", count, casts,
+        first ? ", first list (NEW marks from the next one)" : "");
+    if (fresh && !first) Log(1, "light.list: %d NEW since the previous light.list", fresh);
+    // the summary always fits: the short entries above left 100 characters for it (or none was taken)
+    _snprintf_s(o + used, n - used, _TRUNCATE, "%s%lu lights, %d cast (s1), %d NEW, frame %lu, EnableShadows %lu "
+                "(%d shown; lines in TruMenu.log)", used ? " | " : "", count, casts, first ? 0 : fresh, frame, es & 0xff,
+                shown);
+    return true;
+}
+// light.shadow <n|0x<address>> 0|1 (game thread): SetCastShadows vf+0x4c 0x50a3a0 of one light of the array
+bool RunLightShadow(const char *arg, char *o, size_t n) {
+    DWORD scene = 0, count = 0, data = 0;
+    if (!LtArray(&scene, &count, &data, o, n)) return false;
+    char which[32] = "";
+    int on = -1;
+    if (!arg || sscanf_s(arg, "%31s %d", which, static_cast<unsigned>(sizeof(which)), &on) != 2 || (on != 0 && on != 1)) {
+        Out(o, n, "usage: light.shadow <n from light.list | 0x<address>> 0|1");
+        return false;
+    }
+    DWORD light = 0, index = 0;
+    char *end = nullptr;
+    if (which[0] == '0' && (which[1] == 'x' || which[1] == 'X')) {
+        const DWORD want = strtoul(which, &end, 16);
+        for (index = 0; index < count; ++index) {
+            DWORD l = 0;
+            if (ReadDword(data + 4 * index, &l) && l == want) { light = l; break; }
+        }
+        if (!light) { Out(o, n, "refused: 0x%08lx is not in the scene's light array (%lu lights)", want, count); return false; }
+    } else {
+        index = strtoul(which, &end, 10);
+        if (!end || *end || index >= count) {
+            Out(o, n, "refused: index %s out of range (0 .. %ld, light.list)", which, static_cast<long>(count) - 1);
+            return false;
+        }
+        if (!ReadDword(data + 4 * index, &light) || !light) { Out(o, n, "refused: slot %lu empty", index); return false; }
+    }
+    DWORD vt = 0;
+    if (!ReadDword(light, &vt) || vt != kLtVt) {
+        Out(o, n, "refused: light #%lu 0x%08lx has vtable 0x%08lx, not PCRenderLight 0x%08lx", index, light, vt, kLtVt);
+        return false;
+    }
+    LtInfo before, after;
+    LtRead(scene, light, &before);
+    __try {
+        reinterpret_cast<LtSetCastFn>(kLtSetCast)(reinterpret_cast<void *>(light), on);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        Out(o, n, "exception in SetCastShadows 0x%08lx", kLtSetCast);
+        return false;
+    }
+    LtRead(scene, light, &after);
+    Log(1, "light.shadow #%lu 0x%08lx %d: +0xc5 0x%02x -> 0x%02x, +0xc4 %u, res+0x1878 %u -> CastsShadow %d -> %d", index,
+        light, on, before.c5, after.c5, after.dirty, after.r1878, before.casts ? 1 : 0, after.casts ? 1 : 0);
+    Out(o, n, "light #%lu 0x%08lx: cast bit %d (+0xc5 0x%02x -> 0x%02x), CastsShadow %d -> %d%s", index, light, on,
+        before.c5, after.c5, before.casts ? 1 : 0, after.casts ? 1 : 0,
+        on && !after.r1878 ? " - res+0x1878 is 0, so still no shadow (resource side)" : "");
+    return true;
+}
+// ---- end of 0.21.11 lights
+
 struct Item {
     const char *id, *type, *label;
     bool gameThread;                         // runner must run on the game thread (queued)
@@ -21655,6 +21895,12 @@ const Item kItems[] = {
      ValPhStatus, nullptr},
     {"phys.dump", "action", "0.21.1: the used physics bodies by name, orphans listed, into TruMenu.log", true, ValPhStatus,
      RunPhDump},
+    // 0.21.11 lights (section "0.21.11 lights"; package 18d)
+    {"light.list", "action", "0.21.11: the scene's PCRenderLights (type, +0xc5 cast bit, resource +0x1878 / +0x1879, frame "
+                             "flags +0x64 / +0x65, position, NEW since the last list) into TruMenu.log (read only)", true,
+     ValLight, RunLightList},
+    {"light.shadow", "action", "0.21.11 <n|0x<light>> 0|1: SetCastShadows vf+0x4c 0x50a3a0 of one light of light.list", true,
+     ValLight, RunLightShadow},
     {"ai.spawn", "action", "0.21.1 <object> [1..5] [lara|front]: AI enemies of a kind loaded in this level at / in front of "
                            "Lara (INSTANCE_BirthObjectNoParent; save.backup before the first)", true, ValSpawnEnemy,
      RunAiSpawn},
@@ -25257,7 +25503,9 @@ void PageMarkup() {
 // "German text|English text")
 enum QbKind { kQbBool = 0, kQbValue, kQbAction, kQbInfo, kQbChoice, kQbLabel, kQbPlanned,
               kQbGroup };                  // 0.21.1: a collapsible group heading (arg = its key in [Quick] Closed)
-enum QbFlag { kQfConfirm = 1, kQfBackup = 2 };
+enum QbFlag { kQfConfirm = 1, kQfBackup = 2,
+              kQfLine = 4 };               // 0.21.11 (page Rettung): right / X puts "<id> <arg> " into the quick command
+                                           // line (long menu: the command bar) - for items that need a typed argument
 enum QbCount { kQcNone = 0, kQcLayer, kQcTriggers, kQcTrgLabels, kQcLaraIn, kQcEncl, kQcLabels, kQcMarkup, kQcFlat, kQcOn,
                kQcCine, kQcAi,            // 0.19 kQcAi: enemies in the ai.dumb scope (last frame)
                kQcPhys };                 // 0.21.1: physics bodies used / capacity
@@ -25488,6 +25736,10 @@ const QbRow kQbRenderMore[] = {
     {"Schrift 1x", "Size 1x", "dbg.namesize", "1", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     {"Schrift 1.5x", "Size 1.5x", "dbg.namesize", "1.5", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     {"Schrift 2x", "Size 2x", "dbg.namesize", "2", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    // 0.21.11 lights (package 18d): list, then a shadow switch per light (the index from the list, typed in the line)
+    {"Lichter (Schatten)", "Lights (shadows)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Lichter ins Log", "Lights into the log", "light.list", "", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Licht-Schatten ...", "Light shadow ...", "light.shadow", "", kQbAction, -1, kQcNone, 0, kQbBlue, kQfLine},
 };
 const QbRow kQbLevel[] = {
     {"Alle Trigger", "All triggers", "dbg.triggers", "", kQbBool, -1, kQcTriggers, 0, kQbWhite},
@@ -25642,6 +25894,32 @@ const QbRow kQbCoop[] = {
     {"Controller 2: Stand", "Pad 2: state", "-", "zeigt Controller 2 (verbunden, Tasten)|shows pad 2 (connected, buttons)",
      kQbPlanned, -1, kQcNone, 0, 0, 0},
 };
+// 0.21.11 page "Rettung" (package 18d, finding 18b part D): the existing soft-lock helpers for players in one place - no
+// new game logic, every row is an item the other pages / the command line already have. Rows marked kQfLine need a typed
+// argument (an instance, a backup folder, an object name): right / X puts the line into the quick command line, A runs
+// it (kCmdDanger asks twice where the item is dangerous); level.reload asks twice in the bar (kQfConfirm)
+const QbRow kQbRescue[] = {
+    {"Festgesteckt", "Stuck", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Befreien (Marke)", "Unstuck (mark)", "player.unstuck", "mark", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Befreien: Stand", "Safe ground state", "player.safeground", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Punkt merken", "Mark here", "player.mark", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Zum Punkt", "Back to mark", "player.recall", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Unit neu laden", "Reload unit", "level.reload", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Spielstaende", "Saves", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Saves sichern", "Back up saves", "save.backup", "rettung", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Sicherungen (Liste)", "Backups (list)", "save.backups", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"Sicherung zurueck ...", "Restore a backup ...", "save.restore", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfLine},
+    {"Objekte", "Objects", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Objekte suchen ...", "Find objects ...", "instance.list", "", kQbAction, -1, kQcNone, 0, kQbGrey, kQfLine},
+    {"Objekt zu Lara ...", "Bring object ...", "instance.bring", "", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfLine},
+    {"Objekt einblenden ...", "Unhide object ...", "instance.unhide", "", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfLine},
+    {"Ausruestung", "Gear", "-", "", kQbLabel, -1, kQcNone, 0, kQbCheat, 0},
+    {"Gegenstand geben ...", "Give item ...", "gear.give", "", kQbAction, -1, kQcNone, 0, kQbCheat, kQfLine},
+    {"Medipack geben", "Give medipack", "gear.give", "g_healthpack", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
+    {"Waffe geben", "Give weapon", "weapon.give", "", kQbChoice, -1, kQcNone, kQvWeapon, kQbCheat, 0},
+    {"Munition voll", "Ammo fill", "ammo.fill", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
+};
 // 0.21.1 page "Tests" (TODO 0.21 / 0.21.1 item 2): teleports, then the Prepare shortcuts of the regression lists (the
 // ring's Tests / Prepare - right twice), Stop, and the TO TEST rows (right = OK / done / on, left = Fehler / open / off)
 const QbRow kQbTests[] = {
@@ -25670,6 +25948,7 @@ const QbRow kQbTests[] = {
 #define QB_PAGE(de, en, rows, special) {de, en, rows, static_cast<int>(sizeof(rows) / sizeof(rows[0])), special}
 const QbPage kQbPages[] = {
     {"Favoriten / Zuletzt", "Favourites / recent", nullptr, 0, kQsFav},   // 0.21.1 page 0 (TODO 0.21.1 item 4)
+    QB_PAGE("Rettung", "Rescue", kQbRescue, kQsNone),               // 0.21.11 (players: the soft-lock helpers)
     QB_PAGE("Notfall / Cheats", "Emergency / cheats", kQbEmergency, kQsNone),
     QB_PAGE("Lara", "Lara", kQbLara, kQsLara),
     {"Kostueme", "Costumes", nullptr, 0, kQsCostume},              // 0.21.6 (own page: the list would overfill Lara)
@@ -25768,6 +26047,27 @@ const QbHelp kQbHelp[] = {
                        "shot"},
     {"level.load", "*", "Sicherung, dann Kapitel-Start laden (debug, keine Story)|Backup, then load the chapter start "
                         "(debug, no story values)"},
+    // 0.21.11 page Rettung (the rows with "..." open the quick command line: type the argument, A runs it)
+    {"player.unstuck", "", "Zur neueren Stelle: Marke oder sicherer Boden|To the newer spot: mark or safe ground"},
+    {"player.mark", "", "Merkt Laras Stelle fuer 'Zum Punkt'|Remembers Lara's spot for 'Back to mark'"},
+    {"player.recall", "", "Lara zurueck zur gemerkten Stelle|Lara back to the marked spot"},
+    {"level.reload", "", "Abschnitt neu laden - rechts / X zweimal|Reload the unit - right / X twice"},
+    {"save.backup", "rettung", "Kopiert alle Spielstaende nach TruMenu.saves|Copies every save into TruMenu.saves"},
+    {"save.backups", "", "Sicherungsordner, neueste zuerst|Backup folders, newest first"},
+    {"save.restore", "", "Befehlszeile: Ordnername aus der Liste, A zweimal|Command line: folder name from the list, A "
+                         "twice"},
+    {"instance.list", "", "Befehlszeile: Teil des Objektnamens, A = Liste|Command line: part of the object name, A = list"},
+    {"instance.bring", "", "Befehlszeile: #Nummer oder Intro-Id aus der Liste|Command line: #number or intro id from the "
+                           "list"},
+    {"instance.unhide", "", "Befehlszeile: Objekt wieder sichtbar (#Nummer)|Command line: show the object again "
+                            "(#number)"},
+    {"gear.give", "", "Befehlszeile: Objektname, z. B. g_grapple|Command line: object name, e.g. g_grapple"},
+    {"gear.give", "g_healthpack", "Ein Medipack ins Inventar (im Level)|One medipack into the inventory (in a level)"},
+    {"weapon.give", "", "Links = Waffe waehlen, rechts = geben|Left = choose the weapon, right = give it"},
+    {"ammo.fill", "", "Alle Reserven auf das Maximum (Magazine bleiben)|Every reserve to the maximum (clips unchanged)"},
+    // 0.21.11 lights (page Render-Details)
+    {"light.list", "", "Lichter der Szene + Schatten-Felder ins Log|Scene lights + shadow fields into the log"},
+    {"light.shadow", "", "Befehlszeile: <Nummer aus der Liste> 0 oder 1|Command line: <number from the list> 0 or 1"},
 };
 // the help of an item + argument ("DE|EN"), nullptr = none
 const char *QbHelpText(const char *id, const char *arg) {
@@ -25782,11 +26082,13 @@ void QbHelpPart(const char *text, bool de, char *o, size_t n) {
     if (de) Out(o, n, "%.*s", static_cast<int>(bar - text), text);
     else Out(o, n, "%s", bar + 1);
 }
-const int kQbStartPage = 5;                  // Leveldaten: the layers are what the bar is mostly for (0.21.1: page 0
-                                             // Favoriten / Zuletzt in front; 0.21.6: page Kostueme after Lara)
+const int kQbStartPage = 6;                  // Leveldaten: the layers are what the bar is mostly for (0.21.1: page 0
+                                             // Favoriten / Zuletzt in front; 0.21.6: page Kostueme after Lara;
+                                             // 0.21.11: page Rettung after page 0)
 const int kQbViewMax = 64;                   // rows of one page (static + special; 0.21.1: 64, was 40)
-int g_qbPage = kQbStartPage, g_qbRow[16] = {};  // render thread; kept over a close
-static_assert(kQbPageN <= 16, "g_qbRow holds 16 pages");   // 0.21.5: 15 pages; 0.21.6: 16 (Kostueme) - full
+int g_qbPage = kQbStartPage, g_qbRow[17] = {};  // render thread; kept over a close
+static_assert(kQbPageN <= 17, "g_qbRow holds 17 pages");   // 0.21.5: 15 pages; 0.21.6: 16 (Kostueme); 0.21.11: 17
+                                                            // (Rettung) - full
 int g_qbShowClosed = 1, g_qbTop = 30;        // [Quick] ShowClosed / Top (percent of the screen height)
 float g_qbScale = 1.0f;                      // [Quick] Scale
 LONG g_qbToggles = 0, g_qbTaps = 0, g_qbLate = 0, g_qbRuns = 0;   // quick.status counters
@@ -26182,6 +26484,7 @@ int &QbChoiceIndex(int val) { return val == kQvSpawnKind ? g_qbSpawnChoice : g_q
 
 // one row, left (dir -1) or right (+1): the item with the target state / the next value / the action (right only)
 // 0.21.1: one row of any page (also a favourite / recent row of page 0), the old QbAct(page, row, dir) below
+bool QcPrefill(const QbRow &r);              // 0.21.11 kQfLine rows, after QcOpen
 void QbActRow(int page, const QbRow &r, int dir) {
     const bool de = g_qbLang == 0;
     const char *name = de ? r.de : r.en;
@@ -26254,6 +26557,13 @@ void QbActRow(int page, const QbRow &r, int dir) {
         QbValueArg(r.val, next, arg, sizeof(arg));
     } else {
         if (dir < 0) { QbResult(false, "%s: %s", name, de ? "rechts = starten" : "right = start"); return; }
+        if (r.flags & kQfLine) {             // 0.21.11: the argument is typed in the quick command line (A runs it)
+            if (!QcPrefill(r)) return;       // [Cmd] Enabled=0: QcOpen's own footer line stays
+            Log(1, "quick: %s / %s -> command line '%s %s'", QbPageName(page, true), r.de, r.id, r.arg);
+            QbResult(false, "%s: %s", name, de ? "Befehlszeile: Argument ergaenzen, A = ausfuehren"
+                                               : "command line: add the argument, A = run");
+            return;
+        }
         strncpy_s(arg, sizeof(arg), r.arg, _TRUNCATE);
         char key[160];
         Out(key, sizeof(key), "%d/%s %s", page, r.id, r.arg);
@@ -26312,7 +26622,7 @@ void QbExecRow(int page, const QbRow &r) {
 // special rows that stand for one item + argument (QbDynFav: a switch of page Fixes, a costume, a chapter unit)
 bool QbFavOk(const QbRow *r) {
     return r && r->kind != kQbLabel && r->kind != kQbGroup && r->kind != kQbPlanned && strcmp(r->id, "-") &&
-           FavArgOk(r->arg);
+           !(r->flags & kQfLine) && FavArgOk(r->arg);   // 0.21.11: a kQfLine row needs a typed argument
 }
 bool QbDynFav(int k, char *id, size_t idN, char *arg, size_t argN);   // 0.21.8, after the chapter units
 bool QbDynIsSw(int k);                                                 // 0.21.8, there too
@@ -26840,6 +27150,16 @@ void QcOpen(bool open, const char *by) {
     g_qcHistPos = -1;
     QcDisarm();
     Log(1, "quick: command line %s (%s)", open ? "opened" : "closed", by);
+}
+// 0.21.11 (page Rettung): a kQfLine row - "<id> <arg> " into the quick command line, the line opened; the typed line runs
+// through CmdExecute as every line (kCmdDanger asks twice for save.restore / level.reload ...)
+bool QcPrefill(const QbRow &r) {
+    if (!g_cmdEnabled) { QcOpen(true, "rescue row"); return false; }   // QcOpen says why ([Cmd] Enabled=0)
+    _snprintf_s(g_qcBuf, sizeof(g_qcBuf), _TRUNCATE, "%s %s%s", r.id, r.arg, r.arg[0] ? " " : "");
+    QcOpen(true, "rescue row");
+    g_qcHistPos = -1;
+    g_qcFocus = g_qcOpen != 0;
+    return g_qcOpen != 0;
 }
 // one history step (up = older, down = newer, past the newest = an empty line) - the walk of the menu bar's CmdCallback
 void QcHistory(bool up) {
@@ -30215,7 +30535,14 @@ void PageQbRow(const QbRow &r, int page, int index) {
         if (!strcmp(shownKey, key)) ImGui::TextWrapped("   %s", shown);
     } else {
         Out(label, sizeof(label), "%s / %s  [%s%s%s]", r.de, r.en, r.id, r.arg[0] ? " " : "", r.arg);
-        if (r.flags & (kQfConfirm | kQfBackup)) {
+        if (r.flags & kQfLine) {             // 0.21.11: into the command bar, the argument is typed there
+            char id[260];
+            Out(id, sizeof(id), "%s ...###%s", label, key);
+            if (TmButton(id)) {
+                _snprintf_s(g_cmdBuf, sizeof(g_cmdBuf), _TRUNCATE, "%s %s%s", r.id, r.arg, r.arg[0] ? " " : "");
+                InterlockedExchange(&g_cmdFocusReq, 1);
+            }
+        } else if (r.flags & (kQfConfirm | kQfBackup)) {
             if (ConfirmButton(label, key)) {
                 if (r.flags & kQfBackup) {   // chapters: save.backup first, then the item (shortcut runner)
                     char steps[200];

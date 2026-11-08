@@ -47,7 +47,7 @@
 
 .EXAMPLE
     .\Set-TruMenu.ps1 -Install -Verbose
-    .\Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu0220 -ShaderLabelFile .\work\shader17c_0811\trumenu\stack_n5mats_n6_17c\TruMenu.shaderlabel.txt
+    .\Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu0222 -ShaderLabelFile .\work\shader17c_0811\trumenu\stack_n5mats_n6_17c\TruMenu.shaderlabel.txt
     .\Set-TruMenu.ps1 -Remove
 #>
 [CmdletBinding(DefaultParameterSetName = 'Install')]
@@ -116,7 +116,8 @@ $earlierBuilds = @{
                       '5d6dd6301472d6139706af928b6673679b04d4c2941ef89fb69e6f0f631a14b4',   # 0.21.6 page Kostueme, flight line, quick command line (work\asi\menu0216)
                       '4a5b60b397c0e74af0a36d24514fb7ef68d7fd20933e3d0f7edf08ad81b69a59',   # 0.21.7 help lines, label layers (work\asi\menu0217)
                       '9d1e487dde97a362dd2cc1d9228594fdfaeb0fb7cd6d071556770fef498519f5',   # 0.21.8 command line, favourites with argument (work\asi\menu0218)
-                      'cf4f387174adb115be9df5c5f31adb3733f58cab9b03a146164b66be7aaf715b')   # 0.21.9 test spots, CP rows, units without a DRM (work\asi\menu0219)
+                      'cf4f387174adb115be9df5c5f31adb3733f58cab9b03a146164b66be7aaf715b',   # 0.21.9 test spots, CP rows, units without a DRM (work\asi\menu0219)
+                      '148066e8a7d1bcc197e9febd04181ba464056a2132aa3cfb66ae828cacb9183d')   # 0.21.10 unused DLC slots (work\asi\menu0220 / menu0221)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

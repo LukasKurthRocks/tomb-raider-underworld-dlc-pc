@@ -208,7 +208,8 @@ QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info'
 QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess',
              'kQbCoop',                                                          # 0.21 Koop (planned rows only)
              'kQbTests',                                                         # 0.21.1 Tests (teleports + specials)
-             'kQbRenderMore')                                                    # 0.21.5 Render-Details (ring frozen)
+             'kQbRenderMore',                                                    # 0.21.5 Render-Details (ring frozen)
+             'kQbRescue')                                                        # 0.21.11 Rettung (soft-lock helpers)
 QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang',
                   'time.scale', 'ai.mode',                                       # 0.19 ai.mode
                   'snd.pos', 'snd.lines', 'snd.sort',                            # 0.20.1 sound list
@@ -219,8 +220,8 @@ QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'chea
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
-QB_PAGES_MAX = 16                            # 0.21: + Koop; 0.21.1: + Favoriten / Zuletzt, Tests; 0.21.5: + Render-Details, Fixes;
-                                             # 0.21.6: + Kostueme (= g_qbRow[16], the limit)
+QB_PAGES_MAX = 17                            # 0.21: + Koop; 0.21.1: + Favoriten / Zuletzt, Tests; 0.21.5: + Render-Details, Fixes;
+                                             # 0.21.6: + Kostueme (16); 0.21.11: + Rettung (= g_qbRow[17], the limit)
 # 0.21.6 (2026-11-07): bar page Kostueme, flight key line ([Cheat] FlightHint), quick command line
 Q216_COS_NAMES = ('Classic Lara', 'Blue Bikini', 'Black and White Bikini', 'Red Bikini', 'Camo Bikini', 'Casual Explorer',
                   'Grey Jungle Shorts', 'Legend Lara', 'Bright Blue Bikini', 'Gold Bikini', 'Red Drysuit',
@@ -2049,15 +2050,18 @@ def check_0216(ini_path):
     order = re.findall(r'(?:QB_PAGE\("([^"]*)", "[^"]*", (kQb[A-Za-z]+), (kQs[A-Za-z]+)\)|\{"([^"]*)", "[^"]*", nullptr, 0, '
                        r'(kQs[A-Za-z]+)\})', block)
     pages = [(a or d, b or None, c or e) for a, b, c, d, e in order]
-    if len(pages) > 16: problems.append('TruMenu.cpp: kQbPages has %d pages - g_qbRow holds 16' % len(pages))
+    if len(pages) > QB_PAGES_MAX:             # 0.21.11: 17 (page Rettung; g_qbRow[17])
+        problems.append('TruMenu.cpp: kQbPages has %d pages - g_qbRow holds %d' % (len(pages), QB_PAGES_MAX))
     specials = [p[2] for p in pages]
     if specials.count('kQsCostume') != 1:
         problems.append('TruMenu.cpp: kQbPages needs exactly one page Kostueme (kQsCostume), found %d'
                         % specials.count('kQsCostume'))
     elif pages[specials.index('kQsCostume') - 1][1] != 'kQbLara':
         problems.append('TruMenu.cpp: page Kostueme must follow page Lara')
-    if 'static_assert(kQbPageN <= 16' not in src or 'const int kQbViewMax = 64;' not in src:
-        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= 16, kQbViewMax 64) changed')
+    if 'static_assert(kQbPageN <= %d' % QB_PAGES_MAX not in src or 'g_qbRow[%d]' % QB_PAGES_MAX not in src or \
+            'const int kQbViewMax = 64;' not in src:
+        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= %d, g_qbRow[%d], kQbViewMax 64) '
+                        'changed' % (QB_PAGES_MAX, QB_PAGES_MAX))
     sec = src[src.find('// ---- 0.21.6 costumes'):src.find('// ---- end of 0.21.6 costumes')]
     if len(sec) < 100: problems.append('TruMenu.cpp: section "0.21.6 costumes" missing')
     m = re.search(r'const DWORD kCosSettleMs = (\d+);', sec)

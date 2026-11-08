@@ -2345,7 +2345,7 @@ def check_cosbar():
     src = open(c.CPP, encoding='utf-8').read()
     block = src[src.index('const QbPage kQbPages[] = {'):]
     pages = block[:block.index('\n};')].count('\n    ')
-    good &= pages == 16 and lara_first_over == 38
+    good &= pages == 17 and lara_first_over == 38   # 0.21.11: 17 pages (+ Rettung; g_qbRow[17])
     print('cosbar: 4 rows + the open list (36 -> 40 rows), only the current one marked, no level = every row refused, '
           'labels for dlc_costume_a..p only, records with an object id; own page <= 64 rows (list cut after 60), Lara '
           'page over 64 from N = %d, %d pages  %s' % (lara_first_over, pages, 'ok' if good else 'FAIL'))
