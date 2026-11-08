@@ -22,8 +22,9 @@
 
     -ShaderGate (2026-11-08) checks the shader libraries of the source tree with tools\shader_form_gate.py before
              -Check returns and before anything is copied: ABS_CONST, SINCOS_SAME, X5584 and ERR in port shaders.
-             Report (default for now) logs them as WARN, Enforce refuses the install, Off skips the check. Needs
-             <workspace>\bin\venv; the counts also go to logs\Install-TruTree_<time>_shader_gate.json.
+             Enforce (default since 2026-11-08 15:10, all ten trees of the install stack pass) refuses the install,
+             Report only logs them as WARN (for old test trees), Off skips the check. Needs <workspace>\bin\venv; the
+             counts also go to logs\Install-TruTree_<time>_shader_gate.json.
 
     -Exclude defaults to 'local','padshock': the installed string tables carry the DLC menu text fix
     (docs/DLC_MENU.md) and would be overwritten by tables without it; padshock is the same file.
@@ -49,7 +50,7 @@ param(
     [string]$BackupName,
     [string]$GamePath,
     [switch]$Force,
-    [ValidateSet('Report', 'Enforce', 'Off')][string]$ShaderGate = 'Report',
+    [ValidateSet('Report', 'Enforce', 'Off')][string]$ShaderGate = 'Enforce',
     [switch]$Trace
 )
 
