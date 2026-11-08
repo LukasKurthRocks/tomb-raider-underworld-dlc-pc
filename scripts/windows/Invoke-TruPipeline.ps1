@@ -75,7 +75,10 @@
                costume_dtp_fix prove: exit 1 on a contradicting base word) and each output tree is gated afterwards
                (the tools' scans: exit 1 on a wrong or unexplained word, reports <tree>\chunkdoll_check.json,
                melee_link_check.json, genintro_check.json, DLC 2 also exttuning_check.json / thrall_extension_check.json;
-               dlc_struct_fixes check covers all seven steps); DLC 2 additionally gets the doppelganger language
+               dlc_struct_fixes check covers all seven steps); fadecard / uberanim / fxrec / sgmesh / introtyped /
+               leveltwin / basecopy (2026-11-08, 17n, after dspkind: the typed families of the night 07./08.11.,
+               tools/typed_family_fix.py) are proven first (typed_family_fix proof: exit 1 on a contradicting base word
+               or another pinned count) and gated by dlc_struct_fixes check; DLC 2 additionally gets the doppelganger language
                variants (vo_lang_variants build: <stream>.mul_NNN of the 4 localised voice streams, 20 files, then
                vo_lang_variants check --expect <tree>\vo_lang_md5.tsv, report <tree>\vo_lang_check.json);
                objevent / idword / animlist / fxnode / statevm / chartid (2026-11-03, finding 44) set the converter
@@ -362,6 +365,9 @@ $steps = @{
         @('tools\generator_intro_fix.py', 'proof'),
         @('tools\thrall_extension_fix.py', 'proof'),
         @('tools\costume_dtp_fix.py', 'prove'),
+        # 2026-11-08 (17n): the seven typed-family rules (fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin /
+        # basecopy) on the base pairs (exit 1 on a contradicting word or another count than pinned)
+        @('tools\typed_family_fix.py', 'proof'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
         @('tools\converter_faults_fix.py', 'check', $fix1, '--report', $chk1),
         @('tools\script_clash_fix.py', 'check', $fix1, '--report', $clash1),

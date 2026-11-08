@@ -43,6 +43,23 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              2 023 words, costume packs a h k l m)
   dspkind    tools/soundplex_dsp_kind_fix.py SoundPlex DSP node (type 12) kind u16 of dlc_caverns_hall DTP 23469 +0x74
              (P4c 2026-11-07, docs Befund-P4c-Caverns-0711.md: Xbox word copied raw = kind 1792, no DSP)
+  fadecard   tools/typed_family_fix.py      fade-record DTPs of the cine cards / flash / key-glow objects: header +0x44 and
+             records {s16, s16, raw} (17h-B 2026-11-08: co_dlc_black_card 22651 / co_dlc_white_card 26832)
+  uberanim   tools/typed_family_fix.py      uber play-anim words (action kind 2 argument, transition +0x28) = u16 pair
+             of the Xbox word (17h-C crash 2026-11-08 00:27, goo cannonball DTP 25328 +0x6d4)
+  fxrec      tools/typed_family_fix.py      FX particle records (anchor bf800000 x3, c04a468e x2) +0x18 / +0x38 with an
+             Xbox word XX000000 raw (17j-b: DTP 22819 in 13 DLC 2 DRMs)
+  sgmesh     tools/typed_family_fix.py      streamgroup mesh-list DTPs {n, n x {mesh id, u32, u32, u32}} all u32 (17j-b:
+             dlc2_machine_room_machine_room_all DTP 25512)
+  introtyped tools/typed_family_fix.py      unit DTP intro data: intro +0x7c u32, intro data blocks by (object, size)
+             from the intros of four base units, name strings raw (17j-b / 17l)
+  leveltwin  tools/typed_family_fix.py      Level section of a unit without a same-size base twin: words whose Xbox word
+             equals the l7 twin's Xbox word at the same offset = the twin's PC word (byte permutations only; the
+             NavGraph image stays navraw's) (17j-b: dlc_yggdrasil_end)
+  basecopy   tools/typed_family_fix.py      DTPs whose Xbox payload equals the base Xbox DTP of the same id = the PC base
+             copy (payload relocations equal; DLC trailer kept) (17j-b / 17l: colour LUT 18577, 19397, 4190)
+             The seven typed_family_fix rules re-derive their truth from the base pairs once per process
+             (typed_family_fix.proven: pinned counts, 0 contradicting words) and refuse to write or check without it.
   seqrepeat  tools/soundplex_sequence_fix.py SoundPlex Sequence nodes (type 10): the word data +0xc (s8 repeat + 3 bytes)
              raw = the Xbox bytes, as on every informative base pair (`soundplex_sequence_fix.py proof`; F5 2026-11-05:
              the converter u32-swapped `01 00 00 00` to `00 00 00 01` = repeat 0 = endless, the doppelganger's
@@ -62,7 +79,8 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
 eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, chunkrec, exttuning, thrallext, meleelink, genintro,
-costumedtp, dspkind, seqrepeat, navraw, vmliteral (objtex / objrec / objid
+costumedtp, dspkind, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy, seqrepeat, navraw, vmliteral
+(objtex / objrec / objid
 since 2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
 dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
 steps, docs Befund-Pipeline-Integration-0411.md; seqrepeat since 2026-11-05, WINDOWS_REBUILD finding 49: it touches
@@ -73,10 +91,16 @@ fixes of 2026-11-07, after objid and the base-twin / statechart steps (a proven 
 seqrepeat; each touches only its own records - chunkdoll piece records, DTP 22497 tuning words, type-0x3d extension data,
 melee records, generator intro data, costume model u16 arrays / list counts, one SoundPlex DSP kind word - which no later
 structure step writes; they reproduce the test trees work/datafix_0711 (chunkdoll / exttuning p0711), extfix_0711,
-meleefix_0711 p0711, genfix_0711 p0711, costumefix_0711, caverns74_0711 word for word).
+meleefix_0711 p0711, genfix_0711 p0711, costumefix_0711, caverns74_0711 word for word);
+fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy since 2026-11-08 (17n, the typed families of the
+night 07./08.11.): after dspkind (the earlier data fixes keep their words; none of the seven writes a chunkdoll, tuning,
+extension, melee, generator, costume or DSP word - checked: those steps change 0 words on the outputs), before
+seqrepeat / navraw (they do not write SoundPlex nodes; leveltwin leaves the NavGraph image to navraw); basecopy last of
+the seven (the PC base copy is the game's own byte image of that DTP id, so it has the last word); they reproduce the
+test trees work/endcine_0811, crash_0811, endb270_0811 and the 17l family words of work/b270cmp_0811/tree).
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
 Check mode (objtex / objrec / objid / chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind /
-seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
+fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
   ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
         TREE may be 'A,B' (overlay, the later folder wins - e.g. a pipeline tree with a fix tree on top);
@@ -100,8 +124,10 @@ import drm_write as DW, drm_reloc as R
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
        'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
+       'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
        'seqrepeat', 'navraw', 'vmliteral')
 DATAFIX_STEPS = ('chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind')   # 2026-11-08
+TYPED_STEPS = ('fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy')   # 2026-11-08 (17n)
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (markup_level.py --objects; 23 = TU type)
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -551,6 +577,54 @@ class Steps:
         return new, 'dspkind %s: %d words (%s; Xbox %s); %s' % (rel, len(changes), ', '.join(
             'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes), src, self.PROOF_NOTE)
 
+    # ---- typed families of the night 07./08.11. (steps since 2026-11-08, 17n): tools/typed_family_fix.fix_drm proves
+    # the rule on the base pairs once per process (SystemExit when it fails), changes only words whose PC bytes are
+    # another byte order of the Xbox word (others are counted as kept) and proves its write (AssertionError ->
+    # nothing changed, logged as 'proof failed')
+    def _typed(self, rule, rel, XD, cur):
+        import typed_family_fix as TF
+        try:
+            new, changes, info = TF.fix_drm(rule, XD, cur, rel)
+        except AssertionError as e:
+            return None, '%s %s: proof failed (%s) - nothing changed' % (rule, rel, e)
+        kept = info['kept']
+        tail = '%s%s' % ((', %d kept (no byte order of the Xbox word)' % len(kept)) if kept else '',
+                         ('; ' + '; '.join(info['notes'])) if info['notes'] else '')
+        if new is None:
+            return None, ('%s %s: 0 words%s' % (rule, rel, tail)) if (kept or any('skipped' in n for n in info['notes'])) else None
+        cl = collections.Counter(c[5] for c in changes)
+        return new, '%s %s: %d words (%s: %s)%s; %s' % (
+            rule, rel, len(changes), ', '.join('%s %d' % kv for kv in sorted(cl.items())), self._wlist(
+                '+0x%x %s -> %s' % (q, a.hex(), b.hex()) for k, q, a, b, sid, tag in changes), tail, self.PROOF_NOTE)
+
+    def s_fadecard(self, rel, xf, XD, cur):
+        """fade-record DTPs: header +0x44 and records {s16, s16, raw} (17h-B, typed_family_fix)"""
+        return self._typed('fadecard', rel, XD, cur)
+
+    def s_uberanim(self, rel, xf, XD, cur):
+        """uber play-anim words (action kind 2 argument, transition +0x28) = u16 pair (17h-C, typed_family_fix)"""
+        return self._typed('uberanim', rel, XD, cur)
+
+    def s_fxrec(self, rel, xf, XD, cur):
+        """FX particle records +0x18 / +0x38 with an Xbox word XX000000 raw (17j-b, typed_family_fix)"""
+        return self._typed('fxrec', rel, XD, cur)
+
+    def s_sgmesh(self, rel, xf, XD, cur):
+        """streamgroup mesh-list DTPs all u32 (17j-b, typed_family_fix)"""
+        return self._typed('sgmesh', rel, XD, cur)
+
+    def s_introtyped(self, rel, xf, XD, cur):
+        """unit DTP intro data: +0x7c u32, data blocks by (object, size) from base units, name strings raw (17j-b)"""
+        return self._typed('introtyped', rel, XD, cur)
+
+    def s_leveltwin(self, rel, xf, XD, cur):
+        """Level section without a same-size base twin: the l7 twin's PC word where the Xbox words agree (17j-b)"""
+        return self._typed('leveltwin', rel, XD, cur)
+
+    def s_basecopy(self, rel, xf, XD, cur):
+        """DTPs whose Xbox payload is the base Xbox DTP of the same id = the PC base copy, trailer kept (17j-b / 17l)"""
+        return self._typed('basecopy', rel, XD, cur)
+
     def s_seqrepeat(self, rel, xf, XD, cur):
         """SoundPlex Sequence nodes: data +0xc raw (tools/soundplex_sequence_fix.fix_drm, F5 2026-11-05, finding 49).
         Proof per DRM (in fix_drm): the decoded DRM differs only in the planned bytes, headers / relocations identical,
@@ -699,9 +773,10 @@ def run_twins(srcs, out, names, tmp):
     return files, log
 
 
-CHECK_STEPS = ('objtex', 'objrec', 'objid') + DATAFIX_STEPS + ('seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass)
+CHECK_STEPS = ('objtex', 'objrec', 'objid') + DATAFIX_STEPS + TYPED_STEPS + ('seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass)
 CHECK_ALLOWED = CHECK_STEPS   # navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS); the
-                              # 2026-11-07 data fixes (DATAFIX_STEPS) since 2026-11-08
+                              # 2026-11-07 data fixes (DATAFIX_STEPS) since 2026-11-08, the typed families (TYPED_STEPS,
+                              # 17n) since 2026-11-08
 
 
 def run_check(tree, steps, names=None, report=None):
@@ -739,7 +814,7 @@ def run_check(tree, steps, names=None, report=None):
                     rep[s]['files'].append(rel)
                 # navraw: a unit the rule cannot pair or whose proof failed is not "ok" either (nothing is assumed);
                 # the same for the data fix steps (2026-11-08)
-                if (s == 'navraw' or s in DATAFIX_STEPS) and any('NOT PAIRED' in l or 'proof failed' in l for l in log) \
+                if (s == 'navraw' or s in DATAFIX_STEPS or s in TYPED_STEPS) and any('NOT PAIRED' in l or 'proof failed' in l for l in log) \
                         and rel not in rep[s]['files']:
                     rep[s]['files'].append(rel)
                 rep[s]['lines'] += log

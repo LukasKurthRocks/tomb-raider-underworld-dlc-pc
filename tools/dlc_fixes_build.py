@@ -42,6 +42,13 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          (costume_dtp_fix; DLC 1 and the costume packs), the SoundPlex DSP kind of dlc_caverns_hall DTP 23469
          (soundplex_dsp_kind_fix); each typed by its proven rule, only words whose PC bytes are another byte order of
          the Xbox word, each written DRM proven; an UNEXPECTED word stops the build
+  fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy (ours, 2026-11-08, 17n: the typed families of the
+         night 07./08.11.) after dspkind, also tools/dlc_struct_fixes.py with tools/typed_family_fix.py: fade-record DTPs
+         of the cine cards, uber play-anim words, FX particle record words, streamgroup mesh lists, unit DTP intro
+         data, the Level section of a unit without a same-size base twin (dlc_yggdrasil_end), DTPs whose Xbox payload
+         is the base Xbox DTP of the same id (= the PC base copy, e.g. the colour LUT 18577); each rule proven on the
+         base pairs once per run, only words whose PC bytes are another byte order of the Xbox word, each written DRM
+         proven
   seqrepeat (ours, 2026-11-05, finding 49) after objid, also tools/dlc_struct_fixes.py: the word data +0xc of SoundPlex
          Sequence nodes (s8 repeat + 3 bytes) raw = the Xbox bytes (tools/soundplex_sequence_fix.py; the converter
          u32-swapped repeat 1 to 0 = endless, the DLC 2 doppelganger's groan); a word that is no byte order of the
@@ -359,12 +366,18 @@ def _struct_fix(step):
 # touches; twins / statechart run before, so the proven rule has the last word); Invoke-TruPipeline.ps1 proves the
 # rules first (chunkdoll_record_fix / melee_link_record_fix / generator_intro_fix / thrall_extension_fix proof,
 # costume_dtp_fix prove) and gates every tree afterwards (the tools' scans + dlc_struct_fixes.py check)
+# fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy (2026-11-08, 17n): the typed families of the
+# night 07./08.11. (tools/typed_family_fix.py) after dspkind, before seqrepeat (none writes a word of the earlier data
+# fixes, seqrepeat or the NavGraph image; basecopy last - the PC base copy has the last word); Invoke-TruPipeline.ps1
+# proves the rules first (typed_family_fix.py proof) and gates every tree afterwards (dlc_struct_fixes.py check)
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
                 'markup', 'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro',
-                'costumedtp', 'dspkind', 'seqrepeat', 'navraw', 'vmliteral')
+                'costumedtp', 'dspkind', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
+                'seqrepeat', 'navraw', 'vmliteral')
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
  fix_markup, fix_objtex, fix_objrec, fix_objid, fix_chunkrec, fix_exttuning, fix_thrallext, fix_meleelink, fix_genintro,
- fix_costumedtp, fix_dspkind, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+ fix_costumedtp, fix_dspkind, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh, fix_introtyped, fix_leveltwin,
+ fix_basecopy, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 def _fault_fix(step):
