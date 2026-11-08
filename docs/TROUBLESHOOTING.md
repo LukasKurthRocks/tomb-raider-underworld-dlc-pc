@@ -80,7 +80,7 @@ with `scripts/windows/Set-TruDisplay.ps1` (it saves a backup first; add `-Check`
 | White screen or hang in the first cutscene / at the end of the tutorial | registry `DontDeferShaderCreation` = 0 and `DisableDynamicTextures` = 0 (`Set-TruDisplay.ps1 -StutterFix`); Steam overlay off; reports differ, one player only needed the affinity option |
 | Stutter, slow loading, frame rate dropping after 10-15 minutes | the same two registry values; some players also set `EnableWaterFX` = 0 |
 | Crash with DEP (Data Execution Prevention) | add `tru.exe` as a DEP exception in Windows (the GOG version turns DEP off at run time) |
-| Steam overlay crashes or does not show | turn the Steam overlay off for this game |
+| Steam overlay crashes or does not show | turn the Steam overlay off for this game. With TruMenu 0.21.11 also seen once (8 Nov 2026, at the pause screen): a stack overflow because TruMenu's swap-chain Present hook and the overlay's d3d9 detour call each other in a loop; a re-entry guard in TruMenu is planned |
 | Controller does nothing or the camera stutters | turn **Steam Input** off for this game (Properties → Controller) |
 | Crackling sound | set the audio output to 96 kHz or less |
 | Saving fails or crashes | allow the game to write to its save folder in your security software |
