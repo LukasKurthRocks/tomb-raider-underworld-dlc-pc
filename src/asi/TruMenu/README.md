@@ -2891,6 +2891,21 @@ Played 2026-11-08 21:30 (DLC 2 end cutscene held at the throne): 14 lights, all 
 their colour every frame (flicker, wanted), the 3 shadow-casting cutscene lights run a 5-frame cycle (instance +0x60
 1, 1, 1, 2, 3; +0x78 0 / 1.0); with global shadows off the throne stood still - the flicker is their shadow rendering.
 
+## TruMenu 0.22.3 - 0.22.5 (light.stable: steady scene light order, on by default; 2026-11-08)
+
+`light.stable 1|0` (no argument = report). 0.22.3 sorted the scene lights in the visible-entity list before the light
+pass 0x56d5c0 - never needed (0 of 111 frames), flicker unchanged. 0.22.4 sorts the light pass's own collected list
+(+0x250, count +0x258) by address right after the collection loop: the 6 bytes `mov ecx, [esi+0x250]` at 0x56d69a
+become `jmp LsStub` + nop (the stub saves all registers, sorts, runs the instruction, jumps back to 0x56d6a0), written on
+the game thread only while on and only over the expected bytes, put back when off. **Played:** the collected order of
+the 15 scene lights changed in every frame (112 of 112); with the switch the brightness of the lit figures stood still
+(spread 13.9 -> 0.0, off / on / off) - cause of the end-cutscene flicker proven (ENGINE.md 16). The five cycling states
+are different light combinations (warm torch light vs. a cool front light on Natla); the sorted order keeps one of them.
+**0.22.5: on by default** - `[Light] Stable=1` (missing key = 1), the owner prefers a steady light set to the flicker
+until the real fix (a stable order by weight, or the right weights in the DLC light data, checked against Xenia / the
+Xbox original). The sort applies in every scene; `Stable=0` gives the game's own order. Bar page Tests: "Licht-
+Reihenfolge fest (Flacker-Test)".
+
 ### TO TEST 0.22.1
 
 | # | Step | Expected |
