@@ -58,7 +58,7 @@ Full table with 104 rows: `TU-Abdeckung.md` (findings folder). "Data" = fixed in
 | Input map set 17 (K8) | 6 extra bindings | missing | data fix `input_map_tu_fix.py` ✅ |
 | Chunkdoll limit | 8 | 4 | not ported (deliberate) |
 | Sound-slot 5th argument | TU 0x8226de00 | retail | ⬜ not ported |
-| Main-game bug fixes in the TU | none proven (528 real changes reviewed in part) | - | - |
+| Main-game bug fixes in the TU | none proven in code (528 real changes reviewed in part). Published list (Eidos via TeamXbox 09.03.2009, read by the 17u agent in the Wayback copy; the coordinator could not re-fetch it, no second source with the details): improved jump targeting for pillar jumps; ledge-corner transition (Lara stuck on a ledge); improved edge detection; crash when the PDA is opened during the transition to the main menu; CPU work - fewer cache misses and faster trigger-volume detection ("significant for LS"); small memory leaks fragmenting the heap (crashes in very long sessions); Legend cheats disabled. Search targets for the TU review (assumed = our TU 0.0.2.3, unchecked); PC patch 1.1 (Dec 2008) predates it | 🔶 list / ⬜ code | `docs/Recherche-QoL-Beschwerden-0811.md` (local, 17u) |
 
 ---
 
