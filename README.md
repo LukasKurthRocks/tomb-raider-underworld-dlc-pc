@@ -77,6 +77,17 @@ the story behind them: [docs/DEVLOG.md](docs/DEVLOG.md).*
 - What was found and why, for anyone (including the original author) who wants to pick it up:
   [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) finding 43, [docs/DLC2.md](docs/DLC2.md).
 
+**Comfort fixes for the base game (new, built - not yet tested in game)**
+
+- `TruQoL` plugin ([src/asi/TruQoL](src/asi/TruQoL/README.md), install with `scripts\windows\Set-TruQoL.ps1`): a 60 fps
+  cap at the game's own frame clock (physics puzzles break above 60 fps; switches itself off when DXVK or dxwrapper
+  already cap), a field-of-view factor, a camera shake scale (0 = off, against motion sickness), a start-up fix for PCs
+  with more than 31 CPU threads (would replace the `/affinity` launch option once confirmed) and an optional intro skip.
+  Every key can be changed live from TruMenu's page "Fixes".
+- `scripts\windows\Set-TruDisplay.ps1`: depth of field (in the PC game, but off by default), aspect ratio for 21:9 / 32:9,
+  the stutter fix of the community guides - with a registry backup and a `-Check` dry run.
+- Known problems of the original PC game and their workarounds: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
 **How the Xbox title update is brought to PC (approach)**
 
 The PC game is close to the Xbox retail game; the DLC need the Xbox **title update** on top. So the missing PC piece
