@@ -2523,6 +2523,97 @@ negatives adapted in `make_negative_0217.py`), `tools\trumenu_quick_check.py` mo
 | 13 | Sonstiges (HUD) 0, then Lara-Stimme 0 | HUD / menu sounds off; Lara's breathing / hints off - note anything that stays (finding section 6) |
 | 14 | level load with a slider below 100 | `new (level load) group ...` lines; the factor holds |
 
+## TruMenu 0.21.9 (test spots, DLC units in play order with checkpoints, units without a DRM, goo / navmesh labels with meaning, B7, F11; 2026-11-08)
+
+Night build `work\asi\menu0219` from the gap list `docs\Befund-17i-Menue-Luecken-0811.md` (data
+`work\menu17i_0811\dlc_intros_all.txt`) and `docs\Befund-R17e-Goo-Navmesh-0811.md`. No new byte check (no new code
+address is read: the goo label uses the 0.21.7 uber read path, the navmesh labels the bits of the area words they already
+read), no hook, imports / exports unchanged, `TruMenu.ini` unchanged (= the 0.21.8 sample).
+
+**`cp.jump <unit> <checkpoint intro>`** (new action item, not on the game thread): one shortcut of the 0.8.1 runner -
+`save.backup kapitel;unit.go <unit>;wait.unit <unit>;dbg.cpgo <id>`. `unit.go` decides when its step comes (Lara in the
+unit: nothing; loaded with a stream portal: flight + portal; else `level.load`); `dbg.cpgo <id>` as a shortcut step now
+runs its two steps in place (`cheat.flight 1;player.goto <id>`, `ShortcutTick`) instead of starting a second shortcut over
+the running one (`dbg.cpgo active` stays a command). Refused: a unit not in the level list, a unit without a DRM, a
+pending level change. In `kCmdDanger` (the quick command line asks twice).
+
+**Page Tests: test spots** (group "Teststellen (rechts 2x)"): "End-Szene (020_ghoul)" = `cp.jump dlc_yggdrasil_end 9608`
+(help: CP 9608 lies most likely inside trigger volume 10026 - the cutscene 020_ghoul starts at once), "Boden 25057 (CP
+9970)" = `cp.jump dlc_yggdrasil_end 9970` (the nearest data checkpoint, ~1300 units from the floor spot), "Zeremonienraum
+030_pod" = `level.load dlc2_ceremony_room` with backup. Not in the tour file: `trumenu_ini_check.py` counts 256 of 256
+ring entries with the built-ins (`kRadMaxItems`), new tour entries would be dropped - and the ring is frozen since 0.21.5.
+
+**Units without a DRM** (17i: `dlc_level1_left` / `dlc_level1_right` are in unitlist.txt, also on the Xbox, but no DRM
+exists): at start every DLC 1 / DLC 2 unit of the level list is checked once against `<tru.exe folder>\mods\<unit>.drm`
+(log `0.21.9 units: 23 DLC 1 / DLC 2 units checked ..., 2 without a .drm: dlc_level1_left, dlc_level1_right`). Such a
+unit is grey "keine .drm / nicht ladbar" on page Kapitel and in the long menu's level list, its command-line value says
+"no .drm in mods", Y does not pin it, and `level.load` refuses it (`LoadUnit`). Base-game units (bigfile) and the other
+DLC starts are never marked.
+
+**Page Kapitel: DLC 1 / DLC 2 in play order with checkpoints** (`kChapOrder`, every id from `dlc_intros_all.txt`,
+objects 83 `checkpoint` / 1036 `dlc2_checkpoint`, ordered by their +0x52 index): DLC 2 level2_start (4 CP) -> hall01 (1)
+-> hall02 (3) -> end (4) -> ceremony_room (9) -> "-- Rundweg (Richtung nicht in den Daten)": machine_ceremony (7) /
+machine_room (18) / goo_machine (3) / goo_room (10) / ceremony_goo (5), each "(Rundweg)" -> treasure_room_cine; DLC 1
+level1_start (1) -> caverns (3) -> caverns_hall (1) -> water_wheel (3) -> pillory (6) -> dungeonhalla (3) / dungeonhallb
+(3) -> watertunnel (1) -> dungeon (7) -> treasureroom, then the two units without a DRM. A unit row shows `[+] 4 CP`;
+**left** opens its checkpoint rows (one unit at a time, "rechts 2x, links: CP"), a checkpoint row "CP 9608" runs `cp.jump
+<unit> <id>` on right twice (end / 9608 says "020_ghoul sofort"). Right on the unit row = backup + `level.load` as
+before. Page rows with the biggest unit open: at most 50 of 64.
+
+**Goo drip label** (`dbg.uber`, `uber.dump`; only objects 926 `dlc2_uo_goo_drips` / 937 `_sml` and only when the live
+graph has 8 nodes with node 3 "goo_off" - DTP 24411 / 24872): `goo: leicht, naechster Tropfen 0.3 s` (easy: drop on
+entering node 4, every 0.7 s), `goo: leicht (Startpause), naechster Tropfen 2.1 s` (node 7, 4 s), `goo: hart (ohne
+Ausgang), naechster Tropfen 0.2 s` (nodes 1 / 2: drops at 0.3 / 0.6 s; no command leaves hard), `goo: ..., Tropfen
+jetzt` (the auto nodes 0 / 5), `goo: aus (Befehl 0 = hart / 1 = leicht)` (goo_off), `goo: ein Tropfen, dann aus`
+(spawn_one). Rest = `[trans+0x1c] - [b+0x88]` of the node's timed transition (condition 1), as the 0.21.7 gate label.
+
+**Navmesh labels / legend with meaning** (`nav.labels`; ENGINE.md section 15): line 1 `E<layer>.<graph> #<area> <unit>
+Insel <n|->` (+0x30 bits 7..16, 0x3ff = none), line 2 `gesperrt (Hindernis) custom (handgebaut) | Strafe x3 / fest x1 | 5
+Kanten | 27:1 26:1` (bit 27 = blocked by an obstacle, runtime; bit 26 = custom, else `auto`; +0x34 bits 8..11 obstacle /
+12..15 static penalty multiplier, shown when one is above 1). The legend wraps into rows that fit the screen: "rot Bit 27 =
+von Hindernis gesperrt (Laufzeit)", "orange ... = Hindernis-Strafe", "gelb ... = feste Strafe", "blau Bit 26 verschieden
+(custom / auto)", "magenta Bit 26 = custom (handgebaut)", plus the hint row "lila / violette Flaeche ohne Etikett = wohl
+dbg.enemycoll (Gegner-Kollision), kein Navmesh" (r17e 2b, still to be confirmed live).
+
+**B7: the TO TEST switch note** (`test.toggle <id> ini:<Plugin>:<Section>:<Key>` and toggling it): instead of "INI: takes
+effect at the next start" the note names the switch's "when" column of `TruMenu.switches.txt` (`SwWhenNote`): "INI: live
+(~1 s, TruMenu.switches.txt)", "INI: after a restart (...)", "INI: live while <Key>=1 (now 0), else after a restart
+(...)", or "not in TruMenu.switches.txt - when it takes effect is unknown". No new switches row.
+
+**F11**: the bar's default key line ends with `F11: Foto + Marke` while `[Shot] Enabled=1` and a `[Shot] Hotkey` is set
+(0x7A in the installed INI; another key shows as `F<n>` / `0x..`), and the shot rows (page Lara "Foto mit UI" / "Foto
+sauber", the shot rows of the other pages) have the help "Foto jetzt; Taste F11 ([Shot] Hotkey) = Marke + Foto".
+
+**`Set-TruMenu.ps1 -ShaderLabelFile <path>`** (Install only): installs that file as `TruMenu.shaderlabel.txt` instead of
+the build folder's one (e.g. `work\shader17c_0811\trumenu\<variant>\TruMenu.shaderlabel.txt`); the first line must be
+`# shaderlabel v1`, checked before anything is copied. Without it nothing changes. `$earlierBuilds` now knows the 0.21.7
+/ 0.21.8 builds and sample INIs (the installed 0.21.7 asi would otherwise be "not a build of ours"). `work\asi\menu0219`
+holds no shader label file - pick a variant with the parameter (or the old one stays installed).
+
+Checks: `tools\trumenu_ini_check.py` green (check_0218 now reads its part of the version line, as check_0217);
+`work\asi\menu0219\check_0219.py` (CP ids = data, play order, test spots, the DRM list against the game's mods, the goo
+graph against the r17e dumps, a ShortcutTick model of cp.jump, source rules) with 10 negatives
+(`make_negative_0219.py`); `tools\trumenu_quick_check.py` all ok.
+
+### TO TEST 0.21.9 (owner)
+
+Install: `.\scripts\windows\Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu0219 -ShaderLabelFile
+.\work\shader17c_0811\trumenu\<variant>\TruMenu.shaderlabel.txt` (game closed).
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | game start | `TruMenu.log`: `TruMenu 0.21.9 (`, `0.21.9 units: 23 DLC 1 / DLC 2 units checked ..., 2 without a .drm: dlc_level1_left, dlc_level1_right` |
+| 2 | bar, page Kapitel, group "Abschnitte DLC 1 ..." | play order level1_start .. treasureroom; `dlc_level1_left` / `_right` last, grey "keine .drm", right = "keine .drm in mods - nicht ladbar"; `menu level.load dlc_level1_left` = "refused: ... no .drm in mods" |
+| 3 | group "Abschnitte DLC 2 ...", left on `dlc_yggdrasil_end  [+] 4 CP` | rows CP 10036 / 9953 / 9970 / 9608 below it; CP 9608 "020_ghoul sofort"; the ring units under "-- Rundweg" with "(Rundweg)" |
+| 4 | CP 9970: right, right | backup, then (not in end) level.load or portal, Lara flies to CP 9970; log `shortcut 'CP 9970 (dlc_yggdrasil_end)' ... dbg.cpgo -> cheat.flight 1;player.goto 9970` |
+| 5 | page Tests, "End-Szene (020_ghoul)" right twice | help line "CP 9608 liegt wohl im Trigger 10026 ..."; Lara at CP 9608, 020_ghoul starts at once (note whether it does) |
+| 6 | page Tests, "Boden 25057 (CP 9970)" / "Zeremonienraum 030_pod" | Lara at CP 9970 (floor 25057 ~1300 units away) / ceremony room loads after a backup (does 030_pod play?) |
+| 7 | end room, Leveldaten "Tore / Plattformen (Zustand)" on, near the light columns | goo drips: `goo: leicht, naechster Tropfen 0.x s` counting down (or `goo: aus (Befehl 0 = hart / 1 = leicht)` as on 07.11.); note every change while the fight runs |
+| 8 | hall02 / DLC 1 caverns, "Navmesh Flaechen" + "Alle Ebenen" + "Navmesh beschriften" | legend in rows with the meanings and the violet hint; labels `... Insel n`, `custom (handgebaut)` (DLC 1 caverns) / `auto`; then toggle `dbg.enemycoll`: does the violet ramp go away? |
+| 9 | `menu test.toggle x ini:TruShadowCombat:Death:TranslateT5 x` (any live row of page Fixes) | TO TEST row note "INI: live (~1 s, TruMenu.switches.txt)" instead of "takes effect at the next start"; a restart row says "after a restart" |
+| 10 | bar open on a row without its own key line; page Lara "Foto sauber" | key line ends with `F11: Foto + Marke`; help line "Foto jetzt; Taste F11 ..."; F11 = a Claude mark + clean shot as before |
+| 11 | shader labels in end (Render-Details "Shader-Etiketten") | labels from the variant given to `-ShaderLabelFile` (compare a `shader.dump` block with the variant's notes) |
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

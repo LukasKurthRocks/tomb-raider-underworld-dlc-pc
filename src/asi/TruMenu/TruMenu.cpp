@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -2983,6 +2983,7 @@ bool RunSpeed(const char *arg, char *o, size_t n) {
     return true;
 }
 bool LevelChangePending(char *why, size_t n);   // 0.7.2, in the level.start section
+bool UnitNameNoDrm(const char *unit);        // 0.21.9, section "0.21.9 units without a DRM"
 bool LoadUnit(const char *unit, char *o, size_t n) {
     if (!g_levelOk || !g_experimental) { Out(o, n, "level change code not verified / experimental off"); return false; }
     size_t len = unit ? strlen(unit) : 0;
@@ -2992,6 +2993,10 @@ bool LoadUnit(const char *unit, char *o, size_t n) {
             Out(o, n, "unit name may hold a-z 0-9 _ - only");
             return false;
         }
+    if (UnitNameNoDrm(unit)) {               // 0.21.9: in unitlist.txt, but no mods\<unit>.drm (Befund 17i)
+        Out(o, n, "refused: %s has no .drm in mods (listed in unitlist.txt only - the load would fail)", unit);
+        return false;
+    }
     // 0.7.2: also refused during a mission start (main state 2 / 9 - live 2026-11-02 20:29:17: a level.load during the
     // outfit selection set GameTracker+0xb9, the state-9 screen never served it, the game hung)
     char why[200];
@@ -3427,6 +3432,50 @@ char g_markUnit[40] = "";
 volatile LONG g_weaponsPending = 0;          // frames until INSTANCE_Post(player, 35, 0) after a costume switch
 char g_menuLoopName[64];
 char g_exeDir[MAX_PATH], g_asiDir[MAX_PATH];
+
+// ---- 0.21.9 units without a DRM (docs\Befund-17i-Menue-Luecken-0811.md "Nebenfunde": dlc_level1_left / _right are in
+// unitlist.txt - also the Xbox packs - but no DRM exists in mods, TruMenu offered them anyway) ----
+// A DLC 1 / DLC 2 unit of kUnits loads from <tru.exe folder>\mods\<unit>.drm (the installed tree is flat:
+// mods\dlc_level1_start.drm, mods\dlc_yggdrasil_end.drm). One file test per unit at start (UnitDrmScan; the tree does not
+// change while the game runs): a missing file = grey "keine .drm" on page Kapitel and in the long menu, and level.load
+// refuses the unit. Base-game units live in bigfile.000 and the other DLC starts (3 - 6) have no file to look at - both
+// are never marked.
+signed char g_unitDrm[kUnitCount];           // 0 = not checked, 1 = mods\<unit>.drm present, -1 = missing
+bool UnitDrmChecked(int i) {                 // a DLC 1 / DLC 2 unit (the only ones that load from mods)
+    return i >= 0 && i < kUnitCount && (!strcmp(kUnits[i].group, "DLC 1") || !strcmp(kUnits[i].group, "DLC 2"));
+}
+bool UnitNoDrm(int i) {
+    if (!UnitDrmChecked(i)) return false;
+    if (!g_unitDrm[i]) {
+        char path[MAX_PATH];
+        _snprintf_s(path, sizeof(path), _TRUNCATE, "%smods\\%s.drm", g_exeDir, kUnits[i].unit);
+        const DWORD a = GetFileAttributesA(path);
+        g_unitDrm[i] = a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY) ? 1 : -1;
+    }
+    return g_unitDrm[i] < 0;
+}
+int UnitIndexOf(const char *unit) {
+    for (int i = 0; unit && i < kUnitCount; ++i)
+        if (!_stricmp(kUnits[i].unit, unit)) return i;
+    return -1;
+}
+bool UnitNameNoDrm(const char *unit) { return UnitNoDrm(UnitIndexOf(unit)); }
+// start: every DLC 1 / DLC 2 unit once, one log line with the missing ones
+void UnitDrmScan() {
+    char missing[400] = "";
+    int checked = 0, bad = 0;
+    for (int i = 0; i < kUnitCount; ++i) {
+        if (!UnitDrmChecked(i)) continue;
+        ++checked;
+        if (!UnitNoDrm(i)) continue;
+        ++bad;
+        strncat_s(missing, sizeof(missing), bad > 1 ? ", " : "", _TRUNCATE);
+        strncat_s(missing, sizeof(missing), kUnits[i].unit, _TRUNCATE);
+    }
+    Log(1, "0.21.9 units: %d DLC 1 / DLC 2 units checked against %smods\\<unit>.drm, %d without a .drm%s%s (grey, "
+        "level.load refuses them)", checked, g_exeDir, bad, bad ? ": " : "", missing);
+}
+// ---- end of 0.21.9 units without a DRM ----
 
 void Post(DWORD instance, int message, int data) {
     reinterpret_cast<InstancePostFn>(kInstancePost)(reinterpret_cast<void *>(instance), message, data);
@@ -6828,6 +6877,69 @@ void UberText(DWORD b, bool gate, bool de, char *o, size_t n) {
     else if (gate) Out(o, n, de ? "%s, noch %s" : "%s, %s left", UberWord(name, gate, de), secs);
     else Out(o, n, de ? "%s, noch %s -> %s" : "%s, %s left -> %s", UberWord(name, gate, de), secs, UberWord(target, gate, de));
 }
+// 0.21.9 goo drips (docs\Befund-R17e-Goo-Navmesh-0811.md item 1 and "TruMenu-Vorschlaege", ENGINE.md section 9 "Goo
+// drips", dumps work\r17e_0811\uber_dlc2_uo_goo_drips*.txt): objects 926 dlc2_uo_goo_drips / 937 _sml (DTP 24411 /
+// 24872, PC = Xbox) have one 8-node graph - 0 auto (hard loop), 1 Spawn_hard (_sml: Spawn), 2 Spawn2, 3 goo_off, 4
+// Spawn_easy, 5 auto (easy loop), 6 spawn_one, 7 Spawn_easy_pause_to_start. Nodes 1 / 2 / 4 / 6 drop one goo copy (action
+// 19, object 929 / 942) when they are entered; the timed transitions (condition 1, time in the node) are 7 -> 4 after
+// 4.0 s, 4 -> 5 after 0.7 s (5 -> 4 at once), 1 -> 2 after 0.3 s, 2 -> 0 after 0.6 s (0 -> 1 at once). So the time to the
+// next drop is the node's timed rest = [trans+0x1c] - [b+0x88] (the 0.21.7 UberText rule) and "now" in the auto nodes.
+// Hard (0 / 1 / 2) has no exit - no command leaves it (only easy listens to command 0); goo_off waits for command 0
+// (-> hard) or 1 (-> easy). Only for these two objects and only when the live graph has 8 nodes with node 3 "goo_off";
+// read only through the 0.21.7 path (UberStateOf, UberNodeName) - nothing is written.
+bool UberIsGoo(DWORD oid) { return (oid & 0xffff) == 926 || (oid & 0xffff) == 937; }
+// the soonest timed transition (condition 1) of node k: seconds left (-1 = none), its target in *to
+float UberTimedRest(DWORD b, LONG k, float t, LONG *to) {
+    float best = -1.0f;
+    *to = -1;
+    DWORD desc = 0, nodes = 0, nt = 0, arr = 0;
+    if (k < 0 || !ReadDword(b + 0x78, &desc) || !desc || !ReadDword(desc + 8, &nodes) || !nodes ||
+        !ReadDword(nodes + 28 * static_cast<DWORD>(k) + 0xc, &nt) || nt > 16 ||
+        !ReadDword(nodes + 28 * static_cast<DWORD>(k) + 0x10, &arr) || !arr)
+        return best;
+    for (DWORD j = 0; j < nt; ++j) {
+        DWORD tr = 0, cond = 0, target = 0;
+        float arg = 0.0f;
+        if (!ReadDword(arr + 4 * j, &tr) || !tr || !ReadDword(tr + 0x18, &cond) || cond != 1 ||
+            !ReadFloats(tr + 0x1c, &arg, 1) || !(arg >= 0.0f && arg < 1.0e6f))
+            continue;
+        ReadDword(tr + 4, &target);
+        const float rest = arg - t;
+        if (best < 0.0f || rest < best) { best = rest < 0.0f ? 0.0f : rest; *to = static_cast<LONG>(target); }
+    }
+    return best;
+}
+// the goo line of state b ("goo: leicht, naechster Tropfen 0.3 s"); false = not the goo graph (the caller uses UberText)
+bool UberGooText(DWORD b, bool de, char *o, size_t n) {
+    DWORD desc = 0, count = 0, trans = 0, node = 0;
+    char off[16];
+    if (!ReadDword(b + 0x78, &desc) || !desc || !ReadDword(desc + 4, &count) || count != 8) return false;
+    UberNodeName(b, 3, off, sizeof(off));
+    if (_stricmp(off, "goo_off")) return false;
+    ReadDword(b + 0x80, &trans);
+    ReadDword(b + 0x84, &node);
+    float t = 0.0f;
+    if (!ReadFloats(b + 0x88, &t, 1) || !(t > -1.0e6f && t < 1.0e6f)) t = 0.0f;
+    LONG k = static_cast<LONG>(node);
+    if (trans) {                             // a running transition: the mode of its target, the drop comes on entry
+        DWORD to = 0;
+        ReadDword(trans + 4, &to);
+        k = static_cast<LONG>(to);
+    }
+    const bool hard = k == 0 || k == 1 || k == 2, easy = k == 4 || k == 5 || k == 7;
+    if (k == 3) { Out(o, n, "%s", de ? "goo: aus (Befehl 0 = hart / 1 = leicht)" : "goo: off (command 0 = hard / 1 = easy)"); return true; }
+    if (k == 6) { Out(o, n, "%s", de ? "goo: ein Tropfen, dann aus" : "goo: one drop, then off"); return true; }
+    if (!hard && !easy) return false;
+    const char *mode = hard ? (de ? "hart (ohne Ausgang)" : "hard (no exit)")
+                            : k == 7 ? (de ? "leicht (Startpause)" : "easy (start pause)") : (de ? "leicht" : "easy");
+    LONG to = -1;
+    const float rest = trans ? 0.0f : UberTimedRest(b, k, t, &to);
+    char secs[24];
+    UberSeconds(rest < 0.0f ? 0.0f : rest, secs, sizeof(secs));
+    if (trans || rest < 0.0f) Out(o, n, de ? "goo: %s, Tropfen jetzt" : "goo: %s, drop now", mode);
+    else Out(o, n, de ? "goo: %s, naechster Tropfen %s" : "goo: %s, next drop %s", mode, secs);
+    return true;
+}
 // does the object name hold a part of [Debug] UberMatch
 bool UberNameMatch(const char *name) {
     char low[64], list[sizeof(g_ubMatch)];
@@ -6917,8 +7029,9 @@ void DrawUberLabels() {
         _strlwr_s(low, sizeof(low));
         const bool gate = strstr(low, "gate") != nullptr;
         Out(line1, sizeof(line1), "%s %ld | %.0f", name, static_cast<LONG>(intro), sqrtf(c.dist2));
-        if (c.state) UberText(c.state, gate, de, line2, sizeof(line2));
-        else Out(line2, sizeof(line2), "%s", de ? "(kein Uber-Zustand)" : "(no uber state)");
+        if (!c.state) Out(line2, sizeof(line2), "%s", de ? "(kein Uber-Zustand)" : "(no uber state)");
+        else if (!UberIsGoo(oid) || !UberGooText(c.state, de, line2, sizeof(line2)))   // 0.21.9 goo drips first
+            UberText(c.state, gate, de, line2, sizeof(line2));
         if (c.state && gate) {               // "Tor: oben, noch 12 s"
             char t[160];
             Out(t, sizeof(t), "%s: %s", de ? "Tor" : "Gate", line2);
@@ -6963,7 +7076,8 @@ bool RunUberDump(const char *, char *o, size_t n) {
         strncpy_s(low, sizeof(low), name, _TRUNCATE);
         _strlwr_s(low, sizeof(low));
         if (cand[i].state) {
-            UberText(cand[i].state, strstr(low, "gate") != nullptr, true, text, sizeof(text));
+            if (!UberIsGoo(oid) || !UberGooText(cand[i].state, true, text, sizeof(text)))   // 0.21.9 goo drips
+                UberText(cand[i].state, strstr(low, "gate") != nullptr, true, text, sizeof(text));
             ReadDword(cand[i].state + 0x84, &node);
             ReadDword(cand[i].state + 0x80, &trans);
             ReadDword(cand[i].state + 0x8c, &wait);
@@ -7601,28 +7715,53 @@ int NlCollect(const float *lara, NlCand *out, int max, int *areas) {
     }
     return count;
 }
-// the one-line legend of the engine's edge colours (top centre)
+// the legend of the engine's edge colours (top centre). 0.21.9 (docs\Befund-R17e-Goo-Navmesh-0811.md item 2 / 2b,
+// ENGINE.md section 15 "Area +0x30 bits" / "Area +0x34"): each colour with its meaning - bit 26 = custom area (hand-made,
+// not autogenerated), bit 27 = blocked by an obstacle (runtime only, set when the obstacle penalty reaches 15), +0x34
+// bits 8..11 = obstacle penalty multiplier (runtime), bits 12..15 = static multiplier (meaning unproven) - wrapped into rows
+// that fit the screen, and one hint row: a violet / lilac face is most likely TruMenu's dbg.enemycoll layer (TerrainGroup
+// flag 0x800), not the navmesh (r17e 2b, open: toggle dbg.enemycoll live)
 void NlLegend(bool de) {
     struct Part { ImU32 c; const char *de, *en; };
-    const Part parts[] = {{kNlColours[0], "gruen normal", "green plain"},
-                          {kNlColours[1], "rot Bit 27 (eine Seite)", "red bit 27 (either side)"},
-                          {IM_COL32(255, 160, 60, 255), "orange +0x34 b8-11 > 1", "orange +0x34 b8-11 > 1"},
-                          {kNlColours[3], "gelb +0x34 b12-15 > 1", "yellow +0x34 b12-15 > 1"},
-                          {IM_COL32(90, 140, 255, 255), "blau Bit 26 verschieden", "blue bit 26 differs"},
-                          {kNlColours[2], "magenta Bit 26", "magenta bit 26"},
+    const Part parts[] = {{kNlColours[0], "gruen normal (auto)", "green plain (autogen)"},
+                          {kNlColours[1], "rot Bit 27 = von Hindernis gesperrt (Laufzeit)", "red bit 27 = blocked by an "
+                                                                                           "obstacle (runtime)"},
+                          {IM_COL32(255, 160, 60, 255), "orange +0x34 b8-11 > 1 = Hindernis-Strafe", "orange +0x34 b8-11 > 1 = "
+                                                                                                    "obstacle penalty"},
+                          {kNlColours[3], "gelb +0x34 b12-15 > 1 = feste Strafe", "yellow +0x34 b12-15 > 1 = static penalty"},
+                          {IM_COL32(90, 140, 255, 255), "blau Bit 26 verschieden (custom / auto)", "blue bit 26 differs "
+                                                                                                  "(custom / autogen)"},
+                          {kNlColours[2], "magenta Bit 26 = custom (handgebaut)", "magenta bit 26 = custom (hand-made)"},
                           {IM_COL32(155, 155, 255, 255), "hellblau Kante 0x200", "light blue edge 0x200"}};
+    const int partN = static_cast<int>(sizeof(parts) / sizeof(parts[0]));
     ImGuiIO &io = ImGui::GetIO();
     ImDrawList *dl = ImGui::GetForegroundDrawList();
-    const float gap = 14.0f;
-    float w = 0.0f;
-    for (const Part &p : parts) w += ImGui::CalcTextSize(de ? p.de : p.en).x + gap;
-    float x = (io.DisplaySize.x - w) * 0.5f;
-    const float y = io.DisplaySize.y * 0.06f, h = ImGui::GetFontSize() + 6.0f;
-    dl->AddRectFilled(ImVec2(x - 6.0f, y - 3.0f), ImVec2(x + w, y + h), IM_COL32(0, 0, 0, 160), 4.0f);
-    for (const Part &p : parts) {
-        dl->AddText(ImVec2(x, y), p.c, de ? p.de : p.en);
-        x += ImGui::CalcTextSize(de ? p.de : p.en).x + gap;
+    const float gap = 14.0f, maxW = io.DisplaySize.x * 0.9f, h = ImGui::GetFontSize() + 6.0f;
+    float y = io.DisplaySize.y * 0.06f;
+    for (int first = 0; first < partN;) {    // one row of parts that fits maxW (at least one part)
+        int last = first;
+        float w = ImGui::CalcTextSize(de ? parts[first].de : parts[first].en).x + gap;
+        while (last + 1 < partN) {
+            const float next = ImGui::CalcTextSize(de ? parts[last + 1].de : parts[last + 1].en).x + gap;
+            if (w + next > maxW) break;
+            w += next;
+            ++last;
+        }
+        float x = (io.DisplaySize.x - w) * 0.5f;
+        dl->AddRectFilled(ImVec2(x - 6.0f, y - 3.0f), ImVec2(x + w, y + h), IM_COL32(0, 0, 0, 160), 4.0f);
+        for (int i = first; i <= last; ++i) {
+            dl->AddText(ImVec2(x, y), parts[i].c, de ? parts[i].de : parts[i].en);
+            x += ImGui::CalcTextSize(de ? parts[i].de : parts[i].en).x + gap;
+        }
+        y += h;
+        first = last + 1;
     }
+    const char *hint = de ? "lila / violette Flaeche ohne Etikett = wohl dbg.enemycoll (Gegner-Kollision), kein Navmesh"
+                          : "lilac / violet face without a label = probably dbg.enemycoll (enemy collision), not the navmesh";
+    const float hw = ImGui::CalcTextSize(hint).x;
+    const float hx = (io.DisplaySize.x - hw) * 0.5f;
+    dl->AddRectFilled(ImVec2(hx - 6.0f, y - 3.0f), ImVec2(hx + hw + 6.0f, y + h), IM_COL32(0, 0, 0, 160), 4.0f);
+    dl->AddText(ImVec2(hx, y), IM_COL32(200, 150, 255, 255), hint);
 }
 // Present, every frame while nav.labels is on
 void DrawNavLabels() {
@@ -7659,10 +7798,19 @@ void DrawNavLabels() {
             layer && ReadDword(layer + 0xc + 4 * static_cast<DWORD>(c.graph), &g) && g)
             ReadDword(g + 0x1c, &start);
         if (start != unitFor) { unitFor = start; NlUnitOf(start, unit, sizeof(unit)); }
-        char l1[120], l2[120];
-        Out(l1, sizeof(l1), "E%d.%d #%d%s%s", c.layer, c.graph, c.index, unit[0] ? " " : "", unit);
-        Out(l2, sizeof(l2), "27:%lu 26:%lu b8:%lu b12:%lu | %lu %s", (flags >> 27) & 1, (flags >> 26) & 1, (values >> 8) & 0xf,
-            (values >> 12) & 0xf, flags & 0x7f, de ? "Kanten" : "edges");
+        char l1[120], l2[160], isl[16], pen[40] = "";
+        // 0.21.9: the bits with their meaning (ENGINE.md section 15): island = +0x30 bits 7..16 (0x3ff = none), 27 =
+        // blocked by an obstacle (runtime), 26 = custom (hand-made), else autogen; +0x34 bits 8..11 obstacle / 12..15
+        // static penalty multiplier (shown when one is above 1); the raw bits stay at the end
+        const DWORD island = (flags >> 7) & 0x3ff, b8 = (values >> 8) & 0xf, b12 = (values >> 12) & 0xf;
+        if (island == 0x3ff) Out(isl, sizeof(isl), "-");
+        else Out(isl, sizeof(isl), "%lu", island);
+        if (b8 > 1 || b12 > 1) Out(pen, sizeof(pen), de ? " | Strafe x%lu / fest x%lu" : " | penalty x%lu / static x%lu", b8, b12);
+        Out(l1, sizeof(l1), "E%d.%d #%d%s%s %s %s", c.layer, c.graph, c.index, unit[0] ? " " : "", unit, de ? "Insel" : "island",
+            isl);
+        Out(l2, sizeof(l2), "%s%s%s | %lu %s | 27:%lu 26:%lu", (flags >> 27) & 1 ? (de ? "gesperrt (Hindernis) " : "blocked (obstacle) ") : "",
+            (flags >> 26) & 1 ? (de ? "custom (handgebaut)" : "custom (hand-made)") : (de ? "auto" : "autogen"), pen,
+            flags & 0x7f, de ? "Kanten" : "edges", (flags >> 27) & 1, (flags >> 26) & 1);
         LabelDraw(dl, at, l1, l2, kNlColours[NlFill(flags, values)]);
         ++g_nlShown;
     }
@@ -12093,6 +12241,7 @@ bool RunTestStep(const char *arg, char *o, size_t n) {
     return true;
 }
 
+void SwWhenNote(const char *target, char *o, size_t n);   // 0.21.9 (B7), section "0.21.5 Fixes"
 // 0.5 "<id> <target> <text>": a switch row; target = a TruMenu item (run with 1 / 0) or ini:<Plugin>:<Section>:<Key>
 bool RunTestToggle(const char *arg, char *o, size_t n) {
     char id[64] = "", target[128] = "";
@@ -12129,7 +12278,7 @@ bool RunTestToggle(const char *arg, char *o, size_t n) {
     strncpy_s(t.target, sizeof(t.target), target, _TRUNCATE);
     strncpy_s(t.hint, sizeof(t.hint), rest, _TRUNCATE);
     TestClean(t.hint);
-    if (isIni) strncpy_s(t.note, sizeof(t.note), "INI: takes effect at the next start", _TRUNCATE);
+    if (isIni) SwWhenNote(target, t.note, sizeof(t.note));   // 0.21.9 (B7): the switch's "when" column, not "next start"
     TestSaveLocked();
     int count = g_testCount;
     LeaveCriticalSection(&g_testLock);
@@ -12178,7 +12327,9 @@ bool TestToggleApply(const char *target, bool on, char *o, size_t n) {
             Out(o, n, "cannot write %s (%lu)", path, GetLastError());
             return false;
         }
-        Out(o, n, "[%s] %s=%d written to %s - takes effect at the next start", section, key, on ? 1 : 0, path);
+        char when[160];
+        SwWhenNote(target, when, sizeof(when));   // 0.21.9 (B7)
+        Out(o, n, "[%s] %s=%d written to %s - %s", section, key, on ? 1 : 0, path, when);
         return true;
     }
     if (!ItemUsable(target)) { Out(o, n, "unknown or todo item '%s'", target); return false; }
@@ -12796,6 +12947,21 @@ void ShortcutTick() {
                 g_scCount += k - 1;
             }
             _snprintf_s(g_scState, sizeof(g_scState), _TRUNCATE, "%s: unit.go %s - %s", g_scTitle, unit, how);
+            break;
+        }
+        // 0.21.9 (cp.jump): "dbg.cpgo <intro>" as a step runs its own two steps in place (cheat.flight 1, player.goto
+        // <intro>) - through CmdRunLine it would start a second shortcut over this one; "dbg.cpgo active" stays a command
+        if (!_strnicmp(step, "dbg.cpgo ", 9) && step[9] >= '0' && step[9] <= '9' &&
+            strspn(step + 9, "0123456789") == strlen(step + 9)) {
+            if (g_scCount + 1 > kScMaxSteps) { ShortcutStopLocked("stopped: dbg.cpgo needs more steps than fit"); break; }
+            char go[kScStepLen];
+            Out(go, sizeof(go), "player.goto %s", step + 9);   // (step is overwritten below)
+            --g_scIndex;                               // the two steps take the place of this one
+            for (int j = g_scCount - 1; j > g_scIndex; --j) memcpy(g_scSteps[j + 1], g_scSteps[j], kScStepLen);
+            strncpy_s(g_scSteps[g_scIndex], kScStepLen, "cheat.flight 1", _TRUNCATE);
+            strncpy_s(g_scSteps[g_scIndex + 1], kScStepLen, go, _TRUNCATE);
+            ++g_scCount;
+            Log(1, "shortcut '%s' %d/%d: dbg.cpgo -> cheat.flight 1;%s", g_scTitle, g_scIndex + 1, g_scCount, go);
             break;
         }
         if (!_strnicmp(step, "wait.unit ", 10)) {     // 0.20: a runner step, no item
@@ -19422,6 +19588,22 @@ bool SwIsLive(const SwRow &r) {
     if (!TestIniTarget(r.target, path, sizeof(path), sec, sizeof(sec), key, sizeof(key))) return false;
     return GetPrivateProfileIntA(r.section, r.whenKey, 0, path) != 0;
 }
+// 0.21.9 (TODO B7, docs\Inventur-2026-11-04.md: the TO TEST toggle note "INI: takes effect at the next start" was wrong for
+// live switches): when an INI target "ini:<Plugin>:<Section>:<Key>" takes effect - the "when" column of
+// TruMenu.switches.txt (live / restart / live-if:<Key> with that key's value now); not listed = unknown
+int SwFindLocked(const char *name);          // below
+void SwWhenNote(const char *target, char *o, size_t n) {
+    EnterCriticalSection(&g_swLock);
+    const int i = SwFindLocked(target);
+    SwRow r{};
+    if (i >= 0) r = g_sw[i];
+    LeaveCriticalSection(&g_swLock);
+    if (i < 0) { Out(o, n, "INI: not in TruMenu.switches.txt - when it takes effect is unknown (restart to be sure)"); return; }
+    if (r.when == kSwLive) Out(o, n, "INI: live (~1 s, TruMenu.switches.txt)");
+    else if (r.when == kSwRestart) Out(o, n, "INI: after a restart (TruMenu.switches.txt)");
+    else Out(o, n, "INI: live while %s=1 (now %s), else after a restart (TruMenu.switches.txt)", r.whenKey,
+             SwIsLive(r) ? "1" : "0");
+}
 // the next value: dir -1 / +1 (bool off / on, int one step down / up, choice the previous / next - stops at the end),
 // dir 2 = X (bool toggles, int / choice one step up and wrap to the first); false = no change ("end")
 bool SwNext(const SwRow &r, const char *cur, int dir, char *o, size_t n) {
@@ -20876,6 +21058,7 @@ bool RunDvCp(const char *arg, char *o, size_t n);
 bool RunDvCpAll(const char *arg, char *o, size_t n);
 void ValDvCpList(char *o, size_t n);
 bool RunDvCpGo(const char *arg, char *o, size_t n);
+bool RunCpJump(const char *arg, char *o, size_t n);   // 0.21.9
 void ValPos(char *o, size_t n);
 void ValPosList(char *o, size_t n);
 bool RunPosSave(const char *arg, char *o, size_t n);
@@ -21309,6 +21492,9 @@ const Item kItems[] = {
                            "ACTIVE, hidden", false, ValDvCpList, nullptr},
     {"dbg.cpgo", "action", "0.17 <intro id>|active: flight on, then Lara to that checkpoint (cheat.flight 1 + player.goto as "
                            "a two-step shortcut)", false, ValDvCp, RunDvCpGo},
+    {"cp.jump", "action", "0.21.9 <unit> <checkpoint intro id>: save.backup kapitel, unit.go <unit>, wait.unit <unit>, "
+                          "dbg.cpgo <id> as one shortcut (page Kapitel checkpoint rows, page Tests test spots)", false,
+     ValShortcut, RunCpJump},
     {"pos.save", "action", "0.17 [name]: Lara's unit, live position, yaw, the unit's shift and origin into "
                            "TruMenu.positions.txt next to tru.exe", false, ValPos, RunPosSave},
     {"pos.list", "info", "0.17: the saved positions (TruMenu.positions.txt)", false, ValPosList, nullptr},
@@ -21754,7 +21940,7 @@ DWORD g_cmdVideosTick = 0;
 template <typename F> void CmdArgValues(const char *id, F fn) {
     if (CmdKindOf(id) == kCkBool) { fn("1", "on"); fn("0", "off"); return; }
     if (!_stricmp(id, "level.load")) {
-        for (int i = 0; i < kUnitCount; ++i) fn(kUnits[i].unit, kUnits[i].group);
+        for (int i = 0; i < kUnitCount; ++i) fn(kUnits[i].unit, UnitNoDrm(i) ? "no .drm in mods" : kUnits[i].group);
     } else if (!_stricmp(id, "level.start")) {          // 0.7.1
         fn("dlc2", "dlc_level2_start, intro plays");
         fn("dlc1", "dlc_level1_start, intro plays");
@@ -22016,6 +22202,7 @@ const CmdDanger kCmdDanger[] = {
     {"level.start", "startet eine Mission neu", "starts a mission"},
     {"level.reload", "laedt das Level neu", "reloads the level"},
     {"unit.go", "laedt evtl. einen Abschnitt", "may load a unit"},
+    {"cp.jump", "Sicherung, laedt evtl. einen Abschnitt", "backup, may load a unit"},   // 0.21.9
     {"pos.goload", "laedt evtl. einen Abschnitt", "may load a unit"},
     {"regress.prepare", "laedt / setzt einen Teststand", "loads / sets a test state"},
     {"save.load", "laedt einen Spielstand", "loads a save"},
@@ -24830,6 +25017,10 @@ void PageLevel() {
         if (ImGui::TreeNode(head)) {
             for (int k = i; k < i + count; ++k) {
                 char label[96];
+                if (UnitNoDrm(k)) {          // 0.21.9: no mods\<unit>.drm - grey, not loadable
+                    ImGui::TextDisabled("%s  (keine .drm / no .drm in mods)", kUnits[k].unit);
+                    continue;
+                }
                 _snprintf_s(label, sizeof(label), _TRUNCATE, "%s##unit%d", kUnits[k].unit, k);
                 if (TmButton(label)) QueueItem("level.load", kUnits[k].unit);
                 if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", kUnits[k].path);
@@ -25412,6 +25603,15 @@ const QbRow kQbTests[] = {
     {"Letzte laden + hin", "Load the last + go", "pos.goload", "last", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Aktiver Checkpoint", "Active checkpoint", "dbg.cpgo", "active", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    // 0.21.9 test spots (docs\Befund-17i-Menue-Luecken-0811.md, first gap row; the tour file is full - 256 of 256 ring
+    // entries with the built-ins): right twice = backup, then into the unit and to the checkpoint (cp.jump) / load
+    {"Teststellen (rechts 2x)", "Test spots (right 2x)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
+    {"End-Szene (020_ghoul)", "End scene (020_ghoul)", "cp.jump", "dlc_yggdrasil_end 9608", kQbAction, -1, kQcNone, 0,
+     kQbRed, kQfConfirm},
+    {"Boden 25057 (CP 9970)", "Floor 25057 (CP 9970)", "cp.jump", "dlc_yggdrasil_end 9970", kQbAction, -1, kQcNone, 0,
+     kQbRed, kQfConfirm},
+    {"Zeremonienraum 030_pod", "Ceremony room 030_pod", "level.load", "dlc2_ceremony_room", kQbAction, -1, kQcNone, 0,
+     kQbRed, kQfConfirm | kQfBackup},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
     {"hall02-Zaehler (Tutorial-Kampf)", "hall02 counter (tutorial fight)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
@@ -25510,6 +25710,15 @@ const QbHelp kQbHelp[] = {
     {"time.freezeclock", "", "Shader-Uhr steht mit der Welt (Wasser, Licht)|Shader clock stops with the world (water, "
                              "light)"},
     {"costume.next", "", "Naechstes Kostuem der Wechsel-Liste des Spiels|Next costume of the game's cycle list"},
+    // 0.21.9 test spots of page Tests (Befund 17i) and the shot key (installed TruMenu.ini [Shot] Hotkey=0x7A)
+    {"cp.jump", "dlc_yggdrasil_end 9608", "CP 9608 liegt wohl im Trigger 10026: 020_ghoul sofort|CP 9608 is likely inside "
+                                          "trigger 10026: 020_ghoul at once"},
+    {"cp.jump", "dlc_yggdrasil_end 9970", "Naechster Daten-CP zum Boden 25057, ~1300 Einheiten weg|Nearest data CP to "
+                                          "floor 25057, ~1300 units away"},
+    {"level.load", "dlc2_ceremony_room", "Sicherung, dann Zeremonienraum laden (Szene 030_pod)|Backup, then load the "
+                                         "ceremony room (scene 030_pod)"},
+    {"shot.save", "*", "Foto jetzt; Taste F11 ([Shot] Hotkey) = Marke + Foto|Shot now; key F11 ([Shot] Hotkey) = mark + "
+                       "shot"},
     {"level.load", "*", "Sicherung, dann Kapitel-Start laden (debug, keine Story)|Backup, then load the chapter start "
                         "(debug, no story values)"},
 };
@@ -26979,8 +27188,17 @@ void DrawQuick() {
     bool result = g_qbResult[0] && GetTickCount() - g_qbResultTick < 5000;
     if (result) Out(foot, sizeof(foot), "%s", g_qbResult);
     else if (!QbFootHint(g_qbPage, sel, de, foot, sizeof(foot)))   // 0.21.6: else the selected row's keys (flight, costumes)
+    {
         Out(foot, sizeof(foot), "%s", de ? "hoch / runter: Zeile   links / rechts: aus / an   LB / RB: Seite"
                                           : "up / down: row   left / right: off / on   LB / RB: page");
+        if (g_shotEnabled && g_shotKey) {    // 0.21.9 (Befund 17i "F11 steht nirgends"): the [Shot] Hotkey
+            char key[24], more[48];
+            if (g_shotKey >= 0x70 && g_shotKey <= 0x87) Out(key, sizeof(key), "F%d", g_shotKey - 0x6f);
+            else Out(key, sizeof(key), "0x%02X", g_shotKey);
+            Out(more, sizeof(more), "   %s: %s", key, de ? "Foto + Marke" : "shot + mark");
+            strncat_s(foot, sizeof(foot), more, _TRUNCATE);
+        }
+    }
     // 0.21.3: the X / Y hint on the line that a result never replaces; 0.21.7: "Y: -" where Y is refused (QbFavOk, the
     // rule of QbFavPin), the command line key (L3) when [Cmd] Enabled, and a warning while the game polls the pad past
     // PadHook (front end: the bar cannot keep its buttons from the game then - TODO "Leiste sperrt das Pad ...")
@@ -27490,6 +27708,31 @@ bool RunDvCpGo(const char *arg, char *o, size_t n) {
     Log(1, "dbg.cpgo %ld: %s (src=%s)", intro, steps, ShotSource("dbg.cpgo"));
     return ShortcutStart(steps, title, o, n);
 }
+// 0.21.9 cp.jump <unit> <checkpoint intro> (docs\Befund-17i-Menue-Luecken-0811.md "Abschnitte als Checkpoint-Spruenge":
+// "Sicherung -> level.load -> wait.unit -> dbg.cpgo"): one shortcut of the 0.8.1 runner - save.backup kapitel, unit.go
+// <unit> (the stream portal when the unit is loaded, nothing when Lara is in it, else level.load - the runner decides
+// when the step comes), wait.unit <unit>, dbg.cpgo <intro> (in a shortcut run in place as cheat.flight 1 + player.goto,
+// ShortcutTick). Debug: no story value is set; the page Kapitel / Tests rows ask right twice (kQfConfirm).
+bool RunCpJump(const char *arg, char *o, size_t n) {
+    char unit[64] = "", rest[16] = "";
+    if (!arg || sscanf_s(arg, "%63s %15s", unit, static_cast<unsigned>(sizeof(unit)), rest,
+                         static_cast<unsigned>(sizeof(rest))) != 2) {
+        Out(o, n, "usage: cp.jump <unit> <checkpoint intro id> (backup, unit.go, wait.unit, dbg.cpgo)");
+        return false;
+    }
+    char *end = nullptr;
+    const long intro = strtol(rest, &end, 10);
+    if (!end || *end || intro <= 0) { Out(o, n, "cp.jump: '%s' is no intro id", rest); return false; }
+    if (UnitIndexOf(unit) < 0) { Out(o, n, "cp.jump: %s is not in the level list (level.load values)", unit); return false; }
+    if (UnitNameNoDrm(unit)) { Out(o, n, "cp.jump: %s has no .drm in mods - not loadable", unit); return false; }
+    char why[200];
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: level change pending (%s)", why); return false; }
+    char steps[200], title[64];
+    Out(steps, sizeof(steps), "save.backup kapitel;unit.go %s;wait.unit %s;dbg.cpgo %ld", unit, unit, intro);
+    Out(title, sizeof(title), "CP %ld (%s)", intro, unit);
+    Log(1, "cp.jump %s %ld: %s (src=%s)", unit, intro, steps, ShotSource("cp.jump"));
+    return ShortcutStart(steps, title, o, n);
+}
 
 // ---- 0.17 position bookmarks ----
 // Coordinator, live 2026-11-06: a teleport to converted coordinates of l3_main_hall from l3_main_bedroom ended in the void
@@ -27771,7 +28014,8 @@ enum QbDynKind { kQdNone = 0, kQdPos, kQdCpActive, kQdCpAll, kQdCp, kQdBackupNow
                  kQdItem, kQdPrepare, kQdStop, kQdTodo,     // 0.21.1: page 0 rows, page Tests rows
                  kQdSwGroup, kQdSw,                         // 0.21.5: page Fixes (group, switch)
                  kQdCosPick, kQdCosNext, kQdCosRec, kQdCosGroup, kQdCos,     // 0.21.6: page Kostueme
-                 kQdChapGroup, kQdChap };                   // 0.21.7: page Kapitel (units per chapter)
+                 kQdChapGroup, kQdChap,                     // 0.21.7: page Kapitel (units per chapter)
+                 kQdChapCp };                               // 0.21.9: page Kapitel, a checkpoint of the open unit
 struct QbDyn { int kind; LONG intro; char arg[64], unit[48]; bool loaded; };
 QbDyn g_qbDyn[kQbViewMax];
 int g_qbDynN = 0;
@@ -28604,6 +28848,7 @@ void QbCosAct(const QbDyn &q, int dir) {
     }
 }
 // the footer's first line while a row is selected and no answer is shown: the row's keys (static rows: QbRowHint)
+bool ChapFootHint(const QbDyn &q, bool de, char *o, size_t n);   // 0.21.9, section "0.21.7 chapter units"
 bool QbFootHint(int page, int sel, bool de, char *o, size_t n) {
     if (page < 0 || page >= kQbPageN || sel < 0 || sel >= g_qbViewN) return false;
     const QbPage &p = kQbPages[page];
@@ -28613,6 +28858,7 @@ bool QbFootHint(int page, int sel, bool de, char *o, size_t n) {
         const QbRow *r = QbSpecialRow(k);
         return r && QbRowHint(*r, de, o, n);
     }
+    if (p.special == kQsChapters) return k >= 0 && k < g_qbDynN && ChapFootHint(g_qbDyn[k], de, o, n);   // 0.21.9
     if (p.special != kQsCostume || k < 0 || k >= g_qbDynN) return false;
     const char *t = nullptr;
     switch (g_qbDyn[k].kind) {
@@ -28654,6 +28900,73 @@ const int kChapGroupN = static_cast<int>(sizeof(kChapGroups) / sizeof(kChapGroup
 const char *const kChapDlc2Start = "dlc_level2_start";
 int g_chapOpen = -1;                         // the open group (-1 = none; render thread, kept until the game ends)
 QbRow g_chapRow[kQbViewMax];                 // the unit rows of this frame (level.load <unit>, confirm + backup)
+// 0.21.9 (docs\Befund-17i-Menue-Luecken-0811.md "Abschnitte je DLC (Checkpoint-Objekte 83 / 1036)", data
+// work\menu17i_0811\dlc_intros_all.txt): the DLC 1 / DLC 2 units in play order instead of alphabetical, each with the
+// checkpoint intros of its unit (object 83 checkpoint / 1036 dlc2_checkpoint; in the order of their +0x52 index, the
+// 17i path order where the finding names one - hall02 11258 / 10644 / 11259). DLC 2: level2_start -> hall01 -> hall02 ->
+// end -> ceremony_room -> the ring machine_ceremony / machine_room / goo_machine / goo_room / ceremony_goo (one loop over
+// the stream portals back to ceremony_room; its direction is not in the data: "Rundweg") -> treasure_room_cine (no
+// checkpoint, the finale cinematics 045 / 050). DLC 1: level1_start -> caverns -> caverns_hall -> water_wheel -> pillory
+// -> dungeonhalla / dungeonhallb -> watertunnel -> dungeon -> treasureroom (from caverns_hall on from the portal graph);
+// the two units without a DRM last. A group unit missing here would follow in kUnits order (none today). Left on a unit
+// row opens its checkpoints (one unit at a time), a checkpoint row runs cp.jump <unit> <intro> (right twice).
+struct ChapOrder { const char *group, *unit; bool ring; const char *cps; };   // cps: intro ids, space separated
+const ChapOrder kChapOrder[] = {
+    {"DLC 2", "dlc_level2_start", false, "9400 11277 9733 11278"},
+    {"DLC 2", "dlc_yggdrasil_hall01", false, "10626"},
+    {"DLC 2", "dlc_yggdrasil_hall02", false, "11258 10644 11259"},
+    {"DLC 2", "dlc_yggdrasil_end", false, "10036 9953 9970 9608"},
+    {"DLC 2", "dlc2_ceremony_room", false, "11845 11847 11848 11849 11850 11851 11852 11853 11854"},
+    {"DLC 2", "dlc2_hall_machine_ceremony", true, "19313 11774 11775 11777 11778 11779 12235"},
+    {"DLC 2", "dlc2_machine_room", true, "11696 11697 11698 11699 11700 11701 11702 11703 11704 10204 10217 11669 10222 "
+                                         "11675 10486 11684 10487 11705"},
+    {"DLC 2", "dlc2_hall_goo_machine", true, "11595 11596 11597"},
+    {"DLC 2", "dlc2_goo_room", true, "11457 11458 11459 11460 11461 11462 11463 11464 12017 11433"},
+    {"DLC 2", "dlc2_hall_ceremony_goo", true, "11316 11317 11318 11319 11320"},
+    {"DLC 2", "dlc2_treasure_room_cine", false, ""},
+    {"DLC 1", "dlc_level1_start", false, "12241"},
+    {"DLC 1", "dlc_caverns", false, "9847 9848 9849"},
+    {"DLC 1", "dlc_caverns_hall", false, "9817"},
+    {"DLC 1", "dlc_water_wheel", false, "9751 9857 9752"},
+    {"DLC 1", "dlc_pillory", false, "9706 9707 9708 9709 9710 9718"},
+    {"DLC 1", "dlc_dungeonhalla", false, "9676 9677 9717"},
+    {"DLC 1", "dlc_dungeonhallb", false, "12245 9411 9590"},
+    {"DLC 1", "dlc_watertunnel", false, "9433"},
+    {"DLC 1", "dlc_dungeon", false, "9444 9445 9446 9447 10657 10658 10659"},
+    {"DLC 1", "dlc_treasureroom", false, ""},
+    {"DLC 1", "dlc_level1_left", false, ""},
+    {"DLC 1", "dlc_level1_right", false, ""},
+};
+int g_chapCpOpen = -1;                       // 0.21.9: the kUnits index whose checkpoints are shown (-1 = none)
+char g_chapCpArg[kQbViewMax][72];            // 0.21.9: the cp.jump arguments of this frame's checkpoint rows
+const ChapOrder *ChapOrderOf(int unit) {
+    if (unit < 0 || unit >= kUnitCount) return nullptr;
+    for (const ChapOrder &c : kChapOrder)
+        if (!_stricmp(c.unit, kUnits[unit].unit)) return &c;
+    return nullptr;
+}
+int ChapCpCount(const ChapOrder *c) {
+    int count = 0;
+    for (const char *p = c ? c->cps : ""; *p; ++p)
+        if (*p != ' ' && (p == c->cps || p[-1] == ' ')) ++count;
+    return count;
+}
+// the units of group g in page order: kChapOrder first (play order), then the group's other units of kUnits
+int ChapUnits(int g, int *out, int max) {
+    const char *key = kChapGroups[g].key;
+    int n = 0;
+    for (const ChapOrder &c : kChapOrder) {
+        const int i = strcmp(c.group, key) ? -1 : UnitIndexOf(c.unit);
+        if (i >= 0 && !strcmp(kUnits[i].group, key) && n < max) out[n++] = i;
+    }
+    for (int i = 0; i < kUnitCount && n < max; ++i) {
+        if (strcmp(kUnits[i].group, key)) continue;
+        bool have = false;
+        for (int j = 0; j < n && !have; ++j) have = out[j] == i;
+        if (!have) out[n++] = i;
+    }
+    return n;
+}
 // a DLC 2 unit that is not the DLC 2 start: a direct load may skip the doppelganger setup
 bool ChapDlc2Note(int unit) {
     return unit >= 0 && unit < kUnitCount && !strcmp(kUnits[unit].group, "DLC 2") && _stricmp(kUnits[unit].unit, kChapDlc2Start);
@@ -28663,8 +28976,8 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
     PosLaraUnit(lara, sizeof(lara));
     int n = 0, rows = 0;
     for (int g = 0; g < kChapGroupN && n < max; ++g) {
-        int count = 0;
-        for (int i = 0; i < kUnitCount; ++i) count += !strcmp(kUnits[i].group, kChapGroups[g].key);
+        int order[kUnitCount];               // 0.21.9: play order for DLC 1 / DLC 2 (kChapOrder)
+        const int count = ChapUnits(g, order, kUnitCount);
         const bool open = g_chapOpen == g;
         QbView &w = v[n];
         QbDyn &q = d[n];
@@ -28681,8 +28994,15 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
         q.intro = g;
         ++n;
         if (!open) continue;
-        for (int i = 0; i < kUnitCount && n < max && rows < kQbViewMax; ++i) {
-            if (strcmp(kUnits[i].group, kChapGroups[g].key)) continue;
+        bool ringShown = false;
+        for (int j = 0; j < count && n < max && rows < kQbViewMax; ++j) {
+            const int i = order[j];
+            const ChapOrder *co = ChapOrderOf(i);   // 0.21.9: ring mark, checkpoints
+            if (co && co->ring && !ringShown) {  // 0.21.9: the loop's units under one heading
+                QbDynLabel(&v[n], &d[n], de ? "Rundweg (Richtung nicht in den Daten)" : "Loop (direction not in the data)");
+                ringShown = true;
+                if (++n >= max) break;
+            }
             QbRow &r = g_chapRow[rows];
             r = {kUnits[i].unit, kUnits[i].unit, "level.load", kUnits[i].unit, kQbAction, -1, kQcNone, 0, kQbChapter,
                  kQfConfirm | kQfBackup};
@@ -28694,19 +29014,70 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
             char key[160];
             Out(key, sizeof(key), "%d/%s %s", g_qbPage, r.id, r.arg);   // QbActRow's confirmation key
             const bool armed = QbArmed(key), note = ChapDlc2Note(i), here = lara[0] && !_stricmp(lara, kUnits[i].unit);
-            Out(x.name, sizeof(x.name), "  %s", kUnits[i].unit);
-            Out(x.state, sizeof(x.state), "%s", armed ? (de ? "nochmal rechts!" : "right again!") : (de ? "rechts 2x" : "right 2x"));
-            Out(x.count, sizeof(x.count), "%s", here ? (de ? "Lara hier" : "Lara here") : note ? (de ? "Doppel-Zustand?" : "doppel state?") : "");
-            x.col = here ? IM_COL32(150, 240, 150, 255) : kQbChapter;
-            x.stateCol = armed ? IM_COL32(255, 110, 90, 255) : note ? IM_COL32(255, 190, 90, 255) : IM_COL32(235, 235, 235, 255);
+            const bool noDrm = UnitNoDrm(i);     // 0.21.9: grey, not loadable
+            const int cps = ChapCpCount(co);
+            const bool cpOpen = cps > 0 && g_chapCpOpen == i;
+            char more[48] = "";
+            if (cps) Out(more, sizeof(more), "  %s %d CP", cpOpen ? "[-]" : "[+]", cps);
+            Out(x.name, sizeof(x.name), "  %s%s%s", kUnits[i].unit, co && co->ring ? (de ? " (Rundweg)" : " (loop)") : "", more);
+            Out(x.state, sizeof(x.state), "%s", noDrm ? (de ? "keine .drm" : "no .drm") : armed ? (de ? "nochmal rechts!" : "right again!")
+                                                : cps ? (de ? "rechts 2x, links: CP" : "right 2x, left: CP") : (de ? "rechts 2x" : "right 2x"));
+            Out(x.count, sizeof(x.count), "%s", here ? (de ? "Lara hier" : "Lara here") : noDrm ? (de ? "nicht ladbar" : "not loadable")
+                                                : note ? (de ? "Doppel-Zustand?" : "doppel state?") : "");
+            x.col = noDrm ? IM_COL32(130, 130, 130, 255) : here ? IM_COL32(150, 240, 150, 255) : kQbChapter;
+            x.stateCol = noDrm ? IM_COL32(130, 130, 130, 255) : armed ? IM_COL32(255, 110, 90, 255) : note ? IM_COL32(255, 190, 90, 255)
+                                                                                                       : IM_COL32(235, 235, 235, 255);
             y.kind = kQdChap;
             y.intro = rows++;
             y.loaded = note;
             strncpy_s(y.unit, sizeof(y.unit), kUnits[i].unit, _TRUNCATE);
             ++n;
+            if (!cpOpen) continue;
+            // 0.21.9: the open unit's checkpoints - cp.jump <unit> <intro> (backup, unit.go, wait.unit, dbg.cpgo), right 2x
+            char ids[160];
+            strncpy_s(ids, sizeof(ids), co->cps, _TRUNCATE);
+            char *context = nullptr;
+            for (char *id = strtok_s(ids, " ", &context); id && n < max && rows < kQbViewMax; id = strtok_s(nullptr, " ", &context)) {
+                Out(g_chapCpArg[rows], sizeof(g_chapCpArg[rows]), "%s %s", kUnits[i].unit, id);
+                QbRow &c = g_chapRow[rows];
+                c = {kUnits[i].unit, kUnits[i].unit, "cp.jump", g_chapCpArg[rows], kQbAction, -1, kQcNone, 0, kQbChapter,
+                     kQfConfirm};
+                QbView &cx = v[n];
+                QbDyn &cy = d[n];
+                memset(&cx, 0, sizeof(cx));
+                memset(&cy, 0, sizeof(cy));
+                cx.src = -1;
+                Out(key, sizeof(key), "%d/%s %s", g_qbPage, c.id, c.arg);
+                const bool cpArmed = QbArmed(key);
+                const bool ghoul = !_stricmp(kUnits[i].unit, "dlc_yggdrasil_end") && !strcmp(id, "9608");
+                Out(cx.name, sizeof(cx.name), "      CP %s", id);
+                Out(cx.state, sizeof(cx.state), "%s", cpArmed ? (de ? "nochmal rechts!" : "right again!") : (de ? "rechts 2x" : "right 2x"));
+                Out(cx.count, sizeof(cx.count), "%s", ghoul ? (de ? "020_ghoul sofort" : "020_ghoul at once") : "");
+                cx.col = kQbChapter;
+                cx.stateCol = cpArmed ? IM_COL32(255, 110, 90, 255) : IM_COL32(235, 235, 235, 255);
+                cy.kind = kQdChapCp;
+                cy.intro = rows++;
+                cy.loaded = note;
+                strncpy_s(cy.unit, sizeof(cy.unit), kUnits[i].unit, _TRUNCATE);
+                strncpy_s(cy.arg, sizeof(cy.arg), id, _TRUNCATE);
+                ++n;
+            }
         }
     }
     return n;
+}
+// 0.21.9: the footer's key line on page Kapitel (unit rows with checkpoints, checkpoint rows, units without a DRM)
+bool ChapFootHint(const QbDyn &q, bool de, char *o, size_t n) {
+    const int u = UnitIndexOf(q.unit);
+    const char *t = nullptr;
+    if (q.kind == kQdChapCp) t = de ? "rechts 2x: Sicherung, Unit, Flug + Checkpoint" : "right 2x: backup, unit, flight + checkpoint";
+    else if (q.kind != kQdChap) return false;
+    else if (UnitNoDrm(u)) t = de ? "keine .drm in mods - nicht ladbar" : "no .drm in mods - not loadable";
+    else if (ChapCpCount(ChapOrderOf(u))) t = de ? "rechts 2x: Sicherung + laden   links: Checkpoints auf / zu"
+                                                 : "right 2x: backup + load   left: checkpoints open / close";
+    else return false;
+    Out(o, n, "%s", t);
+    return true;
 }
 // page Kapitel: right / left / X (dir kQbXDir) on a group or a unit row
 void QbChapAct(const QbDyn &q, int dir) {
@@ -28727,6 +29098,20 @@ void QbChapAct(const QbDyn &q, int dir) {
     const int k = static_cast<int>(q.intro);
     if (k < 0 || k >= kQbViewMax) return;
     const QbRow &r = g_chapRow[k];
+    if (q.kind == kQdChap) {                 // 0.21.9: units without a DRM; left = the unit's checkpoints
+        const int u = UnitIndexOf(q.unit);
+        if (UnitNoDrm(u)) {
+            QbResult(true, "%s: %s", q.unit, de ? "keine .drm in mods - nicht ladbar" : "no .drm in mods - not loadable");
+            return;
+        }
+        if (dir == -1 && ChapCpCount(ChapOrderOf(u))) {
+            const bool open = g_chapCpOpen != u;
+            g_chapCpOpen = open ? u : -1;    // one unit's checkpoints at a time
+            QbResult(false, "%s: %s", q.unit, open ? (de ? "Checkpoints auf (rechts 2x = hin)" : "checkpoints open (right 2x = go)")
+                                                   : (de ? "Checkpoints zu" : "checkpoints closed"));
+            return;
+        }
+    }
     char key[160];
     Out(key, sizeof(key), "%d/%s %s", g_qbPage, r.id, r.arg);
     const bool first = dir != -1 && !QbArmed(key);
@@ -28736,9 +29121,20 @@ void QbChapAct(const QbDyn &q, int dir) {
                                              "rechts / X nochmal = laden" : "doppelganger state may be missing (better the "
                                              "DLC 2 start + walk) - right / X again = load");
 }
-// the help line of a unit row
+// the help line of a unit row (0.21.9: also of a checkpoint row)
 bool ChapHelp(const QbDyn &q, bool de, char *o, size_t n) {
-    if (q.loaded) Out(o, n, "%s", de ? "Direkt laden setzt die Doppelgaengerin evtl. nicht auf" : "A direct load may not set "
+    if (q.kind == kQdChapCp) {               // 0.21.9
+        if (!_stricmp(q.unit, "dlc_yggdrasil_end") && !strcmp(q.arg, "9608"))
+            Out(o, n, "%s", de ? "CP 9608 liegt wohl im Trigger 10026: 020_ghoul sofort" : "CP 9608 is likely inside trigger "
+                                 "10026: 020_ghoul at once");
+        else Out(o, n, "%s", de ? "Sicherung, dann in die Unit und zum Checkpoint (Flug an)" : "Backup, then into the unit "
+                                  "and to the checkpoint (flight on)");
+        return true;
+    }
+    if (UnitNameNoDrm(q.unit))               // 0.21.9
+        Out(o, n, "%s", de ? "Keine .drm in mods: nur in unitlist.txt, nicht ladbar" : "No .drm in mods: in unitlist.txt "
+                             "only, not loadable");
+    else if (q.loaded) Out(o, n, "%s", de ? "Direkt laden setzt die Doppelgaengerin evtl. nicht auf" : "A direct load may not set "
                                       "up the doppelganger state");
     else Out(o, n, "%s", de ? "Sicherung, dann diese Unit laden (debug, keine Story-Werte)" : "Backup, then load this unit "
                               "(debug, no story values)");
@@ -28765,7 +29161,7 @@ bool QbDynFav(int k, char *id, size_t idN, char *arg, size_t argN) {
         Out(arg, argN, "%ld", q.intro);
         return true;
     }
-    if (q.kind == kQdChap && q.intro >= 0 && q.intro < kQbViewMax) {
+    if (q.kind == kQdChap && q.intro >= 0 && q.intro < kQbViewMax && !UnitNameNoDrm(q.unit)) {   // 0.21.9: not without a DRM
         Out(id, idN, "level.load");
         Out(arg, argN, "%s", g_chapRow[q.intro].arg);
         return FavArgOk(arg);
@@ -28806,7 +29202,7 @@ bool QbHelpLine(int page, int sel, bool de, char *o, size_t n) {
         LeaveCriticalSection(&g_swLock);
         return o[0] != 0;
     }
-    if (q.kind == kQdChap) return ChapHelp(q, de, o, n);   // 0.21.7 page Kapitel: the unit notes
+    if (q.kind == kQdChap || q.kind == kQdChapCp) return ChapHelp(q, de, o, n);   // 0.21.7 page Kapitel (0.21.9: + CP rows)
     const char *t = nullptr;
     switch (q.kind) {
     case kQdCosPick: t = de ? "Kostuem live wechseln, ohne die Unit neu zu laden" : "Switch the costume live, no unit reload";
@@ -28896,6 +29292,7 @@ void QbSpecialAct(int special, int row, int dir) {
         return;
     case kQdChapGroup:                       // 0.21.7 page Kapitel (X = kQbXDir: a group toggles, a unit = right)
     case kQdChap:
+    case kQdChapCp:                          // 0.21.9: a checkpoint of the open unit (cp.jump)
         QbChapAct(q, dir);
         return;
     case kQdPos:
@@ -31328,7 +31725,8 @@ void Start(HMODULE self) {
     UberCheck();                              // 0.21.7 uber labels (precheck_0217.txt)
     ShaderCheck();                            // 0.21.7 shader labels (precheck_0217.txt = precheck_shaderlabel.txt rows)
     NavLabelCheck();                          // 0.21.7 navmesh labels (precheck_0217.txt)
-    SapCheck();                               // 0.21.7 SweepAndPrune read-out (precheck_0217_sap.txt)
+    UnitDrmScan();                            // 0.21.9 DLC units without mods\<unit>.drm (file tests only)
+    SapCheck();                              // 0.21.7 SweepAndPrune read-out (precheck_0217_sap.txt)
     RenderModeCheck();                       // 0.15 render mode (precheck_015.txt) - before 0.14: the R2 layers' check
     DebugViewCheck();                         // 0.14 debug view (precheck_014.txt)
     ReadabilityCheck();                       // 0.16 depth / Lara in / owner units (precheck_016.txt) - after 0.15 / 0.14

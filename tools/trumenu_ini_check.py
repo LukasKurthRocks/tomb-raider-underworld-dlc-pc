@@ -2414,8 +2414,9 @@ def check_0218(ini_path, switches_path):
     kCmdDanger asks twice), favourites with an argument + star, story values (read only), sound group sliders"""
     problems = []
     src = open(CPP, encoding='utf-8').read()
-    if not src.startswith('//') or 'const char *const kVersion = "TruMenu 0.21.8 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.21.8 ("')
+    # 0.21.9: the version line keeps the 0.21.8 part (as check_0217 reads its own part)
+    if not src.startswith('//') or '0.21.8 (quick command line' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.21.8 part "0.21.8 (quick command line"')
     # 1 byte checks vs the patch sites of TruShadowCombat 0.6.5
     joined = re.sub(r'"\s*\n\s*"', '', src)
     rows = [(int(a, 16), len(re.sub(r'[^0-9a-fA-F]', '', h)) // 2) for a, h in

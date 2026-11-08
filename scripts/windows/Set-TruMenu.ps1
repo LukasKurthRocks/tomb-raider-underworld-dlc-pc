@@ -26,6 +26,10 @@
     0.21.7: also the shader label data TruMenu.shaderlabel.txt (tools/shader_labels.py build; generated locally, never
              in the repository) from the build folder when present, as the media list (ours = first line starts with
              "# shaderlabel v1"); missing = shader.labels stays empty.
+    0.21.9: -ShaderLabelFile <path> installs that shader label data file (e.g. a variant of
+             work\shader17c_0811\trumenu\<variant>\TruMenu.shaderlabel.txt) as TruMenu.shaderlabel.txt instead of the one
+             in the build folder; it must start with "# shaderlabel v1" (checked before anything is copied). Without the
+             parameter nothing changes.
     0.11: the flow file TruMenu.flow.txt next to tru.exe belongs to a test profile (its "flowFile", installed by
              Invoke-TruTestRun.ps1 after this script): -Install and -Remove both delete one of ours (first line starts
              with "# TruMenu flow") so no flow of an earlier run is left; a foreign file of that name is kept.
@@ -37,8 +41,13 @@
 .PARAMETER GamePath
     Game folder; default: found through the Steam libraries.
 
+.PARAMETER ShaderLabelFile
+    0.21.9, -Install only: a shader label data file to install as TruMenu.shaderlabel.txt instead of the build folder's
+    (first line "# shaderlabel v1"). Default: the build folder's file as before.
+
 .EXAMPLE
     .\Set-TruMenu.ps1 -Install -Verbose
+    .\Set-TruMenu.ps1 -Install -SourceDir .\work\asi\menu0219 -ShaderLabelFile .\work\shader17c_0811\trumenu\stack_n5mats_n6_17c\TruMenu.shaderlabel.txt
     .\Set-TruMenu.ps1 -Remove
 #>
 [CmdletBinding(DefaultParameterSetName = 'Install')]
@@ -47,6 +56,7 @@ param(
     [Parameter(ParameterSetName = 'Remove', Mandatory)][switch]$Remove,
     [string]$GamePath,
     [string]$SourceDir,
+    [Parameter(ParameterSetName = 'Install')][string]$ShaderLabelFile,   # 0.21.9
     [switch]$Trace
 )
 
@@ -103,7 +113,9 @@ $earlierBuilds = @{
                       '95b1a8737a46e7ad36fe44f545e83bf0e8456c920d067ab85a84024b7efbe5ae',   # 0.21.3 quick bar X / Y (work\asi\menu0213)
                       '9e79ba3c531da68d2b7436bdbdcedbc24467b03c42e4a9e5f8cd92d63dc0b526',   # 0.21.4 hall02 counter rescue (work\asi\menu0214)
                       'dffdd6c22aaf6e8c1799695ea4bc1f13627f1fc7b3665e88a37efca8105fb3f7',   # 0.21.5 page Fixes, ring frozen (work\asi\menu0215)
-                      '5d6dd6301472d6139706af928b6673679b04d4c2941ef89fb69e6f0f631a14b4')   # 0.21.6 page Kostueme, flight line, quick command line (work\asi\menu0216)
+                      '5d6dd6301472d6139706af928b6673679b04d4c2941ef89fb69e6f0f631a14b4',   # 0.21.6 page Kostueme, flight line, quick command line (work\asi\menu0216)
+                      '4a5b60b397c0e74af0a36d24514fb7ef68d7fd20933e3d0f7edf08ad81b69a59',   # 0.21.7 help lines, label layers (work\asi\menu0217)
+                      '9d1e487dde97a362dd2cc1d9228594fdfaeb0fb7cd6d071556770fef498519f5')   # 0.21.8 command line, favourites with argument (work\asi\menu0218)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
@@ -134,7 +146,9 @@ $earlierBuilds = @{
                       '911689e3d15f986ff71f2b28d0a751717a2f0bafa294523fbad0e62fdc6687bf',   # 0.21 ([Arachno], [Camera]; work\asi\menu021)
                       'd67db7be0aa33d0121c7c0c4b77ffb73e88d3a0264999c5e1e46f23c42c565e0',   # 0.21.1 = 0.21.2 sample (work\asi\menu0211)
                       '33f2763f3f8d04a04e7f1ecbd09922a0cd74b093202bac822a7a79579fee1c60',   # 0.21.3 = 0.21.4 = 0.21.5 sample (work\asi\menu0213)
-                      '5529b585b78ddbdfed7406631d2281b4fef114070c9070458d979a1920499fbe')   # 0.21.6 ([Cheat] FlightHint; work\asi\menu0216)
+                      '5529b585b78ddbdfed7406631d2281b4fef114070c9070458d979a1920499fbe',   # 0.21.6 ([Cheat] FlightHint; work\asi\menu0216)
+                      '7dcef69291dcfcdfe3423b65e90ab9688912bb01ace9b3d7d0245756b673d470',   # 0.21.7 ([Debug] Uber* / Nav* / Sap*, [Shader]; work\asi\menu0217)
+                      '19f783e7768b8fc7978e0387f49db5f0305f6e0c1285f7ebfee78a925c6493a4')   # 0.21.8 = 0.21.9 sample ([SoundGroups]; work\asi\menu0218)
 }
 # 0.21: the owner's own arachnophobia picture (TruMenu.arachno.png, also TruMenu.arachno.<kind>.png) next to tru.exe is
 # private: this script never copies, overwrites or removes it (not even one found in the build folder) - the plugin
@@ -176,6 +190,15 @@ try {
     if (!$GamePath) { $GamePath = Find-TruGamePath }
     if (!$GamePath -or !(Test-Path -LiteralPath (Join-Path $GamePath 'tru.exe'))) { throw "Game folder not found (-GamePath): $GamePath" }
     Write-Log "Game folder: $GamePath" -Level VERBOSE
+    # 0.21.9 -ShaderLabelFile: checked before anything is copied (a wrong file stops the whole install)
+    if ($ShaderLabelFile) {
+        if (!(Test-Path -LiteralPath $ShaderLabelFile -PathType Leaf)) { throw "-ShaderLabelFile not found: $ShaderLabelFile" }
+        $firstLabel = Get-Content -LiteralPath $ShaderLabelFile -TotalCount 1 -ErrorAction SilentlyContinue
+        if (!($firstLabel -and ([string]$firstLabel).StartsWith($shaderMarker))) {
+            throw "-ShaderLabelFile $ShaderLabelFile does not start with '$shaderMarker' (tools/shader_labels.py build output) - nothing installed."
+        }
+        Write-Log "-ShaderLabelFile $ShaderLabelFile sha256 $(Get-Sha256 $ShaderLabelFile) (installed as $shaderList)" -Level VERBOSE
+    }
 
     foreach ($name in $names) {
         $source = Join-Path $built $name
@@ -267,7 +290,8 @@ try {
         $isOurs = [bool]($first -and ([string]$first).StartsWith($shaderMarker))
     }
     if ($Install) {
-        $source = Join-Path $built $shaderList
+        $source = if ($ShaderLabelFile) { $ShaderLabelFile } else { Join-Path $built $shaderList }   # 0.21.9
+        Write-Log "$shaderList source $source" -Level DEBUG
         if (!(Test-Path -LiteralPath $source)) {
             Write-Log "$source not found - shader label data not installed (tools/shader_labels.py build, then OUT\shaderlabel.txt into the build folder as $shaderList); shader.labels stays empty." -Level WARN
         }
