@@ -28,7 +28,16 @@ Usage (from the repository root):
   ../bin/pyt -t 3600 tools/tu_batch.py verify INV.json WORKDIR TREE      independent re-check of every done group in the tree files
   ../bin/pyt -t 3600 tools/tu_batch.py vcheck MODS XDIR [--libs A-B,C] [--no-vm]
       binding_check of every translated pass-2 lib in any mods tree (no tu_batch state needed)
-  ../bin/pyt -t 1800 tools/tu_batch.py selftest      sampler pairing + binding_check regression cases (exit 1 on failure)
+  ../bin/pyt -t 1800 tools/tu_batch.py selftest      sampler pairing + binding_check + abs-const rewrite regression cases (exit 1 on failure)
+  ../bin/pyt -t 3600 tools/tu_batch.py nativefix OUT_MODS LAYER [LAYER ...] [--libs A-B,C]
+      17r: rewrite the ABS_CONST form (abs / -abs on a constant, refused by Windows' own D3D9 on AMD) in the effective
+      files of an install stack (LAYERs = mods folders, lowest first) into OUT_MODS; constant -> unused temp
+      (TLT.fix_abs_native), bit-exact per slot in the VM, f4_lint + D3DX9 valid, lib ids kept, new entry hashes
+
+ABS_CONST (17r, 08.11.): pack_lib runs TLT.fix_abs_native after fix_abs_consts, so new builds carry no abs on a
+constant any more (`cmp r8, -|c221.xxxy|, r5.zxyy, |c221.y|` -> `mov rT, c221` + `cmp r8, -|rT.xxxy|, r5.zxyy,
+|rT.y|`, rT = a temp the shader never uses); upstream's B269 fold into a def literal (`cmp r5, c217.zzzy, r7.zxyy, c221.y`) reads two constant
+registers in one instruction (X5584) and is not used.
 
 Sampler map (08.11., n6b): ALL texture records of a material are paired - the ordinary ones by position, the
 per-instance ones (terrain atlases, [+0x52, +0x52 + byte +0x50)) by kind byte (TLT.sampler_map). verify / vcheck
@@ -341,6 +350,12 @@ def pack_lib(res, nid, taken, nslots):
     for k in range(nslots):
         bc0 = res[k]; bc, nf = TLT.fix_abs_consts(bc0)
         if nf and TLT.vm_same(bc0, bc) < 1.0: raise TP.Fail('abs fold changed slot %d' % k)
+        bc1 = bc
+        try: bc, na = TLT.fix_abs_native(bc1)        # 17r: no abs / -abs on a constant (native D3D9 ABS_CONST)
+        except ValueError as e: raise TP.Fail('slot %d: %s' % (k, e))
+        if na:
+            same, why = TLT.vm_exact(bc1, bc)
+            if not same: raise TP.Fail('abs-const rewrite changed slot %d (%s)' % (k, why))
         if bc not in uniq:
             ok, txt, err = FST.valid(bc)
             if not ok: raise TP.Fail('packed slot %d invalid' % k)
@@ -691,6 +706,131 @@ def cmd_vcheck(mods, xdir, ranges, vm):
     for l in fails: print('  FAIL ' + l)
 
 
+def _lib_parse(d):
+    """ShaderLib section (type 9): u8 kind + 3 pad | u32 tableBytes | u32 dataSize (= len - 4) | u32 slot offset[]
+    (relative to byte 4, 0xffffffff = empty) | entries {u32 word0, u32 size word ((16 + code) | cube mask << 16),
+    u64 hash, code}. -> (head, tb, offs, {offset: [word0, size word, hash, code]}) - slots may share an entry"""
+    tb, ds = struct.unpack_from('<II', d, 4)
+    if ds != len(d) - 4: raise ValueError('dataSize %d != section length - 4 (%d)' % (ds, len(d) - 4))
+    offs = list(struct.unpack_from('<%dI' % (tb // 4), d, 12)); ents = {}
+    for o in offs:
+        if o == 0xffffffff or o in ents: continue
+        a, sz, h = struct.unpack_from('<II8s', d, 4 + o)
+        ents[o] = [a, sz, h, d[4 + o + 16:4 + o + (sz & 0xFFFF)]]
+    return d[:4], tb, offs, ents
+
+
+def _lib_build(head, tb, offs, ents):
+    body = bytearray(); moved = {}; pos = 12 + tb
+    for o in sorted(ents):
+        a, sz, h, code = ents[o]
+        moved[o] = pos - 4
+        e = struct.pack('<II', a, (sz & 0xFFFF0000) | (16 + len(code))) + bytes(h) + code
+        body += e; pos += len(e)
+    no = [o if o == 0xffffffff else moved[o] for o in offs]
+    return bytes(head) + struct.pack('<II', tb, 8 + tb + len(body)) + struct.pack('<%dI' % len(no), *no) + bytes(body)
+
+
+def _ranges(txt):
+    if not txt: return None
+    want = set()
+    for t in txt.split(','):
+        a_, _, b_ = t.partition('-'); want |= set(range(int(a_), int(b_ or a_) + 1))
+    return want
+
+
+def cmd_nativefix(out, layers, ranges=None):
+    """17r (08.11.2026): rewrite the ABS_CONST form (abs / -abs on a constant register, refused by Windows' own D3D9 on
+    AMD) in the pixel shaders of an install stack. LAYERS = mods-style folders, lowest first (e.g. the installed mods,
+    then the test trees in install order); the effective copy of every DRM (top + streamgroups) is the one of the last
+    layer that has it. Every effective file with a ShaderLib (type 9; with --libs only those ids) whose pixel shaders
+    carry the form is rewritten into OUT (sub folder kept): per shader TLT.fix_abs_native (constant -> unused temp,
+    `mov rT, cN` before the instruction), proven per slot bit-exact in the VM (TLT.vm_exact) and valid (f4_lint +
+    D3DX9, FST.valid); lib ids, slot table, word0 and the size word's cube mask are kept, a changed entry gets a new
+    hash (the same new code gets the same hash in every file, never a known hash). Readback: every other section byte-
+    identical, the changed libs parse to the same slots, no ABS_CONST left, no instruction with two different constant
+    registers. Writes OUT/../nativefix.json (per lib: slots, movs, files, source layer) and prints a summary."""
+    want = _ranges(ranges)
+    eff = {}; layer_of = {}
+    for li, L in enumerate(layers):
+        for name, p in mods_drms(L).items(): eff[name] = p; layer_of[name] = li
+    taken = FST.known_hashes()
+    for p in eff.values():                     # every hash of the effective stack is taken
+        try:
+            for s in DW.read(open(p, 'rb').read(), 'le').sections:
+                if s.type == 9 and len(s.data) >= 12:
+                    for e in _lib_parse(s.data)[3].values(): taken.add(bytes(e[2]))
+        except Exception: pass
+    memo = {}; per_lib = collections.defaultdict(lambda: dict(slots=set(), movs=0, files=set(), layers=set()))
+    nfiles = 0; problems = []
+    for name in sorted(eff):
+        p = eff[name]; raw = open(p, 'rb').read()
+        try: D = DW.read(raw, 'le')
+        except Exception: continue
+        changed = {}
+        for si, s in enumerate(D.sections):
+            if s.type != 9 or len(s.data) < 12 or (want is not None and s.id not in want): continue
+            head, tb, offs, ents = _lib_parse(s.data)
+            if _lib_build(head, tb, offs, ents) != s.data: problems.append('%s lib %d: rebuild not byte-identical' % (name, s.id)); continue
+            hit = False
+            for o, e in ents.items():
+                code = e[3]
+                if code[2:4] != b'\xff\xff' or not TLT.abs_const_operands(code): continue
+                new, n = TLT.fix_abs_native(code)
+                if code not in memo:
+                    same, why = TLT.vm_exact(code, new)
+                    if not same: raise SystemExit('%s lib %d entry +%#x: rewrite not bit-exact (%s)' % (name, s.id, o, why))
+                    prog = sm3asm.decode(new); body = new[:4 * prog.nend]
+                    ok_, txt, err = FST.valid(body)
+                    if not ok_: raise SystemExit('%s lib %d entry +%#x: rewritten shader not valid (%s)' % (name, s.id, o, err))
+                    memo[code] = (new, FST.new_hash(b'17r native|' + new, taken), n)
+                new, h, n = memo[code]
+                e[3] = new; e[2] = h; hit = True
+                L_ = per_lib[s.id]; L_['slots'] |= {k for k, oo in enumerate(offs) if oo == o}; L_['movs'] += n
+            if hit:
+                if s.reloc: raise SystemExit('%s lib %d has relocations - refused' % (name, s.id))
+                changed[si] = _lib_build(head, tb, offs, ents)
+                per_lib[s.id]['files'].add(name); per_lib[s.id]['layers'].add(layer_of[name])
+        if not changed: continue
+        old = [bytes(s.data) for s in D.sections]
+        for si, d in changed.items(): D.sections[si].data = d
+        outb = D.write('le')
+        if raw[:4] in (b'CDRM', b'MRDC'): outb = DW.cdrm_encode(outb, 'le')
+        sub = 'streamgroups' if os.path.basename(os.path.dirname(p)).lower() == 'streamgroups' else ''
+        q = os.path.join(out, sub, os.path.basename(p)); os.makedirs(os.path.dirname(q), exist_ok=True)
+        open(q, 'wb').write(outb); nfiles += 1
+        # readback
+        R_ = DW.read(open(q, 'rb').read(), 'le')
+        if len(R_.sections) != len(old): raise SystemExit('%s: section count changed' % q)
+        for si, s in enumerate(R_.sections):
+            if si not in changed:
+                if s.data != old[si]: raise SystemExit('%s: section %d changed unexpectedly' % (q, si))
+                continue
+            h0, tb0, offs0, e0 = _lib_parse(old[si]); h1, tb1, offs1, e1 = _lib_parse(s.data)
+            if h0 != h1 or tb0 != tb1 or [o == 0xffffffff for o in offs0] != [o == 0xffffffff for o in offs1]:
+                raise SystemExit('%s lib %d: slot table changed' % (q, s.id))
+            for k, (o0, o1) in enumerate(zip(offs0, offs1)):
+                if o0 == 0xffffffff: continue
+                c0, c1 = e0[o0][3], e1[o1][3]
+                if e0[o0][0] != e1[o1][0] or (e0[o0][1] >> 16) != (e1[o1][1] >> 16): raise SystemExit('%s lib %d slot %d: word0 / cube mask changed' % (q, s.id, k))
+                if c1[2:4] == b'\xff\xff' and TLT.abs_const_operands(c1): raise SystemExit('%s lib %d slot %d: ABS_CONST left' % (q, s.id, k))
+                if c0 == c1: continue
+                if memo.get(c0, (None,))[0] != c1: raise SystemExit('%s lib %d slot %d: unexpected code' % (q, s.id, k))
+                pr = sm3asm.decode(c1)
+                for i in pr.instrs():
+                    if i.op in ('dcl', 'def', 'defi', 'defb'): continue
+                    if len({o.num for o in i.ops if not o.isdst and o.rtype == sm3asm.RT_CONST and not o.rel}) > 1:
+                        raise SystemExit('%s lib %d slot %d: two different constant registers in one instruction' % (q, s.id, k))
+    rep = {str(l): dict(slots=sorted(v['slots']), movs=v['movs'], files=sorted(v['files']), layers=sorted(v['layers'])) for l, v in sorted(per_lib.items())}
+    json.dump(dict(layers=layers, libs=rep, unique_shaders=len(memo), files=nfiles, problems=problems),
+              open(os.path.join(os.path.dirname(os.path.normpath(out)), 'nativefix.json'), 'w'), indent=1)
+    for l, v in rep.items():
+        print('lib %s: slots %s, %d movs, %d files, layers %s' % (l, v['slots'], v['movs'], len(v['files']), v['layers']))
+    for pb in problems: print('PROBLEM ' + pb)
+    print('SUMMARY nativefix: %d libs, %d unique pixel shaders rewritten (each bit-exact in the VM, f4_lint + D3DX9 valid), '
+          '%d files written to %s, readback ok, %d problems' % (len(rep), len(memo), nfiles, out, len(problems)))
+
+
 def cmd_selftest():
     """regression self-test of the sampler pairing (TLT.pair_records / sampler_map) and of binding_check (n6b 08.11.).
     Synthetic record lists (always) + real data when the files exist (TRUDLC_GAME_MODS not needed): 25057
@@ -727,6 +867,59 @@ def cmd_selftest():
     # 5 role keys: identical on both sides exactly when the pairing holds
     xr_, pr_ = record_roles(X), record_roles(P)
     ok(xr_[9] == pr_[8] == ('inst', 2) and xr_[8] == pr_[9] == ('ord', 0, 0), 'record_roles: Xbox s9 / PC s8 = inst 2, Xbox s8 / PC s9 = ord 0')
+    # 5b abs-const rewrite (17r): TLT.fix_abs_native = constant -> unused temp, bit-exact, no ABS_CONST, no X5584
+    def asm(t): return sm3asm.encode(sm3asm.parse_text(t))
+    # def literal read twice (the translator's form), a uniform constant (sign random in the VM), abs + plain read of one register
+    pa = asm('ps_3_0\ndef c220, 3, 1, 0, -1\ndcl_texcoord v0\ndcl_texcoord1 v1\nmul r1, v0, c5\n'
+             'cmp r8, -c220.zzzy_abs, r1.zxyy, c220.y_abs\ncmp r9, -c7_abs, v1, c220.x\n'
+             'add r2, r8, -c6.yxzw_abs\nadd r2, r2, c6\nmov oC0, r2\nmov oC1, r9\n')
+    na_ = TLT.abs_const_operands(pa)
+    pb_, nmv = TLT.fix_abs_native(pa)
+    ok(na_ == 4 and TLT.abs_const_operands(pb_) == 0 and nmv == 3, 'abs-const rewrite: %d abs operands -> %d, %d movs inserted (one per instruction and register)' % (na_, TLT.abs_const_operands(pb_), nmv))
+    same, why = TLT.vm_exact(pa, pb_)
+    ok(same, 'abs-const rewrite: VM bit-exact (oC0 / oC1, bools off / on, 3 seeds) %s' % why)
+    prg = sm3asm.decode(pb_)
+    two = [sm3asm.fmt_instr(i, 'ps') for i in prg.instrs() if i.op not in ('dcl', 'def') and
+           len({o.num for o in i.ops if not o.isdst and o.rtype == sm3asm.RT_CONST and not o.rel}) > 1]
+    ok(not two, 'abs-const rewrite: no instruction reads two different constant registers (X5584) %s' % two)
+    vt, txt_, err_ = FST.valid(pb_)
+    ok(vt, 'abs-const rewrite: f4_lint + D3DX9 valid %s' % (err_ if not vt else ''))
+    tl = [sm3asm.fmt_instr(i, 'ps') for i in prg.instrs()]
+    ok(any(l.startswith('mov r0, c220') for l in tl) and any(l == 'cmp r8, -r0.zzzy_abs, r1.zxy, r0.y_abs' for l in tl),
+       'abs-const rewrite: mov r0, c220 + cmp r8, -r0.zzzy_abs, r1.zxyy, r0.y_abs (both c220 operands moved) %s' % [l for l in tl if l.startswith(('mov r0', 'cmp r8'))])
+    ok(TLT.fix_abs_native(pb_) == (pb_, 0) and TLT.fix_abs_native(asm('ps_3_0\nmov oC0, c1\n'))[1] == 0, 'abs-const rewrite: idempotent, no change without the form')
+    # temp reuse: three cmps on c220 in a row -> one mov; an `if` in between -> loaded again after it
+    pr3 = asm('ps_3_0\ndef c220, 0, 1, 1.5, -1\ndefb b3, true\ndcl_texcoord v0\nmul r2, v0, c9\n'
+              'cmp r5, -c220.xxxy_abs, r2.zxyy, c220.y_abs\ncmp r6, -c220.xxxy_abs, r2.xyzz, c220.y_abs\n'
+              'if b3\ncmp r7, -c220.xxxy_abs, r2.zyxx, c220.y_abs\nelse\nmov r7, r2\nendif\n'
+              'cmp r8, -c220.xxxy_abs, r7, c220.y_abs\nadd r5, r5, r6\nadd r5, r5, r8\nmov oC0, r5\n')
+    r3, n3 = TLT.fix_abs_native(pr3); s3, w3 = TLT.vm_exact(pr3, r3); v3 = FST.valid(r3)[0]
+    ok(n3 == 3 and s3 and v3 and TLT.abs_const_operands(r3) == 0, 'abs-const rewrite: temp reused (2 cmps in a row -> 1 mov, reloaded inside if and after endif: %d movs), VM bit-exact %s %s, valid %s' % (n3, s3, w3, v3))
+    # sensitivity: a wrong rewrite (abs kept, sign dropped) must fail the bit-exact VM check
+    bad = sm3asm.decode(pb_)
+    for i in bad.instrs():
+        if i.op == 'cmp':
+            for o in i.ops:
+                if not o.isdst and o.smod == 12: o.smod = 11
+    ok(not TLT.vm_exact(pa, sm3asm.encode(bad))[0], 'abs-const rewrite: sensitivity - a rewrite with -|x| -> |x| fails vm_exact')
+    full = asm('ps_3_0\ndcl_texcoord v0\n' + ''.join('mov r%d, v0\n' % r for r in range(32)) + 'add r0, r31, -c3_abs\nmov oC0, r0\n')
+    try: TLT.fix_abs_native(full); raised = False
+    except ValueError: raised = True
+    ok(raised, 'abs-const rewrite: refused (ValueError) when all 32 temps are used and the constant is a uniform')
+    # fallback: all temps used, def literal -> one new def literal, bit for bit (-0.0 kept)
+    fd = asm('ps_3_0\ndef c220, -0.0, 1, -2, 3\ndcl_texcoord v0\n' + ''.join('mov r%d, v0\n' % r for r in range(32)) +
+             'cmp r0, -c220.xxxy_abs, r31, c220.y_abs\nadd r0, r0, -c220.zwzw_abs\nadd r0, r0, r1\nmov oC0, r0\n')
+    fb, nf_ = TLT.fix_abs_native(fd)
+    fx, why = TLT.vm_exact(fd, fb); vt, _, err_ = FST.valid(fb)
+    dl = [sm3asm.fmt_instr(i, 'ps') for i in sm3asm.decode(fb).instrs() if i.op in ('def', 'cmp')]
+    ok(nf_ == 3 and TLT.abs_const_operands(fb) == 0 and fx and vt, 'abs-const fallback (32 temps used): def-literal fold, %d operands, VM bit-exact %s, valid %s %s' % (nf_, fx, vt, dl))
+    sm_ = sm3asm.decode(fb).instrs()
+    newdef = [i for i in sm_ if i.op == 'def' and i.ops[0].num != 220]
+    ok(len(newdef) == 2 and newdef[0].imm[0] == 0x80000000, 'abs-const fallback: two new defs, -|-0.0| keeps the bit pattern 0x80000000 (%s)' % [hex(u) for i in newdef for u in i.imm])
+    try: TLT.fix_abs_native(asm('ps_3_0\ndef c220, 1, 2, 3, 4\ndef c221, 5, 6, 7, 8\ndcl_texcoord v0\n' + ''.join('mov r%d, v0\n' % r for r in range(32)) +
+                                'mad r0, -c220_abs, r31, c221_abs\nmov oC0, r0\n')); raised = False
+    except ValueError: raised = True
+    ok(raised, 'abs-const fallback: refused with more than 4 distinct values in one instruction')
     # 6 real data
     xd = os.path.join(ROOT, 'work', 'sg_audit_0511', 'xbox', 'ack11')
     cases = [('floor 3460', os.path.join(ROOT, 'work', 'floor_0811', 'testtree', 'mods', 'dlc_yggdrasil_end.drm'), 25057, 3460, True),
@@ -792,6 +985,10 @@ def main(a):
         if '--libs' in a: j = a.index('--libs'); rg = a[j + 1]; a = a[:j] + a[j + 2:]
         cmd_vcheck(a[1], a[2], rg, not novm); return
     if a[0] == 'selftest': cmd_selftest(); return
+    if a[0] == 'nativefix':
+        rg = None
+        if '--libs' in a: j = a.index('--libs'); rg = a[j + 1]; a = a[:j] + a[j + 2:]
+        cmd_nativefix(a[1], a[2:], rg); return
     sys.exit(__doc__)
 
 

@@ -117,6 +117,7 @@ work/q17q_0811/
 work/amd17r_0811/
 work/units17s_0811/
 work/native0811/
+work/native0811_17r/
 # local profile archives (moved out of the repository folder, never committed)
 tests/profiles/archive_0311/
 # native D3D9 test output: shaders extracted from the installed mods (game data) and the report

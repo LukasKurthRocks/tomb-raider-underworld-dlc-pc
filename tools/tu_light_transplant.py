@@ -399,6 +399,140 @@ def vm_same(bc_a, bc_b, N=300, seed=9):
     return worst
 
 
+def abs_const_operands(bc):
+    """number of source operands with an abs / -abs modifier on a constant register (native_extract's ABS_CONST rule)"""
+    return sum(1 for i in sm3asm.decode(bc).instrs() if i.op not in ('dcl', 'def', 'defi', 'defb')
+               for o in i.ops if not o.isdst and o.rtype == sm3asm.RT_CONST and o.smod in (11, 12))
+
+
+def fix_abs_native(bc):
+    """Windows' own D3D9 (AMD RX 9070 XT, native test 20.10.2026, form ABS_CONST) refuses an abs / -abs source
+    modifier on a constant register, e.g. `cmp r8, -|c221.xxxy|, r5.zxyy, |c221.y|` (what fix_abs_consts leaves for
+    an Xbox cndge on a literal; the original PC game never uses the form). Rewrite, bit-equivalent (17r, 08.11.2026):
+    per instruction and per constant register that the instruction reads with abs, `mov rT, cN` (all four components,
+    no modifier, relative addressing kept) is inserted right before it, and EVERY operand of that instruction that
+    reads cN reads rT instead (swizzle and modifier kept) - the abs then acts on a temp, which D3D9 allows.
+    rT = a temp register the program never uses (only these movs write it, so a temp already holding cN is reused
+    without a new mov until the next flow-control instruction; relative reads are always reloaded). The mov is not
+    predicated (it only writes rT). The distinct constants per instruction only go down, so no X5584 form
+    (two different constant registers in one instruction) is created - unlike folding -|cN| into a new def literal,
+    which leaves `cmp r5, c217.zzzy, r7.zxyy, c221.y` (upstream B269 / B270: 500 such shaders). Bytes after the END
+    token are kept.
+    Fallback when the program uses all 32 temps: if the instruction reads only def literals (no relative addressing
+    in the whole program), all its operands of such a register are folded into ONE new def literal, bit for bit
+    (float32 sign-bit operations: neg flips, abs clears, -abs sets the sign bit; at most 4 distinct values, lanes
+    picked by swizzle), so the instruction reads one constant without modifier; new registers from c223 down, never
+    c100..c131 (MaterialParams) or a register the program reads; the same values share one register.
+    Returns (bytecode, rewrites: movs inserted + operands folded); (bc, 0) when there is nothing to do; ValueError when
+    neither works."""
+    prog = sm3asm.decode(bc); tail = prog.trailing
+    def ckey(o): return (o.num, o.rel, o.relop.key() if o.relop is not None else None)
+    ins_all = prog.instrs()
+    used = {o.num for i in ins_all for o in i.ops if o.rtype == sm3asm.RT_TEMP}
+    free = [r for r in range(32) if r not in used]
+    defs = {i.ops[0].num: list(i.imm) for i in ins_all if i.op == 'def'}
+    anyrel = any(o.rel and o.rtype == sm3asm.RT_CONST for i in ins_all for o in i.ops)
+    cused = {o.num for i in ins_all for o in i.ops if o.rtype == sm3asm.RT_CONST}
+    cfree = [r for r in range(223, -1, -1) if r not in cused and not 100 <= r < 132]
+    newdefs = {}
+    def lane_bits(o):
+        v = [defs[o.num][(o.swz >> (2 * l)) & 3] for l in range(4)]
+        if o.smod == 1: return [u ^ 0x80000000 for u in v]
+        if o.smod == 11: return [u & 0x7FFFFFFF for u in v]
+        if o.smod == 12: return [u | 0x80000000 for u in v]
+        if o.smod == 0: return v
+        raise ValueError('abs-const fold: source modifier %d' % o.smod)
+    # a temp keeps the constant it was loaded with (only these movs write it): the next instruction that needs the same
+    # constant reads it without a new mov, until a flow-control instruction (branch / join point); relative reads
+    # (c[aL + n], c[a0.x + n]) are always loaded again
+    FLOW = {'if', 'ifc', 'else', 'endif', 'loop', 'endloop', 'rep', 'endrep', 'call', 'callnz', 'label', 'ret',
+            'break', 'breakc', 'breakp'}
+    loaded = {}
+    out = []; nmov = 0
+    for it in prog.items:
+        if not isinstance(it, sm3asm.Instr) or it.op in ('dcl', 'def', 'defi', 'defb'):
+            out.append(it); continue
+        if it.op in FLOW: loaded.clear()
+        srcs = [o for o in it.ops if not o.isdst and o.rtype == sm3asm.RT_CONST]
+        need = []
+        for o in srcs:
+            if o.smod in (11, 12) and ckey(o) not in need: need.append(ckey(o))
+        if not need:
+            out.append(it); continue
+        if len(free) < len(need):
+            if anyrel or any(o.num not in defs for o in srcs):
+                raise ValueError('abs-const rewrite: %d free temps, %d needed, constants not all def literals' % (len(free), len(need)))
+            bits = [lane_bits(o) for o in srcs]
+            vals = []
+            for b in bits:
+                for u in b:
+                    if u not in vals: vals.append(u)
+            if len(vals) > 4: raise ValueError('abs-const fold: %d distinct values' % len(vals))
+            vals += [vals[0]] * (4 - len(vals)); key = tuple(vals)
+            if key not in newdefs:
+                if not cfree: raise ValueError('abs-const fold: no free constant register')
+                newdefs[key] = cfree.pop(0)
+            reg = newdefs[key]; m = iter(srcs); bm = iter(bits); ops = []
+            for o in it.ops:
+                if not o.isdst and o.rtype == sm3asm.RT_CONST:
+                    next(m); b = next(bm)
+                    o = sm3asm.Operand(sm3asm.RT_CONST, reg, swz=sum(vals.index(u) << (2 * l) for l, u in enumerate(b)), smod=0)
+                    nmov += 1
+                ops.append(o)
+            out.append(sm3asm.Instr(it.op, ops, ctrl=it.ctrl, pred=it.pred, imm=it.imm, usage=it.usage)); continue
+        tmap = {}; in_use = set()
+        for key in need:
+            t = None if key[1] else next((t for t, k in loaded.items() if k == key and t not in in_use), None)
+            if t is None:
+                cand = [r for r in free if r not in in_use and r not in loaded] or [r for r in free if r not in in_use]
+                t = cand[0]
+                src = next(o for o in srcs if ckey(o) == key)
+                s2 = sm3asm.Operand(sm3asm.RT_CONST, src.num, rel=src.rel, relop=src.relop, swz=0xE4, smod=0, resv=src.resv)
+                d2 = sm3asm.Operand(sm3asm.RT_TEMP, t, isdst=True, wm=15)
+                out.append(sm3asm.Instr('mov', [d2, s2])); nmov += 1
+                loaded[t] = key
+            tmap[key] = t; in_use.add(t)
+        ops = []
+        for o in it.ops:
+            if not o.isdst and o.rtype == sm3asm.RT_CONST and ckey(o) in tmap:
+                o = sm3asm.Operand(sm3asm.RT_TEMP, tmap[ckey(o)], swz=o.swz, smod=o.smod)
+            ops.append(o)
+        out.append(sm3asm.Instr(it.op, ops, ctrl=it.ctrl, pred=it.pred, imm=it.imm, usage=it.usage))
+        if it.op in FLOW: loaded.clear()
+    if not nmov: return bc, 0
+    if newdefs:
+        last = max(k for k, it in enumerate(out) if isinstance(it, sm3asm.Instr) and it.op in ('dcl', 'def', 'defi', 'defb'))
+        nd = [sm3asm.Instr('def', [sm3asm.Operand(sm3asm.RT_CONST, r, isdst=True, wm=15)], imm=list(v)) for v, r in newdefs.items()]
+        out = out[:last + 1] + nd + out[last + 1:]
+    return sm3asm.encode(sm3asm.Program(prog.kind, prog.major, prog.minor, out)) + tail, nmov
+
+
+def vm_exact(bc_a, bc_b, seeds=(9, 23, 41), N=300):
+    """bit-exact VM comparison of two programs that must compute the same thing (a rewrite such as fix_abs_native):
+    random semantic inputs (F9.Env), every float constant random in [-1.5, 1.5] (the sign matters for abs; a def
+    literal keeps its own value), deterministic textures, light bools all off and all on, per seed. Every colour
+    output oC0..oC3 and oDepth must be equal BITWISE (float32 bit pattern, -0.0 / NaN included) and the kill masks
+    equal. -> (True / False, text of the first difference or '')"""
+    A, B = sm3asm.decode(bc_a), sm3asm.decode(bc_b)
+    outs = [(sm3asm.RT_COLOROUT, k) for k in range(4)] + [(sm3asm.RT_DEPTHOUT, 0)]
+    for seed in seeds:
+        env = F9.Env(seed, None, N); rng = np.random.RandomState(seed + 1000)
+        consts = {r: rng.uniform(-1.5, 1.5, 4).astype(np.float32) for r in range(224)}
+        for bl in ({}, F9.ALLB):
+            a = f9_common.run_state(A, F9.body(A), env.state0(A), consts, env.tex, N, bl)
+            b = f9_common.run_state(B, F9.body(B), env.state0(B), consts, env.tex, N, bl)
+            for k in outs:
+                va, vb = a[0].get(k), b[0].get(k)
+                if (va is None) != (vb is None): return False, 'seed %d: output %s only on one side' % (seed, k)
+                if va is None: continue
+                if not np.array_equal(np.ascontiguousarray(va, np.float32).view(np.uint32),
+                                      np.ascontiguousarray(vb, np.float32).view(np.uint32)):
+                    return False, 'seed %d bools %s: output %s differs' % (seed, 'on' if bl else 'off', k)
+            ka = a[1] if a[1] is not None else np.zeros(N, bool); kb = b[1] if b[1] is not None else np.zeros(N, bool)
+            if not np.array_equal(ka, kb): return False, 'seed %d: kill masks differ' % seed
+    return True, ''
+
+
 def cmd_pack(dirs, pcf, out, ids_new):
     import fade_slots_translate as FST
     os.makedirs(out, exist_ok=True)
@@ -421,6 +555,11 @@ def cmd_pack(dirs, pcf, out, ids_new):
                 same = vm_same(bc0, bc)
                 if same < 1.0: raise SystemExit('lib %d slot %d: abs fold changed the result (%.3f)' % (xid, k, same))
                 fixes[k] = nf
+            bc1 = bc; bc, na = fix_abs_native(bc1)          # 17r: no abs on a constant (native D3D9, AMD)
+            if na:
+                same, why = vm_exact(bc1, bc)
+                if not same: raise SystemExit('lib %d slot %d: abs-const rewrite changed the result (%s)' % (xid, k, why))
+                fixes[k] = '%s+%d mov' % (fixes.get(k, 0), na)
             if bc not in uniq:
                 ok, txt, err = FST.valid(bc)
                 if not ok: raise SystemExit('lib %d slot %d not valid: %s' % (xid, k, err))

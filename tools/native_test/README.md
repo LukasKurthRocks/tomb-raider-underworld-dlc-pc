@@ -41,6 +41,8 @@ Run `RUN_DRAW_TEST.bat` only if the first test reports **0 rejected port shaders
 
 `ABS_CONST` and `SINCOS_SAME` are the two forms an AMD driver refused on 20 Oct 2026. They are fixed in B269_nativo, where the expected count is 0.
 
+**Fork note (8 Nov 2026).** B269_nativo removed `ABS_CONST` by folding it into a new constant, which leaves two different constant registers in one instruction - a form Windows' D3D9 refuses as well (B270: 500 shaders). The `windows` branch rewrites `ABS_CONST` through a temp register instead (`tools/tu_light_transplant.py` `fix_abs_native`) and checks trees with `tools/shader_form_gate.py`. The probes `probes/abs_ps_*.bin` each contain exactly one abs-on-constant form (`abs_ps_cmp_temp_fixed.bin` is the rewritten form and must pass everywhere); the older `feat_ps_*_absmod.bin` read the same constant with and without abs, which NVIDIA refuses too, so they do not isolate the AMD form.
+
 ## Tests performed
 
 - `CreatePixelShader` / `CreateVertexShader` on the probes, then on every port shader (`new_*` = made by the port, `pc_*` = identical to a PC-game shader).
