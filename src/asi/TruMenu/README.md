@@ -2842,6 +2842,46 @@ whether the cinematic handler counts its own times that would jump on release.
 | 6 | `cine.pause 0` | the scene goes on from where it stood, sound in sync |
 | 7 | held, then a load (level.load / checkpoint) | log "off by itself"; the load works |
 
+Live 2026-11-08 (0.22, DLC 2 end-room cutscene at the throne): the pause works - the scene stands, torches and the
+flicker go on, the stream is recognised (its handler = GameTracker cinematic). The sound looped: the stream's sound
+ring is no longer fed and FMOD plays it again (fixed in 0.22.1). A TruLink `menu cine.pause` without an argument
+flipped the pause (0.22.1: report only).
+
+## TruMenu 0.22.1 (cutscene pause: sound held, badge, mark / pause at; 2026-11-08)
+
+Build `work\asi\menu0224`, live wishes of the 0.22 test. `TruMenu.ini` unchanged, no new import.
+
+- **Sound held with the picture.** The cutscene time is the sound position (the sample counter of the stream's DSP
+  ring), so the sound must stop with it - else FMOD repeats the ring and on release the play cursor no longer matches
+  the clock. The game's own "pause all sound" (0x587420 / 0x587460) pauses the master channel group:
+  System_GetMasterChannelGroup 0x7b99b9 and ChannelGroup_SetPaused 0x7b9490 -> ChannelGroupI::setPaused 0x7c4875
+  (flag +0x59, every child group and channel). While a cutscene is held TruMenu pauses the master group - only if it
+  was not paused already, and it gives it back only if TruMenu paused it (the game's pause screen keeps its own).
+  Music and ambience stand still with it.
+- **Steps without drift.** `cine.step n` lets n game frames through with the sound running **muted**
+  (ChannelGroupI::setMute 0x7c48cd, flag +0x58): the clock is the sound, so picture and sound move on together.
+- **Badge** top centre while held: `||  Szene angehalten  <s> s  -  Ton angehalten` (EN with `quick.lang 1`); while
+  stepping `> Bild weiter`. Seconds = `[obj+0x384]` / 30 (the cutscene time counts 1/30 s: dt x 30.0 `[0x8439b8]`,
+  the sound path 0x5800d0 multiplies by the same constant).
+- **`cine.mark`** remembers the playing cutscene's time (seconds); **`cine.pauseat [seconds|off]`** holds the next
+  cutscene that reaches it (no argument = the mark) and stays armed over loads: mark, reload the checkpoint, the
+  cutscene plays and stops at the same spot. No real rewind: the stream is read forward from disk, the cutscene fires
+  one-shot events, and the clock is the sound.
+- **`cine.pause` without an argument only reports** (the bar, the command bar and the menu always send 1 / 0).
+- Byte checks: 4 more (`kCnSndChecks`); without them the picture pause still works and the badge says "Ton: Schleife".
+- Bar page Tests, group "Zwischensequenz": + Stelle merken, Bei Marke anhalten.
+
+### TO TEST 0.22.1
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | log | `0.22 cine.pause: 7 checks ok; 0.22.1 sound pause: 4 checks ok` |
+| 2 | end cutscene, Szene anhalten | badge top centre, sound silent (no loop); log "master channel group ... paused" |
+| 3 | wait 10 s, release | speech goes on where it stopped, lips and sound in sync |
+| 4 | held: Ein Bild weiter a few times, `cine.step 60` | the scene moves on a little, no sound, still in sync after release |
+| 5 | at the throne: Stelle merken; reload the checkpoint; Bei Marke anhalten | the cutscene stops at the same spot by itself |
+| 6 | held, open the game's pause screen, close it | sound stays held (TruMenu did not pause it twice); release gives it back |
+
 ## TO TEST (0.4)
 
 A checklist the main session (Claude over TruLink) fills while the player plays; the player marks the rows with the controller.

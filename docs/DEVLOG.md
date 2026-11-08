@@ -5,6 +5,19 @@ install or play; the [README](../README.md) and [INSTALL](INSTALL.md) cover that
 overlays, log lines, sometimes substitute shaders), scaled down to 1280 px. The README shows the current state; older
 pictures move here.
 
+## 2026-11-08 - the flicker at the throne, with the cutscene held
+
+![The throne in the DLC 2 end-room cutscene flickering while the cutscene stands still](screenshots/dev-flicker-throne-2026-11-08.gif)
+
+*Development build, test overlays on (object names, sound list). The end-room cutscene of Lara's Shadow is held with
+TruMenu's new cutscene pause (`cine.pause`, 0.22): time, actors and camera stand still, the world runs on - and the
+throne still switches between lit and dark, the figures on the stairs with it. So the flicker is not the cutscene's
+timeline but something that exists only while the cutscene runs (in normal play the throne does not flicker). Ruled
+out so far: a doubled pod model (`dlc2_uo_natlapod`, an exact runtime copy on top of the placed one - removed live,
+the flicker stayed) and the black fade card. The walls with baked light stay steady, so the next suspect is the
+dynamic light per model (the cutscene brings its own lights around the figures). Open in TODO; recorded 4 s of the
+game window, 12 frames per second.*
+
 ## 2026-11-08 - the README's former status block (state 2026-11-05, updated 2026-11-08)
 
 On 2026-11-08 the README got a short status table instead; the plugin details moved to [PLUGINS.md](PLUGINS.md). The

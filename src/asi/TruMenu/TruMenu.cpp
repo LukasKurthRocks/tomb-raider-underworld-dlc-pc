@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -21375,13 +21375,35 @@ const DvCheck kCnChecks[] = {
     {0x00590303, "8b8e7c070000 85c9 742a e84e76ecff"},                                      // handler +0x77c update
     {0x00590431, "8b4614 5e 83c408 c20400"},                                                // returns [obj+0x14]
 };
+// 0.22.1 sound: the cutscene time is the sound position (sample counter of the stream's DSP ring), so the sound must
+// stand still with the picture - else FMOD repeats the ring (live 2026-11-08: the line "In dir steckt einfach ..." in a
+// loop) and on release the play cursor no longer matches the clock. The game's own "pause all sound" (0x587420 / resume
+// 0x587460) pauses the master channel group: System_GetMasterChannelGroup 0x7b99b9 (stdcall system, &group) and
+// ChannelGroup_SetPaused 0x7b9490 (stdcall group, paused) -> ChannelGroupI::setPaused 0x7c4875 (flag +0x59, every child
+// group and channel through ChannelI::setPaused 0x7c9beb). TruMenu pauses the master group while a cutscene is held
+// (only if it was not paused already, and gives it back only if TruMenu paused it); a cine.step runs the sound muted
+// (ChannelGroupI::setMute 0x7c48cd, flag +0x58) for the stepped frames, so clock and picture move on together. Music
+// and ambience stand still while held too.
+const DWORD kCnGetMaster = 0x007b99b9, kCnCgSetPaused = 0x007b9490;
+const DvCheck kCnSndChecks[] = {
+    {0x0058742a, "8d0c24 51 50 e885252300 85c0 7521 8b0424 85c0 741a 6a01 50 e849202300"},   // the game's pause-all
+    {0x007b9490, "55 8bec 8d4508 50 ff7508 e8b8b20000 85c0 59 59 750d 8b4d08 6a01 ff750c e8c3b30000 5d c20800"},
+    {0x007c4875, "807c240800 53 8b5c2408 56 57 8bf9 7403 885f59"},   // ChannelGroupI::setPaused: +0x59
+    {0x007c48cd, "807c240800 53 8b5c2408 56 57 8bf9 7403 885f58"},   // ChannelGroupI::setMute: +0x58
+};
+typedef int(__stdcall *CnGetMasterFn)(DWORD system, DWORD *group);
+typedef int(__stdcall *CnCgPausedFn)(DWORD group, int paused);
 typedef DWORD(__fastcall *CnUpdateFn)(DWORD stream, DWORD edx, float dt);
-bool g_cnOk = false, g_cnOn = false, g_cnRefused = false;
+bool g_cnOk = false, g_cnOn = false, g_cnRefused = false, g_cnSndOk = false;
 volatile LONG g_cnChecked = 0;
-char g_cnWhy[96] = "not checked yet";
-volatile LONG g_cnPause = 0, g_cnStep = 0, g_cnSkipped = 0, g_cnSteps = 0;
+char g_cnWhy[96] = "not checked yet", g_cnSndWhy[80] = "not checked yet";
+volatile LONG g_cnPause = 0, g_cnStep = 0, g_cnStepping = 0, g_cnSkipped = 0, g_cnSteps = 0;
 volatile DWORD g_cnStream = 0, g_cnHandler = 0;  // the cutscene stream the gate held last
+volatile DWORD g_cnHeldTick = 0;                  // GetTickCount of the last held update (badge, sound)
 DWORD g_cnLogged = 0;                             // the stream of the last "holds" log line
+bool g_cnSndOurs = false, g_cnSndMuted = false, g_cnSndWasMuted = false;   // what TruMenu did to the master group
+float g_cnMark = -1.0f, g_cnArmAt = -1.0f;        // 0.22.1 cine.mark / cine.pauseat, in seconds of cutscene time
+volatile LONG g_cnArm = 0;
 AiPatch g_cnPatches[2] = {
     {0x005904e3, kCnUpdate, true, "N1 stream walk 0x5904e3", 0, 0, false},
     {0x005954f8, kCnUpdate, true, "N2 stream walk 0x5954f8", 0, 0, false},
@@ -21392,12 +21414,12 @@ DWORD __fastcall CnGate(DWORD stream, DWORD edx, float dt) {
         DWORD handler = 0, state = 0, next = 0;
         if (ReadDword(stream + 0x77c, &handler) && handler && ReadDword(stream + 0x18, &state) && state == 4 &&
             ReadDword(stream + 0x14, &next)) {
-            if (g_cnStep > 0) {
-                InterlockedDecrement(&g_cnStep);
-                InterlockedIncrement(&g_cnSteps);
+            g_cnStream = stream;
+            g_cnHandler = handler;
+            g_cnHeldTick = GetTickCount() | 1;
+            if (g_cnStepping) {
+                InterlockedIncrement(&g_cnSteps);   // cine.step: CnTick counts the frames down
             } else {
-                g_cnStream = stream;
-                g_cnHandler = handler;
                 InterlockedIncrement(&g_cnSkipped);
                 return next;
             }
@@ -21415,18 +21437,137 @@ void CnCheck() {
         p.game = p.target - (p.site + 5);
         p.hook = reinterpret_cast<DWORD>(&CnGate) - (p.site + 5);
     }
-    Log(g_cnOk ? 1 : 0, "0.22 cine.pause: %d checks %s", static_cast<int>(sizeof(kCnChecks) / sizeof(kCnChecks[0])),
-        g_cnWhy);
+    at = 0;
+    g_cnSndOk = DvChecks(kCnSndChecks, sizeof(kCnSndChecks) / sizeof(kCnSndChecks[0]), &at);
+    if (g_cnSndOk) Out(g_cnSndWhy, sizeof(g_cnSndWhy), "ok");
+    else Out(g_cnSndWhy, sizeof(g_cnSndWhy), "sound pause code differs at 0x%08lx", at);
+    Log(g_cnOk ? 1 : 0, "0.22 cine.pause: %d checks %s; 0.22.1 sound pause: %d checks %s",
+        static_cast<int>(sizeof(kCnChecks) / sizeof(kCnChecks[0])), g_cnWhy,
+        static_cast<int>(sizeof(kCnSndChecks) / sizeof(kCnSndChecks[0])), g_cnSndWhy);
 }
-// PadHook, once per game frame: the patches follow the switch; off by itself outside a level
+// the first playing cutscene stream of the stream list and its time in seconds ([obj+0x384] counts 1/30 s: the dt
+// path adds dt x 30.0 [0x8439b8], the sound path 0x5800d0 multiplies seconds by the same constant)
+bool CnFindCine(DWORD *stream, float *seconds) {
+    DWORD s = 0;
+    if (!ReadDword(kCnStreamHead, &s)) return false;
+    for (int count = 0; s && count < 32; ++count) {
+        DWORD handler = 0, state = 0, next = 0;
+        float t = 0.0f;
+        if (ReadDword(s + 0x77c, &handler) && handler && ReadDword(s + 0x18, &state) && state == 4 &&
+            ReadFloats(s + 0x384, &t, 1)) {
+            *stream = s;
+            *seconds = t / 30.0f;
+            return true;
+        }
+        if (!ReadDword(s + 0x14, &next)) break;
+        s = next;
+    }
+    return false;
+}
+// the master channel group (0 = none / sound checks failed); calls into the game's FMOD guarded
+DWORD CnMaster() {
+    DWORD system = 0, group = 0;
+    if (!g_cnSndOk || !ReadDword(kSnFmodSystem, &system) || !system) return 0;
+    __try {
+        if (reinterpret_cast<CnGetMasterFn>(kCnGetMaster)(system, &group) != 0) group = 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        group = 0;
+    }
+    return group;
+}
+bool CnSndPause(DWORD group, bool paused) {
+    __try {
+        return reinterpret_cast<CnCgPausedFn>(kCnCgSetPaused)(group, paused ? 1 : 0) == 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+bool CnSndMute(DWORD group, bool mute) {
+    __try {
+        return reinterpret_cast<FmCgMuteFn>(kFmCgSetMute)(group, nullptr, mute ? 1 : 0, 1) == 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+bool CnHeldNow() {
+    const DWORD tick = g_cnHeldTick;
+    return g_cnOn && g_cnPause && tick && GetTickCount() - tick < 500;
+}
+// game thread: the master group follows the hold (paused), a step (running muted) and the release (running, the
+// mute TruMenu set taken back after the pause - so the release starts the sound before the stream moves on)
+void CnSoundTick() {
+    const bool held = CnHeldNow();
+    const bool want = g_cnSndOk && (held || g_cnStepping);
+    if (!want && !g_cnSndOurs && !g_cnSndMuted) return;
+    const DWORD group = CnMaster();
+    DWORD flags = 0;                             // byte 0 = +0x58 muted, byte 1 = +0x59 paused
+    if (!group || !ReadDword(group + 0x58, &flags)) return;
+    const bool muted = (flags & 0xff) != 0, paused = (flags & 0xff00) != 0;
+    if (want && g_cnStepping) {
+        if (!g_cnSndMuted) {
+            g_cnSndWasMuted = muted;
+            if (!muted) CnSndMute(group, true);
+            g_cnSndMuted = true;
+        }
+        if (g_cnSndOurs) {
+            CnSndPause(group, false);
+            g_cnSndOurs = false;
+        }
+        return;
+    }
+    if (want) {
+        // not paused (yet, or again: the game's pause screen resumes the master group when it closes) -> pause it
+        if (!paused && CnSndPause(group, true)) {
+            if (!g_cnSndOurs) Log(1, "cine.pause: master channel group 0x%08lx paused (the cutscene sound with it)", group);
+            g_cnSndOurs = true;
+        }
+        if (g_cnSndMuted && (g_cnSndOurs || paused)) {
+            if (!g_cnSndWasMuted) CnSndMute(group, false);
+            g_cnSndMuted = false;
+        }
+        return;
+    }
+    if (g_cnSndOurs) {
+        CnSndPause(group, false);
+        g_cnSndOurs = false;
+        Log(1, "cine.pause: master channel group 0x%08lx running again", group);
+    }
+    if (g_cnSndMuted) {
+        if (!g_cnSndWasMuted) CnSndMute(group, false);
+        g_cnSndMuted = false;
+    }
+}
+// PadHook, once per game frame: the patches follow the switch; off by itself outside a level; steps, sound, pauseat
 void CnTick() {
-    if (!g_cnPause && !g_cnOn) return;
+    if (!g_cnPause && !g_cnOn && !g_cnSndOurs && !g_cnSndMuted && !g_cnArm) return;
     CnCheck();
     DWORD state = 0;
-    if (g_cnPause && (!ReadDword(kCnMainState, &state) || state != 1)) {
+    const bool inLevel = ReadDword(kCnMainState, &state) && state == 1;
+    if (g_cnPause && !inLevel) {
         InterlockedExchange(&g_cnPause, 0);
         InterlockedExchange(&g_cnStep, 0);
         Log(1, "cine.pause off by itself: main state %lu (load / not in a level) - %ld frame(s) held", state, g_cnSkipped);
+    }
+    if (g_cnArm && !g_cnPause && inLevel && g_cnOk) {   // 0.22.1 cine.pauseat: hold once the cutscene reaches the time
+        DWORD s = 0;
+        float sec = 0.0f;
+        if (CnFindCine(&s, &sec) && sec >= g_cnArmAt) {
+            InterlockedExchange(&g_cnArm, 0);
+            g_cnRefused = false;
+            InterlockedExchange(&g_cnSkipped, 0);
+            InterlockedExchange(&g_cnSteps, 0);
+            InterlockedExchange(&g_cnPause, 1);
+            Log(1, "cine.pauseat: cutscene stream 0x%08lx reached %.2f s (target %.2f s) - held", s,
+                static_cast<double>(sec), static_cast<double>(g_cnArmAt));
+        }
+    }
+    if (g_cnStepping) {                          // cine.step: n game frames let through, then held again
+        if (InterlockedDecrement(&g_cnStep) <= 0 || !g_cnPause) {
+            InterlockedExchange(&g_cnStep, 0);
+            InterlockedExchange(&g_cnStepping, 0);
+        }
+    } else if (g_cnStep > 0 && g_cnPause && g_cnOn) {
+        InterlockedExchange(&g_cnStepping, 1);
     }
     const bool was = g_cnOn;
     M21PatchGroup(g_cnPatches, 2, g_cnOk && g_cnPause != 0, &g_cnOn, &g_cnRefused, "cine.pause: the stream walk calls "
@@ -21442,16 +21583,87 @@ void CnTick() {
         ReadDword(s + 0x778, &sound);
         ReadFloats(s + 0x384, &t, 1);
         ReadDword(kCnTrackerCine, &tracker);
-        Log(1, "cine.pause holds cutscene stream 0x%08lx at time %.3f (handler 0x%08lx, GameTracker cinematic 0x%08lx, "
-            "sound stream %s)", s, static_cast<double>(t), g_cnHandler, tracker, sound ? "yes" : "no");
+        Log(1, "cine.pause holds cutscene stream 0x%08lx at time %.3f = %.2f s (handler 0x%08lx, GameTracker cinematic "
+            "0x%08lx, sound stream %s)", s, static_cast<double>(t), static_cast<double>(t) / 30.0, g_cnHandler, tracker,
+            sound ? "yes" : "no");
         g_cnLogged = s;
     }
+    CnSoundTick();
+}
+// 0.22.1 badge: top centre while a cutscene is held (or stepped) - "|| Szene angehalten  9.6 s  Ton angehalten"
+bool CnBadgeWanted() { return CnHeldNow() || (g_cnOn && g_cnStepping); }
+void DrawCnBadge() {
+    const bool de = g_qbLang == 0;
+    float t = 0.0f;
+    const DWORD s = g_cnStream;
+    if (s) ReadFloats(s + 0x384, &t, 1);
+    char line[128];
+    const char *sound = !g_cnSndOk ? (de ? "Ton: Schleife" : "sound: loops")
+                      : g_cnSndOurs ? (de ? "Ton angehalten" : "sound held")
+                      : g_cnStepping ? (de ? "Ton stumm" : "sound muted") : (de ? "Ton: Spiel-Pause" : "sound: game's pause");
+    if (g_cnStepping) Out(line, sizeof(line), "%s  %.1f s", de ? "> Bild weiter" : "> frame on", static_cast<double>(t) / 30.0);
+    else Out(line, sizeof(line), "||  %s  %.1f s  -  %s", de ? "Szene angehalten" : "Cutscene held",
+             static_cast<double>(t) / 30.0, sound);
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 12.0f), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.55f);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
+                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
+                             ImGuiWindowFlags_NoSavedSettings;
+    if (ImGui::Begin("##TruCinePause", nullptr, flags))
+        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.35f, 1.0f), "%s", line);
+    ImGui::End();
 }
 void ValCnPause(char *o, size_t n) {
     CnCheck();
-    Out(o, n, "%d (%s; %ld frame(s) held, %ld step(s)%s)", g_cnPause ? 1 : 0,
+    Out(o, n, "%d (%s; %ld frame(s) held, %ld step frame(s); sound %s%s)", g_cnPause ? 1 : 0,
         !g_cnOk ? g_cnWhy : g_cnOn ? "gate patched" : "game's own", g_cnSkipped, g_cnSteps,
+        !g_cnSndOk ? g_cnSndWhy : g_cnSndOurs ? "held by TruMenu" : g_cnSndMuted ? "muted (step)" : "game's own",
         g_cnRefused ? "; patch refused - see TruMenu.log" : "");
+}
+void ValCnMark(char *o, size_t n) {
+    char mark[40] = "none", arm[48] = "off";
+    if (g_cnMark >= 0.0f) Out(mark, sizeof(mark), "%.2f s", static_cast<double>(g_cnMark));
+    if (g_cnArm) Out(arm, sizeof(arm), "armed at %.2f s", static_cast<double>(g_cnArmAt));
+    DWORD s = 0;
+    float sec = 0.0f;
+    char now[48] = "no cutscene";
+    if (CnFindCine(&s, &sec)) Out(now, sizeof(now), "cutscene at %.2f s", static_cast<double>(sec));
+    Out(o, n, "mark %s; pauseat %s; %s", mark, arm, now);
+}
+// 0.22.1: remember the playing cutscene's time (seconds) for cine.pauseat
+bool RunCnMark(const char *, char *o, size_t n) {
+    DWORD s = 0;
+    float sec = 0.0f;
+    if (!CnFindCine(&s, &sec)) { Out(o, n, "cine.mark: no playing cutscene"); return false; }
+    g_cnMark = sec;
+    Log(1, "cine.mark %.2f s (stream 0x%08lx; src=%s)", static_cast<double>(sec), s, ShotSource("cine.mark"));
+    Out(o, n, "cine.mark: %.2f s - cine.pauseat (no argument) holds the cutscene there next time", static_cast<double>(sec));
+    return true;
+}
+// 0.22.1: hold the cutscene once its time reaches <seconds> (no argument = the mark; off = disarm); stays armed over
+// loads, so: mark, reload the checkpoint, the cutscene plays and stands still at the same spot
+bool RunCnPauseAt(const char *arg, char *o, size_t n) {
+    CnCheck();
+    if (arg && (!_stricmp(arg, "off") || !_stricmp(arg, "0"))) {
+        InterlockedExchange(&g_cnArm, 0);
+        Out(o, n, "cine.pauseat off");
+        return true;
+    }
+    if (!g_cnOk) { Out(o, n, "disabled: pre-check failed (%s)", g_cnWhy); return false; }
+    float at = g_cnMark;
+    if (arg && arg[0]) {
+        char *end = nullptr;
+        at = static_cast<float>(strtod(arg, &end));
+        if (end == arg || at < 0.0f) { Out(o, n, "cine.pauseat <seconds> | off (no argument = the cine.mark)"); return false; }
+    }
+    if (at < 0.0f) { Out(o, n, "cine.pauseat: no cine.mark yet - give the seconds"); return false; }
+    g_cnArmAt = at;
+    InterlockedExchange(&g_cnArm, 1);
+    Log(1, "cine.pauseat %.2f s armed (src=%s)", static_cast<double>(at), ShotSource("cine.pauseat"));
+    Out(o, n, "cine.pauseat: the next cutscene that reaches %.2f s stands still there", static_cast<double>(at));
+    return true;
 }
 // the stream list: the first cutscene stream (handler, state, time, sound) and the counts
 void ValCnStatus(char *o, size_t n) {
@@ -21478,6 +21690,9 @@ void ValCnStatus(char *o, size_t n) {
 }
 bool RunCnPause(const char *arg, char *o, size_t n) {
     CnCheck();
+    // 0.22.1: no argument = report only (a TruLink "check" flipped the pause twice in the live test of 2026-11-08);
+    // the bar, the command bar and the menu always send 1 / 0
+    if (!arg || !arg[0]) { ValCnPause(o, n); return true; }
     const bool on = BoolArg(arg, g_cnPause != 0);
     if (on && !g_cnOk) { Out(o, n, "disabled: pre-check failed (%s)", g_cnWhy); return false; }
     if (on) {
@@ -21501,7 +21716,7 @@ bool RunCnStep(const char *arg, char *o, size_t n) {
     if (k < 1) k = 1;
     if (k > 600) k = 600;
     InterlockedExchangeAdd(&g_cnStep, k);
-    Out(o, n, "cine.step: %ld frame(s) of the cutscene", k);
+    Out(o, n, "cine.step: %ld game frame(s) of the cutscene%s", k, g_cnSndOk ? " (sound muted while stepping)" : "");
     return true;
 }
 // ---- end of 0.22 cutscene pause
@@ -22040,13 +22255,19 @@ const Item kItems[] = {
     {"cam.shakestate", "info", "0.21: active camera shake slots (pool 0xe80020), the scale, the rumble", false, ValCsState,
      nullptr},
     // 0.22 (section "0.22 cutscene pause")
-    {"cine.pause", "bool", "0.22: hold a playing cutscene (its stream update 0x5901a0 is skipped: time, actors, camera "
-                           "stand still) while the world, particles and lights run on; off by itself at a load", false,
-     ValCnPause, RunCnPause},
-    {"cine.step", "action", "0.22 [n]: let n frames (default 1, at most 600) of the held cutscene through", false,
-     ValCnPause, RunCnStep},
+    {"cine.pause", "bool", "0.22 1|0: hold a playing cutscene (its stream update 0x5901a0 is skipped: time, actors, "
+                           "camera stand still) while the world, particles and lights run on; 0.22.1: the sound is held "
+                           "too (master channel group), a badge shows it, no argument = report only; off by itself at a "
+                           "load", false, ValCnPause, RunCnPause},
+    {"cine.step", "action", "0.22 [n]: let n game frames (default 1, at most 600) of the held cutscene through (0.22.1: "
+                            "sound muted meanwhile, so clock and picture move on together)", false, ValCnPause, RunCnStep},
     {"cine.status", "info", "0.22: the stream list - the cutscene stream (state, time, handler, sound), GameTracker "
                             "cinematic, the pause", false, ValCnStatus, nullptr},
+    {"cine.mark", "action", "0.22.1: remember the playing cutscene's time (seconds) for cine.pauseat", false, ValCnMark,
+     RunCnMark},
+    {"cine.pauseat", "action", "0.22.1 [seconds|off]: hold the next cutscene that reaches the time (no argument = the "
+                               "mark); stays armed over loads - mark, reload the checkpoint, it stops at the same spot",
+     false, ValCnMark, RunCnPauseAt},
     {"ai.remove", "action", "0.21 nearest|others|all|<intro id>: AI enemies out of the world the game's despawn way (others "
                             "= every one but the nearest to Lara)", true, ValAdRemove, RunAdRemove},
     // 0.21.1 (section "0.21.1 ai.kill")
@@ -26109,6 +26330,8 @@ const QbRow kQbTests[] = {
     {"Zwischensequenz", "Cutscene", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
     {"Szene anhalten", "Hold the cutscene", "cine.pause", "", kQbBool, -1, kQcNone, 0, kQbPlayer, 0},
     {"Ein Bild weiter", "One frame on", "cine.step", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Stelle merken", "Remember the spot", "cine.mark", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},   // 0.22.1
+    {"Bei Marke anhalten", "Hold at the mark", "cine.pauseat", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Szenen-Strom (live)", "Cutscene stream (live)", "cine.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
@@ -26198,6 +26421,9 @@ const QbHelp kQbHelp[] = {
     {"shot.oncine", "", "Foto-Paare beim Start jeder Zwischensequenz|Shot pairs at the start of each cutscene"},
     {"cine.pause", "", "Zwischensequenz anhalten, Effekte laufen weiter|Hold the cutscene, effects run on"},   // 0.22
     {"cine.step", "", "Ein Bild der angehaltenen Szene weiter|One frame of the held cutscene"},
+    {"cine.mark", "", "Szenenzeit merken (Sekunden)|Remember the cutscene time (seconds)"},   // 0.22.1
+    {"cine.pauseat", "", "Naechste Szene haelt an der Marke - Checkpoint neu laden|Next cutscene stops at the mark - "
+                         "reload the checkpoint"},
     {"menu.hidecursor", "", "Kein Mauszeiger ueber dem Spielbild|No mouse cursor over the game picture"},
     {"cheat.flight", "", "Frei fliegen ohne Schwerkraft - Tasten in der Zeile oben|Fly freely without gravity - keys in "
                          "the line above"},
@@ -31547,9 +31773,10 @@ void Render(IDirect3DDevice9 *device) {
     const bool quickDraw = QuickWantsDraw();     // 0.17
     if (!quickDraw) g_qbRect = {0, 0, 0, 0};
     const bool flightHint = FlightHintWanted();  // 0.21.6
+    const bool cnBadge = CnBadgeWanted();        // 0.22.1 cutscene held
     if (!g_menuOpen && !g_overlay && !g_logOverlay && !g_guardOverlay && !g_drawMarkup && !g_lblOn && !g_radOpen &&
         !flowDraw && !DvAnyOn() && !quickDraw && !g_snOn && !ArWantsDraw() && !LabelLayersOn() &&   // 0.21.7: + uber,
-        !flightHint)                                                                           // shader, navmesh labels
+        !flightHint && !cnBadge)                                                               // shader, navmesh labels
         return;
     if (g_imguiFailed) return;
     if (!g_imguiReady) {
@@ -31601,6 +31828,7 @@ void Render(IDirect3DDevice9 *device) {
     if (g_snOn) DrawSoundList();                 // 0.20.1 sound list ([Sound] Position, default bottom left)
     if (flowDraw) DrawFlowOverlay();             // 0.11
     if (flightHint) DrawFlightHint();            // 0.21.6: after the sound list / flow line (it keeps above them)
+    if (cnBadge) DrawCnBadge();                  // 0.22.1: "|| Szene angehalten" top centre
     if (g_menuOpen) DrawMenu();
     if (g_menuOpen) TraceEnd();
     if (g_radOpen && !g_menuOpen) DrawRadial();  // 0.10: foreground draw list, no ImGui window

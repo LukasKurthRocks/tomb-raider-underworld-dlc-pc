@@ -17,7 +17,7 @@ READMEs and [CHANGELOG.md](../CHANGELOG.md); the plugin README and the CHANGELOG
 | Plugin | Group | Version | State |
 |---|---|---|---|
 | [TruQoL](#truqol) | base-game comfort | 0.1.2 | partial: frame limiter and thread cap played 2026-11-08; the other keys offline |
-| [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22 | partial: 0.21.11 played 2026-11-08; 0.22 (cutscene pause) offline |
+| [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22.1 | partial: 0.21.11 and the 0.22 cutscene pause played 2026-11-08; 0.22.1 (sound held, badge, pause at a mark) offline |
 | [TruMercLang](#trumerclang) | base-game comfort (fun option) | 0.1 | offline, default off |
 | [TruShadowPower](#trushadowpower) | DLC 2 title update | 0.20 | partial: played up to 0.18; 0.19 and 0.20 offline |
 | [TruShadowCombat](#trushadowcombat) | DLC 2 title update | 0.6.6 | partial: combat input and damage played; 0.6.6 offline |
@@ -98,9 +98,10 @@ with a stable id that tools run over TruLink. It has a quick bar with pages (for
 of all plugins, "Kostueme", "Rettung" with the soft-lock helpers for players), a radial menu, a command line, level
 and checkpoint jumps, test spots and debug drawing (navmesh, triggers, labels).
 
-- Version: 0.22 (new: `cine.pause` / `cine.step` / `cine.status` hold a playing cutscene while particles and lights run
-  on - bar page "Tests", group "Zwischensequenz").
-- State: 0.21.11 played (installed in the live test of 2026-11-08); 0.22 built and byte-checked, not yet played. Known
+- Version: 0.22.1 (new: `cine.pause` / `cine.step` / `cine.status` hold a playing cutscene while particles and lights
+  run on; 0.22.1 holds the sound with it, shows a badge, and `cine.mark` / `cine.pauseat` stop a cutscene at a
+  remembered time - bar page "Tests", group "Zwischensequenz").
+- State: 0.21.11 and the 0.22 picture pause played on 2026-11-08; 0.22.1 built and byte-checked, not yet played. Known
   problem: together with the Steam
   overlay it can crash with a stack overflow; turn the overlay off until TruMenu has a re-entry guard
   ([TROUBLESHOOTING.md](TROUBLESHOOTING.md#known-problems-of-the-original-pc-game)).
