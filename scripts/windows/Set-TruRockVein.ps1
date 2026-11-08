@@ -1,7 +1,7 @@
 ﻿<#
 .SYNOPSIS
     Installs or removes TruRockVein.asi (DLC 2 rock veins: title-update markup conditions 607 / 608; since 0.10 also
-    the title update's SweepAndPrune limits) next to tru.exe.
+    the title update's SweepAndPrune limits, since 0.11 its ledge-corner nudge) next to tru.exe.
 
 .DESCRIPTION
     -Install copies <workspace>\work\asi\TruRockVein.asi (built by Build-TruAsi.ps1) and its sample .ini into the
@@ -52,9 +52,11 @@ $earlierBuilds = @{
                           'f0d3456c9a66ed27b5fc15f51db83646078f1c19b95501868065f6bb1a37b57e',
                           'c2b626dff712ee579a18ff11eb389333455b9a3a9a289173464243e221e1173b',
                           '66f80abb20e9ec6a74e2f3f6e933e8be2757ec70a870f03406197999cf55b29c',   # 0.8 jump geometry (work\asi_rv08)
-                          'e7430050c8587e8d1a36f09fc8c2d7de4cb2738821e9732af00f1d6967234076')   # 0.9 skip geometry (work\asi_rv09, installed since 2026-11-02)
+                          'e7430050c8587e8d1a36f09fc8c2d7de4cb2738821e9732af00f1d6967234076',   # 0.9 skip geometry (work\asi_rv09, installed since 2026-11-02)
+                          'c50d7a69ee4fe0ac15aceb9dde48315c6b5f6f2f3d646117620039b58a5ea1c8')   # 0.10 SweepAndPrune limits (work\asi\rv10)
     'TruRockVein.ini' = @('89c0283b20a375253d38e6f53e77cfb7df10b0c036650c789564c629d3f227c1',
-                          '1dbfc739c5f0646ba6a791eb1b77504927b74ab7b146d9ae8b71c0621113b19f')   # sample .ini of 0.8 (also 0.9; 0.10 adds [SweepAndPrune])
+                          '1dbfc739c5f0646ba6a791eb1b77504927b74ab7b146d9ae8b71c0621113b19f',   # sample .ini of 0.8 (also 0.9; 0.10 adds [SweepAndPrune])
+                          'a16fb9d9c5671be0a3ba44e3b719465b932ee7ab111286cac4a518dbec8b5c32')   # sample .ini of 0.10 (0.11 adds [LedgeCorner])
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

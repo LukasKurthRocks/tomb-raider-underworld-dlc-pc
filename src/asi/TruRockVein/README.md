@@ -204,6 +204,46 @@ work\asi\rv10`), not loaded.
 | 3 | `[SweepAndPrune] Translate=0`, restart | control line "... boxes +0x24 = 1000, pair parameter +0x2c = 200 (400 pair links), memory +0x20 = 207201, owner +0x20 = 200 ... -> PC limits (Translate=0)"; `sap.status` "b/1000, p/400" |
 | 4 | play a while (loading areas, DLC 2) | no change in behaviour, no crash (memory +412 800 bytes only) |
 
+## 0.11: ledge-corner nudge as the title update (2026-11-08)
+
+Published TU fix (TeamXbox 09.03.2009): "Fixed a ledge corner transition problem from TRU where Lara could end up stuck
+on a ledge". Located in code by 17w (ENGINE.md section 14 "Ledge corner", `docs\Befund-17w-TU-Fixes-0811.md` row 2);
+translated 1:1 here (package 18a, statically proven, `work\ledge18a_0811\`).
+
+| | retail / PC | title update | 0.11 on PC |
+|---|---|---|---|
+| ledge function | retail 0x8242bc30 / PC tru+0x34e5a0 (0x74e5a0) | TU 0x8242ecd8 | - |
+| tracker `[0xfadb58]` (TU `[0x829892b0]`) | +0xc94 box, +0xc98 t, +0xeac partner box, +0xeb0 partner t | same fields | read, +0xc98 written |
+| after "box and partner set, both flag 0x40000000" | PC 0x74e7c6..0x74e80e, then the segment fetch 0x5c3aa0 | TU ..0x8242eea8, then **inserted block 0x8242eeac..0x8242ef40**, then 0x8227b6e0 | hook **0x74e814** (8 bytes `movss xmm1,[0x841134]`, executed in the stub) |
+| look-ahead direction | called late: retail 0x8242c00c, PC **0x74eaed** (`call 0x787ef0`, `cmp eax,4` at 0x74eafe) | called once at 0x8242eebc (`bl 0x82489d10`, r30), reused at 0x8242f094 | called once in the hook, result reused at 0x74eaed (`call LookAheadReuse`) |
+| nudge | - | partner box == box and `floorf(partner t) == floorf(t)`: t = floor - **0.001** (direction 4), else floor + **1.01** | the same; floor = the exe's floor 0x813510 rounded to float |
+| constants | PC `[0x841634]` = 0x3a83126f (already used for t = 0) | TU f30 = `[0x82053608]` = 0x3a83126f (0.001f), `[0x8207ddf8]` = 0x3f8147ae (1.01f) | the two TU words |
+
+Why the result is reused and not computed a second time: 0x787ef0 (parameter 0x1f3 of the agent -> 1..6) is not free of
+side effects - 0x783f50 stores the resolved node in `[agent+0x520]`, 0x784b30 counts each access in the node
+(`add word [ecx+2],1`) and rebalances (0x783d40). The TU calls it once; so does 0.11. 0x74e814..0x74eaed is one straight
+line (one forward `je` inside, no jump from outside into it, `ebx` = the argument, written only at 0x74e5c4). The stub
+keeps all registers, flags and xmm0-xmm7; the x87 stack is empty at the hook. If the stub has not run,
+`LookAheadReuse` calls the original 0x787ef0.
+
+Option: `[LedgeCorner] Translate` (default 1, in the sample ini). Log lines: "ledge corner: title-update nudge added
+(tru+0x34e5a0 = TU 0x8242ecd8, block 0x8242eeac; hook 0x0074e814, look-ahead result reused at 0x0074eaed; ...)" at load,
+then on the first nudge (at `LogLevel=2` every power of two) "ledge corner: title-update nudge (TU 0x8242eeac): box
+0x..., partner t ..., t ... -> ... (look-ahead d) (n nudges)". Errors: "ledge function at ... does not match -
+ledge-corner nudge not added". `Translate=0`: "ledge corner: Translate=0 - PC ledge code kept". Built 2026-11-08 into
+`work\asi\rv11` (install: `Set-TruRockVein.ps1 -Install -SourceDir work\asi\rv11`), not loaded, not tested in the game.
+Known spots: our sources name no level; `docs\Recherche-QoL-Beschwerden-0811.md` links the fix to the TR Chronicles
+bug list entries G5a / G15 (shimmying round corners, also on PC) - not re-checked offline.
+
+**TO TEST (0.11)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | start the game with 0.11 installed | `TruRockVein.log`: "TruRockVein 0.11 loaded (... ledge corner translate 1)" and "ledge corner: title-update nudge added ..." |
+| 2 | hang on a ledge and shimmy round outer and inner corners (corners where Lara used to stop or get stuck; G5a / G15 spots if known) | Lara goes round the corner; the first time one "ledge corner: title-update nudge ..." line (t moved to floor - 0.001 or floor + 1.01) |
+| 3 | the same corner with `[LedgeCorner] Translate=0` | the PC behaviour as before, no nudge line |
+| 4 | ledge climbing in general, DLC 2 rock veins (0.4-0.9 paths) | no change elsewhere, no crash; with `LogLevel=2` the nudge count grows only at corners |
+
 ## Build, install, remove
 
 - Build: `scripts\windows\Build-TruAsi.ps1 -Name TruRockVein` (installed Visual Studio, x86, `/MT`, imports only
@@ -214,7 +254,7 @@ work\asi\rv10`), not loaded.
   `LogDefaultConditions`, `MarkupTypes`, `MarkupSlots`, `NullBoxGuard`, `MarkupAction608`, `AttachGeometry`,
   `State420Slot1`, `ChartLog` (`ChartLogFrom` / `ChartLogTo`), `JumpGeometry`, `SkipGeometry` (0.9) - the switches from
   `MarkupTypes` on default to 1, the chart range to 1470..1510; section `[SweepAndPrune]`: `Translate` (0.10, default 1,
-  read at the game start). Log:
+  read at the game start); section `[LedgeCorner]`: `Translate` (0.11, default 1). Log:
   `TruRockVein.log` next to `tru.exe`.
 
 ## Test

@@ -112,6 +112,26 @@
 // tru+0x1be3c4 in DllMain, i.e. before the game init (checked: the owner pointer must still be 0). Control: on the first
 // machine update (the chart probe, also installed for this alone) one line with core +0x24 / +0x2c / +0x20 and owner
 // +0x20 (TU: 3000 / 500 / 620001 / 500). Memory: +412 800 bytes once from the game allocator.
+//
+// 0.11 (2026-11-08, package 18a; ENGINE.md section 14 "Ledge corner", docs Befund-17w-TU-Fixes-0811 row 2): the title
+// update's ledge-corner nudge (published fix "Lara getting stuck on ledge corners"). Ledge function PC tru+0x34e5a0 =
+// retail 0x8242bc30 = TU 0x8242ecd8, player tracker [0xfadb58] (TU [0x829892b0]): +0xc94 box, +0xc98 t, +0xeac partner
+// box, +0xeb0 partner t. After the tests "box and partner set, both with flag 0x40000000" (PC 0x74e7c6..0x74e80e = TU
+// ..0x8242eea8) the TU inserted block 0x8242eeac..0x8242ef40 runs before the segment fetch (TU 0x8227b6e0 = PC
+// 0x5c3aa0):
+//   dir = LookAheadDirection(arg)                          (TU 0x82489d10 = retail 0x82483c40 = PC 0x787ef0)
+//   if partner box == box and floorf(partner t) == floorf(t):
+//       t = floorf(t) - 0.001f   if dir == 4              (TU f30 = [0x82053608] = 0x3a83126f)
+//       t = floorf(t) + 1.01f    else                     (TU [0x8207ddf8] = 0x3f8147ae)
+// and the TU uses that one result again at 0x8242f094 (cmpwi r30,4), where retail / PC call it (PC site 0x74eaed,
+// result compared with 4 at 0x74eafe). The lookup is not free of side effects (0x783f50 stores the resolved node in
+// [arg+0x520], 0x784b30 counts the access in the node and rebalances), so the plugin keeps the TU's single call:
+// LedgeCornerStub replaces `movss xmm1,[0x841134]` at tru+0x34e814 (8 bytes, executed in the stub; x87 stack empty,
+// eax = tracker, ebx = arg, xmm0 live - all registers kept), and the call at tru+0x34eaed goes to LookAheadReuse,
+// which returns the stored result (else, never expected, it runs the original 0x787ef0). Straight line from 0x74e814
+// to 0x74eaed (one forward je inside, no jump into the range). floorf = the exe's floor 0x813510 rounded to float (TU:
+// floor 0x8268b7a0 + frsp). Option [LedgeCorner] Translate (default 1); log line on the first nudge, at LogLevel 2
+// every power of two.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -280,6 +300,7 @@ int g_chartFrom = 1470, g_chartTo = 1510;
 int g_jumpGeometry = 1;                 // 0.8: TU type-22 branches of the jump-off / fall geometry ([RockVein] JumpGeometry)
 int g_skipGeometry = 1;                 // 0.9: TU type-22 branch of tru+0x34d390 (TU 0x8242a7c8) ([RockVein] SkipGeometry)
 int g_sapTranslate = 1;                 // 0.10: SweepAndPrune limits as the TU ([SweepAndPrune] Translate)
+int g_ledgeCorner = 1;                  // 0.11: TU ledge-corner nudge (TU 0x8242eeac) ([LedgeCorner] Translate)
 DWORD g_facingNext = kFacingNext, g_facingEdge = kFacingEdge, g_moveNext = kMoveNext, g_moveWall = kMoveWall;
 DWORD g_chartTickNext = kChartTickNext;
 volatile LONG g_facingHits = 0, g_moveHits = 0, g_slot1Calls = 0, g_slot1Runs = 0, g_chartLines = 0;
@@ -562,6 +583,7 @@ void ReadOptions(const char *dir) {
     g_jumpGeometry = GetPrivateProfileIntA("RockVein", "JumpGeometry", 1, ini);
     g_skipGeometry = GetPrivateProfileIntA("RockVein", "SkipGeometry", 1, ini);
     g_sapTranslate = GetPrivateProfileIntA("SweepAndPrune", "Translate", 1, ini);   // 0.10
+    g_ledgeCorner = GetPrivateProfileIntA("LedgeCorner", "Translate", 1, ini);      // 0.11
 }
 
 // 0.3: the title update's markup types 22 / 23 -> flag class 1 (Xbox TU 0x822a12e8 table entries 21 / 22 = li r3,1).
@@ -1507,6 +1529,129 @@ void PatchSkipGeometry() {
         Log(0, "fifth geometry function not written (VirtualProtect %lu)", GetLastError());
 }
 
+// ---- 0.11: title-update ledge-corner nudge (TU 0x8242ecd8, inserted block 0x8242eeac..0x8242ef40) ----
+const DWORD kLedgeEntry = 0x0074e5a0;     // push ebp; mov ebp,esp; and esp,-16; mov eax,[0xfadb58]; fldz; mov ecx,[eax+0C94h]
+const char *const kLedgeEntryHex = "55 8bec 83e4f0 a158dbfa00 d9ee 8b88940c0000";
+const DWORD kLedgeArg = 0x0074e5c4;       // mov ebx,[ebp+8] - the argument (TU r27), not written again up to 0x74ea58
+const char *const kLedgeArgHex = "8b5d08";
+// 0x74e7c6..0x74e822: box / partner set, flag 0x40000000 on both (TU ..0x8242eea8), then the hooked movss and the
+// tracker load of the segment fetch
+const DWORD kLedgeCheck = 0x0074e7c6;
+const char *const kLedgeCheckHex = "83b8940c000000 0f8452050000 83b8ac0e000000 0f8445050000 8b88940c0000 8b4928 "
+                                   "f7c100000040 8b90ac0e0000 8b5228 c780d00e000000000000 0f841d050000 f7c200000040 "
+                                   "0f8411050000 f30f100d34118400 8b3558dbfa00";
+const DWORD kLedgeAt = 0x0074e814;        // movss xmm1,[0x841134] (8 bytes), executed in the stub
+const DWORD kLedgeNext = 0x0074e81c;
+// 0x74eace..0x74eb06: push ebx (0x74ea58) ... call 0x787ef0; ...; add esp,4; cmp eax,4 (TU 0x8242f094 reuses r30)
+const DWORD kLookSiteCheck = 0x0074eace;
+const char *const kLookSiteCheckHex = "a158dbfa00 d980980c0000 8b80940c0000 8b4834 d95c242c 83c101 894c2414 e8fe930300 "
+                                      "d944242c 0f28442464 83c404 83f804";
+const DWORD kLookPush = 0x0074ea58;       // push ebx = the argument of the look-ahead call
+const DWORD kLookSite = 0x0074eaed;       // call 0x787ef0 (5 bytes)
+const DWORD kLookAhead = 0x00787ef0;      // LookAheadDirection (cdecl, 1 argument): parameter 0x1f3 -> 1..6
+const char *const kLookAheadHex = "51 8b4c2408 56 8d442404 50 68f3010000 33f6 68f3010000";
+const DWORD kTracker = 0x00fadb58;        // player tracker pointer (TU 0x829892b0)
+const DWORD kFloor = 0x00813510;          // CRT floor (double) - TU floor 0x8268b7a0
+const char *const kFloorHex = "833d403e0d0100 0f844f950000 83ec08";
+const DWORD kTuMinus = 0x3a83126f;        // TU f30 = [0x82053608] = 0.001f (also PC [0x841634], the t = 0 case)
+const DWORD kTuPlus = 0x3f8147ae;         // TU [0x8207ddf8] = 1.01f
+typedef int(__cdecl *LookAheadFn)(void *agent);
+typedef double(__cdecl *FloorFn)(double);
+DWORD g_ledgeNext = kLedgeNext, g_lookAhead = kLookAhead;
+int g_lookHave = 0, g_lookDir = 0;       // the TU's r30: the one look-ahead result of this pass (game thread only)
+volatile LONG g_ledgeNudges = 0;
+
+void __cdecl LedgeCorner(void *agent) {
+    int dir = reinterpret_cast<LookAheadFn>(kLookAhead)(agent);   // TU 0x8242eebc, before the test
+    g_lookDir = dir;
+    g_lookHave = 1;
+    BYTE *p = *reinterpret_cast<BYTE **>(kTracker);
+    if (*reinterpret_cast<DWORD *>(p + 0xc94) != *reinterpret_cast<DWORD *>(p + 0xeac)) return;   // TU 0x8242eed0
+    FloorFn fl = reinterpret_cast<FloorFn>(kFloor);
+    float partner = static_cast<float>(fl(*reinterpret_cast<float *>(p + 0xeb0)));
+    float own = static_cast<float>(fl(*reinterpret_cast<float *>(p + 0xc98)));
+    if (!(partner == own)) return;          // TU 0x8242eef8 fcmpu / bne (unordered = not equal)
+    float before = *reinterpret_cast<float *>(p + 0xc98);
+    float base = static_cast<float>(fl(before));
+    float t = dir == 4 ? base - TuFloat(kTuMinus) : base + TuFloat(kTuPlus);   // TU 0x8242ef18 / 0x8242ef38
+    *reinterpret_cast<float *>(p + 0xc98) = t;
+    LONG n = InterlockedIncrement(&g_ledgeNudges);
+    if (LogNow(n))
+        Log(1, "ledge corner: title-update nudge (TU 0x8242eeac): box 0x%08lx, partner t %.4f, t %.4f -> %.4f "
+               "(look-ahead %d) (%ld nudges)", *reinterpret_cast<DWORD *>(p + 0xc94),
+            static_cast<double>(*reinterpret_cast<float *>(p + 0xeb0)), static_cast<double>(before),
+            static_cast<double>(t), dir, n);
+}
+
+// tru+0x34e814: x87 stack empty, eax = tracker, ebx = argument, xmm0 = 0 (live); all registers and flags kept
+__declspec(naked) void LedgeCornerStub() {
+    __asm {
+        pushfd
+        pushad
+        sub esp, 128
+        movdqu [esp], xmm0
+        movdqu [esp + 16], xmm1
+        movdqu [esp + 32], xmm2
+        movdqu [esp + 48], xmm3
+        movdqu [esp + 64], xmm4
+        movdqu [esp + 80], xmm5
+        movdqu [esp + 96], xmm6
+        movdqu [esp + 112], xmm7
+        push ebx
+        call LedgeCorner
+        add esp, 4
+        movdqu xmm0, [esp]
+        movdqu xmm1, [esp + 16]
+        movdqu xmm2, [esp + 32]
+        movdqu xmm3, [esp + 48]
+        movdqu xmm4, [esp + 64]
+        movdqu xmm5, [esp + 80]
+        movdqu xmm6, [esp + 96]
+        movdqu xmm7, [esp + 112]
+        add esp, 128
+        popad
+        popfd
+        movss xmm1, dword ptr ds:[841134h]  // the replaced instruction
+        jmp dword ptr [g_ledgeNext]
+    }
+}
+
+// tru+0x34eaed: call target instead of 0x787ef0 - the TU's single result (r30), else the original lookup
+__declspec(naked) void LookAheadReuse() {
+    __asm {
+        cmp dword ptr [g_lookHave], 0
+        je orig
+        mov dword ptr [g_lookHave], 0
+        mov eax, dword ptr [g_lookDir]
+        ret
+    orig:
+        jmp dword ptr [g_lookAhead]
+    }
+}
+
+void PatchLedgeCorner() {
+    if (!g_ledgeCorner) {
+        Log(1, "ledge corner: Translate=0 - PC ledge code kept (no title-update nudge)");
+        return;
+    }
+    if (!HexBytesAt(kLedgeEntry, kLedgeEntryHex) || !HexBytesAt(kLedgeArg, kLedgeArgHex) ||
+        !HexBytesAt(kLedgeCheck, kLedgeCheckHex) || !HexBytesAt(kLookSiteCheck, kLookSiteCheckHex) ||
+        !HexBytesAt(kLookPush, "53") || !HexBytesAt(kLookAhead, kLookAheadHex) || !HexBytesAt(kFloor, kFloorHex)) {
+        Log(0, "ledge function at 0x%08lx (sites 0x%08lx / 0x%08lx) does not match - ledge-corner nudge not added",
+            kLedgeEntry, kLedgeAt, kLookSite);
+        return;
+    }
+    BYTE call[5] = {0xe8, 0, 0, 0, 0};
+    DWORD rel = reinterpret_cast<DWORD>(&LookAheadReuse) - (kLookSite + 5);
+    memcpy(call + 1, &rel, 4);
+    // the call site first: until the stub is in, LookAheadReuse finds no stored result and runs the original
+    if (WriteCode(kLookSite, call, sizeof(call)) && WriteJump(kLedgeAt, &LedgeCornerStub, 8))
+        Log(1, "ledge corner: title-update nudge added (tru+0x34e5a0 = TU 0x8242ecd8, block 0x8242eeac; hook 0x%08lx, "
+               "look-ahead result reused at 0x%08lx; t = floor - 0.001 (direction 4) / floor + 1.01)", kLedgeAt, kLookSite);
+    else
+        Log(0, "ledge corner not (fully) written (VirtualProtect %lu)", GetLastError());
+}
+
 bool WriteDword(DWORD at, DWORD value) {
     DWORD old = 0, dummy = 0;
     if (!VirtualProtect(reinterpret_cast<void *>(at), 4, PAGE_READWRITE, &old)) return false;
@@ -1572,11 +1717,12 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruRockVein.log", dir);
     strncpy_s(g_dir, sizeof(g_dir), dir, _TRUNCATE);
     ReadOptions(dir);
-    Log(1, "TruRockVein 0.10 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
+    Log(1, "TruRockVein 0.11 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
         "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d, attach geometry %d, state 420 slot 1 %d, "
-        "chart log %d, jump geometry %d, skip geometry %d, SweepAndPrune translate %d)", g_enabled, g_logLevel,
-        g_logUnhandled, g_logBadValues, g_logDefaultConditions, g_markupTypes, g_markupSlots, g_nullBoxGuard,
-        g_markupAction608, g_attachGeometry, g_state420Slot1, g_chartLog, g_jumpGeometry, g_skipGeometry, g_sapTranslate);
+        "chart log %d, jump geometry %d, skip geometry %d, SweepAndPrune translate %d, ledge corner translate %d)",
+        g_enabled, g_logLevel, g_logUnhandled, g_logBadValues, g_logDefaultConditions, g_markupTypes, g_markupSlots,
+        g_nullBoxGuard, g_markupAction608, g_attachGeometry, g_state420Slot1, g_chartLog, g_jumpGeometry, g_skipGeometry,
+        g_sapTranslate, g_ledgeCorner);
     if (!g_enabled) { Log(1, "disabled by TruRockVein.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -1590,6 +1736,7 @@ void Start(HMODULE self) {
     if (g_chartLog || g_sapTranslate) PatchChartLog();   // 0.10: also the SweepAndPrune control's first-frame probe
     if (g_jumpGeometry) PatchJumpGeometry();
     if (g_skipGeometry) PatchSkipGeometry();
+    PatchLedgeCorner();                     // 0.11 (logs Translate=0 itself)
     if (!BytesAt(kDispatch, kDispatchBytes, sizeof(kDispatchBytes)) || !BytesAt(kDefault, kDefaultBytes, sizeof(kDefaultBytes)) ||
         !BytesAt(kExit, kExitBytes, sizeof(kExitBytes)) || !BytesAt(kCtxUse, kCtxUseBytes, sizeof(kCtxUseBytes))) {
         Log(0, "SCCondTest_MarkupType at 0x%08lx does not match (other tru.exe build?) - not patched", kDispatch);
@@ -1619,4 +1766,4 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
-extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.10 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update)"; }
+extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.11 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update, ledge-corner nudge as the title update)"; }
