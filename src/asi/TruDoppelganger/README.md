@@ -1,7 +1,7 @@
 # TruDoppelganger.asi
 
 DLC 2 *Lara's Shadow*: the state-machine ids the Xbox title update added for the DLC 2 player (the doppelganger), for
-the PC `tru.exe` - see the repository README, "How the Xbox title update is brought to PC", and
+the PC `tru.exe` - see docs/PLUGINS.md, "How the Xbox title update is brought to PC", and
 docs/WINDOWS_REBUILD.md finding 43. **Not yet played** - first build 2026-10-30.
 
 ## What it does

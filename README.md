@@ -4,10 +4,7 @@
 the PC version of the game.**
 
 This is my personal, unofficial fork of [andrearicci93/trudlcport](https://github.com/andrearicci93/trudlcport), the
-project that first converted the DLC for the PC. For *Lara's Shadow* this fork takes its own route: its own
-conversion of the DLC 2 data, and the Doppelgänger's shadow power - which came to the Xbox with a game update, not
-with the DLC files - rebuilt as small add-ons for the PC game, together with tools that repair converted data and help
-testing in the game. You need your own copy of the game and your own Xbox DLC files.
+project that first converted the DLC for the PC. You need your own copy of the game and your own Xbox DLC files.
 
 ![Unofficial](https://img.shields.io/badge/status-unofficial%20personal%20fork-lightgrey)
 ![AI-assisted](https://img.shields.io/badge/AI--assisted-Claude%20(Anthropic)-8A2BE2)
@@ -22,130 +19,45 @@ testing in the game. You need your own copy of the game and your own Xbox DLC fi
 > [Claude Code](https://claude.com/claude-code) (Anthropic's AI assistant), directed and checked by me, and tested on
 > one Windows PC with my own copy of the game and my own Xbox 360 DLC files. They may contain mistakes.
 
-**What this fork is**
+The original's full history is kept; my work sits on branch `windows` ([`main...windows`](../../compare/main...windows)).
+It does not replace the original. More about the fork: [docs/README.md](docs/README.md#about-this-fork).
 
-- A copy of the original repository with its **full, unchanged history**; my work sits on top of it on branch
-  `windows`. Every change is visible in the comparison
-  [`main...windows`](../../compare/main...windows) and can be picked up from there.
-- Made for my own use: running the upstream pipeline on Windows, learning how it works, rebuilding DLC 1 step by step
-  and comparing it with the B138 release, then trying DLC 2 (*Lara's Shadow*) and the costume packs.
-- **It does not replace the original** and is not a competing release. No support, no guarantees, no game data: like
-  the original, everything needs your own files.
+**What this fork does**
 
-**Current state (2026-11-05, tested on one PC, not a release)**
+1. **The DLC port for PC.** DLC 1 *Beneath the Ashes* and DLC 2 *Lara's Shadow*, converted from the Xbox files by the
+   upstream pipeline run on Windows. For DLC 2 the fork makes its own conversion; data faults found in game become
+   pipeline steps.
+2. **The Xbox title update's program code as plugins.** The shadow power of *Lara's Shadow* came with an Xbox game
+   update, not with the DLC files. Its functions are translated one by one into ASI plugins (shadow power, combat,
+   HUD, rock veins, the doppelganger as player).
+3. **Fixes and comfort for the base PC game.** `TruQoL` (60 fps cap, field of view, camera shake, a start-up fix for
+   PCs with many CPU threads), the test menu `TruMenu`, `Set-TruDisplay.ps1` and a table of known problems.
 
-- DLC 1 (B138): fixes found while testing - the "display driver" box on entering the DLC (shader constants), the
-  grapple ring's look, cinematic speech in all five languages. Rebuilt reproducibly by the pipeline step `Repair`.
-  DLC 1 starts correctly after playing DLC 2 in the same session (played).
-- DLC 2 (*Lara's Shadow*), played in our test builds through the Yggdrasil halls: intro, loading-screen title and
-  hint boxes like on the Xbox; the Doppelgänger's original look (title-update shaders translated); the shadow power
-  (slow motion, meter and its HUD); the wall run on the rock veins with its camera; the shadow combat moves; the
-  waterfall. The crash when thralls were unloaded is fixed, dying around the wall run no longer crashes. The end area
-  was reached by a level change, not yet played through in one go. Test evening 8 Nov 2026: the end cutscene is
-  visible (it was black), the ceremony room no longer crashes while the goo cannonballs fly, the end-room floor is
-  textured and the goo particles look right (soft drips instead of square dots).
-- Both DLC: the data fixes found through crash dumps are pipeline steps (WINDOWS_REBUILD.md findings 44-48); our
-  `generalbank` (the title update's loading-screen and hint-box scripts ported to PC) is built by the pipeline step
-  `Generalbank`.
-- Testing: test runs from profiles with automatic log checks (`Invoke-TruTestRun.ps1`, `tests/profiles/`), an
-  in-game controller menu with a radial menu and a guided test flow (`TruMenu`), a local link for scripted checks
-  (`TruLink`) and a log-only trace of sounds, state changes, spawns and level loads (`TruTrace`).
+**State on 2026-11-08** (one PC, not a release; "played" = tested in game, "offline" = only static checks)
+
+| Part | What works | State | What is missing |
+|---|---|---|---|
+| DLC 1 *Beneath the Ashes* | the "display driver" box on entering, the grapple ring's look and cinematic speech in five languages fixed (pipeline step `Repair`); starts correctly after DLC 2 in the same session | played | a crash while loading the dungeon in our test builds: cause found (a DLC 2 effect file of the same name kept a raw texture group count), fix built offline, live test open |
+| DLC 2 *Lara's Shadow* | through the Yggdrasil halls: intro, loading-screen titles and hint boxes, the doppelganger's look, shadow power, wall run, combat, waterfall; 8 Nov: end cutscene visible, no crash in the ceremony room, end-room floor and goo drips right | played; the end area only reached by a level change | **manual play stops at the jump from a ledge to a rock vein**: Lara reaches the vein's attach state, then turns back to the ledge within 0.2-0.6 s (analysis pending); further only with TruMenu's teleports. Also: the shadow finisher never starts, a moaning sound loops, flicker in the end cutscene, some title-update shaders still drawn with substitutes, the achievement fix untested |
+| Xbox title update plugins | slow motion, meter and HUD, power states, wall run and its camera, shadow combat input; thralls take damage and die (title-update damage switch, 7 Nov) | partial: these parts played, the newest versions offline | the finisher's own kill; Lara's ponytail stretches in slow motion (the cloth time step is translated behind a switch, off) |
+| Base-game fixes | `TruQoL` frame limiter at 60 fps; thread cap 8 / 16 / 24 on a 36-thread PC; `TruMenu` with the pages "Fixes" and "Rettung"; known problems in TROUBLESHOOTING | partial: frame limiter and thread cap played, FOV, shake, intro skip and `Set-TruDisplay` graphics options offline | thread cap above 24 hangs (default to become 8); Steam overlay with TruMenu can crash |
+
+Costume packs: converted and checked offline (pipeline step `Costumes`), not played yet. Per plugin:
+[docs/PLUGINS.md](docs/PLUGINS.md).
 
 ![Current development build: TruMenu quick bar, costume page, at the start of Lara's Shadow](docs/screenshots/dev-quickbar-costumes-2026-11-07.jpg)
-*Current development build (7 Nov 2026): the start of Lara's Shadow with the test menu's quick bar, page "Kostueme"
-(TruMenu 0.21.6) - every outfit of the game's cycle list, here the DLC costume f "Casual Explorer". Older snapshots and
-the story behind them: [docs/DEVLOG.md](docs/DEVLOG.md).*
+*Development build (7 Nov 2026): the start of Lara's Shadow with the test menu's quick bar, page "Kostueme"
+(TruMenu 0.21.6), here the DLC costume f "Casual Explorer". Older snapshots and states: [docs/DEVLOG.md](docs/DEVLOG.md).*
 
-**Still missing (short list)**
+**Where to read on**
 
-- DLC 2, **where manual play stops now (8 Nov 2026):** jumping from a ledge to a rock vein - Lara reaches the vein's
-  attach state, then turns back to the ledge within half a second (state-chart log taken, analysis pending). Getting
-  further needs the test menu's teleports.
-- DLC 2: the shadow finisher never starts (its target list stays empty); thralls now take damage and die with the
-  translated damage switch (`TruShadowCombat` `[Damage] Translate`, live test 07.11.), a full playthrough of the first
-  thrall fight is being tested; a moaning sound loops; Lara's ponytail stretches during the slow motion (the title
-  update's cloth time step is translated behind a switch, off by default); some title-update shaders are still drawn
-  with substitutes; the achievement fix is untested in game.
-- DLC 1: a crash while loading the dungeon in our current test builds (under investigation).
-- Costume packs: converted and checked offline (pipeline step `Costumes`), not played yet.
-- What we check after every change: [docs/Regression-DLC2.md](docs/Regression-DLC2.md) (DLC 2) and
-  [docs/Regression-DLC1.md](docs/Regression-DLC1.md).
-
-> [!IMPORTANT]
-> **The shadow power is program code of the Xbox title update, not data.** On the Xbox, *Lara's Shadow* lets Lara use
-> the Doppelgänger's power (hold LB/RB: the world slows down, a shadow meter drains; attach to and climb "rock
-> veins"; shadow combat moves). The PC `tru.exe` never received that exe patch, so no data conversion can bring it
-> back. We translate the title-update functions one by one into small plugins (ASI) that use the PC's own engine
-> functions with the Xbox's values: `TruShadowPower`, `TruShadowCombat`, `TruShadowHud`, `TruRockVein`,
-> `TruDoppelganger`, `TruDlc2Player`. Details:
-> [docs/DLC2.md](docs/DLC2.md#doppelgänger--shadow-power-missing-on-pc) and WINDOWS_REBUILD.md finding 43.
-- What was found and why, for anyone (including the original author) who wants to pick it up:
-  [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) finding 43, [docs/DLC2.md](docs/DLC2.md).
-
-**Comfort fixes for the base game (new, built - not yet tested in game)**
-
-- `TruQoL` plugin ([src/asi/TruQoL](src/asi/TruQoL/README.md), install with `scripts\windows\Set-TruQoL.ps1`): a 60 fps
-  cap at the game's own frame clock (physics puzzles break above 60 fps; switches itself off when DXVK or dxwrapper
-  already cap), a field-of-view factor, a camera shake scale (0 = off, against motion sickness), a start-up fix for PCs
-  with more than 31 CPU threads (would replace the `/affinity` launch option once confirmed) and an optional intro skip.
-  Every key can be changed live from TruMenu's page "Fixes".
-- `scripts\windows\Set-TruDisplay.ps1`: depth of field (in the PC game, but off by default), aspect ratio for 21:9 / 32:9,
-  the stutter fix of the community guides - with a registry backup and a `-Check` dry run.
-- Known problems of the original PC game and their workarounds: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
-
-**How the Xbox title update is brought to PC (approach)**
-
-The PC game is close to the Xbox retail game; the DLC need the Xbox **title update** on top. So the missing PC piece
-is the title update's *difference*, translated: PC + (TU - Xbox retail) = what the PC needs.
-
-```mermaid
-flowchart LR
-    XR["Xbox retail<br/>(game + scripts)"] -- "title update" --> XT["Xbox + TU<br/>(DLC support)"]
-    XR -. "1: match functions / data<br/>(same engine)" .- PC["PC tru.exe +<br/>PC bigfile"]
-    XT -- "2: difference<br/>(scripts, data, code)" --> D["TU delta"]
-    D -- "3a: scripts / data:<br/>convert words" --> PCS["PC generalbank<br/>(loading screen, hint box)"]
-    D -- "3b: exe code:<br/>re-implement as ASI" --> PCA["PC plugin<br/>(shadow power ...)"]
-    PC --> PCS
-    PC --> PCA
-```
-
-| Step | What | State (2026-11-07) |
-|---|---|---|
-| 1 | Match Xbox retail and PC: functions, natives, globals (`tools/xbox_pc_funcmap.py`) | 4 155 pairs, ~1 000 confirmed; names from an early 2007 build help |
-| 2 | Difference Xbox retail -> Xbox + TU (`tools/xbox_func_diff.py`, Xenia memory images) | done: of 937 "changed" functions 528 are real changes; no main-game fix found; the exe spots of the upstream comparison (K1-K14) named and sorted |
-| 3a | Scripts and data of the TU on PC (converted, repaired where PC differs) | loading screen with DLC titles and the hint box done (pipeline step `Generalbank`); the TU's player-list entry for the doppelganger costume and the localised doppelganger lines in progress |
-| 3b | Exe code of the TU on PC (shadow power) | slow motion, meter and HUD, power states, the rock-vein wall run and its camera, shadow combat input translated as plugins (played); **thralls take damage and die** (the TU's damage-type switch 0..27, played 07.11.) and shatter without the PC crash (the TU's death switch for lethal impulse hits); cloth time step translated (switch, off); splash damage / adrenaline in doppelganger mode in progress; the shadow finisher's own kill still open |
-
-**What is new here** (details on branch `windows`)
-
-- [scripts/windows/](scripts/windows/README.md) – PowerShell scripts: install the kit, swap single mod files, display
-  mode and language, tools, the pipeline step by step, a pre-upload check. The installer also takes the raw DLC
-  package files as copied from the console (`Install-TruDlc.ps1 -Package`, or the files in `input\xbox-dlc-live\`):
-  checked against a list of the known packages, verified block by block and extracted
-  ([Raw Xbox LIVE packages](scripts/windows/README.md#raw-xbox-live-packages))
-- [src/asi/](src/asi/) – the plugins (ASI, loaded by ModLoader): the title update's shadow power and DLC 2 player
-  code translated (see above), test helpers `TruMenu`, `TruLink`, `TruTrace`, `TruDataGuard`, and `TruGuard`
-  (fault diagnostics, by a colleague); each with its own README, installed with `scripts/windows/Set-Tru*.ps1`
-- Test runs: `scripts/windows/Invoke-TruTestRun.ps1` with the profiles in `tests/profiles/` (which test builds and
-  plugins to install, what to check, expected log lines, verdict), `Test-TruPreflight.ps1`, `Install-TruTree.ps1`
-- [docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md) – running the pipeline on Windows: missing glue scripts rebuilt,
-  stage-by-stage comparison with B138, run log and findings
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) – overview of the Windows rebuild: data flow, steps, learned tables,
-  how results are verified
-- [docs/RELATED_WORK.md](docs/RELATED_WORK.md) – what we researched and found: earlier attempts to bring the TRU DLC
-  to PC (Tomb Raider Forums 2011-2026), cdcEngine tools, other porting/decomp/recomp projects, techniques worth
-  adopting
-- [docs/WS_MAP.md](docs/WS_MAP.md) – map of the author's `work/ws/` scripts, builds and overlay layers
-- [docs/DLC_MENU.md](docs/DLC_MENU.md), [docs/DLC2.md](docs/DLC2.md), [docs/COSTUMES.md](docs/COSTUMES.md) – DLC menu
-  text fix (all six languages), notes on DLC 2 and the costume packs
-- New tools in `tools/` (e.g. `compare_b138.py`, `compare_sections.py`, `compare_audio.py`, `dlc_media_build.py`,
-  `dlc_audio_build.py`, `mul_audio_nch.py` - the audio fix for non-stereo `.mul`, `dlc_assemble_build.py` (also DLC 2),
-  `mesh_tables_build.py`, `tree_check.py`)
-- [CHANGELOG.md](CHANGELOG.md) – section "Fork branch `windows`" at the top: what this fork changed, by date (no
-  release of the port)
-- [docs/UPSTREAM_DIFF.md](docs/UPSTREAM_DIFF.md) – only what this fork has that the original's `main` does not: changed
-  upstream files with the reason, converter fault families with their checks, names, new parts (generated by
-  `scripts/windows/New-TruUpstreamDiff.ps1`)
+- [docs/README.md](docs/README.md) – index of all documents, by reader
+- [docs/PLUGINS.md](docs/PLUGINS.md) – every plugin: purpose, version, state, INI switches; how the title update is
+  brought to PC
+- [docs/INSTALL.md](docs/INSTALL.md) and [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) – install, known problems
+- [CHANGELOG.md](CHANGELOG.md) – section "Fork branch `windows`": every change by date
+- [docs/ENGINE.md](docs/ENGINE.md) – how the engine works, with addresses and proofs
+- [docs/DLC2.md](docs/DLC2.md) – DLC 2 notes and the shadow power analysis
 
 Versions of this fork are named `<date>[.<n>]-B<upstream build>`, e.g. `20261027-B138`: the B number is always the
 original's build it is based on.

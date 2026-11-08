@@ -5,6 +5,53 @@ install or play; the [README](../README.md) and [INSTALL](INSTALL.md) cover that
 overlays, log lines, sometimes substitute shaders), scaled down to 1280 px. The README shows the current state; older
 pictures move here.
 
+## 2026-11-08 - the README's former status block (state 2026-11-05, updated 2026-11-08)
+
+On 2026-11-08 the README got a short status table instead; the plugin details moved to [PLUGINS.md](PLUGINS.md). The
+former text is kept here as it was (links adjusted to this folder).
+
+The former introduction: *For Lara's Shadow this fork takes its own route: its own conversion of the DLC 2 data, and
+the Doppelgänger's shadow power - which came to the Xbox with a game update, not with the DLC files - rebuilt as small
+add-ons for the PC game, together with tools that repair converted data and help testing in the game.*
+
+**Current state (2026-11-05, tested on one PC, not a release)**
+
+- DLC 1 (B138): fixes found while testing - the "display driver" box on entering the DLC (shader constants), the
+  grapple ring's look, cinematic speech in all five languages. Rebuilt reproducibly by the pipeline step `Repair`.
+  DLC 1 starts correctly after playing DLC 2 in the same session (played).
+- DLC 2 (*Lara's Shadow*), played in our test builds through the Yggdrasil halls: intro, loading-screen title and
+  hint boxes like on the Xbox; the Doppelgänger's original look (title-update shaders translated); the shadow power
+  (slow motion, meter and its HUD); the wall run on the rock veins with its camera; the shadow combat moves; the
+  waterfall. The crash when thralls were unloaded is fixed, dying around the wall run no longer crashes. The end area
+  was reached by a level change, not yet played through in one go. Test evening 8 Nov 2026: the end cutscene is
+  visible (it was black), the ceremony room no longer crashes while the goo cannonballs fly, the end-room floor is
+  textured and the goo particles look right (soft drips instead of square dots).
+- Both DLC: the data fixes found through crash dumps are pipeline steps (WINDOWS_REBUILD.md findings 44-48); our
+  `generalbank` (the title update's loading-screen and hint-box scripts ported to PC) is built by the pipeline step
+  `Generalbank`.
+- Testing: test runs from profiles with automatic log checks (`Invoke-TruTestRun.ps1`, `tests/profiles/`), an
+  in-game controller menu with a radial menu and a guided test flow (`TruMenu`), a local link for scripted checks
+  (`TruLink`) and a log-only trace of sounds, state changes, spawns and level loads (`TruTrace`).
+
+The README picture's former caption: *Current development build (7 Nov 2026): the start of Lara's Shadow with the test
+menu's quick bar, page "Kostueme" (TruMenu 0.21.6) - every outfit of the game's cycle list, here the DLC costume f
+"Casual Explorer".*
+
+**Still missing (short list)**
+
+- DLC 2, **where manual play stops now (8 Nov 2026):** jumping from a ledge to a rock vein - Lara reaches the vein's
+  attach state, then turns back to the ledge within half a second (state-chart log taken, analysis pending). Getting
+  further needs the test menu's teleports.
+- DLC 2: the shadow finisher never starts (its target list stays empty); thralls now take damage and die with the
+  translated damage switch (`TruShadowCombat` `[Damage] Translate`, live test 07.11.), a full playthrough of the first
+  thrall fight is being tested; a moaning sound loops; Lara's ponytail stretches during the slow motion (the title
+  update's cloth time step is translated behind a switch, off by default); some title-update shaders are still drawn
+  with substitutes; the achievement fix is untested in game.
+- DLC 1: a crash while loading the dungeon in our current test builds (under investigation).
+- Costume packs: converted and checked offline (pipeline step `Costumes`), not played yet.
+- What we check after every change: [Regression-DLC2.md](Regression-DLC2.md) (DLC 2) and
+  [Regression-DLC1.md](Regression-DLC1.md).
+
 ## 2026-11-07 - the enemy navmesh, drawn by the game itself
 
 The PC `tru.exe` still contains the complete debug drawing of the pathfinding middleware (NavPower). The switches are

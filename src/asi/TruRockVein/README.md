@@ -1,7 +1,7 @@
 # TruRockVein.asi
 
 DLC 2 *Lara's Shadow*: the rock veins ("Felsrinnen") for the PC `tru.exe` - step 3.4a of bringing the Xbox title
-update to PC (see the repository README, "How the Xbox title update is brought to PC", and docs/WINDOWS_REBUILD.md
+update to PC (see docs/PLUGINS.md, "How the Xbox title update is brought to PC", and docs/WINDOWS_REBUILD.md
 finding 43). 0.1 played 2026-10-30 (patched, never asked - see 0.2); 0.2 built 2026-10-31, not yet played. Since 0.10
 also the title update's SweepAndPrune limits of the markup manager (section 0.10).
 
