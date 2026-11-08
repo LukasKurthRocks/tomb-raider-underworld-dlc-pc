@@ -2877,6 +2877,20 @@ tree (master: 12 plain channels, no child group). The final build pauses the mas
 category tree (log: "2 channel group(s) paused"): silence while held, the line goes on exactly where it stopped, in
 sync. Steps and `cine.pauseat` not yet tried live.
 
+## TruMenu 0.22.2 (light.frame: per-frame light capture; 2026-11-08)
+
+Build `work\asi\menu0225`. `light.frame [n]` (default 60, at most 600): while it runs, the rel32 of the frame end call
+0x5098ca (the reset 0x504c50 of the scene lists, ecx = scene) points to a gate that records this frame's lists before
+the reset: light instances (pointers scene+0x20, count +0x1020; 0x80 bytes each), the light behind each instance
+(0x100 bytes, only when new or changed), light resources (scene+0x1024, count +0x11a4, slot R+0x1d18) and the third
+count +0x1228. After n frames the game thread writes `TruMenu.lightframe.txt` next to tru.exe and puts the call back;
+the file ends with one `S` line per light: frames present, instance / light byte changes, `BLINK?` when it was missing
+in frames or changed in more than a quarter of them. 3 byte checks. Bar page Tests: "Lichter mitschreiben (60 Bilder)".
+
+Played 2026-11-08 21:30 (DLC 2 end cutscene held at the throne): 14 lights, all in every frame; 4 torch lights change
+their colour every frame (flicker, wanted), the 3 shadow-casting cutscene lights run a 5-frame cycle (instance +0x60
+1, 1, 1, 2, 3; +0x78 0 / 1.0); with global shadows off the throne stood still - the flicker is their shadow rendering.
+
 ### TO TEST 0.22.1
 
 | # | Step | Expected |

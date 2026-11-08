@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -1070,6 +1070,7 @@ void DrawSoundList();  // 0.20.1 snd.list overlay (render thread, section "0.20.
 void ArTick();         // 0.21 arachnophobia patches (game thread, section "0.21 arachnophobia")
 void CsTick();         // 0.21 camera shake scale / rumble patches (game thread)
 void CnTick();         // 0.22 cine.pause: the stream walk gate (game thread, section "0.22 cutscene pause")
+void LxTick();         // 0.22.2 light.frame: per-frame light capture (game thread, section "0.22.2 light.frame")
 bool ArWantsDraw();    // 0.21: spider pictures to draw (render thread)
 void ArDrawPictures(IDirect3DDevice9 *dev);
 void ArOnReset();      // 0.21: the picture's D3DPOOL_DEFAULT texture before a Reset
@@ -1384,6 +1385,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         ArTick();                             // 0.21 arachnophobia: slot 7 / sound gates (only while on in a level)
         CsTick();                             // 0.21 camera shake scale / rumble (only below 100 %)
         CnTick();                             // 0.22 cine.pause (cheap while off: one flag)
+        LxTick();                             // 0.22.2 light.frame (cheap while idle: two flags)
         AkTick();                             // 0.21.1 ai.kill: one state line ~1 s after a kill (cheap while idle)
         PhTick();                             // 0.21.1 physics bodies: one read every 250 ms
         NavTick();                           // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
@@ -21771,6 +21773,212 @@ bool RunCnStep(const char *arg, char *o, size_t n) {
 }
 // ---- end of 0.22 cutscene pause
 
+// ======================================================================================================================
+// 0.22.2 light.frame [n] - per-frame light capture for the throne flicker of the DLC 2 end cutscene (TODO N7; the owner,
+// 2026-11-08: "Das waere was was ich gerne beheben will"). The scene (device + 0xfdfc) builds three lists per frame and
+// the frame function clears them at its end with one call (0x5098ca -> 0x504c50, thiscall, no argument):
+//   light instances E: pointers at scene+0x20, count [scene+0x1020] ([E] = the PCRenderLight, E+0x64 / +0x65 flags)
+//   light resources R: pointers at scene+0x1024, count [scene+0x11a4] (0x50428d adds R once: R+0x1d18 = its slot,
+//     -1 = not in the list; the reset writes -1 back; R+0x1d18 = -1 also in the ctor 0x50b7f0)
+//   a third count [scene+0x1228] (read at 0x504b1d / 0x504b57; its list not known - recorded as a number only)
+//   the reset also sets every light's L+0x18 = 0 (0x504cab)
+// While a capture runs the rel32 of 0x5098ca points to LxGate: it writes the three lists of this frame (E raw 0x80 bytes,
+// the light L raw 0x100 bytes only when new or changed) into a memory buffer, then calls the reset. After n frames the
+// game thread writes TruMenu.lightframe.txt next to tru.exe, puts the call back and logs a summary: per light the frames
+// it was in and how often its instance / light bytes changed - a light that is missing in some frames or keeps
+// changing while the cutscene is held is marked "BLINK?". Read only (besides the patch while capturing).
+// ======================================================================================================================
+const DWORD kLxCallSite = 0x005098ca, kLxReset = 0x00504c50;
+const DvCheck kLxChecks[] = {
+    {0x005098bd, "8d8dfcfd0000 c68546fa000000 e881b3ffff"},                         // ecx = scene, call the reset
+    {0x00504c50, "8b81a4110000 56 33f6 3bc6 57 7426 8d948124100000"},                // R count +0x11a4, list +0x1024
+    {0x00504c84, "8b5114 33c0 3bd6 89b1a4110000 89b128120000 89b120100000"},         // the three counts := 0
+};
+typedef void(__fastcall *LxResetFn)(DWORD scene);
+AiPatch g_lxPatches[1] = {{kLxCallSite, kLxReset, true, "F1 frame end 0x5098ca", 0, 0, false}};
+bool g_lxOk = false, g_lxOn = false, g_lxRefused = false;
+volatile LONG g_lxChecked = 0;
+char g_lxWhy[96] = "not checked yet", g_lxLast[MAX_PATH + 64] = "none yet";
+volatile LONG g_lxWant = 0, g_lxLeft = 0, g_lxDone = 0, g_lxTotal = 0;
+char *g_lxBuf = nullptr;
+size_t g_lxLen = 0;
+const size_t kLxCap = 8u * 1024u * 1024u;
+struct LxLight { DWORD light; int present, eChanges, lChanges; DWORD eHash, lHash; };
+LxLight g_lxLights[256];
+int g_lxLightN = 0, g_lxFrame = 0;
+void LxAppend(const char *fmt, ...) {
+    if (!g_lxBuf || g_lxLen + 2048 > kLxCap) return;
+    va_list ap;
+    va_start(ap, fmt);
+    const int k = _vsnprintf_s(g_lxBuf + g_lxLen, kLxCap - g_lxLen, _TRUNCATE, fmt, ap);
+    va_end(ap);
+    if (k > 0) g_lxLen += static_cast<size_t>(k);
+}
+bool LxBlock(DWORD address, BYTE *out, int n) {
+    __try {
+        memcpy(out, reinterpret_cast<const void *>(address), static_cast<size_t>(n));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+DWORD LxHash(const BYTE *b, int n) {
+    DWORD h = 2166136261u;
+    for (int i = 0; i < n; ++i) h = (h ^ b[i]) * 16777619u;
+    return h;
+}
+void LxHex(const BYTE *b, int n, char *o) {
+    static const char kHex[] = "0123456789abcdef";
+    for (int i = 0; i < n; ++i) {
+        o[i * 2] = kHex[b[i] >> 4];
+        o[i * 2 + 1] = kHex[b[i] & 15];
+    }
+    o[n * 2] = 0;
+}
+LxLight *LxLightOf(DWORD light) {
+    for (int i = 0; i < g_lxLightN; ++i)
+        if (g_lxLights[i].light == light) return &g_lxLights[i];
+    if (g_lxLightN >= 256) return nullptr;
+    g_lxLights[g_lxLightN] = {light, 0, 0, 0, 0, 0};
+    return &g_lxLights[g_lxLightN++];
+}
+// one frame, just before the reset clears the lists (the frame function's thread)
+void LxCapture(DWORD scene) {
+    DWORD nE = 0, nR = 0, nX = 0;
+    ReadDword(scene + 0x1020, &nE);
+    ReadDword(scene + 0x11a4, &nR);
+    ReadDword(scene + 0x1228, &nX);
+    ++g_lxFrame;
+    LxAppend("F %d tick %lu E %lu R %lu X %lu\n", g_lxFrame, GetTickCount(), nE, nR, nX);
+    BYTE e[0x80], l[0x100];
+    char hex[0x201];
+    for (DWORD i = 0; i < nE && i < 96; ++i) {
+        DWORD ep = 0, light = 0;
+        if (!ReadDword(scene + 0x20 + i * 4, &ep) || !ep || !LxBlock(ep, e, sizeof(e))) continue;
+        light = *reinterpret_cast<DWORD *>(e);
+        LxHex(e, sizeof(e), hex);
+        LxAppend("E %lu %08lx L %08lx %s\n", i, ep, light, hex);
+        LxLight *t = LxLightOf(light);
+        if (!t) continue;
+        ++t->present;
+        const DWORD eh = LxHash(e + 4, sizeof(e) - 4);
+        if (t->present > 1 && eh != t->eHash) ++t->eChanges;
+        t->eHash = eh;
+        if (light && LxBlock(light, l, sizeof(l))) {
+            const DWORD lh = LxHash(l, sizeof(l));
+            if (t->present == 1 || lh != t->lHash) {
+                if (t->present > 1) ++t->lChanges;
+                LxHex(l, sizeof(l), hex);
+                LxAppend("L %08lx frame %d %s\n", light, g_lxFrame, hex);
+            }
+            t->lHash = lh;
+        }
+    }
+    for (DWORD i = 0; i < nR && i < 96; ++i) {
+        DWORD rp = 0, slot = 0;
+        if (!ReadDword(scene + 0x1024 + i * 4, &rp) || !rp) continue;
+        ReadDword(rp + 0x1d18, &slot);
+        LxAppend("R %lu %08lx slot %ld\n", i, rp, static_cast<LONG>(slot));
+    }
+}
+void __fastcall LxGate(DWORD scene) {
+    if (g_lxLeft > 0) {
+        __try {
+            LxCapture(scene);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            LxAppend("! exception in frame %d\n", g_lxFrame);
+        }
+        if (InterlockedDecrement(&g_lxLeft) == 0) InterlockedExchange(&g_lxDone, 1);
+    }
+    reinterpret_cast<LxResetFn>(kLxReset)(scene);
+}
+void LxCheck() {
+    if (InterlockedExchange(&g_lxChecked, 1)) return;
+    DWORD at = 0;
+    g_lxOk = DvChecks(kLxChecks, sizeof(kLxChecks) / sizeof(kLxChecks[0]), &at);
+    if (g_lxOk) Out(g_lxWhy, sizeof(g_lxWhy), "ok");
+    else Out(g_lxWhy, sizeof(g_lxWhy), "frame end code differs at 0x%08lx", at);
+    for (AiPatch &p : g_lxPatches) {
+        p.game = p.target - (p.site + 5);
+        p.hook = reinterpret_cast<DWORD>(&LxGate) - (p.site + 5);
+    }
+    Log(g_lxOk ? 1 : 0, "0.22.2 light.frame: %d checks %s", static_cast<int>(sizeof(kLxChecks) / sizeof(kLxChecks[0])),
+        g_lxWhy);
+}
+// game thread (PadHook): start (patch + arm), finish (file, summary, patch back)
+void LxTick() {
+    if (!g_lxWant && !g_lxDone && !g_lxOn) return;
+    LxCheck();
+    if (g_lxWant && !g_lxOn && g_lxOk) {
+        const LONG n = InterlockedExchange(&g_lxWant, 0);
+        if (!g_lxBuf) g_lxBuf = static_cast<char *>(VirtualAlloc(nullptr, kLxCap, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+        if (!g_lxBuf) { Log(0, "light.frame: no buffer (VirtualAlloc %lu)", GetLastError()); return; }
+        g_lxLen = 0;
+        g_lxLightN = 0;
+        g_lxFrame = 0;
+        char unit[64];
+        CurrentUnit(unit, sizeof(unit));
+        DWORD s = 0;
+        float sec = -1.0f;
+        CnFindCine(&s, &sec);
+        LxAppend("# TruMenu light.frame: %ld frames, unit %s, cutscene %s %.2f s, held %d\n", n, unit,
+                 s ? "at" : "none", static_cast<double>(sec), CnHeldNow() ? 1 : 0);
+        LxAppend("# F frame | E slot instance L light <0x80 bytes of the instance> | L light frame <0x100 bytes, only "
+                 "when new or changed> | R slot resource +0x1d18\n");
+        InterlockedExchange(&g_lxTotal, n);
+        InterlockedExchange(&g_lxDone, 0);
+        InterlockedExchange(&g_lxLeft, n);
+        M21PatchGroup(g_lxPatches, 1, true, &g_lxOn, &g_lxRefused, "light.frame: the frame end call 0x5098ca",
+                      "capture");
+        if (!g_lxOn) InterlockedExchange(&g_lxLeft, 0);
+        return;
+    }
+    if (!g_lxDone) return;
+    InterlockedExchange(&g_lxDone, 0);
+    M21PatchGroup(g_lxPatches, 1, false, &g_lxOn, &g_lxRefused, "light.frame: the frame end call 0x5098ca", "done");
+    int blink = 0;
+    for (int i = 0; i < g_lxLightN; ++i) {
+        const LxLight &t = g_lxLights[i];
+        const bool suspect = t.present < g_lxFrame || t.lChanges > g_lxFrame / 4 || t.eChanges > g_lxFrame / 4;
+        if (suspect) ++blink;
+        LxAppend("S light %08lx in %d of %d frames, instance bytes changed %d x, light bytes changed %d x%s\n", t.light,
+                 t.present, g_lxFrame, t.eChanges, t.lChanges, suspect ? "  BLINK?" : "");
+    }
+    char path[MAX_PATH + 32];
+    _snprintf_s(path, sizeof(path), _TRUNCATE, "%sTruMenu.lightframe.txt", g_exeDir);
+    HANDLE f = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    DWORD written = 0;
+    const bool ok = f != INVALID_HANDLE_VALUE &&
+                    WriteFile(f, g_lxBuf, static_cast<DWORD>(g_lxLen), &written, nullptr) && written == g_lxLen;
+    if (f != INVALID_HANDLE_VALUE) CloseHandle(f);
+    Out(g_lxLast, sizeof(g_lxLast), "%s (%d frames, %d lights, %d BLINK?)", ok ? path : "write failed", g_lxFrame,
+        g_lxLightN, blink);
+    Log(1, "light.frame: %d frames, %d lights, %d marked BLINK? - %s (%lu bytes%s)", g_lxFrame, g_lxLightN, blink,
+        ok ? path : "file not written", static_cast<DWORD>(g_lxLen), g_lxLen + 2048 > kLxCap ? ", buffer full" : "");
+}
+void ValLf(char *o, size_t n) {
+    LxCheck();
+    if (!g_lxOk) { Out(o, n, "disabled: pre-check failed (%s)", g_lxWhy); return; }
+    if (g_lxOn) Out(o, n, "capturing: %ld of %ld frames left", g_lxLeft, g_lxTotal);
+    else Out(o, n, "idle; last: %s", g_lxLast);
+}
+bool RunLf(const char *arg, char *o, size_t n) {
+    LxCheck();
+    if (!g_lxOk) { Out(o, n, "disabled: pre-check failed (%s)", g_lxWhy); return false; }
+    if (g_lxOn || g_lxWant) { Out(o, n, "light.frame: a capture runs already"); return false; }
+    char why[160];
+    if (!LabelWorldReady(why, sizeof(why))) { Out(o, n, "light.frame: %s", why); return false; }
+    long k = arg && arg[0] ? strtol(arg, nullptr, 10) : 60;
+    if (k < 1) k = 1;
+    if (k > 600) k = 600;
+    g_lxRefused = false;
+    InterlockedExchange(&g_lxWant, k);
+    Log(1, "light.frame %ld (src=%s)", k, ShotSource("light.frame"));
+    Out(o, n, "light.frame: %ld frames from the next game frame -> TruMenu.lightframe.txt next to tru.exe", k);
+    return true;
+}
+// ---- end of 0.22.2 light.frame
+
 struct Item {
     const char *id, *type, *label;
     bool gameThread;                         // runner must run on the game thread (queued)
@@ -22315,6 +22523,10 @@ const Item kItems[] = {
                             "cinematic, the pause", false, ValCnStatus, nullptr},
     {"cine.mark", "action", "0.22.1: remember the playing cutscene's time (seconds) for cine.pauseat", false, ValCnMark,
      RunCnMark},
+    {"light.frame", "action", "0.22.2 [n]: n frames (default 60, at most 600) of the per-frame light lists (instances, "
+                              "light bytes when changed, resources) into TruMenu.lightframe.txt next to tru.exe; summary "
+                              "per light with BLINK? for lights missing in frames or changing all the time", false, ValLf,
+     RunLf},
     {"cine.pauseat", "action", "0.22.1 [seconds|off]: hold the next cutscene that reaches the time (no argument = the "
                                "mark); stays armed over loads - mark, reload the checkpoint, it stops at the same spot",
      false, ValCnMark, RunCnPauseAt},
@@ -26382,6 +26594,8 @@ const QbRow kQbTests[] = {
     {"Ein Bild weiter", "One frame on", "cine.step", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Stelle merken", "Remember the spot", "cine.mark", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},   // 0.22.1
     {"Bei Marke anhalten", "Hold at the mark", "cine.pauseat", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Lichter mitschreiben (60 Bilder)", "Record lights (60 frames)", "light.frame", "60", kQbAction, -1, kQcNone, 0,
+     kQbGrey, 0},   // 0.22.2
     {"Szenen-Strom (live)", "Cutscene stream (live)", "cine.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
@@ -26472,6 +26686,8 @@ const QbHelp kQbHelp[] = {
     {"cine.pause", "", "Zwischensequenz anhalten, Effekte laufen weiter|Hold the cutscene, effects run on"},   // 0.22
     {"cine.step", "", "Ein Bild der angehaltenen Szene weiter|One frame of the held cutscene"},
     {"cine.mark", "", "Szenenzeit merken (Sekunden)|Remember the cutscene time (seconds)"},   // 0.22.1
+    {"light.frame", "*", "Lichter pro Bild in TruMenu.lightframe.txt, BLINK? = Verdacht|Lights per frame into "
+                         "TruMenu.lightframe.txt, BLINK? = suspect"},   // 0.22.2
     {"cine.pauseat", "", "Naechste Szene haelt an der Marke - Checkpoint neu laden|Next cutscene stops at the mark - "
                          "reload the checkpoint"},
     {"menu.hidecursor", "", "Kein Mauszeiger ueber dem Spielbild|No mouse cursor over the game picture"},

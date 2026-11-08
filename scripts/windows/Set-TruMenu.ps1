@@ -121,7 +121,8 @@ $earlierBuilds = @{
                       '35fc734773c461ef55521534f513d53b0019c4d8761a920a921c2e65361f5707',   # 0.21.11 light.list, page Rettung (work\asi\menu0222)
                       'c9e0ffe76fe4ce295f34cebed78cc35659f9390f77202489738e828688ffc7cd',   # 0.22 cutscene pause (work\asi\menu0223)
                       '7cd48b9552e57fda02a6c617d03daadded6f4027465cbc402ff522b8f0c8cdf4',   # 0.22.1 first build: unsigned held-tick bug (installed 20:44)
-                      '17338e08da753c799868b3c9fee972f02ac890d5912617585a77083f1aa3b56d')   # 0.22.1 tick fix, master group only (installed 20:50)
+                      '17338e08da753c799868b3c9fee972f02ac890d5912617585a77083f1aa3b56d',   # 0.22.1 tick fix, master group only (installed 20:50)
+                      'e556c9a7aecc8109f43be3a45311b63e1f947f0fe75324cc28c362541c7509ef')   # 0.22.1 final: category roots held (work\asi\menu0224)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
