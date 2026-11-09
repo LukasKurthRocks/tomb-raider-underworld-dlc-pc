@@ -19,6 +19,13 @@
                 -Windowed / -Fullscreen) only the language changes, the display mode and d3d9.dll stay as they are:
                 English=0, French=1, German=2, Italian=3, Spanish=4, Dutch=5 (order of the locals.bin_001..032
                 language bits; all six verified in game).
+    -SubtitleLanguage
+                Subtitle language apart from the speech (registry value SubtitleLanguage one level up, read by tru.exe at
+                0x477f1b into [0x8900e8]): Auto (-1 = as the game language, the default) or English / French / German /
+                Italian / Spanish (0 .. 4). The game checks the value at start (table 0x477e8c): -1, 0 .. 4, 7 and 9 .. 12
+                are kept, 5, 6 and 8 fall back to -1 - so Dutch is not offered. Every cinematic stream carries all subtitle
+                languages, so German speech with English subtitles should work (not yet seen in game). Like -Language it
+                can be given alone.
 
     Before any change the key is exported to <workspace>\backup\TRU-Graphics_<time>.reg.
     Every run writes <workspace>\logs\Set-TruDisplay_<time>.log. -Verbose shows steps, -Debug the values before/after,
@@ -49,6 +56,8 @@ param(
     [Parameter(ParameterSetName = 'Restore', Mandatory)][switch]$Restore,
     [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
     [ValidateSet('English', 'French', 'German', 'Italian', 'Spanish', 'Dutch')][string]$Language,
+    [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
+    [ValidateSet('Auto', 'English', 'French', 'German', 'Italian', 'Spanish')][string]$SubtitleLanguage,
     [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
     [ValidateSet('On', 'Off')][string]$DepthOfField,
     [Parameter(ParameterSetName = 'Windowed')][Parameter(ParameterSetName = 'Fullscreen')]
@@ -103,6 +112,14 @@ function Set-GameLanguage {
     $id = $languageIds[$Language]
     Set-ItemProperty -LiteralPath $rootPath -Name 'Language' -Value $id -Type DWord
     Write-Log "Language set to $Language ($id)."
+}
+
+# subtitle language: Auto = -1 (as the game language); 0 .. 4 as the speech ids
+function Set-SubtitleLanguage {
+    if (!$SubtitleLanguage) { return }
+    $id = if ($SubtitleLanguage -eq 'Auto') { -1 } else { $languageIds[$SubtitleLanguage] }
+    Set-ItemProperty -LiteralPath $rootPath -Name 'SubtitleLanguage' -Value $id -Type DWord
+    Write-Log "Subtitle language set to $SubtitleLanguage ($id)."
 }
 
 # graphics options -> ordered list of (value name, DWORD); empty when none was given
@@ -216,23 +233,28 @@ try {
     if ($Check) {
         if ($modeGiven) { Write-Log ('Check: display mode would be set: {0}' -f $(if ($Fullscreen) { 'fullscreen' } else { "windowed $Width x $Height" })) }
         if ($Language) { Write-Log "Check: language would be set to $Language." }
+        if ($SubtitleLanguage) {
+            $now = (Get-ItemProperty -LiteralPath $rootPath).SubtitleLanguage
+            Write-Log "Check: subtitle language $now -> $SubtitleLanguage."
+        }
         $current = Get-ItemProperty -LiteralPath $regPath
         foreach ($name in $graphicsPlan.Keys) {
             Write-Log ('Check: {0} {1} -> {2}' -f $name, $current.$name, $graphicsPlan[$name])
         }
-        if (!$modeGiven -and !$Language -and !$graphicsPlan.Count) { Write-Log 'Check: nothing given.' }
+        if (!$modeGiven -and !$Language -and !$SubtitleLanguage -and !$graphicsPlan.Count) { Write-Log 'Check: nothing given.' }
         Write-Log 'Check only - nothing changed.'
         return
     }
     $backupFile = Join-Path $backupDir "TRU-Graphics_$stamp.reg"
     Invoke-Reg @('export', $regNative, $backupFile, '/y')
     Write-Log "Backup: $backupFile" -Level VERBOSE
-    if ($Language) {
+    if ($Language -or $SubtitleLanguage) {
         $rootBackup = Join-Path $backupDir "TRU-Root_$stamp.reg"
         Invoke-Reg @('export', $rootNative, $rootBackup, '/y')
         Write-Log "Backup: $rootBackup" -Level VERBOSE
     }
     Set-GameLanguage
+    Set-SubtitleLanguage
     Set-GraphicsOptions $graphicsPlan
 
     if ($Fullscreen) {
@@ -242,7 +264,7 @@ try {
         Write-Log 'Fullscreen mode set.'
         return
     }
-    if (!$Windowed -and ($Language -or $graphicsPlan.Count)) {
+    if (!$Windowed -and ($Language -or $SubtitleLanguage -or $graphicsPlan.Count)) {
         # only -Language / graphics options given (default parameter set): leave the display mode and d3d9.dll alone
         Write-Values 'after'
         Write-Log 'Display mode unchanged (no -Windowed / -Fullscreen).'

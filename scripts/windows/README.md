@@ -159,6 +159,10 @@ The installer itself and its options are the original's: [docs/INSTALL.md](../..
 - **Language:** registry value `Language` under `HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld`:
   0 English, 1 French, 2 German, 3 Italian, 4 Spanish, 5 Dutch (the order of the `locals.bin_001..032` language
   bits; all six checked in game) - `Set-TruDisplay.ps1 -Language`.
+- **Subtitle language** (apart from the speech): registry value `SubtitleLanguage` in the same key; -1 = as the game
+  language (the default). The game keeps -1, 0 .. 4, 7 and 9 .. 12 and falls back to -1 for 5, 6 and 8, so Dutch is not
+  offered - `Set-TruDisplay.ps1 -SubtitleLanguage Auto|English|French|German|Italian|Spanish` (e.g. German speech with
+  English subtitles; every cinematic stream carries all subtitle languages; not yet seen in game).
 - **Windowed mode:** the game sets `Fullscreen` back to 1 at start-up; `LockWindowSize` and `LockedWindow*` stay but
   are not used. Still open.
 
