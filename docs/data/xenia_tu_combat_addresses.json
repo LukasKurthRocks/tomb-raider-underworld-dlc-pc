@@ -79,7 +79,99 @@
     "proof": {"0x823d7ac8": "0x817f0004", "0x823d7b1c": "0xc03f0008", "0x823d7b20": "0xc05f000c"}
   },
   "instance_ext": {
-    "position": {"offset": "0x20", "proven": false, "pc": "instance +0x20 position (3 floats; ENGINE.md section 2 'Instance fields')", "why": "TU instance +0x10 / +0x2d0 are proven equal to the PC; +0x20 not yet tied to a TU reader"},
-    "stamp": {"offset": "0x44", "proven": false, "pc": "instance +0x44 allocation stamp", "why": "as position"}
+    "position": {"offset": "0x20", "proven": true, "pc": "instance +0x20 position (3 floats; ENGINE.md section 2 'Instance fields')", "why": "TU 0x8238d35c..0x8238d39c: gt = 0x82efb458 (lis -0x7d10 / addi -0x4ba8), r11 = [gt+0xc] (player instance), lfs +0x20 / +0x24 / +0x28 and lvx128 of inst+0x20 subtracted from another vector (2026-11-09 stage 1b)"},
+    "stamp": {"offset": "0x44", "proven": true, "pc": "instance +0x44 allocation stamp", "why": "TU 0x82355158: handle {inst +0, stamp +4} valid when [inst+0x44] == stamp (coordinator requester check 0x82355138)"},
+    "proof": {"0x8238d384": "0x8169000c", "0x8238d388": "0x394b0020", "0x8238d38c": "0xc06b0028", "0x8238d39c": "0xc02b0020", "0x82355158": "0x812b0044"}
+  },
+  "_comment_1b": "2026-11-09 stage 1b (TruXenia extension after the first live session): every section below has TU proof words; 'basis' says whether the meaning comes from TU code, Xbox data or the PC port (ENGINE.md).",
+  "lara_record": {
+    "chart_offset": "0x4",
+    "start_index_offset": "0x0",
+    "record_array_offset": "0xc",
+    "record_state_count_offset": "0xc",
+    "record_state_list_offset": "0x18",
+    "basis": "code + Xbox data",
+    "why": "TU machine reset 0x82482808: r11 = [machine+4] (chart), r10 = s16 [chart+0] start index, r9 = [chart+0xc] record pointer array, r10 = [r9 + 4*index], stw r10 -> [machine+0x520]: +0x520 is a RECORD POINTER, its index is its position in [[machine+4]+0xc] (PC: [machine+0x510] / TruRockVein RecordIndex). Record layout (u16 header: +0xc state-id count, +0x18 pointer to the u16 state ids) as tools/chart_state_path.py reads the Xbox chart DTPs (big endian)",
+    "proof": {"0x8248282c": "0x817f0004", "0x82482834": "0xa14b0000", "0x8248284c": "0x812b000c", "0x82482854": "0x7d48482e", "0x8248285c": "0x915f0520"}
+  },
+  "lara_health": {
+    "offset": "0x628",
+    "max_offset": "0x630",
+    "previous_offset": "0x634",
+    "basis": "code; meaning 'health' from the PC (ENGINE.md section 3 player tracker +0x628)",
+    "why": "TU 0x823e8068..0x823e808c: r11 = [0x829892b0] (player tracker), lfs [r11+0x628] -> stfs [r11+0x634]; computed max -> stfs [r11+0x630]",
+    "proof": {"0x823e8068": "0x3d408299", "0x823e8078": "0x816a92b0", "0x823e8080": "0xc1ab0628", "0x823e8084": "0xd1ab0634", "0x823e808c": "0xd12b0630"}
+  },
+  "enemy_test": {
+    "data_offset": "0x50",
+    "magic": "0xdaf00018",
+    "count_byte": "0x18",
+    "basis": "code",
+    "why": "TU enemy init 0x822da9ac..0x822da9e0: [inst+0x50] word 0 == 0xdaf00018 and byte +0x18 != 0 -> brain of 0x50a0 bytes is allocated (PC 0x63c1b5..0x63c1d3 the same test)",
+    "proof": {"0x822da9ac": "0x817e0050", "0x822da9b8": "0x3d40daf0", "0x822da9c0": "0x61480018", "0x822da9cc": "0x896b0018", "0x822da9e0": "0x388050a0"}
+  },
+  "melee": {
+    "state_machine_offset": "0x1254",
+    "slot_index_offset": "0x18d4",
+    "data_stride": "0x19c",
+    "data_bias": "0x1f",
+    "data_record_offset": "0x50",
+    "data_state_object_offset": "0x198",
+    "record_anim_refs_offset": "0x78",
+    "record_timeout_offset": "0x136",
+    "basis": "code (data address, record pointer); +0x198 state object and +0x78 anim refs {u16 type, u16 anim} x3 from ENGINE.md 13.2 / 13.5 (same on all exes)",
+    "why": "TU MeleeAttack Enter 0x8232fb48: sm = brain+0x1254, slot = [sm + 4*(0x1a0+layer)] = [brain+0x18d4+4*layer], data = (sm + (slot + 2*layer)*0x19c + 0x1f) & ~0xf; record = [[arg]+0] stored at data+0x50; record +0x136 / +0x138 read",
+    "proof": {"0x8232fb80": "0x394501a0", "0x8232fb84": "0x397b1254", "0x8232fb9c": "0x1d48019c", "0x8232fba4": "0x38cb001f", "0x8232fbbc": "0x913f0050", "0x8232fbe8": "0xa12a0136"}
+  },
+  "coordinator": {
+    "requester_offset": "0x2fc4",
+    "handle_instance": "0x4",
+    "handle_stamp": "0x8",
+    "basis": "code (requester and its handle); meaning of the handle open",
+    "why": "TU MeleeAttack Enter 0x8232fce8: r6 = brain+0x2fc4, bl 0x823551b0(requester, target): 0x82355138 checks the handle {[req+4] instance, [req+8] stamp} ([inst+0x44] == stamp) and a field +0x20 of 0x823548b0(inst); then the target's slot manager 0x82354938(target)+0xf78 != 0. TruXenia logs the handle's instance (whom it points at) as raw data",
+    "proof": {"0x8232fce8": "0x38cb2fc4", "0x8232fcf8": "0x480254b9", "0x82355144": "0x35430004", "0x823551e0": "0x39630f78"}
+  },
+  "regenerate_death": {
+    "state_object": "0x8277a7b8",
+    "enter": "0x8235dff8",
+    "basis": "code",
+    "why": "RegenerateDeath Enter TU 0x8235dff8 (vtable 0x8206ea40 slot 7, state object 0x8277a7b8 named RegenerateDeath, tools/xbox_vtable_owner.py): f31 = old LP [brain+0x2c64], LP := 0x822f8c18(health component) (the maximum from the current tune), then 0x822f8dd8(health, old LP) - so during RegenerateDeath the LP field holds the restored MAXIMUM, not damage; the Y finisher sets it to 0",
+    "proof": {"0x8235e040": "0x3bbe2c60", "0x8235e050": "0xc3fe2c64", "0x8235e068": "0x4bf9abb1", "0x8235e06c": "0xd03e2c64"}
+  },
+  "meter_requests": {
+    "offset": "0x40",
+    "slots": 7,
+    "stride": "0x8",
+    "ramp_player": "0x827754ac",
+    "ramp_world": "0x827754cc",
+    "fields": "+0 player time scale request, +4 world time scale request (a value <= 0.0 = slot unused, so 0 and -1 are both empty); the HIGHEST slot with a value > 0 wins, player and world separately -> ramp targets",
+    "threshold": "0x8207d538 (0.0 in the TU image): 0x823d7558 lfs f11, -0x2ac8(r31); 0x823d7578 fcmpu f13, f11; ble -> skip the slot",
+    "slot_names": {"0": "power start / stop", "1": "meter target (targeter 5)", "2": "strike look", "3": "adrenaline look", "4": "player event switch / condition 2401", "5": "state 1018 (0x413)", "6": "script natives 23 / 24 (TU)"},
+    "basis": "code; slot writers from docs Befund-X23-Kraftlauf-0911.md",
+    "why": "TU 0x823d7d1c: addi r3, meter, 0x40 -> selector 0x823d7520: r5 = list+0x30 (slot 6), loop to slot 0 (r5 -= 8), lfs [r5+0] player / [r5+4] world; targets stfs [0x827754ac] (lis -0x7d89 / addi 0x54ac) and [0x827754cc] (addi 0x54cc)",
+    "proof": {"0x823d7d1c": "0x387f0040", "0x823d752c": "0x38a30030", "0x823d7544": "0x394b54cc", "0x823d7564": "0x396954ac", "0x823d7574": "0xc1a50000", "0x823d75b4": "0xc1a50004", "0x823d7558": "0xc17fd538", "0x823d7578": "0xff0d5800"}
+  },
+  "object_table": {
+    "address": "0x82979280",
+    "entries": "0xcc",
+    "stride": "0x24",
+    "object_offset": "0x8",
+    "id_offset": "0xc",
+    "state_offset": "0xe",
+    "loaded_state": 2,
+    "basis": "code (PC twin 0xdb7400, ENGINE.md section 2 'Object tracker table')",
+    "why": "TU 0x8214684c..0x821468f0: r11 = 0x82979280, 0xcc entries of 0x24, u16 +0xe == 2 and u16 +0xc == id -> object pointer [entry+8]",
+    "proof": {"0x8214684c": "0x3d608298", "0x82146850": "0x394000cc", "0x82146854": "0x396b9280", "0x8214685c": "0xa0eb000e", "0x82146868": "0xa0eb000c", "0x82146880": "0x396b0024", "0x821468f0": "0x80ab0008"}
+  },
+  "camera": {
+    "manager": "0x82efc780",
+    "mode_offset": "0x54",
+    "flags_offset": "0x7c",
+    "position": null,
+    "fov": null,
+    "basis": "code (manager address); mode / flags offsets from ENGINE.md section 22 (Xbox +0x54 / +0x7c = PC +0x58 / +0x80); position / look-at / FOV of the current camera not proven on the Xbox - shown '?'",
+    "pc": "manager 0xe804f0, current camera [mgr+0x44], gameplay camera 0xe83860 (focus +0x1cc), FOV camera +0xb0 (vertical radians), camera matrix 0xe804a0, getters 0x5e7850 / 0x5e7870 / 0x5e78a0 / 0x5e78d0",
+    "why": "TU 0x822a9a6c..0x822a9a90 (= PC flag reader 0x5e5e8e): r3 = 0x82efc780 (lis -0x7d10 / addi -0x3880), vtable slot 0xac (flag-bit-2 test) called on it",
+    "proof": {"0x822a9a6c": "0x3d6082f0", "0x822a9a70": "0x386bc780", "0x822a9a7c": "0x814b00ac"}
   }
 }

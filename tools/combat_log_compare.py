@@ -2,7 +2,12 @@
 
 PC side: TruMenu.log `combo:` lines (TruMenu 0.22.9 `combo.trace 1`) joined with TruShadowCombat.log `damage types`
 lines of the same time (+-0.15 s, same LP before) for type / sub / amount. Xbox side: TruXenia's hit log
-(tools/truxenia.py, same `combo:` text plus `| xbox: dist .., meter .. active .., time scale ..`).
+(tools/truxenia.py, same `combo:` text plus `| xbox: dist .., meter .. active .., time scale ..` and, since
+09.11.2026, `| xbox+: kind .., attack .., fly .., last flight .., Lara LP .., Lara states [..], time requests ..,
+world ramp ..`). The `xbox+` part goes into its own column; the PC-compatible columns stay as they were.
+Xbox reaction `finisher-in-RegenerateDeath`: the enemy was in RegenerateDeath, whose Enter (TU 0x8235dff8) sets LP to
+the tune maximum, so the "damage" is the finisher removing that maximum. Those hits are counted separately and kept
+out of the damage mean / min / max and the knock-down share.
 
 Usage (from the repository root):
   ../bin/pyt -t 120 tools/combat_log_compare.py --pc-menu TruMenu.log [--pc-combat TruShadowCombat.log]
@@ -23,6 +28,8 @@ COMBO = re.compile(r'^' + TS + r' combo: Lara records (\S*) -> (.+?) (-?\d+) LP 
 DMG = re.compile(r'^' + TS + r' .*damage types: (0x[0-9a-f]+) obj (\d+) (\S+) type (\d+) sub (\d+) .*?'
                  r'amount (-?[\d.]+), flags (\S+), LP (-?[\d.]+) -> (-?[\d.]+)')
 DOWN = ('fall', 'vault', 'knock', 'regeneratedeath', 'land')
+FINISHER = 'finisher-in-RegenerateDeath'                      # truxenia.py: LP was the restored maximum
+KIND = re.compile(r'kind (\S+?),')
 
 
 def secs(ts):
@@ -42,9 +49,10 @@ def read_combo(path, since, until):
         mm = COMBO.match(line.strip())
         if mm and in_range(mm.group(1), since, until):
             g = mm.groups()
-            out.append({'t': g[0], 'path': g[1], 'enemy': g[2], 'id': g[3], 'lp0': float(g[4]), 'lp': float(g[5]),
+            extra, _, plus = g[11].partition('| xbox+:')
+            out.append({'plus': plus.strip(),'t': g[0], 'path': g[1], 'enemy': g[2], 'id': g[3], 'lp0': float(g[4]), 'lp': float(g[5]),
                         'amount': float(g[6]), 'st0': g[7], 'st': g[8].rstrip(','), 'hit': g[9].rstrip(','),
-                        'reaction': g[10], 'extra': g[11].strip(' |'), 'type': '', 'sub': ''})
+                        'reaction': g[10], 'extra': extra.strip(' |'), 'type': '', 'sub': ''})
     return out
 
 
@@ -71,12 +79,25 @@ def join_damage(hits, path, since, until):
 def summary(name, hits):
     if not hits:
         return ['- %s: no hits' % name]
-    am = [h['amount'] for h in hits]
     rc = collections.Counter(h['reaction'] for h in hits)
-    down = sum(1 for h in hits if any(k in h['reaction'].lower() for k in DOWN))
-    return ['- %s: %d hits, damage mean %.1f (min %.1f, max %.1f); knock-down reactions %d / %d (%.0f %%); reactions %s'
-            % (name, len(hits), sum(am) / len(am), min(am), max(am), down, len(hits), 100.0 * down / len(hits),
-               ', '.join('%s %d' % kv for kv in rc.most_common()))]
+    fin = [h for h in hits if h['reaction'] == FINISHER]
+    real = [h for h in hits if h['reaction'] != FINISHER]
+    out = []
+    if real:
+        am = [h['amount'] for h in real]
+        down = sum(1 for h in real if any(k in h['reaction'].lower() for k in DOWN))
+        out.append('- %s: %d hits, damage mean %.1f (min %.1f, max %.1f); knock-down reactions %d / %d (%.0f %%); '
+                   'reactions %s' % (name, len(real), sum(am) / len(am), min(am), max(am), down, len(real),
+                                     100.0 * down / len(real), ', '.join('%s %d' % kv for kv in rc.most_common())))
+    else:
+        out.append('- %s: no damage hits' % name)
+    if fin:
+        out.append('- %s: %d finisher(s) in RegenerateDeath (LP was the restored maximum; not in the damage numbers)'
+                   % (name, len(fin)))
+    kinds = collections.Counter(m.group(1) for m in (KIND.search(h.get('plus', '')) for h in hits) if m)
+    if kinds:
+        out.append('- %s: hits per kind %s' % (name, ', '.join('%s %d' % kv for kv in kinds.most_common())))
+    return out
 
 
 def main():
@@ -99,8 +120,8 @@ def main():
     lines = ['# Fight comparison PC vs Xbox (Xenia)', '',
              'PC: `%s`%s; Xbox: `%s`' % (a.pc_menu, (' + `%s`' % a.pc_combat) if a.pc_combat else '', a.xbox), '',
              '| # | PC time | PC enemy | PC LP | PC dmg (type/sub) | PC stamina | PC at hit -> reaction | Xbox time | '
-             'Xbox enemy | Xbox LP | Xbox dmg | Xbox stamina | Xbox at hit -> reaction | Xbox extra |',
-             '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
+             'Xbox enemy | Xbox LP | Xbox dmg | Xbox stamina | Xbox at hit -> reaction | Xbox extra | Xbox extra+ |',
+             '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     for i in range(max(len(pc), len(xb))):
         p = pc[i] if i < len(pc) else None
         x = xb[i] if i < len(xb) else None
@@ -108,7 +129,7 @@ def main():
               '%.0f (%s/%s)' % (p['amount'], p['type'] or '?', p['sub'] or '?'), '%s->%s' % (p['st0'], p['st']),
               '%s -> %s' % (p['hit'], p['reaction'])) if p else ('',) * 6
         cx = (x['t'], '%s %s' % (x['enemy'], x['id']), '%.0f->%.0f' % (x['lp0'], x['lp']), '%.0f' % x['amount'],
-              '%s->%s' % (x['st0'], x['st']), '%s -> %s' % (x['hit'], x['reaction']), x['extra']) if x else ('',) * 7
+              '%s->%s' % (x['st0'], x['st']), '%s -> %s' % (x['hit'], x['reaction']), x['extra'], x['plus'].replace('|', '/')) if x else ('',) * 8
         lines.append('| %d | %s |' % (i + 1, ' | '.join(cp + cx)))
     lines += ['', '## Summary', ''] + summary('PC', pc) + summary('Xbox', xb)
     text = '\n'.join(lines) + '\n'
