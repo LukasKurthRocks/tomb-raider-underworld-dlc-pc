@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -1077,6 +1077,9 @@ bool WriteDword(DWORD address, DWORD value) {
 void RunPending();     // items section below
 void AwTick();         // 0.22.9 ai.why / combo.trace, section "0.22.9 enemy diagnosis"
 void CtTick();
+void FtTick();         // 0.22.11 fight.trace / enemy.panel sampling (game thread, section "0.22.11 fight.trace")
+void DrawEnemyPanel(); // 0.22.11 enemy.panel (render thread, Present)
+extern volatile LONG g_epOn;   // 0.22.11 enemy.panel on
 bool InLevel();
 void WeaponsTick();    // 0.3 costume switch: player message 35 a frame later
 void CosValidTick();   // 0.21.7 bar page Kostueme: the game's costume check per cycle-list entry (game thread)
@@ -1414,6 +1417,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         CnTick();                             // 0.22 cine.pause (cheap while off: one flag)
         AwTick();                             // 0.22.9 ai.why: places the coordinator counter once (cheap after that)
         CtTick();                             // 0.22.9 combo.trace (cheap while off: one flag)
+        FtTick();                             // 0.22.11 fight.trace / enemy.panel (cheap while off: two flags)
         LxTick();                             // 0.22.2 light.frame (cheap while idle: two flags)
         LsTick();                             // 0.22.3 light.stable (cheap while off: two flags)
         LcTick();                             // 0.22.10 light cut diagnosis / stablecut (cheap while off: four flags)
@@ -16940,6 +16944,600 @@ bool RunCt(const char *arg, char *o, size_t n) {
     Out(o, n, "combo.trace %d - %s", on ? 1 : 0, on ? "one line per enemy hit in TruMenu.log" : "off");
     return true;
 }
+// ---- 0.22.11 fight.trace + enemy panel (Gegneranzeige): the PC side of the Xbox comparison (TODO N18 / N21, workspace
+// docs\Befund-Xbox-Referenz-0911.md, docs/TRUXENIA.md). The same values TruXenia reads on the Xbox, in its TSV column
+// layout (host_time inst obj_id obj_name lp stamina state0 state1 req target dist lara_rec0 lara_rec1 meter active
+// time_scale), the PC-only columns after them; one line per AI enemy within 6000 units whose LP / states / requested
+// state / target changed (sampled every 100 ms on the game thread), plus a Lara line (inst "-") when Lara's chart record,
+// the camera mode or the camera position (> 25 units) changed - file TruFight.log next to TruMenu.log, opened shared (one-
+// shot readable while the game writes). Read-only, every pointer checked. New PC facts (kFtChecks):
+//   * Lara LP = [[0xfadb58]+0x628] (GetHealth 0x6e7860);
+//   * world / player time scale [0xe7f1a0] / [0xe7f1d4] (SetWorldTimeScale 0x776052 / SetPlayerTimeScale 0x7760b2 read
+//     them as the current value; TU gameTracker+0x118 = the world one = TruXenia time_scale);
+//   * camera: position = vtable +0x34 of the current camera [0xe80534] = 0x5e1c60 `lea eax,[ecx+0xa0]` (getter 0x5e78a0:
+//     snapshot 0xe8eeb0 while byte [0xe8eec8]); FOV = vtable +0x40 = 0x5e1c90 `fld [ecx+0xb0]` (getter 0x5e78d0: snapshot
+//     [0xe8eec0]) - read only when the camera's vtable slot holds that base function; mode manager +0x54 applied / +0x58
+//     requested (0.21 camera notes);
+//   * MeleeAttack: state data (brain + 0x1273 + ([brain+0x18d4 + 4 * layer] + 2 * layer) * 0x19c) & ~0xf (Enter
+//     0x65c7df..0x65c7f9), data+0x198 = the state object, data+0x50 = the attack record (0x65c804); record +0x78 / +0x7c /
+//     +0x80 anim refs {u16 type, u16 anim} (ENGINE.md 13.5) - which melee attack runs (to tell the spit attack apart);
+//   * shadow meter: TruShadowPowerMeterApi (flags bit 0 = power active, value); power mode "slow" when the world time scale
+//     is below 0.99, "fast" when the power is active at 1.0 (Xbox 09.11.: active with 1.0 while running at the goo drip);
+//   * Lara's chart records / state ids: combo.trace's machines [[0xfadb58]+0xf10 / +0xf14] (kCtChecks).
+// Damage type / sub and knockback force of a hit are TruShadowCombat's 'damage types' / '0.6.7 hit' / '0.6.7 knockback'
+// lines of the same time (TruShadowCombat exports no hit data); tools/fight_trace_compare.py puts PC and Xbox side by side.
+const DvCheck kFtChecks[] = {
+    {0x006e7860, "a158dbfa00 85c0 7407 d98028060000 c3"},                                 // GetHealth: Lara LP
+    {0x00776052, "d905a0f1e700"},                                                         // world time scale 0xe7f1a0
+    {0x007760b2, "d905d4f1e700"},                                                         // player time scale 0xe7f1d4
+    {0x005e78a0, "803dc8eee80000 7406 b8b0eee800 c3 8b0d3405e800 8b01 8b5034 ffe2"},      // camera position getter
+    {0x005e1c60, "8d81a0000000 c3"},                                                      // base camera +0x34: +0xa0
+    {0x005e78d0, "803dc8eee80000 7407 d905c0eee800 c3 8b0d3405e800 8b01 8b5040 ffe2"},    // FOV getter
+    {0x005e1c90, "d981b0000000 c3"},                                                      // base camera +0x40: +0xb0
+    {0x0065c7df, "8b8c87d4180000 8d1441 8b4514 69d29c010000 8db43a73120000 83e6f0"},      // MeleeAttack Enter: data
+    {0x0065c800, "8b00 8b08 894e50"},                                                     // data+0x50 = attack record
+};
+bool g_ftChecked = false, g_ftOk = false;
+char g_ftWhy[96] = "not checked";
+volatile LONG g_ftOn = 0, g_epOn = 0;        // fight.trace (TruFight.log), enemy.panel (Gegneranzeige)
+bool FtCheck() {
+    if (g_ftChecked) return g_ftOk;
+    g_ftChecked = true;
+    DWORD at = 0;
+    g_ftOk = DvChecks(kFtChecks, sizeof(kFtChecks) / sizeof(kFtChecks[0]), &at);
+    if (g_ftOk) Out(g_ftWhy, sizeof(g_ftWhy), "ok");
+    else Out(g_ftWhy, sizeof(g_ftWhy), "code differs at 0x%08lx", at);
+    Log(g_ftOk ? 1 : 0, "0.22.11: fight.trace / enemy.panel %s (%d checks)", g_ftWhy,
+        static_cast<int>(sizeof(kFtChecks) / sizeof(kFtChecks[0])));
+    return g_ftOk;
+}
+// TruShadowPowerMeterApi head (TruShadowPower 0.11+): +0x14 = the TU meter +0x40 list of 7 time-scale request slots
+// {player, world} (selector TU 0x823d7520: from slot 6 down the highest value > 0 wins, player and world apart; empty =
+// -1) - workspace docs\Befund-X23-Kraftlauf-0911.md
+struct FtMeterApi { DWORD size, version; volatile DWORD *flags; float *value; float *startValue; float (*request)[2]; };
+// the retail time-ramp natives gamebase 23 / 24 = SetWorldTimeScale 0x776030 / SetPlayerTimeScale 0x776090 (stdcall
+// (float target, float seconds), ret 8; the TU routes its own natives 23 / 24 to request slot 6 in doppelganger mode, the
+// PC scripts call these directly; TruShadowPower's Selector() calls them too): a pass-through counter on both (6 bytes
+// push ecx / mov eax,[0xe7f15c] -> jmp + nop, trampoline with the same 6 bytes), placed once on the game thread the first
+// time fight.trace / enemy.panel run (TruShadowPower checks these bytes only at its own load), never removed; one
+// TruMenu.log line per call (at most 2000) with the caller module, the last call in the fight log column pc_ramp_last
+const char *const kFtSetterHex = "51 a15cf1e700 db055cf1e700 85c0";
+typedef DWORD(__stdcall *FtSetFn)(float target, float seconds);
+FtSetFn g_ftSetW = nullptr, g_ftSetP = nullptr;
+bool g_ftSetTried = false, g_ftSetOn = false;
+LONG g_ftSetLines = 0;
+char g_ftRampLast[80] = "-";
+void FtRampNote(char which, float target, float seconds, const void *ret) {
+    char who[40] = "tru.exe";
+    HMODULE mod = nullptr;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           static_cast<LPCSTR>(ret), &mod) && mod) {
+        char path[MAX_PATH] = "";
+        if (GetModuleFileNameA(mod, path, sizeof(path))) {
+            const char *b = strrchr(path, '\\');
+            Out(who, sizeof(who), "%s", b ? b + 1 : path);
+        }
+    }
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    Out(g_ftRampLast, sizeof(g_ftRampLast), "%02d:%02d:%02d.%03d %c%.3f@%.3fs %s", t.wHour, t.wMinute, t.wSecond,
+        t.wMilliseconds, which, static_cast<double>(target), static_cast<double>(seconds), who);
+    if (InterlockedIncrement(&g_ftSetLines) <= 2000)
+        Log(1, "time ramp: %s <- %.3f over %.3f s (gamebase native %d; caller 0x%08lx in %s)",
+            which == 'W' ? "world" : "player", static_cast<double>(target), static_cast<double>(seconds),
+            which == 'W' ? 23 : 24, reinterpret_cast<DWORD>(ret), who);
+}
+DWORD __stdcall FtSetWHook(float target, float seconds) {
+    FtRampNote('W', target, seconds, _ReturnAddress());
+    return g_ftSetW(target, seconds);
+}
+DWORD __stdcall FtSetPHook(float target, float seconds) {
+    FtRampNote('P', target, seconds, _ReturnAddress());
+    return g_ftSetP(target, seconds);
+}
+FtSetFn FtDetour6(DWORD at, void *hook) {   // game thread: 6 bytes -> jmp hook + nop, returns the trampoline
+    if (!HexBytesAt(at, kFtSetterHex)) return nullptr;
+    BYTE *t = static_cast<BYTE *>(VirtualAlloc(nullptr, 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!t) return nullptr;
+    memcpy(t, reinterpret_cast<const void *>(at), 6);   // push ecx; mov eax,[0xe7f15c] (absolute, movable)
+    t[6] = 0xe9;
+    const DWORD back = (at + 6) - (reinterpret_cast<DWORD>(t) + 11);
+    memcpy(t + 7, &back, 4);
+    FlushInstructionCache(GetCurrentProcess(), t, 16);
+    BYTE jmp[6] = {0xe9, 0, 0, 0, 0, 0x90};
+    const DWORD rel = reinterpret_cast<DWORD>(hook) - (at + 5);
+    memcpy(jmp + 1, &rel, 4);
+    if (!WriteBytes(at, jmp, 6)) { VirtualFree(t, 0, MEM_RELEASE); return nullptr; }
+    return reinterpret_cast<FtSetFn>(t);
+}
+void FtSetTick() {                           // game thread, once
+    if (g_ftSetTried) return;
+    g_ftSetTried = true;
+    g_ftSetW = FtDetour6(0x00776030, reinterpret_cast<void *>(&FtSetWHook));
+    g_ftSetP = g_ftSetW ? FtDetour6(0x00776090, reinterpret_cast<void *>(&FtSetPHook)) : nullptr;
+    g_ftSetOn = g_ftSetW && g_ftSetP;
+    Log(g_ftSetOn ? 1 : 0, "0.22.11: time-ramp natives 0x776030 / 0x776090 %s", g_ftSetOn ? "counted (pass-through)"
+        : g_ftSetW ? "only the world one counted (player setter bytes differ)" : "not counted (setter bytes differ)");
+}
+const FtMeterApi *g_ftMeter = nullptr;
+bool g_ftMeterLooked = false;
+typedef int(__cdecl *FtDgFn)();
+FtDgFn g_ftDg = nullptr;
+void FtLookPlugins() {                       // game thread, once
+    if (g_ftMeterLooked) return;
+    g_ftMeterLooked = true;
+    typedef const FtMeterApi *(__cdecl * MeterFn)();
+    HMODULE m = GetModuleHandleA("TruShadowPower.asi");
+    MeterFn fn = m ? reinterpret_cast<MeterFn>(GetProcAddress(m, "TruShadowPowerMeterApi")) : nullptr;
+    const FtMeterApi *a = fn ? fn() : nullptr;
+    if (a && a->version >= 1 && a->size >= sizeof(FtMeterApi) && a->flags && a->value) g_ftMeter = a;
+    HMODULE d = GetModuleHandleA("TruDlc2Player.asi");
+    g_ftDg = d ? reinterpret_cast<FtDgFn>(GetProcAddress(d, "TruDlc2PlayerDoppelganger")) : nullptr;
+    Log(1, "0.22.11: shadow meter %s, doppelganger flag %s", g_ftMeter ? "via TruShadowPowerMeterApi" : "not available",
+        g_ftDg ? "via TruDlc2PlayerDoppelganger" : "not available");
+}
+struct FtWorld {
+    bool lara;
+    float laraLp, pos[3];
+    int rec0, rec1;
+    char states[40];
+    bool meterOk;
+    float meter;
+    int active, dg;
+    float tsWorld, tsPlayer;
+    bool camOk;
+    float cam[3], fov;
+    DWORD camObj, camMode, camReq;
+    char tsReq[112], tsSel[40];               // meter request slots (occupied only) and the selector's choice
+};
+struct FtRecCache { DWORD rec; int idx; };
+FtRecCache g_ftRc[2] = {};
+void FtReadWorld(DWORD player, FtWorld &w) {
+    memset(&w, 0, sizeof(w));
+    w.rec0 = w.rec1 = -1;
+    w.active = w.dg = -1;
+    w.tsWorld = w.tsPlayer = -1.0f;
+    w.lara = player && ReadFloats(player + kInstancePosition, w.pos, 3) && DvFinite(w.pos, 3);
+    DWORD tracker = 0;
+    ReadDword(0x00fadb58, &tracker);
+    w.laraLp = -1.0f;
+    if (tracker) ReadFloats(tracker + 0x628, &w.laraLp, 1);
+    if (tracker && CtCheck()) {
+        for (int k = 0; k < 2; ++k) {
+            DWORD machine = 0, rec = 0;
+            if (!ReadDword(tracker + 0xf10 + 4 * k, &machine) || !machine || !ReadDword(machine + 0x510, &rec)) continue;
+            if (rec != g_ftRc[k].rec) { g_ftRc[k].rec = rec; g_ftRc[k].idx = CtRecordIndex(machine, rec); }
+            (k ? w.rec1 : w.rec0) = g_ftRc[k].idx;
+            if (k == 0 && rec) {             // state ids of machine 1's record: u16 count +0xc, list +0x18
+                WORD cnt = 0;
+                DWORD list = 0;
+                size_t used = 0;
+                w.states[0] = 0;
+                if (ReadWord(rec + 0xc, &cnt) && ReadDword(rec + 0x18, &list) && list)
+                    for (int i = 0; i < cnt && i < 6; ++i) {
+                        WORD id = 0;
+                        if (ReadWord(list + 2 * i, &id)) LabelAdd(w.states, sizeof(w.states), &used, "%s%u", i ? "/" : "", id);
+                    }
+            }
+        }
+    }
+    if (g_ftMeter) {
+        DWORD fl = 0;
+        if (ReadDword(reinterpret_cast<DWORD>(g_ftMeter->flags), &fl) &&
+            ReadFloats(reinterpret_cast<DWORD>(g_ftMeter->value), &w.meter, 1)) {
+            w.meterOk = true;
+            w.active = (fl & 1) ? 1 : 0;
+        }
+    }
+    Out(w.tsReq, sizeof(w.tsReq), "?");
+    Out(w.tsSel, sizeof(w.tsSel), "?");
+    if (g_ftMeter && g_ftMeter->request) {   // "slot:player/world" for slots with a value > 0 (as the selector), "-" = none
+        float r[7][2];
+        bool ok = true;
+        for (int i = 0; i < 7 && ok; ++i) ok = ReadFloats(reinterpret_cast<DWORD>(&g_ftMeter->request[i][0]), r[i], 2);
+        if (ok) {
+            size_t used = 0;
+            w.tsReq[0] = 0;
+            int sp = -1, sw = -1;
+            for (int i = 0; i < 7; ++i) {
+                if (r[i][0] > 0.0f || r[i][1] > 0.0f) {
+                    char a[12] = "-", b[12] = "-";
+                    if (r[i][0] > 0.0f) Out(a, sizeof(a), "%.2f", static_cast<double>(r[i][0]));
+                    if (r[i][1] > 0.0f) Out(b, sizeof(b), "%.2f", static_cast<double>(r[i][1]));
+                    LabelAdd(w.tsReq, sizeof(w.tsReq), &used, "%s%d:%s/%s", used ? " " : "", i, a, b);
+                }
+                if (r[i][0] > 0.0f) sp = i;
+                if (r[i][1] > 0.0f) sw = i;
+            }
+            if (!w.tsReq[0]) Out(w.tsReq, sizeof(w.tsReq), "-");
+            Out(w.tsSel, sizeof(w.tsSel), "P%.2f(s%d) W%.2f(s%d)", sp >= 0 ? static_cast<double>(r[sp][0]) : 1.0, sp,
+                sw >= 0 ? static_cast<double>(r[sw][1]) : 1.0, sw);
+        }
+    }
+    if (g_ftDg) w.dg = g_ftDg() ? 1 : 0;
+    ReadFloats(0x00e7f1a0, &w.tsWorld, 1);
+    ReadFloats(0x00e7f1d4, &w.tsPlayer, 1);
+    BYTE snap = 0;
+    ReadByte(0x00e8eec8, &snap);
+    ReadDword(kCurrentCamera, &w.camObj);
+    ReadDword(kCamAppliedMode, &w.camMode);
+    ReadDword(kCamReqMode, &w.camReq);
+    if (snap) {
+        w.camOk = ReadFloats(0x00e8eeb0, w.cam, 3) && ReadFloats(0x00e8eec0, &w.fov, 1);
+    } else if (w.camObj) {
+        DWORD vt = 0, slotPos = 0, slotFov = 0;
+        if (ReadDword(w.camObj, &vt) && vt && ReadDword(vt + 0x34, &slotPos) && ReadDword(vt + 0x40, &slotFov) &&
+            slotPos == 0x005e1c60 && slotFov == 0x005e1c90)
+            w.camOk = ReadFloats(w.camObj + 0xa0, w.cam, 3) && ReadFloats(w.camObj + 0xb0, &w.fov, 1);
+    }
+    if (w.camOk && !DvFinite(w.cam, 3)) w.camOk = false;
+}
+// the attack record of a running MeleeAttack (layer 0): "0x<record> a<type>/<anim> ..." or "-"
+void FtAttack(DWORD brain, DWORD s0, char *o, size_t n) {
+    Out(o, n, "-");
+    char nm[32];
+    AwStateName(s0, nm, sizeof(nm));
+    if (strcmp(nm, "MeleeAttack") != 0) return;
+    DWORD slot = 0, rec = 0, obj = 0;
+    if (!ReadDword(brain + 0x18d4, &slot) || slot > 16) return;
+    const DWORD data = (brain + 0x1273 + slot * 0x19c) & ~0xfu;
+    if (!ReadDword(data + 0x198, &obj) || obj != s0 || !ReadDword(data + 0x50, &rec) || !rec) return;
+    WORD a[6] = {};
+    for (int i = 0; i < 6; ++i) ReadWord(rec + 0x78 + 2 * i, &a[i]);
+    Out(o, n, "0x%08lx a%u/%u %u/%u %u/%u", rec, a[0], a[1], a[2], a[3], a[4], a[5]);
+}
+struct FtHit { float amount; DWORD state, reaction, tick; };
+struct FtEn {
+    DWORD inst, oid, s0, s1, req, tgt;
+    LONG intro;
+    float lp, st, maxLp;
+    FtHit hit[3];
+    int nHit;
+    bool open;
+};
+FtEn g_ftEn[48];
+int g_ftEnN = 0;
+DWORD g_ftLast = 0, g_ftLaraRec = 0xffffffff, g_ftCamMode = 0xffffffff;
+float g_ftCamLast[3] = {0.0f, 0.0f, 0.0f};
+HANDLE g_ftFile = INVALID_HANDLE_VALUE;
+LONG g_ftRows = 0;
+char g_ftPath[MAX_PATH] = "";
+FtEn *FtEnOf(DWORD inst, bool add) {
+    for (int i = 0; i < g_ftEnN; ++i)
+        if (g_ftEn[i].inst == inst) return &g_ftEn[i];
+    if (!add) return nullptr;
+    int k = g_ftEnN < 48 ? g_ftEnN++ : static_cast<int>(GetTickCount() % 48);
+    memset(&g_ftEn[k], 0, sizeof(g_ftEn[k]));
+    g_ftEn[k].inst = inst;
+    g_ftEn[k].lp = -1.0e9f;
+    return &g_ftEn[k];
+}
+const char *const kFtHeader = "host_time\tinst\tobj_id\tobj_name\tlp\tstamina\tstate0\tstate1\treq\ttarget\tdist\tlara_rec0\t"
+                              "lara_rec1\tmeter\tactive\ttime_scale\tpc_intro\tpc_ko\tpc_attack\tpc_hit\tpc_lara_lp\t"
+                              "pc_lara_states\tpc_lara_x\tpc_lara_y\tpc_lara_z\tpc_x\tpc_y\tpc_z\tpc_power_mode\t"
+                              "pc_player_time_scale\tpc_doppelganger\tpc_cam_obj\tpc_cam_mode\tpc_cam_req\tpc_cam_dx\t"
+                              "pc_cam_dy\tpc_cam_dz\tpc_cam_dist\tpc_cam_fov_deg\tpc_ts_requests\tpc_ts_selected\t"
+                              "pc_ramp_last\n";
+bool FtOpen() {
+    if (g_ftFile != INVALID_HANDLE_VALUE) return true;
+    if (!g_logPath[0]) return false;
+    strncpy_s(g_ftPath, sizeof(g_ftPath), g_logPath, _TRUNCATE);
+    char *slash = strrchr(g_ftPath, '\\');
+    if (slash) slash[1] = 0;
+    else g_ftPath[0] = 0;
+    strncat_s(g_ftPath, sizeof(g_ftPath), "TruFight.log", _TRUNCATE);
+    g_ftFile = CreateFileA(g_ftPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                           OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (g_ftFile == INVALID_HANDLE_VALUE) return false;
+    LARGE_INTEGER size = {};
+    if (GetFileSizeEx(g_ftFile, &size) && size.QuadPart == 0) {
+        DWORD w = 0;
+        WriteFile(g_ftFile, kFtHeader, static_cast<DWORD>(strlen(kFtHeader)), &w, nullptr);
+    }
+    return true;
+}
+void FtClose() {
+    if (g_ftFile != INVALID_HANDLE_VALUE) CloseHandle(g_ftFile);
+    g_ftFile = INVALID_HANDLE_VALUE;
+}
+// one TSV line; e == nullptr = the Lara line
+void FtWrite(const FtWorld &w, const FtEn *e, DWORD brain, const float *ep) {
+    if (g_ftFile == INVALID_HANDLE_VALUE || InterlockedIncrement(&g_ftRows) > 200000) return;
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    char line[1400], name[64] = "-", s0[32] = "-", s1[32] = "-", rq[32] = "-", tg[24] = "-", dist[16] = "-", ko[32] = "-",
+         atk[64] = "-", hit[48] = "-", lp[16] = "-", st[16] = "-", oid[12] = "-", inst[12] = "-", intro[12] = "-",
+         ex[16] = "-", ey[16] = "-", ez[16] = "-";
+    if (e) {
+        if (!ObjectName(static_cast<int>(e->oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", e->oid & 0xffff);
+        Out(inst, sizeof(inst), "0x%08lx", e->inst);
+        Out(oid, sizeof(oid), "%lu", e->oid & 0xffff);
+        Out(intro, sizeof(intro), "%ld", e->intro);
+        Out(lp, sizeof(lp), "%.1f", static_cast<double>(e->lp));
+        Out(st, sizeof(st), "%.2f", static_cast<double>(e->st));
+        AwStateName(e->s0, s0, sizeof(s0));
+        AwStateName(e->s1, s1, sizeof(s1));
+        AwStateName(e->req, rq, sizeof(rq));
+        DWORD player = 0;
+        ReadDword(kPlayerPtr, &player);
+        if (e->tgt && e->tgt == player) Out(tg, sizeof(tg), "Lara");
+        else if (e->tgt) Out(tg, sizeof(tg), "0x%08lx", e->tgt);
+        if (ep && w.lara) {
+            const float dx = ep[0] - w.pos[0], dy = ep[1] - w.pos[1], dz = ep[2] - w.pos[2];
+            Out(dist, sizeof(dist), "%.0f", static_cast<double>(sqrtf(dx * dx + dy * dy + dz * dz)));
+            Out(ex, sizeof(ex), "%.0f", static_cast<double>(ep[0]));
+            Out(ey, sizeof(ey), "%.0f", static_cast<double>(ep[1]));
+            Out(ez, sizeof(ez), "%.0f", static_cast<double>(ep[2]));
+        }
+        const AwRec *a = AwRecOf(e->inst, false);
+        if (g_awCoOn) {
+            if (a && a->calls) Out(ko, sizeof(ko), "%s %lu/%lu", a->last ? "ja" : "nein", a->grants, a->calls);
+            else Out(ko, sizeof(ko), "0");
+        }
+        FtAttack(brain, e->s0, atk, sizeof(atk));
+        if (e->nHit) {
+            const FtHit &h = e->hit[0];
+            char rn[32] = "-";
+            if (h.reaction) AwStateName(h.reaction, rn, sizeof(rn));
+            Out(hit, sizeof(hit), "-%.1f %s", static_cast<double>(h.amount), rn);
+        }
+    }
+    char camObj[40] = "-", cdx[16] = "-", cdy[16] = "-", cdz[16] = "-", cdist[16] = "-", fov[16] = "-", mode[16] = "-",
+         req[16] = "-", laraLp[16] = "-", lx[16] = "-", ly[16] = "-", lz[16] = "-", meter[16] = "?", active[8] = "?",
+         ts[16] = "?", tsp[16] = "?", dg[4] = "?";
+    if (w.camObj) CameraObjectName(w.camObj, camObj, sizeof(camObj));
+    Out(mode, sizeof(mode), "0x%lx", w.camMode);
+    Out(req, sizeof(req), "0x%lx", w.camReq);
+    if (w.camOk && w.lara) {
+        const float dx = w.cam[0] - w.pos[0], dy = w.cam[1] - w.pos[1], dz = w.cam[2] - w.pos[2];
+        Out(cdx, sizeof(cdx), "%.0f", static_cast<double>(dx));
+        Out(cdy, sizeof(cdy), "%.0f", static_cast<double>(dy));
+        Out(cdz, sizeof(cdz), "%.0f", static_cast<double>(dz));
+        Out(cdist, sizeof(cdist), "%.0f", static_cast<double>(sqrtf(dx * dx + dy * dy + dz * dz)));
+    }
+    if (w.camOk) Out(fov, sizeof(fov), "%.1f", static_cast<double>(w.fov) * 57.29578);
+    if (w.laraLp > -0.5f) Out(laraLp, sizeof(laraLp), "%.1f", static_cast<double>(w.laraLp));
+    if (w.lara) {
+        Out(lx, sizeof(lx), "%.0f", static_cast<double>(w.pos[0]));
+        Out(ly, sizeof(ly), "%.0f", static_cast<double>(w.pos[1]));
+        Out(lz, sizeof(lz), "%.0f", static_cast<double>(w.pos[2]));
+    }
+    if (w.meterOk) {
+        Out(meter, sizeof(meter), "%.1f", static_cast<double>(w.meter));
+        Out(active, sizeof(active), "%s", w.active ? "True" : "False");
+    }
+    if (w.tsWorld >= 0.0f) Out(ts, sizeof(ts), "%.2f", static_cast<double>(w.tsWorld));
+    if (w.tsPlayer >= 0.0f) Out(tsp, sizeof(tsp), "%.2f", static_cast<double>(w.tsPlayer));
+    if (w.dg >= 0) Out(dg, sizeof(dg), "%d", w.dg);
+    const char *pm = !w.meterOk || !w.active ? "-" : w.tsWorld >= 0.0f && w.tsWorld < 0.99f ? "slow" : "fast";
+    const int len = _snprintf_s(line, sizeof(line), _TRUNCATE,
+        "%02d:%02d:%02d.%03d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t"
+        "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+        t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, inst, oid, name, lp, st, s0, s1, rq, tg, dist, w.rec0, w.rec1, meter,
+        active, ts, intro, ko, atk, hit, laraLp, w.states[0] ? w.states : "-", lx, ly, lz, ex, ey, ez, pm, tsp, dg, camObj,
+        mode, req, cdx, cdy, cdz, cdist, fov, w.tsReq, w.tsSel, g_ftRampLast);
+    if (len > 0) {
+        DWORD wr = 0;
+        WriteFile(g_ftFile, line, static_cast<DWORD>(len), &wr, nullptr);
+    }
+}
+// game thread, once per game frame (sampling every 100 ms) while fight.trace or enemy.panel is on
+void FtTick() {
+    if (!g_ftOn && !g_epOn) return;
+    if (!FtCheck()) return;
+    const DWORD now = GetTickCount();
+    if (now - g_ftLast < 100) return;
+    g_ftLast = now;
+    FtLookPlugins();
+    FtSetTick();                             // time-ramp natives counter (once)
+    g_awWant = true;                         // ai.why's coordinator counter (pass-through) gives the Ko column
+    DWORD player = 0;
+    if (!ReadDword(kPlayerPtr, &player) || !player) return;
+    FtWorld w;
+    FtReadWorld(player, w);
+    if (!w.lara) return;
+    if (g_ftOn && !FtOpen()) {
+        InterlockedExchange(&g_ftOn, 0);
+        Log(0, "fight.trace: cannot open %s (%lu) - off", g_ftPath, GetLastError());
+    }
+    bool wrote = false;
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0, brain = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        float p[3];
+        if (AdCandidate(inst, player, &brain) && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            const float dx = p[0] - w.pos[0], dy = p[1] - w.pos[1], dz = p[2] - w.pos[2];
+            if (dx * dx + dy * dy + dz * dz < 6000.0f * 6000.0f) {
+                float lp = 0.0f, st = 0.0f;
+                DWORD s0 = 0, s1 = 0, req = 0, object = 0, oid = 0, intro = 0;
+                ReadFloats(brain + 0x2c64, &lp, 1);
+                ReadFloats(brain + 0x2c6c, &st, 1);
+                ReadDword(brain + 0x125c, &s0);
+                ReadDword(brain + 0x1260, &s1);
+                ReadDword(brain + 0x18f8, &req);
+                ReadDword(inst + 0x10, &object);
+                if (object) ReadDword(object + 0x14, &oid);
+                ReadDword(inst + 0x58, &intro);
+                LONG mode = -1;
+                const DWORD tgt = AwTarget(brain, 0x30, &mode);
+                FtEn *e = FtEnOf(inst, true);
+                const bool first = e->lp < -1.0e8f;
+                const bool changed = first || lp != e->lp || s0 != e->s0 || s1 != e->s1 || req != e->req || tgt != e->tgt;
+                if (!first && lp < e->lp - 0.01f) {          // a hit: newest first, reaction = next other layer-0 state
+                    memmove(&e->hit[1], &e->hit[0], 2 * sizeof(FtHit));
+                    e->hit[0].amount = e->lp - lp;
+                    e->hit[0].state = s0;
+                    e->hit[0].reaction = 0;
+                    e->hit[0].tick = now;
+                    if (e->nHit < 3) ++e->nHit;
+                    e->open = true;
+                } else if (e->open && s0 != e->hit[0].state && now - e->hit[0].tick < 1500) {
+                    e->hit[0].reaction = s0;
+                    e->open = false;
+                } else if (e->open && now - e->hit[0].tick >= 1500) {
+                    e->open = false;
+                }
+                e->oid = oid;
+                e->intro = static_cast<LONG>(intro);
+                e->lp = lp;
+                e->st = st;
+                e->s0 = s0;
+                e->s1 = s1;
+                e->req = req;
+                e->tgt = tgt;
+                if (lp > e->maxLp) e->maxLp = lp;
+                if (g_ftOn && changed) { FtWrite(w, e, brain, p); wrote = true; }
+            }
+        }
+        inst = next;
+    }
+    const DWORD laraRec = static_cast<DWORD>(w.rec0);
+    float moved = 0.0f;
+    if (w.camOk) {
+        const float dx = w.cam[0] - g_ftCamLast[0], dy = w.cam[1] - g_ftCamLast[1], dz = w.cam[2] - g_ftCamLast[2];
+        moved = sqrtf(dx * dx + dy * dy + dz * dz);
+    }
+    static int lastActive = -2;
+    static float lastTs = -2.0f, lastTsP = -2.0f;
+    static char lastReq[112] = "";
+    const bool power = w.active != lastActive || fabsf(w.tsWorld - lastTs) > 0.005f || fabsf(w.tsPlayer - lastTsP) > 0.005f ||
+                       strcmp(w.tsReq, lastReq) != 0;
+    if (g_ftOn && !wrote && (laraRec != g_ftLaraRec || w.camMode != g_ftCamMode || moved > 25.0f || power))
+        FtWrite(w, nullptr, 0, nullptr);
+    lastActive = w.active;
+    lastTs = w.tsWorld;
+    lastTsP = w.tsPlayer;
+    strncpy_s(lastReq, sizeof(lastReq), w.tsReq, _TRUNCATE);
+    g_ftLaraRec = laraRec;
+    g_ftCamMode = w.camMode;
+    if (w.camOk) memcpy(g_ftCamLast, w.cam, sizeof(g_ftCamLast));
+}
+void ValFt(char *o, size_t n) {
+    Out(o, n, "fight.trace %d%s; %ld line(s)%s%s", g_ftOn ? 1 : 0, g_ftChecked && !g_ftOk ? " (code differs)" : "",
+        g_ftRows, g_ftPath[0] ? " -> " : "", g_ftPath[0] ? g_ftPath : "");
+}
+bool RunFt(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValFt(o, n); return true; }   // no argument = report only
+    const bool on = BoolArg(arg, g_ftOn != 0);
+    if (on && !FtCheck()) { Out(o, n, "fight.trace: %s - off", g_ftWhy); return false; }
+    g_ftLaraRec = 0xffffffff;
+    g_ftCamMode = 0xffffffff;
+    InterlockedExchange(&g_ftOn, on ? 1 : 0);
+    if (!on) FtClose();                      // game thread (TruLink / menu items run there), like FtTick
+    Log(1, "fight.trace %d (src=%s)", on ? 1 : 0, ShotSource("fight.trace"));
+    Out(o, n, "fight.trace %d - %s", on ? 1 : 0, on ? "TSV lines (TruXenia layout) in TruFight.log next to TruMenu.log" : "off");
+    return true;
+}
+void ValEp(char *o, size_t n) {
+    Out(o, n, "%ld%s", g_epOn, g_ftChecked && !g_ftOk ? " (code differs)" : "");
+}
+bool RunEp(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValEp(o, n); return true; }
+    const bool on = BoolArg(arg, g_epOn != 0);
+    if (on && !FtCheck()) { Out(o, n, "enemy.panel: %s - off", g_ftWhy); return false; }
+    InterlockedExchange(&g_epOn, on ? 1 : 0);
+    Log(1, "enemy.panel %d (src=%s)", on ? 1 : 0, ShotSource("enemy.panel"));
+    Out(o, n, "enemy.panel %d", on ? 1 : 0);
+    return true;
+}
+// render thread (Present): the nearest AI enemy within 3000 units of Lara, values read live, hits from FtTick
+void DrawEnemyPanel() {
+    char why[160];
+    if (!g_ftOk || !LabelWorldReady(why, sizeof(why))) return;
+    const bool de = g_qbLang == 0;
+    DWORD player = 0, inst = 0, pick = 0, brain = 0, pickBrain = 0;
+    float lara[3], best = 3000.0f * 3000.0f, pp[3] = {0.0f, 0.0f, 0.0f};
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        float p[3];
+        if (AdCandidate(inst, player, &brain) && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            const float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2], d2 = dx * dx + dy * dy + dz * dz;
+            if (d2 < best) { best = d2; pick = inst; pickBrain = brain; memcpy(pp, p, sizeof(pp)); }
+        }
+        inst = next;
+    }
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x - 12.0f, vp->WorkPos.y + vp->WorkSize.y * 0.35f),
+                            ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.6f);
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav |
+                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing |
+                                   ImGuiWindowFlags_NoSavedSettings;
+    if (ImGui::Begin("##TruEnemyPanel", nullptr, flags)) {
+        const ImVec4 head(1.0f, 0.85f, 0.35f, 1.0f), grey(0.75f, 0.75f, 0.75f, 1.0f);
+        if (!pick) {
+            ImGui::TextColored(head, "%s", de ? "Gegneranzeige: kein Gegner in 3000" : "Enemy panel: no enemy within 3000");
+        } else {
+            DWORD object = 0, oid = 0, intro = 0, s0 = 0, s1 = 0, req = 0;
+            ReadDword(pick + 0x10, &object);
+            if (object) ReadDword(object + 0x14, &oid);
+            ReadDword(pick + 0x58, &intro);
+            char name[64];
+            if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+            float lp = 0.0f, st = 0.0f;
+            ReadFloats(pickBrain + 0x2c64, &lp, 1);
+            ReadFloats(pickBrain + 0x2c6c, &st, 1);
+            ReadDword(pickBrain + 0x125c, &s0);
+            ReadDword(pickBrain + 0x1260, &s1);
+            ReadDword(pickBrain + 0x18f8, &req);
+            char n0[32], n1[32], nr[32], atk[64];
+            AwStateName(s0, n0, sizeof(n0));
+            AwStateName(s1, n1, sizeof(n1));
+            AwStateName(req, nr, sizeof(nr));
+            FtAttack(pickBrain, s0, atk, sizeof(atk));
+            const FtEn *e = FtEnOf(pick, false);
+            float maxLp = HpMax(pickBrain);
+            if (!(maxLp > 0.0f) && e) maxLp = e->maxLp;
+            ImGui::TextColored(head, "%s %s (%ld) - %.0f", de ? "Gegner" : "Enemy", name, static_cast<LONG>(intro),
+                               static_cast<double>(sqrtf(best)));
+            char bar[32];
+            Out(bar, sizeof(bar), "%.0f / %.0f", static_cast<double>(lp), static_cast<double>(maxLp));
+            ImGui::ProgressBar(maxLp > 0.0f ? (lp > 0.0f ? lp / maxLp : 0.0f) : 0.0f, ImVec2(220.0f, 0.0f), bar);
+            ImGui::Text("St %.1f | %s %s / %s | %s %s", static_cast<double>(st), de ? "Zustand" : "State", n0, n1,
+                        de ? "Soll" : "Req", nr);
+            LONG mode = -1;
+            const DWORD tgt = AwTarget(pickBrain, 0x30, &mode);
+            const AwRec *a = AwRecOf(pick, false);
+            char ko[32] = "Ko ?";
+            if (g_awCoOn) {
+                if (a && a->calls) Out(ko, sizeof(ko), "Ko %s %lu/%lu", a->last ? (de ? "ja" : "yes") : (de ? "nein" : "no"),
+                                       a->grants, a->calls);
+                else Out(ko, sizeof(ko), "Ko 0");
+            }
+            ImGui::Text("%s %s | %s", de ? "Ziel" : "Target", tgt == player ? "Lara" : tgt ? "?" : "-", ko);
+            if (strcmp(atk, "-") != 0) ImGui::Text("%s %s", de ? "Angriff" : "Attack", atk);
+            if (e && e->nHit) {
+                char hl[120];
+                size_t used = 0;
+                hl[0] = 0;
+                for (int i = 0; i < e->nHit; ++i) {
+                    char rn[32] = "?";
+                    if (e->hit[i].reaction) AwStateName(e->hit[i].reaction, rn, sizeof(rn));
+                    LabelAdd(hl, sizeof(hl), &used, "%s-%.0f %s", i ? " | " : "", static_cast<double>(e->hit[i].amount), rn);
+                }
+                ImGui::TextColored(grey, "%s %s", de ? "Treffer" : "Hits", hl);
+            }
+        }
+        FtWorld w;
+        FtReadWorld(player, w);
+        char pw[48] = "-";
+        if (w.meterOk) Out(pw, sizeof(pw), "%.0f %s", static_cast<double>(w.meter),
+                           !w.active ? (de ? "aus" : "off") : w.tsWorld < 0.99f ? (de ? "Zeitlupe" : "slow motion")
+                                                                                 : (de ? "schnell" : "fast"));
+        ImGui::TextColored(grey, "Lara %.0f | %s %s | %s %.2f / %.2f", static_cast<double>(w.laraLp), de ? "Kraft" : "Power",
+                           pw, de ? "Zeit Welt / Lara" : "Time world / Lara", static_cast<double>(w.tsWorld),
+                           static_cast<double>(w.tsPlayer));
+        if (strcmp(w.tsReq, "?") != 0)
+            ImGui::TextColored(grey, "%s %s -> %s", de ? "Zeit-Anforderungen" : "Time requests", w.tsReq, w.tsSel);
+        if (g_ftOn) ImGui::TextColored(grey, "%s %ld", de ? "Kampf-Spur: Zeilen" : "Fight trace: lines", g_ftRows);
+    }
+    ImGui::End();
+}
 // load: the byte checks of precheck_0201.txt (after M20Check)
 void M201Check() {
     DWORD at = 0;
@@ -23757,6 +24355,14 @@ const Item kItems[] = {
     {"combo.trace", "bool", "0.22.9 1|0: per enemy hit one log line - Lara's chart record path (combo), LP / stamina before "
                             "-> after, the enemy's reaction state; no argument = report only; off by default", false, ValCt,
      RunCt},
+    // 0.22.11 (section "0.22.11 fight.trace")
+    {"fight.trace", "bool", "0.22.11 1|0: TSV lines in TruXenia's column layout (+ PC columns) into TruFight.log - every "
+                            "100 ms the AI enemies within 6000 units whose LP / states / target changed, and Lara / power / "
+                            "time scale / camera lines; for tools/fight_trace_compare.py; no argument = report; off by default",
+     false, ValFt, RunFt},
+    {"enemy.panel", "bool", "0.22.11 1|0: Gegneranzeige at the right edge - nearest AI enemy within 3000 units: LP bar, "
+                            "stamina, states, target, attack slot, attack record, last 3 hits, Lara LP / power / time scale",
+     false, ValEp, RunEp},
     {"sub.lang", "action", "0.22.9 [-1|0..4|7|9..12]: subtitle language live (-1 game language, 0 en, 1 fr, 2 de, 3 it, "
                            "4 es) through the game's option setter 0x5d5100 - from the next subtitle line; no argument = "
                            "report", true, ValSb, RunSb},
@@ -27864,6 +28470,8 @@ const QbRow kQbTests[] = {
     {"Gegner-Diagnose", "Enemy diagnosis", "-", "", kQbLabel, -1, kQcNone, 0, kQbGrey, 0},
     {"Warum greift er nicht an?", "Why no attack?", "ai.why", "", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     {"Kombo-Spur", "Combo trace", "combo.trace", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
+    {"Gegneranzeige", "Enemy panel", "enemy.panel", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},   // 0.22.11
+    {"Kampf-Spur (TruFight.log)", "Fight trace (TruFight.log)", "fight.trace", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
     {"Untertitel-Sprache zeigen", "Show subtitle language", "sub.lang", "", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
@@ -27955,6 +28563,8 @@ const QbHelp kQbHelp[] = {
     {"cine.step", "", "Ein Bild der angehaltenen Szene weiter|One frame of the held cutscene"},
     {"ai.why", "", "N\303\244chster Gegner: Ziel, Angriffsplatz, Sperren ins Log|Nearest enemy: target, slot, gates to log"},   // 0.22.9
     {"combo.trace", "", "Je Treffer: Lara-Kombo, Gegner-Reaktion ins Log|Per hit: Lara combo, enemy reaction to log"},
+    {"enemy.panel", "", "Feld rechts: LP, Zustand, Ziel, letzte Treffer|Panel right: LP, state, target, last hits"},   // 0.22.11
+    {"fight.trace", "", "Kampfwerte wie TruXenia nach TruFight.log|Fight values as TruXenia to TruFight.log"},
     {"sub.lang", "", "Untertitel-Sprache jetzt (sub.lang 2 = Deutsch)|Subtitle language now (sub.lang 0 = English)"},
     {"cine.mark", "", "Szenenzeit merken (Sekunden)|Remember the cutscene time (seconds)"},   // 0.22.1
     {"light.frame", "*", "Lichter je Bild in TruMenu.lightframe.txt; BLINK? = Verdacht|Lights per frame to "
@@ -33360,6 +33970,7 @@ void Render(IDirect3DDevice9 *device) {
     if (g_ubOn) DrawUberLabels();                // 0.21.7 uber labels (gates / platforms: state + time left)
     if (g_shOn) DrawShaderLabels();              // 0.21.7 shader labels (terrain batches: file vs live status)
     if (g_lcLabels) DrawLightCut();              // 0.22.10 light cut: summary line + labels at dropped lights
+    if (g_epOn) DrawEnemyPanel();                // 0.22.11 Gegneranzeige (right edge)
     if (g_nlOn) DrawNavLabels();                 // 0.21.7 navmesh labels (areas of the drawn layers + legend)
     if (DvAnyOn()) DrawDebugView();              // 0.14 debug view (background draw list)
     if (g_dvOn[kDvLegend]) DrawDebugLegend();    // 0.14 legend (foreground, top right)

@@ -2928,6 +2928,65 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.11 - Xbox comparison, PC side: fight trace and enemy panel (2026-11-09)
+
+Built into `work\asi\menu0234`, not installed. Byte checks: `work\asi\menu0234\precheck_0231.txt` (13 checks, 0
+mismatches against the installed `tru.exe`). Goal: the PC logs the same values as TruXenia (`tools/truxenia.py`
+`watch`) does on the Xbox in Xenia, so both runs of the same test card (`docs\Testkarte-Kampf-0911.md` in the
+workspace) can be put side by side. Read-only: no game value is written; every pointer is checked before it is read.
+
+- **`fight.trace 1|0`** (default 0, bar page Tests "Kampf-Spur (TruFight.log)"): tab-separated lines into
+  **`TruFight.log`** next to TruMenu.log (opened shared, readable while the game writes; header line when the file is
+  empty, at most 200000 lines per session). Sampled every 100 ms on the game thread; a line is written when an enemy's
+  LP, state (layer 0 / 1), requested state or target changes, and a Lara line (`inst` = `-`) when Lara's chart record,
+  the camera mode / position, power active, a time scale or a time-scale request changes. Columns - the TruXenia ones
+  first, in its order and format: `host_time inst obj_id obj_name lp stamina state0 state1 req target dist lara_rec0
+  lara_rec1 meter active time_scale`, then the PC-only ones: `pc_intro pc_ko pc_attack pc_hit pc_lara_lp pc_lara_states
+  pc_lara_x pc_lara_y pc_lara_z pc_x pc_y pc_z pc_power_mode pc_player_time_scale pc_doppelganger pc_cam_obj
+  pc_cam_mode pc_cam_req pc_cam_dx pc_cam_dy pc_cam_dz pc_cam_dist pc_cam_fov_deg pc_ts_requests pc_ts_selected
+  pc_ramp_last`.
+  - `time_scale` = world time scale `[0xe7f1a0]` (TU gameTracker+0x118, the TruXenia column), `pc_player_time_scale`
+    = `[0xe7f1d4]`; `meter` / `active` from `TruShadowPowerMeterApi` (value, flags bit 0); `pc_power_mode` `slow`
+    (world < 0.99) / `fast` (active at 1.0 - the Xbox goo-drip run, X23) / `-`.
+  - `pc_ts_requests` = the meter's 7 time-scale request slots (TU meter +0x40, `{player, world}`, empty = -1) as
+    `slot:player/world` for each occupied slot; `pc_ts_selected` = what the selector takes (highest occupied slot,
+    `P1.20(s0) W0.30(s0)`). TruShadowPower 0.20 fills slots 0 / 4 / 5 only - the column shows it, nothing is changed.
+  - `pc_ramp_last` = the last call of the retail time-ramp natives SetWorldTimeScale 0x776030 / SetPlayerTimeScale
+    0x776090 (`gamebase` natives 23 / 24, the ones the TU routes to slot 6). While fight.trace or enemy.panel is on, a
+    pass-through counter sits on both (6-byte jump after a byte check of the prologue, trampoline back; arguments and
+    result unchanged) and writes one TruMenu.log line per call: `time ramp: world <- 0.300 over 0.250 s (gamebase native
+    23; caller 0x... in <module>)` (24 for player; at most 2000 lines); `pc_ramp_last` = `hh:mm:ss.mmm W0.300@0.250s
+    <module>`. It stays in place until the game ends.
+  - `pc_attack` while an enemy is in MeleeAttack: the attack record (state data+0x50) and its anim refs +0x78 / +0x7c /
+    +0x80 (`0x... a<type>/<anim> ...`) - which melee attack runs (the spit attack, X22).
+  - `pc_hit` = the last hit of this enemy: amount, the state at the hit, the reaction (the first other layer-0 state
+    within 1.5 s). Damage type and knockback come from TruShadowCombat's own lines (`damage types`, `0.6.7 hit`,
+    `0.6.7 knockback`) in TruMenu.log, joined by time - TruShadowCombat does not export them.
+  - Camera: position = vtable +0x34 of the current camera (base 0x5e1c60 `lea eax,[ecx+0xa0]`, snapshot 0xe8eeb0 while
+    byte `[0xe8eec8]`), FOV = vtable +0x40 (base 0x5e1c90 `fld [ecx+0xb0]`, radians, logged in degrees), read only when
+    the camera's vtable slot holds that base function; `pc_cam_d*` / `pc_cam_dist` = camera minus Lara. The look-at
+    point is **not** logged (no proven field yet).
+- **`enemy.panel 1|0`** (default 0, bar page Tests "Gegneranzeige"): a fixed panel at the right edge for the nearest
+  enemy within 3000 units (the trace takes 6000; DE / EN with the language switch):
+  ```
+  Gegner viking_thrall (11270) - 312
+  [#########.....] 420 / 500
+  St 0.0 | Zustand Hit / - | Soll -
+  Ziel Lara | Ko ja 1/2
+  Treffer -60 Hit | -40 Hit | -20 Hit
+  Lara 1000 | Kraft 967 Zeitlupe | Zeit Welt / Lara 0.30 / 1.20
+  Zeit-Anforderungen 0:1.20/0.30 -> P1.20(s0) W0.30(s0)
+  ```
+  `St` stamina, `Zustand` layer 0 / 1, `Soll` requested state, `Ziel` target (Lara / ? / -), `Ko` attack coordinator
+  (holds a slot ja / nein, grants / calls; `Ko 0` = no record, `Ko ?` = not read), `Angriff` line during MeleeAttack,
+  `Treffer` the last 3 hits (amount and reaction), then Lara's LP, the power and both time scales, the request slots.
+- Compare: new read-only `tools/fight_trace_compare.py --pc TruFight.log --xbox <truxenia watch .tsv>` (time
+  filters per side, `--enemy`, `--show COL`): the n-th hit of each side in one table (time, enemy, LP, damage, state at
+  the hit -> reaction, the same rule on both sides), the state sequence per enemy, reaction counts and the power phases.
+  `tools/combat_log_compare.py` (combo lines) is unchanged.
+- Open: the look-at point; whether the PC also routes script ramps into a request slot (the column shows it live);
+  `stamina` on the PC is the brain field the 0.22.9 label shows (meaning against the Xbox column still to compare).
+
 ## 0.22.10 - light cut diagnosis and a stable light choice per object (2026-11-09)
 
 Built into `work\asi\menu0233`, not installed. Byte checks: `work\asi\menu0233\precheck_0230.txt` (9 checks, 0
