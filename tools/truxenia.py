@@ -195,7 +195,8 @@ class FakeMem:
         self.w32(prev + S.h(il['next_offset']), 0)                      # end of the instance list
         # melee attack record for thrall 0: data = (brain+0x1254 + 0*0x19c + 0x1f) & ~0xf
         b0 = self.insts[0][1]
-        self.mdata = (b0 + 0x1254 + 0x1f) & ~0xf
+        self.mraw = b0 + 0x1254                          # slot block sm + (slot + 2*layer)*0x19c, slot 0 / layer 0
+        self.mdata = (self.mraw + 0x1f) & ~0xf
         self.mrec = 0x44000000
         self.w32(self.mdata + 0x50, self.mrec)
         for k, v in enumerate((1, 50, 1, 51, 0, 0)):
@@ -283,7 +284,7 @@ class FakeMem:
                 inst, brain = self.insts[ev[2]]
                 self.w32(brain + 0x125c, self.states[ev[3]])
                 if ev[3] == 'MeleeAttack' and ev[2] == 0:
-                    self.w32(self.mdata + 0x198, self.states['MeleeAttack'])
+                    self.w32(self.mraw + 0x1a8, self.states['MeleeAttack'])   # TU switch: stw r30, 0x1a8(slot block)
             elif ev[1] == 'move':
                 self.wf(self.insts[ev[2]][0] + 0x20, ev[3])
             elif ev[1] == 'regen':                       # RegenerateDeath Enter: LP := maximum (TU 0x8235dff8)
@@ -431,15 +432,19 @@ class Model:
         return ' '.join(str(i) for i in ids if i is not None)
 
     def _melee(self, brain, layer, state_obj):
-        """attack record of a running MeleeAttack: data = (brain+0x1254 + (slot + 2*layer)*0x19c + 0x1f) & ~0xf,
-        slot = [brain+0x18d4+4*layer], record = [data+0x50] (TU MeleeAttack Enter 0x8232fb48); self-check data+0x198"""
+        """attack record of a running MeleeAttack: slot block raw = brain+0x1254 + (slot + 2*layer)*0x19c with
+        slot = [brain+0x18d4+4*layer]; state data = (raw + 0x1f) & ~0xf, record = [data+0x50] (TU MeleeAttack Enter
+        0x8232fb48). Self-check: the state switch 0x82349600 stores the state object at raw+0x1a8 (`stw r30,
+        0x1a8(r11)` 0x82349704, r11 = raw) and passes raw+0x10 - NOT at aligned data+0x198: the brain is 16-aligned, so
+        raw (+0x...4) is not, and data+0x198 sat 4 bytes before the state object (live 09.11.: always '?(data)')"""
         me = self.A['melee']
         slot = S.u32(self.mem, brain + S.h(me['slot_index_offset']) + 4 * layer)
         if slot is None or slot > 64:
             return '?'
         sm = brain + S.h(me['state_machine_offset'])
-        data = (sm + (slot + 2 * layer) * S.h(me['data_stride']) + S.h(me['data_bias'])) & ~0xf
-        if S.u32(self.mem, data + S.h(me['data_state_object_offset'])) != state_obj:
+        raw = sm + (slot + 2 * layer) * S.h(me['data_stride'])
+        data = (raw + S.h(me['data_bias'])) & ~0xf
+        if S.u32(self.mem, raw + S.h(me.get('raw_state_object_offset', '0x1a8'))) != state_obj:
             return '?(data)'
         rec = S.u32(self.mem, data + S.h(me['data_record_offset']))
         if not rec:

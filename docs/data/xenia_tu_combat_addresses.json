@@ -117,11 +117,13 @@
     "data_bias": "0x1f",
     "data_record_offset": "0x50",
     "data_state_object_offset": "0x198",
+    "raw_state_object_offset": "0x1a8",
+    "raw_state_object_why": "TU state switch 0x82349600: r11 = sm + idx*0x19c (0x82349688 mulli), data passed = r11+0x10 (0x82349700), state object stored at r11+0x1a8 (0x82349704 stw r30,0x1a8(r11)); the record sits at ((r11+0x1f)&~0xf)+0x50, so the state object is at raw+0x1a8 - aligned data+0x198 is 4 bytes off when the brain is 16-aligned (live 09.11.: always '?(data)')",
     "record_anim_refs_offset": "0x78",
     "record_timeout_offset": "0x136",
     "basis": "code (data address, record pointer); +0x198 state object and +0x78 anim refs {u16 type, u16 anim} x3 from ENGINE.md 13.2 / 13.5 (same on all exes)",
     "why": "TU MeleeAttack Enter 0x8232fb48: sm = brain+0x1254, slot = [sm + 4*(0x1a0+layer)] = [brain+0x18d4+4*layer], data = (sm + (slot + 2*layer)*0x19c + 0x1f) & ~0xf; record = [[arg]+0] stored at data+0x50; record +0x136 / +0x138 read",
-    "proof": {"0x8232fb80": "0x394501a0", "0x8232fb84": "0x397b1254", "0x8232fb9c": "0x1d48019c", "0x8232fba4": "0x38cb001f", "0x8232fbbc": "0x913f0050", "0x8232fbe8": "0xa12a0136"}
+    "proof": {"0x8232fb80": "0x394501a0", "0x8232fb84": "0x397b1254", "0x8232fb9c": "0x1d48019c", "0x8232fba4": "0x38cb001f", "0x8232fbbc": "0x913f0050", "0x8232fbe8": "0xa12a0136", "0x82349688": "0x1d68019c", "0x82349700": "0x388b0010", "0x82349704": "0x93cb01a8"}
   },
   "coordinator": {
     "requester_offset": "0x2fc4",
