@@ -1,4 +1,26 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.7)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.8)
+
+0.6.8 (2026-11-09, **offline, not yet seen in game**; TODO N18 K-1b, main workspace
+`docs\Befund-K1b-Entscheidung-0911.md`, ENGINE.md 13): build `work\asi\combat068`, byte pre-checks
+`work\asi\combat068\precheck_068.txt` (7 checks, 0 mismatches against the installed tru.exe).
+* **Impulse gate** (`[Hit] TranslateImpulseGate`, live, default **1**; TU 0x823e1870..0x823e1884): Lara's contact-hit
+  sender tru+0x319050 (CombatManager in edi, hit instance in ebx, attack data A = `[edi+0xc4]`) sends the hit message
+  0x11c and then, when A+0x10 > 0 and no special body was hit, the impulse message 0x91 (tru+0x3192da..+0x319394). The
+  title update skips that impulse when `[[inst+0x10]]+4` has bit 0x400000 (enemies with a brain, the thrall too) and
+  continues at 0x823e1934 (= PC tru+0x319398); retail and the PC always send it, so on the PC the impulse receiver
+  tru+0x224c60 throws the thrall into Fall on every punch. Jump at tru+0x3192da (5 bytes `lea edx, [esp+0x20]; push
+  edx`) -> `ImpulseGateStub`; flag set and switch on -> tru+0x319398, else the two moved instructions and back to
+  tru+0x3192df (switch 0 = PC). Other impulse senders (weapons, surroundings) are not touched. Side effect: Lara's melee
+  no longer reaches the 0.6.1 lethal-impulse path in tru+0x224c60; death comes through 0x11c + the death check, as in
+  the TU.
+* **Log** (`[Hit] Log`, same cap `[Hit] MaxLines`): per skipped impulse `0.6.8 impulse gate: <enemy> type <A+0xc> force
+  A+0x10 <f>, [[inst+0x10]]+4 0x... -> impulse 0x91 not sent (TU 0x823e1870, #<n>, ...)`. Load line `0.6.8 impulse
+  gate on (...)`.
+* **Hit line label fixed:** `0.6.7 hit:` now prints the subtype msg+0x64 as `sub` (2 for Lara's contact hit, builder
+  argument 17 at tru+0x31914b) and msg+0x54 (argument 16, fixed -1 at tru+0x31914d) as `msg+0x54`; 0.6.7 printed
+  msg+0x54 under `sub`.
+* **Test (hall02, tutorial thrall):** single punches during the thrall's attack with the switch 1 / 0: expected with 1
+  `impulse gate` lines, Hit instead of Fall, Fall only for types 21 / 23..27 (records with s+0x20 = 1).
 
 0.6.7 (2026-11-09, **offline, not yet seen in game**; for the combat tests of TODO N18 "Kampf wie Xbox"): K-1 hit
 structures + knockback and K-7 chunkdoll limit (main workspace `docs\Befund-K1-Umfallen-0911.md`, ENGINE.md 13). Build

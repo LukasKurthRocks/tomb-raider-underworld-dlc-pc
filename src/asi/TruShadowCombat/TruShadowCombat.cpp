@@ -53,6 +53,9 @@
 //    from FIXED extension data (tools/thrall_extension_fix.py); the Vaulted clock (5 s without slow motion, brain+0xc
 //    bit 0x10 / +0x5080 / +0x5084 kept by the plugin) in the Enter and the enemy update tru+0x238d40 ([Death]
 //    TranslateVaultedClock). All default on, live.
+// 14. 0.6.8 (K-1b): Lara's contact-hit sender tru+0x319050 sends the impulse message 0x91 after the hit message 0x11c
+//    (tru+0x3192da); the TU 0x823e1870 skips it for targets with flag 0x400000 in [[inst+0x10]]+4 (enemies with a
+//    brain) - [Hit] TranslateImpulseGate, default on, live.
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -69,7 +72,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.7 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.8 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -100,7 +103,9 @@ const char kVersion[] = "TruShadowCombat 0.6.7 (TU target list 7 -> 10, conditio
                         "from the companion's hit records as the TU 0x82301dc0 ([Hit] Translate), knockback force per "
                         "type from record +0x40 as the TU 0x822f77e4 ([Hit] TranslateKnockback), one log line per hit "
                         "decision ([Hit] Log), chunkdoll limit 4 -> 8 as the TU 0x82376700 ([Chunk] Limit8, start "
-                        "only), all on by default)";
+                        "only), all on by default; 0.6.8: no impulse message 0x91 from Lara's contact hit "
+                        "tru+0x3192da to targets with flag 0x400000 as the TU 0x823e1870 ([Hit] "
+                        "TranslateImpulseGate, on by default), hit line prints the subtype msg+0x64)";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -1681,6 +1686,7 @@ bool g_vaultChain = false;         // 0.6.6: all six links of the Vaulted chain 
 int g_hitTranslate = 1;            // [Hit] Translate (0.6.7, live through P1dReadSwitches)
 int g_hitKnock = 1;                // [Hit] TranslateKnockback (0.6.7, live)
 int g_hitLog = 1;                  // [Hit] Log (0.6.7, live)
+int g_hitImpulseGate = 1;          // [Hit] TranslateImpulseGate (0.6.8, live)
 
 BYTE *__cdecl Record1013(BYTE *target, BYTE *player, const float *pos, const float *rot, float frames, DWORD x34,
                          BYTE *hit) {
@@ -4070,7 +4076,11 @@ const P1dKey kP1dKeys[] = {
      "0 / 1 / 2 / 4)", "PC selector tru+0x2159a0 (types 0..16 only)", "0.6.7"},
     {"Hit", "TranslateKnockback", &g_hitKnock, "knockback force per damage type from the hit record +0x40 (TU 0x822f77e4)",
      "fixed 3.0 (PC)", "0.6.7"},
-    {"Hit", "Log", &g_hitLog, "one line per hit decision / knockback", "no hit lines", "0.6.7"},
+    {"Hit", "Log", &g_hitLog, "one line per hit decision / knockback / gated impulse", "no hit lines", "0.6.7"},
+    // 0.6.8 (K-1b)
+    {"Hit", "TranslateImpulseGate", &g_hitImpulseGate,
+     "no impulse 0x91 from Lara's contact hit to targets with flag 0x400000 (TU 0x823e1870)",
+     "impulse 0x91 to every target (PC)", "0.6.8"},
 };
 
 void P1dReadSwitches() {
@@ -5423,12 +5433,18 @@ DWORD __cdecl HitDecideHook(BYTE *inst, BYTE *msg, BYTE *d, float amount) {
     if (HitLine()) {
         char who[96];
         Describe(inst, who, sizeof(who));
-        LONG type = -1, sub = -1;
-        __try { type = *reinterpret_cast<const LONG *>(msg + 0x50); sub = *reinterpret_cast<const LONG *>(msg + 0x54); }
-        __except (EXCEPTION_EXECUTE_HANDLER) {}
+        // 0.6.8: sub = msg+0x64 (the subtype, builder argument 17, fixed 2 at tru+0x31914b); msg+0x54 (argument 16,
+        // fixed -1 at tru+0x31914d, only the entry list in tru+0x24f230 reads it) under its own name
+        LONG type = -1, sub = -1, m54 = -1;
+        __try {
+            type = *reinterpret_cast<const LONG *>(msg + 0x50);
+            sub = *reinterpret_cast<const LONG *>(msg + 0x64);
+            m54 = *reinterpret_cast<const LONG *>(msg + 0x54);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
         const int src = (g_selInst == inst) ? g_selSource : 0;
-        Log(1, "0.6.7 hit: %s type %ld sub %ld amount %.1f - structure: %s (flags +0x14 0x%08lx) -> %s ([Hit] Translate %d)",
-            who, type, sub, amount, kSelSource[src], src ? g_selFlags : 0, r ? "HEAVY (knockback tru+0x220650)" :
+        Log(1, "0.6.7 hit: %s type %ld sub %ld msg+0x54 %ld amount %.1f - structure: %s (flags +0x14 0x%08lx) -> %s "
+               "([Hit] Translate %d)",
+            who, type, sub, m54, amount, kSelSource[src], src ? g_selFlags : 0, r ? "HEAVY (knockback tru+0x220650)" :
             "light (MoveHit tru+0x25ac80)", g_hitTranslate);
     }
     return r;
@@ -5551,6 +5567,92 @@ void SetupHit() {
         g_hitKnock, g_hitLog, g_hitMax, g_chunk8Placed ? "8 (TU 0x82376700)" : "4 (PC)", g_chunkLimit8);
 }
 
+// ---------------------------------------------------------------- 0.6.8: K-1b impulse gate
+// docs Befund-K1b-Entscheidung-0911 section 3: Lara's contact-hit sender tru+0x319050 (ecx = CombatManager, edi; ebx =
+// the hit instance, receiver of 0x11c and 0x91; attack data A = [edi+0xc4]) sends, when A+0x10 > 0 and no special body
+// was hit, the impulse message 0x91 (tru+0x3192da..+0x319394, send tru+0x31938c) and then continues at tru+0x319398.
+// The TU 0x823e1870..0x823e1884 tests [[r28+0x10]]+4 bit 0x00400000 before that branch and jumps to 0x823e1934 (= PC
+// tru+0x319398) when it is set; retail 0x823df318 and the PC have no such test. The impulse receiver tru+0x224c60
+// throws the enemy up (tru+0x20eeb0) -> Fall on every punch. tru+0x3192da (lea edx, [esp+0x20]; push edx - 5 bytes)
+// -> jmp ImpulseGateStub; FPU stack empty and esp equal at both ends (tru+0x3192d5 also jumps to tru+0x319398).
+// Switch off = the two moved instructions and back to tru+0x3192df (PC).
+const DWORD kImpulseSite = 0x007192da;
+DWORD g_impulseBack = 0x007192df, g_impulseSkip = 0x00719398;
+bool g_impulsePlaced = false;
+volatile LONG g_impulseGated = 0;
+
+// 1 = skip the impulse (TU), 0 = send it (PC)
+DWORD __cdecl ImpulseGate(const BYTE *mgr, const BYTE *inst) {
+    P1dReadSwitches();
+    if (!g_hitImpulseGate || !inst) return 0;
+    const BYTE *o = reinterpret_cast<const BYTE *>(Rd(inst + 0x10));      // TU lwz r11, 0x10(r28)
+    const BYTE *d = o ? reinterpret_cast<const BYTE *>(Rd(o)) : nullptr;   // lwz r10, 0(r11)
+    const DWORD flags = d ? Rd(d + 4) : 0;                                 // lwz r9, 4(r10)
+    if (!(flags & 0x00400000)) return 0;                                   // rlwinm r8, r9, 0, 9, 9; bne
+    const LONG n = InterlockedIncrement(&g_impulseGated);
+    if (HitLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        LONG type = -1;
+        float force = 0.0f;
+        __try {
+            const BYTE *a = *reinterpret_cast<const BYTE *const *>(mgr + 0xc4);
+            type = *reinterpret_cast<const LONG *>(a + 0xc);
+            force = *reinterpret_cast<const float *>(a + 0x10);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        Log(1, "0.6.8 impulse gate: %s type %ld force A+0x10 %.1f, [[inst+0x10]]+4 0x%08lx -> impulse 0x91 not sent "
+               "(TU 0x823e1870, #%ld, [Hit] TranslateImpulseGate %d)", who, type, force, flags, n, g_hitImpulseGate);
+    }
+    return 1;
+}
+
+// jumped to from tru+0x3192da (5 bytes): ebx = the hit instance, edi = the CombatManager
+__declspec(naked) void ImpulseGateStub() {
+    __asm {
+        pushad
+        pushfd
+        push ebx
+        push edi
+        call ImpulseGate
+        add esp, 8
+        test eax, eax
+        jnz ig_skip
+        popfd
+        popad
+        lea edx, [esp + 0x20]
+        push edx
+        jmp dword ptr [g_impulseBack]
+    ig_skip:
+        popfd
+        popad
+        jmp dword ptr [g_impulseSkip]
+    }
+}
+
+void SetupImpulseGate() {
+    const Fact f[] = {
+        {0x0071907a, "8b5e04 f7431400004000 7403 8b5b4c", "sender tru+0x319050: ebx = hit instance"},
+        {0x00719183, "681c010000 53 e8c2a5e9ff", "sender: hit message 0x11c to ebx"},
+        {0x00719193, "8b87c4000000 d85010 dfe0 f6c405 0f8aef010000", "sender: A+0x10 > 0 test"},
+        {0x007191fe, "0f84d6000000", "sender: branch to tru+0x3192da"},
+        {0x00719212, "0f85c2000000", "sender: branch to tru+0x3192da"},
+        {0x007192d5, "e9be000000 8d542420 52 e8dc5cd8ff", "sender: message 7 -> tru+0x319398; impulse branch tru+0x3192da"},
+        {0x00719386, "6891000000 53 e8bfa3e9ff 83c454 eb02 ddd8 8b97c4000000", "sender: impulse 0x91 to ebx, tru+0x319398"},
+    };
+    if (!FactsOk66(f, sizeof(f) / sizeof(f[0]), "0.6.8 impulse gate")) {
+        Log(0, "0.6.8 impulse gate: not placed - Lara's contact hit sends the impulse 0x91 to every target (PC)");
+        return;
+    }
+    BYTE j[5] = {0xe9, 0, 0, 0, 0};
+    const DWORD rel = reinterpret_cast<DWORD>(&ImpulseGateStub) - (kImpulseSite + 5);
+    memcpy(j + 1, &rel, 4);
+    g_impulsePlaced = WriteCode(kImpulseSite, j, sizeof(j));
+    Log(1, "0.6.8 impulse gate %s (tru+0x3192da: no impulse 0x91 to targets with [[inst+0x10]]+4 bit 0x400000 as the TU "
+           "0x823e1870, [Hit] TranslateImpulseGate %d, read again at run time at most once per second; one line per "
+           "skipped impulse with [Hit] Log %d)",
+        g_impulsePlaced ? "on" : "OFF (write failed)", g_hitImpulseGate, g_hitLog);
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -5648,6 +5750,7 @@ void Start(HMODULE self) {
     SetupCompanion();                 // 0.6.5: P1d (after SetupDeath: the Land exception H3b lives in its hook)
     SetupN4c();                       // 0.6.6: T5 + P1c (after SetupCompanion: companion facts; after SetupTranslate1013)
     SetupHit();                       // 0.6.7: K-1 hit structures / knockback + K-7 chunk limit (after SetupCompanion)
+    SetupImpulseGate();               // 0.6.8: K-1b impulse 0x91 gate of Lara's contact hit (independent)
 }
 
 }  // namespace

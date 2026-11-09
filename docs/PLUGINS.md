@@ -20,7 +20,7 @@ READMEs and [CHANGELOG.md](../CHANGELOG.md); the plugin README and the CHANGELOG
 | [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22.1 | partial: 0.21.11 and the 0.22 cutscene pause played 2026-11-08; 0.22.1 (sound held, badge, pause at a mark) offline |
 | [TruMercLang](#trumerclang) | base-game comfort (fun option) | 0.1 | offline, default off |
 | [TruShadowPower](#trushadowpower) | DLC 2 title update | 0.20 | partial: played up to 0.18; 0.19 and 0.20 offline |
-| [TruShadowCombat](#trushadowcombat) | DLC 2 title update | 0.6.6 | partial: combat input and damage played; 0.6.6 offline |
+| [TruShadowCombat](#trushadowcombat) | DLC 2 title update | 0.6.8 | partial: combat input and damage played; 0.6.6 - 0.6.8 offline |
 | [TruShadowHud](#trushadowhud) | DLC 2 title update | 0.2 | partial: HUD natives played 2026-11-05; 0.2 offline |
 | [TruRockVein](#trurockvein) | DLC 2 title update | 0.11 | partial: wall run played; the jump from a ledge to a rock vein turns back |
 | [TruDoppelganger](#trudoppelganger) | DLC 2 title update | 0.1 | in the played DLC 2 stack; its README still says "not yet played" |
@@ -154,14 +154,16 @@ The DLC 2 combat of the title update: the larger target list, the new combat con
 strike, the title update's damage-type switch, lethal impulses, splash damage, the thrall's companion and the
 regenerate / death rules of the thralls.
 
-- Version: 0.6.6.
+- Version: 0.6.8.
 - State: partial. Shadow combat input played; thralls take damage and die with `[Damage] Translate` (live test
-  2026-11-07); 0.6.4 ran in the live test of 2026-11-07. 0.6.6 (T5, Vaulted chain and clock) offline. Open: the shadow
+  2026-11-07); 0.6.4 ran in the live test of 2026-11-07. 0.6.6 (T5, Vaulted chain and clock), 0.6.7 (hit structures,
+  knockback per type, chunkdoll limit 8) and 0.6.8 (impulse gate of Lara's contact hit) offline. Open: the shadow
   finisher never starts (its target list stays empty).
 - INI `TruShadowCombat.ini`: `[ShadowCombat] Enabled` / `LogLevel`; `[TargetList] Enabled`; `[Strike] Translate`
   (0); `[States] Translate1013` (0, finisher); `[Damage] Translate` (1); `[Chunk] Translate`; `[Splash] Translate`;
   `[Companion] Translate`; `[Death] TranslateT5` / `TranslateVaulted` / `TranslateVaultedClock` and the other
-  `[Death]` switches; `[Diag]` log-only hooks. Most switches are read again at run time.
+  `[Death]` switches; `[Hit] Translate` / `TranslateKnockback` / `TranslateImpulseGate` / `Log`; `[Chunk] Limit8`;
+  `[Diag]` log-only hooks. Most switches are read again at run time.
 - Install: `scripts\windows\Set-TruShadowCombat.ps1`.
 - README: [src/asi/TruShadowCombat/README.md](../src/asi/TruShadowCombat/README.md).
 
