@@ -82,16 +82,23 @@ try {
     $running = Get-Process -Name 'gameoverlayui64', 'gameoverlayui' -ErrorAction SilentlyContinue
     if ($running) { Write-Log ("overlay UI already running: pid {0} - a second one is started for tru.exe" -f (($running | ForEach-Object Id) -join ', ')) -Level VERBOSE }
 
+    $uiLog = Join-Path $SteamPath 'logs\gameoverlay_ui.txt'
+    $uiLogLines = if (Test-Path -LiteralPath $uiLog) { @(Get-Content -LiteralPath $uiLog).Count } else { 0 }
+
     $argList = @('-steampid', $steam.Id, '-pid', $game.Id, '-gameid', 8140, '-manuallyclearframes', 0)
     Write-Log ("`"$overlayUi`" " + ($argList -join ' ')) -Level DEBUG
     $ui = Start-Process -FilePath $overlayUi -ArgumentList $argList -PassThru
     Write-Log "Overlay UI started (pid $($ui.Id)) for tru.exe pid $($game.Id), steam pid $($steam.Id). Shift+Tab in the game."
 
     Start-Sleep -Seconds 3
-    $uiLog = Join-Path $SteamPath 'logs\gameoverlay_ui.txt'
     if (Test-Path -LiteralPath $uiLog) {
-        Write-Log 'Steam gameoverlay_ui.txt (last lines):' -Level VERBOSE
-        Get-Content -LiteralPath $uiLog -Tail 8 | ForEach-Object { Write-Log "  $_" -Level VERBOSE }
+        $newLines = @(Get-Content -LiteralPath $uiLog | Select-Object -Skip $uiLogLines)
+        if ($newLines.Count) {
+            Write-Log "Steam gameoverlay_ui.txt ($($newLines.Count) new lines since the start):" -Level VERBOSE
+            $newLines | Select-Object -Last 8 | ForEach-Object { Write-Log "  $_" -Level VERBOSE }
+        } else {
+            Write-Log 'Steam gameoverlay_ui.txt: no new lines yet (normal; the FPS counter in the game shows that the overlay is attached).' -Level VERBOSE
+        }
     }
 } catch {
     Write-Log $_.Exception.Message -Level ERROR
