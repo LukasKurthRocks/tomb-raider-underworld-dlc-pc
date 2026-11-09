@@ -1,0 +1,6 @@
+# Hand-kept statuses for tools/tu_coverage.py (win over the automatic ones). Columns tab-separated.
+# status: ported / explained / irrelevant / open; basis: code / doc / heuristic; tu_addr = TU function start.
+tu_addr	status	basis	plugin	note
+0x823766c0	open	doc		K-7 chunkdoll limit 4 -> 8 (cmp at TU create): portable since 09.11. (physics-step fix live), TODO N18
+0x8226de00	open	doc		sound slot 5th argument (ENGINE.md section 1): not ported
+0x823e0308	open	code		K-5 combat reticle / adrenaline start doppelganger branch (Befund-Anvisier-Kreis-0911): not ported yet
