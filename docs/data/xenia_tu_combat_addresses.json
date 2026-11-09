@@ -42,5 +42,44 @@
     "pc": "[0xfadb58] +0xf10 / +0xf14, machine +0x500 flag, +0x510 record (update 0x787e60)",
     "retail": "machine +0x500 / +0x510 (update 0x8247c980); TU adds 0x10 before these fields",
     "proof": {"0x82473c94": "0x3fe08299", "0x82473c98": "0x817f92b0", "0x82473c9c": "0x83cb0f10", "0x82473ca0": "0x83ab0f14", "0x824828e4": "0x897f0510", "0x8248296c": "0x809f0520"}
+  },
+  "brain_ext": {
+    "_comment": "2026-11-09 TruXenia (tools/truxenia.py). 'proven' false = shown as '?' unless the viewer enables unproven fields (then marked '~').",
+    "requested_state0": {"offset": "0x18f8", "proven": true, "pc": "brain+0x18f8 (TruMenu 0.22.9 'Soll')", "why": "TU 0x822f13a8..0x822f13c0 r8 = [[inst+0x2d0]]+0x2ec (brain), 0x822f1414 lwz [brain+0x125c] and 0x822f1448 lwz [r8+0x18f8] are compared with the same two state objects"},
+    "requested_state1": {"offset": "0x18fc", "proven": false, "pc": "brain+0x18fc", "why": "follows +0x18f8 as on PC; no TU reader of +0x18fc found"},
+    "targeting": {"offset": "0x4e60", "proven": true, "pc": "brain+0x4e10 (EnemyTargeting, ctor 0x653750 at PC 0x6342b1)", "why": "retail brain ctor 0x822d7af8 (= PC 0x634020, map verified) builds EnemyTargeting at +0x4e10 (0x822d80f0 addi r3,r31,0x4e10; bl 0x82341f98); the TU brain ctor 0x822d50a0 builds the same (instruction-equal) ctor TU 0x82341868 at +0x4e60 (0x822d5698) - the TU block shifts the brain by 0x50 between +0x2c90 and +0x3780 (retail +0x3780 / +0x3ec0 / +0x4600 / +0x4e10 = TU +0x37d0 / +0x3f10 / +0x4650 / +0x4e60)"},
+    "target_slot": {"offset": "0x30", "proven": false, "pc": "EnemyTargeting +0x30 slot: +4 mode (-1 none, 0 sense handle +0x28/+0x2c, 1 instance handle +0x20/+0x24, 2 position); instance stamp +0x44 (TruMenu AwTarget)", "why": "EnemyTargeting ctor is instruction-equal; the getter (PC 0x653b60 = retail 0x823436d0, map unverified) not checked in the TU"},
+    "coordinator_requester": {"offset": "0x2fc4", "proven": false, "pc": "brain+0x2fc4 (coordinator 0x67d780 requester)", "why": "33 uses of displacement 0x2fc4 in retail and 33 in TU; the brain shift starts after +0x2c90; the TU coordinator itself is not mapped (retail map 'contradicted') - slot state shown as '?'"},
+    "proof": {"0x822f13c0": "0x810a02ec", "0x822f1414": "0x816b125c", "0x822f1448": "0x83e818f8", "0x822d5698": "0x387f4e60", "0x822d569c": "0x4806c1cd"}
+  },
+  "game_tracker": {
+    "address": "0x82efb458",
+    "player_instance": "0xc",
+    "scaled_dt": "0x100",
+    "world_time_scale": "0x118",
+    "pc": "GameTracker 0xe7f088: +0xc player instance, +0x100 scaled frame dt, +0x118 world time scale (ENGINE.md section 4)",
+    "why": "TU cloth time step 0x822781dc..0x822781f8 (Befund-Exe-Vergleich-0511): gt = 0x82efb458; dt = [gt+0x100]; if (instance == [gt+0xc]) dt /= [gt+0x118]",
+    "proof": {"0x822781dc": "0x3d6082f0", "0x822781e0": "0x396bb458", "0x822781e4": "0x814b000c", "0x822781e8": "0xc02b0100", "0x822781f4": "0xc00b0118"}
+  },
+  "player_tracker": {
+    "doppelganger_flag": "0x1244",
+    "meter_object": "0x508",
+    "combat_manager": "0x504",
+    "lara_lp": null,
+    "pc": "player tracker [0xfadb58]: +0x504 CombatManager / player, +0x628 health (PC; TU offset not proven), +0x1244 doppelganger flag (TU only, TruDlc2Player)",
+    "why": "TU condition 1046 predicate 0x8246e400: [[0x829892b0]+0x1244] byte != 0 -> meter [[0x829892b0]+0x508] flags +4 bit 0, else [[0x829892b0]+0x504]+0x1fc bit 21",
+    "proof": {"0x8246e408": "0x816b92b0", "0x8246e40c": "0x894b1244", "0x8246e418": "0x816b0508", "0x8246e424": "0x816b0004", "0x8246e430": "0x816b0504"}
+  },
+  "meter": {
+    "flags": "0x4",
+    "value": "0x8",
+    "start_value": "0xc",
+    "flag_bits": "1 power active (condition 1046), 4 shadow look (condition 1055, 0x8246e46c), 8 at or above tuning +0x2c, 0x200 ran empty",
+    "why": "meter tick TU 0x823d7a10 (this = meter object): flags +4 (0x823d7ac8 / 0x823d7adc), lfs +8 / +0xc (0x823d7b1c / 0x823d7b20); field meaning from the TruShadowPower translation (struct Meter)",
+    "proof": {"0x823d7ac8": "0x817f0004", "0x823d7b1c": "0xc03f0008", "0x823d7b20": "0xc05f000c"}
+  },
+  "instance_ext": {
+    "position": {"offset": "0x20", "proven": false, "pc": "instance +0x20 position (3 floats; ENGINE.md section 2 'Instance fields')", "why": "TU instance +0x10 / +0x2d0 are proven equal to the PC; +0x20 not yet tied to a TU reader"},
+    "stamp": {"offset": "0x44", "proven": false, "pc": "instance +0x44 allocation stamp", "why": "as position"}
   }
 }

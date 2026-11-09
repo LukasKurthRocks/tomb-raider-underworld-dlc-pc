@@ -17,6 +17,7 @@ state.
 | File | What it is |
 |---|---|
 | [PLUGINS.md](PLUGINS.md) | All ASI plugins of the fork: purpose, version, state, INI switches, links to their READMEs; the title-update approach |
+| [TRUXENIA.md](TRUXENIA.md) | TruXenia: Xbox values from the Xenia emulator (enemies, Lara, hit log, command link, save library) to compare fights with the PC |
 | [DLC_MENU.md](DLC_MENU.md) | The DLC mission screen on PC (title drawn over the description) and its fix in all six languages |
 
 ## Status and history
