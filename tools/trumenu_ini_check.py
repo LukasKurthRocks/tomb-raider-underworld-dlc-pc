@@ -132,6 +132,18 @@ import os, re, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CPP = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.cpp')
 INI = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.ini')
+# 0.22.6 (2026-11-09): TruMenu's German texts carry umlauts as octal UTF-8 escapes (tools/trumenu_umlauts.py); the checks
+# below compare with the ASCII spelling, so the source is read with those escapes turned back into ae / oe / ue / ss
+# (a text with umlauts then counts 2 characters per umlaut - stricter than on screen)
+UMLAUT_ESCAPES = {r'\303\244': 'ae', r'\303\266': 'oe', r'\303\274': 'ue', r'\303\204': 'Ae', r'\303\226': 'Oe',
+                  r'\303\234': 'Ue', r'\303\237': 'ss'}
+
+
+def read_cpp():
+    src = open(CPP, 'r', encoding='utf-8').read()
+    for esc, ascii_text in UMLAUT_ESCAPES.items():
+        src = src.replace(esc, ascii_text)
+    return src
 REGRESS = {'dlc1.txt': 'Regression-DLC1.md', 'dlc2.txt': 'Regression-DLC2.md'}
 RADIAL = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.radial.txt')
 TOUR = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.tour.txt')
@@ -341,7 +353,7 @@ def check_shortcut(where, text, items):
 def check_lists():
     """problems of tests/regress/*.txt (empty list = fine) and a summary per file"""
     problems, summary = [], []
-    items = item_types(open(CPP, encoding='utf-8').read())
+    items = item_types(read_cpp())
     for name, doc in sorted(REGRESS.items()):
         path = os.path.join(ROOT, 'tests', 'regress', name)
         if not os.path.exists(path):
@@ -383,7 +395,7 @@ def check_radial(path=RADIAL, name='TruMenu.radial.txt', marker='# TruMenu radia
     """problems of a radial-format file (TruMenu.radial.txt, 0.10.1 also TruMenu.tour.txt; empty list = fine), a summary
     line and its levels {path: [entries]} (for the limits with the built-in entries)"""
     problems = []
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     items = items or item_types(src)
     m = re.search(r'kRadForbidden\[\] = \{(.*?)\};', src, re.S)
     cpp_forbidden = re.findall(r'"([^"]+)"', m.group(1)) if m else []
@@ -517,7 +529,7 @@ def check_shot(ini_path, radial_path):
             problems.append('%s:%d: [Shot] Folder=%s has a character Windows does not allow' % (name, n, value))
     for key in ('Enabled', 'Folder', 'Clean', 'Hotkey', 'MaxPerMinute'):
         if key not in seen: problems.append('%s: [Shot] %s missing' % (name, key))
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     items = item_types(src)
     for item, typ in (('shot.save', 'action'), ('shot.status', 'info'), ('claude.mark', 'action')):
         if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
@@ -577,7 +589,7 @@ def check_flow(ini_path):
             problems.append('%s:%d: [Flow] File=%s empty or with a character Windows does not allow' % (name, n, value))
     for key in ('Enabled', 'File', 'Overlay', 'Position', 'Size', 'Lines', 'AutoAdvance', 'ToastSeconds', 'PollMs'):
         if key not in seen: problems.append('%s: [Flow] %s missing' % (name, key))
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     items = item_types(src)
     for item in FLOW_ITEMS:
         want = 'info' if item in ('flow.status', 'flow.list') else 'action'
@@ -607,7 +619,7 @@ def check_debug(ini_path, radial_path):
     label keys / dbg.labels; 0.14 the debug view keys, items and ring entries"""
     problems, section, seen = [], None, set()
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     switches = nav_switches(src)
     if not switches: problems.append('TruMenu.cpp: kNavSwitches missing or empty')
     layers = dv_layers(src)
@@ -822,7 +834,7 @@ def check_quick(ini_path, radial_path):
     the value items, every debug view layer reachable from the bar); the new ring entries"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     seen = set()
     for n, key, value in ini_section(ini_path, 'Quick'):
         seen.add(key)
@@ -930,7 +942,7 @@ def check_018(ini_path, radial_path):
     ring's overlay.larain (once, no argument), pos.goload (a name or last), time.scale (a number 0 .. 10)"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     for section, key in Q18_KEYS:
         found = [(n, v) for n, k, v in ini_section(ini_path, section) if k == key]
         if len(found) != 1: problems.append('%s: [%s] %s missing' % (name, section, key))
@@ -999,7 +1011,7 @@ def check_019(ini_path, radial_path, rows):
     precheck tables (present, at most 64 bytes a check - HexBytesAt's buffer)"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     found = {}
     for n, key, value in ini_section(ini_path, 'AI'):
         found[key] = (n, value)
@@ -1090,7 +1102,7 @@ def check_020(ini_path, radial_path, rows):
     once without an argument, the 0.20 precheck tables present with at most 64 bytes a check"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     found = {k: (n, v) for n, k, v in ini_section(ini_path, 'Media')}
     for key in Q20_MEDIA_KEYS:
         if key not in found: problems.append('%s: [Media] %s missing' % (name, key))
@@ -1162,7 +1174,7 @@ def check_0201(ini_path, radial_path):
     thread), the bar rows, the ring entries and their arguments, the precheck tables, the mute order in SndMuteTick"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     found = {k: (n, v) for n, k, v in ini_section(ini_path, 'Sound')}
     for key, rule in Q201_KEYS:
         if key not in found:
@@ -1257,7 +1269,7 @@ def check_021(ini_path, radial_path, rows):
     and the owner-picture rules (.gitignore, Set-TruMenu.ps1, tools/pending_upload_scan.py)"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     for section, keys in (('Arachno', Q21_ARACHNO_KEYS), ('Camera', Q21_CAMERA_KEYS)):
         found = {k: (n, v) for n, k, v in ini_section(ini_path, section)}
         for key, rule in keys:
@@ -1371,7 +1383,7 @@ def check_0211(ini_path, radial_path, rows):
     rule (placed intros only from drawn instances), the thrall-fight Prepare takes unit.go"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     items = item_types(src)
     for item, typ in sorted(Q211_ITEMS.items()):
         if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
@@ -1526,7 +1538,7 @@ def fn_body(src, head):
 def check_0213(ini_path):
     """0.21.3 (2026-11-07 quick bar X / Y, sound list width): see the module text"""
     problems = []
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     m = re.search(r'const WORD kQbOwn = (0x[0-9A-Fa-f]+);', src)
     if not m or int(m.group(1), 16) != QB_OWN:
         problems.append('TruMenu.cpp: kQbOwn must be 0x%04X (D-pad / LB / RB + X / Y), got %s' % (QB_OWN, m.group(1) if m
@@ -1600,7 +1612,7 @@ def check_0214(ini_path, rows):
     """0.21.4 (2026-11-07 hall02 counter): see the module text"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     for item, (typ, thread) in sorted(Q214_ITEMS.items()):
         m = re.search(r'\{"%s", "%s", (?:"[^"]*"\s*)+,\s*(true|false),' % (re.escape(item), typ), src)
         if not m: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
@@ -1962,7 +1974,7 @@ def check_switches(path):
 def check_0215(radial_path, switches_path):
     """0.21.5 (2026-11-07 TruMenu 0.21.5 Fixes + frozen ring): see the module text"""
     problems, summary, rows = check_switches(switches_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     items = item_types(src)
     for item in ('sw.set', 'sw.list', 'sw.reload'):
         m = re.search(r'\{"%s", "action", (?:"[^"]*"\s*)+,\s*(true|false),' % re.escape(item), src)
@@ -2032,7 +2044,7 @@ def check_0216(ini_path):
     command line (L3 alone, not as part of L3 + R3; one command path = CmdRunLine only; keys held from the game)"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     if not src.startswith('//') or '0.21.6 (bar page Kostueme' not in src[:src.find('\n', src.find('kVersion = '))]:
         problems.append('TruMenu.cpp: kVersion must keep the 0.21.6 text (0.21.7: the version check moved to check_0217)')
     # [Cheat] FlightHint
@@ -2141,7 +2153,9 @@ def check_0216(ini_path):
             problems.append('TruMenu.cpp: FlightHintWanted must be g_flightHint && g_flight && !g_menuOpen && InLevel() '
                             '(missing %s)' % need)
     render = fn_body(src, 'void Render(')
-    if 'const bool flightHint = FlightHintWanted();' not in render or '!flightHint)' not in render or \
+    # 0.22.1: the early-return condition goes on with "&& !cnBadge)" (the cutscene pause badge)
+    if 'const bool flightHint = FlightHintWanted();' not in render or \
+            not re.search(r'!flightHint( && ![A-Za-z]+)*\)', render) or \
             'if (flightHint) DrawFlightHint();' not in render:
         problems.append('TruMenu.cpp: Render must draw the flight line only when FlightHintWanted()')
     elif render.find('if (flowDraw) DrawFlowOverlay();') > render.find('if (flightHint) DrawFlightHint();') or \
@@ -2228,7 +2242,7 @@ def check_0217(ini_path, switches_path):
     items, bar rows, Render)"""
     problems = []
     name = os.path.basename(ini_path)
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     # 0.21.8: the version line keeps the 0.21.7 part (as check_0216 reads its own part)
     if not src.startswith('//') or '0.21.7 (bar footer' not in src[:src.find('\n', src.find('kVersion = '))]:
         problems.append('TruMenu.cpp: kVersion must hold the 0.21.7 part "0.21.7 (bar footer"')
@@ -2427,7 +2441,7 @@ def check_0218(ini_path, switches_path):
     0.10's form, the quick command line (suggestions, the one on-screen keyboard with a target, history line shown,
     kCmdDanger asks twice), favourites with an argument + star, story values (read only), sound group sliders"""
     problems = []
-    src = open(CPP, encoding='utf-8').read()
+    src = read_cpp()
     # 0.21.9: the version line keeps the 0.21.8 part (as check_0217 reads its own part)
     if not src.startswith('//') or '0.21.8 (quick command line' not in src[:src.find('\n', src.find('kVersion = '))]:
         problems.append('TruMenu.cpp: kVersion must hold the 0.21.8 part "0.21.8 (quick command line"')
@@ -2597,7 +2611,7 @@ def text(header, rows):
 def main(argv):
     global CPP
     if '--cpp' in argv[:-1]: CPP = argv[argv.index('--cpp') + 1]   # 0.19: negative tests on a copy of TruMenu.cpp
-    header, rows = table(open(CPP, encoding='utf-8').read())
+    header, rows = table(read_cpp())
     want = text(header, rows)
     if argv and argv[0] == '--print':
         sys.stdout.write(want)

@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -796,6 +796,15 @@ const OptDef kOpts[] = {
                                 "surrogate /\npartial / translated / unknown"},
     {"Light", "Stable", "1", "0.22.5: 1 = the scene lights keep one order every frame (light.stable, against the flicker\nof "
                              "lit figures in the DLC 2 end cutscene); 0 = the game's own order"},
+    {"Cine", "PauseKey", "0", "0.22.7: keyboard key (virtual key code, hex or decimal; 0x78 = F9) = cine.pause on / off;\n"
+                              "0 = off"},
+    {"Cine", "StepKey", "0", "0.22.7: keyboard key = cine.step (one frame of the held cutscene); 0x79 = F10; 0 = off"},
+    {"Cine", "ShotKey", "0", "0.22.7: keyboard key = claude.mark now (mark line + clean shot); 0 = off"},
+    {"Cine", "PausePad", "0", "0.22.7: XInput buttons pressed together = cine.pause on / off (hex mask: 0x0100 LB,\n"
+                              "0x0200 RB, 0x0020 View, 0x0010 Start, 0x1000 A ...; e.g. 0x0120 = View + LB; map\nan "
+                              "extra pad button (8BitDo R4 / L4) to such a combo); 0 = off"},
+    {"Cine", "StepPad", "0", "0.22.7: XInput buttons together = cine.step; 0 = off"},
+    {"Cine", "ShotPad", "0", "0.22.7: XInput buttons together = claude.mark now (mark line + clean shot); 0 = off"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -898,6 +907,8 @@ volatile LONG g_qcOskOpen = 0;
 const WORD kQcOskOwn = 0x0010;               // Start
 const WORD kQcOskPad = 0xF31F;               // D-pad, Start, LB, RB, A, B, X, Y (not View, not L3 / R3)
 WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject);   // below (g_padLock not held by the caller)
+void CnPadTick(DWORD index, WORD buttons, bool active);   // 0.22.7 [Cine] pad combos (section "0.22 cutscene pause")
+void CnKeyTick();                                         // 0.22.7 [Cine] keyboard keys (render thread)
 bool g_qbRunning = false;                    // a bar row runs an item (render thread): src=quick
 int g_qbLang = 0;                            // [Quick] Language: 0 de, 1 en (quick.lang)
 volatile LONG g_ocOn = 0;                    // 0.17 [Shot] OnCine / shot.oncine (section "---- 0.17 cutscene shots")
@@ -1268,6 +1279,7 @@ int OnPad(DWORD index, bool connected, const PadState *state, BYTE source, WORD 
     // 0.17 quick-toggle bar: its open combo (chord window) and, while it is open, D-pad / LB / RB - only while neither
     // the menu nor the ring owns the pad (their own combos and neutral pads stay exactly as before)
     WORD qbInject = 0;
+    CnPadTick(index, buttons, connected && result == 0 && !g_menuOpen && !g_radOpen);   // 0.22.7 [Cine] pad combos
     WORD qbClear = QbPad(index, buttons, connected && result == 0 && !g_menuOpen && !g_radOpen, &qbInject);
     if (clear) *clear = qbClear;
     if (inject) *inject = qbInject;
@@ -20170,6 +20182,7 @@ void ShotKeyTick() {
 void ShotBeforeRender(IDirect3DDevice9 *device) {
     g_renderThread = GetCurrentThreadId();
     ShotKeyTick();
+    CnKeyTick();                             // 0.22.7 [Cine] PauseKey / StepKey / ShotKey
     ShotFrame(device, true);
 }
 
@@ -21774,6 +21787,42 @@ bool RunCnStep(const char *arg, char *o, size_t n) {
     InterlockedExchangeAdd(&g_cnStep, k);
     Out(o, n, "cine.step: %ld game frame(s) of the cutscene%s", k, g_cnSndOk ? " (sound muted while stepping)" : "");
     return true;
+}
+// 0.22.7 cutscene keys (owner 2026-11-08: the 8BitDo pad has R4 / L4): [Cine] PauseKey / StepKey / ShotKey = keyboard
+// keys (virtual key codes), PausePad / StepPad / ShotPad = XInput button masks pressed together (an extra pad button is
+// mapped to such a combo in the pad's own software). Edges only (one action per press); the game still gets the keys /
+// buttons. Keyboard on the render thread while the game is in front (as [Shot] Hotkey), pad on the pad path of
+// controller 1 while neither the menu nor the ring owns the pad. Pause toggles cine.pause, Step = cine.step 1,
+// Shot = claude.mark now (a mark line + a clean shot).
+int g_cnKey[3] = {0, 0, 0};
+WORD g_cnPadMask[3] = {0, 0, 0};
+bool g_cnKeyHeld[3] = {false, false, false};
+WORD g_cnPadPrev = 0;
+bool ClaudeMark(const char *kindIn, const char *source, char *o, size_t n);   // shot section
+void CnHotAction(int which, const char *source) {
+    char o[256] = "";
+    if (which == 0) RunCnPause(g_cnPause ? "0" : "1", o, sizeof(o));
+    else if (which == 1) RunCnStep("1", o, sizeof(o));
+    else ClaudeMark("cine", source, o, sizeof(o));
+    Log(1, "cine key (%s): %s", source, o);
+}
+void CnKeyTick() {                               // render thread (ShotBeforeRender)
+    for (int i = 0; i < 3; ++i) {
+        if (!g_cnKey[i]) continue;
+        const bool down = (GetAsyncKeyState(g_cnKey[i]) & 0x8000) != 0 && RadFront();
+        if (down && !g_cnKeyHeld[i]) CnHotAction(i, "keyboard");
+        g_cnKeyHeld[i] = down;
+    }
+}
+void CnPadTick(DWORD index, WORD buttons, bool active) {   // pad path (QbPad's caller)
+    if (index != 0) return;
+    if (!active) { g_cnPadPrev = buttons; return; }
+    for (int i = 0; i < 3; ++i) {
+        const WORD m = g_cnPadMask[i];
+        if (!m) continue;
+        if ((buttons & m) == m && (g_cnPadPrev & m) != m) CnHotAction(i, "pad");
+    }
+    g_cnPadPrev = buttons;
 }
 // ---- end of 0.22 cutscene pause
 
@@ -26829,10 +26878,10 @@ const QbHelp kQbHelp[] = {
     {"cine.pause", "", "Zwischensequenz anhalten, Effekte laufen weiter|Hold the cutscene, effects run on"},   // 0.22
     {"cine.step", "", "Ein Bild der angehaltenen Szene weiter|One frame of the held cutscene"},
     {"cine.mark", "", "Szenenzeit merken (Sekunden)|Remember the cutscene time (seconds)"},   // 0.22.1
-    {"light.frame", "*", "Lichter pro Bild in TruMenu.lightframe.txt, BLINK? = Verdacht|Lights per frame into "
-                         "TruMenu.lightframe.txt, BLINK? = suspect"},   // 0.22.2
-    {"light.stable", "", "Lichter immer in gleicher Reihenfolge - Test gegen das Thron-Flackern|Lights always in one "
-                         "order - test against the throne flicker"},   // 0.22.3
+    {"light.frame", "*", "Lichter je Bild in TruMenu.lightframe.txt; BLINK? = Verdacht|Lights per frame to "
+                         "TruMenu.lightframe.txt; BLINK? = suspect"},   // 0.22.2 (help: at most 60 characters each)
+    {"light.stable", "", "Lichter in fester Reihenfolge - gegen das Thron-Flackern|Lights in a fixed order - against "
+                         "the throne flicker"},   // 0.22.3
     {"cine.pauseat", "", "N\303\244chste Szene h\303\244lt an der Marke - Checkpoint neu laden|Next cutscene stops at the mark - "
                          "reload the checkpoint"},
     {"menu.hidecursor", "", "Kein Mauszeiger \303\274ber dem Spielbild|No mouse cursor over the game picture"},
@@ -32523,6 +32572,19 @@ void ReadOptions(const char *dir) {
         g_flightSpeed = static_cast<float>(atof(OptDefault("Cheat", "FlightSpeed")));
     g_flightHint = OptInt(ini, "Cheat", "FlightHint") != 0 ? 1 : 0;   // 0.21.6
     InterlockedExchange(&g_lsWant, OptInt(ini, "Light", "Stable") != 0 ? 1 : 0);   // 0.22.5: default on (end-cutscene flicker)
+    {                                        // 0.22.7 [Cine] keys (hex or decimal, "0x78")
+        auto cine = [&](const char *key) {
+            char v[32];
+            OptString(ini, "Cine", key, v, sizeof(v));
+            return static_cast<unsigned long>(strtoul(v, nullptr, 0));
+        };
+        g_cnKey[0] = static_cast<int>(cine("PauseKey") & 0xff);
+        g_cnKey[1] = static_cast<int>(cine("StepKey") & 0xff);
+        g_cnKey[2] = static_cast<int>(cine("ShotKey") & 0xff);
+        g_cnPadMask[0] = static_cast<WORD>(cine("PausePad") & 0xffff);
+        g_cnPadMask[1] = static_cast<WORD>(cine("StepPad") & 0xffff);
+        g_cnPadMask[2] = static_cast<WORD>(cine("ShotPad") & 0xffff);
+    }
     OptString(ini, "Levels", "List", g_levelList, sizeof(g_levelList));
     strncpy_s(g_iniPath, sizeof(g_iniPath), ini, _TRUNCATE);
     OptString(ini, "Favorites", "Ids", g_favs, sizeof(g_favs));

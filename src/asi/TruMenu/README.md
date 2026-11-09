@@ -2906,6 +2906,23 @@ until the real fix (a stable order by weight, or the right weights in the DLC li
 Xbox original). The sort applies in every scene; `Stable=0` gives the game's own order. Bar page Tests: "Licht-
 Reihenfolge fest (Flacker-Test)".
 
+## TruMenu 0.22.6 / 0.22.7 (Steam overlay guard, umlauts, cutscene keys; 2026-11-09)
+
+- **0.22.6 Present re-entry guard** (crash of 2026-11-08 with the Steam overlay: TruMenu's swap-chain Present hook and
+  the overlay's d3d9 detour called each other until the stack overflowed): per thread the device and the swap-chain
+  Present hook note that they run; a nested call draws nothing and goes straight to d3d9 behind the overlay's `jmp`
+  through a trampoline that rebuilds the 5 hot-patch bytes (`mov edi, edi; push ebp; mov ebp, esp`), built only when the
+  original starts with E9 and a function body follows; otherwise the nested call returns D3D_OK. One log line.
+  Not yet tested with the overlay.
+- **0.22.6 umlauts:** the German texts show umlauts; `tools/trumenu_umlauts.py` wrote 251 words of a fixed list as octal
+  UTF-8 escapes inside the string literals (the INI option table stays ASCII).
+- **0.22.7 cutscene keys** in `[Cine]`: `PauseKey`, `StepKey`, `ShotKey` (keyboard, virtual key code, hex or decimal -
+  0x78 F9, 0x79 F10) and `PausePad`, `StepPad`, `ShotPad` (XInput masks pressed together - 0x0100 LB, 0x0200 RB, 0x0020
+  View, 0x0010 Start, 0x1000 A, 0x2000 B, 0x4000 X, 0x8000 Y; e.g. 0x0120 = View + LB). Pause toggles `cine.pause`, Step
+  = `cine.step 1`, Shot = `claude.mark now` (mark line + clean shot). Edges only; the game still gets the keys and
+  buttons; the pad combos act only while neither the menu nor the ring owns the pad. All 0 by default. To use the
+  8BitDo's R4 / L4: map them in the pad's own software to such a combo (the pad sends no own XInput bit for them).
+
 ### TO TEST 0.22.1
 
 | # | Step | Expected |
