@@ -2928,6 +2928,24 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.12 - fight trace follows Lara, quick bar shows trace states (2026-11-09)
+
+Built into `work\asi\menu0235`, not installed. No new hooks (no byte checks needed).
+
+- **`fight.trace`:** a Lara-only line (enemy columns `-`, the same column layout as 0.22.11, TruXenia compatible) is
+  also written when Lara's chart record of machine 2 (`lara_rec1`) or her machine-1 state ids (`pc_lara_states`)
+  change. Before only machine 1's record (`lara_rec0`), the camera, the power mode and enemy changes started a line, so
+  phases where only Lara changed (aiming next to an idle tutorial thrall) were missing or only caught by chance (PC log
+  2026-11-09 20:18-20:19: `lara_rec1` 48 / 40 only on lines written for other reasons). Still at most one line per
+  100 ms sample; an enemy line in the same sample carries Lara's columns anyway.
+- **Quick bar:** the bool rows Kampf-Spur (`fight.trace`) and Kombo-Spur (`combo.trace`) always showed "aus": their
+  value text starts with the id (`fight.trace 1; 12 line(s) -> ...`) and the on / off reader looked only at the first
+  character. It now skips a leading `<id> ` - the same reader serves the ring and the menu's bar pages. The switch
+  itself worked (log `fight.trace 1`). `enemy.panel`, `light.stable`, `light.stablecut`, `light.cutlabels` already
+  showed their state (value text starts with 0 / 1).
+- **Quick bar:** an action row of an item with a short value shows the value before "rechts" - Untertitel-Sprache
+  (`sub.lang`) shows the subtitle language now, e.g. `Deutsch (2) - rechts`.
+
 ## 0.22.11 - Xbox comparison, PC side: fight trace and enemy panel (2026-11-09)
 
 Built into `work\asi\menu0234`, not installed. Byte checks: `work\asi\menu0234\precheck_0231.txt` (13 checks, 0

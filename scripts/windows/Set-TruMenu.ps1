@@ -129,7 +129,8 @@ $earlierBuilds = @{
                       'becda781ee582f9fe8bcae0d069b4ba317804115c752965476a29217a7ff367a',   # 0.22.5 light.stable on by default (work\asi\menu0228)
                       '0b5259f02d979ddbdfc8c6efc25ab757593f883792af14b77c14ad1b1c856d71',   # 0.22.8 cutscene pad combos on (work\asi\menu0231)
                       'b867bb00576b69ec3001315c650e980247c2ccd499e0042b806e772de684d951',   # 0.22.9 enemy diagnosis, combo trace, sub.lang (work\asi\menu0232)
-                      '51921b3fecfbfbca948ea00ebeb777d0616cfce4d04814f7f2de911385b4cd30')   # 0.22.10 light cut diagnosis, light.stablecut (work\asi\menu0233)
+                      '51921b3fecfbfbca948ea00ebeb777d0616cfce4d04814f7f2de911385b4cd30',   # 0.22.10 light cut diagnosis, light.stablecut (work\asi\menu0233)
+                      '2991e42742a0f20e6c62558d424a2135f5dcba27f046257a01ff83b09c849d71')   # 0.22.11 fight.trace, enemy.panel (work\asi\menu0234)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
