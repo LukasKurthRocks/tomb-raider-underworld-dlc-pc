@@ -10,11 +10,12 @@ project that first converted the DLC for the PC. You need your own copy of the g
 ![AI-assisted](https://img.shields.io/badge/AI--assisted-Claude%20(Anthropic)-8A2BE2)
 ![Upstream](https://img.shields.io/badge/upstream-andrearicci93%2Ftrudlcport%20B270%20merged-blue)
 
-![The throne in the end-room cutscene of Lara's Shadow, held with TruMenu's cutscene pause - its shadow light still flickers](docs/screenshots/dev-throne-flicker-closeup-2026-11-08.gif)
+![Lara's Shadow on PC: the combat tutorial in the second Yggdrasil hall, with TruMenu's debug labels on the thrall](docs/screenshots/dev-hall02-tutorial-diagnosis-2026-11-09.jpg)
 
-*Work in progress (8 Nov 2026): the end-room cutscene of Lara's Shadow on PC, held with TruMenu's cutscene pause. The
-scene stands still, yet the throne keeps flickering - the shadows of three cutscene lights, traced live into the
-engine's shadow atlas ([DEVLOG](docs/DEVLOG.md), [ENGINE.md](docs/ENGINE.md) section 16).*
+*Work in progress (9 Nov 2026): the combat tutorial of Lara's Shadow on PC, with TruMenu's debug labels (thrall,
+trigger volume, spawn generator). Today's work is a side-by-side comparison with the Xbox 360 original running in an
+emulator: the same fights and scenes measured on both, so the PC behaves like the Xbox. The throne flicker of the
+end cutscene is explained and worked around ([DEVLOG](docs/DEVLOG.md)).*
 
 > [!WARNING]
 > **This is a personal fork, not the original project.** For installing the DLC port, releases and reporting
@@ -39,14 +40,14 @@ It does not replace the original. More about the fork: [docs/README.md](docs/REA
 3. **Fixes and comfort for the base PC game.** `TruQoL` (60 fps cap, field of view, camera shake, a start-up fix for
    PCs with many CPU threads), the test menu `TruMenu`, `Set-TruDisplay.ps1` and a table of known problems.
 
-**State on 2026-11-08** (one PC, not a release; "played" = tested in game, "offline" = only static checks)
+**State on 2026-11-09** (one PC, not a release; "played" = tested in game, "offline" = only static checks)
 
 | Part | What works | State | What is missing |
 |---|---|---|---|
 | DLC 1 *Beneath the Ashes* | the "display driver" box on entering, the grapple ring's look and cinematic speech in five languages fixed (pipeline step `Repair`); starts correctly after DLC 2 in the same session | played | a crash while loading the dungeon in our test builds: cause found (a DLC 2 effect file of the same name kept a raw texture group count), fix built offline, live test open |
-| DLC 2 *Lara's Shadow* | through the Yggdrasil halls: intro, loading-screen titles and hint boxes, the doppelganger's look, shadow power, wall run, combat, waterfall; 8 Nov: end cutscene visible, no crash in the ceremony room, end-room floor and goo drips right | played; the end area only reached by a level change | **manual play stops at the jump from a ledge to a rock vein**: Lara reaches the vein's attach state, then turns back to the ledge within 0.2-0.6 s (analysis pending); further only with TruMenu's teleports. Also: the shadow finisher never starts, a moaning sound loops, flicker in the end cutscene, some title-update shaders still drawn with substitutes, the achievement fix untested |
+| DLC 2 *Lara's Shadow* | through the Yggdrasil halls: intro, loading-screen titles and hint boxes, the doppelganger's look, shadow power, wall run, combat, waterfall; end cutscene visible, no crash in the ceremony room, end-room floor and goo drips right; 9 Nov: hall02 → end level → end cutscenes in one session, throne flicker worked around (light order per object) | played | **combat differs from the Xbox** (measured 9 Nov against the Xbox original in an emulator): thralls fall at every hit, combos do not throw them, the tutorial thrall never attacks first, no lock-on ring - analysis and title-update translations in progress; "objective / hint unlocked" banners run but are invisible (converter fault, data step in progress); rock-vein jump: data and attach point match the title update, live test with the title update's controls open; a moaning sound loops; some title-update shaders still drawn with substitutes |
 | Xbox title update plugins | slow motion, meter and HUD, power states, wall run and its camera, shadow combat input; thralls take damage and die (title-update damage switch, 7 Nov) | partial: these parts played, the newest versions offline | the finisher's own kill; Lara's ponytail stretches in slow motion (the cloth time step is translated behind a switch, off) |
-| Base-game fixes | `TruQoL` frame limiter at 60 fps; thread cap 8 / 16 / 24 on a 36-thread PC; `TruMenu` with the pages "Fixes" and "Rettung"; known problems in TROUBLESHOOTING | partial: frame limiter and thread cap played, FOV, shake, intro skip and `Set-TruDisplay` graphics options offline | thread cap above 24 hangs (default to become 8); Steam overlay with TruMenu can crash |
+| Base-game fixes | `TruQoL` frame limiter at 60 fps; thread cap (default 8 since TruQoL 0.1.3); `TruMenu` with the pages "Fixes" and "Rettung", cutscene pause / step / photo on keys and pad, subtitle language live; known problems in TROUBLESHOOTING | partial: frame limiter, thread cap and cutscene pause played, FOV, shake, intro skip and `Set-TruDisplay` graphics options offline | Steam overlay together with TruMenu: re-entry guard built (TruMenu 0.22.6), live test open |
 
 Costume packs: converted and checked offline (pipeline step `Costumes`), not played yet. Per plugin:
 [docs/PLUGINS.md](docs/PLUGINS.md).

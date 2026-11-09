@@ -5,6 +5,23 @@ install or play; the [README](../README.md) and [INSTALL](INSTALL.md) cover that
 overlays, log lines, sometimes substitute shaders), scaled down to 1280 px. The README shows the current state; older
 pictures move here.
 
+## 2026-11-09 - the throne flicker explained: three lights too many
+
+![Natla in the throne cutscene: top PC (lit warm, then cool, alternating), bottom Xbox 360 original in an emulator (warm hair and cool face at once)](screenshots/dev-natla-pc-vs-xbox-2026-11-09.png)
+
+*Top: PC, six frames of the held cutscene (8 Nov) - Natla's face switches between a warm and a cool light. Bottom:
+the same scene on the Xbox 360 original in the Xenia emulator (9 Nov), three frames - no flicker, and she is lit by
+both lights at once. The cause, read from the code: a PC material shader takes at most 3 shadow lights + 3 plain
+lights + the sun per drawn object, the Xbox shaders take 7 lights of any kind. The PC's light-set builder keeps the
+first lights that fit, in the order of a light list that changes from frame to frame - so Natla gets a different
+light every frame ([ENGINE.md](ENGINE.md) section 16, "Per-draw light limit" / "Light set builder"). Worked around
+with TruMenu's `[Light] Stable` (a fixed order: no flicker, but only the warm light), a finer per-object order is in
+test (`light.stablecut`); the full Xbox look would need different PC shaders.*
+
+The README's title picture until 9 Nov, the same flicker up close:
+
+![The throne in the end-room cutscene of Lara's Shadow, held with TruMenu's cutscene pause - its shadow light still flickers](screenshots/dev-throne-flicker-closeup-2026-11-08.gif)
+
 ## 2026-11-08 - the flicker at the throne, with the cutscene held
 
 ![The throne in the DLC 2 end-room cutscene flickering while the cutscene stands still](screenshots/dev-flicker-throne-2026-11-08.gif)
@@ -15,8 +32,8 @@ throne still switches between lit and dark, the figures on the stairs with it. S
 timeline but something that exists only while the cutscene runs (in normal play the throne does not flicker). Ruled
 out so far: a doubled pod model (`dlc2_uo_natlapod`, an exact runtime copy on top of the placed one - removed live,
 the flicker stayed) and the black fade card. The walls with baked light stay steady, so the next suspect is the
-dynamic light per model (the cutscene brings its own lights around the figures). Open in TODO; recorded 4 s of the
-game window, 12 frames per second.*
+dynamic light per model (the cutscene brings its own lights around the figures). Recorded 4 s of the game window, 12
+frames per second. (Explained on 9 Nov, see above.)*
 
 ## 2026-11-08 - the README's former status block (state 2026-11-05, updated 2026-11-08)
 
