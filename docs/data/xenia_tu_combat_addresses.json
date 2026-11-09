@@ -1,0 +1,46 @@
+{
+  "_comment": "Xbox 360 title update (TU) guest addresses for the read-only Xenia combat sampler (tools/xenia_combat_sampler.py). Proven from the TU code listing (work/asi/combat02/analysis/tu_all.txt); 'proof' = TU instruction words the sampler checks before it trusts the addresses. PC / retail counterparts for orientation. 2026-11-09, N18.",
+  "guest_image_base": "0x82000000",
+  "host_base_default": "0x100000000",
+  "instance_list": {
+    "struct": "0x828aaf18",
+    "head": "0x828aaf1c",
+    "next_offset": "0x8",
+    "pc": "count 0xd98d50, head 0xd98d54, next +8 (walk 0x5d467d)",
+    "retail": "struct 0x828aab98 (walk 0x8229d510..0x8229d52c)",
+    "proof": {"0x82299f0c": "0x3d60828b", "0x82299f10": "0x3bebaf18", "0x82299f50": "0x83ff0004", "0x82299f64": "0x83ff0008"}
+  },
+  "object": {
+    "instance_object_offset": "0x10",
+    "object_id_offset": "0x14",
+    "object_name_ptr_offset": "0x60",
+    "name_table": "0x829bffc8",
+    "pc": "object id dword [obj+0x14] (index into name table [0xdb94d0], 8-byte entries), [obj+0x60] = name pointer (tru+0x1bf0fb)",
+    "retail": "name table 0x829bfed8, setter 0x822836a0..0x822836b8",
+    "proof": {"0x822802e8": "0x3d40829c", "0x822802f8": "0x814affc8", "0x82280300": "0x915c0060"}
+  },
+  "brain": {
+    "path": "[[[inst+0x2d0]]+0x2ec]",
+    "size": "0x50a0",
+    "state_layer0": "0x125c",
+    "state_layer1": "0x1260",
+    "state_name_offset": "0x8",
+    "state_none_name": "0x8206dfd4",
+    "health_component": "0x2c60",
+    "lp": "0x2c64",
+    "stamina": "0x2c6c",
+    "pc": "same offsets (brain 0x5040 B); state machine +0x1254 (IsInState 0x6711f0: [sm+layer*4+8], name [obj+8]); health +0x2c60 / LP +0x2c64 / stamina +0x2c6c",
+    "proof": {"0x822d60d0": "0x816302d0", "0x822d60e0": "0x816b0000", "0x822d60e4": "0x816b02ec", "0x822d60e8": "0x816b125c", "0x822d6100": "0x816b0008", "0x822d5334": "0x387f1254", "0x822da9e0": "0x388050a0", "0x822f65f4": "0xc1ab2c64"},
+    "notes": "stamina +0x2c6c: TU stores at 0x822d5374 / 0x822daa88, reader 0x822e3748 (same offset as PC; meaning taken from the PC, gefolgert)"
+  },
+  "lara_chart": {
+    "player_tracker_ptr": "0x829892b0",
+    "machine0_offset": "0xf10",
+    "machine1_offset": "0xf14",
+    "record_offset": "0x520",
+    "active_flag_offset": "0x510",
+    "pc": "[0xfadb58] +0xf10 / +0xf14, machine +0x500 flag, +0x510 record (update 0x787e60)",
+    "retail": "machine +0x500 / +0x510 (update 0x8247c980); TU adds 0x10 before these fields",
+    "proof": {"0x82473c94": "0x3fe08299", "0x82473c98": "0x817f92b0", "0x82473c9c": "0x83cb0f10", "0x82473ca0": "0x83ab0f14", "0x824828e4": "0x897f0510", "0x8248296c": "0x809f0520"}
+  }
+}
