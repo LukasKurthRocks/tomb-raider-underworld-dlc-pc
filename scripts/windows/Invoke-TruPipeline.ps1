@@ -78,7 +78,10 @@
                dlc_struct_fixes check covers all seven steps); fadecard / uberanim / fxrec / sgmesh / introtyped /
                leveltwin / basecopy (2026-11-08, 17n, after dspkind: the typed families of the night 07./08.11.,
                tools/typed_family_fix.py) are proven first (typed_family_fix proof: exit 1 on a contradicting base word
-               or another pinned count) and gated by dlc_struct_fixes check; DLC 2 additionally gets the doppelganger language
+               or another pinned count) and gated by dlc_struct_fixes check; uiinit (2026-11-09, tools/ui_init_fix.py:
+               UI element init words of DLC scripts re-derived from the Xbox original by the byte order proven on
+               generalbank Xbox <-> PC, applied in place after dlc_fixes_build, gated by ui_text_init_scan: exit 1 on
+               a broken text anchor; report <tree>\..\uiinit_apply.json); DLC 2 additionally gets the doppelganger language
                variants (vo_lang_variants build: <stream>.mul_NNN of the 4 localised voice streams, 20 files, then
                vo_lang_variants check --expect <tree>\vo_lang_md5.tsv, report <tree>\vo_lang_check.json);
                objevent / idword / animlist / fxnode / statevm / chartid (2026-11-03, finding 44) set the converter
@@ -370,7 +373,13 @@ $steps = @{
         # 2026-11-08 (17n): the seven typed-family rules (fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin /
         # basecopy) on the base pairs (exit 1 on a contradicting word or another count than pinned)
         @('tools\typed_family_fix.py', 'proof'),
+        # 2026-11-09 uiinit: byte order of UI element init words (userTypes 301 / 303 / 316 / 320) proven on generalbank
+        # Xbox <-> PC (exit 1 on a contradiction or another count than pinned)
+        @('tools\ui_init_fix.py', 'proof'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
+        # uiinit on the DLC 1 tree in place (planned words only, every write re-read), then the text-anchor gate
+        @('tools\ui_init_fix.py', 'apply', $fix1, '--report', ((Split-Path -Parent $fix1) + '/uiinit_apply.json')),
+        @('tools\ui_text_init_scan.py', $fix1),
         @('tools\converter_faults_fix.py', 'check', $fix1, '--report', $chk1),
         @('tools\script_clash_fix.py', 'check', $fix1, '--report', $clash1),
         @('tools\dlc_struct_fixes.py', 'check', $fix1, '--report', $obj1),
@@ -385,6 +394,9 @@ $steps = @{
         (@('tools\shader_form_gate.py', 'check', $fix1, '--list', '3', '--report', $sg1) + $sgEnforce),
         @('tools\compare_b138.py', $fix1, $cmp1),
         @('tools\dlc_fixes_build.py', 'work/rebuild/dlc2_asm_stage2a/mods', $fix2, '--pack', 'pack11'),
+        # uiinit on the DLC 2 tree (objective / hint notifier banners), then the text-anchor gate
+        @('tools\ui_init_fix.py', 'apply', $fix2, '--pack', 'pack11', '--report', ((Split-Path -Parent $fix2) + '/uiinit_apply.json')),
+        @('tools\ui_text_init_scan.py', $fix2),
         # doppelganger language variants (2026-11-08, no DRM step): <stream>.mul_NNN of the 4 localised DLC 2 voice
         # streams (20 files + the plain English names), vo_lang_md5.tsv next to the mods folder
         @('tools\vo_lang_variants.py', 'build', $fix2, 'pack11'),
