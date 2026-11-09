@@ -125,7 +125,8 @@ $earlierBuilds = @{
                       'e556c9a7aecc8109f43be3a45311b63e1f947f0fe75324cc28c362541c7509ef',   # 0.22.1 final: category roots held (work\asi\menu0224)
                       'b73d684268abfb9299018f141309b3fabf70a4cd2ae1b30b817baff1d1f545b7',   # 0.22.2 light.frame (work\asi\menu0225)
                       'bb126ab7245e47707aa1dc6c7028fb914d49b33688ed5d9d1e62e067f6cbe55b',   # 0.22.3 light.stable visible list (work\asi\menu0226)
-                      '702cd60052ea3d0a6eaee4d25dc6e4f008a080a22a718922a6514ca8886acdc1')   # 0.22.4 light.stable collected list (work\asi\menu0227)
+                      '702cd60052ea3d0a6eaee4d25dc6e4f008a080a22a718922a6514ca8886acdc1',   # 0.22.4 light.stable collected list (work\asi\menu0227)
+                      'becda781ee582f9fe8bcae0d069b4ba317804115c752965476a29217a7ff367a')   # 0.22.5 light.stable on by default (work\asi\menu0228)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',
