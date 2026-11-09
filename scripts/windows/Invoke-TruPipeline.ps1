@@ -398,6 +398,9 @@ $steps = @{
         @('tools\thrall_extension_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $thrall2),
         @('tools\melee_link_record_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $melee2),
         @('tools\generator_intro_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $gen2),
+        # 2026-11-09: the end-level words the 0813 tree had wrong vs the installed tree (Level twin s32, unit root block
+        # twin, uber TRANS +0x34 raw; DTP 24420 +0x6c only WARN) - exit 1 when one comes back
+        @('tools\endlevel_word_judge.py', 'check', $fix2, '--report', ((Split-Path -Parent $fix2) + '/endlevel_words_check.json')),
         @('tools\vo_lang_variants.py', 'check', $fix2, 'pack11', '--expect', $voMd5, '--report', $vo2),
         (@('tools\shader_form_gate.py', 'check', $fix2, '--list', '3', '--report', $sg2) + $sgEnforce)
     )

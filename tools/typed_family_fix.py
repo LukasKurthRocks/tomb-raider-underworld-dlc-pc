@@ -21,11 +21,15 @@ Rules (step names of tools/dlc_struct_fixes.py):
              with the most same-offset equal non-zero Xbox words (>= 50 % and >= 256 words); a word whose DLC Xbox word equals the base
              Xbox word at the same offset and whose base PC word is a byte permutation of it gets the base PC word;
              pointer / id slots of all four sides and the NavGraph image (step navraw) are left alone (17j-b
-             work/endb270_0811/sec0_judge.py, ygg_fix.py L)
+             work/endb270_0811/sec0_judge.py, ygg_fix.py L); since 2026-11-09 also a non-zero DLC Xbox word that
+             DIFFERS from the twin where the twin pair is s32 -> s32 (only when the PC word is a byte order of it:
+             dlc_yggdrasil_end Level +0x148 / +0x168 / +0x178 / +0x188 = installed = B270; 0813 had u16 pairs)
   introtyped unit DTP (Level+0x74 target) intro data: intro +0x7c u32 (s32), intro data blocks by (PC object id, block
              size) with one byte order over every base intro of the BASE_UNITS (17j-b unit_dtp.py / scan_unit.py),
-             name strings (>= 8 printable bytes at a pointer target) raw; NOT the root +0xa4 block +0x90 / +0x94
-             (17j-b raw): the base units disagree (l7_yggdrasil_end +0x94 raw, l7_yggdrasil_hall02 +0x94 s32)
+             name strings (>= 8 printable bytes at a pointer target) raw; the root +0xa4 block +0x90 / +0x94 has no
+             rule over the base units (l7_yggdrasil_end +0x94 raw, l7_yggdrasil_hall02 +0x94 s32), but since 2026-11-09
+             the unit's own base twin (the leveltwin twin of its Level) decides where its Xbox word is the same
+             (root_twin_words: dlc_yggdrasil_end 21218 +0x14f04 = 18550 -> raw)
   fxrec      FX particle records (anchor bf800000 x3, c04a468e x2): record +0x18 and +0x38 with an Xbox word XX000000
              -> raw (17j-b pattern_twins.py: DTP 22819 of dlc2_checkpoint, 13 DRMs)
   sgmesh     streamgroup mesh-list DTPs {u32 n, n x {u32 mesh id (idref 12), u32, u32, u32}}: every word s32 (the id
@@ -380,6 +384,31 @@ def level_twin(lx):
         if best is None or eq > best[1]: best = (n, eq, nz, bx, bp, sl)
     if best is None or not nz or best[1] < TWIN_MIN * nz or best[1] < TWIN_MIN_WORDS: return None
     return best
+
+
+def root_twin_words(XD, ux, px, pp, w):
+    """root +0xa4 block +0x90 / +0x94 of a DLC unit DTP from the unit's base twin (the l7 unit that is the leveltwin
+    twin of the DLC Level): where the DLC Xbox word equals the twin's Xbox word, w[offset] = the twin's PC word (bytes).
+    -> notes"""
+    if not XD.sections or XD.sections[0].type != 0: return []
+    tw = level_twin(bytes(XD.sections[0].data))
+    if tw is None: return []
+    X, P = base_unit(tw[0])
+    if X is None or P is None: return []
+    kx, kp = unit_dtp(X, 'be'), unit_dtp(P, 'le')
+    if kx is None or kp is None: return []
+    bx, bp = X.sections[kx], P.sections[kp]
+    bpx, bpp = dict(R.parse(bytes(bx.reloc), 'be').internal), dict(R.parse(bytes(bp.reloc), 'le').internal)
+    rbx, rb, brx, brp = px.get(0xa4), pp.get(0xa4), bpx.get(0xa4), bpp.get(0xa4)
+    if None in (rbx, rb, brx, brp) or rbx != rb: return []
+    xd, bxd, bpd = bytes(ux.data), bytes(bx.data), bytes(bp.data)
+    out = []
+    for q in (0x90, 0x94):
+        xw, twx, twp = xd[rbx + q:rbx + q + 4], bxd[brx + q:brx + q + 4], bpd[brp + q:brp + q + 4]
+        if len(xw) == 4 and xw == twx and byteorder(twx, twp):
+            w[rb + q] = twp
+            out.append('root block +%#x: Xbox %s = twin %s Xbox -> twin PC %s' % (q, xw.hex(), tw[0], twp.hex()))
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ unit-DTP path table
@@ -867,6 +896,11 @@ def plan(rule, XD, PD, rel=''):
         w = {}
         for o in range(0, min(len(lx), len(bx), len(bp), lim) - 3, 4):
             if lx[o:o + 4] == bx[o:o + 4] and byteorder(bx[o:o + 4], bp[o:o + 4]): w[o] = bp[o:o + 4]
+            # 2026-11-09 (Befund-0813-Rueckschritt-0911): another non-zero Xbox value at an offset whose twin pair is
+            # s32 -> s32 as well (dlc_yggdrasil_end Level +0x148 / +0x168 / +0x178 / +0x188, float z ~10645: the generic
+            # route wrote u16 pairs; = installed tree = B270; the generic route already agrees with the twin's s32 at
+            # every other such word of the unit). _want_rows changes it only when the PC word is a byte order of it.
+            elif lx[o:o + 4] != b'\0\0\0\0' and cls(bx[o:o + 4], bp[o:o + 4]) == 's32': w[o] = 's32'
         notes.append('Level twin %s (%d of %d non-zero Xbox words equal at the same offset, Level %#x vs %#x%s)' % (
             n, eq, nz, len(lx), len(bx), ', NavGraph image from %#x left to navraw' % lim if lim < len(lx) else ''))
         _want_rows(0, x, p, w, rows, kept, 'leveltwin %s' % n, sl)
@@ -890,6 +924,10 @@ def plan(rule, XD, PD, rel=''):
             w[o + 0x7c] = 's32'
             for q, c in rules.get((obj, sz), {}).items(): w.setdefault(dp + q, c)
         for q in name_strings(bytes(ux.data), px): w.setdefault(q, 'raw')
+        # 2026-11-09: root +0xa4 block +0x90 / +0x94 - no rule over the base units (they disagree), but the unit's own
+        # base twin (the leveltwin twin of its Level) decides when its Xbox word is the same: then the twin's PC word
+        # (dlc_yggdrasil_end 21218 +0x14f04 = l7_yggdrasil_end 18550: Xbox 02000000 -> PC 02000000 raw; 0813 wrote s32)
+        notes.extend(root_twin_words(XD, ux, px, pp, w))
         sl = slots(ux, 'be') | slots(u, 'le')
         _want_rows(kp, ux, u, w, rows, kept, 'introtyped DTP %d' % u.id, sl)
         # the unit-DTP path table (18e) where the rules above do not speak
