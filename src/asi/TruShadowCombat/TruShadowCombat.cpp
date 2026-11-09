@@ -69,7 +69,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.6 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.7 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -96,7 +96,11 @@ const char kVersion[] = "TruShadowCombat 0.6.6 (TU target list 7 -> 10, conditio
                         "Vaulted Enter as the TU 0x8232b630 with the step chain 0xbe / 0xf4 records, switch, data "
                         "copier ([Death] TranslateVaulted; step table only from fixed extension data), Vaulted clock "
                         "5 s without slow motion in the Enter and the enemy update tru+0x238d40 ([Death] "
-                        "TranslateVaultedClock), all on by default)";
+                        "TranslateVaultedClock), all on by default; 0.6.7: hit structures for damage types 18..27 "
+                        "from the companion's hit records as the TU 0x82301dc0 ([Hit] Translate), knockback force per "
+                        "type from record +0x40 as the TU 0x822f77e4 ([Hit] TranslateKnockback), one log line per hit "
+                        "decision ([Hit] Log), chunkdoll limit 4 -> 8 as the TU 0x82376700 ([Chunk] Limit8, start "
+                        "only), all on by default)";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -1674,6 +1678,9 @@ int g_translateVaulted = 1;        // [Death] TranslateVaulted (0.6.6, live thro
 int g_translateT5 = 1;             // [Death] TranslateT5 (0.6.6, live through P1dReadSwitches)
 int g_translateClock = 1;          // [Death] TranslateVaultedClock (0.6.6, live through P1dReadSwitches)
 bool g_vaultChain = false;         // 0.6.6: all six links of the Vaulted chain placed
+int g_hitTranslate = 1;            // [Hit] Translate (0.6.7, live through P1dReadSwitches)
+int g_hitKnock = 1;                // [Hit] TranslateKnockback (0.6.7, live)
+int g_hitLog = 1;                  // [Hit] Log (0.6.7, live)
 
 BYTE *__cdecl Record1013(BYTE *target, BYTE *player, const float *pos, const float *rot, float frames, DWORD x34,
                          BYTE *hit) {
@@ -4057,6 +4064,13 @@ const P1dKey kP1dKeys[] = {
     {"Death", "TranslateVaultedClock", &g_translateClock,
      "Vaulted clock as the TU (5 s without slow motion: Enter 0x8232b698, enemy update 0x822db1e8 / 0x822db4e0)",
      "no clock (PC)", "0.6.6"},
+    // 0.6.7 (K-1)
+    {"Hit", "Translate", &g_hitTranslate,
+     "hit structures from the companion's hit records first (TU 0x82301dc0: damage types 18..27 and the extension's "
+     "0 / 1 / 2 / 4)", "PC selector tru+0x2159a0 (types 0..16 only)", "0.6.7"},
+    {"Hit", "TranslateKnockback", &g_hitKnock, "knockback force per damage type from the hit record +0x40 (TU 0x822f77e4)",
+     "fixed 3.0 (PC)", "0.6.7"},
+    {"Hit", "Log", &g_hitLog, "one line per hit decision / knockback", "no hit lines", "0.6.7"},
 };
 
 void P1dReadSwitches() {
@@ -5264,6 +5278,279 @@ void SetupN4c() {
         g_clockPlaced ? "on" : "OFF", g_translateClock);
 }
 
+// ---------------------------------------------------------------- 0.6.7: K-1 hit structures / knockback, K-7 chunks
+// K-1 (docs Befund-K1-Umfallen-0911, ENGINE.md 13): the hit reaction tru+0x23ad50 picks a hit structure with the
+//    selector tru+0x2159a0 (= retail 0x823042a8, cdecl (&s, msg, D)): msg+0x6e -> D+0x53c, else a table for damage
+//    types 0..16 only, then tru+0x213c70(msg, s) may redirect to D+0x758; returns bit 30 of s+0x14. Lara's DLC 2 melee
+//    types 18..27 get no structure, so the decision tru+0x223410 skips its flag tests (s = 0 -> heavy reaction).
+//    The TU selector 0x82301dc0 takes the instance as well and, without +0x6e, first searches the companion's hit
+//    records (0x822da918: [comp+0x2c] count, [comp+0x28] base, 0xc4 bytes each, +0 type == msg+0x50) and uses
+//    record+0xc (0x82301de8..0x82301e48); only without a match the table; the D+0x758 redirect and the return are the
+//    same (0x82301f08..0x82301fa8). The extension 870 holds records for 18..27 and 0 / 1 / 2 / 4 (Xbox = PC data).
+//    Translated at the three PC callers: tru+0x223429 (decision, inst = argument 1), tru+0x23b157 (hit reaction,
+//    inst = esi), tru+0x24f338 (tru+0x24f230 = TU 0x82329810, which got the instance as a new argument r10; on the PC
+//    the instance is known only on the path from the knockback tru+0x220650 (return 0x6206e8, its [ebp+8]); the two
+//    other callers tru+0x24f5ad / tru+0x25215d keep the PC selector - not 1:1, named).
+//    Knockback tru+0x220650 (= retail 0x822f9990, TU 0x822f73a8): force factor fixed 3.0 (fmul qword [0x8415e8] at
+//    tru+0x220940, fld dword [0x845338] = -3.0 at tru+0x220971); the TU takes record+0x40 of the same companion record
+//    (0x822f77e4..0x822f783c, default [0x820526e8] = 3.0) for both (fneg at 0x822f7894). Not translated: the TU's
+//    sideways direction for type 25 with a companion (0x822f7558..0x822f75bc) and brain+0x1254 |= 1 before the second
+//    call (0x822f788c) - not checked against the PC.
+// K-7: chunkdoll limit `cmp [0xecfc70], 4` at tru+0x296fa8 -> 8 as the TU 0x82376700 (retail 0x823769e0: 4). The
+//    counter has no array behind it (only inc tru+0x2970b8 / dec tru+0x296e5c / this compare); the rest of the TU
+//    function's head differs in its object call (not ported). Start only.
+int g_hitMax = 3000;               // [Hit] MaxLines
+int g_chunkLimit8 = 1;             // [Chunk] Limit8 (start only)
+volatile LONG g_hitLines = 0;
+bool g_hitSelPlaced = false, g_hitKbPlaced = false, g_hitDecPlaced = false, g_chunk8Placed = false;
+const DWORD kHitSelect = 0x006159a0, kHitRedirect = 0x00613c70, kHitDecide = 0x00623410;
+const DWORD kSelCallDecide = 0x00623429, kSelCallReaction = 0x0063b157, kSelCallLaunch = 0x0064f338;
+const DWORD kDecideCall = 0x0063b183;
+const DWORD kKbMulSite = 0x00620940, kKbNegSite = 0x00620971;
+DWORD g_kbMulBack = 0x00620946, g_kbNegBack = 0x00620977;
+const DWORD kChunkLimitImm = 0x00696fae;
+typedef DWORD(__cdecl *HitSelectFn)(BYTE **s, BYTE *msg, BYTE *d);
+typedef DWORD(__cdecl *HitRedirectFn)(BYTE *msg, BYTE *s);
+typedef DWORD(__cdecl *HitDecideFn)(BYTE *inst, BYTE *msg, BYTE *d, float amount);
+double g_kbForce = 3.0, g_kbA = 0.0, g_kbX = 0.0;
+float g_kbNeg = -3.0f;
+// the last selection, for the decision line (game thread only)
+const BYTE *g_selInst = nullptr;
+int g_selSource = 0;               // 0 none, 1 PC (table / +0x53c / redirect), 2 companion record (TU path)
+DWORD g_selFlags = 0;
+const char *const kSelSource[] = {"no structure", "PC table", "companion record (TU)"};
+
+bool HitLine() {
+    if (!g_hitLog) return false;
+    const LONG n = InterlockedIncrement(&g_hitLines);
+    if (n > g_hitMax) return false;
+    if (n == g_hitMax) Log(1, "0.6.7: %ld hit lines - this is the last one ([Hit] MaxLines)", static_cast<LONG>(g_hitMax));
+    return true;
+}
+
+// TU 0x82301de8..0x82301e48 / 0x822f77e4..0x822f783c: the first companion hit record whose +0 equals msg+0x50
+const BYTE *CompanionHitRecord(const BYTE *inst, const BYTE *msg) {
+    const BYTE *comp = CompanionData(inst);
+    if (!comp || !msg) return nullptr;
+    __try {
+        const DWORD count = Rd(comp + 0x2c);
+        const BYTE *base = *reinterpret_cast<const BYTE *const *>(comp + 0x28);
+        if (!count || !base || count > 256) return nullptr;     // 256: plugin guard, the TU has none
+        const LONG type = *reinterpret_cast<const LONG *>(msg + 0x50);
+        for (DWORD i = 0; i < count; ++i)
+            if (*reinterpret_cast<const LONG *>(base + i * 0xc4) == type) return base + i * 0xc4;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return nullptr;
+}
+
+DWORD __cdecl HitSelectTU(BYTE **s, BYTE *msg, BYTE *d, BYTE *inst, DWORD site) {
+    P1dReadSwitches();
+    const BYTE *rec = nullptr;
+    if (g_hitTranslate && inst && msg && !msg[0x6e]) rec = CompanionHitRecord(inst, msg);
+    DWORD r = 0;
+    if (!rec) {
+        r = reinterpret_cast<HitSelectFn>(kHitSelect)(s, msg, d) & 0xff;
+        g_selSource = *s ? 1 : 0;
+    } else {
+        *s = const_cast<BYTE *>(rec) + 0xc;                                   // TU 0x82301e44
+        if (reinterpret_cast<HitRedirectFn>(kHitRedirect)(msg, *s) & 0xff) *s = d + 0x758;   // 0x82301f08..0x82301f80
+        r = *s ? (Rd(*s + 0x14) >> 30) & 1 : 0;                               // 0x82301f84..0x82301fa8
+        g_selSource = (*s == d + 0x758) ? 1 : 2;
+    }
+    g_selInst = inst;
+    g_selFlags = *s ? Rd(*s + 0x14) : 0;
+    (void)site;
+    return r;
+}
+
+// tru+0x223429: inside tru+0x223410(inst, msg, D, amount) - at entry of this stub inst is [esp+0x1c]
+__declspec(naked) void HitSelStubDecide() {
+    __asm {
+        push 1
+        push dword ptr [esp + 0x20]
+        push dword ptr [esp + 0x14]
+        push dword ptr [esp + 0x14]
+        push dword ptr [esp + 0x14]
+        call HitSelectTU
+        add esp, 0x14
+        ret
+    }
+}
+
+// tru+0x23b157: inside the hit reaction tru+0x23ad50, esi = inst (tru+0x23ad5e)
+__declspec(naked) void HitSelStubReaction() {
+    __asm {
+        push 2
+        push esi
+        push dword ptr [esp + 0x14]
+        push dword ptr [esp + 0x14]
+        push dword ptr [esp + 0x14]
+        call HitSelectTU
+        add esp, 0x14
+        ret
+    }
+}
+
+// tru+0x24f338: inside tru+0x24f230 (ebp frame); its caller tru+0x220650 (return 0x6206e8, ebp frame) has inst at
+// [its ebp+8]; any other caller: inst 0 = the PC selector
+__declspec(naked) void HitSelStubLaunch() {
+    __asm {
+        push 3
+        mov eax, dword ptr [ebp + 4]
+        cmp eax, 0x006206e8
+        jne hl_other
+        mov eax, dword ptr [ebp]
+        mov eax, dword ptr [eax + 8]
+        jmp hl_have
+    hl_other:
+        xor eax, eax
+    hl_have:
+        push eax
+        push dword ptr [esp + 0x14]
+        push dword ptr [esp + 0x14]
+        push dword ptr [esp + 0x14]
+        call HitSelectTU
+        add esp, 0x14
+        ret
+    }
+}
+
+// tru+0x23b183: the decision tru+0x223410 (cdecl, returns al: 1 = heavy -> tru+0x220650, 0 = light -> tru+0x25ac80)
+DWORD __cdecl HitDecideHook(BYTE *inst, BYTE *msg, BYTE *d, float amount) {
+    g_selInst = nullptr;
+    const DWORD r = reinterpret_cast<HitDecideFn>(kHitDecide)(inst, msg, d, amount) & 0xff;
+    if (HitLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        LONG type = -1, sub = -1;
+        __try { type = *reinterpret_cast<const LONG *>(msg + 0x50); sub = *reinterpret_cast<const LONG *>(msg + 0x54); }
+        __except (EXCEPTION_EXECUTE_HANDLER) {}
+        const int src = (g_selInst == inst) ? g_selSource : 0;
+        Log(1, "0.6.7 hit: %s type %ld sub %ld amount %.1f - structure: %s (flags +0x14 0x%08lx) -> %s ([Hit] Translate %d)",
+            who, type, sub, amount, kSelSource[src], src ? g_selFlags : 0, r ? "HEAVY (knockback tru+0x220650)" :
+            "light (MoveHit tru+0x25ac80)", g_hitTranslate);
+    }
+    return r;
+}
+
+// tru+0x220940: TU 0x822f77e4..0x822f783c + fneg 0x822f7894 - record+0x40 or 3.0 for both factors
+void __cdecl KnockbackForce(BYTE *inst, BYTE *msg) {
+    P1dReadSwitches();
+    float f = 3.0f;                                                          // TU [0x820526e8] = 0x40400000
+    const BYTE *rec = g_hitKnock ? CompanionHitRecord(inst, msg) : nullptr;
+    if (rec) {
+        __try { f = *reinterpret_cast<const float *>(rec + 0x40); }
+        __except (EXCEPTION_EXECUTE_HANDLER) { rec = nullptr; f = 3.0f; }
+    }
+    g_kbForce = f;
+    g_kbNeg = -f;
+    if (HitLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        LONG type = -1;
+        __try { type = *reinterpret_cast<const LONG *>(msg + 0x50); } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        Log(1, "0.6.7 knockback: %s type %ld force %.1f (%s, [Hit] TranslateKnockback %d)", who, type, f,
+            rec ? "companion record +0x40 (TU)" : "3.0 (PC / no record)", g_hitKnock);
+    }
+}
+
+// jumped to from tru+0x220940 (6 bytes): st0 = the factor ([esp+0x54]), st1 = the divisor; ebp = tru+0x220650's frame
+__declspec(naked) void KbMulStub() {
+    __asm {
+        fstp qword ptr [g_kbA]
+        fstp qword ptr [g_kbX]
+        pushad
+        pushfd
+        push dword ptr [ebp + 0xc]
+        push dword ptr [ebp + 8]
+        call KnockbackForce
+        add esp, 8
+        popfd
+        popad
+        fld qword ptr [g_kbX]
+        fld qword ptr [g_kbA]
+        fmul qword ptr [g_kbForce]
+        jmp dword ptr [g_kbMulBack]
+    }
+}
+
+// jumped to from tru+0x220971 (6 bytes): the second factor, -force (TU fneg f1, f13)
+__declspec(naked) void KbNegStub() {
+    __asm {
+        fld dword ptr [g_kbNeg]
+        jmp dword ptr [g_kbNegBack]
+    }
+}
+
+void SetupHit() {
+    const Fact sel[] = {
+        {kHitSelect, "8b4c2408 80796e00 56 8b742408 57 8b7c2414 7408 8d873c050000",
+         "selector tru+0x2159a0 (cdecl &s, msg, D; msg+0x6e -> D+0x53c)"},
+        {0x00615a1f, "8b16 52 51 e848e2ffff 83c408 84c0 7408 81c758070000 893e 8b36 85f6 7411 8b4614 c1e81e 83e001",
+         "selector: redirect tru+0x213c70(msg, s) -> D+0x758, return bit 30 of s+0x14"},
+        {0x00623410, "51 8b442410 57 8b7c2410 50 8d4c2408 57 51 c744241000000000 e87225ffff 8b442410",
+         "decision tru+0x223410: selector call tru+0x223429, inst = argument 1"},
+        {0x0063ad50, "55 8bec 83e4f0 81ec24010000 53 56 8b7508", "hit reaction tru+0x23ad50: esi = inst"},
+        {0x0063b148, "50 8d542424 57 52 c744242c00000000 e844a8fdff 8b44242c",
+         "hit reaction: selector call tru+0x23b157"},
+        {0x0063b178, "51 8b4c242c d91c24 51 57 56 e88882feff 83c410 84c0 0f84a1000000",
+         "hit reaction: decision call tru+0x23b183 (inst, msg, D, amount)"},
+        {0x0064f230, "55 8bec 83e4f0 81ecc4000000", "tru+0x24f230: ebp frame"},
+        {0x0064f32f, "56 0f298424d0000000 e86366fcff d9ee", "tru+0x24f230: selector call tru+0x24f338"},
+        {0x00620650, "55 8bec 83e4f0 83ec54 8b4510 53 56 8b7508 57 8b7d0c",
+         "knockback tru+0x220650: ebp frame, inst [ebp+8], msg [ebp+0xc]"},
+        {0x006206e3, "e848eb0200", "knockback: call tru+0x24f230 (return 0x6206e8)"},
+        {0x0062093c, "d9442454 dc0de8158400 def1", "knockback: factor 3.0 at tru+0x220940"},
+        {0x0062096c, "e8df6bffff d90538538400 8b442460", "knockback: -3.0 at tru+0x220971"},
+        {0x008415e8, "0000000000000840", "double 3.0 at 0x8415e8"},
+        {0x00845338, "000040c0", "float -3.0 at 0x845338"},
+    };
+    if (!g_compOk) {
+        Log(0, "0.6.7 hit: companion lookup not verified (0.6.5) - hit structures / knockback stay PC");
+    } else if (FactsOk66(sel, sizeof(sel) / sizeof(sel[0]), "0.6.7 hit")) {
+        int placed = 0;
+        if (WriteCall(kSelCallDecide, reinterpret_cast<const void *>(&HitSelStubDecide))) ++placed;
+        if (WriteCall(kSelCallReaction, reinterpret_cast<const void *>(&HitSelStubReaction))) ++placed;
+        if (WriteCall(kSelCallLaunch, reinterpret_cast<const void *>(&HitSelStubLaunch))) ++placed;
+        if (WriteCall(kDecideCall, reinterpret_cast<const void *>(&HitDecideHook))) ++placed;
+        BYTE j1[6] = {0xe9, 0, 0, 0, 0, 0x90}, j2[6] = {0xe9, 0, 0, 0, 0, 0x90};
+        DWORD rel = reinterpret_cast<DWORD>(&KbMulStub) - (kKbMulSite + 5);
+        memcpy(j1 + 1, &rel, 4);
+        rel = reinterpret_cast<DWORD>(&KbNegStub) - (kKbNegSite + 5);
+        memcpy(j2 + 1, &rel, 4);
+        if (WriteCode(kKbMulSite, j1, sizeof(j1))) ++placed;
+        if (WriteCode(kKbNegSite, j2, sizeof(j2))) ++placed;
+        if (placed == 6) {
+            g_hitSelPlaced = g_hitDecPlaced = g_hitKbPlaced = true;
+        } else {
+            WriteCall(kSelCallDecide, reinterpret_cast<const void *>(kHitSelect));
+            WriteCall(kSelCallReaction, reinterpret_cast<const void *>(kHitSelect));
+            WriteCall(kSelCallLaunch, reinterpret_cast<const void *>(kHitSelect));
+            WriteCall(kDecideCall, reinterpret_cast<const void *>(kHitDecide));
+            const BYTE o1[6] = {0xdc, 0x0d, 0xe8, 0x15, 0x84, 0x00}, o2[6] = {0xd9, 0x05, 0x38, 0x53, 0x84, 0x00};
+            WriteCode(kKbMulSite, o1, sizeof(o1));
+            WriteCode(kKbNegSite, o2, sizeof(o2));
+            Log(0, "0.6.7 hit: only %d of 6 sites written - all back to the PC code", placed);
+        }
+    }
+    if (g_chunkLimit8) {
+        if (HexAt(0x00696fa8, "833d70fcec0004 7c14 8b4710")) {
+            const BYTE eight = 8;
+            g_chunk8Placed = WriteCode(kChunkLimitImm, &eight, 1);
+        } else {
+            Log(0, "0.6.7 chunk: tru+0x296fa8 is not `cmp [0xecfc70], 4` - limit stays 4");
+        }
+    }
+    Log(1, "0.6.7: hit structures %s (selector calls tru+0x223429 / +0x23b157 / +0x24f338 -> companion hit records as the "
+           "TU 0x82301dc0, [Hit] Translate %d), decision log %s (tru+0x23b183), knockback %s (tru+0x220940 / +0x220971 "
+           "-> record +0x40 as the TU 0x822f77e4, [Hit] TranslateKnockback %d), [Hit] Log %d (max %d lines); chunkdoll "
+           "limit %s ([Chunk] Limit8 %d, start only). Not in 0.6.7: type-25 sideways knockback, brain+0x1254 |= 1 "
+           "(0x822f788c), the instance for tru+0x24f230's callers tru+0x24f5ad / +0x25215d",
+        g_hitSelPlaced ? "on" : "OFF", g_hitTranslate, g_hitDecPlaced ? "on" : "OFF", g_hitKbPlaced ? "on" : "OFF",
+        g_hitKnock, g_hitLog, g_hitMax, g_chunk8Placed ? "8 (TU 0x82376700)" : "4 (PC)", g_chunkLimit8);
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -5305,6 +5592,9 @@ void ReadOptions(const char *dir) {
     g_splashFallback = GetPrivateProfileIntA("Splash", "Fallback", 1, ini) ? 1 : 0;
     g_splashLog = GetPrivateProfileIntA("Splash", "Log", 1, ini) ? 1 : 0;
     g_splashMax = GetPrivateProfileIntA("Splash", "MaxLines", 2000, ini);
+    g_hitMax = GetPrivateProfileIntA("Hit", "MaxLines", 3000, ini);                 // 0.6.7
+    if (g_hitMax < 0) g_hitMax = 0;
+    g_chunkLimit8 = GetPrivateProfileIntA("Chunk", "Limit8", 1, ini) ? 1 : 0;       // 0.6.7 (start only)
     if (g_splashMax < 0) g_splashMax = 0;
     if (g_diagMax < 0) g_diagMax = 0;
 }
@@ -5357,6 +5647,7 @@ void Start(HMODULE self) {
     SetupMelee();                     // 0.6.4: MeleeAttack T-M1 / T-M2 (independent of the parts above)
     SetupCompanion();                 // 0.6.5: P1d (after SetupDeath: the Land exception H3b lives in its hook)
     SetupN4c();                       // 0.6.6: T5 + P1c (after SetupCompanion: companion facts; after SetupTranslate1013)
+    SetupHit();                       // 0.6.7: K-1 hit structures / knockback + K-7 chunk limit (after SetupCompanion)
 }
 
 }  // namespace

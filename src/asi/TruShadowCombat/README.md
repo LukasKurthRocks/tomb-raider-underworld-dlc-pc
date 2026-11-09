@@ -1,4 +1,34 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.6)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.7)
+
+0.6.7 (2026-11-09, **offline, not yet seen in game**; for the combat tests of TODO N18 "Kampf wie Xbox"): K-1 hit
+structures + knockback and K-7 chunkdoll limit (main workspace `docs\Befund-K1-Umfallen-0911.md`, ENGINE.md 13). Build
+`work\asi\combat067`, byte pre-checks `work\asi\combat067\precheck_067.txt` (15 checks, 0 mismatches against the
+installed tru.exe). Switches in `TruShadowCombat.ini` `[Hit]` (live, read again at most once per second through
+`kP1dKeys`) and `[Chunk] Limit8` (start only); all default **1**; a switch at 0 runs the PC code.
+* **Hit structures** (`[Hit] Translate`, TU 0x82301dc0 = retail 0x823042a8 + instance): the selector tru+0x2159a0
+  (cdecl &s, hit message, D) knows damage types 0..16 only; Lara's DLC 2 melee hits are types 18..27, so the PC gives
+  them no structure and the decision tru+0x223410 skips its flag tests (heavy reaction every time). The TU first
+  searches the companion's hit records (extension 870 / 932 / 944: `[comp+0x2c]` count, `[comp+0x28]` base, 0xc4 bytes
+  each, +0 = type == message +0x50) and takes record +0xc; the D+0x758 redirect (tru+0x213c70) and the return (bit 30
+  of +0x14) stay. Placed at the selector calls tru+0x223429 (decision, instance = argument 1) and tru+0x23b157 (hit
+  reaction, esi). **Not 1:1:** tru+0x24f338 (inside tru+0x24f230 = TU 0x82329810, which got the instance as a new
+  argument) gets the instance only on the path from the knockback tru+0x220650 (return 0x6206e8); its callers
+  tru+0x24f5ad / tru+0x25215d keep the PC selector.
+* **Knockback** (`[Hit] TranslateKnockback`, TU 0x822f73a8, block 0x822f77e4..0x822f783c + fneg 0x822f7894): the force
+  factor is record +0x40 of the same companion record (extension 870: 3 for 18-20 / 22 / 25, 9 for 26, 12 for 21, 18 for
+  23 / 24 / 27), 3.0 without a record, instead of the PC's fixed 3.0 / -3.0 (tru+0x220940 `fmul qword [0x8415e8]`,
+  tru+0x220971 `fld dword [0x845338]`). **Not translated:** the TU's sideways direction for type 25 with a companion
+  (0x822f7558..0x822f75bc) and `brain+0x1254 |= 1` before the second call (0x822f788c, not compared with the PC).
+* **Chunkdoll limit** (`[Chunk] Limit8`, start only): `cmp [0xecfc70], 4` at tru+0x296fa8 -> 8 as the TU 0x82376700
+  (retail 0x823769e0: 4). The counter has no array behind it (only inc tru+0x2970b8 / dec tru+0x296e5c / this compare).
+  Was held back until the lethal-impulse translation (0.6.1 `[Chunk] Translate`) was seen live - 09.11.: 5 impulses
+  inside the physics step caught, no crash.
+* **Log** (`[Hit] Log`, cap `[Hit] MaxLines` 3000): per hit decision `0.6.7 hit: <enemy> type <t> sub <s> amount <a> -
+  structure: companion record (TU) / PC table / no structure (flags +0x14 ...) -> HEAVY (knockback) / light (MoveHit)`,
+  per knockback `0.6.7 knockback: <enemy> type <t> force <f> (companion record +0x40 (TU) / 3.0 ...)`. Together with
+  TruMenu 0.22.10 `combo.trace 1` this shows per hit what happened. Load line `0.6.7: hit structures on ...`.
+* **Test (hall02, tutorial thrall):** with `[Hit] Translate=1` punches (type 18) should show `companion record (TU)` and
+  flags 0x10000000; compare heavy / light against `Translate=0` (PC: `no structure -> HEAVY` every time).
 
 0.6.6 (2026-11-08, **offline, not yet seen in game**): N4c - T5 (immediate death in the hit reaction) and P1c (the
 Vaulted Enter of the title update with the chain that feeds it); `docs\Befund-P1d-Begleiter-0711.md` section 2 rows T5 /

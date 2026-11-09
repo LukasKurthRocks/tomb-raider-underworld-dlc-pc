@@ -36,6 +36,9 @@ TruShadowCombat | Melee | TranslateInterrupt | bool | Nahkampf-Unterbrechung wie
 TruShadowCombat | Death | TranslateT5 | bool | Sofort-Tod wie TU (T5) | Immediate death as TU (T5) | live | 1 | Tödlicher Treffer ohne Regeneration: Todesart 7 // Lethal hit, no regeneration: death kind 7 | TruShadowCombat 0.6.6
 TruShadowCombat | Death | TranslateVaulted | bool | Vaulted-Enter wie TU (P1c) | Vaulted enter as TU (P1c) | live | 1 | Stufen-Animation aus Begleiter (nur fixe Daten) // Step animation from companion (fixed data only) | TruShadowCombat 0.6.6
 TruShadowCombat | Death | TranslateVaultedClock | bool | Vaulted-Uhr wie TU | Vaulted clock as TU | live | 1 | 5 s ohne Zeitlupe nach Vaulted // 5 s without slow motion after Vaulted | TruShadowCombat 0.6.6
+TruShadowCombat | Hit | Translate | bool | Treffer-Daten wie TU (K-1) | Hit structures as TU (K-1) | live | 1 | Schlagarten 18-27 aus den Begleiter-Daten // Hit types 18-27 from the companion records | TruShadowCombat 0.6.7
+TruShadowCombat | Hit | TranslateKnockback | bool | Wegschleudern je Schlag wie TU | Knockback per hit type as TU | live | 1 | Kraft 3 / 9 / 12 / 18 statt immer 3 // Force 3 / 9 / 12 / 18 instead of 3 | TruShadowCombat 0.6.7
+TruShadowCombat | Hit | Log | bool | Treffer-Log (schwer / leicht) | Hit log (heavy / light) | live | 1 | Eine Zeile je Treffer und Wegschleudern // One line per hit and knockback | TruShadowCombat 0.6.7
 TruShadowCombat | Splash | Translate | bool | K9 Splash wie TU | K9 splash as TU | live | 1 | Hauptziel ohne Extra-Splash; Typen nur mit [Damage] an // Main target without extra splash; types need [Damage]
 TruShadowCombat | Splash | Fallback | bool | K9 Splash: Xbox-Werte als Ersatz | K9 splash: Xbox values fallback | restart | 1 | Xbox-Werte, wenn die Paar-Tabelle von Objekt 858 abweicht // Xbox values when object 858's pair table differs
 TruShadowCombat | States | Translate1013 | bool | Finisher 1013 wie TU | Finisher 1013 as TU | live | 0 | Finisher 1013 im Doppel-Modus wie TU // Finisher 1013 in doppelganger mode as TU
@@ -91,6 +94,8 @@ TruShadowCombat | Damage | Log | bool | K14 Log | K14 log | restart | 1 | Schade
 TruShadowCombat | Damage | MaxLines | int:0..20000:500 | K14: max. Zeilen | K14: max lines | restart | 3000 | Obergrenze der Schadens-Zeilen // Cap of the damage lines
 TruShadowCombat | Chunk | Log | bool | Chunk Log | Chunk log | restart | 1 | Eine Stoß-Zeile alle 2 s je Gegner // Burst line every 2 s per enemy
 TruShadowCombat | Chunk | MaxLines | int:0..20000:500 | Chunk: max. Zeilen | Chunk: max lines | restart | 2000 | Obergrenze der Chunk-Zeilen // Cap of the chunk lines
+TruShadowCombat | Chunk | Limit8 | bool | Bis 8 Chunkdolls wie TU | Up to 8 chunkdolls as TU | restart | 1 | TU-Grenze 8 statt 4 (K-7) // TU limit 8 instead of 4 (K-7) | TruShadowCombat 0.6.7
+TruShadowCombat | Hit | MaxLines | int:0..20000:500 | Treffer: max. Zeilen | Hits: max lines | restart | 3000 | Obergrenze der Treffer-Zeilen // Cap of the hit lines | TruShadowCombat 0.6.7
 TruShadowCombat | Splash | Log | bool | K9 Splash Log | K9 splash log | restart | 1 | Splash-Zeilen alle 2 s // Splash burst lines every 2 s
 TruShadowCombat | Splash | MaxLines | int:0..20000:500 | K9 Splash: max. Zeilen | K9 splash: max lines | restart | 2000 | Obergrenze der Splash-Zeilen // Cap of the splash lines
 

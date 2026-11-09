@@ -9,7 +9,7 @@
              ships as binkw32.dll loads every *.asi there.
     -Remove  deletes them again - only if they are ours: the same SHA-256 as a TruShadowCombat.asi / .ini built
              anywhere below <workspace>\work\asi (e.g. work\asi\combat01) or one of our released builds listed in
-             $earlierBuilds (0.1 - 0.3, 0.5.3, 0.6 - 0.6.3); a foreign file of the same name is never overwritten or removed.
+             $earlierBuilds (0.1 - 0.3, 0.5.3, 0.6 - 0.6.3, 0.6.6); a foreign file of the same name is never overwritten or removed.
              TruShadowCombat.log is left in place. Nothing installed = nothing to do (no error), so the test harness
              may call -Remove for every profile.
     -Install over an earlier build of ours replaces it (update); an .ini the owner edited is not ours and is kept
@@ -57,7 +57,8 @@ $earlierBuilds = @{
                               '78aec9a1652ead192a9e41a90fd03621d4881387a7605c1a393261ee3e579bc6',    # 0.6 (work\asi\combat06)
                               'acc4aeb17988d236502e1f352f4a9475b4a0e114bf986707b07e5f4ac031a891',    # 0.6.1 (work\asi\combat061)
                               '012c9dc4adddb6b21150bb00fee9d845daab1093bc80069eb6cb0836ae23ed12',    # 0.6.2 (work\asi\combat062)
-                              '45821900e1e218a19798127d8d0e8184b4a2159b141731f787c534260fb701bd')    # 0.6.3 (work\asi\combat063)
+                              '45821900e1e218a19798127d8d0e8184b4a2159b141731f787c534260fb701bd',    # 0.6.3 (work\asi\combat063)
+                              '4c413af861b5104bf024552177eafe63ba534028b2df51cb24f4ce27fb55ac17')    # 0.6.6 (work\asi\combat066)
     'TruShadowCombat.ini' = @('d909de94f1af40861e3e3bb3e183785af75e6f0be2167bc208aa051cfcc85ce0',    # 0.1 sample .ini
                               '4141f31f35f6e3631c5895fb2a1799963a435c2d82dc9f744ca1c8f65468fdae',    # 0.2 sample .ini
                               '8c9be2daf9e926a3d0c26d559c08bf8ee77e817cedcd3b8ebfe56f22d65645f4',    # 0.3 sample .ini
