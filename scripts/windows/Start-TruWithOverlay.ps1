@@ -18,7 +18,8 @@
     a PowerShell line trace.
 
 .PARAMETER SteamPath
-    Steam folder; default: from the registry (HKCU\Software\Valve\Steam SteamPath), else C:\Program Files (x86)\Steam.
+    Steam folder; default: from the registry (HKCU\Software\Valve\Steam SteamPath), else Steam below the 32-bit
+    program files folder (env ProgramFiles(x86)).
 
 .PARAMETER WaitSeconds
     How long to wait for tru.exe after the Steam start (default 90).
@@ -50,7 +51,7 @@ Set-TruLogFile -Path $logFile
 try {
     if (!$SteamPath) {
         $reg = Get-ItemProperty -Path 'HKCU:\Software\Valve\Steam' -Name SteamPath -ErrorAction SilentlyContinue
-        $SteamPath = if ($reg -and $reg.SteamPath) { $reg.SteamPath -replace '/', '\' } else { 'C:\Program Files (x86)\Steam' }
+        $SteamPath = if ($reg -and $reg.SteamPath) { $reg.SteamPath -replace '/', '\' } else { Join-Path ${env:ProgramFiles(x86)} 'Steam' }
     }
     $steamExe = Join-Path $SteamPath 'steam.exe'
     $overlayUi = Join-Path $SteamPath 'gameoverlayui64.exe'
