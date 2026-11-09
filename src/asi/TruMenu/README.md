@@ -2922,6 +2922,11 @@ Reihenfolge fest (Flacker-Test)".
   = `cine.step 1`, Shot = `claude.mark now` (mark line + clean shot). Edges only; the game still gets the keys and
   buttons; the pad combos act only while neither the menu nor the ring owns the pad. All 0 by default. To use the
   8BitDo's R4 / L4: map them in the pad's own software to such a combo (the pad sends no own XInput bit for them).
+- **0.22.8:** the pad combos are on by default - `PausePad=0x0120` (View + LB), `StepPad=0x0220` (View + RB),
+  `ShotPad=0x0320` (View + LB + RB). Pause acts only while a cutscene plays or is held (a stray combo in normal play
+  cannot arm the pause for the next cutscene), step only while held. The pause badge shows a second line with the keys /
+  combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
+  so it follows any change.
 
 ### TO TEST 0.22.1
 
