@@ -2928,6 +2928,55 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.10 - light cut diagnosis and a stable light choice per object (2026-11-09)
+
+Built into `work\asi\menu0233`, not installed. Byte checks: `work\asi\menu0233\precheck_0230.txt` (9 checks, 0
+mismatches against the installed `tru.exe`). Background: workspace `docs\Befund-Licht-Kuerzung-0911.md`, ENGINE.md 16
+"Light set builder". The PC cuts every object's lights in the set builder **0x504cc0**: it walks the object's light
+list in order and keeps the first lights that fit - at most 7, sun 1, shadow slots 3 (of them at most 2 with a shadow
+map), plain 3 (overflow into free shadow slots); a light that fits nowhere is dropped (0x504e56), lights after the 7th
+are not looked at. When the order of the list changes from frame to frame (the throne end cutscene), an object with more
+fitting lights than slots gets another choice every frame - the flicker. The Xbox shaders take 7 lights of any kind
+(Xenia 2026-11-09: no flicker, Natla lit warm and cool at once).
+
+- **`light.cutlabels 1|0`** (bar page Tests next to "Licht-Reihenfolge fest", no argument = report): a line top left
+  `Licht-Kürzung Bild <n>: <sets> Sätze, <cut> gekürzt; stärkste: Li 9 -> 7 (S1 M2 C1 P3) drop 2` and a label at every
+  light that was dropped in the last frame (`Licht #<index from light.list> (<kind>)` / `verworfen <n>x, behalten <n>x`).
+  `Li a -> b` = lights offered to the set -> kept; `S` sun, `M` with a shadow map, `C` shadow slots without a map
+  (shadow casters and plain lights that overflowed there), `P` plain slots; `drop` = taken out again because no slot
+  was free. Kinds: Sonne / Schattenkarte / Schattenwerfer / einfach - the builder's own tests (res+0x42c == 2,
+  res+0x418 && res+0x42c, CastsShadow 0x50a080, rest). The label position is the light's transform row L+0x50 (as
+  light.list - to be confirmed live).
+- **`light.cut [frames] [all]`** (bar: "Licht-Kürzung ins Log (3 Bilder)"): frames (default 3, at most 30) into
+  TruMenu.log - per frame a summary line, then per set `caller`, offered -> kept, category byte, drop, "not looked at",
+  and the offered list in order: `+` kept, `-` dropped, `.` not looked at, each `#index 0xlight kind (position)`.
+  Default only the sets that dropped a light; `all` = every set (several hundred lines per frame). Info only. A set
+  cannot be named by the game object it belongs to (the builder only gets the light list); the list and the caller
+  address tell them apart.
+- **`light.stablecut 1|0`** and **`[Light] StableCut`** (default 0, live from the bar): before the cut, the object's list
+  is ordered by kind (sun, shadow map, shadow caster, plain), then by the light's address - stable from frame to frame,
+  only for the per-object choice; the collected scene list and with it the shadow atlas order stay the game's.
+  **How it relates to `light.stable` (`[Light] Stable=1`, default since 0.22.5):** light.stable sorts the whole
+  collected list +0x250 at 0x56d69a (also the shadow atlas order) and keeps the choice that the address order gives
+  (warm at the throne, the cool front light on Natla missing); light.stablecut only fixes the per-object choice and puts
+  the shadow-mapped and shadow-casting lights first. Both on is allowed (StableCut decides the per-object order then).
+  **A / B at the throne:** (1) Stable=1, StableCut=0 (as now) and (2) Stable=0, StableCut=1 - each with
+  `light.cutlabels 1` and a `light.cut 3` while Natla is on screen; compare the flicker and which light is dropped.
+- Hooks: `jmp` at 0x504e56 (5 bytes `80 44 24 1a ff`, back 0x504e5b) and at 0x504eb9 (8 bytes `8b 4e 0c 51 8d 54 24 18`,
+  back 0x504ec1) only while the labels are on or a capture runs; `jmp` at 0x504cd9 (6 bytes `8b 86 34 12 00 00`, back
+  0x504cdf) only while StableCut is on. All written on the game thread and put back when off; refused (one log line)
+  when the bytes are not the game's.
+
+### TO TEST 0.22.10
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | log | `0.22.10 light cut: 9 checks ok` (first use) |
+| 2 | throne cutscene, "Licht-Kürzung anzeigen" on, `cine.pause` | summary line top left; labels at dropped lights; `light cut diagnosis on` in the log |
+| 3 | `light.cut 3` while Natla is on screen | 3 frames of `light.cut f<n>` lines: which light is `-` (dropped) and whether it changes per frame |
+| 4 | light.stable off, "Licht-Auswahl je Objekt fest" on | no flicker; compare Natla's light with the Xenia picture (warm + cool) |
+| 5 | both off | the flicker is back (proves the order is the cause) |
+
 ## 0.22.9 - enemy diagnosis, combo trace, subtitle language live, combo fix (2026-11-09)
 
 Built into `work\asi\menu0232`, not installed. Byte checks: `work\asi\menu0232\precheck_0229.txt` (9 checks, 0
