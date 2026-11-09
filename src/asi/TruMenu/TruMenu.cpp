@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kostueme: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -77,7 +77,7 @@ const char *const kVersion = "TruMenu 0.22.6 (Present re-entry guard against the
                              "snd.dump into the log; media.mutemusic mutes the FMOD channel groups of the music groups "
                              "(FMOD Ex is linked into tru.exe), the option slider stays; "
                              "0.20 layers dbg.collect = collectibles (*_rw_* rewards by kind, reward pots "
-                             "'enthaelt Artefakt' with their reward index from the intro data) and dbg.enemies = every AI "
+                             "'enth\303\244lt Artefakt' with their reward index from the intro data) and dbg.enemies = every AI "
                              "enemy by kind (thralls, spiders, sharks, big cats, naga, bats, mercs, other) with intro id, "
                              "LP and distance, thralls with the targeter 9 line; ai.dumb forgets on switch-on: the enemy's "
                              "current / override target on Lara cleared once with the engine's slot setter 0x653cf0, "
@@ -86,7 +86,7 @@ const char *const kVersion = "TruMenu 0.22.6 (Present re-entry guard against the
                              "stream portal (pos.portal + wait.unit) before a level.load; [Debug] Depth dim and "
                              "FlatPasses 0x600 by default; media.mutemusic (SOUND_SetMusicVolume 0x589520(0), "
                              "re-applied) / media.muteambient ('_amb_' srmusic tracks); bar rows Gegner, Gegner-Leben, "
-                             "Kanten, Musik aus, Ambient aus, Sammelgegenstaende, Notfall 'Spiel beenden' (game.quit, "
+                             "Kanten, Musik aus, Ambient aus, Sammelgegenst\303\244nde, Notfall 'Spiel beenden' (game.quit, "
                              "twice within 10 s); "
                              "0.19 Dumme KI: ai.dumb - enemies ignore Lara, every AI enemy or by object name "
                              "(sharks / spiders / thralls / [AI] DumbFilter); purge = the engine's sense reset 0x65a140 "
@@ -152,7 +152,7 @@ const char *const kVersion = "TruMenu 0.22.6 (Present re-entry guard against the
                              "0.11: Ablauf: guided test runs from TruMenu.flow.txt ([Flow] Enabled, 0 by default) "
                              "- action / observe / mark steps, counters (TruTrace unit / level loads and restores, plugin "
                              "log patterns, player deaths, switch flips, item runs, marks), conditions after= / check= / "
-                             "fail=, ring level Claude: Weiter / Ueberspringen / Zurueck + Gut / Fehler = the step result, "
+                             "fail=, ring level Claude: Weiter / \303\234berspringen / Zur\303\274ck + Gut / Fehler = the step result, "
                              "a status line in coral ([Flow] Overlay / Position / Size / Lines), flow.say toast, "
                              "flow.goto / skip / add / status over TruLink, 'flow: ...' lines in TruMenu.log; "
                              "0.10.5: screenshots: shot.save [ui|clean] [name] -> [Shot] Folder (TruShots next "
@@ -6210,7 +6210,7 @@ bool NavSet(int i, bool on, const char *src, char *o, size_t n) {
 const char *NavRowNote(const char *arg, bool de) {
     const int i = NavFind(arg);
     if (i < 0 || !NavByteOn(i) || kNavSwitches[i].kind > 1) return "";
-    if (kNavSwitches[i].kind == 1 && !NavByteOn(0) && !NavByteOn(1)) return de ? "(nur mit Flaechen)" : "(needs areas)";
+    if (kNavSwitches[i].kind == 1 && !NavByteOn(0) && !NavByteOn(1)) return de ? "(nur mit Fl\303\244chen)" : "(needs areas)";
     DWORD mask = 0;
     ReadDword(kNavMask, &mask);
     char layers[120];
@@ -6889,8 +6889,8 @@ void UberText(DWORD b, bool gate, bool de, char *o, size_t n) {
         DWORD to = 0;
         ReadDword(trans + 4, &to);
         UberNodeName(b, static_cast<LONG>(to), target, sizeof(target));
-        if (gate && !_stricmp(target, "open")) Out(o, n, "%s", de ? "faehrt hoch" : "moving up");
-        else if (gate && !_stricmp(target, "closed")) Out(o, n, "%s", de ? "faehrt runter" : "moving down");
+        if (gate && !_stricmp(target, "open")) Out(o, n, "%s", de ? "f\303\244hrt hoch" : "moving up");
+        else if (gate && !_stricmp(target, "closed")) Out(o, n, "%s", de ? "f\303\244hrt runter" : "moving down");
         else Out(o, n, "%s -> %s", de ? "wechselt" : "moving", UberWord(target, gate, de));
         if (wait & 1) strncat_s(o, n, de ? " (Animation)" : " (animation)", _TRUNCATE);
         return;
@@ -6983,7 +6983,7 @@ bool UberGooText(DWORD b, bool de, char *o, size_t n) {
     char secs[24];
     UberSeconds(rest < 0.0f ? 0.0f : rest, secs, sizeof(secs));
     if (trans || rest < 0.0f) Out(o, n, de ? "goo: %s, Tropfen jetzt" : "goo: %s, drop now", mode);
-    else Out(o, n, de ? "goo: %s, naechster Tropfen %s" : "goo: %s, next drop %s", mode, secs);
+    else Out(o, n, de ? "goo: %s, n\303\244chster Tropfen %s" : "goo: %s, next drop %s", mode, secs);
     return true;
 }
 // does the object name hold a part of [Debug] UberMatch
@@ -7522,7 +7522,7 @@ ImU32 ShLabelText(const ShBatch &b, bool de, char *l1, size_t n1, char *l2, size
     if (m) Out(lib, sizeof(lib), "%d/%d/%d/%d", m->pc[0], m->pc[1], m->pc[2], m->pc[3]);
     for (char *p = strstr(lib, "-1"); p; p = strstr(lib, "-1")) memmove(p + 1, p + 2, strlen(p + 2) + 1);   // -1 -> -
     Out(l1, n1, "%d %s %s %s [%s %d]%s", b.mat, kShStatusNames[fileStatus], m ? m->slots : "????", lib,
-        de ? "Gelaende" : "terrain", b.section, g_shNameSg[b.drm] == 2 ? " sg?" : "");
+        de ? "Gel\303\244nde" : "terrain", b.section, g_shNameSg[b.drm] == 2 ? " sg?" : "");
     char letters[5];
     int libs[4], status = kShNone;
     if (!ShLive(b.mat, m, letters, libs, &status)) {
@@ -7769,7 +7769,7 @@ int NlCollect(const float *lara, NlCand *out, int max, int *areas) {
 // flag 0x800), not the navmesh (r17e 2b, open: toggle dbg.enemycoll live)
 void NlLegend(bool de) {
     struct Part { ImU32 c; const char *de, *en; };
-    const Part parts[] = {{kNlColours[0], "gruen normal (auto)", "green plain (autogen)"},
+    const Part parts[] = {{kNlColours[0], "gr\303\274n normal (auto)", "green plain (autogen)"},
                           {kNlColours[1], "rot Bit 27 = von Hindernis gesperrt (Laufzeit)", "red bit 27 = blocked by an "
                                                                                            "obstacle (runtime)"},
                           {IM_COL32(255, 160, 60, 255), "orange +0x34 b8-11 > 1 = Hindernis-Strafe", "orange +0x34 b8-11 > 1 = "
@@ -7802,7 +7802,7 @@ void NlLegend(bool de) {
         y += h;
         first = last + 1;
     }
-    const char *hint = de ? "lila / violette Flaeche ohne Etikett = wohl dbg.enemycoll (Gegner-Kollision), kein Navmesh"
+    const char *hint = de ? "lila / violette Fl\303\244che ohne Etikett = wohl dbg.enemycoll (Gegner-Kollision), kein Navmesh"
                           : "lilac / violet face without a label = probably dbg.enemycoll (enemy collision), not the navmesh";
     const float hw = ImGui::CalcTextSize(hint).x;
     const float hx = (io.DisplaySize.x - hw) * 0.5f;
@@ -8181,9 +8181,9 @@ const DvLayerDef kDvLayers[kDvCount] = {
     {"trglabels", "TrgLabels", "Trigger-Namen", "trigger names", IM_COL32(235, 235, 235, 255), "Labels"},
     {"legend", "Legend", "Legende", "legend", IM_COL32(235, 235, 235, 255), "Legend"},
     {"names", "Names", "Objektnamen", "object names", IM_COL32(255, 255, 255, 255), "Names"},
-    {"slide", "Slide", "Rutschflaechen", "slide faces", IM_COL32(255, 45, 45, 255), "Slide faces"},
+    {"slide", "Slide", "Rutschfl\303\244chen", "slide faces", IM_COL32(255, 45, 45, 255), "Slide faces"},
     {"enemycoll", "EnemyColl", "Gegner-Kollision", "enemy-only collision", IM_COL32(190, 80, 255, 255), "Enemy collision"},
-    {"collect", "Collect", "Sammelgegenstaende", "collectibles", IM_COL32(255, 210, 40, 255), "Collectibles"},
+    {"collect", "Collect", "Sammelgegenst\303\244nde", "collectibles", IM_COL32(255, 210, 40, 255), "Collectibles"},
     {"enemies", "Enemies", "Gegner", "enemies", IM_COL32(255, 90, 90, 255), "Enemies"},
 };
 float g_m20Radius = 15000.0f;                // 0.20 [Debug] MarkRadius (collectibles / enemies, from the camera)
@@ -8204,7 +8204,7 @@ int g_dvNameMax = 24, g_dvNameIds = 1;       // [Debug] NameMax / NameIds (intro
 DWORD g_dvNameRgb = 0xffffff;                // [Debug] NameColour RRGGBB
 signed char g_dvNameHit[4096];               // per object id: 0 not looked up, 1 matches NameMatch, 2 not
 struct DvColourPreset { const char *name, *de; DWORD rgb; };
-const DvColourPreset kDvNameColours[] = {{"white", "weiss", 0xffffff}, {"yellow", "gelb", 0xffe040},
+const DvColourPreset kDvNameColours[] = {{"white", "wei\303\237", 0xffffff}, {"yellow", "gelb", 0xffe040},
                                          {"cyan", "cyan", 0x40e8ff}, {"magenta", "magenta", 0xff50ff}};
 const char *g_dvTrgWhy = "not checked", *g_dvPortalWhy = "not checked", *g_dvCpWhy = "not checked";
 volatile LONG g_dvOn[kDvCount] = {};         // the layers (dbg.show <layer>, dbg.triggers, dbg.portals, ...)
@@ -11429,7 +11429,7 @@ void DpTick() {
         InterlockedExchange(&g_dpDumpFrame, -1);
     }
     if (!g_dpMode) { Out(g_dpStateText, sizeof(g_dpStateText), "aus / off (lines on top)"); return; }
-    if (!g_debugEnabled || !g_dpOk) Out(g_dpStateText, sizeof(g_dpStateText), "nicht verfuegbar / unavailable: %s",
+    if (!g_debugEnabled || !g_dpOk) Out(g_dpStateText, sizeof(g_dpStateText), "nicht verf\303\274gbar / unavailable: %s",
                                         g_debugEnabled ? g_dpWhy : "[Debug] Enabled=0");
     else if (g_dpFailed) Out(g_dpStateText, sizeof(g_dpStateText), "aus nach D3D-Fehler / off after a D3D failure (log)");
     else if (!g_rmSlot[kRmScene].on) Out(g_dpStateText, sizeof(g_dpStateText), "wartet / waits: %s",
@@ -11676,13 +11676,13 @@ void PageDebugView() {
         ImGui::SliderFloat("fade start / Beginn  [Debug] FadeStart", &g_dvFadeStart, 0.0f, 100000.0f, "%.0f");
         ImGui::SliderFloat("fade end / Ende  [Debug] FadeEnd", &g_dvFadeEnd, 500.0f, 200000.0f, "%.0f");
         ImGui::SliderInt("far opacity / Rest %  [Debug] FadeMin", &g_dvFadeMin, 0, 100);
-        if (TmCheckbox("face fill / Flaechen fuellen  [dbg.fill]###dvfill", &fill)) RunDvFill(fill ? "1" : "0", o, sizeof(o));
-        ImGui::SliderInt("fill opacity / Fuellung %  [Debug] FillAlpha", &g_dvFillAlpha, 2, 40);
+        if (TmCheckbox("face fill / Fl\303\244chen f\303\274llen  [dbg.fill]###dvfill", &fill)) RunDvFill(fill ? "1" : "0", o, sizeof(o));
+        ImGui::SliderInt("fill opacity / F\303\274llung %  [Debug] FillAlpha", &g_dvFillAlpha, 2, 40);
         ImGui::SliderInt("labels / Beschriftungen  [Debug] ViewLabelMax", &g_dvTagMax, 0, 64);
         if (TmCheckbox("short labels / Kurze Namen  [dbg.short]###dvshort", &brief)) RunDvShort(brief ? "1" : "0", o, sizeof(o));
         if (TmCheckbox("mark the triggers Lara is in / Lara drin markieren  [dbg.larain]###dvlarain", &larain))
             RunDvLaraIn(larain ? "1" : "0", o, sizeof(o));
-        ImGui::TextUnformatted("enclosing boxes / umhuellende  [dbg.enclosing]:");
+        ImGui::TextUnformatted("enclosing boxes / umh\303\274llende  [dbg.enclosing]:");
         for (int i = 0; i < 3; ++i) {
             static const char *const kDe[3] = {"normal", "blass", "aus"};
             char label[64];
@@ -11690,11 +11690,11 @@ void PageDebugView() {
             ImGui::SameLine();
             if (ImGui::RadioButton(label, g_dvEncl == i)) RunDvEnclosing(kDvEnclNames[i], o, sizeof(o));
         }
-        ImGui::SliderFloat("big from / gross ab  [Debug] EnclosingSize", &g_dvEnclSize, 100.0f, 100000.0f, "%.0f");
+        ImGui::SliderFloat("big from / gro\303\237 ab  [Debug] EnclosingSize", &g_dvEnclSize, 100.0f, 100000.0f, "%.0f");
         ImGui::SliderInt("checkpoint marker max % of screen  [Debug] MarkerMax", &g_dvMarkerMax, 2, 50);
         bool v = g_dvOn[kDvLegend] != 0;
         if (TmCheckbox("legend / Legende  [dbg.legend]###dvleg", &v)) DvSet(kDvLegend, v, "menu", o, sizeof(o));
-        ImGui::TextWrapped("dbg.view leaves off / Alles an laesst aus: '%s'  [Debug] ViewSkip", g_dvViewSkip);
+        ImGui::TextWrapped("dbg.view leaves off / Alles an l\303\244sst aus: '%s'  [Debug] ViewSkip", g_dvViewSkip);
         ImGui::TextWrapped("[Debug] Persist %d: %s", g_dvPersist, g_dvPersist ? "every switch here is written to TruMenu.ini"
                            " at once (Set-TruMenu.ps1 then keeps the INI as owner-edited)" : "switches last until the "
                            "game ends; start values = the [Debug] keys");
@@ -11707,7 +11707,7 @@ void PageDebugView() {
         if (TmCheckbox("flat view / Flach-Ansicht  [dbg.flat]###rmflat", &flat)) RunRmFlat(flat ? "1" : "0", o, sizeof(o));
         char census[160], label[200];
         ValRmCensus(census, sizeof(census));
-        Out(label, sizeof(label), "render census / Render-Zaehlung (%d frames)  [dbg.census]###rmcensus", g_rmCensusFrames);
+        Out(label, sizeof(label), "render census / Render-Z\303\244hlung (%d frames)  [dbg.census]###rmcensus", g_rmCensusFrames);
         if (TmButton(label)) RunRmCensus("", o, sizeof(o));
         ImGui::SameLine();
         ImGui::TextWrapped("%s", census);
@@ -11723,7 +11723,7 @@ void PageDebugView() {
             }
         }
         if (g_rmSuggest) {
-            Out(label, sizeof(label), "use the census / aus Zaehlung: 0x%03lx  [dbg.flatpasses census]###rmsug", g_rmSuggest);
+            Out(label, sizeof(label), "use the census / aus Z\303\244hlung: 0x%03lx  [dbg.flatpasses census]###rmsug", g_rmSuggest);
             if (TmButton(label)) RunRmFlatPasses("census", o, sizeof(o));
             ImGui::SameLine();
         }
@@ -11732,7 +11732,7 @@ void PageDebugView() {
         ImGui::SameLine();
         if (ImGui::RadioButton("terrain / models - Terrain / Figuren###rmcc", g_rmColourMode == 1)) RunRmColour("class", o, sizeof(o));
         bool models = g_rmFlatModels != 0, edges = g_rmFlatEdges != 0, anyRt = g_rmFlatAnyRt != 0;
-        if (TmCheckbox("models flat too / Figuren einfaerben  [dbg.flatmodels]###rmmod", &models)) RunRmModels(models ? "1" : "0", o, sizeof(o));
+        if (TmCheckbox("models flat too / Figuren einf\303\244rben  [dbg.flatmodels]###rmmod", &models)) RunRmModels(models ? "1" : "0", o, sizeof(o));
         if (TmCheckbox("edges / Kanten  [dbg.flatedges]###rmedge", &edges)) RunRmEdges(edges ? "1" : "0", o, sizeof(o));
         if (TmCheckbox("every render target / Jedes Ziel  [dbg.flatanyrt]###rmany", &anyRt)) RunRmAnyRt(anyRt ? "1" : "0", o, sizeof(o));
         ImGui::TextWrapped("state: %s", g_rmState);
@@ -14937,10 +14937,10 @@ const M20Kind kEnKindDefs[kEnKinds] = {
     {"thrall", "Thrall", "Thrall", IM_COL32(255, 90, 90, 255)},
     {"spider,tarantula", "Spider", "Spinne", IM_COL32(185, 120, 255, 255)},
     {"shark", "Shark", "Hai", IM_COL32(80, 170, 255, 255)},
-    {"tiger,panther", "Big cat", "Grosskatze", IM_COL32(255, 160, 40, 255)},
+    {"tiger,panther", "Big cat", "Gro\303\237katze", IM_COL32(255, 160, 40, 255)},
     {"naga", "Naga", "Naga", IM_COL32(120, 230, 90, 255)},
     {"bat", "Bat", "Fledermaus", IM_COL32(190, 150, 110, 255)},
-    {"merc,poacher", "Merc", "Soeldner", IM_COL32(245, 245, 120, 255)},
+    {"merc,poacher", "Merc", "S\303\266ldner", IM_COL32(245, 245, 120, 255)},
     {"", "Other enemy", "Anderer Gegner", IM_COL32(225, 225, 225, 255)},
 };
 signed char g_coKind[4096], g_enKind[4096];  // per object id: 0 not looked up, kind + 1, 100 none (render thread)
@@ -15133,8 +15133,8 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
         ReadDword(m.inst + 0x58, &intro);
         if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
         const DWORD ri = CoRewardIndex(m.inst, &script);
-        if (pot && ri) Out(extra, sizeof(extra), " | enthaelt Artefakt #%lu", ri);
-        else if (pot) Out(extra, sizeof(extra), " | enthaelt Artefakt");
+        if (pot && ri) Out(extra, sizeof(extra), " | enth\303\244lt Artefakt #%lu", ri);
+        else if (pot) Out(extra, sizeof(extra), " | enth\303\244lt Artefakt");
         else if (ri) Out(extra, sizeof(extra), " | #%lu", ri);
         DvDistText(m.pos, DvOwnerUnit(m.inst), dist, sizeof(dist));
         Out(m.line1, sizeof(m.line1), "%s %ld%s%s%s", name, static_cast<LONG>(intro), extra, dist,
@@ -15632,7 +15632,7 @@ const char *const kSnPosNames[4] = {"bl", "tl", "tr", "br"};
 const char *const kSnPosDe[4] = {"unten links", "oben links", "oben rechts", "unten rechts"};
 const char *const kSnPosEn[4] = {"bottom left", "top left", "top right", "bottom right"};
 const char *const kSnSortNames[3] = {"group", "volume", "name"};
-const char *const kSnSortDe[3] = {"Gruppe", "Lautstaerke", "Name"};
+const char *const kSnSortDe[3] = {"Gruppe", "Lautst\303\244rke", "Name"};
 enum { kSnMusic = 0, kSnSfx, kSnSpeech, kSnOther, kSnCats };
 const char *const kSnCatDe[kSnCats] = {"MUSIK", "SFX", "SPRACHE", "?"};
 const char *const kSnCatEn[kSnCats] = {"MUSIC", "SFX", "SPEECH", "?"};
@@ -16267,7 +16267,7 @@ void PageSoundList() {
     ImGui::SliderInt("max lines / Zeilen  [snd.lines]###sllines", &g_snLines, 1, 40);
     ImGui::SliderInt("refresh ms / Takt  [snd.refresh]###slrefresh", &g_snRefresh, 100, 10000);
     ImGui::SliderFloat("font scale / Schrift  [snd.scale]###slscale", &g_snScale, 0.5f, 3.0f, "%.2f");
-    if (TmCheckbox("audible only / nur hoerbare  [snd.playing]###slonly", &only)) RunSnPlaying(only ? "1" : "0", o, sizeof(o));
+    if (TmCheckbox("audible only / nur h\303\266rbare  [snd.playing]###slonly", &only)) RunSnPlaying(only ? "1" : "0", o, sizeof(o));
     ImGui::TextUnformatted("groups / Gruppen:");
     static const char *const kLabels[kSnCats] = {"music / Musik  [snd.music]###slm", "SFX / Effekte  [snd.sfx]###sls",
                                                  "speech, cutscene / Sprache  [snd.speech]###slp",
@@ -16449,7 +16449,7 @@ typedef int(__fastcall *FmCgUpdateFn)(DWORD cg, void *edx);   // thiscall, no ar
 struct SgSlider { const char *key, *de, *en; int groups[4]; int n; };
 const SgSlider kSgSliders[] = {               // the finding's section 4 (8 sliders), keys = [SoundGroups] / snd.group
     {"Ambience", "Umgebung", "Ambience", {15, 0, 0, 0}, 1},
-    {"Steps", "Schritte & Koerper", "Footsteps & body", {32, 78, 0, 0}, 2},
+    {"Steps", "Schritte & K\303\266rper", "Footsteps & body", {32, 78, 0, 0}, 2},
     {"Weapons", "Waffen & Treffer", "Weapons & impacts", {58, 60, 51, 31}, 4},
     {"Enemies", "Gegner & Tiere", "Enemies & creatures", {27, 65, 0, 0}, 2},
     {"Lara", "Lara-Stimme & Funk", "Lara voice & radio", {68, 70, 72, 77}, 4},
@@ -17768,7 +17768,7 @@ bool RunAdRemove(const char *arg, char *o, size_t n) {
         "removes them with the next game frame; failed %d", a, ShotSource("ai.remove"), removed, nc,
         kept[0] ? "; kept the nearest " : "", kept, removed ? list : "nothing removed", generators, failed);
     if (stories)                             // 0.21.1 (hall02 live 2026-11-07: the wall waits for these deaths)
-        Log(1, "ai.remove %s: WARNING %d story enemy(ies) (generator / script) removed - zaehlt nicht als Tod, Skripte "
+        Log(1, "ai.remove %s: WARNING %d story enemy(ies) (generator / script) removed - z\303\244hlt nicht als Tod, Skripte "
             "warten evtl. (a despawn never fires the death event; ai.kill kills the game's way; sticky.set repairs a "
             "counter)", a, stories);
     if (!removed) {
@@ -17776,7 +17776,7 @@ bool RunAdRemove(const char *arg, char *o, size_t n) {
         return mode != 3 && !failed;
     }
     Out(o, n, "ai.remove %s: %d removed%s%s%s", a, removed, kept[0] ? ", kept " : "", kept,
-        stories ? " - WARNUNG: Story-Gegner, zaehlt nicht als Tod - Skripte warten evtl. (ai.kill toetet)" : "");
+        stories ? " - WARNUNG: Story-Gegner, z\303\244hlt nicht als Tod - Skripte warten evtl. (ai.kill t\303\266tet)" : "");
     return !failed;
 }
 
@@ -17905,7 +17905,7 @@ void PageArachno() {
     if (TmCheckbox("picture / Bild  [arachno.picture]###arpic", &pic)) RunArPic(pic ? "1" : "0", o, sizeof(o));
     ImGui::SameLine();
     if (TmCheckbox("sounds off / Ton aus  [arachno.mute]###armute", &mute)) RunArMute(mute ? "1" : "0", o, sizeof(o));
-    ImGui::SliderFloat("picture size / Bildgroesse###arscale", &g_arScale, 0.2f, 5.0f, "%.2f");
+    ImGui::SliderFloat("picture size / Bildgr\303\266\303\237e###arscale", &g_arScale, 0.2f, 5.0f, "%.2f");
     ImGui::SliderFloat("wobble / Wippen###arwob", &g_arWobAmp, 0.0f, 0.5f, "%.2f");
     ImGui::SliderFloat("wobble Hz###arhz", &g_arWobHz, 0.0f, 10.0f, "%.1f");
     ImGui::SliderFloat("squash / Quetschen###arsq", &g_arSquash, 0.0f, 0.5f, "%.2f");
@@ -18226,8 +18226,8 @@ const char *AdStoryHint() {
         inst = next;
     }
     if (!story) return nullptr;
-    Out(text, sizeof(text), g_qbLang == 0 ? "%d von %d Gegnern sind Story-Gegner (Generator / Skript): entfernen zaehlt "
-                                            "nicht als Tod - Skripte warten evtl.; 'Toeten' zaehlt"
+    Out(text, sizeof(text), g_qbLang == 0 ? "%d von %d Gegnern sind Story-Gegner (Generator / Skript): entfernen z\303\244hlt "
+                                            "nicht als Tod - Skripte warten evtl.; 'T\303\266ten' z\303\244hlt"
                                           : "%d of %d enemies are story enemies (generator / script): removing is no death "
                                             "- scripts may wait; 'Kill' counts", story, all);
     return text;
@@ -19230,7 +19230,7 @@ void ValStoryValues(char *o, size_t n) {
             if (hits[i].type == s.type && StValue(hits[i], v, sizeof(v))) break;
         LabelAdd(o, n, &used, "%s%s %s", used ? ", " : "", de ? s.de : s.en, v);
     }
-    if (!rows) Out(o, n, de ? "keine bekannten Werte fuer %s (Tabelle: hall02, l3)" : "no known values for %s (table: hall02, "
+    if (!rows) Out(o, n, de ? "keine bekannten Werte f\303\274r %s (Tabelle: hall02, l3)" : "no known values for %s (table: hall02, "
                    "l3)", unit);
 }
 bool RunFixHall02(const char *, char *o, size_t n) {
@@ -19308,8 +19308,8 @@ bool RunFixHall02(const char *, char *o, size_t n) {
         "Trigger + Trigger-Namen %s", ShotSource("fix.hall02"), kH2Unit, tutText, popText, dead, k, kH2ThrallObject,
         trg[0] ? trg : "not loaded", shown[0] ? "switched on" : "unchanged");
     if (!ok) { Out(o, n, "fix.hall02: sticky.set failed (%s) - %s / %s", r, tutText, popText); return false; }
-    Out(o, n, de ? "hall02-Zaehler repariert (%s, %s): jetzt einmal durch den Arena-Trigger 11268 zurueck- oder "
-                   "hineinlaufen (Pruefung nur beim Betreten / Verlassen)%s%s%s"
+    Out(o, n, de ? "hall02-Z\303\244hler repariert (%s, %s): jetzt einmal durch den Arena-Trigger 11268 zur\303\274ck- oder "
+                   "hineinlaufen (Pr\303\274fung nur beim Betreten / Verlassen)%s%s%s"
                  : "hall02 counter repaired (%s, %s): now walk back through / into the arena trigger 11268 once (it "
                    "checks only on enter / leave)%s%s%s",
         popText, tutText, trg[0] ? (de ? "; Trigger bei " : "; trigger at ") : "", trg,
@@ -20785,7 +20785,7 @@ bool RunFlowNext(const char *, char *o, size_t n) {
     EnterCriticalSection(&g_flowLock);
     bool ok = true;
     int i = g_flowCur;
-    if (i >= g_flow.nSteps) { Out(o, n, "flow done - flow.goto <id> / Zurueck to repeat a step"); ok = false; }
+    if (i >= g_flow.nSteps) { Out(o, n, "flow done - flow.goto <id> / Zur\303\274ck to repeat a step"); ok = false; }
     else {
         const truflow::Step &s = g_flow.steps[i];
         FlowRun &r = g_flowRun[i];
@@ -20793,7 +20793,7 @@ bool RunFlowNext(const char *, char *o, size_t n) {
         if (r.state >= kFsOk) { FlowAdvanceLocked(); Out(o, n, "step %s was %s - next", s.id, kFsNames[r.state]); }
         else if (s.kind == truflow::kKindAction) {
             if (r.state == kFsRun) { Out(o, n, "step %s runs (its commands / check)", s.id); ok = false; }
-            else if (FlowWaitLocked(i, wait, sizeof(wait))[0]) { Out(o, n, "step %s waits for %s (Ueberspringen / flow.goto)", s.id, wait); ok = false; }
+            else if (FlowWaitLocked(i, wait, sizeof(wait))[0]) { Out(o, n, "step %s waits for %s (\303\234berspringen / flow.goto)", s.id, wait); ok = false; }
             else if (g_scActive || g_flowRunReq >= 0) { Out(o, n, "a shortcut / Prepare still runs - try again"); ok = false; }
             else {
                 r.state = kFsRun;
@@ -20829,7 +20829,7 @@ bool RunFlowBack(const char *, char *o, size_t n) {
     if (!FlowReady(o, n)) return false;
     EnterCriticalSection(&g_flowLock);
     bool ok = g_flowCur > 0;
-    if (ok) { FlowReopenLocked(g_flowCur - 1, "Zurueck"); Out(o, n, "step %s again", g_flow.steps[g_flowCur].id); }
+    if (ok) { FlowReopenLocked(g_flowCur - 1, "Zur\303\274ck"); Out(o, n, "step %s again", g_flow.steps[g_flowCur].id); }
     else Out(o, n, "at the first step");
     LeaveCriticalSection(&g_flowLock);
     return ok;
@@ -20856,13 +20856,13 @@ bool RunFlowSkip(const char *arg, char *o, size_t n) {
     if (arg && arg[0]) sscanf_s(arg, "%31s %n", id, static_cast<unsigned>(sizeof(id)), &used);
     const char *why = used > 0 && static_cast<size_t>(used) <= strlen(arg) ? arg + used : "";
     char reason[160];
-    truflow::Ascii(why[0] ? why : "Ueberspringen", reason, sizeof(reason));
+    truflow::Ascii(why[0] ? why : "\303\234berspringen", reason, sizeof(reason));
     EnterCriticalSection(&g_flowLock);
     int i = id[0] ? FlowFindLocked(id) : g_flowCur;
     bool ok = i >= 0 && i < g_flow.nSteps;
     if (ok) {
         if (g_flowRunReq == i) g_flowRunReq = -1;
-        FlowFinishLocked(i, kFsSkip, id[0] ? "flow.skip" : "Ueberspringen", reason, true);
+        FlowFinishLocked(i, kFsSkip, id[0] ? "flow.skip" : "\303\234berspringen", reason, true);
         Out(o, n, "step %s skipped (%s)", g_flow.steps[i].id, reason);
     } else Out(o, n, id[0] ? "no step '%s' (flow.list)" : "flow done - nothing to skip%s", id);
     LeaveCriticalSection(&g_flowLock);
@@ -20972,7 +20972,7 @@ bool FlowRadInfo(const char *id, const char *arg, char *o, size_t n) {
             _snprintf_s(o, n, _TRUNCATE, "%s %s = %s + Marke + Bild", s.id, !_stricmp(arg, "good") ? "Gut" : "Fehler",
                         !_stricmp(arg, "good") ? "ok" : "fail");
         else if (!_stricmp(id, "flow.back") && i > 0)
-            _snprintf_s(o, n, _TRUNCATE, "zurueck zu %d/%d: %s", i, g_flow.nSteps, g_flow.steps[i - 1].text);
+            _snprintf_s(o, n, _TRUNCATE, "zur\303\274ck zu %d/%d: %s", i, g_flow.nSteps, g_flow.steps[i - 1].text);
         else
             _snprintf_s(o, n, _TRUNCATE, "%d/%d %s: %s%s%s%s%s", i + 1, g_flow.nSteps, truflow::kKindNames[s.kind], s.text,
                         s.hint[0] ? " - " : "", s.hint, wait[0] ? " - wartet: " : "", wait);
@@ -21010,9 +21010,9 @@ void DrawFlowOverlay() {
                 else _snprintf_s(counter, sizeof(counter), _TRUNCATE, " | %s %d", k.text[0] ? k.text : k.id, g_flowCount[c]);
             }
             for (int j = i + 1; j < total; ++j)
-                if (g_flowRun[j].state < kFsOk) { _snprintf_s(next, sizeof(next), _TRUNCATE, " | naechster: %.80s", g_flow.steps[j].text); break; }
+                if (g_flowRun[j].state < kFsOk) { _snprintf_s(next, sizeof(next), _TRUNCATE, " | n\303\244chster: %.80s", g_flow.steps[j].text); break; }
             _snprintf_s(l1, sizeof(l1), _TRUNCATE, "Claude-Ablauf  Schritt %d/%d%s%s", i + 1, total, counter, next);
-            _snprintf_s(l2, sizeof(l2), _TRUNCATE, "%s %s: %.150s", g_flowRun[i].state == kFsRun ? "laeuft" : "jetzt",
+            _snprintf_s(l2, sizeof(l2), _TRUNCATE, "%s %s: %.150s", g_flowRun[i].state == kFsRun ? "l\303\244uft" : "jetzt",
                         truflow::kKindNames[s.kind], s.text);
             char wait[200];
             FlowWaitLocked(i, wait, sizeof(wait));
@@ -21021,7 +21021,7 @@ void DrawFlowOverlay() {
         } else {
             int c[5] = {};
             for (int k = 0; k < total; ++k) ++c[g_flowRun[k].state];
-            _snprintf_s(l1, sizeof(l1), _TRUNCATE, "Claude-Ablauf fertig: %d ok, %d Fehler, %d uebersprungen, %d offen", c[kFsOk],
+            _snprintf_s(l1, sizeof(l1), _TRUNCATE, "Claude-Ablauf fertig: %d ok, %d Fehler, %d \303\274bersprungen, %d offen", c[kFsOk],
                         c[kFsFail], c[kFsSkip], c[kFsOpen] + c[kFsRun]);
         }
     }
@@ -22404,8 +22404,8 @@ const Item kItems[] = {
     {"flow.next", "action", "0.11 Weiter: the current step - action: run its do= commands (the shortcut path, level changes "
                             "waited for), mark: done, observe: left open; then the next step", false, ValFlowStatus,
      RunFlowNext},
-    {"flow.back", "action", "0.11 Zurueck: the step before is current again (reopened)", false, ValFlowStatus, RunFlowBack},
-    {"flow.skip", "action", "0.11 [<id> [reason]]: skip that step (no id = the current one, ring: Ueberspringen)", false,
+    {"flow.back", "action", "0.11 Zur\303\274ck: the step before is current again (reopened)", false, ValFlowStatus, RunFlowBack},
+    {"flow.skip", "action", "0.11 [<id> [reason]]: skip that step (no id = the current one, ring: \303\234berspringen)", false,
      ValFlowStatus, RunFlowSkip},
     {"flow.goto", "action", "0.11 <id>: that step is current (reopened when it had a result)", false, ValFlowStatus,
      RunFlowGoto},
@@ -22572,7 +22572,7 @@ const Item kItems[] = {
      ValAiStatus, nullptr},
     // 0.20 (docs\Befund-TruMenu-020-0611.md)
     {"dbg.collect", "bool", "0.20: collectibles - every *_rw_* reward by kind and every reward pot / weight-break container "
-                            "('enthaelt Artefakt' + reward index), nearest MarkMax within MarkRadius", false, ValDvCollect,
+                            "('enth\303\244lt Artefakt' + reward index), nearest MarkMax within MarkRadius", false, ValDvCollect,
      RunDvCollect},
     {"dbg.enemies", "bool", "0.20: enemies - every AI enemy coloured by kind, label name + intro id + LP + distance, "
                             "thralls with the targeter 9 line", false, ValDvEnemies, RunDvEnemies},
@@ -22609,7 +22609,7 @@ const Item kItems[] = {
      nullptr},
     {"snd.vol.ambience", "int", "0.21.8 0 .. 100: slider Umgebung / Ambience (groups 15 ..)", false, ValSgOne<0>,
      RunSgOne<0>},
-    {"snd.vol.steps", "int", "0.21.8 0 .. 100: slider Schritte & Koerper / Footsteps & body (32, 78)", false, ValSgOne<1>,
+    {"snd.vol.steps", "int", "0.21.8 0 .. 100: slider Schritte & K\303\266rper / Footsteps & body (32, 78)", false, ValSgOne<1>,
      RunSgOne<1>},
     {"snd.vol.weapons", "int", "0.21.8 0 .. 100: slider Waffen & Treffer / Weapons & impacts (58, 51, 31)", false,
      ValSgOne<2>, RunSgOne<2>},
@@ -23272,32 +23272,32 @@ const char *CmdRunLine(const char *line, bool wait, const char *source) {
 // value item without an argument (CmdExecute shows its value), an unknown word (CmdExecute refuses it).
 struct CmdDanger { const char *id, *de, *en; };
 const CmdDanger kCmdDanger[] = {
-    {"cheat.", "aendert einen Cheat (Unverwundbarkeit, Flug, Munition ...)", "changes a cheat (god mode, flight, ammo ...)"},
+    {"cheat.", "\303\244ndert einen Cheat (Unverwundbarkeit, Flug, Munition ...)", "changes a cheat (god mode, flight, ammo ...)"},
     {"player.invincible", "schaltet die Unverwundbarkeit", "switches god mode"},
     {"player.die", "Lara stirbt", "Lara dies"},
-    {"level.load", "laedt ein Level (Story-Stand!)", "loads a level (story state!)"},
+    {"level.load", "l\303\244dt ein Level (Story-Stand!)", "loads a level (story state!)"},
     {"level.start", "startet eine Mission neu", "starts a mission"},
-    {"level.reload", "laedt das Level neu", "reloads the level"},
-    {"unit.go", "laedt evtl. einen Abschnitt", "may load a unit"},
-    {"cp.jump", "Sicherung, laedt evtl. einen Abschnitt", "backup, may load a unit"},   // 0.21.9
-    {"pos.goload", "laedt evtl. einen Abschnitt", "may load a unit"},
-    {"regress.prepare", "laedt / setzt einen Teststand", "loads / sets a test state"},
-    {"save.load", "laedt einen Spielstand", "loads a save"},
-    {"save.delete", "loescht einen Spielstand", "deletes a save"},
-    {"save.restore", "ueberschreibt die Spielstaende", "overwrites the saves"},
+    {"level.reload", "l\303\244dt das Level neu", "reloads the level"},
+    {"unit.go", "l\303\244dt evtl. einen Abschnitt", "may load a unit"},
+    {"cp.jump", "Sicherung, l\303\244dt evtl. einen Abschnitt", "backup, may load a unit"},   // 0.21.9
+    {"pos.goload", "l\303\244dt evtl. einen Abschnitt", "may load a unit"},
+    {"regress.prepare", "l\303\244dt / setzt einen Teststand", "loads / sets a test state"},
+    {"save.load", "l\303\244dt einen Spielstand", "loads a save"},
+    {"save.delete", "l\303\266scht einen Spielstand", "deletes a save"},
+    {"save.restore", "\303\274berschreibt die Spielst\303\244nde", "overwrites the saves"},
     {"save.import", "schreibt einen Spielstand", "writes a save"},
-    {"costume.reset", "setzt das Kostuem zurueck", "resets the costume"},
-    {"costume.choosereset", "setzt das Kostuem zurueck", "resets the costume"},
-    {"costume.setreload", "Kostuem + Abschnitt neu laden", "costume + reload the unit"},
-    {"costume.choosereload", "Kostuem + Abschnitt neu laden", "costume + reload the unit"},
+    {"costume.reset", "setzt das Kost\303\274m zur\303\274ck", "resets the costume"},
+    {"costume.choosereset", "setzt das Kost\303\274m zur\303\274ck", "resets the costume"},
+    {"costume.setreload", "Kost\303\274m + Abschnitt neu laden", "costume + reload the unit"},
+    {"costume.choosereload", "Kost\303\274m + Abschnitt neu laden", "costume + reload the unit"},
     {"sw.set", "schreibt eine Plugin-INI", "writes a plugin INI"},
-    {"sticky.set", "aendert einen Skript-Wert", "changes a script value"},
-    {"fix.hall02", "aendert den hall02-Zaehler", "changes the hall02 counter"},
-    {"ai.kill", "toetet Gegner (Story zaehlt mit)", "kills enemies (the story counts)"},
+    {"sticky.set", "\303\244ndert einen Skript-Wert", "changes a script value"},
+    {"fix.hall02", "\303\244ndert den hall02-Z\303\244hler", "changes the hall02 counter"},
+    {"ai.kill", "t\303\266tet Gegner (Story z\303\244hlt mit)", "kills enemies (the story counts)"},
     {"ai.remove", "entfernt Gegner (Story wartet evtl.)", "removes enemies (a script may wait)"},
     {"instance.remove", "entfernt ein Objekt", "removes an instance"},
-    {"settings.reset", "setzt TruMenu.ini zurueck", "resets TruMenu.ini"},
-    {"fav.reset", "loescht die Favoriten", "clears the favourites"},
+    {"settings.reset", "setzt TruMenu.ini zur\303\274ck", "resets TruMenu.ini"},
+    {"fav.reset", "l\303\266scht die Favoriten", "clears the favourites"},
     {"game.quit", "beendet das Spiel", "quits the game"},
 };
 const CmdDanger *CmdDangerOf(const char *line) {
@@ -26331,7 +26331,7 @@ const QbChoice kQbMarks[] = {{"now", "Jetzt", "now"}, {"good", "Gut", "good"}, {
 const QbChoice kQbWeapons[] = {{"wp_shotgun", "Schrotflinte", "shotgun"}, {"wp_uzi", "Uzis", "Uzis"},
                                {"wp_dlc_gold_shotgun", "Gold-Schrotflinte", "gold shotgun"},
                                {"wp_assault_rifle", "Sturmgewehr", "assault rifle"},
-                               {"wp_tranq", "Betaeubungsgewehr", "tranquilliser"}};
+                               {"wp_tranq", "Bet\303\244ubungsgewehr", "tranquilliser"}};
 int g_qbChoice[2] = {0, 0};                  // render thread: the current choice of kQvMark / kQvWeapon
 // the pages
 const QbRow kQbEmergency[] = {               // 0.18 Notfall (Lukas: "falls man buggt") + the cheats
@@ -26350,7 +26350,7 @@ const QbRow kQbEmergency[] = {               // 0.18 Notfall (Lukas: "falls man 
     {"Gegner ignorieren Lara", "Enemies ignore Lara", "ai.dumb", "all", kQbBool, -1, kQcAi, 0, kQbAi, 0},   // 0.19
     {"Unit neu laden", "Reload unit", "level.reload", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Munition unendlich", "Infinite ammo", "cheat.ammo", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
-    {"Auffuellen", "Fill up", "cheat.fillup", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
+    {"Auff\303\274llen", "Fill up", "cheat.fillup", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
     {"Ein Treffer", "One-hit kill", "cheat.onehitkill", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Gegner-Gesundheit", "Enemy health", "cheat.enemyhealth", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Munition voll", "Ammo fill", "ammo.fill", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
@@ -26380,7 +26380,7 @@ const QbRow kQbLara[] = {                    // + the saved positions (special p
      kQfConfirm},
 };
 // 0.21.6 page Kostueme: the one row of that page that is a plain item (a dynamic row kQdCosNext shows it, Y can pin it)
-const QbRow kQbCosNext = {"Naechstes Kostuem", "Next costume", "costume.next", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0};
+const QbRow kQbCosNext = {"N\303\244chstes Kost\303\274m", "Next costume", "costume.next", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0};
 const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Alles an / aus", "Everything", "dbg.view", "", kQbBool, -1, kQcOn, 0, kQbWhite, 0},
     {"Legende", "Legend", "dbg.legend", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
@@ -26391,10 +26391,10 @@ const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Deckkraft", "Opacity", "dbg.alpha", "", kQbValue, -1, kQcNone, kQvAlpha, kQbBlue},
     {"Helligkeit", "Brightness", "dbg.bright", "", kQbValue, -1, kQcNone, kQvBright, kQbBlue},
     {"Ferne blasser", "Far fainter", "dbg.fade", "", kQbBool, -1, kQcNone, 0, kQbBlue},
-    {"Flaechen fuellen", "Face fill", "dbg.fill", "", kQbBool, -1, kQcNone, 0, kQbBlue},
+    {"Fl\303\244chen f\303\274llen", "Face fill", "dbg.fill", "", kQbBool, -1, kQcNone, 0, kQbBlue},
     {"Kurze Namen", "Short labels", "dbg.short", "", kQbBool, -1, kQcNone, 0, kQbBlue},
     {"Lara drin", "Lara in", "dbg.larain", "", kQbBool, -1, kQcLaraIn, 0, kQbWhite},
-    {"Umhuellende", "Enclosing", "dbg.enclosing", "", kQbValue, -1, kQcEncl, kQvEncl, kQbBlue},
+    {"Umh\303\274llende", "Enclosing", "dbg.enclosing", "", kQbValue, -1, kQcEncl, kQvEncl, kQbBlue},
     // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
     {"Schnellschalter (offen)", "Quick bar (open)", "quick.open", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
     {"Darstellung: Stand", "Display state", "dbg.style", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
@@ -26405,7 +26405,7 @@ const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Ton: Ort", "Sound: corner", "snd.pos", "", kQbValue, -1, kQcNone, kQvSndPos, kQbSound, 0},
     {"Ton: Zeilen", "Sound: lines", "snd.lines", "", kQbValue, -1, kQcNone, kQvSndLines, kQbSound, 0},
     {"Ton: Sortierung", "Sound: order", "snd.sort", "", kQbValue, -1, kQcNone, kQvSndSort, kQbSound, 0},
-    {"Ton: nur hoerbare", "Sound: audible only", "snd.playing", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton: nur h\303\266rbare", "Sound: audible only", "snd.playing", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
     {"Ton: Musik", "Sound: music", "snd.music", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
     {"Ton: Effekte", "Sound: SFX", "snd.sfx", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
     {"Ton: Sprache", "Sound: speech", "snd.speech", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
@@ -26417,8 +26417,8 @@ const QbRow kQbRender[] = {
     {"Flach-Ansicht", "Flat view", "dbg.flat", "", kQbBool, -1, kQcFlat, 0, kQbFlat},
     {"Kanten", "Edges", "dbg.flatedges", "", kQbBool, -1, kQcNone, 0, kQbFlat, 0},             // 0.20
     {"Pass", "Pass", "dbg.flatpasses", "", kQbValue, -1, kQcNone, kQvPass, kQbFlat},
-    {"Zaehlung", "Census", "dbg.census", "", kQbAction, -1, kQcNone, 0, kQbFlat},
-    {"Rutschflaechen", "Slide faces", "dbg.slide", "", kQbBool, kDvSlide, kQcLayer, 0, 0},
+    {"Z\303\244hlung", "Census", "dbg.census", "", kQbAction, -1, kQcNone, 0, kQbFlat},
+    {"Rutschfl\303\244chen", "Slide faces", "dbg.slide", "", kQbBool, kDvSlide, kQcLayer, 0, 0},
     {"Gegner-Kollision", "Enemy collision", "dbg.enemycoll", "", kQbBool, kDvEnemyColl, kQcLayer, 0, 0},
     {"Gegner", "Enemies", "dbg.enemies", "", kQbBool, kDvEnemies, kQcLayer, 0, 0},              // 0.20
     {"Gegner-Leben zeigen", "Enemy health", "cheat.enemyhealth", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},   // 0.20
@@ -26428,11 +26428,11 @@ const QbRow kQbRender[] = {
     {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},
     {"Nur Kanten", "Ledges only", "draw.ledges", "", kQbBool, -1, kQcNone, 0, kQbMarkup},
     // 0.21.1 (ChunkDoll crash, docs\Befund-ChunkDoll-Absturz-0711.md): physics bodies used / 405, read only
-    {"Physik-Koerper", "Physics bodies", "phys.status", "", kQbInfo, -1, kQcPhys, 0, kQbFlat, 0},
-    {"Physik-Koerper ins Log", "Physics bodies to log", "phys.dump", "", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"Physik-K\303\266rper", "Physics bodies", "phys.status", "", kQbInfo, -1, kQcPhys, 0, kQbFlat, 0},
+    {"Physik-K\303\266rper ins Log", "Physics bodies to log", "phys.dump", "", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
     // 0.21.7 SweepAndPrune read-out (P6a): the markup collision pool, read only
     {"Kanten-Kollision (SAP)", "Ledge collision (SAP)", "sap.status", "", kQbInfo, -1, kQcNone, 0, kQbFlat, 0},
-    {"SAP-Spitzen zuruecksetzen", "Reset SAP peaks", "sap.reset", "", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
+    {"SAP-Spitzen zur\303\274cksetzen", "Reset SAP peaks", "sap.reset", "", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
     // 0.19 Dumme KI: one setting at a time (switching a group on replaces the other); the count = enemies in scope.
     // 0.21.1 (TODO 0.21.1 items 6 / 7): the KI rows in three collapsible groups
     {"Dumme KI (Gegner ignorieren Lara)", "Dumb AI (enemies ignore Lara)", "-", "ki_dumm", kQbGroup, -1, kQcNone, 0,
@@ -26452,25 +26452,25 @@ const QbRow kQbRender[] = {
     {"  Anzahl", "  Count", "ai.spawncount", "", kQbValue, -1, kQcNone, kQvSpawnCount, kQbAi, 0},
     {"  Ort", "  Place", "ai.spawnat", "", kQbValue, -1, kQcNone, kQvSpawnAt, kQbAi, 0},
     {"  Modus: KI dumm (nur diese)", "  Mode: dumb AI (only these)", "-", "nur die gespawnten ignorieren Lara (eigene "
-     "Liste fuer ai.dumb) - geplant|only the spawned ones ignore Lara (own list for ai.dumb) - planned", kQbPlanned, -1,
+     "Liste f\303\274r ai.dumb) - geplant|only the spawned ones ignore Lara (own list for ai.dumb) - planned", kQbPlanned, -1,
      kQcNone, 0, 0, 0},
     {"  Modus: nur Modell", "  Mode: model only", "-", "Gehirn angehalten - sicherer Weg nicht belegt|brain stopped - no "
      "proven safe way yet", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"  Ausruestung / Verhalten", "  Gear / behaviour", "-", "Waffe / Items menschlicher Gegner, Patrouille / Wache aus "
-     "den Intro-Daten - erst klaeren|weapon / items of human enemies, patrol / guard from the intro data - research first",
+    {"  Ausr\303\274stung / Verhalten", "  Gear / behaviour", "-", "Waffe / Items menschlicher Gegner, Patrouille / Wache aus "
+     "den Intro-Daten - erst kl\303\244ren|weapon / items of human enemies, patrol / guard from the intro data - research first",
      kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"  Navmesh-Pruefung", "  Navmesh check", "-", "Spawn-Ort auf dem Navmesh pruefen (sonst steckt die KI fest)|check the "
+    {"  Navmesh-Pr\303\274fung", "  Navmesh check", "-", "Spawn-Ort auf dem Navmesh pr\303\274fen (sonst steckt die KI fest)|check the "
      "spawn spot on the navmesh (else the AI gets stuck)", kQbPlanned, -1, kQcNone, 0, 0, 0},
     // 0.21 ai.remove (Lukas live: too many tutorial thralls for a finisher test): the game's despawn, right twice;
     // 0.21.1 ai.kill (hall02 wall: a despawn never counts as a death) - the game's own kill, right twice
-    {"Gegner entfernen / toeten", "Remove / kill enemies", "-", "ki_weg", kQbGroup, -1, kQcNone, 0, kQbRed, 0},
-    {"Toeten: alle bis auf den naechsten", "Kill: all but the nearest", "ai.kill", "others", kQbAction, -1, kQcNone, 0,
+    {"Gegner entfernen / t\303\266ten", "Remove / kill enemies", "-", "ki_weg", kQbGroup, -1, kQcNone, 0, kQbRed, 0},
+    {"T\303\266ten: alle bis auf den n\303\244chsten", "Kill: all but the nearest", "ai.kill", "others", kQbAction, -1, kQcNone, 0,
      kQbRed, kQfConfirm},
-    {"Toeten: den naechsten", "Kill: the nearest", "ai.kill", "nearest", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
-    {"Toeten: alle", "Kill: all", "ai.kill", "all", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
-    {"Entfernen: alle bis auf den naechsten", "Remove: all but the nearest", "ai.remove", "others", kQbAction, -1, kQcNone,
+    {"T\303\266ten: den n\303\244chsten", "Kill: the nearest", "ai.kill", "nearest", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"T\303\266ten: alle", "Kill: all", "ai.kill", "all", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Entfernen: alle bis auf den n\303\244chsten", "Remove: all but the nearest", "ai.remove", "others", kQbAction, -1, kQcNone,
      0, kQbRed, kQfConfirm},
-    {"Entfernen: den naechsten", "Remove: the nearest", "ai.remove", "nearest", kQbAction, -1, kQcNone, 0, kQbRed,
+    {"Entfernen: den n\303\244chsten", "Remove: the nearest", "ai.remove", "nearest", kQbAction, -1, kQcNone, 0, kQbRed,
      kQfConfirm},
     // 0.21.1 hall02 wall (docs\Befund-Hall02-Wand-0711.md): dispatcher 11270 population = 0, tutorial = 2 (sticky.set,
     // right twice); then walk through the arena trigger 11268
@@ -26482,8 +26482,8 @@ const QbRow kQbRender[] = {
 // 0.21.5 Render-Details (ring frozen, the ring's Spieler/Debug/Render, KI (navmesh) and Namen levels as bar rows): three
 // groups - one group open keeps the page short; the same rows are in the long menu section "Quick bar pages"
 const QbRow kQbRenderMore[] = {
-    {"Flach-Ansicht: Farbe / Paesse", "Flat view: colour / passes", "-", "rd_flat", kQbGroup, -1, kQcNone, 0, kQbFlat, 0},
-    {"Figuren einfaerben", "Colour figures", "dbg.flatmodels", "", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
+    {"Flach-Ansicht: Farbe / P\303\244sse", "Flat view: colour / passes", "-", "rd_flat", kQbGroup, -1, kQcNone, 0, kQbFlat, 0},
+    {"Figuren einf\303\244rben", "Colour figures", "dbg.flatmodels", "", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
     {"Jedes Ziel (auch Schatten)", "Any target (shadows too)", "dbg.flatanyrt", "", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
     {"Farbe: Material", "Colour: material", "dbg.flatcolour", "material", kQbAction, -1, kQcNone, 0, kQbFlat, 0},
     {"Farbe: Terrain / Figuren", "Colour: terrain / figures", "dbg.flatcolour", "class", kQbAction, -1, kQcNone, 0, kQbFlat,
@@ -26499,10 +26499,10 @@ const QbRow kQbRenderMore[] = {
     {"Pass 2", "Pass 2", "dbg.flatpass", "2", kQbBool, -1, kQcNone, 0, kQbFlat, 0},
     {"Render: Stand", "Render state", "dbg.render", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Navmesh", "Navmesh", "-", "rd_nav", kQbGroup, -1, kQcNone, 0, kQbAi, 0},
-    {"Navmesh Flaechen", "Navmesh areas", "nav.draw", "planner_areas", kQbBool, -1, kQcNone, 0, kQbAi, 0},
-    {"Navmesh gefuellt", "Navmesh filled", "nav.draw", "planner_areas_solid", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh Fl\303\244chen", "Navmesh areas", "nav.draw", "planner_areas", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Navmesh gef\303\274llt", "Navmesh filled", "nav.draw", "planner_areas_solid", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"Navmesh Verbindungen", "Navmesh links", "nav.draw", "planner_connectivity", kQbBool, -1, kQcNone, 0, kQbAi, 0},
-    {"Flaechen-Normalen", "Area normals", "nav.draw", "planner_area_normals", kQbBool, -1, kQcNone, 0, kQbAi, 0},
+    {"Fl\303\244chen-Normalen", "Area normals", "nav.draw", "planner_area_normals", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"Hindernisse", "Obstacles", "nav.draw", "obstacles", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"Nav-Proben", "Nav probes", "nav.draw", "recent_navprobes", kQbBool, -1, kQcNone, 0, kQbAi, 0},
     {"Laufweg (Flieger)", "Path (flyer)", "nav.draw", "draw_mover3d_path", kQbBool, -1, kQcNone, 0, kQbAi, 0},
@@ -26521,7 +26521,7 @@ const QbRow kQbRenderMore[] = {
     {"Filter: Thralls", "Filter: thralls", "dbg.namefilter", "thrall", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     {"Filter: Trigger", "Filter: triggers", "dbg.namefilter", "trigger,volume,plane", kQbAction, -1, kQcNone, 0, kQbBlue,
      0},
-    {"Farbe weiss", "Colour white", "dbg.namecolour", "white", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
+    {"Farbe wei\303\237", "Colour white", "dbg.namecolour", "white", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     {"Farbe gelb", "Colour yellow", "dbg.namecolour", "yellow", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     {"Farbe cyan", "Colour cyan", "dbg.namecolour", "cyan", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     {"Farbe magenta", "Colour magenta", "dbg.namecolour", "magenta", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
@@ -26546,7 +26546,7 @@ const QbRow kQbLevel[] = {
     {"Ladebereiche", "Loading areas", "dbg.portals", "", kQbBool, kDvPortals, kQcLayer, 0, 0},
     {"Checkpoints", "Checkpoints", "dbg.checkpoints", "", kQbBool, kDvCheckpoints, kQcLayer, 0, 0},
     {"Trigger-Namen", "Labels", "dbg.show", "trglabels", kQbBool, kDvTrgLabels, kQcTrgLabels, 0, 0},
-    {"Sammelgegenstaende", "Collectibles", "dbg.collect", "", kQbBool, kDvCollect, kQcLayer, 0, 0},   // 0.20
+    {"Sammelgegenst\303\244nde", "Collectibles", "dbg.collect", "", kQbBool, kDvCollect, kQcLayer, 0, 0},   // 0.20
     // 0.21.7 uber labels (gates / platforms: node + time left), read only
     {"Tore / Plattformen (Zustand)", "Gates / platforms (state)", "dbg.uber", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Tore / Plattformen ins Log", "Gates / platforms to log", "uber.dump", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
@@ -26574,16 +26574,16 @@ const QbRow kQbTimeTest[] = {                // 0.18 Zeit / Test
     {"Ton-Liste ins Log", "Sound list to log", "snd.dump", "", kQbAction, -1, kQcNone, 0, kQbSound, 0},   // 0.20.1
     {"Claude-Marke", "Claude mark", "claude.mark", "", kQbChoice, -1, kQcNone, kQvMark, kQbClaude, 0},
     {"Ablauf: weiter", "Flow: next", "flow.next", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
-    {"Ablauf: ueberspringen", "Flow: skip", "flow.skip", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
-    {"Ablauf: zurueck", "Flow: back", "flow.back", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
+    {"Ablauf: \303\274berspringen", "Flow: skip", "flow.skip", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
+    {"Ablauf: zur\303\274ck", "Flow: back", "flow.back", "", kQbAction, -1, kQcNone, 0, kQbClaude, 0},
     {"Ablauf: Stand", "Flow: status", "flow.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Skript-Log", "Script log", "log.script", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
     {"Tiefe: Diagnose", "Depth dump", "dbg.depthdump", "", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     // 0.21.8 sound group sliders (section "0.21.8 sound group sliders", docs\Befund-Ton-Gruppen-0611.md section 4): one
     // factor per slider on the FMOD channel groups, left / right = 10 % steps (snd.vol.<key> = snd.group <Key> <percent>)
-    {"Ton-Gruppen (Lautstaerke)", "Sound groups (volume)", "-", "ton_gruppen", kQbGroup, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton-Gruppen (Lautst\303\244rke)", "Sound groups (volume)", "-", "ton_gruppen", kQbGroup, -1, kQcNone, 0, kQbSound, 0},
     {"Umgebung", "Ambience", "snd.vol.ambience", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
-    {"Schritte & Koerper", "Footsteps & body", "snd.vol.steps", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
+    {"Schritte & K\303\266rper", "Footsteps & body", "snd.vol.steps", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
     {"Waffen & Treffer", "Weapons & impacts", "snd.vol.weapons", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
     {"Gegner & Tiere", "Enemies & creatures", "snd.vol.enemies", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
     {"Lara-Stimme & Funk", "Lara voice & radio", "snd.vol.lara", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
@@ -26628,19 +26628,19 @@ const QbRow kQbChapters[] = {
 // is replaced; Arachnophobie / Thalassophobie stay planned: they are about pictures and water, not the AI).
 const QbRow kQbAccess[] = {
     {"Sehen", "Vision", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
-    {"Farbpaletten", "Colour palettes", "-", "Paletten fuer Farbfehlsicht (Debug-Ansicht, spaeter HUD)|palettes for colour "
+    {"Farbpaletten", "Colour palettes", "-", "Paletten f\303\274r Farbfehlsicht (Debug-Ansicht, sp\303\244ter HUD)|palettes for colour "
      "vision deficiency (debug view, later the HUD)", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"Untertitel gross", "Large subtitles", "-", "Untertitel groesser, dunkler Hintergrund, Sprechername|larger subtitles, dark "
+    {"Untertitel gro\303\237", "Large subtitles", "-", "Untertitel gr\303\266\303\237er, dunkler Hintergrund, Sprechername|larger subtitles, dark "
      "background, speaker name", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Kontrast", "Contrast", "-", "Kontrast-Modus / HUD-Skalierung|contrast mode / HUD scaling", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"Hoeren", "Hearing", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
-    {"Geraeusch-Untertitel", "Sound captions", "-", "Geraeusche als Text ([Explosion], [Thrall knurrt]), Richtung|sounds as "
+    {"H\303\266ren", "Hearing", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Ger\303\244usch-Untertitel", "Sound captions", "-", "Ger\303\244usche als Text ([Explosion], [Thrall knurrt]), Richtung|sounds as "
      "text ([explosion], [thrall growls]), direction", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Mono-Ton", "Mono sound", "-", "Ton in Mono|sound in mono", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Verstehen", "Understanding", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
-    {"Ziel-Erinnerung", "Objective reminder", "-", "was ist zu tun (PDA / Hinweise), Raetsel-Hinweise in Stufen|what to do "
+    {"Ziel-Erinnerung", "Objective reminder", "-", "was ist zu tun (PDA / Hinweise), R\303\244tsel-Hinweise in Stufen|what to do "
      "(PDA / hints), puzzle hints in steps", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"Kapitel ueberspringen", "Skip chapter", "-", "ein Kapitel so beenden wie das Spiel (Story-Werte aus den Save-Diffs) - "
+    {"Kapitel \303\274berspringen", "Skip chapter", "-", "ein Kapitel so beenden wie das Spiel (Story-Werte aus den Save-Diffs) - "
      "Stufe 2; Stufe 1 = Seite Kapitel (debug)|end a chapter the way the game does (story values from the save diffs) - "
      "stage 2; stage 1 = page Chapters (debug)", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Steuerung", "Controls", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
@@ -26651,7 +26651,7 @@ const QbRow kQbAccess[] = {
     {"Mauszeiger aus (Pad-Spiel)", "Mouse cursor off (pad play)", "menu.hidecursor", "", kQbBool, -1, kQcNone, 0, kQbGrey,
      0},                                     // 0.21.1
     {"Gott voll (Hilfe)", "Full god mode (assist)", "cheat.godfull", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
-    {"Reaktions-Momente", "Reaction moments", "-", "Adrenalin-Momente laenger oder automatisch|adrenaline moments longer "
+    {"Reaktions-Momente", "Reaction moments", "-", "Adrenalin-Momente l\303\244nger oder automatisch|adrenaline moments longer "
      "or automatic", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Sonstige (Phobien)", "Other (phobias)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
     // 0.21 Arachnophobie (was planned): the master switch and its three parts
@@ -26661,13 +26661,13 @@ const QbRow kQbAccess[] = {
     {"  Spinnen-Ton aus", "  Spider sounds off", "arachno.mute", "", kQbBool, -1, kQcNone, 0, kQbPhobia, 0},
     {"  Spinnen: Stand", "  Spiders: state", "arachno.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Spinnen ignorieren Lara", "Spiders ignore Lara", "ai.dumb", "spiders", kQbBool, -1, kQcAi, 0, kQbAi, 0},   // 0.19
-    {"Thalassophobie", "Thalassophobia", "-", "tiefes Wasser heller, Weg zur Oberflaeche|deep water brighter, way to the "
+    {"Thalassophobie", "Thalassophobia", "-", "tiefes Wasser heller, Weg zur Oberfl\303\244che|deep water brighter, way to the "
      "surface", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Haie ignorieren Lara", "Sharks ignore Lara", "ai.dumb", "sharks", kQbBool, -1, kQcAi, 0, kQbAi, 0},   // 0.19 (was planned)
     // 0.21 (was planned "Kamera-Wackeln aus"): the shake strength 100 / 50 / 0 %, the pad rumble the same way
     {"Kamera-Wackeln", "Camera shake", "cam.shakescale", "", kQbValue, -1, kQcNone, kQvShake, kQbPhobia, 0},
     {"Vibration", "Rumble", "cam.rumble", "", kQbValue, -1, kQcNone, kQvRumble, kQbPhobia, 0},
-    {"Blitze daempfen", "Dim flashes", "-", "Bildschirm-Blitze daempfen (noch nicht gefunden)|dim screen flashes (not found "
+    {"Blitze d\303\244mpfen", "Dim flashes", "-", "Bildschirm-Blitze d\303\244mpfen (noch nicht gefunden)|dim screen flashes (not found "
      "yet)", kQbPlanned, -1, kQcNone, 0, 0, 0},
 };
 // 0.21 placeholder (Lukas 2026-11-06): co-op - planned rows only, no item behind them yet (research: docs\Befund-Koop-
@@ -26676,9 +26676,9 @@ const QbRow kQbCoop[] = {
     {"Koop (geplant)", "Co-op (planned)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
     {"Koop an / aus", "Co-op on / off", "-", "zweite Figur mit Controller 2|second figure on pad 2", kQbPlanned, -1, kQcNone,
      0, 0, 0},
-    {"Figur: Lara / Doppelgaengerin", "Figure: Lara / doppelganger", "-", "Figur waehlen|choose the figure", kQbPlanned, -1,
+    {"Figur: Lara / Doppelg\303\244ngerin", "Figure: Lara / doppelganger", "-", "Figur w\303\244hlen|choose the figure", kQbPlanned, -1,
      kQcNone, 0, 0, 0},
-    {"Begleiterin (KI)", "Companion (AI)", "-", "Doppelgaengerin mit eigener KI neben Lara - Stufe 1|doppelganger with her "
+    {"Begleiterin (KI)", "Companion (AI)", "-", "Doppelg\303\244ngerin mit eigener KI neben Lara - Stufe 1|doppelganger with her "
      "own AI next to Lara - stage 1", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Marionette (Controller 2)", "Puppet (pad 2)", "-", "zweite Figur laufen lassen, Kamera bleibt bei Lara - Stufe 2|walk "
      "a second figure, the camera stays on Lara - stage 2", kQbPlanned, -1, kQcNone, 0, 0, 0},
@@ -26698,15 +26698,15 @@ const QbRow kQbRescue[] = {
     {"Punkt merken", "Mark here", "player.mark", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Zum Punkt", "Back to mark", "player.recall", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Unit neu laden", "Reload unit", "level.reload", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
-    {"Spielstaende", "Saves", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Spielst\303\244nde", "Saves", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
     {"Saves sichern", "Back up saves", "save.backup", "rettung", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Sicherungen (Liste)", "Backups (list)", "save.backups", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
-    {"Sicherung zurueck ...", "Restore a backup ...", "save.restore", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfLine},
+    {"Sicherung zur\303\274ck ...", "Restore a backup ...", "save.restore", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfLine},
     {"Objekte", "Objects", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
     {"Objekte suchen ...", "Find objects ...", "instance.list", "", kQbAction, -1, kQcNone, 0, kQbGrey, kQfLine},
     {"Objekt zu Lara ...", "Bring object ...", "instance.bring", "", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfLine},
     {"Objekt einblenden ...", "Unhide object ...", "instance.unhide", "", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfLine},
-    {"Ausruestung", "Gear", "-", "", kQbLabel, -1, kQcNone, 0, kQbCheat, 0},
+    {"Ausr\303\274stung", "Gear", "-", "", kQbLabel, -1, kQcNone, 0, kQbCheat, 0},
     {"Gegenstand geben ...", "Give item ...", "gear.give", "", kQbAction, -1, kQcNone, 0, kQbCheat, kQfLine},
     {"Medipack geben", "Give medipack", "gear.give", "g_healthpack", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
     {"Waffe geben", "Give weapon", "weapon.give", "", kQbChoice, -1, kQcNone, kQvWeapon, kQbCheat, 0},
@@ -26742,9 +26742,9 @@ const QbRow kQbTests[] = {
     {"Szenen-Strom (live)", "Cutscene stream (live)", "cine.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
-    {"hall02-Zaehler (Tutorial-Kampf)", "hall02 counter (tutorial fight)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
+    {"hall02-Z\303\244hler (Tutorial-Kampf)", "hall02 counter (tutorial fight)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
     {"hall02-Werte (live)", "hall02 values (live)", "story.values", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},   // 0.21.8
-    {"hall02-Zaehler reparieren", "repair hall02 counter", "fix.hall02", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"hall02-Z\303\244hler reparieren", "repair hall02 counter", "fix.hall02", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Thrall-Skriptwert +8 ins Log", "Thrall script value +8 to log", "thrall.scriptval", "", kQbAction, -1, kQcNone, 0,
      kQbGrey, 0},
 };
@@ -26754,7 +26754,7 @@ const QbPage kQbPages[] = {
     QB_PAGE("Rettung", "Rescue", kQbRescue, kQsNone),               // 0.21.11 (players: the soft-lock helpers)
     QB_PAGE("Notfall / Cheats", "Emergency / cheats", kQbEmergency, kQsNone),
     QB_PAGE("Lara", "Lara", kQbLara, kQsLara),
-    {"Kostueme", "Costumes", nullptr, 0, kQsCostume},              // 0.21.6 (own page: the list would overfill Lara)
+    {"Kost\303\274me", "Costumes", nullptr, 0, kQsCostume},              // 0.21.6 (own page: the list would overfill Lara)
     QB_PAGE("Debug / Darstellung", "Debug / display", kQbDebug, kQsNone),
     QB_PAGE("Leveldaten", "Level data", kQbLevel, kQsNone),
     QB_PAGE("Render / KI", "Render / AI", kQbRender, kQsNone),
@@ -26778,13 +26778,13 @@ const int kQbPageN = static_cast<int>(sizeof(kQbPages) / sizeof(kQbPages[0]));
 const int kQbHelpMax = 60;
 struct QbHelp { const char *id, *arg, *text; };
 const QbHelp kQbHelp[] = {
-    {"nav.draw", "planner_areas", "Umrisse der Gegner-Laufflaechen - braucht 'Alle Ebenen'|Outlines of the enemy walk "
+    {"nav.draw", "planner_areas", "Umrisse der Gegner-Lauffl\303\244chen - braucht 'Alle Ebenen'|Outlines of the enemy walk "
                                   "areas - needs 'All layers'"},
-    {"nav.draw", "planner_areas_solid", "Laufflaechen gefuellt (Farben wie die Umrisse)|Walk areas filled (colours as the "
+    {"nav.draw", "planner_areas_solid", "Lauffl\303\244chen gef\303\274llt (Farben wie die Umrisse)|Walk areas filled (colours as the "
                                         "outlines)"},
-    {"nav.draw", "planner_connectivity", "Linie zu jeder Nachbarflaeche - nur mit Flaechen an|Line to each neighbour area - "
+    {"nav.draw", "planner_connectivity", "Linie zu jeder Nachbarfl\303\244che - nur mit Fl\303\244chen an|Line to each neighbour area - "
                                          "only with areas on"},
-    {"nav.draw", "planner_area_normals", "Normale jeder Laufflaeche - nur mit Flaechen an|Normal of each walk area - only "
+    {"nav.draw", "planner_area_normals", "Normale jeder Lauffl\303\244che - nur mit Fl\303\244chen an|Normal of each walk area - only "
                                          "with areas on"},
     {"nav.draw", "obstacles", "Bewegliche Hindernisse, um die die KI herumgeht|Moving obstacles the AI walks around"},
     {"nav.draw", "recent_navprobes", "Letzte Weg-Abfragen der KI als Linien|Latest AI path queries as lines"},
@@ -26792,39 +26792,39 @@ const QbHelp kQbHelp[] = {
     {"nav.mask", "", "Alle Navmesh-Ebenen zeichnen - sonst oft nichts zu sehen|Draw every navmesh layer - else often "
                      "nothing shows"},
     {"nav.off", "", "Navmesh-Zeichnung aus, Ebenen-Maske wie vorher|Navmesh drawing off, layer mask as before"},
-    {"nav.labels", "", "Nummer + Flags je Laufflaeche, Farben in der Legende|Number + flags per walk area, colours in the "
+    {"nav.labels", "", "Nummer + Flags je Lauffl\303\244che, Farben in der Legende|Number + flags per walk area, colours in the "
                        "legend"},
     {"dbg.uber", "", "Tore / Plattformen: Zustand und Restzeit am Objekt|Gates / platforms: state and time left at the "
                      "object"},
-    {"shader.labels", "", "Material + Shader-Status am Gelaende (Datei und live)|Material + shader status on the terrain "
+    {"shader.labels", "", "Material + Shader-Status am Gel\303\244nde (Datei und live)|Material + shader status on the terrain "
                           "(file and live)"},
     {"shader.dump", "", "Materialien um Lara: Datei gegen live ins Log|Materials around Lara: file vs live into the log"},
     {"sap.status", "", "Kanten-Kollision: Boxen / Paare / Proxies, Spitzen|Ledge collision: boxes / pairs / proxies, peaks"},
     {"story.values", "", "Skript-Werte (Sticky) des Levels, nur lesen; - = keiner|Script (sticky) values of the level, "
                          "read only; - = none"},   // 0.21.8
-    {"dbg.flatmodels", "", "Flach-Ansicht auch fuer Lara, Gegner und Objekte|Flat view for Lara, enemies and objects too"},
+    {"dbg.flatmodels", "", "Flach-Ansicht auch f\303\274r Lara, Gegner und Objekte|Flat view for Lara, enemies and objects too"},
     {"dbg.flatanyrt", "", "Flach-Ansicht auch in Schatten- und Neben-Zielen|Flat view in shadow and side targets too"},
     {"dbg.flatcolour", "material", "Flach-Ansicht: eine Farbe je Material|Flat view: one colour per material"},
-    {"dbg.flatcolour", "class", "Flach-Ansicht: Gelaende und Figuren getrennt gefaerbt|Flat view: terrain and figures "
+    {"dbg.flatcolour", "class", "Flach-Ansicht: Gel\303\244nde und Figuren getrennt gef\303\244rbt|Flat view: terrain and figures "
                                 "coloured apart"},
     {"dbg.flatpass", "*", "Diesen Render-Pass in der Flach-Ansicht ein / aus|This render pass in the flat view on / off"},
-    {"dbg.flatedges", "", "Jede flache Flaeche zusaetzlich als dunkles Gitter|Each flat face again as a dark wireframe"},
-    {"dbg.flatpasses", "", "Welche Render-Paesse die Flach-Ansicht faerbt|Which render passes the flat view colours"},
-    {"dbg.census", "", "Zaehlt Zeichenaufrufe je Pass ins Log (einmal)|Counts draw calls per pass into the log (once)"},
-    {"dbg.slide", "", "Rutschflaechen: rot = steiler als Laras Grenze|Slide faces: red = steeper than Lara's limit"},
-    {"dbg.enemycoll", "", "Kollision nur fuer Gegner (violett)|Collision for enemies only (violet)"},
+    {"dbg.flatedges", "", "Jede flache Fl\303\244che zus\303\244tzlich als dunkles Gitter|Each flat face again as a dark wireframe"},
+    {"dbg.flatpasses", "", "Welche Render-P\303\244sse die Flach-Ansicht f\303\244rbt|Which render passes the flat view colours"},
+    {"dbg.census", "", "Z\303\244hlt Zeichenaufrufe je Pass ins Log (einmal)|Counts draw calls per pass into the log (once)"},
+    {"dbg.slide", "", "Rutschfl\303\244chen: rot = steiler als Laras Grenze|Slide faces: red = steeper than Lara's limit"},
+    {"dbg.enemycoll", "", "Kollision nur f\303\274r Gegner (violett)|Collision for enemies only (violet)"},
     {"draw.ledges", "", "Nur die Greif-Kanten aus dem Markup|Only the grab ledges of the markup"},
     {"ai.mode", "", "Wie 'KI dumm' wirkt: purge (ohne Patch) / gate|How 'dumb AI' works: purge (no patch) / gate"},
-    {"dbg.namefilter", "*", "Objektnamen nur fuer Namen mit diesem Teil|Object names only for names with this part"},
-    {"dbg.depth", "", "Linien hinter Waenden: zeigen / verstecken / gedimmt|Lines behind walls: show / hide / dimmed"},
-    {"dbg.enclosing", "", "Grosse Kaesten um Kamera / Lara: normal / blass / weg|Big boxes around camera / Lara: normal / "
+    {"dbg.namefilter", "*", "Objektnamen nur f\303\274r Namen mit diesem Teil|Object names only for names with this part"},
+    {"dbg.depth", "", "Linien hinter W\303\244nden: zeigen / verstecken / gedimmt|Lines behind walls: show / hide / dimmed"},
+    {"dbg.enclosing", "", "Grosse K\303\244sten um Kamera / Lara: normal / blass / weg|Big boxes around camera / Lara: normal / "
                           "dim / hide"},
     {"dbg.larain", "", "Trigger, in denen Lara steht: fett und pulsierend|Triggers Lara stands in: bold and pulsing"},
     {"dbg.fade", "", "Ferne Objekte blasser zeichnen|Draw far objects fainter"},
-    {"dbg.short", "", "Kurze Namen an Triggern (der naechste voll)|Short trigger labels (the nearest in full)"},
+    {"dbg.short", "", "Kurze Namen an Triggern (der n\303\244chste voll)|Short trigger labels (the nearest in full)"},
     {"dbg.show", "trglabels", "Namen an den Triggern (Objekt, Intro-Id, Form)|Trigger names (object, intro id, shape)"},
     {"dbg.show", "unknown", "Trigger, deren Art TruMenu nicht kennt (grau)|Triggers of a kind TruMenu does not know (grey)"},
-    {"dbg.portals", "", "Lade-Bereiche zwischen den Abschnitten (weiss)|Loading areas between the units (white)"},
+    {"dbg.portals", "", "Lade-Bereiche zwischen den Abschnitten (wei\303\237)|Loading areas between the units (white)"},
     {"shot.oncine", "", "Foto-Paare beim Start jeder Zwischensequenz|Shot pairs at the start of each cutscene"},
     {"cine.pause", "", "Zwischensequenz anhalten, Effekte laufen weiter|Hold the cutscene, effects run on"},   // 0.22
     {"cine.step", "", "Ein Bild der angehaltenen Szene weiter|One frame of the held cutscene"},
@@ -26833,25 +26833,25 @@ const QbHelp kQbHelp[] = {
                          "TruMenu.lightframe.txt, BLINK? = suspect"},   // 0.22.2
     {"light.stable", "", "Lichter immer in gleicher Reihenfolge - Test gegen das Thron-Flackern|Lights always in one "
                          "order - test against the throne flicker"},   // 0.22.3
-    {"cine.pauseat", "", "Naechste Szene haelt an der Marke - Checkpoint neu laden|Next cutscene stops at the mark - "
+    {"cine.pauseat", "", "N\303\244chste Szene h\303\244lt an der Marke - Checkpoint neu laden|Next cutscene stops at the mark - "
                          "reload the checkpoint"},
-    {"menu.hidecursor", "", "Kein Mauszeiger ueber dem Spielbild|No mouse cursor over the game picture"},
+    {"menu.hidecursor", "", "Kein Mauszeiger \303\274ber dem Spielbild|No mouse cursor over the game picture"},
     {"cheat.flight", "", "Frei fliegen ohne Schwerkraft - Tasten in der Zeile oben|Fly freely without gravity - keys in "
                          "the line above"},
     {"overlay.larain", "", "Zeile 'Lara in: <Trigger>' in der Positions-Anzeige|Line 'Lara in: <trigger>' in the position "
                            "overlay"},
     {"player.unstuck", "mark", "Zur zuletzt gemerkten Marke statt zu sicherem Boden|To the last mark instead of safe "
                                "ground"},
-    {"player.safeground", "", "Stand von 'Befreien': sichere Stellen und Gruende|State of 'Unstuck': safe spots and reasons"},
-    {"time.freezesound", "", "Ton pausiert, solange das Rad die Welt anhaelt|Sound pauses while the ring holds the world"},
+    {"player.safeground", "", "Stand von 'Befreien': sichere Stellen und Gr\303\274nde|State of 'Unstuck': safe spots and reasons"},
+    {"time.freezesound", "", "Ton pausiert, solange das Rad die Welt anh\303\244lt|Sound pauses while the ring holds the world"},
     {"time.pausesound", "", "Ton pausiert bei jeder Welt-Pause|Sound pauses with every world pause"},
     {"time.freezeclock", "", "Shader-Uhr steht mit der Welt (Wasser, Licht)|Shader clock stops with the world (water, "
                              "light)"},
-    {"costume.next", "", "Naechstes Kostuem der Wechsel-Liste des Spiels|Next costume of the game's cycle list"},
+    {"costume.next", "", "N\303\244chstes Kost\303\274m der Wechsel-Liste des Spiels|Next costume of the game's cycle list"},
     // 0.21.9 test spots of page Tests (Befund 17i) and the shot key (installed TruMenu.ini [Shot] Hotkey=0x7A)
     {"cp.jump", "dlc_yggdrasil_end 9608", "CP 9608 liegt wohl im Trigger 10026: 020_ghoul sofort|CP 9608 is likely inside "
                                           "trigger 10026: 020_ghoul at once"},
-    {"cp.jump", "dlc_yggdrasil_end 9970", "Naechster Daten-CP zum Boden 25057, ~1300 Einheiten weg|Nearest data CP to "
+    {"cp.jump", "dlc_yggdrasil_end 9970", "N\303\244chster Daten-CP zum Boden 25057, ~1300 Einheiten weg|Nearest data CP to "
                                           "floor 25057, ~1300 units away"},
     {"level.load", "dlc2_ceremony_room", "Sicherung, dann Zeremonienraum laden (Szene 030_pod)|Backup, then load the "
                                          "ceremony room (scene 030_pod)"},
@@ -26861,10 +26861,10 @@ const QbHelp kQbHelp[] = {
                         "(debug, no story values)"},
     // 0.21.11 page Rettung (the rows with "..." open the quick command line: type the argument, A runs it)
     {"player.unstuck", "", "Zur neueren Stelle: Marke oder sicherer Boden|To the newer spot: mark or safe ground"},
-    {"player.mark", "", "Merkt Laras Stelle fuer 'Zum Punkt'|Remembers Lara's spot for 'Back to mark'"},
-    {"player.recall", "", "Lara zurueck zur gemerkten Stelle|Lara back to the marked spot"},
+    {"player.mark", "", "Merkt Laras Stelle f\303\274r 'Zum Punkt'|Remembers Lara's spot for 'Back to mark'"},
+    {"player.recall", "", "Lara zur\303\274ck zur gemerkten Stelle|Lara back to the marked spot"},
     {"level.reload", "", "Abschnitt neu laden - rechts / X zweimal|Reload the unit - right / X twice"},
-    {"save.backup", "rettung", "Kopiert alle Spielstaende nach TruMenu.saves|Copies every save into TruMenu.saves"},
+    {"save.backup", "rettung", "Kopiert alle Spielst\303\244nde nach TruMenu.saves|Copies every save into TruMenu.saves"},
     {"save.backups", "", "Sicherungsordner, neueste zuerst|Backup folders, newest first"},
     {"save.restore", "", "Befehlszeile: Ordnername aus der Liste, A zweimal|Command line: folder name from the list, A "
                          "twice"},
@@ -26875,7 +26875,7 @@ const QbHelp kQbHelp[] = {
                             "(#number)"},
     {"gear.give", "", "Befehlszeile: Objektname, z. B. g_grapple|Command line: object name, e.g. g_grapple"},
     {"gear.give", "g_healthpack", "Ein Medipack ins Inventar (im Level)|One medipack into the inventory (in a level)"},
-    {"weapon.give", "", "Links = Waffe waehlen, rechts = geben|Left = choose the weapon, right = give it"},
+    {"weapon.give", "", "Links = Waffe w\303\244hlen, rechts = geben|Left = choose the weapon, right = give it"},
     {"ammo.fill", "", "Alle Reserven auf das Maximum (Magazine bleiben)|Every reserve to the maximum (clips unchanged)"},
     // 0.21.11 lights (page Render-Details)
     {"light.list", "", "Lichter der Szene + Schatten-Felder ins Log|Scene lights + shadow fields into the log"},
@@ -27258,7 +27258,7 @@ bool QbConfirm(const char *key, const char *name, const char *what) {
     g_qbArmTick = GetTickCount();
     if (!g_qbArmTick) g_qbArmTick = 1;
     QbResult(true, "%s: %s%s%s", name, what && what[0] ? what : "", what && what[0] ? " - " : "",
-             de ? "rechts / X nochmal (3 s) = ausfuehren" : "right / X again (3 s) = run");   // 0.21.3: + X
+             de ? "rechts / X nochmal (3 s) = ausf\303\274hren" : "right / X again (3 s) = run");   // 0.21.3: + X
     return false;
 }
 // run an item from the bar: one log line, the answer in the footer
@@ -27372,7 +27372,7 @@ void QbActRow(int page, const QbRow &r, int dir) {
         if (r.flags & kQfLine) {             // 0.21.11: the argument is typed in the quick command line (A runs it)
             if (!QcPrefill(r)) return;       // [Cmd] Enabled=0: QcOpen's own footer line stays
             Log(1, "quick: %s / %s -> command line '%s %s'", QbPageName(page, true), r.de, r.id, r.arg);
-            QbResult(false, "%s: %s", name, de ? "Befehlszeile: Argument ergaenzen, A = ausfuehren"
+            QbResult(false, "%s: %s", name, de ? "Befehlszeile: Argument erg\303\244nzen, A = ausf\303\274hren"
                                                : "command line: add the argument, A = run");
             return;
         }
@@ -27469,7 +27469,7 @@ void QbFavPin(int page, const QbRow *r, int dyn, const char *viewName) {
         return;
     }
     if (!r && page >= 0 && page < kQbPageN && kQbPages[page].special == kQsCostume) {    // 0.21.6 page Kostueme
-        QbResult(true, "%s", de ? "Y: nur Listen-Zeilen und 'Naechstes Kostuem' werden Favorit (Wahl-Zeilen nicht)"
+        QbResult(true, "%s", de ? "Y: nur Listen-Zeilen und 'N\303\244chstes Kost\303\274m' werden Favorit (Wahl-Zeilen nicht)"
                                 : "Y: only list rows and 'Next costume' can be favourites (not the chooser rows)");
         return;
     }
@@ -27562,7 +27562,7 @@ void QbViewOf(int page, const QbRow &r, QbView &v, bool de) {
     } else if (r.kind == kQbInfo) {
         Out(v.state, sizeof(v.state), "%s", de ? "rechts = zeigen" : "right = show");
     } else if (!_stricmp(r.id, "dbg.census")) {   // idle / requested / running
-        Out(v.state, sizeof(v.state), "%s", g_rmCsRun ? (de ? "laeuft" : "running")
+        Out(v.state, sizeof(v.state), "%s", g_rmCsRun ? (de ? "l\303\244uft" : "running")
                                             : g_rmCensusReq ? (de ? "angefordert" : "requested")
                                             : (de ? "rechts = start" : "right = start"));
     } else {
@@ -27823,15 +27823,15 @@ void PageAi() {
         ImGui::TextDisabled("planned / geplant: mode 'dumb AI only for these', 'model only', gear of human enemies, "
                             "behaviour from intro data, navmesh check");
     }
-    if (!ImGui::CollapsingHeader("Gegner entfernen / toeten / Remove / kill enemies  [ai.kill, ai.remove, sticky.set] "
+    if (!ImGui::CollapsingHeader("Gegner entfernen / t\303\266ten / Remove / kill enemies  [ai.kill, ai.remove, sticky.set] "
                                  "(0.21 / 0.21.1)###grp_ki_weg", ImGuiTreeNodeFlags_DefaultOpen))
         return;
     // 0.21.1 ai.kill: the game's own kill - the death state fires the script event (counts like a death in the game)
-    ImGui::SeparatorText("Kill AI enemies / KI-Gegner toeten  [ai.kill] (0.21.1)");
+    ImGui::SeparatorText("Kill AI enemies / KI-Gegner t\303\266ten  [ai.kill] (0.21.1)");
     if (!g_akOk) ImGui::BeginDisabled();
-    if (TmButton("all but the nearest / alle bis auf den naechsten###akothers")) QueueItem("ai.kill", "others");
+    if (TmButton("all but the nearest / alle bis auf den n\303\244chsten###akothers")) QueueItem("ai.kill", "others");
     ImGui::SameLine();
-    if (TmButton("the nearest / den naechsten###aknearest")) QueueItem("ai.kill", "nearest");
+    if (TmButton("the nearest / den n\303\244chsten###aknearest")) QueueItem("ai.kill", "nearest");
     ImGui::SameLine();
     if (TmButton("all / alle###akall")) QueueItem("ai.kill", "all");
     if (!g_akOk) ImGui::EndDisabled();
@@ -27847,9 +27847,9 @@ void PageAi() {
     if (TmButton("hall02: tutorial = 2  [sticky.set 11270 18509 2]###sthall2")) QueueItem("sticky.set", "11270 18509 2");
     if (!g_stOk) ImGui::EndDisabled();
     // 0.21.4 hall02 counter (section "0.21.4 hall02 counter"): the checked rescue, the +8 values
-    ImGui::SeparatorText("hall02 counter / hall02-Zaehler  [fix.hall02, thrall.scriptval] (0.21.4)");
+    ImGui::SeparatorText("hall02 counter / hall02-Z\303\244hler  [fix.hall02, thrall.scriptval] (0.21.4)");
     if (!g_h2Ok) ImGui::BeginDisabled();
-    if (TmButton("repair (checked) / reparieren (geprueft)###h2fix")) QueueItem("fix.hall02", "");
+    if (TmButton("repair (checked) / reparieren (gepr\303\274ft)###h2fix")) QueueItem("fix.hall02", "");
     ImGui::SameLine();
     if (TmButton("thrall script +8 -> log###h2val")) QueueItem("thrall.scriptval", "");
     if (!g_h2Ok) ImGui::EndDisabled();
@@ -27862,9 +27862,9 @@ void PageAi() {
     // 0.21 ai.remove: the game's despawn (hide, sense manager, generator, kill flag; the game's sweep removes them)
     ImGui::SeparatorText("Remove AI enemies / KI-Gegner entfernen  [ai.remove] (0.21)");
     if (!g_adOk) ImGui::BeginDisabled();
-    if (TmButton("all but the nearest / alle bis auf den naechsten###adothers")) QueueItem("ai.remove", "others");
+    if (TmButton("all but the nearest / alle bis auf den n\303\244chsten###adothers")) QueueItem("ai.remove", "others");
     ImGui::SameLine();
-    if (TmButton("the nearest / den naechsten###adnearest")) QueueItem("ai.remove", "nearest");
+    if (TmButton("the nearest / den n\303\244chsten###adnearest")) QueueItem("ai.remove", "nearest");
     ImGui::SameLine();
     if (TmButton("all / alle###adall")) QueueItem("ai.remove", "all");
     if (!g_adOk) ImGui::EndDisabled();
@@ -27934,7 +27934,7 @@ void QcEdited() {
     QcDisarm();
 }
 const OskTarget g_oskQc = {g_qcBuf, QcOskRun, QcOskClose, QcEdited,
-                           "A tippen  X loeschen  Y Vorschlag  Start ausfuehren  B zurueck  LB / RB Reihen  L3 zu",
+                           "A tippen  X l\303\266schen  Y Vorschlag  Start ausf\303\274hren  B zur\303\274ck  LB / RB Reihen  L3 zu",
                            "A type  X backspace  Y suggestion  Start run  B back  LB / RB rows  L3 close"};
 void QcOskOpen() {
     const bool de = g_qbLang == 0;
@@ -28105,7 +28105,7 @@ void DrawQuickCmd() {
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
                                    ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize;
     if (ImGui::Begin("##TruQuickCmd", nullptr, flags)) {
-        ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.35f, 1.0f), "%s", de ? "Kommandozeile (wie die Befehlszeile im Menue)"
+        ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.35f, 1.0f), "%s", de ? "Kommandozeile (wie die Befehlszeile im Men\303\274)"
                                                                       : "Command line (the menu's command bar)");
         const ImGuiID id = ImGui::GetID("##qcline");
         const bool osk = g_qcOskOpen != 0;
@@ -28146,7 +28146,7 @@ void DrawQuickCmd() {
         if (g_qcOpen && !osk && g_qcHistPos < 0 && g_qcBuf[0] && g_sugCount) {
             CmdSugRows(6);
             ImGui::TextDisabled("%d / %d   %s", g_sugSel >= 0 ? g_sugSel + 1 : 0, g_sugCount,
-                                de ? "hoch / runter = waehlen, Tab = uebernehmen, Enter = ausfuehren"
+                                de ? "hoch / runter = w\303\244hlen, Tab = \303\274bernehmen, Enter = ausf\303\274hren"
                                    : "up / down = choose, Tab = take, Enter = run");
         }
         // 0.21.8 safety: the line a pad step put into the input, with its item's label, before A runs it
@@ -28157,15 +28157,15 @@ void DrawQuickCmd() {
             word[w] = 0;
             const CmdKind k = CmdKindOf(word);
             const char *label = k != kCkUnknown && k != kCkBuiltin ? CmdLabel(word) : "";
-            ImGui::TextColored(ImVec4(0.45f, 0.8f, 1.0f, 1.0f), "%s %.70s%s%.60s", osk ? (de ? "Start fuehrt aus:" :
-                               "Start runs:") : (de ? "A fuehrt aus:" : "A runs:"), g_qcBuf, label[0] ? "  - " : "", label);
+            ImGui::TextColored(ImVec4(0.45f, 0.8f, 1.0f, 1.0f), "%s %.70s%s%.60s", osk ? (de ? "Start f\303\274hrt aus:" :
+                               "Start runs:") : (de ? "A f\303\274hrt aus:" : "A runs:"), g_qcBuf, label[0] ? "  - " : "", label);
             const CmdDanger *dz = CmdDangerOf(g_qcBuf);
             if (dz && !QcArmed())
                 ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "%s %s", de ? "Vorsicht:" : "Careful:", de ? dz->de : dz->en);
         }
         if (g_qcOpen && QcArmed() && g_qcArmWhy) {
             const DWORD left = kQcArmMs - (GetTickCount() - g_qcArmTick);
-            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), de ? "ACHTUNG: %s (%s) - %s nochmal in %.1f s = ausfuehren"
+            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), de ? "ACHTUNG: %s (%s) - %s nochmal in %.1f s = ausf\303\274hren"
                                                                     : "WARNING: %s (%s) - %s again within %.1f s = run",
                                g_qcArmLine, de ? g_qcArmWhy->de : g_qcArmWhy->en, osk ? "Start" : "A",
                                static_cast<double>(left) / 1000.0);
@@ -28196,7 +28196,7 @@ void DrawQuickCmd() {
             if (g_qcOskOpen) DrawOsk(g_oskQc);
         } else {
             g_qcPadEdges = 0;
-            ImGui::TextDisabled("%s", de ? "Enter / A: ausfuehren   Tab: Vorschlag   hoch / runter: Verlauf   Y: Tastatur   "
+            ImGui::TextDisabled("%s", de ? "Enter / A: ausf\303\274hren   Tab: Vorschlag   hoch / runter: Verlauf   Y: Tastatur   "
                                            "Esc / B / L3: zu"
                                          : "Enter / A: run   Tab: suggestion   up / down: history   Y: keyboard   "
                                            "Esc / B / L3: close");
@@ -28389,8 +28389,8 @@ void DrawQuick() {
     }
     const QbRow *selRow = QbSelRow(g_qbPage, sel);   // 0.21.8: + the special rows QbDynFav can pin
     const bool yOk = QbFavOk(QbSelRow(g_qbPage, sel)) || (!selRow && QbDynFavOk(sel - g_qbStaticN));
-    Out(close, sizeof(close), "%s%s   %s: %s%s", yOk ? (de ? "X: ausfuehren  Y: Favorit" : "X: run  Y: favourite")
-                                                 : (de ? "X: ausfuehren  Y: -" : "X: run  Y: -"), l3, combo,
+    Out(close, sizeof(close), "%s%s   %s: %s%s", yOk ? (de ? "X: ausf\303\274hren  Y: Favorit" : "X: run  Y: favourite")
+                                                 : (de ? "X: ausf\303\274hren  Y: -" : "X: run  Y: -"), l3, combo,
         de ? "zu" : "close", g_padModeIdle ? (de ? "   (Pad NICHT gesperrt)" : "   (pad NOT held)") : "");
     float w = pad + sq + pad + nameW + gap + stateW + gap + countW + pad;
     float tw = width(title, fs) + 2.0f * pad, fw = width(foot, fsSmall) + 2.0f * pad, cw = width(close, fsSmall) + 2.0f * pad;
@@ -29309,10 +29309,10 @@ int QbSavesRows(QbView *v, QbDyn *d, int max, bool de) {
     char armedKey[200] = "";
     DWORD left = 0;
     SaveArmed(armedKey, sizeof(armedKey), &left);
-    Out(g_qbHead, sizeof(g_qbHead), "%d %s, %d %s; %s", count, de ? "Spielstaende" : "saves", nb, de ? "Sicherungen" : "backups",
+    Out(g_qbHead, sizeof(g_qbHead), "%d %s, %d %s; %s", count, de ? "Spielst\303\244nde" : "saves", nb, de ? "Sicherungen" : "backups",
         !g_slDirect ? (de ? "Laden aus (DirectLoad=0)" : "load off (DirectLoad=0)")
-        : !g_slOk ? (de ? "Laden: Pruefung fehlgeschlagen" : "load: checks failed")
-        : g_slActive ? (de ? "ein Laden laeuft" : "a load runs") : (de ? "rechts 2x = laden" : "right 2x = load"));
+        : !g_slOk ? (de ? "Laden: Pr\303\274fung fehlgeschlagen" : "load: checks failed")
+        : g_slActive ? (de ? "ein Laden l\303\244uft" : "a load runs") : (de ? "rechts 2x = laden" : "right 2x = load"));
     int n = 0;
     auto add = [&](int kind, const char *name, const char *state, ImU32 col, ImU32 stateCol, bool skip) -> QbDyn & {
         QbView &w = v[n];
@@ -29333,7 +29333,7 @@ int QbSavesRows(QbView *v, QbDyn *d, int max, bool de) {
     add(kQdBackupNow, de ? "Jetzt sichern" : "Back up now", de ? "rechts" : "right", kQbPlayer, IM_COL32(235, 235, 235, 255), false);
     add(kQdRescan, de ? "Liste neu lesen" : "Re-read the list", de ? "rechts" : "right", kQbGrey, IM_COL32(235, 235, 235, 255), false);
     char label[64];
-    Out(label, sizeof(label), "-- %s (%d)", de ? "Spielstaende" : "Saves", count);
+    Out(label, sizeof(label), "-- %s (%d)", de ? "Spielst\303\244nde" : "Saves", count);
     add(kQdLabel, label, "", kQbBlue, kQbBlue, true);
     for (int k = 0; k < count && k < 8 && n < max - 2; ++k) {
         const SaveInfo &s = rows[order[k]];
@@ -29359,7 +29359,7 @@ int QbSavesRows(QbView *v, QbDyn *d, int max, bool de) {
         Out(text, sizeof(text), "%s (%d %s)", backups[k].name, backups[k].files, de ? "Dateien" : "files");
         Out(key, sizeof(key), "save.restore %s", backups[k].name);
         const bool armed = !strcmp(armedKey, key);
-        QbDyn &q = add(kQdBackup, text, armed ? (de ? "nochmal rechts!" : "right again!") : (de ? "zurueckspielen (2x)" : "restore (2x)"),
+        QbDyn &q = add(kQdBackup, text, armed ? (de ? "nochmal rechts!" : "right again!") : (de ? "zur\303\274ckspielen (2x)" : "restore (2x)"),
                        IM_COL32(200, 200, 200, 255), armed ? IM_COL32(255, 110, 90, 255) : IM_COL32(235, 200, 120, 255), false);
         strncpy_s(q.arg, sizeof(q.arg), backups[k].name, _TRUNCATE);
     }
@@ -29402,7 +29402,7 @@ int QbFavRows(QbView *v, QbDyn *d, int max, bool de) {
         d[n].intro = rows++;
         ++n;
     };
-    if (n < max) QbDynLabel(&v[n], &d[n], de ? "Favoriten (Y = anheften / loesen, hier und im Menue)"   // 0.21.3: Y in
+    if (n < max) QbDynLabel(&v[n], &d[n], de ? "Favoriten (Y = anheften / l\303\266sen, hier und im Men\303\274)"   // 0.21.3: Y in
                                              : "Favourites (Y = pin / unpin, here and in the menu)"), ++n;   // the bar too
     int favs = 0;
     bool swRefreshed = false;
@@ -29431,7 +29431,7 @@ int QbFavRows(QbView *v, QbDyn *d, int max, bool de) {
         } else if (!_stricmp(id, "costume.set") && arg[0] >= '0' && arg[0] <= '9') {   // a costume row: its label
             char lab[100];
             CosLabel(static_cast<DWORD>(atoi(arg)), lab, sizeof(lab));
-            Out(t[2], sizeof(t[2]), "%s %s", de ? "Kostuem" : "Costume", lab);
+            Out(t[2], sizeof(t[2]), "%s %s", de ? "Kost\303\274m" : "Costume", lab);
             kind = kQbAction;
             colour = kQbPlayer;
         } else if (!_stricmp(id, "level.load")) {   // a chapter unit: the chapter rows' confirmation + backup
@@ -29538,7 +29538,7 @@ int QbTestsRows(QbView *v, QbDyn *d, int max, bool de) {
         const bool toggle = !strcmp(t.kind, "toggle"), step = !strcmp(t.kind, "step");
         const char *st = t.state;
         Out(w.state, sizeof(w.state), "%s", !strcmp(st, "ok") ? "OK" : !strcmp(st, "fail") ? (de ? "Fehler" : "fail")
-                                            : !strcmp(st, "skip") ? (de ? "uebersprungen" : "skipped")
+                                            : !strcmp(st, "skip") ? (de ? "\303\274bersprungen" : "skipped")
                                             : !strcmp(st, "done") ? (de ? "erledigt" : "done")
                                             : !strcmp(st, "on") ? (de ? "an" : "on") : !strcmp(st, "off") ? (de ? "aus" : "off")
                                             : (de ? "offen" : "open"));
@@ -29805,7 +29805,7 @@ int CosStep(int i, int dir, int n) {
 // the long menu's conditions (PageCostumeLive / PageOutfits, SwitchCostume / SetCostume), short for the count column
 const char *CosWhy(bool live, bool de) {
     if (!g_experimental) return "Experimental=0";
-    if (live ? !(g_switchOk && g_postOk) : !g_costumeOk) return de ? "Pruefung fehlgeschl." : "code check failed";
+    if (live ? !(g_switchOk && g_postOk) : !g_costumeOk) return de ? "Pr\303\274fung fehlgeschl." : "code check failed";
     if (!InLevel()) return de ? "braucht ein Level" : "needs a level";
     return "";
 }
@@ -29823,12 +29823,12 @@ void CosApply(WORD id) {
     char label[112], arg[16];
     CosLabel(id, label, sizeof(label));
     if (static_cast<DWORD>(id) == g_cos.now) {
-        QbResult(false, "%s: %s - %s", de ? "Kostuem" : "Costume", label, de ? "schon an" : "already on");
+        QbResult(false, "%s: %s - %s", de ? "Kost\303\274m" : "Costume", label, de ? "schon an" : "already on");
         return;
     }
     Out(arg, sizeof(arg), "%u", static_cast<unsigned>(id));
     g_qbActRow = nullptr;                    // no static row: nothing for the recent list
-    QbRun("Kostueme", "Kostuem", label, "costume.set", arg);
+    QbRun("Kost\303\274me", "Kost\303\274m", label, "costume.set", arg);
 }
 // every frame (Render, also while the bar is closed): the waiting switch of the choice row once it stood still
 void QbCosTick() {
@@ -29836,7 +29836,7 @@ void QbCosTick() {
     g_cos.pending = false;
     const bool de = g_qbLang == 0;
     const char *why = CosWhy(true, de);
-    if (why[0]) { QbResult(true, "%s: %s", de ? "Kostuem" : "Costume", why); return; }
+    if (why[0]) { QbResult(true, "%s: %s", de ? "Kost\303\274m" : "Costume", why); return; }
     g_cos.now = 0;
     ReadDword(kCostumeNow, &g_cos.now);
     CosApply(g_cos.pickId);
@@ -29855,7 +29855,7 @@ int QbCosRows(QbView *v, QbDyn *d, int max, bool de) {
     if (refused) Out(refusedText, sizeof(refusedText), de ? ", %d vom Spiel abgelehnt" : ", %d refused by the game", refused);
     Out(g_qbHead, sizeof(g_qbHead), de ? "aktuell: %s - %d im Wechsel%s, %d Spieler-Records%s"
                                        : "current: %s - %d in the cycle%s, %d player records%s", cur, listN, refusedText,
-        g_cosRecN, g_cos.listOpen && 4 + listN > max ? (de ? " (Liste gekuerzt)" : " (list cut)") : "");
+        g_cosRecN, g_cos.listOpen && 4 + listN > max ? (de ? " (Liste gek\303\274rzt)" : " (list cut)") : "");
     const ImU32 grey = IM_COL32(130, 130, 130, 255), red = IM_COL32(220, 120, 100, 255), green = IM_COL32(110, 230, 120, 255),
                 white = IM_COL32(235, 235, 235, 255), orange = IM_COL32(255, 190, 90, 255);
     int n = 0;
@@ -29874,7 +29874,7 @@ int QbCosRows(QbView *v, QbDyn *d, int max, bool de) {
     if (n < max) {                           // Kostuem: < name >
         QbView &w = add(kQdCosPick, 0);
         CosLabel(g_cos.pending ? g_cos.pickId : g_cos.now, lab, sizeof(lab));
-        Out(w.name, sizeof(w.name), "%s", de ? "Kostuem" : "Costume");
+        Out(w.name, sizeof(w.name), "%s", de ? "Kost\303\274m" : "Costume");
         Out(w.state, sizeof(w.state), "< %s >", lab);
         Out(w.count, sizeof(w.count), "%s", whyLive[0] ? whyLive : g_cos.pending ? (de ? "wechselt gleich" : "switching")
                                             : (de ? "aktuell" : "current"));
@@ -29888,7 +29888,7 @@ int QbCosRows(QbView *v, QbDyn *d, int max, bool de) {
     if (n < max) {                           // Fuers naechste Laden + neu laden
         QbView &w = add(kQdCosRec, 0);
         const int k = CosRecShown();
-        Out(w.name, sizeof(w.name), "%s", de ? "Fuers naechste Laden + neu laden" : "For the next load + reload");
+        Out(w.name, sizeof(w.name), "%s", de ? "F\303\274rs n\303\244chste Laden + neu laden" : "For the next load + reload");
         char key[64] = "";
         if (k >= 0) {
             char l2[100];
@@ -29904,13 +29904,13 @@ int QbCosRows(QbView *v, QbDyn *d, int max, bool de) {
         const bool chosen = k >= 0 && g_cosRec[k].id == static_cast<int>(s.mode ? s.chosen2 : s.chosen0);
         Out(w.state, sizeof(w.state), "< %s >", lab);
         Out(w.count, sizeof(w.count), "%s", whyRec[0] ? whyRec : armed ? (de ? "X nochmal!" : "X again!")
-                                            : chosen ? (de ? "gewaehlt, X 2x" : "chosen, X 2x") : "X 2x");
+                                            : chosen ? (de ? "gew\303\244hlt, X 2x" : "chosen, X 2x") : "X 2x");
         w.col = whyRec[0] ? grey : kQbRed;
         w.stateCol = whyRec[0] ? red : armed ? IM_COL32(255, 110, 90, 255) : white;
     }
     if (n < max) {                           // [+] Alle Kostueme (N)
         QbView &w = add(kQdCosGroup, 0);
-        Out(w.name, sizeof(w.name), "%s %s (%d)", g_cos.listOpen ? "[-]" : "[+]", de ? "Alle Kostueme" : "All costumes", listN);
+        Out(w.name, sizeof(w.name), "%s %s (%d)", g_cos.listOpen ? "[-]" : "[+]", de ? "Alle Kost\303\274me" : "All costumes", listN);
         Out(w.state, sizeof(w.state), "%s", g_cos.listOpen ? (de ? "links = zu" : "left = close")
                                                            : (de ? "rechts = auf" : "right = open"));
         w.col = kQbBlue;
@@ -29934,7 +29934,7 @@ int QbCosRows(QbView *v, QbDyn *d, int max, bool de) {
 // page Kostueme: right / left / X (dir kQbXDir) on a costume row ("Naechstes Kostuem" goes through QbActRow / QbExecRow)
 void QbCosAct(const QbDyn &q, int dir) {
     const bool de = g_qbLang == 0, x = dir == kQbXDir;
-    const char *cos = de ? "Kostuem" : "Costume";
+    const char *cos = de ? "Kost\303\274m" : "Costume";
     char lab[112];
     switch (q.kind) {
     case kQdCosPick: {
@@ -29957,7 +29957,7 @@ void QbCosAct(const QbDyn &q, int dir) {
             if (CosOffered(g_cos.ids[next]) != 0) break;
         }
         if (CosOffered(g_cos.ids[next]) == 0) {
-            QbResult(true, "%s: %s", cos, de ? "alle Eintraege vom Spiel abgelehnt (0x5c54e0)" : "every entry refused by the "
+            QbResult(true, "%s: %s", cos, de ? "alle Eintr\303\244ge vom Spiel abgelehnt (0x5c54e0)" : "every entry refused by the "
                      "game (0x5c54e0)");
             return;
         }
@@ -29973,7 +29973,7 @@ void QbCosAct(const QbDyn &q, int dir) {
         QbActRow(g_qbPage, kQbCosNext, dir);
         return;
     case kQdCosRec: {
-        const char *name = de ? "Fuers naechste Laden" : "For the next load";
+        const char *name = de ? "F\303\274rs n\303\244chste Laden" : "For the next load";
         const char *why = CosWhy(false, de);
         if (why[0]) { QbResult(true, "%s: %s", name, why); return; }
         const int k = CosRecShown();
@@ -29988,19 +29988,19 @@ void QbCosAct(const QbDyn &q, int dir) {
         if (!x && !(dir > 0 && QbArmed(key))) {   // left / right = another record (right while armed = the confirmation)
             g_cos.rec = CosStep(k, dir, g_cosRecN);
             CosLabelOf(g_cosRec[g_cos.rec].name, lab, sizeof(lab));
-            QbResult(false, "%s: %d %s - %s", name, g_cosRec[g_cos.rec].index, lab, de ? "X 2x = waehlen + Unit neu laden"
+            QbResult(false, "%s: %d %s - %s", name, g_cosRec[g_cos.rec].index, lab, de ? "X 2x = w\303\244hlen + Unit neu laden"
                                                                                      : "X twice = choose + reload the unit");
             return;
         }
         CosLabelOf(g_cosRec[k].name, lab, sizeof(lab));
-        if (!QbConfirm(key, name, de ? "laedt die Unit neu (Story-Werte?)" : "reloads the unit (story values?)")) return;
+        if (!QbConfirm(key, name, de ? "l\303\244dt die Unit neu (Story-Werte?)" : "reloads the unit (story values?)")) return;
         g_qbActRow = nullptr;
-        QbRun("Kostueme", "Fuers naechste Laden", lab, "costume.choosereload", arg);
+        QbRun("Kost\303\274me", "F\303\274rs n\303\244chste Laden", lab, "costume.choosereload", arg);
         return;
     }
     case kQdCosGroup: {
         const bool open = x ? !g_cos.listOpen : dir > 0;
-        const char *name = de ? "Alle Kostueme" : "All costumes";
+        const char *name = de ? "Alle Kost\303\274me" : "All costumes";
         if (open == g_cos.listOpen) {
             QbResult(false, "%s: %s", name, open ? (de ? "schon auf" : "already open") : (de ? "schon zu" : "already closed"));
             return;
@@ -30012,10 +30012,10 @@ void QbCosAct(const QbDyn &q, int dir) {
     case kQdCos: {
         const char *why = CosWhy(true, de);
         if (why[0]) { QbResult(true, "%s: %s", cos, why); return; }
-        if (dir < 0) { QbResult(false, "%s", de ? "rechts / X = dieses Kostuem" : "right / X = wear this one"); return; }
+        if (dir < 0) { QbResult(false, "%s", de ? "rechts / X = dieses Kost\303\274m" : "right / X = wear this one"); return; }
         if (CosOffered(static_cast<WORD>(q.intro)) == 0) {   // 0.21.7: the game's check said no - nothing runs
             CosLabel(static_cast<DWORD>(q.intro), lab, sizeof(lab));
-            QbResult(true, "%s: %s - %s", cos, lab, de ? "vom Spiel abgelehnt (Pruefung 0x5c54e0, keine .drm?)"
+            QbResult(true, "%s: %s - %s", cos, lab, de ? "vom Spiel abgelehnt (Pr\303\274fung 0x5c54e0, keine .drm?)"
                                                        : "refused by the game's check 0x5c54e0 (no .drm?)");
             return;
         }
@@ -30041,12 +30041,12 @@ bool QbFootHint(int page, int sel, bool de, char *o, size_t n) {
     if (p.special != kQsCostume || k < 0 || k >= g_qbDynN) return false;
     const char *t = nullptr;
     switch (g_qbDyn[k].kind) {
-    case kQdCosPick: t = de ? "links / rechts: Kostuem (wechselt nach 0,5 s Ruhe)   X: sofort"
+    case kQdCosPick: t = de ? "links / rechts: Kost\303\274m (wechselt nach 0,5 s Ruhe)   X: sofort"
                             : "left / right: costume (switches after 0.5 s)   X: now"; break;
-    case kQdCosRec: t = de ? "links / rechts: Record   X 2x: waehlen + Unit neu laden"
+    case kQdCosRec: t = de ? "links / rechts: Record   X 2x: w\303\244hlen + Unit neu laden"
                            : "left / right: record   X twice: choose + reload the unit"; break;
     case kQdCosGroup: t = de ? "rechts: auf   links: zu   X: auf / zu" : "right: open   left: close   X: open / close"; break;
-    case kQdCos: t = de ? "rechts / X: dieses Kostuem jetzt" : "right / X: wear this one now"; break;
+    case kQdCos: t = de ? "rechts / X: dieses Kost\303\274m jetzt" : "right / X: wear this one now"; break;
     default: return false;
     }
     Out(o, n, "%s", t);
@@ -30075,7 +30075,7 @@ const ChapGroup kChapGroups[] = {                // key = UnitRow::group (every 
     {"DLC 2", "Abschnitte DLC 2 Laras Schatten", "Units DLC 2 Lara's Shadow"},
     // 0.21.10: the unused DLC slots 3 - 6 of the retail mission screen + dlc_level1_left / _right (kUnitsNoData): no
     // data anywhere (17p / 17s), grey rows, never loadable
-    {"DLC other starts", "Ungenutzte DLC-Plaetze 3 - 6 + left / right", "Unused DLC slots 3 - 6 + left / right"},
+    {"DLC other starts", "Ungenutzte DLC-Pl\303\244tze 3 - 6 + left / right", "Unused DLC slots 3 - 6 + left / right"},
 };
 const int kChapGroupN = static_cast<int>(sizeof(kChapGroups) / sizeof(kChapGroups[0]));
 const char *const kChapDlc2Start = "dlc_level2_start";
@@ -30318,7 +30318,7 @@ void QbChapAct(const QbDyn &q, int dir) {
     const bool first = dir != -1 && !QbArmed(key);
     QbActRow(g_qbPage, r, dir == kQbXDir ? 1 : dir);   // the chapter rows' path: confirm, save.backup, level.load
     if (first && q.loaded)                   // DLC 2 unit: the note with the confirmation
-        QbResult(true, "%s: %s", r.arg, de ? "Doppelgaengerin evtl. nicht aufgesetzt (besser DLC-2-Start + laufen) - "
+        QbResult(true, "%s: %s", r.arg, de ? "Doppelg\303\244ngerin evtl. nicht aufgesetzt (besser DLC-2-Start + laufen) - "
                                              "rechts / X nochmal = laden" : "doppelganger state may be missing (better the "
                                              "DLC 2 start + walk) - right / X again = load");
 }
@@ -30338,7 +30338,7 @@ bool ChapHelp(const QbDyn &q, bool de, char *o, size_t n) {
     else if (UnitNameNoDrm(q.unit))          // 0.21.9
         Out(o, n, "%s", de ? "Keine .drm in mods: nur in unitlist.txt, nicht ladbar" : "No .drm in mods: in unitlist.txt "
                              "only, not loadable");
-    else if (q.loaded) Out(o, n, "%s", de ? "Direkt laden setzt die Doppelgaengerin evtl. nicht auf" : "A direct load may not set "
+    else if (q.loaded) Out(o, n, "%s", de ? "Direkt laden setzt die Doppelg\303\244ngerin evtl. nicht auf" : "A direct load may not set "
                                       "up the doppelganger state");
     else Out(o, n, "%s", de ? "Sicherung, dann diese Unit laden (debug, keine Story-Werte)" : "Backup, then load this unit "
                               "(debug, no story values)");
@@ -30409,14 +30409,14 @@ bool QbHelpLine(int page, int sel, bool de, char *o, size_t n) {
     if (q.kind == kQdChap || q.kind == kQdChapCp) return ChapHelp(q, de, o, n);   // 0.21.7 page Kapitel (0.21.9: + CP rows)
     const char *t = nullptr;
     switch (q.kind) {
-    case kQdCosPick: t = de ? "Kostuem live wechseln, ohne die Unit neu zu laden" : "Switch the costume live, no unit reload";
+    case kQdCosPick: t = de ? "Kost\303\274m live wechseln, ohne die Unit neu zu laden" : "Switch the costume live, no unit reload";
         break;
-    case kQdCosRec: t = de ? "Kostuem fuers naechste Laden waehlen; laedt die Unit neu"
+    case kQdCosRec: t = de ? "Kost\303\274m f\303\274rs n\303\244chste Laden w\303\244hlen; l\303\244dt die Unit neu"
                            : "Choose the costume for the next load; reloads the unit"; break;
     case kQdCos:
         t = CosOffered(static_cast<WORD>(q.intro)) == 0
-                ? (de ? "Vom Spiel abgelehnt (Pruefung 0x5c54e0, keine .drm?)" : "Refused by the game's check (no .drm?)")
-                : (de ? "Dieses Kostuem jetzt anziehen (live)" : "Wear this costume now (live)");
+                ? (de ? "Vom Spiel abgelehnt (Pr\303\274fung 0x5c54e0, keine .drm?)" : "Refused by the game's check (no .drm?)")
+                : (de ? "Dieses Kost\303\274m jetzt anziehen (live)" : "Wear this costume now (live)");
         break;
     default: return false;
     }
@@ -30459,7 +30459,7 @@ void QbSpecialAct(int special, int row, int dir) {
     case kQdPrepare: {                       // 0.21.1 page Tests: the regression shortcut, right twice
         if (dir < 0) { QbResult(false, "%s", de ? "rechts 2x = vorbereiten" : "right 2x = prepare"); return; }
         Out(key, sizeof(key), "prepare %s", q.arg);
-        if (!QbConfirm(key, q.arg, de ? "laedt / teleportiert (Story-Werte?)" : "loads / teleports (story values?)")) return;
+        if (!QbConfirm(key, q.arg, de ? "l\303\244dt / teleportiert (Story-Werte?)" : "loads / teleports (story values?)")) return;
         char o[300];
         const bool ok = RunRegressPrepare(q.arg, o, sizeof(o));
         SetLastAction("regress.prepare", ok, o);
@@ -30506,7 +30506,7 @@ void QbSpecialAct(int special, int row, int dir) {
         {
             char lara[48], what[160];
             PosLaraUnit(lara, sizeof(lara));
-            Out(what, sizeof(what), de ? "Unit %s nicht geladen (Lara in %s) - laedt sie (Story-Werte?)"
+            Out(what, sizeof(what), de ? "Unit %s nicht geladen (Lara in %s) - l\303\244dt sie (Story-Werte?)"
                                        : "unit %s not loaded (Lara in %s) - loads it (story values?)", q.unit, lara[0] ? lara : "-");
             if (!QbConfirm(key, q.arg, what)) return;
         }
@@ -30545,7 +30545,7 @@ void QbSpecialAct(int special, int row, int dir) {
         QbRun("Saves", "load", q.arg, "save.load", q.arg);
         return;
     case kQdBackup:
-        if (dir < 0) { QbResult(false, "%s", de ? "rechts 2x (10 s) = zurueckspielen" : "right 2x (10 s) = restore"); return; }
+        if (dir < 0) { QbResult(false, "%s", de ? "rechts 2x (10 s) = zur\303\274ckspielen" : "right 2x (10 s) = restore"); return; }
         QbRun("Saves", "restore", q.arg, "save.restore", q.arg);
         return;
     default:
