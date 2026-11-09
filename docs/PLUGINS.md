@@ -16,7 +16,7 @@ READMEs and [CHANGELOG.md](../CHANGELOG.md); the plugin README and the CHANGELOG
 
 | Plugin | Group | Version | State |
 |---|---|---|---|
-| [TruQoL](#truqol) | base-game comfort | 0.1.2 | partial: frame limiter and thread cap played 2026-11-08; the other keys offline |
+| [TruQoL](#truqol) | base-game comfort | 0.1.3 | partial: frame limiter and thread cap played 2026-11-08; the other keys offline |
 | [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22.1 | partial: 0.21.11 and the 0.22 cutscene pause played 2026-11-08; 0.22.1 (sound held, badge, pause at a mark) offline |
 | [TruMercLang](#trumerclang) | base-game comfort (fun option) | 0.1 | offline, default off |
 | [TruShadowPower](#trushadowpower) | DLC 2 title update | 0.20 | partial: played up to 0.18; 0.19 and 0.20 offline |
@@ -80,13 +80,13 @@ above 60 fps), a field-of-view factor, a camera-shake factor (against motion sic
 on PCs with more than 31 CPU threads, and an optional skip of the start-up intro movie. TruMenu stays the debug tool;
 TruQoL holds only switches a player wants.
 
-- Version: 0.1.2 (`TruQoL 0.1.2`).
+- Version: 0.1.3 (`TruQoL 0.1.3`).
 - State: partial. In the live test of 2026-11-08 the frame limiter was active at 60 fps. The thread cap was bisected
-  on a 36-thread PC: 8 / 16 / 24 start and load DLC 2, 25 and higher hang at the first load (the default is to become
-  8). More worker threads and the 60 fps limit did not change the load time. FOV, shake scale and intro skip are
+  on a 36-thread PC: 8 / 16 / 24 start and load DLC 2, 25 and higher hang at the first load (default 8
+  since 0.1.3). More worker threads and the 60 fps limit did not change the load time. FOV, shake scale and intro skip are
   offline; the frame limiter's auto-off for DXVK / dxwrapper is not tested with real files.
 - INI `TruQoL.ini`: `[FrameLimit] Enabled` / `MaxFps` (60) / `AutoOff`; `[Camera] Fov` (factor, 0 = the game's) /
-  `FovCutscenes` / `ShakeScale` (0 = no shakes); `[Startup] ThreadCap` (31 in 0.1.2) / `SkipIntro` (0). Most keys
+  `FovCutscenes` / `ShakeScale` (0 = no shakes); `[Startup] ThreadCap` (8; 31 up to 0.1.2) / `SkipIntro` (0). Most keys
   can be changed live from TruMenu's page "Fixes"; `Enabled`, `ThreadCap` and `SkipIntro` need a restart.
 - Install: `scripts\windows\Set-TruQoL.ps1` (`-Check`, `-Install`, `-Remove`).
 - README: [src/asi/TruQoL/README.md](../src/asi/TruQoL/README.md).

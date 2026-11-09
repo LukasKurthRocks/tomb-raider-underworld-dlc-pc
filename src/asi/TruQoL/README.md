@@ -4,9 +4,11 @@ A small ASI plugin for the **PC** `tru.exe` (Steam, Tomb Raider: Underworld 1.1,
 players**: a frame limiter, a field-of-view factor, a camera-shake factor (motion sickness) and the fix for the
 start-up crash on PCs with more than 31 CPU threads; 0.1.2: an optional skip of the start-up intro movie. TruMenu stays the debug tool; TruQoL holds only switches a player
 wants, each with its own INI key (owner decision 2026-11-08). Defaults: **frame limiter on at 60 fps**, the camera
-options neutral (= the game's behaviour), the thread cap on at 31 (it only acts on PCs where the game would crash).
+options neutral (= the game's behaviour), the thread cap on at 8 since 0.1.3 (it only acts on PCs with more threads;
+31 was the old default - live on a 36-thread PC 25 and more hang at the first load).
 
-**Status TruQoL 0.1.2: built 2026-11-08 (`work\asi\qol012`), not installed, not played.** 0.1 (`work\asi\qol01`) was
+**Status TruQoL 0.1.3 (2026-11-09, `work\asi\qol013`): only the ThreadCap default 31 -> 8 changed; the 0.1.2 build
+was installed and played 2026-11-08 (frame limiter, thread cap with 8 / 16 / 24 in the INI).** 0.1 (`work\asi\qol01`) was
 the first build; 0.1.1 (`work\asi\qol011`) reads the live keys again while the game runs (TruMenu page "Fixes", group
 "Komfort (TruQoL)"); 0.1.2 adds `[Startup] SkipIntro` (skip the start-up intro movie, default off - see below).
 Everything below is proven statically (disassembly of the installed `tru.exe`, md5 `5560abac...`, and `binkw32.dll`);
@@ -30,7 +32,7 @@ off / why).
 | `[Camera]` | `Fov` | 0 | 0, 0.5 .. 2.0 | live | **factor** on the game's vertical field of view; 0 or 1 = the game's, 1.15 = 15 % wider |
 | `[Camera]` | `FovCutscenes` | 0 | 0 / 1 | live | 0 = only the gameplay camera, cutscenes keep their framing; 1 = every camera |
 | `[Camera]` | `ShakeScale` | 1.0 | 0 .. 1.0 | live | camera shake strength: 1.0 = the game's, 0 = no camera shakes |
-| `[Startup]` | `ThreadCap` | 31 | 0 .. 31 | restart | the game's CPU count sees at most this many threads (only when the PC has more); 0 = off - acts once, before WinMain |
+| `[Startup]` | `ThreadCap` | 8 | 0 .. 31 | restart | the game's CPU count sees at most this many threads (only when the PC has more); 0 = off - acts once, before WinMain. 0.1.3: default 8 (was 31) - live on a 36-thread PC 8 / 16 / 24 work, 25 and more hang at the first load (worker pool, ENGINE.md 3), more threads gave no faster loading |
 | `[Startup]` | `SkipIntro` | 0 | 0 / 1 | restart | 0.1.2: 1 = skip the start-up intro movie (only before the "press start" screen, never in a level; the legal screens stay); patched once at the start |
 
 Invalid values are logged and replaced by the default (at the start) or keep the current value (live). Every engine
@@ -114,8 +116,8 @@ with 0.1.1 (TruMenu.switches.txt, group "Komfort (TruQoL)").
 
 ## TO TEST
 
-1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol012`; start the game (affinity work-around still in the
-   launch options for the first run); `TruQoL.log`: the loaded line (`TruQoL 0.1.2`), `Startup ThreadCap: on, 31`,
+1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol013`; start the game (affinity work-around still in the
+   launch options for the first run); `TruQoL.log`: the loaded line (`TruQoL 0.1.3`), `Startup ThreadCap: on, 8`,
    `FrameLimit: on, 60 fps`, `Camera Fov: off ... pass-through`, `Camera ShakeScale: off`, `Startup SkipIntro: off`,
    `live: TruQoL.ini is read
    again ...`, then `FrameLimit: d3d9.dll = ...TRAWindowed...` (TRAWindowed installed) and `Startup ThreadCap: CPU count

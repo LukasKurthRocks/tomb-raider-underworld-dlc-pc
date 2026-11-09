@@ -27,7 +27,10 @@
 //    callers, 0x5eea55 (camera apply) and 0x5eb56d (shake sum); both rel32 -> ShakeStub (the game's function, then
 //    fmul by the factor) - the same two sites TruMenu's cam.shakescale uses (TruMenu then refuses its slider and logs
 //    "another plugin?"; with ShakeScale=1.0 TruQoL patches nothing).
-// 3. [Startup] ThreadCap - the start-up crash with > 31 logical CPUs: the CPU topology count 0x4a21d0 (called once:
+// 3. [Startup] ThreadCap (default 8 since 0.1.3: live 2026-11-08 on a 36-thread PC 8 / 16 / 24 started and loaded DLC 2,
+//    25 / 26 / 28 / 31 hung at the first load - the worker pool keeps at most 20 of 24+ workers alive, ENGINE.md 3;
+//    more workers brought no load-time gain; 8 is what the `start /affinity FFFF` work-around gives)
+//    - the start-up crash with > 31 logical CPUs: the CPU topology count 0x4a21d0 (called once:
 //    WinMain 0x479c80 -> 0x47a0bb -> 0x4a28e0 -> 0x4a2904) asks GetProcessAffinityMask at 0x4a2238 and walks mask =
 //    1 << i while mask <= the system mask; the step 0x4a2455 `mov eax, 1; mov ecx, edi; shl eax, cl` shifts modulo 32,
 //    so with bit 31 set (>= 32 threads; a 32-bit process sees 0xffffffff) the mask never becomes 0 or exceeds the
@@ -61,6 +64,10 @@
 // TruShadowCombat's [Damage] Translate switch do. Without the clock hook (bytes differ) there is no tick: every key
 // then takes effect at the next start (logged once).
 //
+// 0.1.3 (2026-11-09) [Startup] ThreadCap default 31 -> 8: the live bisection of 2026-11-08 (36-thread PC) showed
+// 25 / 26 / 28 / 31 hang at the first load, 8 / 16 / 24 run, and more workers do not load faster (ENGINE.md 3).
+// No code change besides the default.
+//
 // 0.1.2 (2026-11-08, package 18c) [Startup] SkipIntro (restart, default 0) - skips the start-up intro movie. Static
 // proof (work\skip18c_0811): the front-end script plays it with the uigamedata native f21 0x7a0cf0 (binder 0x7af0c0
 // idx 0x15) -> PlayMovie 0x77bc60 (its only caller; 0x6457a0 = an empty log stub, 0x5f6420 = mov eax, 1) -> the video
@@ -90,7 +97,7 @@
 
 namespace {
 
-const char kVersion[] = "TruQoL 0.1.2";
+const char kVersion[] = "TruQoL 0.1.3";
 const DWORD kImageBase = 0x00400000;
 
 // ---- 1. frame limiter: the frame-time function 0x5da230 and its two clock reads ----
@@ -161,7 +168,7 @@ int g_limitEnabled = 1, g_maxFps = 60, g_autoOff = 1, g_spinUs = 0;
 float g_fov = 0.0f;                         // factor; 0 (or 1) = game
 int g_fovCutscenes = 0;
 float g_shakeScale = 1.0f;                  // read by ShakeStub
-int g_threadCap = 31;
+int g_threadCap = 8;   // 0.1.3: default 8 (live 2026-11-08, 36-thread PC: 8 / 16 / 24 run, 25 / 26 / 28 / 31 hang)
 int g_skipIntro = 0;                        // 0.1.2: [Startup] SkipIntro (restart)
 
 char g_logPath[MAX_PATH], g_dir[MAX_PATH];
@@ -990,7 +997,7 @@ void ReadOptions() {
     }
     g_fovCutscenes = IniInt("Camera", "FovCutscenes", 0, 0, 1);
     g_shakeScale = IniFloat("Camera", "ShakeScale", 1.0f, 0.0f, 1.0f);
-    g_threadCap = IniInt("Startup", "ThreadCap", 31, 0, 31);
+    g_threadCap = IniInt("Startup", "ThreadCap", 8, 0, 31);   // 0.1.3: default 8 (was 31; 25+ hang at the first load)
     g_skipIntro = IniInt("Startup", "SkipIntro", 0, 0, 1);
 }
 
@@ -1027,7 +1034,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 extern "C" __declspec(dllexport) const char *TruQoLVersion() {
-    return "TruQoL 0.1.2 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
+    return "TruQoL 0.1.3 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
            "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0, start-up "
            "intro skip at the script's PlayMovie call 0x77bc7b; live INI re-read once a second for TruMenu page Fixes)";
 }
