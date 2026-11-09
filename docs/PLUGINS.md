@@ -17,10 +17,10 @@ READMEs and [CHANGELOG.md](../CHANGELOG.md); the plugin README and the CHANGELOG
 | Plugin | Group | Version | State |
 |---|---|---|---|
 | [TruQoL](#truqol) | base-game comfort | 0.1.3 | partial: frame limiter and thread cap played 2026-11-08; the other keys offline |
-| [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22.1 | partial: 0.21.11 and the 0.22 cutscene pause played 2026-11-08; 0.22.1 (sound held, badge, pause at a mark) offline |
+| [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22.12 | partial: cutscene pause, `sub.lang`, `fight.trace`, enemy panel, light diagnosis and the quick bar states played 2026-11-09; known: subtitles run on during the pause, LB + View before RB fires "continue", `sub.lang` not kept over a restart |
 | [TruMercLang](#trumerclang) | base-game comfort (fun option) | 0.1 | offline, default off |
 | [TruShadowPower](#trushadowpower) | DLC 2 title update | 0.20 | partial: played up to 0.18; 0.19 and 0.20 offline |
-| [TruShadowCombat](#trushadowcombat) | DLC 2 title update | 0.6.8 | partial: combat input and damage played; 0.6.6 - 0.6.8 offline |
+| [TruShadowCombat](#trushadowcombat) | DLC 2 title update | 0.6.8 | partial: single punches as on the Xbox played 2026-11-09 (Hit instead of Fall, impulse gate on / off); open: punch combo does not chain, melee kill with the gate not yet seen |
 | [TruShadowHud](#trushadowhud) | DLC 2 title update | 0.2 | partial: HUD natives played 2026-11-05; 0.2 offline |
 | [TruRockVein](#trurockvein) | DLC 2 title update | 0.11 | partial: wall run played; the jump from a ledge to a rock vein turns back |
 | [TruDoppelganger](#trudoppelganger) | DLC 2 title update | 0.1 | in the played DLC 2 stack; its README still says "not yet played" |

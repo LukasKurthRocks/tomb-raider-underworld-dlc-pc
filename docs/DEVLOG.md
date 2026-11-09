@@ -5,6 +5,26 @@ install or play; the [README](../README.md) and [INSTALL](INSTALL.md) cover that
 overlays, log lines, sometimes substitute shaders), scaled down to 1280 px. The README shows the current state; older
 pictures move here.
 
+## 2026-11-09 (evening) - thralls stop falling at every punch
+
+No picture, the proof is in the logs: with TruShadowCombat 0.6.8 the tutorial thrall in hall02 takes three single
+punches as on the Xbox 360 - attack, **Hit** (-20), back to waiting - instead of falling down, getting up and attacking
+again and again. The cause was one check the Xbox title update added to Lara's contact hit: after the hit message the
+game sends a short push (message 0x91); the title update skips it for enemies (flag 0x400000 on the thrall, now
+measured), the PC - built from the code before that update - pushed every enemy into a fall. The plugin translates
+that check 1:1 (`[Hit] TranslateImpulseGate`); switched off live, the old falling came straight back. Still open: the
+punch combo does not chain yet (every press is punch 1), and a melee kill with the check on still has to be watched
+([ENGINE.md](ENGINE.md) section 1, rows "Impulse 0x91" and "Lara's punch combo").
+
+## 2026-11-09 (evening) - the light choice, frame by frame
+
+![The throne in the held end-room cutscene, six frames 0.1 s apart: top row the game's own light order (the dropped shadow light changes every frame), bottom row TruMenu's fixed order (always the same light dropped)](screenshots/dev-throne-light-choice-2026-11-09.png)
+
+*Development build, TruMenu's `light.cutlabels` on: every light the PC had to drop for an object in that frame gets a
+label. Top row, the game's own order: the dropped shadow light alternates between #98 and #93 from frame to frame -
+the throne's brightness jumps between 65 and 74 (of 255). Bottom row, `light.stable` (the default fix): always #94 is
+dropped, the brightness stays at 65-69. The flicker explained in the entry below, now seen at work.*
+
 ## 2026-11-09 - the throne flicker explained: three lights too many
 
 ![Natla in the throne cutscene: top PC (lit warm, then cool, alternating), bottom Xbox 360 original in an emulator (warm hair and cool face at once)](screenshots/dev-natla-pc-vs-xbox-2026-11-09.png)
