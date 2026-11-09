@@ -2928,6 +2928,57 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.9 - enemy diagnosis, combo trace, subtitle language live, combo fix (2026-11-09)
+
+Built into `work\asi\menu0232`, not installed. Byte checks: `work\asi\menu0232\precheck_0229.txt` (9 checks, 0
+mismatches against the installed `tru.exe`).
+
+- **Third enemy label line** (dbg.enemies, every AI enemy, light blue): why an enemy attacks or not and how it took the
+  last hit. Live symptom 2026-11-09: the hall02 tutorial thrall walks to Lara, follows her, stays in `CombatStepIdle`
+  and never attacks. Example: `Ziel Lara 312 | Ko nein 0/14 2s | Soll - | L1 - | Sp - | St 40 | Tr 3 -20>HitReaction`.
+  - `Ziel` - the enemy's current target (EnemyTargeting brain+0x4e10, slot +0x30: mode 0 sense / 1 instance / 2
+    position): `Lara <distance>`, another instance, or `- (m<mode>)` = none.
+  - `Ko` - attack slots: the coordinator 0x67d780 (asked before Attack / MeleeAttack, callers 0x63a731, 0x64fefb,
+    0x65b9f9, 0x65bd26, 0x673981) counted per enemy: `ja` / `nein` = last answer, granted / calls, seconds since the last
+    call; `Ko 0` = the enemy never asked. A pass-through detour on its 5-byte prologue (`83 ec 18 53 56` ->
+    trampoline), placed on the game thread the first time a label or `ai.why` needs it; it never changes the answer.
+  - `Soll` - the requested state (brain+0x18f8), `L1` - the layer 1 state (brain+0x1260); `-` = none, else the state name.
+  - `Sp` - the game's gate bits brain+8: `A` = 0x20 Attack / ScriptAttack off, `M` = 0x100000 Melee off, `X` = 0x800 no
+    damage; `-` = none set.
+  - `St` - stamina (health component brain+0x2c60 +0xc, lowered by 0x620ea0).
+  - `Tr n -x>State` - hits seen (LP drops), the last amount, and the first state the enemy entered within 1.5 s after it
+    (= the hit reaction the game chose: e.g. HitReaction / Vaulted / Fall / RegenerateDeath).
+- **`ai.why [intro id|0xINSTANCE]`** (bar page Tests, group "Gegner-Diagnose"): the nearest AI enemy (or the given one),
+  one long line in TruMenu.log - L0 / L1 / requested states, brain+8 and +0xc, target slot and override slot (+0xf0) with
+  "Lara", the 12 senses (how many hold Lara), attack-slot calls / grants / last answer, LP / damage taken / stamina, hits
+  and the last reaction. Read-only, never toggles anything.
+- **`combo.trace 1|0`** (off by default, live, no argument = report): per AI enemy hit within 3000 units one log line
+  `combo: Lara records <path> -> <enemy> LP a -> b (-x), stamina s -> t, state at the hit ..., reaction ...`. Path =
+  Lara's chart records of chart machine 1 (`[[0xfadb58]+0xf10]`, update 0x787e60 from 0x768c65), the last up to 6 record
+  indices within 2 s - the combo steps; the damage type / sub / amount of the same hit is TruShadowCombat's
+  `damage types` line with the same time stamp. Not traced: the input / link window of each chart transition (needs a
+  hook on the transition 0x787890, which TruTrace already logs), no bar line yet.
+- **`sub.lang -1|0..4|7|9..12`** (no argument = report): the subtitle language live, as `docs\Befund-Untertitel-Live-0911.md`
+  (workspace) proposes - the game's option setter 0x5d5100(0xb, value, 1) on the game thread; its callback 0x5d4dc0
+  writes both profile words `[[0xc59264]+0x208]` / `[[0xc59268]+0x208]`, which every subtitle line reads (0x453990);
+  movies take it at their next start; the next settings save keeps it in the registry. Checks 0x5d5100, 0x5d4dc0,
+  0x453990; at run time `[0x8ab594] == 0x5d4dc0` and both profiles set.
+- **Cutscene pad combos fixed** (live 2026-11-09 15:13: the photo combo View + LB + RB also fired View + LB = pause off
+  and View + RB = step): only the buttons of the three combos count, a combo fires when exactly its buttons are held and
+  that set stood still for 120 ms (pressing View, LB, RB one after the other gives the photo, not the pause on the way),
+  once per press - then all combos wait until no combo button was held for 120 ms. Keyboard keys unchanged (edges).
+
+### TO TEST 0.22.9
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | log | `0.22.9: ai.why / enemy diagnosis line ok (5 checks)`; after the first labels `coordinator 0x67d780 counted` |
+| 2 | hall02 tutorial thrall, dbg.enemies on | third line; while it idles: `Ko 0` (never asks) or `Ko nein n/m` (asks, refused) - decides the next step |
+| 3 | bar Tests: "Warum greift er nicht an?" | one `ai.why:` line in TruMenu.log |
+| 4 | "Kombo-Spur" on, hit a thrall with X X X | `combo:` lines, path grows per step; reaction state per hit |
+| 5 | cutscene, View + LB + RB | photo only - no pause toggle, no step |
+| 6 | cutscene with subtitles, `sub.lang 0` then `sub.lang 2` | next line in English, then German |
+
 ### TO TEST 0.22.1
 
 | # | Step | Expected |

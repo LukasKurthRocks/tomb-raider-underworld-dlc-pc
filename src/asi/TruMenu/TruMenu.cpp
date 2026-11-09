@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -1072,6 +1072,8 @@ bool WriteDword(DWORD address, DWORD value) {
 }
 
 void RunPending();     // items section below
+void AwTick();         // 0.22.9 ai.why / combo.trace, section "0.22.9 enemy diagnosis"
+void CtTick();
 bool InLevel();
 void WeaponsTick();    // 0.3 costume switch: player message 35 a frame later
 void CosValidTick();   // 0.21.7 bar page Kostueme: the game's costume check per cycle-list entry (game thread)
@@ -1403,6 +1405,8 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         ArTick();                             // 0.21 arachnophobia: slot 7 / sound gates (only while on in a level)
         CsTick();                             // 0.21 camera shake scale / rumble (only below 100 %)
         CnTick();                             // 0.22 cine.pause (cheap while off: one flag)
+        AwTick();                             // 0.22.9 ai.why: places the coordinator counter once (cheap after that)
+        CtTick();                             // 0.22.9 combo.trace (cheap while off: one flag)
         LxTick();                             // 0.22.2 light.frame (cheap while idle: two flags)
         LsTick();                             // 0.22.3 light.stable (cheap while off: two flags)
         AkTick();                             // 0.21.1 ai.kill: one state line ~1 s after a kill (cheap while idle)
@@ -6532,6 +6536,10 @@ LblTscSnap g_lblSnap;
 bool g_lblSnapOk = false;
 DWORD AiBrainOf(DWORD inst);                 // 0.19, below (section "0.19 dumb AI")
 void EsStateText(DWORD inst, DWORD brain, char *o, size_t n);   // 0.20.1 enemy state, section "0.20.1 sound list"
+void AwLabelText(DWORD inst, DWORD brain, char *o, size_t n);   // 0.22.9 ai.why line, same section
+void AwTick();
+void CtTick();
+void AwCheck();
 bool M20EnemiesOn();                         // 0.20, below: dbg.enemies on (dbg.labels then leaves AI enemies to it)
 
 // load: the byte checks of precheck_013.txt
@@ -14999,7 +15007,7 @@ struct M20Mark {
     DWORD inst;
     float pos[3], dist2;
     int kind;
-    char line1[128], line2[128];
+    char line1[128], line2[128], line3[160];   // 0.22.9: line3 = ai.why diagnosis (enemies)
     ImU32 colour, colour2;
     float top[3];
     DWORD childIntro;                        // 0.21: the placed intro this runtime child carries (0 = placed / none)
@@ -15197,6 +15205,7 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
         m.colour = k.colour;
         m.colour2 = IM_COL32(235, 235, 235, 255);
         if (m.kind == kEnThrall && g_lblOk) LabelTscText(m.inst, m.line2, sizeof(m.line2), &m.colour2);   // 0.13 Z9
+        AwLabelText(m.inst, brain, m.line3, sizeof(m.line3));   // 0.22.9: why (no) attack, hit reaction
         m.top[0] = head[0]; m.top[1] = head[1]; m.top[2] = head[2] + 40.0f;
     }
     g_dvListed[kDvCollect] = coFound;
@@ -15218,7 +15227,11 @@ bool M20Label(ImDrawList *dl, const M20Mark &m) {
         return false;
     const float fs = ImGui::GetFontSize();
     const ImVec2 s1 = ImGui::CalcTextSize(m.line1), s2 = m.line2[0] ? ImGui::CalcTextSize(m.line2) : ImVec2(0.0f, 0.0f);
-    const float w = (s1.x > s2.x ? s1.x : s2.x) + 8.0f, h = m.line2[0] ? 2.0f * fs + 6.0f : fs + 4.0f;
+    const ImVec2 s3 = m.line3[0] ? ImGui::CalcTextSize(m.line3) : ImVec2(0.0f, 0.0f);   // 0.22.9
+    const int lines = 1 + (m.line2[0] ? 1 : 0) + (m.line3[0] ? 1 : 0);
+    float wMax = s1.x > s2.x ? s1.x : s2.x;
+    if (s3.x > wMax) wMax = s3.x;
+    const float w = wMax + 8.0f, h = static_cast<float>(lines) * (fs + 2.0f) + 2.0f;
     DvRect r = {at.x - w * 0.5f, at.y - h - 6.0f, at.x + w * 0.5f, at.y - 6.0f};
     if (!DvRectFree(r)) {
         r.y0 -= h + 4.0f;
@@ -15230,6 +15243,9 @@ bool M20Label(ImDrawList *dl, const M20Mark &m) {
     dl->AddRectFilled(ImVec2(r.x0, r.y0), ImVec2(r.x1, r.y1), IM_COL32(0, 0, 0, 170), 3.0f);
     dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 2.0f), m.colour | 0xff000000u, m.line1);
     if (m.line2[0]) dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 4.0f + fs), m.colour2 | 0xff000000u, m.line2);
+    if (m.line3[0])                          // 0.22.9: below line 2 (or line 1 when there is none)
+        dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 2.0f + static_cast<float>(lines - 1) * (fs + 2.0f)),
+                    IM_COL32(180, 220, 255, 255), m.line3);
     if (m.hpMax > 0.0f) {                    // 0.21.1: health bar above the label, green -> red, the number in it
         float f = m.hp / m.hpMax;
         f = f < 0.0f ? 0.0f : f > 1.0f ? 1.0f : f;
@@ -16411,6 +16427,510 @@ void EsCheck() {                             // g_esLog: [Debug] EnemyStateLog, 
     Log(g_esOk ? 1 : 0, "0.20.1: enemy state on the labels %s (%d checks%s), image 0x%08lx .. 0x%08lx; [Debug] "
         "EnemyStateLog %d", g_esOk ? "ok" : "off", static_cast<int>(sizeof(kEsChecks) / sizeof(kEsChecks[0])),
         g_esOk ? "" : at ? ", differs" : ", no image", g_esImageLo, g_esImageHi, g_esLog);
+    AwCheck();                               // 0.22.9 ai.why (needs the image bounds above)
+}
+// ---- 0.22.9 enemy "why no attack" / hit reaction diagnosis (ai.why, third label line) ----
+// Live 2026-11-09 14:4x-15:0x (hall02, viking_thrall_tutorial_dlc2 after "Tutorial Text shown; initiating combat
+// tutorial sequence"): the thrall walks to Lara and follows her but stays in CombatStepIdle and never attacks; and on PC
+// a thrall falls over at every hit (Xbox: stays up between hits). Read-only diagnosis, every pointer checked:
+//   * current target = EnemyTargeting (brain+0x4e10) +0x30 slot (getter 0x60e420 -> 0x653b60): +4 mode (-1 none, 0 sense
+//     handle +0x28 {sense, id} -> target [sense+0xa8] when [[sense+0xa8]+0x44] == [sense+0xac] == id (0x63fae0),
+//     1 instance handle +0x20 {inst, id}, 2 position); override slot +0xf0 (mode at +0xf4) - 0.20 ai.dumb notes;
+//   * attack slot request = the coordinator 0x67d780 (thiscall (record, enemy instance, -1 / 0), ret 0xc; callers
+//     0x63a731, 0x64fefb, 0x65b9f9, 0x65bd26, 0x673981; al != 0 = the enemy holds / got an attack slot, 0 = refused):
+//     a pass-through detour on its 5-byte prologue (83 ec 18 53 56 -> trampoline) counts calls and grants per enemy -
+//     placed on the game thread the first time labels or ai.why need it, never removed (no behaviour change);
+//   * gate bits brain+0x08 (0x20 Attack / ScriptAttack off, 0x100000 Melee off, 0x800 no damage - 0.19 ai.noattack
+//     notes) and +0x0c; requested states brain+0x18f8 / +0x18fc (state objects when they are, else raw);
+//   * health component brain+0x2c60: +4 LP, +8 damage taken, +0xc stamina (0x620ea0 subtracts from +0xc);
+//   * hit reaction: the label loop notes every LP drop and the first state the enemy enters within 1.5 s after it
+//     (e.g. HitReaction / Vaulted / Fall / RegenerateDeath) - what the game chose for that hit.
+const DvCheck kAwChecks[] = {
+    {0x0067d780, "83ec18 53 56 57 8b7c242c 57 8bf1 32db e84ccbffff"},   // coordinator prologue (detour site)
+    {0x0060e420, "83c130 e938570400"},                                 // EnemyTargeting+0x30 = the current target
+    {0x00653b60, "8b4104 83e800 7412 83e801 7537 83c120 51"},           // slot +4 mode: 0 sense (+0x28), 1 handle (+0x20)
+    {0x0063fae0, "8b01 85c0 7445 83b8a800000000 743c"},                 // sense handle: [sense+0xa8] target
+    {0x00620ea0, "51 d9410c 8b01 d8642408"},                           // health component +0xc = stamina
+};
+bool g_awOk = false, g_awCoTried = false, g_awCoOn = false;
+char g_awWhy[96] = "not checked";
+struct AwRec {
+    DWORD inst, calls, grants, lastTick;
+    BYTE last;
+    float hp;                                // last LP seen by the label loop
+    DWORD hitTick, hitState, reaction;       // LP drop: time, state then, first other state within 1.5 s
+    float hitAmount;
+    LONG hits;
+};
+AwRec g_awRec[64];
+int g_awRecN = 0;
+AwRec *AwRecOf(DWORD inst, bool add) {       // game thread (detour) and render thread (labels) - plain ints only
+    for (int i = 0; i < g_awRecN; ++i)
+        if (g_awRec[i].inst == inst) return &g_awRec[i];
+    if (!add) return nullptr;
+    int k = g_awRecN < 64 ? g_awRecN++ : static_cast<int>(GetTickCount() % 64);
+    memset(&g_awRec[k], 0, sizeof(g_awRec[k]));
+    g_awRec[k].inst = inst;
+    g_awRec[k].hp = -1.0e9f;
+    return &g_awRec[k];
+}
+typedef char(__fastcall *AwCoFn)(void *self, void *edx, DWORD record, DWORD inst, DWORD a3);
+AwCoFn g_awCoOrig = nullptr;
+char __fastcall AwCoHook(void *self, void *edx, DWORD record, DWORD inst, DWORD a3) {
+    const char r = g_awCoOrig(self, edx, record, inst, a3);
+    AwRec *w = AwRecOf(inst, true);
+    if (w) {
+        ++w->calls;
+        if (r) ++w->grants;
+        w->last = static_cast<BYTE>(r ? 1 : 0);
+        w->lastTick = GetTickCount();
+    }
+    return r;
+}
+void AwCheck() {
+    DWORD at = 0;
+    g_awOk = g_esImageHi > g_esImageLo && DvChecks(kAwChecks, sizeof(kAwChecks) / sizeof(kAwChecks[0]), &at);
+    if (g_awOk) Out(g_awWhy, sizeof(g_awWhy), "ok");
+    else Out(g_awWhy, sizeof(g_awWhy), "code differs at 0x%08lx", at);
+    Log(g_awOk ? 1 : 0, "0.22.9: ai.why / enemy diagnosis line %s (%d checks)", g_awWhy,
+        static_cast<int>(sizeof(kAwChecks) / sizeof(kAwChecks[0])));
+}
+// game thread (PadHook, once per game frame): place the coordinator detour once it is wanted
+bool g_awWant = false;
+void AwTick() {
+    if (!g_awOk || !g_awWant || g_awCoTried) return;
+    g_awCoTried = true;
+    const BYTE orig[5] = {0x83, 0xec, 0x18, 0x53, 0x56};
+    BYTE now[5] = {};
+    for (int i = 0; i < 5; ++i)
+        if (!ReadByte(0x0067d780 + i, &now[i])) now[i] = 0;
+    if (memcmp(now, orig, 5) != 0) {
+        Log(0, "0.22.9: coordinator 0x67d780 already changed (%02x %02x %02x %02x %02x) - no attack-slot counts", now[0],
+            now[1], now[2], now[3], now[4]);
+        return;
+    }
+    BYTE *t = static_cast<BYTE *>(VirtualAlloc(nullptr, 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!t) return;
+    memcpy(t, orig, 5);
+    t[5] = 0xe9;
+    const DWORD back = 0x0067d785 - (reinterpret_cast<DWORD>(t) + 10);
+    memcpy(t + 6, &back, 4);
+    FlushInstructionCache(GetCurrentProcess(), t, 16);
+    g_awCoOrig = reinterpret_cast<AwCoFn>(t);
+    BYTE jmp[5] = {0xe9};
+    const DWORD rel = reinterpret_cast<DWORD>(&AwCoHook) - (0x0067d780 + 5);
+    memcpy(jmp + 1, &rel, 4);
+    g_awCoOn = WriteBytes(0x0067d780, jmp, 5);
+    Log(1, "0.22.9: coordinator 0x67d780 %s (pass-through: attack-slot requests / grants per enemy for ai.why and the "
+           "labels)", g_awCoOn ? "counted" : "NOT patched (write failed)");
+}
+// state object name (or "-" / raw) into o
+void AwStateName(DWORD obj, char *o, size_t n) {
+    DWORD namePtr = 0;
+    char name[32] = "";
+    if (!obj) { Out(o, n, "-"); return; }
+    if (EsInImage(obj) && ReadDword(obj + 8, &namePtr) && EsInImage(namePtr) && ReadString(namePtr, name, sizeof(name))) {
+        size_t len = 0;
+        bool ok = true;
+        for (; name[len]; ++len)
+            if (name[len] < 0x20 || name[len] > 0x7e) ok = false;
+        if (ok && len >= 2) { Out(o, n, "%s", name); return; }
+    }
+    Out(o, n, "0x%lx", obj);
+}
+// the enemy's current target: 0 none, else the instance; *mode = slot mode (-1 none, 0 sense, 1 instance, 2 position)
+DWORD AwTarget(DWORD brain, DWORD slot, LONG *mode) {
+    DWORD m = 0xffffffff, t = 0;
+    *mode = -1;
+    if (!ReadDword(brain + 0x4e10 + slot + 4, &m)) return 0;
+    *mode = static_cast<LONG>(m);
+    if (m == 1) {
+        DWORD id = 0, iid = 0;
+        if (ReadDword(brain + 0x4e10 + slot + 0x20, &t) && t && ReadDword(brain + 0x4e10 + slot + 0x24, &id) &&
+            ReadDword(t + 0x44, &iid) && iid == id)
+            return t;
+        return 0;
+    }
+    if (m == 0) {
+        DWORD s = 0, id = 0, sid = 0, tid = 0;
+        if (ReadDword(brain + 0x4e10 + slot + 0x28, &s) && s && ReadDword(brain + 0x4e10 + slot + 0x2c, &id) &&
+            ReadDword(s + 0xa8, &t) && t && ReadDword(s + 0xac, &sid) && ReadDword(t + 0x44, &tid) && tid == sid &&
+            tid == id)
+            return t;
+        return 0;
+    }
+    return 0;
+}
+// render thread, label loop: note LP drops and the reaction state after them
+void AwNoteHit(DWORD inst, DWORD brain) {
+    float hp = 0.0f;
+    DWORD st = 0;
+    if (!ReadFloats(brain + 0x2c64, &hp, 1) || !ReadDword(brain + 0x125c, &st)) return;
+    AwRec *w = AwRecOf(inst, true);
+    if (!w) return;
+    const DWORD now = GetTickCount();
+    if (w->hp > -1.0e8f && hp < w->hp - 0.01f) {
+        w->hitAmount = w->hp - hp;
+        w->hitTick = now;
+        w->hitState = st;
+        w->reaction = 0;
+        ++w->hits;
+    } else if (w->hitTick && !w->reaction && st != w->hitState && now - w->hitTick < 1500) {
+        w->reaction = st;
+    }
+    w->hp = hp;
+}
+// third label line (all AI enemies while dbg.enemies is on): target, attack slot, gate bits, requested state, layer 1,
+// stamina, last hit reaction - README 0.22.9 explains the abbreviations
+void AwLabelText(DWORD inst, DWORD brain, char *o, size_t n) {
+    o[0] = 0;
+    if (!g_awOk || !brain) return;
+    g_awWant = true;
+    AwNoteHit(inst, brain);
+    DWORD player = 0, b8 = 0, l1 = 0, req = 0;
+    ReadDword(kPlayerPtr, &player);
+    ReadDword(brain + 8, &b8);
+    ReadDword(brain + 0x1260, &l1);
+    ReadDword(brain + 0x18f8, &req);
+    LONG mode = -1;
+    const DWORD tgt = AwTarget(brain, 0x30, &mode);
+    char tg[48], rq[32], s1[32], co[40] = "Ko ?", tr[48] = "";
+    if (tgt && tgt == player) {
+        float a[3], b[3];
+        if (ReadFloats(inst + kInstancePosition, a, 3) && ReadFloats(tgt + kInstancePosition, b, 3)) {
+            const float dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+            Out(tg, sizeof(tg), "Ziel Lara %.0f", static_cast<double>(sqrtf(dx * dx + dy * dy + dz * dz)));
+        } else {
+            Out(tg, sizeof(tg), "Ziel Lara");
+        }
+    } else if (tgt) {
+        Out(tg, sizeof(tg), "Ziel 0x%lx", tgt);
+    } else {
+        Out(tg, sizeof(tg), "Ziel - (m%ld)", mode);
+    }
+    AwStateName(req, rq, sizeof(rq));
+    AwStateName(l1, s1, sizeof(s1));
+    const AwRec *w = AwRecOf(inst, false);
+    if (g_awCoOn) {
+        if (w && w->calls)
+            Out(co, sizeof(co), "Ko %s %lu/%lu %.0fs", w->last ? "ja" : "nein", w->grants, w->calls,
+                static_cast<double>(GetTickCount() - w->lastTick) / 1000.0);
+        else
+            Out(co, sizeof(co), "Ko 0");
+    }
+    if (w && w->hits)
+        Out(tr, sizeof(tr), " | Tr %ld -%.0f>", w->hits, static_cast<double>(w->hitAmount));
+    if (w && w->reaction) {
+        char rn[32];
+        AwStateName(w->reaction, rn, sizeof(rn));
+        const size_t len = strlen(tr);
+        Out(tr + len, sizeof(tr) - len, "%s", rn);
+    }
+    float stamina = 0.0f;
+    char stx[24] = "";
+    if (ReadFloats(brain + 0x2c6c, &stamina, 1) && stamina > -1.0e6f && stamina < 1.0e6f)
+        Out(stx, sizeof(stx), " | St %.0f", static_cast<double>(stamina));
+    Out(o, n, "%s | %s | Soll %s | L1 %s | Sp %s%s%s%s", tg, co, rq, s1,
+        (b8 & (0x20 | 0x100000 | 0x800)) ? "" : "-", (b8 & 0x20) ? "A" : "", (b8 & 0x100000) ? "M" : "",
+        (b8 & 0x800) ? "X" : "");
+    const size_t len = strlen(o);
+    Out(o + len, n - len, "%s%s", stx, tr);
+}
+bool AdCandidate(DWORD inst, DWORD player, DWORD *brain);   // 0.21 ai.remove, section "0.21 ai.remove"
+// ai.why [intro id|0xINSTANCE]: one full diagnosis of the nearest AI enemy (or the given one) into TruMenu.log
+bool RunAw(const char *arg, char *o, size_t n) {
+    if (!g_awOk) { Out(o, n, "disabled: pre-check failed (%s)", g_awWhy); return false; }
+    g_awWant = true;                         // counts start with the next game frame
+    char why[160];
+    if (!LabelWorldReady(why, sizeof(why))) { Out(o, n, "ai.why: %s", why); return false; }
+    DWORD player = 0, inst = 0, pick = 0, brain = 0, pickBrain = 0;
+    float lara[3] = {0.0f, 0.0f, 0.0f}, best = 0.0f;
+    if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) {
+        Out(o, n, "ai.why: no player");
+        return false;
+    }
+    char a[32] = "";
+    if (arg) strncpy_s(a, sizeof(a), arg, _TRUNCATE);
+    DvTrim(a);
+    const bool hex = a[0] == '0' && (a[1] == 'x' || a[1] == 'X');
+    const DWORD wantInst = hex ? strtoul(a, nullptr, 16) : 0;
+    const LONG wantIntro = a[0] && !hex ? strtol(a, nullptr, 10) : 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        float p[3];
+        if (AdCandidate(inst, player, &brain) && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            DWORD intro = 0;
+            ReadDword(inst + 0x58, &intro);
+            const float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2], d2 = dx * dx + dy * dy + dz * dz;
+            const bool match = wantInst ? inst == wantInst : wantIntro ? static_cast<LONG>(intro) == wantIntro : true;
+            if (match && (!pick || d2 < best)) { pick = inst; pickBrain = brain; best = d2; }
+        }
+        inst = next;
+    }
+    if (!pick) { Out(o, n, "ai.why: no AI enemy%s", a[0] ? " with that id" : ""); return false; }
+    DWORD object = 0, oid = 0, intro = 0, b8 = 0, bc = 0, l0 = 0, l1 = 0, r0 = 0, r1 = 0;
+    ReadDword(pick + 0x10, &object);
+    if (object) ReadDword(object + 0x14, &oid);
+    ReadDword(pick + 0x58, &intro);
+    char name[64];
+    if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+    ReadDword(pickBrain + 8, &b8);
+    ReadDword(pickBrain + 0xc, &bc);
+    ReadDword(pickBrain + 0x125c, &l0);
+    ReadDword(pickBrain + 0x1260, &l1);
+    ReadDword(pickBrain + 0x18f8, &r0);
+    ReadDword(pickBrain + 0x18fc, &r1);
+    char sl0[32], sl1[32], sr0[32], sr1[32];
+    AwStateName(l0, sl0, sizeof(sl0));
+    AwStateName(l1, sl1, sizeof(sl1));
+    AwStateName(r0, sr0, sizeof(sr0));
+    AwStateName(r1, sr1, sizeof(sr1));
+    LONG m0 = -1, m1 = -1;
+    const DWORD t0 = AwTarget(pickBrain, 0x30, &m0), t1 = AwTarget(pickBrain, 0xf0, &m1);
+    int senses = 0, sensesLara = 0;          // the 12 EnemySense slots (0.19): +0xa8 target
+    for (DWORD i = 0; i < kAiSlots; ++i) {
+        DWORD t = 0;
+        if (!ReadDword(pickBrain + kAiSenses + kAiSlot0 + i * kAiSlotSize + 0xa8, &t) || !t) continue;
+        ++senses;
+        if (t == player) ++sensesLara;
+    }
+    float hc[4] = {0.0f, 0.0f, 0.0f, 0.0f};  // health component +4 LP, +8 taken, +0xc stamina
+    ReadFloats(pickBrain + 0x2c64, hc + 1, 3);
+    const AwRec *w = AwRecOf(pick, false);
+    char rn[32] = "-", hs[32] = "-";
+    if (w && w->reaction) AwStateName(w->reaction, rn, sizeof(rn));
+    if (w && w->hitState) AwStateName(w->hitState, hs, sizeof(hs));
+    Log(1, "ai.why: %s intro %ld instance 0x%08lx brain 0x%08lx, %.0f units from Lara | states L0 %s, L1 %s, requested "
+           "%s / %s | brain+8 0x%08lx (Attack off %d, Melee off %d, no damage %d), +0xc 0x%08lx | target slot mode %ld -> "
+           "%s0x%08lx, override mode %ld -> %s0x%08lx | senses %d used, %d on Lara | attack slots (0x67d780) %s: %lu "
+           "calls, %lu granted, last %s %.1f s ago | health LP %.1f, taken %.1f, stamina %.1f | hits seen %ld, last -%.1f "
+           "in %s -> reaction %s",
+        name, static_cast<LONG>(intro), pick, pickBrain, static_cast<double>(sqrtf(best)), sl0, sl1, sr0, sr1, b8,
+        (b8 & 0x20) ? 1 : 0, (b8 & 0x100000) ? 1 : 0, (b8 & 0x800) ? 1 : 0, bc, m0, t0 == player ? "Lara " : "", t0, m1,
+        t1 == player ? "Lara " : "", t1, senses, sensesLara, g_awCoOn ? "counted" : "not counted yet (next frame)",
+        w ? w->calls : 0, w ? w->grants : 0, w && w->calls ? (w->last ? "granted" : "refused") : "-",
+        w && w->lastTick ? static_cast<double>(GetTickCount() - w->lastTick) / 1000.0 : 0.0,
+        static_cast<double>(hc[1]), static_cast<double>(hc[2]), static_cast<double>(hc[3]), w ? w->hits : 0,
+        w ? static_cast<double>(w->hitAmount) : 0.0, hs, rn);
+    Out(o, n, "ai.why: %s %ld - %s / %s, target %s, attack slots %lu/%lu, senses on Lara %d (full line in TruMenu.log)",
+        name, static_cast<LONG>(intro), sl0, sr0, t0 == player ? "Lara" : t0 ? "other" : "none", w ? w->grants : 0,
+        w ? w->calls : 0, sensesLara);
+    return true;
+}
+void ValAw(char *o, size_t n) {
+    Out(o, n, "%s; attack-slot counter %s; %d enemies noted", g_awWhy, g_awCoOn ? "on" : "off", g_awRecN);
+}
+// ---- 0.22.9 sub.lang: subtitle language live (docs\Befund-Untertitel-Live-0911.md, static 2026-11-09): every subtitle
+// line of a cinematic reads the profile word (short)[[0xc59264]+0x208] (reader 0x453990, compare 0x45399f; -1 = the
+// game language), Bink movies read it at their start (0x4a0798). The game's own option setter 0x5d5100 (cdecl (index,
+// float value, bool callback), caller cleans 12 B) with option 0xb calls 0x5d4dc0, which writes both profile copies
+// ([[0xc59264]+0x208], [[0xc59268]+0x208]); the next settings save (0x478010) puts the value into [0x8900e8] and the
+// registry. Game thread (TruLink / menu commands run there). Values as the start check 0x477cca keeps: -1, 0..4, 7, 9..12.
+const DvCheck kSbChecks[] = {
+    {0x005d5100, "807c240c00 d9442408 7422 56 8b742408 8b04f53cb58a00"},          // setter (index, float, callback)
+    {0x005d4dc0, "d9442404 e857ff2300 8b0d6492c500 66898108020000 8b156892c500 66898208020000 c3"},   // option 0xb callback
+    {0x00453990, "a16492c500 0fb78008020000 0fbfc8"},                             // subtitle line reader
+};
+bool g_sbChecked = false, g_sbOk = false;
+char g_sbWhy[96] = "not checked";
+bool SbCheck() {
+    if (g_sbChecked) return g_sbOk;
+    g_sbChecked = true;
+    DWORD at = 0;
+    g_sbOk = DvChecks(kSbChecks, sizeof(kSbChecks) / sizeof(kSbChecks[0]), &at);
+    if (g_sbOk) Out(g_sbWhy, sizeof(g_sbWhy), "ok");
+    else Out(g_sbWhy, sizeof(g_sbWhy), "code differs at 0x%08lx", at);
+    Log(g_sbOk ? 1 : 0, "0.22.9: sub.lang %s (%d checks)", g_sbWhy, static_cast<int>(sizeof(kSbChecks) / sizeof(kSbChecks[0])));
+    return g_sbOk;
+}
+const char *SbName(LONG v) {
+    switch (v) {
+    case -1: return "Spielsprache / game language";
+    case 0: return "English";
+    case 1: return "Francais";
+    case 2: return "Deutsch";
+    case 3: return "Italiano";
+    case 4: return "Espanol";
+    default: return "?";
+    }
+}
+void ValSb(char *o, size_t n) {
+    if (!SbCheck()) { Out(o, n, "disabled: %s", g_sbWhy); return; }
+    DWORD prof = 0, cb = 0, reg = 0;
+    WORD w = 0;
+    float opt = 0.0f;
+    const bool okProf = ReadDword(0x00c59264, &prof) && prof && ReadWord(prof + 0x208, &w);
+    ReadDword(0x008ab594, &cb);
+    ReadFloats(0x008ab590, &opt, 1);
+    ReadDword(0x008900e8, &reg);
+    const LONG cur = okProf ? static_cast<LONG>(static_cast<short>(w)) : -99;
+    Out(o, n, "subtitles now %ld (%s), option 0xb %.0f, registry mirror %ld%s", cur, okProf ? SbName(cur) : "no profile",
+        static_cast<double>(opt), static_cast<LONG>(reg), cb == 0x005d4dc0 ? "" : " (option callback differs)");
+}
+bool RunSb(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValSb(o, n); return true; }   // no argument = report only
+    if (!SbCheck()) { Out(o, n, "disabled: %s", g_sbWhy); return false; }
+    char *end = nullptr;
+    const long v = strtol(arg, &end, 10);
+    const bool valid = end && end != arg && (v == -1 || (v >= 0 && v <= 4) || v == 7 || (v >= 9 && v <= 12));
+    if (!valid) { Out(o, n, "usage: sub.lang -1|0..4|7|9..12 (-1 game language, 0 en, 1 fr, 2 de, 3 it, 4 es)"); return false; }
+    DWORD cb = 0, p1 = 0, p2 = 0;
+    if (!ReadDword(0x008ab594, &cb) || cb != 0x005d4dc0 || !ReadDword(0x00c59264, &p1) || !p1 ||
+        !ReadDword(0x00c59268, &p2) || !p2) {
+        Out(o, n, "sub.lang: option table or profile not ready (callback 0x%08lx, profiles 0x%08lx / 0x%08lx)", cb, p1, p2);
+        return false;
+    }
+    typedef void(__cdecl * SetOptionFn)(int index, float value, int callback);
+    reinterpret_cast<SetOptionFn>(0x005d5100)(0xb, static_cast<float>(v), 1);
+    Log(1, "sub.lang %ld (%s) - option setter 0x5d5100(0xb, %ld, 1) (src=%s)", v, SbName(v), v, ShotSource("sub.lang"));
+    Out(o, n, "sub.lang %ld (%s) - from the next subtitle line (movies: next movie); kept with the next settings save", v,
+        SbName(v));
+    return true;
+}
+// ---- 0.22.9 combo.trace (owner 2026-11-09 15:1x: "verify that combos happen"; thralls fall over at every hit on PC):
+// game thread, once per game frame while on (off by default, live, [Debug] ComboTrace): Lara's chart machine 1 =
+// [[0xfadb58]+0xf10] (the per-frame update 0x787e60 is called for +0xf10 and +0xf14 at 0x768c56..0x768c6c), current
+// record [machine+0x510], record index in [[machine+4]+0xc], Lara state ids (u16) count rec+0xc at [rec+0x18]
+// (TruRockVein ChartLog). Every change of record is kept (last 6 = the combo path); every LP drop of an AI enemy within
+// 3000 units of Lara gives one log line: Lara's record path, the enemy's LP / stamina before -> after, the state the enemy
+// is in at the hit and the first other state within 1.5 s (= the hit reaction the game chose: e.g. HitReaction /
+// Vaulted / Fall / RegenerateDeath / none). The damage type / sub / amount of the same hit is TruShadowCombat's
+// "damage types" line (same time stamp). The quick bar shows the last line while the trace is on.
+const DvCheck kCtChecks[] = {
+    {0x00768c50, "a158dbfa00 56 8bb0100f0000 57 8bb8140f0000 8bce e8f6f10100"},   // machines [[0xfadb58]+0xf10 / +0xf14]
+};
+volatile LONG g_ctOn = 0;
+bool g_ctChecked = false, g_ctOk = false;
+struct CtPath { int rec[6]; int n; DWORD tick; };
+CtPath g_ctPath = {};
+DWORD g_ctLastRec = 0;
+struct CtEnemy { DWORD inst; float hp, stamina; DWORD hitTick, hitState; float hpBefore, stBefore, amount; char path[64]; bool open; };
+CtEnemy g_ctEn[48];
+int g_ctEnN = 0;
+LONG g_ctLines = 0;
+char g_ctLast[160] = "";
+bool CtCheck() {
+    if (g_ctChecked) return g_ctOk;
+    g_ctChecked = true;
+    DWORD at = 0;
+    g_ctOk = DvChecks(kCtChecks, sizeof(kCtChecks) / sizeof(kCtChecks[0]), &at);
+    Log(g_ctOk ? 1 : 0, "0.22.9: combo.trace %s", g_ctOk ? "ok (1 check)" : "off - the player machine code differs");
+    return g_ctOk;
+}
+int CtRecordIndex(DWORD machine, DWORD rec) {
+    DWORD defs = 0, arr = 0;
+    if (!rec || !ReadDword(machine + 4, &defs) || !defs || !ReadDword(defs + 0xc, &arr) || !arr) return -1;
+    for (int i = 0; i < 4096; ++i) {
+        DWORD v = 0;
+        if (!ReadDword(arr + 4 * i, &v)) return -1;
+        if (v == rec) return i;
+    }
+    return -1;
+}
+void CtPathText(char *o, size_t n) {
+    o[0] = 0;
+    size_t used = 0;
+    for (int i = 0; i < g_ctPath.n; ++i) LabelAdd(o, n, &used, "%s%d", i ? ">" : "", g_ctPath.rec[i]);
+}
+void CtFinish(CtEnemy &e, DWORD reaction) {
+    char name[64] = "", rs[32] = "-", hs[32] = "-";
+    DWORD object = 0, oid = 0, intro = 0;
+    ReadDword(e.inst + 0x10, &object);
+    if (object) ReadDword(object + 0x14, &oid);
+    ReadDword(e.inst + 0x58, &intro);
+    if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+    if (reaction) AwStateName(reaction, rs, sizeof(rs));
+    AwStateName(e.hitState, hs, sizeof(hs));
+    if (InterlockedIncrement(&g_ctLines) <= 3000)
+        Log(1, "combo: Lara records %s -> %s %ld LP %.1f -> %.1f (-%.1f), stamina %.1f -> %.1f, state at the hit %s, reaction "
+               "%s (TruShadowCombat 'damage types' line of the same time = type / sub / amount)",
+            e.path, name, static_cast<LONG>(intro), static_cast<double>(e.hpBefore), static_cast<double>(e.hp),
+            static_cast<double>(e.amount), static_cast<double>(e.stBefore), static_cast<double>(e.stamina), hs, rs);
+    Out(g_ctLast, sizeof(g_ctLast), "Kombo %s -> %s: %s (-%.0f)", e.path, name, reaction ? rs : "keine Reaktion / none",
+        static_cast<double>(e.amount));
+    e.open = false;
+}
+void CtTick() {                              // game thread, once per game frame
+    if (!g_ctOn || !CtCheck()) return;
+    DWORD tracker = 0, machine = 0, rec = 0, player = 0;
+    if (!ReadDword(0x00fadb58, &tracker) || !tracker || !ReadDword(tracker + 0xf10, &machine) || !machine ||
+        !ReadDword(machine + 0x510, &rec) || !ReadDword(kPlayerPtr, &player) || !player)
+        return;
+    const DWORD now = GetTickCount();
+    if (rec != g_ctLastRec) {
+        g_ctLastRec = rec;
+        const int idx = CtRecordIndex(machine, rec);
+        if (now - g_ctPath.tick > 2000) g_ctPath.n = 0;   // a new combo after 2 s without a record change
+        if (g_ctPath.n == 6) {
+            memmove(g_ctPath.rec, g_ctPath.rec + 1, 5 * sizeof(int));
+            g_ctPath.n = 5;
+        }
+        g_ctPath.rec[g_ctPath.n++] = idx;
+        g_ctPath.tick = now;
+    }
+    float lara[3];
+    if (!ReadFloats(player + kInstancePosition, lara, 3)) return;
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0, brain = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        float p[3];
+        if (AdCandidate(inst, player, &brain) && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            const float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2];
+            if (dx * dx + dy * dy + dz * dz < 3000.0f * 3000.0f) {
+                float hp = 0.0f, st = 0.0f;
+                DWORD state = 0;
+                ReadFloats(brain + 0x2c64, &hp, 1);
+                ReadFloats(brain + 0x2c6c, &st, 1);
+                ReadDword(brain + 0x125c, &state);
+                int k = 0;
+                for (; k < g_ctEnN && g_ctEn[k].inst != inst; ++k) {}
+                if (k == g_ctEnN) {
+                    if (g_ctEnN < 48) ++g_ctEnN;
+                    else k = static_cast<int>(now % 48);
+                    memset(&g_ctEn[k], 0, sizeof(g_ctEn[k]));
+                    g_ctEn[k].inst = inst;
+                    g_ctEn[k].hp = hp;
+                    g_ctEn[k].stamina = st;
+                }
+                CtEnemy &e = g_ctEn[k];
+                if (hp < e.hp - 0.01f) {
+                    if (e.open) CtFinish(e, 0);   // a second hit before any reaction
+                    e.hpBefore = e.hp;
+                    e.stBefore = e.stamina;
+                    e.amount = e.hp - hp;
+                    e.hitTick = now;
+                    e.hitState = state;
+                    e.open = true;
+                    CtPathText(e.path, sizeof(e.path));
+                }
+                e.hp = hp;
+                e.stamina = st;
+                if (e.open && state != e.hitState) CtFinish(e, state);
+                else if (e.open && now - e.hitTick > 1500) CtFinish(e, 0);
+            }
+        }
+        inst = next;
+    }
+}
+void ValCt(char *o, size_t n) {
+    Out(o, n, "combo.trace %d%s; %ld line(s); last: %s", g_ctOn ? 1 : 0, g_ctChecked && !g_ctOk ? " (code differs)" : "",
+        g_ctLines, g_ctLast[0] ? g_ctLast : "-");
+}
+bool RunCt(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValCt(o, n); return true; }   // no argument = report only
+    const bool on = BoolArg(arg, g_ctOn != 0);
+    if (on && !CtCheck()) { Out(o, n, "combo.trace: the player machine code differs - off"); return false; }
+    g_ctPath.n = 0;
+    g_ctLastRec = 0;
+    g_ctEnN = 0;
+    InterlockedExchange(&g_ctOn, on ? 1 : 0);
+    Log(1, "combo.trace %d (src=%s)", on ? 1 : 0, ShotSource("combo.trace"));
+    Out(o, n, "combo.trace %d - %s", on ? 1 : 0, on ? "one line per enemy hit in TruMenu.log" : "off");
+    return true;
 }
 // load: the byte checks of precheck_0201.txt (after M20Check)
 void M201Check() {
@@ -21851,15 +22371,34 @@ void CnKeyTick() {                               // render thread (ShotBeforeRen
         g_cnKeyHeld[i] = down;
     }
 }
+// 0.22.9 (live 2026-11-09 15:13:44-47: View+LB+RB (photo) also fired View+LB (pause off) and View+RB (step)): only the
+// buttons of the three combos count; a combo fires when exactly its buttons are held and that set stood still for
+// 120 ms (so pressing View, LB, RB one after the other fires the photo, not the pause on the way), once - then every
+// combo is locked until no combo button was held for 120 ms
+DWORD g_cnPadSince = 0;                          // tick of the last change of the held combo buttons
+bool g_cnPadLatch = false;                       // a combo fired: wait for the full release
 void CnPadTick(DWORD index, WORD buttons, bool active) {   // pad path (QbPad's caller)
     if (index != 0) return;
-    if (!active) { g_cnPadPrev = buttons; return; }
-    for (int i = 0; i < 3; ++i) {
-        const WORD m = g_cnPadMask[i];
-        if (!m) continue;
-        if ((buttons & m) == m && (g_cnPadPrev & m) != m) CnHotAction(i, "pad");
-    }
+    WORD all = 0;
+    for (int i = 0; i < 3; ++i) all = static_cast<WORD>(all | g_cnPadMask[i]);
+    const WORD held = static_cast<WORD>(buttons & all);
+    const DWORD now = GetTickCount();
+    if (held != (g_cnPadPrev & all)) g_cnPadSince = now;
     g_cnPadPrev = buttons;
+    if (!all) return;
+    const bool stable = now - g_cnPadSince >= 120;
+    if (g_cnPadLatch) {
+        if (!held && stable) g_cnPadLatch = false;
+        return;
+    }
+    if (!active || !held || !stable) return;
+    for (int i = 0; i < 3; ++i) {
+        if (g_cnPadMask[i] && held == g_cnPadMask[i]) {
+            g_cnPadLatch = true;
+            CnHotAction(i, "pad");
+            return;
+        }
+    }
 }
 // ---- end of 0.22 cutscene pause
 
@@ -22743,6 +23282,17 @@ const Item kItems[] = {
                            "load", false, ValCnPause, RunCnPause},
     {"cine.step", "action", "0.22 [n]: let n game frames (default 1, at most 600) of the held cutscene through (0.22.1: "
                             "sound muted meanwhile, so clock and picture move on together)", false, ValCnPause, RunCnStep},
+    // 0.22.9 (section "0.22.9 enemy diagnosis")
+    {"ai.why", "action", "0.22.9 [intro id|0xINSTANCE]: one full diagnosis of the nearest AI enemy (or the given one) into "
+                         "TruMenu.log - states L0 / L1 and requested, brain+8 / +0xc gates, target slot / override, senses "
+                         "on Lara, attack-slot requests / grants (coordinator 0x67d780), LP / taken / stamina, last hit "
+                         "reaction; read-only", false, ValAw, RunAw},
+    {"combo.trace", "bool", "0.22.9 1|0: per enemy hit one log line - Lara's chart record path (combo), LP / stamina before "
+                            "-> after, the enemy's reaction state; no argument = report only; off by default", false, ValCt,
+     RunCt},
+    {"sub.lang", "action", "0.22.9 [-1|0..4|7|9..12]: subtitle language live (-1 game language, 0 en, 1 fr, 2 de, 3 it, "
+                           "4 es) through the game's option setter 0x5d5100 - from the next subtitle line; no argument = "
+                           "report", true, ValSb, RunSb},
     {"cine.status", "info", "0.22: the stream list - the cutscene stream (state, time, handler, sound), GameTracker "
                             "cinematic, the pause", false, ValCnStatus, nullptr},
     {"cine.mark", "action", "0.22.1: remember the playing cutscene's time (seconds) for cine.pauseat", false, ValCnMark,
@@ -26826,6 +27376,11 @@ const QbRow kQbTests[] = {
     {"Licht-Reihenfolge fest (Flacker-Test)", "Stable light order (flicker test)", "light.stable", "", kQbBool, -1,
      kQcNone, 0, kQbPlayer, 0},   // 0.22.3
     {"Szenen-Strom (live)", "Cutscene stream (live)", "cine.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    // 0.22.9 enemy diagnosis: why an enemy does not attack, combo trace, subtitle language
+    {"Gegner-Diagnose", "Enemy diagnosis", "-", "", kQbLabel, -1, kQcNone, 0, kQbGrey, 0},
+    {"Warum greift er nicht an?", "Why no attack?", "ai.why", "", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
+    {"Kombo-Spur", "Combo trace", "combo.trace", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
+    {"Untertitel-Sprache zeigen", "Show subtitle language", "sub.lang", "", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
     {"hall02-Z\303\244hler (Tutorial-Kampf)", "hall02 counter (tutorial fight)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
@@ -26914,6 +27469,9 @@ const QbHelp kQbHelp[] = {
     {"shot.oncine", "", "Foto-Paare beim Start jeder Zwischensequenz|Shot pairs at the start of each cutscene"},
     {"cine.pause", "", "Zwischensequenz anhalten, Effekte laufen weiter|Hold the cutscene, effects run on"},   // 0.22
     {"cine.step", "", "Ein Bild der angehaltenen Szene weiter|One frame of the held cutscene"},
+    {"ai.why", "", "N\303\244chster Gegner: Ziel, Angriffsplatz, Sperren ins Log|Nearest enemy: target, slot, gates to log"},   // 0.22.9
+    {"combo.trace", "", "Je Treffer: Lara-Kombo, Gegner-Reaktion ins Log|Per hit: Lara combo, enemy reaction to log"},
+    {"sub.lang", "", "Untertitel-Sprache jetzt (sub.lang 2 = Deutsch)|Subtitle language now (sub.lang 0 = English)"},
     {"cine.mark", "", "Szenenzeit merken (Sekunden)|Remember the cutscene time (seconds)"},   // 0.22.1
     {"light.frame", "*", "Lichter je Bild in TruMenu.lightframe.txt; BLINK? = Verdacht|Lights per frame to "
                          "TruMenu.lightframe.txt; BLINK? = suspect"},   // 0.22.2 (help: at most 60 characters each)
