@@ -5,6 +5,7 @@ objective / hint notifier text elements, script 26078 / 26430).
 
 Usage (from the repository root):
   ../bin/pyt -t 300 tools/script_block_cmp.py XBOX_SOURCE PC_SOURCE SCRIPT_ID FROM TO [PC_FROM]
+    SCRIPT_ID: one id, or XBOX_ID/PC_ID when the ids differ (2026-11-09 K-5: TU HUD script 38 = PC 37);
     sources as tools/script_func_list.sections; FROM / TO hex (0x..) or decimal, TO exclusive; PC_FROM: the PC block
     starts elsewhere (base-game reference where PC and Xbox scripts differ in size)
     columns: offset, Xbox word, PC word, verdict (same-u32 / u16x2 / equal / other / reloc)
@@ -30,8 +31,9 @@ def main(argv):
         print(__doc__)
         return 2
     shift = int(argv[5], 0) - int(argv[3], 0) if len(argv) == 6 else 0
-    xd, xe, xm = sec(argv[0], int(argv[2]))
-    pd, pe, pm = sec(argv[1], int(argv[2]))
+    xid, _, pid = argv[2].partition('/')    # XBOX_ID/PC_ID when the ids differ (TU HUD 38 = PC 37)
+    xd, xe, xm = sec(argv[0], int(xid))
+    pd, pe, pm = sec(argv[1], int(pid or xid))
     if xd is None or pd is None:
         print('script not found')
         return 1
