@@ -56,7 +56,7 @@ Full table with 104 rows: `TU-Abdeckung.md` (findings folder). "Data" = fixed in
 | Native type `dlc2data` in scripts | bound | not in the exe -> null call | script stub `script_dlc2_flag_stub.py` ✅ |
 | Achievements f16-f20 | Live award | `achievement` has 16 natives (all `ret`) | calls NOPed (`script_missing_native_fix.py`) ✅ |
 | GlobalInfo player list | 29 ids (857 included) | 28 | data fix `globalinfo_player_list_fix.py` (K12) |
-| Sound groups | 80 (77-79 new) | 77 | TU `globalsoundinfo.drm` installed ✅ (kit file; own build `globalsoundinfo_build.py` = kit, 2026-11-10; DSP kind of 77 / 78 lost in the kit form, 18.3); TruMenu 0.21.8 group volume sliders (built) |
+| Sound groups | 80 (77-79 new) | 77 | TU `globalsoundinfo.drm` installed ✅ (kit file; own build `globalsoundinfo_build.py` = kit, 2026-11-10; DSP kind of 77 / 78 lost in the kit form; TU kinds decoded 2026-11-11: 77 = FMOD Echo, 78 = FMOD Chorus, 18.3); TruMenu 0.21.8 group volume sliders (built) |
 | Input map set 17 (K8) | 6 extra bindings | missing | data fix `input_map_tu_fix.py` ✅ |
 | Chunkdoll limit | 8 | 4 | TruShadowCombat 0.6.7 `[Chunk] Limit8` (built; held back until the 0.6.1 lethal-impulse fix was seen live, 09.11.) |
 | Hit structures for DLC 2 melee types 18..27 + knockback per type (K-1) | companion hit records (0x82301dc0, 0x822f77e4) | none / fixed 3.0 | TruShadowCombat 0.6.7 `[Hit] Translate` / `TranslateKnockback` (built) |
@@ -878,7 +878,7 @@ is not valid yet (per-TerrainGroup offsets missing in `unit_frames.terrain_trian
 | Camera position / FOV slots | position getter 0x5e78a0 = snapshot 0xe8eeb0 while byte `[0xe8eec8]`, else current camera `[0xe80534]` vtable +0x34 (base 0x5e1c60 `lea eax,[ecx+0xa0]` -> camera+0xa0 = position); FOV vtable +0x40 base 0x5e1c90 (`fld [ecx+0xb0]`). Gameplay camera vtable 0x85600c: +0x34 = 0x856040 -> 0x5e1c60, +0x40 = 0x85604c -> 0x5e1c90. TruMenu 0.22.11 reads camera+0xa0 / +0xb0 only when the camera's slot holds the base function (else the getter's own override could differ). Look-at point: no proven field ⬜ | ✅ |
 | Cheat "no texture" flags | 0xe7edac / 0xe7edb0 toggled, 0 readers | ✅ |
 | Projected light binding | 0x50a5f0 / 0x5076e0: `X+0x418` sometimes holds a pointer to a render view instead of the texture -> AV 0x5076fa; the B138 exe's `light_tex_guard` restores it when it differs from the invariant of `FinalizeInitialization` | ✅ (from FINDINGS.md) |
-| D3D device creation | 0x7c493d: a boot crash at 0x7c4984 (sources write tru+0x3c4984) is infrastructure (driver / VM), not data | ✅ (from FINDINGS.md) |
+| ~~D3D device creation~~ FMOD ChannelGroupI::addDSP | 0x7c493d is not D3D: FMOD's ChannelGroupI::addDSP (wrapper 0x7b94fe, ChannelGroup validator 0x7c4757; the only game callers 0x58daaa / 0x58db87 / 0x58dd61 = sound group DSP setup, 18.3; corrected 2026-11-11). Old note: a boot crash at 0x7c4984 (`rep movsd` there; sources write tru+0x3c4984) was judged infrastructure (driver / VM), not data - not re-checked | ✅ static (FINDINGS.md row corrected) |
 | Graphics settings | global 0x890388 (0x54 B): +0x25 FullscreenEffects, +0x26 EnableDepthOfField, +0x27 UseLowResDepthOfField, +0x28 EnableShadows; registry read 0x51e120 (call 0x479441; a **missing value reads 0**, any non-zero DWORD 1), write 0x51da80, code defaults 0x477a30 only when the key is missing; active copy `[0xad75e4]` (device manager) +0x15c via ApplySettings 0x522a10: DoF byte +0x182, FS +0x181, Shadows +0x184; +0x183 (low-res DoF) has no reader | ✅ static (17t) |
 | Language / subtitle language | root key `HKCU\...\Tomb Raider: Underworld`, read 0x477ee7 ff. (RegQueryValueEx through esi): `Language` -> `[0x8900e4]`, `SubtitleLanguage` -> `[0x8900e8]` (both written back at 0x478134 ff.). Start-up check 0x477cca: (value + 1) indexes the byte map 0x477e8c (targets 0x477e84 keep / 0x477cfa reset): -1, 0 .. 4, 7, 9 .. 12 are kept, 5, 6, 8 become -1 (-1 = as the game language). `Set-TruDisplay.ps1 -SubtitleLanguage` | ✅ static (09.11.) / live ⬜ |
 | Language ids (2026-11-10) | tru.exe enum 0..12 = en, fr, de, it, es, **ja (5)**, pt, pl, uk-en, ru, cs, **nl (11)**, hu - the Bink subtitle key table at 0x4a07a7 (`lang_english` .. `lang_hungarian`, index = the subtitle word, `cmp cx, 0xd`) and the Bink audio track (0x4a0d79: `BinkSetSoundTrack` with the language, >= 13 -> 0; a movie without that track falls back to track 0). Installer default 0x4791d0 (HKLM `LanguageString`): English 0, French 1, German 2, Italian 3, Spanish 4, Dutch 11, Polish 7, Russian 9, Czech 10, Hungarian 12, anything else 0 - no Japanese string. HKCU `Language` -> option 0x95 (0x477d84) -> SetLanguage 0x49a900 **without a range check** (-1 -> 0): mask `1 << lang` -> 0x54f2e0 -> file system vf+0x10 (0x472990, the ModLoader suffix `_%03d` of mask & 0x7fffffff): en 001, fr 002, de 004, it 008, es 016, **ja 032**, **nl 2048** - so the installed `locals.bin_032` (Dutch text) is the slot of language 5, a Dutch game asks for `_2048` and falls back to the plain name (static 🔶, live ⬜). PC 1.1 spec words: speech EN ffffffe1 has bit 5 set (a mask 0x20 finds the English speech), all six locals tables have bit 5 set, only the Dutch one (ffffffe0) has bit 11. The locals loader 0x49a800 ignores the table's language field; every entry is checked as UTF-8 (0x597dc0, else "Invalid UTF8 encoding"); it runs only while no table is loaded (`[0xa03854]`), the state machine 0x54f260 reloads it on a mask change. Language users: 0x4539a9 (subtitle reader), 0x4a0d79 (Bink track), 0x555c99 (profile word +0x206), script native 0x77c510 (scripts can read the language). A Japanese retail PC build uses spec ffffe020 (ja) / ffffffdf (all others) and cinematic subtitle id 5; a Russian retail build (0685.1) keeps one language per archive, spec ffffe200 (ru, mask 0x200 -> ModLoader `_512`), its file names under the root `pc-russ` instead of `pc-w` (`tools/hash_prefix_probe.py`) | ✅ static |
@@ -1051,12 +1051,12 @@ equivalent, else the label says PART instead of TU). Sources: `Befund-Shader-Eti
 | Walker | `FUN_005920b0`, jump table 0x5923cc, 14 types; node {u32 type, ptr data}. Null data on type 0 -> AV 0x592218; u16-swapped type words (e.g. 0xb0000) fall to the default and return NULL harmlessly (seen in costume DTPs, knight_thrall, adren_trap) | ✅ |
 | 0 TimeIn | walker case 0x5921f9: allocates 0x1c B, reads **only the f32 at data+0** (`fld [data]`), ctor 0x583bf0 | ✅ |
 | 1 Indirect | data -> DTP id | ✅ |
-| 2 Wave (leaf) | 0x591220: data {+0 u32 wave id, +4 u8 (passed to 0x5825e0), +6 u16 (non-zero runs an extra channel-mode branch 0x7b9f6f / 0x7b9f4b with \|0x80000000)}. Group table `[0x8a80d8]` indexed by params+0x14; the bounds check 0x591281 only logs -> a raw group value is an AV. A u32-swapped +4 word turns the byte into 0 and +6 non-zero | ✅ |
+| 2 Wave (leaf) | 0x591220: data {+0 u32 wave id, +4 u8 FMOD priority byte (0x5825e0: Sound getDefaults 0x7b9a6f, setDefaults 0x7b9a27 with priority 255 - byte; 2026-11-11), +6 u16 (non-zero runs an extra channel-mode branch 0x7b9f6f / 0x7b9f4b with \|0x80000000)}. Group table `[0x8a80d8]` indexed by params+0x14; the bounds check 0x591281 only logs -> a raw group value is an AV. A u32-swapped +4 word turns the byte into 0 and +6 non-zero | ✅ |
 | 4 Assign | 0x590970, 0x48 B: +0 child, +4..+0x3c s32 / f32, +0x40 s32 sound group (0 / -1 inherit), +0x44 {u8 max instances, u8 counter, u16} | ✅ |
 | 5 Envelope | 0x590ce0: data {+0 ptr child node, +4 u32 track count, +8 ptr -> track ptrs, +0xc ptr}; allocates 16 * count (a raw count gave a 256 MB OOM). Track {u16 parameter index, u16, ptr curve}. Curve {s32 loop / hold start, s32 loop / hold end (-1 = none), u32 point count, points of 12 B {f32, f32 value, flags}}. The ctor tests BYTE [point+8]: bit 1 -> curve+0 = point index, bit 2 -> curve+4 = point index | ✅ |
 | 8 | data word is an id (surface variant) | ✅ |
 | 10 Sequence | ctor 0x58e070 (vtable 0x85127c), update 0x593720; data {u32 count, children, ptr, **s8 repeat** + 3 B}; **repeat 0 = endless**; the +0xc word must stay raw | ✅ |
-| 12 DSP | {child, u16 DSP kind, u16 0, params, 0}; chain 0x59219f -> 0x58def0 -> 0x58dad0 -> 0x587620 (kinds 1..11, table 0x5876fc) -> FMOD createDSPByType 0x7b98ea; kind 7 -> FMOD type 5 (highpass 🔶), params 0x582ec0 (2200.0, 1.3334); out-of-range kind = no DSP, no crash | ✅ |
+| 12 DSP | {child, u16 DSP kind, u16 0, params, 0}; chain 0x59219f -> 0x58def0 -> 0x58dad0 -> 0x587620 (kinds 1..11, table 0x5876fc) -> FMOD createDSPByType 0x7b98ea; kind 7 -> FMOD type 5 = Highpass ✅ (2026-11-11, table 'Game DSP kinds' in 18.3), params 0x582ec0 (cutoff 2200 Hz, resonance 1.3334); out-of-range kind = no DSP, no crash | ✅ |
 
 Data bugs: endless groans = Sequence +0xc swapped as u32 (43 words in 13 files; step `seqrepeat`,
 `soundplex_sequence_fix.py`); `dlc_caverns_hall` DTP 23469 +0x74 DSP kind raw (0x0700) -> no highpass
@@ -1095,12 +1095,77 @@ DTP (16 or 32 B of floats). The loop 0x58de50 over all groups tests `word ptr [e
 the group's wrapper +0x5c is 0), calls 0x58dad0 -> 0x587620: `movzx` kind 1..11 -> jump table 0x5876fc -> FMOD DSP
 type constant 12 / 17 / 8 / 6 / 10 / 7 / 5 / 3 / 9 / 11 / 13 -> createDSPByType 0x7b98ea, parameters by 0x582ec0 -
 the same chain and the same u16 kind as the SoundPlex DSP node (row "12 DSP" in 18.1, step `dspkind`) ✅.
-Base: only groups 58 / 59 use it (kind 5, blocks 8200 / 4.4 / 0.2
-and 175 / 3.5 / 1.75 - they look like parametric-EQ values 🔶); retail `00050000` -> PC `05000000` (u16 halves, not
+Base: only groups 58 / 59 use it (kind 5 = FMOD ParamEQ ✅: centre 8200 Hz / 4.4 octaves / gain 0.2
+and 175 Hz / 3.5 octaves / gain 1.75); retail `00050000` -> PC `05000000` (u16 halves, not
 u32). The TU gives the new DLC 2 groups 77 / 78 kind 4 / 1 with 32-byte blocks; the B138 / B270 kit file has these two
-words u32-swapped (`00000400` / `00000100`) -> u16 = 0 -> **no DSP for groups 77 / 78 on PC** (what it sounds like on
-the Xbox ⬜). `tools/globalsoundinfo_build.py` builds the kit bytes by default, `--tu-form` the base-rule form
+words u32-swapped (`00000400` / `00000100`) -> u16 = 0 -> **no DSP for groups 77 / 78 on PC** (TU kinds decoded
+2026-11-11, below). `tools/globalsoundinfo_build.py` builds the kit bytes by default, `--tu-form` the base-rule form
 (WINDOWS_REBUILD finding 51).
+**Game DSP kinds** (2026-11-11, `tools/pe_fmod_dsp_desc.py`, workspace `Befund-Soundgruppen-77-78-1111.md`): FMOD Ex is linked
+into tru.exe and every built-in unit fills its description block at run time (`mov esi, DESC; push 'FMOD <name>'; ...;
+mov [DESC+0x6c], TYPE`); SystemI::createDSPByType 0x7bdd9f takes the registered unit whose desc +0x6c equals the
+requested type (`cmp [eax+0x6c], ecx` 0x7bde52); desc +0x3c = parameter count, +0x40 = parameter table (48 B: min,
+max, default, name, label, description; initialised data). The game's kind (u16, group entry +0x7c or SoundPlex DSP
+node) -> createDSPByType type (0x587620, table 0x5876fc) -> unit, and its float block -> DSP::setParameter index
+(0x582ec0, table 0x5831d8; setParameter wrapper 0x7b9420 = unit vtable +0x28) ✅:
+
+| Kind | Type | FMOD unit | Block -> parameter index |
+|---|---|---|---|
+| 1 | 12 | Chorus | f0 x 1000 -> [4] delay ms, f1 -> [5] rate Hz, f2 -> [6] depth, f3 -> [7] feedback, f4 -> [0] dry mix, f5 / f6 / f7 -> [1] / [2] / [3] wet mix taps 1-3 (taps 2 / 3 run 90 / 180 degrees behind tap 1, FMOD's own text) |
+| 2 | 17 | Compressor | f0 -> [0] threshold dB, f1 -> [1] attack ms, f2 -> [2] release ms, f3 x 100 -> [3] make-up gain dB |
+| 3 | 8 | Distortion | f0 -> [0] level |
+| 4 | 6 | Echo | f0 x 1000 -> [0] delay ms, f1 -> [1] decay per repeat, byte +0x10 -> [2] max channels, f2 -> [3] dry mix, f3 -> [4] wet mix |
+| 5 | 10 | ParamEQ | f0 -> [0] centre Hz, f1 -> [1] octaves, f2 -> [2] gain |
+| 6 | 7 | Flange | f0 -> [2] depth, f1 -> [3] rate Hz, f2 -> [0] dry, f3 -> [1] wet |
+| 7 / 8 | 5 / 3 | Highpass / Lowpass | f0 -> [0] cutoff Hz, f1 -> [1] resonance |
+| 9 | 9 | Normalize | f0 x 1000 -> [0] fade time ms, f1 -> [1] lowest volume, f2 -> [2] maximum amp |
+| 10 | 11 | Pitch Shifter | f0 -> [0] pitch, u16 +4 -> [1] FFT size, byte +6 -> [2] overlap, byte +7 -> [3] max channels |
+| 11 | 13 | Reverb (Freeverb) | f0..f4 -> [0..4] room size, damp, wet, dry, width, byte +0x14 -> [5] mode |
+
+Title-update groups (blocks: entry +0x80 relocations of the TU edit, 77 -> first 32 B, 78 -> second; every value lies
+inside the unit's parameter range): **77 = kind 4 Echo** 0.5 / 0.1 / 0.75 / 0.15, byte +0x10 = 0 -> delay 500 ms, decay
+0.1, max channels 0 (FMOD default), dry 0.75, wet 0.15 (one quiet repeat after half a second); **78 = kind 1 Chorus**
+0.075 / 0.86 / 0.05554 / 0.57 / 0.29167 / 0.15278 / 0.23612 / 0.98331 -> delay 75 ms, rate 0.86 Hz, depth 0.0555,
+feedback 0.57, dry 0.29, taps 0.15 / 0.24 / 0.98 (mostly wet: a doubled, slowly wobbling copy 75 ms late); 79 = kind 0
+(copy of entry 54, no DSP). The loop 0x58de50 attaches it once per group: 0x58dad0 makes an own FMOD channel group
+(System::createChannelGroup 0x7b9911, ChannelGroup::addGroup 0x7b94b6 under the group's) and ChannelGroup::addDSP
+0x7b94fe -> ChannelGroupI::addDSP 0x7c493d (call 0x58db87). The same kind table on the Xbox TU is assumed (same game
+code), not checked in the xex ⬜. A/B renders: workspace `references\audio_dsp_1011\index.md`.
+**Sounds of groups 77-79** (Assign +0x40; DLC 2 pipeline tree 1011 = installed; `work/audio_dsp_1111/find_groups.py`,
+`inventory.tsv`): **77** = 7 Assign records - `doppelganger_casual` DTP 22709 (VO streams `Lara_badwater_01..10`), 22714
+(VO `B_L_CHP_S_*` / `B_L_SHT_S_09`), 22715 (`lara_drown_01..08`) and `dlc2_uo_corkscrew_200cm` DTP 26774 (stone thud /
+slide waves 1274 / 1275 / 1277 + 16 DLC waves): the DLC 2 player's voice in bad water / drowning and the corkscrew
+mechanism - none of it fires while climbing / jumping (group 77 never showed up live 10.11.). **78** = 21 records, all
+`doppelganger_casual`: the player's body foley - hand / boot on stone (22711 / 22713 / 22716, base waves 454-470 /
+491-496), wetsuit heels (22718 / 22719), grunt (22708, wave 174), effort / weapon / moan trees (22101, 22270 -> 24552,
+22707, 22961, 24382 -> 24555 / 24556, 24551, 26086, 26182-26184): 176 distinct waves. **79** = 39 records:
+`player_tru_dlc2_extension` 22864 (shadow-power loop), `doppelganger_casual` 24373 / 24375 / 24377 / 24394 / 24539 /
+26079, `dlc2_uo_capsuleadren_switch` 24845 and DTPs 22819 / 25847 in 13 level / object DRMs. The group 78 data equal
+the Xbox (pack11): 61 Assign records and every Envelope track of the 20 group 78 DTPs read the same on the installed PC
+file (2 Assign +0x44 words of 24382 by the u16 rule, envelope point flags by the u16-pair rule of 18.1) ✅.
+**Why the group 78 voices sit at volume 0** (TruMenu snd.dump 10.11.): the logged volume is voice +0x18 = 3D factor
+(0x58e100) x params +0 (0x5914b0..0x5914d4); group volume 1.00 and the channel group not muted -> not the group. For a
+3D source (+0x19 bit 0) with sound propagation on (`[0xccdc60]` +0x44; object made at 0x590528, voices queued at
+VoicePool::Play 0x58c0e3) 0x58d420 looks the voice up in the propagation table (binary search 0x584560 by voice address,
+0x90-B entries: +0x60 direction, +0x80 path length); **no entry -> position (0, 0, 0) and factor 0** (0x58e247..0x58e2bb,
+const 0x84111c = 0) = the group 78 lines with `pos 0 0 0` in the start cutscene ✅. Otherwise position = listener +
+length x direction and the factor is the distance curve 0x5850e0 / 0x585070: 1 inside min, 0 beyond max, t^2 between
+(curve 1); max = source +0 when > 0 (the Assign ctor sets -1.0, 0x5909ee) else [gsi+0x28] +0 = 3160.56, min +4 = 158.03,
+curve +8 = 1.0 (`work/audio_dsp_1111/gsi3d.py`). **TruMenu's snd.dump `pos` / distance of a 3D voice are not world
+values**: voice +0x30..+0x38 is the vector 0x5850e0 writes after the listener transform 0x48a3f0 (y negated, stored at
+0x58e2ee) and +0x3c the factor, so '9389u' is not the distance to the player (the same static ambience emitters show other
+coordinates after the camera switch 20:55:02 -> 20:55:04) 🔶. The gameplay group 78 voices sat ~1300 units in front of
+the listener (= at the player): distance factor about 0.38 there, and group 79 voices at the same spot played at
+0.25-0.30 - so their zero is in their own parameter volume params +0 (Assign volume x envelope slot 0; the group 78
+envelopes jump to 1.0, hold, and fall to 0 in 0.15 s after the release) 🔶 inferred; live values ⬜ (probe: voice +0x3c,
+[voice+0x1c] +0, source +0 / +0x18, and the anim-event payload byte 1 bit 0 that keeps the emitter handle, 18.2).
+**DLC wave-id remap (open)**: 29 group 78 Wave leaves of `doppelganger_casual` (installed = pipeline 1011; DTPs 22101 /
+22961 / 24555 / 26182 / 26184) point at PC wave ids 4803-4811, 4846-4851, 4855-4857, 4868-4873 that no DLC 2 DRM and
+no base PC DRM holds, while the file holds the Xbox tree's ids as its own wave sections (22101: Xbox 4510 / 4511 -> PC
+words 4872 / 4873, sections 4510 / 4511 present): the tree words went through the base Xbox -> PC wave map, the DLC
+wave sections kept their ids -> those leaves are silent on PC ⬜. 22718 / 22719 / 24551 point at base waves 572-596 /
+771-775 (`lara_wetsuit_cold` / `pr_spear`) that no DLC 2 DRM holds ⬜. Pipeline 1011 tree only: DTP 22707 has 9 Wave
++4 words u32-swapped (priority byte 0, u16 0x4000; installed right) ⬜.
 Group 10 (category [3], srmusic / `media.music`) is a child of 3 -> 2 -> **1 (the MusicVolume slider)**, so MusicVolume 0
 silences the music players too (🔶 effective volume = product along the parents, not measured live;
 `sound_groups.py table pcbig:globalsoundinfo.drm`, 2026-11-10).
@@ -1370,6 +1435,7 @@ Sources: `Befund-Thalassophobie-0611.md`, `Befund-Arachnophobie-0611.md`, `Befun
 | 13 | TU fixes not found in code: crash when the PDA opens during the transition to the main menu; heap-leak fix (17w: G2 native binders, PDA scripts and cdc heaps not compared yet) | 1 |
 | 14 | Motion blur data: who writes Xbox instance +0x84 / +0x88 and post-effect object [5]+4; which previous transform the 4 MB VS variants use | 1, 16 |
 | 15 | Flashlight shadow: light-resource flags of Lara's flashlight PC vs Xbox (data flag or missing VSM / 7-light path?) | 16 |
+| 16 | Group 78 voices at volume 0: params volume / envelope release (anim payload byte 1 bit 0) - live probe; DLC-local wave ids remapped in the `doppelganger_casual` trees (29 silent leaves); the TU's kind -> FMOD unit table in the xex | 18.3 |
 
 ---
 
