@@ -188,6 +188,9 @@ work/mat_b270_0511/
 work/kitrest_0511/
 work/sg_audit_0511/
 work/exe_cmp_0511/
+# 2026-11-10 kit independence inventory (summary, exe disassembly)
+work/kitdep_1011/
+work/exe_cmp_b138_1011/
 # safety net: audio never belongs in the repository (game streams .mul_001 ..., WAV listening copies)
 *.wav
 *.mul_0*

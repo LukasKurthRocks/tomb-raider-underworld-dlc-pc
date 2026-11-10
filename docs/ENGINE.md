@@ -1131,6 +1131,17 @@ Crash guards in this area (B138 exe, from FINDINGS.md): `fmod_init_guard` - audi
 and returns NULL for null-data nodes (not for types 2 and 8, which handle it themselves). The exact bytes are in
 `tools/*_guard.py`.
 
+**The whole B138 exe patch** (`tools/exe_cmp.py` Steamless output md5 `56d1ce2d...` -> B138 `5560abac...`, 2026-11-10,
+finding Befund-Kit-Unabhaengigkeit-1011): no new section, same size; header LARGE_ADDRESS_AWARE (Characteristics
+0x103 -> 0x123) and `.text` writable (0x60000020 -> 0xe0000020, for the guard counters); 5 sites + 6 caves at the zero
+tail of `.text` (0x83de00..0x83dffc): `light_tex_guard` 0x50a645 / 0x50a683 -> 0x83de60 (counters 0x83de20),
+`fmod_init_guard` 0x582200 -> 0x83de00, `soundplex_guard` 0x5920d5 -> 0x83df40 (counters 0x83df00) and a fourth guard
+**without an upstream tool**: playerDrawCombatLock 0x71e710 (6 bytes `push ebp; mov ebp,esp; and esp,-16` -> `jmp
+0x83dfd0; nop`), cave: if `this` and `[this+8]` (lock target handle) are non-zero and the handle resolver 0x5b39d0 returns
+0, `[this+8] = 0`; then the three original instructions, back to 0x71e716 (TruShadowPower's `kRingEntry` hooks right
+after it). The three upstream guard tools applied to the Steamless exe leave exactly 47 bytes different from B138:
+the LAA bit (file offset 0x116) and this fourth guard. ✅ static (bytes compared)
+
 ---
 
 ## 19. Costumes
