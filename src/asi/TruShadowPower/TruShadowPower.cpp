@@ -167,6 +167,18 @@
 // the ramp directly as retail (23 world, 24 player). [TimeScale] TranslateSlot6=1 (default) does the same: both PC
 // natives jump to Native23Stub / Native24Stub; outside doppelganger mode the game's own body runs (trampoline).
 // Section "0.21" below.
+//
+// 0.22 (2026-11-10, K-5, workspace docs Befund-Anvisier-Kreis-0911.md section 6 and Befund-TU-Abdeckung-Teilweise-
+// 1011.md): the combat reticle ("ring") request and the adrenaline refill in doppelganger mode as the TU.
+// playerDrawCombatLock (TU 0x823de170, retail 0x823dc120, PC tru+0x31e710) requests the ring (HUD script 37, HUD group
+// 12) when a target exists and CM+0x1fc bit 9 or 10 or a third condition holds; that third condition is CM+0x1fc
+// bit 21 on retail / PC, and in doppelganger mode the TU's meter flag 2 (TU 0x823de47c..0x823de49c, PC site
+// tru+0x31e979). The refill case of PlayerSM::DefaultMessageHandler (TU 0x823ee158..0x823ee22c, PC tru+0x31f500)
+// gates the refill the same way (bit 21 -> meter flag 2), and the TU's "adrenaline full" helper 0x823dfd98 (= PC
+// tru+0x2e6630) tests meter flag 0x40 instead of CM+0x1fc bit 27. [Reticle] TranslateRequest / TranslateRefill
+// (default 1), read again at run time. TU 0x823e0308 (retail strike look, PC tru+0x315020) has a doppelganger branch
+// too, but its only caller 0x8240a430 calls it only outside doppelganger mode - dead code on the Xbox, not ported
+// ([Look] StrikeLook is the TU's doppelganger case). Section "0.22" below.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -3874,6 +3886,282 @@ void PatchSlot6() {
            "read again at run time at most once per second");
 }
 
+// ================================================================================================================
+// 0.22 (K-5, workspace docs Befund-Anvisier-Kreis-0911.md section 6, Befund-TU-Abdeckung-Teilweise-1011.md): the
+// combat reticle request and the adrenaline refill in doppelganger mode as the TU.
+//
+// Ring request - playerDrawCombatLock TU 0x823de170 (retail 0x823dc120, PC tru+0x31e710; draw chain retail = PC:
+// PLAYER_DrawIndicators tru+0x3212d0 -> tru+0x31e710 -> playerDrawCombatReticle tru+0x3037d0, which writes style /
+// position 0xfae8a4..bc and requests HUD group 12, drawn by HUD script 37). Without CM+0x1fc bit 11 the target is
+// player +0x544 / the sense search (PC tru+0x31d0c0); then the ring is drawn when a target exists and
+//   retail 0x823dc424 (to retail 0x823dc434) / PC tru+0x31e966..0x31e981: bit 9 or 10 (PC helper tru+0x2f1ed0) or 21;
+//   TU 0x823de47c..0x823de4a4: bit 9 or 10, else r9 = [0x829892b0] (PC [0xfadb58]): lbz +0x1244 != 0 ->
+//          (([r9+0x508])+4 >> 1) & 1 (meter flag 2) else (CM+0x1fc >> 21) & 1; 0 -> 0x823de618 (no ring).
+// The PC keeps CM+0x1fc in edi from tru+0x31e92a; the site tru+0x31e979 is `mov edx,edi; shr edx,15h; test dl,1;
+// je tru+0x31eb2a` (14 bytes). Port: a 5-byte jump there to RingStub, which asks RingRequestBit (the TU's two tests;
+// meter = this plugin's meter, flag 2 = the shadow strike of TruShadowCombat [Strike] Translate=1) and goes on at
+// tru+0x31e987 (ring) or tru+0x31eb2a (none), edx = word >> 21 as the original. TU r10 is reloaded before every later
+// use (0x823de4b8 / 0x823de630 / 0x823de658), so the overwritten r10 of the doppelganger branch has no other effect.
+//
+// Refill - PlayerSM::DefaultMessageHandler TU 0x823ed958 (retail 0x823eb270, PC tru+0x31f1d0): the refill case
+//   retail 0x823eba74 (to retail 0x823ebb54): CM = [gt]+0x504; CM+0x1fc bit 21 -> skip; else byte 0x829ca5bf = 1, if !bit 22:
+//          CM+0x3c += value, byte 0x829ca5e8 = 0, at >= [0x82988b3c]+0x2d0: CM+0x3c = max and, if !bit 27, bit 22 set
+//          + the two bytes again (inline); then HUD value = CM+0x3c / max, HUD group 1. PC tru+0x31f4f4 (the bit-21
+//          test) + tru+0x2f28c0 (the rest, out of line; full -> tru+0x2e6630, the retail inline part).
+//   TU 0x823ee158..0x823ee22c: gt+0x1244 ? meter flag 2 (0x823ee16c rlwinm 0x1f) : CM bit 21 -> skip; the full case
+//          calls 0x823dfd98 instead of the inline part.
+//   TU 0x823dfd98 (leaf, no .pdata; = PC tru+0x2e6630, thiscall CM): CM+0x3c = max; gt+0x1244 ? meter flag 0x40
+//          (0x823dfdc4 rlwinm 0x1a) : CM bit 27 (0x823dfdd0 rlwinm 5); set -> return; else CM+0x1fc |= 0x400000
+//          (bit 22), the two HUD bytes. The PC function has a second caller, the script native tru+0x377a50 (jmp
+//          tru+0x2e6630 with ecx = CM) - the branch is inside the TU function, so it applies to every caller.
+// Port: a 6-byte jump at tru+0x31f500 (`mov eax,[ecx+1FCh]`) to RefillGateStub (skip -> tru+0x31fcb9 = return 0, else
+// tru+0x31f511) and an 8-byte jump at tru+0x2e6646 (`shr edx,1Bh; test dl,1; jne`, after the fstp: FPU empty) to
+// FullStub (active -> tru+0x2e6667 = ret, else tru+0x2e664e). Not ported, still open: TU 0x823eebc0 (message
+// 0x200003d - PC tru+0x31fa40 - ends at once in doppelganger mode; CM+0x1fc bit 0 + player event 0x3c on the PC).
+//
+// Switches [Reticle] TranslateRequest / TranslateRefill (default 1) read again at run time at most once per second;
+// a site is hooked when its switch or [Reticle] Log is 1 at the start (0 = PC answer through the stub). [Reticle]
+// Log=1: one line per change of a decision (the first 60 per site at LogLevel 1, then LogLevel 2), with counts.
+const DWORD kRingSite = 0x0071e979;           // TU 0x823de47c
+const DWORD kRingSiteCheck = 0x0071e923;
+const char *const kRingSiteHex = "8bce e896e7ffff 8bbefc010000 8bd8 8bc7 c1e80a a801 895c240c 7527 a158dbfa00 "
+                                 "8b8800050000 83b93401000004 7513 d9ee d89898070000 dfe0 f6c405 0f8b1b010000 85db "
+                                 "0f84bc010000 8bce e85b35fdff 84c0 750e 8bd7 c1ea15 f6c201 0f84a3010000 8d442410 53 50";
+const DWORD kRingEntry = 0x0071e716;          // after the foreign 5-byte jump at tru+0x31e710 (exe patch to 0x83dfd0)
+const char *const kRingEntryHex = "a1b0dffa00 83ec44 53 56 8bf1 8b4804 8b11 837a0403 57 0f84dd040000 803de6b48a0000 "
+                                  "0f84d0040000 8b86fc010000 c1e80b a801 0f84d3010000";
+const DWORD kRefillSite = 0x0071f500;         // TU 0x823ee158
+const DWORD kRefillCheck = 0x0071f4f4;
+const char *const kRefillHex = "8b1558dbfa00 8b8a04050000 8b81fc010000 c1e815 a801 0f85a8070000 db4604 51 d91c24 "
+                               "e8a333fdff 33c0";
+const DWORD kRefillExit = 0x0071fcb9;         // pop edi; pop esi; xor eax,eax; pop ebx; mov esp,ebp; pop ebp; ret 4
+const char *const kRefillExitHex = "5f 5e 33c0 5b 8be5 5d c20400";
+const DWORD kRefillBody = 0x006f28c0;         // the PC's out-of-line rest of the refill (calls tru+0x2e6630 when full)
+const char *const kRefillBodyHex = "c605afe8fa0001 f781fc01000000004000 7537 d9413c d8442404 d9593c 8b1564d7fa00 "
+                                   "c605d8e8fa0000 d9413c d982d0020000 ded9 dfe0 f6c441 7a0e d982d0020000 d9593c "
+                                   "e8263dffff d9413c a164d7fa00 d8b0d0020000 6a01 d91dd4e8fa00 e8abb00800";
+const DWORD kFullFn = 0x006e6630;             // TU 0x823dfd98
+const DWORD kFullSite = 0x006e6646;
+const char *const kFullHex = "a164d7fa00 d980d0020000 8b81fc010000 8bd0 d9593c c1ea1b f6c201 7519 0d00004000 "
+                             "8981fc010000 c605afe8fa0001 c605d8e8fa0000 c3";
+const DWORD kFullNative = 0x00777a50;         // the second PC caller (script native: ecx = CM, jmp tru+0x2e6630)
+const char *const kFullNativeHex = "a158dbfa00 8b8804050000 e9d0ebf6ff";
+const DWORD kDgByteGetter = 0x00777dc0;       // larabase f36: the doppelganger byte [[0xfadb58]+0x1244]
+const char *const kDgByteGetterHex = "a158dbfa00 8a8044120000 c3";
+
+int g_retRequest = 1;                         // [Reticle] TranslateRequest
+int g_retRefill = 1;                          // [Reticle] TranslateRefill
+int g_retLog = 1;                             // [Reticle] Log
+bool g_retHooked = false;
+DWORD g_retSwitchTick = 0;
+DWORD g_ringYes = 0x0071e987, g_ringNo = 0x0071eb2a;
+DWORD g_refillGo = 0x0071f511, g_refillSkip = kRefillExit;
+DWORD g_fullGo = 0x006e664e, g_fullRet = 0x006e6667;
+volatile LONG g_retCalls[3];                  // ring request / refill gate / full test
+volatile LONG g_retChanges[3];
+int g_retLast[3] = {-1, -1, -1};              // last decision per site: 4 = switch off, else (doppelganger << 1) | answer
+
+void ReticleReadSwitch() {
+    if (!g_retHooked || !g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_retSwitchTick < 1000) return;
+    g_retSwitchTick = now;
+    const int r = GetPrivateProfileIntA("Reticle", "TranslateRequest", g_retRequest, g_iniPath) ? 1 : 0;
+    const int f = GetPrivateProfileIntA("Reticle", "TranslateRefill", g_retRefill, g_iniPath) ? 1 : 0;
+    if (r != g_retRequest)
+        Log(1, "0.22 switch: [Reticle] TranslateRequest %d -> %d (read again from TruShadowPower.ini) - %s", g_retRequest,
+            r, r ? "ring request by meter flag 2 in doppelganger mode as the TU" : "ring request by CM+0x1fc bit 21 (PC)");
+    if (f != g_retRefill)
+        Log(1, "0.22 switch: [Reticle] TranslateRefill %d -> %d (read again from TruShadowPower.ini) - %s", g_retRefill,
+            f, f ? "adrenaline refill by meter flags 2 / 0x40 in doppelganger mode as the TU" : "refill by CM bits 21 / 27 (PC)");
+    g_retRequest = r;
+    g_retRefill = f;
+}
+
+int RetDoppelganger() {                       // TU: lbz rX, 0x1244([0x829892b0])
+    __try {
+        const BYTE *gt = GameTracker();
+        return (gt && gt[0x1244] != 0) ? 1 : 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return 0;
+    }
+}
+
+void RetNote(int site, int on, int dg, int answer, DWORD word) {
+    const LONG n = InterlockedIncrement(&g_retCalls[site]);
+    const int state = on ? (dg << 1) | answer : 4;
+    if (!g_retLog || state == g_retLast[site]) return;
+    g_retLast[site] = state;
+    const LONG c = InterlockedIncrement(&g_retChanges[site]);
+    const int level = c <= 60 ? 1 : 2;
+    if (level > g_logLevel) return;
+    static const char *const what[3] = {
+        "ring request tru+0x31e979 (TU 0x823de47c)", "refill gate tru+0x31f500 (TU 0x823ee158)",
+        "adrenaline-full test tru+0x2e6646 (TU 0x823dfd98)"};
+    static const char *const tuTest[3] = {"meter flag 2", "meter flag 2", "meter flag 0x40"};
+    static const char *const pcTest[3] = {"CM+0x1fc bit 21", "CM+0x1fc bit 21", "CM+0x1fc bit 27"};
+    static const char *const yes[3] = {"RING requested (HUD group 12 via tru+0x3037d0)", "refill SKIPPED",
+                                       "adrenaline active - bit 22 not set"};
+    static const char *const no[3] = {"no ring", "refill runs", "bit 22 (0x400000) set"};
+    Log(level, "0.22 reticle: %s - %s: %s = %d -> %s (meter flags 0x%03lx, CM+0x1fc 0x%08lx; call %ld, change %ld%s)",
+        what[site], !on ? "[Reticle] switch 0, PC test" : dg ? "doppelganger mode, TU test" : "not in doppelganger mode",
+        on && dg ? tuTest[site] : pcTest[site], answer, answer ? yes[site] : no[site], g_meter.flags, word, n, c,
+        c == 60 ? "; further changes at LogLevel 2" : "");
+}
+
+// game thread, from RingStub: 1 = the third condition of the ring request holds
+int __cdecl RingRequestBit(DWORD word) {
+    ReticleReadSwitch();
+    const int on = g_retRequest;
+    const int dg = on ? RetDoppelganger() : 0;
+    const int answer = dg ? static_cast<int>((g_meter.flags >> 1) & 1) : static_cast<int>((word >> 21) & 1);
+    RetNote(0, on, dg, answer, word);
+    return answer;
+}
+
+// game thread, from RefillGateStub: 1 = skip the refill
+int __cdecl RefillGateBit(DWORD word) {
+    ReticleReadSwitch();
+    const int on = g_retRefill;
+    const int dg = on ? RetDoppelganger() : 0;
+    const int answer = dg ? static_cast<int>((g_meter.flags >> 1) & 1) : static_cast<int>((word >> 21) & 1);
+    RetNote(1, on, dg, answer, word);
+    return answer;
+}
+
+// game thread, from FullStub: 1 = adrenaline active (return without bit 22)
+int __cdecl FullActiveBit(DWORD word) {
+    ReticleReadSwitch();
+    const int on = g_retRefill;
+    const int dg = on ? RetDoppelganger() : 0;
+    const int answer = dg ? static_cast<int>((g_meter.flags >> 6) & 1) : static_cast<int>((word >> 27) & 1);
+    RetNote(2, on, dg, answer, word);
+    return answer;
+}
+
+// jumped to from tru+0x31e979: edi = CM+0x1fc, ebx = the target (kept), esi = CM; continues at tru+0x31e987 (ring) or
+// tru+0x31eb2a (none) with edx = word >> 21 as the original; eax / ecx restored, the FPU stack is empty
+__declspec(naked) void RingStub() {
+    __asm {
+        push eax
+        push ecx
+        push edx
+        push edi
+        call RingRequestBit
+        add esp, 4
+        pop edx
+        pop ecx
+        mov edx, edi
+        shr edx, 15h
+        test eax, eax
+        pop eax
+        jz ring_no
+        jmp dword ptr [g_ringYes]
+    ring_no:
+        jmp dword ptr [g_ringNo]
+    }
+}
+
+// jumped to from tru+0x31f500 (ecx = CM, edx = [0xfadb58], esi = the message): skip -> tru+0x31fcb9, else
+// tru+0x31f511; eax = word >> 21 as the original
+__declspec(naked) void RefillGateStub() {
+    __asm {
+        push ecx
+        push edx
+        push dword ptr [ecx + 1fch]
+        call RefillGateBit
+        add esp, 4
+        pop edx
+        pop ecx
+        push eax
+        mov eax, [ecx + 1fch]
+        shr eax, 15h
+        test dword ptr [esp], 1
+        lea esp, [esp + 4]
+        jnz refill_skip
+        jmp dword ptr [g_refillGo]
+    refill_skip:
+        jmp dword ptr [g_refillSkip]
+    }
+}
+
+// jumped to from tru+0x2e6646 (ecx = CM, eax = edx = CM+0x1fc, CM+0x3c already = max, FPU empty): active ->
+// tru+0x2e6667 (ret), else tru+0x2e664e (bit 22); edx = word >> 27 as the original
+__declspec(naked) void FullStub() {
+    __asm {
+        push eax
+        push ecx
+        push eax
+        call FullActiveBit
+        add esp, 4
+        mov edx, eax
+        pop ecx
+        pop eax
+        push edx
+        mov edx, eax
+        shr edx, 1bh
+        test dword ptr [esp], 1
+        lea esp, [esp + 4]
+        jnz full_ret
+        jmp dword ptr [g_fullGo]
+    full_ret:
+        jmp dword ptr [g_fullRet]
+    }
+}
+
+void PatchReticle() {
+    const bool wantRing = g_retRequest || g_retLog, wantRefill = g_retRefill || g_retLog;
+    if (!wantRing && !wantRefill) {
+        Log(1, "0.22 reticle: [Reticle] TranslateRequest=0, TranslateRefill=0 and Log=0 - tru+0x31e979 / tru+0x31f500 / "
+               "tru+0x2e6646 untouched (a later 1 needs a restart)");
+        return;
+    }
+    if (!HexBytesAt(kDgByteGetter, kDgByteGetterHex)) {
+        Log(0, "0.22 reticle: doppelganger byte getter tru+0x377dc0 does not match - ring request / refill left to the game");
+        return;
+    }
+    bool ring = false, refill = false;
+    if (wantRing) {
+        if (!HexBytesAt(kRingSiteCheck, kRingSiteHex))
+            Log(0, "0.22 reticle: ring request tru+0x31e923..0x31e98f does not match - ring request left to the game");
+        else if (!HexBytesAt(kRingEntry, kRingEntryHex))
+            Log(0, "0.22 reticle: playerDrawCombatLock entry tru+0x31e716 does not match - ring request left to the game");
+        else if (!HexBytesAt(kAimHelper, kAimHelperHex))
+            Log(0, "0.22 reticle: bit 9 / 10 helper tru+0x2f1ed0 does not match - ring request left to the game");
+        else if (!WriteJumpN(kRingSite, reinterpret_cast<const void *>(&RingStub), 5))
+            Log(0, "0.22 reticle: ring request not written (VirtualProtect %lu)", GetLastError());
+        else
+            ring = true;
+    }
+    if (wantRefill) {
+        if (!HexBytesAt(kRefillCheck, kRefillHex) || !HexBytesAt(kRefillExit, kRefillExitHex))
+            Log(0, "0.22 reticle: refill case tru+0x31f4f4 / exit tru+0x31fcb9 does not match - refill left to the game");
+        else if (!HexBytesAt(kRefillBody, kRefillBodyHex))
+            Log(0, "0.22 reticle: refill body tru+0x2f28c0 does not match - refill left to the game");
+        else if (!HexBytesAt(kFullFn, kFullHex))
+            Log(0, "0.22 reticle: adrenaline-full helper tru+0x2e6630 does not match - refill left to the game");
+        else if (!HexBytesAt(kFullNative, kFullNativeHex))
+            Log(0, "0.22 reticle: script native tru+0x377a50 (second caller of tru+0x2e6630) does not match - refill left "
+                   "to the game");
+        else if (!WriteJumpN(kRefillSite, reinterpret_cast<const void *>(&RefillGateStub), 6) ||
+                 !WriteJumpN(kFullSite, reinterpret_cast<const void *>(&FullStub), 8))
+            Log(0, "0.22 reticle: refill sites not written (VirtualProtect %lu)", GetLastError());
+        else
+            refill = true;
+    }
+    g_retHooked = ring || refill;
+    if (ring)
+        Log(1, "0.22 reticle: ring request tru+0x31e979 -> plugin - [Reticle] TranslateRequest %d (%s), log %d", g_retRequest,
+            g_retRequest ? "TU 0x823de47c: in doppelganger mode meter flag 2 instead of CM+0x1fc bit 21" : "PC test",
+            g_retLog);
+    if (refill)
+        Log(1, "0.22 reticle: refill tru+0x31f500 and adrenaline-full tru+0x2e6646 -> plugin - [Reticle] TranslateRefill "
+               "%d (%s), log %d; tru+0x2e6630 is also the body of script native tru+0x377a50", g_retRefill,
+            g_retRefill ? "TU 0x823ee158 / 0x823dfd98: in doppelganger mode meter flag 2 / 0x40 instead of bits 21 / 27"
+                        : "PC tests", g_retLog);
+    if (g_retHooked) Log(1, "0.22 reticle: switches read again at run time at most once per second");
+}
+
 // ---- meter interface (docs Befund-Schattenkampf.md section 5; version 1 = TruShadowCombat's proposal, version 2
 // appends the HUD natives f70-f73 of larabase, TU 0x824aa060 / 0x824aa0a0 / 0x824aa120 / 0x824aa150, for a later HUD
 // plugin - Plan-Nacht-Analysen-2026-11-03.md section 2). Fields are only appended; check version / size.
@@ -3963,6 +4251,9 @@ void ReadOptions(const char *dir) {
     g_k11 = GetPrivateProfileIntA("Adrenaline", "Translate", 1, ini) ? 1 : 0;    // 0.18 (K11), default 1
     g_k11Log = GetPrivateProfileIntA("Adrenaline", "Log", 1, ini) ? 1 : 0;
     g_slot6 = GetPrivateProfileIntA("TimeScale", "TranslateSlot6", 1, ini) ? 1 : 0;   // 0.21 (X23), default 1
+    g_retRequest = GetPrivateProfileIntA("Reticle", "TranslateRequest", 1, ini) ? 1 : 0;   // 0.22 (K-5), default 1
+    g_retRefill = GetPrivateProfileIntA("Reticle", "TranslateRefill", 1, ini) ? 1 : 0;     // 0.22 (K-5), default 1
+    g_retLog = GetPrivateProfileIntA("Reticle", "Log", 1, ini) ? 1 : 0;
 }
 
 void Start(HMODULE self) {
@@ -3973,14 +4264,15 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.21 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.22 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
-        "log %d; 0.21: time-scale slot 6 %d)", g_enabled, g_buttons,
+        "log %d; 0.21: time-scale slot 6 %d; 0.22: reticle request %d, refill %d, log %d)", g_enabled, g_buttons,
         g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled, g_legacyPadStart,
         g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled, g_state2102Enabled, g_loopSound,
-        g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11, g_k11Log, g_slot6);
+        g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11, g_k11Log, g_slot6, g_retRequest,
+        g_retRefill, g_retLog);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -4096,6 +4388,7 @@ void Start(HMODULE self) {
     CheckPadPoll();                     // 0.17: [ShadowPower] MenuInput (before the hook thread reads g_menuInputOk)
     PatchK11();                         // 0.18: K11 - adrenaline tick / bar skipped in doppelganger mode as the TU
     PatchSlot6();                       // 0.21: gamebase natives 23 / 24 -> request slot 6 in doppelganger mode as the TU
+    PatchReticle();                     // 0.22: ring request / adrenaline refill by the meter flags in doppelganger mode
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -4116,7 +4409,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.21 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.22 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
@@ -4124,7 +4417,8 @@ extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
            "adrenaline look = meter flag 0x40 / camera mode 0x34, look screen effect report / switch, GlobalParams[7], "
            "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4, camera flag of the start "
            "(camera bit 2, reader tru+0x1e5e8e), gamebase natives 23 / 24 -> time-scale request slot 6 in doppelganger "
-           "mode (TU 0x824a3238 / 0x824a32f0); switches default off: loop sound, move events 0x83 / 0x84, strike "
+           "mode (TU 0x824a3238 / 0x824a32f0), combat reticle request and adrenaline refill by the meter flags in "
+           "doppelganger mode (TU 0x823de47c / 0x823ee158 / 0x823dfd98); switches default off: loop sound, move events 0x83 / 0x84, strike "
            "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120)";
 }
 

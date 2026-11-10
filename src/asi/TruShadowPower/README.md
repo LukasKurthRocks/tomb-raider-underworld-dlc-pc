@@ -29,9 +29,56 @@ LB / RB started it); 0.17 (LB / RB only as the game gets them, `[ShadowPower] Me
 of the pad-chain re-wrap) built 2026-11-07, not played; 0.20 (`[Look] CameraFlag` default 1 = TU, the PC reader of
 the camera bit found) built 2026-11-07, installed, ran in the sessions of 2026-11-09 (log; its TO TEST rows not
 reported); 0.21 (time-scale request slot 6: gamebase natives 23 / 24 as the TU, `[TimeScale] TranslateSlot6`) built
-2026-11-10, not installed, not played.** Not covered: the
+2026-11-10, not installed, not played; 0.22 (K-5: combat reticle request and adrenaline refill by the meter flags in
+doppelganger mode, `[Reticle]`) built 2026-11-10, not installed, not played.** Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.22: the combat reticle request and the adrenaline refill in doppelganger mode as the TU (K-5, 2026-11-10)
+
+Build `work\asi\power022`; byte pre-checks `work\asi\power022\prechecks_v22.txt` (9 checks, 0 mismatches against
+`data\pc\tru.exe` and the installed `tru.exe`, both md5 `5560abac...`). Workspace docs `Befund-Anvisier-Kreis-0911.md`
+section 6 (draw chain, request) and `Befund-TU-Abdeckung-Teilweise-1011.md` (0x823ed958 refill blocks).
+
+* **Ring (TU 0x823de47c..0x823de4a4):** playerDrawCombatLock (TU 0x823de170, retail 0x823dc120, PC tru+0x31e710)
+  requests the ring - playerDrawCombatReticle tru+0x3037d0 writes style / position (0xfae8a4..bc) and HUD group 12,
+  HUD script 37 draws it - when a target exists and CM+0x1fc bit 9 or 10 is set or a third test holds. Retail / PC
+  (tru+0x31e979, `mov edx,edi; shr edx,15h; test dl,1; je tru+0x31eb2a`): CM+0x1fc **bit 21**. TU: with
+  `[0x829892b0]+0x1244` set, **meter flag 2** (`[+0x508]+4` bit 1, the shadow strike), else bit 21. Bit 21 is never set
+  in DLC 2 on the PC, so the ring was only drawn by bits 9 / 10.
+* **Refill (TU 0x823ee158..0x823ee22c, PlayerSM::DefaultMessageHandler 0x823ed958 = PC tru+0x31f1d0):** the refill
+  case is skipped by **meter flag 2** instead of bit 21 in doppelganger mode (PC tru+0x31f500); when CM+0x3c reaches
+  the max the TU calls **0x823dfd98** (= PC tru+0x2e6630, also the body of the script native tru+0x377a50), which in
+  doppelganger mode tests **meter flag 0x40** (the adrenaline look, `[Look] AdrenalineMode`) instead of CM+0x1fc bit 27
+  before it sets bit 22 (0x400000). The rest (bit-22 gate, add, HUD value 0xfae8d4 / group 1) is the PC's own code
+  (tru+0x2f28c0), the same as the TU.
+* **Not ported:** TU 0x823e0308 (= retail 0x823de058 = PC tru+0x315020, the retail strike look) also has a doppelganger
+  branch (meter flags 2 / 4 instead of bits 21 / 29), but its only caller, the TU switch 0x8240a430 case 5
+  (0x8240a67c..0x8240a6ac), calls it only when `+0x1244` is 0 and calls 0x823d8a80 otherwise - the branch never runs on
+  the Xbox. The TU's doppelganger case 5 is `[Look] StrikeLook=1` (0.14). Also open: TU 0x823eebc0 (message 0x200003d
+  = PC tru+0x31fa40 ends at once in doppelganger mode; on the PC it sets CM+0x1fc bit 0 and fires player event 0x3c)
+  - not shown to be part of the ring. The ring **without** the power (aiming at record 718) has the same code on both
+  sides; its cause is still open (live read).
+* **Port:** 5-byte jump at tru+0x31e979 (RingStub), 6 bytes at tru+0x31f500 (RefillGateStub), 8 bytes at tru+0x2e6646
+  (FullStub, after the fstp: FPU empty); every stub gives the original registers back (edx / eax = word >> 21 / 27).
+  The doppelganger test reads the byte `[[0xfadb58]+0x1244]` as the TU; the meter is this plugin's. `[Reticle]
+  TranslateRequest` / `TranslateRefill` (default 1) are read again at run time at most once per second; a site is
+  hooked when its switch or `[Reticle] Log` is 1 at the start. `[Reticle] Log=1`: one line per change of a decision
+  (`0.22 reticle: ring request tru+0x31e979 (TU 0x823de47c) - doppelganger mode, TU test: meter flag 2 = 1 -> RING
+  requested ...`), the first 60 per site at LogLevel 1, then LogLevel 2.
+* New checks (all of a group must match, else `0.22 reticle: <check> does not match - ... left to the game`): the
+  doppelganger byte getter tru+0x377dc0, playerDrawCombatLock entry tru+0x31e716 and tru+0x31e923..0x31e98d, the bit
+  9 / 10 helper tru+0x2f1ed0; the refill case tru+0x31f4f4, the exit tru+0x31fcb9, the refill body tru+0x2f28c0, the
+  helper tru+0x2e6630 and its native caller tru+0x377a50.
+
+| # | TO TEST 0.22 (DLC 2, sample ini, TruShadowCombat `[Strike] Translate=1`) | expected |
+|---|---|---|
+| 1 | load | `TruShadowPower 0.22 loaded (... 0.22: reticle request 1, refill 1, log 1)`, `0.22 reticle: ring request tru+0x31e979 -> plugin ...`, `0.22 reticle: refill tru+0x31f500 and adrenaline-full tru+0x2e6646 -> plugin ...`, no "does not match" |
+| 2 | fight with the shadow power, a shadow strike on a thrall | `0.22 reticle: ring request ... doppelganger mode, TU test: meter flag 2 = 1 -> RING requested` while the strike runs, `= 0 -> no ring` after it; the ring (yellow brackets / red circle) around the target during the strike - screenshot / time |
+| 3 | DLC 2 fight without the power, only aiming (LT) | ring decided by bits 9 / 10 as before (the third test answers `meter flag 2 = 0` there, as on the Xbox) - report whether a ring shows (the case without the power is still open) |
+| 4 | kill / hit enemies (adrenaline refill message) | `0.22 reticle: refill gate ... doppelganger mode, TU test: meter flag 2 = 0 -> refill runs`; during a shadow strike `= 1 -> refill SKIPPED`; the shadow silhouette may flash the adrenaline value for a moment (TU writes the same HUD value there) |
+| 5 | main game / DLC 1 fight | `... not in doppelganger mode` lines, ring / adrenaline as before |
+| 6 | `[Reticle] TranslateRequest=0` while running | `0.22 switch: [Reticle] TranslateRequest 1 -> 0 ...`, then `[Reticle] switch 0, PC test` lines |
 
 ## 0.21: time-scale request slot 6 - the gamebase natives 23 / 24 as the TU (X23, 2026-11-10)
 
@@ -623,6 +670,7 @@ at least 60 %" before a shadow strike). Option `[Conditions] Enabled`.
 | `0x823d7d40` start: request player = tuning +0x40, world = tuning +0x3c | `StartPower` | `SetPlayerTimeScale` / `SetWorldTimeScale`, 33 ms |
 | `0x823d7fb8` stop: request cleared (both 1.0) | `StopPower` | same setters |
 | `0x824a3238` / `0x824a32f0` gamebase natives 23 / 24: in doppelganger mode request slot 6 (+0x70 player / +0x74 world) + selector, else the retail ramp (0.21) | `Slot6Native` | tru+0x397cf0 / tru+0x397d10 (jump + trampoline) |
+| `0x823de47c` ring request / `0x823ee158` adrenaline refill / `0x823dfd98` adrenaline full: in doppelganger mode meter flag 2 / 2 / 0x40 instead of CM+0x1fc bit 21 / 21 / 27 (0.22) | `RingRequestBit`, `RefillGateBit`, `FullActiveBit` | tru+0x31e979, tru+0x31f500, tru+0x2e6646 (jumps to stubs) |
 | `0x823d81a0` refill: tuning +0x18 per second (+0x20 while a delay runs, +0x1c in another player state), clamp to max +0x10 | `Refill` | HUD below |
 | `0x823d8380` drain by frame time x 1/30 x tuning +0x14, clamp 0..max | `Drain` | HUD below |
 | `0x82415518` tuning = data of the extension instance | `FindTuning` | object table `0xdb7400`, object 858 |
@@ -677,6 +725,9 @@ every `*.asi` next to `tru.exe`.
 | `[Adrenaline] Translate` | 1 | 0.18 (K11): CombatManager::Update skips the adrenaline tick tru+0x318bd0 and bar tru+0x2f2930 while gameTracker+0x1244 is set (TU 0x823dca00); 0 = PC; read again at run time (<= 1 / s) |
 | `[Adrenaline] Log` | 1 | 0.18: one line per change of the K11 decision per site |
 | `[TimeScale] TranslateSlot6` | 1 | 0.21 (X23): gamebase natives 23 / 24 in doppelganger mode -> time-scale request slot 6 (23 player, 24 world, crossed as TU 0x824a3238 / 0x824a32f0), else the game's body; 0 = PC; read again at run time (<= 1 / s, only if 1 at the start) |
+| `[Reticle] TranslateRequest` | 1 | 0.22 (K-5): in doppelganger mode the combat reticle (ring) is requested by meter flag 2 instead of CM+0x1fc bit 21 (TU 0x823de47c, PC site tru+0x31e979); 0 = PC; read again at run time (<= 1 / s) |
+| `[Reticle] TranslateRefill` | 1 | 0.22 (K-5): in doppelganger mode the adrenaline refill message is skipped by meter flag 2 instead of bit 21 (TU 0x823ee158, tru+0x31f500) and the adrenaline-full helper tests meter flag 0x40 instead of bit 27 (TU 0x823dfd98, tru+0x2e6646); 0 = PC; read again at run time (<= 1 / s) |
+| `[Reticle] Log` | 1 | 0.22: one line per change of a decision of the three sites (60 per site at LogLevel 1, then LogLevel 2) |
 
 The 0.2 options `WorldScale`, `PlayerScale`, `RampSeconds`, `[Meter] Enabled`, `DrainSeconds`, `RefillSeconds`,
 `RefillDelay`, `MinStart` are gone - those values now come from the data / the TU constants.

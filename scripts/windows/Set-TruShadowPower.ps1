@@ -52,10 +52,11 @@ $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # unchanged 0.15 sample .ini; 0.17 LB / RB only as the game gets them, [ShadowPower] MenuInput (work\asi\v17,
 # 2026-11-06); 0.18 K11 adrenaline (work\asi\v18, 2026-11-07); 0.19 TruMenu's TruMenuPadBlock instead of the pad-chain
 # re-wrap (work\asi\v19, 2026-11-07, new sample .ini: comment of MenuInput); 0.20 [Look] CameraFlag default 1 = TU
-# (work\asi\v20, 2026-11-07, sample .ini CameraFlag=1)) - recognised as ours for update / removal.
-# The current build 0.21 (X23: gamebase natives 23 / 24 -> time-scale request slot 6 in doppelganger mode as the TU,
-# work\asi\power021, 2026-11-10) ships a new sample .ini ([TimeScale] TranslateSlot6=1); install it with
-# -SourceDir <repo>\work\asi\power021.
+# (work\asi\v20, 2026-11-07, sample .ini CameraFlag=1); 0.21 X23 time-scale request slot 6 (work\asi\power021,
+# 2026-11-10, sample .ini [TimeScale] TranslateSlot6=1)) - recognised as ours for update / removal.
+# The current build 0.22 (K-5: combat reticle request and adrenaline refill by the meter flags in doppelganger mode as
+# the TU, work\asi\power022, 2026-11-10) ships a new sample .ini ([Reticle] TranslateRequest / TranslateRefill / Log);
+# install it with -SourceDir <repo>\work\asi\power022.
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
@@ -77,7 +78,8 @@ $earlierBuilds = @{
                              '0229e49c771a8f55c2e19ef8617648a1a8887c1f85554b1d52b849f3e2ce11ff',   # 0.17 LB / RB only as the game gets them (work\asi\v17, md5 f01010291dfe09ff325a6e8ab40be834)
                              'fc56e3b72d7cb2a0dcf7b9a3a512b9e3595198853304f14c2e2d11a3d57c4b0f',   # 0.18 K11 adrenaline (work\asi\v18, md5 0ee7c5fca49716f2637ade50e37a7032)
                              '06f80b26ebd103348a05eec0c79cf9f2d7b6ba16ee6eb140940190470dcb5b73',   # 0.19 TruMenuPadBlock (work\asi\v19, md5 02a8e389028c1c78e0662b412be4aeb4)
-                             '21c12e8b21c2fa51ec0a89c5b64f206284f435c075ffc21030ac46129ad189b2')   # 0.20 camera flag default 1 (work\asi\v20, md5 26c253ad519a072d6b2573889aac7ab6 = installed on 2026-11-10)
+                             '21c12e8b21c2fa51ec0a89c5b64f206284f435c075ffc21030ac46129ad189b2',   # 0.20 camera flag default 1 (work\asi\v20, md5 26c253ad519a072d6b2573889aac7ab6 = installed on 2026-11-10)
+                             'fc0885d0162d50880be353ae7c72a11bf37bd62b716dd10f813d478679063681')   # 0.21 X23 slot 6 (work\asi\power021, not installed)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
@@ -93,7 +95,8 @@ $earlierBuilds = @{
                              '891e2d9c554239f9a1d1202c7e90511ef15954ac09b3ac9ccfb8778604d1d9ad',   # 0.17 sample .ini ([ShadowPower] MenuInput)
                              '6acc71004ab8c0e2ef7898e0a2feec25e0b093afaf5c071a5fde4a87710a2c26',   # 0.18 sample .ini ([Adrenaline])
                              '0b056fc3baac70cf0571aa82a5933fd0bbcdd4fd17ee5b64433b2a89225726c4',   # 0.19 sample .ini (MenuInput comment)
-                             'df2250c0d73f243e6f3c66456c45d31e6b390d029a43f7391ceeb72b969c8656')   # 0.20 sample .ini (CameraFlag=1)
+                             'df2250c0d73f243e6f3c66456c45d31e6b390d029a43f7391ceeb72b969c8656',   # 0.20 sample .ini (CameraFlag=1)
+                             '7d9f4d2b7f7a7a5176c454b961df9885209db31efc6b2606c04ca77a22cd27da')   # 0.21 sample .ini ([TimeScale] TranslateSlot6)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
