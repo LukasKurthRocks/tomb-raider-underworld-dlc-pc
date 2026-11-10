@@ -61,7 +61,10 @@ The port itself is the original project's release kit. **This fork has no releas
    It must print **All inputs OK**.
 4. Run the same command without `--check`, with `--credits --rad "<radvideo64.exe>" --ffmpeg "<ffmpeg.exe>"`. Each
    DLC needs its credits movie to finish.
-5. Lock the game to 60 fps. Start a **new** game from *Downloadable Content*.
+5. Turn on **fullscreen effects** (game options) and **depth of field** (no menu switch:
+   `.\scripts\windows\Set-TruDisplay.ps1 -FullscreenEffects On -DepthOfField On`, or TruMenu's settings page). Without
+   them the DLC 2 end level misses its haze and soft background.
+6. Lock the game to 60 fps. Start a **new** game from *Downloadable Content*.
 
 Details, update, uninstall and error messages: [docs/INSTALL.md](docs/INSTALL.md).
 
