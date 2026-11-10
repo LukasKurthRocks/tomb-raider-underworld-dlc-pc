@@ -119,7 +119,7 @@ findings and the open lists. Only the title-update row is a count.
 | DLC 2: cutscenes / end + credits | `██████░░░░` ~60 % | end cutscenes visible, throne flicker worked around; cutscene pause and subtitle language live (TruMenu); DLC 2 credits movie built locally | the end chain (finale, credits, menu) not yet played through; the throne's warm top light missing with the workaround |
 | DLC 2: hints / banners | `█████░░░░░` ~50 % | loading-screen titles and hint boxes | "objective / hint unlocked" banners run but are invisible: data step built, live test open |
 | DLC 2: lock-on ring | `████████░░` ~80 % | LT locks on and the ring shows (played 10 Nov): a tuning byte the converter had swapped is fixed by the new pipeline step `playerblock`; ring request with the shadow power translated (`TruShadowPower` 0.22) | Lara's aim records 715 / 722 against 718 on the Xbox (to check); the ring with the shadow power not seen yet |
-| Title-update translation | `█░░░░░░░░░` 14 % | of 1 328 changed / new functions: 96 ported, 55 partial, 2 explained, 88 irrelevant (`tools/tu_coverage.py`; 14 % = ported + explained + irrelevant) | 1 087 open; "open" also counts functions not judged yet |
+| Title-update translation | `█░░░░░░░░░` 14 % | of 1 328 changed / new functions: 96 ported, 55 partial, 2 explained, 88 irrelevant (`tools/tu_coverage.py`; 14 % = ported + explained + irrelevant) | 1 087 open; "open" also counts functions not judged yet. Probably many of them are never needed on PC (Xbox-only code: Live, storage, achievements, platform layer); the count is a work list, not the share of the DLC that is missing |
 | Costume packs | `█████░░░░░` ~50 % | converted and checked offline (pipeline step `Costumes`) | not played yet |
 
 **Where to read on**
