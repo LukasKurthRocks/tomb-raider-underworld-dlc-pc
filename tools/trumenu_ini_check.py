@@ -217,18 +217,21 @@ OC_RANGES = {'OnCinePairs': (1, 50), 'OnCineFastPairs': (1, 50), 'OnCineInterval
 QB_ITEMS = {'quick.open': 'bool', 'quick.lang': 'action', 'quick.status': 'info', 'shot.oncine': 'bool',
             'dbg.depthdump': 'action', 'dbg.cp': 'action', 'dbg.cpall': 'action', 'dbg.cplist': 'info',
             'dbg.cpgo': 'action', 'pos.save': 'action', 'pos.list': 'info', 'pos.go': 'action'}
-QB_TABLES = ('kQbEmergency', 'kQbLara', 'kQbDebug', 'kQbLevel', 'kQbRender', 'kQbTimeTest', 'kQbChapters', 'kQbAccess',
-             'kQbCoop',                                                          # 0.21 Koop (planned rows only)
-             'kQbTests',                                                         # 0.21.1 Tests (teleports + specials)
-             'kQbRenderMore',                                                    # 0.21.5 Render-Details (ring frozen)
-             'kQbRescue')                                                        # 0.21.11 Rettung (soft-lock helpers)
+# 0.22.16: kQbEmergency merged into kQbRescue, kQbRenderMore into kQbRender; new kQbSettings, kQbEnemies
+QB_TABLES = ('kQbSettings', 'kQbRescue', 'kQbLara', 'kQbEnemies', 'kQbLevel', 'kQbRender', 'kQbDebug', 'kQbTimeTest',
+             'kQbTests', 'kQbChapters', 'kQbAccess',
+             'kQbCoop')                                                          # 0.21 Koop (planned rows only)
 QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'cheat.speed', 'dbg.flatpasses', 'quick.lang',
                   'time.scale', 'ai.mode',                                       # 0.19 ai.mode
                   'snd.pos', 'snd.lines', 'snd.sort',                            # 0.20.1 sound list
                   'cam.shakescale', 'cam.rumble',                                # 0.21 camera shake / rumble
                   'ai.spawncount', 'ai.spawnat',                                 # 0.21.1 enemy spawn
                   'snd.vol.ambience', 'snd.vol.steps', 'snd.vol.weapons',       # 0.21.8 sound group sliders
-                  'snd.vol.enemies', 'snd.vol.lara', 'snd.vol.objects', 'snd.vol.dlc2', 'snd.vol.hud')
+                  'snd.vol.enemies', 'snd.vol.lara', 'snd.vol.objects', 'snd.vol.dlc2', 'snd.vol.hud',
+                  # 0.22.16 page Spiel-Einstellungen (sub.lang cycles; gfx.r.* = greyed placeholders with their value)
+                  'sub.lang', 'sub.size', 'sub.boxalpha', 'sub.colour', 'sub.pos', 'game.vol.music', 'game.vol.sfx',
+                  'game.vol.voice', 'game.mouse', 'gfx.filter', 'gfx.aspect', 'gfx.r.vsync', 'gfx.r.triple', 'gfx.r.aa',
+                  'gfx.r.mode', 'gfx.r.fullscreen', 'gfx.r.present2')
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
@@ -252,9 +255,9 @@ AI_KEYS = ('Dumb', 'DumbFilter', 'DumbMode', 'NoInvestigate', 'NoAttack')
 Q20_ITEMS = {'dbg.collect': 'bool', 'dbg.enemies': 'bool', 'media.mutemusic': 'bool', 'media.muteambient': 'bool',
              'pos.portal': 'action'}
 Q20_MEDIA_KEYS = ('MuteMusic', 'MuteAmbient')
-Q20_BAR = (('kQbLevel', 'dbg.collect', ''), ('kQbRender', 'dbg.enemies', ''), ('kQbRender', 'cheat.enemyhealth', ''),
-           ('kQbRender', 'dbg.flatedges', ''), ('kQbTimeTest', 'media.mutemusic', ''),
-           ('kQbTimeTest', 'media.muteambient', ''), ('kQbEmergency', 'game.quit', ''))
+Q20_BAR = (('kQbLevel', 'dbg.collect', ''), ('kQbEnemies', 'dbg.enemies', ''), ('kQbEnemies', 'cheat.enemyhealth', ''),
+           ('kQbRender', 'dbg.flatedges', ''), ('kQbSettings', 'media.mutemusic', ''),   # 0.22.16 pages
+           ('kQbSettings', 'media.muteambient', ''), ('kQbRescue', 'game.quit', ''))
 Q20_RING = ('dbg.collect', 'dbg.enemies', 'media.mutemusic', 'media.muteambient')
 Q20_DEFAULTS = (('AI', 'DumbMode', 'gate'), ('Debug', 'Depth', '2'), ('Debug', 'FlatPasses', '0x600'))
 # 0.20.1: the sound list - items, [Sound] keys (key, rule), bar rows (table, item, kind), check tables
@@ -270,8 +273,8 @@ Q201_BAR = (('kQbDebug', 'snd.list', 'kQbBool'), ('kQbDebug', 'snd.pos', 'kQbVal
             ('kQbDebug', 'snd.lines', 'kQbValue'), ('kQbDebug', 'snd.sort', 'kQbValue'),
             ('kQbDebug', 'snd.playing', 'kQbBool'), ('kQbDebug', 'snd.music', 'kQbBool'),
             ('kQbDebug', 'snd.sfx', 'kQbBool'), ('kQbDebug', 'snd.speech', 'kQbBool'),
-            ('kQbDebug', 'snd.other', 'kQbBool'), ('kQbDebug', 'snd.dump', 'kQbAction'),
-            ('kQbTimeTest', 'snd.list', 'kQbBool'), ('kQbTimeTest', 'snd.dump', 'kQbAction'))
+            ('kQbDebug', 'snd.other', 'kQbBool'), ('kQbDebug', 'snd.dump', 'kQbAction'))
+            # 0.22.16: the copies on Zeit / Test are gone (plan: the sound list stays on Debug / Darstellung)
 Q201_TABLES = ('kSnChecks', 'kSmChecks', 'kEsChecks')
 DV_NAME_COLOURS = ('white', 'yellow', 'cyan', 'magenta', 'weiss', 'gelb')
 # 0.21: Arachnophobie / camera / ai.remove - items, game-thread items, [Arachno] / [Camera] keys (key, rule), defaults,
@@ -291,7 +294,7 @@ Q21_DEFAULTS = (('Arachno', 'Enabled', '0'), ('Camera', 'ShakeScale', '100'), ('
 Q21_BAR = (('kQbAccess', 'arachno.on', 'kQbBool', ''), ('kQbAccess', 'arachno.hide', 'kQbBool', ''),
            ('kQbAccess', 'arachno.picture', 'kQbBool', ''), ('kQbAccess', 'arachno.mute', 'kQbBool', ''),
            ('kQbAccess', 'cam.shakescale', 'kQbValue', ''), ('kQbAccess', 'cam.rumble', 'kQbValue', ''),
-           ('kQbRender', 'ai.remove', 'kQbAction', 'others'))
+           ('kQbEnemies', 'ai.remove', 'kQbAction', 'others'))   # 0.22.16: page Gegner (KI)
 Q21_TABLES = ('kArDrawChecks', 'kArSoundChecks', 'kCsChecks', 'kRbChecks', 'kLfChecks', 'kAdChecks')
 Q21_REPLACED = ('Arachnophobie', 'Kamera-Wackeln aus')
 AD_ARGS = ('nearest', 'others', 'all')
@@ -598,6 +601,14 @@ def check_flow(ini_path):
     return problems
 
 
+def gn_names(src):
+    """0.22.16: the registry names of kGnDefs (gfx.next) in TruMenu.cpp"""
+    if 'const GnDef kGnDefs[] = {' not in src: return []
+    block = src[src.index('const GnDef kGnDefs[] = {'):]
+    block = block[:block.index('\n};')]
+    return re.findall(r'\{"([A-Za-z0-9]+)", (?:0x[0-9a-f]+|-1)\}', block)
+
+
 def nav_switches(src):
     """0.12: the switch names of kNavSwitches in TruMenu.cpp (in table order)"""
     if 'const NavSwitch kNavSwitches[] = {' not in src: return []
@@ -896,6 +907,8 @@ def check_quick(ini_path, radial_path):
                 if arg not in nav_switches(src): problems.append(where + ': nav.draw needs a switch of kNavSwitches')
             elif item == 'dbg.flatpass':     # 0.21.6: "dbg.flatpass <pass>" (RadialOn: the pass bit)
                 if arg not in RM_PASSES: problems.append(where + ': dbg.flatpass needs one of %s' % ' / '.join(RM_PASSES))
+            elif item == 'gfx.next':         # 0.22.16: "gfx.next <RegistryName>" (RadialOn: GnOn, the registry value)
+                if arg not in gn_names(src): problems.append(where + ': gfx.next needs a name of kGnDefs')
             elif items[item] != 'bool' or arg: problems.append(where + ': a bool row needs a bool item without argument')
         elif kind == 'kQbValue' and item not in QB_VALUE_ITEMS:
             problems.append(where + ': a value row needs one of %s' % ', '.join(QB_VALUE_ITEMS))
@@ -1120,9 +1133,9 @@ def check_020(ini_path, radial_path, rows):
     for table, item, arg in Q20_BAR:
         if not any(t == table and i == item and a == arg for t, de, i, a, kind, layer, tail in bar):
             problems.append('TruMenu.cpp: %s has no row %s%s' % (table, item, ' ' + arg if arg else ''))
-    emergency = [r for r in bar if r[0] == 'kQbEmergency']
+    emergency = [r for r in bar if r[0] == 'kQbRescue']   # 0.22.16: Notfall merged into Rettung / Cheats
     if emergency and emergency[-1][2] != 'game.quit':
-        problems.append('TruMenu.cpp: kQbEmergency - game.quit must be the last row (got %s)' % emergency[-1][2])
+        problems.append('TruMenu.cpp: kQbRescue - game.quit must be the last row (got %s)' % emergency[-1][2])
     for t, de, i, a, kind, layer, tail in bar:
         if i == 'game.quit' and ('kQfConfirm' in tail or kind != 'kQbAction'):
             problems.append('TruMenu.cpp: %s row "%s": game.quit is a plain action row (the item arms itself, 10 s)'
@@ -1451,8 +1464,10 @@ def check_0211(ini_path, radial_path, rows):
     for key, item in Q211_GROUPS:
         if key not in keys: problems.append('TruMenu.cpp: group %s missing (KI page)' % key)
         elif item not in inside.get(key, []): problems.append('TruMenu.cpp: group %s has no %s row' % (key, item))
-    renders = [k for k in keys if any(t == 'kQbRender' and kk == 'kQbGroup' and a == k for t, de, i, a, kk, layer, tail in bar)]
-    if len(renders) != 3: problems.append('TruMenu.cpp: Render / KI needs the three KI groups (got %d)' % len(renders))
+    # 0.22.16: the KI groups moved to page Gegner (KI) (kQbEnemies)
+    renders = [k for k, _ in Q211_GROUPS
+               if any(t == 'kQbEnemies' and kk == 'kQbGroup' and a == k for t, de, i, a, kk, layer, tail in bar)]
+    if len(renders) != 3: problems.append('TruMenu.cpp: Gegner (KI) needs the three KI groups (got %d)' % len(renders))
     for want in ('11270 17287 0', '11270 18509 2'):
         if not any(i == 'sticky.set' and a == want for t, de, i, a, k, layer, tail in bar):
             problems.append('TruMenu.cpp: no bar row sticky.set %s (hall02 repair)' % want)
@@ -2080,8 +2095,8 @@ def check_0216(ini_path):
     elif pages[specials.index('kQsCostume') - 1][1] != 'kQbLara':
         problems.append('TruMenu.cpp: page Kostueme must follow page Lara')
     if 'static_assert(kQbPageN <= %d' % QB_PAGES_MAX not in src or 'g_qbRow[%d]' % QB_PAGES_MAX not in src or \
-            'const int kQbViewMax = 64;' not in src:
-        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= %d, g_qbRow[%d], kQbViewMax 64) '
+            'const int kQbViewMax = 112;' not in src:   # 0.22.16: 112 (page Spiel-Einstellungen, every group open)
+        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= %d, g_qbRow[%d], kQbViewMax 112) '
                         'changed' % (QB_PAGES_MAX, QB_PAGES_MAX))
     sec = src[src.find('// ---- 0.21.6 costumes'):src.find('// ---- end of 0.21.6 costumes')]
     if len(sec) < 100: problems.append('TruMenu.cpp: section "0.21.6 costumes" missing')
@@ -2759,6 +2774,76 @@ def check_02215():
         n_checks, len(cols))
 
 
+Q2216_ITEMS = {'sub.show': 'bool', 'sub.size': 'float', 'sub.box': 'bool', 'sub.boxalpha': 'int', 'sub.colour': 'action',
+               'sub.pos': 'int', 'sub.reset': 'action', 'gfx.save': 'action', 'gfx.status': 'info', 'gfx.next': 'action'}
+Q2216_KEYS = (('SubShow', '1'), ('SubSize', '0.6'), ('SubBox', '1'), ('SubBoxAlpha', '25'), ('SubColour', 'white'),
+              ('SubPos', '352'))
+Q2216_PAGES = ('Spiel-Einstellungen', 'Rettung / Cheats', 'Figur', 'Gegner (KI)', 'Leveldaten', 'Render',
+               'Debug / Darstellung', 'Zeit / Ablauf', 'Tests')
+
+
+def check_02216(ini_path):
+    """0.22.16: game settings page - the plan's 29 byte checks (kGsChecks), ValGs<k> / RunGs<k> of kItems = kGsDefs[k],
+    ApplySettings only in GfTick (PadHook via GsTick, never the Present hook), the [Settings] keys with their defaults,
+    the subtitle sites only written in SuApply / GsShutdown, U3 (shown[] matched in SrRewrite), SbName(11), the new
+    page order (still 17 pages, Leveldaten = start page)"""
+    problems = []
+    src = read_cpp()
+    a, b = src.find('// ---- 0.22.16 game settings'), src.find('// ---- end of 0.22.16 game settings')
+    sec = src[a:b] if 0 <= a < b else ''
+    if not sec:
+        return ['TruMenu.cpp: section "0.22.16 game settings" missing'], ''
+    tab = sec[sec.find('const GsCheckRow kGsChecks[] = {'):]
+    tab = tab[:tab.find('\n};')]
+    n_checks = len(re.findall(r'\{kGg[A-Za-z]+, 0x[0-9a-f]{8}, "', tab))
+    if n_checks != 29:
+        problems.append('TruMenu.cpp: kGsChecks must hold the plan\'s 29 byte checks (has %d)' % n_checks)
+    defs = sec[sec.find('const GsDef kGsDefs[] = {'):]
+    defs = re.findall(r'\{"([a-z.0-9]+)", kGk', defs[:defs.find('\n};')])
+    for k, item in enumerate(defs):
+        if not re.search(r'\{"%s", "[a-z]+",\s*(?:"[^"]*"\s*)+,\s*(?:true|false),\s*ValGs<%d>,\s*(?:RunGs<%d>|nullptr)\}'
+                         % (re.escape(item), k, k), src):
+            problems.append('TruMenu.cpp: kItems row %s must use ValGs<%d> (kGsDefs index)' % (item, k))
+    items = dict(re.findall(r'\{"([a-z0-9.]+)", "(bool|int|float|info|action)",', src))
+    for item, typ in Q2216_ITEMS.items():
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    code = re.sub(r'//[^\n]*', '', sec)
+    if code.count('0x00522a10)(dm') != 1 or 'reinterpret_cast<GsApplyFn>(0x00522a10)' not in fn_body(src, 'void GfTick('):
+        problems.append('TruMenu.cpp: ApplySettings 0x522a10 is called in GfTick only')
+    if 'GfTick();' not in fn_body(src, 'void GsTick(') or 'GsTick();' not in fn_body(src, 'DWORD WINAPI PadHook('):
+        problems.append('TruMenu.cpp: GfTick runs from GsTick, GsTick once per game frame in PadHook')
+    for fn in ('HRESULT STDMETHODCALLTYPE PresentHook(', 'HRESULT STDMETHODCALLTYPE SwapPresentHook('):
+        if 'GsTick' in fn_body(src, fn) or 'GfTick' in fn_body(src, fn):
+            problems.append('TruMenu.cpp: no game settings tick in the Present hook')
+    if 'if (dm + 0x10' in code or 'ReadDword(dm + 0x10, &lost) || lost' not in fn_body(src, 'void GfTick('):
+        problems.append('TruMenu.cpp: GfTick must wait while [dm+0x10] != 0 (device lost)')
+    writes = [m.start() for m in re.finditer(r'WriteBytes\(s\.at', code)]
+    if len(writes) != 2 or 'WriteBytes(s.at, bytes, static_cast<size_t>(s.size))' not in fn_body(src, 'bool SuSiteSet('):
+        problems.append('TruMenu.cpp: the subtitle sites are written only by SuSiteSet / GsShutdown')
+    rw = fn_body(src, 'void SrRewrite(')
+    if 'r.shown[all[i].k]' not in rw or 'hit.shown[all[pos[s]].k], 0x100, buf' not in rw:
+        problems.append('TruMenu.cpp: U3 - SrRewrite must match and remember the rewritten line (shown[k])')
+    if 'case 11: return "Nederlands";' not in fn_body(src, 'const char *SbName('):
+        problems.append('TruMenu.cpp: SbName(11) must be "Nederlands"')
+    if 'const int kQbSubLangs[7] = {-1, 0, 1, 2, 3, 4, 11};' not in src:
+        problems.append('TruMenu.cpp: sub.lang bar steps -1 / 0 / 1 / 2 / 3 / 4 / 11')
+    ini = open(ini_path, encoding='utf-8').read()
+    for key, default in Q2216_KEYS:
+        if not re.search(r'^\[Settings\][^\[]*^%s=%s$' % (key, re.escape(default)), ini, re.M | re.S):
+            problems.append('TruMenu.ini: [Settings] %s=%s missing' % (key, default))
+    block = src[src.index('const QbPage kQbPages[] = {'):]
+    block = block[:block.index('\n};')]
+    names = re.findall(r'(?:QB_PAGE\(|\{)"([^"]*)", "[^"]*", (?:kQb|nullptr)', block)
+    pos = -1
+    for want in Q2216_PAGES:
+        if want not in names: problems.append('TruMenu.cpp: page %s missing' % want)
+        elif names.index(want) < pos: problems.append('TruMenu.cpp: page %s out of the plan\'s order' % want)
+        else: pos = names.index(want)
+    if len(names) != 17: problems.append('TruMenu.cpp: kQbPages must keep 17 pages (has %d)' % len(names))
+    return problems, '%d byte checks, %d settings items in kGsDefs order, ApplySettings only in GfTick (PadHook), ' \
+                     '[Settings] keys, U3, %d pages' % (n_checks, len(defs), len(names))
+
+
 def table(src):
     block = src[src.index('const OptDef kOpts[] = {'):]
     block = block[:block.index('\n};')]
@@ -2892,6 +2977,10 @@ def main(argv):
     for p in cproblems15: print('Q02215 %s' % p)
     if not cproblems15: print('ok: 0.22.15 %s' % csummary15)
     problems += cproblems15
+    cproblems16, csummary16 = check_02216(ini_path)   # 0.22.16
+    for p in cproblems16: print('Q02216 %s' % p)
+    if not cproblems16: print('ok: 0.22.16 %s' % csummary16)
+    problems += cproblems16
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

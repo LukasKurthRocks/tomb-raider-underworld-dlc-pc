@@ -2928,6 +2928,79 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.16 - page Spiel-Einstellungen, bar reorganised, sub.lang fixes (2026-11-10)
+
+Built into `work\asi\menu0239`, not installed. Plan: workspace `docs\Plan-TruMenu-Einstellungen-1011.md`; evidence
+`docs\Befund-Spieloptionen-1011.md`; ENGINE.md rows "Option table", "Graphics block fields", "Graphics apply",
+"Settings save with Graphics", "Subtitle draw parameters". Byte checks: `work\asi\menu0239\precheck_02216.txt` (the
+plan's 29 checks, `kGsChecks`; 29 / 0 mismatches against `data\pc\tru.exe` and read-only against the installed
+`tru.exe`). A failed check group greys only its rows and writes one log line (`0.22.16 settings: <group> - code
+differs ...`); the summary line is `0.22.16: game settings page 29 of 29 byte checks ok` (first game frame).
+
+**Page 1 "Spiel-Einstellungen / Game settings"** (collapsible groups; closed at the start: "Braucht D3D-Reset",
+"Grafik ab naechstem Start", "Geraet (Diagnose)", "Ton-Gruppen (TruMenu)", "TruMenu selbst"):
+
+| Group | Rows (item) | Way |
+|---|---|---|
+| Untertitel | Sprache (`sub.lang`, value row: Spielsprache -1 / English 0 / Francais 1 / Deutsch 2 / Italiano 3 / Espanol 4 / Nederlands 11, live), zeigen (`sub.show`), Textgroesse (`sub.size` 0.5 / 0.6 / 0.75 / 0.9 / 1.1), grauer Balken (`sub.box`), Balken-Deckkraft (`sub.boxalpha` 0 / 25 / 40 / 60 / 80 %), Textfarbe (`sub.colour` white / yellow / cyan / grey), Position (`sub.pos` 300 .. 400), Standard (`sub.reset`) | sub.lang: option setter 0x5d5100 + settings save 0x478010 (0.22.13 / 0.22.14). The look is TruMenu's own: draw parameters of 0x583e20 - y base disp32 0x583e39 -> TruMenu float, scale disp32 0x583e7c -> TruMenu float with line step imm8 0x583ebd = round(22 x s / 0.6) and limit 0x583ec6 = 2 x step, box flag 0x583eaa, box colour imm32 0x474f54 = alpha << 24, the line call 0x583eb6 -> `GsSubLine` (off: nothing drawn; colour: `[0x9ce6c0]` set around 0x477180 and put back, alpha byte kept). Written on the game thread (PadHook) only; a site only while it holds the game's bytes or TruMenu's own (else that row greys: "taken by another plugin"); a value at its default puts the game's bytes back; DLL detach puts back what is still TruMenu's. Kept in `TruMenu.ini [Settings]` (SubShow, SubSize, SubBox, SubBoxAlpha, SubColour, SubPos), applied at the first game frame |
+| Ton | Musik / Effekte / Sprache (`game.vol.music` / `.sfx` / `.voice`, 0 .. 128 in steps of 8, shown in %), Musik aus, Ambient aus, Musik: Thailand / stoppen, group "Ton-Gruppen (TruMenu)" (the 0.21.8 sliders) | options 2 / 1 / 3 through the setter with callback 1 (live); the game's settings save 0x478010 runs once, 2 s after the last change (log `0.22.16 settings: options saved 2 s after the last change`) |
+| Bild / Grafik (live) | Vollbild-Effekte (`gfx.fsfx`, +0x25), Tiefenunschaerfe (`gfx.dof`, +0x26, grey while FS is off), Schatten (+0x28), Wasser (+0x3d), Spiegelungen (+0x3c), Volumen (+0x3e), Texturfilter (`gfx.filter` 0..2, +0x50), Seitenverhaeltnis (`gfx.aspect` 4:3 / 16:9 / 16:10, +0x14), Grafik speichern (`gfx.save`, right twice), Grafik: Stand (`gfx.status`) | the runner only queues; `GfTick` in PadHook (never the Present hook) copies the active block `[0xad75e4]+0x15c`, changes the wanted fields, checks vtable `[dm]` = 0x84b54c / slot 0 = 0x522a10 and `[dm+0x10]` == 0 (else it waits, 5 s at most), calls ApplySettings(window `[0x9eede8]`, block); al = 1 -> block to 0x890388 and the option set with bool 0. Log `gfx: ApplySettings ... -> al 1, n ms`. FS grey with DisableNonPow2Textures = 1. `gfx.save` = 0x478010 + 0x4796b0 (root + Graphics), then the next-start values of this session again |
+| Braucht D3D-Reset (geplant) | VSync, Dreifachpuffer, Kantenglaettung, Aufloesung / Bildrate, Vollbild, Bild-Intervall 2 (`gfx.r.*`) | **greyed by design** (coordinator 2026-11-10): the value now is shown read only; a press says "geplant: braucht D3D-Reset (TruMenu-Reset-Hook fehlt)"; no reset hook |
+| Grafik ab naechstem Start | VSync, Dreifachpuffer, Kantenglaettung ... / Textur-Detail ... (command line), Ruckel-Fix (DontDeferShaderCreation = 0 + DisableDynamicTextures = 0), 32-Bit-Texturen / Hardware-DXTC / Hardware-Schattenkarten / Null-Render-Ziele aus; group "Geraet (Diagnose)": the device values of the finding's table 2.3 | `gfx.next <RegistryName> [value]`: one DWORD in `HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld\Graphics` (RegOpenKeyExW / RegSetValueExW of advapi32 looked up at run time - no new import; the key must exist); the row shows the registry value; `gfx.status` lists registry != active. AntiAliasing 0 .. 8 / TextureDetail 0 .. 4: range not verified |
+| Steuerung | Kamera X / Y, Zielen X / Y invertiert (`game.camxinv` ...), Vibration (Spiel) (`game.vibration`), Vibration-Staerke (TruMenu, `cam.rumble`), Maus (`game.mouse` 1 .. 20), Kampfmodus (`game.combatmode`, meaning open) | options 0xc..0xf / 0x10 / 0x96 / 0x11 through the setter (callback 1), saved 2 s later |
+| TruMenu selbst | Menuesprache (`quick.lang`), Mauszeiger aus, Schnellschalter (offen) | moved from Debug / Darstellung |
+
+**sub.lang fixes:** `SbName(11)` = "Nederlands" (was "?"), Francais / Espanol with their accents. **U3** (live 13:48:
+after the first instant switch the box line was the rewritten text, which is no stored line - the second `sub.lang`
+logged `did not come from a stored subtitle record`): each stored record keeps `shown[k]` = the text TruMenu wrote
+(or found) for its line k; `SrRewrite` matches a box line against the reader's line or `shown[k]`, so every further
+switch rewrites again (model `sublang`: + EN -> DE -> NL -> EN, + one line four times).
+
+**Bar reorganised** (plan section 2; 17 pages, Leveldaten stays the start page 6): 0 Favoriten / Zuletzt, 1
+Spiel-Einstellungen (new), 2 **Rettung / Cheats** (Rettung + the rows of Notfall that Rettung did not have, groups
+"Cheats" (closed) and "Spiel" (Sterben, Spiel beenden last)), 3 **Figur** (was Lara: groups Bewegung / Anzeige,
+Positionen, Fotos, Kostuem, Objekte spawnen (closed); then the saved positions and the switch groups **"Schattenkraft
+(Doppelgaengerin)"** (open) / **"Kampf (Doppelgaengerin)"** (closed) - the same switches as page Fixes (TruShadowPower
+ShadowPower Enabled / Buttons, Look Enabled / ScreenEffect, Meter HudBar, Adrenaline / Reticle / TimeScale;
+TruShadowCombat Strike Translate / Gate, Damage, Hit, Melee, Companion), greyed (count column "(Lara)") while
+TruDlc2Player's `TruDlc2PlayerDoppelganger` says Lara is played, still switchable; "Kraft unendlich" planned), 4
+Kostueme, 5 **Gegner (KI)** (Anzeigen, Dumme KI, Gegner spawnen (closed), Gegner entfernen / toeten (closed),
+Gegner-Diagnose (closed: ai.why, combo / fight / aim traces, ring.bits, aim.why)), 6 Leveldaten, 7 **Render** (Render /
+KI + Render-Details: Flach-Ansicht, Farbe / Paesse (closed), Markup / Kanten / Physik / SAP, Navmesh / Shader /
+Objektnamen (closed)), 8 Debug / Darstellung (sound list as the closed group "Ton-Liste (Diagnose)"), 9 **Zeit /
+Ablauf** (time rows, Claude mark, group Ablauf), 10 Tests (teleports, test spots, cutscene, **"Licht (Diagnose)"**
+closed with light.list / light.shadow, depth dump, hall02), 11 .. 16 unchanged (Barrierefreiheit "Verstehen": +
+sub.size / sub.box / sub.colour). Every item of 0.22.15 stays a bar row (`trumenu_ini_check`: ring frozen, every
+ring entry a row; help rows); only the doubles inside the merged page went. Groups that start closed
+(`kQbStartClosed`) count as closed until opened once - `[Quick] Closed` then holds `+<key>`; keys of 0.22.15
+(`ki_dumm`, `ki_spawn`, `ki_weg`, `rd_*`, `obj_spawn`, `ton_gruppen`) are the same, so an existing `[Quick] Closed`
+still resolves; favourites / recent rows are item + argument and find their rows on the new pages. `kQbViewMax` 112
+(the settings page with every group open).
+
+Checks: `tools/trumenu_ini_check.py` check_02216 (29 byte checks, `ValGs<k>` = `kGsDefs[k]`, ApplySettings only in
+GfTick / PadHook, `[Settings]` keys, U3, page order) and the layout checks moved to the new tables;
+`tools/trumenu_quick_check.py` model `settings` (sites, steps, start-closed groups) and `sublang` + 2 U3 cases.
+
+### TO TEST 0.22.16
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | `sub.lang` row on page 1: Spiel -> EN -> FR -> DE -> IT -> ES -> NL in a cutscene (5 min) | each step switches the shown line at once, label "Nederlands" for 11 |
+| 2 | `sub.size` 0.5 / 0.9, `sub.pos` 300 / 400, `sub.box` off, `sub.boxalpha` 60 %, `sub.colour` yellow - in a scene and a Bink movie (10 min) | sizes / height / bar as set; centred at size != 0.6? (inference); **yellow shows yellow** (if it shows cyan the byte order is the other way round - report) |
+| 3 | `sub.show` off / on in a scene (3 min) | no line while off; no old lines after on |
+| 4 | Music 0 -> 64 -> 128, effects, speech; restart the game (5 min) | live; after 2 s log `options saved`; registry VoVolume / MusicVolume / SfxVolume = the values; same after the restart |
+| 5 | **`gfx.fsfx` off -> on in the end level** dlc_yggdrasil_end (10 min) | short hitch, game log "Destroy Resources" / "Create Resources", **no** "Init and Reset"; picture as with the registry = 1; TruMenu.log `gfx: ApplySettings ... -> al 1` |
+| 6 | `gfx.dof` on / off with FS on (far = blurred), then FS off (5 min) | DoF row greyed "nur mit Vollbild-Effekten" |
+| 7 | `gfx.shadows`, `gfx.water`, `gfx.reflect`, `gfx.volfx` once each (2 min each) | live, no reset |
+| 8 | `gfx.aspect`, `gfx.filter` (5 min) | no rebuild; picture changes? |
+| 9 | `gfx.save` (right twice), quit the game normally, read the registry `Graphics` (5 min) | the active values; next-start values of this session written again (log) |
+| 10 | a next-start row (e.g. VSync) (3 min) | registry changed, active value unchanged, `gfx.status` lists it |
+| 11 | Controls: camera Y inverted live; combat mode: what changes? (5 min) | inversion at once; note the combat mode effect |
+| 12 | page Figur: shadow power group in Croft Manor greyed, in DLC 2 as the doppelganger active; "Blick: Bildschirm-Effekt" off, power on (5 min) | state "grau: Lara spielt" / "Doppelgaengerin aktiv"; the switch writes TruShadowPower.ini as on page Fixes |
+| 13 | new order: every old favourite row still there; page 2 Rettung / Cheats complete (5 min) | favourites / recent rows resolve; `[Quick] Closed` of before still applies |
+| 14 | **U3 retest**: held cutscene with a line, `sub.lang` EN -> DE -> NL -> EN (3 min) | every switch rewrites the line (log `sub.lang: box +0x100 ... -> ...` each time, no `did not come from a stored subtitle record`) |
+| 15 | group "Braucht D3D-Reset" (1 min) | **greyed by design**: values shown, a press says "geplant: braucht D3D-Reset (TruMenu-Reset-Hook fehlt)" |
+
 ## 0.22.15 - aim.trace / aim.why: the lock-on path (2026-11-10)
 
 Live test 2026-11-10 13:30 (DLC 2 hall02, 0.22.14): LT held on an attacking yeti, Lara drew the pistol, but her chart

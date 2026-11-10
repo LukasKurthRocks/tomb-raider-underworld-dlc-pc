@@ -2344,7 +2344,8 @@ def check_cosbar():
     lara_first_over = min(n for n in range(200) if 15 + 8 + 4 + n > 64)
     src = open(c.CPP, encoding='utf-8').read()
     block = src[src.index('const QbPage kQbPages[] = {'):]
-    pages = block[:block.index('\n};')].count('\n    ')
+    body = block[:block.index('\n};')]
+    pages = body.count('\n    QB_PAGE(') + body.count('\n    {"')   # 0.22.16: comment lines in the table do not count
     good &= pages == 17 and lara_first_over == 38   # 0.21.11: 17 pages (+ Rettung; g_qbRow[17])
     print('cosbar: 4 rows + the open list (36 -> 40 rows), only the current one marked, no level = every row refused, '
           'labels for dlc_costume_a..p only, records with an object id; own page <= 64 rows (list cut after 60), Lara '
@@ -3151,16 +3152,21 @@ def sr_rewrite(recs, box, v, game_lang):        # SrRewrite: recs older first, e
             if base[j] <= q < base[j] + len(nl[j]): return nl[j][q - base[j]]
         return None
 
-    line_of = lambda i: recs[allp[i][0]]['line'][allp[i][1]]
+    for r in recs:                               # 0.22.16 (U3): shown[k] = what TruMenu wrote for stored line k last
+        if 'shown' not in r: r['shown'] = [None] * len(r['line'])
+
+    def is_line(i, text):
+        j, k, _ = allp[i]
+        return recs[j]['line'][k] == text or recs[j]['shown'][k] == text
     pos = [-1, -1]
     if box[1]:
         for i in range(len(allp) - 1, -1, -1):
-            if line_of(i) == box[1]: pos[1] = i; break
+            if is_line(i, box[1]): pos[1] = i; break
     if box[0]:
-        if pos[1] > 0 and line_of(pos[1] - 1) == box[0]: pos[0] = pos[1] - 1
+        if pos[1] > 0 and is_line(pos[1] - 1, box[0]): pos[0] = pos[1] - 1
         else:
             for i in range(len(allp) - 1, -1, -1):
-                if i != pos[1] and line_of(i) == box[0]: pos[0] = i; break
+                if i != pos[1] and is_line(i, box[0]): pos[0] = i; break
     want = [None, None]
     q1 = -2
     if pos[1] >= 0:
@@ -3171,7 +3177,12 @@ def sr_rewrite(recs, box, v, game_lang):        # SrRewrite: recs older first, e
         else:
             q0 = map_new(allp[pos[0]])
             want[0] = new_text(q0) if q0 >= 0 else None
-    return [want[s][:0xff] if box[s] and pos[s] >= 0 and want[s] is not None else box[s] for s in range(2)]
+    out = [want[s][:0xff] if box[s] and pos[s] >= 0 and want[s] is not None else box[s] for s in range(2)]
+    for s in range(2):                           # 0.22.16 (U3): remember the written / kept text of the stored line
+        if box[s] and pos[s] >= 0 and want[s] is not None:
+            j, k, _ = allp[pos[s]]
+            recs[j]['shown'][k] = out[s]
+    return out
 
 
 def sr_read(text, word, kind=1, game_lang=0):  # what the reader gives the box when the record comes
@@ -3224,6 +3235,23 @@ def check_sublang():
     longt = b'0\r' + b'x' * 300 + b'\r2\rkurz\r'
     cases.append(('255 bytes at most', [len(l) for l in sr_lines({'text': longt, 'kind': 1}, 0, 0)], [255]))
     cases.append(('id "-1" matches word -1 directly', sr_lines({'text': b'-1\rminus\r', 'kind': 0}, -1, 2), [b'minus']))
+    # 0.22.16 (U3, live 2026-11-10 13:48: EN -> DE worked, then 11 / 0 found no stored line): EN -> DE -> NL -> EN
+    nx = b'0\rZip: Go reactivate it.\r2\rZip: Schalte sie wieder ein.\r11\rZip: Zet hem weer aan.\r'
+    c1, c2 = sr_read(pod, 0), sr_read(nx, 0)
+    box = sr_box([c1, c2])
+    chain = []
+    for v in (2, 11, 0):
+        box = sr_rewrite([c1, c2], box, v, 0)
+        chain.append(list(box))
+    cases.append(('U3 chain EN -> DE -> NL -> EN (each switch rewrites again)', chain,
+                  [[b'Amanda hat die Energiezufuhr gekappt.', b'Schalte sie wieder ein.'],
+                   [b'Amanda heeft de stroom uitgezet.', b'Zet hem weer aan.'],
+                   [b'Amanda cut the power.', b'Go reactivate it.']]))
+    d1 = sr_read(pod, 0)
+    one = [b'', d1['line'][0]]
+    for v in (2, 11, 2, 0):
+        one = sr_rewrite([d1], one, v, 0)
+    cases.append(('U3 one line, four switches back to English', one, [b'', b'Amanda cut the power.']))
     for name, got, want in cases:
         good = got == want
         ok &= good
@@ -3295,6 +3323,66 @@ def check_aimwhy():
     return ok
 
 
+# ---- 0.22.16 settings: the subtitle look sites (SuApply), the bar steps, groups that start closed (QbGroupClosed)
+SU_START_CLOSED = ('set_gfxn', 'set_tm', 'fig_combat')   # a sample of kQbStartClosed
+
+
+def su_step(s):                                  # SuStep: round(22 x s / 0.6), 8 .. 60
+    st = int(22.0 * s / 0.6 + 0.5)
+    return max(8, min(60, st))
+
+
+def su_sites(show, size, box, alpha, colour, pos, our_pos=0x10, our_size=0x14, stub=0x99):   # SuApply: wanted bytes
+    default = abs(size - 0.6) < 0.001
+    a = min(255, (alpha * 256 + 50) // 100)
+    return [0x0084e8d0 if pos == 352 else our_pos, 0x00841bd0 if default else our_size,
+            0x16 if default else su_step(size), 0x2c if default else 2 * su_step(size), 1 if box else 0, a << 24,
+            0xffef32c5 if show and colour == 0 else stub]
+
+
+def qb_closed(text, key, start=SU_START_CLOSED):  # QbGroupClosed (0.22.16: "+key" opens a group that starts closed)
+    words = [w for w in text.replace(' ', ',').split(',') if w]
+    if key in words: return True
+    return key in start and '+' + key not in words
+
+
+def qb_set(text, key, closed, start=SU_START_CLOSED):   # QbGroupSet
+    words = [w for w in text.replace(' ', ',').split(',') if w and w != key and w != '+' + key]
+    if closed and key not in start: words.append(key)
+    if not closed and key in start: words.append('+' + key)
+    return ','.join(words)
+
+
+def check_settings():
+    cases = []
+    game = [0x0084e8d0, 0x00841bd0, 0x16, 0x2c, 1, 0x40000000, 0xffef32c5]
+    cases.append(('defaults = the game\'s bytes at every site', su_sites(1, 0.6, 1, 25, 0, 352), game))
+    cases.append(('size 0.9: own float, step 33, limit 66', su_sites(1, 0.9, 1, 25, 0, 352)[1:4], [0x14, 33, 66]))
+    cases.append(('size 1.1: step 40 (imm8, limit 80 < 128)', su_sites(1, 1.1, 1, 25, 0, 352)[2:4], [40, 80]))
+    cases.append(('size 0.5: step 18', su_sites(1, 0.5, 1, 25, 0, 352)[2], 18))
+    cases.append(('opacity 0 / 60 / 80 / 100 %', [su_sites(1, 0.6, 1, p, 0, 352)[5] >> 24 for p in (0, 60, 80, 100)],
+                  [0, 154, 205, 255]))
+    cases.append(('show off or a colour: the line call goes to the stub', [su_sites(0, 0.6, 1, 25, 0, 352)[6],
+                  su_sites(1, 0.6, 1, 25, 2, 352)[6]], [0x99, 0x99]))
+    cases.append(('bar off: flag 0', su_sites(1, 0.6, 0, 25, 0, 352)[4], 0))
+    cases.append(('volume step = round(v / 8), 17 steps', [int(v / 8.0 + 0.5) for v in (0, 4, 64, 124, 128)], [0, 1, 8, 16, 16]))
+    t = ''
+    cases.append(('start-closed group closed with an empty list', qb_closed(t, 'set_gfxn'), True))
+    t = qb_set(t, 'set_gfxn', False)
+    cases.append(('opened: "+set_gfxn" kept', (t, qb_closed(t, 'set_gfxn')), ('+set_gfxn', False)))
+    t = qb_set(t, 'set_gfxn', True)
+    cases.append(('closed again: the word goes', (t, qb_closed(t, 'set_gfxn')), ('', True)))
+    t = qb_set('ki_dumm', 'set_sub', True)
+    cases.append(('a normal group as before', (t, qb_closed(t, 'set_sub'), qb_closed(t, 'ki_dumm')),
+                  ('ki_dumm,set_sub', True, True)))
+    ok = True
+    for name, got, want in cases:
+        good = got == want
+        ok &= good
+        print('settings: %s: %s  %s' % (name, got, 'ok' if good else 'FAIL (want %s)' % (want,)))
+    return ok
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -3315,7 +3403,8 @@ def main():
                check_qcdanger(), check_qcarm(), check_favargs(rng), check_sgcover(), check_qcsuggest(),   # 0.21.8
                check_cinepad(),                                                       # 0.22.13
                check_sublang(),                                                       # 0.22.14
-               check_aimwhy()]                                                        # 0.22.15
+               check_aimwhy(),                                                        # 0.22.15
+               check_settings()]                                                      # 0.22.16
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 
