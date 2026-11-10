@@ -1145,6 +1145,15 @@ tail of `.text` (0x83de00..0x83dffc): `light_tex_guard` 0x50a645 / 0x50a683 -> 0
 0, `[this+8] = 0`; then the three original instructions, back to 0x71e716 (TruShadowPower's `kRingEntry` hooks right
 after it). The three upstream guard tools applied to the Steamless exe leave exactly 47 bytes different from B138:
 the LAA bit (file offset 0x116) and this fourth guard. ✅ static (bytes compared)
+The fourth guard has a tool since 2026-11-10: `tools/combat_lock_guard.py` (44-byte cave, instructions in its
+docstring; `--check` says "patched" on the B138 exe, "original" on the Steamless exe; selftest 7 cases). `[this+8]` is
+a pointer to a handle pair {object*, serial}; the resolver 0x5b39d0 (cdecl, writes ecx / edx) returns the object when
+pointer and object are non-zero and `[object+0x44] == serial`, else 0. The cave saves ecx around the call; eax / edx
+are overwritten by the function itself (0x71e716 / 0x71e725) before they are read. Not covered: a `[this+8]` that
+points to freed memory (the resolver reads through it). The whole exe patch is pipeline step `Exe`
+(`tools/exe_build.py`: Steamless exe md5 `56d1ce2d…` -> LAA -> `fmod_init_guard` -> `light_tex_guard` (+ `.text`
+writable) -> `soundplex_guard` -> `combat_lock_guard` -> section check -> gate): output md5 = `5560abac…` = B138,
+byte-identical. ✅ static (md5 gate)
 
 ---
 

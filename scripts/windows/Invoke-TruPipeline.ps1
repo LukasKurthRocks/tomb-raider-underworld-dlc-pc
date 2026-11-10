@@ -143,6 +143,15 @@
                -FixesOut DIR (2026-11-04, check runs): Generalbank writes DIR\generalbank_build; Repair writes
                DIR\b138_pristine\mods, DIR\generalbank_build (--base = that snapshot's generalbank.drm) and
                DIR\b138_fixes\mods instead of the usual work\rebuild\b138_pristine / generalbank_build / b138_fixes
+      Exe      (2026-11-10, independent of every other step, seconds) our patched tru.exe instead of the kit's:
+               tools\exe_build.py reads the Steamless-unpacked Steam exe (md5 56d1ce2d..., Install-TruAll step 8:
+               ..\data\pc\tru.exe.unpacked.exe / tru.exe.steam_original.unpacked.exe / tru.exe.steamless_original, else
+               work\b270_kit\exe\tru_steam_unpacked_realign.exe; the game folder is only read), sets the LAA bit, applies
+               fmod_init_guard / light_tex_guard (+ .text writable) / soundplex_guard / combat_lock_guard (the fourth
+               B138 guard, lock-on target at 0x71e710), checks the section headers and gates md5 = 5560abac... (the
+               B138 exe); nothing is written when a stage or the gate fails. Then exe_build --check lists every stage
+               of the result (exit 1 unless complete) -> work\rebuild\exe\tru.exe + exe_build.json, exe_check.json
+               (-FixesOut DIR: DIR\exe\...). Not installed by anything yet
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
@@ -171,10 +180,12 @@
     .\Invoke-TruPipeline.ps1 -Step Fixes -FixesOut work/rebuild/pipeline_check_0311 -Verbose
 .EXAMPLE
     .\Invoke-TruPipeline.ps1 -Step Costumes -FixesOut work/rebuild/costumes_0311 -Jobs 1 -Verbose
+.EXAMPLE
+    .\Invoke-TruPipeline.ps1 -Step Exe -Verbose
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank', 'Exe')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(1, 99)][int]$ToTool = 99,
     [ValidateRange(0, 16)][int]$Jobs = 0,
@@ -247,6 +258,8 @@ if ($FixesOut) {
     # Repair: generalbank_build reads its base from this run's own snapshot (its default is work/rebuild/b138_pristine)
     if ($Step -eq 'Repair') { $gbBase = @('--base', "$repPristine/generalbank.drm") }
 }
+# step Exe (2026-11-10): our B138 tru.exe from the Steamless-unpacked Steam exe
+$exeOut = if ($FixesOut) { "$fixRoot/exe" } else { 'work/rebuild/exe' }
 # step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
 $costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
 $costumeTools = @(
@@ -449,6 +462,11 @@ $steps = @{
         @('tools\globalinfo_player_list_fix.py', '--verify', "$gbOut/k12/mods/generalbank.drm", '--report', "$gbOut/player_list_check.json"),
         @('tools\input_map_tu_fix.py', '--verify', "$gbOut/k12/mods/generalbank.drm", '--report', "$gbOut/k12/input_map_check.json")
     )
+    # Exe: build (every stage checks its bytes first, gate md5 = B138), then list the stages of the result
+    Exe = @(
+        @('tools\exe_build.py', "$exeOut/tru.exe", '--report', "$exeOut/exe_build.json"),
+        @('tools\exe_build.py', '--check', "$exeOut/tru.exe", '--report', "$exeOut/exe_check.json")
+    )
 }
 $outputDirs = @{
     Index   = @('work')
@@ -467,6 +485,7 @@ $outputDirs = @{
     Costumes = @('work\rebuild')
     Repair  = @('work\rebuild')
     Generalbank = @('work\rebuild')
+    Exe     = @(($exeOut -replace '/', '\'))
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{

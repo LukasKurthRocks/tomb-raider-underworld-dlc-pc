@@ -220,7 +220,13 @@ our `generalbank.drm` ->
 `work\rebuild\b138_fixes\mods`, install it with `Install-TruTree.ps1 -Source .\work\rebuild\b138_fixes\mods`).
 `Generalbank` rebuilds only our `generalbank.drm` (`tools/generalbank_build.py`, 21 steps: mission screen style, the
 title update's loading screen with the DLC titles and its hint box, ~8 min, two steps need ~16 GB RAM) and checks it
-against the MD5 of the file played in game -> `work\rebuild\generalbank_build\mods`; `Repair` runs it too. What each
+against the MD5 of the file played in game -> `work\rebuild\generalbank_build\mods`; `Repair` runs it too.
+`Exe` (2026-11-10, independent of the other steps, a few seconds) builds the patched `tru.exe` ourselves instead of
+taking it from the kit: `tools/exe_build.py` reads the Steamless-unpacked Steam exe (MD5 `56d1ce2d…`, the file
+`Install-TruAll.ps1` step 8 writes into the game folder; only read), sets the large-address-aware bit, applies
+upstream's three guard tools and our `tools/combat_lock_guard.py` (lock-on target check at 0x71e710) and writes
+`work\rebuild\exe\tru.exe` only when its MD5 equals the B138 exe (`5560abac…`); `exe_build.py --check` then lists
+every stage. Nothing installs that file yet. What each
 step runs, how long it takes and how the result compares with B138:
 [docs/WINDOWS_REBUILD.md](../../docs/WINDOWS_REBUILD.md); upstream's own scripts and layers:
 [docs/WS_MAP.md](../../docs/WS_MAP.md).
