@@ -130,7 +130,19 @@
                vo_lang_variants check pack11 (doppelganger language variants, vo_lang_check.json), generator_intro_fix
                scan (genintro_check.json), dlc_struct_fixes check --steps costumedtp,dspkind (datafix_check.json)
                -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
-      Generalbank  our generalbank.drm alone (after Repair's snapshot): B138's + mission screen style + the title
+      Generalbank  (default since 2026-11-11, Q2, seconds, no kit / Xbox data) tools\generalbank_pc_build.py build:
+               the PC patch.000 generalbank (raw md5 checked) + recipe P3 (DLC text, menu_dlc_patch) + the recorded
+               sections of docs\data\generalbank_pc.json (13 sections: B138's TU edits DTP 36 / script 72, scripts 6 /
+               9 / 104 / 21239 / 20082 + DTP 47 of the chain below, K12 DTP 2, shadow meter HUD scripts 37 / 213 +
+               textures 7899 / 7036) + menu_ring_p14 build (ring tree 7: DLC on slot 7, QUIT on position 14; step
+               file gated md5 = b8b1eb71..., the installed ring tree 7) + the TU doppelganger camera DTPs 21237 / 21238
+               and their curve records 22194 appended (tools/tu_camera_dtp.py; md5 810711f1...); a guard refuses every
+               kit / reference / Xbox / game-mods path; then menu_ring_layout --expect-p14, menu_quit_slot_check
+               --expect f15, input_map_tu_fix --verify
+               -> work\rebuild\generalbank_pc\mods\generalbank.drm + build_report.json (-FixesOut DIR:
+               DIR\generalbank_pc). Docs: Befund-Generalbank-PC-Basis-1111.md. Not installed by anything yet.
+               -GeneralbankKit = the old chain (developer; the source of the knowledge):
+               our generalbank.drm alone (after Repair's snapshot): B138's + mission screen style + the title
                update's loading screen (script 6, DLC titles) and hint box (script 10 -> 9), 21 steps with the
                existing tools, two of them load the generic store (~16 GB RAM, one after the other); step 21 is
                compared with the played test 38 file (MD5); step 22 (2026-11-04) appends the title update's 6 input
@@ -207,6 +219,8 @@ param(
     # (one folder directly below work/rebuild; never a test tree dlc_test*)
     [ValidatePattern('^work[\\/]rebuild[\\/](?!dlc_test)[\w\-\.]+[\\/]?$')][string]$FixesOut,
     [ValidateSet('Report', 'Enforce')][string]$ShaderGate = 'Report',
+    # step Generalbank: the old chain on B138's generalbank (+ two generic-store converter runs) instead of the PC build
+    [switch]$GeneralbankKit,
     [switch]$Trace
 )
 
@@ -272,6 +286,8 @@ if ($FixesOut) {
 }
 # step Exe (2026-11-10): our B138 tru.exe from the Steamless-unpacked Steam exe
 $exeOut = if ($FixesOut) { "$fixRoot/exe" } else { 'work/rebuild/exe' }
+# step Generalbank (2026-11-11): our generalbank.drm from the PC patch.000 original + recorded knowledge + ring P14
+$gbPcOut = if ($FixesOut) { "$fixRoot/generalbank_pc" } else { 'work/rebuild/generalbank_pc' }
 # step Globalsound (2026-11-10): our globalsoundinfo.drm from the PC original + the recorded title-update edit
 $gsOut = if ($FixesOut) { "$fixRoot/globalsound" } else { 'work/rebuild/globalsound' }
 # step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
@@ -467,7 +483,14 @@ $steps = @{
         @('tools\dlc_struct_fixes.py', 'check', "$repPristine,$repFixes", '--steps', 'costumedtp,dspkind', '--pack', 'pack10', '--report', ((Split-Path -Parent $repFixes) + '/datafix_check.json')),
         (@('tools\shader_form_gate.py', 'check', $repFixes, '--list', '3', '--report', ((Split-Path -Parent $repFixes) + '/shader_form_check.json')) + $sgEnforce)
     )
-    Generalbank = @(
+    # Generalbank (2026-11-11, Q2): the PC patch.000 generalbank + docs\data\generalbank_pc.json + ring P14 (md5 gate =
+    # ring tree 7, kit / Xbox paths refused by the tool's guard), then PC-only gates; -GeneralbankKit: the old chain
+    Generalbank = if (!$GeneralbankKit) { @(
+        @('tools\generalbank_pc_build.py', 'build', $gbPcOut),
+        @('tools\menu_ring_layout.py', "$gbPcOut/mods/generalbank.drm", '--expect-p14'),
+        @('tools\menu_quit_slot_check.py', "$gbPcOut/mods/generalbank.drm", '--expect', 'f15'),
+        @('tools\input_map_tu_fix.py', '--verify', "$gbPcOut/mods/generalbank.drm", '--report', "$gbPcOut/input_map_check.json")
+    ) } else { @(
         @('tools\generalbank_build.py', $gbOut),
         @('tools\input_map_tu_fix.py', '--verify', "$gbOut/mods/generalbank.drm", '--report', "$gbOut/input_map_check.json"),
         # gate S104 (2026-11-05): the result = step 22 + exactly the script 104 fix of step 23, block = TU script 134 test
@@ -478,7 +501,7 @@ $steps = @{
         @('tools\globalinfo_player_list_fix.py', "$gbOut/mods/generalbank.drm", "$gbOut/k12/mods/generalbank.drm", '--done-ok'),
         @('tools\globalinfo_player_list_fix.py', '--verify', "$gbOut/k12/mods/generalbank.drm", '--report', "$gbOut/player_list_check.json"),
         @('tools\input_map_tu_fix.py', '--verify', "$gbOut/k12/mods/generalbank.drm", '--report', "$gbOut/k12/input_map_check.json")
-    )
+    ) }
     # Exe: build (every stage checks its bytes first, gate md5 = B138), then list the stages of the result
     Exe = @(
         @('tools\exe_build.py', "$exeOut/tru.exe", '--report', "$exeOut/exe_build.json"),
