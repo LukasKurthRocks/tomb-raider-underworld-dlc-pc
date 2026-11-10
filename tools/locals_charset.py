@@ -53,7 +53,9 @@ def main(argv):
                 if runs and runs[-1][2] == d: runs[-1][1] = i
                 else: runs.append([i, i, d])
             elif js: amb += 1
-            else: none += 1
+            else:
+                none += 1
+                if none <= 12: print('  not in the second table: entry %d %r' % (i, b[:60]))
         print('by text: %d entries found once in the second table, %d several times, %d not at all' % (uniq, amb, none))
         print('  index shift (second - first): %s' % ', '.join('%+d x%d' % kv for kv in shift.most_common(8)))
         big = [r for r in runs if r[1] - r[0] >= 20]

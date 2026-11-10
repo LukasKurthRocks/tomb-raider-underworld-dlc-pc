@@ -11,6 +11,11 @@ Usage (from the repository root):
       A, B: bigfile.000 of each build (little endian); LIST: path list to name hashes (default: the PC list)
   ../bin/pyt -t 600 tools/bigfile_lang_diff.py --specs A.000 [--names LIST.txt]
       one archive: spec word histogram with language bits and example names
+  ../bin/pyt -t 600 tools/bigfile_lang_diff.py --find A.000 PATH [PATH ...]
+      records of these full paths (by name hash), e.g. to probe another platform prefix
+  ../bin/pyt -t 600 tools/bigfile_lang_diff.py --extract A.000 PATH SPEC OUT
+      one record (spec hex) to a file, CDRM-decoded
+  --prefix P: name the hashes with the PC list re-prefixed (pc-w\\ -> P\\), for a build with another root folder
 """
 import sys, os, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -42,6 +47,12 @@ def main(argv):
     show = 25
     if '--show' in argv: k = argv.index('--show'); show = int(argv[k + 1]); del argv[k:k + 2]
     nm = load(names)
+    remap = {}
+    if '--prefix' in argv:                       # B uses another root folder: map its hashes to the pc-w ones
+        from names import crc
+        k = argv.index('--prefix'); pre = argv[k + 1]; del argv[k:k + 2]
+        for h, n in list(nm.items()):
+            if n.lower().startswith('pc-w\\'): remap[crc(pre + n[4:])] = h; nm[crc(pre + n[4:])] = n
     if argv and argv[0] == '--specs':
         idx = read_index(argv[1], 'le')
         print('%s: %d records, %d stored zlib-compressed in the index (clen > 0)'
@@ -49,6 +60,34 @@ def main(argv):
         parts = collections.Counter((r['offset'] << 11) // 0x7FF00000 for r in idx)
         print('  records per part file: %s' % ', '.join('.%03d %d' % kv for kv in sorted(parts.items())))
         specs(idx, nm)
+        return
+    if argv and argv[0] == '--find':             # --find A.000 PATH [PATH ...] : records of these paths (by hash)
+        from names import crc
+        idx = read_index(argv[1], 'le')
+        by = collections.defaultdict(list)
+        for r in idx: by[r['hash']].append(r)
+        def crc_raw(s, up=False):                # the same CRC-32 without lower-casing (or upper-cased)
+            h = 0xffffffff
+            for c in (s.upper() if up else s):
+                h ^= ord(c) << 24
+                for _ in range(8):
+                    h = ((h << 1) ^ 0x4c11db7) & 0xffffffff if h & 0x80000000 else (h << 1) & 0xffffffff
+            return ~h & 0xffffffff
+        for p in argv[2:]:
+            for tag, h in (('lower', crc(p)), ('as-is', crc_raw(p)), ('upper', crc_raw(p, True)),
+                           ('slash', crc(p.replace('\\', '/')))):
+                rs = by.get(h, [])
+                print('%08x %-5s %-60s %s' % (h, tag, p, ' '.join('spec %08x size %d' % (r['spec'], r['size']) for r in rs) or '-'))
+        return
+    if argv and argv[0] == '--size-match':       # --size-match A.000 B.000 : name B's hashes by unique record sizes
+        A, B = read_index(argv[1], 'le'), read_index(argv[2], 'le')
+        ca = collections.Counter(r['size'] for r in A); cb = collections.Counter(r['size'] for r in B)
+        sa = {r['size']: r for r in A if ca[r['size']] == 1}
+        pairs = [(sa[r['size']], r) for r in B if cb[r['size']] == 1 and r['size'] in sa]
+        print('B records with a size unique in both archives: %d' % len(pairs))
+        for a, b in pairs[:show]:
+            print('  B %08x spec %08x size %10d  =  A %s spec %08x' % (b['hash'], b['spec'], b['size'],
+                                                                     nm.get(a['hash'], '0x%08x' % a['hash']), a['spec']))
         return
     if argv and argv[0] == '--extract':          # --extract A.000 PATH SPEC OUT : one record, CDRM-decoded
         from archive import Archive
@@ -66,6 +105,9 @@ def main(argv):
         return
     if len(argv) != 2: sys.exit(__doc__)
     A, B = read_index(argv[0], 'le'), read_index(argv[1], 'le')
+    if remap:
+        for r in B: r['hash'] = remap.get(r['hash'], r['hash'])
+        print('B hashes mapped to the pc-w names: %d of %d' % (sum(1 for r in B if r['hash'] in nm), len(B)))
     print('A: %d records, B: %d records' % (len(A), len(B)))
     for tag, idx in (('A', A), ('B', B)):
         print('%s spec words:' % tag); specs(idx, nm)

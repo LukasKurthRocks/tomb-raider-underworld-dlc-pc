@@ -42,8 +42,9 @@ def descriptors(D, e):
             b = s.data[arr + 12 * i:arr + 12 * i + 12].ljust(12, b'\0')   # the PC section is cut 1 byte short
             ents.append(struct.unpack(e + 'IHHHBB', b))
         codes = [x[0] for x in ents]
-        if any(b <= a for a, b in zip(codes, codes[1:])): continue
-        out.append((si, dict(tex0=w[0], tex1=w[1], w8=w[2], n=n, arr=arr, w14=w[5],
+        unsorted = [i + 1 for i, (a, b) in enumerate(zip(codes, codes[1:])) if b <= a]
+        if len(unsorted) > n // 4: continue                 # not a glyph array
+        out.append((si, dict(tex0=w[0], tex1=w[1], w8=w[2], n=n, arr=arr, w14=w[5], unsorted=unsorted,
                              f18=struct.unpack_from(e + 'f', s.data, 0x18)[0], f1c=struct.unpack_from(e + 'f', s.data, 0x1c)[0],
                              h20=struct.unpack_from(e + 'H', s.data, 0x20)[0], h22=struct.unpack_from(e + 'h', s.data, 0x22)[0],
                              ents=ents)))
@@ -85,7 +86,12 @@ def describe(D, si, d, show_all=False):
           % (d['w8'], d['n'], d['arr'], d['w14'], d['f18'], d['f1c'], d['h20'], d['h22']))
     ents = d['ents']
     codes = [x[0] for x in ents]
-    print('  code points: %d, U+%04X..U+%04X' % (len(codes), codes[0], codes[-1]))
+    print('  code points: %d, U+%04X..U+%04X' % (len(codes), min(codes), max(codes)))
+    if d['unsorted']:
+        # the engine looks codes >= 0x100 up by binary search: entries out of order can be missed
+        print('  NOT SORTED: %d entries smaller than or equal to their predecessor, e.g. %s'
+              % (len(d['unsorted']), ', '.join('#%d U+%04X after U+%04X' % (i, codes[i], codes[i - 1]) for i in d['unsorted'][:8])))
+        print('  duplicate codes: %d' % (len(codes) - len(set(codes))))
     for k, v in sorted(block_counts(codes).items()): print('    %-42s %d' % (k, v))
     rs = ranges(codes)
     print('  %d ranges: %s' % (len(rs), ', '.join('U+%04X' % a if a == b else 'U+%04X..%04X' % (a, b) for a, b in rs)))
