@@ -31,10 +31,62 @@ the camera bit found) built 2026-11-07, installed, ran in the sessions of 2026-1
 reported); 0.21 (time-scale request slot 6: gamebase natives 23 / 24 as the TU, `[TimeScale] TranslateSlot6`) built
 2026-11-10, not installed, not played; 0.22 (K-5: combat reticle request and adrenaline refill by the meter flags in
 doppelganger mode, `[Reticle]`) built 2026-11-10, installed 2026-11-10, not reported; 0.23 (`[Meter] Infinite`:
-infinite shadow power for testing / accessibility, default off, live) built 2026-11-10, not installed, not played.**
+infinite shadow power for testing / accessibility, default off, live) built 2026-11-10, not installed, not played; 0.24
+(`[Camera] TuTimeStep`: the TU's camera time step, default off) built 2026-11-11, not installed, not played.**
 Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.24: the TU's camera time step - `[Camera] TuTimeStep` (N6, 2026-11-11)
+
+Build `work\asi\power024`. **Owner's observation (Xbox TU):** climbing with the shadow power on, the camera re-centres
+behind Lara; on the PC it does not. **TU code (static, Xenia image):** four camera updates of the TU divide the frame
+time by the world time scale before the 1/30 factor; retail and the PC use the world-scaled frame time. gt = TU
+0x82efb458 = PC 0xe7f088, +0x100 = 0xe7f188 (frame time x world scale), +0x118 = 0xe7f1a0 (world time scale).
+
+| TU function (retail) | TU code | PC function (vtable slot, RTTI) | PC site (6 bytes) |
+|---|---|---|---|
+| 0x822ad048 (0x822affd8) camera manager update | 0x822ad06c `lfs f0,0x100` / 0x822ad070 `lfs f13,0x118` / 0x822ad078 `fdivs` / 0x822ad084 `fmuls` 1/30 | tru+0x1f3c70 (0x855ae4 slot 0x28) | tru+0x1f3c79 |
+| 0x822beeb8 (0x822c1678) | 0x822beef8..0x822bef14 | tru+0x1fe2d0 (`LaraCamera` 0x855f54 slot 4) | tru+0x1fe30a |
+| 0x822c39c8 (0x822c6720) | 0x822c3a08..0x822c3a24 | tru+0x202690 (`LaraCameraRewrite` 0x85600c slot 4 = the gameplay camera manager+0xb80) | tru+0x2026ca |
+| 0x822c79d0 (0x822ca700) | 0x822c7a18..0x822c7a30 | tru+0x204470 (`LaraCombatCamera` 0x8560c4 slot 4) | tru+0x2044aa |
+
+Pairing: TU vtables 0x82068930 (+0x28), 0x82068bd8, 0x82068c60, 0x82068ce8 slot 4 = retail 0x82068af0 / 0x82068d74 /
+0x82068df4 / 0x82068e74 (same functions as the coverage pairs); the PC functions have the same structure (settings id
++0x190 / +0x1d0 / +0x144 with the fallbacks +0x144 / +0x144 / +0x148, the stores +0x27b0 / +0x27f0 = TU +0x27a0 /
++0x27e0, LaraCombatCamera `lea ecx, [esi+0x1030]` = TU `addi r30, r31, 0x1030`; manager byte +0x7e = TU +0x7a). No
+other test in the TU (no doppelganger flag, no scale > 0): wherever the world is slowed (shadow power world 0.3, a script
+slow motion through gamebase native 23) the cameras run on the unscaled frame time. The dt of tru+0x202690 goes as argument into
+tru+0x2022f0 (every spring / curve update, the look input tru+0x1ed4a0 and the look step with the auto-recenter
+clock cam+0x1e4, ENGINE.md section 22), so on the PC the gameplay camera follows and re-centres at 0.3 x speed while
+the power is on (with the generalbank DTP 20 defaults the auto-recenter delay of 5 s becomes about 17 s). That this is exactly what the owner saw is inferred, not
+measured (TO TEST row 2).
+
+**Translation.** Each site `fld dword [0xe7f188]` -> jump to a stub `fld [0xe7f188]; fdiv dword [0xe7f1a0]` + a hit
+counter, back to the next instruction; the PC's own `fdiv qword [0x8439b8]` (30.0) stays (= the TU's `fmuls` by
+0x3d088889 = 1/30). The flags are dead at all four sites. World scale 0: the TU divides anyway, as the PC player update
+tru+0x3228e9 does (`dt * 1 / [0xe7f1a0]`, no test); counted for the log only. Checks (all or nothing): the four
+vtable slots, the bytes around each site (incl. the settings lookups), the world scale writer tru+0x1da595 (as 0.15).
+`work\asi\power024\prechecks_v24.txt`: 9 checks, 0 mismatches against `data\pc\tru.exe` and the installed `tru.exe`
+(md5 `5560abac...`). Not translated: the other TU divisions by gt+0x118 (render 0x821f0cf8, enemy 0x822db190 =
+TruShadowCombat Vaulted clock, player 0x8240cf88 / 0x8240e3a0 / 0x82411850 / 0x82411c30 / 0x824126d8, cloth = 0.15) -
+not camera code. Also not part of this: the TU's doppelganger camera defaults (0x822bc198 / 0x822c61d8 use GlobalInfo
++0x14c / +0x150 in doppelganger mode, documented in 0.12, not patched).
+
+* **Log:** at load `TruShadowPower 0.24 loaded (... 0.24: camera TU time step N)`; with 0: `camera time step:
+  [Camera] TuTimeStep=0 - the cameras run on the world-scaled frame time (retail)`; with 1: `camera time step:
+  [Camera] TuTimeStep=1 - tru+0x1f3c79 / ... (unscaled while the world is slowed)`, then per camera `camera time step:
+  first <camera> with the TU division (dt ... / world scale 1.000 = ...)` and, the first time the world is slowed,
+  `camera time step: world time scaled - <camera> runs on dt ... / world scale 0.300 = ... (update N)`; a failed check
+  `camera time step: code does not match (<camera>, bytes | vtable slot) - off`.
+
+| # | TO TEST 0.24 (DLC 2; `[Meter] Infinite=1` of 0.23 helps to hold the power long enough) | expected |
+|---|---|---|
+| 1 | load with `[Camera] TuTimeStep=0` | `camera time step: [Camera] TuTimeStep=0 ...`; camera as 0.23 |
+| 2 | `TuTimeStep=1`, climb a wall / shimmy a ledge with the power held (RB), do not touch the right stick for a few seconds | the camera swings back behind Lara at normal speed (as the Xbox); log `world time scaled - LaraCameraRewrite update ... world scale 0.300` |
+| 3 | same, run and turn on flat ground with the power | the camera follows at normal speed (not lagging 3x); no jumps / shaking |
+| 4 | combat with the power (aim) | `first LaraCombatCamera update ...` if that camera is used; no jumps |
+| 5 | main game, R3 adrenaline | camera as before; normally no `world time scaled` line (on the PC only the gamebase native 23 call tru+0x397d0a and TruShadowPower's selector set the world scale; the player init tru+0x722344 resets it to 1) - if a script slows the world, the cameras keep normal speed as on the TU (no doppelganger test there) |
 
 ## 0.23: infinite shadow power - `[Meter] Infinite` (N2, testing / accessibility, 2026-11-10)
 
@@ -776,6 +828,7 @@ every `*.asi` next to `tru.exe`.
 | `[Look] MoveEvents / StrikeLook` | 0 | 0.14: movement events 0x83 / 0x84, the shadow-strike look |
 | `[Look] CameraFlag` | 1 | 0.14: camera flag of Start (camera +0x80 \|= 2 -> second camera curve set, reader tru+0x1e5e8e); 0.20: default 1 = TU (0.14-0.19: 0) |
 | `[Cloth] TuTimeStep` | 0 | 0.15: the TU's player cloth time step (TU 0x82278120): the ponytail gets the frame time / world scale, so it keeps real time in slow motion |
+| `[Camera] TuTimeStep` | 0 | 0.24: the TU's camera time step (TU 0x822ad048 / 0x822beeb8 / 0x822c39c8 / 0x822c79d0): camera manager + the three Lara cameras get the frame time / world scale, so they follow / re-centre at normal speed in slow motion |
 | `[Adrenaline] Translate` | 1 | 0.18 (K11): CombatManager::Update skips the adrenaline tick tru+0x318bd0 and bar tru+0x2f2930 while gameTracker+0x1244 is set (TU 0x823dca00); 0 = PC; read again at run time (<= 1 / s) |
 | `[Adrenaline] Log` | 1 | 0.18: one line per change of the K11 decision per site |
 | `[TimeScale] TranslateSlot6` | 1 | 0.21 (X23): gamebase natives 23 / 24 in doppelganger mode -> time-scale request slot 6 (23 player, 24 world, crossed as TU 0x824a3238 / 0x824a32f0), else the game's body; 0 = PC; read again at run time (<= 1 / s, only if 1 at the start) |

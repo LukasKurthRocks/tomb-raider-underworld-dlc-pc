@@ -190,6 +190,14 @@
 // +0x40 / +0x3c, flags, condition 1046 = flag 1); it ends only on release / cinematic / game flag, never "meter empty"
 // (no flag 0x200, no event 0x7e). Switching it off lets the meter drain / refill from max with the TU rates again.
 // Section "0.23" below.
+//
+// 0.24 (2026-11-11, N6, project doc Befund-Kletterkamera-Kraft-1111.md): [Camera] TuTimeStep (default 0 = 0.23) - the
+// TU's camera time step. Four TU camera updates (camera manager 0x822ad048, LaraCamera 0x822beeb8, LaraCameraRewrite
+// 0x822c39c8, LaraCombatCamera 0x822c79d0) divide the world-scaled frame time [gt+0x100] by the world time scale
+// [gt+0x118] before the 1/30 factor; retail and the PC use the scaled time, so on the PC the gameplay camera follows /
+// re-centres at 0.3 x speed while the shadow power slows the world. PC sites tru+0x1f3c79 / 0x1fe30a / 0x2026ca /
+// 0x2044aa (6-byte `fld [0xe7f188]` -> stub with `fdiv [0xe7f1a0]`), the same idiom as [Cloth] TuTimeStep (0.15).
+// Section "0.24" below (after the 0.15 cloth section).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -2275,6 +2283,8 @@ void LoopFree(const char *why);
 void MoveEvents();
 // 0.15, defined below (section "0.15")
 void ReportClothTimeStep();
+// 0.24, defined below (section "0.24")
+void ReportCameraTimeStep();
 
 // ---- new tracker -> new meter (TU player init 0x82412ca0 -> 0x82409418 -> meter init 0x823d7700) ----
 typedef int(__cdecl *GenerationFn)();
@@ -2483,6 +2493,7 @@ void MeterTick(bool padHeld) {
                                                  // (also for the legacy 0.8 tick below)
     ScreenEffectPoll();                          // 0.10: only while an event 0x32 is pending
     ReportClothTimeStep();                       // 0.15: log only ([Cloth] TuTimeStep=1)
+    ReportCameraTimeStep();                      // 0.24: log only ([Camera] TuTimeStep=1)
     if (g_legacyPadStart) { LegacyMeterTick(padHeld); return; }
     NewTrackerCheck();
     // TU 0x824128a4..0x824128b8: the player update runs the tick only when gameTracker+0x1244 is set
@@ -3553,6 +3564,142 @@ void PatchClothTimeStep() {
            "(component 14) gets dt [0xe7f188] / world scale [0xe7f1a0] when the instance is [0xe7f094]");
 }
 
+// ---- 0.24 [Camera] TuTimeStep: the TU's camera time step (N6, project doc Befund-Kletterkamera-Kraft-1111.md) ----
+// Retail (= PC) starts four camera updates with dt = [gt+0x100] (frame time * world time scale) * 1/30; the TU divides
+// by the world time scale [gt+0x118] first, so the cameras run on the unscaled frame time while the world is slowed
+// (shadow power: world 0.3). No other test in the TU (no gameTracker+0x1244, no scale > 0). gt = TU 0x82efb458 = PC
+// 0xe7f088 (+0x100 = 0xe7f188, +0x118 = 0xe7f1a0).
+//   TU function (retail)                        TU instructions          PC function (vtable slot)       PC site
+//   camera manager slot 0x28 0x822ad048         0x822ad06c..0x822ad084   tru+0x1f3c70 (0x855ae4 +0x28)    tru+0x1f3c79
+//     (0x822affd8)
+//   LaraCamera slot 4 0x822beeb8 (0x822c1678)   0x822beef8..0x822bef14   tru+0x1fe2d0 (0x855f54 +4)       tru+0x1fe30a
+//   LaraCameraRewrite slot 4 0x822c39c8         0x822c3a08..0x822c3a24   tru+0x202690 (0x85600c +4)       tru+0x2026ca
+//     (0x822c6720)
+//   LaraCombatCamera slot 4 0x822c79d0          0x822c7a18..0x822c7a30   tru+0x204470 (0x8560c4 +4)       tru+0x2044aa
+//     (0x822ca700)
+// The PC keeps `fdiv qword [0x8439b8]` (30.0) after each site (the TU's fmuls by 1/30 = 0x3d088889); the stubs replace
+// only `fld dword [0xe7f188]` (6 bytes) by `fld [0xe7f188]; fdiv [0xe7f1a0]` (TU lfs 0x100 / lfs 0x118 / fdivs). The
+// flags are dead at all four sites (the next flag reader follows a cmp or a call). World scale 0: the TU divides
+// anyway, as the PC player update tru+0x3228e9 does (dt * 1 / [0xe7f1a0], no test) - only counted for the log.
+struct CamDtSite { const char *name; DWORD func; DWORD vtSlot; DWORD check; const char *hex; DWORD site; };
+const CamDtSite kCamDtSites[4] = {
+    {"camera manager update tru+0x1f3c70 (TU 0x822ad048)", 0x005f3c70, 0x00855ae4 + 0x28, 0x005f3c70,
+     "55 8bec 83e4f0 83ec14 d90588f1e700 53 dc35b8398400 56 8bf1 807e7e00", 0x005f3c79},
+    {"LaraCamera update tru+0x1fe2d0 (TU 0x822beeb8)", 0x005fe2d0, 0x00855f54 + 0x4, 0x005fe2dc,
+     "8b8390010000 83f8ff 56 57 740d 50 e891fcf4ff 83c404 85c0 7514 e8855dfdff 8b8044010000 50 e879fcf4ff 83c404 "
+     "d90588f1e700 0f288300010000 dc35b8398400", 0x005fe30a},
+    {"LaraCameraRewrite update tru+0x202690 (TU 0x822c39c8)", 0x00602690, 0x0085600c + 0x4, 0x0060269c,
+     "8b83d0010000 83f8ff 56 57 740d 50 e8d1b8f4ff 83c404 85c0 7514 e8c519fdff 8b8044010000 50 e8b9b8f4ff 83c404 "
+     "d90588f1e700 0f288300010000 dc35b8398400", 0x006026ca},
+    {"LaraCombatCamera update tru+0x204470 (TU 0x822c79d0)", 0x00604470, 0x008560c4 + 0x4, 0x0060447d,
+     "8b8644010000 83f8ff 57 740d 50 e8f19af4ff 83c404 85c0 7514 e8e5fbfcff 8b8048010000 50 e8d99af4ff 83c404 "
+     "d90588f1e700 8d7810 dc35b8398400", 0x006044aa},
+};
+int g_camTimeStep = 0;                                         // [Camera] TuTimeStep
+bool g_camDtOk = false;
+volatile LONG g_camDtHits[4] = {0, 0, 0, 0};                   // divided updates per site (log only)
+DWORD g_camDtBack[4] = {0x005f3c7f, 0x005fe310, 0x006026d0, 0x006044b0};
+
+__declspec(naked) void CamDtStub0() {           // camera manager: TU 0x822ad06c / 0x822ad070 / 0x822ad078
+    __asm {
+        fld dword ptr ds:[0x00e7f188]
+        fdiv dword ptr ds:[0x00e7f1a0]
+        inc dword ptr [g_camDtHits]
+        jmp dword ptr [g_camDtBack]
+    }
+}
+__declspec(naked) void CamDtStub1() {           // LaraCamera: TU 0x822beef8 / 0x822bef00 / 0x822bef08
+    __asm {
+        fld dword ptr ds:[0x00e7f188]
+        fdiv dword ptr ds:[0x00e7f1a0]
+        inc dword ptr [g_camDtHits + 4]
+        jmp dword ptr [g_camDtBack + 4]
+    }
+}
+__declspec(naked) void CamDtStub2() {           // LaraCameraRewrite: TU 0x822c3a08 / 0x822c3a10 / 0x822c3a18
+    __asm {
+        fld dword ptr ds:[0x00e7f188]
+        fdiv dword ptr ds:[0x00e7f1a0]
+        inc dword ptr [g_camDtHits + 8]
+        jmp dword ptr [g_camDtBack + 8]
+    }
+}
+__declspec(naked) void CamDtStub3() {           // LaraCombatCamera: TU 0x822c7a18 / 0x822c7a20 / 0x822c7a28
+    __asm {
+        fld dword ptr ds:[0x00e7f188]
+        fdiv dword ptr ds:[0x00e7f1a0]
+        inc dword ptr [g_camDtHits + 12]
+        jmp dword ptr [g_camDtBack + 12]
+    }
+}
+void (*const kCamDtStubs[4])() = {CamDtStub0, CamDtStub1, CamDtStub2, CamDtStub3};
+
+LONG g_camDtReported[4] = {0, 0, 0, 0};
+bool g_camDtSlowLogged[4] = {false, false, false, false};
+LONG g_camDtZero = 0;
+
+// called once per game frame from MeterTick (game thread, like the camera updates); log only
+void ReportCameraTimeStep() {
+    if (!g_camDtOk) return;
+    const float scale = *reinterpret_cast<volatile const float *>(0x00e7f1a0);
+    const float dt = *reinterpret_cast<volatile const float *>(0x00e7f188);
+    const double result = scale != 0.0f ? static_cast<double>(dt) / scale : 0.0;
+    for (int i = 0; i < 4; ++i) {
+        LONG n = g_camDtHits[i], last = g_camDtReported[i];
+        if (n == last) continue;
+        g_camDtReported[i] = n;
+        if (last == 0)
+            Log(1, "camera time step: first %s with the TU division (dt %.5f / world scale %.3f = %.5f)",
+                kCamDtSites[i].name, dt, scale, result);
+        // log threshold only (not part of the translation): the first update while the world runs slower / faster
+        if (!g_camDtSlowLogged[i] && (scale < 0.99f || scale > 1.01f)) {
+            g_camDtSlowLogged[i] = true;
+            Log(1, "camera time step: world time scaled - %s runs on dt %.5f / world scale %.3f = %.5f (update %ld)",
+                kCamDtSites[i].name, dt, scale, result, n);
+        }
+        bool pow2 = false;
+        for (LONG p = 1; p > 0 && p <= n; p <<= 1)
+            if (p > last) { pow2 = true; break; }
+        if (g_logLevel >= 2 && pow2)
+            Log(2, "camera time step: %ld updates of %s divided (world scale %.3f)", n, kCamDtSites[i].name, scale);
+    }
+    if (scale == 0.0f && g_camDtZero++ == 0)
+        Log(0, "camera time step: world scale 0 while the cameras update - the TU divides anyway");
+}
+
+void PatchCameraTimeStep() {
+    if (!g_camTimeStep) {                                      // default: nothing checked, nothing patched (= 0.23)
+        Log(1, "camera time step: [Camera] TuTimeStep=0 - the cameras run on the world-scaled frame time (retail)");
+        return;
+    }
+    for (int i = 0; i < 4; ++i) {
+        const CamDtSite &s = kCamDtSites[i];
+        bool slotOk = false;
+        __try { slotOk = *reinterpret_cast<const DWORD *>(s.vtSlot) == s.func; }
+        __except (EXCEPTION_EXECUTE_HANDLER) { slotOk = false; }
+        if (!slotOk || !HexBytesAt(s.check, s.hex)) {
+            Log(0, "camera time step: code does not match (%s, %s) - off", s.name, slotOk ? "bytes" : "vtable slot");
+            return;
+        }
+    }
+    if (!HexBytesAt(kWorldScaleSite, kWorldScaleHex)) {
+        Log(0, "camera time step: code does not match (world scale tru+0x1da595) - off");
+        return;
+    }
+    for (int i = 0; i < 4; ++i) {
+        if (!WriteJumpN(kCamDtSites[i].site, reinterpret_cast<const void *>(kCamDtStubs[i]), 6)) {
+            Log(0, "camera time step: VirtualProtect failed at 0x%08lx (%lu) - %d of 4 sites patched",
+                kCamDtSites[i].site, GetLastError(), i);
+            g_camDtOk = i > 0;
+            return;
+        }
+    }
+    g_camDtOk = true;
+    Log(1, "camera time step: [Camera] TuTimeStep=1 - tru+0x1f3c79 / 0x1fe30a / 0x2026ca / 0x2044aa run TU 0x822ad06c / "
+           "0x822beef8 / 0x822c3a08 / 0x822c7a18: camera manager, LaraCamera, LaraCameraRewrite and LaraCombatCamera "
+           "get dt [0xe7f188] / world scale [0xe7f1a0] (unscaled while the world is slowed)");
+}
+
 // ================================================================================================================
 // 0.18 (K11, project doc Befund-TU-K9-K11-0711.md; K11 in Befund-Exe-Stellen-K8-K14-0611.md): CombatManager::Update
 // tru+0x3227d0 (thiscall, ecx = [gameTracker+0x504], called once per frame by the player update at tru+0x3228ae) =
@@ -4329,6 +4476,7 @@ void ReadOptions(const char *dir) {
     g_retRefill = GetPrivateProfileIntA("Reticle", "TranslateRefill", 1, ini) ? 1 : 0;     // 0.22 (K-5), default 1
     g_retLog = GetPrivateProfileIntA("Reticle", "Log", 1, ini) ? 1 : 0;
     g_infinite = GetPrivateProfileIntA("Meter", "Infinite", 0, ini) ? 1 : 0;          // 0.23 (N2), default 0, live
+    g_camTimeStep = GetPrivateProfileIntA("Camera", "TuTimeStep", 0, ini) ? 1 : 0;    // 0.24 (N6), default 0
 }
 
 void Start(HMODULE self) {
@@ -4339,15 +4487,16 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.23 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.24 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
-        "log %d; 0.21: time-scale slot 6 %d; 0.22: reticle request %d, refill %d, log %d; 0.23: infinite meter %d)",
+        "log %d; 0.21: time-scale slot 6 %d; 0.22: reticle request %d, refill %d, log %d; 0.23: infinite meter %d; "
+        "0.24: camera TU time step %d)",
         g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055,
         g_lookEnabled, g_legacyPadStart, g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled,
         g_state2102Enabled, g_loopSound, g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11,
-        g_k11Log, g_slot6, g_retRequest, g_retRefill, g_retLog, g_infinite);
+        g_k11Log, g_slot6, g_retRequest, g_retRefill, g_retLog, g_infinite, g_camTimeStep);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -4464,6 +4613,7 @@ void Start(HMODULE self) {
     PatchK11();                         // 0.18: K11 - adrenaline tick / bar skipped in doppelganger mode as the TU
     PatchSlot6();                       // 0.21: gamebase natives 23 / 24 -> request slot 6 in doppelganger mode as the TU
     PatchReticle();                     // 0.22: ring request / adrenaline refill by the meter flags in doppelganger mode
+    PatchCameraTimeStep();              // 0.24: only with [Camera] TuTimeStep=1 (independent of the doppelganger flag)
     Log(1, "0.23 infinite meter: [Meter] Infinite %d at the start - %s; read again at run time at most once per second "
            "(no game code patched)", g_infinite,
         g_infinite ? "the meter is held at max (tick fill + drain at max), power use as with a full meter"
@@ -4488,7 +4638,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.23 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.24 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
@@ -4498,8 +4648,8 @@ extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
            "(camera bit 2, reader tru+0x1e5e8e), gamebase natives 23 / 24 -> time-scale request slot 6 in doppelganger "
            "mode (TU 0x824a3238 / 0x824a32f0), combat reticle request and adrenaline refill by the meter flags in "
            "doppelganger mode (TU 0x823de47c / 0x823ee158 / 0x823dfd98); switches default off: loop sound, move events 0x83 / 0x84, strike "
-           "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120, infinite meter [Meter] Infinite (live, not a "
-           "TU feature))";
+           "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120, camera TU time step 0x822ad048 / 0x822beeb8 / "
+           "0x822c39c8 / 0x822c79d0, infinite meter [Meter] Infinite (live, not a TU feature))";
 }
 
 // 0.11: the TU meter object for other plugins (TruShadowCombat: condition 538, the shadow strike) - interface version
