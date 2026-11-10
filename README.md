@@ -108,7 +108,8 @@ Before 0.22.18, `[Menu] Enabled=0` turns all of TruMenu off. Controls and pages:
 ## Progress (state 2026-11-10)
 
 Percentages are **estimates**: the share of the Xbox behaviour seen working in game on one PC, judged from the test
-findings and the open lists. Only the title-update row is a count.
+findings and the open lists. Only the title-update row is a count. Left out on purpose and not counted as missing:
+the Xbox Live advert "new download available" in the pause menu (title-update script 7, 12 textures).
 
 | Part | Estimate | What works | What is missing |
 |---|---|---|---|
