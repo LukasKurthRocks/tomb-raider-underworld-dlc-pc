@@ -8,7 +8,10 @@ folder with only the changed / added files, to install with scripts/windows/Inst
                shaders 1704-1707 (copied from the PC `ar_ei_grapple_wall.drm`), the near-LOD materials 21093 / 20344
                become copies of them (surrogate / translated shaders showed the normal map as colour; test 24); then
                both LODs get the base ring MATERIAL 16637 with its textures (tools/material_transplant.py: the base
-               shaders read the slots in the base roles - specular from the DLC normal map looked olive; test 26a)
+               shaders read the slots in the base roles - specular from the DLC normal map looked olive; test 26a).
+               The rule and its owner registry live in tools/rule_owned.py (2026-11-11): the shader re-translation
+               (tu_batch inv / run / nativefix) skips these materials, `rule_owned.py check` guards trees / stacks,
+               `rule_owned.py apply` puts the rule back on top of a stack that lost it (finding 52)
   3. ui        stage-2b fixes `uipath` + `uitext` + `uirecord` (tools/dlc_fixes_build.py) over the B138 files: 25 UI
                timeline paths and 26 text elements in 10 DLC 1 level DRMs (the never-shown Xbox "update required"
                message; owner's decision 2026-10-30, same fixes as DLC 2; test 28), then the 38 text element records of
@@ -40,9 +43,8 @@ Usage (from the repository root):
 import sys, os, shutil, contextlib, io
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_util as BU
-
-RING = {'dlc1_ei_grapple_wall.drm': (21164, 21093), 'dlc1_ei_grapple_ceiling.drm': (20345, 20344)}
-BASE_RING, BASE_LIBS, BASE_MATERIAL = 'ar_ei_grapple_wall.drm', [1704, 1705, 1706, 1707], 16637
+import rule_owned as RO
+from rule_owned import RING, BASE_RING, BASE_LIBS, BASE_MATERIAL      # the ring rule's data (one place since 2026-11-11)
 
 
 def run(mod, args):
@@ -75,24 +77,14 @@ def main(argv):
         import shader_const_fix as SCF
         print('== shaders'); print(run(SCF, [src, out]).strip())
     if 'ring' not in skip:
-        import bigfile_extract as BE, material_shader_swap as MSS, material_copy as MC, material_transplant as MT
+        # the rule lives in tools/rule_owned.py since 2026-11-11 (N3): the same tool calls, plus its owner registry
+        # (tu_batch inv / run / nativefix skip the owned materials) and the guard `rule_owned.py check`
         print('== ring')
         base = os.path.join(tmp, BASE_RING)
-        run(BE, ['pcbig', BASE_RING, base])
+        RO.extract_base(base)
         for name, (far, near) in RING.items():
             cur = os.path.join(out, name) if os.path.exists(os.path.join(out, name)) else os.path.join(src, name)
-            for slot, lib in enumerate(BASE_LIBS):
-                nxt = os.path.join(tmp, '%s.%d' % (name, slot))
-                extra = ['--add-libs-from', base, ','.join(map(str, BASE_LIBS))] if slot == 0 else []
-                print(run(MSS, [cur, nxt, str(far), str(slot), str(lib)] + extra).strip().splitlines()[-1])
-                cur = nxt
-            nxt = os.path.join(tmp, '%s.copy' % name)
-            print(run(MC, [cur, nxt, str(near), str(far)]).strip())
-            # base MATERIAL, not only its shaders: the base shaders read the texture slots in the base roles (test 26a)
-            for i, mid in enumerate((far, near)):
-                dst = os.path.join(out, name) if i == 1 else os.path.join(tmp, '%s.far' % name)
-                print(run(MT, [nxt, dst, str(mid), base, str(BASE_MATERIAL)]).strip().splitlines()[-1])
-                nxt = dst
+            RO.apply_ring(cur, os.path.join(out, name), base, tmp, name, far, near)
     if 'ui' not in skip:
         import dlc_fixes_build as FB
         print('== ui')

@@ -2663,6 +2663,48 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      -> needs a Convert-onwards run, the script comparisons and a game test. Still calibrated on B138 as well:
      `DLC_SYM_SHIFT = 480` (finding 29) - not derived here ⬜.
 
+52. **A later shader re-translation overwrote the played grapple ring fix; rule-owned sections and two guards
+    (2026-11-11, offline; nothing installed).**
+   * **What happened.** The owner saw the DLC 1 grapple ring pink / green again (10.11.). The installed
+     `dlc1_ei_grapple_wall.drm` / `_ceiling.drm` (85dd03d1 / 6731d49c) came from the stack installed 08.11. 17:08
+     (`work/clean17z_0811/n6b`, the AMD-clean copy of the n6b re-translation); the install backup
+     `backup/tree_20261108_170854` holds the replaced copies = the ring fix of 30.10. (06a92469 / f1e2ff94, installed
+     with `play_20261030b`, tests 22 / 24 / 26a). Section compare (Repair vs n6b): apart from the shifted positions,
+     only the **far-LOD material 21164 / 20345** differs (pass-2 PS 1706 -> 3421, 1152 -> 1216 bytes = n6b's
+     MaterialParams) and n6b added the ShaderLib 3421. The near LOD 21093 / 20344 stayed the rule's copy (n6b refused
+     its Xbox libs 2118 / 2052: records). Putting the two Repair files back (10.11. 19:55) made the ring rusty again
+     (owner).
+   * **Why.** `tu_batch.py inv` takes every material whose Xbox pass-2 lib is untranslated (C1-C3 / D) and whose PC
+     pass-2 lib is a base lib (`is_surrogate_lib`) - the ring rule puts the base lib 1706 there on purpose (base
+     material 16637 with 1704-1707), so the inventory saw a "surrogate" and re-translated it from the Xbox lib 2254.
+     The ring rule ran only in `b138_fix_tree` (Repair); the re-translation ran later on the installed files.
+   * **Rule-owned sections** (`tools/rule_owned.py`): registry of sections a fix rule owns (today: ring - materials
+     21164 / 21093 / 20345 / 20344 = base material 16637 byte for byte, ShaderLibs 1704-1707 and textures = the PC base
+     ring's sections). The ring rule itself moved there (`apply_ring`, the same tool calls; `b138_fix_tree` calls it -
+     the refactored Repair ring step writes 06a92469 / f1e2ff94 again). `tu_batch inv` / `run` skip owned materials
+     (an old inventory too), `nativefix` keeps the rule's ShaderLibs; `check LAYER...` = guard (exit 1 when an owned
+     section is not the rule's), `apply OUT LAYER...` = the rule again as the top layer of a stack (drops ShaderLibs only
+     the replaced materials used).
+   * **Gates.** `rule_owned.py apply` on the installed n6b / AMD output (85dd03d1 / 6731d49c) -> **06a92469 /
+     f1e2ff94, byte-identical to the Repair files** (the dropped lib 3421 was the only other difference). `check`:
+     installed now PASS, Repair PASS, n6b test tree / clean17z n6b FAIL (21164 / 20345 != 16637), B138 pristine FAIL.
+     `tu_batch inv` on the installed tree: before 9 materials, 4 of them the ring; after 5 + "skipped, owned by a fix
+     rule: 4", the other rows unchanged. `tu_batch selftest` 29 / 29. `Install-TruTree -Check` with the clean17z n6b
+     tree: refused by the new `-RuleGate` (Enforce default). `Invoke-TruPipeline -Step Repair` runs `rule_owned check`
+     on `b138_fixes` (report `rule_owned_check.json`).
+   * **Audit of the whole 08.11. stack (N2)**: `tools/install_overwrite_audit.py` (generic form: section ownership
+     from the install backups, word fate per overlap) over the 111 files installed since 08.11. 17:08: the ring is the
+     only lost played fix. Other overlaps keep every owned word (DTP fixes of 51c / 51v / 50l / genfix / 48i, the stack
+     added words on top), rewrote shader libs only by `nativefix` (ABS_CONST, VM bit-exact, 17r / 17z), replaced the
+     48g fade copy 2526 of `doppelganger_casual` 26354 by the translation 3401 (tool rule, 8 slots, none empty) or set
+     one DTP word of 3 goo effect files (+0x168, ff000000 -> 000000ff = B270 / B138, b270cmp FP rule with >= 20 base
+     samples) - the 30.10. value was converter output, not a fix. Of 333 n6b material changes all had a base lib (313 +
+     19) or a fade copy (1) in pass 2 before; only the ring's was a deliberate rule. Report (German):
+     `docs/Befund-Regression-Stapel-1111.md` in the workspace.
+   * Lesson: a rule that a later generic step can mistake for its own input needs an owner entry - and an install /
+     pipeline guard that checks the owner's bytes, not only the step's own proofs (n6b's verify / vcheck / native
+     gates all passed: they prove the translation, not that it should have happened).
+
 ## The "VM" in upstream (what it was, what we do instead)
 
 Upstream was developed on macOS (homebrew paths, `/path/to/` placeholders); the game ran in a **Windows 11 VM** with

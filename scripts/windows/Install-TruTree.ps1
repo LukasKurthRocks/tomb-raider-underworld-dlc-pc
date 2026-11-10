@@ -25,6 +25,12 @@
              Enforce (default since 2026-11-08 15:10, all ten trees of the install stack pass) refuses the install,
              Report only logs them as WARN (for old test trees), Off skips the check. Needs <workspace>\bin\venv; the
              counts also go to logs\Install-TruTree_<time>_shader_gate.json.
+    -RuleGate (2026-11-11) checks the files of the source tree whose sections a fix rule owns (tools\rule_owned.py,
+             today the grapple ring rule of b138_fix_tree: materials 21164 / 21093 / 20345 / 20344 = base material
+             16637 with ShaderLibs 1704-1707) before -Check returns and before anything is copied: a tree that brings
+             such a file without the rule (e.g. a shader re-translation built on it, as the 08.11. n6b tree) is refused
+             with Enforce (default), only logged with Report, Off skips it. Fix: tools\rule_owned.py apply OUT
+             <layers...> as the last layer. Report: logs\Install-TruTree_<time>_rule_gate.json.
 
     -Exclude defaults to 'local','padshock': the installed string tables carry the DLC menu text fix
     (docs/DLC_MENU.md) and would be overwritten by tables without it; padshock is the same file.
@@ -51,6 +57,7 @@ param(
     [string]$GamePath,
     [switch]$Force,
     [ValidateSet('Report', 'Enforce', 'Off')][string]$ShaderGate = 'Enforce',
+    [ValidateSet('Report', 'Enforce', 'Off')][string]$RuleGate = 'Enforce',
     [switch]$Trace
 )
 
@@ -202,6 +209,36 @@ try {
                 throw "Shader gate refused the tree (exit $gateExit): $verdict - see $gateReport"
             } else {
                 Write-Log "Shader gate ($ShaderGate, exit $gateExit): $verdict - see $gateReport" -Level WARN
+            }
+        }
+    }
+
+    # rule gate (2026-11-11, N3): a tree must not bring a copy of a file whose sections a fix rule owns without the
+    # rule (tools\rule_owned.py; the ring rule of b138_fix_tree - the 08.11. stack replaced it by n6b's re-translation,
+    # docs/WINDOWS_REBUILD.md finding 52). Only the rule files IN the source tree are checked.
+    if ($RuleGate -ne 'Off' -and @($files | Where-Object { $_.Extension -eq '.drm' }).Count) {
+        $rulePy = Join-Path $root 'bin\venv\Scripts\python.exe'
+        $ruleTool = Join-Path $paths.Repository 'tools\rule_owned.py'
+        $ruleReport = Join-Path $logDir ('Install-TruTree_{0}_rule_gate.json' -f $stamp)
+        if (!(Test-Path -LiteralPath $rulePy) -or !(Test-Path -LiteralPath $ruleTool)) {
+            $msg = "Rule gate: $rulePy or $ruleTool missing - rule-owned sections not checked."
+            if ($RuleGate -eq 'Enforce') { throw $msg }
+            Write-Log $msg -Level WARN
+        } else {
+            $ruleArgs = @('-u', '-I', '-X', 'utf8', $ruleTool, 'check', $src, '--report', $ruleReport)
+            Write-Log ('python {0}' -f ($ruleArgs -join ' ')) -Level DEBUG
+            $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            Push-Location -LiteralPath $paths.Repository     # the tool finds the game archives relative to the clone
+            try { $ruleOut = @(& $rulePy @ruleArgs 2>&1 | ForEach-Object { "$_" }); $ruleExit = $LASTEXITCODE }
+            finally { Pop-Location; $ErrorActionPreference = $eap }
+            foreach ($line in $ruleOut) { Write-Log "  rule: $line" -Level VERBOSE }
+            $ruleVerdict = @($ruleOut | Where-Object { $_ -like 'rule gate: *' }) | Select-Object -Last 1
+            if ($ruleExit -eq 0 -and $ruleVerdict -like 'rule gate: PASS*') {
+                Write-Log "Rule gate ($RuleGate): $ruleVerdict"
+            } elseif ($RuleGate -eq 'Enforce') {
+                throw "Rule gate refused the tree (exit $ruleExit): $ruleVerdict - see $ruleReport (fix: tools\rule_owned.py apply as the last layer)"
+            } else {
+                Write-Log "Rule gate ($RuleGate, exit $ruleExit): $ruleVerdict - see $ruleReport" -Level WARN
             }
         }
     }

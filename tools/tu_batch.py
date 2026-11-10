@@ -184,9 +184,18 @@ def is_surrogate_lib(pid):
     return pid in libs()['P'] or 2494 <= pid <= 2526      # 48g fade copies 2494-2526; 2491-2493 = test 42-46 waterfall translations (played)
 
 
+def owned_by_rule():
+    """{file name lower: {material ids}} a later fix rule owns (tools/rule_owned.py, N3 2026-11-11): the ring rule puts
+    the base lib 1706 on the ring materials ON PURPOSE - for this tool it looks like a surrogate, n6b re-translated
+    21164 / 20345 (08.11.) and the installed stack lost the played ring fix. inv / run skip them, nativefix keeps the
+    rule's ShaderLibs."""
+    import rule_owned as RO
+    return RO.owned_materials()
+
+
 def cmd_inv(xdir, outp, trees):
     eff = effective(trees); ubo, units = units_by_object()
-    L = libs(); rows = {}
+    L = libs(); rows = {}; owned = owned_by_rule(); skipped = []
     xfiles = {}
     for pk in ('ack11', 'ack10'):
         for f in glob.glob(os.path.join(xdir, pk, '*.drm')):
@@ -207,6 +216,9 @@ def cmd_inv(xdir, outp, trees):
             xt = struct.unpack_from('>4I', X[(10, xm)].data, 0x28); pt = struct.unpack_from('<4I', P[(10, pm)].data, 0x28)
             c = SMAP.get(xt[2], {}).get('cls')
             if c not in UNTR or not is_surrogate_lib(pt[2]): continue
+            if pm in owned.get(name, ()):
+                skipped.append('%s mat %d (Xbox lib %d, PC pass-2 lib %d): owned by a fix rule (tools/rule_owned.py)' % (name, pm, xt[2], pt[2]))
+                continue
             r = rows.setdefault(pm, dict(mat=pm, xmat=xm, xlib=xt[2], cls=c, lit=lit_lib(xt[2]), surrogate=SMAP[xt[2]].get('pc'),
                                          vs=(xt[3], pt[3]), vscls=SMAP.get(xt[3], {}).get('cls', 'base'), files=[], units=set(), groups=set()))
             if r['xlib'] != xt[2]: r.setdefault('conflict', []).append(name); continue
@@ -232,6 +244,8 @@ def cmd_inv(xdir, outp, trees):
                 len(r['units']), ' '.join(('streamgroups/' if f['sg'] else '') + f['name'] for f in r['files']),
                 ' [streamgroup-only]' if r['sgonly'] else ''))
         t.write('streamgroup-only materials: %d\n' % sum(1 for r in out if r['sgonly']))
+        t.write('skipped, owned by a fix rule (tools/rule_owned.py): %d\n' % len(skipped))
+        for s in skipped: t.write('  %s\n' % s)
     print(open(os.path.splitext(outp)[0] + '.txt').read()[:3000])
 
 
@@ -409,9 +423,16 @@ def cmd_run(invp, xdir, tree, wd, ids_from, maxn, only, reuse=()):
             if len(cache) > 24: cache.clear()
             cache[p] = TLT.load(p, e)[1]
         return cache[p]
+    owned = owned_by_rule()
     for r in inv:
         if r['mat'] in done_mats or (only and r['xlib'] not in only): continue
         if r.get('conflict'): continue
+        # an inventory written before 2026-11-11 may still list rule-owned copies (the ring): never translate those
+        keep = [f for f in r['files'] if r['mat'] not in owned.get(f['name'], ())]
+        if len(keep) != len(r['files']):
+            log('mat %d: %d file copies skipped - owned by a fix rule (tools/rule_owned.py)' % (r['mat'], len(r['files']) - len(keep)))
+            if not keep: continue
+            r = dict(r); r['files'] = keep
         # 50n: file copies of one material whose records differ (sampler map / DXN) are split into separate groups -
         # every copy gets the lib built for its own records (the engine draws the first loaded copy, each is exact)
         bysig = collections.OrderedDict(); bad = None
@@ -751,6 +772,8 @@ def cmd_nativefix(out, layers, ranges=None):
     identical, the changed libs parse to the same slots, no ABS_CONST left, no instruction with two different constant
     registers. Writes OUT/../nativefix.json (per lib: slots, movs, files, source layer) and prints a summary."""
     want = _ranges(ranges)
+    import rule_owned as RO
+    owned_libs = RO.owned_libs()
     eff = {}; layer_of = {}
     for li, L in enumerate(layers):
         for name, p in mods_drms(L).items(): eff[name] = p; layer_of[name] = li
@@ -768,8 +791,9 @@ def cmd_nativefix(out, layers, ranges=None):
         try: D = DW.read(raw, 'le')
         except Exception: continue
         changed = {}
+        keep_libs = owned_libs.get(name, set())      # the fix rules' ShaderLibs (base PC libs) stay byte-identical
         for si, s in enumerate(D.sections):
-            if s.type != 9 or len(s.data) < 12 or (want is not None and s.id not in want): continue
+            if s.type != 9 or len(s.data) < 12 or (want is not None and s.id not in want) or s.id in keep_libs: continue
             head, tb, offs, ents = _lib_parse(s.data)
             if _lib_build(head, tb, offs, ents) != s.data: problems.append('%s lib %d: rebuild not byte-identical' % (name, s.id)); continue
             hit = False

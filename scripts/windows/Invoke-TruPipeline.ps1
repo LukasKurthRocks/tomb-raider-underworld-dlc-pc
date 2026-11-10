@@ -123,7 +123,10 @@
                paths / texts, DLC 1 state charts, DLC 1 structure fixes (anim event lists of the costumes, pillar
                markup, since 2026-11-08 costumedtp / dspkind; step struct), the DLC 1 achievement call, cinematic
                languages of both DLCs, our generalbank.drm - since 2026-11-08 the K12 one, k12\mods\generalbank.drm);
-               gates afterwards: input_map_tu_fix / globalinfo_player_list_fix --verify (player_list_check.json),
+               gates afterwards: rule_owned check (2026-11-11: the grapple ring rule's sections = PC base ring,
+               rule_owned_check.json; the same tool guards install stacks: Install-TruTree -RuleGate, and puts the
+               rule back on top of a stack whose shader re-translation replaced it: rule_owned apply, finding 52),
+               input_map_tu_fix / globalinfo_player_list_fix --verify (player_list_check.json),
                vo_lang_variants check pack11 (doppelganger language variants, vo_lang_check.json), generator_intro_fix
                scan (genintro_check.json), dlc_struct_fixes check --steps costumedtp,dspkind (datafix_check.json)
                -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
@@ -452,6 +455,9 @@ $steps = @{
         @('tools\globalinfo_player_list_fix.py', "$gbOut/mods/generalbank.drm", "$gbOut/k12/mods/generalbank.drm", '--done-ok'),
         @('tools\globalinfo_player_list_fix.py', '--verify', "$gbOut/k12/mods/generalbank.drm", '--report', "$gbOut/player_list_check.json"),
         @('tools\b138_fix_tree.py', $repPristine, $repFixes, '--dlc2', '--replace', '--generalbank', "$gbOut/k12/mods/generalbank.drm"),
+        # rule gate (2026-11-11, N3): the sections a fix rule owns (grapple ring: base material 16637 + ShaderLibs
+        # 1704-1707 on 21164 / 21093 / 20345 / 20344) are byte-equal to the PC base ring (exit 1 otherwise)
+        @('tools\rule_owned.py', 'check', $repFixes, '--report', ((Split-Path -Parent $repFixes) + '/rule_owned_check.json')),
         @('tools\input_map_tu_fix.py', '--verify', "$repFixes/generalbank.drm", '--report', ((Split-Path -Parent $repFixes) + '/input_map_check.json')),
         # data fix gates on the repair tree (2026-11-08): K12 list, doppelganger language variants (mul_lang_build --dlc2),
         # generator intro data (B138: 0 words), costume DTPs / caverns DSP kind (steps costumedtp / dspkind of b138_fix_tree)
