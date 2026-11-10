@@ -11,7 +11,7 @@ Xbox"). No plugin runs inside Xenia; the Xbox game behaves as it should.
 - **Read only by default.** Xenia is opened with `PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION` and only
   `ReadProcessMemory` is used - no debugger, no suspend (a debugger listing of all memory regions froze Xenia once).
 - **Proof words first.** Every TU address in `docs/data/xenia_tu_combat_addresses.json` carries TU instruction words
-  that prove it; TruXenia compares all of them (91, every JSON section with a `proof` block) with the guest memory
+  that prove it; TruXenia compares all of them (139 since 2026-11-11, every JSON section with a `proof` block) with the guest memory
   and refuses to read on a mismatch.
 - **Unproven fields are `?`.** Fields marked `"proven": false` (target slot, coordinator `Ko`) are shown as `?`; the
   check box "show unproven fields" shows them marked with `~`. Camera position / look-at / FOV are `?` (not proven).
@@ -34,6 +34,7 @@ From the repository root (`../bin/pyt` = the project's Python runner; any Python
 ../bin/pyt -t 0  tools/truxenia.py --nogui        # link only
 ../bin/pyt -t 120 tools/truxenia.py --selftest    # offline: simulated memory, hit log, link, saves (dry run)
 ../bin/pyt -t 60 tools/truxenia.py --dumpfile work/xenia_dump/tu_image_82000000.bin --check   # proof words vs a dump
+../bin/pyt -t 0  tools/truxenia.py --camtrace --camtrace-seconds 300   # camera trace TSV only (next to a running TruXenia)
 ```
 
 Options: `--port N`, `--log PATH`, `--hitlog PATH`, `--unproven`, `--allow-write`, `--lang de|en`, `--verbose`,
@@ -107,7 +108,10 @@ record array `[[machine+4]+0xc]` (TU machine reset 0x82482808). Earlier logs sho
 The PC-compatible columns stay first and unchanged: `host_time inst obj_id obj_name lp stamina state0 state1 req target
 dist lara_rec0 lara_rec1 meter active time_scale`. Appended: `kind pos_x pos_y pos_z speed fly last_flight attack
 ko_handle lp_note lara_lp lara_states lara_pos ts_requests ts_selected ramp_player ramp_world cam_mode cam_flags
-aim_cm1fc aim_bits aim_t0_flags aim_t0_target` (the last four since 2026-11-10, section "Lock-on path").
+aim_cm1fc aim_bits aim_t0_flags aim_t0_target` (the last four since 2026-11-10, section "Lock-on path"), `cam_obj
+cam_x cam_y cam_z cam_yaw cam_pitch cam_fov_deg cam_dir lara_yaw delta_yaw cam_dist cam_clock cam_delay cam_ramp
+cam_weight cam_settings` (since 2026-11-11, section "Camera"). Rows are written per enemy only - for the camera alone
+use `--camtrace`.
 `ts_requests` / `ts_selected` have the same text as TruMenu 0.22.11's `pc_ts_requests` / `pc_ts_selected`
 (`0:1.20/0.30 4:0.02/1.00`, `P0.02(s4) W1.00(s4)`), so PC and Xbox can be matched by column name
 (`tools/fight_trace_compare.py` reads only the shared first 16 columns so far).
@@ -154,9 +158,35 @@ Not proven yet (shown as plan text, no values):
 ### Camera
 
 Shown: manager 0x82efc780 (TU 0x822a9a6c = PC flag reader 0x5e5e8e), mode +0x54, flags +0x7c (ENGINE.md section 22).
-`?` until proven on the Xbox: position, look-at, distance, FOV. PC addresses for the port: manager 0xe804f0, current
-camera [mgr+0x44], gameplay camera 0xe83860 (focus +0x1cc), FOV camera +0xb0 (vertical radians), camera matrix
-0xe804a0, getters 0x5e7850 / 0x5e7870 / 0x5e78a0 / 0x5e78d0. Next step: the TU twins of these getters.
+
+Since 2026-11-11 (camera comparison, workspace `docs\Plan-Kamera-Vergleich-Xenia-PC-1111.md`; address-file section
+`camera`, 36 new proof words, 139 in all):
+
+| Value | TU | Proof (PC twin) |
+|---|---|---|
+| current camera | `[0x82efc780+0x44]` | TU 0x822aabd0 = PC 0x5e7920 instruction for instruction (focus via vtable +0x48) |
+| gameplay camera | `[0x82efc780+0xb50]` (LaraCameraRewrite, vtable 0x82068c60) | manager update 0x822ad048 (PC 0x5f3c70 +0xb80) |
+| camera rotation | current camera +0xa0 (x pitch, z yaw, radians); yaw = +0xa8 | vtable slot 0x34 0x822a3968 `addi r3,r3,0xa0`, slot 0x44 0x822a3988 `lfs f1,0xa8(r3)` (PC 0x5e1c60 / 0x5e1ca0) |
+| camera position | current camera transform +0x10, row 3 (+0x40) | slot 0x38 0x822a3970 `addi r3,r3,0x10` (PC 0x5e1c70); row 3 = position by data (w = 1.0, equals +0x90) |
+| FOV | current camera +0xb0 (vertical radians) | slot 0x40 0x822a3980 (PC 0x5e1c90) |
+| recenter clock | gameplay camera +0x1e4 | weight 0x822c20b8 (vtable slot 0x84), look step 0x822c2ca0 / 0x822c2cd4 |
+| settings | own id +0x1d0, else `[[0x829ca200]+0x144]`, in doppelganger mode +0x14c; entry `[0x8287ba80+4*id]`, S = entry + 0x20; delay S+0xb4, ramp S+0xb8 | lookup 0x822bc198 |
+| Lara yaw | player instance +0x38 | TU 0x8242f990..0x8242f9a8 (PC reads `[[0xe7f094]+0x38]` at 0x752c73) |
+
+**Correction:** the getter PC 0x5e78a0 / slot 0x34 (+0xa0) is the camera ROTATION, not its position (ENGINE.md and
+TruMenu 0.22.11 fight.trace called it "position"; TruFight.log 2026-11-10 shows pc_cam_dx = -Lara position, i.e. "+0xa0"
+near 0). Proof by data: the TU dump `dlc2_shadow_off_image.bin` gameplay camera +0xa0 = (-0.0061, 0, -3.083) and its
+transform rows give the same angles (forward = row 2 = (-sin z, cos z)); camera yaw -176.5 vs bearing camera -> Lara
+-177.2 there, and live 2026-11-10 21:48 yaw 25.9 vs bearing 25.9.
+
+Shown on the Lara page / link `lara` (`; camera: obj ..., position, yaw, pitch, FOV, bearing to Lara, Lara yaw, delta,
+dist, recenter clock (delay, ramp, weight, settings)`) and in 16 new watch columns. Look-at point: not proven (`?`).
+
+**`--camtrace [PATH]`** (`--camtrace-seconds`, default 120, `--camtrace-interval`, default 0.05): no window, no link -
+it may run next to a running TruXenia. One TSV row per sample (`logs/truxenia/cam_<time>.tsv`, a header at every
+start) with the columns of TruShadowPower 0.25's `TruCam.log` (CAM_COLS, side `xbox`; the PC-only pad columns `-`).
+`tools/cam_compare.py` compares both. Live 2026-11-10 21:49-21:53 (DLC 2 start wall): settings `GI+0x14c id 21237`
+(delay 0.25 s, ramp 5.0 s) throughout; the game often sets the clock to delay + ramp (instant recenter) while climbing.
 
 ### Attack coordinator (`Ko`)
 
@@ -183,5 +213,7 @@ against instance +0x44; TU getter 0x82404568 = PC 0x719f00). Lara page line "Zie
   pass the 91 proof words. Not yet run live.
 - 2026-11-10 (offline): lock-on values (section "Lock-on path"); `--selftest` passes with the new aim line, the TU
   image dump passes 103 proof words (0 mismatches). Not yet run live.
-- Open: `Ko` meaning, camera position / FOV, units / sections / shaders, Xenia function-trace reader (stage 2).
+- 2026-11-11: camera values (section "Camera"), `--camtrace`; proof words 139 / 0 mismatches on both TU dumps,
+  `--selftest` passes; read live 21:48 (Xenia running, read only) and used by the owner 21:49-21:53.
+- Open: `Ko` meaning, camera look-at point, units / sections / shaders, Xenia function-trace reader (stage 2).
 - TU addresses: ENGINE.md section 13 rows "TU combat addresses", "TU brain shift", "TU TruXenia stage 1b".

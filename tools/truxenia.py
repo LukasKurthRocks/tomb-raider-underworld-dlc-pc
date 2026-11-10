@@ -16,7 +16,11 @@ Usage (from the repository root):
   ../bin/pyt -t 60 tools/truxenia.py --once            one snapshot to the console
   ../bin/pyt -t 60 tools/truxenia.py --dumpfile work/xenia_dump/tu_image_82000000.bin --check|--once
   ../bin/pyt -t 120 tools/truxenia.py --selftest       offline test with a simulated guest memory (hit log, link,
-                                                       save library dry run) - no Xenia needed
+                                                       save library dry run, camera values / trace) - no Xenia needed
+  ../bin/pyt -t 0 tools/truxenia.py --camtrace [PATH] [--camtrace-seconds 120] [--camtrace-interval 0.05]
+                                                       camera comparison TSV (CAM_COLS = TruShadowPower 0.25 TruCam.log
+                                                       columns; tools/cam_compare.py) - no window, no link, may run
+                                                       next to a running TruXenia
 Options: --port N, --log PATH (default ../logs/truxenia/truxenia_<time>.log), --hitlog PATH (default next to the log),
   --unproven, --allow-write (unlocks `set` after a confirmation), --lang de|en, --verbose, --debug, --trace.
 Link commands (tools/truxenia_cmd.py): status | enemies | lara | snapshot <file> | watch <seconds> <file> |
@@ -243,6 +247,22 @@ class FakeMem:
         self.wf(lara + 0x20, 50.0); self.wf(lara + 0x24, 0.0); self.wf(lara + 0x28, 0.0)
         cam = S.h(A['camera']['manager'])
         self.w32(cam + 0x54, 3); self.w32(cam + 0x7c, 4)
+        # 2026-11-11 camera comparison: gameplay camera = current camera, 300 units behind Lara (Lara at 50 0 0, yaw
+        # 0 rad = facing +y), camera yaw 0 / pitch -0.1 rad, FOV 0.8 rad, own settings id 7 -> entry with delay 5 /
+        # ramp 2, clock 1.5 s
+        c = A['camera']
+        gp, ent, gi = 0x47000000, 0x47100000, 0x47200000
+        self.w32(cam + S.h(c['current_offset']), gp); self.w32(cam + S.h(c['gameplay_offset']), gp)
+        self.w32(gp, S.h(c['gameplay_vtable']))          # vtable slots 0x34..0x44: set by the proof words above
+        self.wf(gp + 0x40, 50.0); self.wf(gp + 0x44, -300.0); self.wf(gp + 0x48, 120.0); self.wf(gp + 0x4c, 1.0)
+        self.wf(gp + 0xa0, -0.1); self.wf(gp + 0xa4, 0.0); self.wf(gp + 0xa8, 0.0)
+        self.wf(gp + 0xb0, 0.8)
+        self.w32(gp + S.h(c['settings_id']), 7); self.wf(gp + S.h(c['recenter_clock']), 1.5)
+        self.w32(S.h(c['settings_table']) + 4 * 7, ent); self.mem[ent + 4] = 0
+        self.wf(ent + 0x20 + 0xb4, 5.0); self.wf(ent + 0x20 + 0xb8, 2.0)
+        self.w32(S.h(c['global_info_ptr']), gi); self.w32(gi + 0x144, 20); self.w32(gi + 0x14c, 21237)
+        self.wf(lara + 0x38, 0.0)
+        self.camgp = gp
         # object table: 0xcc entries of 0x24; two loaded objects
         ot = S.h(A['object_table']['address'])
         for i in range(0xcc):
@@ -419,6 +439,120 @@ class Model:
     def _vec(self, a):
         b = self.mem.read(a, 12) if a else None
         return struct.unpack('>3f', b) if b and len(b) == 12 else None
+
+    def _cam_settings(self, sid, dopp):
+        """TU 0x822bc198 (settings lookup of the camera, 1:1): entry = [table + 4*id] when id != -1 and the entry is
+        set and its byte +4 is 0, else the GlobalInfo default id +0x144 (+0x14c in doppelganger mode); S = entry + 0x20.
+        Returns (text, S) - text names the id that was used."""
+        m, c = self.mem, self.A['camera']
+        tab = S.h(c['settings_table'])
+        busy = S.h(c['settings_entry_busy_byte'])
+
+        def entry(i):
+            if i is None or i < 0 or i > 0xffff:
+                return None
+            e = S.u32(m, tab + 4 * i)
+            if not e:
+                return None
+            return e if u8(m, e + busy) == 0 else None
+        if sid is not None and sid != -1:
+            e = entry(sid)
+            if e:
+                return 'id %d' % sid, e + S.h(c['settings_data'])
+        gi = S.u32(m, S.h(c['global_info_ptr']))
+        off = S.h(c['global_info_doppelganger'] if dopp else c['global_info_default'])
+        fid = S.u32(m, gi + off) if gi else None
+        if fid is not None and fid & 0x80000000:
+            fid -= 1 << 32
+        e = entry(fid)
+        if e:
+            return 'GI+0x%x id %d' % (off, fid), e + S.h(c['settings_data'])
+        return 'GI+0x%x id %s (no entry)' % (off, fid), None
+
+    def cam_values(self, lara_inst=None, lpos=None, dopp=None):
+        """2026-11-11 camera comparison (address file section "camera", 39 proof words): current camera [mgr+0x44],
+        gameplay camera [mgr+0xb50] (LaraCameraRewrite, vtable 0x82068c60); of the current camera, each only when its
+        vtable slot holds the base getter: rotation +0xa0 (slot 0x34; x = pitch, z = yaw, radians), transform +0x10
+        (slot 0x38; position = row 3 at +0x40), FOV +0xb0 (slot 0x40, vertical radians). Lara's yaw = instance +0x38.
+        The gameplay camera's recenter clock +0x1e4 with its settings (delay S+0xb4, ramp S+0xb8, weight as TU
+        0x822c20b8). delta_yaw = camera yaw - Lara yaw (-180..180, 0 = the camera looks the way Lara faces, if her
+        yaw uses the camera's convention - calibrated with L3, docs/Plan-Kamera-Vergleich-Xenia-PC-1111.md); cam_dir
+        = bearing camera -> Lara in the same convention (atan2(-dx, dy)). Read only."""
+        import math
+        m, A = self.mem, self.A
+        c, gt = A['camera'], A['game_tracker']
+        g = S.h(gt['address'])
+        if lara_inst is None:
+            lara_inst = S.u32(m, g + S.h(gt['player_instance']))
+            lpos = self._vec(lara_inst + 0x20) if lara_inst else None
+        if dopp is None:
+            trk = S.u32(m, S.h(A['lara_chart']['player_tracker_ptr']))
+            b = m.read(trk + S.h(A['player_tracker']['doppelganger_flag']), 1) if trk else None
+            dopp = b[0] if b else None
+        mgr = S.h(c['manager'])
+        out = {'cam_obj': '?', 'cam_xyz': None, 'cam_pos': '?', 'cam_fov': '?', 'cam_fov_deg': None, 'cam_dir': None,
+               'cam_yaw': None, 'cam_pitch': None, 'lara_yaw': None, 'delta_yaw': None, 'cam_dist': None,
+               'cam_clock': None, 'cam_delay': None, 'cam_ramp': None, 'cam_weight': None, 'cam_settings': '?',
+               'world_dt': S.f32(m, g + S.h(gt['scaled_dt'])), 'cam_mode': S.u32(m, mgr + S.h(c['mode_offset']))}
+        cur = S.u32(m, mgr + S.h(c['current_offset']))
+        gp = S.u32(m, mgr + S.h(c['gameplay_offset']))
+        vt = S.u32(m, cur) if cur else None
+
+        def base(slot, getter):
+            return bool(vt) and S.u32(m, vt + S.h(c[slot])) == S.h(c[getter])
+
+        def wrap(a):
+            return (a + 180.0) % 360.0 - 180.0
+        if cur:
+            out['cam_obj'] = '%s 0x%08x vt 0x%08x' % ('gameplay' if cur == gp else 'other', cur, vt or 0)
+        if base('transform_slot', 'transform_getter'):
+            out['cam_xyz'] = self._vec(cur + S.h(c['transform']) + S.h(c['position_in_transform']))
+        if base('rotation_slot', 'rotation_getter'):
+            rot = self._vec(cur + S.h(c['rotation']))
+            if rot and all(math.isfinite(v) for v in rot):
+                out['cam_yaw'] = wrap(math.degrees(rot[2]))
+                out['cam_pitch'] = math.degrees(rot[0])
+        if base('fov_slot', 'fov_getter'):
+            fov = S.f32(m, cur + S.h(c['fov']))
+            if fov is not None and math.isfinite(fov):
+                out['cam_fov_deg'] = math.degrees(fov)
+                out['cam_fov'] = '%.1f deg' % out['cam_fov_deg']
+        p = out['cam_xyz']
+        if p and all(math.isfinite(v) for v in p):
+            out['cam_pos'] = '%.0f %.0f %.0f' % p
+            if lpos:
+                dx, dy = lpos[0] - p[0], lpos[1] - p[1]
+                out['cam_dist'] = math.hypot(dx, dy)
+                out['cam_dir'] = math.degrees(math.atan2(0.0 - dx, dy))  # forward (-sin z, cos z) convention
+        yaw = S.f32(m, lara_inst + S.h(c['lara_yaw'])) if lara_inst else None
+        if yaw is not None and math.isfinite(yaw):
+            out['lara_yaw'] = wrap(math.degrees(yaw))
+            if out['cam_yaw'] is not None:
+                out['delta_yaw'] = wrap(out['cam_yaw'] - out['lara_yaw'])
+        if gp and S.u32(m, gp) == S.h(c['gameplay_vtable']):
+            out['cam_clock'] = S.f32(m, gp + S.h(c['recenter_clock']))
+            sid = S.u32(m, gp + S.h(c['settings_id']))
+            if sid is not None and sid & 0x80000000:
+                sid -= 1 << 32
+            txt, sp = self._cam_settings(sid, dopp)
+            out['cam_settings'] = txt
+            if sp:
+                out['cam_delay'] = S.f32(m, sp + S.h(c['settings_delay']))
+                out['cam_ramp'] = S.f32(m, sp + S.h(c['settings_ramp']))
+            t, d, r = out['cam_clock'], out['cam_delay'], out['cam_ramp']
+            if t is not None and d is not None and r:
+                out['cam_weight'] = min(max((t - d) / r, 0.0), 1.0)
+        return out
+
+    def cam_text(self, l):
+        """one line of the camera values (link `lara`, Lara page)"""
+        return ('obj %s, position %s, yaw %s, pitch %s, FOV %s, bearing to Lara %s, Lara yaw %s, delta %s, dist %s, '
+                'recenter clock %s (delay %s, ramp %s, weight %s, %s)' % (
+                    l.get('cam_obj', '?'), l.get('cam_pos', '?'), S.fmt(l.get('cam_yaw')), S.fmt(l.get('cam_pitch')),
+                    l.get('cam_fov', '?'), S.fmt(l.get('cam_dir')),
+                    S.fmt(l.get('lara_yaw')), S.fmt(l.get('delta_yaw')), S.fmt(l.get('cam_dist'), '%.0f'),
+                    S.fmt(l.get('cam_clock'), '%.2f'), S.fmt(l.get('cam_delay'), '%.2f'), S.fmt(l.get('cam_ramp'), '%.2f'),
+                    S.fmt(l.get('cam_weight'), '%.2f'), l.get('cam_settings', '?')))
 
     def _obj_name(self, inst):
         ob = self.A['object']
@@ -660,6 +794,7 @@ class Model:
                 'ramp_player': req['ramp_player'], 'ramp_world': req['ramp_world'],
                 'cam_mode': S.u32(m, mgr + S.h(cam['mode_offset'])), 'cam_flags': S.u32(m, mgr + S.h(cam['flags_offset'])),
                 'cam_pos': '?', 'cam_fov': '?'}
+        lara.update(self.cam_values(lara_inst, lpos, lara['dopp']))      # 2026-11-11 camera comparison
         lara.update(self._aim(trk))
         loaded = self.snap.get('loaded') or {}
         if t - self.loaded_t >= 1.0:
@@ -732,7 +867,68 @@ WATCH_COLS = ('host_time', 'inst', 'obj_id', 'obj_name', 'lp', 'stamina', 'state
               'lara_lp', 'lara_states', 'lara_pos', 'ts_requests', 'ts_selected', 'ramp_player',
               'ramp_world', 'cam_mode', 'cam_flags',
               # 2026-11-10 lock-on path (K-5; PC side TruMenu 0.22.15 TruAim.log cm1fc / b9.. / t0_flags / t0_target)
-              'aim_cm1fc', 'aim_bits', 'aim_t0_flags', 'aim_t0_target')
+              'aim_cm1fc', 'aim_bits', 'aim_t0_flags', 'aim_t0_target',
+              # 2026-11-11 camera comparison (address file section "camera"; PC side TruShadowPower 0.25 TruCam.log)
+              'cam_obj', 'cam_x', 'cam_y', 'cam_z', 'cam_yaw', 'cam_pitch', 'cam_fov_deg', 'cam_dir', 'lara_yaw',
+              'delta_yaw', 'cam_dist', 'cam_clock', 'cam_delay', 'cam_ramp', 'cam_weight', 'cam_settings')
+WATCH_CAM_N = 16                                         # the camera columns at the end of WATCH_COLS
+
+
+def cam_xyz_cols(p):
+    return tuple('%.1f' % v for v in p) if p else ('-', '-', '-')
+
+
+# 2026-11-11 camera comparison: the SAME columns as TruShadowPower 0.25 [Camera] Trace (TruCam.log on PC); read by
+# tools/cam_compare.py. side = xbox | pc; values the side cannot read are '-'.
+CAM_COLS = ('host_time', 't', 'side', 'cam_mode', 'cam_obj', 'cam_x', 'cam_y', 'cam_z', 'lara_x', 'lara_y', 'lara_z',
+            'cam_yaw', 'cam_pitch', 'lara_yaw', 'delta_yaw', 'cam_dir', 'cam_dist', 'cam_fov_deg', 'cam_clock',
+            'cam_delay', 'cam_ramp',
+            'cam_weight', 'cam_settings', 'world_scale', 'world_dt', 'power', 'meter', 'dopp', 'lara_rec0',
+            'cam_step', 'pad_rx', 'pad_ry', 'pad_buttons')
+
+
+class CamTrace:
+    """--camtrace: one row per sample (default every 50 ms) with CAM_COLS - no instance walk, no link, read only"""
+
+    def __init__(self, model, path):
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        self.model, self.path, self.rows, self.t0 = model, path, 0, time.time()
+        self.f = open(path, 'a', encoding='utf-8')
+        self.f.write('\t'.join(CAM_COLS) + '\n')            # a header at every start (cam_compare takes the last run)
+
+    def row(self):
+        mo = self.model
+        m, A = mo.mem, mo.A
+        if isinstance(m, FakeMem):
+            m.tick()
+        gt, pt, lc = A['game_tracker'], A['player_tracker'], A['lara_chart']
+        g = S.h(gt['address'])
+        lara_inst = S.u32(m, g + S.h(gt['player_instance']))
+        lpos = mo._vec(lara_inst + 0x20) if lara_inst else None
+        trk = S.u32(m, S.h(lc['player_tracker_ptr']))
+        db = m.read(trk + S.h(pt['doppelganger_flag']), 1) if trk else None
+        dopp = db[0] if db else None
+        cv = mo.cam_values(lara_inst, lpos, dopp)
+        meter = S.u32(m, trk + S.h(pt['meter_object'])) if trk else None
+        mflags = S.u32(m, meter + S.h(A['meter']['flags'])) if meter else None
+        mac = S.u32(m, trk + S.h(lc['machine0_offset'])) if trk else None
+        rec = S.u32(m, mac + S.h(lc['record_offset'])) if mac else None
+        idx = mo._record_index(mac, rec)
+        now = time.time()
+        vals = (now_ts(), '%.3f' % (now - self.t0), 'xbox', S.fmt(cv['cam_mode'], '%d'), cv['cam_obj'],
+                *cam_xyz_cols(cv['cam_xyz']), *cam_xyz_cols(lpos), S.fmt(cv['cam_yaw'], '%.2f'),
+                S.fmt(cv['cam_pitch'], '%.2f'), S.fmt(cv['lara_yaw'], '%.2f'), S.fmt(cv['delta_yaw'], '%.2f'),
+                S.fmt(cv['cam_dir'], '%.2f'), S.fmt(cv['cam_dist'], '%.0f'),
+                S.fmt(cv['cam_fov_deg'], '%.1f'), S.fmt(cv['cam_clock'], '%.3f'), S.fmt(cv['cam_delay'], '%.2f'),
+                S.fmt(cv['cam_ramp'], '%.2f'), S.fmt(cv['cam_weight'], '%.3f'), cv['cam_settings'],
+                S.fmt(S.f32(m, g + S.h(gt['world_time_scale'])), '%.3f'), S.fmt(cv['world_dt'], '%.4f'),
+                '-' if mflags is None else (mflags & 1), S.fmt(S.f32(m, meter + S.h(A['meter']['value'])) if meter else None),
+                '-' if dopp is None else dopp, idx if idx is not None else ('-' if not rec else '?'),
+                'tu', '-', '-', '-')
+        self.f.write('\t'.join(str(v) for v in vals) + '\n')
+        self.f.flush()
+        self.rows += 1
+        return vals
 
 
 class Watch:
@@ -762,7 +958,13 @@ class Watch:
                     S.fmt(lara.get('ramp_player'), '%.3f'), S.fmt(lara.get('ramp_world'), '%.3f'),
                     lara.get('cam_mode'), lara.get('cam_flags'),
                     S.fmt(lara.get('aim_w'), '0x%08x'), lara.get('aim_bits', '?'),
-                    S.fmt(lara.get('aim_t0_flags'), '0x%x'), lara.get('aim_target', '?'))
+                    S.fmt(lara.get('aim_t0_flags'), '0x%x'), lara.get('aim_target', '?'),
+                    lara.get('cam_obj', '?'), *cam_xyz_cols(lara.get('cam_xyz')), S.fmt(lara.get('cam_yaw')),
+                    S.fmt(lara.get('cam_pitch')), S.fmt(lara.get('cam_fov_deg')),
+                    S.fmt(lara.get('cam_dir')), S.fmt(lara.get('lara_yaw')), S.fmt(lara.get('delta_yaw')),
+                    S.fmt(lara.get('cam_dist'), '%.0f'), S.fmt(lara.get('cam_clock'), '%.3f'),
+                    S.fmt(lara.get('cam_delay'), '%.2f'), S.fmt(lara.get('cam_ramp'), '%.2f'),
+                    S.fmt(lara.get('cam_weight'), '%.3f'), lara.get('cam_settings', '?'))
             self.f.write('\t'.join(str(v) for v in vals) + '\n')
             self.rows += 1
         self.f.flush()
@@ -871,7 +1073,8 @@ class Link:
                         l.get('dopp'), l.get('req_slots'), l.get('win_player'), l.get('win_world'),
                         S.fmt(l.get('ramp_player'), '%.3f'), S.fmt(l.get('ramp_world'), '%.3f'), l.get('cam_mode'),
                         l.get('cam_flags'), l.get('cam_pos'), l.get('cam_fov'), S.fmt(l.get('aim_w'), '0x%08x'),
-                        l.get('aim_bits'), S.fmt(l.get('aim_t0_flags'), '0x%x'), l.get('aim_target'))]
+                        l.get('aim_bits'), S.fmt(l.get('aim_t0_flags'), '0x%x'), l.get('aim_target')) +
+                    '; camera: ' + self.model.cam_text(l)]
         if c == 'objects':
             want = parts[1].lower() if len(parts) > 1 else None
             return ['0x%08x %s %s [%s]%s dist %s' % (o['inst'], o['oid'], o['name'], o['cat'],
@@ -1160,7 +1363,8 @@ def run_gui(model, link, args, log):
                          S.fmt(l.get('ramp_world'), '%.3f'), tr('dopp', L), l.get('dopp'), tr('camera', L),
                          l.get('cam_mode'), l.get('cam_flags'), l.get('cam_pos'), l.get('cam_fov'),
                          tr('aim', L), S.fmt(l.get('aim_w'), '0x%08x'), l.get('aim_bits'),
-                         S.fmt(l.get('aim_t0_flags'), '0x%x'), tr('target', L), l.get('aim_target')))
+                         S.fmt(l.get('aim_t0_flags'), '0x%x'), tr('target', L), l.get('aim_target')) +
+                     '\n%s: %s' % (tr('camera', L), model.cam_text(l)))
         ld = snap.get('loaded') or {}
         key = ld.get('time', '') if isinstance(ld, dict) else ''
         if key != shown[1]:
@@ -1253,6 +1457,21 @@ def selftest(model, link, args, log):
     wl = open(wpath, encoding='utf-8').read().splitlines()
     need(len(wl) >= 2 and all(len(r.split('\t')) == len(WATCH_COLS) for r in wl),
          'watch TSV: rows do not have %d fields' % len(WATCH_COLS))
+    need(any('camera: obj gameplay 0x47000000 vt 0x82068c60, position 50 -300 120, yaw 0.0, pitch -5.7, FOV 45.8 '
+             'deg, bearing to Lara 0.0, Lara yaw 0.0, delta 0.0, dist 300, recenter clock 1.50 (delay 5.00, ramp 2.00, '
+             'weight 0.00, id 7)' in x for x in out['lara']),
+         'camera values (position / yaw / FOV / recenter clock / settings) missing')
+    cpath = os.path.join(os.path.dirname(os.path.abspath(args.log)), 'cam_selftest_%s.tsv' % time.strftime('%H%M%S'))
+    ct = CamTrace(model, cpath)
+    crow = ct.row()
+    ct.f.close()
+    cl = open(cpath, encoding='utf-8').read().splitlines()
+    need(len(cl) == 2 and all(len(r.split('\t')) == len(CAM_COLS) for r in cl),
+         'cam TSV: rows do not have %d fields' % len(CAM_COLS))
+    need(crow[CAM_COLS.index('delta_yaw')] == '0.00' and crow[CAM_COLS.index('cam_delay')] == '5.00',
+         'cam TSV: delta_yaw / cam_delay %r / %r' % (crow[CAM_COLS.index('delta_yaw')], crow[CAM_COLS.index('cam_delay')]))
+    need(all(v not in ('-', '?') for v in wl[-1].split('\t')[len(WATCH_COLS) - WATCH_CAM_N:]),
+         'watch TSV: camera columns empty: %r' % wl[-1].split('\t')[len(WATCH_COLS) - WATCH_CAM_N:])
     need(any('loaded 2' in x for x in out['loaded']), 'object table: expected 2 loaded objects')
     need(any('fly' in h for h in model.hits) and any(v != '-' for v in model.lastfly.values()), 'no flight measured')
     okst, msg = store_saves('selftest_dry', log, dry=True)
@@ -1284,6 +1503,11 @@ def main():
     ap.add_argument('--verbose', action='store_true')
     ap.add_argument('--debug', action='store_true')
     ap.add_argument('--trace', action='store_true')
+    ap.add_argument('--camtrace', nargs='?', const='', default=None,
+                    help='camera comparison: TSV with the TruCam.log columns (default logs/truxenia/cam_<time>.tsv); '
+                         'no window, no link - may run next to a running TruXenia')
+    ap.add_argument('--camtrace-seconds', type=float, default=120.0)
+    ap.add_argument('--camtrace-interval', type=float, default=0.05)
     a = ap.parse_args()
     if a.selftest_gui:
         a.selftest = True
@@ -1311,6 +1535,26 @@ def main():
         log.w('E', 'refusing: proof words differ (use --force only if you know why)')
         return 1
     model = Model(mem, A, log, a.unproven)
+    if a.camtrace is not None and not a.selftest:
+        cpath = a.camtrace or os.path.join(os.path.dirname(a.log), 'cam_%s.tsv' % stamp)
+        ct = CamTrace(model, cpath)
+        log.w('I', 'camera trace %s: %.0f s every %.3f s (stop with Ctrl+C)' % (cpath, a.camtrace_seconds,
+                                                                                a.camtrace_interval))
+        end = time.time() + a.camtrace_seconds
+        try:
+            while time.time() < end:
+                if not mem.alive():
+                    log.w('I', 'Xenia exited - stop')
+                    break
+                ct.row()
+                if a.once or a.dumpfile:
+                    break
+                time.sleep(a.camtrace_interval)
+        except KeyboardInterrupt:
+            pass
+        ct.f.close()
+        log.w('I', 'camera trace end: %d rows in %s' % (ct.rows, cpath))
+        return 0
     hp = a.hitlog or os.path.join(os.path.dirname(a.log), 'hits_%s%s.log' % (stamp, '_selftest' if a.selftest else ''))
     model.hitlog = open(hp, 'a', encoding='utf-8')
     log.w('I', 'hit log %s' % hp)

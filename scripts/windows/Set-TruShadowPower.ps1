@@ -56,10 +56,11 @@ $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # 2026-11-10, sample .ini [TimeScale] TranslateSlot6=1); 0.22 K-5 combat reticle request and adrenaline refill
 # (work\asi\power022, 2026-11-10, md5 10654dc22b5937f3e3ad878a4cc59557 = installed on 2026-11-10, sample .ini
 # [Reticle]); 0.23 N2 [Meter] Infinite (work\asi\power023, 2026-11-10, sample .ini [Meter] Infinite=0)) - recognised
-# as ours for update / removal.
-# The current build 0.24 (N6: [Camera] TuTimeStep - the TU's camera time step, default 0; work\asi\power024,
-# 2026-11-11) ships a new sample .ini ([Camera] TuTimeStep=0); its hashes are listed too (marked current) so a later
-# build recognises it. Install it with -SourceDir <repo>\work\asi\power024.
+# as ours for update / removal; 0.24 N6 [Camera] TuTimeStep (work\asi\power024, 2026-11-11).
+# The current build 0.25 (camera comparison: keys [Camera] CameraTuTimeStep / [Cloth] ClothTuTimeStep - the old name
+# TuTimeStep is still read -, [Camera] Trace (TruCam.log) and [Camera] DoppelgangerSettings, defaults 0;
+# work\asi\power025, 2026-11-11) ships a new sample .ini; its hashes are listed too (marked current) so a later build
+# recognises it. Install it with -SourceDir <repo>\work\asi\power025.
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
@@ -85,7 +86,8 @@ $earlierBuilds = @{
                              'fc0885d0162d50880be353ae7c72a11bf37bd62b716dd10f813d478679063681',   # 0.21 X23 slot 6 (work\asi\power021, not installed)
                              'fb19e1c4fa0bc444cbf7eb3bc422989a588539b0ce72fbe8b5fc3c5b76a06a31',   # 0.22 K-5 reticle / refill (work\asi\power022, md5 10654dc22b5937f3e3ad878a4cc59557 = installed on 2026-11-10)
                              'c22dac1ce3c09f4049600f82908b9c6c84fc71e707ad930575ec4ae3d4741a58',   # 0.23 N2 [Meter] Infinite (work\asi\power023, md5 b679a97ad58c753717574e4bc5605ab0, not installed)
-                             '5ca2d7adfa45aec86ec6a1b4651aa10ae099735fbba7c13afa183bde24b1efdf')   # 0.24 N6 [Camera] TuTimeStep (work\asi\power024, md5 3f1d37f5dd003d090bee745bf6121c87, current, not installed)
+                             '5ca2d7adfa45aec86ec6a1b4651aa10ae099735fbba7c13afa183bde24b1efdf',   # 0.24 N6 [Camera] TuTimeStep (work\asi\power024, md5 3f1d37f5dd003d090bee745bf6121c87, not installed)
+                             '89d15879f6f32b7eb8402c95668fefeb4ea999c5f571c32e3d5d2157a88c9114')   # 0.25 camera trace / doppelganger settings (work\asi\power025, md5 ea3c85aa0b6c283f358a408add8faa6b, current, not installed)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
@@ -105,7 +107,8 @@ $earlierBuilds = @{
                              '7d9f4d2b7f7a7a5176c454b961df9885209db31efc6b2606c04ca77a22cd27da',   # 0.21 sample .ini ([TimeScale] TranslateSlot6)
                              '0215ac43c100a4a613ad05959966817df45eb90c83d86b89ac3adcb3cbaaf998',   # 0.22 sample .ini ([Reticle])
                              '682949882f7777c1dcf0e9e1233ae1da9bed273a42b61f83e6c14ad46e01d3cb',   # 0.23 sample .ini ([Meter] Infinite=0)
-                             '64f16eef48ea3a89fe6de96c2ce2150bbf6ce6cfbfdf6c999ae31ea810b1c6b4')   # 0.24 sample .ini ([Camera] TuTimeStep=0, current)
+                             '64f16eef48ea3a89fe6de96c2ce2150bbf6ce6cfbfdf6c999ae31ea810b1c6b4',   # 0.24 sample .ini ([Camera] TuTimeStep=0)
+                             '12285a5977b07ffbec8d9b3a01a97e14792cd5ec0a127dc97807f9dd978e859d')   # 0.25 sample .ini ([Camera] CameraTuTimeStep / DoppelgangerSettings / Trace, [Cloth] ClothTuTimeStep, current)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

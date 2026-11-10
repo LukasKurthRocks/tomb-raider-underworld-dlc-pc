@@ -198,6 +198,16 @@
 // re-centres at 0.3 x speed while the shadow power slows the world. PC sites tru+0x1f3c79 / 0x1fe30a / 0x2026ca /
 // 0x2044aa (6-byte `fld [0xe7f188]` -> stub with `fdiv [0xe7f1a0]`), the same idiom as [Cloth] TuTimeStep (0.15).
 // Section "0.24" below (after the 0.15 cloth section).
+//
+// 0.25 (2026-11-11, project doc Plan-Kamera-Vergleich-Xenia-PC-1111.md): ini keys renamed [Camera] CameraTuTimeStep /
+// [Cloth] ClothTuTimeStep (the old name TuTimeStep is still read when the new key is missing). [Camera] Trace=1
+// (default 0, live): TruCam.log, one TSV row per TraceInterval ms with TruXenia's --camtrace columns (camera / Lara
+// yaw, recenter clock and settings, world scale, meter, pad) - read only. [Camera] DoppelgangerSettings (default 0):
+// the TU's camera settings choice in doppelganger mode (0x822bc198 / 0x822c61d8: DTP 21237 / 21238 instead of the
+// GlobalInfo defaults) at the 34 PC fallback blocks; 1 = 1:1 (needs the DTPs in the data - the installed generalbank
+// lacks them), 2 = 1 + a stand-in for 21237 (PC DTP 20 with the TU's delay 0.25 s / ramp 5.0 s - partial). Live Xbox
+// 2026-11-10 21:48: the gameplay camera uses 21237 (0.25 s / 5.0 s), the PC DTP 20 (5.0 s / 2.0 s). State 2102 no longer
+// reads PC GlobalInfo +0x14c (DTP 22). Sections "0.25 [Camera] Trace" / "0.25 DoppelgangerSettings".
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -206,6 +216,9 @@
 #include <stdarg.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
+#include <errno.h>
+#include <share.h>
 
 namespace {
 
@@ -381,6 +394,7 @@ double g_infHeld = 0.0;                 // 0.23: their amounts (meter units not 
 LONG g_infFills = 0;                    // 0.23: tick fills to max while Infinite is on (log only)
 
 char g_logPath[MAX_PATH];
+char g_iniPath[MAX_PATH];                     // 0.18: for the run-time reads of the ini ([Adrenaline] Translate, ...)
 CRITICAL_SECTION g_logLock;
 volatile XInputGetStateFn g_original = nullptr;
 SetTimeScaleFn g_setWorld = reinterpret_cast<SetTimeScaleFn>(kSetWorld);
@@ -1032,6 +1046,9 @@ void WithheldLog() {
 
 void Slot6ReadSwitch();                 // 0.21: [TimeScale] TranslateSlot6 at run time (defined below)
 void InfiniteReadSwitch();              // 0.23: [Meter] Infinite at run time (defined below)
+void CamTraceReadSwitch();              // 0.25: [Camera] Trace at run time (defined below)
+volatile SHORT g_padRx = 0, g_padRy = 0;   // 0.25 camera trace: pad 0 as the pad hook got it
+volatile WORD g_padButtons = 0;
 
 DWORD WINAPI PadHook(DWORD index, PadState *state) {
     if (g_inPadHook)                            // another plugin's hook called back into us: break the loop
@@ -1040,6 +1057,11 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     DWORD result = g_original ? g_original(index, state) : ERROR_DEVICE_NOT_CONNECTED;
     g_inPadHook = 0;
     if (index > 3) return result;
+    if (index == 0 && result == 0 && state) {   // 0.25 camera trace: pad 0 as this hook got it (read only)
+        g_padRx = state->sThumbRX;
+        g_padRy = state->sThumbRY;
+        g_padButtons = state->wButtons;
+    }
     WORD before = g_lastButtons[index];
     g_lastButtons[index] = GameButtons(index, result, state);     // 0.17: as the game gets them (0.16: state only)
     WithheldLog();
@@ -1052,6 +1074,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     for (int i = 0; i < 4; ++i) held = held || g_lastButtons[i] != 0;
     Slot6ReadSwitch();                          // 0.21: once per game frame, reads the ini at most once per second
     InfiniteReadSwitch();                       // 0.23: the same (game thread, before the tick that uses it)
+    CamTraceReadSwitch();                       // 0.25: [Camera] Trace / TraceInterval, the same
     MeterTick(held);
     return result;
 }
@@ -2285,6 +2308,10 @@ void MoveEvents();
 void ReportClothTimeStep();
 // 0.24, defined below (section "0.24")
 void ReportCameraTimeStep();
+// 0.25, defined below (sections "0.25 [Camera] Trace" / "0.25 DoppelgangerSettings")
+void DgSynthTick();
+void ReportCamSettings();
+void CamTraceTick();
 
 // ---- new tracker -> new meter (TU player init 0x82412ca0 -> 0x82409418 -> meter init 0x823d7700) ----
 typedef int(__cdecl *GenerationFn)();
@@ -2492,8 +2519,11 @@ void MeterTick(bool padHeld) {
     if (TickGate()) return;                      // 0.16: no player / not in a level / level change - TU: no tick
                                                  // (also for the legacy 0.8 tick below)
     ScreenEffectPoll();                          // 0.10: only while an event 0x32 is pending
-    ReportClothTimeStep();                       // 0.15: log only ([Cloth] TuTimeStep=1)
-    ReportCameraTimeStep();                      // 0.24: log only ([Camera] TuTimeStep=1)
+    ReportClothTimeStep();                       // 0.15: log only ([Cloth] ClothTuTimeStep=1)
+    ReportCameraTimeStep();                      // 0.24: log only ([Camera] CameraTuTimeStep=1)
+    DgSynthTick();                               // 0.25: [Camera] DoppelgangerSettings=2 stand-in (once)
+    ReportCamSettings();                         // 0.25: the gameplay camera's settings choice (log on change)
+    CamTraceTick();                              // 0.25: [Camera] Trace=1 -> TruCam.log
     if (g_legacyPadStart) { LegacyMeterTick(padHeld); return; }
     NewTrackerCheck();
     // TU 0x824128a4..0x824128b8: the player update runs the tick only when gameTracker+0x1244 is set
@@ -2789,6 +2819,7 @@ const DWORD kCamDefaults = 0x005d4080;              // mov eax, [0xe7ee50]; ret 
 const char *const kCamDefaultsHex = "a150eee700 c3";
 bool g_state2102Ok = false;
 volatile LONG g_state2102Calls = 0;
+DWORD __cdecl CamFallback(DWORD disp);              // 0.25, section "0.25 DoppelgangerSettings"
 
 void __cdecl State2102(BYTE *) {
     if (!g_state2102Ok) return;
@@ -2806,9 +2837,11 @@ void __cdecl State2102(BYTE *) {
         BYTE *e = id != -1 ? reinterpret_cast<CamSettingsFn>(kCamSettings)(id) : nullptr;
         const bool dg = Doppelganger() != 0;
         if (!e) {
-            BYTE *defaults = *reinterpret_cast<BYTE *const *>(0x00e7ee50);
-            if (!defaults) return;
-            e = reinterpret_cast<CamSettingsFn>(kCamSettings)(*reinterpret_cast<const int *>(defaults + (dg ? 0x14c : 0x144)));
+            // 0.25: the TU's doppelganger default is the TU GlobalInfo +0x14c = DTP 21237; the PC GlobalInfo +0x14c is
+            // DTP 22 (not camera settings), which 0.11..0.24 read here. Now the choice of the patched fallback blocks
+            // (section "0.25 DoppelgangerSettings": 21237 when loaded / stand-in, else the retail +0x144)
+            if (!*reinterpret_cast<BYTE *const *>(0x00e7ee50)) return;
+            e = reinterpret_cast<BYTE *>(CamFallback(0x144));
         }
         if (!e) return;
         const BYTE *s = e + 0x10;
@@ -2817,7 +2850,7 @@ void __cdecl State2102(BYTE *) {
         if (n == 1 || g_logLevel >= 2)
             Log(n == 1 ? 1 : 2, "state 2102 (TU 0x822ae918 -> 0x822c2130)%s: Lara camera 0x%08lx settings %d%s -> blend "
                 "time +0x1e4 = %.2f (end)", n == 1 ? " first call" : "", reinterpret_cast<DWORD>(cam), id,
-                id == -1 ? (dg ? " (doppelganger default +0x14c)" : " (default +0x144)") : "", end);
+                id == -1 ? (dg ? " (doppelganger: 0.25 choice)" : " (default +0x144)") : "", end);
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         Log(0, "state 2102: access fault - off");
         g_state2102Ok = false;
@@ -3560,7 +3593,7 @@ void PatchClothTimeStep() {
         return;
     }
     g_clothOk = true;
-    Log(1, "cloth time step: [Cloth] TuTimeStep=1 - tru+0x1bbec2 runs TU 0x822781dc..0x822781f8: the player's cloth "
+    Log(1, "cloth time step: [Cloth] ClothTuTimeStep=1 - tru+0x1bbec2 runs TU 0x822781dc..0x822781f8: the player's cloth "
            "(component 14) gets dt [0xe7f188] / world scale [0xe7f1a0] when the instance is [0xe7f094]");
 }
 
@@ -3669,7 +3702,7 @@ void ReportCameraTimeStep() {
 
 void PatchCameraTimeStep() {
     if (!g_camTimeStep) {                                      // default: nothing checked, nothing patched (= 0.23)
-        Log(1, "camera time step: [Camera] TuTimeStep=0 - the cameras run on the world-scaled frame time (retail)");
+        Log(1, "camera time step: [Camera] CameraTuTimeStep=0 - the cameras run on the world-scaled frame time (retail)");
         return;
     }
     for (int i = 0; i < 4; ++i) {
@@ -3695,9 +3728,485 @@ void PatchCameraTimeStep() {
         }
     }
     g_camDtOk = true;
-    Log(1, "camera time step: [Camera] TuTimeStep=1 - tru+0x1f3c79 / 0x1fe30a / 0x2026ca / 0x2044aa run TU 0x822ad06c / "
-           "0x822beef8 / 0x822c3a08 / 0x822c7a18: camera manager, LaraCamera, LaraCameraRewrite and LaraCombatCamera "
-           "get dt [0xe7f188] / world scale [0xe7f1a0] (unscaled while the world is slowed)");
+    Log(1, "camera time step: [Camera] CameraTuTimeStep=1 - tru+0x1f3c79 / 0x1fe30a / 0x2026ca / 0x2044aa run TU "
+           "0x822ad06c / 0x822beef8 / 0x822c3a08 / 0x822c7a18: camera manager, LaraCamera, LaraCameraRewrite and "
+           "LaraCombatCamera get dt [0xe7f188] / world scale [0xe7f1a0] (unscaled while the world is slowed)");
+}
+
+// ---- 0.25 [Camera] Trace: the PC side of the camera comparison with TruXenia (project doc
+// Plan-Kamera-Vergleich-Xenia-PC-1111.md; Xbox side: tools/truxenia.py --camtrace, address file section "camera") ----
+// Read only, game thread (from MeterTick, i.e. only while Lara exists and updates), one TSV row every
+// [Camera] TraceInterval ms (default 50) into TruCam.log next to this plugin (opened shared, a header at every open).
+// The columns are TruXenia's CAM_COLS (tools/truxenia.py), side "pc". Sources (each pinned in kCamTraceChecks):
+//   manager 0xe804f0: requested mode +0x58 (= TU +0x54; chooser 0x5e80b9), current camera +0x44 (focus getter
+//     0x5e7920 = TU 0x822aabd0), gameplay camera +0xb80 (manager update 0x5f3cbb, = TU +0xb50), LaraCameraRewrite
+//     vtable 0x85600c;
+//   of the current camera, only when its vtable slot holds the base getter: rotation +0xa0 (slot 0x34 0x5e1c60; x =
+//     pitch, z = yaw in radians - the getter 0x5e78a0 ENGINE.md / fight.trace call "position" returns this rotation),
+//     transform +0x10 (slot 0x38 0x5e1c70; world position = row 3 at +0x40), FOV +0xb0 (slot 0x40 0x5e1c90);
+//   Lara: instance [0xe7f094] +0x20 position, +0x38 yaw (read as at 0x752c73);
+//   recenter (gameplay camera): clock +0x1e4 (look step 0x5ffe80), settings = lookup 0x54df80([cam+0x1d0]) or of
+//     [[0xe7ee50]+0x144] (0x6026b6, GlobalInfo 0x5d4080), S = lookup + 0x10 (0x6026ea), delay S+0xb4, ramp S+0xb8,
+//     weight = clamp((clock - delay) / ramp, 0, 1) as 0x5ffa90 (TU 0x822bc198 / 0x822c20b8 the same, but in
+//     doppelganger mode the TU falls back to GlobalInfo +0x14c = DTP 21237);
+//   world scale [0xe7f1a0], scaled frame time [0xe7f188], power = meter flag 1, Lara's record index of machine 0
+//     ([[0xfadb58]+0xf10] +0x510 in [[machine+4]+0xc], as TruMenu combo.trace), pad 0 right stick / buttons as this
+//     plugin's pad hook gets them (raw, before TruMenu's masking), cam_step = tu when 0.24's four stubs are in.
+// delta_yaw = camera yaw - Lara yaw (-180..180); cam_dir = bearing camera -> Lara in the camera's convention
+// (forward = (-sin z, cos z)). Nothing is written into the game.
+const DWORD kCtMgr = 0x00e804f0;
+const DWORD kCtRewriteVt = 0x0085600c;
+const DWORD kCtGetRot = 0x005e1c60, kCtGetXf = 0x005e1c70, kCtGetFov = 0x005e1c90;
+const DWORD kCtSetTable = 0x00c36f28, kCtGlobalInfo = 0x00e7ee50;
+const CodeCheck kCamTraceChecks[] = {
+    {0x005e80b9, "c7465834000000"},                                         // requested mode manager+0x58
+    {0x005e7920, "8b0d3405e800 8b01 8b5048 ffd2 85c0 7505 a194f0e700 c3"},  // current camera [mgr+0x44] (TU 0x822aabd0)
+    {0x005f3cbb, "8b5e44 8bbe800b0000"},                                    // manager +0x44 / gameplay +0xb80
+    {0x005e1c60, "8d81a0000000 c3"},                                        // slot 0x34: rotation +0xa0
+    {0x005e1c70, "8d4110 c3"},                                              // slot 0x38: transform +0x10
+    {0x005e1c90, "d981b0000000 c3"},                                        // slot 0x40: FOV +0xb0
+    {0x005ffe80, "d996e4010000"},                                           // look step: clock +0x1e4
+    {0x005ffa9d, "d981e4010000 d8a0b4000000 d8b0b8000000"},                 // weight: clock, S+0xb4, S+0xb8
+    {0x0054df80, "8b442404 8b0485286fc300 85c0 740a 80780400 7504 83c010 c3"},   // settings lookup
+    // the fallback block 0x6026b6 (GlobalInfo +0x144): checked in CamTraceOpen (original or 0.25's patch)
+    {0x006026ea, "8d7010"},                                               // S = lookup + 0x10
+    {0x005d4080, "a150eee700 c3"},                                          // GlobalInfo [0xe7ee50]
+    {0x00752c73, "8b0d94f0e700 d94138"},                                    // Lara yaw [[0xe7f094]+0x38]
+    {0x00768c50, "a158dbfa00 56 8bb0100f0000 57 8bb8140f0000 8bce e8f6f10100"},  // chart machines +0xf10 / +0xf14
+};
+int g_camTrace = 0;                                            // [Camera] Trace (read again at run time)
+int g_camTraceMs = 50;                                         // [Camera] TraceInterval
+int g_camTraceOk = -1;                                         // -1 not checked, 0 code differs, 1 ok
+FILE *g_camTraceFile = nullptr;
+char g_camTracePath[MAX_PATH];
+DWORD g_camTraceTick = 0, g_camTraceSwitchTick = 0;
+LONG g_camTraceRows = 0;
+LARGE_INTEGER g_camTraceT0, g_camTraceFreq;
+int g_camTraceIni = 0;                                         // the last [Camera] Trace value read from the ini
+DWORD g_ctLastRec = 0;
+int g_ctLastIdx = -1;
+
+bool CtD(DWORD a, DWORD *v) {
+    __try { *v = *reinterpret_cast<const volatile DWORD *>(a); return true; }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+bool CtF(DWORD a, float *v) {
+    DWORD d = 0;
+    if (!a || !CtD(a, &d)) return false;
+    memcpy(v, &d, 4);
+    return _finite(*v) != 0;
+}
+bool CtB(DWORD a, BYTE *v) {
+    __try { *v = *reinterpret_cast<const volatile BYTE *>(a); return true; }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+double CtWrap(double a) {
+    double r = fmod(a + 180.0, 360.0);
+    if (r < 0.0) r += 360.0;
+    return r - 180.0;
+}
+// settings entry as 0x54df80: [0xc36f28 + 4 * id], used when set and its byte +4 is 0
+DWORD CtEntry(LONG id) {
+    DWORD e = 0;
+    BYTE busy = 1;
+    if (id < 0 || id > 0xffff || !CtD(kCtSetTable + 4 * static_cast<DWORD>(id), &e) || !e) return 0;
+    return CtB(e + 4, &busy) && busy == 0 ? e : 0;
+}
+int DgDecision(DWORD disp);                                    // 0.25 DoppelgangerSettings, defined below
+bool DgBlockOk(DWORD at, DWORD disp);
+bool g_dgPatched = false;                                      // 0.25: the 34 fallback blocks are patched
+int g_dgSettings = 0;                                          // [Camera] DoppelgangerSettings (0 / 1 / 2)
+const LONG kTuDgId144 = 21237, kTuDgId148 = 21238;             // TU GlobalInfo +0x14c / +0x150 (doppelganger)
+const DWORD kDgSynthSize = 0x1008;                             // PC generalbank DTP 20: 4104 bytes
+__declspec(align(16)) BYTE g_dgSynth[kDgSynthSize + 8];        // 0.25 stand-in for DTP 21237 (mode 2)
+// the settings a camera with own id `id` gets (as 0x602690 & co. with 0.25's patched fallback blocks): returns the
+// lookup result (data; S = data + 0x10) or 0, and names the choice in `t`
+DWORD CtPick(LONG id, DWORD disp, char *t, size_t n) {
+    DWORD e = 0, gi = 0, fid = 0;
+    if (id != -1 && (e = CtEntry(id)) != 0) {
+        _snprintf_s(t, n, _TRUNCATE, "id %ld", id);
+        return e + 0x10;
+    }
+    const int d = DgDecision(disp);
+    const LONG tu = disp == 0x144 ? kTuDgId144 : kTuDgId148;
+    if (d == 1 && (e = CtEntry(tu)) != 0) {
+        _snprintf_s(t, n, _TRUNCATE, "TU id %ld (doppelganger)", tu);
+        return e + 0x10;
+    }
+    if (!CtD(kCtGlobalInfo, &gi) || !gi || !CtD(gi + disp, &fid)) {
+        _snprintf_s(t, n, _TRUNCATE, "GI+0x%lx unreadable", disp);
+        return 0;
+    }
+    if (d == 2) {
+        _snprintf_s(t, n, _TRUNCATE, "stand-in %ld = GI+0x%lx id %ld + TU delay/ramp", tu, disp, static_cast<LONG>(fid));
+        return reinterpret_cast<DWORD>(g_dgSynth);
+    }
+    e = CtEntry(static_cast<LONG>(fid));
+    _snprintf_s(t, n, _TRUNCATE, e ? "GI+0x%lx id %ld" : "GI+0x%lx id %ld (no entry)", disp, static_cast<LONG>(fid));
+    return e ? e + 0x10 : 0;
+}
+int CtRecordIndex() {
+    DWORD tracker = 0, machine = 0, rec = 0, defs = 0, arr = 0;
+    if (!CtD(kPlayerStatePtr, &tracker) || !tracker || !CtD(tracker + 0xf10, &machine) || !machine ||
+        !CtD(machine + 0x510, &rec) || !rec)
+        return -1;
+    if (rec == g_ctLastRec) return g_ctLastIdx;
+    g_ctLastRec = rec;
+    g_ctLastIdx = -2;                                          // record set, index not found
+    if (!CtD(machine + 4, &defs) || !defs || !CtD(defs + 0xc, &arr) || !arr) return g_ctLastIdx;
+    for (int i = 0; i < 8192; ++i) {
+        DWORD v = 0;
+        if (!CtD(arr + 4 * i, &v)) break;
+        if (v == rec) { g_ctLastIdx = i; break; }
+    }
+    return g_ctLastIdx;
+}
+
+void CamTraceClose(const char *why) {
+    if (!g_camTraceFile) return;
+    fclose(g_camTraceFile);
+    g_camTraceFile = nullptr;
+    Log(1, "0.25 camera trace: off (%s) - %ld rows in %s", why, g_camTraceRows, g_camTracePath);
+}
+
+bool CamTraceOpen() {
+    if (g_camTraceOk < 0) {
+        g_camTraceOk = 1;
+        if (!DgBlockOk(0x006026b6, 0x144) && !g_dgPatched) {
+            Log(0, "0.25 camera trace: the settings fallback block 0x6026b6 does not match - no trace");
+            g_camTraceOk = 0;
+        }
+        for (const auto &c : kCamTraceChecks) {
+            if (g_camTraceOk && !HexBytesAt(c.address, c.bytes)) {
+                Log(0, "0.25 camera trace: code at 0x%08lx does not match - no trace", c.address);
+                g_camTraceOk = 0;
+            }
+        }
+        if (g_camTraceOk)
+            Log(1, "0.25 camera trace: %u code checks + the fallback block 0x6026b6 passed",
+                static_cast<unsigned>(sizeof(kCamTraceChecks) / sizeof(kCamTraceChecks[0])));
+    }
+    if (!g_camTraceOk) return false;
+    g_camTraceFile = _fsopen(g_camTracePath, "a", _SH_DENYNO);
+    if (!g_camTraceFile) {
+        Log(0, "0.25 camera trace: cannot open %s (errno %d) - off until [Camera] Trace is switched 0 -> 1 again",
+            g_camTracePath, errno);
+        g_camTrace = 0;                                        // no retry per frame; CamTraceReadSwitch re-arms on 0 -> 1
+        return false;
+    }
+    fputs("host_time\tt\tside\tcam_mode\tcam_obj\tcam_x\tcam_y\tcam_z\tlara_x\tlara_y\tlara_z\tcam_yaw\tcam_pitch\t"
+          "lara_yaw\tdelta_yaw\tcam_dir\tcam_dist\tcam_fov_deg\tcam_clock\tcam_delay\tcam_ramp\tcam_weight\t"
+          "cam_settings\tworld_scale\tworld_dt\tpower\tmeter\tdopp\tlara_rec0\tcam_step\tpad_rx\tpad_ry\tpad_buttons\n",
+          g_camTraceFile);
+    fflush(g_camTraceFile);
+    QueryPerformanceFrequency(&g_camTraceFreq);
+    QueryPerformanceCounter(&g_camTraceT0);
+    g_camTraceRows = 0;
+    Log(1, "0.25 camera trace: on - %s every %d ms (columns = TruXenia --camtrace)", g_camTracePath, g_camTraceMs);
+    return true;
+}
+
+// "%.Nf" or "-" into a small buffer
+const char *CtNum(char *b, size_t n, bool ok, double v, int decimals) {
+    if (!ok) { strcpy_s(b, n, "-"); return b; }
+    _snprintf_s(b, n, _TRUNCATE, "%.*f", decimals, v);
+    return b;
+}
+
+// game thread, from MeterTick (Lara exists)
+void CamTraceTick() {
+    if (!g_camTrace) {
+        if (g_camTraceFile) CamTraceClose("[Camera] Trace=0");
+        return;
+    }
+    const DWORD now = GetTickCount();
+    if (g_camTraceFile && now - g_camTraceTick < static_cast<DWORD>(g_camTraceMs)) return;
+    g_camTraceTick = now;
+    if (!g_camTraceFile && (g_camTraceOk == 0 || !CamTraceOpen())) return;
+    DWORD mode = 0, cur = 0, gp = 0, vt = 0, slot = 0, lara = 0;
+    bool modeOk = CtD(kCtMgr + 0x58, &mode);
+    CtD(kCtMgr + 0x44, &cur);
+    CtD(kCtMgr + 0xb80, &gp);
+    if (cur) CtD(cur, &vt);
+    float cx = 0, cy = 0, cz = 0, rx = 0, rz = 0, fov = 0, lx = 0, ly = 0, lz = 0, lyaw = 0;
+    bool posOk = false, rotOk = false, fovOk = false, laraOk = false, yawOk = false;
+    if (vt && CtD(vt + 0x38, &slot) && slot == kCtGetXf)
+        posOk = CtF(cur + 0x40, &cx) && CtF(cur + 0x44, &cy) && CtF(cur + 0x48, &cz);
+    if (vt && CtD(vt + 0x34, &slot) && slot == kCtGetRot) rotOk = CtF(cur + 0xa0, &rx) && CtF(cur + 0xa8, &rz);
+    if (vt && CtD(vt + 0x40, &slot) && slot == kCtGetFov) fovOk = CtF(cur + 0xb0, &fov);
+    if (CtD(0x00e7f094, &lara) && lara) {
+        laraOk = CtF(lara + 0x20, &lx) && CtF(lara + 0x24, &ly) && CtF(lara + 0x28, &lz);
+        yawOk = CtF(lara + 0x38, &lyaw);
+    }
+    const double kDeg = 57.29577951308232;
+    const double camYaw = CtWrap(rz * kDeg), laraYaw = CtWrap(lyaw * kDeg);
+    double dist = 0.0, dir = 0.0;
+    if (posOk && laraOk) {
+        const double dx = static_cast<double>(lx) - cx, dy = static_cast<double>(ly) - cy;
+        dist = sqrt(dx * dx + dy * dy);
+        dir = atan2(0.0 - dx, dy) * kDeg;
+    }
+    // recenter clock + settings of the gameplay camera (0x602690 / 0x5ffa90; with 0.25 DoppelgangerSettings the pick
+    // of the patched fallback blocks)
+    DWORD gvt = 0, sid = 0, data = 0;
+    float clock = 0, delay = 0, ramp = 0;
+    bool clockOk = false, setOk = false;
+    char setText[64] = "-";
+    if (gp && CtD(gp, &gvt) && gvt == kCtRewriteVt) {
+        clockOk = CtF(gp + 0x1e4, &clock);
+        if (CtD(gp + 0x1d0, &sid)) data = CtPick(static_cast<LONG>(sid), 0x144, setText, sizeof(setText));
+        if (data) setOk = CtF(data + 0x10 + 0xb4, &delay) && CtF(data + 0x10 + 0xb8, &ramp);
+    }
+    double weight = 0.0;
+    const bool weightOk = clockOk && setOk && ramp != 0.0f;
+    if (weightOk) {
+        weight = (static_cast<double>(clock) - delay) / ramp;
+        weight = weight < 0.0 ? 0.0 : weight > 1.0 ? 1.0 : weight;
+    }
+    float scale = 0, wdt = 0;
+    const bool scaleOk = CtF(0x00e7f1a0, &scale), wdtOk = CtF(0x00e7f188, &wdt);
+    const int rec = CtRecordIndex();
+    LARGE_INTEGER q;
+    QueryPerformanceCounter(&q);
+    const double t = g_camTraceFreq.QuadPart ? static_cast<double>(q.QuadPart - g_camTraceT0.QuadPart) /
+                                                   static_cast<double>(g_camTraceFreq.QuadPart) : 0.0;
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    char obj[64], recText[16], b[20][24];
+    if (cur)
+        _snprintf_s(obj, sizeof(obj), _TRUNCATE, "%s 0x%08lx vt 0x%08lx", cur == gp ? "gameplay" : "other", cur, vt);
+    else
+        strcpy_s(obj, sizeof(obj), "-");
+    if (rec >= 0) _snprintf_s(recText, sizeof(recText), _TRUNCATE, "%d", rec);
+    else strcpy_s(recText, sizeof(recText), rec == -2 ? "?" : "-");
+    fprintf(g_camTraceFile,
+            "%02d:%02d:%02d.%03d\t%.3f\tpc\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t"
+            "%s\t%s\t%s\t%d\t%.1f\t%d\t%s\t%s\t%d\t%d\t0x%04x\n",
+            st.wHour, st.wMinute, st.wSecond, st.wMilliseconds, t, CtNum(b[0], 24, modeOk, mode, 0), obj,
+            CtNum(b[1], 24, posOk, cx, 1), CtNum(b[2], 24, posOk, cy, 1), CtNum(b[3], 24, posOk, cz, 1),
+            CtNum(b[4], 24, laraOk, lx, 1), CtNum(b[5], 24, laraOk, ly, 1), CtNum(b[6], 24, laraOk, lz, 1),
+            CtNum(b[7], 24, rotOk, camYaw, 2), CtNum(b[8], 24, rotOk, rx * kDeg, 2), CtNum(b[9], 24, yawOk, laraYaw, 2),
+            CtNum(b[10], 24, rotOk && yawOk, CtWrap(camYaw - laraYaw), 2), CtNum(b[11], 24, posOk && laraOk, dir, 2),
+            CtNum(b[12], 24, posOk && laraOk, dist, 0), CtNum(b[13], 24, fovOk, fov * kDeg, 1),
+            CtNum(b[14], 24, clockOk, clock, 3), CtNum(b[15], 24, setOk, delay, 2), CtNum(b[16], 24, setOk, ramp, 2),
+            CtNum(b[17], 24, weightOk, weight, 3), setText, CtNum(b[18], 24, scaleOk, scale, 3),
+            CtNum(b[19], 24, wdtOk, wdt, 4), (g_meter.flags & 1) ? 1 : 0, g_meter.value, Doppelganger(), recText,
+            g_camDtOk ? "tu" : "retail", static_cast<int>(g_padRx), static_cast<int>(g_padRy),
+            static_cast<unsigned>(g_padButtons));
+    fflush(g_camTraceFile);
+    ++g_camTraceRows;
+}
+
+// [Camera] Trace / TraceInterval read again at most once a second (game thread, from the pad hook)
+void CamTraceReadSwitch() {
+    if (!g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_camTraceSwitchTick < 1000) return;
+    g_camTraceSwitchTick = now;
+    const int v = GetPrivateProfileIntA("Camera", "Trace", g_camTrace, g_iniPath) ? 1 : 0;
+    int ms = GetPrivateProfileIntA("Camera", "TraceInterval", g_camTraceMs, g_iniPath);
+    if (ms < 10) ms = 10;
+    if (ms > 5000) ms = 5000;
+    if (ms != g_camTraceMs) {
+        Log(1, "0.25 camera trace: [Camera] TraceInterval %d -> %d ms", g_camTraceMs, ms);
+        g_camTraceMs = ms;
+    }
+    if (v != g_camTraceIni) {
+        Log(1, "0.25 switch: [Camera] Trace %d -> %d (read again from TruShadowPower.ini)", g_camTraceIni, v);
+        g_camTraceIni = v;
+        g_camTrace = v;
+    }
+}
+
+// ---- 0.25 [Camera] DoppelgangerSettings: the TU's camera settings choice in doppelganger mode ----
+// TU 0x822bc198 (38 calls: LaraCamera / LaraCameraRewrite code, e.g. the update 0x822c39e4, the recenter weight
+// 0x822c20cc, the instant recenter 0x822c2144) and 0x822c61d8 (10 calls, LaraCombatCamera): a camera's own settings id
+// first; else the GlobalInfo default [[0x829ca200]+0x144] (+0x148 combat), but +0x14c (+0x150) when
+// [[0x829892b0]+0x1244] (doppelganger) is set. The TU's GlobalInfo holds 21237 / 21238 there (live 2026-11-10 21:48:
+// "GI+0x14c id 21237", delay 0.25 s / ramp 5.0 s; TU generalbank DTP 21237 data +0xc4 / +0xc8). The PC's GlobalInfo
+// has other DTPs at +0x14c / +0x150 (DTP 22 ...), so the port uses the TU ids, not the PC offsets.
+// PC: the lookup is inlined as `call 0x5d4080; mov eax,[eax+0x144|0x148]; push eax; call 0x54df80; add esp,4` - 28
+// blocks (+0x144) in 0x5f9a6c..0x6026b6 and 6 (+0x148) in 0x602b5c..0x604d5d (work\camcmp_1111\pc_fallback_sites.py:
+// exactly these 34 blocks in the exe; the other 17 / 5 GlobalInfo +0x144 / +0x148 readers have another form and are not
+// camera fallbacks). Each block becomes `call DgStub144|148` + 15 nops; the stub keeps ecx / edx and returns the lookup
+// result in eax like the block (the game's lookup 0x54df80 is called, so TruDataGuard's jump there stays in the path).
+// Modes: 0 = retail (nothing patched, default), 1 = the TU choice 1:1 - in doppelganger mode id 21237 / 21238 when that
+// DTP is loaded, else the retail default (the installed PC generalbank has NO DTP 21237 / 21238 - a data port is
+// needed for mode 1 to change anything), 2 = like 1, and while DTP 21237 is not loaded a STAND-IN for it: a copy of the
+// loaded default (PC DTP 20, checked: word0 0xb, delay 5.0, ramp 2.0, rate 1.0) with the TU's delay 0.25 / ramp 5.0.
+// The stand-in is a PARTIAL port: TU 21237 equals PC DTP 20 in its scalar head except these two words, but its curve
+// tables from S+0x124 on differ (work\camcmp_1111\cmp_dtp20_21237_full.txt) and are not ported. Combat 21238 has no
+// stand-in. State 2102 (0.11, instant recenter) uses the same choice since 0.25 (before: PC GlobalInfo +0x14c = DTP 22).
+const DWORD kDgSites144[] = {0x005f9a6c, 0x005f9b5c, 0x005f9f56, 0x005fa09c, 0x005faaec, 0x005fac1d, 0x005fc886,
+                             0x005fcaa1, 0x005fcd9c, 0x005fd99d, 0x005fdd6b, 0x005fde0b, 0x005fdef0, 0x005fe2f6,
+                             0x005fe94c, 0x005fea3c, 0x005fee36, 0x005fef7c, 0x005ff81c, 0x005ff94d, 0x00600c36,
+                             0x00600e61, 0x0060115c, 0x00601d5d, 0x0060212b, 0x006021cb, 0x006022b0, 0x006026b6};
+const DWORD kDgSites148[] = {0x00602b5c, 0x00602f41, 0x006031ba, 0x00604496, 0x00604b46, 0x00604d5d};
+const DWORD kDgLookup = 0x0054df80, kDgGlobalInfoFn = 0x005d4080;
+typedef DWORD(__cdecl *DgLookupFn)(int id);
+volatile LONG g_dgSynthOn = 0;
+bool g_dgSynthTried = false;
+volatile LONG g_dgLastDecision[2] = {-1, -1};                  // per family, for the log
+volatile LONG g_dgCalls[2][3] = {{0, 0, 0}, {0, 0, 0}};        // decisions counted (log)
+char g_dgSetText[64] = "";                                     // ReportCamSettings: last logged choice
+float g_dgSetDelay = -1.0f, g_dgSetRamp = -1.0f;
+DWORD g_dgSetTick = 0;
+
+// 0 = retail default, 1 = the TU id (its DTP is loaded), 2 = the stand-in (mode 2, +0x144 only)
+int DgDecision(DWORD disp) {
+    if (!g_dgPatched || !g_dgSettings || !Doppelganger()) return 0;
+    if (CtEntry(disp == 0x144 ? kTuDgId144 : kTuDgId148)) return 1;
+    if (g_dgSettings == 2 && disp == 0x144 && g_dgSynthOn) return 2;
+    return 0;
+}
+
+// called by the patched blocks (game thread, camera code): the block's result
+DWORD __cdecl CamFallback(DWORD disp) {
+    const int d = DgDecision(disp);
+    const int f = disp == 0x144 ? 0 : 1;
+    InterlockedIncrement(&g_dgCalls[f][d]);
+    if (InterlockedExchange(&g_dgLastDecision[f], d) != d) {
+        static const char *const what[3] = {"the retail GlobalInfo default", "the TU id (DTP loaded)",
+                                            "the stand-in (PC default + TU delay 0.25 / ramp 5.0)"};
+        Log(1, "0.25 doppelganger settings: %s fallback now %s (%s, doppelganger %d)", f ? "combat camera (+0x148)"
+            : "Lara camera (+0x144)", what[d], d ? (f ? "id 21238" : "id 21237") : "as retail", Doppelganger());
+    }
+    if (d == 2) return reinterpret_cast<DWORD>(g_dgSynth);
+    const DWORD gi = reinterpret_cast<DWORD(__cdecl *)()>(kDgGlobalInfoFn)();
+    const int id = d == 1 ? static_cast<int>(f ? kTuDgId148 : kTuDgId144) : *reinterpret_cast<const int *>(gi + disp);
+    return reinterpret_cast<DgLookupFn>(kDgLookup)(id);
+}
+
+__declspec(naked) void DgStub144() {             // replaces call 0x5d4080 .. add esp,4 (20 bytes) at kDgSites144
+    __asm {
+        push ecx
+        push edx
+        push 0x144
+        call CamFallback
+        add esp, 4
+        pop edx
+        pop ecx
+        ret
+    }
+}
+__declspec(naked) void DgStub148() {             // the same for the combat camera blocks (+0x148)
+    __asm {
+        push ecx
+        push edx
+        push 0x148
+        call CamFallback
+        add esp, 4
+        pop edx
+        pop ecx
+        ret
+    }
+}
+
+bool DgBlockOk(DWORD at, DWORD disp) {
+    BYTE b[20];
+    __try { memcpy(b, reinterpret_cast<const void *>(at), sizeof(b)); }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    DWORD rel1 = 0, rel2 = 0, d = 0;
+    memcpy(&rel1, b + 1, 4);
+    memcpy(&d, b + 7, 4);
+    memcpy(&rel2, b + 13, 4);
+    return b[0] == 0xe8 && at + 5 + rel1 == kDgGlobalInfoFn && b[5] == 0x8b && b[6] == 0x80 && d == disp &&
+           b[11] == 0x50 && b[12] == 0xe8 && at + 17 + rel2 == kDgLookup && b[17] == 0x83 && b[18] == 0xc4 &&
+           b[19] == 0x04;
+}
+
+bool WriteCallPad(DWORD at, const void *to, int length) {
+    BYTE code[20];
+    memset(code, 0x90, sizeof(code));
+    code[0] = 0xe8;
+    DWORD rel = reinterpret_cast<DWORD>(to) - (at + 5);
+    memcpy(code + 1, &rel, 4);
+    DWORD old = 0, dummy = 0;
+    if (length > 20 || !VirtualProtect(reinterpret_cast<void *>(at), length, PAGE_EXECUTE_READWRITE, &old)) return false;
+    memcpy(reinterpret_cast<void *>(at), code, length);
+    VirtualProtect(reinterpret_cast<void *>(at), length, old, &dummy);
+    FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<void *>(at), length);
+    return true;
+}
+
+void PatchDgSettings() {
+    if (!g_dgSettings) {
+        Log(1, "0.25 doppelganger settings: [Camera] DoppelgangerSettings=0 - the cameras keep the retail GlobalInfo "
+               "defaults in doppelganger mode (PC DTP 20 / 21; TU: 21237 / 21238)");
+        return;
+    }
+    DWORD target = 0;
+    const char *bad = CamSettingsState(&target) == 0 ? "section lookup tru+0x14df80"
+                      : !HexBytesAt(kCamDefaults, kCamDefaultsHex) ? "GlobalInfo getter tru+0x1d4080" : nullptr;
+    for (DWORD at : kDgSites144)
+        if (!bad && !DgBlockOk(at, 0x144)) bad = "a +0x144 fallback block";
+    for (DWORD at : kDgSites148)
+        if (!bad && !DgBlockOk(at, 0x148)) bad = "a +0x148 fallback block";
+    if (bad) {
+        Log(0, "0.25 doppelganger settings: code does not match (%s) - off", bad);
+        return;
+    }
+    int n = 0;
+    for (DWORD at : kDgSites144) n += WriteCallPad(at, reinterpret_cast<const void *>(&DgStub144), 20) ? 1 : 0;
+    for (DWORD at : kDgSites148) n += WriteCallPad(at, reinterpret_cast<const void *>(&DgStub148), 20) ? 1 : 0;
+    const int all = static_cast<int>(sizeof(kDgSites144) / sizeof(kDgSites144[0]) + sizeof(kDgSites148) /
+                                     sizeof(kDgSites148[0]));
+    g_dgPatched = n > 0;
+    Log(n == all ? 1 : 0, "0.25 doppelganger settings: [Camera] DoppelgangerSettings=%d - %d of %d camera fallback blocks "
+        "patched (TU 0x822bc198 / 0x822c61d8: doppelganger -> id 21237 / 21238 when loaded%s); DTP 21237 %s, 21238 %s "
+        "now", g_dgSettings, n, all, g_dgSettings == 2 ? ", else a stand-in for 21237" : ", else retail",
+        CtEntry(kTuDgId144) ? "loaded" : "not loaded", CtEntry(kTuDgId148) ? "loaded" : "not loaded");
+}
+
+// game thread (MeterTick): mode 2 builds the stand-in once, the first time the doppelganger flag is set and DTP 21237
+// is not loaded
+void DgSynthTick() {
+    if (g_dgSettings != 2 || !g_dgPatched || g_dgSynthTried || !Doppelganger() || CtEntry(kTuDgId144)) return;
+    g_dgSynthTried = true;
+    DWORD gi = 0, fid = 0, e = 0, word0 = 0;
+    float dl = 0, rp = 0, rt = 0;
+    if (!CtD(kCtGlobalInfo, &gi) || !gi || !CtD(gi + 0x144, &fid) || !(e = CtEntry(static_cast<LONG>(fid)))) {
+        Log(0, "0.25 doppelganger settings: no stand-in - the GlobalInfo default +0x144 is not loaded");
+        return;
+    }
+    const DWORD data = e + 0x10;
+    if (!CtD(data, &word0) || word0 != 0xb || !CtF(data + 0x10 + 0xb4, &dl) || !CtF(data + 0x10 + 0xb8, &rp) ||
+        !CtF(data + 0x10 + 0xbc, &rt) || dl != 5.0f || rp != 2.0f || rt != 1.0f) {
+        Log(0, "0.25 doppelganger settings: no stand-in - the default id %ld is not the known PC DTP 20 (word0 0x%lx, "
+               "delay %.3f, ramp %.3f, rate %.3f)", static_cast<LONG>(fid), word0, dl, rp, rt);
+        return;
+    }
+    __try { memcpy(g_dgSynth, reinterpret_cast<const void *>(data), kDgSynthSize); }
+    __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "0.25 doppelganger settings: no stand-in - DTP %ld unreadable", static_cast<LONG>(fid));
+        return;
+    }
+    const DWORD tuDelay = 0x3e800000, tuRamp = 0x40a00000;     // TU generalbank DTP 21237 data +0xc4 / +0xc8
+    memcpy(g_dgSynth + 0x10 + 0xb4, &tuDelay, 4);
+    memcpy(g_dgSynth + 0x10 + 0xb8, &tuRamp, 4);
+    InterlockedExchange(&g_dgSynthOn, 1);
+    Log(1, "0.25 doppelganger settings: stand-in for DTP 21237 built at 0x%08lx = DTP %ld (0x%lx bytes) with the TU's "
+           "delay 0.25 s / ramp 5.00 s instead of %.2f / %.2f (rate %.2f kept; curve tables of 21237 not ported)",
+        reinterpret_cast<DWORD>(g_dgSynth), static_cast<LONG>(fid), kDgSynthSize, dl, rp, rt);
+}
+
+// game thread (MeterTick), at most once a second: the gameplay camera's settings choice, logged when it changes
+void ReportCamSettings() {
+    const DWORD now = GetTickCount();
+    if (now - g_dgSetTick < 1000) return;
+    g_dgSetTick = now;
+    DWORD gp = 0, vt = 0, sid = 0;
+    if (!CtD(kCtMgr + 0xb80, &gp) || !gp || !CtD(gp, &vt) || vt != kCtRewriteVt || !CtD(gp + 0x1d0, &sid)) return;
+    char t[64];
+    const DWORD data = CtPick(static_cast<LONG>(sid), 0x144, t, sizeof(t));
+    float dl = -1.0f, rp = -1.0f;
+    if (data && !(CtF(data + 0x10 + 0xb4, &dl) && CtF(data + 0x10 + 0xb8, &rp))) dl = rp = -1.0f;
+    if (strcmp(t, g_dgSetText) == 0 && dl == g_dgSetDelay && rp == g_dgSetRamp) return;
+    strcpy_s(g_dgSetText, sizeof(g_dgSetText), t);
+    g_dgSetDelay = dl;
+    g_dgSetRamp = rp;
+    Log(1, "camera settings: gameplay camera 0x%08lx uses %s - recenter delay %.2f s, ramp %.2f s (doppelganger %d, "
+           "[Camera] DoppelgangerSettings %d)", gp, t, dl, rp, Doppelganger(), g_dgSettings);
 }
 
 // ================================================================================================================
@@ -3726,7 +4235,7 @@ const DWORD kAdrBarFn = 0x006f2930;           // adrenaline bar, retail 0x823ddc
 int g_k11 = 1;                                // [Adrenaline] Translate
 int g_k11Log = 1;                             // [Adrenaline] Log
 bool g_k11Hooked = false;
-char g_iniPath[MAX_PATH];                     // 0.18: for the run-time read of [Adrenaline] Translate
+// g_iniPath (0.18): defined next to g_logPath since 0.25 (the camera trace switch reads it earlier in the file)
 DWORD g_k11SwitchTick = 0;
 DWORD g_adrTickTo = kAdrTickFn, g_adrBarTo = kAdrBarFn;
 volatile LONG g_k11Count[2][2];               // [tick / bar][run / skipped]
@@ -4466,7 +4975,9 @@ void ReadOptions(const char *dir) {
     g_moveEvents = GetPrivateProfileIntA("Look", "MoveEvents", 0, ini);
     g_cameraFlag = GetPrivateProfileIntA("Look", "CameraFlag", 1, ini);         // 0.20: default 1 = TU (0.14-0.19: 0)
     g_strikeLook = GetPrivateProfileIntA("Look", "StrikeLook", 0, ini);
-    g_clothTimeStep = GetPrivateProfileIntA("Cloth", "TuTimeStep", 0, ini);     // 0.15, default 0
+    // 0.15, default 0; 0.25: key ClothTuTimeStep, the old name TuTimeStep is read when the new key is missing
+    g_clothTimeStep = GetPrivateProfileIntA("Cloth", "ClothTuTimeStep",
+                                            GetPrivateProfileIntA("Cloth", "TuTimeStep", 0, ini), ini);
     g_menuInput = GetPrivateProfileIntA("ShadowPower", "MenuInput", 1, ini);    // 0.17, default 1 (0 = 0.16)
     strcpy_s(g_iniPath, sizeof(g_iniPath), ini);                                 // 0.18: run-time read
     g_k11 = GetPrivateProfileIntA("Adrenaline", "Translate", 1, ini) ? 1 : 0;    // 0.18 (K11), default 1
@@ -4476,7 +4987,16 @@ void ReadOptions(const char *dir) {
     g_retRefill = GetPrivateProfileIntA("Reticle", "TranslateRefill", 1, ini) ? 1 : 0;     // 0.22 (K-5), default 1
     g_retLog = GetPrivateProfileIntA("Reticle", "Log", 1, ini) ? 1 : 0;
     g_infinite = GetPrivateProfileIntA("Meter", "Infinite", 0, ini) ? 1 : 0;          // 0.23 (N2), default 0, live
-    g_camTimeStep = GetPrivateProfileIntA("Camera", "TuTimeStep", 0, ini) ? 1 : 0;    // 0.24 (N6), default 0
+    // 0.24 (N6), default 0; 0.25: key CameraTuTimeStep, the old name TuTimeStep is read when the new key is missing
+    g_camTimeStep = GetPrivateProfileIntA("Camera", "CameraTuTimeStep",
+                                          GetPrivateProfileIntA("Camera", "TuTimeStep", 0, ini), ini) ? 1 : 0;
+    g_camTrace = g_camTraceIni = GetPrivateProfileIntA("Camera", "Trace", 0, ini) ? 1 : 0;     // 0.25, default 0, live
+    g_camTraceMs = GetPrivateProfileIntA("Camera", "TraceInterval", 50, ini);
+    if (g_camTraceMs < 10) g_camTraceMs = 10;
+    if (g_camTraceMs > 5000) g_camTraceMs = 5000;
+    g_dgSettings = GetPrivateProfileIntA("Camera", "DoppelgangerSettings", 0, ini);           // 0.25, default 0
+    if (g_dgSettings < 0 || g_dgSettings > 2) g_dgSettings = 0;
+    _snprintf_s(g_camTracePath, sizeof(g_camTracePath), _TRUNCATE, "%sTruCam.log", dir);
 }
 
 void Start(HMODULE self) {
@@ -4487,16 +5007,17 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.24 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.25 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
         "log %d; 0.21: time-scale slot 6 %d; 0.22: reticle request %d, refill %d, log %d; 0.23: infinite meter %d; "
-        "0.24: camera TU time step %d)",
+        "0.24: camera TU time step %d; 0.25: camera trace %d (%d ms), doppelganger camera settings %d)",
         g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055,
         g_lookEnabled, g_legacyPadStart, g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled,
         g_state2102Enabled, g_loopSound, g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11,
-        g_k11Log, g_slot6, g_retRequest, g_retRefill, g_retLog, g_infinite, g_camTimeStep);
+        g_k11Log, g_slot6, g_retRequest, g_retRefill, g_retLog, g_infinite, g_camTimeStep, g_camTrace, g_camTraceMs,
+        g_dgSettings);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -4607,13 +5128,16 @@ void Start(HMODULE self) {
     CheckMoveEvents();
     CheckCameraFlag();
     PatchStrikeLook();
-    PatchClothTimeStep();               // 0.15: only with [Cloth] TuTimeStep=1 (independent of the doppelganger flag)
+    PatchClothTimeStep();               // 0.15: only with [Cloth] ClothTuTimeStep=1 (independent of the doppelganger flag)
     CheckTickGate();                    // 0.16: main state / level change tests of the tick (player tests always on)
     CheckPadPoll();                     // 0.17: [ShadowPower] MenuInput (before the hook thread reads g_menuInputOk)
     PatchK11();                         // 0.18: K11 - adrenaline tick / bar skipped in doppelganger mode as the TU
     PatchSlot6();                       // 0.21: gamebase natives 23 / 24 -> request slot 6 in doppelganger mode as the TU
     PatchReticle();                     // 0.22: ring request / adrenaline refill by the meter flags in doppelganger mode
-    PatchCameraTimeStep();              // 0.24: only with [Camera] TuTimeStep=1 (independent of the doppelganger flag)
+    PatchCameraTimeStep();              // 0.24: only with [Camera] CameraTuTimeStep=1 (independent of the doppelganger flag)
+    PatchDgSettings();                  // 0.25: only with [Camera] DoppelgangerSettings=1|2 (after the 0.11 / 0.24 checks)
+    Log(1, "0.25 camera trace: [Camera] Trace %d at the start (read again at run time at most once per second; %s, "
+           "every %d ms; read only)", g_camTrace, g_camTracePath, g_camTraceMs);
     Log(1, "0.23 infinite meter: [Meter] Infinite %d at the start - %s; read again at run time at most once per second "
            "(no game code patched)", g_infinite,
         g_infinite ? "the meter is held at max (tick fill + drain at max), power use as with a full meter"
@@ -4638,7 +5162,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.24 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.25 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
@@ -4649,7 +5173,9 @@ extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
            "mode (TU 0x824a3238 / 0x824a32f0), combat reticle request and adrenaline refill by the meter flags in "
            "doppelganger mode (TU 0x823de47c / 0x823ee158 / 0x823dfd98); switches default off: loop sound, move events 0x83 / 0x84, strike "
            "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120, camera TU time step 0x822ad048 / 0x822beeb8 / "
-           "0x822c39c8 / 0x822c79d0, infinite meter [Meter] Infinite (live, not a TU feature))";
+           "0x822c39c8 / 0x822c79d0, doppelganger camera settings 0x822bc198 / 0x822c61d8 (DTP 21237 / 21238, mode 2 "
+           "with a partial stand-in), infinite meter [Meter] Infinite (live, not a TU feature), camera trace TruCam.log "
+           "(read only))";
 }
 
 // 0.11: the TU meter object for other plugins (TruShadowCombat: condition 538, the shadow strike) - interface version

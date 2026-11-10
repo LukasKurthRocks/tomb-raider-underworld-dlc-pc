@@ -32,10 +32,59 @@ reported); 0.21 (time-scale request slot 6: gamebase natives 23 / 24 as the TU, 
 2026-11-10, not installed, not played; 0.22 (K-5: combat reticle request and adrenaline refill by the meter flags in
 doppelganger mode, `[Reticle]`) built 2026-11-10, installed 2026-11-10, not reported; 0.23 (`[Meter] Infinite`:
 infinite shadow power for testing / accessibility, default off, live) built 2026-11-10, not installed, not played; 0.24
-(`[Camera] TuTimeStep`: the TU's camera time step, default off) built 2026-11-11, not installed, not played.**
+(`[Camera] TuTimeStep`: the TU's camera time step, default off) built 2026-11-11, not installed, not played; 0.25
+(keys `CameraTuTimeStep` / `ClothTuTimeStep`, `[Camera] Trace` = TruCam.log, `[Camera] DoppelgangerSettings`: the TU's
+camera settings in doppelganger mode, defaults off) built 2026-11-11, not installed, not played.**
 Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.25: camera trace and the TU's doppelganger camera settings (2026-11-11)
+
+Workspace doc `docs\Plan-Kamera-Vergleich-Xenia-PC-1111.md`. Live Xbox 2026-11-10 21:48-21:53 (TruXenia
+`--camtrace`, DLC 2 start wall, climbing with and without the power): the gameplay camera uses the camera settings
+**DTP 21237** (recenter delay 0.25 s, fade 5.0 s; `GI+0x14c id 21237`) the whole time and re-centres behind Lara; the
+PC uses the GlobalInfo default DTP 20 (delay 5.0 s, fade 2.0 s). The TU's choice: settings lookup 0x822bc198 (38 calls,
+LaraCamera / LaraCameraRewrite) and 0x822c61d8 (10 calls, LaraCombatCamera) take the camera's own id first, else
+GlobalInfo +0x144 / +0x148, but **+0x14c / +0x150 (= 21237 / 21238) when gameTracker+0x1244 (doppelganger) is set**.
+
+* **Ini keys renamed:** `[Camera] TuTimeStep` -> `[Camera] CameraTuTimeStep`, `[Cloth] TuTimeStep` ->
+  `[Cloth] ClothTuTimeStep` (TruMenu's switch list too). The old name is still read when the new key is missing.
+* **`[Camera] Trace=1`** (default 0, read again at run time <= 1 / s): `TruCam.log` next to the plugin, one TSV row every
+  `[Camera] TraceInterval` ms (default 50) while Lara exists, opened shared. Columns = TruXenia's `--camtrace` columns
+  (`tools/truxenia.py` CAM_COLS), side `pc`: camera mode (manager +0x58), current camera (gameplay / other + vtable),
+  camera position (transform +0x10 row 3), camera yaw / pitch (rotation +0xa0 / +0xa8 - the getter tru+0x1e78a0 that
+  ENGINE.md / fight.trace called "position" returns this rotation), Lara position / yaw (+0x20 / +0x38), delta_yaw,
+  bearing camera -> Lara, FOV, the gameplay camera's recenter clock +0x1e4 with the settings it uses (own id / GlobalInfo
+  default / TU id / stand-in) and their delay / fade / weight, world time scale, scaled frame time, power, meter,
+  doppelganger flag, Lara's record index, `cam_step` (tu = 0.24's stubs in), pad 0 right stick and buttons (raw, as this
+  plugin's pad hook gets them). Read only; 13 byte checks + the fallback block tru+0x2026b6.
+* **`[Camera] DoppelgangerSettings`** (default 0 = PC, read at the start): the 34 PC fallback blocks of the camera code
+  (`call tru+0x1d4080; mov eax,[eax+0x144|0x148]; push eax; call tru+0x14df80; add esp,4`, 28 x +0x144 in
+  tru+0x1f9a6c..0x2026b6, 6 x +0x148 in tru+0x202b5c..0x204d5d; no branch lands inside one) become `call DgStub` + 15
+  nops; the stub returns the lookup result like the block (the game's lookup is called, TruDataGuard's jump there stays).
+  * `1` = the TU choice 1:1: in doppelganger mode id 21237 (Lara cameras) / 21238 (combat camera) **when that DTP is
+    loaded**, else the retail default. The installed PC generalbank has neither (only DTP 20 / 21 / 22), so mode 1
+    changes nothing until the data port adds them (log line at load: `DTP 21237 not loaded`).
+  * `2` = like 1, plus a **stand-in** for 21237 while it is missing: a copy of the loaded default (checked: PC DTP 20,
+    word0 0xb, delay 5.0 / fade 2.0 / rate 1.0) with the TU's delay 0.25 s / fade 5.0 s (TU generalbank DTP 21237 data
+    +0xc4 / +0xc8). **Partial port:** TU 21237 and PC DTP 20 agree in the scalar head except these two words, but
+    21237's curve tables from S+0x124 on differ (5592 vs 4104 bytes) and are not ported. Combat 21238 has no stand-in.
+  * State 2102 (0.11, instant recenter) no longer reads PC GlobalInfo +0x14c (that is DTP 22, not camera settings - a
+    0.11 mistranslation of the TU's +0x14c); it uses the same choice as the blocks (retail +0x144 with mode 0).
+  * Log: `0.25 doppelganger settings: ... N of 34 camera fallback blocks patched ...`, per family on every change
+    `... fallback now <retail | TU id | stand-in>`, mode 2 once `stand-in for DTP 21237 built ...`, and always (every
+    mode) `camera settings: gameplay camera 0x... uses <choice> - recenter delay X s, ramp Y s` when it changes.
+* Build `work\asi\power025` (sha256 `89d15879…9114`, md5 `ea3c85aa…aa6b`), `cl /W4` 0 warnings; byte pre-checks
+  `work\asi\power025\prechecks_v25.txt` (50, 0 mismatches against the exe md5 5560abac…).
+
+| # | TO TEST 0.25 (DLC 2, sample ini; `[Meter] Infinite=1` helps) | expected |
+|---|---|---|
+| 1 | load with the sample ini | `0.25 doppelganger settings: [Camera] DoppelgangerSettings=0 ...`, `0.25 camera trace: [Camera] Trace 0 ...`; `camera settings: gameplay camera ... uses GI+0x144 id 20 - recenter delay 5.00 s, ramp 2.00 s` |
+| 2 | `[Camera] Trace=1` while playing (no restart) | `0.25 switch: [Camera] Trace 0 -> 1`, `0.25 camera trace: 13 code checks ... passed`, `TruCam.log` grows (20 rows / s) |
+| 3 | `DoppelgangerSettings=1` (restart) | `34 of 34 camera fallback blocks patched ...; DTP 21237 not loaded`; camera unchanged (retail default) |
+| 4 | `DoppelgangerSettings=2` (restart), DLC 2, climb the start wall from the left with the power, release the stick | `stand-in for DTP 21237 built ...`, `camera settings: ... uses stand-in 21237 ... delay 0.25 s, ramp 5.00 s`; the camera turns back behind Lara after ~0.25 s within ~5 s (Xbox); compare with `tools/cam_compare.py` |
+| 5 | same with `CameraTuTimeStep=1` in addition | with the power the recenter runs at real time (Xbox: cam_step tu) |
 
 ## 0.24: the TU's camera time step - `[Camera] TuTimeStep` (N6, 2026-11-11)
 
@@ -827,8 +876,10 @@ every `*.asi` next to `tru.exe`.
 | `[Sound] LoopSound` | 0 | 0.14: the TU's looping sound of the power |
 | `[Look] MoveEvents / StrikeLook` | 0 | 0.14: movement events 0x83 / 0x84, the shadow-strike look |
 | `[Look] CameraFlag` | 1 | 0.14: camera flag of Start (camera +0x80 \|= 2 -> second camera curve set, reader tru+0x1e5e8e); 0.20: default 1 = TU (0.14-0.19: 0) |
-| `[Cloth] TuTimeStep` | 0 | 0.15: the TU's player cloth time step (TU 0x82278120): the ponytail gets the frame time / world scale, so it keeps real time in slow motion |
-| `[Camera] TuTimeStep` | 0 | 0.24: the TU's camera time step (TU 0x822ad048 / 0x822beeb8 / 0x822c39c8 / 0x822c79d0): camera manager + the three Lara cameras get the frame time / world scale, so they follow / re-centre at normal speed in slow motion |
+| `[Cloth] ClothTuTimeStep` | 0 | 0.15: the TU's player cloth time step (TU 0x82278120): the ponytail gets the frame time / world scale, so it keeps real time in slow motion (0.25: renamed from `TuTimeStep`, the old name is still read) |
+| `[Camera] CameraTuTimeStep` | 0 | 0.24: the TU's camera time step (TU 0x822ad048 / 0x822beeb8 / 0x822c39c8 / 0x822c79d0): camera manager + the three Lara cameras get the frame time / world scale, so they follow / re-centre at normal speed in slow motion (0.25: renamed from `TuTimeStep`, the old name is still read) |
+| `[Camera] DoppelgangerSettings` | 0 | 0.25: the TU's camera settings in doppelganger mode (0x822bc198 / 0x822c61d8): 1 = DTP 21237 / 21238 when loaded (1:1), 2 = 1 + a stand-in for 21237 (PC DTP 20 with the TU's delay 0.25 s / fade 5.0 s, partial) |
+| `[Camera] Trace` / `TraceInterval` | 0 / 50 | 0.25: `TruCam.log` (TSV, TruXenia `--camtrace` columns) every N ms; read only; read again at run time (<= 1 / s) |
 | `[Adrenaline] Translate` | 1 | 0.18 (K11): CombatManager::Update skips the adrenaline tick tru+0x318bd0 and bar tru+0x2f2930 while gameTracker+0x1244 is set (TU 0x823dca00); 0 = PC; read again at run time (<= 1 / s) |
 | `[Adrenaline] Log` | 1 | 0.18: one line per change of the K11 decision per site |
 | `[TimeScale] TranslateSlot6` | 1 | 0.21 (X23): gamebase natives 23 / 24 in doppelganger mode -> time-scale request slot 6 (23 player, 24 world, crossed as TU 0x824a3238 / 0x824a32f0), else the game's body; 0 = PC; read again at run time (<= 1 / s, only if 1 at the start) |
