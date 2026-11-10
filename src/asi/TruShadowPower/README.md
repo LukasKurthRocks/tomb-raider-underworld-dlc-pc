@@ -34,10 +34,72 @@ doppelganger mode, `[Reticle]`) built 2026-11-10, installed 2026-11-10, not repo
 infinite shadow power for testing / accessibility, default off, live) built 2026-11-10, not installed, not played; 0.24
 (`[Camera] TuTimeStep`: the TU's camera time step, default off) built 2026-11-11, not installed, not played; 0.25
 (keys `CameraTuTimeStep` / `ClothTuTimeStep`, `[Camera] Trace` = TruCam.log, `[Camera] DoppelgangerSettings`: the TU's
-camera settings in doppelganger mode, defaults off) built 2026-11-11, not installed, not played.**
+camera settings in doppelganger mode, defaults off) built 2026-11-11, installed and played 2026-11-10 22:21-22:30
+(DoppelgangerSettings=2 worked; the trace refused - fixed in 0.26); 0.26 (trace next to TruDataGuard, 21237's per-mode
+tables in the stand-in) built 2026-11-11, not installed, not played.**
 Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.26: camera trace next to TruDataGuard, DTP 21237's per-mode tables (2026-11-11)
+
+Live 2026-11-10 22:21-22:30 (0.25, `DoppelgangerSettings=2`, `Trace=1`): the stand-in worked (`gameplay camera
+0x00e83860 uses stand-in 21237 ... recenter delay 0.25 s, ramp 5.00 s`), the owner: "camera better, sometimes it lags
+behind"; but `0.25 camera trace: code at 0x0054df80 does not match - no trace`, no TruCam.log. TruMenu.log of the same
+run: while climbing the camera mode (manager +0x58) runs 1 -> 61 -> 62 -> 60 -> 11 -> 46 -> 1 (also 8, 37), the camera
+object stays the gameplay camera 0xe83860.
+
+* **Trace cause:** TruDataGuard.asi (loads first, alphabetical) writes a 5-byte `jmp` to its guard stub over the start of
+  the settings lookup tru+0x14df80 (the same log at 22:21:48.159: `state 2102: section lookup tru+0x14df80 jumps to
+  TruDataGuard.asi (0x71cc15f0) - accepted`). The exe bytes are the original (installed `tru.exe` = `data\pc\tru.exe`,
+  md5 5560abac..., `pe_bytes_check` ok); 0.25's trace list compared the original bytes there and refused. **Fix:** the
+  trace checks the lookup with `CamSettingsState` (original bytes, or TruDataGuard's jump + original tail - the check
+  state 2102 uses since 0.13) and no longer lists it in `kCamTraceChecks`; the trace never calls the lookup (it reads the
+  table 0xc36f28 itself). Every check is now run and every mismatch named. Columns unchanged (= TruXenia `CAM_COLS`, 33,
+  `cam_mode` = manager +0x58 is column 4; `work\power026_1111\check_cam_cols.py`).
+* **Climb modes (static):** the mode reaches the gameplay camera through SetMode vslot 0x60 0x6020e0 (TU 0x822c1e38):
+  mode -> cam+0x1e0, settings S, per-mode curve sets (0x5fe800 / 0x5fe8c0 -> +0x1344 / +0x1348), apply 0x601d30 (TU
+  0x822c5bd0). The per-mode parameters live **in the settings DTP**: table A (S+0x134 / S+0x138, 16-byte entries
+  {nModes, modes*, nParams, params*}, first hit 0x5f99f0, params {kind 1..0x1c, payload} 0x18 bytes through 0x5ff080:
+  kind 10 / 11 = camera position sets +0x3b0 / +0x620 from a set DTP (0x5f9940, 0x6c-byte records), kind 2 = +0x1320,
+  kinds 5 / 6 inline curves, ...) and table B (S+0x13c / S+0x140, {key, nModes, modes*}, 0x5f9960). All these paths read
+  S through the doppelganger-aware lookup on both sides (PC: the patched blocks 0x60212b / 0x6021cb / 0x601d5d /
+  0x5fee36; TU: 0x822bc198 from 0x822c1e38 / 0x822c5bd0) - so on the Xbox every mode, the climb modes included, uses
+  21237's tables, and 0.25's patch already sends the PC there; what was missing is the **data**. TU 21237 against the TU
+  retail default DTP 21 (equal to PC DTP 20 by value in every mode, `cam_mode_tables.py`):
+
+  | mode (live climb run) | TU 21237 | PC DTP 20 / TU 21 | 0.25 stand-in |
+  |---|---|---|---|
+  | 61, 62, 60 (and 63) | entry: sets 22194[76] / [77] (new records) + table B key 22 | no entry (base settings) | no entry |
+  | 8 | +0x1320 = 1580, sets 22194[0] (changed) / [2] | +0x1320 = 948, sets 30[2] / [0] | as PC |
+  | 11, 46, 1, 37 | = retail | | = TU |
+  | 0, 23, 32, 33, 34, 58, 59 | own entries | other / none | as PC |
+
+  Outside tables A / B, 21237 equals the retail default except the delay / ramp (`cmp_21_21237_deep.py`: head + all
+  pointed blocks, 5 differences = the two times, the two table counts, the set reference S+0x40 whose index 1 is equal).
+* **Port (`DoppelgangerSettings=2`, no new key):** when the stand-in is built, it also gets 21237's tables: table A = the
+  12 TU entries of the differing modes first, then DTP 20's 25 entries (0x5f99f0's first hit = TU 21237 for every mode
+  0..127, generator self-check); table B = DTP 20's 13 + key 22 (modes 60..63). Kind 10 / 11 sets: TU DTP 22194 records
+  equal to the retail set DTP 31 use PC DTP 30 at the same index (31 = 30 at all 76 indices); the 13 changed / new ones
+  are built from their converted words (word rules from the 76 retail pairs; the only pointer word 25 = the set DTP's
+  shared end pointer, taken from PC 30 record 0). Tables generated by `work\power026_1111\make_dg_modes.py` into
+  `TruShadowPower_dgmodes.inc`. 12 reader checks (`kDgModeChecks`); on a mismatch or unexpected DTP 20 / 30 counts the
+  stand-in keeps 0.25's form and logs why. When a data port loads the real DTP 21237 (mode 1 / 2 pick it), it brings its
+  own tables and none of this is used. A mode already active when the stand-in is built keeps its old parameters until
+  the next mode change.
+* Log: `0.26 doppelganger mode tables: stand-in table A 37 entries ... / table B 14 (+ key 22: modes 60..63); 13 set
+  records built ...`, the stand-in line ends `0.26: 21237's mode tables A / B ported ...`; the `camera settings` line and
+  the trace column `cam_settings` say `stand-in 21237 = GI+0x144 id 20 + TU delay/ramp + modes`.
+* Build `work\asi\power026` (sha256 `8b89599b…0891`, md5 `44466496…ab1f`), `cl /W4` 0 warnings; byte pre-checks
+  `work\asi\power026\prechecks_v26.txt` (16, 0 mismatches against the exe md5 5560abac…; the 0.25 list re-run 50 / 0).
+
+| # | TO TEST 0.26 (DLC 2, `DoppelgangerSettings=2`, `Trace=1`; `[Meter] Infinite=1` helps) | expected |
+|---|---|---|
+| 1 | load, enter DLC 2 | `0.26 camera trace: 12 code checks + settings lookup 0x0054df80 (TruDataGuard's jump + original tail, accepted ...) ... passed`, `0.25 camera trace: on - ...TruCam.log`; TruCam.log grows (20 rows / s) |
+| 2 | first doppelganger tick | `0.26 doppelganger mode tables: stand-in table A 37 entries ... table B 14 ...; 13 set records built ..., PC set DTP 30 at 0x... (= the lookup of id 30)`; no `not ported` line |
+| 3 | climb the start wall (modes 61 / 62 / 60 in TruMenu.log), let go of the stick | the camera keeps Lara at the TU distance / height of sets 22194[76] / [77] while hanging / shimmying; compare TruCam.log with the Xbox trace (`tools/cam_compare.py`); report "lags behind" again or not |
+| 4 | mode 8 moments (short 1 -> 8 -> 1 switches) | no jump of the camera; `cam_mode` 8 rows in TruCam.log |
+| 5 | `DoppelgangerSettings=0` (restart) | no `0.26 doppelganger mode tables` line, retail camera; the trace still runs |
 
 ## 0.25: camera trace and the TU's doppelganger camera settings (2026-11-11)
 

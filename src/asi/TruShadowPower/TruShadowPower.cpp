@@ -208,6 +208,12 @@
 // lacks them), 2 = 1 + a stand-in for 21237 (PC DTP 20 with the TU's delay 0.25 s / ramp 5.0 s - partial). Live Xbox
 // 2026-11-10 21:48: the gameplay camera uses 21237 (0.25 s / 5.0 s), the PC DTP 20 (5.0 s / 2.0 s). State 2102 no longer
 // reads PC GlobalInfo +0x14c (DTP 22). Sections "0.25 [Camera] Trace" / "0.25 DoppelgangerSettings".
+//
+// 0.26 (2026-11-11): [Camera] Trace accepts TruDataGuard's jump at the settings lookup 0x54df80 (0.25 compared the
+// original bytes and refused the trace, live 2026-11-10 22:23:31 "code at 0x0054df80 does not match"; the trace never
+// calls the lookup, it reads the table 0xc36f28 itself) and names every failing check. DoppelgangerSettings=2: the
+// stand-in also carries DTP 21237's per-mode tables (table A / B; the climb modes 60 / 61 / 62 and 0 / 8 / 23 / 32 /
+// 33 / 34 / 58 / 59 / 63 differ from the retail default) - section "0.26 doppelganger mode tables".
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -3767,8 +3773,10 @@ const CodeCheck kCamTraceChecks[] = {
     {0x005e1c90, "d981b0000000 c3"},                                        // slot 0x40: FOV +0xb0
     {0x005ffe80, "d996e4010000"},                                           // look step: clock +0x1e4
     {0x005ffa9d, "d981e4010000 d8a0b4000000 d8b0b8000000"},                 // weight: clock, S+0xb4, S+0xb8
-    {0x0054df80, "8b442404 8b0485286fc300 85c0 740a 80780400 7504 83c010 c3"},   // settings lookup
-    // the fallback block 0x6026b6 (GlobalInfo +0x144): checked in CamTraceOpen (original or 0.25's patch)
+    // 0.26: the settings lookup 0x54df80 is checked in CamTraceOpen with CamSettingsState (original bytes OR
+    // TruDataGuard's 5-byte jump + original tail, as state 2102 since 0.13) - 0.25 listed the original bytes here and
+    // refused the trace whenever TruDataGuard.asi was installed (live 2026-11-10 22:23:31). The fallback block
+    // 0x6026b6 (GlobalInfo +0x144): checked in CamTraceOpen as well (original or 0.25's patch).
     {0x006026ea, "8d7010"},                                               // S = lookup + 0x10
     {0x005d4080, "a150eee700 c3"},                                          // GlobalInfo [0xe7ee50]
     {0x00752c73, "8b0d94f0e700 d94138"},                                    // Lara yaw [[0xe7f094]+0x38]
@@ -3815,6 +3823,7 @@ DWORD CtEntry(LONG id) {
 int DgDecision(DWORD disp);                                    // 0.25 DoppelgangerSettings, defined below
 bool DgBlockOk(DWORD at, DWORD disp);
 bool g_dgPatched = false;                                      // 0.25: the 34 fallback blocks are patched
+bool g_dgModesOn = false;                                      // 0.26: the stand-in carries 21237's mode tables
 int g_dgSettings = 0;                                          // [Camera] DoppelgangerSettings (0 / 1 / 2)
 const LONG kTuDgId144 = 21237, kTuDgId148 = 21238;             // TU GlobalInfo +0x14c / +0x150 (doppelganger)
 const DWORD kDgSynthSize = 0x1008;                             // PC generalbank DTP 20: 4104 bytes
@@ -3838,7 +3847,8 @@ DWORD CtPick(LONG id, DWORD disp, char *t, size_t n) {
         return 0;
     }
     if (d == 2) {
-        _snprintf_s(t, n, _TRUNCATE, "stand-in %ld = GI+0x%lx id %ld + TU delay/ramp", tu, disp, static_cast<LONG>(fid));
+        _snprintf_s(t, n, _TRUNCATE, "stand-in %ld = GI+0x%lx id %ld + TU delay/ramp%s", tu, disp,
+                    static_cast<LONG>(fid), g_dgModesOn ? " + modes" : "");
         return reinterpret_cast<DWORD>(g_dgSynth);
     }
     e = CtEntry(static_cast<LONG>(fid));
@@ -3876,15 +3886,25 @@ bool CamTraceOpen() {
             Log(0, "0.25 camera trace: the settings fallback block 0x6026b6 does not match - no trace");
             g_camTraceOk = 0;
         }
+        // 0.26: every check is run and every mismatch named (0.25 stopped at the first one)
         for (const auto &c : kCamTraceChecks) {
-            if (g_camTraceOk && !HexBytesAt(c.address, c.bytes)) {
-                Log(0, "0.25 camera trace: code at 0x%08lx does not match - no trace", c.address);
+            if (!HexBytesAt(c.address, c.bytes)) {
+                Log(0, "0.26 camera trace: code at 0x%08lx does not match - no trace", c.address);
                 g_camTraceOk = 0;
             }
         }
+        DWORD target = 0;
+        const int lookup = CamSettingsState(&target);
+        if (lookup == 0) {
+            Log(0, "0.26 camera trace: settings lookup 0x0054df80 is neither the original nor TruDataGuard's jump - no "
+                   "trace");
+            g_camTraceOk = 0;
+        }
         if (g_camTraceOk)
-            Log(1, "0.25 camera trace: %u code checks + the fallback block 0x6026b6 passed",
-                static_cast<unsigned>(sizeof(kCamTraceChecks) / sizeof(kCamTraceChecks[0])));
+            Log(1, "0.26 camera trace: %u code checks + settings lookup 0x0054df80 (%s) + the fallback block 0x6026b6 "
+                   "passed", static_cast<unsigned>(sizeof(kCamTraceChecks) / sizeof(kCamTraceChecks[0])),
+                lookup == 2 ? "TruDataGuard's jump + original tail, accepted - the trace reads the table itself"
+                            : "original bytes");
     }
     if (!g_camTraceOk) return false;
     g_camTraceFile = _fsopen(g_camTracePath, "a", _SH_DENYNO);
@@ -4158,6 +4178,137 @@ void PatchDgSettings() {
         CtEntry(kTuDgId144) ? "loaded" : "not loaded", CtEntry(kTuDgId148) ? "loaded" : "not loaded");
 }
 
+// ---- 0.26 doppelganger mode tables: the per-mode part of TU DTP 21237 in the stand-in (DoppelgangerSettings=2) ----
+// (project doc Plan-Kamera-Vergleich-Xenia-PC-1111.md, 0.26; tools: work\power026_1111\cam_mode_tables.py,
+// cam_set_records.py, make_dg_modes.py). A camera settings DTP holds two per-mode tables (S = data + 0x10):
+//   A: S+0x134 count / S+0x138 -> 16-byte entries {nModes, modes*, nParams, params*}; 0x5f99f0 returns the first entry
+//      that lists the camera's mode (+0x1e0) and has params; apply 0x601d30 (from SetMode vslot 0x60 0x6020e0 / 0x64
+//      0x6021b0, TU 0x822c1e38 -> 0x822c5bd0) runs the 0x18-byte params {kind 1..0x1c, payload} through 0x5ff080
+//      (jump table 0x5ff2a8): kind 10 / 11 = a camera position set (0x5f9940: payload {set DTP*, index}, 0x6c-byte
+//      records) for +0x3b0 / +0x620 (0x6080f0), kind 2 = +0x1320, kinds 5 / 6 inline curves +0x1248 / +0x1278, ...
+//   B: S+0x13c count / S+0x140 -> 12-byte entries {i8 key, nModes, modes*}; 0x5f9960(S, key, mode) (0x5fe800 /
+//      0x5fe8c0 in SetMode -> cam+0x1344 / +0x1348): modes in which a focus object with record byte +0x4d == key uses
+//      its own camera curves.
+// The settings in both games go through the doppelganger-aware lookup in these paths (PC: the patched fallback blocks
+// 0x60212b / 0x6021cb / 0x601d5d / 0x5fee36; TU: 0x822bc198 called by 0x822c1e38 and 0x822c5bd0), so in doppelganger
+// mode EVERY mode of the gameplay camera reads DTP 21237's tables on the TU. TU 21237 against the TU retail default
+// DTP 21 (= PC DTP 20 by value in every mode): table A has 35 entries instead of 25 - the first hit differs for the
+// modes 0, 8, 23, 32, 33, 34, 58, 59, 60, 61, 62, 63 (60 / 61 / 62 = the climb modes of the live run 2026-11-10
+// 22:24, with no entry at all in the retail tables; 8: +0x1320 1580 instead of 948 and other sets; 11 / 46 / 1 / 37
+// are equal) - and table B has the extra entry key 22 for the modes 60..63. The sets of 21237 are the TU DTP 22194
+// (86 records; TU retail DTP 31 = PC DTP 30, 76 records, equal at every index): 22194 records equal to 31 map to PC 30
+// at the same index, the 13 others (changed or new) are built here from their converted words (word rules from the 76
+// retail pairs; word 25 = the shared end pointer of the set DTP, taken from PC DTP 30 record 0). 0.25's stand-in kept
+// DTP 20's tables, i.e. the climb modes ran with the retail (no) per-mode parameters. 0.26: the stand-in gets table A
+// = the 12 ported TU entries first, then DTP 20's 25 entries (first hit = TU 21237 for every mode 0..127, checked by
+// the generator), table B = DTP 20's 13 entries + key 22. The real DTP 21237 (when a data port loads it, DgDecision 1)
+// carries its own tables; nothing here is used then. Each reader is byte-checked; a mismatch keeps 0.25's stand-in.
+struct DgModeEntry { int firstMode, modes, firstRec, recs; };
+struct DgModeRec { DWORD kind; DWORD w[5]; int set; };   // set: -1 none, 0..75 PC DTP 30 index, 0x100 + n built set n
+#include "TruShadowPower_dgmodes.inc"
+const CodeCheck kDgModeChecks[] = {
+    {0x005f99f7, "8ba834010000"},                                       // 0x5f99f0: table A count S+0x134
+    {0x005f9a04, "8b8038010000"},                                       // table A entries S+0x138
+    {0x005f9a10, "8b30 32d2 33c9 3bce 7312 8b5004 393c8a"},             // entry {nModes, modes*}
+    {0x005f9a30, "83780800 770c 83c301 83c010"},                        // nParams +8 > 0, stride 0x10
+    {0x005f9977, "39b33c010000"},                                       // 0x5f9960: table B count S+0x13c
+    {0x005f9990, "8b8340010000 0fbe0406"},                              // entries S+0x140, key byte +0
+    {0x005f99a0, "8b8b40010000 8b543108 8b7c3104"},                     // modes* +8, nModes +4
+    {0x005f99d2, "83c60c"},                                             // stride 12
+    {0x005f9940, "8b08 85c9 740e 8b4004 3b01 7307 6bc06c 034104 c3"},   // set {table*, index}, 0x6c-byte records
+    {0x005ff0b5, "8b400c 03442418 8b08 83c1ff 83f91b"},                 // params +0xc, kind 1..0x1c
+    {0x005ff28b, "8344241818"},                                         // param stride 0x18
+    {0x00601dc5, "8bbee0010000 8bc5 e81e7cffff"},                       // apply: mode +0x1e0 -> 0x5f99f0
+};
+const size_t kDgModeEntryCount = sizeof(kDgModeEntries) / sizeof(kDgModeEntries[0]);
+const size_t kDgModeRecCount = sizeof(kDgModeRecs) / sizeof(kDgModeRecs[0]);
+const size_t kDgModeSetCount = sizeof(kDgModeSets) / sizeof(kDgModeSets[0]);
+const DWORD kDgPcTabA = 25, kDgPcTabB = 13, kDgPcSets = 76;    // PC DTP 20 / DTP 30 as the generator read them
+DWORD g_dgTabA[kDgModeEntryCount + kDgPcTabA][4];
+DWORD g_dgTabB[kDgPcTabB + 1][3];
+DWORD g_dgRecs[kDgModeRecCount][6];
+DWORD g_dgSets[kDgModeSetCount][27];
+DWORD g_dgSetTable[2];                                         // {count, records*} as 0x5f9940 reads a set DTP
+
+// fills the stand-in's table A / B pointers (S+0x134..0x140); data = PC DTP 20 data (the stand-in's source)
+bool DgModeTables(DWORD data, char *why, size_t n) {
+    for (const auto &c : kDgModeChecks)
+        if (!HexBytesAt(c.address, c.bytes)) {
+            _snprintf_s(why, n, _TRUNCATE, "code at 0x%08lx differs", c.address);
+            return false;
+        }
+    const DWORD s = data + 0x10;
+    DWORD nA = 0, pA = 0, nB = 0, pB = 0;
+    if (!CtD(s + 0x134, &nA) || !CtD(s + 0x138, &pA) || !CtD(s + 0x13c, &nB) || !CtD(s + 0x140, &pB) || !pA || !pB ||
+        nA != kDgPcTabA || nB != kDgPcTabB) {
+        _snprintf_s(why, n, _TRUNCATE, "DTP 20 tables A %lu / B %lu, expected %lu / %lu", nA, nB, kDgPcTabA, kDgPcTabB);
+        return false;
+    }
+    // the set DTP 30 as DTP 20's own kind 10 / 11 records name it (resolved pointer, payload word 0)
+    DWORD p30 = 0;
+    for (DWORD i = 0; i < nA && !p30; ++i) {
+        DWORD np = 0, pr = 0;
+        if (!CtD(pA + 16 * i + 8, &np) || !CtD(pA + 16 * i + 12, &pr) || !pr) continue;
+        for (DWORD k = 0; k < np && !p30; ++k) {
+            DWORD kind = 0;
+            if (CtD(pr + 0x18 * k, &kind) && (kind == 10 || kind == 11)) CtD(pr + 0x18 * k + 4, &p30);
+        }
+    }
+    DWORD n30 = 0, r30 = 0, end30 = 0;
+    if (!p30 || !CtD(p30, &n30) || n30 != kDgPcSets || !CtD(p30 + 4, &r30) || !r30 || !CtD(r30 + 25 * 4, &end30) ||
+        !end30) {
+        _snprintf_s(why, n, _TRUNCATE, "set DTP 30 at 0x%08lx: %lu records (expected %lu), end pointer 0x%08lx", p30, n30,
+                    kDgPcSets, end30);
+        return false;
+    }
+    for (size_t i = 0; i < kDgModeSetCount; ++i) {
+        memcpy(g_dgSets[i], kDgModeSets[i], sizeof(g_dgSets[i]));
+        g_dgSets[i][25] = end30;
+    }
+    g_dgSetTable[0] = static_cast<DWORD>(kDgModeSetCount);
+    g_dgSetTable[1] = reinterpret_cast<DWORD>(g_dgSets);
+    for (size_t i = 0; i < kDgModeRecCount; ++i) {
+        const DgModeRec &r = kDgModeRecs[i];
+        g_dgRecs[i][0] = r.kind;
+        memcpy(&g_dgRecs[i][1], r.w, sizeof(r.w));
+        if (r.set >= 0x100) {
+            g_dgRecs[i][1] = reinterpret_cast<DWORD>(g_dgSetTable);
+            g_dgRecs[i][2] = static_cast<DWORD>(r.set - 0x100);
+        } else if (r.set >= 0) {
+            g_dgRecs[i][1] = p30;
+            g_dgRecs[i][2] = static_cast<DWORD>(r.set);
+        }
+    }
+    for (size_t i = 0; i < kDgModeEntryCount; ++i) {
+        const DgModeEntry &e = kDgModeEntries[i];
+        g_dgTabA[i][0] = static_cast<DWORD>(e.modes);
+        g_dgTabA[i][1] = reinterpret_cast<DWORD>(&kDgModeModes[e.firstMode]);
+        g_dgTabA[i][2] = static_cast<DWORD>(e.recs);
+        g_dgTabA[i][3] = reinterpret_cast<DWORD>(g_dgRecs[e.firstRec]);
+    }
+    __try {
+        memcpy(g_dgTabA[kDgModeEntryCount], reinterpret_cast<const void *>(pA), 16 * kDgPcTabA);
+        memcpy(g_dgTabB, reinterpret_cast<const void *>(pB), 12 * kDgPcTabB);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        _snprintf_s(why, n, _TRUNCATE, "DTP 20 tables unreadable");
+        return false;
+    }
+    g_dgTabB[kDgPcTabB][0] = 22;                                   // key byte 22 (+1..+3 padding 0)
+    g_dgTabB[kDgPcTabB][1] = static_cast<DWORD>(sizeof(kDgBModes22) / sizeof(kDgBModes22[0]));
+    g_dgTabB[kDgPcTabB][2] = reinterpret_cast<DWORD>(kDgBModes22);
+    BYTE *ss = g_dgSynth + 0x10;
+    const DWORD v[4] = {static_cast<DWORD>(kDgModeEntryCount + kDgPcTabA), reinterpret_cast<DWORD>(g_dgTabA),
+                        kDgPcTabB + 1, reinterpret_cast<DWORD>(g_dgTabB)};
+    memcpy(ss + 0x134, v, sizeof(v));
+    const DWORD e30 = CtEntry(30);
+    Log(1, "0.26 doppelganger mode tables: stand-in table A %lu entries (the %u TU 21237 entries of the modes 0 8 23 32 33 "
+           "34 58 59 60 61 62 63 first, then DTP 20's %lu) / table B %lu (+ key 22: modes 60..63); %u set records "
+           "built (TU 22194 changed / new), PC set DTP 30 at 0x%08lx (%s the lookup of id 30)", v[0],
+        static_cast<unsigned>(kDgModeEntryCount), kDgPcTabA, v[2], static_cast<unsigned>(kDgModeSetCount), p30,
+        e30 && e30 + 0x10 == p30 ? "=" : "!=");
+    return true;
+}
+
 // game thread (MeterTick): mode 2 builds the stand-in once, the first time the doppelganger flag is set and DTP 21237
 // is not loaded
 void DgSynthTick() {
@@ -4184,10 +4335,16 @@ void DgSynthTick() {
     const DWORD tuDelay = 0x3e800000, tuRamp = 0x40a00000;     // TU generalbank DTP 21237 data +0xc4 / +0xc8
     memcpy(g_dgSynth + 0x10 + 0xb4, &tuDelay, 4);
     memcpy(g_dgSynth + 0x10 + 0xb8, &tuRamp, 4);
+    char why[96] = "";
+    g_dgModesOn = DgModeTables(data, why, sizeof(why));        // 0.26: the per-mode tables of 21237
+    if (!g_dgModesOn)
+        Log(0, "0.26 doppelganger mode tables: not ported (%s) - the stand-in keeps DTP 20's mode tables as 0.25", why);
     InterlockedExchange(&g_dgSynthOn, 1);
     Log(1, "0.25 doppelganger settings: stand-in for DTP 21237 built at 0x%08lx = DTP %ld (0x%lx bytes) with the TU's "
-           "delay 0.25 s / ramp 5.00 s instead of %.2f / %.2f (rate %.2f kept; curve tables of 21237 not ported)",
-        reinterpret_cast<DWORD>(g_dgSynth), static_cast<LONG>(fid), kDgSynthSize, dl, rp, rt);
+           "delay 0.25 s / ramp 5.00 s instead of %.2f / %.2f (rate %.2f kept; %s)",
+        reinterpret_cast<DWORD>(g_dgSynth), static_cast<LONG>(fid), kDgSynthSize, dl, rp, rt,
+        g_dgModesOn ? "0.26: 21237's mode tables A / B ported - outside them 21237 equals the retail default"
+                    : "mode tables of 21237 not ported");
 }
 
 // game thread (MeterTick), at most once a second: the gameplay camera's settings choice, logged when it changes
@@ -5007,7 +5164,7 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.25 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.26 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
@@ -5162,7 +5319,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.25 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.26 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
@@ -5174,7 +5331,7 @@ extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
            "doppelganger mode (TU 0x823de47c / 0x823ee158 / 0x823dfd98); switches default off: loop sound, move events 0x83 / 0x84, strike "
            "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120, camera TU time step 0x822ad048 / 0x822beeb8 / "
            "0x822c39c8 / 0x822c79d0, doppelganger camera settings 0x822bc198 / 0x822c61d8 (DTP 21237 / 21238, mode 2 "
-           "with a partial stand-in), infinite meter [Meter] Infinite (live, not a TU feature), camera trace TruCam.log "
+           "with a stand-in: TU delay / ramp + 21237's per-mode tables), infinite meter [Meter] Infinite (live, not a TU feature), camera trace TruCam.log "
            "(read only))";
 }
 
