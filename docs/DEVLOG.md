@@ -21,7 +21,7 @@ punch combo does not chain yet (every press is punch 1), and a melee kill with t
 ![The throne in the held end-room cutscene, six frames 0.1 s apart: top row the game's own light order (the dropped shadow light changes every frame), bottom row TruMenu's fixed order (always the same light dropped)](screenshots/dev-throne-light-choice-2026-11-09.png)
 
 *Development build, TruMenu's `light.cutlabels` on: every light the PC had to drop for an object in that frame gets a
-label. Top row, the game's own order: the dropped shadow light alternates between #98 and #93 from frame to frame -
+label. Top row, the game's own order: the dropped shadow light alternates between #90 and #93 from frame to frame (first misread as #98) -
 the throne's brightness jumps between 65 and 74 (of 255). Bottom row, `light.stable` (the default fix): always #94 is
 dropped, the brightness stays at 65-69. The flicker explained in the entry below, now seen at work.*
 
