@@ -56,6 +56,10 @@
 // 14. 0.6.8 (K-1b): Lara's contact-hit sender tru+0x319050 sends the impulse message 0x91 after the hit message 0x11c
 //    (tru+0x3192da); the TU 0x823e1870 skips it for targets with flag 0x400000 in [[inst+0x10]]+4 (enemies with a
 //    brain) - [Hit] TranslateImpulseGate, default on, live.
+// 15. 0.6.9 (K-8 / melee kill, log only): three call sites log what they did - the chunkdoll build of the Death state
+//    (tru+0x26c9f9), the hit-list add of Lara's contact hit (tru+0x3190ad) and the death switch tru+0x241650 (entry) -
+//    [Hit] Log / [Death] Log, live. The TU death switch 0x823258c8 only inlines retail's request helper 0x8230e290
+//    (= PC tru+0x23d6e0): the same request through brain+0x1254, nothing to translate.
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -72,7 +76,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.8 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.9 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -105,7 +109,10 @@ const char kVersion[] = "TruShadowCombat 0.6.8 (TU target list 7 -> 10, conditio
                         "decision ([Hit] Log), chunkdoll limit 4 -> 8 as the TU 0x82376700 ([Chunk] Limit8, start "
                         "only), all on by default; 0.6.8: no impulse message 0x91 from Lara's contact hit "
                         "tru+0x3192da to targets with flag 0x400000 as the TU 0x823e1870 ([Hit] "
-                        "TranslateImpulseGate, on by default), hit line prints the subtype msg+0x64)";
+                        "TranslateImpulseGate, on by default), hit line prints the subtype msg+0x64; 0.6.9: log points "
+                        "(nothing changed in the game) at the Death state's chunkdoll build tru+0x26c9f9 ([Death] Log), "
+                        "the hit-list add of Lara's contact hit tru+0x3190ad ([Hit] Log) and the death switch "
+                        "tru+0x241650 ([Death] Log))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -1687,6 +1694,7 @@ int g_hitTranslate = 1;            // [Hit] Translate (0.6.7, live through P1dRe
 int g_hitKnock = 1;                // [Hit] TranslateKnockback (0.6.7, live)
 int g_hitLog = 1;                  // [Hit] Log (0.6.7, live)
 int g_hitImpulseGate = 1;          // [Hit] TranslateImpulseGate (0.6.8, live)
+int g_deathLog = 1;                // [Death] Log (0.6.9, live): chunkdoll build + death switch lines
 
 BYTE *__cdecl Record1013(BYTE *target, BYTE *player, const float *pos, const float *rot, float frames, DWORD x34,
                          BYTE *hit) {
@@ -4081,6 +4089,9 @@ const P1dKey kP1dKeys[] = {
     {"Hit", "TranslateImpulseGate", &g_hitImpulseGate,
      "no impulse 0x91 from Lara's contact hit to targets with flag 0x400000 (TU 0x823e1870)",
      "impulse 0x91 to every target (PC)", "0.6.8"},
+    // 0.6.9 (K-8 / melee kill, log only)
+    {"Death", "Log", &g_deathLog, "one line per chunkdoll build of the Death state and per death switch",
+     "no chunkdoll / death switch lines", "0.6.9"},
 };
 
 void P1dReadSwitches() {
@@ -5653,6 +5664,344 @@ void SetupImpulseGate() {
         g_impulsePlaced ? "on" : "OFF (write failed)", g_hitImpulseGate, g_hitLog);
 }
 
+// ---------------------------------------------------------------- 0.6.9: K-8 / melee kill log points (log only)
+// docs Befund-K8-Kombo-1011 sections 5 / 6.3 (main workspace). Each part calls the original code with the same
+// arguments and only writes a line; nothing in the game changes.
+// 1. Death state slot 8 tru+0x26c950 (TU 0x8232cd50): after the state timer the tune record r = tru+0x214610
+//    (brain+0x168) (edi from tru+0x26c9dc); r+0x46 (u16) != 0 -> chunkdoll build tru+0x296f90(inst) at tru+0x26c9f9
+//    (cdecl, al = built; TU 0x823766c0). Call redirected to ChunkBuildStub. Line: instance, r+0x46 / +0x48 / +0x4c,
+//    result, chunkdoll counter [0xecfc70] before / after, physics lock [[0xa037f4]+0x20f8], LP. [Death] Log.
+// 2. Lara's contact-hit sender tru+0x319050: tru+0x3190ad calls the hit-list add tru+0x2e6990 (thiscall ecx = the
+//    CombatManager edi, argument = target ebx, ret 4): the first empty of the 8 slots +0xa4..+0xc0 takes the target,
+//    al = 0 when it is already in the list or the list is full - only al = 1 lets the hit message 0x11c / the impulse
+//    go out (tru+0x3190b4). Call redirected to HitListStub. Line: target, result (added slot k / refused: already in
+//    slot k / list full), the 8 slots, Lara's chart record (machine 1 [[0xfadb58]+0xf10], record [machine+0x510],
+//    index = position in [[machine+4]+0xc], as TruMenu combo.trace), attack data A = [edi+0xc4] (+4 damage, +0xc type,
+//    +0x10 force), [States] Translate1004. The same target / result / record again within 1 s is counted, not logged.
+//    [Hit] Log (cap [Hit] MaxLines, shared with the 0.6.7 / 0.6.8 hit lines).
+// 3. The death switch tru+0x241650 (= retail 0x82327a18, TU 0x823258c8; cdecl inst, vec16 *, u8, ptr, u8, kind, u8):
+//    entry hook (6 bytes push ebp; mov ebp, esp; and esp, -16 into a trampoline). It ends in tru+0x23d6e0(inst,
+//    EnemyState_Death 0x8ae904, &data, 0) at tru+0x24170b (= retail 0x8230e290): a request {data,
+//    "EnemyDeathSwitchData", 0x20} to the enemy's state machine brain+0x1254 through tru+0x271d30 (= retail 0x82349b90
+//    = TU 0x82349468: tru+0x271080 files the request, then unless the current state's slot +0x40 (inst, 1) says no,
+//    machine+4 |= 1 and tru+0x271c10 switches at once). Line: enemy, kind (data +0x14), layer-0 state before -> after
+//    the call (after = the switch happened inside the call), LP, result al, caller (tru+0x... or this plugin's own
+//    0.6.1 / 0.6.5 / 0.6.6 calls). The call site tru+0x24170b itself is not patched: TruMenu's ai.kill checks its
+//    bytes. [Death] Log.
+// Task 2 (TU 0x823258c8 against retail 0x82327a18 / PC tru+0x241650): the TU inlined retail's helper 0x8230e290 - the
+//    same call 0x82349468(brain+0x1254, inst, brain+0x11e0, Death 0x82779bf8, {data, "EnemyDeathSwitchData", 0x20}, 0)
+//    as retail 0x82349b90(...) - the rest differs only in stack offsets and shifted constants with equal values
+//    ([0x8207d538] = 0, [0x82052664] = -1.0f). The PC calls the same helper (tru+0x23d6e0 -> tru+0x271d30), so the
+//    request through brain+0x1254 is already the PC's way: nothing to translate, no [Death] TranslateSwitchRequest.
+const DWORD kChunkBuild = 0x00696f90, kChunkBuildCall = 0x0066c9f9, kChunkCount = 0x00ecfc70;
+const DWORD kHitListAdd = 0x006e6990, kHitListCall = 0x007190ad;
+const DWORD kDeathCheckRet = 0x0062042f;      // the game's death check tru+0x220380 calls the switch at tru+0x22042a
+typedef DWORD(__cdecl *ChunkBuildFn)(BYTE *inst);
+typedef DWORD(__fastcall *HitListAddFn)(BYTE *mgr, int edx, BYTE *target);   // thiscall, ret 4
+bool g_chunkBuildPlaced = false, g_hitListPlaced = false, g_switchPlaced = false;
+bool g_k8MachineOk = false;        // Lara's chart machine 1 at [[0xfadb58]+0xf10] (TruMenu combo.trace check)
+DeathSwitchFn g_oDeathSwitch = nullptr;
+BYTE *g_k8Code = nullptr;
+HMODULE g_self = nullptr;
+DWORD g_imageEnd = 0;
+volatile LONG g_k8Lines = 0, g_chunkBuilds = 0, g_switches = 0;
+const LONG kK8MaxLines = 2000;
+CRITICAL_SECTION g_k8Lock;
+
+bool K8DeathLine() {
+    if (!g_deathLog) return false;
+    const LONG n = InterlockedIncrement(&g_k8Lines);
+    if (n > kK8MaxLines) return false;
+    if (n == kK8MaxLines) Log(1, "0.6.9: %ld chunk build / death switch lines - this is the last one", kK8MaxLines);
+    return true;
+}
+
+bool InImage(DWORD p) { return p >= kImageBase && p < g_imageEnd; }
+
+// name of a state object ((char *)[obj+8], as TruMenu's enemy labels); "(none)" for 0, "0x..." when not readable
+void StateName(DWORD obj, char *out, size_t size) {
+    if (!obj) { strcpy_s(out, size, "(none)"); return; }
+    _snprintf_s(out, size, _TRUNCATE, "0x%08lx", obj);
+    if (!InImage(obj)) return;
+    const DWORD name = Rd(reinterpret_cast<const void *>(obj + 8));
+    if (!InImage(name)) return;
+    char s[32];
+    size_t i = 0;
+    __try {
+        const char *p = reinterpret_cast<const char *>(name);
+        for (; i + 1 < sizeof(s) && p[i]; ++i) {
+            if (p[i] < 0x20 || p[i] > 0x7e) return;
+            s[i] = p[i];
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return;
+    }
+    s[i] = 0;
+    if (i >= 2) strcpy_s(out, size, s);
+}
+
+// Lara's chart machine 1: record index (position in [[machine+4]+0xc]) of [machine+0x510]; -1 unknown
+int LaraRecord() {
+    if (!g_k8MachineOk) return -1;
+    const BYTE *gt = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kGameTrackerPtr)));
+    const BYTE *machine = gt ? reinterpret_cast<const BYTE *>(Rd(gt + 0xf10)) : nullptr;
+    const DWORD rec = machine ? Rd(machine + 0x510) : 0;
+    const BYTE *defs = machine ? reinterpret_cast<const BYTE *>(Rd(machine + 4)) : nullptr;
+    const BYTE *arr = defs ? reinterpret_cast<const BYTE *>(Rd(defs + 0xc)) : nullptr;
+    if (!rec || !arr) return -1;
+    __try {
+        for (int i = 0; i < 4096; ++i)
+            if (reinterpret_cast<const DWORD *>(arr)[i] == rec) return i;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return -1;
+}
+
+DWORD PhysLock() {
+    const BYTE *phys = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kPhysPtr)));
+    return phys ? Rd(phys + 0x20f8) : 0xffffffff;
+}
+
+// ---- 1. chunkdoll build of the Death state
+DWORD __cdecl ChunkBuildLog(BYTE *inst, const BYTE *record) {
+    P1dReadSwitches();
+    const LONG before = static_cast<LONG>(Rd(reinterpret_cast<const void *>(kChunkCount)));
+    const DWORD lock = PhysLock();
+    const DWORD r = reinterpret_cast<ChunkBuildFn>(kChunkBuild)(inst);
+    const LONG n = InterlockedIncrement(&g_chunkBuilds);
+    if (K8DeathLine()) {
+        char who[96];
+        Describe(inst, who, sizeof(who));
+        const BYTE *brain = P1dBrain(inst);
+        const DWORD w44 = Rd(record + 0x44), w48 = Rd(record + 0x48);
+        Log(1, "0.6.9 chunk build: %s in the Death state (tru+0x26c9f9 -> tru+0x296f90, TU 0x8232ce28 -> 0x823766c0): record "
+               "+0x46 %lu, +0x48 %lu, +0x4c %.2f -> %s; chunkdoll count [0xecfc70] %ld -> %ld (limit %d), physics lock "
+               "0x%lx%s, LP %.1f (#%ld, [Death] Log %d)",
+            who, w44 >> 16, w48 & 0xff, RdFloat(record + 0x4c), (r & 0xff) ? "BUILT" : "not built (al 0)", before,
+            static_cast<LONG>(Rd(reinterpret_cast<const void *>(kChunkCount))), g_chunk8Placed ? 8 : 4, lock,
+            (lock != 0xffffffff && (lock & 1)) ? " (inside the physics step!)" : "",
+            brain ? RdFloat(brain + 0x2c64) : 0.0f, n, g_deathLog);
+    }
+    return r;
+}
+
+// tru+0x26c9f9: [esp+4] = inst (the pushed argument), edi = the tune record
+__declspec(naked) void ChunkBuildStub() {
+    __asm {
+        push edi
+        push dword ptr [esp + 8]
+        call ChunkBuildLog
+        add esp, 8
+        ret
+    }
+}
+
+// ---- 2. hit-list add of Lara's contact hit
+struct HitListSeen { const BYTE *target; int cls, rec; DWORD tick; LONG same; };
+HitListSeen g_hlSeen[4];
+int g_hlNext = 0;
+volatile LONG g_hlContacts = 0;
+
+void HitListLine(const BYTE *mgr, const BYTE *target, DWORD r, const DWORD *before) {
+    DWORD after[8] = {0};
+    int slot = -1, cls = 0;                    // 0 added, 1 already in, 2 full, 3 refused (other)
+    __try {
+        for (int k = 0; k < 8; ++k) after[k] = reinterpret_cast<const DWORD *>(mgr + 0xa4)[k];
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    const DWORD t = reinterpret_cast<DWORD>(target);
+    for (int k = 0; k < 8 && slot < 0; ++k)
+        if (r ? (!before[k] && after[k] == t) : before[k] == t) slot = k;
+    if (r) cls = 0;
+    else if (slot >= 0) cls = 1;
+    else {
+        int used = 0;
+        for (int k = 0; k < 8; ++k) if (before[k]) ++used;
+        cls = used == 8 ? 2 : 3;
+    }
+    const int rec = LaraRecord();
+    const DWORD now = GetTickCount();
+    const LONG contact = InterlockedIncrement(&g_hlContacts);
+    LONG same = 0;
+    EnterCriticalSection(&g_k8Lock);
+    int i = 0;
+    for (; i < 4; ++i)
+        if (g_hlSeen[i].target == target) break;
+    if (i < 4 && g_hlSeen[i].cls == cls && g_hlSeen[i].rec == rec && now - g_hlSeen[i].tick < 1000) {
+        ++g_hlSeen[i].same;
+        LeaveCriticalSection(&g_k8Lock);
+        return;
+    }
+    if (i == 4) {
+        i = g_hlNext;
+        g_hlNext = (g_hlNext + 1) % 4;
+        g_hlSeen[i].same = 0;
+    }
+    same = g_hlSeen[i].same;
+    g_hlSeen[i].target = target;
+    g_hlSeen[i].cls = cls;
+    g_hlSeen[i].rec = rec;
+    g_hlSeen[i].tick = now;
+    g_hlSeen[i].same = 0;
+    LeaveCriticalSection(&g_k8Lock);
+    if (!HitLine()) return;
+    char who[96], list[200], res[48];
+    Describe(target, who, sizeof(who));
+    list[0] = 0;
+    size_t used = 0;
+    for (int k = 0; k < 8; ++k) {
+        const int w = _snprintf_s(list + used, sizeof(list) - used, _TRUNCATE, "%s%s", k ? " " : "",
+                                  after[k] == 0 ? "-" : after[k] == t ? "T" : "x");
+        if (w > 0) used += static_cast<size_t>(w);
+    }
+    if (cls == 0) _snprintf_s(res, sizeof(res), _TRUNCATE, "added in slot %d", slot);
+    else if (cls == 1) _snprintf_s(res, sizeof(res), _TRUNCATE, "REFUSED: already in slot %d", slot);
+    else if (cls == 2) strcpy_s(res, sizeof(res), "REFUSED: list full");
+    else strcpy_s(res, sizeof(res), "REFUSED (al 0)");
+    LONG type = -1;
+    float damage = 0.0f, force = 0.0f;
+    __try {
+        const BYTE *a = *reinterpret_cast<const BYTE *const *>(mgr + 0xc4);
+        if (a) {
+            damage = *reinterpret_cast<const float *>(a + 4);
+            type = *reinterpret_cast<const LONG *>(a + 0xc);
+            force = *reinterpret_cast<const float *>(a + 0x10);
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    Log(1, "0.6.9 hit list: contact -> %s at Lara record %d, attack type %ld damage %.1f force %.1f -> %s (tru+0x3190ad -> "
+           "tru+0x2e6990%s); list +0xa4 [%s] (T = this target, x = other); %ld repeat(s) of this target's previous line "
+           "not logged; [States] Translate1004 %d (contact #%ld)",
+        who, rec, type, damage, force, res, r ? ": hit message 0x11c follows" : ": no hit message", list, same,
+        g_translate1004, contact);
+}
+
+DWORD __cdecl HitListLog(BYTE *mgr, BYTE *target) {
+    P1dReadSwitches();
+    const bool want = g_hitLog != 0;
+    DWORD before[8] = {0};
+    if (want) {
+        __try {
+            for (int k = 0; k < 8; ++k) before[k] = reinterpret_cast<const DWORD *>(mgr + 0xa4)[k];
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+        }
+    }
+    const DWORD r = reinterpret_cast<HitListAddFn>(kHitListAdd)(mgr, 0, target);
+    if (want) HitListLine(mgr, target, r & 0xff, before);
+    return r;
+}
+
+// tru+0x3190ad: thiscall ecx = the CombatManager, [esp+4] = the target; the original returns with ret 4
+__declspec(naked) void HitListStub() {
+    __asm {
+        push dword ptr [esp + 4]
+        push ecx
+        call HitListLog
+        add esp, 8
+        ret 4
+    }
+}
+
+// ---- 3. the death switch (entry hook; the original runs through the trampoline with the same arguments)
+DWORD __cdecl DeathSwitchHook(BYTE *inst, const float *vec, DWORD a2, DWORD a3, DWORD a4, DWORD kind, DWORD a6) {
+    const DWORD ret = reinterpret_cast<DWORD>(_ReturnAddress());
+    P1dReadSwitches();
+    const bool want = g_deathLog != 0;
+    const BYTE *brain = want ? P1dBrain(inst) : nullptr;
+    const DWORD stateBefore = brain ? Rd(brain + 0x125c) : 0;
+    const float lp = brain ? RdFloat(brain + 0x2c64) : 0.0f;
+    const DWORD r = g_oDeathSwitch(inst, vec, a2, a3, a4, kind, a6);
+    const LONG n = InterlockedIncrement(&g_switches);
+    if (want && K8DeathLine()) {
+        char who[96], before[32], after[32], caller[64];
+        Describe(inst, who, sizeof(who));
+        StateName(stateBefore, before, sizeof(before));
+        const DWORD stateAfter = brain ? Rd(brain + 0x125c) : 0;
+        StateName(stateAfter, after, sizeof(after));
+        MEMORY_BASIC_INFORMATION mi;
+        const bool ours = VirtualQuery(reinterpret_cast<const void *>(ret), &mi, sizeof(mi)) &&
+                          mi.AllocationBase == reinterpret_cast<void *>(g_self);
+        if (ours) _snprintf_s(caller, sizeof(caller), _TRUNCATE, "TruShadowCombat (0x%08lx)", ret);
+        else if (ret == kDeathCheckRet) strcpy_s(caller, sizeof(caller), "death check tru+0x220380");
+        else _snprintf_s(caller, sizeof(caller), _TRUNCATE, "tru+0x%lx", ret - 5 - kImageBase);
+        Log(1, "0.6.9 death switch: %s kind %lu (args %lu / 0x%lx / %lu / %lu) from %s, LP %.1f, state %s -> %s%s, request "
+               "to brain+0x1254 %s (tru+0x241650 = TU 0x823258c8, #%ld, [Death] Log %d)",
+            who, kind, a2 & 0xff, a3, a4 & 0xff, a6 & 0xff, caller, lp, before, after,
+            stateAfter != stateBefore ? " (switched inside the call)" : " (not switched yet)",
+            (r & 0xff) ? "accepted (al 1)" : "al 0", n, g_deathLog);
+    }
+    return r;
+}
+
+bool FactsOk69(const Fact *f, size_t count, const char *part) {
+    for (size_t i = 0; i < count; ++i)
+        if (!HexAt(f[i].at, f[i].hex)) {
+            Log(0, "0.6.9 %s: %s at 0x%08lx does not match - log point not placed", part, f[i].what, f[i].at);
+            return false;
+        }
+    return true;
+}
+
+void SetupK8Log() {
+    g_imageEnd = kImageBase;
+    __try {
+        const BYTE *b = reinterpret_cast<const BYTE *>(kImageBase);
+        const IMAGE_NT_HEADERS32 *nt = reinterpret_cast<const IMAGE_NT_HEADERS32 *>(b + Rd(b + 0x3c));
+        g_imageEnd = kImageBase + nt->OptionalHeader.SizeOfImage;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    InitializeCriticalSection(&g_k8Lock);
+    // the chart machine (as TruMenu combo.trace kCtChecks): [[0xfadb58]+0xf10] / +0xf14 into the per-frame update
+    g_k8MachineOk = HexAt(0x00768c50, "a158dbfa00 56 8bb0100f0000 57 8bb8140f0000 8bce e8f6f10100");
+    const Fact chunk[] = {
+        {0x0066c95c, "8b7d08 8b87d0020000 85c0 897c240c", "Death slot 8 tru+0x26c950: inst = [ebp+8] -> [esp+0xc]"},
+        {0x0066c9d0, "8b8368010000 50 e8347cfaff 8bf8 83c404 85ff 0f84f2000000 66837f4600 0f84e7000000 8b4c240c 51 "
+                     "e892a50200 83c404 84c0 0f84ce000000",
+         "Death slot 8: record tru+0x214610(brain+0x168) in edi, +0x46 != 0 -> call tru+0x296f90(inst) at tru+0x26c9f9"},
+        {kChunkBuild, "51 57 8b7c240c 6880010000 57 e84fc7f1ff", "chunkdoll build tru+0x296f90 (cdecl inst)"},
+        {0x00696fa8, "833d70fcec00", "chunkdoll build: counter [0xecfc70]"},
+    };
+    const Fact hit[] = {
+        {0x00719061, "8bf9", "sender tru+0x319050: edi = ecx = the CombatManager"},
+        {0x007190aa, "53 8bcf e8ded8fcff 84c0 0f8439030000", "sender: hit-list add tru+0x2e6990(ebx) at tru+0x3190ad"},
+        {kHitListAdd, "53 8b5c2408 56 32c0 57 33d2 8db1a4000000 8b3e 85ff 7415 3bfb 741a 83c201 83c604 83fa08 7ceb 5f 5e "
+                      "5b c20400 899c91a4000000 b001 5f 5e 5b c20400",
+         "hit-list add tru+0x2e6990 (thiscall, 8 slots +0xa4, ret 4)"},
+    };
+    if (!g_k8MachineOk) Log(0, "0.6.9: chart machine read at 0x768c50 does not match - hit-list lines without Lara's record");
+    if (FactsOk69(chunk, sizeof(chunk) / sizeof(chunk[0]), "chunk build"))
+        g_chunkBuildPlaced = WriteCall(kChunkBuildCall, reinterpret_cast<const void *>(&ChunkBuildStub));
+    if (FactsOk69(hit, sizeof(hit) / sizeof(hit[0]), "hit list"))
+        g_hitListPlaced = WriteCall(kHitListCall, reinterpret_cast<const void *>(&HitListStub));
+    if (FactsOk69(kDeathSwitchFacts, sizeof(kDeathSwitchFacts) / sizeof(kDeathSwitchFacts[0]), "death switch")) {
+        g_k8Code = static_cast<BYTE *>(VirtualAlloc(nullptr, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
+        if (g_k8Code) {
+            memcpy(g_k8Code, reinterpret_cast<const void *>(kDeathSwitch), 6);   // push ebp; mov ebp, esp; and esp, -16
+            g_k8Code[6] = 0xe9;
+            const DWORD rel = (kDeathSwitch + 6) - (reinterpret_cast<DWORD>(g_k8Code) + 11);
+            memcpy(g_k8Code + 7, &rel, 4);
+            DWORD old = 0;
+            if (VirtualProtect(g_k8Code, 4096, PAGE_EXECUTE_READ, &old)) {
+                g_oDeathSwitch = reinterpret_cast<DeathSwitchFn>(g_k8Code);
+                BYTE j[6] = {0xe9, 0, 0, 0, 0, 0x90};
+                const DWORD to = reinterpret_cast<DWORD>(&DeathSwitchHook) - (kDeathSwitch + 5);
+                memcpy(j + 1, &to, 4);
+                g_switchPlaced = WriteCode(kDeathSwitch, j, sizeof(j));
+            } else {
+                Log(0, "0.6.9 death switch: code page protection failed (%lu) - not placed", GetLastError());
+            }
+        } else {
+            Log(0, "0.6.9 death switch: no code page (%lu) - not placed", GetLastError());
+        }
+    }
+    Log(1, "0.6.9 log points (nothing changed in the game): chunkdoll build of the Death state %s (tru+0x26c9f9), hit-list "
+           "add of Lara's contact hit %s (tru+0x3190ad, Lara's record %s), death switch %s (entry tru+0x241650); [Hit] Log "
+           "%d, [Death] Log %d (live). TU 0x823258c8 = retail 0x82327a18 with the request helper 0x8230e290 (= PC "
+           "tru+0x23d6e0) inlined: the PC already requests Death through brain+0x1254 - nothing to translate",
+        g_chunkBuildPlaced ? "on" : "OFF", g_hitListPlaced ? "on" : "OFF", g_k8MachineOk ? "read" : "not read",
+        g_switchPlaced ? "on" : "OFF", g_hitLog, g_deathLog);
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -5707,6 +6056,7 @@ void Start(HMODULE self) {
     while (len > 0 && dir[len - 1] != '\\' && dir[len - 1] != '/') --len;
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowCombat.log", dir);
+    g_self = self;                    // 0.6.9: the death switch line names this plugin's own calls
     ReadOptions(dir);
     Log(1, "%s loaded (enabled %d, log level %d, target list %d, conditions %d, states %d, strike gate %d, strike "
            "translate %d)", kVersion, g_enabled, g_logLevel, g_targetList, g_conditions, g_statesOn, g_strikeGate,
@@ -5751,6 +6101,7 @@ void Start(HMODULE self) {
     SetupN4c();                       // 0.6.6: T5 + P1c (after SetupCompanion: companion facts; after SetupTranslate1013)
     SetupHit();                       // 0.6.7: K-1 hit structures / knockback + K-7 chunk limit (after SetupCompanion)
     SetupImpulseGate();               // 0.6.8: K-1b impulse 0x91 gate of Lara's contact hit (independent)
+    SetupK8Log();                     // 0.6.9: log points (last: the death switch facts are checked by 0.6.1 / 0.6.5 too)
 }
 
 }  // namespace

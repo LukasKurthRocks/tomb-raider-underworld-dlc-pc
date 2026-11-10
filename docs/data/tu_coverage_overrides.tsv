@@ -45,3 +45,4 @@ tu_addr	status	basis	plugin	note	pc	retail
 0x823e2bb8	covered	code	TruShadowPower	point argument of 0x823e2b98 (TU-new): [Look] StrikeLook writes the function out with the point (TruShadowPower: 'point 0 -> the retail body; else ... *point instead of 0x82406690(target)')		
 0x823e2bf8	covered	code	TruShadowPower	point argument of 0x823e2b98: target point = *point instead of getTargetPosition 0x82406690 - [Look] StrikeLook		
 0x824126f0	noport	code		GameTracker address low half + register numbers only		
+0x823258c8	explained	code		death switch: the TU inlines retail's request helper 0x8230e290 (= PC tru+0x23d6e0) - the same call 0x82349468 = retail 0x82349b90 (= PC tru+0x271d30)(brain+0x1254, inst, brain+0x11e0, Death state, {data, EnemyDeathSwitchData, 0x20}, 0); the rest is stack offsets and shifted constants with equal values. The PC already requests Death through brain+0x1254 - no port (10.11., TruShadowCombat 0.6.9 logs every switch)	0x00641650	

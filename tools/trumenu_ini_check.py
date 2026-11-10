@@ -1721,6 +1721,7 @@ SW_LIVE = {
     ('TruShadowCombat', 'Hit', 'TranslateKnockback'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
     ('TruShadowCombat', 'Hit', 'Log'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),
     ('TruShadowCombat', 'Hit', 'TranslateImpulseGate'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),    # 0.6.8
+    ('TruShadowCombat', 'Death', 'Log'): ('void P1dReadSwitches(', 'kP1dKeys[] = {'),                   # 0.6.9
     ('TruShadowCombat', 'Strike', 'Translate'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate1013'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate1019'): 'void ReadSwitches(',

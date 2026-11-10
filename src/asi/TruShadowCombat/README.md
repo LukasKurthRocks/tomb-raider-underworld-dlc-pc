@@ -1,4 +1,49 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.8)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.9)
+
+0.6.9 (2026-11-10, **offline, not yet seen in game**; TODO N18 K-8 / melee kill, main workspace
+`docs\Befund-K8-Kombo-1011.md` sections 5 / 6.3, ENGINE.md 13): **log points only - nothing in the game changes**.
+Build `work\asi\combat069`, byte pre-checks `work\asi\combat069\precheck_069.txt` (11 checks: 9 the plugin does at
+load + 2 facts of the study; 0 mismatches against `data\pc\tru.exe` and the installed tru.exe). Each part calls the
+original code with the same arguments and then writes a line; a failed byte check leaves that site untouched.
+* **Chunkdoll build of the Death state** (`[Death] Log`, new, live, default **1**): Death slot 8 tru+0x26c950 (TU
+  0x8232cd50) builds the chunkdoll with tru+0x296f90(inst) at tru+0x26c9f9 (TU 0x8232ce28 -> 0x823766c0) when the tune
+  record (tru+0x214610(brain+0x168), in edi) has +0x46 != 0. The call goes through `ChunkBuildStub`: line `0.6.9 chunk
+  build: <enemy> in the Death state ... record +0x46 <n>, +0x48 <n>, +0x4c <f> -> BUILT / not built (al 0); chunkdoll
+  count [0xecfc70] <a> -> <b> (limit 8 / 4), physics lock 0x<l>, LP <f>`. Answers "did it shatter" from the log.
+* **Hit-list add of Lara's contact hit** (`[Hit] Log`, cap `[Hit] MaxLines`): the sender tru+0x319050 calls the add
+  tru+0x2e6990 (thiscall CombatManager, target; 8 slots +0xa4..+0xc0; al = 0 if already in the list or full) at
+  tru+0x3190ad; only al = 1 lets the hit message 0x11c out. Through `HitListStub`: line `0.6.9 hit list: contact ->
+  <enemy> at Lara record <n>, attack type <A+0xc> damage <A+4> force <A+0x10> -> added in slot k / REFUSED: already in
+  slot k / REFUSED: list full ...; list +0xa4 [T - x ...] (T = this target, x = other); <n> repeat(s) ... not logged;
+  [States] Translate1004 <0/1>`. Lara's record = machine 1 `[[0xfadb58]+0xf10]`, `[machine+0x510]` as an index in
+  `[[machine+4]+0xc]` (as TruMenu `combo.trace`; -1 when the machine check at 0x768c50 fails). The same target / result /
+  record again within 1 s is only counted (contacts come every physics step while the fist touches). This is the K-8
+  proof: with `Translate1004=0` the fist touches at 755 / 754 / 753 but the list refuses; with 1 it is added.
+* **Death switch** (`[Death] Log`): entry hook of tru+0x241650 (= retail 0x82327a18, TU 0x823258c8; 6 bytes into a
+  trampoline): line `0.6.9 death switch: <enemy> kind <k> (args ...) from <caller>, LP <f>, state <before> -> <after>
+  (switched inside the call / not switched yet), request to brain+0x1254 accepted (al 1) / al 0`. Caller = `death check
+  tru+0x220380`, another `tru+0x...`, or `TruShadowCombat (0x...)` for the plugin's own 0.6.1 / 0.6.5 / 0.6.6 calls. The
+  call site tru+0x24170b is not patched (TruMenu's `ai.kill` checks those bytes).
+* **Study TU 0x823258c8 (death switch) - nothing to translate, no `[Death] TranslateSwitchRequest`:** the TU body is
+  retail 0x82327a18 with retail's helper 0x8230e290 inlined. Both end in the same call 0x82349468 (= retail
+  0x82349b90)(brain+0x1254, inst, brain+0x11e0, Death 0x82779bf8 / retail 0x82779978, &{data, "EnemyDeathSwitchData",
+  0x20}, 0); the rest differs only in stack offsets and shifted constants with equal values. The PC does the same:
+  tru+0x241650 -> tru+0x23d6e0 (= 0x8230e290: `ecx = brain+0x1254`, {data, 0x8588b8 "EnemyDeathSwitchData", 0x20}) ->
+  tru+0x271d30 (= 0x82349b90: file the request tru+0x271080, then unless the current state's slot +0x40 (inst, 1)
+  refuses, machine+4 |= 1 and switch at once tru+0x271c10). So the "request through the behaviour control" is already
+  the PC's way; death animation timing, chunkdoll and regeneration cannot change from it. The new death-switch line
+  shows live whether the switch happens inside the call. Disassemblies: `work\asi\combat069\analysis`.
+* **TO TEST** (hall02, tutorial thrall; `[Hit] Log=1`, `[Death] Log=1`; TruMenu `combo.trace 1` helps):
+
+| # | what | expected log lines |
+|---|---|---|
+| 1 | game start | `TruShadowCombat 0.6.9 ... loaded`; `0.6.9 log points (nothing changed in the game): chunkdoll build of the Death state on ..., hit-list add of Lara's contact hit on (..., Lara's record read), death switch on ...`; no `0.6.9 ... does not match` |
+| 2 | 4 x X, `[States] Translate1004=0` | 752: `0.6.9 hit list: contact -> <thrall> at Lara record 752 ... -> added in slot 0 ...: hit message 0x11c follows`; then at 755 / 754 / 753: `... at Lara record 755 ... REFUSED: already in slot 0 ... list +0xa4 [T - - - - - - -]` = K-8 proven (the fist touches, the list refuses). No hit-list line at 755 at all = the fist does not touch (contact problem, not the list) |
+| 3 | 4 x X, `[States] Translate1004=1` (live) | `state 1004 slot 1 ... ON: ... list cleared` before each new record, then `... at Lara record 755 ... added in slot 0` (and 754 / 753); TruMenu `combo:` -40 / -60 like the Xbox |
+| 4 | X X Y (with 1004 on and off) | `... at Lara record 760 ... added` (on) / `REFUSED: already in slot 0` (off); combo `752>755>760 ... (-100.0)` with 1004 on |
+| 5 | melee kill: knock the thrall down, Y finisher | `0.6.5 death: ... RegenerateDeath hit ... death switch kind 7 and notification 38` -> `0.6.9 death switch: <thrall> kind 7 ... from TruShadowCombat (...), ..., state RegenerateDeath -> Death (switched inside the call) or (not switched yet), request ... accepted (al 1)` (which of the two is the open timing question - both are the PC's = retail's way) -> after the Death timer `0.6.9 chunk build: <thrall> in the Death state ... record +0x46 <n> -> BUILT; chunkdoll count 0 -> 1 (limit 8), physics lock 0x0` + the thrall shatters. `not built` = limit / object test failed (send the log); no chunk-build line at all = the Death state never reached its timer or the record has +0x46 = 0 |
+| 6 | other kills (pistol, a punch without regeneration) | `0.6.9 death switch: ... from death check tru+0x220380` or `0.6.6 T5` + `from TruShadowCombat`; then the chunk-build line as in 5 |
+| 7 | anything odd | `[Hit] Log=0` and `[Death] Log=0` stop the lines (the hooks still pass through); send `TruShadowCombat.log` |
 
 0.6.8 (2026-11-09, **offline, not yet seen in game**; TODO N18 K-1b, main workspace
 `docs\Befund-K1b-Entscheidung-0911.md`, ENGINE.md 13): build `work\asi\combat068`, byte pre-checks
@@ -606,6 +651,7 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Death] TranslateT5` | 1 | 0.6.6 (T5): lethal, not regenerating hit on an enemy with a companion -> death kind 7 at once in the hit reaction (TU 0x823038d8); live |
 | `[Death] TranslateVaulted` | 1 | 0.6.6 (P1c): Vaulted Enter as the TU 0x8232b630 with the step chain (records 0xbe / 0xf4, switch, copier); step table only from fixed extension data; live |
 | `[Death] TranslateVaultedClock` | 1 | 0.6.6 (P1c K): the TU's Vaulted clock - 5 s without slow motion (Enter 0x8232b698, enemy update 0x822db190); needs the chain; live |
+| `[Death] Log` | 1 | 0.6.9: one line per chunkdoll build of the Death state (tru+0x26c9f9) and per death switch (tru+0x241650), max 2000; log only; live |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 
