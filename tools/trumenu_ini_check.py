@@ -2992,8 +2992,8 @@ def check_02219(ini_path, switches_path):
     RememberPage / LastPage for the bar), power.infinite (TruShadowPower 0.23 [Meter] Infinite) with its bar row"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.19 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.19')
+    if '"0.22.19 (pages remembered' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.20: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.19 part "0.22.19 (pages remembered"')
     ini = open(ini_path, encoding='utf-8').read()
     for sec, key, val in (('Menu', 'RememberPage', '1'), ('Menu', 'OpenPages', 'totest,quick'),
                           ('Quick', 'RememberPage', '1'), ('Quick', 'LastPage', '')):
@@ -3069,6 +3069,90 @@ def check_02219(ini_path, switches_path):
     if '1e466d0709564db15ef8b7cf0b1d97dac49c8ef98cb043617a608f7ad2d5cd3c' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.18 build hash (work\\asi\\menu0241) is missing')
     return problems, '%d menu pages, 17 bar page names, power.infinite row / item / greying' % len(mp)
+
+
+def check_02220(ini_path):
+    """0.22.20: menu.noattract ([Menu] NoAttract, default 0): the AttractTimer clock (generalbank script 60 member 4) taken
+    at the clock f11 native, held at elapsed 0 through the clock update slot 0x84584c while on; bar row in
+    Spiel-Einstellungen / Hauptmenue, item, help, greying, persistence, 13 byte checks = precheck_02220 rows"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.20 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.20')
+    ini = open(ini_path, encoding='utf-8').read()
+    if not re.search(r'\{"Menu", "NoAttract", "0",', src):
+        problems.append('TruMenu.cpp: kOpts [Menu] NoAttract default must be "0"')
+    block = re.search(r'^\[Menu\]\r?\n(.*?)(?=^\[|\Z)', ini, re.M | re.S)
+    if not block or not re.search(r'^NoAttract=0\r?$', block.group(1), re.M):
+        problems.append('TruMenu.ini: [Menu] NoAttract=0 missing')
+    if 'InterlockedExchange(&g_naWant, OptInt(ini, "Menu", "NoAttract") != 0 ? 1 : 0);' not in fn_body(src, 'void ReadOptions('):
+        problems.append('TruMenu.cpp: ReadOptions must read [Menu] NoAttract into g_naWant')
+    # item: bool, explicit value, no argument = report (never a flip), written at once
+    if not re.search(r'\{"menu\.noattract", "bool", "', src): problems.append('TruMenu.cpp: item menu.noattract missing')
+    run = fn_body(src, 'bool RunNa(')
+    for want in ('if (!arg || !arg[0]) { ValNa(o, n); return true; }', 'IniKeep("Menu", "NoAttract", on ? "1" : "0");',
+                 'usage: menu.noattract 1|0'):
+        if want not in run: problems.append('TruMenu.cpp: RunNa must hold %s' % want)
+    if 'BoolArg(' in run: problems.append('TruMenu.cpp: RunNa must not use BoolArg (an empty argument would flip)')
+    # mechanism: capture at the f11 native (passive), hold through the update slot only for the captured clock in the
+    # front end, the game's code called on in both hooks
+    f11 = fn_body(src, 'void __fastcall NaF11(')
+    if 'NaCapture(' not in f11 or 'reinterpret_cast<NaClockFn>(kNaF11Body)(slot);' not in f11:
+        problems.append('TruMenu.cpp: NaF11 must capture and then call the game\'s f11 body 0x4a34f0')
+    cap = fn_body(src, 'void NaCapture(')
+    for want in ('if (vt != kNaClockVt)', 'if (!NaFrontEnd())', 'g_naClock = clock;'):
+        if want not in cap: problems.append('TruMenu.cpp: NaCapture must hold %s' % want)
+    upd = fn_body(src, 'void __fastcall NaUpdate(')
+    for want in ('if (g_naWant && want)', 'clock == want && NaFrontEnd()', '*elapsed = 0.0f;',
+                 'reinterpret_cast<NaUpdFn>(kNaUpdOrig)(self, edx, dt);'):
+        if want not in upd: problems.append('TruMenu.cpp: NaUpdate must hold %s' % want)
+    if upd.find('reinterpret_cast<NaUpdFn>(kNaUpdOrig)') < upd.find('*elapsed = 0.0f;'):
+        problems.append('TruMenu.cpp: NaUpdate must reset before the game\'s update runs')
+    fe = fn_body(src, 'bool NaFrontEnd(')
+    if '(state == 6 || state == 10)' not in fe: problems.append('TruMenu.cpp: NaFrontEnd must test main state 6 / 10')
+    for want in ('const DWORD kNaF11Site = 0x00795cc4, kNaF11Body = 0x004a34f0, kNaClockVt = 0x00845860;',
+                 'const DWORD kNaUpdSlot = 0x0084584c, kNaUpdOrig = 0x004a3960;',
+                 'const BYTE kNaF11Orig[5] = {0xe9, 0x27, 0xd8, 0xd0, 0xff};',
+                 'const BYTE kNaUpdSlotOrig[4] = {0x60, 0x39, 0x4a, 0x00};'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    tick = fn_body(src, 'void NaTick(')
+    for want in ('LcPatch(kNaF11Site, kNaF11Orig, g_naF11Patch, 5, true)', 'LcPatch(kNaUpdSlot, kNaUpdSlotOrig, g_naUpdPatch, 4, true)',
+                 'LcPatch(kNaUpdSlot, kNaUpdSlotOrig, g_naUpdPatch, 4, false)'):
+        if want not in tick: problems.append('TruMenu.cpp: NaTick must hold %s' % want)
+    if 'NaTick();' not in fn_body(src, 'DWORD WINAPI PadHook(') or 'if (padIdle) NaTick();' not in fn_body(src, 'void Render('):
+        problems.append('TruMenu.cpp: NaTick must run in PadHook (every poll) and in Render while no pad poll')
+    if 'if (!_stricmp(id, "menu.noattract")) return NaWhy();' not in fn_body(src, 'const char *RadialWhy('):
+        problems.append('TruMenu.cpp: RadialWhy must grey menu.noattract with NaWhy')
+    for t in re.findall(r'"((?:[^"\\]|\\.)*)"', fn_body(src, 'const char *NaWhy(')):
+        if len(t) > 60: problems.append('TruMenu.cpp: NaWhy text over 60 characters: %s' % t)
+    # 13 byte checks = the rows of precheck_02220 section 9
+    m = re.search(r'const DvCheck kNaChecks\[\] = \{(.*?)\n\};', src, re.S)
+    rows = re.findall(r'\{0x([0-9a-f]{8}), "([0-9a-f ]+)"\}', m.group(1)) if m else []
+    if len(rows) != 13: problems.append('TruMenu.cpp: kNaChecks must hold 13 rows, %d' % len(rows))
+    pre = os.path.join(ROOT, 'work', 'asi', 'menu0243', 'precheck_02220.txt')
+    if os.path.exists(pre):
+        lines = [l.split(None, 1) for l in open(pre, encoding='utf-8').read().splitlines() if l.strip() and not l.startswith('#')]
+        if len(lines) != 45: problems.append('precheck_02220.txt: 45 rows expected, %d' % len(lines))
+        have = {(a.lower(), b.replace(' ', '').lower()) for a, b in lines}
+        for a, b in rows:
+            if (a, b.replace(' ', '')) not in have: problems.append('precheck_02220.txt: row 0x%s missing' % a)
+    # bar row: own group "Hauptmenue" in Spiel-Einstellungen, before "TruMenu selbst"; help line within 60 characters
+    tables = src[src.find('const QbRow kQbSettings[] = {'):]
+    tables = tables[:tables.find('\n};')]
+    g, r, t = (tables.find('"set_main", kQbGroup'), tables.find('"menu.noattract", "", kQbBool'),
+               tables.find('"set_tm", kQbGroup'))
+    if not (0 <= g < r < t): problems.append('TruMenu.cpp: row menu.noattract (bool) must sit in group set_main of kQbSettings')
+    if 'Main menu attract video off' not in tables or 'Hauptmenue-Video aus' not in tables:   # read_cpp: umlauts as ue
+        problems.append('TruMenu.cpp: bar row texts "Hauptmenue-Video aus" / "Main menu attract video off" missing')
+    hm = re.search(r'\{"menu\.noattract", "", "((?:[^"\\]|\\.)*)"\s*"((?:[^"\\]|\\.)*)"\}', src)
+    if not hm: problems.append('TruMenu.cpp: kQbHelp row menu.noattract missing')
+    else:
+        de, en = unescape(hm.group(1) + hm.group(2)).split('|')
+        if len(de) > 60 or len(en) > 60: problems.append('TruMenu.cpp: menu.noattract help over 60 characters')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '1121ff2ac48ec544401d5fbbc51be70697c8b450cbeda9de0b96fc35d289601c' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.19 build hash (work\\asi\\menu0242) is missing')
+    return problems, 'menu.noattract: [Menu] NoAttract=0, item / row / help / greying, capture + hold, %d byte checks' % len(rows)
 
 
 def table(src):
@@ -3220,6 +3304,10 @@ def main(argv):
     for p in cproblems19: print('Q02219 %s' % p)
     if not cproblems19: print('ok: 0.22.19 %s' % csummary19)
     problems += cproblems19
+    cproblems20, csummary20 = check_02220(ini_path)   # 0.22.20
+    for p in cproblems20: print('Q02220 %s' % p)
+    if not cproblems20: print('ok: 0.22.20 %s' % csummary20)
+    problems += cproblems20
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

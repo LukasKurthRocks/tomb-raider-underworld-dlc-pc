@@ -2928,6 +2928,81 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.20 - main menu attract video off (2026-11-10)
+
+Built into `work\asi\menu0243`, not installed, no live test. Owner's wish: the main menu shall stay on screen (for
+screenshots) - no teaser video after the idle time; the menu background (the scene behind the ring) stays exactly as it
+is. `menu.noattract 1|0` (no argument = report, never a flip), `[Menu] NoAttract` (default 0 = the game's teaser,
+written back at once like the 0.22.18 settings), bar row **"Hauptmenü-Video aus" / "Main menu attract video off"** on
+page Spiel-Einstellungen, own group "Hauptmenü" / "Main menu" (before "TruMenu selbst"), help line "Kein Teaser-Video
+nach Leerlauf im Hauptmenü".
+
+**Who starts the teaser** (static, `tools/script_dis.py` / `script_func_list.py` / `script_members_list.py` on the
+installed `mods\generalbank.drm` and the PC patch generalbank - script 60 is the same in both - and `tools/pe_dis.py` on
+`data\pc\tru.exe`; one-off tools and outputs in `work\menu0243_1011`):
+
+- Generalbank **script 60 `AttractTimer`** (print "AttractTimer()::Run()"; the log lines "UI - STARTING / RESTARTING /
+  STOPPING Attract Mode Timer" are its functions 4 / 3 / 5, called by the main menu script 7 - "Stopping Main Menu
+  attract mode timer...N" is script 7's own print). Member 4 (instance +4) is a native **`clock`** (script 125, package
+  `game/script/core/core`; init block `{autostart 0, alarm 40.0, repeat 1}`).
+- f1 (vtable 22, the per-frame update) starts the clock while `uigamedata` f37 holds (0x5d56e0: main state 6 or 10 = the
+  front end); f4 START = clock f11 + f0, f3 RESTART = clock f11 + f1 + f0.
+- When the clock fires, f2 (vtable 1, the clock event) checks clock f10 (`==` its member 4), front-end state != 4 and
+  two `stdscreenmgr` tests, then broadcasts **"stopTitleMusic"**, calls `uigamedata` f22 (StopMovie) and **f26** =
+  0x7a0d30 -> 0x77bd40 -> 0x5d5700: front-end state 6, screens closed, main state 10 -> the front-end switch plays the
+  attract list 0x8abef4 ("intro") through 0x5d5520 / the Bink player 0x4a12b0. f26 has no other caller in the
+  generalbank (`work\menu0243_1011\native_callers.py`).
+- The clock in the exe: class vtable 0x861e94, binder 0x7ab770 (natives f0 0x795c30 Start, f1 Stop, f4 IsRunning, f7
+  elapsed, f9 SetAlarm, f10 0x796fd0 `==`, f11 0x795cc0 = `mov ecx, [esp+4]; jmp 0x4a34f0` re-registers the update
+  object). Object 0x20 B, vtable 0x845860: +8 state (2 = running), +0x10 elapsed, +0x14 alarm, +0x18 fired, +0x19
+  repeat, +0xc update object (vtable 0x84583c) whose **slot 4 (0x84584c) = 0x4a3960(dt)**: while running elapsed += dt;
+  not fired and elapsed >= alarm -> fired (repeat: elapsed -= alarm) and the event goes to the owner script.
+- Clock **f11 is called only by script 60** (+0x608 in f3, +0x698 in f4): 54 calls in the 27 DRMs of the installed mods
+  tree that carry clock calls, all script 60 (`work\menu0243_1011\clock_f11_callers_mods.txt`); the base levels inside
+  the bigfile were not scanned - hence the extra gates below.
+
+**What TruMenu does** (section "0.22.20 menu.noattract", game thread, generalbank.drm untouched):
+
+1. Capture (passive, placed once the 13 checks pass, whether the switch is on or not - so turning it on in the menu needs
+   no restart of the timer): the jmp of the f11 native (0x795cc4) goes to `NaF11`. It gets the member address
+   (AttractTimer +4); the clock behind it is taken when its vtable is 0x845860 and the main state is 6 / 10 (log line
+   `menu.noattract: AttractTimer clock 0x... (member 0x...; state, elapsed, alarm, repeat) taken from clock f11`), then
+   the game's 0x4a34f0 runs.
+2. Hold (only while the switch is on): slot 4 of the update vtable (0x84584c) points to `NaUpdate`. For the captured
+   clock only, and only in main state 6 / 10, elapsed is set to 0 before the game's 0x4a3960 runs - the alarm never
+   fires, f2 never runs: no "stopTitleMusic", no StopMovie, no f26, so the title music and the menu background go on as
+   before. Every other clock (and the AttractTimer clock outside the front end) is the game's. Off = slot 4 put back
+   (log line with the held frames); elapsed then starts from one frame, so no teaser at once - the full idle time first.
+3. Turned on before the clock was taken (e.g. TruMenu loaded late): the game's teaser can come once until the timer's
+   next START / RESTART (any input in the menu, or the menu coming back after the teaser) - from then on it is held.
+
+`menu.noattract` without an argument reports e.g. `1 (held; clock taken, repeat, 3120 frames held, 4 timer starts
+seen)`; the row is greyed with the reason when the code differs (13 checks) or a patch site was not the game's bytes.
+
+**Start-up intro (TODO "faster start"):** not part of TruMenu - TruQoL 0.1.2 already has `[Startup] SkipIntro`
+(PlayMovie call 0x77bc7b, only before "press start"; switchable on bar page Fixes, restart). The legal screens are
+script-drawn, no movie. The attract "intro" is the same Bink file, but it is played by 0x5d5520 directly and is
+covered by `menu.noattract`, not by SkipIntro.
+
+Checks: `work\asi\menu0243\precheck_02220.txt` = the 32 rows of 0.22.18 + the 13 rows of `kNaChecks` (clock class /
+binder / f11 native + body, clock vtable + constructor, update object vtable + slot 4, update body, init block, f37
+gate): 45 checks, 0 mismatches against `data\pc\tru.exe` and read-only against the installed `tru.exe`;
+`trumenu_precheck_match` 13 = 13. `trumenu_ini_check` `check_02220` (default 0 in kOpts / sample INI / ReadOptions,
+item / row / group / help / greying, RunNa no-flip + usage + IniKeep, capture and hold order, the 13 rows in the precheck
+file, Set-TruMenu 0.22.19 hash; negative test on a copy: 3 of 3 mutations caught); `trumenu_quick_check` model
+`noattract` (14 cases: game's teaser when off, 10 000 held frames without an event, other clocks / levels untouched, no
+teaser at once after off, capture rules, RunNa). `Set-TruMenu.ps1` knows the 0.22.19 hash.
+
+### TO TEST 0.22.20
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | off (default) | main menu, touch nothing ~1 min | the game's teaser starts as before; TruMenu.log `menu.noattract: AttractTimer clock ... taken from clock f11` (main state 6 / 10) |
+| 2 | on | bar Spiel-Einstellungen / Hauptmenü, "Hauptmenü-Video aus" right; back in the main menu, touch nothing 5 min | no teaser; menu background and title music keep running; `menu menu.noattract` = `1 (held; clock taken, ... frames held ...)` |
+| 3 | persist | restart the game | `[Menu] NoAttract=1` in TruMenu.ini, menu stays from the first idle on |
+| 4 | off again | row left, wait in the menu | log `menu.noattract off: N frames held`; teaser after the normal idle time, not at once |
+| 5 | level | start a level with the switch on | nothing changes in the level (other clocks are the game's) |
+
 ## 0.22.19 - pages remembered, "Kraft unendlich" in the cheats (2026-11-10)
 
 Built into `work\asi\menu0242`, not installed, no live test. Owner's wishes after the 0.22.18 live result (20:10:
@@ -3911,6 +3986,7 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Menu] PauseGame` | 0 | 0.7.1: 1 = also set the `time.pause` bit while the menu is open; on close only what TruMenu set is cleared |
 | `[Menu] RememberPage` | 1 | 0.22.19: 1 = the big window opens with the pages that were open last time (`OpenPages`), also after a restart; 0 = the built-in pages (TO TEST, Quick access) |
 | `[Menu] OpenPages` | `totest,quick` | 0.22.19: keys of the open pages (comma list, rewritten when a page is opened / closed; keys in the start line `menu pages`); unknown keys dropped, only unknown = the built-in pages |
+| `[Menu] NoAttract` | 0 | 0.22.20 (`menu.noattract`): 1 = no teaser video (attract mode) after the idle time in the main menu - the AttractTimer clock is held at 0 in the front end, the background stays; 0 = the game's teaser |
 | `[Quick] RememberPage` | 1 | 0.22.19: 1 = the bar opens on the page it showed last (`LastPage`), also after a restart; 0 = always page Level data |
 | `[Quick] LastPage` | (empty) | 0.22.19: English name of the last bar page (rewritten 1 s after a page change and at the close); empty = Level data, a name that is no page any more = page 1, logged |
 | `[Pad] BlockInput` | 1 | 0 = the game sees the pad while the menu is open |

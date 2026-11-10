@@ -3947,6 +3947,155 @@ def check_infinite():
     return good
 
 
+# ---- 0.22.20 menu.noattract: NaCapture (clock f11 native), NaUpdate (update slot 0x84584c) over the game's clock update
+# 0x4a3960 (running: elapsed += dt; not fired and elapsed >= alarm -> event, fired or elapsed -= alarm with repeat), RunNa ----
+NA_CLOCK_VT = 0x845860
+
+
+def na_source():
+    import os, re
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'asi', 'TruMenu',
+                            'TruMenu.cpp'), encoding='utf-8').read()
+    fe = re.search(r'\nbool NaFrontEnd\(\) \{.*?\n\}', src, re.S).group(0)
+    states = tuple(int(x) for x in re.findall(r'state == (\d+)', fe))
+    vt = int(re.search(r'kNaClockVt = 0x([0-9a-f]+);', src).group(1), 16)
+    return states, vt
+
+
+class NaClock:
+    def __init__(self, alarm=40.0, repeat=1, autostart=0, vt=NA_CLOCK_VT):
+        self.vt, self.alarm, self.repeat = vt, alarm, repeat
+        self.state, self.elapsed, self.fired, self.events = (2 if autostart else 0), 0.0, False, 0
+
+    def start(self):                             # clock f0 0x4a3450: only when not running
+        if self.state != 2: self.fired, self.elapsed, self.state = False, 0.0, 2
+
+    def stop(self): self.state = 0               # clock f1 0x4a3470
+
+    def game_update(self, dt):                   # 0x4a3960
+        if self.state != 2: return
+        self.elapsed += dt
+        if self.fired or not self.elapsed >= self.alarm: return
+        if not self.repeat: self.fired = True
+        else: self.elapsed -= self.alarm
+        self.events += 1                         # the event to the owner script: AttractTimer f2 -> f26 = teaser
+
+
+class NaModel:
+    def __init__(self, states):
+        self.states, self.want, self.clock, self.holds, self.foreign, self.outside = states, 0, None, 0, 0, 0
+        self.main = 6
+
+    def f11(self, clock):                        # NaF11 -> NaCapture, then the game's f11 body (re-register)
+        if clock.vt != NA_CLOCK_VT: self.foreign += 1; return
+        if self.main not in self.states: self.outside += 1; return
+        self.clock = clock
+
+    def update(self, clock, dt):                 # NaUpdate (only while the slot is patched = want)
+        if self.want and self.clock is clock and self.main in self.states:
+            clock.elapsed = 0.0
+            self.holds += 1
+        clock.game_update(dt)
+
+
+def na_run(arg, want, ini_text):                 # RunNa: (ok, new want, new ini text or None, reply)
+    v = (arg or '')
+    if not v: return True, want, None, 'report'
+    if v == '1' or v.lower() in ('on', 'true'): on = 1
+    elif v == '0' or v.lower() in ('off', 'false'): on = 0
+    else: return False, want, None, 'usage'
+    return True, on, ini_set(ini_text, 'Menu', 'NoAttract', str(on)), 'written'
+
+
+def na_restart(m, c):                            # AttractTimer f3 RESTART: f11, f1, f0
+    m.f11(c); c.stop(); c.start()
+
+
+def check_noattract():
+    states, vt = na_source()
+    cases = []
+    cases.append(('source: NaFrontEnd = main state 6 / 10 (uigamedata f37 0x5d56e0), clock vtable 0x845860',
+                  states == (6, 10) and vt == NA_CLOCK_VT))
+    # off: the game's teaser (alarm 40.0, repeat 1 = the AttractTimer init block)
+    m, c = NaModel(states), NaClock()
+    na_restart(m, c)
+    for _ in range(41): m.update(c, 1.0)
+    first = c.events
+    for _ in range(40): m.update(c, 1.0)
+    cases.append(('switch off: the clock fires at elapsed 40 and again 40 later (repeat) - the game as before',
+                  first == 1 and c.events == 2))
+    # on + taken: never fires in the front end, however long the menu idles (10 000 frames, dt 1.0 and 2.5)
+    m, c = NaModel(states), NaClock()
+    m.want = 1
+    na_restart(m, c)
+    for k in range(10000): m.update(c, 1.0 if k % 2 else 2.5)
+    cases.append(('switch on, clock taken: 10 000 menu frames, no event (no stopTitleMusic / StopMovie / teaser)',
+                  c.events == 0 and m.holds == 10000 and c.elapsed <= 2.5))
+    # every other clock stays the game's
+    other = NaClock(alarm=5.0, repeat=0)
+    other.start()
+    for _ in range(6): m.update(other, 1.0)
+    cases.append(('switch on: another clock (alarm 5, no repeat) fires as the game\'s', other.events == 1))
+    # outside the front end the taken clock is not held
+    m.main = 1
+    for _ in range(41): m.update(c, 1.0)
+    cases.append(('switch on, main state 1 (level): the AttractTimer clock is the game\'s again', c.events == 1))
+    # switch off after a long hold: no teaser at once, the full idle time first
+    m, c = NaModel(states), NaClock()
+    m.want = 1
+    na_restart(m, c)
+    for _ in range(1000): m.update(c, 1.0)
+    m.want = 0                                   # elapsed = one dt (held to 0, then the game's += dt)
+    for _ in range(38): m.update(c, 1.0)
+    early = c.events
+    for _ in range(2): m.update(c, 1.0)
+    cases.append(('switch off after 1000 held frames: no event at once, the first after the idle time (40 - 1 dt)',
+                  early == 0 and c.events == 1))
+    # on before the clock was taken: the game's until the timer's next start / restart (f11), then held
+    m, c = NaModel(states), NaClock()
+    m.want = 1
+    c.start()                                    # started by f1 OnUpdate (f0 only, no f11)
+    for _ in range(41): m.update(c, 1.0)
+    before = c.events
+    na_restart(m, c)
+    for _ in range(500): m.update(c, 1.0)
+    cases.append(('on before the clock is known: the game\'s; taken at the next RESTART (f11), then held',
+                  before == 1 and m.clock is c and c.events == 1))
+    # capture rules
+    m = NaModel(states)
+    m.f11(NaClock(vt=0x84586c))
+    m.main = 1
+    m.f11(NaClock())
+    cases.append(('f11 with another vtable / outside the front end: nothing taken (counted)', m.clock is None and
+                  m.foreign == 1 and m.outside == 1))
+    m.main = 10
+    c1, c2 = NaClock(), NaClock()
+    m.f11(c1)
+    m.f11(c2)
+    cases.append(('a new AttractTimer clock (main state 10) replaces the old one', m.clock is c2))
+    # RunNa
+    ini = '[Menu]\nEnabled=0\n; c\nNoAttract=0\n\n[Pad]\nBlockInput=1\n'
+    ok, want, text, kind = na_run('', 1, ini)
+    cases.append(('no argument = report, never a flip, nothing written', ok and want == 1 and text is None and
+                  kind == 'report'))
+    ok, want, text, kind = na_run('maybe', 0, ini)
+    cases.append(('a bad value: usage, nothing changed', not ok and want == 0 and text is None))
+    ok, want, text, kind = na_run('1', 0, ini)
+    cases.append(('menu.noattract 1: [Menu] NoAttract=1 written, the other lines kept', ok and want == 1 and
+                  ini_get(text, 'Menu', 'NoAttract', None) == '1' and 'Enabled=0' in text and '; c' in text and
+                  'BlockInput=1' in text))
+    ok, want, text2, kind = na_run('off', 1, text)
+    cases.append(('menu.noattract off: back to 0; a restart reads 0 (the game\'s teaser)', ok and want == 0 and
+                  ini_get(text2, 'Menu', 'NoAttract', '0') == '0'))
+    cases.append(('missing key = 0 (kOpts default, the game\'s behaviour)',
+                  ini_get('[Menu]\nEnabled=0\n', 'Menu', 'NoAttract', '0') == '0'))
+    good = True
+    for name, ok in cases:
+        print('noattract: %-77s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= bool(ok)
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -3971,7 +4120,8 @@ def main():
                check_settings(),                                                      # 0.22.16
                check_subfallback(),                                                   # 0.22.17
                check_groups_nested(), check_volsave(), check_persist(), check_subalign(),   # 0.22.18
-               check_lastpage(), check_menupages(), check_infinite()]                 # 0.22.19
+               check_lastpage(), check_menupages(), check_infinite(),                 # 0.22.19
+               check_noattract()]                                                     # 0.22.20
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 
