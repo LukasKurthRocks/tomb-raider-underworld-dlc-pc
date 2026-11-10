@@ -11,13 +11,18 @@ What it prints for one or more sources:
   * the 16 hit-area members 0x108 .. 0x180 (userType 361): their entries reference widgets by name symbol; shown as
     the instance offsets of the members carrying those names (bg / icon / label plate / text of each position)
   * the label text id (locals) of the slot text widgets and the texture id (id5) of the slot icons
+  * position 14 (bottom) as tools/menu_ring_p14.py builds it (layout "V3 P14, stage light", 2026-11-10): the slot-7
+    form, the value func 19 stores in the lock m0xa90[13] in the base state (1 = locked, PC original), whether func 29
+    places icon 0x7bc on PC, its texture / text, the appended blocks that show it, re-free it after the dialog blocks
+    and test a click on hit area 0x170 (-> quit fall-through func 8 +0x188f8)
 Optional --variant 16: the same positions as if m0xa70 were 16.0 (count 8, step pi/8) - arithmetic only.
 
 Usage (from the repository root):
-  ../bin/pyt -t 300 tools/menu_ring_layout.py SOURCE [SOURCE ...] [--variant 16]
+  ../bin/pyt -t 300 tools/menu_ring_layout.py SOURCE [SOURCE ...] [--variant 16] [--expect-p14]
   SOURCE as tools/script_func_list.sections (a PC generalbank.drm file, pp / pb, pc:generalbank.drm)
 Exit 0 when every source has the PC layout this finding describes (m0xa70 = 14.0, 16 hit areas, position 14 =
-bottom); 1 otherwise.
+bottom) - with --expect-p14 also position 14 = door / text 131 / click 0x170 enabled (menu_ring_p14.p14_full);
+1 otherwise.
 """
 import sys, os, struct, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -66,7 +71,30 @@ def positions(count, step, radius):
     return out
 
 
-def report(src, variant):
+def p14(src):
+    """position-14 block of the report -> True when the stage-light layout is complete"""
+    import menu_ring_p14 as P14
+    S, e = FL.sections(src)
+    try:
+        st = P14.p14_status(P14.Secs(S))
+    except Exception as x:                # a source without the expected script 7 layout
+        print('  position 14: not decoded (%s: %s)' % (type(x).__name__, x))
+        return False
+    print('  position 14 (bottom, hit area 0x170): slot 7 form %s; base-state lock m0xa90[13] = %s (%s); func 29 places '
+          'icon 0x7bc on PC: %s; icon texture id5:%d%s, text %d%s' % (
+              st['slot7'], st['lock14_base'], 'free' if st['lock14_base'] == 0 else 'locked',
+              'yes' if st['place14_pc'] else 'no', st['icon14'], ' (door)' if st['icon14'] == 26 else '',
+              st['text14'], ' (QUIT GAME)' if st['text14'] == 131 else ''))
+    print('    blocks: show 0x6b4 / 0x7bc %s; re-free after dialog blocks %s; click 0x170 %s' % (
+        ', '.join(st['shows']) or 'none', ', '.join(st['refree']) or 'none',
+        ', '.join('%s -> %s' % (a, '/'.join(b)) for a, b in st['click']) or 'none'))
+    full = P14.p14_full(st)
+    print('    -> %s' % ('QUIT GAME on position 14: door / text 131 / click 0x170 enabled (quit fall-through +0x188f8)'
+                         if full else 'position 14 not (fully) enabled'))
+    return full
+
+
+def report(src, variant, expect_p14=False):
     L = load(src)
     if L is None:
         print('%s: script %d not found or not a PC source' % (src, SID))
@@ -118,11 +146,14 @@ def report(src, variant):
     ok = abs(total - 14.0) < 1e-4 and nhit == 16 and abs(positions(count, step, radius)[13][3] - radius) < 1e-3
     print('  -> %s' % ('PC layout: 7 slots left, 7 sub positions right, position 14 = bottom' if ok else
                        'layout differs from the finding'))
-    return ok
+    full = p14(src)
+    return ok and (full or not expect_p14)
 
 
 def main(argv):
     variant = None
+    expect_p14 = '--expect-p14' in argv
+    argv = [a for a in argv if a != '--expect-p14']
     if '--variant' in argv:
         k = argv.index('--variant'); variant = float(argv[k + 1]); del argv[k:k + 2]
     if not argv:
@@ -130,7 +161,7 @@ def main(argv):
         return 2
     ok = True
     for src in argv:
-        ok &= report(src, variant)
+        ok &= report(src, variant, expect_p14)
     print('result: %s' % ('ok' if ok else 'NOT ok'))
     return 0 if ok else 1
 
