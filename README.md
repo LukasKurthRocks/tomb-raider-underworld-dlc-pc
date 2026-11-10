@@ -46,8 +46,8 @@ The port itself is the original project's release kit. **This fork has no releas
 
 - *Tomb Raider: Underworld*, Steam, PC: `tru.exe` v1.1 (MD5 `b36da327a320eab8b5c8464b27685840`), unpacked once with
   [Steamless](https://github.com/atom0s/Steamless/releases) (writes `tru.exe.unpacked.exe`)
-- your own Xbox 360 DLC files `pack10.000` (DLC 1) and `pack11.000` (DLC 2), plus `credits_DLC1.wmv` /
-  `credits_DLC2.wmv` for the end credits
+- your own Xbox 360 DLC content folders: `pack10.000` (DLC 1) and `pack11.000` (DLC 2); the end-credits videos
+  `credits_DLC1.wmv` / `credits_DLC2.wmv` are already in the same folders
 - [ModLoader](https://github.com/TombRaiderModding/ModLoader/releases) (`ModLoader.asi` + its `binkw32.dll` proxy)
 - Python 3.9+ with `bsdiff4` and `numpy`; for the credits ffmpeg and RAD Video Tools
 - `trudlcport-kit-B270.zip`, `install_dlc.py`, `tex_convert.py`, `credits_convert.py` from the
@@ -59,8 +59,9 @@ The port itself is the original project's release kit. **This fork has no releas
 2. Put the three scripts and the unzipped `kit` folder into one folder. Close the game.
 3. Dry run: `python install_dlc.py --game "<game folder>" --dlc "<folder with the Xbox files>" --kit .\kit --check`.
    It must print **All inputs OK**.
-4. Run the same command without `--check`, with `--credits --rad "<radvideo64.exe>" --ffmpeg "<ffmpeg.exe>"`. Each
-   DLC needs its credits movie to finish.
+4. Run the same command without `--check`, with `--credits --rad "<radvideo64.exe>" --ffmpeg "<ffmpeg.exe>"`:
+   `--credits` converts the credits videos from the DLC folders into the game's format. Without them a DLC ends on a
+   black screen after its last cutscene.
 5. Turn on **fullscreen effects** (game options) and **depth of field** (no menu switch:
    `.\scripts\windows\Set-TruDisplay.ps1 -FullscreenEffects On -DepthOfField On`, or TruMenu's settings page). Without
    them the DLC 2 end level misses its haze and soft background.
