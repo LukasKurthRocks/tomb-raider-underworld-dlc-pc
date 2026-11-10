@@ -38,6 +38,13 @@ Changes (script 7 offsets of the PC script, 197 664 B; the pause-menu port only 
           func 24 +0x5274 after func 20, func 24 +0x52d4 and func 52 +0x1569c after func 43 re-free and show it
       B1e func 1 +0x43ec (OnOpen, before the ring-in state): the same again whenever the menu opens or comes back
           from a screen / dialog (tree 2 showed the door without its disc after new game -> cancel)
+      Tree 6 (pause-menu video of tree 4: door popped in before the sweep and stayed on screen after the close):
+      B1a (func 19, base state of every Run) and B1e (func 1 OnOpen) now HIDE door + disc (B1e also frees 14);
+      B1f func 50 +0x151b0 shows them as step 8 of the ring-in sweep (func 50 plays slot k's three timelines and
+      waits m0xa2c * uigamedata f110 per slot; the block sits after slot 7's wait, adds no wait of its own, so slots
+      1-7 and the end of the ring-in keep their timing); B1g func 2 +0x826c (OnClose) hides them; B3s func 27 +0x631c
+      (end of case 7 = step 7) sets the disc's scale property explicitly (uibitmap f40 into local 0xb4 as the case
+      does for 0x660, uivec3property f4 = last key of 0x92c) in case a timeline left it elsewhere.
       Every show block sets the colours the 7 ring slots get from their animation sets (resting keys, func 28 leaves
       all of them at alpha 0): disc ARGB ffc8c8c8 (set 0xbb0), icon ff3273b9 (sets 0x964 / 0x994).
   B2  func 8 +0x18f50 (where the slot-7 click test lands when slot 7 was not clicked, before the sub-ring dispatch):
@@ -87,6 +94,9 @@ D4 = dict(member=ICON14, old=31, new=26, donor=DOOR, at=0x22d30)
 D5 = dict(member=TEXT14, old=141, new=131, donor=QUITTEXT, at=0x1e450)
 D6 = dict(member=BG14, old=16, new=15, donor=0x660, at=0x21870)    # disc of the 7 ring slots (16 = sub-ring disc)
 REF_COLOR = (0x7294, {0x7290: 0x0f000618}, 0x65, 'func 28 +0x7290: uibitmap f18 (colour) on background 0x618')
+REF_HIDE = (0x46e4, {0x46e0: 0x0f0006b4}, 0x65, 'func 20 +0x46e0: uibitmap f5 (hide) on 0x6b4')
+REF_F40 = (0x6304, {0x62fc: 0x090000b4, 0x6300: 0x0f000660}, 0x65, 'func 27 +0x62fc: uibitmap f40 (scale property)')
+REF_V3SET = (0x5540, {0x553c: 0x0f000a58}, 0x65, 'func 25 +0x553c: uivec3property f4 (set)')
 # references copied from existing code: (call word offset, expected words before / at it, what)
 REF_SHOW = (0x4668, {0x4664: 0x0f0006b4}, 0x65, 'func 20 +0x4664: uibitmap f4 (show) on background 0x6b4')
 REF_F22 = (0x106b0, {0x106ac: 0x0f0007bc}, 0x68, 'func 43 +0x106ac: func 22 (show icon) on 0x7bc')
@@ -99,8 +109,8 @@ QUIT_CTX = {0x188f8: 0x00000303, 0x18904: 0x03000002, 0x18908: 0x0f000a88, 0x189
             0x18944: 0x0f000a90, 0x18948: 0x03000007, 0x18e14: 0x10000af8, 0x18e18: 0x6a000000}
 # block sites: key, function, site (op00 marker), marker, back word, (m0xa88 value set before, open script) or None
 SITES = [
-    dict(key='B1a', func=19, site=0x3da4, marker=0x8a7, back_word=0x000008a8, kind='show',
-         note='func 19 base state: show 0x6b4 / 0x7bc'),
+    dict(key='B1a', func=19, site=0x3da4, marker=0x8a7, back_word=0x000008a8, kind='hide',
+         note='func 19 base state: 0x6b4 / 0x7bc hidden until their step of the ring-in (B1f)'),
     dict(key='B1b_options', func=8, site=0x17c10, marker=0x20e, back_word=0x66000000, kind='refree',
          dialog=(0x17710, 2, 0x17c30, 127), note='func 8 options dialog block (m0xa88 = 2, screen script 127)'),
     dict(key='B1b_av', func=8, site=0x18768, marker=0x2dd, back_word=0x66000000, kind='refree',
@@ -117,8 +127,17 @@ SITES = [
          after_call=(0x52c8, 43), note='func 24 after func 43 (labels of the sub-ring: 0x7bc hidden)'),
     dict(key='B1d_f52', func=52, site=0x1569c, marker=0x1581, back_word=0x00001582, kind='refree',
          after_call=(0x15694, 43), note='func 52 (sub-ring animation state) after func 43'),
-    dict(key='B1e_open', func=1, site=0x43ec, marker=0x8d, back_word=0x04000001, kind='refree',
-         note='func 1 OnOpen before the ring-in state (op7d 1): colours again after a closed screen / dialog'),
+    dict(key='B1e_open', func=1, site=0x43ec, marker=0x8d, back_word=0x04000001, kind='hidefree',
+         note='func 1 OnOpen before the ring-in state (op7d 1): position 14 free, door + disc hidden until B1f'),
+    # tree 6 (owner, 2026-11-10): the door is the 8th step of the ring-in sweep and leaves with the menu
+    dict(key='B1f_step8', func=50, site=0x151b0, marker=0x1541, back_word=0x00001542, kind='show',
+         note='func 50 ring-in, after slot 7 and its step wait (m0xa2c * uigamedata f110): '
+                                'show door + disc with the slot colours = step 8 of the sweep, no extra wait'),
+    dict(key='B1g_close', func=2, site=0x826c, marker=0x95, back_word=0x00000096, kind='hide',
+         note='func 2 OnClose (both paths, the f37 jump lands here): hide door + disc'),
+    dict(key='B3s_scale', func=27, site=0x631c, marker=0x9f9, back_word=0x630003b0, kind='scale',
+         note='func 27 case 7 end (ring-in step 7): disc scale property (uibitmap f40 into local 0xb4, as the '
+              'case does for 0x660) = last key of the slot disc timeline 0x92c (uivec3property f4)'),
 ]
 # colours of the 7 ring slots, from their animation sets (ring-in key at 0.18 s, tools: work/ring_p14_1011/anim_tree.py)
 ICON_RGB = (0x32 / 255.0, 0x73 / 255.0, 0xb9 / 255.0)   # icon set 0x964 / 0x994 (type 83): ARGB ff3273b9
@@ -324,7 +343,11 @@ def plan(D):
         words[a] = (old, new, 'D8 0x7bc init +0x%x: colour %08x -> %08x (as the door 0x738)' % (k, old, new))
     # ---- references for the blocks
     show = ref_call(s, REF_SHOW); f22 = ref_call(s, REF_F22); hit = ref_call(s, REF_HIT); inp = ref_call(s, REF_IN)
-    colour = ref_call(s, REF_COLOR)
+    colour = ref_call(s, REF_COLOR); hide = ref_call(s, REF_HIDE); f40 = ref_call(s, REF_F40)
+    v3set = ref_call(s, REF_V3SET)
+    for ref, want in ((REF_HIDE, ['uibitmap', 'f5']), (REF_F40, ['uibitmap', 'f40']), (REF_V3SET, ['uivec3property', 'f4'])):
+        if s.call_name(ref[0] + 4).split()[:2] != want:
+            raise Refuse('%s: %s, expected %s' % (ref[3], s.call_name(ref[0] + 4), ' '.join(want)))
     if s.proto_func(f22[1]) != 22: raise Refuse('func 43 +0x106b0 does not call func 22')
     if s.call_name(REF_COLOR[0] + 4).split()[:2] != ['uibitmap', 'f18']:
         raise Refuse('func 28 +0x7298 is %s, not uibitmap f18' % s.call_name(REF_COLOR[0] + 4))
@@ -361,6 +384,10 @@ def plan(D):
                           'ARGB ffc8c8c8, the disc key of animation set 0xbb0')
     show_ic = show_tinted(ICON14, 'icon of position 14, door', ICON_RGB,
                           'ARGB ff3273b9, the icon key of animation sets 0x964 / 0x994')
+    hide_both = []
+    for m, what in ((ICON14, 'door'), (BG14, 'disc')):
+        hide_both += [(op(0x0f, m), None, 'push member 0x%x (%s)' % (m, what)), (op(0x65), None, 'native call'),
+                      (PH, hide, 'uibitmap f5 (hide), as func 20 +0x46e0')]
     int_added, ext_added, blocks = [], [], {}
     for st in SITES:
         a = st['site']
@@ -393,11 +420,26 @@ def plan(D):
             for o, opc, w, ex in s.instrs(ca + 8, a):
                 if opc != 0x00: raise Refuse('%s: +0x%x op%02x between the call and the site' % (st['key'], o, opc))
         code = [(op(0, st['marker']), None, 'the replaced debug line marker op00 %d' % st['marker'])]
+        free = lock13_w + [(op(0x04, 0), None, 'value 0'), (op(0x2e), None, 'store: m0xa90[13] = 0 (free)')]
         if st['kind'] == 'show':
             code += show_bg + show_ic
         elif st['kind'] == 'refree':
-            code += lock13_w + [(op(0x04, 0), None, 'value 0'), (op(0x2e), None, 'store: m0xa90[13] = 0 (free)')]
-            code += show_bg + show_ic
+            code += free + show_bg + show_ic
+        elif st['kind'] == 'hide':
+            code += hide_both
+        elif st['kind'] == 'hidefree':
+            code += free + hide_both
+        elif st['kind'] == 'scale':
+            expect_words(s, {0x62fc: 0x090000b4, 0x6300: 0x0f000660, 0x6304: 0x65000000, 0x630c: 0x090000b4},
+                         'B3s func 27 case 7 scale link of 0x660 via local 0xb4')
+            code += [(op(0x09, 0xb4), None, 'push &local 0xb4 (scale property handle, as func 27 +0x62fc)'),
+                     (op(0x0f, BG14), None, 'push member 0x6b4'), (op(0x65), None, 'native call'),
+                     (PH, f40, 'uibitmap f40 (scale property), as func 27 +0x6304'),
+                     (op(P.PUSHF), None, 'push float x'), (sx, None, 'x = last key of 0x92c'),
+                     (op(P.PUSHF), None, 'push float y'), (sy, None, 'y = last key of 0x92c'),
+                     (op(0x03, 0), None, 'z int 0 (key z = 0)'), (op(0x5c), None, 'int -> float'),
+                     (op(0x09, 0xb4), None, 'push &local 0xb4 (the property)'), (op(0x65), None, 'native call'),
+                     (PH, v3set, 'uivec3property f4 (set x, y, z), as func 25 +0x553c')]
         else:
             code += [(op(0x09, 0xb2), None, 'push &local 0xb2 (result; the slot-7 test +0x188ac uses it the same way)'),
                      (op(0x09, 0xb4), None, 'push &local 0xb4'), (op(0x0f, HIT14), None, 'push hit area 0x170 (position 14)'),
@@ -443,8 +485,11 @@ def p14_full(st):
     return (st['slot7'] == 'f15' and st['lock14_base'] == 0 and st['place14_pc'] and st['icon14'] == D4['new'] and
             st['text14'] == D5['new'] and st['bg14'] == D6['new'] and st['bg14_scale'] == [3.6, 3.6] and
             st['icon14_colours'] == ['00c0c0c0', 'ff606060'] and
-            len(st['shows']) == 1 and
-            len(st['refree']) == sum(x['kind'] == 'refree' for x in SITES) and st['quit_click'])
+            len(st['blocks']) == len(SITES) and
+            len(st['shows']) == sum(x['kind'] in ('show', 'refree') for x in SITES) and
+            len(st['hides']) == sum(x['kind'] in ('hide', 'hidefree') for x in SITES) and
+            len(st['refree']) == sum(x['kind'] in ('refree', 'hidefree') for x in SITES) and
+            len(st['scale']) == sum(x['kind'] == 'scale' for x in SITES) and st['quit_click'])
 
 
 def trigrams(s, lo, hi):
@@ -469,7 +514,8 @@ def shape_gate(sb, sa, info):
     for j, lo, hi in sb.code: known.update(trigrams(sb, lo, hi))
     probs = []
     for key, b in info['blocks'].items():
-        for g in trigrams(sa, b['block'], b['block'] + 4 * b['words']):
+        # the block's last word is our structural return jump (op63 back to the site + 4): not a compiler shape
+        for g in trigrams(sa, b['block'], b['block'] + 4 * (b['words'] - 1)):
             if g not in known:
                 probs.append('%s block +0x%x: opcode sequence %s does not occur in the original script 7' % (
                     key, b['block'], ' '.join('op%02x' % x for x in g)))
@@ -499,7 +545,7 @@ def p14_status(D):
     out['bg14_scale'] = [round(struct.unpack('<f', struct.pack('<I', s.w(s.init_word(BG14, k))))[0], 4)
                          for k in (0x34, 0x38)]
     end = max(hi for j, lo, hi in s.code)
-    shows, refree, click = [], [], []
+    blocks, shows, hides, refree, scale, click = [], [], [], [], [], []
     for j, lo, hi in s.code:
         for o, opc, w, ex in s.instrs(lo, hi):
             if opc != 0x63: continue
@@ -512,11 +558,20 @@ def p14_status(D):
                 if len(blk) > 64: break
             mem = [bw & 0xffffff for b, bop, bw, bex in blk if bop == 0x0f]
             jumps = [b + 4 + 4 * s24(bw) for b, bop, bw, bex in blk if bop == 0x63]
-            if ICON14 in mem and LOCK not in mem: shows.append('f%d +0x%x' % (j, o))
-            if ICON14 in mem and LOCK in mem: refree.append('f%d +0x%x' % (j, o))
+            calls = []                                     # (member pushed last, call name)
+            last = None
+            for b, bop, bw, bex in blk:
+                if bop == 0x0f: last = bw & 0xffffff
+                if bop == 0x65: calls.append((last, ' '.join(s.call_name(bex[0]).split()[:2])))
+            here = 'f%d +0x%x' % (j, o)
+            blocks.append(here)
+            if (ICON14, 'uibitmap f4') in calls: shows.append(here)
+            if (ICON14, 'uibitmap f5') in calls: hides.append(here)
+            if LOCK in mem and any(bop == 0x2e for b, bop, bw, bex in blk): refree.append(here)
+            if (BG14, 'uibitmap f40') in calls: scale.append(here)
             if HIT14 in mem and LOCK in mem:
-                click.append(('f%d +0x%x' % (j, o), ['+0x%x' % x for x in jumps if x != o + 4]))
-    out.update(shows=shows, refree=refree, click=click)
+                click.append((here, ['+0x%x' % x for x in jumps if x != o + 4]))
+    out.update(blocks=blocks, shows=shows, hides=hides, refree=refree, scale=scale, click=click)
     out['quit_click'] = any(QUIT_FALL == int(x[1:], 16) for site, js in click for x in js)
     return out
 
@@ -552,6 +607,12 @@ _SHOW = _tint(BG14, 0xffc8c8c8) + _tint(ICON14, 0xff3273b9)
 EXPECT_BLOCK = {
     'show': ['op00 M'] + _SHOW + ['op63 -> BACK'],
     'refree': ['op00 M', 'op0f 2704', 'op03 13', 'op21 14', 'op1e 1', 'op04 0', 'op2e 0'] + _SHOW + ['op63 -> BACK'],
+    'hide': ['op00 M', 'op0f 1980', 'op65 uibitmap f5 (+0x110)', 'op0f 1716', 'op65 uibitmap f5 (+0x110)',
+             'op63 -> BACK'],
+    'hidefree': ['op00 M', 'op0f 2704', 'op03 13', 'op21 14', 'op1e 1', 'op04 0', 'op2e 0', 'op0f 1980',
+                 'op65 uibitmap f5 (+0x110)', 'op0f 1716', 'op65 uibitmap f5 (+0x110)', 'op63 -> BACK'],
+    'scale': ['op00 M', 'op09 180', 'op0f 1716', 'op65 uibitmap f40 (+0x4e4)', 'op02 3.60000', 'op02 3.60000',
+              'op03 0', 'op5c 0', 'op09 180', 'op65 uivec3property f4 (+0xd4)', 'op63 -> BACK'],
     'click': ['op00 M', 'op09 178', 'op09 180', 'op0f 368', 'op65 HIT', 'op09 180', 'op09 0', 'op65 IN', 'op06 178',
               'op0f 2704', 'op03 13', 'op21 14', 'op1b 0', 'op50 0', 'op51 0', 'op64 -> SKIP',
               'op63 -> +0x188f8', 'op63 -> BACK'],
