@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -16747,6 +16747,7 @@ const DvCheck kSbChecks[] = {
 };
 bool g_sbChecked = false, g_sbOk = false;
 char g_sbWhy[96] = "not checked";
+LONG g_sbSaves = 0;                          // 0.22.13: settings saves (0x478010) done by sub.lang
 bool SbCheck() {
     if (g_sbChecked) return g_sbOk;
     g_sbChecked = true;
@@ -16778,8 +16779,53 @@ void ValSb(char *o, size_t n) {
     ReadFloats(0x008ab590, &opt, 1);
     ReadDword(0x008900e8, &reg);
     const LONG cur = okProf ? static_cast<LONG>(static_cast<short>(w)) : -99;
-    Out(o, n, "subtitles now %ld (%s), option 0xb %.0f, registry mirror %ld%s", cur, okProf ? SbName(cur) : "no profile",
-        static_cast<double>(opt), static_cast<LONG>(reg), cb == 0x005d4dc0 ? "" : " (option callback differs)");
+    Out(o, n, "subtitles now %ld (%s), option 0xb %.0f, registry mirror %ld%s; %ld settings save(s) by sub.lang", cur,
+        okProf ? SbName(cur) : "no profile", static_cast<double>(opt), static_cast<LONG>(reg),
+        cb == 0x005d4dc0 ? "" : " (option callback differs)", g_sbSaves);
+}
+// 0.22.13 (live 2026-11-09, Befund-PC-Test-0911-Abend row "TruMenu 0.22.12": after a restart sub.lang was back at -1):
+// the game writes its settings only in 0x478010, and its only caller is the shutdown path 0x5df930 (call 0x5df935) -
+// a game ended by game.quit (TerminateProcess) or a crash never saves. 0x478010 (cdecl, no arguments, plain ret):
+// copies the device manager's active graphics settings ([0xad75e4]+0x15c, 0x54 bytes) into the registry image
+// 0x890388, reads the options 0x95 / 0xb / 0x96 / 0x11 / 0xc..0xf (0x5d5140) into 0x8900e4 / 0x8900e8 (SubtitleLanguage)
+// / 0x8900d4 / 0x8900f0.., the sound volumes (0x587190 / 0x5870a0 / 0x5870f0) and 0x481c50, then RegCreateKeyEx
+// HKCU\...\Tomb Raider: Underworld and RegSetValueEx of every value (RegCloseKey; nothing when the key cannot be
+// opened). So it writes the settings exactly as they are now - what the game itself would write at its next clean
+// exit. TruMenu calls it right after the option setter, on the game thread (sub.lang is a game-thread item), under
+// __try; byte checks kSbSaveChecks; run-time check [0xad75e4] != 0.
+const DvCheck kSbSaveChecks[] = {
+    {0x00478010, "83ec08 56 8b35e475ad00 57 81c65c010000 b915000000 bf88038900 6895000000 f3a5 e809d11500"},
+    {0x0047803c, "6a0b a3e4008900 e8f8d01500 e8d3cc3900 6896000000 a3e8008900"},   // option 0xb -> 0x8900e8
+    {0x00478222, "c3"},                                                         // plain ret (cdecl, no arguments)
+};
+bool g_sbSaveChecked = false, g_sbSaveOk = false;
+bool SbSave(char *o, size_t n) {
+    if (!g_sbSaveChecked) {
+        g_sbSaveChecked = true;
+        DWORD at = 0;
+        g_sbSaveOk = DvChecks(kSbSaveChecks, sizeof(kSbSaveChecks) / sizeof(kSbSaveChecks[0]), &at);
+        Log(g_sbSaveOk ? 1 : 0, "0.22.13: settings save 0x478010 %s (%d checks)", g_sbSaveOk ? "ok" : "code differs - not "
+            "called", static_cast<int>(sizeof(kSbSaveChecks) / sizeof(kSbSaveChecks[0])));
+        if (!g_sbSaveOk) Log(0, "0.22.13: settings save check failed at 0x%08lx", at);
+    }
+    if (!g_sbSaveOk) { Out(o, n, "NOT saved (settings save code differs) - kept only until the game ends"); return false; }
+    DWORD dev = 0;
+    if (!ReadDword(0x00ad75e4, &dev) || !dev) { Out(o, n, "NOT saved (no device settings yet)"); return false; }
+    bool ok = true;
+    __try {
+        reinterpret_cast<void(__cdecl *)()>(0x00478010)();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        ok = false;
+        InterlockedIncrement(&g_ownExceptions);
+    }
+    DWORD reg = 0;
+    ReadDword(0x008900e8, &reg);
+    const LONG k = InterlockedIncrement(&g_sbSaves);
+    Log(ok ? 1 : 0, "sub.lang: settings save 0x478010 %s (#%ld) - registry mirror [0x8900e8] now %ld",
+        ok ? "done" : "raised an exception", k, static_cast<LONG>(reg));
+    if (ok) Out(o, n, "saved to the registry (game's settings save, mirror %ld)", static_cast<LONG>(reg));
+    else Out(o, n, "NOT saved (settings save raised an exception - see TruMenu.log)");
+    return ok;
 }
 bool RunSb(const char *arg, char *o, size_t n) {
     if (!arg || !arg[0]) { ValSb(o, n); return true; }   // no argument = report only
@@ -16797,9 +16843,10 @@ bool RunSb(const char *arg, char *o, size_t n) {
     typedef void(__cdecl * SetOptionFn)(int index, float value, int callback);
     reinterpret_cast<SetOptionFn>(0x005d5100)(0xb, static_cast<float>(v), 1);
     Log(1, "sub.lang %ld (%s) - option setter 0x5d5100(0xb, %ld, 1) (src=%s)", v, SbName(v), v, ShotSource("sub.lang"));
-    Out(o, n, "sub.lang %ld (%s) - from the next subtitle line (movies: next movie); kept with the next settings save", v,
-        SbName(v));
-    return true;
+    char saved[96];
+    const bool kept = SbSave(saved, sizeof(saved));   // 0.22.13: the game's own settings save -> registry
+    Out(o, n, "sub.lang %ld (%s) - from the next subtitle line (movies: next movie); %s", v, SbName(v), saved);
+    return kept;
 }
 // ---- 0.22.9 combo.trace (owner 2026-11-09 15:1x: "verify that combos happen"; thralls fall over at every hit on PC):
 // game thread, once per game frame while on (off by default, live, [Debug] ComboTrace): Lara's chart machine 1 =
@@ -17076,9 +17123,180 @@ void FtLookPlugins() {                       // game thread, once
     Log(1, "0.22.11: shadow meter %s, doppelganger flag %s", g_ftMeter ? "via TruShadowPowerMeterApi" : "not available",
         g_ftDg ? "via TruDlc2PlayerDoppelganger" : "not available");
 }
+// ---- 0.22.13 ring bits (K-5, workspace docs\Befund-Anvisier-Kreis-0911.md section 6, ENGINE.md "Combat reticle"):
+// the combat reticle request of playerDrawCombatLock 0x71e710 -> playerDrawCombatReticle 0x7037d0. The engine only
+// feeds the HUD script 37: it draws when a target is there and (CM+0x1fc bit 9 or 10 (helper 0x6f1ed0) or bit 21);
+// bit 11 = the lock-on branch; the reticle object [CM+0] word +0x40 (bit 9 = draw nothing, bit 6 = the special path);
+// request = HUD group 12 (0x77d9d0(12): 0xfae924 |= 1 << 12, cleared by 0x77db70 / 0x77dde0); style byte 0xfae8ac
+// (setter 0x77a680), position 0xfae8a4 / a8. CM = [[0xfadb58]+0x504] (0x5d4859). Read only. Bit 21's own readers
+// (0x71e979, 0x715026) are not byte-checked at run time: TruShadowPower patches 0x71e979 (its 0.22 reticle request) -
+// both are pinned in work\asi\menu0236\precheck_02213.txt (offline, unpatched exe).
+const DvCheck kRgChecks[] = {
+    {0x005d4859, "a158dbfa00 8b8804050000"},                                        // CM = [[0xfadb58]+0x504]
+    {0x006f1ed0, "8b81fc010000 8bc8 c1e909 f6c101 750a c1e80a a801"},                // +0x1fc bit 9 or bit 10
+    {0x0071e73f, "8b86fc010000 c1e80b a801"},                                        // +0x1fc bit 11 (lock-on)
+    {0x0071e992, "8b3e 0fb75f40"},                                                   // reticle [CM+0], word +0x40
+    {0x007037dc, "668b4640 66c1e809 a801"},                                          // reticle +0x40 bit 9
+    {0x0077d9d0, "8b4c2404 8d41ff 83f81e 770e ba01000000 d3e2 091524e9fa00 c3"},     // HUD group n -> 0xfae924
+    {0x0077a680, "8a442404 a2ace8fa00 c3"},                                          // style byte 0xfae8ac
+};
+bool g_rgChecked = false, g_rgOk = false;
+char g_rgWhy[80] = "not checked";
+bool RgCheck() {
+    if (g_rgChecked) return g_rgOk;
+    g_rgChecked = true;
+    DWORD at = 0;
+    g_rgOk = DvChecks(kRgChecks, sizeof(kRgChecks) / sizeof(kRgChecks[0]), &at);
+    if (g_rgOk) Out(g_rgWhy, sizeof(g_rgWhy), "ok");
+    else Out(g_rgWhy, sizeof(g_rgWhy), "code differs at 0x%08lx", at);
+    Log(g_rgOk ? 1 : 0, "0.22.13: ring.bits %s (%d checks)", g_rgWhy, static_cast<int>(sizeof(kRgChecks) / sizeof(kRgChecks[0])));
+    return g_rgOk;
+}
+struct RgBits { bool ok, retOk; DWORD cm, w, hud, ret; WORD r40; BYTE style; float pos[2]; };
+bool RgRead(RgBits &b) {
+    memset(&b, 0, sizeof(b));
+    DWORD tracker = 0;
+    if (!RgCheck() || !ReadDword(0x00fadb58, &tracker) || !tracker || !ReadDword(tracker + 0x504, &b.cm) || !b.cm ||
+        !ReadDword(b.cm + 0x1fc, &b.w))
+        return false;
+    ReadDword(0x00fae924, &b.hud);
+    ReadByte(0x00fae8ac, &b.style);
+    ReadFloats(0x00fae8a4, b.pos, 2);
+    b.retOk = ReadDword(b.cm, &b.ret) && b.ret && ReadWord(b.ret + 0x40, &b.r40);
+    b.ok = true;
+    return true;
+}
+int RgBit(DWORD w, int bit) { return static_cast<int>((w >> bit) & 1); }
+// one compact text: "9:0 10:1 11:0 21:0 | HUD12 1 | style 2 | ret40 0x0040 (6:1 9:0)"
+void RgText(const RgBits &b, bool de, char *o, size_t n) {
+    if (!b.ok) { Out(o, n, "%s", !g_rgOk ? g_rgWhy : de ? "kein Kampf-Manager" : "no combat manager"); return; }
+    char ret[40] = "?";
+    if (b.retOk) Out(ret, sizeof(ret), "0x%04x (6:%d 9:%d)", b.r40, RgBit(b.r40, 6), RgBit(b.r40, 9));
+    Out(o, n, "%s 9:%d 10:%d 11:%d 21:%d | HUD12 %d | %s %u | %s %s", de ? "Bits" : "bits", RgBit(b.w, 9), RgBit(b.w, 10),
+        RgBit(b.w, 11), RgBit(b.w, 21), RgBit(b.hud, 12), de ? "Stil" : "style", b.style, de ? "Fk40" : "ret40", ret);
+}
+void ValRg(char *o, size_t n) {
+    RgBits b;
+    RgRead(b);
+    if (!b.ok) { RgText(b, false, o, n); return; }
+    char t[120];
+    RgText(b, false, t, sizeof(t));
+    Out(o, n, "%s; CM 0x%08lx +0x1fc 0x%08lx, HUD mask 0xfae924 0x%08lx, position %.0f / %.0f, reticle 0x%08lx (read only; "
+        "drawn when a target is there and bit 9 or 10 or 21)", t, b.cm, b.w, b.hud, static_cast<double>(b.pos[0]),
+        static_cast<double>(b.pos[1]), b.ret);
+}
+// ---- 0.22.13 goo drips (workspace docs\Befund-Goo-Tropfen-1011.md section 3; ENGINE.md 9 "Goo drips"): the two drip
+// sources over the end-level corridor = intro 10706 / 10707 of object 926 dlc2_uo_goo_drips (uber graph DTP 24411:
+// Spawn_easy 1 copy / 0.7 s, Spawn_hard 2 / 0.9 s), their run-time copies = object 929 dlc2_uo_goo_drips_spawned (942
+// _sml). Read only, while fight.trace is on and only when a source is loaded and Lara is within 2500 units (x / y) of
+// the sources' mid point: the sources' uber node + time in it (UberStateOf, the 0.21.7 path kUbChecks), the number of
+// copies and the nearest copy: position inst+0x20, x / y distance and dz (copy - Lara), iflags inst+0x14 (0x800 hidden /
+// 0x20), its uber node + time. A line is written every 100 ms sample while Lara is in that zone.
+struct FtDrip {
+    bool zone;
+    char src[2][40];
+    int n;
+    bool hasNear;
+    float pos[3], dxy, dz;
+    DWORD iflags;
+    char node[40];
+};
+// "Spawn_easy@0.35" / "->Done" (running transition) / "-" (no uber state) / "?" (uber checks failed)
+void FtUberShort(DWORD inst, char *o, size_t n) {
+    if (!g_ubOk) { Out(o, n, "?"); return; }
+    const DWORD b = UberStateOf(inst);
+    if (!b) { Out(o, n, "-"); return; }
+    DWORD trans = 0, node = 0;
+    float t = 0.0f;
+    char name[32];
+    ReadDword(b + 0x80, &trans);
+    ReadDword(b + 0x84, &node);
+    if (!ReadFloats(b + 0x88, &t, 1) || !(t > -1.0e6f && t < 1.0e6f)) t = 0.0f;
+    if (trans) {
+        DWORD to = 0;
+        ReadDword(trans + 4, &to);
+        UberNodeName(b, static_cast<LONG>(to), name, sizeof(name));
+        Out(o, n, "->%s", name[0] ? name : "?");
+        return;
+    }
+    UberNodeName(b, static_cast<LONG>(node), name, sizeof(name));
+    if (name[0]) Out(o, n, "%s@%.2f", name, static_cast<double>(t));
+    else Out(o, n, "n%lu@%.2f", node, static_cast<double>(t));
+}
+void FtDripRead(const float lara[3], FtDrip &d) {
+    memset(&d, 0, sizeof(d));
+    Out(d.src[0], sizeof(d.src[0]), "-");
+    Out(d.src[1], sizeof(d.src[1]), "-");
+    Out(d.node, sizeof(d.node), "-");
+    DWORD srcInst[2] = {0, 0}, nearInst = 0;
+    float srcPos[2][3] = {}, best = 1.0e30f;
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    for (int guard = 0; inst && guard < 4096; ++guard) {
+        DWORD next = 0, object = 0, oid = 0, intro = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        if (ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid)) {
+            oid &= 0xffff;
+            if (oid == 926 && ReadDword(inst + 0x58, &intro) && (intro == 10706 || intro == 10707)) {
+                const int k = intro == 10706 ? 0 : 1;
+                if (ReadFloats(inst + kInstancePosition, srcPos[k], 3) && DvFinite(srcPos[k], 3)) srcInst[k] = inst;
+            } else if (oid == 929 || oid == 942) {
+                float p[3];
+                if (ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+                    ++d.n;
+                    const float dx = p[0] - lara[0], dy = p[1] - lara[1], d2 = dx * dx + dy * dy;
+                    if (d2 < best) { best = d2; nearInst = inst; memcpy(d.pos, p, sizeof(d.pos)); }
+                }
+            }
+        }
+        inst = next;
+    }
+    if (!srcInst[0] && !srcInst[1]) return;   // not the end level (or the sources are not loaded)
+    float mid[2] = {0.0f, 0.0f};
+    int m = 0;
+    for (int k = 0; k < 2; ++k)
+        if (srcInst[k]) { mid[0] += srcPos[k][0]; mid[1] += srcPos[k][1]; ++m; }
+    mid[0] /= static_cast<float>(m);
+    mid[1] /= static_cast<float>(m);
+    const float zx = lara[0] - mid[0], zy = lara[1] - mid[1];
+    d.zone = zx * zx + zy * zy < 2500.0f * 2500.0f;
+    if (!d.zone) return;
+    for (int k = 0; k < 2; ++k)
+        if (srcInst[k]) FtUberShort(srcInst[k], d.src[k], sizeof(d.src[k]));
+    if (nearInst) {
+        d.hasNear = true;
+        d.dxy = sqrtf(best);
+        d.dz = d.pos[2] - lara[2];
+        ReadDword(nearInst + 0x14, &d.iflags);
+        FtUberShort(nearInst, d.node, sizeof(d.node));
+    }
+}
+// ---- 0.22.13 Lara's damage: the enemy damage function 0x637590 is TruShadowCombat's hook site ([Damage] Log writes
+// every call with target, type, sub, amount as "damage types" lines). TruMenu does not hook it (a second hook on a
+// foreign jump would depend on the load order); it logs once whether the entry is the game's or a foreign jump and
+// writes Lara's LP drop per 100 ms sample (pc_lara_dmg: "-<amount>", "-<LP> dead" when the LP can no longer be read).
+// Whether Lara's hits pass 0x637590 at all is open (the function reads an AI brain [[inst+0x2d0]]+0x2ec).
+bool g_ftDmgLooked = false;
+float g_ftLaraLpLast = -1.0f;
+void FtDmgLook() {                           // game thread, once
+    if (g_ftDmgLooked) return;
+    g_ftDmgLooked = true;
+    BYTE first = 0;
+    ReadByte(0x00637590, &first);
+    if (HexBytesAt(0x00637590, "55 8b6c2408 8b85d0020000"))
+        Log(1, "0.22.13: damage function 0x637590 has the game's entry - TruMenu does not hook it either; pc_lara_dmg = "
+            "Lara's LP drop per sample");
+    else
+        Log(1, "0.22.13: damage function 0x637590 is hooked by another plugin (first byte 0x%02x; TruShadowCombat [Damage]) "
+            "- no TruMenu hook; pc_lara_dmg = Lara's LP drop per sample, damage type / sub = TruShadowCombat's 'damage "
+            "types' line of the same time", first);
+}
 struct FtWorld {
     bool lara;
     float laraLp, pos[3];
+    RgBits rb;                                // 0.22.13 ring bits
+    FtDrip drip;                              // 0.22.13 goo drips (filled by FtTick while fight.trace is on)
+    char dmg[24];                             // 0.22.13 Lara's LP drop in this sample
     int rec0, rec1;
     char states[40];
     bool meterOk;
@@ -17171,6 +17389,11 @@ void FtReadWorld(DWORD player, FtWorld &w) {
             w.camOk = ReadFloats(w.camObj + 0xa0, w.cam, 3) && ReadFloats(w.camObj + 0xb0, &w.fov, 1);
     }
     if (w.camOk && !DvFinite(w.cam, 3)) w.camOk = false;
+    RgRead(w.rb);                            // 0.22.13 ring bits (read only)
+    Out(w.dmg, sizeof(w.dmg), "-");
+    Out(w.drip.src[0], sizeof(w.drip.src[0]), "-");
+    Out(w.drip.src[1], sizeof(w.drip.src[1]), "-");
+    Out(w.drip.node, sizeof(w.drip.node), "-");
 }
 // the attack record of a running MeleeAttack (layer 0): "0x<record> a<type>/<anim> ..." or "-"
 void FtAttack(DWORD brain, DWORD s0, char *o, size_t n) {
@@ -17218,7 +17441,11 @@ const char *const kFtHeader = "host_time\tinst\tobj_id\tobj_name\tlp\tstamina\ts
                               "pc_lara_states\tpc_lara_x\tpc_lara_y\tpc_lara_z\tpc_x\tpc_y\tpc_z\tpc_power_mode\t"
                               "pc_player_time_scale\tpc_doppelganger\tpc_cam_obj\tpc_cam_mode\tpc_cam_req\tpc_cam_dx\t"
                               "pc_cam_dy\tpc_cam_dz\tpc_cam_dist\tpc_cam_fov_deg\tpc_ts_requests\tpc_ts_selected\t"
-                              "pc_ramp_last\n";
+                              "pc_ramp_last\t"
+                              // 0.22.13: new columns only at the end (the TruXenia order above stays)
+                              "pc_ring_bits\tpc_hud_g12\tpc_ret_style\tpc_ret40\tpc_drip_q10706\tpc_drip_q10707\t"
+                              "pc_drip_n\tpc_drip_near_x\tpc_drip_near_y\tpc_drip_near_z\tpc_drip_near_dxy\t"
+                              "pc_drip_near_dz\tpc_drip_near_iflags\tpc_drip_near_node\tpc_lara_dmg\n";
 bool FtOpen() {
     if (g_ftFile != INVALID_HANDLE_VALUE) return true;
     if (!g_logPath[0]) return false;
@@ -17230,11 +17457,10 @@ bool FtOpen() {
     g_ftFile = CreateFileA(g_ftPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
                            OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (g_ftFile == INVALID_HANDLE_VALUE) return false;
-    LARGE_INTEGER size = {};
-    if (GetFileSizeEx(g_ftFile, &size) && size.QuadPart == 0) {
-        DWORD w = 0;
-        WriteFile(g_ftFile, kFtHeader, static_cast<DWORD>(strlen(kFtHeader)), &w, nullptr);
-    }
+    // 0.22.13: a header line at every open (the column count grew; tools/fight_trace_compare.py takes repeated headers -
+    // "files collect sessions") - before only into an empty file
+    DWORD w = 0;
+    WriteFile(g_ftFile, kFtHeader, static_cast<DWORD>(strlen(kFtHeader)), &w, nullptr);
     return true;
 }
 void FtClose() {
@@ -17246,7 +17472,7 @@ void FtWrite(const FtWorld &w, const FtEn *e, DWORD brain, const float *ep) {
     if (g_ftFile == INVALID_HANDLE_VALUE || InterlockedIncrement(&g_ftRows) > 200000) return;
     SYSTEMTIME t;
     GetLocalTime(&t);
-    char line[1400], name[64] = "-", s0[32] = "-", s1[32] = "-", rq[32] = "-", tg[24] = "-", dist[16] = "-", ko[32] = "-",
+    char line[2000], name[64] = "-", s0[32] = "-", s1[32] = "-", rq[32] = "-", tg[24] = "-", dist[16] = "-", ko[32] = "-",
          atk[64] = "-", hit[48] = "-", lp[16] = "-", st[16] = "-", oid[12] = "-", inst[12] = "-", intro[12] = "-",
          ex[16] = "-", ey[16] = "-", ez[16] = "-";
     if (e) {
@@ -17311,12 +17537,36 @@ void FtWrite(const FtWorld &w, const FtEn *e, DWORD brain, const float *ep) {
     if (w.tsPlayer >= 0.0f) Out(tsp, sizeof(tsp), "%.2f", static_cast<double>(w.tsPlayer));
     if (w.dg >= 0) Out(dg, sizeof(dg), "%d", w.dg);
     const char *pm = !w.meterOk || !w.active ? "-" : w.tsWorld >= 0.0f && w.tsWorld < 0.99f ? "slow" : "fast";
+    // 0.22.13 columns (at the end): ring bits, goo drips, Lara's LP drop
+    char rbits[48] = "?", hud12[4] = "?", style[8] = "?", ret40[12] = "?", dn[8] = "-", dx[12] = "-", dy[12] = "-",
+         dz[12] = "-", dxy[12] = "-", ddz[12] = "-", dfl[16] = "-";
+    if (w.rb.ok) {
+        Out(rbits, sizeof(rbits), "9:%d 10:%d 11:%d 21:%d (0x%08lx)", RgBit(w.rb.w, 9), RgBit(w.rb.w, 10), RgBit(w.rb.w, 11),
+            RgBit(w.rb.w, 21), w.rb.w);
+        Out(hud12, sizeof(hud12), "%d", RgBit(w.rb.hud, 12));
+        Out(style, sizeof(style), "%u", w.rb.style);
+        if (w.rb.retOk) Out(ret40, sizeof(ret40), "0x%04x", w.rb.r40);
+    }
+    if (w.drip.zone) {
+        Out(dn, sizeof(dn), "%d", w.drip.n);
+        if (w.drip.hasNear) {
+            Out(dx, sizeof(dx), "%.0f", static_cast<double>(w.drip.pos[0]));
+            Out(dy, sizeof(dy), "%.0f", static_cast<double>(w.drip.pos[1]));
+            Out(dz, sizeof(dz), "%.0f", static_cast<double>(w.drip.pos[2]));
+            Out(dxy, sizeof(dxy), "%.0f", static_cast<double>(w.drip.dxy));
+            Out(ddz, sizeof(ddz), "%.0f", static_cast<double>(w.drip.dz));
+            Out(dfl, sizeof(dfl), "0x%lx", w.drip.iflags);
+        }
+    }
     const int len = _snprintf_s(line, sizeof(line), _TRUNCATE,
         "%02d:%02d:%02d.%03d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t"
-        "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+        "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t"
+        "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
         t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, inst, oid, name, lp, st, s0, s1, rq, tg, dist, w.rec0, w.rec1, meter,
         active, ts, intro, ko, atk, hit, laraLp, w.states[0] ? w.states : "-", lx, ly, lz, ex, ey, ez, pm, tsp, dg, camObj,
-        mode, req, cdx, cdy, cdz, cdist, fov, w.tsReq, w.tsSel, g_ftRampLast);
+        mode, req, cdx, cdy, cdz, cdist, fov, w.tsReq, w.tsSel, g_ftRampLast,
+        rbits, hud12, style, ret40, w.drip.zone ? w.drip.src[0] : "-", w.drip.zone ? w.drip.src[1] : "-", dn, dx, dy, dz, dxy,
+        ddz, dfl, w.drip.zone ? w.drip.node : "-", w.dmg);
     if (len > 0) {
         DWORD wr = 0;
         WriteFile(g_ftFile, line, static_cast<DWORD>(len), &wr, nullptr);
@@ -17340,6 +17590,20 @@ void FtTick() {
     if (g_ftOn && !FtOpen()) {
         InterlockedExchange(&g_ftOn, 0);
         Log(0, "fight.trace: cannot open %s (%lu) - off", g_ftPath, GetLastError());
+    }
+    // 0.22.13: Lara's LP drop of this sample, the goo drips near the end-level corridor
+    bool laraHit = false;
+    if (g_ftLaraLpLast > 0.0f && w.laraLp > -0.5f && w.laraLp < g_ftLaraLpLast - 0.01f) {
+        Out(w.dmg, sizeof(w.dmg), "-%.1f", static_cast<double>(g_ftLaraLpLast - w.laraLp));
+        laraHit = true;
+    } else if (g_ftLaraLpLast > 0.0f && w.laraLp < -0.5f) {
+        Out(w.dmg, sizeof(w.dmg), "-%.1f dead", static_cast<double>(g_ftLaraLpLast));
+        laraHit = true;
+    }
+    g_ftLaraLpLast = w.laraLp;
+    if (g_ftOn) {
+        FtDmgLook();
+        FtDripRead(w.pos, w.drip);
     }
     bool wrote = false;
     DWORD inst = 0;
@@ -17407,7 +17671,16 @@ void FtTick() {
     static char lastReq[112] = "";
     const bool power = w.active != lastActive || fabsf(w.tsWorld - lastTs) > 0.005f || fabsf(w.tsPlayer - lastTsP) > 0.005f ||
                        strcmp(w.tsReq, lastReq) != 0;
-    if (g_ftOn && !wrote && (lara || w.camMode != g_ftCamMode || moved > 25.0f || power))
+    // 0.22.13: the ring bits (9 / 10 / 11 / 21, HUD group 12, style, reticle +0x40) changing, a hit on Lara, and every
+    // sample in the goo drip zone give a Lara line too
+    static DWORD lastRing = 0xffffffff;
+    const DWORD ring = w.rb.ok ? ((w.rb.w >> 9) & 7) | (((w.rb.w >> 21) & 1) << 3) | (((w.rb.hud >> 12) & 1) << 4) |
+                                 (static_cast<DWORD>(w.rb.style) << 8) | (static_cast<DWORD>(w.rb.r40) << 16)
+                               : 0xfffffffe;
+    const bool ringChanged = ring != lastRing;
+    lastRing = ring;
+    if (g_ftOn && !wrote && (lara || w.camMode != g_ftCamMode || moved > 25.0f || power || ringChanged || laraHit ||
+                             w.drip.zone))
         FtWrite(w, nullptr, 0, nullptr);
     lastActive = w.active;
     lastTs = w.tsWorld;
@@ -17540,7 +17813,11 @@ void DrawEnemyPanel() {
                            static_cast<double>(w.tsPlayer));
         if (strcmp(w.tsReq, "?") != 0)
             ImGui::TextColored(grey, "%s %s -> %s", de ? "Zeit-Anforderungen" : "Time requests", w.tsReq, w.tsSel);
-        if (g_ftOn) ImGui::TextColored(grey, "%s %ld", de ? "Kampf-Spur: Zeilen" : "Fight trace: lines", g_ftRows);
+        char rt[140];                        // 0.22.13: the ring request bits (K-5)
+        RgText(w.rb, de, rt, sizeof(rt));
+        ImGui::TextColored(grey, "%s %s", de ? "Ring:" : "Ring:", rt);
+        // 0.22.13 (live 2026-11-09: "Kampf-Spur: Zeilen 203" read as a value, not as on / off)
+        if (g_ftOn) ImGui::TextColored(grey, de ? "Kampf-Spur: an (%ld Zeilen)" : "Fight trace: on (%ld lines)", g_ftRows);
     }
     ImGui::End();
 }
@@ -22546,6 +22823,34 @@ const DvCheck kCnSndChecks[] = {
     {0x007c4875, "807c240800 53 8b5c2408 56 57 8bf9 7403 885f59"},   // ChannelGroupI::setPaused: +0x59
     {0x007c48cd, "807c240800 53 8b5c2408 56 57 8bf9 7403 885f58"},   // ChannelGroupI::setMute: +0x58
 };
+// 0.22.13 subtitle line clock (live 2026-11-09 ~21:20, Befund-PC-Test-0911-Abend row 7b: the subtitles ran on during
+// cine.pause while picture and sound stood). Static 2026-11-10 (tools/pe_dis.py, pe_abs_uses.py, pe_callers.py): a
+// cutscene's subtitle text comes with its stream frames - the cinematic handler update 0x457100 (called by the stream
+// update at 0x59030d, so skipped by CnGate) hands it to the subtitle reader 0x4538d0 (call 0x4574ec; language test
+// 0x453990), which adds each line with 0x583db0(text, 90) to the subtitle box 0xccdec0: two 0x100-byte slots (+0 the
+// upper / older line, +0x100 the newest), floats +0x200 / +0x204, and the line clock +0x208 = max(+0x208, 90). The ONLY
+// thing that counts it down is the subtitle draw 0x583e20 (called from the game display at 0x5da17d, also by the Bink
+// player at 0x4a0a0c): unless the game state byte 0xe7f143 is 6 or 10 (the game's own pause), +0x208 -= [0xe7f188] (the
+// scaled frame time, 1.0 = one 30 fps frame) at 0x583f1c; at <= 0 the newest line moves up (+0x100 -> +0, +0x204 ->
+// +0x200), the lower slot is cleared and the clock restarts at 90.0 ([0x843cbc]) - so on a held cutscene the shown
+// lines scroll up and vanish after 3 s. While a cutscene is held TruMenu points the disp32 of that `fsub` (0x583f24) to
+// its own float g_cnSubDt: 0.0 while held, the game's frame time while stepping / not holding; put back with the walk
+// calls. Nothing else of the subtitle box is written.
+const DWORD kCnSubBox = 0x00ccdec0, kCnSubDtGame = 0x00e7f188;
+const DvCheck kCnSubChecks[] = {
+    {0x00583f0c, "a043f1e700 83c408 3c06 745e 3c0a 745a"},                          // no countdown in states 6 / 10
+    {0x00583f1c, "d98308020000 d82588f1e700 d95c2424 d9442424 d99308020000"},       // +0x208 -= [0xe7f188]
+    {0x00583f6a, "d905bc3c8400 d99b08020000"},                                      // expired: clock = 90.0
+    {0x00583db0, "a043f1e700 3c06 745c 3c0a 7458"},                                 // add line (text, 90)
+    {0x005da178, "b9c0decc00 e89e9cfaff"},                                          // display: draw 0x583e20
+    {0x004574ec, "e8dfc3ffff"},                                                     // handler -> reader 0x4538d0
+};
+bool g_cnSubOk = false, g_cnSubOn = false, g_cnSubRefused = false;
+char g_cnSubWhy[80] = "not checked yet";
+volatile float g_cnSubDt = 0.0f;                 // what the subtitle draw subtracts while the patch is in
+AiPatch g_cnSubPatch[1] = {
+    {0x00583f24, kCnSubDtGame, false, "N3 subtitle clock 0x583f24", 0, 0, false},
+};
 typedef int(__stdcall *CnGetMasterFn)(DWORD system, DWORD *group);
 typedef int(__stdcall *CnCgPausedFn)(DWORD group, int paused);
 typedef DWORD(__fastcall *CnUpdateFn)(DWORD stream, DWORD edx, float dt);
@@ -22596,9 +22901,16 @@ void CnCheck() {
     g_cnSndOk = DvChecks(kCnSndChecks, sizeof(kCnSndChecks) / sizeof(kCnSndChecks[0]), &at);
     if (g_cnSndOk) Out(g_cnSndWhy, sizeof(g_cnSndWhy), "ok");
     else Out(g_cnSndWhy, sizeof(g_cnSndWhy), "sound pause code differs at 0x%08lx", at);
-    Log(g_cnOk ? 1 : 0, "0.22 cine.pause: %d checks %s; 0.22.1 sound pause: %d checks %s",
-        static_cast<int>(sizeof(kCnChecks) / sizeof(kCnChecks[0])), g_cnWhy,
-        static_cast<int>(sizeof(kCnSndChecks) / sizeof(kCnSndChecks[0])), g_cnSndWhy);
+    at = 0;
+    g_cnSubOk = DvChecks(kCnSubChecks, sizeof(kCnSubChecks) / sizeof(kCnSubChecks[0]), &at);   // 0.22.13
+    if (g_cnSubOk) Out(g_cnSubWhy, sizeof(g_cnSubWhy), "ok");
+    else Out(g_cnSubWhy, sizeof(g_cnSubWhy), "subtitle clock code differs at 0x%08lx", at);
+    g_cnSubPatch[0].game = kCnSubDtGame;
+    g_cnSubPatch[0].hook = reinterpret_cast<DWORD>(&g_cnSubDt);
+    Log(g_cnOk ? 1 : 0, "0.22 cine.pause: %d checks %s; 0.22.1 sound pause: %d checks %s; 0.22.13 subtitle clock: %d "
+        "checks %s", static_cast<int>(sizeof(kCnChecks) / sizeof(kCnChecks[0])), g_cnWhy,
+        static_cast<int>(sizeof(kCnSndChecks) / sizeof(kCnSndChecks[0])), g_cnSndWhy,
+        static_cast<int>(sizeof(kCnSubChecks) / sizeof(kCnSubChecks[0])), g_cnSubWhy);
 }
 // the first playing cutscene stream of the stream list and its time in seconds ([obj+0x384] counts 1/30 s: the dt
 // path adds dt x 30.0 [0x8439b8], the sound path 0x5800d0 multiplies seconds by the same constant)
@@ -22781,6 +23093,16 @@ void CnTick() {
         Log(1, "cine.pause: %ld frame(s) held, %ld step(s) let through", g_cnSkipped, g_cnSteps);
         g_cnLogged = 0;
     }
+    // 0.22.13: the subtitle line clock follows the hold - 0.0 while a cutscene stream is held, the game's frame time
+    // while stepping (the lines move on with the stepped frames) or while nothing is held; the patch goes in and out
+    // with the walk calls (value first, then the patch)
+    {
+        float dt = 0.0f;
+        if (!(CnHeldNow() && !g_cnStepping) && !ReadFloats(kCnSubDtGame, &dt, 1)) dt = 0.0f;
+        g_cnSubDt = dt;
+        M21PatchGroup(g_cnSubPatch, 1, g_cnSubOk && g_cnOn, &g_cnSubOn, &g_cnSubRefused, "cine.pause: the subtitle line "
+                      "clock (fsub [0xe7f188] at 0x583f1c of the subtitle draw 0x583e20)", g_cnOn ? "pause on" : "pause off");
+    }
     const DWORD s = g_cnStream;
     if (g_cnOn && g_cnSkipped > 0 && s && s != g_cnLogged) {   // one line per held cutscene stream
         DWORD sound = 0, tracker = 0;
@@ -22788,9 +23110,17 @@ void CnTick() {
         ReadDword(s + 0x778, &sound);
         ReadFloats(s + 0x384, &t, 1);
         ReadDword(kCnTrackerCine, &tracker);
+        float sub = -1.0f;                       // 0.22.13: the subtitle line clock (1/30 s left of the newest line)
+        char line0[48] = "", line1[48] = "";
+        ReadFloats(kCnSubBox + 0x208, &sub, 1);
+        ReadString(kCnSubBox, line0, sizeof(line0));
+        ReadString(kCnSubBox + 0x100, line1, sizeof(line1));
+        for (char *c = line0; *c; ++c) if (static_cast<unsigned char>(*c) < 32 || static_cast<unsigned char>(*c) > 126) *c = '?';
+        for (char *c = line1; *c; ++c) if (static_cast<unsigned char>(*c) < 32 || static_cast<unsigned char>(*c) > 126) *c = '?';
         Log(1, "cine.pause holds cutscene stream 0x%08lx at time %.3f = %.2f s (handler 0x%08lx, GameTracker cinematic "
-            "0x%08lx, sound stream %s)", s, static_cast<double>(t), static_cast<double>(t) / 30.0, g_cnHandler, tracker,
-            sound ? "yes" : "no");
+            "0x%08lx, sound stream %s); subtitle clock %.1f (%s), lines '%s' / '%s'", s, static_cast<double>(t),
+            static_cast<double>(t) / 30.0, g_cnHandler, tracker, sound ? "yes" : "no", static_cast<double>(sub),
+            g_cnSubOn ? "held" : g_cnSubOk ? "not patched" : g_cnSubWhy, line0, line1);
         g_cnLogged = s;
     }
     CnSoundTick();
@@ -22808,8 +23138,9 @@ void DrawCnBadge() {
                       : g_cnSndOurs ? (de ? "Ton angehalten" : "sound held")
                       : g_cnStepping ? (de ? "Ton stumm" : "sound muted") : (de ? "Ton: Spiel-Pause" : "sound: game's pause");
     if (g_cnStepping) Out(line, sizeof(line), "%s  %.1f s", de ? "> Bild weiter" : "> frame on", static_cast<double>(t) / 30.0);
-    else Out(line, sizeof(line), "||  %s  %.1f s  -  %s", de ? "Szene angehalten" : "Cutscene held",
-             static_cast<double>(t) / 30.0, sound);
+    else Out(line, sizeof(line), "||  %s  %.1f s  -  %s%s", de ? "Szene angehalten" : "Cutscene held",
+             static_cast<double>(t) / 30.0, sound, g_cnSubOn && g_cnSubDt == 0.0f ? (de ? ", Untertitel stehen" :
+             ", subtitles held") : "");   // 0.22.13
     ImGuiViewport *vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 12.0f), ImGuiCond_Always,
                             ImVec2(0.5f, 0.0f));
@@ -22827,10 +23158,13 @@ void DrawCnBadge() {
 }
 void ValCnPause(char *o, size_t n) {
     CnCheck();
-    Out(o, n, "%d (%s; %ld frame(s) held, %ld step frame(s); sound %s%s)", g_cnPause ? 1 : 0,
+    float sub = -1.0f;
+    ReadFloats(kCnSubBox + 0x208, &sub, 1);
+    Out(o, n, "%d (%s; %ld frame(s) held, %ld step frame(s); sound %s; subtitle clock %s %.1f%s)", g_cnPause ? 1 : 0,
         !g_cnOk ? g_cnWhy : g_cnOn ? "gate patched" : "game's own", g_cnSkipped, g_cnSteps,
         !g_cnSndOk ? g_cnSndWhy : g_cnSndOurs ? "held by TruMenu" : g_cnSndMuted ? "muted (step)" : "game's own",
-        g_cnRefused ? "; patch refused - see TruMenu.log" : "");
+        !g_cnSubOk ? g_cnSubWhy : g_cnSubOn && g_cnSubDt == 0.0f ? "held" : "game's own", static_cast<double>(sub),
+        g_cnRefused || g_cnSubRefused ? "; patch refused - see TruMenu.log" : "");
 }
 void ValCnMark(char *o, size_t n) {
     char mark[40] = "none", arm[48] = "off";
@@ -22909,6 +23243,7 @@ bool RunCnPause(const char *arg, char *o, size_t n) {
         char why[160];
         if (!LabelWorldReady(why, sizeof(why))) { Out(o, n, "cine.pause: %s", why); return false; }
         g_cnRefused = false;                  // a refusal is tried again when the switch is set again
+        g_cnSubRefused = false;               // 0.22.13 (subtitle clock patch)
         InterlockedExchange(&g_cnSkipped, 0);
         InterlockedExchange(&g_cnSteps, 0);
     } else {
@@ -22985,28 +23320,57 @@ void CnKeyTick() {                               // render thread (ShotBeforeRen
     }
 }
 // 0.22.9 (live 2026-11-09 15:13:44-47: View+LB+RB (photo) also fired View+LB (pause off) and View+RB (step)): only the
-// buttons of the three combos count; a combo fires when exactly its buttons are held and that set stood still for
-// 120 ms (so pressing View, LB, RB one after the other fires the photo, not the pause on the way), once - then every
-// combo is locked until no combo button was held for 120 ms
+// buttons of the three combos count. 0.22.13 (live 2026-11-09 21:04, Befund-PC-Test-0911-Abend row 6: LB + View pressed
+// before RB fired "continue" on the way to the photo - the 0.22.9 rule fired a combo once its set stood still 120 ms):
+//   * a combo whose buttons are part of another combo (by default LB + View and RB + View inside LB + RB + View) fires
+//     on RELEASE - when one of its buttons is let go - and only if no other combo button was added while it was held
+//     (the "peak" = every combo button held since the last full release must be exactly its set);
+//   * a combo that is part of no other (the photo LB + RB + View) fires as soon as exactly its buttons are held;
+//   * one action per press: after a combo fired every combo waits until no combo button was held for 120 ms.
+// Keyboard keys are unchanged (edges, CnKeyTick).
 DWORD g_cnPadSince = 0;                          // tick of the last change of the held combo buttons
 bool g_cnPadLatch = false;                       // a combo fired: wait for the full release
+WORD g_cnPadPeak = 0;                            // 0.22.13: every combo button held since the last full release
+// combo i is part of another combo (its mask inside a larger one) - it fires on release
+bool CnPadIsSub(int i) {
+    const WORD m = g_cnPadMask[i];
+    if (!m) return false;
+    for (int j = 0; j < 3; ++j)
+        if (j != i && g_cnPadMask[j] && g_cnPadMask[j] != m && (g_cnPadMask[j] & m) == m) return true;
+    return false;
+}
 void CnPadTick(DWORD index, WORD buttons, bool active) {   // pad path (QbPad's caller)
     if (index != 0) return;
     WORD all = 0;
     for (int i = 0; i < 3; ++i) all = static_cast<WORD>(all | g_cnPadMask[i]);
-    const WORD held = static_cast<WORD>(buttons & all);
+    const WORD held = static_cast<WORD>(buttons & all), before = static_cast<WORD>(g_cnPadPrev & all);
     const DWORD now = GetTickCount();
-    if (held != (g_cnPadPrev & all)) g_cnPadSince = now;
+    if (held != before) g_cnPadSince = now;
     g_cnPadPrev = buttons;
     if (!all) return;
     const bool stable = now - g_cnPadSince >= 120;
     if (g_cnPadLatch) {
-        if (!held && stable) g_cnPadLatch = false;
+        if (!held && stable) { g_cnPadLatch = false; g_cnPadPeak = 0; }
         return;
     }
-    if (!active || !held || !stable) return;
-    for (int i = 0; i < 3; ++i) {
-        if (g_cnPadMask[i] && held == g_cnPadMask[i]) {
+    if (!held) {                                 // full release: the next press starts a new peak
+        if (stable) g_cnPadPeak = 0;
+    }
+    // release of a sub-combo: its full set was held before, one of its buttons is up now, nothing else joined
+    for (int i = 0; i < 3 && before; ++i) {
+        const WORD m = g_cnPadMask[i];
+        if (!m || !CnPadIsSub(i) || (before & m) != m || (held & m) == m) continue;
+        const WORD peak = static_cast<WORD>(g_cnPadPeak | before);
+        g_cnPadLatch = true;                     // pressed and let go: this press is used up either way
+        if (peak == m && active) CnHotAction(i, "pad (released)");
+        else if (peak != m) Log(1, "cine pad: combo 0x%04x let go after 0x%04x was held - no action (another combo "
+                                    "button joined)", m, peak);
+        return;
+    }
+    g_cnPadPeak = static_cast<WORD>(g_cnPadPeak | held);
+    if (!active || !held) return;
+    for (int i = 0; i < 3; ++i) {                // a combo that is part of no other: at once, exactly its buttons
+        if (g_cnPadMask[i] && held == g_cnPadMask[i] && !CnPadIsSub(i)) {
             g_cnPadLatch = true;
             CnHotAction(i, "pad");
             return;
@@ -24350,7 +24714,7 @@ const Item kItems[] = {
     {"cine.pause", "bool", "0.22 1|0: hold a playing cutscene (its stream update 0x5901a0 is skipped: time, actors, "
                            "camera stand still) while the world, particles and lights run on; 0.22.1: the sound is held "
                            "too (master channel group), a badge shows it, no argument = report only; off by itself at a "
-                           "load", false, ValCnPause, RunCnPause},
+                           "load; 0.22.13: the subtitle line clock is held too", false, ValCnPause, RunCnPause},
     {"cine.step", "action", "0.22 [n]: let n game frames (default 1, at most 600) of the held cutscene through (0.22.1: "
                             "sound muted meanwhile, so clock and picture move on together)", false, ValCnPause, RunCnStep},
     // 0.22.9 (section "0.22.9 enemy diagnosis")
@@ -24369,9 +24733,13 @@ const Item kItems[] = {
     {"enemy.panel", "bool", "0.22.11 1|0: Gegneranzeige at the right edge - nearest AI enemy within 3000 units: LP bar, "
                             "stamina, states, target, attack slot, attack record, last 3 hits, Lara LP / power / time scale",
      false, ValEp, RunEp},
+    {"ring.bits", "info", "0.22.13: the combat reticle request (K-5) - CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of "
+                          "0xfae924, style 0xfae8ac, position, reticle +0x40 bits 6 / 9; read only (an info item: it never "
+                          "switches anything)", false, ValRg, nullptr},
     {"sub.lang", "action", "0.22.9 [-1|0..4|7|9..12]: subtitle language live (-1 game language, 0 en, 1 fr, 2 de, 3 it, "
-                           "4 es) through the game's option setter 0x5d5100 - from the next subtitle line; no argument = "
-                           "report", true, ValSb, RunSb},
+                           "4 es) through the game's option setter 0x5d5100 - from the next subtitle line; 0.22.13: then "
+                           "the game's settings save 0x478010 (registry), so it survives a restart; no argument = report",
+     true, ValSb, RunSb},
     {"cine.status", "info", "0.22: the stream list - the cutscene stream (state, time, handler, sound), GameTracker "
                             "cinematic, the pause", false, ValCnStatus, nullptr},
     {"cine.mark", "action", "0.22.1: remember the playing cutscene's time (seconds) for cine.pauseat", false, ValCnMark,
@@ -28490,6 +28858,7 @@ const QbRow kQbTests[] = {
     {"Kombo-Spur", "Combo trace", "combo.trace", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
     {"Gegneranzeige", "Enemy panel", "enemy.panel", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},   // 0.22.11
     {"Kampf-Spur (TruFight.log)", "Fight trace (TruFight.log)", "fight.trace", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
+    {"Ziel-Ring: Bits (live)", "Target ring: bits (live)", "ring.bits", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},   // 0.22.13
     {"Untertitel-Sprache zeigen", "Show subtitle language", "sub.lang", "", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
@@ -28583,6 +28952,7 @@ const QbHelp kQbHelp[] = {
     {"combo.trace", "", "Je Treffer: Lara-Kombo, Gegner-Reaktion ins Log|Per hit: Lara combo, enemy reaction to log"},
     {"enemy.panel", "", "Feld rechts: LP, Zustand, Ziel, letzte Treffer|Panel right: LP, state, target, last hits"},   // 0.22.11
     {"fight.trace", "", "Kampfwerte wie TruXenia nach TruFight.log|Fight values as TruXenia to TruFight.log"},
+    {"ring.bits", "", "Ziel-Ring: Kampf-Bits, HUD-Gruppe 12, Stil (nur lesen)|Target ring: combat bits, HUD group 12 (read)"},   // 0.22.13
     {"sub.lang", "", "Untertitel-Sprache jetzt (sub.lang 2 = Deutsch)|Subtitle language now (sub.lang 0 = English)"},
     {"cine.mark", "", "Szenenzeit merken (Sekunden)|Remember the cutscene time (seconds)"},   // 0.22.1
     {"light.frame", "*", "Lichter je Bild in TruMenu.lightframe.txt; BLINK? = Verdacht|Lights per frame to "

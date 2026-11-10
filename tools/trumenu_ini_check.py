@@ -2587,6 +2587,89 @@ def check_0218(ini_path, switches_path):
                          len(dids), len(re.findall(r'\n    \{', m.group(1))) if m else 0, len(have))
 
 
+Q02213_FT_NEW = ('pc_ring_bits', 'pc_hud_g12', 'pc_ret_style', 'pc_ret40', 'pc_drip_q10706', 'pc_drip_q10707', 'pc_drip_n',
+                 'pc_drip_near_x', 'pc_drip_near_y', 'pc_drip_near_z', 'pc_drip_near_dxy', 'pc_drip_near_dz',
+                 'pc_drip_near_iflags', 'pc_drip_near_node', 'pc_lara_dmg')
+Q02213_FT_OLD_LAST = 'pc_ramp_last'      # the 0.22.11 header ended here (TruXenia order first, then the PC columns)
+
+
+def check_02213():
+    """0.22.13: cutscene pad combos (sub-combos on release, the photo at once), the subtitle line clock held with the
+    pause (data patch at 0x583f24, byte checks), sub.lang calls the settings save 0x478010 (byte checks, __try), the enemy
+    panel text "Kampf-Spur: an (n Zeilen)", ring.bits = an info item (read only), the new fight.trace columns at the end
+    (header and format agree), no hook on 0x637590 (TruShadowCombat's site), no check on TruShadowPower's 0x71e979"""
+    problems = []
+    src = read_cpp()
+    # 1 pad combos
+    pt = fn_body(src, 'void CnPadTick(')
+    if 'CnPadIsSub(i)' not in pt or 'g_cnPadPeak' not in pt or 'peak == m && active' not in pt:
+        problems.append('TruMenu.cpp: CnPadTick must fire a sub-combo on release only when the peak is exactly its set')
+    if '!CnPadIsSub(i)' not in pt or 'held == g_cnPadMask[i]' not in pt:
+        problems.append('TruMenu.cpp: CnPadTick must fire a combo that is part of no other at once (exactly its buttons)')
+    sub = fn_body(src, 'bool CnPadIsSub(')
+    if '(g_cnPadMask[j] & m) == m' not in sub:
+        problems.append('TruMenu.cpp: CnPadIsSub must test "inside a larger combo"')
+    # 2 subtitle clock
+    if '{0x00583f1c, "d98308020000 d82588f1e700' not in src or 'const DvCheck kCnSubChecks[] = {' not in src:
+        problems.append('TruMenu.cpp: kCnSubChecks must check the subtitle countdown 0x583f1c (fsub [0xe7f188])')
+    if '{0x00583f24, kCnSubDtGame, false, "N3 subtitle clock 0x583f24"' not in src:
+        problems.append('TruMenu.cpp: g_cnSubPatch must be the disp32 at 0x583f24 (data patch, not a call)')
+    tick = fn_body(src, 'void CnTick(')
+    i_v, i_p = tick.find('g_cnSubDt = dt;'), tick.find('M21PatchGroup(g_cnSubPatch, 1, g_cnSubOk && g_cnOn')
+    if not (0 <= i_v < i_p):
+        problems.append('TruMenu.cpp: CnTick must set g_cnSubDt before it patches, and patch only with the walk (g_cnOn)')
+    if 'CnHeldNow() && !g_cnStepping' not in tick:
+        problems.append('TruMenu.cpp: the subtitle clock stands only while held and not stepping')
+    # 3 settings save
+    sv = fn_body(src, 'bool SbSave(')
+    if 'kSbSaveChecks' not in sv or '__try' not in sv or '0x00478010' not in sv or '0x00ad75e4' not in sv:
+        problems.append('TruMenu.cpp: SbSave must byte-check 0x478010, test [0xad75e4] and call it under __try')
+    if 'SbSave(saved, sizeof(saved))' not in fn_body(src, 'bool RunSb('):
+        problems.append('TruMenu.cpp: RunSb must call SbSave after the option setter')
+    if not re.search(r'\{"sub\.lang", "action", .*?true, ValSb, RunSb\}', src, re.S):
+        problems.append('TruMenu.cpp: sub.lang must stay a game-thread item (the save runs there)')
+    # 4 enemy panel text
+    ep = re.sub(r'//[^\n]*', '', fn_body(src, 'void DrawEnemyPanel('))
+    if '"Kampf-Spur: an (%ld Zeilen)"' not in ep or '"Fight trace: on (%ld lines)"' not in ep or 'Kampf-Spur: Zeilen' in ep:
+        problems.append('TruMenu.cpp: DrawEnemyPanel must say "Kampf-Spur: an (n Zeilen)" / "Fight trace: on (n lines)"')
+    # 5 ring.bits: an info item, read only
+    if '{"ring.bits", "info",' not in src or 'false, ValRg, nullptr}' not in src:
+        problems.append('TruMenu.cpp: ring.bits must be an info item without a runner')
+    rg = src[src.find('// ---- 0.22.13 ring bits'):src.find('// ---- 0.22.13 goo drips')]
+    if not rg or any(t in rg for t in ('WriteDword(', 'WriteBytes(', 'PutByte(', 'QueueItem(')):
+        problems.append('TruMenu.cpp: the ring bit section must only read')
+    code = re.sub(r'//[^\n]*', '', rg)
+    if any(a in code for a in ('0x0071e979', '0x00715026', '0x00716f5f')):
+        problems.append('TruMenu.cpp: no run-time byte check on TruShadowPower\'s patch sites 0x71e979 / 0x715026 / 0x716f5f')
+    if '"Ziel-Ring: Bits (live)", "Target ring: bits (live)", "ring.bits", "", kQbInfo' not in src:
+        problems.append('TruMenu.cpp: bar row "Ziel-Ring: Bits (live)" (info) missing')
+    # 6 fight.trace columns: the old header unchanged, new columns at the end, the format has one field per column
+    m = re.search(r'const char \*const kFtHeader = (.*?);\r?\n', src, re.S)
+    head = ''.join(re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(1))).replace('\\t', '\t').replace('\\n', '\n') if m else ''
+    cols = head.rstrip('\n').split('\t')
+    if Q02213_FT_OLD_LAST not in cols or tuple(cols[cols.index(Q02213_FT_OLD_LAST) + 1:]) != Q02213_FT_NEW or \
+            cols[:3] != ['host_time', 'inst', 'obj_id']:
+        problems.append('TruMenu.cpp: kFtHeader must keep the TruXenia order and end with %s' % ', '.join(Q02213_FT_NEW))
+    wr = fn_body(src, 'void FtWrite(')
+    fm = re.search(r'_snprintf_s\(line, sizeof\(line\), _TRUNCATE,\s*((?:"[^"]*"\s*)+),', wr)
+    fmt = ''.join(re.findall(r'"([^"]*)"', fm.group(1))) if fm else ''
+    fields = fmt.count('\\t') + 1 if fmt else 0
+    if fields != len(cols):
+        problems.append('TruMenu.cpp: FtWrite writes %d fields, kFtHeader has %d columns' % (fields, len(cols)))
+    ft = fn_body(src, 'void FtTick(')
+    if 'FtDripRead(w.pos, w.drip)' not in ft or 'w.drip.zone' not in ft:
+        problems.append('TruMenu.cpp: FtTick must read the goo drips (FtDripRead) and write a line every sample in the zone')
+    dr = fn_body(src, 'void FtDripRead(')
+    if 'oid == 926' not in dr or 'intro == 10706 || intro == 10707' not in dr or 'oid == 929 || oid == 942' not in dr or \
+            '2500.0f * 2500.0f' not in dr:
+        problems.append('TruMenu.cpp: FtDripRead must use the finding\'s sources 10706 / 10707 (926), copies 929 / 942, 2500')
+    look = fn_body(src, 'void FtDmgLook(')
+    if 'HexBytesAt(0x00637590' not in look or re.search(r'Write(Bytes|Dword)\(\s*0x00637590', src):
+        problems.append('TruMenu.cpp: 0x637590 must only be looked at (TruShadowCombat hooks it), never written')
+    return problems, 'pad sub-combos on release, subtitle clock 0x583f24, settings save 0x478010, panel text, ring.bits ' \
+                     'info, %d fight.trace columns (%d new at the end)' % (len(cols), len(Q02213_FT_NEW))
+
+
 def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
@@ -2712,6 +2795,10 @@ def main(argv):
     for p in nproblems: print('Q0201 %s' % p)
     if not nproblems: print('ok: 0.20.1 sound list: %s' % nsummary)
     problems += nproblems
+    cproblems13, csummary13 = check_02213()   # 0.22.13
+    for p in cproblems13: print('Q02213 %s' % p)
+    if not cproblems13: print('ok: 0.22.13 %s' % csummary13)
+    problems += cproblems13
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

@@ -3009,6 +3009,81 @@ def check_qcsuggest():
     return ok
 
 
+def cine_pad_sim(polls, masks=(0x0120, 0x0220, 0x0320), active=True):
+    """0.22.13 CnPadTick / CnPadIsSub as a model: polls = [(ms, buttons)], one poll every given time; returns the actions
+    fired as (ms, combo index). A combo inside a larger one fires on release when the peak is exactly its set; a combo
+    inside no other fires as soon as exactly its buttons are held; one action per press (latch until 120 ms released)."""
+    def is_sub(i):
+        m = masks[i]
+        return bool(m) and any(j != i and masks[j] and masks[j] != m and (masks[j] & m) == m for j in range(3))
+    allm = masks[0] | masks[1] | masks[2]
+    st = dict(prev=0, since=0, latch=False, peak=0)
+    out = []
+    for now, buttons in polls:
+        held, before = buttons & allm, st['prev'] & allm
+        if held != before: st['since'] = now
+        st['prev'] = buttons
+        stable = now - st['since'] >= 120
+        if st['latch']:
+            if not held and stable: st['latch'], st['peak'] = False, 0
+            continue
+        if not held and stable: st['peak'] = 0
+        fired = False
+        for i in range(3):
+            m = masks[i]
+            if not before or not m or not is_sub(i) or (before & m) != m or (held & m) == m: continue
+            st['latch'] = True
+            if (st['peak'] | before) == m and active: out.append((now, i))
+            fired = True
+            break
+        if fired: continue
+        st['peak'] |= held
+        if not active or not held: continue
+        for i in range(3):
+            if masks[i] and held == masks[i] and not is_sub(i):
+                st['latch'] = True
+                out.append((now, i))
+                break
+    return out
+
+
+def check_cinepad():
+    """0.22.13 (live 2026-11-09 21:04: LB + View pressed before RB fired 'continue' on the way to the photo combo)"""
+    LB, RB, VIEW = 0x0100, 0x0200, 0x0020
+    def run(seq, step=10, **kw):                 # seq = [(ms from, buttons)] -> polls every 10 ms up to the last + 400
+        polls, end = [], seq[-1][0] + 400
+        for t in range(0, end, step):
+            b = 0
+            for at, bt in seq:
+                if t >= at: b = bt
+            polls.append((t, b))
+        return [i for _, i in cine_pad_sim(polls, **kw)]
+    cases = [
+        ('LB, View, then RB (the live case) -> photo only', [(0, LB), (50, LB | VIEW), (400, LB | VIEW | RB), (700, 0)], [2]),
+        ('LB + View held 1 s, released -> continue once', [(0, LB | VIEW), (1000, 0)], [0]),
+        ('LB + View, LB let go first -> continue at once', [(0, LB | VIEW), (300, VIEW), (600, 0)], [0]),
+        ('RB + View, released -> one frame', [(0, VIEW | RB), (200, 0)], [1]),
+        ('all three in one poll -> photo', [(0, LB | RB | VIEW), (300, 0)], [2]),
+        ('photo, then RB let go while LB + View stay -> nothing more', [(0, LB | RB | VIEW), (300, LB | VIEW), (900, 0)], [2]),
+        ('LB + View, RB tapped for 10 ms -> photo (at once), no continue',
+         [(0, LB | VIEW), (200, LB | VIEW | RB), (210, LB | VIEW), (500, 0)], [2]),
+        ('View alone -> nothing', [(0, VIEW), (300, 0)], []),
+        ('LB + RB, RB let go, View added, released -> nothing (RB was part of this press)',
+         [(0, LB | RB), (100, LB), (150, LB | VIEW), (400, 0)], []),
+        ('two presses of LB + View -> continue twice', [(0, LB | VIEW), (200, 0), (500, LB | VIEW), (700, 0)], [0, 0]),
+    ]
+    ok = True
+    for name, seq, want in cases:
+        got = run(seq)
+        good = got == want
+        ok &= good
+        print('cinepad: %s: %s  %s' % (name, got, 'ok' if good else 'FAIL (want %s)' % want))
+    got = run([(0, LB | VIEW), (300, 0)], active=False)
+    ok &= got == []
+    print('cinepad: menu / ring own the pad (not active) -> nothing: %s  %s' % (got, 'ok' if got == [] else 'FAIL'))
+    return ok
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -3026,7 +3101,8 @@ def main():
                check_togglerows(),
                check_yfooter(), check_utf8cut(rng), check_cosvalid(rng), check_uber(), check_navwalk(rng),   # 0.21.7
                check_chapters(), check_shlive(),
-               check_qcdanger(), check_qcarm(), check_favargs(rng), check_sgcover(), check_qcsuggest()]   # 0.21.8
+               check_qcdanger(), check_qcarm(), check_favargs(rng), check_sgcover(), check_qcsuggest(),   # 0.21.8
+               check_cinepad()]                                                       # 0.22.13
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

@@ -2928,6 +2928,72 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.13 - pad combos on release, subtitles held, sub.lang kept, ring bits, goo drip columns (2026-11-10)
+
+Built into `work\asi\menu0236`, not installed. Byte checks: `work\asi\menu0236\precheck_02213.txt` (21 checks, 0
+mismatches against the installed `tru.exe`). Background (workspace): `docs\Befund-PC-Test-0911-Abend.md` rows 6, 7, 7b,
+9 and "TruMenu 0.22.12", `docs\Befund-Goo-Tropfen-1011.md` section 3, `docs\Befund-Anvisier-Kreis-0911.md` section 6.
+
+- **Cutscene pad combos (row 6: LB + View pressed before RB fired "weiter" on the way to the photo).** A combo whose
+  buttons are part of another combo - by default LB + View (weiter) and RB + View (1 Bild), both inside LB + RB + View
+  (Foto) - now fires on **release** (when one of its buttons is let go) and only if no other combo button was added
+  while it was held. A combo that is part of no other (the photo) fires as soon as exactly its buttons are held. One
+  action per press; then every combo waits until no combo button was held for 120 ms (as 0.22.9). A press that had
+  another combo button in it and does nothing writes `cine pad: combo 0x.... let go after 0x.... was held - no action`.
+  Keyboard keys (`[Cine] PauseKey` ...) unchanged. Model: `tools/trumenu_quick_check.py` `cinepad` (11 cases).
+- **The pause holds the subtitle lines too (row 7b).** Static (2026-11-10): a cutscene's subtitle text comes with its
+  stream frames - the cinematic handler update 0x457100 (skipped by the 0.22 gate) hands it to the reader 0x4538d0,
+  which adds each line with 0x583db0(text, 90) to the subtitle box 0xccdec0 (two 0x100-byte lines, line clock +0x208).
+  The only thing that counts the clock down is the subtitle **draw** 0x583e20 (from the game display 0x5da17d):
+  `+0x208 -= [0xe7f188]` (the scaled frame time) unless the game state byte 0xe7f143 is 6 / 10 (the game's pause); at
+  <= 0 the newest line moves up, the lower one is cleared and the clock restarts at 90 (3 s) - that is why the lines
+  scrolled away while picture and sound stood. While a cutscene is held, the disp32 of that `fsub` (0x583f24) points to
+  TruMenu's own float: 0.0 while held, the game's frame time while stepping (`cine.step`) or while nothing is held; it
+  goes in and out with the stream walk calls. 6 byte checks (`kCnSubChecks`); a mismatch keeps only this part off
+  (`0.22.13 subtitle clock: 6 checks ...` in the first `cine.pause` log line). The badge says `, Untertitel stehen`; the
+  "holds cutscene stream" line shows the clock and both lines.
+- **`sub.lang` survives a restart.** The game writes its settings only in **0x478010**, whose only caller is the
+  shutdown path 0x5df930 (0x5df935) - a game ended by `game.quit` (TerminateProcess) or a crash never saves, so the
+  option was back at -1. `sub.lang <n>` now calls 0x478010 right after the option setter (game thread, `__try`, 3 byte
+  checks `kSbSaveChecks`, `[0xad75e4]` must be set): it writes the settings as they are now - graphics copy, options,
+  volumes, `SubtitleLanguage` - to `HKCU\...\Tomb Raider: Underworld`, exactly what the game writes at a clean exit. Log:
+  `sub.lang: settings save 0x478010 done (#1) - registry mirror [0x8900e8] now 2`. No INI value needed.
+- **Enemy panel:** `Kampf-Spur: an (203 Zeilen)` / `Fight trace: on (203 lines)` (was `Kampf-Spur: Zeilen 203`), and a
+  new line `Ring: Bits 9:0 10:1 11:0 21:0 | HUD12 1 | Stil 2 | Fk40 0x0040 (6:1 9:0)`.
+- **`ring.bits` (info, bar page Tests "Ziel-Ring: Bits (live)")** - the combat reticle request (K-5, ENGINE.md "Combat
+  reticle"): CM = `[[0xfadb58]+0x504]`, `+0x1fc` bits 9 / 10 (helper 0x6f1ed0) / 11 (lock-on, 0x71e73f) / 21, HUD group
+  bit 12 of 0xfae924 (0x77d9d0), style byte 0xfae8ac (0x77a680), position 0xfae8a4 / a8, reticle `[CM+0]` word +0x40
+  (bits 6 / 9, 0x71e992 / 0x7037dc). Read only, never switches anything. 7 byte checks `kRgChecks`; bit 21's own
+  readers 0x71e979 / 0x715026 are only checked offline - TruShadowPower patches 0x71e979.
+- **`fight.trace` new columns (at the end; the TruXenia order and every older column unchanged):** `pc_ring_bits`
+  (`9:0 10:1 11:0 21:0 (0x<word>)`), `pc_hud_g12`, `pc_ret_style`, `pc_ret40`; goo drips `pc_drip_q10706`,
+  `pc_drip_q10707` (uber node of each source + time in it, `Spawn_easy@0.35`, `->Done` while a transition runs),
+  `pc_drip_n` (copies of object 929 / 942), the nearest copy (x / y distance to Lara): `pc_drip_near_x/_y/_z`,
+  `pc_drip_near_dxy`, `pc_drip_near_dz` (copy - Lara), `pc_drip_near_iflags` (inst+0x14), `pc_drip_near_node`; and
+  `pc_lara_dmg` (Lara's LP drop in this 100 ms sample, `-2000.0 dead` when the LP is gone). The drip columns are filled
+  only when a source (intro 10706 / 10707 of object 926) is loaded and Lara is within 2500 units (x / y) of their mid
+  point; there a line is written every sample. A line is also written when the ring bits change or Lara loses LP. A
+  header line is written at every `fight.trace 1` (the column count grew; `tools/fight_trace_compare.py` takes repeated
+  headers). **No hook on 0x637590:** TruShadowCombat hooks it (`[Damage] Log`: target, type, sub, amount as `damage
+  types` lines); TruMenu logs once whether the entry is the game's or a foreign jump and uses the LP drop.
+
+### TO TEST 0.22.13
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | first `cine.status` / `cine.pause` | log `... 0.22.13 subtitle clock: 6 checks ok` |
+| 2 | end cutscene with subtitles, LB + View, release | pause on when released (not on pressing); log `cine key (pad (released))` |
+| 3 | held: LB + View, then add RB | photo only; the pause stays on (no "weiter"); log `cine key (pad)` with the shot |
+| 4 | held: RB + View, release | one frame on |
+| 5 | held for 10 s with a subtitle line on screen | the line stays (badge `, Untertitel stehen`); log line "holds cutscene stream ... subtitle clock ... held" |
+| 6 | `cine.step 30` while held | the subtitle moves on with the frames |
+| 7 | release (LB + View) | the line runs on from where it stood, next lines in sync with the speech |
+| 8 | `sub.lang 2` | log `sub.lang: settings save 0x478010 done (#1) - registry mirror [0x8900e8] now 2` |
+| 9 | quit the game (also with `game.quit`), start again, `sub.lang` | `subtitles now 2 (Deutsch) ... registry mirror 2` |
+| 10 | `enemy.panel 1`, `fight.trace 1` | panel: `Kampf-Spur: an (n Zeilen)` and a `Ring:` line |
+| 11 | bar Tests "Ziel-Ring: Bits (live)" while Lara aims at a thrall (LT), then with the power (RB) | bits / HUD12 / style change; note which ones (K-5: target + bit 9/10/21 -> HUD12 1) |
+| 12 | DLC 2 end level, goo drip corridor with `fight.trace 1` (with / without power, die once) | TruFight.log: lines every 100 ms there, `pc_drip_*` filled, `pc_lara_dmg` at the death; log `0.22.13: damage function 0x637590 ...` once |
+
 ## 0.22.12 - fight trace follows Lara, quick bar shows trace states (2026-11-09)
 
 Built into `work\asi\menu0235`, not installed. No new hooks (no byte checks needed).
