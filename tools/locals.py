@@ -8,7 +8,9 @@ Strings are referenced by INDEX from game data, so the merge keeps PC indices an
 
 Usage: python3 -I tools/locals.py survey      (compare all versions)
        python3 -I tools/locals.py build [out]  -> <out>/mods/local/locals.bin_<NNN> (ModLoader per-language name:
-            '%s_%03d' % (path, specMask & ~0x80000000); NNN = 001/002/004/008/016 from the spec low bits, 032 for 0xffffffe0 = GUESS)
+            '%s_%03d' % (path, specMask & ~0x80000000); NNN = 001/002/004/008/016 from the spec low bits, 032 for 0xffffffe0;
+            languages (table field, checked 2026-11-10 on the installed tables): 001 English (0), 002 French (1),
+            004 German (3), 008 Italian (2), 016 Spanish (4), 032 Dutch (5, text only - no Dutch speech in the .mul))
             + <out>/locmap_xbox_to_pc.json (Xbox TU string index -> PC string id, for the data converters)
 """
 import sys, os, struct, collections
