@@ -113,7 +113,7 @@ the Xbox Live advert "new download available" in the pause menu (title-update sc
 
 | Part | Estimate | What works | What is missing |
 |---|---|---|---|
-| DLC 1 *Beneath the Ashes* | `█████████░` ~90 % | played; "display driver" box, grapple ring look, cinematic speech in five languages fixed; starts after DLC 2 in the same session | crash while loading the dungeon in the fork's builds: cause found, fix built offline, not yet confirmed in game |
+| DLC 1 *Beneath the Ashes* | `█████████░` ~90 % | played; "display driver" box, cinematic speech in five languages fixed; dungeon loads and reloads after death without the crash (2026-11-10); starts after DLC 2 in the same session | grapple ring shows wrong colours again in the close-up view (a later shader rebuild replaced the ring fix) |
 | DLC 2: levels / story | `████████░░` ~80 % | played through the Yggdrasil halls to the end level and its cutscenes; doppelganger look, wall run, waterfall | rock-vein jump from a ledge turns back; a moaning sound loops; some materials still drawn with substitute shaders |
 | DLC 2: combat | `████████░░` ~85 % | as on the Xbox for single hits, the punch combo (20 / 40 / 60 / 80), the big-hit fall and the kick kill (`TruShadowCombat` 0.6.8-0.6.10); melee kill and chunkdoll; shooting with the shadow power; lock-on with the ring (row below) | the shadow finisher never starts |
 | DLC 2: shadow power | `████████░░` ~80 % | slow motion, meter and HUD, power states, wall run and its camera | at the goo drip the PC stays in slow motion while Lara runs (Xbox: normal speed); Lara's ponytail stretches in slow motion |
