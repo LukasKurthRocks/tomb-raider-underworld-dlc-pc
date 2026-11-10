@@ -759,7 +759,7 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      | `generalbank.drm` | 48 scripts changed + 2 new, 65 textures, 11 DTPs: mission screen, loading screen with DLC background and intro trigger, golden shotgun, pause menu, "dlc2data" | partly: menu item + mission screen (B138 patch, our text style fix); loading screen, intro trigger, "dlc2data", golden shotgun missing |
      | `local/locals.bin` x 6 languages | 1 284 -> 1 407 strings: real DLC names/descriptions instead of retail placeholders ("DLC TEST MISSION 2", "Extra Costume 1"), hint texts | merged into the PC tables (`tools/locals.py`) |
      | `tr8/objectlist.txt`, `objlist.dat`, `unitlist.txt` | registers DLC objects and level units | merged (`work/generic/merged/tr8`, in B138) |
-     | `globalsoundinfo.drm` | 1 script + 1 sound DTP grown | in B138 |
+     | `globalsoundinfo.drm` | 1 sound DTP grown (3 sound groups, +480 B); scripts: 4 words swapped in Xbox 56, the contents of 220 / 221 and 768-770 permuted (not taken, finding 51) | in B138; own build `tools/globalsoundinfo_build.py` (finding 51) |
      | `padshock/padshocklib.tfb` | 1 rumble entry (`dlc1_adren_bridge`; missing = crash) | `tools/padshock_convert.py` |
      | `default.xexp` (exe patch) | engine code - presumably mounting DLC packages and the licence check | none on PC: the mod loader replaces it; the related engine natives are stubs on PC (finding 41, `tools/menu_dlc_patch.py`) |
 
@@ -2588,6 +2588,80 @@ basis for converting DLC 2 (*Lara's Shadow*) with the same pipeline.
      their 11 achievement calls (finding of the kit leftovers: they crash on the PC). Not applied: `statechart_other`
      (the twin truth also flags words in B138 files and 50l objects - open which side is right). 8 installed copies
      have no Xbox source and are checked for achievement / scriptclash only.
+51. **Kit independence: `globalsoundinfo.drm` from the PC original + recorded TU knowledge; the B138 Symbol
+    calibration re-derived from the base game (2026-11-10, offline, nothing installed).**
+   * **What the kit changed.** PC original (`bigfile.000`, not in `patch.000`; raw 77 402 B, 52 sections) against
+     the kit file (B138 = B270, raw 77 906 B): header, dependency names, section list, ids, `ver` / flags and 51 of 52
+     sections equal; only the sound DTP 792 differs (13 920 -> 14 400 B, internal relocations 94 -> 97, no
+     external / id relocations). Xbox retail -> title update: DTP 775 grows by exactly the same edit, and four
+     scripts change as well - Xbox 56 (= PC 55) has two adjacent word pairs swapped (+0x60 / +0x64, +0x84 / +0x88),
+     and the contents of 220 / 221 and 768 / 769 / 770 are permuted between the ids (each TU section equals the retail
+     section at another index). The kit took **only the DTP**: kit = PC original + the TU DTP edit, not the whole TU
+     file converted. PC 55 is resident in the PC generalbank anyway (first loaded wins; workspace docs Befund-Kit-PC-Dateien-1011.md).
+   * **The edit** (`tools/globalsoundinfo_build.py learn`, from retail + TU; PC DTP 792 and retail DTP 775 have equal
+     relocations and 3 470 of 3 480 words u32-swapped, so the TU offsets apply to the PC section): group count 77 -> 80
+     (+0xe4), pause list count 4 -> 5 (+0xfc); three 0x84-byte entries appended to the table at +0x2928 - 77 = PC
+     entry 9 with +0x7c = 4, 78 = PC entry 1 with parent 77 and +0x7c = 1, 79 = PC entry 54 (parent 53); 79 appended to
+     the pause list (+0x2958); a 16-byte zero runtime area for 79 before the area of group 54 (+0x3480) and 2 x 32
+     bytes of floats for 77 / 78 before the area of group 7 (+0x3640); three new internal relocations (the +0x80
+     pointers of the new entries); every pointer at or behind an insertion moves with it. An insertion inside a run of
+     equal words is placed where the shifted retail relocations reproduce all 94 TU relocations (the right-most such
+     place = the start of the following area / list). Recorded in `docs/data/globalsoundinfo_tu.json`: offsets, copy
+     sources and **88 bytes of TU values** (22 u32 numbers: 16 floats, 3 entry words, 1 list word, 2 counts); all
+     other bytes come from the player's PC file. The kit writes the internal relocation list sorted by offset
+     (PC / retail / TU keep +0xd0 / +0xd4 last) - kept (`reloc_sorted`) for the gate.
+   * **Gate**: raw DRM md5 `94a70736...` = kit, 52 / 52 sections equal (`--check --kit`), PC input md5 checked first.
+     The CDRM bytes are not equal (17 704 vs 17 698 B): the venv's zlib is zlib-ng 1.3.1, which does not re-encode
+     even the PC original byte-equal (`work/kitfree_1011/cdrm_probe.py`); the CDRM md5 is reported, not gated (as
+     content-equal in `kit_dependency.py`).
+   * **A kit error, found on the way.** Group entry +0x7c is a u16 DSP kind, not a u32: 0x58de50 loops over all groups,
+     `cmp word ptr [entry+0x7c], 0`, non-zero -> 0x58dad0 -> 0x587620 (`movzx` kind 1..11 -> FMOD DSP type constant ->
+     0x7b98ea, parameters from the +0x80 block) (ENGINE 18.3; the same chain and u16 kind as the SoundPlex DSP node
+     that step `dspkind` fixes, ENGINE 18.1). The base entries 58 / 59 (kind 5) are u16 halves
+     (retail `00050000` -> PC `05000000`); the kit wrote the TU values of 77 / 78 u32-swapped (`00000400` /
+     `00000100`) -> the u16 reads 0 -> no DSP effect for the two new DLC 2 groups on PC. Default build = kit bytes
+     (md5 gate, the file B138 / B270 players run); `--tu-form` writes the two words as u16 halves (recorded raw md5
+     `99834881...`; against the kit exactly +0x29a4 / +0x2a28 differ). Which one to install = owner's decision after a
+     listening test (DLC 2 player sounds); what the effect sounds like on the Xbox ⬜.
+   * **Pipeline step `Globalsound`** (`Invoke-TruPipeline.ps1`, seconds, independent of every other step): build +
+     `--check` of the written file -> `work/rebuild/globalsound/mods/globalsoundinfo.drm` + `globalsound_check.json`.
+     Not installed by anything yet (the Repair tree still takes the kit's copy from the B138 snapshot - md5-equal in
+     content).
+   * **The B138 Symbol calibration** (`docs/data/b138_symbol_calibration.json`, 167 Xbox Symbols outside the learned
+     map). Made from B138 itself (finding 33 `symbol_guess_check.py --write`, pruned with `script_diff_compare.py
+     --prune`, finding 35 run 3); read by `dlc_generic.DlcIds._sym_setup` for exact lookups in every conversion
+     (Convert, Assemble, Dlc2, Costumes and the Fixes tools that convert; `TRUDLC_SYM_EXTRA` = another file / `off`) and
+     merged by `sym_calibration_check.py` into `work/rebuild/sym_base_evidence.json` (generalbank_build,
+     generalbank_hud_build, script7_pause_port).
+   * New `tools/sym_calibration_derive.py derive / check` (developer tool, ~1.8 GB of memory, 3.5 min): votes over the
+     18 475 distinct script pairs of `pairs.pkl` (18 045, retail <-> PC bigfile) and `pairs_patch.pkl` (430, TU
+     generalbank <-> PC patch.000 ...) - function / prototype names, DataMember names and call sites
+     (`sym_calibration_check.py`), plus raw code words (equal layout, not a u32 number, other half unchanged / mapped).
+     Choice in rounds: names with >= 2 votes, then raw words (identity votes dropped, >= 2 votes, >= 75 %), then
+     single name votes (kept out of the usable `symbols`). Where the learned map knows the name, the methods agree
+     58 512 / 0 (members), 46 126 / 0 (calls), 73 119 / 450 (arguments). Output `docs/data/sym_calibration_derived.json`
+     (Symbol numbers and vote counts only; `symbols` = the 123 values with >= 2 votes, usable as `TRUDLC_SYM_EXTRA`).
+   * **Gate: derived = B138 for 42 of 167 (25 %) -> the pipeline is not switched** (owner's decision). Classes:
+     * 42 equal, all with base evidence (names: 230, 954, 4447, 4479, 4509, 4510, 4539, 4894, 8943, 8944, 12980,
+       14991; raw words: e.g. 375 -> 714 in 157 words, 4441 -> 5823 in 1 281, 4709 / 4710 -> 6037 / 6038 in 864);
+     * 81 contradicted by base evidence of >= 2 votes: **1975-2048** (73 Symbols): members of 107 script pairs, for
+       2047 / 2048 also 214 name and 700 call votes, give xs + 61 - B138 has xs - 22 (1975-2014) or the collision
+       value 40000 + xs (2015-2048); the title-update scripts alone (TU generalbank <-> PC patch.000) give the derived
+       value for 77 of the 81 and B138's for 1 (522, raw words); 515 / 521 / 522 -> 517 / 523 / 524 (460 /
+       1 051 name, 736 member votes; finding 43 already) - but raw code words give B138's 340 / 341 for 521 / 522 (12 /
+       41 words), so those Xbox values are a name in one place and something else in code (open); 781 -> 783 (2
+       member votes), 1195 -> 1292 (10); 9621 / 9622 / 9648 (B138 = Xbox value) -> 12215 / 12154 / 11740 by raw words
+       (8 / 24 / 37);
+     * 38 with a single name vote only (364-441 apart from 14 raw-proven ones, 986, 1286): one script pair's member
+       list says +2 (= our interpolation), while raw words prove B138's +339 / +340 run for the neighbours (368 / 369,
+       374-382) - the single votes are not trusted, B138 is probably right there 🔶;
+     * 6 without any base evidence: 390, 1178, 16310, 16311 (B138 = 40000 + xs, upstream's collision fallback), 862,
+       1974.
+   * Meaning: the calibration is upstream's converter output (its learned map + guess rules), not ground truth. The
+     base game confirms 42 values and contradicts 81 strongly (73 of them a whole run, confirmed by the title-update
+     scripts). Switching changes DLC script words that were played with the B138 values (finding 35: 2 486 words)
+     -> needs a Convert-onwards run, the script comparisons and a game test. Still calibrated on B138 as well:
+     `DLC_SYM_SHIFT = 480` (finding 29) - not derived here ⬜.
 
 ## The "VM" in upstream (what it was, what we do instead)
 

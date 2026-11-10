@@ -55,7 +55,7 @@ Full table with 104 rows: `TU-Abdeckung.md` (findings folder). "Data" = fixed in
 | Native type `dlc2data` in scripts | bound | not in the exe -> null call | script stub `script_dlc2_flag_stub.py` ✅ |
 | Achievements f16-f20 | Live award | `achievement` has 16 natives (all `ret`) | calls NOPed (`script_missing_native_fix.py`) ✅ |
 | GlobalInfo player list | 29 ids (857 included) | 28 | data fix `globalinfo_player_list_fix.py` (K12) |
-| Sound groups | 80 (77-79 new) | 77 | TU `globalsoundinfo.drm` installed ✅; TruMenu 0.21.8 group volume sliders (built) |
+| Sound groups | 80 (77-79 new) | 77 | TU `globalsoundinfo.drm` installed ✅ (kit file; own build `globalsoundinfo_build.py` = kit, 2026-11-10; DSP kind of 77 / 78 lost in the kit form, 18.3); TruMenu 0.21.8 group volume sliders (built) |
 | Input map set 17 (K8) | 6 extra bindings | missing | data fix `input_map_tu_fix.py` ✅ |
 | Chunkdoll limit | 8 | 4 | TruShadowCombat 0.6.7 `[Chunk] Limit8` (built; held back until the 0.6.1 lethal-impulse fix was seen live, 09.11.) |
 | Hit structures for DLC 2 melee types 18..27 + knockback per type (K-1) | companion hit records (0x82301dc0, 0x822f77e4) | none / fixed 3.0 | TruShadowCombat 0.6.7 `[Hit] Translate` / `TranslateKnockback` (built) |
@@ -1087,6 +1087,17 @@ death list 70 / 76, pause list 6 / 25 / 3 / 9 / 79 (handler 0x5874b0), category 
 7, [3] srmusic 10, [4] default 14, [5] cinstream 25, [6] 53 (reader ⬜). Entry 0x84 B: +0 f32 volume (sliders 0x587171,
 SetVolume 0x587770), +0x10 flags (bit 0 paused), +0x68 parent; R+0x6c = FMOD ChannelGroupI. `SOUND_ResetGroups` 0x5895f0.
 Mute `ChannelGroupI::setMute` 0x7c48cd (TruMenu `media.mutemusic`). ✅ Tool `tools/sound_groups.py`.
+**Group DSP effect** (2026-11-10): entry +0x7c is a **u16** DSP kind and +0x80 points to its parameter block in the
+DTP (16 or 32 B of floats). The loop 0x58de50 over all groups tests `word ptr [entry+0x7c]` and, when non-zero (and
+the group's wrapper +0x5c is 0), calls 0x58dad0 -> 0x587620: `movzx` kind 1..11 -> jump table 0x5876fc -> FMOD DSP
+type constant 12 / 17 / 8 / 6 / 10 / 7 / 5 / 3 / 9 / 11 / 13 -> createDSPByType 0x7b98ea, parameters by 0x582ec0 -
+the same chain and the same u16 kind as the SoundPlex DSP node (row "12 DSP" in 18.1, step `dspkind`) ✅.
+Base: only groups 58 / 59 use it (kind 5, blocks 8200 / 4.4 / 0.2
+and 175 / 3.5 / 1.75 - they look like parametric-EQ values 🔶); retail `00050000` -> PC `05000000` (u16 halves, not
+u32). The TU gives the new DLC 2 groups 77 / 78 kind 4 / 1 with 32-byte blocks; the B138 / B270 kit file has these two
+words u32-swapped (`00000400` / `00000100`) -> u16 = 0 -> **no DSP for groups 77 / 78 on PC** (what it sounds like on
+the Xbox ⬜). `tools/globalsoundinfo_build.py` builds the kit bytes by default, `--tu-form` the base-rule form
+(WINDOWS_REBUILD finding 51).
 Group 10 (category [3], srmusic / `media.music`) is a child of 3 -> 2 -> **1 (the MusicVolume slider)**, so MusicVolume 0
 silences the music players too (🔶 effective volume = product along the parents, not measured live;
 `sound_groups.py table pcbig:globalsoundinfo.drm`, 2026-11-10).

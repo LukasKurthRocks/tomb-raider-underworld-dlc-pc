@@ -1,0 +1,4130 @@
+{
+"about": "Xbox Symbol -> PC Symbol for the 167 Symbols of b138_symbol_calibration.json, derived from our own data (base-game Xbox <-> PC script pairs: function / prototype / member names, call sites, raw code words) by tools/sym_calibration_derive.py; \"symbols\" holds only the Symbols with base evidence of >= 2 votes (the others get the converter rule anyway when no calibration is loaded), usable as TRUDLC_SYM_EXTRA. \"detail\" = per Symbol B138 value, derived value, method, top votes (all pairs) and tu_era_votes (title-update generalbank <-> PC patch.000 only).",
+"symbols": {
+"230": 232,
+"368": 708,
+"369": 709,
+"374": 713,
+"375": 714,
+"376": 715,
+"377": 716,
+"378": 717,
+"379": 718,
+"380": 719,
+"381": 720,
+"382": 721,
+"385": 392,
+"387": 657,
+"422": 749,
+"515": 517,
+"521": 523,
+"522": 524,
+"550": 553,
+"551": 552,
+"781": 783,
+"922": 927,
+"942": 947,
+"954": 981,
+"1195": 1292,
+"1975": 2036,
+"1976": 2037,
+"1977": 2038,
+"1978": 2039,
+"1979": 2040,
+"1980": 2041,
+"1981": 2042,
+"1982": 2043,
+"1983": 2044,
+"1984": 2045,
+"1985": 2046,
+"1986": 2047,
+"1987": 2048,
+"1988": 2049,
+"1989": 2050,
+"1990": 2051,
+"1991": 2052,
+"1992": 2053,
+"1993": 2054,
+"1994": 2055,
+"1995": 2056,
+"1996": 2057,
+"1997": 2058,
+"1998": 2059,
+"1999": 2060,
+"2000": 2061,
+"2001": 2062,
+"2003": 2064,
+"2004": 2065,
+"2005": 2066,
+"2006": 2067,
+"2007": 2068,
+"2008": 2069,
+"2009": 2070,
+"2010": 2071,
+"2011": 2072,
+"2012": 2073,
+"2013": 2074,
+"2014": 2075,
+"2015": 2076,
+"2016": 2077,
+"2017": 2078,
+"2018": 2079,
+"2019": 2080,
+"2020": 2081,
+"2021": 2082,
+"2022": 2083,
+"2023": 2084,
+"2024": 2085,
+"2025": 2086,
+"2026": 2087,
+"2027": 2088,
+"2028": 2089,
+"2029": 2090,
+"2030": 2091,
+"2031": 2092,
+"2032": 2093,
+"2033": 2094,
+"2034": 2095,
+"2035": 2096,
+"2036": 2097,
+"2037": 2098,
+"2038": 2099,
+"2039": 2100,
+"2040": 2101,
+"2041": 2102,
+"2042": 2103,
+"2043": 2104,
+"2044": 2105,
+"2045": 2106,
+"2046": 2107,
+"2047": 2108,
+"2048": 2109,
+"3856": 4022,
+"4441": 5823,
+"4447": 5827,
+"4449": 5841,
+"4479": 5812,
+"4483": 5790,
+"4484": 5791,
+"4485": 5792,
+"4509": 5798,
+"4510": 5797,
+"4539": 5800,
+"4701": 5926,
+"4709": 6037,
+"4710": 6038,
+"4847": 6048,
+"4848": 6049,
+"4894": 6415,
+"8943": 9478,
+"8944": 9479,
+"9621": 12215,
+"9622": 12154,
+"9648": 11740,
+"12980": 9988,
+"14991": 12109,
+"16344": 15198
+},
+"detail": {
+"230": {
+"b138": 232,
+"rule": 230,
+"rule_route": "guess_lower",
+"votes": {
+"name": [
+[
+232,
+9151
+]
+],
+"call": [
+[
+232,
+3050
+]
+],
+"raw": [
+[
+232,
+6738
+],
+[
+244,
+9
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+232,
+243
+]
+],
+"raw": [
+[
+232,
+104
+]
+]
+},
+"derived": 232,
+"method": "base evidence (names)"
+},
+"364": {
+"b138": 40364,
+"rule": 366,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+366,
+1
+]
+],
+"raw": [
+[
+364,
+14
+],
+[
+416,
+12
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+416,
+1
+]
+]
+},
+"derived": 366,
+"method": "base evidence (names, single vote)"
+},
+"365": {
+"b138": 602,
+"rule": 367,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+367,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 367,
+"method": "base evidence (names, single vote)"
+},
+"366": {
+"b138": 706,
+"rule": 368,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+368,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 368,
+"method": "base evidence (names, single vote)"
+},
+"367": {
+"b138": 707,
+"rule": 369,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+369,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 369,
+"method": "base evidence (names, single vote)"
+},
+"368": {
+"b138": 708,
+"rule": 370,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+370,
+1
+]
+],
+"raw": [
+[
+368,
+108
+],
+[
+708,
+21
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+368,
+3
+]
+]
+},
+"derived": 708,
+"method": "base evidence (raw words)"
+},
+"369": {
+"b138": 709,
+"rule": 371,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+371,
+1
+]
+],
+"raw": [
+[
+709,
+2
+]
+]
+},
+"tu_era_votes": {},
+"derived": 709,
+"method": "base evidence (raw words)"
+},
+"370": {
+"b138": 710,
+"rule": 372,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+372,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 372,
+"method": "base evidence (names, single vote)"
+},
+"371": {
+"b138": 711,
+"rule": 373,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+373,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 373,
+"method": "base evidence (names, single vote)"
+},
+"372": {
+"b138": 370,
+"rule": 374,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+374,
+1
+]
+],
+"raw": [
+[
+372,
+87
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+372,
+1
+]
+]
+},
+"derived": 374,
+"method": "base evidence (names, single vote)"
+},
+"373": {
+"b138": 712,
+"rule": 375,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+375,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 375,
+"method": "base evidence (names, single vote)"
+},
+"374": {
+"b138": 713,
+"rule": 376,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+376,
+1
+]
+],
+"raw": [
+[
+713,
+18
+]
+]
+},
+"tu_era_votes": {},
+"derived": 713,
+"method": "base evidence (raw words)"
+},
+"375": {
+"b138": 714,
+"rule": 377,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+377,
+1
+]
+],
+"raw": [
+[
+714,
+157
+]
+]
+},
+"tu_era_votes": {},
+"derived": 714,
+"method": "base evidence (raw words)"
+},
+"376": {
+"b138": 715,
+"rule": 378,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+378,
+1
+]
+],
+"raw": [
+[
+376,
+11
+],
+[
+715,
+10
+]
+]
+},
+"tu_era_votes": {},
+"derived": 715,
+"method": "base evidence (raw words)"
+},
+"377": {
+"b138": 716,
+"rule": 379,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+379,
+1
+]
+],
+"raw": [
+[
+716,
+19
+]
+]
+},
+"tu_era_votes": {},
+"derived": 716,
+"method": "base evidence (raw words)"
+},
+"378": {
+"b138": 717,
+"rule": 380,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+380,
+1
+]
+],
+"raw": [
+[
+717,
+19
+]
+]
+},
+"tu_era_votes": {},
+"derived": 717,
+"method": "base evidence (raw words)"
+},
+"379": {
+"b138": 718,
+"rule": 381,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+381,
+1
+]
+],
+"raw": [
+[
+718,
+12
+]
+]
+},
+"tu_era_votes": {},
+"derived": 718,
+"method": "base evidence (raw words)"
+},
+"380": {
+"b138": 719,
+"rule": 382,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+382,
+1
+]
+],
+"raw": [
+[
+380,
+124
+],
+[
+719,
+21
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+380,
+3
+]
+]
+},
+"derived": 719,
+"method": "base evidence (raw words)"
+},
+"381": {
+"b138": 720,
+"rule": 383,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+383,
+1
+]
+],
+"raw": [
+[
+720,
+12
+]
+]
+},
+"tu_era_votes": {},
+"derived": 720,
+"method": "base evidence (raw words)"
+},
+"382": {
+"b138": 721,
+"rule": 384,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+384,
+1
+]
+],
+"raw": [
+[
+721,
+12
+]
+]
+},
+"tu_era_votes": {},
+"derived": 721,
+"method": "base evidence (raw words)"
+},
+"383": {
+"b138": 722,
+"rule": 385,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+385,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 385,
+"method": "base evidence (names, single vote)"
+},
+"384": {
+"b138": 723,
+"rule": 386,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+386,
+1
+]
+],
+"raw": [
+[
+384,
+107
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+384,
+3
+]
+]
+},
+"derived": 386,
+"method": "base evidence (names, single vote)"
+},
+"385": {
+"b138": 392,
+"rule": 387,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+387,
+1
+]
+],
+"raw": [
+[
+392,
+25
+]
+]
+},
+"tu_era_votes": {},
+"derived": 392,
+"method": "base evidence (raw words)"
+},
+"386": {
+"b138": 540,
+"rule": 388,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+388,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 388,
+"method": "base evidence (names, single vote)"
+},
+"387": {
+"b138": 657,
+"rule": 389,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+389,
+1
+]
+],
+"raw": [
+[
+657,
+4
+]
+]
+},
+"tu_era_votes": {},
+"derived": 657,
+"method": "base evidence (raw words)"
+},
+"388": {
+"b138": 658,
+"rule": 390,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+390,
+1
+]
+],
+"raw": [
+[
+388,
+169
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+388,
+2
+]
+]
+},
+"derived": 390,
+"method": "base evidence (names, single vote)"
+},
+"390": {
+"b138": 40390,
+"rule": 392,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+392,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 392,
+"method": "converter rule (interpolated)"
+},
+"391": {
+"b138": 727,
+"rule": 393,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+393,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 393,
+"method": "base evidence (names, single vote)"
+},
+"392": {
+"b138": 728,
+"rule": 394,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+394,
+1
+]
+],
+"raw": [
+[
+392,
+185
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+392,
+4
+]
+]
+},
+"derived": 394,
+"method": "base evidence (names, single vote)"
+},
+"393": {
+"b138": 729,
+"rule": 395,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+395,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 395,
+"method": "base evidence (names, single vote)"
+},
+"394": {
+"b138": 730,
+"rule": 396,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+396,
+1
+]
+],
+"raw": [
+[
+730,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 396,
+"method": "base evidence (names, single vote)"
+},
+"395": {
+"b138": 731,
+"rule": 397,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+397,
+1
+]
+],
+"raw": [
+[
+731,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 397,
+"method": "base evidence (names, single vote)"
+},
+"396": {
+"b138": 732,
+"rule": 398,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+398,
+1
+]
+],
+"raw": [
+[
+396,
+121
+],
+[
+732,
+1
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+396,
+3
+]
+]
+},
+"derived": 398,
+"method": "base evidence (names, single vote)"
+},
+"397": {
+"b138": 733,
+"rule": 399,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+399,
+1
+]
+],
+"raw": [
+[
+733,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 399,
+"method": "base evidence (names, single vote)"
+},
+"398": {
+"b138": 734,
+"rule": 400,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+400,
+1
+]
+],
+"raw": [
+[
+734,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 400,
+"method": "base evidence (names, single vote)"
+},
+"399": {
+"b138": 735,
+"rule": 401,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+401,
+1
+]
+],
+"raw": [
+[
+735,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 401,
+"method": "base evidence (names, single vote)"
+},
+"400": {
+"b138": 736,
+"rule": 402,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+402,
+1
+]
+],
+"raw": [
+[
+400,
+110
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+400,
+3
+]
+]
+},
+"derived": 402,
+"method": "base evidence (names, single vote)"
+},
+"401": {
+"b138": 737,
+"rule": 403,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+403,
+1
+]
+],
+"raw": [
+[
+737,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 403,
+"method": "base evidence (names, single vote)"
+},
+"402": {
+"b138": 738,
+"rule": 404,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+404,
+1
+]
+],
+"raw": [
+[
+738,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 404,
+"method": "base evidence (names, single vote)"
+},
+"403": {
+"b138": 739,
+"rule": 405,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+405,
+1
+]
+],
+"raw": [
+[
+739,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 405,
+"method": "base evidence (names, single vote)"
+},
+"404": {
+"b138": 740,
+"rule": 406,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+406,
+1
+]
+],
+"raw": [
+[
+404,
+14
+],
+[
+740,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 406,
+"method": "base evidence (names, single vote)"
+},
+"405": {
+"b138": 741,
+"rule": 407,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+407,
+1
+]
+],
+"raw": [
+[
+741,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 407,
+"method": "base evidence (names, single vote)"
+},
+"406": {
+"b138": 742,
+"rule": 408,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+408,
+1
+]
+],
+"raw": [
+[
+742,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 408,
+"method": "base evidence (names, single vote)"
+},
+"416": {
+"b138": 747,
+"rule": 418,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+418,
+1
+]
+],
+"raw": [
+[
+416,
+157
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+416,
+2
+]
+]
+},
+"derived": 418,
+"method": "base evidence (names, single vote)"
+},
+"417": {
+"b138": 748,
+"rule": 419,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+419,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 419,
+"method": "base evidence (names, single vote)"
+},
+"419": {
+"b138": 750,
+"rule": 421,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+421,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 421,
+"method": "base evidence (names, single vote)"
+},
+"420": {
+"b138": 751,
+"rule": 422,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+422,
+1
+]
+],
+"raw": [
+[
+420,
+11
+]
+]
+},
+"tu_era_votes": {},
+"derived": 422,
+"method": "base evidence (names, single vote)"
+},
+"421": {
+"b138": 752,
+"rule": 423,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+423,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 423,
+"method": "base evidence (names, single vote)"
+},
+"422": {
+"b138": 749,
+"rule": 424,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+424,
+1
+]
+],
+"raw": [
+[
+749,
+6
+]
+]
+},
+"tu_era_votes": {},
+"derived": 749,
+"method": "base evidence (raw words)"
+},
+"423": {
+"b138": 40423,
+"rule": 425,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+425,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 425,
+"method": "base evidence (names, single vote)"
+},
+"424": {
+"b138": 754,
+"rule": 426,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+426,
+1
+]
+],
+"raw": [
+[
+424,
+118
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+424,
+3
+]
+]
+},
+"derived": 426,
+"method": "base evidence (names, single vote)"
+},
+"441": {
+"b138": 771,
+"rule": 443,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+443,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 443,
+"method": "base evidence (names, single vote)"
+},
+"515": {
+"b138": 333,
+"rule": 517,
+"rule_route": "interpolated",
+"votes": {
+"name": [
+[
+517,
+460
+],
+[
+983,
+4
+],
+[
+2775,
+4
+]
+],
+"raw": [
+[
+770,
+377
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+517,
+57
+],
+[
+983,
+2
+],
+[
+2775,
+2
+]
+],
+"raw": [
+[
+770,
+6
+]
+]
+},
+"derived": 517,
+"method": "base evidence (names)"
+},
+"521": {
+"b138": 340,
+"rule": 523,
+"rule_route": "interpolated",
+"votes": {
+"name": [
+[
+523,
+1051
+]
+],
+"raw": [
+[
+340,
+12
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+523,
+39
+]
+]
+},
+"derived": 523,
+"method": "base evidence (names)"
+},
+"522": {
+"b138": 341,
+"rule": 524,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+524,
+736
+],
+[
+91,
+210
+]
+],
+"raw": [
+[
+341,
+41
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+524,
+26
+],
+[
+91,
+6
+]
+],
+"raw": [
+[
+341,
+7
+]
+]
+},
+"derived": 524,
+"method": "base evidence (names)"
+},
+"550": {
+"b138": 553,
+"rule": 552,
+"rule_route": "interpolated",
+"votes": {
+"raw": [
+[
+553,
+2143
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+553,
+32
+]
+]
+},
+"derived": 553,
+"method": "base evidence (raw words)"
+},
+"551": {
+"b138": 552,
+"rule": 553,
+"rule_route": "interpolated",
+"votes": {
+"raw": [
+[
+552,
+51
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+552,
+22
+]
+]
+},
+"derived": 552,
+"method": "base evidence (raw words)"
+},
+"781": {
+"b138": 615,
+"rule": 783,
+"rule_route": "guess_lower",
+"votes": {
+"member": [
+[
+783,
+2
+]
+]
+},
+"tu_era_votes": {},
+"derived": 783,
+"method": "base evidence (names)"
+},
+"862": {
+"b138": 866,
+"rule": 864,
+"rule_route": "guess_lower",
+"votes": {},
+"tu_era_votes": {},
+"derived": 864,
+"method": "converter rule (guess_lower)"
+},
+"922": {
+"b138": 927,
+"rule": 926,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+927,
+282
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+927,
+2
+]
+]
+},
+"derived": 927,
+"method": "base evidence (raw words)"
+},
+"942": {
+"b138": 947,
+"rule": 946,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+947,
+3
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+947,
+1
+]
+]
+},
+"derived": 947,
+"method": "base evidence (raw words)"
+},
+"954": {
+"b138": 981,
+"rule": 959,
+"rule_route": "guess_lower",
+"votes": {
+"name": [
+[
+981,
+1316
+]
+],
+"call": [
+[
+981,
+30
+]
+],
+"raw": [
+[
+981,
+1070
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+981,
+26
+]
+],
+"raw": [
+[
+981,
+14
+]
+]
+},
+"derived": 981,
+"method": "base evidence (names)"
+},
+"986": {
+"b138": 1287,
+"rule": 1013,
+"rule_route": "guess_lower",
+"votes": {
+"name": [
+[
+1005,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 1005,
+"method": "base evidence (names, single vote)"
+},
+"1178": {
+"b138": 41178,
+"rule": 1205,
+"rule_route": "guess_lower",
+"votes": {},
+"tu_era_votes": {},
+"derived": 1205,
+"method": "converter rule (guess_lower)"
+},
+"1195": {
+"b138": 1239,
+"rule": 1222,
+"rule_route": "guess_lower",
+"votes": {
+"member": [
+[
+1292,
+10
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+1292,
+4
+]
+]
+},
+"derived": 1292,
+"method": "base evidence (names)"
+},
+"1286": {
+"b138": 5033,
+"rule": 1315,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+1315,
+1
+]
+]
+},
+"tu_era_votes": {},
+"derived": 1315,
+"method": "base evidence (names, single vote)"
+},
+"1974": {
+"b138": 1952,
+"rule": 2035,
+"rule_route": "interpolated",
+"votes": {},
+"tu_era_votes": {},
+"derived": 2035,
+"method": "converter rule (interpolated)"
+},
+"1975": {
+"b138": 1953,
+"rule": 2036,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2036,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2036,
+3
+]
+]
+},
+"derived": 2036,
+"method": "base evidence (names)"
+},
+"1976": {
+"b138": 1954,
+"rule": 2037,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2037,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2037,
+3
+]
+]
+},
+"derived": 2037,
+"method": "base evidence (names)"
+},
+"1977": {
+"b138": 1955,
+"rule": 2038,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2038,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2038,
+3
+]
+]
+},
+"derived": 2038,
+"method": "base evidence (names)"
+},
+"1978": {
+"b138": 1956,
+"rule": 2039,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2039,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2039,
+3
+]
+]
+},
+"derived": 2039,
+"method": "base evidence (names)"
+},
+"1979": {
+"b138": 1957,
+"rule": 2040,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2040,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2040,
+3
+]
+]
+},
+"derived": 2040,
+"method": "base evidence (names)"
+},
+"1980": {
+"b138": 1958,
+"rule": 2041,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2041,
+118
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2041,
+3
+]
+]
+},
+"derived": 2041,
+"method": "base evidence (names)"
+},
+"1981": {
+"b138": 1959,
+"rule": 2042,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2042,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2042,
+3
+]
+]
+},
+"derived": 2042,
+"method": "base evidence (names)"
+},
+"1982": {
+"b138": 1960,
+"rule": 2043,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2043,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2043,
+3
+]
+]
+},
+"derived": 2043,
+"method": "base evidence (names)"
+},
+"1983": {
+"b138": 1961,
+"rule": 2044,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2044,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2044,
+3
+]
+]
+},
+"derived": 2044,
+"method": "base evidence (names)"
+},
+"1984": {
+"b138": 1962,
+"rule": 2045,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2045,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2045,
+3
+]
+]
+},
+"derived": 2045,
+"method": "base evidence (names)"
+},
+"1985": {
+"b138": 1963,
+"rule": 2046,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2046,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2046,
+3
+]
+]
+},
+"derived": 2046,
+"method": "base evidence (names)"
+},
+"1986": {
+"b138": 1964,
+"rule": 2047,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2047,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2047,
+3
+]
+]
+},
+"derived": 2047,
+"method": "base evidence (names)"
+},
+"1987": {
+"b138": 1965,
+"rule": 2048,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2048,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2048,
+3
+]
+]
+},
+"derived": 2048,
+"method": "base evidence (names)"
+},
+"1988": {
+"b138": 1966,
+"rule": 2049,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2049,
+118
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2049,
+3
+]
+]
+},
+"derived": 2049,
+"method": "base evidence (names)"
+},
+"1989": {
+"b138": 1967,
+"rule": 2050,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2050,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2050,
+3
+]
+]
+},
+"derived": 2050,
+"method": "base evidence (names)"
+},
+"1990": {
+"b138": 1968,
+"rule": 2051,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2051,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2051,
+3
+]
+]
+},
+"derived": 2051,
+"method": "base evidence (names)"
+},
+"1991": {
+"b138": 1969,
+"rule": 2052,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2052,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2052,
+3
+]
+]
+},
+"derived": 2052,
+"method": "base evidence (names)"
+},
+"1992": {
+"b138": 1970,
+"rule": 2053,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2053,
+107
+]
+],
+"raw": [
+[
+1992,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2053,
+3
+]
+],
+"raw": [
+[
+1992,
+3
+]
+]
+},
+"derived": 2053,
+"method": "base evidence (names)"
+},
+"1993": {
+"b138": 1971,
+"rule": 2054,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2054,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2054,
+3
+]
+]
+},
+"derived": 2054,
+"method": "base evidence (names)"
+},
+"1994": {
+"b138": 1972,
+"rule": 2055,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2055,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2055,
+3
+]
+]
+},
+"derived": 2055,
+"method": "base evidence (names)"
+},
+"1995": {
+"b138": 1973,
+"rule": 2056,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2056,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2056,
+3
+]
+]
+},
+"derived": 2056,
+"method": "base evidence (names)"
+},
+"1996": {
+"b138": 1974,
+"rule": 2057,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2057,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2057,
+3
+]
+]
+},
+"derived": 2057,
+"method": "base evidence (names)"
+},
+"1997": {
+"b138": 1975,
+"rule": 2058,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2058,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2058,
+3
+]
+]
+},
+"derived": 2058,
+"method": "base evidence (names)"
+},
+"1998": {
+"b138": 1976,
+"rule": 2059,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2059,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2059,
+3
+]
+]
+},
+"derived": 2059,
+"method": "base evidence (names)"
+},
+"1999": {
+"b138": 1977,
+"rule": 2060,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2060,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2060,
+3
+]
+]
+},
+"derived": 2060,
+"method": "base evidence (names)"
+},
+"2000": {
+"b138": 1978,
+"rule": 2061,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2061,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2061,
+3
+]
+]
+},
+"derived": 2061,
+"method": "base evidence (names)"
+},
+"2001": {
+"b138": 1979,
+"rule": 2062,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2062,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2062,
+3
+]
+]
+},
+"derived": 2062,
+"method": "base evidence (names)"
+},
+"2003": {
+"b138": 1981,
+"rule": 2064,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2064,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2064,
+3
+]
+]
+},
+"derived": 2064,
+"method": "base evidence (names)"
+},
+"2004": {
+"b138": 1982,
+"rule": 2065,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2065,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2065,
+3
+]
+]
+},
+"derived": 2065,
+"method": "base evidence (names)"
+},
+"2005": {
+"b138": 1983,
+"rule": 2066,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2066,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2066,
+3
+]
+]
+},
+"derived": 2066,
+"method": "base evidence (names)"
+},
+"2006": {
+"b138": 1984,
+"rule": 2067,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2067,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2067,
+3
+]
+]
+},
+"derived": 2067,
+"method": "base evidence (names)"
+},
+"2007": {
+"b138": 1985,
+"rule": 2068,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2068,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2068,
+3
+]
+]
+},
+"derived": 2068,
+"method": "base evidence (names)"
+},
+"2008": {
+"b138": 1986,
+"rule": 2069,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2069,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2069,
+3
+]
+]
+},
+"derived": 2069,
+"method": "base evidence (names)"
+},
+"2009": {
+"b138": 1987,
+"rule": 2070,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2070,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2070,
+3
+]
+]
+},
+"derived": 2070,
+"method": "base evidence (names)"
+},
+"2010": {
+"b138": 1988,
+"rule": 2071,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2071,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2071,
+3
+]
+]
+},
+"derived": 2071,
+"method": "base evidence (names)"
+},
+"2011": {
+"b138": 1989,
+"rule": 2072,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2072,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2072,
+3
+]
+]
+},
+"derived": 2072,
+"method": "base evidence (names)"
+},
+"2012": {
+"b138": 1990,
+"rule": 2073,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2073,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2073,
+3
+]
+]
+},
+"derived": 2073,
+"method": "base evidence (names)"
+},
+"2013": {
+"b138": 1991,
+"rule": 2074,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2074,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2074,
+3
+]
+]
+},
+"derived": 2074,
+"method": "base evidence (names)"
+},
+"2014": {
+"b138": 1992,
+"rule": 2075,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2075,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2075,
+3
+]
+]
+},
+"derived": 2075,
+"method": "base evidence (names)"
+},
+"2015": {
+"b138": 42015,
+"rule": 2076,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2076,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2076,
+3
+]
+]
+},
+"derived": 2076,
+"method": "base evidence (names)"
+},
+"2016": {
+"b138": 42016,
+"rule": 2077,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2077,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2077,
+3
+]
+]
+},
+"derived": 2077,
+"method": "base evidence (names)"
+},
+"2017": {
+"b138": 42017,
+"rule": 2078,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2078,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2078,
+3
+]
+]
+},
+"derived": 2078,
+"method": "base evidence (names)"
+},
+"2018": {
+"b138": 42018,
+"rule": 2079,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2079,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2079,
+3
+]
+]
+},
+"derived": 2079,
+"method": "base evidence (names)"
+},
+"2019": {
+"b138": 42019,
+"rule": 2080,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2080,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2080,
+3
+]
+]
+},
+"derived": 2080,
+"method": "base evidence (names)"
+},
+"2020": {
+"b138": 42020,
+"rule": 2081,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2081,
+107
+]
+],
+"raw": [
+[
+2020,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2081,
+3
+]
+],
+"raw": [
+[
+2020,
+3
+]
+]
+},
+"derived": 2081,
+"method": "base evidence (names)"
+},
+"2021": {
+"b138": 42021,
+"rule": 2082,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2082,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2082,
+3
+]
+]
+},
+"derived": 2082,
+"method": "base evidence (names)"
+},
+"2022": {
+"b138": 42022,
+"rule": 2083,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2083,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2083,
+3
+]
+]
+},
+"derived": 2083,
+"method": "base evidence (names)"
+},
+"2023": {
+"b138": 42023,
+"rule": 2084,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2084,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2084,
+3
+]
+]
+},
+"derived": 2084,
+"method": "base evidence (names)"
+},
+"2024": {
+"b138": 42024,
+"rule": 2085,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2085,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2085,
+3
+]
+]
+},
+"derived": 2085,
+"method": "base evidence (names)"
+},
+"2025": {
+"b138": 42025,
+"rule": 2086,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2086,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2086,
+3
+]
+]
+},
+"derived": 2086,
+"method": "base evidence (names)"
+},
+"2026": {
+"b138": 42026,
+"rule": 2087,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2087,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2087,
+3
+]
+]
+},
+"derived": 2087,
+"method": "base evidence (names)"
+},
+"2027": {
+"b138": 42027,
+"rule": 2088,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2088,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2088,
+3
+]
+]
+},
+"derived": 2088,
+"method": "base evidence (names)"
+},
+"2028": {
+"b138": 42028,
+"rule": 2089,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2089,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2089,
+3
+]
+]
+},
+"derived": 2089,
+"method": "base evidence (names)"
+},
+"2029": {
+"b138": 42029,
+"rule": 2090,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2090,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2090,
+3
+]
+]
+},
+"derived": 2090,
+"method": "base evidence (names)"
+},
+"2030": {
+"b138": 42030,
+"rule": 2091,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2091,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2091,
+3
+]
+]
+},
+"derived": 2091,
+"method": "base evidence (names)"
+},
+"2031": {
+"b138": 42031,
+"rule": 2092,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2092,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2092,
+3
+]
+]
+},
+"derived": 2092,
+"method": "base evidence (names)"
+},
+"2032": {
+"b138": 42032,
+"rule": 2093,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2093,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2093,
+3
+]
+]
+},
+"derived": 2093,
+"method": "base evidence (names)"
+},
+"2033": {
+"b138": 42033,
+"rule": 2094,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2094,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2094,
+3
+]
+]
+},
+"derived": 2094,
+"method": "base evidence (names)"
+},
+"2034": {
+"b138": 42034,
+"rule": 2095,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2095,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2095,
+3
+]
+]
+},
+"derived": 2095,
+"method": "base evidence (names)"
+},
+"2035": {
+"b138": 42035,
+"rule": 2096,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2096,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2096,
+3
+]
+]
+},
+"derived": 2096,
+"method": "base evidence (names)"
+},
+"2036": {
+"b138": 42036,
+"rule": 2097,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2097,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2097,
+3
+]
+]
+},
+"derived": 2097,
+"method": "base evidence (names)"
+},
+"2037": {
+"b138": 42037,
+"rule": 2098,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2098,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2098,
+3
+]
+]
+},
+"derived": 2098,
+"method": "base evidence (names)"
+},
+"2038": {
+"b138": 42038,
+"rule": 2099,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2099,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2099,
+3
+]
+]
+},
+"derived": 2099,
+"method": "base evidence (names)"
+},
+"2039": {
+"b138": 42039,
+"rule": 2100,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2100,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2100,
+3
+]
+]
+},
+"derived": 2100,
+"method": "base evidence (names)"
+},
+"2040": {
+"b138": 42040,
+"rule": 2101,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2101,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2101,
+3
+]
+]
+},
+"derived": 2101,
+"method": "base evidence (names)"
+},
+"2041": {
+"b138": 42041,
+"rule": 2102,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2102,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2102,
+3
+]
+]
+},
+"derived": 2102,
+"method": "base evidence (names)"
+},
+"2042": {
+"b138": 42042,
+"rule": 2103,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2103,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2103,
+3
+]
+]
+},
+"derived": 2103,
+"method": "base evidence (names)"
+},
+"2043": {
+"b138": 42043,
+"rule": 2104,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2104,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2104,
+3
+]
+]
+},
+"derived": 2104,
+"method": "base evidence (names)"
+},
+"2044": {
+"b138": 42044,
+"rule": 2105,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2105,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2105,
+3
+]
+]
+},
+"derived": 2105,
+"method": "base evidence (names)"
+},
+"2045": {
+"b138": 42045,
+"rule": 2106,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2106,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2106,
+3
+]
+]
+},
+"derived": 2106,
+"method": "base evidence (names)"
+},
+"2046": {
+"b138": 42046,
+"rule": 2107,
+"rule_route": "interpolated",
+"votes": {
+"member": [
+[
+2107,
+107
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+2107,
+3
+]
+]
+},
+"derived": 2107,
+"method": "base evidence (names)"
+},
+"2047": {
+"b138": 42047,
+"rule": 2108,
+"rule_route": "interpolated",
+"votes": {
+"name": [
+[
+2108,
+214
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+2108,
+6
+]
+]
+},
+"derived": 2108,
+"method": "base evidence (names)"
+},
+"2048": {
+"b138": 42048,
+"rule": 2109,
+"rule_route": "interpolated",
+"votes": {
+"name": [
+[
+2109,
+214
+]
+],
+"call": [
+[
+2109,
+700
+]
+],
+"raw": [
+[
+2048,
+107
+],
+[
+8,
+6
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+2109,
+6
+]
+],
+"call": [
+[
+2109,
+10
+]
+],
+"raw": [
+[
+2048,
+3
+]
+]
+},
+"derived": 2109,
+"method": "base evidence (names)"
+},
+"3856": {
+"b138": 4022,
+"rule": 4075,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+4022,
+398
+],
+[
+8682,
+2
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+4022,
+10
+]
+]
+},
+"derived": 4022,
+"method": "base evidence (raw words)"
+},
+"4441": {
+"b138": 5823,
+"rule": 44441,
+"rule_route": "guess_collision_new",
+"votes": {
+"raw": [
+[
+5823,
+1281
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+5823,
+27
+]
+]
+},
+"derived": 5823,
+"method": "base evidence (raw words)"
+},
+"4447": {
+"b138": 5827,
+"rule": 5841,
+"rule_route": "guess_lower",
+"votes": {
+"name": [
+[
+5827,
+1062
+]
+],
+"call": [
+[
+5827,
+430
+]
+],
+"raw": [
+[
+5827,
+1042
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+5827,
+18
+]
+],
+"call": [
+[
+5827,
+20
+]
+],
+"raw": [
+[
+5827,
+16
+]
+]
+},
+"derived": 5827,
+"method": "base evidence (names)"
+},
+"4449": {
+"b138": 5841,
+"rule": 5829,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+5841,
+1583
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+5841,
+31
+]
+]
+},
+"derived": 5841,
+"method": "base evidence (raw words)"
+},
+"4479": {
+"b138": 5812,
+"rule": 44479,
+"rule_route": "guess_collision_new",
+"votes": {
+"name": [
+[
+5812,
+1070
+]
+],
+"call": [
+[
+5812,
+10
+]
+],
+"raw": [
+[
+5812,
+1070
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+5812,
+16
+]
+],
+"raw": [
+[
+5812,
+16
+]
+]
+},
+"derived": 5812,
+"method": "base evidence (names)"
+},
+"4483": {
+"b138": 5790,
+"rule": 44483,
+"rule_route": "guess_collision_new",
+"votes": {
+"raw": [
+[
+5790,
+414
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+5790,
+6
+]
+]
+},
+"derived": 5790,
+"method": "base evidence (raw words)"
+},
+"4484": {
+"b138": 5791,
+"rule": 44484,
+"rule_route": "guess_collision_new",
+"votes": {
+"raw": [
+[
+5791,
+414
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+5791,
+6
+]
+]
+},
+"derived": 5791,
+"method": "base evidence (raw words)"
+},
+"4485": {
+"b138": 5792,
+"rule": 44485,
+"rule_route": "guess_collision_new",
+"votes": {
+"raw": [
+[
+5792,
+208
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+5792,
+3
+]
+]
+},
+"derived": 5792,
+"method": "base evidence (raw words)"
+},
+"4509": {
+"b138": 5798,
+"rule": 44509,
+"rule_route": "guess_collision_new",
+"votes": {
+"name": [
+[
+5798,
+456
+]
+],
+"call": [
+[
+5798,
+920
+]
+],
+"raw": [
+[
+5798,
+404
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+5798,
+4
+]
+],
+"call": [
+[
+5798,
+10
+]
+],
+"raw": [
+[
+5798,
+4
+]
+]
+},
+"derived": 5798,
+"method": "base evidence (names)"
+},
+"4510": {
+"b138": 5797,
+"rule": 5893,
+"rule_route": "guess_lower",
+"votes": {
+"name": [
+[
+5797,
+456
+]
+],
+"call": [
+[
+5797,
+620
+]
+],
+"raw": [
+[
+5797,
+404
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+5797,
+4
+]
+],
+"call": [
+[
+5797,
+10
+]
+],
+"raw": [
+[
+5797,
+4
+]
+]
+},
+"derived": 5797,
+"method": "base evidence (names)"
+},
+"4539": {
+"b138": 5800,
+"rule": 5798,
+"rule_route": "guess_lower",
+"votes": {
+"name": [
+[
+5800,
+244
+]
+],
+"raw": [
+[
+5800,
+242
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+5800,
+2
+]
+],
+"raw": [
+[
+5800,
+2
+]
+]
+},
+"derived": 5800,
+"method": "base evidence (names)"
+},
+"4701": {
+"b138": 5926,
+"rule": 6155,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+5926,
+149
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+5926,
+4
+]
+]
+},
+"derived": 5926,
+"method": "base evidence (raw words)"
+},
+"4709": {
+"b138": 6037,
+"rule": 6160,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+6037,
+864
+],
+[
+2000,
+1
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+6037,
+18
+]
+]
+},
+"derived": 6037,
+"method": "base evidence (raw words)"
+},
+"4710": {
+"b138": 6038,
+"rule": 44710,
+"rule_route": "guess_collision_new",
+"votes": {
+"raw": [
+[
+6038,
+864
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+6038,
+18
+]
+]
+},
+"derived": 6038,
+"method": "base evidence (raw words)"
+},
+"4847": {
+"b138": 6048,
+"rule": 44847,
+"rule_route": "guess_collision_new",
+"votes": {
+"raw": [
+[
+6048,
+306
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+6048,
+4
+]
+]
+},
+"derived": 6048,
+"method": "base evidence (raw words)"
+},
+"4848": {
+"b138": 6049,
+"rule": 44848,
+"rule_route": "guess_collision_new",
+"votes": {
+"raw": [
+[
+6049,
+306
+]
+]
+},
+"tu_era_votes": {
+"raw": [
+[
+6049,
+4
+]
+]
+},
+"derived": 6049,
+"method": "base evidence (raw words)"
+},
+"4894": {
+"b138": 6415,
+"rule": 6444,
+"rule_route": "guess_lower",
+"votes": {
+"name": [
+[
+6415,
+442
+]
+],
+"call": [
+[
+6415,
+70
+]
+],
+"raw": [
+[
+6415,
+442
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+6415,
+8
+]
+],
+"raw": [
+[
+6415,
+8
+]
+]
+},
+"derived": 6415,
+"method": "base evidence (names)"
+},
+"8943": {
+"b138": 9478,
+"rule": 48943,
+"rule_route": "guess_collision_new",
+"votes": {
+"name": [
+[
+9478,
+168
+]
+],
+"raw": [
+[
+9478,
+168
+]
+]
+},
+"tu_era_votes": {
+"name": [
+[
+9478,
+2
+]
+],
+"raw": [
+[
+9478,
+2
+]
+]
+},
+"derived": 9478,
+"method": "base evidence (names)"
+},
+"8944": {
+"b138": 9479,
+"rule": 9477,
+"rule_route": "guess_lower",
+"votes": {
+"member": [
+[
+9479,
+84
+]
+],
+"raw": [
+[
+9479,
+84
+]
+]
+},
+"tu_era_votes": {
+"member": [
+[
+9479,
+1
+]
+],
+"raw": [
+[
+9479,
+1
+]
+]
+},
+"derived": 9479,
+"method": "base evidence (names)"
+},
+"9621": {
+"b138": 9621,
+"rule": 12215,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+12215,
+8
+]
+]
+},
+"tu_era_votes": {},
+"derived": 12215,
+"method": "base evidence (raw words)"
+},
+"9622": {
+"b138": 9622,
+"rule": 12216,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+12154,
+24
+]
+]
+},
+"tu_era_votes": {},
+"derived": 12154,
+"method": "base evidence (raw words)"
+},
+"9648": {
+"b138": 9648,
+"rule": 49648,
+"rule_route": "guess_collision_new",
+"votes": {
+"raw": [
+[
+11740,
+37
+]
+]
+},
+"tu_era_votes": {},
+"derived": 11740,
+"method": "base evidence (raw words)"
+},
+"12980": {
+"b138": 9988,
+"rule": 9986,
+"rule_route": "guess_lower",
+"votes": {
+"name": [
+[
+9988,
+6
+]
+],
+"call": [
+[
+9988,
+20
+]
+],
+"raw": [
+[
+9988,
+6
+]
+]
+},
+"tu_era_votes": {},
+"derived": 9988,
+"method": "base evidence (names)"
+},
+"14991": {
+"b138": 12109,
+"rule": 54991,
+"rule_route": "guess_collision_new",
+"votes": {
+"name": [
+[
+12109,
+2
+]
+],
+"raw": [
+[
+12109,
+2
+]
+]
+},
+"tu_era_votes": {},
+"derived": 12109,
+"method": "base evidence (names)"
+},
+"16310": {
+"b138": 56310,
+"rule": 13642,
+"rule_route": "guess_lower",
+"votes": {},
+"tu_era_votes": {},
+"derived": 13642,
+"method": "converter rule (guess_lower)"
+},
+"16311": {
+"b138": 56311,
+"rule": 13643,
+"rule_route": "guess_lower",
+"votes": {},
+"tu_era_votes": {},
+"derived": 13643,
+"method": "converter rule (guess_lower)"
+},
+"16344": {
+"b138": 15198,
+"rule": 9988,
+"rule_route": "guess_lower",
+"votes": {
+"raw": [
+[
+15198,
+6
+]
+]
+},
+"tu_era_votes": {},
+"derived": 15198,
+"method": "base evidence (raw words)"
+}
+},
+"stats": {
+"base drm pairs": 1054,
+"script pairs (base)": 18045,
+"script pair seen before": 38324,
+"script without a PC partner": 14,
+"patch drm pairs": 4,
+"script pairs (patch)": 430
+},
+"vote_kinds": {
+"learned map agrees (members)": 58512,
+"members": 16388,
+"learned map agrees (args)": 73119,
+"args": 56085,
+"locals": 91434,
+"call sites": 130188,
+"learned map agrees (calls)": 46126,
+"learned map agrees (locals)": 5882,
+"call sites: code lengths differ (function skipped)": 277,
+"learned map DISAGREES (args)": 450,
+"call sites: function counts differ (script skipped)": 192
+},
+"evidence_symbols_outside_map": 4456
+}

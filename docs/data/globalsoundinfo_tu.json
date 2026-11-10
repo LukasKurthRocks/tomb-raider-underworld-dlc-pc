@@ -1,0 +1,232 @@
+{
+ "about": "Title-update edit of globalsoundinfo.drm (sound DTP PC 792 / Xbox 775: 3 new sound groups for DLC 2) against the player's PC original, learned by tools/globalsoundinfo_build.py learn from the Xbox retail <-> TitleUpdate.000 pair. Offsets are bytes in the PC section before the edit (set_u32, inserts.at) or in the result (new_internal); values are word values as the Xbox reads them; entry set words carry the PC byte form of their field proven on the base entries ([offset, value, form, proof]). Only tu_literal_bytes bytes are TU values; entries are copies of PC entries. not_taken = the other TU changes of the file (left out, as by the B138 kit). kit_form_words = set words the kit wrote in another form (default build = kit).",
+ "schema": 1,
+ "file": "globalsoundinfo.drm",
+ "pc": {
+  "name": "pc-w\\globalsoundinfo.drm",
+  "source": "pc/bigfile.000",
+  "raw_md5": "ed12e423c4c919a0a63cf1d54a3301ae",
+  "cdrm_md5": "3a7656766e7ae159b59a9dc25f90604a"
+ },
+ "edit": {
+  "section": [
+   7,
+   792
+  ],
+  "xbox_section": [
+   7,
+   775
+  ],
+  "size_pc": 13920,
+  "size_out": 14400,
+  "set_u32": [
+   [
+    228,
+    80,
+    "group count"
+   ],
+   [
+    252,
+    5,
+    "pause list count"
+   ]
+  ],
+  "inserts": [
+   {
+    "at": 10536,
+    "len": 396,
+    "what": "sound group entries 77..79 (0x84 each): copy of a PC entry + set words",
+    "entry_base": 372,
+    "entry_size": 132,
+    "entries": [
+     {
+      "group": 77,
+      "copy": 9,
+      "set": [
+       [
+        124,
+        262144,
+        "u16x2",
+        "base entries: 2 of 77 distinguish u32 / u16x2; u32 contradicted by [58, 59], u16x2 by none"
+       ]
+      ]
+     },
+     {
+      "group": 78,
+      "copy": 1,
+      "set": [
+       [
+        104,
+        77,
+        "u32",
+        "base entries: 73 of 77 distinguish u32 / u16x2; u32 contradicted by none, u16x2 by [2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]"
+       ],
+       [
+        124,
+        65536,
+        "u16x2",
+        "base entries: 2 of 77 distinguish u32 / u16x2; u32 contradicted by [58, 59], u16x2 by none"
+       ]
+      ]
+     },
+     {
+      "group": 79,
+      "copy": 54,
+      "set": []
+     }
+    ],
+    "at_hex": "0x2928"
+   },
+   {
+    "at": 10584,
+    "len": 4,
+    "what": "pause list: appended group(s) [79]",
+    "u32": [
+     79
+    ],
+    "at_hex": "0x2958"
+   },
+   {
+    "at": 13440,
+    "len": 16,
+    "what": "runtime area (+0x80 pointer target) of new group 79: zero bytes",
+    "zero": 16,
+    "at_hex": "0x3480"
+   },
+   {
+    "at": 13888,
+    "len": 64,
+    "what": "runtime area (+0x80 pointer target) of new group 77 and the following new group(s): TU u32 words",
+    "u32": [
+     1056964608,
+     1036831949,
+     1061158912,
+     1041865114,
+     0,
+     0,
+     0,
+     0,
+     1033476506,
+     1063004406,
+     1029930473,
+     1058139013,
+     1049974213,
+     1042051676,
+     1047644529,
+     1065073204
+    ],
+    "at_hex": "0x3640"
+   }
+  ],
+  "new_internal": [
+   [
+    10664,
+    14304
+   ],
+   [
+    10796,
+    14336
+   ],
+   [
+    10928,
+    13840
+   ]
+  ],
+  "reloc_sorted": true
+ },
+ "tu_literal_bytes": 88,
+ "not_taken": [
+  {
+   "index": 16,
+   "type": 8,
+   "xbox_id": 56,
+   "pc_id": 55,
+   "size_retail": 6457,
+   "size_tu": 6457,
+   "words": 4
+  },
+  {
+   "index": 26,
+   "type": 8,
+   "xbox_id": 220,
+   "pc_id": 222,
+   "size_retail": 1959,
+   "size_tu": 321,
+   "tu_content_is_retail_index": [
+    27
+   ]
+  },
+  {
+   "index": 27,
+   "type": 8,
+   "xbox_id": 221,
+   "pc_id": 223,
+   "size_retail": 321,
+   "size_tu": 1959,
+   "tu_content_is_retail_index": [
+    26
+   ]
+  },
+  {
+   "index": 46,
+   "type": 8,
+   "xbox_id": 768,
+   "pc_id": 778,
+   "size_retail": 241,
+   "size_tu": 237,
+   "tu_content_is_retail_index": [
+    48
+   ]
+  },
+  {
+   "index": 47,
+   "type": 8,
+   "xbox_id": 769,
+   "pc_id": 779,
+   "size_retail": 143,
+   "size_tu": 241,
+   "tu_content_is_retail_index": [
+    46
+   ]
+  },
+  {
+   "index": 48,
+   "type": 8,
+   "xbox_id": 770,
+   "pc_id": 780,
+   "size_retail": 237,
+   "size_tu": 143,
+   "tu_content_is_retail_index": [
+    47
+   ]
+  }
+ ],
+ "learn_notes": [
+  "PC DTP 792 and retail DTP 775: same size 13920, relocations equal (94 internal)",
+  "PC = u32-swapped retail in 3470 of 3480 words (others at 0x28, 0x2c, 0x38, 0xb8, 0xd8, 0x158, 0x168, 0x170, 0x1fd8, 0x205c)"
+ ],
+ "expect": {
+  "raw_md5": "94a70736fe28e727eb8d0b02d271d8b9",
+  "cdrm_md5": "444484266d549b13b0c3eac25059fb85",
+  "cdrm_size": 17698,
+  "source": "B138 kit globalsoundinfo.drm (= B270, docs/data/kit_dependency.tsv)",
+  "tu_form_raw_md5": "99834881531f622d51015a9afb4617fe"
+ },
+ "kit_form_words": {
+  "words": [
+   {
+    "offset": 10660,
+    "group": 77,
+    "field": 124,
+    "form": "u16x2"
+   },
+   {
+    "offset": 10792,
+    "group": 78,
+    "field": 124,
+    "form": "u16x2"
+   }
+  ],
+  "why": "the engine reads the group entry field +0x7c as a u16 (0x58de54 cmp word ptr [eax+0x7c], 0; 0x587620 movzx = DSP kind 1..11 -> FMOD DSP type, 0x7b98ea) and the base entries 58 / 59 carry it as u16 halves (retail 00050000 -> PC 05000000); the B138 kit file has these words u32-swapped (00000400 / 00000100: u16 at +0x7c = 0, no DSP for the new groups). Default build = kit bytes (md5 gate), --tu-form = base-rule form"
+ }
+}

@@ -152,6 +152,15 @@
                B138 exe); nothing is written when a stage or the gate fails. Then exe_build --check lists every stage
                of the result (exit 1 unless complete) -> work\rebuild\exe\tru.exe + exe_build.json, exe_check.json
                (-FixesOut DIR: DIR\exe\...). Not installed by anything yet
+      Globalsound  (2026-11-10, independent of every other step, seconds) our globalsoundinfo.drm instead of the
+               kit's: tools\globalsoundinfo_build.py takes the PC original (bigfile.000; its md5 is checked) and applies
+               the recorded title-update edit docs\data\globalsoundinfo_tu.json (sound DTP 792: groups 77-79 for DLC 2,
+               pause list + 79, two runtime areas, 88 bytes of TU values); gate = raw DRM md5 94a70736... (the B138 /
+               B270 kit file; the CDRM bytes differ only by the zlib build), nothing is written when it fails; then
+               --check re-reads the written file -> work\rebuild\globalsound\mods\globalsoundinfo.drm +
+               globalsound_check.json (-FixesOut DIR: DIR\globalsound\...). Kit bytes on purpose: the two new u16 DSP
+               kinds (entry +0x7c of groups 77 / 78) stay u32-swapped as in the kit until the owner decides
+               (--tu-form, docs/WINDOWS_REBUILD.md finding 51). Not installed by anything yet
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
@@ -185,7 +194,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank', 'Exe')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank', 'Exe', 'Globalsound')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(1, 99)][int]$ToTool = 99,
     [ValidateRange(0, 16)][int]$Jobs = 0,
@@ -260,6 +269,8 @@ if ($FixesOut) {
 }
 # step Exe (2026-11-10): our B138 tru.exe from the Steamless-unpacked Steam exe
 $exeOut = if ($FixesOut) { "$fixRoot/exe" } else { 'work/rebuild/exe' }
+# step Globalsound (2026-11-10): our globalsoundinfo.drm from the PC original + the recorded title-update edit
+$gsOut = if ($FixesOut) { "$fixRoot/globalsound" } else { 'work/rebuild/globalsound' }
 # step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
 $costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
 $costumeTools = @(
@@ -467,6 +478,11 @@ $steps = @{
         @('tools\exe_build.py', "$exeOut/tru.exe", '--report', "$exeOut/exe_build.json"),
         @('tools\exe_build.py', '--check', "$exeOut/tru.exe", '--report', "$exeOut/exe_check.json")
     )
+    # Globalsound: build (PC original md5 checked first, gate raw md5 = B138 / B270 kit file), then re-check the file
+    Globalsound = @(
+        @('tools\globalsoundinfo_build.py', 'build', $gsOut),
+        @('tools\globalsoundinfo_build.py', '--check', "$gsOut/mods/globalsoundinfo.drm")
+    )
 }
 $outputDirs = @{
     Index   = @('work')
@@ -486,6 +502,7 @@ $outputDirs = @{
     Repair  = @('work\rebuild')
     Generalbank = @('work\rebuild')
     Exe     = @(($exeOut -replace '/', '\'))
+    Globalsound = @(($gsOut -replace '/', '\'))
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{
