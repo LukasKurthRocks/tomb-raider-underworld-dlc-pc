@@ -20,7 +20,7 @@ READMEs and [CHANGELOG.md](../CHANGELOG.md); the plugin README and the CHANGELOG
 | [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22.12 | partial: cutscene pause, `sub.lang`, `fight.trace`, enemy panel, light diagnosis and the quick bar states played 2026-11-09; known: subtitles run on during the pause, LB + View before RB fires "continue", `sub.lang` not kept over a restart |
 | [TruMercLang](#trumerclang) | base-game comfort (fun option) | 0.1 | offline, default off |
 | [TruShadowPower](#trushadowpower) | DLC 2 title update | 0.22 | partial: 0.20 installed and in use 2026-11-09 (power, wall run, goo drip: the PC stays in slow motion while running, the Xbox switches to world 1.0); 0.21 (time-scale slot 6) and 0.22 (K-5 ring request / adrenaline refill by the meter flags) offline, not installed |
-| [TruShadowCombat](#trushadowcombat) | DLC 2 title update | 0.6.9 | partial: single punches as on the Xbox played 2026-11-09 (Hit instead of Fall, impulse gate on / off); open: punch combo does not chain (fix `[States] Translate1004=1` to test), melee kill with the gate not yet seen; 0.6.9 log points (hit list, chunkdoll build, death switch) offline |
+| [TruShadowCombat](#trushadowcombat) | DLC 2 title update | 0.6.10 | partial: single punches as on the Xbox played 2026-11-09 (Hit instead of Fall, impulse gate on / off); open: punch combo does not chain (fix `[States] Translate1004=1` to test), melee kill with the gate not yet seen; 0.6.9 log points (hit list, chunkdoll build, death switch) and 0.6.10 knockback speed of the 4th chain punch (`[Hit] TranslateHitSpeed`, K-8b) offline |
 | [TruShadowHud](#trushadowhud) | DLC 2 title update | 0.2 | partial: HUD natives played 2026-11-05; 0.2 offline |
 | [TruRockVein](#trurockvein) | DLC 2 title update | 0.11 | partial: wall run played; the jump from a ledge to a rock vein turns back |
 | [TruDoppelganger](#trudoppelganger) | DLC 2 title update | 0.1 | in the played DLC 2 stack; its README still says "not yet played" |
@@ -163,17 +163,20 @@ The DLC 2 combat of the title update: the larger target list, the new combat con
 strike, the title update's damage-type switch, lethal impulses, splash damage, the thrall's companion and the
 regenerate / death rules of the thralls.
 
-- Version: 0.6.9.
+- Version: 0.6.10.
 - State: partial. Shadow combat input played; thralls take damage and die with `[Damage] Translate` (live test
   2026-11-07); 0.6.4 ran in the live test of 2026-11-07. 0.6.6 (T5, Vaulted chain and clock), 0.6.7 (hit structures,
   knockback per type, chunkdoll limit 8) and 0.6.8 (impulse gate of Lara's contact hit) offline. 0.6.9 (offline): log
   points only - the hit-list add of Lara's contact hit (K-8 proof), the Death state's chunkdoll build and the death
   switch (`[Death] Log`); the title update's death switch needs no port (same request through brain+0x1254 as the PC).
+  0.6.10 (offline, K-8b): Lara's contact hit gives the hit message the knockback speed msg+0x44 = (int) A+0x10 (and
+  msg+0x48 = (int) A+0x14) as the title update 0x823e169c, so type 21 / 26 punches knock back again (`[Hit]
+  TranslateHitSpeed`); the type-27 substitute record of the same TU block is still open.
   Open: the shadow finisher never starts (its target list stays empty).
 - INI `TruShadowCombat.ini`: `[ShadowCombat] Enabled` / `LogLevel`; `[TargetList] Enabled`; `[Strike] Translate`
   (0); `[States] Translate1013` (0, finisher); `[Damage] Translate` (1); `[Chunk] Translate`; `[Splash] Translate`;
   `[Companion] Translate`; `[Death] TranslateT5` / `TranslateVaulted` / `TranslateVaultedClock` and the other
-  `[Death]` switches, `[Death] Log`; `[Hit] Translate` / `TranslateKnockback` / `TranslateImpulseGate` / `Log`; `[Chunk] Limit8`;
+  `[Death]` switches, `[Death] Log`; `[Hit] Translate` / `TranslateKnockback` / `TranslateImpulseGate` / `TranslateHitSpeed` / `Log`; `[Chunk] Limit8`;
   `[Diag]` log-only hooks. Most switches are read again at run time.
 - Install: `scripts\windows\Set-TruShadowCombat.ps1`.
 - README: [src/asi/TruShadowCombat/README.md](../src/asi/TruShadowCombat/README.md).

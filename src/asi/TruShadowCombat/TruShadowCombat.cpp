@@ -60,6 +60,11 @@
 //    (tru+0x26c9f9), the hit-list add of Lara's contact hit (tru+0x3190ad) and the death switch tru+0x241650 (entry) -
 //    [Hit] Log / [Death] Log, live. The TU death switch 0x823258c8 only inlines retail's request helper 0x8230e290
 //    (= PC tru+0x23d6e0): the same request through brain+0x1254, nothing to translate.
+// 16. 0.6.10 (K-8b): Lara's contact-hit sender tru+0x319050 gives the hit message 0x11c msg+0x44 = (int) A+0x10 (the
+//    attack force) and msg+0x48 = (int) A+0x14 as the TU 0x823e169c..0x823e16c8 (retail / PC: 0 / 0); the knockback
+//    tru+0x220650 takes msg+0x44 as its speed when > 0, so records with s+0x30 = 0 (types 21 / 26) knock back again -
+//    [Hit] TranslateHitSpeed, default on, live. Still open: the TU's type-27 substitute record [CM+0xc8] of the same
+//    block (0x823e160c..0x823e1674).
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -76,7 +81,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.9 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.10 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -112,7 +117,9 @@ const char kVersion[] = "TruShadowCombat 0.6.9 (TU target list 7 -> 10, conditio
                         "TranslateImpulseGate, on by default), hit line prints the subtype msg+0x64; 0.6.9: log points "
                         "(nothing changed in the game) at the Death state's chunkdoll build tru+0x26c9f9 ([Death] Log), "
                         "the hit-list add of Lara's contact hit tru+0x3190ad ([Hit] Log) and the death switch "
-                        "tru+0x241650 ([Death] Log))";
+                        "tru+0x241650 ([Death] Log); 0.6.10: Lara's contact hit gives the hit message msg+0x44 / "
+                        "+0x48 = (int) A+0x10 / A+0x14 as the TU 0x823e169c (tru+0x319169, knockback speed; [Hit] "
+                        "TranslateHitSpeed, on by default))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -1695,6 +1702,7 @@ int g_hitKnock = 1;                // [Hit] TranslateKnockback (0.6.7, live)
 int g_hitLog = 1;                  // [Hit] Log (0.6.7, live)
 int g_hitImpulseGate = 1;          // [Hit] TranslateImpulseGate (0.6.8, live)
 int g_deathLog = 1;                // [Death] Log (0.6.9, live): chunkdoll build + death switch lines
+int g_hitSpeed = 1;                // [Hit] TranslateHitSpeed (0.6.10, live): msg+0x44 / +0x48 from A+0x10 / A+0x14
 
 BYTE *__cdecl Record1013(BYTE *target, BYTE *player, const float *pos, const float *rot, float frames, DWORD x34,
                          BYTE *hit) {
@@ -4092,6 +4100,10 @@ const P1dKey kP1dKeys[] = {
     // 0.6.9 (K-8 / melee kill, log only)
     {"Death", "Log", &g_deathLog, "one line per chunkdoll build of the Death state and per death switch",
      "no chunkdoll / death switch lines", "0.6.9"},
+    // 0.6.10 (K-8b)
+    {"Hit", "TranslateHitSpeed", &g_hitSpeed,
+     "Lara's contact hit: msg+0x44 / +0x48 = (int) A+0x10 / A+0x14 (TU 0x823e169c, knockback speed)",
+     "msg+0x44 / +0x48 = 0 / 0 (PC)", "0.6.10"},
 };
 
 void P1dReadSwitches() {
@@ -5446,17 +5458,21 @@ DWORD __cdecl HitDecideHook(BYTE *inst, BYTE *msg, BYTE *d, float amount) {
         Describe(inst, who, sizeof(who));
         // 0.6.8: sub = msg+0x64 (the subtype, builder argument 17, fixed 2 at tru+0x31914b); msg+0x54 (argument 16,
         // fixed -1 at tru+0x31914d, only the entry list in tru+0x24f230 reads it) under its own name
-        LONG type = -1, sub = -1, m54 = -1;
+        // 0.6.10: msg+0x44 (builder argument 5, the knockback speed when > 0) / msg+0x48 (argument 6) - Lara's contact
+        // hit gives (int) A+0x10 / A+0x14 with [Hit] TranslateHitSpeed=1, else 0 / 0
+        LONG type = -1, sub = -1, m54 = -1, m44 = -1, m48 = -1;
         __try {
             type = *reinterpret_cast<const LONG *>(msg + 0x50);
             sub = *reinterpret_cast<const LONG *>(msg + 0x64);
             m54 = *reinterpret_cast<const LONG *>(msg + 0x54);
+            m44 = *reinterpret_cast<const LONG *>(msg + 0x44);
+            m48 = *reinterpret_cast<const LONG *>(msg + 0x48);
         } __except (EXCEPTION_EXECUTE_HANDLER) {}
         const int src = (g_selInst == inst) ? g_selSource : 0;
-        Log(1, "0.6.7 hit: %s type %ld sub %ld msg+0x54 %ld amount %.1f - structure: %s (flags +0x14 0x%08lx) -> %s "
-               "([Hit] Translate %d)",
-            who, type, sub, m54, amount, kSelSource[src], src ? g_selFlags : 0, r ? "HEAVY (knockback tru+0x220650)" :
-            "light (MoveHit tru+0x25ac80)", g_hitTranslate);
+        Log(1, "0.6.7 hit: %s type %ld sub %ld msg+0x54 %ld amount %.1f msg+0x44 %ld msg+0x48 %ld - structure: %s (flags "
+               "+0x14 0x%08lx) -> %s ([Hit] Translate %d, TranslateHitSpeed %d)",
+            who, type, sub, m54, amount, m44, m48, kSelSource[src], src ? g_selFlags : 0,
+            r ? "HEAVY (knockback tru+0x220650)" : "light (MoveHit tru+0x25ac80)", g_hitTranslate, g_hitSpeed);
     }
     return r;
 }
@@ -6002,6 +6018,76 @@ void SetupK8Log() {
         g_switchPlaced ? "on" : "OFF", g_hitLog, g_deathLog);
 }
 
+// ---------------------------------------------------------------- 0.6.10: K-8b knockback speed of Lara's contact hit
+// docs Befund-K8b-Art21-1011 sections 3 / 5 (main workspace). Lara's contact-hit sender tru+0x319050 (= retail
+// 0x823def28, TU 0x823e1488) builds the hit message 0x11c with tru+0x23c9b0 (= TU 0x8230afd8; argument 5 -> msg+0x44,
+// argument 6 -> msg+0x48, argument 7 -> msg+0x40: tru+0x23c9d4..+0x23c9e6). Retail and the PC push 0 / 0 / 0 at
+// tru+0x319169..+0x31916e (`6a 00` x 3: argument 7, 6, 5 in push order). The TU passes
+// r7 = (int) A+0x10 (fctiwz f28, 0x823e169c..0x823e16a8) and r8 = (int) A+0x14 (fctiwz f29, 0x823e16ac..0x823e16c8),
+// r9 = 0; A = the attack data (TU: its 10-word copy at r1+0x100; PC: eax = [CombatManager+0xc4] from tru+0x319133,
+// st0 = A+4 for the `fstp [esp]` at tru+0x319170). The knockback tru+0x220650 (= TU 0x822f73a8) takes v = (int)
+// msg+0x44 when > 0, else the record's s+0x30 (fild [edi+0x44] tru+0x220716..+0x22073e); records with s+0x30 = 0
+// (types 21 / 26) never knocked back on the PC. Every other receiver of this 0x11c gets the values too - as on the Xbox.
+// tru+0x319169 (6 bytes, three `push 0`) -> jmp HitSpeedStub + nop; the stub pushes the same three dwords (TU values or
+// 0 / 0 / 0) and returns to tru+0x31916f. FPU stack untouched (cvttss2si is SSE), esp the same as the PC at the return,
+// ecx is only the placeholder pushed at tru+0x31916f and overwritten by `fstp [esp]`, the flags are dead (push / fstp /
+// mov / call follow). No branch in tru+0x319050..+0x319400 and no rel32 call / jmp in the exe targets
+// tru+0x31916a..+0x31916f (pe_dis.py + pe_callers.py, 10.11.).
+// cvttss2si truncates toward zero as fctiwz; for NaN / out of range it gives 0x80000000 (fctiwz: 0x7fffffff for large
+// positive values) - irrelevant for Lara's forces 0..1250.
+// Not 1:1 / still open: the TU's type-27 substitute record [CM+0xc8] of the same block (0x823e160c..0x823e1674) - the
+// TU copies it over A for type 27 first; the stub reads A as the PC does. Once that substitute is ported, A+0x10 /
+// A+0x14 come from the substitute copy.
+const DWORD kHitSpeedSite = 0x00719169;
+DWORD g_hitSpeedBack = 0x0071916f;
+bool g_hitSpeedPlaced = false;
+
+// jumped to from tru+0x319169: eax = A, st0 = A+4; switch read again by P1dReadSwitches (every contact through the
+// 0.6.9 hit-list hook and every hit selection)
+__declspec(naked) void HitSpeedStub() {
+    __asm {
+        cmp dword ptr [g_hitSpeed], 0
+        je hs_pc
+        push 0                                  // argument 7 -> msg+0x40 (TU r9 = 0)
+        cvttss2si ecx, dword ptr [eax + 0x14]   // TU fctiwz f29 (A+0x14)
+        push ecx                                // argument 6 -> msg+0x48 (TU r8)
+        cvttss2si ecx, dword ptr [eax + 0x10]   // TU fctiwz f28 (A+0x10, the attack force)
+        push ecx                                // argument 5 -> msg+0x44 (TU r7)
+        jmp dword ptr [g_hitSpeedBack]
+    hs_pc:
+        push 0
+        push 0
+        push 0
+        jmp dword ptr [g_hitSpeedBack]
+    }
+}
+
+void SetupHitSpeed() {
+    const Fact f[] = {
+        {0x00719133, "8bc1 ddd8 0fb64801 d94004 51 8b4c2418 6a00 6a00 6a00 6a00 6a02 6aff 51 8b4c2438 8b4904 51 "
+                     "8d4c2474 51 8b480c",
+         "sender tru+0x319050: eax = A (tru+0x319133, not written up to tru+0x319169), st0 = A+4"},
+        {0x00719160, "6a00 6aff 6a00 51 6aff 6a00 6a00 6a00 51 d91c24 6a00 52 8b1594f0e700 52 e82e38f2ff",
+         "sender: push 0 / 0 / 0 at tru+0x319169 (arguments 7 / 6 / 5), builder call tru+0x31917d"},
+        {0x0063c9b0, "56 6880000000 e85541f8ff d9442418", "builder tru+0x23c9b0: argument 1 at [esp+0xc]"},
+        {0x0063c9d4, "8b54241c 894838 8b4c2420 895044 8b542424 894848 8b4c2428 895040",
+         "builder: argument 5 -> msg+0x44, 6 -> msg+0x48, 7 -> msg+0x40"},
+    };
+    if (!FactsOk66(f, sizeof(f) / sizeof(f[0]), "0.6.10 hit speed")) {
+        Log(0, "0.6.10 hit speed: not placed - Lara's contact hit gives msg+0x44 / +0x48 = 0 / 0 (PC)");
+        return;
+    }
+    BYTE j[6] = {0xe9, 0, 0, 0, 0, 0x90};
+    const DWORD rel = reinterpret_cast<DWORD>(&HitSpeedStub) - (kHitSpeedSite + 5);
+    memcpy(j + 1, &rel, 4);
+    g_hitSpeedPlaced = WriteCode(kHitSpeedSite, j, sizeof(j));
+    Log(1, "0.6.10 hit speed %s (tru+0x319169: Lara's contact hit gives the hit message 0x11c msg+0x44 = (int) A+0x10 and "
+           "msg+0x48 = (int) A+0x14 as the TU 0x823e169c..0x823e16c8 - the knockback tru+0x220650 runs with msg+0x44 when "
+           "> 0, else s+0x30; [Hit] TranslateHitSpeed %d, read again at run time at most once per second; the values "
+           "show in the `0.6.7 hit:` line). Not ported: the TU's type-27 substitute record [CM+0xc8] of the same block",
+        g_hitSpeedPlaced ? "on" : "OFF (write failed)", g_hitSpeed);
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -6102,6 +6188,7 @@ void Start(HMODULE self) {
     SetupHit();                       // 0.6.7: K-1 hit structures / knockback + K-7 chunk limit (after SetupCompanion)
     SetupImpulseGate();               // 0.6.8: K-1b impulse 0x91 gate of Lara's contact hit (independent)
     SetupK8Log();                     // 0.6.9: log points (last: the death switch facts are checked by 0.6.1 / 0.6.5 too)
+    SetupHitSpeed();                  // 0.6.10: K-8b msg+0x44 / +0x48 of Lara's contact hit (independent)
 }
 
 }  // namespace

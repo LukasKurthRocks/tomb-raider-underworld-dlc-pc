@@ -1,4 +1,41 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.9)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.10)
+
+0.6.10 (2026-11-10, **offline, not yet seen in game**; K-8b "4th chain punch, type 21, -80 does not knock the thrall
+down", main workspace `docs\Befund-K8b-Art21-1011.md`, ENGINE.md 13): build `work\asi\combat0610`, byte pre-checks
+`work\asi\combat0610\precheck_0610.txt` (6 checks: 4 the plugin does at load + 2 proof facts; 0 mismatches against
+`data\pc\tru.exe` and the installed tru.exe).
+* **Knockback speed of Lara's contact hit** (`[Hit] TranslateHitSpeed`, new, live, default **1**; TU
+  0x823e169c..0x823e16c8): the sender tru+0x319050 builds the hit message 0x11c with tru+0x23c9b0 (= TU 0x8230afd8:
+  argument 5 -> msg+0x44, 6 -> msg+0x48, 7 -> msg+0x40). Retail and the PC push 0 / 0 / 0 (tru+0x319169..+0x31916e);
+  the title update passes msg+0x44 = `(int)` A+0x10 (Lara's attack force, `fctiwz f28`) and msg+0x48 = `(int)` A+0x14
+  (`fctiwz f29`), A = the attack data `[CombatManager+0xc4]` (eax at that point). The knockback tru+0x220650 (= TU
+  0x822f73a8) runs with speed v = msg+0x44 when > 0, else the hit record's s+0x30 (tru+0x220716..+0x22073e); records
+  with s+0x30 = 0 - type 21 (the 4th chain punch, 753) and type 26 (775) - therefore never knocked back on the PC: the
+  thrall stayed in Hit, the Xbox throws it. 6-byte jump at tru+0x319169 (`6a 00` x 3) -> `HitSpeedStub` + nop: pushes
+  0, `cvttss2si` A+0x14, `cvttss2si` A+0x10 (truncation toward zero as `fctiwz`) and returns to tru+0x31916f; FPU
+  stack, esp and the pushed count as the PC; no branch targets the overwritten bytes (`pe_dis.py` on
+  tru+0x319050..+0x319400, `pe_callers.py` on the whole exe). Switch 0 = push 0 / 0 / 0 (PC). Every other receiver of
+  this 0x11c gets the values too, as on the Xbox. NaN / out-of-range forces would give 0x80000000 (`fctiwz`:
+  0x7fffffff) - irrelevant for Lara's forces 0..1250.
+* **Hit line:** `0.6.7 hit:` (prefix unchanged) now also prints `msg+0x44 <v> msg+0x48 <v>` after `amount` and
+  `TranslateHitSpeed <0/1>` at the end - the speed the knockback works with.
+* **Still open (not 1:1):** the TU's type-27 substitute record `[CM+0xc8]` of the same block 0x823e160c..0x823e1674
+  (the TU copies it over A for type 27 before these arguments) is not ported - the stub reads A as the PC does. Who reads
+  msg+0x48 is not searched (guess: the upward share).
+* **Effect (inferred):** only hits with s+0x20 = 1 **and** A+0x10 > 0 change: type 21 (753, force 250) and type 26
+  (775, force 1250) now knock back; types 23 / 24 / 25 / 27 with force > 0 would take A+0x10 instead of s+0x30 (762 /
+  759 / 772 have force 0 today -> unchanged). Types 18 / 19 / 20 / 22 stay Hit (s+0x20 = 0).
+* **TO TEST** (hall02, tutorial thrall, `[States] Translate1004=1`, `[Hit] TranslateImpulseGate=1`, `[Hit] Log=1`):
+
+| # | what | expected |
+|---|---|---|
+| 1 | game start | `TruShadowCombat 0.6.10 ... loaded`; `0.6.10 hit speed on (tru+0x319169 ...)`; no `0.6.10 hit speed: ... does not match` / `0.6.10 hit speed: not placed` line |
+| 2 | 4 x X, `TranslateHitSpeed=1` | `0.6.7 hit: ... type 21 ... msg+0x44 250 ...` -> right after it **`0.6.7 knockback: ... type 21 force 12.0 (companion record +0x40 (TU) ...)`**; TruFight: -80 -> **Fall -> Land -> Getup** (Xbox: 469-1 097 units in 1.1-2.0 s); types 18 / 19 / 20 stay Hit with `msg+0x44 200`, no knockback line |
+| 3 | 4 x X, `TranslateHitSpeed=0` (live) | as before: `msg+0x44 0`, no knockback line for type 21, Hit |
+| 4 | X X Y / big punch | types 23 / 25 unchanged (`msg+0x44 0`, force 3 or from the record) -> Fall / Splat |
+| 5 | shadow pull 775 (type 26) | now a knockback line + Fall (compare Xbox X21 "electrically thrown away") |
+| 6 | Xbox counter-check (TruXenia) | 4 x X on the tutorial thrall: `combo: Lara records ...>754>753 ... (-80.0) ... reaction Fall` - a recording with record 753 is still missing |
+| 7 | side effects | still no `impulse 0x91` to thralls, no crash at tru+0x319169, death / chunkdoll (PC test package 1 row 5) unchanged |
 
 0.6.9 (2026-11-10, **offline, not yet seen in game**; TODO N18 K-8 / melee kill, main workspace
 `docs\Befund-K8-Kombo-1011.md` sections 5 / 6.3, ENGINE.md 13): **log points only - nothing in the game changes**.
@@ -652,6 +689,7 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Death] TranslateVaulted` | 1 | 0.6.6 (P1c): Vaulted Enter as the TU 0x8232b630 with the step chain (records 0xbe / 0xf4, switch, copier); step table only from fixed extension data; live |
 | `[Death] TranslateVaultedClock` | 1 | 0.6.6 (P1c K): the TU's Vaulted clock - 5 s without slow motion (Enter 0x8232b698, enemy update 0x822db190); needs the chain; live |
 | `[Death] Log` | 1 | 0.6.9: one line per chunkdoll build of the Death state (tru+0x26c9f9) and per death switch (tru+0x241650), max 2000; log only; live |
+| `[Hit] TranslateHitSpeed` | 1 | 0.6.10 (K-8b): Lara's contact hit gives msg+0x44 / +0x48 = (int) A+0x10 / A+0x14 as the TU 0x823e169c (tru+0x319169) - the knockback speed; 0 = 0 / 0 (PC); live |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 
