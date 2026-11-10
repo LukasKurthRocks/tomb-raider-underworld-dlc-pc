@@ -98,7 +98,7 @@ menu window and the radial ring off (`[Menu] Enabled=0`, `[Radial] Enabled=0`).
    `TruMenu.switches.txt` (page "Fixes"), `.radial.txt` / `.tour.txt` (ring), `.media.txt` (track names),
    `.shaderlabel.txt` (shader labels); a missing file only leaves its page empty.
 3. In game, Xbox controller: **View + Start** opens / closes the bar; D-pad up / down = row, left / right = off / on,
-   LB / RB = page, X = run the row. The game keeps running. Bar language: `[Quick] Language` (`en` default from 0.22.18).
+   LB / RB = page, X = run the row. The game keeps running. German menu: `[Quick] Language=de`.
 
 Before 0.22.18, `[Menu] Enabled=0` turns all of TruMenu off. Controls and pages:
 [src/asi/TruMenu/README.md](src/asi/TruMenu/README.md).
