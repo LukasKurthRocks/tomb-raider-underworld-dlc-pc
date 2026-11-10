@@ -2928,6 +2928,119 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.18 - volume save, groups everywhere, step mode, subtitle alignment, speech language, light demote (2026-11-10)
+
+Built into `work\asi\menu0241`, not installed, no live test. Byte checks: `work\asi\menu0241\precheck_02218.txt` (32
+new checks: `kVsChecks` 6, `kSaChecks` 7, `kVlChecks` 9 + 1 ret, `kLdChecks` 10; 0 mismatches against
+`data\pc\tru.exe` and read-only against the installed `tru.exe`). Wishes of 2026-11-10 (owner / coordinator).
+
+- **1 Volume save (live 16:44: `game.vol.music 128` live, `options saved`, registry `MusicVolume` stayed 0).** Static
+  (`tools/pe_dis.py`): the settings save 0x478010 refreshes the mirrors 0x8900e0 / d8 / dc from the FMOD categories
+  (0x47809b..0x4780b4) but its `RegSetValueEx` calls write only Language, SubtitleLanguage, Vibration, CombatMode, the
+  four inversions, 0x890100, 0x8900c8, 0x890104 - **never MouseSensitivity, VoVolume, MusicVolume, SfxVolume**. Those are
+  written only by 0x4796b0 (0x4796ef / 0x47977a / 0x479791 / 0x4797a8; root values + Graphics from 0x890388). The game's
+  own menu: its volume natives 0x5a4af0 / 0x5a4b30 / 0x5a4b70 set the mirror, leaving the pause menu (0x5d473d) calls
+  0x4796b0. TruMenu now does the same: a volume / mouse change sets the mirror at once; the delayed save runs 0x478010,
+  sets the volume mirrors from the profile fields P+0x338 / +0x33c / +0x340 (what the callbacks and the natives write -
+  not the FMOD category, which `media.mutemusic`'s fallback sets to 0), then 0x4796b0, then the next-start values of this
+  session again (`GnRewrite`, as `gfx.save`). Log `0.22.18 options: 0x478010 + 0x4796b0 done (#n) - MusicVolume 128 ...`.
+  Other options (inversion, sub.lang ...) keep the 0x478010-only save. Model `volsave` (8 cases).
+- **2 Groups everywhere, indentation.** Every `-- ...` heading of the bar tables is a collapsible group now (16 headings:
+  Kostuem, Barrierefreiheit Sehen / Hoeren / Verstehen / Steuerung / Sonstige, Koop, Rettung Festgesteckt / Spielstaende
+  / Objekte / Ausruestung, Tests Teleport / Teststellen / Zwischensequenz / Diagnose / hall02-Zaehler) plus "Zeit" (page
+  Zeit / Ablauf) and "Darstellung" (page Debug) for their loose rows - new keys, open at the start, so an existing
+  `[Quick] Closed` resolves as before. `kQfSub` = a sub-group: "Ton-Gruppen (TruMenu)" in Ton, "Geraet (Diagnose)" in
+  "Grafik ab naechstem Start" (the bug of the shot `pc_leiste_gruppen_164959.png`). A closed group hides everything up
+  to the next heading of its level or above; the closed count includes its sub-groups' rows. Drawing: headings at the
+  left, rows one step (`[-] ` wide) per level further right, the square column only on rows, a thin guide line per open
+  level. Special pages: a `[+]` / `[-]` / `-- ` special row is a heading, the rows after it one step in. Long menu
+  (Quick bar pages, Barrierefreiheit): groups are collapsing headers, sub-groups indented. `QuickCheck` no longer counts
+  group headings as unknown items (the start line said 29 unknown). `kQbViewMax` 128. Model `groups 0.22.18` (7 cases).
+- **3 Frame stepping.** While View (the button all three combos share, `CnPadMod`) stays down, each RB tap is one frame
+  (step mode; 0.22.13's wait for a full release never ended with View held - only one step). RB + View held 0.4 s =
+  `cine.step 1` every 1000 / `[Settings] StepRate` ms (5 / 10 / 15, `cine.steprate`, bar row in Tests / Zwischensequenz;
+  the subtitles run along); letting go stops with no extra frame; LB added stops the repeat, the photo fires, the pause
+  stays. Keyboard keys unchanged. Model `cinepad` + 12 cases (the 0.22.13 bug case included).
+- **4 Subtitle alignment.** Evidence: the draw 0x583e20 sets the text origin (0, 352) through 0x474ce0 (0x9de6e8 /
+  ec), the line draw 0x477180 centres each `\n` segment: x = ([0x9ce6cc] - width (0x4758c0, thiscall) * [0x9ce6bc]) *
+  0.5 -> 0x9de6e0; the box 0x4759b0 and the string entry 0x476bc0 add the origin. `sub.halign centre|left|right` +
+  `sub.margin 0..30` (percent of the width): `GsSubLine` (the 0.22.16 line call 0x583eb6) moves the origin x for its line
+  by (wanted x - centred x) and puts it back - no game code changed. `sub.valign bottom|top|free`: bottom = `sub.pos` 250
+  .. 420 (game 352), top = 16, free = `sub.pos` 16 .. 448 - 2 x line step - 8 (two lines always fit). `[Settings]
+  SubAlignV / SubAlignH / SubMargin`; rows in the Untertitel group; `sub.reset` resets them too. Only the first `\n`
+  segment of a box line sets the shift (box lines are single lines). Model `subalign` (9 cases).
+- **5 Speech language (plan S1).** `voice.lang game|en|fr|de|it|es|nl|ja|ru` (row "Sprachausgabe (nur Ton)" in Ton):
+  on the game thread, while MultiFS slot +0x18 (0x472be0) says free, slot +0x10 (0x472d80) gets `1 << lang` (game =
+  `1 << [0x8906b8]`); read back through +0x14; ModLoader found by its mask setter bytes (its child's +0xc compared). No
+  locals reload - in-game lines switch at the next sentence, cutscenes at the next scene, texts stay. NL / JA / RU only
+  when `mods\cinstream`, `mods\vo\dlc1` or `mods\vo\dlc2` hold a `*_2048` / `*_032` / `*_512` file (checked once, else
+  refused). `[Settings] VoiceLanguage` (written at once, applied at the first game frames). `voice.full <lang>` (rows
+  "Sprache komplett (Text + Ton)" DE / EN, right twice): option 0x95 stored without its callback (no live text switch),
+  0x478010 writes `Language`, speech now; texts and menus at the next start.
+- **6 Music player (plan S2).** `Set-TruMenu.ps1` falls back to the last generated `work\media\menu\TruMenu.media.txt`
+  when the build folder has none (warning with its date; the list there is from 2026-11-02 - regenerate with
+  `tools/music_list.py --menu-out work\media\menu` for the DLC tracks' sound flags). Rows in Ton: "Musik auf 100 %" -
+  red **"Musik-Lautstaerke ist 0 - der Player bleibt stumm"** while option 2 is 0, else the volume in the count column;
+  "Musik auch im Level" (`media.music.inlevels`, `[Media] MusicInLevels`, written at once); "Musik: laeuft gerade".
+- **7 Goo drip columns.** `TruFight.log` 2026-11-10 13:39: in 2145 zone lines every copy stood at the source (x -195,
+  y -6292 / -5725, z 12110) - inst+0x20 of a copy does not move while it falls (animation 1). Not decidable offline, so
+  candidate columns at the end: `pc_drip_b0_x/_y/_z/_dz` (bone matrix 0 translation `[[inst+0x90]+0x30]`, the nearest
+  copy by it), `pc_drip_b0_lowz` (lowest bone-0 z of all copies), `pc_drip_near_oldz` (inst+0xc0),
+  `pc_drip_near_phys` (inst+0x274); one TruMenu.log line the first time bone 0 and inst+0x20 differ by > 50 units.
+- **8 `light.demote`** (`[Light] Demote`, default 0, Tests / Licht (Diagnose)): set builder 0x504cc0, caster branch
+  0x504e06 (`cmp dl, 3; jae drop`) -> `LdBuildStub`: shadow part full, a plain place free, the new light a plain shadow
+  caster (no shadow map) -> of the set's casters and the new one, the one **farthest from the camera** (entry+0x10)
+  is demoted (plain count + 1, marked per builder object); slot distributor 0x5042b0, CastsShadow call 0x504341 ->
+  `LdCastStub`: a marked entry of the same object answers "no shadow" and takes a plain slot. Marks live 50 ms (the set is built every frame). Written
+  on the game thread, put back when off; `light.demote` (no argument) reports demoted / kept / no plain place.
+- **Settings written back (owner, live 17:07).** `IniKeep` (WritePrivateProfileString: only that key line changes,
+  comments and other keys stay) right after: `quick.lang` ([Quick] Language), `cam.shakescale` / `cam.rumble`
+  ([Camera]), `media.mutemusic` / `.muteambient` / `.music.inlevels` ([Media]), `light.stable` / `.stablecut` /
+  `.demote` ([Light]), `cine.steprate`, `sub.valign` / `.halign` / `.margin`, `voice.lang` ([Settings]). Already kept
+  before: `sub.*` look, `snd.vol.*` ([SoundGroups]), `menu.hidecursor`, `[Quick] Closed` / favourites / recent; the game
+  options (`game.vol.*`, inversion, `sub.lang`, `gfx.*`) go to the registry. **Session-only by design:** debug / diagnosis
+  toggles (`dbg.*`, `nav.*`, `fight.trace`, `aim.trace`, `enemy.panel`, `light.cutlabels`, `cine.pause`, `time.*`,
+  cheats, `ai.*`), the sound list display (`snd.pos` / `.lines` / `.sort` / ...), `shot.oncine`. Model `persist`.
+- **Defaults (coordinator, for new users: only the bar).** `[Menu] Enabled` is now the big menu window (default **0**:
+  L3 + R3 / ToggleKey / items never open it, log `menu not opened ... [Menu] Enabled=0`); the old master switch "load but
+  hook nothing" moved to **`[Menu] Load`** (default 1). `[Radial] Enabled` default **0**, `[Quick] Enabled` 1, `[Quick]
+  Language` default **en** (also when the key is missing). Code defaults = sample `TruMenu.ini`; an edited ini is kept
+  by `Set-TruMenu.ps1` (its `Enabled=1` keeps the big menu).
+- **TruShadowPower 0.23 `[Meter] Infinite`**: row "Kraft unendlich" in the group "Schattenkraft (Doppelgaengerin)" (page
+  Figur) - the planned row is gone.
+- `Set-TruMenu.ps1` knows the 0.22.17 hash; checks `trumenu_ini_check` `check_02218`, `trumenu_quick_check` models
+  `volsave`, `groups 0.22.18`, `cinepad` 0.22.18, `persist`, `subalign`.
+
+### TO TEST 0.22.18
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | volume | `game.vol.music` 64 -> 128 (bar), wait 3 s, read registry `MusicVolume`; game.quit, restart | log `0.22.18 options: 0x478010 + 0x4796b0 done ... MusicVolume 128`; registry 128; after the restart music at 100 % |
+| 2 | volume | `game.mouse` 15; `game.vol.sfx` 40 | registry MouseSensitivity 15 / SfxVolume 40 |
+| 3 | volume | after a `gfx.next` row (e.g. VSync), change the music volume | the next-start value stays in the registry (log `... 1 next-start value(s) again`) |
+| 4 | groups | page Spiel-Einstellungen: open Ton, Grafik ab naechstem Start | headings left, rows indented, Ton-Gruppen / Geraet one step more, guide lines; closing Grafik hides Geraet too |
+| 5 | groups | pages Rettung / Cheats, Tests, Zeit / Ablauf, Barrierefreiheit, Koop | every section `[-]` / `[+]`, an old `[Quick] Closed` still applies |
+| 6 | groups | long menu (big window), section "Quick bar pages" | groups collapsible, sub-groups indented |
+| 7 | step | held cutscene: keep View down, tap RB 3 times | 3 frames |
+| 8 | step | hold RB + View 2 s (StepRate 10), release | ~16 frames, the subtitles run along, no extra frame at the release |
+| 9 | step | while repeating add LB | repeat stops, photo, the cutscene stays held |
+| 10 | step | `cine.steprate 5` / `15`, restart | rate as set; `[Settings] StepRate` kept |
+| 11 | subtitles | `sub.halign left`, `right`, `sub.margin 0` / `10` in a cutscene and a Bink movie | lines and grey bar at the left / right margin; centre again with `centre` |
+| 12 | subtitles | `sub.valign top`; `free` + `sub.pos` steps; size 1.1 | at the top; free range 16 .. 360 at 1.1, two lines visible |
+| 13 | voice | in a level with Zip / Alister lines: `voice.lang de` (English game) | log `0.22.18 voice.lang #1: German: mask 0x4 set, archives report 0x4, ModLoader +0xc agrees`; next sentence German, texts English |
+| 14 | voice | `voice.lang de` before a DLC 2 cutscene | the cutscene speaks German (mods `_004` files) |
+| 15 | voice | `voice.lang nl` / `ja` / `ru` | refused (no `_2048` / `_032` / `_512` files) unless the mods hold them |
+| 16 | voice | restart with `VoiceLanguage=de` | German speech from the start, log line at the first game frames |
+| 17 | voice | "Sprache komplett: Deutsch" (right twice), restart | speech German at once; after the restart texts / menus German; registry Language 2 |
+| 18 | music | install with `Set-TruMenu.ps1` (build folder has no list) | warning "using the last generated list ..."; TruMenu.log `media list ...: 63 rows` |
+| 19 | music | music volume 0 | red warning row in Ton; right = 100 % |
+| 20 | music | `media.music.inlevels 1`, `media.music.play l2_waters_of_thailand` in a level | plays; `[Media] MusicInLevels=1` kept |
+| 21 | goo | end level corridor, `fight.trace 1`, stand under the drips | `pc_drip_b0_*` / `_lowz` move with the falling drop? log `0.22.18 goo drip copy ... differs`? report which column moves |
+| 22 | light | throne cutscene held, `light.demote 1`, `light.cut 3` | no dropped light in the 5 sets (#91 plain without shadow), warm top + cool side together; `light.demote` report counts |
+| 23 | defaults | fresh sample ini: L3 + R3 | nothing opens (log `menu not opened`), Start + View opens the bar, bar text English |
+| 24 | persist | `quick.lang en` in the bar, restart | the bar stays English (`[Quick] Language=en` written) |
+| 25 | figure | page Figur, Schattenkraft group: "Kraft unendlich" | a live switch row (TruShadowPower 0.23), no "geplant" row |
+
 ## 0.22.17 - subtitle fallback to English (2026-11-10)
 
 For a game language whose subtitles the DLC cinematics do not carry (Russian, id 9, installed from a retail copy for the
@@ -3733,7 +3846,8 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 
 | Section / key | Default | Meaning |
 |---|---|---|
-| `[Menu] Enabled` | 1 | 0 = load but hook nothing |
+| `[Menu] Enabled` | 0 (0.22.18; was 1) | 0.22.18: 1 = the big menu window may open (ToggleButtons / ToggleKey), 0 = never - the bar, ring and items work. Before 0.22.18: 0 = load but hook nothing |
+| `[Menu] Load` | 1 | 0.22.18: 0 = load but hook nothing (the old meaning of `[Menu] Enabled=0`) |
 | `[Menu] LogLevel` | 1 | 0 errors, 1 info, 2 every toggle / item, 3 debug; `TruMenu.log` next to `tru.exe` |
 | `[Menu] ToggleButtons` | 192 (0x00C0) | XInput button mask that opens / closes the menu (all buttons of the mask together) |
 | `[Menu] ToggleKey` | 0 | virtual key that also toggles the menu (0 = off) |

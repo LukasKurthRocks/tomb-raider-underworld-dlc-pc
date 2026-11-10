@@ -1560,14 +1560,61 @@ def check_favrecent():
     return good
 
 
-def qb_build(rows, closed):                   # QbBuild: a closed group hides its rows up to the next heading / group
-    out, hide = [], False
+def qb_build(rows, closed, depths=None):     # QbBuild: a closed group hides its rows up to the next heading / group
+    """0.22.18: a row may be ('subgroup', key) = a group of level 1 (kQfSub); a closed group hides everything up to the
+    next heading of its level or above; depths (a list) gets each shown view's indentation (heading: its level, row:
+    the level below the last heading)"""
+    out, hide_above, depth = [], -1, 0
     for kind, key in rows:
-        if kind in ('label', 'group'): hide = False
-        elif hide: continue
+        head = kind in ('label', 'group', 'subgroup')
+        lv = (1 if kind == 'subgroup' else 0) if head else depth
+        if head:
+            if hide_above >= 0 and lv > hide_above: continue
+            hide_above, depth = -1, lv + 1
+        elif hide_above >= 0: continue
         out.append(key)
-        if kind == 'group': hide = key in closed
+        if depths is not None: depths.append(lv)
+        if kind in ('group', 'subgroup') and key in closed: hide_above = lv
     return out
+
+
+def qb_inside(rows, i):                       # QbGroupInside: item rows up to the next heading of its level or above
+    lv = 1 if rows[i][0] == 'subgroup' else 0
+    n = 0
+    for kind, _ in rows[i + 1:]:
+        if kind in ('label', 'group', 'subgroup'):
+            if (1 if kind == 'subgroup' else 0) <= lv: break
+            continue
+        n += 1
+    return n
+
+
+def check_groups_nested():
+    """0.22.18: the settings page shape - Ton with its sub-group Ton-Gruppen, Grafik ab naechstem Start with Geraet"""
+    rows = [('group', 'set_snd'), ('row', 'music'), ('row', 'sfx'), ('subgroup', 'ton_gruppen'), ('row', 'amb'),
+            ('row', 'steps'), ('group', 'set_gfxn'), ('row', 'vsync'), ('subgroup', 'set_gfxdev'), ('row', 'hwvp'),
+            ('group', 'set_ctl'), ('row', 'camx')]
+    cases = []
+    d = []
+    shown = qb_build(rows, set(), d)
+    cases.append(('all open: every row, depths 0 1 1 1 2 2 0 1 1 2 0 1', shown == [k for _, k in rows] and
+                  d == [0, 1, 1, 1, 2, 2, 0, 1, 1, 2, 0, 1]))
+    cases.append(('Ton closed: its sub-group and rows hidden, Grafik next',
+                  qb_build(rows, {'set_snd'}) == ['set_snd', 'set_gfxn', 'vsync', 'set_gfxdev', 'hwvp', 'set_ctl', 'camx']))
+    cases.append(('Ton-Gruppen closed: Ton rows stay, its rows hidden',
+                  qb_build(rows, {'ton_gruppen'}) == ['set_snd', 'music', 'sfx', 'ton_gruppen', 'set_gfxn', 'vsync',
+                                                      'set_gfxdev', 'hwvp', 'set_ctl', 'camx']))
+    cases.append(('Geraet closed inside open Grafik: Steuerung (level 0) still shown',
+                  qb_build(rows, {'set_gfxdev'})[-4:] == ['vsync', 'set_gfxdev', 'set_ctl', 'camx']))
+    cases.append(('Grafik closed + Geraet closed: no Geraet heading', 'set_gfxdev' not in qb_build(rows, {'set_gfxn', 'set_gfxdev'})))
+    cases.append(('counts: Ton 4 (with sub-group rows), Ton-Gruppen 2, Grafik 2, Geraet 1',
+                  [qb_inside(rows, i) for i in (0, 3, 6, 8)] == [4, 2, 2, 1]))
+    cases.append(('a header sits left of its rows (depth heading < depth rows)', d[0] < d[1] and d[3] < d[4] and d[8] < d[9]))
+    good = True
+    for name, ok in cases:
+        print('groups 0.22.18: %-70s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= ok
+    return good
 
 
 def qb_group_set(text, key, closed):          # QbGroupSet: rewrite the comma list
@@ -3010,29 +3057,59 @@ def check_qcsuggest():
     return ok
 
 
-def cine_pad_sim(polls, masks=(0x0120, 0x0220, 0x0320), active=True):
+def cine_pad_sim(polls, masks=(0x0120, 0x0220, 0x0320), active=True, version='0.22.18', paused=True, rate=10):
     """0.22.13 CnPadTick / CnPadIsSub as a model: polls = [(ms, buttons)], one poll every given time; returns the actions
     fired as (ms, combo index). A combo inside a larger one fires on release when the peak is exactly its set; a combo
-    inside no other fires as soon as exactly its buttons are held; one action per press (latch until 120 ms released)."""
+    inside no other fires as soon as exactly its buttons are held; one action per press (latch until 120 ms released).
+    0.22.18 (CnPadMod / CnStepRepeat): the shared button (View) alone counts as released - each RB tap with View held is
+    one frame (no latch for the step), RB + View held 400 ms repeats one frame ('r') every 1000 / rate ms while the
+    cutscene is held (paused), the release after a repeat gives no frame, a third button stops the repeat."""
     def is_sub(i):
         m = masks[i]
         return bool(m) and any(j != i and masks[j] and masks[j] != m and (masks[j] & m) == m for j in range(3))
     allm = masks[0] | masks[1] | masks[2]
-    st = dict(prev=0, since=0, latch=False, peak=0)
+    set_masks = [m for m in masks if m]
+    mod = 0
+    if version == '0.22.18' and len(set_masks) >= 2:
+        mod = 0xffff
+        for m in set_masks: mod &= m
+    st = dict(prev=0, since=0, latch=False, peak=0, down=None, rep=False, ended=False, nxt=0)
     out = []
     for now, buttons in polls:
         held, before = buttons & allm, st['prev'] & allm
         if held != before: st['since'] = now
         st['prev'] = buttons
         stable = now - st['since'] >= 120
+        bare = (held & ~mod & 0xffff) == 0
+        if version == '0.22.18':                  # CnStepRepeat
+            m1 = masks[1]
+            on = bool(m1) and is_sub(1) and held == m1 and active and paused and not st['latch']
+            if not on:
+                st['down'] = None
+                if st['rep']: st['rep'], st['ended'] = False, True
+            elif st['down'] is None:
+                st['down'], st['ended'] = now, False
+            else:
+                every = 1000 // (rate if rate in (5, 15) else 10)
+                if not st['rep'] and now - st['down'] >= 400: st['rep'], st['nxt'] = True, now
+                if st['rep'] and now - st['nxt'] >= 0:
+                    out.append((now, 'r'))
+                    st['nxt'] += every
+                    if now - st['nxt'] > 500: st['nxt'] = now + every
         if st['latch']:
-            if not held and stable: st['latch'], st['peak'] = False, 0
+            if bare and stable: st['latch'], st['peak'], st['ended'] = False, held, False
             continue
-        if not held and stable: st['peak'] = 0
+        if bare and stable: st['peak'] = held
         fired = False
         for i in range(3):
             m = masks[i]
             if not before or not m or not is_sub(i) or (before & m) != m or (held & m) == m: continue
+            if version == '0.22.18' and i == 1 and (st['peak'] | before) == m:   # step: no latch
+                st['peak'] = held
+                if st['ended']: st['ended'] = False
+                elif active and paused: out.append((now, 1))
+                fired = True
+                break
             st['latch'] = True
             if (st['peak'] | before) == m and active: out.append((now, i))
             fired = True
@@ -3082,6 +3159,35 @@ def check_cinepad():
     got = run([(0, LB | VIEW), (300, 0)], active=False)
     ok &= got == []
     print('cinepad: menu / ring own the pad (not active) -> nothing: %s  %s' % (got, 'ok' if got == [] else 'FAIL'))
+    # 0.22.18 (owner 2026-11-10): step mode with View held, hold-to-repeat, LB stops the repeat
+    R = 'r'
+    cases18 = [
+        ('0.22.13: View held, RB tapped twice -> only ONE frame (the bug)',
+         [(0, VIEW), (100, VIEW | RB), (200, VIEW), (300, VIEW | RB), (400, VIEW), (600, 0)], [1], dict(version='0.22.13')),
+        ('View held, RB tapped three times -> three frames',
+         [(0, VIEW), (100, VIEW | RB), (200, VIEW), (300, VIEW | RB), (400, VIEW), (500, VIEW | RB), (600, VIEW),
+          (900, 0)], [1, 1, 1], {}),
+        ('RB + View short (200 ms) -> one frame', [(0, VIEW | RB), (200, 0)], [1], {}),
+        ('RB + View held 1 s, rate 10 -> 6 repeat frames (400 .. 900 ms), release gives no extra frame',
+         [(0, VIEW | RB), (1000, 0)], [R] * 6, {}),
+        ('RB + View held 1 s, rate 5 -> 3 frames', [(0, VIEW | RB), (1000, 0)], [R] * 3, dict(rate=5)),
+        ('RB + View held 1 s, rate 15 -> 9 frames', [(0, VIEW | RB), (1000, 0)], [R] * 9, dict(rate=15)),
+        ('held 1 s, then LB added -> repeat stops, photo, pause stays (no continue)',
+         [(0, VIEW | RB), (1000, VIEW | RB | LB), (1300, 0)], [R] * 6 + [2], {}),
+        ('held 1 s, RB let go (View stays), RB tapped -> repeats, then one frame',
+         [(0, VIEW | RB), (1000, VIEW), (1200, VIEW | RB), (1300, VIEW), (1600, 0)], [R] * 6 + [1], {}),
+        ('View let go first while repeating -> stop, no extra frame', [(0, VIEW | RB), (1000, RB), (1200, 0)], [R] * 6, {}),
+        ('cutscene not held: RB + View held 1 s -> nothing', [(0, VIEW | RB), (1000, 0)], [], dict(paused=False)),
+        ('View held, LB tapped -> continue (pause off) as before', [(0, VIEW), (100, VIEW | LB), (300, VIEW), (600, 0)],
+         [0], {}),
+        ('View held: RB tap, then LB tap -> frame, then continue',
+         [(0, VIEW), (100, VIEW | RB), (200, VIEW), (400, VIEW | LB), (500, VIEW), (800, 0)], [1, 0], {}),
+    ]
+    for name, seq, want, kw in cases18:
+        got = run(seq, **kw)
+        good = got == want
+        ok &= good
+        print('cinepad 0.22.18: %s: %s  %s' % (name, got, 'ok' if good else 'FAIL (want %s)' % want))
     return ok
 
 
@@ -3501,6 +3607,148 @@ def check_settings():
     return ok
 
 
+# ---- 0.22.18 volume save (live 2026-11-10 16:44: game.vol.music 128 live, 'options saved', registry MusicVolume 0) ----
+# static (tools/pe_dis.py on data/pc/tru.exe): 0x478010 sets the mirrors 0x8900d4 / e0 / d8 / dc but its RegSetValueEx
+# calls write only the values below; 0x4796b0 writes the root values incl. the four (0x4796ef / 0x47977a / 0x479791 /
+# 0x4797a8) + Graphics from 0x890388
+REG_478010 = {'Language', 'SubtitleLanguage', 'Vibration', 'CombatMode', 'CameraXInverted', 'CameraYInverted',
+              'AimXInverted', 'AimYInverted', 'v890100', 'v8900c8', 'v890104'}
+REG_4796B0 = REG_478010 | {'MouseSensitivity', 'VoVolume', 'MusicVolume', 'SfxVolume', 'Graphics'}
+VS_MIRROR = {0x01: 'SfxVolume', 0x02: 'MusicVolume', 0x03: 'VoVolume', 0x96: 'MouseSensitivity'}
+
+
+def vs_save(changes, vs_ok=True, gg_save_ok=True, version='0.22.18'):
+    """GsRun + GsTick: changes = option indexes set within 2 s; returns (registry names written, next-start rewrite)"""
+    full = version == '0.22.18' and vs_ok and any(o in VS_MIRROR for o in changes)
+    if not full: return set(REG_478010), False         # SbSave only (0.22.16 / 0.22.17 for every change)
+    if not gg_save_ok: return set(REG_478010), False   # GsSaveFull: 0x4796b0 checks failed -> root only, reported
+    return set(REG_4796B0), True                      # + GnRewrite (the next-start values again)
+
+
+def check_volsave():
+    cases = []
+    w, _ = vs_save([0x02], version='0.22.17')
+    cases.append(('0.22.17 music 128 (live 16:44): MusicVolume NOT written (the bug)', 'MusicVolume' not in w))
+    w, again = vs_save([0x02])
+    cases.append(('music: MusicVolume written by 0x4796b0, next-start values again', 'MusicVolume' in w and again))
+    w, _ = vs_save([0x01, 0x03])
+    cases.append(('effects + speech in one save: SfxVolume + VoVolume', {'SfxVolume', 'VoVolume'} <= w))
+    w, _ = vs_save([0x96])
+    cases.append(('mouse: MouseSensitivity (also missing before)', 'MouseSensitivity' in w))
+    w, again = vs_save([0x0c])
+    cases.append(('inversion only: 0x478010 alone (no Graphics rewrite)', 'Graphics' not in w and not again and
+                  'CameraXInverted' in w))
+    w, _ = vs_save([0x0b])
+    cases.append(('sub.lang path: SubtitleLanguage, no Graphics', 'SubtitleLanguage' in w and 'Graphics' not in w))
+    w, _ = vs_save([0x02], vs_ok=False)
+    cases.append(('checks differ: root only, volumes not written (logged)', 'MusicVolume' not in w))
+    w, _ = vs_save([0x02, 0x0c])
+    cases.append(('volume + inversion in one window: both', {'MusicVolume', 'CameraXInverted'} <= w))
+    good = True
+    for name, ok in cases:
+        print('volsave: %-74s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= ok
+    return good
+
+
+# ---- 0.22.18 settings written back (owner, live 17:07: quick.lang en was German again after a restart) ----
+def ini_set(text, sec, key, val):
+    """WritePrivateProfileString as used by IniKeep: the key line of the section replaced (or added at the section's
+    end, or a new section at the end); every other line - comments, other keys, other sections - stays"""
+    lines = text.split('\n')
+    start = next((i for i, l in enumerate(lines) if l.strip().lower() == '[%s]' % sec.lower()), -1)
+    if start < 0: return text.rstrip('\n') + '\n[%s]\n%s=%s\n' % (sec, key, val)
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith('[')), len(lines))
+    for i in range(start + 1, end):
+        if lines[i].split('=', 1)[0].strip().lower() == key.lower() and not lines[i].startswith(';'):
+            lines[i] = '%s=%s' % (key, val)
+            return '\n'.join(lines)
+    last = end
+    while last > start + 1 and not lines[last - 1].strip(): last -= 1
+    lines.insert(last, '%s=%s' % (key, val))
+    return '\n'.join(lines)
+
+
+def ini_get(text, sec, key, default):            # GetPrivateProfileString (OptString / OptInt with the kOpts default)
+    cur = None
+    for l in text.split('\n'):
+        s = l.strip()
+        if s.startswith('['): cur = s[1:-1].lower()
+        elif cur == sec.lower() and not s.startswith(';') and '=' in s and s.split('=', 1)[0].strip().lower() == key.lower():
+            return s.split('=', 1)[1].strip()
+    return default
+
+
+def check_persist():
+    user = ('; my notes\n[Menu]\nEnabled=1\n; keep me\n[Quick]\n; 0.17: language of the bar\nLanguage=de\n'
+            'Closed=+set_tm,ki_dumm\n[Camera]\nRumble=100\n')
+    cases = []
+    t = ini_set(user, 'Quick', 'Language', 'en')
+    cases.append(('quick.lang en: [Quick] Language=en, comments + Closed + [Menu] Enabled=1 kept',
+                  ini_get(t, 'Quick', 'Language', 'en') == 'en' and '; my notes' in t and '; keep me' in t and
+                  'Closed=+set_tm,ki_dumm' in t and ini_get(t, 'Menu', 'Enabled', '0') == '1'))
+    lang = lambda v: 0 if v.lower() == 'de' else 1   # g_qbLang = !_stricmp(v, "de") ? 0 : 1
+    cases.append(('restart: the written en is read as English', lang(ini_get(t, 'Quick', 'Language', 'en')) == 1))
+    cases.append(('missing key -> English (0.22.18 default)', lang(ini_get('[Quick]\n', 'Quick', 'Language', 'en')) == 1))
+    cases.append(('a user\'s "de" stays German', lang(ini_get(user, 'Quick', 'Language', 'en')) == 0))
+    t2 = ini_set(t, 'Settings', 'StepRate', '15')
+    cases.append(('a key of a missing section ([Settings] StepRate) is added, the rest unchanged',
+                  ini_get(t2, 'Settings', 'StepRate', '10') == '15' and t2.startswith(t.rstrip('\n'))))
+    t3 = ini_set(t2, 'Camera', 'Rumble', '50')
+    cases.append(('cam.rumble 50 replaces only that line', ini_get(t3, 'Camera', 'Rumble', '100') == '50' and
+                  t3.count('Rumble=') == 1))
+    menu = lambda v: int(v) != 0                     # g_menuWindow = [Menu] Enabled != 0, default 0
+    cases.append(('[Menu] Enabled missing -> big window off; a user\'s 1 keeps it',
+                  not menu(ini_get('[Menu]\n', 'Menu', 'Enabled', '0')) and menu(ini_get(user, 'Menu', 'Enabled', '0'))))
+    good = True
+    for name, ok in cases:
+        print('persist: %-76s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= ok
+    return good
+
+
+# ---- 0.22.18 subtitle alignment: 0x477180 centres x = (W - width * sx) * 0.5; GsSubLine moves the origin x by dx ----
+def sa_step(size):                               # SuStep / SuIsDefault
+    if abs(size - 0.6) < 0.001: return 22
+    st = int(22.0 * size / 0.6 + 0.5)
+    return max(8, min(60, st))
+
+
+def sa_y(mode, pos, size):                       # SaY: bottom 250 .. 420, top 16, free 16 .. 448 - 2 steps - 8
+    if mode == 1: return 16
+    if mode == 2: return max(16, min(448 - 2 * sa_step(size) - 8, pos))
+    return max(250, min(420, pos))
+
+
+def sa_x(align, W, width, margin):               # the drawn x after GsSubLine's shift (origin 0)
+    centred = (W - width) * 0.5
+    if align == 0: return centred
+    m = W * margin / 100.0
+    want = m if align == 1 else W - m - width
+    return centred + (want - centred)
+
+
+def check_subalign():
+    W = 640.0
+    cases = [
+        ('centre (game): x = (640 - 200) / 2 = 220', sa_x(0, W, 200, 5) == 220.0),
+        ('left 5 %: x = 32', sa_x(1, W, 200, 5) == 32.0),
+        ('right 5 %: right edge at 608', sa_x(2, W, 200, 5) + 200 == 608.0),
+        ('left 0 %: x = 0', sa_x(1, W, 300, 0) == 0.0),
+        ('bottom keeps 250 .. 420 (game 352)', sa_y(0, 352, 0.6) == 352 and sa_y(0, 100, 0.6) == 250),
+        ('top: y 16', sa_y(1, 352, 0.6) == 16),
+        ('free, size 0.6: up to 448 - 44 - 8 = 396 (two lines fit)', sa_y(2, 440, 0.6) == 396 and sa_y(2, 20, 0.6) == 20),
+        ('free, size 1.1: step 40, up to 360', sa_step(1.1) == 40 and sa_y(2, 440, 1.1) == 360),
+        ('free: two lines always end above 448', all(sa_y(2, p, s) + 2 * sa_step(s) <= 448 for p in range(0, 500, 7)
+                                                     for s in (0.5, 0.6, 0.75, 0.9, 1.1, 1.5))),
+    ]
+    good = True
+    for name, ok in cases:
+        print('subalign: %-70s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= ok
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -3523,7 +3771,8 @@ def main():
                check_sublang(),                                                       # 0.22.14
                check_aimwhy(),                                                        # 0.22.15
                check_settings(),                                                      # 0.22.16
-               check_subfallback()]                                                   # 0.22.17
+               check_subfallback(),                                                   # 0.22.17
+               check_groups_nested(), check_volsave(), check_persist(), check_subalign()]   # 0.22.18
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

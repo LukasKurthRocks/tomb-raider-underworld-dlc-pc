@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -320,7 +320,9 @@ typedef bool(__cdecl *CostumeValidFn)(int id);
 // (keep both in step; a '\n' in a comment starts a new "; " line).
 struct OptDef { const char *section, *key, *def, *comment; };
 const OptDef kOpts[] = {
-    {"Menu", "Enabled", "1", "0 = load but hook nothing"},
+    {"Menu", "Enabled", "0", "0.22.18: 1 = the big menu window (ToggleButtons / ToggleKey); 0 = it never opens - the quick "
+                             "bar, the ring\nand the items (TruLink) still work"},
+    {"Menu", "Load", "1", "0.22.18: 0 = load but hook nothing (before 0.22.18 that was [Menu] Enabled=0)"},
     {"Menu", "LogLevel", "1", "0 errors, 1 info, 2 every menu toggle / action, 3 debug - TruMenu.log next to tru.exe"},
     {"Menu", "ToggleButtons", "192", "XInput buttons that open / close the menu together: 0x0040 L3 + 0x0080 R3 = 192 (0x00C0)"},
     {"Menu", "ToggleKey", "0", "keyboard key that also opens / closes the menu (virtual key code, e.g. 119 = F8); 0 = off"},
@@ -429,9 +431,10 @@ const OptDef kOpts[] = {
     {"Saves", "DirectLoad", "1", "0.18 (save.load): 1 = a save of the game's list can be loaded from TruMenu (menu Saves "
                                  "page, quick-toggle bar page\nSaves; twice within 10 s, never over TruLink) - the game's "
                                  "own load step table 0x789de0, in a level only; 0 = refused"},
-    {"Radial", "Enabled", "1", "0.10: 1 = radial menu: hold HoldButtons for HoldMs - a ring of up to 8 entries from "
+    {"Radial", "Enabled", "0", "0.10: 1 = radial menu: hold HoldButtons for HoldMs - a ring of up to 8 entries from "
                                "TruMenu.radial.txt next to tru.exe,\nhow it is used says Mode; a short press opens TruMenu as "
-                               "before (at the release when\nHoldButtons = [Menu] ToggleButtons); 0 = TruMenu exactly as 0.9"},
+                               "before (at the release when\nHoldButtons = [Menu] ToggleButtons); 0 = TruMenu exactly as 0.9 "
+                               "(0.22.18: default 0 - the quick bar only)"},
     {"Radial", "Mode", "menu", "0.10.1: menu = the ring stays open after the open (L3 + R3 held / Key or MouseButton "
                                "tapped), left stick / right stick /\nD-pad / mouse pick, only A / Enter / left click runs or "
                                "opens a level, B / Backspace / right click = back, L3 + R3 / Key again\ncloses, the game gets "
@@ -698,7 +701,7 @@ const OptDef kOpts[] = {
                                 "it (late)"},
     {"Quick", "ShowClosed", "1", "0.17: 1 = the closed bar shows one line 'Debug: N an' (needs [Debug] Enabled=1, in a "
                                  "level); 0 = nothing while closed"},
-    {"Quick", "Language", "de", "0.17: language of the bar, de or en (quick.lang switches it until the next start)"},
+    {"Quick", "Language", "en", "0.17: language of the bar, de or en (0.22.18: default en; quick.lang writes it here)"},
     {"Quick", "Top", "30", "0.17: top edge of the bar in percent of the screen height, 5 .. 80"},
     {"Quick", "Scale", "1.0", "0.17: text size of the bar relative to the menu font, 0.5 .. 3"},
     {"Quick", "Closed", "", "0.21.1: keys of the closed groups of the bar (comma list; the bar rewrites it when a group is "
@@ -799,6 +802,9 @@ const OptDef kOpts[] = {
     {"Light", "StableCut", "0", "0.22.10: 1 = every object gets its lights in a fixed order before the cut to 3 + 3 + sun\n"
                                 "(light.stablecut: sun, shadow map, caster, plain, then address); 0 = the game's order. "
                                 "Throne test:\nStable=1 / StableCut=0 against Stable=0 / StableCut=1"},
+    {"Light", "Demote", "0", "0.22.18 (light.demote): 1 = a shadow caster beyond the 3 shadow places takes a free plain "
+                             "place without a\nshadow (the farthest from the camera) instead of being dropped; 0 = the "
+                             "game's drop"},
     {"Cine", "PauseKey", "0", "0.22.7: keyboard key (virtual key code, hex or decimal; 0x78 = F9) = cine.pause on / off;\n"
                               "0 = off"},
     {"Cine", "StepKey", "0", "0.22.7: keyboard key = cine.step (one frame of the held cutscene); 0x79 = F10; 0 = off"},
@@ -823,6 +829,14 @@ const OptDef kOpts[] = {
     {"Settings", "SubtitleFallback", "1", "0.22.17: 1 = a cutscene whose subtitles have no line in the chosen language "
                                           "(the DLC\ncinematics for Russian) shows the English line instead; 0 = no "
                                           "line (the game's)"},
+    {"Settings", "StepRate", "10", "0.22.18 (cine.steprate): frames per second while RB + View is held in a held "
+                                   "cutscene (after 0.4 s), 5 / 10 / 15"},
+    {"Settings", "SubAlignV", "0", "0.22.18 (sub.valign): subtitle height - 0 bottom (SubPos 250 .. 420, game), 1 top, 2 "
+                                   "free (SubPos 16 .. 448 - 2 lines)"},
+    {"Settings", "SubAlignH", "0", "0.22.18 (sub.halign): 0 centred (game), 1 left, 2 right - at SubMargin"},
+    {"Settings", "SubMargin", "5", "0.22.18 (sub.margin): left / right subtitle margin in percent of the width, 0 .. 30"},
+    {"Settings", "VoiceLanguage", "game", "0.22.18 (voice.lang): speech language only - game, en, fr, de, it, es, nl, "
+                                          "ja, ru (nl / ja / ru only\nwith speech files in mods\\); texts stay"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -838,7 +852,8 @@ void OptString(const char *ini, const char *section, const char *key, char *out,
     GetPrivateProfileStringA(section, key, OptDefault(section, key), out, size, ini);
 }
 
-int g_enabled = 1;
+int g_enabled = 1;                      // 0.22.18: [Menu] Load (the master switch)
+int g_menuWindow = 0;                   // 0.22.18: [Menu] Enabled - the big menu window may open (default 0: bar only)
 int g_logLevel = 1;                     // 0 errors, 1 info, 2 actions, 3 debug
 WORD g_toggleButtons = kPadL3 | kPadR3;
 int g_toggleKey = 0;                    // virtual key (e.g. 119 = F8), 0 = off
@@ -878,7 +893,7 @@ volatile LONG g_cameraChanges = 1;                                           // 
 char g_regressStart[8] = "all";                                              // 0.8 [Regress] List
 volatile LONG g_inputTrace = 1;                                              // 0.8.1 [Log] InputTrace
 // 0.10 [Radial] (workspace docs\Konzept-Bau-Rad.md): hold the pad buttons / the key / the mouse button = radial menu
-int g_radEnabled = 1;
+int g_radEnabled = 0;                                                        // 0.22.18: default 0 (bar only)
 WORD g_radHold = kPadL3 | kPadR3;                                            // [Radial] HoldButtons (0 = no pad hold)
 int g_radHoldMs = 500, g_radKey = 0x78, g_radMouse = 0;                     // HoldMs, Key (F9), MouseButton (0 = off)
 int g_radRemember = 1, g_radPassLeft = 1, g_radSpawn = 0;                    // RememberPosition, PassLeftStick, Spawn
@@ -928,7 +943,7 @@ WORD QbPad(DWORD index, WORD buttons, bool active, WORD *inject);   // below (g_
 void CnPadTick(DWORD index, WORD buttons, bool active);   // 0.22.7 [Cine] pad combos (section "0.22 cutscene pause")
 void CnKeyTick();                                         // 0.22.7 [Cine] keyboard keys (render thread)
 bool g_qbRunning = false;                    // a bar row runs an item (render thread): src=quick
-int g_qbLang = 0;                            // [Quick] Language: 0 de, 1 en (quick.lang)
+int g_qbLang = 1;                            // [Quick] Language: 0 de, 1 en (quick.lang; 0.22.18: default en)
 volatile LONG g_ocOn = 0;                    // 0.17 [Shot] OnCine / shot.oncine (section "---- 0.17 cutscene shots")
 // 0.17 checkpoint list ([Debug] CheckpointHide, dbg.cp): one bit per intro id 0 .. 65535 = that marker is hidden (byte
 // writes only - the render thread draws, items may come from TruLink)
@@ -1001,6 +1016,21 @@ bool g_flight = false;                  // our view of GameTracker.cheatMode aft
 int g_cameraModeChoice = 11;
 char g_levelList[1024] = "";            // [Levels] List (comma separated unit names)
 char g_iniPath[MAX_PATH] = "";
+// 0.22.18 (owner, live 17:07: the bar's menu language was German again after a restart): a TruMenu-own setting changed
+// in the bar / menu / TruLink is written back to its TruMenu.ini key at once - WritePrivateProfileString (the writer of
+// [Quick] Closed / favourites) changes only that key line, the other content and comments stay
+void Log(int level, const char *fmt, ...);
+void IniKeep(const char *section, const char *key, const char *value) {
+    if (!g_iniPath[0]) return;
+    if (!WritePrivateProfileStringA(section, key, value, g_iniPath))
+        Log(0, "writing [%s] %s=%s to TruMenu.ini failed (%lu) - kept until the game ends", section, key, value,
+            GetLastError());
+}
+void IniKeepInt(const char *section, const char *key, long value) {
+    char v[24];
+    _snprintf_s(v, sizeof(v), _TRUNCATE, "%ld", value);
+    IniKeep(section, key, v);
+}
 char g_favs[1024] = "";                 // 0.3 [Favorites] Ids (comma separated item ids)
 CRITICAL_SECTION g_favLock;
 const char *const kFavDefault = "player.invincible,player.health,time.scale,time.pause,level.reload,camera.free,"
@@ -1112,6 +1142,7 @@ void GsTick();         // 0.22.16 game settings: subtitle look, live graphics, s
 void LxTick();        // 0.22.2 light.frame: per-frame light capture (game thread, section "0.22.2 light.frame")
 void LsTick();         // 0.22.3 light.stable: stable scene light order (game thread, section "0.22.3 light.stable")
 void LcTick();         // 0.22.10 light cut: builder hooks follow the switches (game thread, section "0.22.10 light cut")
+void LdTick();         // 0.22.18 light.demote (same section)
 void LcFrameEnd();     // 0.22.10 light cut: close the frame's stats / capture (render thread, Present)
 void DrawLightCut();   // 0.22.10 light.cutlabels (render thread, Present)
 extern volatile LONG g_lcLabels;   // 0.22.10 light.cutlabels on (section "0.22.10 light cut")
@@ -1210,6 +1241,12 @@ void EdgeAdd(BYTE kind, BYTE down, BYTE source, BYTE pad, WORD code, SHORT x, SH
 // ---- pad ----
 void ToggleMenu(const char *by) {
     LONG open = !InterlockedCompareExchange(&g_menuOpen, 0, 0);
+    if (open && !g_menuWindow) {             // 0.22.18: [Menu] Enabled=0 - the big window never opens (closing works)
+        static LONG told = 0;
+        if (InterlockedIncrement(&told) <= 5)
+            Log(1, "menu not opened (%s): [Menu] Enabled=0 - the big menu window is off (quick bar: [Quick] OpenButtons)", by);
+        return;
+    }
     InterlockedExchange(&g_menuOpen, open);
     if (open) InterlockedExchange(&g_menuJustOpened, 1);
     Log(1, "menu %s (%s)", open ? "opened" : "closed", by);   // 0.7.1: level 1 - the reason of every close in the log
@@ -1439,6 +1476,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         LxTick();                             // 0.22.2 light.frame (cheap while idle: two flags)
         LsTick();                             // 0.22.3 light.stable (cheap while off: two flags)
         LcTick();                             // 0.22.10 light cut diagnosis / stablecut (cheap while off: four flags)
+        LdTick();                             // 0.22.18 light.demote (cheap while off: two flags)
         AkTick();                             // 0.21.1 ai.kill: one state line ~1 s after a kill (cheap while idle)
         PhTick();                             // 0.21.1 physics bodies: one read every 250 ms
         NavTick();                           // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
@@ -14783,6 +14821,18 @@ bool MusicPlace(char *o, size_t n) {
     Out(o, n, "only in the main menu (main state %lu, needs 10) or in a level with [Media] MusicInLevels=1", state);
     return false;
 }
+// 0.22.18 media.music.inlevels 1|0 (plan S2): the [Media] MusicInLevels switch as a bar row, written at once
+void ValMusicInLevels(char *o, size_t n) { Out(o, n, "%d", g_musicInLevels ? 1 : 0); }
+bool RunMusicInLevels(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValMusicInLevels(o, n); return true; }
+    const bool on = BoolArg(arg, g_musicInLevels != 0);
+    g_musicInLevels = on ? 1 : 0;
+    IniKeep("Media", "MusicInLevels", on ? "1" : "0");
+    Log(1, "media.music.inlevels %d (src=%s): [Media] MusicInLevels written", on ? 1 : 0, ShotSource("media.music.inlevels"));
+    Out(o, n, "media.music.inlevels %d - %s (kept in TruMenu.ini)", on ? 1 : 0,
+        on ? "media.music.play also in a level (experimental)" : "main menu only");
+    return true;
+}
 void ValMusicList(char *o, size_t n) {
     if (g_mediaCount < 0) { Out(o, n, "no %s (tools/music_list.py --menu-out; the install copies it)", g_mediaPath); return; }
     size_t used = 0;
@@ -15514,6 +15564,7 @@ bool RunMuteMusic(const char *arg, char *o, size_t n) {
     if (!g_smOk && !g_sndOk) { Out(o, n, "disabled: pre-check failed (%s; %s)", g_smWhy, g_sndWhy); return false; }
     const bool on = BoolArg(arg, g_sndMuteMusic != 0);
     InterlockedExchange(&g_sndMuteMusic, on ? 1 : 0);
+    IniKeep("Media", "MuteMusic", on ? "1" : "0");   // 0.22.18
     if (g_smOk)
         Log(1, "media.mutemusic %d (src=%s): %s", on ? 1 : 0, ShotSource("media.mutemusic"),
             on ? "the music channel groups muted with the next game frame (FMOD ChannelGroupI::setMute; the option slider "
@@ -15533,6 +15584,7 @@ bool RunMuteAmbient(const char *arg, char *o, size_t n) {
     if (!g_musicOk) { Out(o, n, "disabled: music pre-check failed (%s)", g_musicCheck); return false; }
     const bool on = BoolArg(arg, g_sndMuteAmb != 0);
     InterlockedExchange(&g_sndMuteAmb, on ? 1 : 0);
+    IniKeep("Media", "MuteAmbient", on ? "1" : "0");   // 0.22.18
     Log(1, "media.muteambient %d (src=%s): '_amb_' srmusic tracks (DLC 2 beds) %s; base-game ambience in sound groups is "
         "not covered", on ? 1 : 0, ShotSource("media.muteambient"), on ? "stopped whenever they start" : "play again "
         "with their next start");
@@ -16815,11 +16867,14 @@ void ValSb(char *o, size_t n) {
 // a game ended by game.quit (TerminateProcess) or a crash never saves. 0x478010 (cdecl, no arguments, plain ret):
 // copies the device manager's active graphics settings ([0xad75e4]+0x15c, 0x54 bytes) into the registry image
 // 0x890388, reads the options 0x95 / 0xb / 0x96 / 0x11 / 0xc..0xf (0x5d5140) into 0x8900e4 / 0x8900e8 (SubtitleLanguage)
-// / 0x8900d4 / 0x8900f0.., the sound volumes (0x587190 / 0x5870a0 / 0x5870f0) and 0x481c50, then RegCreateKeyEx
-// HKCU\...\Tomb Raider: Underworld and RegSetValueEx of every value (RegCloseKey; nothing when the key cannot be
-// opened). So it writes the settings exactly as they are now - what the game itself would write at its next clean
-// exit. TruMenu calls it right after the option setter, on the game thread (sub.lang is a game-thread item), under
-// __try; byte checks kSbSaveChecks; run-time check [0xad75e4] != 0.
+// / 0x8900d4 / 0x8900f0.., then RegCreateKeyEx HKCU\...\Tomb Raider: Underworld, the sound volume mirrors 0x8900e0 /
+// d8 / dc from 0x587190 / 0x5870a0 / 0x5870f0 and 0x481c50, then RegSetValueEx of Language, SubtitleLanguage,
+// Vibration, CombatMode, the four inversions, 0x890100, 0x8900c8, 0x890104 (RegCloseKey; nothing when the key cannot be
+// opened). 0.22.18 (live 2026-11-10 16:44, MusicVolume stayed 0): it does NOT write MouseSensitivity, VoVolume,
+// MusicVolume, SfxVolume (0x8900d4 / e0 / d8 / dc) - only 0x4796b0 does (0x4796ef / 0x47977a / 0x479791 / 0x4797a8;
+// the game's menu: its volume natives 0x5a4af0 / 0x5a4b30 / 0x5a4b70 set the mirror, leaving the pause menu 0x5d473d
+// calls 0x4796b0) - see GsSaveFull. TruMenu calls it right after the option setter, on the game thread (sub.lang is a
+// game-thread item), under __try; byte checks kSbSaveChecks; run-time check [0xad75e4] != 0.
 const DvCheck kSbSaveChecks[] = {
     {0x00478010, "83ec08 56 8b35e475ad00 57 81c65c010000 b915000000 bf88038900 6895000000 f3a5 e809d11500"},
     {0x0047803c, "6a0b a3e4008900 e8f8d01500 e8d3cc3900 6896000000 a3e8008900"},   // option 0xb -> 0x8900e8
@@ -17448,6 +17503,9 @@ bool GsActive(BYTE *b, DWORD *dmOut) {      // the active graphics block of the 
 }
 volatile LONG g_gsSaveAt = 0;                // GetTickCount of the last option change that waits for the save (0 = none)
 LONG g_gsSaves = 0;
+volatile LONG g_gsSaveFull = 0;              // 0.22.18: a volume / mouse change waits for the save -> GsSaveFull
+DWORD VsMirror(int opt);                     // 0.22.18 volume save, after RunGsSave's neighbours below
+bool VsOk();
 void GsSaveLater() {
     const DWORD t = GetTickCount();
     InterlockedExchange(&g_gsSaveAt, static_cast<LONG>(t ? t : 1));
@@ -17663,17 +17721,99 @@ bool SuSetColour(DWORD v) {
         return false;
     }
 }
+// 0.22.18 subtitle alignment (owner 2026-11-10). Evidence (tools/pe_dis.py on data\pc\tru.exe): the subtitle draw
+// 0x583e20 sets the text origin 0x474ce0(x 0, y [0x84e8d0] 352) -> 0x9de6e8 / 0x9de6ec and calls the line draw 0x477180
+// per box line; 0x477180 centres every '\n' segment on its own: x = ([0x9ce6cc] - width(0x4758c0, thiscall (font, text),
+// float in st0) * [0x9ce6bc]) * 0.5 ([0x8413c0]) -> 0x9de6e0 (0x47720e..0x477244), y = its argument -> 0x9de6e4; the box
+// 0x4759b0 and the string entry 0x476bc0 both use origin + position (0x4759b3 / 0x476c02). So GsSubLine moves the origin
+// x by (wanted x - centred x) for the line and puts it back after - no game code changed. Vertical: the y base
+// (disp32 0x583e39, 0.22.16) - top / free; 448 = the virtual screen height of that base (sub.pos).
+const DvCheck kSaChecks[] = {
+    {0x00583e41, "d9ee d91c24 e8950eefff"},                                     // origin x = 0 (0x474ce0)
+    {0x00474ce0, "d9442404 d91de8e69d00 d9442408 d91dece69d00 c3"},             // origin setter -> 0x9de6e8 / ec
+    {0x0047720e, "d905cce69c00"},                                               // fld [0x9ce6cc] (screen width)
+    {0x0047722b, "e890e6ffff d80dbce69c00 807d1000 dc6c2410 dc0dc0138400 d91de0e69d00"},   // width x scale, centre
+    {0x004758c0, "51 d9ee 53 56 8b742410"},                                     // width (thiscall, 1 argument)
+    {0x004759b3, "d905e8e69d00 8b442410 d805e0e69d00"},                         // box: origin x + position x
+    {0x00476c02, "d905e8e69d00"},                                               // string entry: origin x
+};
+int g_saOk = -1;                             // -1 not checked, 0 code differs, 1 ok
+volatile LONG g_suAlignV = 0, g_suAlignH = 0, g_suMargin = 5;   // [Settings] SubAlignV / SubAlignH / SubMargin
+LONG g_saLines = 0, g_saFails = 0;
+bool SaOk() {
+    if (g_saOk < 0) {
+        DWORD at = 0;
+        g_saOk = DvChecks(kSaChecks, sizeof(kSaChecks) / sizeof(kSaChecks[0]), &at) ? 1 : 0;
+        Log(g_saOk, "0.22.18: subtitle alignment %s (%d checks%s)", g_saOk ? "ok" : "code differs - left / right off",
+            static_cast<int>(sizeof(kSaChecks) / sizeof(kSaChecks[0])), g_saOk ? "" : ", see the next line");
+        if (!g_saOk) Log(0, "0.22.18: subtitle alignment check failed at 0x%08lx", at);
+    }
+    return g_saOk == 1;
+}
+typedef float(__fastcall *SaWidthFn)(DWORD font, DWORD edx, const char *text);
+// the x shift that puts the first '\n' segment of text left / right (margin = percent of the width), 0 = centred
+bool SaShift(DWORD font, const char *text, float *dx) {
+    *dx = 0.0f;
+    const LONG h = g_suAlignH;
+    if (!h || !SaOk()) return false;
+    char seg[256];
+    size_t i = 0;
+    for (; text[i] && text[i] != '\n' && i + 1 < sizeof(seg); ++i) seg[i] = text[i];
+    seg[i] = 0;
+    float w = 0.0f, sx = 0.0f, width = 0.0f;
+    if (!ReadFloats(0x009ce6cc, &w, 1) || !ReadFloats(0x009ce6bc, &sx, 1) || !(w > 100.0f && w < 10000.0f)) return false;
+    __try {
+        width = reinterpret_cast<SaWidthFn>(0x004758c0)(font, 0, seg) * sx;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        ++g_saFails;
+        return false;
+    }
+    const float m = w * static_cast<float>(g_suMargin) / 100.0f, centred = (w - width) * 0.5f;
+    const float want = h == 1 ? m : w - m - width;
+    *dx = want - centred;
+    return true;
+}
+bool SaSetOriginX(float x) {                 // 0x9de6e8 is plain game data (written by 0x474ce0 every subtitle draw)
+    __try {
+        *reinterpret_cast<volatile float *>(0x009de6e8) = x;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
 // the line call 0x583eb6 (thiscall: ecx = font [0x9de6d4], (text, float y, box), ret 0xc = __fastcall + unused edx)
 DWORD __fastcall GsSubLine(DWORD font, DWORD edx, const char *text, float y, int box) {
     if (!g_suShow) return 0;                 // sub.show 0: no text entry, so no box either
+    float dx = 0.0f, ox = 0.0f;              // 0.22.18: left / right - the origin x moved for this line only
+    const bool shift = text && SaShift(font, text, &dx) && ReadFloats(0x009de6e8, &ox, 1) && SaSetOriginX(ox + dx);
+    if (shift) ++g_saLines;
     const LONG c = g_suColour;
-    if (c <= 0 || c >= kSuColourN) return reinterpret_cast<SuLineFn>(0x00477180)(font, edx, text, y, box);
     DWORD old = 0;
-    if (!ReadDword(0x009ce6c0, &old)) return reinterpret_cast<SuLineFn>(0x00477180)(font, edx, text, y, box);
-    SuSetColour((old & 0xff000000u) | kSuColours[c].rgb);
-    const DWORD r = reinterpret_cast<SuLineFn>(0x00477180)(font, edx, text, y, box);
-    SuSetColour(old);
+    DWORD r;
+    if (c <= 0 || c >= kSuColourN || !ReadDword(0x009ce6c0, &old)) {
+        r = reinterpret_cast<SuLineFn>(0x00477180)(font, edx, text, y, box);
+    } else {
+        SuSetColour((old & 0xff000000u) | kSuColours[c].rgb);
+        r = reinterpret_cast<SuLineFn>(0x00477180)(font, edx, text, y, box);
+        SuSetColour(old);
+    }
+    if (shift) SaSetOriginX(ox);
     return r;
+}
+// 0.22.18: the y base for the alignment - bottom = sub.pos (250 .. 420, game 352), top = 16, free = sub.pos within
+// 16 .. 448 - 2 x line step - 8 (two lines always fit)
+int SuStep(float s);
+bool SuIsDefault(float s);
+int SaFreeMax(float size) { return 448 - 2 * (SuIsDefault(size) ? 22 : SuStep(size)) - 8; }
+LONG SaY(LONG pos, float size) {
+    const LONG v = g_suAlignV;
+    if (v == 1) return 16;
+    if (v == 2) {
+        const LONG hi = SaFreeMax(size);
+        return pos < 16 ? 16 : pos > hi ? hi : pos;
+    }
+    return pos < 250 ? 250 : pos > 420 ? 420 : pos;
 }
 bool SuSiteSet(SuSite &s, DWORD want) {     // game thread
     if (s.refused || !GsOk(s.group)) return false;
@@ -17707,13 +17847,13 @@ bool SuIsDefault(float s) { return fabsf(s - 0.6f) < 0.001f; }
 void SuApply() {                             // game thread (GsTick)
     if (!InterlockedExchange(&g_suDirty, 0)) return;
     const float size = g_suSize;
-    const LONG pos = g_suPos, alpha = g_suAlpha;
+    const LONG pos = SaY(g_suPos, g_suSize), alpha = g_suAlpha;   // 0.22.18: top / free alignment
     g_suPosF = static_cast<float>(pos);
     g_suSizeF = size;
     const bool defSize = SuIsDefault(size);
     const int step = SuStep(size);
     const DWORD a = static_cast<DWORD>((alpha * 256 + 50) / 100 > 255 ? 255 : (alpha * 256 + 50) / 100);
-    const DWORD line = g_suShow && g_suColour == 0 ? 0xffef32c5u
+    const DWORD line = g_suShow && g_suColour == 0 && (g_suAlignH == 0 || !SaOk()) ? 0xffef32c5u
                      : static_cast<DWORD>(reinterpret_cast<DWORD>(&GsSubLine) - (0x00583eb6 + 5));
     const DWORD want[kSuSiteN] = {
         pos == 352 ? 0x0084e8d0u : reinterpret_cast<DWORD>(&g_suPosF),
@@ -17749,6 +17889,9 @@ void SuSave() {
                                g_iniPath);
     Out(v, sizeof(v), "%ld", g_suPos);
     WritePrivateProfileStringA("Settings", "SubPos", v, g_iniPath);
+    IniKeepInt("Settings", "SubAlignV", g_suAlignV);   // 0.22.18
+    IniKeepInt("Settings", "SubAlignH", g_suAlignH);
+    IniKeepInt("Settings", "SubMargin", g_suMargin);
 }
 int SuColourFind(const char *a) {
     for (int i = 0; i < kSuColourN; ++i)
@@ -17757,7 +17900,10 @@ int SuColourFind(const char *a) {
     const long v = strtol(a, &end, 10);
     return end && end != a && !*end && v >= 0 && v < kSuColourN ? static_cast<int>(v) : -1;
 }
+int g_cnStepRate = 10;                       // 0.22.18 [Settings] StepRate 5 / 10 / 15 (held RB + View, cine.steprate)
 void GsReadOptions(const char *ini) {        // [Settings] (start; GsTick applies them with the first game frame)
+    const int sr = OptInt(ini, "Settings", "StepRate");   // 0.22.18
+    g_cnStepRate = sr == 5 || sr == 15 ? sr : 10;
     InterlockedExchange(&g_suShow, OptInt(ini, "Settings", "SubShow") != 0 ? 1 : 0);
     InterlockedExchange(&g_suBox, OptInt(ini, "Settings", "SubBox") != 0 ? 1 : 0);
     char v[32];
@@ -17770,7 +17916,12 @@ void GsReadOptions(const char *ini) {        // [Settings] (start; GsTick applie
     const int c = SuColourFind(v);
     InterlockedExchange(&g_suColour, c >= 0 ? c : 0);
     const int p = OptInt(ini, "Settings", "SubPos");
-    InterlockedExchange(&g_suPos, p >= 250 && p <= 420 ? p : 352);
+    InterlockedExchange(&g_suPos, p >= 16 && p <= 420 ? p : 352);   // 0.22.18: 16 .. (free); SaY clamps per mode
+    const int av = OptInt(ini, "Settings", "SubAlignV"), ah = OptInt(ini, "Settings", "SubAlignH"),
+              mg = OptInt(ini, "Settings", "SubMargin");
+    InterlockedExchange(&g_suAlignV, av >= 0 && av <= 2 ? av : 0);
+    InterlockedExchange(&g_suAlignH, ah >= 0 && ah <= 2 ? ah : 0);
+    InterlockedExchange(&g_suMargin, mg >= 0 && mg <= 30 ? mg : 5);
     InterlockedExchange(&g_suDirty, 1);
     InterlockedExchange(&g_sfOn, OptInt(ini, "Settings", "SubtitleFallback") != 0 ? 1 : 0);   // 0.22.17
 }
@@ -17887,6 +18038,11 @@ bool GsRun(int k, const char *arg, char *o, size_t n) {
         const long lo = d.kind == kGkMouse ? 1 : 0, hi = d.kind == kGkVol ? 128 : d.kind == kGkMouse ? 20 : 1;
         if (!num || v < lo || v > hi) { Out(o, n, "usage: %s %ld .. %ld", d.id, lo, hi); return false; }
         if (!GsSetOpt(d.opt, static_cast<float>(v), 1)) { Out(o, n, "%s: the option setter raised an exception", d.id); return false; }
+        const DWORD mirror = VsMirror(d.opt);  // 0.22.18: as the game's natives (0x5a4b5c); saved by 0x4796b0 only
+        if (mirror && VsOk()) {
+            WriteDword(mirror, static_cast<DWORD>(v));
+            InterlockedExchange(&g_gsSaveFull, 1);
+        }
         GsSaveLater();
         Log(1, "%s %ld (src=%s): option setter 0x5d5100(0x%02x, %ld, 1); the settings save 0x478010 follows 2 s after the "
             "last change", d.id, v, ShotSource(d.id), d.opt, v);
@@ -17996,6 +18152,68 @@ void GfTick() {                              // PadHook, once per game frame
 void ValGsSave(char *o, size_t n) {
     Out(o, n, "%ld live graphics change(s), %ld refused; last: %s; %ld settings save(s) by the page", g_gfApplies, g_gfFails,
         g_gfLast, g_gsSaves);
+}
+// 0.22.18 (volume save bug, live 2026-11-10 16:44): 0x478010 refreshes the mirrors 0x8900d4 / e0 / d8 / dc but writes
+// none of them to the registry; 0x4796b0 (root values incl. MouseSensitivity / VoVolume / MusicVolume / SfxVolume +
+// Graphics from 0x890388) is the game's own write of them - called when its pause menu closes (0x5d473d). So a volume
+// or mouse change saves as the game's menu does: mirror = the value (as the natives 0x5a4b1c / 0x5a4b5c / 0x5a4b9c),
+// 0x478010 (mirrors + 0x890388 from the active block), 0x4796b0, then the next-start values again (GnRewrite).
+const DvCheck kVsChecks[] = {
+    {0x0047809b, "e8f0f01000 a3e0008900 e8f6ef1000 a3d8008900 e83cf01000 a3dc008900"},   // 0x478010: mirrors from FMOD
+    {0x004796ef, "6a04 68d4008900 6a04 50 68a4478400 52 ffd6"},                         // 0x4796b0: MouseSensitivity
+    {0x00479778, "6a04 68e0008900 6a04 6a00 68e0468400 52 ffd6"},                         // VoVolume
+    {0x0047978f, "6a04 68d8008900 6a04 6a00 68c8468400 50 ffd6"},                         // MusicVolume
+    {0x004797a6, "6a04 68dc008900 6a04 6a00 68b4468400 51 ffd6"},                         // SfxVolume
+    {0x005a4b5c, "8935d8008900 5e c744240402000000"},                                     // the game's music native
+};
+const int kVsCheckN = static_cast<int>(sizeof(kVsChecks) / sizeof(kVsChecks[0]));
+int g_vsOk = -1;                             // -1 not checked, 0 code differs, 1 ok
+LONG g_vsSaves = 0;
+bool VsOk() {
+    if (g_vsOk < 0) {
+        DWORD at = 0;
+        g_vsOk = DvChecks(kVsChecks, static_cast<size_t>(kVsCheckN), &at) ? 1 : 0;
+        if (g_vsOk) Log(1, "0.22.18: volume save (0x478010 mirrors + 0x4796b0 registry write) ok (%d checks)", kVsCheckN);
+        else Log(0, "0.22.18: volume save - code differs at 0x%08lx, volumes / mouse stay unsaved (only 0x478010)", at);
+    }
+    return g_vsOk == 1;
+}
+DWORD VsMirror(int opt) {                    // option index -> registry mirror (0 = none)
+    return opt == 0x01 ? 0x008900dc : opt == 0x02 ? 0x008900d8 : opt == 0x03 ? 0x008900e0 : opt == 0x96 ? 0x008900d4 : 0;
+}
+bool GsSaveFull(const char *who, char *o, size_t n) {   // game thread
+    char s1[96];
+    if (!SbSave(s1, sizeof(s1))) { Out(o, n, "%s", s1); return false; }
+    if (!GsOk(kGgSave) || !VsOk()) { Out(o, n, "%s; volumes / mouse NOT saved (0x4796b0 checks)", s1); return false; }
+    // 0x478010 took the volume mirrors from the FMOD categories (0x5870a0 ...); the player's choice is the profile field
+    // P+0x338 / +0x33c / +0x340 ([0xc59264]) - written by the option callbacks 0x5d4d20.. and by the game's menu natives
+    // 0x5a4b30.., not by media.mutemusic's fallback (0x589520(0) only), which must not be saved as the volume
+    DWORD prof = 0;
+    if (ReadDword(0x00c59264, &prof) && prof) {
+        const DWORD off[3] = {0x338, 0x33c, 0x340}, mir[3] = {0x008900d8, 0x008900dc, 0x008900e0};
+        for (int k = 0; k < 3; ++k) {
+            DWORD v = 0;
+            if (ReadDword(prof + off[k], &v) && v <= 128) WriteDword(mir[k], v);
+        }
+    }
+    bool ok = true;
+    __try {
+        reinterpret_cast<void(__cdecl *)()>(0x004796b0)();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        ok = false;
+        InterlockedIncrement(&g_ownExceptions);
+    }
+    const int again = ok ? GnRewrite() : 0;
+    DWORD mu = 0, sf = 0, vo = 0, mo = 0;
+    ReadDword(0x008900d8, &mu); ReadDword(0x008900dc, &sf); ReadDword(0x008900e0, &vo); ReadDword(0x008900d4, &mo);
+    const LONG k = InterlockedIncrement(&g_vsSaves);
+    Log(ok ? 1 : 0, "0.22.18 %s: 0x478010 + 0x4796b0 %s (#%ld) - MusicVolume %ld, SfxVolume %ld, VoVolume %ld, "
+        "MouseSensitivity %ld written; %d next-start value(s) again", who, ok ? "done" : "raised an exception", k,
+        static_cast<LONG>(mu), static_cast<LONG>(sf), static_cast<LONG>(vo), static_cast<LONG>(mo), again);
+    if (ok) Out(o, n, "saved (music %ld, effects %ld, speech %ld, mouse %ld)", static_cast<LONG>(mu), static_cast<LONG>(sf),
+                static_cast<LONG>(vo), static_cast<LONG>(mo));
+    else Out(o, n, "root saved, 0x4796b0 raised an exception (volumes NOT saved)");
+    return ok;
 }
 bool RunGsSave(const char *arg, char *o, size_t n) {   // game thread
     (void)arg;
@@ -18131,16 +18349,21 @@ bool SuRun(int k, const char *arg, char *o, size_t n) {
         InterlockedExchange(&g_suColour, c);
         break;
     }
-    case kSuPos:
-        if (!num || f < 250 || f > 420) { Out(o, n, "usage: sub.pos 250 .. 420 (game 352)"); return false; }
+    case kSuPos: {                           // 0.22.18: free alignment = 16 .. 448 - 2 lines
+        const double lo = g_suAlignV == 2 ? 16 : 250, hi = g_suAlignV == 2 ? SaFreeMax(g_suSize) : 420;
+        if (!num || f < lo || f > hi) { Out(o, n, "usage: sub.pos %.0f .. %.0f (game 352)", lo, hi); return false; }
         InterlockedExchange(&g_suPos, static_cast<LONG>(f + 0.5));
         break;
+    }
     default:                                 // sub.reset: every site back to the game's bytes
         InterlockedExchange(&g_suShow, 1);
         InterlockedExchange(&g_suBox, 1);
         InterlockedExchange(&g_suAlpha, 25);
         InterlockedExchange(&g_suColour, 0);
         InterlockedExchange(&g_suPos, 352);
+        InterlockedExchange(&g_suAlignV, 0);   // 0.22.18
+        InterlockedExchange(&g_suAlignH, 0);
+        InterlockedExchange(&g_suMargin, 5);
         g_suSize = 0.6f;
         break;
     }
@@ -18154,18 +18377,305 @@ bool SuRun(int k, const char *arg, char *o, size_t n) {
 }
 template <int K> void ValSu(char *o, size_t n) { SuValue(K == kSuReset ? -1 : K, o, n); }
 template <int K> bool RunSu(const char *a, char *o, size_t n) { return SuRun(K, a, o, n); }
+// 0.22.18 sub.valign bottom|top|free, sub.halign centre|left|right, sub.margin <0 .. 30> (percent of the width)
+const char *const kSaV[3] = {"bottom", "top", "free"}, *const kSaH[3] = {"centre", "left", "right"};
+void ValSaV(char *o, size_t n) {
+    Out(o, n, "%s (y %ld; sub.pos %s)", kSaV[g_suAlignV >= 0 && g_suAlignV < 3 ? g_suAlignV : 0], SaY(g_suPos, g_suSize),
+        g_suAlignV == 2 ? "16 .. 448 - 2 lines" : g_suAlignV == 1 ? "not used" : "250 .. 420");
+}
+void ValSaH(char *o, size_t n) {
+    Out(o, n, "%s%s (%ld line(s) moved, %ld failed)", kSaH[g_suAlignH >= 0 && g_suAlignH < 3 ? g_suAlignH : 0],
+        g_saOk == 0 ? " - code differs, centred" : "", g_saLines, g_saFails);
+}
+void ValSaMargin(char *o, size_t n) { Out(o, n, "%ld %%", g_suMargin); }
+int SaWord(const char *a, const char *const *words, int count) {
+    for (int i = 0; i < count; ++i)
+        if (!_stricmp(a, words[i])) return i;
+    if (!_stricmp(a, "center")) return 0;
+    char *end = nullptr;
+    const long v = strtol(a, &end, 10);
+    return end && end != a && !*end && v >= 0 && v < count ? static_cast<int>(v) : -1;
+}
+bool SaRun(int which, const char *arg, char *o, size_t n) {
+    static const char *const ids[3] = {"sub.valign", "sub.halign", "sub.margin"};
+    if (!arg || !arg[0]) {
+        if (which == 0) ValSaV(o, n); else if (which == 1) ValSaH(o, n); else ValSaMargin(o, n);
+        return true;
+    }
+    const char *why = GsWhy("sub.pos");
+    if (why[0]) { Out(o, n, "%s: disabled - %s", ids[which], why); return false; }
+    if (which == 0) {
+        const int v = SaWord(arg, kSaV, 3);
+        if (v < 0) { Out(o, n, "usage: sub.valign bottom|top|free"); return false; }
+        InterlockedExchange(&g_suAlignV, v);
+    } else if (which == 1) {
+        const int v = SaWord(arg, kSaH, 3);
+        if (v < 0) { Out(o, n, "usage: sub.halign centre|left|right"); return false; }
+        if (v && !SaOk()) { Out(o, n, "sub.halign: code differs (see TruMenu.log) - stays centred"); return false; }
+        InterlockedExchange(&g_suAlignH, v);
+    } else {
+        const long v = strtol(arg, nullptr, 10);
+        if (v < 0 || v > 30) { Out(o, n, "usage: sub.margin 0 .. 30 (percent of the width)"); return false; }
+        InterlockedExchange(&g_suMargin, v);
+    }
+    InterlockedExchange(&g_suDirty, 1);
+    SuSave();
+    char v[120];
+    if (which == 0) ValSaV(v, sizeof(v)); else if (which == 1) ValSaH(v, sizeof(v)); else ValSaMargin(v, sizeof(v));
+    Log(1, "%s %s (src=%s): %s - with the next game frame, [Settings] written", ids[which], arg, ShotSource(ids[which]), v);
+    Out(o, n, "%s: %s (kept in TruMenu.ini [Settings])", ids[which], v);
+    return true;
+}
+template <int K> bool RunSa(const char *a, char *o, size_t n) { return SaRun(K, a, o, n); }
+
+// ---- 0.22.18 voice.lang: the speech language alone (workspace docs\Plan-TruMenu-Sprache-Player-1011.md S1,
+// docs\Befund-Sprache-Live-1011.md way B; static, tools/pe_dis.py on data\pc\tru.exe). The global file system
+// GetFS 0x472b50 = [0x9ce278] is the MultiFS (vtable 0x8440ec): slot +0x10 SetSpecialisationMask 0x472d80 hands the mask
+// to every mounted child ([fs+4 + i*0x28], count [fs+0x57c]; the archives' FindEntry mask this+8, ModLoader's +8 / +0xc),
+// slot +0x14 0x472dc0 = the first child's mask, slot +0x18 IsBusy 0x472be0. Set on the game thread only while +0x18 says
+// free (as the game's stepper 0x54f260) - an in-game line switches at its next sentence, a cutscene at its next scene;
+// no locals reload (texts / subtitles stay), [0x8906b8] untouched. "game" = 1 << [0x8906b8]. NL / JA / RU have no
+// speech in the archives: offered only when mods\cinstream or mods\vo\dlc1 / dlc2 hold files ending _<mask> (_2048 /
+// _032 / _512), else refused (greyed). voice.full = the whole language: voice now + registry Language through the
+// game's settings save 0x478010 (option 0x95 stored with callback 0 - no live text switch; texts at the next start).
+struct VlChoice { const char *word, *de, *en; int lang; bool mods; };
+const VlChoice kVlChoices[] = {
+    {"game", "Spielsprache", "game language", -1, false}, {"en", "English", "English", 0, false},
+    {"fr", "Fran\303\247ais", "French", 1, false}, {"de", "Deutsch", "German", 2, false},
+    {"it", "Italiano", "Italian", 3, false}, {"es", "Espa\303\261ol", "Spanish", 4, false},
+    {"nl", "Nederlands", "Dutch", 11, true}, {"ja", "Japanisch", "Japanese", 5, true}, {"ru", "Russkij", "Russian", 9, true},
+};
+const int kVlChoiceN = static_cast<int>(sizeof(kVlChoices) / sizeof(kVlChoices[0]));
+const DvCheck kVlChecks[] = {
+    {0x00472b50, "a178e29c00 c3"},                                                          // GetFS
+    {0x008440ec, "00364700 c0354700 c02b4700 e0354700 802d4700 c02d4700 e02b4700 80364700"},   // MultiFS vtable
+    {0x00472d80, "53 56 8bd9 33f6 39b37c050000 7623 55 8b6c2410 57 8d7b04 8b0f 8b01 8b5010 55 ffd2 83c601 83c728"},
+    {0x00472db3, "c20400"},                                                                 // SetMask: thiscall, 1 arg
+    {0x00472be0, "53 56 8bd9 33f6 39b37c050000 57 761f 8d7b04 8b0f 8b01 8b5018 ffd2 83f801"},   // IsBusy
+    {0x00472dc0, "83b97c05000000 7504 83c8ff c3 8b4904"},                                    // GetMask (first child)
+    {0x00843fdc, "90294700"},                                                               // ArchiveFS slot +0x10
+    {0x0049a900, "8b4c2404 390db8068900 746a 83f9ff 7502 33c9 51 890db8068900"},            // SetLanguage, [0x8906b8]
+    {0x008ab9e4, "304f5d00"},                                                               // option 0x95 callback
+};
+const BYTE kVlModLoaderSet[] = {0x55, 0x8b, 0xec, 0x8b, 0x45, 0x08, 0x89, 0x41, 0x08, 0x25, 0xff, 0xff, 0xff, 0x7f,
+                                0x89, 0x41, 0x0c, 0x5d, 0xc2, 0x04, 0x00};   // ModLoader's mask setter (plan 2.2 #7)
+int g_vlOk = -1;                             // -1 not checked, 0 code differs, 1 ok
+volatile LONG g_vlChoice = 0;                // the voice choice (index of kVlChoices), [Settings] VoiceLanguage
+volatile LONG g_vlPending = 0;               // 1 = set the mask on the game thread
+DWORD g_vlSince = 0;                         // first try of the pending set (2 s, then given up)
+LONG g_vlSets = 0, g_vlBusyFrames = 0;
+DWORD g_vlMask = 0, g_vlModMask = 0;
+int g_vlModLoader = -1;                      // -1 not looked, 0 none, 1 found (its child's +0xc read back)
+char g_vlLast[200] = "";
+int g_vlModsHas[16];                         // per choice: -1 not scanned, 0 no files, 1 files
+bool VlOk() {
+    if (g_vlOk < 0) {
+        DWORD at = 0;
+        g_vlOk = DvChecks(kVlChecks, sizeof(kVlChecks) / sizeof(kVlChecks[0]), &at) ? 1 : 0;
+        Log(g_vlOk, "0.22.18: voice.lang (MultiFS mask 0x472d80) %s (%d checks)", g_vlOk ? "ok" : "code differs - off",
+            static_cast<int>(sizeof(kVlChecks) / sizeof(kVlChecks[0])));
+        if (!g_vlOk) Log(0, "0.22.18: voice.lang check failed at 0x%08lx", at);
+    }
+    return g_vlOk == 1;
+}
+bool VlHasSpeech(int k) {                    // a choice whose speech exists (archives, or mods\ files _<mask>)
+    if (k < 0 || k >= kVlChoiceN) return false;
+    if (!kVlChoices[k].mods) return true;
+    if (g_vlModsHas[k] == 0 || g_vlModsHas[k] == 1) return g_vlModsHas[k] == 1;
+    char dir[MAX_PATH];
+    const DWORD len = GetModuleFileNameA(nullptr, dir, MAX_PATH);
+    char *slash = len ? strrchr(dir, '\\') : nullptr;
+    g_vlModsHas[k] = 0;
+    if (!slash) return false;
+    slash[1] = 0;
+    const unsigned mask = 1u << kVlChoices[k].lang;
+    static const char *const sub[3] = {"mods\\cinstream", "mods\\vo\\dlc1", "mods\\vo\\dlc2"};
+    for (int s = 0; s < 3 && !g_vlModsHas[k]; ++s) {
+        char pat[MAX_PATH];
+        _snprintf_s(pat, sizeof(pat), _TRUNCATE, mask < 1000 ? "%s%s\\*_%03u" : "%s%s\\*_%u", dir, sub[s], mask);
+        WIN32_FIND_DATAA fd;
+        HANDLE h = FindFirstFileA(pat, &fd);
+        if (h != INVALID_HANDLE_VALUE) { g_vlModsHas[k] = 1; FindClose(h); }
+    }
+    Log(1, "0.22.18 voice.lang: %s (mask 0x%x) - %s in mods\\", kVlChoices[k].en, mask,
+        g_vlModsHas[k] ? "speech files found" : "no speech files");
+    return g_vlModsHas[k] == 1;
+}
+int VlChoiceNow() { const LONG c = g_vlChoice; return c >= 0 && c < kVlChoiceN ? static_cast<int>(c) : 0; }
+DWORD VlWantMask() {
+    const int k = VlChoiceNow();
+    int lang = kVlChoices[k].lang;
+    if (lang < 0) {
+        DWORD g = 0;
+        if (!ReadDword(0x008906b8, &g) || g > 15) g = 0;
+        lang = static_cast<int>(g);
+    }
+    return 1u << lang;
+}
+typedef int(__fastcall *VlBusyFn)(DWORD fs, DWORD edx);
+typedef void(__fastcall *VlSetFn)(DWORD fs, DWORD edx, DWORD mask);
+typedef DWORD(__fastcall *VlGetFn)(DWORD fs, DWORD edx);
+void VlTick() {                              // game thread (GsTick)
+    if (!g_vlPending || !VlOk()) return;
+    const DWORD now = GetTickCount();
+    if (!g_vlSince) g_vlSince = now ? now : 1;
+    DWORD fs = 0, vt = 0;
+    if (!ReadDword(0x009ce278, &fs) || !fs || !ReadDword(fs, &vt) || vt != 0x008440ec) {
+        if (now - g_vlSince > 2000) {
+            InterlockedExchange(&g_vlPending, 0);
+            g_vlSince = 0;
+            Out(g_vlLast, sizeof(g_vlLast), "not set: no MultiFS (fs 0x%08lx vtable 0x%08lx)", fs, vt);
+            Log(0, "0.22.18 voice.lang: %s", g_vlLast);
+        }
+        return;
+    }
+    int busy = 1;
+    DWORD got = 0;
+    const DWORD mask = VlWantMask();
+    bool ok = true;
+    __try {
+        busy = reinterpret_cast<VlBusyFn>(0x00472be0)(fs, 0);
+        if (!busy) {
+            reinterpret_cast<VlSetFn>(0x00472d80)(fs, 0, mask);
+            got = reinterpret_cast<VlGetFn>(0x00472dc0)(fs, 0);
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        ok = false;
+        InterlockedIncrement(&g_ownExceptions);
+    }
+    if (ok && busy) {
+        ++g_vlBusyFrames;
+        if (now - g_vlSince > 2000) {
+            InterlockedExchange(&g_vlPending, 0);
+            g_vlSince = 0;
+            Out(g_vlLast, sizeof(g_vlLast), "not set: the file system stayed busy for 2 s - try again");
+            Log(0, "0.22.18 voice.lang: %s", g_vlLast);
+        }
+        return;
+    }
+    InterlockedExchange(&g_vlPending, 0);
+    g_vlSince = 0;
+    if (!ok) {
+        Out(g_vlLast, sizeof(g_vlLast), "the mask call raised an exception");
+        Log(0, "0.22.18 voice.lang: %s", g_vlLast);
+        return;
+    }
+    // ModLoader (plan 2.2 #7): a child whose slot +0x10 holds ModLoader's mask setter - read its +0xc back
+    DWORD count = 0;
+    g_vlModLoader = 0;
+    g_vlModMask = 0;
+    if (ReadDword(fs + 0x57c, &count) && count < 64)
+        for (DWORD i = 0; i < count; ++i) {
+            DWORD child = 0, cvt = 0, set = 0;
+            if (!ReadDword(fs + 4 + i * 0x28, &child) || !child || !ReadDword(child, &cvt) || !ReadDword(cvt + 0x10, &set))
+                continue;
+            if (set < 0x10000 || IsBadReadPtr(reinterpret_cast<const void *>(set), sizeof(kVlModLoaderSet)) ||
+                memcmp(reinterpret_cast<const void *>(set), kVlModLoaderSet, sizeof(kVlModLoaderSet)))
+                continue;
+            g_vlModLoader = 1;
+            ReadDword(child + 0xc, &g_vlModMask);
+            break;
+        }
+    g_vlMask = mask;
+    ++g_vlSets;
+    Out(g_vlLast, sizeof(g_vlLast), "%s: mask 0x%lx set, archives report 0x%lx%s%s", kVlChoices[VlChoiceNow()].en, mask, got,
+        g_vlModLoader == 1 ? ", ModLoader +0xc " : ", ModLoader not found (archives only)",
+        g_vlModLoader == 1 ? (g_vlModMask == (mask & 0x7fffffffu) ? "agrees" : "DIFFERS") : "");
+    Log(got == mask ? 1 : 0, "0.22.18 voice.lang #%ld: %s (busy %ld frame(s) before; next sentence / next scene)", g_vlSets,
+        g_vlLast, g_vlBusyFrames);
+    g_vlBusyFrames = 0;
+}
+void ValVl(char *o, size_t n) {
+    DWORD g = 0;
+    ReadDword(0x008906b8, &g);
+    Out(o, n, "%s (speech; game language %ld)%s%s%s", kVlChoices[VlChoiceNow()].en, static_cast<LONG>(g),
+        g_vlOk == 0 ? " - code differs, off" : "", g_vlLast[0] ? "; " : "", g_vlLast);
+}
+int VlFind(const char *a) {
+    for (int i = 0; i < kVlChoiceN; ++i)
+        if (!_stricmp(a, kVlChoices[i].word) || !_stricmp(a, kVlChoices[i].en)) return i;
+    if (!_stricmp(a, "-1")) return 0;
+    char *end = nullptr;
+    const long v = strtol(a, &end, 10);
+    if (end && end != a && !*end)
+        for (int i = 1; i < kVlChoiceN; ++i)
+            if (kVlChoices[i].lang == v) return i;
+    return -1;
+}
+bool RunVl(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValVl(o, n); return true; }
+    if (!VlOk()) { Out(o, n, "voice.lang: code differs (see TruMenu.log) - off"); return false; }
+    const int k = VlFind(arg);
+    if (k < 0) { Out(o, n, "usage: voice.lang game|en|fr|de|it|es|nl|ja|ru"); return false; }
+    if (!VlHasSpeech(k)) {
+        Out(o, n, "voice.lang %s: no speech recording (no mods\\ files _%u) - not set", kVlChoices[k].word,
+            1u << kVlChoices[k].lang);
+        return false;
+    }
+    InterlockedExchange(&g_vlChoice, k);
+    InterlockedExchange(&g_vlPending, 1);
+    IniKeep("Settings", "VoiceLanguage", kVlChoices[k].word);
+    Log(1, "voice.lang %s (src=%s): mask set on the game thread when the file system is free; [Settings] VoiceLanguage "
+        "written", kVlChoices[k].word, ShotSource("voice.lang"));
+    Out(o, n, "voice.lang %s - speech from the next sentence / next scene; texts stay (kept in TruMenu.ini)",
+        kVlChoices[k].word);
+    return true;
+}
+// voice.full <lang>: the whole language - speech now (as voice.lang) and registry Language for the next start
+LONG g_vlFull = 0;
+void ValVlFull(char *o, size_t n) {
+    DWORD reg = 0;
+    ReadDword(0x008900e4, &reg);
+    Out(o, n, "registry mirror Language %ld; option 0x95 %.0f; %ld full switch(es)", static_cast<LONG>(reg),
+        static_cast<double>(GsOpt(0x95)), g_vlFull);
+}
+bool RunVlFull(const char *arg, char *o, size_t n) {   // game thread
+    if (!arg || !arg[0]) { ValVlFull(o, n); return true; }
+    if (!VlOk()) { Out(o, n, "voice.full: code differs (see TruMenu.log) - off"); return false; }
+    const int k = VlFind(arg);
+    if (k <= 0) { Out(o, n, "usage: voice.full en|fr|de|it|es|nl|ja|ru (the game language for the next start)"); return false; }
+    if (!VlHasSpeech(k)) { Out(o, n, "voice.full %s: no speech recording in mods\\ - not set", kVlChoices[k].word); return false; }
+    if (!GsSetOpt(0x95, static_cast<float>(kVlChoices[k].lang), 0)) {
+        Out(o, n, "voice.full: the option setter raised an exception");
+        return false;
+    }
+    char s[96];
+    const bool saved = SbSave(s, sizeof(s));   // 0x478010: option 0x95 -> [0x8900e4] -> registry Language
+    InterlockedExchange(&g_vlChoice, k);
+    InterlockedExchange(&g_vlPending, 1);
+    IniKeep("Settings", "VoiceLanguage", "game");   // the next start's game language is this one
+    ++g_vlFull;
+    DWORD reg = 0;
+    ReadDword(0x008900e4, &reg);
+    Log(saved ? 1 : 0, "voice.full %s (src=%s): option 0x95 = %d (stored, no live text switch), settings save %s - "
+        "registry Language mirror %ld; speech now, texts at the next start", kVlChoices[k].word, ShotSource("voice.full"),
+        kVlChoices[k].lang, saved ? "done" : "FAILED", static_cast<LONG>(reg));
+    Out(o, n, "voice.full %s: speech now, texts and menus at the next start (%s)", kVlChoices[k].word, s);
+    return saved;
+}
+void VlReadOptions(const char *ini) {        // [Settings] VoiceLanguage (start), applied on the first game frames
+    for (int i = 0; i < 16; ++i) g_vlModsHas[i] = -1;
+    char v[32];
+    OptString(ini, "Settings", "VoiceLanguage", v, sizeof(v));
+    DvTrim(v);
+    const int k = v[0] ? VlFind(v) : 0;
+    InterlockedExchange(&g_vlChoice, k > 0 ? k : 0);
+    if (k > 0) InterlockedExchange(&g_vlPending, 1);   // "game" = nothing to do
+}
 // PadHook, once per game frame: checks once, subtitle look, live graphics, the delayed settings save
 void FtLookPlugins();                        // section "0.22.11 fight.trace": TruDlc2Player's doppelganger flag (page Figur)
 void GsTick() {
     GsCheck();
     FtLookPlugins();                         // once (a flag after the first call)
     if (g_suDirty) SuApply();
+    VlTick();                                // 0.22.18 voice.lang
     GfTick();
     const LONG at = g_gsSaveAt;
     if (at && GetTickCount() - static_cast<DWORD>(at) >= 2000) {
         InterlockedExchange(&g_gsSaveAt, 0);
-        char s[96];
-        const bool ok = SbSave(s, sizeof(s));
+        char s[160];
+        const bool full = InterlockedExchange(&g_gsSaveFull, 0) != 0;   // 0.22.18: volumes / mouse -> + 0x4796b0
+        const bool ok = full ? GsSaveFull("options", s, sizeof(s)) : SbSave(s, sizeof(s));
         ++g_gsSaves;
         Log(ok ? 1 : 0, "0.22.16 settings: options saved 2 s after the last change - %s", s);
     }
@@ -18577,6 +19087,12 @@ void ValRg(char *o, size_t n) {
 // the sources' mid point: the sources' uber node + time in it (UberStateOf, the 0.21.7 path kUbChecks), the number of
 // copies and the nearest copy: position inst+0x20, x / y distance and dz (copy - Lara), iflags inst+0x14 (0x800 hidden /
 // 0x20), its uber node + time. A line is written every 100 ms sample while Lara is in that zone.
+// 0.22.18 (TruFight.log 2026-11-10 13:39, 2145 zone lines): pc_drip_near_* stayed at the sources (x -195, y -6292 /
+// -5725, z 12110) for every copy and sample - inst+0x20 of a copy does not move while it falls (the fall plays as its
+// animation 1, Befund-Goo-Tropfen section 2). Which field moves is not known offline, so candidate columns follow
+// (evidence first): bone 0 translation [[inst+0x90]+0x30..0x38] (ENGINE "Instance fields": +0x90 bone matrices,
+// 0x40 B each), the old position inst+0xc0, the physics body inst+0x274; the nearest copy by bone 0 x / y and the
+// lowest bone-0 z of all copies. One TruMenu.log line the first time bone 0 and inst+0x20 differ by > 50 units.
 struct FtDrip {
     bool zone;
     char src[2][40];
@@ -18585,7 +19101,16 @@ struct FtDrip {
     float pos[3], dxy, dz;
     DWORD iflags;
     char node[40];
+    bool hasBone;                             // 0.22.18 candidates
+    float bone[3], boneDz, oldZ, lowBoneZ;
+    DWORD phys;
 };
+bool g_ftDripMoveLogged = false;
+bool FtBone0(DWORD inst, float out[3]) {     // 0.22.18: the translation of bone matrix 0 ([inst+0x90] + 0x30)
+    DWORD m = 0;
+    return ReadDword(inst + 0x90, &m) && m > 0x10000 && ReadFloats(m + 0x30, out, 3) && DvFinite(out, 3) &&
+           fabsf(out[0]) < 1.0e6f && fabsf(out[1]) < 1.0e6f && fabsf(out[2]) < 1.0e6f;
+}
 // "Spawn_easy@0.35" / "->Done" (running transition) / "-" (no uber state) / "?" (uber checks failed)
 void FtUberShort(DWORD inst, char *o, size_t n) {
     if (!g_ubOk) { Out(o, n, "?"); return; }
@@ -18613,8 +19138,9 @@ void FtDripRead(const float lara[3], FtDrip &d) {
     Out(d.src[0], sizeof(d.src[0]), "-");
     Out(d.src[1], sizeof(d.src[1]), "-");
     Out(d.node, sizeof(d.node), "-");
-    DWORD srcInst[2] = {0, 0}, nearInst = 0;
-    float srcPos[2][3] = {}, best = 1.0e30f;
+    DWORD srcInst[2] = {0, 0}, nearInst = 0, nearBone = 0;
+    float srcPos[2][3] = {}, best = 1.0e30f, bestBone = 1.0e30f;
+    d.lowBoneZ = 1.0e30f;
     DWORD inst = 0;
     ReadDword(kFirstInstance, &inst);
     for (int guard = 0; inst && guard < 4096; ++guard) {
@@ -18631,6 +19157,20 @@ void FtDripRead(const float lara[3], FtDrip &d) {
                     ++d.n;
                     const float dx = p[0] - lara[0], dy = p[1] - lara[1], d2 = dx * dx + dy * dy;
                     if (d2 < best) { best = d2; nearInst = inst; memcpy(d.pos, p, sizeof(d.pos)); }
+                    float b[3];                       // 0.22.18 candidate: bone 0
+                    if (FtBone0(inst, b)) {
+                        const float bx = b[0] - lara[0], by = b[1] - lara[1], b2 = bx * bx + by * by;
+                        if (b2 < bestBone) { bestBone = b2; nearBone = inst; memcpy(d.bone, b, sizeof(d.bone)); }
+                        if (b[2] < d.lowBoneZ) d.lowBoneZ = b[2];
+                        if (!g_ftDripMoveLogged && (fabsf(b[0] - p[0]) > 50.0f || fabsf(b[1] - p[1]) > 50.0f ||
+                                                    fabsf(b[2] - p[2]) > 50.0f)) {
+                            g_ftDripMoveLogged = true;
+                            Log(1, "0.22.18 goo drip copy 0x%08lx: bone 0 %.0f %.0f %.0f differs from inst+0x20 %.0f %.0f "
+                                "%.0f - the falling copy moves in its bone matrices (candidate confirmed once)", inst,
+                                static_cast<double>(b[0]), static_cast<double>(b[1]), static_cast<double>(b[2]),
+                                static_cast<double>(p[0]), static_cast<double>(p[1]), static_cast<double>(p[2]));
+                        }
+                    }
                 }
             }
         }
@@ -18654,6 +19194,13 @@ void FtDripRead(const float lara[3], FtDrip &d) {
         d.dz = d.pos[2] - lara[2];
         ReadDword(nearInst + 0x14, &d.iflags);
         FtUberShort(nearInst, d.node, sizeof(d.node));
+        float old[3];                         // 0.22.18 candidates of the nearest copy (inst+0x20 rule)
+        d.oldZ = ReadFloats(nearInst + 0xc0, old, 3) && DvFinite(old, 3) ? old[2] : 1.0e30f;
+        ReadDword(nearInst + 0x274, &d.phys);
+    }
+    if (nearBone) {
+        d.hasBone = true;
+        d.boneDz = d.bone[2] - lara[2];
     }
 }
 // ---- 0.22.13 Lara's damage: the enemy damage function 0x637590 is TruShadowCombat's hook site ([Damage] Log writes
@@ -18830,7 +19377,10 @@ const char *const kFtHeader = "host_time\tinst\tobj_id\tobj_name\tlp\tstamina\ts
                               // 0.22.13: new columns only at the end (the TruXenia order above stays)
                               "pc_ring_bits\tpc_hud_g12\tpc_ret_style\tpc_ret40\tpc_drip_q10706\tpc_drip_q10707\t"
                               "pc_drip_n\tpc_drip_near_x\tpc_drip_near_y\tpc_drip_near_z\tpc_drip_near_dxy\t"
-                              "pc_drip_near_dz\tpc_drip_near_iflags\tpc_drip_near_node\tpc_lara_dmg\n";
+                              "pc_drip_near_dz\tpc_drip_near_iflags\tpc_drip_near_node\tpc_lara_dmg\t"
+                              // 0.22.18: candidate columns for the falling copy (bone 0, old position, physics body)
+                              "pc_drip_b0_x\tpc_drip_b0_y\tpc_drip_b0_z\tpc_drip_b0_dz\tpc_drip_b0_lowz\t"
+                              "pc_drip_near_oldz\tpc_drip_near_phys\n";
 bool FtOpen() {
     if (g_ftFile != INVALID_HANDLE_VALUE) return true;
     if (!g_logPath[0]) return false;
@@ -18943,15 +19493,27 @@ void FtWrite(const FtWorld &w, const FtEn *e, DWORD brain, const float *ep) {
             Out(dfl, sizeof(dfl), "0x%lx", w.drip.iflags);
         }
     }
+    char bx[12] = "-", by[12] = "-", bz[12] = "-", bdz[12] = "-", blz[12] = "-", oz[12] = "-", ph[12] = "-";   // 0.22.18
+    if (w.drip.zone && w.drip.hasBone) {
+        Out(bx, sizeof(bx), "%.0f", static_cast<double>(w.drip.bone[0]));
+        Out(by, sizeof(by), "%.0f", static_cast<double>(w.drip.bone[1]));
+        Out(bz, sizeof(bz), "%.0f", static_cast<double>(w.drip.bone[2]));
+        Out(bdz, sizeof(bdz), "%.0f", static_cast<double>(w.drip.boneDz));
+        Out(blz, sizeof(blz), "%.0f", static_cast<double>(w.drip.lowBoneZ));
+    }
+    if (w.drip.zone && w.drip.hasNear) {
+        if (w.drip.oldZ < 1.0e29f) Out(oz, sizeof(oz), "%.0f", static_cast<double>(w.drip.oldZ));
+        Out(ph, sizeof(ph), "0x%lx", w.drip.phys);
+    }
     const int len = _snprintf_s(line, sizeof(line), _TRUNCATE,
         "%02d:%02d:%02d.%03d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t"
         "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t"
-        "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+        "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
         t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, inst, oid, name, lp, st, s0, s1, rq, tg, dist, w.rec0, w.rec1, meter,
         active, ts, intro, ko, atk, hit, laraLp, w.states[0] ? w.states : "-", lx, ly, lz, ex, ey, ez, pm, tsp, dg, camObj,
         mode, req, cdx, cdy, cdz, cdist, fov, w.tsReq, w.tsSel, g_ftRampLast,
         rbits, hud12, style, ret40, w.drip.zone ? w.drip.src[0] : "-", w.drip.zone ? w.drip.src[1] : "-", dn, dx, dy, dz, dxy,
-        ddz, dfl, w.drip.zone ? w.drip.node : "-", w.dmg);
+        ddz, dfl, w.drip.zone ? w.drip.node : "-", w.dmg, bx, by, bz, bdz, blz, oz, ph);
     if (len > 0) {
         DWORD wr = 0;
         WriteFile(g_ftFile, line, static_cast<DWORD>(len), &wr, nullptr);
@@ -20761,6 +21323,7 @@ bool RunCsScale(const char *arg, char *o, size_t n) {
     InterlockedExchange(&g_csShake, v);
     g_csLogged = v;
     g_csRefused = false;
+    IniKeepInt("Camera", "ShakeScale", v);   // 0.22.18
     Log(1, "cam.shakescale %ld (src=%s): %s with the next game frame", v, ShotSource("cam.shakescale"),
         v == 100 ? "the game's own strength (stub off)" : v ? "camera shakes scaled (stub on 0x5eea55 / 0x5eb56d)"
                                                             : "camera shakes off (strength x 0)");
@@ -20775,6 +21338,7 @@ bool RunRbRumble(const char *arg, char *o, size_t n) {
     if (!end || end == arg || v < 0 || v > 100) { Out(o, n, "usage: cam.rumble 0 .. 100 (percent, 0 = off)"); return false; }
     InterlockedExchange(&g_rbRumble, v);
     g_rbRefused = false;
+    IniKeepInt("Camera", "Rumble", v);       // 0.22.18
     Log(1, "cam.rumble %ld (src=%s): %s with the next game frame", v, ShotSource("cam.rumble"),
         v == 100 ? "the game's own rumble" : "both motors scaled (XInputSetState pointer [0xa02b90] wrapped)");
     Out(o, n, "cam.rumble %ld %%", v);
@@ -25046,6 +25610,18 @@ bool RunCnStep(const char *arg, char *o, size_t n) {
     Out(o, n, "cine.step: %ld game frame(s) of the cutscene%s", k, g_cnSndOk ? " (sound muted while stepping)" : "");
     return true;
 }
+// 0.22.18 cine.steprate 5|10|15: frames per second while RB + View is held (CnStepRepeat), [Settings] StepRate
+void ValCnStepRate(char *o, size_t n) { Out(o, n, "%d/s", g_cnStepRate); }
+bool RunCnStepRate(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValCnStepRate(o, n); return true; }
+    const long v = strtol(arg, nullptr, 10);
+    if (v != 5 && v != 10 && v != 15) { Out(o, n, "usage: cine.steprate 5|10|15; now %d", g_cnStepRate); return false; }
+    g_cnStepRate = static_cast<int>(v);
+    IniKeepInt("Settings", "StepRate", v);
+    Log(1, "cine.steprate %ld (src=%s): [Settings] StepRate written", v, ShotSource("cine.steprate"));
+    Out(o, n, "cine.steprate %ld frames per second while RB + View is held (kept in TruMenu.ini)", v);
+    return true;
+}
 // 0.22.7 cutscene keys (owner 2026-11-08: the 8BitDo pad has R4 / L4): [Cine] PauseKey / StepKey / ShotKey = keyboard
 // keys (virtual key codes), PausePad / StepPad / ShotPad = XInput button masks pressed together (an extra pad button is
 // mapped to such a combo in the pad's own software). Edges only (one action per press); the game still gets the keys /
@@ -25121,6 +25697,56 @@ bool CnPadIsSub(int i) {
         if (j != i && g_cnPadMask[j] && g_cnPadMask[j] != m && (g_cnPadMask[j] & m) == m) return true;
     return false;
 }
+// 0.22.18 (owner 2026-11-10): frame stepping by holding.
+//   * the shared button of the combos (CnPadMod: View by default) alone counts as "nothing held" - while View stays down,
+//     each RB tap (press + release) is one frame (step mode); the 0.22.13 wait for a full release ended only when View
+//     was let go too, so a second RB tap with View held did nothing (the latch never cleared);
+//   * RB + View held >= 400 ms (only these two, cutscene held): one frame every 1000 / [Settings] StepRate ms (5 / 10 /
+//     15 per s) through cine.step 1 (the subtitles run along); letting go stops it with no extra frame; LB added stops
+//     the repeat, the photo fires (its own rule), the pause stays;
+//   * keyboard keys unchanged. Model: tools/trumenu_quick_check.py cinepad (0.22.18 cases).
+DWORD g_cnStepDown = 0;                         // tick when exactly the step combo became held (0 = not)
+DWORD g_cnStepNext = 0;                          // the next repeat frame
+bool g_cnStepRep = false, g_cnStepEnded = false; // repeating; a repeat ended (its release gives no frame)
+LONG g_cnStepRepN = 0, g_cnStepRepeats = 0;      // frames of this repeat, repeats so far
+WORD CnPadMod() {                                // the button every set combo shares (0 = fewer than two combos)
+    WORD m = 0xffff;
+    int k = 0;
+    for (int i = 0; i < 3; ++i)
+        if (g_cnPadMask[i]) { m = static_cast<WORD>(m & g_cnPadMask[i]); ++k; }
+    return k >= 2 ? m : 0;
+}
+void CnStepRepeat(WORD held, bool active, DWORD now) {
+    const WORD m = g_cnPadMask[1];
+    const bool on = m && CnPadIsSub(1) && held == m && active && g_cnPause && !g_cnPadLatch;
+    if (!on) {
+        g_cnStepDown = 0;
+        if (g_cnStepRep) {
+            g_cnStepRep = false;
+            g_cnStepEnded = true;
+            Log(1, "cine pad: frame repeat stopped after %ld frame(s) (buttons 0x%04x%s)", g_cnStepRepN, held,
+                g_cnPause ? "" : ", cutscene no longer held");
+        }
+        return;
+    }
+    if (!g_cnStepDown) { g_cnStepDown = now; g_cnStepEnded = false; return; }
+    const int rate = g_cnStepRate == 5 || g_cnStepRate == 15 ? g_cnStepRate : 10;
+    const DWORD every = static_cast<DWORD>(1000 / rate);
+    if (!g_cnStepRep) {
+        if (now - g_cnStepDown < 400) return;
+        g_cnStepRep = true;
+        g_cnStepRepN = 0;
+        g_cnStepNext = now;
+        ++g_cnStepRepeats;
+        Log(1, "cine pad: 0x%04x held 400 ms - one frame every %lu ms ([Settings] StepRate %d)", m, every, rate);
+    }
+    if (static_cast<LONG>(now - g_cnStepNext) >= 0) {
+        char o[160];
+        if (RunCnStep("1", o, sizeof(o))) ++g_cnStepRepN;
+        g_cnStepNext += every;
+        if (static_cast<LONG>(now - g_cnStepNext) > 500) g_cnStepNext = now + every;   // a stall: no burst
+    }
+}
 void CnPadTick(DWORD index, WORD buttons, bool active) {   // pad path (QbPad's caller)
     if (index != 0) return;
     WORD all = 0;
@@ -25131,18 +25757,25 @@ void CnPadTick(DWORD index, WORD buttons, bool active) {   // pad path (QbPad's 
     g_cnPadPrev = buttons;
     if (!all) return;
     const bool stable = now - g_cnPadSince >= 120;
+    const WORD mod = CnPadMod();
+    const bool bare = (held & static_cast<WORD>(~mod)) == 0;   // 0.22.18: nothing, or only the shared button (View)
+    CnStepRepeat(held, active, now);             // 0.22.18
     if (g_cnPadLatch) {
-        if (!held && stable) { g_cnPadLatch = false; g_cnPadPeak = 0; }
+        if (bare && stable) { g_cnPadLatch = false; g_cnPadPeak = held; g_cnStepEnded = false; }
         return;
     }
-    if (!held) {                                 // full release: the next press starts a new peak
-        if (stable) g_cnPadPeak = 0;
-    }
+    if (bare && stable) g_cnPadPeak = held;      // a new press starts a new peak (0.22.18: View may stay down)
     // release of a sub-combo: its full set was held before, one of its buttons is up now, nothing else joined
     for (int i = 0; i < 3 && before; ++i) {
         const WORD m = g_cnPadMask[i];
         if (!m || !CnPadIsSub(i) || (before & m) != m || (held & m) == m) continue;
         const WORD peak = static_cast<WORD>(g_cnPadPeak | before);
+        if (i == 1 && peak == m) {               // 0.22.18 step: no latch - View held stays step mode
+            g_cnPadPeak = held;
+            if (g_cnStepEnded) g_cnStepEnded = false;   // the release after a repeat: no extra frame
+            else if (active) CnHotAction(1, "pad (released)");
+            return;
+        }
         g_cnPadLatch = true;                     // pressed and let go: this press is used up either way
         if (peak == m && active) CnHotAction(i, "pad (released)");
         else if (peak != m) Log(1, "cine pad: combo 0x%04x let go after 0x%04x was held - no action (another combo "
@@ -25494,6 +26127,7 @@ bool RunLs(const char *arg, char *o, size_t n) {
         InterlockedExchange(&g_lsFrames, 0);
     }
     InterlockedExchange(&g_lsWant, on ? 1 : 0);
+    IniKeep("Light", "Stable", on ? "1" : "0");   // 0.22.18
     Log(1, "light.stable %d (src=%s)", on ? 1 : 0, ShotSource("light.stable"));
     Out(o, n, "light.stable %d - %s with the next game frame", on ? 1 : 0,
         on ? "the scene lights keep one order (sorted by address)" : "the game's own light order");
@@ -25810,6 +26444,199 @@ void LcTick() {
         }
     }
 }
+// ---- 0.22.18 light.demote 1|0 ([Light] Demote, default 0; workspace docs\Befund-Thron-Licht94-1011.md section 4):
+// "demote instead of drop". The set builder 0x504cc0 drops a shadow caster when the shadow part of the set is full
+// (caster branch 0x504e01: bits 0-1 of the category byte == 3 -> 0x504e56) even while a plain place is free (bits
+// 2-3 < 3). The slot distributor 0x5042b0 sends an entry to a shadow slot when the light's vf+0x50 (CastsShadow
+// 0x50a080) says so (call at 0x504341), else to the plain slots 3..5 (ebx; at 6 back to the shadow counter).
+//   C1: jmp at 0x504e06 (`cmp dl, 3; jae 0x504e56`, 5 bytes) -> LdBuildStub: shadow part full, a plain place free, the
+//       new light a plain shadow caster (LcKind 2, no shadow map - those also count in bits 4-5): of the set's casters
+//       (kind 2, not demoted) and the new one, the one FARTHEST from the camera (entry+0x10 = the frame instance's
+//       position, light.frame) is demoted: plain count + 1 in [esp+0x1b], marked (builder this [esp+0x10], entry);
+//       the new light then stays as a caster in the freed place, or is the demoted one itself. Else the game's drop.
+//   C2: call at 0x504341 (`mov eax, [edx+0x50]; call eax`, 5 bytes) -> LdCastStub: the game's CastsShadow, then false
+//       for a marked entry of the same builder object ([esp+0x1c] of 0x5042b0 = the builder's this: 0x5043b6 writes the
+//       set to this+0x1658 beside the builder's cache +0x1654), so it takes a plain slot without a shadow.
+// Marks live 50 ms (device SetLights clears the set cache +0x1654, so the set is built again every frame; the
+// distributor runs right after the builder). Written on the game thread (LdTick), put back when off.
+const DWORD kLdMarkMs = 50;
+const DWORD kLdBuildSite = 0x00504e06, kLdCastSite = 0x00504341;
+const BYTE kLdBuildOrig[5] = {0x80, 0xfa, 0x03, 0x73, 0x4b};
+const BYTE kLdCastOrig[5] = {0x8b, 0x42, 0x50, 0xff, 0xd0};
+const DvCheck kLdChecks[] = {
+    {0x00504e01, "8ad3 80e203 80fa03 734b 8ac3 0401 32c3 2403 32d8"},           // caster branch: full -> drop
+    {0x00504d3d, "0fb6cb c6406401 8b16 89448c1c"},                              // entry -> [esp+0x1c + count*4]
+    {0x00504d4d, "8044241a01"},                                                 // count byte [esp+0x1a]
+    {0x00504dc8, "8acb 80e10c 80f90c"},                                         // plain part bits 2-3
+    {0x00504e5b, "8b742410 83c701"},                                            // next light (esi = this [esp+0x10])
+    {0x005042b0, "83ec10 55 8b6c2418 57 33ff 3bef 894c2414"},                    // distributor: this -> [esp+0x14]
+    {0x005042f1, "56 8b542414 8b32 8b0e 8b411c"},                               // entry esi, [E] = the light
+    {0x0050433f, "8b11 8b4250 ffd0 84c0 751d 83fb06 7418"},                      // CastsShadow -> shadow / plain slot
+    {0x005043b1, "8b442414 5f 89a858160000"},                                    // set -> this+0x1658
+    {0x0050a080, "f681c500000004 7412 8b411c 80b87818000000"},                  // CastsShadow = LcKind's caster test
+};
+bool g_ldOk = false, g_ldOn = false, g_ldRefused = false;
+volatile LONG g_ldChecked = 0, g_ldWant = 0, g_ldDemoted = 0, g_ldKept = 0, g_ldNoPlace = 0;
+char g_ldWhy[96] = "not checked yet";
+DWORD g_ldBackAddr = 0x00504e0b, g_ldDropAddr = 0x00504e56, g_ldNextAddr = 0x00504e5b;
+BYTE g_ldBuildPatch[5] = {}, g_ldCastPatch[5] = {};
+LONG g_ldResult = 0;
+struct LdMark { DWORD self, entry, tick; };
+LdMark g_ldMarks[64];
+// render thread: the camera position for "farthest" (the 0.14 label matrix, DvCamPos)
+bool LdCamPos(float p[3]) {
+    DvCam c;
+    memset(&c, 0, sizeof(c));
+    return ReadFloats(kLblMatrix, c.v.m, 16) && DvFinite(c.v.m, 16) && DvCamPos(c, p);
+}
+void LdMark1(DWORD self, DWORD entry) {
+    const DWORD now = GetTickCount();
+    int slot = -1;
+    for (int i = 0; i < 64; ++i) {
+        LdMark &m = g_ldMarks[i];
+        if (m.self == self && now - m.tick > 30) m.self = 0;   // an older build of this object
+        if (slot < 0 && (!m.self || now - m.tick > kLdMarkMs)) slot = i;
+    }
+    if (slot < 0) slot = static_cast<int>(now % 64);
+    g_ldMarks[slot] = {self, entry, now};
+}
+bool __stdcall LdIsDemoted(DWORD self, DWORD entry) {
+    const DWORD now = GetTickCount();
+    for (int i = 0; i < 64; ++i) {
+        const LdMark &m = g_ldMarks[i];
+        if (m.self == self && m.entry == entry && now - m.tick <= kLdMarkMs) return true;
+    }
+    return false;
+}
+// render thread (LdBuildStub): the shadow part is full; true = a caster was demoted ([esp+0x1b] updated)
+bool __stdcall LdOnFull(DWORD esp) {
+    __try {
+        BYTE *cat = reinterpret_cast<BYTE *>(esp + 0x1b);
+        const int count = *reinterpret_cast<const BYTE *>(esp + 0x1a);
+        const DWORD self = *reinterpret_cast<const DWORD *>(esp + 0x10);
+        if (count < 1 || count > 7) return false;
+        if (((*cat >> 2) & 3) >= 3) { InterlockedIncrement(&g_ldNoPlace); return false; }   // no plain place
+        const DWORD *entries = reinterpret_cast<const DWORD *>(esp + 0x1c);
+        const DWORD cur = entries[count - 1];
+        if (!cur || LcKind(*reinterpret_cast<const DWORD *>(cur)) != 2) return false;   // only plain shadow casters
+        float cam[3];
+        const bool haveCam = LdCamPos(cam);
+        DWORD pick = cur;                    // the farthest caster ("far" is a Windows macro)
+        float pickD = -1.0f;
+        for (int i = 0; i < count; ++i) {
+            const DWORD e = entries[i];
+            if (!e || (i < count - 1 && (LcKind(*reinterpret_cast<const DWORD *>(e)) != 2 || LdIsDemoted(self, e)))) continue;
+            float p[3];
+            if (!haveCam || !ReadFloats(e + 0x10, p, 3) || !DvFinite(p, 3)) continue;
+            const float dx = p[0] - cam[0], dy = p[1] - cam[1], dz = p[2] - cam[2], d = dx * dx + dy * dy + dz * dz;
+            if (d > pickD) { pickD = d; pick = e; }
+        }
+        LdMark1(self, pick);
+        *cat = static_cast<BYTE>((*cat & ~0x0c) | ((((*cat >> 2) & 3) + 1) << 2));   // plain + 1
+        InterlockedIncrement(&g_ldDemoted);
+        if (pick != cur) InterlockedIncrement(&g_ldKept);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+__declspec(naked) void LdBuildStub() {
+    __asm {
+        cmp dl, 3
+        jb not_full
+        pushad
+        pushfd
+        lea eax, [esp + 0x24]
+        push eax
+        call LdOnFull
+        movzx eax, al
+        mov dword ptr [g_ldResult], eax
+        popfd
+        popad
+        cmp dword ptr [g_ldResult], 0
+        jne demoted
+        jmp dword ptr [g_ldDropAddr]
+    demoted:
+        mov bl, byte ptr [esp + 0x1b]
+        jmp dword ptr [g_ldNextAddr]
+    not_full:
+        jmp dword ptr [g_ldBackAddr]
+    }
+}
+__declspec(naked) void LdCastStub() {
+    __asm {
+        mov edx, dword ptr [ecx]
+        call dword ptr [edx + 0x50]
+        test al, al
+        jz done
+        push eax
+        mov eax, dword ptr [esp + 0x24]
+        push esi
+        push eax
+        call LdIsDemoted
+        test al, al
+        pop eax
+        jz done
+        xor eax, eax
+    done:
+        ret
+    }
+}
+void LdCheck() {
+    if (InterlockedExchange(&g_ldChecked, 1)) return;
+    DWORD at = 0;
+    g_ldOk = DvChecks(kLdChecks, sizeof(kLdChecks) / sizeof(kLdChecks[0]), &at);
+    if (g_ldOk) Out(g_ldWhy, sizeof(g_ldWhy), "ok");
+    else Out(g_ldWhy, sizeof(g_ldWhy), "light-set code differs at 0x%08lx", at);
+    LcJmp(g_ldBuildPatch, 5, kLdBuildSite, &LdBuildStub);
+    const DWORD rel = reinterpret_cast<DWORD>(&LdCastStub) - (kLdCastSite + 5);
+    g_ldCastPatch[0] = 0xe8;
+    memcpy(g_ldCastPatch + 1, &rel, 4);
+    Log(g_ldOk ? 1 : 0, "0.22.18 light.demote: %d checks %s", static_cast<int>(sizeof(kLdChecks) / sizeof(kLdChecks[0])),
+        g_ldWhy);
+}
+void LdTick() {                              // game thread (with LcTick)
+    const bool want = g_ldWant != 0;
+    if (want == g_ldOn) return;
+    LdCheck();
+    if (!g_ldOk) return;
+    if (want && !g_ldRefused) {
+        if (LcPatch(kLdBuildSite, kLdBuildOrig, g_ldBuildPatch, 5, true)) {
+            if (LcPatch(kLdCastSite, kLdCastOrig, g_ldCastPatch, 5, true)) {
+                g_ldOn = true;
+                Log(1, "light.demote on: 0x504e06 -> LdBuildStub, 0x504341 -> LdCastStub (a 4th shadow caster takes a "
+                    "free plain place without a shadow - the farthest from the camera)");
+            } else {
+                LcPatch(kLdBuildSite, kLdBuildOrig, g_ldBuildPatch, 5, false);
+                g_ldRefused = true;
+            }
+        } else {
+            g_ldRefused = true;
+        }
+        if (g_ldRefused) Log(0, "light.demote: 0x504e06 / 0x504341 not the game's bytes (or not writable) - left untouched");
+    } else if (!want) {
+        const bool a = LcPatch(kLdCastSite, kLdCastOrig, g_ldCastPatch, 5, false);
+        const bool b = LcPatch(kLdBuildSite, kLdBuildOrig, g_ldBuildPatch, 5, false);
+        g_ldOn = false;
+        Log(1, "light.demote off%s: %ld demoted (%ld times another caster than the new one), %ld times no plain place",
+            a && b ? "" : " (a site was changed by someone else - left)", g_ldDemoted, g_ldKept, g_ldNoPlace);
+    }
+}
+void ValLd(char *o, size_t n) {
+    Out(o, n, "%ld (%s; %ld demoted, %ld kept the new caster, %ld no plain place%s)", g_ldWant, g_ldOn ? "patched" :
+        "game's own", g_ldDemoted, g_ldKept, g_ldNoPlace, g_ldChecked && !g_ldOk ? "; code differs" : g_ldRefused ?
+        "; patch refused" : "");
+}
+bool RunLd(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValLd(o, n); return true; }
+    const bool on = BoolArg(arg, g_ldWant != 0);
+    InterlockedExchange(&g_ldWant, on ? 1 : 0);
+    IniKeep("Light", "Demote", on ? "1" : "0");
+    Log(1, "light.demote %d (src=%s): with the next game frame, [Light] Demote written", on ? 1 : 0, ShotSource("light.demote"));
+    Out(o, n, "light.demote %d - %s (kept in TruMenu.ini)", on ? 1 : 0, on ? "a 4th shadow caster takes a free plain place "
+        "(no shadow) instead of being dropped" : "the game's drop");
+    return true;
+}
 // render thread, once per Present (ShotBeforeRender): close the frame
 void LcFrameEnd() {
     if (!g_lcDiagOn) return;
@@ -25951,6 +26778,7 @@ bool RunLcStable(const char *arg, char *o, size_t n) {
         InterlockedExchange(&g_lcSortCalls, 0);
     }
     InterlockedExchange(&g_lcStableWant, on ? 1 : 0);
+    IniKeep("Light", "StableCut", on ? "1" : "0");   // 0.22.18
     Log(1, "light.stablecut %d (src=%s)", on ? 1 : 0, ShotSource("light.stablecut"));
     Out(o, n, "light.stablecut %d - %s with the next game frame", on ? 1 : 0,
         on ? "each object gets its lights in a fixed order (sun, shadow map, caster, plain, then address)" :
@@ -26117,6 +26945,13 @@ const Item kItems[] = {
      true, ValMusicNow, RunMusicStop},
     {"media.music.now", "info", "the 8 srmusic slots 0xcc5260 (+0 current, +0x100 requested, +0x51c object) and the unit "
                                 "music name 0xd98f64", false, ValMusicNow, nullptr},
+    {"media.music.inlevels", "bool", "0.22.18 1|0: media.music.play also in a level ([Media] MusicInLevels, written at "
+                                     "once; experimental)", false, ValMusicInLevels, RunMusicInLevels},
+    {"voice.lang", "value", "0.22.18 game|en|fr|de|it|es|nl|ja|ru: speech language only (MultiFS mask 0x472d80 while "
+                            "0x472be0 says free) - next sentence / next scene, texts stay ([Settings] VoiceLanguage)",
+     false, ValVl, RunVl},
+    {"voice.full", "action", "0.22.18 en|fr|de|...: whole game language - speech now, registry Language (0x478010) for the "
+                             "texts at the next start", true, ValVlFull, RunVlFull},
     {"dev.musicvars", "bool", "developer flag Show Music Vars ([0xe7f098] & 0x10000000; row from the original table)", true,
      ValMusicVars, RunMusicVars},
     {"dev.monstermusicvars", "bool", "developer flag Show Monster Music Vars ([0xe7f0a0] & 0x01000000; no reader in "
@@ -26366,7 +27201,7 @@ const Item kItems[] = {
                            "+ Start); the game keeps running, only D-pad / LB / RB / X / Y belong to the bar while it is "
                            "open (0.21.3: X = run the row, Y = pin / unpin it as a favourite)",
      false, ValQuickOpen, RunQuickOpen},
-    {"quick.lang", "action", "0.17 de|en: language of the bar ([Quick] Language; until the next start)", false, ValQuickLang,
+    {"quick.lang", "action", "0.17 de|en: language of the bar ([Quick] Language; 0.22.18: written to TruMenu.ini)", false, ValQuickLang,
      RunQuickLang},
     {"quick.status", "info", "0.17: bar state - open, page / row, combo and chord window, debug layers on, last action",
      false, ValQuickStatus, nullptr},
@@ -26499,6 +27334,8 @@ const Item kItems[] = {
                            "load; 0.22.13: the subtitle line clock is held too", false, ValCnPause, RunCnPause},
     {"cine.step", "action", "0.22 [n]: let n game frames (default 1, at most 600) of the held cutscene through (0.22.1: "
                             "sound muted meanwhile, so clock and picture move on together)", false, ValCnPause, RunCnStep},
+    {"cine.steprate", "value", "0.22.18 5|10|15: frames per second while RB + View is held in a held cutscene (after "
+                               "0.4 s; [Settings] StepRate, written at once)", false, ValCnStepRate, RunCnStepRate},
     // 0.22.9 (section "0.22.9 enemy diagnosis")
     {"ai.why", "action", "0.22.9 [intro id|0xINSTANCE]: one full diagnosis of the nearest AI enemy (or the given one) into "
                          "TruMenu.log - states L0 / L1 and requested, brain+8 / +0xc gates, target slot / override, senses "
@@ -26546,8 +27383,14 @@ const Item kItems[] = {
      ValSu<kSuAlpha>, RunSu<kSuAlpha>},
     {"sub.colour", "action", "0.22.16 white|yellow|cyan|grey: subtitle text colour (font colour [0x9ce6c0] around the line "
                              "call)", false, ValSu<kSuColour>, RunSu<kSuColour>},
-    {"sub.pos", "int", "0.22.16 <250 .. 420>: y of the first subtitle line (game 352; disp32 0x583e39)", false,
-     ValSu<kSuPos>, RunSu<kSuPos>},
+    {"sub.pos", "int", "0.22.16 <250 .. 420>: y of the first subtitle line (game 352; disp32 0x583e39); 0.22.18: "
+                       "sub.valign free = 16 .. 448 - 2 lines", false, ValSu<kSuPos>, RunSu<kSuPos>},
+    {"sub.valign", "value", "0.22.18 bottom|top|free: subtitle height - bottom = sub.pos 250 .. 420 (game), top, free "
+                            "= sub.pos 16 .. 448 - 2 lines ([Settings] SubAlignV)", false, ValSaV, RunSa<0>},
+    {"sub.halign", "value", "0.22.18 centre|left|right: subtitle lines centred (game) or at the left / right margin "
+                            "(origin x of 0x477180 moved per line; [Settings] SubAlignH)", false, ValSaH, RunSa<1>},
+    {"sub.margin", "int", "0.22.18 <0 .. 30>: left / right subtitle margin in percent of the width ([Settings] "
+                          "SubMargin, default 5)", false, ValSaMargin, RunSa<2>},
     {"sub.reset", "action", "0.22.16: subtitle look back to the game's (every site gets the game's bytes)", false,
      ValSu<kSuReset>, RunSu<kSuReset>},
     {"game.vol.music", "int", "0.22.16 <0 .. 128>: music volume live (option 2, setter 0x5d5100; saved after 2 s)", true,
@@ -26612,6 +27455,9 @@ const Item kItems[] = {
                                 "(sun, shadow map, caster, plain, then address) - per object only, the shadow atlas order "
                                 "stays; no argument = report",
      false, ValLcStable, RunLcStable},
+    {"light.demote", "bool", "0.22.18 1|0 ([Light] Demote): a 4th shadow caster takes a free plain place without a shadow "
+                             "(the farthest from the camera) instead of being dropped - hooks 0x504e06 / 0x504341; no "
+                             "argument = report", false, ValLd, RunLd},
     {"light.frame", "action", "0.22.2 [n]: n frames (default 60, at most 600) of the per-frame light lists (instances, "
                               "light bytes when changed, resources) into TruMenu.lightframe.txt next to tru.exe; summary "
                               "per light with BLINK? for lights missing in frames or changing all the time", false, ValLf,
@@ -30269,8 +31115,9 @@ void PageMarkup() {
 enum QbKind { kQbBool = 0, kQbValue, kQbAction, kQbInfo, kQbChoice, kQbLabel, kQbPlanned,
               kQbGroup };                  // 0.21.1: a collapsible group heading (arg = its key in [Quick] Closed)
 enum QbFlag { kQfConfirm = 1, kQfBackup = 2,
-              kQfLine = 4 };               // 0.21.11 (page Rettung): right / X puts "<id> <arg> " into the quick command
+              kQfLine = 4,                 // 0.21.11 (page Rettung): right / X puts "<id> <arg> " into the quick command
                                            // line (long menu: the command bar) - for items that need a typed argument
+              kQfSub = 8 };                // 0.22.18: a kQbGroup inside the group before it (nesting level 1)
 enum QbCount { kQcNone = 0, kQcLayer, kQcTriggers, kQcTrgLabels, kQcLaraIn, kQcEncl, kQcLabels, kQcMarkup, kQcFlat, kQcOn,
                kQcCine, kQcAi,            // 0.19 kQcAi: enemies in the ai.dumb scope (last frame)
                kQcPhys };                 // 0.21.1: physics bodies used / capacity
@@ -30281,9 +31128,15 @@ enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvP
              kQvSpawnKind, kQvSpawnCount, kQvSpawnAt,     // 0.21.1 enemy spawn: kind (choice), count 1 .. 5, place
              kQvSndGroup,                                 // 0.21.8 sound group slider 0 .. 100 % (the row's item)
              kQvSubLang, kQvSubSize, kQvSubAlpha, kQvSubColour, kQvSubPos,   // 0.22.16 settings page: subtitles
-             kQvVol, kQvMouse, kQvGfx3 };                 // 0.22.16 volume 0 .. 128 / 8, mouse 1 .. 20, gfx 0 .. 2 (item)
+             kQvVol, kQvMouse, kQvGfx3,                   // 0.22.16 volume 0 .. 128 / 8, mouse 1 .. 20, gfx 0 .. 2 (item)
+             kQvStepRate,                                 // 0.22.18 cine.steprate 5 / 10 / 15
+             kQvSubAlignV, kQvSubAlignH, kQvSubMargin,    // 0.22.18 subtitle alignment
+             kQvVoiceLang };                              // 0.22.18 voice.lang
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
+// 0.22.18 (owner 2026-11-10, shot pc_leiste_gruppen_164959): the nesting level of a group heading - 0 top, 1 a sub-group
+// (kQfSub); its rows are one level deeper. A closed group hides everything up to the next heading of its level or above.
+int QbGroupLevel(const QbRow &r) { return (r.flags & kQfSub) ? 1 : 0; }
 enum QbSpecial { kQsNone = 0, kQsLara, kQsCheckpoints, kQsSaves, kQsFav, kQsTests,   // 0.21.1 kQsFav / kQsTests
                  kQsSwitches,              // 0.21.5 page Fixes (TruMenu.switches.txt)
                  kQsCostume,               // 0.21.6 page Kostueme (section "0.21.6 costumes")
@@ -30320,12 +31173,26 @@ const QbRow kQbSettings[] = {
     {"Grauer Balken", "Grey bar", "sub.box", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
     {"Balken-Deckkraft", "Bar opacity", "sub.boxalpha", "", kQbValue, -1, kQcNone, kQvSubAlpha, kQbWhite, 0},
     {"Textfarbe", "Text colour", "sub.colour", "", kQbValue, -1, kQcNone, kQvSubColour, kQbWhite, 0},
+    {"Ausrichtung vertikal", "Vertical alignment", "sub.valign", "", kQbValue, -1, kQcNone, kQvSubAlignV, kQbWhite, 0},
     {"Position (H\303\266he)", "Position (height)", "sub.pos", "", kQbValue, -1, kQcNone, kQvSubPos, kQbWhite, 0},
+    {"Ausrichtung horizontal", "Horizontal alignment", "sub.halign", "", kQbValue, -1, kQcNone, kQvSubAlignH, kQbWhite, 0},
+    {"Rand links / rechts", "Margin left / right", "sub.margin", "", kQbValue, -1, kQcNone, kQvSubMargin, kQbWhite, 0},
     {"Standard (Spiel)", "Defaults (game)", "sub.reset", "", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     {"Ton", "Sound", "-", "set_snd", kQbGroup, -1, kQcNone, 0, kQbSound, 0},
     {"Musik", "Music", "game.vol.music", "", kQbValue, -1, kQcNone, kQvVol, kQbSound, 0},
     {"Effekte", "Effects", "game.vol.sfx", "", kQbValue, -1, kQcNone, kQvVol, kQbSound, 0},
     {"Sprache", "Speech", "game.vol.voice", "", kQbValue, -1, kQcNone, kQvVol, kQbSound, 0},
+    // 0.22.18 (plan S1): the speech language alone, and the whole language for the next start
+    {"Sprachausgabe (nur Ton)", "Speech language (voice only)", "voice.lang", "", kQbValue, -1, kQcNone, kQvVoiceLang,
+     kQbSound, 0},
+    {"Sprache komplett (Text + Ton): Deutsch", "Whole language (text + voice): German", "voice.full", "de", kQbAction, -1,
+     kQcNone, 0, kQbRed, kQfConfirm},
+    {"Sprache komplett (Text + Ton): English", "Whole language (text + voice): English", "voice.full", "en", kQbAction,
+     -1, kQcNone, 0, kQbRed, kQfConfirm},
+    // 0.22.18 (plan S2): music player rows - a red warning row while the music volume is 0 (QbViewOf)
+    {"Musik auf 100 %", "Music to 100 %", "game.vol.music", "128", kQbAction, -1, kQcNone, 0, kQbSound, 0},
+    {"Musik auch im Level", "Music also in levels", "media.music.inlevels", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
+    {"Musik: l\303\244uft gerade", "Music: now playing", "media.music.now", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Musik aus", "Music off", "media.mutemusic", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},        // 0.20
     {"Ambient aus", "Ambience off", "media.muteambient", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},  // 0.20
     {"Musik: Thailand", "Music: Thailand", "media.music.play", "l2_waters_of_thailand", kQbAction, -1, kQcNone, 0,
@@ -30333,7 +31200,7 @@ const QbRow kQbSettings[] = {
     {"Musik stoppen", "Music stop", "media.music.stop", "all", kQbAction, -1, kQcNone, 0, kQbTime, 0},
     // 0.21.8 sound group sliders (section "0.21.8 sound group sliders", docs\Befund-Ton-Gruppen-0611.md section 4): one
     // factor per slider on the FMOD channel groups, left / right = 10 % steps (snd.vol.<key> = snd.group <Key> <percent>)
-    {"Ton-Gruppen (TruMenu)", "Sound groups (TruMenu)", "-", "ton_gruppen", kQbGroup, -1, kQcNone, 0, kQbSound, 0},
+    {"Ton-Gruppen (TruMenu)", "Sound groups (TruMenu)", "-", "ton_gruppen", kQbGroup, -1, kQcNone, 0, kQbSound, kQfSub},
     {"Umgebung", "Ambience", "snd.vol.ambience", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
     {"Schritte & K\303\266rper", "Footsteps & body", "snd.vol.steps", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
     {"Waffen & Treffer", "Weapons & impacts", "snd.vol.weapons", "", kQbValue, -1, kQcNone, kQvSndGroup, kQbSound, 0},
@@ -30375,7 +31242,7 @@ const QbRow kQbSettings[] = {
      kQcNone, 0, kQbBlue, 0},
     {"Null-Render-Ziele aus", "Null render targets off", "gfx.next", "DisableNullRenderTargets", kQbBool, -1, kQcNone, 0,
      kQbBlue, 0},
-    {"Ger\303\244t (Diagnose)", "Device (diagnosis)", "-", "set_gfxdev", kQbGroup, -1, kQcNone, 0, kQbGrey, 0},
+    {"Ger\303\244t (Diagnose)", "Device (diagnosis)", "-", "set_gfxdev", kQbGroup, -1, kQcNone, 0, kQbGrey, kQfSub},
     {"Hardware-VP aus", "Hardware VP off", "gfx.next", "DisableHardwareVP", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
     {"Pure Device aus", "Pure device off", "gfx.next", "DisablePureDevice", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
     {"Referenz-Ger\303\244t (langsam!)", "Reference device (slow!)", "gfx.next", "UseRefDevice", kQbBool, -1, kQcNone, 0,
@@ -30427,7 +31294,7 @@ const QbRow kQbLara[] = {                    // + the saved positions and the tw
     {"Foto sauber", "Clean shot", "shot.save", "clean", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
     {"Foto (wie im Rad)", "Shot (as in the ring)", "shot.save", "ring", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
-    {"Kost\303\274m", "Costume", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Kost\303\274m", "Costume", "-", "fig_costume", kQbGroup, -1, kQcNone, 0, kQbPlayer, 0},
     {"N\303\244chstes Kost\303\274m", "Next costume", "costume.next", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Objekte spawnen (Rad-Stufe R2)", "Spawn objects (ring stage R2)", "-", "obj_spawn", kQbGroup, -1, kQcNone, 0,
      kQbPlayer, 0},
@@ -30441,6 +31308,7 @@ const QbRow kQbLara[] = {                    // + the saved positions and the tw
 // 0.21.6 page Kostueme: the one row of that page that is a plain item (a dynamic row kQdCosNext shows it, Y can pin it)
 const QbRow kQbCosNext = {"N\303\244chstes Kost\303\274m", "Next costume", "costume.next", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0};
 const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
+    {"Darstellung", "Display", "-", "dbg_view", kQbGroup, -1, kQcNone, 0, kQbWhite, 0},   // 0.22.18: loose rows as a group
     {"Alles an / aus", "Everything", "dbg.view", "", kQbBool, -1, kQcOn, 0, kQbWhite, 0},
     {"Legende", "Legend", "dbg.legend", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
     {"Zwischensequenz-Fotos", "Cutscene shots", "shot.oncine", "", kQbBool, -1, kQcCine, 0, kQbPlayer, 0},
@@ -30628,6 +31496,7 @@ const QbRow kQbLevel[] = {
     {"Checkpoints: Liste", "Checkpoints: list", "dbg.cplist", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
 };
 const QbRow kQbTimeTest[] = {                // 0.18 Zeit / Test
+    {"Zeit", "Time", "-", "tm_time", kQbGroup, -1, kQcNone, 0, kQbTime, 0},   // 0.22.18: the loose rows as a group
     {"Welt anhalten", "Pause world", "time.pause", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
     {"Zeitlupe", "Time scale", "time.scale", "", kQbValue, -1, kQcNone, kQvTime, kQbTime, 0},
     {"Ton mit anhalten", "Freeze sound too", "time.freezesound", "", kQbBool, -1, kQcNone, 0, kQbTime, 0},
@@ -30680,17 +31549,17 @@ const QbRow kQbChapters[] = {
 // 0.19: Sonstige - "Spinnen ignorieren Lara" / "Haie ignorieren Lara" = ai.dumb spiders / sharks (the planned row "Haie"
 // is replaced; Arachnophobie / Thalassophobie stay planned: they are about pictures and water, not the AI).
 const QbRow kQbAccess[] = {
-    {"Sehen", "Vision", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Sehen", "Vision", "-", "acc_see", kQbGroup, -1, kQcNone, 0, kQbBlue, 0},
     {"Farbpaletten", "Colour palettes", "-", "Paletten f\303\274r Farbfehlsicht (Debug-Ansicht, sp\303\244ter HUD)|palettes for colour "
      "vision deficiency (debug view, later the HUD)", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Untertitel gro\303\237", "Large subtitles", "-", "Untertitel gr\303\266\303\237er, dunkler Hintergrund, Sprechername|larger subtitles, dark "
      "background, speaker name", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Kontrast", "Contrast", "-", "Kontrast-Modus / HUD-Skalierung|contrast mode / HUD scaling", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"H\303\266ren", "Hearing", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"H\303\266ren", "Hearing", "-", "acc_hear", kQbGroup, -1, kQcNone, 0, kQbBlue, 0},
     {"Ger\303\244usch-Untertitel", "Sound captions", "-", "Ger\303\244usche als Text ([Explosion], [Thrall knurrt]), Richtung|sounds as "
      "text ([explosion], [thrall growls]), direction", kQbPlanned, -1, kQcNone, 0, 0, 0},
     {"Mono-Ton", "Mono sound", "-", "Ton in Mono|sound in mono", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"Verstehen", "Understanding", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Verstehen", "Understanding", "-", "acc_understand", kQbGroup, -1, kQcNone, 0, kQbBlue, 0},
     // 0.22.16: the subtitle look of page Spiel-Einstellungen (the same items)
     {"Untertitel gr\303\266\303\237er", "Larger subtitles", "sub.size", "", kQbValue, -1, kQcNone, kQvSubSize, kQbWhite, 0},
     {"Untertitel-Balken", "Subtitle bar", "sub.box", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
@@ -30700,7 +31569,7 @@ const QbRow kQbAccess[] = {
     {"Kapitel \303\274berspringen", "Skip chapter", "-", "ein Kapitel so beenden wie das Spiel (Story-Werte aus den Save-Diffs) - "
      "Stufe 2; Stufe 1 = Seite Kapitel (debug)|end a chapter the way the game does (story values from the save diffs) - "
      "stage 2; stage 1 = page Chapters (debug)", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"Steuerung", "Controls", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Steuerung", "Controls", "-", "acc_ctl", kQbGroup, -1, kQcNone, 0, kQbBlue, 0},
     {"Zeitlupe (Hilfe)", "Slow motion (assist)", "time.scale", "", kQbValue, -1, kQcNone, kQvAssist, kQbTime, 0},
     {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Befreien: Stand", "Safe ground state", "player.safeground", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
@@ -30710,7 +31579,7 @@ const QbRow kQbAccess[] = {
     {"Gott voll (Hilfe)", "Full god mode (assist)", "cheat.godfull", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Reaktions-Momente", "Reaction moments", "-", "Adrenalin-Momente l\303\244nger oder automatisch|adrenaline moments longer "
      "or automatic", kQbPlanned, -1, kQcNone, 0, 0, 0},
-    {"Sonstige (Phobien)", "Other (phobias)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Sonstige (Phobien)", "Other (phobias)", "-", "acc_other", kQbGroup, -1, kQcNone, 0, kQbBlue, 0},
     // 0.21 Arachnophobie (was planned): the master switch and its three parts
     {"Arachnophobie", "Arachnophobia", "arachno.on", "", kQbBool, -1, kQcNone, 0, kQbPhobia, 0},
     {"  Spinnen-Modell aus", "  Spider model off", "arachno.hide", "", kQbBool, -1, kQcNone, 0, kQbPhobia, 0},
@@ -30730,7 +31599,7 @@ const QbRow kQbAccess[] = {
 // 0.21 placeholder (Lukas 2026-11-06): co-op - planned rows only, no item behind them yet (research: docs\Befund-Koop-
 // Stufe0-0611.md); the same rows are the menu group "Co-op / Koop (planned)"
 const QbRow kQbCoop[] = {
-    {"Koop (geplant)", "Co-op (planned)", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Koop (geplant)", "Co-op (planned)", "-", "coop", kQbGroup, -1, kQcNone, 0, kQbBlue, 0},
     {"Koop an / aus", "Co-op on / off", "-", "zweite Figur mit Controller 2|second figure on pad 2", kQbPlanned, -1, kQcNone,
      0, 0, 0},
     {"Figur: Lara / Doppelg\303\244ngerin", "Figure: Lara / doppelganger", "-", "Figur w\303\244hlen|choose the figure", kQbPlanned, -1,
@@ -30748,25 +31617,25 @@ const QbRow kQbCoop[] = {
 // argument (an instance, a backup folder, an object name): right / X puts the line into the quick command line, A runs
 // it (kCmdDanger asks twice where the item is dangerous); level.reload asks twice in the bar (kQfConfirm)
 const QbRow kQbRescue[] = {
-    {"Festgesteckt", "Stuck", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Festgesteckt", "Stuck", "-", "rc_stuck", kQbGroup, -1, kQcNone, 0, kQbPlayer, 0},
     {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Befreien (Marke)", "Unstuck (mark)", "player.unstuck", "mark", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Befreien: Stand", "Safe ground state", "player.safeground", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Punkt merken", "Mark here", "player.mark", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Zum Punkt", "Back to mark", "player.recall", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Unit neu laden", "Reload unit", "level.reload", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
-    {"Spielst\303\244nde", "Saves", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Spielst\303\244nde", "Saves", "-", "rc_saves", kQbGroup, -1, kQcNone, 0, kQbPlayer, 0},
     {"Saves sichern", "Back up saves", "save.backup", "rettung", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     // 0.22.16 (from Notfall): the ring entry "Saves sichern" without a folder name (ring frozen: every entry is a row)
     {"Saves sichern (wie im Rad)", "Back up saves (as in the ring)", "save.backup", "", kQbAction, -1, kQcNone, 0,
      kQbPlayer, 0},
     {"Sicherungen (Liste)", "Backups (list)", "save.backups", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Sicherung zur\303\274ck ...", "Restore a backup ...", "save.restore", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfLine},
-    {"Objekte", "Objects", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Objekte", "Objects", "-", "rc_objects", kQbGroup, -1, kQcNone, 0, kQbPlayer, 0},
     {"Objekte suchen ...", "Find objects ...", "instance.list", "", kQbAction, -1, kQcNone, 0, kQbGrey, kQfLine},
     {"Objekt zu Lara ...", "Bring object ...", "instance.bring", "", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfLine},
     {"Objekt einblenden ...", "Unhide object ...", "instance.unhide", "", kQbAction, -1, kQcNone, 0, kQbPlayer, kQfLine},
-    {"Ausr\303\274stung", "Gear", "-", "", kQbLabel, -1, kQcNone, 0, kQbCheat, 0},
+    {"Ausr\303\274stung", "Gear", "-", "rc_gear", kQbGroup, -1, kQcNone, 0, kQbCheat, 0},
     {"Gegenstand geben ...", "Give item ...", "gear.give", "", kQbAction, -1, kQcNone, 0, kQbCheat, kQfLine},
     {"Medipack geben", "Give medipack", "gear.give", "g_healthpack", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
     {"Waffe geben", "Give weapon", "weapon.give", "", kQbChoice, -1, kQcNone, kQvWeapon, kQbCheat, 0},
@@ -30791,14 +31660,14 @@ const QbRow kQbRescue[] = {
 // 0.21.1 page "Tests" (TODO 0.21 / 0.21.1 item 2): teleports, then the Prepare shortcuts of the regression lists (the
 // ring's Tests / Prepare - right twice), Stop, and the TO TEST rows (right = OK / done / on, left = Fehler / open / off)
 const QbRow kQbTests[] = {
-    {"Teleport", "Teleport", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Teleport", "Teleport", "-", "ts_teleport", kQbGroup, -1, kQcNone, 0, kQbPlayer, 0},
     {"Zur letzten Position", "To the last position", "pos.go", "last", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Letzte laden + hin", "Load the last + go", "pos.goload", "last", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Aktiver Checkpoint", "Active checkpoint", "dbg.cpgo", "active", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Befreien", "Unstuck", "player.unstuck", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     // 0.21.9 test spots (docs\Befund-17i-Menue-Luecken-0811.md, first gap row; the tour file is full - 256 of 256 ring
     // entries with the built-ins): right twice = backup, then into the unit and to the checkpoint (cp.jump) / load
-    {"Teststellen (rechts 2x)", "Test spots (right 2x)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
+    {"Teststellen (rechts 2x)", "Test spots (right 2x)", "-", "ts_spots", kQbGroup, -1, kQcNone, 0, kQbRed, 0},
     {"End-Szene (020_ghoul)", "End scene (020_ghoul)", "cp.jump", "dlc_yggdrasil_end 9608", kQbAction, -1, kQcNone, 0,
      kQbRed, kQfConfirm},
     {"Boden 25057 (CP 9970)", "Floor 25057 (CP 9970)", "cp.jump", "dlc_yggdrasil_end 9970", kQbAction, -1, kQcNone, 0,
@@ -30806,9 +31675,11 @@ const QbRow kQbTests[] = {
     {"Zeremonienraum 030_pod", "Ceremony room 030_pod", "level.load", "dlc2_ceremony_room", kQbAction, -1, kQcNone, 0,
      kQbRed, kQfConfirm | kQfBackup},
     // 0.22 cutscene pause (TODO N12): hold the scene, effects run on; one frame on; the stream state
-    {"Zwischensequenz", "Cutscene", "-", "", kQbLabel, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Zwischensequenz", "Cutscene", "-", "ts_cine", kQbGroup, -1, kQcNone, 0, kQbPlayer, 0},
     {"Szene anhalten", "Hold the cutscene", "cine.pause", "", kQbBool, -1, kQcNone, 0, kQbPlayer, 0},
     {"Ein Bild weiter", "One frame on", "cine.step", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Bilder pro s (RB + View halten)", "Frames per s (hold RB + View)", "cine.steprate", "", kQbValue, -1, kQcNone,
+     kQvStepRate, kQbPlayer, 0},   // 0.22.18
     {"Stelle merken", "Remember the spot", "cine.mark", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},   // 0.22.1
     {"Bei Marke anhalten", "Hold at the mark", "cine.pauseat", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
     {"Szenen-Strom (live)", "Cutscene stream (live)", "cine.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
@@ -30823,15 +31694,17 @@ const QbRow kQbTests[] = {
      0, kQbGrey, 0},   // 0.22.10
     {"Licht-Auswahl je Objekt fest", "Stable light choice per object", "light.stablecut", "", kQbBool, -1, kQcNone, 0,
      kQbPlayer, 0},   // 0.22.10
+    {"Licht herabstufen statt verwerfen", "Demote a light instead of dropping", "light.demote", "", kQbBool, -1, kQcNone,
+     0, kQbPlayer, 0},   // 0.22.18
     // 0.21.11 lights (package 18d): list, then a shadow switch per light (the index from the list, typed in the line)
     {"Lichter ins Log", "Lights into the log", "light.list", "", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     {"Licht-Schatten ...", "Light shadow ...", "light.shadow", "", kQbAction, -1, kQcNone, 0, kQbBlue, kQfLine},
     // 0.22.9 enemy diagnosis: 0.22.16 on page Gegner (KI); sub.lang: page Spiel-Einstellungen
-    {"Diagnose", "Diagnosis", "-", "", kQbLabel, -1, kQcNone, 0, kQbBlue, 0},
+    {"Diagnose", "Diagnosis", "-", "ts_diag", kQbGroup, -1, kQcNone, 0, kQbBlue, 0},
     {"Tiefe: Diagnose", "Depth dump", "dbg.depthdump", "", kQbAction, -1, kQcNone, 0, kQbBlue, 0},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
-    {"hall02-Z\303\244hler (Tutorial-Kampf)", "hall02 counter (tutorial fight)", "-", "", kQbLabel, -1, kQcNone, 0, kQbRed, 0},
+    {"hall02-Z\303\244hler (Tutorial-Kampf)", "hall02 counter (tutorial fight)", "-", "ts_hall02", kQbGroup, -1, kQcNone, 0, kQbRed, 0},
     {"hall02-Werte (live)", "hall02 values (live)", "story.values", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},   // 0.21.8
     {"hall02-Z\303\244hler reparieren", "repair hall02 counter", "fix.hall02", "", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
     {"Thrall-Skriptwert +8 ins Log", "Thrall script value +8 to log", "thrall.scriptval", "", kQbAction, -1, kQcNone, 0,
@@ -30951,6 +31824,15 @@ const QbHelp kQbHelp[] = {
     {"light.cutlabels", "", "Verworfene Lichter am Objekt + Zeile oben links|Dropped lights at the light + a summary line"},
     {"light.cut", "*", "Licht-S\303\244tze ins Log: + behalten, - verworfen|Light sets to the log: + kept, - dropped"},
     {"light.stablecut", "", "Feste Lichtwahl je Objekt (statt light.stable)|Fixed light choice per object (vs light.stable)"},
+    // 0.22.18
+    {"light.demote", "", "4. Schattenlicht ohne Schatten statt weg|4th shadow light without shadow, not dropped"},
+    {"cine.steprate", "", "Bilder pro s, wenn RB + View gehalten wird|Frames per s while RB + View is held"},
+    {"sub.valign", "", "Untertitel unten (Spiel), oben oder frei|Subtitles at the bottom (game), top or free"},
+    {"sub.halign", "", "Untertitel mittig (Spiel), links oder rechts|Subtitles centred (game), left or right"},
+    {"sub.margin", "", "Rand links / rechts in % der Breite|Left / right margin in % of the width"},
+    {"voice.lang", "", "Nur die Sprachausgabe, ab dem n\303\244chsten Satz|Speech only, from the next sentence"},
+    {"voice.full", "*", "Ton sofort, Texte ab dem n\303\244chsten Start|Voice now, texts from the next start"},
+    {"media.music.inlevels", "", "Musik-Player auch im Level (Versuch)|Music player also in levels (test)"},
     {"cine.pauseat", "", "N\303\244chste Szene h\303\244lt an der Marke - Checkpoint neu laden|Next cutscene stops at the mark - "
                          "reload the checkpoint"},
     {"menu.hidecursor", "", "Kein Mauszeiger \303\274ber dem Spielbild|No mouse cursor over the game picture"},
@@ -31015,8 +31897,8 @@ void QbHelpPart(const char *text, bool de, char *o, size_t n) {
 const int kQbStartPage = 6;                  // Leveldaten: the layers are what the bar is mostly for (0.21.1: page 0
                                              // Favoriten / Zuletzt in front; 0.21.6: page Kostueme after Lara;
                                              // 0.21.11: page Rettung after page 0)
-const int kQbViewMax = 112;                  // rows of one page (static + special; 0.21.1: 64, was 40; 0.22.16: 112 -
-                                             // page Spiel-Einstellungen with every group open)
+const int kQbViewMax = 128;                  // rows of one page (static + special; 0.21.1: 64, was 40; 0.22.16: 112 -
+                                             // page Spiel-Einstellungen with every group open; 0.22.18: 128 - its new rows)
 int g_qbPage = kQbStartPage, g_qbRow[17] = {};  // render thread; kept over a close
 static_assert(kQbPageN <= 17, "g_qbRow holds 17 pages");   // 0.21.5: 15 pages; 0.21.6: 16 (Kostueme); 0.21.11: 17
                                                             // (Rettung) - full
@@ -31153,7 +32035,8 @@ int QbValueCount(int val) {
          : val == kQvSndGroup ? 11                                               // 0.21.8: 0, 10 .. 100 %
          : val == kQvSubLang ? 7 : val == kQvSubSize || val == kQvSubAlpha ? 5   // 0.22.16 settings page
          : val == kQvSubColour ? 4 : val == kQvSubPos ? 11 : val == kQvVol ? 17 : val == kQvMouse ? 20
-         : val == kQvGfx3 ? 3 : 0;
+         : val == kQvGfx3 || val == kQvStepRate || val == kQvSubAlignV || val == kQvSubAlignH ? 3
+         : val == kQvSubMargin ? 5 : val == kQvVoiceLang ? kVlChoiceN : 0;
 }
 // 0.22.16: sub.lang steps - game language, English, French, German, Italian, Spanish, Dutch (the DLC 2 records' ids)
 const int kQbSubLangs[7] = {-1, 0, 1, 2, 3, 4, 11};
@@ -31186,10 +32069,18 @@ void QbValueArg(int val, int i, char *o, size_t n) {
     case kQvSubSize: Out(o, n, "%.2f", static_cast<double>(kSuSizes[i])); break;
     case kQvSubAlpha: Out(o, n, "%d", kSuAlphas[i]); break;
     case kQvSubColour: Out(o, n, "%s", kSuColours[i].word); break;
-    case kQvSubPos: Out(o, n, "%d", i == 5 ? 352 : 300 + i * 10); break;   // the game's 352 instead of 350
+    case kQvSubPos:                                                 // the game's 352 instead of 350; 0.22.18 free: 16 ..
+        if (g_suAlignV == 2) Out(o, n, "%d", 16 + i * (SaFreeMax(g_suSize) - 16) / 10);
+        else Out(o, n, "%d", i == 5 ? 352 : 300 + i * 10);
+        break;
+    case kQvSubAlignV: Out(o, n, "%s", kSaV[i]); break;             // 0.22.18
+    case kQvSubAlignH: Out(o, n, "%s", kSaH[i]); break;
+    case kQvSubMargin: Out(o, n, "%d", i * 5); break;
+    case kQvVoiceLang: Out(o, n, "%s", kVlChoices[i].word); break;
     case kQvVol: Out(o, n, "%d", i * 8); break;
     case kQvMouse: Out(o, n, "%d", i + 1); break;
     case kQvGfx3: Out(o, n, "%d", i); break;
+    case kQvStepRate: Out(o, n, "%d", 5 + 5 * i); break;   // 0.22.18
     default: o[0] = 0;
     }
 }
@@ -31213,7 +32104,18 @@ int QbValueNow(int val) {
             if (abs(static_cast<int>(g_suAlpha) - kSuAlphas[i]) < abs(static_cast<int>(g_suAlpha) - kSuAlphas[v])) v = i;
         break;
     case kQvSubColour: v = static_cast<int>(g_suColour); break;
-    case kQvSubPos: v = (static_cast<int>(g_suPos) - 300 + 5) / 10; break;
+    case kQvSubPos:
+        if (g_suAlignV == 2) {                           // 0.22.18 free: the nearest of the 11 steps
+            const int span = SaFreeMax(g_suSize) - 16;
+            v = span > 0 ? ((static_cast<int>(g_suPos) - 16) * 10 + span / 2) / span : 0;
+        } else {
+            v = (static_cast<int>(g_suPos) - 300 + 5) / 10;
+        }
+        break;
+    case kQvSubAlignV: v = static_cast<int>(g_suAlignV); break;   // 0.22.18
+    case kQvSubAlignH: v = static_cast<int>(g_suAlignH); break;
+    case kQvSubMargin: v = (static_cast<int>(g_suMargin) + 2) / 5; break;
+    case kQvVoiceLang: v = VlChoiceNow(); break;
     case kQvMouse: v = static_cast<int>(GsOpt(0x96) + 0.5f) - 1; break;
     case kQvDepth: v = static_cast<int>(g_dpMode); break;
     case kQvAlpha: v = (g_dvAlpha + 5) / 10 - 1; break;
@@ -31232,6 +32134,7 @@ int QbValueNow(int val) {
     case kQvAiMode: v = g_aiGateMode ? 1 : 0; break;   // 0.19
     case kQvSpawnCount: v = static_cast<int>(g_spCount) - 1; break;   // 0.21.1
     case kQvSpawnAt: v = g_spAt ? 1 : 0; break;
+    case kQvStepRate: v = g_cnStepRate / 5 - 1; break;  // 0.22.18
     case kQvSndPos: v = g_snPos; break;                 // 0.20.1
     case kQvSndSort: v = g_snSort; break;
     case kQvShake:                                      // 0.21: the nearest step
@@ -31678,6 +32581,8 @@ struct QbView {
     bool skip;                               // a heading: up / down pass over it
     int src;                                 // 0.21.1: the page's static row of this view (-1 = a special row)
     bool fav;                                // 0.21.8: its item + argument is a favourite (a yellow star after the name)
+    int depth;                               // 0.22.18: indentation steps (a heading: its level; a row: the level below)
+    bool head;                               // 0.22.18: a group heading / label (drawn without the square column)
 };
 QbView g_qbView[kQbViewMax];
 int g_qbViewN = 0, g_qbViewPage = -1;
@@ -31760,6 +32665,18 @@ void QbViewOf(int page, const QbRow &r, QbView &v, bool de) {
         Out(v.count, sizeof(v.count), "%s", note);
         v.stateCol = IM_COL32(255, 190, 90, 255);
     }
+    if (!_stricmp(r.id, "game.vol.music") && !strcmp(r.arg, "128") && !grey) {   // 0.22.18 (plan S2): the warning row
+        const float mv = GsOpt(0x02);
+        if (mv < 0.5f) {
+            Out(v.name, sizeof(v.name), "%s", de ? "Musik-Lautst\303\244rke ist 0 - der Player bleibt stumm"
+                                                 : "Music volume is 0 - the player stays silent");
+            Out(v.state, sizeof(v.state), "%s", de ? "rechts = 100 %" : "right = 100 %");
+            v.col = IM_COL32(255, 90, 80, 255);
+            v.stateCol = IM_COL32(255, 90, 80, 255);
+        } else {
+            Out(v.count, sizeof(v.count), "%s %.0f %%", de ? "jetzt" : "now", static_cast<double>(mv) * 100.0 / 128.0);
+        }
+    }
 }
 int g_qbStaticN = 0;                         // 0.21.1: views of the static rows (the special rows follow)
 // 0.18: the rows of a page for this frame - static rows the 0.17 way (state, colour, count), then the special rows;
@@ -31767,24 +32684,46 @@ int g_qbStaticN = 0;                         // 0.21.1: views of the static rows
 LONG g_qbFrame = 0, g_qbBuiltFrame = -1;
 int QbSpecialBuild(int special, int base, bool de);
 void QbMarkFavs(int page);                   // 0.21.8, below
+// 0.22.18: the item rows of group i - up to the next heading of its level or above (sub-group rows included)
+int QbGroupInside(const QbPage &p, int i) {
+    const int lv = QbGroupLevel(p.rows[i]);
+    int inside = 0;
+    for (int j = i + 1; j < p.n; ++j) {
+        const QbRow &q = p.rows[j];
+        if (q.kind == kQbLabel || q.kind == kQbGroup) {
+            if (QbGroupLevel(q) <= lv) break;
+            continue;
+        }
+        ++inside;
+    }
+    return inside;
+}
 void QbBuild(int page) {
     const bool de = g_qbLang == 0;
     const QbPage &p = kQbPages[page];
     g_qbViewN = 0;
     g_qbHead[0] = 0;
     if (p.special != kQsSaves) g_qbSavesPageSeen = 0;   // entering the Saves page again re-reads the files
-    bool hide = false;
+    int hideAbove = -1;                      // 0.22.18: the level of the closed group whose rows are hidden (-1 none)
+    int depth = 0;                           // 0.22.18: the depth of the rows after the last heading
     for (int i = 0; i < p.n && g_qbViewN < kQbViewMax; ++i) {
         const QbRow &r = p.rows[i];
-        if (r.kind == kQbLabel || r.kind == kQbGroup) hide = false;
-        else if (hide) continue;
+        const bool head = r.kind == kQbLabel || r.kind == kQbGroup;
+        const int lv = head ? QbGroupLevel(r) : depth;
+        if (head) {
+            if (hideAbove >= 0 && lv > hideAbove) continue;   // a sub-group inside a closed group
+            hideAbove = -1;
+            depth = lv + 1;
+        } else if (hideAbove >= 0) continue;
         QbView &v = g_qbView[g_qbViewN++];
         QbViewOf(page, r, v, de);
         v.src = i;
+        v.depth = lv;
+        v.head = head;
         if (r.kind == kQbGroup) {
-            hide = QbGroupClosed(r.arg);
-            int inside = 0;
-            for (int j = i + 1; j < p.n && p.rows[j].kind != kQbLabel && p.rows[j].kind != kQbGroup; ++j) ++inside;
+            const bool hide = QbGroupClosed(r.arg);
+            if (hide) hideAbove = lv;
+            const int inside = QbGroupInside(p, i);
             Out(v.name, sizeof(v.name), "%s %s", hide ? "[+]" : "[-]", de ? r.de : r.en);
             if (hide) Out(v.state, sizeof(v.state), de ? "%d Zeilen - rechts = auf" : "%d rows - right = open", inside);
             else Out(v.state, sizeof(v.state), "%s", de ? "links = zu" : "left = close");
@@ -31793,7 +32732,14 @@ void QbBuild(int page) {
     g_qbStaticN = g_qbViewN;
     if (p.special) {
         const int k = QbSpecialBuild(p.special, g_qbViewN, de);
-        for (int j = 0; j < k; ++j) g_qbView[g_qbViewN + j].src = -1;
+        bool inHead = false;                 // 0.22.18: special headings ("[+] ..." / "-- ...") at level 0, rows below
+        for (int j = 0; j < k; ++j) {
+            QbView &v = g_qbView[g_qbViewN + j];
+            v.src = -1;
+            v.head = !strncmp(v.name, "[+] ", 4) || !strncmp(v.name, "[-] ", 4) || !strncmp(v.name, "-- ", 3);
+            if (v.head) inHead = true;
+            v.depth = v.head || !inHead ? 0 : 1;
+        }
         g_qbViewN += k;
     }
     QbMarkFavs(page);                        // 0.21.8 star
@@ -31836,6 +32782,25 @@ void QbMarkFavs(int page) {
     }
 }
 
+// 0.22.18: the bar's groups in the long menu - a collapsible header per group (a sub-group indented one step, its
+// rows too), the rows hidden while their group is closed; open at first unless the group starts closed in the bar
+struct QbMenuGroups {
+    bool open[2] = {true, true};
+    bool indented = false;
+    void Head(const QbRow &r) {
+        const int lv = QbGroupLevel(r);
+        if (indented) { ImGui::Unindent(); indented = false; }
+        if (lv > 0 && !open[0]) { open[1] = false; return; }
+        char label[200];
+        Out(label, sizeof(label), "%s / %s###mg_%s_%s", r.de, r.en, r.arg[0] ? r.arg : "x", r.en);
+        if (lv > 0) { ImGui::Indent(); indented = true; }
+        const bool o = ImGui::CollapsingHeader(label, QbStartClosed(r.arg) ? 0 : ImGuiTreeNodeFlags_DefaultOpen);
+        if (lv == 0) { open[0] = o; open[1] = true; }
+        else open[1] = o;
+    }
+    bool Show() const { return open[0] && open[1]; }
+    void End() { if (indented) { ImGui::Unindent(); indented = false; } }
+};
 // 0.18 menu page "Accessibility / Barrierefreiheit": the same rows as the bar page (kQbAccess) - headings, the working
 // assists (checkboxes / buttons running the existing items), the planned functions greyed with a one-line tooltip
 void PageAccess() {
@@ -31847,13 +32812,14 @@ void PageAccess() {
                        "shake' below.");
     char o[300];
     int index = 0;
+    QbMenuGroups groups;                     // 0.22.18: the bar's groups as collapsible headers
     for (const QbRow &r : kQbAccess) {
         ++index;                             // 0.19: widget ids by row (two rows may run the same item, ai.dumb)
-        if (r.kind == kQbLabel) {
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(0.63f, 0.9f, 1.0f, 1.0f), "%s / %s", r.de, r.en);
+        if (r.kind == kQbLabel || r.kind == kQbGroup) {
+            groups.Head(r);
             continue;
         }
+        if (!groups.Show()) continue;
         if (r.kind == kQbPlanned) {
             ImGui::TextDisabled("   %s / %s  (geplant / planned)", r.de, r.en);
             if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", r.arg);
@@ -31897,6 +32863,7 @@ void PageAccess() {
             ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f), "(%s)", why);
         }
     }
+    groups.End();
 }
 
 // 0.21 menu group "Co-op / Koop (planned)": the planned rows of the bar page Koop (no function yet)
@@ -31904,7 +32871,7 @@ void PageCoop() {
     ImGui::TextWrapped("Placeholder (0.21): a second figure in the game - nothing works yet; hover for what each row will "
                        "do. Bar page: Koop.");
     for (const QbRow &r : kQbCoop) {
-        if (r.kind == kQbLabel) continue;
+        if (r.kind == kQbLabel || r.kind == kQbGroup) continue;
         ImGui::TextDisabled("   %s / %s  (geplant / planned)", r.de, r.en);
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", r.arg);
     }
@@ -32529,9 +33496,13 @@ void DrawQuick() {
         Out(more, sizeof(more), "   %d-%d / %d", first + 1, last, n);
         strncat_s(title, sizeof(title), more, _TRUNCATE);
     }
+    // 0.22.18: headings at the left, the rows of a group one step (ind) per level further right, the square column only
+    // on item rows; nameW = the widest left part (indent + square column + name)
+    const float ind = width("[-] ", fs);
+    auto leftOf = [&](const QbView &v) { return static_cast<float>(v.depth) * ind + (v.head ? 0.0f : sq + pad); };
     float nameW = 0.0f, stateW = 0.0f, countW = 0.0f;
     for (int i = first; i < last; ++i) {
-        float a = width(g_qbView[i].name, fs) + (g_qbView[i].fav ? width(" *", fs) : 0.0f),   // 0.21.8 star
+        float a = leftOf(g_qbView[i]) + width(g_qbView[i].name, fs) + (g_qbView[i].fav ? width(" *", fs) : 0.0f),   // star
               b = width(g_qbView[i].state, fs), c = width(g_qbView[i].count, fs);
         if (a > nameW) nameW = a;
         if (b > stateW) stateW = b;
@@ -32566,7 +33537,7 @@ void DrawQuick() {
     Out(close, sizeof(close), "%s%s   %s: %s%s", yOk ? (de ? "X: ausf\303\274hren  Y: Favorit" : "X: run  Y: favourite")
                                                  : (de ? "X: ausf\303\274hren  Y: -" : "X: run  Y: -"), l3, combo,
         de ? "zu" : "close", g_padModeIdle ? (de ? "   (Pad NICHT gesperrt)" : "   (pad NOT held)") : "");
-    float w = pad + sq + pad + nameW + gap + stateW + gap + countW + pad;
+    float w = pad + nameW + gap + stateW + gap + countW + pad;
     float tw = width(title, fs) + 2.0f * pad, fw = width(foot, fsSmall) + 2.0f * pad, cw = width(close, fsSmall) + 2.0f * pad;
     const float pw = hasHelp ? width(help, fsSmall) + 2.0f * pad : 0.0f;   // 0.21.7 help line
     if (pw > w) w = pw < io.DisplaySize.x * 0.45f ? pw : io.DisplaySize.x * 0.45f;
@@ -32593,15 +33564,23 @@ void DrawQuick() {
         dl->AddText(font, fs, ImVec2(x0 + pad, y), IM_COL32(170, 170, 170, 255), de ? "(keine)" : "(none)");
         y += rowH;
     }
-    const float nameX = x0 + pad + sq + pad, stateX = nameX + nameW + gap, countRight = x0 + w - pad;
+    const float stateX = x0 + pad + nameW + gap, countRight = x0 + w - pad;
+    const float guideDx = width("[", fs) * 0.5f;
     for (int i = first; i < last; ++i) {
         const QbView &v = g_qbView[i];
         if (i == sel) {
             dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + w - 2.0f, y + rowH - 1.0f), IM_COL32(70, 110, 190, 150), 3.0f);
             dl->AddRectFilled(ImVec2(x0 + 2.0f, y - 1.0f), ImVec2(x0 + 5.0f, y + rowH - 1.0f), IM_COL32(255, 220, 90, 255));
         }
+        // 0.22.18: a thin guide line per open group level under its "[" (rows of an open group only)
+        for (int k = 0; k < v.depth; ++k) {
+            const float gx = x0 + pad + static_cast<float>(k) * ind + guideDx;
+            dl->AddLine(ImVec2(gx, y - 1.0f), ImVec2(gx, y + rowH - 1.0f), IM_COL32(160, 230, 255, 70), 1.0f);
+        }
+        const float rowX = x0 + pad + static_cast<float>(v.depth) * ind;
+        const float nameX = v.head ? rowX : rowX + sq + pad;
         if (v.square) {                      // the colour square: filled = on, an outline = off
-            ImVec2 a(x0 + pad, y + (fs - sq) * 0.5f + 1.0f), b(a.x + sq, a.y + sq);
+            ImVec2 a(rowX, y + (fs - sq) * 0.5f + 1.0f), b(a.x + sq, a.y + sq);
             if (v.square == 1) dl->AddRectFilled(a, b, v.col | 0xff000000u, 2.0f);
             else dl->AddRect(a, b, v.col, 2.0f, 0, 1.2f);
         }
@@ -32649,8 +33628,9 @@ bool RunQuickLang(const char *arg, char *o, size_t n) {
     int lang = !v[0] ? !g_qbLang : !_stricmp(v, "en") ? 1 : !_stricmp(v, "de") ? 0 : -1;
     if (lang < 0) { Out(o, n, "usage: quick.lang de|en; now %s", g_qbLang ? "en" : "de"); return false; }
     g_qbLang = lang;
-    Log(1, "quick.lang %s (src=%s)", lang ? "en" : "de", ShotSource("quick.lang"));
-    Out(o, n, "quick.lang %s", lang ? "en" : "de");
+    IniKeep("Quick", "Language", lang ? "en" : "de");   // 0.22.18: kept over restarts
+    Log(1, "quick.lang %s (src=%s): [Quick] Language written", lang ? "en" : "de", ShotSource("quick.lang"));
+    Out(o, n, "quick.lang %s (kept in TruMenu.ini)", lang ? "en" : "de");
     return true;
 }
 void ValQuickStatus(char *o, size_t n) {
@@ -33369,7 +34349,7 @@ enum QbDynKind { kQdNone = 0, kQdPos, kQdCpActive, kQdCpAll, kQdCp, kQdBackupNow
                  kQdCosPick, kQdCosNext, kQdCosRec, kQdCosGroup, kQdCos,     // 0.21.6: page Kostueme
                  kQdChapGroup, kQdChap,                     // 0.21.7: page Kapitel (units per chapter)
                  kQdChapCp,                                 // 0.21.9: page Kapitel, a checkpoint of the open unit
-                 kQdFigGroup, kQdFigPlan };                 // 0.22.16: page Figur (switch group, planned row)
+                 kQdFigGroup };                             // 0.22.16: page Figur (switch group; 0.22.18: no planned row)
 struct QbDyn { int kind; LONG intro; char arg[64], unit[48]; bool loaded; };
 QbDyn g_qbDyn[kQbViewMax];
 int g_qbDynN = 0;
@@ -33839,6 +34819,7 @@ const QbFigSw kQbFigShadow[] = {
     {"TruShadowPower", "Look", "ScreenEffect"}, {"TruShadowPower", "Meter", "HudBar"},
     {"TruShadowPower", "Adrenaline", "Translate"}, {"TruShadowPower", "Reticle", "TranslateRequest"},
     {"TruShadowPower", "TimeScale", "TranslateSlot6"}, {"TruShadowPower", "ShadowPower", "Buttons"},
+    {"TruShadowPower", "Meter", "Infinite"},   // 0.22.18: TruShadowPower 0.23 live switch (was the planned row, N2)
 };
 const QbFigSw kQbFigCombat[] = {
     {"TruShadowCombat", "Strike", "Translate"}, {"TruShadowCombat", "Strike", "Gate"},
@@ -33898,30 +34879,12 @@ int QbFigRows(QbView *v, QbDyn *d, int max, bool de) {
                 ++n;
                 break;
             }
-        if (!g && n < max) {                 // plan N2: "Kraft unendlich" planned until the switch exists
-            QbView &p = v[n];
-            QbDyn &pq = d[n];
-            memset(&p, 0, sizeof(p));
-            memset(&pq, 0, sizeof(pq));
-            p.src = -1;
-            Out(p.name, sizeof(p.name), "   %s", de ? "Kraft unendlich" : "Infinite power");
-            Out(p.state, sizeof(p.state), "%s", de ? "geplant" : "planned");
-            p.col = IM_COL32(125, 125, 125, 255);
-            p.stateCol = IM_COL32(125, 125, 125, 255);
-            pq.kind = kQdFigPlan;
-            ++n;
-        }
     }
     LeaveCriticalSection(&g_swLock);
     return n;
 }
 void QbFigAct(const QbDyn &q, int dir) {
     const bool de = g_qbLang == 0;
-    if (q.kind == kQdFigPlan) {
-        QbResult(false, "%s", de ? "Kraft unendlich (geplant, N2): Schattenkraft-Leiste bleibt voll - der Schalter fehlt noch"
-                                 : "Infinite power (planned, N2): the shadow meter stays full - the switch is not built yet");
-        return;
-    }
     const char *key = q.intro ? "fig_combat" : "fig_shadow";
     const bool closed = QbGroupClosed(key);
     const bool close = dir == kQbXDir ? !closed : dir < 0;
@@ -34768,8 +35731,7 @@ void QbSpecialAct(int special, int row, int dir) {
     case kQdSw:
         QbSwAct(q, dir);
         return;
-    case kQdFigGroup:                        // 0.22.16 page Figur
-    case kQdFigPlan:
+    case kQdFigGroup:                        // 0.22.16 page Figur (0.22.18: the planned row is a real switch now)
         QbFigAct(q, dir);
         return;
     case kQdCosPick:                         // 0.21.6 page Kostueme
@@ -34942,7 +35904,8 @@ void QuickCheck() {
     int planned = 0;
     for (const QbPage &p : kQbPages)
         for (int i = 0; i < p.n; ++i) {
-            if (p.rows[i].kind == kQbLabel || p.rows[i].kind == kQbPlanned) {   // 0.18: no item
+            if (p.rows[i].kind == kQbLabel || p.rows[i].kind == kQbPlanned ||
+                p.rows[i].kind == kQbGroup) {   // 0.18: no item (0.22.18: group headings too - were 29 "unknown")
                 planned += p.rows[i].kind == kQbPlanned ? 1 : 0;
                 continue;
             }
@@ -35683,11 +36646,16 @@ void PageQbAll() {
         char head[96];
         Out(head, sizeof(head), "%s / %s (%d)###qbpage%d", pg.de, pg.en, pg.n, p);
         if (!ImGui::TreeNode(head)) continue;
+        QbMenuGroups groups;                 // 0.22.18: the bar's groups as collapsible headers
         for (int i = 0; i < pg.n; ++i) {
+            const QbRow &r = pg.rows[i];
+            if (r.kind == kQbLabel || r.kind == kQbGroup) { groups.Head(r); continue; }
+            if (!groups.Show()) continue;
             ImGui::PushID(i);
-            PageQbRow(pg.rows[i], p, i);
+            PageQbRow(r, p, i);
             ImGui::PopID();
         }
+        groups.End();
         ImGui::TreePop();
     }
 }
@@ -36792,7 +37760,8 @@ void ReadOptions(const char *dir) {
     char ini[MAX_PATH], text[32];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruMenu.ini", dir);
     // defaults: the kOpts table (also the source of the shipped TruMenu.ini)
-    g_enabled = OptInt(ini, "Menu", "Enabled");
+    g_enabled = OptInt(ini, "Menu", "Load");               // 0.22.18: the master switch (was [Menu] Enabled)
+    g_menuWindow = OptInt(ini, "Menu", "Enabled") != 0 ? 1 : 0;   // 0.22.18: the big window (default 0)
     g_logLevel = OptInt(ini, "Menu", "LogLevel");
     g_toggleButtons = static_cast<WORD>(OptInt(ini, "Menu", "ToggleButtons"));
     if (!g_toggleButtons) g_toggleButtons = kPadL3 | kPadR3;
@@ -36811,6 +37780,7 @@ void ReadOptions(const char *dir) {
     g_flightHint = OptInt(ini, "Cheat", "FlightHint") != 0 ? 1 : 0;   // 0.21.6
     InterlockedExchange(&g_lsWant, OptInt(ini, "Light", "Stable") != 0 ? 1 : 0);   // 0.22.5: default on (end-cutscene flicker)
     InterlockedExchange(&g_lcStableWant, OptInt(ini, "Light", "StableCut") != 0 ? 1 : 0);   // 0.22.10: default off
+    InterlockedExchange(&g_ldWant, OptInt(ini, "Light", "Demote") != 0 ? 1 : 0);   // 0.22.18: default off
     {                                        // 0.22.7 [Cine] keys (hex or decimal, "0x78")
         auto cine = [&](const char *key) {
             char v[32];
@@ -37040,6 +38010,7 @@ void ReadOptions(const char *dir) {
     ArReadOptions(ini);                                                              // 0.21 [Arachno] / [Camera]
     SgReadOptions(ini);                                                              // 0.21.8 [SoundGroups]
     GsReadOptions(ini);                                                              // 0.22.16 [Settings]
+    VlReadOptions(ini);                                                              // 0.22.18 [Settings] VoiceLanguage
     // 0.10 [Radial]: HoldButtons / Key also as hex ("0x00C0", "0x78")
     auto number = [&](const char *key) {
         char v[32];
@@ -37123,7 +38094,7 @@ void ReadOptions(const char *dir) {
         char v[32];
         OptString(ini, "Quick", "Language", v, sizeof(v));
         DvTrim(v);
-        g_qbLang = !_stricmp(v, "en") ? 1 : 0;
+        g_qbLang = !_stricmp(v, "de") ? 0 : 1;   // 0.22.18: English unless "de"
         OptString(ini, "Quick", "Scale", v, sizeof(v));
         float s = static_cast<float>(atof(v));
         g_qbScale = s >= 0.5f && s <= 3.0f ? s : static_cast<float>(atof(OptDefault("Quick", "Scale")));
@@ -37186,7 +38157,9 @@ void Start(HMODULE self) {
         g_flowToastMs / 1000, g_flowPollMs, g_flowEnabled ? " - the worker reads the file" : " - off");
     if (g_shotKey && (g_shotKey == g_toggleKey || (g_radEnabled && g_shotKey == g_radKey)))
         Log(0, "shot: [Shot] Hotkey 0x%02x is also [Menu] ToggleKey / [Radial] Key - both act on that key", g_shotKey);
-    if (!g_enabled) { Log(1, "disabled by TruMenu.ini - nothing hooked"); return; }
+    if (!g_enabled) { Log(1, "disabled by TruMenu.ini ([Menu] Load=0) - nothing hooked"); return; }
+    Log(1, "0.22.18: big menu window %s ([Menu] Enabled), ring %s ([Radial] Enabled), quick bar %s ([Quick] Enabled)",
+        g_menuWindow ? "on" : "off", g_radEnabled ? "on" : "off", g_qbEnabled ? "on" : "off");
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     g_baseOk = base == kImageBase;
     if (!g_baseOk) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }

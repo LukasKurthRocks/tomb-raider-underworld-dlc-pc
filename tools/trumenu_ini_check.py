@@ -231,7 +231,9 @@ QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'chea
                   # 0.22.16 page Spiel-Einstellungen (sub.lang cycles; gfx.r.* = greyed placeholders with their value)
                   'sub.lang', 'sub.size', 'sub.boxalpha', 'sub.colour', 'sub.pos', 'game.vol.music', 'game.vol.sfx',
                   'game.vol.voice', 'game.mouse', 'gfx.filter', 'gfx.aspect', 'gfx.r.vsync', 'gfx.r.triple', 'gfx.r.aa',
-                  'gfx.r.mode', 'gfx.r.fullscreen', 'gfx.r.present2')
+                  'gfx.r.mode', 'gfx.r.fullscreen', 'gfx.r.present2',
+                  # 0.22.18 subtitle alignment, voice language, frame-step rate
+                  'sub.valign', 'sub.halign', 'sub.margin', 'voice.lang', 'cine.steprate')
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
@@ -912,7 +914,8 @@ def check_quick(ini_path, radial_path):
             elif items[item] != 'bool' or arg: problems.append(where + ': a bool row needs a bool item without argument')
         elif kind == 'kQbValue' and item not in QB_VALUE_ITEMS:
             problems.append(where + ': a value row needs one of %s' % ', '.join(QB_VALUE_ITEMS))
-        elif kind == 'kQbAction' and items[item] != 'action' and not (item == 'player.health' and not arg):
+        elif kind == 'kQbAction' and items[item] != 'action' and not (item == 'player.health' and not arg) and \
+                not (item == 'game.vol.music' and arg == '128'):   # 0.22.18: the music volume warning row
             problems.append(where + ': an action row needs an action item (or player.health without argument)')
         elif kind == 'kQbInfo' and items[item] != 'info': problems.append(where + ': an info row needs an info item')
         elif kind == 'kQbChoice' and items[item] != 'action': problems.append(where + ': a choice row needs an action item')
@@ -1315,7 +1318,7 @@ def check_021(ini_path, radial_path, rows):
         if i == 'ai.remove':
             if a not in AD_ARGS: problems.append(where + ': ai.remove needs nearest / others / all')
             if k != 'kQbAction' or 'kQfConfirm' not in tail: problems.append(where + ': ai.remove = action row with kQfConfirm')
-        if t == 'kQbCoop' and k not in ('kQbLabel', 'kQbPlanned'):
+        if t == 'kQbCoop' and k not in ('kQbLabel', 'kQbPlanned', 'kQbGroup'):   # 0.22.18: the heading is a group
             problems.append(where + ': the Koop page has planned rows only (no function yet)')
     if not any(t == 'kQbCoop' and k == 'kQbPlanned' for t, de, i, a, k, layer, tail in bar):
         problems.append('TruMenu.cpp: kQbCoop has no planned row')
@@ -2096,8 +2099,8 @@ def check_0216(ini_path):
     elif pages[specials.index('kQsCostume') - 1][1] != 'kQbLara':
         problems.append('TruMenu.cpp: page Kostueme must follow page Lara')
     if 'static_assert(kQbPageN <= %d' % QB_PAGES_MAX not in src or 'g_qbRow[%d]' % QB_PAGES_MAX not in src or \
-            'const int kQbViewMax = 112;' not in src:   # 0.22.16: 112 (page Spiel-Einstellungen, every group open)
-        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= %d, g_qbRow[%d], kQbViewMax 112) '
+            'const int kQbViewMax = 128;' not in src:   # 0.22.16: 112; 0.22.18: 128 (settings page, every group open)
+        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= %d, g_qbRow[%d], kQbViewMax 128) '
                         'changed' % (QB_PAGES_MAX, QB_PAGES_MAX))
     sec = src[src.find('// ---- 0.21.6 costumes'):src.find('// ---- end of 0.21.6 costumes')]
     if len(sec) < 100: problems.append('TruMenu.cpp: section "0.21.6 costumes" missing')
@@ -2665,7 +2668,8 @@ def check_02213():
     m = re.search(r'const char \*const kFtHeader = (.*?);\r?\n', src, re.S)
     head = ''.join(re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(1))).replace('\\t', '\t').replace('\\n', '\n') if m else ''
     cols = head.rstrip('\n').split('\t')
-    if Q02213_FT_OLD_LAST not in cols or tuple(cols[cols.index(Q02213_FT_OLD_LAST) + 1:]) != Q02213_FT_NEW or \
+    new_at = cols.index(Q02213_FT_OLD_LAST) + 1 if Q02213_FT_OLD_LAST in cols else 0   # 0.22.18: more columns after
+    if Q02213_FT_OLD_LAST not in cols or tuple(cols[new_at:new_at + len(Q02213_FT_NEW)]) != Q02213_FT_NEW or \
             cols[:3] != ['host_time', 'inst', 'obj_id']:
         problems.append('TruMenu.cpp: kFtHeader must keep the TruXenia order and end with %s' % ', '.join(Q02213_FT_NEW))
     wr = fn_body(src, 'void FtWrite(')
@@ -2852,8 +2856,8 @@ def check_02217(ini_path):
     +0x14 / +0x77c / +0x384 = the ones of kCnChecks, read only with g_cnOk), SrLines uses the same rule with r.seen"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.17 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.17')
+    if '"0.22.17 (subtitle fallback' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.18: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.17 part "0.22.17 (subtitle fallback"')
     if not re.search(r'\{"Settings", "SubtitleFallback", "1", "0\.22\.17:', src):
         problems.append('TruMenu.cpp: kOpts row [Settings] SubtitleFallback default 1 missing')
     ini = open(ini_path, encoding='utf-8').read()
@@ -2886,6 +2890,101 @@ def check_02217(ini_path):
     if 'n + static_cast<size_t>(hl) + el + 2 > cap' not in bd or 'out[n] = 0;' not in bd:
         problems.append('TruMenu.cpp: SfBuild must stay inside its buffer and end with NUL')
     return problems, 'SubtitleFallback key, SfUse rule, stream reset, stream list offsets pinned by kCnChecks'
+
+
+def check_02218(ini_path):
+    """0.22.18: volume save through 0x4796b0, groups everywhere (nesting, no '--' labels), frame stepping, subtitle
+    alignment, voice.lang / voice.full, music rows, goo drip candidates, light.demote, settings written back, defaults
+    (big menu / ring off, bar on, English), TruShadowPower [Meter] Infinite, Set-TruMenu hashes + media fallback"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.18 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.18')
+    ini = open(ini_path, encoding='utf-8').read()
+    # defaults: kOpts = sample .ini = code default when the key is missing
+    for sec, key, val in (('Menu', 'Enabled', '0'), ('Menu', 'Load', '1'), ('Radial', 'Enabled', '0'),
+                          ('Quick', 'Enabled', '1'), ('Quick', 'Language', 'en'), ('Settings', 'StepRate', '10'),
+                          ('Settings', 'SubAlignV', '0'), ('Settings', 'SubAlignH', '0'), ('Settings', 'SubMargin', '5'),
+                          ('Settings', 'VoiceLanguage', 'game'), ('Light', 'Demote', '0')):
+        if not re.search(r'\{"%s", "%s", "%s",' % (sec, key, re.escape(val)), src):
+            problems.append('TruMenu.cpp: kOpts [%s] %s default must be %s' % (sec, key, val))
+        block = re.search(r'^\[%s\]\r?\n(.*?)(?=^\[|\Z)' % sec, ini, re.M | re.S)   # comments may hold '['
+        if not block or not re.search(r'^%s=%s\r?$' % (key, re.escape(val)), block.group(1), re.M):
+            problems.append('TruMenu.ini: [%s] %s=%s missing' % (sec, key, val))
+    for want in ('int g_menuWindow = 0;', 'int g_radEnabled = 0;', 'int g_qbLang = 1;', 'g_enabled = OptInt(ini, "Menu", "Load");',
+                 "g_qbLang = !_stricmp(v, \"de\") ? 0 : 1;"):
+        if want not in src: problems.append('TruMenu.cpp: default %s missing' % want)
+    tm = re.sub(r'//[^\n]*', '', fn_body(src, 'void ToggleMenu('))
+    if 'if (open && !g_menuWindow)' not in tm or 'return;' not in tm:
+        problems.append('TruMenu.cpp: ToggleMenu must refuse to open while [Menu] Enabled=0')
+    # 1 volume save
+    m = re.search(r'const DvCheck kVsChecks\[\] = \{(.*?)\n\};', src, re.S)
+    if not m or len(re.findall(r'\{0x', m.group(1))) != 6:
+        problems.append('TruMenu.cpp: kVsChecks must hold the 6 rows of precheck_02218 (mirrors, 0x4796b0, native)')
+    full = re.sub(r'//[^\n]*', '', fn_body(src, 'bool GsSaveFull('))
+    for want in ('SbSave(', '0x004796b0', 'GnRewrite()', 'prof + off[k]'):
+        if want not in full: problems.append('TruMenu.cpp: GsSaveFull must hold %s' % want)
+    tick = fn_body(src, 'void GsTick(')
+    if 'g_gsSaveFull' not in tick or 'GsSaveFull("options"' not in tick or 'VlTick();' not in tick:
+        problems.append('TruMenu.cpp: GsTick must save volumes through GsSaveFull and call VlTick')
+    # 2 groups: no '--' label rows left in the bar tables, sub-groups, nesting in QbBuild
+    tables = src[src.find('const QbRow kQbSettings[] = {'):src.find('const QbPage kQbPages[]')]
+    if re.search(r'"-", "[^"]*", kQbLabel', tables):
+        problems.append('TruMenu.cpp: a bar table still has a kQbLabel heading (0.22.18: every section a group)')
+    keys = re.findall(r'"-", "([a-z0-9_]+)", kQbGroup', tables)
+    dup = sorted(set(k for k in keys if keys.count(k) > 1))
+    if dup: problems.append('TruMenu.cpp: group keys used twice: %s' % ', '.join(dup))
+    for key in ('ton_gruppen', 'set_gfxdev'):
+        if not re.search(r'"-", "%s", kQbGroup, -1, kQcNone, 0, kQb\w+, kQfSub\}' % key, tables):
+            problems.append('TruMenu.cpp: group %s must be a sub-group (kQfSub)' % key)
+    qb = fn_body(src, 'void QbBuild(')
+    if 'QbGroupLevel(r)' not in qb or 'hideAbove' not in qb or 'v.depth = ' not in qb:
+        problems.append('TruMenu.cpp: QbBuild must nest groups (QbGroupLevel, hideAbove, depth)')
+    dq = fn_body(src, 'void DrawQuick(')
+    if 'leftOf' not in dq or 'AddLine' not in dq:
+        problems.append('TruMenu.cpp: DrawQuick must indent rows per level and draw the guide line')
+    # 3 frame stepping
+    pad = fn_body(src, 'void CnPadTick(')
+    if 'CnStepRepeat(held, active, now);' not in pad or 'CnPadMod()' not in pad or 'g_cnStepEnded' not in pad:
+        problems.append('TruMenu.cpp: CnPadTick must use CnPadMod / CnStepRepeat / g_cnStepEnded (0.22.18)')
+    # 4 subtitle alignment, 5 voice, 8 light.demote: check tables
+    for name, n in (('kSaChecks', 7), ('kVlChecks', 9), ('kLdChecks', 10)):
+        m = re.search(r'const DvCheck %s\[\] = \{(.*?)\n\};' % name, src, re.S)
+        if not m or len(re.findall(r'\{0x', m.group(1))) != n:
+            problems.append('TruMenu.cpp: %s must hold %d rows (precheck_02218)' % (name, n))
+    sl = fn_body(src, 'DWORD __fastcall GsSubLine(')
+    if 'if (shift) SaSetOriginX(ox);' not in sl:
+        problems.append('TruMenu.cpp: GsSubLine must put the origin x back after the line')
+    pre = os.path.join(ROOT, 'work', 'asi', 'menu0241', 'precheck_02218.txt')
+    if os.path.exists(pre):
+        rows = [l for l in open(pre, encoding='utf-8').read().splitlines() if l.strip() and not l.startswith('#')]
+        if len(rows) != 32: problems.append('precheck_02218.txt: 32 rows expected, %d' % len(rows))
+    # persistence: the bar's TruMenu-own settings write their key at once
+    for fn, key in (('bool RunQuickLang(', '"Quick", "Language"'), ('bool RunCsScale(', '"Camera", "ShakeScale"'),
+                    ('bool RunRbRumble(', '"Camera", "Rumble"'), ('bool RunMuteMusic(', '"Media", "MuteMusic"'),
+                    ('bool RunMuteAmbient(', '"Media", "MuteAmbient"'), ('bool RunLs(', '"Light", "Stable"'),
+                    ('bool RunLcStable(', '"Light", "StableCut"'), ('bool RunCnStepRate(', '"Settings", "StepRate"'),
+                    ('bool RunVl(', '"Settings", "VoiceLanguage"'), ('bool RunMusicInLevels(', '"Media", "MusicInLevels"'),
+                    ('bool RunLd(', '"Light", "Demote"'), ('bool RunHideCursor(', '"Menu", "HideCursor"')):
+        if key not in fn_body(src, fn): problems.append('TruMenu.cpp: %s must write [%s] at once' % (fn[5:-1], key))
+    for want in ('"SubAlignV"', '"SubAlignH"', '"SubMargin"'):
+        if want not in fn_body(src, 'void SuSave('): problems.append('TruMenu.cpp: SuSave must write %s' % want)
+    # 6 music rows, 7 drip candidates, TruShadowPower Infinite
+    for item in ('media.music.inlevels', 'voice.lang', 'voice.full', 'light.demote', 'cine.steprate', 'sub.valign',
+                 'sub.halign', 'sub.margin'):
+        if not re.search(r'\{"%s", "' % re.escape(item), src): problems.append('TruMenu.cpp: item %s missing' % item)
+    if '"pc_drip_b0_x\\tpc_drip_b0_y\\tpc_drip_b0_z\\tpc_drip_b0_dz\\tpc_drip_b0_lowz\\t"' not in src:
+        problems.append('TruMenu.cpp: fight.trace header must end with the 0.22.18 drip candidate columns')
+    if '{"TruShadowPower", "Meter", "Infinite"}' not in src or 'kQdFigPlan' in src:
+        problems.append('TruMenu.cpp: kQbFigShadow must hold [Meter] Infinite, the planned row must be gone')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    for h in ('6fb7c6772c147b952ae595a39b7601fb2d8b36e34bfa37cf73c6bc18d06a8235',
+              '7c810b6dc7a344b3302f70762b6e0f77bf7aab6cdf17922058ae1b70e8d0ff38'):
+        if h not in ps: problems.append('Set-TruMenu.ps1: earlier build hash %s... missing' % h[:12])
+    if 'work\\media\\menu\\$mediaList' not in ps:
+        problems.append('Set-TruMenu.ps1: the media list fallback work\\media\\menu is missing')
+    return problems, 'defaults, volume save, %d groups (no labels), step mode, alignment / voice / demote checks, ' \
+                     'settings written back, drip columns, Set-TruMenu' % len(keys)
 
 
 def table(src):
@@ -3029,6 +3128,10 @@ def main(argv):
     for p in cproblems17: print('Q02217 %s' % p)
     if not cproblems17: print('ok: 0.22.17 %s' % csummary17)
     problems += cproblems17
+    cproblems18, csummary18 = check_02218(ini_path)   # 0.22.18
+    for p in cproblems18: print('Q02218 %s' % p)
+    if not cproblems18: print('ok: 0.22.18 %s' % csummary18)
+    problems += cproblems18
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))
