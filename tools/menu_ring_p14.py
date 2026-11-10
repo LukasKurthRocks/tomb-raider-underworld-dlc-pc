@@ -17,15 +17,19 @@ Changes (script 7 offsets of the PC script, 197 664 B; the pause-menu port only 
   D5  text 0x468 init +0x5c: locals 141 (STORAGE DEVICE) -> 131 (QUIT GAME)
   D6  background 0x6b4 init +0x5c (id type 5): texture 16 (sub-ring disc) -> 15 (the disc of the 7 ring slots)
   B1  appended blocks, each reached by an op63 that replaces one op00 marker and jumping back after it:
-      B1a func 19 +0x3da4 (end of the base state): show background 0x6b4 (uibitmap f4, as func 20 does for the
-          Xbox sub-ring 1) + colour (1, 1, 1, 1) (uibitmap f18 as func 28; func 28 leaves every background at alpha
-          0, the ring slots get theirs from the ring-in animation, which position 14 has none of - tree 1 showed the
-          door without its disc) and icon 0x7bc (func 22, as func 43 shows 0x7bc on Xbox)
+      B1a func 19 +0x3da4 (end of the base state): show background 0x6b4 and icon 0x7bc (uibitmap f4, as func 20
+          does for the Xbox sub-ring 1) + colour (uibitmap f18, call copied from func 28; tree 1 showed the door
+          without its disc, tree 2 drew the door grey with func 22's colour)
       B1b func 8 +0x17c10 (options), +0x18768 (audio / visual), +0x18e04 (quit dialog): these three "dialog blocks"
           lock positions 8-14 again and hide 0x7bc / 0x6b4 before they open their screen; the block re-frees
           m0xa90[13] and shows 0x6b4 / 0x7bc, so the door is there again when the screen / dialog closes
-      Sub-rings (func 24 -> func 20 / 43) keep hiding 0x6b4 / 0x7bc and locking position 14 themselves (static:
-      func 20 cases 2-7, func 43 cases 2-7 on PC) - nothing added there.
+      B1c / B1d (tree 3, owner's wish): the door stays visible and usable while a sub-ring is open - position 14
+          is unused by every PC sub-ring (func 20 cases 2-7 only hide 0x6b4 and lock it, func 43 only hides 0x7bc):
+          func 24 +0x5274 after func 20, func 24 +0x52d4 and func 52 +0x1569c after func 43 re-free and show it
+      B1e func 1 +0x43ec (OnOpen, before the ring-in state): the same again whenever the menu opens or comes back
+          from a screen / dialog (tree 2 showed the door without its disc after new game -> cancel)
+      Every show block sets the colours the 7 ring slots get from their animation sets (resting keys, func 28 leaves
+      all of them at alpha 0): disc ARGB ffc8c8c8 (set 0xbb0), icon ff3273b9 (sets 0x964 / 0x994).
   B2  func 8 +0x18f50 (where the slot-7 click test lands when slot 7 was not clicked, before the sub-ring dispatch):
       click on hit area 0x170 (the same hit area f14 + input f0 test as slot 7 at +0x188ac, its locals 0xb2 / 0xb4)
       AND NOT m0xa90[13] -> jump to the quit fall-through +0x188f8; otherwise continue at +0x18f54
@@ -95,7 +99,20 @@ SITES = [
          dialog=(0x18904, 2, 0x18e18, 128), note='func 8 quit dialog block (m0xa88 = 2, DialogYesNo script 128)'),
     dict(key='B2', func=8, site=0x18f50, marker=0x374, back_word=0x00000375, kind='click',
          note='func 8 after the slot-7 click test: click on 0x170 and position 14 free -> quit fall-through'),
+    # tree 3 (owner, 2026-11-10): the door stays at the bottom while a sub-ring is open (position 14 is unused by
+    # every PC sub-ring: func 20 only hides / locks it there) and its colours are re-applied whenever the menu opens
+    dict(key='B1c_subring', func=24, site=0x5274, marker=0x98c, back_word=0x0000098d, kind='refree',
+         after_call=(0x526c, 20), note='func 24 after func 20 (sub-ring opened: 14 locked, 0x6b4 hidden)'),
+    dict(key='B1d_f24', func=24, site=0x52d4, marker=0x997, back_word=0x00000998, kind='refree',
+         after_call=(0x52c8, 43), note='func 24 after func 43 (labels of the sub-ring: 0x7bc hidden)'),
+    dict(key='B1d_f52', func=52, site=0x1569c, marker=0x1581, back_word=0x00001582, kind='refree',
+         after_call=(0x15694, 43), note='func 52 (sub-ring animation state) after func 43'),
+    dict(key='B1e_open', func=1, site=0x43ec, marker=0x8d, back_word=0x04000001, kind='refree',
+         note='func 1 OnOpen before the ring-in state (op7d 1): colours again after a closed screen / dialog'),
 ]
+# colours of the 7 ring slots, from their animation sets (ring-in key at 0.18 s, tools: work/ring_p14_1011/anim_tree.py)
+ICON_RGB = (0x32 / 255.0, 0x73 / 255.0, 0xb9 / 255.0)   # icon set 0x964 / 0x994 (type 83): ARGB ff3273b9
+DISC_RGB = (0xc8 / 255.0, 0xc8 / 255.0, 0xc8 / 255.0)   # background set 0xbb0 (type 83): ARGB ffc8c8c8
 
 
 def op(o, n=0):
@@ -285,14 +302,23 @@ def plan(D):
     lock13 = [(op(0x0f, LOCK), None, 'push member m0xa90 (lock list bool[14])'), (op(0x03, 13), None, 'index 13'),
               (op(0x21, 14), None, 'element of 14')]
     lock13_w = lock13 + [(op(0x1e, 1), None, 'op1e 1 (write form, as func 19 +0x3d98)')]
-    one = [(op(0x03, 1), None, 'int 1'), (op(0x5c), None, 'int -> float')]
-    show_bg = [(op(0x0f, BG14), None, 'push member 0x6b4 (background of position 14)'), (op(0x65), None, 'native call'),
-               (PH, show, 'uibitmap f4 (show), as func 20 +0x4664')] + one * 4 + [
-               (op(0x0f, BG14), None, 'push member 0x6b4'), (op(0x65), None, 'native call'),
-               (PH, colour, 'uibitmap f18 colour (1, 1, 1, 1): opaque, untinted (func 21 hides with (1, 1, 1, 0); '
-                            'func 28 leaves every background at alpha 0 until a ring animation fades it in)')]
-    show_ic = [(op(0x0f, ICON14), None, 'push member 0x7bc (icon of position 14, door)'), (op(0x68), None, 'call'),
-               (PH, f22, 'func 22 (show icon), as func 43 +0x106ac')]
+    def show_tinted(member, what, rgb, why):
+        """uibitmap f4 (show) + f18 colour (r, g, b, 1): floats as func 22 pushes them (op02), alpha int 1 -> float"""
+        fl = []
+        for v, ch in zip(rgb, 'rgb'):
+            fl += [(op(P.PUSHF), None, 'push float %s' % ch),
+                   (struct.unpack('<I', struct.pack('<f', v))[0], None, '%s = %.5f' % (ch, v))]
+        return ([(op(0x0f, member), None, 'push member 0x%x (%s)' % (member, what)), (op(0x65), None, 'native call'),
+                 (PH, show, 'uibitmap f4 (show), as func 20 +0x4664')] + fl +
+                [(op(0x03, 1), None, 'alpha int 1'), (op(0x5c), None, 'int -> float'),
+                 (op(0x0f, member), None, 'push member 0x%x' % member), (op(0x65), None, 'native call'),
+                 (PH, colour, 'uibitmap f18 colour: %s' % why)])
+    # func 28 leaves every background / icon at alpha 0, the 7 ring slots get theirs from their ring-in animation
+    # sets - position 14 has none, so its colours are set here to the resting key colours of those sets
+    show_bg = show_tinted(BG14, 'background of position 14, slot disc', DISC_RGB,
+                          'ARGB ffc8c8c8, the disc key of animation set 0xbb0')
+    show_ic = show_tinted(ICON14, 'icon of position 14, door', ICON_RGB,
+                          'ARGB ff3273b9, the icon key of animation sets 0x964 / 0x994')
     int_added, ext_added, blocks = [], [], {}
     for st in SITES:
         a = st['site']
@@ -318,6 +344,12 @@ def plan(D):
             for o, opc, w, ex in s.instrs(back, open_at + 8):
                 if opc in (0x0c, 0x0e, 0x0f) and (w & 0xffffff) in (LOCK, ICON14, BG14, HIT14):
                     raise Refuse('%s: +0x%x touches 0x%x after the site' % (st['key'], o, w & 0xffffff))
+        if 'after_call' in st:
+            ca, fk = st['after_call']
+            if s.w(ca) != op(0x68) or s.proto_func(s.it.get(ca + 4)) != fk or s.func_of(ca) != st['func']:
+                raise Refuse('%s: +0x%x is not the call of func %d in func %d' % (st['key'], ca, fk, st['func']))
+            for o, opc, w, ex in s.instrs(ca + 8, a):
+                if opc != 0x00: raise Refuse('%s: +0x%x op%02x between the call and the site' % (st['key'], o, opc))
         code = [(op(0, st['marker']), None, 'the replaced debug line marker op00 %d' % st['marker'])]
         if st['kind'] == 'show':
             code += show_bg + show_ic
@@ -368,7 +400,7 @@ def p14_full(st):
     """True when a p14_status() shows the complete stage-light layout"""
     return (st['slot7'] == 'f15' and st['lock14_base'] == 0 and st['place14_pc'] and st['icon14'] == D4['new'] and
             st['text14'] == D5['new'] and st['bg14'] == D6['new'] and len(st['shows']) == 1 and
-            len(st['refree']) == 3 and st['quit_click'])
+            len(st['refree']) == sum(x['kind'] == 'refree' for x in SITES) and st['quit_click'])
 
 
 def trigrams(s, lo, hi):
@@ -456,13 +488,20 @@ def decode_blocks(s, info):
             if opc in (0x65, 0x66): res.append('op%02x %s' % (opc, s.call_name(ex[0])))
             elif opc == 0x68: res.append('op68 func %s' % s.proto_func(s.it.get(ex[0])))
             elif opc in JUMPS: res.append('op%02x -> +0x%x' % (opc, o + 4 + 4 * s24(w)))
+            elif opc == P.PUSHF: res.append('op02 %.5f' % struct.unpack('<f', struct.pack('<I', s.w(ex[0])))[0])
             else: res.append('op%02x %d' % (opc, s24(w) if opc in (0x03, 0x04) else w & 0xffffff))
         rows.append((key, b, res))
     return rows, probs
 
 
-_SHOW = ['op0f 1716', 'op65 uibitmap f4 (+0xf4)'] + ['op03 1', 'op5c 0'] * 4 + [
-    'op0f 1716', 'op65 uibitmap f18 (+0x27c)', 'op0f 1980', 'op68 func 22']
+def _tint(member, argb):
+    """expected decode of show_tinted(): f4, three float channels of the ARGB key, alpha 1, f18"""
+    ch = ['op02 %.5f' % struct.unpack('<f', struct.pack('<f', ((argb >> sh) & 0xff) / 255.0))[0] for sh in (16, 8, 0)]
+    return (['op0f %d' % member, 'op65 uibitmap f4 (+0xf4)'] + ch +
+            ['op03 1', 'op5c 0', 'op0f %d' % member, 'op65 uibitmap f18 (+0x27c)'])
+
+
+_SHOW = _tint(BG14, 0xffc8c8c8) + _tint(ICON14, 0xff3273b9)
 EXPECT_BLOCK = {
     'show': ['op00 M'] + _SHOW + ['op63 -> BACK'],
     'refree': ['op00 M', 'op0f 2704', 'op03 13', 'op21 14', 'op1e 1', 'op04 0', 'op2e 0'] + _SHOW + ['op63 -> BACK'],

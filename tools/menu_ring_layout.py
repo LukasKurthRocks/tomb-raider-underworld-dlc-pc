@@ -86,7 +86,7 @@ def p14(src):
               'yes' if st['place14_pc'] else 'no', st['icon14'], ' (door)' if st['icon14'] == 26 else '',
               st['text14'], ' (QUIT GAME)' if st['text14'] == 131 else '', st['bg14'],
               ' (slot disc)' if st['bg14'] == 15 else ' (sub-ring disc)' if st['bg14'] == 16 else ''))
-    print('    blocks: show 0x6b4 / 0x7bc %s; re-free after dialog blocks %s; click 0x170 %s' % (
+    print('    blocks: show 0x6b4 / 0x7bc %s; re-free + show (dialog blocks, sub-ring, menu open) %s; click 0x170 %s' % (
         ', '.join(st['shows']) or 'none', ', '.join(st['refree']) or 'none',
         ', '.join('%s -> %s' % (a, '/'.join(b)) for a, b in st['click']) or 'none'))
     full = P14.p14_full(st)
