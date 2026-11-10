@@ -134,7 +134,8 @@ $earlierBuilds = @{
                       '9cbbd7a7f9384dad5da59e904552d39ad0c651f37f0041e9bc2758249158e4df',   # 0.22.12 fight.trace Lara lines, bar trace states (work\asi\menu0235)
                       'ed4956839217da70e8f438a9c1bebbaf098816a0875093e2f5d2263e2442e2ac',   # 0.22.13 pad combos on release, subtitle clock held (work\asi\menu0236)
                       'ea95cee0477c751c9bade1c48124721eab7f562639d89b543e350f2c94cd29a8',   # 0.22.14 sub.lang switches the shown lines at once (work\asi\menu0237)
-                      '5c4612a49fe164ae91370718c5116f870178d68450c3984975b59c185d43f6b0')   # 0.22.15 aim.trace / aim.why (work\asi\menu0238)
+                      '5c4612a49fe164ae91370718c5116f870178d68450c3984975b59c185d43f6b0',   # 0.22.15 aim.trace / aim.why (work\asi\menu0238)
+                      '6fb7c6772c147b952ae595a39b7601fb2d8b36e34bfa37cf73c6bc18d06a8235')   # 0.22.16 page Spiel-Einstellungen (work\asi\menu0239)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

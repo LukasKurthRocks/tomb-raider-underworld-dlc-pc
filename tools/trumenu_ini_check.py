@@ -2844,6 +2844,49 @@ def check_02216(ini_path):
                      '[Settings] keys, U3, %d pages' % (n_checks, len(defs), len(names))
 
 
+def check_02217(ini_path):
+    """0.22.17: subtitle fallback - [Settings] SubtitleFallback=1 (kOpts, sample .ini, GsReadOptions), SrReader hands
+    the English record to the reader 0x4538d0 only through SfUse (wanted id missing, id 0 present, the stream never
+    carried the wanted id) + SfBuild, the stream reset on a handler change or a time step back (stream list offsets
+    +0x14 / +0x77c / +0x384 = the ones of kCnChecks, read only with g_cnOk), SrLines uses the same rule with r.seen"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.17 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.17')
+    if not re.search(r'\{"Settings", "SubtitleFallback", "1", "0\.22\.17:', src):
+        problems.append('TruMenu.cpp: kOpts row [Settings] SubtitleFallback default 1 missing')
+    ini = open(ini_path, encoding='utf-8').read()
+    if not re.search(r'^\[Settings\][^\[]*^SubtitleFallback=1$', ini, re.M | re.S):
+        problems.append('TruMenu.ini: [Settings] SubtitleFallback=1 missing')
+    if 'OptInt(ini, "Settings", "SubtitleFallback")' not in fn_body(src, 'void GsReadOptions('):
+        problems.append('TruMenu.cpp: GsReadOptions must read [Settings] SubtitleFallback')
+    use = re.sub(r'//[^\n]*', '', fn_body(src, 'bool SfUse('))
+    for want in ('g_sfOn', 'want > 0', '!(mask & (1u << want))', '(mask & 1u)', '!(seen & (1u << want))'):
+        if want not in use: problems.append('TruMenu.cpp: SfUse must test %s' % want)
+    rd = re.sub(r'//[^\n]*', '', fn_body(src, 'void __fastcall SrReader('))
+    i_time, i_use, i_or, i_call = (rd.find('SfStreamTime(self, &t)'), rd.find('SfUse(mask, want, g_sfSeen)'),
+                                   rd.find('g_sfSeen |= mask'), rd.find('(self, edx, r.fallback ? g_sfBuf : text)'))
+    if not (0 <= i_time < i_use < i_or < i_call):
+        problems.append('TruMenu.cpp: SrReader order - stream time, SfUse (ids before this record), add the record\'s '
+                        'ids, then the reader with g_sfBuf only on a fallback')
+    if 'self != g_sfHandler || (timed && t + 0.5f < g_sfTime)' not in rd or 'g_sfSeen = 0;' not in rd:
+        problems.append('TruMenu.cpp: SrReader must start a new stream on a handler change or a time step back')
+    st = re.sub(r'//[^\n]*', '', fn_body(src, 'bool SfStreamTime('))
+    for want in ('if (!g_cnOk) return false;', 'ReadDword(0x00ccdc64, &s)', 'ReadDword(s + 0x77c, &h)',
+                 'ReadFloats(s + 0x384, t, 1)', 'ReadDword(s + 0x14, &s)'):
+        if want not in st: problems.append('TruMenu.cpp: SfStreamTime must hold %s' % want)
+    for want in ('{0x005904d0, "a164dccc00', '{0x00590303, "8b8e7c070000', '{0x0059023f, "d99e84030000"}',
+                 '{0x00590431, "8b4614'):
+        if want not in src: problems.append('TruMenu.cpp: kCnChecks must still pin %s (SfStreamTime relies on it)' % want)
+    ln = fn_body(src, 'int SrLines(')
+    if 'SfUse(SrIdMask(r.text), SrWant(word, gameLang, r.kind), r.seen)' not in ln or 'english ? id == 0 :' not in ln:
+        problems.append('TruMenu.cpp: SrLines must use the fallback rule with the record\'s stream ids (r.seen)')
+    bd = re.sub(r'//[^\n]*', '', fn_body(src, 'bool SfBuild('))
+    if 'n + static_cast<size_t>(hl) + el + 2 > cap' not in bd or 'out[n] = 0;' not in bd:
+        problems.append('TruMenu.cpp: SfBuild must stay inside its buffer and end with NUL')
+    return problems, 'SubtitleFallback key, SfUse rule, stream reset, stream list offsets pinned by kCnChecks'
+
+
 def table(src):
     block = src[src.index('const OptDef kOpts[] = {'):]
     block = block[:block.index('\n};')]
@@ -2981,6 +3024,10 @@ def main(argv):
     for p in cproblems16: print('Q02216 %s' % p)
     if not cproblems16: print('ok: 0.22.16 %s' % csummary16)
     problems += cproblems16
+    cproblems17, csummary17 = check_02217(ini_path)   # 0.22.17
+    for p in cproblems17: print('Q02217 %s' % p)
+    if not cproblems17: print('ok: 0.22.17 %s' % csummary17)
+    problems += cproblems17
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

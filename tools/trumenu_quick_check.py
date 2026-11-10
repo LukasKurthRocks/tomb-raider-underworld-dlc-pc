@@ -3102,8 +3102,48 @@ def sr_atoi(b, p):                               # CRT atoi from p (the reader's
     return sign * v
 
 
+def sr_mask(b):                                  # SrIdMask (0.22.17): ids 0..31 of a record
+    m, p = 0, 0
+    while p < len(b) and sr_space(b[p]): p += 1
+    while p < len(b):
+        idv = sr_atoi(b, p)
+        if 0 <= idv < 32: m |= 1 << idv
+        while p < len(b) and b[p] != 0x0d: p += 1
+        if p < len(b): p += 1
+        while p < len(b) and b[p] != 0x0d: p += 1
+        while p < len(b) and sr_space(b[p]): p += 1
+    return m
+
+
+def sr_want(word, game_lang, kind):              # SrWant: the id the reader shows, -1 = none
+    if kind == 2: return -1
+    if word != -1: return word
+    return game_lang if kind == 1 else -1
+
+
+def sf_use(mask, want, seen, on=True):           # SfUse
+    return bool(on and 0 < want < 32 and not (mask >> want) & 1 and mask & 1 and not (seen >> want) & 1)
+
+
+def sf_build(b, want):                           # SfBuild: '<want>\r<text of each id 0 entry>\r'
+    out, p = bytearray(), 0
+    while p < len(b) and sr_space(b[p]): p += 1
+    while p < len(b):
+        idv = sr_atoi(b, p)
+        while p < len(b) and b[p] != 0x0d: p += 1
+        if p < len(b): p += 1
+        e = p
+        while p < len(b) and b[p] != 0x0d: p += 1
+        if idv == 0: out += b'%d\r' % want + b[e:p] + b'\r'
+        while p < len(b) and sr_space(b[p]): p += 1
+    return bytes(out)
+
+
 def sr_lines(rec, word, game_lang, cap=8):      # SrLines
     b, kind = rec['text'], rec['kind']
+    # 0.22.17: records read through sf_stream carry 'seen' (the stream's ids before them) and use the fallback rule;
+    # the 0.22.14 cases below build records without it (no stream) and keep the plain rule
+    english = 'seen' in rec and sf_use(sr_mask(b), sr_want(word, game_lang, kind), rec['seen'], rec.get('on', True))
     out, p = [], 0
     while p < len(b) and sr_space(b[p]): p += 1
     while p < len(b):
@@ -3115,7 +3155,7 @@ def sr_lines(rec, word, game_lang, cap=8):      # SrLines
             e.append(b[p])
             p += 1
         while p < len(b) and b[p] != 0x0d: p += 1
-        show = kind != 2 and (idv == word or (word == -1 and idv == game_lang and kind == 1))
+        show = kind != 2 and (idv == 0 if english else (idv == word or (word == -1 and idv == game_lang and kind == 1)))
         if show:
             for tok in bytes(e).split(b'\n'):
                 if not tok: continue                     # strtok skips empty tokens
@@ -3256,6 +3296,84 @@ def check_sublang():
         good = got == want
         ok &= good
         print('sublang: %s: %s  %s' % (name, got, 'ok' if good else 'FAIL (want %s)' % want))
+    return ok
+
+
+# ---- 0.22.17 subfallback: SrReader's stream state (handler, time, ids seen) and the English stand-in
+def sf_stream(events, word, game_lang, kind=1, on=True):
+    """events: (handler, stream time, record text) in play order -> the records as SrReader stores them, each with
+    'line' = what the REAL reader 0x4538d0 hands to the box (run on the text SrReader passes it: the original or
+    SfBuild's), 'seen', 'fallback'"""
+    st = {'handler': None, 'time': 0.0, 'seen': 0}
+    out = []
+    for handler, t, text in events:
+        if handler != st['handler'] or (t is not None and t + 0.5 < st['time']):
+            st['handler'], st['seen'] = handler, 0
+        if t is not None: st['time'] = t
+        mask, want = sr_mask(text), sr_want(word, game_lang, kind)
+        rec = {'text': text, 'kind': kind, 'seen': st['seen'], 'on': on}
+        fb = sf_use(mask, want, st['seen'], on) and bool(sf_build(text, want))
+        st['seen'] |= mask
+        given = sf_build(text, want) if fb else text
+        rec['fallback'] = fb
+        rec['line'] = sr_lines({'text': given, 'kind': kind}, word, game_lang)   # the game's reader: plain rule
+        out.append(rec)
+    return out
+
+
+def check_subfallback():
+    ok = True
+    cases = []
+    # DLC 2 record form (ids 0 11 1 2 3 4, pdlc2_030_pod.mul), made-up text
+    dlc = b'0\rAmanda cut the power.\r11\rNL line\r1\rFR line\r2\rDE line\r3\rIT line\r4\rES line\r'
+    dlc2 = b'0\rZip: Go reactivate it.\r2\rZip: DE zwei\r'
+    fr_only = b'1\rFR only\r'
+    r = sf_stream([(1, 1.0, dlc), (1, 2.0, fr_only), (1, 3.0, dlc2)], -1, 9)
+    cases.append(('DLC stream, game language 9: English lines, a French-only cue adds nothing',
+                  [x['line'] for x in r], [[b'Amanda cut the power.'], [], [b'Go reactivate it.']]))
+    cases.append(('DLC stream, fallback off: nothing (the game\'s)',
+                  [x['line'] for x in sf_stream([(1, 1.0, dlc), (1, 3.0, dlc2)], -1, 9, on=False)], [[], []]))
+    cases.append(('English game (9 not wanted): unchanged', [x['line'] for x in sf_stream([(1, 1.0, dlc)], -1, 0)],
+                  [[b'Amanda cut the power.']]))
+    cases.append(('sub.lang word 9 (not -1) also falls back', [x['line'] for x in sf_stream([(1, 1.0, dlc)], 9, 2)],
+                  [[b'Amanda cut the power.']]))
+    cases.append(('kind 0 with word -1: the reader shows nothing, no fallback',
+                  [x['line'] for x in sf_stream([(1, 1.0, dlc)], -1, 9, kind=0)], [[]]))
+    cases.append(('kind 2: nothing', [x['line'] for x in sf_stream([(1, 1.0, dlc)], 9, 9, kind=2)], [[]]))
+    # base cutscene with its own per-language cue times: the id sets of the first 14 records of a Russian retail
+    # 030_med_yacht.mul (tools/mul_sub_records.py; texts made up): English-only cues must never show in Russian
+    sets = [(0, 3, 12, 2, 1, 11, 10, 7, 4, 9), (3, 9, 4, 2, 0, 10, 11, 12, 7, 1), (4,), (1,), (3, 9), (0, 10, 11, 2, 7, 12),
+            (4,), (1,), (3,), (7, 0, 10, 11, 12), (9,), (2,), (0, 10, 4, 9, 7, 3, 12, 2, 1, 11), (4,)]
+    base = [(5, 10.0 + k, b''.join(b'%d\rL%d-%d\r' % (i, k, i) for i in s)) for k, s in enumerate(sets)]
+    r = sf_stream(base, -1, 9)
+    shown = [l for x in r for l in x['line']]
+    cases.append(('base stream (per-language cues): only id 9 lines, no English stand-in',
+                  (shown, sum(x['fallback'] for x in r)), ([b'L0-9', b'L1-9', b'L4-9', b'L10-9', b'L12-9'], 0)))
+    # a DLC cutscene after a base one: new handler -> fresh stream
+    r = sf_stream(base[:2] + [(6, 1.0, dlc)], -1, 9)
+    cases.append(('new handler after a base cutscene: the DLC line falls back', r[-1]['line'], [b'Amanda cut the power.']))
+    # the same handler address reused, stream time back at the start -> fresh stream
+    r = sf_stream(base[:2] + [(5, 0.2, dlc)], -1, 9)
+    cases.append(('same handler, time back to 0.2 s: fresh stream, fallback', r[-1]['line'], [b'Amanda cut the power.']))
+    r = sf_stream(base[:2] + [(5, 12.0, dlc)], -1, 9)
+    cases.append(('same handler, time goes on: the stream had 9, no fallback', r[-1]['line'], []))
+    r = sf_stream(base[:2] + [(5, None, dlc)], -1, 9)
+    cases.append(('stream time unreadable: handler only (same handler -> no fallback)', r[-1]['line'], []))
+    # TruMenu's parse (SrLines with the record's 'seen') agrees with the real reader on the given text
+    r = sf_stream([(1, 1.0, dlc), (1, 2.0, fr_only), (1, 3.0, dlc2)] + base, -1, 9)
+    agree = all(sr_lines(x, -1, 9) == x['line'] for x in r)
+    cases.append(('SrLines(record, word, language) = the reader\'s lines for every record', agree, True))
+    # sub.lang rewrite in a DLC cutscene: German shown, then 9 -> the English stand-in
+    r = sf_stream([(1, 1.0, dlc), (1, 3.0, dlc2)], 2, 0)
+    cases.append(('sub.lang 2 -> 9 in a DLC cutscene: both lines English', sr_rewrite(r, sr_box(r), 9, 0),
+                  [b'Amanda cut the power.', b'Go reactivate it.']))
+    cases.append(('SfBuild form', sf_build(dlc2, 9), b'9\rZip: Go reactivate it.\r'))
+    cases.append(('two-digit id (10) in SfBuild', sr_lines({'text': sf_build(dlc, 10), 'kind': 1}, 10, 0),
+                  [b'Amanda cut the power.']))
+    for name, got, want in cases:
+        good = got == want
+        ok &= good
+        print('subfallback: %s: %s  %s' % (name, got, 'ok' if good else 'FAIL (want %s)' % (want,)))
     return ok
 
 
@@ -3404,7 +3522,8 @@ def main():
                check_cinepad(),                                                       # 0.22.13
                check_sublang(),                                                       # 0.22.14
                check_aimwhy(),                                                        # 0.22.15
-               check_settings()]                                                      # 0.22.16
+               check_settings(),                                                      # 0.22.16
+               check_subfallback()]                                                   # 0.22.17
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

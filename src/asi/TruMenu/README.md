@@ -2928,6 +2928,48 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.17 - subtitle fallback to English (2026-11-10)
+
+For a game language whose subtitles the DLC cinematics do not carry (Russian, id 9, installed from a retail copy for the
+owner's own game: `tools/lang_retail_build.py`): the DLC cinematic records hold ids 0 1 2 3 4 11 only, so the subtitle
+reader 0x4538d0 found no line and the DLC cutscenes stayed without subtitles.
+
+- In TruMenu's reader hook (the 0.22.14 call patch 0x4574ec, `SrReader`): when a record lacks the id the reader would
+  show (`SrWant`: the profile word, or the game language for word -1 and kind 1; kind 2 shows nothing) and holds id 0,
+  the reader gets `'<wanted id>\r<English text>\r'` (`SfBuild`) instead of the record - **only while no record of the
+  same stream carried the wanted id** (`SfUse`).
+- Why per stream: every language has its own cue times; a record holds only the languages whose line starts at that
+  frame (32 of the 832 Russian base cinematic records carry id 0 but not 9). A per-record rule would mix English lines
+  into the Russian base cutscenes. In the Russian data no record with id 0 comes before the first record with id 9 of its
+  file (38 cinematics; 0 in the 3 neutral PC cinematics with subtitles; `lang_retail_build.py speech`), so the rule never
+  shows English in a stream that has the language.
+- Stream = the cinematic handler (`ecx` of the reader); a new stream when the handler changes or the stream time
+  `[s+0x384]` of the stream whose `[s+0x77c]` is that handler goes back (stream list head `[0xccdc64]`, next `[s+0x14]`
+  - the offsets of the 0.22 `kCnChecks`; read only when those checks held, else the handler alone).
+- `sub.lang` rewrites (0.22.14) and TruMenu's own parse (`SrLines`, the "agrees" log) use the same rule with the stream
+  ids stored per record (`seen`).
+- `[Settings] SubtitleFallback=1` (default 1; a missing key counts as 1); 0 = the game's behaviour. `sub.lang` without
+  argument reports `English fallback on (n record(s))`; the first 20 fallbacks log one line each
+  (`0.22.17: subtitle record #n has no id 9 - English line shown`). `SbName(9)` = "Russkij (Russian)" (the menu font has
+  no Cyrillic).
+- No new patch site; the bytes the rule relies on (reader, language choice, stream walk) are the existing kSrChecks /
+  kCnChecks rows, pinned again in `work\asi\menu0240\precheck_02217.txt` (9 checks, 0 mismatches against
+  `data\pc\tru.exe`).
+
+Checks: `tools/trumenu_ini_check.py` `check_02217`, `tools/trumenu_quick_check.py` model `subfallback` (16 cases: DLC
+stream in Russian, fallback off, English game, kind 0 / 2, the id sets of a Russian base cutscene - no English stand-in,
+new handler / time back / time on / time unreadable, TruMenu's parse = the reader's lines, `sub.lang` 2 -> 9 in a DLC
+cutscene, `SfBuild` form, two-digit id).
+
+### TO TEST 0.22.17
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | `Language` = 9 (registry), DLC 2 cutscene `pdlc2_030_pod` or `045_finale` (5 min) | English subtitle lines with Cyrillic menus; TruMenu.log `0.22.17: subtitle record #n has no id 9 - English line shown` |
+| 2 | same, base-game cutscene (e.g. the prologue `010_pro_surprise`) (3 min) | Russian lines only, **no** English line in between, no fallback log line |
+| 3 | `SubtitleFallback=0`, DLC 2 cutscene (3 min) | no subtitles (the game's behaviour) |
+| 4 | German game (`Language` = 2), DLC cutscene (2 min) | German lines as before, no fallback log line |
+
 ## 0.22.16 - page Spiel-Einstellungen, bar reorganised, sub.lang fixes (2026-11-10)
 
 Built into `work\asi\menu0239`, not installed. Plan: workspace `docs\Plan-TruMenu-Einstellungen-1011.md`; evidence
