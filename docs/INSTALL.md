@@ -14,6 +14,19 @@ Time: about 15 minutes, plus 5-20 minutes per credits movie. Disk: about 4 GB fr
 
 > Italiano: istruzioni brevi in fondo alla pagina.
 
+**Short way (this fork, Windows):** put your Xbox DLC folders into `<workspace>\input\xbox-dlc\` and double-click
+`Install.bat` in the repository folder (`<workspace>` = the folder that holds the repository folder; steps in the
+[README](../README.md#install-the-dlc)). It runs `scripts\windows\Install-TruAll.ps1`, which does the steps below for
+you: it fetches ModLoader v1.2, the B270 kit and the three `.py` files from the official releases (SHA-256 pinned, an
+existing file with a wrong hash stops it), makes a venv `<workspace>\bin\venv-install` with `bsdiff4` + `numpy`,
+fetches ffmpeg for the credits, finds RAD Video Tools if installed (never downloaded; without it no credits), then
+runs `install_dlc.py` (dry run first, `--credits` with RAD) through `Install-TruDlc.ps1 -Build B270`, builds and
+installs the fork's DLC 2 plugins when Visual Studio x86 is installed, and turns on fullscreen effects and depth of
+field. It never installs Python itself, and it does not fetch Steamless yet (no pinned hash): it says when to run
+Steamless by hand. `Install.bat -Check` lists every download (URL, target, SHA-256) and step and changes nothing;
+`-NoDownload`, `-NoPlugins`, `-NoCredits`, `-NoMenu`, `-QoL`. Log: `<workspace>\logs\Install-TruAll_<time>.log`.
+The rest of this page is the manual way.
+
 ---
 
 ## 1. What you need

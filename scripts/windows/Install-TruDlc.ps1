@@ -54,6 +54,16 @@
     Known-packages list (default scripts\windows\TruDlcPackages.json).
 .PARAMETER Force
     With -Restore: restore even when installed files were changed since the install (they are saved first; logged).
+.PARAMETER Python
+    Python executable for install_dlc.py and the package tool (default: python from PATH). Install-TruAll.ps1 passes
+    its own venv (<workspace>\bin\venv-install).
+.PARAMETER Credits
+    Install: also build the credits movies (install_dlc.py --credits, with -Rad / -Ffmpeg when given). The dry run
+    before the install stays without --credits.
+.PARAMETER Rad
+    radvideo64.exe for --credits (passed as --rad).
+.PARAMETER Ffmpeg
+    ffmpeg.exe for --credits (passed as --ffmpeg).
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -66,7 +76,11 @@ param(
     [string[]]$Package,
     [switch]$PackageOnly,
     [string]$DlcPath,
-    [string]$PackageList
+    [string]$PackageList,
+    [string]$Python = 'python',
+    [switch]$Credits,
+    [string]$Rad,
+    [string]$Ffmpeg
 )
 
 $ErrorActionPreference = 'Stop'
@@ -198,12 +212,12 @@ function Assert-GameClosed {
 function Invoke-Installer {
     param([string[]]$ExtraArgs)
     $pyArgs = @($installer, '--game', $GamePath, '--dlc', $dlcPath, '--kit', $kitPath) + $ExtraArgs
-    Write-Log ('python ' + (($pyArgs | ForEach-Object { '"{0}"' -f $_ }) -join ' ')) -Level DEBUG
+    Write-Log ($Python + ' ' + (($pyArgs | ForEach-Object { '"{0}"' -f $_ }) -join ' ')) -Level DEBUG
     # Native stderr must not become a terminating error under ErrorActionPreference Stop (PS 5.1).
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
-        & python @pyArgs 2>&1 | ForEach-Object {
+        & $Python @pyArgs 2>&1 | ForEach-Object {
             $text = if ($_ -is [System.Management.Automation.ErrorRecord]) { 'stderr: ' + $_.Exception.Message } else { [string]$_ }
             Write-Log $text
         }
@@ -225,6 +239,7 @@ try {
     if (!$Restore) {
         $packageArgs = @{ Destination = $dlcPath; CheckOnly = [bool]$Check; WhatIf = [bool]$WhatIfPreference }
         if ($PackageList) { $packageArgs.PackageList = $PackageList }
+        if ($PSBoundParameters.ContainsKey('Python')) { $packageArgs.Python = $Python }
         $hasPackages = $false
         if ($Package) {
             $packageArgs.Path = $Package
@@ -292,7 +307,7 @@ try {
         return
     }
 
-    $pyVersion = (& python --version 2>&1) -join ' '
+    $pyVersion = (& $Python --version 2>&1) -join ' '
     Write-Log "Python: $pyVersion" -Level DEBUG
 
     if ($Check) {
@@ -309,6 +324,20 @@ try {
     if (!$PSCmdlet.ShouldProcess($GamePath, 'Install ModLoader and the DLC kit (install_dlc.py)')) { return }
     Assert-GameClosed
     Write-FileState 'before install'
+
+    # First install on this PC (2026-11-10, Install-TruAll.ps1): no backups yet -> take them from the game folder,
+    # but only files with the Steam MD5 (tru.exe or the tru.exe.steam_original an earlier install kept).
+    New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+    foreach ($pair in @(@('binkw32.dll.steam_original', $md5BinkOriginal, @('binkw32.dll')),
+                        @('tru.exe.steam_original', $md5ExeOriginal, @('tru.exe', 'tru.exe.steam_original')))) {
+        $backup = Join-Path $backupDir $pair[0]
+        if (Test-Path -LiteralPath $backup -PathType Leaf) { continue }
+        $from = @($pair[2] | ForEach-Object { Join-Path $GamePath $_ } |
+            Where-Object { (Test-Path -LiteralPath $_ -PathType Leaf) -and ((Get-Md5 $_) -eq $pair[1]) }) | Select-Object -First 1
+        if (!$from) { throw "No backup $backup and no file with the Steam MD5 $($pair[1]) in the game folder ($($pair[2] -join ', ')) - nothing changed." }
+        Copy-Item -LiteralPath $from -Destination $backup
+        Write-Log "Backup created: $from -> $backup"
+    }
 
     # Safety: the backups must be the untouched Steam files before anything is overwritten.
     foreach ($pair in @(@('binkw32.dll.steam_original', $md5BinkOriginal), @('tru.exe.steam_original', $md5ExeOriginal))) {
@@ -328,8 +357,14 @@ try {
         Write-Log "copied $name"
     }
 
-    Write-Log 'Running install_dlc.py ...' -Level VERBOSE
-    $code = Invoke-Installer @()
+    $installArgs = @()
+    if ($Credits) {
+        $installArgs += '--credits'
+        if ($Rad) { $installArgs += @('--rad', $Rad) }
+        if ($Ffmpeg) { $installArgs += @('--ffmpeg', $Ffmpeg) }
+    }
+    Write-Log "Running install_dlc.py $($installArgs -join ' ') ..." -Level VERBOSE
+    $code = Invoke-Installer $installArgs
     Write-FileState 'after install'
     if ($code -ne 0) { throw "install_dlc.py failed (exit code $code)." }
     Write-InstallManifest

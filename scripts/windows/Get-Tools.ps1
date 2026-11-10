@@ -10,11 +10,21 @@
     Every run writes <workspace>\logs\Get-Tools_<time>.log. -Verbose shows steps, -Debug URLs/paths/hashes,
     -Trace adds a PowerShell line trace.
 
+.PARAMETER Name
+    Only the tools whose name matches one of these wildcards, e.g. 'ffmpeg*' (Install-TruAll.ps1 fetches only ffmpeg).
+.PARAMETER Check
+    Lists every selected tool with URL, target and SHA-256 and whether it is already there; downloads and unpacks
+    nothing.
+
 .EXAMPLE
     .\Get-Tools.ps1 -Verbose
+.EXAMPLE
+    .\Get-Tools.ps1 -Name 'ffmpeg*' -Check
 #>
 [CmdletBinding()]
 param(
+    [string[]]$Name,
+    [switch]$Check,
     [switch]$Trace
 )
 
@@ -84,7 +94,12 @@ $tools = @(
     }
 )
 
-New-Item -ItemType Directory -Force -Path $dlDir, $logDir | Out-Null
+if ($Name) {
+    $tools = @($tools | Where-Object { $toolName = $_.Name; @($Name | Where-Object { $toolName -like $_ }).Count })
+}
+
+if ($Check) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
+else { New-Item -ItemType Directory -Force -Path $dlDir, $logDir | Out-Null }
 $logFile = Join-Path $logDir ('Get-Tools_{0}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
 Set-TruLogFile -Path $logFile
 
@@ -95,7 +110,8 @@ function Get-Sha256 {
 
 if ($Trace) { Set-PSDebug -Trace 1 }
 try {
-    Write-Log "Get-Tools log=$logFile" -Level VERBOSE
+    Write-Log "Get-Tools log=$logFile check=$([bool]$Check)" -Level VERBOSE
+    if (!$tools.Count) { throw "No tool matches -Name $($Name -join ', ')." }
     foreach ($tool in $tools) {
         $zip    = Join-Path $dlDir $tool.File
         $target = Join-Path $binDir $tool.Folder
@@ -108,6 +124,11 @@ try {
         }
 
         $haveValidZip = (Test-Path -LiteralPath $zip) -and ((Get-Sha256 $zip) -eq $tool.Sha256)
+        if ($Check) {
+            $what = if ($haveValidZip) { "verified zip already there: $zip" } else { "would download $($tool.Url) -> $zip" }
+            Write-Log ('Check: {0}: {1}, sha256 {2}, then unpack to {3}' -f $tool.Name, $what, $tool.Sha256, $target)
+            continue
+        }
         if (!$haveValidZip) {
             Write-Log "Downloading $($tool.File) ..." -Level VERBOSE
             $previous = $ErrorActionPreference

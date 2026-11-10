@@ -42,36 +42,35 @@ It does not replace the original. More about the fork: [docs/README.md](docs/REA
 
 The port itself is the original project's release kit. **This fork has no releases**: no kit, no built plugins.
 
-**You need**
-
-- *Tomb Raider: Underworld*, Steam, PC: `tru.exe` v1.1 (MD5 `b36da327a320eab8b5c8464b27685840`), unpacked once with
-  [Steamless](https://github.com/atom0s/Steamless/releases) (writes `tru.exe.unpacked.exe`)
-- your own Xbox 360 DLC content folders: `pack10.000` (DLC 1) and `pack11.000` (DLC 2); the end-credits videos
-  `credits_DLC1.wmv` / `credits_DLC2.wmv` are already in the same folders
-- [ModLoader](https://github.com/TombRaiderModding/ModLoader/releases) (`ModLoader.asi` + its `binkw32.dll` proxy)
-- Python 3.9+ with `bsdiff4` and `numpy`; for the credits ffmpeg and RAD Video Tools
-- `trudlcport-kit-B270.zip`, `install_dlc.py`, `tex_convert.py`, `credits_convert.py` from the
-  [original's releases](https://github.com/andrearicci93/trudlcport/releases)
+**You need:** *Tomb Raider: Underworld* from Steam (PC, `tru.exe` v1.1) and your own Xbox 360 DLC folders. Optional,
+for the end-credits movies: [RAD Video Tools](https://www.radgametools.com/bnkdown.htm) (free) - without it each DLC
+ends on a black screen after its last cutscene. Python 3.9+ must be installed ([python.org](https://www.python.org/)).
 
 **Steps**
 
-1. Copy the ModLoader files into the game folder. Run Steamless on `tru.exe` there.
-2. Put the three scripts and the unzipped `kit` folder into one folder. Close the game.
-3. Dry run: `python install_dlc.py --game "<game folder>" --dlc "<folder with the Xbox files>" --kit .\kit --check`.
-   It must print **All inputs OK**.
-4. Run the same command without `--check`, with `--credits --rad "<radvideo64.exe>" --ffmpeg "<ffmpeg.exe>"`:
-   `--credits` converts the credits videos from the DLC folders into the game's format. Without them a DLC ends on a
-   black screen after its last cutscene.
-5. Turn on **fullscreen effects** (game options) and **depth of field** (no menu switch:
-   `.\scripts\windows\Set-TruDisplay.ps1 -FullscreenEffects On -DepthOfField On`, or TruMenu's settings page). Without
-   them the DLC 2 end level misses its haze and soft background.
-6. Lock the game to 60 fps. Start a **new** game from *Downloadable Content*.
+1. Download this repository as a zip (*Code* -> *Download ZIP*) and unzip it into a new empty folder (called `TRU-DLC`
+   here), so that you have `TRU-DLC\<repository folder>\Install.bat`. Downloads, venv and logs go into `TRU-DLC\`.
+2. Copy your Xbox DLC folders `9CA70CF0EDA43654D158C2E37470D301DFA850E753` (*Beneath the Ashes*) and
+   `600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153` (*Lara's Shadow*) from the console's
+   `Content\<profile>\534307EC\00000002\` into `TRU-DLC\input\xbox-dlc\` (raw package files: `TRU-DLC\input\xbox-dlc-live\`).
+   The script names the exact folder if they are missing.
+3. Close the game and double-click `Install.bat`. `Install.bat -Check` in a command prompt only lists what it would
+   do.
 
-Details, update, uninstall and error messages: [docs/INSTALL.md](docs/INSTALL.md).
+`Install.bat` fetches what is missing (pinned versions, SHA-256 checked, skipped when already there): ModLoader v1.2,
+the original's B270 kit with `install_dlc.py` / `tex_convert.py` / `credits_convert.py`, `bsdiff4` + `numpy` in its own
+Python venv, ffmpeg for the credits. Then it runs the original's installer (dry run first), builds and installs the
+DLC 2 plugins when Visual Studio is there, and turns on fullscreen effects and depth of field. Steamless is not
+fetched yet: the script tells you when to run it on `tru.exe`. Afterwards: lock the game to 60 fps, start a **new**
+game from *Downloadable Content*. The manual way, update, uninstall, error messages: [docs/INSTALL.md](docs/INSTALL.md).
 
-**This fork's plugins on top (optional).** The title-update plugins (point 2 above) live in [`src/asi/`](src/asi/).
-Build them with Visual Studio (x86) and install them next to `tru.exe`, game closed
-([scripts/windows/README.md](scripts/windows/README.md)):
+The conversion itself still comes from the original's kit. The fork's own pipeline
+([docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md)) also builds on the B138 kit for the shaders, the `tru.exe` patches
+and about 40 remaining files - a port fully without the kit is not possible yet.
+
+**This fork's plugins.** The title-update plugins (point 2 above) live in [`src/asi/`](src/asi/). `Install.bat`
+builds them with Visual Studio (x86) if it finds it (`-NoPlugins` skips them, `-NoMenu` leaves TruMenu out, `-QoL`
+adds TruQoL). By hand, game closed ([scripts/windows/README.md](scripts/windows/README.md)):
 
 ```powershell
 .\scripts\windows\Build-TruAsi.ps1 -Name TruShadowPower      # -> work\asi\
