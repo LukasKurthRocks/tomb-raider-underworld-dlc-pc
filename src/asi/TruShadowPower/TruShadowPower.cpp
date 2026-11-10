@@ -157,6 +157,16 @@
 // (site 0x823e0904) - neither runs in doppelganger mode; on the PC the camera reset tru+0x1edf50 (vtable slot 0x20,
 // from the camera init tru+0x1f2440 at level / player init) clears +0x80. The reader site and the bit-2 test slot are
 // byte-checked too; the flag call itself is unchanged.
+//
+// 0.21 (2026-11-10, X23, workspace doc Befund-X23-Kraftlauf-0911.md): time-scale request slot 6. The TU's gamebase
+// natives 23 / 24 (binder 0x824a28c0 entries 23 / 24 = 0x824a3238 / 0x824a32f0; retail 0x8249dac8 / 0x8249db18, binder
+// 0x8249ced0; PC tru+0x397cf0 / tru+0x397d10, binder tru+0x3b44a0 at tru+0x3b4548) take args[0] = target, args[1] =
+// seconds. With the player state [0x829892b0], the tuning (0x82415518), gameTracker+0x1244 and the meter +0x508 all
+// set they write args[0] into meter +0x70 (native 23) / +0x74 (native 24) and call the selector 0x823d7520 - crossed
+// against the retail meaning: +0x70 is slot 6 PLAYER, +0x74 slot 6 WORLD; the duration is not used. Otherwise they set
+// the ramp directly as retail (23 world, 24 player). [TimeScale] TranslateSlot6=1 (default) does the same: both PC
+// natives jump to Native23Stub / Native24Stub; outside doppelganger mode the game's own body runs (trampoline).
+// Section "0.21" below.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -316,7 +326,7 @@ struct Meter {
     DWORD startTime;                    // +0x3c game clock at the last start / stop
     // +0x40..+0x77: time-scale request list of 0x823d7520, 7 slots {player, world}; a value <= 0 = no request
     // (-1.0 [0x82052664] clears a slot). Slot 0 = the power (Start / Stop), 2 = shadow look (0x823d8a80, not ported),
-    // 4 = timed request of condition 2401, 5 = state 1018.
+    // 4 = timed request of condition 2401, 5 = state 1018, 6 = the gamebase natives 23 / 24 in doppelganger mode (0.21).
     float request[7][2];
 };
 
@@ -533,7 +543,8 @@ void MeterInit() {
 // 0x823d7520 (request selector, argument meter +0x40): the highest slot with a player value > 0 sets the player
 // ramp, the highest with a world value > 0 the world ramp; none -> 1.0. The TU writes the ramp structs directly
 // (target, 33 ms, current value, clock) - the PC setters write the same ramps (0.3).
-void Selector() {
+// 0.21: the pick of the selector alone (also for the slot-6 log lines)
+void SelectorPick(float *playerOut, float *worldOut) {
     bool player = false, world = false;
     float playerTarget = kOne, worldTarget = kOne;
     for (int i = 6; i >= 0; --i) {
@@ -541,6 +552,13 @@ void Selector() {
         if (!world && kZero < g_meter.request[i][1]) { world = true; worldTarget = g_meter.request[i][1]; }
         if (player && world) break;
     }
+    *playerOut = playerTarget;
+    *worldOut = worldTarget;
+}
+
+void Selector() {
+    float playerTarget = kOne, worldTarget = kOne;
+    SelectorPick(&playerTarget, &worldTarget);
     g_setPlayer(playerTarget, kRampSeconds);
     g_setWorld(worldTarget, kRampSeconds);
     Log(3, "selector: player %.3f, world %.3f", playerTarget, worldTarget);
@@ -953,6 +971,8 @@ void WithheldLog() {
     if (g_withheldOn) ++g_withheldPolls;
 }
 
+void Slot6ReadSwitch();                 // 0.21: [TimeScale] TranslateSlot6 at run time (defined below)
+
 DWORD WINAPI PadHook(DWORD index, PadState *state) {
     if (g_inPadHook)                            // another plugin's hook called back into us: break the loop
         return g_realXInput ? g_realXInput(index, state) : ERROR_DEVICE_NOT_CONNECTED;   // 0.19: as 0.16
@@ -970,6 +990,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     g_lastClock = clock;
     bool held = false;
     for (int i = 0; i < 4; ++i) held = held || g_lastButtons[i] != 0;
+    Slot6ReadSwitch();                          // 0.21: once per game frame, reads the ini at most once per second
     MeterTick(held);
     return result;
 }
@@ -2231,6 +2252,9 @@ void NewTrackerCheck() {
         // 0.14: the player teardown 0x82412ea8..0x82412ebc frees the old meter's loop handle (0x823d7680: stop,
         // release the node, free) before the new player init builds a new meter (0x823d7700 then makes a new handle)
         if (g_loopSound) LoopFree("new game tracker");
+        if (kZero < g_meter.request[6][0] || kZero < g_meter.request[6][1])     // 0.21: one line per slot-6 change
+            Log(1, "0.21 slot 6: cleared with the new game tracker (was player %.3f / world %.3f; the plugin's meter is "
+                   "re-initialised, all 7 slots empty)", g_meter.request[6][0], g_meter.request[6][1]);
         MeterInit();
         if (requests) Selector();       // the plugin's meter outlives the TU object: release its time-scale requests
         Log(1, "new game tracker (generation %d): meter re-initialised (was flags 0x%03lx%s)", gen, was,
@@ -3635,6 +3659,221 @@ void PatchK11() {
         g_k11 ? "TU 0x823dca00: both skipped while gameTracker+0x1244 is set" : "PC: both always", g_k11Log);
 }
 
+// ================================================================================================================
+// 0.21 (X23, workspace docs Befund-X23-Kraftlauf-0911.md, Befund-PC-Test-0911-Abend.md rows 5 / 5b): time-scale
+// request slot 6 = the gamebase natives 23 / 24 as the TU.
+//
+// gamebase (generalbank script 55, functions f23 @0x3f8 / f24 @0x414, static natives with two floats: args[0] target,
+// args[1] seconds). Bound by the native binder of the type: TU 0x824a28c0 (stw at +0x298 / +0x2b4 = entries 23 / 24,
+// pairs with retail 0x8249ced0, not with 0x8249cd98 as tu_coverage.tsv guesses), PC tru+0x3b44a0 (tru+0x3b4548:
+// push 0x797cf0; push 0x17; call tru+0x1768f0 / push 0x797d10; push 0x18; ...).
+//   retail 0x8249dac8 (23) / 0x8249db18 (24): ramp world 0x8277525c / player 0x8277523c = {target, seconds x 1000,
+//          current scale, now} - PC tru+0x397cf0 / tru+0x397d10 call SetWorldTimeScale tru+0x376030 /
+//          SetPlayerTimeScale tru+0x376090, the same ramps 0x8abeb4 / 0x8abe94.
+//   TU 0x824a3238 (23) / 0x824a32f0 (24): r7 = player state [0x829892b0] (PC [0xfadb58]); if r7 != 0 and the tuning
+//          lookup 0x82415518 (tracker+0x1314 extension data; plugin FindTuning) != 0 and byte r7+0x1244 != 0 and the
+//          meter r7+0x508 != 0: stfs args[0] -> meter +0x70 (23) / meter +0x74 (24) (0x824a3280 / 0x824a3338), selector
+//          0x823d7520(meter +0x40), return - args[1] (the duration) is loaded but not used. Else the retail body
+//          (ramp 0x827754cc world for 23 / 0x827754ac player for 24).
+//   The selector reads slot k at meter +0x40 + 8k: +0 player (-> ramp 0x827754ac), +4 world (-> 0x827754cc). So in
+//   doppelganger mode native 23 (retail: world) requests the PLAYER scale of slot 6 and native 24 (retail: player)
+//   the WORLD scale - crossed against the retail meaning; translated as it stands.
+//   A value <= 0 (threshold 0x8207d538 = 0.0) leaves the slot empty: the scripts clear slot 6 by calling the native
+//   with 0 or a negative value. No other TU code writes meter +0x70 / +0x74 (stores of the natives only); the meter
+//   init 0x823d7700 does not touch the list.
+//   Callers in the DLC data (tools/script_ref_find.py 55 0x3f8,0x414 over the B270 kit, 268 DRMs): only script 205
+//   f1 (Lara, proto vtIndex 55, debug text "Heads up!!!": f24(p0, p8), f23(p4 x p0, p8)) and DLC 1 script 3583
+//   (dlc_caverns). No DLC script refers to 205's prototype 2 (the virtual "Heads up"); its partners f2 / f3 ("You
+//   Failed" / "Success") call gamebase f2 / f1 (current scales directly, TU 0x824a30d0 / 0x824a30b8, not slot 6).
+//   Neither native tests speed, state or input - "running" is not decided here.
+// Port: tru+0x397cf0 / tru+0x397d10 start with a 5-byte jump to Native23Stub / Native24Stub. Slot6Native makes the
+// TU's tests (player state [0xfadb58], FindTuning, byte +0x1244; the plugin's meter always exists = +0x508) and writes
+// g_meter.request[6][0] (23) / [6][1] (24) + Selector(); else (or with [TimeScale] TranslateSlot6=0) the game's own
+// body runs through a trampoline (its first 7 bytes, then back to +7). Byte checks of both bodies and of the binder
+// lines before any patch. One log line per slot-6 change (and per native call at LogLevel 2; the first 50 calls of
+// the retail path also at LogLevel 1). TranslateSlot6 is read again at run time at most once per second (only when
+// hooked at the start); switching it off releases a set slot 6 (plugin rule, not TU).
+const DWORD kNative23 = 0x00797cf0;           // gamebase native 23 (TU 0x824a3238, retail 0x8249dac8)
+const DWORD kNative24 = 0x00797d10;           // gamebase native 24 (TU 0x824a32f0, retail 0x8249db18)
+// mov eax,[esp+0xc]; fld [eax+4]; sub esp,8; fstp [esp+4]; fld [eax]; mov eax,[esp+0xc]; mov ecx,[eax+0x14];
+// fstp [esp]; call SetWorldTimeScale tru+0x376030 / SetPlayerTimeScale tru+0x376090; ret
+const char *const kNative23Hex = "8b44240c d94004 83ec08 d95c2404 d900 8b44240c 8b4814 d91c24 e821e3fdff c3";
+const char *const kNative24Hex = "8b44240c d94004 83ec08 d95c2404 d900 8b44240c 8b4814 d91c24 e861e3fdff c3";
+const DWORD kGamebaseBind = 0x007b4548;       // in the gamebase binder tru+0x3b44a0: entries 0x17 / 0x18
+const char *const kGamebaseBindHex = "68f07c7900 6a17 8bcf e89a23dcff 68107d7900 6a18 8bcf e88c23dcff";
+const int kNativeMoved = 7;                   // mov eax,[esp+0xc] (4) + fld dword [eax+4] (3): no relative operand
+int g_slot6 = 1;                              // [TimeScale] TranslateSlot6
+bool g_slot6Hooked = false;
+DWORD g_slot6SwitchTick = 0;
+DWORD g_native23To = 0, g_native24To = 0;     // trampolines: the game's body of native 23 / 24
+volatile LONG g_slot6Calls[2][2];             // [native 23 / 24][retail body / slot 6]
+
+void Slot6Release(const char *why) {
+    if (!(kZero < g_meter.request[6][0] || kZero < g_meter.request[6][1])) return;
+    const float p = g_meter.request[6][0], w = g_meter.request[6][1];
+    g_meter.request[6][0] = g_meter.request[6][1] = kNoRequest;
+    Selector();
+    float sp = kOne, sw = kOne;
+    SelectorPick(&sp, &sw);
+    Log(1, "0.21 slot 6: cleared (%s; was player %.3f / world %.3f) - selector now player %.3f, world %.3f", why, p, w,
+        sp, sw);
+}
+
+void Slot6ReadSwitch() {
+    if (!g_slot6Hooked || !g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_slot6SwitchTick < 1000) return;
+    g_slot6SwitchTick = now;
+    const int t = GetPrivateProfileIntA("TimeScale", "TranslateSlot6", g_slot6, g_iniPath) ? 1 : 0;
+    if (t == g_slot6) return;
+    Log(1, "0.21 switch: [TimeScale] TranslateSlot6 %d -> %d (read again from TruShadowPower.ini) - %s", g_slot6, t,
+        t ? "gamebase natives 23 / 24 request slot 6 in doppelganger mode as the TU"
+          : "gamebase natives 23 / 24 set the ramps directly (retail body)");
+    g_slot6 = t;
+    if (!t) Slot6Release("[TimeScale] TranslateSlot6=0");
+}
+
+// game thread (script VM, op66 static call of gamebase f23 / f24): 1 = handled as the TU's doppelganger branch,
+// 0 = run the game's body (the TU's retail branch)
+int __cdecl Slot6Native(int native, const float *args) {
+    const int k = native == 24 ? 1 : 0;
+    float value = kZero, seconds = kZero;
+    __try {
+        value = args[0];
+        seconds = args[1];
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "0.21 slot 6: gamebase native %d - argument read fault (args 0x%08lx) - game body", native,
+            reinterpret_cast<DWORD>(args));
+        return 0;
+    }
+    Slot6ReadSwitch();
+    const char *why = nullptr;
+    if (!g_slot6) {
+        why = "[TimeScale] TranslateSlot6=0";
+    } else {
+        const BYTE *gt = GameTracker();                 // TU: lwz r7, [0x829892b0]
+        if (!gt) {
+            why = "no player state [0xfadb58] (TU: [0x829892b0] = 0)";
+        } else if (!FindTuning()) {                     // TU: bl 0x82415518
+            why = "no tuning of object 858 (TU: 0x82415518 = 0)";
+        } else {
+            BYTE dg = 0;
+            __try {
+                dg = gt[0x1244];                        // TU: lbz r11, 0x1244(r7)
+            } __except (EXCEPTION_EXECUTE_HANDLER) {
+                dg = 0;
+            }
+            if (!dg) why = "not in doppelganger mode (gameTracker+0x1244 = 0)";
+            // TU: lwz r11, 0x508(r7) - the meter object; the plugin's meter always exists
+        }
+    }
+    if (why) {
+        const LONG n = InterlockedIncrement(&g_slot6Calls[k][0]);
+        if (n <= 50 || g_logLevel >= 2)
+            Log(n <= 50 ? 1 : 2, "0.21 slot 6: gamebase native %d (%s %.3f over %.3f s) -> game body, ramp set directly "
+                                 "- %s (call %ld of this kind)", native, native == 23 ? "world" : "player", value,
+                seconds, why, n);
+        return 0;
+    }
+    const LONG n = InterlockedIncrement(&g_slot6Calls[k][1]);
+    float *slot = &g_meter.request[6][native == 23 ? 0 : 1];    // TU: stfs f0, 0x70(r11) (23) / 0x74(r11) (24)
+    const float was = *slot;
+    *slot = value;
+    Selector();                                                  // TU: bl 0x823d7520 (meter +0x40)
+    float sp = kOne, sw = kOne;
+    SelectorPick(&sp, &sw);
+    const bool change = was != value;
+    if (change || g_logLevel >= 2)
+        Log(change ? 1 : 2, "0.21 slot 6: gamebase native %d (script value %.3f, duration %.3f s not used) in doppelganger "
+                            "mode -> slot 6 %s (meter +0x%x) %.3f -> %.3f (TU 0x%08lx) - selector: player %.3f, world "
+                            "%.3f (slot 6 now player %.3f / world %.3f; call %ld of this kind)",
+            native, value, seconds, native == 23 ? "PLAYER" : "WORLD", native == 23 ? 0x70 : 0x74, was, value,
+            native == 23 ? 0x824a3280UL : 0x824a3338UL, sp, sw, g_meter.request[6][0], g_meter.request[6][1], n);
+    return 1;
+}
+
+// jumped to from tru+0x397cf0 / tru+0x397d10 (cdecl: [esp] = return into the script VM, [esp+0xc] = the argument
+// block, as the game's body reads it); eax / ecx / edx are free, the FPU stack is empty
+__declspec(naked) void Native23Stub() {
+    __asm {
+        mov eax, [esp + 0xc]
+        push eax
+        push 23
+        call Slot6Native
+        add esp, 8
+        test eax, eax
+        jnz n23_done
+        jmp dword ptr [g_native23To]
+    n23_done:
+        ret
+    }
+}
+
+__declspec(naked) void Native24Stub() {
+    __asm {
+        mov eax, [esp + 0xc]
+        push eax
+        push 24
+        call Slot6Native
+        add esp, 8
+        test eax, eax
+        jnz n24_done
+        jmp dword ptr [g_native24To]
+    n24_done:
+        ret
+    }
+}
+
+// the first kNativeMoved bytes of the game's body, then a jump back behind them
+DWORD MakeNativeTrampoline(DWORD at) {
+    BYTE *t = static_cast<BYTE *>(VirtualAlloc(nullptr, 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!t) return 0;
+    memcpy(t, reinterpret_cast<const void *>(at), kNativeMoved);
+    t[kNativeMoved] = 0xe9;
+    const DWORD back = (at + kNativeMoved) - (reinterpret_cast<DWORD>(t) + kNativeMoved + 5);
+    memcpy(t + kNativeMoved + 1, &back, 4);
+    FlushInstructionCache(GetCurrentProcess(), t, 16);
+    return reinterpret_cast<DWORD>(t);
+}
+
+void PatchSlot6() {
+    if (!g_slot6) {
+        Log(1, "0.21 slot 6: [TimeScale] TranslateSlot6=0 - gamebase natives 23 / 24 untouched (a later 1 needs a "
+               "restart)");
+        return;
+    }
+    struct { DWORD at; const char *hex; const char *what; } const facts[] = {
+        {kNative23, kNative23Hex, "gamebase native 23 tru+0x397cf0 (args -> SetWorldTimeScale tru+0x376030)"},
+        {kNative24, kNative24Hex, "gamebase native 24 tru+0x397d10 (args -> SetPlayerTimeScale tru+0x376090)"},
+        {kGamebaseBind, kGamebaseBindHex, "gamebase binder tru+0x3b4548 (entries 0x17 / 0x18 = tru+0x397cf0 / tru+0x397d10)"},
+        {kSetWorld, "51 a15cf1e700 db055cf1e700 85c0", "SetWorldTimeScale tru+0x376030"},
+        {kSetPlayer, "51 a15cf1e700 db055cf1e700 85c0", "SetPlayerTimeScale tru+0x376090"},
+    };
+    for (const auto &f : facts)
+        if (!HexBytesAt(f.at, f.hex)) {
+            Log(0, "0.21 slot 6: %s at 0x%08lx does not match - natives 23 / 24 left to the game", f.what, f.at);
+            return;
+        }
+    g_native23To = MakeNativeTrampoline(kNative23);
+    g_native24To = MakeNativeTrampoline(kNative24);
+    if (!g_native23To || !g_native24To) {
+        Log(0, "0.21 slot 6: VirtualAlloc failed (%lu) - natives 23 / 24 left to the game", GetLastError());
+        return;
+    }
+    if (!WriteJump5(kNative23, reinterpret_cast<const void *>(&Native23Stub))) {
+        Log(0, "0.21 slot 6: native 23 not written (VirtualProtect %lu) - natives 23 / 24 left to the game", GetLastError());
+        return;
+    }
+    if (!WriteJump5(kNative24, reinterpret_cast<const void *>(&Native24Stub))) {
+        Log(0, "0.21 slot 6: native 24 not written (VirtualProtect %lu) - only native 23 translated", GetLastError());
+    }
+    g_slot6Hooked = true;
+    Log(1, "0.21 slot 6: gamebase natives 23 / 24 (tru+0x397cf0 / tru+0x397d10) -> plugin: in doppelganger mode "
+           "(player state, tuning 858, gameTracker+0x1244) native 23 writes request slot 6 PLAYER, native 24 slot 6 "
+           "WORLD, then the selector (TU 0x824a3238 / 0x824a32f0); else the game's body. [TimeScale] TranslateSlot6 "
+           "read again at run time at most once per second");
+}
+
 // ---- meter interface (docs Befund-Schattenkampf.md section 5; version 1 = TruShadowCombat's proposal, version 2
 // appends the HUD natives f70-f73 of larabase, TU 0x824aa060 / 0x824aa0a0 / 0x824aa120 / 0x824aa150, for a later HUD
 // plugin - Plan-Nacht-Analysen-2026-11-03.md section 2). Fields are only appended; check version / size.
@@ -3723,6 +3962,7 @@ void ReadOptions(const char *dir) {
     strcpy_s(g_iniPath, sizeof(g_iniPath), ini);                                 // 0.18: run-time read
     g_k11 = GetPrivateProfileIntA("Adrenaline", "Translate", 1, ini) ? 1 : 0;    // 0.18 (K11), default 1
     g_k11Log = GetPrivateProfileIntA("Adrenaline", "Log", 1, ini) ? 1 : 0;
+    g_slot6 = GetPrivateProfileIntA("TimeScale", "TranslateSlot6", 1, ini) ? 1 : 0;   // 0.21 (X23), default 1
 }
 
 void Start(HMODULE self) {
@@ -3733,14 +3973,14 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.20 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.21 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
-        "log %d)", g_enabled, g_buttons,
+        "log %d; 0.21: time-scale slot 6 %d)", g_enabled, g_buttons,
         g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled, g_legacyPadStart,
         g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled, g_state2102Enabled, g_loopSound,
-        g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11, g_k11Log);
+        g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11, g_k11Log, g_slot6);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -3855,6 +4095,7 @@ void Start(HMODULE self) {
     CheckTickGate();                    // 0.16: main state / level change tests of the tick (player tests always on)
     CheckPadPoll();                     // 0.17: [ShadowPower] MenuInput (before the hook thread reads g_menuInputOk)
     PatchK11();                         // 0.18: K11 - adrenaline tick / bar skipped in doppelganger mode as the TU
+    PatchSlot6();                       // 0.21: gamebase natives 23 / 24 -> request slot 6 in doppelganger mode as the TU
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -3875,14 +4116,15 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.20 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.21 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
            "conditions 1046 / 1047 / 1048-1056 / 2401, states 243 / 245 / 1018 / 2102, activities 1009 / 1039, shadow look = TU player events of start / stop, "
            "adrenaline look = meter flag 0x40 / camera mode 0x34, look screen effect report / switch, GlobalParams[7], "
            "InstanceParams[1] in cinematics, meter interface TruShadowPowerMeterApi v4, camera flag of the start "
-           "(camera bit 2, reader tru+0x1e5e8e); switches default off: loop sound, move events 0x83 / 0x84, strike "
+           "(camera bit 2, reader tru+0x1e5e8e), gamebase natives 23 / 24 -> time-scale request slot 6 in doppelganger "
+           "mode (TU 0x824a3238 / 0x824a32f0); switches default off: loop sound, move events 0x83 / 0x84, strike "
            "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120)";
 }
 

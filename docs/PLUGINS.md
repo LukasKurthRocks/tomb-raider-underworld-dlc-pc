@@ -19,7 +19,7 @@ READMEs and [CHANGELOG.md](../CHANGELOG.md); the plugin README and the CHANGELOG
 | [TruQoL](#truqol) | base-game comfort | 0.1.3 | partial: frame limiter and thread cap played 2026-11-08; the other keys offline |
 | [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22.12 | partial: cutscene pause, `sub.lang`, `fight.trace`, enemy panel, light diagnosis and the quick bar states played 2026-11-09; known: subtitles run on during the pause, LB + View before RB fires "continue", `sub.lang` not kept over a restart |
 | [TruMercLang](#trumerclang) | base-game comfort (fun option) | 0.1 | offline, default off |
-| [TruShadowPower](#trushadowpower) | DLC 2 title update | 0.20 | partial: played up to 0.18; 0.19 and 0.20 offline |
+| [TruShadowPower](#trushadowpower) | DLC 2 title update | 0.21 | partial: 0.20 installed and in use 2026-11-09 (power, wall run, goo drip: the PC stays in slow motion while running, the Xbox switches to world 1.0); 0.21 (time-scale slot 6) offline, not installed |
 | [TruShadowCombat](#trushadowcombat) | DLC 2 title update | 0.6.8 | partial: single punches as on the Xbox played 2026-11-09 (Hit instead of Fall, impulse gate on / off); open: punch combo does not chain, melee kill with the gate not yet seen |
 | [TruShadowHud](#trushadowhud) | DLC 2 title update | 0.2 | partial: HUD natives played 2026-11-05; 0.2 offline |
 | [TruRockVein](#trurockvein) | DLC 2 title update | 0.11 | partial: wall run played; the jump from a ledge to a rock vein turns back |
@@ -139,12 +139,17 @@ The slow motion and the meter of the DLC 2 shadow power: while LB or RB is held 
 (the yellow silhouette in the HUD) drains; it refills over time. Since 0.3 the meter is a function-by-function
 translation of the title-update code that reads its rates from the same data the Xbox reads.
 
-- Version: 0.20.
+- Version: 0.21.
 - State: partial. Played up to 0.18 (0.18, no retail adrenaline in doppelganger mode, played 2026-11-07); 0.19
-  (TruMenu's pad block) and 0.20 (`[Look] CameraFlag` default 1 as the title update) built, not played.
+  (TruMenu's pad block) and 0.20 (`[Look] CameraFlag` default 1 as the title update) built, 0.20 installed and in use
+  in the tests of 2026-11-09 (its own TO TEST rows not reported). 0.21 (`[TimeScale] TranslateSlot6`, default 1: the
+  gamebase script natives 23 / 24 write time-scale request slot 6 in doppelganger mode as the title update) built
+  2026-11-10, not installed. Known: at the goo drip the PC stays at world 0.3 while Lara runs with the power, the
+  Xbox goes to 1.0; on 2026-11-09 no script called natives 23 / 24 there (TruMenu's ramp counter), so slot 6 is
+  probably not the cause - the 0.21 log decides it.
 - INI `TruShadowPower.ini`: `[ShadowPower] Enabled` / `Buttons` (768 = LB or RB) / `MenuInput`; `[Meter] HudBar` /
   `Fallback`; `[Look] AdrenalineMode` / `CameraFlag`; `[Cloth] TuTimeStep` (0: the title update's player cloth time
-  step, against the stretched ponytail in slow motion); `[Adrenaline] Translate`.
+  step, against the stretched ponytail in slow motion); `[Adrenaline] Translate`; `[TimeScale] TranslateSlot6`.
 - Install: `scripts\windows\Set-TruShadowPower.ps1`.
 - README: [src/asi/TruShadowPower/README.md](../src/asi/TruShadowPower/README.md).
 

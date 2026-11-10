@@ -27,9 +27,65 @@ LB / RB started it); 0.17 (LB / RB only as the game gets them, `[ShadowPower] Me
 2026-11-07 14:44 / 14:53 (bar LB / RB suppressed); 0.18 (K11: no retail adrenaline tick / bar in doppelganger mode,
 `[Adrenaline] Translate`) built 2026-11-07, played 2026-11-07 from 15:02; 0.19 (TruMenu's `TruMenuPadBlock` instead
 of the pad-chain re-wrap) built 2026-11-07, not played; 0.20 (`[Look] CameraFlag` default 1 = TU, the PC reader of
-the camera bit found) built 2026-11-07, not played.** Not covered: the
+the camera bit found) built 2026-11-07, installed, ran in the sessions of 2026-11-09 (log; its TO TEST rows not
+reported); 0.21 (time-scale request slot 6: gamebase natives 23 / 24 as the TU, `[TimeScale] TranslateSlot6`) built
+2026-11-10, not installed, not played.** Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.21: time-scale request slot 6 - the gamebase natives 23 / 24 as the TU (X23, 2026-11-10)
+
+Build `work\asi\power021`; byte pre-checks `work\asi\power021\prechecks_v21.txt` (5 checks, 0 mismatches against
+`data\pc\tru.exe` and the installed `tru.exe`, both md5 `5560abac...`). Workspace docs `Befund-X23-Kraftlauf-0911.md`
+(the slot writers) and `Befund-PC-Test-0911-Abend.md` rows 5 / 5b (the goo drip).
+
+* **TU:** the request selector 0x823d7520 reads 7 slots {player, world} at meter +0x40; slot 6 (+0x70 / +0x74) is
+  written only by the TU versions of the **gamebase natives 23 / 24** (generalbank script 55, f23 @0x3f8 / f24
+  @0x414; binder 0x824a28c0 stores them at +0x298 / +0x2b4 = entries 23 / 24 - its retail partner is 0x8249ced0 with
+  0x8249dac8 / 0x8249db18, on the PC tru+0x3b44a0 with tru+0x397cf0 / tru+0x397d10). Arguments args[0] = target,
+  args[1] = seconds. **0x824a3238 (23):** player state `[0x829892b0]` != 0, tuning lookup 0x82415518 != 0,
+  `gameTracker+0x1244` != 0 and meter `+0x508` != 0 -> `stfs args[0], meter+0x70` (0x824a3280), selector, return;
+  else the retail body: world ramp 0x827754cc = {target, seconds x 1000, current world scale, now}. **0x824a32f0
+  (24):** the same with `meter+0x74` (0x824a3338) / the player ramp 0x827754ac. The selector takes slot +0 as the
+  PLAYER and +4 as the WORLD value (ramps 0x827754ac / 0x827754cc) - so in doppelganger mode **native 23 requests the
+  player scale and native 24 the world scale**, crossed against their retail meaning. The duration is not used there
+  (the selector ramps in 33 ms). A value <= 0 empties the slot (threshold 0.0): a script clears slot 6 by calling the
+  native with 0 or a negative value. No other TU code stores to meter +0x70 / +0x74; the meter init 0x823d7700 does not
+  touch the list. Neither native looks at speed, state or input.
+* **Callers (data):** `tools/script_ref_find.py 55 0x3f8,0x414` over the 268 DRMs of the B270 kit: only script 205
+  f1 (Lara's class, vtable slot 55, debug text "Heads up!!!": `f24(p0, p8)`, `f23(p4 x p0, p8)`, members +0x24 / +0x20
+  / +0x1c) in every DLC level / player file, and DLC 1 script 3583 (dlc_caverns). No DLC script refers to the
+  prototype of 205 f1 (`script_ref_find.py 205 0x123c`: 0 hits) - inside the DLC data nothing calls it. Its partners
+  f2 / f3 ("You Failed" / "Success") call gamebase f2 / f1, which write the current scales directly (TU 0x824a30d0 /
+  0x824a30b8, unchanged by the TU) - not slot 6.
+* **PC evidence (2026-11-09 evening, TruMenu 0.22.11 counts every call of SetWorldTimeScale / SetPlayerTimeScale with
+  its caller module):** 372 calls, all from TruShadowPower.asi, none from tru.exe - so no script ran gamebase 23 / 24
+  in that session, the goo-drip runs 20:57:51 and 20:59:15 included. Slot 6 has therefore **probably no part in the
+  goo-drip difference** (Xbox world 1.00 while running); the Xbox log of 18:06 also shows the meter standing still at
+  893.5 from 02.14 to 02.70 while the world scale jumps to 1.00, and draining at ~200 / s afterwards - another
+  mechanism, open. 0.21 is the translation nevertheless (the TU path exists), and its log lines settle it live.
+* **Port:** `[TimeScale] TranslateSlot6=1` (default): tru+0x397cf0 / tru+0x397d10 start with a 5-byte jump to
+  Native23Stub / Native24Stub. They make the TU's tests (player state `[0xfadb58]`, `FindTuning` = the tick's tuning
+  lookup incl. `[Meter] Fallback`, byte `+0x1244`; the plugin's meter always exists) and write
+  `request[6][0]` (23) / `request[6][1]` (24), then `Selector()`; otherwise the game's own body runs through a
+  trampoline (its first 7 bytes, relocation-free, then back), so the ramp is set exactly as before (and TruMenu's
+  counter still names tru.exe as the caller). A new game tracker re-initialises the meter, slot 6 included. Read
+  again at run time at most once per second (only when hooked at the start); switching it off empties a set slot 6
+  (plugin rule).
+* **Log:** one line per slot-6 change (`0.21 slot 6: gamebase native 24 (script value ...) in doppelganger mode ->
+  slot 6 WORLD (meter +0x74) -1.000 -> 1.000 (TU 0x824a3338) - selector: player ..., world ...`), the first 50
+  retail-path calls per native (`-> game body, ramp set directly - not in doppelganger mode ...`), the rest at
+  LogLevel 2. TruMenu's `fight.trace` request column (`TruShadowPowerMeterApi` requests) shows slot 6 as `6:<player>/<world>` (e.g. `6:-/1.00`).
+* New checks (all must match, else `0.21 slot 6: <check> does not match - natives 23 / 24 left to the game`): both
+  native bodies (32 bytes each, incl. the call to the setter), the binder lines tru+0x3b4548 (entries 0x17 / 0x18),
+  both setters.
+
+| # | TO TEST 0.21 (DLC 2, sample ini) | expected |
+|---|---|---|
+| 1 | load | `TruShadowPower 0.21 loaded (... 0.21: time-scale slot 6 1)`, `0.21 slot 6: gamebase natives 23 / 24 (tru+0x397cf0 / tru+0x397d10) -> plugin ...`, no "does not match" |
+| 2 | goo drip (end level) with the power, running | world scale while running (TruMenu `fight.trace`: `time_scale`, `pc_ramp_last`, request column): if a `0.21 slot 6:` line comes, slot 6 decides it (Xbox: world 1.00); if none comes (as on 2026-11-09), slot 6 is not the mechanism - report the time of the run |
+| 3 | main game / DLC 1 (a "Heads up" slow motion, if one is known) | `0.21 slot 6: gamebase native 24 / 23 ... -> game body ... not in doppelganger mode`, slow motion as before |
+| 4 | `[TimeScale] TranslateSlot6=0` while running | `0.21 switch: [TimeScale] TranslateSlot6 1 -> 0 ...`; natives 23 / 24 = PC |
 
 ## 0.20: the camera flag of the start as the TU (P5b, 2026-11-07)
 
@@ -566,6 +622,7 @@ at least 60 %" before a shadow strike). Option `[Conditions] Enabled`.
 | `0x823d8120` may start (after "empty" only above tuning +0x28) | `CanStart` | - |
 | `0x823d7d40` start: request player = tuning +0x40, world = tuning +0x3c | `StartPower` | `SetPlayerTimeScale` / `SetWorldTimeScale`, 33 ms |
 | `0x823d7fb8` stop: request cleared (both 1.0) | `StopPower` | same setters |
+| `0x824a3238` / `0x824a32f0` gamebase natives 23 / 24: in doppelganger mode request slot 6 (+0x70 player / +0x74 world) + selector, else the retail ramp (0.21) | `Slot6Native` | tru+0x397cf0 / tru+0x397d10 (jump + trampoline) |
 | `0x823d81a0` refill: tuning +0x18 per second (+0x20 while a delay runs, +0x1c in another player state), clamp to max +0x10 | `Refill` | HUD below |
 | `0x823d8380` drain by frame time x 1/30 x tuning +0x14, clamp 0..max | `Drain` | HUD below |
 | `0x82415518` tuning = data of the extension instance | `FindTuning` | object table `0xdb7400`, object 858 |
@@ -619,6 +676,7 @@ every `*.asi` next to `tru.exe`.
 | `[Cloth] TuTimeStep` | 0 | 0.15: the TU's player cloth time step (TU 0x82278120): the ponytail gets the frame time / world scale, so it keeps real time in slow motion |
 | `[Adrenaline] Translate` | 1 | 0.18 (K11): CombatManager::Update skips the adrenaline tick tru+0x318bd0 and bar tru+0x2f2930 while gameTracker+0x1244 is set (TU 0x823dca00); 0 = PC; read again at run time (<= 1 / s) |
 | `[Adrenaline] Log` | 1 | 0.18: one line per change of the K11 decision per site |
+| `[TimeScale] TranslateSlot6` | 1 | 0.21 (X23): gamebase natives 23 / 24 in doppelganger mode -> time-scale request slot 6 (23 player, 24 world, crossed as TU 0x824a3238 / 0x824a32f0), else the game's body; 0 = PC; read again at run time (<= 1 / s, only if 1 at the start) |
 
 The 0.2 options `WorldScale`, `PlayerScale`, `RampSeconds`, `[Meter] Enabled`, `DrainSeconds`, `RefillSeconds`,
 `RefillDelay`, `MinStart` are gone - those values now come from the data / the TU constants.

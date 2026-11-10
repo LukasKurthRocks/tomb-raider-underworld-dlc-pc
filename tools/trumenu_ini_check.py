@@ -1729,6 +1729,7 @@ SW_LIVE = {
     ('TruShadowCombat', 'States', 'Translate231Slot0'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate231Slot1'): 'void ReadSwitches(',
     ('TruShadowPower', 'Adrenaline', 'Translate'): 'void K11ReadSwitch(',
+    ('TruShadowPower', 'TimeScale', 'TranslateSlot6'): 'void Slot6ReadSwitch(',     # 0.21 (X23, 2026-11-10)
     ('TruMercLang', 'MercLang', 'Enabled'): 'void PollIni(',
     ('TruMercLang', 'MercLang', 'Language'): 'void PollIni(',
     # TruQoL 0.1.1 (17y): LiveTick (game thread, once a second after a change of the file time) -> LiveReadOptions
