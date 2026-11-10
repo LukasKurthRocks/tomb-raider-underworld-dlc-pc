@@ -60,8 +60,8 @@ ends on a black screen after its last cutscene. Python 3.9+ must be installed ([
 `Install.bat` fetches what is missing (pinned versions, SHA-256 checked, skipped when already there): ModLoader v1.2,
 the original's B270 kit with `install_dlc.py` / `tex_convert.py` / `credits_convert.py`, `bsdiff4` + `numpy` in its own
 Python venv, ffmpeg for the credits. Then it runs the original's installer (dry run first), builds and installs the
-DLC 2 plugins when Visual Studio is there, and turns on fullscreen effects and depth of field. Steamless is not
-fetched yet: the script tells you when to run it on `tru.exe`. Afterwards: lock the game to 60 fps, start a **new**
+DLC 2 plugins when Visual Studio is there, and turns on fullscreen effects and depth of field. It also fetches
+Steamless and unpacks `tru.exe` with it (checked by MD5). Afterwards: lock the game to 60 fps, start a **new**
 game from *Downloadable Content*. The manual way, update, uninstall, error messages: [docs/INSTALL.md](docs/INSTALL.md).
 
 The conversion itself still comes from the original's kit. The fork's own pipeline

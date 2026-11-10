@@ -22,8 +22,8 @@ existing file with a wrong hash stops it), makes a venv `<workspace>\bin\venv-in
 fetches ffmpeg for the credits, finds RAD Video Tools if installed (never downloaded; without it no credits), then
 runs `install_dlc.py` (dry run first, `--credits` with RAD) through `Install-TruDlc.ps1 -Build B270`, builds and
 installs the fork's DLC 2 plugins when Visual Studio x86 is installed, and turns on fullscreen effects and depth of
-field. It never installs Python itself, and it does not fetch Steamless yet (no pinned hash): it says when to run
-Steamless by hand. `Install.bat -Check` lists every download (URL, target, SHA-256) and step and changes nothing;
+field. It never installs Python itself. It fetches Steamless v3.1.0.5 (SHA-256 pinned), runs it on the Steam `tru.exe`
+and checks the MD5 of the unpacked exe. `Install.bat -Check` lists every download (URL, target, SHA-256) and step and changes nothing;
 `-NoDownload`, `-NoPlugins`, `-NoCredits`, `-NoMenu`, `-QoL`. Log: `<workspace>\logs\Install-TruAll_<time>.log`.
 The rest of this page is the manual way.
 

@@ -39,9 +39,9 @@
                     the SHA256SUMS.txt of the owner's download of 2026-11-05
       ModLoader     computed from the owner's ModLoader.zip of release v1.2 (1 313 604 bytes = the release asset);
                     GitHub shows no digest for that 2024 release
-      Steamless     not pinned yet (no digest on GitHub, no verified copy): the script does not download it and asks
-                    to run Steamless by hand, or to unzip it into <workspace>\bin\steamless-3.1.0.5 (then the script
-                    runs it and checks the MD5 of tru.exe.unpacked.exe) - see $steamless below
+      Steamless     computed from the release asset of v3.1.0.5 downloaded on 2026-11-10 (610 646 bytes = the size
+                    GitHub lists; GitHub shows no digest for that 2024 release); the script runs Steamless.CLI.exe and
+                    checks the MD5 of tru.exe.unpacked.exe - see $steamless below
       ffmpeg        Get-Tools.ps1 (gyan.dev release 9.0.2)
 
     -Check lists everything it would download (URL, target, SHA-256) or do, checks the files that are already there
@@ -124,11 +124,13 @@ $kitFiles = @(
     @{ Name = 'B270 tex_convert.py'; File = 'tex_convert.py'; Sha256 = '053338dbd5b6b1af70ab36b0597374756e766fcbfce9e123f35fe72e2aff6d53' },
     @{ Name = 'B270 credits_convert.py'; File = 'credits_convert.py'; Sha256 = '4b56ae4ec6da1f9722cc782eba97253774cfbad133b23460853eb222adc346bc' }
 ) | ForEach-Object { @{ Name = $_.Name; Url = "$b270Url/$($_.File)"; Target = (Join-Path $release $_.File); Sha256 = $_.Sha256; Source = $b270Source } }
-# Steamless: tested with the March 2024 release v3.1.0.5 (docs/INSTALL.md). Its SHA-256 is not pinned yet - GitHub
-# shows no digest for it and no verified copy was at hand on 2026-11-10. Until Sha256 is set it is never downloaded.
+# Steamless: tested with the March 2024 release v3.1.0.5 (docs/INSTALL.md). GitHub shows no digest for it; the SHA-256
+# below was computed from the release asset downloaded on 2026-11-10 (610 646 bytes, the size GitHub lists). The
+# unpacked exe it writes is checked against $md5UnpackedExe, so a wrong Steamless cannot slip through unnoticed.
 $steamless = @{
     Name = 'Steamless v3.1.0.5'; Url = 'https://github.com/atom0s/Steamless/releases/download/v3.1.0.5/Steamless.v3.1.0.5.-.by.atom0s.zip'
-    Target = (Join-Path $dlDir 'Steamless.v3.1.0.5.-.by.atom0s.zip'); Sha256 = ''; Source = 'not pinned yet'
+    Target = (Join-Path $dlDir 'Steamless.v3.1.0.5.-.by.atom0s.zip'); Sha256 = 'e3e2d22e098ff3fb359b2876aa2bed9596f0501e6ff588cbffae90a76d2dc4f5'
+    Source = 'computed from the v3.1.0.5 release asset, 2026-11-10 (610 646 bytes; GitHub shows no digest)'
     Folder = (Join-Path $binDir 'steamless-3.1.0.5')
     Manual = 'Run Steamless (https://github.com/atom0s/Steamless/releases, v3.1.0.5, default options) once on {0}; it writes {0}.unpacked.exe. Or unzip that Steamless release into {1}: the installer then runs it and checks the MD5 of what it writes. Then start Install.bat again.'
 }
