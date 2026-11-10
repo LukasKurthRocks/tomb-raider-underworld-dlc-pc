@@ -106,7 +106,8 @@ record array `[[machine+4]+0xc]` (TU machine reset 0x82482808). Earlier logs sho
 
 The PC-compatible columns stay first and unchanged: `host_time inst obj_id obj_name lp stamina state0 state1 req target
 dist lara_rec0 lara_rec1 meter active time_scale`. Appended: `kind pos_x pos_y pos_z speed fly last_flight attack
-ko_handle lp_note lara_lp lara_states lara_pos ts_requests ts_selected ramp_player ramp_world cam_mode cam_flags`.
+ko_handle lp_note lara_lp lara_states lara_pos ts_requests ts_selected ramp_player ramp_world cam_mode cam_flags
+aim_cm1fc aim_bits aim_t0_flags aim_t0_target` (the last four since 2026-11-10, section "Lock-on path").
 `ts_requests` / `ts_selected` have the same text as TruMenu 0.22.11's `pc_ts_requests` / `pc_ts_selected`
 (`0:1.20/0.30 4:0.02/1.00`, `P0.02(s4) W1.00(s4)`), so PC and Xbox can be matched by column name
 (`tools/fight_trace_compare.py` reads only the shared first 16 columns so far).
@@ -163,6 +164,16 @@ Proven: MeleeAttack Enter passes brain+0x2fc4 (a requester with the handle {inst
 which checks the handle and the target's slot manager +0xf78. TruXenia logs the handle target (`ko_handle`); what the
 coordinator grants (slot, order) is still open - `Ko` stays `?`.
 
+### Lock-on path (aiming, 2026-11-10)
+
+For the K-5 comparison (PC: no lock target while LT is held; PC side = TruMenu 0.22.15 `aim.trace` / `TruAim.log`,
+ENGINE.md row "Lock-on path"). Address-file section `aim`, 9 proof words: CM = player tracker +0x504, **CM+0x1fc**
+shown as bits 9 (soft lock, TU 0x823de858 = PC 0x71ec50) / 10 (lock, TU 0x823de9f0 = PC 0x71edf0) / 11 / 18 / 19 /
+20 / 21; **targeter 0** = `[[0x829ca648]+0]`, flags +8, target = node +0x90 -> handle {instance, stamp} (stamp checked
+against instance +0x44; TU getter 0x82404568 = PC 0x719f00). Lara page line "Zielen (Lock)", link `lara`, the four
+`aim_*` TSV columns. Read only. Not read on the Xbox (offsets not proven there): the pad word, the aim timers
+(TU player fields are shifted by +4 around +0x50f / +0x540), the candidate lists.
+
 ## State (2026-11-09)
 
 - First live session 09.11. 17:35-18:10 (hit log, values readable, proof words passed).
@@ -170,5 +181,7 @@ coordinator grants (slot, order) is still open - `Ko` stays `?`.
   brain test, kinds + filter, RegenerateDeath LP note, time-scale request slots, object table. `--selftest` passes
   (4 hit lines incl. the RegenerateDeath finisher, link commands, locked `set`, save dry run); both TU image dumps
   pass the 91 proof words. Not yet run live.
+- 2026-11-10 (offline): lock-on values (section "Lock-on path"); `--selftest` passes with the new aim line, the TU
+  image dump passes 103 proof words (0 mismatches). Not yet run live.
 - Open: `Ko` meaning, camera position / FOV, units / sections / shaders, Xenia function-trace reader (stage 2).
 - TU addresses: ENGINE.md section 13 rows "TU combat addresses", "TU brain shift", "TU TruXenia stage 1b".

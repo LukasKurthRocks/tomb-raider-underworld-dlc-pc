@@ -72,6 +72,7 @@ T = {
     'vel': ('Tempo', 'Speed'), 'legend': ('Legende', 'Legend'),
     'laralp': ('Lara LP', 'Lara LP'), 'larastates': ('Lara-Zustände', 'Lara states'),
     'camera': ('Kamera', 'Camera'), 'requests': ('Zeit-Anforderungen', 'Time requests'),
+    'aim': ('Zielen (Lock)', 'Aim (lock)'),
     'ramps': ('Rampen Spieler / Welt', 'Ramps player / world'),
     'objtable': ('Objekttabelle (0x82979280)', 'Object table (0x82979280)'),
     'loadplan': ('Einheiten, Sektionen, Shader: noch nicht belegt - Plan in docs/TRUXENIA.md',
@@ -225,6 +226,13 @@ class FakeMem:
         self.w32(mac0 + S.h(lc['record_offset']), self.recptr[1482]); self.w32(mac1 + S.h(lc['record_offset']), 0)
         self.w32(trk + S.h(pt['meter_object']), meter)
         self.mem[trk + S.h(pt['doppelganger_flag'])] = 1
+        # 2026-11-10 aim: CM +0x1fc with bits 10 / 18 / 19, targeter 0 locked on thrall 0 (stamp 7)
+        am, cm, tlist, t0, node = A['aim'], 0x43500000, 0x43600000, 0x43610000, 0x43620000
+        self.w32(trk + S.h(pt['combat_manager']), cm)
+        self.w32(cm + S.h(am['combat_manager_bits']), (1 << 10) | (1 << 18) | (1 << 19))
+        self.w32(S.h(am['targeter_list']), tlist); self.w32(tlist, t0)
+        self.w32(t0 + S.h(am['targeter_flags']), 1); self.w32(t0 + S.h(am['targeter_target_node']), node)
+        self.w32(node + S.h(am['node_handle']), self.insts[0][0]); self.w32(node + S.h(am['node_handle']) + 4, 7)
         self.wf(trk + 0x628, 1000.0); self.wf(trk + 0x630, 1000.0)
         self.w32(meter + 4, 0); self.wf(meter + 8, 1000.0); self.wf(meter + 0xc, 1000.0)
         for k in range(14):
@@ -376,6 +384,37 @@ class Model:
             return '?'
         v = fn(S.h(f['offset']))
         return '~%s' % (v,)
+
+    def _aim(self, trk):
+        """2026-11-10 K-5 lock-on path (section "aim" of the address file; PC side TruMenu 0.22.15 aim.trace): CM+0x1fc
+        bits 9 soft lock / 10 lock / 11 / 18 / 19 / 20 / 21 and targeter 0 (flags +8, target = node +0x90 -> handle
+        {instance, stamp} checked against instance +0x44) - read only"""
+        m, A = self.mem, self.A
+        pt, am = A['player_tracker'], A['aim']
+        out = {'aim_w': None, 'aim_bits': '?', 'aim_t0_flags': None, 'aim_target': '?'}
+        cm = S.u32(m, trk + S.h(pt['combat_manager'])) if trk else None
+        w = S.u32(m, cm + S.h(am['combat_manager_bits'])) if cm else None
+        if w is not None:
+            out['aim_w'] = w
+            out['aim_bits'] = ' '.join('%d:%d' % (b, (w >> b) & 1) for b in (9, 10, 11, 18, 19, 20, 21))
+        lst = S.u32(m, S.h(am['targeter_list']))
+        t0 = S.u32(m, lst) if lst else None
+        if not t0:
+            return out
+        out['aim_t0_flags'] = S.u32(m, t0 + S.h(am['targeter_flags']))
+        node = S.u32(m, t0 + S.h(am['targeter_target_node']))
+        if not node:
+            out['aim_target'] = '-'
+            return out
+        h = node + S.h(am['node_handle'])
+        inst, stamp = S.u32(m, h), S.u32(m, h + 4)
+        cur = S.u32(m, inst + S.h(A['instance_ext']['stamp']['offset'])) if inst else None
+        if not inst or cur is None or cur != stamp:
+            out['aim_target'] = '(stale node 0x%08x)' % node
+            return out
+        oid, name = self._obj_name(inst)
+        out['aim_target'] = '%s 0x%08x' % (name or '?', inst)
+        return out
 
     def _vec(self, a):
         b = self.mem.read(a, 12) if a else None
@@ -621,6 +660,7 @@ class Model:
                 'ramp_player': req['ramp_player'], 'ramp_world': req['ramp_world'],
                 'cam_mode': S.u32(m, mgr + S.h(cam['mode_offset'])), 'cam_flags': S.u32(m, mgr + S.h(cam['flags_offset'])),
                 'cam_pos': '?', 'cam_fov': '?'}
+        lara.update(self._aim(trk))
         loaded = self.snap.get('loaded') or {}
         if t - self.loaded_t >= 1.0:
             loaded = self._loaded()
@@ -690,7 +730,9 @@ WATCH_COLS = ('host_time', 'inst', 'obj_id', 'obj_name', 'lp', 'stamina', 'state
               'kind', 'pos_x', 'pos_y', 'pos_z', 'speed', 'fly', 'last_flight', 'attack', 'ko_handle', 'lp_note',
               # ts_requests / ts_selected: same text as TruMenu 0.22.11 pc_ts_requests / pc_ts_selected
               'lara_lp', 'lara_states', 'lara_pos', 'ts_requests', 'ts_selected', 'ramp_player',
-              'ramp_world', 'cam_mode', 'cam_flags')
+              'ramp_world', 'cam_mode', 'cam_flags',
+              # 2026-11-10 lock-on path (K-5; PC side TruMenu 0.22.15 TruAim.log cm1fc / b9.. / t0_flags / t0_target)
+              'aim_cm1fc', 'aim_bits', 'aim_t0_flags', 'aim_t0_target')
 
 
 class Watch:
@@ -718,7 +760,9 @@ class Watch:
                     e.get('lp_note', '-'), S.fmt(lara.get('lp')), lara.get('states', '?'), lpos,
                     lara.get('req_slots', '?'), lara.get('req_selected', '?'),
                     S.fmt(lara.get('ramp_player'), '%.3f'), S.fmt(lara.get('ramp_world'), '%.3f'),
-                    lara.get('cam_mode'), lara.get('cam_flags'))
+                    lara.get('cam_mode'), lara.get('cam_flags'),
+                    S.fmt(lara.get('aim_w'), '0x%08x'), lara.get('aim_bits', '?'),
+                    S.fmt(lara.get('aim_t0_flags'), '0x%x'), lara.get('aim_target', '?'))
             self.f.write('\t'.join(str(v) for v in vals) + '\n')
             self.rows += 1
         self.f.flush()
@@ -820,13 +864,14 @@ class Link:
             l = snap['lara']
             return ['records %s / %s, states [%s] / [%s], LP %s (max %s), pos %s, meter %s flags %s active %s, '
                     'time scale %s, doppelganger %s, time requests %s (winner player %s / world %s), ramps %s / %s, '
-                    'camera mode %s flags %s position %s FOV %s' % (
+                    'camera mode %s flags %s position %s FOV %s, aim CM+0x1fc %s [%s] targeter 0 flags %s target %s' % (
                         l.get('rec0'), l.get('rec1'), l.get('states'), l.get('states1'), S.fmt(l.get('lp')),
                         S.fmt(l.get('lp_max')), ('%.0f %.0f %.0f' % l['pos']) if l.get('pos') else '?',
                         S.fmt(l.get('meter')), l.get('mflags'), l.get('active'), S.fmt(l.get('scale'), '%.2f'),
                         l.get('dopp'), l.get('req_slots'), l.get('win_player'), l.get('win_world'),
                         S.fmt(l.get('ramp_player'), '%.3f'), S.fmt(l.get('ramp_world'), '%.3f'), l.get('cam_mode'),
-                        l.get('cam_flags'), l.get('cam_pos'), l.get('cam_fov'))]
+                        l.get('cam_flags'), l.get('cam_pos'), l.get('cam_fov'), S.fmt(l.get('aim_w'), '0x%08x'),
+                        l.get('aim_bits'), S.fmt(l.get('aim_t0_flags'), '0x%x'), l.get('aim_target'))]
         if c == 'objects':
             want = parts[1].lower() if len(parts) > 1 else None
             return ['0x%08x %s %s [%s]%s dist %s' % (o['inst'], o['oid'], o['name'], o['cat'],
@@ -1105,14 +1150,17 @@ def run_gui(model, link, args, log):
         l = snap['lara']
         pos = ('%.0f %.0f %.0f' % l['pos']) if l.get('pos') else '?'
         lara_txt.set('%s: %s / %s   [%s] / [%s]\n%s: %s (max %s)\n%s: %s\n%s: %s (%s %s, flags %s)\n%s: %s\n'
-                     '%s: %s  (player %s / world %s)\n%s: %s / %s\n%s: %s\n%s: mode %s, flags %s, position %s, FOV %s' % (
+                     '%s: %s  (player %s / world %s)\n%s: %s / %s\n%s: %s\n%s: mode %s, flags %s, position %s, FOV %s'
+                     '\n%s: CM+0x1fc %s [%s], Z0 flags %s, %s %s' % (
                          tr('records', L), l.get('rec0'), l.get('rec1'), l.get('states'), l.get('states1'),
                          tr('laralp', L), S.fmt(l.get('lp')), S.fmt(l.get('lp_max')), tr('pos', L), pos,
                          tr('meter', L), S.fmt(l.get('meter')), tr('active', L), l.get('active'), l.get('mflags'),
                          tr('scale', L), S.fmt(l.get('scale'), '%.2f'), tr('requests', L), l.get('req_slots'),
                          l.get('win_player'), l.get('win_world'), tr('ramps', L), S.fmt(l.get('ramp_player'), '%.3f'),
                          S.fmt(l.get('ramp_world'), '%.3f'), tr('dopp', L), l.get('dopp'), tr('camera', L),
-                         l.get('cam_mode'), l.get('cam_flags'), l.get('cam_pos'), l.get('cam_fov')))
+                         l.get('cam_mode'), l.get('cam_flags'), l.get('cam_pos'), l.get('cam_fov'),
+                         tr('aim', L), S.fmt(l.get('aim_w'), '0x%08x'), l.get('aim_bits'),
+                         S.fmt(l.get('aim_t0_flags'), '0x%x'), tr('target', L), l.get('aim_target')))
         ld = snap.get('loaded') or {}
         key = ld.get('time', '') if isinstance(ld, dict) else ''
         if key != shown[1]:
@@ -1196,6 +1244,8 @@ def selftest(model, link, args, log):
     need(model.snap['lara'].get('req_selected') == 'P0.02(s4) W1.00(s4)',
          'ts_selected %r, expected the TruMenu text P0.02(s4) W1.00(s4)' % model.snap['lara'].get('req_selected'))
     need('ts_requests' in WATCH_COLS and WATCH_COLS[:16][-1] == 'time_scale', 'watch columns: PC-compatible part changed')
+    need(any('aim CM+0x1fc 0x000c0400 [9:0 10:1 11:0 18:1 19:1 20:0 21:0] targeter 0 flags 0x1 target '
+             'viking_thrall_tutorial_dlc2_ 0x41000000' in x for x in out['lara']), 'aim: lock bits / targeter 0 target missing')
     wpath = os.path.join(os.path.dirname(os.path.abspath(args.log)), 'watch_selftest_%s.tsv' % time.strftime('%H%M%S'))
     w = Watch(wpath, 60)
     w.row(model.snap['time'], model.snap['enemies'], model.snap['lara'])
