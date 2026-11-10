@@ -30,9 +30,60 @@ of the pad-chain re-wrap) built 2026-11-07, not played; 0.20 (`[Look] CameraFlag
 the camera bit found) built 2026-11-07, installed, ran in the sessions of 2026-11-09 (log; its TO TEST rows not
 reported); 0.21 (time-scale request slot 6: gamebase natives 23 / 24 as the TU, `[TimeScale] TranslateSlot6`) built
 2026-11-10, not installed, not played; 0.22 (K-5: combat reticle request and adrenaline refill by the meter flags in
-doppelganger mode, `[Reticle]`) built 2026-11-10, not installed, not played.** Not covered: the
+doppelganger mode, `[Reticle]`) built 2026-11-10, installed 2026-11-10, not reported; 0.23 (`[Meter] Infinite`:
+infinite shadow power for testing / accessibility, default off, live) built 2026-11-10, not installed, not played.**
+Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.23: infinite shadow power - `[Meter] Infinite` (N2, testing / accessibility, 2026-11-10)
+
+Build `work\asi\power023`. **Not a TU feature** - a switch for tests and for players who want the power without the
+meter (TruMenu's planned row "Kraft unendlich", plan N2). Default `Infinite=0` = the TU meter exactly as 0.22.
+
+* **What it does (`Infinite=1`):** the meter stays at its max (tuning +0x10 = 1000). Nothing is written from another
+  thread and no game code is patched; only the plugin's own meter path changes, on the game thread:
+  * the tick (TU path `MeterTick` after the doppelganger gate and the tuning lookup, and the legacy 0.8 tick) calls
+    `InfiniteHold` before its button / drain / refill block: value below max -> value = max, refill delay 0, flag 8
+    when tuning +0x2c <= value - the state a finished `Refill` (0x823d81a0) leaves - and the HUD bar once to full
+    (`ShowMeter(1.0)`, with the 0.16 player-state guard);
+  * `Drain` (0x823d8380) leaves the value at max. Every drain goes through it: the tick's 200 / s, state 1018's cost,
+    and `TruShadowPowerMeterApi` `drain` (TruShadowCombat's shadow strike start +0x34 and its "drain all" +0x10 at the
+    strike-look end) - the amounts are only counted for the log.
+* **Power use as with a full meter:** start (`StartPower`: events 0x89 / 0x32, 0x81 because value == max, 0x87;
+  request slot 0 = tuning +0x40 player / +0x3c world, i.e. the usual 1.2 / 0.3 slow motion), the look, the meter flags
+  (1, 8, 2 / 4 / 0x40 by their own code), condition 1046 (doppelganger mode: flag 1), conditions 1049-1056 (they read
+  the full value), GlobalParams[7] (value / max = 1). The power ends only on release, a cinematic, the block byte or the
+  game flag - never with "meter empty": `kZero < value` always holds after the drain, so flag 0x200, event 0x7e and the
+  `shadow power OFF (meter empty)` line do not come; `StopPower` fires 0x33 / 0x82 ("meter left"). Flag 0x200 from
+  before the switch is cleared by `CanStart` at the next press (value above tuning +0x28), as with a refilled meter.
+* **Switch off:** the meter drains / refills again with the TU rates from max (no jump: the value is the one the
+  plugin held).
+* **Run time:** `InfiniteReadSwitch` reads `[Meter] Infinite` at most once per second from the pad poll (game thread,
+  right before the tick, next to the 0.21 switch) - also when it was 0 at the game start (nothing to hook).
+* **Log:** at load `TruShadowPower 0.23 loaded (... 0.23: infinite meter N)` and `0.23 infinite meter: [Meter] Infinite
+  N at the start - ...`; per change `0.23 switch: [Meter] Infinite 0 -> 1 (read again from TruShadowPower.ini) - the
+  meter is held at max ... (meter M, power on / off, flags 0x...)` and `0.23 switch: [Meter] Infinite 1 -> 0 ... from M
+  (power ...); while on: N drain calls held at max (X units not taken), K fills`; the first fill after the switch
+  `0.23 infinite meter: filled M -> 1000.0 (tuning +0x10; power ..., flags 0x..., fill 1)` (later fills at LogLevel 3).
+* **TruMenu:** the row is `TruShadowPower | Meter | Infinite | bool | Kraft unendlich | Infinite power | live | 0`
+  in `src/asi/TruMenu/TruMenu.switches.txt` (since TruShadowPower 0.23); `tools/trumenu_ini_check.py` SW_LIVE names
+  `InfiniteReadSwitch`. TruMenu drives it like every plugin switch: `sw.set` / the Fixes page write the ini key with
+  WritePrivateProfileString, the plugin picks it up within a second. Its figure page (doppelganger group, today the
+  greyed "Kraft unendlich - geplant" row of plan N2) can list `{"TruShadowPower", "Meter", "Infinite"}` in
+  `kQbFigShadow` instead of the planned row (TruMenu change, not part of this build).
+* **Checks:** no new byte checks (no game code is patched for 0.23); the lists of v09 .. v20, power021 and power022
+  (218 checks) give 0 mismatches against `data\pc\tru.exe` and the installed `tru.exe` (both md5 `5560abac...`,
+  results `work\asi\power023\prechecks_v23.txt`).
+
+| # | TO TEST 0.23 (DLC 2, sample ini, then `[Meter] Infinite=1`) | expected |
+|---|---|---|
+| 1 | load with `Infinite=0` | `TruShadowPower 0.23 loaded (... 0.23: infinite meter 0)`, `0.23 infinite meter: [Meter] Infinite 0 at the start - the meter drains / refills with the TU rates`; power / meter as 0.22 (drain 200 / s, `shadow power OFF (meter empty)` after ~5 s held) |
+| 2 | set `[Meter] Infinite=1` while running (TruMenu row "Kraft unendlich" or the ini) | within ~1 s `0.23 switch: [Meter] Infinite 0 -> 1 ...`; with a part-empty meter `0.23 infinite meter: filled ... -> 1000.0`, the yellow silhouette full |
+| 3 | DLC 2, hold the power (LB / RB) for 30 s | the meter stays full (HUD silhouette full, TruMenu `fight.trace` meter 1000), the time scale as usual (world 0.3 / player 1.2 for the whole 30 s, `time_scale` / request column slot 0), the look on; no `meter empty` line, no event 0x7e |
+| 4 | release, press again, shadow strike on a thrall (TruShadowCombat `[Strike] Translate=1`) | power starts every time (no "start refused" / 0x80), strike as with a full meter, the meter stays at 1000 after the strike's drain |
+| 5 | set `[Meter] Infinite=0` while the power is held | `0.23 switch: [Meter] Infinite 1 -> 0 ... from 1000.0 (power on); while on: N drain calls held ...`; the meter drains again (~200 / s), empty after ~5 s -> `shadow power OFF (meter empty)`, then refills |
+| 6 | main game / DLC 1 with `Infinite=1` | nothing changes there (no doppelganger mode, no tick) |
 
 ## 0.22: the combat reticle request and the adrenaline refill in doppelganger mode as the TU (K-5, 2026-11-10)
 
@@ -709,6 +760,7 @@ every `*.asi` next to `tru.exe`.
 | `[ShadowPower] Buttons` | 768 | XInput mask: 256 LB, 512 RB, 768 either (Xbox) |
 | `[Meter] HudBar` | 1 | feed the HUD silhouette; 0 = no HUD writes |
 | `[Meter] Fallback` | 1 | 1 = file values when object 858 is not loaded; 0 = no power then |
+| `[Meter] Infinite` | 0 | 0.23 (N2, not a TU feature): 1 = the meter stays at max (tick fill + every drain left at max), power use as with a full meter, never "meter empty"; read again at run time (<= 1 / s) |
 | `[ShadowPower] LegacyPadStart` | 0 | 0.9: 1 = the 0.8 tick (every level, no doppelganger / cinematic gates) |
 | `[ShadowPower] GameInput` | 0 | 0.9: 1 = LB / RB from the game's input records +0x1a70 / +0x1b30 & 4 (the TU's source; unproven on PC) |
 | `[ShadowPower] MenuInput` | 1 | 0.17: LB / RB only as the game gets them (a button TruMenu withholds is ignored until released; 0.19: from TruMenu's `TruMenuPadBlock` + a second pad read, no re-wrap of the pad chain); 0 = 0.16 |

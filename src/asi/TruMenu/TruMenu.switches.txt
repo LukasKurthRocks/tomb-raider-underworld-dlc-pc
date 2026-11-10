@@ -77,6 +77,7 @@ TruShadowPower | Sound | LoopSound | bool | Kraft-Ton Schleife | Power loop soun
 TruShadowPower | Cloth | TuTimeStep | bool | Zopf: TU-Zeitschritt | Ponytail: TU time step | restart | 0 | Zopf nutzt Bildzeit / Welt-Zeitfaktor wie TU // Ponytail uses frame time / world time scale as TU
 TruShadowPower | Meter | HudBar | bool | Gelbe Leiste im HUD | Yellow HUD bar | restart | 1 | Füllt die zweite, gelbe Leiste im HUD // Feeds the HUD's second, yellow bar
 TruShadowPower | Meter | Fallback | bool | Leiste: Ersatzwerte | Meter: fallback values | restart | 1 | Eingebaute Objektwerte, wenn das Zusatz-Objekt fehlt // Built-in object values if the extension object is missing
+TruShadowPower | Meter | Infinite | bool | Kraft unendlich | Infinite power | live | 0 | Leiste bleibt voll, Kraft ohne Verbrauch (Test / Hilfe) // Meter stays full, power without cost (testing / access) | TruShadowPower 0.23
 TruShadowPower | Conditions | Enabled | bool | TU-Bedingungen 1049-1056 | TU conditions 1049-1056 | restart | 1 | TU-Bedingungen 1049-1054 / 1056 in Laras Tabelle // TU conditions 1049-1054 / 1056 in Lara's table
 TruShadowPower | States | Enabled | bool | TU-Zustände 243/245/1018 | TU states 243/245/1018 | restart | 1 | Zustände 243 / 245 / 1018 samt Bedingungen, Aktivitäten // States 243 / 245 / 1018 with conditions, activities
 TruShadowPower | States | State2102 | bool | Wandlauf 2102 | Wall run 2102 | restart | 1 | Wandlauf-Zustand 2102 (Kamera-Übergang beim Sprung) // Wall-run state 2102 (camera blend jump)

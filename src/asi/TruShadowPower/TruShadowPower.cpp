@@ -179,6 +179,17 @@
 // (default 1), read again at run time. TU 0x823e0308 (retail strike look, PC tru+0x315020) has a doppelganger branch
 // too, but its only caller 0x8240a430 calls it only outside doppelganger mode - dead code on the Xbox, not ported
 // ([Look] StrikeLook is the TU's doppelganger case). Section "0.22" below.
+//
+// 0.23 (2026-11-10, N2, testing / accessibility - not a TU feature): [Meter] Infinite=1 keeps the meter at max.
+// Default 0; read again at run time at most once per second (InfiniteReadSwitch, game thread, from the pad poll like
+// the 0.21 switch). Only the plugin's own meter path changes, nothing is written from another thread and no game code
+// is patched: the tick (TU and legacy) sets the value to tuning +0x10 before its button / drain / refill block, as a
+// finished refill leaves it (InfiniteHold: value = max, delay 0, flag 8 by tuning +0x2c, the HUD bar once to full),
+// and Drain (0x823d8380 - the tick, state 1018, TruShadowPowerMeterApi drain of TruShadowCombat's strike) leaves the
+// value at max. So the power runs exactly as with a full meter (start events 0x81 / 0x87, request slot 0 with tuning
+// +0x40 / +0x3c, flags, condition 1046 = flag 1); it ends only on release / cinematic / game flag, never "meter empty"
+// (no flag 0x200, no event 0x7e). Switching it off lets the meter drain / refill from max with the TU rates again.
+// Section "0.23" below.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -356,6 +367,10 @@ int g_moveEvents = 0;                   // 0.14 [Look] MoveEvents: TU 0x823d77f0
 int g_cameraFlag = 0;                   // 0.14 [Look] CameraFlag: TU Start's camera manager vtbl[0xa4] (+0x80 |= 2)
 int g_strikeLook = 0;                   // 0.14 [Look] StrikeLook: TU 0x823d8a80 / 0x823d9050 (player anim events 5 / 4)
 int g_menuInput = 1;                    // 0.17 [ShadowPower] MenuInput: buttons only as the game gets them (0 = 0.16)
+int g_infinite = 0;                     // 0.23 [Meter] Infinite: the meter stays at max (read again at run time)
+LONG g_infDrains = 0;                   // 0.23: drain calls held at max while Infinite is on (log only)
+double g_infHeld = 0.0;                 // 0.23: their amounts (meter units not taken, log only)
+LONG g_infFills = 0;                    // 0.23: tick fills to max while Infinite is on (log only)
 
 char g_logPath[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -855,6 +870,11 @@ void Drain(const BYTE *tuning, float amount) {
     if (!tuning) return;
     float max = Tune(tuning, kTuneMax);
     float value = g_meter.value - amount;
+    if (g_infinite) {                   // 0.23 [Meter] Infinite=1: the drain leaves the meter at max (amount only counted)
+        value = max;
+        ++g_infDrains;
+        g_infHeld += amount;
+    }
     if (max - value < 0.0f) value = max;
     if (value < 0.0f) value = kZero;
     g_meter.value = value;
@@ -863,12 +883,31 @@ void Drain(const BYTE *tuning, float amount) {
     // not ported: sounds 0x7d (crossing tuning +0x30), 0x85 / 0x86
 }
 
+// 0.23 [Meter] Infinite=1 (not a TU function): called by the tick on the game thread before its button / drain /
+// refill block - the meter is set to max as a finished Refill leaves it (value = tuning +0x10, delay 0, flag 8 when
+// tuning +0x2c <= value), the HUD bar once to full. Flag 0x200 ("ran empty") is left to CanStart, which clears it
+// because the value is above tuning +0x28.
+void InfiniteHold(const BYTE *tuning) {
+    if (!g_infinite || !tuning) return;
+    const float max = Tune(tuning, kTuneMax);
+    if (g_meter.value == max) return;
+    const float before = g_meter.value;
+    g_meter.value = max;
+    g_meter.delay = kZero;
+    if (Tune(tuning, kTuneHigh) <= g_meter.value) g_meter.flags |= 8;
+    ShowMeter(1.0f);
+    const LONG n = ++g_infFills;
+    Log(n == 1 ? 1 : 3, "0.23 infinite meter: filled %.1f -> %.1f (tuning +0x10; power %s, flags 0x%03lx, fill %ld)", before,
+        max, (g_meter.flags & 1) ? "on" : "off", g_meter.flags, n);
+}
+
 // 0x823d7a10 as translated up to 0.8 (kept for [ShadowPower] LegacyPadStart=1): runs in every level, without the
 // TU's doppelganger / cinematic gates (on the Xbox called once per frame from the player update 0x824126d8; here from
 // the pad poll, once per advance of the game clock). 0.9's MeterTick (below) is the TU path.
 void LegacyMeterTick(bool held) {
     const BYTE *tuning = FindTuning();
     g_tuning = tuning;
+    InfiniteHold(tuning);                                   // 0.23: [Meter] Infinite=1 (nothing when 0)
     // not ported: stop on cinematic / 0x829ca6da, zone query 0x412 (flag 0x80), the looping sound, effects
     // 0x823d77f0 / 0x823d94f8 (blur), the 0x82efb514 bit, the timed request +0x38
     float frames = *kFrameTime;
@@ -984,6 +1023,7 @@ void WithheldLog() {
 }
 
 void Slot6ReadSwitch();                 // 0.21: [TimeScale] TranslateSlot6 at run time (defined below)
+void InfiniteReadSwitch();              // 0.23: [Meter] Infinite at run time (defined below)
 
 DWORD WINAPI PadHook(DWORD index, PadState *state) {
     if (g_inPadHook)                            // another plugin's hook called back into us: break the loop
@@ -1003,6 +1043,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     bool held = false;
     for (int i = 0; i < 4; ++i) held = held || g_lastButtons[i] != 0;
     Slot6ReadSwitch();                          // 0.21: once per game frame, reads the ini at most once per second
+    InfiniteReadSwitch();                       // 0.23: the same (game thread, before the tick that uses it)
     MeterTick(held);
     return result;
 }
@@ -2469,6 +2510,7 @@ void MeterTick(bool padHeld) {
     if (!dg) return;
     const BYTE *tuning = FindTuning();
     g_tuning = tuning;
+    InfiniteHold(tuning);                        // 0.23: [Meter] Infinite=1 - meter at max before the TU block
     float frames = *kFrameTime;
     if (!(frames >= 0.0f && frames < 30.0f)) frames = 0.0f;
     // 0x823d7a30..0x823d7a9c: a running cinematic or 0x829ca6da -> print "ADRENALINE: Process(): stopping
@@ -4162,6 +4204,38 @@ void PatchReticle() {
     if (g_retHooked) Log(1, "0.22 reticle: switches read again at run time at most once per second");
 }
 
+// ================================================================================================================
+// 0.23 (N2, testing / accessibility): [Meter] Infinite - the meter stays at max. Not a TU feature; the TU's meter code
+// (tick, Drain, Refill, Start / Stop) is unchanged and runs as with a full meter: InfiniteHold (tick, before the button
+// / drain / refill block) sets the value to tuning +0x10, Drain leaves it there. Read again at run time at most once
+// per second from the pad poll (game thread, before the tick), also when it was 0 at the start - no game code is
+// patched for it. One line per change, with what was held back while it was on.
+DWORD g_infSwitchTick = 0;
+
+void InfiniteReadSwitch() {
+    if (!g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_infSwitchTick < 1000) return;
+    g_infSwitchTick = now;
+    const int v = GetPrivateProfileIntA("Meter", "Infinite", g_infinite, g_iniPath) ? 1 : 0;
+    if (v == g_infinite) return;
+    if (v) {
+        Log(1, "0.23 switch: [Meter] Infinite 0 -> 1 (read again from TruShadowPower.ini) - the meter is held at max: "
+               "the tick fills it to tuning +0x10, every drain (tick, state 1018, TruShadowPowerMeterApi) leaves it at "
+               "max; power use as with a full meter, no \"meter empty\" (meter %.1f, power %s, flags 0x%03lx)",
+            g_meter.value, (g_meter.flags & 1) ? "on" : "off", g_meter.flags);
+        g_infDrains = 0;
+        g_infHeld = 0.0;
+        g_infFills = 0;
+    } else {
+        Log(1, "0.23 switch: [Meter] Infinite 1 -> 0 (read again from TruShadowPower.ini) - the meter drains / refills "
+               "again with the TU rates from %.1f (power %s); while on: %ld drain calls held at max (%.1f units not "
+               "taken), %ld fills", g_meter.value, (g_meter.flags & 1) ? "on" : "off", g_infDrains, g_infHeld,
+            g_infFills);
+    }
+    g_infinite = v;
+}
+
 // ---- meter interface (docs Befund-Schattenkampf.md section 5; version 1 = TruShadowCombat's proposal, version 2
 // appends the HUD natives f70-f73 of larabase, TU 0x824aa060 / 0x824aa0a0 / 0x824aa120 / 0x824aa150, for a later HUD
 // plugin - Plan-Nacht-Analysen-2026-11-03.md section 2). Fields are only appended; check version / size.
@@ -4254,6 +4328,7 @@ void ReadOptions(const char *dir) {
     g_retRequest = GetPrivateProfileIntA("Reticle", "TranslateRequest", 1, ini) ? 1 : 0;   // 0.22 (K-5), default 1
     g_retRefill = GetPrivateProfileIntA("Reticle", "TranslateRefill", 1, ini) ? 1 : 0;     // 0.22 (K-5), default 1
     g_retLog = GetPrivateProfileIntA("Reticle", "Log", 1, ini) ? 1 : 0;
+    g_infinite = GetPrivateProfileIntA("Meter", "Infinite", 0, ini) ? 1 : 0;          // 0.23 (N2), default 0, live
 }
 
 void Start(HMODULE self) {
@@ -4264,15 +4339,15 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.22 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.23 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
-        "log %d; 0.21: time-scale slot 6 %d; 0.22: reticle request %d, refill %d, log %d)", g_enabled, g_buttons,
-        g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055, g_lookEnabled, g_legacyPadStart,
-        g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled, g_state2102Enabled, g_loopSound,
-        g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11, g_k11Log, g_slot6, g_retRequest,
-        g_retRefill, g_retLog);
+        "log %d; 0.21: time-scale slot 6 %d; 0.22: reticle request %d, refill %d, log %d; 0.23: infinite meter %d)",
+        g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055,
+        g_lookEnabled, g_legacyPadStart, g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled,
+        g_state2102Enabled, g_loopSound, g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11,
+        g_k11Log, g_slot6, g_retRequest, g_retRefill, g_retLog, g_infinite);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -4389,6 +4464,10 @@ void Start(HMODULE self) {
     PatchK11();                         // 0.18: K11 - adrenaline tick / bar skipped in doppelganger mode as the TU
     PatchSlot6();                       // 0.21: gamebase natives 23 / 24 -> request slot 6 in doppelganger mode as the TU
     PatchReticle();                     // 0.22: ring request / adrenaline refill by the meter flags in doppelganger mode
+    Log(1, "0.23 infinite meter: [Meter] Infinite %d at the start - %s; read again at run time at most once per second "
+           "(no game code patched)", g_infinite,
+        g_infinite ? "the meter is held at max (tick fill + drain at max), power use as with a full meter"
+                   : "the meter drains / refills with the TU rates");
     HANDLE thread = CreateThread(nullptr, 0, HookThread, nullptr, 0, nullptr);
     if (thread) CloseHandle(thread);
     else Log(0, "CreateThread failed (%lu) - not hooked", GetLastError());
@@ -4409,7 +4488,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.22 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.23 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
@@ -4419,7 +4498,8 @@ extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
            "(camera bit 2, reader tru+0x1e5e8e), gamebase natives 23 / 24 -> time-scale request slot 6 in doppelganger "
            "mode (TU 0x824a3238 / 0x824a32f0), combat reticle request and adrenaline refill by the meter flags in "
            "doppelganger mode (TU 0x823de47c / 0x823ee158 / 0x823dfd98); switches default off: loop sound, move events 0x83 / 0x84, strike "
-           "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120)";
+           "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120, infinite meter [Meter] Infinite (live, not a "
+           "TU feature))";
 }
 
 // 0.11: the TU meter object for other plugins (TruShadowCombat: condition 538, the shadow strike) - interface version

@@ -53,10 +53,12 @@ $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # 2026-11-06); 0.18 K11 adrenaline (work\asi\v18, 2026-11-07); 0.19 TruMenu's TruMenuPadBlock instead of the pad-chain
 # re-wrap (work\asi\v19, 2026-11-07, new sample .ini: comment of MenuInput); 0.20 [Look] CameraFlag default 1 = TU
 # (work\asi\v20, 2026-11-07, sample .ini CameraFlag=1); 0.21 X23 time-scale request slot 6 (work\asi\power021,
-# 2026-11-10, sample .ini [TimeScale] TranslateSlot6=1)) - recognised as ours for update / removal.
-# The current build 0.22 (K-5: combat reticle request and adrenaline refill by the meter flags in doppelganger mode as
-# the TU, work\asi\power022, 2026-11-10) ships a new sample .ini ([Reticle] TranslateRequest / TranslateRefill / Log);
-# install it with -SourceDir <repo>\work\asi\power022.
+# 2026-11-10, sample .ini [TimeScale] TranslateSlot6=1); 0.22 K-5 combat reticle request and adrenaline refill
+# (work\asi\power022, 2026-11-10, md5 10654dc22b5937f3e3ad878a4cc59557 = installed on 2026-11-10, sample .ini
+# [Reticle])) - recognised as ours for update / removal.
+# The current build 0.23 (N2: [Meter] Infinite - infinite shadow power for testing / accessibility, default 0, live;
+# work\asi\power023, 2026-11-10) ships a new sample .ini ([Meter] Infinite=0); its hashes are listed too (marked
+# current) so a later build recognises it. Install it with -SourceDir <repo>\work\asi\power023.
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
@@ -79,7 +81,9 @@ $earlierBuilds = @{
                              'fc56e3b72d7cb2a0dcf7b9a3a512b9e3595198853304f14c2e2d11a3d57c4b0f',   # 0.18 K11 adrenaline (work\asi\v18, md5 0ee7c5fca49716f2637ade50e37a7032)
                              '06f80b26ebd103348a05eec0c79cf9f2d7b6ba16ee6eb140940190470dcb5b73',   # 0.19 TruMenuPadBlock (work\asi\v19, md5 02a8e389028c1c78e0662b412be4aeb4)
                              '21c12e8b21c2fa51ec0a89c5b64f206284f435c075ffc21030ac46129ad189b2',   # 0.20 camera flag default 1 (work\asi\v20, md5 26c253ad519a072d6b2573889aac7ab6 = installed on 2026-11-10)
-                             'fc0885d0162d50880be353ae7c72a11bf37bd62b716dd10f813d478679063681')   # 0.21 X23 slot 6 (work\asi\power021, not installed)
+                             'fc0885d0162d50880be353ae7c72a11bf37bd62b716dd10f813d478679063681',   # 0.21 X23 slot 6 (work\asi\power021, not installed)
+                             'fb19e1c4fa0bc444cbf7eb3bc422989a588539b0ce72fbe8b5fc3c5b76a06a31',   # 0.22 K-5 reticle / refill (work\asi\power022, md5 10654dc22b5937f3e3ad878a4cc59557 = installed on 2026-11-10)
+                             'c22dac1ce3c09f4049600f82908b9c6c84fc71e707ad930575ec4ae3d4741a58')   # 0.23 N2 [Meter] Infinite (work\asi\power023, md5 b679a97ad58c753717574e4bc5605ab0, current, not installed)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
@@ -96,7 +100,9 @@ $earlierBuilds = @{
                              '6acc71004ab8c0e2ef7898e0a2feec25e0b093afaf5c071a5fde4a87710a2c26',   # 0.18 sample .ini ([Adrenaline])
                              '0b056fc3baac70cf0571aa82a5933fd0bbcdd4fd17ee5b64433b2a89225726c4',   # 0.19 sample .ini (MenuInput comment)
                              'df2250c0d73f243e6f3c66456c45d31e6b390d029a43f7391ceeb72b969c8656',   # 0.20 sample .ini (CameraFlag=1)
-                             '7d9f4d2b7f7a7a5176c454b961df9885209db31efc6b2606c04ca77a22cd27da')   # 0.21 sample .ini ([TimeScale] TranslateSlot6)
+                             '7d9f4d2b7f7a7a5176c454b961df9885209db31efc6b2606c04ca77a22cd27da',   # 0.21 sample .ini ([TimeScale] TranslateSlot6)
+                             '0215ac43c100a4a613ad05959966817df45eb90c83d86b89ac3adcb3cbaaf998',   # 0.22 sample .ini ([Reticle])
+                             '682949882f7777c1dcf0e9e1233ae1da9bed273a42b61f83e6c14ad46e01d3cb')   # 0.23 sample .ini ([Meter] Infinite=0, current)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

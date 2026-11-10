@@ -1749,6 +1749,7 @@ SW_LIVE = {
     ('TruShadowPower', 'TimeScale', 'TranslateSlot6'): 'void Slot6ReadSwitch(',     # 0.21 (X23, 2026-11-10)
     ('TruShadowPower', 'Reticle', 'TranslateRequest'): 'void ReticleReadSwitch(',   # 0.22 (K-5, 2026-11-10)
     ('TruShadowPower', 'Reticle', 'TranslateRefill'): 'void ReticleReadSwitch(',
+    ('TruShadowPower', 'Meter', 'Infinite'): 'void InfiniteReadSwitch(',             # 0.23 (N2, 2026-11-10)
     ('TruMercLang', 'MercLang', 'Enabled'): 'void PollIni(',
     ('TruMercLang', 'MercLang', 'Language'): 'void PollIni(',
     # TruQoL 0.1.1 (17y): LiveTick (game thread, once a second after a change of the file time) -> LiveReadOptions
