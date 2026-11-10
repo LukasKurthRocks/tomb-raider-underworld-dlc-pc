@@ -2898,8 +2898,8 @@ def check_02218(ini_path):
     (big menu / ring off, bar on, English), TruShadowPower [Meter] Infinite, Set-TruMenu hashes + media fallback"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.18 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.18')
+    if '"0.22.18 (volumes / mouse saved' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.19: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.18 part "0.22.18 (volumes / mouse saved"')
     ini = open(ini_path, encoding='utf-8').read()
     # defaults: kOpts = sample .ini = code default when the key is missing
     for sec, key, val in (('Menu', 'Enabled', '0'), ('Menu', 'Load', '1'), ('Radial', 'Enabled', '0'),
@@ -2985,6 +2985,90 @@ def check_02218(ini_path):
         problems.append('Set-TruMenu.ps1: the media list fallback work\\media\\menu is missing')
     return problems, 'defaults, volume save, %d groups (no labels), step mode, alignment / voice / demote checks, ' \
                      'settings written back, drip columns, Set-TruMenu' % len(keys)
+
+
+def check_02219(ini_path, switches_path):
+    """0.22.19: pages remembered ([Menu] RememberPage / OpenPages for the big window's collapsing headers, [Quick]
+    RememberPage / LastPage for the bar), power.infinite (TruShadowPower 0.23 [Meter] Infinite) with its bar row"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.19 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.19')
+    ini = open(ini_path, encoding='utf-8').read()
+    for sec, key, val in (('Menu', 'RememberPage', '1'), ('Menu', 'OpenPages', 'totest,quick'),
+                          ('Quick', 'RememberPage', '1'), ('Quick', 'LastPage', '')):
+        if not re.search(r'\{"%s", "%s", "%s",' % (sec, key, re.escape(val)), src):
+            problems.append('TruMenu.cpp: kOpts [%s] %s default must be "%s"' % (sec, key, val))
+        block = re.search(r'^\[%s\]\r?\n(.*?)(?=^\[|\Z)' % sec, ini, re.M | re.S)
+        if not block or not re.search(r'^%s=%s\r?$' % (key, re.escape(val)), block.group(1), re.M):
+            problems.append('TruMenu.ini: [%s] %s=%s missing' % (sec, key, val))
+    # 1a big window: every page header through MenuPage, one key each, all keys in kMpPages
+    m = re.search(r'const char \*const kMpPages\[\] = \{(.*?)\};', src, re.S)
+    mp = re.findall(r'"([a-z0-9]+)"', m.group(1)) if m else []
+    if not mp: problems.append('TruMenu.cpp: kMpPages missing')
+    if len(set(mp)) != len(mp): problems.append('TruMenu.cpp: kMpPages holds a key twice')
+    dm = re.sub(r'//[^\n]*', '', fn_body(src, 'void DrawMenu('))
+    if 'TmCollapsingHeader(' in dm or 'ImGui::CollapsingHeader(' in dm:
+        problems.append('TruMenu.cpp: DrawMenu still draws a page header without MenuPage')
+    used = re.findall(r'MenuPage\((?:"(?:[^"\\]|\\.)*"|header), "([a-z0-9]+)"', dm)
+    if sorted(used) != sorted(mp):
+        problems.append('TruMenu.cpp: DrawMenu MenuPage keys %s != kMpPages %s' % (sorted(used), sorted(mp)))
+    for k in 'totest,quick'.split(','):
+        if k not in mp: problems.append('TruMenu.cpp: OpenPages default key %s not in kMpPages' % k)
+    pg = fn_body(src, 'bool MenuPage(')
+    for want in ('ImGui::SetNextItemOpen(MpHas(g_mpOpen, key), ImGuiCond_Once)', 'ImGui::IsItemToggledOpen()',
+                 'IniKeep("Menu", "OpenPages", g_mpOpen)', 'if (g_mpRemember'):
+        if want not in pg: problems.append('TruMenu.cpp: MenuPage must hold %s' % want)
+    ro = fn_body(src, 'void ReadOptions(')
+    for want in ('OptInt(ini, "Menu", "RememberPage")', 'MpLoad(pages);', 'quick("RememberPage", 0, 1)',
+                 'OptString(ini, "Quick", "LastPage"', 'QbPageLoad(last);'):
+        if want not in ro: problems.append('TruMenu.cpp: ReadOptions must hold %s' % want)
+    # 1b quick bar: written only on a change (debounced while open), page names unique
+    qt = fn_body(src, 'void QuickTick(')
+    if 'QbPageKeep();' not in qt or qt.find('QbPageKeep();') > qt.find('if (!g_qbOpen || g_menuOpen'):
+        problems.append('TruMenu.cpp: QuickTick must call QbPageKeep before its early returns')
+    keep = fn_body(src, 'void QbPageKeep(')
+    for want in ('g_qbPage == g_qbPageSaved', 'now - g_qbPageAt < 1000', 'IniKeep("Quick", "LastPage", kQbPages[g_qbPage].en)'):
+        if want not in keep: problems.append('TruMenu.cpp: QbPageKeep must hold %s' % want)
+    load = fn_body(src, 'void QbPageLoad(')
+    if 'g_qbPage = 0;' not in load or 'Log(1, ' not in load or 'kQbStartPage' not in load:
+        problems.append('TruMenu.cpp: QbPageLoad must fall back to page 1 with a log line, empty = kQbStartPage')
+    pages = re.findall(r'(?:QB_PAGE\(|\{)"((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)", (?:kQb\w+|nullptr)',
+                       src[src.find('const QbPage kQbPages[] = {'):src.find('#undef QB_PAGE')])
+    names = [n.lower() for de, en in pages for n in {de, en}]
+    if len(pages) != 17: problems.append('TruMenu.cpp: kQbPages: 17 pages expected, %d' % len(pages))
+    if len(names) != len(set(names)): problems.append('TruMenu.cpp: a bar page name is used twice (LastPage)')
+    for de, en in pages:
+        if not re.match(r'^[ -~]+$', en) or en != en.strip() or en.isdigit():
+            problems.append('TruMenu.cpp: page name "%s" unfit for [Quick] LastPage' % en)
+    # 2 power.infinite
+    if not re.search(r'\{"power\.infinite", "bool", "', src): problems.append('TruMenu.cpp: item power.infinite missing')
+    if 'const char *const kPiTarget = "ini:TruShadowPower:Meter:Infinite";' not in src:
+        problems.append('TruMenu.cpp: kPiTarget must be ini:TruShadowPower:Meter:Infinite')
+    run = fn_body(src, 'bool RunPi(')
+    for want in ('if (!v[0]) { ValPi(o, n); return true; }', 'WritePrivateProfileStringA("Meter", "Infinite"',
+                 'PiWhy()', 'InterlockedExchange(&g_swReadAt, 0);'):
+        if want not in run: problems.append('TruMenu.cpp: RunPi must hold %s' % want)
+    why = fn_body(src, 'const char *PiWhy(')
+    for t in re.findall(r'"((?:[^"\\]|\\.)*)"', why):
+        if len(t) > 60: problems.append('TruMenu.cpp: PiWhy text over 60 characters: %s' % t)
+    if 'if (!_stricmp(id, "power.infinite")) return PiWhy();' not in fn_body(src, 'const char *RadialWhy('):
+        problems.append('TruMenu.cpp: RadialWhy must grey power.infinite with PiWhy')
+    rescue = src[src.find('const QbRow kQbRescue[] = {'):]
+    rescue = rescue[:rescue.find('\n};')]
+    a, b = rescue.find('"rc_cheats", kQbGroup'), rescue.find('"rc_game", kQbGroup')
+    row = rescue.find('"power.infinite", "", kQbBool')
+    if not (0 <= a < row < b): problems.append('TruMenu.cpp: row power.infinite (bool) must sit in group Cheats of Rettung')
+    sw = open(switches_path, encoding='utf-8').read()
+    if not re.search(r'^TruShadowPower \| Meter \| Infinite \| bool \|', sw, re.M):
+        problems.append('TruMenu.switches.txt: the TruShadowPower [Meter] Infinite row is missing')
+    tsp = open(os.path.join(PLUGINS, 'TruShadowPower', 'TruShadowPower.cpp'), encoding='utf-8').read()
+    if 'return "TruShadowPower 0.23 (' not in tsp or 'GetPrivateProfileIntA("Meter", "Infinite"' not in tsp:
+        problems.append('TruShadowPower.cpp: version export 0.23 / [Meter] Infinite read not found (kPiMinVersion 23)')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '1e466d0709564db15ef8b7cf0b1d97dac49c8ef98cb043617a608f7ad2d5cd3c' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.18 build hash (work\\asi\\menu0241) is missing')
+    return problems, '%d menu pages, 17 bar page names, power.infinite row / item / greying' % len(mp)
 
 
 def table(src):
@@ -3132,6 +3216,10 @@ def main(argv):
     for p in cproblems18: print('Q02218 %s' % p)
     if not cproblems18: print('ok: 0.22.18 %s' % csummary18)
     problems += cproblems18
+    cproblems19, csummary19 = check_02219(ini_path, opt.get('--switches', SWITCHES))   # 0.22.19
+    for p in cproblems19: print('Q02219 %s' % p)
+    if not cproblems19: print('ok: 0.22.19 %s' % csummary19)
+    problems += cproblems19
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

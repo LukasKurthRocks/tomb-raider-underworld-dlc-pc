@@ -138,7 +138,8 @@ $earlierBuilds = @{
                       'ea95cee0477c751c9bade1c48124721eab7f562639d89b543e350f2c94cd29a8',   # 0.22.14 sub.lang switches the shown lines at once (work\asi\menu0237)
                       '5c4612a49fe164ae91370718c5116f870178d68450c3984975b59c185d43f6b0',   # 0.22.15 aim.trace / aim.why (work\asi\menu0238)
                       '6fb7c6772c147b952ae595a39b7601fb2d8b36e34bfa37cf73c6bc18d06a8235',   # 0.22.16 page Spiel-Einstellungen (work\asi\menu0239)
-                      '7c810b6dc7a344b3302f70762b6e0f77bf7aab6cdf17922058ae1b70e8d0ff38')   # 0.22.17 subtitle fallback (work\asi\menu0240)
+                      '7c810b6dc7a344b3302f70762b6e0f77bf7aab6cdf17922058ae1b70e8d0ff38',   # 0.22.17 subtitle fallback (work\asi\menu0240)
+                      '1e466d0709564db15ef8b7cf0b1d97dac49c8ef98cb043617a608f7ad2d5cd3c')   # 0.22.18 volume save, groups, step mode (work\asi\menu0241)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

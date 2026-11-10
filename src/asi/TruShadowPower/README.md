@@ -71,7 +71,9 @@ meter (TruMenu's planned row "Kraft unendlich", plan N2). Default `Infinite=0` =
   `InfiniteReadSwitch`. TruMenu drives it like every plugin switch: `sw.set` / the Fixes page write the ini key with
   WritePrivateProfileString, the plugin picks it up within a second. Its figure page (doppelganger group, today the
   greyed "Kraft unendlich - geplant" row of plan N2) can list `{"TruShadowPower", "Meter", "Infinite"}` in
-  `kQbFigShadow` instead of the planned row (TruMenu change, not part of this build).
+  `kQbFigShadow` instead of the planned row (TruMenu change, not part of this build). Done: TruMenu 0.22.18 lists it in
+  the Figur group; TruMenu 0.22.19 adds the item `power.infinite 1|0` (no argument = report) and the row "Kraft
+  unendlich" in Rettung / Cheats, greyed while this plugin (0.23+) is not loaded or its INI is missing.
 * **Checks:** no new byte checks (no game code is patched for 0.23); the lists of v09 .. v20, power021 and power022
   (218 checks) give 0 mismatches against `data\pc\tru.exe` and the installed `tru.exe` (both md5 `5560abac...`,
   results `work\asi\power023\prechecks_v23.txt`).

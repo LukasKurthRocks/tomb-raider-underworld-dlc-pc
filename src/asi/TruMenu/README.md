@@ -2928,6 +2928,59 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.19 - pages remembered, "Kraft unendlich" in the cheats (2026-11-10)
+
+Built into `work\asi\menu0242`, not installed, no live test. Owner's wishes after the 0.22.18 live result (20:10:
+language and music volume kept over restarts). No game code touched - INI files only, so no new byte checks
+(`work\asi\menu0242\precheck_02219.txt` = the 32 rows of 0.22.18 run again: 0 mismatches against `data\pc\tru.exe` and
+read-only against the installed `tru.exe`).
+
+- **Quick bar: the last page.** The bar opens on the page it showed last, also after a restart: `[Quick] LastPage` holds
+  the page's English name (the German name and a page number 1 .. 17 are read too). Written by `QbPageKeep` (every
+  Present, two compares per frame): 1 s after the last LB / RB page change while the bar is open, or at once when it is
+  closed - never per frame, never an unchanged value (paging away and back before the write writes nothing). Empty =
+  page Level data as before; a name that is no page any more (a later version renamed it) opens page 1 (Favourites /
+  recent) with the log line `quick: [Quick] LastPage '<name>' is no bar page (any more) - opening page 1 ...`, the next
+  close writes a real name. `[Quick] RememberPage=0` = always page Level data, nothing written. Only the page, not the
+  row (rows are rebuilt per frame; the row per page is kept for the session as before).
+- **Big window: the open pages.** The big window has no tabs - its pages are collapsing headers, several may be open.
+  Each page has a short key (`kMpPages`: totest, regress, quick, status, devmenu, timeplayer, instances, costumelive,
+  log, videos, music, saves, settings, overlay, access, arachno, coop, ai, fixes, qbpages, camera, cheat, cheats, markup,
+  debugview, level, outfits, devchannel; the start line `menu pages: ...` lists them). `[Menu] OpenPages` (default
+  `totest,quick` = the old defaults) lists the open ones; the first draw of a page in this ImGui context takes its state
+  from the list (`SetNextItemOpen(..., ImGuiCond_Once)`; `io.IniFilename` is null, so once per start), a toggle (click,
+  A / Enter: `IsItemToggledOpen`) rewrites the list at once through `IniKeep`. Keys that are no page are dropped with a
+  log line; a value of only unknown keys = the built-in pages; an empty value = every page closed. `[Menu]
+  RememberPage=0` = the headers' own defaults (TO TEST, Quick access open), nothing written.
+- **`power.infinite 1|0`** (bar row **"Kraft unendlich" / "Infinite shadow power"** in Rettung / Cheats, group Cheats,
+  next to "Munition unendlich"): writes TruShadowPower 0.23's `[Meter] Infinite` into `TruShadowPower.ini` next to the
+  `.asi` files (the same path as the Fixes rows: `TestIniTarget`, the folder of TruMenu's own INI) with
+  `WritePrivateProfileString` - only that key line changes; an older INI without the key gets it at the end of `[Meter]`,
+  comments and every other line stay. TruShadowPower reads it within ~1 s (`InfiniteReadSwitch`). No argument = report
+  (`1 ([Meter] Infinite 1; TruShadowPower.asi loaded 0.23, TruShadowPower.ini found)`), never a flip. Refused, and the
+  row greyed with the reason in the help line and a short one in the count column, while TruShadowPower.asi is not
+  loaded ("nicht installiert"), its version export is older than 0.23 ("< 0.23") or the INI is missing ("INI fehlt") -
+  no INI is ever created. The state is read at most once per second, at once after a write; the Figur / Fixes switch row
+  of the same key (`TruMenu.switches.txt`) is refreshed with it. A missing key shows "aus" (TruShadowPower starts with 0).
+- Checks: `trumenu_ini_check` `check_02219` (defaults = sample INI, every page header through `MenuPage` with one key
+  of `kMpPages`, `QbPageKeep` before `QuickTick`'s early returns, 17 unique page names, `power.infinite` item / row /
+  greying / write, TruShadowPower 0.23 export, Set-TruMenu 0.22.18 hash); `trumenu_quick_check` models `lastpage` (13),
+  `menupages` (9), `infinite` (13). `Set-TruMenu.ps1` knows the 0.22.18 hash.
+
+### TO TEST 0.22.19
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | bar page | open the bar, RB to "Rescue / cheats", wait 2 s, close; `game.quit`, restart, open the bar | opens on "Rescue / cheats"; TruMenu.ini `[Quick] LastPage=Rescue / cheats` |
+| 2 | bar page | RB 3 x quickly, close within 1 s | one write (the last page), log level 2: one `[Quick] LastPage=... written` line |
+| 3 | bar page | edit `LastPage=Lara` (no page), restart | bar opens on page 1, log `... is no bar page (any more) - opening page 1` |
+| 4 | bar page | `[Quick] RememberPage=0`, restart | always page Level data, `LastPage` untouched |
+| 5 | big window | `[Menu] Enabled=1`: open Fixes and Status, close Quick access; restart, open the window | Fixes + Status open, Quick access closed; `[Menu] OpenPages=totest,status,fixes` |
+| 6 | infinite | page Rettung / Cheats, "Kraft unendlich" right (TruShadowPower 0.23 installed) | row "an"; `TruShadowPower.ini [Meter] Infinite=1` (the older INI: key added, the rest unchanged); TruShadowPower.log `0.23 switch: [Meter] Infinite 0 -> 1`; DLC 2: the meter stays full |
+| 7 | infinite | `menu power.infinite` over TruLink (no argument) | report only, nothing written |
+| 8 | infinite | the same row on page Figur (Schattenkraft group) | shows the same state within 1 s |
+| 9 | infinite | without TruShadowPower.asi (or an older one) | row grey, count column "nicht installiert" / "< 0.23", help line the reason; right = refused, nothing written |
+
 ## 0.22.18 - volume save, groups everywhere, step mode, subtitle alignment, speech language, light demote (2026-11-10)
 
 Built into `work\asi\menu0241`, not installed, no live test. Byte checks: `work\asi\menu0241\precheck_02218.txt` (32
@@ -3856,6 +3909,10 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Menu] FreeMouse` | 1 | 0.7: while the menu is open the mouse belongs to the menu (cursor drawn, no mouse messages to the game, its `SetCursorPos` / `ClipCursor` held until close); 0 = as 0.6 |
 | `[Menu] BlockGameInput` | 1 | 0.7.1: while the menu is open the game gets no keyboard (its DirectInput keyboard reads no key events, a key it saw going down is released once, a key held at the close stays away until released; key messages to the menu only); 0 = as 0.7 |
 | `[Menu] PauseGame` | 0 | 0.7.1: 1 = also set the `time.pause` bit while the menu is open; on close only what TruMenu set is cleared |
+| `[Menu] RememberPage` | 1 | 0.22.19: 1 = the big window opens with the pages that were open last time (`OpenPages`), also after a restart; 0 = the built-in pages (TO TEST, Quick access) |
+| `[Menu] OpenPages` | `totest,quick` | 0.22.19: keys of the open pages (comma list, rewritten when a page is opened / closed; keys in the start line `menu pages`); unknown keys dropped, only unknown = the built-in pages |
+| `[Quick] RememberPage` | 1 | 0.22.19: 1 = the bar opens on the page it showed last (`LastPage`), also after a restart; 0 = always page Level data |
+| `[Quick] LastPage` | (empty) | 0.22.19: English name of the last bar page (rewritten 1 s after a page change and at the close); empty = Level data, a name that is no page any more = page 1, logged |
 | `[Pad] BlockInput` | 1 | 0 = the game sees the pad while the menu is open |
 | `[Cheat] Experimental` | 1 | 0 = no game-changing actions (pages read-only) |
 | `[Cheat] FlightSpeed` | 20 | units per 30 fps frame at full trigger |

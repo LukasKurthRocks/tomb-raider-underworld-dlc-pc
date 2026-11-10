@@ -3749,6 +3749,204 @@ def check_subalign():
     return good
 
 
+# ---- 0.22.19 pages remembered: [Quick] LastPage (QbPageFind / QbPageLoad / QbPageKeep), [Menu] OpenPages (MpLoad /
+# MpBuild / MenuPage) ----
+def qb_page_names():
+    import os, re
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'asi', 'TruMenu',
+                            'TruMenu.cpp'), encoding='utf-8').read()
+    block = src[src.index('const QbPage kQbPages[] = {'):src.index('#undef QB_PAGE')]
+    pages = re.findall(r'(?:QB_PAGE\(|\{)"((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)", (?:kQb\w+|nullptr)', block)
+    mp = re.findall(r'"([a-z0-9]+)"', re.search(r'const char \*const kMpPages\[\] = \{(.*?)\};', src, re.S).group(1))
+    return pages, mp
+
+
+def qb_find(pages, name):                        # QbPageFind
+    if not name: return -1
+    for i, (de, en) in enumerate(pages):
+        if name.lower() in (en.lower(), de.lower()): return i
+    return int(name) - 1 if name.isdigit() and 1 <= int(name) <= len(pages) else -1
+
+
+def qb_load(pages, value, remember=1, start=6):  # QbPageLoad: (page, saved, logged)
+    if not remember or not value: return start, start, False
+    p = qb_find(pages, value)
+    if p < 0: return 0, -1, True
+    return p, p, False
+
+
+def qb_keep_run(pages, events, page, saved, end, remember=1, step=16):
+    """QbPageKeep once per frame; events = [(t, 'page', p) | (t, 'open') | (t, 'close')]; returns the writes [(t, name)]"""
+    writes, pending, at, is_open = [], -1, 0, False
+    ev = sorted(events, key=lambda e: e[0])
+    t, k = 0, 0
+    while t <= end:
+        while k < len(ev) and ev[k][0] <= t:
+            e = ev[k]
+            if e[1] == 'page': page = e[2]
+            elif e[1] == 'open': is_open = True
+            else: is_open = False
+            k += 1
+        if not remember or page == saved:
+            pending = -1
+        else:
+            if page != pending: pending, at = page, t
+            if not (is_open and t - at < 1000):
+                writes.append((t, pages[page][1]))
+                saved, pending = page, -1
+        t += step
+    return writes, saved
+
+
+def check_lastpage():
+    pages, _ = qb_page_names()
+    cases = []
+    cases.append(('17 bar pages, every name unique (de + en, case-insensitive)', len(pages) == 17 and
+                  len({n.lower() for p in pages for n in p}) == len({n.lower() for p in pages for n in set(p)}) and
+                  len({n.lower() for p in pages for n in set(p)}) == sum(len(set(p)) for p in pages)))
+    cases.append(('empty LastPage -> start page 6 (Level data, as before)', qb_load(pages, '') == (6, 6, False)))
+    cases.append(('RememberPage=0 ignores a stored page', qb_load(pages, 'Rescue / cheats', remember=0)[0] == 6))
+    cases.append(('stored English name -> that page', all(qb_load(pages, en)[0] == i for i, (de, en) in enumerate(pages))))
+    cases.append(('German name and page number accepted', qb_load(pages, 'Rettung / Cheats')[0] == 2 and
+                  qb_load(pages, '3')[0] == 2 and qb_load(pages, 'rescue / CHEATS')[0] == 2))
+    cases.append(('a name that is no page any more -> page 1, logged, saved = -1', qb_load(pages, 'Lara') == (0, -1, True)
+                  and qb_load(pages, '18') == (0, -1, True) and qb_load(pages, '0') == (0, -1, True)))
+    w, s = qb_keep_run(pages, [(0, 'open'), (100, 'page', 7), (300, 'page', 8), (500, 'page', 9)], 6, 6, 3000)
+    cases.append(('LB / RB three times while open: one write 1 s after the last change',   # frames of 16 ms
+                  len(w) == 1 and w[0][1] == pages[9][1] and 1500 <= w[0][0] <= 1532 and s == 9))
+    w, s = qb_keep_run(pages, [(0, 'open'), (100, 'page', 2), (300, 'close')], 6, 6, 3000)
+    cases.append(('page change, close within 1 s: written at the close', len(w) == 1 and w[0][1] == pages[2][1] and
+                  300 <= w[0][0] <= 316))
+    w, s = qb_keep_run(pages, [(0, 'open'), (100, 'page', 7), (400, 'page', 6), (900, 'close')], 6, 6, 3000)
+    cases.append(('paged away and back before the write: nothing written', w == []))
+    w, s = qb_keep_run(pages, [(0, 'open'), (2000, 'close'), (3000, 'open')], 6, 6, 5000)
+    cases.append(('open / close without a page change: nothing written (never per frame)', w == []))
+    p, saved, _ = qb_load(pages, 'gone page')
+    w, s = qb_keep_run(pages, [(0, 'open'), (200, 'close')], p, saved, 1000)
+    cases.append(('after the fallback: the first close writes a real page name', w and w[0][1] == pages[0][1]))
+    w, s = qb_keep_run(pages, [(0, 'open'), (100, 'page', 2), (300, 'close')], 6, 6, 3000, remember=0)
+    cases.append(('RememberPage=0: never written', w == []))
+    t = ini_set('[Quick]\nLanguage=de\n; c\nRecent=\n', 'Quick', 'LastPage', pages[2][1])
+    cases.append(('restart: the written name opens that page, other lines kept',
+                  qb_load(pages, ini_get(t, 'Quick', 'LastPage', ''))[0] == 2 and 'Language=de' in t and '; c' in t))
+    good = True
+    for name, ok in cases:
+        print('lastpage: %-78s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= bool(ok)
+    return good
+
+
+def mp_has(lst, key):                            # MpHas
+    return any(k.strip().lower() == key.lower() for k in lst.split(',') if k.strip())
+
+
+def mp_build(keys, old, key=None, is_open=False):   # MpBuild: kMpPages order
+    return ','.join(k for k in keys if (is_open if key and k == key else mp_has(old, k)))
+
+
+def mp_load(keys, value, default='totest,quick'):   # MpLoad: (list, logged)
+    toks = [k.strip() for k in value.split(',') if k.strip()]
+    known = [k for k in toks if k.lower() in keys]
+    dropped = [k for k in toks if k.lower() not in keys]
+    if dropped and not known: return mp_build(keys, default), True
+    return mp_build(keys, value), bool(dropped)
+
+
+def check_menupages():
+    _, keys = qb_page_names()
+    cases = []
+    cases.append(('28 page keys, unique, defaults totest / quick among them', len(keys) == 28 and len(set(keys)) == 28
+                  and 'totest' in keys and 'quick' in keys))
+    cases.append(('default list -> TO TEST + Quick access open', mp_load(keys, 'totest,quick') == ('totest,quick', False)))
+    cases.append(('unknown key dropped (logged), the rest kept in page order',
+                  mp_load(keys, 'cheats, gone ,status') == ('status,cheats', True)))
+    cases.append(('only unknown keys -> the built-in pages (logged)', mp_load(keys, 'old1,old2') == ('totest,quick', True)))
+    cases.append(('empty value (the owner closed every page) stays all closed', mp_load(keys, '') == ('', False)))
+    lst = mp_build(keys, 'totest,quick', 'fixes', True)
+    cases.append(('open Fixes: added in page order', lst == 'totest,quick,fixes'))
+    lst = mp_build(keys, lst, 'quick', False)
+    cases.append(('close Quick access: removed, the others stay', lst == 'totest,fixes'))
+    cases.append(('a toggle of an already listed page writes no doubles', mp_build(keys, 'fixes,fixes', 'fixes', True)
+                  == 'fixes'))
+    # SetNextItemOpen(..., ImGuiCond_Once): the list applies only while ImGui has no state for the header
+    state = {}
+    def draw(key, lst):
+        if key not in state: state[key] = mp_has(lst, key)
+        return state[key]
+    first = draw('fixes', 'fixes')
+    state['fixes'] = False                     # the owner closes it (TreeNodeBehavior stores the click)
+    cases.append(('Once: the stored list opens the page once, a later click wins over the list',
+                  first and not draw('fixes', 'fixes')))
+    good = True
+    for name, ok in cases:
+        print('menupages: %-77s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= bool(ok)
+    return good
+
+
+# ---- 0.22.19 power.infinite: RunPi / PiWhy and TruShadowPower 0.23 InfiniteReadSwitch ----
+def pi_run(arg, loaded, version, ini_text):
+    """RunPi: (ok, new ini text or None = nothing written, reply kind)"""
+    v = (arg or '').strip()
+    if not v: return True, None, 'report'
+    on = v in ('1',) or v.lower() == 'on'
+    off = v in ('0',) or v.lower() == 'off'
+    if not on and not off: return False, None, 'usage'
+    if not loaded or version < 23 or ini_text is None: return False, None, 'refused'
+    cur = ini_get(ini_text, 'Meter', 'Infinite', None)
+    if cur is not None and (int(cur) != 0) == on: return True, None, 'already'
+    return True, ini_set(ini_text, 'Meter', 'Infinite', '1' if on else '0'), 'written'
+
+
+def tsp_read(ini_text, current):                 # GetPrivateProfileIntA("Meter", "Infinite", g_infinite, ...) ? 1 : 0
+    v = ini_get(ini_text, 'Meter', 'Infinite', None)
+    return current if v is None else (1 if int(v) else 0)
+
+
+def check_infinite():
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sample = open(os.path.join(root, 'src', 'asi', 'TruShadowPower', 'TruShadowPower.ini'), encoding='utf-8').read()
+    sample = sample.replace('\r\n', '\n')
+    old = '\n'.join(l for l in sample.split('\n') if 'Infinite' not in l and not l.startswith('; 0.23:')
+                    and not l.startswith('; fills it') and not l.startswith('; 0 = the TU meter'))
+    cases = []
+    cases.append(('sample TruShadowPower.ini has [Meter] Infinite=0', ini_get(sample, 'Meter', 'Infinite', None) == '0'))
+    cases.append(('the older INI (game folder style) has no Infinite key', ini_get(old, 'Meter', 'Infinite', None) is None))
+    ok, t, kind = pi_run('1', True, 23, old)
+    lines_old = [l for l in old.split('\n') if l.strip()]
+    lines_new = [l for l in (t or '').split('\n') if l.strip()]
+    cases.append(('older INI + power.infinite 1: key added in [Meter], every other line kept in order',
+                  ok and kind == 'written' and ini_get(t, 'Meter', 'Infinite', None) == '1' and
+                  [l for l in lines_new if l != 'Infinite=1'] == lines_old and lines_new.count('Infinite=1') == 1))
+    ok, t2, kind = pi_run('0', True, 23, sample)
+    cases.append(('sample INI + power.infinite 0: already 0, nothing written', ok and t2 is None and kind == 'already'))
+    ok, t3, kind = pi_run('1', True, 23, sample)
+    cases.append(('sample INI + 1: only the key line changes', ok and t3 is not None and
+                  [a for a, b in zip(sample.split('\n'), t3.split('\n')) if a != b] == ['Infinite=0'] and
+                  len(sample.split('\n')) == len(t3.split('\n'))))
+    cases.append(('no argument = report, never a flip, nothing written', pi_run('', True, 23, sample)[1:] == (None, 'report')
+                  and pi_run(None, True, 23, t3)[1:] == (None, 'report')))
+    cases.append(('bad value refused (usage)', pi_run('2', True, 23, sample)[1:] == (None, 'usage')))
+    cases.append(('TruShadowPower.asi not loaded: refused, nothing written', pi_run('1', False, -1, sample)[1:]
+                  == (None, 'refused')))
+    cases.append(('TruShadowPower 0.22 (or no version export): refused', pi_run('1', True, 22, sample)[1:] == (None, 'refused')
+                  and pi_run('1', True, -1, sample)[1:] == (None, 'refused')))
+    cases.append(('no TruShadowPower.ini: refused (no INI is created)', pi_run('1', True, 23, None)[1:] == (None, 'refused')))
+    cases.append(('TruShadowPower reads the written 1 / 0 within its 1 s poll', tsp_read(t3, 0) == 1 and
+                  tsp_read(ini_set(t3, 'Meter', 'Infinite', '0'), 1) == 0))
+    cases.append(('a missing key keeps TruShadowPower\'s current value (its read default)', tsp_read(old, 1) == 1 and
+                  tsp_read(old, 0) == 0))
+    on_of = lambda text: 1 if ini_get(text, 'Meter', 'Infinite', None) == '1' else 0   # ValPi's first character
+    cases.append(('bar state: missing key shows off (TruShadowPower starts with 0), 1 shows on', on_of(old) == 0 and
+                  on_of(t3) == 1))
+    good = True
+    for name, ok in cases:
+        print('infinite: %-78s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= bool(ok)
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -3772,7 +3970,8 @@ def main():
                check_aimwhy(),                                                        # 0.22.15
                check_settings(),                                                      # 0.22.16
                check_subfallback(),                                                   # 0.22.17
-               check_groups_nested(), check_volsave(), check_persist(), check_subalign()]   # 0.22.18
+               check_groups_nested(), check_volsave(), check_persist(), check_subalign(),   # 0.22.18
+               check_lastpage(), check_menupages(), check_infinite()]                 # 0.22.19
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 
