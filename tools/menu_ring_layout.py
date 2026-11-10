@@ -81,10 +81,11 @@ def p14(src):
         print('  position 14: not decoded (%s: %s)' % (type(x).__name__, x))
         return False
     print('  position 14 (bottom, hit area 0x170): slot 7 form %s; base-state lock m0xa90[13] = %s (%s); func 29 places '
-          'icon 0x7bc on PC: %s; icon texture id5:%d%s, text %d%s' % (
+          'icon 0x7bc on PC: %s; icon texture id5:%d%s, text %d%s, background 0x6b4 texture id5:%d%s' % (
               st['slot7'], st['lock14_base'], 'free' if st['lock14_base'] == 0 else 'locked',
               'yes' if st['place14_pc'] else 'no', st['icon14'], ' (door)' if st['icon14'] == 26 else '',
-              st['text14'], ' (QUIT GAME)' if st['text14'] == 131 else ''))
+              st['text14'], ' (QUIT GAME)' if st['text14'] == 131 else '', st['bg14'],
+              ' (slot disc)' if st['bg14'] == 15 else ' (sub-ring disc)' if st['bg14'] == 16 else ''))
     print('    blocks: show 0x6b4 / 0x7bc %s; re-free after dialog blocks %s; click 0x170 %s' % (
         ', '.join(st['shows']) or 'none', ', '.join(st['refree']) or 'none',
         ', '.join('%s -> %s' % (a, '/'.join(b)) for a, b in st['click']) or 'none'))

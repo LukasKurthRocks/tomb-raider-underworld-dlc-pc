@@ -15,9 +15,12 @@ Changes (script 7 offsets of the PC script, 197 664 B; the pause-menu port only 
   D3  func 29 +0x8124: op50 NOT -> op00 debug line marker: PositionMenuItems places icon 0x7bc on position 14 on PC
   D4  icon 0x7bc init +0x5c (id relocation type 5): texture 31 (Xbox STORAGE DEVICE) -> 26 (the door of icon 0x738)
   D5  text 0x468 init +0x5c: locals 141 (STORAGE DEVICE) -> 131 (QUIT GAME)
+  D6  background 0x6b4 init +0x5c (id type 5): texture 16 (sub-ring disc) -> 15 (the disc of the 7 ring slots)
   B1  appended blocks, each reached by an op63 that replaces one op00 marker and jumping back after it:
       B1a func 19 +0x3da4 (end of the base state): show background 0x6b4 (uibitmap f4, as func 20 does for the
-          Xbox sub-ring 1) and icon 0x7bc (func 22, as func 43 shows 0x7bc on Xbox)
+          Xbox sub-ring 1) + colour (1, 1, 1, 1) (uibitmap f18 as func 28; func 28 leaves every background at alpha
+          0, the ring slots get theirs from the ring-in animation, which position 14 has none of - tree 1 showed the
+          door without its disc) and icon 0x7bc (func 22, as func 43 shows 0x7bc on Xbox)
       B1b func 8 +0x17c10 (options), +0x18768 (audio / visual), +0x18e04 (quit dialog): these three "dialog blocks"
           lock positions 8-14 again and hide 0x7bc / 0x6b4 before they open their screen; the block re-frees
           m0xa90[13] and shows 0x6b4 / 0x7bc, so the door is there again when the screen / dialog closes
@@ -26,6 +29,10 @@ Changes (script 7 offsets of the PC script, 197 664 B; the pause-menu port only 
   B2  func 8 +0x18f50 (where the slot-7 click test lands when slot 7 was not clicked, before the sub-ring dispatch):
       click on hit area 0x170 (the same hit area f14 + input f0 test as slot 7 at +0x188ac, its locals 0xb2 / 0xb4)
       AND NOT m0xa90[13] -> jump to the quit fall-through +0x188f8; otherwise continue at +0x18f54
+      The lock element is READ as `0f a90; 03 13; 21 14; 1b` (func 14 / 18); `1e 1` belongs to the WRITE form only.
+      Tree 1 (2026-11-10, md5 e64ca088) read it with op1e: the VM's op1b handler (0x57d1af) then took a stale stack
+      word as offset and crashed at 0x57d1c4 on the next click after DLC / new game (3 crash dumps, VM pc in this
+      block) - the opcode shape gate of `verify` now refuses that.
 Every replaced word is checked against its expected old value first (refused otherwise), every native / prototype
 target of the new code is copied from an existing call of the same thing in script 7 (no guessed offsets), no jump of
 script 7 may land inside a replaced window or on a block's return address.
@@ -38,7 +45,9 @@ Commands (from the repository root):
         or appended word of script 7 explained by the plan from BEFORE; relocations = BEFORE's (3 external targets
         changed as planned) + exactly the planned appended ones; AFTER decoded by itself (the three sites = f15 form,
         D2-D5 values, each block from its op63: opcodes, members, call targets by native name / function index,
-        jumps); the script walker reports the same problems as for BEFORE. Exit 1 = refused.
+        jumps); the script walker reports the same problems as for BEFORE; shape gate: every opcode 3-gram of every
+        appended block (op00 markers left out, cut after each jump) occurs in the code of BEFORE's script 7, i.e.
+        the blocks only use statement shapes the original compiler produced. Exit 1 = refused.
 Status of any file: tools/menu_ring_layout.py (prints the position-14 state via p14_status() of this module).
 """
 import sys, os, struct, json, hashlib
@@ -62,6 +71,8 @@ D3 = dict(at=0x8124, old=0x50000000, new=0x00000b3f,
                0x8130: 0x0f0007bc, 0x8140: 0x68000000})
 D4 = dict(member=ICON14, old=31, new=26, donor=DOOR, at=0x22d30)
 D5 = dict(member=TEXT14, old=141, new=131, donor=QUITTEXT, at=0x1e450)
+D6 = dict(member=BG14, old=16, new=15, donor=0x660, at=0x21870)    # disc of the 7 ring slots (16 = sub-ring disc)
+REF_COLOR = (0x7294, {0x7290: 0x0f000618}, 0x65, 'func 28 +0x7290: uibitmap f18 (colour) on background 0x618')
 # references copied from existing code: (call word offset, expected words before / at it, what)
 REF_SHOW = (0x4668, {0x4664: 0x0f0006b4}, 0x65, 'func 20 +0x4664: uibitmap f4 (show) on background 0x6b4')
 REF_F22 = (0x106b0, {0x106ac: 0x0f0007bc}, 0x68, 'func 43 +0x106ac: func 22 (show icon) on 0x7bc')
@@ -240,21 +251,24 @@ def plan(D):
         raise Refuse('D3: +0x%x is %08x, expected op50 after corebase f17 in func 29' % (D3['at'], s.w(D3['at'])))
     if D3['at'] in jt: raise Refuse('D3: a jump lands on +0x%x' % D3['at'])
     words[D3['at']] = (D3['old'], D3['new'], 'D3 func 29 case 14: op50 NOT -> op00 marker (icon 0x7bc placed on PC)')
-    for nm, X, kind in (('D4', D4, 'texture'), ('D5', D5, 'text')):
+    for nm, X, kind in (('D4', D4, 'texture'), ('D5', D5, 'text'), ('D6', D6, 'texture')):
         a = s.init_word(X['member'], 0x5c); b = s.init_word(X['donor'], 0x5c)
         if a != X['at']: raise Refuse('%s: init word of 0x%x at %s, expected +0x%x' % (nm, X['member'], a, X['at']))
         if s.w(a) != X['old'] or s.w(b) != X['new']:
             raise Refuse('%s: 0x%x %s %d (donor 0x%x %d), expected %d (%d)' % (nm, X['member'], kind, s.w(a),
                          X['donor'], s.w(b), X['old'], X['new']))
         if kind == 'texture' and (s.ids.get(a) != 5 or s.ids.get(b) != 5):
-            raise Refuse('D4: id relocation types %s / %s, expected 5 / 5' % (s.ids.get(a), s.ids.get(b)))
+            raise Refuse('%s: id relocation types %s / %s, expected 5 / 5' % (nm, s.ids.get(a), s.ids.get(b)))
         if kind == 'text' and (a in s.ids or a in s.it or a in s.ext):
             raise Refuse('D5: +0x%x carries a relocation' % a)
         words[a] = (X['old'], X['new'], '%s 0x%x init +0x5c: %s %d -> %d (as 0x%x)' % (nm, X['member'], kind,
                     X['old'], X['new'], X['donor']))
     # ---- references for the blocks
     show = ref_call(s, REF_SHOW); f22 = ref_call(s, REF_F22); hit = ref_call(s, REF_HIT); inp = ref_call(s, REF_IN)
+    colour = ref_call(s, REF_COLOR)
     if s.proto_func(f22[1]) != 22: raise Refuse('func 43 +0x106b0 does not call func 22')
+    if s.call_name(REF_COLOR[0] + 4).split()[:2] != ['uibitmap', 'f18']:
+        raise Refuse('func 28 +0x7298 is %s, not uibitmap f18' % s.call_name(REF_COLOR[0] + 4))
     if s.call_name(REF_SHOW[0] + 4).split()[:2] != ['uibitmap', 'f4']:
         raise Refuse('func 20 +0x4668 is %s, not uibitmap f4' % s.call_name(REF_SHOW[0] + 4))
     expect_words(s, QUIT_CTX, 'quit fall-through func 8 +0x188f8')
@@ -266,10 +280,17 @@ def plan(D):
     old_len = len(s.d)
     for a in range(old_len - old_len % 4, len(d), 4):
         words[a] = (None, struct.unpack_from('<I', d, a)[0], 'alignment')
+    # element of the lock list: a WRITE is `0f a90; i; 21 14; 1e 1; 04 v; 2e` (func 19 / 20 / 8), a READ is
+    # `0f a90; i; 21 14; 1b` (func 14 / 18) - tree 1 read with the write prefix (op1e) and crashed in the op1b handler
     lock13 = [(op(0x0f, LOCK), None, 'push member m0xa90 (lock list bool[14])'), (op(0x03, 13), None, 'index 13'),
-              (op(0x21, 14), None, 'element of 14'), (op(0x1e, 1), None, 'op1e 1')]
+              (op(0x21, 14), None, 'element of 14')]
+    lock13_w = lock13 + [(op(0x1e, 1), None, 'op1e 1 (write form, as func 19 +0x3d98)')]
+    one = [(op(0x03, 1), None, 'int 1'), (op(0x5c), None, 'int -> float')]
     show_bg = [(op(0x0f, BG14), None, 'push member 0x6b4 (background of position 14)'), (op(0x65), None, 'native call'),
-               (PH, show, 'uibitmap f4 (show), as func 20 +0x4664')]
+               (PH, show, 'uibitmap f4 (show), as func 20 +0x4664')] + one * 4 + [
+               (op(0x0f, BG14), None, 'push member 0x6b4'), (op(0x65), None, 'native call'),
+               (PH, colour, 'uibitmap f18 colour (1, 1, 1, 1): opaque, untinted (func 21 hides with (1, 1, 1, 0); '
+                            'func 28 leaves every background at alpha 0 until a ring animation fades it in)')]
     show_ic = [(op(0x0f, ICON14), None, 'push member 0x7bc (icon of position 14, door)'), (op(0x68), None, 'call'),
                (PH, f22, 'func 22 (show icon), as func 43 +0x106ac')]
     int_added, ext_added, blocks = [], [], {}
@@ -301,7 +322,7 @@ def plan(D):
         if st['kind'] == 'show':
             code += show_bg + show_ic
         elif st['kind'] == 'refree':
-            code += lock13 + [(op(0x04, 0), None, 'value 0'), (op(0x2e), None, 'store: m0xa90[13] = 0 (free)')]
+            code += lock13_w + [(op(0x04, 0), None, 'value 0'), (op(0x2e), None, 'store: m0xa90[13] = 0 (free)')]
             code += show_bg + show_ic
         else:
             code += [(op(0x09, 0xb2), None, 'push &local 0xb2 (result; the slot-7 test +0x188ac uses it the same way)'),
@@ -346,7 +367,37 @@ class Secs:
 def p14_full(st):
     """True when a p14_status() shows the complete stage-light layout"""
     return (st['slot7'] == 'f15' and st['lock14_base'] == 0 and st['place14_pc'] and st['icon14'] == D4['new'] and
-            st['text14'] == D5['new'] and len(st['shows']) == 1 and len(st['refree']) == 3 and st['quit_click'])
+            st['text14'] == D5['new'] and st['bg14'] == D6['new'] and len(st['shows']) == 1 and
+            len(st['refree']) == 3 and st['quit_click'])
+
+
+def trigrams(s, lo, hi):
+    """opcode 3-grams of the instructions in [lo, hi), debug line markers (op00) left out, never across a jump:
+    the sequence is cut after every op63 / op64 (the condition is consumed there, the expression stack is empty), so
+    the 3-grams describe expression / statement shapes, not the order of the appended control flow"""
+    out, run = [], []
+    for o, opc, w, ex in s.instrs(lo, hi):
+        if opc == 0x00: continue
+        run.append(opc)
+        if opc in JUMPS:
+            out += [tuple(run[k:k + 3]) for k in range(len(run) - 2)]; run = []
+    out += [tuple(run[k:k + 3]) for k in range(len(run) - 2)]
+    return out
+
+
+def shape_gate(sb, sa, info):
+    """every opcode 3-gram of every appended block must occur in the code of the original script 7 (BEFORE):
+    the blocks only re-use statement shapes the compiler produced (catches e.g. a read written with the store prefix
+    op1e, tree 1's crash) - returns the problems"""
+    known = set()
+    for j, lo, hi in sb.code: known.update(trigrams(sb, lo, hi))
+    probs = []
+    for key, b in info['blocks'].items():
+        for g in trigrams(sa, b['block'], b['block'] + 4 * b['words']):
+            if g not in known:
+                probs.append('%s block +0x%x: opcode sequence %s does not occur in the original script 7' % (
+                    key, b['block'], ' '.join('op%02x' % x for x in g)))
+    return probs
 
 
 def p14_status(D):
@@ -367,6 +418,7 @@ def p14_status(D):
     out['lock14_base'] = vals[-1] if vals else None
     out['place14_pc'] = s.w(D3['at']) >> 24 == 0x00 and s.w(D3['at'] + 0xc) == op(0x0f, ICON14)
     out['icon14'] = s.w(s.init_word(ICON14, 0x5c)); out['text14'] = s.w(s.init_word(TEXT14, 0x5c))
+    out['bg14'] = s.w(s.init_word(BG14, 0x5c))
     end = max(hi for j, lo, hi in s.code)
     shows, refree, click = [], [], []
     for j, lo, hi in s.code:
@@ -409,12 +461,13 @@ def decode_blocks(s, info):
     return rows, probs
 
 
+_SHOW = ['op0f 1716', 'op65 uibitmap f4 (+0xf4)'] + ['op03 1', 'op5c 0'] * 4 + [
+    'op0f 1716', 'op65 uibitmap f18 (+0x27c)', 'op0f 1980', 'op68 func 22']
 EXPECT_BLOCK = {
-    'show': ['op00 M', 'op0f 1716', 'op65 uibitmap f4 (+0xf4)', 'op0f 1980', 'op68 func 22', 'op63 -> BACK'],
-    'refree': ['op00 M', 'op0f 2704', 'op03 13', 'op21 14', 'op1e 1', 'op04 0', 'op2e 0', 'op0f 1716',
-               'op65 uibitmap f4 (+0xf4)', 'op0f 1980', 'op68 func 22', 'op63 -> BACK'],
+    'show': ['op00 M'] + _SHOW + ['op63 -> BACK'],
+    'refree': ['op00 M', 'op0f 2704', 'op03 13', 'op21 14', 'op1e 1', 'op04 0', 'op2e 0'] + _SHOW + ['op63 -> BACK'],
     'click': ['op00 M', 'op09 178', 'op09 180', 'op0f 368', 'op65 HIT', 'op09 180', 'op09 0', 'op65 IN', 'op06 178',
-              'op0f 2704', 'op03 13', 'op21 14', 'op1e 1', 'op1b 0', 'op50 0', 'op51 0', 'op64 -> SKIP',
+              'op0f 2704', 'op03 13', 'op21 14', 'op1b 0', 'op50 0', 'op51 0', 'op64 -> SKIP',
               'op63 -> +0x188f8', 'op63 -> BACK'],
 }
 
@@ -482,10 +535,14 @@ def verify(rb, ra, names=('BEFORE', 'AFTER')):
             if st['slot7'] != 'f15': bad.append('slot 7 sites: %s, expected f15' % st['slot7'])
             if st['lock14_base'] != 0: bad.append('func 19 stores %s in m0xa90[13], expected 0' % st['lock14_base'])
             if not st['place14_pc']: bad.append('func 29 case 14 still gated')
-            if (st['icon14'], st['text14']) != (D4['new'], D5['new']): bad.append('icon / text %s' % ((st['icon14'], st['text14']),))
+            if (st['icon14'], st['text14'], st['bg14']) != (D4['new'], D5['new'], D6['new']):
+                bad.append('icon / text / background %s' % ((st['icon14'], st['text14'], st['bg14']),))
             if not st['quit_click']: bad.append('no click block to the quit fall-through')
             rows, probs = decode_blocks(sa, info)
             bad += probs
+            shape = shape_gate(sb, sa, info)
+            bad += shape
+            rep['shape_gate'] = dict(blocks=len(info['blocks']), unknown_sequences=len(shape))
             dec = {}
             for key, b, res in rows:
                 st_ = next(x for x in SITES if x['key'] == key)
