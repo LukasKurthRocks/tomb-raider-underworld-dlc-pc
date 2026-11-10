@@ -2712,6 +2712,51 @@ def check_02214():
                      '+0x100 only'
 
 
+def check_02215():
+    """0.22.15: aim.trace / aim.why read the lock-on path only - 20 byte checks (kAmChecks) behind AmCheck (which also
+    needs the ring.bits and chart checks), no write into game memory and no game call in the section, the TruAim.log
+    header has as many columns as AmBody writes, both items in kOpts, bar rows on page Tests next to ring.bits, AmTick
+    once per game frame"""
+    problems = []
+    src = read_cpp()
+    a, b = src.find('// ---- 0.22.15 aim.trace / aim.why'), src.find('\nvoid ValFt(')
+    sec = src[a:b] if 0 <= a < b else ''
+    if not sec:
+        return ['TruMenu.cpp: section "0.22.15 aim.trace / aim.why" missing (before ValFt)'], ''
+    tab = sec[sec.find('const DvCheck kAmChecks[] = {'):]
+    tab = tab[:tab.find('\n};')]
+    n_checks = len(re.findall(r'\{0x[0-9a-f]{8}, "', tab))
+    if n_checks != 20:
+        problems.append('TruMenu.cpp: kAmChecks must hold 20 byte checks (has %d)' % n_checks)
+    for want in ('{0x006f2800, "53 8b1d58dbfa00 8b8300050000 56 8bb034010000 83fe0c"}',
+                 '{0x007216b0, "83ec08 55 8be9 f785fc01000000000400"}', '{0x0071d97d, "898f90000000"}',
+                 'g_amOk = RgCheck() && CtCheck() && DvChecks(kAmChecks'):
+        if want not in sec:
+            problems.append('TruMenu.cpp: 0.22.15 section must hold %s' % want)
+    code = re.sub(r'//[^\n]*', '', sec)
+    for bad in ('WriteDword(', 'WriteBytes(', 'WriteByte(', 'VirtualProtect(', '__asm', 'Fn>(0x00'):
+        if bad in code:
+            problems.append('TruMenu.cpp: the 0.22.15 section must stay read only (found %s)' % bad)
+    hdr = re.search(r'kAmHeader = ((?:"[^"]*"\s*)+);', sec)
+    cols = ''.join(re.findall(r'"([^"]*)"', hdr.group(1))).replace('\\t', '\t').replace('\\n', '').split('\t') if hdr else []
+    body = fn_body(src, 'void AmBody(')
+    fmt = re.search(r'Out\(o, n, ((?:"[^"]*"\s*)+),', body)
+    nfmt = len(re.findall(r'%[-0-9.]*l?[dusxf]', ''.join(re.findall(r'"([^"]*)"', fmt.group(1))))) if fmt else -1
+    # the line = host_time + AmBody's fields; the four bucket counts %lu/%lu/%lu/%lu are one column (t0_buckets)
+    if not cols or len(cols) - 1 != nfmt - 3:
+        problems.append('TruMenu.cpp: TruAim.log header has %d columns, AmBody writes %d' % (len(cols), nfmt - 3 + 1))
+    for item in ('{"aim.trace", "bool",', '{"aim.why", "info",'):
+        if item not in src:
+            problems.append('TruMenu.cpp: kOpts needs %s' % item)
+    rows = src.find('"ring.bits", "", kQbInfo')
+    if rows < 0 or src.find('"aim.trace", "", kQbBool', rows) < 0 or src.find('"aim.why", "", kQbInfo', rows) < 0:
+        problems.append('TruMenu.cpp: bar rows aim.trace (bool) / aim.why (info) must follow ring.bits on page Tests')
+    if 'AmTick();' not in fn_body(src, 'DWORD WINAPI PadHook('):
+        problems.append('TruMenu.cpp: AmTick must run once per game frame (PadHook)')
+    return problems, '%d byte checks, read only, %d TruAim.log columns, items + bar rows, AmTick per frame' % (
+        n_checks, len(cols))
+
+
 def table(src):
     block = src[src.index('const OptDef kOpts[] = {'):]
     block = block[:block.index('\n};')]
@@ -2841,6 +2886,10 @@ def main(argv):
     for p in cproblems14: print('Q02214 %s' % p)
     if not cproblems14: print('ok: 0.22.14 %s' % csummary14)
     problems += cproblems14
+    cproblems15, csummary15 = check_02215()   # 0.22.15
+    for p in cproblems15: print('Q02215 %s' % p)
+    if not cproblems15: print('ok: 0.22.15 %s' % csummary15)
+    problems += cproblems15
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

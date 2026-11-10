@@ -3231,6 +3231,67 @@ def check_sublang():
     return ok
 
 
+AW = ['ok', 'nodata', 'noenemy', 'noweapon', 'weaponblocks', 'gamegate', 'noinput', 'nobit18', 'bit11', 'nolockbits',
+      'scripted', 'notargeter', 'nocand', 'notcand', 'rejected', 'bucket', 'othertarget']   # the kAw* enum order
+
+
+def am_why(s):                                  # AmRead: the first blocking step of the lock-on path (0.22.15)
+    held = s.get('padOk', True) and bool(s.get('pad630', 0) & 4)
+    pressed = s.get('padOk', True) and bool(s.get('pad690', 0) & 4)
+    timers = s.get('t588', 0.0) > 0.0 or s.get('t58c', 0.0) > 0.0 or s.get('t798', 0.0) != 0.0   # 0x72180f..0x721836
+    w = s.get('w', 0)
+    lock = ((w >> 9) & 3) != 0
+    near, where = s.get('near', 1), s.get('where', -1)
+    if not near: return 'noenemy'
+    if where == 0x30 and lock: return 'ok'
+    if s.get('t788', 0.0) > 0.0: return 'scripted'
+    wpn = s.get('wpn', 0)
+    if wpn == -1: return 'noweapon'
+    if wpn in (7, 12): return 'weaponblocks'
+    if not lock and (s.get('e6', 1) == 0 or (s.get('g144', 0) & 1) or s.get('g143', 0) == 4): return 'gamegate'
+    if not lock and not held and not pressed and not timers: return 'noinput'
+    if not (w >> 18) & 1: return 'nobit18'
+    if (w >> 11) & 1: return 'bit11'
+    if not lock: return 'nolockbits'
+    if not s.get('t0', True): return 'notargeter'
+    if not s.get('ncand', 0): return 'nocand'
+    if where == -1: return 'notcand'
+    if where == 0x20: return 'rejected'
+    if s.get('target', 0) and s.get('target', 0) != near: return 'othertarget'
+    return 'bucket'
+
+
+def check_aimwhy():
+    """0.22.15 aim.why: the order of AmRead's tests (model of the C++ chain; the 10.11. live case first)"""
+    ok = True
+    b18_19 = (1 << 18) | (1 << 19)
+    live = 0x065f8010                           # TruFight.log 13:30-13:31: bits 18 / 19 / 20 set, 9 / 10 / 11 clear
+    cases = [
+        ('bits as live 10.11. (18 / 19 set, 9 / 10 clear), no pad bit 2, timers 0', dict(w=live, wpn=0, pad630=0, ncand=1, where=0x10), 'noinput'),
+        ('pad bit 2 held, no lock bits yet (one frame before 0x7216b0)', dict(w=live, wpn=0, pad630=4, t588=3.0), 'nolockbits'),
+        ('held, but chart bit 18 clear', dict(w=0, wpn=0, pad630=4), 'nobit18'),
+        ('no weapon', dict(w=live, wpn=-1, pad630=4), 'noweapon'),
+        ('weapon kind 12', dict(w=live, wpn=12, pad630=4), 'weaponblocks'),
+        ('menu bit 0xe7f144', dict(w=live, wpn=0, g144=1, pad630=4), 'gamegate'),
+        ('byte 0x8ab4e6 = 0', dict(w=live, wpn=0, e6=0, pad630=4), 'gamegate'),
+        ('scripted target P+0x788', dict(w=live, wpn=0, t788=2.0), 'scripted'),
+        ('bit 11 with input', dict(w=b18_19 | (1 << 11), wpn=0, pad630=4), 'bit11'),
+        ('lock (bit 10), nearest rejected', dict(w=b18_19 | (1 << 10), wpn=0, ncand=2, where=0x20), 'rejected'),
+        ('lock, nearest not offered', dict(w=b18_19 | (1 << 10), wpn=0, ncand=1, where=-1), 'notcand'),
+        ('lock, no candidates', dict(w=b18_19 | (1 << 10), wpn=0, ncand=0), 'nocand'),
+        ('lock, other target', dict(w=b18_19 | (1 << 10), wpn=0, ncand=2, where=0x10, target=2), 'othertarget'),
+        ('soft lock (bit 9), nearest = target', dict(w=b18_19 | (1 << 9), wpn=0, ncand=1, where=0x30, target=1), 'ok'),
+        ('locked target wins over a game gate', dict(w=b18_19 | (1 << 10), wpn=0, e6=0, where=0x30, target=1), 'ok'),
+        ('no enemy', dict(near=0, w=live), 'noenemy'),
+    ]
+    for name, s, want in cases:
+        got = am_why(s)
+        good = got == want and got in AW
+        ok &= good
+        print('aimwhy: %s: %s  %s' % (name, got, 'ok' if good else 'FAIL (want %s)' % want))
+    return ok
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -3250,7 +3311,8 @@ def main():
                check_chapters(), check_shlive(),
                check_qcdanger(), check_qcarm(), check_favargs(rng), check_sgcover(), check_qcsuggest(),   # 0.21.8
                check_cinepad(),                                                       # 0.22.13
-               check_sublang()]                                                       # 0.22.14
+               check_sublang(),                                                       # 0.22.14
+               check_aimwhy()]                                                        # 0.22.15
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

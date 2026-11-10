@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input pad word +0x630 / +0x690 bit 2, game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 20 byte checks); " "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -1078,6 +1078,7 @@ void RunPending();     // items section below
 void AwTick();         // 0.22.9 ai.why / combo.trace, section "0.22.9 enemy diagnosis"
 void CtTick();
 void FtTick();         // 0.22.11 fight.trace / enemy.panel sampling (game thread, section "0.22.11 fight.trace")
+void AmTick();         // 0.22.15 aim.trace sampling (game thread, section "0.22.15 aim.trace")
 void DrawEnemyPanel(); // 0.22.11 enemy.panel (render thread, Present)
 extern volatile LONG g_epOn;   // 0.22.11 enemy.panel on
 bool InLevel();
@@ -1420,6 +1421,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         AwTick();                            // 0.22.9 ai.why: places the coordinator counter once (cheap after that)
         CtTick();                             // 0.22.9 combo.trace (cheap while off: one flag)
         FtTick();                             // 0.22.11 fight.trace / enemy.panel (cheap while off: two flags)
+        AmTick();                             // 0.22.15 aim.trace (cheap while off: one flag)
         LxTick();                             // 0.22.2 light.frame (cheap while idle: two flags)
         LsTick();                             // 0.22.3 light.stable (cheap while off: two flags)
         LcTick();                             // 0.22.10 light cut diagnosis / stablecut (cheap while off: four flags)
@@ -18023,6 +18025,387 @@ void FtTick() {
     g_ftCamMode = w.camMode;
     if (w.camOk) memcpy(g_ftCamLast, w.cam, sizeof(g_ftCamLast));
 }
+// ---- 0.22.15 aim.trace / aim.why (K-5 live 2026-11-10 13:30: LT held on an attacking yeti, Lara drew the pistol, but
+// her chart record never reached 718 and CM+0x1fc bits 9 / 10 stayed 0 - no lock target at all). The lock-on path in
+// tru.exe (static, workspace docs\Befund-Zielerfassung-1011.md, ENGINE.md "Lock-on path"):
+//   1. aim input: pad action word [[[0xa02b68]+0x18]+0] +0x630 bit 2 (held) / +0x690 bit 2 (pressed), read by the
+//      condition-506 predicate 0x6f2800 (ecx = CM) and the lock update 0x7216b0; gates byte 0x8ab4e6 != 0,
+//      [0xe7f144] bit 0 clear, byte [0xe7f143] != 4; weapon slot [[P+0x500]+0x134] (-1 none, 7 / 12 block, 3 / 4 always);
+//   2. chart: condition 506 (handler 0x763c50 -> 0x6f2800) takes record 38 -> 709 ({500,506,1} {500,504,0}), 709 ->
+//      714 ({400,401,401}), 716 -> 718 ({400,403,415} {500,525,0} {2100,2102,3,NOT}); record 710 (parent of the aim
+//      records) runs activities 1001 / 1003 / 1004 = CM+0x1fc bits 19 / 18 / 20 (switch 0x767ae3);
+//   3. CombatManager::Update 0x7227d0 -> lock update 0x7216b0: bit 18 clear -> lock off 0x71ef60; bit 11 -> nothing;
+//      aim timers P+0x58c (pressed, tuning byte +0x294) / P+0x588 (held, tuning byte +0x27c) not > 0, P+0x798 == 0
+//      and bit 21 clear -> off; else bit 19 -> lock 0x71edf0 (bit 10, targeter 0 parameters = chart parameter 0x3f6 or
+//      [0xfad764]+0x488 via 0x713540, select 0x716590 + set 0x716730) or soft lock 0x71ec50 (bit 9);
+//   4. target = P+0x540 while P+0x788 > 0 (scripted) else targeter 0's +0x90 node (0x71d0c0 -> 0x719f00) - the ring
+//      chain 0x71e710 reads it (ring.bits).
+// Targeter layout as TruShadowCombat 0.5.2 checks it (ctor 0x71d900): +0 index, +8 flags, +0xc candidates, +0x34
+// parameters {flags, groups, group pointers}, +0x38 buckets (0x14 each: +0 head, +8 count), +0x3c rejected list (+0x44
+// count), +0x90 target node; node +4 next, +8 handle {instance, stamp = instance +0x44}. A candidate in bucket g passed
+// eligibility 0x6ecca0 and filter group g (0x712090: distance / angle records); in the rejected list it failed
+// eligibility or every filter group (which one is not read here - TruShadowCombat's WHY does that for targeter 9 only).
+// Read only: no game function is called, every pointer is checked, the code facts are byte-checked once (kAmChecks).
+// aim.trace 1|0 writes one TSV line per change into TruAim.log next to TruMenu.log (header at every open).
+const DvCheck kAmChecks[] = {
+    {0x006f2800, "53 8b1d58dbfa00 8b8300050000 56 8bb034010000 83fe0c"},                  // 506: weapon [[P+0x500]+0x134]
+    {0x006f2862, "d9ee d89b88050000"},                                                    // 506: held timer P+0x588
+    {0x006f2871, "803de6b48a0000 7437 f60544f1e70001 752e 803d43f1e70004 7425 a1682ba000 8b4818 8b11 8b8230060000 2404"},
+    {0x007216b0, "83ec08 55 8be9 f785fc01000000000400"},                                  // lock update: bit 18
+    {0x007216ed, "a1682ba000 8b5018 8b02 8b9090060000 22d1"},                             // pad +0x690 (pressed)
+    {0x00721801, "f7c200080000"},                                                         // bit 11
+    {0x00721811, "d8918c050000 dfe0 f6c405 7b30 d89188050000"},                           // timers P+0x58c / P+0x588
+    {0x0072182b, "d89198070000"},                                                         // timer P+0x798
+    {0x00721899, "f7c200000800 74d9 8bcd ddd8 5d 83c408 e942d5ffff"},                     // bit 19 -> lock 0x71edf0
+    {0x0071eec1, "81e2fffdffff 81ca00040000 8995fc010000"},                               // lock: bit 10, not 9
+    {0x0071ed22, "8b86fc010000 25fffbffff 0d00020000"},                                   // soft lock: bit 9, not 10
+    {0x0071d0c0, "d9ee 8b0d58dbfa00 d89988070000 dfe0 f6c441 7a07 8d8140050000 c3 a1acdffa00 8b08 e918ceffff"},
+    {0x0071d913, "8b4d08 890f b801000000 d3e0 33c9 3bd9 894f08 894704 894f0c 895f30 895f34 894f38 894f3c 894f40 894f44"},
+    {0x0071d97d, "898f90000000"},                                                         // targeter +0x90 target node
+    {0x00716524, "8d7e08 55 57 e8c2d4e9ff 8b4c2424 83c408 894e14"},                       // node +8 handle
+    {0x00716548, "8b4b34 85c9 7421 0fb6c0 3b4104 7419 8d1480 8b4338 8d0c90"},             // buckets 0x14, groups +4
+    {0x00716570, "8d4b3c 56 e8c767fdff 016b0c"},                                          // rejected list +0x3c
+    {0x006ecd4b, "894204 8b5104 8910 c7400400000000 83410801"},                           // list append: node +4 next
+    {0x00767afa, "84db 7419 a158dbfa00 8b8004050000 8188fc01000000000800"},               // activity 1001: bit 19
+    {0x00767b31, "84db 741a 8b1558dbfa00 8b8204050000 8188fc01000000000400"},             // activity 1003: bit 18
+};
+bool g_amChecked = false, g_amOk = false;
+char g_amWhy[80] = "not checked";
+volatile LONG g_amOn = 0, g_amRows = 0;
+HANDLE g_amFile = INVALID_HANDLE_VALUE;
+char g_amPath[MAX_PATH] = "";
+DWORD g_amLast = 0;
+char g_amKey[1400] = "";
+bool AmCheck() {
+    if (g_amChecked) return g_amOk;
+    g_amChecked = true;
+    DWORD at = 0;
+    g_amOk = RgCheck() && CtCheck() && DvChecks(kAmChecks, sizeof(kAmChecks) / sizeof(kAmChecks[0]), &at);
+    if (g_amOk) Out(g_amWhy, sizeof(g_amWhy), "ok");
+    else if (!g_rgOk) Out(g_amWhy, sizeof(g_amWhy), "ring.bits checks: %s", g_rgWhy);
+    else if (at) Out(g_amWhy, sizeof(g_amWhy), "code differs at 0x%08lx", at);
+    else Out(g_amWhy, sizeof(g_amWhy), "chart record checks (combo.trace) failed");
+    Log(g_amOk ? 1 : 0, "0.22.15: aim.trace / aim.why %s (%d checks)", g_amWhy,
+        static_cast<int>(sizeof(kAmChecks) / sizeof(kAmChecks[0])));
+    return g_amOk;
+}
+const int kAmMaxCand = 12;
+struct AmCand { DWORD inst; int where; float dist, ang; char name[40]; LONG intro; };   // where: 0x10+g bucket, 0x20 rejected
+struct AmState {
+    bool ok, padOk, t0Ok;
+    DWORD tracker, cm, w, pad630, pad690, t0, t0Flags, t0Node, t0Target, t0Cand, t0Params, t0PFlags, t0Groups, t0Rej;
+    DWORD bucket[4];
+    BYTE gateE6, gate144, gate143;
+    LONG wpn134, wpn138;
+    float t588, t58c, t798, t788;
+    int rec0, rec1, nCand;
+    bool truncated;
+    AmCand cand[kAmMaxCand];
+    DWORD nearInst;                           // nearest AI enemy within 6000 units (AdCandidate), 0 = none
+    float nearDist;
+    char nearName[40];
+    LONG nearIntro;
+    int nearWhere;                            // -1 = not a candidate of targeter 0, 0x10+g, 0x20, 0x30 = the target
+    int why;                                  // AmWhyText
+};
+DWORD AmHandleInst(DWORD node) {               // node +8 {instance, stamp}: the instance when its +0x44 still matches
+    DWORD inst = 0, stamp = 0, cur = 0;
+    if (!ReadDword(node + 8, &inst) || !inst || !ReadDword(node + 12, &stamp) || !ReadDword(inst + 0x44, &cur) ||
+        cur != stamp)
+        return 0;
+    return inst;
+}
+void AmName(DWORD inst, char *o, size_t n, LONG *intro) {
+    DWORD object = 0, oid = 0, in = 0;
+    Out(o, n, "?");
+    if (ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid)) ObjectName(static_cast<int>(oid & 0xffff), o, n);
+    *intro = ReadDword(inst + 0x58, &in) ? static_cast<LONG>(in) : -1;
+}
+// angle in degrees between the camera's view (camera -> Lara, x / y) and Lara -> instance; -1 = unknown
+float AmAngle(const FtWorld &w, const float *p) {
+    if (!w.camOk) return -1.0f;
+    const float vx = w.pos[0] - w.cam[0], vy = w.pos[1] - w.cam[1], ex = p[0] - w.pos[0], ey = p[1] - w.pos[1];
+    const float lv = sqrtf(vx * vx + vy * vy), le = sqrtf(ex * ex + ey * ey);
+    if (lv < 1.0f || le < 1.0f) return -1.0f;
+    float c = (vx * ex + vy * ey) / (lv * le);
+    if (c > 1.0f) c = 1.0f;
+    if (c < -1.0f) c = -1.0f;
+    return acosf(c) * 57.29578f;
+}
+void AmList(AmState &s, const FtWorld &w, DWORD head, int where) {
+    DWORD node = head;
+    for (int guard = 0; node && guard < 256; ++guard) {
+        if (s.nCand >= kAmMaxCand) { s.truncated = true; return; }
+        AmCand &c = s.cand[s.nCand++];
+        memset(&c, 0, sizeof(c));
+        c.where = where;
+        c.dist = c.ang = -1.0f;
+        c.inst = AmHandleInst(node);
+        float p[3];
+        if (c.inst) {
+            AmName(c.inst, c.name, sizeof(c.name), &c.intro);
+            if (w.lara && ReadFloats(c.inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+                const float dx = p[0] - w.pos[0], dy = p[1] - w.pos[1], dz = p[2] - w.pos[2];
+                c.dist = sqrtf(dx * dx + dy * dy + dz * dz);
+                c.ang = AmAngle(w, p);
+            }
+        } else {
+            Out(c.name, sizeof(c.name), "(stale handle)");
+            c.intro = -1;
+        }
+        if (!ReadDword(node + 4, &node)) return;
+    }
+}
+// why codes, first blocking step of the path above (aim.why, TruAim.log column why)
+enum {
+    kAwOk = 0, kAwNoData, kAwNoEnemy, kAwNoWeapon, kAwWeaponBlocks, kAwGameGate, kAwNoInput, kAwNoBit18, kAwBit11,
+    kAwNoLockBits, kAwScripted, kAwNoTargeter, kAwNoCand, kAwNotCand, kAwRejected, kAwBucket, kAwOtherTarget
+};
+const char *AmWhyText(int why, bool de) {
+    switch (why) {
+    case kAwOk: return de ? "Ziel erfasst: der n\303\244chste Gegner ist das Ziel von Zielsucher 0" : "locked: the nearest enemy is targeter 0's target";
+    case kAwNoData: return de ? "keine Daten (kein Spieler / Kampf-Manager oder Pr\303\274fung fehlgeschlagen)" : "no data (no player / combat manager or checks failed)";
+    case kAwNoEnemy: return de ? "kein KI-Gegner innerhalb 6000 Einheiten" : "no AI enemy within 6000 units";
+    case kAwNoWeapon: return de ? "Lara hat keine Waffe in der Hand (Waffenplatz -1): Bedingung 506 ist falsch" : "Lara holds no weapon (weapon slot -1): condition 506 is false";
+    case kAwWeaponBlocks: return de ? "Waffenart 7 / 12 sperrt das Zielen (Bedingung 506 falsch)" : "weapon kind 7 / 12 blocks aiming (condition 506 false)";
+    case kAwGameGate: return de ? "Spiel sperrt das Zielen (Byte 0x8ab4e6 = 0, Men\303\274-Bit 0xe7f144 oder Zustand 0xe7f143 = 4)" : "the game blocks aiming (byte 0x8ab4e6 = 0, menu bit 0xe7f144 or state 0xe7f143 = 4)";
+    case kAwNoInput: return de ? "Spiel sieht die Ziel-Taste nicht (Pad-Wort +0x630 / +0x690 Bit 2 = 0, Zeiten 0)" : "the game does not see the aim button (pad word +0x630 / +0x690 bit 2 = 0, timers 0)";
+    case kAwNoBit18: return de ? "Diagramm erlaubt kein Zielen (CM+0x1fc Bit 18 = 0: Aktivit\303\244t 1003 nicht aktiv)" : "the chart does not allow aiming (CM+0x1fc bit 18 = 0: activity 1003 not active)";
+    case kAwBit11: return de ? "Bit 11 gesetzt: die Lock-Aktualisierung 0x7216b0 tut nichts" : "bit 11 set: the lock update 0x7216b0 does nothing";
+    case kAwNoLockBits: return de ? "Eingabe gesehen, aber kein Lock-Modus (Bits 9 / 10 = 0)" : "input seen but no lock mode (bits 9 / 10 = 0)";
+    case kAwScripted: return de ? "Skript-Ziel aktiv (P+0x788 > 0: Ziel = P+0x540, nicht Zielsucher 0)" : "scripted target (P+0x788 > 0: target = P+0x540, not targeter 0)";
+    case kAwNoTargeter: return de ? "Zielsucher 0 fehlt ([0xfadfac])" : "targeter 0 missing ([0xfadfac])";
+    case kAwNoCand: return de ? "Zielsucher 0 hat keine Kandidaten" : "targeter 0 has no candidates";
+    case kAwNotCand: return de ? "der n\303\244chste Gegner ist kein Kandidat von Zielsucher 0 (nicht angeboten)" : "the nearest enemy is not a candidate of targeter 0 (not offered)";
+    case kAwRejected: return de ? "abgelehnt von Zielsucher 0 (Eignung 0x6ecca0 oder Abstand / Winkel 0x712090)" : "rejected by targeter 0 (eligibility 0x6ecca0 or distance / angle 0x712090)";
+    case kAwBucket: return de ? "in einer Filtergruppe von Zielsucher 0, aber kein Ziel gew\303\244hlt (Lock aus oder Sichttest)" : "in a filter group of targeter 0 but no target chosen (lock off or sight test)";
+    case kAwOtherTarget: return de ? "Zielsucher 0 hat ein anderes Ziel" : "targeter 0 has another target";
+    }
+    return "?";
+}
+void AmRead(AmState &s, const FtWorld &w, DWORD player) {
+    memset(&s, 0, sizeof(s));
+    s.wpn134 = s.wpn138 = -2;
+    s.rec0 = w.rec0;
+    s.rec1 = w.rec1;
+    s.nearWhere = -1;
+    s.why = kAwNoData;
+    if (!AmCheck() || !ReadDword(0x00fadb58, &s.tracker) || !s.tracker || !ReadDword(s.tracker + 0x504, &s.cm) || !s.cm ||
+        !ReadDword(s.cm + 0x1fc, &s.w))
+        return;
+    s.ok = true;
+    DWORD inv = 0, a = 0, b = 0, c = 0;
+    if (ReadDword(s.tracker + 0x500, &inv) && inv) {
+        ReadDword(inv + 0x134, reinterpret_cast<DWORD *>(&s.wpn134));
+        ReadDword(inv + 0x138, reinterpret_cast<DWORD *>(&s.wpn138));
+    }
+    ReadFloats(s.tracker + 0x588, &s.t588, 1);
+    ReadFloats(s.tracker + 0x58c, &s.t58c, 1);
+    ReadFloats(s.tracker + 0x798, &s.t798, 1);
+    ReadFloats(s.tracker + 0x788, &s.t788, 1);
+    ReadByte(0x008ab4e6, &s.gateE6);
+    ReadByte(0x00e7f144, &s.gate144);
+    ReadByte(0x00e7f143, &s.gate143);
+    s.padOk = ReadDword(0x00a02b68, &a) && a && ReadDword(a + 0x18, &b) && b && ReadDword(b, &c) && c &&
+              ReadDword(c + 0x630, &s.pad630) && ReadDword(c + 0x690, &s.pad690);
+    DWORD list = 0;
+    s.t0Ok = ReadDword(0x00fadfac, &list) && list && ReadDword(list, &s.t0) && s.t0;
+    if (s.t0Ok) {
+        ReadDword(s.t0 + 8, &s.t0Flags);
+        ReadDword(s.t0 + 0xc, &s.t0Cand);
+        ReadDword(s.t0 + 0x90, &s.t0Node);
+        ReadDword(s.t0 + 0x44, &s.t0Rej);
+        if (s.t0Node) s.t0Target = AmHandleInst(s.t0Node);
+        if (ReadDword(s.t0 + 0x34, &s.t0Params) && s.t0Params) {
+            ReadDword(s.t0Params, &s.t0PFlags);
+            ReadDword(s.t0Params + 4, &s.t0Groups);
+        }
+        DWORD buckets = 0, head = 0;
+        if (ReadDword(s.t0 + 0x38, &buckets) && buckets)
+            for (DWORD g = 0; g < s.t0Groups && g < 4; ++g) {
+                ReadDword(buckets + g * 0x14 + 8, &s.bucket[g]);
+                if (ReadDword(buckets + g * 0x14, &head) && head) AmList(s, w, head, 0x10 + static_cast<int>(g));
+            }
+        if (ReadDword(s.t0 + 0x3c, &head) && head) AmList(s, w, head, 0x20);
+    }
+    // nearest AI enemy within 6000 units (the fight.trace rule)
+    DWORD inst = 0;
+    ReadDword(kFirstInstance, &inst);
+    s.nearDist = 6000.0f;
+    for (int guard = 0; inst && w.lara && guard < 4096; ++guard) {
+        DWORD next = 0, brain = 0;
+        if (!ReadDword(inst + 8, &next)) break;
+        float p[3];
+        if (AdCandidate(inst, player, &brain) && ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3)) {
+            const float dx = p[0] - w.pos[0], dy = p[1] - w.pos[1], dz = p[2] - w.pos[2];
+            const float d = sqrtf(dx * dx + dy * dy + dz * dz);
+            if (d < s.nearDist) { s.nearDist = d; s.nearInst = inst; }
+        }
+        inst = next;
+    }
+    if (s.nearInst) {
+        AmName(s.nearInst, s.nearName, sizeof(s.nearName), &s.nearIntro);
+        if (s.nearInst == s.t0Target) s.nearWhere = 0x30;
+        else
+            for (int i = 0; i < s.nCand; ++i)
+                if (s.cand[i].inst == s.nearInst) { s.nearWhere = s.cand[i].where; break; }
+    }
+    // the first blocking step (path in the section comment)
+    const bool held = s.padOk && (s.pad630 & 4), pressed = s.padOk && (s.pad690 & 4);
+    const bool timers = s.t588 > 0.0f || s.t58c > 0.0f || s.t798 != 0.0f;   // the tests of 0x72180f..0x721836
+    const bool lock = ((s.w >> 9) & 3) != 0;
+    if (!s.nearInst) s.why = kAwNoEnemy;
+    else if (s.nearWhere == 0x30 && lock) s.why = kAwOk;
+    else if (s.t788 > 0.0f) s.why = kAwScripted;
+    else if (s.wpn134 == -1) s.why = kAwNoWeapon;
+    else if (s.wpn134 == 7 || s.wpn134 == 12) s.why = kAwWeaponBlocks;
+    else if (!lock && (s.gateE6 == 0 || (s.gate144 & 1) || s.gate143 == 4)) s.why = kAwGameGate;
+    else if (!lock && !held && !pressed && !timers) s.why = kAwNoInput;
+    else if (!((s.w >> 18) & 1)) s.why = kAwNoBit18;
+    else if ((s.w >> 11) & 1) s.why = kAwBit11;
+    else if (!lock) s.why = kAwNoLockBits;
+    else if (!s.t0Ok) s.why = kAwNoTargeter;
+    else if (!s.nCand) s.why = kAwNoCand;
+    else if (s.nearWhere == -1) s.why = kAwNotCand;
+    else if (s.nearWhere == 0x20) s.why = kAwRejected;
+    else if (s.t0Target && s.t0Target != s.nearInst) s.why = kAwOtherTarget;
+    else s.why = kAwBucket;
+}
+const char *AmWhere(int where, char *buf, size_t n) {
+    if (where == 0x30) Out(buf, n, "TARGET");
+    else if (where == 0x20) Out(buf, n, "rejected");
+    else if (where >= 0x10 && where < 0x20) Out(buf, n, "group%d", where - 0x10);
+    else Out(buf, n, "not-listed");
+    return buf;
+}
+const char *const kAmHeader = "host_time\taim_held\taim_pressed\tpad630\tpad690\tgate_8ab4e6\tgate_e7f144\tgate_e7f143\t"
+                              "weapon134\tweapon138\tt588_held\tt58c_pressed\tt798\tt788_script\tcm1fc\tb9\tb10\tb11\tb18\t"
+                              "b19\tb20\tb21\tlara_rec0\tlara_rec1\tt0_flags\tt0_target\tt0_cand\tt0_buckets\tt0_rejected\t"
+                              "t0_params\tt0_pflags\tt0_groups\tcandidates\tnearest\tnear_dist\tnear_where\twhy\twhy_text\n";
+bool AmOpen() {
+    if (g_amFile != INVALID_HANDLE_VALUE) return true;
+    if (!g_logPath[0]) return false;
+    strncpy_s(g_amPath, sizeof(g_amPath), g_logPath, _TRUNCATE);
+    char *slash = strrchr(g_amPath, '\\');
+    if (slash) slash[1] = 0;
+    else g_amPath[0] = 0;
+    strncat_s(g_amPath, sizeof(g_amPath), "TruAim.log", _TRUNCATE);
+    g_amFile = CreateFileA(g_amPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                           OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (g_amFile == INVALID_HANDLE_VALUE) return false;
+    DWORD wr = 0;
+    WriteFile(g_amFile, kAmHeader, static_cast<DWORD>(strlen(kAmHeader)), &wr, nullptr);
+    return true;
+}
+void AmClose() {
+    if (g_amFile != INVALID_HANDLE_VALUE) CloseHandle(g_amFile);
+    g_amFile = INVALID_HANDLE_VALUE;
+}
+// the values of one line without the time; exact = timers / distances as written, else coarse (the change key)
+void AmBody(const AmState &s, char *o, size_t n, bool exact) {
+    char cands[640] = "", nearTxt[96] = "-", tgt[64] = "-", wh[16];
+    size_t used = 0;
+    for (int i = 0; i < s.nCand; ++i) {
+        const AmCand &c = s.cand[i];
+        const float d = exact ? c.dist : floorf(c.dist / 100.0f) * 100.0f, a = exact ? c.ang : floorf(c.ang / 10.0f) * 10.0f;
+        LabelAdd(cands, sizeof(cands), &used, "%s%s#%ld@%.0f/%.0fdeg:%s", i ? " " : "", c.name, c.intro,
+                 static_cast<double>(d), static_cast<double>(a), AmWhere(c.inst == s.t0Target && c.inst ? 0x30 : c.where, wh, sizeof(wh)));
+    }
+    if (s.truncated) LabelAdd(cands, sizeof(cands), &used, " +more");
+    if (!used) Out(cands, sizeof(cands), "-");
+    if (s.t0Target) {
+        LONG in = -1;
+        char nm[40];
+        AmName(s.t0Target, nm, sizeof(nm), &in);
+        Out(tgt, sizeof(tgt), "%s#%ld", nm, in);
+    } else if (s.t0Node) Out(tgt, sizeof(tgt), "(stale node 0x%08lx)", s.t0Node);
+    if (s.nearInst) Out(nearTxt, sizeof(nearTxt), "%s#%ld", s.nearName, s.nearIntro);
+    const float nd = exact ? s.nearDist : floorf(s.nearDist / 100.0f) * 100.0f;
+    char t[4][16];
+    const float tv[4] = {s.t588, s.t58c, s.t798, s.t788};
+    for (int k = 0; k < 4; ++k) {
+        if (exact) Out(t[k], sizeof(t[k]), "%.2f", static_cast<double>(tv[k]));
+        else Out(t[k], sizeof(t[k]), "%s", tv[k] > 0.0f ? "+" : tv[k] < 0.0f ? "-" : "0");
+    }
+    Out(o, n, "%d\t%d\t0x%08lx\t0x%08lx\t%u\t%u\t%u\t%ld\t%ld\t%s\t%s\t%s\t%s\t0x%08lx\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t"
+        "0x%lx\t%s\t%lu\t%lu/%lu/%lu/%lu\t%lu\t0x%08lx\t0x%08lx\t%lu\t%s\t%s\t%.0f\t%s\t%d\t%s",
+        s.padOk ? static_cast<int>((s.pad630 >> 2) & 1) : -1, s.padOk ? static_cast<int>((s.pad690 >> 2) & 1) : -1,
+        exact ? s.pad630 : (s.pad630 & 4), exact ? s.pad690 : (s.pad690 & 4), s.gateE6, s.gate144 & 1u, s.gate143,
+        s.wpn134, s.wpn138, t[0], t[1], t[2], t[3], s.w, RgBit(s.w, 9), RgBit(s.w, 10), RgBit(s.w, 11), RgBit(s.w, 18),
+        RgBit(s.w, 19), RgBit(s.w, 20), RgBit(s.w, 21), s.rec0, s.rec1, s.t0Flags, tgt, s.t0Cand, s.bucket[0], s.bucket[1],
+        s.bucket[2], s.bucket[3], s.t0Rej, s.t0Params, s.t0PFlags, s.t0Groups, cands, nearTxt, static_cast<double>(nd),
+        s.nearInst ? AmWhere(s.nearWhere, wh, sizeof(wh)) : "-", s.why, AmWhyText(s.why, false));
+}
+// game thread, once per game frame (sampling every 100 ms) while aim.trace is on
+void AmTick() {
+    if (!g_amOn) return;
+    if (!AmCheck()) { InterlockedExchange(&g_amOn, 0); return; }
+    const DWORD now = GetTickCount();
+    if (now - g_amLast < 100) return;
+    g_amLast = now;
+    DWORD player = 0;
+    if (!ReadDword(kPlayerPtr, &player) || !player) return;
+    FtWorld w;
+    FtReadWorld(player, w);
+    AmState s;
+    AmRead(s, w, player);
+    if (!s.ok) return;
+    char key[sizeof(g_amKey)];
+    AmBody(s, key, sizeof(key), false);
+    if (strcmp(key, g_amKey) == 0) return;
+    strncpy_s(g_amKey, sizeof(g_amKey), key, _TRUNCATE);
+    if (!AmOpen()) {
+        InterlockedExchange(&g_amOn, 0);
+        Log(0, "aim.trace: cannot open %s (%lu) - off", g_amPath, GetLastError());
+        return;
+    }
+    if (InterlockedIncrement(&g_amRows) > 100000) return;
+    char body[1400], line[1500];
+    AmBody(s, body, sizeof(body), true);
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    const int len = _snprintf_s(line, sizeof(line), _TRUNCATE, "%02d:%02d:%02d.%03d\t%s\n", t.wHour, t.wMinute, t.wSecond,
+                                t.wMilliseconds, body);
+    if (len > 0) {
+        DWORD wr = 0;
+        WriteFile(g_amFile, line, static_cast<DWORD>(len), &wr, nullptr);
+    }
+}
+void ValAm(char *o, size_t n) {
+    Out(o, n, "aim.trace %d%s; %ld line(s)%s%s", g_amOn ? 1 : 0, g_amChecked && !g_amOk ? " (code differs)" : "", g_amRows,
+        g_amPath[0] ? " -> " : "", g_amPath[0] ? g_amPath : "");
+}
+bool RunAm(const char *arg, char *o, size_t n) {
+    if (!arg || !arg[0]) { ValAm(o, n); return true; }   // no argument = report only
+    const bool on = BoolArg(arg, g_amOn != 0);
+    if (on && !AmCheck()) { Out(o, n, "aim.trace: %s - off", g_amWhy); return false; }
+    g_amKey[0] = 0;
+    InterlockedExchange(&g_amOn, on ? 1 : 0);
+    if (!on) AmClose();                      // game thread (TruLink / menu items run there), like AmTick
+    Log(1, "aim.trace %d (src=%s)", on ? 1 : 0, ShotSource("aim.trace"));
+    Out(o, n, "aim.trace %d - %s", on ? 1 : 0, on ? "one TSV line per change in TruAim.log next to TruMenu.log" : "off");
+    return true;
+}
+// info item: the reason for the nearest enemy in plain words (quick bar language), then the inputs it used
+void ValAmWhy(char *o, size_t n) {
+    const bool de = g_qbLang == 0;
+    DWORD player = 0;
+    if (!AmCheck()) { Out(o, n, "%s: %s", de ? "aus" : "off", g_amWhy); return; }
+    if (!ReadDword(kPlayerPtr, &player) || !player) { Out(o, n, "%s", AmWhyText(kAwNoData, de)); return; }
+    FtWorld w;
+    FtReadWorld(player, w);
+    AmState s;
+    AmRead(s, w, player);
+    char wh[16];
+    if (!s.ok) { Out(o, n, "%s", AmWhyText(kAwNoData, de)); return; }
+    Out(o, n, "%s | %s %s %.0f (%s) | LT %d/%d, %s %ld, %s 9:%d 10:%d 11:%d 18:%d 19:%d | %s %d/%d | Z0 %lu (%lu %s)",
+        AmWhyText(s.why, de), de ? "n\303\244chster" : "nearest", s.nearInst ? s.nearName : "-",
+        static_cast<double>(s.nearInst ? s.nearDist : 0.0f), s.nearInst ? AmWhere(s.nearWhere, wh, sizeof(wh)) : "-",
+        s.padOk ? static_cast<int>((s.pad630 >> 2) & 1) : -1, s.padOk ? static_cast<int>((s.pad690 >> 2) & 1) : -1,
+        de ? "Waffe" : "weapon", s.wpn134, de ? "Bits" : "bits", RgBit(s.w, 9), RgBit(s.w, 10), RgBit(s.w, 11),
+        RgBit(s.w, 18), RgBit(s.w, 19), de ? "Datensatz" : "record", s.rec0, s.rec1, s.t0Cand, s.t0Rej,
+        de ? "abgelehnt" : "rejected");
+}
 void ValFt(char *o, size_t n) {
     Out(o, n, "fight.trace %d%s; %ld line(s)%s%s", g_ftOn ? 1 : 0, g_ftChecked && !g_ftOk ? " (code differs)" : "",
         g_ftRows, g_ftPath[0] ? " -> " : "", g_ftPath[0] ? g_ftPath : "");
@@ -25067,6 +25450,16 @@ const Item kItems[] = {
     {"ring.bits", "info", "0.22.13: the combat reticle request (K-5) - CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of "
                           "0xfae924, style 0xfae8ac, position, reticle +0x40 bits 6 / 9; read only (an info item: it never "
                           "switches anything)", false, ValRg, nullptr},
+    // 0.22.15 (section "0.22.15 aim.trace")
+    {"aim.trace", "bool", "0.22.15 1|0: lock-on trace (K-5) - one TSV line per change into TruAim.log: aim input (pad word "
+                          "+0x630 / +0x690 bit 2), game gates, weapon slot, aim timers, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / "
+                          "20 / 21, Lara's chart records, targeter 0 (flags, target, candidates by group / rejected with "
+                          "distance and angle), nearest enemy, why code; read only; no argument = report; off by default",
+     false, ValAm, RunAm},
+    {"aim.why", "info", "0.22.15: why the nearest enemy is not locked on - the first blocking step of the lock-on path "
+                        "(weapon, game gates, aim input, chart bit 18, bits 9 / 10, targeter 0 group / rejected) in plain "
+                        "words (quick bar language); read only (an info item: it never switches anything)",
+     false, ValAmWhy, nullptr},
     {"sub.lang", "action", "0.22.9 [-1|0..4|7|9..12]: subtitle language live (-1 game language, 0 en, 1 fr, 2 de, 3 it, "
                            "4 es) through the game's option setter 0x5d5100 - from the next subtitle line; 0.22.13: then "
                            "the game's settings save 0x478010 (registry), so it survives a restart; 0.22.14: the shown "
@@ -29192,6 +29585,8 @@ const QbRow kQbTests[] = {
     {"Gegneranzeige", "Enemy panel", "enemy.panel", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},   // 0.22.11
     {"Kampf-Spur (TruFight.log)", "Fight trace (TruFight.log)", "fight.trace", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},
     {"Ziel-Ring: Bits (live)", "Target ring: bits (live)", "ring.bits", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},   // 0.22.13
+    {"Ziel-Spur (TruAim.log)", "Aim trace (TruAim.log)", "aim.trace", "", kQbBool, -1, kQcNone, 0, kQbGrey, 0},   // 0.22.15
+    {"Warum kein Ziel? (live)", "Why no lock? (live)", "aim.why", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},       // 0.22.15
     {"Untertitel-Sprache zeigen", "Show subtitle language", "sub.lang", "", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.4 hall02 counter (docs\Befund-Hall02-Zaehler-Drift-0711.md, docs\Befund-Hall02-TU-Vergleich-0711.md): the
     // rescue for saves whose checkpoint 11258 holds tutorial thralls (right / X twice), the +8 values into the log
@@ -29286,6 +29681,8 @@ const QbHelp kQbHelp[] = {
     {"enemy.panel", "", "Feld rechts: LP, Zustand, Ziel, letzte Treffer|Panel right: LP, state, target, last hits"},   // 0.22.11
     {"fight.trace", "", "Kampfwerte wie TruXenia nach TruFight.log|Fight values as TruXenia to TruFight.log"},
     {"ring.bits", "", "Ziel-Ring: Kampf-Bits, HUD-Gruppe 12, Stil (nur lesen)|Target ring: combat bits, HUD group 12 (read)"},   // 0.22.13
+    {"aim.trace", "", "Zielerfassung je \303\204nderung nach TruAim.log|Lock-on path per change to TruAim.log"},   // 0.22.15
+    {"aim.why", "", "Warum kein Ziel: erster sperrender Schritt|Why no lock: the first blocking step"},          // 0.22.15
     {"sub.lang", "", "Untertitel-Sprache jetzt (sub.lang 2 = Deutsch)|Subtitle language now (sub.lang 0 = English)"},
     {"cine.mark", "", "Szenenzeit merken (Sekunden)|Remember the cutscene time (seconds)"},   // 0.22.1
     {"light.frame", "*", "Lichter je Bild in TruMenu.lightframe.txt; BLINK? = Verdacht|Lights per frame to "
