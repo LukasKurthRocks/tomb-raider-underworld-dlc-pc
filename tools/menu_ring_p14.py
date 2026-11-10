@@ -45,6 +45,15 @@ Changes (script 7 offsets of the PC script, 197 664 B; the pause-menu port only 
       1-7 and the end of the ring-in keep their timing); B1g func 2 +0x826c (OnClose) hides them; B3s func 27 +0x631c
       (end of case 7 = step 7) sets the disc's scale property explicitly (uibitmap f40 into local 0xb4 as the case
       does for 0x660, uivec3property f4 = last key of 0x92c) in case a timeline left it elsewhere.
+      Tree 7 (B3, owner's night task): the door + disc get their own ring-in animation exactly like slot 7 - three
+      timeline members cloned from slot 7's set (0xbe0 disc colour, 0x994 icon colour, 0x95c disc scale; entry,
+      start-function-info entry, init node with the shared desc and an own copy of the keys) at the next free
+      instance offsets (3205 -> 3208 / 3216 / 3224, size 3232), names = Symbols no script of the file uses as a
+      member / function / local name; members and start-function-info arrays re-homed as by
+      tools/script7_pause_port.py (old arrays stay, orphaned). B3_link (func 27 +0x631c, end of case 7) clears and
+      links them to 0x6b4 / 0x7bc with the case's own call shapes (locals 0xbc / 0xd8 / 0xc4 of case 8, same
+      userTypes); B1f (func 50 step 8) plays them (f13 / f13 / f15) and shows the two widgets instead of setting
+      the colours. `verify` adds a clone gate (template comparison of every clone, old entries unchanged).
       Every show block sets the colours the 7 ring slots get from their animation sets (resting keys, func 28 leaves
       all of them at alpha 0): disc ARGB ffc8c8c8 (set 0xbb0), icon ff3273b9 (sets 0x964 / 0x994).
   B2  func 8 +0x18f50 (where the slot-7 click test lands when slot 7 was not clicked, before the sub-ring dispatch):
@@ -97,6 +106,25 @@ REF_COLOR = (0x7294, {0x7290: 0x0f000618}, 0x65, 'func 28 +0x7290: uibitmap f18 
 REF_HIDE = (0x46e4, {0x46e0: 0x0f0006b4}, 0x65, 'func 20 +0x46e0: uibitmap f5 (hide) on 0x6b4')
 REF_F40 = (0x6304, {0x62fc: 0x090000b4, 0x6300: 0x0f000660}, 0x65, 'func 27 +0x62fc: uibitmap f40 (scale property)')
 REF_V3SET = (0x5540, {0x553c: 0x0f000a58}, 0x65, 'func 25 +0x553c: uivec3property f4 (set)')
+# func 27 case 7 (links slot 7's set) and func 50 step 7 (plays it): the call shapes of B3
+REF_TL_CLEAR = (0x623c, {0x6238: 0x0f000be0}, 0x65, 'func 27 +0x6238: uicolortimeline f12 on 0xbe0')
+REF_V3_CLEAR = (0x625c, {0x6258: 0x0f00095c}, 0x65, 'func 27 +0x6258: uivec3timeline f14 on 0x95c')
+REF_F43 = (0x6270, {0x6268: 0x09000098, 0x626c: 0x0f000660}, 0x65, 'func 27 +0x6268: uibitmap f43 of 0x660')
+REF_TL_LINK = (0x6280, {0x6278: 0x09000098, 0x627c: 0x0f000be0}, 0x65, 'func 27 +0x6278: uicolortimeline f10')
+REF_V3_LINK = (0x6314, {0x630c: 0x090000b4, 0x6310: 0x0f00095c}, 0x65, 'func 27 +0x630c: uivec3timeline f12')
+REF_TL_PLAY = (0x15164, {0x15160: 0x0f000be0}, 0x65, 'func 50 +0x15160: uicolortimeline f13 on 0xbe0')
+REF_V3_PLAY = (0x15184, {0x15180: 0x0f00095c}, 0x65, 'func 50 +0x15180: uivec3timeline f15 on 0x95c')
+
+
+def local_ut(s, fk, off):
+    """userType of the local at frame offset off of function fk (None if there is none)"""
+    f = s.arr['funcs'][0] + s.arr['funcs'][2] * fk
+    lt = s.it.get(f + 12)
+    if lt is None: return None
+    for k in range(s.w(lt - 4)):
+        e = lt + 20 * k
+        if struct.unpack_from('<H', s.d, e + 12)[0] == off: return struct.unpack_from('<H', s.d, e + 4)[0]
+    return None
 # references copied from existing code: (call word offset, expected words before / at it, what)
 REF_SHOW = (0x4668, {0x4664: 0x0f0006b4}, 0x65, 'func 20 +0x4664: uibitmap f4 (show) on background 0x6b4')
 REF_F22 = (0x106b0, {0x106ac: 0x0f0007bc}, 0x68, 'func 43 +0x106ac: func 22 (show icon) on 0x7bc')
@@ -130,14 +158,14 @@ SITES = [
     dict(key='B1e_open', func=1, site=0x43ec, marker=0x8d, back_word=0x04000001, kind='hidefree',
          note='func 1 OnOpen before the ring-in state (op7d 1): position 14 free, door + disc hidden until B1f'),
     # tree 6 (owner, 2026-11-10): the door is the 8th step of the ring-in sweep and leaves with the menu
-    dict(key='B1f_step8', func=50, site=0x151b0, marker=0x1541, back_word=0x00001542, kind='show',
+    dict(key='B1f_step8', func=50, site=0x151b0, marker=0x1541, back_word=0x00001542, kind='play',
          note='func 50 ring-in, after slot 7 and its step wait (m0xa2c * uigamedata f110): '
                                 'show door + disc with the slot colours = step 8 of the sweep, no extra wait'),
     dict(key='B1g_close', func=2, site=0x826c, marker=0x95, back_word=0x00000096, kind='hide',
          note='func 2 OnClose (both paths, the f37 jump lands here): hide door + disc'),
-    dict(key='B3s_scale', func=27, site=0x631c, marker=0x9f9, back_word=0x630003b0, kind='scale',
-         note='func 27 case 7 end (ring-in step 7): disc scale property (uibitmap f40 into local 0xb4, as the '
-              'case does for 0x660) = last key of the slot disc timeline 0x92c (uivec3property f4)'),
+    dict(key='B3_link', func=27, site=0x631c, marker=0x9f9, back_word=0x630003b0, kind='link',
+         note='func 27 case 7 end (ring-in step 7, after slot 7 is linked): clear + link the door\'s three cloned '
+              'timelines to the disc / door as the case links slot 7 (locals 0xbc / 0xd8 / 0xc4 of case 8)'),
 ]
 # colours of the 7 ring slots, from their animation sets (ring-in key at 0.18 s, tools: work/ring_p14_1011/anim_tree.py)
 ICON_RGB = (0x32 / 255.0, 0x73 / 255.0, 0xb9 / 255.0)   # icon set 0x964 / 0x994 (type 83): ARGB ff3273b9
@@ -273,6 +301,152 @@ def ref_call(s, ref):
     return ('ext',) + s.ext[a + 4]
 
 
+# B3 (tree 7): the door's own ring-in animation = clones of slot 7's three timeline members (func 27 case 7 links
+# 0xbe0 -> colour of disc 0x660, 0x994 -> colour of the slot-7 icon, 0x95c -> scale of 0x660; func 50 step 7 plays
+# them). A timeline member = 8 instance bytes, entry {tag, userType, type id (id ref 8:83 / 84), offset, name, init},
+# a start-function-info entry (type id, offset) and an init block [-> node][node: 0, flags, mode, -> desc, count,
+# -> keys, 0]; desc is shared by all members of one kind (e.g. 0x2f4b0 for every slot scale timeline), keys are
+# count x 8 (colour: time, ARGB) or count x 16 (vec3: time, x, y, z) bytes of their own.
+CLONE_FROM = ((0xbe0, 'disc colour (as slot 7 0xbe0)'), (0x994, 'door colour (as slot 7 0x994)'),
+              (0x95c, 'disc scale (as slot 7 0x95c)'))
+KEY_SIZE = {83: 8, 84: 16}
+
+
+def clone_timelines(D, s, d, r, words):
+    """append three timeline members (copies of CLONE_FROM) at the next free instance offsets: new members array
+    (old entries + 3), new start-function-info array (3 new entries first, as the pause-menu port), their init nodes
+    and key blocks; re-homes the root pointers +0x2c / +0x30, sets the instance size. Records every appended word in
+    `words`. Returns ([{off, ty, name, ...}], new instance size)"""
+    w = lambda a: struct.unpack_from('<I', s.d, a)[0]
+    size, align = struct.unpack_from('<HH', s.d, 0x1c)
+    if align != 4: raise Refuse('B3: instance align %d' % align)
+    mt, mn, msz = s.arr['members']; st_t, st_n, st_sz = s.arr['sfi']
+    if msz != 20 or st_sz != 8: raise Refuse('B3: member / sfi entry sizes %d / %d' % (msz, st_sz))
+    # nothing else may point into the arrays that get re-homed; no script may inherit from script 7
+    for i, x in enumerate(D.sections):
+        if x.type != 8 or not x.data or i == s.k: continue
+        rr = R.parse(x.reloc, 'le')
+        if 0x18 in rr.id_offsets() and struct.unpack_from('<I', x.data, 0x18)[0] == SID:
+            raise Refuse('B3: script %d inherits from script 7' % x.id)
+        for si, so, do in rr.external:
+            if si == s.k and (mt - 4 <= do < mt + mn * msz or st_t - 4 <= do < st_t + st_n * st_sz):
+                raise Refuse('B3: script %d +0x%x points into the script 7 arrays' % (x.id, so))
+    for src, tgt in s.rel.internal:
+        if (mt - 4 <= tgt < mt + mn * msz and src != 0x2c) or (st_t - 4 <= tgt < st_t + st_n * st_sz and src != 0x30):
+            raise Refuse('B3: internal pointer +0x%x -> +0x%x into the members / sfi array' % (src, tgt))
+    if s.it.get(0x2c) != mt or s.it.get(0x30) != st_t: raise Refuse('B3: root pointers +0x2c / +0x30 not the arrays')
+    # names: Symbols above every member name of script 7 that no script of the file uses as a member, function
+    # (prototype) or local name - so the clones cannot collide with any name lookup
+    used = set()
+    for x in D.sections:
+        if x.type != 8 or not x.data: continue
+        try:
+            rlx = R.parse(x.reloc, 'le'); itx = dict(rlx.internal)
+            Wx = SC.Walk(x.data, rlx, 'le').run()
+        except Exception:
+            continue
+        for name, t, n, sz in Wx.arrays:
+            if name == 'members':
+                used.update(struct.unpack_from('<H', x.data, t + sz * k + 14)[0] for k in range(n))
+            elif name == 'protos':
+                for k in range(n):
+                    used.update(struct.unpack_from('<HH', x.data, t + sz * k + 8))
+            elif name == 'funcs':
+                for k in range(n):
+                    lt = itx.get(t + sz * k + 12)
+                    if lt is None or lt < 4: continue
+                    nl = struct.unpack_from('<I', x.data, lt - 4)[0]
+                    if nl > 4096 or lt + 20 * nl > len(x.data): continue
+                    used.update(struct.unpack_from('<H', x.data, lt + 20 * j + 14)[0] for j in range(nl))
+    top = max(struct.unpack_from('<H', s.d, mt + msz * k + 14)[0] for k in range(mn))
+    names = []
+    cand = top + 1
+    while len(names) < len(CLONE_FROM):
+        if cand not in used: names.append(cand)
+        cand += 1
+    if names[-1] > max(used): raise Refuse('B3: no unused name Symbol below the highest one in use')
+    clones = []
+    nxt = (size + 3) & ~3
+    for (tmpl, what), name in zip(CLONE_FROM, names):
+        a = s.mem[tmpl]
+        ty = w(a + 8)
+        node = s.it.get(s.it.get(a + 16))
+        if ty not in KEY_SIZE or s.ids.get(a + 8) != 8 or node is None:
+            raise Refuse('B3: 0x%x is not a timeline member with an init node' % tmpl)
+        nw = [w(node + 4 * k) for k in range(7)]
+        if [k for k in range(7) if node + 4 * k in s.it] != [3, 5] or nw[6] != 0 or any(
+                node + 4 * k in s.ext or node + 4 * k in s.ids for k in range(7)):
+            raise Refuse('B3: 0x%x init node layout %s' % (tmpl, nw))
+        desc, keys, cnt = s.it[node + 12], s.it[node + 20], nw[4]
+        kb = KEY_SIZE[ty] * cnt
+        if any(keys <= q < keys + kb for q in list(s.it) + list(s.ext) + list(s.ids)):
+            raise Refuse('B3: key block of 0x%x carries relocations' % tmpl)
+        others = [e for e in range(a, a + msz, 4) if (e in s.it or e in s.ext or e in s.ids) and e not in (a + 8, a + 16)]
+        if others: raise Refuse('B3: member entry of 0x%x has more relocations %s' % (tmpl, others))
+        clones.append(dict(tmpl=tmpl, what=what, entry=a, ty=ty, off=nxt, name=name, node=node, nodew=nw,
+                           desc=desc, keys=keys, cnt=cnt, kbytes=kb))
+        nxt += 8
+    new_size = nxt
+    if new_size > 0xffff: raise Refuse('B3: instance size')
+
+    def pad():
+        while len(d) % 4: d.append(0)
+
+    def note(lo, why):
+        pad()
+        for q in range(lo - lo % 4, len(d), 4):
+            words[q] = (None, struct.unpack_from('<I', d, q)[0], why)
+
+    def dup(lo, hi, delta):
+        r.internal += [(a_ + delta, t_) for a_, t_ in list(r.internal) if lo <= a_ < hi]
+        r.external += [(si, a_ + delta, dd) for si, a_, dd in list(r.external) if lo <= a_ < hi]
+        r.idref += [(t_, a_ + delta) for t_, a_ in list(r.idref) if lo <= a_ < hi]
+        r.idref_a += [(t_, a_ + delta) for t_, a_ in list(r.idref_a) if lo <= a_ < hi]
+
+    def idkind(a_):
+        for nm in ('idref', 'idref_a'):
+            if any(o == a_ for _, o in getattr(r, nm)): return nm
+        raise Refuse('B3: no id reference at +0x%x' % a_)
+
+    def retarget(a_, t_):
+        n0 = len(r.internal)
+        r.internal = [(x, y) for x, y in r.internal if x != a_]
+        if len(r.internal) != n0 - 1: raise Refuse('B3: no internal pointer at +0x%x' % a_)
+        r.internal.append((a_, t_))
+
+    for c in clones:
+        pad(); c['kb_at'] = lo = len(d); d.extend(s.d[c['keys']:c['keys'] + c['kbytes']])
+        note(lo, 'B3 %s: key block, copy of +0x%x (%d keys)' % (c['what'], c['keys'], c['cnt']))
+        pad(); c['init'] = lo = len(d)
+        d.extend(struct.pack('<I', PH)); r.internal.append((lo, lo + 4))
+        nw = list(c['nodew']); nw[3] = PH; nw[5] = PH
+        d.extend(struct.pack('<7I', *nw))
+        r.internal += [(lo + 4 + 12, c['desc']), (lo + 4 + 20, c['kb_at'])]
+        note(lo, 'B3 %s: init [-> node][node as 0x%x, desc shared +0x%x, own keys]' % (c['what'], c['tmpl'], c['desc']))
+    # members: old entries + 3
+    pad(); lo = len(d); d.extend(struct.pack('<I', mn + len(clones))); nmt = len(d)
+    d.extend(s.d[mt:mt + msz * mn]); dup(mt, mt + msz * mn, nmt - mt)
+    for c in clones:
+        e = len(d); d.extend(s.d[c['entry']:c['entry'] + msz])
+        struct.pack_into('<HH', d, e + 12, c['off'], c['name']); struct.pack_into('<I', d, e + 16, PH)
+        getattr(r, idkind(c['entry'] + 8)).append((8, e + 8)); r.internal.append((e + 16, c['init']))
+        c['entry_new'] = e
+    note(lo, 'B3 members array: %d old entries + 3 timeline members' % mn)
+    retarget(0x2c, nmt)
+    # start-function-info: the 3 new entries first (highest offset first), then the old ones
+    tmpl_sfi = next(st_t + 8 * k for k in range(st_n) if w(st_t + 8 * k + 4) == CLONE_FROM[0][0])
+    pad(); lo = len(d); d.extend(struct.pack('<I', st_n + len(clones))); nst = len(d)
+    for c in sorted(clones, key=lambda q: -q['off']):
+        e = len(d); d.extend(struct.pack('<II', c['ty'], c['off'])); getattr(r, idkind(tmpl_sfi)).append((8, e))
+    d.extend(s.d[st_t:st_t + 8 * st_n]); dup(st_t, st_t + 8 * st_n, nst + 8 * len(clones) - st_t)
+    note(lo, 'B3 start-function-info: 3 new entries first, then %d old ones' % st_n)
+    retarget(0x30, nst)
+    old1c = w(0x1c)
+    words[0x1c] = (old1c, (old1c & 0xffff0000) | new_size, 'B3 instance size %d -> %d (3 timeline members at %s)' % (
+        size, new_size, ', '.join('0x%x' % c['off'] for c in clones)))
+    return clones, new_size
+
+
 def plan(D):
     """script 7 of D -> (new data, new Reloc, info); Refuse on any mismatch. info['words'] = {offset: (old or None,
     new, why)}, info['ext_changed'] = {src: (old (si, do), new (si, do))}, info['ext_added'] / ['int_added']"""
@@ -345,7 +519,14 @@ def plan(D):
     show = ref_call(s, REF_SHOW); f22 = ref_call(s, REF_F22); hit = ref_call(s, REF_HIT); inp = ref_call(s, REF_IN)
     colour = ref_call(s, REF_COLOR); hide = ref_call(s, REF_HIDE); f40 = ref_call(s, REF_F40)
     v3set = ref_call(s, REF_V3SET)
-    for ref, want in ((REF_HIDE, ['uibitmap', 'f5']), (REF_F40, ['uibitmap', 'f40']), (REF_V3SET, ['uivec3property', 'f4'])):
+    tl_clear = ref_call(s, REF_TL_CLEAR); v3_clear = ref_call(s, REF_V3_CLEAR); f43 = ref_call(s, REF_F43)
+    tl_link = ref_call(s, REF_TL_LINK); v3_link = ref_call(s, REF_V3_LINK)
+    tl_play = ref_call(s, REF_TL_PLAY); v3_play = ref_call(s, REF_V3_PLAY)
+    for ref, want in ((REF_HIDE, ['uibitmap', 'f5']), (REF_F40, ['uibitmap', 'f40']), (REF_V3SET, ['uivec3property', 'f4']),
+                      (REF_TL_CLEAR, ['uicolortimeline', 'f12']), (REF_V3_CLEAR, ['uivec3timeline', 'f14']),
+                      (REF_F43, ['uibitmap', 'f43']), (REF_TL_LINK, ['uicolortimeline', 'f10']),
+                      (REF_V3_LINK, ['uivec3timeline', 'f12']), (REF_TL_PLAY, ['uicolortimeline', 'f13']),
+                      (REF_V3_PLAY, ['uivec3timeline', 'f15'])):
         if s.call_name(ref[0] + 4).split()[:2] != want:
             raise Refuse('%s: %s, expected %s' % (ref[3], s.call_name(ref[0] + 4), ' '.join(want)))
     if s.proto_func(f22[1]) != 22: raise Refuse('func 43 +0x106b0 does not call func 22')
@@ -362,6 +543,8 @@ def plan(D):
     old_len = len(s.d)
     for a in range(old_len - old_len % 4, len(d), 4):
         words[a] = (None, struct.unpack_from('<I', d, a)[0], 'alignment')
+    clones, new_size = clone_timelines(D, s, d, r, words)
+    NEWBG, NEWIC, NEWSC = (c['off'] for c in clones)
     # element of the lock list: a WRITE is `0f a90; i; 21 14; 1e 1; 04 v; 2e` (func 19 / 20 / 8), a READ is
     # `0f a90; i; 21 14; 1b` (func 14 / 18) - tree 1 read with the write prefix (op1e) and crashed in the op1b handler
     lock13 = [(op(0x0f, LOCK), None, 'push member m0xa90 (lock list bool[14])'), (op(0x03, 13), None, 'index 13'),
@@ -429,17 +612,38 @@ def plan(D):
             code += hide_both
         elif st['kind'] == 'hidefree':
             code += free + hide_both
-        elif st['kind'] == 'scale':
-            expect_words(s, {0x62fc: 0x090000b4, 0x6300: 0x0f000660, 0x6304: 0x65000000, 0x630c: 0x090000b4},
-                         'B3s func 27 case 7 scale link of 0x660 via local 0xb4')
-            code += [(op(0x09, 0xb4), None, 'push &local 0xb4 (scale property handle, as func 27 +0x62fc)'),
-                     (op(0x0f, BG14), None, 'push member 0x6b4'), (op(0x65), None, 'native call'),
-                     (PH, f40, 'uibitmap f40 (scale property), as func 27 +0x6304'),
-                     (op(P.PUSHF), None, 'push float x'), (sx, None, 'x = last key of 0x92c'),
-                     (op(P.PUSHF), None, 'push float y'), (sy, None, 'y = last key of 0x92c'),
-                     (op(0x03, 0), None, 'z int 0 (key z = 0)'), (op(0x5c), None, 'int -> float'),
-                     (op(0x09, 0xb4), None, 'push &local 0xb4 (the property)'), (op(0x65), None, 'native call'),
-                     (PH, v3set, 'uivec3property f4 (set x, y, z), as func 25 +0x553c')]
+        elif st['kind'] == 'link':
+            # locals of case 8 (not used on the case-7 path), types as needed: 0xbc / 0xd8 colour property handles
+            # (userType 552, as case 7's 0x98), 0xc4 vec3 property handle (420, as case 7's 0xb4)
+            for lo_, ut_ in ((0xbc, 552), (0xd8, 552), (0xc4, 420)):
+                if local_ut(s, 27, lo_) != ut_: raise Refuse('B3: func 27 local 0x%x is not userType %d' % (lo_, ut_))
+            call = lambda what, ref: [(op(0x65), None, 'native call'), (PH, ref, what)]
+            code += ([(op(0x0f, NEWBG), None, 'push new timeline 0x%x (disc colour)' % NEWBG)] +
+                     call('uicolortimeline f12 (clear), as +0x6238', tl_clear) +
+                     [(op(0x0f, NEWIC), None, 'push new timeline 0x%x (door colour)' % NEWIC)] +
+                     call('uicolortimeline f12 (clear), as +0x6248', tl_clear) +
+                     [(op(0x0f, NEWSC), None, 'push new timeline 0x%x (disc scale)' % NEWSC)] +
+                     call('uivec3timeline f14 (clear), as +0x6258', v3_clear))
+            for loc, wid, prop, prop_ref, tl, tl_ref, why in (
+                    (0xbc, BG14, 'uibitmap f43 (colour property)', f43, NEWBG, tl_link, 'uicolortimeline f10 (link)'),
+                    (0xd8, ICON14, 'uibitmap f43 (colour property)', f43, NEWIC, tl_link, 'uicolortimeline f10 (link)'),
+                    (0xc4, BG14, 'uibitmap f40 (scale property)', f40, NEWSC, v3_link, 'uivec3timeline f12 (link)')):
+                code += ([(op(0x09, loc), None, 'push &local 0x%x' % loc), (op(0x0f, wid), None, 'push 0x%x' % wid)] +
+                         call(prop + ', as case 7 +0x626c / +0x6300', prop_ref) +
+                         [(op(0x09, loc), None, 'push &local 0x%x' % loc), (op(0x0f, tl), None, 'push 0x%x' % tl)] +
+                         call(why + ', as case 7 +0x627c / +0x6310', tl_ref))
+        elif st['kind'] == 'play':
+            # as func 50 plays slot k: colour timelines f13, scale timeline f15; then show the two widgets
+            code += [(op(0x0f, NEWBG), None, 'push 0x%x' % NEWBG), (op(0x65), None, 'native call'),
+                     (PH, tl_play, 'uicolortimeline f13 (play), as func 50 +0x15160'),
+                     (op(0x0f, NEWIC), None, 'push 0x%x' % NEWIC), (op(0x65), None, 'native call'),
+                     (PH, tl_play, 'uicolortimeline f13 (play), as func 50 +0x15170'),
+                     (op(0x0f, NEWSC), None, 'push 0x%x' % NEWSC), (op(0x65), None, 'native call'),
+                     (PH, v3_play, 'uivec3timeline f15 (play), as func 50 +0x15180'),
+                     (op(0x0f, BG14), None, 'push 0x6b4 (disc)'), (op(0x65), None, 'native call'),
+                     (PH, show, 'uibitmap f4 (show)'),
+                     (op(0x0f, ICON14), None, 'push 0x7bc (door)'), (op(0x65), None, 'native call'),
+                     (PH, show, 'uibitmap f4 (show)')]
         else:
             code += [(op(0x09, 0xb2), None, 'push &local 0xb2 (result; the slot-7 test +0x188ac uses it the same way)'),
                      (op(0x09, 0xb4), None, 'push &local 0xb4'), (op(0x0f, HIT14), None, 'push hit area 0x170 (position 14)'),
@@ -467,7 +671,7 @@ def plan(D):
         if a + 4 <= len(d): struct.pack_into('<I', d, a, new)
     r.internal += int_added; r.external += ext_added
     info = dict(words=words, ext_changed=ext_changed, ext_added=ext_added, int_added=int_added, blocks=blocks,
-                forms=forms, old_size=old_len, new_size=len(d))
+                forms=forms, old_size=old_len, new_size=len(d), clones=clones, inst_size=new_size)
     return bytes(d), r, info
 
 
@@ -486,10 +690,11 @@ def p14_full(st):
             st['text14'] == D5['new'] and st['bg14'] == D6['new'] and st['bg14_scale'] == [3.6, 3.6] and
             st['icon14_colours'] == ['00c0c0c0', 'ff606060'] and
             len(st['blocks']) == len(SITES) and
-            len(st['shows']) == sum(x['kind'] in ('show', 'refree') for x in SITES) and
+            len(st['shows']) == sum(x['kind'] in ('show', 'refree', 'play') for x in SITES) and
             len(st['hides']) == sum(x['kind'] in ('hide', 'hidefree') for x in SITES) and
             len(st['refree']) == sum(x['kind'] in ('refree', 'hidefree') for x in SITES) and
-            len(st['scale']) == sum(x['kind'] == 'scale' for x in SITES) and st['quit_click'])
+            len(st['link']) == sum(x['kind'] == 'link' for x in SITES) and
+            len(st['play']) == sum(x['kind'] == 'play' for x in SITES) and st['quit_click'])
 
 
 def trigrams(s, lo, hi):
@@ -504,6 +709,44 @@ def trigrams(s, lo, hi):
             out += [tuple(run[k:k + 3]) for k in range(len(run) - 2)]; run = []
     out += [tuple(run[k:k + 3]) for k in range(len(run) - 2)]
     return out
+
+
+def clone_gate(sb, sa, info):
+    """the cloned timeline members, decoded from AFTER alone and compared with their templates in BEFORE: member count
+    + 3, instance size, every old member entry unchanged (offset, name, type, init target), each clone = template
+    entry with its own offset / name, its init node = template node except the two pointers, desc pointer = the
+    template's, key block = a byte copy of the template's keys; start-function-info = old entries + one (type, offset)
+    per clone; no clone overlaps the old instance"""
+    probs = []
+    mb, ma = sb.arr['members'], sa.arr['members']
+    if ma[1] != mb[1] + len(info['clones']): probs.append('members %d -> %d' % (mb[1], ma[1]))
+    size_b, size_a = struct.unpack_from('<H', sb.d, 0x1c)[0], struct.unpack_from('<H', sa.d, 0x1c)[0]
+    if size_a != info['inst_size']: probs.append('instance size %d, planned %d' % (size_a, info['inst_size']))
+    ent = lambda S, a: (S.w(a), struct.unpack_from('<H', S.d, a + 4)[0], S.w(a + 8), S.ids.get(a + 8),
+                        struct.unpack_from('<HH', S.d, a + 12), S.it.get(a + 16))
+    for k in range(mb[1]):
+        if ent(sb, mb[0] + 20 * k) != ent(sa, ma[0] + 20 * k): probs.append('old member entry %d changed' % k)
+    sfa = {(sa.w(sa.arr['sfi'][0] + 8 * k), sa.w(sa.arr['sfi'][0] + 8 * k + 4)) for k in range(sa.arr['sfi'][1])}
+    sfb = [(sb.w(sb.arr['sfi'][0] + 8 * k), sb.w(sb.arr['sfi'][0] + 8 * k + 4)) for k in range(sb.arr['sfi'][1])]
+    if sa.arr['sfi'][1] != len(sfb) + len(info['clones']) or not set(sfb) <= sfa:
+        probs.append('start-function-info %d -> %d entries' % (len(sfb), sa.arr['sfi'][1]))
+    for c in info['clones']:
+        if c['off'] < size_b or c['off'] + 8 > size_a: probs.append('0x%x outside the new instance bytes' % c['off'])
+        if (c['ty'], c['off']) not in sfa: probs.append('no start-function-info entry for 0x%x' % c['off'])
+        a = sa.mem.get(c['off'])
+        if a is None: probs.append('member 0x%x missing' % c['off']); continue
+        e_new, e_old = ent(sa, a), ent(sb, sb.mem[c['tmpl']])
+        if e_new[:4] != e_old[:4] or e_new[4] != (c['off'], c['name']):
+            probs.append('member 0x%x entry %s vs template %s' % (c['off'], e_new, e_old))
+        node = sa.it.get(e_new[5]); tnode = sb.it.get(e_old[5])
+        if node is None or [sa.w(node + 4 * k) for k in (0, 1, 2, 4, 6)] != [sb.w(tnode + 4 * k) for k in (0, 1, 2, 4, 6)]:
+            probs.append('member 0x%x init node differs from the template' % c['off']); continue
+        if sa.it.get(node + 12) != sb.it.get(tnode + 12): probs.append('member 0x%x desc pointer' % c['off'])
+        kn, ko = sa.it.get(node + 20), sb.it.get(tnode + 20)
+        nb = KEY_SIZE[c['ty']] * sb.w(tnode + 16)
+        if kn is None or kn == ko or sa.d[kn:kn + nb] != sb.d[ko:ko + nb]:
+            probs.append('member 0x%x key block not a copy of the template keys' % c['off'])
+    return probs
 
 
 def shape_gate(sb, sa, info):
@@ -545,7 +788,7 @@ def p14_status(D):
     out['bg14_scale'] = [round(struct.unpack('<f', struct.pack('<I', s.w(s.init_word(BG14, k))))[0], 4)
                          for k in (0x34, 0x38)]
     end = max(hi for j, lo, hi in s.code)
-    blocks, shows, hides, refree, scale, click = [], [], [], [], [], []
+    blocks, shows, hides, refree, link, play, click = [], [], [], [], [], [], []
     for j, lo, hi in s.code:
         for o, opc, w, ex in s.instrs(lo, hi):
             if opc != 0x63: continue
@@ -568,10 +811,12 @@ def p14_status(D):
             if (ICON14, 'uibitmap f4') in calls: shows.append(here)
             if (ICON14, 'uibitmap f5') in calls: hides.append(here)
             if LOCK in mem and any(bop == 0x2e for b, bop, bw, bex in blk): refree.append(here)
-            if (BG14, 'uibitmap f40') in calls: scale.append(here)
+            names_ = [cn for m_, cn in calls]
+            if 'uicolortimeline f10' in names_: link.append(here)
+            if 'uicolortimeline f13' in names_: play.append(here)
             if HIT14 in mem and LOCK in mem:
                 click.append((here, ['+0x%x' % x for x in jumps if x != o + 4]))
-    out.update(blocks=blocks, shows=shows, hides=hides, refree=refree, scale=scale, click=click)
+    out.update(blocks=blocks, shows=shows, hides=hides, refree=refree, link=link, play=play, click=click)
     out['quit_click'] = any(QUIT_FALL == int(x[1:], 16) for site, js in click for x in js)
     return out
 
@@ -601,6 +846,25 @@ def _tint(member, argb):
     ch = ['op02 %.5f' % struct.unpack('<f', struct.pack('<f', ((argb >> sh) & 0xff) / 255.0))[0] for sh in (16, 8, 0)]
     return (['op0f %d' % member, 'op65 uibitmap f4 (+0xf4)'] + ch +
             ['op03 1', 'op5c 0', 'op0f %d' % member, 'op65 uibitmap f18 (+0x27c)'])
+
+
+def expect_b3(kind, bg, ic, sc):
+    """expected decode of the B3 link / play blocks (new timeline offsets bg / ic / sc), None for other kinds"""
+    if kind == 'link':
+        out = ['op00 M', 'op0f %d' % bg, 'op65 uicolortimeline f12 (+0x1b4)', 'op0f %d' % ic,
+               'op65 uicolortimeline f12 (+0x1b4)', 'op0f %d' % sc, 'op65 uivec3timeline f14 (+0x1ec)']
+        for loc, wid, prop, tl, link in ((0xbc, BG14, 'f43 (+0x538)', bg, 'uicolortimeline f10 (+0x17c)'),
+                                         (0xd8, ICON14, 'f43 (+0x538)', ic, 'uicolortimeline f10 (+0x17c)'),
+                                         (0xc4, BG14, 'f40 (+0x4e4)', sc, 'uivec3timeline f12 (+0x1b4)')):
+            out += ['op09 %d' % loc, 'op0f %d' % wid, 'op65 uibitmap ' + prop, 'op09 %d' % loc, 'op0f %d' % tl,
+                    'op65 ' + link]
+        return out + ['op63 -> BACK']
+    if kind == 'play':
+        return ['op00 M', 'op0f %d' % bg, 'op65 uicolortimeline f13 (+0x1d0)', 'op0f %d' % ic,
+                'op65 uicolortimeline f13 (+0x1d0)', 'op0f %d' % sc, 'op65 uivec3timeline f15 (+0x208)',
+                'op0f %d' % BG14, 'op65 uibitmap f4 (+0xf4)', 'op0f %d' % ICON14, 'op65 uibitmap f4 (+0xf4)',
+                'op63 -> BACK']
+    return None
 
 
 _SHOW = _tint(BG14, 0xffc8c8c8) + _tint(ICON14, 0xff3273b9)
@@ -660,19 +924,16 @@ def verify(rb, ra, names=('BEFORE', 'AFTER')):
                 words.append(dict(offset='0x%x' % off, old='%08x' % old if old is not None else None, new='%08x' % new,
                                   why=exp[2]))
         rb_, ra_ = R.parse(B.sections[k7].reloc, 'le'), R.parse(A.sections[k7].reloc, 'le')
-        for k in ('idref_a', 'unk3', 'idref'):
-            if getattr(ra_, k) != getattr(rb_, k): bad.append('relocations %s differ - unexplained' % k)
-        n0 = len(rb_.internal)
-        if ra_.internal[:n0] != rb_.internal: bad.append('existing internal relocations changed')
-        if ra_.internal[n0:] != info['int_added']: bad.append('appended internal relocations differ from the plan')
-        m0 = len(rb_.external)
-        want = [(info['ext_changed'][so][1][0], so, info['ext_changed'][so][1][1]) if so in info['ext_changed']
-                else (si, so, do) for si, so, do in rb_.external]
-        if ra_.external[:m0] != want: bad.append('existing external relocations differ from the plan')
-        if ra_.external[m0:] != info['ext_added']: bad.append('appended external relocations differ from the plan')
+        # every relocation list of AFTER = exactly the plan's (built from BEFORE): retargets + appended entries
+        for k in ('internal', 'external', 'idref', 'idref_a', 'unk3'):
+            if getattr(ra_, k) != getattr(er, k):
+                bad.append('relocations %s differ from the plan (%d / planned %d)' % (k, len(getattr(ra_, k)),
+                                                                                   len(getattr(er, k))))
         rep['relocations'] = dict(external_retargeted=['+0x%x: (section %d, +0x%x) -> (section %d, +0x%x)' % (
             so, o[0], o[1], nw[0], nw[1]) for so, (o, nw) in sorted(info['ext_changed'].items())],
-            external_added=len(info['ext_added']), internal_added=len(info['int_added']))
+            counts_before={k: len(getattr(rb_, k)) for k in ('internal', 'external', 'idref', 'idref_a')},
+            counts_after={k: len(getattr(ra_, k)) for k in ('internal', 'external', 'idref', 'idref_a')},
+            internal_retargeted=sorted('+0x%x' % a_ for a_, t_ in set(rb_.internal) - set(ra_.internal)))
         # AFTER by itself
         try:
             sa, sb = S7(A), S7(B)
@@ -690,12 +951,19 @@ def verify(rb, ra, names=('BEFORE', 'AFTER')):
             bad += probs
             shape = shape_gate(sb, sa, info)
             bad += shape
+            cl = clone_gate(sb, sa, info)
+            bad += cl
+            rep['clone_gate'] = dict(members=len(info['clones']), problems=len(cl),
+                                     clones=['0x%x (%d) as 0x%x name %d' % (c['off'], c['ty'], c['tmpl'], c['name'])
+                                             for c in info['clones']])
             rep['shape_gate'] = dict(blocks=len(info['blocks']), unknown_sequences=len(shape))
             dec = {}
             for key, b, res in rows:
                 st_ = next(x for x in SITES if x['key'] == key)
+                bg_, ic_, sc_ = (c['off'] for c in info['clones'])
+                tmpl = expect_b3(st_['kind'], bg_, ic_, sc_) or EXPECT_BLOCK[st_['kind']]
                 exp = [x.replace('M', str(st_['marker'])).replace('BACK', '+0x%x' % b['back'])
-                       .replace('HIT', 'hit f14').replace('IN', 'in f0') for x in EXPECT_BLOCK[st_['kind']]]
+                       .replace('HIT', 'hit f14').replace('IN', 'in f0') for x in tmpl]
                 got = list(res)
                 if st_['kind'] == 'click':
                     skip_to = b['block'] + 4 * (b['words'] - 1)
