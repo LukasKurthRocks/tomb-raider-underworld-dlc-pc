@@ -94,7 +94,7 @@ menu window and the radial ring off (`[Menu] Enabled=0`, `[Radial] Enabled=0`).
    `TruMenu.switches.txt` (page "Fixes"), `.radial.txt` / `.tour.txt` (ring), `.media.txt` (track names),
    `.shaderlabel.txt` (shader labels); a missing file only leaves its page empty.
 3. In game, Xbox controller: **View + Start** opens / closes the bar; D-pad up / down = row, left / right = off / on,
-   LB / RB = page, X = run the row. The game keeps running. Bar language: `[Quick] Language=en` (default `de`).
+   LB / RB = page, X = run the row. The game keeps running. Bar language: `[Quick] Language` (`en` default from 0.22.18).
 
 Before 0.22.18, `[Menu] Enabled=0` turns all of TruMenu off. Controls and pages:
 [src/asi/TruMenu/README.md](src/asi/TruMenu/README.md).
@@ -111,11 +111,11 @@ findings and the open lists. Only the title-update row is a count.
 |---|---|---|---|
 | DLC 1 *Beneath the Ashes* | `█████████░` ~90 % | played; "display driver" box, grapple ring look, cinematic speech in five languages fixed; starts after DLC 2 in the same session | crash while loading the dungeon in the fork's builds: cause found, fix built offline, not yet confirmed in game |
 | DLC 2: levels / story | `████████░░` ~80 % | played through the Yggdrasil halls to the end level and its cutscenes; doppelganger look, wall run, waterfall | rock-vein jump from a ledge turns back; a moaning sound loops; some materials still drawn with substitute shaders |
-| DLC 2: combat | `███████░░░` ~75 % | as on the Xbox for single hits, the punch combo (20 / 40 / 60 / 80) and the big-hit fall (`TruShadowCombat` 0.6.8-0.6.10); melee kill and chunkdoll | the shadow finisher never starts; lock-on (row below) |
+| DLC 2: combat | `████████░░` ~85 % | as on the Xbox for single hits, the punch combo (20 / 40 / 60 / 80), the big-hit fall and the kick kill (`TruShadowCombat` 0.6.8-0.6.10); melee kill and chunkdoll; shooting with the shadow power; lock-on with the ring (row below) | the shadow finisher never starts |
 | DLC 2: shadow power | `████████░░` ~80 % | slow motion, meter and HUD, power states, wall run and its camera | at the goo drip the PC stays in slow motion while Lara runs (Xbox: normal speed); Lara's ponytail stretches in slow motion |
 | DLC 2: cutscenes / end + credits | `██████░░░░` ~60 % | end cutscenes visible, throne flicker worked around; cutscene pause and subtitle language live (TruMenu); DLC 2 credits movie built locally | the end chain (finale, credits, menu) not yet played through; the throne's warm top light missing with the workaround |
 | DLC 2: hints / banners | `█████░░░░░` ~50 % | loading-screen titles and hint boxes | "objective / hint unlocked" banners run but are invisible: data step built, live test open |
-| DLC 2: lock-on ring | `██░░░░░░░░` ~20 % | ring request with the shadow power translated (`TruShadowPower` 0.22) | LT never locks on: cause found (a tuning byte swapped by the converter), fix built offline (pipeline step `playerblock`), live test open; no ring yet |
+| DLC 2: lock-on ring | `████████░░` ~80 % | LT locks on and the ring shows (played 10 Nov): a tuning byte the converter had swapped is fixed by the new pipeline step `playerblock`; ring request with the shadow power translated (`TruShadowPower` 0.22) | Lara's aim records 715 / 722 against 718 on the Xbox (to check); the ring with the shadow power not seen yet |
 | Title-update translation | `█░░░░░░░░░` 14 % | of 1 328 changed / new functions: 96 ported, 55 partial, 2 explained, 88 irrelevant (`tools/tu_coverage.py`; 14 % = ported + explained + irrelevant) | 1 087 open; "open" also counts functions not judged yet |
 | Costume packs | `█████░░░░░` ~50 % | converted and checked offline (pipeline step `Costumes`) | not played yet |
 
