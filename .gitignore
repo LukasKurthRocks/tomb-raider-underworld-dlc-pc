@@ -198,3 +198,6 @@ work/kitfree_1011/
 # safety net: audio never belongs in the repository (game streams .mul_001 ..., WAV listening copies)
 *.wav
 *.mul_0*
+# 2026-11-11 Q26 (owner decision: no game data in the repository): includes generated from the player's own files
+# (tools/tu_dg_modes_inc.py -> src/asi/TruShadowPower/TruShadowPower_dgmodes.local.inc)
+*.local.inc

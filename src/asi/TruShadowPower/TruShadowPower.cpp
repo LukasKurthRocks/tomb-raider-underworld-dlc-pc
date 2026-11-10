@@ -4205,7 +4205,11 @@ void PatchDgSettings() {
 // carries its own tables; nothing here is used then. Each reader is byte-checked; a mismatch keeps 0.25's stand-in.
 struct DgModeEntry { int firstMode, modes, firstRec, recs; };
 struct DgModeRec { DWORD kind; DWORD w[5]; int set; };   // set: -1 none, 0..75 PC DTP 30 index, 0x100 + n built set n
-#include "TruShadowPower_dgmodes.inc"
+// The tables are converted title-update data and therefore not in the repository (owner decision 2026-11-10): they are
+// generated from the player's own TitleUpdate.000 + patch.000 by tools/tu_dg_modes_inc.py into the gitignored
+// TruShadowPower_dgmodes.local.inc. Built without it, DgModeTables reports "not built in" and the stand-in keeps 0.25.
+#if __has_include("TruShadowPower_dgmodes.local.inc")
+#include "TruShadowPower_dgmodes.local.inc"
 const CodeCheck kDgModeChecks[] = {
     {0x005f99f7, "8ba834010000"},                                       // 0x5f99f0: table A count S+0x134
     {0x005f9a04, "8b8038010000"},                                       // table A entries S+0x138
@@ -4308,6 +4312,12 @@ bool DgModeTables(DWORD data, char *why, size_t n) {
         e30 && e30 + 0x10 == p30 ? "=" : "!=");
     return true;
 }
+#else
+bool DgModeTables(DWORD, char *why, size_t n) {
+    _snprintf_s(why, n, _TRUNCATE, "tables not built in: tools/tu_dg_modes_inc.py");
+    return false;
+}
+#endif
 
 // game thread (MeterTick): mode 2 builds the stand-in once, the first time the doppelganger flag is set and DTP 21237
 // is not loaded
