@@ -16,6 +16,11 @@ Changes (script 7 offsets of the PC script, 197 664 B; the pause-menu port only 
   D4  icon 0x7bc init +0x5c (id relocation type 5): texture 31 (Xbox STORAGE DEVICE) -> 26 (the door of icon 0x738)
   D5  text 0x468 init +0x5c: locals 141 (STORAGE DEVICE) -> 131 (QUIT GAME)
   D6  background 0x6b4 init +0x5c (id type 5): texture 16 (sub-ring disc) -> 15 (the disc of the 7 ring slots)
+  D7  background 0x6b4 init +0x34 / +0x38 (scale x / y): 1.0 -> 3.6, the last key of the slot disc scale timeline
+      0x92c (uivec3timeline, keys (0, 0, 0, 0) -> (0.18, 3.6, 3.6, 0), read from the data). Every background starts
+      at 1.0; the ring slots and the sub-rings get 3.6 only from that animation (tree 3: small disc on the main ring,
+      right size after a sub-ring had animated it, small again after new game -> cancel = the widget back at its
+      init value). With the init value at 3.6 every reset lands on the right size - no code, no shared timeline.
   B1  appended blocks, each reached by an op63 that replaces one op00 marker and jumping back after it:
       B1a func 19 +0x3da4 (end of the base state): show background 0x6b4 and icon 0x7bc (uibitmap f4, as func 20
           does for the Xbox sub-ring 1) + colour (uibitmap f18, call copied from func 28; tree 1 showed the door
@@ -215,6 +220,23 @@ def expect_words(s, ctx, what):
         if s.w(a) != v: raise Refuse('%s: +0x%x is %08x, expected %08x - nothing written' % (what, a, s.w(a), v))
 
 
+DISC_TL = 0x92c                     # uivec3timeline of slot 1's disc (func 27 +0x5df0 / +0x5e5c); its keys:
+#                                     init -> node -> (+20) key list (time, x, y, z) x 2: (0, 0, 0, 0), (0.18, 3.6, 3.6, 0)
+
+
+def disc_scale(s):
+    """(x, y) words of the last key of the disc scale timeline 0x92c, read from the data (Refuse if the layout differs)"""
+    if DISC_TL not in s.mem: raise Refuse('no member 0x92c')
+    root = s.it.get(s.mem[DISC_TL] + 16); node = s.it.get(root) if root is not None else None
+    keys = s.it.get(node + 20) if node is not None else None
+    if keys is None: raise Refuse('0x92c: key list not found')
+    k = [s.w(keys + 4 * j) for j in range(8)]
+    t1 = struct.unpack('<f', struct.pack('<I', k[4]))[0]
+    if k[:4] != [0, 0, 0, 0] or not 0.0 < t1 < 1.0 or k[5] != k[6] or k[7] != 0:
+        raise Refuse('0x92c keys %s not (0,0,0,0) (t, s, s, 0)' % ' '.join('%08x' % x for x in k))
+    return k[5], k[6]
+
+
 def ref_call(s, ref):
     """copy the call target of an existing call: ('ext', si, do) or ('int', target), with the check of its context"""
     a, ctx, opc, what = ref
@@ -280,6 +302,15 @@ def plan(D):
             raise Refuse('D5: +0x%x carries a relocation' % a)
         words[a] = (X['old'], X['new'], '%s 0x%x init +0x5c: %s %d -> %d (as 0x%x)' % (nm, X['member'], kind,
                     X['old'], X['new'], X['donor']))
+    # D7: disc scale. Init +0x34 / +0x38 = scale x / y (icons 1.8, every background 1.0); the ring slots' discs reach
+    # their size only through the scale timeline 0x92c (uivec3timeline, linked by uibitmap f40), last key (3.6, 3.6)
+    sx, sy = disc_scale(s)
+    for k, v in ((0x34, sx), (0x38, sy)):
+        a = s.init_word(BG14, k); b = s.init_word(D6['donor'], k)
+        if s.w(a) != 0x3f800000 or s.w(b) != 0x3f800000 or a in s.it or a in s.ext or a in s.ids:
+            raise Refuse('D7: 0x6b4 / 0x660 init +0x%x = %08x / %08x (expected 1.0, no relocation)' % (k, s.w(a), s.w(b)))
+        words[a] = (0x3f800000, v, 'D7 0x6b4 init +0x%x: scale 1.0 -> %g (last key of the slot disc scale timeline 0x92c)'
+                    % (k, struct.unpack('<f', struct.pack('<I', v))[0]))
     # ---- references for the blocks
     show = ref_call(s, REF_SHOW); f22 = ref_call(s, REF_F22); hit = ref_call(s, REF_HIT); inp = ref_call(s, REF_IN)
     colour = ref_call(s, REF_COLOR)
@@ -399,7 +430,8 @@ class Secs:
 def p14_full(st):
     """True when a p14_status() shows the complete stage-light layout"""
     return (st['slot7'] == 'f15' and st['lock14_base'] == 0 and st['place14_pc'] and st['icon14'] == D4['new'] and
-            st['text14'] == D5['new'] and st['bg14'] == D6['new'] and len(st['shows']) == 1 and
+            st['text14'] == D5['new'] and st['bg14'] == D6['new'] and st['bg14_scale'] == [3.6, 3.6] and
+            len(st['shows']) == 1 and
             len(st['refree']) == sum(x['kind'] == 'refree' for x in SITES) and st['quit_click'])
 
 
@@ -451,6 +483,8 @@ def p14_status(D):
     out['place14_pc'] = s.w(D3['at']) >> 24 == 0x00 and s.w(D3['at'] + 0xc) == op(0x0f, ICON14)
     out['icon14'] = s.w(s.init_word(ICON14, 0x5c)); out['text14'] = s.w(s.init_word(TEXT14, 0x5c))
     out['bg14'] = s.w(s.init_word(BG14, 0x5c))
+    out['bg14_scale'] = [round(struct.unpack('<f', struct.pack('<I', s.w(s.init_word(BG14, k))))[0], 4)
+                         for k in (0x34, 0x38)]
     end = max(hi for j, lo, hi in s.code)
     shows, refree, click = [], [], []
     for j, lo, hi in s.code:
@@ -574,8 +608,9 @@ def verify(rb, ra, names=('BEFORE', 'AFTER')):
             if st['slot7'] != 'f15': bad.append('slot 7 sites: %s, expected f15' % st['slot7'])
             if st['lock14_base'] != 0: bad.append('func 19 stores %s in m0xa90[13], expected 0' % st['lock14_base'])
             if not st['place14_pc']: bad.append('func 29 case 14 still gated')
-            if (st['icon14'], st['text14'], st['bg14']) != (D4['new'], D5['new'], D6['new']):
-                bad.append('icon / text / background %s' % ((st['icon14'], st['text14'], st['bg14']),))
+            if (st['icon14'], st['text14'], st['bg14'], st['bg14_scale']) != (D4['new'], D5['new'], D6['new'], [3.6, 3.6]):
+                bad.append('icon / text / background / scale %s' % ((st['icon14'], st['text14'], st['bg14'],
+                                                                     st['bg14_scale']),))
             if not st['quit_click']: bad.append('no click block to the quit fall-through')
             rows, probs = decode_blocks(sa, info)
             bad += probs
