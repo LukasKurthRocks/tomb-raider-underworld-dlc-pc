@@ -26,6 +26,28 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW, drm_reloc as R, script_conv as SC
 
 
+def ref_vte(pd, pr, slot):
+    """the reference section's VTE of `slot`: (VTE bytes = u32 n + n pointers, [(section index, offset in the VTE,
+    target offset)]); refuses a VTE with internal relocations"""
+    pit = dict(pr.internal)
+    pv = pit[pit[0x44] + 4 * slot]; n = struct.unpack_from('<I', pd, pv)[0]; vlen = 4 + 4 * n
+    if any(pv <= a < pv + vlen for a, _ in pr.internal): raise ValueError('reference VTE has internal relocations')
+    return bytes(pd[pv:pv + vlen]), [(si, a - pv, dd) for si, a, dd in pr.external if pv <= a < pv + vlen]
+
+
+def appended(at, slots_old, slot, vte_bytes, pext):
+    """the block appended at data offset `at` (4-aligned): [VTE copy][count][new table of placeholders] -> (bytes,
+    table offset, internal entries [(0x44, table)] + [(slot pointer, target)], external entries of the VTE copy);
+    slots_old = the old table's slot targets. Also used by tools/generalbank_pc_build.py (rule, not recorded bytes)."""
+    size = len(slots_old)
+    slots = list(slots_old[:slot]) + [at] + list(slots_old[slot:])
+    d = bytes(vte_bytes) + struct.pack('<I', size + 1)
+    table = at + len(d)
+    d += struct.pack('<I', 0xBEEBBEEB) * (size + 1)          # pointer slots: the PC files hold this placeholder
+    return d, table, [(0x44, table)] + [(table + 4 * k, t) for k, t in enumerate(slots)], \
+        [(si, at + o, dd) for si, o, dd in pext]
+
+
 def main(argv):
     ref_any = '--ref-any' in argv
     argv = [a for a in argv if a != '--ref-any']
@@ -39,11 +61,13 @@ def main(argv):
     if ref_any:
         if psize <= slot: sys.exit('reference has %d slots - no slot %d to copy' % (psize, slot))
     elif psize != size + 1: sys.exit('reference has %d slots, this section %d - expected exactly one more' % (psize, size))
-    old = it[0x44]; pold = pit[0x44]
+    old = it[0x44]
     # the reference VTE of the extra slot: u32 n + n pointers
-    pv = pit[pold + 4 * slot]; n = struct.unpack_from('<I', pd, pv)[0]; vlen = 4 + 4 * n
-    if any(pv <= a < pv + vlen for a, _ in pr.internal): sys.exit('reference VTE has internal relocations - not copied')
-    pext = [(si, a - pv, dd) for si, a, dd in pr.external if pv <= a < pv + vlen]
+    try:
+        vte_bytes, pext = ref_vte(pd, pr, slot)
+    except ValueError as e:
+        sys.exit('%s - not copied' % e)
+    n = (len(vte_bytes) - 4) // 4
     for si, _, _ in pext:       # REF's section indices are reused: IN must hold the same section at that index
         if si >= len(D.sections) or (D.sections[si].type, D.sections[si].id) != (P.sections[si].type, P.sections[si].id):
             sys.exit('section %d is %s in the reference but %s here - the inputs are not laid out alike' % (
@@ -53,15 +77,12 @@ def main(argv):
     if missing: sys.exit('vtable slots %s have no internal relocation (null or external) - not handled' % missing)
     # append: [VTE copy][count][new table]
     while len(d) % 4: d.append(0)
-    vte = len(d); d += pd[pv:pv + vlen]
-    d += struct.pack('<I', size + 1); table = len(d)
-    slots = [it[old + 4 * k] for k in range(size)]
-    slots = slots[:slot] + [vte] + slots[slot:]
-    d += b'\0' * (4 * (size + 1))
-    r.internal = [(a, b) for a, b in r.internal if a != 0x44] + [(0x44, table)] + [(table + 4 * k, t) for k, t in enumerate(slots)]
-    for k in range(size + 1): struct.pack_into('<I', d, table + 4 * k, 0xBEEBBEEB)   # pointer slots: the PC files
-    struct.pack_into('<I', d, 0x44, 0xBEEBBEEB)                                       # hold this placeholder
-    r.external += [(si, vte + o, dd) for si, o, dd in pext]
+    vte = len(d)
+    blk, table, ints, exts = appended(vte, [it[old + 4 * k] for k in range(size)], slot, vte_bytes, pext)
+    d += blk
+    r.internal = [(a, b) for a, b in r.internal if a != 0x44] + ints
+    struct.pack_into('<I', d, 0x44, 0xBEEBBEEB)                                       # the PC files hold this placeholder
+    r.external += exts
     struct.pack_into('<H', d, 0x3c, size + 1)
     # prototypes: vtIndex >= slot -> +1 (u16 at prototype + 6)
     shifted = 0

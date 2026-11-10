@@ -40,6 +40,55 @@ def op(o, n=0):
     return ((o & 0xff) << 24) | (n & 0xffffff)
 
 
+def build_stub(stub, si63, si230):
+    """the stub appended at data offset `stub` (4-aligned) + the call-site words; si63 / si230 = section indexes of
+    scripts 63 / 230 in the file. -> dict(code=[(word, reloc)], blob=code + strings (bytes from `stub` on),
+    internal=[(offset, target)], external=[(section index, offset, target offset)], sites=[(offset, word)]).
+    Also used by tools/generalbank_pc_build.py: the stub is our own code, made by this rule, not recorded bytes."""
+    if stub % 4: raise ValueError('stub offset must be 4-aligned')
+    code = []                                   # (word, reloc) reloc = ('ext', si, dst) / ('int', string index) / None
+    E = lambda word, rel=None: code.append((word, rel))
+    E(op(0x09, 12)); E(op(0x09, 12))            # result slots: f14 -> local 12, f34 -> local 12 (pushed first = f14's)
+    E(op(0x0f, UGD)); E(op(0x65)); E(PLACEHOLDER, ('ext', si63, F34[1]))     # local12 = uigamedata.f34()
+    E(op(0x08, 12)); E(op(0x66)); E(PLACEHOLDER, ('ext', si230, F14[1]))     # local12 = corebase.f14(local12)
+    jumps_to_match = []
+    for k, _ in enumerate(DLC2_UNITS):
+        # op05 + the relocated string pointer (test 37 lacked the op05 word: the pointer itself ran as op03 and pushed
+        # its low 24 bits - crash in op4f at tru+0x17dbf3 with 0x00154660)
+        E(op(0x08, 12)); E(op(0x05)); E(PLACEHOLDER, ('int', k)); E(op(0x4f)); E(op(0x64, 1))
+        jumps_to_match.append(len(code)); E(None)                           # op63 -> MATCH, filled below
+    tails = {}
+    for name, val in (('nomatch', 0), ('match', 1)):
+        tails[name] = len(code)
+        E(op(0x09, 1)); E(op(0x04, val)); E(op(0x2e))                        # local1 = val
+        E(op(0x0f, MEMBER)); E(op(0x04, val)); E(op(0x2e))                   # flag  = val
+        tails[name + '_back'] = len(code); E(None)                          # op63 -> +0x444
+    at = lambda i: stub + 4 * i
+    for i in jumps_to_match:
+        code[i] = (op(0x63, (at(tails['match']) - (at(i) + 4)) // 4), None)
+    for t in ('nomatch_back', 'match_back'):
+        i = tails[t]; code[i] = (op(0x63, (0x444 - (at(i) + 4)) // 4), None)
+    d = bytearray()
+    for word, _ in code:
+        d += struct.pack('<I', word)
+    strs = []
+    for u in DLC2_UNITS:
+        while len(d) % 4: d.append(0)
+        strs.append(stub + len(d)); d += u.encode('ascii') + b'\0'
+    while len(d) % 4: d.append(0)
+    internal, external = [], []
+    for i, (word, rel) in enumerate(code):
+        if rel and rel[0] == 'ext': external.append((rel[1], at(i), rel[2]))
+        elif rel and rel[0] == 'int': internal.append((at(i), strs[rel[1]]))
+    sites = [(0x434, op(0x63, (stub - 0x438) // 4)),                           # f2: f0 query -> stub
+             (0x444, op(0x06, 1)),                                              # restore op06 1
+             (0x958, op(0x09, 8)), (0x95c, op(0x0c, MEMBER)), (0x960, op(0x2e)),  # f9: local8 = flag
+             (0x968, op(0x06, 8))]                                              # restore op06 8
+    for a, val in ((0x754, 0), (0x864, 1), (0x9b8, 0)):                        # f1(val): flag = val
+        sites += [(a, op(0x0f, MEMBER)), (a + 4, op(0x04, val)), (a + 8, op(0x2e))]
+    return dict(code=code, blob=bytes(d), internal=internal, external=external, sites=sites, strings=strs)
+
+
 def main(argv):
     src, out = argv[0], argv[1]
     D = DW.read(open(src, 'rb').read(), 'le')
@@ -72,46 +121,15 @@ def main(argv):
     # --- appended stub: code, then the strings ------------------------------------------------------------------
     while len(d) % 4: d.append(0)
     stub = len(d)
-    code = []                                   # (word, reloc) reloc = ('ext', si, dst) / ('int', string index) / None
-    E = lambda word, rel=None: code.append((word, rel))
-    E(op(0x09, 12)); E(op(0x09, 12))            # result slots: f14 -> local 12, f34 -> local 12 (pushed first = f14's)
-    E(op(0x0f, UGD)); E(op(0x65)); E(PLACEHOLDER, ('ext', si63, F34[1]))     # local12 = uigamedata.f34()
-    E(op(0x08, 12)); E(op(0x66)); E(PLACEHOLDER, ('ext', si230, F14[1]))     # local12 = corebase.f14(local12)
-    jumps_to_match = []
-    for k, _ in enumerate(DLC2_UNITS):
-        # op05 + the relocated string pointer (test 37 lacked the op05 word: the pointer itself ran as op03 and pushed
-        # its low 24 bits - crash in op4f at tru+0x17dbf3 with 0x00154660)
-        E(op(0x08, 12)); E(op(0x05)); E(PLACEHOLDER, ('int', k)); E(op(0x4f)); E(op(0x64, 1))
-        jumps_to_match.append(len(code)); E(None)                           # op63 -> MATCH, filled below
-    tails = {}
-    for name, val in (('nomatch', 0), ('match', 1)):
-        tails[name] = len(code)
-        E(op(0x09, 1)); E(op(0x04, val)); E(op(0x2e))                        # local1 = val
-        E(op(0x0f, MEMBER)); E(op(0x04, val)); E(op(0x2e))                   # flag  = val
-        tails[name + '_back'] = len(code); E(None)                          # op63 -> +0x444
+    S = build_stub(stub, si63, si230)
+    code, strs = S['code'], S['strings']
     at = lambda i: stub + 4 * i
-    for i in jumps_to_match:
-        code[i] = (op(0x63, (at(tails['match']) - (at(i) + 4)) // 4), None)
-    for t in ('nomatch_back', 'match_back'):
-        i = tails[t]; code[i] = (op(0x63, (0x444 - (at(i) + 4)) // 4), None)
-    for word, _ in code:
-        d += struct.pack('<I', word)
-    strs = []
-    for u in DLC2_UNITS:
-        while len(d) % 4: d.append(0)
-        strs.append(len(d)); d += u.encode('ascii') + b'\0'
-    while len(d) % 4: d.append(0)
-    for i, (word, rel) in enumerate(code):
-        if rel and rel[0] == 'ext': r.external.append((rel[1], at(i), rel[2]))
-        elif rel and rel[0] == 'int': r.internal.append((at(i), strs[rel[1]]))
+    d += S['blob']
+    r.internal += S['internal']; r.external += S['external']
 
     # --- the call sites ---------------------------------------------------------------------------------------------
-    put(0x434, op(0x63, (stub - 0x438) // 4))                                  # f2: f0 query -> stub
-    put(0x444, op(0x06, 1))                                                    # restore op06 1
-    put(0x958, op(0x09, 8)); put(0x95c, op(0x0c, MEMBER)); put(0x960, op(0x2e))  # f9: local8 = flag
-    put(0x968, op(0x06, 8))                                                    # restore op06 8
-    for a, val in ((0x754, 0), (0x864, 1), (0x9b8, 0)):                        # f1(val): flag = val
-        put(a, op(0x0f, MEMBER)); put(a + 4, op(0x04, val)); put(a + 8, op(0x2e))
+    for a, v in S['sites']:
+        put(a, v)
 
     before = len(s.data); s.data = bytes(d); s.reloc = R.write(r, 'le')
     raw = D.write('le'); C = DW.read(DW.cdrm_encode(raw, 'le'), 'le')

@@ -25,18 +25,27 @@ sections; every one is reproduced here:
   tu_camera      new DTPs 21237 / 21238 / 22194        tools/tu_camera_dtp.py (TU doppelganger camera   knowledge, added
                  (after the ring, not in tree 7)       settings + their curve records; 2026-11-11)      after the ring
 
-Knowledge file (docs/data/generalbank_pc.json, schema 2, written by `learn`; owner decision 2026-11-10: the repository
+Knowledge file (docs/data/generalbank_pc.json, schema 3, written by `learn`; owner decision 2026-11-10: the repository
 holds NO copies of game data, only references, rules and hashes): per section a SOURCE table (sections of the player's
 own files, each with its md5: `pc:T:ID` = the PC patch.000 generalbank, `tu:T:ID` = the Xbox title update
-TitleUpdate.000 generalbank, `tex:T:ID` = tools/tex_convert.convert of that TU texture section) and, for the data and
-the relocation blob, a word PROGRAM over them: `<src><form><byte offset>+<words>` takes words of a source in a form
-(id / kp = bytes kept, sw = u32 byte swap Xbox -> PC, h = u16-pair swap), `L<n>` / `T<n>` take n residual words /
-tail bytes. The forms are the word rules of the converters that made the recorded bytes (generic converter / script
-converter / tex_convert / tu_camera_dtp), recorded per word run. RESIDUAL = result bytes no rule derives yet (our own
-values, the PC layout's member offset / symbol words of converted scripts, shifted relocation entries): a few bytes
-per section are kept INLINE as hex (small values, listed per section in the report), larger residuals only in the
-LOCAL knowledge file (default ../data/local/generalbank_pc.local.json, outside the repository) - the build names
-the sections it cannot make without it. Every source section, residual and result is md5-checked.
+TitleUpdate.000 generalbank, `tex:T:ID` = tools/tex_convert.convert of that TU texture section, `xr:T:ID` = that TU
+section's relocations converted to the PC file by rule, `own:NAME@T:ID+HEX` = our own recipe made by its tool) and,
+for the data and the relocation blob, a word PROGRAM over them: `<src><form><byte offset>+<words>` takes words of a
+source in a form (id / kp = bytes kept, sw = u32 byte swap Xbox -> PC, h = u16-pair swap, sa / sb / sab = h with the
+first / second / both u16 halves mapped as cdc::Symbol), `L<n>` / `T<n>` take n residual words / tail bytes. The forms
+are the word rules of the converters that made the recorded bytes (generic converter / script converter /
+tex_convert / tu_camera_dtp), recorded per word run. RULES (schema 3, Q29 2026-11-11, docs
+Befund-Generalbank-Rest-Regeln-1111.md): `rules.symbols` = the converter's Xbox -> PC Symbol map for the Symbols the
+ported scripts use, as runs of equal delta (DataMember offset | name, userType, ScriptName words; the ported scripts
+keep the Xbox data offsets); `rules.scripts` = the script ids the converter's id map renumbers (external relocation
+targets). Source xr applies them to the TU relocations (target index in the result order, call offsets through
+script_conv.offset_map as tools/drm_put_sections.py --xbox); own:vtable31 = tools/script_vtable_insert.py (PC slot 31),
+own:dlc2_stub = tools/script_dlc2_flag_stub.py. RESIDUAL = result bytes no rule derives yet (our own values: locals
+string ids of our merged table, relocation table counts, ...): up to INLINE_MAX bytes per section are kept INLINE as
+hex (listed per section in the report), larger residuals only in the LOCAL knowledge file (default
+../data/local/generalbank_pc.local.json, outside the repository; since K20261111-3 no section needs it and build does
+not read it) - the build names the sections it cannot make without it. Every source section, residual and result is
+md5-checked.
 
 Build (player path): PC patch.000 record pc-w\\generalbank.drm (raw md5 checked against the knowledge file) + the
 player's TitleUpdate.000 generalbank (raw md5 checked) -> recipe P3 -> the recorded sections -> steps/01_pc_knowledge
@@ -62,7 +71,7 @@ Usage (from the repository root):
         and compare with EXPECT_FILE (tree 7); --add-sections: every section of DRM (tools/tu_camera_dtp.py convert)
         is recorded as a tu_camera section added after the ring; --write stores the knowledge file (+ the local file)
 """
-import sys, os, re, json, struct, hashlib, time
+import sys, os, re, json, struct, hashlib, time, bisect, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW, drm_reloc as R
 
@@ -74,8 +83,10 @@ PC_NAME = 'pc-w\\generalbank.drm'
 TU_ARCH = '../data/TombRaiderUnderworld_Patched/TitleUpdate.000'     # the player's own title update (workspace copy)
 TU_NAME = 'xenon-w\\generalbank.drm'
 OUT_DEFAULT = 'work/rebuild/generalbank_pc'
-VERSION = 'K20261111-2'      # knowledge version (Plan-Spielerweg 5.2); a new learn with other content = a new version
-SCHEMA = 2                   # 1 = literal copies (K20261111-1, retired 2026-11-11), 2 = references + rules + residual
+VERSION = 'K20261111-3'      # knowledge version (Plan-Spielerweg 5.2); a new learn with other content = a new version
+SCHEMA = 3                   # 1 = literal copies (K20261111-1, retired 2026-11-11), 2 = references + residual
+                             # (K20261111-2), 3 = 2 + rules: symbol map, script id map, converted TU relocations (xr),
+                             # our own recipes (own) - the three ported scripts need no local file any more (Q29)
 INLINE_MAX = 64              # residual bytes per section kept inline (small values); more -> local knowledge file
 # path fragments the build must never touch (lower case, forward slashes)
 KIT_PATTERNS = ('b138', 'b270', 'b269', 'b132', 'b90', '/release/', 'kit', 'pristine', 'b138_fixes', '_repair',
@@ -134,9 +145,31 @@ GUARD = Guard()
 
 # ---------------------------------------------------------------- reference programs (schema 2)
 # word forms: id / kp = bytes kept (PC words / Xbox bytes that keep their order: u8 tables, byte strings), sw = u32
-# byte swap (Xbox big endian -> PC), h = u16-pair swap (two u16 fields in one word)
-FORMS = ('id', 'kp', 'sw', 'h')
-TOK = re.compile(r'^([A-Z])(id|kp|sw|h)(\d+)\+(\d+)$')
+# byte swap (Xbox big endian -> PC), h = u16-pair swap (two u16 fields in one word); the symbol forms (schema 3) are h
+# with cdc::Symbol halves mapped Xbox -> PC by the knowledge's symbol rule (sym): sb = (u16 kept, Symbol) = DataMember
+# offset | name, sa = (Symbol, u16 kept) = DataType userType | pad, sab = (Symbol, Symbol) = ScriptName
+FORMS = ('id', 'kp', 'sw', 'h', 'sa', 'sb', 'sab')
+TOK = re.compile(r'^([A-Z])(id|kp|sw|h|sab|sa|sb)(\d+)\+(\d+)$')
+SYMBOL_LABELS = (('dm.off', 'b'), ('dt.user', 'a'), ('proto', 'ab'), ('root', 'ab'), ('state', 'ab'))
+RULES = dict(runs=[], starts=[], scripts={})     # set by set_rules from the knowledge file (schema 3)
+
+
+def set_rules(rules):
+    """symbol rule: runs [Xbox first, Xbox last, delta] (PC Symbol = Xbox Symbol + delta inside a run, else kept);
+    script rule: {Xbox file key T:ID: PC key} where the converter's id map renumbers (else the same key)"""
+    runs = sorted((rules or {}).get('symbols', {}).get('runs', []))
+    RULES.update(runs=runs, starts=[r[0] for r in runs], scripts=dict((rules or {}).get('scripts', {}).get('map', {})))
+
+
+def sym(x):
+    k = bisect.bisect_right(RULES['starts'], x) - 1
+    if k >= 0 and x <= RULES['runs'][k][1]: return (x + RULES['runs'][k][2]) & 0xffff
+    return x
+
+
+def sym_dict():
+    """the symbol rule as a dict over its runs (script_conv.offset_map takes a dict)"""
+    return {x: (x + d) & 0xffff for a, b, d in RULES['runs'] for x in range(a, b + 1)}
 
 
 def form(b, f):
@@ -145,6 +178,11 @@ def form(b, f):
     n = len(b) // 4
     if f == 'sw': return struct.pack('<%dI' % n, *struct.unpack('>%dI' % n, b[:4 * n]))
     if f == 'h': return struct.pack('<%dH' % (2 * n), *struct.unpack('>%dH' % (2 * n), b[:4 * n]))
+    if f in ('sa', 'sb', 'sab'):
+        v = list(struct.unpack('>%dH' % (2 * n), b[:4 * n]))
+        if f != 'sb': v[0::2] = [sym(x) for x in v[0::2]]
+        if f != 'sa': v[1::2] = [sym(x) for x in v[1::2]]
+        return struct.pack('<%dH' % (2 * n), *v)
     raise ValueError('unknown form %r' % f)
 
 
@@ -243,16 +281,90 @@ def read_tu(path):
     return DW.cdrm_decode(a.read(r[0]), 'be')
 
 
+# scripts ported from the title update with the Xbox data offsets kept (result key: TU key; tools/generalbank_build.py
+# steps 2-21, tools/generalbank_hud_build.py): their relocations are the TU's, converted by rule (source xr)
+PORTS = {'8:6': '8:6', '8:9': '8:10', '8:37': '8:38', '8:21239': '8:21239', '8:20082': '8:20082'}
+# our own recipes appended to a ported script (source own:NAME@T:ID+HEX = made by the recipe's own tool at data offset
+# HEX of that section): vtable31 = tools/script_vtable_insert.py (the PC parent's extra vtable slot 31: VTE copy from
+# the PC script + new table, root 0x3c / 0x44; generalbank_build steps 5 / 14, generalbank_hud_build), dlc2_stub =
+# tools/script_dlc2_flag_stub.py (step 21)
+OWN = {'8:6': ('vtable31',), '8:9': ('vtable31', 'dlc2_stub'), '8:37': ('vtable31',)}
+VT_SLOT = 31
+
+
 class Sources:
     """section sources of the player's files: pc:T:ID (PC generalbank), tu:T:ID (TU generalbank), tex:T:ID
-    (tools/tex_convert.convert of the TU texture section); part 'data' / 'reloc'"""
-    def __init__(self, raw_pc, raw_tu):
-        self.pc = {key(s): s for s in DW.read(raw_pc, 'le').sections} if raw_pc is not None else {}
-        self.tu = {key(s): s for s in DW.read(raw_tu, 'be').sections} if raw_tu is not None else {}
-        self.tex = {}
+    (tools/tex_convert.convert of the TU texture section), xr:T:ID (the TU section's relocations converted to the PC
+    file by rule, data part empty), own:NAME+HEX (our own recipe bytes at that data offset); part 'data' / 'reloc'.
+    order = the section keys of the result file (PC order + the new sections) - xr / own address sections by index"""
+    def __init__(self, raw_pc, raw_tu, order=None):
+        D = DW.read(raw_pc, 'le') if raw_pc is not None else None
+        T = DW.read(raw_tu, 'be') if raw_tu is not None else None
+        self.pc = {key(s): s for s in D.sections} if D else {}
+        self.tu = {key(s): s for s in T.sections} if T else {}
+        self.tu_keys = [key(s) for s in T.sections] if T else []
+        self.order = order
+        self.tex, self.xr, self.omaps, self.own = {}, {}, {}, {}
+
+    def index(self, k):
+        if self.order is None: raise SystemExit('source needs the result section order')
+        if not hasattr(self, '_idx'): self._idx = {x: i for i, x in enumerate(self.order)}
+        return self._idx.get(k)
+
+    def xreloc(self, k):
+        """TU section k's relocations in the PC file (rule, schema 3): internal / id entries kept (the ported script
+        keeps the Xbox data offsets); external entries: target section = the TU target through the script rule (its
+        index in the result order; a target missing there is dropped - the residual keeps it), destination offset
+        = script_conv.offset_map(TU target, PC target, symbol rule) when the target is a PC script that is not one of
+        the ported scripts (they keep the Xbox layout) - the call-offset rule of tools/drm_put_sections.py --xbox"""
+        if k in self.xr: return self.xr[k]
+        import script_conv as SC
+        r = R.parse(self.tu[k].reloc, 'be')
+        ext = []
+        for si, src, dst in r.external:
+            tk = self.tu_keys[si]
+            pk = RULES['scripts'].get(tk, tk)
+            i = self.index(pk)
+            if i is None: continue
+            if pk.startswith('8:') and pk in self.pc and pk not in PORTS and tk in self.tu and self.tu[tk].data:
+                if tk not in self.omaps:
+                    x, p = self.tu[tk], self.pc[pk]
+                    self.omaps[tk] = SC.offset_map(x.data, R.parse(x.reloc, 'be'), p.data, R.parse(p.reloc, 'le'),
+                                                   sym_dict())
+                dst = self.omaps[tk].get(dst, dst)
+            ext.append((i, src, dst))
+        self.xr[k] = R.write(R.Reloc(list(r.internal), ext, list(r.idref_a), list(r.unk3), list(r.idref)), 'le')
+        return self.xr[k]
+
+    def own_part(self, k, part):
+        """own:NAME@T:ID+HEX - our own recipe for section T:ID, made by its tool's rule at data offset HEX: data =
+        the words the recipe writes, reloc = its relocation entries (8 bytes each, internal then external)"""
+        if k not in self.own:
+            name, rest = k.split('@'); sk, at = rest.split('+'); at = int(at, 16)
+            if name == 'dlc2_stub':
+                import script_dlc2_flag_stub as ST
+                S = ST.build_stub(at, self.index('8:%d' % ST.F34[0]), self.index('8:%d' % ST.F14[0]))
+                data = S['blob'] + b''.join(struct.pack('<I', w) for a, w in S['sites'])
+                ints, exts = S['internal'], S['external']
+            elif name == 'vtable31':
+                import script_vtable_insert as VT
+                t, p = self.tu[PORTS[sk]], self.pc[sk]      # the ported TU script, the PC script (the reference)
+                it = dict(R.parse(t.reloc, 'be').internal)
+                size = struct.unpack_from('>H', t.data, 0x3c)[0]
+                vb, pext = VT.ref_vte(p.data, R.parse(p.reloc, 'le'), VT_SLOT)
+                blk, table, ints, exts = VT.appended(at, [it[it[0x44] + 4 * j] for j in range(size)], VT_SLOT, vb, pext)
+                data = struct.pack('<H', size + 1) + t.data[0x3e:0x40] + blk      # root 0x3c (vtableSize + 1) + block
+            else:
+                raise SystemExit('unknown own recipe %r' % name)
+            rel = b''.join(struct.pack('<II', a, b) for a, b in ints) + \
+                b''.join(struct.pack('<Q', R.pack_ext(*e)) for e in exts)
+            self.own[k] = dict(data=data, reloc=rel)
+        return self.own[k][part]
 
     def get(self, ref, part):
         kind, k = ref.split(':', 1)
+        if kind == 'xr': return b'' if part == 'data' else self.xreloc(k)
+        if kind == 'own': return self.own_part(k, part)
         if kind == 'tex':
             if part == 'reloc': return b''
             if k not in self.tex:
@@ -296,7 +408,7 @@ def load_local(path, K):
     """local knowledge (outside the repository): {key: {data: hex, reloc: hex}} for the residuals stored 'local'"""
     need = [e['key'] for e in K['sections'] + K.get('post_ring_sections', [])
             if any(e[p]['residual']['store'] == 'local' and e[p]['residual']['bytes'] for p in ('data', 'reloc'))]
-    if not os.path.isfile(path): return None, need
+    if not need or not os.path.isfile(path): return None, need     # no section needs it: the file is not even read
     L = json.load(open(path, encoding='utf-8'))
     if L.get('knowledge_version') != K['version']:
         raise SystemExit('local knowledge %s is for version %s, knowledge is %s' % (path, L.get('knowledge_version'),
@@ -385,7 +497,13 @@ def load_knowledge(path):
     K = json.load(open(path, encoding='utf-8'))
     if K.get('schema') != SCHEMA: raise SystemExit('unknown knowledge schema %r (this tool: %d)' % (K.get('schema'),
                                                                                                     SCHEMA))
+    set_rules(K.get('rules'))
     return K
+
+
+def result_order(raw_pc, K):
+    """section keys of the result file before the ring: the PC order + the new recorded sections (apply_knowledge)"""
+    return [key(s) for s in DW.read(raw_pc, 'le').sections] + [e['key'] for e in K['sections'] if e['new']]
 
 
 # ---------------------------------------------------------------- gate (word diff per section)
@@ -452,17 +570,47 @@ TU_FROM = {'8:9': ['8:10'], '8:37': ['8:38'], '8:213': ['8:211'], '7:36': ['7:37
 LETTERS = 'ABCDEFGHIJKMNOPQRSUVWXYZ'        # no L / T (residual tokens)
 
 
+def own_refs(k, s, SRC):
+    """own recipe sources of result section s (developer, learn): a recipe is used only where the result holds
+    exactly the block its rule makes at that offset (dlc2_stub: at the section end; vtable31: the table root 0x44
+    points to, the VTE copy before its count word)"""
+    out = []
+    for name in OWN.get(k, ()):
+        if name == 'dlc2_stub':
+            import script_dlc2_flag_stub as ST
+            n = len(ST.build_stub(0, 0, 0)['blob'])
+            at = len(s.data) - n; skip = 0
+        elif name == 'vtable31':
+            import script_vtable_insert as VT
+            p = SRC.pc.get(k)
+            table = dict(R.parse(s.reloc, 'le').internal).get(0x44)
+            if p is None or table is None: continue
+            at = table - 4 - len(VT.ref_vte(p.data, R.parse(p.reloc, 'le'), VT_SLOT)[0]); skip = 4
+        else:
+            continue
+        if at < 0 or at % 4: continue
+        ref = 'own:%s@%s+%x' % (name, k, at)
+        blk = SRC.get(ref, 'data')[skip:]
+        if s.data[at:at + len(blk)] == blk if name == 'vtable31' else s.data[at:] == blk[:len(s.data) - at]:
+            out.append(ref)
+        else:
+            print('%s: own recipe %s does not match the reference at +0x%x - not used' % (k, name, at))
+    return out
+
+
 def record_section(k, s, SRC):
     """the result section s (key k) as a reference program over the player's files -> (entry part, residuals)"""
     ty, i = (int(x) for x in k.split(':'))
     tu = TU_FROM.get(k, []) + ['%d:%d' % (ty, i + d) for d in (0, 1, -1)]
     tu = [c for j, c in enumerate(tu) if c in SRC.tu and c not in tu[:j]]
     refs = (['pc:' + k] if k in SRC.pc else []) + ['tu:' + c for c in tu] + (['tex:' + c for c in tu] if ty == 5 else [])
+    refs += (['xr:' + PORTS[k]] if k in PORTS and PORTS[k] in SRC.tu else []) + own_refs(k, s, SRC)
     if len(refs) > len(LETTERS): raise SystemExit('%s: too many sources' % k)
     table = {LETTERS[j]: r for j, r in enumerate(refs)}
     part = {}
     for p in ('data', 'reloc'):
-        forms = {'pc': ('id',), 'tex': ('id',), 'tu': ('sw', 'kp', 'h') if p == 'data' else ('sw', 'kp')}
+        forms = {'pc': ('id',), 'tex': ('id',), 'xr': ('id',), 'own': ('id',),
+                 'tu': ('sw', 'kp', 'h', 'sa', 'sb', 'sab') if p == 'data' else ('sw', 'kp')}
         srcs = [(l, SRC.get(r, p), forms[r.split(':')[0]]) for l, r in table.items()]
         ops, res = encode_refs(getattr(s, p), [x for x in srcs if x[1]])
         if decode_refs(ops, {l: b for l, b, _ in srcs}, res) != getattr(s, p): raise SystemExit('%s %s: round trip' % (k, p))
@@ -499,6 +647,77 @@ def check_script7(p7, r7):
     return len(ext)
 
 
+def derive_rules(Rf, SRC):
+    """developer: the symbol and script id rules of the ported scripts (PORTS), read off the reference against the
+    player's TU sections. Symbol pairs: every word the script walker (script_conv.Walk) labels as a Symbol field
+    (SYMBOL_LABELS) at the same data offset with the same label in the TU script and the reference (the port keeps
+    the Xbox offsets); script pairs: the target section of each external relocation, TU entry and reference entry
+    matched by their source offset. Majority per Xbox value; a minority value stays residual (reported). Symbols are
+    stored as runs of equal delta over the sorted Xbox values."""
+    import script_conv as SC
+    rb = {key(s): s for s in Rf.sections}; rk = [key(s) for s in Rf.sections]
+    pairs, keys = collections.defaultdict(collections.Counter), collections.defaultdict(collections.Counter)
+    for k, tk in PORTS.items():
+        s, t = rb[k], SRC.tu[tk]
+        rr, tr = R.parse(s.reloc, 'le'), R.parse(t.reloc, 'be')
+        Wr, Wt = SC.Walk(s.data, rr, 'le').run(), SC.Walk(t.data, tr, 'be').run()
+        for o, lab in Wr.lab.items():
+            if Wt.lab.get(o) != lab: continue
+            halves = next((h for name, h in SYMBOL_LABELS if lab[0] == name and
+                           (name not in ('root', 'proto') or lab[1] == 8)), None)
+            if not halves: continue
+            a, b = struct.unpack_from('<HH', s.data, o), struct.unpack_from('>HH', t.data, o)
+            if 'a' in halves: pairs[b[0]][a[0]] += 1
+            if 'b' in halves: pairs[b[1]][a[1]] += 1
+        tx = {src: si for si, src, dst in tr.external}
+        for si, src, dst in rr.external:
+            if src in tx: keys[SRC.tu_keys[tx[src]]][rk[si]] += 1
+    sym_conf = {x: dict(c) for x, c in pairs.items() if len(c) > 1}
+    runs = []
+    for x in sorted(pairs):
+        d = pairs[x].most_common(1)[0][0] - x
+        if runs and runs[-1][2] == d: runs[-1][1] = x
+        else: runs.append([x, x, d])
+    key_conf = {a: dict(c) for a, c in keys.items() if len(c) > 1}
+    smap = {a: c.most_common(1)[0][0] for a, c in sorted(keys.items()) if c.most_common(1)[0][0] != a}
+    rules = dict(
+        symbols=dict(about='cdc::Symbol Xbox -> PC (u16) of the ported scripts: inside a run [Xbox first, Xbox last, '
+                           'delta] PC = Xbox + delta, else kept. Read off the reference (the converter\'s DlcIds.sym: '
+                           'learned base map, calibration / base evidence, +480 above the Xbox base max) for the %d '
+                           'Symbols the ported scripts use; a rule (numbers), no game bytes' % len(pairs),
+                     runs=runs, pairs=len(pairs), conflicts=len(sym_conf)),
+        scripts=dict(about='section key Xbox title update -> PC file where the converter\'s id map (work/generic/'
+                           'idmap.json type 8) renumbers a script; every other key is kept (%d target keys seen)'
+                           % len(keys), map=smap, keys=len(keys), conflicts=len(key_conf)))
+    return rules, dict(symbol_conflicts=sym_conf, key_conflicts=key_conf, symbol_pairs=pairs, key_pairs=keys)
+
+
+def rules_evidence(ev):
+    """developer evidence: the rules against the converter's own tables when they exist locally (DlcIds with the
+    base evidence symbols of generalbank_build step 2; idmap.json type 8) - report only"""
+    out = []
+    try:
+        if os.path.isfile(os.path.join(REPO, 'work', 'rebuild', 'sym_base_evidence.json')):
+            os.environ.setdefault('TRUDLC_SYM_EXTRA', os.path.join(REPO, 'work', 'rebuild', 'sym_base_evidence.json'))
+        import dlc_generic as DG
+        ids = DG.DlcIds()
+        diff = sorted((x, c.most_common(1)[0][0], ids.sym(x)) for x, c in ev['symbol_pairs'].items()
+                      if ids.sym(x) != c.most_common(1)[0][0])
+        out.append('symbol rule vs the converter (DlcIds.sym): %d of %d equal, differing (Xbox, reference, converter) '
+                   '%s' % (len(ev['symbol_pairs']) - len(diff), len(ev['symbol_pairs']), diff))
+        m8 = ids.base.get(8, {})
+        kd = []
+        for a, c in ev['key_pairs'].items():
+            t, i = (int(v) for v in a.split(':'))
+            want = '%d:%d' % (t, m8.get(i, i)) if t == 8 else a
+            if want != c.most_common(1)[0][0]: kd.append((a, c.most_common(1)[0][0], want))
+        out.append('script rule vs idmap type 8: %d of %d equal, differing %s' % (len(ev['key_pairs']) - len(kd),
+                                                                                 len(ev['key_pairs']), kd))
+    except (Exception, SystemExit) as e:
+        out.append('converter tables not available (%s) - rules checked by the build md5 only' % e)
+    return out
+
+
 def learn(argv):
     write = '--write' in argv; argv = [a for a in argv if a != '--write']
     pc, tu, kpath, lpath = PC_ARCH, TU_ARCH, KNOW, LOCAL
@@ -520,6 +739,12 @@ def learn(argv):
     if rk[:len(pk)] != pk: sys.exit('the reference does not start with the PC section order')
     pb = {key(s): s for s in P.sections}
     n_ext = check_script7(pb['8:7'], Rf.sections[pk.index('8:7')])
+    rules, ev = derive_rules(Rf, SRC)
+    set_rules(rules); SRC.order = rk
+    print('rules: symbol map %d pairs -> %d runs (conflicts %s), script id map %d of %d keys renumbered (conflicts %s)'
+          % (rules['symbols']['pairs'], len(rules['symbols']['runs']), ev['symbol_conflicts'] or 'none',
+             len(rules['scripts']['map']), rules['scripts']['keys'], ev['key_conflicts'] or 'none'))
+    for line in rules_evidence(ev): print(line)
     secs, totals = [], {}
     for s in Rf.sections:
         k = key(s)
@@ -544,7 +769,9 @@ def learn(argv):
         '(K12 + HUD generalbank, the base of ring tree 7) that differ from the player\'s PC patch.000 generalbank, '
         'as word programs over sections of the player\'s own files (pc = PC patch.000 generalbank, tu = Xbox title '
         'update TitleUpdate.000 generalbank, tex = tools/tex_convert of a TU texture), each source with its md5; '
-        'forms id / kp (bytes kept), sw (u32 swap), h (u16-pair swap). No game data is stored here: residual bytes no '
+        'forms id / kp (bytes kept), sw (u32 swap), h (u16-pair swap), sa / sb / sab (h with Symbol halves mapped by '
+        'rules.symbols); xr = TU relocations converted by rules.symbols / rules.scripts, own = our recipe tools '
+        '(script_vtable_insert, script_dlc2_flag_stub). No game data is stored here: residual bytes no '
         'rule derives yet are inline only when small (values, listed in docs Befund-Wissen-nur-Verweise-1111.md), '
         'otherwise in the local knowledge file outside the repository. Script 7 is not recorded: recipe P3 + '
         'tools/menu_ring_p14.py (its D1 rewrites the three slot-7 sites). post_ring_sections = new sections appended '
@@ -558,7 +785,7 @@ def learn(argv):
                             'generalbank_build -> generalbank_hud_build -> globalinfo_player_list_fix)'),
         script7=dict(recipe='P3', p3=[P3_AT, P3_OLD, P3_NEW], slot7_sites_in_reference='b138 form, rewritten by ring D1',
                      external_relocations_retargeted_in_reference=n_ext),
-        order_md5=md5(','.join(rk).encode()), sections=secs, totals=totals)
+        order_md5=md5(','.join(rk).encode()), rules=rules, sections=secs, totals=totals)
     log = []
     pre = apply_knowledge(raw_pc, SRC, LOC, K, log)
     K['pre_ring_raw_md5'] = md5(pre)
@@ -613,6 +840,10 @@ def learn(argv):
             json.dump(K, f, indent=1)
             f.write('\n')
         print('written', kpath, os.path.getsize(kpath), 'B')
+        if not LOC:
+            print('no residual needs the local knowledge file - %s not written (an older one is not read by build)'
+                  % lpath)
+            return 0
         L = dict(schema=1, knowledge_version=VERSION, about=(
             'LOCAL generalbank knowledge (never in the repository): residual bytes of the sections no rule derives yet, '
             'for tools/generalbank_pc_build.py (docs Befund-Wissen-nur-Verweise-1111.md)'), sections=LOC)
@@ -679,7 +910,9 @@ def build(argv):
     if md5(raw_tu) != K['tu']['raw_md5']:
         raise SystemExit('the title update generalbank is not the recorded one (raw md5 %s, knowledge %s)' % (
             md5(raw_tu), K['tu']['raw_md5']))
-    SRC = Sources(raw_pc, raw_tu)
+    SRC = Sources(raw_pc, raw_tu, result_order(raw_pc, K))
+    log.append('rules: symbol map %d runs, script id map %d keys (knowledge %s)' % (
+        len(RULES['runs']), len(RULES['scripts']), K['version']))
     pre = apply_knowledge(raw_pc, SRC, local, K, log)
     if md5(pre) != K['pre_ring_raw_md5']: raise SystemExit('pre-ring raw md5 %s != recorded %s' % (md5(pre),
                                                                                                   K['pre_ring_raw_md5']))
