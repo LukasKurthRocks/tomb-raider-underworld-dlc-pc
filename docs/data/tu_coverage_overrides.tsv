@@ -1,6 +1,43 @@
 # Hand-kept statuses for tools/tu_coverage.py (win over the automatic ones). Columns tab-separated.
-# status: ported / explained / irrelevant / open; basis: code / doc / heuristic; tu_addr = TU function start.
-tu_addr	status	basis	plugin	note
-0x823766c0	open	doc		K-7 chunkdoll limit 4 -> 8 (cmp at TU create): portable since 09.11. (physics-step fix live), TODO N18
+# Function rows: status ported / partial / explained / irrelevant / open, or empty = keep the automatic status and only
+#   add the note; tu_addr = any address inside the TU function; pc = PC partner from a finding (beats the map);
+#   retail = retail partner from a finding / plugin (tu_addr must then be the TU function start; beats the alignment).
+#   ported / explained / irrelevant here also close every open block of the function (a hand check of the whole body).
+# Block rows: status covered (a plugin translates this changed block, evidence in the note), noport (the block needs
+#   no port, reason in the note) or uncovered (a plugin names it, but does not translate it); tu_addr = any address
+#   inside the changed block (see --why / --show).
+# basis: code / doc / heuristic.
+tu_addr	status	basis	plugin	note	pc	retail
+0x823766c0		doc		K-7 chunkdoll limit 4 -> 8 (cmp at TU create 0x82376700): TruShadowCombat 0.6.7 [Chunk] Limit8 (built 09.11., default 1)
 0x8226de00	open	doc		sound slot 5th argument (ENGINE.md section 1): not ported
 0x823e0308	open	code		K-5 combat reticle / adrenaline start doppelganger branch (Befund-Anvisier-Kreis-0911): not ported yet
+0x823d7520		doc		X23: time-scale request selector (TruShadowPower); slot-6 writers = gamebase natives 23 / 24 0x824a3238 / 0x824a32f0, translated in TruShadowPower 0.21 (commit 1b0f991, not yet seen live)
+0x824a28c0		doc		gamebase script native binder (entries 23 / 24 at +0x298 / +0x2b4 = 0x824a3238 / 0x824a32f0); retail partner 0x8249ced0 (natives 0x8249dac8 / 0x8249db18) from the X23 work 10.11., the alignment had paired 0x8249cd98. The TU inlines the per-entry getter retail calls (0x8216bac8), so the whole body is one code block; the entries were not compared one by one		0x8249ced0
+0x824a3238		doc		X23: gamebase native 23 (retail 0x8249dac8, PC tru+0x397cf0): doppelganger mode -> time-scale request slot 6 player + selector, else the retail ramp - TruShadowPower 0.21 [TimeScale] TranslateSlot6 (commit 1b0f991, not yet seen live); the retail native has no .pdata entry, so the row stays 'new'
+0x824a32f0		doc		X23: gamebase native 24 (retail 0x8249db18, PC tru+0x397d10): doppelganger mode -> time-scale request slot 6 world + selector, else the retail ramp - TruShadowPower 0.21 [TimeScale] TranslateSlot6 (commit 1b0f991, not yet seen live); the retail native has no .pdata entry, so the row stays 'new'
+0x82305ba0		doc		K-1b: this is the impulse receiver (PC 0x624c60, Befund-K1b-Entscheidung-0911 / ENGINE.md 13); the map's 0x60f020 (contradicted) and the prototype name ENEMY_PlayEventBark come from a wrong pairing	0x00624c60
+0x8235e338		doc		RegenerateDeath slot 12 Exit (H6): retail 0x8235ea38 = PC tru+0x27eeb0 per TruShadowCombat; the body + PlayNotification(34)		0x8235ea38
+0x823e1220		doc		retail partner 0x823dedc0 per TruShadowCombat (the alignment left it unpaired)		0x823dedc0
+0x8235e270		code		RegenerateDeath area, TU function next to H6 (time compare -> state switch 0x8230bf78 with 2-byte data; read from code, meaning a guess); retail partner unknown - not translated
+0x822ebd0c	covered	code	TruShadowCombat	targeter loop 7 -> 10 (target list): the TU inlines the loop, the PC helper tru+0x31dcb0 is patched at 0x71dcd0 (byte check 83fe07 -> 0a)
+0x823eea64	covered	code	TruShadowCombat	targeter loop 7 -> 10 (target list): PC helper tru+0x31dcb0 patched at 0x71dcd0 (byte check 83fe07 -> 0a)
+0x823eeaa8	covered	code	TruShadowCombat	targeter loop 7 -> 10 (target list): PC helper tru+0x31dcb0 patched at 0x71dcd0 (byte check 83fe07 -> 0a)
+0x823eeb10	covered	code	TruShadowCombat	targeter loop 7 -> 10 (target list): PC helper tru+0x31dcb0 patched at 0x71dcd0 (byte check 83fe07 -> 0a)
+0x823e1528	noport	code		only a reload of [r25+0xc] (register pressure); the named 0x823e1530 / retail 0x823defd4 is the hit-list loop retail has as well, not a translation
+0x8245efd4	covered	code	TruShadowCombat	state 1004 slot 1 re-enter: clears the player's hit list +0xa4 unless parameter 0x415 - [States] Translate1004 (0.5.1, default 0 = off; the K-8 fix, Befund-K8-Kombo-1011)
+0x8232cf20	noport	code		Death state at the chunkdoll: the TU also sets +0x14 |= 0x20 on the companion instance (brain+0x5090); the PC builds no companion instance (TruShadowCombat H0 'not rebuilt: the instance itself') - nothing to port while there is none
+0x8240a6c8	covered	code	TruShadowPower	player anim event switch case 4 in doppelganger mode -> 0x823d9050 (strike look off) instead of retail 0x823e07e8: [Look] StrikeLook, PC call sites tru+0x316f6b / tru+0x316f86		
+0x822f65d4	noport	code		branch inverted around a hoisted zero (r28 = 0): r11 = 0 or [[r11]+0x2ec] on both sides - same result		
+0x82418160	noport	code		only debug output: compares of the type (0x7a..0x89, 0x32..0x38) around calls of the empty print stub 0x82455a38 (blr)		
+0x822f7558	uncovered	doc		named in TruShadowCombat only under "Not translated" (line above): the sideways direction for type 25 with a companion		
+0x822da9e0	noport	code		brain size 0x50a0 (TU) vs 0x5040 (retail / PC): the TU-only fields (companion handle brain+0x5090 ...); TruShadowCombat H0 keeps the companion data outside the brain		
+0x822daa34	noport	code		call of the TU-only companion builder 0x822da800: TruShadowCombat H0 answers the companion questions from the object table instead (instance not rebuilt, by design)		
+0x822ebd60	noport	code		field displacements +0x50 (0x4c4c -> 0x4c9c, 0x4c80 -> 0x4cd0): TU brain layout		
+0x822ebdd0	noport	code		removes the companion instance (brain+0x5090, +0x14 |= 0x20) as in the Death state 0x8232cf20; the PC builds no companion instance		
+0x8232fea8	noport	code		the load lwz [r31+0x74] moved two instructions earlier (same value)		
+0x8232fec0	noport	code		the load lwz [r31+0x74] moved two instructions earlier (same value)		
+0x8232ff0c	noport	code		field displacements +0x50 (0x3434 -> 0x3484, vector offset 0x790 -> 0x7e0 off brain+0x2c90): TU brain layout		
+0x823e0b28	noport	code		the high half of the tracker address is kept in r31 (register use, same load of [0x829892b0])		
+0x823e2bb8	covered	code	TruShadowPower	point argument of 0x823e2b98 (TU-new): [Look] StrikeLook writes the function out with the point (TruShadowPower: 'point 0 -> the retail body; else ... *point instead of 0x82406690(target)')		
+0x823e2bf8	covered	code	TruShadowPower	point argument of 0x823e2b98: target point = *point instead of getTargetPosition 0x82406690 - [Look] StrikeLook		
+0x824126f0	noport	code		GameTracker address low half + register numbers only		
