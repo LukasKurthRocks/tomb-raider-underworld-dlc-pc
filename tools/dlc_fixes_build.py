@@ -42,6 +42,9 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
          (costume_dtp_fix; DLC 1 and the costume packs), the SoundPlex DSP kind of dlc_caverns_hall DTP 23469
          (soundplex_dsp_kind_fix); each typed by its proven rule, only words whose PC bytes are another byte order of
          the Xbox word, each written DRM proven; an UNEXPECTED word stops the build
+  waveid (ours, 2026-11-11, Q4) after playerblock, also tools/dlc_struct_fixes.py: SoundPlex Wave leaves - wave id
+         data +0 = ids(6, Xbox id), data +4 = u8u8u16 (tools/soundplex_wave_id_fix.py, base proof 750 pairs / 4718
+         leaves); pipeline 1011: DLC 2 337 words in 24 DRMs (doppelganger_casual 173), DLC 1 24 (raft_bridge_spawned)
   fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy (ours, 2026-11-08, 17n: the typed families of the
          night 07./08.11.) after dspkind, also tools/dlc_struct_fixes.py with tools/typed_family_fix.py: fade-record DTPs
          of the cine cards, uber play-anim words, FX particle record words, streamgroup mesh lists, unit DTP intro
@@ -378,14 +381,18 @@ def _struct_fix(step):
 # playerblock (2026-11-10, K-5b): the player data block (DTP +0xc8, PC [0xfad764]) in the byte order of five base player
 # pairs (tools/player_block_fix.py; doppelganger_casual +0x294 LT lock time), after dspkind; Invoke-TruPipeline.ps1
 # proves the rule first (player_block_fix.py proof) and gates every tree (dlc_struct_fixes.py check)
+# waveid (2026-11-11, Q4): SoundPlex Wave leaves - wave id data +0 = ids(6, Xbox id) (the learned type-7 table gave it the
+# DTP-id class id32:7 or none: doppelganger_casual group-78 body sounds silent / wrong), +4 {u8, u8, u16} = u8u8u16
+# (tools/soundplex_wave_id_fix.py; base proof once per process), after playerblock; gated by dlc_struct_fixes.py check
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
                 'markup', 'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro',
-                'costumedtp', 'dspkind', 'playerblock', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped',
+                'costumedtp', 'dspkind', 'playerblock', 'waveid', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped',
                 'leveltwin', 'basecopy', 'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
  fix_markup, fix_objtex, fix_objrec, fix_objid, fix_chunkrec, fix_exttuning, fix_thrallext, fix_meleelink, fix_genintro,
- fix_costumedtp, fix_dspkind, fix_playerblock, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh, fix_introtyped,
- fix_leveltwin, fix_basecopy, fix_fxrecread, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+ fix_costumedtp, fix_dspkind, fix_playerblock, fix_waveid, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh,
+ fix_introtyped, fix_leveltwin, fix_basecopy, fix_fxrecread, fix_seqrepeat, fix_navraw,
+ fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 def _fault_fix(step):

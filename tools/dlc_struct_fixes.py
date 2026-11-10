@@ -48,7 +48,12 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              lara_snow_light), code-proven READERS where they are ambiguous; ids / pointers left alone (K-5b
              2026-11-10, docs Befund-Lock-Tuning-1011.md: doppelganger_casual DTP 20212 block +0x294 u8 LT lock time
              u32-swapped to 0 = no lock-on, +0x25c u16 pair swapped)
-  fadecard   tools/typed_family_fix.py      fade-record DTPs of the cine cards / flash / key-glow objects: header +0x44 and
+  waveid     tools/soundplex_wave_id_fix.py SoundPlex Wave leaves (node type 2) of every SoundPlex DTP: data +0 wave id =
+             ids(6, Xbox id) (the converter wrote the DTP-id map ids(7, x) or kept the Xbox id: doppelganger_casual 164
+             words in 11 group-78 DTPs = silent / wrong body sounds), data +4 {u8 priority, u8, u16} = u8u8u16 of the
+             Xbox word (pipeline 1011: DTP 22707 x9 u32-swapped); base proof 750 pairs / 4718 leaves, 0 contradicting
+             (Q4 2026-11-11, docs Befund-Doppelgaenger-Wellen-1111.md); UNEXPECTED leaves are left and fail the check
+  fadecard  tools/typed_family_fix.py      fade-record DTPs of the cine cards / flash / key-glow objects: header +0x44 and
              records {s16, s16, raw} (17h-B 2026-11-08: co_dlc_black_card 22651 / co_dlc_white_card 26832)
   uberanim   tools/typed_family_fix.py      uber play-anim words (action kind 2 argument, transition +0x28) = u16 pair
              of the Xbox word (17h-C crash 2026-11-08 00:27, goo cannonball DTP 25328 +0x6d4)
@@ -90,7 +95,7 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
 eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, chunkrec, exttuning, thrallext, meleelink, genintro,
-costumedtp, dspkind, playerblock, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy, fxrecread,
+costumedtp, dspkind, playerblock, waveid, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy, fxrecread,
 seqrepeat, navraw, vmliteral (objtex / objrec / objid
 since 2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
 dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
@@ -114,9 +119,13 @@ objrec does not rule (proof: objrec_overlap 0) and no other typed step reads the
 playerblock since 2026-11-10 (K-5b) after dspkind: it writes only words of the player data block (DTP +0xc8 target,
 0x1034 B) whose base pairs prove a pure byte order; objid's +0x94 / +0x98 ids are no byte order there (left to objid),
 no later step writes the block (uberanim needs the 0x8080b00b uber magic at that target).
+waveid since 2026-11-11 (Q4) after playerblock (and after twins; pipeline 1011 still had 9 u32-swapped +4 words in DTP
+22707 there): it writes only the two data
+words of SoundPlex Wave leaves; no later step writes them (seqrepeat: Sequence +0xc only; basecopy's PC base copy holds
+the same words by the base proof). It reproduces work/q4_waves_1111/tree on top of the installed file word for word.
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
 Check mode (objtex / objrec / objid / chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind /
-playerblock / fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
+playerblock / waveid / fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
   ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
         TREE may be 'A,B' (overlay, the later folder wins - e.g. a pipeline tree with a fix tree on top);
@@ -140,10 +149,10 @@ import drm_write as DW, drm_reloc as R
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
        'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
-       'playerblock', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy', 'fxrecread',
-       'seqrepeat', 'navraw', 'vmliteral')
+       'playerblock', 'waveid', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
+       'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
 DATAFIX_STEPS = ('chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
-                 'playerblock')   # 2026-11-08; playerblock 2026-11-10 (K-5b)
+                 'playerblock', 'waveid')   # 2026-11-08; playerblock 2026-11-10 (K-5b); waveid 2026-11-11 (Q4)
 TYPED_STEPS = ('fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
                'fxrecread')   # 2026-11-08 (17n; fxrecread 18e)
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -610,6 +619,33 @@ class Steps:
         if new is None: return None, None
         return new, 'playerblock %s: %d words (%s); %s' % (rel, len(changes), self._wlist(
             'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes), self.PROOF_NOTE)
+
+    def s_waveid(self, rel, xf, XD, cur):
+        """SoundPlex Wave leaves (node type 2): data +0 wave id = ids(6, Xbox id) (the converter wrote ids(7, x) or kept
+        the Xbox id), data +4 {u8 priority, u8, u16} = u8u8u16 of the Xbox word (tools/soundplex_wave_id_fix.fix_drm,
+        Q4 2026-11-11, docs Befund-Doppelgaenger-Wellen-1111.md: doppelganger_casual 164 words in 11 group-78 DTPs,
+        pipeline 1011 also DTP 22707 +4 x9). The base proof (750 pairs, 4718 leaves, 0 contradicting) runs once per
+        process; a failed proof stops the step (SystemExit). UNEXPECTED leaves (old word no known form, target no wave
+        of the DRM / base PC wave) are left and logged as NOT PAIRED, so the check fails on them."""
+        import soundplex_wave_id_fix as WF
+        ok, lines = WF.proven()
+        if not ok:
+            raise SystemExit('waveid: base proof FAILED - %s' % ' / '.join(lines[-3:]))
+        try:
+            new, changes, info = WF.fix_drm(XD, cur)
+        except AssertionError as e:
+            return None, 'waveid %s: proof failed (%s) - nothing changed' % (rel, e)
+        odd = [r for r in info['rows'] if r[7].startswith('UNEXPECTED')]
+        tail = ('; NOT PAIRED (UNEXPECTED leaves %d: %s)' % (len(odd), '; '.join(
+            'DTP %d leaf +%#x +%d %s' % (r[1], r[2], r[3], r[7]) for r in odd[:6]))) if odd else ''
+        if info['layout']: tail += '; layout differs (not planned): DTP %s' % info['layout'][:10]
+        if info['mismatch']: tail += '; wave-section pairing != ids(6): %s' % info['mismatch'][:5]
+        if new is None:
+            return None, ('waveid %s: 0 words%s' % (rel, tail)) if tail else None
+        cl = collections.Counter(c[5] for c in changes)
+        return new, 'waveid %s: %d words (%s: %s)%s; %s' % (
+            rel, len(changes), ', '.join('%s %d' % kv for kv in sorted(cl.items())), self._wlist(
+                'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid, c in changes), tail, self.PROOF_NOTE)
 
     # ---- typed families of the night 07./08.11. (steps since 2026-11-08, 17n): tools/typed_family_fix.fix_drm proves
     # the rule on the base pairs once per process (SystemExit when it fails), changes only words whose PC bytes are
