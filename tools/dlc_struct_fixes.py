@@ -43,6 +43,11 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              2 023 words, costume packs a h k l m)
   dspkind    tools/soundplex_dsp_kind_fix.py SoundPlex DSP node (type 12) kind u16 of dlc_caverns_hall DTP 23469 +0x74
              (P4c 2026-11-07, docs Befund-P4c-Caverns-0711.md: Xbox word copied raw = kind 1792, no DSP)
+  playerblock tools/player_block_fix.py    player data block (player object DTP +0xc8, 0x1034 B = PC `[0xfad764]`) in
+             the byte order of five base player pairs (lara, lara_casual, lara_bikini, lara_wetsuit_cold,
+             lara_snow_light), code-proven READERS where they are ambiguous; ids / pointers left alone (K-5b
+             2026-11-10, docs Befund-Lock-Tuning-1011.md: doppelganger_casual DTP 20212 block +0x294 u8 LT lock time
+             u32-swapped to 0 = no lock-on, +0x25c u16 pair swapped)
   fadecard   tools/typed_family_fix.py      fade-record DTPs of the cine cards / flash / key-glow objects: header +0x44 and
              records {s16, s16, raw} (17h-B 2026-11-08: co_dlc_black_card 22651 / co_dlc_white_card 26832)
   uberanim   tools/typed_family_fix.py      uber play-anim words (action kind 2 argument, transition +0x28) = u16 pair
@@ -85,8 +90,8 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
 eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, chunkrec, exttuning, thrallext, meleelink, genintro,
-costumedtp, dspkind, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy, fxrecread, seqrepeat, navraw,
-vmliteral (objtex / objrec / objid
+costumedtp, dspkind, playerblock, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy, fxrecread,
+seqrepeat, navraw, vmliteral (objtex / objrec / objid
 since 2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
 dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
 steps, docs Befund-Pipeline-Integration-0411.md; seqrepeat since 2026-11-05, WINDOWS_REBUILD finding 49: it touches
@@ -106,9 +111,12 @@ the seven (the PC base copy is the game's own byte image of that DTP id, so it h
 test trees work/endcine_0811, crash_0811, endb270_0811 and the 17l family words of work/b270cmp_0811/tree);
 fxrecread since 2026-11-08 (18e) after basecopy, before seqrepeat: it writes only particle record words at offsets that
 objrec does not rule (proof: objrec_overlap 0) and no other typed step reads them.
+playerblock since 2026-11-10 (K-5b) after dspkind: it writes only words of the player data block (DTP +0xc8 target,
+0x1034 B) whose base pairs prove a pure byte order; objid's +0x94 / +0x98 ids are no byte order there (left to objid),
+no later step writes the block (uberanim needs the 0x8080b00b uber magic at that target).
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
 Check mode (objtex / objrec / objid / chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind /
-fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
+playerblock / fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
   ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
         TREE may be 'A,B' (overlay, the later folder wins - e.g. a pipeline tree with a fix tree on top);
@@ -132,9 +140,10 @@ import drm_write as DW, drm_reloc as R
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
        'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
-       'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy', 'fxrecread',
+       'playerblock', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy', 'fxrecread',
        'seqrepeat', 'navraw', 'vmliteral')
-DATAFIX_STEPS = ('chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind')   # 2026-11-08
+DATAFIX_STEPS = ('chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
+                 'playerblock')   # 2026-11-08; playerblock 2026-11-10 (K-5b)
 TYPED_STEPS = ('fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
                'fxrecread')   # 2026-11-08 (17n; fxrecread 18e)
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -585,6 +594,22 @@ class Steps:
             return None, ('dspkind %s: 0 words; %s' % (rel, '; '.join(odd))) if odd else None
         return new, 'dspkind %s: %d words (%s; Xbox %s); %s' % (rel, len(changes), ', '.join(
             'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes), src, self.PROOF_NOTE)
+
+    def s_playerblock(self, rel, xf, XD, cur):
+        """player data block (player object DTP +0xc8, 0x1034 B, PC `[0xfad764]`): words in the byte order of the five
+        base player pairs, READERS where they are ambiguous (tools/player_block_fix.fix_drm, K-5b 2026-11-10, docs
+        Befund-Lock-Tuning-1011.md: doppelganger_casual DTP 20212 block +0x294 = LT lock time 0 -> no lock-on); only
+        DRMs with such a block; ids / pointers are left alone"""
+        import player_block_fix as PB
+        if PB.words(DW.read(cur, 'le'), 'le') is None: return None, None
+        try:
+            new, changes, info = PB.fix_drm(XD, cur, rel, self.xpack)
+        except AssertionError as e:
+            return None, 'playerblock %s: proof failed (%s) - nothing changed' % (rel, e)
+        if info['skip']: return None, 'playerblock %s: NOT PAIRED (%s) - nothing changed' % (rel, info['skip'])
+        if new is None: return None, None
+        return new, 'playerblock %s: %d words (%s); %s' % (rel, len(changes), self._wlist(
+            'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid in changes), self.PROOF_NOTE)
 
     # ---- typed families of the night 07./08.11. (steps since 2026-11-08, 17n): tools/typed_family_fix.fix_drm proves
     # the rule on the base pairs once per process (SystemExit when it fails), changes only words whose PC bytes are

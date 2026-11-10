@@ -376,6 +376,9 @@ $steps = @{
         # 2026-11-09 uiinit: byte order of UI element init words (userTypes 301 / 303 / 316 / 320) proven on generalbank
         # Xbox <-> PC (exit 1 on a contradiction or another count than pinned)
         @('tools\ui_init_fix.py', 'proof'),
+        # 2026-11-10 K-5b playerblock: byte order of the player data block (DTP +0xc8, PC [0xfad764]) on five base
+        # player pairs, leave-one-out (exit 1 on a contradicting word or a READERS order the pairs do not allow)
+        @('tools\player_block_fix.py', 'proof'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
         # uiinit on the DLC 1 tree in place (planned words only, every write re-read), then the text-anchor gate
         @('tools\ui_init_fix.py', 'apply', $fix1, '--report', ((Split-Path -Parent $fix1) + '/uiinit_apply.json')),

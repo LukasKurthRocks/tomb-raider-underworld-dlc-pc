@@ -375,14 +375,17 @@ def _struct_fix(step):
 # proves the rules first (typed_family_fix.py proof) and gates every tree afterwards (dlc_struct_fixes.py check)
 # fxrecread (2026-11-08, 18e): the 0x17c particle record words objrec does not rule, by the reads of tru.exe 0x543f70,
 # after basecopy, before seqrepeat (introtyped takes the unit-DTP path table since 18e as well)
+# playerblock (2026-11-10, K-5b): the player data block (DTP +0xc8, PC [0xfad764]) in the byte order of five base player
+# pairs (tools/player_block_fix.py; doppelganger_casual +0x294 LT lock time), after dspkind; Invoke-TruPipeline.ps1
+# proves the rule first (player_block_fix.py proof) and gates every tree (dlc_struct_fixes.py check)
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
                 'markup', 'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro',
-                'costumedtp', 'dspkind', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
-                'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
+                'costumedtp', 'dspkind', 'playerblock', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped',
+                'leveltwin', 'basecopy', 'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
  fix_markup, fix_objtex, fix_objrec, fix_objid, fix_chunkrec, fix_exttuning, fix_thrallext, fix_meleelink, fix_genintro,
- fix_costumedtp, fix_dspkind, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh, fix_introtyped, fix_leveltwin,
- fix_basecopy, fix_fxrecread, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+ fix_costumedtp, fix_dspkind, fix_playerblock, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh, fix_introtyped,
+ fix_leveltwin, fix_basecopy, fix_fxrecread, fix_seqrepeat, fix_navraw, fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 
 
 def _fault_fix(step):
