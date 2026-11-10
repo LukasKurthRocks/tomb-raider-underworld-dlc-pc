@@ -2675,6 +2675,43 @@ def unescape(s):
     return s.replace('\\"', '"').replace('\\n', '\n').replace('\\\\', '\\')
 
 
+def check_02214():
+    """0.22.14: sub.lang rewrites the shown subtitle lines at once - the two call patches 0x4574ec (reader) and 0x453a17
+    (box add line) with their byte checks, a ring of 2 whole records (copied, not a pointer), the rewrite only after the
+    option setter and the settings save, the box written only at +0 / +0x100 (never the clock +0x208 or the floats)"""
+    problems = []
+    src = read_cpp()
+    a, b = src.find('// ---- 0.22.14 sub.lang switches'), src.find('\nbool RunSb(')
+    sec = src[a:b] if 0 <= a < b else ''
+    if not sec:
+        return ['TruMenu.cpp: section "0.22.14 sub.lang switches" missing (before RunSb)'], ''
+    for want in ('{0x004574ec, 0x004538d0, true, "S1 subtitle reader call 0x4574ec"',
+                 '{0x00453a17, 0x00583db0, true, "S2 subtitle box add call 0x453a17"',
+                 '{0x004574de, "68a0cf9c00 8bce c683a0cf9c0000 e8dfc3ffff"}', '{0x00453a0f, "6a5a 50 b9c0decc00 e894031300"}',
+                 '{0x00453a75, "c20400"}', '{0x00583e15, "c20800"}', 'const int kSrRing = 2'):
+        if want not in sec:
+            problems.append('TruMenu.cpp: 0.22.14 section must hold %s' % want)
+    rd = fn_body(src, 'void __fastcall SrReader(')
+    if 'r.text[i] = text[i]' not in rd or '__try' not in rd or 'reinterpret_cast<SrReaderFn>(0x004538d0)' not in rd:
+        problems.append('TruMenu.cpp: SrReader must copy the whole record under __try, then call the reader 0x4538d0')
+    tk = fn_body(src, 'void SrTick(')
+    if not (0 <= tk.find('CnCheck();') < tk.find('SrCheck()') < tk.find('M21PatchGroup(g_srPatches')):
+        problems.append('TruMenu.cpp: SrTick must run CnCheck (reads 0x4574ec) and SrCheck before it patches')
+    code = re.sub(r'//[^\n]*', '', fn_body(src, 'void SrRewrite('))
+    if 'WriteBytes(at, buf, len + 1)' not in code or 'strnlen_s(want[s], 0xff)' not in code:
+        problems.append('TruMenu.cpp: SrRewrite must write each box line with its NUL, at most 0xff bytes')
+    if re.search(r'kSrBox \+ 0x20[048]', code) or 'WriteDword(' in code:
+        problems.append('TruMenu.cpp: SrRewrite must not touch the clock +0x208 or the floats +0x200 / +0x204')
+    rs = fn_body(src, 'bool RunSb(')
+    i_set, i_save, i_rw = rs.find('0x005d5100'), rs.find('SbSave(saved'), rs.find('SrRewrite(v,')
+    if not (0 <= i_set < i_save < i_rw):
+        problems.append('TruMenu.cpp: RunSb must rewrite the box after the option setter and the settings save')
+    if 'SrTick();' not in fn_body(src, 'DWORD WINAPI PadHook('):
+        problems.append('TruMenu.cpp: SrTick must run once per game frame (PadHook)')
+    return problems, 'record ring (2 whole records), calls 0x4574ec / 0x453a17, rewrite after setter + save, box +0 / ' \
+                     '+0x100 only'
+
+
 def table(src):
     block = src[src.index('const OptDef kOpts[] = {'):]
     block = block[:block.index('\n};')]
@@ -2800,6 +2837,10 @@ def main(argv):
     for p in cproblems13: print('Q02213 %s' % p)
     if not cproblems13: print('ok: 0.22.13 %s' % csummary13)
     problems += cproblems13
+    cproblems14, csummary14 = check_02214()   # 0.22.14
+    for p in cproblems14: print('Q02214 %s' % p)
+    if not cproblems14: print('ok: 0.22.14 %s' % csummary14)
+    problems += cproblems14
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

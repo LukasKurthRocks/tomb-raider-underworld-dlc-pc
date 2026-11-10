@@ -2928,6 +2928,66 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.14 - sub.lang switches the shown subtitle lines at once (2026-11-10)
+
+Built into `work\asi\menu0237`, not installed. Byte checks: `work\asi\menu0237\precheck_02214.txt` (13 checks, 0
+mismatches against `data\pc\tru.exe` and the installed `tru.exe`); the 21 checks of 0.22.13 stay. Background: ENGINE.md
+rows "Subtitle record format", "Subtitle line clock", "Subtitle language at run time"; workspace
+`docs\Befund-Untertitel-Live-0911.md`.
+
+Before, `sub.lang` changed only the profile word: the two lines in the subtitle box 0xccdec0 are finished copies, so the
+old language stayed on screen until the next line - in a cutscene held by `cine.pause` (0.22.13 holds the line clock)
+until the user stepped on.
+
+- **Subtitle record (static, from the code):** the cinematic handler update 0x457100 copies a frame's subtitle text
+  (at most 0xfff bytes, NUL at the end) to the static buffer 0x9ccfa0 and calls the reader 0x4538d0 with it (call
+  0x4574ec). One record holds **every language**: `<id>\r<text>\r<id>\r<text>\r...` (ids 0 en, 1 fr, 2 de, 3 it, 4 es,
+  11 nl in DLC 2). Per entry the reader takes `atoi` of the id, the text up to the next `\r` (**255 bytes at most**, the
+  rest is skipped), and shows it when the handler's kind byte `[[ecx+4]+4]` is not 2 and (id == the profile word, or
+  word -1 and id == the game language `[0x8906b8]` and kind 1). A shown entry is cut at `\n` (strtok) into lines; each
+  line loses a leading `<speaker>: ` and goes to 0x583db0(box, line, 90) - **one record adds 0..n lines** (n = the `\n`
+  lines of the chosen entry; usually 1). Text bytes are **UTF-8** (`tools/mul_sub_records.py`: 107 non-ASCII entries
+  in 76 records of the installed `cinstream\*.mul`, all valid UTF-8); the box keeps them as they are (strcpy).
+- **Record ring:** the call 0x4574ec goes to TruMenu's `SrReader`, which copies the **whole record** (not the pointer -
+  0x9ccfa0 is reused for the next frame) with the kind byte, the profile word and the game language into its ring of the
+  last 2 records, then calls the reader. The call 0x453a17 (reader -> box) goes to `SrAddLine`, which notes each line
+  the box takes (not in game state 6 / 10, where 0x583db0 drops it), then calls 0x583db0. Both are rel32 call patches,
+  set once on the first game frame after 13 byte checks (`kSrChecks`) - after the 0.22.13 checks, which also read
+  0x4574ec. A patch site that is not the game's (another plugin) is left alone: `patch refused` in the log and in
+  `sub.lang` (no argument), and `sub.lang <n>` works as in 0.22.13. Because of that order the `0.22 cine.pause: ...
+  checks` log line now comes at the first game frame, not at the first `cine.pause`.
+- **Rewrite on `sub.lang <n>`** (after the option setter and the settings save, game thread): each non-empty box line
+  (+0 upper, +0x100 newest) is looked up among the stored lines (newest first; the box moves the newest line up at the
+  next line, 0x583d80, and when the clock runs out); the record's lines for the new language are built exactly as the
+  reader does, and the line is written into the box (<= 0x100 bytes incl. NUL). If the two box lines followed each
+  other, the upper one becomes the line before the new newest one. The clock +0x208 and the floats +0x200 / +0x204 are
+  not touched - in a held cutscene the new line stands at once and the clock stays held. A line that did not come from
+  a stored record (Bink movie 0x4a09c8 / 0x4a0a02, the 0xfff-text line 0x4574d7, an older record) stays and is logged
+  (`did not come from a stored subtitle record ... left unchanged`); a record without the new language leaves the line
+  before it as the newest (as the game would). Log per record: ids, kind, word, lines then / now and `TruMenu's parse
+  agrees` (the reader's own lines against TruMenu's copy of the parse; `DIFFERS` = report it).
+- `sub.lang` (no argument) adds `instant switch on (n records read, n lines, n rewrite(s))`; the reply of
+  `sub.lang <n>` says `shown lines: 2 rewritten, 0 left ...`.
+- Checks: `tools/trumenu_ini_check.py` check_02214, `tools/trumenu_quick_check.py` model `sublang` (13 cases: the
+  DLC 2 record of `pdlc2_030_pod.mul`, back to English, French UTF-8, clock expired, Bink line, -1 / kind, 2 lines -> 1,
+  no German entry, speaker strip, 255 bytes, id -1).
+
+### TO TEST 0.22.14
+
+| # | Step | Expected |
+|---|---|---|
+| 1 | game start (first game frame, front end) | log `0.22.14: sub.lang instant switch (subtitle records) ok (13 checks)` and `0.22.14 sub.lang: subtitle record ring on (checks ok): S1 ..., S2 ... -> TruMenu` |
+| 2 | `sub.lang` (no argument) after a cutscene line | `... instant switch on (n records read, n lines, 0 rewrite(s))` |
+| 3 | DLC 2 ceremony room `pdlc2_030_pod` (English subtitles), hold the cutscene with a line on screen (LB + View), `sub.lang 0` first if needed | the line stays English |
+| 4 | held: `sub.lang 2` | **the shown line switches to German at once** (both lines if two are shown); reply `shown lines: 1 rewritten` (or 2); log `sub.lang: box +0x100 (record #n line 1/1) '...' -> '...'`, `TruMenu's parse agrees`; badge still `Untertitel stehen` |
+| 5 | held: `sub.lang 0` | **back to English at once** |
+| 6 | held: `sub.lang 2`, then step with RB + View until the next line | the next line in German; the clock still held after the step |
+| 7 | release (LB + View) | the cutscene runs on, the lines in German and in sync |
+| 8 | `sub.lang 0` during a running (not held) cutscene | the shown line switches at once, the next lines English |
+| 9 | Bink movie with subtitles, `sub.lang 2` during it | its line stays (log `did not come from a stored subtitle record`), next movie German |
+| 10 | `sub.lang -1` (game language) in a held cutscene | the line in the game's language (German game -> German) |
+| 11 | regression: the 0.22.13 rows 1, 5, 8 | unchanged |
+
 ## 0.22.13 - pad combos on release, subtitles held, sub.lang kept, ring bits, goo drip columns (2026-11-10)
 
 Built into `work\asi\menu0236`, not installed. Byte checks: `work\asi\menu0236\precheck_02213.txt` (21 checks, 0

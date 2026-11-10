@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -1094,6 +1094,7 @@ void DrawSoundList();  // 0.20.1 snd.list overlay (render thread, section "0.20.
 void ArTick();         // 0.21 arachnophobia patches (game thread, section "0.21 arachnophobia")
 void CsTick();         // 0.21 camera shake scale / rumble patches (game thread)
 void CnTick();         // 0.22 cine.pause: the stream walk gate (game thread, section "0.22 cutscene pause")
+void SrTick();         // 0.22.14 sub.lang instant switch: subtitle record ring (game thread, section "0.22.14 sub.lang")
 void LxTick();         // 0.22.2 light.frame: per-frame light capture (game thread, section "0.22.2 light.frame")
 void LsTick();         // 0.22.3 light.stable: stable scene light order (game thread, section "0.22.3 light.stable")
 void LcTick();         // 0.22.10 light cut: builder hooks follow the switches (game thread, section "0.22.10 light cut")
@@ -1415,7 +1416,8 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         ArTick();                             // 0.21 arachnophobia: slot 7 / sound gates (only while on in a level)
         CsTick();                             // 0.21 camera shake scale / rumble (only below 100 %)
         CnTick();                             // 0.22 cine.pause (cheap while off: one flag)
-        AwTick();                             // 0.22.9 ai.why: places the coordinator counter once (cheap after that)
+        SrTick();                             // 0.22.14 sub.lang instant switch: record ring patches (once)
+        AwTick();                            // 0.22.9 ai.why: places the coordinator counter once (cheap after that)
         CtTick();                             // 0.22.9 combo.trace (cheap while off: one flag)
         FtTick();                             // 0.22.11 fight.trace / enemy.panel (cheap while off: two flags)
         LxTick();                             // 0.22.2 light.frame (cheap while idle: two flags)
@@ -16769,6 +16771,9 @@ const char *SbName(LONG v) {
     default: return "?";
     }
 }
+extern bool g_srOn, g_srRefused;             // 0.22.14 instant switch (section below)
+extern char g_srWhy[96];
+extern volatile LONG g_srSeq, g_srLinesSeen, g_srRewrites;
 void ValSb(char *o, size_t n) {
     if (!SbCheck()) { Out(o, n, "disabled: %s", g_sbWhy); return; }
     DWORD prof = 0, cb = 0, reg = 0;
@@ -16779,9 +16784,10 @@ void ValSb(char *o, size_t n) {
     ReadFloats(0x008ab590, &opt, 1);
     ReadDword(0x008900e8, &reg);
     const LONG cur = okProf ? static_cast<LONG>(static_cast<short>(w)) : -99;
-    Out(o, n, "subtitles now %ld (%s), option 0xb %.0f, registry mirror %ld%s; %ld settings save(s) by sub.lang", cur,
-        okProf ? SbName(cur) : "no profile", static_cast<double>(opt), static_cast<LONG>(reg),
-        cb == 0x005d4dc0 ? "" : " (option callback differs)", g_sbSaves);
+    Out(o, n, "subtitles now %ld (%s), option 0xb %.0f, registry mirror %ld%s; %ld settings save(s) by sub.lang; "
+        "instant switch %s (%ld records read, %ld lines, %ld rewrite(s))", cur, okProf ? SbName(cur) : "no profile",
+        static_cast<double>(opt), static_cast<LONG>(reg), cb == 0x005d4dc0 ? "" : " (option callback differs)",
+        g_sbSaves, g_srOn ? "on" : g_srRefused ? "patch refused" : g_srWhy, g_srSeq, g_srLinesSeen, g_srRewrites);
 }
 // 0.22.13 (live 2026-11-09, Befund-PC-Test-0911-Abend row "TruMenu 0.22.12": after a restart sub.lang was back at -1):
 // the game writes its settings only in 0x478010, and its only caller is the shutdown path 0x5df930 (call 0x5df935) -
@@ -16827,6 +16833,329 @@ bool SbSave(char *o, size_t n) {
     else Out(o, n, "NOT saved (settings save raised an exception - see TruMenu.log)");
     return ok;
 }
+// ---- 0.22.14 sub.lang switches the shown lines at once (static 2026-11-10, tools/pe_dis.py on data\pc\tru.exe,
+// tools/mul_sub_records.py on the installed cinstream\*.mul; ENGINE.md row "Subtitle record format"). Before, sub.lang
+// changed only the profile word, and the two lines in the subtitle box 0xccdec0 were finished copies in the old language.
+// The cinematic handler update 0x457100 copies a frame's subtitle text (<= 0xfff bytes, NUL at its end; 0x4535a0) to the
+// static buffer 0x9ccfa0 and calls the reader 0x4538d0 (thiscall, ecx = handler, [esp+4] = text, ret 4) at 0x4574ec.
+// Record = '<id>\r<text>\r<id>\r<text>\r...' with every language: leading isspace skipped (0x815187, _ctype & 8); per
+// entry id = atoi (0x814fba), skip to '\r' (+1), copy up to '\r' / NUL, 255 bytes at most (cmp ecx, 0xff at 0x453954),
+// the rest of the entry skipped, NUL; shown when the handler's kind byte [[ecx+4]+4] != 2 and (id == (short)[[0xc59264]
+// +0x208] or (word == -1 and id == [0x8906b8] (0x49a730, game language) and kind == 1)); a shown entry is cut by strtok
+// at "\n" (0x841fb0) into lines, each line loses a leading "<speaker>: " (first ': ' that has a byte after it, 0x4539e0)
+// and goes to 0x583db0(box, line, 90) (0x453a17) - so one call adds 0..n lines; the text is UTF-8 (all 107 non-ASCII
+// language entries of the 76 records tools/mul_sub_records.py found are valid UTF-8), the box keeps the bytes (strcpy).
+// TruMenu: call 0x4574ec -> SrReader copies the whole record (all languages) with the handler kind, the profile word and
+// the game language into its own ring of the last 2 records, then calls the reader; call 0x453a17 -> SrAddLine notes
+// each line the reader hands to the box (when the box takes it: state byte 0xe7f143 not 6 / 10), then calls 0x583db0.
+// On sub.lang <v> (after the option setter and the settings save, game thread) SrRewrite finds which stored line each
+// box line (+0 / +0x100) is (newest first; the box moves the newest line up at the next line, 0x583d80, or when the clock
+// runs out), builds the record's lines for the new language exactly as the reader does and writes them into the box
+// (<= 0x100 bytes incl. NUL). The clock +0x208 and the floats +0x200 / +0x204 stay. A box line that no stored record gave
+// (Bink movie 0x4a09c8 / 0x4a0a02, the 0xfff text 0x4574d7, an older record) stays as it is - one log line.
+const DWORD kSrBox = 0x00ccdec0;
+const DvCheck kSrChecks[] = {
+    {0x004574de, "68a0cf9c00 8bce c683a0cf9c0000 e8dfc3ffff"},                    // handler: reader(0x9ccfa0) at 0x4574ec
+    {0x004538d0, "81ec04010000 a1e8d78b00 33c4 89842400010000 55 56 8bb42410010000 0fbe06 50 8be9 e88f183c00"},
+    {0x00453920, "56 e894163c00 8bf8 8a06 83c404 3c0d 740e 84c0 7412 8a4601 83c601 3c0d 75f2 803e00 7403 83c601"},
+    {0x00453947, "8a06 33c9 3c0d 7433 90 84c0 741a 81f9ff000000 7d12 83c601 88440c10 8a06 83c101 3c0d 75e4"},
+    {0x00453982, "8b5504 c6440c1000 807a0402 742f a16492c500 0fb78008020000 0fbfc8 3bf9 7418 663dffff 7516 e8826d0400 "
+                 "3bf8 750d 8b5504 807a0401 7504 b301"},                           // language choice
+    {0x004539c1, "8d442410 68b01f8400 50 e81a153c00"},                            // strtok(line, "\n")
+    {0x004539e0, "33c9 3808 7429 8a540101 84d2 7421 807c010200 741a 803c013a 7505 80fa20 740b"},   // "<speaker>: "
+    {0x00453a0f, "6a5a 50 b9c0decc00 e894031300"},                                // box add line (0x453a17)
+    {0x00453a75, "c20400"},                                                       // reader: ret 4
+    {0x00841fb0, "0a00"},                                                         // strtok delimiter "\n"
+    {0x0049a730, "a1b8068900 c3"},                                                // game language [0x8906b8]
+    {0x00583d80, "56 57 8db900010000 8bf1 8bc7 2bf7"},                            // newest line moves up
+    {0x00583e15, "c20800"},                                                       // add line: ret 8
+};
+const int kSrRing = 2, kSrMaxLines = 8;
+struct SrRec {
+    LONG seq;                     // 0 = empty
+    DWORD handler;
+    BYTE kind;                    // [[handler+4]+4] when read (2 = no subtitles)
+    short word;                   // the profile word when read
+    LONG gameLang;                // [0x8906b8] when read
+    int len;
+    char text[0x1000];            // the whole record, every language
+    int lineN, lineDropped;       // lines the reader handed to the box (and how many did not fit here)
+    char line[kSrMaxLines][0x100];
+};
+SrRec g_srRec[kSrRing];
+volatile LONG g_srSeq = 0, g_srLinesSeen = 0, g_srRewrites = 0;
+int g_srCur = -1;                 // ring slot of the record being read (game thread)
+bool g_srChecked = false, g_srOk = false, g_srOn = false, g_srRefused = false;
+char g_srWhy[96] = "not checked yet";
+AiPatch g_srPatches[2] = {
+    {0x004574ec, 0x004538d0, true, "S1 subtitle reader call 0x4574ec", 0, 0, false},
+    {0x00453a17, 0x00583db0, true, "S2 subtitle box add call 0x453a17", 0, 0, false},
+};
+typedef void(__fastcall *SrReaderFn)(DWORD self, DWORD edx, const char *text);
+typedef void(__fastcall *SrAddFn)(DWORD box, DWORD edx, const char *text, int frames);
+void __fastcall SrReader(DWORD self, DWORD edx, const char *text) {
+    const LONG seq = InterlockedIncrement(&g_srSeq);
+    const int slot = static_cast<int>(seq % kSrRing);
+    SrRec &r = g_srRec[slot];
+    r.seq = 0;
+    r.lineN = 0;
+    r.lineDropped = 0;
+    r.len = 0;
+    r.text[0] = 0;
+    bool ok = true;
+    __try {
+        int i = 0;
+        for (; i < 0xfff && text[i]; ++i) r.text[i] = text[i];
+        r.text[i] = 0;
+        r.len = i;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        ok = false;
+        r.text[0] = 0;
+    }
+    DWORD info = 0, prof = 0, lang = 0;
+    BYTE kind = 0xff;
+    WORD w = 0xffff;
+    if (ReadDword(self + 4, &info) && info) ReadByte(info + 4, &kind);
+    if (ReadDword(0x00c59264, &prof) && prof) ReadWord(prof + 0x208, &w);
+    ReadDword(0x008906b8, &lang);
+    r.handler = self;
+    r.kind = kind;
+    r.word = static_cast<short>(w);
+    r.gameLang = static_cast<LONG>(lang);
+    r.seq = ok ? seq : 0;
+    g_srCur = ok ? slot : -1;
+    reinterpret_cast<SrReaderFn>(0x004538d0)(self, edx, text);
+    g_srCur = -1;
+}
+void __fastcall SrAddLine(DWORD box, DWORD edx, const char *text, int frames) {
+    BYTE st = 0;
+    ReadByte(0x00e7f143, &st);
+    if (g_srCur >= 0 && box == kSrBox && st != 6 && st != 10) {   // 0x583db0 drops the line in states 6 / 10
+        SrRec &r = g_srRec[g_srCur];
+        if (r.lineN < kSrMaxLines) {
+            char *d = r.line[r.lineN];
+            int i = 0;
+            __try {
+                for (; i < 0xff && text[i]; ++i) d[i] = text[i];
+            } __except (EXCEPTION_EXECUTE_HANDLER) {
+                i = 0;
+            }
+            d[i] = 0;
+            ++r.lineN;
+        } else {
+            ++r.lineDropped;
+        }
+        InterlockedIncrement(&g_srLinesSeen);
+    }
+    reinterpret_cast<SrAddFn>(0x00583db0)(box, edx, text, frames);
+}
+bool SrCheck() {
+    if (g_srChecked) return g_srOk;
+    g_srChecked = true;
+    DWORD at = 0;
+    g_srOk = DvChecks(kSrChecks, sizeof(kSrChecks) / sizeof(kSrChecks[0]), &at);
+    if (g_srOk) Out(g_srWhy, sizeof(g_srWhy), "ok");
+    else Out(g_srWhy, sizeof(g_srWhy), "subtitle reader code differs at 0x%08lx", at);
+    g_srPatches[0].game = g_srPatches[0].target - (g_srPatches[0].site + 5);
+    g_srPatches[0].hook = reinterpret_cast<DWORD>(&SrReader) - (g_srPatches[0].site + 5);
+    g_srPatches[1].game = g_srPatches[1].target - (g_srPatches[1].site + 5);
+    g_srPatches[1].hook = reinterpret_cast<DWORD>(&SrAddLine) - (g_srPatches[1].site + 5);
+    Log(g_srOk ? 1 : 0, "0.22.14: sub.lang instant switch (subtitle records) %s (%d checks)", g_srWhy,
+        static_cast<int>(sizeof(kSrChecks) / sizeof(kSrChecks[0])));
+    return g_srOk;
+}
+void M21PatchGroup(AiPatch *p, int n, bool want, bool *on, bool *refused, const char *what, const char *why);
+void CnCheck();
+// PadHook, once per game frame: the two call patches go in once the checks hold (the 0.22.13 subtitle clock checks of
+// CnCheck read the call 0x4574ec too - they run first, on the game's bytes)
+void SrTick() {
+    if (g_srOn || g_srRefused) return;
+    CnCheck();
+    if (!SrCheck()) return;
+    M21PatchGroup(g_srPatches, 2, true, &g_srOn, &g_srRefused, "0.22.14 sub.lang: subtitle record ring", "checks ok");
+}
+bool SrSpace(char c) { return c == ' ' || (c >= 9 && c <= 13); }   // the reader's isspace (C locale, _ctype & 8)
+// the lines the reader 0x4538d0 hands to the box for record r with the profile word "word" (and game language)
+int SrLines(const SrRec &r, short word, LONG gameLang, char (*out)[0x100], int cap) {
+    int n = 0;
+    const char *p = r.text;
+    while (SrSpace(*p)) ++p;
+    while (*p) {
+        const int id = atoi(p);
+        while (*p && *p != '\r') ++p;
+        if (*p) ++p;
+        char entry[0x100];
+        int c = 0;
+        while (*p && *p != '\r' && c < 0xff) entry[c++] = *p++;
+        while (*p && *p != '\r') ++p;
+        entry[c] = 0;
+        const bool show = r.kind != 2 && (id == static_cast<int>(word) ||
+                                          (word == -1 && id == gameLang && r.kind == 1));
+        if (show) {
+            int i = 0;
+            while (entry[i]) {                    // strtok(entry, "\n"): empty tokens are skipped
+                while (entry[i] == '\n') ++i;
+                if (!entry[i]) break;
+                const int start = i;
+                while (entry[i] && entry[i] != '\n') ++i;
+                char tok[0x100];
+                const int len = i - start;
+                memcpy(tok, entry + start, static_cast<size_t>(len));
+                tok[len] = 0;
+                const char *t = tok;
+                for (int k = 0; t[k] && t[k + 1] && t[k + 2]; ++k)   // drop "<speaker>: " (0x4539e0..0x453a0b)
+                    if (t[k] == ':' && t[k + 1] == ' ') { t += k + 2; break; }
+                if (n < cap) strcpy_s(out[n], 0x100, t);
+                ++n;
+            }
+        }
+        while (SrSpace(*p)) ++p;
+    }
+    return n < cap ? n : cap;
+}
+bool SrReadSlot(DWORD at, char *out) {   // one box slot, 0x100 bytes, NUL kept
+    out[0] = 0;
+    __try {
+        memcpy(out, reinterpret_cast<const void *>(at), 0x100);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        out[0] = 0;
+        return false;
+    }
+    out[0xff] = 0;
+    return true;
+}
+void SrShort(const char *s, char *o, size_t n) {   // a line for the log: control bytes as '?', at most 60 bytes
+    size_t i = 0;
+    for (; s[i] && i < 60 && i + 1 < n; ++i) o[i] = static_cast<unsigned char>(s[i]) < 32 ? '?' : s[i];
+    o[i] = 0;
+}
+struct SrPos { int slot, k, n; };
+// game thread, after the option setter: the box lines in the language "v"; o = one short result for the reply
+void SrRewrite(LONG v, char *o, size_t n) {
+    if (!g_srOn) { Out(o, n, "shown lines not rewritten (record hook %s)", g_srOk ? "not in" : g_srWhy); return; }
+    int order[kSrRing] = {0, 0}, rn = 0;      // stored records, older first
+    for (int i = 0; i < kSrRing; ++i)
+        if (g_srRec[i].seq) order[rn++] = i;
+    if (rn == 2 && g_srRec[order[0]].seq > g_srRec[order[1]].seq) { const int t = order[0]; order[0] = order[1]; order[1] = t; }
+    if (!rn) {
+        Out(o, n, "shown lines not rewritten (no subtitle record read yet)");
+        Log(1, "sub.lang: no stored subtitle record - box left");
+        return;
+    }
+    static char box[2][0x100];
+    SrReadSlot(kSrBox, box[0]);
+    SrReadSlot(kSrBox + 0x100, box[1]);
+    SrPos all[kSrRing * kSrMaxLines];
+    int an = 0, baseNew[kSrRing] = {0, 0}, nn[kSrRing] = {0, 0}, total = 0;
+    static char lines[kSrRing][kSrMaxLines][0x100];
+    DWORD lang = 0;
+    ReadDword(0x008906b8, &lang);
+    for (int j = 0; j < rn; ++j) {
+        const SrRec &r = g_srRec[order[j]];
+        for (int k = 0; k < r.lineN; ++k) all[an++] = {order[j], k, r.lineN};
+        nn[j] = SrLines(r, static_cast<short>(v), static_cast<LONG>(lang), lines[j], kSrMaxLines);
+        baseNew[j] = total;
+        total += nn[j];
+        char ids[64] = "";
+        size_t used = 0;
+        const char *p = r.text;           // the record's ids (log only)
+        while (*p) {
+            while (SrSpace(*p)) ++p;
+            if (!*p) break;
+            LabelAdd(ids, sizeof(ids), &used, "%s%d", used ? "," : "", atoi(p));
+            while (*p && *p != '\r') ++p;
+            if (*p) ++p;
+            while (*p && *p != '\r') ++p;
+        }
+        // the reader's own lines against TruMenu's copy of its parse (same record, the word it was read with)
+        static char again[kSrMaxLines][0x100];
+        const int an2 = SrLines(r, r.word, r.gameLang, again, kSrMaxLines);
+        bool same = an2 == r.lineN;
+        for (int k = 0; same && k < an2; ++k) same = !strcmp(again[k], r.line[k]);
+        char old[64] = "", now[64] = "";
+        SrShort(r.lineN ? r.line[r.lineN - 1] : "", old, sizeof(old));
+        SrShort(nn[j] ? lines[j][nn[j] - 1] : "", now, sizeof(now));
+        Log(1, "sub.lang: record #%ld (%d bytes, ids %s, kind %u, read with word %d / game language %ld): %d line(s) "
+            "shown then ('%s'; TruMenu's parse %s), %d line(s) for %ld ('%s')%s", r.seq, r.len, ids,
+            static_cast<unsigned>(r.kind), static_cast<int>(r.word), r.gameLang, r.lineN, old,
+            same ? "agrees" : "DIFFERS", nn[j], v, now, r.lineDropped ? " - more lines than TruMenu keeps" : "");
+    }
+    auto slotIndex = [&](int slot) { for (int j = 0; j < rn; ++j) if (order[j] == slot) return j; return 0; };
+    // a stored line -> index into the new line sequence (-1 = older than the stored records / nothing)
+    auto mapNew = [&](const SrPos &p) {
+        const int j = slotIndex(p.slot);
+        if (!nn[j]) return baseNew[j] - 1;     // no line in the new language: the line before stays the newest
+        const int kk = p.k == p.n - 1 ? nn[j] - 1 : (p.k < nn[j] - 1 ? p.k : nn[j] - 1);
+        return baseNew[j] + kk;
+    };
+    auto newText = [&](int q) -> const char * {
+        for (int j = rn - 1; j >= 0; --j)
+            if (q >= baseNew[j] && q < baseNew[j] + nn[j]) return lines[j][q - baseNew[j]];
+        return nullptr;
+    };
+    int pos[2] = {-1, -1};                    // [0] = +0 (upper), [1] = +0x100 (newest)
+    if (box[1][0])
+        for (int i = an - 1; i >= 0; --i)
+            if (!strcmp(g_srRec[all[i].slot].line[all[i].k], box[1])) { pos[1] = i; break; }
+    if (box[0][0]) {
+        if (pos[1] > 0 && !strcmp(g_srRec[all[pos[1] - 1].slot].line[all[pos[1] - 1].k], box[0])) pos[0] = pos[1] - 1;
+        else
+            for (int i = an - 1; i >= 0; --i)
+                if (i != pos[1] && !strcmp(g_srRec[all[i].slot].line[all[i].k], box[0])) { pos[0] = i; break; }
+    }
+    const char *want[2] = {nullptr, nullptr};
+    const char *why[2] = {"", ""};
+    int q1 = -2;
+    if (pos[1] >= 0) {
+        q1 = mapNew(all[pos[1]]);
+        want[1] = q1 >= 0 ? newText(q1) : nullptr;
+        if (!want[1]) why[1] = "the record has no line in this language and the line before is older than the ring";
+    }
+    if (pos[0] >= 0) {
+        if (pos[1] >= 0 && pos[0] == pos[1] - 1) {   // the two lines followed each other: keep that order
+            want[0] = q1 >= 1 ? newText(q1 - 1) : nullptr;
+            if (!want[0]) why[0] = "the line before the new newest line is older than the ring";
+        } else {
+            const int q0 = mapNew(all[pos[0]]);
+            want[0] = q0 >= 0 ? newText(q0) : nullptr;
+            if (!want[0]) why[0] = "the record has no line in this language and the line before is older than the ring";
+        }
+    }
+    int written = 0, kept = 0;
+    for (int s = 0; s < 2; ++s) {
+        if (!box[s][0]) continue;
+        const DWORD at = kSrBox + static_cast<DWORD>(s) * 0x100;
+        char was[64] = "", now[64] = "";
+        SrShort(box[s], was, sizeof(was));
+        if (pos[s] < 0) {
+            ++kept;
+            Log(1, "sub.lang: box +0x%x '%s' did not come from a stored subtitle record (Bink movie, other source or "
+                "older) - left unchanged", s * 0x100, was);
+            continue;
+        }
+        if (!want[s]) {
+            ++kept;
+            Log(1, "sub.lang: box +0x%x '%s' left unchanged - %s", s * 0x100, was, why[s]);
+            continue;
+        }
+        if (!strcmp(want[s], box[s])) { ++kept; continue; }
+        const size_t len = strnlen_s(want[s], 0xff);
+        char buf[0x100];
+        memcpy(buf, want[s], len);
+        buf[len] = 0;
+        SrShort(buf, now, sizeof(now));
+        if (WriteBytes(at, buf, len + 1)) {
+            ++written;
+            Log(1, "sub.lang: box +0x%x (record #%ld line %d/%d) '%s' -> '%s'", s * 0x100, g_srRec[all[pos[s]].slot].seq,
+                all[pos[s]].k + 1, all[pos[s]].n, was, now);
+        } else {
+            ++kept;
+            Log(0, "sub.lang: box +0x%x could not be written", s * 0x100);
+        }
+    }
+    const LONG k = InterlockedIncrement(&g_srRewrites);
+    Out(o, n, "shown lines: %d rewritten, %d left (rewrite #%ld, %d stored record(s))", written, kept, k, rn);
+}
 bool RunSb(const char *arg, char *o, size_t n) {
     if (!arg || !arg[0]) { ValSb(o, n); return true; }   // no argument = report only
     if (!SbCheck()) { Out(o, n, "disabled: %s", g_sbWhy); return false; }
@@ -16845,7 +17174,9 @@ bool RunSb(const char *arg, char *o, size_t n) {
     Log(1, "sub.lang %ld (%s) - option setter 0x5d5100(0xb, %ld, 1) (src=%s)", v, SbName(v), v, ShotSource("sub.lang"));
     char saved[96];
     const bool kept = SbSave(saved, sizeof(saved));   // 0.22.13: the game's own settings save -> registry
-    Out(o, n, "sub.lang %ld (%s) - from the next subtitle line (movies: next movie); %s", v, SbName(v), saved);
+    char shown[96];
+    SrRewrite(v, shown, sizeof(shown));                // 0.22.14: the lines on screen at once (stored records)
+    Out(o, n, "sub.lang %ld (%s) - %s; next lines too (movies: next movie); %s", v, SbName(v), shown, saved);
     return kept;
 }
 // ---- 0.22.9 combo.trace (owner 2026-11-09 15:1x: "verify that combos happen"; thralls fall over at every hit on PC):
@@ -24738,7 +25069,9 @@ const Item kItems[] = {
                           "switches anything)", false, ValRg, nullptr},
     {"sub.lang", "action", "0.22.9 [-1|0..4|7|9..12]: subtitle language live (-1 game language, 0 en, 1 fr, 2 de, 3 it, "
                            "4 es) through the game's option setter 0x5d5100 - from the next subtitle line; 0.22.13: then "
-                           "the game's settings save 0x478010 (registry), so it survives a restart; no argument = report",
+                           "the game's settings save 0x478010 (registry), so it survives a restart; 0.22.14: the shown "
+                           "lines switch at once (TruMenu keeps the last 2 subtitle records with every language and "
+                           "rewrites the box 0xccdec0 +0 / +0x100), also in a held cutscene; no argument = report",
      true, ValSb, RunSb},
     {"cine.status", "info", "0.22: the stream list - the cutscene stream (state, time, handler, sound), GameTracker "
                             "cinematic, the pause", false, ValCnStatus, nullptr},

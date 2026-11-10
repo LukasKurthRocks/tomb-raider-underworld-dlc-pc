@@ -3084,6 +3084,153 @@ def check_cinepad():
     return ok
 
 
+# ---- 0.22.14 sublang: the reader's parse (SrLines, as 0x4538d0) and the box rewrite (SrRewrite)
+def sr_space(c):
+    return c == 0x20 or 9 <= c <= 13
+
+
+def sr_atoi(b, p):                               # CRT atoi from p (the reader's id; p is not at whitespace here)
+    i, sign, v = p, 1, 0
+    while i < len(b) and sr_space(b[i]): i += 1
+    if i < len(b) and b[i] in (0x2b, 0x2d):
+        sign = -1 if b[i] == 0x2d else 1
+        i += 1
+    while i < len(b) and 0x30 <= b[i] <= 0x39:
+        v = v * 10 + b[i] - 0x30
+        i += 1
+    return sign * v
+
+
+def sr_lines(rec, word, game_lang, cap=8):      # SrLines
+    b, kind = rec['text'], rec['kind']
+    out, p = [], 0
+    while p < len(b) and sr_space(b[p]): p += 1
+    while p < len(b):
+        idv = sr_atoi(b, p)
+        while p < len(b) and b[p] != 0x0d: p += 1
+        if p < len(b): p += 1
+        e = bytearray()
+        while p < len(b) and b[p] != 0x0d and len(e) < 0xff:
+            e.append(b[p])
+            p += 1
+        while p < len(b) and b[p] != 0x0d: p += 1
+        show = kind != 2 and (idv == word or (word == -1 and idv == game_lang and kind == 1))
+        if show:
+            for tok in bytes(e).split(b'\n'):
+                if not tok: continue                     # strtok skips empty tokens
+                t = tok
+                k = 0
+                while k + 2 < len(t):                    # t[k], t[k + 1], t[k + 2] all non-NUL (0x4539e0..0x453a0b)
+                    if t[k] == 0x3a and t[k + 1] == 0x20:
+                        t = t[k + 2:]
+                        break
+                    k += 1
+                out.append(t)
+        while p < len(b) and sr_space(b[p]): p += 1
+    return out[:cap]
+
+
+def sr_rewrite(recs, box, v, game_lang):        # SrRewrite: recs older first, each with 'line' = what the box got
+    allp = []
+    for j, r in enumerate(recs):
+        for k in range(len(r['line'])): allp.append((j, k, len(r['line'])))
+    nl = [sr_lines(r, v, game_lang) for r in recs]
+    base, total = [], 0
+    for j in range(len(recs)):
+        base.append(total)
+        total += len(nl[j])
+
+    def map_new(pos):
+        j, k, n = pos
+        if not nl[j]: return base[j] - 1
+        kk = len(nl[j]) - 1 if k == n - 1 else min(k, len(nl[j]) - 1)
+        return base[j] + kk
+
+    def new_text(q):
+        for j in range(len(recs) - 1, -1, -1):
+            if base[j] <= q < base[j] + len(nl[j]): return nl[j][q - base[j]]
+        return None
+
+    line_of = lambda i: recs[allp[i][0]]['line'][allp[i][1]]
+    pos = [-1, -1]
+    if box[1]:
+        for i in range(len(allp) - 1, -1, -1):
+            if line_of(i) == box[1]: pos[1] = i; break
+    if box[0]:
+        if pos[1] > 0 and line_of(pos[1] - 1) == box[0]: pos[0] = pos[1] - 1
+        else:
+            for i in range(len(allp) - 1, -1, -1):
+                if i != pos[1] and line_of(i) == box[0]: pos[0] = i; break
+    want = [None, None]
+    q1 = -2
+    if pos[1] >= 0:
+        q1 = map_new(allp[pos[1]])
+        want[1] = new_text(q1) if q1 >= 0 else None
+    if pos[0] >= 0:
+        if pos[1] >= 0 and pos[0] == pos[1] - 1: want[0] = new_text(q1 - 1) if q1 >= 1 else None
+        else:
+            q0 = map_new(allp[pos[0]])
+            want[0] = new_text(q0) if q0 >= 0 else None
+    return [want[s][:0xff] if box[s] and pos[s] >= 0 and want[s] is not None else box[s] for s in range(2)]
+
+
+def sr_read(text, word, kind=1, game_lang=0):  # what the reader gives the box when the record comes
+    r = {'text': text, 'kind': kind}
+    r['line'] = sr_lines(r, word, game_lang)
+    return r
+
+
+def sr_box(recs):                                # the box after the records: the last two lines (no clock expiry)
+    lines = [l for r in recs for l in r['line']]
+    return [lines[-2] if len(lines) > 1 else b'', lines[-1] if lines else b'']
+
+
+def check_sublang():
+    ok = True
+    # the record of pdlc2_030_pod.mul @0x3e798c (tools/mul_sub_records.py), the next one made up in the same form
+    pod = b'0\rAmanda cut the power.\r11\rAmanda heeft de stroom uitgezet.\r1\rAmanda a coup\xc3\xa9 le courant.\r' \
+          b'2\rAmanda hat die Energiezufuhr gekappt.\r3\rAmanda ha tolto la corrente.\r4\rAmanda ha desactivado la ' \
+          b'energ\xc3\xada, ve a activarla.\r'
+    nxt = b'0\rZip: Go reactivate it.\r2\rZip: Schalte sie wieder ein.\r'
+    cases = []
+    a, b2 = sr_read(pod, 0), sr_read(nxt, 0)
+    cases.append(('held cutscene, sub.lang 2: both lines German', sr_rewrite([a, b2], sr_box([a, b2]), 2, 0),
+                  [b'Amanda hat die Energiezufuhr gekappt.', b'Schalte sie wieder ein.']))
+    a2, b3 = sr_read(pod, 2), sr_read(nxt, 2)
+    cases.append(('German shown, sub.lang 0: back to English', sr_rewrite([a2, b3], sr_box([a2, b3]), 0, 0),
+                  [b'Amanda cut the power.', b'Go reactivate it.']))
+    cases.append(('sub.lang 1: French keeps the UTF-8 bytes', sr_rewrite([b2, a], sr_box([b2, a]), 1, 0),
+                  [b'Go reactivate it.', b'Amanda a coup\xc3\xa9 le courant.']))
+    cases.append(('clock ran out (upper = newest, lower empty)', sr_rewrite([a, b2], [b'Go reactivate it.', b''], 2, 0),
+                  [b'Schalte sie wieder ein.', b'']))
+    cases.append(('Bink line (no stored record) stays', sr_rewrite([a, b2], [b'Movie line', b'Go reactivate it.'], 2, 0),
+                  [b'Movie line', b'Schalte sie wieder ein.']))
+    cases.append(('-1 = game language (2) for kind 1', sr_rewrite([a, b2], sr_box([a, b2]), -1, 2),
+                  [b'Amanda hat die Energiezufuhr gekappt.', b'Schalte sie wieder ein.']))
+    k0a, k0b = sr_read(pod, 0, kind=0), sr_read(nxt, 0, kind=0)
+    cases.append(('-1 with kind 0: no line -> left', sr_rewrite([k0a, k0b], sr_box([k0a, k0b]), -1, 2),
+                  [b'Amanda cut the power.', b'Go reactivate it.']))
+    cases.append(('kind 2 shows nothing', sr_lines({'text': pod, 'kind': 2}, 0, 0), []))
+    two = b'0\rLine one\nLine two\r2\rZeile eins und zwei\r'
+    t = sr_read(two, 0)
+    cases.append(('2 English lines -> 1 German: upper from the record before', sr_rewrite([a, t], sr_box([a, t]), 2, 0),
+                  [b'Amanda hat die Energiezufuhr gekappt.', b'Zeile eins und zwei']))
+    nde = b'0\rOnly English here.\r3\rSolo italiano.\r'
+    o = sr_read(nde, 0)
+    cases.append(('no German entry: lower = the record before, upper left',
+                  sr_rewrite([a, o], sr_box([a, o]), 2, 0), [b'Amanda cut the power.', b'Amanda hat die Energiezufuhr gekappt.']))
+    cases.append(('speaker strip only at ": " with a byte after it', sr_lines({'text': b'0\rNote:x\r0\rA: \r0\rB: c\r', 'kind': 1}, 0, 0),
+                  [b'Note:x', b'A: ', b'c']))
+    longt = b'0\r' + b'x' * 300 + b'\r2\rkurz\r'
+    cases.append(('255 bytes at most', [len(l) for l in sr_lines({'text': longt, 'kind': 1}, 0, 0)], [255]))
+    cases.append(('id "-1" matches word -1 directly', sr_lines({'text': b'-1\rminus\r', 'kind': 0}, -1, 2), [b'minus']))
+    for name, got, want in cases:
+        good = got == want
+        ok &= good
+        print('sublang: %s: %s  %s' % (name, got, 'ok' if good else 'FAIL (want %s)' % want))
+    return ok
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -3102,7 +3249,8 @@ def main():
                check_yfooter(), check_utf8cut(rng), check_cosvalid(rng), check_uber(), check_navwalk(rng),   # 0.21.7
                check_chapters(), check_shlive(),
                check_qcdanger(), check_qcarm(), check_favargs(rng), check_sgcover(), check_qcsuggest(),   # 0.21.8
-               check_cinepad()]                                                       # 0.22.13
+               check_cinepad(),                                                       # 0.22.13
+               check_sublang()]                                                       # 0.22.14
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 
