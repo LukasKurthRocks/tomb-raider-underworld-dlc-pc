@@ -2,19 +2,22 @@
 
 A small ASI plugin for the **PC** `tru.exe` (Steam, Tomb Raider: Underworld 1.1, unpacked) with **comfort options for
 players**: a frame limiter, a field-of-view factor, a camera-shake factor (motion sickness) and the fix for the
-start-up crash on PCs with more than 31 CPU threads; 0.1.2: an optional skip of the start-up intro movie. TruMenu stays the debug tool; TruQoL holds only switches a player
+start-up crash on PCs with more than 31 CPU threads; 0.1.2: an optional skip of the start-up intro movie; 0.1.4: an
+optional fix for the half-speed main menu after "pause -> back to the main menu". TruMenu stays the debug tool; TruQoL holds only switches a player
 wants, each with its own INI key (owner decision 2026-11-08). Defaults: **frame limiter on at 60 fps**, the camera
 options neutral (= the game's behaviour), the thread cap on at 8 since 0.1.3 (it only acts on PCs with more threads;
 31 was the old default - live on a 36-thread PC 25 and more hang at the first load).
 
-**Status TruQoL 0.1.3 (2026-11-09, `work\asi\qol013`): only the ThreadCap default 31 -> 8 changed; the 0.1.2 build
-was installed and played 2026-11-08 (frame limiter, thread cap with 8 / 16 / 24 in the INI).** 0.1 (`work\asi\qol01`) was
+**Status TruQoL 0.1.4 (2026-11-11, `work\asi\qol014`): new `[Fixes] FrontEndPauseBit` (live, default 0 = the game's
+behaviour) - built and checked offline, not installed, not played (see "FrontEndPauseBit" below).** 0.1.3 (2026-11-09,
+`work\asi\qol013`) changed only the ThreadCap default 31 -> 8; the 0.1.2 build
+was installed and played 2026-11-08 (frame limiter, thread cap with 8 / 16 / 24 in the INI). 0.1 (`work\asi\qol01`) was
 the first build; 0.1.1 (`work\asi\qol011`) reads the live keys again while the game runs (TruMenu page "Fixes", group
 "Komfort (TruQoL)"); 0.1.2 adds `[Startup] SkipIntro` (skip the start-up intro movie, default off - see below).
 Everything below is proven statically (disassembly of the installed `tru.exe`, md5 `5560abac...`, and `binkw32.dll`);
 nothing is seen in game yet.
 
-Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\qol012` (check first with `-Check`, remove with
+Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\qol014` (check first with `-Check`, remove with
 `-Remove` / `-Restore`). The Ultimate ASI Loader the game ships as `binkw32.dll` loads every `*.asi` next to `tru.exe`;
 ModLoader.asi is just another plugin of that loader. Log: `TruQoL.log` next to `tru.exe`, one line per feature (on /
 off / why).
@@ -34,6 +37,7 @@ off / why).
 | `[Camera]` | `ShakeScale` | 1.0 | 0 .. 1.0 | live | camera shake strength: 1.0 = the game's, 0 = no camera shakes |
 | `[Startup]` | `ThreadCap` | 8 | 0 .. 31 | restart | the game's CPU count sees at most this many threads (only when the PC has more); 0 = off - acts once, before WinMain. 0.1.3: default 8 (was 31) - live on a 36-thread PC 8 / 16 / 24 work, 25 and more hang at the first load (worker pool, ENGINE.md 3), more threads gave no faster loading |
 | `[Startup]` | `SkipIntro` | 0 | 0 / 1 | restart | 0.1.2: 1 = skip the start-up intro movie (only before the "press start" screen, never in a level; the legal screens stay); patched once at the start |
+| `[Fixes]` | `FrontEndPauseBit` | 0 | 0 / 1 | live | 0.1.4: 1 = clear the pause bit the front end keeps after "pause -> back to the main menu" (main-menu clocks, e.g. the teaser timer, then run in real time instead of half speed); only in the front end and only while no pause is open - the pause in a level is untouched. 0 = the game's behaviour (the bit stays until the next level load) |
 
 Invalid values are logged and replaced by the default (at the start) or keep the current value (live). Every engine
 address is byte-checked before it is patched; on a mismatch that feature stays off and the log says why.
@@ -55,6 +59,7 @@ keeps it); **one log line per change** (`live: [Section] Key old -> new ...`).
 | `[Camera] Fov` / `FovCutscenes` | the FOV call 0x5cb0a8 is patched **once at the start** whenever its code matches (also `Fov=0`); `FovHook` returns the game's value while the factor is 0 or 1. Not patched at run time: it is render code and its thread is not proven |
 | `[Camera] ShakeScale` | the 0.1 rule kept live: TruQoL owns the shake calls 0x5eea55 / 0x5eb56d **only while ShakeScale < 1.0**. A change to < 1.0 points both to `ShakeStub` - only while both still call the game's 0x5eb460 (TruMenu's `cam.shakescale` below 100 % holds them: refused with one line, tried again at the next change of the key); a change to 1.0 puts the game's target back (only while both still call `ShakeStub`) and TruMenu's slider may take them again (move it once more: TruMenu retries only after a change). These two rel32 writes run on the game thread, as TruMenu's own run-time patch of the same two sites (`M21PatchGroup` from its pad hook) and TruShadowCombat's `[Damage] Translate` switch |
 | `[TruQoL] LogLevel` | the next line uses the new level; the change line itself is always written |
+| `[Fixes] FrontEndPauseBit` (0.1.4) | no code is written at run time: the paused-branch clock call 0x5da684 goes to `PauseClockStub` from the start (together with the frame-limiter hook); the key is a flag that `PauseBitCheck` reads at every paused frame |
 | `[TruQoL] Enabled`, `[Startup] ThreadCap`, `[Startup] SkipIntro` (0.1.2) | **restart**: `Enabled=0` patches nothing (no tick); the CPU count runs once in WinMain; the intro plays once, right after the start, so the movie call is patched in DllMain or not at all |
 
 Without the clock hook (bytes differ, another plugin owns the calls) there is no tick: every key takes effect at the
@@ -114,11 +119,48 @@ Not done: an INI value in degrees (the game's base FOV is camera tuning data, no
 TruMenu `camera.fov` in the gameplay camera to translate a degree wish into a factor), a hot-key. The TruMenu page came
 with 0.1.1 (TruMenu.switches.txt, group "Komfort (TruQoL)").
 
+## FrontEndPauseBit (0.1.4): the stale pause bit in the front end
+
+The finding (`docs\Befund-Skript-Uhr-halbe-Zeit-1111.md` in the workspace, commit 9787ea5, ENGINE.md row "Script clock
+time step / stale pause bit"): the in-game pause sets bit **0x10000000** of **`[0xe7f0b4]`**; while it is set the
+frame-time function 0x5da230 takes its paused branch and stores a **fixed 0.5** as the frame time `[0xe7f188]`. The
+level exit does not clear the bit, so after "pause -> back to the main menu" the front end keeps it and every script
+clock in the main menu runs at half speed (the main menu's Bink loop runs at 29.97 Hz: 0.5 / 30 s per loop; the
+teaser came after ~81 s instead of 40 s). Live 2026-11-10 (TruLink): in a level with the pause open `[0xe7f0b4]` has
+0x10000000, `[0xe7f188]` = 0.5, main state 1; then in the main menu `[0xe7f0b4]` = 0x50000000, `[0xe7f188]` = 0.5,
+main state `[0xe7ed60]` = 10. The same code is on the Xbox (retail and TU) - an original quirk, not our port.
+
+| What | Address | Proof | St |
+|---|---|---|---|
+| Hook | rel32 of the clock call **0x5da684** (already redirected since 0.1) -> `PauseClockStub` = `PauseBitCheck`, then exactly `ClockStub` (wait + the game's clock 0x597f10). The running-branch call 0x5da247 keeps `ClockStub` | the call lies only in the paused branch: 0x5da233 `test [0xe7f0b4], 0x10000000` -> 0x5da240 `jne 0x5da621` is the only way into 0x5da621, 0x5da628 the only jump to 0x5da664, the branch has no call / jump / ret before 0x5da684, and no rel32 branch elsewhere in `.text` lands in it. So `PauseBitCheck` runs only in frames that see the bit; it is the 0.1 hook site, no new code patch | ✅ static |
+| The bit | set only at **0x5d47bb** / **0x5d482b** (pause 0x5d4780 / 0x5d4810, both `or [0xe7f0b4], 0x10000000`); cleared by `and` only at **0x5d4752** (unpause 0x5d4700) and by the reset 0x5d3e74 (`mov [0xe7f0b4], ebx`, ebx = 0, level load); the level exit 0x5dab40 clears only bit 0x10 (**0x5dab9e**) | every instruction with the memory operand `[0xe7f0b4]` decoded (`work\qol_pausebit_1111\check_qol014.py` section pausebit): the register writers are 0x5d3e74 (ebx = 0 from 0x5d3df6), 0x5ddf57 (esi = 0x40000000 from 0x5ddf2f), 0x5df878 (eax = 1); no byte access to 0xe7f0b5..0xe7f0b7 | ✅ static |
+| Who reads the bit | **0x5da233** (frame time) and **0x5bf861** (render time step: `[0xe7f194]` / 60 instead of `[0xe7f188]` / 30) | the only `test` with 0x10000000; the two whole-dword loads 0x5d4877 / 0x5d4a00 (pause control 0x5d4870, called only from 0x5dfc44) test 0x80, 0x40000000, 0x20000000 | ✅ static |
+| The pause byte | **`[0xe7f143]`** = 6 is written only at **0x5d47a7** / **0x5d481a**, each a few instructions before the bit is set in the same function; the other 9 writers store 0 (unpause 0x5d475e, level exit **0x5dac6e** `mov [0xe7f143], bl` with bl = 0 from 0x5dab46, 0x5d7538, 0x5d756c, 0x5df883, 0x5dfbc9, 0x77c2a3), 4 (0x5d757f) or 0xa (0x5da941) | every instruction with the memory operand `[0xe7f143]` decoded; the pause menu itself decides by the same byte (0x78bb13 / 0x78bb28 `cmp [0xe7f143], 6`) | ✅ static |
+| Front end | main state `[0xe7ed60]` 6 or 10 | the rule of `uigamedata` f37 **0x5d56e0** (`cmp eax, 6; je; cmp eax, 0xa; je` -> 1) | ✅ static |
+| What a clear does | the next frame takes the running branch with `[0xe7f384]` = 1 (written by the paused branch at 0x5da66a): the game's own "first frame after the pause" step (0x5da4e8: saved values 0x8abea4.. back, time dilation 0xe7f1d8 -> 0xe7f1d4), then 0x5da538 clears `[0xe7f384]` - the same path as after a real unpause; the frame time is measured again | listing 0x5da230 (`work\clockhalf_1111\frametime_5da230.txt`) | ✅ static |
+| Not done | the other steps of the unpause 0x5d4700 (object manager 0x5785a0, 0x5bfdf0(0), `[0xe7f094]+0x14` bit 0x100) are not run - they belong to the level that is gone; bit 0x40000000 (the pause menu's unpause request, also left in the main menu: 0x50000000) is not touched | the original leaves both as they are, too | - |
+
+**The rule** (`PauseBitCheck`, game thread, only in the paused branch): switch on **and** the start checks matched
+**and** main state 6 / 10 **and** pause byte != 6 **and** the bit set -> `lock and [0xe7f0b4], ~0x10000000`. Why the
+pause byte: 6 means a pause the game holds open (written only together with the bit; every other writer ends the
+pause state) - then the bit stays and one line says so (once per run). In a level (main state 1) nothing is ever
+touched, so the pause menu in a level still freezes the game. Byte checks at the start (`StartPauseBit`, after the
+clock hook; a mismatch = the feature stays off with one log line): the paused branch 0x5da664 (0.5 from 0x8413a8,
+`[0xe7f384]` = 1, store to `[0xe7f188]`), the float 0.5 at 0x8413a8, both pause functions (0x5d47a7 / 0x5d481a ..
+the bit set), the unpause 0x5d4752, the level exit 0x5dab9e / 0x5dac6e, f37 0x5d56e0 and the render-step reader
+0x5bf861; the clock call 0x5da684 itself is checked by the frame limiter's checks (bytes + target 0x597f10). Log
+(LogLevel 1): one line per clear with the main state, the pause byte and the flags before / after; at most one line
+per 10 s (clears in between are counted in the next line). Nothing else is written; no code is patched at run time.
+
+Why default 0: proven statically and the cause seen live, but the fix itself has not run in the game yet (TO TEST
+13).
+
 ## TO TEST
 
-1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol013`; start the game (affinity work-around still in the
-   launch options for the first run); `TruQoL.log`: the loaded line (`TruQoL 0.1.3`), `Startup ThreadCap: on, 8`,
-   `FrameLimit: on, 60 fps`, `Camera Fov: off ... pass-through`, `Camera ShakeScale: off`, `Startup SkipIntro: off`,
+1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol014`; start the game (affinity work-around still in the
+   launch options for the first run); `TruQoL.log`: the loaded line (`TruQoL 0.1.4`), `Startup ThreadCap: on, 8`,
+   `FrameLimit: on, 60 fps`, `Fixes FrontEndPauseBit: off ... pass-through`, `Camera Fov: off ... pass-through`,
+   `Camera ShakeScale: off`, `Startup SkipIntro: off`,
    `live: TruQoL.ini is read
    again ...`, then `FrameLimit: d3d9.dll = ...TRAWindowed...` (TRAWindowed installed) and `Startup ThreadCap: CPU count
    1 - ... unchanged` (fewer than 32 threads here).
@@ -153,14 +195,29 @@ with 0.1.1 (TruMenu.switches.txt, group "Komfort (TruQoL)").
     (medsea_loop) runs; music / sound normal; New Game and Load work. Back to the main menu from a level and wait for the
     attract mode: the attract "intro" plays (not skipped). If instead a line says `played - ... main state N`, the gate
     was too strict (report N).
+13. FrontEndPauseBit (0.1.4): install `work\asi\qol014`; log `Fixes FrontEndPauseBit: off - ... pass-through`. TruMenu
+    0.22.21 "Teaser-Uhr anzeigen" on (page Spiel-Einstellungen, group "Hauptmenü"). a) `FrontEndPauseBit=0` first:
+    load a level, pause, "back to the main menu": the teaser line counts about half as fast as a watch (teaser after
+    ~81 s), TruLink `read32 0xe7f0b4` has 0x10000000. b) `FrontEndPauseBit=1` (TruMenu page Fixes, group "Komfort
+    (TruQoL)", live): within a second one line `stale pause bit cleared in the front end (main state 10, pause byte 0,
+    [0x00e7f0b4] 0x50000000 -> 0x40000000)`; from then the teaser timer runs in real time (40 s alarm after 40 s on a
+    watch, the line `Teaser-Uhr 40.0 / 40.0 s` at the same moment), `readf 0xe7f188` about 1.0 instead of 0.500; the
+    menu animations, the menu music and the background movie normal. c) The same path again with the switch already
+    on: one clear line right after the main menu appears. d) In-level pause with the switch on: the pause menu still
+    freezes the game (Lara, enemies, water stand still; `[0xe7f188]` = 0.5 and the bit stays while it is open; no
+    clear line while in the level); unpause and play on normally. e) Fresh start without a level: no clear line at
+    all (the bit is never set). Note any line `pause byte ... = 6 - a pause the game holds open` (main state and when).
 
 ## Files
 
 `TruQoL.cpp` (source; the comment block at the top holds the evidence in short), `TruQoL.ini` (sample with the
-defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol012`. Offline checks:
+defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol014`. Offline checks:
 `work\qol17x_0811\check_qol01.py` (0.1: bytes, call targets, the start-up order, the loader default, the build, INI,
 README, install script) with negative tests `work\qol17x_0811\make_negative_qol01.py`; for 0.1.1
 `work\qol17y_0811\check_qol011.py` (the same plus the live logic: tick, gates, ShakeApply, the switches rows) with
 `work\qol17y_0811\make_negative_qol011.py`; for 0.1.2 `work\skip18c_0811\check_qol012.py` (the same plus SkipIntro:
 the movie chain, the player's open-failure path, the gates, the restart row) with
-`work\skip18c_0811\make_negative_qol012.py`.
+`work\skip18c_0811\make_negative_qol012.py`; for 0.1.4 `work\qol_pausebit_1111\check_qol014.py` (the same plus
+section pausebit: every instruction with the memory operand of the pause byte / pause flags decoded, the paused branch
+reached only with the bit, the `PauseBitCheck` order, the clock-site / hook pairing) with
+`work\qol_pausebit_1111\make_negative_qol014.py`.

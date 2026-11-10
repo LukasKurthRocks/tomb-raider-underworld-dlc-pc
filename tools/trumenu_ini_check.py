@@ -1766,6 +1766,7 @@ SW_LIVE = {
     ('TruQoL', 'Camera', 'Fov'): 'void LiveReadOptions(',
     ('TruQoL', 'Camera', 'FovCutscenes'): 'void LiveReadOptions(',
     ('TruQoL', 'Camera', 'ShakeScale'): 'void LiveReadOptions(',
+    ('TruQoL', 'Fixes', 'FrontEndPauseBit'): 'void LiveReadOptions(',   # TruQoL 0.1.4 (2026-11-11)
 }
 SW_MAX, SW_GROUP_MAX = 160, 24
 RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries

@@ -83,6 +83,28 @@
 // (attract "intro" 0x5d5520, menu loop "medsea_loop" 0x5daf3e, state-8 "explode" 0x5db008, the queue 0xe7ece0) call
 // 0x4a12b0 directly and are never touched; the state-1 handler 0x5dae86 sets state 2 by itself. The legal screens are
 // no movie (no logo .bik in Movies\; state 0 is not in the code switch 0x5dae7f, i.e. script-drawn): not skipped.
+//
+// 0.1.4 (2026-11-11) [Fixes] FrontEndPauseBit (live, default 0 = the game's behaviour) - the stale pause bit in the
+// front end (docs\Befund-Skript-Uhr-halbe-Zeit-1111.md, commit 9787ea5). The in-game pause 0x5d4780 / 0x5d4810 writes
+// the pause byte 0xe7f143 = 6 and then sets [0xe7f0b4] |= 0x10000000; with that bit the frame-time function 0x5da230
+// takes its paused branch 0x5da621 and stores a FIXED 0.5 to [0xe7f188] (0x5da664 fld [0x8413a8]). Only the unpause
+// 0x5d4700 (0x5d4752) and the reset 0x5d3df0 at level load clear the bit; the level exit 0x5dab40 clears only bit 0x10
+// (0x5dab9e) and writes the pause byte 0 (0x5dac6e, bl = 0 from 0x5dab46). After "pause -> back to the main menu" the
+// front end keeps the bit: the main menu's Bink loop runs at 29.97 Hz with dt 0.5 / 30 s, every script clock there runs
+// at half speed (teaser after ~81 s instead of 40 s; live 2026-11-10 via TruLink: [0xe7f0b4] = 0x50000000, [0xe7f188] =
+// 0.5, main state [0xe7ed60] = 10). Same code on Xbox retail / TU. The fix uses the clock call 0x5da684 that 0.1 already
+// redirects - it lies only in the paused branch, so it runs only while the bit is set: from 0.1.4 that one site goes to
+// PauseClockStub (= PauseBitCheck, then exactly ClockStub). PauseBitCheck clears the bit (lock and) only while the
+// switch is 1, the main state is 6 or 10 (front end, the rule of uigamedata f37 0x5d56e0) and the pause byte is not 6.
+// Pause byte 6 is written only by the two pause functions, each right before it sets the bit (0x5d47a7 -> 0x5d47bb,
+// 0x5d481a -> 0x5d482b); every other writer (unpause 0, level exit 0, 0x5d7538 / 0x5d756c / 0x5df883 / 0x5dfbc9 /
+// 0x77c2a3 0, 0x5d757f 4, 0x5da941 0xa) ends that pause state - so "byte != 6" means no pause is open, and the pause
+// menu itself decides by the same byte (0x78bb13 / 0x78bb28). In a level (main state 1) nothing is touched: the pause
+// there keeps its freeze. The frame after the clear takes the running branch with the game's own "first frame after the
+// pause" step ([0xe7f384] = 1 from 0x5da66a: saved values back, then 0x5da538 clears it), as after a real unpause; the
+// other effects of the unpause 0x5d4700 (object manager 0x5785a0, 0x5bfdf0(0), [0xe7f094]+0x14) are NOT run - the level
+// they belong to is gone. Readers of the bit: 0x5da233 (frame time) and 0x5bf861 (render step) only. One log line per
+// clear at LogLevel 1 (at most one per 10 s; later ones counted in the next line).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -97,7 +119,7 @@
 
 namespace {
 
-const char kVersion[] = "TruQoL 0.1.3";
+const char kVersion[] = "TruQoL 0.1.4";
 const DWORD kImageBase = 0x00400000;
 
 // ---- 1. frame limiter: the frame-time function 0x5da230 and its two clock reads ----
@@ -162,6 +184,29 @@ const DWORD kMovieStop = 0x00a039b8;        // the player's stop byte (native f2
 const DWORD kMovieLoop = 0x00a039dc;        // the player's loop byte
 const DWORD kMoviePause = 0x00a039dd;       // the player's pause byte
 
+// ---- 5. front end: the stale pause bit (0.1.4) - nothing patched here; the hook is the clock call kClockCallPause ----
+const DWORD kGameFlags = 0x00e7f0b4;        // dword: bit 0x10000000 = paused (frame time fixed at 0.5)
+const DWORD kPauseBit = 0x10000000;
+const DWORD kPauseByte = 0x00e7f143;        // byte: 6 = paused (written only by the two pause functions)
+const DWORD kPauseBranch = 0x005da664;      // paused branch: fld [0x8413a8] (0.5); [0xe7f384] = 1; fstp [0xe7f188]; ...
+const char *const kPauseBranchHex = "d905a8138400 c70584f3e70001000000 d91d88f1e700 c70560f1e70010000000";
+const DWORD kPauseHalf = 0x008413a8;        // float 0.5
+const char *const kPauseHalfHex = "0000003f";
+const DWORD kPauseOn1 = 0x005d47a7;         // pause 0x5d4780: byte 6, two calls, then the bit
+const char *const kPauseOn1Hex = "c60543f1e70006 e83db6feff 83c404 e8f52cfbff 810db4f0e70000000010";
+const DWORD kPauseOn2 = 0x005d481a;         // pause 0x5d4810: byte 6, two calls, then the bit
+const char *const kPauseOn2Hex = "c60543f1e70006 e88a2cfbff e8a5eceaff 810db4f0e70000000010";
+const DWORD kUnpauseClear = 0x005d4752;     // unpause 0x5d4700: clear the bit, byte 0
+const char *const kUnpauseClearHex = "8125b4f0e700ffffffef 6a00 c60543f1e70000";
+const DWORD kLevelExitBit = 0x005dab9e;     // level exit 0x5dab40: clears only bit 0x10
+const char *const kLevelExitBitHex = "8325b4f0e700ef";
+const DWORD kLevelExitByte = 0x005dac6e;    // level exit: pause byte = bl (0, xor ebx, ebx at 0x5dab46)
+const char *const kLevelExitByteHex = "881d43f1e700";
+const DWORD kFrontEndTest = 0x005d56e0;     // uigamedata f37: main state 6 or 10 = front end
+const char *const kFrontEndTestHex = "a160ede700 83f806 7408 83f80a 7403 32c0 c3 b001 c3";
+const DWORD kRenderStepRead = 0x005bf861;   // the other reader of the bit (render time step)
+const char *const kRenderStepReadHex = "f705b4f0e70000000010";
+
 // ---- options (TruQoL.ini) ----
 int g_enabled = 1, g_logLevel = 1;
 int g_limitEnabled = 1, g_maxFps = 60, g_autoOff = 1, g_spinUs = 0;
@@ -170,6 +215,7 @@ int g_fovCutscenes = 0;
 float g_shakeScale = 1.0f;                  // read by ShakeStub
 int g_threadCap = 8;   // 0.1.3: default 8 (live 2026-11-08, 36-thread PC: 8 / 16 / 24 run, 25 / 26 / 28 / 31 hang)
 int g_skipIntro = 0;                        // 0.1.2: [Startup] SkipIntro (restart)
+int g_frontEndPauseBit = 0;                 // 0.1.4: [Fixes] FrontEndPauseBit (live; read by PauseBitCheck)
 
 char g_logPath[MAX_PATH], g_dir[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -245,8 +291,9 @@ DWORD CallTarget(DWORD site) {
     return site + 5 + rel;
 }
 
-// a group of rel32 call sites that must all call `game` today; all are pointed to `hook`, or none
-bool RedirectCalls(const DWORD *sites, int count, DWORD game, DWORD hook, const char *what) {
+// a group of rel32 call sites that must all call `game` today; site i is pointed to hooks[i], all or none (0.1.4: one
+// hook per site - the paused-branch clock call gets its own stub)
+bool RedirectCallsTo(const DWORD *sites, const DWORD *hooks, int count, DWORD game, const char *what) {
     for (int i = 0; i < count; ++i) {
         DWORD t = CallTarget(sites[i]);
         if (t != game) {
@@ -256,7 +303,7 @@ bool RedirectCalls(const DWORD *sites, int count, DWORD game, DWORD hook, const 
         }
     }
     for (int i = 0; i < count; ++i) {
-        DWORD rel = hook - (sites[i] + 5);
+        DWORD rel = hooks[i] - (sites[i] + 5);
         if (!WriteCode(sites[i] + 1, &rel, 4)) {
             for (int j = 0; j < i; ++j) {           // put back what was already written
                 DWORD back = game - (sites[j] + 5);
@@ -267,6 +314,14 @@ bool RedirectCalls(const DWORD *sites, int count, DWORD game, DWORD hook, const 
         }
     }
     return true;
+}
+
+// all sites to the same hook
+bool RedirectCalls(const DWORD *sites, int count, DWORD game, DWORD hook, const char *what) {
+    DWORD hooks[4];
+    if (count < 1 || count > 4) return false;
+    for (int i = 0; i < count; ++i) hooks[i] = hook;
+    return RedirectCallsTo(sites, hooks, count, game, what);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -581,6 +636,69 @@ __declspec(naked) void ClockStub() {
     }
 }
 
+// ---- 0.1.4 [Fixes] FrontEndPauseBit: the stale pause bit in the front end ----
+bool g_pauseBitOk = false;                  // the pause / unpause / level-exit / front-end code matched at the start
+LONG g_pauseBitClears = 0, g_pauseBitLogged = 0;
+DWORD g_pauseBitLogTick = 0;
+bool g_pauseBitHeldNoted = false;           // "pause byte 6 in the front end" logged once
+
+// game thread, from PauseClockStub = only in the paused branch of 0x5da230 (the bit was set at 0x5da233 this frame)
+extern "C" void __cdecl PauseBitCheck() {
+    if (!g_frontEndPauseBit || !g_pauseBitOk) return;
+    const DWORD mainState = *reinterpret_cast<const volatile DWORD *>(kMainState);
+    if (mainState != 6 && mainState != 10) return;                       // a level (1) or a load: the game's pause
+    const BYTE pauseByte = *reinterpret_cast<const volatile BYTE *>(kPauseByte);
+    if (pauseByte == 6) {                                                 // a pause the game holds open: keep it
+        if (!g_pauseBitHeldNoted) {
+            g_pauseBitHeldNoted = true;
+            Log(1, "Fixes FrontEndPauseBit: front end (main state %lu) with the pause byte 0x%08lx = 6 - a pause the "
+                   "game holds open, the bit stays (logged once)", mainState, kPauseByte);
+        }
+        return;
+    }
+    volatile LONG *flags = reinterpret_cast<volatile LONG *>(kGameFlags);
+    if (!(*flags & static_cast<LONG>(kPauseBit))) return;
+    const LONG before = InterlockedAnd(flags, ~static_cast<LONG>(kPauseBit));
+    const LONG n = ++g_pauseBitClears;
+    const DWORD now = GetTickCount();
+    if (g_pauseBitLogged == 0 || now - g_pauseBitLogTick >= 10000) {
+        Log(1, "Fixes FrontEndPauseBit: stale pause bit cleared in the front end (main state %lu, pause byte %u, "
+               "[0x%08lx] 0x%08lx -> 0x%08lx) - the frame time is measured again from the next frame; clear %ld (%ld not "
+               "logged since the last line)", mainState, pauseByte, kGameFlags, static_cast<DWORD>(before),
+            static_cast<DWORD>(before & ~static_cast<LONG>(kPauseBit)), n, n - 1 - g_pauseBitLogged);
+        g_pauseBitLogged = n;
+        g_pauseBitLogTick = now;
+    }
+}
+
+// in place of `call 0x597f10` at 0x5da684 only (the paused branch): the front-end check, then exactly ClockStub
+__declspec(naked) void PauseClockStub() {
+    __asm {
+        call PauseBitCheck
+        call LimiterWait
+        jmp dword ptr [g_clockFn]
+    }
+}
+
+// the premises of PauseBitCheck (read only; the hook itself is the clock call 0x5da684 of StartFrameLimit)
+void StartPauseBit() {
+    g_pauseBitOk = HexBytesAt(kPauseBranch, kPauseBranchHex) && HexBytesAt(kPauseHalf, kPauseHalfHex) &&
+                   HexBytesAt(kPauseOn1, kPauseOn1Hex) && HexBytesAt(kPauseOn2, kPauseOn2Hex) &&
+                   HexBytesAt(kUnpauseClear, kUnpauseClearHex) && HexBytesAt(kLevelExitBit, kLevelExitBitHex) &&
+                   HexBytesAt(kLevelExitByte, kLevelExitByteHex) && HexBytesAt(kFrontEndTest, kFrontEndTestHex) &&
+                   HexBytesAt(kRenderStepRead, kRenderStepReadHex);
+    if (!g_pauseBitOk) {
+        Log(0, "Fixes FrontEndPauseBit: off - the pause / unpause / level-exit / front-end code (0x%08lx, 0x%08lx, "
+               "0x%08lx, 0x%08lx) does not match this tru.exe; nothing is cleared in this run", kPauseOn1, kUnpauseClear,
+            kLevelExitBit, kFrontEndTest);
+        return;
+    }
+    Log(1, "Fixes FrontEndPauseBit: %s - the paused-branch clock call 0x%08lx -> TruQoL: %s", g_frontEndPauseBit ? "on" : "off",
+        kClockCallPause, g_frontEndPauseBit ? "the stale pause bit 0x10000000 of [0xe7f0b4] is cleared while the main state "
+                                              "is 6 / 10 (front end) and the pause byte is not 6; a level's pause stays"
+                                            : "pass-through, the game's behaviour (1 in TruQoL.ini takes effect within a second)");
+}
+
 // 0.1.1: the clock calls are patched whenever TruQoL is enabled and the bytes match - also with [FrameLimit] Enabled=0
 // (then ClockStub is a pass-through until Enabled=1 is read live); they also carry the live tick
 void StartFrameLimit() {
@@ -588,6 +706,7 @@ void StartFrameLimit() {
         !HexBytesAt(kClock, kClockHex) || !HexBytesAt(kFrameStore, kFrameStoreHex)) {
         Log(0, "FrameLimit: off - the frame-time function 0x%08lx / clock 0x%08lx do not match this tru.exe; no live "
                "tick either: every TruQoL.ini change takes effect at the next start", kFrameTimer, kClock);
+        Log(0, "Fixes FrontEndPauseBit: off - it needs the clock call 0x%08lx", kClockCallPause);
         return;
     }
     LARGE_INTEGER f;
@@ -595,11 +714,15 @@ void StartFrameLimit() {
     g_qpf = f.QuadPart;
     g_period = g_qpf / g_maxFps;
     const DWORD sites[2] = {kClockCallRun, kClockCallPause};
-    if (!RedirectCalls(sites, 2, kClock, reinterpret_cast<DWORD>(&ClockStub), "FrameLimit")) {
+    // 0.1.4: the paused-branch call goes to PauseClockStub (= the front-end pause-bit check, then exactly ClockStub)
+    const DWORD hooks[2] = {reinterpret_cast<DWORD>(&ClockStub), reinterpret_cast<DWORD>(&PauseClockStub)};
+    if (!RedirectCallsTo(sites, hooks, 2, kClock, "FrameLimit")) {
         Log(0, "FrameLimit: no live tick - every TruQoL.ini change takes effect at the next start");
+        Log(0, "Fixes FrontEndPauseBit: off - it needs the clock call 0x%08lx", kClockCallPause);
         return;
     }
     g_limitHooked = true;
+    StartPauseBit();
     g_detectPending = true;                  // read only, whatever AutoOff says (AutoOff is live)
     if (!g_limitEnabled)
         Log(1, "FrameLimit: off ([FrameLimit] Enabled=0) - the game's own frame rate; the clock calls 0x%08lx / 0x%08lx "
@@ -950,6 +1073,14 @@ void LiveReadOptions() {
         }
         Log(1, "live: [Camera] ShakeScale %.2f -> %.2f%s", was, shake, note);
     }
+    const int pauseBit = IniInt("Fixes", "FrontEndPauseBit", g_frontEndPauseBit, 0, 1);   // 0.1.4
+    if (pauseBit != g_frontEndPauseBit) {
+        g_frontEndPauseBit = pauseBit;
+        Log(1, "live: [Fixes] FrontEndPauseBit %d -> %d (%s)%s", !pauseBit, pauseBit,
+            pauseBit ? "a stale pause bit in the front end is cleared from the next paused frame"
+                     : "the game's behaviour: a stale pause bit stays until the next level load",
+            g_limitHooked && g_pauseBitOk ? "" : " - the clock call / pause code did not match: no effect in this run");
+    }
 }
 
 // game thread, every frame (LimiterWait): at most once a second, and only when TruQoL.ini's last-write time changed,
@@ -999,6 +1130,7 @@ void ReadOptions() {
     g_shakeScale = IniFloat("Camera", "ShakeScale", 1.0f, 0.0f, 1.0f);
     g_threadCap = IniInt("Startup", "ThreadCap", 8, 0, 31);   // 0.1.3: default 8 (was 31; 25+ hang at the first load)
     g_skipIntro = IniInt("Startup", "SkipIntro", 0, 0, 1);
+    g_frontEndPauseBit = IniInt("Fixes", "FrontEndPauseBit", 0, 0, 1);   // 0.1.4
 }
 
 void Start(HMODULE self) {
@@ -1006,8 +1138,8 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruQoL.log", g_dir);
     ReadOptions();
     Log(1, "%s loaded (enabled %d, log level %d; FrameLimit %d / %d fps / AutoOff %d, Fov %g / cutscenes %d, ShakeScale "
-           "%g, ThreadCap %d, SkipIntro %d)", kVersion, g_enabled, g_logLevel, g_limitEnabled, g_maxFps, g_autoOff, g_fov,
-        g_fovCutscenes, g_shakeScale, g_threadCap, g_skipIntro);
+           "%g, ThreadCap %d, SkipIntro %d, FrontEndPauseBit %d)", kVersion, g_enabled, g_logLevel, g_limitEnabled,
+        g_maxFps, g_autoOff, g_fov, g_fovCutscenes, g_shakeScale, g_threadCap, g_skipIntro, g_frontEndPauseBit);
     if (!g_enabled) { Log(1, "disabled by TruQoL.ini ([TruQoL] Enabled=0) - nothing patched"); return; }
     const DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - nothing patched", base, kImageBase); return; }
@@ -1018,8 +1150,8 @@ void Start(HMODULE self) {
     g_iniTimeOk = IniTime(&g_iniTime);       // 0.1.1: the live tick reads again only after a change of TruQoL.ini
     if (g_limitHooked)
         Log(1, "live: TruQoL.ini is read again at most once a second when it changes (LogLevel, FrameLimit Enabled / "
-               "MaxFps / AutoOff / SpinUs, Camera Fov / FovCutscenes / ShakeScale; restart: Enabled, ThreadCap, "
-               "SkipIntro)");
+               "MaxFps / AutoOff / SpinUs, Camera Fov / FovCutscenes / ShakeScale, Fixes FrontEndPauseBit; restart: "
+               "Enabled, ThreadCap, SkipIntro)");
 }
 
 }  // namespace
@@ -1034,7 +1166,8 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 extern "C" __declspec(dllexport) const char *TruQoLVersion() {
-    return "TruQoL 0.1.3 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
+    return "TruQoL 0.1.4 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
            "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0, start-up "
-           "intro skip at the script's PlayMovie call 0x77bc7b; live INI re-read once a second for TruMenu page Fixes)";
+           "intro skip at the script's PlayMovie call 0x77bc7b, stale front-end pause bit at the paused-branch clock "
+           "call 0x5da684; live INI re-read once a second for TruMenu page Fixes)";
 }

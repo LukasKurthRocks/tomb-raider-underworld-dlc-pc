@@ -16,7 +16,7 @@ READMEs and [CHANGELOG.md](../CHANGELOG.md); the plugin README and the CHANGELOG
 
 | Plugin | Group | Version | State |
 |---|---|---|---|
-| [TruQoL](#truqol) | base-game comfort | 0.1.3 | partial: frame limiter and thread cap played 2026-11-08; the other keys offline |
+| [TruQoL](#truqol) | base-game comfort | 0.1.4 | partial: frame limiter and thread cap played 2026-11-08; the other keys offline |
 | [TruMenu](#trumenu) | base-game comfort (test menu) | 0.22.12 | partial: cutscene pause, `sub.lang`, `fight.trace`, enemy panel, light diagnosis and the quick bar states played 2026-11-09; known: subtitles run on during the pause, LB + View before RB fires "continue", `sub.lang` not kept over a restart |
 | [TruMercLang](#trumerclang) | base-game comfort (fun option) | 0.1 | offline, default off |
 | [TruShadowPower](#trushadowpower) | DLC 2 title update | 0.23 | partial: 0.20 installed and in use 2026-11-09 (power, wall run, goo drip: the PC stays in slow motion while running, the Xbox switches to world 1.0); 0.21 (time-scale slot 6) offline; 0.22 (K-5 ring request / adrenaline refill by the meter flags) installed 2026-11-10, not reported; 0.23 (`[Meter] Infinite`, infinite power for testing / accessibility, default off) offline, not installed |
@@ -77,16 +77,19 @@ game and where they were found in the code (static).
 
 Comfort options for players of the base game: a frame limiter at the game's own frame clock (physics puzzles break
 above 60 fps), a field-of-view factor, a camera-shake factor (against motion sickness), a fix for the start-up crash
-on PCs with more than 31 CPU threads, and an optional skip of the start-up intro movie. TruMenu stays the debug tool;
-TruQoL holds only switches a player wants.
+on PCs with more than 31 CPU threads, an optional skip of the start-up intro movie and (0.1.4) an optional fix for the
+half-speed main menu after "pause -> back to the main menu". TruMenu stays the debug tool; TruQoL holds only switches a
+player wants.
 
-- Version: 0.1.3 (`TruQoL 0.1.3`).
+- Version: 0.1.4 (`TruQoL 0.1.4`; built, not installed, not played).
 - State: partial. In the live test of 2026-11-08 the frame limiter was active at 60 fps. The thread cap was bisected
   on a 36-thread PC: 8 / 16 / 24 start and load DLC 2, 25 and higher hang at the first load (default 8
   since 0.1.3). More worker threads and the 60 fps limit did not change the load time. FOV, shake scale and intro skip are
-  offline; the frame limiter's auto-off for DXVK / dxwrapper is not tested with real files.
+  offline; the frame limiter's auto-off for DXVK / dxwrapper is not tested with real files. `FrontEndPauseBit` (0.1.4)
+  is offline.
 - INI `TruQoL.ini`: `[FrameLimit] Enabled` / `MaxFps` (60) / `AutoOff`; `[Camera] Fov` (factor, 0 = the game's) /
-  `FovCutscenes` / `ShakeScale` (0 = no shakes); `[Startup] ThreadCap` (8; 31 up to 0.1.2) / `SkipIntro` (0). Most keys
+  `FovCutscenes` / `ShakeScale` (0 = no shakes); `[Startup] ThreadCap` (8; 31 up to 0.1.2) / `SkipIntro` (0);
+  `[Fixes] FrontEndPauseBit` (0 = the game's half-speed main menu after a pause exit, 1 = fixed). Most keys
   can be changed live from TruMenu's page "Fixes"; `Enabled`, `ThreadCap` and `SkipIntro` need a restart.
 - Install: `scripts\windows\Set-TruQoL.ps1` (`-Check`, `-Install`, `-Remove`).
 - README: [src/asi/TruQoL/README.md](../src/asi/TruQoL/README.md).
