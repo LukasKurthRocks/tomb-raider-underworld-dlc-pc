@@ -12,10 +12,8 @@ project that first converted the DLC for the PC. You need your own copy of the g
 
 ![Lara's Shadow on PC: the combat tutorial in the second Yggdrasil hall, with TruMenu's debug labels on the thrall](docs/screenshots/dev-hall02-tutorial-diagnosis-2026-11-09.jpg)
 
-*Work in progress (9 Nov 2026): the combat tutorial of Lara's Shadow on PC, with TruMenu's debug labels (thrall,
-trigger volume, spawn generator). Today's work is a side-by-side comparison with the Xbox 360 original running in an
-emulator: the same fights and scenes measured on both, so the PC behaves like the Xbox. The throne flicker of the
-end cutscene is explained and worked around ([DEVLOG](docs/DEVLOG.md)).*
+*Development build (9 Nov 2026): the combat tutorial of Lara's Shadow on PC with TruMenu's debug labels (thrall,
+trigger volume, spawn generator), measured against the Xbox 360 original in an emulator ([DEVLOG](docs/DEVLOG.md)).*
 
 > [!WARNING]
 > **This is a personal fork, not the original project.** For installing the DLC port, releases and reporting
@@ -40,21 +38,86 @@ It does not replace the original. More about the fork: [docs/README.md](docs/REA
 3. **Fixes and comfort for the base PC game.** `TruQoL` (60 fps cap, field of view, camera shake, a start-up fix for
    PCs with many CPU threads), the test menu `TruMenu`, `Set-TruDisplay.ps1` and a table of known problems.
 
-**State on 2026-11-09** (one PC, not a release; "played" = tested in game, "offline" = only static checks)
+## Install the DLC
 
-| Part | What works | State | What is missing |
+The port itself is the original project's release kit. **This fork has no releases**: no kit, no built plugins.
+
+**You need**
+
+- *Tomb Raider: Underworld*, Steam, PC: `tru.exe` v1.1 (MD5 `b36da327a320eab8b5c8464b27685840`), unpacked once with
+  [Steamless](https://github.com/atom0s/Steamless/releases) (writes `tru.exe.unpacked.exe`)
+- your own Xbox 360 DLC files `pack10.000` (DLC 1) and `pack11.000` (DLC 2), plus `credits_DLC1.wmv` /
+  `credits_DLC2.wmv` for the end credits
+- [ModLoader](https://github.com/TombRaiderModding/ModLoader/releases) (`ModLoader.asi` + its `binkw32.dll` proxy)
+- Python 3.9+ with `bsdiff4` and `numpy`; for the credits ffmpeg and RAD Video Tools
+- `trudlcport-kit-B270.zip`, `install_dlc.py`, `tex_convert.py`, `credits_convert.py` from the
+  [original's releases](https://github.com/andrearicci93/trudlcport/releases)
+
+**Steps**
+
+1. Copy the ModLoader files into the game folder. Run Steamless on `tru.exe` there.
+2. Put the three scripts and the unzipped `kit` folder into one folder. Close the game.
+3. Dry run: `python install_dlc.py --game "<game folder>" --dlc "<folder with the Xbox files>" --kit .\kit --check`.
+   It must print **All inputs OK**.
+4. Run the same command without `--check`, with `--credits --rad "<radvideo64.exe>" --ffmpeg "<ffmpeg.exe>"`. Each
+   DLC needs its credits movie to finish.
+5. Lock the game to 60 fps. Start a **new** game from *Downloadable Content*.
+
+Details, update, uninstall and error messages: [docs/INSTALL.md](docs/INSTALL.md).
+
+**This fork's plugins on top (optional).** The title-update plugins (point 2 above) live in [`src/asi/`](src/asi/).
+Build them with Visual Studio (x86) and install them next to `tru.exe`, game closed
+([scripts/windows/README.md](scripts/windows/README.md)):
+
+```powershell
+.\scripts\windows\Build-TruAsi.ps1 -Name TruShadowPower      # -> work\asi\
+.\scripts\windows\Set-TruShadowPower.ps1 -Install           # the same for every Set-Tru<Plugin>.ps1
+```
+
+- DLC 2 as on the Xbox: `TruShadowPower`, `TruShadowCombat`, `TruRockVein`, `TruDoppelganger`, `TruDlc2Player`;
+  `TruShadowHud` only with a `generalbank.drm` that has the title update's HUD script (`tools/generalbank_hud_build.py`).
+- Optional: `TruQoL` (60 fps cap, field of view, start-up fix for PCs with more than 31 CPU threads), `TruMenu`,
+  `TruMercLang`. `TruLink`, `TruTrace`, `TruDataGuard` and `TruGuard` are developer tools.
+- Tested only on the author's own build (B138 base with the fork's own DLC 2 conversion), **not on the B270 kit**.
+  Every plugin checks the bytes of `tru.exe` first; where they differ, that part stays off and its log says why.
+
+Per plugin: [docs/PLUGINS.md](docs/PLUGINS.md).
+
+## Optional: TruMenu (quick bar only)
+
+From 0.22.18 the shipped `TruMenu.ini` opens only the quick bar at the left screen edge: `[Quick] Enabled=1`, the big
+menu window and the radial ring off (`[Menu] Enabled=0`, `[Radial] Enabled=0`).
+
+1. Build: `.\scripts\windows\Build-TruAsi.ps1 -Name TruMenu` (compiles Dear ImGui too).
+2. Install, game closed: `.\scripts\windows\Set-TruMenu.ps1 -Install -SourceDir .\work\asi`. Needed: `TruMenu.asi` +
+   `TruMenu.ini` next to `tru.exe`, loaded by the ASI loader of the ModLoader `binkw32.dll` proxy. Optional:
+   `TruMenu.switches.txt` (page "Fixes"), `.radial.txt` / `.tour.txt` (ring), `.media.txt` (track names),
+   `.shaderlabel.txt` (shader labels); a missing file only leaves its page empty.
+3. In game, Xbox controller: **View + Start** opens / closes the bar; D-pad up / down = row, left / right = off / on,
+   LB / RB = page, X = run the row. The game keeps running. Bar language: `[Quick] Language=en` (default `de`).
+
+Before 0.22.18, `[Menu] Enabled=0` turns all of TruMenu off. Controls and pages:
+[src/asi/TruMenu/README.md](src/asi/TruMenu/README.md).
+
+![Development build: TruMenu quick bar, costume page, at the start of Lara's Shadow](docs/screenshots/dev-quickbar-costumes-2026-11-07.jpg)
+*Development build (7 Nov 2026): the quick bar at the start of Lara's Shadow, page "Kostueme" (TruMenu 0.21.6).*
+
+## Progress (state 2026-11-10)
+
+Percentages are **estimates**: the share of the Xbox behaviour seen working in game on one PC, judged from the test
+findings and the open lists. Only the title-update row is a count.
+
+| Part | Estimate | What works | What is missing |
 |---|---|---|---|
-| DLC 1 *Beneath the Ashes* | the "display driver" box on entering, the grapple ring's look and cinematic speech in five languages fixed (pipeline step `Repair`); starts correctly after DLC 2 in the same session | played | a crash while loading the dungeon in our test builds: cause found (a DLC 2 effect file of the same name kept a raw texture group count), fix built offline, live test open |
-| DLC 2 *Lara's Shadow* | through the Yggdrasil halls: intro, loading-screen titles and hint boxes, the doppelganger's look, shadow power, wall run, combat, waterfall; end cutscene visible, no crash in the ceremony room, end-room floor and goo drips right; 9 Nov: hall02 → end level → end cutscenes in one session, throne flicker worked around (light order per object) | played | **combat differs from the Xbox** (measured 9 Nov against the Xbox original in an emulator): thralls fall at every hit, combos do not throw them, the tutorial thrall never attacks first, no lock-on ring - analysis and title-update translations in progress; "objective / hint unlocked" banners run but are invisible (converter fault, data step in progress); rock-vein jump: data and attach point match the title update, live test with the title update's controls open; a moaning sound loops; some title-update shaders still drawn with substitutes |
-| Xbox title update plugins | slow motion, meter and HUD, power states, wall run and its camera, shadow combat input; thralls take damage and die (title-update damage switch, 7 Nov) | partial: these parts played, the newest versions offline | the finisher's own kill; Lara's ponytail stretches in slow motion (the cloth time step is translated behind a switch, off) |
-| Base-game fixes | `TruQoL` frame limiter at 60 fps; thread cap (default 8 since TruQoL 0.1.3); `TruMenu` with the pages "Fixes" and "Rettung", cutscene pause / step / photo on keys and pad, subtitle language live; known problems in TROUBLESHOOTING | partial: frame limiter, thread cap and cutscene pause played, FOV, shake, intro skip and `Set-TruDisplay` graphics options offline | Steam overlay together with TruMenu: re-entry guard built (TruMenu 0.22.6), live test open |
-
-Costume packs: converted and checked offline (pipeline step `Costumes`), not played yet. Per plugin:
-[docs/PLUGINS.md](docs/PLUGINS.md).
-
-![Current development build: TruMenu quick bar, costume page, at the start of Lara's Shadow](docs/screenshots/dev-quickbar-costumes-2026-11-07.jpg)
-*Development build (7 Nov 2026): the start of Lara's Shadow with the test menu's quick bar, page "Kostueme"
-(TruMenu 0.21.6), here the DLC costume f "Casual Explorer". Older snapshots and states: [docs/DEVLOG.md](docs/DEVLOG.md).*
+| DLC 1 *Beneath the Ashes* | `█████████░` ~90 % | played; "display driver" box, grapple ring look, cinematic speech in five languages fixed; starts after DLC 2 in the same session | crash while loading the dungeon in the fork's builds: cause found, fix built offline, not yet confirmed in game |
+| DLC 2: levels / story | `████████░░` ~80 % | played through the Yggdrasil halls to the end level and its cutscenes; doppelganger look, wall run, waterfall | rock-vein jump from a ledge turns back; a moaning sound loops; some materials still drawn with substitute shaders |
+| DLC 2: combat | `███████░░░` ~75 % | as on the Xbox for single hits, the punch combo (20 / 40 / 60 / 80) and the big-hit fall (`TruShadowCombat` 0.6.8-0.6.10); melee kill and chunkdoll | the shadow finisher never starts; lock-on (row below) |
+| DLC 2: shadow power | `████████░░` ~80 % | slow motion, meter and HUD, power states, wall run and its camera | at the goo drip the PC stays in slow motion while Lara runs (Xbox: normal speed); Lara's ponytail stretches in slow motion |
+| DLC 2: cutscenes / end + credits | `██████░░░░` ~60 % | end cutscenes visible, throne flicker worked around; cutscene pause and subtitle language live (TruMenu); DLC 2 credits movie built locally | the end chain (finale, credits, menu) not yet played through; the throne's warm top light missing with the workaround |
+| DLC 2: hints / banners | `█████░░░░░` ~50 % | loading-screen titles and hint boxes | "objective / hint unlocked" banners run but are invisible: data step built, live test open |
+| DLC 2: lock-on ring | `██░░░░░░░░` ~20 % | ring request with the shadow power translated (`TruShadowPower` 0.22) | LT never locks on: cause found (a tuning byte swapped by the converter), fix built offline (pipeline step `playerblock`), live test open; no ring yet |
+| Title-update translation | `█░░░░░░░░░` 14 % | of 1 328 changed / new functions: 96 ported, 55 partial, 2 explained, 88 irrelevant (`tools/tu_coverage.py`; 14 % = ported + explained + irrelevant) | 1 087 open; "open" also counts functions not judged yet |
+| Costume packs | `█████░░░░░` ~50 % | converted and checked offline (pipeline step `Costumes`) | not played yet |
 
 **Where to read on**
 
