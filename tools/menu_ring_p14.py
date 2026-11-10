@@ -21,6 +21,11 @@ Changes (script 7 offsets of the PC script, 197 664 B; the pause-menu port only 
       at 1.0; the ring slots and the sub-rings get 3.6 only from that animation (tree 3: small disc on the main ring,
       right size after a sub-ring had animated it, small again after new game -> cancel = the widget back at its
       init value). With the init value at 3.6 every reset lands on the right size - no code, no shared timeline.
+  D8  icon 0x7bc init +0x4c / +0x58 (two ARGB colour words): ffc0c0c0 / 00606060 -> 00c0c0c0 / ff606060 = the PC
+      door 0x738 and every ring slot icon (tree 4 live: the door looked sharper than the slot icons). In all 612
+      uibitmap inits of generalbank +0x58 is ff606060 except the 32 sub-ring style icons of script 7 (00606060,
+      0x7bc among them); what the engine draws with it (second layer?) is not traced in the exe. +0x4c alpha 0 as on
+      the slot icons: the blocks set the visible colour at runtime (uibitmap f18) as the slots' colour timelines do.
   B1  appended blocks, each reached by an op63 that replaces one op00 marker and jumping back after it:
       B1a func 19 +0x3da4 (end of the base state): show background 0x6b4 and icon 0x7bc (uibitmap f4, as func 20
           does for the Xbox sub-ring 1) + colour (uibitmap f18, call copied from func 28; tree 1 showed the door
@@ -311,6 +316,12 @@ def plan(D):
             raise Refuse('D7: 0x6b4 / 0x660 init +0x%x = %08x / %08x (expected 1.0, no relocation)' % (k, s.w(a), s.w(b)))
         words[a] = (0x3f800000, v, 'D7 0x6b4 init +0x%x: scale 1.0 -> %g (last key of the slot disc scale timeline 0x92c)'
                     % (k, struct.unpack('<f', struct.pack('<I', v))[0]))
+    # D8: the door's two colour words as on the PC door 0x738 (and every slot icon)
+    for k, old, new in ((0x4c, 0xffc0c0c0, 0x00c0c0c0), (0x58, 0x00606060, 0xff606060)):
+        a = s.init_word(ICON14, k); b = s.init_word(DOOR, k)
+        if s.w(a) != old or s.w(b) != new or a in s.it or a in s.ext or a in s.ids:
+            raise Refuse('D8: 0x7bc / 0x738 init +0x%x = %08x / %08x, expected %08x / %08x' % (k, s.w(a), s.w(b), old, new))
+        words[a] = (old, new, 'D8 0x7bc init +0x%x: colour %08x -> %08x (as the door 0x738)' % (k, old, new))
     # ---- references for the blocks
     show = ref_call(s, REF_SHOW); f22 = ref_call(s, REF_F22); hit = ref_call(s, REF_HIT); inp = ref_call(s, REF_IN)
     colour = ref_call(s, REF_COLOR)
@@ -431,6 +442,7 @@ def p14_full(st):
     """True when a p14_status() shows the complete stage-light layout"""
     return (st['slot7'] == 'f15' and st['lock14_base'] == 0 and st['place14_pc'] and st['icon14'] == D4['new'] and
             st['text14'] == D5['new'] and st['bg14'] == D6['new'] and st['bg14_scale'] == [3.6, 3.6] and
+            st['icon14_colours'] == ['00c0c0c0', 'ff606060'] and
             len(st['shows']) == 1 and
             len(st['refree']) == sum(x['kind'] == 'refree' for x in SITES) and st['quit_click'])
 
@@ -483,6 +495,7 @@ def p14_status(D):
     out['place14_pc'] = s.w(D3['at']) >> 24 == 0x00 and s.w(D3['at'] + 0xc) == op(0x0f, ICON14)
     out['icon14'] = s.w(s.init_word(ICON14, 0x5c)); out['text14'] = s.w(s.init_word(TEXT14, 0x5c))
     out['bg14'] = s.w(s.init_word(BG14, 0x5c))
+    out['icon14_colours'] = ['%08x' % s.w(s.init_word(ICON14, k)) for k in (0x4c, 0x58)]
     out['bg14_scale'] = [round(struct.unpack('<f', struct.pack('<I', s.w(s.init_word(BG14, k))))[0], 4)
                          for k in (0x34, 0x38)]
     end = max(hi for j, lo, hi in s.code)
