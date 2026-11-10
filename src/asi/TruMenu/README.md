@@ -2935,47 +2935,53 @@ record stayed 39 / 40 / 15 (never 718 as on the Xbox) and CM+0x1fc bits 9 / 10 /
 which step of the lock-on path stops (static map: ENGINE.md section 13.7 "Lock-on path"; workspace
 `docs\Befund-Zielerfassung-1011.md`):
 
-1. aim input = pad action word `[[[0xa02b68]+0x18]+0]` +0x630 bit 2 (held) / +0x690 bit 2 (pressed); gates byte
-   0x8ab4e6 != 0, `[0xe7f144]` bit 0 clear, byte `[0xe7f143]` != 4; weapon slot `[[P+0x500]+0x134]` (P = `[0xfadb58]`;
-   -1 none, 7 / 12 block, 3 / 4 always) - read by condition 506 (0x763c50 -> 0x6f2800) and the lock update 0x7216b0;
+1. aim input = the action records `[[[0xa02b68]+0x18]+0]` + action * 0x30 (flag 4 = held): **+0x630 = action 33
+   = RT** (PC DTP 47 source 4 = pad code 5), **+0x690 = action 35 = LT** (source 22 = pad code 4; the XInput poll
+   0x484c06..0x484c47 gives bLeftTrigger code 4, bRightTrigger code 5); gates byte 0x8ab4e6 != 0, `[0xe7f144]` bit 0
+   clear, byte `[0xe7f143]` != 4; weapon slot `[[P+0x500]+0x134]` (P = `[0xfadb58]`; -1 none, 7 / 12 block, 3 / 4
+   always) - condition 506 (0x763c50 -> 0x6f2800) reads action 33 (RT), the lock update 0x7216b0 sets **P+0x58c =
+   tuning byte `[0xfad764]+0x294` while LT is held** and P+0x588 = byte +0x27c while RT is held (`[0xfad764]` = the
+   player instance's data +0x50, set at 0x71adbd);
 2. chart: condition 506 takes record 38 -> 709, then 714 / 716 -> **718** (`{400,401,401} {400,403,415} {500,525,0}
    {2100,2102,3,NOT}`); record 710 runs activities 1001 / 1003 / 1004 = CM+0x1fc bits 19 / 18 / 20;
 3. lock update 0x7216b0 (from CombatManager::Update 0x7227d3): bit 18 clear -> off; bit 11 -> nothing; timers P+0x58c
-   (pressed) / P+0x588 (held) not > 0, P+0x798 == 0 and bit 21 clear -> off; else bit 19 -> lock 0x71edf0 (**bit 10**) or
+   (LT) / P+0x588 (RT) not > 0, P+0x798 == 0 and bit 21 clear -> off; else bit 19 -> lock 0x71edf0 (**bit 10**) or
    soft lock 0x71ec50 (**bit 9**), which set targeter 0's parameters (chart parameter 0x3f6 or `[0xfad764]+0x488`) and
    select / set its target;
 4. target = P+0x540 while P+0x788 > 0, else targeter 0's +0x90 node (0x71d0c0) - the ring chain reads it (`ring.bits`).
 
 - **`aim.trace 1|0`** (bool, default 0, live; bar page Tests "Ziel-Spur (TruAim.log)"): every 100 ms on the game
-  thread, one TSV line per change into **`TruAim.log`** next to TruMenu.log (header at every open; 38 columns): aim
-  held / pressed + both pad words, the three gates, weapon slots +0x134 / +0x138, timers P+0x588 / +0x58c / +0x798 /
-  +0x788, CM+0x1fc with bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records (machines 1 / 2), targeter 0 (flags,
+  thread, one TSV line per change into **`TruAim.log`** next to TruMenu.log (header at every open; 40 columns): RT
+  (action 33) / LT (action 35) held + both action flag words, the three gates, weapon slots +0x134 / +0x138, timers
+  P+0x588 / +0x58c / +0x798 / +0x788, tuning bytes +0x294 / +0x27c, CM+0x1fc with bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records (machines 1 / 2), targeter 0 (flags,
   target, candidates, bucket counts, rejected count, parameter pointer / flags / groups), its candidate list
   (`name#intro@distance/angle:group<g>|rejected|TARGET`, angle = between the camera view and Lara -> enemy, x / y), the
   nearest AI enemy (6000 units), where it is in targeter 0, why code + text. Change key: timers as sign, distances
   to 100 units, angles to 10 degrees. At most 100 000 lines.
 - **`aim.why`** (info item, bar row "Warum kein Ziel? (live)"): the first blocking step for the nearest enemy in plain
-  words (DE / EN after the quick bar language), then LT held / pressed, weapon, bits 9 / 10 / 11 / 18 / 19, records,
-  targeter 0 candidates / rejected. Order (model `aimwhy` in `tools/trumenu_quick_check.py`, 16 cases): no enemy ->
-  locked -> scripted target -> no weapon -> weapon 7 / 12 -> game gate -> no aim input -> bit 18 -> bit 11 -> no lock
-  bits -> targeter 0 missing / no candidates / not offered / rejected / other target / in a group.
+  words (DE / EN after the quick bar language), then RT / LT held, weapon, bits 9 / 10 / 11 / 18 / 19, records,
+  targeter 0 candidates / rejected. Order (model `aimwhy` in `tools/trumenu_quick_check.py`, 18 cases): no enemy ->
+  locked -> scripted target -> no weapon -> weapon 7 / 12 -> game gate -> no aim input -> bit 18 -> bit 11 -> LT held
+  but tuning byte +0x294 = 0 -> no lock bits -> targeter 0 missing / no candidates / not offered / rejected / other
+  target / in a group.
 - A candidate in group g passed eligibility 0x6ecca0 and filter group g (0x712090, distance / angle records); in the
   rejected list it failed eligibility or every group - which one is **not** read (no game function is called;
   TruShadowCombat's WHY does it for targeter 9 only). The thrall label "Z9 abgelehnt F00 (Filter)" is **targeter 9**
   (TU index 9, the doppelganger finisher targeter of condition 2011, parameters from the DLC 2 tuning), not the aim
   targeter 0: F00 = eligibility passed, none of its filter groups.
-- Read only, every pointer checked, 20 byte checks (`kAmChecks`, `work\asi\menu0238\precheck_02215.txt`: 0 mismatches
+- Read only, every pointer checked, 25 byte checks (`kAmChecks`, `work\asi\menu0238\precheck_02215.txt`: 0 mismatches
   against `data\pc\tru.exe` and the installed `tru.exe`); also needs the ring.bits and combo.trace checks.
 
 ### TO TEST 0.22.15
 
 | # | Step | Expected |
 |---|---|---|
-| 1 | game start, first `aim.trace 1` | log `0.22.15: aim.trace / aim.why ok (20 checks)`, reply `aim.trace 1 - one TSV line per change in TruAim.log ...`; TruAim.log gets the header |
-| 2 | DLC 2 hall02, pistol drawn, no enemy near, LT not held | lines with `aim_held 0`, why `noenemy` or `noinput` |
-| 3 | yeti / thrall in front, **hold LT** (as 13:30) | column `aim_held` / `aim_pressed` and `pad630` / `pad690`: does bit 2 ever become 1? timers t588 / t58c > 0? bits b9 / b10? `lara_rec0` 718? |
+| 1 | game start, first `aim.trace 1` | log `0.22.15: aim.trace / aim.why ok (25 checks)`, reply `aim.trace 1 - one TSV line per change in TruAim.log ...`; TruAim.log gets the header |
+| 2 | DLC 2 hall02, pistol drawn, no enemy near, no trigger held | lines with `act35_lt_held 0`, why 2 (`noenemy`) or 6 (`noinput`); note `tune294` / `tune27c` |
+| 3 | yeti / thrall in front, **hold LT** (as 13:30) | `act35_lt_held` 1? `t58c_lt` > 0? `tune294` > 0? bits b9 / b10? `lara_rec0` 718? |
 | 4 | same, read `aim.why` in the bar (page Tests) | one sentence; note it with the screenshot |
-| 5 | if `aim_held` stays 0 while LT is held: press the other trigger / bumpers / RS click one by one, each held 2 s | which button sets bit 2 of +0x630 (the game's aim action on this pad mapping) |
+| 5 | **hold RT** at the enemy (without LT), then both | `act33_rt_held` 1, `t588_rt` > 0 (`tune27c`), b9 or b10? |
+| 5a | if `act35_lt_held` stays 0 while LT is held | the trigger reaches the game as another pad code (pad mapping / XInput) - press the bumpers / RS click one by one, 2 s each, and note which column moves |
 | 6 | if the lock bits come (b10 1) but no ring: candidates column | yeti `group0` / `rejected` / `TARGET`, distance / angle |
 | 7 | main game (any level with pistols), hold the aim button at an enemy | the same columns with a lock (b9 / b10 1, `TARGET`) - the PC baseline |
 | 8 | `aim.trace 0` | file closed, `aim.trace 0 - off`; regression: `fight.trace`, `ring.bits`, `enemy.panel` unchanged |

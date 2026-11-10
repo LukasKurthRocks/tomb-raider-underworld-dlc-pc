@@ -3232,7 +3232,7 @@ def check_sublang():
 
 
 AW = ['ok', 'nodata', 'noenemy', 'noweapon', 'weaponblocks', 'gamegate', 'noinput', 'nobit18', 'bit11', 'nolockbits',
-      'scripted', 'notargeter', 'nocand', 'notcand', 'rejected', 'bucket', 'othertarget']   # the kAw* enum order
+      'scripted', 'notargeter', 'nocand', 'notcand', 'rejected', 'bucket', 'othertarget', 'tunezero']   # kAw* order
 
 
 def am_why(s):                                  # AmRead: the first blocking step of the lock-on path (0.22.15)
@@ -3252,6 +3252,7 @@ def am_why(s):                                  # AmRead: the first blocking ste
     if not lock and not held and not pressed and not timers: return 'noinput'
     if not (w >> 18) & 1: return 'nobit18'
     if (w >> 11) & 1: return 'bit11'
+    if not lock and pressed and not timers and s.get('tuneok', True) and s.get('tune294', 1) == 0: return 'tunezero'
     if not lock: return 'nolockbits'
     if not s.get('t0', True): return 'notargeter'
     if not s.get('ncand', 0): return 'nocand'
@@ -3270,6 +3271,8 @@ def check_aimwhy():
         ('bits as live 10.11. (18 / 19 set, 9 / 10 clear), no pad bit 2, timers 0', dict(w=live, wpn=0, pad630=0, ncand=1, where=0x10), 'noinput'),
         ('pad bit 2 held, no lock bits yet (one frame before 0x7216b0)', dict(w=live, wpn=0, pad630=4, t588=3.0), 'nolockbits'),
         ('held, but chart bit 18 clear', dict(w=0, wpn=0, pad630=4), 'nobit18'),
+        ('LT (action 35) held, tuning byte +0x294 = 0, timers 0', dict(w=live, wpn=0, pad690=4, tune294=0), 'tunezero'),
+        ('LT held, tuning byte 15 but timer not yet set', dict(w=live, wpn=0, pad690=4, tune294=15), 'nolockbits'),
         ('no weapon', dict(w=live, wpn=-1, pad630=4), 'noweapon'),
         ('weapon kind 12', dict(w=live, wpn=12, pad630=4), 'weaponblocks'),
         ('menu bit 0xe7f144', dict(w=live, wpn=0, g144=1, pad630=4), 'gamegate'),

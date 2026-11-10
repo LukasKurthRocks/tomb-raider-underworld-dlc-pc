@@ -2713,7 +2713,7 @@ def check_02214():
 
 
 def check_02215():
-    """0.22.15: aim.trace / aim.why read the lock-on path only - 20 byte checks (kAmChecks) behind AmCheck (which also
+    """0.22.15: aim.trace / aim.why read the lock-on path only - 25 byte checks (kAmChecks) behind AmCheck (which also
     needs the ring.bits and chart checks), no write into game memory and no game call in the section, the TruAim.log
     header has as many columns as AmBody writes, both items in kOpts, bar rows on page Tests next to ring.bits, AmTick
     once per game frame"""
@@ -2726,9 +2726,10 @@ def check_02215():
     tab = sec[sec.find('const DvCheck kAmChecks[] = {'):]
     tab = tab[:tab.find('\n};')]
     n_checks = len(re.findall(r'\{0x[0-9a-f]{8}, "', tab))
-    if n_checks != 20:
-        problems.append('TruMenu.cpp: kAmChecks must hold 20 byte checks (has %d)' % n_checks)
+    if n_checks != 25:
+        problems.append('TruMenu.cpp: kAmChecks must hold 25 byte checks (has %d)' % n_checks)
     for want in ('{0x006f2800, "53 8b1d58dbfa00 8b8300050000 56 8bb034010000 83fe0c"}',
+                 '{0x0072170a, "a164d7fa00 0fb69094020000"}', '{0x00484c32, "c7460404000000"}',
                  '{0x007216b0, "83ec08 55 8be9 f785fc01000000000400"}', '{0x0071d97d, "898f90000000"}',
                  'g_amOk = RgCheck() && CtCheck() && DvChecks(kAmChecks'):
         if want not in sec:
