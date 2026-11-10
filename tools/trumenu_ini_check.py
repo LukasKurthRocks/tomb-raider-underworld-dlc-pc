@@ -3063,8 +3063,9 @@ def check_02219(ini_path, switches_path):
     if not re.search(r'^TruShadowPower \| Meter \| Infinite \| bool \|', sw, re.M):
         problems.append('TruMenu.switches.txt: the TruShadowPower [Meter] Infinite row is missing')
     tsp = open(os.path.join(PLUGINS, 'TruShadowPower', 'TruShadowPower.cpp'), encoding='utf-8').read()
-    if 'return "TruShadowPower 0.23 (' not in tsp or 'GetPrivateProfileIntA("Meter", "Infinite"' not in tsp:
-        problems.append('TruShadowPower.cpp: version export 0.23 / [Meter] Infinite read not found (kPiMinVersion 23)')
+    vm = re.search(r'return "TruShadowPower 0\.(\d+) \(', tsp)   # 0.22.21: 0.23 or later (TruShadowPower 0.24 of 4222070)
+    if not vm or int(vm.group(1)) < 23 or 'GetPrivateProfileIntA("Meter", "Infinite"' not in tsp:
+        problems.append('TruShadowPower.cpp: version export 0.23+ / [Meter] Infinite read not found (kPiMinVersion 23)')
     ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
     if '1e466d0709564db15ef8b7cf0b1d97dac49c8ef98cb043617a608f7ad2d5cd3c' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.18 build hash (work\\asi\\menu0241) is missing')
@@ -3077,8 +3078,8 @@ def check_02220(ini_path):
     Spiel-Einstellungen / Hauptmenue, item, help, greying, persistence, 13 byte checks = precheck_02220 rows"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.20 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.20')
+    if '"0.22.20 (main menu attract video off' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.21: later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.20 part "0.22.20 (main menu attract video off"')
     ini = open(ini_path, encoding='utf-8').read()
     if not re.search(r'\{"Menu", "NoAttract", "0",', src):
         problems.append('TruMenu.cpp: kOpts [Menu] NoAttract default must be "0"')
@@ -3103,7 +3104,7 @@ def check_02220(ini_path):
     for want in ('if (vt != kNaClockVt)', 'if (!NaFrontEnd())', 'g_naClock = clock;'):
         if want not in cap: problems.append('TruMenu.cpp: NaCapture must hold %s' % want)
     upd = fn_body(src, 'void __fastcall NaUpdate(')
-    for want in ('if (g_naWant && want)', 'clock == want && NaFrontEnd()', '*elapsed = 0.0f;',
+    for want in ('g_naWant && clock == want', 'clock == want && NaFrontEnd()', '*elapsed = 0.0f;',   # 0.22.21 form
                  'reinterpret_cast<NaUpdFn>(kNaUpdOrig)(self, edx, dt);'):
         if want not in upd: problems.append('TruMenu.cpp: NaUpdate must hold %s' % want)
     if upd.find('reinterpret_cast<NaUpdFn>(kNaUpdOrig)') < upd.find('*elapsed = 0.0f;'):
@@ -3153,6 +3154,97 @@ def check_02220(ini_path):
     if '1121ff2ac48ec544401d5fbbc51be70697c8b450cbeda9de0b96fc35d289601c' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.19 build hash (work\\asi\\menu0242) is missing')
     return problems, 'menu.noattract: [Menu] NoAttract=0, item / row / help / greying, capture + hold, %d byte checks' % len(rows)
+
+
+def check_02221(ini_path):
+    """0.22.21: menu.attracttimer ([Menu] AttractTimerShow, default 0; [Menu] AttractTimerPosition, default tr): the teaser
+    timer line in the front end - read only through the 0.22.20 update slot (NaUpdate writes only in the hold branch,
+    NtPre / NtPost only read), a shadow count with a flash + log line per alarm; bar row next to "Hauptmenue-Video aus",
+    item, help, greying, persistence; no new byte checks (precheck_02221 = the 45 rows of precheck_02220)"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.21 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.21')
+    ini = open(ini_path, encoding='utf-8').read()
+    block = re.search(r'^\[Menu\]\r?\n(.*?)(?=^\[|\Z)', ini, re.M | re.S)
+    for key, val in (('AttractTimerShow', '0'), ('AttractTimerPosition', 'tr')):
+        if not re.search(r'\{"Menu", "%s", "%s",' % (key, val), src):
+            problems.append('TruMenu.cpp: kOpts [Menu] %s default must be "%s"' % (key, val))
+        if not block or not re.search(r'^%s=%s\r?$' % (key, val), block.group(1), re.M):
+            problems.append('TruMenu.ini: [Menu] %s=%s missing' % (key, val))
+    ro = fn_body(src, 'void ReadOptions(')
+    if 'InterlockedExchange(&g_ntWant, OptInt(ini, "Menu", "AttractTimerShow") != 0 ? 1 : 0);' not in ro:
+        problems.append('TruMenu.cpp: ReadOptions must read [Menu] AttractTimerShow into g_ntWant')
+    if 'OptString(ini, "Menu", "AttractTimerPosition", v, sizeof(v));' not in ro or 'g_ntPos = 2;' not in ro:
+        problems.append('TruMenu.cpp: ReadOptions must read [Menu] AttractTimerPosition (default tr = index 2)')
+    m = re.search(r'const char \*const kSnPosNames\[4\] = \{([^}]*)\};', src)
+    if not m or re.findall(r'"(\w+)"', m.group(1))[2:3] != ['tr']:
+        problems.append('TruMenu.cpp: kSnPosNames[2] must be "tr" (the AttractTimerPosition default index)')
+    # item: bool, explicit value, no argument = report (never a flip), written at once
+    if not re.search(r'\{"menu\.attracttimer", "bool", "', src): problems.append('TruMenu.cpp: item menu.attracttimer missing')
+    run = fn_body(src, 'bool RunNt(')
+    for want in ('if (!arg || !arg[0]) { ValNt(o, n); return true; }', 'IniKeep("Menu", "AttractTimerShow", on ? "1" : "0");',
+                 'usage: menu.attracttimer 1|0'):
+        if want not in run: problems.append('TruMenu.cpp: RunNt must hold %s' % want)
+    if 'BoolArg(' in run: problems.append('TruMenu.cpp: RunNt must not use BoolArg (an empty argument would flip)')
+    # read only: the slot follows hold || line; NaUpdate writes the clock only in the hold branch; NtPre / NtPost read
+    tick = fn_body(src, 'void NaTick(')
+    if 'want = hold || g_ntWant != 0;' not in tick: problems.append('TruMenu.cpp: NaTick must patch the slot for hold || line')
+    upd = fn_body(src, 'void __fastcall NaUpdate(')
+    if upd.count('= 0.0f;') != 2 or upd.count('*elapsed = 0.0f;') != 1:   # `float game = 0.0f;` + the hold's write
+        problems.append('TruMenu.cpp: NaUpdate may write the clock only in the hold branch (*elapsed = 0.0f)')
+    hb = upd.find('if (g_naWant && clock == want && NaFrontEnd())')
+    if hb < 0 or not (hb < upd.find('*elapsed = 0.0f;') < upd.find('held = true;')):
+        problems.append('TruMenu.cpp: the write in NaUpdate must sit in the g_naWant hold branch')
+    if not (0 <= upd.find('NtPre(clock);') < hb):
+        problems.append('TruMenu.cpp: NaUpdate must call NtPre before the hold (the elapsed the game itself had)')
+    orig, post = upd.find('reinterpret_cast<NaUpdFn>(kNaUpdOrig)(self, edx, dt);'), upd.find('NtPost(seen, game, st, firedBefore, held, dt);')
+    if not (0 <= orig < post): problems.append('TruMenu.cpp: NaUpdate must call NtPost after the game\'s update')
+    for name in ('void NtPre(', 'void NtPost('):
+        body = fn_body(src, name)
+        if not body: problems.append('TruMenu.cpp: %s missing' % name); continue
+        if re.search(r'reinterpret_cast<(?:float|DWORD|BYTE) \*>', body):
+            problems.append('TruMenu.cpp: %s must only read the clock (const casts)' % name.strip('( '))
+    post_b = fn_body(src, 'void NtPost(')
+    for want in ('if (running) g_ntShadow = g_ntShadow + dt;', '(g_naRepeat || g_ntPassed == 0)',
+                 'if (!flash || !g_ntWant) return;', 'g_ntFlashTick = GetTickCount();', 'Log(1, "menu.attracttimer: '):
+        if want not in post_b: problems.append('TruMenu.cpp: NtPost must hold %s' % want)
+    if 'bool NtWantsDraw() { return g_ntWant != 0 && NaFrontEnd(); }' not in src:
+        problems.append('TruMenu.cpp: NtWantsDraw must be g_ntWant && NaFrontEnd (front end only)')
+    rnd = fn_body(src, 'void Render(')
+    for want in ('const bool ntDraw = NtWantsDraw();', '!cnBadge && !ntDraw)', 'if (ntDraw) DrawNt();'):
+        if want not in rnd: problems.append('TruMenu.cpp: Render must hold %s' % want)
+    if 'g_ntFlashTick && now - g_ntFlashTick < 1000' not in fn_body(src, 'void DrawNt(').replace('flashAt', 'g_ntFlashTick'):
+        problems.append('TruMenu.cpp: DrawNt must flash 1 s after g_ntFlashTick')
+    if 'if (!_stricmp(id, "menu.attracttimer")) return NaWhy();' not in fn_body(src, 'const char *RadialWhy('):
+        problems.append('TruMenu.cpp: RadialWhy must grey menu.attracttimer with NaWhy')
+    # bar row right after "Hauptmenue-Video aus" in group set_main, before "TruMenu selbst"; help within 60 characters
+    tables = src[src.find('const QbRow kQbSettings[] = {'):]
+    tables = tables[:tables.find('\n};')]
+    g, a, r, t = (tables.find('"set_main", kQbGroup'), tables.find('"menu.noattract", "", kQbBool'),
+                  tables.find('"menu.attracttimer", "", kQbBool'), tables.find('"set_tm", kQbGroup'))
+    if not (0 <= g < a < r < t):
+        problems.append('TruMenu.cpp: row menu.attracttimer (bool) must follow menu.noattract in group set_main of kQbSettings')
+    if '"Teaser-Uhr anzeigen", "Show teaser timer", "menu.attracttimer"' not in tables:
+        problems.append('TruMenu.cpp: bar row texts "Teaser-Uhr anzeigen" / "Show teaser timer" missing')
+    hm = re.search(r'\{"menu\.attracttimer", "", "((?:[^"\\]|\\.)*)"\s*"((?:[^"\\]|\\.)*)"\}', src)
+    if not hm: problems.append('TruMenu.cpp: kQbHelp row menu.attracttimer missing')
+    else:
+        de, en = unescape(hm.group(1) + hm.group(2)).split('|')
+        if len(de) > 60 or len(en) > 60: problems.append('TruMenu.cpp: menu.attracttimer help over 60 characters')
+    # no new byte checks: precheck_02221 = the 45 rows of precheck_02220
+    pre20 = os.path.join(ROOT, 'work', 'asi', 'menu0243', 'precheck_02220.txt')
+    pre21 = os.path.join(ROOT, 'work', 'asi', 'menu0244', 'precheck_02221.txt')
+    rows = lambda p: sorted(l.split(None, 1)[0].lower() + ' ' + l.split(None, 1)[1].replace(' ', '').lower()
+                            for l in open(p, encoding='utf-8').read().splitlines() if l.strip() and not l.startswith('#'))
+    if os.path.exists(pre20) and os.path.exists(pre21):
+        r20, r21 = rows(pre20), rows(pre21)
+        if len(r21) != 45 or r20 != r21: problems.append('precheck_02221.txt: must hold the 45 rows of precheck_02220 (%d)' % len(r21))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '8e3d279fde431b57f9417d9954d692476b256c69cc92ac004a241b990aaebc2c' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.20 build hash (work\\asi\\menu0243) is missing')
+    return problems, ('menu.attracttimer: [Menu] AttractTimerShow=0 / AttractTimerPosition=tr, item / row / help / '
+                      'greying, read-only shadow + flash, front end only, 45 byte checks unchanged')
 
 
 def table(src):
@@ -3308,6 +3400,10 @@ def main(argv):
     for p in cproblems20: print('Q02220 %s' % p)
     if not cproblems20: print('ok: 0.22.20 %s' % csummary20)
     problems += cproblems20
+    cproblems21, csummary21 = check_02221(ini_path)   # 0.22.21
+    for p in cproblems21: print('Q02221 %s' % p)
+    if not cproblems21: print('ok: 0.22.21 %s' % csummary21)
+    problems += cproblems21
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

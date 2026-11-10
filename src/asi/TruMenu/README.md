@@ -2928,6 +2928,87 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.21 - teaser timer line in the main menu (2026-11-10)
+
+Built into `work\asi\menu0244`, not installed, no live test. Owner's wish after the 0.22.20 live result (21:25-21:27,
+no teaser after 113 s): a switch **"Teaser-Uhr anzeigen" / "Show teaser timer"** that shows the AttractTimer clock in
+the main menu, also while `menu.noattract` holds it, and marks the moment the teaser would have started.
+`menu.attracttimer 1|0` (no argument = report, never a flip; a bad value = usage), `[Menu] AttractTimerShow` (default 0,
+written back at once like the 0.22.18 settings), `[Menu] AttractTimerPosition` (corner `tl` / `tr` / `bl` / `br` as the
+sound list's `[Sound] Position`, default `tr`; anything else = `tr`; INI only). Bar row on page Spiel-Einstellungen,
+group "Hauptmenü", right after "Hauptmenü-Video aus"; help line "Zeit bis zum Teaser im Hauptmenü - blinkt beim Alarm";
+greyed with the same reason as `menu.noattract` (13 checks of 0.22.20 differ / a patch refused).
+
+**What the line shows** (section "0.22.21 menu.attracttimer", drawn in Present only in the front end = main state 6 /
+10, the AttractTimer's own gate; never in a level):
+
+| State | Line 1 | Line 2 |
+|---|---|---|
+| clock not taken yet (TruMenu waits for the timer's next START / RESTART) | `Teaser-Uhr: noch keine Uhr` | `kommt mit dem nächsten Start (Eingabe im Menü)` |
+| `menu.noattract` off | `Teaser-Uhr 12.3 / 40.0 s` (real elapsed / alarm; `(steht)` / `(Pause)` when the clock is stopped / paused) | `Teaser 1x gestartet seit Start` |
+| `menu.noattract` holds | `Teaser-Uhr gesperrt - 52.3 s seit Start` (shadow count) | `Alarm alle 40.0 s - Teaser wäre 1x gestartet` |
+| 1 s after an alarm | the box orange, white text | `>> Teaser startet jetzt` (real) / `>> jetzt wäre der Teaser gestartet` (held) |
+| checks failed / patch refused | `Teaser-Uhr: Spielcode weicht ab (TruMenu.log)` | - |
+
+English texts with the bar language English (`Teaser timer 12.3 / 40.0 s`, `Teaser timer held - 52.3 s since start`,
+`>> the teaser would start now` ...).
+
+**How it reads the clock** (game thread, read only): the 0.22.20 update slot 0x84584c now points to `NaUpdate` while
+the hold **or** the line wants it (`NaTick`); with the line alone `NaUpdate` writes nothing - it only reads the captured
+clock around the game's 0x4a3960 (`NtPre` before the hold, `NtPost` after the game's update): state +8, elapsed +0x10,
+fired +0x18; alarm / repeat come from the capture at the f11 native. These are the offsets the 0.22.20 rows of
+0x4a3993 / 0x4a39b7 already pin, so there are no new byte checks.
+
+- **Shadow count** = the dt the game hands the clock's update while the clock runs (state 2 - the game adds dt only
+  then), so it keeps counting while NoAttract sets the real elapsed to 0. It starts anew when the game (re)starts the
+  clock outside the update: `NtPre` sees an elapsed that is not what the previous update left, or the clock running at
+  0 again after a stop (clock f0 Start: "only when not running: fired 0, elapsed 0, state 2", ENGINE.md "Script
+  `clock`"). That is "since the last START / RESTART" whenever that call really restarts the clock (RESTART = f11 + f1
+  Stop + f0; in TruMenu.log of 2026-11-10 21:24-21:31 every "STARTING" followed a "STOPPING"); a START on a clock that
+  already runs changes nothing in the game, so the shadow does not restart there either - it stays the time the game
+  itself would have counted.
+- **Flash** (1 s orange box) + one TruMenu.log line at LogLevel 1 per flash - while held: each time the shadow passes
+  the alarm (40 s, then 80 s, 120 s ... because repeat = 1; once without repeat); while not held: when the real clock
+  fires in this update (fired set, or elapsed -= alarm with repeat) - the teaser then starts as the game's. Log line
+  e.g. `menu.attracttimer: the teaser would start now (held) (alarm 1) - shadow 40.01 s, alarm 40.00 s, real elapsed
+  0.02, 40.0 s wall time since the clock's (re)start, NoAttract holds`. The wall time is TruMenu's own GetTickCount
+  since the shadow restart: that the clock's dt is in seconds is an assumption (alarm 40.0 and the ~40 s idle time
+  match), the log line lets the live test confirm it.
+- Switching NoAttract while the line is on keeps the slot patched; the hold change gets its own log line
+  (`menu.noattract on: update slot 0x84584c already NaUpdate ...` / `menu.noattract off (update slot stays NaUpdate for
+  the teaser timer line, read only): N frames held ...`). Both off = slot put back as in 0.22.20.
+
+`menu.attracttimer` without an argument reports e.g. `1 (NoAttract holds - shadow count; clock read, real 0.02 / 40.00
+s, shadow 52.31 s, 1 alarm(s) since the start, 1 flash(es), corner tr)`.
+
+Also in this commit (the TruMenu checks failed on HEAD because of TruShadowPower 0.24, commit 4222070):
+`TruMenu.switches.txt` got the row for TruShadowPower `[Camera] TuTimeStep` (restart, default 0, since TruShadowPower
+0.24; read once in its ReadOptions), and `check_02219` accepts a TruShadowPower version export 0.23 or later.
+
+Checks: `work\asi\menu0244\precheck_02221.txt` = the 45 rows of `precheck_02220.txt` (no new rows): 45 checks, 0
+mismatches against `data\pc\tru.exe` and read-only against the installed `tru.exe`; `trumenu_precheck_match` 0.22.20
+section 13 = 13, 0.22.21 section 0 = 0. `trumenu_ini_check` `check_02221` (defaults in kOpts / sample INI /
+ReadOptions, item / row order / help / greying, RunNt no-flip + usage + IniKeep, the slot for hold or line, NaUpdate
+writes only in the hold branch, NtPre / NtPost only read, NtPost after the game's update, front end only, 1 s flash, the
+45 precheck rows, Set-TruMenu 0.22.20 hash; negative test on a copy: 5 of 5 mutations caught); `check_02220` follows
+the new NaUpdate form; `trumenu_quick_check` model `attracttimer` (15 cases: read only - 400 frames identical to the
+game alone, flash frames = the frames the free clock fires with mixed dt, RESTART / START on a running clock / STOP +
+START, no repeat, line off, level, RunNt, position default); qb layout, readability, umlauts, flat PS checks pass.
+`Set-TruMenu.ps1` knows the 0.22.20 hash.
+
+### TO TEST 0.22.21
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | line, NoAttract off | bar Spiel-Einstellungen / Hauptmenü, "Teaser-Uhr anzeigen" right; main menu, touch nothing | top right `Teaser-Uhr 0.0 / 40.0 s` counting up; at 40 s the box flashes orange 1 s with `>> Teaser startet jetzt`, the teaser starts (the game's); TruMenu.log `menu.attracttimer: the clock fired - the teaser starts (alarm 1) - ... 40.0 s wall time ...` |
+| 2 | dt = seconds? | compare the line with a stopwatch / the log line's wall time | shadow / elapsed seconds = wall seconds (else note the factor) |
+| 3 | line + NoAttract | also "Hauptmenü-Video aus" right; touch nothing ~2.5 min | `Teaser-Uhr gesperrt - ... s seit Start`; flashes at 40 / 80 / 120 s with `>> jetzt wäre der Teaser gestartet`, no teaser; one log line per flash |
+| 4 | input | press a direction in the menu | the count starts from 0 again (RESTART) |
+| 5 | level | start / load a level | no line in the level; back in the main menu it is there again |
+| 6 | corner / persist | `[Menu] AttractTimerPosition=bl`, restart | line bottom left; `AttractTimerShow=1` kept from the row |
+| 7 | toggle NoAttract with the line on | "Hauptmenü-Video aus" right / left | log `menu.noattract on: update slot 0x84584c already NaUpdate ...` / `menu.noattract off (update slot stays NaUpdate ...)`; line switches between real and shadow |
+| 8 | line off | row left | line gone; with NoAttract off too: log `menu.noattract off: N frames held` (slot put back) |
+
 ## 0.22.20 - main menu attract video off (2026-11-10)
 
 Built into `work\asi\menu0243`, not installed, no live test. Owner's wish: the main menu shall stay on screen (for
@@ -3987,6 +4068,8 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Menu] RememberPage` | 1 | 0.22.19: 1 = the big window opens with the pages that were open last time (`OpenPages`), also after a restart; 0 = the built-in pages (TO TEST, Quick access) |
 | `[Menu] OpenPages` | `totest,quick` | 0.22.19: keys of the open pages (comma list, rewritten when a page is opened / closed; keys in the start line `menu pages`); unknown keys dropped, only unknown = the built-in pages |
 | `[Menu] NoAttract` | 0 | 0.22.20 (`menu.noattract`): 1 = no teaser video (attract mode) after the idle time in the main menu - the AttractTimer clock is held at 0 in the front end, the background stays; 0 = the game's teaser |
+| `[Menu] AttractTimerShow` | 0 | 0.22.21 (`menu.attracttimer`): 1 = a line in a screen corner while in the main menu (front end) shows the teaser timer - elapsed / alarm, while `NoAttract` holds a shadow count that flashes 1 s (and writes a log line) when the teaser would have started; read only; 0 = no line |
+| `[Menu] AttractTimerPosition` | `tr` | 0.22.21: corner of the teaser timer line - `tl`, `tr`, `bl`, `br`; anything else = `tr` |
 | `[Quick] RememberPage` | 1 | 0.22.19: 1 = the bar opens on the page it showed last (`LastPage`), also after a restart; 0 = always page Level data |
 | `[Quick] LastPage` | (empty) | 0.22.19: English name of the last bar page (rewritten 1 s after a page change and at the close); empty = Level data, a name that is no page any more = page 1, logged |
 | `[Pad] BlockInput` | 1 | 0 = the game sees the pad while the menu is open |

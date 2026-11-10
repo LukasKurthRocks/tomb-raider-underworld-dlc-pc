@@ -4096,6 +4096,197 @@ def check_noattract():
     return good
 
 
+# ---- 0.22.21 menu.attracttimer: NaUpdate with NtPre / NtPost (read only) over the same clock model; the shadow count
+# restarts when the clock's elapsed is not what the last update left (or 0 again with the clock running after a stop),
+# passes the alarm 40 / 80 / ... (repeat) while held, flashes on the real event while not held; RunNt ----
+def nt_source():
+    import os, re
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'asi', 'TruMenu',
+                            'TruMenu.cpp'), encoding='utf-8').read()
+    post = re.search(r'\nvoid NtPost\(.*?\n\}', src, re.S).group(0)
+    pre = re.search(r'\nvoid NtPre\(.*?\n\}', src, re.S).group(0)
+    pos = re.findall(r'"(\w+)"', re.search(r'const char \*const kSnPosNames\[4\] = \{([^}]*)\};', src).group(1))
+    return {'repeat_rule': '(g_naRepeat || g_ntPassed == 0)' in post,
+            'reset_rule': 'e != g_ntLeft || (st == 2 && g_ntState != 2 && e == 0.0f)' in pre,
+            'front_end': 'bool NtWantsDraw() { return g_ntWant != 0 && NaFrontEnd(); }' in src,
+            'pos_default': pos[2] if len(pos) == 4 else None}
+
+
+class NtModel:
+    """NaUpdate (0.22.21) = NtPre, the 0.22.20 hold, the game's update, NtPost; the slot is patched (line or hold)"""
+    def __init__(self, line=1, hold=0, main=6):
+        self.line, self.hold, self.main = line, hold, main
+        self.cap, self.alarm, self.repeat = None, 0.0, 0
+        self.nt_clock, self.left, self.state, self.shadow, self.passed = None, 0.0, 0, 0.0, 0
+        self.flashes, self.resets, self.frame = [], 0, 0
+
+    def f11(self, clock):                        # NaCapture: vtable + front end
+        if clock.vt == NA_CLOCK_VT and self.main in (6, 10):
+            self.cap, self.alarm, self.repeat = clock, clock.alarm, clock.repeat
+
+    def pre(self, c):
+        e, st = c.elapsed, c.state
+        if c is not self.nt_clock: self.nt_clock, reset = c, True
+        else: reset = e != self.left or (st == 2 and self.state != 2 and e == 0.0)
+        if reset: self.shadow, self.passed, self.resets = e, 0, self.resets + 1
+
+    def post(self, c, game, st, fired_before, held, dt):
+        e, st2, fired = c.elapsed, c.state, c.fired
+        running = st == 2
+        real = running and not fired_before and (fired or e < game)
+        flash = False
+        if running: self.shadow += dt
+        if held:
+            if running and self.alarm > 0 and (self.repeat or self.passed == 0) and \
+                    self.shadow >= self.alarm * (self.passed + 1):
+                self.passed += 1; flash = True
+        elif real:
+            self.passed += 1; flash = True
+        self.left, self.state = e, st2
+        if flash and self.line: self.flashes.append((self.frame, 'real' if real else 'held', round(self.shadow, 6)))
+
+    def update(self, c, dt):
+        self.frame += 1
+        seen = c is self.cap and self.cap is not None
+        st = fired_before = None
+        if seen:
+            self.pre(c); st, fired_before = c.state, c.fired
+        held = False
+        if self.hold and c is self.cap and self.main in (6, 10):
+            c.elapsed = 0.0; held = True
+        game = c.elapsed
+        c.game_update(dt)
+        if seen: self.post(c, game, st, fired_before, held, dt)
+
+
+def nt_run(arg, want, ini_text):                 # RunNt: (ok, new want, new ini text or None, reply)
+    v = (arg or '')
+    if not v: return True, want, None, 'report'
+    if v == '1' or v.lower() in ('on', 'true'): on = 1
+    elif v == '0' or v.lower() in ('off', 'false'): on = 0
+    else: return False, want, None, 'usage'
+    return True, on, ini_set(ini_text, 'Menu', 'AttractTimerShow', str(on)), 'written'
+
+
+def nt_pos(value):                               # ReadOptions: [Menu] AttractTimerPosition, else tr (index 2)
+    names = ['bl', 'tl', 'tr', 'br']
+    pos = 2
+    for i, n in enumerate(names):
+        if (value or '').lower() == n: pos = i
+    return names[pos]
+
+
+def check_attracttimer():
+    s = nt_source()
+    cases = []
+    cases.append(('source: repeat rule, restart rule, front end only, position default tr',
+                  s['repeat_rule'] and s['reset_rule'] and s['front_end'] and s['pos_default'] == 'tr'))
+    # read only: NoAttract off, line on - the clock runs exactly as without TruMenu (elapsed and events per frame)
+    m, c, ref = NtModel(line=1, hold=0), NaClock(), NaClock()
+    m.f11(c); c.stop(); c.start(); ref.stop(); ref.start()
+    same = True
+    for k in range(400):
+        dt = (0.5, 1.0, 2.5, 0.016)[k % 4]
+        m.update(c, dt); ref.game_update(dt)
+        same &= c.elapsed == ref.elapsed and c.events == ref.events and c.fired == ref.fired
+    cases.append(('NoAttract off, line on: 400 frames, elapsed / events identical to the game alone (read only)', same))
+    # NoAttract off: a flash exactly at each real event (40, 80 s), marked real
+    m, c = NtModel(line=1, hold=0), NaClock()
+    m.f11(c); c.stop(); c.start()
+    frames = []
+    for k in range(81):
+        before = c.events
+        m.update(c, 1.0)
+        if c.events > before: frames.append(m.frame)
+    cases.append(('NoAttract off: flashes at the frames the clock fires (40, 80), each "real"',
+                  frames == [40, 80] and [f for f, _, _ in m.flashes] == frames and
+                  all(k == 'real' for _, k, _ in m.flashes)))
+    # NoAttract on: no event, the shadow passes 40 / 80 / 120 s
+    m, c = NtModel(line=1, hold=1), NaClock()
+    m.f11(c); c.stop(); c.start()
+    for _ in range(125): m.update(c, 1.0)
+    cases.append(('NoAttract on: 125 s idle - no event, flashes at shadow 40 / 80 / 120 ("held")',
+                  c.events == 0 and [sh for _, _, sh in m.flashes] == [40.0, 80.0, 120.0] and
+                  all(k == 'held' for _, k, _ in m.flashes)))
+    # the shadow flashes on the frame the unheld clock would have fired (mixed dt)
+    m, c, ref = NtModel(line=1, hold=1), NaClock(), NaClock()
+    m.f11(c); c.stop(); c.start(); ref.stop(); ref.start()
+    fire = []
+    for k in range(300):
+        dt = (2.5, 1.0, 0.25)[k % 3]
+        before = ref.events
+        ref.game_update(dt); m.update(c, dt)
+        if ref.events > before: fire.append(m.frame)
+    cases.append(('NoAttract on, dt 2.5 / 1.0 / 0.25: the flash frames = the frames the free clock fires',
+                  fire and [f for f, _, _ in m.flashes] == fire))
+    # RESTART (f11, f1, f0) at 30 s: the shadow from 0, the next flash 40 s after the restart
+    m, c = NtModel(line=1, hold=1), NaClock()
+    m.f11(c); c.stop(); c.start()
+    for _ in range(30): m.update(c, 1.0)
+    na_restart(m, c)
+    for _ in range(45): m.update(c, 1.0)
+    cases.append(('RESTART at 30 s: shadow anew, the flash 40 s after the restart (frame 70), not at 40',
+                  [f for f, _, _ in m.flashes] == [70] and m.resets == 2))
+    # START (f11 + f0) on a running clock: f0 does nothing - the shadow counts on, as the game's elapsed would
+    m, c = NtModel(line=1, hold=1), NaClock()
+    m.f11(c); c.stop(); c.start()
+    for _ in range(30): m.update(c, 1.0)
+    m.f11(c); c.start()
+    for _ in range(15): m.update(c, 1.0)
+    cases.append(('START on a running clock (f0 no-op): the shadow goes on, flash at 40 s', [f for f, _, _ in m.flashes]
+                  == [40]))
+    # STOP 20 frames, then START: no count while stopped, from 0 at the start (also with the held elapsed left at 0)
+    m, c = NtModel(line=1, hold=1), NaClock()
+    m.f11(c); c.stop(); c.start()
+    for _ in range(25): m.update(c, 1.0)
+    c.stop()
+    for _ in range(20): m.update(c, 1.0)
+    stopped = m.shadow
+    m.f11(c); c.start()
+    for _ in range(45): m.update(c, 1.0)
+    cases.append(('STOP 20 frames (shadow stays 25), START: shadow from 0, flash 40 s after the start (frame 85)',
+                  stopped == 25.0 and [f for f, _, _ in m.flashes] == [85]))
+    # no repeat: one flash only
+    m, c = NtModel(line=1, hold=1), NaClock(repeat=0)
+    m.f11(c); c.stop(); c.start()
+    for _ in range(200): m.update(c, 1.0)
+    cases.append(('a clock without repeat: one flash only (40 s)', [sh for _, _, sh in m.flashes] == [40.0]))
+    # line off: no flash / log line, the count goes on (turned on later: the next alarm flashes)
+    m, c = NtModel(line=0, hold=1), NaClock()
+    m.f11(c); c.stop(); c.start()
+    for _ in range(50): m.update(c, 1.0)
+    quiet = not m.flashes
+    m.line = 1
+    for _ in range(35): m.update(c, 1.0)
+    cases.append(('line off: no flash; turned on at 50 s, the next flash at shadow 80', quiet and
+                  [sh for _, _, sh in m.flashes] == [80.0]))
+    # outside the front end the hold stops: real events, the line is not drawn there (NtWantsDraw)
+    m, c = NtModel(line=1, hold=1, main=1), NaClock()
+    m.main = 6; m.f11(c); m.main = 1
+    c.stop(); c.start()
+    for _ in range(41): m.update(c, 1.0)
+    cases.append(('main state 1 (level): the game\'s clock fires (not held), flash marked real', c.events == 1 and
+                  [k for _, k, _ in m.flashes] == ['real']))
+    # RunNt / INI
+    ini = '[Menu]\nEnabled=0\nNoAttract=1\nAttractTimerShow=0\nAttractTimerPosition=tr\n\n[Pad]\nBlockInput=1\n'
+    ok, want, text, kind = nt_run('', 1, ini)
+    cases.append(('no argument = report, never a flip, nothing written', ok and want == 1 and text is None))
+    ok, want, text, kind = nt_run('2', 0, ini)
+    cases.append(('a bad value: usage, nothing changed', not ok and want == 0 and text is None))
+    ok, want, text, kind = nt_run('1', 0, ini)
+    cases.append(('menu.attracttimer 1: [Menu] AttractTimerShow=1 written, NoAttract and the rest kept', ok and want == 1
+                  and ini_get(text, 'Menu', 'AttractTimerShow', None) == '1' and ini_get(text, 'Menu', 'NoAttract', None)
+                  == '1' and 'BlockInput=1' in text))
+    cases.append(('missing key = 0; AttractTimerPosition tl / BR kept, empty / bad = tr',
+                  ini_get('[Menu]\nEnabled=0\n', 'Menu', 'AttractTimerShow', '0') == '0' and nt_pos('tl') == 'tl' and
+                  nt_pos('BR') == 'br' and nt_pos('') == 'tr' and nt_pos('middle') == 'tr'))
+    good = True
+    for name, ok in cases:
+        print('attracttimer: %-74s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= bool(ok)
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -4121,7 +4312,8 @@ def main():
                check_subfallback(),                                                   # 0.22.17
                check_groups_nested(), check_volsave(), check_persist(), check_subalign(),   # 0.22.18
                check_lastpage(), check_menupages(), check_infinite(),                 # 0.22.19
-               check_noattract()]                                                     # 0.22.20
+               check_noattract(),                                                     # 0.22.20
+               check_attracttimer()]                                                  # 0.22.21
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

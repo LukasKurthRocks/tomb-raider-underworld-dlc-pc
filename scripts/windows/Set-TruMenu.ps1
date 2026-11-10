@@ -140,7 +140,8 @@ $earlierBuilds = @{
                       '6fb7c6772c147b952ae595a39b7601fb2d8b36e34bfa37cf73c6bc18d06a8235',   # 0.22.16 page Spiel-Einstellungen (work\asi\menu0239)
                       '7c810b6dc7a344b3302f70762b6e0f77bf7aab6cdf17922058ae1b70e8d0ff38',   # 0.22.17 subtitle fallback (work\asi\menu0240)
                       '1e466d0709564db15ef8b7cf0b1d97dac49c8ef98cb043617a608f7ad2d5cd3c',   # 0.22.18 volume save, groups, step mode (work\asi\menu0241)
-                      '1121ff2ac48ec544401d5fbbc51be70697c8b450cbeda9de0b96fc35d289601c')   # 0.22.19 pages remembered, power.infinite (work\asi\menu0242)
+                      '1121ff2ac48ec544401d5fbbc51be70697c8b450cbeda9de0b96fc35d289601c',   # 0.22.19 pages remembered, power.infinite (work\asi\menu0242)
+                      '8e3d279fde431b57f9417d9954d692476b256c69cc92ac004a241b990aaebc2c')   # 0.22.20 main menu attract video off (work\asi\menu0243)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

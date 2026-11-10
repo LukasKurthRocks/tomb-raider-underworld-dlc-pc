@@ -75,6 +75,7 @@ TruShadowPower | Look | CameraFlag | bool | Blick: Kamera-Flag wie TU | Look: ca
 TruShadowPower | Look | StrikeLook | bool | Blick beim Schattenschlag | Strike look | restart | 0 | Blick beim Schattenschlag; braucht [Strike] Translate=1 // Shadow strike look; needs [Strike] Translate=1
 TruShadowPower | Sound | LoopSound | bool | Kraft-Ton Schleife | Power loop sound | restart | 0 | Kraft-Ton in Schleife (SoundPlex, Tuning +0x5c) // Looping power sound (SoundPlex, tuning +0x5c)
 TruShadowPower | Cloth | TuTimeStep | bool | Zopf: TU-Zeitschritt | Ponytail: TU time step | restart | 0 | Zopf nutzt Bildzeit / Welt-Zeitfaktor wie TU // Ponytail uses frame time / world time scale as TU
+TruShadowPower | Camera | TuTimeStep | bool | Kamera: TU-Zeitschritt (N6) | Camera: TU time step (N6) | restart | 0 | Kamera folgt unter der Kraft im Normaltempo wie TU // Camera follows at normal speed under the power as TU | TruShadowPower 0.24
 TruShadowPower | Meter | HudBar | bool | Gelbe Leiste im HUD | Yellow HUD bar | restart | 1 | Füllt die zweite, gelbe Leiste im HUD // Feeds the HUD's second, yellow bar
 TruShadowPower | Meter | Fallback | bool | Leiste: Ersatzwerte | Meter: fallback values | restart | 1 | Eingebaute Objektwerte, wenn das Zusatz-Objekt fehlt // Built-in object values if the extension object is missing
 TruShadowPower | Meter | Infinite | bool | Kraft unendlich | Infinite power | live | 0 | Leiste bleibt voll, Kraft ohne Verbrauch (Test / Hilfe) // Meter stays full, power without cost (testing / access) | TruShadowPower 0.23
