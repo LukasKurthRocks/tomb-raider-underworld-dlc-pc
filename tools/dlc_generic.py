@@ -30,6 +30,15 @@ GENERIC = (0, 2, 7, 8, 11, 13)
 MEDIA = (5, 6, 9, 10, 12)
 SYM = G.SYM
 LOC = 101          # pseudo type: localisation string index (locals.bin), see tools/locals.py
+# Xbox -> PC locals string id map written by the pipeline (Media: tools/locals.py build work/rebuild/stage1)
+LOCMAP = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'work', 'rebuild', 'stage1', 'locmap_xbox_to_pc.json')
+
+
+def locmap_path():
+    """TRUDLC_LOCMAP (a file or a folder holding locmap_xbox_to_pc.json), else LOCMAP"""
+    p = os.environ.get('TRUDLC_LOCMAP') or LOCMAP
+    return os.path.join(p, 'locmap_xbox_to_pc.json') if os.path.isdir(p) else p
+
 
 class DlcIds:
     def __init__(self, store=None, dlc=None, table_path=os.path.join(W, 'dlc_idmap.json'), rebuild=False):
@@ -157,10 +166,15 @@ class DlcIds:
     local = {}      # per-DRM overrides {(type, xbox_id): pc_id}, set by convert_drm to keep ids unique inside one DRM
 
     def loc(self, x):
-        """Xbox (TU) localisation string index -> PC string id (tools/locals.py build; 0 = null). Unknown -> x."""
+        """Xbox (TU) localisation string index -> PC string id (tools/locals.py build; 0 = null). Unknown -> x.
+        The map is the pipeline's (locmap_path(); until 2026-11-11 this read work/generic/locals/, which nothing
+        writes, so every lookup silently returned the Xbox index - Q46). A missing map is a hard error."""
         if self._loc is None:
-            p = os.path.join(W, 'locals', 'locmap_xbox_to_pc.json')
-            self._loc = {int(k): v for k, v in json.load(open(p))['map'].items()} if os.path.exists(p) else {}
+            p = locmap_path()
+            if not os.path.exists(p):
+                raise SystemExit('DlcIds.loc: no locals string id map %s (pipeline step Media: tools/locals.py build '
+                                 'work/rebuild/stage1; or set TRUDLC_LOCMAP)' % os.path.normpath(p))
+            self._loc = {int(k): v for k, v in json.load(open(p))['map'].items()}
         if x in self._loc: return self._loc[x]
         self.missing[LOC] += 1
         return x

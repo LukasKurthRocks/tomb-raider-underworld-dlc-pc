@@ -42,17 +42,31 @@ def template():
     return x, p, rules
 
 
-def process(rel, path, tpl, st, log):
-    import dtp_audit as DA, drm_write as DW, drm_reloc as R
+_IDS = None
+
+
+def process(rel, path, tpl, st, log, ids=None):
+    """ids: dlc_generic.DlcIds for the script pairing (one is made once when None)"""
+    global _IDS
+    import dtp_audit as DA, drm_write as DW, drm_reloc as R, dlc_script_pairs as SP
     xs = DA.xsecs(rel)
     if xs is None: return None
+    if ids is None:
+        if _IDS is None:
+            import dlc_generic as DG
+            _IDS = DG.DlcIds()
+        ids = _IDS
     rx, rp, rules = tpl
     raw = open(path, 'rb').read(); D = DW.read(raw, 'le')
-    pc8 = {s.id: s for s in D.sections if s.type == 8}
     changed = False
-    for x in xs:
-        sec = pc8.get(x['id']) if x['type'] == 8 and x['data'] is not None and x['id'] >= 20000 else None
-        if sec is None or len(sec.data) != len(x['data']): continue
+    # Q46: Xbox <-> PC script by the converter's id map + name Symbol (as tools/script_uitext_fix.py): new DLC scripts
+    # (Xbox id >= 20000) as before plus base scripts built in the Xbox layout (route 'convert'), renumbered or not
+    pm, pst = SP.pairs(xs, D, ids)
+    for k, v in pst.items(): st['pairing: ' + k] += v
+    for k, (x, route) in sorted(pm.items()):
+        sec = D.sections[k]
+        if not (x['id'] >= 20000 or route == 'convert') or len(sec.data) != len(x['data']): continue
+        if x['id'] < 20000: st['scripts in scope: base id, route convert'] += 1
         xd = x['data']; xr = R.parse(x['reloc'], 'be'); rel_off = set(xr.pointer_offsets()) | set(xr.id_offsets())
         pd = bytearray(sec.data)
         for o in range(0, len(xd) - 4 * N + 1, 4):

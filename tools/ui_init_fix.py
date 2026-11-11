@@ -15,8 +15,16 @@ members with a UI userType are walked in parallel (tools/script_init_from_pc.py 
 Xbox word into the PC word give the rule; where no class fits, a consistent whole-word value map (Xbox word -> PC word)
 is the rule (the PC-only field +0x08 behind a text id: Xbox 0 -> PC 00010000); anything else is a contradiction
 (exit 1). Apply: in a DLC script (the PC file keeps the Xbox offsets) every leaf of a UI member's init tree whose key
-has a rule gets the rule's word from the Xbox original; id classes (symbols, locals string ids, ...) and leaves
-without a rule keep the converter's word (counted); relocation / id slots are never touched.
+has a rule gets the rule's word from the Xbox original; id classes (symbols, ...) and leaves without a rule keep the
+converter's word (counted); relocation / id slots are never touched.
+
+Locals string ids (Q46, 2026-11-11): with the pipeline's locals map (dlc_generic.locmap_path(); DlcIds.loc used to
+read a path nothing writes and returned the Xbox index) the text id leaf of the UI text element (ut 301, path [0, 92])
+proves as the locals class id16a:101 on the base pairs (86 observations; without the map a coincidental id16a:110 from
+4). Such leaves (LOC_CLASSES) are applied: Xbox index (high u16) -> PC string id by the map, except where every base
+observation of that Xbox index shows one other PC id (the PC's own button prompts, LOC_PC); an index outside the map
+keeps the converter's word (counted). Scripts are paired with their Xbox source by dlc_script_pairs (id map + name
+Symbol, renumbered scripts included); scripts whose PC bytes are a PC base copy (route pc_copy) are not touched.
 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/ui_init_fix.py proof [--report R.json]
@@ -39,11 +47,15 @@ import script_init_from_pc as SIP
 UI_UTS = (301, 303, 316, 320)          # PC userTypes of the UI element native types (Xbox 299 / 301 / 314 / 318)
 BASE_SRC = ('generalbank.drm',)
 ID_CLASSES = {c for c in L.CLASSES if c.startswith('id') or c in ('syma_r', 'r_symb')}
+LOC_CLASSES = {'id16a:101'}             # locals string id in the high u16 (Xbox) -> PC string id (applied, Q46)
+LOC_PC = {}             # {key: {Xbox index: PC id}} - every base observation of the index shows this other PC id
 PREF = ('s32', 'raw', 's16', 'b2s16', 's16b2')
 ZERO_RULE_MIN = 5       # Xbox 0 -> one non-zero PC value: only with at least this many unanimous base observations
 # pinned proof counts (first run 2026-11-09): changing data or code must not move them silently
 PINNED = {'base script pairs': 141, 'UI members paired': 389, 'observations': 23279, 'contradictions': 0,
-          'rule s32': 129, 'zero rule ut 301 path [0, 100]: base observations': 108}
+          'rule s32': 129, 'zero rule ut 301 path [0, 100]: base observations': 108,
+          # Q46 (2026-11-11): the text id leaf proves as the locals class once the map is read
+          'rule id16a:101': 1}
 
 _IDS = None
 
@@ -145,32 +157,59 @@ def learn():
         if zr:
             st['zero rule (Xbox 0 -> one PC value in every base observation)'] += 1
             st['zero rule ut %d path %s: base observations' % (key[0], list(key[2]))] = sum(zero.values())
+    # Q46: locals string id leaves - per Xbox index the PC ids of ALL base observations; one id other than the map's =
+    # the PC's own prompt (LOC_PC); several ids = the map is kept (counted)
+    LOC_PC.clear()
+    for key, r in rules.items():
+        if r[1] not in LOC_CLASSES: continue
+        seen = collections.defaultdict(set)
+        for x, p in obs[key]:
+            hi, lo = struct.unpack('>HH', x)
+            if lo or hi in (0, 0xffff): continue
+            seen[hi].add(struct.unpack('<I', p)[0])
+            st['locals text id base observations: %s' % ('= map' if L.apply_word(x, r[1], I) == p else 'other PC id')] += 1
+        for hi, ps in seen.items():
+            if len(ps) > 1: st['locals text ids with several PC ids on the base (map kept)'] += 1; continue
+            pv = next(iter(ps))
+            if struct.pack('<I', pv) != L.apply_word(struct.pack('>HH', hi, 0), r[1], I):
+                LOC_PC.setdefault(key, {})[hi] = pv
+        st['locals text ids: PC prompt ids learned'] += len(LOC_PC.get(key, {}))
     st['contradictions'] = len(contra)
     return rules, st, contra
 
 
-def xbox_section(name, sid, cache):
+def xbox_sections(name, cache):
+    """all Xbox sections of the DRM's source (list of drm.sections_with_data dicts, [] when none)"""
     if name not in cache:
         import convert_dlc as CD
         from drm import cdrm_decode, sections_with_data
         raw, _ = CD.raw_dlc(name)
-        cache[name] = {s['id']: s for s in sections_with_data(cdrm_decode(raw, 'be'), 'be')[1] if s['type'] == 8} if raw else {}
-    return cache[name].get(sid)
+        cache[name] = sections_with_data(cdrm_decode(raw, 'be'), 'be')[1] if raw else []
+    return cache[name]
 
 
 def plan_drm(path, rules, cache, st):
     """[(section index, offset, old, new, script id, key, class)] for one PC DRM"""
+    import dlc_script_pairs as SP
     I = ids()
     D = DW.read(open(path, 'rb').read(), 'le')
     out = []
+    pm = None
     for si, s in enumerate(D.sections):
         if s.type != 8 or not s.data: continue
         W, rel = walk(s.data, s.reloc, 'le')
         mem = SIP.members(W, s.data, 'le')
         ui = [(k, a) for k, la in mem.items() if k[3] in UI_UTS for a in la if W.it.get(a + 16) is not None]
         if not ui: continue
-        x = xbox_section(os.path.basename(path), s.id, cache)
+        if pm is None:
+            # Q46: the Xbox script by the converter's id map + name Symbol (dlc_script_pairs; until 2026-11-11 the
+            # Xbox section of the PC id: renumbered scripts such as g_pda PC 3347 = Xbox 3207 had none)
+            pm, pst = SP.pairs(xbox_sections(os.path.basename(path), cache), D, I)
+            for k, v in pst.items(): st['pairing: ' + k] += v
+        x, route = pm.get(si, (None, None))
         if x is None: st['scripts with UI members but no Xbox section (kept)'] += 1; continue
+        if route == 'pc_copy': st['scripts with UI members, PC bytes (route pc_copy, kept)'] += 1; continue
+        if x['id'] != s.id: st['scripts with UI members, renumbered (Xbox id != PC id)'] += 1
         xd = x['data']
         if len(xd) != len(s.data): st['scripts with another size than the Xbox section (kept)'] += 1; continue
         nt = no_touch(rel)
@@ -187,11 +226,20 @@ def plan_drm(path, rules, cache, st):
                 if zr is not None and xw == b'\0\0\0\0':
                     new, c = bytes.fromhex(zr), 'zero->%s' % zr
                 elif c is None: st['UI words with only a zero rule, Xbox not 0 (kept)'] += 1; continue
+                elif c in LOC_CLASSES:
+                    hi, lo = struct.unpack('>HH', xw)
+                    I.loc(1)                                    # loads the map (hard error when missing)
+                    if lo or hi == 0xffff: st['UI text id words not in the index form (kept)'] += 1; continue
+                    if hi == 0: new = L.apply_word(xw, c, I)
+                    elif hi in LOC_PC.get((ut, tag, path_), {}): new, c = struct.pack('<I', LOC_PC[(ut, tag, path_)][hi]), c + ' PC prompt'
+                    elif hi in I._loc: new = L.apply_word(xw, c, I)
+                    else: st['UI text id words outside the locals map (kept)'] += 1; continue
+                    st['UI text id words (locals map)'] += 1
                 elif c == 'id-mixed' or c in ID_CLASSES: st['UI id words (kept: converter id maps)'] += 1; continue
                 elif c == 's32text': new = xw if text_word(xw) else L.apply_word(xw, 's32', I)
                 else: new = L.apply_word(xw, c, I)
                 if new == pw: st['UI words already right'] += 1; continue
-                out.append((si, o, pw, new, s.id, (ut, tag, path_), c))
+                out.append((si, o, pw, new, s.id, (ut, tag, path_), c, xw))
     return D, out
 
 
@@ -210,9 +258,9 @@ def run_tree(tree, write, rules, report):
             st['DRMs not read'] += 1; print('%s: not read (%s)' % (p, ex)); continue
         if not plan: continue
         st['DRMs with changes'] += 1; st['words changed'] += len(plan)
-        for si, o, old, new, sid, key, c in plan:
+        for si, o, old, new, sid, key, c, xw in plan:
             rows.append(dict(drm=os.path.basename(p), script=sid, off=o, old=old.hex(), new=new.hex(), ut=key[0],
-                             path=list(key[2]), rule=c))
+                             path=list(key[2]), rule=c, xbox=xw.hex()))
         print('%s: %d words (scripts %s)' % (os.path.basename(p), len(plan), ','.join(sorted({str(x[4]) for x in plan}))))
         if not write: continue
         old_raw = open(p, 'rb').read()
@@ -256,10 +304,14 @@ def main(argv):
         for k in pin: print('PINNED COUNT DIFFERS: %s = %s (pinned %s)' % (k, st.get(k), PINNED[k]))
         maps = {('%d %#x %s' % (k[0], k[1], list(k[2]))): r[3] for k, r in rules.items() if r[3]}
         for k, v in sorted(maps.items()): print('zero rule %s: Xbox 0 -> %s' % (k, v))
+        for k, m in sorted(LOC_PC.items()):
+            print('locals text id %d %#x %s: PC prompt ids %s' % (k[0], k[1], list(k[2]), dict(sorted(m.items()))))
         print('rules %d (%s), contradictions %d' % (len(rules), ', '.join('%s %d' % kv for kv in sorted(collections.Counter(
             str(r[1]) for r in rules.values()).items())), len(contra)))
         if rep:
             json.dump(dict(stats=dict(st), contradictions=[[list(map(str, k)), e] for k, e in contra], zero_rules=maps,
+                           loc_pc={'%d %#x %s' % (k[0], k[1], list(k[2])): {str(a): b for a, b in sorted(m.items())}
+                                   for k, m in LOC_PC.items()},
                            rules={'%d %#x %s' % (k[0], k[1], list(k[2])): [r[1], r[2], r[3]] for k, r in rules.items()}),
                       open(rep, 'w'), indent=1)
         return 1 if contra or pin else 0

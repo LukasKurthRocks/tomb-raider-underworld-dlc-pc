@@ -32,12 +32,18 @@ def process(rel, path, ids, st, log, write=True):
     import dtp_audit as DA, drm_write as DW, drm_reloc as R, script_u16array_check as U16
     xs = DA.xsecs(rel)
     if xs is None: return None
+    import dlc_script_pairs as SP
     raw = open(path, 'rb').read(); D = DW.read(raw, 'le')
-    pc8 = {s.id: s for s in D.sections if s.type == 8}
     changed = False
-    for x in xs:
-        sec = pc8.get(x['id']) if x['type'] == 8 and x['data'] is not None and x['id'] >= 20000 else None
-        if sec is None or len(sec.data) != len(x['data']): continue
+    # Q46: Xbox <-> PC script by the converter's id map + name Symbol (renumbered scripts such as g_pda Xbox 3207 =
+    # PC 3347 were never found under the Xbox id); in scope: new DLC scripts (Xbox id >= 20000) as before, plus base
+    # scripts the converter built in the Xbox layout (route 'convert'); PC-byte routes (pc_copy / template) stay
+    pm, pst = SP.pairs(xs, D, ids)
+    for k, v in pst.items(): st['pairing: ' + k] += v
+    for k, (x, route) in sorted(pm.items()):
+        sec = D.sections[k]
+        if not (x['id'] >= 20000 or route == 'convert') or len(sec.data) != len(x['data']): continue
+        if x['id'] < 20000: st['scripts in scope: base id, route convert'] += 1
         xd = x['data']; xr = R.parse(x['reloc'], 'be'); sl = set(xr.pointer_offsets()) | set(xr.id_offsets())
         # inline u16 arrays {n, ptr -> next, u16[n]} are member Symbol paths (fix uipath): a one-element array
         # `1, ptr, sym << 16` has the hint-list shape of pattern B, so their words are never string ids here
@@ -118,7 +124,7 @@ def main(argv):
     if '--locmap' in argv: k = argv.index('--locmap'); locmap = argv[k + 1]; del argv[k:k + 2]
     import json, dtp_audit as DA, dlc_generic as DG
     ids = DG.DlcIds()
-    if locmap:      # the converter reads work/generic/locals/locmap_xbox_to_pc.json, which the pipeline never wrote
+    if locmap:      # else DlcIds.loc reads dlc_generic.locmap_path() (TRUDLC_LOCMAP or work/rebuild/stage1/, Q46)
         ids._loc = {int(k): v for k, v in json.load(open(locmap))['map'].items()}
     if not ids.loc(1297) != 1297: raise SystemExit('no string id map (pass --locmap FILE)')
     srcs = [os.path.abspath(s) for s in argv[0].split(',')]      # several IN dirs: the later one wins

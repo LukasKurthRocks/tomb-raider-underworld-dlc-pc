@@ -247,7 +247,7 @@ def fix_uitext(out, srcs=None):
     import collections, json
     sys.path.insert(0, HERE)
     import dtp_audit as DA, dlc_generic as DG, script_uitext_fix as TF
-    lm = os.environ.get('TRUDLC_LOCMAP') or os.path.join(HERE, '..', 'work', 'rebuild', 'stage1', 'locmap_xbox_to_pc.json')
+    lm = DG.locmap_path()       # TRUDLC_LOCMAP (file or folder), else work/rebuild/stage1/
     if not os.path.exists(lm): raise SystemExit('uitext: no string id map %s (run tools/locals.py build first)' % lm)
     ids = DG.DlcIds(); ids._loc = {int(k): v for k, v in json.load(open(lm))['map'].items()}
     st = collections.Counter(); files, log = [], []
