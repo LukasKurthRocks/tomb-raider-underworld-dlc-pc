@@ -60,9 +60,11 @@ $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # The current build 0.25 (camera comparison: keys [Camera] CameraTuTimeStep / [Cloth] ClothTuTimeStep - the old name
 # TuTimeStep is still read -, [Camera] Trace (TruCam.log) and [Camera] DoppelgangerSettings, defaults 0;
 # work\asi\power025, 2026-11-11) ships a new sample .ini; its hashes are listed too so a later build recognises it.
-# The current build 0.26 ([Camera] Trace accepts TruDataGuard's jump at tru+0x14df80; DoppelgangerSettings=2 also ports
-# DTP 21237's per-mode tables, e.g. the climb modes 60 / 61 / 62; work\asi\power026, 2026-11-11, sample .ini comment
-# updated) is listed too (marked current). Install it with -SourceDir <repo>\work\asi\power026.
+# 0.26 ([Camera] Trace accepts TruDataGuard's jump at tru+0x14df80; DoppelgangerSettings=2 also ports DTP 21237's
+# per-mode tables, e.g. the climb modes 60 / 61 / 62; work\asi\power026, 2026-11-11, sample .ini comment updated).
+# The current build 0.27 (Q50: [Camera] ShakeTuTimeStep and [Player] TuTimeStep, the TU's remaining divisions by the
+# world time scale, defaults 0; work\asi\power027, 2026-11-11, new sample .ini) is listed too (marked current). Install
+# it with -SourceDir <repo>\work\asi\power027.
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
@@ -90,7 +92,8 @@ $earlierBuilds = @{
                              'c22dac1ce3c09f4049600f82908b9c6c84fc71e707ad930575ec4ae3d4741a58',   # 0.23 N2 [Meter] Infinite (work\asi\power023, md5 b679a97ad58c753717574e4bc5605ab0, not installed)
                              '5ca2d7adfa45aec86ec6a1b4651aa10ae099735fbba7c13afa183bde24b1efdf',   # 0.24 N6 [Camera] TuTimeStep (work\asi\power024, md5 3f1d37f5dd003d090bee745bf6121c87, not installed)
                              '89d15879f6f32b7eb8402c95668fefeb4ea999c5f571c32e3d5d2157a88c9114',   # 0.25 camera trace / doppelganger settings (work\asi\power025, md5 ea3c85aa0b6c283f358a408add8faa6b, installed on 2026-11-10 22:21)
-                             '8b89599bf6dae64bb8825935893bbd5ea1930dacb0c64a815821b42b16ec0891')   # 0.26 trace next to TruDataGuard / 21237 mode tables (work\asi\power026, md5 44466496213915f2baf9e66e7de2ab1f, current, not installed)
+                             '8b89599bf6dae64bb8825935893bbd5ea1930dacb0c64a815821b42b16ec0891',   # 0.26 trace next to TruDataGuard / 21237 mode tables (work\asi\power026, md5 44466496213915f2baf9e66e7de2ab1f, not installed)
+                             '09e84202e4821c0c0b1f446f941cc22bf1a35167ce07007660012ce9049bd540')   # 0.27 Q50 shake / player TU time step (work\asi\power027, md5 3cf7221657a229d114a4a1f4ee4199fc, current, not installed)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
@@ -112,7 +115,8 @@ $earlierBuilds = @{
                              '682949882f7777c1dcf0e9e1233ae1da9bed273a42b61f83e6c14ad46e01d3cb',   # 0.23 sample .ini ([Meter] Infinite=0)
                              '64f16eef48ea3a89fe6de96c2ce2150bbf6ce6cfbfdf6c999ae31ea810b1c6b4',   # 0.24 sample .ini ([Camera] TuTimeStep=0)
                              '12285a5977b07ffbec8d9b3a01a97e14792cd5ec0a127dc97807f9dd978e859d',   # 0.25 sample .ini ([Camera] CameraTuTimeStep / DoppelgangerSettings / Trace, [Cloth] ClothTuTimeStep)
-                             '459f0410785e554a3022a7b386e8d7c24e60ecac8f5279f22a4e7724cff67e32')   # 0.26 sample .ini (DoppelgangerSettings comment: mode tables, current)
+                             '459f0410785e554a3022a7b386e8d7c24e60ecac8f5279f22a4e7724cff67e32',   # 0.26 sample .ini (DoppelgangerSettings comment: mode tables)
+                             'a5d221a3cfdb4f124ee8ed8f009b0d927654d2113e91f49585ffb277426a056d')   # 0.27 sample .ini ([Camera] ShakeTuTimeStep=0, [Player] TuTimeStep=0, current)
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

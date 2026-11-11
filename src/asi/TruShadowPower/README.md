@@ -36,10 +36,52 @@ infinite shadow power for testing / accessibility, default off, live) built 2026
 (keys `CameraTuTimeStep` / `ClothTuTimeStep`, `[Camera] Trace` = TruCam.log, `[Camera] DoppelgangerSettings`: the TU's
 camera settings in doppelganger mode, defaults off) built 2026-11-11, installed and played 2026-11-10 22:21-22:30
 (DoppelgangerSettings=2 worked; the trace refused - fixed in 0.26); 0.26 (trace next to TruDataGuard, 21237's per-mode
-tables in the stand-in) built 2026-11-11, not installed, not played.**
+tables in the stand-in) built 2026-11-11, not installed, not played; 0.27 (`[Camera] ShakeTuTimeStep`, `[Player]
+TuTimeStep`: the TU's remaining divisions by the world time scale, defaults off) built 2026-11-11, not installed, not
+played.**
 Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
+
+## 0.27: the TU's other world-time divisions - `[Camera] ShakeTuTimeStep`, `[Player] TuTimeStep` (Q50, 2026-11-11)
+
+Build `work\asi\power027`. The workspace survey Befund-TU-Prioritaeten-Q17-1111.md found six more TU places (ranks 7
+and 11) that divide gameTracker+0x100 (frame time x world scale, PC 0xe7f188) by +0x118 (world scale, PC 0xe7f1a0)
+where retail and the PC do not. Each was read in the TU and retail images (Xenia) and in `data\pc\tru.exe`; workspace
+report Befund-Zeitschritt-Q50-1111.md. No doppelganger or scale test in any of them (as 0.24).
+
+| Switch | TU function (retail) | TU code | PC partner (how paired) | PC site, translation |
+|---|---|---|---|---|
+| `[Camera] ShakeTuTimeStep` | camera shake pool 0x822af4d8 (0x822b2408) | 0x822af510..0x822af524: dt = gt+0x100 / gt+0x118 * 1/30 (0.0 when gt+0xbb == 6) | tru+0x1f3390: same body (gt+0xbb test, `fldz`, 8 slots of 0x90 from 0xe80020, update tru+0x1f3190); both called first by the camera update (TU 0x822aa520, PC tru+0x1f3df0), then the manager on pool + 0x4d0. Q17's coverage partner 0x5ed860 is wrong | tru+0x1f339e `fld [0xe7f188]` -> `fld; fdiv [0xe7f1a0]` (the `fdiv [30.0]` stays) |
+| `[Player] TuTimeStep` P1 | query 0x8240cf88 case 0xe0 (0x8240a180) | 0x8240dbbc..0x8240dbd0, 0x8240dc00: int(length * ((1.0 / gt+0x118) / gt+0x100)) | tru+0x309fd0 (Lara's object table: TU 0x8275ae48 / PC 0x8aba38), case 224 tru+0x30a6d5 (same +0x90 / +0x94 rows, length, truncation) | tru+0x30a70a `fdiv [0xe7f188]` -> `fld1; fdiv [0xe7f1a0]; fdiv [0xe7f188]; fmulp` |
+| P2 | message 0x8240e3a0 case 0x190 (0x8240b560) | 0x8240faa4..0x8240fad0: position += vector * 1/30 * min(gt+0x100 / gt+0x118, 2.0) | tru+0x31ffe0 (table 0x8aba3c), case 400 tru+0x320eb8 (min helper tru+0x35170, 2.0, 1/30) | tru+0x320ed7 `fld` -> `fld; fdiv` |
+| P3 | ComputeSmoothRide 0x82411850 (0x8240ea00) | 0x82411b50..0x82411b64: every use of dt in the smoothing block becomes gt+0x100 / gt+0x118 | tru+0x300940 (called by P4 right after tru+0x3005c0 as in the TU; fields +0x20 / +0x24 / +0x28 / +0x30, [0xfad764] +0x514 / +0x518, query 0x149) | tru+0x300bda `fld` (the function's only dt load) -> `fld; fdiv` |
+| P4 | RazielAdditionalCollide 0x82411c30 (0x8240edd8) | 0x82411c78..0x82411c8c / 0x82411f98: when instance+0x298 == 0, gt+0x100 = gt+0x100 / gt+0x118 for the whole body, the old value written back at the end | tru+0x31bfa0 (table 0x8aba40; the same +0x298 test, calls tru+0x300940, message 0xa6 at the end) | entry tru+0x31bfa0 -> wrapper: test +0x298, save, divide, call the body (trampoline of the 6 prologue bytes), restore |
+| P5 | PLAYER_GetAttachedToVelocity 0x82419c98 (0x82416ac8) | 0x82419ff4..0x8241a020: min(gt+0x100 / gt+0x118, 2.0) into the velocity call | tru+0x3027b0 (10 callers each; TU camera manager 0x822ad048 / PC tru+0x1e7ef0; the same +0x274 branch) | tru+0x302a43 `fld` -> `fld; fdiv` |
+
+P3 runs inside P4's window, so in the TU (and here) it divides the already unscaled frame time once more - kept as the
+TU does it. Static site check (`tools/pe_patch_site_check.py`, 6 sites): whole instructions, no branch into a patched
+range. The stubs keep the flags (`pushfd` / `popfd`) and all registers. Checks before patching (all or nothing per
+switch): 3 for the shake, 18 for the player sites (dispatch bytes, byte / jump table entries, the blocks around each
+site, the callers), plus the world scale writer tru+0x1da595 (as 0.15 / 0.24). TruDataGuard patches only its DTP
+lookups; no other plugin of this repository patches or byte-checks these ranges (grep, TruGuard excluded).
+
+* **Switches:** default 0 = nothing checked, nothing patched (= 0.26). With 1 at the start the sites are patched and the
+  key is read again at run time at most once per second (0 sends the stubs along the PC path; a later 1 after a start
+  with 0 needs a restart).
+* **Log:** `TruShadowPower 0.27 loaded (... 0.27: shake TU time step N, player TU time step N)`; `0.27 time step:
+  [Camera] ShakeTuTimeStep=1 - 3 code checks passed; ...` / `[Player] TuTimeStep=1 - 18 code checks passed; ...`; per
+  site once `0.27 time step: first <site> with the TU division (dt ... / world scale ... = ...)` and, the first time the
+  world is slowed, `0.27 time step: world time scaled - <site> divided: ...`; `0.27 switch: ... 1 -> 0` on a live
+  change; a failed check names the address and `- off`.
+
+| # | TO TEST 0.27 (DLC 2, `[Meter] Infinite=1` helps; `ShakeTuTimeStep=1`, `[Player] TuTimeStep=1`) | expected |
+|---|---|---|
+| 1 | load | `ShakeTuTimeStep=1 - 3 code checks passed`, `TuTimeStep=1 - 18 code checks passed`; no `does not match` |
+| 2 | play normally (world 1.0) | per site `first ... with the TU division (... world scale 1.000 ...)` when it is used; the game plays as before |
+| 3 | hold the power while something shakes the camera | the shake ends as fast as without the power (PC 0.26: about 3.3 times longer); log `world time scaled - camera shake pool ...` |
+| 4 | jump / fall / climb with the power held | Lara moves as before in slow motion; `world time scaled - RazielAdditionalCollide ...`; watch for odd falls or jitter |
+| 5 | set a key to 0 in the ini while playing | `0.27 switch: ... 1 -> 0`, PC behaviour again |
 
 ## 0.26: camera trace next to TruDataGuard, DTP 21237's per-mode tables (2026-11-11)
 
@@ -944,6 +986,8 @@ every `*.asi` next to `tru.exe`.
 | `[Cloth] ClothTuTimeStep` | 0 | 0.15: the TU's player cloth time step (TU 0x82278120): the ponytail gets the frame time / world scale, so it keeps real time in slow motion (0.25: renamed from `TuTimeStep`, the old name is still read) |
 | `[Camera] CameraTuTimeStep` | 0 | 0.24: the TU's camera time step (TU 0x822ad048 / 0x822beeb8 / 0x822c39c8 / 0x822c79d0): camera manager + the three Lara cameras get the frame time / world scale, so they follow / re-centre at normal speed in slow motion (0.25: renamed from `TuTimeStep`, the old name is still read) |
 | `[Camera] DoppelgangerSettings` | 0 | 0.25: the TU's camera settings in doppelganger mode (0x822bc198 / 0x822c61d8): 1 = DTP 21237 / 21238 when loaded (1:1), 2 = 1 + a stand-in for 21237 (PC DTP 20 with the TU's delay 0.25 s / fade 5.0 s, partial) |
+| `[Camera] ShakeTuTimeStep` | 0 | 0.27: the TU's time step of the camera shake pool (TU 0x822af4d8, site tru+0x1f339e): shakes keep real time in slow motion; patched only when 1 at the start, then read again at run time (<= 1 / s) |
+| `[Player] TuTimeStep` | 0 | 0.27: the TU's time step at five player sites (query 0xe0, message 0x190, ComputeSmoothRide, RazielAdditionalCollide, PLAYER_GetAttachedToVelocity); patched only when 1 at the start, then read again at run time (<= 1 / s) |
 | `[Camera] Trace` / `TraceInterval` | 0 / 50 | 0.25: `TruCam.log` (TSV, TruXenia `--camtrace` columns) every N ms; read only; read again at run time (<= 1 / s) |
 | `[Adrenaline] Translate` | 1 | 0.18 (K11): CombatManager::Update skips the adrenaline tick tru+0x318bd0 and bar tru+0x2f2930 while gameTracker+0x1244 is set (TU 0x823dca00); 0 = PC; read again at run time (<= 1 / s) |
 | `[Adrenaline] Log` | 1 | 0.18: one line per change of the K11 decision per site |

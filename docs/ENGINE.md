@@ -47,6 +47,7 @@ Full table with 104 rows: `TU-Abdeckung.md` (findings folder). "Data" = fixed in
 | Brain size | 0x50a0 B; the TU-added block shifts the tail by 0x58 (TU +0x5088 = PC +0x5030) | 0x5040 B | plugins keep TU-only fields in their own tables (TruShadowCombat 0.6.6 clock) |
 | Cloth / braid time step (K1) | dt / world time scale for the player | plain dt | TruShadowPower `[Cloth] TuTimeStep` (built, default 0) |
 | Camera time step (N6) | camera manager + LaraCamera / LaraCameraRewrite / LaraCombatCamera updates: dt / world time scale (TU 0x822ad048 / 0x822beeb8 / 0x822c39c8 / 0x822c79d0) - normal-speed camera (follow, auto-recenter) in slow motion | world-scaled dt (0x5f3c79 / 0x5fe30a / 0x6026ca / 0x6044aa): camera at 0.3 x speed under the power | TruShadowPower 0.24 `[Camera] TuTimeStep` (built, default 0) |
+| Camera shake / player time step (Q50) | dt / world time scale in the camera shake pool (TU 0x822af4d8) and five player places: query 0xe0, message 0x190, ComputeSmoothRide, RazielAdditionalCollide (whole body), PLAYER_GetAttachedToVelocity (section 20.5) | world-scaled dt (0x5f339e; 0x70a70a / 0x720ed7 / 0x700bda / 0x71bfa0 / 0x702a43) | TruShadowPower 0.27 `[Camera] ShakeTuTimeStep` / `[Player] TuTimeStep` (built, default 0) |
 | Camera flag bit 2 on power start | set, never cleared | set / cleared by strike look | TruShadowPower 0.20 `[Look] CameraFlag=1` (built) |
 | Doppelganger flag gameTracker+0x1244 | DoppelgangerInit sets it | nobody writes it | TruDlc2Player `TrackerFlag` / `FlagReset` |
 | Player extension object 858 | created by TU-only 0x82412ab0 | never created | object search in 0xdb7400 + `[Meter] Fallback` ✅ |
@@ -1412,6 +1413,26 @@ Status: gameplay partly live; look and one-shot sounds built or not ported, live
 Cloth (type 14) update 0x5bbe70, site 0x5bbec2 (`fld [0xe7f188]`): the TU divides dt by the world time scale `[0xe7f1a0]`
 for the player instance (TU 0x82278120), so the braid does not freeze in slow motion. TruShadowPower 0.15 `[Cloth]
 TuTimeStep` (default 0): built. Source: `Befund-F20-Zopf-0611.md`.
+
+### 20.5 Camera shake and player time step (Q50)
+
+Six more TU places divide gameTracker+0x100 (`[0xe7f188]`) by +0x118 (`[0xe7f1a0]`) where retail = PC do not (Q17
+ranks 7 / 11; read in the TU / retail images and `data\pc\tru.exe`). No doppelganger or scale test in any of them.
+
+| TU (retail) | What | PC partner, site | St |
+|---|---|---|---|
+| 0x822af4d8 (0x822b2408) | camera shake pool ("camerashakes", 8 slots x 0x90 at 0xe80020 = camera manager 0xe804f0 - 0x4d0; TU 0x82efc2b0): dt = 0 when gt+0xbb == 6, else gt+0x100 / gt+0x118 * 1/30 | 0x5f3390 (called first by the camera update 0x5f3df0 = TU 0x822aa520, then the manager 0x5f3c70); site 0x5f339e `fld [0xe7f188]`. tu_coverage's partner 0x5ed860 is wrong | ✅ static |
+| 0x8240cf88 case 0xe0 (0x8240a180) | Lara's query (object table TU 0x8275ae3c / PC 0x8aba2c: init, process, collide, query, message, additional collide): int(length(+0x90 row 3 - +0x94 row 3) * ((1.0 / gt+0x118) / gt+0x100)); retail / PC int(length / gt+0x100) | 0x709fd0 case 224 (byte table 0x70ac7c, jump table 0x70abc8 index 42) -> 0x70a6d5; site 0x70a70a `fdiv [0xe7f188]` | ✅ static |
+| 0x8240e3a0 case 0x190 (0x8240b560) | Lara's message: instance position += vector * 1/30 * min(dt, 2.0), TU dt = gt+0x100 / gt+0x118 | 0x71ffe0 case 400 (base 0x106, byte table 0x7211e0, jump table 0x7211bc index 3) -> 0x720eb8, min helper 0x435170; site 0x720ed7 | ✅ static |
+| 0x82411850 ComputeSmoothRide (0x8240ea00) | every dt use of the smoothing block = gt+0x100 / gt+0x118 | 0x700940 (only caller 0x71bfa0 at 0x71c076); site 0x700bda, the function's only dt load (-> [esp+0x18]) | ✅ static |
+| 0x82411c30 RazielAdditionalCollide (0x8240edd8) | instance+0x298 == 0: gt+0x100 = gt+0x100 / gt+0x118 for the whole body, the old value written back at the end (TU 0x82411c8c / 0x82411f98) - all callees (gravity, collision, ComputeSmoothRide, which then divides once more) see the unscaled dt | 0x71bfa0 (same +0x298 test, ends with message 0xa6 0x5b3750); entry wrapper | ✅ static |
+| 0x82419c98 PLAYER_GetAttachedToVelocity (0x82416ac8) | branch instance+0x274 == 0: min(dt, 2.0) into the velocity call, TU dt = gt+0x100 / gt+0x118 | 0x7027b0 (10 callers each; e.g. camera 0x5e7f48 = TU 0x822ad0b4); site 0x702a43 | ✅ static |
+
+The PC player process 0x7228e0 (TU 0x824126d8) already divides 0xe7f188 for its first part (0x72290d .. 0x7229eb, =
+retail); its second TU reader 0x82412874 (loop of 10 calls 0x82404c60 with dt / scale, tu_coverage "ported") was not
+checked here. TruShadowPower 0.27 `[Camera] ShakeTuTimeStep` / `[Player]
+TuTimeStep` (default 0; patched only when 1 at the start, then read again at run time): built, live ⬜. Source:
+`Befund-Zeitschritt-Q50-1111.md`.
 
 ---
 

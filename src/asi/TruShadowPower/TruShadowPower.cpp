@@ -214,6 +214,14 @@
 // calls the lookup, it reads the table 0xc36f28 itself) and names every failing check. DoppelgangerSettings=2: the
 // stand-in also carries DTP 21237's per-mode tables (table A / B; the climb modes 60 / 61 / 62 and 0 / 8 / 23 / 32 /
 // 33 / 34 / 58 / 59 / 63 differ from the retail default) - section "0.26 doppelganger mode tables".
+//
+// 0.27 (2026-11-11, Q50, project doc Befund-Zeitschritt-Q50-1111.md): the TU's remaining divisions of the frame time
+// by the world time scale (Q17 ranks 7 / 11), two new switches (default 0 = 0.26; patched only when 1 at the start,
+// then read again at run time at most once per second). [Camera] ShakeTuTimeStep: the camera shake pool TU 0x822af4d8
+// = PC tru+0x1f3390 (site tru+0x1f339e). [Player] TuTimeStep: Lara's query case 0xe0 (TU 0x8240cf88, site
+// tru+0x30a70a), message 0x190 (TU 0x8240e3a0, tru+0x320ed7), ComputeSmoothRide (TU 0x82411850, tru+0x300bda),
+// RazielAdditionalCollide (TU 0x82411c30: gt+0x100 divided for its whole body, wrapper at tru+0x31bfa0) and
+// PLAYER_GetAttachedToVelocity (TU 0x82419c98, tru+0x302a43). Section "0.27" below (after the 0.24 section).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -1053,6 +1061,7 @@ void WithheldLog() {
 void Slot6ReadSwitch();                 // 0.21: [TimeScale] TranslateSlot6 at run time (defined below)
 void InfiniteReadSwitch();              // 0.23: [Meter] Infinite at run time (defined below)
 void CamTraceReadSwitch();              // 0.25: [Camera] Trace at run time (defined below)
+void TimeStepReadSwitch();              // 0.27: [Camera] ShakeTuTimeStep / [Player] TuTimeStep at run time (below)
 volatile SHORT g_padRx = 0, g_padRy = 0;   // 0.25 camera trace: pad 0 as the pad hook got it
 volatile WORD g_padButtons = 0;
 
@@ -1081,6 +1090,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     Slot6ReadSwitch();                          // 0.21: once per game frame, reads the ini at most once per second
     InfiniteReadSwitch();                       // 0.23: the same (game thread, before the tick that uses it)
     CamTraceReadSwitch();                       // 0.25: [Camera] Trace / TraceInterval, the same
+    TimeStepReadSwitch();                       // 0.27: only when patched at the start, the same
     MeterTick(held);
     return result;
 }
@@ -2314,6 +2324,8 @@ void MoveEvents();
 void ReportClothTimeStep();
 // 0.24, defined below (section "0.24")
 void ReportCameraTimeStep();
+// 0.27, defined below (section "0.27")
+void ReportTimeStep027();
 // 0.25, defined below (sections "0.25 [Camera] Trace" / "0.25 DoppelgangerSettings")
 void DgSynthTick();
 void ReportCamSettings();
@@ -2527,7 +2539,8 @@ void MeterTick(bool padHeld) {
     ScreenEffectPoll();                          // 0.10: only while an event 0x32 is pending
     ReportClothTimeStep();                       // 0.15: log only ([Cloth] ClothTuTimeStep=1)
     ReportCameraTimeStep();                      // 0.24: log only ([Camera] CameraTuTimeStep=1)
-    DgSynthTick();                               // 0.25: [Camera] DoppelgangerSettings=2 stand-in (once)
+    ReportTimeStep027();                         // 0.27: log only ([Camera] ShakeTuTimeStep / [Player] TuTimeStep)
+    DgSynthTick();                              // 0.25: [Camera] DoppelgangerSettings=2 stand-in (once)
     ReportCamSettings();                         // 0.25: the gameplay camera's settings choice (log on change)
     CamTraceTick();                              // 0.25: [Camera] Trace=1 -> TruCam.log
     if (g_legacyPadStart) { LegacyMeterTick(padHeld); return; }
@@ -3737,6 +3750,312 @@ void PatchCameraTimeStep() {
     Log(1, "camera time step: [Camera] CameraTuTimeStep=1 - tru+0x1f3c79 / 0x1fe30a / 0x2026ca / 0x2044aa run TU "
            "0x822ad06c / 0x822beef8 / 0x822c3a08 / 0x822c7a18: camera manager, LaraCamera, LaraCameraRewrite and "
            "LaraCombatCamera get dt [0xe7f188] / world scale [0xe7f1a0] (unscaled while the world is slowed)");
+}
+
+// ---- 0.27 [Camera] ShakeTuTimeStep / [Player] TuTimeStep: the TU's other world-time divisions (Q50, project doc
+// Befund-Zeitschritt-Q50-1111.md; found by Q17, Befund-TU-Prioritaeten-Q17-1111.md ranks 7 / 11) ----
+// The TU divides gameTracker+0x100 (frame time x world scale, PC 0xe7f188) by +0x118 (world scale, PC 0xe7f1a0) at six
+// more places than retail (= the PC). None of them tests the doppelganger flag or the scale (as 0.24); world scale 0:
+// the TU divides anyway (counted for the log only).
+//   [Camera] ShakeTuTimeStep - the camera shake pool: TU 0x822af4d8 (retail 0x822b2408) = PC tru+0x1f3390 (Q17's
+//     coverage partner 0x5ed860 is wrong). Both are called first by the camera update (TU 0x822aa520 bl 0x822af4d8,
+//     then the manager 0x822ad048 on 0x82efc780; PC tru+0x1f3df0 call tru+0x1f3390, then tru+0x1f3c70 on 0xe804f0 =
+//     pool + 0x4d0 on both). dt = 0.0 when gt+0xbb == 6, else gt+0x100 / gt+0x118 * 1/30 (TU 0x822af510..0x822af524;
+//     retail / PC: gt+0x100 * 1/30), then the 8 slots of 0x90 bytes (TU 0x82efc2b0, PC 0xe80020) update with it (TU
+//     0x822af2c0 / PC tru+0x1f3190). PC site tru+0x1f339e `fld [0xe7f188]`; its `fdiv qword [30.0]` stays.
+//   [Player] TuTimeStep - Lara's object functions (TU table 0x8275ae3c = PC 0x8aba2c: init, process, collide, query,
+//     message, additional collide):
+//     P1 query case 0xe0 (TU 0x8240cf88 -> 0x8240db78; PC tru+0x309fd0 case 224 -> tru+0x30a6d5): retail / PC return
+//        int(length(+0x90 row 3 - +0x94 row 3) / gt+0x100); the TU int(length * ((1.0 / gt+0x118) / gt+0x100))
+//        (0x8240dbbc..0x8240dbd0, 0x8240dc00; 1.0 = TU 0x8207d544). PC site tru+0x30a70a `fdiv [0xe7f188]`, st0 = length.
+//     P2 message 0x190 (TU 0x8240e3a0 -> 0x8240fa6c; PC tru+0x31ffe0 case 400 -> tru+0x320eb8): the player instance
+//        position += vector * 1/30 * min(dt, 2.0) with dt = gt+0x100 (retail / PC) / gt+0x100 / gt+0x118 (TU
+//        0x8240faa4..0x8240fad0). PC site tru+0x320ed7 `fld [0xe7f188]` (argument of the min helper tru+0x35170).
+//     P3 ComputeSmoothRide (TU 0x82411850, retail 0x8240ea00, PC tru+0x300940, only called by P4): the smoothing block
+//        uses gt+0x100 / gt+0x118 wherever retail uses gt+0x100 (TU 0x82411b50..0x82411bf4: retail f0 -> TU f6). PC site
+//        tru+0x300bda, the function's only `fld [0xe7f188]` (stored to [esp+0x18], every use reads it from there).
+//     P4 RazielAdditionalCollide (TU 0x82411c30, retail 0x8240edd8, PC tru+0x31bfa0): when instance+0x298 == 0 the TU
+//        stores gt+0x100 / gt+0x118 into gt+0x100 for the whole body (0x82411c78..0x82411c8c, f30 = the old value) and
+//        writes the old value back after the last call (0x82411f98): every callee (P3, gravity / collision steps) sees
+//        the unscaled frame time. PC: the entry jumps to a wrapper that does the same around the game's body
+//        (trampoline = the 6 moved prologue bytes). P3 divides again inside this window, as in the TU.
+//     P5 PLAYER_GetAttachedToVelocity (TU 0x82419c98, retail 0x82416ac8, PC tru+0x3027b0; 10 callers each, e.g. TU
+//        camera manager 0x822ad048 / PC tru+0x1e7ef0): the platform branch (instance+0x274 == 0) passes min(dt, 2.0)
+//        with dt = gt+0x100 / gt+0x118 in the TU (0x82419ff4..0x8241a020). PC site tru+0x302a43 `fld [0xe7f188]`.
+// Patched only when the switch is 1 at the start (default 0: nothing checked, nothing patched). Then read again at run
+// time at most once per second (TimeStepReadSwitch, game thread): 0 sends every stub along the PC path (the jumps stay).
+// The stubs keep the flags (pushfd / popfd) and the registers; the wrapper runs at a function entry (cdecl, eax free).
+int g_shakeTimeStep = 0;                                       // [Camera] ShakeTuTimeStep at the start
+int g_playerTimeStep = 0;                                      // [Player] TuTimeStep at the start
+volatile LONG g_shakeOn = 0, g_playerOn = 0;                   // live values read by the stubs
+bool g_shakePatched = false, g_playerPatched = false;
+DWORD g_tsSwitchTick = 0;
+const int kTsSites = 6;                                        // 0 shake, 1..5 = P1..P5
+const char *const kTsNames[kTsSites] = {
+    "camera shake pool tru+0x1f3390 (TU 0x822af4d8)", "player query 0xe0 tru+0x30a6d5 (TU 0x8240db78)",
+    "player message 0x190 tru+0x320eb8 (TU 0x8240fa6c)", "ComputeSmoothRide tru+0x300940 (TU 0x82411850)",
+    "RazielAdditionalCollide tru+0x31bfa0 (TU 0x82411c30)", "PLAYER_GetAttachedToVelocity tru+0x3027b0 (TU 0x82419c98)"};
+const DWORD kTsSite[kTsSites] = {0x005f339e, 0x0070a70a, 0x00720ed7, 0x00700bda, 0x0071bfa0, 0x00702a43};
+DWORD g_tsBack[kTsSites] = {0x005f33a4, 0x0070a710, 0x00720edd, 0x00700be0, 0, 0x00702a49};
+volatile LONG g_tsHits[kTsSites] = {0, 0, 0, 0, 0, 0};          // divided calls per site (log only)
+LONG g_tsReported[kTsSites] = {0, 0, 0, 0, 0, 0};
+bool g_tsSlowLogged[kTsSites] = {false, false, false, false, false, false};
+LONG g_tsZero = 0;
+DWORD g_addCollideBody = 0;                                    // trampoline: moved prologue + jmp tru+0x31bfa6
+
+__declspec(naked) void TsShakeStub() {          // tru+0x1f339e, TU 0x822af510 / 0x822af518 / 0x822af51c
+    __asm {
+        fld dword ptr ds:[0x00e7f188]
+        pushfd
+        cmp dword ptr [g_shakeOn], 0
+        je plain
+        fdiv dword ptr ds:[0x00e7f1a0]
+        inc dword ptr [g_tsHits]
+    plain:
+        popfd
+        jmp dword ptr [g_tsBack]
+    }
+}
+__declspec(naked) void TsQueryStub() {          // tru+0x30a70a, st0 = the length (TU f11)
+    __asm {
+        pushfd
+        cmp dword ptr [g_playerOn], 0
+        je plain
+        fld1                                    // TU 0x8240dbbc lfs f0 = [0x8207d544] = 1.0
+        fdiv dword ptr ds:[0x00e7f1a0]          // TU 0x8240dbc0 / 0x8240dbc4 f13 = 1.0 / gt+0x118
+        fdiv dword ptr ds:[0x00e7f188]          // TU 0x8240dbc8 / 0x8240dbd0 f12 = f13 / gt+0x100
+        fmulp st(1), st                         // TU 0x8240dc00 f10 = f12 * length
+        inc dword ptr [g_tsHits + 4]
+        popfd
+        jmp dword ptr [g_tsBack + 4]            // PC: ftol tru+0x414d20 = TU fctiwz
+    plain:
+        fdiv dword ptr ds:[0x00e7f188]          // PC / retail 0x8240adc4: length / gt+0x100
+        popfd
+        jmp dword ptr [g_tsBack + 4]
+    }
+}
+__declspec(naked) void TsMessageStub() {        // tru+0x320ed7, TU 0x8240faa4 / 0x8240faac / 0x8240fab4
+    __asm {
+        fld dword ptr ds:[0x00e7f188]
+        pushfd
+        cmp dword ptr [g_playerOn], 0
+        je plain
+        fdiv dword ptr ds:[0x00e7f1a0]
+        inc dword ptr [g_tsHits + 8]
+    plain:
+        popfd
+        jmp dword ptr [g_tsBack + 8]
+    }
+}
+__declspec(naked) void TsSmoothRideStub() {     // tru+0x300bda, TU 0x82411b50 / 0x82411b5c / 0x82411b64
+    __asm {
+        fld dword ptr ds:[0x00e7f188]
+        pushfd
+        cmp dword ptr [g_playerOn], 0
+        je plain
+        fdiv dword ptr ds:[0x00e7f1a0]
+        inc dword ptr [g_tsHits + 12]
+    plain:
+        popfd
+        jmp dword ptr [g_tsBack + 12]
+    }
+}
+__declspec(naked) void TsAddCollideStub() {     // tru+0x31bfa0 entry, cdecl(instance)
+    __asm {
+        cmp dword ptr [g_playerOn], 0
+        je plain
+        mov eax, dword ptr [esp + 4]            // the instance (TU r31 = r3)
+        cmp dword ptr [eax + 0x298], 0          // TU 0x82411c50 / 0x82411c54 / 0x82411c58 bne -> no division
+        jne plain
+        push dword ptr ds:[0x00e7f188]          // TU 0x82411c80 fmr f30,f0 (the old gt+0x100)
+        fld dword ptr ds:[0x00e7f188]           // TU 0x82411c78 lfs f0,0x100
+        fdiv dword ptr ds:[0x00e7f1a0]          // TU 0x82411c7c lfs f13,0x118 / 0x82411c84 fdiv / 0x82411c88 frsp
+        fstp dword ptr ds:[0x00e7f188]          // TU 0x82411c8c stfs f0,0x100
+        push dword ptr [esp + 8]                // the instance again
+        call dword ptr [g_addCollideBody]       // the game's body (= TU 0x82411c90..0x82411f94)
+        add esp, 4
+        pop dword ptr ds:[0x00e7f188]           // TU 0x82411f98 stfs f30,0x100
+        inc dword ptr [g_tsHits + 16]
+        ret
+    plain:
+        jmp dword ptr [g_addCollideBody]
+    }
+}
+__declspec(naked) void TsVelocityStub() {       // tru+0x302a43, TU 0x82419ff4 / 0x82419ffc / 0x8241a004
+    __asm {
+        fld dword ptr ds:[0x00e7f188]
+        pushfd
+        cmp dword ptr [g_playerOn], 0
+        je plain
+        fdiv dword ptr ds:[0x00e7f1a0]
+        inc dword ptr [g_tsHits + 20]
+    plain:
+        popfd
+        jmp dword ptr [g_tsBack + 20]
+    }
+}
+
+// called once per game frame from MeterTick (game thread); log only: one line per site at its first divided call,
+// one at its first call while the world runs slower / faster than 1 % (log threshold only, not part of the translation)
+void ReportTimeStep027() {
+    if (!g_shakePatched && !g_playerPatched) return;
+    const float scale = *reinterpret_cast<volatile const float *>(0x00e7f1a0);
+    const float dt = *reinterpret_cast<volatile const float *>(0x00e7f188);
+    const double result = scale != 0.0f ? static_cast<double>(dt) / scale : 0.0;
+    for (int i = 0; i < kTsSites; ++i) {
+        LONG n = g_tsHits[i], last = g_tsReported[i];
+        if (n == last) continue;
+        g_tsReported[i] = n;
+        if (last == 0)
+            Log(1, "0.27 time step: first %s with the TU division (dt %.5f / world scale %.3f = %.5f)", kTsNames[i],
+                dt, scale, result);
+        if (!g_tsSlowLogged[i] && (scale < 0.99f || scale > 1.01f)) {
+            g_tsSlowLogged[i] = true;
+            Log(1, "0.27 time step: world time scaled - %s divided: dt %.5f / world scale %.3f = %.5f (call %ld)",
+                kTsNames[i], dt, scale, result, n);
+        }
+        bool pow2 = false;
+        for (LONG p = 1; p > 0 && p <= n; p <<= 1)
+            if (p > last) { pow2 = true; break; }
+        if (g_logLevel >= 2 && pow2)
+            Log(2, "0.27 time step: %ld calls of %s divided (world scale %.3f)", n, kTsNames[i], scale);
+    }
+    if (scale == 0.0f && g_tsZero++ == 0)
+        Log(0, "0.27 time step: world scale 0 while a divided site runs - the TU divides anyway");
+}
+
+void TimeStepReadSwitch() {
+    if ((!g_shakePatched && !g_playerPatched) || !g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_tsSwitchTick < 1000) return;
+    g_tsSwitchTick = now;
+    if (g_shakePatched) {
+        const LONG v = GetPrivateProfileIntA("Camera", "ShakeTuTimeStep", g_shakeOn, g_iniPath) ? 1 : 0;
+        if (v != g_shakeOn) {
+            Log(1, "0.27 switch: [Camera] ShakeTuTimeStep %ld -> %ld (read again from TruShadowPower.ini) - %s",
+                g_shakeOn, v, v ? "the camera shake pool runs on dt / world scale (TU 0x822af4d8)"
+                                : "the camera shake pool runs on the world-scaled dt (PC)");
+            g_shakeOn = v;
+        }
+    }
+    if (g_playerPatched) {
+        const LONG v = GetPrivateProfileIntA("Player", "TuTimeStep", g_playerOn, g_iniPath) ? 1 : 0;
+        if (v != g_playerOn) {
+            Log(1, "0.27 switch: [Player] TuTimeStep %ld -> %ld (read again from TruShadowPower.ini) - %s",
+                g_playerOn, v, v ? "the five player sites divide by the world scale (TU)"
+                                 : "the five player sites use the world-scaled dt (PC)");
+            g_playerOn = v;
+        }
+    }
+}
+
+struct TsCheck { DWORD at; const char *hex; const char *what; };
+const TsCheck kShakeChecks[] = {
+    {0x005f3390, "51 803d43f1e70006 7504 d9ee eb0c d90588f1e700 dc35b8398400 56 d95c2404 57 be2800e800",
+     "shake update tru+0x1f3390 (gt+0xbb test, dt, pool 0xe80028)"},
+    {0x005f33e2, "81c690000000 81fea804e800 7cc5", "shake pool loop (slots of 0x90 up to 0xe804a8)"},
+    {0x005f3e07, "e884f5ffff b9f004e800 e85afeffff", "camera update tru+0x1f3e07: shake pool, then the manager 0xe804f0"},
+};
+const TsCheck kPlayerChecks[] = {
+    {0x00709fdf, "3d36010000 53 56 8b7508 57 0f8785080000 0f8458080000 3df8000000 0f87b50b0000 0fb6887cac7000 "
+                 "ff248dc8ab7000", "player query tru+0x309fd0 dispatch"},
+    {0x0070ad5c, "2a", "query byte table: case 224 -> index 42"},
+    {0x0070ac70, "d5a67000", "query jump table: index 42 -> tru+0x30a6d5"},
+    {0x0070a6d5, "8b8690000000 85c0 0f84aefbffff 8bb694000000 85f6 0f84a0fbffff 0f284030 0f284e30 0f5cc1 8d4c2420 "
+                 "0f29442420 e8867ad2ff d83588f1e700 e80ba61000", "query case 224 (length of +0x90 - +0x94 / dt)"},
+    {0x00720e99, "8d87fafeffff 3de9000000 0f8745010000 0fb680e0117200 ff2485bc117200",
+     "player message tru+0x31ffe0 dispatch (base 0x106)"},
+    {0x0072126a, "03", "message byte table: 0x190 -> index 3"},
+    {0x007211c8, "b80e7200", "message jump table: index 3 -> tru+0x320eb8"},
+    {0x00720eb8, "d94308 83ec0c d95c2408 8d4c243c d94304 d95c2404 d903 d91c24 e84910d1ff d90588f1e700 0f284c2430 "
+                 "f30f1005105f8500 83ec08 d95c2404 0fc6c000 d9059c288400 0f59c1 d91c24 0f29442438 e86542d1ff",
+     "message 0x190 (position += vector * 1/30 * min(dt, 2.0))"},
+    {0x00435170, "d9442408 d9442404 d8d1 dfe0 f6c441 750b ddd8 d95c2408 d9442408 c3", "min helper tru+0x35170"},
+    {0x00700940, "558bec 83e4f0 8b0d58dbfa00 d9ee 83ec54", "ComputeSmoothRide tru+0x300940 entry"},
+    {0x00700bbc, "807f3000 7518 8b450c d94008 d95f20 d94008 c6473001 d95f24 d9ee d95f28 d90588f1e700 a164d7fa00 "
+                 "d95c2418 d9c0 d86720 d9442418 d9c0 defa d9c9 d95c241c d98018050000 dc0d20118400 dc35b8398400",
+     "ComputeSmoothRide smoothing block (dt -> [esp+0x18])"},
+    {0x0071bfa0, "558bec 83e4f0 83ec68 56 8b7508 83be9802000000 57 0f850b030000",
+     "RazielAdditionalCollide tru+0x31bfa0 entry (instance+0x298 test)"},
+    {0x0071c076, "e8c548feff", "RazielAdditionalCollide calls ComputeSmoothRide tru+0x300940"},
+    {0x0071c2b6, "6a00 68a6000000 56 e88d74e9ff 83c40c 5f 5e 8be5 5d c3", "RazielAdditionalCollide end (message 0xa6)"},
+    {0x007027b0, "558bec 83e4f0 83ec34 8b4508 53 8b5d0c 56", "PLAYER_GetAttachedToVelocity tru+0x3027b0 entry"},
+    {0x00702a03, "8b8e74020000 85c9 7430", "GetAttachedToVelocity: instance+0x274 test"},
+    {0x00702a3d, "d9059c288400 d90588f1e700 d8d1 dfe0 f6c405 7a04 ddd9 eb02 ddd8 a194f0e700 d95c242c",
+     "GetAttachedToVelocity platform branch (min(dt, 2.0))"},
+    {0x005e7f48, "e863a81100", "camera caller tru+0x1e7f48 -> tru+0x3027b0"},
+};
+
+void PatchTimeStep027() {
+    if (!g_shakeTimeStep && !g_playerTimeStep) {       // default: nothing checked, nothing patched (= 0.26)
+        Log(1, "0.27 time step: [Camera] ShakeTuTimeStep=0, [Player] TuTimeStep=0 - camera shake and the five player "
+               "sites run on the world-scaled frame time (retail; a later 1 needs a restart)");
+        return;
+    }
+    if (!HexBytesAt(kWorldScaleSite, kWorldScaleHex)) {
+        Log(0, "0.27 time step: code does not match (world scale tru+0x1da595) - off");
+        return;
+    }
+    if (g_shakeTimeStep) {
+        const char *bad = nullptr;
+        for (const auto &c : kShakeChecks)
+            if (!HexBytesAt(c.at, c.hex)) {
+                bad = c.what;
+                Log(0, "0.27 time step: code at 0x%08lx does not match (%s)", c.at, c.what);
+            }
+        if (bad) {
+            Log(0, "0.27 time step: [Camera] ShakeTuTimeStep=1 - checks failed - off");
+        } else if (!WriteJumpN(kTsSite[0], reinterpret_cast<const void *>(&TsShakeStub), 6)) {
+            Log(0, "0.27 time step: VirtualProtect failed at 0x%08lx (%lu) - shake off", kTsSite[0], GetLastError());
+        } else {
+            g_shakePatched = true;
+            g_shakeOn = 1;
+            Log(1, "0.27 time step: [Camera] ShakeTuTimeStep=1 - %u code checks passed; tru+0x1f339e runs TU "
+                   "0x822af510..0x822af51c: the camera shake pool gets dt [0xe7f188] / world scale [0xe7f1a0] (read again "
+                   "at run time at most once per second)",
+                static_cast<unsigned>(sizeof(kShakeChecks) / sizeof(kShakeChecks[0])));
+        }
+    } else {
+        Log(1, "0.27 time step: [Camera] ShakeTuTimeStep=0 - camera shake on the world-scaled frame time (retail)");
+    }
+    if (!g_playerTimeStep) {
+        Log(1, "0.27 time step: [Player] TuTimeStep=0 - the five player sites on the world-scaled frame time (retail)");
+        return;
+    }
+    const char *bad = nullptr;
+    for (const auto &c : kPlayerChecks)
+        if (!HexBytesAt(c.at, c.hex)) {
+            bad = c.what;
+            Log(0, "0.27 time step: code at 0x%08lx does not match (%s)", c.at, c.what);
+        }
+    if (bad) { Log(0, "0.27 time step: [Player] TuTimeStep=1 - checks failed - off (no site patched)"); return; }
+    BYTE *t = static_cast<BYTE *>(VirtualAlloc(nullptr, 16, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    if (!t) { Log(0, "0.27 time step: VirtualAlloc failed (%lu) - player sites off", GetLastError()); return; }
+    memcpy(t, reinterpret_cast<const void *>(kTsSite[4]), 6);     // push ebp; mov ebp,esp; and esp,-16 (no rel operand)
+    t[6] = 0xe9;
+    const DWORD back = (kTsSite[4] + 6) - (reinterpret_cast<DWORD>(t) + 11);
+    memcpy(t + 7, &back, 4);
+    FlushInstructionCache(GetCurrentProcess(), t, 16);
+    g_addCollideBody = reinterpret_cast<DWORD>(t);
+    g_playerOn = 1;                                              // before the jumps: the stubs read it
+    void (*const stubs[5])() = {TsQueryStub, TsMessageStub, TsSmoothRideStub, TsAddCollideStub, TsVelocityStub};
+    int done = 0;
+    for (int i = 1; i < kTsSites; ++i) {
+        if (!WriteJumpN(kTsSite[i], reinterpret_cast<const void *>(stubs[i - 1]), 6)) {
+            Log(0, "0.27 time step: VirtualProtect failed at 0x%08lx (%lu) - %d of 5 player sites patched", kTsSite[i],
+                GetLastError(), done);
+            break;
+        }
+        ++done;
+    }
+    g_playerPatched = done > 0;
+    if (done == 5)
+        Log(1, "0.27 time step: [Player] TuTimeStep=1 - %u code checks passed; tru+0x30a70a (query 0xe0, TU 0x8240dbc4), "
+               "tru+0x320ed7 (message 0x190, TU 0x8240fab4), tru+0x300bda (ComputeSmoothRide, TU 0x82411b64), "
+               "tru+0x31bfa0 (RazielAdditionalCollide: gt+0x100 = dt / world scale for its body, TU 0x82411c84 / "
+               "0x82411f98), tru+0x302a43 (GetAttachedToVelocity, TU 0x8241a004) divide by world scale [0xe7f1a0] (read "
+               "again at run time at most once per second)",
+            static_cast<unsigned>(sizeof(kPlayerChecks) / sizeof(kPlayerChecks[0])));
 }
 
 // ---- 0.25 [Camera] Trace: the PC side of the camera comparison with TruXenia (project doc
@@ -5163,6 +5482,8 @@ void ReadOptions(const char *dir) {
     if (g_camTraceMs > 5000) g_camTraceMs = 5000;
     g_dgSettings = GetPrivateProfileIntA("Camera", "DoppelgangerSettings", 0, ini);           // 0.25, default 0
     if (g_dgSettings < 0 || g_dgSettings > 2) g_dgSettings = 0;
+    g_shakeTimeStep = GetPrivateProfileIntA("Camera", "ShakeTuTimeStep", 0, ini) ? 1 : 0;     // 0.27, default 0
+    g_playerTimeStep = GetPrivateProfileIntA("Player", "TuTimeStep", 0, ini) ? 1 : 0;         // 0.27, default 0
     _snprintf_s(g_camTracePath, sizeof(g_camTracePath), _TRUNCATE, "%sTruCam.log", dir);
 }
 
@@ -5174,17 +5495,18 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.26 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.27 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
         "log %d; 0.21: time-scale slot 6 %d; 0.22: reticle request %d, refill %d, log %d; 0.23: infinite meter %d; "
-        "0.24: camera TU time step %d; 0.25: camera trace %d (%d ms), doppelganger camera settings %d)",
+        "0.24: camera TU time step %d; 0.25: camera trace %d (%d ms), doppelganger camera settings %d; 0.27: shake TU "
+        "time step %d, player TU time step %d)",
         g_enabled, g_buttons, g_hudFeed, g_fallback, g_condEnabled, g_statesEnabled, g_cond1046, g_cond1055,
         g_lookEnabled, g_legacyPadStart, g_gameInput, g_adrenalineMode, g_lookScreen, g_gp7Enabled, g_cineParamEnabled,
         g_state2102Enabled, g_loopSound, g_moveEvents, g_cameraFlag, g_strikeLook, g_clothTimeStep, g_menuInput, g_k11,
         g_k11Log, g_slot6, g_retRequest, g_retRefill, g_retLog, g_infinite, g_camTimeStep, g_camTrace, g_camTraceMs,
-        g_dgSettings);
+        g_dgSettings, g_shakeTimeStep, g_playerTimeStep);
     if (!g_enabled) { Log(1, "disabled by TruShadowPower.ini - nothing hooked"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not hooked", base, kImageBase); return; }
@@ -5303,6 +5625,7 @@ void Start(HMODULE self) {
     PatchReticle();                     // 0.22: ring request / adrenaline refill by the meter flags in doppelganger mode
     PatchCameraTimeStep();              // 0.24: only with [Camera] CameraTuTimeStep=1 (independent of the doppelganger flag)
     PatchDgSettings();                  // 0.25: only with [Camera] DoppelgangerSettings=1|2 (after the 0.11 / 0.24 checks)
+    PatchTimeStep027();                 // 0.27: only with [Camera] ShakeTuTimeStep=1 / [Player] TuTimeStep=1
     Log(1, "0.25 camera trace: [Camera] Trace %d at the start (read again at run time at most once per second; %s, "
            "every %d ms; read only)", g_camTrace, g_camTracePath, g_camTraceMs);
     Log(1, "0.23 infinite meter: [Meter] Infinite %d at the start - %s; read again at run time at most once per second "
@@ -5329,7 +5652,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.26 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.27 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
@@ -5341,7 +5664,8 @@ extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
            "doppelganger mode (TU 0x823de47c / 0x823ee158 / 0x823dfd98); switches default off: loop sound, move events 0x83 / 0x84, strike "
            "look 0x823d8a80 / 0x823d9050, cloth TU time step 0x82278120, camera TU time step 0x822ad048 / 0x822beeb8 / "
            "0x822c39c8 / 0x822c79d0, doppelganger camera settings 0x822bc198 / 0x822c61d8 (DTP 21237 / 21238, mode 2 "
-           "with a stand-in: TU delay / ramp + 21237's per-mode tables), infinite meter [Meter] Infinite (live, not a TU feature), camera trace TruCam.log "
+           "with a stand-in: TU delay / ramp + 21237's per-mode tables), camera shake TU time step 0x822af4d8, player "
+           "TU time step 0x8240cf88 / 0x8240e3a0 / 0x82411850 / 0x82411c30 / 0x82419c98, infinite meter [Meter] Infinite (live, not a TU feature), camera trace TruCam.log "
            "(read only))";
 }
 
