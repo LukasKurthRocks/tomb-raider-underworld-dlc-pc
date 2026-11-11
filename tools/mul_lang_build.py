@@ -16,7 +16,11 @@ so each variant is written as <path>\\<name>_NNN (001 EN, 002 FR, 004 DE, 008 IT
 
 Usage (from the repository root):
   ../bin/pyt -t 3600 tools/mul_lang_build.py OUT_MODS_DIR pack10|pack11 [NAME.mul ...] [--check] [--no-voice]
-  without NAME: every cinstream .mul of the pack and every localised voice stream; --check: list the variants only
+                                             [--variants-only] [--no-cine]
+  without NAME: every cinstream .mul of the pack and every localised voice stream; --check: list the variants only;
+  --variants-only (2026-11-11, pipeline step Lang, tools/lang_variants_step.py): write only the <name>_NNN files,
+  not the plain English voice name (that one comes from the audio steps); --no-cine: the voice streams only (step
+  Lang runs one process per cinematic and one for the voice lines)
 """
 import sys, os, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -38,10 +42,11 @@ def voice_names(pack):
 
 
 def main(argv):
-    check = '--check' in argv; voice = '--no-voice' not in argv
-    argv = [a for a in argv if a not in ('--check', '--no-voice')]
+    check = '--check' in argv; voice = '--no-voice' not in argv; plain = '--variants-only' not in argv
+    cine = '--no-cine' not in argv
+    argv = [a for a in argv if a not in ('--check', '--no-voice', '--variants-only', '--no-cine')]
     out, pack = argv[0], argv[1]
-    jobs = [('cine', 'xenon-w\\cinstream\\' + nm) for nm in (argv[2:] or CINE[pack])]
+    jobs = [('cine', 'xenon-w\\cinstream\\' + nm) for nm in (argv[2:] or CINE[pack])] if cine else []
     if voice and not argv[2:]: jobs += [('voice', nm) for nm in voice_names(pack)]
     A = Archive(R + [p for p in PACKS if p.endswith('/%s.000' % pack)][0], 'be')
     import mul_convert as M, mul_audio_nch as MN, music_convert as MC, dlc_generic as DG
@@ -59,7 +64,7 @@ def main(argv):
             xd = A.read(r)
             pd = M.convert(xd, ids) if kind == 'cine' else MC.convert_mul(xd)[0]
             o, info = MN.swap(xd, pd)
-            targets = ['%s_%03d' % (rel, LANG[spec])] + ([rel] if kind == 'voice' and spec == 0xffffffe1 else [])
+            targets = ['%s_%03d' % (rel, LANG[spec])] + ([rel] if plain and kind == 'voice' and spec == 0xffffffe1 else [])
             for t in targets:
                 q = os.path.join(out, t); os.makedirs(os.path.dirname(q), exist_ok=True); open(q, 'wb').write(o)
                 st['written %s' % kind] += 1

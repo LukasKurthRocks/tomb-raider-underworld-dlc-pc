@@ -176,6 +176,15 @@
                globalsound_check.json (-FixesOut DIR: DIR\globalsound\...). Kit bytes on purpose: the two new u16 DSP
                kinds (entry +0x7c of groups 77 / 78) stay u32-swapped as in the kit until the owner decides
                (--tu-form, docs/WINDOWS_REBUILD.md finding 51). Not installed by anything yet
+      Lang     (2026-11-11, R10, independent of every other step except Names; ~47 min with 3 processes) the language
+               variants <name>.mul_NNN of the DLC cinematics (pdlc1_010 / 030, pdlc2_020 / 030 / 040 / 045 / 050) and
+               the 5 DLC 1 radio lines from the Xbox packs: tools\lang_variants_step.py build = tools\mul_lang_build.py
+               --variants-only (one process per cinematic + one for the voice lines, at most 3), 60 files: 001 EN,
+               002 FR, 004 DE, 008 IT, 016 ES; no .mul_2048 (Dutch: no Dutch speech exists, the plain English name is
+               the fallback) and no .mul_032 (the Japanese slot); then lang_variants_step check = gate: exactly these
+               60 files, each md5 = docs\data\lang_variants_md5.tsv (the installed variants)
+               -> work\rebuild\lang\mods + lang_md5.tsv, lang_check.json (-FixesOut DIR: DIR\lang\...).
+               The DLC 2 doppelganger variants stay in Fixes (vo_lang_variants). Not installed by anything yet
 
     Aborting: a step can be stopped between tools without loss (each tool writes its output when it finishes);
     a tool stopped midway has to run again. -FromTool N resumes a step at its N-th tool (numbers as shown in the
@@ -209,7 +218,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank', 'Exe', 'Globalsound')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank', 'Exe', 'Globalsound', 'Lang')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(1, 99)][int]$ToTool = 99,
     [ValidateRange(0, 16)][int]$Jobs = 0,
@@ -290,6 +299,8 @@ $exeOut = if ($FixesOut) { "$fixRoot/exe" } else { 'work/rebuild/exe' }
 $gbPcOut = if ($FixesOut) { "$fixRoot/generalbank_pc" } else { 'work/rebuild/generalbank_pc' }
 # step Globalsound (2026-11-10): our globalsoundinfo.drm from the PC original + the recorded title-update edit
 $gsOut = if ($FixesOut) { "$fixRoot/globalsound" } else { 'work/rebuild/globalsound' }
+# step Lang (2026-11-11, R10): the 60 language variants of the DLC cinematics / DLC 1 radio lines
+$langOut = if ($FixesOut) { "$fixRoot/lang" } else { 'work/rebuild/lang' }
 # step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
 $costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
 $costumeTools = @(
@@ -512,6 +523,12 @@ $steps = @{
         @('tools\globalsoundinfo_build.py', 'build', $gsOut),
         @('tools\globalsoundinfo_build.py', '--check', "$gsOut/mods/globalsoundinfo.drm")
     )
+    # Lang: build (mul_lang_build --variants-only, one process per cinematic / voice set, at most 3), then the gate
+    # (exactly the 60 files, md5 = the installed variants, no .mul_2048 / .mul_032)
+    Lang = @(
+        @('tools\lang_variants_step.py', 'build', "$langOut/mods", '--replace'),
+        @('tools\lang_variants_step.py', 'check', "$langOut/mods", '--report', "$langOut/lang_check.json")
+    )
 }
 $outputDirs = @{
     Index   = @('work')
@@ -532,6 +549,7 @@ $outputDirs = @{
     Generalbank = @('work\rebuild')
     Exe     = @(($exeOut -replace '/', '\'))
     Globalsound = @(($gsOut -replace '/', '\'))
+    Lang    = @(($langOut -replace '/', '\'))
 }
 # steps whose progress can be measured by counting output files
 $progressHints = @{
