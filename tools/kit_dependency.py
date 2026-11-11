@@ -20,8 +20,8 @@ Usage (from the repository root):
             B270 kit work/b270_kit/kit/manifest.json, its files from work/b270_kit/mods (tools/kit_rebuild.py output);
             independent trees <run>/dlc1/mods, <run>/dlc2/mods, work/rebuild/costumes_0913/<pack>/stage2b/mods;
             kit-based trees <run>_repair/b138_fixes/mods, <run>_gb/generalbank_build/mods
-  --own OWN_DIR (2026-11-11): the assembled own tree of tools/own_tree.py (OWN_DIR/mods, OWN_DIR/exe/tru.exe) is the
-            only tree; its manifest's kit_derived column decides 'kit_based'. --b138-mods DIR: where the B138 kit
+  --own OWN_DIR (2026-11-11): the assembled own tree of tools/own_tree.py (OWN_DIR/mods, OWN_DIR/exe/tru.exe and, since
+            Q42, OWN_DIR/movies/credits_DLC*.bik for the kits' movies/ entries) is the only tree; its manifest's kit_derived column decides 'kit_based'. --b138-mods DIR: where the B138 kit
             files are when <run>_repair does not exist (read only, e.g. work/rebuild/pipeline_check_1011_repair/...)
 """
 import sys, os, json, hashlib, collections
@@ -121,7 +121,8 @@ def main(argv):
     based = [('repair', run + '_repair/b138_fixes/mods'), ('gb', run + '_gb/generalbank_build/mods')]
     if own:
         # the assembled own tree is the only tree; files its manifest marks kit_derived count as 'kit_based'
-        indep, based = [('own', own + '/mods'), ('own_exe', own + '/exe')], []
+        # OWN_DIR/movies (2026-11-11, Q42): the end credits of the assemble step's credits layer; kit rel movies/<name>
+        indep, based = [('own', own + '/mods'), ('own_exe', own + '/exe'), ('own_movies', own)], []
         mp = os.path.join(own, 'own_manifest.tsv')
         kd = set()
         if os.path.isfile(mp):
@@ -160,6 +161,7 @@ def main(argv):
             if area == 'costume': order = sorted(indep, key=lambda t: 0 if t[0].startswith('cost') else 1)
             tree, op = '', None
             for l, d in order:
+                if l == 'own_movies' and not rel.lower().startswith('movies/'): continue   # OWN_DIR itself: movies only
                 q = find(d, rel)
                 if q: tree, op = l, q; break
             cls, reason, secs, our_md5 = '', '', '', ''

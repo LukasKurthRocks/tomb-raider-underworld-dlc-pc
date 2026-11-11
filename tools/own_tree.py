@@ -2,7 +2,7 @@ r"""The own mods tree from our pipeline outputs only (no file of the B138 / B270
 the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
 
   assemble OUT_DIR [--run work/rebuild/pipeline_check_1011] [--costumes work/rebuild/costumes_0913]
-                   [--generalbank pc|k12] [--no-lang] [--exe FILE]
+                   [--generalbank pc|k12] [--no-lang] [--exe FILE] [--credits DIR]
       copies the pipeline outputs, in this order (a later layer wins for a file two layers have; every overlap is
       listed with "same" / "DIFFERENT"):
         dlc1         <run>/dlc1/mods                        step Fixes (-FixesOut <run>), DLC 1 tree (B138 layout)
@@ -21,11 +21,15 @@ the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
                      generalbank.drm -> marked kit_derived
       and the exe of step Exe (<run>/exe/tru.exe, else work/rebuild/exe/tru.exe; --exe FILE) to OUT_DIR/exe/ (not
       part of mods).
+      Credits (2026-11-11, Q42): the end-credits movies credits_DLC1.bik / credits_DLC2.bik of scripts/credits_convert.py
+      (--dlc 1 / --dlc 2: the player's own credits_DLC<n>.wmv of the DLC content folder, ffmpeg + RAD Video Tools) from
+      --credits DIR (default <run>/credits, else work/rebuild/credits) to OUT_DIR/movies/ (not part of mods; manifest
+      rows ../movies/<name>, as the exe). A missing movie is named, not fatal (credits need RAD Video Tools).
       DROP: pipeline outputs a played tree must not have (g_pda.drm, finding 40); ALIAS: byte copies of a pipeline
       output under a name the game asks for and no step writes yet (loading_bg_dlc1/2.raw_004) - both with the
       evidence in the table below, both listed in assemble_overlaps.tsv.
       Refuses any source below a kit / kit-based tree (b138_pristine, b138_fixes, *_repair, b270_kit, release).
-      Writes OUT_DIR/mods, OUT_DIR/exe/tru.exe, OUT_DIR/own_manifest.tsv (rel, size, md5, raw_md5, layer, step,
+      Writes OUT_DIR/mods, OUT_DIR/exe/tru.exe, OUT_DIR/movies/credits_DLC*.bik, OUT_DIR/own_manifest.tsv (rel, size, md5, raw_md5, layer, step,
       kit_derived, source, also_in) and OUT_DIR/assemble_overlaps.tsv. OUT_DIR/mods must not exist yet.
 
   compare OWN_MODS GAME_MODS --backup ../backup --logs ../logs --out DIR [--manifest OWN_MANIFEST.tsv]
@@ -156,14 +160,16 @@ def assemble(argv):
     lang = '--no-lang' not in argv
     if not lang: argv.remove('--no-lang')
     exe = arg(argv, '--exe', in_run(run, 'exe/tru.exe', 'work/rebuild/exe/tru.exe'))
+    credits = arg(argv, '--credits', in_run(run, 'credits', 'work/rebuild/credits'))
     outdir = argv[0]
     mods = os.path.join(outdir, 'mods')
     if os.path.exists(mods): raise SystemExit('exists already: %s (remove it first)' % mods)
     lay = layers(run, costumes, gb, lang)
-    for name, step, d, pat, kd in lay + [('exe', 'Exe', exe, None, False)]:
+    for name, step, d, pat, kd in lay + [('exe', 'Exe', exe, None, False), ('credits', 'Credits', credits, None, False)]:
         low = d.replace('\\', '/').lower()
         if any(f.replace('\\', '/') in low for f in FORBIDDEN):
             raise SystemExit('refused: layer %s reads a kit / kit-based tree: %s' % (name, d))
+        if name == 'credits': continue      # optional (RAD Video Tools); missing movies are named below
         if name == 'exe':
             if not os.path.isfile(d): raise SystemExit('missing exe: %s' % d)
             continue
@@ -207,7 +213,19 @@ def assemble(argv):
     if exe and os.path.isfile(exe):
         os.makedirs(os.path.join(outdir, 'exe'), exist_ok=True)
         q = os.path.join(outdir, 'exe', 'tru.exe'); shutil.copy2(exe, q); exe_md5 = md5_file(q)
-    cols = ['rel', 'size', 'md5', 'raw_md5', 'layer', 'step', 'kit_derived', 'source', 'also_in']
+    movies = []                            # (name, size, md5, source): end credits of scripts/credits_convert.py
+    for n in ('1', '2'):
+        name = 'credits_DLC%s.bik' % n
+        p = os.path.join(credits, name)
+        if not os.path.isfile(p):
+            print('credits: %s not built (missing %s) - scripts/credits_convert.py --dlc %s' % (name, p, n)); continue
+        os.makedirs(os.path.join(outdir, 'movies'), exist_ok=True)
+        q = os.path.join(outdir, 'movies', name); m = md5_file(p)
+        shutil.copy2(p, q)
+        if md5_file(q) != m: raise SystemExit('copy check failed: %s' % q)
+        movies.append((name, os.path.getsize(q), m, p))
+        print('credits: %s %d bytes md5 %s <- %s' % (name, os.path.getsize(q), m, p))
+    cols =['rel', 'size', 'md5', 'raw_md5', 'layer', 'step', 'kit_derived', 'source', 'also_in']
     with open(os.path.join(outdir, 'own_manifest.tsv'), 'w', encoding='utf-8', newline='\n') as f:
         f.write('\t'.join(cols) + '\n')
         for k, e in files.items():
@@ -216,6 +234,9 @@ def assemble(argv):
                                ','.join(e['also_in']) or '-']) + '\n')
         f.write('\t'.join(['../exe/tru.exe', str(os.path.getsize(exe)) if exe_md5 != '-' else '0', exe_md5, '-', 'exe',
                            'Exe (not part of mods)', 'no', exe.replace('\\', '/'), '-']) + '\n')
+        for name, size, m, p in movies:
+            f.write('\t'.join(['../movies/' + name, str(size), m, '-', 'credits',
+                               'Credits (scripts/credits_convert.py, not part of mods)', 'no', p.replace('\\', '/'), '-']) + '\n')
     with open(os.path.join(outdir, 'assemble_overlaps.tsv'), 'w', encoding='utf-8', newline='\n') as f:
         f.write('rel\tlayer\toverrides\tverdict\n')
         for r in overlaps: f.write('\t'.join(r) + '\n')
@@ -227,7 +248,8 @@ def assemble(argv):
     print('overlaps:', dict(ov))
     for r in overlaps:
         if 'DIFFERENT' in r[3] or 'not_in' in r[3]: print('  %-60s %-12s over %-8s %s' % r)
-    print('own tree: %d files, %d bytes -> %s; exe md5 %s' % (len(files), sum(e['size'] for e in files.values()), mods, exe_md5))
+    print('own tree: %d files, %d bytes -> %s; exe md5 %s; movies %s' % (len(files), sum(e['size'] for e in files.values()), mods,
+                                                                      exe_md5, ', '.join(m[0] for m in movies) or 'none'))
 
 
 # ----------------------------------------------------------------------------------------------------------- compare
