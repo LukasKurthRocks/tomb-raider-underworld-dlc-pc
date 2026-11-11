@@ -58,8 +58,12 @@ ZERO_RULE_MIN = 5       # Xbox 0 -> one non-zero PC value: only with at least th
 # Q55 (2026-11-11): member twins by declaration order - 389 -> 446 members, 23279 -> 26195 observations, s32 129 -> 128
 # (4 keys s32 -> id-mixed: script 7 holds a member-name Symbol path there), zero rule 108 -> 126, prompt ids 5 -> 3;
 # planned words on pipeline_check_1111b unchanged (DLC 1 3116, DLC 2 1871 rows identical)
-PINNED = {'base script pairs': 141, 'UI members paired': 446, 'observations': 26195, 'contradictions': 0,
-          'rule s32': 128, 'zero rule ut 301 path [0, 100]: base observations': 126,
+# Q58 (2026-11-11): DlcIds.sym reads the twin Symbols (docs/data/symbol_twins.json) - the base scripts pair by name
+# Symbol 141 -> 148, UI members 446 -> 573, observations 26195 -> 33336, s32 128 -> 143, zero rule 126 -> 213,
+# contradictions 0, prompt ids 3; scan of the Q58 projection of pipeline_check_1111c (uiinit already applied): 0 words
+# planned in DLC 1 and DLC 2 (the new rules give every applied word again; docs Befund-Membernamen-Q58-1111.md)
+PINNED = {'base script pairs': 148, 'UI members paired': 573, 'observations': 33336, 'contradictions': 0,
+          'rule s32': 143, 'zero rule ut 301 path [0, 100]: base observations': 213,
           # Q46 (2026-11-11): the text id leaf proves as the locals class once the map is read
           'rule id16a:101': 1,
           'locals text ids: PC prompt ids learned': 3}

@@ -140,7 +140,55 @@ def members(w, d, e):
     return out
 
 
+def pair_entries(wa, sd, wb, pd, prl, x, st, by_name=False):
+    """IN (converted, Xbox layout, little-endian) <-> REF (PC) entries -> ([(key, IN entry, PC entry)], [(key, IN entry)
+    without a PC partner]); key = (array, IN name, tag, userType).
+    With the Xbox source x (--xbox) and the Xbox layout kept (same size): the PC twin in the declaration order
+    (Q58: script_member_pairs.align on the Xbox source; a twin of another userType is not paired, counted). Q55 proved
+    the alignment on the 280 base pairs (623 / 7 against the text id referee; the old name rule 207 / 181 there) and
+    the name rule right on base pair 6 (41 / 0, every name there from the base map) - with the Q58 twin Symbols
+    (docs/data/symbol_twins.json) the converter's names ARE the twins' names wherever a twin exists, so both rules agree
+    where the name rule was proven. Without --xbox (or by_name, --by-name): the name rule (array, name, tag, userType),
+    args / locals in walk order across functions (LIMIT: a function the PC added or removed shifts that pairing)."""
+    ma, mb = members(wa, sd, 'le'), members(wb, pd, 'le')
+    plist, only_e = [], []
+    if x is not None and len(x['data']) == len(sd) and not by_name:
+        import script_member_pairs as MP
+        import dlc_generic as DG
+        tw, _ = MP.align(x['data'], x['reloc'], pd, prl, DG.DlcIds())
+        info = {a: k for k, la in mb.items() for a in la}
+        st['pairing: declaration-order twins (script_member_pairs.align), locals by name'] = 1
+        for key, la in ma.items():
+            if key[0] == 'locals':
+                # locals keep the name rule: aligned across all functions the walk order pairs other locals where the
+                # PC added / removed functions (Q58 referee, base map: 186 = / 7 !=); script 6 with twin names: members
+                # and args of both rules identical, locals 507 common, 57 name-rule-only / 72 twin-only pairs
+                lb = mb.get(key, [])
+                if len(la) != len(lb): st['locals: unequal counts per name (surplus not paired)'] += abs(len(la) - len(lb))
+                plist += [(key, a, b) for a, b in zip(la, lb)]
+                only_e += [(key, a) for a in la[len(lb):]]
+                continue
+            for a in la:
+                b = tw.get(a)
+                if b is None: only_e.append((key, a)); continue
+                kb = info[b]
+                if (kb[0], kb[2], kb[3]) != (key[0], key[2], key[3]):
+                    st['%s: twin of another array / userType (not paired)' % key[0]] += 1; only_e.append((key, a)); continue
+                if kb[1] != key[1]: st['%s: twin with another name than the converter\'s' % key[0]] += 1
+                plist.append((key, a, b))
+        return plist, only_e
+    if x is not None and not by_name: st['pairing: by name (Xbox source of another size)'] = 1
+    for key, la in ma.items():
+        lb = mb.get(key)
+        if not lb: only_e += [(key, a) for a in la]; continue
+        if len(la) != len(lb): st['%s: unequal counts per name (surplus not paired)' % key[0]] += abs(len(la) - len(lb))
+        plist += [(key, a, b) for a, b in zip(la, lb)]
+        only_e += [(key, a) for a in la[len(lb):]]
+    return plist, only_e
+
+
 def main(argv):
+    by_name = '--by-name' in argv; argv = [a for a in argv if a != '--by-name']
     xname = None; retail = '--retail' in argv; argv = [a for a in argv if a != '--retail']
     if '--xbox' in argv: k = argv.index('--xbox'); xname = argv[k + 1]; del argv[k:k + 2]
     xid = None      # Xbox script id when it differs from the PC one (title update script 10 = PC script 9)
@@ -156,28 +204,26 @@ def main(argv):
     wa = SC.Walk(s.data, ra, 'le'); wa.run(); wb = SC.Walk(p.data, rb, 'le'); wb.run()
     ita, itb = dict(ra.internal), dict(rb.internal)
     ita0 = dict(ita)        # relocations before any re-layout: field rules are learned in the Xbox layout
-    d = bytearray(s.data); st = collections.Counter(); seen = set(); only = []; shapes = []; pairs = []
-    ma, mb = members(wa, s.data, 'le'), members(wb, p.data, 'le')
-    for key, la in ma.items():
-        lb = mb.get(key)
-        if not lb: only.append(key); continue
-        # args / locals of the same name and type are paired in walk order across functions (LIMIT: a function the
-        # PC added or removed shifts the pairing); surplus entries on either side are counted, not copied
-        if len(la) != len(lb): st['%s: unequal counts per name (surplus not paired)' % key[0]] += abs(len(la) - len(lb))
-        for a, b in zip(la, lb):
-            ia, ib = ita.get(a + 16), itb.get(b + 16)
-            if ia is None and ib is None: continue
-            if (ia is None) != (ib is None): st['init present on one side only (kept)'] += 1; continue
-            st['%s with init paired' % key[0]] += 1; pairs.append(((key[2], key[3]), ia, ib))
-            copy_tree(d, wa, ita, p.data, wb, itb, ia, ib, st, seen, shapes)
-    if xname:       # members without a PC counterpart: byte order per field learned from the paired members
+    d = bytearray(s.data); st = collections.Counter(); seen = set(); shapes = []; pairs = []
+    x = None
+    if xname:
         import dtp_word_classes as C
         x = next(q for q in C.find(C.BASE[1:] if retail else C.BASE, 'be', 'xenon-w' + chr(92) + xname)
                  if q['type'] == 8 and q['id'] == (sid if xid is None else xid))
+    ma = members(wa, s.data, 'le')
+    plist, only_e = pair_entries(wa, s.data, wb, p.data, p.reloc, x, st, by_name=by_name)
+    for key, a, b in plist:
+        ia, ib = ita.get(a + 16), itb.get(b + 16)
+        if ia is None and ib is None: continue
+        if (ia is None) != (ib is None): st['init present on one side only (kept)'] += 1; continue
+        st['%s with init paired' % key[0]] += 1; pairs.append(((key[2], key[3]), ia, ib))
+        copy_tree(d, wa, ita, p.data, wb, itb, ia, ib, st, seen, shapes)
+    only = list(collections.OrderedDict.fromkeys(k for k, _ in only_e))
+    if xname:       # members without a PC counterpart: byte order per field learned from the paired members
         rules = learn_rules(wa, ita0, x['data'], p.data, wb, itb, pairs)
         st['field rules learned'] = len(rules)
-        for key in only:
-            for a in ma[key]:
+        for key, a in only_e:
+            if True:
                 ia = ita.get(a + 16)
                 if ia is None: continue
                 if apply_rules(d, wa, ita, x['data'], ia, key[2], key[3], rules, st) and key[3] == GLYPH_UT:
@@ -203,7 +249,7 @@ def main(argv):
     open(out, 'wb').write(DW.cdrm_encode(raw, 'le'))
     print('script %d: %s' % (sid, dict(st)))
     if shapes: print('nodes of another shape (ours offset, words, PC offset, words):', ', '.join('0x%x %d / 0x%x %d' % x for x in shapes[:12]))
-    with_init = [k for k in only if any(ita.get(a + 16) is not None for a in ma[k])]
+    with_init = list(collections.OrderedDict.fromkeys(k for k, a in only_e if ita.get(a + 16) is not None))
     print('data members without a PC counterpart: %d (%d with init, kept as converted): %s' % (
         len(only), len(with_init), ', '.join('%s %d' % (k[0], k[1]) for k in with_init[:40])))
     print('->', out)

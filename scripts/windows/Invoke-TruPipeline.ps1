@@ -493,6 +493,9 @@ $steps = @{
         # 2026-11-09 uiinit: byte order of UI element init words (userTypes 301 / 303 / 316 / 320) proven on generalbank
         # Xbox <-> PC (exit 1 on a contradiction or another count than pinned)
         @('tools\ui_init_fix.py', 'proof'),
+        # 2026-11-11 (Q58): the twin Symbol entries the converter reads (docs/data/symbol_twins.json) re-derive from the
+        # base pairs (exit 1 when they differ or a twin vote disagrees with the learned base map)
+        @('tools\symbol_twins.py', 'check'),
         # 2026-11-10 K-5b playerblock: byte order of the player data block (DTP +0xc8, PC [0xfad764]) on five base
         # player pairs, leave-one-out (exit 1 on a contradicting word or a READERS order the pairs do not allow)
         @('tools\player_block_fix.py', 'proof'),
@@ -502,6 +505,9 @@ $steps = @{
         @('tools\ui_text_init_scan.py', $fix1),
         @('tools\converter_faults_fix.py', 'check', $fix1, '--report', $chk1),
         @('tools\script_clash_fix.py', 'check', $fix1, '--report', $clash1),
+        # 2026-11-11 (Q58): Symbol paths in script init data resolve on PC to the member / function the Xbox path names
+        # (exit 1 on a wrong or unresolved element; the converter writes them as two Symbols since Q58)
+        @('tools\script_path_check.py', 'scan', $fix1, '--report', ((Split-Path -Parent $fix1) + '/script_path_check.json')),
         @('tools\dlc_struct_fixes.py', 'check', $fix1, '--report', $obj1),
         # DLC 1 = pack10 first, the same Xbox sources as dlc_fixes_build without --pack
         @('tools\soundplex_sequence_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $seq1),
@@ -522,6 +528,7 @@ $steps = @{
         @('tools\vo_lang_variants.py', 'build', $fix2, 'pack11'),
         @('tools\converter_faults_fix.py', 'check', $fix2, '--pack', 'pack11', '--report', $chk2),
         @('tools\script_clash_fix.py', 'check', $fix2, '--report', $clash2),
+        @('tools\script_path_check.py', 'scan', $fix2, '--pack', 'pack11', '--report', ((Split-Path -Parent $fix2) + '/script_path_check.json')),
         @('tools\dlc_struct_fixes.py', 'check', $fix2, '--pack', 'pack11', '--report', $obj2),
         @('tools\soundplex_sequence_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $seq2),
         @('tools\navgraph_raw_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $nav2),

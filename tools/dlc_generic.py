@@ -69,6 +69,7 @@ class DlcIds:
     DLC_SYM_SHIFT = 480
     SYM_CALIBRATION = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'data',
                                    'b138_symbol_calibration.json')
+    SYM_TWINS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'data', 'symbol_twins.json')
 
     def _sym_setup(self):
         m = self.base.get(SYM, {})
@@ -87,12 +88,31 @@ class DlcIds:
             self.sym_extra = {int(a): b for a, b in d.items() if int(a) not in m}
             if os.environ.get('TRUDLC_SYM_EXTRA'):
                 print('symbol map: %d extra exact-only entries from %s' % (len(self.sym_extra), extra), flush=True)
+        # Q58 (2026-11-11): Symbols whose PC name the declaration-order twins of the base script pairs prove
+        # (tools/symbol_twins.py -> docs/data/symbol_twins.json; script_member_pairs.align): exact entries after the
+        # learned map, before the calibration and every guess. TRUDLC_SYM_TWINS = another JSON file, or 'off' for none.
+        # Calibration entries naming a twin's PC Symbol are dropped (two Xbox Symbols must not share one PC name);
+        # the twins' PC Symbols join the collision set, so a guess never takes one (-> 40000 + Xbox, stays unique).
+        self.sym_twins = {}; self.sym_extra_dropped = 0
+        tw = os.environ.get('TRUDLC_SYM_TWINS') or self.SYM_TWINS
+        if tw != 'off' and not os.path.exists(tw):
+            raise SystemExit('symbol twins not found: %s (TRUDLC_SYM_TWINS=%s; "off" disables them; build: '
+                             'tools/symbol_twins.py build)' % (tw, os.environ.get('TRUDLC_SYM_TWINS', '')))
+        if tw != 'off':
+            d = json.load(open(tw, encoding='utf-8'))
+            d = d.get('symbols', d)
+            self.sym_twins = {int(a): b for a, b in d.items() if int(a) not in m}
+            tv = set(self.sym_twins.values())
+            drop = [a for a, b in self.sym_extra.items() if b in tv and a not in self.sym_twins]
+            for a in drop: del self.sym_extra[a]
+            self.sym_extra_dropped = len(drop)
         self.sks = sorted(m)
-        self.sused = set(m.values())
+        self.sused = set(m.values()) | set(self.sym_twins.values())
         self.xs_max = max(m); self.ps_max = max(max(m.values()), self.PC_SYM_MAX)
         self.sym_shift = self.DLC_SYM_SHIFT if self.DLC_SYM_SHIFT is not None else self.ps_max - self.xs_max
         self.sym_info = dict(mapped=len(m), xbox_max=self.xs_max, pc_max=self.ps_max, shift=self.sym_shift,
                              collision_base=40000, extra_entries=len(self.sym_extra))
+        if self.sym_twins: self.sym_info.update(twin_entries=len(self.sym_twins), extra_dropped=self.sym_extra_dropped)
         self.sym_stats = collections.Counter()
 
     def sym(self, xs):
@@ -101,6 +121,7 @@ class DlcIds:
         guessed from the lower neighbour's offset; a guess that would hit an existing PC symbol -> 40000+xs."""
         m = self.base[SYM]
         if xs in m: self.sym_stats['mapped'] += 1; return m[xs]
+        if xs in self.sym_twins: self.sym_stats['twin'] += 1; return self.sym_twins[xs]
         if xs in self.sym_extra: self.sym_stats['extra'] += 1; return self.sym_extra[xs]
         if xs == 0 or xs == 0xffff: self.sym_stats['null'] += 1; return xs
         if xs > self.xs_max: self.sym_stats['dlc_new_shift'] += 1; return xs + self.sym_shift

@@ -90,16 +90,56 @@ def train(pairs, ids, T=None):
             T.add(lab + ('~' + _shape(xw),), cs)        # most specific level: value shape (prefixes = plain label)
     return T
 
+PATH_BT = (0xa, 0xb)        # base types whose member hands a ScriptType on to the next path element (tru.exe 0x4c8420)
+
+
+def path_words(xd, W, e='be'):
+    """Symbol path words {u16 member, u16 property} in the init data of one script (Q58, 2026-11-11): an init leaf
+    (members / args / locals, script_init_from_pc.leaves) whose high half names a member of this script of base type
+    0xa / 0xb and whose low half is neither 0 nor 0xffff. tru.exe resolves such paths BY NAME, two u16 Symbols in
+    memory order (0x4d08e0: word [path + 2 * i]); proof on the re-authored base pairs generalbank + g_pda (Xbox <-> PC,
+    members by script_member_pairs.align, work/q58_names_1111/base_path_proof.py): 1 846 path words, the PC keeps both
+    halves in memory order in 1 844 (2 = the PC re-pointed 3347's path to another member), the property half = DlcIds.sym
+    in 1 846 / 1 846. The learned per-label classes made 296 of 356 DLC path words s32 (byte-reversed, names unmapped:
+    g_pda 3347 / 3360 / 3361 / ..., generalbank 72 copy in dlc1_health_pack; tools/script_path_check.py). -> set of
+    word offsets, converted as id16ab:100. TRUDLC_SCRIPT_PATHS=off restores the learned classes (A/B runs)."""
+    import script_init_from_pc as SIP
+    E = '>' if e == 'be' else '<'
+    obj = set()
+    for nm, t, n, sz in W.arrays:
+        if nm == 'members' and sz == 20:
+            for k in range(n):
+                a = t + 20 * k
+                if a + 16 <= len(xd) and struct.unpack_from(E + 'I', xd, a)[0] & 0xf in PATH_BT:
+                    obj.add(struct.unpack_from(E + 'H', xd, a + 14)[0])
+    obj.discard(0); obj.discard(0xffff)
+    out = set()
+    if not obj: return out
+    for nm, t, n, sz in W.arrays:
+        if nm not in ('members', 'args', 'locals') or sz != 20: continue
+        for k in range(n):
+            ia = W.it.get(t + 20 * k + 16)
+            if ia is None: continue
+            for _, o in SIP.leaves(W, W.it, ia):
+                if o + 4 > len(xd): continue
+                a, b = struct.unpack_from(E + 'HH', xd, o)
+                if a in obj and b not in (0, 0xffff): out.add(o)
+    return out
+
+
 def convert(xd, rel, ids, T, fallback=None, W=None):
-    """xd: Xbox section data, rel: parsed BE reloc. fallback(w, xw) -> class for words the walker did not label."""
+    """xd: Xbox section data, rel: parsed BE reloc. fallback(w, xw) -> class for words the walker did not label.
+    Symbol path words (path_words) are converted as two Symbols (id16ab:100) whatever the label table says."""
     W = W or S.walk(xd, rel)
     out = bytearray(xd)
     skip = set(rel.pointer_offsets()) | set(rel.id_offsets())
+    paths = path_words(xd, W) if os.environ.get('TRUDLC_SCRIPT_PATHS', '').lower() != 'off' else set()
     for w in range(0, len(xd) // 4 * 4, 4):
         if w in skip: continue
         xw = xd[w:w + 4]
         lab = W.lab.get(w)
-        if lab is not None: c = T.best(lab + ('~' + _shape(xw),))
+        if w in paths: c = 'id16ab:100'
+        elif lab is not None: c = T.best(lab + ('~' + _shape(xw),))
         elif fallback is not None: c = fallback(w, xw)
         else: c = 'raw' if G.is_text(xw) and xw != xw[::-1] else 's32'
         out[w:w + 4] = apply_word(xw, c, ids)
