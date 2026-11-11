@@ -8,3 +8,4 @@
 tools/native_test/probes/*.bin | synthetic | hand-made D3D9 ps_3_0 token streams (header ffff0300, dcl/def, one to three instructions, end 0000ffff; the slot probes repeat 9-11 distinct words up to 32769 slots); test inputs of the native D3D9 test (tools/native_test/README.md), no shader of the game
 src/asi/third_party/imgui/* | third-party | Dear ImGui 1.91.9 (MIT, LICENSE.txt next to it): CJK glyph-range offset tables, CRC32 tables and the compressed ProggyClean font that ship with ImGui
 src/asi/third_party/stb/* | third-party | stb_image (public domain / MIT, LICENSE.txt next to it): DEFLATE default code-length tables
+work/q89_skeleton_1111/skeleton_map.txt | own | Q89 analysis output: lists of bone indices (0..197, e.g. "unmapped target: [6, 7, 8, ...]") computed by work/q89_skeleton_1111/skeleton_map.py from mesh bone counts - enumerations, no bytes of a game file; flagged 2026-11-11 as "byte array 176 values"
