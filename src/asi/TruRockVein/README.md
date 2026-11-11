@@ -295,6 +295,61 @@ extracted); every vertical pole (types 4 / 5) and pillar (15) markup is a candid
 | 3 | the same jump with `LogLevel=2`, then set `[JumpTarget] Translate=0` in the ini while the game runs, jump again | "switch [JumpTarget] Translate 1 -> 0"; the case count stops growing (PC path); 1 again switches back |
 | 4 | ledge jumps, horizontal poles, DLC 2 rock veins | no change, no case line for horizontal segments, no crash |
 
+## 0.13: edge check as the title update (2026-11-11, Q62)
+
+Published TU fix (TeamXbox 09.03.2009): "Improved Lara's edge detection". Located in code by 17w (ENGINE.md section
+14 "Edge probe", `docs\Befund-17w-TU-Fixes-0811.md` row 3); translated 1:1 here (Q62, statically proven,
+`work\q62_edges_1111\`, finding `docs\Befund-Kantenerkennung-Q62-1111.md` in the workspace). A base-game change: it
+works in every level, not only in the DLCs.
+
+`PhysicsCheckEdgesAndWalls` (PC tru+0x1d7fa0 = retail 0x82298780 = TU 0x82294f90; one caller, tru+0x3002d0) casts
+horizontal line probes around Lara and keeps the best edge. Lara's tuning (`[0xfad764]`, all five base player objects,
+Xbox = PC): probe count +0x600 = **1** (one probe at Lara's heading, step pi), flags +0x628 = 0xc000 - bit 0x4000 is
+set, so there is always the extra slot i = -1 for the left-stick direction. The TU changed two things:
+
+| | retail / PC | title update | switch |
+|---|---|---|---|
+| stick probe | i = -1 always; the stick direction is merged into the fan in angle order (fan shifted by one step until it is reached), **also with the stick at rest** (direction then from whatever the stick's angle field +0xc holds, 0x6eba90) - 0x5d84ad..0x5d865c | only when the stick magnitude `[[0xfadfb0]+0xb0]+0x18` > **0.1** (TU +0x4cc, `[0x82051c40]` = 0x3dcccccd); i = -1 is its own probe at the stick direction, skipped when `((first - step - stick) / 2pi - floor) * 2pi < 0.1` (TU +0x5a4..+0x5f8; 0x3e22f983, floor 0x8268b7a0, 0x40c90fdb); every i >= 0 = first + i * step | `[LedgeProbe] Translate` |
+| best edge | best score from **0.0**, a candidate wins only with score **>** best (the first of equal ones) - 0x5d80dc, 0x5d9751..0x5d975f | best from **-1.0** (`[0x82052664]` = 0xbf800000, TU +0xc0), a candidate wins unless score **<** best (TU +0x14bc `blt`: the later of equal ones) | `[LedgeProbe] BestEdge` |
+
+The score is a dot product with the stick direction (stick pushed) or Lara's facing (TU / PC `vdot3fp128 ..., v119`):
+on the PC an edge with score <= 0 (beside / behind that direction) is never taken; on the TU it is, if nothing better
+is found.
+
+Hooks (all bytes checked before patching, 10 checks): **0x5d84ad** (5 bytes `mov eax,[0xfad764]`; `ProbeSetupStub`
+runs the setup to 0x5d84cc itself: start index, mode byte `[S+64h]` = 2 for a title-update pass, best score -1),
+**0x5d8596** (5 bytes `cmp byte [esp+64h],0`; `ProbeLoopStub`: PC pass unchanged; title-update pass: i >= 0 = the PC's
+own fan angle without merge, i = -1 = `ProbeStick` -> probe at 0x5d8660 or skip to the loop end 0x5d983b with one x87
+value, as the PC's own 0x5d988c), **0x5d975c** (9 bytes `test ah,5 / jp 0x5d9839`; `ProbeBestStub`: `test ah,45h`).
+Registers, xmm0-7 and the x87 stack are kept.
+
+Keyboard: the magnitude comes from the same move actions 0 / 1 for pad and keyboard (0x7137f6 / 0x713825 -> 0x706660
+-> 0x706540: per-axis response curve 0x702690, magnitude `min(sqrt(x^2 + y^2), 1)` -> +0x18). A digital key gives 0 or
+a full axis, so "magnitude > 0.1" then means "a move key is held"; which value a key writes into its action was not
+traced to the key level - the log line "stick magnitude ..." shows it in test 2.
+
+Options: `[LedgeProbe] Translate` and `BestEdge` (default 1, in the sample ini; both 0 at the start = nothing patched,
+else read again at run time at most once a second; TruMenu page Fixes rows "live"). Log lines: "edge probe:
+title-update edge check added (tru+0x1d7fa0 = TU 0x82294f90; hooks 0x005d84ad / 0x005d8596 / 0x005d975c; ...)" at
+load; then once each (at `LogLevel=2` every power of two): "edge probe: stick magnitude M > 0.1 - stick direction A as
+its own probe i = -1", "edge probe: title-update stick probe at A ...", "edge probe: stick at rest (magnitude M <=
+0.1) - title update: no stick probe, PC: ...", "edge probe: stick probe skipped, D rad from ...", "edge probe: stick
+magnitude M (> 0, <= 0.1) - no stick probe" (analogue stick only), "best edge: title-update rule took an edge the PC
+rule refuses (... score <= 0: n, tie: m)", "live: [LedgeProbe] Translate a -> b". Error: "edge check at ... does not
+match - title-update edge probe not added". Built 2026-11-11 into `work\asi\rv13` (install: `Set-TruRockVein.ps1
+-Install -SourceDir work\asi\rv13`), not loaded, not tested in the game.
+
+**TO TEST (0.13)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | start the game with 0.13 installed | `TruRockVein.log`: "TruRockVein 0.13 loaded ..." and "edge probe: title-update edge check added ... Translate 1 ..., BestEdge 1 ..." |
+| 2 | any base-game level with climbing (e.g. the first ledges of Coastal Thailand): run and jump at a ledge **with the stick / a move key held towards it**; once with the pad, once with the keyboard | Lara grabs as before; log once "edge probe: stick magnitude M > 0.1 - stick direction ... as its own probe" and "title-update stick probe at ..." - note M for the keyboard (answers the keyboard question) |
+| 3 | stand under / next to a ledge and jump straight up, or let go of a ledge, **without touching the stick** | log once "edge probe: stick at rest (magnitude 0.0000 <= 0.1) - title update: no stick probe ..."; Lara catches edges in front of her as before, no grab towards an old stick direction |
+| 4 | jumps where Lara used to miss a ledge beside her or slightly behind the stick direction (side jumps along a wall, jumps at a corner; Steam names "Thors Grube" - not checked) | more grabs than with 1.1; with `LogLevel=2` "best edge: title-update rule took an edge the PC rule refuses" counts them |
+| 5 | the same spot with `[LedgeProbe] Translate=0`, then `BestEdge=0` (live: TruMenu Fixes or the ini) | "live: [LedgeProbe] ..." line, then the PC behaviour; both 0 at the start: "... not patched" |
+| 6 | DLC 2 rock veins, ledge corners (0.11), general climbing for a while | no change elsewhere, no crash |
+
 ## Build, install, remove
 
 - Build: `scripts\windows\Build-TruAsi.ps1 -Name TruRockVein` (installed Visual Studio, x86, `/MT`, imports only
@@ -305,7 +360,8 @@ extracted); every vertical pole (types 4 / 5) and pillar (15) markup is a candid
   `LogDefaultConditions`, `MarkupTypes`, `MarkupSlots`, `NullBoxGuard`, `MarkupAction608`, `AttachGeometry`,
   `State420Slot1`, `ChartLog` (`ChartLogFrom` / `ChartLogTo`), `JumpGeometry`, `SkipGeometry` (0.9) - the switches from
   `MarkupTypes` on default to 1, the chart range to 1470..1510; section `[SweepAndPrune]`: `Translate` (0.10, default 1,
-  read at the game start); section `[LedgeCorner]`: `Translate` (0.11, default 1); section `[JumpTarget]`: `Translate`
+  read at the game start); section `[LedgeCorner]`: `Translate` (0.11, default 1); section `[LedgeProbe]`: `Translate`,
+  `BestEdge` (0.13, default 1, read again at run time); section `[JumpTarget]`: `Translate`
   (0.12, default 1, read again at run time when 1 at the start). Log:
   `TruRockVein.log` next to `tru.exe`.
 

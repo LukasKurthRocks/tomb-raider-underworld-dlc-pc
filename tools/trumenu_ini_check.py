@@ -1777,6 +1777,8 @@ SW_LIVE = {
     ('TruShadowPower', 'Meter', 'Infinite'): 'void InfiniteReadSwitch(',             # 0.23 (N2, 2026-11-10)
     ('TruShadowPower', 'Camera', 'Trace'): 'void CamTraceReadSwitch(',               # 0.25 (camera trace, 2026-11-11)
     ('TruShadowPower', 'Camera', 'TraceInterval'): 'void CamTraceReadSwitch(',
+    ('TruRockVein', 'LedgeProbe', 'Translate'): 'void ProbeLiveRead(',             # 0.13 (Q62, 2026-11-11)
+    ('TruRockVein', 'LedgeProbe', 'BestEdge'): 'void ProbeLiveRead(',
     ('TruMercLang', 'MercLang', 'Enabled'): 'void PollIni(',
     ('TruMercLang', 'MercLang', 'Language'): 'void PollIni(',
     # TruQoL 0.1.1 (17y): LiveTick (game thread, once a second after a change of the file time) -> LiveReadOptions

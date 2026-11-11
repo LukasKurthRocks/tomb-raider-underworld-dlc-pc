@@ -152,6 +152,28 @@
 // to tru+0x2fa865. Option [JumpTarget] Translate (default 1): 0 at the start = nothing patched; else read again at
 // run time at most once a second when the general case runs (0 = PC path). Log line on the first TU case, at LogLevel
 // 2 every power of two; first negative t and first "no target" case once each.
+//
+// 0.13 (2026-11-11, Q62; docs Befund-17w-TU-Fixes-0811 row 3, Befund-Kantenerkennung-Q62-1111; ENGINE.md section 14
+// "Edge probe"): the title update's edge probe (published fix "ledge detection"). PhysicsCheckEdgesAndWalls PC
+// tru+0x1d7fa0 = retail 0x82298780 = TU 0x82294f90. Probe fan: count tuning [0xfad764]+0x600, step [S+0A4h], first
+// angle [S+0E8h], index i [S+68h] (S = the function's frame); with tuning +0x628 bit 0x4000 the loop starts at i = -1
+// (one extra probe for the stick direction [S+0ECh], magnitude [[0xfadfb0]+0xb0]+0x18). The TU changed two things:
+//   1. stick probe   retail / PC: i = -1 whenever the bit is set; the stick direction is merged into the fan at the
+//                    first fan angle within one step below it, the fan shifted by one step until then - even with the
+//                    stick at rest (0x5d8596..0x5d865c, flag [S+64h] / [S+63h]).
+//                    TU: i = -1 only when magnitude > 0.1 (TU +0x4cc..+0x4dc, [0x82051c40] = 0x3dcccccd); i = -1 is
+//                    its own probe at the stick direction, skipped when d = ((a - stick) / 2pi - floor(..)) * 2pi
+//                    < 0.1 with a = first - step (TU +0x5a4..+0x5f8: 0x3e22f983, floor 0x8268b7a0 + frsp,
+//                    0x40c90fdb); every i >= 0 probes first + i * step, no merge, no shift.
+//   2. best edge     retail / PC: best score starts at 0.0 and a candidate wins only when score > best (first of equal
+//                    wins; 0x5d80dc, 0x5d9751..0x5d975f). TU: best starts at -1.0 (f20 = [0x82052664] = 0xbf800000,
+//                    TU +0xc0) and a candidate wins unless score < best (TU +0x14bc blt: last of equal wins).
+// Hooks: tru+0x1d84ad (5 bytes `mov eax,[0xfad764]`, ProbeSetupStub runs the setup to 0x5d84cc itself), tru+0x1d8596
+// (5 bytes `cmp byte [esp+64h],0`, ProbeLoopStub: mode byte [S+64h] = 2 = title-update pass; i = -1 -> ProbeStick,
+// skip = fldz + 0x5d983b (the loop's i++ with one x87 value, as 0x5d988c), probe = 0x5d8660; i >= 0 -> ZF = 1 and
+// back to 0x5d859b = the PC's own fan angle), tru+0x1d975c (9 bytes `test ah,5 / jp`, ProbeBestStub). Options
+// [LedgeProbe] Translate (1.) and BestEdge (2.), default 1: both 0 at the start = nothing patched; else read again
+// at run time at most once a second (in the setup hook). Log lines on the first case of each kind.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -324,6 +346,10 @@ int g_sapTranslate = 1;                 // 0.10: SweepAndPrune limits as the TU 
 int g_ledgeCorner = 1;                  // 0.11: TU ledge-corner nudge (TU 0x8242eeac) ([LedgeCorner] Translate)
 int g_jumpTarget = 1;                   // 0.12: TU jump targets on vertical segments ([JumpTarget] Translate, at the start)
 char g_iniPath[MAX_PATH];               // 0.12: TruRockVein.ini, for the run-time re-read of [JumpTarget] Translate
+int g_probeTranslate = 1;               // 0.13: TU stick probe of the edge check ([LedgeProbe] Translate, live)
+int g_probeBest = 1;                    // 0.13: TU best-edge rule of the edge check ([LedgeProbe] BestEdge, live)
+char g_probeIni[MAX_PATH];              // 0.13: TruRockVein.ini for the run-time re-read of [LedgeProbe]
+FILETIME g_probeIniTime;
 DWORD g_facingNext = kFacingNext, g_facingEdge = kFacingEdge, g_moveNext = kMoveNext, g_moveWall = kMoveWall;
 DWORD g_chartTickNext = kChartTickNext;
 volatile LONG g_facingHits = 0, g_moveHits = 0, g_slot1Calls = 0, g_slot1Runs = 0, g_chartLines = 0;
@@ -609,6 +635,11 @@ void ReadOptions(const char *dir) {
     g_ledgeCorner = GetPrivateProfileIntA("LedgeCorner", "Translate", 1, ini);      // 0.11
     g_jumpTarget = GetPrivateProfileIntA("JumpTarget", "Translate", 1, ini);        // 0.12
     strncpy_s(g_iniPath, sizeof(g_iniPath), ini, _TRUNCATE);
+    g_probeTranslate = GetPrivateProfileIntA("LedgeProbe", "Translate", 1, ini);    // 0.13
+    g_probeBest = GetPrivateProfileIntA("LedgeProbe", "BestEdge", 1, ini);          // 0.13
+    strncpy_s(g_probeIni, sizeof(g_probeIni), ini, _TRUNCATE);
+    WIN32_FILE_ATTRIBUTE_DATA attr;
+    if (GetFileAttributesExA(ini, GetFileExInfoStandard, &attr)) g_probeIniTime = attr.ftLastWriteTime;
 }
 
 // 0.3: the title update's markup types 22 / 23 -> flag class 1 (Xbox TU 0x822a12e8 table entries 21 / 22 = li r3,1).
@@ -1852,6 +1883,276 @@ void PatchJumpTarget() {
     }
 }
 
+// ---- 0.13: title-update edge probe (TU 0x82294f90 PhysicsCheckEdgesAndWalls: stick probe + best-edge rule) ----
+const DWORD kProbeFunc = 0x005d7fa0;
+const char *const kProbeFuncHex = "55 8bec 83e4f0 81ec34030000";
+// fldz; [S+130h] = edi; fst [S+0C8h]; [S+138h] = edi; fstp [S+13Ch] (best score = 0.0)
+const DWORD kProbeInit = 0x005d80c5;
+const char *const kProbeInitHex = "d9ee 89bc2430010000 d99424c8000000 89bc2438010000 d99c243c010000";
+// stick direction -> [S+0ECh] (0x6eba90, ecx = FilteredInput + 0x50), magnitude [[0xfadfb0]+0xb0]+0x18 > 0
+const DWORD kProbeStick = 0x005d837b;
+const char *const kProbeStickHex = "8b0db0dffa00 818c24a000000000001000 83c150 e8fc361100 d99c24ec000000 "
+                                   "8b15b0dffa00 d9ee 8b82b0000000 d85018";
+// setup 0x5d84ad..0x5d84cc: eax = tuning, edx = start index, [S+64h] = merge flag
+const DWORD kProbeSetup = 0x005d84ad;
+const char *const kProbeSetupHex = "a164d7fa00 33d2 66f780280600000040 c644246400 7408 c644246401 83caff 8b4c2448";
+const DWORD kProbeSetupNext = 0x005d84cc;
+// fan: [S+0A4h] step (0x5d84f7 / 0x5d851f / 0x5d8539 / 0x5d8552), [S+0E8h] first angle, [S+68h] = edx = i
+const DWORD kProbeFan = 0x005d8563;
+const char *const kProbeFanHex = "0fbfc0 d99c24e8000000 3bd0 c644246300 89542468 0f8d0e130000";
+// loop head 0x5d8596: flag test, angle i * step + first -> [S+20h], je 0x5d8660 when the flag is 0
+const DWORD kProbeLoop = 0x005d8596;
+const char *const kProbeLoopHex = "807c246400 db442468 d88c24a4000000 d88424e8000000 d95c2420 0f84a9000000 "
+                                  "807c246300 0f859e000000 d98424ec000000";
+const DWORD kProbeLoopNext = 0x005d859b;
+const DWORD kProbeAngle = 0x005d8660;     // fld [S+20h]; call 0x813420 (x87 stack empty)
+const char *const kProbeAngleHex = "d9442420 e8b7ad2300";
+const DWORD kProbeContinue = 0x005d983b;  // i++ / loop test (one x87 value on the stack, popped at 0x5d8594)
+const char *const kProbeContinueHex = "8b1564d7fa00 8b442468 0fbf8a00060000 83c001 3bc1 89442468 0f8c39edffff";
+// best edge: fld [S+13Ch]; fcomp st(1) (st1 = score); fnstsw ax; test ah,5; jp 0x5d9839 (skip); next 0x5d9765
+const DWORD kProbeBestCheck = 0x005d9751;
+const char *const kProbeBestHex = "d984243c010000 d8d9 dfe0 f6c405 0f8ad4000000 807c242700";
+const DWORD kProbeBest = 0x005d975c;
+const DWORD kProbeBestAccept = 0x005d9765, kProbeBestSkip = 0x005d9839;
+const DWORD kFilteredInput = 0x00fadfb0;  // TU 0x829ca64c
+const DWORD kPlayerTuning = 0x00fad764;
+const DWORD kTuProbeMin = 0x3dcccccd;     // TU f21 = [0x82051c40] = 0.1f: magnitude gate and angle gate
+const DWORD kTuInvTwoPi = 0x3e22f983;     // TU f18 = [0x8207d6d8] = 1 / 2pi
+const DWORD kTuTwoPi = 0x40c90fdb;        // TU [0x82052754] = 2pi
+const DWORD kTuBestStart = 0xbf800000;    // TU f20 = [0x82052664] = -1.0f
+DWORD g_probeSetupNext = kProbeSetupNext, g_probeLoopNext = kProbeLoopNext, g_probeAngle = kProbeAngle;
+DWORD g_probeContinue = kProbeContinue, g_probeBestAccept = kProbeBestAccept, g_probeBestSkip = kProbeBestSkip;
+int g_probeResult = 0;                  // ProbeStick: 1 = probe the stick direction, 0 = skip (game thread only)
+int g_bestPass = 0;                     // BestEdge latched for the current call (set in ProbeSetup)
+DWORD g_probeTick = 0;
+volatile LONG g_probeStickOn = 0, g_probeStickOff = 0, g_probeStickRuns = 0, g_probeGateSkips = 0;
+volatile LONG g_bestLow = 0, g_bestTie = 0;   // ProbeBestStub: accepts the PC rule refuses (score <= 0 / tie)
+LONG g_bestLowLogged = 0, g_bestTieLogged = 0;
+int g_magSmallLogged = 0;
+
+void ProbeLiveRead() {
+    DWORD now = GetTickCount();
+    if (now - g_probeTick < 1000) return;
+    g_probeTick = now;
+    WIN32_FILE_ATTRIBUTE_DATA attr;
+    if (!g_probeIni[0] || !GetFileAttributesExA(g_probeIni, GetFileExInfoStandard, &attr)) return;
+    if (CompareFileTime(&attr.ftLastWriteTime, &g_probeIniTime) == 0) return;
+    g_probeIniTime = attr.ftLastWriteTime;
+    int t = GetPrivateProfileIntA("LedgeProbe", "Translate", g_probeTranslate, g_probeIni);
+    int b = GetPrivateProfileIntA("LedgeProbe", "BestEdge", g_probeBest, g_probeIni);
+    if (t != g_probeTranslate) Log(1, "live: [LedgeProbe] Translate %d -> %d", g_probeTranslate, t);
+    if (b != g_probeBest) Log(1, "live: [LedgeProbe] BestEdge %d -> %d", g_probeBest, b);
+    g_probeTranslate = t;
+    g_probeBest = b;
+}
+
+float StickMagnitude() {
+    BYTE *fi = *reinterpret_cast<BYTE **>(kFilteredInput);
+    if (!fi) return 0.0f;
+    BYTE *stick = *reinterpret_cast<BYTE **>(fi + 0xb0);
+    return stick ? *reinterpret_cast<float *>(stick + 0x18) : 0.0f;
+}
+
+// tru+0x5d84ad, frame S: returns the start index (edx), writes the mode byte [S+64h] and the best-score start
+int __cdecl ProbeSetup(BYTE *frame) {
+    ProbeLiveRead();
+    if (g_bestLow != g_bestLowLogged || g_bestTie != g_bestTieLogged) {
+        LONG low = g_bestLow, tie = g_bestTie;
+        if ((LogNow(low) && low != g_bestLowLogged) || (LogNow(tie) && tie != g_bestTieLogged))
+            Log(1, "best edge: title-update rule took an edge the PC rule refuses (TU 0x8229644c blt; score <= 0: %ld, "
+                   "tie: %ld)", low, tie);
+        g_bestLowLogged = low;
+        g_bestTieLogged = tie;
+    }
+    BYTE *tuning = *reinterpret_cast<BYTE **>(kPlayerTuning);
+    const bool bit = (*reinterpret_cast<WORD *>(tuning + 0x628) & 0x4000) != 0;   // PC 0x5d84b4
+    g_bestPass = g_probeBest;
+    if (g_bestPass) *reinterpret_cast<DWORD *>(frame + 0x13c) = kTuBestStart;      // TU +0xc0 stfs f20,0x120(r1)
+    if (!g_probeTranslate) {                // the PC setup 0x5d84b2..0x5d84c9
+        frame[0x64] = bit ? 1 : 0;
+        return bit ? -1 : 0;
+    }
+    frame[0x64] = 2;                        // ProbeLoopStub: title-update pass
+    if (!bit) return 0;                     // TU +0x4c8 beq (r10 stays 0)
+    const float mag = StickMagnitude();     // TU +0x4cc..+0x4d4 [[0x829ca64c]+0xb0]+0x18
+    if (mag <= TuFloat(kTuProbeMin)) {      // TU +0x4d8 fcmpu / +0x4dc ble: no stick probe (unordered -> probe)
+        LONG n = InterlockedIncrement(&g_probeStickOff);
+        if (mag > 0.0f && !g_magSmallLogged) {
+            g_magSmallLogged = 1;
+            Log(1, "edge probe: stick magnitude %.4f (> 0, <= 0.1) - no stick probe (the PC probes it)",
+                static_cast<double>(mag));
+        }
+        if (LogNow(n))
+            Log(1, "edge probe: stick at rest (magnitude %.4f <= 0.1) - title update: no stick probe, PC: stick "
+                   "direction merged into the fan (%ld passes)", static_cast<double>(mag), n);
+        return 0;
+    }
+    LONG n = InterlockedIncrement(&g_probeStickOn);
+    if (LogNow(n))
+        Log(1, "edge probe: stick magnitude %.4f > 0.1 - stick direction %.4f as its own probe i = -1 (TU 0x82295534) "
+               "(%ld passes)", static_cast<double>(mag), static_cast<double>(*reinterpret_cast<float *>(frame + 0xec)), n);
+    return -1;
+}
+
+// i = -1 of a title-update pass (TU +0x5a0..+0x5f8): stick direction as the probe angle [S+20h] or skip
+void __cdecl ProbeStick(BYTE *frame) {
+    const float step = *reinterpret_cast<float *>(frame + 0xa4);
+    const float first = *reinterpret_cast<float *>(frame + 0xe8);
+    const float stick = *reinterpret_cast<float *>(frame + 0xec);
+    const float a = first - step;                                  // TU +0x5b8 fmadds (-1 * step + first)
+    const float x = (a - stick) * TuFloat(kTuInvTwoPi);            // TU +0x5c0 fsubs, +0x5c4 fmuls
+    const float fl = static_cast<float>(reinterpret_cast<FloorFn>(kFloor)(x));   // TU +0x5cc floor, +0x5d0 frsp
+    const float d = (x - fl) * TuFloat(kTuTwoPi);                  // TU +0x5dc fsubs, +0x5e0 fmuls
+    if (d < TuFloat(kTuProbeMin)) {                                // TU +0x5e4 fcmpu / +0x5e8 blt -> +0x1500 (i++)
+        g_probeResult = 0;
+        LONG n = InterlockedIncrement(&g_probeGateSkips);
+        if (LogNow(n))
+            Log(1, "edge probe: stick probe skipped, %.4f rad from the probe slot first - step (< 0.1, TU 0x82295578) "
+                   "(%ld skips)", static_cast<double>(d), n);
+        return;
+    }
+    *reinterpret_cast<float *>(frame + 0x20) = stick;              // TU +0x5ec / +0x5f8: angle = stick direction
+    g_probeResult = 1;
+    LONG n = InterlockedIncrement(&g_probeStickRuns);
+    if (LogNow(n))
+        Log(1, "edge probe: title-update stick probe at %.4f (fan first %.4f, step %.4f) (%ld probes)",
+            static_cast<double>(stick), static_cast<double>(first), static_cast<double>(step), n);
+}
+
+// tru+0x5d84ad: x87 stack empty; the PC setup's results in edx / [S+64h], eax = [0xfad764] as the original
+__declspec(naked) void ProbeSetupStub() {
+    __asm {
+        pushad
+        sub esp, 128
+        movdqu [esp], xmm0
+        movdqu [esp + 16], xmm1
+        movdqu [esp + 32], xmm2
+        movdqu [esp + 48], xmm3
+        movdqu [esp + 64], xmm4
+        movdqu [esp + 80], xmm5
+        movdqu [esp + 96], xmm6
+        movdqu [esp + 112], xmm7
+        lea eax, [esp + 160]                // S = esp at the hook (128 + pushad 32)
+        push eax
+        call ProbeSetup
+        add esp, 4
+        mov [esp + 148], eax                // pushad slot of edx (128 + 20)
+        movdqu xmm0, [esp]
+        movdqu xmm1, [esp + 16]
+        movdqu xmm2, [esp + 32]
+        movdqu xmm3, [esp + 48]
+        movdqu xmm4, [esp + 64]
+        movdqu xmm5, [esp + 80]
+        movdqu xmm6, [esp + 96]
+        movdqu xmm7, [esp + 112]
+        add esp, 128
+        popad
+        mov eax, dword ptr ds:[0FAD764h]    // the replaced instruction (0x5d84e4 reads eax)
+        jmp dword ptr [g_probeSetupNext]
+    }
+}
+
+// tru+0x5d8596 (loop head, x87 stack empty)
+__declspec(naked) void ProbeLoopStub() {
+    __asm {
+        cmp byte ptr [esp + 64h], 2
+        je tu
+        cmp byte ptr [esp + 64h], 0         // the replaced instruction (PC pass)
+        jmp dword ptr [g_probeLoopNext]
+    tu:
+        cmp dword ptr [esp + 68h], -1
+        je stick
+        cmp eax, eax                        // ZF = 1: the PC's own angle i * step + first, je 0x5d8660 (no merge)
+        jmp dword ptr [g_probeLoopNext]
+    stick:
+        pushad
+        sub esp, 128
+        movdqu [esp], xmm0
+        movdqu [esp + 16], xmm1
+        movdqu [esp + 32], xmm2
+        movdqu [esp + 48], xmm3
+        movdqu [esp + 64], xmm4
+        movdqu [esp + 80], xmm5
+        movdqu [esp + 96], xmm6
+        movdqu [esp + 112], xmm7
+        lea eax, [esp + 160]
+        push eax
+        call ProbeStick
+        add esp, 4
+        movdqu xmm0, [esp]
+        movdqu xmm1, [esp + 16]
+        movdqu xmm2, [esp + 32]
+        movdqu xmm3, [esp + 48]
+        movdqu xmm4, [esp + 64]
+        movdqu xmm5, [esp + 80]
+        movdqu xmm6, [esp + 96]
+        movdqu xmm7, [esp + 112]
+        add esp, 128
+        popad
+        cmp dword ptr [g_probeResult], 0
+        je skip
+        jmp dword ptr [g_probeAngle]        // probe [S+20h] = stick direction
+    skip:
+        fldz                                // the loop end expects one x87 value (as 0x5d988c)
+        jmp dword ptr [g_probeContinue]
+    }
+}
+
+// tru+0x5d975c: ah = FPU status of `fld [S+13Ch]; fcomp st(1)` (best vs score, score left in st0)
+__declspec(naked) void ProbeBestStub() {
+    __asm {
+        cmp dword ptr [g_bestPass], 0
+        je pc
+        test ah, 45h                        // TU blt: skip only when score < best (C0 = C2 = C3 = 0)
+        jz skip
+        test ah, 1                          // C0: best < score - the PC rule takes it as well (unless score <= 0)
+        jnz above
+        lock inc dword ptr [g_bestTie]
+    above:
+        ftst                                // score vs 0.0 (no pop; eax is reloaded after 0x5d9765)
+        fnstsw ax
+        test ah, 41h
+        jz accept
+        lock inc dword ptr [g_bestLow]
+    accept:
+        jmp dword ptr [g_probeBestAccept]
+    pc:
+        test ah, 5                          // the replaced instructions (PC rule: score > best)
+        jp skip
+        jmp dword ptr [g_probeBestAccept]
+    skip:
+        jmp dword ptr [g_probeBestSkip]
+    }
+}
+
+void PatchLedgeProbe() {
+    if (!g_probeTranslate && !g_probeBest) {
+        Log(1, "edge probe: [LedgeProbe] Translate=0 and BestEdge=0 at the start - PC edge check kept (not patched)");
+        return;
+    }
+    if (!HexBytesAt(kProbeFunc, kProbeFuncHex) || !HexBytesAt(kProbeInit, kProbeInitHex) ||
+        !HexBytesAt(kProbeStick, kProbeStickHex) || !HexBytesAt(kProbeSetup, kProbeSetupHex) ||
+        !HexBytesAt(kProbeFan, kProbeFanHex) || !HexBytesAt(kProbeLoop, kProbeLoopHex) ||
+        !HexBytesAt(kProbeAngle, kProbeAngleHex) || !HexBytesAt(kProbeContinue, kProbeContinueHex) ||
+        !HexBytesAt(kProbeBestCheck, kProbeBestHex) || !HexBytesAt(kFloor, kFloorHex)) {
+        Log(0, "edge check at 0x%08lx (sites 0x%08lx / 0x%08lx / 0x%08lx) does not match - title-update edge probe not "
+               "added", kProbeFunc, kProbeSetup, kProbeLoop, kProbeBest);
+        return;
+    }
+    BYTE best[9] = {0xe9, 0, 0, 0, 0, 0x90, 0x90, 0x90, 0x90};
+    DWORD rel = reinterpret_cast<DWORD>(&ProbeBestStub) - (kProbeBest + 5);
+    memcpy(best + 1, &rel, 4);
+    // the best-edge site first (g_bestPass is 0 until the setup hook runs), then the loop head, then the setup
+    if (WriteCode(kProbeBest, best, sizeof(best)) && WriteJump(kProbeLoop, &ProbeLoopStub, 5) &&
+        WriteJump(kProbeSetup, &ProbeSetupStub, 5))
+        Log(1, "edge probe: title-update edge check added (tru+0x1d7fa0 = TU 0x82294f90; hooks 0x%08lx / 0x%08lx / "
+               "0x%08lx; Translate %d = stick probe only above magnitude 0.1 and as its own probe, BestEdge %d = best "
+               "score from -1, ties to the later probe; both read again at run time)", kProbeSetup, kProbeLoop,
+            kProbeBest, g_probeTranslate, g_probeBest);
+    else
+        Log(0, "edge probe not (fully) written (VirtualProtect %lu)", GetLastError());
+}
+
 bool WriteDword(DWORD at, DWORD value) {
     DWORD old = 0, dummy = 0;
     if (!VirtualProtect(reinterpret_cast<void *>(at), 4, PAGE_READWRITE, &old)) return false;
@@ -1917,7 +2218,7 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruRockVein.log", dir);
     strncpy_s(g_dir, sizeof(g_dir), dir, _TRUNCATE);
     ReadOptions(dir);
-    Log(1, "TruRockVein 0.12 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
+    Log(1, "TruRockVein 0.13 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
         "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d, attach geometry %d, state 420 slot 1 %d, "
         "chart log %d, jump geometry %d, skip geometry %d, SweepAndPrune translate %d, ledge corner translate %d, "
         "jump target translate %d)",
@@ -1939,6 +2240,7 @@ void Start(HMODULE self) {
     if (g_skipGeometry) PatchSkipGeometry();
     PatchLedgeCorner();                     // 0.11 (logs Translate=0 itself)
     PatchJumpTarget();                      // 0.12 (logs Translate=0 itself)
+    PatchLedgeProbe();                      // 0.13 (logs Translate=0 / BestEdge=0 itself)
     if (!BytesAt(kDispatch, kDispatchBytes, sizeof(kDispatchBytes)) || !BytesAt(kDefault, kDefaultBytes, sizeof(kDefaultBytes)) ||
         !BytesAt(kExit, kExitBytes, sizeof(kExitBytes)) || !BytesAt(kCtxUse, kCtxUseBytes, sizeof(kCtxUseBytes))) {
         Log(0, "SCCondTest_MarkupType at 0x%08lx does not match (other tru.exe build?) - not patched", kDispatch);
@@ -1968,4 +2270,4 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
-extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.12 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update, ledge-corner nudge as the title update, jump targets on vertical segments as the title update)"; }
+extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.13 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update, ledge-corner nudge as the title update, jump targets on vertical segments as the title update, edge probe as the title update)"; }

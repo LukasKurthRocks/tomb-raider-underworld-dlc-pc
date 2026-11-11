@@ -2,7 +2,7 @@
 .SYNOPSIS
     Installs or removes TruRockVein.asi (DLC 2 rock veins: title-update markup conditions 607 / 608; since 0.10 also
     the title update's SweepAndPrune limits, since 0.11 its ledge-corner nudge, since 0.12 its jump targets on
-    vertical segments) next to tru.exe.
+    vertical segments, since 0.13 its edge probe) next to tru.exe.
 
 .DESCRIPTION
     -Install copies <workspace>\work\asi\TruRockVein.asi (built by Build-TruAsi.ps1) and its sample .ini into the
@@ -55,11 +55,13 @@ $earlierBuilds = @{
                           '66f80abb20e9ec6a74e2f3f6e933e8be2757ec70a870f03406197999cf55b29c',   # 0.8 jump geometry (work\asi_rv08)
                           'e7430050c8587e8d1a36f09fc8c2d7de4cb2738821e9732af00f1d6967234076',   # 0.9 skip geometry (work\asi_rv09, installed since 2026-11-02)
                           'c50d7a69ee4fe0ac15aceb9dde48315c6b5f6f2f3d646117620039b58a5ea1c8',   # 0.10 SweepAndPrune limits (work\asi\rv10)
-                          'e019de803b1ebb828cb05a07d11bf159cd792f8d7bc3e83b7fca1fc8be1535b0')   # 0.11 ledge-corner nudge (work\asi\rv11)
+                          'e019de803b1ebb828cb05a07d11bf159cd792f8d7bc3e83b7fca1fc8be1535b0',   # 0.11 ledge-corner nudge (work\asi\rv11)
+                          '4f385dac84cb3834c9826e6c7bb3bdcc6e9a4f62cf6f0b3a7cfc0f4d12c781e3')   # 0.12 jump targets (work\asi\rv12)
     'TruRockVein.ini' = @('89c0283b20a375253d38e6f53e77cfb7df10b0c036650c789564c629d3f227c1',
                           '1dbfc739c5f0646ba6a791eb1b77504927b74ab7b146d9ae8b71c0621113b19f',   # sample .ini of 0.8 (also 0.9; 0.10 adds [SweepAndPrune])
                           'a16fb9d9c5671be0a3ba44e3b719465b932ee7ab111286cac4a518dbec8b5c32',   # sample .ini of 0.10 (0.11 adds [LedgeCorner])
-                          'ec223baec6277c03619d04d075701c92c01a84da544b219016a245a30d509d66')   # sample .ini of 0.11 (0.12 adds [JumpTarget])
+                          'ec223baec6277c03619d04d075701c92c01a84da544b219016a245a30d509d66',   # sample .ini of 0.11 (0.12 adds [JumpTarget])
+                          '1d460eafa229946cb81a9e98dc2240d0a075483c87a60c5eb9702e25074942b6')   # sample .ini of 0.12 (0.13 adds [LedgeProbe])
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
