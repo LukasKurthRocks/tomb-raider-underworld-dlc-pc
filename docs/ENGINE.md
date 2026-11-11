@@ -407,6 +407,31 @@ Plugin: TruMenu 0.21.4 `fix.hall02` (only when no live 1004 thrall: tutorial 185
 **Hints** (text ids 5204-5210): hint_08 (5204) closed by 25 + 26 / 35-37; hint_09 by 28 / 35; hint_10 by 30; hint_11 by
 31; hint_12 by 32; hint_17 (5209) shown by 33, closed by 29 / 34 / 38; hint_18 by 27.
 
+**Which move closes hint_08** ✅ (logs 07.-10.11., `tools/hall02_tutorial_episodes.py`): `tutorial is 2` follows the
+first contact of a **kick record 759 / 760 / 761 / 762 (attack types 25 / 24 / 22 / 23)** after punches 752-755 (types
+18-21) by 0.36-0.84 s in 8 of 8 cases - shorter than the 1 s wait in 23101 f3, so the kick notification is sent at the
+move's start (inferred). Punches alone, the shadow attack 772 (type 27, states 1017 -> 244) and the shadow pull 775
+(type 26) never set it (4 of 4 stuck episodes; live 10.11. 22:08 = punches + 772 + 3 x 775, no kick). Scripts = Xbox, so
+this is TU behaviour; whether the pull sends a kick notification on the Xbox is not measured ⬜. Sender path: script
+message 0x394 -> 0x768a20 (`[msg+2] == 0x20`, id `[msg+4]`), pairs {0x394, 0x768a20} at .data 0x8b24ec / 0x8b2814.
+The TU also calls PlayNotification directly with 27 (0x823de9bc / 0x823dead0, lock-on) and 31 (0x823a3eb4); the PC
+has no such callers ⬜.
+
+**Generator 10028 spawn** (PC, static): messages 0x781730 - 0x1e6 Spawn(n, -1) 0x780eb0, 0x1e7 off / 0x1e9 on (+0x84
+bit 0), switch 0x23 restore (+0x7c expected children, +0x80 spawn counter), 0xba remove child 0x7815f0, 0xff 0x780cd0,
+0x100 add child 0x781690, 0x11c 0x780a20. The death enter 0x66c310 sends the script death event (0x4b0850) and then
+0xba to the parent generator (handle brain+0x4c4c). Spawn aborts on: +0x7c >= 0 and child count +0x70 != +0x7c; data
++0x5c bit 1 while the generator is drawn; player farther than 0.9 x data +0x54 / +0x58; **player within data +0x50
+(632.1) of the generator** (3D, 0x780b20); no spawn list; +0x70 >= max alive +0x30 or **+0x80 >= total +0x34 (7)**;
+object not in the generator's list; an object with flag 0x400000 (enemy, alive or dead) in a cylinder 600 wide /
++-316.05 high around the spawn point (0x655230 -> 0x6544f0); instance creation 0x780a90 fails. hall02 spawns at the
+generator in the pit (Xbox TruXenia (-1399.4, 6767.1, -1642.2), lands at (-602.8, 6767.1, -312.7); PC the same landing),
+so the two distance tests cannot see Lara or bodies on the floor. Script VM: op7d -> 0x57c830 -> 0x57c2f0 sets the
+state without comparing it with the current one; 0x57b560 starts the new state's Run, so `goto state 2` in state 2
+restarts f8 (inferred). Live: after the 1st tutorial death the next thrall came 4 of 4 times (2.8-3.7 s), after the 2nd
+**0 of 2** (07.11. 20:58, 10.11. 22:08) - cause open (counter +0x80 restored by 0x23? script state?) ⏳, finding
+`Befund-Yeti-Tutorial-1111.md` (workspace).
+
 ### 8.2 Other level-script knowledge
 
 | Topic | Fact | St |
