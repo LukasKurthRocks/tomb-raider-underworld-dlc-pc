@@ -164,6 +164,165 @@ function Get-Md5 {
     (Get-FileHash -LiteralPath $Path -Algorithm MD5).Hash.ToLower()
 }
 
+function Get-TruPlayerGuardRules {
+    <#
+    .SYNOPSIS
+        Loads the player-path guard rules docs\data\playerpath_guard.json (plan Spielerweg P0, gate G2).
+    .DESCRIPTION
+        The same rules tools\player_guard.py applies inside every Python tool process. Returns an object with
+        Version, Categories (Name, Action, Ws, Repo, Name regex lists), Allow (workspace-relative paths) and the
+        Repository / Workspace folders (lower case, forward slashes) the patterns are relative to.
+    .PARAMETER Repository
+        The repository folder (Get-TruWorkspacePath).Repository.
+    .EXAMPLE
+        $rules = Get-TruPlayerGuardRules -Repository $paths.Repository
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Repository)
+    $file = Join-Path $Repository 'docs\data\playerpath_guard.json'
+    $json = Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($json.schema -ne 1) { throw "player guard rules: schema $($json.schema), expected 1 ($file)" }
+    $cats = @()
+    foreach ($p in $json.categories.PSObject.Properties) {
+        $cats += [pscustomobject]@{
+            Name = $p.Name; Action = $p.Value.action
+            Ws = @($p.Value.ws | ForEach-Object { $_.ToLower() }); Repo = @($p.Value.repo | ForEach-Object { $_.ToLower() })
+            NameRx = @($p.Value.name)
+        }
+    }
+    $norm = { param($x) ([IO.Path]::GetFullPath($x) -replace '\\', '/').TrimEnd('/').ToLower() }
+    return [pscustomobject]@{
+        Version = $json.version; Categories = $cats
+        Allow = @($json.allow | ForEach-Object { $_.ws.ToLower() })
+        Repository = (& $norm $Repository); Workspace = (& $norm (Split-Path -Parent $Repository))
+    }
+}
+
+function Resolve-TruLinkPath {
+    <#
+    .SYNOPSIS
+        Full path with junctions / symbolic links resolved component by component (private helper).
+    #>
+    param([string]$Path)
+    $full = [IO.Path]::GetFullPath($Path)
+    $root = [IO.Path]::GetPathRoot($full)
+    $parts = $full.Substring($root.Length).Split([char[]]@('\', '/'), [StringSplitOptions]::RemoveEmptyEntries)
+    $cur = $root
+    foreach ($part in $parts) {
+        $cur = Join-Path $cur $part
+        $item = Get-Item -LiteralPath $cur -Force -ErrorAction SilentlyContinue
+        if ($item -and $item.LinkType -in 'Junction', 'SymbolicLink' -and $item.Target) {
+            $target = @($item.Target)[0]
+            if (![IO.Path]::IsPathRooted($target)) { $target = Join-Path (Split-Path -Parent $cur) $target }
+            $cur = [IO.Path]::GetFullPath($target)
+        }
+    }
+    return $cur
+}
+
+function Test-TruPlayerPath {
+    <#
+    .SYNOPSIS
+        Classifies one path by the player-path guard rules; $null when no rule matches.
+    .DESCRIPTION
+        Matches the path as written and with junctions resolved (lower case, forward slashes) against each
+        category's workspace / repository prefixes and file-name patterns. A trailing bigfile part size
+        ('@7ff00000') is ignored. Returns Category, Action (refuse / log / allow), Rule and the resolved Path.
+        Nothing is opened.
+    .PARAMETER Path
+        Path to classify (relative paths are taken relative to -BaseDir).
+    .PARAMETER Rules
+        Get-TruPlayerGuardRules result.
+    .PARAMETER BaseDir
+        Folder relative paths start from (the repository: the pipeline's tools run there).
+    .EXAMPLE
+        Test-TruPlayerPath -Path '../data/TombRaiderUnderworld_Patched/layer1.000' -Rules $rules -BaseDir $clone
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)]$Rules, [Parameter(Mandatory)][string]$BaseDir)
+    $p = $Path -replace '@[0-9a-fA-F]+$', ''
+    if (![IO.Path]::IsPathRooted($p)) { $p = Join-Path $BaseDir $p }
+    try { $forms = @((Resolve-TruLinkPath $p), [IO.Path]::GetFullPath($p)) } catch { return $null }
+    $forms = @($forms | ForEach-Object { ($_ -replace '\\', '/').TrimEnd('/').ToLower() } | Select-Object -Unique)
+    $rel = foreach ($f in $forms) {
+        [pscustomobject]@{
+            Full = $f
+            Ws   = $(if ($f.StartsWith($Rules.Workspace + '/')) { $f.Substring($Rules.Workspace.Length + 1) } else { $null })
+            Repo = $(if ($f.StartsWith($Rules.Repository + '/')) { $f.Substring($Rules.Repository.Length + 1) } else { $null })
+        }
+    }
+    foreach ($r in $rel) {
+        if ($r.Ws -and $Rules.Allow -contains $r.Ws) {
+            return [pscustomobject]@{ Category = 'tu_allow'; Action = 'allow'; Rule = $r.Ws; Path = $forms[0] }
+        }
+    }
+    $hit = {
+        param($relPath, $patterns)
+        if ($null -eq $relPath) { return $null }
+        foreach ($pat in $patterns) {
+            if ($pat.EndsWith('/')) { if ($relPath -eq $pat.TrimEnd('/') -or $relPath.StartsWith($pat)) { return $pat } }
+            elseif ($relPath.StartsWith($pat)) { return $pat }
+        }
+        return $null
+    }
+    foreach ($c in $Rules.Categories) {
+        foreach ($r in $rel) {
+            $rule = & $hit $r.Ws $c.Ws
+            if (!$rule) { $rule = & $hit $r.Repo $c.Repo }
+            if (!$rule) {
+                $leaf = ($r.Full -split '/')[-1]
+                foreach ($rx in $c.NameRx) { if ($leaf -match $rx) { $rule = $rx; break } }
+            }
+            if ($rule) { return [pscustomobject]@{ Category = $c.Name; Action = $c.Action; Rule = $rule; Path = $r.Full } }
+        }
+    }
+    return $null
+}
+
+function Assert-TruPlayerToolArgs {
+    <#
+    .SYNOPSIS
+        Checks the arguments of one pipeline tool call against the player-path guard rules before it starts.
+    .DESCRIPTION
+        Every argument (comma-separated lists are split, options starting with '-' skipped) is classified with
+        Test-TruPlayerPath. Each match is logged (Write-Log). Mode Enforce throws when an argument names a path of
+        a category with action refuse; mode Report only logs. Returns the matches. Nothing is opened; what a tool
+        reads by itself (default paths in its code) is caught by tools\player_guard.py inside the process.
+    .PARAMETER ToolArgs
+        The tool and its arguments as passed to Invoke-Tool.
+    .PARAMETER Rules
+        Get-TruPlayerGuardRules result.
+    .PARAMETER Mode
+        Report or Enforce.
+    .PARAMETER BaseDir
+        The repository (working folder of the tools).
+    .EXAMPLE
+        Assert-TruPlayerToolArgs -ToolArgs $toolArgs -Rules $rules -Mode Enforce -BaseDir $clone
+    #>
+    [CmdletBinding()]
+    param([string[]]$ToolArgs, [Parameter(Mandatory)]$Rules, [ValidateSet('Report', 'Enforce')][string]$Mode = 'Enforce',
+          [Parameter(Mandatory)][string]$BaseDir)
+    foreach ($preference in (Get-TruCallerPreference -Cmdlet $PSCmdlet).GetEnumerator()) {
+        Set-Variable -Name $preference.Key -Value $preference.Value -Scope Local
+    }
+    $found = @()
+    foreach ($a in $ToolArgs) {
+        foreach ($p in ($a -split ',')) {
+            if (!$p -or $p.StartsWith('-')) { continue }
+            $m = Test-TruPlayerPath -Path $p -Rules $Rules -BaseDir $BaseDir
+            if (!$m -or $m.Action -eq 'allow') { continue }
+            $found += $m
+            $verb = if ($m.Action -ne 'refuse') { 'logged' } elseif ($Mode -eq 'Enforce') { 'refused' } else { 'would-refuse' }
+            Write-Log ('player guard: {0} argument {1} ({2}, rule {3}) of {4}' -f $verb, $p, $m.Category, $m.Rule, $ToolArgs[0]) -Level WARN
+        }
+    }
+    $refused = @($found | Where-Object { $_.Action -eq 'refuse' })
+    if ($Mode -eq 'Enforce' -and $refused.Count) {
+        throw ('player guard: {0} refused argument(s) of {1}: {2}' -f $refused.Count, $ToolArgs[0], (($refused | ForEach-Object { $_.Path }) -join ', '))
+    }
+    return $found
+}
+
 function Get-TruInstalledRecord {
     <#
     .SYNOPSIS
@@ -288,4 +447,5 @@ function Assert-TruRestoreAllowed {
 }
 
 Export-ModuleMember -Function Set-TruLogFile, Write-Log, Get-TruWorkspacePath, Find-TruGamePath, Get-Md5,
-    Get-TruInstalledRecord, Get-TruInstallDeviation, Assert-TruRestoreAllowed
+    Get-TruInstalledRecord, Get-TruInstallDeviation, Assert-TruRestoreAllowed,
+    Get-TruPlayerGuardRules, Test-TruPlayerPath, Assert-TruPlayerToolArgs

@@ -1,0 +1,285 @@
+{
+ "schema": 1,
+ "version": "M20261111-1",
+ "generated": "2026-11-11",
+ "about": "Player-path manifest (plan Spielerweg P0): the inputs a player brings (PC game, own Xbox DLC packs, own TitleUpdate.000) and the knowledge files of the repository, by name and hash only (no game bytes). Written by tools/playerpath_manifest.py build; gate G1 = tools/playerpath_manifest.py check.",
+ "player_inputs": {
+  "pc_game": {
+   "where": "Steam game folder (workspace junction data/pc)",
+   "reference": "docs/data/pc_game_files.tsv",
+   "note": "the pipeline reads the archives bigfile.000 - .003 and patch.000; tru.exe: the Exe step reads the Steamless-unpacked Steam exe (md5 56d1ce2dffa62f16354063da2df44d5a, tools/exe_build.py), the tru.exe of a played game folder may already be a patched one",
+   "files": [
+    {
+     "name": "bigfile.000",
+     "reference_size": 2145345536,
+     "reference_md5": "839e192dbfded17d5f788a99279efc70",
+     "md5": "839e192dbfded17d5f788a99279efc70",
+     "size": 2145345536,
+     "match": true
+    },
+    {
+     "name": "bigfile.001",
+     "reference_size": 2139930624,
+     "reference_md5": "f4ceeb06c1accbcb4a4e1aa7e613895e",
+     "md5": "f4ceeb06c1accbcb4a4e1aa7e613895e",
+     "size": 2139930624,
+     "match": true
+    },
+    {
+     "name": "bigfile.002",
+     "reference_size": 2146330624,
+     "reference_md5": "1d5b5c46daf69b62dc93a68394952d15",
+     "md5": "1d5b5c46daf69b62dc93a68394952d15",
+     "size": 2146330624,
+     "match": true
+    },
+    {
+     "name": "bigfile.003",
+     "reference_size": 857427968,
+     "reference_md5": "b700d3153784366540dbbc87cc7a8149",
+     "md5": "b700d3153784366540dbbc87cc7a8149",
+     "size": 857427968,
+     "match": true
+    },
+    {
+     "name": "patch.000",
+     "reference_size": 20924416,
+     "reference_md5": "942d7f5639757fa80a9c6750d86067f4",
+     "md5": "942d7f5639757fa80a9c6750d86067f4",
+     "size": 20924416,
+     "match": true
+    },
+    {
+     "name": "tru.exe",
+     "reference_size": 6766592,
+     "reference_md5": "b36da327a320eab8b5c8464b27685840",
+     "measured_md5_here": "5560abacbc6968cdc17871c3ec8ca21c",
+     "measured_size_here": 6422528,
+     "match": false,
+     "note": "not gated: the Exe step reads the Steamless-unpacked Steam exe; reference_md5 = docs/data/pc_game_files.tsv (initial import), the measured exe here is another build (installed)"
+    }
+   ]
+  },
+  "xbox_dlc": {
+   "where": "Xbox 360 content folder 534307EC/00000002 (workspace junction data/Xenia-SteveRepack/Content/534307EC/00000002), Xenia-extracted folders",
+   "packs": [
+    {
+     "content": "9CA70CF0EDA43654D158C2E37470D301DFA850E753",
+     "pack": "pack10",
+     "what": "DLC 1 Beneath the Ashes",
+     "files": [
+      {
+       "file": "credits_DLC1.wmv",
+       "size": 44101260,
+       "md5": "386ee1c176ce7f296873733fd45b91b9"
+      },
+      {
+       "file": "pack10.000",
+       "size": 973111296,
+       "md5": "5568bcf26ff41c37eb676805bb55da93"
+      },
+      {
+       "file": "spa.bin",
+       "size": 377782,
+       "md5": "084e9cbd6400000de1cf1e136294d175"
+      }
+     ]
+    },
+    {
+     "content": "600A12643FCDAC84003E6E0DBD0A1A8F7DAE9DD153",
+     "pack": "pack11",
+     "what": "DLC 2 Lara's Shadow",
+     "files": [
+      {
+       "file": "credits_DLC2.wmv",
+       "size": 46498561,
+       "md5": "7842a2bcbd015f0f47265a337461628d"
+      },
+      {
+       "file": "pack11.000",
+       "size": 1189642240,
+       "md5": "2af94eb5ab87be1b05c9c863dc2c088d"
+      },
+      {
+       "file": "spa.bin",
+       "size": 434922,
+       "md5": "ab8ebd6927396f5a8f84777b0a74e4c5"
+      }
+     ]
+    },
+    {
+     "content": "E5AFB2B959A72C52120D73678AED11BD8752686753",
+     "pack": "pack1",
+     "what": "costume pack",
+     "files": [
+      {
+       "file": "pack1.000",
+       "size": 64305152,
+       "md5": "bea3cc15b8ac8d5e68295c7e3b2b4def"
+      }
+     ]
+    },
+    {
+     "content": "9FDDD06617D1016DE468ACF53AC663E8BA2AD41853",
+     "pack": "pack2",
+     "what": "costume pack",
+     "files": [
+      {
+       "file": "pack2.000",
+       "size": 65755136,
+       "md5": "6f76c3ae2ad84bb42efebb969c3f3c31"
+      }
+     ]
+    },
+    {
+     "content": "AC0089F81B621CD0E0C156B6176EFCC6C844705D53",
+     "pack": "pack20",
+     "what": "costume pack",
+     "files": [
+      {
+       "file": "pack20.000",
+       "size": 64448512,
+       "md5": "25a719f154cc74e478a58974e96999b8"
+      }
+     ]
+    }
+   ]
+  },
+  "title_update": {
+   "name": "TitleUpdate.000",
+   "where": "workspace data/TombRaiderUnderworld_Patched (the player supplies only this file of the Xbox game folder)",
+   "size": 1914880,
+   "md5": "9da8461e4d3aaf92117f071ae2e71cd8",
+   "generalbank_record": {
+    "name": "xenon-w\\generalbank.drm",
+    "raw_md5": "d49ae004d6aa2b57df30026f8a89cd72",
+    "raw_size": 7808309,
+    "checked_by": "tools/generalbank_pc_build.py"
+   }
+  }
+ },
+ "knowledge": [
+  {
+   "file": "docs/data/B132.kit_manifest.json",
+   "size_lf": 121852,
+   "md5_lf": "07e5105768830619f507d5f852768492"
+  },
+  {
+   "file": "docs/data/B138.kit_manifest.json",
+   "size_lf": 121849,
+   "md5_lf": "a0a4c10a39df7bcf010227cddab86728"
+  },
+  {
+   "file": "docs/data/b138_symbol_calibration.json",
+   "size_lf": 2862,
+   "md5_lf": "3ea6881d4a059bcd168ccda79ae7d328"
+  },
+  {
+   "file": "docs/data/B269_nativo.kit_manifest.json",
+   "size_lf": 299670,
+   "md5_lf": "ec0ca980f75c55dc1c301fce5ffb0e58"
+  },
+  {
+   "file": "docs/data/B270_acqua.kit_manifest.json",
+   "size_lf": 299669,
+   "md5_lf": "ccd3133dc36ce67a0089cd415c021f0f"
+  },
+  {
+   "file": "docs/data/B90_gold_L4.manifest.tsv",
+   "size_lf": 26168,
+   "md5_lf": "f81ce2ea96544464970f87df4de17746"
+  },
+  {
+   "file": "docs/data/dlc_names_extra.txt",
+   "size_lf": 1120,
+   "md5_lf": "ac7b0c08e3b8643ddee5e388a9888c6f"
+  },
+  {
+   "file": "docs/data/generalbank_pc.json",
+   "size_lf": 43809,
+   "md5_lf": "3b1488331ccb7d7bad016addc411e7ee",
+   "version": "K20261111-3",
+   "schema": 3
+  },
+  {
+   "file": "docs/data/globalsoundinfo_tu.json",
+   "size_lf": 5473,
+   "md5_lf": "35b2c6354ea8b7b76c2155ea529fe0e7",
+   "schema": 1
+  },
+  {
+   "file": "docs/data/kit_dependency.tsv",
+   "size_lf": 159279,
+   "md5_lf": "f86983af28c906d516734077bd126334"
+  },
+  {
+   "file": "docs/data/lang_variants_md5.tsv",
+   "size_lf": 6078,
+   "md5_lf": "4d5b00e9eb08073343ca30ae9666965f"
+  },
+  {
+   "file": "docs/data/pc_game_files.tsv",
+   "size_lf": 602,
+   "md5_lf": "71b18788f72295f30ae19f8182967616"
+  },
+  {
+   "file": "docs/data/playerpath_guard.json",
+   "size_lf": 2891,
+   "md5_lf": "1697dbfa758d7d50db19842ce31de96b",
+   "version": "G20261111-1",
+   "schema": 1
+  },
+  {
+   "file": "docs/data/script_clash_ids.json",
+   "size_lf": 865,
+   "md5_lf": "6420d3b50fc1e501d0f1e69f98f50ba0"
+  },
+  {
+   "file": "docs/data/shader_decisions.tsv",
+   "size_lf": 534301,
+   "md5_lf": "823300c66d174ed77f1a59fe12dc1289"
+  },
+  {
+   "file": "docs/data/sym_calibration_derived.json",
+   "size_lf": 38924,
+   "md5_lf": "da9c56436cf03df5ac1b63e69a178112"
+  },
+  {
+   "file": "docs/data/tu_coverage.tsv",
+   "size_lf": 352187,
+   "md5_lf": "7092383a3e857d139a1d3cce867b454c"
+  },
+  {
+   "file": "docs/data/tu_coverage_overrides.tsv",
+   "size_lf": 9319,
+   "md5_lf": "337baca3c9c2e4d64389ec500ea64292"
+  },
+  {
+   "file": "docs/data/upstream_diff_curated.md",
+   "size_lf": 5635,
+   "md5_lf": "9fc32795710a47ae75137d9e94a6b8da"
+  },
+  {
+   "file": "docs/data/upstream_diff_notes.tsv",
+   "size_lf": 3791,
+   "md5_lf": "cf0723ebd948e5849946bf7b9beea450"
+  },
+  {
+   "file": "docs/data/xenia_tu_combat_addresses.json",
+   "size_lf": 20352,
+   "md5_lf": "fab4c90888d5925eaf65d061b0f7cfdd"
+  }
+ ],
+ "guard": {
+  "rules": "docs/data/playerpath_guard.json",
+  "version": "G20261111-1",
+  "tool": "tools/player_guard.py",
+  "switch": "TRU_PLAYER_MODE=report|enforce, Invoke-TruPipeline -PlayerMode Report|Enforce (-Player)",
+  "developer_only": [
+   "Xbox base game layer1.000 / .001, layer2.000 / .001, default.xex, default.xexp, $SystemUpdate, movies",
+   "Xenia memory images work/xenia_dump (retail / title update exe)",
+   "developer intermediate data: work/generic/pairs.pkl, pairs_patch.pkl, store.pkl (xb_store part), work/idx_xbox_base.json, work/script/pairs_*.pkl, work/render/pairs_render.pkl, shaderlibs.pkl, work/ws/cine/pairs.pkl"
+  ]
+ },
+ "problems": []
+}

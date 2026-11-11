@@ -1,4 +1,7 @@
 import struct, sys
+import os as _os
+if _os.environ.get('TRU_PLAYER_MODE', '').strip().lower() not in ('', '0', 'off'):   # player-path access guard (P0)
+    sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); import player_guard
 def read_index(path, endian):
     e = '>' if endian == 'be' else '<'
     with open(path, 'rb') as f:

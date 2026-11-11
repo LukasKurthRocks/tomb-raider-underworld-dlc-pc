@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "version": "G20261111-1",
+  "about": "Player-path access guard rules (plan Spielerweg P0 / gate G2). Read by tools/player_guard.py (audit hook in every Python tool process) and by TruCommon.psm1 Test-TruPlayerPath (tool arguments of Invoke-TruPipeline). Paths are matched in lower case with forward slashes, after resolving junctions; 'ws' = relative to the workspace (the folder that holds the repository), 'repo' = relative to the repository, 'name' = regular expression on the file name alone. A prefix ending in '/' matches the folder itself and everything below it. action refuse = refused when TRU_PLAYER_MODE=enforce (logged as would-refuse in report mode); action log = only logged (the player may have it, the plan has not decided yet).",
+  "categories": {
+    "xbox_base": {
+      "action": "refuse",
+      "why": "Xbox 360 base game (layer1 / layer2, default.xex, the title update's exe patch, movies, system update): developers only; a player never has or needs it",
+      "ws": ["input/xbox-game/", "data/tombraiderunderworld_patched/"],
+      "repo": [],
+      "name": ["^layer[12]\\.\\d{3}$", "^default\\.xexp?$"]
+    },
+    "xbox_derived": {
+      "action": "refuse",
+      "why": "developer intermediate data that holds Xbox base-game bytes or their section index (plan section 3); store.pkl is refused as a whole because its xb_store part is base-game bytes (a player store without xb_store is plan step P2 / P8)",
+      "ws": [],
+      "repo": ["work/idx_xbox_base.json", "work/generic/pairs.pkl", "work/generic/pairs_patch.pkl", "work/generic/store.pkl",
+               "work/script/pairs_", "work/render/pairs_render.pkl", "work/render/shaderlibs.pkl", "work/ws/cine/pairs.pkl",
+               "work/xenia_dump/"],
+      "name": ["^tu_image_[0-9a-f]+\\.bin$", "^retail_image_[0-9a-f]+\\.bin$"]
+    },
+    "yura": {
+      "action": "log",
+      "why": "Yura 1.7.2 file lists (third-party names only): the plan keeps them as a download or moves the needed names into the knowledge package (open)",
+      "ws": [],
+      "repo": ["ref/yura-release/"],
+      "name": []
+    },
+    "kit": {
+      "action": "log",
+      "why": "community kits / kit-derived trees (B90 / B132 / B138 / B269 / B270, pristine snapshots): not on the player path either (plan section 1); logged only in P0",
+      "ws": ["release/"],
+      "repo": ["work/rebuild/b138_pristine/", "work/rebuild/b138_fixes/", "work/rebuild/base_b138/", "work/b270_kit/"],
+      "name": []
+    }
+  },
+  "allow": [
+    {
+      "ws": "input/xbox-game/titleupdate.000",
+      "md5": "9da8461e4d3aaf92117f071ae2e71cd8",
+      "why": "the player's own Xbox title update (player input; md5 of the whole file, checked once per process; another file is refused). d49ae004... is the raw md5 of its generalbank record (docs/data/generalbank_pc.json tu.raw_md5), checked by generalbank_pc_build"
+    }
+  ]
+}

@@ -209,8 +209,21 @@
     SINCOS_SAME, X5584, ERR in port shaders; report <tree>\shader_form_check.json). Report (default for now) only
     lists them, Enforce makes a hard form fail the step (exit 1).
 
+    -PlayerMode (2026-11-11, plan Spielerweg P0 / gate G2): player-path access guard, rules in
+    docs\data\playerpath_guard.json. Off (default) = developer path, unchanged; a TRU_PLAYER_MODE / TRU_PLAYER_LOG
+    left in the calling shell is ignored for the run. Report = every tool runs through tools\player_guard.py run
+    with TRU_PLAYER_MODE=report: every open / listing / process start of an Xbox base-game path (layer1 / layer2,
+    default.xex, the game folder except TitleUpdate.000 with its md5) or of developer data made from it (pairs.pkl,
+    store.pkl, idx_xbox_base.json, script \ render \ cine pairs, Xenia images) is logged, nothing refused.
+    Enforce (= -Player) = such accesses are refused (PermissionError in the tool, exit 2 -> the step fails); tool
+    arguments naming such a path are refused before the tool starts (Assert-TruPlayerToolArgs). Access log:
+    <workspace>\logs\player_guard_<step>_<time>.tsv, counts per tool in the run log and in <log>.json.
+    P0 switches only the guard; the step lists stay the developer ones (the knowledge-based steps follow in P1 ...).
+
     -Verbose shows steps, -Debug the command lines, -Trace adds a PowerShell line trace.
 
+.EXAMPLE
+    .\Invoke-TruPipeline.ps1 -Step Globalsound -PlayerMode Report -FixesOut work/rebuild/q14_p0_1111 -Verbose
 .EXAMPLE
     .\Invoke-TruPipeline.ps1 -Step Cache -Verbose
 .EXAMPLE
@@ -236,8 +249,15 @@ param(
     [ValidateSet('Report', 'Enforce')][string]$ShaderGate = 'Report',
     # step Generalbank: the old chain on B138's generalbank (+ two generic-store converter runs) instead of the PC build
     [switch]$GeneralbankKit,
+    # player-path access guard (plan Spielerweg P0): Off / Report (log only) / Enforce; -Player = Enforce
+    [ValidateSet('Off', 'Report', 'Enforce')][string]$PlayerMode = 'Off',
+    [switch]$Player,
     [switch]$Trace
 )
+if ($Player) {
+    if ($PSBoundParameters.ContainsKey('PlayerMode') -and $PlayerMode -ne 'Enforce') { throw '-Player means -PlayerMode Enforce; do not combine it with another -PlayerMode.' }
+    $PlayerMode = 'Enforce'
+}
 
 $ErrorActionPreference = 'Stop'
 if ($PSBoundParameters.ContainsKey('Debug')) { $DebugPreference = 'Continue' }
@@ -648,6 +668,7 @@ $results = @()
 $started = Get-Date
 $script:runningProcess = $null
 $savedEnv = @{}
+$playerRules = $null; $playerLog = $null
 Push-Location $clone
 try {
     Write-Log "Invoke-TruPipeline step=$Step log=$logFile" -Level VERBOSE
@@ -674,6 +695,22 @@ try {
             [Environment]::SetEnvironmentVariable($name, $null, 'Process')
         }
     }
+    # player-path access guard (P0): the run's own -PlayerMode, never a mode left in the calling shell
+    foreach ($name in 'TRU_PLAYER_MODE', 'TRU_PLAYER_LOG') {
+        $value = [Environment]::GetEnvironmentVariable($name, 'Process')
+        if ($value) {
+            $savedEnv[$name] = $value
+            Write-Log "ignoring $name=$value from the calling shell for this run" -Level VERBOSE
+            [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+        }
+    }
+    if ($PlayerMode -ne 'Off') {
+        $playerRules = Get-TruPlayerGuardRules -Repository $clone
+        $playerLog = Join-Path $logDir ('player_guard_{0}_{1}.tsv' -f $Step, (Get-Date -Format 'yyyyMMdd_HHmmss'))
+        $env:TRU_PLAYER_MODE = $PlayerMode.ToLower()
+        $env:TRU_PLAYER_LOG = $playerLog
+        Write-Log ('player guard: {0}, rules {1}, access log {2}' -f $PlayerMode, $playerRules.Version, $playerLog) -Level VERBOSE
+    }
     Write-Log ('processes: heavy {0}, light {1} (free RAM {2} GB, {3} logical CPUs)' -f $Jobs, $LightJobs, $freeGb, $cpus) -Level VERBOSE
     foreach ($dir in $outputDirs[$Step]) { New-Item -ItemType Directory -Force -Path (Join-Path $clone $dir) | Out-Null }
 
@@ -692,7 +729,13 @@ try {
         $t0 = Get-Date
         $label = 'tool {0}/{1} {2}' -f $toolIndex, $toolCount, (Split-Path -Leaf $toolArgs[0])
         Write-Log ('== ' + ($toolArgs -join ' ')) -Level VERBOSE
-        $code = Invoke-Tool -ToolArgs $toolArgs -Label $label
+        $runArgs = $toolArgs
+        if ($playerRules) {
+            # arguments first (Enforce throws here), then the tool runs inside the guard (its own default paths)
+            $null = Assert-TruPlayerToolArgs -ToolArgs $toolArgs -Rules $playerRules -Mode $PlayerMode -BaseDir $clone
+            $runArgs = @('tools\player_guard.py', 'run') + $toolArgs
+        }
+        $code = Invoke-Tool -ToolArgs $runArgs -Label $label
         $seconds = [int]((Get-Date) - $t0).TotalSeconds
         $results += [pscustomobject]@{ Tool = ($toolArgs -join ' '); ExitCode = $code; Seconds = $seconds }
         if ($code -ne 0) { throw "Tool failed (exit code $code): $($toolArgs -join ' ')" }
@@ -706,6 +749,19 @@ catch {
 finally {
     Pop-Location
     if ($Trace) { Set-PSDebug -Off }
+    if ($playerRules) {
+        # counts per tool / action / category from the access log (tools\player_guard.py summary)
+        Write-Log ('--- player guard ({0}) ---' -f $PlayerMode)
+        if (Test-Path -LiteralPath $playerLog) {
+            $guardTool = Join-Path $clone 'tools\player_guard.py'
+            $sum = & $python -u -I -X utf8 $guardTool summary $playerLog --json ($playerLog -replace '\.tsv$', '.json') 2>&1
+            foreach ($l in $sum) { Write-Log ('{0}' -f $l) }
+        } else {
+            Write-Log 'no access matched a guard rule (no access log written)'
+        }
+        [Environment]::SetEnvironmentVariable('TRU_PLAYER_MODE', $null, 'Process')
+        [Environment]::SetEnvironmentVariable('TRU_PLAYER_LOG', $null, 'Process')
+    }
     foreach ($name in $savedEnv.Keys) { [Environment]::SetEnvironmentVariable($name, $savedEnv[$name], 'Process') }
     # aborted (Ctrl+C, error) while a tool was running: the tool and its worker processes keep running (they were
     # started without a console). Nothing is ended automatically - the PIDs are logged so the user can decide.

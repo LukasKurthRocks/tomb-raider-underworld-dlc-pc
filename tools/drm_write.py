@@ -19,6 +19,8 @@ Usage: python3 -I tools/drm_write.py [N]   round-trip test on the first N PC big
 """
 import struct, zlib, sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+if os.environ.get('TRU_PLAYER_MODE', '').strip().lower() not in ('', '0', 'off'):   # player-path access guard (P0)
+    import player_guard
 
 BLOCK = 0x40000
 

@@ -20,6 +20,9 @@ Layout (verified on all 1054 Xbox<->PC base DRM pairs, both endians; see NOTES.m
   Byte-swapping: header/internal/kindA/resource entries are u32 swaps, external entries are a u64 swap.
 """
 import struct
+import os as _os, sys as _sys
+if _os.environ.get('TRU_PLAYER_MODE', '').strip().lower() not in ('', '0', 'off'):   # player-path access guard (P0)
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__))); import player_guard
 
 class Reloc:
     __slots__ = ('internal', 'external', 'idref_a', 'unk3', 'idref')
