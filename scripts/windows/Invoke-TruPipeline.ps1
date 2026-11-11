@@ -100,6 +100,16 @@
                report <tree>\script_clash_check.json).
                -FixesOut DIR (relative to the repository) writes DIR\dlc1\mods and DIR\dlc2\mods instead of
                work\rebuild\asm_stage2b and dlc2_asm_stage2b (check runs that must not replace the usual outputs)
+      Shaders  (2026-11-11, plan A2 stage 1, after Fixes; minutes) the recorded shader decisions on the Fixes output:
+               tools\shader_step.py apply reads docs\data\shader_step.tsv (made by shader_step.py plan from
+               docs\data\shader_decisions.tsv) and the lib store work\shader_store (our recorded translations, not in
+               the repository) + the Xbox DLC DRMs of tu_batch xdump (work\sg_audit_0511\xbox): recorded ShaderLibs
+               (nativefix ABS_CONST rewrite with stack-independent entry hashes), material shader tuples + Xbox
+               MaterialParams where the material's texture records are the ones the lib was built for (else refused);
+               only the changed DRMs -> <out>\shaders\mods (a layer over dlc1 / dlc2); then rule_owned apply (the ring
+               rule last, <out>\shaders_rule\mods), rule_owned check over the stack, shader_form_gate (-ShaderGate) and
+               tu_batch vcheck --strict (binding check of every translated pass-2 lib, exit 1 on a problem) on the
+               shaders layer. <out> = -FixesOut DIR, else work\rebuild. Not assembled / installed by anything yet
       Costumes the three Xbox costume packs (2026-11-03; pack1 Wetsuit k / p, pack2 Classic a / h, pack20 Designer
                l / m), after Assemble (render tables) and Fixes' proof: verify_ids extend (adds the packs' ids to
                dlc_idmap.json, existing entries never change; second run adds nothing), converter_faults_fix proof,
@@ -237,7 +247,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Costumes', 'Repair', 'Generalbank', 'Exe', 'Globalsound', 'Lang')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Shaders', 'Costumes', 'Repair', 'Generalbank', 'Exe', 'Globalsound', 'Lang')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(1, 99)][int]$ToTool = 99,
     [ValidateRange(0, 16)][int]$Jobs = 0,
@@ -327,6 +337,9 @@ $gbPcOut = if ($FixesOut) { "$fixRoot/generalbank_pc" } else { 'work/rebuild/gen
 $gsOut = if ($FixesOut) { "$fixRoot/globalsound" } else { 'work/rebuild/globalsound' }
 # step Lang (2026-11-11, R10): the 60 language variants of the DLC cinematics / DLC 1 radio lines
 $langOut = if ($FixesOut) { "$fixRoot/lang" } else { 'work/rebuild/lang' }
+# step Shaders (2026-11-11, A2 stage 1): recorded shader decisions as a layer over the Fixes trees, ring rule last
+$shOut = if ($FixesOut) { "$fixRoot/shaders" } else { 'work/rebuild/shaders' }
+$shRule = if ($FixesOut) { "$fixRoot/shaders_rule" } else { 'work/rebuild/shaders_rule' }
 # step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
 $costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
 $costumeTools = @(
@@ -499,6 +512,14 @@ $steps = @{
         @('tools\vo_lang_variants.py', 'check', $fix2, 'pack11', '--expect', $voMd5, '--report', $vo2),
         (@('tools\shader_form_gate.py', 'check', $fix2, '--list', '3', '--report', $sg2) + $sgEnforce)
     )
+    # Shaders (2026-11-11, A2 stage 1): recorded decisions -> shaders layer, ring rule on top, then the gates
+    Shaders = @(
+        @('tools\shader_step.py', 'apply', '--layers', "$fix1,$fix2", '--out', "$shOut/mods", '--report', "$shOut/shader_step_apply.json"),
+        @('tools\rule_owned.py', 'apply', "$shRule/mods", $fix1, $fix2, "$shOut/mods"),
+        @('tools\rule_owned.py', 'check', $fix1, $fix2, "$shOut/mods", "$shRule/mods", '--report', "$shRule/rule_owned_check.json"),
+        (@('tools\shader_form_gate.py', 'check', "$shOut/mods", '--list', '3', '--report', "$shOut/shader_form_check.json") + $sgEnforce),
+        @('tools\tu_batch.py', 'vcheck', "$shOut/mods", 'work/sg_audit_0511/xbox', '--strict')
+    )
     Costumes = $costumeTools
     Repair = @(
         @('tools\b138_snapshot.py', '../release/B138/kit/manifest.json', '../data/pc/mods', '../backup', $repPristine, '../backup/mods', 'work/rebuild/base_b138'),
@@ -571,6 +592,7 @@ $outputDirs = @{
     Assemble = @('work\render', 'work\rebuild')
     Dlc2    = @('work\rebuild')
     Fixes   = @('work\rebuild')
+    Shaders = @(($shOut -replace '/', '\'), ($shRule -replace '/', '\'))
     Costumes = @('work\rebuild')
     Repair  = @('work\rebuild')
     Generalbank = @('work\rebuild')

@@ -26,8 +26,9 @@ Usage (from the repository root):
       --reuse: a group whose packed lib is byte-identical to a done group of an earlier WORKDIR (same Xbox lib, same
       materials) keeps that lib id, all others get new ids from IDS_FROM
   ../bin/pyt -t 3600 tools/tu_batch.py verify INV.json WORKDIR TREE      independent re-check of every done group in the tree files
-  ../bin/pyt -t 3600 tools/tu_batch.py vcheck MODS XDIR [--libs A-B,C] [--no-vm]
-      binding_check of every translated pass-2 lib in any mods tree (no tu_batch state needed)
+  ../bin/pyt -t 3600 tools/tu_batch.py vcheck MODS XDIR [--libs A-B,C] [--no-vm] [--strict]
+      binding_check of every translated pass-2 lib in any mods tree (no tu_batch state needed); --strict: exit 1 when a
+      copy has a binding problem (pipeline step Shaders)
   ../bin/pyt -t 1800 tools/tu_batch.py selftest      sampler pairing + binding_check + abs-const rewrite regression cases (exit 1 on failure)
   ../bin/pyt -t 3600 tools/tu_batch.py nativefix OUT_MODS LAYER [LAYER ...] [--libs A-B,C]
       17r: rewrite the ABS_CONST form (abs / -abs on a constant, refused by Windows' own D3D9 on AMD) in the effective
@@ -725,6 +726,7 @@ def cmd_vcheck(mods, xdir, ranges, vm):
                   '-' if worst is None else '%.3f' % worst, (' | ' + '; '.join(probs[:6])) if probs else ''), flush=True)
     print('SUMMARY vcheck %s: %d translated material copies, %d with binding problems' % (mods, tot, nfail))
     for l in fails: print('  FAIL ' + l)
+    return nfail
 
 
 def _lib_parse(d):
@@ -1005,9 +1007,12 @@ def main(a):
         cmd_run(a[1], a[2], a[3], a[4], int(a[5]), mx, only, reuse); return
     if a[0] == 'vcheck':
         novm = '--no-vm' in a; a = [x for x in a if x != '--no-vm']
+        strict = '--strict' in a; a = [x for x in a if x != '--strict']     # 2026-11-11 (pipeline step Shaders): exit 1 on a problem
         rg = None
         if '--libs' in a: j = a.index('--libs'); rg = a[j + 1]; a = a[:j] + a[j + 2:]
-        cmd_vcheck(a[1], a[2], rg, not novm); return
+        nfail = cmd_vcheck(a[1], a[2], rg, not novm)
+        if strict and nfail: sys.exit(1)
+        return
     if a[0] == 'selftest': cmd_selftest(); return
     if a[0] == 'nativefix':
         rg = None
