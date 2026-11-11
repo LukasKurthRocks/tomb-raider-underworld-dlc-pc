@@ -1201,7 +1201,13 @@ u32-swapped in pipeline 1011 only (installed right; which earlier step should ha
 after `playerblock`; `tools/soundplex_wave_id_fix.py`): +0 = ids(6, Xbox), +4 = u8u8u16. Other DRMs: installed DLC 2
 56 more words in 20 DRMs (DTP 22819 in 13 level DRMs x2, goo / rune / treadmill objects), pipeline 1011 additionally
 +4 u32 in the pistons a / b / c (26 each), DLC 1 `dlc1_uo_raft_bridge_spawned` (24). Test tree `work/q4_waves_1111/tree`
-(installed file + 164 words) ⬜ live. Note: the A1 listening samples (`references/audio_dsp_1011`) of 22711 / 22713 /
+(installed file + 164 words) ⬜ live. Rest (Q27, 2026-11-11): scan of 254 installed DLC 1 / 2 DRMs = exactly those 56
+words in 20 DLC 2 DRMs (DLC 1 0: the raft's 24 +4 words are pipeline-1011 only); test tree `work/q27_waves_1111/tree`
+(installed files incl. the banner uiinit words + 56 words, `fix_word_diff` 0 other words), unresolved refs 56 -> 0
+(53 of the old ids are in no installed DLC DRM). DTP 22819 = `dlc2_checkpoint` object data (596 B, in 13 DRMs): its two
+leaves name the DLC waves 4545 / 4571, which sit in exactly those 13 DRMs (when the sound starts: ⬜ live). The object
+trees 24809 / 24810 / 25095 / 25097 / 26826 / 24865 / 24866 / 26785 now name base `energy_pulse_*` waves, 24936
+(extending bridge) `thrall_flow_a_07`, all inside the same DRM. ⬜ live. Note: the A1 listening samples (`references/audio_dsp_1011`) of 22711 / 22713 /
 22716 / 22718 / 22719 / 24551 were taken by the wrong PC ids (scuffs / wetsuit heels / speargun instead of landings /
 grunts / handgun shots).
 Group 10 (category [3], srmusic / `media.music`) is a child of 3 -> 2 -> **1 (the MusicVolume slider)**, so MusicVolume 0
