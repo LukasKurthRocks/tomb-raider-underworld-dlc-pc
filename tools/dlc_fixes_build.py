@@ -55,6 +55,11 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
   fxrecread (ours, 2026-11-08, 18e) after basecopy, also tools/typed_family_fix.py: the 0x17c particle record words of
          the object data DTP at the 12 offsets objrec does not rule, by the reads of tru.exe 0x543f70 (u8 fields in
          place, +0x58 / +0x5c / +0x160 u16); introtyped takes the unit-DTP pointer-path table of 77 base units since 18e
+  idpair, fxrelayout, lv90dtp, odtwin, fpkeys (ours, 2026-11-11, Q5: the R4 / R5 data words that only the played test
+         trees had) after fxrecread, also tools/dlc_struct_fixes.py: thrall sound record ids R1 (dlc_idpair_fix),
+         table-record DTPs re-laid to the PC stride 0x28 (fxrec_relayout_fix), the [Level+0x90]+0x1c DTP all s32,
+         thrall object data copies by the aligned base twin, dtp_audit keys with >= 100 unanimous base samples
+         (typed_family_fix); each proven on the base pairs once per run, each written DRM proven
   seqrepeat (ours, 2026-11-05, finding 49) after objid, also tools/dlc_struct_fixes.py: the word data +0xc of SoundPlex
          Sequence nodes (s8 repeat + 3 bytes) raw = the Xbox bytes (tools/soundplex_sequence_fix.py; the converter
          u32-swapped repeat 1 to 0 = endless, the DLC 2 doppelganger's groan); a word that is no byte order of the
@@ -393,6 +398,14 @@ STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventl
  fix_costumedtp, fix_dspkind, fix_playerblock, fix_waveid, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh,
  fix_introtyped, fix_leveltwin, fix_basecopy, fix_fxrecread, fix_seqrepeat, fix_navraw,
  fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
+
+
+# Q5 (2026-11-11, workspace docs Befund-Datenwoerter-Schritt-1111.md): idpair / fxrelayout / lv90dtp / odtwin / fpkeys =
+# the R4 / R5 data words that only the played test trees had, after fxrecread, before seqrepeat (dlc_struct_fixes.Q5_STEPS;
+# typed_family_fix.py proof / the tools' proven() prove the rules once per process, dlc_struct_fixes.py check gates them)
+Q5_STEPS = ('idpair', 'fxrelayout', 'lv90dtp', 'odtwin', 'fpkeys')
+STRUCT_STEPS = STRUCT_STEPS[:STRUCT_STEPS.index('seqrepeat')] + Q5_STEPS + STRUCT_STEPS[STRUCT_STEPS.index('seqrepeat'):]
+for _s in Q5_STEPS: globals()['fix_' + _s] = _struct_fix(_s)
 
 
 def _fault_fix(step):

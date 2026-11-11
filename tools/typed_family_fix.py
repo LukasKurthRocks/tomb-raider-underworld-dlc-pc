@@ -48,23 +48,40 @@ introtyped also takes, since 18e (2026-11-08), the words of the unit-DTP pointer
   byte orders gives ONE wanted word for this Xbox word, no sample is 'other' and >= 10 votes come from base samples of
   the same zero / non-zero byte shape as the DLC word; the 17j-b rules above win where they speak. NOT the word unit DTP 23100 +0x6268 (dlc_yggdrasil_hall02: the
   17l fp rule says s32, the table s16 - owner decision open).
-Not built here (owner decision pending, 17l / 17m): odtwin (aligned thrall object data), fpkeys (dtp_audit keys),
-the DTP 24392 re-spacing + twin step, class-d words.
+Q5 rules (2026-11-11, workspace docs Befund-Datenwoerter-Schritt-1111.md: the R4 / R5 words of the played trees):
+  lv90dtp    the DTP named at [Level+0x90] +0x1c (one family {u32 n, ptr, ptr, float records}): every word s32 (17p /
+             17q; proof over the 81 base level units of the PC file list, 0 contradicting)
+  fpkeys     dtp_audit structure keys (dtp_audit.word_keys) with >= FP_MIN = 100 informative base samples whose
+             explaining byte orders give ONE PC word for the Xbox word (17l "fp100"); not the unit DTP (introtyped,
+             owner decision 7), the lv90dtp DTP, fxrelayout's table-record DTPs, DTPs whose Xbox bytes are a base
+             section or whose internal pointers differ; only DLC 1 / DLC 2 pack sources (FP_PACKS: the six DLC 2
+             costume packs pack1 / pack2 / pack20 hold ~3 300 such words, never played - owner decision); proof = the
+             key statistics + a held-out 2-fold by DRM (pinned: 95 wrong of 2 092 178 decided)
+  odtwin     thrall object data COPIES: record-shaped DTPs (objdata_rec_classes.records) that are not the object +8
+             data of this DRM (viking_thrall_tutorial_dlc2_ 24424, yeti_thrall_armored_dlc2_ 24575 = copies of the
+             viking / yeti object data, which objrec / fxrecread never reach) are difflib-aligned with the base enemy's
+             object data (OD_TWINS, >= 80 % of the words in equal blocks; 17l align_twin.py); a word inside an equal
+             block gets the base PC word when it is one byte order of the (same) Xbox word. Proof: base viking_thrall
+             vs yeti_thrall object data aligned the same way, 4165 equal Xbox words with one PC order each, 0 disagree.
+             Alignments are cached by content hash (work/generic/odtwin_align.pkl, ~8 min each without the cache).
+             The object data proper is left to objrec / fxrecread (the rule gives 0 changes there on pipeline 1011).
+Not built here: the DTP 24392 re-spacing + twin step, class-d words, the introtyped / B270 conflicts (decision 7).
 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/typed_family_fix.py proof [--rules a,b] [--report R.json]
         base proof of every rule (exit 1 when a pinned count differs or a base word contradicts a rule)
   ../bin/pyt -t 3600 tools/typed_family_fix.py scan TREE [--rules a,b] [--pack pack11] [--names a.drm,b.drm]
         per DRM / rule the words a fix would change (nothing written); exit 1 when any
-Library (steps of tools/dlc_struct_fixes.py): fix_drm(rule, XD, raw, rel) -> (new raw or None, changes [(section index,
+Library (steps of tools/dlc_struct_fixes.py): fix_drm(rule, XD, raw, rel, pack) -> (new raw or None, changes [(section index,
   offset, old, new, section id, tag)], info dict(rows, kept, notes)); proven(rule) -> (ok, lines) once per process.
 """
-import sys, os, struct, collections, json, io, contextlib, pickle
+import sys, os, re, struct, collections, json, io, contextlib, pickle
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import drm_reloc as R, drm_write as DW
 
-RULES = ('fadecard', 'uberanim', 'basecopy', 'leveltwin', 'introtyped', 'fxrec', 'sgmesh', 'fxrecread')
+RULES = ('fadecard', 'uberanim', 'basecopy', 'leveltwin', 'introtyped', 'fxrec', 'sgmesh', 'fxrecread',
+         'lv90dtp', 'fpkeys', 'odtwin')      # lv90dtp / fpkeys / odtwin 2026-11-11 (Q5, R4 / R5 data words)
 PERMS = {'s32': (3, 2, 1, 0), 's16': (1, 0, 3, 2), 'raw': (0, 1, 2, 3)}
 # u16 / u8 mixes (unit-DTP path table and fxrecread): b2s16 = bytes 0, 1 in place + u16 at byte 2, s16b2 = u16 at byte 0
 XPERMS = dict(PERMS, b2s16=(0, 1, 3, 2), s16b2=(1, 0, 2, 3))
@@ -92,6 +109,16 @@ TWIN_MIN_WORDS = 256         # ... and at least this many: unrelated l7 units sh
                              # (proof leveltwin), a tiny Level (dlc2_costumes 0xa0 B: 9 of 14) is no twin
 XLAYERS = ['../data/TombRaiderUnderworld_Patched/layer%d.000' % i for i in (1, 2)]
 PCBIG = '../data/pc/bigfile.000'
+# lv90dtp (Q5): base units = the level DRMs of the PC file list (l1_ .. l7_; 17p base_units.txt)
+LV90_UNIT = re.compile(r'^l\d_[a-z0-9_]+\.drm$')
+# fpkeys (Q5): a dtp_audit structure key rules a word when >= FP_MIN informative base samples exist and the byte orders
+# that explain ALL of them give one PC word for the Xbox word (17l "fp100" = the fp words of the installed b270cmp tree)
+FP_MIN = 100
+FP_PACKS = ('pack10', 'pack11')      # fpkeys writes only DRMs whose Xbox source is the DLC 1 / DLC 2 pack (plan)
+# odtwin (Q5): DLC 2 thrall DRMs -> the base enemy whose object data is the aligned twin (17l align_twin.py)
+OD_TWINS = {'viking_thrall_dlc2_': 'viking_thrall', 'viking_thrall_tutorial_dlc2_': 'viking_thrall',
+            'yeti_thrall_dlc2_': 'yeti_thrall', 'yeti_thrall_armored_dlc2_': 'yeti_thrall'}
+OD_MIN = 0.8                          # odtwin: share of the DLC DTP's words inside equal blocks of the alignment
 
 # pinned base counts (calibrated 2026-11-08 on work/generic/store.pkl and the l7_* units of layer1 / layer2 / PC
 # bigfile.000); `proof` fails when a count differs or a base word contradicts the rule
@@ -110,6 +137,14 @@ PROOF_EXPECT = {
     'sgmesh': {'dtps': 84, 'ok': 188, 'amb': 178, 'contra': 0},
     # 18e: 11 032 base particle records (17o p1_base), 12 offsets x records, 0 slots
     'fxrecread': {'objrec_overlap': 0, 'objects': 471, 'records': 11032, 'ok': 64929, 'amb': 67455, 'contra': 0},
+    # Q5 2026-11-11: 81 base level units (l1_ .. l7_ of the PC file list) with an [Level+0x90]+0x1c DTP on both sides
+    'lv90dtp': {'pairs': 81, 'ok': 517303, 'slot': 150293, 'amb': 44304, 'contra': 0},
+    # Q5 2026-11-11: 3 838 860 informative base samples, 1714 keys with >= 100 unanimous samples; held-out 2-fold by
+    # DRM: 2 092 178 decided words, 95 wrong (4.5e-5)
+    'fpkeys': {'keys': 1714, 'samples': 3838860, 'loo_n': 2092178, 'loo_wrong': 95, 'contra': 0},
+    # Q5 2026-11-11: base viking_thrall vs yeti_thrall object data (34 948 / 35 740 B) aligned: equal Xbox words with a
+    # single PC byte order on both sides agree in every case
+    'odtwin': {'bases': 2, 'aligned': 8581, 'agree': 4165, 'no_single_order': 4251, 'contra': 0},
 }
 
 
@@ -692,6 +727,144 @@ def fx_base_records():
 
 
 # ------------------------------------------------------------------------------------------------ proofs
+# ------------------------------------------------------------------------------------------------ Q5 rules (2026-11-11)
+def lv90_dtp(D, e):
+    """section index of the DTP named at [Level+0x90] +0x1c (Level+0x90 = external relocation to section T, T +0x1c =
+    idref type 7; 17p / 17q, ENGINE.md section 2: one DTP family {u32 n, ptr, ptr, float records}) or None"""
+    if not D.sections or D.sections[0].type != 0: return None
+    t = {so: (si, do) for si, so, do in R.parse(bytes(D.sections[0].reloc), e).external}.get(0x90)
+    if t is None or t[0] >= len(D.sections): return None
+    si, do = t
+    T = D.sections[si]; r = R.parse(bytes(T.reloc), e)
+    if {o: ty for ty, o in list(r.idref) + list(r.idref_a)}.get(do + 0x1c) != 7 or do + 0x20 > len(T.data): return None
+    did = struct.unpack_from(('>' if e == 'be' else '<') + 'I', bytes(T.data), do + 0x1c)[0]
+    return next((k for k, s in enumerate(D.sections) if s.type == 7 and s.id == did), None)
+
+
+def lv90_base():
+    """[(unit, Xbox DTP, PC DTP)] of the base level units (PC file list l<n>_*.drm, PC bigfile.000 / Xbox layer1 / 2)
+    whose [Level+0x90]+0x1c DTP exists on both sides with the same size"""
+    if 'lv90' in _ST: return _ST['lv90']
+    from archive import Archive
+    from names import crc
+    names = sorted({l.strip()[5:].lower() for l in open(PC_FILELIST, encoding='utf-8', errors='ignore')
+                    if l.lower().startswith('pc-w\\') and LV90_UNIT.match(l.strip()[5:].lower())})
+    P = Archive(PCBIG, 'le'); XA = [Archive(p, 'be') for p in XLAYERS]
+    out = []
+    for n in names:
+        r = P.find(crc('pc-w\\' + n), 0xffffffff) or P.find(crc('pc-w\\' + n))
+        if not r: continue
+        X = None
+        for A in XA:
+            q = A.find(crc('xenon-w\\' + n), 0xffffffff) or A.find(crc('xenon-w\\' + n))
+            if q: X = DW.read(A.read(q[0]), 'be'); break
+        if X is None: continue
+        PD = DW.read(P.read(r[0]), 'le')
+        kx, kp = lv90_dtp(X, 'be'), lv90_dtp(PD, 'le')
+        if kx is None or kp is None or len(X.sections[kx].data) != len(PD.sections[kp].data): continue
+        out.append((n, X.sections[kx], PD.sections[kp]))
+    _ST['lv90'] = out
+    return out
+
+
+def fp_stats():
+    """dtp_audit structure keys over the base Xbox / PC DTP pairs (dtp_audit.base_pairs: same size, same internal
+    pointers; palindromic and non-permutation words skipped, as dtp_audit.learn) -> (total, (fold 0, fold 1)), each
+    {key: [n, s32, s16, raw, b2s16, s16b2]} = informative samples and how many each byte order explains; folds by DRM
+    (dtp_audit.fold) for the held-out proof"""
+    if 'fp' in _ST: return _ST['fp']
+    import dtp_audit as DA
+    tot, folds = {}, ({}, {})
+    for x, p, xb, pc, xr in DA.base_pairs():
+        f = DA.fold(xb['src']); xd, pd = xb['data'], pc['data']
+        for o, k in DA.word_keys(xd, xr):
+            c = DA.cls(xd[o:o + 4], pd[o:o + 4])
+            if c == DA.ALL or c == 0: continue
+            for S in (tot, folds[f]):
+                v = S.get(k)
+                if v is None: v = S[k] = [0] * 6
+                v[0] += 1
+                for q in range(5):
+                    if c >> q & 1: v[q + 1] += 1
+    _ST['fp'] = (tot, folds)
+    return _ST['fp']
+
+
+def one_order(x, p):
+    """p is at least one of the five byte orders of x and not both raw and s32 (a palindrome gives no evidence)"""
+    import dtp_audit as DA
+    c = [n for n in DA.NAMES if bytes(x[j] for j in DA.PERMS[n]) == p]
+    return bool(c) and not ('raw' in c and 's32' in c)
+
+
+def od_base(name):
+    """(Xbox, PC) object data DTP (object +8 of the first object section) of a base DRM, same size, or None"""
+    k = ('od', name)
+    if k not in _ST:
+        X, P = base_unit(name)
+        def od(D, e):
+            if D is None: return None
+            E = '>' if e == 'be' else '<'
+            for s in D.sections:
+                if s.type == 11 and len(s.data) >= 12:
+                    i = struct.unpack_from(E + 'I', bytes(s.data), 8)[0]
+                    return next((t for t in D.sections if t.type == 7 and t.id == i), None)
+            return None
+        bx, bp = od(X, 'be'), od(P, 'le')
+        _ST[k] = (bx, bp) if bx is not None and bp is not None and len(bx.data) == len(bp.data) else None
+    return _ST[k]
+
+
+OD_CACHE = os.path.join(HERE, '..', 'work', 'generic', 'odtwin_align.pkl')
+
+
+def od_align(a, b):
+    """{offset in a: offset in b} of the words inside the equal blocks of a difflib alignment of two word sequences
+    (autojunk off, as 17l align_twin.py), and the word count of a. difflib needs ~8 min per thrall DTP (10 000 words),
+    so the matching blocks are cached by the sha1 of both inputs in work/generic/odtwin_align.pkl (a cache miss
+    recomputes; the result depends only on the two byte strings)"""
+    import difflib, hashlib
+    key = hashlib.sha1(a).hexdigest() + ':' + hashlib.sha1(b).hexdigest()
+    C = _ST.get('odc')
+    if C is None:
+        try: C = pickle.load(open(OD_CACHE, 'rb'))
+        except Exception: C = {}
+        _ST['odc'] = C
+    blocks = C.get(key)
+    if blocks is None:
+        wa = [a[o:o + 4] for o in range(0, len(a) - 3, 4)]; wb = [b[o:o + 4] for o in range(0, len(b) - 3, 4)]
+        blocks = [tuple(x) for x in difflib.SequenceMatcher(None, wa, wb, autojunk=False).get_matching_blocks()]
+        C[key] = blocks
+        try:
+            tmp = OD_CACHE + '.%d.tmp' % os.getpid()
+            pickle.dump(C, open(tmp, 'wb')); os.replace(tmp, OD_CACHE)
+        except Exception:
+            pass
+    m = {}
+    for i, j, n in blocks:
+        for q in range(n): m[4 * (i + q)] = 4 * (j + q)
+    return m, len(a) // 4
+
+
+def od_copies(XD):
+    """[(section index, DTP)] of the Xbox DRM's record-shaped type-7 DTPs (objdata_rec_classes.records) that are NOT the
+    object +8 data of an object of this DRM (copies of another enemy's object data: viking_thrall_tutorial_dlc2_
+    24424, yeti_thrall_armored_dlc2_ 24575 - objrec / fxrecread walk only object +8 data)"""
+    import objdata_rec_classes as RC, objdata_fx_fix as OF
+    ods = set(OF.od_ids(XD, 'be'))
+    return [(k, s) for k, s in enumerate(XD.sections) if s.type == 7 and s.id not in ods
+            and RC.records(bytes(s.data), 'be', bytes(s.reloc))[0]]
+
+
+def fp_want(v, xw):
+    """the PC word of Xbox word xw at a key with statistics v: None when < FP_MIN samples or the byte orders that
+    explain every sample give different words for xw"""
+    if v is None or v[0] < FP_MIN: return None
+    import dtp_audit as DA
+    ws = {bytes(xw[j] for j in DA.PERMS[DA.NAMES[q]]) for q in range(5) if v[q + 1] == v[0]}
+    return ws.pop() if len(ws) == 1 else None
+
+
 def proof_counts(rule):
     """base-pair statistics of one rule -> dict (contra = base words that contradict the rule)"""
     got = collections.Counter()
@@ -784,6 +957,57 @@ def proof_counts(rule):
                 if pw != xperm(xw, c): got['contra'] += 1
                 elif len({xperm(xw, k) for k in XPERMS}) == 1: got['amb'] += 1
                 else: got['ok'] += 1
+    elif rule == 'lv90dtp':
+        # every non-slot word of the base [Level+0x90]+0x1c DTPs: PC = s32 of the Xbox word (ok: only s32 fits; amb:
+        # s32 and another order give the same bytes; other: no byte order = not data of this rule's kind, counted);
+        # contra = a PC word in another byte order only
+        B = lv90_base()
+        got['pairs'] = len(B)
+        for n, x, p in B:
+            sl = slots(x, 'be') | slots(p, 'le'); xd, pd = bytes(x.data), bytes(p.data)
+            for o in range(0, len(xd) - 3, 4):
+                if o in sl: got['slot'] += 1; continue
+                xw, pw = xd[o:o + 4], pd[o:o + 4]
+                m = [c for c in PERMS if perm(xw, c) == pw]
+                if 's32' in m: got['ok' if len(m) == 1 else 'amb'] += 1
+                elif m or byteorder(xw, pw): got['contra'] += 1
+                else: got['other'] += 1
+    elif rule == 'odtwin':
+        # the premise on the base: two base enemies' object data (viking_thrall / yeti_thrall) aligned the same way -
+        # where the Xbox words are equal inside an equal block and both PC words are one byte order, they must agree
+        names = sorted(set(OD_TWINS.values()))
+        T = {n: od_base(n) for n in names}
+        got['bases'] = sum(1 for v in T.values() if v is not None)
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                if T[a] is None or T[b] is None: continue
+                (ax, ap), (bx, bp) = T[a], T[b]
+                axd, apd, bxd, bpd = bytes(ax.data), bytes(ap.data), bytes(bx.data), bytes(bp.data)
+                asl = slots(ax, 'be') | slots(ap, 'le'); bsl = slots(bx, 'be') | slots(bp, 'le')
+                m, nw = od_align(axd, bxd)
+                got['aligned'] += len(m)
+                for o, ob in m.items():
+                    if o in asl or ob in bsl: continue
+                    xw = axd[o:o + 4]
+                    if not one_order(xw, apd[o:o + 4]) or not one_order(xw, bpd[ob:ob + 4]): got['no_single_order'] += 1
+                    elif apd[o:o + 4] == bpd[ob:ob + 4]: got['agree'] += 1
+                    else: got['contra'] += 1
+    elif rule == 'fpkeys':
+        # keys with >= FP_MIN samples whose explaining orders are unanimous (in-sample contradictions are 0 by
+        # construction); held-out: rules of one DRM fold applied to the other fold's samples (decided / wrong)
+        import dtp_audit as DA
+        tot, folds = fp_stats()
+        got['keys'] = sum(1 for v in tot.values() if v[0] >= FP_MIN and max(v[1:]) == v[0])
+        got['samples'] = sum(v[0] for v in tot.values())
+        for x, p, xb, pc, xr in DA.base_pairs():
+            f = DA.fold(xb['src']); xd, pd = xb['data'], pc['data']; other = folds[1 - f]
+            for o, k in DA.word_keys(xd, xr):
+                c = DA.cls(xd[o:o + 4], pd[o:o + 4])
+                if c == DA.ALL or c == 0: continue
+                w = fp_want(other.get(k), xd[o:o + 4])
+                if w is None: continue
+                got['loo_n'] += 1
+                if w != pd[o:o + 4]: got['loo_wrong'] += 1
     got.setdefault('contra', 0)
     return dict(got)
 
@@ -832,7 +1056,7 @@ def _want_rows(k, x, p, words, rows, kept, tag, sl):
         else: kept.append((k, o, xw, pw, want, tag))
 
 
-def plan(rule, XD, PD, rel=''):
+def plan(rule, XD, PD, rel='', pack=None):
     """-> dict(rows=[(PC section index, offset, Xbox word, PC word, wanted word, tag)], kept=[...], notes=[...])"""
     rows, kept, notes = [], [], []
     if rule in ('fadecard', 'uberanim', 'sgmesh', 'fxrec'):
@@ -961,19 +1185,85 @@ def plan(rule, XD, PD, rel=''):
                         if pw == want: continue
                         t = (k, bp + o, xw, pw, want, 'fxrecread DTP %d copy %d rec %d +%#x %s' % (did, c, j, o, cl))
                         (rows if byteorder(xw, pw) and byteorder(xw, want) else kept).append(t)
+    elif rule == 'lv90dtp':
+        # the [Level+0x90]+0x1c DTP of a unit: every word s32 (17p: 47 base pairs, 301 268 words, 0 raw; 17q:
+        # dlc2_ceremony_room DTP 25696 107 words left raw = BE floats, dlc2_machine_room 25390 6)
+        kx, kp = lv90_dtp(XD, 'be'), lv90_dtp(PD, 'le')
+        if kx is None or kp is None: return dict(rows=rows, kept=kept, notes=notes)
+        x, p = XD.sections[kx], PD.sections[kp]
+        if x.id != p.id or len(x.data) != len(p.data):
+            notes.append('[Level+0x90]+0x1c DTP: Xbox %d %d B / PC %d %d B - skipped' % (x.id, len(x.data), p.id, len(p.data)))
+            return dict(rows=rows, kept=kept, notes=notes)
+        _want_rows(kp, x, p, {o: 's32' for o in range(0, len(x.data) - 3, 4)}, rows, kept, 'lv90dtp DTP %d' % p.id,
+                   slots(x, 'be') | slots(p, 'le'))
+    elif rule == 'odtwin':
+        # thrall object data COPIES (record-shaped DTPs that are not object +8 data of this DRM, size within 0.8-1.25 of
+        # the base twin): difflib-aligned with the base enemy's object data (17l align_twin.py); a word inside an equal
+        # block (same Xbox word) gets the base PC word when that is one byte order of it (not palindromic)
+        stem = os.path.basename(rel.replace('\\', '/'))[:-4].lower() if rel else ''
+        bn = OD_TWINS.get(stem)
+        if bn is None: return dict(rows=rows, kept=kept, notes=notes)
+        tw = od_base(bn)
+        if tw is None:
+            notes.append('base %s: no object data pair of one size - skipped' % bn); return dict(rows=rows, kept=kept, notes=notes)
+        bx, bp = tw; bxd, bpd = bytes(bx.data), bytes(bp.data); bsl = slots(bx, 'be') | slots(bp, 'le')
+        cp = {id(s) for q, s in od_copies(XD) if 0.8 * len(bxd) <= len(s.data) <= 1.25 * len(bxd)}
+        for k, x, p in pairs(XD, PD):
+            if id(x) not in cp: continue
+            if x.type != 7 or p.type != 7 or x.id != p.id or len(x.data) != len(p.data): continue
+            xd = bytes(x.data)
+            m, nw = od_align(xd, bxd)
+            if len(m) < OD_MIN * nw:
+                notes.append('DTP %d: %d of %d words aligned to %s - below %d %%, skipped' % (p.id, len(m), nw, bn, 100 * OD_MIN))
+                continue
+            sl = slots(x, 'be') | slots(p, 'le')
+            w = {o: bpd[ob:ob + 4] for o, ob in m.items() if o not in sl and ob not in bsl and xd[o:o + 4] == bxd[ob:ob + 4]
+                 and one_order(xd[o:o + 4], bpd[ob:ob + 4])}
+            notes.append('DTP %d: %d of %d words aligned to %s object data %d' % (p.id, len(m), nw, bn, bp.id))
+            _want_rows(k, x, p, w, rows, kept, 'odtwin DTP %d (%s)' % (p.id, bn), sl)
+    elif rule == 'fpkeys':
+        # dtp_audit structure keys with >= FP_MIN unanimous base samples (17l fp100); not the unit DTP (introtyped and
+        # its owner decision 7 own it), not DTPs whose Xbox bytes are a base section (pc_copy / basecopy route), not
+        # DTPs whose internal pointer layout differs from the Xbox section; only words whose PC bytes are a byte order
+        # of the Xbox word. Only DLC 1 / DLC 2 pack sources (FP_PACKS): the costume packs were never played and are
+        # left to the owner (their counts are listed in docs Befund-Datenwoerter-Schritt-1111.md)
+        if pack is not None and pack not in FP_PACKS:
+            notes.append('pack %s: fpkeys writes only %s - skipped' % (pack, '/'.join(FP_PACKS)))
+            return dict(rows=rows, kept=kept, notes=notes)
+        import dtp_audit as DA, fxrec_relayout_fix as FR
+        tot, _ = fp_stats(); st, ids, pcn = store()
+        own = {unit_dtp(PD, 'le'), lv90_dtp(PD, 'le')}       # sections introtyped / lv90dtp rule
+        xids = {s.id for s in XD.sections if s.type == 7}
+        for k, x, p in pairs(XD, PD):
+            # same id, or a base id the converter's base id map renumbered (lara_doppelganger 961 / 1581, thrall 17088)
+            if x.type != 7 or p.type != 7 or len(x.data) != len(p.data) or k in own: continue
+            if x.id != p.id and ids.base[7].get(x.id) != p.id: continue
+            if FR.table_dtp(x, xids): continue                   # fxrelayout's re-laid record arrays
+            xd, pd = bytes(x.data), bytes(p.data)
+            xb = st['xb_store'].get((7, x.id))
+            if xb is not None and xb['data'] == xd and xb['reloc'] == bytes(x.reloc): continue
+            xr = R.parse(bytes(x.reloc), 'be')
+            if dict(xr.internal) != dict(R.parse(bytes(p.reloc), 'le').internal): continue
+            w = {}
+            for o, key in DA.word_keys(xd, xr):
+                if not byteorder(xd[o:o + 4], pd[o:o + 4]): continue
+                want = fp_want(tot.get(key), xd[o:o + 4])
+                if want is not None: w[o] = want
+            if w: _want_rows(k, x, p, w, rows, kept, 'fpkeys DTP %d' % p.id, slots(x, 'be') | slots(p, 'le'))
     else:
         raise SystemExit('rule? %s' % rule)
     return dict(rows=rows, kept=kept, notes=notes)
 
 
-def fix_drm(rule, XD, raw, rel=''):
+def fix_drm(rule, XD, raw, rel='', pack=None):
     """-> (new raw or None, changes [(k, offset, old, new, section id, tag)], info). The base proof of the rule must hold
     (SystemExit otherwise). Proven write: decoded bytes differ only in the planned bytes, headers / relocations / names
-    identical, re-plan 0 rows - AssertionError otherwise (the caller keeps its DRM)."""
+    identical, re-plan 0 rows - AssertionError otherwise (the caller keeps its DRM). pack = label of the Xbox source
+    ('pack11'; only fpkeys reads it)."""
     ok, lines = proven(rule)
     if not ok: raise SystemExit('%s: base proof FAILED - %s' % (rule, ' / '.join(lines[-2:])))
     PD = DW.read(raw, 'le')
-    info = plan(rule, XD, PD, rel)
+    info = plan(rule, XD, PD, rel, pack)
     if not info['rows']: return None, [], info
     changes = []
     for k, o, xw, pw, want, tag in info['rows']:
@@ -996,7 +1286,7 @@ def fix_drm(rule, XD, raw, rel=''):
     planned = {bases[k] + o + j for k, o, a, b, sid, tag in changes for j in range(4) if a[j] != b[j]}
     diff = {i for i in range(len(dec0)) if dec0[i] != dec1[i]}
     assert diff == planned, 'byte diff %d != planned %d' % (len(diff), len(planned))
-    again = plan(rule, XD, D1, rel)
+    again = plan(rule, XD, D1, rel, pack)
     assert not again['rows'], 're-plan %d rows' % len(again['rows'])
     return out, changes, info
 
@@ -1024,7 +1314,7 @@ def main(argv):
         if xr is None: continue
         XD = DW.read(cdrm_decode(xr, 'be'), 'be'); raw = open(path, 'rb').read()
         for r in rules:
-            new, ch, info = fix_drm(r, XD, raw, rel)
+            new, ch, info = fix_drm(r, XD, raw, rel, os.path.basename(src.replace('\\', '/')).split('.')[0])
             if ch or info['kept'] or info['notes']:
                 line = '%-10s %-55s %d words, %d kept (no byte order)%s' % (r, rel, len(ch), len(info['kept']),
                                                                          ('; ' + '; '.join(info['notes'])) if info['notes'] else '')

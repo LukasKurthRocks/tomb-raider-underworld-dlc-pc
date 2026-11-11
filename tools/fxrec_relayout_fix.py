@@ -20,6 +20,11 @@ zero on the Xbox and no relocation (pointer source, pointer target other than P,
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/fxrec_relayout_fix.py basepair NAME [NAME ...]   proof: rebuild = Crystal's PC bytes?
   ../bin/pyt -t 900 tools/fxrec_relayout_fix.py check PC.drm [--pack pack11] [--out OUT.drm] [--md5 TREE]
+  ../bin/pyt -t 1800 tools/fxrec_relayout_fix.py proof    rebuild = Crystal's PC bytes on every base table-record DTP
+        of the PC file list's fx_*.drm (pinned counts; exit 1 otherwise)
+Library (step `fxrelayout` of tools/dlc_struct_fixes.py, 2026-11-11 Q5 = the R3 DTPs of the played tree
+  dlc_test51i_ids): proven() -> (ok, counts) once per process; fix_drm(XD, raw) -> (new raw or None, edits, counts),
+  proven write (only bytes inside the re-laid arrays, sizes / relocations identical, re-plan 'already PC layout').
 """
 import sys, os, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,6 +34,9 @@ import objdata_idword_fix as OI
 LAYOUT = {0x00: 'u16u16', 0x04: 'u32', 0x08: 'u8u8u16', 0x0c: 'u16u16', 0x10: 'u16u16'}
 PERMS = {'u32': (3, 2, 1, 0), 'u16u16': (1, 0, 3, 2), 'u8u8u16': (0, 1, 3, 2)}
 XS, PS = 0x24, 0x28
+PC_FILELIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ref', 'yura-release', 'FileLists',
+                           'Tomb Raider Underworld (PC).txt')
+PROOF_EXPECT = {'files': 21, 'records': 42, 'equal': 21, 'DIFF': 0}   # calibrated 2026-11-11 (Q5)
 
 
 def table_dtp(x, xids):
@@ -96,12 +104,79 @@ def plan(XD, PD, label, log=print):
     return edits, st
 
 
+def proof_counts():
+    """every table-record DTP (table_dtp on the Xbox bytes) of the base fx_*.drm pairs (PC file list; Xbox
+    TitleUpdate / layer1 / layer2, PC patch / bigfile): rebuild from the Xbox bytes == Crystal's PC bytes ('equal'),
+    else 'DIFF'; 'problem' = rebuild reports a problem"""
+    import dtp_word_classes as C
+    import converter_faults_fix as CF
+    mk = lambda secs: DW.Drm([DW.Section(s['type'], s['id'], s['data'] or b'', s['reloc'] or b'') for s in secs])
+    names = sorted({l.strip()[5:].lower() for l in open(PC_FILELIST, encoding='utf-8', errors='ignore')
+                    if l.lower().startswith('pc-w\\fx_') and l.strip().lower().endswith('.drm')})
+    tot = collections.Counter()
+    for name in names:
+        X = C.find(C.BASE, 'be', 'xenon-w' + C.BS + name)
+        if X is None: continue
+        P_ = C.find(C.PC, 'le', 'pc-w' + C.BS + name)
+        if P_ is None: continue
+        XD, PD = mk(X), mk(P_)
+        pmap = OI.id_map(XD, PD); xids = {s.id for s in XD.sections if s.type == 7}
+        hit = False
+        for k, x, p in CF.pairs_by_position(XD, PD):
+            if x.type != 7 or p.type != 7 or len(x.data) != len(p.data): continue
+            t = table_dtp(x, xids)
+            if not t: continue
+            n, P = t; hit = True
+            new, bad = rebuild(x, n, P, pmap)
+            tot['records'] += n
+            tot['problem' if bad else 'equal' if bytes(p.data[P:P + PS * n]) == new else 'DIFF'] += 1
+        tot['files'] += hit
+    tot.setdefault('DIFF', 0)
+    return dict(tot)
+
+
+_PROVEN = []
+
+
+def proven():
+    if not _PROVEN:
+        got = proof_counts()
+        _PROVEN.append((got.get('DIFF', 1) == 0 and got == PROOF_EXPECT, got))
+    return _PROVEN[0]
+
+
+def fix_drm(XD, raw):
+    """step fxrelayout on one DRM -> (new raw or None, edits [(k, P, old bytes, new bytes)], counts); proven write"""
+    PD = DW.read(raw, 'le')
+    edits, st = plan(XD, PD, '', log=lambda *a: None)
+    if not edits: return None, [], st
+    for k, P, cur, new in edits:
+        s = PD.sections[k]; d = bytearray(s.data); assert bytes(d[P:P + len(cur)]) == cur
+        d[P:P + len(new)] = new; s.data = bytes(d)
+    out = PD.write('le')
+    if raw[:4] == b'CDRM': out = DW.cdrm_encode(out, 'le')
+    D0, D1 = DW.read(raw, 'le'), DW.read(out, 'le')
+    assert len(D0.sections) == len(D1.sections) and (D0.names, D0.pad, D0.ver) == (D1.names, D1.pad, D1.ver), 'header changed'
+    for k, (a, b) in enumerate(zip(D0.sections, D1.sections)):
+        assert (a.type, a.id, a.flags, a.reloc, len(a.data)) == (b.type, b.id, b.flags, b.reloc, len(b.data)), 'section changed'
+        rng = [(P, P + len(new)) for kk, P, cur, new in edits if kk == k]
+        assert all(any(lo <= i < hi for lo, hi in rng) for i in range(len(a.data)) if a.data[i] != b.data[i]), 'bytes outside'
+    again, _ = plan(XD, D1, '', log=lambda *a: None)
+    assert not again, 're-plan %d DTPs' % len(again)
+    return out, edits, st
+
+
 def main(argv):
     def opt(n, d):
         if n in argv:
             k = argv.index(n); v = argv[k + 1]; del argv[k:k + 2]; return v
         return d
     pack = opt('--pack', 'pack11'); out = opt('--out', None); md5 = opt('--md5', None)
+    if argv == ['proof']:
+        ok, got = proven()
+        print('fxrelayout base proof %s: %s%s' % ('PROVEN' if ok else 'FAILED', got,
+                                                  '' if got == PROOF_EXPECT else ' (expected %s)' % PROOF_EXPECT))
+        return 0 if ok else 1
     if len(argv) < 2: print(__doc__); return 2
     if argv[0] == 'basepair':
         import dtp_word_classes as C

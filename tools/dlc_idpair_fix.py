@@ -31,11 +31,19 @@ Usage (from the repository root):
   ../bin/pyt -t 1800 tools/dlc_idpair_fix.py basepair NAME [NAME ...]
   XBOX default: convert_dlc.raw_dlc(file name) with TRUDLC_PACK_FIRST=--pack (pack11 = DLC 2, pack10 = DLC 1)
   --md5 TREE writes TREE/md5.tsv (md5 + path relative to TREE/mods) after --out
+  ../bin/pyt -t 900 tools/dlc_idpair_fix.py proof      R1 on Crystal's base pairs, pinned counts (exit 1 otherwise)
+Library (step `idpair` of tools/dlc_struct_fixes.py, 2026-11-11 Q5 = the R1 words of the played tree dlc_test51i_ids):
+  proven() -> (ok, counts) once per process; fix_drm(XD, raw) -> (new raw or None, changes, counts), proven write
+  (decoded DRM differs only in the planned bytes, headers / relocations identical, re-check 0).
 """
 import sys, os, struct, collections, hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW, drm_reloc as R
 import objdata_idword_fix as OI
+
+# R1 base proof (Q5 2026-11-11): Crystal's PC viking_thrall / yeti_thrall hold every R1 id as the u32 PC id
+BASE_PROOF = ('viking_thrall.drm', 'yeti_thrall.drm')
+PROOF_EXPECT = {'R1 ok': 13, 'R1 to repair': 0}     # calibrated 2026-11-11 (6 viking + 7 yeti R1 records, all u32)
 
 
 def u16pair(v):
@@ -135,6 +143,59 @@ def apply(path, PD, changes, out):
     return other == 0 and words == len(changes)
 
 
+def proof_counts():
+    """R1 on Crystal's own PC base pairs (BASE_PROOF): counts of check_doc; 'R1 to repair' must be 0"""
+    import dtp_word_classes as C
+    mk = lambda secs: DW.Drm([DW.Section(s['type'], s['id'], s['data'] or b'', s['reloc'] or b'') for s in secs])
+    tot = collections.Counter()
+    for name in BASE_PROOF:
+        X = C.find(C.BASE, 'be', 'xenon-w' + C.BS + name); P = C.find(C.PC, 'le', 'pc-w' + C.BS + name)
+        if X is None or P is None: tot['no base pair'] += 1; continue
+        ch, st = check_doc(mk(X), mk(P), name + ' ', log=lambda *a: None, repair=('R1',))
+        tot.update({k: v for k, v in st.items() if k.startswith('R1')})
+        tot['R1 to repair'] += len(ch)
+    tot.setdefault('R1 to repair', 0)
+    return dict(tot)
+
+
+_PROVEN = []
+
+
+def proven():
+    """(ok, counts) of the R1 base proof, once per process: ok = no base R1 word to repair and the pinned counts"""
+    if not _PROVEN:
+        got = proof_counts()
+        _PROVEN.append((got.get('R1 to repair', 1) == 0 and got == PROOF_EXPECT, got))
+    return _PROVEN[0]
+
+
+def fix_drm(XD, raw):
+    """step idpair (R1 only) on one DRM -> (new raw or None, changes [(k, off, old, new, rule)], counts). Proven write:
+    the decoded DRM differs only in the planned bytes, section headers / relocations / names identical, re-check 0
+    (AssertionError otherwise)."""
+    PD = DW.read(raw, 'le')
+    ch, st = check_doc(XD, PD, '', log=lambda *a: None, repair=('R1',))
+    if not ch: return None, [], st
+    for k in sorted({c[0] for c in ch}):
+        d = bytearray(PD.sections[k].data)
+        for kk, o, old, new, rule in ch:
+            if kk == k:
+                assert bytes(d[o:o + 4]) == old; d[o:o + 4] = new
+        PD.sections[k].data = bytes(d)
+    out = PD.write('le')
+    if raw[:4] == b'CDRM': out = DW.cdrm_encode(out, 'le')
+    D0, D1 = DW.read(raw, 'le'), DW.read(out, 'le')
+    assert len(D0.sections) == len(D1.sections) and (D0.names, D0.pad, D0.ver) == (D1.names, D1.pad, D1.ver), 'header changed'
+    planned = {(k, o + j) for k, o, a, b, r in ch for j in range(4) if a[j] != b[j]}
+    for k, (a, b) in enumerate(zip(D0.sections, D1.sections)):
+        assert (a.type, a.id, a.flags, a.reloc, len(a.data)) == (b.type, b.id, b.flags, b.reloc, len(b.data)), 'section changed'
+        if a.data != b.data:
+            assert {(k, i) for i in range(len(a.data)) if a.data[i] != b.data[i]} == {q for q in planned if q[0] == k}, 'unplanned bytes'
+    again, _ = check_doc(XD, D1, '', log=lambda *a: None, repair=('R1',))
+    assert not again, 're-check %d words' % len(again)
+    return out, ch, st
+
+
 def main(argv):
     def opt(n, d):
         if n in argv:
@@ -142,6 +203,11 @@ def main(argv):
         return d
     pack = opt('--pack', 'pack11'); xp = opt('--xbox', None); out = opt('--out', None); md5 = opt('--md5', None)
     rep = opt('--repair', 'R1')
+    if argv == ['proof']:
+        ok, got = proven()
+        print('idpair R1 base proof %s: %s%s' % ('PROVEN' if ok else 'FAILED', got,
+                                                 '' if got == PROOF_EXPECT else ' (expected %s)' % PROOF_EXPECT))
+        return 0 if ok else 1
     if len(argv) < 2: print(__doc__); return 2
     if argv[0] == 'basepair':          # the rules on Crystal's own PC build of base-game files: proof of the u32 class
         import dtp_word_classes as C

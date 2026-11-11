@@ -76,6 +76,28 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              s16 (17o / 18e 2026-11-08: 11 032 base records)
              The eight typed_family_fix rules re-derive their truth from the base pairs once per process
              (typed_family_fix.proven: pinned counts, 0 contradicting words) and refuse to write or check without it.
+  Q5 steps (2026-11-11, workspace docs Befund-Datenwoerter-Schritt-1111.md: the R4 / R5 data words that only the played
+  test trees b270cmp / dlc_test51i_ids / crash17m / dopp17m / treecer / 51v_fix26_15f had), after fxrecread, before
+  seqrepeat, in this order:
+  idpair     tools/dlc_idpair_fix.py        rule R1 only: thrall sound records {0x50.., 0, 03000000, DTP id, n, 0, 0}: the
+             id = u32 PC id of the Xbox id's position partner where the converter wrote a u16 pair / kept the Xbox
+             bytes (base proof: Crystal's viking_thrall / yeti_thrall 13 / 13 u32; 51i: 26514 / 26803 / 26804)
+  fxrelayout tools/fxrec_relayout_fix.py    table-record DTPs (head +0x34 n, +0x38 records): Xbox stride 0x24 -> PC
+             0x28, fields u16u16 / u32 / u8u8u16 / u16u16 / u16u16 / u32 PC id (base proof: 21 fx DTPs / 42 records
+             rebuilt = Crystal's PC bytes; 51i: torches 25815 / 24851 / 25126, cine object 26644, cannonball 25326,
+             upcolumn pit 26484)
+  lv90dtp    tools/typed_family_fix.py      the DTP named at [Level+0x90] +0x1c: every word s32 (81 base units, 0
+             contradicting; 17q: ceremony_room 25696 107 BE floats left raw, machine_room 25390 6)
+  odtwin     tools/typed_family_fix.py      thrall object data COPIES (record-shaped DTPs that are not object +8 data of
+             their DRM: viking_thrall_tutorial_dlc2_ 24424, yeti_thrall_armored_dlc2_ 24575) by the difflib-aligned
+             base enemy object data (17l align_twin; base proof viking vs yeti 4165 / 4165 agree)
+  fpkeys     tools/typed_family_fix.py      dtp_audit structure keys with >= 100 unanimous base samples (17l fp100);
+             not the unit DTP (introtyped), the lv90 DTP, table-record DTPs or base-content DTPs; DLC 1 / DLC 2 packs
+             only (costume packs: never played, left to the owner); held-out proof pinned
+             The three typed_family_fix rules prove themselves like the other typed rules; idpair / fxrelayout run
+             their base proof once per process (dlc_idpair_fix.proven / fxrec_relayout_fix.proven, SystemExit when
+             it fails). None of them writes a word another step rules (fpkeys skips the sections the others own;
+             check mode of every step on the result: 0).
   seqrepeat  tools/soundplex_sequence_fix.py SoundPlex Sequence nodes (type 10): the word data +0xc (s8 repeat + 3 bytes)
              raw = the Xbox bytes, as on every informative base pair (`soundplex_sequence_fix.py proof`; F5 2026-11-05:
              the converter u32-swapped `01 00 00 00` to `00 00 00 01` = repeat 0 = endless, the doppelganger's
@@ -160,6 +182,9 @@ MARKUP_TYPES = {1, 22, 23}    # markup type chars of the DLC 2 object markup (ma
 FADE_OBJECTS = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
 FADE_FIRST_ID = 2494          # section_id_free.py 9 2494 45 ... (test 48g): 2494-2531 free; 2491-2493 = test 46
 XOBJLIST = os.path.join(W, 'generic', 'lists', 'dlc_pack11_objectlist.txt')
+# Q5 (2026-11-11): the R4 / R5 data words of the played test trees as steps, after fxrecread, before seqrepeat
+Q5_STEPS = ('idpair', 'fxrelayout', 'lv90dtp', 'odtwin', 'fpkeys')
+ALL = ALL[:ALL.index('seqrepeat')] + Q5_STEPS + ALL[ALL.index('seqrepeat'):]
 
 
 def quiet(fn, *a):
@@ -654,7 +679,7 @@ class Steps:
     def _typed(self, rule, rel, XD, cur):
         import typed_family_fix as TF
         try:
-            new, changes, info = TF.fix_drm(rule, XD, cur, rel)
+            new, changes, info = TF.fix_drm(rule, XD, cur, rel, self.xpack)
         except AssertionError as e:
             return None, '%s %s: proof failed (%s) - nothing changed' % (rule, rel, e)
         kept = info['kept']
@@ -698,6 +723,46 @@ class Steps:
     def s_fxrecread(self, rel, xf, XD, cur):
         """0x17c particle records at the offsets objrec does not rule, by the reads of tru.exe 0x543f70 (17o / 18e)"""
         return self._typed('fxrecread', rel, XD, cur)
+
+    # ---- Q5 (2026-11-11): the R4 / R5 data words of the played test trees
+    def _q5_tool(self, name, mod, rel, XD, cur, fmt):
+        """idpair / fxrelayout: the tool's base proof once per process (SystemExit when it fails), then its proven
+        fix_drm (AssertionError -> nothing changed, logged as 'proof failed')"""
+        ok, got = mod.proven()
+        if not ok: raise SystemExit('%s: base proof FAILED - %s (expected %s)' % (name, got, mod.PROOF_EXPECT))
+        try:
+            new, changes, st = mod.fix_drm(XD, cur)
+        except AssertionError as e:
+            return None, '%s %s: proof failed (%s) - nothing changed' % (name, rel, e)
+        if new is None: return None, None
+        return new, '%s %s: %d %s (%s); %s' % (name, rel, len(changes), 'words' if name == 'idpair' else 'DTPs',
+                                              self._wlist(fmt(c) for c in changes), self.PROOF_NOTE)
+
+    def s_idpair(self, rel, xf, XD, cur):
+        """thrall sound record ids (R1) = u32 PC id (tools/dlc_idpair_fix.py; 51i_ids)"""
+        import dlc_idpair_fix as IP
+        PD = DW.read(cur, 'le')
+        return self._q5_tool('idpair', IP, rel, XD, cur, lambda c: 'DTP %d +0x%x %s -> %s' % (
+            PD.sections[c[0]].id, c[1], c[2].hex(), c[3].hex()))
+
+    def s_fxrelayout(self, rel, xf, XD, cur):
+        """table-record DTPs re-laid to the PC stride 0x28 (tools/fxrec_relayout_fix.py; 51i_ids)"""
+        import fxrec_relayout_fix as FR
+        PD = DW.read(cur, 'le')
+        return self._q5_tool('fxrelayout', FR, rel, XD, cur, lambda c: 'DTP %d +0x%x %d B' % (
+            PD.sections[c[0]].id, c[1], len(c[3])))
+
+    def s_lv90dtp(self, rel, xf, XD, cur):
+        """[Level+0x90]+0x1c DTP every word s32 (17p / 17q, typed_family_fix)"""
+        return self._typed('lv90dtp', rel, XD, cur)
+
+    def s_odtwin(self, rel, xf, XD, cur):
+        """thrall object data copies by the aligned base twin (17l align_twin, typed_family_fix)"""
+        return self._typed('odtwin', rel, XD, cur)
+
+    def s_fpkeys(self, rel, xf, XD, cur):
+        """dtp_audit structure keys with >= 100 unanimous base samples (17l fp100, typed_family_fix)"""
+        return self._typed('fpkeys', rel, XD, cur)
 
     def s_seqrepeat(self, rel, xf, XD, cur):
         """SoundPlex Sequence nodes: data +0xc raw (tools/soundplex_sequence_fix.fix_drm, F5 2026-11-05, finding 49).
@@ -847,7 +912,7 @@ def run_twins(srcs, out, names, tmp):
     return files, log
 
 
-CHECK_STEPS = ('objtex', 'objrec', 'objid') + DATAFIX_STEPS + TYPED_STEPS + ('seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass)
+CHECK_STEPS = ('objtex', 'objrec', 'objid') + DATAFIX_STEPS + TYPED_STEPS + Q5_STEPS + ('seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass); Q5_STEPS since 2026-11-11
 CHECK_ALLOWED = CHECK_STEPS   # navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS); the
                               # 2026-11-07 data fixes (DATAFIX_STEPS) since 2026-11-08, the typed families (TYPED_STEPS,
                               # 17n) since 2026-11-08
@@ -888,7 +953,7 @@ def run_check(tree, steps, names=None, report=None):
                     rep[s]['files'].append(rel)
                 # navraw: a unit the rule cannot pair or whose proof failed is not "ok" either (nothing is assumed);
                 # the same for the data fix steps (2026-11-08)
-                if (s == 'navraw' or s in DATAFIX_STEPS or s in TYPED_STEPS) and any('NOT PAIRED' in l or 'proof failed' in l for l in log) \
+                if (s == 'navraw' or s in DATAFIX_STEPS or s in TYPED_STEPS or s in Q5_STEPS) and any('NOT PAIRED' in l or 'proof failed' in l for l in log) \
                         and rel not in rep[s]['files']:
                     rep[s]['files'].append(rel)
                 rep[s]['lines'] += log
