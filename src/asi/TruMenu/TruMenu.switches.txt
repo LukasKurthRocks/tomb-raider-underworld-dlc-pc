@@ -49,6 +49,7 @@ TruShadowCombat | States | Translate1019 | bool | Zustand 1019 (Kampf-Hub) | Sta
 TruShadowCombat | States | Translate1020 | bool | Zustand 1020 (nach Finisher) | State 1020 (after finisher) | live | 0 | Zustand 1020 nach dem Finisher wirkt // State 1020 after the finisher acts
 TruShadowCombat | States | Translate1004 | bool | Zustand 1004 Trefferliste | State 1004 hit list | live | 0 | 1004 behält die Finisher-Trefferliste (auch Slot 1) // 1004 keeps the finisher hit list (also slot 1)
 TruShadowCombat | States | Translate1008 | bool | Finisher Y 1008 wie TU | Finisher Y 1008 as TU | live | 0 | Lara landet am Thrall statt dahinter (Q19) // Lara lands on the thrall, not past it (Q19) | TruShadowCombat 0.6.11
+TruShadowCombat | States | Translate1015Exit | bool | Finisher-Y-Tötung 1015 wie TU | Finisher Y kill 1015 as TU | live | 0 | Thrall stirbt am Ende von Finisher Y (Q37) // Thrall dies at the end of finisher Y (Q37) | TruShadowCombat 0.6.12
 TruShadowCombat | States | Translate231Slot0 | bool | Zustand 231 Slot 0 | State 231 slot 0 | live | 0 | Zustand 231 Slot 0 mit dem TU-Doppel-Helfer // State 231 slot 0 with the TU doppelganger helper
 TruShadowCombat | States | Translate231Slot1 | bool | Zustand 231 Slot 1 | State 231 slot 1 | live | 0 | Zustand 231 Slot 1 wie TU // State 231 slot 1 as TU
 TruShadowCombat | Strike | Translate | bool | Schattenschlag wie TU | Shadow strike as TU | live | 0 | TU-Schattenschlag; braucht Gate oder Translate beim Start // TU shadow strike; needs Gate or Translate at start
@@ -147,6 +148,7 @@ TruDlc2Player | Dlc2Player | FlagReset | bool | Neues Spiel: Doppel-Flag aus | N
 TruDlc2Player | Dlc2Player | CostumeReset | bool | Kostüm außerhalb DLC 2 zurück | Costume reset outside DLC 2 | restart | 1 | DLC-2-Kostüm außerhalb von DLC 2 -> Unit-Standard // DLC 2 costume outside DLC 2 -> the unit default
 TruDlc2Player | Dlc2Player | TrackerFlag | bool | Tracker-Flag +0x1244 | Tracker flag +0x1244 | restart | 1 | DoppelgangerInit setzt gameTracker+0x1244 = 1 // DoppelgangerInit sets gameTracker+0x1244 = 1
 TruDlc2Player | Costume | TuMapping | bool | TU-Kostüm-Abbildung 857/11 | TU costume map 857/11 | restart | 0 | Kostüm 857 <-> 11 beim Speichern / Laden / Spawnen // Costume 857 <-> 11 in save / load / spawn
+TruDlc2Player | Mission | DialogStart | bool | DLC-2-Start ohne Outfit-Wahl | DLC 2 start w/o outfit choice | restart | 1 | Pausenmenü -> DLC 2: ohne Outfit-Wahl, wie TU // Pause menu -> DLC 2: no outfit selection, as TU | TruDlc2Player 0.6
 TruDlc2Player | Dlc2Player | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = jeder neue Game-Tracker // 2 = every new game tracker
 
 group | merclang | Söldner-Sprache (TruMercLang) | Mercenary language (TruMercLang)

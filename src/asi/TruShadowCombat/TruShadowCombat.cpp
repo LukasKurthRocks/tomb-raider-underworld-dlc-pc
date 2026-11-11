@@ -69,6 +69,10 @@
 //    0x82455a38, 0x8245fa40, 0, 0} - enter / tick steer Lara's motion channel onto the target of targeter TU 7 (PC slot
 //    6), the PC's slot 4 tru+0x36d9a0 (retail, removed by the TU) is not run - [States] Translate1008, default off,
 //    live; every level (the TU has no doppelganger test there).
+// 18. 0.6.12 (Q37, the thrall got up again after the finisher Y): the TU-new exit of state 1015 0x8245fe58
+//    ("ThrallFatalityEnd") - the finisher's target in CM+0x48 still valid -> death switch kind 0 (LP 0, Death state)
+//    with v = Lara - target, z = 0, then the retail clear (PC slot 2 tru+0x35e0f0) - [States] Translate1015Exit,
+//    default off, live.
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -85,7 +89,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.11 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.12 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -125,7 +129,9 @@ const char kVersion[] = "TruShadowCombat 0.6.11 (TU target list 7 -> 10, conditi
                         "+0x48 = (int) A+0x10 / A+0x14 as the TU 0x823e169c (tru+0x319169, knockback speed; [Hit] "
                         "TranslateHitSpeed, on by default); 0.6.11: state 1008 (finisher Y move) as the TU 0x8245f7b0 / "
                         "0x8245fa40 - steer onto the target of targeter TU 7 every tick, PC slot 4 tru+0x36d9a0 not run "
-                        "([States] Translate1008, off by default))";
+                        "([States] Translate1008, off by default); 0.6.12: state 1015 exit as the TU 0x8245fe58 - death "
+                        "switch kind 0 on the finisher's target before the PC clear ([States] Translate1015Exit, off by "
+                        "default))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -1509,6 +1515,8 @@ int g_probe231 = 1;                              // [Probe] States231And1004: wr
 bool g_s231Ok = false, g_reg231 = false, g_reg1004 = false;
 int g_translate1008 = 0;                         // 0.6.11 [States] Translate1008 (read again at run time)
 bool g_reg1008 = false;                          // 0.6.11: record 1008 of Lara's table copy wrapped
+int g_translate1015Exit = 0;                     // 0.6.12 [States] Translate1015Exit (read again at run time)
+bool g_reg1015 = false;                          // 0.6.12: slot 2 of record 1015 of Lara's table copy wrapped
 const DWORD kState231Pc = 0x0075f550, kState1004Pc = 0x0075e020, kState1004PcSlot2 = 0x0075e060,
             kClearHitList = 0x006e6950, kAfter1004 = 0x007036c0;
 typedef void(__fastcall *PlayerFn)(BYTE *player, int);    // tru+0x2e6950 / tru+0x3036c0 (thiscall, no arguments)
@@ -2308,9 +2316,11 @@ void ReadSwitches() {
     }
     // 0.5.1: states 231 / 1004
     // 0.6.11: state 1008 (same handling: the wrappers decide per call)
-    struct { const char *key; int *value; bool *reg; } const sw[4] = {
+    // 0.6.12: state 1015 exit (same handling)
+    struct { const char *key; int *value; bool *reg; } const sw[5] = {
         {"Translate231Slot0", &g_translate231s0, &g_reg231}, {"Translate231Slot1", &g_translate231s1, &g_reg231},
-        {"Translate1004", &g_translate1004, &g_reg1004}, {"Translate1008", &g_translate1008, &g_reg1008}};
+        {"Translate1004", &g_translate1004, &g_reg1004}, {"Translate1008", &g_translate1008, &g_reg1008},
+        {"Translate1015Exit", &g_translate1015Exit, &g_reg1015}};
     for (const auto &s : sw) {
         int v = GetPrivateProfileIntA("States", s.key, *s.value, g_iniPath) ? 1 : 0;
         if (v == (*s.value ? 1 : 0)) continue;
@@ -2516,10 +2526,19 @@ void __cdecl State1014Slot3(void *agent) { State1014(2, agent); }
 // PC slot 4 is not run (the TU has none). Slot 2 is the TU's empty function plus the end line (both settings).
 // Not part of it: 1015 slot 2 (TU-new 0x8245fe58: death switch on the 1015 target CM+0x48 at the attack's end) - other
 // data (CM+0x48 / +0x4c, not agent +0x4f4), other object (the target, not Lara's channel); docs Befund-Translate1008.
+// It is ported separately in 0.6.12 ([States] Translate1015Exit, section "0.6.12: state 1015 exit").
 int g_probe1008 = 1;                             // [Probe] State1008: wrap record 1008 at all
 bool g_s1008Ok = false;                          // building blocks below verified
 const DWORD kState1008Entry = 0x008b19bc, kState1008PcSlot4 = 0x0076d9a0;
 StateFn g_orig1008Slot4 = nullptr;
+
+// 0.6.12: state 1015 exit (TU 0x8245fe58) - the section "0.6.12: state 1015 exit" below; registered in ExtendStates
+// (g_translate1015Exit / g_reg1015 are defined with g_translate1008 above ReadSwitches). No [Probe] key: with
+// Translate1015Exit=0 the wrapper only adds a log line before the PC slot 2 (TruMenu's switch list is at 159 of 160 rows)
+bool g_s1015Ok = false;
+const DWORD kState1015Pc = 0x0075e0e0, kState1015PcSlot2 = 0x0075e0f0;
+StateFn g_orig1015Slot2 = nullptr;
+void __cdecl State1015Slot2(void *agent);
 
 bool CheckState1008Blocks() {
     struct { DWORD at; const char *hex; const char *what; } const s[] = {
@@ -2932,6 +2951,23 @@ bool ExtendStates() {
     } else if (g_statesOn && g_probe1008) {
         Log(0, "machine 1 state 1008: not wrapped (building blocks 1008 %d, 1019 %d, states %d)", g_s1008Ok ? 1 : 0,
             g_s1019Ok ? 1 : 0, g_statesOk ? 1 : 0);
+    }
+    if (g_statesOn && g_s1015Ok) {
+        // 0.6.12: 1015 {PC slot 0, 0, PC slot 2, 0, 0, 0} -> slot 2 = wrapper (TU 0x8245fe58 = kill, then the PC clear);
+        // slot 0 stays the PC's (TU 0x8245fde8 = retail with targeter TU 7 = PC slot 6)
+        int i = Find(g_m1State, 7, n, 1015);
+        const DWORD *r = i >= 0 ? g_m1State + i * 7 : nullptr;
+        if (r && r[1] == kState1015Pc && r[2] == 0 && r[3] == kState1015PcSlot2 && r[4] == 0 && r[5] == 0 && r[6] == 0) {
+            g_orig1015Slot2 = reinterpret_cast<StateFn>(r[3]);
+            g_m1State[i * 7 + 3] = reinterpret_cast<DWORD>(&State1015Slot2);
+            g_reg1015 = true;
+            strncat_s(done, sizeof(done), g_translate1015Exit ? " 1015 (slot 2, ON)" : " 1015 (slot 2, log only)", _TRUNCATE);
+        } else {
+            Log(0, "machine 1 state 1015 is not {0x%08lx, 0, 0x%08lx, 0, 0, 0} (%s) - not wrapped", kState1015Pc,
+                kState1015PcSlot2, r ? "other handlers - another plugin?" : "missing");
+        }
+    } else if (g_statesOn) {
+        Log(0, "machine 1 state 1015: not wrapped (building blocks 1015 exit %d)", g_s1015Ok ? 1 : 0);
     }
     if (!done[0]) return false;
     DWORD value = reinterpret_cast<DWORD>(g_m1State);
@@ -6315,6 +6351,101 @@ void SetupHitSpeed() {
         g_hitSpeedPlaced ? "on" : "OFF (write failed)", g_hitSpeed);
 }
 
+// ---------------------------------------------------------------- 0.6.12: state 1015 exit (finisher Y kill) as the TU
+// Q37 (main workspace docs\Befund-Translate1015Exit-1111.md; follows docs\Befund-Translate1008-1111.md section 4).
+// Record 742 [1004 1015] = the finisher Y attack on a downed thrall (743 [1008] = the move after it, 0.6.11).
+// PC = retail: table entry 1015 at tru.exe 0x8b1a48 = {1015, tru+0x35e0e0, 0, tru+0x35e0f0, 0, 0, 0}. Slot 0 ->
+// tru+0x31d8c0 (CM = [gameTracker+0x504]: targeter 6 object -> handle CM+0x48 / +0x4c through tru+0x1b39f0 unless
+// [t+0x14] & 0x400000; CM+0x1fc |= 0x40000000), slot 2 -> tru+0x2e66d0 (handle CM+0x48 cleared, CM+0x1fc &=
+// ~0x40000000) = retail 0x8245bcd8 / 0x8245bd48.
+// TU table 0x827589cc = {0x8245fde8 (= retail with targeter TU 7 = PC slot 6), 0, 0x8245fe58, 0, 0, 0}. The TU-new exit
+// 0x8245fe58 ("[CombatManager::ThrallFatalityEnd] Enemy Didn't Chunk from Fatality, Chunking them explicitly on exit."
+// at 0x82072148, an argument of the empty print 0x82455a38; the string is not in the PC exe): handle CM+0x48 valid
+// ([object+0x44] == CM+0x4c) -> v = player +0x20 - target +0x20 (all 4 lanes, vsubfp128), lane 2 (z) = 0.0
+// ([0x8207d538]); death switch 0x823258c8(target, r4 0, r5 0, r6 0, kind r7 0, r8 1, v1 = v) = PC tru+0x241650(target,
+// &v, 0, 0, 0, 0, 1) (argument mapping of 0.6.1); then the retail clear (= tru+0x2e66d0, the PC slot 2 run after it).
+// Death kind 0 (static, both exes): the switch sets LP 0 (PC tru+0x237850 / TU inline + 0x822f8dd8 = tru+0x22e180) and
+// fills data +0x14 = 0, +0x19 = (kind 5 or 7) = 0, +0x1a = 0, +0x1b = 1 (TU 0x82325930..0x82325998, the same
+// stores in PC tru+0x241650); the Death Enter (PC tru+0x26c500, TU 0x8232c818, retail 0x8232d820) plays the effect "death"
+// (kind 5 = "vehicle death") and, with +0x19 = 0, takes the default orientation instead of the hit vector. The PC-only
+// +0x19 call tru+0x218020 (only when inst+0x298 == 0, and it returns at once then) is not reached with kind 0. The PC
+// itself uses kind 0 for damage type 0xe (tru+0x213b40). So kind 0 = LP 0 + Death state + "death" effect on both.
+// [States] Translate1015Exit (default 0, read again at run time): 0 = only the PC slot 2 (clear), the line says what
+// the TU would do ("off (would)"); 1 = the kill as the TU, then the PC slot 2. One line per exit with a valid target
+// (target, LP and layer-0 state before / after, Lara's chart record). [States] Enabled=0: record untouched.
+Trace g_t1015x = {"state 1015 slot 2 (TU 0x8245fe58 ThrallFatalityEnd: kill the finisher's target, then the clear)"};
+
+bool CheckState1015Blocks() {
+    struct { DWORD at; const char *hex; const char *what; } const s[] = {
+        {0x008b1a48, "f7030000 e0e07500 00000000 f0e07500 00000000 00000000 00000000",
+         "PC table entry 1015 {1015, tru+0x35e0e0, 0, tru+0x35e0f0, 0, 0, 0} (tru.exe 0x8b1a48)"},
+        {kState1015Pc, "a158dbfa00 8b8804050000 e9d0f7fbff", "PC 1015 slot 0 tru+0x35e0e0 -> tru+0x31d8c0([gameTracker+0x504])"},
+        {0x0071d8c0, "56 6a06 8bf1 e8d6f0ffff 85c0 7423 50 e8fc60e9ff 83c404 85c0 7416 f7401400004000 750d 50 8d4648 50 "
+                     "e80261e9ff 83c408 818efc01000000000040 5e c3",
+         "tru+0x31d8c0: targeter 6 object -> handle CM+0x48 / +0x4c unless flag 0x400000"},
+        {kState1015PcSlot2, "a158dbfa00 8b8804050000 e9d085f8ff", "PC 1015 slot 2 tru+0x35e0f0 -> tru+0x2e66d0([gameTracker+0x504])"},
+        {0x006e66d0, "56 8bf1 8d4648 6a00 50 e812d3ecff 81a6fc010000ffffffbf 83c408 5e c3",
+         "tru+0x2e66d0: handle CM+0x48 cleared, CM+0x1fc &= ~0x40000000"},
+        {0x005b39d0, "8b4c2404 85c9 740e 8b01 85c0 7408 8b5044 3b5104 7402 33c0 c3",
+         "handle check tru+0x1b39d0 ([object+0x44] == id, as HandleObject)"},
+        {0x005b39f0, "8b442408 85c0 8b4c2404 8901 7407 8b4044 894104 c3 c7410400000000 c3",
+         "handle set tru+0x1b39f0 ({object, object+0x44})"},
+        {0x0076d9e0, "f7461400004000 7505 8d4620 eb08 a194f0e700 83c020", "player pointer [0xe7f094] + 0x20 (tru+0x36d9ee)"},
+        {kDeathSwitch, kDeathSwitchFacts[0].hex, "death switch tru+0x241650 (cdecl 7 arguments, data +0x14 kind, +0x19 = "
+                                                 "kind 5 / 7, +0x1a / +0x1b)"},
+        {0x0066c844, "807b1b00 7417 837c243005 57 7507 e829c6faff eb05 e8f2c5faff",
+         "Death Enter tru+0x26c844: data +0x1b -> kind 5 \"vehicle death\" tru+0x218e80, else \"death\" tru+0x218e50"},
+    };
+    for (const auto &c : s)
+        if (!HexAt(c.at, c.hex)) {
+            Log(0, "state 1015 exit: %s at 0x%08lx does not match - not wrapped", c.what, c.at);
+            return false;
+        }
+    return true;
+}
+
+// TU 0x8245fe58 (slot 2 = exit of state 1015)
+void __cdecl State1015Slot2(void *agent) {
+    ReadSwitches();
+    const bool apply = g_translate1015Exit != 0;
+    __try {
+        BYTE *cm = *reinterpret_cast<BYTE **>(GameTracker() + 0x504);
+        BYTE *t = cm ? HandleObject(reinterpret_cast<const DWORD *>(cm + 0x48)) : nullptr;
+        if (t) {
+            BYTE *player = Player();
+            __declspec(align(16)) float v[4];
+            const float *pp = Pos(player), *tp = Pos(t);
+            for (int k = 0; k < 4; ++k) v[k] = pp[k] - tp[k];     // vsubfp128 v61 = player +0x20 - target +0x20
+            v[2] = kZero;                                         // stfs [0x8207d538] into lane 2
+            const BYTE *brain = P1dBrain(t);
+            const float lpBefore = brain ? RdFloat(brain + 0x2c64) : 0.0f;
+            const DWORD stateBefore = brain ? Rd(brain + 0x125c) : 0;
+            DWORD r = 0;
+            if (apply) r = reinterpret_cast<DeathSwitchFn>(kDeathSwitch)(t, v, 0, 0, 0, 0, 1);
+            const float lpAfter = brain ? RdFloat(brain + 0x2c64) : 0.0f;
+            const DWORD stateAfter = brain ? Rd(brain + 0x125c) : 0;
+            char who[96], before[32], after[32];
+            Describe(t, who, sizeof(who));
+            StateName(stateBefore, before, sizeof(before));
+            StateName(stateAfter, after, sizeof(after));
+            if (apply)
+                TraceLog(g_t1015x, true, 1, "ON: target %s, death switch kind 0 (target, &v, 0, 0, 0, 0, 1), v = %.1f %.1f "
+                         "%.1f -> al %lu; LP %.1f -> %.1f, state %s -> %s; Lara record %d; then the PC clear tru+0x2e66d0",
+                         who, v[0], v[1], v[2], r & 0xff, lpBefore, lpAfter, before, after, LaraRecord());
+            else
+                TraceLog(g_t1015x, true, 0, "off (would): target %s, LP %.1f, state %s - the TU would switch it to Death "
+                         "kind 0 now (v = %.1f %.1f %.1f); Lara record %d; only the PC clear tru+0x2e66d0", who, lpBefore,
+                         before, v[0], v[1], v[2], LaraRecord());
+        } else {
+            TraceLog(g_t1015x, true, 2, "%s no valid target in CM+0x48 (empty or stale handle) - nothing, as the TU; the PC "
+                     "clear tru+0x2e66d0", apply ? "ON:" : "off:");
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 1015 slot 2: access fault - kill skipped, the PC clear runs");
+    }
+    if (g_orig1015Slot2) g_orig1015Slot2(agent);
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -6337,6 +6468,7 @@ void ReadOptions(const char *dir) {
     g_probe231 = GetPrivateProfileIntA("Probe", "States231And1004", 1, ini);
     g_translate1008 = GetPrivateProfileIntA("States", "Translate1008", 0, ini) ? 1 : 0;   // 0.6.11
     g_probe1008 = GetPrivateProfileIntA("Probe", "State1008", 1, ini);
+    g_translate1015Exit = GetPrivateProfileIntA("States", "Translate1015Exit", 0, ini) ? 1 : 0;   // 0.6.12
     g_diagT9 = GetPrivateProfileIntA("Diag", "Targeter9", 1, ini);
     g_diagWhy = GetPrivateProfileIntA("Diag", "Targeter9Why", 1, ini);
     g_diag2011 = GetPrivateProfileIntA("Diag", "Condition2011", 1, ini);
@@ -6404,6 +6536,12 @@ void Start(HMODULE self) {
                "slot 4 + \"off (would)\" lines; 1 = steer onto the target of targeter TU 7 every tick, every level; read "
                "again at run time)", g_s1008Ok ? "building blocks verified, wrapped at Lara's registration"
                                              : "building blocks NOT verified - PC handler", g_translate1008);
+    g_s1015Ok = CheckState1015Blocks();   // 0.6.12 (before SetupK8Log places its entry hook on the death switch)
+    if (g_statesOn)
+        Log(1, "state 1015 exit (finisher Y kill, TU 0x8245fe58 ThrallFatalityEnd): %s - Translate1015Exit %d (0 = PC "
+               "clear + \"off (would)\" lines; 1 = death switch kind 0 on the CM+0x48 target, then the PC clear; read "
+               "again at run time)", g_s1015Ok ? "building blocks verified, wrapped at Lara's registration"
+                                             : "building blocks NOT verified - PC handler", g_translate1015Exit);
     if (g_strikeTranslate)
         Log(1, "shadow strike translation %s ([Strike] Translate=1; also needs TruShadowPowerMeterApi at run time)",
             g_strikeOk ? "ready" : "OFF: building blocks not verified");

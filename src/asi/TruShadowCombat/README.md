@@ -1,4 +1,39 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.11)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.12)
+
+0.6.12 (2026-11-11, **offline, not yet seen in game**; Q37 "the thrall got up again after the finisher Y", live
+2026-11-10 22:12; main workspace `docs\Befund-Translate1015Exit-1111.md`, ENGINE.md 12): build `work\asi\combat0612`,
+byte pre-checks `work\asi\combat0612\precheck_0612.txt` (13 checks: the 10 of `CheckState1015Blocks`, 3 proof facts of
+the death-kind reading; 0 mismatches against `data\pc\tru.exe` and the installed tru.exe).
+* **State 1015 exit = the kill of the finisher Y's target** (chart record 742 [1004 1015]; `[States]
+  Translate1015Exit`, new, live, default **0**). PC = retail: table entry 1015 at tru.exe 0x8b1a48 = {tru+0x35e0e0, 0,
+  tru+0x35e0f0, 0, 0, 0}: slot 0 keeps the targeter-6 object in CombatManager +0x48 / +0x4c (tru+0x31d8c0), slot 2 only
+  clears it (tru+0x2e66d0, = retail 0x8245bd48). TU table 0x827589cc: slot 2 = **0x8245fe58** (TU-new,
+  "[CombatManager::ThrallFatalityEnd] Enemy Didn't Chunk from Fatality, Chunking them explicitly on exit."): when the
+  stored handle is still valid, v = Lara +0x20 - target +0x20 with z = 0, death switch 0x823258c8(target, 0, 0, 0,
+  kind 0, 1, v) = tru+0x241650(target, &v, 0, 0, 0, 0, 1), then the retail clear. Ported 1:1: the plugin's copy of
+  Lara's table gets a wrapper in slot 2 that does the kill (with `Translate1015Exit=1`) and then always runs the PC
+  slot 2. Slot 0 stays the PC's (TU 0x8245fde8 = retail with the index remap 6 -> 7 only).
+* **Death kind 0** (static, PC and TU): the switch sets LP 0 and requests EnemyState_Death with data +0x14 = 0,
+  +0x19 = 0 (only kinds 5 / 7 set it), +0x1a = 0, +0x1b = 1. The Death Enter (PC tru+0x26c500, TU 0x8232c818) then
+  plays the effect "death" (kind 5 would be "vehicle death") and keeps the default orientation instead of the hit
+  vector (+0x19 = 0). The PC-only +0x19 call tru+0x218020 is not reached with kind 0 (and does nothing in that path
+  anyway). The PC itself uses kind 0 for damage type 0xe. So kind 0 = the same death on both exes.
+* **Log:** one line per 1015 exit: `state 1015 slot 2 (...) (call n): ON: target 0x... obj N name, death switch kind 0
+  ..., v = x y 0 -> al r; LP a -> b, state S1 -> S2; Lara record k; then the PC clear tru+0x2e66d0` or `off (would):
+  target ..., LP a, state S - the TU would switch it to Death kind 0 now ...`, or `no valid target in CM+0x48` (as the
+  TU: nothing). With `[Death] Log=1` the 0.6.9 line `0.6.9 death switch: ... kind 0 ... from TruShadowCombat (...)`
+  follows the ON line.
+* **TO TEST** (hall02, tutorial thrall knocked down, finisher Y (the 742 [1004 1015] -> 743 [1008] chain), TruFight
+  trace on; can be combined with the 0.6.11 test):
+
+| # | what | expected |
+|---|---|---|
+| 1 | game start | `TruShadowCombat 0.6.12 ... loaded`; `state 1015 exit (finisher Y kill, ...): building blocks verified, wrapped at Lara's registration - Translate1015Exit 0`; at the level start `machine 1 states: ... 1015 (slot 2, log only)`; no `state 1015 exit: ... does not match` / `machine 1 state 1015 is not ...` line |
+| 2 | finisher Y on a downed thrall, `Translate1015Exit=0` | as 0.6.11: **the thrall gets up again** (RegenerateDeath -> Regenerate); log `state 1015 slot 2 ... off (would): target 0x<thrall> ..., LP 0.0 (or the low LP), state RegenerateDeath - the TU would switch it to Death kind 0 now` |
+| 3 | the same with `Translate1015Exit=1` (live, TruMenu switch "Finisher Y kill 1015 as TU") | `0.5.1 switch: [States] Translate1015Exit 0 -> 1`; `ON: target 0x<thrall> ..., LP a -> 0.0, state RegenerateDeath -> Death`; **the thrall dies and does not get up again** (chunkdoll / death as after a normal kill; `0.6.9 death switch: ... kind 0 ... from TruShadowCombat`, then `0.6.9 chunk build` if the record has a chunkdoll) |
+| 4 | compare 0 / 1 | only 1 kills at the end of 742; with 0 the 0.6.10 / 0.6.11 behaviour stays (thrall regenerates) |
+| 5 | when it fires | note the `Lara record` in the line (expected 742 -> the kill comes at the change to 743, i.e. before / at the start of the 1008 move - inferred from the record contents, not measured) |
+| 6 | side effects | no `access fault` line; 1015 exits without a target say `no valid target in CM+0x48`; main game finisher Y with 1: the target dies as well (the TU has no level test there) |
 
 0.6.11 (2026-11-11, **offline, not yet seen in game**; Q19 "Lara falls out of the world after the finisher Y in
 hall02", main workspace `docs\Befund-Sturz-durch-Welt-1111.md` and `docs\Befund-Translate1008-1111.md`, ENGINE.md 12):
@@ -675,6 +710,7 @@ gameTracker+0x1244), `TruDoppelganger.asi` (generic registry of the TU condition
 | state 244 (0.2) | 0x82464198 / 0x824642a8 / 0x82463fc8: dash to the 1017 target | new record; channel mode 2 tru+0x38d00; step count +0x1280 (shared with TruShadowPower only from meter API version 3) |
 | state 1007 slots 4 / 5 (0.2) | 0x8245f068 (doppelganger branch) | wrapped: doppelganger -> translation, else PC slot 4 tru+0x36d930 |
 | state 1008 (0.6.11) | {0x8245f7b0, 0, 0x82455a38 (empty), 0x8245fa40, 0, 0}: enter / tick steer the motion channel onto the target of targeter TU 7 (mode 3 {FaceTarget, t+0x20, n x 100}; Busy244 -> mode 2 stop) | record {0, 0, 0, 0, tru+0x36d9a0, 0} wrapped: slots 0 / 3 = translation (`Translate1008=1`) or log only, slot 2 = end line, slot 4 = PC handler only with `Translate1008=0` |
+| state 1015 exit (0.6.12) | slot 2 0x8245fe58 (TU-new): target in CM+0x48 valid -> death switch kind 0 (v = Lara - target, z = 0), then the retail clear | slot 2 of record {tru+0x35e0e0, 0, tru+0x35e0f0, 0, 0, 0} wrapped: kill with `Translate1015Exit=1` (else log only), then the PC slot 2 tru+0x35e0f0 |
 
 The tables are extended when Lara's registration runs (PC tru+0x368b60, reached through the vtable slot 0x85e1d4):
 the current `push table` operand (original or TruShadowPower's copy) is copied with these records. Byte pre-checks:
@@ -736,6 +772,7 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Hit] TranslateHitSpeed` | 1 | 0.6.10 (K-8b): Lara's contact hit gives msg+0x44 / +0x48 = (int) A+0x10 / A+0x14 as the TU 0x823e169c (tru+0x319169) - the knockback speed; 0 = 0 / 0 (PC); live |
 | `[States] Translate1008` | 0 | 0.6.11 (Q19): state 1008 (finisher Y move) as the TU 0x8245f7b0 / 0x8245fa40 - steer Lara onto the target of targeter TU 7 every tick, PC slot 4 tru+0x36d9a0 not run; 0 = PC + "off (would)" lines; every level; live |
 | `[Probe] State1008` | 1 | 0.6.11: wrap record 1008 (slots 0 / 2 / 3 / 4) at all; 0 = PC record untouched (start only) |
+| `[States] Translate1015Exit` | 0 | 0.6.12 (Q37): exit of state 1015 as the TU 0x8245fe58 - death switch kind 0 on the finisher Y's target (CM+0x48) before the PC clear; 0 = PC + "off (would)" lines; every level; live. Slot 2 is wrapped whenever `[States] Enabled=1` and the 10 byte checks pass (no own probe key) |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 
