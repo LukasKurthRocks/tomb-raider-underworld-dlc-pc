@@ -1285,6 +1285,27 @@ points to freed memory (the resolver reads through it). The whole exe patch is p
 (`tools/exe_build.py`: Steamless exe md5 `56d1ce2d…` -> LAA -> `fmod_init_guard` -> `light_tex_guard` (+ `.text`
 writable) -> `soundplex_guard` -> `combat_lock_guard` -> section check -> gate): output md5 = `5560abac…` = B138,
 byte-identical. ✅ static (md5 gate)
+**What `fmod_init_guard` covers, and how tru.exe ends without an exception** (2026-11-11, Q22, workspace
+`Befund-FMOD-Startabsturz-1111.md`; listings `work/q22_fmod_1111/dis_*.txt`). The guard only zeroes the three
+out-locals of the audio init 0x582200 (called once, 0x586ffd in the sound init 0x586db0): after a failed
+`System::init` the FMOD validators (0x7c4cd3 / 0x7bac01 / 0x7c4757 test only for 0) then answer "invalid handle"
+instead of the AV 0x7b92fb. It installs no exception handler and covers no other site. tru.exe's own exits without
+an exception: the fatal-error function **0x596cb0** (47 call sites, message formatted into 0xcd98a0) -> 0x478b00 (hides
+the window when `[0x890390]`, dialog 0x47b4c0) -> **0x478a10**: on the main thread (`[0x9de710]`) the shut-down calls
+0x5237d0 / 0x587030 / 0x482540, each inside `__try / __except(1)`, DestroyWindow, `ExitProcess(0)` (call 0x478aec); on
+another thread `SuspendThread([0x9de704])` + `TerminateProcess(self, -1)` (0x478a66). Further: WinMain's registry
+check `SKUType` in 0x4791d0 -> `ExitProcess(-1)` 0x479690; the allocator 0x59a0e9 `MessageBoxA("Unable to reserve %dMB
+of address space.")` + `ExitProcess(-1)` 0x59a0f1; the single-instance test 0x479e47 (CreateMutexW name 0x88fa60,
+ERROR_ALREADY_EXISTS -> EnumWindows 0x4787d0 or a box with locals 5000 / 5006 -> WinMain returns 1; else it is created
+again at 0x479f25 and the handle kept in a local); CRT: `__crtExitProcess` 0x816a00, /GS failure 0x81d734 (SetUnhandledExceptionFilter(0),
+UnhandledExceptionFilter, `TerminateProcess(self, 0xc0000409)`), invalid parameter 0x81e3bb (0xc000000d), abort
+0x8146b2 (0x40000015, then `_exit(3)`); the C++ terminate filter 0x8281b5 is installed at 0x8281f2. Imports:
+ExitProcess slot 0x83e054, TerminateProcess 0x83e058. **Group DSP failure path:** 0x587620 zeroes its DSP out-local
+before createDSPByType 0x7b98ea, 0x582ec0 returns at once for DSP 0, ChannelGroupI::addDSP 0x7c493d returns 0x25 for
+DSP 0 (0x7c4955) - a failed DSP creation leaves the group without DSP and does not crash. The group DSPs are created in
+the sound update 0x5954d0 -> 0x58dd80 (loop 0x58de50, once per group: wrapper +0x5c = DSP count after 0x58dad0), which
+the loop iteration 0x47afd0 runs before the input update 0x4868a0 (first XInput load 0x482490). TruQoL 0.1.5
+`[Diag] ExitTrace` logs these exits. ✅ static
 
 ---
 

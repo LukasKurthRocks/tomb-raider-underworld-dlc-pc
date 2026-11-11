@@ -8,8 +8,11 @@ wants, each with its own INI key (owner decision 2026-11-08). Defaults: **frame 
 options neutral (= the game's behaviour), the thread cap on at 8 since 0.1.3 (it only acts on PCs with more threads;
 31 was the old default - live on a 36-thread PC 25 and more hang at the first load).
 
-**Status TruQoL 0.1.4 (2026-11-11, `work\asi\qol014`): new `[Fixes] FrontEndPauseBit` (live, default 0 = the game's
-behaviour) - built and checked offline, not installed, not played (see "FrontEndPauseBit" below).** 0.1.3 (2026-11-09,
+**Status TruQoL 0.1.5 (2026-11-11, `work\asi\qol015`): new diagnosis `[Diag] ExitTrace` (restart, default 0 = nothing
+installed; not in the shipped INI) for the rare silent end at start-up - built, checked offline with a test exe (not
+with tru.exe), not installed, not played (see "ExitTrace" below).** 0.1.4 (2026-11-11, `work\asi\qol014`): new `[Fixes]
+FrontEndPauseBit` (live, default 0 = the game's behaviour) - built and checked offline, not installed, not played (see
+"FrontEndPauseBit" below). 0.1.3 (2026-11-09,
 `work\asi\qol013`) changed only the ThreadCap default 31 -> 8; the 0.1.2 build
 was installed and played 2026-11-08 (frame limiter, thread cap with 8 / 16 / 24 in the INI). 0.1 (`work\asi\qol01`) was
 the first build; 0.1.1 (`work\asi\qol011`) reads the live keys again while the game runs (TruMenu page "Fixes", group
@@ -38,6 +41,8 @@ off / why).
 | `[Startup]` | `ThreadCap` | 8 | 0 .. 31 | restart | the game's CPU count sees at most this many threads (only when the PC has more); 0 = off - acts once, before WinMain. 0.1.3: default 8 (was 31) - live on a 36-thread PC 8 / 16 / 24 work, 25 and more hang at the first load (worker pool, ENGINE.md 3), more threads gave no faster loading |
 | `[Startup]` | `SkipIntro` | 0 | 0 / 1 | restart | 0.1.2: 1 = skip the start-up intro movie (only before the "press start" screen, never in a level; the legal screens stay); patched once at the start |
 | `[Fixes]` | `FrontEndPauseBit` | 0 | 0 / 1 | live | 0.1.4: 1 = clear the pause bit the front end keeps after "pause -> back to the main menu" (main-menu clocks, e.g. the teaser timer, then run in real time instead of half speed); only in the front end and only while no pause is open - the pause in a level is untouched. 0 = the game's behaviour (the bit stays until the next level load) |
+
+| `[Diag]` | `ExitTrace` | 0 | 0 / 1 | restart | 0.1.5: 1 = write `TruQoL.exit.log` (first-chance exceptions, tru.exe's own `ExitProcess` / `TerminateProcess`, the DLL detach) - a diagnosis, see "ExitTrace" below. **Not in the shipped `TruQoL.ini`** (every key there needs a TruMenu switches row, which TruMenu's owner adds): add `[Diag]` / `ExitTrace=1` by hand |
 
 Invalid values are logged and replaced by the default (at the start) or keep the current value (live). Every engine
 address is byte-checked before it is patched; on a mismatch that feature stays off and the log says why.
@@ -155,6 +160,32 @@ per 10 s (clears in between are counted in the next line). Nothing else is writt
 Why default 0: proven statically and the cause seen live, but the fix itself has not run in the game yet (TO TEST
 13).
 
+## ExitTrace (0.1.5): what ended the game?
+
+Live 2026-11-10 20:45:39-44 the game ended about 4-10 s after the start (during the start-up intro): every plugin log
+stops, no WER dump although `LocalDumps\tru.exe` is set (DumpType 2, DumpCount 3; the three dumps in the default
+dump folder are from 20:01-20:04), no Application event (an unhandled exception normally leaves Application
+Error 1000); the next start worked (workspace `docs\Befund-FMOD-Startabsturz-1111.md`). Without an exception that
+reached WER the process ended through an exit call or from outside. `[Diag] ExitTrace=1` (restart) tells these apart
+next time, in its own file `TruQoL.exit.log` (TruQoL.log is opened per line with `fopen_s`, which refuses a second
+writer):
+
+| Line | Written by | Means |
+|---|---|---|
+| `=== <date time> TruQoL 0.1.5 ExitTrace: pid, main thread, ... WER LocalDumps ...` | DllMain | session start (full date: the file is appended over days) |
+| `first-chance exception 0xC... at <address> ...; thread ...` | vectored handler, registered first, returns `EXCEPTION_CONTINUE_SEARCH` | an exception with an error code was raised (it may still be caught - other plugins probe memory with `__try`); first 24 in full, then at most one line per second; the last one is repeated in the exit / detach line |
+| `module (start / new / at exit): <name> base size` | a thread every 2 s for 60 s, and the ExitProcess hook | names for the allocation bases in the exception lines |
+| `exit: ExitProcess(...)` / `exit: TerminateProcess(...) called from <address> = <site>` | tru.exe's import slots 0x83e054 / 0x83e058 (chained) | the game's own exit paths: 0x478aec / 0x478a66 fatal-error path 0x596cb0 (dialog, then exit; on another thread with the main thread suspended), 0x479690 SKUType check, 0x59a0f1 address-space message box, 0x816a00 CRT exit, 0x81d740 CRT /GS failure, 0x81e3c7 CRT invalid parameter |
+| `detach: process exit` | DLL_PROCESS_DETACH | some module called ExitProcess (also one that does not go through tru.exe's import slot) |
+| nothing after the last line | - | TerminateProcess by another module or from outside (TruMenu's `game.quit` writes its own line in TruMenu.log) |
+
+The handler and the exit / detach lines use no heap, no CRT and no lock (own formatter, `WriteFile`, `GetLocalTime`,
+`VirtualQuery`): they can run inside a heap or loader fault, on an overflowed stack, or while ExitProcess has already
+ended the other threads. Nothing of it changes what the game does; with `ExitTrace=0` nothing is installed. Offline
+check: `work\q22_fmod_1111\xt_harness.ps1` (a test exe at base 0x400000 loads the built TruQoL.asi with `ExitTrace=1`:
+header, exception lines incl. the per-second limit after 24, module lines, detach line with the last exception;
+tru.exe's slots are outside the test exe, so the log says "not hooked" there - the hook itself is untested).
+
 ## TO TEST
 
 1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol014`; start the game (affinity work-around still in the
@@ -207,11 +238,19 @@ Why default 0: proven statically and the cause seen live, but the fix itself has
     freezes the game (Lara, enemies, water stand still; `[0xe7f188]` = 0.5 and the bit stays while it is open; no
     clear line while in the level); unpause and play on normally. e) Fresh start without a level: no clear line at
     all (the bit is never set). Note any line `pause byte ... = 6 - a pause the game holds open` (main state and when).
+14. ExitTrace (0.1.5): install `work\asi\qol015`, add `[Diag]` / `ExitTrace=1` to `TruQoL.ini`, start. `TruQoL.log`:
+    `Diag ExitTrace: tru.exe import slot 0x0083e054 ExitProcess held ... (...KERNEL32.DLL, kernel32's own) -> TruQoL`
+    (and the same for 0x0083e058) and `Diag ExitTrace: on - ... (7 of 7 exit sites named)`. `TruQoL.exit.log`: the
+    header with today's date, module lines; then quit through the game's own menu: an `exit: ExitProcess(...) called
+    from ... = ...` line (note which site) and a `detach: process exit` line. Note the `first-chance exception` lines of
+    a normal start (other plugins' probes) as the baseline. Start and play as usual: no slower start, nothing else
+    changes. After a silent end: keep `TruQoL.exit.log` and report its last lines.
 
 ## Files
 
 `TruQoL.cpp` (source; the comment block at the top holds the evidence in short), `TruQoL.ini` (sample with the
-defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol014`. Offline checks:
+defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol015` (0.1.5; the
+0.1.4 build is `work\asi\qol014`). 0.1.5 ExitTrace: `work\q22_fmod_1111\xt_harness.ps1` (see "ExitTrace"). Offline checks:
 `work\qol17x_0811\check_qol01.py` (0.1: bytes, call targets, the start-up order, the loader default, the build, INI,
 README, install script) with negative tests `work\qol17x_0811\make_negative_qol01.py`; for 0.1.1
 `work\qol17y_0811\check_qol011.py` (the same plus the live logic: tick, gates, ShakeApply, the switches rows) with

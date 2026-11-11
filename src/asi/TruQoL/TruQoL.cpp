@@ -105,13 +105,40 @@
 // other effects of the unpause 0x5d4700 (object manager 0x5785a0, 0x5bfdf0(0), [0xe7f094]+0x14) are NOT run - the level
 // they belong to is gone. Readers of the bit: 0x5da233 (frame time) and 0x5bf861 (render step) only. One log line per
 // clear at LogLevel 1 (at most one per 10 s; later ones counted in the next line).
+//
+// 0.1.5 (2026-11-11, Q22, workspace doc Befund-FMOD-Startabsturz-1111.md) [Diag] ExitTrace (restart, default 0 = nothing
+// installed) - a diagnosis for the rare silent end at start-up (live 2026-11-10 20:45:44: logs stop, no WER dump, no
+// Application event = no exception reached WER). With ExitTrace=1 TruQoL writes TruQoL.exit.log (own file, kept open
+// with read sharing - TruQoL.log is opened per line with fopen_s, which refuses a second writer) with
+//   (a) a session header with the full date, pid, main thread and the WER LocalDumps values for tru.exe (read only);
+//   (b) first-chance exceptions with an error code (>= 0xC0000000) from a vectored handler registered first: code,
+//       address (tru+offset or the allocation base of its module), thread, access kind / address for 0xC0000005 /
+//       0xC0000006, esp; the first 24 in full, later ones counted. It always returns EXCEPTION_CONTINUE_SEARCH (logging
+//       only). Written without heap or locks (own formatter, WriteFile, GetLocalTime, VirtualQuery) because it can run
+//       inside a heap or loader fault or on the last page of an overflowed stack;
+//   (c) every call of tru.exe's own ExitProcess / TerminateProcess(self) through its import slots 0x83e054 / 0x83e058
+//       (chained: TruQoL calls what the slot held) with exit code, caller and the known site name: 0x478aec / 0x478a66
+//       the fatal-error path 0x596cb0 -> dialog 0x47b4c0 -> 0x478a10 (main thread: shut-down, ExitProcess(0); another
+//       thread: SuspendThread(main), TerminateProcess(-1)), 0x479690 the WinMain SKUType registry check, 0x59a0f1 the
+//       allocator's "Unable to reserve %dMB of address space" box, 0x816a00 the CRT exit, 0x81d740 the CRT /GS failure
+//       (0xc0000409), 0x81e3c7 the CRT invalid-parameter end (0xc000000d);
+//   (d) DLL_PROCESS_DETACH with "process exit" = some module called ExitProcess (also one that bypasses tru.exe's IAT).
+// Reading: an exit line names the path; a detach line without an exit line = ExitProcess from another module; only
+// exception lines = a fault followed by an end outside these paths (fail-fast, a handler that terminates); nothing at
+// all = TerminateProcess by another module or from outside. TruMenu's game.quit logs itself (TruMenu.log). The key is
+// not in the shipped TruQoL.ini (every key there needs a TruMenu switches row); add "[Diag]" / "ExitTrace=1" by hand.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <intrin.h>
+#include <psapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+
+#pragma comment(lib, "advapi32.lib")   // 0.1.5 ExitTrace: the WER LocalDumps values (read only)
+#pragma intrinsic(_ReturnAddress)
 
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
@@ -119,7 +146,7 @@
 
 namespace {
 
-const char kVersion[] = "TruQoL 0.1.4";
+const char kVersion[] = "TruQoL 0.1.5";
 const DWORD kImageBase = 0x00400000;
 
 // ---- 1. frame limiter: the frame-time function 0x5da230 and its two clock reads ----
@@ -216,6 +243,7 @@ float g_shakeScale = 1.0f;                  // read by ShakeStub
 int g_threadCap = 8;   // 0.1.3: default 8 (live 2026-11-08, 36-thread PC: 8 / 16 / 24 run, 25 / 26 / 28 / 31 hang)
 int g_skipIntro = 0;                        // 0.1.2: [Startup] SkipIntro (restart)
 int g_frontEndPauseBit = 0;                 // 0.1.4: [Fixes] FrontEndPauseBit (live; read by PauseBitCheck)
+int g_exitTrace = 0;                        // 0.1.5: [Diag] ExitTrace (restart; not in the shipped INI)
 
 char g_logPath[MAX_PATH], g_dir[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -1000,6 +1028,355 @@ void StartSkipIntro() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// 6. diagnosis (0.1.5): [Diag] ExitTrace - see the header. Nothing of this runs with ExitTrace=0 (the default).
+const DWORD kIatExitProcess = 0x0083e054;       // tru.exe import slot KERNEL32!ExitProcess
+const DWORD kIatTerminateProcess = 0x0083e058;  // tru.exe import slot KERNEL32!TerminateProcess
+const LONG kXtFullLines = 24;                   // first-chance exceptions written in full; later ones only counted
+const int kXtModMax = 256;
+
+struct XtSite {
+    DWORD ret;            // return address of `call dword ptr [slot]` (6 bytes before)
+    const char *call;     // the call's bytes (checked at the start; an unchecked site is shown without a name)
+    const char *what;
+};
+const XtSite kXtSites[] = {
+    {0x00478af2, "ff1554e08300", "fatal-error path 0x596cb0 -> 0x478a10 on the main thread (dialog 0x47b4c0, then shut-down)"},
+    {0x00478a6c, "ff1558e08300", "fatal-error path 0x596cb0 -> 0x478a10 on another thread (main thread suspended)"},
+    {0x00479696, "ff1554e08300", "WinMain registry check SKUType (0x4791d0)"},
+    {0x0059a0f7, "ff1554e08300", "allocator: 'Unable to reserve %dMB of address space' message box (0x59a0e9)"},
+    {0x00816a06, "ff1554e08300", "CRT exit (__crtExitProcess: WinMain returned or exit())"},
+    {0x0081d746, "ff1558e08300", "CRT /GS cookie failure (0xc0000409, after UnhandledExceptionFilter)"},
+    {0x0081e3cd, "ff1558e08300", "CRT invalid parameter (0xc000000d, after UnhandledExceptionFilter)"},
+};
+const int kXtSiteCount = sizeof(kXtSites) / sizeof(kXtSites[0]);
+bool g_xtSiteOk[kXtSiteCount];
+
+typedef VOID(WINAPI *ExitProcessFn)(UINT);
+typedef BOOL(WINAPI *TerminateProcessFn)(HANDLE, UINT);
+ExitProcessFn g_xtExit = nullptr;               // what tru.exe's slot held (kernel32's or another hook)
+TerminateProcessFn g_xtTerminate = nullptr;
+HANDLE g_xtFile = INVALID_HANDLE_VALUE;
+DWORD g_xtMainThread = 0, g_xtImageEnd = 0;
+volatile LONG g_xtExceptions = 0;
+volatile LONG g_xtLastTick = 0;                 // GetTickCount of the last written exception line
+volatile DWORD g_xtLastCode = 0, g_xtLastAddr = 0, g_xtLastThread = 0;
+volatile LONG g_xtModBusy = 0;
+HMODULE g_xtSeen[kXtModMax];
+int g_xtSeenCount = 0;
+
+// line builder without heap, CRT or locks: it runs inside faults (heap / loader) and on an overflowed stack
+struct XtLine {
+    char s[480];
+    int n;
+    XtLine() : n(0) {}
+    void Ch(char c) {
+        if (n < static_cast<int>(sizeof(s)) - 3) s[n++] = c;
+    }
+    void Str(const char *t) {
+        while (t && *t) Ch(*t++);
+    }
+    void Hex(DWORD v) {
+        Str("0x");
+        for (int i = 7; i >= 0; --i) Ch("0123456789abcdef"[(v >> (i * 4)) & 0xf]);
+    }
+    void Dec(DWORD v, int width = 1) {
+        char d[12];
+        int k = 0;
+        do {
+            d[k++] = static_cast<char>('0' + v % 10);
+            v /= 10;
+        } while (v && k < 11);
+        while (k < width && k < 11) d[k++] = '0';
+        while (k > 0) Ch(d[--k]);
+    }
+    void Time(bool date) {
+        SYSTEMTIME t;
+        GetLocalTime(&t);
+        if (date) {
+            Dec(t.wYear, 4); Ch('-'); Dec(t.wMonth, 2); Ch('-'); Dec(t.wDay, 2); Ch(' ');
+        }
+        Dec(t.wHour, 2); Ch(':'); Dec(t.wMinute, 2); Ch(':'); Dec(t.wSecond, 2); Ch('.'); Dec(t.wMilliseconds, 3); Ch(' ');
+    }
+    void Addr(DWORD a) {
+        Hex(a);
+        if (a >= kImageBase && a < g_xtImageEnd) { Str(" (tru.exe)"); return; }
+        MEMORY_BASIC_INFORMATION m;
+        if (VirtualQuery(reinterpret_cast<LPCVOID>(static_cast<DWORD_PTR>(a)), &m, sizeof(m)) && m.AllocationBase) {
+            Str(" (allocation base ");
+            Hex(static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(m.AllocationBase)));
+            Str(" - see the module lines)");
+        }
+    }
+    void Thread() {
+        const DWORD id = GetCurrentThreadId();
+        Str("thread ");
+        Dec(id);
+        if (id == g_xtMainThread) Str(" (main)");
+    }
+    void Write() {
+        s[n++] = '\r';
+        s[n++] = '\n';
+        DWORD written = 0;
+        if (g_xtFile != INVALID_HANDLE_VALUE) WriteFile(g_xtFile, s, static_cast<DWORD>(n), &written, nullptr);
+    }
+};
+
+// module list (name, base, size) - only new modules; from the watch thread and the ExitProcess hook (normal context,
+// never from the exception handler or TerminateProcess: those may run while another thread holds the loader lock)
+void XtModules(const char *when) {
+    if (InterlockedExchange(&g_xtModBusy, 1)) return;
+    HMODULE mods[kXtModMax];
+    DWORD need = 0;
+    if (K32EnumProcessModules(GetCurrentProcess(), mods, sizeof(mods), &need)) {
+        int count = static_cast<int>(need / sizeof(HMODULE));
+        if (count > kXtModMax) count = kXtModMax;
+        for (int i = 0; i < count; ++i) {
+            bool seen = false;
+            for (int k = 0; k < g_xtSeenCount && !seen; ++k) seen = g_xtSeen[k] == mods[i];
+            if (seen || g_xtSeenCount >= kXtModMax) continue;
+            g_xtSeen[g_xtSeenCount++] = mods[i];
+            char path[MAX_PATH];
+            DWORD len = GetModuleFileNameA(mods[i], path, MAX_PATH);
+            const char *name = path;
+            for (DWORD c = 0; c < len; ++c)
+                if (path[c] == '\\' || path[c] == '/') name = path + c + 1;
+            MODULEINFO info = {};
+            K32GetModuleInformation(GetCurrentProcess(), mods[i], &info, sizeof(info));
+            XtLine l;
+            l.Time(false);
+            l.Str("module (");
+            l.Str(when);
+            l.Str("): ");
+            l.Str(len ? name : "?");
+            l.Str(" base ");
+            l.Hex(static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(mods[i])));
+            l.Str(" size ");
+            l.Hex(info.SizeOfImage);
+            l.Write();
+        }
+    }
+    InterlockedExchange(&g_xtModBusy, 0);
+}
+
+// first-chance exceptions with an error code; logging only
+LONG CALLBACK XtVeh(EXCEPTION_POINTERS *ep) {
+    const EXCEPTION_RECORD *r = ep ? ep->ExceptionRecord : nullptr;
+    if (!r || r->ExceptionCode < 0xc0000000u || g_xtFile == INVALID_HANDLE_VALUE) return EXCEPTION_CONTINUE_SEARCH;
+    const LONG count = InterlockedIncrement(&g_xtExceptions);
+    g_xtLastCode = r->ExceptionCode;             // for the exit / detach line (the probes of other plugins may use up
+    g_xtLastAddr = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(r->ExceptionAddress));   // the full lines)
+    g_xtLastThread = GetCurrentThreadId();
+    const LONG now = static_cast<LONG>(GetTickCount());
+    if (count > kXtFullLines) {                  // later ones: at most one line per second
+        const LONG last = g_xtLastTick;
+        if (static_cast<DWORD>(now - last) < 1000 || InterlockedCompareExchange(&g_xtLastTick, now, last) != last)
+            return EXCEPTION_CONTINUE_SEARCH;
+    } else {
+        g_xtLastTick = now;
+    }
+    XtLine l;
+    l.Time(false);
+    l.Str("first-chance exception ");
+    l.Hex(r->ExceptionCode);
+    l.Str(" at ");
+    l.Addr(static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(r->ExceptionAddress)));
+    l.Str("; ");
+    l.Thread();
+    if ((r->ExceptionCode == EXCEPTION_ACCESS_VIOLATION || r->ExceptionCode == EXCEPTION_IN_PAGE_ERROR) &&
+        r->NumberParameters >= 2) {
+        const ULONG_PTR kind = r->ExceptionInformation[0];
+        l.Str(kind == 0 ? "; read of " : kind == 1 ? "; write to " : kind == 8 ? "; execute at " : "; access to ");
+        l.Hex(static_cast<DWORD>(r->ExceptionInformation[1]));
+    }
+    if (ep->ContextRecord) {
+        l.Str("; esp ");
+        l.Hex(ep->ContextRecord->Esp);
+    }
+    l.Str("; #");
+    l.Dec(static_cast<DWORD>(count));
+    if (count == kXtFullLines) l.Str(" - later ones at most one line per second (count + last one in the exit line)");
+    l.Write();
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void XtLastException(XtLine &l) {
+    l.Str("; first-chance exceptions ");
+    l.Dec(static_cast<DWORD>(g_xtExceptions));
+    if (!g_xtExceptions) return;
+    l.Str(", last ");
+    l.Hex(g_xtLastCode);
+    l.Str(" at ");
+    l.Hex(g_xtLastAddr);
+    if (g_xtLastAddr >= kImageBase && g_xtLastAddr < g_xtImageEnd) l.Str(" (tru.exe)");
+    l.Str(" thread ");
+    l.Dec(g_xtLastThread);
+}
+
+void XtExitLine(const char *what, UINT code, DWORD from) {
+    XtLine l;
+    l.Time(true);
+    l.Str("exit: ");
+    l.Str(what);
+    l.Str("(exit code ");
+    l.Hex(code);
+    l.Str(") called from ");
+    l.Addr(from);
+    for (int i = 0; i < kXtSiteCount; ++i)
+        if (g_xtSiteOk[i] && kXtSites[i].ret == from) {
+            l.Str(" = ");
+            l.Str(kXtSites[i].what);
+        }
+    l.Str("; ");
+    l.Thread();
+    XtLastException(l);
+    l.Write();
+}
+
+VOID WINAPI XtExitProcess(UINT code) {
+    XtExitLine("ExitProcess", code, static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(_ReturnAddress())));
+    XtModules("at exit");                        // every thread still runs here: the normal context
+    ExitProcessFn next = g_xtExit;
+    if (next) next(code);
+    ExitProcess(code);                           // not reached
+}
+
+BOOL WINAPI XtTerminateProcess(HANDLE process, UINT code) {
+    if (process == GetCurrentProcess() || GetProcessId(process) == GetCurrentProcessId())
+        XtExitLine("TerminateProcess", code, static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(_ReturnAddress())));
+    TerminateProcessFn next = g_xtTerminate;
+    return next ? next(process, code) : TerminateProcess(process, code);
+}
+
+// one import slot of tru.exe -> hook; the hook calls what the slot held (kernel32's function or another hook)
+bool XtHookSlot(DWORD slot, const char *name, DWORD hook, DWORD *original) {
+    DWORD current = 0;
+    if (!ReadDword(slot, &current) || !current) {
+        Log(0, "Diag ExitTrace: import slot 0x%08lx (%s) unreadable or empty - not hooked", slot, name);
+        return false;
+    }
+    char owner[MAX_PATH] = "?";
+    HMODULE mod = nullptr;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           reinterpret_cast<LPCSTR>(static_cast<DWORD_PTR>(current)), &mod) && mod)
+        GetModuleFileNameA(mod, owner, MAX_PATH);
+    const DWORD own = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetProcAddress(GetModuleHandleA("kernel32.dll"), name)));
+    *original = current;
+    if (!WriteCode(slot, &hook, sizeof(hook))) return false;
+    Log(1, "Diag ExitTrace: tru.exe import slot 0x%08lx %s held 0x%08lx (%s%s) -> TruQoL, chained", slot, name, current,
+        owner, current == own ? ", kernel32's own" : ", NOT kernel32's own address: another hook, called after TruQoL");
+    return true;
+}
+
+// watch thread: the module lines (allocation bases of the exception lines -> names) every 2 s for the first 60 s
+DWORD WINAPI XtWatch(LPVOID) {
+    for (int i = 0; i < 30; ++i) {
+        XtModules(i ? "new" : "start");
+        Sleep(2000);
+    }
+    return 0;
+}
+
+DWORD XtImageEnd() {                             // tru.exe's SizeOfImage from its PE header
+    __try {
+        const BYTE *base = reinterpret_cast<const BYTE *>(static_cast<DWORD_PTR>(kImageBase));
+        const IMAGE_NT_HEADERS32 *nt = reinterpret_cast<const IMAGE_NT_HEADERS32 *>(
+            base + reinterpret_cast<const IMAGE_DOS_HEADER *>(base)->e_lfanew);
+        return kImageBase + nt->OptionalHeader.SizeOfImage;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return kImageBase;
+    }
+}
+
+void XtRegDword(HKEY key, const char *value, char *out, size_t n) {
+    DWORD v = 0, size = sizeof(v), type = 0;
+    if (RegQueryValueExA(key, value, nullptr, &type, reinterpret_cast<BYTE *>(&v), &size) == ERROR_SUCCESS &&
+        type == REG_DWORD)
+        _snprintf_s(out, n, _TRUNCATE, "%lu", v);
+    else
+        _snprintf_s(out, n, _TRUNCATE, "-");
+}
+
+void StartExitTrace() {
+    if (!g_exitTrace) {
+        Log(1, "Diag ExitTrace: off ([Diag] ExitTrace=0, restart) - no exception / exit trace");
+        return;
+    }
+    char path[MAX_PATH];
+    _snprintf_s(path, sizeof(path), _TRUNCATE, "%sTruQoL.exit.log", g_dir);
+    g_xtFile = CreateFileA(path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                           OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (g_xtFile == INVALID_HANDLE_VALUE) {
+        Log(0, "Diag ExitTrace: %s cannot be opened (%lu) - off", path, GetLastError());
+        return;
+    }
+    g_xtMainThread = GetCurrentThreadId();       // DllMain: the ASI loader loads the plugins on the main thread
+    g_xtImageEnd = XtImageEnd();
+    int sitesOk = 0;
+    for (int i = 0; i < kXtSiteCount; ++i) {
+        g_xtSiteOk[i] = HexBytesAt(kXtSites[i].ret - 6, kXtSites[i].call);
+        if (g_xtSiteOk[i]) ++sitesOk;
+    }
+    char dumpType[16] = "-", dumpCount[16] = "-", dumpFolder[MAX_PATH] = "";
+    bool werKey = false;
+    HKEY key = nullptr;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps\\tru.exe",
+                      0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &key) == ERROR_SUCCESS) {
+        werKey = true;
+        XtRegDword(key, "DumpType", dumpType, sizeof(dumpType));
+        XtRegDword(key, "DumpCount", dumpCount, sizeof(dumpCount));
+        DWORD size = sizeof(dumpFolder) - 1, type = 0;
+        if (RegQueryValueExA(key, "DumpFolder", nullptr, &type, reinterpret_cast<BYTE *>(dumpFolder), &size) !=
+                ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ))
+            dumpFolder[0] = 0;
+        dumpFolder[sizeof(dumpFolder) - 1] = 0;
+        RegCloseKey(key);
+    }
+    char head[1000];
+    XtLine stamp;
+    stamp.Time(true);
+    stamp.s[stamp.n] = 0;
+    _snprintf_s(head, sizeof(head), _TRUNCATE,
+                "%s=== %s ExitTrace: pid %lu, main thread %lu, tru.exe 0x%08lx..0x%08lx, %d of %d known exit sites "
+                "verified; WER LocalDumps tru.exe: %s%s%s%s%s%s%s (read only). Lines: 'first-chance exception' = "
+                "seen by the vectored handler (may still be caught); 'exit:' = tru.exe's own ExitProcess / "
+                "TerminateProcess; 'detach: process exit' = some module's ExitProcess; no line = ended from outside "
+                "these paths\r\n",
+                stamp.s, kVersion, GetCurrentProcessId(), g_xtMainThread, kImageBase, g_xtImageEnd, sitesOk,
+                kXtSiteCount, werKey ? "DumpType " : "key not found", werKey ? dumpType : "",
+                werKey ? ", DumpCount " : "", werKey ? dumpCount : "", werKey ? ", DumpFolder '" : "",
+                werKey ? dumpFolder : "", werKey ? "'" : "");
+    DWORD written = 0;
+    WriteFile(g_xtFile, head, static_cast<DWORD>(strlen(head)), &written, nullptr);
+    PVOID veh = AddVectoredExceptionHandler(1, &XtVeh);
+    DWORD exitOrig = 0, termOrig = 0;
+    const bool exitHooked = XtHookSlot(kIatExitProcess, "ExitProcess",
+                                       static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(&XtExitProcess)), &exitOrig);
+    if (exitHooked) g_xtExit = reinterpret_cast<ExitProcessFn>(static_cast<DWORD_PTR>(exitOrig));
+    const bool termHooked = XtHookSlot(kIatTerminateProcess, "TerminateProcess",
+                                       static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(&XtTerminateProcess)), &termOrig);
+    if (termHooked) g_xtTerminate = reinterpret_cast<TerminateProcessFn>(static_cast<DWORD_PTR>(termOrig));
+    HANDLE watch = CreateThread(nullptr, 0, &XtWatch, nullptr, 0, nullptr);
+    if (watch) CloseHandle(watch);
+    Log(1, "Diag ExitTrace: on - %sTruQoL.exit.log: first-chance exceptions >= 0xC0000000 (vectored handler %s, first "
+           "%ld in full), tru.exe's ExitProcess %s / TerminateProcess %s (%d of %d exit sites named), module lines for "
+           "60 s, the DLL detach (restart key; logging only, nothing else changes)",
+        g_dir, veh ? "on" : "FAILED", kXtFullLines, exitHooked ? "hooked" : "NOT hooked",
+        termHooked ? "hooked" : "NOT hooked", sitesOk, kXtSiteCount);
+}
+
+// DLL_PROCESS_DETACH (heap-free: during ExitProcess the other threads are already gone, maybe holding locks)
+void XtDetach(bool processExit) {
+    if (g_xtFile == INVALID_HANDLE_VALUE) return;
+    XtLine l;
+    l.Time(true);
+    l.Str(processExit ? "detach: process exit (some module called ExitProcess)" : "detach: FreeLibrary");
+    l.Str("; ");
+    l.Thread();
+    XtLastException(l);
+    l.Write();
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // 0.1.1 live keys (TruMenu page Fixes / TruMenu.switches.txt "live"): game thread, from LiveTick. Every read passes the
 // current value as its default (a missing key keeps it); one log line per change. Not here (restart): [TruQoL] Enabled,
 // [Startup] ThreadCap.
@@ -1131,6 +1508,7 @@ void ReadOptions() {
     g_threadCap = IniInt("Startup", "ThreadCap", 8, 0, 31);   // 0.1.3: default 8 (was 31; 25+ hang at the first load)
     g_skipIntro = IniInt("Startup", "SkipIntro", 0, 0, 1);
     g_frontEndPauseBit = IniInt("Fixes", "FrontEndPauseBit", 0, 0, 1);   // 0.1.4
+    g_exitTrace = IniInt("Diag", "ExitTrace", 0, 0, 1);                   // 0.1.5 (restart; not in the shipped INI)
 }
 
 void Start(HMODULE self) {
@@ -1138,11 +1516,13 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruQoL.log", g_dir);
     ReadOptions();
     Log(1, "%s loaded (enabled %d, log level %d; FrameLimit %d / %d fps / AutoOff %d, Fov %g / cutscenes %d, ShakeScale "
-           "%g, ThreadCap %d, SkipIntro %d, FrontEndPauseBit %d)", kVersion, g_enabled, g_logLevel, g_limitEnabled,
-        g_maxFps, g_autoOff, g_fov, g_fovCutscenes, g_shakeScale, g_threadCap, g_skipIntro, g_frontEndPauseBit);
+           "%g, ThreadCap %d, SkipIntro %d, FrontEndPauseBit %d, ExitTrace %d)", kVersion, g_enabled, g_logLevel,
+        g_limitEnabled, g_maxFps, g_autoOff, g_fov, g_fovCutscenes, g_shakeScale, g_threadCap, g_skipIntro,
+        g_frontEndPauseBit, g_exitTrace);
     if (!g_enabled) { Log(1, "disabled by TruQoL.ini ([TruQoL] Enabled=0) - nothing patched"); return; }
     const DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - nothing patched", base, kImageBase); return; }
+    StartExitTrace();                        // 0.1.5: first, so the trace covers the rest of the start ([Diag] ExitTrace)
     StartThreadCap();                        // first: the CPU count runs in WinMain, soon after the plugins are loaded
     StartFrameLimit();
     StartCamera();
@@ -1151,23 +1531,26 @@ void Start(HMODULE self) {
     if (g_limitHooked)
         Log(1, "live: TruQoL.ini is read again at most once a second when it changes (LogLevel, FrameLimit Enabled / "
                "MaxFps / AutoOff / SpinUs, Camera Fov / FovCutscenes / ShakeScale, Fixes FrontEndPauseBit; restart: "
-               "Enabled, ThreadCap, SkipIntro)");
+               "Enabled, ThreadCap, SkipIntro, Diag ExitTrace)");
 }
 
 }  // namespace
 
-BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
+BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved) {
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         InitializeCriticalSection(&g_logLock);
         Start(instance);
+    } else if (reason == DLL_PROCESS_DETACH) {
+        XtDetach(reserved != nullptr);       // 0.1.5 ExitTrace (nothing while it is off)
     }
     return TRUE;
 }
 
 extern "C" __declspec(dllexport) const char *TruQoLVersion() {
-    return "TruQoL 0.1.4 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
+    return "TruQoL 0.1.5 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
            "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0, start-up "
            "intro skip at the script's PlayMovie call 0x77bc7b, stale front-end pause bit at the paused-branch clock "
-           "call 0x5da684; live INI re-read once a second for TruMenu page Fixes)";
+           "call 0x5da684; live INI re-read once a second for TruMenu page Fixes; [Diag] ExitTrace (default off): "
+           "first-chance exceptions + tru.exe's ExitProcess / TerminateProcess -> TruQoL.exit.log)";
 }
