@@ -9,7 +9,9 @@ the top member - tools/script_conv.py initdata), not per real field. For the UI 
 tools/ui_text_init_scan.py: 53 of 1071 text anchors).
 
 Rule (proof): base scripts of the same name in xbox:generalbank.drm and pc:generalbank.drm are paired by their name
-Symbol (Xbox -> PC through the id map), their members by (array, name, type tag, userType); the init trees of paired
+Symbol (Xbox -> PC through the id map), their members by the place in the declaration order (Q55,
+tools/script_member_pairs.align; until Q55 by (array, guessed name Symbol, type tag, userType), which paired neighbour
+entries: PC prompt ids 129 -> 139 / 131 -> 150 said other texts), same type tag and userType; the init trees of paired
 members with a UI userType are walked in parallel (tools/script_init_from_pc.py leaves: same tree shape required). Per
 (PC userType, type tag, path in the init tree) the word classes of tools/script_learn.py that turn EVERY informative
 Xbox word into the PC word give the rule; where no class fits, a consistent whole-word value map (Xbox word -> PC word)
@@ -43,6 +45,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import drm_write as DW, drm_reloc as R, script_conv as SC, script_func_list as FL, script_learn as L
 import script_init_from_pc as SIP
+import script_member_pairs as MP
 
 UI_UTS = (301, 303, 316, 320)          # PC userTypes of the UI element native types (Xbox 299 / 301 / 314 / 318)
 BASE_SRC = ('generalbank.drm',)
@@ -52,10 +55,14 @@ LOC_PC = {}             # {key: {Xbox index: PC id}} - every base observation of
 PREF = ('s32', 'raw', 's16', 'b2s16', 's16b2')
 ZERO_RULE_MIN = 5       # Xbox 0 -> one non-zero PC value: only with at least this many unanimous base observations
 # pinned proof counts (first run 2026-11-09): changing data or code must not move them silently
-PINNED = {'base script pairs': 141, 'UI members paired': 389, 'observations': 23279, 'contradictions': 0,
-          'rule s32': 129, 'zero rule ut 301 path [0, 100]: base observations': 108,
+# Q55 (2026-11-11): member twins by declaration order - 389 -> 446 members, 23279 -> 26195 observations, s32 129 -> 128
+# (4 keys s32 -> id-mixed: script 7 holds a member-name Symbol path there), zero rule 108 -> 126, prompt ids 5 -> 3;
+# planned words on pipeline_check_1111b unchanged (DLC 1 3116, DLC 2 1871 rows identical)
+PINNED = {'base script pairs': 141, 'UI members paired': 446, 'observations': 26195, 'contradictions': 0,
+          'rule s32': 128, 'zero rule ut 301 path [0, 100]: base observations': 126,
           # Q46 (2026-11-11): the text id leaf proves as the locals class once the map is read
-          'rule id16a:101': 1}
+          'rule id16a:101': 1,
+          'locals text ids: PC prompt ids learned': 3}
 
 _IDS = None
 
@@ -108,14 +115,20 @@ def learn():
             _, pd, prl = cand[0]
             Wx, rx = walk(xd, xrl, 'be'); Wp, rp = walk(pd, prl, 'le')
             nx, np_ = no_touch(rx), no_touch(rp)
-            mx, mp = SIP.members(Wx, xd, 'be'), SIP.members(Wp, pd, 'le')
+            mx = SIP.members(Wx, xd, 'be')
+            # Q55: the PC twin of a member / arg / local by its place in the declaration order
+            # (script_member_pairs.align), not by the converter's guessed name Symbol
+            twin, _ = MP.align(xd, xrl, pd, prl, I, None, Wx=Wx, Wp=Wp)
             st['base script pairs'] += 1
             for (arr, nm, tag, ut), la in mx.items():
                 put = I.sym(ut)
                 if put not in UI_UTS: continue
-                lb = mp.get((arr, I.sym(nm), tag, put))
-                if not lb: st['UI members without a PC partner'] += 1; continue
-                for ma, mb in zip(la, lb):
+                for ma in la:
+                    mb = twin.get(ma)
+                    if mb is None: st['UI members without a PC twin'] += 1; continue
+                    if struct.unpack_from('<IH', pd, mb) != (tag, put):
+                        st['UI members whose PC twin has another userType (skipped)'] += 1; continue
+                    if struct.unpack_from('<H', pd, mb + 14)[0] != I.sym(nm): st['UI members paired, PC name != DlcIds.sym(Xbox name)'] += 1
                     ia, ib = Wx.it.get(ma + 16), Wp.it.get(mb + 16)
                     if ia is None or ib is None: continue
                     lx, lp = list(SIP.leaves(Wx, Wx.it, ia)), list(SIP.leaves(Wp, Wp.it, ib))

@@ -25,8 +25,10 @@ short). This tool decides per script, with a proof, and ports what has to be por
   converted     5 changed DTPs, 13 changed + 4 new  the converted section (as drm_merge_pc); the
                 textures, 1 new DTP                 converter gives the pack's change only
   (PC-only sections are appended, external relocation indices remapped.)
-Init words of a ported / new script (members, arguments, locals): a member paired with the PC script (same name, tag,
-userType), whose init tree has the same shape after the struct re-layout and whose init the pack did not change
+Init words of a ported / new script (members, arguments, locals): a member with a PC twin (Q55: recorded by learn -
+pack entry -> Xbox base entry of the same Xbox name -> PC entry by its place in the declaration order,
+tools/script_member_pairs.py; same type tag; until Q55 the PC member of the same converted name, a Symbol guess that
+named neighbour entries), whose init tree has the same shape after the struct re-layout and whose init the pack did not change
 (learn: Xbox base vs pack11) takes the PC words (tools/script_init_from_pc.copy_tree, struct 351 re-laid out by
 copy); everything else is derived from the Xbox original word by word: UI text id (uitext 301 path [0, 92]) through
 the locals map (PC prompt ids first), UI userTypes through the proven tools/ui_init_fix.py rules, the rest through
@@ -45,8 +47,7 @@ slots 0..31 = PC uiscreen 93 (slot 31 = f111), same inherited / own pattern as t
 override - slot 17 "PDA menu onclicked" - is a WARN), every prototype vtIndex consistent; every struct-351 init of the
 file in the PC layout; every ported / new script decodes without walker problems and its code opcodes = the Xbox
 original; every text id leaf of a ported / new script = the rule word of the Xbox word (Q48: a member copied from the
-same-name PC member gets its text ids by rule too - converter member names are Symbol guesses that can name a
-neighbour entry); relocations in bounds; read back.
+PC gets its text ids by rule too - the PC re-authored some texts); relocations in bounds; read back.
 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/gpda_port.py analyze CONVERTED_G_PDA [--report R.json]
@@ -318,14 +319,15 @@ def analyze(argv):
         if tg: print('        moved per target: %s' % dict(tg))
     # init words: PC values for the paired members, rules for the DLC-only ones
     print('member / local init words (script-6 rule):')
-    obs_all, xdata = {}, {}
+    obs_all, xdata, tw = {}, {}, {}
     for pid in PORT:
         cs = cv[(8, pid)]; ps = pc[(8, pid)]; xs = pk[inv[(8, pid)]]
         xdata[pid] = xs['data']
+        tw[pid] = twins_of(xs, xb[inv[(8, pid)]], ps)[0]
         d = bytearray(cs.data); ra = R.parse(cs.reloc, 'le'); st = collections.Counter(); log = []
-        wa, ita0, wb, itb, obs = port_init(d, ra, ps['data'], ps['reloc'], xs['data'], None, st, log, pid)
+        wa, ita0, wb, itb, obs = port_init(d, ra, ps['data'], ps['reloc'], xs['data'], None, st, log, pid, tw[pid])
         obs_all[pid] = (wa, ita0, wb, itb, obs, ps['data'])
-        _, _, _, _, only, _ = init_pairs(bytearray(cs.data), R.parse(cs.reloc, 'le'), ps['data'], ps['reloc'])
+        _, _, _, _, only, _ = init_pairs(bytearray(cs.data), R.parse(cs.reloc, 'le'), ps['data'], ps['reloc'], tw[pid])
         with_init = collections.Counter((k[0], k[3]) for k, la in only for a in la if (a + 16) in ita0)
         print('   %5d: %s; DLC-only with init (array, userType): %s' % (pid, dict(st), dict(with_init)))
         for l in log[:6]: print('     ' + l)
@@ -335,7 +337,7 @@ def analyze(argv):
         cs = cv[(8, pid)]; xs = pk[inv[(8, pid)]]
         d = bytearray(cs.data); ra = R.parse(cs.reloc, 'le'); st = collections.Counter(); log = []
         p = pc.get((8, pid))
-        port_init(d, ra, p['data'] if p else None, p['reloc'] if p else None, xs['data'], rules, st, log, pid)
+        port_init(d, ra, p['data'] if p else None, p['reloc'] if p else None, xs['data'], rules, st, log, pid, tw.get(pid, {}))
         print('   %5d DLC-only: %s' % (pid, {k: v for k, v in st.items() if 'TU-only' in k or 'DLC-only' in k}))
         for l in log[:6]: print('     ' + l)
     if rep_path:
@@ -435,9 +437,10 @@ def ext_check(conv_sec, xsec, conv_keys, E, fkey_of):
     return out
 
 
-def init_pairs(d, ra, pdata, preloc):
-    """members / args / locals of a converted script paired with its PC version (script_init_from_pc rules): returns
-    (walk A, its internal map, walk B, its internal map, pairs [(key, a entry, b entry)], only-A keys, counts)"""
+def init_pairs(d, ra, pdata, preloc, twins):
+    """members / args / locals of a converted script paired with its PC version: returns (walk A, its internal map,
+    walk B, its internal map, pairs [(key, a entry, b entry)], only-A keys, counts). twins = {entry offset: PC entry
+    offset} (script_member_pairs.chain, Q55; until Q55 the same-name PC member - a converter name guess)"""
     import script_init_from_pc as SIP
     wa = SC.Walk(bytes(d), ra, 'le'); wa.run()
     ma = SIP.members(wa, bytes(d), 'le')
@@ -445,23 +448,30 @@ def init_pairs(d, ra, pdata, preloc):
         return wa, None, None, [], list(ma.items()), collections.Counter()
     rb = R.parse(preloc, 'le')
     wb = SC.Walk(pdata, rb, 'le'); wb.run()
-    mb = SIP.members(wb, pdata, 'le')
     pairs, only, st = [], [], collections.Counter()
     for key, la in ma.items():
-        lb = mb.get(key)
-        if not lb: only.append((key, la)); continue
-        if len(la) != len(lb): st['%s: unequal counts per name (surplus not paired)' % key[0]] += abs(len(la) - len(lb))
-        for a, b in zip(la, lb): pairs.append((key, a, b))
+        rest = []
+        for a in la:
+            b = twins.get(a)
+            if b is None or struct.unpack_from('<IH', pdata, b) != (key[2], key[3]): rest.append(a); continue
+            pairs.append((key, a, b))
+        if rest: only.append((key, rest))
     return wa, wb, rb, pairs, only, st
 
 
-def port_init(d, ra, pdata, preloc, xdata, rules, st, log, sid):
+def twins_of(xs, xb, ps):
+    """developer: {pack entry offset: PC entry offset} of one ported script (pack / Xbox base / PC section dicts)"""
+    import script_member_pairs as MP
+    return MP.chain(xs['data'], xs['reloc'], xb['data'], xb['reloc'], ps['data'], ps['reloc'], ids())
+
+
+def port_init(d, ra, pdata, preloc, xdata, rules, st, log, sid, twins=None):
     """script-6 init step on bytearray d / relocation object ra of a ported script: every paired member / arg / local
     init tree takes the PC words (struct nodes re-laid out to the PC layout, tools/script_init_from_pc.copy_tree); the
     DLC-only ones get their words from the Xbox original through `rules` (per type tag / userType / path, learned
     from the pairs of all ported scripts); returns the observation pairs (for learning) when rules is None"""
     import script_init_from_pc as SIP
-    wa, wb, rb, pairs, only, c0 = init_pairs(d, ra, pdata, preloc)
+    wa, wb, rb, pairs, only, c0 = init_pairs(d, ra, pdata, preloc, twins or {})
     st.update(c0)
     ita = dict(ra.internal); itb = dict(rb.internal) if rb is not None else {}; ita0 = dict(ita)
     seen, shapes, obs = set(), [], []
@@ -573,19 +583,24 @@ def learn_base_rules(skip_uts=()):
     import ui_init_fix as U
     import script_learn as L
     import script_init_from_pc as SIP
+    import script_member_pairs as MP
     I = ids()
     obs = collections.defaultdict(list); st = collections.Counter(); shapes = collections.defaultdict(list)
     for fname, sid, xd, xrl, pd, prl in base_pairs():
         Wx, rx = U.walk(xd, xrl, 'be'); Wp, rp = U.walk(pd, prl, 'le')
         nx, np_ = U.no_touch(rx), U.no_touch(rp)
-        mx, mp = SIP.members(Wx, xd, 'be'), SIP.members(Wp, pd, 'le')
+        mx = SIP.members(Wx, xd, 'be')
+        # Q55: PC twins by the place in the declaration order (script_member_pairs.align), not the guessed name
+        twin, tst = MP.align(xd, xrl, pd, prl, I, None, Wx=Wx, Wp=Wp)
+        for k, v in tst.items(): st['twins ' + k] += v
         st['base script pairs'] += 1
         for (arr, nm, tag, ut), la in mx.items():
             put = I.sym(ut)
             if put in skip_uts: continue
-            lb = mp.get((arr, I.sym(nm), tag, put))
-            if not lb: continue
-            for ma, mb in zip(la, lb):
+            for ma in la:
+                mb = twin.get(ma)
+                if mb is None: continue
+                if struct.unpack_from('<IH', pd, mb) != (tag, put): st['twins with another userType (skipped)'] += 1; continue
                 ia, ib = Wx.it.get(ma + 16), Wp.it.get(mb + 16)
                 if ia is None or ib is None: continue
                 lx, lp = list(SIP.leaves(Wx, Wx.it, ia)), list(SIP.leaves(Wp, Wp.it, ib))
@@ -656,7 +671,9 @@ KNOW = os.path.join(REPO, 'docs', 'data', 'gpda_port.json')
 # -2 (Q48): re-learned with the Q46 DlcIds.loc (pipeline locals map); -1 was learned while DlcIds.loc returned the Xbox
 # index, so the text id leaves 223 [0, 0] / 301 [0, 92] got a coincidental unit-id class id16a:110 (5 / 4 observations)
 # and the DLC list entries kept the raw Xbox string index (23 words in 3347 / 3360 / 3367, 1 in 3384)
-VERSION = 'G20261111-2'
+# -3 (Q55): base rules learned on member twins by declaration order (tools/script_member_pairs.py) instead of the
+# converter's guessed names; member_twins = the PC twin entry offset of every pack entry of a ported script
+VERSION = 'G20261111-3'
 UI_UTS = (301, 303, 316, 320)
 LOC_RULES = ('id16a:101', 'id32:101')     # locals string id classes (tools/script_learn.py; DlcIds.loc = locals map)
 PH = 0xBEEBBEEB
@@ -718,6 +735,16 @@ def learn(argv):
         b = member_leaves_words(pk[xk]['data'], pk[xk]['reloc'], 'be')
         ch = sorted({k[:4] for k in b if k in a and a[k] != b[k]})
         changed_members[key] = [[x[0], x[1], x[2], x[3]] for x in ch]
+    # Q55: the PC twin of every member / arg / local of a ported script: pack entry -> Xbox base entry (same Xbox
+    # Symbols) -> PC entry (place in the declaration order, script_member_pairs) - entry offsets only
+    twins, twin_stats = {}, {}
+    for key, r in rec.items():
+        if r != 'port': continue
+        t, pid = map(int, key.split(':')); xk = inv[(t, pid)]
+        m, s_ = twins_of(pk[xk], xb[xk], pc[(t, pid)])
+        twins[key] = sorted([a, b] for a, b in m.items())
+        twin_stats[key] = dict(s_)
+        print('twins %s: %s' % (key, {k: v for k, v in s_.items() if 'members' in k or k.startswith('pack entries')}))
     rules, shapes, st = learn_base_rules()
     import ui_init_fix as U
     urules, ust, ucontra = U.learn()
@@ -729,6 +756,7 @@ def learn(argv):
              pack_md5={k_(t, I(t, x)): md5(s['data'] + s['reloc']) for (t, x), s in pk.items()},
              pc_md5={k_(t, i): md5(s['data'] + s['reloc']) for (t, i), s in pc.items()},
              changed_members=changed_members,
+             member_twins=twins, member_twin_stats=twin_stats,
              rules={rkey(k): v for k, v in rules.items()},
              ui_rules={rkey(k): [v[1], v[3]] for k, v in urules.items()},
              text_id_pc={str(k): v for k, v in sorted(TEXT_PC.items())},
@@ -756,6 +784,8 @@ def load_knowledge(path=KNOW):
         return tuple(out)
     K['_rules'] = {pk(k): v for k, v in K['rules'].items()}
     K['_ui'] = {pk(k): v for k, v in K['ui_rules'].items()}
+    if 'member_twins' not in K: sys.exit('knowledge %s has no member_twins (learned before Q55) - run learn --write' % path)
+    K['_twins'] = {key: {a: b for a, b in v} for key, v in K['member_twins'].items()}
     TEXT_PC.clear(); TEXT_PC.update({int(k): v for k, v in K.get('text_id_pc', {}).items()})
     # text id leaves: the UI text element + every leaf whose learned rule is the locals class (223 [0, 0], Q48)
     K['_text'] = set(TEXT_ID) | {(k[0], k[2]) for k, v in K['_rules'].items() if v == 'id16a:101' and k[0] != 'fb'}
@@ -942,14 +972,13 @@ def port_init2(d, ra, conv_data, pc_sec, xs, K, key, st, risk):
     if len(xd) != len(conv_data): sys.exit('%s: converted and Xbox section differ in size' % key)
     ma = SIP.members(wa, bytes(conv_data), 'le')
     xkey_at = {a: k for k, la in SIP.members(Wx, xd, 'be').items() for a in la}     # same entry offsets (Xbox layout)
-    mb, wb, itb = {}, None, {}
+    wb, itb = None, {}
+    tw = K['_twins'].get(key, {}) if pc_sec is not None else {}
     if pc_sec is not None:
         rb = R.parse(pc_sec['reloc'], 'le'); wb = SC.Walk(pc_sec['data'], rb, 'le').run(); itb = dict(rb.internal)
-        mb = SIP.members(wb, pc_sec['data'], 'le')
     changed = {tuple(x) for x in K['changed_members'].get(key, [])}
     seen = set()
     for mk, la in ma.items():
-        lb = mb.get(mk, [])
         for j, a in enumerate(la):
             ia = ita.get(a + 16)
             if ia is None: continue
@@ -958,7 +987,16 @@ def port_init2(d, ra, conv_data, pc_sec, xs, K, key, st, risk):
             if xk is None or Wx.it.get(a + 16) != ia or xk[0] != mk[0] or xk[2] != mk[2]:
                 risk.append('%d %s: no Xbox member at the same offset - kept converted' % (sid, label)); st['members without Xbox twin'] += 1
                 continue
-            ib = itb.get(lb[j] + 16) if j < len(lb) else None
+            # Q55: the PC twin recorded by learn (place in the declaration order via the Xbox base), not the PC member
+            # of the same converted name (a DlcIds.sym guess that named neighbour entries); same type tag required
+            b = tw.get(a)
+            if b is not None and struct.unpack_from('<I', pc_sec['data'], b)[0] != mk[2]:
+                st['twins with another type tag (by rule)'] += 1; b = None
+            if b is not None and struct.unpack_from('<H', pc_sec['data'], b + 4)[0] != mk[3]:
+                st['twins whose userType differs from the converted one'] += 1
+            if b is not None and struct.unpack_from('<H', pc_sec['data'], b + 14)[0] != mk[1]:
+                st['twins whose PC name differs from the converted (guessed) name'] += 1
+            ib = itb.get(b + 16) if b is not None else None
             if ib is not None and tuple(xk) not in changed:
                 lx = [(relayout_path(mk[3], p), o) for p, o in SIP.leaves(Wx, Wx.it, ia)]
                 lx = [p for p, o in lx if p is not None]
@@ -994,6 +1032,70 @@ def port_init2(d, ra, conv_data, pc_sec, xs, K, key, st, risk):
     bad = sorted(a for a in ita if a not in old_rel and a in prot)
     if bad: sys.exit('%s: a moved relocation lands on a structural word (%s) - nothing written' % (key, ['0x%x' % a for a in bad[:6]]))
     ra.internal = list(ita.items())
+
+
+def path_words(d, rel, xd, xrl):
+    """Symbol path words {member name, property} in the init leaves of a ported script (Q55): the high u16 of the Xbox
+    word is a member name of the same Xbox script and the low u16 a non-zero base-range Symbol (a native property; as
+    an integer or a float such a word would be 0x13xx0000..0x17xx0000 = 3e8 / 1e-26 - none in these scripts).
+    The engine resolves such paths BY NAME (tru.exe 0x4d08e0: per path element the DataMember of that name, 0x4c8420
+    over ScriptType+0x2c, else a function of that name up the class chain, 0x4d0850). -> [(offset, target entry offset,
+    Xbox property Symbol)] - offsets of the converted section = the Xbox offsets"""
+    import script_member_pairs as MP
+    import script_init_from_pc as SIP
+    xmax = ids().xs_max
+    _, ex = MP.entries(xd, xrl, 'be')
+    at = {}
+    for q in ex['members']: at.setdefault(q['name'], q['a'])
+    W, eb = MP.entries(bytes(d), R.write(rel, 'le') if not isinstance(rel, (bytes, bytearray)) else rel, 'le')
+    out, seen = [], set()
+    for kind in MP.KINDS:
+        for q in eb[kind]:
+            if q['init'] is None: continue
+            for p, o in SIP.leaves(W, W.it, q['init']):
+                if o in seen or o + 4 > len(xd): continue
+                seen.add(o)
+                xh, xl = struct.unpack_from('>HH', xd, o)
+                if xh in at and 0 < xl <= xmax: out.append((o, at[xh], xl))
+    return out
+
+
+def twin_names(d, rel, xs, pc_sec, K, key, st, risk):
+    """Q55: every member of a ported script with a PC twin takes the twin's PC name (the converter's name is a DlcIds.sym
+    guess that differs from the PC name in most g_pda members); every Symbol path word {member, property} names the
+    final name of the member the Xbox path names (property: the learned base map). Paths are resolved by name at run
+    time (path_words), so a path copied from the PC twin (PC names) and the member names must agree."""
+    import script_member_pairs as MP
+    I = ids()
+    sid = int(key.split(':')[1])
+    tw = K['_twins'].get(key, {})
+    _, eb = MP.entries(bytes(d), R.write(rel, 'le'), 'le')
+    taken = set()
+    for q in eb['members']:
+        b = tw.get(q['a'])
+        if b is None: continue
+        pn = struct.unpack_from('<H', pc_sec['data'], b + 14)[0]
+        taken.add(pn)
+        if pn != q['name']:
+            d[q['a'] + 14:q['a'] + 16] = struct.pack('<H', pn); st['member names -> PC twin name'] += 1
+        else: st['member names = PC twin name already'] += 1
+    xname = {q['a']: q['name'] for q in MP.entries(xs['data'], xs['reloc'], 'be')[1]['members']}
+    for q in eb['members']:
+        # a member without a PC twin (DLC-only) whose guessed name is a twin's PC name: DlcIds' collision rule 40000 + Xbox
+        if q['a'] not in tw and q['name'] in taken:
+            nn = 40000 + xname[q['a']]
+            d[q['a'] + 14:q['a'] + 16] = struct.pack('<H', nn); st['member names without twin moved off a twin name (40000 + Xbox)'] += 1
+    names = collections.Counter(struct.unpack_from('<H', d, q['a'] + 14)[0] for q in eb['members'])
+    dup = sorted(n for n, c in names.items() if c > 1)
+    if dup:
+        risk.append('%d: member names used twice: %s' % (sid, dup[:8])); st['member names used twice'] += len(dup)
+    for o, ta, xl in path_words(d, rel, xs['data'], xs['reloc']):
+        fin = struct.unpack_from('<H', d, ta + 14)[0]
+        n0, p0 = struct.unpack_from('<HH', d, o)
+        # property: the PC copy's where the word already names the final member (copied from the PC twin), else the map
+        want = struct.pack('<HH', fin, p0 if n0 == fin else I.sym(xl))
+        if bytes(d[o:o + 4]) == want: st['path words already right'] += 1; continue
+        d[o:o + 4] = want; st['path words -> final member name'] += 1; st['init words changed'] += 1
 
 
 def protected_offsets(W):
@@ -1114,6 +1216,7 @@ def build(argv):
         # b) init words
         d = bytearray(s.data); r = R.parse(s.reloc, 'le')
         port_init2(d, r, s.data, pc.get((t, sid)) if rec[key] == 'port' else None, xs, K, key, sst, srisk)
+        if rec[key] == 'port': twin_names(d, r, xs, pc[(t, sid)], K, key, sst, srisk)
         # c) PC vtable slot 31 for the uiscreen classes
         v0 = View(s.data, s.reloc, 'le')
         if v0.super_id() == UISCREEN:
@@ -1292,6 +1395,23 @@ def gate_sections(S, pc, PCS, pk, inv, rec, targets):
                     badt.append('%d:%d +0x%x %s' % (key[0], key[1], o, bytes(v.d[o:o + 4]).hex()))
     out.append(('ok   ' if not badt else 'FAIL ') + 'text ids of the ported / new scripts: %s, other %d %s' % (
         dict(tst), len(badt), badt[:6]))
+    # (5) Symbol paths (Q55): every path word {member name, property} of a ported script names exactly one member of
+    # the script, the one the Xbox path names (the engine resolves paths by name, path_words)
+    pst = collections.Counter(); badp = []
+    for key in sorted(tset):
+        if rec.get(k_(*key)) != 'port': continue
+        v = view(key); xs = pk[inv[key]]
+        if v is None: continue
+        names = collections.defaultdict(list)
+        for kk, la in SIP.members(v.W, v.d, 'le').items():
+            if kk[0] == 'members':
+                for a in la: names[kk[1]].append(a)
+        for o, ta, xl in path_words(v.d, v.rel, xs['data'], xs['reloc']):
+            n0 = struct.unpack_from('<H', v.d, o)[0]
+            if names.get(n0) == [ta]: pst['resolve to the Xbox target'] += 1
+            else: badp.append('%d:%d +0x%x name %d -> %s (target +0x%x)' % (key[0], key[1], o, n0, names.get(n0), ta))
+    out.append(('ok   ' if not badp else 'FAIL ') + 'Symbol paths of the ported scripts: %s, other %d %s' % (
+        dict(pst), len(badp), badp[:6]))
     return out
 
 
