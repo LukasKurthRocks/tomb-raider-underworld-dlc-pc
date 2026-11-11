@@ -130,14 +130,19 @@
                vo_lang_variants check pack11 (doppelganger language variants, vo_lang_check.json), generator_intro_fix
                scan (genintro_check.json), dlc_struct_fixes check --steps costumedtp,dspkind (datafix_check.json)
                -> work\rebuild\b138_pristine\mods, work\rebuild\b138_fixes\mods (install with Install-TruTree.ps1)
-      Generalbank  (default since 2026-11-11, Q2, seconds, no kit / Xbox data) tools\generalbank_pc_build.py build:
-               the PC patch.000 generalbank (raw md5 checked) + recipe P3 (DLC text, menu_dlc_patch) + the recorded
-               sections of docs\data\generalbank_pc.json (13 sections: B138's TU edits DTP 36 / script 72, scripts 6 /
+      Generalbank  (default since 2026-11-11, Q2, seconds, no kit) tools\generalbank_pc_build.py build: needs the
+               player's own Xbox title update TitleUpdate.000 (--tu, default
+               ..\data\TombRaiderUnderworld_Patched\TitleUpdate.000; raw md5 of its generalbank checked) and no local
+               knowledge file (since c883db5, knowledge K20261111-3: rules instead of the local residual bytes);
+               the PC patch.000 generalbank (raw md5 checked) + recipe P3 (DLC text, menu_dlc_patch) + the sections
+               docs\data\generalbank_pc.json describes as references to sections of the PC / TU files (md5) + word
+               rules, no game data (13 sections: B138's TU edits DTP 36 / script 72, scripts 6 /
                9 / 104 / 21239 / 20082 + DTP 47 of the chain below, K12 DTP 2, shadow meter HUD scripts 37 / 213 +
                textures 7899 / 7036) + menu_ring_p14 build (ring tree 7: DLC on slot 7, QUIT on position 14; step
                file gated md5 = b8b1eb71..., the installed ring tree 7) + the TU doppelganger camera DTPs 21237 / 21238
                and their curve records 22194 appended (tools/tu_camera_dtp.py; md5 810711f1...); a guard refuses every
-               kit / reference / Xbox / game-mods path; then menu_ring_layout --expect-p14, menu_quit_slot_check
+               kit / reference / game-mods path and every Xbox path except the TitleUpdate.000 given with --tu; then
+               menu_ring_layout --expect-p14, menu_quit_slot_check
                --expect f15, input_map_tu_fix --verify
                -> work\rebuild\generalbank_pc\mods\generalbank.drm + build_report.json (-FixesOut DIR:
                DIR\generalbank_pc). Docs: Befund-Generalbank-PC-Basis-1111.md. Not installed by anything yet.
@@ -494,8 +499,9 @@ $steps = @{
         @('tools\dlc_struct_fixes.py', 'check', "$repPristine,$repFixes", '--steps', 'costumedtp,dspkind', '--pack', 'pack10', '--report', ((Split-Path -Parent $repFixes) + '/datafix_check.json')),
         (@('tools\shader_form_gate.py', 'check', $repFixes, '--list', '3', '--report', ((Split-Path -Parent $repFixes) + '/shader_form_check.json')) + $sgEnforce)
     )
-    # Generalbank (2026-11-11, Q2): the PC patch.000 generalbank + docs\data\generalbank_pc.json + ring P14 (md5 gate =
-    # ring tree 7, kit / Xbox paths refused by the tool's guard), then PC-only gates; -GeneralbankKit: the old chain
+    # Generalbank (2026-11-11, Q2): the PC patch.000 generalbank + the player's TitleUpdate.000 (tool default path) +
+    # docs\data\generalbank_pc.json + ring P14 (md5 gate = ring tree 7, kit paths and Xbox paths other than the TU
+    # refused by the tool's guard), then PC-only gates; -GeneralbankKit: the old chain
     Generalbank = if (!$GeneralbankKit) { @(
         @('tools\generalbank_pc_build.py', 'build', $gbPcOut),
         @('tools\menu_ring_layout.py', "$gbPcOut/mods/generalbank.drm", '--expect-p14'),

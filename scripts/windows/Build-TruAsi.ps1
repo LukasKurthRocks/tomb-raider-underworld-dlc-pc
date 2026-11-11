@@ -9,6 +9,12 @@
     Calls vcvarsall.bat (target x86) of the newest Visual Studio found (2022 Community by default), compiles with
     cl /LD /O2 /MT (static runtime, no extra DLLs next to the game) and writes <workspace>\work\asi\<name>.asi plus
     the sample .ini. Nothing is copied into the game folder - install with Set-TruShadowPower.ps1 -Install.
+    TruShadowPower (2026-11-11, Q30): first the 0.26 doppelganger mode tables are generated from the player's own
+    files (tools\tu_dg_modes_inc.py, TitleUpdate.000 + PC patch.000, read-only) into
+    src\asi\TruShadowPower\TruShadowPower_dgmodes.local.inc (gitignored: converted title-update data, never committed;
+    generator log <OutDir>\TruShadowPower_dgmodes.txt). Without a TitleUpdate.000 the generator is skipped and logged:
+    the plugin builds without the tables (__has_include; DgModeTables reports "not built in", the stand-in keeps the
+    0.25 tables) or with an include left by an earlier run (its date is logged). A failing generator stops the build.
     Every run writes <workspace>\logs\Build-TruAsi_<time>.log incl. the compiler / linker output. -Verbose shows the
     steps, -Debug the commands and dumpbin output, -Trace adds a PowerShell line trace.
 
@@ -22,6 +28,10 @@
     Output folder (default <repository>\work\asi). A separate folder (e.g. work\asi\v05) keeps an earlier build of the
     same plugin untouched.
 
+.PARAMETER TitleUpdate
+    TruShadowPower only: the player's Xbox title update TitleUpdate.000 for the mode-table generator (default
+    <workspace>\data\TombRaiderUnderworld_Patched\TitleUpdate.000). Missing = build without generating (logged).
+
 .EXAMPLE
     .\Build-TruAsi.ps1 -Verbose
 #>
@@ -30,6 +40,7 @@ param(
     [string]$Name = 'TruShadowPower',
     [string]$VsPath = 'C:\Program Files\Microsoft Visual Studio\2022\Community',
     [string]$OutDir,
+    [string]$TitleUpdate,
     [switch]$Trace
 )
 
@@ -62,6 +73,37 @@ function Invoke-Logged {
     return $code
 }
 
+function Update-TruDgModesInclude {
+    # TruShadowPower 0.26 mode tables: tools\tu_dg_modes_inc.py writes the gitignored include from the player's own
+    # TitleUpdate.000 + PC patch.000; no TitleUpdate.000 = skip and log (the plugin handles a missing include itself)
+    $include = Join-Path $srcDir 'TruShadowPower_dgmodes.local.inc'
+    $tu = if ($TitleUpdate) { $TitleUpdate } else { Join-Path $paths.Workspace 'data\TombRaiderUnderworld_Patched\TitleUpdate.000' }
+    $python = Join-Path $paths.Workspace 'bin\venv\Scripts\python.exe'
+    if (!(Test-Path -LiteralPath $tu -PathType Leaf)) {
+        if (Test-Path -LiteralPath $include) {
+            Write-Log ('dgmodes: no TitleUpdate.000 ({0}) - include not regenerated, the existing one from {1:yyyy-MM-dd HH:mm} is built in: {2}' -f $tu, (Get-Item -LiteralPath $include).LastWriteTime, $include) -Level WARN
+        } else {
+            Write-Log ('dgmodes: no TitleUpdate.000 ({0}) - building without the 0.26 mode tables (DgModeTables "not built in", stand-in keeps 0.25)' -f $tu) -Level WARN
+        }
+        return
+    }
+    if (!(Test-Path -LiteralPath $python)) { throw "Python venv not found: $python (needed for tools\tu_dg_modes_inc.py)" }
+    $text = Join-Path $outDir 'TruShadowPower_dgmodes.txt'
+    Write-Log ('dgmodes: generating {0} from {1}' -f $include, $tu) -Level VERBOSE
+    # the generator's PC input (../data/pc/patch.000) is relative to the repository: run it from there
+    Push-Location -LiteralPath $repo
+    try {
+        $code = Invoke-Logged -Exe $python -Arguments @('-u', '-I', '-X', 'utf8', 'tools\tu_dg_modes_inc.py', $text, $include, '--tu', $tu)
+    } finally {
+        Pop-Location
+    }
+    if (Test-Path -LiteralPath $text) {
+        Select-String -LiteralPath $text -Pattern '^SELF-CHECK' | ForEach-Object { Write-Log ('dgmodes: ' + $_.Line) }
+    }
+    if ($code -ne 0 -or !(Test-Path -LiteralPath $include)) { throw "dgmodes generator failed (exit code $code), see $logFile and $text" }
+    Write-Log ('dgmodes: include written ({0} bytes, md5 {1})' -f (Get-Item -LiteralPath $include).Length, (Get-FileHash -LiteralPath $include -Algorithm MD5).Hash.ToLower())
+}
+
 if ($Trace) { Set-PSDebug -Trace 1 }
 try {
     Write-Log "Build-TruAsi name=$Name log=$logFile" -Level VERBOSE
@@ -69,6 +111,7 @@ try {
     if (!(Test-Path -LiteralPath $source)) { throw "Source not found: $source" }
     $vcvars = Join-Path $VsPath 'VC\Auxiliary\Build\vcvarsall.bat'
     if (!(Test-Path -LiteralPath $vcvars)) { throw "vcvarsall.bat not found: $vcvars (-VsPath)" }
+    if ($Name -eq 'TruShadowPower') { Update-TruDgModesInclude }
 
     $asi = Join-Path $outDir "$Name.asi"
     $obj = Join-Path $outDir "$Name.obj"
