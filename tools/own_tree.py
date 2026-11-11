@@ -2,11 +2,18 @@ r"""The own mods tree from our pipeline outputs only (no file of the B138 / B270
 the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
 
   assemble OUT_DIR [--run work/rebuild/pipeline_check_1011] [--costumes work/rebuild/costumes_0913]
-                   [--generalbank pc|k12] [--no-lang] [--exe FILE] [--credits DIR]
+                   [--generalbank pc|k12] [--no-lang] [--no-shaders] [--exe FILE] [--credits DIR]
       copies the pipeline outputs, in this order (a later layer wins for a file two layers have; every overlap is
       listed with "same" / "DIFFERENT"):
         dlc1         <run>/dlc1/mods                        step Fixes (-FixesOut <run>), DLC 1 tree (B138 layout)
         dlc2         <run>/dlc2/mods                        step Fixes, DLC 2 tree
+        shaders      <run>/shaders/mods                     step Shaders (2026-11-11, A2): recorded shader decisions
+                                                            (tools/shader_step.py apply) on dlc1 / dlc2 of the same run
+        shaders_rule <run>/shaders_rule/mods                step Shaders: rule_owned apply (grapple ring), last
+                     Both are required unless --no-shaders: shader_step_apply.json must name dlc1 / dlc2 of <run> as
+                     its input, have 0 errors, rule_owned_check.json must pass, and no shaders file may be older
+                     than its Fixes input (stale). A later layer that replaces a shaders file with other content is
+                     refused (the shader decisions of that DRM would be lost).
         cost_<pack>  <costumes>/<pack>/stage2b/mods         step Costumes; only dlc_costume_*.drm (images / lists of
                                                             the costume trees are the DLC 1 tree's, docs/COSTUMES.md)
         lang         <run>/lang/mods                        step Lang (2026-11-11, R10): the 60 language variants of
@@ -57,9 +64,9 @@ the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
       regression class R1-R13 (Befund-Eigener-Baum-1111.md) -> DIR/breakdown.md (or FILE).
 
 Usage (from the repository root):
-  ../bin/pyt -t 600 tools/own_tree.py assemble work/own_1011
+  ../bin/pyt -t 600 tools/own_tree.py assemble work/own_1011 --no-shaders
   ../bin/pyt -t 900 tools/own_tree.py assemble work/own_1111 --run work/rebuild/pipeline_check_1111b
-        (Fixes + Lang + Generalbank + Exe + Globalsound all run with -FixesOut work/rebuild/pipeline_check_1111b)
+        (Fixes + Shaders + Lang + Generalbank + Exe + Globalsound all run with -FixesOut work/rebuild/pipeline_check_1111b)
   ../bin/pyt -t 5400 tools/own_tree.py compare work/own_1011/mods ../data/pc/mods --backup ../backup --logs ../logs
         --out work/own_1011/compare --manifest work/own_1011/own_manifest.tsv
 """
@@ -135,9 +142,17 @@ def in_run(run, sub, fallback):
     return p if os.path.exists(p) else fallback
 
 
-def layers(run, costumes, gb='pc', lang=True):
+SHADER_LAYERS = ('shaders', 'shaders_rule')
+
+
+def layers(run, costumes, gb='pc', lang=True, shaders=True):
     L = [('dlc1', 'Fixes (DLC 1, -FixesOut %s)' % run, run + '/dlc1/mods', None, False),
          ('dlc2', 'Fixes (DLC 2, -FixesOut %s)' % run, run + '/dlc2/mods', None, False)]
+    if shaders:
+        # step Shaders (A2, 2026-11-11): recorded shader decisions over dlc1 / dlc2 of the SAME run, ring rule last
+        L.append(('shaders', 'Shaders (shader_step apply: recorded libs + material tuples, -FixesOut %s)' % run,
+                  run + '/shaders/mods', None, False))
+        L.append(('shaders_rule', 'Shaders (rule_owned apply: grapple ring, last tool of the step)', run + '/shaders_rule/mods', None, False))
     for pk in ('pack1', 'pack2', 'pack20'):
         L.append(('cost_' + pk, 'Costumes (%s)' % costumes, '%s/%s/stage2b/mods' % (costumes, pk), 'dlc_costume_*.drm', False))
     if lang:
@@ -153,18 +168,49 @@ def layers(run, costumes, gb='pc', lang=True):
     return L
 
 
+def shader_layers_check(run):
+    """the shaders layers must belong to THIS run: shader_step_apply.json read dlc1 / dlc2 of <run>, no apply error, the
+    ring rule check passed, and no shaders file is older than its Fixes input (Fixes run again after Shaders = stale)"""
+    sd, rd = run + '/shaders', run + '/shaders_rule'
+    rep, chk = sd + '/shader_step_apply.json', rd + '/rule_owned_check.json'
+    hint = ' - run Invoke-TruPipeline.ps1 -Step Shaders -FixesOut %s, or assemble with --no-shaders' % run
+    for p in (sd + '/mods', rd + '/mods', rep):
+        if not os.path.exists(p): raise SystemExit('missing shaders layer part %s%s' % (p, hint))
+    a = json.load(open(rep, encoding='utf-8'))
+    want = [run + '/dlc1/mods', run + '/dlc2/mods']
+    got = [x.replace('\\', '/').rstrip('/') for x in a.get('layers', [])]
+    if [os.path.normcase(os.path.abspath(x)) for x in got] != [os.path.normcase(os.path.abspath(x)) for x in want]:
+        raise SystemExit('shaders layer was applied on %s, not on %s%s' % (got, want, hint))
+    if a.get('errors'): raise SystemExit('shaders layer has %d apply errors (%s)%s' % (len(a['errors']), a['errors'][0][:120], hint))
+    if os.path.isfile(chk):
+        c = json.load(open(chk, encoding='utf-8'))
+        bad = c.get('failed') or any(not f.get('ok') for f in (c.get('files') or {}).values())
+        if bad: raise SystemExit('rule_owned check of the shaders run did not pass (%s)%s' % (chk, hint))
+    stale = []
+    for k, (rel, p) in walk(sd + '/mods').items():
+        for src in want:
+            q = os.path.join(src, rel.replace('/', os.sep))
+            if os.path.isfile(q) and os.path.getmtime(q) > os.path.getmtime(p): stale.append(rel)
+    if stale: raise SystemExit('shaders layer is older than its Fixes input for %d files (e.g. %s)%s' % (len(stale), stale[0], hint))
+    print('shaders layers: %s (%d files) + %s (%d files), apply %d libs / %d materials, 0 errors, not stale' % (
+        sd + '/mods', len(walk(sd + '/mods')), rd + '/mods', len(walk(rd + '/mods')), a.get('libs_added', 0), a.get('materials', 0)))
+
+
 def assemble(argv):
     run = arg(argv, '--run', 'work/rebuild/pipeline_check_1011').replace('\\', '/').rstrip('/')
     costumes = arg(argv, '--costumes', 'work/rebuild/costumes_0913')
     gb = arg(argv, '--generalbank', 'pc')
     lang = '--no-lang' not in argv
     if not lang: argv.remove('--no-lang')
+    shaders = '--no-shaders' not in argv
+    if not shaders: argv.remove('--no-shaders')
     exe = arg(argv, '--exe', in_run(run, 'exe/tru.exe', 'work/rebuild/exe/tru.exe'))
     credits = arg(argv, '--credits', in_run(run, 'credits', 'work/rebuild/credits'))
     outdir = argv[0]
     mods = os.path.join(outdir, 'mods')
     if os.path.exists(mods): raise SystemExit('exists already: %s (remove it first)' % mods)
-    lay = layers(run, costumes, gb, lang)
+    lay = layers(run, costumes, gb, lang, shaders)
+    if shaders: shader_layers_check(run)
     for name, step, d, pat, kd in lay + [('exe', 'Exe', exe, None, False), ('credits', 'Credits', credits, None, False)]:
         low = d.replace('\\', '/').lower()
         if any(f.replace('\\', '/') in low for f in FORBIDDEN):
@@ -191,6 +237,10 @@ def assemble(argv):
             if prev:
                 verdict = 'same' if prev['md5'] == m else ('same_content' if raw_md5(prev['source']) and raw_md5(prev['source']) == raw_md5(p) else 'DIFFERENT')
                 overlaps.append((rel, name, prev['layer'], verdict))
+                if prev['layer'] in SHADER_LAYERS and name not in SHADER_LAYERS and verdict == 'DIFFERENT':
+                    # a later step's file would throw away the shader decisions of this DRM
+                    raise SystemExit('refused: layer %s replaces %s of layer %s with other content (shader decisions lost)' % (
+                        name, rel, prev['layer']))
                 also = prev['also_in'] + ['%s:%s' % (prev['layer'], verdict)]
             files[k] = dict(rel=rel, source=p, md5=m, size=os.path.getsize(p), layer=name, step=step, kit_derived=kd, also_in=also)
     for rel, why in DROP:
