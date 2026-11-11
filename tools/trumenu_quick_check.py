@@ -4287,6 +4287,115 @@ def check_attracttimer():
     return good
 
 
+# ---- 0.22.22 teaser timer line: bar language, game clock / wall clock, pause bit marker. The frame time function
+# 0x5da230 stores the fixed 0.5 to [0xe7f188] while [0xe7f0b4] & 0x10000000, else the measured frame interval in 1/30 s;
+# the per-frame update 0x47afd0 hands the clocks [0xe7f188] * 1/30 (docs/Befund-Skript-Uhr-halbe-Zeit-1111.md). The
+# line's texts are taken from DrawNt's de ? .. : .. pairs in TruMenu.cpp ----
+NT_PAUSE_BIT = 0x10000000
+
+
+def nt_c_literal(seq):                           # adjacent C string literals -> text (octal UTF-8 escapes decoded)
+    import re
+    out = bytearray()
+    for part in re.findall(r'"((?:[^"\\]|\\.)*)"', seq):
+        i = 0
+        while i < len(part):
+            ch = part[i]
+            if ch == '\\' and i + 3 < len(part) and part[i + 1:i + 4].isdigit():
+                out.append(int(part[i + 1:i + 4], 8)); i += 4
+            elif ch == '\\':
+                out += {'n': b'\n', '"': b'"', '\\': b'\\'}.get(part[i + 1], part[i + 1].encode()); i += 2
+            else:
+                out += ch.encode('utf-8'); i += 1
+    return out.decode('utf-8')
+
+
+def nt_texts():
+    """DrawNt (TruMenu.cpp): the language flag and the de / en pairs of the head (held), clock line, marker lines"""
+    import os, re
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'asi', 'TruMenu',
+                            'TruMenu.cpp'), encoding='utf-8').read().replace('\r\n', '\n')
+    draw = re.search(r'\nvoid DrawNt\(.*?\n\}', src, re.S).group(0)
+    half = re.search(r'\nint NtPauseHalf\(.*?\n\}', src, re.S).group(0)
+    seq = r'("(?:[^"\\]|\\.)*"(?:\s*"(?:[^"\\]|\\.)*")*)'
+    def pair(head):
+        m = re.search(re.escape(head) + r'\s*de \? ' + seq + r'\s*:\s*' + seq, draw)
+        return (nt_c_literal(m.group(1)), nt_c_literal(m.group(2))) if m else None
+    return {'lang': draw.split('\n')[2].strip() == 'const bool de = g_qbLang == 0;',
+            'rule': 'return (*flags & kNtPauseBit) && *frame == 0.5f ? 1 : 0;' in half,
+            'head': pair('if (held) Out(l1, sizeof(l1),'), 'clock': pair('Out(l2, sizeof(l2),'),
+            'half': pair('if (half > 0) Out(l4, sizeof(l4), "%s",'), 'nocheck': pair('else if (half < 0) Out(l4, sizeof(l4), "%s",')}
+
+
+def nt_pause_half(ok, frame, flags):             # NtPauseHalf: -1 checks failed, 1 bit + fixed 0.5, else 0
+    if not ok: return -1
+    return 1 if (flags & NT_PAUSE_BIT) and frame == 0.5 else 0
+
+
+def nt_frame_time(bit, interval):                # 0x5da230: paused branch 0.5, else the interval in 1/30 s
+    return 0.5 if bit else interval * 30.0
+
+
+def nt_run_loop(hz, seconds, bit_until=None, bit=True):
+    """NoAttract holds, line on: one 0x47afd0 per loop at hz; returns (model, [(wall, shadow, marker)] per loop)"""
+    m, c = NtModel(line=1, hold=1), NaClock()
+    m.f11(c); c.stop(); c.start()
+    wall, rows = 0.0, []
+    for _ in range(int(round(hz * seconds))):
+        wall += 1.0 / hz
+        on = bit and (bit_until is None or wall < bit_until)
+        frame = nt_frame_time(on, 1.0 / hz)
+        m.update(c, frame / 30.0)
+        rows.append((wall, m.shadow, nt_pause_half(True, frame, NT_PAUSE_BIT | 0x40000000 if on else 0x40000000)))
+    return m, rows
+
+
+def check_ntclock():
+    t = nt_texts()
+    cases = []
+    cases.append(('source: DrawNt language = g_qbLang (bar), marker rule bit + 0.5, de / en pairs found',
+                  t['lang'] and t['rule'] and all(t[k] for k in ('head', 'clock', 'half', 'nocheck'))))
+    if not cases[0][1]:
+        print('ntclock: %-76s FAIL' % cases[0][0])
+        return False
+    de = t['clock'][0] % (19.2, 38.5)
+    en = t['clock'][1] % (19.2, 38.5)
+    cases.append(('bar language de: "%s" / "%s"' % (t['head'][0] % '', de), 'Spieluhr 19.2 s' in de and
+                  'Wanduhr 38.5 s' in de and t['half'][0] == 'Pause-Bit aktiv (halbe Zeit)' and
+                  'gesperrt' in t['head'][0] and 'clock' not in de))
+    cases.append(('bar language en: "%s" / "%s"' % (t['head'][1] % '', en), 'game clock 19.2 s' in en and
+                  'wall clock 38.5 s' in en and t['half'][1] == 'Pause bit set (half time)' and 'Uhr' not in en))
+    # the live case: stale pause bit in the main menu, Bink loop 29.97 Hz -> clock at half speed, marker on
+    m, rows = nt_run_loop(29.97, 130.0)
+    flash = m.flashes[0][0] if m.flashes else None
+    wall_at, shadow_at = (rows[flash - 1][0], rows[flash - 1][1]) if flash else (0.0, 0.0)
+    cases.append(('pause bit, 29.97 Hz: first flash at game clock %.2f s = wall %.1f s (ratio %.4f), marker on'
+                  % (shadow_at, wall_at, shadow_at / wall_at if wall_at else 0.0),
+                  flash and 79.5 < wall_at < 80.5 and 40.0 <= shadow_at < 40.05 and all(r[2] == 1 for r in rows)))
+    # TruQoL FrontEndPauseBit clears the bit at 30 s: from then game clock and wall clock run together, marker off
+    m, rows = nt_run_loop(29.97, 90.0, bit_until=30.0)
+    gap = [w - s for w, s, _ in rows]
+    after = [r for r in rows if r[0] >= 30.1]
+    cases.append(('bit cleared at wall 30 s: gap game / wall stays %.2f s (+- 0.05) for 60 s, marker off after'
+                  % gap[-1], after and abs(gap[-1] - (after[0][0] - after[0][1])) < 0.05 and
+                  14.9 < gap[-1] < 15.1 and all(r[2] == 0 for r in after)))
+    # 60 Hz without the bit: the measured frame time is also 0.5 - no marker (the bit is missing), clock = wall
+    m, rows = nt_run_loop(60.0, 60.0, bit=False)
+    cases.append(('60 Hz, no pause bit: frame time 0.5 measured, marker off, game clock %.2f s = wall %.2f s'
+                  % (rows[-1][1], rows[-1][0]), all(r[2] == 0 for r in rows) and abs(rows[-1][1] - rows[-1][0]) < 0.01))
+    # bit set with another frame time (the lock value 1.0 of the first frame after the pause): no marker
+    cases.append(('bit set, frame time 1.0: no marker; bit clear, 0.5: no marker; both: marker',
+                  nt_pause_half(True, 1.0, NT_PAUSE_BIT) == 0 and nt_pause_half(True, 0.5, 0) == 0 and
+                  nt_pause_half(True, 0.5, NT_PAUSE_BIT) == 1))
+    cases.append(('checks failed: "%s" / "%s"' % t['nocheck'], nt_pause_half(False, 0.5, NT_PAUSE_BIT) == -1 and
+                  'prüfbar' in t['nocheck'][0] and 'checkable' in t['nocheck'][1]))
+    good = True
+    for name, ok in cases:
+        print('ntclock: %-76s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= bool(ok)
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -4313,7 +4422,8 @@ def main():
                check_groups_nested(), check_volsave(), check_persist(), check_subalign(),   # 0.22.18
                check_lastpage(), check_menupages(), check_infinite(),                 # 0.22.19
                check_noattract(),                                                     # 0.22.20
-               check_attracttimer()]                                                  # 0.22.21
+               check_attracttimer(),                                                  # 0.22.21
+               check_ntclock()]                                                       # 0.22.22
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

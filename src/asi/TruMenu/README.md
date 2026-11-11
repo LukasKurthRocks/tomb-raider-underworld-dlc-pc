@@ -2928,6 +2928,78 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.22 - teaser timer line: game clock / wall clock, pause bit marker (2026-11-11)
+
+Built into `work\asi\menu0245`, not installed, no live test. Two wishes from the 0.22.21 live test of 2026-11-10:
+
+1. **Language.** The line showed `Teaser timer held - 19.2 s since start / alarm every 40.0 s - teaser would have
+   started 0x` in English. The line already took its language from the bar language `[Quick] Language` / `quick.lang`
+   (`const bool de = g_qbLang == 0;`, the same pattern as the cutscene badge, the flight line and every other overlay).
+   Evidence that the bar language was English in that session: the installed `TruMenu.ini` holds `[Quick]
+   Language=en`, `TruMenu.log` shows `quick.lang en (src=quick): [Quick] Language written` at 20:12:22 (bar row
+   Menüsprache, after `quick.lang de` at 20:07:04) and `Language en` in the start-up line of every later start
+   (21:54:10, 22:04:32, 22:21:47). So nothing in the code chose English on its own; with `quick.lang de` (bar row
+   Spiel-Einstellungen / TruMenu selbst / Menüsprache) the line is German. 0.22.22 keeps that pattern and makes it a
+   check: every text of `DrawNt` is a `de ? .. : ..` pair (`trumenu_ini_check` `check_02222`, `trumenu_quick_check`
+   model `ntclock`).
+2. **Half speed.** The clock ran at half speed because of the stale pause bit
+   (`docs\Befund-Skript-Uhr-halbe-Zeit-1111.md`; fixed separately by TruQoL 0.1.4 `[Fixes] FrontEndPauseBit`). The
+   line now shows both clocks and a marker:
+
+| Line | German (bar language de) | English (bar language en) |
+|---|---|---|
+| 1 head, NoAttract holds | `Teaser-Uhr gesperrt` (+ ` (Pause)` / ` (steht)`) | `Teaser timer held` |
+| 1 head, NoAttract off | `Teaser-Uhr 12.3 / 40.0 s` (real elapsed / alarm) | `Teaser timer 12.3 / 40.0 s` |
+| 2 clocks (new) | `Spieluhr 19.2 s / Wanduhr 38.5 s seit Start` | `game clock 19.2 s / wall clock 38.5 s since start` |
+| 3 alarms, NoAttract holds | `Alarm alle 40.0 s - Teaser wäre 0x gestartet` | `alarm every 40.0 s - teaser would have started 0x` |
+| 3 alarms, NoAttract off | `Teaser 0x gestartet seit Start` | `teaser started 0x since start` |
+| 3 for 1 s after an alarm | `>> jetzt wäre der Teaser gestartet` / `>> Teaser startet jetzt` | `>> the teaser would start now` / `>> teaser starts now` |
+| 4 marker (new, orange-red) | `Pause-Bit aktiv (halbe Zeit)` | `Pause bit set (half time)` |
+| 4 checks failed | `Pause-Bit: nicht prüfbar (TruMenu.log)` | `Pause bit: not checkable (TruMenu.log)` |
+
+- **Spieluhr / game clock** = the shadow count of 0.22.21: the dt the game handed the clock's update since the clock's
+  (re)start (counts on while NoAttract holds the real elapsed at 0).
+- **Wanduhr / wall clock** = `GetTickCount` since the same (re)start (`g_ntResetTick`, set by `NtPre` when the game
+  (re)starts the clock) - the value the 0.22.21 flash log line already wrote as "wall time since the clock's
+  (re)start". With the bit stale in the main menu the game clock grows half as fast as the wall clock (live
+  2026-11-10: 40.02 s at 81.3 s wall).
+- **Marker** while `[0xe7f188] == 0.5` **and** `[0xe7f0b4] & 0x10000000`: the frame time function 0x5da230 stores the
+  fixed 0.5 (`fld [0x8413a8]`) to `[0xe7f188]` in its paused branch; the per-frame update 0x47afd0 hands the clocks
+  `[0xe7f188]` × 1/30. Both conditions are needed: at 60 fps without the bit the measured frame time is also 0.5 (real
+  time), and the first frame after a pause has the bit with the lock value 1.0. Read on the render thread
+  (`ReadFloats` / `ReadDword`, `NtPauseHalf`), nothing written; the two addresses are only read.
+- **Byte checks** (new, `kNtChecks`, checked once at the first draw / report, one TruMenu.log line
+  `0.22.22 menu.attracttimer pause bit: 4 checks ok`): 0x5da233 `test [0xe7f0b4], 0x10000000`; 0x5da664 `fld
+  [0x8413a8]; mov [0xe7f384], 1; fstp [0xe7f188]` (TruQoL hooks only the call 0x5da684 after it); 0x8413a8 = 0.5f;
+  0x47b036 `fld [0xe7f188]; fmul qword [0x843cb0]`. A failed check = line 4 "nicht prüfbar", the rest of the line as
+  before.
+- `menu.attracttimer` without an argument also reports `wall %.1f s since the (re)start`, `frame time`, the flags dword
+  and `pause bit set (half time)` / `no pause bit`.
+- INI unchanged (no new key); the item help names the new lines.
+
+Checks: `work\asi\menu0245\precheck_02222.txt` = the 45 rows of `precheck_02221.txt` + the 4 rows of `kNtChecks`: 49
+checks, 0 mismatches against `data\pc\tru.exe` and read-only against the installed `tru.exe`;
+`trumenu_precheck_match` 0.22.20 section 13 = 13, 0.22.21 section 4 = 4. `trumenu_ini_check` `check_02222`
+(kVersion, `de` from `g_qbLang`, no `DrawNt` text without a de / en pair, the clock line and the marker texts,
+`NtWallSeconds` from `g_ntResetTick`, `NtPauseHalf` rule bit + 0.5 after the checks, the two addresses only defined and
+read, `NtPbCheck` once, `ValNt` fields, the 4 rows = `precheck_02222` section 10, Set-TruMenu 0.22.21 hash; negative test
+on a copy: 6 of 6 mutations caught), `check_02221` now looks for its part inside kVersion; `trumenu_quick_check` model
+`ntclock` (8 cases: texts from the source in both languages; stale bit with the Bink loop at 29.97 Hz = first flash at
+game clock 40.02 s / wall 80.1 s, marker on; bit cleared at 30 s = the gap stays 15.0 s, marker off; 60 Hz without the
+bit = no marker, game clock = wall clock; bit with 1.0 / 0.5 without the bit = no marker; checks failed = "nicht
+prüfbar"). qb layout (unchanged), readability, umlauts, flat PS pass. `Set-TruMenu.ps1` knows the 0.22.21 hash.
+
+### TO TEST 0.22.22
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | language | bar Spiel-Einstellungen / TruMenu selbst / Menüsprache = DE (`quick.lang de`); main menu with "Teaser-Uhr anzeigen" on | all lines German (`Teaser-Uhr ...`, `Spieluhr ... / Wanduhr ...`); `quick.lang en` -> English at once |
+| 2 | fresh start | start the game, main menu, touch nothing | line 2 game clock ≈ wall clock; no line 4; teaser (NoAttract off) at 40 s wall |
+| 3 | stale pause bit | load a level, pause, "back to the main menu" (TruQoL `[Fixes] FrontEndPauseBit=0`) | line 4 `Pause-Bit aktiv (halbe Zeit)`; game clock ≈ half the wall clock |
+| 4 | TruQoL fix | same as 3 with `[Fixes] FrontEndPauseBit=1` | no line 4; game clock ≈ wall clock |
+| 5 | report | `menu attracttimer` over TruLink (no argument) | in case 3: `... wall N s since the (re)start ... frame time 0.500, flags 0x........: pause bit set (half time)` (flags with bit 0x10000000) |
+| 6 | checks | TruMenu.log after the first draw | `0.22.22 menu.attracttimer pause bit: 4 checks ok` |
+
 ## 0.22.21 - teaser timer line in the main menu (2026-11-10)
 
 Built into `work\asi\menu0244`, not installed, no live test. Owner's wish after the 0.22.20 live result (21:25-21:27,

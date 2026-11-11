@@ -3168,8 +3168,8 @@ def check_02221(ini_path):
     item, help, greying, persistence; no new byte checks (precheck_02221 = the 45 rows of precheck_02220)"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.21 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.21')
+    if '"0.22.21 (teaser timer: menu.attracttimer' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.22: later
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.21 part "0.22.21 (teaser timer: menu.attracttimer"')
     ini = open(ini_path, encoding='utf-8').read()
     block = re.search(r'^\[Menu\]\r?\n(.*?)(?=^\[|\Z)', ini, re.M | re.S)
     for key, val in (('AttractTimerShow', '0'), ('AttractTimerPosition', 'tr')):
@@ -3250,6 +3250,75 @@ def check_02221(ini_path):
         problems.append('Set-TruMenu.ps1: the 0.22.20 build hash (work\\asi\\menu0243) is missing')
     return problems, ('menu.attracttimer: [Menu] AttractTimerShow=0 / AttractTimerPosition=tr, item / row / help / '
                       'greying, read-only shadow + flash, front end only, 45 byte checks unchanged')
+
+
+NT_LITSEQ = r'"(?:[^"\\]|\\.)*"(?:\s*"(?:[^"\\]|\\.)*")*'
+
+
+def check_02222(ini_path):
+    """0.22.22 (live 2026-11-10): the teaser timer line in the bar language (every text a de ? .. : .. pair after
+    `const bool de = g_qbLang == 0;`), the game clock (shadow) next to the wall clock since the clock's (re)start, and the
+    pause bit marker - [0xe7f188] == 0.5 and [0xe7f0b4] & 0x10000000, read only after the 4 kNtChecks rows (precheck_02222
+    = the 45 rows of precheck_02221 + these 4); INI unchanged"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.22 (' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.22')
+    draw = fn_body(src, 'void DrawNt(')
+    if not draw.split('\n')[2:3] == ['    const bool de = g_qbLang == 0;']:
+        problems.append('TruMenu.cpp: DrawNt must start with const bool de = g_qbLang == 0; (the bar language)')
+    # bilingual: with every de ? A : B pair taken out, no literal with words is left (only formats / the window id)
+    rest = re.sub(r'de\s*\?\s*' + NT_LITSEQ + r'\s*:\s*' + NT_LITSEQ, '', draw)
+    left = [unescape(x) for x in re.findall(r'"((?:[^"\\]|\\.)*)"', rest)]
+    single = [t for t in left if re.search(r'[A-Za-z]{2}', t.replace('%ld', '').replace('%s', '')) and
+              t != '##TruAttractTimer']
+    if single: problems.append('TruMenu.cpp: DrawNt texts without a de / en pair: %s' % ', '.join(single))
+    for want in ('Spieluhr %.1f s / Wanduhr %.1f s seit Start', 'game clock %.1f s / wall clock %.1f s "\n            "since start',
+                 '"Pause-Bit aktiv (halbe Zeit)" : "Pause bit set (half time)"', 'NtWallSeconds()',
+                 'const int half = NtPauseHalf(&frame, &gameFlags);', 'if (half > 0) Out(l4,',
+                 'flashAt && now - flashAt < 1000'):
+        if want not in draw: problems.append('TruMenu.cpp: DrawNt must hold %s' % want.replace('\n', ' '))
+    wall = fn_body(src, 'double NtWallSeconds(')
+    if 'const DWORD at = g_ntResetTick;' not in wall or 'GetTickCount() - at' not in wall:
+        problems.append('TruMenu.cpp: NtWallSeconds must count GetTickCount since g_ntResetTick (NtPre\'s (re)start)')
+    if 'g_ntResetTick = GetTickCount();' not in fn_body(src, 'void NtPre('):
+        problems.append('TruMenu.cpp: NtPre must set g_ntResetTick at the clock\'s (re)start')
+    # the marker: both conditions, read only, only after the checks
+    if 'const DWORD kNtFrameTime = 0x00e7f188, kNtGameFlags = 0x00e7f0b4, kNtPauseBit = 0x10000000;' not in src:
+        problems.append('TruMenu.cpp: kNtFrameTime 0xe7f188 / kNtGameFlags 0xe7f0b4 / kNtPauseBit 0x10000000 missing')
+    ph = fn_body(src, 'int NtPauseHalf(')
+    for want in ('NtPbCheck();', 'if (!g_ntPbDone) return 0;',
+                 'if (!g_ntPbOk || !ReadFloats(kNtFrameTime, frame, 1) || !ReadDword(kNtGameFlags, flags)) return -1;',
+                 'return (*flags & kNtPauseBit) && *frame == 0.5f ? 1 : 0;'):
+        if want not in ph: problems.append('TruMenu.cpp: NtPauseHalf must hold %s' % want)
+    uses = re.findall(r'[^\n]*\bkNt(?:FrameTime|GameFlags)\b[^\n]*', src)
+    if len(uses) != 2 or any('const DWORD kNtFrameTime' not in u and 'ReadFloats(kNtFrameTime' not in u for u in uses):
+        problems.append('TruMenu.cpp: kNtFrameTime / kNtGameFlags may only be defined and read (ReadFloats / ReadDword)')
+    pc = fn_body(src, 'void NtPbCheck(')
+    if 'if (InterlockedExchange(&g_ntPbChecked, 1)) return;' not in pc or 'InterlockedExchange(&g_ntPbDone, 1);' not in pc:
+        problems.append('TruMenu.cpp: NtPbCheck must run once and mark g_ntPbDone after the result')
+    val = fn_body(src, 'void ValNt(')
+    for want in ('NtPauseHalf(&frame, &gameFlags)', 'wall %.1f s since the (re)start', 'frame time %.3f'):
+        if want not in val: problems.append('TruMenu.cpp: ValNt must hold %s' % want)
+    # 4 byte checks = the rows of section 10 of precheck_02222; precheck_02222 = precheck_02221 + these 4
+    m = re.search(r'const DvCheck kNtChecks\[\] = \{(.*?)\n\};', src, re.S)
+    rows = [(a, b.replace(' ', '')) for a, b in re.findall(r'\{0x([0-9a-f]{8}), "([0-9a-f ]+)"\}', m.group(1))] if m else []
+    want_rows = [('005da233', 'f705b4f0e70000000010'), ('005da664', 'd905a8138400c70584f3e70001000000d91d88f1e700'),
+                 ('008413a8', '0000003f'), ('0047b036', 'd90588f1e700dc0db03c8400')]
+    if rows != want_rows: problems.append('TruMenu.cpp: kNtChecks must be the 4 rows 0x5da233 / 0x5da664 / 0x8413a8 / 0x47b036')
+    pre21 = os.path.join(ROOT, 'work', 'asi', 'menu0244', 'precheck_02221.txt')
+    pre22 = os.path.join(ROOT, 'work', 'asi', 'menu0245', 'precheck_02222.txt')
+    prows = lambda p: sorted(l.split(None, 1)[0].lower() + ' ' + l.split(None, 1)[1].replace(' ', '').lower()
+                             for l in open(p, encoding='utf-8').read().splitlines() if l.strip() and not l.startswith('#'))
+    if os.path.exists(pre21) and os.path.exists(pre22):
+        r21, r22 = prows(pre21), prows(pre22)
+        if len(r22) != 49 or sorted(r21 + ['%s %s' % r for r in want_rows]) != r22:
+            problems.append('precheck_02222.txt: must hold the 45 rows of precheck_02221 + the 4 kNtChecks rows (%d)' % len(r22))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '362f51e23edff6116e183ff7c5212b3d120981a558bf99a47a5fde015755af67' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.21 build hash (work\\asi\\menu0244) is missing')
+    return problems, ('teaser timer line in the bar language, game clock / wall clock, pause bit marker (0.5 + bit), '
+                      '%d byte checks read only, precheck_02222 = 45 + 4 rows' % len(rows))
 
 
 def table(src):
@@ -3409,6 +3478,10 @@ def main(argv):
     for p in cproblems21: print('Q02221 %s' % p)
     if not cproblems21: print('ok: 0.22.21 %s' % csummary21)
     problems += cproblems21
+    cproblems22, csummary22 = check_02222(ini_path)   # 0.22.22
+    for p in cproblems22: print('Q02222 %s' % p)
+    if not cproblems22: print('ok: 0.22.22 %s' % csummary22)
+    problems += cproblems22
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))
