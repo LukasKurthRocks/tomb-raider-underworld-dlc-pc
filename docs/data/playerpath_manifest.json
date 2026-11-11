@@ -196,9 +196,9 @@
   },
   {
    "file": "docs/data/generalbank_pc.json",
-   "size_lf": 43809,
-   "md5_lf": "3b1488331ccb7d7bad016addc411e7ee",
-   "version": "K20261111-3",
+   "size_lf": 44670,
+   "md5_lf": "f0a857896cba7f9f97e485d556340a4a",
+   "version": "K20261111-4",
    "schema": 3
   },
   {
@@ -258,8 +258,8 @@
   },
   {
    "file": "docs/data/tu_coverage_overrides.tsv",
-   "size_lf": 9319,
-   "md5_lf": "337baca3c9c2e4d64389ec500ea64292"
+   "size_lf": 11041,
+   "md5_lf": "9ec6f9e1d49723ee5a2a1a4cbcee9828"
   },
   {
    "file": "docs/data/upstream_diff_curated.md",

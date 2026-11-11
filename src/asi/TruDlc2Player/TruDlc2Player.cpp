@@ -134,9 +134,28 @@
 //      0x824798dc, inlined by the TU at 0x8247f558..0x8247f56c) to a stub that makes that call and then
 //      tru+0x1bfdf0(0), the TU's store right after it.
 //   Not translated (no plugin site): the TU's main-menu start (script 134 function 9, no game in progress) also calls
-//   natives (8,120) f6..f10 with 1; the PC script 104 function 9 (pipeline S104) has no such calls - a data change.
-//   Also open: the same TU store after cases 4 and 6 (addresses in the Befund; not named here, so that
-//   tools/tu_coverage.py does not count those blocks as covered).
+//   natives (8,120) f6..f10 with 1; the PC script 104 function 9 (pipeline S104) has no such calls - a data change,
+//   since Q40 the opt-in rule tu134_tailoring of tools/generalbank_pc_build.py (build --tailoring).
+//
+// 0.8 (2026-11-11, Q40, docs Befund-Hauptmenue-Schwierigkeit-1111.md): the same TU-only render-hold store after cases
+// 4 and 6 of RegisterAcceptChanges, behind [Mission] DialogHoldClear (default 0 = as 0.7, nothing patched; independent
+// of DialogStart / DialogDifficulty). TU vs retail vs PC, instruction by instruction (jump tables TU 0x8247f118, retail
+// 0x82479700, PC tru+0x37e97c; entries 3 / 5):
+//   case 4 (opened by script 7 f8 with action 4 on TU and PC): TU 0x8247f1b4..0x8247f1cc = retail 0x82479788..0x824797a0
+//      ([0x829ca6d9] = 1, [0x829ca6d3] = 3, bl 0x8247e000 = retail 0x82478590 = PC tru+0x37e460) = PC tru+0x37e7f0..0x37e7fe
+//      ([0xfae8dc] = 1, [0xfae8da] = 3, call tru+0x37e460; the PC's extra call tru+0x83810 before them is PC-only),
+//      then TU 0x8247f1d0..0x8247f1dc `stb 0, 0x1f94(0x829be044)` - not in retail / PC. The plugin redirects the call
+//      tru+0x37e7fe (5 bytes, next jmp tru+0x37e94a) to a stub: tru+0x37e460, then tru+0x1bfdf0(0).
+//   case 6 (level "ee_01" / "Ee_01" -> selection 0, else 1): TU 0x8247f20c..0x8247f2a4 = retail 0x824797c4..0x82479870
+//      (two compares, MainTracker_UILoadLevel(&name, sel, 1, 0); the TU joins retail's two call sites into one) = PC
+//      tru+0x37e808..0x37e895 (UILoadLevel inlined twice: [0xfae8d9] = sel, game data +0x90 = 0, tru+0x1dfb20(name, 1)),
+//      then TU 0x8247f2a8..0x8247f2b4 `stb 0, 0x1f94(0x829be044)` after the call - not in retail / PC. The plugin
+//      redirects both calls tru+0x37e860 / tru+0x37e88d (each followed by add esp,8; jmp tru+0x37e94a) to a cdecl stub:
+//      tru+0x1dfb20(name, arg), then tru+0x1bfdf0(0).
+//   Every site: whole instruction, no branch into it (tools/pe_patch_site_check.py), bytes checked before the write.
+//   case 9 needs nothing: TU 0x8247f584..0x8247f5c0 = retail 0x824798e4..0x824798f8 with the two getters inlined
+//   ([0x829ca6d9] = 1; [0x829be084] vcall +8 = retail bl 0x821666c0; [0x829be07c] vcall +0xc = retail bl 0x821669a0)
+//   = PC tru+0x37e900..0x37e911 ([0xfae8dc] = 1; tru+0xbe560 = [0xa13f58] vcall +8; tru+0xbdd90 = [0xa13f50] vcall +0xc).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -278,6 +297,23 @@ typedef void(__cdecl *SetterFn)(int);
 typedef void(__cdecl *VoidFn)();
 typedef void(__cdecl *HoldSetFn)(BYTE);
 
+// ---- 0.8: the TU's render-hold store after cases 4 and 6 (TU 0x8247f1dc / 0x8247f2b4), [Mission] DialogHoldClear ----
+const DWORD kCase4 = 0x0077e7eb;           // table entry 3: call 0x483810; [0xfae8dc] = 1; [0xfae8da] = 3; call 0x77e460
+const char *const kCase4Hex = "e82050d0ff c605dce8fa0001 c605dae8fa0003";
+const DWORD kCase4Call = 0x0077e7fe;       // call 0x77e460; jmp 0x77e94a (TU bl 0x8247e000 at 0x8247f1cc, then the store)
+const char *const kCase4CallHex = "e85dfcffff e942010000";
+const DWORD kCase4Callee = 0x0077e460;     // TU 0x8247e000 = retail 0x82478590 (xbox_pc_map verified): call 0x4be580; ...
+const char *const kCase4CalleeHex = "e81b01d4ff e8f600d4ff 8b0d20e9fa00";
+const DWORD kCase6 = 0x0077e808;           // table entry 5: cmp ebp,ebx; je out; mov ecx,[esp+10h]; mov [0FAE914h],ecx
+const char *const kCase6Hex = "3beb 0f843a010000 8b4c2410 890d14e9fa00";
+struct LoadSite { DWORD at; const char *hex; const char *what; };
+const LoadSite kCase6Calls[] = {           // the two inlined UILoadLevel(&name, sel, 1, 0) of case 6 (sel 1 / sel 0)
+    {0x0077e860, "e8bb12e6ff 83c408 e9dd000000", "sel 1 (not ee_01)"},
+    {0x0077e88d, "e88e12e6ff 83c408 e9b0000000", "sel 0 (ee_01 / Ee_01)"}};
+const DWORD kLevelRequest = 0x005dfb20;    // cdecl(name, BYTE arg) - the call of f27's 4th-argument-0 tail
+const char *const kLevelRequestHex = "53 8a5c240c 84db 56 b8d0498500";
+typedef void(__cdecl *LevelRequestFn)(const char *, int);
+
 // options (TruDlc2Player.ini, section [Dlc2Player])
 int g_enabled = 1, g_logLevel = 1, g_costume = 1, g_typeRecord = 1, g_flagReset = 1, g_costumeReset = 1;
 int g_trackerFlag = 1;                     // 0.4: DoppelgangerInit also stores [[0xfadb58]]+0x1244 = 1 (TU 0x82412c84)
@@ -287,6 +323,8 @@ int g_dialogStart = 1;                     // 0.6: [Mission] DialogStart - dialo
 volatile LONG g_dialogStarts = 0;          // 0.6: case-8 starts done (each one logged)
 int g_dialogDifficulty = 0;                // 0.7: [Mission] DialogDifficulty - tailoring reset + hold store of case 8
 bool g_difficultyOk = false;               // 0.7: setters checked and the tail call redirected
+int g_dialogHoldClear = 0;                 // 0.8: [Mission] DialogHoldClear - the TU's hold store after cases 4 / 6
+volatile LONG g_caseHolds = 0;             // 0.8: hold clears done in cases 4 / 6 (each one logged)
 const DWORD kTrackerPtr = 0x00fadb58;      // TU 0x829892b0 (the game tracker / player state block)
 const DWORD kTrackerFlag = 0x1244;         // TU flag byte, read by larabase f36 tru+0x377dc0 and tru+0x3200df
 const DWORD kF36Body = 0x00777dc0;         // larabase f36 body: mov eax,[0FADB58h]; mov al,[eax+1244h]; ret
@@ -985,6 +1023,79 @@ bool PatchDialogDifficulty() {
     return true;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// 0.8: the TU's `stb 0, 0x1f94(0x829be044)` after the call of case 4 (TU 0x8247f1d0..0x8247f1dc) and of case 6
+// (TU 0x8247f2a8..0x8247f2b4) = PC tru+0x1bfdf0(0) ([0xdb94de] = 0) right after the PC's partner call
+void CaseHoldClear(int which, const char *what) {
+    BYTE before = 0xff, after = 0xff;
+    __try { before = *reinterpret_cast<volatile BYTE *>(kHoldByte); } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    reinterpret_cast<HoldSetFn>(kHoldSet)(0);
+    __try { after = *reinterpret_cast<volatile BYTE *>(kHoldByte); } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    LONG n = InterlockedIncrement(&g_caseHolds);
+    Log(1, "dialog hold %ld: case %d (%s) - render hold [0x%08lx] %u -> %u (0x%08lx(0) as the TU store %s "
+           "`stb 0, 0x1f94(0x829be044)`)", n, which, what, kHoldByte, before, after, kHoldSet,
+        which == 4 ? "0x8247f1dc" : "0x8247f2b4");
+}
+
+// case 4: tru+0x37e7fe `call 0x77e460` -> this (next instruction jmp 0x77e94a; eax / ecx / edx are free there)
+extern "C" void __cdecl AcceptCase4Call() {
+    reinterpret_cast<VoidFn>(kCase4Callee)();
+    CaseHoldClear(4, "after tru+0x37e460 = TU bl 0x8247e000");
+}
+
+// case 6: tru+0x37e860 / 0x37e88d `call 0x5dfb20` (cdecl, 2 arguments, the caller pops them) -> this
+extern "C" void __cdecl AcceptCase6Load(const char *name, int arg) {
+    reinterpret_cast<LevelRequestFn>(kLevelRequest)(name, arg);
+    char shown[64];
+    SafeName(name ? name : "", shown, sizeof(shown));
+    char what[120];
+    _snprintf_s(what, sizeof(what), _TRUNCATE, "level \"%s\", after tru+0x1dfb20(name, %d) = TU bl 0x8247d818", shown,
+                arg);
+    CaseHoldClear(6, what);
+}
+
+bool PatchDialogHoldClear() {
+    DWORD e4 = 0, e6 = 0;
+    bool ok = HexBytesAt(kAcceptFn, kAcceptFnHex) && HexBytesAt(kAcceptSwitch, kAcceptSwitchHex) &&
+              ReadDword(kAcceptTable + 3 * 4, &e4) && e4 == kCase4 && ReadDword(kAcceptTable + 5 * 4, &e6) &&
+              e6 == kCase6 && HexBytesAt(kCase4, kCase4Hex) && HexBytesAt(kCase4Call, kCase4CallHex) &&
+              HexBytesAt(kCase4Callee, kCase4CalleeHex) && HexBytesAt(kCase6, kCase6Hex) &&
+              HexBytesAt(kLevelRequest, kLevelRequestHex) && HexBytesAt(kHoldSet, kHoldSetHex);
+    for (const LoadSite &s : kCase6Calls) ok = ok && HexBytesAt(s.at, s.hex);
+    if (!ok) {
+        Log(0, "dialog hold: RegisterAcceptChanges 0x%08lx / case 4 0x%08lx (table 0x%08lx) / case 6 0x%08lx (table "
+               "0x%08lx) / call sites 0x%08lx, 0x%08lx, 0x%08lx / callees 0x%08lx, 0x%08lx / hold setter 0x%08lx do not "
+               "match - not patched", kAcceptFn, kCase4, e4, kCase6, e6, kCase4Call, kCase6Calls[0].at,
+            kCase6Calls[1].at, kCase4Callee, kLevelRequest, kHoldSet);
+        return false;
+    }
+    struct Redirect { DWORD at; const void *to; } redirects[] = {
+        {kCase4Call, reinterpret_cast<const void *>(&AcceptCase4Call)},
+        {kCase6Calls[0].at, reinterpret_cast<const void *>(&AcceptCase6Load)},
+        {kCase6Calls[1].at, reinterpret_cast<const void *>(&AcceptCase6Load)}};
+    BYTE saved[3][5];
+    int done = 0;
+    for (const Redirect &r : redirects) {
+        memcpy(saved[done], reinterpret_cast<const void *>(r.at), 5);
+        BYTE code[5];
+        code[0] = 0xe8;
+        DWORD rel = reinterpret_cast<DWORD>(r.to) - (r.at + 5);
+        memcpy(code + 1, &rel, 4);
+        if (!WriteCode(r.at, code, sizeof(code))) break;
+        ++done;
+    }
+    if (done != 3) {
+        for (int i = 0; i < done; ++i) WriteCode(redirects[i].at, saved[i], 5);
+        Log(0, "dialog hold: patch incomplete - original calls restored (none of the three)");
+        return false;
+    }
+    Log(1, "dialog hold: RegisterAcceptChanges cases 4 and 6 clear the render hold [0x%08lx] after their call as the TU "
+           "(case 4: call at 0x%08lx -> 0x%08lx + 0x%08lx(0), TU 0x8247f1dc; case 6: calls at 0x%08lx / 0x%08lx -> "
+           "0x%08lx + 0x%08lx(0), TU 0x8247f2b4)", kHoldByte, kCase4Call, kCase4Callee, kHoldSet, kCase6Calls[0].at,
+        kCase6Calls[1].at, kLevelRequest, kHoldSet);
+    return true;
+}
+
 void ReadOptions(const char *dir) {
     char ini[MAX_PATH];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruDlc2Player.ini", dir);
@@ -998,6 +1109,7 @@ void ReadOptions(const char *dir) {
     g_tuMapping = GetPrivateProfileIntA("Costume", "TuMapping", 0, ini);      // 0.5, default 0 = as 0.4
     g_dialogStart = GetPrivateProfileIntA("Mission", "DialogStart", 1, ini);  // 0.6, 0 = as 0.5
     g_dialogDifficulty = GetPrivateProfileIntA("Mission", "DialogDifficulty", 0, ini);  // 0.7, 0 = as 0.6
+    g_dialogHoldClear = GetPrivateProfileIntA("Mission", "DialogHoldClear", 0, ini);    // 0.8, 0 = as 0.7
 }
 
 void Start(HMODULE self) {
@@ -1007,10 +1119,11 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDlc2Player.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDlc2Player 0.7 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
-           "reset %d, tracker flag %d, [Costume] TU mapping %d, [Mission] dialog start %d, dialog difficulty %d)",
+    Log(1, "TruDlc2Player 0.8 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
+           "reset %d, tracker flag %d, [Costume] TU mapping %d, [Mission] dialog start %d, dialog difficulty %d, dialog "
+           "hold clear %d)",
         g_enabled, g_logLevel, g_costume, g_typeRecord, g_flagReset, g_costumeReset, g_trackerFlag, g_tuMapping,
-        g_dialogStart, g_dialogDifficulty);
+        g_dialogStart, g_dialogDifficulty, g_dialogHoldClear);
     if (!g_enabled) { Log(1, "disabled by TruDlc2Player.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -1048,6 +1161,10 @@ void Start(HMODULE self) {
         Log(1, "dialog difficulty: off ([Mission] DialogDifficulty=0) - a level started from the game keeps the player "
                "tailoring (the TU resets it to Medium)");
     }
+    // 0.8: the TU's hold store after cases 4 and 6 - own sites, independent of the case-8 patches
+    if (g_dialogHoldClear) PatchDialogHoldClear();
+    else Log(1, "dialog hold: off ([Mission] DialogHoldClear=0) - cases 4 / 6 leave the render hold as the PC / retail "
+                "(the TU clears it after them)");
 }
 
 }  // namespace
@@ -1063,10 +1180,11 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported: plugin identification, and the TU's gameTracker+0x1244 for other plugins (1 after DoppelgangerInit)
 extern "C" __declspec(dllexport) const char *TruDlc2PlayerVersion() {
-    return "TruDlc2Player 0.7 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
+    return "TruDlc2Player 0.8 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
            "reset outside DLC 2, game tracker +0x1244 as the TU, [Costume] TuMapping 857 <-> 11 in save / load / "
            "spawns, [Mission] DialogStart: DLC 2 from the game without the outfit selection as the TU, [Mission] "
-           "DialogDifficulty: that start also resets the player tailoring to Medium as the TU)";
+           "DialogDifficulty: that start also resets the player tailoring to Medium as the TU, [Mission] "
+           "DialogHoldClear: dialog cases 4 / 6 clear the render hold as the TU)";
 }
 
 extern "C" __declspec(dllexport) int TruDlc2PlayerDoppelganger() {

@@ -22,6 +22,8 @@ Befund-TU-Funktionen L4, Befund-Kostuem-Reset-DLC1).
 
 | 0.7 rest of case 8 (`[Mission] DialogDifficulty`, default 0) | the same case 0x8247f2d8..0x8247f3a0: "Resetting player tailoring to Medium difficulty." - `0x822a2b50(name, old, 1)` + game data +0x3efa0 / a4 / ac / b0 = 1 for EnemyHP / AmmoAdj / PlayerHP / SavingGrabAdj, +0x3efb4 = 1 (= the bodies of the setters 0x824be628..0x824be788, natives f6..f10, with 1); after the case 0x8247f57c `stb 0, 0x1f94(0x829be044)` | inside the 0.6 stub, before f27: the PC setters 0x6e75a0 / 0x6e75e0 / 0x6e7620 / 0x6e7660 / 0x6e76a0 with 1 (+0x3ef98 / 9c / a4 / a8 / ac; their metric call 0x6457a0 is the PC's empty `ret`); the tail's last call 0x77e8f9 (call 0x4be5e0) -> a stub that makes it and then 0x5bfdf0(0) = `[0xdb94de] = 0`; needs `DialogStart=1` |
 
+| 0.8 hold clear after cases 4 / 6 (`[Mission] DialogHoldClear`, default 0) | case 4 0x8247f1b4..0x8247f1dc: `[0x829ca6d9] = 1`, `[0x829ca6d3] = 3`, `bl 0x8247e000`, then `stb 0, 0x1f94(0x829be044)`; case 6 0x8247f20c..0x8247f2b4: `MainTracker_UILoadLevel(&name, sel, 1, 0)` (sel 0 for `ee_01` / `Ee_01`), then the same store | case 4 0x77e7eb (= retail case 4 + a PC-only call 0x483810): the call 0x77e7fe (call 0x77e460 = TU 0x8247e000) -> a stub that makes it and then 0x5bfdf0(0); case 6 0x77e808 (UILoadLevel inlined twice, as retail): both calls 0x77e860 / 0x77e88d (call 0x5dfb20(name, 1)) -> a cdecl stub that makes it and then 0x5bfdf0(0); independent of the 0.6 / 0.7 keys |
+
 Every patched byte is compared with the expected code / data first; on a mismatch that part is left alone and the
 reason is logged.
 
@@ -46,9 +48,27 @@ retail `bl 0x821669e0` the TU inlined right before its store) to a stub that mak
 No branch enters the tail 0x77e8e3..0x77e8fe (`tools/pe_patch_site_check.py`). Byte checks:
 `work/asi/dlc2p07/prechecks_dlc2p07.txt` (16 / 16 ok against tru.exe md5 5560abac...).
 
-Not translated: the TU's main-menu start (script 134 function 9, no game in progress) calls the natives f6..f10 with 1
-as well; the PC's script 104 function 9 (pipeline S104) has no such calls - a data change, not plugin code. The same
-TU store after cases 4 and 6 is also open.
+Not translated by the plugin: the TU's main-menu start (script 134 function 9, no game in progress) calls the natives
+f6..f10 with 1 as well; the PC's script 104 function 9 (pipeline S104) has no such calls - a data change, since Q40
+the opt-in rule `tu134_tailoring` of `tools/generalbank_pc_build.py build --tailoring`. The same TU store after cases
+4 and 6: 0.8 (below).
+
+### 0.8: the TU's render-hold clear after cases 4 and 6 (Befund-Hauptmenue-Schwierigkeit-1111)
+
+The TU ends cases 4 and 6 of `RegisterAcceptChanges` with the same `stb 0, 0x1f94(0x829be044)` as case 8; retail and
+PC have none there. Side by side (jump tables TU 0x8247f118, retail 0x82479700, PC 0x77e97c, entries 3 and 5):
+
+| case | TU | retail | PC |
+|---|---|---|---|
+| 4 (script 7 f8 opens the dialog with action 4, TU and PC) | 0x8247f1b4: `[0x829ca6d9] = 1`, `[0x829ca6d3] = 3`, `bl 0x8247e000`, **`stb 0` 0x8247f1d0..0x8247f1dc** | 0x82479788: the same without the store (`bl 0x82478590`) | 0x77e7eb: `call 0x483810` (PC-only), `[0xfae8dc] = 1`, `[0xfae8da] = 3`, `call 0x77e460` (= retail 0x82478590, verified) |
+| 6 (level start, `ee_01` / `Ee_01` -> no selection) | 0x8247f20c: two compares, `bl 0x8247d818(&name, sel, 1, 0)`, **`stb 0` 0x8247f2a8..0x8247f2b4** | 0x824797c4: the same with two call sites, no store | 0x77e808: UILoadLevel inlined twice (`[0xfae8d9] = sel`, game data +0x90 = 0, `call 0x5dfb20(name, 1)`) |
+| 9 | 0x8247f584: `[0x829ca6d9] = 1`, `[0x829be084]` vcall +8, `[0x829be07c]` vcall +0xc | 0x824798e4: the same through the getters 0x821666c0 / 0x821669a0 | 0x77e900: `[0xfae8dc] = 1`, 0x4be560 (`[0xa13f58]` +8), 0x4bdd90 (`[0xa13f50]` +0xc) - equal, nothing to port |
+
+`DialogHoldClear=1` redirects the call 0x77e7fe to a stub (0x77e460, then 0x5bfdf0(0)) and the two calls 0x77e860 /
+0x77e88d to a cdecl stub (0x5dfb20(name, arg), then 0x5bfdf0(0)); each a whole 5-byte call followed by the PC's own
+`add esp,8` / `jmp 0x77e94a`, no branch into any of them (`tools/pe_patch_site_check.py`). Byte checks:
+`work/asi/dlc2p08/prechecks_dlc2p08.txt` (17 / 17 ok against tru.exe md5 5560abac...). Every clear is logged with the
+byte before / after.
 
 ### 0.6: DLC 2 from the pause menu without the outfit selection (Befund-Kostuemauswahl-DLC2-1111)
 
@@ -124,6 +144,7 @@ DLC 2 (TruMenu `costume.choose doppelganger_casual`) is reset as well; `CostumeR
 | `[Costume] TuMapping` | 0 | 0.5: the TU's 857 <-> 11 mapping in state save / load / both spawns (needs `TypeRecord=1`, `Costume=1`; 0 = nothing patched, as 0.4) |
 | `[Mission] DialogStart` | 1 | 0.6: a level started from the game (pause menu -> DLC, dialog accept case 8) as the TU: `dlc_level2..6_start` without the outfit selection, every level with the new-game reset (independent of the other keys; 0 = nothing patched, as 0.5) |
 | `[Mission] DialogDifficulty` | 0 | 0.7: that start also sets the player tailoring to Medium (1) through the game's five setters and clears the render hold `[0xdb94de]` after the case, as the TU (needs `DialogStart=1`; 0 = nothing patched, as 0.6) |
+| `[Mission] DialogHoldClear` | 0 | 0.8: the dialog's cases 4 and 6 clear the render hold `[0xdb94de]` right after their call, as the TU (0x8247f1dc / 0x8247f2b4; independent of the keys above; 0 = nothing patched, as 0.7) |
 
 ## Log lines (`TruDlc2Player.log` next to `tru.exe`)
 
@@ -215,7 +236,30 @@ then the built-in 0 applies). No TruMenu Fixes row (the switch list is full at 1
    hold [0x00db94de] <b> -> 0` (note `<b>`: 1 = the pause menu's hold was still set at that point - then the TU
    store matters; 0 = it was already cleared); DLC 2 starts normally.
 5. In DLC 2 the options show Medium for all values (as on the Xbox TU); Lara's health / enemy health as Medium.
-6. Main menu -> DLC -> DLC 2: no `dialog difficulty` line (script path; the TU resets there too - not ported, the
-   values stay as set).
+6. Main menu -> DLC -> DLC 2: no `dialog difficulty` line (script path; the TU resets there too - since Q40 the
+   opt-in generalbank rule `tu134_tailoring`, see TO TEST 0.8 step 6; without it the values stay as set).
 7. Crash / hang after "yes" or a frozen picture after the load: `DialogDifficulty=0`, send TruDlc2Player.log +
    TruMenu.log.
+
+## TO TEST (0.8, build `work\asi\dlc2p08`)
+
+Install with `Set-TruDlc2Player.ps1 -Install -SourceDir work\asi\dlc2p08` (game closed). `DialogHoldClear` is 0 by
+default: set `[Mission] DialogHoldClear=1` in the installed `TruDlc2Player.ini` (an edited 0.7 .ini lacks the key -
+then the built-in 0 applies). The TruMenu Fixes row for the key is still to be added (switch file limit now 512).
+
+1. `DialogHoldClear=0`: start line `TruDlc2Player 0.8 loaded (... dialog difficulty D, dialog hold clear 0)`,
+   `dialog hold: off ...`; everything as 0.7.
+2. `DialogHoldClear=1`: `dialog hold: RegisterAcceptChanges cases 4 and 6 clear the render hold [0x00db94de] ... (case
+   4: call at 0x0077e7fe ... case 6: calls at 0x0077e860 / 0x0077e88d ...)`.
+3. Case 4 = the pause / main menu ring's dialog with action 4 (script 7 f8 +0x17460 / +0x1748c; which menu item it is
+   was not traced - try the pause menu's yes / no items such as restart / load / quit and answer yes): `dialog hold N:
+   case 4 (after tru+0x37e460 = TU bl 0x8247e000) - render hold [0x00db94de] <b> -> 0`; the game goes on as before
+   (`<b>` 1 = the hold was still set, the TU's clear matters).
+4. Case 6 (a level start that compares the name with `ee_01`; no generalbank script opens action 6 - it may never
+   appear): a `dialog hold N: case 6 (level "...", after tru+0x1dfb20(name, 1) ...)` line only if it does.
+5. Animated shaders (water, light shafts) after such a dialog: running (not frozen) - compare with 0.7.
+6. Main menu tailoring (data, not this plugin): build the generalbank with
+   `tools/generalbank_pc_build.py build work/rebuild/generalbank_pc_tailoring --tailoring` (md5 014bce24...), install
+   it as `mods\generalbank.drm`; set the difficulty values away from Medium; main menu (no game running) -> DLC ->
+   DLC 2: the values are Medium (1) afterwards, as on the TU. Undo: the default build (810711f1...).
+7. Crash / hang after a dialog "yes": `DialogHoldClear=0`, send TruDlc2Player.log + TruMenu.log.

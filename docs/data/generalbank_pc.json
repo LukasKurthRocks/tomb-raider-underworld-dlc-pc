@@ -1,6 +1,6 @@
 {
  "schema": 3,
- "version": "K20261111-3",
+ "version": "K20261111-4",
  "about": "generalbank.drm knowledge for tools/generalbank_pc_build.py: the sections of the developer reference (K12 + HUD generalbank, the base of ring tree 7) that differ from the player's PC patch.000 generalbank, as word programs over sections of the player's own files (pc = PC patch.000 generalbank, tu = Xbox title update TitleUpdate.000 generalbank, tex = tools/tex_convert of a TU texture), each source with its md5; forms id / kp (bytes kept), sw (u32 swap), h (u16-pair swap), sa / sb / sab (h with Symbol halves mapped by rules.symbols); xr = TU relocations converted by rules.symbols / rules.scripts, own = our recipe tools (script_vtable_insert, script_dlc2_flag_stub). No game data is stored here: residual bytes no rule derives yet are inline only when small (values, listed in docs Befund-Wissen-nur-Verweise-1111.md), otherwise in the local knowledge file outside the repository. Script 7 is not recorded: recipe P3 + tools/menu_ring_p14.py (its D1 rewrites the three slot-7 sites). post_ring_sections = new sections appended after the ring (tu_camera: tools/tu_camera_dtp.py rules). Classes: see the tool docstring and docs Befund-Generalbank-PC-Basis-1111.md.",
  "pc": {
   "name": "pc-w\\generalbank.drm",
@@ -1008,5 +1008,24 @@
    "learned_from": "tu_camera.drm"
   }
  ],
- "local_sections": []
+ "local_sections": [],
+ "post_ring_rules": [
+  {
+   "rule": "tu134_tailoring",
+   "default": false,
+   "section": "8:104",
+   "tu_section": "8:134",
+   "about": "opt-in (build --tailoring): TU script 134 function 9 resets the player tailoring to Medium (corebase print + uiexperienceadjustmentmenu f6..f10 with 1) on the main-menu path; translated into an appended block of PC script 104 function 9 (new member of the native type, dependency, stackSize) - rule code in the tool, docs Befund-Hauptmenue-Schwierigkeit-1111.md",
+   "before": {
+    "data_md5": "0d05c29804243ac928b3f37fad607968",
+    "reloc_md5": "d61f7b62876f84fc5543ebdd094bd314"
+   },
+   "after": {
+    "data_md5": "252efa38a38ce6886d6c58b220805a25",
+    "reloc_md5": "fdd2194dd42d3450e39516cec7868610"
+   },
+   "md5": "014bce24a0d7070efff04c36aa97d793",
+   "md5_no_camera": "92ec71b727c742ee23dd5add1dd62b22"
+  }
+ ]
 }

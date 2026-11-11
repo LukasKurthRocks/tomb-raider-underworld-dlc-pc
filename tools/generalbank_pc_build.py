@@ -59,8 +59,20 @@ every file read is listed in OUT/build_report.json.
 Usage (from the repository root):
   ../bin/pyt -t 900 tools/generalbank_pc_build.py build [OUT_DIR] [--pc PATCH000] [--tu TITLEUPDATE000]
                                                        [--knowledge JSON] [--local JSON] [--expect MD5|none]
-                                                       [--no-tu-camera]
+                                                       [--no-tu-camera] [--tailoring]
         default OUT_DIR work/rebuild/generalbank_pc (replaced), -> OUT_DIR/mods/generalbank.drm, OUT_DIR/build_report.json
+        --tailoring (opt-in, Q40 2026-11-11, docs Befund-Hauptmenue-Schwierigkeit-1111.md): rule tu134_tailoring on
+        the result (steps/03_before_tailoring.drm = the default result): the title update's script 134 function 9
+        main-menu reset of the player tailoring to Medium (print + uiexperienceadjustmentmenu f6..f10 with 1) as an
+        appended block of PC script 104 function 9 before the level test; verified (tailoring-verify) and md5-checked
+        against knowledge post_ring_rules; default expect = that rule's md5 / md5_no_camera
+  ../bin/pyt -t 900 tools/generalbank_pc_build.py tailoring-verify BEFORE AFTER [TITLEUPDATE000]
+        read-only: AFTER = BEFORE + exactly rule tu134_tailoring (only script 104; every changed old word planned:
+        the site op63, instance size, f9 stackSize; members / deps pointers retargeted, everything else appended;
+        AFTER = the plan; block decoded from AFTER = the TU block; shape gate: opcode 3-grams in PC scripts 104 / 121)
+  ../bin/pyt -t 900 tools/generalbank_pc_build.py rules-record BUILD_OUT_DIR [--knowledge JSON] [--tu TU] [--write]
+        developer: the md5s of the post-ring rules from a default build's mods/generalbank.drm + steps/02_ring.drm
+        (learn records them too); --write stores them in the knowledge file (version K20261111-4)
   ../bin/pyt -t 900 tools/generalbank_pc_build.py gate FILE REFERENCE [--allow-extra T:ID,...] [--report R.json]
         read-only: header, section order and every section word by word (data + relocations), exit 1 on any difference;
         --allow-extra: these sections may exist in FILE only, at its end (the header's section count differs by them)
@@ -83,7 +95,7 @@ PC_NAME = 'pc-w\\generalbank.drm'
 TU_ARCH = '../data/TombRaiderUnderworld_Patched/TitleUpdate.000'     # the player's own title update (workspace copy)
 TU_NAME = 'xenon-w\\generalbank.drm'
 OUT_DEFAULT = 'work/rebuild/generalbank_pc'
-VERSION = 'K20261111-3'      # knowledge version (Plan-Spielerweg 5.2); a new learn with other content = a new version
+VERSION = 'K20261111-4'      # knowledge version (-4, Q40: + post_ring_rules tu134_tailoring) (Plan-Spielerweg 5.2); a new learn with other content = a new version
 SCHEMA = 3                   # 1 = literal copies (K20261111-1, retired 2026-11-11), 2 = references + residual
                              # (K20261111-2), 3 = 2 + rules: symbol map, script id map, converted TU relocations (xr),
                              # our own recipes (own) - the three ported scripts need no local file any more (Q29)
@@ -826,6 +838,8 @@ def learn(argv):
     else:
         fin = out_b
     K['expect'].update(md5=md5(fin), raw_md5=md5(DW.cdrm_decode(fin, 'le')))
+    K['post_ring_rules'] = [record_tailoring(fin, out_b, raw_tu)]
+    print('rule %s (opt-in): result md5 %s' % (T134['rule'], K['post_ring_rules'][0]['md5']))
     K['local_sections'] = sorted(LOC)
     for e in secs + post:
         print('%-10s %-11s sources %-40s residual data %5d B, reloc %5d B (%s)' % (
@@ -863,6 +877,414 @@ def tally(totals, e):
         if r['bytes']: t['residual_' + r['store']] += r['bytes']
 
 
+# ---------------------------------------------------------------- rule T134 (Q40): main-menu tailoring reset
+# The title update's script 134 function 9 (mission screen, branch "no game in progress", main menu -> DLC -> level ->
+# yes) prints 'Resetting player tailoring to Medium difficulty.' (corebase f7) and calls uiexperienceadjustmentmenu
+# f6..f10 with 1 (the five player adjustment setters, PC exe 0x6e75a0..0x6e76a0 through the natives 0x77baa0..0x77bae0;
+# docs Befund-DLC-Schwierigkeit-1111.md section 4) between its internal call (op68) and the level test; PC script 104
+# function 9 has no such calls. The rule translates that TU block word by word into an appended block of PC script 104,
+# reached from the op63 that already leaves the op68 for the appended level test (generalbank_build step 23) and
+# jumping on to that level test - the TU's order. The TU's object member (type uiexperienceadjustmentmenu, no init)
+# becomes a new PC member at the next free instance offset; its entry is a copy of the PC's own member of that type
+# whose script pairs with the other TU script holding the same TU member (same type, TU name, member index and
+# instance offset: TU 109 m18 = PC 121 m18), so the PC name is read from the PC file, not guessed; the dependency list
+# gets the native type as the TU's does; the function's stackSize = max(PC, TU) as tools/script7_pause_port.py.
+# Members and dependencies are re-homed (appended copies, old arrays stay orphaned with their relocations). Everything
+# is read from the player's PC + TU files; the knowledge file records only md5s (post_ring_rules). Opt-in (build
+# --tailoring): the default result stays the live-tested file.
+T134 = dict(pc='8:104', tu='8:134', func=9, native='uiexperienceadjustmentmenu',
+            text='Resetting player tailoring to Medium difficulty.', calls=5, rule='tu134_tailoring')
+CODE_EXTRA = None
+JUMP_OPS = (0x63, 0x64)
+
+
+def _op(o, n=0):
+    return ((o & 0xff) << 24) | (n & 0xffffff)
+
+
+def _s24(v):
+    v &= 0xffffff
+    return v - (1 << 24) if v & 0x800000 else v
+
+
+def _cstr(d, a):
+    return bytes(d[a:d.index(b'\0', a)]).decode('latin-1')
+
+
+class Scr:
+    """one script section of a DRM (endian e): words, relocations, arrays, members, code ranges, instructions"""
+    def __init__(self, D, k, e):
+        global CODE_EXTRA
+        import script_conv as SC
+        if CODE_EXTRA is None: CODE_EXTRA = dict(SC.Walk.EXTRA); CODE_EXTRA[0x02] = 1      # op02 float literal
+        self.D, self.e, self.E = D, e, ('>' if e == 'be' else '<')
+        self.keys = [key(x) for x in D.sections]
+        self.k = self.keys.index(k)
+        s = D.sections[self.k]
+        self.d, self.rel = bytes(s.data), R.parse(s.reloc, e)
+        self.it = dict(self.rel.internal)
+        self.ext = {so: (si, do) for si, so, do in self.rel.external}
+        self.ids = self.rel.id_offsets()
+        self.arr = {n: (t, c, sz) for n, t, c, sz in SC.Walk(self.d, self.rel, e).run().arrays}
+
+    def w(self, a): return struct.unpack_from(self.E + 'I', self.d, a)[0]
+    def h(self, a): return struct.unpack_from(self.E + 'H', self.d, a)[0]
+
+    def func(self, j):
+        t, n, sz = self.arr['funcs']
+        if j >= n: raise SystemExit('script has %d functions, no f%d' % (n, j))
+        return t + sz * j
+
+    def code_range(self, j):
+        ct = self.it.get(self.func(j) + 0x18)
+        if ct is None: raise SystemExit('f%d has no code' % j)
+        return ct, ct + 4 * self.w(ct - 4)
+
+    def instrs(self, lo, hi):
+        o = lo
+        while o < hi:
+            x = self.w(o); n = CODE_EXTRA.get(x >> 24, 0)
+            yield o, x >> 24, x, [o + 4 * (q + 1) for q in range(n)]
+            o += 4 * (1 + n)
+
+    def members(self):
+        t, n, sz = self.arr['members']
+        return [dict(i=j, a=t + sz * j, tag=self.w(t + sz * j), ut=self.h(t + sz * j + 4), ty=self.w(t + sz * j + 8),
+                     tyref=self.ids.get(t + sz * j + 8), off=self.h(t + sz * j + 12), name=self.h(t + sz * j + 14),
+                     init=self.it.get(t + sz * j + 16)) for j in range(n)]
+
+    def deps(self):
+        t, n, sz = self.arr.get('deps', (None, 0, 4))
+        return [self.w(t + 4 * j) for j in range(n)] if n else []
+
+    def target(self, a):
+        si, do = self.ext[a]
+        return self.keys[si], do
+
+
+def _natives(D, e):
+    """{section key: native name} of every native script type (root 0x10 -> name string)"""
+    out = {}
+    for s in D.sections:
+        if s.type != 8 or not s.data: continue
+        it = dict(R.parse(s.reloc, e).internal)
+        if 0x10 in it: out[key(s)] = _cstr(s.data, it[0x10])
+    return out
+
+
+def _func_index(S, off):
+    t, n, sz = S.arr['funcs']
+    return (off - t) // sz if t <= off < t + n * sz and (off - t) % sz == 0 else None
+
+
+def tailoring_plan(raw_in, raw_tu):
+    """PC raw DRM (the ring + camera result) + the player's TU raw generalbank -> (raw out, info); refuses (SystemExit)
+    on anything that is not exactly the expected input"""
+    P, T = DW.read(raw_in, 'le'), DW.read(raw_tu, 'be')
+    pc, tu = Scr(P, T134['pc'], 'le'), Scr(T, T134['tu'], 'be')
+    pnat, tnat = _natives(P, 'le'), _natives(T, 'be')
+    log = []
+    # ---- the TU block: from the op05 of the text to the last of the five native calls, between op68 and the test
+    lo, hi = tu.code_range(T134['func'])
+    ins = [x for x in tu.instrs(lo, hi) if x[1] != 0x00]
+    at = [j for j, x in enumerate(ins) if x[1] == 0x05 and x[3][0] in tu.it and _cstr(tu.d, tu.it[x[3][0]]) == T134['text']]
+    if len(at) != 1: raise SystemExit('TU script 134 f9: %d prints of the tailoring text (expected 1)' % len(at))
+    j0 = at[0]; j = j0; calls = 0
+    while calls < T134['calls']:
+        j += 1
+        if j >= len(ins): raise SystemExit('TU script 134 f9: block runs past the function')
+        if ins[j][1] == 0x65:
+            tk, to = tu.target(ins[j][3][0])
+            if tnat.get(tk) != T134['native']: raise SystemExit('TU +0x%x: call into %s, not %s' % (ins[j][0], tk, T134['native']))
+            calls += 1
+    tblock = ins[j0:j + 1]
+    if ins[j0 - 1][1] != 0x68 or ins[j + 1][1] != 0x0e:
+        raise SystemExit('TU block not between the op68 call and the level test (op%02x / op%02x)' % (ins[j0 - 1][1], ins[j + 1][1]))
+    tlo, thi = tblock[0][0], tblock[-1][0] + 4 * (1 + len(tblock[-1][3]))
+    log.append('TU script 134 f9 block +0x%x..+0x%x: %d instructions without the op00 markers (op68 before, op0e test after)'
+               % (tlo, thi, len(tblock)))
+    # ---- the PC site: f9's only op68, then the op63 to the appended level test (step 23)
+    plo, phi = pc.code_range(T134['func'])
+    p68 = [x for x in pc.instrs(plo, phi) if x[1] == 0x68]
+    if len(p68) != 1: raise SystemExit('PC script 104 f9: %d op68 (expected 1)' % len(p68))
+    site = p68[0][0] + 8
+    sw = pc.w(site)
+    if sw >> 24 != 0x63: raise SystemExit('PC script 104 +0x%x: %08x, not the op63 to the level test block' % (site, sw))
+    old_block = site + 4 + 4 * _s24(sw)
+    if not (phi <= old_block < len(pc.d)) or pc.w(old_block) >> 24 != 0x0e:
+        raise SystemExit('PC script 104 +0x%x: op63 target +0x%x is not the appended level test' % (site, old_block))
+    k108 = [k for k, v in pnat.items() if v == T134['native']]
+    if len(k108) != 1: raise SystemExit('PC: %d scripts of native %s' % (len(k108), T134['native']))
+    k108 = k108[0]
+    if any(pc.keys[si] == k108 for si, so, do in pc.rel.external):
+        raise SystemExit('PC script 104 already calls %s - rule applied already?' % T134['native'])
+    # ---- translation tables: call targets, member
+    def map_call(o):
+        tk, to = tu.target(o)
+        pk = RULES['scripts'].get(tk, tk)
+        if tnat.get(tk) is None or tnat.get(tk) != pnat.get(pk):
+            raise SystemExit('TU call target %s (%s) -> PC %s (%s): not the same native' % (tk, tnat.get(tk), pk, pnat.get(pk)))
+        ps = Scr(P, pk, 'le'); ts = Scr(T, tk, 'be')
+        fj = _func_index(ts, to)
+        if fj is None or _func_index(ps, to) != fj: raise SystemExit('TU %s +0x%x: no function entry at the same PC offset' % (tk, to))
+        return pk, to, '%s f%d (+0x%x) -> PC %s f%d' % (tk, fj, to, pk, fj)
+    size, align = pc.h(0x1c), pc.h(0x1e)
+    tmem = {m['off']: m for m in tu.members()}
+    used = sorted({x[2] & 0xffffff for x in tblock if x[1] == 0x0f})
+    if len(used) != 1: raise SystemExit('TU block uses %d members (expected 1)' % len(used))
+    xm = tmem[used[0]]
+    if xm['tyref'] != 8 or xm['init'] is not None: raise SystemExit('TU member %d: not a script-type member without init' % xm['off'])
+    tyk = RULES['scripts'].get('8:%d' % xm['ty'], '8:%d' % xm['ty'])
+    if tnat.get('8:%d' % xm['ty']) != T134['native'] or tyk != k108:
+        raise SystemExit('TU member %d type 8:%d does not map to the PC native %s' % (xm['off'], xm['ty'], k108))
+    pty = int(k108.split(':')[1])
+    if any(m['tyref'] == 8 and m['ty'] == pty for m in pc.members()):
+        raise SystemExit('PC script 104 already has a member of type %s' % k108)
+    # name: the TU scripts with the same TU member (type, name) paired with a PC script by member index + offset
+    pairs, pmem = [], None
+    for s in T.sections:
+        if s.type != 8 or not s.data or key(s) == T134['tu']: continue
+        ts = Scr(T, key(s), 'be')
+        if 'members' not in ts.arr: continue
+        for m in ts.members():
+            if m['tyref'] == 8 and m['ty'] == xm['ty'] and m['name'] == xm['name']:
+                if pmem is None:          # PC members of the native type, per script (walked once)
+                    pmem = []
+                    for q in P.sections:
+                        if q.type != 8 or not q.data: continue
+                        ps = Scr(P, key(q), 'le')
+                        if 'members' in ps.arr:
+                            pmem += [(key(q), x) for x in ps.members() if x['tyref'] == 8 and x['ty'] == pty]
+                pairs += [(key(s), qk, m['i'], m['off'], x) for qk, x in pmem if x['i'] == m['i'] and x['off'] == m['off']]
+    names = {p[4]['name'] for p in pairs}
+    if len(pairs) != 1 or len(names) != 1:
+        raise SystemExit('member name: %d TU / PC script pairs %s (expected exactly 1)' % (len(pairs), [p[:4] for p in pairs]))
+    tk_, pk_, mi, moff, tmpl = pairs[0]
+    if tmpl['tag'] != xm['tag'] or tmpl['init'] is not None:
+        raise SystemExit('template member %s m%d: tag %08x / init, TU %08x' % (pk_, mi, tmpl['tag'], xm['tag']))
+    tsrc = Scr(P, pk_, 'le')
+    new_off = (size + align - 1) // align * align if align else size
+    new_size = new_off + 4
+    log.append('member TU %d (type %s, name %d) -> new PC %d (type %s, name %d: TU %s m%d = PC %s m%d, offset %d); '
+               'instance size %d -> %d' % (xm['off'], '8:%d' % xm['ty'], xm['name'], new_off, k108, tmpl['name'], tk_, mi,
+                                          pk_, mi, moff, size, new_size))
+    # ---- build
+    d = bytearray(pc.d); r = R.parse(P.sections[pc.k].reloc, 'le')
+    old_len = len(d)
+    def pad():
+        while len(d) % 4: d.append(0)
+    def dup(lo_, hi_, delta):
+        r.internal += [(a + delta, t) for a, t in list(r.internal) if lo_ <= a < hi_]
+        r.external += [(si, a + delta, dd) for si, a, dd in list(r.external) if lo_ <= a < hi_]
+        r.idref += [(t, a + delta) for t, a in list(r.idref) if lo_ <= a < hi_]
+        r.idref_a += [(t, a + delta) for t, a in list(r.idref_a) if lo_ <= a < hi_]
+    def retarget(a, t):
+        n0 = len(r.internal)
+        r.internal = [(x, y) for x, y in r.internal if x != a]
+        if len(r.internal) != n0 - 1: raise SystemExit('no internal pointer at +0x%x' % a)
+        r.internal.append((a, t))
+    pad()
+    stro = len(d); d += T134['text'].encode('latin-1') + b'\0'; pad()
+    # members: count + old entries + the new one
+    mt, mn, msz = pc.arr['members']
+    d += struct.pack('<I', mn + 1); nmt = len(d)
+    d += pc.d[mt:mt + msz * mn]; dup(mt, mt + msz * mn, nmt - mt)
+    na = len(d); d += tsrc.d[tmpl['a']:tmpl['a'] + 12] + struct.pack('<HHI', new_off, tmpl['name'], 0)
+    r.idref.append((8, na + 8))
+    retarget(0x2c, nmt)
+    # dependencies: count + old + the native type
+    dt, dn, _ = pc.arr['deps']
+    d += struct.pack('<I', dn + 1); ndt = len(d)
+    d += pc.d[dt:dt + 4 * dn]; dup(dt, dt + 4 * dn, ndt - dt)
+    d += struct.pack('<I', pty); r.idref.append((8, ndt + 4 * dn))
+    retarget(0x48, ndt)
+    # the block
+    code = []
+    for o, opc, x, ex in tblock:
+        if opc in (0x03, 0x04): code.append((x, None))
+        elif opc == 0x05: code.append((x, None)); code.append((PH_WORD, ('int', stro)))
+        elif opc == 0x0f: code.append((_op(0x0f, new_off), None))
+        elif opc in (0x65, 0x66):
+            pk, po, txt = map_call(ex[0]); log.append('TU +0x%x op%02x: %s' % (o, opc, txt))
+            code.append((x, None)); code.append((PH_WORD, ('ext', pc.keys.index(pk), po)))
+        else: raise SystemExit('TU +0x%x: opcode %02x not handled' % (o, opc))
+    blk = len(d)
+    code.append((_op(0x63, (old_block - (blk + 4 * len(code) + 4)) // 4), None))
+    for k_, (x, rel) in enumerate(code):
+        a = blk + 4 * k_
+        d += struct.pack('<I', x)
+        if rel and rel[0] == 'int': r.internal.append((a, rel[1]))
+        elif rel and rel[0] == 'ext': r.external.append((rel[1], a, rel[2]))
+    words = {site: (sw, _op(0x63, (blk - (site + 4)) // 4), 'op63 -> the tailoring block (was -> the level test +0x%x)' % old_block)}
+    struct.pack_into('<I', d, site, words[site][1])
+    struct.pack_into('<H', d, 0x1c, new_size)
+    words[0x1c] = (pc.w(0x1c), struct.unpack_from('<I', d, 0x1c)[0], 'instance size %d -> %d' % (size, new_size))
+    f9 = pc.func(T134['func'])
+    pst, tst = pc.h(f9 + 10), tu.h(tu.func(T134['func']) + 10)
+    if tst > pst:
+        struct.pack_into('<H', d, f9 + 10, tst)
+        words[f9 + 8] = (pc.w(f9 + 8), struct.unpack_from('<I', d, f9 + 8)[0], 'f9 stackSize %d -> %d (TU %d)' % (pst, tst, tst))
+    P.sections[pc.k].data = bytes(d); P.sections[pc.k].reloc = R.write(r, 'le')
+    log.append('script 104: %d -> %d B; members %d -> %d (+0x%x), deps %d -> %d (+0x%x, + %s), block +0x%x (%d words, '
+               'string +0x%x), site +0x%x, f9 stackSize %d -> %d' % (old_len, len(d), mn, mn + 1, nmt, dn, dn + 1, ndt,
+                                                                    k108, blk, len(code), stro, site, pst, max(pst, tst)))
+    info = dict(site=site, old_block=old_block, block=blk, words=len(code), new_off=new_off, new_size=new_size,
+                name=tmpl['name'], k108=k108, changed=words, old_len=old_len, tu_block=(tlo, thi), nmt=nmt, ndt=ndt,
+                stackSize=(pst, max(pst, tst)))
+    return P.write('le'), info, log
+
+
+PH_WORD = 0xBEEBBEEB
+
+
+def _sec_md5(raw, k):
+    s = next(x for x in DW.read(raw, 'le').sections if key(x) == k)
+    return dict(data_md5=md5(s.data), reloc_md5=md5(s.reloc))
+
+
+def apply_tailoring(fin, raw_tu, rule, log):
+    """file bytes (CDRM) -> file bytes with rule T134, every step checked against the recorded md5s"""
+    raw_b = DW.cdrm_decode(fin, 'le')
+    if _sec_md5(raw_b, T134['pc']) != rule['before']:
+        raise SystemExit('rule %s: script 104 before is not the recorded one %s' % (T134['rule'], rule['before']))
+    raw_a, info, tlog = tailoring_plan(raw_b, raw_tu)
+    log += ['rule %s: %s' % (T134['rule'], x) for x in tlog]
+    probs, _ = tailoring_verify(raw_b, raw_a, raw_tu)
+    if probs: raise SystemExit('rule %s: verify refused: %s' % (T134['rule'], '; '.join(probs[:10])))
+    if _sec_md5(raw_a, T134['pc']) != rule['after']:
+        raise SystemExit('rule %s: script 104 after is not the recorded one %s' % (T134['rule'], rule['after']))
+    log.append('rule %s: verify ok (only script 104 differs, every changed word planned, block = TU script 134 '
+               'f9 +0x%x..+0x%x, shape gate ok); script 104 md5 = recorded' % ((T134['rule'],) + info['tu_block']))
+    return DW.cdrm_encode(raw_a, 'le')
+
+
+def record_tailoring(fin_cam, fin_nocam, raw_tu):
+    """developer: the post_ring_rules entry of rule T134 from the two results (with / without the tu_camera
+    sections) - md5s only"""
+    out = dict(rule=T134['rule'], default=False, section=T134['pc'], tu_section=T134['tu'], about=(
+        'opt-in (build --tailoring): TU script 134 function 9 resets the player tailoring to Medium (corebase print + '
+        'uiexperienceadjustmentmenu f6..f10 with 1) on the main-menu path; translated into an appended block of PC '
+        'script 104 function 9 (new member of the native type, dependency, stackSize) - rule code in the tool, '
+        'docs Befund-Hauptmenue-Schwierigkeit-1111.md'))
+    for tag, fin in (('', fin_cam), ('_no_camera', fin_nocam)):
+        raw_b = DW.cdrm_decode(fin, 'le')
+        raw_a, info, _ = tailoring_plan(raw_b, raw_tu)
+        probs, _ = tailoring_verify(raw_b, raw_a, raw_tu)
+        if probs: raise SystemExit('rule %s: verify refused: %s' % (T134['rule'], probs[:10]))
+        out['before' + tag], out['after' + tag] = _sec_md5(raw_b, T134['pc']), _sec_md5(raw_a, T134['pc'])
+        out['md5' + tag] = md5(DW.cdrm_encode(raw_a, 'le'))
+    if (out['before'], out['after']) != (out['before_no_camera'], out['after_no_camera']):
+        raise SystemExit('rule %s: script 104 differs with / without the camera sections' % T134['rule'])
+    del out['before_no_camera'], out['after_no_camera']
+    return out
+
+
+def rules_record(argv):
+    """developer: rules-record OUT_DIR_OF_A_BUILD [--knowledge JSON] [--tu TU] [--write]: the build's
+    mods/generalbank.drm (= expect.md5) and steps/02_ring.drm (= expect.ring_md5) -> post_ring_rules"""
+    write = '--write' in argv; argv = [a for a in argv if a != '--write']
+    kpath, tu = KNOW, TU_ARCH
+    if '--knowledge' in argv: k = argv.index('--knowledge'); kpath = argv[k + 1]; del argv[k:k + 2]
+    if '--tu' in argv: k = argv.index('--tu'); tu = argv[k + 1]; del argv[k:k + 2]
+    if len(argv) != 1: sys.exit(__doc__)
+    K = load_knowledge(kpath)
+    cam = open(os.path.join(argv[0], 'mods', 'generalbank.drm'), 'rb').read()
+    nocam = open(os.path.join(argv[0], 'steps', '02_ring.drm'), 'rb').read()
+    if (md5(cam), md5(nocam)) != (K['expect']['md5'], K['expect']['ring_md5']):
+        raise SystemExit('the build files are not the recorded results (%s / %s)' % (md5(cam), md5(nocam)))
+    raw_tu = read_tu(tu)
+    if md5(raw_tu) != K['tu']['raw_md5']: raise SystemExit('title update generalbank is not the recorded one')
+    e = record_tailoring(cam, nocam, raw_tu)
+    print(json.dumps(e, indent=1))
+    rules = [x for x in K.get('post_ring_rules', []) if x['rule'] != e['rule']] + [e]
+    if write:
+        K['post_ring_rules'] = rules
+        K['version'] = VERSION
+        with open(kpath, 'w', encoding='utf-8', newline='\n') as f:
+            json.dump(K, f, indent=1)
+            f.write('\n')
+        print('written', kpath, os.path.getsize(kpath), 'B (version %s)' % VERSION)
+    return 0
+
+
+def tailoring_verify(raw_b, raw_a, raw_tu):
+    """AFTER = BEFORE + exactly rule T134: every other section byte-identical; script 104 word diff over BEFORE's
+    length only at the planned words; relocations = BEFORE's (members / deps pointers retargeted) + appended ones;
+    AFTER = the plan from BEFORE byte for byte; the block decoded from AFTER alone against the TU block (opcodes,
+    immediates, text, native + function index, member type); members / deps; shape gate (opcode 3-grams of the
+    block in the PC compiler's code of scripts 104 / 121) -> problems"""
+    import menu_ring_p14 as MR
+    probs = []
+    g = gate(DW.cdrm_encode(raw_a, 'le'), DW.cdrm_encode(raw_b, 'le'))
+    diff =[x.get('key') for x in g['differing']]
+    if not g['header_same'] or not g['order_same'] or diff != [T134['pc']]:
+        probs.append('sections differing %s (expected only %s), header same %s, order same %s' % (
+            diff, T134['pc'], g['header_same'], g['order_same']))
+    plan, info, _ = tailoring_plan(raw_b, raw_tu)
+    B, A, Q = DW.read(raw_b, 'le'), DW.read(raw_a, 'le'), DW.read(plan, 'le')
+    T = DW.read(raw_tu, 'be')
+    b, a = Scr(B, T134['pc'], 'le'), Scr(A, T134['pc'], 'le')
+    q = Q.sections[b.k]
+    if (a.d, A.sections[a.k].reloc) != (q.data, q.reloc): probs.append('script 104 is not the plan from BEFORE')
+    for o in range(0, info['old_len'] - info['old_len'] % 4, 4):
+        if b.w(o) != a.w(o) and o not in info['changed']: probs.append('+0x%x %08x -> %08x unexplained' % (o, b.w(o), a.w(o)))
+    for o, (x, y, why) in info['changed'].items():
+        if (b.w(o), a.w(o)) != (x, y): probs.append('+0x%x: %08x -> %08x, planned %08x -> %08x (%s)' % (o, b.w(o), a.w(o), x, y, why))
+    bi, ai = dict(b.rel.internal), dict(a.rel.internal)
+    for o, t in bi.items():
+        if o in (0x2c, 0x48): continue
+        if ai.get(o) != t: probs.append('internal pointer +0x%x changed' % o)
+    if any(o < info['old_len'] for o in set(ai) - set(bi)): probs.append('new internal pointers inside the old bytes')
+    for nm in ('external', 'idref', 'idref_a', 'unk3'):
+        ob, oa = getattr(b.rel, nm), getattr(a.rel, nm)
+        if oa[:len(ob)] != ob: probs.append('relocations %s: old entries changed' % nm)
+        if nm == 'external' and any(so < info['old_len'] for si, so, do in oa[len(ob):]): probs.append('new external inside old bytes')
+        if nm in ('idref', 'idref_a') and any(so < info['old_len'] for t, so in oa[len(ob):]): probs.append('new %s inside old bytes' % nm)
+    # decode from AFTER alone
+    blk = info['site'] + 4 + 4 * _s24(a.w(info['site']))
+    if blk != info['block']: probs.append('site does not jump to the block')
+    tu = Scr(T, T134['tu'], 'be')
+    tins = [x for x in tu.instrs(*info['tu_block']) if x[1] != 0x00]
+    pins = list(a.instrs(blk, blk + 4 * info['words']))
+    pnat, tnat = _natives(A, 'le'), _natives(T, 'be')
+    am = {m['off']: m for m in a.members()}; tm = {m['off']: m for m in tu.members()}
+    if len(pins) != len(tins) + 1: probs.append('block has %d instructions, TU %d + jump' % (len(pins), len(tins)))
+    for (xo, xop, xw, xex), (po, pop, pw, pex) in zip(tins, pins):
+        ok = xop == pop
+        if ok and xop in (0x03, 0x04): ok = xw == pw
+        if ok and xop == 0x05: ok = _cstr(tu.d, tu.it[xex[0]]) == _cstr(a.d, a.it[pex[0]])
+        if ok and xop in (0x65, 0x66):
+            (tk, to), (pk, po_) = tu.target(xex[0]), a.target(pex[0])
+            ok = tnat.get(tk) == pnat.get(pk) is not None and _func_index(tu if tk == T134['tu'] else Scr(T, tk, 'be'), to) == \
+                _func_index(Scr(A, pk, 'le'), po_) is not None
+        if ok and xop == 0x0f:
+            xm_, pm_ = tm.get(xw & 0xffffff), am.get(pw & 0xffffff)
+            ok = pm_ is not None and xm_ is not None and tnat.get('8:%d' % xm_['ty']) == pnat.get('8:%d' % pm_['ty'])
+        if not ok: probs.append('TU +0x%x %08x / PC +0x%x %08x differ' % (xo, xw, po, pw))
+    last = pins[-1] if pins else (0, 0, 0, [])
+    if last[1] != 0x63 or last[0] + 4 + 4 * _s24(last[2]) != info['old_block']: probs.append('block does not end with op63 -> level test')
+    # the level test block unchanged, members, deps
+    if a.d[info['old_block']:info['old_len']] != b.d[info['old_block']:info['old_len']]: probs.append('level test block changed')
+    ent = lambda m: (m['tag'], m['ut'], m['ty'], m['tyref'], m['off'], m['name'], m['init'])
+    mb, ma = b.members(), a.members()
+    if [ent(m) for m in mb] != [ent(m) for m in ma[:len(mb)]] or len(ma) != len(mb) + 1: probs.append('old member entries changed')
+    nm_ = ma[-1] if ma else {}
+    if (nm_.get('off'), nm_.get('ty'), nm_.get('tyref'), nm_.get('name'), nm_.get('init')) != \
+            (info['new_off'], int(info['k108'].split(':')[1]), 8, info['name'], None) or a.h(0x1c) != info['new_size']:
+        probs.append('new member / instance size')
+    if a.deps() != b.deps() + [int(info['k108'].split(':')[1])]: probs.append('deps %s' % a.deps())
+    # shape gate: every opcode 3-gram of the block (without the final jump) in the PC compiler's code (104 / 121)
+    known = set()
+    for k in (T134['pc'], '8:121'):
+        S = Scr(B, k, 'le')
+        for j in range(S.arr['funcs'][1]):
+            if S.it.get(S.func(j) + 0x18) is None: continue
+            known.update(MR.trigrams(S, *S.code_range(j)))
+    for gm in MR.trigrams(a, blk, blk + 4 * (info['words'] - 1)):
+        if gm not in known: probs.append('shape gate: %s does not occur in PC scripts 104 / 121' % ' '.join('op%02x' % x for x in gm))
+    return probs, info
+
+
 # ---------------------------------------------------------------- ring sub-step + build
 def ring(a, b, report):
     import menu_ring_p14 as MR
@@ -881,6 +1303,7 @@ def build(argv):
     if '--local' in argv: k = argv.index('--local'); lpath = argv[k + 1]; del argv[k:k + 2]
     if '--expect' in argv: k = argv.index('--expect'); expect = argv[k + 1]; del argv[k:k + 2]
     camera = '--no-tu-camera' not in argv; argv = [a for a in argv if a != '--no-tu-camera']
+    tailor = '--tailoring' in argv; argv = [a for a in argv if a != '--tailoring']
     if len(argv) > 1: sys.exit(__doc__)
     outdir = argv[0] if argv else OUT_DEFAULT
     import build_util as BU
@@ -893,7 +1316,13 @@ def build(argv):
     t0 = time.time(); log = []
     K = load_knowledge(kpath)
     post = K.get('post_ring_sections', []) if camera else []
-    if expect is None: expect = K['expect']['md5'] if post else K['expect']['ring_md5']
+    rule = None
+    if tailor:
+        rule = next((x for x in K.get('post_ring_rules', []) if x['rule'] == T134['rule']), None)
+        if rule is None: raise SystemExit('--tailoring: the knowledge file records no rule %s' % T134['rule'])
+    if expect is None:
+        expect = (rule['md5'] if post else rule['md5_no_camera']) if rule else \
+            K['expect']['md5'] if post else K['expect']['ring_md5']
     local, need = load_local(lpath, K)
     if need and local is None:
         raise SystemExit('the local knowledge file %s is missing; sections %s still need residual bytes no rule '
@@ -929,17 +1358,24 @@ def build(argv):
     out = os.path.join(outdir, 'mods', 'generalbank.drm')
     os.makedirs(os.path.dirname(out), exist_ok=True)
     if post:
-        open(out, 'wb').write(DW.cdrm_encode(append_sections(DW.cdrm_decode(ring_b, 'le'), post, SRC, local, log),
-                                             'le'))
+        fin = DW.cdrm_encode(append_sections(DW.cdrm_decode(ring_b, 'le'), post, SRC, local, log), 'le')
     else:
-        open(out, 'wb').write(ring_b)
+        fin = ring_b
         log.append('no post-ring sections (%s)' % ('--no-tu-camera' if not camera else 'none recorded'))
+    if rule:
+        b3 = os.path.join(st, '03_before_tailoring.drm')
+        open(b3, 'wb').write(fin)
+        log.append('-> %s md5 %s (input of rule %s)' % (b3, md5(fin), T134['rule']))
+        fin = apply_tailoring(fin, raw_tu, rule, log)
+    open(out, 'wb').write(fin)
     got = md5(open(out, 'rb').read())
     GUARD.on = False
     ok = ring_ok and (expect.lower() == 'none' or got == expect)
     log.append('result %s md5 %s %s' % (out, got, 'not compared' if expect.lower() == 'none' else
-                                        ('= expected %s (%s)' % (expect, 'ring tree 7 + %d new sections' % len(post)
-                                                                 if post else 'ring tree 7') if got == expect else
+                                        ('= expected %s (%s%s)' % (expect, 'ring tree 7 + %d new sections' % len(post)
+                                                                   if post else 'ring tree 7',
+                                                                   ' + rule %s' % T134['rule'] if rule else '')
+                                         if got == expect else
                                          'DIFFERS from expected %s' % expect)))
     reads = sorted(set(GUARD.read))
     rep = dict(tool='generalbank_pc_build', time=time.strftime('%Y-%m-%d %H:%M:%S'), seconds=round(time.time() - t0, 1),
@@ -963,6 +1399,17 @@ def main(argv):
         except PermissionError as e:
             print('GUARD: %s' % e); return 2
     if cmd == 'learn': return learn(rest)
+    if cmd == 'rules-record': return rules_record(rest)
+    if cmd == 'tailoring-verify':
+        if len(rest) not in (2, 3): sys.exit(__doc__)
+        load_knowledge(KNOW)                                # rules.scripts (TU -> PC script keys)
+        rb, ra =(DW.cdrm_decode(open(p, 'rb').read(), 'le') for p in rest[:2])
+        probs, info = tailoring_verify(rb, ra, read_tu(rest[2] if len(rest) > 2 else TU_ARCH))
+        for x in probs: print('  PROBLEM:', x)
+        for o, (x, y, why) in sorted(info['changed'].items()): print('  +0x%x %08x -> %08x  %s' % (o, x, y, why))
+        print('tailoring-verify: %s' % ('ok - only script 104, every word planned, block = TU, shape gate ok' if not probs
+                                        else '%d problem(s)' % len(probs)))
+        return 0 if not probs else 1
     if cmd == 'gate':
         rp, extra = None, []
         if '--report' in rest: k = rest.index('--report'); rp = rest[k + 1]; del rest[k:k + 2]
