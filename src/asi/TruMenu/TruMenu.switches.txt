@@ -152,6 +152,7 @@ TruDlc2Player | Dlc2Player | TrackerFlag | bool | Tracker-Flag +0x1244 | Tracker
 TruDlc2Player | Costume | TuMapping | bool | TU-Kostüm-Abbildung 857/11 | TU costume map 857/11 | restart | 0 | Kostüm 857 <-> 11 beim Speichern / Laden / Spawnen // Costume 857 <-> 11 in save / load / spawn
 TruDlc2Player | Mission | DialogStart | bool | DLC-2-Start ohne Outfit-Wahl | DLC 2 start w/o outfit choice | restart | 1 | Pausenmenü -> DLC 2: ohne Outfit-Wahl, wie TU // Pause menu -> DLC 2: no outfit selection, as TU | TruDlc2Player 0.6
 TruDlc2Player | Mission | DialogDifficulty | bool | Levelstart: Anpassung auf Mittel | Level start: tailoring to Medium | restart | 0 | Mit DialogStart: Missionsstart setzt Anpassung = Mittel // With DialogStart: mission start sets tailoring = Medium | TruDlc2Player 0.7
+TruDlc2Player | Mission | DialogHoldClear | bool | Dialog 4/6: Render-Halt aus | Dialog 4/6: clear render hold | restart | 0 | Nach Dialog-Fall 4 / 6 Shader-Uhr-Halt = 0, wie TU // After dialog case 4 / 6 shader clock hold = 0, as TU | TruDlc2Player 0.8
 TruDlc2Player | Dlc2Player | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = jeder neue Game-Tracker // 2 = every new game tracker
 
 group | merclang | Söldner-Sprache (TruMercLang) | Mercenary language (TruMercLang)
