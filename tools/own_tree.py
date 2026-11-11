@@ -9,10 +9,12 @@ the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
         dlc2         <run>/dlc2/mods                        step Fixes, DLC 2 tree
         shaders      <run>/shaders/mods                     step Shaders (2026-11-11, A2): recorded shader decisions
                                                             (tools/shader_step.py apply) on dlc1 / dlc2 of the same run
+        shaders_tr   <run>/shaders_tr/mods                  step Shaders (A2 stage 2): our pass-2 translations on the
+                                                            pipeline materials (tools/shader_translate.py run)
         shaders_rule <run>/shaders_rule/mods                step Shaders: rule_owned apply (grapple ring), last
-                     Both are required unless --no-shaders: shader_step_apply.json must name dlc1 / dlc2 of <run> as
-                     its input, have 0 errors, rule_owned_check.json must pass, and no shaders file may be older
-                     than its Fixes input (stale). A later layer that replaces a shaders file with other content is
+                     All three are required unless --no-shaders: shader_step_apply.json must name dlc1 / dlc2 of <run>
+                     as its input, shader_translate.json dlc1 / dlc2 / shaders, both 0 errors, rule_owned_check.json
+                     must pass, and no shaders file may be older than its input (stale). A later layer that replaces a shaders file with other content is
                      refused (the shader decisions of that DRM would be lost).
         doppel       <run>/doppel/mods                      step DoppelCostume (2026-11-11, Q23): dlc_doppel_costume_a.drm
                      (else work/rebuild/doppel/mods)        = our doppelganger_casual with object id 857 -> 1031
@@ -147,7 +149,7 @@ def in_run(run, sub, fallback):
     return p if os.path.exists(p) else fallback
 
 
-SHADER_LAYERS = ('shaders', 'shaders_rule')
+SHADER_LAYERS = ('shaders', 'shaders_tr', 'shaders_rule')
 
 
 DOPPEL = ('dlc_doppel_costume_a.drm', 'doppelganger_casual.drm')
@@ -160,6 +162,8 @@ def layers(run, costumes, gb='pc', lang=True, shaders=True, doppel=True):
         # step Shaders (A2, 2026-11-11): recorded shader decisions over dlc1 / dlc2 of the SAME run, ring rule last
         L.append(('shaders', 'Shaders (shader_step apply: recorded libs + material tuples, -FixesOut %s)' % run,
                   run + '/shaders/mods', None, False))
+        L.append(('shaders_tr', 'Shaders (shader_translate run: our pass-2 translations on the pipeline materials)',
+                  run + '/shaders_tr/mods', None, False))
         L.append(('shaders_rule', 'Shaders (rule_owned apply: grapple ring, last tool of the step)', run + '/shaders_rule/mods', None, False))
     if doppel:
         # step DoppelCostume (Q23, 2026-11-11): the clone of the doppelganger_casual above (object id 857 -> 1031)
@@ -204,8 +208,25 @@ def shader_layers_check(run):
             q = os.path.join(src, rel.replace('/', os.sep))
             if os.path.isfile(q) and os.path.getmtime(q) > os.path.getmtime(p): stale.append(rel)
     if stale: raise SystemExit('shaders layer is older than its Fixes input for %d files (e.g. %s)%s' % (len(stale), stale[0], hint))
-    print('shaders layers: %s (%d files) + %s (%d files), apply %d libs / %d materials, 0 errors, not stale' % (
-        sd + '/mods', len(walk(sd + '/mods')), rd + '/mods', len(walk(rd + '/mods')), a.get('libs_added', 0), a.get('materials', 0)))
+    # A2 stage 2: shaders_tr (shader_translate run) on dlc1 / dlc2 / shaders of the same run, 0 errors, not stale
+    td = run + '/shaders_tr'; trep = td + '/shader_translate.json'
+    for p in (td + '/mods', trep):
+        if not os.path.exists(p): raise SystemExit('missing shaders layer part %s%s' % (p, hint))
+    t = json.load(open(trep, encoding='utf-8'))
+    tw = want + [sd + '/mods']
+    tg = [x.replace('\\', '/').rstrip('/') for x in t.get('layers', [])]
+    if [os.path.normcase(os.path.abspath(x)) for x in tg] != [os.path.normcase(os.path.abspath(x)) for x in tw]:
+        raise SystemExit('shaders_tr layer was translated on %s, not on %s%s' % (tg, tw, hint))
+    if t.get('errors'): raise SystemExit('shaders_tr layer has %d errors (%s)%s' % (len(t['errors']), t['errors'][0][:120], hint))
+    for k, (rel, p) in walk(td + '/mods').items():
+        for src in tw:
+            q = os.path.join(src, rel.replace('/', os.sep))
+            if os.path.isfile(q) and os.path.getmtime(q) > os.path.getmtime(p): stale.append(rel)
+    if stale: raise SystemExit('shaders_tr layer is older than its input for %d files (e.g. %s)%s' % (len(stale), stale[0], hint))
+    ng = collections.Counter(g.get('action') for g in t.get('groups', []))
+    print('shaders layers: %s (%d files) + %s (%d files) + %s (%d files), apply %d libs / %d materials, translate %s, 0 errors, not stale' % (
+        sd + '/mods', len(walk(sd + '/mods')), td + '/mods', len(walk(td + '/mods')), rd + '/mods', len(walk(rd + '/mods')),
+        a.get('libs_added', 0), a.get('materials', 0), dict(ng)))
 
 
 def doppel_layer_check(files, d):

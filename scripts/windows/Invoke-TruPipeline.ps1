@@ -106,10 +106,17 @@
                the repository) + the Xbox DLC DRMs of tu_batch xdump (work\sg_audit_0511\xbox): recorded ShaderLibs
                (nativefix ABS_CONST rewrite with stack-independent entry hashes), material shader tuples + Xbox
                MaterialParams where the material's texture records are the ones the lib was built for (else refused);
-               only the changed DRMs -> <out>\shaders\mods (a layer over dlc1 / dlc2); then rule_owned apply (the ring
-               rule last, <out>\shaders_rule\mods), rule_owned check over the stack, shader_form_gate (-ShaderGate) and
-               tu_batch vcheck --strict (binding check of every translated pass-2 lib, exit 1 on a problem) on the
-               shaders layer. <out> = -FixesOut DIR, else work\rebuild. Not assembled / installed by anything yet
+               only the changed DRMs -> <out>\shaders\mods (a layer over dlc1 / dlc2); then (A2 stage 2)
+               tools\shader_translate.py run: OUR pass-2 translation on the pipeline material (our records) for the
+               materials the recorded decisions cannot serve (kit state K_MAT_*, the q17q 20265 one-off, rows apply
+               refused): reuse of a recorded lib for the same Xbox lib whose binding check passes on every copy, else
+               tu_batch build_group + pack_lib (new ids from 3600), VS rule (recorded VS for the same Xbox VS when the
+               PC VS lacks an interpolator), lane rule (pass-0/1 lanes keep their value) -> <out>\shaders_tr\mods,
+               compared with docs\data\shader_translate.tsv (--expect, exit 1 on any difference); then rule_owned apply
+               (the ring rule last, <out>\shaders_rule\mods), rule_owned check over the stack, shader_form_gate
+               (-ShaderGate) and tu_batch vcheck --strict (binding check of every translated pass-2 lib, exit 1 on a
+               problem) on both shader layers. <out> = -FixesOut DIR, else work\rebuild. tools\own_tree.py assemble
+               takes shaders, shaders_tr and shaders_rule as layers
       Costumes the three Xbox costume packs (2026-11-03; pack1 Wetsuit k / p, pack2 Classic a / h, pack20 Designer
                l / m), after Assemble (render tables) and Fixes' proof: verify_ids extend (adds the packs' ids to
                dlc_idmap.json, existing entries never change; second run adds nothing), converter_faults_fix proof,
@@ -352,9 +359,11 @@ $langOut = if ($FixesOut) { "$fixRoot/lang" } else { 'work/rebuild/lang' }
 # step Shaders (2026-11-11, A2 stage 1): recorded shader decisions as a layer over the Fixes trees, ring rule last
 $shOut = if ($FixesOut) { "$fixRoot/shaders" } else { 'work/rebuild/shaders' }
 $shRule = if ($FixesOut) { "$fixRoot/shaders_rule" } else { 'work/rebuild/shaders_rule' }
+# A2 stage 2 (2026-11-11): our own pass-2 translations on the pipeline materials (kit / one-off / refused rows)
+$shTr = if ($FixesOut) { "$fixRoot/shaders_tr" } else { 'work/rebuild/shaders_tr' }
 # step DoppelCostume (2026-11-11, Q23): dlc_doppel_costume_a.drm cloned from the top-most doppelganger_casual.drm
 $dpOut = if ($FixesOut) { "$fixRoot/doppel" } else { 'work/rebuild/doppel' }
-$dpStack = @('--stack', $fix2, "$shOut/mods", "$shRule/mods")
+$dpStack = @('--stack', $fix2, "$shOut/mods", "$shTr/mods", "$shRule/mods")
 # step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
 $costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
 $costumeTools = @(
@@ -530,10 +539,14 @@ $steps = @{
     # Shaders (2026-11-11, A2 stage 1): recorded decisions -> shaders layer, ring rule on top, then the gates
     Shaders = @(
         @('tools\shader_step.py', 'apply', '--layers', "$fix1,$fix2", '--out', "$shOut/mods", '--report', "$shOut/shader_step_apply.json"),
-        @('tools\rule_owned.py', 'apply', "$shRule/mods", $fix1, $fix2, "$shOut/mods"),
-        @('tools\rule_owned.py', 'check', $fix1, $fix2, "$shOut/mods", "$shRule/mods", '--report', "$shRule/rule_owned_check.json"),
+        @('tools\shader_translate.py', 'run', '--layers', "$fix1,$fix2,$shOut/mods", '--out', "$shTr/mods", '--apply-report', "$shOut/shader_step_apply.json",
+          '--work', "$shTr/work", '--expect', 'docs/data/shader_translate.tsv', '--report', "$shTr/shader_translate.json"),
+        @('tools\rule_owned.py', 'apply', "$shRule/mods", $fix1, $fix2, "$shOut/mods", "$shTr/mods"),
+        @('tools\rule_owned.py', 'check', $fix1, $fix2, "$shOut/mods", "$shTr/mods", "$shRule/mods", '--report', "$shRule/rule_owned_check.json"),
         (@('tools\shader_form_gate.py', 'check', "$shOut/mods", '--list', '3', '--report', "$shOut/shader_form_check.json") + $sgEnforce),
-        @('tools\tu_batch.py', 'vcheck', "$shOut/mods", 'work/sg_audit_0511/xbox', '--strict')
+        (@('tools\shader_form_gate.py', 'check', "$shTr/mods", '--list', '3', '--report', "$shTr/shader_form_check.json") + $sgEnforce),
+        @('tools\tu_batch.py', 'vcheck', "$shOut/mods", 'work/sg_audit_0511/xbox', '--strict'),
+        @('tools\tu_batch.py', 'vcheck', "$shTr/mods", 'work/sg_audit_0511/xbox', '--strict')
     )
     Costumes = $costumeTools
     # DoppelCostume (Q23): recipe object id 857 -> 1031 on our doppelganger_casual (gate before writing), then re-check
@@ -612,7 +625,7 @@ $outputDirs = @{
     Assemble = @('work\render', 'work\rebuild')
     Dlc2    = @('work\rebuild')
     Fixes   = @('work\rebuild')
-    Shaders = @(($shOut -replace '/', '\'), ($shRule -replace '/', '\'))
+    Shaders = @(($shOut -replace '/', '\'), ($shTr -replace '/', '\'), ($shRule -replace '/', '\'))
     Costumes = @('work\rebuild')
     DoppelCostume = @(($dpOut -replace '/', '\'))
     Repair  = @('work\rebuild')
