@@ -2928,6 +2928,40 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.29 - radial lock: Enabled=0 closes, entries only after a drawn ring (2026-11-11)
+
+Built into `work\asi\menu0252` (sha256 `7c8acbb3...c5444f2ab1`, 1,927,680 bytes), not installed, no live test (Q103;
+finding in the workspace `docs\Befund-Radial-Sperre-Q103-1111.md`). Trigger: the evening of 2026-11-11 read the lines
+`radial: level 'Tests/Prepare'` / `radial: closed (Prepare started ...)` at 19:35 as today's. They stand in a TruMenu
+0.10.1 session of an earlier day (TruMenu.log line 2690 ff.); today's 0.22.28 sessions (from 19:09:55, `radial: enabled
+0`) hold no radial line at all, and the code had every ring path behind `g_radEnabled` already (OnPad `hold = 0`,
+RadialTick returns, the window procedure branch, `radial.open` refused). 0.22.29 hardens two gaps anyway:
+
+- **Enabled=0 closes an open ring**: when `[Radial] Enabled` turns 0 while a ring is open (`settings.reset` re-reads
+  the INI), RadialTick used to return early and the ring state (neutral pad, frozen world) stayed. Now it closes it
+  (`radial: closed ([Radial] Enabled=0) ...`) and drops pending release / open / close requests.
+- **Entries only after a drawn ring**: DrawRadial counts the frames it really drew since the open (`g_radDrawn`). A
+  release (Mode=wheel), a confirm (Mode=menu: A / Enter / left click), A / left click (wheel) or the R3 release (latched)
+  runs an entry only when the ring was drawn in at least 3 frames; else nothing runs and `radial: <what> ignored - not
+  drawn (n frames)` is logged (a release then closes the ring). The close line names the frames: `radial: closed (...)
+  at '...', drawn in n frames`.
+- `TruMenuPadBlock` (the state other plugins read, e.g. TruShadowPower's "pad input suppressed" lines) is unchanged: it
+  is built from the live open flags; the 0x0200 / 0x0100 (RB / LB) suppressions of 21:32:46 .. 21:33:23 and 21:45:34
+  all fall inside an open quick bar (`quick: opened` 21:32:29 .. `closed` 21:33:31, `opened` 21:45:33) - the bar's
+  page buttons, as documented in 0.21.1.
+- No new INI key (258), no hook, no byte check. Check: `trumenu_ini_check` `check_02229` (Enabled=0 close + dropped
+  requests, 4 guards, 6 entry calls in RadialTick, frame count reset / increment, Set-TruMenu 0.22.28 hash);
+  `check_02228` looks for its kVersion part. Build: 0 warnings in TruMenu.cpp (2 in the third-party `imgui_demo.cpp`).
+
+### TO TEST 0.22.29
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | radial off | `[Radial] Enabled=0`; hold Start + View (and L3 + R3) 2 s, release | the quick bar / menu toggles as usual; `TruMenu.log` has **no** `radial: opened` / `radial: level` line |
+| 2 | RB, bar closed | bar closed, tap RB a few times | `TruShadowPower.log` writes **no** `pad input suppressed: buttons 0x0200` line |
+| 3 | RB, bar open | bar open, RB page change | a suppression line may come (the bar owns RB) - as before |
+| 4 | ring on (optional) | `[Radial] Enabled=1`, open the ring, confirm an entry | runs as before; the close line ends `drawn in n frames` with n > 0 |
+
 ## 0.22.28 - test packages on page Tests (2026-11-11)
 
 Built into `work\asi\menu0251` (sha256 `e284247a...1bf554fd`, 1,926,656 bytes), not installed, no live test (Q90;

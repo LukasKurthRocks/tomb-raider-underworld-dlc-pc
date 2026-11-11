@@ -3914,8 +3914,8 @@ def check_02228(ini_path, switches_path):
     count skips the notes; no new INI key (258); Set-TruMenu.ps1 knows the 0.22.27 hash"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.28 (test packages, Q90' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.28 (test packages, Q90')
+    if '"0.22.28 (test packages, Q90' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.29: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.28 part "0.22.28 (test packages, Q90"')
     tests = src[src.find('const QbRow kQbTests[] = {'):]
     tests = tests[:tests.find('\n};')]
     a, b = tests.find('// ---- TP Q90 begin'), tests.find('// ---- TP Q90 end')
@@ -4009,6 +4009,49 @@ def check_02228(ini_path, switches_path):
     return problems, ('TP block: %d rows (%d groups, %d checks, %d switches, %d notes), all kQfTp, packages %s, no INI '
                       'key' % (len(rows), n['kQbGroup'], n['kQbCheck'], n['kQbSwitch'], n['kQbNote'],
                                ' '.join(p.upper() for p in sorted(seen))))
+
+
+def check_02229():
+    """0.22.29 (Q103 radial lock; workspace docs/Befund-Radial-Sperre-Q103-1111.md): RadialTick with [Radial] Enabled=0
+    closes a ring that is still open and drops its pending requests; DrawRadial counts its frames (g_radDrawn, reset at
+    the open); every place that runs a ring entry from RadialTick (release, Mode=menu confirm, A / click, R3) asks
+    RadDrawnEnough first, which logs 'radial: <what> ignored - not drawn'; no new INI key (258); Set-TruMenu.ps1 knows
+    the 0.22.28 hash"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.29 (radial lock, Q103' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.29 (radial lock, Q103')
+    tick = src[src.find('\nvoid RadialTick() {'):]
+    tick = tick[:tick.find('\n}\n')]
+    if not tick: return problems + ['TruMenu.cpp: RadialTick not found'], 'radial: no RadialTick'
+    head = tick[:tick.find('bool front')]
+    if 'if (!g_radEnabled) {' not in head or 'RadialClose("[Radial] Enabled=0")' not in head:
+        problems.append('TruMenu.cpp: RadialTick must close an open ring when [Radial] Enabled=0')
+    for req in ('g_radRelease', 'g_radOpenReq', 'g_radCloseReq'):
+        if 'InterlockedExchange(&%s, 0);' % req not in head:
+            problems.append('TruMenu.cpp: RadialTick with Enabled=0 must drop %s' % req)
+    acts = len(re.findall(r'RadialActivate\(|RadVirtActivate\(|RadQuitPress\(', tick))
+    guards = ['RadDrawnEnough("release")', 'RadDrawnEnough("confirm")', 'RadDrawnEnough("A / left click")',
+              'RadDrawnEnough("R3 release")']
+    for g in guards:
+        if g not in tick: problems.append('TruMenu.cpp: RadialTick lacks %s' % g)
+    if acts != 6:
+        problems.append('TruMenu.cpp: RadialTick runs entries at %d places (0.22.29 guarded 6) - guard a new one' % acts)
+    if 'InterlockedExchange(&g_radDrawn, 0);' not in tick: problems.append('TruMenu.cpp: g_radDrawn must reset at the open')
+    draw = src[src.find('\nvoid DrawRadial() {'):]
+    draw = draw[:draw.find('EnterCriticalSection(&g_radLock);')]
+    if 'InterlockedIncrement(&g_radDrawn);' not in draw:
+        problems.append('TruMenu.cpp: DrawRadial must count its frame before the lock')
+    if 'ignored - not drawn (%ld frames)' not in src: problems.append('TruMenu.cpp: RadDrawnEnough log line missing')
+    if src.count('RadialActivate(') - src.count('void RadialActivate(') != 4:
+        problems.append('TruMenu.cpp: RadialActivate must be called only from RadialTick (4 places)')
+    header, opt_rows = table(src)
+    if len(opt_rows) != 258: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.29 adds no INI key (258)' % len(opt_rows))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if 'e284247a58914abc4c856343d52f067fe83ad1a37fb4fa16a16e5cf01bf554fd' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.28 build hash (work\\asi\\menu0251) is missing')
+    return problems, 'radial lock: Enabled=0 closes, %d drawn-frame guards, %d entry calls in RadialTick' % (
+        len(guards), acts)
 
 
 def table(src):
@@ -4197,6 +4240,10 @@ def main(argv):
     for p in cproblems28: print('Q02228 %s' % p)
     if not cproblems28: print('ok: 0.22.28 %s' % csummary28)
     problems += cproblems28
+    cproblems29, csummary29 = check_02229()   # 0.22.29
+    for p in cproblems29: print('Q02229 %s' % p)
+    if not cproblems29: print('ok: 0.22.29 %s' % csummary29)
+    problems += cproblems29
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))
