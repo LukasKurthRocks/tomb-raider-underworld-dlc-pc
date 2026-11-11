@@ -296,6 +296,26 @@ Tools / plugins: `tools/trusave_diff.py` (show / diff / get), `tools/saves_lib.p
 calls watcher 0x4af740). Sources: `Befund-Saves-Sticky-0611.md`, `Befund-Hall02-TU-Vergleich-0711.md`,
 `Befund-TruMenu-Trigger-0611.md`. Notes about "Hold clears settings" belong to another project, **not** to this game's saves.
 
+### 6.4 Checkpoint snapshot, restore order, inventory (Q72, 2026-11-11, static)
+
+| Item | PC | St |
+|---|---|---|
+| Live / snapshot | live SaveInfo `[0xc59258]` = `[0xc57250]` (every `SAVE_Instance` / dead-bit writer; 0x555280 sets `[0xc57250]`, `SAVE_ClearMemory` 0x556940 clears `[0xc5925c]` then `[0xc59258]`); snapshot `[0xc5925c]`. **Correction to 6.2**: game block `[0xc59264]` = block 6 of the **live** arena, `[0xc59268]` = block 6 of the snapshot | ✅ |
+| Checkpoint = copy | `SAVE_SaveGame(0)` 0x5570f0: instances of loaded units 0x5568c0, game block 0x555be0, then `memcpy(snapshot, live, 0x140004)`; `SAVE_RestoreGame` 0x557130: `memcpy(live, snapshot)`, 0xdeadbeef check, buffered list 0xc57258 cleared, stickies 0x5558a0, game block 0x556e90. Player spawn 0x5d40c0 ends with `jmp SAVE_SaveGame(0)` (0x5d4330, when edi = 0 🔶) | ✅ |
+| Live updates during play | unit dump 0x5c1cab / 0x5c1cd2 and 0x5d2b81 -> `SAVE_Instance`; dead bits 0x555a80 (0x5bc6a2, 0x6154ec, 0x627b47, 0x638e6a, 0x65264c); grapple message 0x15b (family table 0x8afcb8 "Grapple", 0x6cc6d9): grabbed object back to its intro position if its home unit is loaded, else saved as block 2 and killed. Both blocks written (survive the rollback, intended): options 0x5a4b07..0x5a4cc7, chapter flags 0x5561e0, +8 flags 0x5daa81, checkpoint id +0x90 from the chapter select 0x77e419..0x77e8d5 | ✅ |
+| Classifier 0x556020 on `dtp = [[inst+0x10]]` (object DTP = section 11:<object> word +0 -> type 7) | `dtp+4 & 2` or `inst+0x18 & 0x20000` -> never; `dtp+4 & 0x400000` / `dtp+8 & 0x800` -> dead bit first; player or `dtp+0 & 0x80000000` -> full (block 3 if `inst+0xe0 != +0xe4`, intro id >= 0x40000000 or no intro record, else block 4); else block 5 (anim component `[inst+0x284]` words only, no position) unless iflag 0x100000 + query 0x5d. Tool `tools/save_class_check.py` | ✅ |
+| Block 3 / 4 fields | 3 (0x555370): +4 current unit, +8 object, +0xc birth unit, **+0x10 link parent id = inst+0x228**, +0x14 intro id, +0x18 / +0x1c iflags, position / rotation, extra. 4 (0x555470): +4 birth unit, +0x10 link parent, +0x14 intro id, position / rotation only if changed (0x555f20). inst+0x228 = linked-move parent (proto `SAVE_UpdateSavedIntroWithIntro` stores `[[inst+0x26c]+0x60]` there, `PhysicsDecoupleLinkedMove` finds / clears the same id) 🔶 | ✅ / 🔶 |
+| Restore order | unit load -> 0x5556d0 buffers blocks 3 / 4 whose +4 = unit (0xc57258, 0x800 slots, count `[0xc59260]`) -> 0x555640 (0x5d3eb1 each pass, 0x5de708 on reload): kind 3 0x5bb160 / kind 4 0x5bb640 stay buffered while the object is not loaded or the **link parent does not exist** (`INSTANCE_Find` 0x5b3950; 0x5bb1f1, 0x5bb6c1) | ✅ |
+| Birth suppression | intro birth 0x5bcc30 (and 0x5b5580) skips an intro when the instance exists, **a block 3 / 4 with its intro id exists** (0x555730) or its dead bit is set -> a block that never restores = the object is gone for good | ✅ |
+| Inventory save | player family 0x8aba2c {0x721f80, process 0x7228e0, 0x6ee4b0, query **0x709fd0**, message 0x71ffe0, 0x71bfa0}; query 0x17 (0x70a232) returns 0 and writes the live game block: +0x350 / +0x354 / +0x358 = P+0x640 / +0x968 / +0x96c (P = `[0xfadb58]`), +0x1a8 player unit, and WeaponManager `[P+0x500]` 0x6f5910(gb+0x34c): +0x44 byte, **+0x48 15 intro ids** (handles WM+4+16i -> inst+0x58), **+0x84 8 intro ids** (WM+0xf4+8i), +0xa4 6 u16 counts (0x777950(i)), +0xbc 6 floats P+0x528.., +0xd4 byte | ✅ |
+| Inventory restore | 0x715ef0 (from the player message handler 0x720130): each id -> 0x555f60(player, id, 0x715e90, 0 / 1): `INSTANCE_Find` -> give now, else waiting table **0xc592a8** (64 x 0x14 {owner handle, id, callback, flag}, 0x5550a0; full = silently dropped) fired by 0x555110 on every birth / restore (0x5bcfd1, 0x5bd065, 0x5bd24f, 0x5bd395, 0x5bb625, 0x5bba38, 0x4d50bc), cleared by owner removal 0x555180 and `SAVE_Init` 0x556d21 only. An item whose instance never comes back stays missing | ✅ |
+| TU | none of these functions changes behaviour: 0x715ef0 = TU 0x823e8fd8 only shifts the player-state offsets +4 (0x51c -> 0x520, 0x528 -> 0x52c); `GAMELOOP_ChangeMode` 0x5de480 = TU 0x82298ef0 has 4 open code blocks, none calls SAVE_* or the inventory (meaning ⬜) | ✅ static |
+| Dead field | u16 `0xe7ee74 + 2i` (i 1..10) set on restore from game block +0x230 / +0x260 (0x556dd0 -> 0x5d5150), no reader in tru.exe; +0x230 written only by `SAVE_ClearMemory` | ✅ |
+
+Dead-end class (Q63 cases 1 / 3): a saved block that never restores (bound to an unloaded unit, link parent gone) hides
+the object and empties its inventory slot, and the home intro stays suppressed. Which condition the reported cases hit:
+⬜ (needs the read-only probe `save.pending` / `save.inv` / `save.find`). Source: `Befund-Checkpoint-Zustand-Q72-1111.md`.
+
 ---
 
 ## 7. Scripts
