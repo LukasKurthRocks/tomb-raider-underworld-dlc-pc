@@ -696,13 +696,16 @@
 "base script pairs": 266,
 "contradicting keys": 2,
 "keys without information": 588,
+"locals class 223|42|p0/0: observations / = PC": "1107 / 1071",
+"locals class 301|42|p0/92: observations / = PC": "144 / 99",
 "members paired": 3647,
 "members with another init tree shape": 60,
-"observations with another PC value": 4194,
+"observations with another PC value": 1878,
 "relayout fields = PC": 26,
 "text id rule on base pairs (locals map only): = PC": 99,
 "text id rule on base pairs (locals map only): another PC id": 45,
-"text ids: PC prompt ids learned": 17
+"text ids: PC id says something else (locals map kept)": 14,
+"text ids: PC prompt ids learned": 3
 },
 "pack_md5": {
 "10:3348": "35d94e1cac731a6fb5a8848d8f21b00b",
@@ -1824,7 +1827,7 @@
 "221|42|p0/28": "s32",
 "221|42|p0/4/0": "id32:7",
 "221|42|p0/4/16": "s32",
-"223|42|p0/0": "id16a:110",
+"223|42|p0/0": "id16a:101",
 "223|42|p0/12": "s32",
 "291|42|p0/0": "s16",
 "291|42|p0/12": "s32",
@@ -1887,7 +1890,7 @@
 "301|42|p0/80": "raw",
 "301|42|p0/84": "s32",
 "301|42|p0/88": "s32",
-"301|42|p0/92": "id16a:110",
+"301|42|p0/92": "id16a:101",
 "301|42|p0/96": "s32",
 "303|42|p0/0": "s32",
 "303|42|p0/12/0": "s32",
@@ -2254,7 +2257,7 @@
 "fb|221|42|2|28": "s32",
 "fb|221|42|3|0": "id32:7",
 "fb|221|42|3|16": "s32",
-"fb|223|42|2|0": "id16a:110",
+"fb|223|42|2|0": "id16a:101",
 "fb|223|42|2|12": "s32",
 "fb|291|42|2|0": "s16",
 "fb|291|42|2|12": "s32",
@@ -2286,7 +2289,7 @@
 "fb|301|42|2|80": "raw",
 "fb|301|42|2|84": "s32",
 "fb|301|42|2|88": "s32",
-"fb|301|42|2|92": "id16a:110",
+"fb|301|42|2|92": "id16a:101",
 "fb|301|42|2|96": "s32",
 "fb|301|42|3|0": "id-mixed",
 "fb|301|42|3|12": "s32",
@@ -2478,22 +2481,8 @@
 "fb|913|42|2|8": "raw"
 },
 "text_id_pc": {
-"1025": 385,
-"1028": 1079,
-"1029": 1105,
-"1030": 1106,
-"1031": 1107,
-"1034": 1110,
-"1035": 1111,
-"1036": 1112,
-"1038": 1114,
-"1039": 1115,
-"1041": 1117,
 "115": 45,
 "116": 46,
-"129": 139,
-"131": 150,
-"363": 1100,
 "98": 120
 },
 "ui_learn_stats": {
@@ -2504,12 +2493,15 @@
 "base scripts without a PC script of the same name": 27,
 "contradictions": 0,
 "keys without information": 132,
+"locals text id base observations: = map": 86,
+"locals text id base observations: other PC id": 25,
+"locals text ids: PC prompt ids learned": 5,
 "observations": 23279,
-"observations with a re-authored PC value (no byte order fits)": 591,
+"observations with a re-authored PC value (no byte order fits)": 509,
 "rule None": 1,
 "rule id (mixed id classes, kept)": 6,
 "rule id16a:100": 13,
-"rule id16a:110": 1,
+"rule id16a:101": 1,
 "rule id16ab:100": 20,
 "rule raw": 7,
 "rule s32": 129,
@@ -2735,7 +2727,7 @@ null
 null
 ],
 "301|42|p0/92": [
-"id16a:110",
+"id16a:101",
 null
 ],
 "301|42|p0/96": [
@@ -3231,5 +3223,5 @@ null
 null
 ]
 },
-"version": "G20261111-1"
+"version": "G20261111-2"
 }

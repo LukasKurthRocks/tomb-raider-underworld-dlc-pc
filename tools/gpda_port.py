@@ -31,7 +31,8 @@ userType), whose init tree has the same shape after the struct re-layout and who
 copy); everything else is derived from the Xbox original word by word: UI text id (uitext 301 path [0, 92]) through
 the locals map (PC prompt ids first), UI userTypes through the proven tools/ui_init_fix.py rules, the rest through
 word classes learned from every Xbox base <-> PC script pair of generalbank + g_pda (key userType / tag / path, a
-fallback key for chained list nodes), struct 351 re-laid out by RELAYOUT; Xbox 0 / -1 stay; a float-shaped word
+fallback key for chained list nodes; the list entry text id, userType 223 path [0, 0], proves as the locals class
+id16a:101 = the locals map, Q48), struct 351 re-laid out by RELAYOUT; Xbox 0 / -1 stay; a float-shaped word
 without a rule -> s32 (heuristic, listed); anything else keeps the converted word and is listed as a risk. Words of
 structural arrays (and their count words) are never changed.
 
@@ -43,7 +44,9 @@ name only the map RULE guesses is reported as unverified, not failed); every por
 slots 0..31 = PC uiscreen 93 (slot 31 = f111), same inherited / own pattern as the PC version of the script (a PC-only
 override - slot 17 "PDA menu onclicked" - is a WARN), every prototype vtIndex consistent; every struct-351 init of the
 file in the PC layout; every ported / new script decodes without walker problems and its code opcodes = the Xbox
-original; relocations in bounds; read back.
+original; every text id leaf of a ported / new script = the rule word of the Xbox word (Q48: a member copied from the
+same-name PC member gets its text ids by rule too - converter member names are Symbol guesses that can name a
+neighbour entry); relocations in bounds; read back.
 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/gpda_port.py analyze CONVERTED_G_PDA [--report R.json]
@@ -614,9 +617,15 @@ def learn_base_rules(skip_uts=()):
                                                                          'not mappable' if w is None else 'another PC id')] += 1
                 if w is not None and w != p and x[2:] == b'\0\0': votes[struct.unpack('>H', x[:2])[0]][struct.unpack('<I', p)[0]] += 1
     TEXT_PC.clear()
+    XT, PT = text_tables()
     for xi, c in votes.items():
-        if len(c) == 1: TEXT_PC[xi] = next(iter(c))
-        else: st['text ids with several PC prompt ids (locals map kept)'] += 1
+        if len(c) != 1: st['text ids with several PC prompt ids (locals map kept)'] += 1; continue
+        pid = next(iter(c))
+        # Q48: a PC id is a prompt id only when it says the same as the Xbox string (button glyphs aside, Xbox 98
+        # -> PC 120); the other votes are base members paired by a guessed Symbol name one entry off (Xbox 1034 ->
+        # PC 1110, 1035 -> 1111 = map(1034)) or re-authored PC lists - the locals map stays
+        if same_text(XT, xi, PT, pid): TEXT_PC[xi] = pid
+        else: st['text ids: PC id says something else (locals map kept)'] += 1
     st['text ids: PC prompt ids learned'] = len(TEXT_PC)
     rules = {}
     for key, Lo in obs.items():
@@ -635,13 +644,21 @@ def learn_base_rules(skip_uts=()):
             if all(s & U.ID_CLASSES for _, _, s in info): rules[key] = 'id-mixed'; continue
             st['contradicting keys'] += 1; rules[key] = None; continue
         rules[key] = next((q for q in U.PREF if q in ok), None) or sorted(ok, key=lambda q: L.CLASSES.index(q))[0]
+    for key, c in rules.items():        # proof size of every text id leaf (locals class) - needs the pipeline locals map
+        if c in LOC_RULES and key[0] != 'fb':
+            st['locals class %s: observations / = PC' % rkey(key)] = '%d / %d' % (
+                len(obs[key]), sum(L.apply_word(x, c, I) == p for x, p in obs[key]))
     return rules, shapes, st
 
 
 # ------------------------------------------------------------------------------------------------ knowledge (learn)
 KNOW = os.path.join(REPO, 'docs', 'data', 'gpda_port.json')
-VERSION = 'G20261111-1'
+# -2 (Q48): re-learned with the Q46 DlcIds.loc (pipeline locals map); -1 was learned while DlcIds.loc returned the Xbox
+# index, so the text id leaves 223 [0, 0] / 301 [0, 92] got a coincidental unit-id class id16a:110 (5 / 4 observations)
+# and the DLC list entries kept the raw Xbox string index (23 words in 3347 / 3360 / 3367, 1 in 3384)
+VERSION = 'G20261111-2'
 UI_UTS = (301, 303, 316, 320)
+LOC_RULES = ('id16a:101', 'id32:101')     # locals string id classes (tools/script_learn.py; DlcIds.loc = locals map)
 PH = 0xBEEBBEEB
 
 
@@ -740,6 +757,9 @@ def load_knowledge(path=KNOW):
     K['_rules'] = {pk(k): v for k, v in K['rules'].items()}
     K['_ui'] = {pk(k): v for k, v in K['ui_rules'].items()}
     TEXT_PC.clear(); TEXT_PC.update({int(k): v for k, v in K.get('text_id_pc', {}).items()})
+    # text id leaves: the UI text element + every leaf whose learned rule is the locals class (223 [0, 0], Q48)
+    K['_text'] = set(TEXT_ID) | {(k[0], k[2]) for k, v in K['_rules'].items() if v == 'id16a:101' and k[0] != 'fb'}
+    TEXT_KEYS.clear(); TEXT_KEYS.update(K['_text'])
     return K
 
 
@@ -764,7 +784,10 @@ def locmap():
     return _LOCMAP
 
 
-TEXT_PC = {}        # Xbox index -> PC id the PC's own base menus use for the same prompt (learn: base pairs, unanimous)
+TEXT_PC = {}        # Xbox index -> PC id the PC's own base menus use for the same prompt (learn: base pairs, unanimous,
+                    # same text up to the button glyphs - Q48)
+TWINS = []          # build: text ids of members copied from the PC that the rules replaced (another text in the PC)
+TEXT_KEYS = set()   # (userType, path) of the text id leaves (load_knowledge)
 
 
 def text_id_word(xw, pc_first=True):
@@ -777,6 +800,53 @@ def text_id_word(xw, pc_first=True):
     v = TEXT_PC.get(hi) if pc_first else None
     if v is None: v = locmap()[0].get(hi)
     return None if v is None else struct.pack('<I', v)
+
+
+def text_tables():
+    """developer (learn): (Xbox TU English strings, PC strings) - the PC table is the pipeline's locals.bin_001 next to
+    the locals map (work/rebuild/stage1/mods/local/), i.e. the PC original table + the appended DLC strings"""
+    import locals as LC
+    p = os.path.join(os.path.dirname(os.path.abspath(locmap()[1])), 'mods', 'local', 'locals.bin_001')
+    if not os.path.exists(p): sys.exit('PC string table not found: %s' % p)
+    tu, e = LC.files('tu')
+    return LC.parse(tu[0xfffff7e1], e)[1], LC.parse(open(p, 'rb').read(), 'le')[1]
+
+
+def same_text(XT, xi, PT, pid):
+    """the Xbox string xi and the PC string pid say the same - button glyphs (U+1800..U+18FF) and spacing aside"""
+    if not (0 <= xi < len(XT) and 0 <= pid < len(PT)): return False
+    norm = lambda b: ' '.join(''.join(ch for ch in b.decode('utf-8', 'replace') if not 0x1800 <= ord(ch) <= 0x18ff).split())
+    return norm(XT[xi]) == norm(PT[pid])
+
+
+def text_rule_word(ut, pp, xw):
+    """the PC word the rules give a text id leaf (UI text element: proven prompt id, else the locals map; list entry:
+    the locals map); None when the Xbox word is not an index (low half set) or the index is not in the map"""
+    if (ut, pp) in TEXT_ID: return text_id_word(xw)
+    hi, lo = struct.unpack('>HH', xw)
+    if lo: return None
+    if hi in (0, 0xffff): return xw[:2][::-1] + b'\0\0'
+    v = locmap()[0].get(hi)
+    return None if v is None else struct.pack('<I', v)
+
+
+def text_after_copy(d, xd, Wx, ia, ut, K, st, sid, label):
+    """Q48: after a member was copied from the same-name PC member, every text id leaf gets the word the rules derive
+    from the Xbox word (locals map; UI text: proven prompt id first) - the text names the entry and the ported code is
+    the Xbox code. Member names of ported scripts are the converter's Symbol guesses (dlc_generic.DlcIds.sym
+    'guess_lower', off by 1..8 entries in several g_pda ranges), so a same-name PC member can be a neighbour entry, and
+    the PC re-authored some lists; the other words of the member stay the PC copy (listed in TWINS)"""
+    import script_init_from_pc as SIP
+    for p, o in SIP.leaves(Wx, Wx.it, ia):
+        pp = relayout_path(ut, p)
+        if pp is None or (ut, pp) not in K['_text']: continue
+        xw = bytes(xd[o:o + 4]); want = text_rule_word(ut, pp, xw)
+        if want is None or bytes(d[o:o + 4]) == want: continue
+        TWINS.append('%d %s ut %d path %s +0x%x: Xbox %s, PC copy %s -> %s' % (sid, label, ut, list(pp), o, xw.hex(),
+                                                                             bytes(d[o:o + 4]).hex(), want.hex()))
+        d[o:o + 4] = want
+        st['text ids: the same-name PC member holds another text id -> rule word (ut %d)' % ut] += 1
+        st['init words changed'] += 1
 
 
 def L_apply(xw, cls):
@@ -837,7 +907,14 @@ def rule_member(d, ita, xd, Wx, ia, ut, tag, K, st, risk, sid, label):
             c = K['_rules'].get((ut, tag, pp))
             if c is None: c = K['_rules'].get(fallback_key(ut, tag, pp))
             if c == 'id-mixed': new = cw; st['words id-mixed (converted kept)'] += 1
-            elif c is not None: new = word_by_rule(xw, c, I); st['words by base rule'] += 1
+            elif c is not None:
+                new = word_by_rule(xw, c, I); st['words by base rule'] += 1
+                hi, lo = struct.unpack('>HH', xw)
+                if c == 'id16a:101' and not lo and hi not in (0, 0xffff):
+                    st['text ids by base rule (locals map, ut %d path %s)' % (ut, list(pp))] += 1
+                    if hi not in locmap()[0]:       # DlcIds.loc would silently keep the Xbox index
+                        new = cw; risk.append('%d %s ut %d path %s +0x%x: text index %d not in the locals map (kept %s)' % (
+                            sid, label, ut, list(pp), ot, hi, cw.hex()))
         if new is None:
             if xw in (b'\0\0\0\0', b'\xff\xff\xff\xff'): new = xw; st['words without a rule, 0 / -1'] += 1
             elif C.plaus(xw):
@@ -893,6 +970,7 @@ def port_init2(d, ra, conv_data, pc_sec, xs, K, key, st, risk):
                         st['%s from the PC' % mk[0]] += 1
                         st['init words changed'] += st0['words changed']
                         st['structs re-laid out (PC copy)'] += st0['nodes re-laid out to the PC struct layout']
+                        text_after_copy(d, xd, Wx, ia, mk[3], K, st, sid, label)
                         continue
                     risk.append('%d %s: copy found another node shape after the check (%s)' % (sid, label, shapes[:2]))
                 st['%s by rule (PC init has another shape)' % mk[0]] += 1
@@ -1061,7 +1139,7 @@ def build(argv):
     open(fn, 'wb').write(blob)
     rep = dict(tool='tools/gpda_port.py build', knowledge=K['version'], converted=os.path.relpath(conv), only_safe=only_safe,
                out=os.path.relpath(fn), md5=md5(blob), sections=len(E2.sections), per_script=per, gates=gates,
-               risks=risk, log=log)
+               risks=risk, text_twins_refused=TWINS, locmap=locmap()[1:], log=log)
     json.dump(rep, open(os.path.join(out, 'build_report.json'), 'w'), indent=1)
     L('written %s: %d sections, md5 %s, relocations out of bounds 0, risks %d' % (fn, len(E2.sections), md5(blob), len(risk)))
 
@@ -1196,6 +1274,24 @@ def gate_sections(S, pc, PCS, pk, inv, rec, targets):
                                        struct.unpack_from('>I', vx.d, t + 4 * j)[0] >> 24 for t, n in codes for j in range(n))
         out.append(('ok   ' if same and not v.W.bad else 'FAIL ') + '%d:%d decodes (walker problems %d%s), %d code arrays, opcodes = Xbox: %s' % (
             key[0], key[1], len(v.W.bad), (' ' + repr(v.W.bad[:4])) if v.W.bad else '', len(codes), same))
+    # (4) text ids (Q48): every text id leaf of a ported / new script (list entry 223 [0, 0], UI text 301 [0, 92]) holds
+    # the word the rules derive from the Xbox word at the same offset (locals map; UI text: proven PC prompt id first)
+    tst = collections.Counter(); badt = []
+    for key in sorted(tset):
+        v = view(key); xs = pk[inv[key]]
+        if v is None: continue
+        for mk, la in SIP.members(v.W, v.d, 'le').items():
+            for a in la:
+                ia = v.W.it.get(a + 16)
+                if ia is None: continue
+                for p, o in SIP.leaves(v.W, v.W.it, ia):
+                    if (mk[3], tuple(p)) not in TEXT_KEYS: continue
+                    want = text_rule_word(mk[3], tuple(p), bytes(xs['data'][o:o + 4]))
+                    if want is None: tst['not judgeable (index not in the map / no index)'] += 1; continue
+                    if bytes(v.d[o:o + 4]) == want: tst['= rule'] += 1; continue
+                    badt.append('%d:%d +0x%x %s' % (key[0], key[1], o, bytes(v.d[o:o + 4]).hex()))
+    out.append(('ok   ' if not badt else 'FAIL ') + 'text ids of the ported / new scripts: %s, other %d %s' % (
+        dict(tst), len(badt), badt[:6]))
     return out
 
 
