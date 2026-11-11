@@ -1,0 +1,86 @@
+
+l7_yggdrasil_end [pcbig]: 525 intros
+  intro  79 obj  768 natla_end                    uid   8233 pos -10895 -5026 6813 data 0 B
+  intro  80 obj  768 natla_end                    uid   8234 pos -4630 -9169 5814 data 0 B
+  intro  82 obj  768 natla_end                    uid   8236 pos -8947 2193 6110 data 0 B
+  intro  83 obj  768 natla_end                    uid   8237 pos -3391 8077 5735 data 0 B
+  intro  84 obj  769 wp_natla_fireball_adren      uid   8238 pos 308 -371 9063 data 0 B
+  intro  85 obj  769 wp_natla_fireball_adren      uid   8239 pos -364 -371 9063 data 0 B
+  intro  86 obj  769 wp_natla_fireball_adren      uid   8240 pos -104 -371 9063 data 0 B
+  intro  87 obj  769 wp_natla_fireball_adren      uid   8241 pos 145 -371 9063 data 0 B
+  intro  92 obj  768 natla_end                    uid   8246 pos 4249 36 16598 data 0 B
+  intro  93 obj  769 wp_natla_fireball_adren      uid   8247 pos 699 -371 9063 data 0 B
+  intro  95 obj  769 wp_natla_fireball_adren      uid   8249 pos 886 -371 9063 data 0 B
+  intro  96 obj  769 wp_natla_fireball_adren      uid   8250 pos 1128 -371 9063 data 0 B
+  intro  97 obj  769 wp_natla_fireball_adren      uid   8251 pos 1412 -371 9063 data 0 B
+  intro  98 obj  769 wp_natla_fireball_adren      uid   8252 pos 1799 -371 9063 data 0 B
+  intro 102 obj  769 wp_natla_fireball_adren      uid   8256 pos 2042 -371 9063 data 0 B
+  intro 103 obj  769 wp_natla_fireball_adren      uid   8257 pos 2290 -371 9063 data 0 B
+  intro 104 obj  769 wp_natla_fireball_adren      uid   8258 pos 2558 -371 9063 data 0 B
+  intro 105 obj  770 co_hell_thrall               uid   8259 pos -22839 162 6093 data 0 B
+  intro 106 obj  223 amanda                       uid   8260 pos -10506 20777 -10737 data 0 B
+  intro 140 obj  284 co_natla                     uid   8294 pos -10034 20797 -10783 data 0 B
+  intro 249 obj  768 natla_end                    uid   8403 pos 2845 0 11632 data 0 B
+  intro 431 obj  789 fx_natla_fireball_explosion  uid   8585 pos 2331 -7544 8988 data 0 B
+  no intro for: 281 co_amanda, 1024 natla_thrall
+
+l7_yggdrasil_hall02 [pcbig]: 23 intros
+  no intro for: 223 amanda, 281 co_amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l7_helheim01 [pcbig]: 125 intros
+  intro  66 obj  284 co_natla                     uid   8961 pos 0 0 0 data 0 B
+  no intro for: 223 amanda, 281 co_amanda, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l7_yggdrasil [pcbig]: 25 intros
+  intro   4 obj  281 co_amanda                    uid   8774 pos 0 0 -2764 data 0 B
+  intro  13 obj  284 co_natla                     uid   8801 pos 0 0 -2764 data 0 B
+  no intro for: 223 amanda, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+dlc_yggdrasil_end [mods]: 164 intros
+  intro  32 obj 1024 natla_thrall                 uid  10155 pos 0 0 -6808 data 0 B
+  intro 148 obj 1024 natla_thrall                 uid  11449 pos 19737 43 5361 data 0 B
+  no intro for: 223 amanda, 281 co_amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion
+
+dlc_level2_start [mods]: 58 intros
+  intro  21 obj  223 amanda                       uid  11290 pos 0 0 -3513 data 0 B
+  no intro for: 281 co_amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l6_ship_natla_room [pcbig]: 29 intros
+  intro   5 obj  223 amanda                       uid   1386 pos 0 0 -3219 data 0 B
+  intro  19 obj  284 co_natla                     uid   1400 pos 0 0 -3219 data 0 B
+  no intro for: 281 co_amanda, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l7_thin_ice [pcbig]: 19 intros
+  intro   2 obj  223 amanda                       uid   9070 pos 0 0 0 data 0 B
+  no intro for: 281 co_amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l1_cine_ship_sinking [pcbig]: 47 intros
+  intro   3 obj  223 amanda                       uid   1004 pos -9278 34441 4239 data 0 B
+  no intro for: 281 co_amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l1_ship_natla_room [pcbig]: 31 intros
+  intro  11 obj  281 co_amanda                    uid   1289 pos 0 0 -10723 data 0 B
+  intro  20 obj  284 co_natla                     uid   1372 pos 0 0 -10723 data 0 B
+  no intro for: 223 amanda, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l1_ship_engine_hall [pcbig]: 34 intros
+  intro  10 obj  281 co_amanda                    uid   1421 pos 0 0 -10723 data 0 B
+  intro  21 obj  284 co_natla                     uid   1432 pos 0 0 -10723 data 0 B
+  no intro for: 223 amanda, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l7_himalaya_end [pcbig]: 142 intros
+  intro   1 obj  281 co_amanda                    uid   7995 pos 0 0 0 data 0 B
+  no intro for: 223 amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+l7_monastery [pcbig]: 18 intros
+  intro   1 obj  281 co_amanda                    uid   8137 pos 0 0 0 data 0 B
+  no intro for: 223 amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion, 1024 natla_thrall
+
+dlc2_ceremony_room [mods]: 155 intros
+  intro  39 obj 1024 natla_thrall                 uid  11878 pos 0 0 0 data 0 B
+  intro 107 obj 1024 natla_thrall                 uid  10075 pos 8643 0 692 data 0 B
+  no intro for: 223 amanda, 281 co_amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion
+
+dlc2_treasure_room_cine [mods]: 31 intros
+  intro  14 obj 1024 natla_thrall                 uid  12155 pos 0 0 0 data 0 B
+  no intro for: 223 amanda, 281 co_amanda, 284 co_natla, 768 natla_end, 769 wp_natla_fireball_adren, 770 co_hell_thrall, 789 fx_natla_fireball_explosion

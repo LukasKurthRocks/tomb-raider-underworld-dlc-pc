@@ -1,0 +1,162 @@
+0043723b shl6 add        eax, edi                                 idx from 004371d5 add edi, dword ptr [eax + 0x90] | bounded? no
+00439b82 shl6 add        ecx, eax                                 idx from 00439b72 mov ecx, dword ptr [esi + 0xc] | bounded? cmp @00439b32 edi, ecx
+00439b8d shl6 add        edi, eax                                 idx from 00439b7c mov edi, dword ptr [esi + 8] | bounded? no
+0043f161 shl6 add        esi, ecx                                 idx from 0043f14b movzx esi, byte ptr [ebx + 0x10d] | bounded? cmp @0043f0d9 esi, 3
+00441e9f shl6 add        esi, eax                                 idx from 00441e8b mov esi, dword ptr [ecx] | bounded? cmp @00441e1f esi, esi
+00447579 shl6 add        eax, ecx                                 idx from 00447568 movsx eax, word ptr [esi + 0x40] | bounded? no
+004475a0 shl6 add        eax, ecx                                 idx from 00447599 movsx eax, word ptr [esi + 0x42] | bounded? no
+00454e9c shl6 add        esi, ecx                                 idx from 00454e97 mov esi, eax | bounded? cmp @00454e68 esi, eax
+0045561a shl6 add        esi, eax                                 idx from 0045560d mov esi, dword ptr [ebx] | bounded? no
+0045bd93 shl6 add        eax, edx                                 idx from 0045bd8d movsx eax, word ptr [esi] | bounded? no
+0045cd15 shl6 add        edx, esi                                 idx from 0045cd0b mov edx, dword ptr [eax + edx + 0x38] | bounded? cmp @0045ccf3 edx, edx
+00497aad shl6 add        edx, ecx                                 idx from 00497a9b movzx edx, byte ptr [edi + esi + 0x140] | bounded? no
+004994ff shl6 add        ecx, ebx                                 idx from 004994f8 mov ecx, dword ptr [eax + edx + 0x38] | bounded? no
+00499c43 shl6 add        esi, eax                                 idx from 00499c3e mov esi, dword ptr [ebx] | bounded? no
+004d4e65 shl6 add        edx, edi                                 idx from 004d4e2b movzx edx, word ptr [eax] | bounded? cmp @004d4e1e ecx, edx
+004ec28a shl6 add        eax, edi                                 idx from 004ec246 mov eax, dword ptr [ebp + 0xc] | bounded? cmp @004ec27f eax, ecx
+0053013b shl6 add        edx, ecx                                 idx from 00530133 movsx edx, word ptr [edi + eax*2 + 8] | bounded? no
+00530181 shl6 add        eax, ecx                                 idx from 00530179 movsx eax, word ptr [edi + edx*2 + 8] | bounded? no
+005301c6 shl6 add        edx, ecx                                 idx from 005301be movsx edx, word ptr [edi + eax*2 + 8] | bounded? no
+0053068b shl6 add        eax, ecx                                 idx from 00530675 mov eax, dword ptr [ebp + 0x10] | bounded? cmp @0053064e eax, ebx
+0053826c shl6 add        edx, ecx                                 idx from 005381e3 movsx ecx, word ptr [eax + edx*2 + 8] | bounded? no
+005382aa shl6 add        edx, eax                                 idx from 00538298 mov eax, dword ptr [esp + 0x64] | bounded? no
+005382d0 shl6 add        edx, eax                                 idx from 005382bb mov eax, dword ptr [esp + 0x48] | bounded? no
+005386df shl6 [base+idx] movaps xmm0, xmmword ptr [ecx + eax + 0x30]     idx from 005386ae neg eax | bounded? cmp @005386ba eax, eax
+0053ae9f shl6 add        edx, eax                                 idx from 0053ae8d mov eax, dword ptr [esp + 0x54] | bounded? no
+0053aec2 shl6 add        edx, eax                                 idx from 0053aeb0 mov eax, dword ptr [esp + 0x28] | bounded? no
+0053f1c7 shl6 add        edi, eax                                 idx from 0053f16e mov edi, dword ptr [ebp + 0xc] | bounded? no
+0054642b shl6 add        edx, eax                                 idx from 0054640f movsx edx, word ptr [esi + 0x24] | bounded? no
+005875c3 shl6 [base+idx] movaps xmm0, xmmword ptr [ecx + eax + 0x30]     idx from 005875a6 mov eax, dword ptr [ebp + 0x10] | bounded? cmp @005875ac eax, eax
+005b3ff0 shl6 [base+idx] movaps xmm0, xmmword ptr [ecx + eax + 0x30]     idx from 005b3fd6 mov eax, dword ptr [ebp + 0xc] | bounded? cmp @005b3fdf eax, eax
+005b64bc fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @005b64b6
+005b6594 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @005b658e
+005b77a5 shl6 add        eax, ecx                                 idx from 005b779b movsx eax, byte ptr [eax + 0xa1] | bounded? no
+005b7aea shl6 add        edx, ecx                                 idx from 005b7ad7 movsx edx, byte ptr [edx + 0xa1] | bounded? no
+005b89d6 shl6 add        ebx, eax                                 idx from 005b89b9 movsx ebx, word ptr [ecx - 2] | bounded? no
+005b89dc shl6 add        ecx, eax                                 idx from 005b89cc movsx ecx, word ptr [ecx - 4] | bounded? no
+005bbcdd shl6 add        eax, edx                                 idx from 005bbcd4 movsx eax, byte ptr [eax + 0x21] | bounded? no
+005bd451 shl6 add        eax, ecx                                 idx from 005bd44c mov eax, ebx | bounded? cmp @005bd429 eax, eax
+005bf6aa fixed bone   1 (+0x20) mov    dword ptr [edx + 0x60], esi              base @005bf694
+005c5604 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @005c55fe
+005c68f9 fixed bone   2 (+0x18) mov    eax, dword ptr [eax + 0x98]              base @005c68ef
+005d3a00 fixed bone   1 (+0x38) fld    dword ptr [eax + 0x78]                   base @005d39ec
+005d3aa8 fixed bone   1 (+0x38) fld    dword ptr [eax + 0x78]                   base @005d3a86
+005d788b fixed bone   1 (+0x38) fld    dword ptr [ecx + 0x78]                   base @005d7881
+005d8278 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @005d8272
+005deb76 shl6 add        edx, eax                                 idx from 005deb67 mov edx, dword ptr [ebp + 0x10] | bounded? no
+005e0d0d fixed bone 108 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x1b30]         base @005e0d07
+005e2261 fixed bone 108 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x1b30]         base @005e225b
+005ea109 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @005ea103
+005f43f8 shl6 add        esi, eax                                 idx from 005f43e7 mov esi, dword ptr [ebx + 0xe0] | bounded? no
+005f8589 fixed bone 108 (+0x30) movaps xmm0, xmmword ptr [edx + 0x1b30]         base @005f8581
+005f8963 fixed bone 108 (+0x30) movaps xmm0, xmmword ptr [eax + 0x1b30]         base @005f895d
+005f8fd1 fixed bone 108 (+0x30) movaps xmm0, xmmword ptr [edx + 0x1b30]         base @005f8fc9
+00607da5 shl6 add        esi, ecx                                 idx from 00607d9a mov esi, dword ptr [ebx + 0x84] | bounded? no
+00607efc shl6 add        eax, ecx                                 idx from 00607ef2 mov eax, dword ptr [eax + 0x84] | bounded? cmp @00607ecc eax, eax
+0060a144 fixed bone 108 (+0x30) movaps xmm0, xmmword ptr [eax + 0x1b30]         base @0060a13e
+00615d1f shl6 add        eax, ecx                                 idx from 00615d0a movsx eax, di | bounded? cmp @00615d0d ecx, eax
+0062fb0e fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @0062fb08
+0062fb91 fixed bone   1 (+0x20) movaps xmm0, xmmword ptr [eax + 0x60]           base @0062fb87
+006323dd fixed bone   1 (+0x30) movaps xmm1, xmmword ptr [eax + 0x70]           base @006323d7
+006324cb shl6 add        eax, esi                                 idx from 006324ba movzx eax, word ptr [edi] | bounded? cmp @00632471 eax, ecx
+00632662 shl6 add        edx, esi                                 idx from 00632655 movsx edx, word ptr [eax + 6] | bounded? no
+00652465 shl6 [base+idx] movaps xmm1, xmmword ptr [ecx + eax + 0x30]     idx from 00652440 mov eax, dword ptr [ebp + 0x10] | bounded? cmp @00652443 ecx, eax
+0069688b shl6 add        eax, edi                                 idx from ? | bounded? no
+0069689a shl6 add        esi, edi                                 idx from 0069687e mov esi, dword ptr [ebp + 0xc] | bounded? no
+006a0330 shl6 add        ebx, eax                                 idx from ? | bounded? no
+006a36e9 fixed bone   1 (+0x30) movaps xmm1, xmmword ptr [edx + 0x70]           base @006a36e3
+006a3fd3 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @006a3fcd
+006a406c fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @006a4066
+006a42d1 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @006a42c5
+006a480e fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @006a4808
+006a48de fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @006a48d8
+006a4ba1 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @006a4b96
+006afc0e fixed bone   3 (+0x30) movaps xmm0, xmmword ptr [eax + 0xf0]           base @006afc08
+006afcde fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @006afcd4
+006b50d0 shl6 add        edx, esi                                 idx from 006b5096 movzx edx, word ptr [eax] | bounded? cmp @006b5071 ecx, edx
+006b713d shl6 add        eax, ecx                                 idx from 006b7123 movsx eax, byte ptr [edi + 0xa1] | bounded? no
+006b9758 shl6 add        eax, ecx                                 idx from 006b973c movzx eax, word ptr [eax] | bounded? cmp @006b972b eax, ebx
+006c7e1f shl6 add        eax, ecx                                 idx from 006c7e14 movzx eax, word ptr [eax] | bounded? cmp @006c7dd4 eax, edi
+006cd737 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @006cd731
+006cd77a fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @006cd774
+006ce82c fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @006ce826
+006d0d34 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @006d0d27
+006d14b8 fixed bone   1 (+0x30) movaps xmm1, xmmword ptr [eax + 0x70]           base @006d14b2
+006d14bc fixed bone   2 (+0x30) movaps xmm2, xmmword ptr [eax + 0xb0]           base @006d14b2
+006d14c3 fixed bone   3 (+0x30) movaps xmm0, xmmword ptr [eax + 0xf0]           base @006d14b2
+006d3c69 shl6 add        eax, ecx                                 idx from 006d3c4c movzx eax, word ptr [eax] | bounded? cmp @006d3c3b eax, ebx
+006d8d45 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @006d8d3f
+006d99b8 fixed bone   1 (+0x30) movaps xmm1, xmmword ptr [ecx + 0x70]           base @006d999f
+006ded35 fixed bone   4 (+0x30) movaps xmm0, xmmword ptr [eax + 0x130]          base @006ded2f
+006def94 fixed bone   4 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x130]          base @006def8e
+006e1f9e fixed bone   4 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x130]          base @006e1f98
+006e23ae fixed bone   4 (+0x30) movaps xmm1, xmmword ptr [edx + 0x130]          base @006e23a5
+006e33e5 fixed bone   4 (+0x30) movaps xmm0, xmmword ptr [edx + 0x130]          base @006e33df
+006e35f4 fixed bone   4 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x130]          base @006e35ee
+006e49d3 fixed bone   4 (+0x30) movaps xmm1, xmmword ptr [eax + 0x130]          base @006e49c1
+006ee5ec shl6 add        eax, esi                                 idx from 006ee5c2 mov esi, dword ptr [ebp + 0xc] | bounded? no
+006f081b fixed bone   1 (+0x38) fld    dword ptr [eax + 0x78]                   base @006f0815
+006f214c fixed bone   1 (+0x00) movaps xmm0, xmmword ptr [eax + 0x40]           base @006f2146
+006f24bf fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @006f24b9
+006f7315 fixed bone   1 (+0x20) movaps xmm2, xmmword ptr [eax + 0x60]           base @006f72d1
+007019ff fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @007019f9
+00703377 fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @0070335c
+00704d2e shl6 add        esi, eax                                 idx from 00704d27 mov esi, dword ptr [ebp + 0xc] | bounded? no
+00704d44 shl6 add        esi, eax                                 idx from 00704d3e mov esi, dword ptr [ebp + 0x10] | bounded? no
+00704ead shl6 add        esi, eax                                 idx from 00704ea7 mov esi, dword ptr [ebp + 0xc] | bounded? no
+00704ec4 shl6 add        esi, eax                                 idx from 00704ebe mov esi, dword ptr [ebp + 0x10] | bounded? no
+00704eda shl6 add        esi, eax                                 idx from 00704ed4 mov esi, dword ptr [ebp + 0x14] | bounded? no
+00708e8c fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @00708e86
+0070a102 shl6 add        eax, esi                                 idx from 0070a0f3 mov eax, dword ptr [edx + 0x1a8] | bounded? no
+0070ae7b fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @0070ae75
+0070b3ca fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @0070b3be
+0070c573 fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @0070c567
+0070e279 shl6 add        ecx, eax                                 idx from 0070e26f mov ecx, dword ptr [edx + 0x80] | bounded? no
+00714059 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @00714053
+0071c226 shl6 add        eax, ecx                                 idx from 0071c1ff mov eax, dword ptr [eax + 0x218] | bounded? no
+0071c6ae fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @0071c6a8
+00722a8a fixed bone   1 (+0x30) movaps xmm1, xmmword ptr [ecx + 0x70]           base @00722a84
+00733e57 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @00733e51
+0073579d shl6 [base+idx] movaps xmm0, xmmword ptr [edx + ecx + 0x30]     idx from 00735798 mov ecx, edi | bounded? no
+007392c7 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @007392c1
+0073939e shl6 add        esi, ecx                                 idx from 0073938f mov esi, dword ptr [eax + 0x214] | bounded? no
+0073975d fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @00739757
+00739ce8 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @00739ce2
+00739dae fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @00739da8
+0073a1e2 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @0073a1dc
+0073a53d fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @0073a537
+0073a9be fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @0073a9b2
+0073abd4 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @0073abce
+0073bc75 fixed bone   1 (+0x30) movaps xmm1, xmmword ptr [ecx + 0x70]           base @0073bc6f
+0073c0fa fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @0073c0f4
+0073c461 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @0073c45b
+0073d2dd fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @0073d2d1
+0073d511 fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @0073d504
+0073f553 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @0073f54d
+0073f7e8 fixed bone   1 (+0x10) movaps xmm1, xmmword ptr [edx + 0x50]           base @0073f7e2
+00740805 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [ecx + 0x70]           base @007407fb
+0074562b fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @00745622
+00745cdb fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @00745cd5
+00746b5c shl6 add        esi, eax                                 idx from 00746b49 mov esi, dword ptr [esi + 0x214] | bounded? no
+007494b4 fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @007494ae
+00758ebb fixed bone   1 (+0x10) movaps xmm1, xmmword ptr [eax + 0x50]           base @00758eb3
+00758f4f fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @00758ef0
+0076e7c1 fixed bone   1 (+0x00) lea    esi, [eax + 0x40]                        base @0076e7ba
+0076ea1f fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @0076ea19
+0076f647 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [eax + 0x70]           base @0076f641
+007700f4 fixed bone   1 (+0x30) movaps xmm0, xmmword ptr [edx + 0x70]           base @007700ee
+0078dfce shl6 add        eax, ebx                                 idx from 0078dfc0 mov eax, dword ptr [ebp + 0x10] | bounded? cmp @0078dfc3 eax, ecx
+0078e1bd shl6 add        esi, eax                                 idx from 0078e1b3 movsx esi, byte ptr [esi + 0xa1] | bounded? no
+0078e24f shl6 add        esi, ecx                                 idx from 0078e23a movzx esi, byte ptr [edx + eax*8 + 3] | bounded? no
+007c5f1e fixed bone   4 (+0x3c) mov    ecx, dword ptr [ecx + 0x13c]             base @007c5f14
+007c5f69 fixed bone   4 (+0x08) cmp    dword ptr [eax + 0x108], ecx             base @007c5f5f
+007c5f98 fixed bone   2 (+0x08) cmp    dword ptr [ecx + 0x88], ebx              base @007c5f8c
+007c5fa0 fixed bone   2 (+0x00) mov    eax, dword ptr [ecx + 0x80]              base @007c5f8c
+007c5fb6 fixed bone   2 (+0x08) cmp    edx, dword ptr [eax + 0x88]              base @007c5faf
+007c7630 fixed bone   2 (+0x14) cmp    ebx, dword ptr [eax + 0x94]              base @007c762a
+007c7641 fixed bone   5 (+0x10) mov    eax, dword ptr [eax + 0x150]             base @007c762a
+007eca01 fixed bone   2 (+0x08) cmp    dword ptr [eax + 0x88], 0                base @007ec9f7
+007eca3f fixed bone   2 (+0x14) mov    dword ptr [eax + 0x94], ecx              base @007eca2f
+007ecb51 fixed bone   5 (+0x00) mov    eax, dword ptr [eax + 0x140]             base @007ecb47
+007ed0cf fixed bone   5 (+0x10) mov    eax, dword ptr [eax + 0x150]             base @007ed0c4
+# fixed-bone uses 94, shl6 uses 67

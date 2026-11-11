@@ -1,0 +1,140 @@
+
+== lara_casual [pcbig, 52507886 B decoded, 4168 sections]
+  model DTP 2646 (section #3290) nseg 116 size 0x6cdd8 roots [0] parent>=self [] animsk ext section #3467 type 12 id 2649 size 0x13ce30 +0x13a7e0 count 153 next u32 0xbeebbeeb, mesh numBones 153
+  model DTP 2647 (section #3291) nseg 113 size 0x5208 roots [0] parent>=self [] animsk ext section #3468 type 12 id 2367 size 0x1cf0 +0xa8 count 113 next u32 0xbeebbeeb, mesh numBones 0
+  model DTP 2648 (section #3292) nseg 1 size 0x2e0 roots [0] parent>=self [] animsk -
+  object DTP 2643: anim table 1818 (in this DRM 1818, seg counts {113: 1795, 109: 13, 97: 3, 99: 2, 98: 5}), slots 1502, model slots 3 [(2646, 7, False), (2647, 7, False), (2648, 7, False)]
+  type-2 anim sections in DRM: 1744, seg counts {97: 3, 98: 5, 99: 2, 109: 13, 113: 1721}
+
+== lara [pcbig, 53657290 B decoded, 4170 sections]
+  model DTP 2267 (section #3290) nseg 116 size 0x82ad4 roots [0] parent>=self [] animsk ext section #3473 type 12 id 2366 size 0x18cb50 +0x18a500 count 153 next u32 0xbeebbeeb, mesh numBones 153
+  model DTP 2268 (section #3291) nseg 113 size 0x5208 roots [0] parent>=self [] animsk ext section #3474 type 12 id 2367 size 0x1cf0 +0xa8 count 113 next u32 0xbeebbeeb, mesh numBones 0
+  model DTP 2269 (section #3292) nseg 1 size 0x2e0 roots [0] parent>=self [] animsk -
+  object DTP 850: anim table 1818 (in this DRM 1818, seg counts {113: 1795, 109: 13, 97: 3, 99: 2, 98: 5}), slots 1502, model slots 3 [(2267, 7, False), (2268, 7, False), (2269, 7, False)]
+  type-2 anim sections in DRM: 1744, seg counts {97: 3, 98: 5, 99: 2, 109: 13, 113: 1721}
+
+== doppelganger_casual [mods, 58900194 B decoded, 3833 sections]
+  model DTP 22493 (section #2698) nseg 116 size 0x69490 roots [0] parent>=self [] animsk ext section #2877 type 12 id 21730 size 0x135b90 +0x133500 count 154 next u32 0xbeebbeeb, mesh numBones 154
+  model DTP 22494 (section #2699) nseg 113 size 0x5208 roots [0] parent>=self [] animsk ext section #2878 type 12 id 22601 size 0x1cf0 +0xa8 count 113 next u32 0xbeebbeeb, mesh numBones 0
+  model DTP 22495 (section #2700) nseg 1 size 0x2e0 roots [0] parent>=self [] animsk -
+  object DTP 20212: anim table 1428 (in this DRM 1428, seg counts {113: 1407, 109: 12, 97: 2, 99: 2, 98: 5}), slots 1206, model slots 3 [(22493, 7, False), (22494, 7, False), (22495, 7, False)]
+  type-2 anim sections in DRM: 1361, seg counts {97: 2, 98: 5, 99: 2, 109: 12, 113: 1340}
+
+== lara_doppelganger [mods, 52302074 B decoded, 4182 sections]
+  model DTP 25050 (section #3290) nseg 116 size 0x66e94 roots [0] parent>=self [] animsk ext section #3465 type 12 id 7067 size 0x12ce10 +0x12a780 count 154 next u32 0xbeebbeeb, mesh numBones 154
+  model DTP 25051 (section #3291) nseg 113 size 0x5208 roots [0] parent>=self [] animsk ext section #3466 type 12 id 2367 size 0x1cf0 +0xa8 count 113 next u32 0xbeebbeeb, mesh numBones 0
+  model DTP 25052 (section #3292) nseg 1 size 0x2e0 roots [0] parent>=self [] animsk -
+  object DTP 25048: anim table 1818 (in this DRM 1818, seg counts {113: 1795, 109: 13, 97: 3, 99: 2, 98: 5}), slots 1502, model slots 3 [(25050, 7, False), (25051, 7, False), (25052, 7, False)]
+  type-2 anim sections in DRM: 1744, seg counts {97: 3, 98: 5, 99: 2, 109: 13, 113: 1721}
+
+== co_dlc_lara [mods, 12304762 B decoded, 208 sections]
+  model DTP 24719 (section #5) nseg 116 size 0x2798 roots [0] parent>=self [] animsk ext section #7 type 12 id 24720 size 0x11ca90 +0x11a440 count 153 next u32 0xbeebbeeb, mesh numBones 153
+  object DTP: none with an anim table
+  type-2 anim sections in DRM: 1, seg counts {116: 1}
+
+== natla_end [pcbig, 16299809 B decoded, 356 sections]
+  model DTP 19101 (section #56) nseg 195 size 0x3288 roots [0] parent>=self [] animsk ext section #83 type 12 id 19106 size 0xd86a0 +0xd5510 count 198 next u32 0xbeebbeeb, mesh numBones 198
+  object DTP 19089: anim table 14 (in this DRM 14, seg counts {194: 12, 195: 1, 1: 1}), slots 13, model slots 1 [(19101, 7, False)]
+  type-2 anim sections in DRM: 14, seg counts {1: 1, 194: 12, 195: 1}
+
+== natla_thrall [mods, 17575295 B decoded, 278 sections]
+  model DTP 21776 (section #48) nseg 195 size 0x3204 roots [0] parent>=self [] animsk ext section #59 type 12 id 22648 size 0xdf090 +0xdbf00 count 198 next u32 0xbeebbeeb, mesh numBones 198
+  object DTP: none with an anim table
+  type-2 anim sections in DRM: 4, seg counts {195: 4}
+
+== amanda [pcbig, 21422898 B decoded, 319 sections]
+  model DTP 6069 (section #59) nseg 106 size 0x1c44 roots [0] parent>=self [] animsk ext section #71 type 12 id 6070 size 0x10ed10 +0x10c600 count 156 next u32 0xbeebbeeb, mesh numBones 156
+  object DTP 6059: anim table 8 (in this DRM 8, seg counts {2: 7, 1: 1}), slots 7, model slots 1 [(6069, 7, False)]
+  type-2 anim sections in DRM: 2, seg counts {1: 1, 2: 1}
+
+== co_amanda [pcbig, 21423506 B decoded, 321 sections]
+  model DTP 7174 (section #60) nseg 106 size 0x1c44 roots [0] parent>=self [] animsk ext section #72 type 12 id 6070 size 0x10ed10 +0x10c600 count 156 next u32 0xbeebbeeb, mesh numBones 156
+  object DTP 7173: anim table 8 (in this DRM 8, seg counts {103: 1, 2: 6, 1: 1}), slots 7, model slots 1 [(7174, 7, False)]
+  type-2 anim sections in DRM: 3, seg counts {1: 1, 2: 1, 103: 1}
+
+== co_natla [pcbig, 13848406 B decoded, 268 sections]
+  model DTP 7116 (section #33) nseg 195 size 0x3204 roots [0] parent>=self [] animsk ext section #45 type 12 id 7120 size 0xd86a0 +0xd5510 count 198 next u32 0xbeebbeeb, mesh numBones 198
+  object DTP 7110: anim table 2 (in this DRM 2, seg counts {194: 2}), slots 1, model slots 1 [(7116, 7, False)]
+  type-2 anim sections in DRM: 2, seg counts {194: 2}
+
+== viking_thrall [pcbig, 21319132 B decoded, 892 sections]
+  model DTP 14579 (section #236) nseg 63 size 0x148c roots [0] parent>=self [] animsk ext section #293 type 12 id 14580 size 0xe3ec0 +0xe21f0 count 115 next u32 0xbeebbeeb, mesh numBones 115
+  object DTP 14577: anim table 95 (in this DRM 95, seg counts {62: 18, 63: 65, 61: 1, 2: 6, 113: 5}), slots 85, model slots 1 [(14579, 7, False)]
+  type-2 anim sections in DRM: 85, seg counts {2: 2, 61: 1, 62: 18, 63: 60, 113: 4}
+
+== mayan_thrall [pcbig, 21627488 B decoded, 902 sections]
+  model DTP 14531 (section #236) nseg 66 size 0x154c roots [0] parent>=self [] animsk ext section #292 type 12 id 14542 size 0x16d5c0 +0x16b730 count 122 next u32 0xbeebbeeb, mesh numBones 122
+  object DTP 14442: anim table 95 (in this DRM 95, seg counts {62: 18, 63: 65, 61: 1, 2: 6, 113: 5}), slots 85, model slots 1 [(14531, 7, False)]
+  type-2 anim sections in DRM: 85, seg counts {2: 2, 61: 1, 62: 18, 63: 60, 113: 4}
+
+== yeti_thrall [pcbig, 22476424 B decoded, 760 sections]
+  model DTP 17087 (section #237) nseg 68 size 0x169c roots [0] parent>=self [] animsk ext section #292 type 12 id 17099 size 0x181c20 +0x17fb90 count 130 next u32 0xbeebbeeb, mesh numBones 130
+  object DTP 16991: anim table 94 (in this DRM 94, seg counts {65: 31, 1: 6, 68: 33, 2: 1, 63: 18, 113: 5}), slots 104, model slots 1 [(17087, 7, False)]
+  type-2 anim sections in DRM: 82, seg counts {1: 1, 2: 1, 63: 18, 65: 30, 68: 28, 113: 4}
+
+== merc [pcbig, 14645945 B decoded, 725 sections]
+  model DTP 7988 (section #259) nseg 62 size 0x1474 roots [0] parent>=self [] animsk ext section #317 type 12 id 7378 size 0xf67b0 +0xf5828 count 62 next u32 0xbeebbeeb, mesh numBones 62
+  object DTP 7987: anim table 126 (in this DRM 126, seg counts {63: 119, 228: 1, 113: 5, 95: 1}), slots 144, model slots 1 [(7988, 7, False)]
+  type-2 anim sections in DRM: 119, seg counts {63: 113, 95: 1, 113: 4, 228: 1}
+
+== knight_thrall [mods, 18643552 B decoded, 837 sections]
+  model DTP 20319 (section #235) nseg 63 size 0x148c roots [0] parent>=self [] animsk ext section #293 type 12 id 20320 size 0x80150 +0x7e180 count 127 next u32 0xbeebbeeb, mesh numBones 127
+  object DTP 20996: anim table 95 (in this DRM 95, seg counts {62: 9, 63: 74, 61: 1, 2: 6, 113: 5}), slots 85, model slots 1 [(20319, 7, False)]
+  type-2 anim sections in DRM: 84, seg counts {2: 2, 61: 1, 62: 9, 63: 68, 113: 4}
+
+== viking_thrall_dlc2_ [mods, 25281016 B decoded, 993 sections]
+  model DTP 26090 (section #289) nseg 63 size 0x148c roots [0] parent>=self [] animsk ext section #353 type 12 id 26185 size 0xe11c0 +0xdf4f0 count 115 next u32 0xbeebbeeb, mesh numBones 115
+  object DTP 24426: anim table 115 (in this DRM 115, seg counts {62: 16, 63: 85, 61: 1, 2: 6, 113: 7}), slots 111, model slots 1 [(26090, 7, False)]
+  type-2 anim sections in DRM: 106, seg counts {2: 2, 61: 1, 62: 16, 63: 81, 113: 6}
+
+== co_hell_thrall [pcbig, 8473470 B decoded, 156 sections]
+  model DTP 19122 (section #70) nseg 7 size 0x254 roots [0] parent>=self [] animsk ext section #82 type 12 id 19123 size 0x750 +0x588 count 7 next u32 0xbeebbeeb, mesh numBones 7
+  object DTP: none with an anim table
+  type-2 anim sections in DRM: 2, seg counts {1: 1, 2: 1}
+
+== pairwise (main model = the one with most segments; anim skeleton = model with the anim count)
+  lara_casual                  render 116 seg (DTP 2646) | most common anim seg count 113 | model with that count: 2647
+  lara                         render 116 seg (DTP 2267) | most common anim seg count 113 | model with that count: 2268
+  doppelganger_casual          render 116 seg (DTP 22493) | most common anim seg count 113 | model with that count: 22494
+  lara_doppelganger            render 116 seg (DTP 25050) | most common anim seg count 113 | model with that count: 25051
+  co_dlc_lara                  render 116 seg (DTP 24719) | most common anim seg count 116 | model with that count: 24719
+  natla_end                    render 195 seg (DTP 19101) | most common anim seg count 194 | model with that count: -
+  natla_thrall                 render 195 seg (DTP 21776) | most common anim seg count 195 | model with that count: 21776
+  amanda                       render 106 seg (DTP 6069) | most common anim seg count 2 | model with that count: -
+  co_amanda                    render 106 seg (DTP 7174) | most common anim seg count 103 | model with that count: -
+  co_natla                     render 195 seg (DTP 7116) | most common anim seg count 194 | model with that count: -
+  viking_thrall                render 63 seg (DTP 14579) | most common anim seg count 63 | model with that count: 14579
+  mayan_thrall                 render 66 seg (DTP 14531) | most common anim seg count 63 | model with that count: -
+  yeti_thrall                  render 68 seg (DTP 17087) | most common anim seg count 65 | model with that count: -
+  merc                         render 62 seg (DTP 7988) | most common anim seg count 63 | model with that count: -
+  knight_thrall                render 63 seg (DTP 20319) | most common anim seg count 63 | model with that count: 20319
+  viking_thrall_dlc2_          render 63 seg (DTP 26090) | most common anim seg count 63 | model with that count: 26090
+  co_hell_thrall               render 7 seg (DTP 19122) | most common anim seg count 2 | model with that count: -
+
+  reference lara_casual skeleton DTP 2647 (113 seg)
+  lara_casual                  render 116 seg: equal parent prefix 113, first diff bone 113 (-9 vs 17), max pivot distance on prefix 0.00
+  lara_casual                  animsk 113 seg: equal parent prefix 113, first diff -, max pivot distance on prefix 0.00
+  lara                         render 116 seg: equal parent prefix 113, first diff bone 113 (-9 vs 17), max pivot distance on prefix 0.00
+  lara                         animsk 113 seg: equal parent prefix 113, first diff -, max pivot distance on prefix 0.00
+  doppelganger_casual          render 116 seg: equal parent prefix 113, first diff bone 113 (-9 vs 17), max pivot distance on prefix 0.00
+  doppelganger_casual          animsk 113 seg: equal parent prefix 113, first diff -, max pivot distance on prefix 0.00
+  lara_doppelganger            render 116 seg: equal parent prefix 113, first diff bone 113 (-9 vs 17), max pivot distance on prefix 0.00
+  lara_doppelganger            animsk 113 seg: equal parent prefix 113, first diff -, max pivot distance on prefix 0.00
+  co_dlc_lara                  render 116 seg: equal parent prefix 113, first diff bone 113 (-9 vs 17), max pivot distance on prefix 0.00
+  co_dlc_lara                  animsk 116 seg: equal parent prefix 113, first diff bone 113 (-9 vs 17), max pivot distance on prefix 0.00
+  natla_end                    render 195 seg: equal parent prefix   9, first diff bone 9 (3 vs 8), max pivot distance on prefix 180.00
+  natla_thrall                 render 195 seg: equal parent prefix   9, first diff bone 9 (3 vs 8), max pivot distance on prefix 180.00
+  natla_thrall                 animsk 195 seg: equal parent prefix   9, first diff bone 9 (3 vs 8), max pivot distance on prefix 180.00
+  amanda                       render 106 seg: equal parent prefix  71, first diff bone 71 (55 vs 54), max pivot distance on prefix 39.67
+  co_amanda                    render 106 seg: equal parent prefix  71, first diff bone 71 (55 vs 54), max pivot distance on prefix 39.67
+  co_natla                     render 195 seg: equal parent prefix   9, first diff bone 9 (3 vs 8), max pivot distance on prefix 180.00
+  viking_thrall                render  63 seg: equal parent prefix  19, first diff bone 19 (17 vs 18), max pivot distance on prefix 150.90
+  viking_thrall                animsk  63 seg: equal parent prefix  19, first diff bone 19 (17 vs 18), max pivot distance on prefix 150.90
+  mayan_thrall                 render  66 seg: equal parent prefix  19, first diff bone 19 (17 vs 18), max pivot distance on prefix 150.90
+  yeti_thrall                  render  68 seg: equal parent prefix  19, first diff bone 19 (17 vs 18), max pivot distance on prefix 309.66
+  merc                         render  62 seg: equal parent prefix   9, first diff bone 9 (3 vs 4), max pivot distance on prefix 197.21
+  knight_thrall                render  63 seg: equal parent prefix  19, first diff bone 19 (17 vs 18), max pivot distance on prefix 150.90
+  knight_thrall                animsk  63 seg: equal parent prefix  19, first diff bone 19 (17 vs 18), max pivot distance on prefix 150.90
+  viking_thrall_dlc2_          render  63 seg: equal parent prefix  19, first diff bone 19 (17 vs 18), max pivot distance on prefix 150.90
+  viking_thrall_dlc2_          animsk  63 seg: equal parent prefix  19, first diff bone 19 (17 vs 18), max pivot distance on prefix 150.90
+  co_hell_thrall               render   7 seg: equal parent prefix   2, first diff bone 2 (1 vs 0), max pivot distance on prefix 845.55
