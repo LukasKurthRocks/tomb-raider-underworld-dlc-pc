@@ -143,6 +143,12 @@ Set-TruMenu.ps1 knows the 0.22.25 hash.
 Q75 (2026-11-11): SW_START_GATED - switches the plugin re-reads at run time only when they were 1 at the start
 (TruShadowPower 0.27 [Camera] ShakeTuTimeStep / [Player] TuTimeStep): row "restart", the re-read function reads the key,
 the hint names "live nur wenn 1 beim Start" // "live if 1 at start" (live-if:<own key> would be read after the write).
+0.22.28 (Q90, test packages on page Tests): check_02228 - the block "TP Q90" of kQbTests (every row readable by qb_rows
+and flagged kQfTp, kQfTp nowhere else), group tp_q90 + one closed kQfSub group per package A, 1 .. 9 with a hint and a
+check, check ids tp<package>.<name> unique and in their package, switch rows only keys of TruMenu.switches.txt, the
+row kinds kQbCheck / kQbSwitch / kQbNote handled in view / action / X / help / long menu and refused as favourites,
+the bar's TO TEST list skips the tp ids, no new INI key; check_018 accepts id "-" on kQbNote rows; check_02227 looks
+for its kVersion part; Set-TruMenu.ps1 knows the 0.22.27 hash.
 Options: --switches FILE checks that file instead of the shipped one.
 
 Usage (from the repository root):
@@ -851,15 +857,16 @@ def ini_section(ini_path, wanted):
 
 def qb_rows(src, with_tail=False):
     """0.17: the rows of the quick-toggle bar tables: [(table, de, id, arg, kind, layer)]; 0.18: id may be "-" (label /
-    planned rows), the argument may be several adjacent string literals, with_tail adds the rest of the row (flags)"""
+    planned rows), the argument may be several adjacent string literals, with_tail adds the rest of the row (flags);
+    0.22.28: a line break may follow any comma of a row (before only after the layer)"""
     rows = []
     for table in QB_TABLES:
         start = 'const QbRow %s[] = {' % table
         if start not in src: continue
         block = src[src.index(start):]
         block = block[:block.index('\n};')]
-        for m in re.finditer(r'\{"([^"]*)", "([^"]*)", "([a-z][a-z0-9_.]*|-)", ((?:"[^"]*"\s*)+), (kQb[A-Za-z]+), '
-                             r'(-1|kDv[A-Za-z]+),([^{}]*)\}', block, re.S):
+        for m in re.finditer(r'\{"([^"]*)",\s+"([^"]*)",\s+"([a-z][a-z0-9_.]*|-)",\s+((?:"[^"]*"\s*)+),\s+(kQb[A-Za-z]+),'
+                             r'\s+(-1|kDv[A-Za-z]+),([^{}]*)\}', block, re.S):
             arg = ''.join(re.findall(r'"([^"]*)"', m.group(4)))
             row = (table, m.group(1), m.group(3), arg, m.group(5), m.group(6))
             rows.append(row + (m.group(7),) if with_tail else row)
@@ -1005,8 +1012,8 @@ def check_018(ini_path, radial_path):
     for table, de, item, arg, kind, layer, tail in qb_rows(src, True):
         where = 'TruMenu.cpp: %s row "%s" (%s %s)' % (table, de, item, arg)
         flags = 'kQfConfirm' in tail or 'kQfBackup' in tail
-        if (item == '-') != (kind in ('kQbLabel', 'kQbPlanned', 'kQbGroup')):   # 0.21.1 kQbGroup
-            problems.append(where + ': id "-" exactly on label / planned / group rows')
+        if (item == '-') != (kind in ('kQbLabel', 'kQbPlanned', 'kQbGroup', 'kQbNote')):   # 0.21.1 kQbGroup, 0.22.28
+            problems.append(where + ': id "-" exactly on label / planned / group / note rows')
         if kind == 'kQbPlanned':
             planned += 1
             if arg.count('|') != 1 or not all(arg.split('|')): problems.append(where + ': planned text "German|English"')
@@ -3812,8 +3819,8 @@ def check_02227(ini_path, switches_path):
     the 58 rows of precheck_02226 + these 39; Set-TruMenu.ps1 knows the 0.22.26 hash"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.27 (save probe, Q79' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.27 (save probe, Q79')
+    if '"0.22.27 (save probe, Q79' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.28: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.27 part "0.22.27 (save probe, Q79"')
     inc = '#include "TruSaveProbe.h"'
     if src.count(inc) != 1 or not 0 < src.find(inc) < src.find('struct Item {') or src.find(inc) < src.find('namespace {'):
         problems.append('TruMenu.cpp: TruSaveProbe.h must be included once inside the namespace, before struct Item')
@@ -3889,6 +3896,119 @@ def check_02227(ini_path, switches_path):
     return problems, ('save probe: %d items read only on the TruLink thread, kSvChecks %d + kSvHookChecks %d + 2 prologues '
                       '= precheck_02227_sv, memcpy 0x8148a0 only in the 2 copy hooks, [Log] Save default 0 live, switch '
                       'row' % (len(SV_ITEMS), len(reads), len(hooks)))
+
+
+TP_PACKAGES = ('a', '1', '2', '3', '4', '5', '6', '7', '8', '9')   # docs/Testpakete-1111.md, package 0 = install only
+TP_KINDS = ('kQbCheck', 'kQbSwitch', 'kQbNote')
+
+
+def check_02228(ini_path, switches_path):
+    """0.22.28 (Q90, test packages of docs/Testpakete-1111.md on page Tests; workspace docs/Befund-Testseiten-Q90-1111.md):
+    the block "TP Q90" at the top of kQbTests - every row parsed by qb_rows (no row the other checks cannot see) and
+    flagged kQfTp, no kQfTp row anywhere else; group tp_q90 (level 0) with one kQfSub group per package A, 1 .. 9 (no
+    package 0), each in kQbStartClosed, each with a hint (kQbNote) and at least one check (kQbCheck); checks = test.mark
+    with a unique id tp<package>.<name> of their own package; switch rows = sw.set with a key of TruMenu.switches.txt; note
+    rows id "-" without argument; labels fit the bar row (QbView name 112 bytes); the three kinds handled in QbViewOf /
+    QbActRow / QbExecRow / QbHelpLine / PageQbRow, no favourites, the TO TEST list on the bar skips the tp ids, a check
+    joins the TO TEST list through RunTestAdd only when it is not listed and is marked through TestMark; the start-up row
+    count skips the notes; no new INI key (258); Set-TruMenu.ps1 knows the 0.22.27 hash"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.28 (test packages, Q90' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.28 (test packages, Q90')
+    tests = src[src.find('const QbRow kQbTests[] = {'):]
+    tests = tests[:tests.find('\n};')]
+    a, b = tests.find('// ---- TP Q90 begin'), tests.find('// ---- TP Q90 end')
+    if a < 0 or b < a: return problems + ['TruMenu.cpp: kQbTests lacks the block "TP Q90 begin" .. "TP Q90 end"'], 'TP: no block'
+    block = tests[a:b]
+    if tests.find('"ts_teleport", kQbGroup') < b: problems.append('TruMenu.cpp: the TP block must stand before ts_teleport')
+    raw = re.findall(r'\n    \{"', block)
+    rows = [r for r in qb_rows(src, True) if r[0] == 'kQbTests' and 'kQfTp' in r[6]]
+    if len(rows) != len(raw):
+        problems.append('TruMenu.cpp: TP block has %d rows, qb_rows parses %d with kQfTp (a row split where the table '
+                        'parser cannot read it, or a row without kQfTp)' % (len(raw), len(rows)))
+    flags = len(re.findall(r'kQfTp\}', src))
+    if flags != len(raw) or re.findall(r'kQfTp\}', tests[:a] + tests[b:]):
+        problems.append('TruMenu.cpp: kQfTp only on the rows of the TP block (%d flags, %d rows)' % (flags, len(raw)))
+    starts = LIT.findall(src[src.find('const char *const kQbStartClosed[] = {'):].split('};')[0])
+    sw_keys = set()
+    for line in open(switches_path, encoding='utf-8').read().splitlines():
+        f = [x.strip() for x in line.split('|')]
+        if line.startswith('#') or len(f) < 9 or f[0] == 'group': continue
+        sw_keys.add('%s:%s:%s' % (f[0], f[1], f[2]))
+    pkg, seen, ids = None, {}, set()
+    for t, de, item, arg, kind, layer, tail in rows:
+        where = 'TruMenu.cpp: TP row "%s" (%s %s)' % (de, item, arg)
+        de_en = re.search(r'\{"%s", "([^"]*)", "%s"' % (re.escape(de), re.escape(item)), block)
+        for text in (de, de_en.group(1) if de_en else ''):
+            if len(text.encode('utf-8')) > 100: problems.append(where + ': label longer than 100 bytes')
+        if kind == 'kQbGroup':
+            if arg == 'tp_q90':
+                if 'kQfSub' in tail or pkg is not None: problems.append(where + ': tp_q90 = the first row, level 0')
+                pkg = ''
+                continue
+            m = re.fullmatch(r'tp_([a-z0-9])', arg)
+            if not m or 'kQfSub' not in tail: problems.append(where + ': a package group tp_<package> with kQfSub')
+            elif arg not in starts: problems.append(where + ': %s missing in kQbStartClosed' % arg)
+            pkg = m.group(1) if m else '?'
+            seen[pkg] = {'note': 0, 'check': 0}
+            continue
+        if pkg is None: problems.append(where + ': before the group tp_q90')
+        if kind == 'kQbNote':
+            if item != '-' or arg: problems.append(where + ': a note row has id "-" and no argument')
+            if pkg in seen: seen[pkg]['note'] += 1
+        elif kind == 'kQbCheck':
+            if item != 'test.mark' or not re.fullmatch(r'tp[A1-9]\.[a-z0-9]+', arg) or len(arg) > 63:
+                problems.append(where + ': a check row is test.mark tp<package>.<name>')
+            elif arg[2].lower() != pkg: problems.append(where + ': check id of another package (group tp_%s)' % pkg)
+            if arg in ids: problems.append(where + ': check id twice')
+            ids.add(arg)
+            if pkg in seen: seen[pkg]['check'] += 1
+        elif kind == 'kQbSwitch':
+            if item != 'sw.set' or arg not in sw_keys:
+                problems.append(where + ': a switch row is sw.set <Plugin>:<Section>:<Key> of %s' %
+                                os.path.basename(switches_path))
+        elif kind in ('kQbLabel', 'kQbPlanned'): problems.append(where + ': no label / planned rows in the TP block')
+    if sorted(seen) != sorted(TP_PACKAGES):
+        problems.append('TruMenu.cpp: TP package groups %s, wanted %s' % (sorted(seen), sorted(TP_PACKAGES)))
+    for p, c in sorted(seen.items()):
+        if not c['note'] or not c['check']: problems.append('TruMenu.cpp: package %s needs a hint and a check' % p)
+    view = fn_body(src, 'void QbViewOf(')
+    for k in TP_KINDS:
+        if 'r.kind == %s' % k not in view: problems.append('TruMenu.cpp: QbViewOf must handle %s' % k)
+    act = fn_body(src, 'void QbActRow(')
+    for k in TP_KINDS:
+        if 'r.kind == %s' % k not in act: problems.append('TruMenu.cpp: QbActRow must handle %s' % k)
+    if act.find('r.kind == kQbSwitch') > act.find('g_qbActRow = &r;'):
+        problems.append('TruMenu.cpp: QbActRow handles the TP kinds before g_qbActRow = &r (not in the recent list)')
+    ex = fn_body(src, 'void QbExecRow(')
+    if 'case kQbCheck: TpCheckSet(page, r, "skip", true)' not in ex or 'case kQbNote: return;' not in ex or \
+            'TpSwAct(r, kQbXDir)' not in ex:
+        problems.append('TruMenu.cpp: QbExecRow: X on a check = skip, on a switch = kQbXDir, on a note nothing')
+    for fn in ('bool QbHelpLine(', 'void PageQbRow('):
+        body = fn_body(src, fn)
+        if any('kind == %s' % k not in body for k in TP_KINDS): problems.append('TruMenu.cpp: %s must handle the TP kinds' % fn)
+    fav = fn_body(src, 'bool QbFavOk(')
+    if any('r->kind != %s' % k not in fav for k in TP_KINDS): problems.append('TruMenu.cpp: QbFavOk must refuse the TP kinds')
+    if 't.id[3] == \'.\') continue;' not in fn_body(src, 'int QbTestsRows('):
+        problems.append('TruMenu.cpp: QbTestsRows must skip the tp<package>.<name> rows')
+    cs = fn_body(src, 'void TpCheckSet(')
+    i_list, i_add, i_mark = cs.find('if (!listed) {'), cs.find('RunTestAdd('), cs.find('TestMark(r.arg, state')
+    if not (0 <= i_list < i_add < i_mark) or '"open" : want' not in cs:
+        problems.append('TruMenu.cpp: TpCheckSet: test.add only when not listed, then TestMark; the same state again = open')
+    sv = fn_body(src, 'void TpSwAct(')
+    if 'SwFindLocked(r.arg)' not in sv or 'QbSwAct(y, dir)' not in sv or 'y.kind = kQdSw;' not in sv:
+        problems.append('TruMenu.cpp: TpSwAct must find the switch and run the page Fixes path QbSwAct')
+    if 'p.rows[i].kind == kQbNote' not in src: problems.append('TruMenu.cpp: the start-up row count must skip the notes')
+    header, opt_rows = table(src)
+    if len(opt_rows) != 258: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.28 adds no INI key (258)' % len(opt_rows))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if 'ebd75bd759135f76a26bcf867310d394033c48467e1e64e93431ab337388159d' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.27 build hash (work\\asi\\menu0250) is missing')
+    n = {k: sum(1 for r in rows if r[4] == k) for k in TP_KINDS + ('kQbGroup',)}
+    return problems, ('TP block: %d rows (%d groups, %d checks, %d switches, %d notes), all kQfTp, packages %s, no INI '
+                      'key' % (len(rows), n['kQbGroup'], n['kQbCheck'], n['kQbSwitch'], n['kQbNote'],
+                               ' '.join(p.upper() for p in sorted(seen))))
 
 
 def table(src):
@@ -4073,6 +4193,10 @@ def main(argv):
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)
     problems += cproblems27
+    cproblems28, csummary28 = check_02228(ini_path, opt.get('--switches', SWITCHES))   # 0.22.28
+    for p in cproblems28: print('Q02228 %s' % p)
+    if not cproblems28: print('ok: 0.22.28 %s' % csummary28)
+    problems += cproblems28
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

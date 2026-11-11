@@ -2928,6 +2928,59 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.28 - test packages on page Tests (2026-11-11)
+
+Built into `work\asi\menu0251` (sha256 `e284247a...1bf554fd`, 1,926,656 bytes), not installed, no live test (Q90;
+finding in the workspace `docs\Befund-Testseiten-Q90-1111.md`). Owner wish for tonight's tests: the packages of the
+workspace `docs\Testpakete-1111.md` as groups on the bar page **Tests**, so each package is one place in the game.
+
+- **Group "Testpakete 11.11. (Q90)"** at the top of page Tests (open), one **sub-group per package** A, 1 .. 9 (package 0
+  is the install, no group), each closed at the start (`kQbStartClosed` `tp_a`, `tp_1` .. `tp_9`; opening one is kept in
+  `[Quick] Closed` as every group since 0.21.1 / 0.22.16). The groups were collapsible already (0.21.1 / 0.22.18: right
+  = open, left = close, X = toggle; the long menu shows them as collapsing headers) - nothing new was needed for that.
+- Each package: a **hint line** (where / before, grey, passed over by up / down), **jump / load rows** of existing items
+  (`level.start dlc2` / `dlc1` (main menu), `level.load l1_seatop` / `l3_caverns_start` with backup, `arena.go 1a`), the
+  **switches** the package toggles as the page Fixes rows themselves (same value, colour, count column live /
+  Neustart, help line, write path `sw.set`): TruShadowPower `[Camera] ShakeTuTimeStep`, `[Player] TuTimeStep`, `[Camera]
+  DoppelgangerSettings`, `[Camera] CameraTuTimeStep`; TruQoL `[FrameLimit] Enabled` / `MaxFps`; TruRockVein `[JumpTarget]
+  Translate`, `[LedgeProbe] Translate` / `BestEdge`; TruMenu `[Log] Save`; existing bool items `log.script` /
+  `log.scriptfile` (`[Log] Script` / `ScriptToFile`), `gfx.water`, `fight.trace`, `menu.attracttimer`, `cheat.god`,
+  `adren.keep`; **probe rows** `save.inv`, `save.find 5240` / `5695`, `save.pending`, `save.waiting`, `thrall.scriptval`,
+  `adren.meter`, `adren.fill`, `phys.status`, `ai.remove spawned`, `save.backup paket5|6|7`, `claude.mark gfx`; and the
+  **TO TEST checks** of the package.
+- **Check rows** (`kQbCheck`, id `test.mark`, argument = the check id `tp<package>.<name>`, e.g. `tp1.climbcam`,
+  `tp7.pole`; 46 checks): state `offen` / `OK` / `Fehler` / `übersprungen`, the id in the count column. Bar: **right =
+  OK, left = Fehler, X = übersprungen**; the same press again on a row in that state = `offen` (undo). Long menu: one
+  button per state. At its first mark the check joins the TO TEST list (`test.add <id> Q90 <English label>`), so
+  `TruMenu.tests.txt`, `test.list` and the ring's TO TEST hold it too; the bar's own TO TEST list on page Tests leaves
+  the `tp*` rows out (they stand in their package). Log lines per mark:
+  `tests: test.mark tp1.climbcam ok` (TestMark) and `quick: Tests / TP tp1.climbcam (Climb camera turns after ~1/4 s
+  (T5)) -> ok`.
+- **Test-package content is tagged**: every row carries the flag `kQfTp` and stands in the block `// ---- TP Q90 begin`
+  .. `// ---- TP Q90 end` of `kQbTests`; owner 2026-11-11: after the tests each row becomes a real row of its page or is
+  deleted. The three row kinds `kQbCheck` / `kQbSwitch` / `kQbNote` are only used there so far; no favourites, not in
+  "Zuletzt".
+- No new INI key (258), no hook, no byte check. Checks: `trumenu_ini_check` `check_02228` (block parsed completely and
+  flagged, kQfTp nowhere else, 10 package groups closed at the start with a hint and a check each, check ids unique and
+  in their package, switch rows only keys of `TruMenu.switches.txt`, the kinds handled in view / action / X / help /
+  long menu, no favourites, the bar's TO TEST list skips `tp*`, test.add only when not listed, Set-TruMenu 0.22.27 hash);
+  `qb_rows` reads rows with a line break after any comma (it skipped such rows silently - with the wider pattern 3 older
+  rows are checked too, all pass); `check_018` allows id `-` on note rows; `check_02227` looks for its kVersion part.
+  Negative test on copies: 10 of 10 mutations caught (`work\q90_testpages_1111\make_neg.py`). `trumenu_quick_check` all
+  ok, `trumenu_readability_check` all pass. Build: 0 warnings in TruMenu.cpp (2 in the third-party `imgui_demo.cpp`).
+
+### TO TEST 0.22.28
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | groups | bar page Tests | first row `[-] Testpakete 11.11. (Q90)`, below it the hint and ten closed rows `[+] Paket A ...` .. `[+] Paket 9 ...` (`n Zeilen - rechts = auf`) |
+| 2 | open / close | right on `Paket 1`, left again; X on it | opens / closes; after a restart the state is kept (`[Quick] Closed` `+tp_1`) |
+| 3 | switch row | Paket 5 "Bilder je Sekunde" left / right | `< 60 >` steps through 30 .. 144, log `quick: Fixes / Bilder je Sekunde -> sw.set TruQoL:FrameLimit:MaxFps 75`; page Fixes shows the same value |
+| 4 | check | Paket 1 "Kletterkamera ..." right; right again; left; X | `OK` (green square) -> `offen` -> `Fehler` -> `übersprungen`; `TruMenu.log` `tests: test.mark tp1.climbcam ok` ...; `TruMenu.tests.txt` holds `tp1.climbcam` |
+| 5 | TO TEST list | after 4: bottom of page Tests | the TO TEST list does not repeat `tp1.climbcam`; ring Tests / TO TEST and `test.list` show it |
+| 6 | long menu | section "Quick bar pages" / Tests | the package groups as headers; a check row with OK / Fehler / Skip / Offen buttons, a switch row with < / > |
+| 7 | hint line | up / down over a package | the grey hint line is passed over |
+
 ## 0.22.27 - save probe: save.pending / save.inv / save.waiting / save.find, [Log] Save (2026-11-11)
 
 Built into `work\asi\menu0250` (sha256 `ebd75bd7...388159d`, 1,909,248 bytes), not installed, no live test (Q79; finding in
