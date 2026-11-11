@@ -12,8 +12,12 @@ Usage: python3 -I tools/locals.py survey      (compare all versions)
             languages (table field, checked 2026-11-10 on the installed tables): 001 English (0), 002 French (1),
             004 German (3), 008 Italian (2), 016 Spanish (4), 032 Dutch (5, text only - no Dutch speech in the .mul))
             + <out>/locmap_xbox_to_pc.json (Xbox TU string index -> PC string id, for the data converters)
+            Text rules of the installed (played) tables, applied by build (2026-11-11, R9): merged() also replaces
+            localised placeholders (same_slot_number), unfilled_from_packs() (PC 5211; skip with --no-pack-fill =
+            the Xbox TU state, empty / 'KEIN TEXT'), unwrap_descriptions() (PC 456 / 457). No text is stored here:
+            every string comes from the player's archives at build time. Gate: tools/locals_text_gate.py.
 """
-import sys, os, struct, collections
+import sys, os, re, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from archive import Archive
 from names import crc
@@ -116,9 +120,23 @@ def build_map(V):
     return m, dict(matched=len(votes), mapped_by_string=len(ks), interpolated=interp, appended=len(appended),
                    appended_base=sum(1 for x in appended if x < nbase), appended_dlc=sum(1 for x in appended if x >= nbase), pc_n=npc, tu_n=ntu)
 
+_NUM = re.compile(rb'^(.*\S)\s+(\d+)$')
+
+
+def same_slot_number(pc_text, base_text):
+    """True when the PC text is the PC's own localised name of the same numbered Xbox base placeholder: both end in
+    the same slot number after a non-empty stem ('Traje Extra 11' / 'Extra Costume 11', 'Mision Extra 1' /
+    'DLC Mission 1'). A real PC name ('Roter Trockenanzug Leicht') has no slot number and is kept."""
+    a, b = _NUM.match(pc_text.strip()), _NUM.match(base_text.strip())
+    return bool(a and b and a.group(2) == b.group(2))
+
+
 def merged(V, spec, m):
     """PC patch table + TU strings: appended ids get the TU text; a mapped base id whose PC text equals the Xbox
-    BASE text (placeholder like 'DLC TEST MISSION 2' / 'Extra Costume 1') but changed in the TU gets the TU text."""
+    BASE text (placeholder like 'DLC TEST MISSION 2' / 'Extra Costume 1') but changed in the TU gets the TU text;
+    so does one whose PC text is a LOCALISED placeholder of the same slot (same_slot_number: Spanish PC 93 / 98 /
+    450 'Traje Extra 11' / 'Traje Extra 16' / 'Mision Extra 1' -> TU 'Traje seco rojo' / ... / 'BAJO LAS CENIZAS';
+    the rule of the former tools/locals_fix_dlcimg.py, which listed these three ids by hand)."""
     pc = list(V['pcpatch'][spec][1]); lang = V['pcpatch'][spec][0]
     X = V['xbase'][spec][1]; T = V['tu'][spec][1]
     n = max(m.values()) + 1
@@ -128,8 +146,50 @@ def merged(V, spec, m):
         if x == 0: continue
         if p >= len(V['pcpatch'][spec][1]): pc[p] = T[x]; st['appended'] += 1
         elif x < len(X) and T[x] != X[x] and pc[p] == X[x]: pc[p] = T[x]; st['placeholder_replaced'] += 1
+        elif x < len(X) and T[x] != X[x] and pc[p] != T[x] and same_slot_number(pc[p], X[x]):
+            pc[p] = T[x]; st['localised_placeholder_replaced'] += 1
         elif x < len(X) and T[x] != X[x]: st['tu_changed_but_pc_differs_kept_pc'] += 1
     return lang, pc, st
+
+
+# Costume packs (Xbox marketplace) whose string table is an OLDER layout of the DLC range (1376 entries; their
+# 1296-1353 are a DLC 1 hint list the title update replaced) - read only for unfilled_from_packs().
+COSTUME_PACKS = ('pack1', 'pack2')
+# PC ids of the DLC 1 / DLC 2 mission descriptions (Xbox TU 459 / 460), see unwrap_descriptions()
+DESC_IDS = {459: 456, 460: 457}
+
+
+def unfilled_from_packs(V, m, spec, strings, en_spec=0xfffff7e1):
+    """Installed-state rule (B138 kit, played 27.10.): a DLC id (Xbox index >= base table size) whose title-update
+    entry is EMPTY in English is an unfilled slot (the other languages hold '' / 'KEIN TEXT' / 'NO TEXT'); it takes,
+    in every language, the entry of the costume packs' tables at the same index when that is non-empty in English and
+    all present packs agree. Today exactly one id: Xbox 1326 = PC 5211. Note: on the Xbox (TU = pack11 table) the
+    slot stays empty - the packs' text there is a DLC 1 hint line of their older layout, not a TU string."""
+    st = collections.Counter()
+    nbase = len(V['xbase'][spec][1]); T = V['tu'][spec][1]; TE = V['tu'][en_spec][1]
+    packs = [k for k in COSTUME_PACKS if k in V and spec in V[k] and en_spec in V[k]]
+    for x, p in m.items():
+        if x < nbase or x >= len(T) or TE[x] != b'': continue
+        st['tu_empty_slots'] += 1
+        cand = [(V[k][en_spec][1][x], V[k][spec][1][x]) for k in packs if x < len(V[k][spec][1])]
+        cand = [c for c in cand if c[0] != b'']
+        if not packs: st['no_costume_pack'] += 1; continue
+        if not cand: st['pack_empty_too'] += 1; continue
+        if len({c[1] for c in cand}) != 1: st['packs_disagree'] += 1; continue
+        strings[p] = cand[0][1]; st['filled_from_pack'] += 1
+    return st
+
+
+def unwrap_descriptions(m, strings):
+    """Installed-state rule (tools/dlc_text_unwrap.py, played 27.10., docs/DLC_MENU.md): with the Xbox TU text style
+    the mission description box wraps by itself, so every hard line break of the two DLC descriptions becomes a
+    space (FR / DE / IT / ES / NL carry Xbox breaks every 47-52 characters; English has none). Same length."""
+    st = collections.Counter()
+    for x, p in DESC_IDS.items():
+        assert m.get(x) == p, 'description id map changed: Xbox %d -> %s, expected %d' % (x, m.get(x), p)
+        if b'\n' in strings[p]:
+            strings[p] = strings[p].replace(b'\n', b' '); st['description_unwrapped'] += 1
+    return st
 
 def write_pc(lang, strings, offs_pc):
     """PC layout: index 0 and PC 'missing' ids point at offset 0 (the header) like the shipped PC file."""
@@ -145,6 +205,8 @@ files_cache = {}
 
 if __name__ == '__main__':
     import json
+    no_pack_fill = '--no-pack-fill' in sys.argv
+    if no_pack_fill: sys.argv.remove('--no-pack-fill')
     for k in SRC:
         f, e = files(k)
         if f: files_cache[k] = f
@@ -160,6 +222,8 @@ if __name__ == '__main__':
         d = os.path.join(out, 'mods', 'local'); os.makedirs(d, exist_ok=True)
         for spec in SPECS:
             lang, strings, st = merged(V, spec, m)
+            if not no_pack_fill: st.update(unfilled_from_packs(V, m, spec, strings))
+            st.update(unwrap_descriptions(m, strings))
             offs_pc = parse(files_cache['pcpatch'][spec], 'le')[2]
             b = write_pc(lang, strings, offs_pc)
             back = parse(b, 'le')[1]

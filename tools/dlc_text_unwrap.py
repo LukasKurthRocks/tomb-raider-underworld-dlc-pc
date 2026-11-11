@@ -9,6 +9,8 @@ them itself - one rule for every language. Same length, so offsets do not change
 Usage (from the repository root):  ..\\bin\\venv\\Scripts\\python.exe -I tools/dlc_text_unwrap.py [src dir]
   src dir defaults to ../data/pc/mods/local/ (the installed build)
   -> work/dlc_text/local/locals.bin_<NNN> (+ md5.txt, patch_log.txt)
+Pipeline: since 2026-11-11 the same rule runs inside `tools/locals.py build` (unwrap_descriptions); this tool stays
+for patching an existing set of tables.
 """
 import sys, os, hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

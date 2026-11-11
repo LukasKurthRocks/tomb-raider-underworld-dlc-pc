@@ -3,7 +3,9 @@ and applies the TU text where the TU changed an Xbox base placeholder but the PC
 equality rule of locals.merged() did not recognise: found by comparing every mapped id (6 languages) -> only Spanish (spec 0xfffff7f0, suffix 016):
  PC 450 'Mision Extra 1' -> TU 'BAJO LAS CENIZAS' (DLC mission 1 title in the DLC menu), PC 93 'Traje Extra 11' -> 'Traje seco rojo',
  PC 98 'Traje Extra 16' -> 'Traje humedo azul'. German PC 93 ('Roter Trockenanzug Leicht') is a real PC text and is kept.
-Output: work/dlc_images/local/mods/local/locals.bin_{001,002,004,008,016,032} + md5.txt. Run: tools/venv/bin/python -I tools/locals_fix_dlcimg.py"""
+Output: work/dlc_images/local/mods/local/locals.bin_{001,002,004,008,016,032} + md5.txt. Run: tools/venv/bin/python -I tools/locals_fix_dlcimg.py
+Superseded 2026-11-11: `tools/locals.py build` finds these three ids itself by rule (merged() / same_slot_number: the PC
+text ends in the slot number of the Xbox base placeholder); kept for reference."""
 import sys, os, json, hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import locals as L, dlc_text_cov as C

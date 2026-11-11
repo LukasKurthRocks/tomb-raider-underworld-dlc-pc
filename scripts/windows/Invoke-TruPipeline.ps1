@@ -27,8 +27,9 @@
                   work\chain_aim\model_point_rules.pkl, work\generic\dtpid_evidence.pkl
       Convert  dlc_convert_all --media --write --extra-fixes -> work\generic\out\pack10|pack11\*.drm
       Names    dlc_names (file names of unnamed DLC records) -> work\generic\dlc_names.txt (can run any time after Ids)
-      Media    dlc_media_build (our reconstruction: DLC 1 tree in the B138 layout), locals build, padshock build,
-               compare_b138 -> work\rebuild\stage1\mods + work\rebuild\compare_stage1.json
+      Media    dlc_media_build (our reconstruction: DLC 1 tree in the B138 layout), locals build (with the text
+               rules of the played tables: localised placeholders, unfilled slot from the costume packs, unwrapped
+               DLC descriptions; gate tools\locals_text_gate.py), padshock build, compare_b138 -> work\rebuild\stage1\mods + work\rebuild\compare_stage1.json
       Audio    dlc_audio_build (our glue: wave_swap for all DRMs incl. sub folders, mul_audio_batch), compare_b138
                -> work\rebuild\stage2a\mods (replaced on every run) + compare_stage2a.json
       Assemble upstream's full stage-1 route (optional, after Media): render tables (render_tables_build build,
