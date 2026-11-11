@@ -109,10 +109,34 @@
 // jump to AcceptStartLevel, which calls f27(&name, sel, 0, 1) as the TU does; the PC's own case-8 tail (vcall +0x148,
 // stdscreenmgr f7 / f19) follows unchanged. With sel 0 and the reset the level load takes the unit default (dlc_level2
 // _start: lara_doppelganger -> doppelganger_casual by 0.1), as the main-menu start (script 104 as the TU) already does.
-// Not ported (documented in the Befund): the TU's tailoring reset in the same case (four calls 0x822a2b50 "EnemyHP" /
-// "AmmoAdj" / "PlayerHP" / "SavingGrabAdj" with the old value, then game data +0x3efa0 / a4 / ac / b0 / b4 = 1; PC
-// +0x3ef98 / 9c / a4 / a8 / ac by the +8 shift of UILoadLevel's saved fields - the PC partner of 0x822a2b50 is not
-// identified) and the TU-only `stb 0, 0x1f94(0x829be044)` after the case.
+// Not ported in 0.6: the TU's tailoring reset in the same case and the TU-only `stb 0, 0x1f94(0x829be044)` after the
+// case - both translated by 0.7 ([Mission] DialogDifficulty, below).
+//
+// 0.7 (2026-11-11, Q33, docs Befund-DLC-Schwierigkeit-1111.md): the rest of the TU's case 8, behind
+// [Mission] DialogDifficulty (default 0 = as 0.6; needs DialogStart=1, whose detour it extends).
+//   a) TU 0x8247f2d8..0x8247f3a0 "Resetting player tailoring to Medium difficulty.": for EnemyHP / AmmoAdj / PlayerHP /
+//      SavingGrabAdj 0x822a2b50(name, old value, 1) + game data ([0x829be4a8]) +0x3efa0 / a4 / ac / b0 = 1, then
+//      +0x3efb4 = 1. That is word for word the body of the TU's tailoring setters 0x824be628 / 680 / 6d8 / 730 / 788
+//      (script natives (8,120) f6..f10; retail 0x824ba640 / 698 / 6f0 / 748 / 7a0, moved-equal, the same offsets) with
+//      the value 1. Their PC partners (xbox_pc_map "string, anchor", strings EnemyHP 0x85ddf8 ... SavingGrabAdj
+//      0x85de14) are tru+0x2e75a0 / 0x2e75e0 / 0x2e7620 / 0x2e7660 / 0x2e76a0 (natives f6..f10 of the class registered
+//      by tru+0x3aede0): `v <= 2 ? (0x6457a0(name, old, v), [[0xc59264]+0x3ef98 / 9c / a4 / a8 / ac] = v)`. So
+//      0x822a2b50 = GameMetrics SendSettingChangedMetric (TU: two "%d" strings, then 0x822a2c38 builds a metric
+//      "Setting" / "Prev" / "New", error "[GameMetrics] SendSettingChangedMetric NewMetric NULL") = PC tru+0x2457a0, the
+//      folded empty function (`ret`, 2143 callers) - metrics are compiled out of the PC build. The plugin calls the
+//      five PC setters with 1 in the TU's order, before f27 (as the TU: reset, print, rule, UILoadLevel); 1 is also
+//      the PC's own default (tru+0x2e7500 sets all five to 1).
+//   b) TU 0x8247f570..0x8247f57c `stb 0, 0x1f94(0x829be044)` = byte 0x829bffd8 (retail 0x829bdf54 + 0x1f94 =
+//      0x829bfee8), after the case's tail. Retail writers 0x8229d6d0 (1) / 0x8229d5d0 (0) = PC tru+0x1d4780 / 0x1d4700
+//      (xbox_pc_map verified; the same state +0xbb = 6 / 0 and flag masks) store it through tru+0x1bfdf0(b) =
+//      `[0xdb94de] = b` (TruMenu 0.10.4: the pause menu's render-clock hold, read only by tru+0x1bf840: dt 0 while
+//      set). The plugin redirects the tail's last call tru+0x37e8f9 (call tru+0xbe5e0 = retail `bl 0x821669e0` at
+//      0x824798dc, inlined by the TU at 0x8247f558..0x8247f56c) to a stub that makes that call and then
+//      tru+0x1bfdf0(0), the TU's store right after it.
+//   Not translated (no plugin site): the TU's main-menu start (script 134 function 9, no game in progress) also calls
+//   natives (8,120) f6..f10 with 1; the PC script 104 function 9 (pipeline S104) has no such calls - a data change.
+//   Also open: the same TU store after cases 4 and 6 (addresses in the Befund; not named here, so that
+//   tools/tu_coverage.py does not count those blocks as covered).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -216,6 +240,44 @@ const char *const kNoSelectUnits[] = {"dlc_level2_start", "dlc_level3_start", "d
                                       "dlc_level6_start"};
 typedef void(__cdecl *UiLoadLevelFn)(const DWORD *args, int select, int arg3, int newGame);
 
+// ---- 0.7: the rest of the TU's case 8 (tailoring reset 0x8247f2d8..0x8247f3a0, store 0x8247f570..0x8247f57c),
+// [Mission] DialogDifficulty ----
+struct TailorSetter {
+    const char *name;                      // the metric name the setter passes (TU 0x82072374 ...), or the native
+    DWORD fn, pcOff, tuOff;                // PC setter, PC game-data field, TU game-data field
+    const char *hex;                       // the whole PC setter (byte check)
+};
+const TailorSetter kTailor[] = {
+    // TU 0x8247f2e8..0x8247f324 (setter 0x824be628, native f6)
+    {"EnemyHP", 0x006e75a0, 0x3ef98, 0x3efa0,
+     "56 8b742408 83fe02 7726 a16492c500 8b8898ef0300 56 51 68f8dd8500 e8dfe1f5ff 8b156492c500 83c40c 89b298ef0300 5e c3"},
+    // TU 0x8247f30c..0x8247f34c (setter 0x824be680, native f7)
+    {"AmmoAdj", 0x006e75e0, 0x3ef9c, 0x3efa4,
+     "56 8b742408 83fe02 7726 a16492c500 8b889cef0300 56 51 6800de8500 e89fe1f5ff 8b156492c500 83c40c 89b29cef0300 5e c3"},
+    // TU 0x8247f334..0x8247f374 (setter 0x824be6d8, native f8)
+    {"PlayerHP", 0x006e7620, 0x3efa4, 0x3efac,
+     "56 8b742408 83fe02 7726 a16492c500 8b88a4ef0300 56 51 6808de8500 e85fe1f5ff 8b156492c500 83c40c 89b2a4ef0300 5e c3"},
+    // TU 0x8247f35c..0x8247f39c (setter 0x824be730, native f9)
+    {"SavingGrabAdj", 0x006e7660, 0x3efa8, 0x3efb0,
+     "56 8b742408 83fe02 7726 a16492c500 8b88a8ef0300 56 51 6814de8500 e81fe1f5ff 8b156492c500 83c40c 89b2a8ef0300 5e c3"},
+    // TU 0x8247f384..0x8247f3a0 (setter 0x824be788, native f10: no metric)
+    {"native f10", 0x006e76a0, 0x3efac, 0x3efb4, "8b442404 83f802 770c 8b0d6492c500 8981acef0300 c3"},
+};
+const int kTailorCount = sizeof(kTailor) / sizeof(kTailor[0]);
+const int kTailorMedium = 1;               // TU li r5,1 / li r31,1 ("Medium"); the PC default (tru+0x2e7500)
+const DWORD kMetricStub = 0x006457a0;      // PC partner of TU 0x822a2b50 (SendSettingChangedMetric): `ret` (folded)
+const char *const kMetricStubHex = "c3 cc";
+const DWORD kTailCall = 0x0077e8f9;        // case-8 tail: call 0x4be5e0; jmp 0x77e94a (TU store after the inlined call)
+const char *const kTailCallHex = "e8e2fcd3ff eb4a";
+const DWORD kTailCallee = 0x004be5e0;      // mov ecx,[0A13F50h]; mov eax,[ecx]; mov edx,[eax+10h]; jmp edx
+const char *const kTailCalleeHex = "8b0d503fa100 8b01 8b5010 ffe2";
+const DWORD kHoldSet = 0x005bfdf0;         // cdecl(BYTE b): [0xdb94de] = b (retail stb 0x829bfee8, TU 0x829bffd8)
+const char *const kHoldSetHex = "8a442404 a2de94db00 c3";
+const DWORD kHoldByte = 0x00db94de;
+typedef void(__cdecl *SetterFn)(int);
+typedef void(__cdecl *VoidFn)();
+typedef void(__cdecl *HoldSetFn)(BYTE);
+
 // options (TruDlc2Player.ini, section [Dlc2Player])
 int g_enabled = 1, g_logLevel = 1, g_costume = 1, g_typeRecord = 1, g_flagReset = 1, g_costumeReset = 1;
 int g_trackerFlag = 1;                     // 0.4: DoppelgangerInit also stores [[0xfadb58]]+0x1244 = 1 (TU 0x82412c84)
@@ -223,6 +285,8 @@ int g_tuMapping = 0;                       // 0.5: [Costume] TuMapping - the TU'
 volatile LONG g_mapCount = 0;              // 0.5: mappings done (each one logged)
 int g_dialogStart = 1;                     // 0.6: [Mission] DialogStart - dialog accept case 8 as the TU
 volatile LONG g_dialogStarts = 0;          // 0.6: case-8 starts done (each one logged)
+int g_dialogDifficulty = 0;                // 0.7: [Mission] DialogDifficulty - tailoring reset + hold store of case 8
+bool g_difficultyOk = false;               // 0.7: setters checked and the tail call redirected
 const DWORD kTrackerPtr = 0x00fadb58;      // TU 0x829892b0 (the game tracker / player state block)
 const DWORD kTrackerFlag = 0x1244;         // TU flag byte, read by larabase f36 tru+0x377dc0 and tru+0x3200df
 const DWORD kF36Body = 0x00777dc0;         // larabase f36 body: mov eax,[0FADB58h]; mov al,[eax+1244h]; ret
@@ -776,12 +840,47 @@ bool PatchTuMapping() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// 0.7: TU 0x8247f2d8..0x8247f3a0 "Resetting player tailoring to Medium difficulty." - the five PC tailoring setters
+// with 1 in the TU's order (each = the TU's metric call (a PC `ret`) + store); old / new values logged
+void TailoringReset(LONG n) {
+    DWORD game = 0, before[kTailorCount], after[kTailorCount];
+    bool readOk = ReadDword(kGameData, &game) && game;
+    for (int i = 0; i < kTailorCount; ++i) {
+        before[i] = 0xffffffff;
+        if (readOk) ReadDword(game + kTailor[i].pcOff, &before[i]);
+    }
+    for (int i = 0; i < kTailorCount; ++i) {
+        __try {
+            reinterpret_cast<SetterFn>(kTailor[i].fn)(kTailorMedium);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+            Log(0, "dialog difficulty %ld: exception 0x%08lx in the %s setter 0x%08lx - the rest of the reset skipped", n,
+                GetExceptionCode(), kTailor[i].name, kTailor[i].fn);
+            return;
+        }
+    }
+    game = 0;
+    readOk = ReadDword(kGameData, &game) && game;
+    for (int i = 0; i < kTailorCount; ++i) {
+        after[i] = 0xffffffff;
+        if (readOk) ReadDword(game + kTailor[i].pcOff, &after[i]);
+    }
+    Log(1, "dialog difficulty %ld: player tailoring reset to Medium (1) as the TU 0x8247f2d8..0x8247f3a0 - EnemyHP +0x%lx "
+           "%ld -> %ld, AmmoAdj +0x%lx %ld -> %ld, PlayerHP +0x%lx %ld -> %ld, SavingGrabAdj +0x%lx %ld -> %ld, f10 +0x%lx "
+           "%ld -> %ld (game data 0x%08lx)", n,
+        kTailor[0].pcOff, static_cast<long>(before[0]), static_cast<long>(after[0]),
+        kTailor[1].pcOff, static_cast<long>(before[1]), static_cast<long>(after[1]),
+        kTailor[2].pcOff, static_cast<long>(before[2]), static_cast<long>(after[2]),
+        kTailor[3].pcOff, static_cast<long>(before[3]), static_cast<long>(after[3]),
+        kTailor[4].pcOff, static_cast<long>(before[4]), static_cast<long>(after[4]), game);
+}
+
 // 0.6: dialog accept case 8 (start a level from the game) as the TU, 0x8247f2c8..0x8247f510 (see the header)
 extern "C" void __cdecl AcceptStartLevel(const char *name) {
     static DWORD args[1];                  // the DataValue f27 reads its name from (TU: &local 0x60); f27 copies the name
     LONG n = InterlockedIncrement(&g_dialogStarts);
     char shown[64];
     SafeName(name ? name : "", shown, sizeof(shown));
+    if (g_difficultyOk) TailoringReset(n); // 0.7: the TU resets before the print / rule / UILoadLevel
     int select = 1;                        // TU 0x8247f3c8..0x8247f4dc: five byte-compare loops (= strcmp)
     for (const char *u : kNoSelectUnits)
         if (strcmp(shown, u) == 0) select = 0;
@@ -842,6 +941,50 @@ bool PatchDialogStart() {
     return true;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// 0.7: the case-8 tail's last call tru+0x37e8f9 (call 0x4be5e0) -> this; then the TU's store 0x8247f570..0x8247f57c
+// `stb 0, 0x1f94(0x829be044)` = PC 0x5bfdf0(0) ([0xdb94de] = 0). Called only from case 8 (no branch into the tail:
+// tools/pe_patch_site_check.py); eax / ecx / edx are free (the next instruction is jmp 0x77e94a, which loads eax)
+volatile LONG g_tailHolds = 0;
+
+extern "C" void __cdecl AcceptCase8Tail() {
+    reinterpret_cast<VoidFn>(kTailCallee)();
+    BYTE before = 0xff, after = 0xff;
+    __try { before = *reinterpret_cast<volatile BYTE *>(kHoldByte); } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    reinterpret_cast<HoldSetFn>(kHoldSet)(0);
+    __try { after = *reinterpret_cast<volatile BYTE *>(kHoldByte); } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    LONG n = InterlockedIncrement(&g_tailHolds);
+    Log(1, "dialog difficulty %ld: case-8 tail - render hold [0x%08lx] %u -> %u (0x%08lx(0) as the TU store 0x8247f57c "
+           "`stb 0, 0x1f94(0x829be044)`)", n, kHoldByte, before, after, kHoldSet);
+}
+
+bool PatchDialogDifficulty() {
+    for (int i = 0; i < kTailorCount; ++i) {
+        if (!HexBytesAt(kTailor[i].fn, kTailor[i].hex)) {
+            Log(0, "dialog difficulty: the %s setter 0x%08lx (TU game data +0x%lx = PC +0x%lx) does not match - not "
+                   "patched", kTailor[i].name, kTailor[i].fn, kTailor[i].tuOff, kTailor[i].pcOff);
+            return false;
+        }
+    }
+    if (!HexBytesAt(kMetricStub, kMetricStubHex) || !HexBytesAt(kTailCall, kTailCallHex) ||
+        !HexBytesAt(kTailCallee, kTailCalleeHex) || !HexBytesAt(kHoldSet, kHoldSetHex)) {
+        Log(0, "dialog difficulty: metric stub 0x%08lx / tail call 0x%08lx / its callee 0x%08lx / hold setter 0x%08lx does "
+               "not match - not patched", kMetricStub, kTailCall, kTailCallee, kHoldSet);
+        return false;
+    }
+    BYTE code[5];
+    code[0] = 0xe8;
+    DWORD rel = reinterpret_cast<DWORD>(&AcceptCase8Tail) - (kTailCall + 5);
+    memcpy(code + 1, &rel, 4);
+    if (!WriteCode(kTailCall, code, sizeof(code))) return false;
+    g_difficultyOk = true;
+    Log(1, "dialog difficulty: case 8 also resets the player tailoring to Medium (setters 0x%08lx / 0x%08lx / 0x%08lx / "
+           "0x%08lx / 0x%08lx with 1, before f27; TU 0x8247f2d8..0x8247f3a0) and clears the render hold [0x%08lx] after "
+           "its tail (call at 0x%08lx redirected; TU 0x8247f57c)", kTailor[0].fn, kTailor[1].fn, kTailor[2].fn,
+        kTailor[3].fn, kTailor[4].fn, kHoldByte, kTailCall);
+    return true;
+}
+
 void ReadOptions(const char *dir) {
     char ini[MAX_PATH];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruDlc2Player.ini", dir);
@@ -854,6 +997,7 @@ void ReadOptions(const char *dir) {
     g_trackerFlag = GetPrivateProfileIntA("Dlc2Player", "TrackerFlag", 1, ini);
     g_tuMapping = GetPrivateProfileIntA("Costume", "TuMapping", 0, ini);      // 0.5, default 0 = as 0.4
     g_dialogStart = GetPrivateProfileIntA("Mission", "DialogStart", 1, ini);  // 0.6, 0 = as 0.5
+    g_dialogDifficulty = GetPrivateProfileIntA("Mission", "DialogDifficulty", 0, ini);  // 0.7, 0 = as 0.6
 }
 
 void Start(HMODULE self) {
@@ -863,9 +1007,10 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDlc2Player.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDlc2Player 0.6 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
-           "reset %d, tracker flag %d, [Costume] TU mapping %d, [Mission] dialog start %d)", g_enabled, g_logLevel,
-        g_costume, g_typeRecord, g_flagReset, g_costumeReset, g_trackerFlag, g_tuMapping, g_dialogStart);
+    Log(1, "TruDlc2Player 0.7 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
+           "reset %d, tracker flag %d, [Costume] TU mapping %d, [Mission] dialog start %d, dialog difficulty %d)",
+        g_enabled, g_logLevel, g_costume, g_typeRecord, g_flagReset, g_costumeReset, g_trackerFlag, g_tuMapping,
+        g_dialogStart, g_dialogDifficulty);
     if (!g_enabled) { Log(1, "disabled by TruDlc2Player.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -890,9 +1035,19 @@ void Start(HMODULE self) {
     if (g_flagReset) PatchFlagReset();
     else Log(1, "flag reset: off ([Dlc2Player] FlagReset=0) - the flag stays set after DLC 2 for the whole session");
     // 0.6: independent of the costume patches (the TU rule decides only the selection and the new-game reset)
-    if (g_dialogStart) PatchDialogStart();
+    bool started = false;
+    if (g_dialogStart) started = PatchDialogStart();
     else Log(1, "dialog start: off ([Mission] DialogStart=0) - a level started from the game (pause menu -> DLC) keeps "
                 "the PC / retail UILoadLevel(name, 1, 0, 0): always the outfit selection");
+    // 0.7: the rest of the TU's case 8 - only together with the 0.6 detour (the TU does all of it in one case)
+    if (g_dialogDifficulty) {
+        if (started) PatchDialogDifficulty();
+        else Log(0, "dialog difficulty: [Mission] DialogDifficulty=1 but the DialogStart detour is not in place "
+                    "(DialogStart=0 or its check failed) - not patched");
+    } else {
+        Log(1, "dialog difficulty: off ([Mission] DialogDifficulty=0) - a level started from the game keeps the player "
+               "tailoring (the TU resets it to Medium)");
+    }
 }
 
 }  // namespace
@@ -908,9 +1063,10 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported: plugin identification, and the TU's gameTracker+0x1244 for other plugins (1 after DoppelgangerInit)
 extern "C" __declspec(dllexport) const char *TruDlc2PlayerVersion() {
-    return "TruDlc2Player 0.6 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
+    return "TruDlc2Player 0.7 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
            "reset outside DLC 2, game tracker +0x1244 as the TU, [Costume] TuMapping 857 <-> 11 in save / load / "
-           "spawns, [Mission] DialogStart: DLC 2 from the game without the outfit selection as the TU)";
+           "spawns, [Mission] DialogStart: DLC 2 from the game without the outfit selection as the TU, [Mission] "
+           "DialogDifficulty: that start also resets the player tailoring to Medium as the TU)";
 }
 
 extern "C" __declspec(dllexport) int TruDlc2PlayerDoppelganger() {

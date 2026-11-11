@@ -20,8 +20,35 @@ Befund-TU-Funktionen L4, Befund-Kostuem-Reset-DLC1).
 
 | 0.6 level start from the game (`[Mission] DialogStart`, default 1) | yes / no dialog accept `ScriptDialogYesNo::RegisterAcceptChanges` 0x8247f0c0, case 8 0x8247f2c8..0x8247f510: `sel` = 0 for `dlc_level2_start` .. `dlc_level6_start` (string table 0x820760f8), else 1; `MainTracker_UILoadLevel(name, sel, 0, 1)` | PC 0x77e790 case 8 (retail code: `UILoadLevel(name, 1, 0, 0)` inlined, always the outfit selection): the 35 bytes 0x77e8c0..0x77e8e3 jump to a stub that calls f27 0x77e170(name, sel, 0, 1); the PC's own case tail follows |
 
+| 0.7 rest of case 8 (`[Mission] DialogDifficulty`, default 0) | the same case 0x8247f2d8..0x8247f3a0: "Resetting player tailoring to Medium difficulty." - `0x822a2b50(name, old, 1)` + game data +0x3efa0 / a4 / ac / b0 = 1 for EnemyHP / AmmoAdj / PlayerHP / SavingGrabAdj, +0x3efb4 = 1 (= the bodies of the setters 0x824be628..0x824be788, natives f6..f10, with 1); after the case 0x8247f57c `stb 0, 0x1f94(0x829be044)` | inside the 0.6 stub, before f27: the PC setters 0x6e75a0 / 0x6e75e0 / 0x6e7620 / 0x6e7660 / 0x6e76a0 with 1 (+0x3ef98 / 9c / a4 / a8 / ac; their metric call 0x6457a0 is the PC's empty `ret`); the tail's last call 0x77e8f9 (call 0x4be5e0) -> a stub that makes it and then 0x5bfdf0(0) = `[0xdb94de] = 0`; needs `DialogStart=1` |
+
 Every patched byte is compared with the expected code / data first; on a mismatch that part is left alone and the
 reason is logged.
+
+### 0.7: the TU's tailoring reset in the same case (Befund-DLC-Schwierigkeit-1111)
+
+The TU's case 8 also sets the player tailoring (the difficulty values) to Medium before the start. The call
+0x822a2b50 the TU makes for four of the values is `GameMetrics` *SendSettingChangedMetric* (it formats old / new with
+`%d` and builds a metric "Setting" / "Prev" / "New"); the case's code is word for word the body of the TU's tailoring
+setters 0x824be628 / 680 / 6d8 / 730 / 788 (script natives f6..f10; retail 0x824ba640..0x824ba7a0 moved-equal) with
+the value 1. Their PC partners are the setters 0x6e75a0 / 0x6e75e0 / 0x6e7620 / 0x6e7660 / 0x6e76a0 (strings
+`EnemyHP` 0x85ddf8 ... `SavingGrabAdj` 0x85de14; natives f6..f10 of the class registered by 0x7aede0), each
+`v <= 2 -> 0x6457a0(name, old, v); [[0xc59264] + 0x3ef98 / 9c / a4 / a8 / ac] = v`. 0x6457a0 is the PC's folded empty
+function (`ret`, 2143 callers): metrics are compiled out, so the PC partner of 0x822a2b50 is that `ret`. 1 is also the
+PC's own default (0x6e7500 sets all five to 1). `DialogDifficulty=1` calls the five setters with 1 in the TU's order
+inside the 0.6 stub, before f27, and logs old / new values.
+
+After the case the TU stores `0x1f94(0x829be044) = 0` (byte 0x829bffd8; retail 0x829bfee8). Retail writes that byte
+in 0x8229d6d0 (1) / 0x8229d5d0 (0), whose PC partners 0x5d4780 / 0x5d4700 (xbox_pc_map verified, the same state
++0xbb = 6 / 0 and flag masks) call 0x5bfdf0(1 / 0) = `[0xdb94de]` - the pause menu's render-clock hold (TruMenu
+README, shader clock: dt 0 while set). The plugin redirects the case tail's last call 0x77e8f9 (call 0x4be5e0, the
+retail `bl 0x821669e0` the TU inlined right before its store) to a stub that makes that call and then 0x5bfdf0(0).
+No branch enters the tail 0x77e8e3..0x77e8fe (`tools/pe_patch_site_check.py`). Byte checks:
+`work/asi/dlc2p07/prechecks_dlc2p07.txt` (16 / 16 ok against tru.exe md5 5560abac...).
+
+Not translated: the TU's main-menu start (script 134 function 9, no game in progress) calls the natives f6..f10 with 1
+as well; the PC's script 104 function 9 (pipeline S104) has no such calls - a data change, not plugin code. The same
+TU store after cases 4 and 6 is also open.
 
 ### 0.6: DLC 2 from the pause menu without the outfit selection (Befund-Kostuemauswahl-DLC2-1111)
 
@@ -34,9 +61,9 @@ and the dialog's accept handler starts the level. Retail and PC: `UILoadLevel(na
 the chosen costume stays); TU: `UILoadLevel(name, 0 for dlc_level2..6_start else 1, 0, 1)` - the 4th argument 1 also
 runs the new-game block with the costume reset, so the unit default `lara_doppelganger` (-> `doppelganger_casual`,
 0.1) is loaded. `DialogStart=1` translates the rule and the call; DLC 1 keeps its selection (as on the TU).
-Not ported: the TU's tailoring reset to Medium in the same case (`EnemyHP` / `AmmoAdj` / `PlayerHP` /
-`SavingGrabAdj` via 0x822a2b50, whose PC partner is not identified) - on PC the player's tailoring stays as it was
-(f27 keeps it across the reset); and the TU-only byte store `0x1f94(0x829be044) = 0` after the case. Byte checks:
+Not ported in 0.6: the TU's tailoring reset to Medium in the same case (`EnemyHP` / `AmmoAdj` / `PlayerHP` /
+`SavingGrabAdj` via 0x822a2b50) - on PC the player's tailoring stays as it was (f27 keeps it across the reset); and
+the TU-only byte store `0x1f94(0x829be044) = 0` after the case. Both: 0.7 `DialogDifficulty` (above). Byte checks:
 `work/asi/dlc2p06/prechecks_dlc2p06.txt` (8 / 8 ok against tru.exe md5 5560abac...); patch site:
 `tools/pe_patch_site_check.py` (no branch into the 35 bytes). Log: one line per start (`dialog start N: level ...`)
 and the selection byte after f27.
@@ -96,6 +123,7 @@ DLC 2 (TruMenu `costume.choose doppelganger_casual`) is reset as well; `CostumeR
 | `TrackerFlag` | 1 | 0.4: DoppelgangerInit also stores game tracker +0x1244 = 1 (TU 0x82412c84) |
 | `[Costume] TuMapping` | 0 | 0.5: the TU's 857 <-> 11 mapping in state save / load / both spawns (needs `TypeRecord=1`, `Costume=1`; 0 = nothing patched, as 0.4) |
 | `[Mission] DialogStart` | 1 | 0.6: a level started from the game (pause menu -> DLC, dialog accept case 8) as the TU: `dlc_level2..6_start` without the outfit selection, every level with the new-game reset (independent of the other keys; 0 = nothing patched, as 0.5) |
+| `[Mission] DialogDifficulty` | 0 | 0.7: that start also sets the player tailoring to Medium (1) through the game's five setters and clears the render hold `[0xdb94de]` after the case, as the TU (needs `DialogStart=1`; 0 = nothing patched, as 0.6) |
 
 ## Log lines (`TruDlc2Player.log` next to `tru.exe`)
 
@@ -168,3 +196,26 @@ built-in default `DialogStart=1` applies when the key is missing).
 4. In DLC 2: pause -> DLC -> DLC 1 -> yes: `dialog start N: level "dlc_level1_start" ... 1, 0, 1 ... WITH costume /
    weapon selection`; the outfit screen appears (as on the TU), Lara in the chosen outfit.
 5. If the game crashes or hangs after "yes": `DialogStart=0` and send TruDlc2Player.log + TruMenu.log.
+
+## TO TEST (0.7, build `work\asi\dlc2p07`)
+
+Install with `Set-TruDlc2Player.ps1 -Install -SourceDir work\asi\dlc2p07` (game closed). `DialogDifficulty` is 0 by
+default: set `[Mission] DialogDifficulty=1` in the installed `TruDlc2Player.ini` (an edited 0.6 .ini lacks the key -
+then the built-in 0 applies). No TruMenu Fixes row (the switch list is full at 159 / 160).
+
+1. `DialogDifficulty=0`: start line `TruDlc2Player 0.7 loaded (... dialog start 1, dialog difficulty 0)`,
+   `dialog difficulty: off ...`; everything as 0.6.
+2. `DialogDifficulty=1`: `dialog difficulty: case 8 also resets the player tailoring to Medium (setters 0x006e75a0 ...)
+   ... (call at 0x0077e8f9 redirected; TU 0x8247f57c)`.
+3. In the game's options set the difficulty / tailoring values away from Medium (e.g. enemy health high, player health
+   low); note them.
+4. In DLC 1: pause -> DLC -> DLC 2 -> yes: `dialog difficulty 1: player tailoring reset to Medium (1) ... EnemyHP
+   +0x3ef98 <old> -> 1, AmmoAdj +0x3ef9c <old> -> 1, PlayerHP +0x3efa4 <old> -> 1, SavingGrabAdj +0x3efa8 <old> -> 1,
+   f10 +0x3efac <old> -> 1`, then the 0.6 `dialog start 1: ...` lines, then `dialog difficulty 1: case-8 tail - render
+   hold [0x00db94de] <b> -> 0` (note `<b>`: 1 = the pause menu's hold was still set at that point - then the TU
+   store matters; 0 = it was already cleared); DLC 2 starts normally.
+5. In DLC 2 the options show Medium for all values (as on the Xbox TU); Lara's health / enemy health as Medium.
+6. Main menu -> DLC -> DLC 2: no `dialog difficulty` line (script path; the TU resets there too - not ported, the
+   values stay as set).
+7. Crash / hang after "yes" or a frozen picture after the load: `DialogDifficulty=0`, send TruDlc2Player.log +
+   TruMenu.log.
