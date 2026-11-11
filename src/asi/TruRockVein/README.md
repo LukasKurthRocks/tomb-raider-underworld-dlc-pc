@@ -3,7 +3,8 @@
 DLC 2 *Lara's Shadow*: the rock veins ("Felsrinnen") for the PC `tru.exe` - step 3.4a of bringing the Xbox title
 update to PC (see docs/PLUGINS.md, "How the Xbox title update is brought to PC", and docs/WINDOWS_REBUILD.md
 finding 43). 0.1 played 2026-10-30 (patched, never asked - see 0.2); 0.2 built 2026-10-31, not yet played. Since 0.10
-also the title update's SweepAndPrune limits of the markup manager (section 0.10).
+also the title update's SweepAndPrune limits of the markup manager (section 0.10), since 0.11 its ledge-corner nudge,
+since 0.12 its jump targets on vertical segments (pillar jumps) - base-game fixes the PC never got.
 
 ## What it does
 
@@ -244,6 +245,56 @@ bug list entries G5a / G15 (shimmying round corners, also on PC) - not re-checke
 | 3 | the same corner with `[LedgeCorner] Translate=0` | the PC behaviour as before, no nudge line |
 | 4 | ledge climbing in general, DLC 2 rock veins (0.4-0.9 paths) | no change elsewhere, no crash; with `LogLevel=2` the nudge count grows only at corners |
 
+## 0.12: jump targets on vertical segments as the title update (2026-11-11)
+
+Published TU fix (TeamXbox 09.03.2009): "Improved jump targeting for pillar jumps". Located in code by 17w
+(`docs\Befund-17w-TU-Fixes-0811.md` row 1, ENGINE.md section 14 "Jump targeting"), translated 1:1 here (Q61,
+statically proven, `work\q61_jumptarget_1111\`, finding `docs\Befund-Sprungziele-Q61-1111.md` in the workspace).
+
+Jump targeting tests Lara's jump parabola against every markup segment: ParabolaVsSegment (PC tru+0x2f9940 = retail
+0x823f43d8 = **TU 0x823f6b08**). Its general case (PC 0x6fa83f, TU +0x96c) runs when the segment is (nearly)
+**vertical** - PC `dl`: `|dx| + |dy| < 0.05 x max(|dz|, 0.001)` (0x6f9c41..0x6f9c8b) - and the jump has horizontal
+speed (`[esp+2Fh]` = 0: `|vx| + |vy| >= 0.001 x (|vz| + 1)`, 0x6f9cf7..0x6f9d21). Ledges (horizontal) never take it;
+vertical poles and pillars do.
+
+| | retail / PC (0x6fa855..0x6fa91d) | title update (TU +0x96c..+0xa08) | 0.12 on PC |
+|---|---|---|---|
+| t | `-dot(v, p) / k` (p = start - A without its part along the segment, k = \|v⊥\|² + p·g: one Newton step from t = 0 towards the closest approach to the segment's line), then **max(t, 0)**, min(t, tMax) | the same, then **\|t\|** (fcmpu / bge / fneg), min(t, tMax), max(t, 0) (two fsel) | as the TU |
+| target | the segment point closest to parabola(t); returns **1** with that t | the same point, then **ParabolaVsPoint**(tOut, ptOut, parabola, point, clamp 1) (TU 0x823f6950 = retail 0x823f4220 = PC **0x6f96c0**): the cubic for the closest approach to that point, **0..2** times | the PC's own 0x46ab60 and 0x6f96c0, count returned |
+| constants | 0.5 (double 0x8413c0) | f29 = 0.5, -1.0 at r5-0x11a0 (the `fchs` of the PC) | 0.5f |
+
+Hook: the 16 bytes `fchs; fdiv [esp+0A8h]; add esp,8; fstp [esp+18h]` at **0x6fa855** run in the stub (4 whole
+instructions, no branch into them, 0x6fa83f is reached only by the je at 0x6fa4a0). Then the frame S: `[S+18h]` t,
+`[S+48h]` tOut, `[S+4Ch]` ptOut, `[S+50h]` velocity, `[S+80h]` origin, `[S+0F0h]` gravity vector, esi parabola (+0x24
+tMax), edi / ebx the segment points (not written between the hook and the call 0x6fa8f7). TU path: `JumpTargetTu`
+writes the position to `[S+90h]` (mulps / addps like 0x6fa8b3..0x6fa8eb), calls 0x46ab60 into `[S+30h]`, then
+0x6f96c0, and leaves through the epilogue 0x6fa488 with the count in eax. PC path: back to 0x6fa865. All five callers
+take 0..2 (0x70fe22 skips 0, the four in 0x6fad70 loop over the count).
+
+Option: `[JumpTarget] Translate` (default 1, like every untested TU translation of this plugin; in the sample ini).
+0 at the game start = nothing patched; with 1 at the start the key is read again at run time (at most once a second,
+when the general case runs): 0 then takes the PC path. Log lines: "jump target: title-update vertical-segment case
+added (...)" at load; on the first case (at `LogLevel=2` every power of two) "jump target: title-update
+vertical-segment case (TU 0x823f6b08 +0x96c): t A -> B (PC: C), segment point (x, y, z), ParabolaVsPoint -> n
+target(s) t D (k cases)"; once each "jump target: first negative t ..." and "jump target: first vertical segment the
+TU rejects ...". Live switch: "jump target: switch [JumpTarget] Translate 1 -> 0 ...". Errors: "ParabolaVsSegment at
+... does not match - title-update jump targeting not added". Built 2026-11-11 into `work\asi\rv12` (install:
+`Set-TruRockVein.ps1 -Install -SourceDir work\asi\rv12`), not loaded, not tested in the game.
+
+Known spot: Croft Manor unit `l3_caverns_start` holds a type-15 **pillar** markup (id 963) whose two points differ only
+in z (1 343 units, item matrix = identity; `tools/markup_level.py --raw` on `work\manor_0611\pcbig\`) - a vertical
+segment, so a jump towards it takes the general case. Other levels are not scanned (only these 9 manor units are
+extracted); every vertical pole (types 4 / 5) and pillar (15) markup is a candidate.
+
+**TO TEST (0.12)**
+
+| # | test | what the owner should see |
+|---|---|---|
+| 1 | start the game with 0.12 installed | `TruRockVein.log`: "TruRockVein 0.12 loaded (... jump target translate 1)" and "jump target: title-update vertical-segment case added ..." |
+| 2 | jump at a vertical pole or pillar from the side (Croft Manor caverns start, pillar id 963; any level with vertical poles) - also jumps where Lara used to miss, grab too low / high or not aim at the pole | one "jump target: title-update vertical-segment case ..." line (t and the PC's t side by side); Lara lands on / grabs the pole; a "first negative t" line shows a case the PC aimed at the jump start |
+| 3 | the same jump with `LogLevel=2`, then set `[JumpTarget] Translate=0` in the ini while the game runs, jump again | "switch [JumpTarget] Translate 1 -> 0"; the case count stops growing (PC path); 1 again switches back |
+| 4 | ledge jumps, horizontal poles, DLC 2 rock veins | no change, no case line for horizontal segments, no crash |
+
 ## Build, install, remove
 
 - Build: `scripts\windows\Build-TruAsi.ps1 -Name TruRockVein` (installed Visual Studio, x86, `/MT`, imports only
@@ -254,7 +305,8 @@ bug list entries G5a / G15 (shimmying round corners, also on PC) - not re-checke
   `LogDefaultConditions`, `MarkupTypes`, `MarkupSlots`, `NullBoxGuard`, `MarkupAction608`, `AttachGeometry`,
   `State420Slot1`, `ChartLog` (`ChartLogFrom` / `ChartLogTo`), `JumpGeometry`, `SkipGeometry` (0.9) - the switches from
   `MarkupTypes` on default to 1, the chart range to 1470..1510; section `[SweepAndPrune]`: `Translate` (0.10, default 1,
-  read at the game start); section `[LedgeCorner]`: `Translate` (0.11, default 1). Log:
+  read at the game start); section `[LedgeCorner]`: `Translate` (0.11, default 1); section `[JumpTarget]`: `Translate`
+  (0.12, default 1, read again at run time when 1 at the start). Log:
   `TruRockVein.log` next to `tru.exe`.
 
 ## Test

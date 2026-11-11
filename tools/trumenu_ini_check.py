@@ -1739,6 +1739,7 @@ SW_TEXT_KEYS = {('TruMercLang', 'MercLang', 'PathFilter'), ('TruTrace', 'Trace',
 # the run-time re-read of every live key: (plugin, section, key) -> function head in the plugin source whose body holds
 # the section and key literals (read from the plugin sources 2026-11-07; everything else is read once in DllMain)
 SW_LIVE = {
+    ('TruRockVein', 'JumpTarget', 'Translate'): 'void JumpTargetReadSwitch(',      # 0.12 (Q61, 2026-11-11)
     ('TruShadowCombat', 'Damage', 'Translate'): 'void DamageReadSwitch(',
     ('TruShadowCombat', 'Chunk', 'Translate'): 'void ChunkReadSwitch(',
     ('TruShadowCombat', 'Splash', 'Translate'): 'void SplashReadSwitch(',

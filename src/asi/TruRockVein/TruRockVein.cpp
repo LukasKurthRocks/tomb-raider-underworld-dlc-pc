@@ -132,6 +132,26 @@
 // to 0x74eaed (one forward je inside, no jump into the range). floorf = the exe's floor 0x813510 rounded to float (TU:
 // floor 0x8268b7a0 + frsp). Option [LedgeCorner] Translate (default 1); log line on the first nudge, at LogLevel 2
 // every power of two.
+//
+// 0.12 (2026-11-11, Q61; docs Befund-17w-TU-Fixes-0811 row 1, Befund-Sprungziele-Q61-1111; ENGINE.md section 14 "Jump
+// targeting"): the title update's jump targets on vertical segments (published fix "Improved jump targeting for pillar
+// jumps"). ParabolaVsSegment PC tru+0x2f9940 = retail 0x823f43d8 = TU 0x823f6b08. Its general case (PC 0x6fa83f, TU
+// +0x96c) is taken when the segment is (nearly) vertical (PC dl: |dx| + |dy| < 0.05 x max(|dz|, 0.001)) and the jump
+// has horizontal speed (PC [esp+2Fh] = 0: |vx| + |vy| >= 0.001 x (|vz| + 1)). Both compute t = -dot(v, p) / k (p =
+// start - segment point A without its part along the segment, k = |v_perp|^2 + dot(p, g); one Newton step from t = 0):
+//   retail / PC: t = min(max(t, 0), tMax); return 1 with t and the segment point closest to parabola(t)
+//   TU:          t = |t| (fcmpu / bge / fneg); t = fsel(tMax - t, t, tMax); t = fsel(t, t, 0); point = the segment
+//                point closest to parabola(t); return ParabolaVsPoint(tOut, ptOut, parabola, point, clamp 1)
+//                (TU 0x823f6950 = retail 0x823f4220 = PC 0x6f96c0: the cubic for the closest approach to that point,
+//                0..2 times, written to tOut / ptOut)
+// JumpTargetStub replaces fchs / fdiv / add esp,8 / fstp [esp+18h] at tru+0x2fa855 (16 bytes, executed in the stub);
+// then esp = the function's frame S: [S+18h] t, [S+48h] tOut, [S+4Ch] ptOut, [S+50h] velocity, [S+80h] origin,
+// [S+0F0h] gravity vector, esi parabola (+0x24 tMax), edi / ebx the segment points as the PC passes them to
+// 0x46ab60. TU path: JumpTargetTu computes the TU's t, the position as the PC does (mulps / addps), calls the PC's own
+// 0x46ab60 and 0x6f96c0 and leaves through the function's epilogue tru+0x2fa488 with the count in eax. PC path: back
+// to tru+0x2fa865. Option [JumpTarget] Translate (default 1): 0 at the start = nothing patched; else read again at
+// run time at most once a second when the general case runs (0 = PC path). Log line on the first TU case, at LogLevel
+// 2 every power of two; first negative t and first "no target" case once each.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -140,6 +160,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <math.h>
+#include <xmmintrin.h>
 
 namespace {
 
@@ -301,6 +322,8 @@ int g_jumpGeometry = 1;                 // 0.8: TU type-22 branches of the jump-
 int g_skipGeometry = 1;                 // 0.9: TU type-22 branch of tru+0x34d390 (TU 0x8242a7c8) ([RockVein] SkipGeometry)
 int g_sapTranslate = 1;                 // 0.10: SweepAndPrune limits as the TU ([SweepAndPrune] Translate)
 int g_ledgeCorner = 1;                  // 0.11: TU ledge-corner nudge (TU 0x8242eeac) ([LedgeCorner] Translate)
+int g_jumpTarget = 1;                   // 0.12: TU jump targets on vertical segments ([JumpTarget] Translate, at the start)
+char g_iniPath[MAX_PATH];               // 0.12: TruRockVein.ini, for the run-time re-read of [JumpTarget] Translate
 DWORD g_facingNext = kFacingNext, g_facingEdge = kFacingEdge, g_moveNext = kMoveNext, g_moveWall = kMoveWall;
 DWORD g_chartTickNext = kChartTickNext;
 volatile LONG g_facingHits = 0, g_moveHits = 0, g_slot1Calls = 0, g_slot1Runs = 0, g_chartLines = 0;
@@ -584,6 +607,8 @@ void ReadOptions(const char *dir) {
     g_skipGeometry = GetPrivateProfileIntA("RockVein", "SkipGeometry", 1, ini);
     g_sapTranslate = GetPrivateProfileIntA("SweepAndPrune", "Translate", 1, ini);   // 0.10
     g_ledgeCorner = GetPrivateProfileIntA("LedgeCorner", "Translate", 1, ini);      // 0.11
+    g_jumpTarget = GetPrivateProfileIntA("JumpTarget", "Translate", 1, ini);        // 0.12
+    strncpy_s(g_iniPath, sizeof(g_iniPath), ini, _TRUNCATE);
 }
 
 // 0.3: the title update's markup types 22 / 23 -> flag class 1 (Xbox TU 0x822a12e8 table entries 21 / 22 = li r3,1).
@@ -1652,6 +1677,181 @@ void PatchLedgeCorner() {
         Log(0, "ledge corner not (fully) written (VirtualProtect %lu)", GetLastError());
 }
 
+// ---- 0.12: title-update jump targets on vertical segments (TU 0x823f6b08 ParabolaVsSegment, general case +0x96c) ----
+// ParabolaVsSegment (custom: ecx ptOut, edx parabola, [ebp+8] tOut, [ebp+0Ch] / [ebp+10h] segment, [ebp+18h] clamp
+// flag); frame S = esp after push ebx / esi / edi: [S+48h] tOut, [S+4Ch] ptOut
+const DWORD kJtSeg = 0x006f9940;
+const char *const kJtSegHex = "55 8bec 83e4f0 81ec04010000 8b4508 d9ee 53 d95c2410 8b5d10 0f280b 56 57 8b7d0c 0f2807 "
+                              "894c244c 8bf2 0f5cc8 8d4c2460 89442448";
+// segment = point: ParabolaVsPoint(tOut, ptOut, parabola, segment point, [ebp+18h]) - the PC's own argument order
+const DWORD kJtPoint = 0x006f9987;
+const char *const kJtPointHex = "8b5518 8b44244c 8b4c2448 52 57 56 50 51 e824fdffff 83c414";
+// return 1 with t = [S+18h] (point copied before), then the epilogue tru+0x2fa488 (eax kept)
+const DWORD kJtTail = 0x006fa476;
+const char *const kJtTailHex = "d9442418 89780c 8b442448 d918 b801000000 5f 5e 5b 8be5 5d c3";
+const DWORD kJtExit = 0x006fa488;         // pop edi; pop esi; pop ebx; mov esp,ebp; pop ebp; ret
+// dl = vertical segment, [esp+2Fh] = vertical velocity: dl && ![esp+2Fh] -> the general case 0x6fa83f
+const DWORD kJtFlags = 0x006fa48f;
+const char *const kJtFlagsHex = "84d2 0f848b040000 807c242f00 ddd8 ddd8 0f8499030000";
+// general case: dot(velocity [S+50h], direction [S+0C0h]) by 0x4320a0, then the hooked fchs / fdiv [S+0A0h] / add
+// esp,8 / fstp [S+18h]
+const DWORD kJtGeneral = 0x006fa83f;
+const char *const kJtGeneralHex = "8d8c24c0000000 ddd9 51 ddd8 8d542454 52 e84b78d3ff d9e0 d8b424a8000000 83c408 d95c2418";
+const DWORD kJtAt = 0x006fa855;           // 16 bytes, executed in the stub
+const DWORD kJtNext = 0x006fa865;         // the PC's max(t, 0) (fldz; fcom [esp+18h]) and min(t, tMax) by 0x435170
+const char *const kJtNextHex = "d9ee d8542418 dfe0 f6c441 7506 d95c2418 eb02 ddd8 d94624 83ec08 d95c2404 d9442420 "
+                               "d91c24 e8e0a8d3ff d95c2420";
+// position = t x velocity + origin + (0.5 t^2) x gravity [S+0F0h] -> [S+90h]; closest segment point -> [S+30h]
+const DWORD kJtPos = 0x006fa894;
+const char *const kJtPosHex = "53 d9442424 f30f10442424 dd05c0138400 57 d8c9 8d8424a0000000 0fc6c000 0f59442460 "
+                              "0f58842490000000 dec9 50 8d4c2444 d99c24b4000000 f30f108c24b4000000 0fc6c900 "
+                              "0f598c2404010000";
+const DWORD kJtCall = 0x006fa8e3;         // 0x46ab60(&[S+0A0h], &[S+30h], &[S+90h], edi, ebx), then copy and jmp tail
+const char *const kJtCallHex = "51 8d9424b8000000 0f58c1 52 0f298424ac000000 e86402d7ff ddd8 8b7c2458 8b742450 83c41c "
+                               "8b44244c 8b4c2430 8b542438 8908 897004 895008 e954fbffff";
+const DWORD kPvPoint = 0x006f96c0;        // ParabolaVsPoint (cdecl; TU 0x823f6950 = retail 0x823f4220)
+const char *const kPvPointHex = "55 8bec 83e4f0 83ec54 8b4508 8b4d0c 53 8b5d10 0f281b";
+const DWORD kClosest = 0x0046ab60;        // closest point on a segment (cdecl; TU 0x821140e0 = retail 0x821141d8)
+const char *const kClosestHex = "55 8bec 83e4f0 83ec1c 8b4518 d9ee 8b5514 d9c0 0f2808 0f2812";
+typedef int(__cdecl *PvPointFn)(float *tOut, void *ptOut, const void *parabola, const void *point, int clamp);
+typedef float(__cdecl *ClosestFn)(float *param, void *point, const void *position, const void *a, const void *b);
+DWORD g_jtNext = kJtNext, g_jtExit = kJtExit;
+int g_jtPatched = 0;
+volatile LONG g_jtOn = 0;                 // live value: 1 = TU path (read by the stub)
+DWORD g_jtTick = 0;
+volatile LONG g_jtHits = 0, g_jtNegative = 0, g_jtNone = 0, g_jtPcHits = 0;
+
+void JumpTargetReadSwitch() {
+    if (!g_jtPatched || !g_iniPath[0]) return;
+    const DWORD now = GetTickCount();
+    if (now - g_jtTick < 1000) return;
+    g_jtTick = now;
+    const LONG v = GetPrivateProfileIntA("JumpTarget", "Translate", g_jtOn, g_iniPath) ? 1 : 0;
+    if (v != g_jtOn) {
+        Log(1, "jump target: switch [JumpTarget] Translate %ld -> %ld (read again from TruRockVein.ini) - %s", g_jtOn, v,
+            v ? "vertical segments: |t|, then ParabolaVsPoint (TU 0x823f6b08)" : "vertical segments: PC max(t, 0), 1 target");
+        g_jtOn = v;
+    }
+}
+
+// game thread, from the stub: the ini at most once a second, then the live value
+int __cdecl JumpTargetSwitch() {
+    JumpTargetReadSwitch();
+    if (!g_jtOn) InterlockedIncrement(&g_jtPcHits);
+    return g_jtOn ? 1 : 0;
+}
+
+// s = the frame S of ParabolaVsSegment (esp after the replaced instructions); returns the TU's target count
+int __cdecl JumpTargetTu(BYTE *s, const BYTE *parabola, const BYTE *segA, const BYTE *segB) {
+    const float raw = *reinterpret_cast<float *>(s + 0x18);         // -dot / k, as the PC computed it
+    const float tMax = *reinterpret_cast<const float *>(parabola + 0x24);
+    float t = raw;
+    if (!(t >= 0.0f)) t = -t;                                        // TU +0x988 fcmpu / bge / fneg f0,f0
+    const float m = (tMax - t >= 0.0f) ? t : tMax;                   // TU fsubs f12,f13,f0; fsel f11,f12,f0,f13
+    t = (m >= 0.0f) ? m : 0.0f;                                      // TU fsel f0,f11,f11,f31 (f31 = 0)
+    *reinterpret_cast<float *>(s + 0x18) = t;
+    const float h = (t * t) * 0.5f;                                  // TU fmuls f10,f0,f0; fmuls f9,f10,f29 (0.5)
+    __m128 pos = _mm_add_ps(_mm_mul_ps(_mm_set1_ps(t), _mm_load_ps(reinterpret_cast<float *>(s + 0x50))),
+                            _mm_load_ps(reinterpret_cast<float *>(s + 0x80)));            // PC 0x6fa8b3 / 0x6fa8b8
+    pos = _mm_add_ps(pos, _mm_mul_ps(_mm_set1_ps(h), _mm_load_ps(reinterpret_cast<float *>(s + 0xf0))));   // 0x6fa8db
+    _mm_store_ps(reinterpret_cast<float *>(s + 0x90), pos);
+    reinterpret_cast<ClosestFn>(kClosest)(reinterpret_cast<float *>(s + 0xa0), s + 0x30, s + 0x90, segA, segB);
+    float *tOut = *reinterpret_cast<float **>(s + 0x48);
+    void *ptOut = *reinterpret_cast<void **>(s + 0x4c);
+    const int n = reinterpret_cast<PvPointFn>(kPvPoint)(tOut, ptOut, parabola, s + 0x30, 1);   // TU li r6,1; bl
+    const float *p = reinterpret_cast<const float *>(s + 0x30);
+    float pc = (0.0f > raw) ? 0.0f : raw;                            // PC 0x6fa865 max, 0x435170 min (for the log)
+    if (pc > tMax) pc = tMax;
+    const LONG k = InterlockedIncrement(&g_jtHits);
+    if (LogNow(k))
+        Log(1, "jump target: title-update vertical-segment case (TU 0x823f6b08 +0x96c): t %.4f -> %.4f (PC: %.4f), "
+               "segment point (%.1f, %.1f, %.1f), ParabolaVsPoint -> %d target(s)%s%.4f (%ld cases)",
+            static_cast<double>(raw), static_cast<double>(t), static_cast<double>(pc), static_cast<double>(p[0]),
+            static_cast<double>(p[1]), static_cast<double>(p[2]), n, n > 0 ? " t " : " - ", n > 0 ? static_cast<double>(tOut[0]) : 0.0, k);
+    if (raw < 0.0f && InterlockedIncrement(&g_jtNegative) == 1)
+        Log(1, "jump target: first negative t %.4f (PC would clamp it to 0 = the start of the jump; TU |t| = %.4f), "
+               "ParabolaVsPoint -> %d target(s)", static_cast<double>(raw), static_cast<double>(t), n);
+    if (n == 0 && InterlockedIncrement(&g_jtNone) == 1)
+        Log(1, "jump target: first vertical segment the TU rejects (ParabolaVsPoint found no time; the PC returned 1 "
+               "target with t %.4f)", static_cast<double>(pc));
+    return n;
+}
+
+// tru+0x2fa855: x87 st0 = dot (return of 0x4320a0), its two arguments still on the stack; eax / ecx / edx and the
+// flags are dead here (0x6fa86b fnstsw ax, 0x6fa88b call), xmm0-7 kept around the switch call
+__declspec(naked) void JumpTargetStub() {
+    __asm {
+        fchs                                // the replaced PC instructions 0x6fa855..0x6fa865
+        fdiv dword ptr [esp + 0xa8]
+        add esp, 8
+        fstp dword ptr [esp + 0x18]
+        pushad
+        sub esp, 128
+        movdqu [esp], xmm0
+        movdqu [esp + 16], xmm1
+        movdqu [esp + 32], xmm2
+        movdqu [esp + 48], xmm3
+        movdqu [esp + 64], xmm4
+        movdqu [esp + 80], xmm5
+        movdqu [esp + 96], xmm6
+        movdqu [esp + 112], xmm7
+        call JumpTargetSwitch
+        mov [esp + 128 + 28], eax           // saved EAX of pushad
+        movdqu xmm0, [esp]
+        movdqu xmm1, [esp + 16]
+        movdqu xmm2, [esp + 32]
+        movdqu xmm3, [esp + 48]
+        movdqu xmm4, [esp + 64]
+        movdqu xmm5, [esp + 80]
+        movdqu xmm6, [esp + 96]
+        movdqu xmm7, [esp + 112]
+        add esp, 128
+        popad
+        test eax, eax
+        jz pc_path
+        mov eax, esp                        // S
+        push ebx                            // segment points as the PC passes them to 0x46ab60
+        push edi
+        push esi                            // parabola
+        push eax
+        call JumpTargetTu
+        add esp, 16
+        jmp dword ptr [g_jtExit]            // eax = count; pop edi / esi / ebx; mov esp,ebp; pop ebp; ret
+    pc_path:
+        jmp dword ptr [g_jtNext]
+    }
+}
+
+void PatchJumpTarget() {
+    if (!g_jumpTarget) {
+        Log(1, "jump target: Translate=0 - PC jump targeting kept (vertical segments: max(t, 0), 1 target)");
+        return;
+    }
+    if (!HexBytesAt(kJtSeg, kJtSegHex) || !HexBytesAt(kJtPoint, kJtPointHex) || !HexBytesAt(kJtTail, kJtTailHex) ||
+        !HexBytesAt(kJtFlags, kJtFlagsHex) || !HexBytesAt(kJtGeneral, kJtGeneralHex) || !HexBytesAt(kJtNext, kJtNextHex) ||
+        !HexBytesAt(kJtPos, kJtPosHex) || !HexBytesAt(kJtCall, kJtCallHex) || !HexBytesAt(kPvPoint, kPvPointHex) ||
+        !HexBytesAt(kClosest, kClosestHex)) {
+        Log(0, "ParabolaVsSegment at 0x%08lx (site 0x%08lx) does not match - title-update jump targeting not added", kJtSeg,
+            kJtAt);
+        return;
+    }
+    g_jtOn = 1;
+    g_jtPatched = 1;
+    BYTE code[16];                          // jmp JumpTargetStub + 11 nops over the 16 replaced bytes
+    memset(code, 0x90, sizeof(code));
+    code[0] = 0xe9;
+    const DWORD rel = reinterpret_cast<DWORD>(&JumpTargetStub) - (kJtAt + 5);
+    memcpy(code + 1, &rel, 4);
+    if (WriteCode(kJtAt, code, sizeof(code)))
+        Log(1, "jump target: title-update vertical-segment case added (tru+0x2f9940 = TU 0x823f6b08, +0x96c..+0xa08; "
+               "hook 0x%08lx: t = |t|, clamp, ParabolaVsPoint 0x%08lx on the segment point; Translate read again at run "
+               "time)", kJtAt, kPvPoint);
+    else {
+        g_jtPatched = 0;
+        Log(0, "jump target not (fully) written (VirtualProtect %lu)", GetLastError());
+    }
+}
+
 bool WriteDword(DWORD at, DWORD value) {
     DWORD old = 0, dummy = 0;
     if (!VirtualProtect(reinterpret_cast<void *>(at), 4, PAGE_READWRITE, &old)) return false;
@@ -1717,12 +1917,13 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruRockVein.log", dir);
     strncpy_s(g_dir, sizeof(g_dir), dir, _TRUNCATE);
     ReadOptions(dir);
-    Log(1, "TruRockVein 0.11 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
+    Log(1, "TruRockVein 0.12 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
         "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d, attach geometry %d, state 420 slot 1 %d, "
-        "chart log %d, jump geometry %d, skip geometry %d, SweepAndPrune translate %d, ledge corner translate %d)",
+        "chart log %d, jump geometry %d, skip geometry %d, SweepAndPrune translate %d, ledge corner translate %d, "
+        "jump target translate %d)",
         g_enabled, g_logLevel, g_logUnhandled, g_logBadValues, g_logDefaultConditions, g_markupTypes, g_markupSlots,
         g_nullBoxGuard, g_markupAction608, g_attachGeometry, g_state420Slot1, g_chartLog, g_jumpGeometry, g_skipGeometry,
-        g_sapTranslate, g_ledgeCorner);
+        g_sapTranslate, g_ledgeCorner, g_jumpTarget);
     if (!g_enabled) { Log(1, "disabled by TruRockVein.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -1737,6 +1938,7 @@ void Start(HMODULE self) {
     if (g_jumpGeometry) PatchJumpGeometry();
     if (g_skipGeometry) PatchSkipGeometry();
     PatchLedgeCorner();                     // 0.11 (logs Translate=0 itself)
+    PatchJumpTarget();                      // 0.12 (logs Translate=0 itself)
     if (!BytesAt(kDispatch, kDispatchBytes, sizeof(kDispatchBytes)) || !BytesAt(kDefault, kDefaultBytes, sizeof(kDefaultBytes)) ||
         !BytesAt(kExit, kExitBytes, sizeof(kExitBytes)) || !BytesAt(kCtxUse, kCtxUseBytes, sizeof(kCtxUseBytes))) {
         Log(0, "SCCondTest_MarkupType at 0x%08lx does not match (other tru.exe build?) - not patched", kDispatch);
@@ -1766,4 +1968,4 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
-extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.11 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update, ledge-corner nudge as the title update)"; }
+extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.12 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update, ledge-corner nudge as the title update, jump targets on vertical segments as the title update)"; }

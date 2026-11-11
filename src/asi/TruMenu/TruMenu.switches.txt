@@ -134,6 +134,7 @@ TruRockVein | RockVein | LogDefaultConditions | bool | Log: Standard-Bedingungen
 TruRockVein | RockVein | LogLevel | int:0..3 | Log-Stufe | Log level | restart | 1 | 3 = jeder Aufruf // 3 = every call
 TruRockVein | SweepAndPrune | Translate | bool | Kanten-Kollision: Grenzen wie TU | Ledge collision: limits as TU | restart | 1 | 3000 Boxen, 1000 Paare statt 1000/400; +412 KB // 3000 boxes, 1000 pair links instead of 1000/400 | TruRockVein 0.10
 TruRockVein | LedgeCorner | Translate | bool | Kanten-Ecke wie TU | Ledge corner as TU | restart | 1 | TU-Fix: Lara bleibt nicht mehr an Ecken hängen // TU fix: Lara no longer sticks at corners | TruRockVein 0.11
+TruRockVein | JumpTarget | Translate | bool | Sprungziel Säule/Stange wie TU | Pillar/pole jump target as TU | live | 1 | TU-Fix Säulensprung; live nur mit Hook beim Start // TU fix pillar jumps; live only if hooked at start | TruRockVein 0.12
 
 group | doppel | Doppelgängerin (TruDoppelganger) | Doppelganger (TruDoppelganger)
 TruDoppelganger | Doppelganger | Enabled | bool | TruDoppelganger an | TruDoppelganger on | restart | 1 | 0 = nichts patchen // 0 = patch nothing
