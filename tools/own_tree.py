@@ -2,7 +2,7 @@ r"""The own mods tree from our pipeline outputs only (no file of the B138 / B270
 the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
 
   assemble OUT_DIR [--run work/rebuild/pipeline_check_1011] [--costumes work/rebuild/costumes_0913]
-                   [--generalbank pc|k12] [--no-lang] [--no-shaders] [--exe FILE] [--credits DIR]
+                   [--generalbank pc|k12] [--no-lang] [--no-shaders] [--no-doppel] [--exe FILE] [--credits DIR]
       copies the pipeline outputs, in this order (a later layer wins for a file two layers have; every overlap is
       listed with "same" / "DIFFERENT"):
         dlc1         <run>/dlc1/mods                        step Fixes (-FixesOut <run>), DLC 1 tree (B138 layout)
@@ -14,6 +14,11 @@ the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
                      its input, have 0 errors, rule_owned_check.json must pass, and no shaders file may be older
                      than its Fixes input (stale). A later layer that replaces a shaders file with other content is
                      refused (the shader decisions of that DRM would be lost).
+        doppel       <run>/doppel/mods                      step DoppelCostume (2026-11-11, Q23): dlc_doppel_costume_a.drm
+                     (else work/rebuild/doppel/mods)        = our doppelganger_casual with object id 857 -> 1031
+                     (tools/doppel_costume_clone.py; the B270 kit's file is the same recipe on his casual). Required
+                     unless --no-doppel: its doppel_costume_check.json must be ok and name as source md5 the
+                     doppelganger_casual.drm this tree ends up with (else stale: refused).
         cost_<pack>  <costumes>/<pack>/stage2b/mods         step Costumes; only dlc_costume_*.drm (images / lists of
                                                             the costume trees are the DLC 1 tree's, docs/COSTUMES.md)
         lang         <run>/lang/mods                        step Lang (2026-11-11, R10): the 60 language variants of
@@ -145,7 +150,10 @@ def in_run(run, sub, fallback):
 SHADER_LAYERS = ('shaders', 'shaders_rule')
 
 
-def layers(run, costumes, gb='pc', lang=True, shaders=True):
+DOPPEL = ('dlc_doppel_costume_a.drm', 'doppelganger_casual.drm')
+
+
+def layers(run, costumes, gb='pc', lang=True, shaders=True, doppel=True):
     L = [('dlc1', 'Fixes (DLC 1, -FixesOut %s)' % run, run + '/dlc1/mods', None, False),
          ('dlc2', 'Fixes (DLC 2, -FixesOut %s)' % run, run + '/dlc2/mods', None, False)]
     if shaders:
@@ -153,6 +161,10 @@ def layers(run, costumes, gb='pc', lang=True, shaders=True):
         L.append(('shaders', 'Shaders (shader_step apply: recorded libs + material tuples, -FixesOut %s)' % run,
                   run + '/shaders/mods', None, False))
         L.append(('shaders_rule', 'Shaders (rule_owned apply: grapple ring, last tool of the step)', run + '/shaders_rule/mods', None, False))
+    if doppel:
+        # step DoppelCostume (Q23, 2026-11-11): the clone of the doppelganger_casual above (object id 857 -> 1031)
+        L.append(('doppel', 'DoppelCostume (doppel_costume_clone: our doppelganger_casual, object id 857 -> 1031)',
+                  in_run(run, 'doppel/mods', 'work/rebuild/doppel/mods'), DOPPEL[0], False))
     for pk in ('pack1', 'pack2', 'pack20'):
         L.append(('cost_' + pk, 'Costumes (%s)' % costumes, '%s/%s/stage2b/mods' % (costumes, pk), 'dlc_costume_*.drm', False))
     if lang:
@@ -196,6 +208,26 @@ def shader_layers_check(run):
         sd + '/mods', len(walk(sd + '/mods')), rd + '/mods', len(walk(rd + '/mods')), a.get('libs_added', 0), a.get('materials', 0)))
 
 
+def doppel_layer_check(files, d):
+    """the doppel layer's clone must be the one step DoppelCostume made from the doppelganger_casual.drm this tree ends
+    up with (doppel_costume_check.json next to the layer's mods folder: ok, source md5 = that file, file md5 = the
+    clone in the tree)"""
+    hint = ' - run Invoke-TruPipeline.ps1 -Step DoppelCostume (same -FixesOut as Fixes / Shaders), or assemble with --no-doppel'
+    clone, src = files.get(DOPPEL[0]), files.get(DOPPEL[1])
+    if not clone or clone['layer'] != 'doppel': raise SystemExit('doppel layer: %s missing in %s%s' % (DOPPEL[0], d, hint))
+    if not src: raise SystemExit('doppel layer: no %s in the tree%s' % (DOPPEL[1], hint))
+    chk = os.path.join(os.path.dirname(d.rstrip('/\\')), 'doppel_costume_check.json')
+    if not os.path.isfile(chk): raise SystemExit('doppel layer: missing %s%s' % (chk, hint))
+    c = json.load(open(chk, encoding='utf-8'))
+    if not c.get('ok'): raise SystemExit('doppel layer: check did not pass (%s)%s' % (chk, hint))
+    if c.get('md5') != clone['md5']: raise SystemExit('doppel layer: %s is not the checked file (%s)%s' % (DOPPEL[0], chk, hint))
+    if c.get('source_md5') != src['md5']:
+        raise SystemExit('doppel layer: stale - cloned from %s (md5 %s), the tree has %s from layer %s (md5 %s)%s' % (
+            c.get('source'), c.get('source_md5'), DOPPEL[1], src['layer'], src['md5'], hint))
+    print('doppel layer: %s = clone of %s from layer %s (md5 %s), object id %s -> %s, check ok' % (
+        DOPPEL[0], DOPPEL[1], src['layer'], src['md5'], c.get('source_id'), c.get('clone_id')))
+
+
 def assemble(argv):
     run = arg(argv, '--run', 'work/rebuild/pipeline_check_1011').replace('\\', '/').rstrip('/')
     costumes = arg(argv, '--costumes', 'work/rebuild/costumes_0913')
@@ -204,12 +236,14 @@ def assemble(argv):
     if not lang: argv.remove('--no-lang')
     shaders = '--no-shaders' not in argv
     if not shaders: argv.remove('--no-shaders')
+    doppel = '--no-doppel' not in argv
+    if not doppel: argv.remove('--no-doppel')
     exe = arg(argv, '--exe', in_run(run, 'exe/tru.exe', 'work/rebuild/exe/tru.exe'))
     credits = arg(argv, '--credits', in_run(run, 'credits', 'work/rebuild/credits'))
     outdir = argv[0]
     mods = os.path.join(outdir, 'mods')
     if os.path.exists(mods): raise SystemExit('exists already: %s (remove it first)' % mods)
-    lay = layers(run, costumes, gb, lang, shaders)
+    lay = layers(run, costumes, gb, lang, shaders, doppel)
     if shaders: shader_layers_check(run)
     for name, step, d, pat, kd in lay + [('exe', 'Exe', exe, None, False), ('credits', 'Credits', credits, None, False)]:
         low = d.replace('\\', '/').lower()
@@ -243,6 +277,7 @@ def assemble(argv):
                         name, rel, prev['layer']))
                 also = prev['also_in'] + ['%s:%s' % (prev['layer'], verdict)]
             files[k] = dict(rel=rel, source=p, md5=m, size=os.path.getsize(p), layer=name, step=step, kit_derived=kd, also_in=also)
+    if doppel: doppel_layer_check(files, [x for x in lay if x[0] == 'doppel'][0][2])
     for rel, why in DROP:
         e = files.pop(rel.lower(), None)
         print('dropped %s (%s): %s' % (rel, e['layer'] if e else 'not present', why))

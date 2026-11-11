@@ -128,6 +128,16 @@
                leave DLC 1 / DLC 2 assemble byte-identical (tools/render_tables_compare.py tables / tree).
                About 75-90 min per costume DRM: their DTPs are larger than every Xbox base record (no pc_copy /
                template, route 'convert'; tools/costume_pack_check.py xids)
+      DoppelCostume  (2026-11-11, Q23, after Fixes / Shaders, seconds, no kit) the Doppelganger costume
+               dlc_doppel_costume_a.drm (pack20 lists the object, no Xbox package has a DRM for it; until now only in
+               the B270 kit): tools\doppel_costume_clone.py build takes OUR doppelganger_casual.drm from the top of
+               the stack Fixes dlc2 -> shaders -> shaders_rule and applies the upstream author's recipe (measured on
+               the B270 kit pair): object section (type 11) id 857 -> 1031 and the object's id word +0x14 the same
+               (ids from the dlc2 tree's objectlist.txt), nothing else; the structural gate runs before anything is
+               written; then doppel_costume_clone check re-derives the clone from the current source (exit 1 when
+               stale or any other byte differs) -> work\rebuild\doppel\mods\dlc_doppel_costume_a.drm +
+               doppel_costume_build.json / doppel_costume_check.json (-FixesOut DIR: DIR\doppel\...); tools\own_tree.py
+               assemble takes it as layer doppel. Docs: Befund-Kostuem-Klon-Q23-1111.md
       Repair   the repair tree for an installed B138 (finding 43, tested in game 2026-10-30): b138_snapshot (pristine
                B138 mods, verified against the kit manifest, from the game folder and the Install-TruTree backups),
                generalbank_build (see Generalbank), b138_fix_tree (shader constant fix, grapple ring shaders, DLC 1 UI
@@ -244,10 +254,12 @@
     .\Invoke-TruPipeline.ps1 -Step Costumes -FixesOut work/rebuild/costumes_0311 -Jobs 1 -Verbose
 .EXAMPLE
     .\Invoke-TruPipeline.ps1 -Step Exe -Verbose
+.EXAMPLE
+    .\Invoke-TruPipeline.ps1 -Step DoppelCostume -FixesOut work/rebuild/pipeline_check_1111b -Verbose
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Shaders', 'Costumes', 'Repair', 'Generalbank', 'Exe', 'Globalsound', 'Lang')][string]$Step,
+    [Parameter(Mandatory)][ValidateSet('Index', 'Cache', 'Ids', 'Learn', 'Tables', 'Prep', 'Convert', 'Names', 'Media', 'Audio', 'Assemble', 'Dlc2', 'Fixes', 'Shaders', 'Costumes', 'DoppelCostume', 'Repair', 'Generalbank', 'Exe', 'Globalsound', 'Lang')][string]$Step,
     [ValidateRange(1, 99)][int]$FromTool = 1,
     [ValidateRange(1, 99)][int]$ToTool = 99,
     [ValidateRange(0, 16)][int]$Jobs = 0,
@@ -340,6 +352,9 @@ $langOut = if ($FixesOut) { "$fixRoot/lang" } else { 'work/rebuild/lang' }
 # step Shaders (2026-11-11, A2 stage 1): recorded shader decisions as a layer over the Fixes trees, ring rule last
 $shOut = if ($FixesOut) { "$fixRoot/shaders" } else { 'work/rebuild/shaders' }
 $shRule = if ($FixesOut) { "$fixRoot/shaders_rule" } else { 'work/rebuild/shaders_rule' }
+# step DoppelCostume (2026-11-11, Q23): dlc_doppel_costume_a.drm cloned from the top-most doppelganger_casual.drm
+$dpOut = if ($FixesOut) { "$fixRoot/doppel" } else { 'work/rebuild/doppel' }
+$dpStack = @('--stack', $fix2, "$shOut/mods", "$shRule/mods")
 # step Costumes: one chain per costume pack (the DLC 2 route), below work/rebuild/costumes or -FixesOut
 $costRoot = if ($FixesOut) { $fixRoot } else { 'work/rebuild/costumes' }
 $costumeTools = @(
@@ -521,6 +536,11 @@ $steps = @{
         @('tools\tu_batch.py', 'vcheck', "$shOut/mods", 'work/sg_audit_0511/xbox', '--strict')
     )
     Costumes = $costumeTools
+    # DoppelCostume (Q23): recipe object id 857 -> 1031 on our doppelganger_casual (gate before writing), then re-check
+    DoppelCostume = @(
+        (@('tools\doppel_costume_clone.py', 'build') + $dpStack + @('--out', "$dpOut/mods", '--report', "$dpOut/doppel_costume_build.json")),
+        (@('tools\doppel_costume_clone.py', 'check', "$dpOut/mods/dlc_doppel_costume_a.drm") + $dpStack + @('--report', "$dpOut/doppel_costume_check.json"))
+    )
     Repair = @(
         @('tools\b138_snapshot.py', '../release/B138/kit/manifest.json', '../data/pc/mods', '../backup', $repPristine, '../backup/mods', 'work/rebuild/base_b138'),
         (@('tools\generalbank_build.py', $gbOut) + $gbBase),
@@ -594,6 +614,7 @@ $outputDirs = @{
     Fixes   = @('work\rebuild')
     Shaders = @(($shOut -replace '/', '\'), ($shRule -replace '/', '\'))
     Costumes = @('work\rebuild')
+    DoppelCostume = @(($dpOut -replace '/', '\'))
     Repair  = @('work\rebuild')
     Generalbank = @('work\rebuild')
     Exe     = @(($exeOut -replace '/', '\'))

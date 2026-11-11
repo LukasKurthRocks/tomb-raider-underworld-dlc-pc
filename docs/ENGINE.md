@@ -1331,7 +1331,14 @@ Plugins: TruDlc2Player 0.1 `Costume` (name substitution at 0x5de3a3), `TypeRecor
 from DLC 2 hold 857. Not ported: the altPlayerObjectID store and the TU spawn fallback ⬜.
 Data: costume model u16 arrays and list counters (`tools/costume_dtp_fix.py`, pipeline step `costumedtp` since 08.11.; costume f missing 586 words installed; our
 own costume chain a / h / k / l / m has the same fault). Slots g / n and `dlc_costumes4` never shipped (owner decision E4).
-Sources: `Befund-Kostuem-Reset-DLC1.md`, `Befund-Kostueme-Port.md`, `Befund-P4a-Kostueme-0711.md`,
+Object DRM identity (Q23, 11.11.): the object section (type 11) id = the objectlist id and its data word +0x14 = the same
+id in all 126 object DRMs of our DLC 2 tree and all 214 of the B270 kit; the file name = the objectlist name of that id ✅.
+**`dlc_doppel_costume_a`** (object 1031, listed by pack20, no Xbox DRM; b-d have no object): the B270 file is
+`doppelganger_casual.drm` with only that id changed, 857 -> 1031 in the section header and at +0x14 (his pair also
+differs in 97 words of 22 DTPs, all the same 4 bytes in another order = a different conversion run; ours equals his
+shipped casual in 95). Pipeline step `DoppelCostume` (`tools/doppel_costume_clone.py`, own tree layer `doppel`) ✅ data,
+in game ⬜.
+Sources: `Befund-Kostuem-Reset-DLC1.md`, `Befund-Kostueme-Port.md`, `Befund-P4a-Kostueme-0711.md`, `Befund-Kostuem-Klon-Q23-1111.md`,
 `Befund-Menue-Dlc2Player-0411b.md`; [COSTUMES.md](COSTUMES.md), [TruDlc2Player README](../src/asi/TruDlc2Player/README.md).
 
 ---
