@@ -1,0 +1,27 @@
+id	name	source	stored	decoded	tree	tree_name	b18	children	total_stored	total_decoded	missing	units
+217	shark_blueshark	pcbig	4040076	7908061	2	CreatureVolumetric	2		4040076	7908061		l2_cliffclimb l1_seafloor
+311	merc	pcbig	6713740	14645945	0	Soldier	2	114:wp_akrifle 62:pr_akriflebullet 53:bullet_hit 61:bullet_hit_underwater 63:pr_akriflebullet_concentrated	10119843	30349335		l1_ship_exterior l6_ship_exterior l6_ship_upper_hallway
+312	merc_deux	pcbig	6715469	14650693	0	Soldier	2	114:wp_akrifle 62:pr_akriflebullet 53:bullet_hit 61:bullet_hit_underwater 63:pr_akriflebullet_concentrated	10121572	30354083		l1_ship_exterior l6_ship_exterior l6_ship_engine_hall l6_ship_upper_hallway
+336	bat_enemy	pcbig	1831373	2698593	2	CreatureVolumetric	1		1831373	2698593		l2_puzzleroom l2_norsehub l2_maproom l5_valaskjalf l2_towerroom l2_junglehub l2_hubhall l3_chapel l4_temple l5_valaskjalf_entryb l5_valaskjalf_entry dlc_level1_start dlc_dungeonhallb dlc_pillory dlc_water_wheel dlc_dungeonhalla dlc_caverns
+337	tiger	pcbig	7090105	13824589	1	Creature	1		7090105	13824589		l2_towerroom l2_junglehub
+367	naga_green	pcbig	8434243	17507593	1	Creature	1		8434243	17507593		l2_puzzleroom l2_norsehub
+368	naga_red	pcbig	8327371	17846933	1	Creature	1		8327371	17846933		l2_puzzleroom l2_norsehub
+370	small_albino_spider	pcbig	2360111	3542128	1	Creature	1		2360111	3542128		l2_norsehub l2_maproom l4_traprooms l4_ragnarok_room l2_hubhall l2_shrineroom l4_temple l5_valaskjalf_entryb dlc_dungeon dlc_caverns_hall dlc_caverns
+419	small_brown_spider	pcbig	2359771	3538221	1	Creature	1		2359771	3538221		l2_cliffclimb l2_hubhall l3_chapel l3_stairhall dlc_level1_start
+448	small_brown_spider_no_jump	pcbig	2360762	3538929	1	Creature	1		2360762	3538929		l2_cliffclimb
+516	panther_thrall	pcbig	11945076	23095048	3	Thrall	5	518:panther_thrall_chunkdoll	16889944	33598624		l3_secretchamber l4_pool
+564	cat_panther	pcbig	5644351	12140709	1	Creature	1		5644351	12140709		l4_trailstart l4_ballcourt l4_temple l4_templepath
+565	poacher	pcbig	7131127	16167017	0	Soldier	1	114:wp_akrifle 62:pr_akriflebullet 53:bullet_hit 61:bullet_hit_underwater 63:pr_akriflebullet_concentrated	10537230	31870407		l4_ballcourt l4_temple
+566	poacher_long_range	pcbig	7138179	16168133	0	Soldier	1	114:wp_akrifle 62:pr_akriflebullet 53:bullet_hit 61:bullet_hit_underwater 63:pr_akriflebullet_concentrated	10544282	31871523		l4_ballcourt l4_temple
+600	mayan_thrall	pcbig	11344147	21627488	3	Thrall	3	602:viking_thrall_chunkdoll	14394974	28426808		l4_pool
+603	viking_thrall	pcbig	11190349	21319132	3	Thrall	3	602:viking_thrall_chunkdoll	14241176	28118452		l5_valgrind l5_valaskjalf l7_helheim01 l5_valaskjalf_entryb l5_valaskjalf_entry l7_yggdrasil_hall02 l7_yggdrasil_hall01 l7_helheim03
+604	giant_albino_tarantula	pcbig	6369562	12845108	1	Creature	1		6369562	12845108		l4_traprooms l4_ragnarok_room l5_valaskjalf l4_staircase_xibalba l5_valaskjalf_entryb dlc_dungeonhallb dlc_dungeon dlc_pillory dlc_dungeonhalla dlc_caverns
+703	giant_albino_tarantula_blind	pcbig	6368521	12845336	1	Creature	1		6368521	12845336		l5_valaskjalf
+705	yeti_thrall	pcbig	12671965	22476424	3	Thrall	3	706:yeti_thrall_chunkdoll	14584601	27454696		l5_valaskjalf l7_helheim01 l7_yggdrasil_end l7_yggdrasil_hall02 l7_yggdrasil_hall01 l7_helheim03
+791	yeti_thrall_yggdrasil	pcbig	12670694	22476684	3	Thrall	3	706:yeti_thrall_chunkdoll	14583330	27454956		l7_helheim01 l7_yggdrasil_end dlc2_goo_room dlc2_hall_machine_ceremony
+821	shark_greenland	pcbig	3934081	8043013	2	CreatureVolumetric	1		3934081	8043013		l7_arctic_sea
+855	knight_thrall	mods	9191736	18643552	3	Thrall	1	877:knight_thrall_chunkdoll	12211539	25399652		dlc_dungeonhallb dlc_dungeon dlc_pillory dlc_dungeonhalla
+927	viking_thrall_dlc2_	mods	11477366	25281016	3	Thrall	1	1006:viking_thrall_chunkdoll_dlc2_ 870:viking_thrall_dlc2_extension	15201290	34401234		dlc_yggdrasil_end dlc2_hall_ceremony_goo dlc2_ceremony_room dlc2_goo_room dlc2_hall_goo_machine dlc2_machine_room dlc2_hall_machine_ceremony
+931	yeti_thrall_dlc2_	mods	13838099	28354040	3	Thrall	3	1007:yeti_thrall_chunkdoll_dlc2_ 932:yeti_thrall_dlc2_extension 944:yeti_thrall_armored_dlc2_extension	16453763	35765996		dlc_yggdrasil_hall02 dlc2_hall_ceremony_goo dlc2_ceremony_room dlc2_goo_room dlc2_hall_goo_machine dlc2_machine_room dlc2_hall_machine_ceremony dlc2_treasure_room_cine
+943	yeti_thrall_armored_dlc2_	mods	13636216	27617848	3	Thrall	3	1033:yeti_thrall_armored_chunkdoll_dlc_2_ 944:yeti_thrall_armored_dlc2_extension	17153933	36379326		dlc2_ceremony_room dlc2_goo_room dlc2_machine_room dlc2_hall_machine_ceremony
+1004	viking_thrall_tutorial_dlc2_	mods	11478109	25283836	3	Thrall	1	1006:viking_thrall_chunkdoll_dlc2_ 870:viking_thrall_dlc2_extension	15202033	34404054		dlc_yggdrasil_hall02

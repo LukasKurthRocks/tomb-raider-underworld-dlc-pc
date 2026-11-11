@@ -1,0 +1,407 @@
+pairs with differing shared ids (type: shared / differ):
+shark_blueshark                    merc                               shared   137 differ     0  texture 10/0 wave 67/0 dtp 11/0 script 45/0 shaderlib 4/0
+shark_blueshark                    merc_deux                          shared   137 differ     0  texture 10/0 wave 67/0 dtp 11/0 script 45/0 shaderlib 4/0
+shark_blueshark                    bat_enemy                          shared   124 differ     0  texture 1/0 wave 67/0 dtp 7/0 script 45/0 shaderlib 4/0
+shark_blueshark                    tiger                              shared   166 differ     0  texture 8/0 wave 101/0 dtp 12/0 script 45/0
+shark_blueshark                    naga_green                         shared   176 differ     0  texture 10/0 wave 101/0 dtp 12/0 script 45/0 shaderlib 8/0
+shark_blueshark                    naga_red                           shared   176 differ     0  texture 10/0 wave 101/0 dtp 12/0 script 45/0 shaderlib 8/0
+shark_blueshark                    small_albino_spider                shared   160 differ     0  texture 2/0 wave 101/0 dtp 8/0 script 45/0 shaderlib 4/0
+shark_blueshark                    small_brown_spider                 shared   160 differ     0  texture 2/0 wave 101/0 dtp 8/0 script 45/0 shaderlib 4/0
+shark_blueshark                    small_brown_spider_no_jump         shared   160 differ     0  texture 2/0 wave 101/0 dtp 8/0 script 45/0 shaderlib 4/0
+shark_blueshark                    panther_thrall                     shared   166 differ     0  texture 9/0 wave 101/0 dtp 11/0 script 45/0
+shark_blueshark                    cat_panther                        shared   171 differ     0  texture 9/0 wave 101/0 dtp 12/0 script 45/0 shaderlib 4/0
+shark_blueshark                    poacher                            shared   138 differ     0  texture 11/0 wave 67/0 dtp 11/0 script 45/0 shaderlib 4/0
+shark_blueshark                    poacher_long_range                 shared   138 differ     0  texture 11/0 wave 67/0 dtp 11/0 script 45/0 shaderlib 4/0
+shark_blueshark                    mayan_thrall                       shared   175 differ     0  texture 10/0 wave 101/0 dtp 11/0 script 45/0 shaderlib 8/0
+shark_blueshark                    viking_thrall                      shared   171 differ     0  texture 10/0 wave 101/0 dtp 11/0 script 45/0 shaderlib 4/0
+shark_blueshark                    giant_albino_tarantula             shared   164 differ     0  texture 10/0 wave 101/0 dtp 8/0 script 45/0
+shark_blueshark                    giant_albino_tarantula_blind       shared   164 differ     0  texture 10/0 wave 101/0 dtp 8/0 script 45/0
+shark_blueshark                    yeti_thrall                        shared   175 differ     0  texture 10/0 wave 101/0 dtp 11/0 script 45/0 shaderlib 8/0
+shark_blueshark                    yeti_thrall_yggdrasil              shared   175 differ     0  texture 10/0 wave 101/0 dtp 11/0 script 45/0 shaderlib 8/0
+shark_blueshark                    shark_greenland                    shared   176 differ     0  texture 17/0 wave 95/0 dtp 13/0 script 45/0 shaderlib 4/0 material 2/0
+shark_blueshark                    knight_thrall                      shared   166 differ   101  texture 9/0 wave 101/101 dtp 11/0 script 45/0
+shark_blueshark                    viking_thrall_dlc2_                shared   168 differ    99  texture 13/1 wave 98/98 dtp 8/0 script 45/0 shaderlib 4/0
+shark_blueshark                    yeti_thrall_dlc2_                  shared   168 differ    99  texture 13/1 wave 98/98 dtp 8/0 script 45/0 shaderlib 4/0
+shark_blueshark                    yeti_thrall_armored_dlc2_          shared   168 differ    99  texture 13/1 wave 98/98 dtp 8/0 script 45/0 shaderlib 4/0
+shark_blueshark                    viking_thrall_tutorial_dlc2_       shared   168 differ    99  texture 13/1 wave 98/98 dtp 8/0 script 45/0 shaderlib 4/0
+shark_blueshark                    UNIT:l7_helheim03                  shared   156 differ     0  texture 6/0 wave 98/0 dtp 7/0 script 45/0
+shark_blueshark                    UNIT:l7_yggdrasil_hall02           shared   184 differ     0  texture 6/0 wave 123/0 dtp 10/0 script 45/0
+shark_blueshark                    UNIT:dlc_yggdrasil_hall02          shared   156 differ    99  texture 6/1 wave 98/98 dtp 7/0 script 45/0
+merc                               merc_deux                          shared   992 differ     0  anim 183/0 texture 182/0 wave 202/0 dtp 281/0 script 51/0 shaderlib 45/0 material 45/0 mesh 3/0
+merc                               bat_enemy                          shared   140 differ     0  texture 8/0 wave 70/0 dtp 13/0 script 45/0 shaderlib 4/0
+merc                               tiger                              shared   388 differ     0  anim 1/0 texture 97/0 wave 100/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+merc                               naga_green                         shared   377 differ     0  anim 1/0 texture 99/0 wave 90/0 dtp 96/0 script 45/0 shaderlib 14/0 material 32/0
+merc                               naga_red                           shared   377 differ     0  anim 1/0 texture 99/0 wave 90/0 dtp 96/0 script 45/0 shaderlib 14/0 material 32/0
+merc                               small_albino_spider                shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+merc                               small_brown_spider                 shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+merc                               small_brown_spider_no_jump         shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+merc                               panther_thrall                     shared   399 differ     0  anim 1/0 texture 100/0 wave 108/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+merc                               cat_panther                        shared   389 differ     0  anim 1/0 texture 98/0 wave 100/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+merc                               poacher                            shared   948 differ     0  anim 183/0 texture 156/0 wave 202/0 dtp 281/0 script 50/0 shaderlib 37/0 material 37/0 mesh 2/0
+merc                               poacher_long_range                 shared   948 differ     0  anim 183/0 texture 156/0 wave 202/0 dtp 281/0 script 50/0 shaderlib 37/0 material 37/0 mesh 2/0
+merc                               mayan_thrall                       shared   386 differ     0  anim 3/0 texture 85/0 wave 109/0 dtp 94/0 script 45/0 shaderlib 18/0 material 32/0
+merc                               viking_thrall                      shared   382 differ     0  anim 3/0 texture 85/0 wave 109/0 dtp 94/0 script 45/0 shaderlib 14/0 material 32/0
+merc                               giant_albino_tarantula             shared   363 differ     0  anim 1/0 texture 80/0 wave 105/0 dtp 90/0 script 45/0 shaderlib 10/0 material 32/0
+merc                               giant_albino_tarantula_blind       shared   363 differ     0  anim 1/0 texture 80/0 wave 105/0 dtp 90/0 script 45/0 shaderlib 10/0 material 32/0
+merc                               yeti_thrall                        shared   214 differ     0  texture 32/0 wave 105/0 dtp 23/0 script 45/0 shaderlib 8/0 material 1/0
+merc                               yeti_thrall_yggdrasil              shared   214 differ     0  texture 32/0 wave 105/0 dtp 23/0 script 45/0 shaderlib 8/0 material 1/0
+merc                               shark_greenland                    shared    98 differ     0  texture 10/0 wave 31/0 dtp 8/0 script 45/0 shaderlib 4/0
+merc                               knight_thrall                      shared   372 differ   129  anim 3/0 texture 85/16 wave 104/104 dtp 93/9 script 45/0 shaderlib 10/0 material 32/0
+merc                               viking_thrall_dlc2_                shared   376 differ   127  anim 3/0 texture 87/17 wave 101/101 dtp 90/9 script 45/0 shaderlib 17/0 material 33/0
+merc                               yeti_thrall_dlc2_                  shared   365 differ   122  texture 87/17 wave 97/97 dtp 85/8 script 45/0 shaderlib 18/0 material 33/0
+merc                               yeti_thrall_armored_dlc2_          shared   365 differ   122  texture 87/17 wave 97/97 dtp 85/8 script 45/0 shaderlib 18/0 material 33/0
+merc                               viking_thrall_tutorial_dlc2_       shared   376 differ   127  anim 3/0 texture 87/17 wave 101/101 dtp 90/9 script 45/0 shaderlib 17/0 material 33/0
+merc                               UNIT:l7_helheim03                  shared   154 differ     0  texture 14/0 wave 82/0 dtp 10/0 script 45/0 shaderlib 3/0
+merc                               UNIT:l7_yggdrasil_hall02           shared   154 differ     0  texture 14/0 wave 82/0 dtp 10/0 script 45/0 shaderlib 3/0
+merc                               UNIT:dlc_yggdrasil_hall02          shared   154 differ    83  texture 14/1 wave 82/82 dtp 10/0 script 45/0 shaderlib 3/0
+merc_deux                          bat_enemy                          shared   140 differ     0  texture 8/0 wave 70/0 dtp 13/0 script 45/0 shaderlib 4/0
+merc_deux                          tiger                              shared   388 differ     0  anim 1/0 texture 97/0 wave 100/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+merc_deux                          naga_green                         shared   377 differ     0  anim 1/0 texture 99/0 wave 90/0 dtp 96/0 script 45/0 shaderlib 14/0 material 32/0
+merc_deux                          naga_red                           shared   377 differ     0  anim 1/0 texture 99/0 wave 90/0 dtp 96/0 script 45/0 shaderlib 14/0 material 32/0
+merc_deux                          small_albino_spider                shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+merc_deux                          small_brown_spider                 shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+merc_deux                          small_brown_spider_no_jump         shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+merc_deux                          panther_thrall                     shared   399 differ     0  anim 1/0 texture 100/0 wave 108/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+merc_deux                          cat_panther                        shared   389 differ     0  anim 1/0 texture 98/0 wave 100/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+merc_deux                          poacher                            shared   948 differ     0  anim 183/0 texture 156/0 wave 202/0 dtp 281/0 script 50/0 shaderlib 37/0 material 37/0 mesh 2/0
+merc_deux                          poacher_long_range                 shared   948 differ     0  anim 183/0 texture 156/0 wave 202/0 dtp 281/0 script 50/0 shaderlib 37/0 material 37/0 mesh 2/0
+merc_deux                          mayan_thrall                       shared   386 differ     0  anim 3/0 texture 85/0 wave 109/0 dtp 94/0 script 45/0 shaderlib 18/0 material 32/0
+merc_deux                          viking_thrall                      shared   382 differ     0  anim 3/0 texture 85/0 wave 109/0 dtp 94/0 script 45/0 shaderlib 14/0 material 32/0
+merc_deux                          giant_albino_tarantula             shared   363 differ     0  anim 1/0 texture 80/0 wave 105/0 dtp 90/0 script 45/0 shaderlib 10/0 material 32/0
+merc_deux                          giant_albino_tarantula_blind       shared   363 differ     0  anim 1/0 texture 80/0 wave 105/0 dtp 90/0 script 45/0 shaderlib 10/0 material 32/0
+merc_deux                          yeti_thrall                        shared   214 differ     0  texture 32/0 wave 105/0 dtp 23/0 script 45/0 shaderlib 8/0 material 1/0
+merc_deux                          yeti_thrall_yggdrasil              shared   214 differ     0  texture 32/0 wave 105/0 dtp 23/0 script 45/0 shaderlib 8/0 material 1/0
+merc_deux                          shark_greenland                    shared    98 differ     0  texture 10/0 wave 31/0 dtp 8/0 script 45/0 shaderlib 4/0
+merc_deux                          knight_thrall                      shared   372 differ   129  anim 3/0 texture 85/16 wave 104/104 dtp 93/9 script 45/0 shaderlib 10/0 material 32/0
+merc_deux                          viking_thrall_dlc2_                shared   376 differ   127  anim 3/0 texture 87/17 wave 101/101 dtp 90/9 script 45/0 shaderlib 17/0 material 33/0
+merc_deux                          yeti_thrall_dlc2_                  shared   365 differ   122  texture 87/17 wave 97/97 dtp 85/8 script 45/0 shaderlib 18/0 material 33/0
+merc_deux                          yeti_thrall_armored_dlc2_          shared   365 differ   122  texture 87/17 wave 97/97 dtp 85/8 script 45/0 shaderlib 18/0 material 33/0
+merc_deux                          viking_thrall_tutorial_dlc2_       shared   376 differ   127  anim 3/0 texture 87/17 wave 101/101 dtp 90/9 script 45/0 shaderlib 17/0 material 33/0
+merc_deux                          UNIT:l7_helheim03                  shared   154 differ     0  texture 14/0 wave 82/0 dtp 10/0 script 45/0 shaderlib 3/0
+merc_deux                          UNIT:l7_yggdrasil_hall02           shared   154 differ     0  texture 14/0 wave 82/0 dtp 10/0 script 45/0 shaderlib 3/0
+merc_deux                          UNIT:dlc_yggdrasil_hall02          shared   154 differ    83  texture 14/1 wave 82/82 dtp 10/0 script 45/0 shaderlib 3/0
+bat_enemy                          tiger                              shared   147 differ     0  texture 8/0 wave 79/0 dtp 15/0 script 45/0
+bat_enemy                          naga_green                         shared   141 differ     0  texture 8/0 wave 70/0 dtp 14/0 script 45/0 shaderlib 4/0
+bat_enemy                          naga_red                           shared   141 differ     0  texture 8/0 wave 70/0 dtp 14/0 script 45/0 shaderlib 4/0
+bat_enemy                          small_albino_spider                shared   147 differ     0  texture 9/0 wave 78/0 dtp 11/0 script 45/0 shaderlib 4/0
+bat_enemy                          small_brown_spider                 shared   147 differ     0  texture 9/0 wave 78/0 dtp 11/0 script 45/0 shaderlib 4/0
+bat_enemy                          small_brown_spider_no_jump         shared   147 differ     0  texture 9/0 wave 78/0 dtp 11/0 script 45/0 shaderlib 4/0
+bat_enemy                          panther_thrall                     shared   156 differ     0  texture 8/0 wave 87/0 dtp 16/0 script 45/0
+bat_enemy                          cat_panther                        shared   151 differ     0  texture 8/0 wave 79/0 dtp 15/0 script 45/0 shaderlib 4/0
+bat_enemy                          poacher                            shared   140 differ     0  texture 8/0 wave 70/0 dtp 13/0 script 45/0 shaderlib 4/0
+bat_enemy                          poacher_long_range                 shared   140 differ     0  texture 8/0 wave 70/0 dtp 13/0 script 45/0 shaderlib 4/0
+bat_enemy                          mayan_thrall                       shared   150 differ     0  texture 8/0 wave 84/0 dtp 9/0 script 45/0 shaderlib 4/0
+bat_enemy                          viking_thrall                      shared   150 differ     0  texture 8/0 wave 84/0 dtp 9/0 script 45/0 shaderlib 4/0
+bat_enemy                          giant_albino_tarantula             shared   139 differ     0  texture 9/0 wave 75/0 dtp 10/0 script 45/0
+bat_enemy                          giant_albino_tarantula_blind       shared   139 differ     0  texture 9/0 wave 75/0 dtp 10/0 script 45/0
+bat_enemy                          yeti_thrall                        shared   145 differ     0  texture 3/0 wave 84/0 dtp 9/0 script 45/0 shaderlib 4/0
+bat_enemy                          yeti_thrall_yggdrasil              shared   145 differ     0  texture 3/0 wave 84/0 dtp 9/0 script 45/0 shaderlib 4/0
+bat_enemy                          shark_greenland                    shared    86 differ     0  texture 1/0 wave 31/0 dtp 5/0 script 45/0 shaderlib 4/0
+bat_enemy                          knight_thrall                      shared   146 differ    84  texture 8/0 wave 84/84 dtp 9/0 script 45/0
+bat_enemy                          viking_thrall_dlc2_                shared   146 differ    81  texture 8/0 wave 81/81 dtp 8/0 script 45/0 shaderlib 4/0
+bat_enemy                          yeti_thrall_dlc2_                  shared   146 differ    81  texture 8/0 wave 81/81 dtp 8/0 script 45/0 shaderlib 4/0
+bat_enemy                          yeti_thrall_armored_dlc2_          shared   146 differ    81  texture 8/0 wave 81/81 dtp 8/0 script 45/0 shaderlib 4/0
+bat_enemy                          viking_thrall_tutorial_dlc2_       shared   146 differ    81  texture 8/0 wave 81/81 dtp 8/0 script 45/0 shaderlib 4/0
+bat_enemy                          UNIT:l7_helheim03                  shared   125 differ     0  texture 1/0 wave 72/0 dtp 7/0 script 45/0
+bat_enemy                          UNIT:l7_yggdrasil_hall02           shared   125 differ     0  texture 1/0 wave 72/0 dtp 7/0 script 45/0
+bat_enemy                          UNIT:dlc_yggdrasil_hall02          shared   125 differ    72  texture 1/0 wave 72/72 dtp 7/0 script 45/0
+tiger                              naga_green                         shared   485 differ     0  anim 4/0 texture 99/0 wave 186/0 dtp 103/0 script 45/0 shaderlib 14/0 material 34/0
+tiger                              naga_red                           shared   485 differ     0  anim 4/0 texture 99/0 wave 186/0 dtp 103/0 script 45/0 shaderlib 14/0 material 34/0
+tiger                              small_albino_spider                shared   164 differ     0  texture 8/0 wave 101/0 dtp 10/0 script 45/0
+tiger                              small_brown_spider                 shared   164 differ     0  texture 8/0 wave 101/0 dtp 10/0 script 45/0
+tiger                              small_brown_spider_no_jump         shared   164 differ     0  texture 8/0 wave 101/0 dtp 10/0 script 45/0
+tiger                              panther_thrall                     shared   623 differ     0  anim 86/0 texture 100/0 wave 209/0 dtp 131/0 script 45/0 shaderlib 18/0 material 34/0
+tiger                              cat_panther                        shared   695 differ     0  anim 86/0 texture 100/0 wave 224/0 dtp 192/0 script 45/0 shaderlib 14/0 material 34/0
+tiger                              poacher                            shared   388 differ     0  anim 1/0 texture 97/0 wave 100/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+tiger                              poacher_long_range                 shared   388 differ     0  anim 1/0 texture 97/0 wave 100/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+tiger                              mayan_thrall                       shared   410 differ     0  texture 79/0 wave 148/0 dtp 92/0 script 45/0 shaderlib 14/0 material 32/0
+tiger                              viking_thrall                      shared   406 differ     0  texture 79/0 wave 148/0 dtp 92/0 script 45/0 shaderlib 10/0 material 32/0
+tiger                              giant_albino_tarantula             shared   444 differ     0  anim 4/0 texture 79/0 wave 180/0 dtp 94/0 script 45/0 shaderlib 10/0 material 32/0
+tiger                              giant_albino_tarantula_blind       shared   444 differ     0  anim 4/0 texture 79/0 wave 180/0 dtp 94/0 script 45/0 shaderlib 10/0 material 32/0
+tiger                              yeti_thrall                        shared   248 differ     0  texture 26/0 wave 148/0 dtp 24/0 script 45/0 shaderlib 4/0 material 1/0
+tiger                              yeti_thrall_yggdrasil              shared   248 differ     0  texture 26/0 wave 148/0 dtp 24/0 script 45/0 shaderlib 4/0 material 1/0
+tiger                              shark_greenland                    shared   128 differ     0  texture 9/0 wave 65/0 dtp 9/0 script 45/0
+tiger                              knight_thrall                      shared   400 differ   167  texture 79/16 wave 143/143 dtp 91/8 script 45/0 shaderlib 10/0 material 32/0
+tiger                              viking_thrall_dlc2_                shared   397 differ   165  texture 81/17 wave 140/140 dtp 88/8 script 45/0 shaderlib 11/0 material 32/0
+tiger                              yeti_thrall_dlc2_                  shared   395 differ   165  texture 81/17 wave 140/140 dtp 86/8 script 45/0 shaderlib 11/0 material 32/0
+tiger                              yeti_thrall_armored_dlc2_          shared   395 differ   165  texture 81/17 wave 140/140 dtp 86/8 script 45/0 shaderlib 11/0 material 32/0
+tiger                              viking_thrall_tutorial_dlc2_       shared   397 differ   165  texture 81/17 wave 140/140 dtp 88/8 script 45/0 shaderlib 11/0 material 32/0
+tiger                              UNIT:l7_helheim03                  shared   163 differ     0  texture 8/0 wave 98/0 dtp 9/0 script 45/0 shaderlib 3/0
+tiger                              UNIT:l7_yggdrasil_hall02           shared   163 differ     0  texture 8/0 wave 98/0 dtp 9/0 script 45/0 shaderlib 3/0
+tiger                              UNIT:dlc_yggdrasil_hall02          shared   163 differ    99  texture 8/1 wave 98/98 dtp 9/0 script 45/0 shaderlib 3/0
+naga_green                         naga_red                           shared   802 differ     0  anim 111/0 texture 120/0 wave 268/0 dtp 195/0 script 45/0 shaderlib 26/0 material 37/0
+naga_green                         small_albino_spider                shared   169 differ     0  texture 9/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+naga_green                         small_brown_spider                 shared   169 differ     0  texture 9/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+naga_green                         small_brown_spider_no_jump         shared   169 differ     0  texture 9/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+naga_green                         panther_thrall                     shared   495 differ     0  anim 4/0 texture 104/0 wave 191/0 dtp 103/0 script 45/0 shaderlib 14/0 material 34/0
+naga_green                         cat_panther                        shared   490 differ     0  anim 4/0 texture 100/0 wave 186/0 dtp 103/0 script 45/0 shaderlib 18/0 material 34/0
+naga_green                         poacher                            shared   378 differ     0  anim 1/0 texture 100/0 wave 90/0 dtp 96/0 script 45/0 shaderlib 14/0 material 32/0
+naga_green                         poacher_long_range                 shared   378 differ     0  anim 1/0 texture 100/0 wave 90/0 dtp 96/0 script 45/0 shaderlib 14/0 material 32/0
+naga_green                         mayan_thrall                       shared   410 differ     0  texture 86/0 wave 139/0 dtp 90/0 script 45/0 shaderlib 18/0 material 32/0
+naga_green                         viking_thrall                      shared   406 differ     0  texture 86/0 wave 139/0 dtp 90/0 script 45/0 shaderlib 14/0 material 32/0
+naga_green                         giant_albino_tarantula             shared   453 differ     0  anim 4/0 texture 81/0 wave 187/0 dtp 94/0 script 45/0 shaderlib 10/0 material 32/0
+naga_green                         giant_albino_tarantula_blind       shared   453 differ     0  anim 4/0 texture 81/0 wave 187/0 dtp 94/0 script 45/0 shaderlib 10/0 material 32/0
+naga_green                         yeti_thrall                        shared   253 differ     0  texture 33/0 wave 139/0 dtp 23/0 script 45/0 shaderlib 12/0 material 1/0
+naga_green                         yeti_thrall_yggdrasil              shared   253 differ     0  texture 33/0 wave 139/0 dtp 23/0 script 45/0 shaderlib 12/0 material 1/0
+naga_green                         shark_greenland                    shared   134 differ     0  texture 11/0 wave 65/0 dtp 9/0 script 45/0 shaderlib 4/0
+naga_green                         knight_thrall                      shared   395 differ   158  texture 85/16 wave 134/134 dtp 89/8 script 45/0 shaderlib 10/0 material 32/0
+naga_green                         viking_thrall_dlc2_                shared   397 differ   157  texture 88/18 wave 131/131 dtp 86/8 script 45/0 shaderlib 15/0 material 32/0
+naga_green                         yeti_thrall_dlc2_                  shared   396 differ   157  texture 88/18 wave 131/131 dtp 85/8 script 45/0 shaderlib 15/0 material 32/0
+naga_green                         yeti_thrall_armored_dlc2_          shared   396 differ   157  texture 88/18 wave 131/131 dtp 85/8 script 45/0 shaderlib 15/0 material 32/0
+naga_green                         viking_thrall_tutorial_dlc2_       shared   397 differ   157  texture 88/18 wave 131/131 dtp 86/8 script 45/0 shaderlib 15/0 material 32/0
+naga_green                         UNIT:l7_helheim03                  shared   166 differ     0  texture 12/0 wave 98/0 dtp 8/0 script 45/0 shaderlib 3/0
+naga_green                         UNIT:l7_yggdrasil_hall02           shared   166 differ     0  texture 12/0 wave 98/0 dtp 8/0 script 45/0 shaderlib 3/0
+naga_green                         UNIT:dlc_yggdrasil_hall02          shared   166 differ   100  texture 12/2 wave 98/98 dtp 8/0 script 45/0 shaderlib 3/0
+naga_red                           small_albino_spider                shared   169 differ     0  texture 9/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+naga_red                           small_brown_spider                 shared   169 differ     0  texture 9/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+naga_red                           small_brown_spider_no_jump         shared   169 differ     0  texture 9/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+naga_red                           panther_thrall                     shared   495 differ     0  anim 4/0 texture 104/0 wave 191/0 dtp 103/0 script 45/0 shaderlib 14/0 material 34/0
+naga_red                           cat_panther                        shared   490 differ     0  anim 4/0 texture 100/0 wave 186/0 dtp 103/0 script 45/0 shaderlib 18/0 material 34/0
+naga_red                           poacher                            shared   378 differ     0  anim 1/0 texture 100/0 wave 90/0 dtp 96/0 script 45/0 shaderlib 14/0 material 32/0
+naga_red                           poacher_long_range                 shared   378 differ     0  anim 1/0 texture 100/0 wave 90/0 dtp 96/0 script 45/0 shaderlib 14/0 material 32/0
+naga_red                           mayan_thrall                       shared   410 differ     0  texture 86/0 wave 139/0 dtp 90/0 script 45/0 shaderlib 18/0 material 32/0
+naga_red                           viking_thrall                      shared   406 differ     0  texture 86/0 wave 139/0 dtp 90/0 script 45/0 shaderlib 14/0 material 32/0
+naga_red                           giant_albino_tarantula             shared   453 differ     0  anim 4/0 texture 81/0 wave 187/0 dtp 94/0 script 45/0 shaderlib 10/0 material 32/0
+naga_red                           giant_albino_tarantula_blind       shared   453 differ     0  anim 4/0 texture 81/0 wave 187/0 dtp 94/0 script 45/0 shaderlib 10/0 material 32/0
+naga_red                           yeti_thrall                        shared   253 differ     0  texture 33/0 wave 139/0 dtp 23/0 script 45/0 shaderlib 12/0 material 1/0
+naga_red                           yeti_thrall_yggdrasil              shared   253 differ     0  texture 33/0 wave 139/0 dtp 23/0 script 45/0 shaderlib 12/0 material 1/0
+naga_red                           shark_greenland                    shared   134 differ     0  texture 11/0 wave 65/0 dtp 9/0 script 45/0 shaderlib 4/0
+naga_red                           knight_thrall                      shared   395 differ   158  texture 85/16 wave 134/134 dtp 89/8 script 45/0 shaderlib 10/0 material 32/0
+naga_red                           viking_thrall_dlc2_                shared   397 differ   157  texture 88/18 wave 131/131 dtp 86/8 script 45/0 shaderlib 15/0 material 32/0
+naga_red                           yeti_thrall_dlc2_                  shared   396 differ   157  texture 88/18 wave 131/131 dtp 85/8 script 45/0 shaderlib 15/0 material 32/0
+naga_red                           yeti_thrall_armored_dlc2_          shared   396 differ   157  texture 88/18 wave 131/131 dtp 85/8 script 45/0 shaderlib 15/0 material 32/0
+naga_red                           viking_thrall_tutorial_dlc2_       shared   397 differ   157  texture 88/18 wave 131/131 dtp 86/8 script 45/0 shaderlib 15/0 material 32/0
+naga_red                           UNIT:l7_helheim03                  shared   166 differ     0  texture 12/0 wave 98/0 dtp 8/0 script 45/0 shaderlib 3/0
+naga_red                           UNIT:l7_yggdrasil_hall02           shared   166 differ     0  texture 12/0 wave 98/0 dtp 8/0 script 45/0 shaderlib 3/0
+naga_red                           UNIT:dlc_yggdrasil_hall02          shared   166 differ   100  texture 12/2 wave 98/98 dtp 8/0 script 45/0 shaderlib 3/0
+small_albino_spider                small_brown_spider                 shared   355 differ     0  anim 59/0 texture 22/0 wave 161/0 dtp 57/0 script 45/0 shaderlib 8/0 material 3/0
+small_albino_spider                small_brown_spider_no_jump         shared   355 differ     0  anim 59/0 texture 22/0 wave 161/0 dtp 57/0 script 45/0 shaderlib 8/0 material 3/0
+small_albino_spider                panther_thrall                     shared   196 differ     0  texture 10/0 wave 127/0 dtp 13/0 script 46/0
+small_albino_spider                cat_panther                        shared   170 differ     0  texture 10/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+small_albino_spider                poacher                            shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_albino_spider                poacher_long_range                 shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_albino_spider                mayan_thrall                       shared   198 differ     0  texture 10/0 wave 127/0 dtp 11/0 script 46/0 shaderlib 4/0
+small_albino_spider                viking_thrall                      shared   198 differ     0  texture 10/0 wave 127/0 dtp 11/0 script 46/0 shaderlib 4/0
+small_albino_spider                giant_albino_tarantula             shared   208 differ     0  texture 13/0 wave 133/0 dtp 16/0 script 46/0
+small_albino_spider                giant_albino_tarantula_blind       shared   208 differ     0  texture 13/0 wave 133/0 dtp 16/0 script 46/0
+small_albino_spider                yeti_thrall                        shared   194 differ     0  texture 6/0 wave 127/0 dtp 11/0 script 46/0 shaderlib 4/0
+small_albino_spider                yeti_thrall_yggdrasil              shared   194 differ     0  texture 6/0 wave 127/0 dtp 11/0 script 46/0 shaderlib 4/0
+small_albino_spider                shark_greenland                    shared   122 differ     0  texture 2/0 wave 65/0 dtp 6/0 script 45/0 shaderlib 4/0
+small_albino_spider                knight_thrall                      shared   194 differ   127  texture 10/0 wave 127/127 dtp 11/0 script 46/0
+small_albino_spider                viking_thrall_dlc2_                shared   194 differ   124  texture 10/0 wave 124/124 dtp 10/0 script 46/0 shaderlib 4/0
+small_albino_spider                yeti_thrall_dlc2_                  shared   195 differ   124  texture 11/0 wave 124/124 dtp 10/0 script 46/0 shaderlib 4/0
+small_albino_spider                yeti_thrall_armored_dlc2_          shared   195 differ   124  texture 11/0 wave 124/124 dtp 10/0 script 46/0 shaderlib 4/0
+small_albino_spider                viking_thrall_tutorial_dlc2_       shared   194 differ   124  texture 10/0 wave 124/124 dtp 10/0 script 46/0 shaderlib 4/0
+small_albino_spider                UNIT:l7_helheim03                  shared   182 differ     0  texture 2/0 wave 124/0 dtp 10/0 script 46/0
+small_albino_spider                UNIT:l7_yggdrasil_hall02           shared   182 differ     0  texture 2/0 wave 124/0 dtp 10/0 script 46/0
+small_albino_spider                UNIT:dlc_yggdrasil_hall02          shared   182 differ   124  texture 2/0 wave 124/124 dtp 10/0 script 46/0
+small_brown_spider                 small_brown_spider_no_jump         shared   358 differ     0  anim 59/0 texture 22/0 wave 161/0 dtp 57/0 script 46/0 shaderlib 8/0 material 4/0 mesh 1/0
+small_brown_spider                 panther_thrall                     shared   195 differ     0  texture 10/0 wave 127/0 dtp 13/0 script 45/0
+small_brown_spider                 cat_panther                        shared   170 differ     0  texture 10/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider                 poacher                            shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider                 poacher_long_range                 shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider                 mayan_thrall                       shared   197 differ     0  texture 10/0 wave 127/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider                 viking_thrall                      shared   197 differ     0  texture 10/0 wave 127/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider                 giant_albino_tarantula             shared   207 differ     0  texture 13/0 wave 133/0 dtp 16/0 script 45/0
+small_brown_spider                 giant_albino_tarantula_blind       shared   207 differ     0  texture 13/0 wave 133/0 dtp 16/0 script 45/0
+small_brown_spider                 yeti_thrall                        shared   193 differ     0  texture 6/0 wave 127/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider                 yeti_thrall_yggdrasil              shared   193 differ     0  texture 6/0 wave 127/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider                 shark_greenland                    shared   122 differ     0  texture 2/0 wave 65/0 dtp 6/0 script 45/0 shaderlib 4/0
+small_brown_spider                 knight_thrall                      shared   193 differ   127  texture 10/0 wave 127/127 dtp 11/0 script 45/0
+small_brown_spider                 viking_thrall_dlc2_                shared   193 differ   124  texture 10/0 wave 124/124 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider                 yeti_thrall_dlc2_                  shared   194 differ   124  texture 11/0 wave 124/124 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider                 yeti_thrall_armored_dlc2_          shared   194 differ   124  texture 11/0 wave 124/124 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider                 viking_thrall_tutorial_dlc2_       shared   193 differ   124  texture 10/0 wave 124/124 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider                 UNIT:l7_helheim03                  shared   181 differ     0  texture 2/0 wave 124/0 dtp 10/0 script 45/0
+small_brown_spider                 UNIT:l7_yggdrasil_hall02           shared   181 differ     0  texture 2/0 wave 124/0 dtp 10/0 script 45/0
+small_brown_spider                 UNIT:dlc_yggdrasil_hall02          shared   181 differ   124  texture 2/0 wave 124/124 dtp 10/0 script 45/0
+small_brown_spider_no_jump         panther_thrall                     shared   195 differ     0  texture 10/0 wave 127/0 dtp 13/0 script 45/0
+small_brown_spider_no_jump         cat_panther                        shared   170 differ     0  texture 10/0 wave 101/0 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         poacher                            shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         poacher_long_range                 shared   159 differ     0  texture 9/0 wave 90/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         mayan_thrall                       shared   197 differ     0  texture 10/0 wave 127/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         viking_thrall                      shared   197 differ     0  texture 10/0 wave 127/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         giant_albino_tarantula             shared   207 differ     0  texture 13/0 wave 133/0 dtp 16/0 script 45/0
+small_brown_spider_no_jump         giant_albino_tarantula_blind       shared   207 differ     0  texture 13/0 wave 133/0 dtp 16/0 script 45/0
+small_brown_spider_no_jump         yeti_thrall                        shared   193 differ     0  texture 6/0 wave 127/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         yeti_thrall_yggdrasil              shared   193 differ     0  texture 6/0 wave 127/0 dtp 11/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         shark_greenland                    shared   122 differ     0  texture 2/0 wave 65/0 dtp 6/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         knight_thrall                      shared   193 differ   127  texture 10/0 wave 127/127 dtp 11/0 script 45/0
+small_brown_spider_no_jump         viking_thrall_dlc2_                shared   193 differ   124  texture 10/0 wave 124/124 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         yeti_thrall_dlc2_                  shared   194 differ   124  texture 11/0 wave 124/124 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         yeti_thrall_armored_dlc2_          shared   194 differ   124  texture 11/0 wave 124/124 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         viking_thrall_tutorial_dlc2_       shared   193 differ   124  texture 10/0 wave 124/124 dtp 10/0 script 45/0 shaderlib 4/0
+small_brown_spider_no_jump         UNIT:l7_helheim03                  shared   181 differ     0  texture 2/0 wave 124/0 dtp 10/0 script 45/0
+small_brown_spider_no_jump         UNIT:l7_yggdrasil_hall02           shared   181 differ     0  texture 2/0 wave 124/0 dtp 10/0 script 45/0
+small_brown_spider_no_jump         UNIT:dlc_yggdrasil_hall02          shared   181 differ   124  texture 2/0 wave 124/124 dtp 10/0 script 45/0
+panther_thrall                     cat_panther                        shared   622 differ     0  anim 88/0 texture 101/0 wave 209/0 dtp 131/0 script 45/0 shaderlib 14/0 material 34/0
+panther_thrall                     poacher                            shared   399 differ     0  anim 1/0 texture 100/0 wave 108/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+panther_thrall                     poacher_long_range                 shared   399 differ     0  anim 1/0 texture 100/0 wave 108/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+panther_thrall                     mayan_thrall                       shared   520 differ     0  texture 99/0 wave 207/0 dtp 106/0 script 48/0 shaderlib 22/0 material 38/0
+panther_thrall                     viking_thrall                      shared   516 differ     0  texture 99/0 wave 207/0 dtp 106/0 script 48/0 shaderlib 18/0 material 38/0
+panther_thrall                     giant_albino_tarantula             shared   476 differ     0  anim 4/0 texture 81/0 wave 206/0 dtp 97/0 script 46/0 shaderlib 10/0 material 32/0
+panther_thrall                     giant_albino_tarantula_blind       shared   476 differ     0  anim 4/0 texture 81/0 wave 206/0 dtp 97/0 script 46/0 shaderlib 10/0 material 32/0
+panther_thrall                     yeti_thrall                        shared   358 differ     0  texture 46/0 wave 207/0 dtp 38/0 script 48/0 shaderlib 12/0 material 7/0
+panther_thrall                     yeti_thrall_yggdrasil              shared   358 differ     0  texture 46/0 wave 207/0 dtp 38/0 script 48/0 shaderlib 12/0 material 7/0
+panther_thrall                     shark_greenland                    shared   128 differ     0  texture 10/0 wave 65/0 dtp 8/0 script 45/0
+panther_thrall                     knight_thrall                      shared   508 differ   232  texture 99/22 wave 201/201 dtp 105/9 script 48/0 shaderlib 17/0 material 38/0
+panther_thrall                     viking_thrall_dlc2_                shared   505 differ   231  texture 101/23 wave 198/198 dtp 102/10 script 47/0 shaderlib 19/0 material 38/0
+panther_thrall                     yeti_thrall_dlc2_                  shared   499 differ   231  texture 101/23 wave 198/198 dtp 100/10 script 47/0 shaderlib 15/0 material 38/0
+panther_thrall                     yeti_thrall_armored_dlc2_          shared   499 differ   231  texture 101/23 wave 198/198 dtp 100/10 script 47/0 shaderlib 15/0 material 38/0
+panther_thrall                     viking_thrall_tutorial_dlc2_       shared   505 differ   231  texture 101/23 wave 198/198 dtp 102/10 script 47/0 shaderlib 19/0 material 38/0
+panther_thrall                     UNIT:l7_helheim03                  shared   208 differ     0  texture 11/0 wave 132/0 dtp 14/0 script 48/0 shaderlib 3/0
+panther_thrall                     UNIT:l7_yggdrasil_hall02           shared   208 differ     0  texture 11/0 wave 132/0 dtp 14/0 script 48/0 shaderlib 3/0
+panther_thrall                     UNIT:dlc_yggdrasil_hall02          shared   207 differ   134  texture 11/1 wave 132/132 dtp 14/1 script 47/0 shaderlib 3/0
+cat_panther                        poacher                            shared   389 differ     0  anim 1/0 texture 98/0 wave 100/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+cat_panther                        poacher_long_range                 shared   389 differ     0  anim 1/0 texture 98/0 wave 100/0 dtp 99/0 script 45/0 shaderlib 14/0 material 32/0
+cat_panther                        mayan_thrall                       shared   411 differ     0  texture 80/0 wave 148/0 dtp 92/0 script 45/0 shaderlib 14/0 material 32/0
+cat_panther                        viking_thrall                      shared   411 differ     0  texture 80/0 wave 148/0 dtp 92/0 script 45/0 shaderlib 14/0 material 32/0
+cat_panther                        giant_albino_tarantula             shared   445 differ     0  anim 4/0 texture 80/0 wave 180/0 dtp 94/0 script 45/0 shaderlib 10/0 material 32/0
+cat_panther                        giant_albino_tarantula_blind       shared   445 differ     0  anim 4/0 texture 80/0 wave 180/0 dtp 94/0 script 45/0 shaderlib 10/0 material 32/0
+cat_panther                        yeti_thrall                        shared   253 differ     0  texture 27/0 wave 148/0 dtp 24/0 script 45/0 shaderlib 8/0 material 1/0
+cat_panther                        yeti_thrall_yggdrasil              shared   253 differ     0  texture 27/0 wave 148/0 dtp 24/0 script 45/0 shaderlib 8/0 material 1/0
+cat_panther                        shark_greenland                    shared   133 differ     0  texture 10/0 wave 65/0 dtp 9/0 script 45/0 shaderlib 4/0
+cat_panther                        knight_thrall                      shared   401 differ   167  texture 80/16 wave 143/143 dtp 91/8 script 45/0 shaderlib 10/0 material 32/0
+cat_panther                        viking_thrall_dlc2_                shared   402 differ   165  texture 82/17 wave 140/140 dtp 88/8 script 45/0 shaderlib 15/0 material 32/0
+cat_panther                        yeti_thrall_dlc2_                  shared   400 differ   165  texture 82/17 wave 140/140 dtp 86/8 script 45/0 shaderlib 15/0 material 32/0
+cat_panther                        yeti_thrall_armored_dlc2_          shared   400 differ   165  texture 82/17 wave 140/140 dtp 86/8 script 45/0 shaderlib 15/0 material 32/0
+cat_panther                        viking_thrall_tutorial_dlc2_       shared   402 differ   165  texture 82/17 wave 140/140 dtp 88/8 script 45/0 shaderlib 15/0 material 32/0
+cat_panther                        UNIT:l7_helheim03                  shared   164 differ     0  texture 9/0 wave 98/0 dtp 9/0 script 45/0 shaderlib 3/0
+cat_panther                        UNIT:l7_yggdrasil_hall02           shared   164 differ     0  texture 9/0 wave 98/0 dtp 9/0 script 45/0 shaderlib 3/0
+cat_panther                        UNIT:dlc_yggdrasil_hall02          shared   164 differ    99  texture 9/1 wave 98/98 dtp 9/0 script 45/0 shaderlib 3/0
+poacher                            poacher_long_range                 shared  1067 differ     0  anim 183/0 texture 225/0 wave 202/0 dtp 281/0 script 51/0 shaderlib 65/0 material 57/0 mesh 3/0
+poacher                            mayan_thrall                       shared   391 differ     0  anim 3/0 texture 86/0 wave 109/0 dtp 94/0 script 45/0 shaderlib 22/0 material 32/0
+poacher                            viking_thrall                      shared   383 differ     0  anim 3/0 texture 86/0 wave 109/0 dtp 94/0 script 45/0 shaderlib 14/0 material 32/0
+poacher                            giant_albino_tarantula             shared   364 differ     0  anim 1/0 texture 81/0 wave 105/0 dtp 90/0 script 45/0 shaderlib 10/0 material 32/0
+poacher                            giant_albino_tarantula_blind       shared   364 differ     0  anim 1/0 texture 81/0 wave 105/0 dtp 90/0 script 45/0 shaderlib 10/0 material 32/0
+poacher                            yeti_thrall                        shared   215 differ     0  texture 33/0 wave 105/0 dtp 23/0 script 45/0 shaderlib 8/0 material 1/0
+poacher                            yeti_thrall_yggdrasil              shared   215 differ     0  texture 33/0 wave 105/0 dtp 23/0 script 45/0 shaderlib 8/0 material 1/0
+poacher                            shark_greenland                    shared    99 differ     0  texture 11/0 wave 31/0 dtp 8/0 script 45/0 shaderlib 4/0
+poacher                            knight_thrall                      shared   372 differ   129  anim 3/0 texture 85/16 wave 104/104 dtp 93/9 script 45/0 shaderlib 10/0 material 32/0
+poacher                            viking_thrall_dlc2_                shared   377 differ   128  anim 3/0 texture 88/18 wave 101/101 dtp 90/9 script 45/0 shaderlib 17/0 material 33/0
+poacher                            yeti_thrall_dlc2_                  shared   366 differ   123  texture 88/18 wave 97/97 dtp 85/8 script 45/0 shaderlib 18/0 material 33/0
+poacher                            yeti_thrall_armored_dlc2_          shared   366 differ   123  texture 88/18 wave 97/97 dtp 85/8 script 45/0 shaderlib 18/0 material 33/0
+poacher                            viking_thrall_tutorial_dlc2_       shared   377 differ   128  anim 3/0 texture 88/18 wave 101/101 dtp 90/9 script 45/0 shaderlib 17/0 material 33/0
+poacher                            UNIT:l7_helheim03                  shared   155 differ     0  texture 15/0 wave 82/0 dtp 10/0 script 45/0 shaderlib 3/0
+poacher                            UNIT:l7_yggdrasil_hall02           shared   155 differ     0  texture 15/0 wave 82/0 dtp 10/0 script 45/0 shaderlib 3/0
+poacher                            UNIT:dlc_yggdrasil_hall02          shared   155 differ    84  texture 15/2 wave 82/82 dtp 10/0 script 45/0 shaderlib 3/0
+poacher_long_range                 mayan_thrall                       shared   391 differ     0  anim 3/0 texture 86/0 wave 109/0 dtp 94/0 script 45/0 shaderlib 22/0 material 32/0
+poacher_long_range                 viking_thrall                      shared   383 differ     0  anim 3/0 texture 86/0 wave 109/0 dtp 94/0 script 45/0 shaderlib 14/0 material 32/0
+poacher_long_range                 giant_albino_tarantula             shared   364 differ     0  anim 1/0 texture 81/0 wave 105/0 dtp 90/0 script 45/0 shaderlib 10/0 material 32/0
+poacher_long_range                 giant_albino_tarantula_blind       shared   364 differ     0  anim 1/0 texture 81/0 wave 105/0 dtp 90/0 script 45/0 shaderlib 10/0 material 32/0
+poacher_long_range                 yeti_thrall                        shared   215 differ     0  texture 33/0 wave 105/0 dtp 23/0 script 45/0 shaderlib 8/0 material 1/0
+poacher_long_range                 yeti_thrall_yggdrasil              shared   215 differ     0  texture 33/0 wave 105/0 dtp 23/0 script 45/0 shaderlib 8/0 material 1/0
+poacher_long_range                 shark_greenland                    shared    99 differ     0  texture 11/0 wave 31/0 dtp 8/0 script 45/0 shaderlib 4/0
+poacher_long_range                 knight_thrall                      shared   372 differ   129  anim 3/0 texture 85/16 wave 104/104 dtp 93/9 script 45/0 shaderlib 10/0 material 32/0
+poacher_long_range                 viking_thrall_dlc2_                shared   377 differ   128  anim 3/0 texture 88/18 wave 101/101 dtp 90/9 script 45/0 shaderlib 17/0 material 33/0
+poacher_long_range                 yeti_thrall_dlc2_                  shared   366 differ   123  texture 88/18 wave 97/97 dtp 85/8 script 45/0 shaderlib 18/0 material 33/0
+poacher_long_range                 yeti_thrall_armored_dlc2_          shared   366 differ   123  texture 88/18 wave 97/97 dtp 85/8 script 45/0 shaderlib 18/0 material 33/0
+poacher_long_range                 viking_thrall_tutorial_dlc2_       shared   377 differ   128  anim 3/0 texture 88/18 wave 101/101 dtp 90/9 script 45/0 shaderlib 17/0 material 33/0
+poacher_long_range                 UNIT:l7_helheim03                  shared   155 differ     0  texture 15/0 wave 82/0 dtp 10/0 script 45/0 shaderlib 3/0
+poacher_long_range                 UNIT:l7_yggdrasil_hall02           shared   155 differ     0  texture 15/0 wave 82/0 dtp 10/0 script 45/0 shaderlib 3/0
+poacher_long_range                 UNIT:dlc_yggdrasil_hall02          shared   155 differ    84  texture 15/2 wave 82/82 dtp 10/0 script 45/0 shaderlib 3/0
+mayan_thrall                       viking_thrall                      shared   896 differ     0  anim 85/0 texture 135/0 wave 312/0 dtp 224/0 script 48/0 shaderlib 38/0 material 48/0 mesh 6/0
+mayan_thrall                       giant_albino_tarantula             shared   426 differ     0  texture 82/0 wave 165/0 dtp 91/0 script 46/0 shaderlib 10/0 material 32/0
+mayan_thrall                       giant_albino_tarantula_blind       shared   426 differ     0  texture 82/0 wave 165/0 dtp 91/0 script 46/0 shaderlib 10/0 material 32/0
+mayan_thrall                       yeti_thrall                        shared   447 differ     0  anim 1/0 texture 62/0 wave 252/0 dtp 43/0 script 48/0 shaderlib 28/0 material 11/0 mesh 2/0
+mayan_thrall                       yeti_thrall_yggdrasil              shared   447 differ     0  anim 1/0 texture 62/0 wave 252/0 dtp 43/0 script 48/0 shaderlib 28/0 material 11/0 mesh 2/0
+mayan_thrall                       shark_greenland                    shared   133 differ     0  texture 11/0 wave 65/0 dtp 8/0 script 45/0 shaderlib 4/0
+mayan_thrall                       knight_thrall                      shared   609 differ   300  anim 4/0 texture 106/23 wave 266/266 dtp 122/11 script 48/0 shaderlib 24/0 material 39/0
+mayan_thrall                       viking_thrall_dlc2_                shared   671 differ   326  anim 3/0 texture 135/30 wave 281/281 dtp 124/15 script 47/0 shaderlib 34/0 material 47/0
+mayan_thrall                       yeti_thrall_dlc2_                  shared   580 differ   278  texture 115/25 wave 243/243 dtp 104/10 script 47/0 shaderlib 29/0 material 42/0
+mayan_thrall                       yeti_thrall_armored_dlc2_          shared   577 differ   278  texture 115/25 wave 243/243 dtp 104/10 script 47/0 shaderlib 26/0 material 42/0
+mayan_thrall                       viking_thrall_tutorial_dlc2_       shared   671 differ   326  anim 3/0 texture 135/30 wave 281/281 dtp 124/15 script 47/0 shaderlib 34/0 material 47/0
+mayan_thrall                       UNIT:l7_helheim03                  shared   249 differ     0  texture 12/0 wave 168/0 dtp 18/0 script 48/0 shaderlib 3/0
+mayan_thrall                       UNIT:l7_yggdrasil_hall02           shared   249 differ     0  texture 12/0 wave 168/0 dtp 18/0 script 48/0 shaderlib 3/0
+mayan_thrall                       UNIT:dlc_yggdrasil_hall02          shared   229 differ   155  texture 12/2 wave 150/150 dtp 17/3 script 47/0 shaderlib 3/0
+viking_thrall                      giant_albino_tarantula             shared   426 differ     0  texture 82/0 wave 165/0 dtp 91/0 script 46/0 shaderlib 10/0 material 32/0
+viking_thrall                      giant_albino_tarantula_blind       shared   426 differ     0  texture 82/0 wave 165/0 dtp 91/0 script 46/0 shaderlib 10/0 material 32/0
+viking_thrall                      yeti_thrall                        shared   443 differ     0  anim 1/0 texture 62/0 wave 252/0 dtp 43/0 script 48/0 shaderlib 24/0 material 11/0 mesh 2/0
+viking_thrall                      yeti_thrall_yggdrasil              shared   443 differ     0  anim 1/0 texture 62/0 wave 252/0 dtp 43/0 script 48/0 shaderlib 24/0 material 11/0 mesh 2/0
+viking_thrall                      shark_greenland                    shared   133 differ     0  texture 11/0 wave 65/0 dtp 8/0 script 45/0 shaderlib 4/0
+viking_thrall                      knight_thrall                      shared   609 differ   300  anim 4/0 texture 106/23 wave 266/266 dtp 122/11 script 48/0 shaderlib 24/0 material 39/0
+viking_thrall                      viking_thrall_dlc2_                shared   678 differ   327  anim 3/0 texture 142/31 wave 281/281 dtp 124/15 script 47/0 shaderlib 34/0 material 47/0
+viking_thrall                      yeti_thrall_dlc2_                  shared   577 differ   278  texture 115/25 wave 243/243 dtp 104/10 script 47/0 shaderlib 26/0 material 42/0
+viking_thrall                      yeti_thrall_armored_dlc2_          shared   577 differ   278  texture 115/25 wave 243/243 dtp 104/10 script 47/0 shaderlib 26/0 material 42/0
+viking_thrall                      viking_thrall_tutorial_dlc2_       shared   678 differ   327  anim 3/0 texture 142/31 wave 281/281 dtp 124/15 script 47/0 shaderlib 34/0 material 47/0
+viking_thrall                      UNIT:l7_helheim03                  shared   250 differ     0  texture 12/0 wave 168/0 dtp 18/0 script 49/0 shaderlib 3/0
+viking_thrall                      UNIT:l7_yggdrasil_hall02           shared   250 differ     0  texture 12/0 wave 168/0 dtp 18/0 script 49/0 shaderlib 3/0
+viking_thrall                      UNIT:dlc_yggdrasil_hall02          shared   229 differ   155  texture 12/2 wave 150/150 dtp 17/3 script 47/0 shaderlib 3/0
+giant_albino_tarantula             giant_albino_tarantula_blind       shared   754 differ     0  anim 79/0 texture 93/0 wave 294/0 dtp 182/0 script 47/0 shaderlib 22/0 material 36/0 mesh 1/0
+giant_albino_tarantula             yeti_thrall                        shared   268 differ     0  texture 29/0 wave 165/0 dtp 23/0 script 46/0 shaderlib 4/0 material 1/0
+giant_albino_tarantula             yeti_thrall_yggdrasil              shared   268 differ     0  texture 29/0 wave 165/0 dtp 23/0 script 46/0 shaderlib 4/0 material 1/0
+giant_albino_tarantula             shark_greenland                    shared   127 differ     0  texture 11/0 wave 65/0 dtp 6/0 script 45/0
+giant_albino_tarantula             knight_thrall                      shared   419 differ   184  texture 81/16 wave 160/160 dtp 90/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula             viking_thrall_dlc2_                shared   416 differ   182  texture 82/17 wave 157/157 dtp 89/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula             yeti_thrall_dlc2_                  shared   414 differ   182  texture 82/17 wave 157/157 dtp 87/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula             yeti_thrall_armored_dlc2_          shared   414 differ   182  texture 82/17 wave 157/157 dtp 87/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula             viking_thrall_tutorial_dlc2_       shared   416 differ   182  texture 82/17 wave 157/157 dtp 89/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula             UNIT:l7_helheim03                  shared   206 differ     0  texture 10/0 wave 134/0 dtp 13/0 script 46/0 shaderlib 3/0
+giant_albino_tarantula             UNIT:l7_yggdrasil_hall02           shared   206 differ     0  texture 10/0 wave 134/0 dtp 13/0 script 46/0 shaderlib 3/0
+giant_albino_tarantula             UNIT:dlc_yggdrasil_hall02          shared   206 differ   136  texture 10/2 wave 134/134 dtp 13/0 script 46/0 shaderlib 3/0
+giant_albino_tarantula_blind       yeti_thrall                        shared   268 differ     0  texture 29/0 wave 165/0 dtp 23/0 script 46/0 shaderlib 4/0 material 1/0
+giant_albino_tarantula_blind       yeti_thrall_yggdrasil              shared   268 differ     0  texture 29/0 wave 165/0 dtp 23/0 script 46/0 shaderlib 4/0 material 1/0
+giant_albino_tarantula_blind       shark_greenland                    shared   127 differ     0  texture 11/0 wave 65/0 dtp 6/0 script 45/0
+giant_albino_tarantula_blind       knight_thrall                      shared   419 differ   184  texture 81/16 wave 160/160 dtp 90/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula_blind       viking_thrall_dlc2_                shared   416 differ   182  texture 82/17 wave 157/157 dtp 89/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula_blind       yeti_thrall_dlc2_                  shared   414 differ   182  texture 82/17 wave 157/157 dtp 87/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula_blind       yeti_thrall_armored_dlc2_          shared   414 differ   182  texture 82/17 wave 157/157 dtp 87/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula_blind       viking_thrall_tutorial_dlc2_       shared   416 differ   182  texture 82/17 wave 157/157 dtp 89/8 script 46/0 shaderlib 10/0 material 32/0
+giant_albino_tarantula_blind       UNIT:l7_helheim03                  shared   206 differ     0  texture 10/0 wave 134/0 dtp 13/0 script 46/0 shaderlib 3/0
+giant_albino_tarantula_blind       UNIT:l7_yggdrasil_hall02           shared   206 differ     0  texture 10/0 wave 134/0 dtp 13/0 script 46/0 shaderlib 3/0
+giant_albino_tarantula_blind       UNIT:dlc_yggdrasil_hall02          shared   206 differ   136  texture 10/2 wave 134/134 dtp 13/0 script 46/0 shaderlib 3/0
+yeti_thrall                        yeti_thrall_yggdrasil              shared   789 differ     0  anim 83/0 texture 102/0 wave 330/0 dtp 165/0 script 49/0 shaderlib 32/0 material 22/0 mesh 6/0
+yeti_thrall                        shark_greenland                    shared   133 differ     0  texture 11/0 wave 65/0 dtp 8/0 script 45/0 shaderlib 4/0
+yeti_thrall                        knight_thrall                      shared   374 differ   224  anim 1/0 texture 53/8 wave 206/206 dtp 40/10 script 48/0 shaderlib 18/0 material 8/0
+yeti_thrall                        viking_thrall_dlc2_                shared   425 differ   263  texture 62/10 wave 243/243 dtp 38/10 script 47/0 shaderlib 24/0 material 11/0
+yeti_thrall                        yeti_thrall_dlc2_                  shared   558 differ   351  anim 3/0 texture 102/21 wave 311/311 dtp 56/19 script 47/0 shaderlib 24/0 material 15/0
+yeti_thrall                        yeti_thrall_armored_dlc2_          shared   546 differ   349  anim 3/0 texture 90/19 wave 311/311 dtp 56/19 script 47/0 shaderlib 24/0 material 15/0
+yeti_thrall                        viking_thrall_tutorial_dlc2_       shared   425 differ   263  texture 62/10 wave 243/243 dtp 38/10 script 47/0 shaderlib 24/0 material 11/0
+yeti_thrall                        UNIT:l7_helheim03                  shared   214 differ     0  texture 8/0 wave 144/0 dtp 13/0 script 49/0
+yeti_thrall                        UNIT:l7_yggdrasil_hall02           shared   214 differ     0  texture 8/0 wave 144/0 dtp 13/0 script 49/0
+yeti_thrall                        UNIT:dlc_yggdrasil_hall02          shared   211 differ   146  texture 8/1 wave 144/144 dtp 12/1 script 47/0
+yeti_thrall_yggdrasil              shark_greenland                    shared   133 differ     0  texture 11/0 wave 65/0 dtp 8/0 script 45/0 shaderlib 4/0
+yeti_thrall_yggdrasil              knight_thrall                      shared   374 differ   224  anim 1/0 texture 53/8 wave 206/206 dtp 40/10 script 48/0 shaderlib 18/0 material 8/0
+yeti_thrall_yggdrasil              viking_thrall_dlc2_                shared   425 differ   263  texture 62/10 wave 243/243 dtp 38/10 script 47/0 shaderlib 24/0 material 11/0
+yeti_thrall_yggdrasil              yeti_thrall_dlc2_                  shared   558 differ   351  anim 3/0 texture 102/21 wave 311/311 dtp 56/19 script 47/0 shaderlib 24/0 material 15/0
+yeti_thrall_yggdrasil              yeti_thrall_armored_dlc2_          shared   546 differ   349  anim 3/0 texture 90/19 wave 311/311 dtp 56/19 script 47/0 shaderlib 24/0 material 15/0
+yeti_thrall_yggdrasil              viking_thrall_tutorial_dlc2_       shared   425 differ   263  texture 62/10 wave 243/243 dtp 38/10 script 47/0 shaderlib 24/0 material 11/0
+yeti_thrall_yggdrasil              UNIT:l7_helheim03                  shared   214 differ     0  texture 8/0 wave 144/0 dtp 13/0 script 49/0
+yeti_thrall_yggdrasil              UNIT:l7_yggdrasil_hall02           shared   214 differ     0  texture 8/0 wave 144/0 dtp 13/0 script 49/0
+yeti_thrall_yggdrasil              UNIT:dlc_yggdrasil_hall02          shared   211 differ   146  texture 8/1 wave 144/144 dtp 12/1 script 47/0
+shark_greenland                    knight_thrall                      shared   128 differ    65  texture 10/0 wave 65/65 dtp 8/0 script 45/0
+shark_greenland                    viking_thrall_dlc2_                shared   135 differ    66  texture 14/1 wave 65/65 dtp 7/0 script 45/0 shaderlib 4/0
+shark_greenland                    yeti_thrall_dlc2_                  shared   135 differ    66  texture 14/1 wave 65/65 dtp 7/0 script 45/0 shaderlib 4/0
+shark_greenland                    yeti_thrall_armored_dlc2_          shared   135 differ    66  texture 14/1 wave 65/65 dtp 7/0 script 45/0 shaderlib 4/0
+shark_greenland                    viking_thrall_tutorial_dlc2_       shared   135 differ    66  texture 14/1 wave 65/65 dtp 7/0 script 45/0 shaderlib 4/0
+shark_greenland                    UNIT:l7_helheim03                  shared   122 differ     0  texture 6/0 wave 65/0 dtp 6/0 script 45/0
+shark_greenland                    UNIT:l7_yggdrasil_hall02           shared   150 differ     0  texture 6/0 wave 90/0 dtp 9/0 script 45/0
+shark_greenland                    UNIT:dlc_yggdrasil_hall02          shared   122 differ    66  texture 6/1 wave 65/65 dtp 6/0 script 45/0
+knight_thrall                      viking_thrall_dlc2_                shared   579 differ    35  anim 3/0 texture 106/0 wave 242/30 dtp 118/5 script 47/0 shaderlib 24/0 material 39/0
+knight_thrall                      yeti_thrall_dlc2_                  shared   520 differ    19  texture 106/0 wave 204/18 dtp 103/1 script 47/0 shaderlib 21/0 material 39/0
+knight_thrall                      yeti_thrall_armored_dlc2_          shared   521 differ    19  texture 106/0 wave 204/18 dtp 103/1 script 47/0 shaderlib 22/0 material 39/0
+knight_thrall                      viking_thrall_tutorial_dlc2_       shared   579 differ    35  anim 3/0 texture 106/0 wave 242/30 dtp 118/5 script 47/0 shaderlib 24/0 material 39/0
+knight_thrall                      UNIT:l7_helheim03                  shared   248 differ   170  texture 11/1 wave 169/169 dtp 17/0 script 48/0 shaderlib 3/0
+knight_thrall                      UNIT:l7_yggdrasil_hall02           shared   248 differ   170  texture 11/1 wave 169/169 dtp 17/0 script 48/0 shaderlib 3/0
+knight_thrall                      UNIT:dlc_yggdrasil_hall02          shared   230 differ    23  texture 11/0 wave 151/20 dtp 17/3 script 47/0 shaderlib 4/0
+viking_thrall_dlc2_                yeti_thrall_dlc2_                  shared   689 differ     1  anim 1/0 texture 135/0 wave 267/0 dtp 116/1 script 48/0 shaderlib 60/0 material 62/0
+viking_thrall_dlc2_                yeti_thrall_armored_dlc2_          shared   685 differ     1  anim 1/0 texture 135/0 wave 267/0 dtp 116/1 script 48/0 shaderlib 56/0 material 62/0
+viking_thrall_dlc2_                viking_thrall_tutorial_dlc2_       shared  1041 differ     1  anim 106/0 texture 162/0 wave 312/0 dtp 258/1 script 50/0 shaderlib 71/0 material 74/0 mesh 8/0
+viking_thrall_dlc2_                UNIT:l7_helheim03                  shared   246 differ   172  texture 12/2 wave 167/167 dtp 17/3 script 47/0 shaderlib 3/0
+viking_thrall_dlc2_                UNIT:l7_yggdrasil_hall02           shared   250 differ   176  texture 12/2 wave 171/171 dtp 17/3 script 47/0 shaderlib 3/0
+viking_thrall_dlc2_                UNIT:dlc_yggdrasil_hall02          shared   236 differ     0  texture 12/0 wave 155/0 dtp 17/0 script 49/0 shaderlib 3/0
+yeti_thrall_dlc2_                  yeti_thrall_armored_dlc2_          shared   971 differ     1  anim 26/0 texture 163/0 wave 342/0 dtp 261/1 script 50/0 shaderlib 62/0 material 66/0 mesh 1/0
+yeti_thrall_dlc2_                  viking_thrall_tutorial_dlc2_       shared   689 differ     1  anim 1/0 texture 135/0 wave 267/0 dtp 116/1 script 48/0 shaderlib 60/0 material 62/0
+yeti_thrall_dlc2_                  UNIT:l7_helheim03                  shared   221 differ   148  texture 12/2 wave 145/145 dtp 14/1 script 47/0 shaderlib 3/0
+yeti_thrall_dlc2_                  UNIT:l7_yggdrasil_hall02           shared   225 differ   152  texture 12/2 wave 149/149 dtp 14/1 script 47/0 shaderlib 3/0
+yeti_thrall_dlc2_                  UNIT:dlc_yggdrasil_hall02          shared   227 differ     0  texture 12/0 wave 149/0 dtp 13/0 script 49/0 shaderlib 4/0
+yeti_thrall_armored_dlc2_          viking_thrall_tutorial_dlc2_       shared   685 differ     1  anim 1/0 texture 135/0 wave 267/0 dtp 116/1 script 48/0 shaderlib 56/0 material 62/0
+yeti_thrall_armored_dlc2_          UNIT:l7_helheim03                  shared   221 differ   148  texture 12/2 wave 145/145 dtp 14/1 script 47/0 shaderlib 3/0
+yeti_thrall_armored_dlc2_          UNIT:l7_yggdrasil_hall02           shared   225 differ   152  texture 12/2 wave 149/149 dtp 14/1 script 47/0 shaderlib 3/0
+yeti_thrall_armored_dlc2_          UNIT:dlc_yggdrasil_hall02          shared   228 differ     0  texture 12/0 wave 149/0 dtp 13/0 script 49/0 shaderlib 5/0
+viking_thrall_tutorial_dlc2_       UNIT:l7_helheim03                  shared   246 differ   172  texture 12/2 wave 167/167 dtp 17/3 script 47/0 shaderlib 3/0
+viking_thrall_tutorial_dlc2_       UNIT:l7_yggdrasil_hall02           shared   250 differ   176  texture 12/2 wave 171/171 dtp 17/3 script 47/0 shaderlib 3/0
+viking_thrall_tutorial_dlc2_       UNIT:dlc_yggdrasil_hall02          shared   237 differ     0  texture 12/0 wave 155/0 dtp 17/0 script 50/0 shaderlib 3/0
+UNIT:l7_helheim03                  UNIT:l7_yggdrasil_hall02           shared   658 differ     0  texture 59/0 wave 370/0 dtp 59/0 script 121/0 shaderlib 35/0 material 14/0
+UNIT:l7_helheim03                  UNIT:dlc_yggdrasil_hall02          shared   546 differ   366  texture 19/3 wave 352/352 dtp 47/9 script 103/2 shaderlib 20/0 material 5/0
+UNIT:l7_yggdrasil_hall02           UNIT:dlc_yggdrasil_hall02          shared   633 differ   389  texture 20/4 wave 370/370 dtp 51/11 script 128/4 shaderlib 51/0 material 13/0

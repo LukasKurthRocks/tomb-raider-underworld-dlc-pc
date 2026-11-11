@@ -1,0 +1,133 @@
+
+217 shark_blueshark: 1 DRMs (shark_blueshark), 296 sections, 131 wave sections
+  shark_blueshark anim table 28 entries, 0 ids not in the group DRMs
+
+311 merc: 6 DRMs (merc wp_akrifle pr_akriflebullet bullet_hit bullet_hit_underwater pr_akriflebullet_concentrated), 1604 sections, 235 wave sections
+  merc anim table 126 entries, 0 ids not in the group DRMs
+  wp_akrifle anim table 45 entries, 0 ids not in the group DRMs
+  pr_akriflebullet anim table 0 entries, 0 ids not in the group DRMs
+  bullet_hit anim table 25 entries, 0 ids not in the group DRMs
+  bullet_hit_underwater anim table 25 entries, 0 ids not in the group DRMs
+  pr_akriflebullet_concentrated anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+312 merc_deux: 6 DRMs (merc_deux wp_akrifle pr_akriflebullet bullet_hit bullet_hit_underwater pr_akriflebullet_concentrated), 1605 sections, 235 wave sections
+  merc_deux anim table 126 entries, 0 ids not in the group DRMs
+  wp_akrifle anim table 45 entries, 0 ids not in the group DRMs
+  pr_akriflebullet anim table 0 entries, 0 ids not in the group DRMs
+  bullet_hit anim table 25 entries, 0 ids not in the group DRMs
+  bullet_hit_underwater anim table 25 entries, 0 ids not in the group DRMs
+  pr_akriflebullet_concentrated anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+336 bat_enemy: 1 DRMs (bat_enemy), 227 sections, 107 wave sections
+  bat_enemy anim table 13 entries, 0 ids not in the group DRMs
+
+337 tiger: 1 DRMs (tiger), 757 sections, 238 wave sections
+  tiger anim table 93 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+367 naga_green: 1 DRMs (naga_green), 832 sections, 276 wave sections
+  naga_green anim table 112 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+368 naga_red: 1 DRMs (naga_red), 833 sections, 276 wave sections
+  naga_red anim table 112 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+370 small_albino_spider: 1 DRMs (small_albino_spider), 364 sections, 161 wave sections
+  small_albino_spider anim table 59 entries, 0 ids not in the group DRMs
+
+419 small_brown_spider: 1 DRMs (small_brown_spider), 363 sections, 161 wave sections
+  small_brown_spider anim table 59 entries, 0 ids not in the group DRMs
+
+448 small_brown_spider_no_jump: 1 DRMs (small_brown_spider_no_jump), 364 sections, 161 wave sections
+  small_brown_spider_no_jump anim table 59 entries, 0 ids not in the group DRMs
+
+516 panther_thrall: 2 DRMs (panther_thrall panther_thrall_chunkdoll), 985 sections, 339 wave sections
+  panther_thrall anim table 105 entries, 0 ids not in the group DRMs
+  panther_thrall_chunkdoll anim table 1 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+564 cat_panther: 1 DRMs (cat_panther), 756 sections, 233 wave sections
+  cat_panther anim table 93 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+565 poacher: 6 DRMs (poacher wp_akrifle pr_akriflebullet bullet_hit bullet_hit_underwater pr_akriflebullet_concentrated), 1680 sections, 235 wave sections
+  poacher anim table 126 entries, 0 ids not in the group DRMs
+  wp_akrifle anim table 45 entries, 0 ids not in the group DRMs
+  pr_akriflebullet anim table 0 entries, 0 ids not in the group DRMs
+  bullet_hit anim table 25 entries, 0 ids not in the group DRMs
+  bullet_hit_underwater anim table 25 entries, 0 ids not in the group DRMs
+  pr_akriflebullet_concentrated anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+566 poacher_long_range: 6 DRMs (poacher_long_range wp_akrifle pr_akriflebullet bullet_hit bullet_hit_underwater pr_akriflebullet_concentrated), 1681 sections, 235 wave sections
+  poacher_long_range anim table 126 entries, 0 ids not in the group DRMs
+  wp_akrifle anim table 45 entries, 0 ids not in the group DRMs
+  pr_akriflebullet anim table 0 entries, 0 ids not in the group DRMs
+  bullet_hit anim table 25 entries, 0 ids not in the group DRMs
+  bullet_hit_underwater anim table 25 entries, 0 ids not in the group DRMs
+  pr_akriflebullet_concentrated anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+600 mayan_thrall: 2 DRMs (mayan_thrall viking_thrall_chunkdoll), 1023 sections, 346 wave sections
+  mayan_thrall anim table 95 entries, 0 ids not in the group DRMs
+  viking_thrall_chunkdoll anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+603 viking_thrall: 2 DRMs (viking_thrall viking_thrall_chunkdoll), 1013 sections, 346 wave sections
+  viking_thrall anim table 95 entries, 0 ids not in the group DRMs
+  viking_thrall_chunkdoll anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+604 giant_albino_tarantula: 1 DRMs (giant_albino_tarantula), 762 sections, 294 wave sections
+  giant_albino_tarantula anim table 82 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+703 giant_albino_tarantula_blind: 1 DRMs (giant_albino_tarantula_blind), 763 sections, 294 wave sections
+  giant_albino_tarantula_blind anim table 82 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+705 yeti_thrall: 2 DRMs (yeti_thrall yeti_thrall_chunkdoll), 871 sections, 364 wave sections
+  yeti_thrall anim table 94 entries, 0 ids not in the group DRMs
+  yeti_thrall_chunkdoll anim table 1 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+791 yeti_thrall_yggdrasil: 2 DRMs (yeti_thrall_yggdrasil yeti_thrall_chunkdoll), 872 sections, 364 wave sections
+  yeti_thrall_yggdrasil anim table 94 entries, 0 ids not in the group DRMs
+  yeti_thrall_chunkdoll anim table 1 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+821 shark_greenland: 1 DRMs (shark_greenland), 252 sections, 95 wave sections
+  shark_greenland anim table 28 entries, 0 ids not in the group DRMs
+
+855 knight_thrall: 2 DRMs (knight_thrall knight_thrall_chunkdoll), 946 sections, 312 wave sections
+  knight_thrall anim table 95 entries, 0 ids not in the group DRMs
+  knight_thrall_chunkdoll anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+927 viking_thrall_dlc2_: 3 DRMs (viking_thrall_dlc2_ viking_thrall_chunkdoll_dlc2_ viking_thrall_dlc2_extension), 1192 sections, 346 wave sections
+  viking_thrall_dlc2_ anim table 115 entries, 0 ids not in the group DRMs
+  viking_thrall_chunkdoll_dlc2_ anim table 0 entries, 0 ids not in the group DRMs
+  viking_thrall_dlc2_extension anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+931 yeti_thrall_dlc2_: 4 DRMs (yeti_thrall_dlc2_ yeti_thrall_chunkdoll_dlc2_ yeti_thrall_dlc2_extension yeti_thrall_armored_dlc2_extension), 1289 sections, 376 wave sections
+  yeti_thrall_dlc2_ anim table 121 entries, 0 ids not in the group DRMs
+  yeti_thrall_chunkdoll_dlc2_ anim table 1 entries, 0 ids not in the group DRMs
+  yeti_thrall_dlc2_extension anim table 0 entries, 0 ids not in the group DRMs
+  yeti_thrall_armored_dlc2_extension anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+943 yeti_thrall_armored_dlc2_: 3 DRMs (yeti_thrall_armored_dlc2_ yeti_thrall_armored_chunkdoll_dlc_2_ yeti_thrall_armored_dlc2_extension), 1248 sections, 376 wave sections
+  yeti_thrall_armored_dlc2_ anim table 121 entries, 0 ids not in the group DRMs
+  yeti_thrall_armored_chunkdoll_dlc_2_ anim table 1 entries, 0 ids not in the group DRMs
+  yeti_thrall_armored_dlc2_extension anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1
+
+1004 viking_thrall_tutorial_dlc2_: 3 DRMs (viking_thrall_tutorial_dlc2_ viking_thrall_chunkdoll_dlc2_ viking_thrall_dlc2_extension), 1193 sections, 346 wave sections
+  viking_thrall_tutorial_dlc2_ anim table 115 entries, 0 ids not in the group DRMs
+  viking_thrall_chunkdoll_dlc2_ anim table 0 entries, 0 ids not in the group DRMs
+  viking_thrall_dlc2_extension anim table 0 entries, 0 ids not in the group DRMs
+  refs to texture outside the group: 1 ids; found in: mods:generalbank x1, bigfile:generalbank x1, patch:generalbank x1, bigfile:055_med_merc x1

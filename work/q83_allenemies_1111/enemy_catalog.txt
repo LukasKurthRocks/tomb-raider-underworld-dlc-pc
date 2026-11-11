@@ -1,0 +1,181 @@
+473 objects scanned, 26 with an enemy record
+
+217 shark_blueshark  [pcbig, stored 4040076 B, decoded 7908061 B]  tree 2 CreatureVolumetric  +0x18=2  (data sec 5941 +0xea0)
+  children (load order): -
+  total object + children: stored 4040076 B (3.9 MB), decoded 7908061 B (7.5 MB)
+  units listing it (2): l2_cliffclimb, l1_seafloor
+
+311 merc  [pcbig, stored 6713740 B, decoded 14645945 B]  tree 0 Soldier  +0x18=2  (data sec 7987 +0x3ac0)
+  children (load order): 114
+    114 wp_akrifle  [pcbig, 2062388 B / 7354006 B]
+      62 pr_akriflebullet  [pcbig, 20135 B / 107754 B]
+        53 bullet_hit  [pcbig, 651668 B / 4066758 B]
+        61 bullet_hit_underwater  [pcbig, 651449 B / 4066938 B]
+      63 pr_akriflebullet_concentrated  [pcbig, 20463 B / 107934 B]
+        53 bullet_hit (again)
+        61 bullet_hit_underwater (again)
+  total object + children: stored 10119843 B (9.7 MB), decoded 30349335 B (28.9 MB)
+  units listing it (3): l1_ship_exterior, l6_ship_exterior, l6_ship_upper_hallway
+  units listing it AND every child (0): -
+
+312 merc_deux  [pcbig, stored 6715469 B, decoded 14650693 B]  tree 0 Soldier  +0x18=2  (data sec 7991 +0x3ac0)
+  children (load order): 114
+    114 wp_akrifle  [pcbig, 2062388 B / 7354006 B]
+      62 pr_akriflebullet  [pcbig, 20135 B / 107754 B]
+        53 bullet_hit  [pcbig, 651668 B / 4066758 B]
+        61 bullet_hit_underwater  [pcbig, 651449 B / 4066938 B]
+      63 pr_akriflebullet_concentrated  [pcbig, 20463 B / 107934 B]
+        53 bullet_hit (again)
+        61 bullet_hit_underwater (again)
+  total object + children: stored 10121572 B (9.7 MB), decoded 30354083 B (28.9 MB)
+  units listing it (4): l1_ship_exterior, l6_ship_exterior, l6_ship_engine_hall, l6_ship_upper_hallway
+  units listing it AND every child (0): -
+
+336 bat_enemy  [pcbig, stored 1831373 B, decoded 2698593 B]  tree 2 CreatureVolumetric  +0x18=1  (data sec 8529 +0xa40)
+  children (load order): -
+  total object + children: stored 1831373 B (1.7 MB), decoded 2698593 B (2.6 MB)
+  units listing it (17): l2_puzzleroom, l2_norsehub, l2_maproom, l5_valaskjalf, l2_towerroom, l2_junglehub, l2_hubhall, l3_chapel, l4_temple, l5_valaskjalf_entryb, l5_valaskjalf_entry, dlc_level1_start, dlc_dungeonhallb, dlc_pillory, dlc_water_wheel, dlc_dungeonhalla, dlc_caverns
+
+337 tiger  [pcbig, stored 7090105 B, decoded 13824589 B]  tree 1 Creature  +0x18=1  (data sec 8556 +0x2e30)
+  children (load order): -
+  total object + children: stored 7090105 B (6.8 MB), decoded 13824589 B (13.2 MB)
+  units listing it (2): l2_towerroom, l2_junglehub
+
+367 naga_green  [pcbig, stored 8434243 B, decoded 17507593 B]  tree 1 Creature  +0x18=1  (data sec 9277 +0x3310)
+  children (load order): -
+  total object + children: stored 8434243 B (8.0 MB), decoded 17507593 B (16.7 MB)
+  units listing it (2): l2_puzzleroom, l2_norsehub
+
+368 naga_red  [pcbig, stored 8327371 B, decoded 17846933 B]  tree 1 Creature  +0x18=1  (data sec 9379 +0x3310)
+  children (load order): -
+  total object + children: stored 8327371 B (7.9 MB), decoded 17846933 B (17.0 MB)
+  units listing it (2): l2_puzzleroom, l2_norsehub
+
+370 small_albino_spider  [pcbig, stored 2360111 B, decoded 3542128 B]  tree 1 Creature  +0x18=1  (data sec 9394 +0x1350)
+  children (load order): -
+  total object + children: stored 2360111 B (2.3 MB), decoded 3542128 B (3.4 MB)
+  units listing it (11): l2_norsehub, l2_maproom, l4_traprooms, l4_ragnarok_room, l2_hubhall, l2_shrineroom, l4_temple, l5_valaskjalf_entryb, dlc_dungeon, dlc_caverns_hall, dlc_caverns
+
+419 small_brown_spider  [pcbig, stored 2359771 B, decoded 3538221 B]  tree 1 Creature  +0x18=1  (data sec 10628 +0x1350)
+  children (load order): -
+  total object + children: stored 2359771 B (2.3 MB), decoded 3538221 B (3.4 MB)
+  units listing it (5): l2_cliffclimb, l2_hubhall, l3_chapel, l3_stairhall, dlc_level1_start
+
+448 small_brown_spider_no_jump  [pcbig, stored 2360762 B, decoded 3538929 B]  tree 1 Creature  +0x18=1  (data sec 11354 +0x1350)
+  children (load order): -
+  total object + children: stored 2360762 B (2.3 MB), decoded 3538929 B (3.4 MB)
+  units listing it (1): l2_cliffclimb
+
+516 panther_thrall  [pcbig, stored 11945076 B, decoded 23095048 B]  tree 3 Thrall  +0x18=5  (data sec 12581 +0x3cc0)
+  children (load order): 518
+    518 panther_thrall_chunkdoll  [pcbig, 4944868 B / 10503576 B]
+  total object + children: stored 16889944 B (16.1 MB), decoded 33598624 B (32.0 MB)
+  units listing it (2): l3_secretchamber, l4_pool
+
+564 cat_panther  [pcbig, stored 5644351 B, decoded 12140709 B]  tree 1 Creature  +0x18=1  (data sec 13824 +0x2e30)
+  children (load order): -
+  total object + children: stored 5644351 B (5.4 MB), decoded 12140709 B (11.6 MB)
+  units listing it (4): l4_trailstart, l4_ballcourt, l4_temple, l4_templepath
+
+565 poacher  [pcbig, stored 7131127 B, decoded 16167017 B]  tree 0 Soldier  +0x18=1  (data sec 13835 +0x3ac0)
+  children (load order): 114
+    114 wp_akrifle  [pcbig, 2062388 B / 7354006 B]
+      62 pr_akriflebullet  [pcbig, 20135 B / 107754 B]
+        53 bullet_hit  [pcbig, 651668 B / 4066758 B]
+        61 bullet_hit_underwater  [pcbig, 651449 B / 4066938 B]
+      63 pr_akriflebullet_concentrated  [pcbig, 20463 B / 107934 B]
+        53 bullet_hit (again)
+        61 bullet_hit_underwater (again)
+  total object + children: stored 10537230 B (10.0 MB), decoded 31870407 B (30.4 MB)
+  units listing it (2): l4_ballcourt, l4_temple
+  units listing it AND every child (0): -
+
+566 poacher_long_range  [pcbig, stored 7138179 B, decoded 16168133 B]  tree 0 Soldier  +0x18=1  (data sec 13860 +0x3ac0)
+  children (load order): 114
+    114 wp_akrifle  [pcbig, 2062388 B / 7354006 B]
+      62 pr_akriflebullet  [pcbig, 20135 B / 107754 B]
+        53 bullet_hit  [pcbig, 651668 B / 4066758 B]
+        61 bullet_hit_underwater  [pcbig, 651449 B / 4066938 B]
+      63 pr_akriflebullet_concentrated  [pcbig, 20463 B / 107934 B]
+        53 bullet_hit (again)
+        61 bullet_hit_underwater (again)
+  total object + children: stored 10544282 B (10.1 MB), decoded 31871523 B (30.4 MB)
+  units listing it (2): l4_ballcourt, l4_temple
+  units listing it AND every child (0): -
+
+600 mayan_thrall  [pcbig, stored 11344147 B, decoded 21627488 B]  tree 3 Thrall  +0x18=3  (data sec 14442 +0x34f0)
+  children (load order): 602
+    602 viking_thrall_chunkdoll  [pcbig, 3050827 B / 6799320 B]
+  total object + children: stored 14394974 B (13.7 MB), decoded 28426808 B (27.1 MB)
+  units listing it (1): l4_pool
+
+603 viking_thrall  [pcbig, stored 11190349 B, decoded 21319132 B]  tree 3 Thrall  +0x18=3  (data sec 14577 +0x34e0)
+  children (load order): 602
+    602 viking_thrall_chunkdoll  [pcbig, 3050827 B / 6799320 B]
+  total object + children: stored 14241176 B (13.6 MB), decoded 28118452 B (26.8 MB)
+  units listing it (8): l5_valgrind, l5_valaskjalf, l7_helheim01, l5_valaskjalf_entryb, l5_valaskjalf_entry, l7_yggdrasil_hall02, l7_yggdrasil_hall01, l7_helheim03
+
+604 giant_albino_tarantula  [pcbig, stored 6369562 B, decoded 12845108 B]  tree 1 Creature  +0x18=1  (data sec 14636 +0x23f0)
+  children (load order): -
+  total object + children: stored 6369562 B (6.1 MB), decoded 12845108 B (12.3 MB)
+  units listing it (10): l4_traprooms, l4_ragnarok_room, l5_valaskjalf, l4_staircase_xibalba, l5_valaskjalf_entryb, dlc_dungeonhallb, dlc_dungeon, dlc_pillory, dlc_dungeonhalla, dlc_caverns
+
+703 giant_albino_tarantula_blind  [pcbig, stored 6368521 B, decoded 12845336 B]  tree 1 Creature  +0x18=1  (data sec 16984 +0x23f0)
+  children (load order): -
+  total object + children: stored 6368521 B (6.1 MB), decoded 12845336 B (12.3 MB)
+  units listing it (1): l5_valaskjalf
+
+705 yeti_thrall  [pcbig, stored 12671965 B, decoded 22476424 B]  tree 3 Thrall  +0x18=3  (data sec 16991 +0x31a0)
+  children (load order): 706
+    706 yeti_thrall_chunkdoll  [pcbig, 1912636 B / 4978272 B]
+  total object + children: stored 14584601 B (13.9 MB), decoded 27454696 B (26.2 MB)
+  units listing it (6): l5_valaskjalf, l7_helheim01, l7_yggdrasil_end, l7_yggdrasil_hall02, l7_yggdrasil_hall01, l7_helheim03
+
+791 yeti_thrall_yggdrasil  [pcbig, stored 12670694 B, decoded 22476684 B]  tree 3 Thrall  +0x18=3  (data sec 19277 +0x31a0)
+  children (load order): 706
+    706 yeti_thrall_chunkdoll  [pcbig, 1912636 B / 4978272 B]
+  total object + children: stored 14583330 B (13.9 MB), decoded 27454956 B (26.2 MB)
+  units listing it (4): l7_helheim01, l7_yggdrasil_end, dlc2_goo_room, dlc2_hall_machine_ceremony
+  units listing it AND every child (2): l7_helheim01, l7_yggdrasil_end
+
+821 shark_greenland  [pcbig, stored 3934081 B, decoded 8043013 B]  tree 2 CreatureVolumetric  +0x18=1  (data sec 20060 +0xbf0)
+  children (load order): -
+  total object + children: stored 3934081 B (3.8 MB), decoded 8043013 B (7.7 MB)
+  units listing it (1): l7_arctic_sea
+
+855 knight_thrall  [mods, stored 9191736 B, decoded 18643552 B]  tree 3 Thrall  +0x18=1  (data sec 20996 +0x34e0)
+  children (load order): 877
+    877 knight_thrall_chunkdoll  [mods, 3019803 B / 6756100 B]
+  total object + children: stored 12211539 B (11.6 MB), decoded 25399652 B (24.2 MB)
+  units listing it (4): dlc_dungeonhallb, dlc_dungeon, dlc_pillory, dlc_dungeonhalla
+
+927 viking_thrall_dlc2_  [mods, stored 11477366 B, decoded 25281016 B]  tree 3 Thrall  +0x18=1  (data sec 24426 +0x3e10)
+  children (load order): 1006 870
+    1006 viking_thrall_chunkdoll_dlc2_  [mods, 3703527 B / 9009544 B]
+    870 viking_thrall_dlc2_extension  [mods, 20397 B / 110674 B]
+  total object + children: stored 15201290 B (14.5 MB), decoded 34401234 B (32.8 MB)
+  units listing it (7): dlc_yggdrasil_end, dlc2_hall_ceremony_goo, dlc2_ceremony_room, dlc2_goo_room, dlc2_hall_goo_machine, dlc2_machine_room, dlc2_hall_machine_ceremony
+
+931 yeti_thrall_dlc2_  [mods, stored 13838099 B, decoded 28354040 B]  tree 3 Thrall  +0x18=3  (data sec 24577 +0x3e40)
+  children (load order): 1007 932
+    1007 yeti_thrall_chunkdoll_dlc2_  [mods, 2574416 B / 7188672 B]
+    932 yeti_thrall_dlc2_extension  [mods, 20648 B / 111658 B]
+      944 yeti_thrall_armored_dlc2_extension  [mods, 20600 B / 111626 B]
+  total object + children: stored 16453763 B (15.7 MB), decoded 35765996 B (34.1 MB)
+  units listing it (8): dlc_yggdrasil_hall02, dlc2_hall_ceremony_goo, dlc2_ceremony_room, dlc2_goo_room, dlc2_hall_goo_machine, dlc2_machine_room, dlc2_hall_machine_ceremony, dlc2_treasure_room_cine
+  units listing it AND every child (3): dlc2_ceremony_room, dlc2_goo_room, dlc2_machine_room
+
+943 yeti_thrall_armored_dlc2_  [mods, stored 13636216 B, decoded 27617848 B]  tree 3 Thrall  +0x18=3  (data sec 24890 +0x3e40)
+  children (load order): 1033 944
+    1033 yeti_thrall_armored_chunkdoll_dlc_2_  [mods, 3497117 B / 8649852 B]
+    944 yeti_thrall_armored_dlc2_extension  [mods, 20600 B / 111626 B]
+  total object + children: stored 17153933 B (16.4 MB), decoded 36379326 B (34.7 MB)
+  units listing it (4): dlc2_ceremony_room, dlc2_goo_room, dlc2_machine_room, dlc2_hall_machine_ceremony
+  units listing it AND every child (3): dlc2_ceremony_room, dlc2_goo_room, dlc2_machine_room
+
+1004 viking_thrall_tutorial_dlc2_  [mods, stored 11478109 B, decoded 25283836 B]  tree 3 Thrall  +0x18=1  (data sec 24536 +0x3e10)
+  children (load order): 1006 870
+    1006 viking_thrall_chunkdoll_dlc2_  [mods, 3703527 B / 9009544 B]
+    870 viking_thrall_dlc2_extension  [mods, 20397 B / 110674 B]
+  total object + children: stored 15202033 B (14.5 MB), decoded 34404054 B (32.8 MB)
+  units listing it (1): dlc_yggdrasil_hall02
