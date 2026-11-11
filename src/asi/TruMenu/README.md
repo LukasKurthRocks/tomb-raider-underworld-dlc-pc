@@ -2928,6 +2928,54 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.23 - switches file limit 512 (2026-11-11)
+
+Built into `work\asi\menu0246`, not installed, no live test (night queue Q39). `TruMenu.switches.txt` (bar page Fixes,
+menu section Fixes, the Figur switch groups) had a hard limit of 160 switch lines; after TruShadowCombat 0.6.12 /
+TruDlc2Player 0.6 the file held 159, and every new plugin INI key needs a row (`trumenu_ini_check` enforces it).
+
+- **Limit 512 switch lines** (`kSwMax`, was 160; `kSwGroupMax` stays 24). A fixed table, no heap container: the file
+  is read in DllMain and under `g_swLock`, rows are copied by value. Measured on the two builds
+  (`work\menu0246_1111\pe_vsizes.txt`): `.data` virtual size +336,520 bytes (352 more rows x 956 bytes `SwRow` +
+  `SwValue`), raw size unchanged (18,432) - zero-filled memory, the `.asi` grew only by the new code and text (1,536
+  bytes). **File format unchanged** (only the header comment names the new limit).
+- **No silent cut any more.** Before, lines past the limit went through the 5-line skip log ("too many switch lines"),
+  so a long file lost rows nearly unnoticed, and the switch lines below a group line past 24 groups were given to the
+  previous group. Now each kind gets one `TruMenu.log` line with the count and the first line number:
+  `switches: <path> exceeds the limit of 512 switch lines: N switch line(s) from line L on not shown` and
+  `switches: <path> exceeds the limit of 24 groups: N group line(s) from line L on not shown, with their M switch
+  line(s)` (those rows belong to no shown group). The start-up line reads `switches: N switches in G groups from <path>
+  (S lines skipped, O over the limit of 512 / 24)`; `sw.reload` / the page head say `lines over the limit not shown
+  (log)`.
+- **Places that use the count**, checked: the loader `SwLoadLocked`, `SwRefresh` / `sw.list` (loop over the rows read),
+  `SwFindLocked` (`sw.set`, favourites `sw.set|<switch>`, the TO TEST when column - a linear search, no own limit),
+  the long menu section Fixes (`PageSwitches`, every row), the Figur page (fixed key lists looked up by name). The
+  quick bar page Fixes holds `kQbViewMax` = 128 rows (group rows + the one open group's rows); a group too large for
+  the page used to be cut silently - the head now says `- N Zeilen nicht gezeigt (Seite max. 128, Menü zeigt alle)` /
+  `- N rows not shown (page max 128, the menu shows all)`. The shipped file: largest page 43 rows (group
+  Schattenkraft open).
+- **Switch row** for TruDlc2Player 0.7 `[Mission] DialogDifficulty` (restart, default 0, group DLC 2 Spielerin /
+  Kostüm: `Levelstart: Anpassung auf Mittel` / `Level start: tailoring to Medium`) - its commit 94dab2b left it out
+  because the list was at 159 of 160; the file now holds 160 rows in 10 groups (352 free).
+- Checks: byte prechecks unchanged (`precheck_02223.txt` = the 49 rows of 0.22.22, 49 checks 0 mismatches against
+  `data/pc/tru.exe` and the installed `tru.exe`); `trumenu_ini_check` SW_MAX 512 and `check_02223` (limits, tables
+  sized by `kSwMax`, the two log lines, rows below a dropped group, the page head note, the page model of the file:
+  group rows + the largest group <= 128, the file header, Set-TruMenu 0.22.22 hash; negative test on copies: 8 of 8
+  mutations caught), `check_02222` looks for its part inside kVersion; `trumenu_quick_check` `swfold` reads the
+  shipped file's groups against 128 (was a fixed 9-group list against 64) and new model `swcap` (8 cases: 160 rows
+  all shown; 161 rows - 0.22.22 drops one, 0.22.23 none; 600 rows = 512 shown and one line; the old 5-line cap as
+  negative model; 26 groups; page cut and head count). qb layout, readability, umlauts, flat PS pass. `Set-TruMenu.ps1`
+  knows the 0.22.22 hash.
+
+### TO TEST 0.22.23
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start-up | start the game, read `TruMenu.log` | `switches: 160 switches in 10 groups from ...TruMenu.switches.txt (0 lines skipped, 0 over the limit of 512 / 24)` |
+| 2 | new row | bar page Fixes, group `DLC 2 Spielerin / Kostüm` | row `Levelstart: Anpassung auf Mittel` (Neustart, value of `TruDlc2Player.ini`; `(aus)` while the installed INI is older than 0.7) |
+| 3 | page / menu | open each group on page Fixes; menu section Fixes | every group's rows as before, no "nicht gezeigt" in the head |
+| 4 | optional: over the limits | back up the installed `TruMenu.switches.txt`, copy `work\menu0246_1111\TruMenu.switches.limittest.txt` over it (570 rows, 25 groups; the extra rows belong to the made-up plugin `TruLimitTest` without INI = `keine INI`, never written), `menu sw.reload` | log: `exceeds the limit of 24 groups: 1 group line(s) from line 613 on not shown, with their 20 switch line(s)`, `exceeds the limit of 512 switch lines: 38 switch line(s) from line 574 on not shown`, `512 switches in 24 groups ... (0 lines skipped, 59 over the limit of 512 / 24)`; page Fixes with group `Limit-Test limittest` open: head `... - 26 Zeilen nicht gezeigt (Seite max. 128, Menü zeigt alle)`; then put the backup back and `menu sw.reload` |
+
 ## 0.22.22 - teaser timer line: game clock / wall clock, pause bit marker (2026-11-11)
 
 Built into `work\asi\menu0245`, not installed, no live test. Two wishes from the 0.22.21 live test of 2026-11-10:

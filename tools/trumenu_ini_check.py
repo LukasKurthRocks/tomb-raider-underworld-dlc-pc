@@ -109,7 +109,7 @@ store in the section (no WriteDword / VirtualProtect / volatile write).
 Since TruMenu 0.21.5 (2026-11-07 Fixes + frozen ring) also the switches file src/asi/TruMenu/TruMenu.switches.txt
 (first line "# TruMenu switches", ASCII, group lines "group | key | DE | EN [| open]", switch lines "Plugin | Section |
 Key | bool / int:lo..hi[:step] / choice:a,b | DE | EN | live / restart / live-if:<Key> | default | hint [| since]",
-at most 160 rows / 24 groups, no key twice): every key in its shipped plugin INI (src/asi/<Plugin>/<Plugin>.ini) with
+at most 512 rows / 24 groups (0.22.23; was 160 rows), no key twice): every key in its shipped plugin INI (src/asi/<Plugin>/<Plugin>.ini) with
 the default = the INI value (a row whose "since" version is newer than the plugin source may wait), the INI value
 fits the type, every live / live-if row has the plugin re-read function of SW_LIVE (body holds the section and key
 literals), no restart row is re-read, every key of the eight plugin INIs has a row (text filters excepted); the items
@@ -118,6 +118,10 @@ value changed, then the one write), the marker in SwLoadLocked, Y refused on pag
 sections PageSwitches / PageQbAll, Build-TruAsi.ps1 / Set-TruMenu.ps1 copy the file; the frozen ring: its header
 says so ("aktuell nicht weiter gemacht"), at most 172 entries, every entry is a bar row (ring_parity: bool rows take
 0 / 1 / no argument, value rows their steps, choice rows their choices, other rows the same argument).
+0.22.23 (Q39, switches file limit): SW_MAX 512 = kSwMax of TruMenu.cpp (was 160), the loader names lines over the
+limits in TruMenu.log (no silent cut), the page Fixes head names rows it cannot hold, the switches file's own header
+says 512, and the page model of the shipped file: group rows + the largest group <= kQbViewMax (128) - else the open
+group would be cut on the bar page (split the group).
 Options: --switches FILE checks that file instead of the shipped one.
 
 Usage (from the repository root):
@@ -1770,7 +1774,8 @@ SW_LIVE = {
     ('TruQoL', 'Camera', 'ShakeScale'): 'void LiveReadOptions(',
     ('TruQoL', 'Fixes', 'FrontEndPauseBit'): 'void LiveReadOptions(',   # TruQoL 0.1.4 (2026-11-11)
 }
-SW_MAX, SW_GROUP_MAX = 160, 24
+SW_MAX, SW_GROUP_MAX = 512, 24              # 0.22.23: 512 rows (was 160 - the shipped file had 159)
+QB_VIEW_MAX = 128                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group)
 RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries
 
 
@@ -3262,8 +3267,8 @@ def check_02222(ini_path):
     = the 45 rows of precheck_02221 + these 4); INI unchanged"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.22 (' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.22')
+    if '"0.22.22 (teaser timer line' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.23: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.22 part "0.22.22 (teaser timer line"')
     draw = fn_body(src, 'void DrawNt(')
     if not draw.split('\n')[2:3] == ['    const bool de = g_qbLang == 0;']:
         problems.append('TruMenu.cpp: DrawNt must start with const bool de = g_qbLang == 0; (the bar language)')
@@ -3319,6 +3324,76 @@ def check_02222(ini_path):
         problems.append('Set-TruMenu.ps1: the 0.22.21 build hash (work\\asi\\menu0244) is missing')
     return problems, ('teaser timer line in the bar language, game clock / wall clock, pause bit marker (0.5 + bit), '
                       '%d byte checks read only, precheck_02222 = 45 + 4 rows' % len(rows))
+
+
+def switch_groups(path):
+    """0.22.23: [(group key, switch lines)] of a switches file in file order (comments / blank lines skipped)"""
+    out = []
+    for line in open(path, encoding='utf-8').read().splitlines()[1:]:
+        s = line.strip()
+        if not s or s.startswith('#'): continue
+        f = [x.strip() for x in s.split('|')]
+        if f[0] == 'group': out.append([f[1] if len(f) > 1 else '?', 0])
+        elif out: out[-1][1] += 1
+    return out
+
+
+def check_02223(switches_path):
+    """0.22.23 (Q39, switches file limit): kSwMax 512 (was 160) = SW_MAX, the tables sized by it, file lines over the
+    limits named in TruMenu.log (one line per kind with count and first line number, no silent "too many" skip), rows
+    below a group over the limit not given to the previous group, g_swState / the page Fixes head say so, the page
+    model of the file (group rows + the largest group <= kQbViewMax), the file header names 512, no new byte checks
+    (precheck_02223 = the 49 rows of precheck_02222), Set-TruMenu.ps1 knows the 0.22.22 hash; INI unchanged"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.23 (switches file limit' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.23 (switches file limit')
+    if 'const int kQbViewMax = %d;' % QB_VIEW_MAX not in src:
+        problems.append('TruMenu.cpp: kQbViewMax differs from this tool (%d)' % QB_VIEW_MAX)
+    for want in ('SwRow g_sw[kSwMax];', 'SwGroup g_swGroup[kSwGroupMax];', 'SwValue g_swVal[kSwMax];'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing (the switch tables are sized by the limits)' % want)
+    if re.search(r'\b(g_sw|g_swVal)\[\s*\d+\s*\]', src):
+        problems.append('TruMenu.cpp: a switch table with a number instead of kSwMax')
+    load = fn_body(src, 'void SwLoadLocked(')
+    for want in ('g_swN = g_swGroupN = g_swOver = 0;', 'else if (g_swGroupN >= kSwGroupMax) {',
+                 'if (!overGroups++) overGroupAt = number;', 'groupDropped = true;', 'groupDropped = false;',
+                 'else if (groupDropped) {', '++overGroupRows;', 'else if (g_swN >= kSwMax) {',
+                 'if (!overRows++) overRowAt = number;', 'exceeds the limit of %d groups',
+                 'exceeds the limit of %d switch lines', 'kSwMax, overRows, overRowAt',
+                 'kSwGroupMax, overGroups, overGroupAt, overGroupRows', 'g_swOver = overRows + overGroups + overGroupRows;',
+                 'lines over the limit not shown (log)'):
+        if want not in load: problems.append('TruMenu.cpp: SwLoadLocked must hold %s' % want)
+    if 'too many switch lines' in load or 'too many groups' in load:
+        problems.append('TruMenu.cpp: SwLoadLocked still skips lines over the limit in the 5-line skip log only')
+    rows = fn_body(src, 'int QbSwRows(')
+    for want in ('want += 1 + (g_swGroup[g].open ? g_swGroup[g].count : 0);', 'if (g_swN && (want > n || g_swOver))',
+                 'rows not shown (page max %d, the menu shows all)', 'want - n, max', 'file over the limit (log)'):
+        if want not in rows: problems.append('TruMenu.cpp: QbSwRows must hold %s' % want)
+    # the page model of the file: one group open at a time, so the largest page = every group row + the largest group
+    groups = switch_groups(switches_path)
+    name = os.path.basename(switches_path)
+    biggest = max(groups, key=lambda g: g[1]) if groups else ['-', 0]
+    page = len(groups) + biggest[1]
+    if page > QB_VIEW_MAX:
+        problems.append('%s: group %s open = %d rows on page Fixes > kQbViewMax %d (split the group)' %
+                        (name, biggest[0], page, QB_VIEW_MAX))
+    total = sum(g[1] for g in groups)
+    head = open(switches_path, encoding='utf-8').read()[:4000]
+    if 'At most %d switch lines and %d groups' % (SW_MAX, SW_GROUP_MAX) not in head:
+        problems.append('%s: the header must name the limits (At most %d switch lines and %d groups)' % (name, SW_MAX,
+                                                                                                      SW_GROUP_MAX))
+    pre22 = os.path.join(ROOT, 'work', 'asi', 'menu0245', 'precheck_02222.txt')
+    pre23 = os.path.join(ROOT, 'work', 'asi', 'menu0246', 'precheck_02223.txt')
+    prows = lambda p: sorted(l.split(None, 1)[0].lower() + ' ' + l.split(None, 1)[1].replace(' ', '').lower()
+                             for l in open(p, encoding='utf-8').read().splitlines() if l.strip() and not l.startswith('#'))
+    if os.path.exists(pre22) and os.path.exists(pre23) and (len(prows(pre23)) != 49 or prows(pre22) != prows(pre23)):
+        problems.append('precheck_02223.txt: must be the 49 rows of precheck_02222 (no new byte checks)')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if 'cddddc1bb118000f06c60b6e41f089338305e5fbcb9894c1f4468001e06867ea' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.22 build hash (work\\asi\\menu0245) is missing')
+    return problems, ('switches limit %d / %d groups (file %d rows in %d groups, %d free), lines over it logged, page '
+                      'Fixes at most %d rows (group %s open) <= %d, no new byte checks' %
+                      (SW_MAX, SW_GROUP_MAX, total, len(groups), SW_MAX - total, page, biggest[0], QB_VIEW_MAX))
 
 
 def table(src):
@@ -3482,6 +3557,10 @@ def main(argv):
     for p in cproblems22: print('Q02222 %s' % p)
     if not cproblems22: print('ok: 0.22.22 %s' % csummary22)
     problems += cproblems22
+    cproblems23, csummary23 = check_02223(opt.get('--switches', SWITCHES))   # 0.22.23
+    for p in cproblems23: print('Q02223 %s' % p)
+    if not cproblems23: print('ok: 0.22.23 %s' % csummary23)
+    problems += cproblems23
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

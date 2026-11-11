@@ -105,7 +105,11 @@ Usage (from the repository root):
   ../bin/pyt -t 120 tools/trumenu_quick_check.py            all models, exit 1 on a failure
 0.21.5 (2026-11-07 Fixes + frozen ring): switches (SwNext / RunSwSet: bool / int / choice steps, X toggle / wrap,
 listed key, type, INI exists, unchanged = no write, live / restart / live-if), swfold (one group open at a time,
-largest page <= 64 rows), ringparity (every ring entry of the shipped file is a bar row, ring frozen at 172).
+largest page <= 64 rows; 0.22.23: the shipped file's groups, kQbViewMax 128), ringparity (every ring entry of the
+shipped file is a bar row, ring frozen at 172).
+0.22.23 (Q39 switches file limit): swcap (SwLoadLocked with kSwMax 512 / kSwGroupMax 24: lines over a limit are not
+shown, counted with the first line number for one log line per kind, rows below a group over the limit belong to no
+group; QbSwRows: rows the page cannot hold are counted for the head note; the old 160 cap as negative model).
 0.21.6 (2026-11-07 costumes / flight line / quick command line): cosbar (QbCosRows: 4 rows + the open list from the
 cycle list, the current costume marked, every row refused without a level, labels "<slot> <text> (<object>)" only for
 dlc_costume_a..p, records only with an object id; page / row limits: own page <= 64 rows for any list up to 60, the
@@ -2296,9 +2300,19 @@ def sw_rows(counts, groups):                   # QbSwRows: group row + the open 
     return sum(1 + (c if o else 0) for c, o in zip(counts, groups))
 
 
+QB_VIEW_MAX = 128                              # kQbViewMax (0.22.18; 0.21.1 .. 0.22.15: 64)
+
+
+def shipped_switch_counts():                   # 0.22.23: the shipped file's group sizes (was a fixed list of 9 groups)
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import trumenu_ini_check as c
+    return [n for _, n in c.switch_groups(c.SWITCHES)]
+
+
 def check_swfold():
     good = True
-    counts = [14, 25, 19, 5, 7, 5, 8, 4, 28]   # the shipped file's groups
+    counts = [14, 25, 19, 5, 7, 5, 8, 4, 28]   # the 0.21.5 file's groups (the fold rule itself)
     g = [True] + [False] * 8
     good &= sw_rows(counts, g) == 9 + 14
     g = sw_fold(g, 8, 1)
@@ -2306,11 +2320,130 @@ def check_swfold():
     good &= sw_fold(g, 8, 1) == g and sw_fold(g, 3, -1) == g
     g = sw_fold(g, 8, 2)
     good &= g == [False] * 9
-    worst = max(sw_rows(counts, [i == k for i in range(9)]) for k in range(9))
-    good &= worst <= 64                       # kQbViewMax
-    allopen = sw_rows(counts, [True] * 9)
+    counts = shipped_switch_counts()           # 0.22.23: the shipped file against kQbViewMax 128
+    k = len(counts)
+    worst = max(sw_rows(counts, [i == j for i in range(k)]) for j in range(k))
+    good &= worst <= QB_VIEW_MAX
+    allopen = sw_rows(counts, [True] * k)
     print('swfold: one group open at a time (right / X opens and closes the others, left / X closes, no change = no '
-          'action); largest page %d rows <= 64 (all open would be %d > 64)  %s' % (worst, allopen, 'ok' if good else 'FAIL'))
+          'action); shipped file %d rows in %d groups: largest page %d rows <= %d (all open would be %d)  %s'
+          % (sum(counts), k, worst, QB_VIEW_MAX, allopen, 'ok' if good else 'FAIL'))
+    return good
+
+
+# ---- 0.22.23 switches file limit: SwLoadLocked (kSwMax 512 / kSwGroupMax 24, file format unchanged) and the page Fixes
+# head note of QbSwRows. Lines over a limit are not shown; each kind is counted with its first line number for ONE
+# TruMenu.log line (before: "too many switch lines" went through the 5-line skip log, so a long file was cut almost
+# silently). Rows below a group line over the limit belong to no shown group (before: to the previous group).
+SW_MAX_NEW, SW_MAX_OLD, SW_GROUP_MAX = 512, 160, 24
+
+
+def sw_load(lines, row_max=SW_MAX_NEW, group_max=SW_GROUP_MAX, old=False):
+    """lines: ('g', key) / ('r', key) in file order (line number = index + 2, line 1 = the marker). Returns shown groups
+    {key: rows}, shown row count, the log lines (one per kind; old=True: the 0.22.22 loader's per-line log, cap 5)"""
+    groups, order, n, logs = {}, [], 0, []
+    over_rows = over_groups = over_group_rows = bad = 0
+    row_at = group_at = 0
+    dropped = False
+    for i, (kind, key) in enumerate(lines):
+        number = i + 2
+        if kind == 'g':
+            if len(order) >= group_max:
+                if old:
+                    bad += 1
+                    if bad <= 5: logs.append('line %d skipped (too many groups)' % number)
+                    continue
+                over_groups += 1
+                group_at = group_at or number
+                dropped = True
+                continue
+            dropped = False
+            order.append(key)
+            groups[key] = 0
+            continue
+        if not order: continue
+        if dropped and not old:
+            over_group_rows += 1
+            continue
+        if n >= row_max:
+            if old:
+                bad += 1
+                if bad <= 5: logs.append('line %d skipped (too many switch lines)' % number)
+                continue
+            over_rows += 1
+            row_at = row_at or number
+            continue
+        groups[order[-1]] += 1
+        n += 1
+    if over_groups: logs.append('exceeds the limit of %d groups: %d group line(s) from line %d on, with their %d switch '
+                                'line(s)' % (group_max, over_groups, group_at, over_group_rows))
+    if over_rows: logs.append('exceeds the limit of %d switch lines: %d switch line(s) from line %d on' % (row_max,
+                                                                                                        over_rows, row_at))
+    return groups, n, logs, over_rows + over_groups + over_group_rows
+
+
+def sw_page(counts, open_index, page_max=QB_VIEW_MAX):
+    """QbSwRows: (rows built, rows not shown) - every group row, the open group's rows, cut at page_max"""
+    n = want = 0
+    for g, c in enumerate(counts):
+        want += 1 + (c if g == open_index else 0)
+        if n < page_max: n += 1
+        if g == open_index:
+            n = min(page_max, n + c)
+    return n, want - n
+
+
+def sw_file(groups):                           # [(group key, rows)] -> loader lines
+    out = []
+    for key, rows in groups:
+        out.append(('g', key))
+        out += [('r', '%s%d' % (key, i)) for i in range(rows)]
+    return out
+
+
+def check_swcap():
+    cases = []
+    shipped = shipped_switch_counts()
+    lines = sw_file([('g%d' % i, c) for i, c in enumerate(shipped)])
+    groups, n, logs, over = sw_load(lines)
+    cases.append(('shipped file: %d rows in %d groups all shown, no limit line (%d free of %d)'
+                  % (n, len(groups), SW_MAX_NEW - n, SW_MAX_NEW), n == sum(shipped) and not logs and over == 0))
+    # the row that broke 0.22.22: 161 rows - the old loader drops row 161, the new one keeps it
+    lines = sw_file([('a', 100), ('b', 61)])
+    _, n_old, logs_old, _ = sw_load(lines, row_max=SW_MAX_OLD, old=True)
+    _, n_new, logs_new, _ = sw_load(lines)
+    cases.append(('161 rows: 0.22.22 cap 160 shows %d (log "%s"), 0.22.23 shows %d, no limit line'
+                  % (n_old, logs_old[0] if logs_old else '-', n_new), n_old == 160 and n_new == 161 and not logs_new))
+    # 600 rows: 512 shown, 88 over in ONE line with the first line number (old: 5 lines for 440 dropped rows)
+    lines = sw_file([('g%d' % i, 60) for i in range(10)])
+    groups, n, logs, over = sw_load(lines)
+    first = [i + 2 for i, l in enumerate(lines) if l[0] == 'r'][SW_MAX_NEW]
+    _, n_old, logs_old, _ = sw_load(lines, row_max=SW_MAX_OLD, old=True)
+    cases.append(('600 rows: %d shown, one line "%s"' % (n, logs[0] if logs else '-'), n == SW_MAX_NEW and over == 88 and
+                  logs == ['exceeds the limit of 512 switch lines: 88 switch line(s) from line %d on' % first]))
+    cases.append(('negative model 0.22.22 on 600 rows: %d of %d dropped rows named (5-line cap) - caught'
+                  % (len(logs_old), 600 - n_old), n_old == 160 and len(logs_old) == 5 and 600 - n_old == 440))
+    # 26 groups: groups 25 / 26 and their rows not shown, group 24 keeps its own rows only
+    lines = sw_file([('g%d' % i, 3) for i in range(26)])
+    groups, n, logs, over = sw_load(lines)
+    old_groups, _, _, _ = sw_load(lines, old=True)
+    cases.append(('26 groups: %d shown, g23 %d rows (0.22.22: %d - the rows of g24 / g25 joined it), %d log line'
+                  % (len(groups), groups['g23'], old_groups['g23'], len(logs)),
+                  len(groups) == 24 and groups['g23'] == 3 and old_groups['g23'] == 9 and n == 72 and over == 2 + 6 and
+                  logs == ['exceeds the limit of 24 groups: 2 group line(s) from line %d on, with their 6 switch line(s)'
+                           % (24 * 4 + 2)]))
+    # page Fixes: the shipped file never cuts; a 130-row group cuts 12 rows with 10 groups and says so
+    worst = max(sw_page(shipped, k)[1] for k in range(len(shipped)))
+    cases.append(('page Fixes, shipped file: every group open in turn, rows not shown max %d' % worst, worst == 0))
+    built, hidden = sw_page([5] * 9 + [130], 9)
+    cases.append(('page Fixes, 10 groups, open group 130 rows: %d rows built, %d named in the head' % (built, hidden),
+                  built == QB_VIEW_MAX and hidden == 12))
+    built, hidden = sw_page([118] + [1] * 9, 0)
+    cases.append(('page Fixes, 10 groups, open group 118 rows: %d rows, nothing cut' % built, built == 128 and hidden == 0))
+    good = True
+    for name, ok in cases:
+        print('swcap: %-90s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= bool(ok)
     return good
 
 
@@ -4423,7 +4556,8 @@ def main():
                check_lastpage(), check_menupages(), check_infinite(),                 # 0.22.19
                check_noattract(),                                                     # 0.22.20
                check_attracttimer(),                                                  # 0.22.21
-               check_ntclock()]                                                       # 0.22.22
+               check_ntclock(),                                                       # 0.22.22
+               check_swcap()]                                                         # 0.22.23
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

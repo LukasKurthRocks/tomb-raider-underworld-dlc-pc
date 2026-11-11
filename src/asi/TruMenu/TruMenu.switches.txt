@@ -17,9 +17,11 @@
 #   since      optional "<Plugin> <version>": the row belongs to that plugin version (key / default may be missing or
 #              differ in the installed INI until it is installed)
 # UTF-8 without BOM (0.21.7: German texts with umlauts - the menu font, ImGui's ProggyClean, has the Latin-1 glyphs);
-# plugin / section / key / type / when / default stay ASCII. At most 160 switch lines and 24 groups. Text values
-# (PathFilter, SpawnFilter, ProgressFilter) are no switches and are not listed. tools/trumenu_ini_check.py checks every
-# key against the shipped plugin INIs and every "live" claim against the plugin's re-read function.
+# plugin / section / key / type / when / default stay ASCII. At most 512 switch lines and 24 groups (TruMenu 0.22.23;
+# before 160 - lines past the limit are not shown and named in TruMenu.log). The quick bar page Fixes holds 128 rows
+# (group rows + the open group's rows); a group that does not fit is cut there with a note, the long menu shows all.
+# Text values (PathFilter, SpawnFilter, ProgressFilter) are no switches and are not listed. tools/trumenu_ini_check.py
+# checks every key against the shipped plugin INIs and every "live" claim against the plugin's re-read function.
 
 group | dlc2kampf | DLC 2 Kampf (TruShadowCombat) | DLC 2 combat (TruShadowCombat) | open
 TruShadowCombat | Damage | Translate | bool | K14 Schaden 17-27 wie TU | K14 damage types 17-27 as TU | live | 1 | Schadensarten 17-27 wie TU; live nur mit Hook beim Start // Damage types 17-27 as TU; live only if hooked at start | TruShadowCombat 0.6.3
@@ -149,6 +151,7 @@ TruDlc2Player | Dlc2Player | CostumeReset | bool | Kostüm außerhalb DLC 2 zur�
 TruDlc2Player | Dlc2Player | TrackerFlag | bool | Tracker-Flag +0x1244 | Tracker flag +0x1244 | restart | 1 | DoppelgangerInit setzt gameTracker+0x1244 = 1 // DoppelgangerInit sets gameTracker+0x1244 = 1
 TruDlc2Player | Costume | TuMapping | bool | TU-Kostüm-Abbildung 857/11 | TU costume map 857/11 | restart | 0 | Kostüm 857 <-> 11 beim Speichern / Laden / Spawnen // Costume 857 <-> 11 in save / load / spawn
 TruDlc2Player | Mission | DialogStart | bool | DLC-2-Start ohne Outfit-Wahl | DLC 2 start w/o outfit choice | restart | 1 | Pausenmenü -> DLC 2: ohne Outfit-Wahl, wie TU // Pause menu -> DLC 2: no outfit selection, as TU | TruDlc2Player 0.6
+TruDlc2Player | Mission | DialogDifficulty | bool | Levelstart: Anpassung auf Mittel | Level start: tailoring to Medium | restart | 0 | Mit DialogStart: Missionsstart setzt Anpassung = Mittel // With DialogStart: mission start sets tailoring = Medium | TruDlc2Player 0.7
 TruDlc2Player | Dlc2Player | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = jeder neue Game-Tracker // 2 = every new game tracker
 
 group | merclang | Söldner-Sprache (TruMercLang) | Mercenary language (TruMercLang)
