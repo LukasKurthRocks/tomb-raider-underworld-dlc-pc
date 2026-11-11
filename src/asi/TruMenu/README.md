@@ -2928,6 +2928,106 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.27 - save probe: save.pending / save.inv / save.waiting / save.find, [Log] Save (2026-11-11)
+
+Built into `work\asi\menu0250` (sha256 `ebd75bd7...388159d`, 1,909,248 bytes), not installed, no live test (Q79; finding in
+the workspace `docs\Befund-Speicher-Probe-Q79-1111.md`, follow-up P1 of `docs\Befund-Checkpoint-Zustand-Q72-1111.md`,
+ENGINE.md 6.4). Question: after death + checkpoint reload an object (pole, key) or an inventory item is gone for good
+(Q63 cases 1 / 3 / 13 / 18) - which of the restore conditions held it back? The probe shows it from memory, **read only**.
+The code is its own file `TruSaveProbe.h`, included by `TruMenu.cpp` right before the item table (it uses TruMenu's
+helpers; no new file in the build).
+
+- **What it reads** (all static, PC `tru.exe`; byte checks below): the live SaveInfo arena `[0xc59258]` and the
+  checkpoint snapshot `[0xc5925c]` (`SAVE_SaveGame` copies live -> snapshot, `SAVE_RestoreGame` back); their blocks
+  (head = type | size / 4 << 8, used end at +0x1357f4); block 3 (+4 current unit, +8 object, +0xc birth unit, +0x10 link
+  parent, +0x14 intro id), block 4 (+4 birth unit, +0x10 link parent, +0x14 intro id); the dead bits (+0x1357f8); the
+  restore buffer 0xc57258 (0x800 block pointers, count `[0xc59260]`); the game blocks `[0xc59264]` (live) /
+  `[0xc59268]` (snapshot) with the inventory area +0x34c; the waiting table 0xc592a8 (64 x 0x14); the instance lookup
+  of `INSTANCE_Find` 0x5b3950 (index table 0xd99000 / ids 0xda1000 / base `[0xd98f60]`, bit 0x20 of +0x14 = being
+  removed), the object tracker 0xdb7400 (status 2 = loaded), the stream unit table 0xdbab40 and the unit's intro lists
+  (`[[unit+8]+0x74]`, as 0x5b3860). No game function is called, nothing is written.
+- **Restore reason** (the pass 0x555640 with 0x5bb160 / 0x5bb640, written as words): `waits for its unit X to load` /
+  `unit X (not loaded) - the next pass takes it out of the buffer` (0x55567a; the unit's next load buffers it again,
+  0x5556d0); `instance exists - no restore` (0x5bb1c3 / 0x5bb692: the pass returns 0 and **keeps** the slot);
+  `waits: object N name not loaded (tracker status s / no tracker entry)` (0x5bb1df / 0x5bb6af); `no intro record`
+  (block 4); `waits: link parent N missing (dead bit d)` (0x5bb1f1 / 0x5bb6c1); `ready - restores at the next pass`.
+- **Unit names**: the probe remembers every loaded unit's name once a second (128 per session), so a block bound to an
+  unloaded unit says `l4_pool (not loaded)`; a unit never loaded in this session shows as `#<id> (not loaded, name not
+  seen this session)`.
+- **`[Log] Save`** (default 0, live - read about once a second; bar page Fixes, group `Diagnose (TruMenu)`): 1 points the
+  rel32 of the two memcpy calls 0x557127 (`SAVE_SaveGame`) / 0x5571a3 (`SAVE_RestoreGame`) at TruMenu - each calls the
+  game's memcpy 0x8148a0 with the same arguments, then writes two lines (below); 0 puts the game's call back. Only the
+  call targets change (M21PatchGroup: only while the dword is the game's). The prologues 0x5570f0 / 0x557130 are
+  TruTrace's hook places: SvCheck accepts the game's bytes or a `jmp` there.
+
+### Items (TruLink `menu <id> [arg]`, command bar)
+
+| Item | Kind | What |
+|---|---|---|
+| `save.pending [all]` | action | the restore buffer slot by slot (block decoded + restore reason), then the live blocks 3 / 4 **without an instance** that **moved unit** (block 3, +4 != +0xc, marked `MOVED`) or hang on a **link parent**; `all` = every block 3 / 4 without an instance (long: the full text in `TruMenu.log`) |
+| `save.inv` | action | the inventory area of the live game block (+0x44, +4 / +8 / +0xc, 15 + 8 intro ids, 6 counts +0xa4, 6 floats +0xbc, +0xd4, player unit +0x1a8, unit name, checkpoint id), each id with its instance or `NO INSTANCE` + its block 3 / 4 and unit + waiting slot + dead bit; the snapshot's area (or `equal to live`); then the WeaponManager slots **now** (`[[0xfadb58]+0x500]`: 15 right-hand slots, 8 gear) as intro ids |
+| `save.waiting` | action | the waiting table 0xc592a8: owner (intro id, name, `(Lara)`), id with its state, callback (`inventory 0x715e90`), flag; slots whose owner handle no longer resolves count as free (as 0x5550a0) |
+| `save.find <id>` | action | one intro / instance id (decimal or `0x` hex): instance list (address, name, position, units +0xe0 / +0xe4, link parent +0x228, iflags), `INSTANCE_Find`, every block of the id in the live arena (with the restore reason) and in the snapshot, child blocks (link parent = id), the dead bit in both, buffer slots, waiting slots, inventory places (live / snapshot game block, WeaponManager now) |
+
+All four run on the TruLink thread (no `[Cheat] Experimental` needed); each answer also goes into `TruMenu.log`
+(`save.<item> (k/n): ...`, cut into pieces of 1,800 characters). The value of each item is a status line: checks,
+`[Log] Save`, the patch state, the save / restore counts seen. Intro ids of objects made at run time (weapons, gear:
+>= 0x40000000 = 1073741824) are shown decimal; `tools/trusave_diff.py inv` prints both forms.
+
+### `TruMenu.log` lines (`[Log] Save=1`)
+
+```
+save: #1 SAVE_RestoreGame(<arg>) from 0x005de53c = death reload 0x5de480 (0x5de537): live before used 0x.., N blocks (1:a 2:b 3:c 4:d 5:e 6:1), m moved block 3, d dead bits; after the copy ... (unit '<name>' checkpoint <id>); rolled back: blocks +x, block 3 +y, block 4 +z, dead bits +w; check word 0xdeadbeef; buffered k (cleared next), waiting w (Lara l)
+save: #1 inventory after the copy (handed back by 0x715ef0 at the player's restore): [0] <id> <name> block 3 <unit>; ...; g[2] ...; counts a b c d e f
+save: #2 SAVE_SaveGame(0) from 0x005de6fa = player spawn 0x5d40c0 (jmp 0x5d4330) after the death reload 0x5de480 (0x5de6f5): snapshot unit '<name>' checkpoint <id>; used ...; Lara's unit <unit>; buffered k, waiting w (Lara l)
+save: #2 inventory in the snapshot (written by the player query 0x17 just now): ...
+```
+
+The caller is named for the return addresses read from the code (`0x6a1e17` = call 0x6a1e12 in 0x6a1a70, `0x5dfbbc` =
+`dev.reload_current_unit`, `0x5de6fa` / `0x5de179` = the player spawn's tail jump after the death reload / from
+0x5de040, `0x5de53c` = death reload, `0x78b00f` / `0x78b0fa` / `0x78b21c` = the save file load 0x78ab60), else with its
+module. The save line after a death reload (the spawn's `SAVE_SaveGame(0)`) is the one that shows the waiting table
+filled by the inventory restore - that is the moment an item that never comes back is seen (`waiting w (Lara l)`).
+
+### Checks
+
+- Byte checks `kSvChecks` (32 rows: arenas / copy size, block head, walker, game block pointers, buffer, the restore
+  conditions of blocks 3 / 4, intro lists, `INSTANCE_Find`, tracker, unit lookup, dead bits, waiting table, handle,
+  inventory save / restore, query 0x17) and `kSvHookChecks` (5 rows: the code between each function's entry and its
+  copy call - no other push, so the caller / argument are read at `frame[4]` / `[5]` and `frame[17]` / `[18]` - and the
+  two calls), plus the two prologues: `work\asi\menu0250\precheck_02227.txt` = the 58 rows of 0.22.26 + these 39, 97
+  checks 0 mismatches against `data/pc/tru.exe` and the installed `tru.exe`; `trumenu_precheck_match --cpp
+  TruSaveProbe.h` section `0.22.27 save probe` 39 = 39. Without the reads: every item answers `disabled: pre-check
+  failed (...)`; without the hook rows: `[Log] Save=1` writes one `no lines - <reason>` line.
+- `trumenu_ini_check` `check_02227` (items on the TruLink thread, include once before the item table, rows = the
+  precheck file, no write helper / VirtualProtect, the game memcpy only in the two copy hooks inside `__try`, the frame
+  offsets, `SvTick` order, `SvReady` first in each runner, [Log] Save in kOpts / INI / ReadOptions / `SvReadSwitch` /
+  switches row, Set-TruMenu 0.22.26 hash); `plugin_source` reads the plugin's `.h` files too (SW_LIVE `SvReadSwitch`);
+  `check_02224` counts only the FallNet row (TruMenu has two rows now); `check_02226` looks for its kVersion part.
+  Negative test on copies: 14 of 14 mutations caught (`work\q79_saveprobe_1111\make_neg.py`).
+- Harness with the header's own code on real saves (`work\q79_saveprobe_1111\harness.cpp`, MSVC x86: the game addresses
+  committed at the same places with a fake game state around the save's arena): 3 saves of the owner (read in place:
+  Mittelmeer `l1_seatop` 470 blocks, Autosave `dlc_level2_start` 39, a test save 121) x 28 checks PASS, 0 FAIL - block
+  counts, moved blocks and dead bits equal `trusave_diff`; every restore reason, both `INSTANCE_Find` paths, the bit
+  0x20, dead bits, stale waiting handles, the two log lines, the switch on / off and the refusal without checks.
+- `TruMenu.ini` = the defaults table (258 keys; `settings.reset` now writes 42,760 bytes).
+
+### TO TEST 0.22.27
+
+Before: `save.backup` (or `menu save.backup` over TruLink); `[Log] Save=1` (bar page Fixes, group `Diagnose (TruMenu)`,
+or `sw.set TruMenu:Log:Save 1`); god mode off (a death is needed).
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start-up | start the game, read `TruMenu.log` | `0.22.27: save probe ok (kSvChecks 32); [Log] Save lines ok (prologues game / game) (kSvHookChecks 5), [Log] Save=0 (live)` (with TruTrace's save hooks: `jmp of another plugin`) |
+| 2 | switch | `[Log] Save` 1 | `save: [Log] Save 0 -> 1 (TruMenu.ini, live)` and `0.22.27 [Log] Save: save / restore lines on ([Log] Save=1): S1 ..., S2 ... -> TruMenu` within ~1 s |
+| 3 | items idle | in any level: `save.inv`, `save.waiting`, `save.pending` | inventory ids with names (weapons / gear), `0 waiting of 64`, `buffered [0xc59260] = 0` (or a few) |
+| 4 | T10 pole | Süd-Mexiko `l4_temple`, before the poles 5240 / 5241: checkpoint; `save.find 5240`; pick the pole up, put it down **in a neighbour unit** (or on a moving object); `save.find 5240`; die (fall) before the next checkpoint; after the reload `save.find 5240`, `save.pending` | before: `instance ... unit +0xe0 <unit>`; after the drop the live block 3 says `MOVED` / link parent; after the reload: the restore line (`rolled back ...`), the spawn's save line; if the pole is missing, `save.find` names its block and the reason (`waits for its unit ...` / `waits: link parent ...` / `instance exists`) - **copy the lines** |
+| 5 | T10 key | `l4_ragnarok_room`, key 5695 not taken: take it, walk into `l4_staircase_mictlan` or `l4_pool`, reach a checkpoint there, walk back and die; reload; `save.inv`, `save.waiting`, `save.find 5695`, `save.pending` | `save:` lines with `5695` in the inventory list and its block unit; after the reload: is 5695 in a 15 / 8 slot, `NO INSTANCE`, a waiting slot of Lara? Screenshot of the inventory ring |
+| 6 | T14 Manor | Croft Manor, a room with thralls before a checkpoint: checkpoint with thralls alive, kill one, die, reload; `save.inv` before and after, `thrall.scriptval` | counts +0xa4 before / after (ammo back to the checkpoint = intended), the restore line `dead bits -n` (thralls back) |
+| 7 | switch off | `[Log] Save` 0 | `... save / restore lines off ([Log] Save=0): S1 ..., S2 ... put back`; no more `save:` lines |
+| 8 | file | after a test: `tools/trusave_diff.py inv <Autosave>` | the same inventory ids as `save.inv` (snapshot) |
+
 ## 0.22.26 - test arena "Arena 1 - Kampf": arena spots, adrenaline meter, remove the spawned (2026-11-11)
 
 Built into `work\asi\menu0249` (sha256 `99c948b4...d2ddfb1e`, 1,880,064 bytes), not installed, no live test (Q76;

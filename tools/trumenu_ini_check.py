@@ -1803,6 +1803,7 @@ SW_LIVE = {
     ('TruQoL', 'Camera', 'ShakeScale'): 'void LiveReadOptions(',
     ('TruQoL', 'Fixes', 'FrontEndPauseBit'): 'void LiveReadOptions(',   # TruQoL 0.1.4 (2026-11-11)
     ('TruMenu', 'Rescue', 'FallNet'): 'void FnReadSwitch(',             # TruMenu 0.22.24 (Q36, about once a second)
+    ('TruMenu', 'Log', 'Save'): 'void SvReadSwitch(',                   # TruMenu 0.22.27 (Q79, TruSaveProbe.h)
 }
 # Q75 (2026-11-11): keys the plugin re-reads at run time only when they were 1 at the game start (the code is patched
 # only then; a 1 after a start with 0 needs a restart). No "when" form of TruMenu says that: live-if:<Key> asks the key's
@@ -1871,9 +1872,10 @@ def plugin_version(plugin):
 
 
 def plugin_source(plugin):
+    """the plugin's .cpp files, Q79: and its .h files (TruMenu 0.22.27 keeps SvReadSwitch in TruSaveProbe.h)"""
     folder = os.path.join(PLUGINS, plugin)
     return '\n'.join(open(os.path.join(folder, f), encoding='utf-8', errors='replace').read()
-                     for f in sorted(os.listdir(folder)) if f.endswith('.cpp'))
+                     for f in sorted(os.listdir(folder)) if f.endswith(('.cpp', '.h')))
 
 
 def plugin_ini(plugin):
@@ -3519,7 +3521,8 @@ def check_02224(ini_path, switches_path):
     ini = open(ini_path, encoding='utf-8').read()
     if not re.search(r'\n\[Rescue\]\n(;[^\n]*\n)+FallNet=0\n', ini.replace('\r\n', '\n')):
         problems.append('%s: [Rescue] FallNet=0 missing' % os.path.basename(ini_path))
-    sw = [l for l in open(switches_path, encoding='utf-8').read().splitlines() if l.startswith('TruMenu | ')]
+    sw = [l for l in open(switches_path, encoding='utf-8').read().splitlines() if l.startswith('TruMenu | Rescue | FallNet ')]
+    # 0.22.27 (Q79): TruMenu has a second row ([Log] Save, check_02227) - here only the FallNet row counts
     if len(sw) != 1 or not sw[0].startswith('TruMenu | Rescue | FallNet | bool | ') or ' | live | 0 | ' not in sw[0]:
         problems.append('%s: one row TruMenu | Rescue | FallNet | bool | ... | live | 0 | ... wanted' %
                         os.path.basename(switches_path))
@@ -3707,8 +3710,8 @@ def check_02226(ini_path):
     Set-TruMenu.ps1 knows the 0.22.25 hash"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.26 (test arena, Q76' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.26 (test arena, Q76')
+    if '"0.22.26 (test arena, Q76' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.27: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.26 part "0.22.26 (test arena, Q76"')
     m = re.search(r'const DvCheck kAdmChecks\[\] = \{(.*?)\n\};', src, re.S)
     rows = [(a, ''.join(b).replace(' ', '')) for a, b in
             [(x, re.findall(r'"([0-9a-f ]+)"', y)) for x, y in
@@ -3785,6 +3788,109 @@ def check_02226(ini_path):
                       'new INI key' % (len(rows), len(ARENA_ROWS)))
 
 
+SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
+SV_ITEMS = ('save.pending', 'save.inv', 'save.waiting', 'save.find')
+
+
+def sv_rows(src, name):
+    """the {0xADDR, "hex"} rows of a DvCheck table in TruSaveProbe.h (hex joined over string pieces, no spaces)"""
+    m = re.search(r'const DvCheck %s\[\] = \{(.*?)\n\};' % re.escape(name), src, re.S)
+    if not m: return []
+    return [(a, ''.join(LIT.findall(b)).replace(' ', '')) for a, b in
+            re.findall(r'\{0x([0-9a-f]{8}), ((?:"[0-9a-f ]+"\s*)+)\}', m.group(1))]
+
+
+def check_02227(ini_path, switches_path):
+    """0.22.27 (Q79, save / checkpoint probe; workspace docs/Befund-Speicher-Probe-Q79-1111.md, P1 of Q72): the items
+    save.pending / save.inv / save.waiting / save.find (actions, TruLink thread, read only) in TruSaveProbe.h, included
+    once inside TruMenu.cpp before the item table; the byte checks = work/asi/menu0250/precheck_02227_sv.txt (kSvChecks 32
+    + kSvHookChecks 5 + the two prologues), each at most 64 bytes, SvReady -> SvCheck before any read; read only: no
+    write helper, no VirtualProtect, no game function call except the game's memcpy 0x8148a0 inside SvSaveCopy /
+    SvRestoreCopy (the [Log] Save call patches, M21PatchGroup only after g_svHookOk, the frame offsets of the two copy
+    calls); [Log] Save default 0 (kOpts, TruMenu.ini, ReadOptions, live SvReadSwitch), SvTick in PadHook's per-frame block
+    after FallWatchTick, SvCheck in Start after FwCheck; one switch row TruMenu | Log | Save (live, 0); precheck_02227 =
+    the 58 rows of precheck_02226 + these 39; Set-TruMenu.ps1 knows the 0.22.26 hash"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.27 (save probe, Q79' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.27 (save probe, Q79')
+    inc = '#include "TruSaveProbe.h"'
+    if src.count(inc) != 1 or not 0 < src.find(inc) < src.find('struct Item {') or src.find(inc) < src.find('namespace {'):
+        problems.append('TruMenu.cpp: TruSaveProbe.h must be included once inside the namespace, before struct Item')
+    if not os.path.exists(SV_HEADER): return problems + ['TruSaveProbe.h missing'], 'save probe: header missing'
+    hdr = open(SV_HEADER, encoding='utf-8').read()
+    reads, hooks = sv_rows(hdr, 'kSvChecks'), sv_rows(hdr, 'kSvHookChecks')
+    pre_sv = os.path.join(ROOT, 'work', 'asi', 'menu0250', 'precheck_02227_sv.txt')
+    pre26 = os.path.join(ROOT, 'work', 'asi', 'menu0249', 'precheck_02226.txt')
+    pre27 = os.path.join(ROOT, 'work', 'asi', 'menu0250', 'precheck_02227.txt')
+    prows = lambda p: sorted(l.split(None, 1)[0].lower() + ' ' + l.split(None, 1)[1].replace(' ', '').lower()
+                             for l in open(p, encoding='utf-8').read().splitlines() if l.strip() and not l.startswith('#'))
+    mine = sorted('%s %s' % r for r in reads + hooks + [('005570f0', '807c240400'), ('00557130', '83ec1c')])
+    if len(reads) != 32 or len(hooks) != 5: problems.append('TruSaveProbe.h: kSvChecks 32 / kSvHookChecks 5 rows wanted '
+                                                            '(%d / %d)' % (len(reads), len(hooks)))
+    if any(len(h) > 128 for a, h in reads + hooks): problems.append('TruSaveProbe.h: a byte check longer than 64 bytes')
+    if os.path.exists(pre_sv) and prows(pre_sv) != mine:
+        problems.append('precheck_02227_sv.txt: must be the 39 rows of TruSaveProbe.h')
+    if os.path.exists(pre26) and os.path.exists(pre27) and sorted(prows(pre26) + mine) != prows(pre27):
+        problems.append('precheck_02227.txt: must hold the rows of precheck_02226 + the 39 save probe rows')
+    for want in ('HexBytesAt(0x005570f0, "807c240400")', 'HexBytesAt(0x00557130, "83ec1c")', 'j1 == 0xe9', 'j2 == 0xe9'):
+        if want not in fn_body(hdr, 'bool SvCheck('): problems.append('TruSaveProbe.h: SvCheck must hold %s' % want)
+    for bad in ('WriteDword(', 'WriteBytes(', 'VirtualProtect', 'CallFn', 'GiveObject'):
+        if bad in hdr: problems.append('TruSaveProbe.h: %s found - the probe is read only' % bad)
+    if hdr.count('reinterpret_cast<SvCopyFn>(kSvCopy)(d, s, n)') != 2 or 'kSvCopy = 0x008148a0' not in hdr:
+        problems.append('TruSaveProbe.h: the game memcpy 0x8148a0 must be called exactly twice (SvSaveCopy / SvRestoreCopy)')
+    for fn, want in (('void *__cdecl SvSaveCopy(', 'SvOnSave(frame[4], static_cast<BYTE>(frame[5] & 0xff));'),
+                     ('void *__cdecl SvRestoreCopy(', 'SvOnRestore(frame[17], frame[18], before);')):
+        body = fn_body(hdr, fn)
+        if want not in body or 'reinterpret_cast<SvCopyFn>(kSvCopy)(d, s, n)' not in body or '__try' not in body:
+            problems.append('TruSaveProbe.h: %s must call the copy and then %s inside __try' % (fn.split()[-1], want))
+    if '{0x00557127, kSvCopy, true,' not in hdr or '{0x005571a3, kSvCopy, true,' not in hdr:
+        problems.append('TruSaveProbe.h: g_svPatches must be the two copy calls 0x557127 / 0x5571a3')
+    tick = fn_body(hdr, 'void SvTick(')
+    order = ['SvReadSwitch();', 'if (want == g_svPatchOn) return;', 'SvCheck();', 'if (want && !g_svHookOk) {',
+             'M21PatchGroup(g_svPatches, 2, want,']
+    at = [tick.find(x) for x in order]
+    if any(a < 0 for a in at) or at != sorted(at):
+        problems.append('TruSaveProbe.h: SvTick must read the switch, return while unchanged, check, refuse, then patch')
+    if 'GetPrivateProfileIntA("Log", "Save"' not in fn_body(hdr, 'void SvReadSwitch('):
+        problems.append('TruSaveProbe.h: SvReadSwitch must read [Log] Save')
+    if 'if (!SvCheck())' not in fn_body(hdr, 'bool SvReady('):
+        problems.append('TruSaveProbe.h: SvReady must run SvCheck first')
+    for fn in ('bool RunSvPending(', 'bool RunSvInv(', 'bool RunSvWaiting(', 'bool RunSvFind('):
+        body = fn_body(hdr, fn)
+        lines = body.split('\n')               # fn_body starts with the newline before the head line
+        if len(lines) < 3 or 'if (!SvReady(o, n)) return false;' not in lines[2]:
+            problems.append('TruSaveProbe.h: %s must start with SvReady' % fn.strip('('))
+    items = item_types(src)
+    for item in SV_ITEMS:
+        m = re.search(r'\{"%s", "action", (?:"[^"]*"\s*)+, (true|false),' % re.escape(item), src)
+        if items.get(item) != 'action' or not m or m.group(1) != 'false':
+            problems.append('TruMenu.cpp: item %s must be an action on the TruLink thread (gameThread false)' % item)
+    block = src[src.find('        FallWatchTick();'):][:300]
+    if not re.search(r'\n        SvTick\(\);', block):     # a call statement, not a comment
+        problems.append('TruMenu.cpp: SvTick must run in the per-frame block after FallWatchTick')
+    if 'void SvTick();' not in src[:src.find('DWORD WINAPI PadHook(')]:
+        problems.append('TruMenu.cpp: SvTick must be declared before PadHook')
+    start = fn_body(src, 'void Start(')
+    fw, sv = re.search(r'\n    FwCheck\(\);', start), re.search(r'\n    SvCheck\(\);', start)
+    if not fw or not sv or fw.start() > sv.start():
+        problems.append('TruMenu.cpp: Start must run SvCheck after FwCheck')
+    if 'InterlockedExchange(&g_svLogOn, OptInt(ini, "Log", "Save") != 0 ? 1 : 0);' not in fn_body(src, 'void ReadOptions('):
+        problems.append('TruMenu.cpp: ReadOptions must read [Log] Save')
+    if not any(k == 'Save' and v == '0' for line, k, v in ini_section(ini_path, 'Log')):
+        problems.append('%s: [Log] Save=0 missing' % os.path.basename(ini_path))
+    sw = [l for l in open(switches_path, encoding='utf-8').read().splitlines() if l.startswith('TruMenu | Log | Save ')]
+    if len(sw) != 1 or not sw[0].startswith('TruMenu | Log | Save | bool | ') or ' | live | 0 | ' not in sw[0]:
+        problems.append('%s: one row TruMenu | Log | Save | bool | ... | live | 0 | ... wanted' %
+                        os.path.basename(switches_path))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '99c948b48082fc1f4cb58c89922454b64f609354ca602bdf2d8f9695d2ddfb1e' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.26 build hash (work\\asi\\menu0249) is missing')
+    return problems, ('save probe: %d items read only on the TruLink thread, kSvChecks %d + kSvHookChecks %d + 2 prologues '
+                      '= precheck_02227_sv, memcpy 0x8148a0 only in the 2 copy hooks, [Log] Save default 0 live, switch '
+                      'row' % (len(SV_ITEMS), len(reads), len(hooks)))
+
+
 def table(src):
     block = src[src.index('const OptDef kOpts[] = {'):]
     block = block[:block.index('\n};')]
@@ -3810,8 +3916,9 @@ def text(header, rows):
 
 
 def main(argv):
-    global CPP
+    global CPP, SV_HEADER
     if '--cpp' in argv[:-1]: CPP = argv[argv.index('--cpp') + 1]   # 0.19: negative tests on a copy of TruMenu.cpp
+    if '--svh' in argv[:-1]: SV_HEADER = argv[argv.index('--svh') + 1]   # 0.22.27: a copy of TruSaveProbe.h
     header, rows = table(read_cpp())
     want = text(header, rows)
     if argv and argv[0] == '--print':
@@ -3962,6 +4069,10 @@ def main(argv):
     for p in cproblems26: print('Q02226 %s' % p)
     if not cproblems26: print('ok: 0.22.26 %s' % csummary26)
     problems += cproblems26
+    cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
+    for p in cproblems27: print('Q02227 %s' % p)
+    if not cproblems27: print('ok: 0.22.27 %s' % csummary27)
+    problems += cproblems27
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

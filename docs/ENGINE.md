@@ -315,10 +315,14 @@ calls watcher 0x4af740). Sources: `Befund-Saves-Sticky-0611.md`, `Befund-Hall02-
 | Inventory restore | 0x715ef0 (from the player message handler 0x720130): each id -> 0x555f60(player, id, 0x715e90, 0 / 1): `INSTANCE_Find` -> give now, else waiting table **0xc592a8** (64 x 0x14 {owner handle, id, callback, flag}, 0x5550a0; full = silently dropped) fired by 0x555110 on every birth / restore (0x5bcfd1, 0x5bd065, 0x5bd24f, 0x5bd395, 0x5bb625, 0x5bba38, 0x4d50bc), cleared by owner removal 0x555180 and `SAVE_Init` 0x556d21 only. An item whose instance never comes back stays missing | ✅ |
 | TU | none of these functions changes behaviour: 0x715ef0 = TU 0x823e8fd8 only shifts the player-state offsets +4 (0x51c -> 0x520, 0x528 -> 0x52c); `GAMELOOP_ChangeMode` 0x5de480 = TU 0x82298ef0 has 4 open code blocks, none calls SAVE_* or the inventory (meaning ⬜) | ✅ static |
 | Dead field | u16 `0xe7ee74 + 2i` (i 1..10) set on restore from game block +0x230 / +0x260 (0x556dd0 -> 0x5d5150), no reader in tru.exe; +0x230 written only by `SAVE_ClearMemory` | ✅ |
+| Buffer pass outcome (Q79) | 0x555640 per slot: unit not loaded -> slot **removed** (0x55567a; the unit's next load buffers the block again, 0x5556d0); restore returns an instance or sets the out flag -> removed (0x55569b); **instance already exists** (0x5bb1c3 / 0x5bb692 -> return 0, out flag untouched) and the wait paths (object not loaded 0x5bb5bd / 0x5bba06, link parent missing) -> slot **kept** (0x5556a1). A block whose object is not in the tracker makes 0x5c1730 -> 0x5c1550 open a tracker entry (status 1) and ask the loader (0x5c1670 / 0x5c1685) | ✅ static |
+| Other ids | INSTANCE_Find 0x5b3950: id < 0x4000 -> u16 index `[0xd99000 + 2 id]`, instance `[0xd98f60] + (index - 1) * 0x2f0`; else the index of the id in the 0x400 dwords at 0xda1000, instance `[0xd98f60] + index * 0x2f0`; none when byte +0x14 & 0x20. Waiting slot = {handle (instance, stamp +0x44), +8 id, +0xc callback, +0x10 flag}; a slot whose handle no longer resolves is free (0x5550a0). Run-time ids (>= 0x40000000: weapons / gear) have no dead bit (0x555a18) | ✅ |
+| Probe (Q79) | TruMenu 0.22.27 `save.pending [all]` / `save.inv` / `save.waiting` / `save.find <id>` (read only, `TruSaveProbe.h`, 39 byte checks) and `[Log] Save` (two lines per `SAVE_SaveGame` / `SAVE_RestoreGame` through their memcpy calls 0x557127 / 0x5571a3); `tools/trusave_diff.py inv SAVE` decodes the inventory area of a save file | built, live ⬜ |
 
 Dead-end class (Q63 cases 1 / 3): a saved block that never restores (bound to an unloaded unit, link parent gone) hides
 the object and empties its inventory slot, and the home intro stays suppressed. Which condition the reported cases hit:
-⬜ (needs the read-only probe `save.pending` / `save.inv` / `save.find`). Source: `Befund-Checkpoint-Zustand-Q72-1111.md`.
+⬜ (the read-only probe TruMenu 0.22.27 `save.pending` / `save.inv` / `save.find` / `[Log] Save` is built - live test
+T10 / T14). Source: `Befund-Checkpoint-Zustand-Q72-1111.md`, `Befund-Speicher-Probe-Q79-1111.md`.
 
 ---
 

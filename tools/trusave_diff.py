@@ -35,6 +35,15 @@ Game block (offsets from its start = data offset 0; 0x555be0 checkpoint save, 0x
   inferred), +0x1f2 s16 current chapter (SAVE_GetCurrentChapter 0x555bd0), +0x20c u16 costume object id
   ([0xe7f1c8], 0x555cb1 / load 0x556fbd), chapter table +0x424 + 20 * n, n < 0x12: +0 u8 chapter done (0x5561f3),
   +2 u8 done with game value 0x22 condition (0x55623a), +4 u32 chapter start time, +0xc u32 chapter time (0x555edf).
+  2026-11-11 (Q79, TruMenu 0.22.27 save probe; Q72 ENGINE.md 6.4): +0x1a8 u32 player unit (inst+0xe0, 0x70a28b);
+  inventory area +0x34c (written only by the player query 0x17 inside SAVE_SaveGame(0), 0x70a232 -> 0x6f5910; read back
+  by 0x715ef0): +4 / +8 / +0xc = player state P+0x640 / +0x968 / +0x96c, +0x44 u8 (WeaponManager +0 != 0), +0x48 15 x
+  u32 intro ids (WM+4+16i -> inst+0x58), +0x84 8 x u32 intro ids (WM+0xf4+8i), +0xa4 6 x u16 counts (0x777950(i)),
+  +0xbc 6 x f32 (P+0x528..), +0xd4 u8 (0x698860). An item comes back only when the instance of its id comes back
+  (0x555f60; else the 64-slot waiting table 0xc592a8) - command inv shows each id's blocks.
+  Block 3 fields (0x555370): +4 current unit (inst+0xe0), +8 object id, +0xc birth unit (inst+0xe4), +0x10 link parent
+  id (inst+0x228), +0x14 unique id; block 4 (0x555470): +4 birth unit, +0x10 link parent, +0x14 unique id. A block 3
+  whose +4 differs from +0xc is an object that moved to another unit (restored only while that unit is loaded).
 
 Names: give unit / bank DRMs with --drm (repeatable, or a folder) to name stickies: kind 0 -> the intro (unit, object,
 per-instance script) and the member that declares the key; kind 2 -> the script whose name Symbol matches. A few
@@ -44,8 +53,10 @@ Usage (from the repository root):
   ../bin/pyt -t 600 tools/trusave_diff.py show SAVE [--drm DRM_OR_DIR ...] [--all]
   ../bin/pyt -t 600 tools/trusave_diff.py diff OLD NEW [--drm DRM_OR_DIR ...] [--max N]
   ../bin/pyt -t 600 tools/trusave_diff.py get SAVE KIND ID KEY      one sticky (KIND 0/1/2, ID / KEY decimal or 0x)
+  ../bin/pyt -t 600 tools/trusave_diff.py inv SAVE [--max N]        inventory area + each id's blocks, moved blocks
   show --all prints every sticky (default: the named ones + a count); diff prints changed known values by name and
-  the unknown changed byte ranges (game block byte diff, arena blocks matched by (savedID, unique id)).
+  the unknown changed byte ranges (game block byte diff, arena blocks matched by (savedID, unique id)); since Q79 also
+  the inventory changes (ids per slot, counts) and an inventory line in every header.
 Exit code: 0 = done, 1 = a CRC mismatch was found, 2 = usage error.
 """
 import os, struct, sys
@@ -81,7 +92,10 @@ GAME_FIELDS = [  # (offset, size, name) - read / written in tru.exe as cited in 
     (0x08, 2, 'flags'), (0x0a, 2, 'version'), (0x90, 4, 'checkpoint id'), (0x19c, 4, '+0x19c ([0xe7f154])'),
     (0x1a0, 4, 'play time (s, inferred unit)'), (0x1f2, 2, 'current chapter'), (0x20c, 2, 'costume object id'),
     (0x218, 4, '+0x218 (init 0x40000000 at 0x5569e4; runtime id counter?)'),
+    (0x1a8, 4, 'player unit (+0x1a8, 0x70a28b)'),
 ]
+INV = 0x34c        # Q79: inventory area of the game block (0x70a243 / 0x6f5910 / 0x715f05)
+INV_SIZE = 0xd8    # up to +0xd4 u8
 
 
 def u32(b, o): return struct.unpack_from('<I', b, o)[0]
@@ -177,11 +191,36 @@ class Save:
         g['chapters'] = ch
         return g
 
+    def inventory(self):
+        """Q79: the inventory area +0x34c of the game block (0x6f5910 writes it, 0x715ef0 reads it)"""
+        b, o = self.b, INV
+        return {'player state +0x640 / +0x968 / +0x96c': struct.unpack_from('<III', b, o + 4),
+                'wm set (+0x44)': b[o + 0x44],
+                'ids15': list(struct.unpack_from('<15I', b, o + 0x48)),
+                'ids8': list(struct.unpack_from('<8I', b, o + 0x84)),
+                'counts': list(struct.unpack_from('<6H', b, o + 0xa4)),
+                'floats': list(struct.unpack_from('<6f', b, o + 0xbc)),
+                '+0xd4': b[o + 0xd4]}
+
+    def id_blocks(self, uid):
+        """[(offset, savedID, size)] of the arena blocks whose unique id word is uid"""
+        return [(o, sid, size) for o, sid, size, key in self.blocks if key == uid and sid in (2, 3, 4, 5)]
+
+    def block_fields(self, o, sid):
+        """Q79: the restore-relevant words of a block 3 / 4 (unit, object, birth unit, link parent)"""
+        b = self.b
+        if sid == 3:
+            return {'unit': u32(b, o + 4), 'object': u32(b, o + 8), 'birth unit': u32(b, o + 0xc),
+                    'link parent': u32(b, o + 0x10)}
+        if sid == 4:
+            return {'unit': u32(b, o + 4), 'link parent': u32(b, o + 0x10)}
+        return {}
+
     def known_ranges(self):
         """byte ranges of the data entry that are decoded (excluded from the unknown-bytes diff)"""
         r = [(0x10, 0x94)] + [(o, o + n) for o, n, _ in GAME_FIELDS]
         r += [(CHAPTER_TABLE + CHAPTER_STRIDE * n, CHAPTER_TABLE + CHAPTER_STRIDE * n + 16) for n in range(CHAPTERS)]
-        r += [(ARENA_END, ARENA_END + 4), (DEAD_BITS, DEAD_BITS + DEAD_LEN)]
+        r += [(ARENA_END, ARENA_END + 4), (DEAD_BITS, DEAD_BITS + DEAD_LEN), (INV, INV + INV_SIZE)]   # Q79: + inventory
         for typ, (ids, vals, mx) in STORES.items():
             r += [(ids, ids + 4 + 8 * mx), (vals, vals + (mx // 8 if typ == 'bool' else 4 * mx))]
         return r
@@ -328,6 +367,11 @@ def header_lines(s):
     per = {}
     for (typ, kind, sid, key) in s.stickies: per[typ] = per.get(typ, 0) + 1
     out.append('  stickies: %s; dead-dead ids: %d' % (', '.join('%s %d' % kv for kv in sorted(per.items())), len(s.dead)))
+    inv = s.inventory()                      # Q79
+    out.append('  inventory +0x34c: 15 ids %s; 8 ids %s; counts %s; player unit %d' % (
+        ' '.join('[%d]%d' % (i, v) for i, v in enumerate(inv['ids15']) if v) or '-',
+        ' '.join('[%d]%d' % (i, v) for i, v in enumerate(inv['ids8']) if v) or '-',
+        ' '.join(str(c) for c in inv['counts']), g['player unit (+0x1a8, 0x70a28b)']))
     other = [p for p in s.problems if 'CRC' not in p]
     if other: out.append('  PROBLEMS: ' + '; '.join(other))
     return out
@@ -374,6 +418,13 @@ def cmd_diff(pa, pb, names, mx):
     for n in range(CHAPTERS):
         if ga['chapters'][n] != gb['chapters'][n]:
             print('  chapter %2d (done, done2, start, time) %s -> %s' % (n, ga['chapters'][n], gb['chapters'][n]))
+    # Q79: inventory slots and counts
+    ia, ib = A.inventory(), B.inventory()
+    for part in ('ids15', 'ids8', 'counts'):
+        for i, (x, y) in enumerate(zip(ia[part], ib[part])):
+            if x != y: print('  inventory %s[%d] %d -> %d' % (part, i, x, y))
+    for k in ('player state +0x640 / +0x968 / +0x96c', 'wm set (+0x44)', 'floats', '+0xd4'):
+        if ia[k] != ib[k]: print('  inventory %s %s -> %s' % (k, ia[k], ib[k]))
     # stickies
     keys = sorted(set(A.stickies) | set(B.stickies), key=lambda t: (t[0], t[1], t[2], t[3]))
     ch, new, gone = [], [], []
@@ -444,6 +495,47 @@ def cmd_get(path, kind, sid, key):
     return 0
 
 
+def block_text(s, o, sid):
+    """Q79: one block 2..5 with its restore-relevant fields"""
+    f = s.block_fields(o, sid)
+    t = '%s at 0x%x' % (BLOCK_NAMES[sid], o)
+    if sid == 3:
+        t += ', object %d %s, unit %d, birth unit %d%s, link parent %s' % (
+            f['object'], object_name(f['object'] & 0xffff), f['unit'], f['birth unit'],
+            ' (MOVED)' if f['unit'] != f['birth unit'] else '', uid_text(f['link parent']) if f['link parent'] else '0')
+    elif sid == 4:
+        t += ', birth unit %d, link parent %s' % (f['unit'], uid_text(f['link parent']) if f['link parent'] else '0')
+    return t
+
+
+def cmd_inv(path, mx):
+    """Q79: the inventory area of the save's game block, each id's blocks / dead bit, and the moved blocks 3"""
+    s = Save(path)
+    print('\n'.join(header_lines(s)))
+    inv = s.inventory()
+    print('  inventory area +0x%x: +0x44 %d, player state +0x640 / +0x968 / +0x96c = %s, +0xd4 %d' % (
+        INV, inv['wm set (+0x44)'], ' '.join('0x%08x' % v for v in inv['player state +0x640 / +0x968 / +0x96c']),
+        inv['+0xd4']))
+    print('  counts +0xa4: %s; floats +0xbc: %s' % (' '.join(str(c) for c in inv['counts']),
+                                                    ' '.join('%.4g' % f for f in inv['floats'])))
+    for part, base in (('ids15', 0x48), ('ids8', 0x84)):
+        for i, uid in enumerate(inv[part]):
+            if not uid: continue
+            blocks = s.id_blocks(uid)
+            dead = uid in s.dead
+            print('  %s[%2d] (+0x%x) id %s (%d = TruMenu save.find): %s%s' % (part, i, base + 4 * i, uid_text(uid), uid,
+                                                   '; '.join(block_text(s, o, sid) for o, sid, _ in blocks) or
+                                                   'NO BLOCK 2..5', '; dead-dead bit set' if dead else ''))
+    moved = [(o, sid) for o, sid, size, key in s.blocks if sid == 3 and u32(s.b, o + 4) != u32(s.b, o + 0xc)]
+    linked = [(o, sid) for o, sid, size, key in s.blocks if sid in (3, 4) and u32(s.b, o + 0x10)]
+    print('  moved blocks 3 (unit +4 != birth unit +0xc): %d; blocks 3 / 4 with a link parent: %d' % (len(moved),
+                                                                                                    len(linked)))
+    for o, sid in sorted(set(moved + linked))[:mx]:
+        print('    id %s: %s' % (uid_text(u32(s.b, o + 0x14)), block_text(s, o, sid)))
+    if len(set(moved + linked)) > mx: print('    ... %d more' % (len(set(moved + linked)) - mx))
+    return 1 if [p for p in s.problems if 'CRC' in p] else 0
+
+
 def main(argv):
     argv = list(argv)
     drms = []
@@ -459,6 +551,7 @@ def main(argv):
     cmd = argv[0]
     if cmd == 'get' and len(argv) == 5:
         return cmd_get(argv[1], int(argv[2], 0), int(argv[3], 0), int(argv[4], 0))
+    if cmd == 'inv' and len(argv) == 2: return cmd_inv(argv[1], mx)   # Q79
     names = Names(drms)
     if cmd == 'show' and len(argv) == 2: return cmd_show(argv[1], names, every)
     if cmd == 'diff' and len(argv) == 3: return cmd_diff(argv[1], argv[2], names, mx)

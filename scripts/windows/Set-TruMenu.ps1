@@ -146,7 +146,8 @@ $earlierBuilds = @{
                       'cddddc1bb118000f06c60b6e41f089338305e5fbcb9894c1f4468001e06867ea',   # 0.22.22 game clock / wall clock, pause bit marker (work\asi\menu0245)
                       'ad52175615e9cded7b3a0c08a51566618d71e8751b30a62293ad26ab4b221b2f',   # 0.22.23 switches file limit 512 (work\asi\menu0246)
                       'd792fca9fc969130ac3db5ae98263062af55f47b6933545fe17e929376a57ba9',   # 0.22.24 fall watch + fall net (work\asi\menu0247)
-                      '79af7b39926cb91c87ec4804a0698e6ec310d3e14ce9041eae5242762e29a211')   # 0.22.25 settings.reset writes the whole INI (work\asi\menu0248)
+                      '79af7b39926cb91c87ec4804a0698e6ec310d3e14ce9041eae5242762e29a211',   # 0.22.25 settings.reset writes the whole INI (work\asi\menu0248)
+                      '99c948b48082fc1f4cb58c89922454b64f609354ca602bdf2d8f9695d2ddfb1e')   # 0.22.26 test arena, adrenaline meter (work\asi\menu0249)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

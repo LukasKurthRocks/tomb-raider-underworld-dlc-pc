@@ -218,3 +218,7 @@ TruQoL | Save | RetryOnLock | bool | Speichern: bei gesperrter Datei erneut vers
 # 2026-11-11 (Q36): TruMenu 0.22.24 - its own [Rescue] FallNet in TruMenu.ini (re-read about once a second = live)
 group | rettung | Rettung (TruMenu) | Rescue (TruMenu)
 TruMenu | Rescue | FallNet | bool | Fallnetz (Sturz aus der Welt) | Fall net (fall out of the world) | live | 0 | 3 s im Fall + 3000 unter sicherem Boden: dorthin zurück // 3 s falling + 3000 below safe ground: put back there | TruMenu 0.22.24
+
+# 2026-11-11 (Q79): TruMenu 0.22.27 - its own [Log] Save in TruMenu.ini (re-read about once a second = live)
+group | tmdiag | Diagnose (TruMenu) | Diagnosis (TruMenu)
+TruMenu | Log | Save | bool | Speicher-Log (Checkpoint / Tod-Laden) | Save log (checkpoint / death reload) | live | 0 | Zwei Zeilen je Speichern / Laden in TruMenu.log // Two lines per save / restore in TruMenu.log | TruMenu 0.22.27
