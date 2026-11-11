@@ -48,6 +48,7 @@ TruShadowCombat | States | Translate1013 | bool | Finisher 1013 wie TU | Finishe
 TruShadowCombat | States | Translate1019 | bool | Zustand 1019 (Kampf-Hub) | State 1019 (combat hub) | live | 0 | Zustand 1019 wirkt (0 = nur Log) // State 1019 acts (0 = log only)
 TruShadowCombat | States | Translate1020 | bool | Zustand 1020 (nach Finisher) | State 1020 (after finisher) | live | 0 | Zustand 1020 nach dem Finisher wirkt // State 1020 after the finisher acts
 TruShadowCombat | States | Translate1004 | bool | Zustand 1004 Trefferliste | State 1004 hit list | live | 0 | 1004 behält die Finisher-Trefferliste (auch Slot 1) // 1004 keeps the finisher hit list (also slot 1)
+TruShadowCombat | States | Translate1008 | bool | Finisher Y 1008 wie TU | Finisher Y 1008 as TU | live | 0 | Lara landet am Thrall statt dahinter (Q19) // Lara lands on the thrall, not past it (Q19) | TruShadowCombat 0.6.11
 TruShadowCombat | States | Translate231Slot0 | bool | Zustand 231 Slot 0 | State 231 slot 0 | live | 0 | Zustand 231 Slot 0 mit dem TU-Doppel-Helfer // State 231 slot 0 with the TU doppelganger helper
 TruShadowCombat | States | Translate231Slot1 | bool | Zustand 231 Slot 1 | State 231 slot 1 | live | 0 | Zustand 231 Slot 1 wie TU // State 231 slot 1 as TU
 TruShadowCombat | Strike | Translate | bool | Schattenschlag wie TU | Shadow strike as TU | live | 0 | TU-Schattenschlag; braucht Gate oder Translate beim Start // TU shadow strike; needs Gate or Translate at start
@@ -97,6 +98,7 @@ TruShadowCombat | States | Enabled | bool | TU-Zustände 1017/244/1007 | TU stat
 TruShadowCombat | Probe | State1013 | bool | Probe: Finisher 1013 | Probe: finisher 1013 | restart | 1 | Ziel von Finisher 1013 PC gegen TU ins Log // Log PC vs TU target of finisher 1013
 TruShadowCombat | Probe | States1019 | bool | Probe: Zustände 1019/1020 | Probe: states 1019/1020 | restart | 1 | Zustände 1019 / 1020 überhaupt anmelden // Register states 1019 / 1020 at all
 TruShadowCombat | Probe | States231And1004 | bool | Probe: Zustände 231/1004 | Probe: states 231/1004 | restart | 1 | Zustände 231 / 1004 überhaupt einhüllen // Wrap states 231 / 1004 at all
+TruShadowCombat | Probe | State1008 | bool | Probe: Zustand 1008 | Probe: state 1008 | restart | 1 | Zustand 1008 überhaupt einhüllen // Wrap state 1008 at all | TruShadowCombat 0.6.11
 TruShadowCombat | Diag | Targeter9 | bool | Diagnose: Zielsucher 9 | Diag: targeter 9 | restart | 1 | Loggt, wer Zielsucher 9 füllt / leert // Log who fills / clears targeter 9
 TruShadowCombat | Diag | Targeter9Why | bool | Diagnose: Zielsucher 9 warum | Diag: targeter 9 why | restart | 1 | 1x pro s: warum Kandidaten abgelehnt wurden // 1 / s eligibility test of rejected candidates
 TruShadowCombat | Diag | Condition2011 | bool | Diagnose: Bedingung 2011 | Diag: condition 2011 | restart | 1 | Jede Auswertung von Bedingung 2011 ins Log // Log every evaluation of condition 2011

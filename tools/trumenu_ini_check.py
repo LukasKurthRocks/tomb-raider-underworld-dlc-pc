@@ -1746,6 +1746,7 @@ SW_LIVE = {
     ('TruShadowCombat', 'States', 'Translate1019'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate1020'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate1004'): 'void ReadSwitches(',
+    ('TruShadowCombat', 'States', 'Translate1008'): 'void ReadSwitches(',            # 0.6.11
     ('TruShadowCombat', 'States', 'Translate231Slot0'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate231Slot1'): 'void ReadSwitches(',
     ('TruShadowPower', 'Adrenaline', 'Translate'): 'void K11ReadSwitch(',

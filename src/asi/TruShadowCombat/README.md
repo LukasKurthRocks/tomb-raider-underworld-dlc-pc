@@ -1,4 +1,47 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.10)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.11)
+
+0.6.11 (2026-11-11, **offline, not yet seen in game**; Q19 "Lara falls out of the world after the finisher Y in
+hall02", main workspace `docs\Befund-Sturz-durch-Welt-1111.md` and `docs\Befund-Translate1008-1111.md`, ENGINE.md 12):
+build `work\asi\combat0611`, byte pre-checks `work\asi\combat0611\precheck_0611.txt` (23 checks: the 7 of
+`CheckState1008Blocks`, the 14 building blocks it reuses, 2 proof facts; 0 mismatches against `data\pc\tru.exe` and
+the installed tru.exe).
+* **State 1008 = the finisher Y move** (chart record 743 [1008] under 742 [1004 1015]; `[States] Translate1008`, new,
+  live, default **0**). PC = retail: table entry 1008 at tru.exe 0x8b19bc (machine-1 table 0x8b0a50, the push operand
+  at tru+0x368b99, entry 141 x 28 bytes) = {0, 0, 0, 0, slot 4 tru+0x36d9a0, 0}; tru+0x36d9a0 (= retail 0x8245bb30)
+  only writes gameTracker+0x1270 (facing) / +0x1260 (target +0x20) for targeter 6 - Lara is carried by the
+  animation's root motion alone (PC 2026-11-10: +341 / +614 units, 112 / 324 / 346 past the target; at the hall02
+  edge she left the floor). TU table 0x82758940: 1008 = {**0x8245f7b0**, 0, 0x82455a38 (`blr`), **0x8245fa40**, 0,
+  0}, slot 4 removed. Translated 1:1:
+  * slot 0 (enter, TU 0x8245f7b0): handle = tru+0x31c9a0(player, PC slot 6) (= TU 0x823dd138 with 7) kept by the
+    plugin (TU agent +0x4f4 / +0x4f8 - its only writer in the state code; a new target list resets it as the 1019
+    handle); slot 3 (tick, TU 0x8245fa40): the kept handle when its +0x44 stamp still matches.
+  * both: `Busy244` -> channel mode 2 {instance +0x20, (0, 0, 0, 1), animation entry +0x28 - 1.0} (tru+0x38d00,
+    stop); no target -> nothing; else face = `FaceTarget(t, 1)` (TU 0x82457b28), point = t +0x20 (player +0x20 for
+    `[t+0x14] & 0x400000`), n = tru+0x35f3e0 (TU 0x82463af8 flag 0); n > 0 -> channel mode 3 {face, point, n x 100.0}
+    (tru+0x38dc0), else mode 3 with the animation's frame count (tru+0x3e480). Every tick re-aims at the target's
+    current position, so the move ends on the target instead of past it.
+  * slot 2 = the TU's empty function + the plugin's end line; slot 4 (PC tru+0x36d9a0) runs only with
+    `Translate1008=0` (the TU has none; gameTracker+0x1260 / +0x1270 are then not written by 1008, as on the TU).
+  * No doppelganger test in either TU function: every level, as the TU. `[Probe] State1008=0` leaves the record as
+    the PC's (start only). Not ported: the TU print stub's arguments (they would read address 0x10 for a dead handle).
+* **Log:** `state 1008 slot 0 (...) (call n): ON: / off (would): handle taken, target 0x... ; Lara x y z, distance d
+  -> path p (...), steering point x y z, frames n`; `state 1008 slot 3 (...) ON tick k (ms): target, path, steering
+  point, Lara, distance` (path change, else every 250 ms; 8 lines per run at level 1); `state 1008 slot 2 (...):
+  Translate1008 0/1, k ticks, ms; Lara x y z, d units from the enter point; target ... END DISTANCE d (horizontal h)`.
+* **Not part of it (other mechanism, evidence in the Befund):** the TU-new exit of 1015 (0x8245fe58) calls the death
+  switch (TU 0x823258c8 = tru+0x241650: LP 0, Death) on the 1015 target kept in CombatManager +0x48 / +0x4c, direction
+  target -> Lara (z = 0), kind 0 - the kill of the finisher Y's target, not Lara's move; it shares no data with 1008.
+* **TO TEST** (hall02, tutorial thrall knocked down near the arena edge at y ~ 8260, TruMenu `combo.trace` /
+  TruFight trace on):
+
+| # | what | expected |
+|---|---|---|
+| 1 | game start | `TruShadowCombat 0.6.11 ... loaded`; `state 1008 (finisher Y move, ...): building blocks verified, wrapped at Lara's registration - Translate1008 0`; at the level start `machine 1 states: ... 1008 (slots 0 / 2 / 3 / 4, log only)`; no `state 1008: ... does not match` / `machine 1 state 1008 is not ...` line |
+| 2 | finisher Y on a downed thrall, `Translate1008=0` | as 0.6.10 (Lara overshoots); log `state 1008 slot 0 ... off (would): handle taken, target 0x<thrall> ... path 3`, tick lines `off (would)`, end line with END DISTANCE ~300+ |
+| 3 | the same with `Translate1008=1` (live, TruMenu switch "Finisher Y 1008 as TU") | `0.5.1 switch: [States] Translate1008 0 -> 1`; slot 0 `ON: ... path 3`; tick lines with the steering point = the thrall's position; end line **END DISTANCE <= ~50**; TruFight: the 743 rows end next to the lying thrall, no fall; at the y ~ 8260 edge Lara stays on the floor |
+| 4 | finisher Y with no target / outside a fight (if reachable) | `path 2` (nothing) - root motion as the PC |
+| 5 | main game (any level with a finisher Y, `Translate1008=1`) | same steering (the TU has no doppelganger test); no crash |
+| 6 | side effects | the thrall still dies / regenerates as before (the kill at the end of 1015 is not ported); no `access fault` line |
 
 0.6.10 (2026-11-10, **offline, not yet seen in game**; K-8b "4th chain punch, type 21, -80 does not knock the thrall
 down", main workspace `docs\Befund-K8b-Art21-1011.md`, ENGINE.md 13): build `work\asi\combat0610`, byte pre-checks
@@ -631,6 +674,7 @@ gameTracker+0x1244), `TruDoppelganger.asi` (generic registry of the TU condition
 | state 1017 slot 4 (0.2) | 0x8245f5a0: target from parameter 0x40f / aim, facing (0x82457b28), gameTracker+0x1260 / +0x1270, target handle +0x1284 | new record; facing tru+0x30b8a0; the handle feeds condition 2013 and state 244 |
 | state 244 (0.2) | 0x82464198 / 0x824642a8 / 0x82463fc8: dash to the 1017 target | new record; channel mode 2 tru+0x38d00; step count +0x1280 (shared with TruShadowPower only from meter API version 3) |
 | state 1007 slots 4 / 5 (0.2) | 0x8245f068 (doppelganger branch) | wrapped: doppelganger -> translation, else PC slot 4 tru+0x36d930 |
+| state 1008 (0.6.11) | {0x8245f7b0, 0, 0x82455a38 (empty), 0x8245fa40, 0, 0}: enter / tick steer the motion channel onto the target of targeter TU 7 (mode 3 {FaceTarget, t+0x20, n x 100}; Busy244 -> mode 2 stop) | record {0, 0, 0, 0, tru+0x36d9a0, 0} wrapped: slots 0 / 3 = translation (`Translate1008=1`) or log only, slot 2 = end line, slot 4 = PC handler only with `Translate1008=0` |
 
 The tables are extended when Lara's registration runs (PC tru+0x368b60, reached through the vtable slot 0x85e1d4):
 the current `push table` operand (original or TruShadowPower's copy) is copied with these records. Byte pre-checks:
@@ -690,6 +734,8 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Death] TranslateVaultedClock` | 1 | 0.6.6 (P1c K): the TU's Vaulted clock - 5 s without slow motion (Enter 0x8232b698, enemy update 0x822db190); needs the chain; live |
 | `[Death] Log` | 1 | 0.6.9: one line per chunkdoll build of the Death state (tru+0x26c9f9) and per death switch (tru+0x241650), max 2000; log only; live |
 | `[Hit] TranslateHitSpeed` | 1 | 0.6.10 (K-8b): Lara's contact hit gives msg+0x44 / +0x48 = (int) A+0x10 / A+0x14 as the TU 0x823e169c (tru+0x319169) - the knockback speed; 0 = 0 / 0 (PC); live |
+| `[States] Translate1008` | 0 | 0.6.11 (Q19): state 1008 (finisher Y move) as the TU 0x8245f7b0 / 0x8245fa40 - steer Lara onto the target of targeter TU 7 every tick, PC slot 4 tru+0x36d9a0 not run; 0 = PC + "off (would)" lines; every level; live |
+| `[Probe] State1008` | 1 | 0.6.11: wrap record 1008 (slots 0 / 2 / 3 / 4) at all; 0 = PC record untouched (start only) |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 

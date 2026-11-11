@@ -65,6 +65,10 @@
 //    tru+0x220650 takes msg+0x44 as its speed when > 0, so records with s+0x30 = 0 (types 21 / 26) knock back again -
 //    [Hit] TranslateHitSpeed, default on, live. Still open: the TU's type-27 substitute record [CM+0xc8] of the same
 //    block (0x823e160c..0x823e1674).
+// 17. 0.6.11 (Q19, finisher Y past the target / out of the world): state 1008 as the TU table entry {0x8245f7b0, 0,
+//    0x82455a38, 0x8245fa40, 0, 0} - enter / tick steer Lara's motion channel onto the target of targeter TU 7 (PC slot
+//    6), the PC's slot 4 tru+0x36d9a0 (retail, removed by the TU) is not run - [States] Translate1008, default off,
+//    live; every level (the TU has no doppelganger test there).
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -81,7 +85,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.10 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.11 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -119,7 +123,9 @@ const char kVersion[] = "TruShadowCombat 0.6.10 (TU target list 7 -> 10, conditi
                         "the hit-list add of Lara's contact hit tru+0x3190ad ([Hit] Log) and the death switch "
                         "tru+0x241650 ([Death] Log); 0.6.10: Lara's contact hit gives the hit message msg+0x44 / "
                         "+0x48 = (int) A+0x10 / A+0x14 as the TU 0x823e169c (tru+0x319169, knockback speed; [Hit] "
-                        "TranslateHitSpeed, on by default))";
+                        "TranslateHitSpeed, on by default); 0.6.11: state 1008 (finisher Y move) as the TU 0x8245f7b0 / "
+                        "0x8245fa40 - steer onto the target of targeter TU 7 every tick, PC slot 4 tru+0x36d9a0 not run "
+                        "([States] Translate1008, off by default))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -1501,6 +1507,8 @@ void __cdecl State1020Slot1(void *agent) { State1020(agent, 1); }
 int g_translate231s0 = 0, g_translate231s1 = 0, g_translate1004 = 0;
 int g_probe231 = 1;                              // [Probe] States231And1004: wrap / add the slots at all
 bool g_s231Ok = false, g_reg231 = false, g_reg1004 = false;
+int g_translate1008 = 0;                         // 0.6.11 [States] Translate1008 (read again at run time)
+bool g_reg1008 = false;                          // 0.6.11: record 1008 of Lara's table copy wrapped
 const DWORD kState231Pc = 0x0075f550, kState1004Pc = 0x0075e020, kState1004PcSlot2 = 0x0075e060,
             kClearHitList = 0x006e6950, kAfter1004 = 0x007036c0;
 typedef void(__fastcall *PlayerFn)(BYTE *player, int);    // tru+0x2e6950 / tru+0x3036c0 (thiscall, no arguments)
@@ -2299,9 +2307,10 @@ void ReadSwitches() {
         g_translate1020 = t1020;
     }
     // 0.5.1: states 231 / 1004
-    struct { const char *key; int *value; bool *reg; } const sw[3] = {
+    // 0.6.11: state 1008 (same handling: the wrappers decide per call)
+    struct { const char *key; int *value; bool *reg; } const sw[4] = {
         {"Translate231Slot0", &g_translate231s0, &g_reg231}, {"Translate231Slot1", &g_translate231s1, &g_reg231},
-        {"Translate1004", &g_translate1004, &g_reg1004}};
+        {"Translate1004", &g_translate1004, &g_reg1004}, {"Translate1008", &g_translate1008, &g_reg1008}};
     for (const auto &s : sw) {
         int v = GetPrivateProfileIntA("States", s.key, *s.value, g_iniPath) ? 1 : 0;
         if (v == (*s.value ? 1 : 0)) continue;
@@ -2484,6 +2493,203 @@ void __cdecl State1014Slot0(void *agent) { State1014(0, agent); }
 void __cdecl State1014Slot2(void *agent) { State1014(1, agent); }
 void __cdecl State1014Slot3(void *agent) { State1014(2, agent); }
 
+// ---------------------------------------------------------------- 0.6.11: state 1008 (finisher Y move) as the TU
+// Q19 (main workspace docs\Befund-Sturz-durch-Welt-1111.md, docs\Befund-Translate1008-1111.md): chart record 743 [1008]
+// under 742 [1004 1015] = the finisher Y on a downed thrall. PC = retail: table entry 1008 at tru.exe 0x8b19bc (machine-1
+// state table 0x8b0a50 = push operand at tru+0x368b99, + 141 x 28 bytes) = {1008, 0, 0, 0, 0, tru+0x36d9a0, 0};
+// tru+0x36d9a0 (= retail 0x8245bb30, slot 4) takes targeter 6 (tru+0x31caf0) and writes only gameTracker+0x1270 (facing,
+// tru+0x36a750) and +0x1260 (target +0x20, player +0x20 for [t+0x14] & 0x400000). It does not move Lara: the leap is the
+// animation's root motion (PC live 2026-11-10: 340..660 units, up to 345 past the target, out of the world at an edge).
+// TU table 0x82758940: 1008 = {0x8245f7b0, 0, 0x82455a38, 0x8245fa40, 0, 0} - slot 4 removed, slot 2 = 0x82455a38 (blr).
+//   slot 0 (enter) 0x8245f7b0: h = 0x823dd138(player, 7) (= PC tru+0x31c9a0, TU 7 = PC slot 6); h != 0 -> agent +0x4f4 /
+//     +0x4f8 = h[0] / h[1] (the only writer of +0x4f4 in the state code, tools/ppc_field_writes.py; kept here as
+//     g_h1008), t = h[0] when [h[0]+0x44] == h[1], else 0; then the empty print 0x82455a38 (its arguments
+//     [[t+0x10]+0x60] / [t+0x58] read address 0x10 when t = 0 - not made); h == 0 -> t = 0, +0x4f4 unchanged.
+//   slot 3 (tick) 0x8245fa40: t = the kept handle's object when its +0x44 still equals the id, else 0.
+//   both then: Busy244(gameTracker) -> channel mode 2 {instance +0x20, (0, 0, 0, 1), animation entry +0x28 - 1.0f}
+//     (= tru+0x38d00); else t == 0 -> nothing; else face = 0x82457b28(t, 1) (FaceTarget), point = t +0x20 (player +0x20
+//     when [t+0x14] & 0x400000), n = 0x82463af8(&n, agent, 0) (= tru+0x35f3e0); n > 0 -> channel mode 3 {face, point,
+//     (float) n x 100.0f [0x8207d53c]} (= tru+0x38dc0), else mode 3 with the animation's frame count (s16
+//     [[chan+0x80]+0x24]+0x34 x +0x32, = tru+0x3e480). Every tick re-aims the channel at the target's current position.
+// Neither function tests the doppelganger flag: every level, as the TU. [States] Translate1008 (default 0, read again at
+// run time): 0 = PC slot 4 runs, slots 0 / 3 only log what the TU would do ("off (would)"); 1 = slots 0 / 3 act and the
+// PC slot 4 is not run (the TU has none). Slot 2 is the TU's empty function plus the end line (both settings).
+// Not part of it: 1015 slot 2 (TU-new 0x8245fe58: death switch on the 1015 target CM+0x48 at the attack's end) - other
+// data (CM+0x48 / +0x4c, not agent +0x4f4), other object (the target, not Lara's channel); docs Befund-Translate1008.
+int g_probe1008 = 1;                             // [Probe] State1008: wrap record 1008 at all
+bool g_s1008Ok = false;                          // building blocks below verified
+const DWORD kState1008Entry = 0x008b19bc, kState1008PcSlot4 = 0x0076d9a0;
+StateFn g_orig1008Slot4 = nullptr;
+
+bool CheckState1008Blocks() {
+    struct { DWORD at; const char *hex; const char *what; } const s[] = {
+        {kState1008Entry, "f0030000 00000000 00000000 00000000 00000000 a0d97600 00000000",
+         "PC table entry 1008 {1008, 0, 0, 0, 0, tru+0x36d9a0, 0} (tru.exe 0x8b19bc)"},
+        {0x00768b99, "68 500a8b00", "machine-1 state table push 0x8b0a50 (tru+0x368b99; another plugin may have moved it)"},
+        {kState1008PcSlot4, "55 8bec 83e4f0 a158dbfa00 8b8804050000 83ec1c 56 6a06 e834f1faff 8bf0 8d4c2410 56 51 e887cdffff",
+         "PC 1008 slot 4 tru+0x36d9a0 (targeter 6, facing tru+0x36a750)"},
+        {0x0076d9d7, "0f298270120000", "PC 1008 slot 4: gameTracker+0x1270 store"},
+        {0x0076d9e0, "f7461400004000 7505 8d4620 eb08 a194f0e700 83c020", "PC 1008 slot 4: point = t+0x20 / player+0x20"},
+        {0x0076d9fe, "81c160120000", "PC 1008 slot 4: gameTracker+0x1260 store"},
+        {kTargetOf, kTargetOfHex, "tru+0x31caf0 calls tru+0x31c9a0 (handle) then the object check"},
+    };
+    for (const auto &c : s) {
+        if (c.at == 0x00768b99 && !HexAt(c.at, c.hex)) {   // only informative: the copy is checked at registration
+            Log(1, "state 1008: %s at 0x%08lx differs - the record is checked again in the registered table", c.what, c.at);
+            continue;
+        }
+        if (!HexAt(c.at, c.hex)) { Log(0, "state 1008: %s at 0x%08lx does not match - not wrapped", c.what, c.at); return false; }
+    }
+    return true;
+}
+
+// TU agent +0x4f4 / +0x4f8 (handle {object, id} of 1008's target); a new target list ([0xfadfac] changed, PC player
+// init tru+0x322631) counts as a new agent - as g_m1019
+DWORD g_h1008[2] = {0, 0};
+BYTE **g_h1008List = nullptr;
+DWORD *Handle1008() {
+    if (g_h1008List != List()) { g_h1008[0] = g_h1008[1] = 0; g_h1008List = List(); }
+    return g_h1008;
+}
+
+// one run of the state (enter .. exit) for the log
+struct Run1008 { DWORD enterTick, lastLine; LONG ticks, lines; int path; float enter[4], point[4]; } g_run1008;
+Trace g_t1008e = {"state 1008 slot 0 (TU 0x8245f7b0: finisher Y - target TU 7, steer onto it)"};
+Trace g_t1008x = {"state 1008 slot 2 (TU 0x82455a38 empty: end)"};
+Trace g_t1008s4 = {"state 1008 slot 4 (PC tru+0x36d9a0, not in the TU table)"};
+
+const float *Pos(const BYTE *o) { return reinterpret_cast<const float *>(o + 0x20); }
+float Dist3(const float *a, const float *b) {
+    const float d[3] = {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+    return sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+}
+float DistXY(const float *a, const float *b) {
+    const float d[2] = {a[0] - b[0], a[1] - b[1]};
+    return sqrtf(d[0] * d[0] + d[1] * d[1]);
+}
+
+// common body of TU 0x8245f7b0 (from 0x8245f84c) / 0x8245fa40 (from 0x8245faa0). Returns the path: 1 Busy244 -> mode 2
+// stop at the instance, 2 no target -> nothing, 3 mode 3 frames n x 100, 4 mode 3 animation frames. apply = 0 only
+// computes (the channel is not written).
+int Move1008(void *agent, BYTE *t, bool apply, float *point, int *frames) {
+    BYTE *chan = Channel(static_cast<BYTE *>(agent));
+    const BYTE *inst = *reinterpret_cast<const BYTE *const *>(static_cast<BYTE *>(agent) + 8);
+    *frames = 0;
+    if (Busy244(GameTracker())) {
+        const float f = *reinterpret_cast<const float *>(AnimEntry(chan) + 0x28) - kOne;
+        Copy4(point, Pos(inst));
+        if (apply) reinterpret_cast<ChanMode2Fn>(kChanMode2)(chan, 0, Pos(inst), f);
+        return 1;
+    }
+    if (!t) return 2;
+    Vec4 face;
+    FaceTarget(face, t, 1);
+    Copy4(point, Pos(Excluded(t) ? Player() : t));
+    int n = 0;
+    reinterpret_cast<AnimFramesFn>(kAnimFrames)(&n, agent);
+    *frames = n;
+    if (n > 0) {
+        if (apply) reinterpret_cast<ChanMode3Fn>(kChanMode3)(chan, 0, face, point, static_cast<float>(n) * kHundred);
+        return 3;
+    }
+    if (apply) reinterpret_cast<ChanVec2Fn>(kChanMode3Anim)(chan, 0, face, point);
+    return 4;
+}
+
+const char kPath1008[] = "1 Busy244: mode 2 stop, 2 no target: nothing, 3 mode 3 n x 100 frames, 4 mode 3 animation frames";
+
+void __cdecl State1008Slot0(void *agent) {
+    ReadSwitches();
+    const bool apply = g_translate1008 != 0;
+    __try {
+        BYTE *player = *reinterpret_cast<BYTE **>(GameTracker() + 0x504);
+        DWORD *h = reinterpret_cast<TargetInnerFn>(kTargetOfInner)(player, 0, SlotOf(7));
+        DWORD *kept = Handle1008();
+        BYTE *t = nullptr;
+        if (h) {
+            kept[0] = h[0];
+            kept[1] = h[1];
+            t = HandleObject(h);
+        }
+        const BYTE *inst = *reinterpret_cast<const BYTE *const *>(static_cast<BYTE *>(agent) + 8);
+        Vec4 point;
+        int frames = 0;
+        const int path = Move1008(agent, t, apply, point, &frames);
+        g_run1008.enterTick = g_run1008.lastLine = GetTickCount();
+        g_run1008.ticks = g_run1008.lines = 0;
+        g_run1008.path = path;
+        Copy4(g_run1008.enter, Pos(inst));
+        Copy4(g_run1008.point, point);
+        TraceLog(g_t1008e, true, path, "%s handle %s, target 0x%08lx%s; Lara %.1f %.1f %.1f, distance %.1f -> path %d (%s), "
+                 "steering point %.1f %.1f %.1f, frames %d", apply ? "ON:" : "off (would):",
+                 h ? "taken" : "none (kept handle unchanged)", reinterpret_cast<DWORD>(t),
+                 t && Excluded(t) ? " (excluded: point = player)" : "", Pos(inst)[0], Pos(inst)[1], Pos(inst)[2],
+                 t ? Dist3(Pos(inst), Pos(t)) : -1.0f, path, kPath1008, point[0], point[1], point[2], frames);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 1008 slot 0: access fault - skipped");
+    }
+}
+
+void __cdecl State1008Slot3(void *agent) {
+    ReadSwitches();
+    const bool apply = g_translate1008 != 0;
+    __try {
+        BYTE *t = HandleObject(Handle1008());
+        const BYTE *inst = *reinterpret_cast<const BYTE *const *>(static_cast<BYTE *>(agent) + 8);
+        Vec4 point;
+        int frames = 0;
+        const int path = Move1008(agent, t, apply, point, &frames);
+        const LONG k = ++g_run1008.ticks;
+        const bool changed = path != g_run1008.path;
+        g_run1008.path = path;
+        Copy4(g_run1008.point, point);
+        // steering line: on a path change, else every 250 ms; at most 8 per run (level 1), the rest at level 3
+        const DWORD now = GetTickCount();
+        if (changed || now - g_run1008.lastLine >= 250) {
+            g_run1008.lastLine = now;
+            Log(++g_run1008.lines <= 8 ? 1 : 3, "state 1008 slot 3 (TU 0x8245fa40: steer onto the target) %s tick %ld "
+                "(%lu ms): target 0x%08lx, path %d%s, steering point %.1f %.1f %.1f, frames %d; Lara %.1f %.1f %.1f, "
+                "distance %.1f", apply ? "ON" : "off (would)", k, now - g_run1008.enterTick, reinterpret_cast<DWORD>(t),
+                path, changed ? " (changed)" : "", point[0], point[1], point[2], frames, Pos(inst)[0], Pos(inst)[1],
+                Pos(inst)[2], t ? Dist3(Pos(inst), Pos(t)) : -1.0f);
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 1008 slot 3: access fault - skipped");
+    }
+}
+
+// TU slot 2 = 0x82455a38 (blr): nothing happens there; the line is the plugin's
+void __cdecl State1008Slot2(void *agent) {
+    __try {
+        BYTE *t = HandleObject(Handle1008());
+        const BYTE *inst = *reinterpret_cast<const BYTE *const *>(static_cast<BYTE *>(agent) + 8);
+        const float *l = Pos(inst);
+        char where[160] = "no valid target";
+        if (t)
+            _snprintf_s(where, sizeof(where), _TRUNCATE, "target 0x%08lx at %.1f %.1f %.1f: END DISTANCE %.1f (horizontal "
+                        "%.1f)", reinterpret_cast<DWORD>(t), Pos(t)[0], Pos(t)[1], Pos(t)[2], Dist3(l, Pos(t)),
+                        DistXY(l, Pos(t)));
+        TraceLog(g_t1008x, true, t ? 1 : 0, "%s, %ld ticks, %lu ms; Lara %.1f %.1f %.1f, %.1f units from the enter point "
+                 "(horizontal %.1f); %s; last path %d, steering point %.1f %.1f %.1f",
+                 g_translate1008 ? "Translate1008 1" : "Translate1008 0 (PC root motion)", g_run1008.ticks,
+                 GetTickCount() - g_run1008.enterTick, l[0], l[1], l[2], Dist3(l, g_run1008.enter),
+                 DistXY(l, g_run1008.enter), where, g_run1008.path, g_run1008.point[0], g_run1008.point[1],
+                 g_run1008.point[2]);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "state 1008 slot 2: access fault in the end line");
+    }
+}
+
+void __cdecl State1008Slot4(void *agent) {
+    ReadSwitches();
+    if (!g_translate1008) {
+        if (g_orig1008Slot4) g_orig1008Slot4(agent);
+        return;
+    }
+    TraceLog(g_t1008s4, false, 1, "ON: not run (the TU table has no slot 4 for 1008; gameTracker+0x1260 / +0x1270 "
+             "not written)");
+}
+
 // ---------------------------------------------------------------- Lara's tables at registration time
 // TU 0x82473b50 = PC tru+0x368b60 (virtual, the only reference is the vtable slot 0x85e1d4) registers the tables of
 // the two machines (gameTracker+0xf10 / +0xf14) through `push table` operands. TruShadowPower (machine 1) points
@@ -2581,7 +2787,7 @@ bool ExtendStates() {
     int n = Count(t, 7, 260);
     if (n <= 0) { Log(0, "machine 1 states: table 0x%08lx unreadable / too long - state 1014 not gated", *operand); return false; }
     memcpy(g_m1State, t, (n + 1) * 7 * sizeof(DWORD));
-    char done[320] = "";
+    char done[400] = "";
     // 1014 (strike gate / translation)
     if (g_strikeGate || g_strikeTranslate) {
         int i = Find(g_m1State, 7, n, 1014);
@@ -2705,6 +2911,27 @@ bool ExtendStates() {
     } else if (g_statesOn && g_probe231) {
         Log(0, "machine 1 states 231 / 1004: not wrapped (building blocks 231 / 1004 %d, 1019 %d, states %d)",
             g_s231Ok ? 1 : 0, g_s1019Ok ? 1 : 0, g_statesOk ? 1 : 0);
+    }
+    if (g_statesOn && g_s1008Ok && g_probe1008) {
+        // 0.6.11: 1008 {0, 0, 0, 0, PC slot 4, 0} -> {TU slot 0, 0, slot 2 (TU: empty), TU slot 3, wrapper of slot 4, 0}
+        int i = Find(g_m1State, 7, n, 1008);
+        const DWORD *r = i >= 0 ? g_m1State + i * 7 : nullptr;
+        if (r && r[1] == 0 && r[2] == 0 && r[3] == 0 && r[4] == 0 && r[5] == kState1008PcSlot4 && r[6] == 0) {
+            g_orig1008Slot4 = reinterpret_cast<StateFn>(r[5]);
+            g_m1State[i * 7 + 1] = reinterpret_cast<DWORD>(&State1008Slot0);
+            g_m1State[i * 7 + 3] = reinterpret_cast<DWORD>(&State1008Slot2);
+            g_m1State[i * 7 + 4] = reinterpret_cast<DWORD>(&State1008Slot3);
+            g_m1State[i * 7 + 5] = reinterpret_cast<DWORD>(&State1008Slot4);
+            g_reg1008 = true;
+            strncat_s(done, sizeof(done), g_translate1008 ? " 1008 (slots 0 / 2 / 3 / 4, ON)" : " 1008 (slots 0 / 2 / 3 / 4, log only)",
+                      _TRUNCATE);
+        } else {
+            Log(0, "machine 1 state 1008 is not {0, 0, 0, 0, 0x%08lx, 0} (%s) - not wrapped", kState1008PcSlot4,
+                r ? "other handlers - another plugin?" : "missing");
+        }
+    } else if (g_statesOn && g_probe1008) {
+        Log(0, "machine 1 state 1008: not wrapped (building blocks 1008 %d, 1019 %d, states %d)", g_s1008Ok ? 1 : 0,
+            g_s1019Ok ? 1 : 0, g_statesOk ? 1 : 0);
     }
     if (!done[0]) return false;
     DWORD value = reinterpret_cast<DWORD>(g_m1State);
@@ -6108,6 +6335,8 @@ void ReadOptions(const char *dir) {
     g_translate231s1 = GetPrivateProfileIntA("States", "Translate231Slot1", 0, ini) ? 1 : 0;
     g_translate1004 = GetPrivateProfileIntA("States", "Translate1004", 0, ini) ? 1 : 0;
     g_probe231 = GetPrivateProfileIntA("Probe", "States231And1004", 1, ini);
+    g_translate1008 = GetPrivateProfileIntA("States", "Translate1008", 0, ini) ? 1 : 0;   // 0.6.11
+    g_probe1008 = GetPrivateProfileIntA("Probe", "State1008", 1, ini);
     g_diagT9 = GetPrivateProfileIntA("Diag", "Targeter9", 1, ini);
     g_diagWhy = GetPrivateProfileIntA("Diag", "Targeter9Why", 1, ini);
     g_diag2011 = GetPrivateProfileIntA("Diag", "Condition2011", 1, ini);
@@ -6169,6 +6398,12 @@ void Start(HMODULE self) {
                "Translate1004 %d (0 = PC handler + \"off (would)\" lines; read again at run time)",
             g_s231Ok ? "building blocks verified, wrapped at Lara's registration" : "building blocks NOT verified - PC handlers",
             g_translate231s0, g_translate231s1, g_translate1004);
+    g_s1008Ok = g_blocksOk && g_s1019Ok && CheckState1008Blocks();   // 0.6.11
+    if (g_statesOn && g_probe1008)
+        Log(1, "state 1008 (finisher Y move, TU 0x8245f7b0 / 0x8245fa40, slot 4 removed): %s - Translate1008 %d (0 = PC "
+               "slot 4 + \"off (would)\" lines; 1 = steer onto the target of targeter TU 7 every tick, every level; read "
+               "again at run time)", g_s1008Ok ? "building blocks verified, wrapped at Lara's registration"
+                                             : "building blocks NOT verified - PC handler", g_translate1008);
     if (g_strikeTranslate)
         Log(1, "shadow strike translation %s ([Strike] Translate=1; also needs TruShadowPowerMeterApi at run time)",
             g_strikeOk ? "ready" : "OFF: building blocks not verified");
