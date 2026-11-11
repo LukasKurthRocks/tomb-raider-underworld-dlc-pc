@@ -127,6 +127,12 @@ fall watch rules and constants, FallNetTick's order (time, count, sample, height
 RunUnstuck and the net share UnstuckPlace, [Rescue] FallNet in kOpts / ReadOptions / FnReadSwitch / the INI, the one
 TruMenu switch row (SW_ROW_ONLY: TruMenu may have rows without every TruMenu.ini key being one), precheck_02224 = the
 49 rows of precheck_02223 + kCtChecks + kFwChecks, Set-TruMenu.ps1 knows the 0.22.23 hash.
+0.22.25 (Q45, settings.reset wrote a cut INI): check_02225 - no fixed char array in RunSettingsReset / DefaultIniText
+that is not larger than the generated default text (the 0.10 .. 0.22.24 static 16384 vs ~42 KB), the measured build
+(DefaultIniText(nullptr, 0), malloc, cut / write / close checked, built before the backup), IniPut / TextAdd measure
+first; the texts built from TruMenu's tables against their buffers (table_texts: Log line vs light.cut, [Quick] Closed
+with every group key, [Menu] OpenPages, [Cheats] State, [Debug] NavDraw, settings.show in t_value, [Quick] Recent),
+QbGroupSet / CpPersist whole keys only, Set-TruMenu.ps1 knows the 0.22.24 hash.
 Options: --switches FILE checks that file instead of the shipped one.
 
 Usage (from the repository root):
@@ -1053,7 +1059,8 @@ def check_019(ini_path, radial_path, rows):
         elif key in ('NoInvestigate', 'NoAttack') and value not in ('0', '1'): problems.append(where + ' (0 / 1)')
     for sec, key, default, comment in rows:
         if len(comment) >= 512:
-            problems.append('TruMenu.cpp: kOpts [%s] %s comment has %d characters (DefaultIniText keeps 511)'
+            problems.append('TruMenu.cpp: kOpts [%s] %s comment has %d characters (at most 511 - DefaultIniText cut there '
+                            'until 0.22.24, kept as the limit)'
                             % (sec, key, len(comment)))
     items = item_types(src)
     for item, typ in sorted(Q19_ITEMS.items()):
@@ -3420,8 +3427,8 @@ def check_02224(ini_path, switches_path):
     kCtChecks row + these 2); the TruMenu switch row; Set-TruMenu.ps1 knows the 0.22.23 hash"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.24 (fall watch + fall net' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.24 (fall watch + fall net')
+    if '0.22.24 (fall watch + fall net' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.25: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.24 part "0.22.24 (fall watch + fall net"')
     m = re.search(r'const DvCheck kFwChecks\[\] = \{(.*?)\n\};', src, re.S)
     rows = [(a, b.replace(' ', '')) for a, b in re.findall(r'\{0x([0-9a-f]{8}), "([0-9a-f ]+)"\}', m.group(1))] if m else []
     if rows != FW_ROWS: problems.append('TruMenu.cpp: kFwChecks must be the 2 rows 0x787910 / 0x7859d0')
@@ -3494,6 +3501,148 @@ def check_02224(ini_path, switches_path):
     return problems, ('fall watch (records %s, states 1008 / 1015, watchdog, safe ground, 40 lines / 10 s), [Rescue] '
                       'FallNet default 0 live, net after 3 s / 3000 units through UnstuckPlace, %d + 1 byte checks, '
                       'switch row' % ('/'.join(['742', '743', '1068', '1080']), len(rows)))
+
+
+def c_size(src, text):
+    """the size of a C array declaration size text ('512', 'kQbRecentCap * 112', 'sizeof(g_qbClosed)'); None = unknown"""
+    total = 1
+    for part in text.split('*'):
+        part = part.strip()
+        m = re.fullmatch(r'sizeof\((\w+)\)', part)
+        if m:
+            d = re.search(r'\bchar %s\[([^\]]+)\]' % m.group(1), src)
+            value = c_size(src, d.group(1)) if d else None
+        elif re.fullmatch(r'\d+', part):
+            value = int(part)
+        else:
+            d = re.search(r'\bconst (?:int|size_t) %s = (\d+);' % re.escape(part), src)
+            value = int(d.group(1)) if d else None
+        if value is None: return None
+        total *= value
+    return total
+
+
+def c_array(src, body, name):
+    """size of 'char <name>[N]' in body (the first one), None when there is none"""
+    m = re.search(r'\bchar %s\[([^\]]+)\]' % re.escape(name), body)
+    return c_size(src, m.group(1)) if m else None
+
+
+def table_texts(src):
+    """0.22.25 (Q45): the worst-case lengths of TruMenu texts built from its own tables (no NUL)"""
+    def block(head):
+        b = src[src.index(head):] if head in src else ''
+        return b[:b.find('};')]
+    header, rows = table(src)
+    out = {'ini': len(text(header, rows).encode('utf-8')), 'keys': len(rows),
+           'comment': max(len(c) for _, _, _, c in rows),
+           'settings': len('; '.join('[%s] %s=%s (default)' % (s, k, d) for s, k, d, _ in rows))}
+    cheats = re.findall(r'\{"([a-z0-9_.]+)", kCat[A-Za-z]+', block('const CheatRow kCheatRows[] = {'))
+    out['cheats'] = (len(','.join(cheats)), len(cheats))
+    nav = re.findall(r'^\s*\{"([a-z0-9_]+)", 0x', block('const NavSwitch kNavSwitches[] = {'), re.M)
+    out['nav'] = (len(','.join(nav)), len(nav))
+    pages = LIT.findall(block('const char *const kMpPages[] = {'))
+    out['pages'] = (len(','.join(pages)), len(pages))
+    starts = LIT.findall(block('const char *const kQbStartClosed[] = {'))
+    groups = []
+    for g in re.findall(r'"-", "([a-z0-9_]+)", kQbGroup', src) + ['fig_shadow', 'fig_combat']:
+        if g not in groups: groups.append(g)
+    out['closed'] = (len(','.join(('+' + g) if g in starts else g for g in groups)), len(groups))
+    return out
+
+
+def check_02225():
+    """0.22.25 (Q45, agent finding during Q36): settings.reset built the default TruMenu.ini in a static 16384-byte buffer
+    while the text is ~42 KB - it wrote a truncated INI. Now: no fixed buffer for the default text (measured with
+    DefaultIniText(nullptr, 0), built in a malloc of that size before the backup, cut / write / close checked); every
+    fixed char array left in RunSettingsReset / DefaultIniText must be larger than the text (this rule would have caught
+    16384 < 42 KB). The other texts built from TruMenu's tables against their buffers: Log line (light.cut lines of 1400),
+    [Quick] Closed with every group key toggled, [Menu] OpenPages with every page, [Cheats] State with every cheat,
+    [Debug] NavDraw with every switch, settings.show at the defaults in t_value, [Quick] Recent at its field limits;
+    QbGroupSet / CpPersist append whole keys only (TextAdd); Set-TruMenu.ps1 knows the 0.22.24 hash"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.25 (settings.reset writes the whole TruMenu.ini' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.25 (settings.reset writes the whole TruMenu.ini')
+    t = table_texts(src)
+    reset, dtext = fn_body(src, 'bool RunSettingsReset('), fn_body(src, 'size_t DefaultIniText(')
+    if not reset or not dtext: problems.append('TruMenu.cpp: RunSettingsReset / DefaultIniText missing')
+    for where, body in (('RunSettingsReset', reset), ('DefaultIniText', dtext)):
+        for name, size in re.findall(r'\bchar (\w+)\[([^\]]+)\]', body):
+            n = c_size(src, size)
+            if name == 'backup' and where == 'RunSettingsReset': continue      # the backup path (MAX_PATH)
+            if name == 'comment' and n is not None and n > t['comment']: continue
+            if n is None or n <= t['ini']:
+                problems.append('TruMenu.cpp: %s holds char %s[%s] - the default text is %d bytes (settings.reset would '
+                                'write a cut TruMenu.ini)' % (where, name, size, t['ini']))
+    for want in ('const size_t len = DefaultIniText(nullptr, 0);', 'malloc(len + 1)',
+                 'DefaultIniText(text, len + 1, &cut)', 'if (cut || built != len || strlen(text) != len)',
+                 'fwrite(text, 1, len, f)', 'if (wrote != len || !closed)'):
+        if want not in reset: problems.append('TruMenu.cpp: RunSettingsReset must hold %s' % want)
+    if not (0 <= reset.find('DefaultIniText(text') < reset.find('CopyFileA(') < reset.find('fopen_s(')):
+        problems.append('TruMenu.cpp: RunSettingsReset must build the text before the backup and the write')
+    put = fn_body(src, 'void IniPut(')
+    if '_vscprintf(fmt, ap)' not in put or not put.endswith('\n    t.used += static_cast<size_t>(w);\n}') or \
+            'if (t.out) {' not in put:   # counted on the function level: also when measuring / not written
+        problems.append('TruMenu.cpp: IniPut must measure every piece (_vscprintf) and count it also when not writing')
+    if 'IniPut(' not in dtext or '_snprintf_s' in dtext or 'strtok_s' in dtext:
+        problems.append('TruMenu.cpp: DefaultIniText must build through IniPut (no _snprintf_s / strtok_s copy)')
+    add = fn_body(src, 'bool TextAdd(')
+    if '_vscprintf(fmt, ap)' not in add or 'return false;' not in add:
+        problems.append('TruMenu.cpp: TextAdd must measure the piece and refuse it whole')
+    # the other table texts
+    line = c_array(src, fn_body(src, 'void Log('), 'line')
+    lc = c_array(src, fn_body(src, 'void LcLogFrame('), 'text')
+    if line is None or line < 2048 or (lc is not None and lc + 13 >= line):
+        problems.append('TruMenu.cpp: Log line must hold 2048 and the light.cut text + time stamp (line %s, text %s)'
+                        % (line, lc))
+    sizes = {name: c_size(src, m) for name, m in re.findall(r'^(?:extern )?char (g_qbClosed|g_mpOpen|g_cheatState|'
+                                                            r'g_navAuto)\[([^\]]+)\]', src, re.M)}
+    decl = re.findall(r'^(?:extern )?char g_qbClosed\[([^\]]+)\]', src, re.M)
+    if len(set(decl)) != 1: problems.append('TruMenu.cpp: g_qbClosed extern and definition differ (%s)' % decl)
+    for key, buf, what in (('closed', 'g_qbClosed', '[Quick] Closed, every group key toggled'),
+                           ('pages', 'g_mpOpen', '[Menu] OpenPages, every page open'),
+                           ('cheats', 'g_cheatState', '[Cheats] State, every cheat on'),
+                           ('nav', 'g_navAuto', '[Debug] NavDraw, every switch on')):
+        need, count = t[key]
+        if sizes.get(buf) is None or need >= sizes[buf]:
+            problems.append('TruMenu.cpp: %s %s too small: %s needs %d + 1 (%d entries)' % (buf, sizes.get(buf), what,
+                                                                                          need, count))
+    for fn, name, key in (('void CheatPersistSave(', 'list', 'cheats'), ('void DvPersistNav(', 'list', 'nav'),
+                          ('void MpLogKeys(', 'keys', 'pages')):
+        n = c_array(src, fn_body(src, fn), name)
+        if n is None or t[key][0] >= n:
+            problems.append('TruMenu.cpp: %s char %s[%s] too small for %d + 1' % (fn[5:-1], name, n, t[key][0]))
+    grp = fn_body(src, 'bool QbGroupSet(')
+    if not grp or 'LabelAdd(' in grp or grp.count('TextAdd(') != 3 or 'return false;' not in grp:
+        problems.append('TruMenu.cpp: QbGroupSet must append whole keys (TextAdd) and refuse a list that does not fit')
+    if src.count('if (!QbGroupSet(') != 2:
+        problems.append('TruMenu.cpp: both QbGroupSet callers must handle a refused list')
+    cp = fn_body(src, 'void CpPersist(')
+    hide = c_array(src, fn_body(src, 'void ReadOptions('), 'hide')
+    if 'LabelAdd(' in cp or 'TextAdd(' not in cp or c_array(src, cp, 'list') != hide or \
+            c_array(src, fn_body(src, 'void CpHideParse('), 'copy') != hide:
+        problems.append('TruMenu.cpp: CpPersist must write whole ids (TextAdd) into the read size of CheckpointHide')
+    vs = fn_body(src, 'void ValSettings(')
+    tv = c_size(src, (re.search(r'char t_value\[([^\]]+)\]', src) or re.search('(x)', 'x')).group(1))
+    if '_snprintf_s(o + used' in vs or 'TextAdd(o, n - kMoreRoom, &used' not in vs or 'more keys' not in vs:
+        problems.append('TruMenu.cpp: ValSettings must add whole keys and name the keys it could not hold')
+    if tv is None or t['settings'] + 120 >= tv:
+        problems.append('TruMenu.cpp: t_value %s too small for settings.show at the defaults (%d)' % (tv, t['settings']))
+    rec = c_array(src, fn_body(src, 'void QbRecentSave('), 'text')
+    m = re.search(r'struct QbRecent \{ char id\[(\d+)\], arg\[(\d+)\]; \};', src)
+    cap = c_size(src, 'kQbRecentCap')
+    if not m or rec is None or cap is None or cap * (int(m.group(1)) - 1 + int(m.group(2)) - 1 + 2) - 1 >= rec:
+        problems.append('TruMenu.cpp: QbRecentSave text too small for kQbRecentCap full entries')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if 'd792fca9fc969130ac3db5ae98263062af55f47b6933545fe17e929376a57ba9' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.24 build hash (work\\asi\\menu0247) is missing')
+    return problems, ('settings.reset: default text %d bytes (%d keys) built in a measured buffer, no fixed array; table '
+                      'texts fit: Log line %s (light.cut %s), [Quick] Closed %d of %s, OpenPages %d of %s, Cheats %d of '
+                      '%s, NavDraw %d of %s, settings.show %d of %s' % (
+                          t['ini'], t['keys'], line, lc, t['closed'][0], sizes.get('g_qbClosed'), t['pages'][0],
+                          sizes.get('g_mpOpen'), t['cheats'][0], sizes.get('g_cheatState'), t['nav'][0],
+                          sizes.get('g_navAuto'), t['settings'], tv))
 
 
 def table(src):
@@ -3665,6 +3814,10 @@ def main(argv):
     for p in cproblems24: print('Q02224 %s' % p)
     if not cproblems24: print('ok: 0.22.24 %s' % csummary24)
     problems += cproblems24
+    cproblems25, csummary25 = check_02225()   # 0.22.25
+    for p in cproblems25: print('Q02225 %s' % p)
+    if not cproblems25: print('ok: 0.22.25 %s' % csummary25)
+    problems += cproblems25
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

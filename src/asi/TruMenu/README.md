@@ -2928,6 +2928,58 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.25 - settings.reset writes the whole TruMenu.ini (2026-11-11)
+
+Built into `work\asi\menu0248`, not installed, no live test (night queue Q45, agent finding during Q36).
+`settings.reset` (menu Settings "Reset all settings", TruLink `settings.reset`) built the default text in a
+`static char text[16384]` (since 0.10) - the text from the `kOpts` table is 42,408 bytes (257 keys, 27 sections), so the
+written `TruMenu.ini` held only the first 16,383 bytes: 15 sections, 84 keys, the rest missing (missing keys then took
+the built-in defaults, so the game ran on, but the file was cut - measured with the 0.22.24 code in a harness,
+`work\menu0248_1111\reset_old.ini`).
+
+- **Fix:** `DefaultIniText(nullptr, 0)` measures the text (`IniPut` counts every piece with `_vscprintf`), the reset
+  allocates exactly that size and builds it; the text is built **before** the backup and the write (a failure changes
+  nothing), a cut text / short write / failed close is refused with the byte counts; the answer names the size:
+  `TruMenu.ini rewritten from the defaults (42408 bytes, 257 keys), backup ...`. Comment lines are split in place (no
+  512-byte copy any more). Harness with TruMenu's own code (`work\menu0248_1111\make_harness.py`, MSVC x86): measured
+  42,408, built 42,408, the file equals the shipped `TruMenu.ini` (LF) byte for byte; into a 16,384 buffer it now stops
+  at a whole line (16,360) and reports `cut`.
+- **Other texts built from TruMenu's tables** (searched in `TruMenu.cpp`; worst cases from the tables,
+  `trumenu_ini_check` `table_texts`):
+  - `TruMenu.log` line buffer 512 -> **2048**: `light.cut` lines are built in 1400 bytes, the patch lines of the 0.15
+    render mode / `M21PatchGroup` in 480 / 600 - a `Log` line held at most 498 characters after the time stamp, the
+    rest was dropped.
+  - `[Quick] Closed` (`g_qbClosed`) 384 -> **1024**: every bar group toggled needs 470 (50 group keys, 17 start
+    closed); `QbGroupSet` now adds whole keys only and refuses a list that does not fit (log line, bar answer
+    `[Quick] Closed voll` / `full`) - before, `LabelAdd` could write half a key into the INI.
+  - `[Debug] CheckpointHide` (`CpPersist`, 512 = the read size): whole ids only; ids that do not fit are named in one
+    log line (hidden for the session only) - before, half an id could be written (a wrong id at the next start).
+  - `settings.show` (`ValSettings`, 16 KB answer): whole keys; when full it ends with `... (+N more keys ...)` instead
+    of stopping in the middle of a key. All defaults need 8,330 characters; every key changed to a 40-character value
+    would need ~19,400.
+  - Fit, unchanged: `[Menu] OpenPages` 207 of 400 (28 pages), `[Cheats] State` 69 of 256 (5 ids), `[Debug] NavDraw`
+    120 of 200 / 256 (7 switches), `[Quick] Recent` 1,791 of 1,792 at the field limits, favourites (refused whole since
+    0.21.8), `list` (TruLink) 39,102 of 49,152 without values, `sw.list` lines (one log line per switch, < 512).
+- Checks: `trumenu_ini_check` `check_02225` - no fixed char array in `RunSettingsReset` / `DefaultIniText` that is not
+  larger than the generated default text (on the 0.22.24 source: `RunSettingsReset holds char text[16384] - the default
+  text is 42408 bytes`), the measured build, the order build / backup / write, `IniPut` / `TextAdd`, the table texts
+  above against their buffers; negative test on copies: 14 of 14 caught (the 0.22.24 source + 13 mutations).
+  `precheck_02225.txt` = the 52 rows of 0.22.24 (no new byte checks): 52 checks 0 mismatches against `data/pc/tru.exe`
+  and the installed `tru.exe`. `trumenu_quick_check`, qb layout (unchanged), readability, umlauts, flat PS pass.
+  `Set-TruMenu.ps1` knows the 0.22.24 hash.
+
+### TO TEST 0.22.25
+
+**Back up the installed `TruMenu.ini` first** (copy it next to the game, e.g. `TruMenu.ini.vor-0.22.25`) - the reset
+rewrites it with the defaults (it makes its own `TruMenu.ini.bak_<time>` too).
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | reset | menu Settings: "Reset all settings" (A twice) or `menu settings.reset` | answer / log `settings: TruMenu.ini rewritten from the defaults (42408 bytes, 257 keys), backup ...TruMenu.ini.bak_<time>`; the new `TruMenu.ini` is 42,408 bytes with LF (Explorer: ~41 KB), last section `[Rescue]` with `FallNet=0` at its end - equal to `src\asi\TruMenu\TruMenu.ini` apart from the line ends |
+| 2 | after the reset | `menu settings.show` | every key `(default)`, no `(missing: default)` |
+| 3 | restore | close the game, copy the backup from before the test back over `TruMenu.ini` | your settings as before |
+| 4 | bar groups | quick bar: close and open a few groups | `[Quick] Closed` in `TruMenu.ini` holds whole keys, log `quick: ... group ... closed ([Quick] Closed=...)` |
+
 ## 0.22.24 - fall watch + fall net (2026-11-11)
 
 Built into `work\asi\menu0247`, not installed, no live test (night queue Q36). Finding Q19 (workspace
@@ -3031,7 +3083,7 @@ TruDlc2Player 0.6 the file held 159, and every new plugin INI key needs a row (`
 
 | # | Point | Step | Expected |
 |---|---|---|---|
-| 1 | start-up | start the game, read `TruMenu.log` | `switches: 160 switches in 10 groups from ...TruMenu.switches.txt (0 lines skipped, 0 over the limit of 512 / 24)` |
+| 1 | start-up | start the game, read `TruMenu.log` | `switches: 162 switches in 11 groups from ...TruMenu.switches.txt (0 lines skipped, 0 over the limit of 512 / 24)` (the file as of 0.22.24: 160 at 0.22.23 + `DialogHoldClear` (Q41) + `FallNet` in the group `Rettung (TruMenu)` (0.22.24); an older installed file shows its own count) |
 | 2 | new row | bar page Fixes, group `DLC 2 Spielerin / Kostüm` | row `Levelstart: Anpassung auf Mittel` (Neustart, value of `TruDlc2Player.ini`; `(aus)` while the installed INI is older than 0.7) |
 | 3 | page / menu | open each group on page Fixes; menu section Fixes | every group's rows as before, no "nicht gezeigt" in the head |
 | 4 | optional: over the limits | back up the installed `TruMenu.switches.txt`, copy `work\menu0246_1111\TruMenu.switches.limittest.txt` over it (570 rows, 25 groups; the extra rows belong to the made-up plugin `TruLimitTest` without INI = `keine INI`, never written), `menu sw.reload` | log: `exceeds the limit of 24 groups: 1 group line(s) from line 613 on not shown, with their 20 switch line(s)`, `exceeds the limit of 512 switch lines: 38 switch line(s) from line 574 on not shown`, `512 switches in 24 groups ... (0 lines skipped, 59 over the limit of 512 / 24)`; page Fixes with group `Limit-Test limittest` open: head `... - 26 Zeilen nicht gezeigt (Seite max. 128, Menü zeigt alle)`; then put the backup back and `menu sw.reload` |

@@ -222,7 +222,8 @@ built-in default `DialogStart=1` applies when the key is missing).
 
 Install with `Set-TruDlc2Player.ps1 -Install -SourceDir work\asi\dlc2p07` (game closed). `DialogDifficulty` is 0 by
 default: set `[Mission] DialogDifficulty=1` in the installed `TruDlc2Player.ini` (an edited 0.6 .ini lacks the key -
-then the built-in 0 applies). No TruMenu Fixes row (the switch list is full at 159 / 160).
+then the built-in 0 applies). TruMenu Fixes row since TruMenu 0.22.23 (switch file limit 512): group `DLC 2 Spielerin /
+Kostüm`, `Levelstart: Anpassung auf Mittel` (restart).
 
 1. `DialogDifficulty=0`: start line `TruDlc2Player 0.7 loaded (... dialog start 1, dialog difficulty 0)`,
    `dialog difficulty: off ...`; everything as 0.6.
@@ -245,7 +246,9 @@ then the built-in 0 applies). No TruMenu Fixes row (the switch list is full at 1
 
 Install with `Set-TruDlc2Player.ps1 -Install -SourceDir work\asi\dlc2p08` (game closed). `DialogHoldClear` is 0 by
 default: set `[Mission] DialogHoldClear=1` in the installed `TruDlc2Player.ini` (an edited 0.7 .ini lacks the key -
-then the built-in 0 applies). The TruMenu Fixes row for the key is still to be added (switch file limit now 512).
+then the built-in 0 applies). TruMenu Fixes row (since Q41, `TruMenu.switches.txt`): group `DLC 2 Spielerin / Kostüm`,
+`Dialog 4/6: Render-Halt aus` / `Dialog 4/6: clear render hold` (restart) - next to the rows of `DialogStart` and
+`DialogDifficulty`.
 
 1. `DialogHoldClear=0`: start line `TruDlc2Player 0.8 loaded (... dialog difficulty D, dialog hold clear 0)`,
    `dialog hold: off ...`; everything as 0.7.
