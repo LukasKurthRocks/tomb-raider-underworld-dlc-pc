@@ -43,8 +43,10 @@ Usage (from the repository root):
   --compare OLD.tsv   add a status transition table (old -> new) to the summary
   --why A[,A..]       print every finding / plugin line that names the functions containing A, and their blocks
   --show A[,A..]      as --why plus retail / TU disassembly of every open code block side by side (--all: every block)
-  --why / --show alone print only (the TSV is written only with --out)
-Output: the TSV (one row per changed / new TU function; block columns blocks, blocks_open, bytes_open,
+  --out FILE          write the TSV there (the list in the repo: --out docs/data/tu_coverage.tsv); without --out no
+                      TSV is written at all - the run only prints the summary (and writes --summary if given)
+  --why / --show alone print only (no summary; the TSV is written only with --out)
+Output: the TSV (--out only; one row per changed / new TU function; block columns blocks, blocks_open, bytes_open,
 uncovered_blocks (range, kind, size, {hint: callees, compare / li constants, built addresses}), covered_blocks (range:
 evidence)) and a summary (counts per status / topic, biggest open topics) on stdout and in --summary. Only addresses,
 names, constants and counts are written - no game bytes (--show prints disassembly to stdout only).
@@ -601,7 +603,7 @@ WEAK = ('', '2nd-ring neighbours (weak)', 'callers / callees', 'strings', 'data 
 
 
 def main(argv):
-    out = os.path.join(ROOT, 'docs', 'data', 'tu_coverage.tsv')
+    out = None                                     # Q43: the TSV is written only with --out (as the help says)
     summ = None
     if '--out' in argv:
         out = argv[argv.index('--out') + 1]
@@ -905,13 +907,14 @@ def main(argv):
     head = ['tu_addr', 'class', 'size', 'retail', 'retail_size', 'pc', 'pc_tier', 'proto_name', 'proto_obj', 'topic',
             'topic_basis', 'marks', 'strings', 'named_neighbours', 'status', 'plugin', 'basis', 'refs', 'note',
             'blocks', 'blocks_open', 'bytes_open', 'uncovered_blocks', 'covered_blocks']
-    if (show or why) and '--out' not in argv:
-        return 0                                   # inspection run: print only, keep the TSV
-    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-    with open(out, 'w', encoding='utf-8', newline='\n') as f:
-        f.write('\t'.join(head) + '\n')
-        for r in rows:
-            f.write('\t'.join(c.replace('\t', ' ').replace('\n', ' ') for c in r) + '\n')
+    if (show or why) and out is None:
+        return 0                                   # inspection run: print only, no TSV, no summary
+    if out is not None:
+        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+        with open(out, 'w', encoding='utf-8', newline='\n') as f:
+            f.write('\t'.join(head) + '\n')
+            for r in rows:
+                f.write('\t'.join(c.replace('\t', ' ').replace('\n', ' ') for c in r) + '\n')
 
     size = lambda r: int(r[2])
     lines = ['TU coverage (retail -> TU): equal %d, changed %d, new %d, removed %d; listed %d (changed + new), %d B'
@@ -980,6 +983,8 @@ def main(argv):
         lines.append('status old -> new (vs %s):' % os.path.basename(argv[argv.index('--compare') + 1]))
         for (a, b), n in sorted(tr.items()):
             lines.append('  %-10s -> %-10s %5d' % (a, b, n))
+    lines.append('TSV: %s' % (out if out is not None else 'not written (no --out; the list in the repo is written with '
+                                                          '--out docs/data/tu_coverage.tsv)'))
     text = '\n'.join(lines)
     print(text)
     if summ:

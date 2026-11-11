@@ -104,8 +104,10 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              paired Xbox / PC by pointer-path label + size (so also dlc2_machine_room, whose PC unit DTP has another
              layout): the 32 curve words = s16 (base proof: 20 units, 556 records, 12 893 informative words s16, 0
              contradicting; the learned type-7 table had swapped float-looking pairs as s32 - non-monotone ramps);
-             agrees with introtyped's path table wherever both speak; after the Q5 steps, before seqrepeat; opt-in
-             for the check gate (--steps unitcurve) until enabled in CHECK_STEPS
+             agrees with introtyped's path table wherever both speak; after the Q5 steps, before seqrepeat; in the
+             default check gate (CHECK_STEPS) since 2026-11-11 (Q32 follow-up) - a tree built before 7cef8ab (e.g.
+             work/rebuild/pipeline_check_1111b, 421 words in 7 DRMs) fails it: check it with --skip unitcurve
+             (or an explicit --steps list without unitcurve), or rebuild it (Fixes)
   seqrepeat  tools/soundplex_sequence_fix.py SoundPlex Sequence nodes (type 10): the word data +0xc (s8 repeat + 3 bytes)
              raw = the Xbox bytes, as on every informative base pair (`soundplex_sequence_fix.py proof`; F5 2026-11-05:
              the converter u32-swapped `01 00 00 00` to `00 00 00 01` = repeat 0 = endless, the doppelganger's
@@ -155,9 +157,13 @@ words of SoundPlex Wave leaves; no later step writes them (seqrepeat: Sequence +
 the same words by the base proof). It reproduces work/q4_waves_1111/tree on top of the installed file word for word.
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
 Check mode (objtex / objrec / objid / chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind /
-playerblock / waveid / fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after Fixes and per costume pack):
-  ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--pack pack11] [--report R.json]
+playerblock / waveid / fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread / idpair /
+fxrelayout / lv90dtp / odtwin / fpkeys / unitcurve / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after
+Fixes and per costume pack):
+  ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--skip unitcurve] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
+        --skip a,b drops steps from the default list (or from --steps): for a tree built before a step was added,
+        e.g. --skip unitcurve for work/rebuild/pipeline_check_1111b (built before 7cef8ab);
         TREE may be 'A,B' (overlay, the later folder wins - e.g. a pipeline tree with a fix tree on top);
         objtex also runs the pack-independent structural check of tools/objdata_texlist_check.py on every DRM (a DTP
         whose Xbox copy of the chosen pack has another layout is skipped by the comparison, 2026-11-05 dlc_dungeon)
@@ -941,9 +947,10 @@ def run_twins(srcs, out, names, tmp):
     return files, log
 
 
-CHECK_STEPS = ('objtex', 'objrec', 'objid') + DATAFIX_STEPS + TYPED_STEPS + Q5_STEPS + ('seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass); Q5_STEPS since 2026-11-11
-CHECK_ALLOWED = CHECK_STEPS + Q32_STEPS   # Q32_STEPS: --steps only until enabled in CHECK_STEPS (the pipeline run
-                              # of 11.11. was built without it); navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS); the
+CHECK_STEPS = ('objtex', 'objrec', 'objid') + DATAFIX_STEPS + TYPED_STEPS + Q5_STEPS + Q32_STEPS + ('seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass); Q5_STEPS since 2026-11-11
+CHECK_ALLOWED = CHECK_STEPS   # Q32_STEPS in the default gate since 2026-11-11 (Q32 follow-up); pipeline_check_1111b
+                              # was built before unitcurve: check it with --skip unitcurve (or rebuild it)
+                              # navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS); the
                               # 2026-11-07 data fixes (DATAFIX_STEPS) since 2026-11-08, the typed families (TYPED_STEPS,
                               # 17n) since 2026-11-08
 
@@ -1014,8 +1021,10 @@ def main(argv):
     if argv and argv[0] == 'check':
         rep = None
         if '--report' in argv: k = argv.index('--report'); rep = argv[k + 1]; del argv[k:k + 2]
-        steps = steps or list(CHECK_STEPS)
-        if len(argv) != 2 or any(s not in CHECK_ALLOWED for s in steps): raise SystemExit(__doc__)
+        skip = []
+        if '--skip' in argv: k = argv.index('--skip'); skip = argv[k + 1].split(','); del argv[k:k + 2]
+        steps = [s for s in (steps or list(CHECK_STEPS)) if s not in skip]
+        if len(argv) != 2 or not steps or any(s not in CHECK_ALLOWED for s in steps + skip): raise SystemExit(__doc__)
         sys.exit(run_check(argv[1], [s for s in ALL if s in steps], names, rep))
     if len(argv) != 2 or not steps or any(s not in ALL for s in steps): raise SystemExit(__doc__)
     ol = os.path.join(argv[0], 'tr8', 'pc-w', 'objectlist.txt')

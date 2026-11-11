@@ -408,7 +408,7 @@ STRUCT_STEPS = STRUCT_STEPS[:STRUCT_STEPS.index('seqrepeat')] + Q5_STEPS + STRUC
 for _s in Q5_STEPS: globals()['fix_' + _s] = _struct_fix(_s)
 # Q32 (2026-11-11, workspace docs Befund-Introtyped-1111.md, decision 7): unitcurve = the 64 u16 curve words of the
 # unit-DTP curve records (tools/unit_curve_fix.py, base proof once per process), after the Q5 steps, before seqrepeat;
-# gated by dlc_struct_fixes.py check --steps unitcurve (default gate once enabled in its CHECK_STEPS)
+# gated by dlc_struct_fixes.py check (in its default CHECK_STEPS since 2026-11-11; older trees: --skip unitcurve)
 Q32_STEPS = ('unitcurve',)
 STRUCT_STEPS = STRUCT_STEPS[:STRUCT_STEPS.index('seqrepeat')] + Q32_STEPS + STRUCT_STEPS[STRUCT_STEPS.index('seqrepeat'):]
 for _s in Q32_STEPS: globals()['fix_' + _s] = _struct_fix(_s)
