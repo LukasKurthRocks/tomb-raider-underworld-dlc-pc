@@ -18,8 +18,28 @@ Befund-TU-Funktionen L4, Befund-Kostuem-Reset-DLC1).
 
 | 0.5 TU costume mapping (`[Costume] TuMapping`, default 0) | state save 0x821fef58 (0x821ff0dc..0x821ff118): current == id(`doppelganger_casual`) -> `+0x20c` = id(`lara_doppelganger`); state load 0x821ff1e0 (0x821ff518..0x821ff540): `+0x20c` == id(`lara_doppelganger`) -> current = id(`doppelganger_casual`); spawns 0x822973b0 (0x822976b0..0x822976d8) and 0x82297f10 (0x8229803c..0x82298064): record `+0x50` == id(`lara_doppelganger`) -> current and `+0x50` = id(`doppelganger_casual`) | detours tru+0x155cb1 (save, 13 bytes), tru+0x156fbd (load, 13), tru+0x1d42e9 (player spawn tru+0x1d40c0, 5), tru+0x1d4469 (costume-switch spawn tru+0x1d4340, record 0xe7f2a0, 8); name lookup tru+0x1bf770 (= TU 0x822809e0) at every call; all four or none; needs `TypeRecord=1` + `Costume=1` |
 
+| 0.6 level start from the game (`[Mission] DialogStart`, default 1) | yes / no dialog accept `ScriptDialogYesNo::RegisterAcceptChanges` 0x8247f0c0, case 8 0x8247f2c8..0x8247f510: `sel` = 0 for `dlc_level2_start` .. `dlc_level6_start` (string table 0x820760f8), else 1; `MainTracker_UILoadLevel(name, sel, 0, 1)` | PC 0x77e790 case 8 (retail code: `UILoadLevel(name, 1, 0, 0)` inlined, always the outfit selection): the 35 bytes 0x77e8c0..0x77e8e3 jump to a stub that calls f27 0x77e170(name, sel, 0, 1); the PC's own case tail follows |
+
 Every patched byte is compared with the expected code / data first; on a mismatch that part is left alone and the
 reason is logged.
+
+### 0.6: DLC 2 from the pause menu without the outfit selection (Befund-Kostuemauswahl-DLC2-1111)
+
+Live 2026-11-10 21:12: DLC 2 started from inside DLC 1 (pause ring -> DLC -> mission screen -> "Wenn Sie ein neues
+Spiel starten ..." -> yes) showed the outfit selection, Lara was loaded in the chosen outfit (no `level load`
+costume line in TruDlc2Player.log, DoppelgangerInit only after a manual `costume.set 11`). Started from the main menu,
+DLC 2 has no selection (script 104 as the TU, pipeline step S104). The difference is exe code: in a running game
+script 104 function 9 (the same as TU script 134 function 9 in this branch) opens the yes / no dialog with action 8,
+and the dialog's accept handler starts the level. Retail and PC: `UILoadLevel(name, 1, 0, 0)` (always the selection,
+the chosen costume stays); TU: `UILoadLevel(name, 0 for dlc_level2..6_start else 1, 0, 1)` - the 4th argument 1 also
+runs the new-game block with the costume reset, so the unit default `lara_doppelganger` (-> `doppelganger_casual`,
+0.1) is loaded. `DialogStart=1` translates the rule and the call; DLC 1 keeps its selection (as on the TU).
+Not ported: the TU's tailoring reset to Medium in the same case (`EnemyHP` / `AmmoAdj` / `PlayerHP` /
+`SavingGrabAdj` via 0x822a2b50, whose PC partner is not identified) - on PC the player's tailoring stays as it was
+(f27 keeps it across the reset); and the TU-only byte store `0x1f94(0x829be044) = 0` after the case. Byte checks:
+`work/asi/dlc2p06/prechecks_dlc2p06.txt` (8 / 8 ok against tru.exe md5 5560abac...); patch site:
+`tools/pe_patch_site_check.py` (no branch into the 35 bytes). Log: one line per start (`dialog start N: level ...`)
+and the selection byte after f27.
 
 ### 0.5: the TU's costume mapping 857 <-> 11 (Befund-Kostuem-Reset-DLC1 section 7)
 
@@ -75,6 +95,7 @@ DLC 2 (TruMenu `costume.choose doppelganger_casual`) is reset as well; `CostumeR
 | `CostumeReset` | 1 | 0.3: chosen-costume reset outside DLC 2 (needs `Costume=1`, same detour) |
 | `TrackerFlag` | 1 | 0.4: DoppelgangerInit also stores game tracker +0x1244 = 1 (TU 0x82412c84) |
 | `[Costume] TuMapping` | 0 | 0.5: the TU's 857 <-> 11 mapping in state save / load / both spawns (needs `TypeRecord=1`, `Costume=1`; 0 = nothing patched, as 0.4) |
+| `[Mission] DialogStart` | 1 | 0.6: a level started from the game (pause menu -> DLC, dialog accept case 8) as the TU: `dlc_level2..6_start` without the outfit selection, every level with the new-game reset (independent of the other keys; 0 = nothing patched, as 0.5) |
 
 ## Log lines (`TruDlc2Player.log` next to `tru.exe`)
 
@@ -131,3 +152,19 @@ Back up the saves first (a save written with `TuMapping=1` holds 11 in the chose
    +0x20c 11 ...)` and normal Lara.
 6. A `costume map ... (player spawn ...)` / `(switch spawn ...)` line appears only when a spawn sees 11 - rare on PC
    (the level load already loads 857); none is expected in a normal run.
+
+## Test (0.6, build `work\asi\dlc2p06`)
+
+Install with `Set-TruDlc2Player.ps1 -Install -SourceDir work\asi\dlc2p06` (game closed; an edited .ini is kept - the
+built-in default `DialogStart=1` applies when the key is missing).
+
+1. Start: `TruDlc2Player 0.6 loaded (... [Mission] dialog start 1)`, `dialog start: RegisterAcceptChanges case 8 ...
+   (detour at 0x0077e8c0, 35 bytes)`.
+2. Main menu -> DLC -> DLC 2: no outfit screen, doppelganger (unchanged, script 104); no `dialog start` line.
+3. In DLC 1: pause -> DLC -> DLC 2 -> yes: `dialog start 1: level "dlc_level2_start" ... f27 UILoadLevel(..., 0, 0, 1)
+   ... without costume / weapon selection`, `selection byte [0x00fae8d9] = 0`, then `level load N: costume
+   "lara_doppelganger" -> doppelganger_casual (... chosen +0x20c 0 ...)` and `DoppelgangerInit finished`; no outfit
+   screen in the game.
+4. In DLC 2: pause -> DLC -> DLC 1 -> yes: `dialog start N: level "dlc_level1_start" ... 1, 0, 1 ... WITH costume /
+   weapon selection`; the outfit screen appears (as on the TU), Lara in the chosen outfit.
+5. If the game crashes or hangs after "yes": `DialogStart=0` and send TruDlc2Player.log + TruMenu.log.

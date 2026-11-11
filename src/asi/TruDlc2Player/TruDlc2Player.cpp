@@ -90,6 +90,29 @@
 // 0x822973b0 got a validity test + unit-default fallback before the mapping (0x82297688..0x822976ac; retail and PC
 // have none there). With the mapping a PC save written in DLC 2 holds 11 like the TU's; the level load turns 11 into
 // doppelganger_casual (0.1) and outside DLC 2 the 0.3 reset zeroes it (both names are handled there).
+//
+// 0.6 (2026-11-11, Q7, docs Befund-Kostuemauswahl-DLC2-1111.md): DLC 2 started from the game (pause menu -> DLC ->
+// mission screen -> yes / no dialog) without the outfit / weapon selection, as the TU. That start is not script code:
+// the dialog's accept handler ScriptDialogYesNo::RegisterAcceptChanges (TU 0x8247f0c0, retail 0x824796a0, PC tru+0x37e790
+// - xbox_pc_map "string, verified") switches on the pending action [0xfae918]; case 8 (jump table tru+0x37e97c entry 7)
+// starts the level named by the dialog. Retail 0x82479884..0x824798a8 and PC tru+0x37e8a9..0x37e8e3 (UILoadLevel
+// inlined with the 4th argument 0: selection byte [0xfae8d9] = 1, game data +0x90 = 0 twice, tru+0x1dfb20(name, 0)):
+//     MainTracker_UILoadLevel(&name, 1, 0, 0)          -> always the selection (main state 9), chosen costume kept
+// TU 0x8247f2c8..0x8247f510:
+//     (tailoring reset to Medium, see below), print "Attempting to load level: %s",
+//     sel = name in {dlc_level2_start, dlc_level3_start, dlc_level4_start, dlc_level5_start, dlc_level6_start}
+//           (string table 0x820760f8..0x82076148, byte compare = strcmp) ? 0 : 1
+//     MainTracker_UILoadLevel(&name, sel, 0, 1)        -> 4th argument 1: the new-game block with reset 0x821fe9a8
+// MainTracker_UILoadLevel is unchanged by the TU (TU 0x8247d818 = retail 0x82477dc0, moved-equal) and is PC uigamedata
+// f27 tru+0x37e170 (its arg-4 = 0 tail tru+0x37e411..0x37e434 is exactly the inlined PC case 8). DialogStart replaces
+// the 35 bytes tru+0x37e8c0..0x37e8e3 (whole instructions, no branch into them: tools/pe_patch_site_check.py) with a
+// jump to AcceptStartLevel, which calls f27(&name, sel, 0, 1) as the TU does; the PC's own case-8 tail (vcall +0x148,
+// stdscreenmgr f7 / f19) follows unchanged. With sel 0 and the reset the level load takes the unit default (dlc_level2
+// _start: lara_doppelganger -> doppelganger_casual by 0.1), as the main-menu start (script 104 as the TU) already does.
+// Not ported (documented in the Befund): the TU's tailoring reset in the same case (four calls 0x822a2b50 "EnemyHP" /
+// "AmmoAdj" / "PlayerHP" / "SavingGrabAdj" with the old value, then game data +0x3efa0 / a4 / ac / b0 / b4 = 1; PC
+// +0x3ef98 / 9c / a4 / a8 / ac by the +8 shift of UILoadLevel's saved fields - the PC partner of 0x822a2b50 is not
+// identified) and the TU-only `stb 0, 0x1f94(0x829be044)` after the case.
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -169,11 +192,37 @@ const DWORD kSpawnRecordB = 0x00e7f2a0;    // TU 0x83208430 (spawn 0x82297f10's 
 const DWORD kSpawnCall = 0x005d4471;       // call 0x5bd080 (TU 0x82270fa0) right after the switch-spawn site
 const char *const kSpawnCallHex = "e80a8cfeff";
 
+// ---- 0.6: dialog accept case 8 as the TU (RegisterAcceptChanges TU 0x8247f2c8..0x8247f510), [Mission] DialogStart ----
+const DWORD kAcceptFn = 0x0077e790;        // RegisterAcceptChanges: mov eax,[0FAE914h]; sub esp,8; push ebx/ebp/esi/edi
+const char *const kAcceptFnHex = "a114e9fa00 83ec08 53 55 56 57";
+const DWORD kAcceptSwitch = 0x0077e7b4;    // mov eax,[0FAE918h]; mov ebp,[esp+14h]; add eax,-1; xor ebx,ebx; cmp eax,0Ah;
+const char *const kAcceptSwitchHex = "a118e9fa00 8b6c2414 83c0ff 33db 83f80a 0f877a010000 ff24857ce97700";  // ja; jmp [tbl]
+const DWORD kAcceptTable = 0x0077e97c;     // jump table, entry 7 = case 8
+const DWORD kCase8 = 0x0077e8a9;           // cmp ebp,ebx; je out; mov edx,[esp+10h]; mov eax,[0C59268h]; mov [0FAE914h],edx
+const char *const kCase8Hex = "3beb 0f8499000000 8b542410 a16892c500 891514e9fa00";
+const DWORD kCase8Site = 0x0077e8c0;       // the inlined UILoadLevel(&name, 1, 0, 0), 35 bytes, whole instructions
+const char *const kCase8SiteHex = "c605d9e8fa0001 899890000000 8b0d6492c500 53 55 899990000000 e84012e6ff 83c408";
+const DWORD kCase8Back = 0x0077e8e3;       // call 0x5a48d0 (the PC's own case-8 tail)
+const char *const kCase8BackHex = "e8e85fe2ff";
+const DWORD kUiLoadLevel = 0x0077e170;     // uigamedata f27 = MainTracker_UILoadLevel (TU 0x8247d818 = retail 0x82477dc0)
+const char *const kUiLoadLevelHex = "55 8bec 83e4f8 81ec54020000 807d0c00 8b4508 8b08 53 0f95c2 807d1400 56 57 894c2448 "
+                                    "8815d9e8fa00 0f8472020000";
+const DWORD kUiLoadTail = 0x0077e411;      // f27's 4th-argument-0 path = the PC's inlined case 8
+const char *const kUiLoadTailHex = "8b0d6892c500 33c0 898190000000 8b156492c500 8b4c2448 898290000000 8b4510 50 51 "
+                                   "e8e716e6ff";
+const DWORD kSelectByte = 0x00fae8d9;      // costume / weapon selection (TU 0x829ca6d2)
+// TU string table 0x820760f8 .. 0x82076148, in the TU's order
+const char *const kNoSelectUnits[] = {"dlc_level2_start", "dlc_level3_start", "dlc_level4_start", "dlc_level5_start",
+                                      "dlc_level6_start"};
+typedef void(__cdecl *UiLoadLevelFn)(const DWORD *args, int select, int arg3, int newGame);
+
 // options (TruDlc2Player.ini, section [Dlc2Player])
 int g_enabled = 1, g_logLevel = 1, g_costume = 1, g_typeRecord = 1, g_flagReset = 1, g_costumeReset = 1;
 int g_trackerFlag = 1;                     // 0.4: DoppelgangerInit also stores [[0xfadb58]]+0x1244 = 1 (TU 0x82412c84)
 int g_tuMapping = 0;                       // 0.5: [Costume] TuMapping - the TU's 857 <-> 11 in save / load / spawns
 volatile LONG g_mapCount = 0;              // 0.5: mappings done (each one logged)
+int g_dialogStart = 1;                     // 0.6: [Mission] DialogStart - dialog accept case 8 as the TU
+volatile LONG g_dialogStarts = 0;          // 0.6: case-8 starts done (each one logged)
 const DWORD kTrackerPtr = 0x00fadb58;      // TU 0x829892b0 (the game tracker / player state block)
 const DWORD kTrackerFlag = 0x1244;         // TU flag byte, read by larabase f36 tru+0x377dc0 and tru+0x3200df
 const DWORD kF36Body = 0x00777dc0;         // larabase f36 body: mov eax,[0FADB58h]; mov al,[eax+1244h]; ret
@@ -726,6 +775,73 @@ bool PatchTuMapping() {
     return true;
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// 0.6: dialog accept case 8 (start a level from the game) as the TU, 0x8247f2c8..0x8247f510 (see the header)
+extern "C" void __cdecl AcceptStartLevel(const char *name) {
+    static DWORD args[1];                  // the DataValue f27 reads its name from (TU: &local 0x60); f27 copies the name
+    LONG n = InterlockedIncrement(&g_dialogStarts);
+    char shown[64];
+    SafeName(name ? name : "", shown, sizeof(shown));
+    int select = 1;                        // TU 0x8247f3c8..0x8247f4dc: five byte-compare loops (= strcmp)
+    for (const char *u : kNoSelectUnits)
+        if (strcmp(shown, u) == 0) select = 0;
+    Log(1, "dialog start %ld: level \"%s\" (RegisterAcceptChanges case 8) -> f27 UILoadLevel(\"%s\", %d, 0, 1) as the TU "
+           "0x8247f510: %s; 4th argument 1 = new-game block with the costume reset (PC retail code: (\"%s\", 1, 0, 0))",
+        n, shown, shown, select,
+        select ? "WITH costume / weapon selection (not dlc_level2..6_start)"
+               : "without costume / weapon selection (TU: \"Attempting to load DLC2 starting unit without "
+                 "costume/weapon selection.\")", shown);
+    args[0] = reinterpret_cast<DWORD>(name);
+    __try {
+        reinterpret_cast<UiLoadLevelFn>(kUiLoadLevel)(args, select, 0, 1);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log(0, "dialog start %ld: exception 0x%08lx in f27 UILoadLevel(\"%s\", %d, 0, 1)", n, GetExceptionCode(), shown,
+            select);
+        return;
+    }
+    BYTE sel = 0xff;
+    __try { sel = *reinterpret_cast<volatile BYTE *>(kSelectByte); } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    Log(1, "dialog start %ld: f27 returned, selection byte [0x%08lx] = %u", n, kSelectByte, sel);
+}
+
+// replaces tru+0x37e8c0..0x37e8e3 (ebp = the level name, ebx = 0; eax / ecx / edx are free - the original code
+// overwrites them and the tail's call 0x5a48d0 returns in eax)
+DWORD g_case8Back = kCase8Back;
+
+__declspec(naked) void AcceptCase8Detour() {
+    __asm {
+        pushad
+        push ebp
+        call AcceptStartLevel
+        add esp, 4
+        popad
+        jmp dword ptr [g_case8Back]
+    }
+}
+
+bool PatchDialogStart() {
+    DWORD entry = 0;
+    if (!HexBytesAt(kAcceptFn, kAcceptFnHex) || !HexBytesAt(kAcceptSwitch, kAcceptSwitchHex) ||
+        !ReadDword(kAcceptTable + 7 * 4, &entry) || entry != kCase8 || !HexBytesAt(kCase8, kCase8Hex) ||
+        !HexBytesAt(kCase8Site, kCase8SiteHex) || !HexBytesAt(kCase8Back, kCase8BackHex) ||
+        !HexBytesAt(kUiLoadLevel, kUiLoadLevelHex) || !HexBytesAt(kUiLoadTail, kUiLoadTailHex)) {
+        Log(0, "dialog start: RegisterAcceptChanges 0x%08lx / case 8 0x%08lx (table entry 0x%08lx) / site 0x%08lx / f27 "
+               "0x%08lx does not match - not patched (DLC 2 from the game keeps the outfit selection)", kAcceptFn, kCase8,
+            entry, kCase8Site, kUiLoadLevel);
+        return false;
+    }
+    BYTE code[35];
+    memset(code, 0x90, sizeof(code));
+    code[0] = 0xe9;
+    DWORD rel = reinterpret_cast<DWORD>(&AcceptCase8Detour) - (kCase8Site + 5);
+    memcpy(code + 1, &rel, 4);
+    if (kCase8Back - kCase8Site != sizeof(code) || !WriteCode(kCase8Site, code, sizeof(code))) return false;
+    Log(1, "dialog start: RegisterAcceptChanges case 8 (a level started from the game, e.g. pause menu -> DLC) calls f27 "
+           "UILoadLevel(name, 0 for dlc_level2..6_start else 1, 0, 1) as the TU 0x8247f2c8..0x8247f510 (detour at "
+           "0x%08lx, 35 bytes); DLC 2 starts without the outfit selection", kCase8Site);
+    return true;
+}
+
 void ReadOptions(const char *dir) {
     char ini[MAX_PATH];
     _snprintf_s(ini, sizeof(ini), _TRUNCATE, "%sTruDlc2Player.ini", dir);
@@ -737,6 +853,7 @@ void ReadOptions(const char *dir) {
     g_costumeReset = GetPrivateProfileIntA("Dlc2Player", "CostumeReset", 1, ini);
     g_trackerFlag = GetPrivateProfileIntA("Dlc2Player", "TrackerFlag", 1, ini);
     g_tuMapping = GetPrivateProfileIntA("Costume", "TuMapping", 0, ini);      // 0.5, default 0 = as 0.4
+    g_dialogStart = GetPrivateProfileIntA("Mission", "DialogStart", 1, ini);  // 0.6, 0 = as 0.5
 }
 
 void Start(HMODULE self) {
@@ -746,9 +863,9 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDlc2Player.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDlc2Player 0.5 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
-           "reset %d, tracker flag %d, [Costume] TU mapping %d)", g_enabled, g_logLevel, g_costume, g_typeRecord,
-        g_flagReset, g_costumeReset, g_trackerFlag, g_tuMapping);
+    Log(1, "TruDlc2Player 0.6 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
+           "reset %d, tracker flag %d, [Costume] TU mapping %d, [Mission] dialog start %d)", g_enabled, g_logLevel,
+        g_costume, g_typeRecord, g_flagReset, g_costumeReset, g_trackerFlag, g_tuMapping, g_dialogStart);
     if (!g_enabled) { Log(1, "disabled by TruDlc2Player.ini - nothing patched"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - not patched", base, kImageBase); return; }
@@ -772,6 +889,10 @@ void Start(HMODULE self) {
     }
     if (g_flagReset) PatchFlagReset();
     else Log(1, "flag reset: off ([Dlc2Player] FlagReset=0) - the flag stays set after DLC 2 for the whole session");
+    // 0.6: independent of the costume patches (the TU rule decides only the selection and the new-game reset)
+    if (g_dialogStart) PatchDialogStart();
+    else Log(1, "dialog start: off ([Mission] DialogStart=0) - a level started from the game (pause menu -> DLC) keeps "
+                "the PC / retail UILoadLevel(name, 1, 0, 0): always the outfit selection");
 }
 
 }  // namespace
@@ -787,9 +908,9 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported: plugin identification, and the TU's gameTracker+0x1244 for other plugins (1 after DoppelgangerInit)
 extern "C" __declspec(dllexport) const char *TruDlc2PlayerVersion() {
-    return "TruDlc2Player 0.5 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
+    return "TruDlc2Player 0.6 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
            "reset outside DLC 2, game tracker +0x1244 as the TU, [Costume] TuMapping 857 <-> 11 in save / load / "
-           "spawns)";
+           "spawns, [Mission] DialogStart: DLC 2 from the game without the outfit selection as the TU)";
 }
 
 extern "C" __declspec(dllexport) int TruDlc2PlayerDoppelganger() {
