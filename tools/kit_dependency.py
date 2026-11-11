@@ -20,6 +20,9 @@ Usage (from the repository root):
             B270 kit work/b270_kit/kit/manifest.json, its files from work/b270_kit/mods (tools/kit_rebuild.py output);
             independent trees <run>/dlc1/mods, <run>/dlc2/mods, work/rebuild/costumes_0913/<pack>/stage2b/mods;
             kit-based trees <run>_repair/b138_fixes/mods, <run>_gb/generalbank_build/mods
+  --own OWN_DIR (2026-11-11): the assembled own tree of tools/own_tree.py (OWN_DIR/mods, OWN_DIR/exe/tru.exe) is the
+            only tree; its manifest's kit_derived column decides 'kit_based'. --b138-mods DIR: where the B138 kit
+            files are when <run>_repair does not exist (read only, e.g. work/rebuild/pipeline_check_1011_repair/...)
 """
 import sys, os, json, hashlib, collections
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -107,13 +110,25 @@ def main(argv):
     run = arg(argv, '--run', 'work/rebuild/pipeline_check_1011')
     tsv = arg(argv, '--tsv', 'docs/data/kit_dependency.tsv')
     md = arg(argv, '--md', 'work/kitdep_1011/summary.md')
+    own = arg(argv, '--own')
+    b138_mods = arg(argv, '--b138-mods', run + '_repair/b138_pristine/mods')
     nosec = '--no-sections' in argv
-    kits = [('B138', '../release/B138/kit/manifest.json', run + '_repair/b138_pristine/mods'),
+    kits = [('B138', '../release/B138/kit/manifest.json', b138_mods),
             ('B270', 'work/b270_kit/kit/manifest.json', 'work/b270_kit/mods')]
     indep = [('dlc1', run + '/dlc1/mods'), ('dlc2', run + '/dlc2/mods')]
     for pk in ('pack1', 'pack2', 'pack20'):
         indep.append(('cost_' + pk, 'work/rebuild/costumes_0913/%s/stage2b/mods' % pk))
     based = [('repair', run + '_repair/b138_fixes/mods'), ('gb', run + '_gb/generalbank_build/mods')]
+    if own:
+        # the assembled own tree is the only tree; files its manifest marks kit_derived count as 'kit_based'
+        indep, based = [('own', own + '/mods'), ('own_exe', own + '/exe')], []
+        mp = os.path.join(own, 'own_manifest.tsv')
+        kd = set()
+        if os.path.isfile(mp):
+            for ln in open(mp, encoding='utf-8').read().splitlines()[1:]:
+                c = ln.split('\t')
+                if len(c) > 6 and c[6] == 'yes': kd.add(c[0].lower())
+        if kd: raise SystemExit('own tree has kit_derived files (%s): not supported with --own' % ', '.join(sorted(kd)))
     for l, d in indep + based:
         print('tree %-12s %s %s' % (l, d, 'ok' if os.path.isdir(d) else 'MISSING'))
     b90 = {}
@@ -186,7 +201,7 @@ def main(argv):
         f.write('\t'.join(cols) + '\n')
         for r in rows: f.write('\t'.join(str(r[c]) for c in cols) + '\n')
     # summary
-    L = ['# Kit dependency (tools/kit_dependency.py)', '', 'run: `%s`' % run, '']
+    L = ['# Kit dependency (tools/kit_dependency.py)', '', ('own tree: `%s`' % own) if own else ('run: `%s`' % run), '']
     for kname, _, _ in kits:
         rs = [r for r in rows if r['kit'] == kname]
         c = collections.Counter(r['cls'] for r in rs)

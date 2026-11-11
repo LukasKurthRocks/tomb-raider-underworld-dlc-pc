@@ -2,16 +2,25 @@ r"""The own mods tree from our pipeline outputs only (no file of the B138 / B270
 the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
 
   assemble OUT_DIR [--run work/rebuild/pipeline_check_1011] [--costumes work/rebuild/costumes_0913]
+                   [--generalbank pc|k12] [--no-lang] [--exe FILE]
       copies the pipeline outputs, in this order (a later layer wins for a file two layers have; every overlap is
       listed with "same" / "DIFFERENT"):
         dlc1         <run>/dlc1/mods                        step Fixes (-FixesOut <run>), DLC 1 tree (B138 layout)
         dlc2         <run>/dlc2/mods                        step Fixes, DLC 2 tree
         cost_<pack>  <costumes>/<pack>/stage2b/mods         step Costumes; only dlc_costume_*.drm (images / lists of
                                                             the costume trees are the DLC 1 tree's, docs/COSTUMES.md)
-        globalsound  work/rebuild/globalsound/mods          step Globalsound (kit-free: PC original + TU edit)
-        generalbank  <run>_gb/generalbank_build/k12/mods    step Generalbank (K12 file); its INPUT is still B138's
-                                                            generalbank.drm -> marked kit_derived
-      and the exe of step Exe (work/rebuild/exe/tru.exe) to OUT_DIR/exe/ (not part of mods).
+        lang         <run>/lang/mods                        step Lang (2026-11-11, R10): the 60 language variants of
+                     (else work/rebuild/lang/mods)          the DLC cinematics / DLC 1 radio lines (replaces the
+                                                            carry-over list carry_lang.txt); --no-lang leaves it out
+        globalsound  <run>/globalsound/mods                 step Globalsound (kit-free: PC original + TU edit)
+                     (else work/rebuild/globalsound/mods)
+        generalbank  --generalbank pc (default since 2026-11-11): <run>/generalbank_pc/mods (else
+                     work/rebuild/generalbank_pc/mods), step Generalbank = PC patch.000 generalbank + recorded
+                     knowledge + ring P14 + TU camera DTPs, no kit input;
+                     --generalbank k12: <run>_gb/generalbank_build/k12/mods, the old K12 file whose INPUT is B138's
+                     generalbank.drm -> marked kit_derived
+      and the exe of step Exe (<run>/exe/tru.exe, else work/rebuild/exe/tru.exe; --exe FILE) to OUT_DIR/exe/ (not
+      part of mods).
       DROP: pipeline outputs a played tree must not have (g_pda.drm, finding 40); ALIAS: byte copies of a pipeline
       output under a name the game asks for and no step writes yet (loading_bg_dlc1/2.raw_004) - both with the
       evidence in the table below, both listed in assemble_overlaps.tsv.
@@ -39,11 +48,14 @@ the installed game (2026-11-11, docs Befund-Eigener-Baum-1111.md).
       Writes DIR/compare.tsv (one row per file), DIR/regressions.tsv (one row per (file, install) with sections the
       own tree lacks), DIR/sections.tsv (one row per differing section) and DIR/summary.md.
 
-  report DIR
-      read-only: per event and state the differing section types and files of a compare run -> DIR/breakdown.md.
+  report DIR [--out FILE]
+      read-only: per event and state the differing section types and files of a compare run, and the counts per
+      regression class R1-R13 (Befund-Eigener-Baum-1111.md) -> DIR/breakdown.md (or FILE).
 
 Usage (from the repository root):
   ../bin/pyt -t 600 tools/own_tree.py assemble work/own_1011
+  ../bin/pyt -t 900 tools/own_tree.py assemble work/own_1111 --run work/rebuild/pipeline_check_1111b
+        (Fixes + Lang + Generalbank + Exe + Globalsound all run with -FixesOut work/rebuild/pipeline_check_1111b)
   ../bin/pyt -t 5400 tools/own_tree.py compare work/own_1011/mods ../data/pc/mods --backup ../backup --logs ../logs
         --out work/own_1011/compare --manifest work/own_1011/own_manifest.tsv
 """
@@ -113,28 +125,48 @@ ALIAS = [('image/loading_bg_dlc1.raw', 'image/loading_bg_dlc1.raw_004',
          ('image/loading_bg_dlc2.raw', 'image/loading_bg_dlc2.raw_004', 'as loading_bg_dlc1.raw_004')]
 
 
-def layers(run, costumes):
+def in_run(run, sub, fallback):
+    """a side step's output of this run (-FixesOut <run> puts it below <run>), else the step's usual folder"""
+    p = run + '/' + sub
+    return p if os.path.exists(p) else fallback
+
+
+def layers(run, costumes, gb='pc', lang=True):
     L = [('dlc1', 'Fixes (DLC 1, -FixesOut %s)' % run, run + '/dlc1/mods', None, False),
          ('dlc2', 'Fixes (DLC 2, -FixesOut %s)' % run, run + '/dlc2/mods', None, False)]
     for pk in ('pack1', 'pack2', 'pack20'):
         L.append(('cost_' + pk, 'Costumes (%s)' % costumes, '%s/%s/stage2b/mods' % (costumes, pk), 'dlc_costume_*.drm', False))
-    L.append(('globalsound', 'Globalsound', 'work/rebuild/globalsound/mods', None, False))
-    L.append(('generalbank', 'Generalbank (K12; input = B138 generalbank.drm)', run + '_gb/generalbank_build/k12/mods', None, True))
+    if lang:
+        L.append(('lang', 'Lang (language variants, R10)', in_run(run, 'lang/mods', 'work/rebuild/lang/mods'), None, False))
+    L.append(('globalsound', 'Globalsound', in_run(run, 'globalsound/mods', 'work/rebuild/globalsound/mods'), None, False))
+    if gb == 'k12':
+        L.append(('generalbank', 'Generalbank (K12; input = B138 generalbank.drm)', run + '_gb/generalbank_build/k12/mods', None, True))
+    elif gb == 'pc':
+        L.append(('generalbank', 'Generalbank (PC basis: patch.000 + knowledge + ring P14 + TU camera DTPs)',
+                  in_run(run, 'generalbank_pc/mods', 'work/rebuild/generalbank_pc/mods'), None, False))
+    else:
+        raise SystemExit('--generalbank must be pc or k12: %s' % gb)
     return L
 
 
 def assemble(argv):
-    run = arg(argv, '--run', 'work/rebuild/pipeline_check_1011')
+    run = arg(argv, '--run', 'work/rebuild/pipeline_check_1011').replace('\\', '/').rstrip('/')
     costumes = arg(argv, '--costumes', 'work/rebuild/costumes_0913')
-    exe = arg(argv, '--exe', 'work/rebuild/exe/tru.exe')
+    gb = arg(argv, '--generalbank', 'pc')
+    lang = '--no-lang' not in argv
+    if not lang: argv.remove('--no-lang')
+    exe = arg(argv, '--exe', in_run(run, 'exe/tru.exe', 'work/rebuild/exe/tru.exe'))
     outdir = argv[0]
     mods = os.path.join(outdir, 'mods')
     if os.path.exists(mods): raise SystemExit('exists already: %s (remove it first)' % mods)
-    lay = layers(run, costumes)
-    for name, step, d, pat, kd in lay:
+    lay = layers(run, costumes, gb, lang)
+    for name, step, d, pat, kd in lay + [('exe', 'Exe', exe, None, False)]:
         low = d.replace('\\', '/').lower()
         if any(f.replace('\\', '/') in low for f in FORBIDDEN):
             raise SystemExit('refused: layer %s reads a kit / kit-based tree: %s' % (name, d))
+        if name == 'exe':
+            if not os.path.isfile(d): raise SystemExit('missing exe: %s' % d)
+            continue
         if not os.path.isdir(d): raise SystemExit('missing layer %s: %s' % (name, d))
     files = collections.OrderedDict()      # rel_lower -> dict
     overlaps, skipped = [], collections.Counter()
@@ -521,9 +553,37 @@ def compare(argv):
     print('wrote', outd)
 
 
+R5_SOURCES = ('dlc_test51i_ids', 'crash17m', 'dopp17m', 'treecer', 'dlc_test51v_fix26_15f', 'meleefix_0711', 'genfix_0711',
+              'costumefix_0711', 'moan_0711', 'dlc_test51c_objfx', 'caverns74_0711')
+
+
+def r_class(rel, typ, who, src, state):
+    """regression class of one differing section (sections.tsv row) - the table of Befund-Eigener-Baum-1111.md:
+    R1 N6b shaders, R2 other shader trees, R3 grapple ring (DLC 1), R4 B270 data words (b270cmp), R5 data words of other
+    test trees, R6 shadow meter HUD (generalbank), R7 ring menu P14, R8 lock-on K-5b, R9 texts, R10 language variants
+    (only_installed files, see report), R12 UI records test 34, R13 objlist.dat; 'added' = files a 30.10. play tree
+    added (no before state), 'base' = first installed state"""
+    r, s = rel.lower(), (src or '').replace('\\', '/').lower()
+    if who == 'base': return 'base'
+    if r.startswith('dlc1_ei_grapple_'): return 'R3'
+    if 'fix_lock_1011' in s: return 'R8'
+    if 'dlc_test50l_hud' in s: return 'R6'
+    if 'ring_p14' in s: return 'R7'
+    if 'dlc_text' in s: return 'R9'
+    if 'dlc_test34_records' in s: return 'R12'
+    if r.endswith('objlist.dat'): return 'R13'
+    if state == 'added_file_differs': return 'added'
+    if typ in ('shaderlib', 'material'):
+        return 'R1' if ('/n6b' in s or 'tree_n6b' in s) else 'R2'
+    if 'b270cmp' in s: return 'R4'
+    if any(x in s for x in R5_SOURCES): return 'R5'
+    return 'other (%s %s)' % (src, typ)
+
+
 def report(argv):
     """breakdown of a compare run (DIR/sections.tsv + compare.tsv): per event and state the section types and files;
-    writes DIR/breakdown.md"""
+    writes DIR/breakdown.md (--out FILE: there instead)"""
+    outf = arg(argv, '--out')
     d = argv[0]
     rows = [ln.split('\t') for ln in open(os.path.join(d, 'sections.tsv'), encoding='utf-8').read().splitlines()[1:]]
     comp = [ln.split('\t') for ln in open(os.path.join(d, 'compare.tsv'), encoding='utf-8').read().splitlines()]
@@ -543,13 +603,32 @@ def report(argv):
         fs = sorted(files[(who, st)])
         L.append('| %s | %s | %s | %s | %d: %s |' % (who, src.get(who, '-'), st, ', '.join('%s %d' % kv for kv in sorted(c.items())),
                                                   len(fs), ', '.join('`%s`' % f for f in fs[:12]) + (' ...' if len(fs) > 12 else '')))
+    # the regression classes R1-R13 of docs Befund-Eigener-Baum-1111.md (N1), so two compare runs can be set side by side
+    cls_c = collections.defaultdict(collections.Counter)
+    cls_f = collections.defaultdict(set)
+    for rel, sec, t, who, s, st in rows:
+        base_t = t.split('_', 1)[1] if t.startswith(('ownonly_', 'instonly_')) else t
+        rc = r_class(rel, base_t, who, s, st)
+        cls_c[rc][st] += 1
+        cls_f[rc].add(rel)
+    for r in comp:
+        if r['cls'] == 'only_installed':
+            rc = 'R10' if re.search(r'\.mul_\d+$', r['rel'].lower()) else 'only_installed (%s)' % r.get('producer_src', '-')
+            cls_c[rc]['only_installed_file'] += 1
+            cls_f[rc].add(r['rel'])
+    states = ['fix_missing', 'changed_differently', 'section_missing_in_own', 'added_file_differs', 'no_before',
+              'base_differs', 'only_installed_file']
+    L += ['', '## Regression classes (R1-R13 of Befund-Eigener-Baum-1111.md)', '',
+          '| class | files | ' + ' | '.join(states) + ' |', '|---|---|' + '---|' * len(states)]
+    for rc in sorted(cls_c, key=lambda k: (not k.startswith('R'), int(re.sub(r'\D', '', k) or 0) if k.startswith('R') else 0, k)):
+        L.append('| %s | %d | %s |' % (rc, len(cls_f[rc]), ' | '.join(str(cls_c[rc][s]) for s in states)))
     L += ['', '## Files per class and own layer', '', '| class | own layer | files |', '|---|---|---|']
     for (cl, ly), n in sorted(collections.Counter((r['cls'], r['own_layer']) for r in comp).items()):
         L.append('| %s | %s | %d |' % (cl, ly, n))
     L += ['', '## Notes (string tables, hand copies, unknown producers)', '']
     for r in comp:
         if r.get('note', '-') not in ('', '-'): L.append('- `%s` (%s): %s' % (r['rel'], r['cls'], r['note']))
-    open(os.path.join(d, 'breakdown.md'), 'w', encoding='utf-8', newline='\n').write('\n'.join(L) + '\n')
+    open(outf or os.path.join(d, 'breakdown.md'), 'w', encoding='utf-8', newline='\n').write('\n'.join(L) + '\n')
     print('\n'.join(L))
 
 
