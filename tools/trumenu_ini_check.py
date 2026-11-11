@@ -133,6 +133,9 @@ that is not larger than the generated default text (the 0.10 .. 0.22.24 static 1
 first; the texts built from TruMenu's tables against their buffers (table_texts: Log line vs light.cut, [Quick] Closed
 with every group key, [Menu] OpenPages, [Cheats] State, [Debug] NavDraw, settings.show in t_value, [Quick] Recent),
 QbGroupSet / CpPersist whole keys only, Set-TruMenu.ps1 knows the 0.22.24 hash.
+Q75 (2026-11-11): SW_START_GATED - switches the plugin re-reads at run time only when they were 1 at the start
+(TruShadowPower 0.27 [Camera] ShakeTuTimeStep / [Player] TuTimeStep): row "restart", the re-read function reads the key,
+the hint names "live nur wenn 1 beim Start" // "live if 1 at start" (live-if:<own key> would be read after the write).
 Options: --switches FILE checks that file instead of the shipped one.
 
 Usage (from the repository root):
@@ -1793,6 +1796,15 @@ SW_LIVE = {
     ('TruQoL', 'Fixes', 'FrontEndPauseBit'): 'void LiveReadOptions(',   # TruQoL 0.1.4 (2026-11-11)
     ('TruMenu', 'Rescue', 'FallNet'): 'void FnReadSwitch(',             # TruMenu 0.22.24 (Q36, about once a second)
 }
+# Q75 (2026-11-11): keys the plugin re-reads at run time only when they were 1 at the game start (the code is patched
+# only then; a 1 after a start with 0 needs a restart). No "when" form of TruMenu says that: live-if:<Key> asks the key's
+# value after the write (SwIsLive), so a row naming its own key would claim live for 0 -> 1 and restart for 1 -> 0 -
+# both wrong. The row is "restart" (true for the first switch-on) and its hint names the live case in both languages.
+SW_START_GATED = {
+    ('TruShadowPower', 'Camera', 'ShakeTuTimeStep'): 'void TimeStepReadSwitch(',   # 0.27 (Q50, 2026-11-11)
+    ('TruShadowPower', 'Player', 'TuTimeStep'): 'void TimeStepReadSwitch(',
+}
+SW_START_GATED_HINT = ('live nur wenn 1 beim Start', 'live if 1 at start')
 SW_MAX, SW_GROUP_MAX = 512, 24              # 0.22.23: 512 rows (was 160 - the shipped file had 159)
 QB_VIEW_MAX = 128                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group)
 RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries
@@ -2015,6 +2027,17 @@ def check_switches(path):
                     problems.append('%s: %s has no read of [%s] %s' % (where, live.strip('('), section, key))
             if when.startswith('live-if:') and (section, when[8:]) not in ini:
                 problems.append('%s: %s - [%s] %s not in %s.ini' % (where, when, section, when[8:], plugin))
+        gated = SW_START_GATED.get((plugin, section, key))
+        if gated:                            # Q75: re-read only when 1 at the start - restart row, hint names live
+            if live: problems.append('%s: [%s] %s in SW_LIVE and SW_START_GATED' % (where, section, key))
+            if when != 'restart':
+                problems.append('%s: [%s] %s is re-read only when 1 at the start - mark it restart (got %s)' % (
+                    where, section, key, when))
+            body = fn_body(sources[plugin], gated)
+            if not body or '"%s"' % key not in body or '"%s"' % section not in body:
+                problems.append('%s: %s has no read of [%s] %s' % (where, gated.strip('('), section, key))
+            for h, need in zip(halves, SW_START_GATED_HINT):
+                if need not in h: problems.append('%s: hint must name "%s"' % (where, need))
     if len(rows) > SW_MAX: problems.append('%s: %d switch lines, TruMenu keeps %d' % (name, len(rows), SW_MAX))
     if groups > SW_GROUP_MAX: problems.append('%s: %d groups, TruMenu keeps %d' % (name, groups, SW_GROUP_MAX))
     for plugin in SW_PLUGINS:                # every switch of the plugin INIs is a row
@@ -2024,6 +2047,9 @@ def check_switches(path):
     for (plugin, section, key) in SW_LIVE:
         if (plugin, section, key) not in seen: problems.append('%s: live key [%s] %s of %s has no row' % (name, section,
                                                                                                          key, plugin))
+    for (plugin, section, key) in SW_START_GATED:
+        if (plugin, section, key) not in seen:
+            problems.append('%s: start-gated key [%s] %s of %s has no row' % (name, section, key, plugin))
     live_n = sum(1 for r in rows if r[5] != 'restart')
     return problems, '%d switches (%d live / live-if) in %d groups, %d plugins' % (len(rows), live_n, groups,
                                                                                 len({r[1] for r in rows})), rows

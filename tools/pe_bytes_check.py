@@ -5,6 +5,8 @@ Usage (from the repository root):
   ../bin/pyt -t 120 tools/pe_bytes_check.py EXE ADDR=HEX [ADDR=HEX ..]      HEX may contain spaces if quoted
   ../bin/pyt -t 120 tools/pe_bytes_check.py EXE --file CHECKS.txt          one `ADDR HEX...` per line, # comments
 Prints ok / MISMATCH (with the bytes found) per check and a total.
+Exit code (Q75, 2026-11-11; before: always 0): 0 = every check ok, 1 = at least one MISMATCH (an address outside
+every section counts as one), 2 = usage error (no exe / no check given).
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -12,6 +14,9 @@ import pe_callers as PE
 
 
 def main(argv):
+    if len(argv) < 2 or (argv[1] == '--file' and len(argv) < 3):
+        print(__doc__.strip())
+        return 2
     exe = open(argv[0], 'rb').read()
     base, secs = PE.sections(exe)
 
@@ -40,7 +45,8 @@ def main(argv):
         bad += not ok
         print('%s 0x%08x %2d bytes%s' % ('ok      ' if ok else 'MISMATCH', va, len(want), '' if ok else ' found ' + got.hex()))
     print('%d checks, %d mismatches' % (len(checks), bad))
+    return 1 if bad else 0
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))

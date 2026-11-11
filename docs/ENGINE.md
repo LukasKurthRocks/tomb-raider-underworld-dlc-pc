@@ -316,6 +316,18 @@ u32 (op2f skips address 0); op31 string assign; op43..op46 compares; op4f strcmp
 0x57e62c); op63 jump; op64 jump if 0; op65 native; op68 own function; op6b wait-style call; op7b return; op7d set state
 and leave (0x57e50d); op7e cast along `[R+8]` (0x57e720); op80 wait N s (0x57e27e). Disassembler: `tools/script_dis.py`.
 
+**Call opcodes** (Q75, handlers read through the jump table 0x57e52c, index = opcode - 1) ✅ static: operand word =
+**function entry** (entry +0 = prototype): op65 native (0x57de34, pops the object, calls `[entry+0x14]`), op66 on self
+(0x57deb8 -> `CallFunction` 0x57ad10), op69 on a popped object (0x57df5a, skips a null object / `[obj+0xc]` = 0),
+op71 on a popped object (0x57dfd3, 0x574960), op6b popped object (0x57e2b0, 0x574960, then leaves the loop), op6c self
+(0x57e335 -> 0x57af00, leaves), op6f popped object (0x57e3da -> 0x57af00, leaves). Operand = **prototype** (virtual:
+u16 vtable index at prototype +6, looked up by 0x574990): op68 self (0x57df06; "own function" above), op6a popped object
+(0x57df7d, vtable `[[obj+8]+0x3c]`), op6e self (0x57e3c4, leaves), op70 popped object (0x57e419, leaves); op67 / op6d
+(0x57dec9 / 0x57e35e, self) take two words: a pointer to a script root +0x3c (vtable size, compared with the index) and
+the prototype. Installed mods tree 2026-11-11 (`tools/native_calls_check.py --ops`, PC natives from generalbank): calls
+into native types op65 42 960, op66 10 706, op69 2 708, op6b 705, op67 43 (+ 41 vtable-size words, all +0x3c), op6c 1 -
+op65 / op66 alone missed 3 498 of 57 164 (Q66: g_binoculars 3243 calls screenshotsystem 3248 by op69).
+
 **Script section layout** (proven on 17039 Xbox / PC pairs, `tools/script_conv.py`): root +0x08 name, +0x0c native package,
 +0x10 native name, +0x14 self id, +0x18 super id, +0x20 states, +0x2c members, +0x30 start function, +0x34 prototypes,
 +0x38 functions, +0x3c vtable size, +0x44 vtable. Member 20 B {DataType 12, u16 offset, name, init}; prototype 28 B

@@ -149,7 +149,14 @@ def func_of(funcs, a):
     return None
 
 
+NARGS = {'funcs': 2, 'refs': 3, 'str': 3, 'func': 3, 'words': 4, 'items': 4, 'dis': 4, 'disp': 3, 'exclusive': 3}
+
+
 def main(argv):
+    # Q75 (2026-11-11): no / unknown command or too few arguments -> usage, exit 2 (was: IndexError traceback)
+    if not argv or argv[0] not in NARGS or len(argv) < NARGS[argv[0]]:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
     cmd, path = argv[0], argv[1]
     d, secs = load(path)
     funcs, res = cached(path)
@@ -251,4 +258,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    sys.exit(main(sys.argv[1:]))
