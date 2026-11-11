@@ -1,0 +1,10 @@
+﻿# Allow-list of Test-TruUploadReady.ps1, category GameData: file versions proven NOT to be copies of game data.
+# One entry per line: <path wildcard (git path, '/' separators)> | <class> | <reason with the proof>
+# Classes: synthetic (made by hand / by a generator, no game bytes), own (our own data), third-party (library code
+# under its own licence), screenshot (images; docs/ and assets/ images are listed separately anyway).
+# An allowed file is still listed in the log ('allowed' section) with this reason; add an entry only with a proof.
+# Checked 2026-11-11 (Q47).
+
+tools/native_test/probes/*.bin | synthetic | hand-made D3D9 ps_3_0 token streams (header ffff0300, dcl/def, one to three instructions, end 0000ffff; the slot probes repeat 9-11 distinct words up to 32769 slots); test inputs of the native D3D9 test (tools/native_test/README.md), no shader of the game
+src/asi/third_party/imgui/* | third-party | Dear ImGui 1.91.9 (MIT, LICENSE.txt next to it): CJK glyph-range offset tables, CRC32 tables and the compressed ProggyClean font that ship with ImGui
+src/asi/third_party/stb/* | third-party | stb_image (public domain / MIT, LICENSE.txt next to it): DEFLATE default code-length tables
