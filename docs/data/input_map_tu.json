@@ -1,0 +1,18 @@
+{
+ "schema": 1,
+ "version": "I20261111-1",
+ "about": "The title update's own input bindings of the generalbank action map (Xbox DTP 48 / PC DTP 47) = TitleUpdate.000 DTP 48 minus retail (layer1) DTP 48, recorded as ids so that tools/input_map_tu_fix.py needs no Xbox base game (plan Spielerweg P5-light, 2026-11-11). Each binding is the 4 bytes {action, set, source_a, source_b} in memory order; source_b null = byte 0xff (no second source). Order = TU order. tools/input_map_tu_fix.py checks every binding against the player's TitleUpdate.000 DTP 48 (present there) and, with --derive on the developer PC, recomputes TU minus retail and compares it with this list.",
+ "evidence": "tools/input_map_tu_fix.py --verify (code before 2026-11-11 P5-light: TU minus retail) on work/rebuild/q14_p0_1111/generalbank_pc/mods/generalbank.drm, log work/q15_p1_1111/dev_inputmap.log: 'TU-only bindings (Xbox DTP 48: TU 145, retail 139): 6'; finding: workspace docs/Befund-Schattenkampf.md (night 04.11., attack request 152)",
+ "dtp_xbox": 48,
+ "dtp_pc": 47,
+ "tu_bindings": 145,
+ "retail_bindings": 139,
+ "bindings": [
+  {"action": 141, "set": 17, "source_a": 32, "source_b": null},
+  {"action": 142, "set": 17, "source_a": 3, "source_b": null},
+  {"action": 143, "set": 17, "source_a": 2, "source_b": null},
+  {"action": 145, "set": 17, "source_a": 33, "source_b": null},
+  {"action": 146, "set": 17, "source_a": 2, "source_b": null},
+  {"action": 147, "set": 17, "source_a": 3, "source_b": null}
+ ]
+}

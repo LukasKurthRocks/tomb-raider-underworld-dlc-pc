@@ -37,7 +37,12 @@ SRC = {'xbase': (B + 'TombRaiderUnderworld_Patched/layer1.000', 'be', 'xenon-w')
        'pack1': (C + 'E5AFB2B959A72C52120D73678AED11BD8752686753/pack1.000', 'be', 'xenon-w'),
        'pack2': (C + '9FDDD06617D1016DE468ACF53AC663E8BA2AD41853/pack2.000', 'be', 'xenon-w'),
        'pack20': (C + 'AC0089F81B621CD0E0C156B6176EFCC6C844705D53/pack20.000', 'be', 'xenon-w')}
-# the packs are surveyed only; the PC tables are built from the PC patch table + the title update (merged())
+# The PC tables are built from the PC patch table + the title-update table (merged()). The title update's 6 locals.bin
+# records are byte-identical to pack11's (work/playerpath_1011/tu_vs_dlc.tsv; the survey prints "pack11 diff(tu) 0"),
+# so build reads that table from pack11 (TU_TABLE, plan Spielerweg P1, 2026-11-11): the player path needs no
+# TitleUpdate.000 here. build opens only BUILD_SRC; survey (developer) opens every source incl. 'tu'.
+TU_TABLE = 'pack11'
+BUILD_SRC = ('xbase', 'pcbig', 'pcpatch', TU_TABLE, 'pack1', 'pack2')
 
 def parse(b, endian):
     e = '>' if endian == 'be' else '<'
@@ -65,9 +70,9 @@ def files(src):
     a = Archive(path, e)
     return {r['spec']: a.read(r) for r in a.find(crc(pre + '\\local\\locals.bin'))}, e
 
-def survey():
+def survey(srcs=SRC):
     V = {}
-    for s in SRC:
+    for s in srcs:
         f, e = files(s)
         if not f: continue
         V[s] = {}
@@ -82,7 +87,7 @@ def survey():
 def compare(V):
     for spec in sorted(V['pcpatch']):
         pc = V['pcpatch'][spec][1]; pb = V['pcbig'][spec][1] if spec in V.get('pcbig', {}) else None
-        xb = V['xbase'][spec][1]; tu = V['tu'][spec][1]
+        xb = V['xbase'][spec][1]; tu = V['tu' if 'tu' in V else TU_TABLE][spec][1]
         d = lambda a, b: sum(1 for i in range(min(len(a), len(b))) if a[i] != b[i])
         line = 'spec %08x: n pcbig %s pcpatch %d xbase %d tu %d' % (spec, len(pb) if pb else '-', len(pc), len(xb), len(tu))
         line += ' | diff(xbase,pcbig) %s diff(tu,pcpatch) %d diff(xbase,tu) %d' % (d(xb, pb) if pb else '-', d(tu, pc), d(xb, tu))
@@ -114,7 +119,7 @@ def build_map(V):
         (p, n), = c.most_common(1)
         if n >= 4: m[x] = p
     inv = collections.Counter(m.values()); m = {k: v for k, v in m.items() if inv[v] == 1}
-    nbase = len(V['xbase'][SPECS[0]][1]); ntu = len(V['tu'][SPECS[0]][1])
+    nbase = len(V['xbase'][SPECS[0]][1]); ntu = len(V[TU_TABLE][SPECS[0]][1])
     ks = sorted(m); interp = 0
     for a, b in zip(ks, ks[1:]):
         if b - a > 1 and m[b] - m[a] == b - a:
@@ -143,7 +148,7 @@ def merged(V, spec, m):
     450 'Traje Extra 11' / 'Traje Extra 16' / 'Mision Extra 1' -> TU 'Traje seco rojo' / ... / 'BAJO LAS CENIZAS';
     the rule of the former tools/locals_fix_dlcimg.py, which listed these three ids by hand)."""
     pc = list(V['pcpatch'][spec][1]); lang = V['pcpatch'][spec][0]
-    X = V['xbase'][spec][1]; T = V['tu'][spec][1]
+    X = V['xbase'][spec][1]; T = V[TU_TABLE][spec][1]
     n = max(m.values()) + 1
     pc += [b''] * (n - len(pc))
     st = collections.Counter()
@@ -171,7 +176,7 @@ def unfilled_from_packs(V, m, spec, strings, en_spec=0xfffff7e1):
     all present packs agree. Today exactly one id: Xbox 1326 = PC 5211. Note: on the Xbox (TU = pack11 table) the
     slot stays empty - the packs' text there is a DLC 1 hint line of their older layout, not a TU string."""
     st = collections.Counter()
-    nbase = len(V['xbase'][spec][1]); T = V['tu'][spec][1]; TE = V['tu'][en_spec][1]
+    nbase = len(V['xbase'][spec][1]); T = V[TU_TABLE][spec][1]; TE = V[TU_TABLE][en_spec][1]
     packs = [k for k in COSTUME_PACKS if k in V and spec in V[k] and en_spec in V[k]]
     for x, p in m.items():
         if x < nbase or x >= len(T) or TE[x] != b'': continue
@@ -279,10 +284,11 @@ if __name__ == '__main__':
     if no_pack_fill: sys.argv.remove('--no-pack-fill')
     pad_names = '--pad-glyph-names' in sys.argv
     if pad_names: sys.argv.remove('--pad-glyph-names')
-    for k in SRC:
+    srcs = BUILD_SRC if sys.argv[1:2] == ['build'] else SRC
+    for k in srcs:
         f, e = files(k)
         if f: files_cache[k] = f
-    V = survey()
+    V = survey(srcs)
     compare(V)
     if sys.argv[1:2] == ['build']:
         out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(B, 'trudlcport/work/generic/locals')

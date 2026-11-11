@@ -9,9 +9,13 @@ Xbox TU's DTP 48 has 6 bindings more than retail - all in set 17 (Lara): action 
 142 / 143 / 147 (the DLC 2 chart's attack requests {150,152,142/143/147}) and 141 / 145 (the TU shadow-power
 buttons) stay at their default 8 (= up, tru+0x80a50) whatever the pad does.
 
-What the tool does (every value read from the files, nothing typed in):
+What the tool does (every value read from the files or the recorded rule, nothing typed in):
   1. TU-only bindings = (tu:generalbank.drm DTP 48) minus (retail:generalbank.drm DTP 48), as bytes {action, set,
-     source A, source B} (Xbox originals, big endian, read in memory order as the Xbox lbz does).
+     source A, source B} (Xbox originals, big endian, read in memory order as the Xbox lbz does). Since 2026-11-11
+     (plan Spielerweg P5-light) they come from the recorded rule docs/data/input_map_tu.json (the 6 bindings as ids,
+     TU order), checked against the player's title update: TU DTP 48 has the recorded binding count and holds every
+     recorded binding, in that order - so no Xbox base game (layer1) is read. --derive (developer PC) recomputes
+     TU minus retail as before and stops when it differs from the rule.
   2. Every source they use must have the same descriptor on the PC (PC DTP record k = {u8, u8, u16 code, ...} in
      little endian vs the Xbox record in big endian, all 0x18 bytes compared field by field) - else stop.
   3. None of these bindings may already be in the PC map (same 4 bytes) - else stop (already fixed).
@@ -22,9 +26,11 @@ What the tool does (every value read from the files, nothing typed in):
 
 Usage (from the repository root):
   ../bin/pyt -t 300 tools/input_map_tu_fix.py IN_generalbank.drm OUT_generalbank.drm [--dtp 47] [--check] [--done-ok]
+                                              [--derive]
   --check   only report (no output written); exit code 0 = would change, 3 = nothing to do
   --done-ok (pipeline, idempotent) all bindings already there: copy IN to OUT unchanged, exit 0 (else exit 3)
-  ../bin/pyt -t 300 tools/input_map_tu_fix.py --verify generalbank.drm [--report R.json]
+  --derive  developer: TU-only bindings from TU minus retail (reads layer1), must equal docs/data/input_map_tu.json
+  ../bin/pyt -t 300 tools/input_map_tu_fix.py --verify generalbank.drm [--report R.json] [--derive]
             pipeline check (2026-11-04, agent N11): exit 0 = all TU bindings present, 1 = missing (nothing written)
 Pipeline: tools/generalbank_build.py step 22 (after the played test-38 chain, so every generalbank built from it -
 the test variants autostart / HUD / pause included - carries the bindings); tools/generalbank_hud_build.py step T10
@@ -46,9 +52,40 @@ def xbox_map(spec):
     return binds, srcs
 
 
+RULE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'docs', 'data', 'input_map_tu.json')
+
+
+def rule_bindings(path=RULE):
+    """(the recorded TU-only bindings as 4-byte strings in TU order, the rule document)"""
+    with open(path, encoding='utf-8') as f: d = json.load(f)
+    if d.get('schema') != 1: sys.exit('%s: schema %r, expected 1' % (path, d.get('schema')))
+    return [bytes((b['action'], b['set'], b['source_a'], 0xff if b['source_b'] is None else b['source_b']))
+            for b in d['bindings']], d
+
+
+def tu_only(tu_b, derive):
+    """(TU-only bindings in TU order, retail binding count, where from): the recorded rule, checked against the
+    title update's DTP 48; --derive: TU minus retail (layer1) as before, which must equal the rule"""
+    rule, d = rule_bindings()
+    if len(tu_b) != d['tu_bindings']:
+        sys.exit('title update DTP 48: %d bindings, the rule was recorded on %d (%s) - another title update?'
+                 % (len(tu_b), d['tu_bindings'], d['version']))
+    miss = list((collections.Counter(rule) - collections.Counter(tu_b)).elements())
+    if miss or rule != sorted(rule, key=tu_b.index):
+        sys.exit('rule %s: bindings not in the title update DTP 48 %s or not in TU order' % (d['version'], miss))
+    if not derive: return rule, d['retail_bindings'], 'rule %s' % d['version']
+    rt_b, _ = xbox_map('retail:generalbank.drm')
+    extra = list((collections.Counter(tu_b) - collections.Counter(rt_b)).elements())
+    extra.sort(key=tu_b.index)                       # TU order
+    if extra != rule or len(rt_b) != d['retail_bindings']:
+        sys.exit('derived TU minus retail (%d bindings, retail %d) differs from rule %s (%d, retail %d): %r'
+                 % (len(extra), len(rt_b), d['version'], len(rule), d['retail_bindings'], extra))
+    return extra, len(rt_b), 'derived = rule %s' % d['version']
+
+
 def main(argv):
-    check = '--check' in argv; verify = '--verify' in argv; done_ok = '--done-ok' in argv
-    argv = [a for a in argv if a not in ('--check', '--verify', '--done-ok')]
+    check = '--check' in argv; verify = '--verify' in argv; done_ok = '--done-ok' in argv; derive = '--derive' in argv
+    argv = [a for a in argv if a not in ('--check', '--verify', '--done-ok', '--derive')]
     dtp = 47; report = None
     if '--dtp' in argv: k = argv.index('--dtp'); dtp = int(argv[k + 1]); del argv[k:k + 2]
     if '--report' in argv: k = argv.index('--report'); report = argv[k + 1]; del argv[k:k + 2]
@@ -56,10 +93,8 @@ def main(argv):
     raw = open(argv[0], 'rb').read()
     D = DW.read(raw, 'le')
     tu_b, tu_s = xbox_map('tu:generalbank.drm')
-    rt_b, _ = xbox_map('retail:generalbank.drm')
-    extra = list((collections.Counter(tu_b) - collections.Counter(rt_b)).elements())
-    extra.sort(key=tu_b.index)                       # TU order
-    print('TU-only bindings (Xbox DTP 48: TU %d, retail %d): %d' % (len(tu_b), len(rt_b), len(extra)))
+    extra, rt_n, how = tu_only(tu_b, derive)
+    print('TU-only bindings (Xbox DTP 48: TU %d, retail %d): %d (%s)' % (len(tu_b), rt_n, len(extra), how))
     for b in extra: print('  action %d set %d source %s / %s' % (b[0], b[1], b[2], 'none' if b[3] == 0xff else b[3]))
     si = next(i for i, s in enumerate(D.sections) if s.type == 7 and s.id == dtp)
     s = D.sections[si]; d = bytearray(s.data)
