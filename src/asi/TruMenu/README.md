@@ -2928,6 +2928,69 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.26 - test arena "Arena 1 - Kampf": arena spots, adrenaline meter, remove the spawned (2026-11-11)
+
+Built into `work\asi\menu0249` (sha256 `99c948b4...d2ddfb1e`, 1,880,064 bytes), not installed, no live test (Q76;
+finding in the workspace `docs\Befund-Test-Arena-Q76-1111.md`). Owner wish: a large flat place in an existing level
+where enemies can be spawned on demand for combat tests (adrenaline jump-off, finishers, grapple, lock-on). Owner
+2026-11-11 13:05: this is **"Arena 1 - Kampf"**; an "Arena 2 - Museum" (unused objects) follows as its own task - the
+names leave room for it: one arena list `kArenas` with spot keys `<arena number><letter>` (`1a`..), `arena.go <spot>`,
+`arena.list` for every arena, one bar group per arena (`ts_arena1`, later `ts_arena2`).
+
+- **Page Tests, group "Arena 1 - Kampf (Q76)"** (`ts_arena1`): three floors where AI enemy kinds are resident (the
+  unit's `objlist.dat` entries), reached with **`arena.go 1a|1b|1c`** (right twice) = one shortcut like `cp.jump`:
+  `save.backup kapitel`, `unit.go <unit>`, `wait.unit <unit>`, `cheat.flight 1`, `player.goto <intro> force` (a
+  generator may not be drawn - `player.goto` would refuse it; after `wait.unit` its unit is loaded); the "Fliegen" row
+  turns the flight off; `arena.list` names the spots:
+  - **1a** `l7_helheim03` intro 8785 (`viking_thrall_generator`, live (5230.9, -452.0, -3215.7)): 8 placed
+    `viking_thrall`, 1 `yeti_thrall`, 3 viking + 1 yeti generators, all 14 intros at live z -3215.7 over 11,943 x 3,629
+    units - base game, adrenaline works there.
+  - **1b** `l7_yggdrasil_hall02` intro 8762 (`viking_thrall_generator`, live (1504.2, 6958.9, -312.7)): 2 vikings, 1 yeti
+    at z -312.7 / -295.3 - base game.
+  - **1c** `dlc_yggdrasil_hall02` checkpoint 10644 (live (-161.3, 3925.0, -312.7)): `viking_thrall_tutorial_dlc2_`,
+    `yeti_thrall_dlc2_`; the DLC 2 doppelganger mode skips the game's adrenaline tick / bar (TU test, TruShadowPower
+    `[Adrenaline] Translate`), so no adrenaline here. The hall02 story counter may count spawned thralls' deaths (not
+    proven either way) - `save.backup` runs before.
+  - then: flight, god mode, **the `ai.spawn` rows** of page Gegner (KI) (kind = the AI enemy objects loaded now, count,
+    place), **"Gespawnte entfernen"** = `ai.remove spawned`, the adrenaline rows, enemy panel, fight trace.
+- **`ai.remove spawned`**: only the instances `ai.spawn` made (ring of 64: address + allocation stamp `+0x44`, so a
+  reused slot is not taken); the other modes unchanged.
+- **Adrenaline meter** (ENGINE.md 13.7, Q65): `adren.meter` (info, read only) = CM+0x3c / max `[[0xfad764]+0x2d0]`
+  (CM = `[[0xfadb58]+0x504]`), "held full" = CM+0x1fc bit 22, bit 27, the doppelganger byte `[[0xfadb58]+0x1244]`.
+  `adren.fill` (cheat, game thread) calls the game's own **meter full 0x6e6630** (thiscall CM, leaf: CM+0x3c = max,
+  unless bit 27: bit 22 + HUD bytes 0xfae8af / 0xfae8d8) - the body of the script native 0x777a50 and of the refill's own
+  call 0x6f2905. `adren.keep 1|0` (cheat, not kept in the INI) does the same once per game frame (PadHook) while the
+  meter is below the maximum and bits 22 / 27 are clear. Both behind `[Cheats] Enabled` + `[Cheat] Experimental`.
+- 6 byte checks `kAdmChecks` (checked at the first use, one log line `0.22.26: adrenaline meter ok (6 checks)`): the CM
+  read 0x5d4859, 0x6e6630 before and after the 8 bytes TruShadowPower 0.22 `[Reticle] TranslateRefill` patches at
+  0x6e6646 (left out on purpose), 0x777a50, the refill 0x6f28c0, the bar 0x6f2930. `precheck_02226.txt` = the 52 rows of
+  0.22.25 + these 6: 58 checks, 0 mismatches against `data/pc/tru.exe`. No new INI key.
+- Not built (finding section 1): spawning an enemy that is **not** resident. `instance.spawn` can stream an object in
+  (request + poll), but the engine marks it loaded (state 2, 0x54e756) **before** it requests the children
+  (0x54e84b: chunkdoll, companion, weapons) - an enemy born at once may miss them. A stream-in mode would have to wait
+  for the children's entries too; not proven, so the arena uses resident kinds only.
+- Checks: `trumenu_ini_check` `check_02226` (kAdmChecks rows, meter-full only in `AdmFillNow` inside `__try`, CheatGate
+  on fill / keep, `AdmTick` per frame, items, `ai.remove spawned` through `SpIsOurs`, `kArenas` + the `arena.go` steps,
+  the three spot rows of arena 1, `arena.go` in kCmdDanger, no INI key, the 0.22.25 hash in `Set-TruMenu.ps1`); negative tests on
+  copies, 4 of 4 caught (no `AdmTick` call, no `SpRemember`, `player.goto` without `force`, fill / keep without
+  CheatGate). `trumenu_quick_check` all ok, `trumenu_readability_check` all pass, `trumenu_precheck_match` (section
+  0.22.26) 6 equal / 0 only in the source. Build: 0 warnings in TruMenu.cpp (2 in the third-party `imgui_demo.cpp`).
+
+### TO TEST 0.22.26
+
+`[Cheats] Enabled=1` and `[Cheat] Experimental=1` in `TruMenu.ini`. Recipe with the arena (T17 / T18): workspace
+`docs\Befund-Test-Arena-Q76-1111.md` section 4.
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | spot 1a | page Tests, group "Arena 1 - Kampf (Q76)": "1a: Helheim-Halle (l7)" (right twice) | backup `..._kapitel`, `l7_helheim03` loads, log `shortcut 'arena 1a (l7_helheim03)' ... player.goto 8785 force`, Lara at the generator (flight on); "Fliegen" off: she stands on the floor (z about -3216) |
+| 2 | spawn | "Gegner spawnen" -> kind `viking_thrall` (or `yeti_thrall`), count 2, right twice | log `ai.spawn viking_thrall x2 ... 2 born at Lara`; they attack (enemy panel: CombatStepIdle / MeleeAttack) |
+| 3 | remove | "Gespawnte entfernen" (right twice) | `ai.remove spawned: 2 removed`; placed thralls stay |
+| 4 | meter | "Adrenalin (live)" while fighting | value rises with hits, max as in the HUD; bit 22 when full |
+| 5 | fill | "Adrenalin voll" | `adrenaline x -> max of max (held full until it is used)`; HUD bar full |
+| 6 | keep | "Adrenalin voll halten" on, use the adrenaline, off | the bar is full again after each use; off = the game's own |
+| 7 | spot 1c | "1c: hall02 DLC 2" then "Adrenalin (live)" | the line names the doppelganger mode (no adrenaline in DLC 2) |
+
 ## 0.22.25 - settings.reset writes the whole TruMenu.ini (2026-11-11)
 
 Built into `work\asi\menu0248`, not installed, no live test (night queue Q45, agent finding during Q36).

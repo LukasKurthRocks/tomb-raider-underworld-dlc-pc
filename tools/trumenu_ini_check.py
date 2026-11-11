@@ -133,6 +133,13 @@ that is not larger than the generated default text (the 0.10 .. 0.22.24 static 1
 first; the texts built from TruMenu's tables against their buffers (table_texts: Log line vs light.cut, [Quick] Closed
 with every group key, [Menu] OpenPages, [Cheats] State, [Debug] NavDraw, settings.show in t_value, [Quick] Recent),
 QbGroupSet / CpPersist whole keys only, Set-TruMenu.ps1 knows the 0.22.24 hash.
+0.22.26 (Q76, test arena): check_02226 - kAdmChecks rows (= work/asi/menu0249/precheck_02226.txt section 12), the
+meter-full call only through AdmFillNow inside __try, adren.fill / adren.keep behind CheatGate, AdmTick in the per-frame
+block, items adren.meter / adren.fill / adren.keep, ai.remove spawned through SpIsOurs (address + stamp +0x44, filled by
+RunAiSpawn), the page Tests group ts_arena1 ("Arena 1 - Kampf") with the rows arena.go 1a / 1b / 1c, kArenas = units +
+intro ids of the finding (spot key = arena number + letter, one list for later arenas),
+arena.go = backup, unit.go, wait.unit, flight, player.goto <intro> force (refusals as cp.jump), no new INI key,
+Set-TruMenu.ps1 knows the 0.22.25 hash.
 Q75 (2026-11-11): SW_START_GATED - switches the plugin re-reads at run time only when they were 1 at the start
 (TruShadowPower 0.27 [Camera] ShakeTuTimeStep / [Player] TuTimeStep): row "restart", the re-read function reads the key,
 the hint names "live nur wenn 1 beim Start" // "live if 1 at start" (live-if:<own key> would be read after the write).
@@ -1335,7 +1342,8 @@ def check_021(ini_path, radial_path, rows):
         if t == 'kQbAccess' and k == 'kQbPlanned' and de in Q21_REPLACED:
             problems.append(where + ': still planned (0.21 built it)')
         if i == 'ai.remove':
-            if a not in AD_ARGS: problems.append(where + ': ai.remove needs nearest / others / all')
+            if a not in AD_ARGS + ('spawned',):   # 0.22.26: spawned = only ai.spawn's instances
+                problems.append(where + ': ai.remove needs nearest / others / all / spawned')
             if k != 'kQbAction' or 'kQfConfirm' not in tail: problems.append(where + ': ai.remove = action row with kQfConfirm')
         if t == 'kQbCoop' and k not in ('kQbLabel', 'kQbPlanned', 'kQbGroup'):   # 0.22.18: the heading is a group
             problems.append(where + ': the Koop page has planned rows only (no function yet)')
@@ -3591,8 +3599,9 @@ def check_02225():
     QbGroupSet / CpPersist append whole keys only (TextAdd); Set-TruMenu.ps1 knows the 0.22.24 hash"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.25 (settings.reset writes the whole TruMenu.ini' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.25 (settings.reset writes the whole TruMenu.ini')
+    if '0.22.25 (settings.reset writes the whole TruMenu.ini' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.25 part "0.22.25 (settings.reset writes the whole '
+                        'TruMenu.ini"')   # 0.22.26: a later part
     t = table_texts(src)
     reset, dtext = fn_body(src, 'bool RunSettingsReset('), fn_body(src, 'size_t DefaultIniText(')
     if not reset or not dtext: problems.append('TruMenu.cpp: RunSettingsReset / DefaultIniText missing')
@@ -3672,6 +3681,108 @@ def check_02225():
                           t['ini'], t['keys'], line, lc, t['closed'][0], sizes.get('g_qbClosed'), t['pages'][0],
                           sizes.get('g_mpOpen'), t['cheats'][0], sizes.get('g_cheatState'), t['nav'][0],
                           sizes.get('g_navAuto'), t['settings'], tv))
+
+
+ADM_ROWS = [('005d4859', 'a158dbfa008b8804050000'),
+            ('006e6630', 'a164d7fa00d980d00200008b81fc0100008bd0d9593c'),
+            ('006e664e', '0d000040008981fc010000c605afe8fa0001c605d8e8fa0000c3'),
+            ('00777a50', 'a158dbfa008b8804050000e9d0ebf6ff'),
+            ('006f28c0', 'c605afe8fa0001f781fc010000000040007537d9413cd8442404d9593c'),
+            ('006f2930', '8b91fc010000d9ee83ec08f7c200004000756fd8513c')]
+ARENA_ROWS = [('arena.go', '1a'), ('arena.go', '1b'), ('arena.go', '1c')]   # arena 1 "Kampf" (arena 2 "Museum" later)
+ARENA_TABLE = [('1', '1a', 'l7_helheim03', '8785'), ('1', '1b', 'l7_yggdrasil_hall02', '8762'),
+               ('1', '1c', 'dlc_yggdrasil_hall02', '10644')]
+
+
+def check_02226(ini_path):
+    """0.22.26 (Q76, test arena; workspace docs/Befund-Test-Arena-Q76-1111.md): the adrenaline meter - kAdmChecks = the 6
+    rows (meter-full 0x6e6630 checked only before / after the 8 bytes TruShadowPower 0.22 patches at 0x6e6646), the
+    meter-full call only in AdmFillNow inside __try, adren.fill / adren.keep behind CheatGate (cheats + experimental +
+    level), AdmTick in PadHook's per-frame block and gated by the switch; items adren.meter (info) / adren.fill (action,
+    game thread) / adren.keep (bool); ai.remove spawned only through SpIsOurs (address + allocation stamp +0x44, entries
+    from RunAiSpawn); page Tests group ts_arena1 with the rows arena.go 1a / 1b / 1c, kArenas = the 3 spots of the finding
+    (arena 1 "Kampf", spot keys start with the arena number),
+    RunArenaGo's shortcut (backup, unit.go, wait.unit, flight, player.goto force) and refusals, arena.go in kCmdDanger;
+    no new INI key ([Adrenaline] / [Arena] absent);
+    Set-TruMenu.ps1 knows the 0.22.25 hash"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.26 (test arena, Q76' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.26 (test arena, Q76')
+    m = re.search(r'const DvCheck kAdmChecks\[\] = \{(.*?)\n\};', src, re.S)
+    rows = [(a, ''.join(b).replace(' ', '')) for a, b in
+            [(x, re.findall(r'"([0-9a-f ]+)"', y)) for x, y in
+             re.findall(r'\{0x([0-9a-f]{8}), ((?:"[0-9a-f ]+"\s*)+)\}', m.group(1))]] if m else []
+    if rows != ADM_ROWS: problems.append('TruMenu.cpp: kAdmChecks must be the 6 rows of precheck_02226 section 12')
+    if any(int(a, 16) <= 0x6e6646 < int(a, 16) + len(b) // 2 or int(a, 16) <= 0x6e664d < int(a, 16) + len(b) // 2
+           for a, b in rows):
+        problems.append('TruMenu.cpp: kAdmChecks must not cover 0x6e6646..0x6e664d (TruShadowPower 0.22 patch)')
+    fill = fn_body(src, 'bool AdmFillNow(')
+    if src.count('reinterpret_cast<AdmFullFn>(kAdmFull)') != 1 or 'reinterpret_cast<AdmFullFn>(kAdmFull)' not in fill or \
+            not 0 <= fill.find('__try') < fill.find('AdmFullFn') < fill.find('__except'):
+        problems.append('TruMenu.cpp: the meter-full 0x6e6630 must be called once, in AdmFillNow inside __try')
+    for fn in ('bool RunAdmFill(', 'bool RunAdmKeep('):
+        if 'if (!CheatGate(AdmCheck(), g_admWhy, o, n)) return false;' not in fn_body(src, fn):
+            problems.append('TruMenu.cpp: %s must start with CheatGate(AdmCheck(), ...)' % fn.strip('('))
+    tick = fn_body(src, 'void AdmTick(')
+    for want in ('if (!g_admKeep || !g_admOk || !InLevel()) return;', '(s.w & (0x400000 | 0x8000000))',
+                 'AdmFillNow(s, nullptr, 0);'):
+        if want not in tick: problems.append('TruMenu.cpp: AdmTick must hold %s' % want)
+    block = src[src.find('        AkTick();'):][:400]
+    if 'AdmTick();' not in block: problems.append('TruMenu.cpp: AdmTick must run in the per-frame block (after AkTick)')
+    if 'AdmCheck() ||' not in fn_body(src, 'bool AdmRead('):
+        problems.append('TruMenu.cpp: AdmRead must run AdmCheck before any read')
+    items = item_types(src)
+    for item, typ in (('adren.meter', 'info'), ('adren.fill', 'action'), ('adren.keep', 'bool')):
+        if items.get(item) != typ: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, typ))
+    m = re.search(r'\{"adren\.fill", "action", (?:"[^"]*"\s*)+, (true|false),', src)
+    if not m or m.group(1) != 'true': problems.append('TruMenu.cpp: adren.fill must run on the game thread')
+    remove = fn_body(src, 'bool RunAdRemove(')
+    if 'else if (!_stricmp(a, "spawned")) mode = 4;' not in remove or 'mode == 4 ? SpIsOurs(g_adCand[i].inst)' not in remove:
+        problems.append('TruMenu.cpp: ai.remove spawned must take only SpIsOurs instances')
+    ours = fn_body(src, 'bool SpIsOurs(')
+    if 'ReadDword(inst + 0x44, &stamp)' not in ours or 'g_spMade[i].stamp == stamp' not in ours:
+        problems.append('TruMenu.cpp: SpIsOurs must compare address and allocation stamp +0x44')
+    spawn = fn_body(src, 'bool RunAiSpawn(')
+    if not 0 <= spawn.find('++born;') < spawn.find('SpRemember(inst);'):
+        problems.append('TruMenu.cpp: RunAiSpawn must remember each born instance (SpRemember)')
+    bar = qb_rows(src, True)
+    tests = [(i, a, k, tail) for t, de, i, a, k, layer, tail in bar if t == 'kQbTests']
+    for item, arg in ARENA_ROWS:
+        if not any(i == item and a == arg and k == 'kQbAction' and 'kQfConfirm' in tail for i, a, k, tail in tests):
+            problems.append('TruMenu.cpp: kQbTests lacks the arena row %s %s (action, kQfConfirm)' % (item, arg))
+    for item, kind in (('adren.meter', 'kQbInfo'), ('adren.fill', 'kQbAction'), ('adren.keep', 'kQbBool'),
+                       ('ai.spawn', 'kQbChoice')):
+        if not any(i == item and k == kind for i, a, k, tail in tests):
+            problems.append('TruMenu.cpp: kQbTests lacks the %s row %s' % (kind, item))
+    if not any(i == 'ai.remove' and a == 'spawned' for i, a, k, tail in tests):
+        problems.append('TruMenu.cpp: kQbTests lacks the row ai.remove spawned')
+    if '"ts_arena1", kQbGroup' not in src: problems.append('TruMenu.cpp: kQbTests lacks the group ts_arena1')
+    m = re.search(r'const TarArena kArenas\[\] = \{(.*?)\n\};', src, re.S)
+    arenas = re.findall(r'\{(\d+), "([0-9][a-z])", "([a-z0-9_]+)", (\d+), ', m.group(1)) if m else []
+    if arenas != ARENA_TABLE: problems.append('TruMenu.cpp: kArenas must be the 3 spots of arena 1 (1a / 1b / 1c)')
+    if any(not k.startswith(a) for a, k, u, i in arenas):
+        problems.append('TruMenu.cpp: a kArenas spot key must start with its arena number')
+    if 'const char *const kArenaNames[][2] = {{"", ""}, {"Kampf", "combat"}};' not in src:
+        problems.append('TruMenu.cpp: kArenaNames must name arena 1 "Kampf" (owner 2026-11-11 13:05)')
+    go = fn_body(src, 'bool RunArenaGo(')
+    if '"save.backup kapitel;unit.go %s;wait.unit %s;cheat.flight 1;player.goto %ld force"' not in go:
+        problems.append('TruMenu.cpp: arena.go must run backup, unit.go, wait.unit, flight, player.goto force')
+    for want in ('UnitIndexOf(a->unit) < 0', 'UnitNameNoDrm(a->unit)', 'LevelChangePending(why, sizeof(why))',
+                 'return ShortcutStart(steps, title, o, n);'):
+        if want not in go: problems.append('TruMenu.cpp: RunArenaGo must hold %s' % want)
+    if items.get('arena.go') != 'action' or items.get('arena.list') != 'info':
+        problems.append('TruMenu.cpp: items arena.go (action) / arena.list (info) missing in kItems')
+    if not re.search(r'\{"arena\.go", "Sicherung', src): problems.append('TruMenu.cpp: kCmdDanger lacks arena.go')
+    for sec in ('Adrenaline', 'Arena'):
+        for line, key, value in ini_section(ini_path, sec):
+            problems.append('TruMenu.ini:%d: [%s] %s - 0.22.26 adds no INI key' % (line, sec, key))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '79af7b39926cb91c87ec4804a0698e6ec310d3e14ce9041eae5242762e29a211' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.25 build hash (work\\asi\\menu0248) is missing')
+    return problems, ('test arena: %d kAdmChecks rows (0x6e6646 patch left out), meter-full once in __try, CheatGate on '
+                      'fill / keep, AdmTick per frame, ai.remove spawned by address + stamp, page Tests %d arena rows, no '
+                      'new INI key' % (len(rows), len(ARENA_ROWS)))
 
 
 def table(src):
@@ -3847,6 +3958,10 @@ def main(argv):
     for p in cproblems25: print('Q02225 %s' % p)
     if not cproblems25: print('ok: 0.22.25 %s' % csummary25)
     problems += cproblems25
+    cproblems26, csummary26 = check_02226(ini_path)   # 0.22.26
+    for p in cproblems26: print('Q02226 %s' % p)
+    if not cproblems26: print('ok: 0.22.26 %s' % csummary26)
+    problems += cproblems26
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

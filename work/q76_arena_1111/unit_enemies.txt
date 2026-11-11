@@ -1,0 +1,59 @@
+l1_ship_exterior                         enemies: merc, merc_deux  | generators: merc_generator_run
+l2_cliffclimb                            enemies: shark_blueshark, small_brown_spider, small_brown_spider_no_jump
+l2_puzzleroom                            enemies: bat_enemy  | generators: bat_generator
+l2_norsehub                              enemies: bat_enemy, small_albino_spider  | generators: bat_generator, small_albino_spider_generator
+l2_maproom                               enemies: bat_enemy, small_albino_spider
+l3_secretchamber                         enemies: panther_thrall
+l4_trailstart                            enemies: cat_panther
+l4_ballcourt                             enemies: cat_panther
+l4_traprooms                             enemies: giant_albino_tarantula, small_albino_spider  | generators: small_albino_spider_generator
+l4_ragnarok_room                         enemies: giant_albino_tarantula, small_albino_spider
+l4_pool                                  enemies: mayan_thrall, panther_thrall  | generators: mayan_thrall_pool_generator
+l5_valgrind                              enemies: viking_thrall
+l5_valaskjalf                            enemies: bat_enemy, giant_albino_tarantula, giant_albino_tarantula_blind, viking_thrall, yeti_thrall  | generators: viking_thrall_pool_generator
+l6_ship_exterior                         enemies: merc, merc_deux  | generators: merc_generator, merc_generator_run
+l6_ship_natla_room                       enemies: amanda
+l7_thin_ice                              enemies: amanda
+l7_helheim01                             enemies: viking_thrall, yeti_thrall, yeti_thrall_yggdrasil  | generators: viking_thrall_generator, yeti_thrall_pool_generator
+l7_yggdrasil_end                         enemies: amanda, natla_end, yeti_thrall, yeti_thrall_yggdrasil  | generators: yeti_thrall_pool_generator
+l1_seafloor                              enemies: jellyfish_a, shark_blueshark
+l1_norse_hallway_a                       enemies: jellyfish_a
+l1_cine_ship_sinking                     enemies: amanda
+l1_ship_engine_hall                      enemies: -  | generators: merc_generator_run
+l6_ship_engine_hall                      enemies: amanda, merc_deux  | generators: merc_generator_run
+l1_ship_upper_hallway_b                  enemies: -  | generators: merc_generator_run
+l1_ship_upper_hallway_a                  enemies: -  | generators: merc_generator_run
+l2_towerroom                             enemies: bat_enemy, tiger
+l2_junglehub                             enemies: bat_enemy, tiger  | generators: bat_generator
+l2_hubhall                               enemies: bat_enemy, small_albino_spider, small_brown_spider  | generators: bat_generator, small_brown_spider_generator
+l2_shrineroom                            enemies: small_albino_spider
+l3_chapel                                enemies: bat_enemy, small_brown_spider  | generators: bat_generator, small_brown_spider_generator
+l3_stairhall                             enemies: small_brown_spider  | generators: small_brown_spider_generator
+l4_temple                                enemies: bat_enemy, cat_panther, small_albino_spider
+l4_templepath                            enemies: cat_panther
+l4_staircase_xibalba                     enemies: giant_albino_tarantula  | generators: giant_tarantula_generator
+l5_valaskjalf_entryb                     enemies: bat_enemy, giant_albino_tarantula, small_albino_spider, viking_thrall
+l5_valaskjalf_entry                      enemies: bat_enemy, viking_thrall
+l6_ship_upper_hallway                    enemies: merc, merc_deux  | generators: merc_generator_run
+l7_yggdrasil_hall02                      enemies: natla_end, viking_thrall, yeti_thrall  | generators: viking_thrall_generator
+l7_yggdrasil_hall01                      enemies: viking_thrall, yeti_thrall
+l7_helheim03                             enemies: viking_thrall, yeti_thrall  | generators: viking_thrall_generator, yeti_thrall_generator
+l7_arctic_sea                            enemies: shark_greenland
+dlc_level1_start                         enemies: bat_enemy, small_brown_spider  | generators: bat_generator, small_brown_spider_generator
+dlc_level2_start                         enemies: amanda
+dlc_dungeonhallb                         enemies: bat_enemy, giant_albino_tarantula
+dlc_dungeon                              enemies: giant_albino_tarantula, small_albino_spider  | generators: knight_thrall_pool_generator
+dlc_pillory                              enemies: bat_enemy, giant_albino_tarantula
+dlc_water_wheel                          enemies: bat_enemy
+dlc_dungeonhalla                         enemies: bat_enemy, giant_albino_tarantula
+dlc_caverns_hall                         enemies: small_albino_spider
+dlc_caverns                              enemies: bat_enemy, giant_albino_tarantula, small_albino_spider
+dlc_yggdrasil_end                        enemies: viking_thrall_dlc2_, viking_thrall_dlc2_extension  | generators: viking_thrall_pool_generator_dlc2_
+dlc_yggdrasil_hall02                     enemies: viking_thrall_dlc2_extension, viking_thrall_tutorial_dlc2_, yeti_thrall_dlc2_, yeti_thrall_dlc2_extension  | generators: viking_thrall_tutorial_pool_generator_dlc2_
+dlc2_hall_ceremony_goo                   enemies: viking_thrall_dlc2_, viking_thrall_dlc2_extension, yeti_thrall_dlc2_, yeti_thrall_dlc2_extension  | generators: viking_thrall_pool_generator_dlc2_
+dlc2_ceremony_room                       enemies: viking_thrall_dlc2_, viking_thrall_dlc2_extension, yeti_thrall_armored_dlc2_, yeti_thrall_armored_dlc2_extension, yeti_thrall_dlc2_, yeti_thrall_dlc2_extension
+dlc2_goo_room                            enemies: viking_thrall_dlc2_, viking_thrall_dlc2_extension, yeti_thrall_armored_dlc2_, yeti_thrall_armored_dlc2_extension, yeti_thrall_dlc2_, yeti_thrall_dlc2_extension, yeti_thrall_yggdrasil  | generators: viking_thrall_pool_generator_dlc2_, yeti_thrall_pool_generator_arc_dlc2_
+dlc2_hall_goo_machine                    enemies: viking_thrall_dlc2_, viking_thrall_dlc2_extension, yeti_thrall_dlc2_, yeti_thrall_dlc2_extension
+dlc2_machine_room                        enemies: viking_thrall_dlc2_, viking_thrall_dlc2_extension, yeti_thrall_armored_dlc2_, yeti_thrall_armored_dlc2_extension, yeti_thrall_dlc2_, yeti_thrall_dlc2_extension  | generators: viking_thrall_pool_generator_dlc2_
+dlc2_hall_machine_ceremony               enemies: viking_thrall_dlc2_, viking_thrall_dlc2_extension, yeti_thrall_armored_dlc2_, yeti_thrall_dlc2_, yeti_thrall_dlc2_extension, yeti_thrall_yggdrasil  | generators: viking_thrall_pool_generator_dlc2_, yeti_thrall_pool_generator_arc_dlc2_
+dlc2_treasure_room_cine                  enemies: yeti_thrall_dlc2_, yeti_thrall_dlc2_extension
