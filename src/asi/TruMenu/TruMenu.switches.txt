@@ -207,3 +207,7 @@ TruQoL | Startup | ThreadCap | int:0..31 | Start-Fix über 31 CPU-Threads | Star
 TruQoL | Startup | SkipIntro | bool | Start-Intro überspringen | Skip start-up intro | restart | 0 | Nur Intro-Film vor Press Start; Rechtstexte bleiben // Intro movie before Press Start only; legal screens stay | TruQoL 0.1.2
 # 2026-11-11: TruQoL 0.1.4 - FrontEndPauseBit is a live flag (its hook is the paused-branch clock call, placed at the start)
 TruQoL | Fixes | FrontEndPauseBit | bool | Hauptmenü-Uhren nach Pause normal | Main menu clocks normal after pause | live | 0 | Altes Pause-Bit im Hauptmenü löschen (Teaser nach 40 s) // Clears the stale pause bit in the main menu (teaser 40 s) | TruQoL 0.1.4
+
+# 2026-11-11 (Q36): TruMenu 0.22.24 - its own [Rescue] FallNet in TruMenu.ini (re-read about once a second = live)
+group | rettung | Rettung (TruMenu) | Rescue (TruMenu)
+TruMenu | Rescue | FallNet | bool | Fallnetz (Sturz aus der Welt) | Fall net (fall out of the world) | live | 0 | 3 s im Fall + 3000 unter sicherem Boden: dorthin zurück // 3 s falling + 3000 below safe ground: put back there | TruMenu 0.22.24

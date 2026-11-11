@@ -62,7 +62,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.23 (switches file limit: TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -858,6 +858,12 @@ const OptDef kOpts[] = {
     {"Settings", "SubMargin", "5", "0.22.18 (sub.margin): left / right subtitle margin in percent of the width, 0 .. 30"},
     {"Settings", "VoiceLanguage", "game", "0.22.18 (voice.lang): speech language only - game, en, fr, de, it, es, nl, "
                                           "ja, ru (nl / ja / ru only\nwith speech files in mods\\); texts stay"},
+    // 0.22.24 fall net (Q19: Lara fell out of the world in hall02 after a finisher at the edge)
+    {"Rescue", "FallNet", "0", "0.22.24: 1 = fall net - Lara in the fall record 1068 for more than 3 s and more than "
+                               "3000 units below\nthe newest safe-ground sample of her unit (player.unstuck ring) is put "
+                               "back on that sample, at most\n3 times per fall, never with the menu open or in a "
+                               "cinematic; 0 = off (one 'would' line per fall).\nLive (read about once a second). The "
+                               "'fall watch' log lines come at LogLevel 1 either way"},
 };
 const char *const kIniHeader = "TruMenu.asi options - put next to tru.exe together with TruMenu.asi (optional; defaults below)";
 
@@ -1195,6 +1201,7 @@ extern CRITICAL_SECTION g_arLock;
 extern volatile LONG g_snOn;
 void NavTick();        // 0.12 Debug-Zeichnung: [Debug] NavDraw / NavMask once in the first loaded level (game thread)
 void SafeGroundTick(); // 0.8.1 player.unstuck: ring of recent safe positions (game thread)
+void FallWatchTick();  // 0.22.24 fall watch log lines + [Rescue] FallNet (game thread, section "0.22.24 fall watch")
 void NoDamageTick();   // 0.10.2 cheat.godfull: the player's no-damage bit once per game frame (game thread)
 void SoundFreezeTick(); // 0.10.3 [Radial] FreezeSound / [Menu] PauseSound: sound pause with the world (game thread)
 void ShaderClockTick(); // 0.10.4 [Radial] FreezeShaderClock: the shader clock TimeVector holds with the freeze
@@ -1504,6 +1511,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
         PhTick();                             // 0.21.1 physics bodies: one read every 250 ms
         NavTick();                           // 0.12: [Debug] NavDraw / NavMask (once, first loaded level)
         SafeGroundTick();                     // 0.8.1: player.unstuck ring
+        FallWatchTick();                      // 0.22.24: fall watch lines / fall net (after the ring sample)
     }
     return result;
 }
@@ -3962,8 +3970,8 @@ bool CinematicNow() {
     return ReadDword(cine + 0x2c, &track) && track != 0xffffffff;
 }
 
-// why no safe ground is sampled now ("" = sample)
-const char *SafePauseReason() {
+// why no safe ground is sampled now ("" = sample); 0.22.24: timeScale false = without the time.scale test (fall net)
+const char *SafePauseReason(bool timeScale = true) {
     if (g_menuOpen) return "menu open";
     if (g_radOpen) return "ring open";
     if (g_flight) return "flight on";
@@ -3974,9 +3982,11 @@ const char *SafePauseReason() {
     BYTE control = 1;
     if (g_controlOk && ReadByte(kPlayerControl, &control) && !control) return "player control off";
     float scale = 1.0f;
-    if (g_timeOk && ReadFloats(kTimeDilation, &scale, 1) && (scale < 0.99f || scale > 1.01f)) return "time.scale not 1";
+    if (timeScale && g_timeOk && ReadFloats(kTimeDilation, &scale, 1) && (scale < 0.99f || scale > 1.01f))
+        return "time.scale not 1";
     return "";
 }
+void FwSafeAdded(const SafeSpot &s, int count);   // 0.22.24 fall watch: one rate-limited line per ring addition (below)
 
 void SafeGroundTick() {
     static int frames = 0;
@@ -4019,6 +4029,8 @@ void SafeGroundTick() {
         float dx = m[0] - last.p[0], dy = m[1] - last.p[1], dz = m[2] - last.p[2];
         add = dx * dx + dy * dy + dz * dz >= 100.0f * 100.0f || _stricmp(last.unit, unit) != 0;
     }
+    SafeSpot added = {};
+    int count = 0;
     if (add) {
         SafeSpot &s = g_safe[g_safeNext];
         memcpy(s.p, m, sizeof(s.p));
@@ -4027,8 +4039,11 @@ void SafeGroundTick() {
         strncpy_s(s.unit, sizeof(s.unit), unit, _TRUNCATE);
         g_safeNext = (g_safeNext + 1) % kSafeMax;
         if (g_safeCount < kSafeMax) ++g_safeCount;
+        added = s;
+        count = g_safeCount;
     }
     LeaveCriticalSection(&g_safeLock);
+    if (add) FwSafeAdded(added, count);       // 0.22.24: logged outside the lock (rate-limited)
 }
 void ValUnstuck(char *o, size_t n) {
     EnterCriticalSection(&g_safeLock);
@@ -4042,6 +4057,14 @@ void ValUnstuck(char *o, size_t n) {
     else Out(o, n, "%d safe spots, newest %.0f %.0f %.0f (%lu s ago, %s); mark %s; ground windows %ld ok / %ld not; "
              "waiting: %s", c, last.p[0], last.p[1], last.p[2], (GetTickCount() - last.tick) / 1000, last.unit,
              g_markSet ? "set" : "-", g_safeAccepted, g_safeRejected, g_safePause);
+}
+// 0.22.24: the one teleport of player.unstuck and the fall net - position, then the spot's yaw (0.10.2); Lara's movement
+// state and velocity stay as the game has them (no proven field, see player.mark above)
+bool UnstuckPlace(DWORD player, const float *to, float yaw, bool *yawOk) {
+    *yawOk = false;
+    if (!SetPosition(player, to)) return false;
+    *yawOk = SetYaw(player, yaw);
+    return true;
 }
 bool RunUnstuck(const char *arg, char *o, size_t n) {
     DWORD player = 0;
@@ -4078,9 +4101,9 @@ bool RunUnstuck(const char *arg, char *o, size_t n) {
         return false;
     }
     const float *to = useMark ? g_mark : spot.p;
-    if (!SetPosition(player, to)) { Out(o, n, "write failed"); return false; }
     float yaw = useMark ? g_markYaw : spot.yaw;  // 0.10.2: the facing of that moment too
-    bool yawOk = SetYaw(player, yaw);
+    bool yawOk = false;
+    if (!UnstuckPlace(player, to, yaw, &yawOk)) { Out(o, n, "write failed"); return false; }
     g_unstuckLastTick = now;
     g_unstuckLastSpot = useMark ? g_markTick : spot.tick;
     Out(o, n, "player.unstuck: %s %.0f %.0f %.0f yaw %.3f%s%s (from %.0f %.0f %.0f)", useMark ? "player.mark" : "safe ground",
@@ -18909,6 +18932,300 @@ bool RunCt(const char *arg, char *o, size_t n) {
     Out(o, n, "combo.trace %d - %s", on ? 1 : 0, on ? "one line per enemy hit in TruMenu.log" : "off");
     return true;
 }
+// ---- 0.22.24 fall watch + fall net (Q19 / Q36, workspace docs\Befund-Sturz-durch-Welt-1111.md: after a finisher Y at
+// the edge of hall02, live 2026-11-10 22:12, Lara fell out of the world - chart record 1068 [517] = falling for minutes,
+// x / y fixed, z down to -170,000 and more, no kill plane; the log had no positions between the 10-s labels, no record
+// lines outside TruTrace's teleport window, nothing for states 1008 / 1015 and no safe-ground samples).
+// Game thread, once per game frame (PadHook, after SafeGroundTick). Read only, except the fall net's teleport.
+//   * Lara's chart machine 1 = [[0xfadb58]+0xf10] (kCtChecks, as combo.trace / fight.trace), current record
+//     [machine+0x510], its index in [[machine+4]+0xc] (CtRecordIndex), state ids u16 count rec+0xc / list rec+0x18 -
+//     the two new byte checks kFwChecks: ChangeState 0x787910 reads the record array and [esi+0x510], the state enter
+//     loop 0x7859d0 reads rec+0x18 / rec+0xc / the u16 ids. Without all three checks no line and no net.
+//   * Log lines at [Menu] LogLevel >= 1 (prefix "fall watch:"): every record change whose old or new record is 742 /
+//     743 / 1068 / 1080 or that makes state 1008 / 1015 appear / disappear in the record's state ids - both records with
+//     their state ids, Lara's position and unit; entering 1068 adds the newest safe-ground sample, leaving it the time
+//     and the z change. While in 1068 a watchdog line every second (every 10 s after 30 s): position, z drop since
+//     1068 began, height below the newest safe-ground sample. Safe-ground ring additions: at most one line per 2 s
+//     with the count since the last line. Rate limit for all of these: 40 lines per 10 s, the dropped count goes into
+//     the next line. Time in 1068 = the wall time of the game frames, at most 100 ms per frame (a pause or a load does
+//     not count).
+//   * [Rescue] FallNet=1 (default 0, re-read about once a second = live): Lara in record 1068 for more than 3 s and
+//     more than 3000 units below the newest safe-ground sample of her unit taken before 1068 began -> put back on that
+//     sample with its yaw through UnstuckPlace (player.unstuck's teleport), one "fall net:" line with before / after and
+//     a second line 1 s later (record, position). Never while the menu / ring is open, flight is on, the world pause
+//     bit is set, the main state is not 1, a cinematic runs, player control is off, LP <= 0 or [Cheat] Experimental=0
+//     (SafePauseReason without the time.scale test; one "waiting" line per fall). Velocity and chart state are NOT
+//     reset (no proven field): if she falls again, the next rescue (>= 1 s later, again 3000 units below) takes the
+//     next older sample; after 3 rescues in one stay in 1068 the net gives up for that stay (one line). FallNet=0: one
+//     "off - would" line per fall instead.
+const DvCheck kFwChecks[] = {
+    {0x00787910, "8b570c 0fbfc1 8b2c82 85ed 8b9e10050000"},   // ChangeState: [[m+4]+0xc][index]; record [m+0x510]
+    {0x007859d0, "8b5e18 33ed 66396e0c 7649 eb03 8d4900 8b442418 85c0 0fb733"},   // state ids: rec+0x18 list, rec+0xc count
+};
+const int kFwRecords[] = {742, 743, 1068, 1080};   // finisher Y 742 [1004 1015] -> 743 [1008]; 1080 [515] -> 1068 [517]
+const int kFwFallRecord = 1068;
+const WORD kFwStateA = 1008, kFwStateB = 1015;
+const int kFwMaxLines = 40;
+const DWORD kFwWindowMs = 10000, kFwSafeLogMs = 2000, kFwFrameCapMs = 100;
+const DWORD kFnAfterMs = 3000, kFnAgainMs = 1000;
+const float kFnBelow = 3000.0f;
+const int kFnMaxRescues = 3;
+volatile LONG g_fnOn = 0;                     // [Rescue] FallNet (ReadOptions, then FnReadSwitch about once a second)
+bool g_fnRead = false;
+DWORD g_fnReadTick = 0;
+bool g_fwChecked = false, g_fwOk = false;
+DWORD g_fwRec = 0, g_fwFrameTick = 0;
+int g_fwIdx = -1, g_fwStates = 0;
+char g_fwRecText[64] = "";
+bool g_fwIn = false;                          // in record 1068 now (one stay = one fall)
+DWORD g_fwInMs = 0, g_fwNextWatchMs = 0, g_fwInTick = 0;
+float g_fwInZ = 0.0f;
+int g_fnRescues = 0;
+DWORD g_fnLastMs = 0, g_fnUsedTick = 0, g_fnFollowAt = 0;
+float g_fnSpot[3] = {};
+bool g_fnNotedNone = false, g_fnNotedWait = false, g_fnNotedOff = false, g_fnGaveUp = false;
+DWORD g_fwWinTick = 0, g_fwSafeLogTick = 0;
+int g_fwWinLines = 0, g_fwSafeAdds = 0;
+LONG g_fwDropped = 0;
+
+bool FwCheck() {
+    if (g_fwChecked) return g_fwOk;
+    g_fwChecked = true;
+    DWORD at = 0;
+    const bool ct = CtCheck();
+    g_fwOk = ct && DvChecks(kFwChecks, sizeof(kFwChecks) / sizeof(kFwChecks[0]), &at);
+    if (g_fwOk) Log(1, "0.22.24: fall watch ok (kCtChecks 1 + kFwChecks %u), fall net [Rescue] FallNet=%ld (live)",
+                    static_cast<unsigned>(sizeof(kFwChecks) / sizeof(kFwChecks[0])), g_fnOn);
+    else Log(0, "0.22.24: fall watch / fall net off - %s differs (0x%08lx)", ct ? "the chart record code" :
+             "the player machine code", ct ? at : 0x00768c50);
+    return g_fwOk;
+}
+// [Rescue] FallNet from TruMenu.ini (the switches row is "live": TruMenu reads the key again about once a second)
+void FnReadSwitch() {
+    if (!g_iniPath[0]) return;
+    const LONG v = GetPrivateProfileIntA("Rescue", "FallNet", atoi(OptDefault("Rescue", "FallNet")), g_iniPath) != 0 ? 1 : 0;
+    const LONG was = InterlockedExchange(&g_fnOn, v);
+    if (g_fnRead && was != v) Log(1, "fall net: [Rescue] FallNet %ld -> %ld (TruMenu.ini, live)", was, v);
+    g_fnRead = true;
+}
+// one watch line may go out now (40 per 10 s); *suffix = the count dropped since the last line that went out
+bool FwLineOk(char *suffix, size_t n) {
+    suffix[0] = 0;
+    if (g_logLevel < 1) return false;
+    const DWORD now = GetTickCount();
+    if (now - g_fwWinTick >= kFwWindowMs) { g_fwWinTick = now; g_fwWinLines = 0; }
+    if (g_fwWinLines >= kFwMaxLines) { ++g_fwDropped; return false; }
+    ++g_fwWinLines;
+    if (g_fwDropped) Out(suffix, n, " (%ld watch line(s) dropped by the rate limit)", g_fwDropped);
+    g_fwDropped = 0;
+    return true;
+}
+bool FwWatched(int idx) {
+    for (int r : kFwRecords) if (r == idx) return true;
+    return false;
+}
+// "<index> [<state ids>]" (up to 8 ids); returns bit 0 = state 1008 in the record, bit 1 = 1015 (all ids)
+int FwRecordText(DWORD rec, int idx, char *o, size_t n) {
+    size_t used = 0;
+    int flags = 0;
+    o[0] = 0;
+    LabelAdd(o, n, &used, "%d [", idx);
+    WORD cnt = 0;
+    DWORD list = 0;
+    if (rec && ReadWord(rec + 0xc, &cnt) && ReadDword(rec + 0x18, &list) && list)
+        for (int i = 0; i < cnt && i < 64; ++i) {
+            WORD id = 0;
+            if (!ReadWord(list + 2 * i, &id)) break;
+            if (i < 8) LabelAdd(o, n, &used, "%s%u", i ? " " : "", id);
+            if (id == kFwStateA) flags |= 1;
+            if (id == kFwStateB) flags |= 2;
+        }
+    LabelAdd(o, n, &used, "]");
+    return flags;
+}
+// the n-th rule of the net: the newest ring sample of <unit> taken before <before> (and before <older> when set)
+bool FwNewestSafe(const char *unit, DWORD before, DWORD older, SafeSpot *out) {
+    bool found = false;
+    EnterCriticalSection(&g_safeLock);
+    for (int i = 1; i <= g_safeCount && !found; ++i) {
+        const SafeSpot &s = g_safe[(g_safeNext + kSafeMax - i) % kSafeMax];
+        if (_stricmp(s.unit, unit) != 0 || static_cast<LONG>(before - s.tick) <= 0) continue;
+        if (older && static_cast<LONG>(older - s.tick) <= 0) continue;
+        *out = s;
+        found = true;
+    }
+    LeaveCriticalSection(&g_safeLock);
+    return found;
+}
+// SafeGroundTick added a ring entry (game thread, outside g_safeLock): at most one line per 2 s
+void FwSafeAdded(const SafeSpot &s, int count) {
+    ++g_fwSafeAdds;
+    const DWORD now = GetTickCount();
+    if (g_fwSafeLogTick && now - g_fwSafeLogTick < kFwSafeLogMs) return;
+    char drop[64];
+    if (!FwLineOk(drop, sizeof(drop))) return;
+    g_fwSafeLogTick = now ? now : 1;
+    Log(1, "fall watch: safe ground + %.1f %.1f %.1f yaw %.3f, unit %s, ring %d of %d (%d added since the last line)%s",
+        static_cast<double>(s.p[0]), static_cast<double>(s.p[1]), static_cast<double>(s.p[2]),
+        static_cast<double>(s.yaw), s.unit, count, kSafeMax, g_fwSafeAdds, drop);
+    g_fwSafeAdds = 0;
+}
+// " <dz> below the newest safe ground x y z (n s old)" / " no safe ground in this unit before the fall"
+void FwSafeText(const float *p, const char *unit, char *o, size_t n) {
+    SafeSpot s = {};
+    if (!FwNewestSafe(unit, g_fwIn ? g_fwInTick : GetTickCount(), 0, &s)) { Out(o, n, "no safe ground in this unit before it"); return; }
+    Out(o, n, "%.0f below the newest safe ground %.1f %.1f %.1f (%lu s old)", static_cast<double>(s.p[2] - p[2]),
+        static_cast<double>(s.p[0]), static_cast<double>(s.p[1]), static_cast<double>(s.p[2]),
+        (GetTickCount() - s.tick) / 1000);
+}
+// why the net may not act now ("" = it may)
+const char *FnPauseReason() {
+    if (!g_experimental) return "[Cheat] Experimental=0";
+    const char *why = SafePauseReason(false);
+    if (why[0]) return why;
+    float health = 0.0f;
+    const DWORD ps = PlayerState();
+    if (!ps || !ReadFloats(ps + 0x628, &health, 1) || !(health > 0.0f)) return "health <= 0";
+    return "";
+}
+void FallNetTick(DWORD player, const float *p, const char *unit) {
+    if (g_fwInMs <= kFnAfterMs) return;
+    if (g_fnRescues && g_fwInMs - g_fnLastMs < kFnAgainMs) return;
+    if (g_fnRescues >= kFnMaxRescues) {
+        if (!g_fnGaveUp)
+            Log(1, "fall net: %d rescues in this fall, no more until Lara leaves record %d (Lara %.1f %.1f %.1f, %.1f s)",
+                g_fnRescues, kFwFallRecord, static_cast<double>(p[0]), static_cast<double>(p[1]),
+                static_cast<double>(p[2]), g_fwInMs / 1000.0);
+        g_fnGaveUp = true;
+        return;
+    }
+    SafeSpot s = {};
+    if (!FwNewestSafe(unit, g_fwInTick, g_fnUsedTick, &s)) {
+        if (!g_fnNotedNone)
+            Log(1, "fall net: %.1f s in record %d at %.1f %.1f %.1f, no %ssafe-ground sample of unit %s before the fall - "
+                   "nothing to put her on", g_fwInMs / 1000.0, kFwFallRecord, static_cast<double>(p[0]),
+                static_cast<double>(p[1]), static_cast<double>(p[2]), g_fnRescues ? "older " : "", unit);
+        g_fnNotedNone = true;
+        return;
+    }
+    const float below = s.p[2] - p[2];
+    if (!(below > kFnBelow)) return;          // not far enough below the sample yet
+    const char *why = FnPauseReason();
+    if (why[0]) {
+        if (!g_fnNotedWait) Log(1, "fall net: Lara %.0f below safe ground after %.1f s in record %d - waiting (%s)",
+                                static_cast<double>(below), g_fwInMs / 1000.0, kFwFallRecord, why);
+        g_fnNotedWait = true;
+        return;
+    }
+    if (!g_fnOn) {
+        if (!g_fnNotedOff)
+            Log(1, "fall net off ([Rescue] FallNet=0): would put Lara %.1f %.1f %.1f (%.0f below, %.1f s in record %d) on "
+                   "safe ground %.1f %.1f %.1f (%lu s old)", static_cast<double>(p[0]), static_cast<double>(p[1]),
+                static_cast<double>(p[2]), static_cast<double>(below), g_fwInMs / 1000.0, kFwFallRecord,
+                static_cast<double>(s.p[0]), static_cast<double>(s.p[1]), static_cast<double>(s.p[2]),
+                (GetTickCount() - s.tick) / 1000);
+        g_fnNotedOff = true;
+        return;
+    }
+    bool yawOk = false;
+    const bool placed = UnstuckPlace(player, s.p, s.yaw, &yawOk);
+    ++g_fnRescues;                            // a failed write counts too: no write loop every frame
+    g_fnLastMs = g_fwInMs;
+    g_fnUsedTick = s.tick;
+    if (!placed) {
+        Log(0, "fall net: rescue %d of %d - position write failed (Lara %.1f %.1f %.1f)", g_fnRescues, kFnMaxRescues,
+            static_cast<double>(p[0]), static_cast<double>(p[1]), static_cast<double>(p[2]));
+        return;
+    }
+    g_fnFollowAt = GetTickCount();
+    if (!g_fnFollowAt) g_fnFollowAt = 1;
+    memcpy(g_fnSpot, s.p, sizeof(g_fnSpot));
+    Log(1, "fall net: rescue %d of %d after %.1f s in record %d: Lara %.1f %.1f %.1f (%.0f below) -> safe ground %.1f %.1f "
+           "%.1f yaw %.3f%s (sample %lu s old, unit %s); velocity / chart state not reset", g_fnRescues, kFnMaxRescues,
+        g_fwInMs / 1000.0, kFwFallRecord, static_cast<double>(p[0]), static_cast<double>(p[1]),
+        static_cast<double>(p[2]), static_cast<double>(below), static_cast<double>(s.p[0]), static_cast<double>(s.p[1]),
+        static_cast<double>(s.p[2]), static_cast<double>(s.yaw), yawOk ? "" : " (yaw NOT written)",
+        (GetTickCount() - s.tick) / 1000, s.unit);
+}
+void FwBegin(const float *p, DWORD now) {
+    g_fwIn = true;
+    g_fwInMs = 0;
+    g_fwNextWatchMs = 1000;
+    g_fwInTick = now ? now : 1;
+    g_fwInZ = p[2];
+    g_fnRescues = 0;
+    g_fnLastMs = g_fnUsedTick = 0;
+    g_fnNotedNone = g_fnNotedWait = g_fnNotedOff = g_fnGaveUp = false;
+}
+void FallWatchTick() {                       // game thread, once per game frame
+    const DWORD now = GetTickCount();
+    if (now - g_fnReadTick >= 1000) { g_fnReadTick = now; FnReadSwitch(); }
+    DWORD dt = g_fwFrameTick ? now - g_fwFrameTick : 0;
+    g_fwFrameTick = now;
+    if (dt > kFwFrameCapMs) dt = kFwFrameCapMs;
+    if ((g_logLevel < 1 && !g_fnOn) || !FwCheck()) { g_fwRec = 0; g_fwIdx = -1; g_fwRecText[0] = 0; g_fwIn = false; return; }
+    DWORD tracker = 0, machine = 0, rec = 0, player = 0;
+    float p[3];
+    if (!g_playerOk || !ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, p, 3) ||
+        !DvFinite(p, 3) || !ReadDword(0x00fadb58, &tracker) || !tracker || !ReadDword(tracker + 0xf10, &machine) ||
+        !machine || !ReadDword(machine + 0x510, &rec)) {
+        if (g_fwIn) Log(1, "fall watch: no player / chart machine any more after %.1f s in record %d (level change?)",
+                        g_fwInMs / 1000.0, kFwFallRecord);
+        g_fwRec = 0; g_fwIdx = -1; g_fwRecText[0] = 0; g_fwIn = false;
+        g_fnFollowAt = 0;
+        return;
+    }
+    char unit[40];
+    CurrentUnit(unit, sizeof(unit));
+    if (rec != g_fwRec) {
+        char was[64];
+        strncpy_s(was, sizeof(was), g_fwRecText[0] ? g_fwRecText : "-", _TRUNCATE);
+        const int oldIdx = g_fwIdx, oldFlags = g_fwStates;
+        g_fwRec = rec;
+        g_fwIdx = CtRecordIndex(machine, rec);
+        g_fwStates = FwRecordText(rec, g_fwIdx, g_fwRecText, sizeof(g_fwRecText));
+        char extra[200] = "", states[48] = "";
+        size_t used = 0;
+        const int changed = oldFlags ^ g_fwStates;
+        if (changed & 1) LabelAdd(states, sizeof(states), &used, " (state %u %s", kFwStateA, (g_fwStates & 1) ? "on" : "off");
+        if (changed & 2) LabelAdd(states, sizeof(states), &used, "%sstate %u %s", used ? ", " : " (", kFwStateB,
+                                  (g_fwStates & 2) ? "on" : "off");
+        if (used) LabelAdd(states, sizeof(states), &used, ")");
+        if (g_fwIdx == kFwFallRecord && !g_fwIn) {   // a fall begins
+            FwBegin(p, now);
+            char safe[120];
+            FwSafeText(p, unit, safe, sizeof(safe));
+            Out(extra, sizeof(extra), "; fall begins, Lara %s", safe);
+        } else if (g_fwIdx != kFwFallRecord && g_fwIn) {   // a fall ends (landing, death, rescue landing)
+            Out(extra, sizeof(extra), "; after %.1f s in record %d, z %+.0f since it began%s", g_fwInMs / 1000.0,
+                kFwFallRecord, static_cast<double>(p[2] - g_fwInZ), g_fnRescues ? " (fall net used)" : "");
+            g_fwIn = false;
+        }
+        char drop[64];
+        if ((FwWatched(oldIdx) || FwWatched(g_fwIdx) || changed) && FwLineOk(drop, sizeof(drop)))
+            Log(1, "fall watch: record %s -> %s%s, Lara %.1f %.1f %.1f, unit %s%s%s", was, g_fwRecText, states,
+                static_cast<double>(p[0]), static_cast<double>(p[1]), static_cast<double>(p[2]), unit, extra, drop);
+    }
+    if (g_fnFollowAt && now - g_fnFollowAt >= 1000) {   // 1 s after a rescue: where is she now
+        Log(1, "fall net: 1 s after rescue %d: record %s, Lara %.1f %.1f %.1f (z %+.0f from the safe ground)", g_fnRescues,
+            g_fwRecText, static_cast<double>(p[0]), static_cast<double>(p[1]), static_cast<double>(p[2]),
+            static_cast<double>(p[2] - g_fnSpot[2]));
+        g_fnFollowAt = 0;
+    }
+    if (!g_fwIn) return;
+    g_fwInMs += dt;
+    if (g_fwInMs >= g_fwNextWatchMs) {
+        g_fwNextWatchMs += g_fwNextWatchMs < 30000 ? 1000 : 10000;   // 1, 2 .. 30 s, then 40, 50 .. (no drift)
+        char safe[120], drop[64];
+        FwSafeText(p, unit, safe, sizeof(safe));
+        if (FwLineOk(drop, sizeof(drop)))
+            Log(1, "fall watch: %.1f s in record %d, Lara %.1f %.1f %.1f, z drop %.0f since it began (%.1f), %s%s",
+                g_fwInMs / 1000.0, kFwFallRecord, static_cast<double>(p[0]), static_cast<double>(p[1]),
+                static_cast<double>(p[2]), static_cast<double>(g_fwInZ - p[2]), static_cast<double>(g_fwInZ), safe, drop);
+    }
+    FallNetTick(player, p, unit);
+}
+// ---- end of 0.22.24 fall watch
 // ---- 0.22.11 fight.trace + enemy panel (Gegneranzeige): the PC side of the Xbox comparison (TODO N18 / N21, workspace
 // docs\Befund-Xbox-Referenz-0911.md, docs/TRUXENIA.md). The same values TruXenia reads on the Xbox, in its TSV column
 // layout (host_time inst obj_id obj_name lp stamina state0 state1 req target dist lara_rec0 lara_rec1 meter active
@@ -38587,6 +38904,7 @@ void ReadOptions(const char *dir) {
     InterlockedExchange(&g_ldWant, OptInt(ini, "Light", "Demote") != 0 ? 1 : 0);   // 0.22.18: default off
     InterlockedExchange(&g_naWant, OptInt(ini, "Menu", "NoAttract") != 0 ? 1 : 0);   // 0.22.20: default off
     InterlockedExchange(&g_ntWant, OptInt(ini, "Menu", "AttractTimerShow") != 0 ? 1 : 0);   // 0.22.21: default off
+    InterlockedExchange(&g_fnOn, OptInt(ini, "Rescue", "FallNet") != 0 ? 1 : 0);   // 0.22.24: default off (live: FnReadSwitch)
     {                                        // 0.22.21 [Menu] AttractTimerPosition: tl / tr / bl / br, else tr
         char v[16];
         OptString(ini, "Menu", "AttractTimerPosition", v, sizeof(v));
@@ -39143,6 +39461,7 @@ void Start(HMODULE self) {
            "%d samples x %d frames, chord %.0f, slope %.1f + %.0f, cinematic test %d, marks keep the yaw",
         kPlayerModeFlags, kNoDamageBit, g_godFullOk ? 1 : 0, kSafeWindow, kSafeEvery, kSafeChord, kSafeSlope, kSafeStep,
         g_cineOk ? 1 : 0);
+    FwCheck();                                // 0.22.24 fall watch / fall net: kCtChecks + kFwChecks, one line
     QuickCheck();                             // 0.17 quick-toggle bar + shot.oncine (precheck_017.txt; after 0.8 / 0.10.2)
     PosCheck();                               // 0.17 checkpoint list / position bookmarks (precheck_017.txt)
     DevRead();

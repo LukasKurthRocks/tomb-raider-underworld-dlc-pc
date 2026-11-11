@@ -2928,6 +2928,66 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.24 - fall watch + fall net (2026-11-11)
+
+Built into `work\asi\menu0247`, not installed, no live test (night queue Q36). Finding Q19 (workspace
+`docs\Befund-Sturz-durch-Welt-1111.md`): after a finisher Y on a thrall lying at the edge of hall02 (live 2026-11-10
+22:12) Lara fell out of the world - chart record 1068 [517] = falling, x / y fixed, z down to -170,000 and more, no
+kill plane. The logs had no position between the 10-s labels, no record line outside TruTrace's teleport window,
+nothing for states 1008 / 1015 and no safe-ground samples.
+
+- **Reads (2 new byte checks, `kFwChecks`):** Lara's chart machine 1 `[[0xfadb58]+0xf10]` (the `kCtChecks` row of
+  0.22.9), current record `[machine+0x510]` and its index in `[[machine+4]+0xc]` (ChangeState 0x787910 / 0x78791b:
+  `8b570c 0fbfc1 8b2c82 85ed 8b9e10050000`), the record's state ids u16 count `rec+0xc` / list `rec+0x18` (state enter
+  loop 0x7859d0: `8b5e18 33ed 66396e0c ...  0fb733`) - the same reads as `combo.trace` / `fight.trace` / TruTrace /
+  TruRockVein. Without all three checks: one log line, no watch line, no net.
+- **Fall watch (log lines `fall watch:` at `[Menu] LogLevel` 1, always on):** every record change whose old or new
+  record is 742 / 743 / 1068 / 1080 (finisher Y 742 [1004 1015] -> 743 [1008]; jump / fall 1080 [515] -> 1068 [517])
+  or that makes state 1008 / 1015 appear / disappear in the record's state ids: `fall watch: record 742 [1004 1015] ->
+  743 [1008] (state 1008 on, state 1015 off), Lara x y z, unit <unit>`; entering 1068 adds `; fall begins, Lara <n>
+  below the newest safe ground x y z (<s> s old)`, leaving it `; after <s> s in record 1068, z <+-n> since it began`.
+  While in 1068 a watchdog line every second (1, 2 .. 30 s, then every 10 s): `fall watch: <s> s in record 1068, Lara
+  x y z, z drop <n> since it began (<z0>), <n> below the newest safe ground ...`. Safe-ground ring additions
+  (`player.unstuck` sampler): `fall watch: safe ground + x y z yaw <r>, unit <unit>, ring <n> of 16 (<k> added since the
+  last line)` at most every 2 s. One rate limit for all of them: 40 lines per 10 s, the next line names the dropped
+  count. "Time in 1068" = the wall time of the game frames, at most 100 ms per frame (a pause or load does not count).
+- **Fall net `[Rescue] FallNet` (default 0, live - TruMenu reads the key about once a second; bar page Fixes, group
+  `Rettung (TruMenu)`):** when Lara is more than 3 s in record 1068 **and** more than 3000 units below the newest
+  safe-ground sample of her unit taken before 1068 began, she is put back on that sample with its yaw through
+  `UnstuckPlace` - the one teleport of `player.unstuck` (position, then yaw), which `player.unstuck` now uses too.
+  Lines: `fall net: rescue 1 of 3 after 3.0 s in record 1068: Lara x y z (<n> below) -> safe ground x y z yaw <r>
+  (sample <s> s old, unit <unit>); velocity / chart state not reset` and 1 s later `fall net: 1 s after rescue 1:
+  record <rec>, Lara x y z (z <+-n> from the safe ground)`. Never while the menu or ring is open, flight is on, the
+  world pause bit is set, the main state is not 1, a cinematic runs, player control is off, LP <= 0 or `[Cheat]
+  Experimental=0` (one `waiting (<reason>)` line per fall; the rescue follows once the reason is gone).
+  `FallNet=0`: one `fall net off ([Rescue] FallNet=0): would put Lara ...` line per fall.
+- **Open: velocity.** No velocity / "stand" field of the player is proven (see `player.mark`, 0.10.2 / 0.10.4), so the
+  net moves the position only; Lara keeps record 1068 and her fall speed (Q19 fit: -5,151 units/s^2, at 3 s about
+  15,000 units/s = ~500 units per 30-fps frame). Whether the floor catches her at that speed is the live test's
+  question. If she falls again, the next rescue (at least 1 s later, again 3000 units below) takes the next older
+  sample; after 3 rescues in one fall the net stops for that fall (`fall net: 3 rescues in this fall, no more ...`).
+- Checks: `precheck_02224.txt` = the 49 rows of 0.22.23 + the `kCtChecks` row + the 2 `kFwChecks` rows, 52 checks 0
+  mismatches against `data/pc/tru.exe` and the installed `tru.exe`; `trumenu_precheck_match` section `0.22.24 fall
+  watch` 2 = 2; `trumenu_ini_check` `check_02224` (negative test on copies: 12 of 12 mutations caught), the switches
+  check accepts TruMenu's own row (`SW_ROW_ONLY`, live = `FnReadSwitch`), `check_02223` looks for its kVersion part;
+  `trumenu_quick_check` new model `fallnet` (11 cases on the Q19 fall numbers: first rescue at 3.03 s, worst case 3
+  rescues 1 s apart with older samples, floor holds = one rescue and a fall-end line, FallNet=0 / menu open / normal jump
+  / frame gap / watchdog cadence / rate limit / foreign unit, and a negative model without the 1 s spacing); qb layout,
+  readability, umlauts, flat PS pass. `Set-TruMenu.ps1` knows the 0.22.23 hash.
+
+### TO TEST 0.22.24
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start-up | start the game, read `TruMenu.log` | `0.22.24: fall watch ok (kCtChecks 1 + kFwChecks 2), fall net [Rescue] FallNet=0 (live)` |
+| 2 | watch lines | hall02, a normal jump and a fall from a ledge | `fall watch: record ... -> 1080 [515]`, `1080 [515] -> 1068 [517] ...; fall begins`, `1068 [517] -> <landing> ...; after <s> s in record 1068`; while walking `fall watch: safe ground + ...` at most every 2 s |
+| 3 | finisher lines | hall02 thrall fight, finisher Y on a lying thrall | `record ... -> 742 [1004 1015] (state 1015 on)`, `742 [...] -> 743 [1008] (state 1008 on, state 1015 off)` with Lara's positions |
+| 4 | net on | bar page Fixes, group `Rettung (TruMenu)`: `Fallnetz (Sturz aus der Welt)` on (`sw.set TruMenu:Rescue:FallNet 1`) | log `fall net: [Rescue] FallNet 0 -> 1 (TruMenu.ini, live)` within ~1 s |
+| 5 | provoke the fall | TruShadowCombat `Translate1008=0` (as the Q19 session), hall02: knock a thrall to the y ~ 8260 edge, finisher Y | `fall begins` line, watchdog lines, then **within ~3 s** `fall net: rescue 1 of 3 ... -> safe ground ...`, Lara back on the floor; `1 s after rescue 1: record <landing>` and a `... -> <landing> ...; after <s> s in record 1068 ... (fall net used)` line. If she falls through again: rescues 2 / 3 1 s apart, then `no more` - note the lines (velocity question) |
+| 6 | net off | `FallNet` 0, provoke again (or any long fall) | `fall net off ([Rescue] FallNet=0): would put Lara ...` once, no teleport |
+| 7 | menu during the fall | net on, open the bar while she falls | `fall net: ... waiting (menu open)`, the rescue right after closing the bar |
+| 8 | unstuck unchanged | `player.unstuck` as before | the same answer text as 0.22.23 |
+
 ## 0.22.23 - switches file limit 512 (2026-11-11)
 
 Built into `work\asi\menu0246`, not installed, no live test (night queue Q39). `TruMenu.switches.txt` (bar page Fixes,
@@ -4242,6 +4302,7 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Shot] Clean` | 1 | 0.10.5: 1 = copied before TruMenu draws; 0 = after (as on screen); `shot.save ui` / `clean` per shot; `claude.mark` always clean |
 | `[Shot] Hotkey` | 0 | 0.10.5: virtual key (e.g. `0x7A` = F11) = `claude.mark now`; the game still gets it; 0 = off |
 | `[Shot] MaxPerMinute` | 30 | 0.10.5: shots (and, separately, marks) per minute, 1 .. 120; 0 = no limit |
+| `[Rescue] FallNet` | 0 | 0.22.24: 1 = fall net - Lara more than 3 s in the fall record 1068 and more than 3000 units below the newest safe-ground sample of her unit (the `player.unstuck` ring) is put back on that sample (at most 3 times per fall, never with the menu / ring open, in a cinematic, without player control); 0 = off, one "would" line per fall. Live: TruMenu reads the key about once a second (switch row in group `Rettung (TruMenu)`). The `fall watch:` log lines come at LogLevel 1 either way |
 
 ## Build, install, test (Windows)
 

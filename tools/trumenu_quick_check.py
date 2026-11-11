@@ -110,6 +110,13 @@ shipped file is a bar row, ring frozen at 172).
 0.22.23 (Q39 switches file limit): swcap (SwLoadLocked with kSwMax 512 / kSwGroupMax 24: lines over a limit are not
 shown, counted with the first line number for one log line per kind, rows below a group over the limit belong to no
 group; QbSwRows: rows the page cannot hold are counted for the head note; the old 160 cap as negative model).
+0.22.24 (Q36 fall watch / fall net): fallnet (FallWatchTick / FallNetTick / FwLineOk: the Q19 fall of 2026-11-10 with
+the gravity of the finding (-5,151 u/s^2, start at rest ~2,100 units below the floor) at 30 frames/s - the net's first
+rescue after 3 s in record 1068, at most 3 per fall with older samples when she keeps falling (worst case: velocity kept,
+no floor), one fall-end line when the floor holds her, FallNet=0 one "would" line, the menu open = one waiting line
+and the rescue after the close, a normal jump = no watchdog line / no rescue, a 10 s frame gap counts 100 ms, the
+watchdog every 1 s / every 10 s after 30 s, 40 watch lines per 10 s with the dropped count in the next line, samples of
+another unit / taken after the fall began never used; the constants and rule lines are read from TruMenu.cpp).
 0.21.6 (2026-11-07 costumes / flight line / quick command line): cosbar (QbCosRows: 4 rows + the open list from the
 cycle list, the current costume marked, every row refused without a level, labels "<slot> <text> (<object>)" only for
 dlc_costume_a..p, records only with an object id; page / row limits: own page <= 64 rows for any list up to 60, the
@@ -4529,6 +4536,258 @@ def check_ntclock():
     return good
 
 
+# ------------------------------------------------------------------------------------------------- fallnet (0.22.24)
+def fn_source():
+    """0.22.24: constants and rule lines of the fall watch / fall net in TruMenu.cpp"""
+    import os, re
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src', 'asi', 'TruMenu',
+                            'TruMenu.cpp'), encoding='utf-8').read()
+    def num(name):
+        m = re.search(r'\b%s = (\d+(?:\.\d+)?)f?\b' % name, src)
+        return float(m.group(1)) if m else None
+    recs = re.search(r'const int kFwRecords\[\] = \{([^}]*)\};', src)
+    net = re.search(r'\nvoid FallNetTick\([^;{]*\{.*?\n\}', src, re.S)          # the definitions, not a declaration
+    watch = re.search(r'\nvoid FallWatchTick\(\) \{.*?\n\}', src, re.S)
+    net = net.group(0) if net else ''
+    watch = watch.group(0) if watch else ''
+    order = ['if (g_fwInMs <= kFnAfterMs) return;', 'if (g_fnRescues && g_fwInMs - g_fnLastMs < kFnAgainMs) return;',
+             'if (g_fnRescues >= kFnMaxRescues) {', 'if (!FwNewestSafe(unit, g_fwInTick, g_fnUsedTick, &s)) {',
+             'if (!(below > kFnBelow)) return;', 'const char *why = FnPauseReason();', 'if (!g_fnOn) {',
+             'const bool placed = UnstuckPlace(player, s.p, s.yaw, &yawOk);']
+    at = [net.find(x) for x in order]
+    return {'after': num('kFnAfterMs'), 'again': num('kFnAgainMs'), 'below': num('kFnBelow'),
+            'max': num('kFnMaxRescues'), 'lines': num('kFwMaxLines'), 'window': num('kFwWindowMs'),
+            'cap': num('kFwFrameCapMs'), 'fall': num('kFwFallRecord'),
+            'records': [int(x) for x in recs.group(1).split(',')] if recs else [],
+            'order': all(a >= 0 for a in at) and at == sorted(at),
+            'cadence': 'g_fwNextWatchMs += g_fwNextWatchMs < 30000 ? 1000 : 10000;' in watch,
+            'capped': 'if (dt > kFwFrameCapMs) dt = kFwFrameCapMs;' in watch,
+            'pause': 'const char *why = SafePauseReason(false);' in src and 'if (!g_experimental) return' in src}
+
+
+class FnModel:
+    """FallWatchTick + FallNetTick + FwLineOk + FwNewestSafe of 0.22.24, line by line; times in ms"""
+    def __init__(self, c, on=1, level=1):
+        self.c, self.on, self.level = c, on, level
+        self.idx, self.frame_tick = None, None
+        self.in_, self.in_ms, self.next_watch, self.in_tick, self.in_z = False, 0, 0, 0, 0.0
+        self.rescues, self.last_ms, self.used_tick, self.follow_at = 0, 0, 0, 0
+        self.noted = {'none': False, 'wait': False, 'off': False, 'gaveup': False}
+        self.win_tick, self.win_lines, self.dropped = 0, 0, 0
+        self.ring = []                           # (tick, z, unit), oldest first
+        self.lines, self.places = [], []
+
+    def line_ok(self, now):                      # FwLineOk: None = not logged, else the dropped count it carries
+        if self.level < 1: return None
+        if now - self.win_tick >= self.c['window']: self.win_tick, self.win_lines = now, 0
+        if self.win_lines >= self.c['lines']:
+            self.dropped += 1
+            return None
+        self.win_lines += 1
+        d, self.dropped = self.dropped, 0
+        return d
+
+    def newest(self, unit, before, older):       # FwNewestSafe
+        for tick, z, u in reversed(self.ring):
+            if u != unit or before - tick <= 0: continue
+            if older and older - tick <= 0: continue
+            return tick, z
+        return None
+
+    def tick(self, now, idx, z, unit='hall02', why=''):
+        """one game frame; returns Lara's z after the frame (the net's teleport)"""
+        c = self.c
+        dt = now - self.frame_tick if self.frame_tick is not None else 0
+        self.frame_tick = now
+        dt = min(dt, c['cap'])
+        if idx != self.idx:
+            old, self.idx = self.idx, idx
+            extra = ''
+            if idx == c['fall'] and not self.in_:
+                self.in_, self.in_ms, self.next_watch, self.in_tick, self.in_z = True, 0, 1000, now, z
+                self.rescues, self.last_ms, self.used_tick = 0, 0, 0
+                self.noted = dict.fromkeys(self.noted, False)
+                extra = 'begin'
+            elif idx != c['fall'] and self.in_:
+                extra = 'end' + (' net' if self.rescues else '')
+                self.in_ = False
+            if old in c['records'] or idx in c['records']:
+                d = self.line_ok(now)
+                if d is not None: self.lines.append((now, 'record', old, idx, extra, d))
+        if self.follow_at and now - self.follow_at >= 1000:
+            self.lines.append((now, 'follow', idx, z))
+            self.follow_at = 0
+        if not self.in_: return z
+        self.in_ms += dt
+        if self.in_ms >= self.next_watch:
+            self.next_watch += 1000 if self.next_watch < 30000 else 10000
+            d = self.line_ok(now)
+            if d is not None: self.lines.append((now, 'watch', self.in_ms, z, d))
+        # FallNetTick
+        if self.in_ms <= c['after']: return z
+        if self.rescues and self.in_ms - self.last_ms < c['again']: return z
+        if self.rescues >= c['max']:
+            if not self.noted['gaveup']: self.lines.append((now, 'gaveup', self.rescues))
+            self.noted['gaveup'] = True
+            return z
+        s = self.newest(unit, self.in_tick, self.used_tick)
+        if not s:
+            if not self.noted['none']: self.lines.append((now, 'none'))
+            self.noted['none'] = True
+            return z
+        if not (s[1] - z > c['below']): return z
+        if why:
+            if not self.noted['wait']: self.lines.append((now, 'wait', why))
+            self.noted['wait'] = True
+            return z
+        if not self.on:
+            if not self.noted['off']: self.lines.append((now, 'would', z, s[1]))
+            self.noted['off'] = True
+            return z
+        self.rescues += 1
+        self.last_ms, self.used_tick, self.follow_at = self.in_ms, s[0], now or 1
+        self.places.append((now, self.in_ms, z, s[1], s[0]))
+        self.lines.append((now, 'rescue', self.rescues))
+        return s[1]
+
+
+def fn_fall(m, catch=False, seconds=12.0, fps=30.0, why_at=None, g=-5151.0, start=-2500.0, t0=20000):
+    """the Q19 fall: record 754 one frame and 1080 0.2 s on the floor, then record 1068 from rest at `start` (the fit's
+    rest point ~2,100 below the floor); the velocity is kept through a rescue (worst case: no floor catches her) unless
+    `catch` (the floor holds her: record 1050 from the next frame)"""
+    floor = -295.3
+    for k in range(3):                           # three ring samples on the floor, 15 / 10 / 5 s before
+        m.ring.append((t0 - 15000 + 5000 * k, floor, 'hall02'))
+    step = 1000.0 / fps
+    t, z, v, idx, n = float(t0), floor, 0.0, 754, 0
+    caught = False
+    while t < t0 + seconds * 1000:
+        now = int(t)
+        if n == 0: idx = 754
+        elif t < t0 + 200: idx = 1080
+        elif caught: idx, v = 1050, 0.0
+        else:
+            if idx != 1068: z, v = start, 0.0
+            idx = 1068
+        why = why_at(t - t0) if why_at else ''
+        z2 = m.tick(now, idx, z, why=why)
+        if z2 != z:
+            z = z2
+            if catch: caught = True
+        if idx == 1068 and not caught:
+            v += g * step / 1000.0
+            z += v * step / 1000.0
+        t += step
+        n += 1
+    return m
+
+
+def check_fallnet():
+    c = fn_source()
+    cases = [('source: constants %s / %s / %s / %s, %s lines per %s ms, cap %s, records %s, order / cadence / cap'
+              % (c['after'], c['again'], c['below'], c['max'], c['lines'], c['window'], c['cap'], c['records']),
+              c['after'] == 3000 and c['again'] == 1000 and c['below'] == 3000 and c['max'] == 3 and
+              c['lines'] == 40 and c['window'] == 10000 and c['cap'] == 100 and c['fall'] == 1068 and
+              c['records'] == [742, 743, 1068, 1080] and c['order'] and c['cadence'] and c['capped'] and c['pause'])]
+    if not cases[0][1]:
+        print('fallnet: %-100s FAIL' % cases[0][0])
+        return False
+    # 1 worst case: she keeps falling after each rescue - 3 rescues, newest sample first, then one give-up line
+    m = fn_fall(FnModel(c))
+    p = m.places
+    kinds = [l[1] for l in m.lines]
+    cases.append(('Q19 fall, velocity kept: rescues at %s s in 1068, samples newest -> oldest, 1 give-up line'
+                  % ', '.join('%.2f' % (x[1] / 1000.0) for x in p),
+                  len(p) == 3 and 3000 < p[0][1] <= 3100 and all(b[1] - a[1] >= 1000 for a, b in zip(p, p[1:])) and
+                  [x[4] for x in p] == sorted([x[4] for x in p], reverse=True) and kinds.count('gaveup') == 1))
+    cases.append(('Q19 fall: first rescue at z %.0f = %.0f below the floor sample (> 3000)' % (p[0][2], p[0][3] - p[0][2]),
+                  bool(p) and p[0][3] - p[0][2] > 3000))
+    # 2 the floor holds her after the first rescue: one rescue, the fall ends with "net", a follow-up line in 1050
+    m = fn_fall(FnModel(c), catch=True)
+    ends = [l for l in m.lines if l[1] == 'record' and l[4].startswith('end')]
+    follow = [l for l in m.lines if l[1] == 'follow']
+    cases.append(('floor holds her: %d rescue, fall-end line "%s", follow-up in record %s' %
+                  (len(m.places), ends[0][4] if ends else '-', follow[0][2] if follow else '-'),
+                  len(m.places) == 1 and len(ends) == 1 and ends[0][4] == 'end net' and len(follow) == 1 and
+                  follow[0][2] == 1050))
+    # 3 FallNet=0: one "would" line, no rescue
+    m = fn_fall(FnModel(c, on=0))
+    would = sum(1 for l in m.lines if l[1] == 'would')
+    cases.append(('FallNet=0: %d "would" line, %d rescues' % (would, len(m.places)), would == 1 and not m.places))
+    # 4 menu open 2.5 .. 6.0 s after the start: one waiting line, the rescue at the first frame after the close
+    m = fn_fall(FnModel(c), why_at=lambda dt: 'menu open' if 2500 <= dt < 6000 else '')
+    waits = [l for l in m.lines if l[1] == 'wait']
+    first = (m.places[0][0] - 20000) / 1000.0 if m.places else -1.0
+    cases.append(('menu open 2.5 .. 6.0 s: %d waiting line, first rescue %.2f s after the start' % (len(waits), first),
+                  len(waits) == 1 and 6.0 <= first < 6.04))
+    # 5 a normal jump: 1080 0.3 s, 1068 0.8 s (300 units), landing - 3 record lines, no watchdog, no rescue
+    m = FnModel(c)
+    m.ring.append((500, 0.0, 'hall02'))
+    t, z = 1000, 0.0
+    for k in range(60):
+        idx = 61 if k < 10 else 1080 if k < 19 else 1068 if k < 43 else 1050
+        if idx == 1068: z -= 12.5
+        m.tick(t, idx, z)
+        t += 33
+    kinds = [l[1] for l in m.lines]
+    cases.append(('normal jump: %d record lines, %d watchdog lines, %d rescues' %
+                  (kinds.count('record'), kinds.count('watch'), len(m.places)),
+                  kinds.count('record') == 3 and kinds.count('watch') == 0 and not m.places))
+    # 6 a 10 s frame gap (pause / load) inside 1068 counts 100 ms: 2.8 s of frames + the gap stay below 3 s
+    m = FnModel(c)
+    m.ring.append((500, 0.0, 'hall02'))
+    m.tick(900, 61, 0.0)
+    t = 1000
+    for k in range(85):
+        m.tick(t, 1068, -5000.0)
+        t += 33
+    m.tick(t + 10000, 1068, -5000.0)
+    cases.append(('10 s frame gap in 1068: time in 1068 %.2f s, no rescue' % (m.in_ms / 1000.0),
+                  m.in_ms < 3000 and not m.places))
+    # 7 watchdog cadence over 65 s without a sample: 1 .. 30 s every second, then 40 / 50 / 60; one "no sample" line
+    m = FnModel(c)
+    m.tick(0, 61, 0.0)
+    t, z = 100, 0.0
+    while t <= 65100:
+        m.tick(t, 1068, z)
+        z -= 100.0
+        t += 33
+    watch = [l[2] // 1000 for l in m.lines if l[1] == 'watch']
+    nones = sum(1 for l in m.lines if l[1] == 'none')
+    cases.append(('65 s in 1068: %d watchdog lines (%s .. %s), %d "no sample" line' %
+                  (len(watch), watch[:2], watch[-3:], nones),
+                  len(watch) == 33 and watch[:30] == list(range(1, 31)) and watch[30:] == [40, 50, 60] and nones == 1))
+    # 8 rate limit: 742 <-> 743 every 100 ms for 12 s -> 40 lines in the first 10 s, the next carries the dropped count
+    m = FnModel(c)
+    for k in range(120):
+        m.tick(100 * k + 50, 742 if k % 2 else 743, 0.0)
+    early = [l for l in m.lines if l[0] < 10050]
+    later = [l for l in m.lines if l[0] >= 10050]
+    cases.append(('742 <-> 743 every 100 ms: %d lines in the first 10 s, the next line names %d dropped' %
+                  (len(early), later[0][5] if later else -1), len(early) == 40 and bool(later) and later[0][5] == 60))
+    # 9 samples of another unit or taken after the fall began are never used
+    m = FnModel(c)
+    m.ring += [(500, 0.0, 'other_unit'), (2500, 0.0, 'hall02')]
+    m.tick(900, 61, 0.0)
+    t = 1000
+    while t < 6000:
+        m.tick(t, 1068, -9000.0)
+        t += 33
+    nones = sum(1 for l in m.lines if l[1] == 'none')
+    cases.append(('only samples of another unit / after the fall began: %d rescues, %d "no sample" line' %
+                  (len(m.places), nones), not m.places and nones == 1))
+    # negative model: without the 1 s spacing the worst case spends all 3 rescues within a second
+    m = fn_fall(FnModel(dict(c, again=0)))
+    span = (m.places[-1][1] - m.places[0][1]) / 1000.0 if len(m.places) > 1 else 99.0
+    cases.append(('negative model (no 1 s spacing): 3 rescues within %.2f s - caught by case 1' % span,
+                  len(m.places) == 3 and span < 1.0))
+    good = True
+    for name, ok in cases:
+        print('fallnet: %-100s %s' % (name, 'ok' if ok else 'FAIL'))
+        good &= bool(ok)
+    return good
+
+
 def main():
     rng = random.Random(17)
     results = [check_depth(rng), check_chord(), check_frames(), check_segments(), check_confirm(), check_presets(),
@@ -4557,7 +4816,8 @@ def main():
                check_noattract(),                                                     # 0.22.20
                check_attracttimer(),                                                  # 0.22.21
                check_ntclock(),                                                       # 0.22.22
-               check_swcap()]                                                         # 0.22.23
+               check_swcap(),                                                         # 0.22.23
+               check_fallnet()]                                                       # 0.22.24
     print('all ok' if all(results) else 'FAILED')
     return 0 if all(results) else 1
 

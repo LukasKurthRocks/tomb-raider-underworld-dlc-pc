@@ -122,6 +122,11 @@ says so ("aktuell nicht weiter gemacht"), at most 172 entries, every entry is a 
 limits in TruMenu.log (no silent cut), the page Fixes head names rows it cannot hold, the switches file's own header
 says 512, and the page model of the shipped file: group rows + the largest group <= kQbViewMax (128) - else the open
 group would be cut on the bar page (split the group).
+0.22.24 (Q36, fall watch / fall net): check_02224 - kFwChecks / kCtChecks rows, FwCheck before any chart read, the
+fall watch rules and constants, FallNetTick's order (time, count, sample, height, pause, switch, then UnstuckPlace),
+RunUnstuck and the net share UnstuckPlace, [Rescue] FallNet in kOpts / ReadOptions / FnReadSwitch / the INI, the one
+TruMenu switch row (SW_ROW_ONLY: TruMenu may have rows without every TruMenu.ini key being one), precheck_02224 = the
+49 rows of precheck_02223 + kCtChecks + kFwChecks, Set-TruMenu.ps1 knows the 0.22.23 hash.
 Options: --switches FILE checks that file instead of the shipped one.
 
 Usage (from the repository root):
@@ -1719,6 +1724,9 @@ PLUGINS = os.path.join(ROOT, 'src', 'asi')
 # 0.21.5 (2026-11-07 TruMenu 0.21.5 Fixes): the plugins of the switches file (never TruGuard); text keys are no switches
 SW_PLUGINS = ('TruShadowPower', 'TruShadowCombat', 'TruShadowHud', 'TruRockVein', 'TruDoppelganger', 'TruDlc2Player',
               'TruMercLang', 'TruTrace', 'TruQoL')   # 2026-11-08 (17y): + the player plugin TruQoL 0.1.1
+# 0.22.24 (Q36): plugins that may have rows without every INI key being one - TruMenu's own [Rescue] FallNet row (its
+# other TruMenu.ini keys are the bar / menu items' business, not switches)
+SW_ROW_ONLY = ('TruMenu',)
 SW_TEXT_KEYS = {('TruMercLang', 'MercLang', 'PathFilter'), ('TruTrace', 'Trace', 'SpawnFilter'),
                 ('TruTrace', 'Trace', 'ProgressFilter')}
 # the run-time re-read of every live key: (plugin, section, key) -> function head in the plugin source whose body holds
@@ -1773,6 +1781,7 @@ SW_LIVE = {
     ('TruQoL', 'Camera', 'FovCutscenes'): 'void LiveReadOptions(',
     ('TruQoL', 'Camera', 'ShakeScale'): 'void LiveReadOptions(',
     ('TruQoL', 'Fixes', 'FrontEndPauseBit'): 'void LiveReadOptions(',   # TruQoL 0.1.4 (2026-11-11)
+    ('TruMenu', 'Rescue', 'FallNet'): 'void FnReadSwitch(',             # TruMenu 0.22.24 (Q36, about once a second)
 }
 SW_MAX, SW_GROUP_MAX = 512, 24              # 0.22.23: 512 rows (was 160 - the shipped file had 159)
 QB_VIEW_MAX = 128                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group)
@@ -1923,7 +1932,8 @@ def check_switches(path):
             continue
         plugin, section, key, typ, de, en, when, default, hint = f[:9]
         since = f[9] if len(f) == 10 else ''
-        if plugin not in SW_PLUGINS: problems.append('%s: plugin %s not in %s' % (where, plugin, SW_PLUGINS))
+        if plugin not in SW_PLUGINS + SW_ROW_ONLY:
+            problems.append('%s: plugin %s not in %s' % (where, plugin, SW_PLUGINS + SW_ROW_ONLY))
         if not (word.fullmatch(section) and len(section) < 32 and word.fullmatch(key) and len(key) < 40):
             problems.append('%s: section / key (letters, digits, _)' % where)
         # 17y: choice values may hold a dot (TruQoL Fov / ShakeScale floats as their exact INI text)
@@ -1954,7 +1964,7 @@ def check_switches(path):
         if (plugin, section, key) in seen: problems.append('%s: [%s] %s of %s twice' % (where, section, key, plugin))
         seen.add((plugin, section, key))
         rows.append((n, plugin, section, key, typ, when, default, since))
-        if plugin not in SW_PLUGINS: continue
+        if plugin not in SW_PLUGINS + SW_ROW_ONLY: continue
         if plugin not in inis:
             inis[plugin], versions[plugin], sources[plugin] = plugin_ini(plugin), plugin_version(plugin), \
                 plugin_source(plugin)
@@ -3346,8 +3356,8 @@ def check_02223(switches_path):
     (precheck_02223 = the 49 rows of precheck_02222), Set-TruMenu.ps1 knows the 0.22.22 hash; INI unchanged"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.23 (switches file limit' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.23 (switches file limit')
+    if '"0.22.23 (switches file limit' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.24: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.23 part "0.22.23 (switches file limit"')
     if 'const int kQbViewMax = %d;' % QB_VIEW_MAX not in src:
         problems.append('TruMenu.cpp: kQbViewMax differs from this tool (%d)' % QB_VIEW_MAX)
     for want in ('SwRow g_sw[kSwMax];', 'SwGroup g_swGroup[kSwGroupMax];', 'SwValue g_swVal[kSwMax];'):
@@ -3394,6 +3404,96 @@ def check_02223(switches_path):
     return problems, ('switches limit %d / %d groups (file %d rows in %d groups, %d free), lines over it logged, page '
                       'Fixes at most %d rows (group %s open) <= %d, no new byte checks' %
                       (SW_MAX, SW_GROUP_MAX, total, len(groups), SW_MAX - total, page, biggest[0], QB_VIEW_MAX))
+
+
+FW_ROWS = [('00787910', '8b570c0fbfc18b2c8285ed8b9e10050000'),
+           ('007859d0', '8b5e1833ed66396e0c7649eb038d49008b44241885c00fb733')]
+CT_ROW = ('00768c50', 'a158dbfa00568bb0100f0000578bb8140f00008bcee8f6f10100')
+
+
+def check_02224(ini_path, switches_path):
+    """0.22.24 (Q36, the Q19 fall out of the world in hall02): fall watch lines at LogLevel 1 (records 742 / 743 / 1068 /
+    1080, states 1008 / 1015, watchdog in 1068, safe-ground additions, one rate limit) and [Rescue] FallNet (default 0,
+    live, re-read by FnReadSwitch): the net acts only after 3 s in 1068 and 3000 units below the newest safe-ground
+    sample before the fall, through UnstuckPlace (player.unstuck's teleport), after the pause test, at most 3 times per
+    fall; 2 byte checks kFwChecks + kCtChecks before any read (precheck_02224 = the 49 rows of precheck_02223 + the
+    kCtChecks row + these 2); the TruMenu switch row; Set-TruMenu.ps1 knows the 0.22.23 hash"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.24 (fall watch + fall net' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.24 (fall watch + fall net')
+    m = re.search(r'const DvCheck kFwChecks\[\] = \{(.*?)\n\};', src, re.S)
+    rows = [(a, b.replace(' ', '')) for a, b in re.findall(r'\{0x([0-9a-f]{8}), "([0-9a-f ]+)"\}', m.group(1))] if m else []
+    if rows != FW_ROWS: problems.append('TruMenu.cpp: kFwChecks must be the 2 rows 0x787910 / 0x7859d0')
+    m = re.search(r'const DvCheck kCtChecks\[\] = \{(.*?)\n\};', src, re.S)
+    ct = [(a, b.replace(' ', '')) for a, b in re.findall(r'\{0x([0-9a-f]{8}), "([0-9a-f ]+)"\}', m.group(1))] if m else []
+    if ct != [CT_ROW]: problems.append('TruMenu.cpp: kCtChecks must stay the one row 0x768c50')
+    chk = fn_body(src, 'bool FwCheck(')
+    for want in ('const bool ct = CtCheck();', 'g_fwOk = ct && DvChecks(kFwChecks,'):
+        if want not in chk: problems.append('TruMenu.cpp: FwCheck must hold %s' % want)
+    watch = fn_body(src, 'void FallWatchTick(')
+    for want in ('if ((g_logLevel < 1 && !g_fnOn) || !FwCheck())', 'if (now - g_fnReadTick >= 1000) { g_fnReadTick = now; FnReadSwitch(); }',
+                 'if (dt > kFwFrameCapMs) dt = kFwFrameCapMs;', 'ReadDword(machine + 0x510, &rec)',
+                 'g_fwIdx = CtRecordIndex(machine, rec);', '(FwWatched(oldIdx) || FwWatched(g_fwIdx) || changed) && FwLineOk(',
+                 'g_fwNextWatchMs += g_fwNextWatchMs < 30000 ? 1000 : 10000;', 'FallNetTick(player, p, unit);'):
+        if want not in watch: problems.append('TruMenu.cpp: FallWatchTick must hold %s' % want)
+    if watch.find('FwCheck()') > watch.find('ReadDword(0x00fadb58'):
+        problems.append('TruMenu.cpp: FallWatchTick reads the chart machine before FwCheck')
+    tick = src[src.find('        SafeGroundTick();'):][:300]   # the per-frame block of PadHook
+    if 'FallWatchTick();' not in tick: problems.append('TruMenu.cpp: FallWatchTick must run right after SafeGroundTick')
+    net = fn_body(src, 'void FallNetTick(')
+    order = ['if (g_fwInMs <= kFnAfterMs) return;', 'if (g_fnRescues >= kFnMaxRescues) {',
+             'if (!FwNewestSafe(unit, g_fwInTick, g_fnUsedTick, &s)) {', 'if (!(below > kFnBelow)) return;',
+             'const char *why = FnPauseReason();', 'if (!g_fnOn) {', 'UnstuckPlace(player, s.p, s.yaw, &yawOk);']
+    at = [net.find(x) for x in order]
+    if any(a < 0 for a in at) or at != sorted(at):
+        problems.append('TruMenu.cpp: FallNetTick must test time, count, sample, height, pause, switch - then place')
+    if 'SetPosition(' in net or 'SetYaw(' in net:
+        problems.append('TruMenu.cpp: FallNetTick must teleport only through UnstuckPlace')
+    for name, want in (('kFnAfterMs', '3000'), ('kFnAgainMs', '1000'), ('kFnBelow', '3000.0f'), ('kFnMaxRescues', '3'),
+                       ('kFwMaxLines', '40'), ('kFwWindowMs', '10000'), ('kFwSafeLogMs', '2000'), ('kFwFrameCapMs', '100')):
+        if not re.search(r'\b%s = %s[,;]' % (name, re.escape(want)), src):
+            problems.append('TruMenu.cpp: %s must be %s' % (name, want))
+    if 'const int kFwRecords[] = {742, 743, 1068, 1080};' not in src or 'const WORD kFwStateA = 1008, kFwStateB = 1015;' not in src:
+        problems.append('TruMenu.cpp: kFwRecords 742 / 743 / 1068 / 1080 and states 1008 / 1015 missing')
+    unstuck = fn_body(src, 'bool RunUnstuck(')
+    if 'UnstuckPlace(player, to, yaw, &yawOk)' not in unstuck or 'SetPosition(' in unstuck:
+        problems.append('TruMenu.cpp: RunUnstuck must teleport through UnstuckPlace (the one path of the fall net)')
+    pause = fn_body(src, 'const char *FnPauseReason(')
+    for want in ('if (!g_experimental)', 'SafePauseReason(false)', '!(health > 0.0f)'):
+        if want not in pause: problems.append('TruMenu.cpp: FnPauseReason must hold %s' % want)
+    safe = fn_body(src, 'const char *SafePauseReason(')
+    for want in ('"menu open"', '"ring open"', '"flight on"', '"cinematic"', '"player control off"', 'if (timeScale &&'):
+        if want not in safe: problems.append('TruMenu.cpp: SafePauseReason must hold %s' % want)
+    rd = fn_body(src, 'void FnReadSwitch(')
+    if 'GetPrivateProfileIntA("Rescue", "FallNet"' not in rd:
+        problems.append('TruMenu.cpp: FnReadSwitch must read [Rescue] FallNet')
+    if 'InterlockedExchange(&g_fnOn, OptInt(ini, "Rescue", "FallNet") != 0 ? 1 : 0);' not in fn_body(src, 'void ReadOptions('):
+        problems.append('TruMenu.cpp: ReadOptions must read [Rescue] FallNet')
+    if 'if (add) FwSafeAdded(added, count);' not in fn_body(src, 'void SafeGroundTick('):
+        problems.append('TruMenu.cpp: SafeGroundTick must hand each ring addition to FwSafeAdded (outside the lock)')
+    ini = open(ini_path, encoding='utf-8').read()
+    if not re.search(r'\n\[Rescue\]\n(;[^\n]*\n)+FallNet=0\n', ini.replace('\r\n', '\n')):
+        problems.append('%s: [Rescue] FallNet=0 missing' % os.path.basename(ini_path))
+    sw = [l for l in open(switches_path, encoding='utf-8').read().splitlines() if l.startswith('TruMenu | ')]
+    if len(sw) != 1 or not sw[0].startswith('TruMenu | Rescue | FallNet | bool | ') or ' | live | 0 | ' not in sw[0]:
+        problems.append('%s: one row TruMenu | Rescue | FallNet | bool | ... | live | 0 | ... wanted' %
+                        os.path.basename(switches_path))
+    pre23 = os.path.join(ROOT, 'work', 'asi', 'menu0246', 'precheck_02223.txt')
+    pre24 = os.path.join(ROOT, 'work', 'asi', 'menu0247', 'precheck_02224.txt')
+    prows = lambda p: sorted(l.split(None, 1)[0].lower() + ' ' + l.split(None, 1)[1].replace(' ', '').lower()
+                             for l in open(p, encoding='utf-8').read().splitlines() if l.strip() and not l.startswith('#'))
+    if os.path.exists(pre23) and os.path.exists(pre24):
+        r23, r24 = prows(pre23), prows(pre24)
+        if len(r24) != 52 or sorted(r23 + ['%s %s' % r for r in [CT_ROW] + FW_ROWS]) != r24:
+            problems.append('precheck_02224.txt: must hold the 49 rows of precheck_02223 + kCtChecks + the 2 kFwChecks '
+                            'rows (%d)' % len(r24))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if 'ad52175615e9cded7b3a0c08a51566618d71e8751b30a62293ad26ab4b221b2f' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.23 build hash (work\\asi\\menu0246) is missing')
+    return problems, ('fall watch (records %s, states 1008 / 1015, watchdog, safe ground, 40 lines / 10 s), [Rescue] '
+                      'FallNet default 0 live, net after 3 s / 3000 units through UnstuckPlace, %d + 1 byte checks, '
+                      'switch row' % ('/'.join(['742', '743', '1068', '1080']), len(rows)))
 
 
 def table(src):
@@ -3561,6 +3661,10 @@ def main(argv):
     for p in cproblems23: print('Q02223 %s' % p)
     if not cproblems23: print('ok: 0.22.23 %s' % csummary23)
     problems += cproblems23
+    cproblems24, csummary24 = check_02224(ini_path, opt.get('--switches', SWITCHES))   # 0.22.24
+    for p in cproblems24: print('Q02224 %s' % p)
+    if not cproblems24: print('ok: 0.22.24 %s' % csummary24)
+    problems += cproblems24
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))
