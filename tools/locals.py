@@ -16,6 +16,11 @@ Usage: python3 -I tools/locals.py survey      (compare all versions)
             localised placeholders (same_slot_number), unfilled_from_packs() (PC 5211; skip with --no-pack-fill =
             the Xbox TU state, empty / 'KEIN TEXT'), unwrap_descriptions() (PC 456 / 457). No text is stored here:
             every string comes from the player's archives at build time. Gate: tools/locals_text_gate.py.
+            --pad-glyph-names (Q9, 2026-11-11, opt-in until played): pad_glyph_names() - the PC names of the
+            Xbox 360 pad's Start / Back buttons become their button glyphs U+1810 / U+1811 (TU look of
+            "Press [Back]" prompts such as 5182 / 5201 / 1301; see pad_glyph_names()).
+       python3 -I tools/locals.py padnames IN_DIR OUT_DIR  -> the same rule on existing tables (e.g. the installed
+            ones, read only): OUT_DIR/locals.bin_<NNN> for the six languages, nothing else changed.
 """
 import sys, os, re, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -191,6 +196,69 @@ def unwrap_descriptions(m, strings):
             strings[p] = strings[p].replace(b'\n', b' '); st['description_unwrapped'] += 1
     return st
 
+# Button names of the Xbox 360 pad on PC (tru.exe 1.1, static 2026-11-11, docs/ENGINE.md "Button glyphs in text"):
+# the name loader 0x47a2c0 sets the name of input code 0x40 + c (XInput button c, pad codes as in ENGINE.md section 21)
+# to GetLocalString(PAD_NAME_FIRST + c) for c = 0..15 when the pad is an "Xbox 360 Controller". cdc::UIText draws its
+# text through 0x5a7c20, which replaces every U+1800..U+182E by ESC + name of the bound button + ESC; the pad code of
+# a code point comes from the table at 0x8a9ef8 (index = code point - 0x1800). PAD_GLYPH is that table inverted for
+# the 16 XInput buttons (code point whose table entry is c).
+PAD_NAME_FIRST = 5061
+PAD_GLYPH = {0: 0x1801, 1: 0x1800, 2: 0x1802, 3: 0x1803, 4: 0x1805, 5: 0x1807, 6: 0x1804, 7: 0x1806,
+             8: 0x180e, 9: 0x180f, 10: 0x1810, 11: 0x1811, 12: 0x1808, 13: 0x1809, 14: 0x180b, 15: 0x180a}
+
+
+def _pad_glyphs(b):
+    return [ord(ch) for ch in b.decode('utf-8', 'replace') if 0x1800 <= ord(ch) <= 0x18ff]
+
+
+def pad_glyph_names(strings):
+    """Rule (Q9, opt-in --pad-glyph-names / subcommand padnames): a PC pad button name (PAD_NAME_FIRST + c) that
+    holds no button glyph - in the PC 1.1 tables only Start (c = 10, 5071) and Back (c = 11, 5072), in all six
+    languages ('Start Button' / 'START', 'Back Button' / 'BACK', ...) - becomes the one glyph the substitution
+    table maps to that pad code, U+1810 / U+1811 (both in the PC font, page 1: the Xbox Start / Back icons).
+    The other 14 names are glyphs already (12 equal PAD_GLYPH; L3 / R3 use the plain stick icons U+180C / U+180D)
+    and stay. Effect: every UIText prompt with U+1810 / U+1811 shows the icon like the Xbox title update instead of
+    the word (DLC 2 banner 5182 / 5201, hint 5287, base 1301); keyboard / mouse names are not touched."""
+    st = collections.Counter()
+    for c, cp in sorted(PAD_GLYPH.items()):
+        i = PAD_NAME_FIRST + c
+        if i >= len(strings): st['pad_name_missing'] += 1; continue
+        if _pad_glyphs(strings[i]): st['pad_name_glyph_kept'] += 1; continue
+        if not strings[i] or strings[i] == b'\x03': st['pad_name_empty_kept'] += 1; continue
+        strings[i] = chr(cp).encode('utf-8'); st['pad_name_to_glyph'] += 1
+    return st
+
+
+def pad_names_dir(src, dst):
+    """padnames subcommand: pad_glyph_names() on the six tables in src (read only), written to dst. The source
+    bytes stay as they are; each changed string is appended at the end and only its offset word is repointed
+    (other ids that share the old string keep it). Checks: same count / language, only the rule's ids differ,
+    every other offset and every source byte unchanged."""
+    os.makedirs(dst, exist_ok=True)
+    ok = True
+    for sfx in ('001', '002', '004', '008', '016', '032'):
+        raw = open(os.path.join(src, 'locals.bin_' + sfx), 'rb').read()
+        lang, st, offs = parse(raw, 'le')
+        new = list(st); stat = pad_glyph_names(new)
+        b = bytearray(raw); offs2 = list(offs)
+        for i in range(len(st)):
+            if new[i] != st[i]:
+                offs2[i] = len(b); b += new[i] + b'\0'
+                struct.pack_into('<I', b, 8 + 4 * i, offs2[i])
+        b = bytes(b)
+        lang2, back, offs3 = parse(b, 'le')
+        diff = [i for i in range(len(st)) if back[i] != st[i]]
+        moved = [i for i in range(len(st)) if offs3[i] != offs[i]]
+        words = {8 + 4 * i + k for i in diff for k in range(4)}   # the repointed offset words
+        kept = all(b[k] == raw[k] for k in range(len(raw)) if k not in words)
+        ok &= (lang2 == lang and len(back) == len(st) and diff == moved and kept
+               and all(PAD_NAME_FIRST <= i < PAD_NAME_FIRST + 16 for i in diff))
+        open(os.path.join(dst, 'locals.bin_' + sfx), 'wb').write(b)
+        print('locals.bin_%s lang %d n %d changed %s source bytes kept %s %s' % (sfx, lang, len(st), diff, kept, dict(stat)))
+    print('padnames: %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+
 def write_pc(lang, strings, offs_pc):
     """PC layout: index 0 and PC 'missing' ids point at offset 0 (the header) like the shipped PC file."""
     n = len(strings); hdr = 8 + 4 * n
@@ -205,8 +273,12 @@ files_cache = {}
 
 if __name__ == '__main__':
     import json
+    if sys.argv[1:2] == ['padnames']:
+        sys.exit(0 if pad_names_dir(sys.argv[2], sys.argv[3]) else 1)
     no_pack_fill = '--no-pack-fill' in sys.argv
     if no_pack_fill: sys.argv.remove('--no-pack-fill')
+    pad_names = '--pad-glyph-names' in sys.argv
+    if pad_names: sys.argv.remove('--pad-glyph-names')
     for k in SRC:
         f, e = files(k)
         if f: files_cache[k] = f
@@ -224,6 +296,7 @@ if __name__ == '__main__':
             lang, strings, st = merged(V, spec, m)
             if not no_pack_fill: st.update(unfilled_from_packs(V, m, spec, strings))
             st.update(unwrap_descriptions(m, strings))
+            if pad_names: st.update(pad_glyph_names(strings))
             offs_pc = parse(files_cache['pcpatch'][spec], 'le')[2]
             b = write_pc(lang, strings, offs_pc)
             back = parse(b, 'le')[1]
