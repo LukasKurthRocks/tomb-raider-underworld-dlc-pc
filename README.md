@@ -65,8 +65,9 @@ Steamless and unpacks `tru.exe` with it (checked by MD5). Afterwards: lock the g
 game from *Downloadable Content*. The manual way, update, uninstall, error messages: [docs/INSTALL.md](docs/INSTALL.md).
 
 The conversion itself still comes from the original's kit. The fork's own pipeline
-([docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md)) also builds on the B138 kit for the shaders, the `tru.exe` patches
-and about 40 remaining files - a port fully without the kit is not possible yet.
+([docs/WINDOWS_REBUILD.md](docs/WINDOWS_REBUILD.md)) now assembles a complete tree in which no file is derived from a kit
+file (offline, 11 Nov 2026; not played yet). About 812 shader sections of the played fixes, the DLC 1 credits movie and
+one B270 costume file are not pipeline steps yet - a port fully without the kit is not possible yet.
 
 **This fork's plugins.** The title-update plugins (point 2 above) live in [`src/asi/`](src/asi/). `Install.bat`
 builds them with Visual Studio (x86) if it finds it (`-NoPlugins` skips them, `-NoMenu` leaves TruMenu out, `-QoL`
@@ -79,8 +80,12 @@ adds TruQoL). By hand, game closed ([scripts/windows/README.md](scripts/windows/
 
 - DLC 2 as on the Xbox: `TruShadowPower`, `TruShadowCombat`, `TruRockVein`, `TruDoppelganger`, `TruDlc2Player`;
   `TruShadowHud` only with a `generalbank.drm` that has the title update's HUD script (`tools/generalbank_hud_build.py`).
-- Optional: `TruQoL` (60 fps cap, field of view, start-up fix for PCs with more than 31 CPU threads), `TruMenu`,
-  `TruMercLang`. `TruLink`, `TruTrace`, `TruDataGuard` and `TruGuard` are developer tools.
+- `TruShadowPower` reads the doppelganger camera tables from your own Xbox title update when it is built
+  (`TitleUpdate.000`; `Build-TruAsi.ps1 -TitleUpdate <file>`, default `TRU-DLC\data\TombRaiderUnderworld_Patched\`).
+  Without it the plugin is built without these tables and the build log says so. No title-update data is in the
+  repository.
+- Optional: `TruQoL` (60 fps cap, field of view, start-up fix for PCs with more than 31 CPU threads, main menu at
+  normal speed after quitting a level from the pause menu), `TruMenu`, `TruMercLang`. `TruLink`, `TruTrace`, `TruDataGuard` and `TruGuard` are developer tools.
 - Tested only on the author's own build (B138 base with the fork's own DLC 2 conversion), **not on the B270 kit**.
   Every plugin checks the bytes of `tru.exe` first; where they differ, that part stays off and its log says why.
 
@@ -99,28 +104,38 @@ menu window and the radial ring off (`[Menu] Enabled=0`, `[Radial] Enabled=0`).
 3. In game, Xbox controller: **View + Start** opens / closes the bar; D-pad up / down = row, left / right = off / on,
    LB / RB = page, X = run the row. The game keeps running. German menu: `[Quick] Language=de`.
 
+From 0.22.19 the bar opens on the page it showed last; newer rows turn the main-menu attract video off, show the
+teaser timer and give infinite shadow power for testing; `TruMenu.switches.txt` takes up to 512 switch rows (0.22.23).
+
 Before 0.22.18, `[Menu] Enabled=0` turns all of TruMenu off. Controls and pages:
 [src/asi/TruMenu/README.md](src/asi/TruMenu/README.md).
 
 ![Development build: TruMenu quick bar, costume page, at the start of Lara's Shadow](docs/screenshots/dev-quickbar-costumes-2026-11-07.jpg)
 *Development build (7 Nov 2026): the quick bar at the start of Lara's Shadow, page "Kostueme" (TruMenu 0.21.6).*
 
-## Progress (state 2026-11-10)
+## Progress (state 2026-11-11)
 
 Percentages are **estimates**: the share of the Xbox behaviour seen working in game on one PC, judged from the test
-findings and the open lists. Only the title-update row is a count. Left out on purpose and not counted as missing:
-the Xbox Live advert "new download available" in the pause menu (title-update script 7, 12 textures).
+findings and the open lists. The title-update row is a count; the kit and player-path rows are offline states, not
+played. "Installed, not played" = built and in the game folder, not yet checked in game. Left out on purpose and not
+counted as missing: the Xbox Live advert "new download available" in the pause menu (title-update script 7, 12
+textures).
 
 | Part | Estimate | What works | What is missing |
 |---|---|---|---|
-| DLC 1 *Beneath the Ashes* | `█████████░` ~90 % | played; "display driver" box, cinematic speech in five languages fixed; dungeon loads and reloads after death without the crash (2026-11-10); starts after DLC 2 in the same session | grapple ring shows wrong colours again in the close-up view (a later shader rebuild replaced the ring fix) |
-| DLC 2: levels / story | `████████░░` ~80 % | played through the Yggdrasil halls to the end level and its cutscenes; doppelganger look, wall run, waterfall | rock-vein jump from a ledge turns back; a moaning sound loops; some materials still drawn with substitute shaders |
-| DLC 2: combat | `████████░░` ~85 % | as on the Xbox for single hits, the punch combo (20 / 40 / 60 / 80), the big-hit fall and the kick kill (`TruShadowCombat` 0.6.8-0.6.10); melee kill and chunkdoll; shooting with the shadow power; lock-on with the ring (row below) | the shadow finisher never starts |
-| DLC 2: shadow power | `████████░░` ~80 % | slow motion, meter and HUD, power states, wall run and its camera | at the goo drip the PC stays in slow motion while Lara runs (Xbox: normal speed); Lara's ponytail stretches in slow motion |
+| DLC 1 *Beneath the Ashes* | `█████████░` ~90 % | played; "display driver" box, cinematic speech in five languages fixed; dungeon loads and reloads after death without the crash; grapple ring right again (played 10 Nov) - a later shader rebuild had replaced its fix, the fix is now a guarded pipeline rule; starts after DLC 2 in the same session | no replay on the current build yet |
+| DLC 2: levels / story | `████████░░` ~80 % | played through the Yggdrasil halls to the end level and its cutscenes; doppelganger look, wall run, waterfall; the hall02 combat tutorial goes on after a kick, as on the Xbox | rock-vein jump from a ledge turns back; some materials still drawn with substitute shaders; twice no third tutorial thrall came (cause narrowed); DLC 2 from the pause menu without the outfit screen, as the title update (`TruDlc2Player` 0.6), installed, not played |
+| DLC 2: combat | `████████░░` ~85 % | as on the Xbox for single hits, the punch combo (20 / 40 / 60 / 80), the big-hit fall and the kick kill (`TruShadowCombat` 0.6.8-0.6.10); melee kill and chunkdoll; shooting with the shadow power; lock-on with the ring (row below); the finisher Y starts | finisher Y: Lara leaps past the target (once out of the world at an arena edge) and the thrall gets up again (10 Nov) - the title update's steering and kill are ported (`TruShadowCombat` 0.6.11 / 0.6.12), installed, not played |
+| DLC 2: shadow power | `████████░░` ~80 % | slow motion, meter and HUD, power states, wall run | at the goo drip the PC stays in slow motion while Lara runs (Xbox: normal speed); Lara's ponytail stretches in slow motion |
+| DLC 2: camera | `███████░░░` ~70 % | climbing camera: cause measured on the Xbox in an emulator (the doppelganger's own camera settings: re-centre after 0.25 s instead of 5 s); `TruShadowPower` 0.25 uses them - better in game (10 Nov), "sometimes lags behind" | `TruShadowPower` 0.26 (own tables of the climb modes, camera trace for a number comparison) and a generalbank with the real camera settings built offline, not played |
 | DLC 2: cutscenes / end + credits | `██████░░░░` ~60 % | end cutscenes visible, throne flicker worked around; cutscene pause and subtitle language live (TruMenu); DLC 2 credits movie built locally | the end chain (finale, credits, menu) not yet played through; the throne's warm top light missing with the workaround |
-| DLC 2: hints / banners | `█████░░░░░` ~50 % | loading-screen titles and hint boxes | "objective / hint unlocked" banners run but are invisible: data step built, live test open |
-| DLC 2: lock-on ring | `████████░░` ~80 % | LT locks on and the ring shows (played 10 Nov): a tuning byte the converter had swapped is fixed by the new pipeline step `playerblock`; ring request with the shadow power translated (`TruShadowPower` 0.22) | Lara's aim records 715 / 722 against 718 on the Xbox (to check); the ring with the shadow power not seen yet |
-| Title-update translation | `█░░░░░░░░░` 14 % | of 1 328 changed / new functions: 96 ported, 55 partial, 2 explained, 88 irrelevant (`tools/tu_coverage.py`; 14 % = ported + explained + irrelevant) | 1 087 open; "open" also counts functions not judged yet. Probably many of them are never needed on PC (Xbox-only code: Live, storage, achievements, platform layer); the count is a work list, not the share of the DLC that is missing |
+| DLC 2: hints / banners | `███████░░░` ~70 % | loading-screen titles and hint boxes; the "OBJECTIVE REVEALED" banner shows (played 10 Nov - its data step had never been installed) | the banner names the button (BACK) instead of its icon, as the PC base game does (optional text rule built, not installed); View opens nothing because the DLC 2 PDA is missing |
+| DLC 2: lock-on ring | `████████░░` ~80 % | LT locks on and the ring shows (played 10 Nov): a tuning byte the converter had swapped is fixed by the pipeline step `playerblock`; ring request with the shadow power translated (`TruShadowPower` 0.22) | Lara's aim records 715 / 722 against 718 on the Xbox (to check); the ring with the shadow power not seen yet |
+| DLC 2: sounds | `███████░░░` ~70 % | sound groups 77 / 78 decoded (echo / chorus); 118 silent and 46 wrong wave references of the doppelganger's body sounds and 56 in 20 other DLC 2 files fixed by the new pipeline step `waveid`, installed | not heard in game yet; a moaning sound loops; echo / chorus effect not decided |
+| Menus | `████████░░` ~80 % | ring menu: DOWNLOADABLE CONTENT on slot 7 in the main **and** the pause menu, QUIT GAME on ring position 14 (played 10 Nov, no crash); main-menu attract video off (TruMenu, played) | last ring layout (door fades in like the slots) installed, not played; main menu at half speed after quitting from the pause menu - `TruQoL` 0.1.4 fix installed, not played |
+| Kit independence | offline | the fork's own tree: 572 files, none derived from a kit file (generalbank built from the player's PC patch, 60 language variants, exe, sound info); "fix missing" sections against the played tree 918 -> 836 | about 812 shader sections of the played fixes (the main gap); `credits_DLC1.bik` and one B270 costume file only in the kit; the own tree not played |
+| Player path | offline | build without the Xbox base game: steps P0 (file manifest, access guard, gate) and P1 done - Generalbank, Globalsound and Lang need only the PC game, the player's title update and DLC packs | the other pipeline steps not moved yet (P2 onwards) |
+| Title-update translation | `█░░░░░░░░░` 15 % | of 1 328 changed / new functions: 105 ported, 65 partial, 2 explained, 88 irrelevant (`tools/tu_coverage.py`, 11 Nov; 15 % = ported + explained + irrelevant) | 1 068 open; "open" also counts functions not judged yet. Probably many of them are never needed on PC (Xbox-only code: Live, storage, achievements, platform layer); the count is a work list, not the share of the DLC that is missing |
 | Costume packs | `█████░░░░░` ~50 % | converted and checked offline (pipeline step `Costumes`) | not played yet |
 
 **Where to read on**
