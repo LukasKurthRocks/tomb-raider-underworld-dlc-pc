@@ -502,3 +502,4 @@ First public release: **Beneath the Ashes playable from start to end credits** o
 rebuilds the build byte for byte from the player's own files. Fixed since B90: enemies frozen (navmesh), crash when collecting DLC
 treasures, cobwebs, black ceiling in pillory, black water textures, pause-menu QUIT, end-credits hang, many data fixes.
 | 2026-11-11 | Upload scan allow-list: `work/q89_skeleton_1111/skeleton_map.txt` (class own - computed bone-index lists of the Q89 skeleton map, flagged as a 176-value byte array; no game bytes) |
+| 2026-11-11 | README / TROUBLESHOOTING: the start-up crash on PCs with more than 31 CPU threads is named as fixed (`TruQoL` `[Startup] ThreadCap=8`, default since 0.1.3); the Steam launch option `cmd /c start "" /affinity FFFF %command%` is only the fallback without TruQoL |

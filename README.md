@@ -35,8 +35,9 @@ It does not replace the original. More about the fork: [docs/README.md](docs/REA
 2. **The Xbox title update's program code as plugins.** The shadow power of *Lara's Shadow* came with an Xbox game
    update, not with the DLC files. Its functions are translated one by one into ASI plugins (shadow power, combat,
    HUD, rock veins, the doppelganger as player).
-3. **Fixes and comfort for the base PC game.** `TruQoL` (60 fps cap, field of view, camera shake, a start-up fix for
-   PCs with many CPU threads), the title update's three base-game fixes the PC never got (in `TruRockVein`: ledge
+3. **Fixes and comfort for the base PC game.** `TruQoL` (60 fps cap, field of view, camera shake; **fixed: the
+   start-up crash on PCs with more than 31 CPU threads** - `[Startup] ThreadCap=8`, no Steam launch option such as
+   `/affinity FFFF` needed any more), the title update's three base-game fixes the PC never got (in `TruRockVein`: ledge
    corners, jump targets on poles and pillars, ledge detection), the test menu `TruMenu`, `Set-TruDisplay.ps1` and a
    table of known problems.
 

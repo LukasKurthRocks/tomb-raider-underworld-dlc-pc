@@ -76,7 +76,7 @@ with `scripts/windows/Set-TruDisplay.ps1` (it saves a backup first; add `-Check`
 
 | Problem | What helps |
 |---|---|
-| Crash at start-up on CPUs with more than 31 threads | Steam launch option `cmd /c start "" /affinity FFFF %command%` (see `scripts/windows/README.md`) |
+| Crash at start-up on CPUs with more than 31 threads | fixed by `TruQoL` `[Startup] ThreadCap=8` (default since 0.1.3; the game sees at most 8 threads) - no launch option needed. Without TruQoL: Steam launch option `cmd /c start "" /affinity FFFF %command%` (see `scripts/windows/README.md`) |
 | White screen or hang in the first cutscene / at the end of the tutorial | registry `DontDeferShaderCreation` = 0 and `DisableDynamicTextures` = 0 (`Set-TruDisplay.ps1 -StutterFix`); Steam overlay off; reports differ, one player only needed the affinity option |
 | Stutter, slow loading, frame rate dropping after 10-15 minutes | the same two registry values; some players also set `EnableWaterFX` = 0 |
 | Crash with DEP (Data Execution Prevention) | add `tru.exe` as a DEP exception in Windows (the GOG version turns DEP off at run time) |
