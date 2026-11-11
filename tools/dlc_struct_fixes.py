@@ -65,7 +65,8 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              from the intros of four base units, name strings raw (17j-b / 17l); since 18e (2026-11-08) also the
              unit-DTP pointer-path table of 77 base units (17o: tiers K1 exact / KS stride / KA alias / K3 last-wild,
              >= 10 votes of the word's byte shape, no contradicting sample; 17o's size-only tier not used) where those
-             rules do not speak; not DTP 23100 +0x6268 (rule conflict open)
+             rules do not speak; not DTP 23100 +0x6268 (TABLE_EXCLUDE; decided 2026-11-11 Q32: s16, a curve word,
+             written by unitcurve)
   leveltwin  tools/typed_family_fix.py      Level section of a unit without a same-size base twin: words whose Xbox word
              equals the l7 twin's Xbox word at the same offset = the twin's PC word (byte permutations only; the
              NavGraph image stays navraw's) (17j-b: dlc_yggdrasil_end)
@@ -98,6 +99,13 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              their base proof once per process (dlc_idpair_fix.proven / fxrec_relayout_fix.proven, SystemExit when
              it fails). None of them writes a word another step rules (fpkeys skips the sections the others own;
              check mode of every step on the result: 0).
+  unitcurve  tools/unit_curve_fix.py       unit-DTP curve records (Q32 2026-11-11, decision 7): regions below root
+             +0x6c / +0x1fc whose records all end in beebbeeb (stride 0xc0: u16[64] at +0x34; stride 0xb0: at +0x24),
+             paired Xbox / PC by pointer-path label + size (so also dlc2_machine_room, whose PC unit DTP has another
+             layout): the 32 curve words = s16 (base proof: 20 units, 556 records, 12 893 informative words s16, 0
+             contradicting; the learned type-7 table had swapped float-looking pairs as s32 - non-monotone ramps);
+             agrees with introtyped's path table wherever both speak; after the Q5 steps, before seqrepeat; opt-in
+             for the check gate (--steps unitcurve) until enabled in CHECK_STEPS
   seqrepeat  tools/soundplex_sequence_fix.py SoundPlex Sequence nodes (type 10): the word data +0xc (s8 repeat + 3 bytes)
              raw = the Xbox bytes, as on every informative base pair (`soundplex_sequence_fix.py proof`; F5 2026-11-05:
              the converter u32-swapped `01 00 00 00` to `00 00 00 01` = repeat 0 = endless, the doppelganger's
@@ -185,6 +193,9 @@ XOBJLIST = os.path.join(W, 'generic', 'lists', 'dlc_pack11_objectlist.txt')
 # Q5 (2026-11-11): the R4 / R5 data words of the played test trees as steps, after fxrecread, before seqrepeat
 Q5_STEPS = ('idpair', 'fxrelayout', 'lv90dtp', 'odtwin', 'fpkeys')
 ALL = ALL[:ALL.index('seqrepeat')] + Q5_STEPS + ALL[ALL.index('seqrepeat'):]
+# Q32 (2026-11-11): unit-DTP curve records (decision 7), after the Q5 steps, before seqrepeat
+Q32_STEPS = ('unitcurve',)
+ALL = ALL[:ALL.index('seqrepeat')] + Q32_STEPS + ALL[ALL.index('seqrepeat'):]
 
 
 def quiet(fn, *a):
@@ -764,6 +775,24 @@ class Steps:
         """dtp_audit structure keys with >= 100 unanimous base samples (17l fp100, typed_family_fix)"""
         return self._typed('fpkeys', rel, XD, cur)
 
+    # ---- Q32 (2026-11-11): unit-DTP curve records
+    def s_unitcurve(self, rel, xf, XD, cur):
+        """unit-DTP curve records: the 64 u16 of every record = s16 (tools/unit_curve_fix.py, Q32 decision 7)"""
+        import unit_curve_fix as UC
+        ok, got = UC.proven()
+        if not ok: raise SystemExit('unitcurve: base proof FAILED - %s (expected %s)' % (got, UC.PROOF_EXPECT))
+        try:
+            new, changes, info = UC.fix_drm(XD, cur)
+        except AssertionError as e:
+            return None, 'unitcurve %s: proof failed (%s) - nothing changed' % (rel, e)
+        kept = info['kept']
+        tail = '%s%s' % ((', %d kept (no byte order of the Xbox word)' % len(kept)) if kept else '',
+                         ('; ' + '; '.join(info['notes'])) if info['notes'] else '')
+        if new is None:
+            return None, ('unitcurve %s: 0 words%s' % (rel, tail)) if (kept or info['notes']) else None
+        return new, 'unitcurve %s: %d words (%s)%s; %s' % (rel, len(changes), self._wlist(
+            '+0x%x %s -> %s' % (q, a.hex(), b.hex()) for k, q, a, b, sid in changes), tail, self.PROOF_NOTE)
+
     def s_seqrepeat(self, rel, xf, XD, cur):
         """SoundPlex Sequence nodes: data +0xc raw (tools/soundplex_sequence_fix.fix_drm, F5 2026-11-05, finding 49).
         Proof per DRM (in fix_drm): the decoded DRM differs only in the planned bytes, headers / relocations identical,
@@ -913,7 +942,8 @@ def run_twins(srcs, out, names, tmp):
 
 
 CHECK_STEPS = ('objtex', 'objrec', 'objid') + DATAFIX_STEPS + TYPED_STEPS + Q5_STEPS + ('seqrepeat', 'navraw')   # steps with a check mode (no tool run, no shared corpus pass); Q5_STEPS since 2026-11-11
-CHECK_ALLOWED = CHECK_STEPS   # navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS); the
+CHECK_ALLOWED = CHECK_STEPS + Q32_STEPS   # Q32_STEPS: --steps only until enabled in CHECK_STEPS (the pipeline run
+                              # of 11.11. was built without it); navraw in the default gate since 2026-11-06 (step of dlc_fixes_build.STRUCT_STEPS); the
                               # 2026-11-07 data fixes (DATAFIX_STEPS) since 2026-11-08, the typed families (TYPED_STEPS,
                               # 17n) since 2026-11-08
 
@@ -953,7 +983,7 @@ def run_check(tree, steps, names=None, report=None):
                     rep[s]['files'].append(rel)
                 # navraw: a unit the rule cannot pair or whose proof failed is not "ok" either (nothing is assumed);
                 # the same for the data fix steps (2026-11-08)
-                if (s == 'navraw' or s in DATAFIX_STEPS or s in TYPED_STEPS or s in Q5_STEPS) and any('NOT PAIRED' in l or 'proof failed' in l for l in log) \
+                if (s == 'navraw' or s in DATAFIX_STEPS or s in TYPED_STEPS or s in Q5_STEPS or s in Q32_STEPS) and any('NOT PAIRED' in l or 'proof failed' in l for l in log) \
                         and rel not in rep[s]['files']:
                     rep[s]['files'].append(rel)
                 rep[s]['lines'] += log

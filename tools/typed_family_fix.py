@@ -47,13 +47,17 @@ introtyped also takes, since 18e (2026-11-08), the words of the unit-DTP pointer
   pipeline copies it typed DLC 1 float records as u16 pairs); a tier decides when the intersection of its samples'
   byte orders gives ONE wanted word for this Xbox word, no sample is 'other' and >= 10 votes come from base samples of
   the same zero / non-zero byte shape as the DLC word; the 17j-b rules above win where they speak. NOT the word unit DTP 23100 +0x6268 (dlc_yggdrasil_hall02: the
-  17l fp rule says s32, the table s16 - owner decision open).
+  17l fp rule says s32, the table s16 - decided 2026-11-11 (Q32): s16, a word of a 0xb0 curve record, written by the
+  step unitcurve of tools/unit_curve_fix.py; left out here so that introtyped's own counts stay as pinned).
+  Decision 7 (Q32, 2026-11-11, workspace docs Befund-Introtyped-1111.md): where the installed tree differs from this
+  table / these rules (388 words in 6 DLC 2 unit DTPs), the table is right in every class - base votes 10 .. 1063 per
+  key with 0 against, and the installed tree types the other words of the same fields the table's way.
 Q5 rules (2026-11-11, workspace docs Befund-Datenwoerter-Schritt-1111.md: the R4 / R5 words of the played trees):
   lv90dtp    the DTP named at [Level+0x90] +0x1c (one family {u32 n, ptr, ptr, float records}): every word s32 (17p /
              17q; proof over the 81 base level units of the PC file list, 0 contradicting)
   fpkeys     dtp_audit structure keys (dtp_audit.word_keys) with >= FP_MIN = 100 informative base samples whose
-             explaining byte orders give ONE PC word for the Xbox word (17l "fp100"); not the unit DTP (introtyped,
-             owner decision 7), the lv90dtp DTP, fxrelayout's table-record DTPs, DTPs whose Xbox bytes are a base
+             explaining byte orders give ONE PC word for the Xbox word (17l "fp100"); not the unit DTP (introtyped /
+             unitcurve own it; decision 7 decided for their table 2026-11-11, Q32), the lv90dtp DTP, fxrelayout's table-record DTPs, DTPs whose Xbox bytes are a base
              section or whose internal pointers differ; only DLC 1 / DLC 2 pack sources (FP_PACKS: the six DLC 2
              costume packs pack1 / pack2 / pack20 hold ~3 300 such words, never played - owner decision); proof = the
              key statistics + a held-out 2-fold by DRM (pinned: 95 wrong of 2 092 178 decided)
@@ -65,7 +69,8 @@ Q5 rules (2026-11-11, workspace docs Befund-Datenwoerter-Schritt-1111.md: the R4
              vs yeti_thrall object data aligned the same way, 4165 equal Xbox words with one PC order each, 0 disagree.
              Alignments are cached by content hash (work/generic/odtwin_align.pkl, ~8 min each without the cache).
              The object data proper is left to objrec / fxrecread (the rule gives 0 changes there on pipeline 1011).
-Not built here: the DTP 24392 re-spacing + twin step, class-d words, the introtyped / B270 conflicts (decision 7).
+Not built here: the DTP 24392 re-spacing + twin step, class-d words. The unit-DTP curve records (decision 7, Q32) are
+the step unitcurve of tools/unit_curve_fix.py.
 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/typed_family_fix.py proof [--rules a,b] [--report R.json]
@@ -91,7 +96,8 @@ FXREAD = {0x40: 'raw', 0x68: 'raw', 0x7c: 'raw', 0x88: 'raw', 0x90: 'raw', 0x11c
 FX_REC = 0x17c
 # introtyped path table
 TABLE_MIN = 10                     # votes a tier key needs
-TABLE_EXCLUDE = {(23100, 0x6268): 'rule conflict (17l fp rule s32, path table K1 s16) - owner decision open'}
+TABLE_EXCLUDE = {(23100, 0x6268): 'rule conflict (17l fp rule s32, path table K1 s16) - decided s16 (Q32), written by '
+                                  'the step unitcurve'}
 PC_FILELIST = os.path.join(HERE, '..', 'ref', 'yura-release', 'FileLists', 'Tomb Raider Underworld (PC).txt')
 LISTS = os.path.join(HERE, '..', 'work', 'generic', 'lists')
 BEEB = b'\xbe\xeb\xbe\xeb'

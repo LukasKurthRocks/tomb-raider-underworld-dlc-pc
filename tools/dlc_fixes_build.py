@@ -406,6 +406,12 @@ STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventl
 Q5_STEPS = ('idpair', 'fxrelayout', 'lv90dtp', 'odtwin', 'fpkeys')
 STRUCT_STEPS = STRUCT_STEPS[:STRUCT_STEPS.index('seqrepeat')] + Q5_STEPS + STRUCT_STEPS[STRUCT_STEPS.index('seqrepeat'):]
 for _s in Q5_STEPS: globals()['fix_' + _s] = _struct_fix(_s)
+# Q32 (2026-11-11, workspace docs Befund-Introtyped-1111.md, decision 7): unitcurve = the 64 u16 curve words of the
+# unit-DTP curve records (tools/unit_curve_fix.py, base proof once per process), after the Q5 steps, before seqrepeat;
+# gated by dlc_struct_fixes.py check --steps unitcurve (default gate once enabled in its CHECK_STEPS)
+Q32_STEPS = ('unitcurve',)
+STRUCT_STEPS = STRUCT_STEPS[:STRUCT_STEPS.index('seqrepeat')] + Q32_STEPS + STRUCT_STEPS[STRUCT_STEPS.index('seqrepeat'):]
+for _s in Q32_STEPS: globals()['fix_' + _s] = _struct_fix(_s)
 
 
 def _fault_fix(step):
