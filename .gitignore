@@ -205,3 +205,5 @@ work/kitfree_1011/
 work/q72_checkpoint_1111/
 # 2026-11-11 Q79 (save probe): disassemblies, harness (reads the owner's saves in place), negative test copies
 work/q79_saveprobe_1111/
+# 2026-11-11 Q84 (diving tanks): disassemblies, extracted DRMs, one-off scripts
+work/q84_tanks_1111/
