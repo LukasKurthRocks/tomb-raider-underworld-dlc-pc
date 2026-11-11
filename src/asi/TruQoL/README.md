@@ -8,7 +8,10 @@ wants, each with its own INI key (owner decision 2026-11-08). Defaults: **frame 
 options neutral (= the game's behaviour), the thread cap on at 8 since 0.1.3 (it only acts on PCs with more threads;
 31 was the old default - live on a 36-thread PC 25 and more hang at the first load).
 
-**Status TruQoL 0.1.5 (2026-11-11, `work\asi\qol015`): new diagnosis `[Diag] ExitTrace` (restart, default 0 = nothing
+**Status TruQoL 0.1.6 (2026-11-11, `work\asi\qol016`): new `[Save] RetryOnLock` (restart, default 0 = nothing
+patched) - the save / load file open retries when another program (security scan, backup, sync) still holds the file - built, byte
+checks and the patch site checked offline against `tru.exe`, not installed, not played (see "RetryOnLock" below).**
+0.1.5 (2026-11-11, `work\asi\qol015`): new diagnosis `[Diag] ExitTrace` (restart, default 0 = nothing
 installed; not in the shipped INI) for the rare silent end at start-up - built, checked offline with a test exe (not
 with tru.exe), not installed, not played (see "ExitTrace" below).** 0.1.4 (2026-11-11, `work\asi\qol014`): new `[Fixes]
 FrontEndPauseBit` (live, default 0 = the game's behaviour) - built and checked offline, not installed, not played (see
@@ -42,6 +45,7 @@ off / why).
 | `[Startup]` | `SkipIntro` | 0 | 0 / 1 | restart | 0.1.2: 1 = skip the start-up intro movie (only before the "press start" screen, never in a level; the legal screens stay); patched once at the start |
 | `[Fixes]` | `FrontEndPauseBit` | 0 | 0 / 1 | live | 0.1.4: 1 = clear the pause bit the front end keeps after "pause -> back to the main menu" (main-menu clocks, e.g. the teaser timer, then run in real time instead of half speed); only in the front end and only while no pause is open - the pause in a level is untouched. 0 = the game's behaviour (the bit stays until the next level load) |
 
+| `[Save]` | `RetryOnLock` | 0 | 0 / 1 | restart | 0.1.6: 1 = when the save / load file cannot be opened because another program holds it (sharing / lock / access error), try again up to 10 times 100 ms apart (only then; at most about 1 s); 0 = the game's one try (a failed save write deletes the slot's file) |
 | `[Diag]` | `ExitTrace` | 0 | 0 / 1 | restart | 0.1.5: 1 = write `TruQoL.exit.log` (first-chance exceptions, tru.exe's own `ExitProcess` / `TerminateProcess`, the DLL detach) - a diagnosis, see "ExitTrace" below. **Not in the shipped `TruQoL.ini`** (every key there needs a TruMenu switches row, which TruMenu's owner adds): add `[Diag]` / `ExitTrace=1` by hand |
 
 Invalid values are logged and replaced by the default (at the start) or keep the current value (live). Every engine
@@ -65,7 +69,7 @@ keeps it); **one log line per change** (`live: [Section] Key old -> new ...`).
 | `[Camera] ShakeScale` | the 0.1 rule kept live: TruQoL owns the shake calls 0x5eea55 / 0x5eb56d **only while ShakeScale < 1.0**. A change to < 1.0 points both to `ShakeStub` - only while both still call the game's 0x5eb460 (TruMenu's `cam.shakescale` below 100 % holds them: refused with one line, tried again at the next change of the key); a change to 1.0 puts the game's target back (only while both still call `ShakeStub`) and TruMenu's slider may take them again (move it once more: TruMenu retries only after a change). These two rel32 writes run on the game thread, as TruMenu's own run-time patch of the same two sites (`M21PatchGroup` from its pad hook) and TruShadowCombat's `[Damage] Translate` switch |
 | `[TruQoL] LogLevel` | the next line uses the new level; the change line itself is always written |
 | `[Fixes] FrontEndPauseBit` (0.1.4) | no code is written at run time: the paused-branch clock call 0x5da684 goes to `PauseClockStub` from the start (together with the frame-limiter hook); the key is a flag that `PauseBitCheck` reads at every paused frame |
-| `[TruQoL] Enabled`, `[Startup] ThreadCap`, `[Startup] SkipIntro` (0.1.2) | **restart**: `Enabled=0` patches nothing (no tick); the CPU count runs once in WinMain; the intro plays once, right after the start, so the movie call is patched in DllMain or not at all |
+| `[TruQoL] Enabled`, `[Startup] ThreadCap`, `[Startup] SkipIntro` (0.1.2), `[Save] RetryOnLock` (0.1.6) | **restart**: `Enabled=0` patches nothing (no tick); the CPU count runs once in WinMain; the intro plays once, right after the start, so the movie call is patched in DllMain or not at all; the save open call is patched in DllMain or not at all |
 
 Without the clock hook (bytes differ, another plugin owns the calls) there is no tick: every key takes effect at the
 next start (logged once).
@@ -186,6 +190,30 @@ check: `work\q22_fmod_1111\xt_harness.ps1` (a test exe at base 0x400000 loads th
 header, exception lines incl. the per-second limit after 24, module lines, detach line with the last exception;
 tru.exe's slots are outside the test exe, so the log says "not hooked" there - the hook itself is untested).
 
+## RetryOnLock (0.1.6): saving fails while another program holds the file
+
+Players report that saving fails with security software running (Steam guide "Definitive Improvement Guide"; workspace doc
+`docs\Befund-PC-Technik-Q69-1111.md`). Static reading of `tru.exe` (Q69):
+
+| What | Address | Proof | St |
+|---|---|---|---|
+| File open of the save / load state machine | **0x6db690** (thiscall (path, write)) | write: `CreateFileW(path, GENERIC_WRITE, 0 = no sharing, -, CREATE_ALWAYS, FILE_FLAG_OVERLAPPED)`; read: `(GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, 0)`; both branches reach the one call **0x6db6d0** `call [0x83e0c4]`; failure -> status +0x24 = 2 | ✅ static |
+| Writer tick | **0x6db810** (via 0x6dc140, called by the save menu code 0x78ab60 ..) | status 2 .. 5 -> step 2 = abort **0x6db956**: CloseHandle, `DeleteFileW(path)` when the status is not 0, result +0x1c = 3. Steps 3 .. 8: open, header / blocks by overlapped `WriteFile` (ERROR_IO_PENDING 0x3e5 accepted), `GetOverlappedResult` polled (0x3e4 = not yet) | ✅ static |
+| Retry / temporary file | - | none: one open per save, the slot file is truncated in place (CREATE_ALWAYS) - a failed write leaves no old save | ✅ static |
+
+The hook: `call [0x83e0c4]` (6 bytes) at 0x6db6d0 -> `call SaveCreateFile; nop` (patched once at the start, only with
+`RetryOnLock=1`, after byte checks of the argument block 0x6db6a9 .. 0x6db6e3, the abort 0x6db956 and the tick 0x6db810;
+`tools/pe_patch_site_check.py`: one whole instruction, the only branch to it is the `jmp` of the write branch to its
+start). `SaveCreateFile` calls what the import slot 0x83e0c4 holds at that moment (chained: a loader that hooks
+CreateFileW stays in the path). Only when that returns INVALID_HANDLE_VALUE with ERROR_SHARING_VIOLATION (32),
+ERROR_LOCK_VIOLATION (33) or ERROR_ACCESS_DENIED (5) it sleeps 100 ms and tries again, at most 10 times; any other error
+(e.g. no save file yet on a load) goes back at once. One log line per retried open: file name, read / write, the
+first error, the result. The wait runs on the thread that ticks the save (the save menu), at most about 1 s, only in
+that error case. Not done (plan): writing to a temporary file and renaming it over the slot (keeps the old save when a
+write fails); the abort's `DeleteFileW` stays the game's.
+
+Why default 0: proven statically; a locked save file has not been reproduced in the game yet (TO TEST 15).
+
 ## TO TEST
 
 1. Install with `Set-TruQoL.ps1 -Install -SourceDir work\asi\qol014`; start the game (affinity work-around still in the
@@ -245,12 +273,19 @@ tru.exe's slots are outside the test exe, so the log says "not hooked" there - t
     from ... = ...` line (note which site) and a `detach: process exit` line. Note the `first-chance exception` lines of
     a normal start (other plugins' probes) as the baseline. Start and play as usual: no slower start, nothing else
     changes. After a silent end: keep `TruQoL.exit.log` and report its last lines.
+15. RetryOnLock (0.1.6): install `work\asi\qol016`. a) `RetryOnLock=0`: log `Save RetryOnLock: off`; save and load as
+    usual. b) `RetryOnLock=1` (restart): log `Save RetryOnLock: on - CreateFileW call 0x006db6d0 ...`; save and load as
+    usual - no extra line (no retry needed). c) Provoke a lock: in the save folder hold the slot file open without
+    sharing (PowerShell: `$f = [IO.File]::Open('<slot file>', 'Open', 'ReadWrite', 'None')`), save to that slot, close
+    the handle (`$f.Close()`) within about 1 s: one line `'savegameNN.sav' (write) - CreateFileW error 32 at the first
+    try, opened after N retries` and the save works; keep it open longer: `... still 32 after 10 retries - the game's
+    own failure path` and the game's save error as before. With `RetryOnLock=0` the same lock fails at once (baseline).
 
 ## Files
 
 `TruQoL.cpp` (source; the comment block at the top holds the evidence in short), `TruQoL.ini` (sample with the
-defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol015` (0.1.5; the
-0.1.4 build is `work\asi\qol014`). 0.1.5 ExitTrace: `work\q22_fmod_1111\xt_harness.ps1` (see "ExitTrace"). Offline checks:
+defaults), build: `scripts\windows\Build-TruAsi.ps1 -Name TruQoL -OutDir <repo>\work\asi\qol016` (0.1.6; the
+0.1.5 build is `work\asi\qol015`, 0.1.4 `work\asi\qol014`). 0.1.5 ExitTrace: `work\q22_fmod_1111\xt_harness.ps1` (see "ExitTrace"). Offline checks:
 `work\qol17x_0811\check_qol01.py` (0.1: bytes, call targets, the start-up order, the loader default, the build, INI,
 README, install script) with negative tests `work\qol17x_0811\make_negative_qol01.py`; for 0.1.1
 `work\qol17y_0811\check_qol011.py` (the same plus the live logic: tick, gates, ShakeApply, the switches rows) with

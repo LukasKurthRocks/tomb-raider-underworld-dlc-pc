@@ -127,6 +127,18 @@
 // exception lines = a fault followed by an end outside these paths (fail-fast, a handler that terminates); nothing at
 // all = TerminateProcess by another module or from outside. TruMenu's game.quit logs itself (TruMenu.log). The key is
 // not in the shipped TruQoL.ini (every key there needs a TruMenu switches row); add "[Diag]" / "ExitTrace=1" by hand.
+//
+// 0.1.6 (2026-11-11, Q69, workspace doc Befund-PC-Technik-Q69-1111.md) [Save] RetryOnLock (restart, default 0 = nothing
+// patched) - saving fails while security software runs (Steam guide). The save / load state machine (writer 0x6db810, loader
+// 0x6db9b0, ticked by the save menu code 0x78ab60.. through 0x6dc140) opens its file in 0x6db690: write = CreateFileW(path,
+// GENERIC_WRITE, share 0, -, CREATE_ALWAYS, FILE_FLAG_OVERLAPPED), read = (GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
+// 0); both reach the one call `call [0x83e0c4]` at 0x6db6d0. On INVALID_HANDLE_VALUE it sets status +0x24 = 2 and the
+// next tick takes step 2 = abort 0x6db956 (CloseHandle, DeleteFileW(path) when the status is not 0, result +0x1c = 3):
+// one try, no retry, no temporary file. A scanner that still holds the file (no FILE_SHARE_WRITE) makes the open fail
+// with ERROR_SHARING_VIOLATION. RetryOnLock=1: the call becomes `call SaveCreateFile; nop`; it calls what the IAT slot
+// 0x83e0c4 holds (chained), and only when that fails with ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION /
+// ERROR_ACCESS_DENIED it waits 100 ms and tries again, at most 10 times (at most about 1 s on the thread that ticks the
+// save, only in that error case). One log line per retried open (file name, first error, result).
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -146,7 +158,7 @@
 
 namespace {
 
-const char kVersion[] = "TruQoL 0.1.5";
+const char kVersion[] = "TruQoL 0.1.6";
 const DWORD kImageBase = 0x00400000;
 
 // ---- 1. frame limiter: the frame-time function 0x5da230 and its two clock reads ----
@@ -234,6 +246,21 @@ const char *const kFrontEndTestHex = "a160ede700 83f806 7408 83f80a 7403 32c0 c3
 const DWORD kRenderStepRead = 0x005bf861;   // the other reader of the bit (render time step)
 const char *const kRenderStepReadHex = "f705b4f0e70000000010";
 
+// ---- 6. saves: the save / load file open 0x6db690 (0.1.6) ----
+const DWORD kSaveOpenArgs = 0x006db6a9;     // write: push 0x40000000 (overlapped), 2 (CREATE_ALWAYS), 0, 0 (share),
+                                            // 0x40000000 (GENERIC_WRITE), path; read: 3, 0, 1, 0x80000000, path; then
+                                            // call [0x83e0c4]; cmp eax, -1; mov [esi], eax; jne; status +0x24 = 2
+const char *const kSaveOpenArgsHex = "6800000040 7410 6a02 50 50 8b44241c 6800000040 50 eb10 8b4c2410 6a03 6a00 6a01 "
+                                     "6800000080 51 ff15c4e08300 83f8ff 8906 750d c7462402000000";
+const DWORD kSaveOpenCall = 0x006db6d0;     // call [0x83e0c4] (6 bytes) - the patched instruction
+const DWORD kCreateFileWIat = 0x0083e0c4;
+const DWORD kSaveAbort = 0x006db956;        // writer step 2: CloseHandle, status != 0 -> DeleteFileW(path)
+const char *const kSaveAbortHex = "8b06 33ff 3bc7 7407 50 ff15b4e18300 397e24 740a 8b5628 52 ff15cce08300";
+const DWORD kSaveTick = 0x006db810;         // writer tick: status 2 .. 5 -> step 2 (abort), no retry
+const char *const kSaveTickHex = "56 8bf1 8b4624 83f801 0f846d010000 83c0fe 83f803 57 bf02000000 7703 897e20";
+const int kSaveRetries = 10;                // at most 10 retries ...
+const DWORD kSaveRetryMs = 100;             // ... 100 ms apart (about 1 s, only after a failed first open)
+
 // ---- options (TruQoL.ini) ----
 int g_enabled = 1, g_logLevel = 1;
 int g_limitEnabled = 1, g_maxFps = 60, g_autoOff = 1, g_spinUs = 0;
@@ -244,6 +271,7 @@ int g_threadCap = 8;   // 0.1.3: default 8 (live 2026-11-08, 36-thread PC: 8 / 1
 int g_skipIntro = 0;                        // 0.1.2: [Startup] SkipIntro (restart)
 int g_frontEndPauseBit = 0;                 // 0.1.4: [Fixes] FrontEndPauseBit (live; read by PauseBitCheck)
 int g_exitTrace = 0;                        // 0.1.5: [Diag] ExitTrace (restart; not in the shipped INI)
+int g_saveRetry = 0;                        // 0.1.6: [Save] RetryOnLock (restart)
 
 char g_logPath[MAX_PATH], g_dir[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -1377,6 +1405,92 @@ void XtDetach(bool processExit) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// 7. saves (0.1.6): [Save] RetryOnLock - see the header. Nothing of this runs with RetryOnLock=0 (the default).
+typedef HANDLE(WINAPI *CreateFileWFn)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
+bool g_saveHooked = false;
+volatile LONG g_saveOpens = 0, g_saveRetried = 0;
+
+// the file name for the log (the game's own wide path: last part only, ASCII, copied under SEH)
+void SaveName(LPCWSTR path, char *out, size_t n) {
+    out[0] = 0;
+    if (!path) { strcpy_s(out, n, "(null)"); return; }
+    __try {
+        LPCWSTR name = path;
+        for (LPCWSTR p = path; *p; ++p)
+            if (*p == L'\\' || *p == L'/') name = p + 1;
+        size_t k = 0;
+        for (; k + 1 < n && name[k]; ++k)
+            out[k] = (name[k] >= 0x20 && name[k] < 0x7f) ? static_cast<char>(name[k]) : '?';
+        out[k] = 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        strcpy_s(out, n, "(unreadable)");
+    }
+}
+
+// the errors a scanner / indexer / backup tool that still holds the file gives; "not found" and the rest stay the game's
+bool SaveLockError(DWORD e) {
+    return e == ERROR_SHARING_VIOLATION || e == ERROR_LOCK_VIOLATION || e == ERROR_ACCESS_DENIED;
+}
+
+// in place of `call [0x83e0c4]` (CreateFileW) at 0x6db6d0 in the save / load file open 0x6db690 (stdcall, the same seven
+// arguments, the game reads eax only: cmp eax, -1)
+HANDLE WINAPI SaveCreateFile(LPCWSTR path, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES sa, DWORD disposition,
+                             DWORD flags, HANDLE templ) {
+    DWORD slot = 0;
+    CreateFileWFn real = ReadDword(kCreateFileWIat, &slot) && slot ? reinterpret_cast<CreateFileWFn>(slot)
+                                                                     : &CreateFileW;
+    InterlockedIncrement(&g_saveOpens);
+    HANDLE h = real(path, access, share, sa, disposition, flags, templ);
+    if (h != INVALID_HANDLE_VALUE) return h;
+    DWORD err = GetLastError();
+    if (!SaveLockError(err)) return h;       // e.g. no save file yet on a load: the game's own answer, untouched
+    const DWORD first = err;
+    int tries = 0;
+    while (tries < kSaveRetries && h == INVALID_HANDLE_VALUE && SaveLockError(err)) {
+        Sleep(kSaveRetryMs);
+        ++tries;
+        h = real(path, access, share, sa, disposition, flags, templ);
+        err = h == INVALID_HANDLE_VALUE ? GetLastError() : 0;
+    }
+    InterlockedIncrement(&g_saveRetried);
+    char name[80];
+    SaveName(path, name, sizeof(name));
+    const char *const what = (access & GENERIC_WRITE) ? "write" : "read";
+    if (h != INVALID_HANDLE_VALUE) {
+        Log(1, "Save RetryOnLock: '%s' (%s) - CreateFileW error %lu at the first try, opened after %d retr%s x %lu ms "
+               "(%ld retried opens of %ld)", name, what, first, tries, tries == 1 ? "y" : "ies", kSaveRetryMs,
+            g_saveRetried, g_saveOpens);
+        return h;
+    }
+    Log(0, "Save RetryOnLock: '%s' (%s) - CreateFileW error %lu at the first try, still %lu after %d retries x %lu ms - "
+           "the game's own failure path (status 2, abort 0x6db956)", name, what, first, err, tries, kSaveRetryMs);
+    SetLastError(err);
+    return h;
+}
+
+void StartSaveRetry() {
+    if (!g_saveRetry) {
+        Log(1, "Save RetryOnLock: off (RetryOnLock=0) - the game's own save / load open: one CreateFileW, no retry "
+               "(restart key)");
+        return;
+    }
+    if (!HexBytesAt(kSaveOpenArgs, kSaveOpenArgsHex) || !HexBytesAt(kSaveAbort, kSaveAbortHex) ||
+        !HexBytesAt(kSaveTick, kSaveTickHex)) {
+        Log(0, "Save RetryOnLock: off - the save file open 0x%08lx / abort 0x%08lx / tick 0x%08lx do not match this "
+               "tru.exe (or another plugin patched them)", kSaveOpenArgs, kSaveAbort, kSaveTick);
+        return;
+    }
+    BYTE call[6] = {0xe8, 0, 0, 0, 0, 0x90};
+    const DWORD rel = reinterpret_cast<DWORD>(&SaveCreateFile) - (kSaveOpenCall + 5);
+    memcpy(call + 1, &rel, 4);
+    if (!WriteCode(kSaveOpenCall, call, sizeof(call))) return;
+    g_saveHooked = true;
+    Log(1, "Save RetryOnLock: on - CreateFileW call 0x%08lx of the save / load file open 0x6db690 -> TruQoL: after a "
+           "sharing / lock / access error up to %d retries %lu ms apart (only then; the first try is the game's own)",
+        kSaveOpenCall, kSaveRetries, kSaveRetryMs);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // 0.1.1 live keys (TruMenu page Fixes / TruMenu.switches.txt "live"): game thread, from LiveTick. Every read passes the
 // current value as its default (a missing key keeps it); one log line per change. Not here (restart): [TruQoL] Enabled,
 // [Startup] ThreadCap.
@@ -1509,6 +1623,7 @@ void ReadOptions() {
     g_skipIntro = IniInt("Startup", "SkipIntro", 0, 0, 1);
     g_frontEndPauseBit = IniInt("Fixes", "FrontEndPauseBit", 0, 0, 1);   // 0.1.4
     g_exitTrace = IniInt("Diag", "ExitTrace", 0, 0, 1);                   // 0.1.5 (restart; not in the shipped INI)
+    g_saveRetry = IniInt("Save", "RetryOnLock", 0, 0, 1);                 // 0.1.6 (restart)
 }
 
 void Start(HMODULE self) {
@@ -1516,9 +1631,9 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruQoL.log", g_dir);
     ReadOptions();
     Log(1, "%s loaded (enabled %d, log level %d; FrameLimit %d / %d fps / AutoOff %d, Fov %g / cutscenes %d, ShakeScale "
-           "%g, ThreadCap %d, SkipIntro %d, FrontEndPauseBit %d, ExitTrace %d)", kVersion, g_enabled, g_logLevel,
-        g_limitEnabled, g_maxFps, g_autoOff, g_fov, g_fovCutscenes, g_shakeScale, g_threadCap, g_skipIntro,
-        g_frontEndPauseBit, g_exitTrace);
+           "%g, ThreadCap %d, SkipIntro %d, FrontEndPauseBit %d, ExitTrace %d, RetryOnLock %d)", kVersion, g_enabled,
+        g_logLevel, g_limitEnabled, g_maxFps, g_autoOff, g_fov, g_fovCutscenes, g_shakeScale, g_threadCap, g_skipIntro,
+        g_frontEndPauseBit, g_exitTrace, g_saveRetry);
     if (!g_enabled) { Log(1, "disabled by TruQoL.ini ([TruQoL] Enabled=0) - nothing patched"); return; }
     const DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - nothing patched", base, kImageBase); return; }
@@ -1527,11 +1642,12 @@ void Start(HMODULE self) {
     StartFrameLimit();
     StartCamera();
     StartSkipIntro();                        // 0.1.2: before WinMain, so no movie can be playing yet
+    StartSaveRetry();                        // 0.1.6: [Save] RetryOnLock (restart)
     g_iniTimeOk = IniTime(&g_iniTime);       // 0.1.1: the live tick reads again only after a change of TruQoL.ini
     if (g_limitHooked)
         Log(1, "live: TruQoL.ini is read again at most once a second when it changes (LogLevel, FrameLimit Enabled / "
                "MaxFps / AutoOff / SpinUs, Camera Fov / FovCutscenes / ShakeScale, Fixes FrontEndPauseBit; restart: "
-               "Enabled, ThreadCap, SkipIntro, Diag ExitTrace)");
+               "Enabled, ThreadCap, SkipIntro, Diag ExitTrace, Save RetryOnLock)");
 }
 
 }  // namespace
@@ -1548,9 +1664,10 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved) {
 }
 
 extern "C" __declspec(dllexport) const char *TruQoLVersion() {
-    return "TruQoL 0.1.5 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
+    return "TruQoL 0.1.6 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
            "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0, start-up "
            "intro skip at the script's PlayMovie call 0x77bc7b, stale front-end pause bit at the paused-branch clock "
            "call 0x5da684; live INI re-read once a second for TruMenu page Fixes; [Diag] ExitTrace (default off): "
-           "first-chance exceptions + tru.exe's ExitProcess / TerminateProcess -> TruQoL.exit.log)";
+           "first-chance exceptions + tru.exe's ExitProcess / TerminateProcess -> TruQoL.exit.log; [Save] RetryOnLock "
+           "(default off): retry of the save / load CreateFileW 0x6db6d0 on a sharing / lock / access error)";
 }
