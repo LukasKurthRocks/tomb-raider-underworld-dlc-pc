@@ -14,7 +14,7 @@ Usage (from the repository root):
 """
 import sys, os, re, collections, statistics
 
-T = re.compile(r'^(\d\d):(\d\d):(\d\d)\.(\d\d\d) ')
+T = re.compile(r'^(?:\d{4}-\d\d-\d\d )?(\d\d):(\d\d):(\d\d)\.(\d\d\d) ')   # optional date since Q107
 START = re.compile(r'sound: START sound (\d+) \(soundplex (0x[0-9a-f]+)\) emitter (0x[0-9a-f]+) (.*?): inst (0x[0-9a-f]+).*?'
                    r'payload (0x[0-9a-f]+) bytes (\w\w) (\w\w) s16 (-?\d+), record h (0x[0-9a-f]+) frame (-?\d+);.*instance list: (\w+)')
 LONG = re.compile(r'sound: LONG sound (\d+) emitter (0x[0-9a-f]+) still alive after (\d+)\.(\d+) s \(refcount (\d+), flags '
@@ -73,7 +73,8 @@ def main(a):
     if os.path.exists(mp):
         for line in open(mp, encoding='utf-8', errors='replace'):
             m = MARK.search(line)
-            if m and line[13:].startswith('claude.mark sound'):     # the tester's "sound strange" marks only
+            st = T.match(line)                                       # Q107: stamp with or without the date
+            if m and st and line[st.end():].startswith('claude.mark sound'):   # the tester's "sound strange" marks only
                 marks.append((secs(m.group(2) + ' '), m.group(1), m.group(3)[:90]))
     by = collections.defaultdict(list)
     for L in lives: by[L['sid']].append(L)

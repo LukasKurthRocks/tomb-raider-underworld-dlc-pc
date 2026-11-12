@@ -22,7 +22,7 @@ import collections
 import re
 import sys
 
-TS = r'([0-9]{2}[:][0-9]{2}[:][0-9]{2}[.][0-9]{3})'           # HH:MM:SS.mmm
+TS = r'(?:[0-9]{4}-[0-9]{2}-[0-9]{2} )?([0-9]{2}[:][0-9]{2}[:][0-9]{2}[.][0-9]{3})'   # [YYYY-MM-DD ]HH:MM:SS.mmm (Q107)
 COMBO = re.compile(r'^' + TS + r' combo: Lara records (\S*) -> (.+?) (-?\d+) LP (-?[\d.]+) -> (-?[\d.]+) '
                    r'\(-(-?[\d.]+)\), stamina (\S+) -> (\S+), state at the hit (\S+), reaction (\S+)(.*)$')
 DMG = re.compile(r'^' + TS + r' .*damage types: (0x[0-9a-f]+) obj (\d+) (\S+) type (\d+) sub (\d+) .*?'

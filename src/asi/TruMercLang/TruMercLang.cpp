@@ -33,6 +33,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <share.h>
+#include "../TruLog.h"                      // Q107: date + time in every log line, session header
 
 namespace {
 
@@ -99,10 +100,7 @@ CRITICAL_SECTION g_seenLock;
 void Log(int level, const char *fmt, ...) {
     if (level > g_logLevel || !g_logPath[0]) return;
     char line[640];
-    SYSTEMTIME t;
-    GetLocalTime(&t);
-    int n = _snprintf_s(line, sizeof(line), _TRUNCATE, "%02d:%02d:%02d.%03d ", t.wHour, t.wMinute, t.wSecond,
-                        t.wMilliseconds);
+    int n = TruLogStamp(line, sizeof(line));     // Q107: "YYYY-MM-DD HH:MM:SS.mmm "
     va_list ap;
     va_start(ap, fmt);
     if (n > 0) _vsnprintf_s(line + n, sizeof(line) - n, _TRUNCATE, fmt, ap);
@@ -111,6 +109,7 @@ void Log(int level, const char *fmt, ...) {
     // _fsopen with _SH_DENYNO (not fopen_s, which opens exclusively): a reader of the log never blocks a line
     FILE *f = _fsopen(g_logPath, "a", _SH_DENYNO);
     if (f) {
+        TruLogSessionStart(f, "TruMercLang", kVersion);
         fputs(line, f);
         fputs("\n", f);
         fclose(f);

@@ -77,6 +77,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include "../TruLog.h"                      // Q107: date + time in every log line, session header
 
 namespace {
 
@@ -288,6 +289,7 @@ void Flush() {
     if (n && g_logPath[0]) {
         FILE *f = nullptr;
         if (fopen_s(&f, g_logPath, "ab") == 0 && f) {
+            TruLogSessionStart(f, "TruTrace", kVersion, true);   // Q107: one header per process
             fwrite(g_flushBuf, 1, n, f);
             fclose(f);
         }
@@ -315,9 +317,10 @@ void Log(int cat, int level, const char *fmt, ...) {
     LONG sec = static_cast<LONG>(GetTickCount() / 1000);
     if (sec != r.second) {
         if (r.dropped) {
-            char note[160];
-            _snprintf_s(note, sizeof(note), _TRUNCATE, "%02d:%02d:%02d.%03d [%s] %s: (%ld lines suppressed by the rate "
-                        "limit, MaxLinesPerSecond %d)", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, g_unit,
+            char note[200];                 // Q107: + 11 for the date
+            _snprintf_s(note, sizeof(note), _TRUNCATE, "%04d-%02d-%02d %02d:%02d:%02d.%03d [%s] %s: (%ld lines suppressed "
+                        "by the rate limit, MaxLinesPerSecond %d)", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute,
+                        t.wSecond, t.wMilliseconds, g_unit,
                         kCatName[cat], r.dropped, g_maxPerSec);
             Append(note);
         }
@@ -331,8 +334,9 @@ void Log(int cat, int level, const char *fmt, ...) {
         ++r.droppedTotal;
         if (r.total == g_maxPerCat) {
             ++r.total;
-            _snprintf_s(line, sizeof(line), _TRUNCATE, "%02d:%02d:%02d.%03d [%s] %s: MaxLinesPerCategory %d reached - no "
-                        "more lines of this category", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, g_unit,
+            _snprintf_s(line, sizeof(line), _TRUNCATE, "%04d-%02d-%02d %02d:%02d:%02d.%03d [%s] %s: MaxLinesPerCategory "
+                        "%d reached - no more lines of this category", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute,
+                        t.wSecond, t.wMilliseconds, g_unit,
                         kCatName[cat], g_maxPerCat);
             Append(line);
         }
@@ -342,8 +346,8 @@ void Log(int cat, int level, const char *fmt, ...) {
     }
     ++r.inSecond;
     ++r.total;
-    int n = _snprintf_s(line, sizeof(line), _TRUNCATE, "%02d:%02d:%02d.%03d [%s] %s: ", t.wHour, t.wMinute, t.wSecond,
-                        t.wMilliseconds, g_unit, kCatName[cat]);
+    int n = _snprintf_s(line, sizeof(line), _TRUNCATE, "%04d-%02d-%02d %02d:%02d:%02d.%03d [%s] %s: ", t.wYear,
+                        t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, g_unit, kCatName[cat]);
     va_list ap;
     va_start(ap, fmt);
     if (n > 0) _vsnprintf_s(line + n, sizeof(line) - n, _TRUNCATE, fmt, ap);

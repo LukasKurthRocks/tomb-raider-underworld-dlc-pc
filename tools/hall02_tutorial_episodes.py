@@ -12,7 +12,7 @@ Usage (from the repository root; copy the logs once - never read the live files 
 import re
 import sys
 
-T = re.compile(r'^(\d\d):(\d\d):(\d\d)\.(\d\d\d) ')
+T = re.compile(r'^(?:\d{4}-\d\d-\d\d )?(\d\d):(\d\d):(\d\d)\.(\d\d\d) ')   # optional date since Q107
 
 
 def secs(line):

@@ -4001,7 +4001,8 @@ def check_02228(ini_path, switches_path):
         problems.append('TruMenu.cpp: TpSwAct must find the switch and run the page Fixes path QbSwAct')
     if 'p.rows[i].kind == kQbNote' not in src: problems.append('TruMenu.cpp: the start-up row count must skip the notes')
     header, opt_rows = table(src)
-    if len(opt_rows) != 258: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.28 adds no INI key (258)' % len(opt_rows))
+    if len(opt_rows) < 258:   # 0.22.30 adds [Input] DeviceGlyphs: at least the 258 keys of 0.22.28
+        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.28 adds no INI key (258)' % len(opt_rows))
     ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
     if 'ebd75bd759135f76a26bcf867310d394033c48467e1e64e93431ab337388159d' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.27 build hash (work\\asi\\menu0250) is missing')
@@ -4019,8 +4020,8 @@ def check_02229():
     the 0.22.28 hash"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.29 (radial lock, Q103' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.29 (radial lock, Q103')
+    if '0.22.29 (radial lock, Q103' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.30: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.29 part "0.22.29 (radial lock, Q103"')
     tick = src[src.find('\nvoid RadialTick() {'):]
     tick = tick[:tick.find('\n}\n')]
     if not tick: return problems + ['TruMenu.cpp: RadialTick not found'], 'radial: no RadialTick'
@@ -4046,12 +4047,89 @@ def check_02229():
     if src.count('RadialActivate(') - src.count('void RadialActivate(') != 4:
         problems.append('TruMenu.cpp: RadialActivate must be called only from RadialTick (4 places)')
     header, opt_rows = table(src)
-    if len(opt_rows) != 258: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.29 adds no INI key (258)' % len(opt_rows))
+    if len(opt_rows) < 258:   # 0.22.30 adds [Input] DeviceGlyphs
+        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.29 adds no INI key (258)' % len(opt_rows))
     ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
     if 'e284247a58914abc4c856343d52f067fe83ad1a37fb4fa16a16e5cf01bf554fd' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.28 build hash (work\\asi\\menu0251) is missing')
     return problems, 'radial lock: Enabled=0 closes, %d drawn-frame guards, %d entry calls in RadialTick' % (
         len(guards), acts)
+
+
+def check_02230():
+    """0.22.30 (group D1 12.11.; workspace docs/Befund-Gruppe-D1-1211.md): Q107 - Log() stamps with TruLogStamp (date +
+    time) and writes the session header through TruLogSessionStart (src/asi/TruLog.h), StampLength takes an optional
+    date; Q95 - [Input] DeviceGlyphs (default 0), PadHook / WndProcHook feed the last device, GlTick patches the 23 bytes
+    at 0x5a7d75 only after 12 byte checks (push esi / call GlName / add esp, 4 / 14 nops), GlName falls back to the
+    game's vf+0x20; Q103 rest - QuickTick asks QbDrawnEnough before any bar press, DrawQuick counts the open bar,
+    DrawMenu disables its widgets (PushItemFlag / PopItemFlag) and drops the TO TEST X / Y edges below 3 drawn frames,
+    the counters reset at the open; kOpts 259 keys; Set-TruMenu.ps1 knows the 0.22.29 hash"""
+    problems = []
+    src = read_cpp()
+    if 'const char *const kVersion = "TruMenu 0.22.30 (log dates, device glyphs, drawn guards' not in src:
+        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.30 (log dates, device glyphs, drawn guards')
+    log = fn_body(src, 'void Log(')
+    if 'TruLogStamp(line, sizeof(line))' not in log or 'TruLogSessionStart(f, "TruMenu", kVersion);' not in log:
+        problems.append('TruMenu.cpp: Log must stamp with TruLogStamp and write the session header (Q107)')
+    if '#include "../TruLog.h"' not in src: problems.append('TruMenu.cpp: TruLog.h not included')
+    hdr = open(os.path.join(ROOT, 'src', 'asi', 'TruLog.h'), encoding='utf-8-sig').read()
+    if '"%04d-%02d-%02d %02d:%02d:%02d.%03d "' not in hdr or 'session start (pid %lu) ===' not in hdr:
+        problems.append('TruLog.h: stamp "YYYY-MM-DD HH:MM:SS.mmm " / session header text changed')
+    st = fn_body(src, 'size_t StampLength(')
+    if "t[4] == '-'" not in st or 'StampLengthTime(t + date)' not in st:
+        problems.append('TruMenu.cpp: StampLength must take an optional "YYYY-MM-DD " before the time')
+    # Q95 device glyphs
+    if '"Input", "DeviceGlyphs", "0"' not in src: problems.append('TruMenu.cpp: kOpts lacks [Input] DeviceGlyphs=0')
+    if 'g_glDevGlyphs = OptInt(ini, "Input", "DeviceGlyphs") != 0 ? 1 : 0;' not in src:
+        problems.append('TruMenu.cpp: ReadOptions must read [Input] DeviceGlyphs')
+    if 'if (connected) GlPadSeen(copy);' not in fn_body(src, 'DWORD WINAPI PadHook('):
+        problems.append('TruMenu.cpp: PadHook must feed GlPadSeen with the raw poll')
+    if 'GlWndSeen(hwnd, msg, wParam, lParam);' not in fn_body(src, 'LRESULT CALLBACK WndProcHook('):
+        problems.append('TruMenu.cpp: WndProcHook must feed GlWndSeen')
+    checks = src[src.find('const DvCheck kGlChecks[] = {'):]
+    checks = checks[:checks.find('\n};')]
+    n_checks = len(re.findall(r'\{0x00[0-9a-f]{6}, "', checks))
+    if n_checks != 12: problems.append('TruMenu.cpp: kGlChecks has %d checks (0.22.30: 12)' % n_checks)
+    orig = 'a1 68 2b a0 00 8b 48 08 8b 11 8b 04 b5 f8 9e 8a 00 8b 52 20 50 ff d2'.split()
+    have = re.search(r'const BYTE kGlSiteOrig\[23\] = \{(.*?)\};', src, re.S)
+    if not have or [x.strip()[2:] for x in have.group(1).split(',')] != orig:
+        problems.append('TruMenu.cpp: kGlSiteOrig must be the 23 game bytes at 0x5a7d75')
+    tick = fn_body(src, 'void GlTick(')
+    i_chk, i_patch = tick.find('DvChecks(kGlChecks'), tick.find('LcPatch(kGlSite, kGlSiteOrig')
+    if not (0 <= i_chk < i_patch) or 'if (!g_glDevGlyphs || g_glChecked) return;' not in tick:
+        problems.append('TruMenu.cpp: GlTick must check the bytes before the patch and only with DeviceGlyphs=1')
+    for b in ('g_glPatch[0] = 0x56;', 'g_glPatch[1] = 0xe8;', 'g_glPatch[6] = 0x83;', 'g_glPatch[8] = 0x04;',
+              'for (int i = 9; i < 23; ++i) g_glPatch[i] = 0x90;', '(kGlSite + 1 + 5)'):
+        if b not in tick: problems.append('TruMenu.cpp: GlTick patch layout lacks %s' % b)
+    gn = fn_body(src, 'const GlStr *__cdecl GlName(')
+    if 'return own(remap, 0, code);' not in gn or '__except' not in gn:
+        problems.append('TruMenu.cpp: GlName must fall back to the game\'s vf+0x20 and catch faults')
+    if 'GlTick();' not in fn_body(src, 'void Render('):
+        problems.append('TruMenu.cpp: Render must call GlTick')
+    # Q103 rest
+    qt = fn_body(src, 'void QuickTick(')
+    i_guard, i_dir = qt.find('if (edges && !QbDrawnEnough(edges)) {'), qt.find('const WORD dir = ')
+    if not (0 <= i_guard < i_dir): problems.append('TruMenu.cpp: QuickTick must ask QbDrawnEnough before any bar press')
+    if 'if (!g_qbOpen) InterlockedExchange(&g_qbDrawn, 0);' not in qt:
+        problems.append('TruMenu.cpp: g_qbDrawn must reset while the bar is closed')
+    if 'if (g_qbOpen) InterlockedIncrement(&g_qbDrawn);' not in fn_body(src, 'void DrawQuick('):
+        problems.append('TruMenu.cpp: DrawQuick must count the open bar\'s frames')
+    dm = fn_body(src, 'void DrawMenu(')
+    if dm.count('ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);') != 1 or dm.count('if (notDrawn) ImGui::PopItemFlag();') != 1:
+        problems.append('TruMenu.cpp: DrawMenu must push / pop the disabled flag once each')
+    if '&& !notDrawn;' not in dm or 'InterlockedIncrement(&g_menuDrawn);' not in dm:
+        problems.append('TruMenu.cpp: DrawMenu must drop X / Y while not drawn and count its frames')
+    if 'InterlockedExchange(&g_menuDrawn, 0);' not in fn_body(src, 'void Render('):
+        problems.append('TruMenu.cpp: g_menuDrawn must reset at the open / close')
+    for line in ('quick: buttons 0x%04x ignored - not drawn (%ld frames)', 'menu: input ignored - not drawn (%ld frames)'):
+        if line not in src: problems.append('TruMenu.cpp: log line "%s" missing' % line)
+    header, opt_rows = table(src)
+    if len(opt_rows) != 259: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.30 adds [Input] DeviceGlyphs (259)' % len(opt_rows))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '7c8acbb34540547c2ec2893072c0e8d3e941517a57b2a17b92bcf1c5444f2ab1' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.29 build hash (work\\asi\\menu0252) is missing')
+    return problems, 'log dates + session header, device glyphs (%d byte checks, 23-byte patch), quick bar / menu drawn ' \
+                     'guards, %d INI keys' % (n_checks, len(opt_rows))
 
 
 def table(src):
@@ -4244,6 +4322,10 @@ def main(argv):
     for p in cproblems29: print('Q02229 %s' % p)
     if not cproblems29: print('ok: 0.22.29 %s' % csummary29)
     problems += cproblems29
+    cproblems30, csummary30 = check_02230()   # 0.22.30
+    for p in cproblems30: print('Q02230 %s' % p)
+    if not cproblems30: print('ok: 0.22.30 %s' % csummary30)
+    problems += cproblems30
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

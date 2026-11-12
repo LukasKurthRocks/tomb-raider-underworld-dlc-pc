@@ -22,7 +22,7 @@ import sys, os, re
 
 SHORT_MS = 100
 BURST_MS = 2500
-TS = re.compile(r'^(\d\d):(\d\d):(\d\d)\.(\d{3}) (.*)$')
+TS = re.compile(r'^(?:\d{4}-\d\d-\d\d )?(\d\d):(\d\d):(\d\d)\.(\d{3}) (.*)$')   # optional date since Q107
 DBGTIME = re.compile(r'^Debug session time: \w+ \w+ +\d+ (\d\d):(\d\d):(\d\d)\.(\d{3}) ')
 BPLINE = re.compile(r'^0:000> (b[pa]\d*)\s+(\S+(?:\s+\S+)?)')
 GENERIC = {

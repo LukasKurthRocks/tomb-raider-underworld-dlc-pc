@@ -2928,6 +2928,55 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.30 - log dates, device glyphs, drawn guards for bar and menu (2026-11-12)
+
+Built into `work\asi\menu0253`, not installed, no live test (group D1: Q107, Q95, Q103 rest; finding in the workspace
+`docs\Befund-Gruppe-D1-1211.md`).
+
+- **Q107 - date in every log line:** `TruMenu.log` lines start with `YYYY-MM-DD HH:MM:SS.mmm` (was `HH:MM:SS.mmm`), and
+  the first line a process writes is the session header `=== <date time> TruMenu 0.22.30 session start (pid n) ===`.
+  The stamp and the header come from the shared `src\asi\TruLog.h`; every other plugin log uses it as well (TruShadowPower,
+  TruShadowCombat, TruQoL incl. `TruQoL.exit.log` lines, TruRockVein, TruDlc2Player, TruLink, TruTrace, TruShadowHud,
+  TruMercLang, TruDoppelganger, TruDataGuard). All plugins read the clock with `GetLocalTime`; the "one TruShadowCombat line
+  1 h off" of 2026-11-11 was a line of an earlier day in the multi-day log (no clock difference). The log page / overlay
+  (`StampLength`) accept a stamp with or without the date and show the time. The `claude.mark` line keeps its inner
+  `HH:MM:SS.mmm`. Readers accept both forms: `Invoke-TruTestRun.ps1` (marks, flow lines), `combat_log_compare.py`,
+  `combo_hitlist_trace.py`, `hitch_scan.py`, `trace_sound_life.py`, `hall02_tutorial_episodes.py`,
+  `light_frame_report.py`. TSV traces (TruFight.log, TruAim.log, TruShadowPower's TSV) keep their time column.
+- **Q95 - button prompts by the last used device** (`[Input] DeviceGlyphs`, default 0): the PC replaces every pad
+  character U+1800..U+182E of a UIText by the name of the bound key (0x5a7c20; Q9). With 1, TruMenu notes the last used
+  device - pad: a button, a trigger past 30 or a stick past XInput's dead zone in the game's poll (PadHook); keyboard /
+  mouse: a key, a mouse button, the wheel or a mouse move away from the client centre (WndProcHook; the game puts the
+  cursor back to the centre after each camera move, that move does not count) - and at the first frame patches 23 bytes
+  at 0x5a7d75 (`push esi` / `call GlName` / `add esp, 4` / 14 nops) after 12 byte checks. `GlName` gives for a pad the
+  symbol of the first XInput binding (the 14 symbols of texts 5061..5076 and U+1810 / U+1811 for Start / Back - the
+  font DTP 46, page 1 = texture 110, holds both), for keyboard / mouse the name of the first other binding; no device
+  seen yet, the Enter / Esc / Backspace aliases without a pad, stick directions or `DeviceGlyphs=0` again
+  (`settings.reset`) keep the game's own name. Log: `glyphs: last device pad -> keyboard / mouse (key 0x57; switch n)`
+  (the first 20 at LogLevel 1), `glyphs: first pad prompt - U+1811 ...`, `0.22.30 device glyphs: 12 checks ok ...`.
+- **Q103 rest - only what is on screen acts:** as the ring in 0.22.29, the quick bar acts on its presses (D-pad, LB / RB,
+  X / Y) only after DrawQuick drew the open bar in 3 frames, else `quick: buttons 0x.... ignored - not drawn (n
+  frames)`; the big menu's widgets (menu window and command bar) are disabled (`ImGuiItemFlags_Disabled`, the look stays)
+  and the TO TEST X / Y edges dropped until DrawMenu built the window in 3 frames since the open, a press then logs
+  `menu: input ignored - not drawn (n frames)`. Both counters reset at each open.
+- One new INI key (259). Check: `trumenu_ini_check` `check_02230` (Log stamp / header, StampLength, the key and its
+  readers, 12 checks, the original 23 bytes, patch layout, GlName fallback, bar guard before any press, menu push / pop,
+  frame counters, Set-TruMenu 0.22.29 hash); `check_02228` / `check_02229` accept 259 keys and look for their kVersion
+  part. Build: 0 warnings in TruMenu.cpp (2 in the third-party `imgui_demo.cpp`).
+
+### TO TEST 0.22.30
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | log date | start the game once | every new line of `TruMenu.log` (and of every other `Tru*.log`) starts with today's date; one `=== ... session start (pid n) ===` line per plugin and start |
+| 2 | log page | open the log page / overlay | lines show `HH:MM:SS.mmm` as before (no date in the overlay) |
+| 3 | glyphs off | `[Input] DeviceGlyphs=0` (default), DLC 2 banner "ZIEL FREIGESCHALTET" | as before: `BACK` as a word (pad) |
+| 4 | glyphs, pad | `DeviceGlyphs=1`, restart, play with the pad, banner / any hint with Start or Back | the Back / Start symbol instead of the word; `glyphs: first pad prompt` line |
+| 5 | glyphs, keyboard | same session: press a key or move the mouse, look at a hint | the key name (e.g. Tab for Back); `glyphs: last device pad -> keyboard / mouse` |
+| 6 | glyphs, switch back | touch the pad again | symbols again; no flicker while only the mouse camera turns |
+| 7 | bar not drawn | open the quick bar during a load / right after Start + View and press X / right at once | nothing runs before the bar is visible; possibly `quick: buttons ... ignored - not drawn` |
+| 8 | menu not drawn | open the big menu and press A / Enter at once | nothing runs in the first frames; `menu: input ignored - not drawn` possible; afterwards the menu works as before |
+
 ## 0.22.29 - radial lock: Enabled=0 closes, entries only after a drawn ring (2026-11-11)
 
 Built into `work\asi\menu0252` (sha256 `7c8acbb3...c5444f2ab1`, 1,927,680 bytes), not installed, no live test (Q103;
@@ -4443,7 +4492,7 @@ checks"). Not yet run in the game.
 | `weapon.slots`, `weapon.has` | weapon manager `WM = [[0xfadb58]+0x500]`; 15 slots, right hand handle `{instance, id}` at `WM+4+0x10*slot`, left hand at `WM+0xc+0x10*slot` (reader 0x6e7b90: `cmp esi, 0xe`, `[esi+edi+4/8]`, `[esi+edi+0xc/0x10]`); a handle is valid when `[instance+0x44] == id` (the game's check 0x5b39d0 - TruMenu repeats it with its own reads instead of calling it); object name `[[instance+0x10]+0x60]` (as the gear callback reads it at 0x715ea2); selected slot `WM+0x138` | 0x5b39d0 bytes, 0x6e7b98 / 0x6e7bb9 / 0x6e7bde |
 | `ammo.fill` | for type 0..5: `reserve[type]` (u16 `playerstate+0x51c+2*type`) = *MaxAmmo* 0x6eeae0 cdecl `(s8 type) -> u16` (6-entry jump table, `0xffff` for other types; reads the player's object data `[[0xe7f094]+0x50]`, so a level is needed); the clips are **not** refilled (0x6e7ae0 not used) | 0x6eeae0 prologue + jump, 0x6eec67 `or ax, 0xffff; ret` |
 | `gear.give` | *GiveObject* 0x555f60 cdecl `(owner = player instance, objectId, callback 0x715e90, flag 1)`: an existing instance of the object (0x5b3950) goes to the callback at once, else 0x5550a0 loads / births it first; the callback with flag 1 calls *WM::AddGear* (catalog 17.1 step 5). Main state 1 only | 0x555f60 and 0x715e90 bytes, 0x715eb2 `mov eax, [0xfadb58]; mov ecx, [eax+0x500]` |
-| Log collapse / filters | in `PushLine`: a leading `HH:MM:SS[.mmm] ` is the time stamp; the newest line of the same source with the same text is counted and moved to the head; TruLink lines `> read* / scan* / watch* / ping` and `[>] menu <id>` with an info item (or `status.*`, `list`) are dropped when `HideLinkReads=1`; severity by words (errors: fail, error, exception, ` NO `, `err `, crash; warnings: warn, not match, mismatch, busy, refused, unreadable, timeout, missing, skipped, not verified); rate limit counted per source and second, the dropped count is written as one line when the second is over | - |
+| Log collapse / filters | in `PushLine`: a leading `[YYYY-MM-DD ]HH:MM:SS[.mmm] ` is the time stamp (0.22.30: the date is optional and not shown); the newest line of the same source with the same text is counted and moved to the head; TruLink lines `> read* / scan* / watch* / ping` and `[>] menu <id>` with an info item (or `status.*`, `list`) are dropped when `HideLinkReads=1`; severity by words (errors: fail, error, exception, ` NO `, `err `, crash; warnings: warn, not match, mismatch, busy, refused, unreadable, timeout, missing, skipped, not verified); rate limit counted per source and second, the dropped count is written as one line when the second is over | - |
 | `camera.free` | **still todo**: the free camera needs the offsets of the camera's `transform` / `invTransform` and the per-frame rebuild (catalog section 9). Found on 2026-10-31 only a lead: 0x5edb50 writes a matrix at 0xe8ee30 (via 0x431e10) and its inverse at 0xe8ee70 (`0x49be10(0xe8ee70, src)`), i.e. inverse = transform + 0x40 for that camera object; which camera / base it is and whether mode 11 keeps the game from overwriting it is **not verified** | - |
 
 ## Hooks

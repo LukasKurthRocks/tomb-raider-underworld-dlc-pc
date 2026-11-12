@@ -22,7 +22,7 @@ Usage (from the repository root):
 """
 import sys, os, re, struct, collections
 
-TIME = r'([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+)'      # log time stamp HH:MM:SS.mmm
+TIME = r'(?:[0-9]{4}-[0-9]{2}-[0-9]{2} )?([0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+)'   # log stamp [YYYY-MM-DD ]HH:MM:SS.mmm (Q107)
 CUT_RE = re.compile(r'^' + TIME + r' light\.cut f(\d+) caller (0x[0-9a-f]+): (\d+) offered -> (\d+) kept '
                     r'\(([^)]*)\) drop (\d+), not looked at (\d+) \| list (.*)$')
 ITEM_RE = re.compile(r'([+\-.])#(\d+) (0x[0-9a-f]+) ([a-z ]+?) \((-?[\d.]+) (-?[\d.]+) (-?[\d.]+)\)')

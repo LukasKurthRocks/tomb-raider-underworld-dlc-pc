@@ -30,7 +30,7 @@ import collections
 import re
 import sys
 
-TS = r'([0-9]{2}[:][0-9]{2}[:][0-9]{2}[.][0-9]{3})'
+TS = r'(?:[0-9]{4}-[0-9]{2}-[0-9]{2} )?([0-9]{2}[:][0-9]{2}[:][0-9]{2}[.][0-9]{3})'   # [YYYY-MM-DD ]HH:MM:SS.mmm (Q107)
 COMBO = re.compile(r'^' + TS + r' combo: Lara records (\S*) -> (.+?) (-?\d+) LP (-?[\d.]+) -> (-?[\d.]+) '
                    r'\(-(-?[\d.]+)\).*?state at the hit (\S+), reaction (\S+)')
 S1004 = re.compile(r'^' + TS + r' state 1004 slot ([01]) .*?\(call (\d+)\): (ON:|off \(would\):) parameter 0x415 '

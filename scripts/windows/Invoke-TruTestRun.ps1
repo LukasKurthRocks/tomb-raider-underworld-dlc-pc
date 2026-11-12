@@ -898,13 +898,15 @@ function Get-TruFlowResult {
     $log = Join-Path $Folder 'TruMenu.log'
     $lines = if (Test-Path -LiteralPath $log) { [IO.File]::ReadAllLines($log) } else { @() }
     foreach ($l in $lines) {
-        if ($l -match '^(\d\d:\d\d:\d\d)\.\d+ claude\.mark (\S+): \S+ unit=(\S+) pos=(\S+ \S+ \S+) step=(\S+) shot=(\S+) src=(\S+)') {
+        # Q107: the plugin logs carry 'YYYY-MM-DD ' before the time since 12.11.2026 (older lines without it);
+        # [0-9]{2} instead of \d\d: the upload scan reads a letter + colon + backslash as a drive path
+        if ($l -match '^(?:[0-9]{4}-[0-9]{2}-[0-9]{2} )?([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+ claude\.mark (\S+): \S+ unit=(\S+) pos=(\S+ \S+ \S+) step=(\S+) shot=(\S+) src=(\S+)') {
             $file = $Matches[6]
             $res.marks += [ordered]@{ time = $Matches[1]; kind = $Matches[2]; unit = $Matches[3]; step = $Matches[5]; shot = $file
                 src = $Matches[7]; collected = ($file -ne '-' -and (Test-Path -LiteralPath (Join-Path $shotDir $file))) }
             continue
         }
-        if ($l -notmatch '^(\d\d:\d\d:\d\d)\.\d+ flow: (.*)$') { continue }
+        if ($l -notmatch '^(?:[0-9]{4}-[0-9]{2}-[0-9]{2} )?([0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]+ flow: (.*)$') { continue }
         $t = $Matches[1]
         $rest = $Matches[2]
         if ($rest -match '^loaded (.*)$') { $res.loaded = "$t $($Matches[1])" }

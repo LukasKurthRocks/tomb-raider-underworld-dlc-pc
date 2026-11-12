@@ -53,6 +53,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include "../TruLog.h"                      // Q107: date + time in every log line, session header
 
 namespace {
 
@@ -105,10 +106,7 @@ volatile LONG g_laraBinds = 0, g_dlc2Binds = 0;
 void Log(int level, const char *fmt, ...) {
     if (level > g_logLevel || !g_logPath[0]) return;
     char line[700];
-    SYSTEMTIME t;
-    GetLocalTime(&t);
-    int n = _snprintf_s(line, sizeof(line), _TRUNCATE, "%02d:%02d:%02d.%03d ", t.wHour, t.wMinute, t.wSecond,
-                        t.wMilliseconds);
+    int n = TruLogStamp(line, sizeof(line));     // Q107: "YYYY-MM-DD HH:MM:SS.mmm "
     va_list ap;
     va_start(ap, fmt);
     if (n > 0) _vsnprintf_s(line + n, sizeof(line) - n, _TRUNCATE, fmt, ap);
@@ -116,6 +114,7 @@ void Log(int level, const char *fmt, ...) {
     EnterCriticalSection(&g_logLock);
     FILE *f = nullptr;
     if (fopen_s(&f, g_logPath, "a") == 0 && f) {
+        TruLogSessionStart(f, "TruShadowHud", kVersion);
         fputs(line, f);
         fputs("\n", f);
         fclose(f);
