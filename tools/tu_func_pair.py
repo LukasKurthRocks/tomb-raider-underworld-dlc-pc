@@ -14,12 +14,17 @@ partly moved functions. This tool pairs them by evidence, in rounds:
   position     - last resort: xbox_func_diff's positional pair when both are still unpaired and similarity >= 0.5
 Every pair has a size-ratio guard (TU / retail 0.4 .. 2.5). Status per function: moved-equal (aligned or moved),
 paired (method + confidence), tu-only, retail-only.
+Functions (Q49, 12.11.2026): the .pdata functions plus every bl target outside them (leaf functions without an unwind
+entry, ~1 900 per image; end = first unconditional return / branch out that no in-function branch jumps past, see
+leaf_end) - column no_pdata says which side has such a function. --check-leaf runs leaf_end on the .pdata functions
+(how often it finds their known end) and prints how many functions without .pdata it adds.
 
 Usage (from the repository root):
   ../bin/pyt -t 3600 tools/tu_func_pair.py RETAIL.bin TU.bin OUT_DIR
+  ../bin/pyt -t 900 tools/tu_func_pair.py --check-leaf IMAGE.bin [IMAGE.bin ...]
   e.g. work/xenia_dump/retail_image_82000000.bin work/xenia_dump/tu_image_82000000.bin work/tu_funcdiff
 Output: OUT_DIR/pairs.tsv (tu, retail, status, method, confidence, score, sizes, xbox_func_diff class of the TU
-function and of the retail function),
+function and of the retail function, no_pdata),
 OUT_DIR/pair_summary.txt. Only addresses, sizes, methods and counts - no game bytes.
 The module also exports the instruction helpers used by tools/tu_func_classify.py (skeleton tokens, similarity).
 """
@@ -35,6 +40,129 @@ XO_OPS = {19, 31, 59, 63}
 
 def words(d, fs, fe):
     return struct.unpack_from('>%dI' % ((fe - fs) // 4), d, fs - BASE)
+
+
+# ---- functions without a .pdata entry (Q49, 12.11.2026) ----
+# The linker gives leaf functions (no stack frame, no calls) no .pdata entry; ppc_xrefs / xbox_func_diff only know the
+# .pdata functions, so ~1 900 functions per image that are reached by `bl` were invisible to the pairing and to the
+# coverage list (Q75). They are added here as functions: start = the bl target, end = see leaf_end.
+BLR, BCTR = 0x4e800020, 0x4e800420
+
+
+def leaf_end(d, s, limit):
+    """end (exclusive) of a function starting at s that has no .pdata entry: the first unconditional return (blr /
+    bctr) or unconditional branch out of [s, limit) that no in-function branch (bc / b) or in-code jump table entry
+    jumps past; a zero word (padding) also ends it. Bounded by `limit` (the next known function start). Checked
+    against the .pdata functions themselves: see --check-leaf"""
+    maxt = s
+    a = s
+    while a < limit:
+        w = struct.unpack_from('>I', d, a - BASE)[0]
+        if w == 0:
+            return a if a > s else a + 4
+        op = w >> 26
+        if s <= w < limit and not (w & 3) and w > a:   # absolute in-function address: jump table entry
+            maxt = max(maxt, w)
+        elif op == 16:
+            bd = w & 0xfffc
+            t = a + (bd - 0x10000 if bd & 0x8000 else bd)
+            if s <= t < limit:
+                maxt = max(maxt, t)
+        elif op == 18 and not (w & 1):                 # b (no link)
+            li = w & 0x03fffffc
+            t = (a + (li - 0x04000000 if li & 0x02000000 else li)) & 0xffffffff
+            if s <= t < limit and not (w & 2):
+                maxt = max(maxt, t)
+            elif a >= maxt:
+                return a + 4                           # tail branch out of the function
+        elif (w == BLR or w == BCTR) and a >= maxt:
+            return a + 4
+        a += 4
+    return limit
+
+
+def nopdata_functions(d, secs, funcs, res):
+    """[(start, end)] of the bl targets outside every .pdata function, repeated over the new functions' own bl calls
+    until no new target appears (leaf functions rarely call; the loop is a guard)"""
+    code = P.code_ranges(secs)
+    known = sorted(f[0] for f in funcs)
+    pstart = [f[0] for f in funcs]
+    found = {}
+    todo = res
+    while True:
+        new = set()
+        for fs, items in todo.items():
+            for a, k, v in items:
+                if k == 'call' and v not in found and not (v & 3) and P.func_of(funcs, v) is None and \
+                        any(c0 <= v < c1 for c0, c1 in code):
+                    new.add(v)
+        if not new:
+            break
+        starts = sorted(set(known) | set(found) | new)
+        ext = []
+        for v in sorted(new):
+            i = bisect.bisect_right(starts, v)
+            lim = starts[i] if i < len(starts) else next(c1 for c0, c1 in code if c0 <= v < c1)
+            lim = min(lim, next(c1 for c0, c1 in code if c0 <= v < c1))
+            j = bisect.bisect_right(pstart, v)
+            if j < len(pstart):
+                lim = min(lim, pstart[j])
+            found[v] = leaf_end(d, v, lim)
+            ext.append((v, found[v]))
+        todo = P.scan(d, secs, ext)
+    # a later-found start can cut an earlier end: clip every end at the next start
+    starts = sorted(set(known) | set(found))
+    out = []
+    for v in sorted(found):
+        i = bisect.bisect_right(starts, v)
+        e = found[v] if i >= len(starts) else min(found[v], starts[i])
+        out.append((v, e))
+    return out
+
+
+_ALL = {}
+_pdata_cached = P.cached                           # the .pdata-only cache (main() swaps P.cached while building FM.Xbox)
+
+
+def cached_all(path):
+    """(funcs, res) like ppc_xrefs.cached, plus the functions without .pdata (nopdata_functions) and their scan;
+    funcs sorted by start. Kept in memory per process (the .pdata part comes from ppc_xrefs' cache)"""
+    if path not in _ALL:
+        funcs, res = _pdata_cached(path)
+        d, secs = P.load(path)
+        extra = nopdata_functions(d, secs, funcs, res)
+        res2 = dict(res)
+        res2.update(P.scan(d, secs, extra))
+        _ALL[path] = (sorted(list(funcs) + extra), res2, set(s for s, e in extra))
+    return _ALL[path][0], _ALL[path][1]
+
+
+def nopdata_starts(path):
+    """starts of the functions cached_all added (no .pdata entry)"""
+    cached_all(path)
+    return _ALL[path][2]
+
+
+def functions_all(path):
+    """as xbox_func_diff.functions (d, [(start, end)], normalised hashes), including the functions without .pdata"""
+    d, secs = P.load(path)
+    funcs, res = cached_all(path)
+    return d, funcs, [XD.norm_hash(d, s, e) for s, e in funcs]
+
+
+def check_leaf(path):
+    """leaf_end applied to every .pdata function start (limit = the next .pdata start): how often does it find the
+    .pdata end exactly - the error rate to expect for the functions without .pdata"""
+    funcs, res = _pdata_cached(path)
+    d, secs = P.load(path)
+    st = collections.Counter()
+    for i, (s, e) in enumerate(funcs):
+        lim = funcs[i + 1][0] if i + 1 < len(funcs) else e
+        x = leaf_end(d, s, lim)
+        calls = any(k == 'call' for a, k, v in res.get(s, ()))
+        kind = 'calls' if calls else 'leaf'
+        st[(kind, 'exact' if x == e else ('short' if x < e else 'long'))] += 1
+    return st
 
 
 def skel(w):
@@ -170,23 +298,36 @@ def read_pairs(path):
 
 
 def main(argv):
+    if argv and argv[0] == '--check-leaf':           # Q49: how well leaf_end finds known function ends
+        for path in argv[1:]:
+            st = check_leaf(path)
+            funcs, res = cached_all(path)
+            n = len(nopdata_starts(path))
+            print('%s: .pdata functions by leaf_end result: %s; functions without .pdata added: %d' % (
+                os.path.basename(path), ', '.join('%s %s %d' % (k[0], k[1], v) for k, v in sorted(st.items())), n))
+        return
     if len(argv) != 3:
         sys.exit(__doc__)
     retail, tu, out = argv
     os.makedirs(out, exist_ok=True)
     log = []
     say = lambda s: (print(s, flush=True), log.append(s))
-    rd, rf, rh = XD.functions(retail)
-    td, tf, th = XD.functions(tu)
+    rd, rf, rh = functions_all(retail)               # Q49: .pdata functions + bl targets without .pdata
+    td, tf, th = functions_all(tu)
     hr = dict((f[0], h) for f, h in zip(rf, rh))
     ht = dict((f[0], h) for f, h in zip(tf, th))
     ocls, oremoved = old_classes(rf, rh, tf, th)
-    say('retail %d functions, TU %d functions; xbox_func_diff: equal %d, changed %d, new %d, removed %d' % (
-        len(rf), len(tf), sum(1 for c in ocls.values() if c[0] == 'equal'),
-        sum(1 for c in ocls.values() if c[0] == 'changed'), sum(1 for c in ocls.values() if c[0] == 'new'),
-        len(oremoved)))
-    R = FM.Xbox(retail)
-    T = FM.Xbox(tu)
+    say('retail %d functions, TU %d functions (without .pdata: %d / %d, Q49); address-order alignment: equal %d, '
+        'changed %d, new %d, removed %d' % (
+            len(rf), len(tf), len(nopdata_starts(retail)), len(nopdata_starts(tu)),
+            sum(1 for c in ocls.values() if c[0] == 'equal'), sum(1 for c in ocls.values() if c[0] == 'changed'),
+            sum(1 for c in ocls.values() if c[0] == 'new'), len(oremoved)))
+    P.cached = cached_all                            # FM.Xbox reads ppc_xrefs.cached: give it the full function list
+    try:
+        R = FM.Xbox(retail)
+        T = FM.Xbox(tu)
+    finally:
+        P.cached = _pdata_cached
     cache_r, cache_t = {}, {}
     sk_r = lambda a: cache_r.setdefault(a, skeleton(rd, a, a + R.size[a]))
     sk_t = lambda a: cache_t.setdefault(a, skeleton(td, a, a + T.size[a]))
@@ -263,14 +404,18 @@ def main(argv):
             rows.append((None, s, 'retail-only', '', '', 0.0)); stat[('retail-only', '', '')] += 1
     rows.sort(key=lambda r: (r[0] if r[0] is not None else 0xffffffff, r[1] or 0))
     with open(os.path.join(out, 'pairs.tsv'), 'w', encoding='utf-8', newline='\n') as f:
-        f.write('tu\tretail\tstatus\tmethod\tconfidence\tscore\ttu_size\tretail_size\tdiff_class\tretail_class\n')
+        f.write('tu\tretail\tstatus\tmethod\tconfidence\tscore\ttu_size\tretail_size\tdiff_class\tretail_class\t'
+                'no_pdata\n')
         rchg = set(r for c, r in ocls.values() if c == 'changed')
+        np_t, np_r = nopdata_starts(tu), nopdata_starts(retail)
         for t, r, status, meth, conf, score in rows:
             oc = ocls.get(t, ('', None))[0] if t is not None else ''
             rc = '' if r is None else 'removed' if r in oremoved else 'changed' if r in rchg else 'equal'
-            f.write('%s\t%s\t%s\t%s\t%s\t%.3f\t%d\t%d\t%s\t%s\n' % (
+            npd = '/'.join(x for x, y in (('tu', t in np_t), ('retail', r in np_r)) if y)
+            f.write('%s\t%s\t%s\t%s\t%s\t%.3f\t%d\t%d\t%s\t%s\t%s\n' % (
                 ('0x%08x' % t) if t is not None else '', ('0x%08x' % r) if r is not None else '', status, meth, conf,
-                score, T.size.get(t, 0) if t is not None else 0, R.size.get(r, 0) if r is not None else 0, oc, rc))
+                score, T.size.get(t, 0) if t is not None else 0, R.size.get(r, 0) if r is not None else 0, oc, rc,
+                npd))
     say('pairs by status / method / confidence:')
     for k, n in sorted(stat.items()):
         say('  %-12s %-10s %-7s %6d' % (k[0], k[1], k[2], n))

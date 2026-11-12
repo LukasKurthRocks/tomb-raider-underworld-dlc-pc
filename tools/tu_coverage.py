@@ -12,6 +12,16 @@ Inputs (all workspace-relative):
   docs/data/tu_coverage_overrides.tsv  hand-kept statuses (tu_addr, status, basis, plugin, note, pc) for functions
                                        and for single changed blocks - win over everything (format: file header)
 
+Functions and pairing (Q49, 12.11.2026): both images are cut into the .pdata functions plus the bl targets without a
+.pdata entry (leaf functions, tools/tu_func_pair.cached_all; ~1 900 per image, end found by a scan that hits 99.8 % of
+the .pdata ends). After the address-order alignment, unpaired new TU / removed retail functions pair as class `moved`
+when their normalised body hash is equal and unique on both sides (the linker moved them), then through the call sites
+of paired functions (a removed retail callee always facing the same new TU callee). Late pairs without any changed
+block are not listed; empty new functions (`blr` only) neither. A retail-labelled address does not name a TU function
+across a pair with a size ratio > 2 (split / inlined / guessed pair). A plugin address counts as "not ported" when its
+line or the sentence before it (across comment lines, up to the last '. ', blank line, bullet or table border) says
+so ("not ported", "Not in 0.6.6", ...).
+
 Changed blocks (changed functions): the TU and retail bodies are aligned instruction by instruction (difflib on a
 register-free skeleton; relocations masked: b / bl by callee identity, bc / jump tables by target, lis / address
 halves). Every differing run (runs <= 2 instructions apart merge) is a block, a TU address range with a kind:
@@ -54,6 +64,7 @@ names, constants and counts are written - no game bytes (--show prints disassemb
 import sys, os, re, struct, difflib, collections, glob
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import xbox_func_diff as XD
+import tu_func_pair as TP
 import ppc_xrefs as P
 
 BASE = 0x82000000
@@ -154,8 +165,13 @@ def pair_run(rd, rfs, td, tfs, threshold=0.5):
 
 
 def align():
-    rd, rf, rh = XD.functions(RETAIL)
-    td, tf, th = XD.functions(TU)
+    """functions of both images (.pdata + the bl targets without .pdata, tu_func_pair.functions_all - Q49), aligned in
+    address order (equal / changed / new / removed); then the still unpaired new TU and removed retail functions pair
+    as 'moved' when their normalised body hash (xbox_func_diff.norm_hash) is equal and unique on both sides - a
+    function the TU linker only moved (Q17: ~253 of the 'new' ones). Returns ..., moved [(retail, tu)], ambiguous
+    (hash groups with several candidates on a side, left unpaired)"""
+    rd, rf, rh = TP.functions_all(RETAIL)
+    td, tf, th = TP.functions_all(TU)
     sm = difflib.SequenceMatcher(None, rh, th, autojunk=False)
     equal, changed, new, removed = [], [], [], []
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
@@ -170,7 +186,74 @@ def align():
             changed += [(rf[i1 + a], tf[j1 + b]) for a, b in pairs]
             new += [tf[j] for j in range(j1, j2) if j - j1 not in {b for a, b in pairs}]
             removed += [rf[i] for i in range(i1, i2) if i - i1 not in {a for a, b in pairs}]
-    return rd, rf, td, tf, equal, changed, new, removed
+    hr = dict(zip((f[0] for f in rf), rh))
+    ht = dict(zip((f[0] for f in tf), th))
+    rby, tby = collections.defaultdict(list), collections.defaultdict(list)
+    for r in removed:
+        rby[hr[r[0]]].append(r)
+    for t in new:
+        tby[ht[t[0]]].append(t)
+    moved, ambiguous = [], 0
+    for h, ts in tby.items():
+        rs = rby.get(h)
+        if rs and len(rs) == 1 and len(ts) == 1:
+            moved.append((rs[0], ts[0]))
+        elif rs:
+            ambiguous += len(ts)
+    mt, mr = {t[0] for r, t in moved}, {r[0] for r, t in moved}
+    new = [t for t in new if t[0] not in mt]
+    removed = [r for r in removed if r[0] not in mr]
+    via_calls = callsite_pairs(equal + changed + moved, new, removed)
+    ct, cr = {t[0] for r, t in via_calls}, {r[0] for r, t in via_calls}
+    new = [t for t in new if t[0] not in ct]
+    removed = [r for r in removed if r[0] not in cr]
+    return rd, rf, td, tf, equal, changed + via_calls, new, removed, sorted(moved, key=lambda p: p[1][0]), ambiguous, \
+        {t[0] for r, t in via_calls}
+
+
+def callsite_pairs(pairs, new, removed, rounds=4):
+    """Q49: pair still unpaired functions through the call sites of paired ones. For every pair the ordered bl
+    callee lists of both bodies are aligned (difflib on the callee identity: a paired callee is its TU start); where a
+    run differs with the same length, an unpaired retail callee (removed) facing an unpaired TU callee (new) is one
+    vote. A pair is taken when the votes agree both ways (the retail function always faces that TU function and vice
+    versa) and the sizes fit (0.4 .. 2.5) - e.g. TU-changed leaf lookups the TU calls where retail called the old
+    one. Returns [(retail (start, end), tu (start, end))]"""
+    _, rres = TP.cached_all(RETAIL)
+    _, tres = TP.cached_all(TU)
+    newd, remd = {t[0]: t for t in new}, {r[0]: r for r in removed}
+    r2t = {r[0]: t[0] for r, t in pairs}
+    t2r = {t[0]: r[0] for r, t in pairs}
+    pr = [(r[0], t[0]) for r, t in pairs]
+    out = []
+    for _ in range(rounds):
+        votes = collections.defaultdict(collections.Counter)
+        back = collections.defaultdict(collections.Counter)
+        for ra, ta in pr:
+            cr = [v for a, k, v in rres.get(ra, ()) if k == 'call']
+            ct = [v for a, k, v in tres.get(ta, ()) if k == 'call']
+            kr = [r2t.get(v, ('r', v)) for v in cr]
+            kt = [v if v in t2r else ('t', v) for v in ct]
+            for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, kr, kt, autojunk=False).get_opcodes():
+                if tag == 'replace' and i2 - i1 == j2 - j1:
+                    for x, y in zip(cr[i1:i2], ct[j1:j2]):
+                        if x in remd and y in newd:
+                            votes[x][y] += 1
+                            back[y][x] += 1
+        got = []
+        for x, c in votes.items():
+            if len(c) == 1:
+                y = next(iter(c))
+                if len(back[y]) == 1 and y not in t2r and x not in r2t:
+                    sr, st = remd[x][1] - x, newd[y][1] - y
+                    if 0.4 <= st / float(max(4, sr)) <= 2.5:
+                        got.append((remd[x], newd[y]))
+        if not got:
+            break
+        for r, t in got:
+            r2t[r[0]], t2r[t[0]] = t[0], r[0]
+        out += got
+        pr = [(r[0], t[0]) for r, t in got]       # next round: only the new pairs' call sites
+    return out
 
 
 def read_tsv(path):
@@ -200,6 +283,10 @@ def cstring(d, a):
 
 NEGATED = re.compile(r'not (yet )?(translated|ported)|untranslated|nicht (übersetzt|portiert)|no port|'
                      r'not in (this build|0\.\d)|stays? (the )?PC\b', re.I)
+# sentence starts for the negation scope: after '. ' / '.\n' (not inside 0.6.6 / 0x..), a blank (comment) line, a
+# bullet or heading line, a table cell border
+SENT_END = re.compile(r'\.(?=\s)|\n[ \t]*(?://+|#+|;+)?[ \t]*\n|\n[ \t]*(?://+|#+)?[ \t]*(?=[*-] |\d+\. |#)|'
+                      r'(?<=\s)\|(?=\s)')
 RANGE_RE = re.compile(r'(0x82[0-9a-fA-F]{6}) ?(?:\.\.|-|–|—) ?(?:0x)?(82[0-9a-fA-F]{6})\b')
 HIT_LINES = collections.defaultdict(list)   # (source label, address) -> the text lines naming it (for --why)
 REF_TEXT = {}                                 # path -> committed text (--ref REV)
@@ -230,7 +317,12 @@ def harvest(paths, label):
             kind = 'retail' if 'retail' in pre.lower() else ('tu' if re.search(r'\bTU\b', pre) else 'unlabeled')
             ls, le = t.rfind('\n', 0, m.start()) + 1, t.find('\n', m.end())
             line = t[ls:le if le >= 0 else len(t)]
-            neg = bool(NEGATED.search(line))
+            # negated: the line says so (anywhere), or the sentence the address stands in says so BEFORE the address
+            # (Q49: "Not part of the mapping, not ported: ... (TU 0x821ff514 ...)" spans comment lines; "Not in
+            # 0.6.6: ..., the step queries (0x823093a0 -> 0x82308850)." - the address is on a later line)
+            ss = max((b.end() for b in SENT_END.finditer(t, max(0, m.start() - 700), m.start())),
+                     default=max(0, m.start() - 700))
+            neg = bool(NEGATED.search(line)) or bool(NEGATED.search(t[ss:m.start()]))
             sw = SWITCH_RE.search(line)
             a = int(m.group(0), 16)
             if len(HIT_LINES[(label(p), a)]) < 4:
@@ -609,7 +701,11 @@ def main(argv):
         out = argv[argv.index('--out') + 1]
     if '--summary' in argv:
         summ = argv[argv.index('--summary') + 1]
-    rd, rf, td, tf, equal, changed, new, removed = align()
+    rd, rf, td, tf, equal, changed, new, removed, moved, ambiguous, via_calls = align()
+    stubs = {t[0] for t in new if t[1] - t[0] == 4 and _word(td, t[0]) == TP.BLR}
+    new = [t for t in new if t[0] not in stubs]    # empty functions (blr only, debug-print stubs): nothing to port
+    moved_t = {t[0] for r, t in moved}
+    changed = changed + moved                      # moved pairs are diffed like changed ones (class 'moved')
     tu_starts = [f[0] for f in tf]
     tu_end = dict(tf)
     rt_starts = [f[0] for f in rf]
@@ -643,7 +739,7 @@ def main(argv):
         changed = keep + [((ra, rt_end[ra]), (ta, tu_end[ta])) for ta, ra in sorted(forced.items())]
     tu2rt = {t[0]: r[0] for r, t in equal + changed}
     rt2tu = {r[0]: t[0] for r, t in equal + changed}
-    cls = {t[0]: 'changed' for r, t in changed}
+    cls = {t[0]: ('moved' if t[0] in moved_t and t[0] not in forced else 'changed') for r, t in changed}
     cls.update({t[0]: 'new' for t in new})
     xmap = {}
     for r in read_tsv(XMAP):
@@ -658,7 +754,8 @@ def main(argv):
                 proto.setdefault(int(r['retail'], 16), (r['name'], r['obj']))
             except ValueError:
                 pass
-    funcs, res = P.cached(TU)
+    funcs, res = TP.cached_all(TU)                 # Q49: with the functions without .pdata
+    nopdata = TP.nopdata_starts(TU)
     callers = collections.defaultdict(set)
     for fs, items in res.items():
         for a, k, v in items:
@@ -736,6 +833,12 @@ def main(argv):
                 rfn = owner(rt_starts, rt_end, a)
                 if rfn is not None:
                     fn = rt2tu.get(rfn)
+                    # Q49: a retail address does not name a TU function across an unreliable pair (size ratio > 2:
+                    # a split / inlined function or a positional guess inside a rewritten run, e.g. retail getters
+                    # 0x821666c0 / 0x821669a0, which the TU inlined)
+                    if fn is not None and max(tu_end[fn] - fn, rt_end[rfn] - rfn) > \
+                            2 * min(tu_end[fn] - fn, rt_end[rfn] - rfn):
+                        fn = None
             if fn is not None and fn in cls:
                 target[fn].add(src)
                 if target is plug_by_fn:
@@ -755,7 +858,7 @@ def main(argv):
             ovr[fn] = r
 
     # changed blocks of every changed function (relocation-free instruction diff, see changed_blocks)
-    _, rres = P.cached(RETAIL)
+    _, rres = TP.cached_all(RETAIL)
     rreloc = {a for items in rres.values() for a, k, v in items if k == 'addr'}
     treloc = {a for items in res.values() for a, k, v in items if k == 'addr'}
     rhash = dict(zip(rt_starts, (XD.norm_hash(rd, s, e) for s, e in rf)))
@@ -769,6 +872,10 @@ def main(argv):
         else:
             rp = tu2rt[fs]
             blocks[fs] = changed_blocks(rd, rp, rt_end[rp], td, fs, tu_end[fs], rreloc, treloc, rcallee, tcallee)
+    moved_same = [fs for fs in cls if cls[fs] == 'moved' and not blocks[fs]]
+    calls_same = [fs for fs in cls if fs in via_calls and not blocks[fs]]
+    for fs in moved_same + calls_same:             # paired late and no changed block at all: not a TU change
+        del cls[fs]
 
     rows = []
     for fs in sorted(cls):
@@ -896,6 +1003,10 @@ def main(argv):
                     ' | '.join(unc[:12]) + (' | +%d more' % (len(unc) - 12) if len(unc) > 12 else '') +
                     (' (+%s)' % ', '.join('%d %s' % (na[k], k) for k in NOGAP if na[k]) if na else ''),
                     ' | '.join(cov[:8]) + (' | +%d more' % (len(cov) - 8) if len(cov) > 8 else '')]
+        if fs in nopdata:
+            note = ((note + '; ') if note else '') + 'no .pdata (bl target, end found by scan)'
+        if fs in via_calls:
+            note = ((note + '; ') if note else '') + 'retail partner from the call sites of paired functions (Q49)'
         if rp and max(fe - fs, rt_end[rp] - rp) > 2 * min(fe - fs, rt_end[rp] - rp):
             note = ((note + '; ') if note else '') + 'size ratio TU %d B / retail %d B: split function or wrong ' \
                 'pairing - blocks unreliable' % (fe - fs, rt_end[rp] - rp)
@@ -917,8 +1028,16 @@ def main(argv):
                 f.write('\t'.join(c.replace('\t', ' ').replace('\n', ' ') for c in r) + '\n')
 
     size = lambda r: int(r[2])
-    lines = ['TU coverage (retail -> TU): equal %d, changed %d, new %d, removed %d; listed %d (changed + new), %d B'
-             % (len(equal), len(changed), len(new), len(removed), len(rows), sum(map(size, rows)))]
+    lines = ['TU coverage (retail -> TU): equal %d, changed %d, new %d, removed %d; listed %d (changed + moved + new), '
+             '%d B' % (len(equal), len(changed) - len(moved), len(new), len(removed), len(rows), sum(map(size, rows))),
+             'moved (new TU / removed retail with an equal unique body hash, Q49): %d pairs, %d without any changed '
+             'block (not listed), %d listed as class moved; %d new TU functions share a hash with several candidates '
+             '(left unpaired)' % (len(moved), len(moved_same), sum(1 for r in rows if r[1] == 'moved'), ambiguous),
+             'functions without .pdata (bl targets, Q49): TU %d / retail %d added; listed %d; empty new functions '
+             '(blr only) not listed: %d' % (len(nopdata), len(TP.nopdata_starts(RETAIL)),
+                                            sum(1 for r in rows if int(r[0], 16) in nopdata), len(stubs)),
+             'paired through call sites of paired functions (Q49): %d (%d without any changed block, not listed; '
+             'listed %d)' % (len(via_calls), len(calls_same), sum(1 for r in rows if int(r[0], 16) in via_calls))]
     st = collections.Counter(r[14] for r in rows)
     sb = collections.Counter()
     for r in rows:
