@@ -48,7 +48,8 @@ $asiRoot = Join-Path $repo 'work\asi'
 $built   = if ($SourceDir) { $SourceDir } else { $asiRoot }
 $names   = 'TruShadowHud.asi', 'TruShadowHud.ini'
 # released builds of ours (SHA-256), recognised even when their output folder below work\asi is gone
-# (the current build 0.2, dlc2data f1, work\asi\hud02, 2026-11-07, is found below work\asi like every other build)
+# (the current build 0.2.1, dated log lines, work\asi\i_1211\TruShadowHud, 2026-11-12, is listed here and is also found
+# below work\asi like every other build; 0.2 = dlc2data f1, work\asi\hud02, installed 2026-11-07)
 $earlierBuilds = @{
     'TruShadowHud.asi' = @('8d664b7fbec2df33d67b6f9f89a0835de7e070c52469d8312b398901b2d2e1cb',   # 0.1 (work\asi\hud01, md5 a31308dd4b4be496e54e0d0b3fb646a7)
                            'e742db730e32daa95ceeec1b5adbae60915ca60d1d2649c2ce8d2fb2f5436a11',   # 0.2 (work\asi\hud02, installed 2026-11-07)

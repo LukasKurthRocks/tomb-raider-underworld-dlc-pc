@@ -78,6 +78,11 @@
 //    AssistPointer, default off, live); Q68 lock-on switch input (calls 0x71cd07 / 0x71cd20, [Lock] MouseSwitch /
 //    RightKey / LeftKey, the game's by default, live); Q99 option A (byte 0x696f69, [Chunk] RemoveLastPiece, default
 //    off, live). PC options, not TU translations (section "group C").
+// 20. 0.6.14 (group L, F6, PC-side only): adrenaline fill / drain on the game's own rules - message 0xd9 (damage
+//    dealt) x [Adrenaline] FillPercent at its post 0x63b03a, drain rates player data +0x2d4 / +0x2d8 x DrainPercent /
+//    DrainModePercent at the bar's loads 0x6f2965 / 0x6f2972 (100 = the data), condition 538 (meter full, the first
+//    condition of the vault-off strike) answered 1 with StrikeWithoutFullMeter=1; log lines per 0xd9 fill and per
+//    strike prompt (CM+0x1fc bit 28 from condition 2302). All defaults = the game, all live (section "group L").
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -95,7 +100,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.13 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.14 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -142,7 +147,10 @@ const char kVersion[] = "TruShadowCombat 0.6.13 (TU target list 7 -> 10, conditi
                         "1014 enter and the strike shot; [Adrenaline] Log, on by default), Q109 pointer assist "
                         "([Adrenaline] AssistPointer, off by default), Q68 lock-on switch input ([Lock] MouseSwitch / "
                         "RightKey / LeftKey, the game's by default), Q99 option A ([Chunk] RemoveLastPiece, off by "
-                        "default))";
+                        "default); 0.6.14: group L - F6 adrenaline fill / drain percent on the game's 0xd9 fill and "
+                        "the data drain rates ([Adrenaline] FillPercent / DrainPercent / DrainModePercent, 100 by "
+                        "default), strike without a full meter (StrikeWithoutFullMeter, off by default), fill and "
+                        "strike-prompt log lines)";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -887,9 +895,27 @@ done:
     return r;
 }
 
+// 0.6.14 (group L, F6): [Adrenaline] StrikeWithoutFullMeter (PC option, default 0 = the game). Condition 538 = CM+0x1fc
+// bit 22 (meter full) is the first condition of the only transition into the vault-off strike (chart record 786 =
+// state 1014, from the combat records 711 / 724 / 730: {500,538,1} {2000,2001,1} {2000,2011,1} {700,701,0}
+// {1500,1502,0} {2300,2302,1} {150,150,46}); its other use {150,150,46} {500,538,0} {2300,2304,1} is the "not full"
+// feedback (Lara event 0x38). With 1 the main-game answer is 1 (the strike empties the meter itself, 0x71d5e2).
+volatile LONG g_strikeAnyMeter = 0;
+DWORD g_strikeAnyTick = 0;
+
 char __cdecl Pred538(const BYTE *record) {
     const int dg = Doppelganger();
-    if (!dg) return reinterpret_cast<PredFn>(kPred538Pc)(record);       // player +0x1fc bit 22 (retail = PC)
+    if (!dg) {
+        const char full = reinterpret_cast<PredFn>(kPred538Pc)(record);  // player +0x1fc bit 22 (retail = PC)
+        if (full || !g_strikeAnyMeter) return full;
+        const DWORD now = GetTickCount();
+        if (now - g_strikeAnyTick > 5000) {
+            g_strikeAnyTick = now;
+            Log(1, "0.6.14 F6 condition 538 (meter full, CM+0x1fc bit 22) answered 1 without a full meter "
+                   "([Adrenaline] StrikeWithoutFullMeter=1; at most one line per 5 s)");
+        }
+        return 1;
+    }
     const TruShadowPowerMeter *m = Meter();
     char r = m ? static_cast<char>((*m->flags >> 3) & 1) : 0;
     if (m)
@@ -6467,9 +6493,10 @@ void __cdecl State1015Slot2(void *agent) {
 //    key in registry value "9" of HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld\Input);
 //  * vault-off strike = state 1014 slot 0 0x71d3c0: target of targeter 5, enemy query 0x165 (answered by the enemy query
 //    0x632200 from its tune chain brain+0x168, record +0x54 - in every enemy state), message 0xbe, meter empty, bit 21.
-//    Entered by {500,518,1} = message 0x1c9 at most 100 ms old (Lara's handler 0x76fe27 stamps machine 1 +0x90; sender
-//    the movement collision 0x5dce20 at 0x5dd8a4) with {200,201,1} = the record's animation ended (0x783840) or
-//    {1000,20,354} = time in the record >= chart parameter 354 (0x783b70 -> 0x782b40 mode 1);
+//    Entered (0.6.14, group L: chart RECORD 786 holds state id 1014) from the combat records 711 / 724 / 730 by
+//    {500,538,1} meter full, {2000,2001,1}, {2000,2011,1}, {700,701,0}, {1500,1502,0}, {2300,2302,1} (prompt) and
+//    {150,150,46} = action 46 held (pad code 1 = X). Group C read the transitions into chart RECORD 1014 (state 612,
+//    {500,518,1} = message 0x1c9 <= 100 ms + animation end / time >= chart parameter 354 = 5 ticks) - not the strike;
 //  * circle = reticle [CM+0] word +0x40 bit 6 (set at the strike look 0x70db20), pointer +0x20 / +0x24 (start 0x6e6a70:
 //    random point at distance 256 - radius), radius +0x30 = [0xfae8d0] (script native setter 0x77a7d0); bit 7 =
 //    |pointer| < radius, computed in 0x6f2f20 every frame before the stick (actions 2 / 3 x tuning +0x454 x frame ms /
@@ -6703,6 +6730,175 @@ void Q108ChunkApply(const char *why) {
     }
 }
 
+// ---------------------------------------------------------------- 0.6.14: group L (F6 adrenaline options)
+// Main workspace docs\Befund-Gruppe-L-1211.md, docs\Befund-Gruppe-F-1211.md 4.3 (static, PC tru.exe = retail logic):
+//  * fill: the enemy damage path 0x63ad50 posts message 0xd9 to the player when Lara is the attacker (0x63afe2) with
+//    the damage dealt, (int)(LP before - max(LP after, 0)) (0x63b02e..0x63b03a, INSTANCE_Post 0x5b3750, synchronous);
+//    the player handler 0x71f1d0 case 217 (0x71f4f4) skips it while CM+0x1fc bit 21 (headshot window), else 0x6f28c0
+//    adds it unless bit 22 (full); max = player data +0x2d0 (lara DTP 850: 500). [Adrenaline] FillPercent scales that
+//    amount at the post (the call 0x63b03a) - the game's fill rule, only the factor is the PC option;
+//  * drain: the bar 0x6f2930 (tail-jumped from CombatManager::Update): meter -= [0xe7f188] x 1/30 x rate, rate = player
+//    data +0x2d8 (225) in adrenaline mode (bit 27, load at 0x6f2965) else +0x2d4 (20, load at 0x6f2972).
+//    [Adrenaline] DrainModePercent / DrainPercent multiply those data values (100 = the data);
+//  * strike prompt: condition 2302 (0x7663d0) sets CM+0x1fc bit 28 + byte 0xfae8d8 = 1 + HUD group 1 when the strike's
+//    conditions before it hold (meter full, activity 1002, hard-lock target, 701 / 1502 clear; the condition list stops
+//    at the first false, 0x785920); the level loop clears both every frame (0x5dfda1). Logged from the poll (latch).
+// Sites not touched by TruShadowPower (0x71f500 / 0x6f28c0 / 0x6f2930 head / 0x6f29b2) or TruMenu (0x6f28c0 / 0x6f2930).
+const DWORD kL14FillCall = 0x0063b03a, kL14Post = 0x005b3750;
+const DWORD kL14RateMode = 0x006f2965, kL14RateNormal = 0x006f2972;
+const DWORD kL14BitPrompt = 0x10000000;
+volatile LONG g_fillPercent = 100, g_drainPercent = 100, g_drainModePercent = 100;
+float g_drainFactor = 1.0f, g_drainModeFactor = 1.0f;   // read by the rate stubs (aligned 32-bit stores)
+bool g_fillHooked = false, g_drainHooked = false;
+volatile LONG g_fillLines = 0;
+
+LONG L14Clamp(LONG v, LONG lo, LONG hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+void L14ReadSwitches(bool report) {
+    const char *ini = g_iniPath;
+    const LONG fill = L14Clamp(GetPrivateProfileIntA("Adrenaline", "FillPercent", 100, ini), 0, 1000);
+    const LONG drain = L14Clamp(GetPrivateProfileIntA("Adrenaline", "DrainPercent", 100, ini), 0, 1000);
+    const LONG drainMode = L14Clamp(GetPrivateProfileIntA("Adrenaline", "DrainModePercent", 100, ini), 0, 1000);
+    const LONG any = GetPrivateProfileIntA("Adrenaline", "StrikeWithoutFullMeter", 0, ini) ? 1 : 0;
+    if (report && (fill != g_fillPercent || drain != g_drainPercent || drainMode != g_drainModePercent ||
+                   any != g_strikeAnyMeter))
+        Log(1, "0.6.14 switches (run time): [Adrenaline] FillPercent %ld, DrainPercent %ld, DrainModePercent %ld, "
+               "StrikeWithoutFullMeter %ld", fill, drain, drainMode, any);
+    InterlockedExchange(&g_fillPercent, fill);
+    InterlockedExchange(&g_drainPercent, drain);
+    InterlockedExchange(&g_drainModePercent, drainMode);
+    InterlockedExchange(&g_strikeAnyMeter, any);
+    g_drainFactor = static_cast<float>(drain) / 100.0f;
+    g_drainModeFactor = static_cast<float>(drainMode) / 100.0f;
+}
+
+// game thread: the call 0x63b03a = INSTANCE_Post(player, 0xd9, damage dealt) of the enemy damage path (cdecl, the
+// caller pops 12 bytes); the amount is scaled by FillPercent, one line per post (the first 80 at level 1)
+typedef void(__cdecl *PostFn)(void *inst, DWORD msg, DWORD data);
+void __cdecl FillPost(void *player, DWORD msg, DWORD amount) {
+    const LONG pct = g_fillPercent;
+    DWORD give = amount;
+    if (msg == 0xd9 && pct != 100) {
+        const double v = static_cast<double>(static_cast<int>(amount)) * pct / 100.0;
+        give = static_cast<DWORD>(static_cast<int>(v >= 0.0 ? v + 0.5 : v - 0.5));
+    }
+    Q108State a;
+    memset(&a, 0, sizeof(a));
+    const bool logIt = g_adrLog && g_q108ReadOk && msg == 0xd9;
+    if (logIt) Q108Read(&a);
+    reinterpret_cast<PostFn>(kL14Post)(player, msg, give);
+    if (!logIt) return;
+    Q108State b;
+    Q108Read(&b);
+    const LONG n = InterlockedIncrement(&g_fillLines);
+    Log(n <= 80 ? 1 : 2, "0.6.14 F6 fill: message 0xd9 (damage Lara dealt) %d x FillPercent %ld -> %d; meter %.1f -> %.1f "
+                         "/ %.0f%s", static_cast<int>(amount), pct, static_cast<int>(give), a.meter, b.meter, b.max,
+        (a.flags & kQ108BitWindow) ? " (skipped: bit 21, headshot window - 0x71f50b)"
+        : (a.flags & kQ108BitFull) ? " (not added: bit 22, meter held full - 0x6f28d1)" : "");
+}
+
+// game thread: the bar 0x6f2930 loads its drain rate here (FPU: st0 = 0.0 below; the stub pushes one value like the
+// replaced fld). 0x6f2965 `mov eax,[0xfad764]; fld [eax+0x2d8]` (11 B), 0x6f2972 `mov edx,[0xfad764]; fld [edx+0x2d4]`
+// (12 B) - same registers, the factor read from the plugin (1.0 = the data value exactly)
+__declspec(naked) void RateModeStub() {
+    __asm {
+        mov eax, dword ptr ds:[0x00fad764]
+        fld dword ptr [eax + 0x2d8]
+        fmul dword ptr [g_drainModeFactor]
+        ret
+    }
+}
+__declspec(naked) void RateNormalStub() {
+    __asm {
+        mov edx, dword ptr ds:[0x00fad764]
+        fld dword ptr [edx + 0x2d4]
+        fmul dword ptr [g_drainFactor]
+        ret
+    }
+}
+
+bool L14WriteCallPad(DWORD at, const void *to, size_t length) {
+    BYTE c[16];
+    if (length < 5 || length > sizeof(c)) return false;
+    memset(c, 0x90, sizeof(c));
+    c[0] = 0xe8;
+    const DWORD rel = reinterpret_cast<DWORD>(to) - (at + 5);
+    memcpy(c + 1, &rel, 4);
+    return WriteCode(at, c, length);
+}
+
+// poll thread: the strike prompt (bit 28, set by condition 2302 while the strike could start, cleared every frame) as
+// a latch - ON when seen, OFF when not seen for 300 ms
+void L14PollPrompt(const Q108State &s, DWORD now) {
+    static bool on = false;
+    static DWORD seen = 0, since = 0;
+    static LONG lines = 0;
+    if (s.flags & kL14BitPrompt) {
+        seen = now;
+        if (!on) {
+            on = true;
+            since = now;
+            if (++lines <= 200) {
+                char text[420];
+                Q108Text(s, text, sizeof(text));
+                Log(1, "0.6.14 F6 strike prompt ON (CM+0x1fc bit 28 from condition 2302: meter full, activity 1002, "
+                       "hard-lock target (2011), 701 / 1502 clear) - holding action 46 (pad X = code 1) starts the "
+                       "vault-off strike (chart record 786 = state 1014) - %s", text);
+            }
+        }
+    } else if (on && now - seen > 300) {
+        on = false;
+        if (lines <= 200) Log(1, "0.6.14 F6 strike prompt OFF after %lu ms (Lara record %d)", seen - since, LaraRecord());
+    }
+}
+
+void SetupL14() {
+    struct Check { DWORD at; const char *hex; const char *what; };
+    const Check fillFacts[] = {
+        {0x0063afe2, "3b1d94f0e700 755c", "0x63ad50: attacker == player [0xe7f094]"},
+        {0x0063b02e, "e8ed9c1d00 50 68d9000000 53 e81187f7ff 83c40c", "0x63ad50: INSTANCE_Post(player, 0xd9, (int) damage)"},
+        {kL14Post, "56 8b742408 8d8610010000 85c0 7422 57 8bbe20010000", "INSTANCE_Post 0x5b3750 (cdecl, handler +0x120)"},
+        {0x0071f4f4, "8b1558dbfa00 8b8a04050000", "player handler case 217 (0x71f4f4)"},
+        {0x0071f511, "db4604 51 d91c24 e8a333fdff", "case 217: 0x6f28c0((float) amount)"},
+    };
+    bool ok = true;
+    for (const auto &c : fillFacts)
+        if (!HexAt(c.at, c.hex)) {
+            Log(0, "0.6.14 F6: %s at 0x%08lx does not match - FillPercent / fill log not placed", c.what, c.at);
+            ok = false;
+            break;
+        }
+    if (ok) g_fillHooked = WriteCall(kL14FillCall, reinterpret_cast<const void *>(&FillPost));
+    const Check drainFacts[] = {
+        {0x006f294d, "d90588f1e700 c1ea1b f6c201 dc0db03c8400 d95c2404 740d a164d7fa00 d980d8020000 eb0c 8b1564d7fa00 "
+                     "d982d4020000 d91c24 d9413c", "bar 0x6f2930: rate = player data +0x2d8 (bit 27) / +0x2d4"},
+        {0x006f2930, "8b91fc010000 d9ee 83ec08 f7c200004000 756f d8513c",
+         "bar 0x6f2930 head (bit 22 gate, CM+0x3c)"},
+    };
+    ok = true;
+    for (const auto &c : drainFacts)
+        if (!HexAt(c.at, c.hex)) {
+            Log(0, "0.6.14 F6: %s at 0x%08lx does not match - DrainPercent / DrainModePercent not placed", c.what, c.at);
+            ok = false;
+            break;
+        }
+    if (ok) {
+        const bool m = L14WriteCallPad(kL14RateMode, reinterpret_cast<const void *>(&RateModeStub), 11);
+        const bool n = m && L14WriteCallPad(kL14RateNormal, reinterpret_cast<const void *>(&RateNormalStub), 12);
+        if (m && !n) {
+            const BYTE orig[11] = {0xa1, 0x64, 0xd7, 0xfa, 0x00, 0xd9, 0x80, 0xd8, 0x02, 0x00, 0x00};
+            WriteCode(kL14RateMode, orig, sizeof(orig));
+        }
+        g_drainHooked = m && n;
+    }
+    Log(1, "0.6.14 group L (F6): fill %s (call 0x63b03a, FillPercent %ld), drain %s (0x6f2965 / 0x6f2972, DrainPercent "
+           "%ld, DrainModePercent %ld; 100 = player data +0x2d4 / +0x2d8), StrikeWithoutFullMeter %ld (condition 538 %s), "
+           "strike prompt log %s; switches read again at run time (<= 1 / s)",
+        g_fillHooked ? "placed" : "NOT placed", g_fillPercent, g_drainHooked ? "placed" : "NOT placed", g_drainPercent,
+        g_drainModePercent, g_strikeAnyMeter, (g_conditions && g_blocksOk) ? "registered" : "NOT registered - no effect",
+        (g_adrLog && g_q108ReadOk) ? "on" : "off");
+}
+
 void Q108ReadSwitches(bool report) {
     const char *ini = g_iniPath;
     const LONG assist = GetPrivateProfileIntA("Adrenaline", "AssistPointer", 0, ini) ? 1 : 0;
@@ -6719,6 +6915,7 @@ void Q108ReadSwitches(bool report) {
     InterlockedExchange(&g_lockKeyRight, right);
     InterlockedExchange(&g_lockKeyLeft, left);
     InterlockedExchange(&g_chunkRemoveLast, chunk);
+    L14ReadSwitches(report);   // 0.6.14: F6 fill / drain percent, strike without a full meter
 }
 
 // poll thread (every 10 ms, reads only, faults caught by Rd): one line per change of adrenaline mode / window / full,
@@ -6802,6 +6999,7 @@ DWORD WINAPI Q108Thread(LPVOID) {
         }
         Q108Scale("world", prev.world, s.world, now, &sW, &lowW, &logW, &linesW);
         Q108Scale("player", prev.player, s.player, now, &sP, &lowP, &logP, &linesP);
+        L14PollPrompt(s, now);   // 0.6.14: strike prompt (bit 28) as a latch
         prev = s;
     }
 }
@@ -7002,6 +7200,7 @@ void Start(HMODULE self) {
     SetupK8Log();                     // 0.6.9: log points (last: the death switch facts are checked by 0.6.1 / 0.6.5 too)
     SetupHitSpeed();                  // 0.6.10: K-8b msg+0x44 / +0x48 of Lara's contact hit (independent)
     SetupQ108();                      // 0.6.13: group C - Q108 log, Q109 assist, Q68 lock input, Q99 option A
+    SetupL14();                       // 0.6.14: group L - F6 fill / drain percent, strike without a full meter
 }
 
 }  // namespace

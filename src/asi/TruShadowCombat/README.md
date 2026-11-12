@@ -1,4 +1,40 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.13)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.14)
+
+0.6.14 (2026-11-12, **offline, not yet seen in game**; group L / F6, main workspace `docs\Befund-Gruppe-L-1211.md`,
+`docs\Befund-Gruppe-F-1211.md` 4.3, ENGINE.md 13.7): build `work\asi\combat0614`, byte pre-checks
+`work\asi\combat0614\precheck_0614.txt`. **PC options on the game's own rules, every default = the game.**
+* **Correction of 0.6.13 / group C:** the vault-off strike is chart **record 786** (state id 1014), entered only from
+  the combat records 711 / 724 / 730 by `{500,538,1}` **meter full** (CM+0x1fc bit 22), `{2000,2001,1}` (activity 1002
+  of record 705), `{2000,2011,1}` (hard lock + target of targeter 5 + enemy query 0x161), `{700,701,0}`,
+  `{1500,1502,0}`, `{2300,2302,1}` (strike prompt: bit 28 + byte 0xfae8d8 + HUD group 1) and `{150,150,46}` = **action 46
+  held = pad X** (code 1; keyboard: registry value "1"). The `{500,518,1}` transitions read by group C lead into chart
+  record 1014 (state 612, a landing record) - not the strike. Without a full meter the same button gives
+  `{150,150,46} {500,538,0} {2300,2304,1}` = Lara event 0x38 (feedback). So "no slow motion without a full meter"
+  (11.11.) is the game's rule.
+* **`[Adrenaline] FillPercent`** (new, live, default **100**): the enemy damage path posts message 0xd9 with the damage
+  Lara dealt (0x63b03a -> INSTANCE_Post 0x5b3750); the plugin scales that amount (rounded) before the post. Line per post:
+  `0.6.14 F6 fill: message 0xd9 (damage Lara dealt) n x FillPercent p -> m; meter a -> b / 500` (+ "skipped: bit 21" /
+  "not added: bit 22").
+* **`[Adrenaline] DrainPercent` / `DrainModePercent`** (new, live, default **100** = player data +0x2d4 = 20 /
+  +0x2d8 = 225): the bar 0x6f2930 loads its rate at 0x6f2965 / 0x6f2972; both loads go through stubs that multiply the
+  data value (factor 1.0 = the same value).
+* **`[Adrenaline] StrikeWithoutFullMeter`** (new, live, default **0**, accessibility): condition 538 answers 1 in the
+  main game (the plugin's registered 538 handler; doppelganger mode keeps the TU meter flag 8), so the strike starts
+  without a full meter. Needs `[Conditions] Enabled=1`. Line `0.6.14 F6 condition 538 ... answered 1 without a full meter`.
+* **Strike prompt log** (part of `[Adrenaline] Log`): `0.6.14 F6 strike prompt ON (CM+0x1fc bit 28 from condition 2302 ...)`
+  / `OFF after n ms` - the frames in which X would start the strike.
+* Sites: 0x63b03a (call), 0x6f2965 (11 B) / 0x6f2972 (12 B) - not touched or checked by TruShadowPower (0x71f500,
+  0x6f28c0, 0x6f2930 head, 0x6f29b2) or TruMenu (0x6f28c0, 0x6f2930 head).
+
+| # | what | expected |
+|---|---|---|
+| 1 | game start | `TruShadowCombat 0.6.14 ... loaded`; `0.6.14 group L (F6): fill placed (call 0x63b03a, FillPercent 100), drain placed (...), StrikeWithoutFullMeter 0 (condition 538 registered), strike prompt log on`; no `0.6.14 F6: ... does not match` |
+| 2 | empty meter, pistol hits on a Viking | per hit `0.6.14 F6 fill: message 0xd9 ... n x FillPercent 100 -> n; meter a -> a+n / 500`; n = the LP the hit took |
+| 3 | `FillPercent=200`, repeat 2 | `-> 2n`, meter rises twice as fast |
+| 4 | full meter (`adren.fill`), lock on (LT) near a Viking | `0.6.14 F6 strike prompt ON ...` while the conditions hold; **X** (keyboard: the key of registry value "1") -> `Q108 state 1014 enter ... STARTED` |
+| 5 | `DrainPercent=0` / `DrainModePercent=50` | the meter no longer drains / drains at half speed in R3 mode |
+| 6 | `StrikeWithoutFullMeter=1`, meter empty, lock + X near a Viking | `0.6.14 F6 condition 538 ... answered 1`, the strike starts (slow motion, circle) |
+| 7 | trouble | all four back to 100 / 100 / 100 / 0; send the log |
 
 0.6.13 (2026-11-12, **offline, not yet seen in game**; group C: Q108 / Q109 / Q68 / Q99, main workspace
 `docs\Befund-Gruppe-C-1211.md`, ENGINE.md 13.7 / 21): build `work\asi\combat0613`, byte pre-checks
@@ -825,6 +861,9 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[Lock] MouseSwitch` | 1 | 0.6.13 (Q68, PC option): 0 = the mouse axes no longer feed the lock-on target switch 0x71cb10 (calls 0x71cd07 / 0x71cd20); 1 = the game's; live |
 | `[Lock] RightKey` / `LeftKey` | 0 | 0.6.13 (Q68): virtual-key codes that switch the locked target right / left (one frame of +-1.0 on the switch's mouse x read); 0 = off; live |
 | `[Chunk] RemoveLastPiece` | 0 | 0.6.13 (Q99 option A, PC option): 0x696f69 `75` -> `eb`, the permanent chunk piece is removed after its lifetime; live |
+| `[Adrenaline] FillPercent` | 100 | 0.6.14 (F6, PC option): message 0xd9 (damage Lara dealt, the game's fill) x percent at its post 0x63b03a; 0..1000; live |
+| `[Adrenaline] DrainPercent` / `DrainModePercent` | 100 / 100 | 0.6.14 (F6, PC option): drain rate = player data +0x2d4 (20) / +0x2d8 (225, R3 mode) x percent (loads 0x6f2972 / 0x6f2965); 0..1000; live |
+| `[Adrenaline] StrikeWithoutFullMeter` | 0 | 0.6.14 (F6, accessibility): condition 538 (meter full, first condition of the vault-off strike) answers 1 in the main game; needs `[Conditions] Enabled=1`; live |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 

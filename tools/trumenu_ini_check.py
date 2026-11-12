@@ -1791,6 +1791,10 @@ SW_LIVE = {
     ('TruShadowCombat', 'Lock', 'RightKey'): 'void Q108ReadSwitches(',
     ('TruShadowCombat', 'Lock', 'LeftKey'): 'void Q108ReadSwitches(',
     ('TruShadowCombat', 'Chunk', 'RemoveLastPiece'): 'void Q108ReadSwitches(',
+    ('TruShadowCombat', 'Adrenaline', 'FillPercent'): 'void L14ReadSwitches(',   # 0.6.14 (group L, 2026-11-12)
+    ('TruShadowCombat', 'Adrenaline', 'DrainPercent'): 'void L14ReadSwitches(',
+    ('TruShadowCombat', 'Adrenaline', 'DrainModePercent'): 'void L14ReadSwitches(',
+    ('TruShadowCombat', 'Adrenaline', 'StrikeWithoutFullMeter'): 'void L14ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate231Slot0'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate231Slot1'): 'void ReadSwitches(',
     ('TruShadowPower', 'Adrenaline', 'Translate'): 'void K11ReadSwitch(',

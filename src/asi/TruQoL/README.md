@@ -23,7 +23,7 @@ the first build; 0.1.1 (`work\asi\qol011`) reads the live keys again while the g
 Everything below is proven statically (disassembly of the installed `tru.exe`, md5 `5560abac...`, and `binkw32.dll`);
 nothing is seen in game yet.
 
-Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\qol014` (check first with `-Check`, remove with
+Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\i_1211\TruQoL` (current build 0.1.7; check first with `-Check`, remove with
 `-Remove` / `-Restore`). The Ultimate ASI Loader the game ships as `binkw32.dll` loads every `*.asi` next to `tru.exe`;
 ModLoader.asi is just another plugin of that loader. Log: `TruQoL.log` next to `tru.exe`, one line per feature (on /
 off / why).
