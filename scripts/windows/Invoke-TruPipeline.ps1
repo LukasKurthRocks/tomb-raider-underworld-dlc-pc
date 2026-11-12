@@ -499,6 +499,9 @@ $steps = @{
         # 2026-11-10 K-5b playerblock: byte order of the player data block (DTP +0xc8, PC [0xfad764]) on five base
         # player pairs, leave-one-out (exit 1 on a contradicting word or a READERS order the pairs do not allow)
         @('tools\player_block_fix.py', 'proof'),
+        # 2026-11-12 (Q110) objfield: u16 object ids of the unit default gear lists and the chunkdoll data D+8 = PC id
+        # of the Xbox object name on every base pair (exit 1 on a contradicting field or another count than pinned)
+        @('tools\object_id_field_fix.py', 'proof'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
         # uiinit on the DLC 1 tree in place (planned words only, every write re-read), then the text-anchor gate
         @('tools\ui_init_fix.py', 'apply', $fix1, '--report', ((Split-Path -Parent $fix1) + '/uiinit_apply.json')),

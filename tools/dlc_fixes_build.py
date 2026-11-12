@@ -45,6 +45,10 @@ replaces the files it fixes there. Upstream's own scripts in work/ws/ are called
   waveid (ours, 2026-11-11, Q4) after playerblock, also tools/dlc_struct_fixes.py: SoundPlex Wave leaves - wave id
          data +0 = ids(6, Xbox id), data +4 = u8u8u16 (tools/soundplex_wave_id_fix.py, base proof 750 pairs / 4718
          leaves); pipeline 1011: DLC 2 337 words in 24 DRMs (doppelganger_casual 173), DLC 1 24 (raft_bridge_spawned)
+  objfield (ours, 2026-11-12, Q110) after waveid, also tools/dlc_struct_fixes.py: u16 object ids the converter left as
+         the Xbox id in the unit default gear lists (level env +0x2b4) and the chunkdoll data D+8 = PC id of the Xbox
+         object name (tools/object_id_field_fix.py, base proof 1466 gear entries / 3 chunkdolls); pipeline 1111c: DLC 2
+         13 words (gear list DTP 25270 51 g_pda -> 48 in 11 units, yeti chunkdolls 363 -> 705), DLC 1 0
   fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy (ours, 2026-11-08, 17n: the typed families of the
          night 07./08.11.) after dspkind, also tools/dlc_struct_fixes.py with tools/typed_family_fix.py: fade-record DTPs
          of the cine cards, uber play-anim words, FX particle record words, streamgroup mesh lists, unit DTP intro
@@ -391,11 +395,13 @@ def _struct_fix(step):
 # (tools/soundplex_wave_id_fix.py; base proof once per process), after playerblock; gated by dlc_struct_fixes.py check
 STRUCT_STEPS = ('twins', 'childids', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'fadeslots', 'animfx',
                 'markup', 'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro',
-                'costumedtp', 'dspkind', 'playerblock', 'waveid', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped',
-                'leveltwin', 'basecopy', 'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
+                'costumedtp', 'dspkind', 'playerblock', 'waveid', 'objfield', 'fadecard', 'uberanim', 'fxrec', 'sgmesh',
+                'introtyped', 'leveltwin', 'basecopy', 'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
+# objfield (2026-11-12, Q110): u16 object ids left as the Xbox id in the unit default gear lists and the chunkdoll data
+# D+8 (tools/object_id_field_fix.py; base proof once per process), after waveid; gated by dlc_struct_fixes.py check
 (fix_twins, fix_childids, fix_translist, fix_actlist, fix_condlist, fix_eventlist, fix_reclist, fix_fadeslots, fix_animfx,
  fix_markup, fix_objtex, fix_objrec, fix_objid, fix_chunkrec, fix_exttuning, fix_thrallext, fix_meleelink, fix_genintro,
- fix_costumedtp, fix_dspkind, fix_playerblock, fix_waveid, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh,
+ fix_costumedtp, fix_dspkind, fix_playerblock, fix_waveid, fix_objfield, fix_fadecard, fix_uberanim, fix_fxrec, fix_sgmesh,
  fix_introtyped, fix_leveltwin, fix_basecopy, fix_fxrecread, fix_seqrepeat, fix_navraw,
  fix_vmliteral) = (_struct_fix(s) for s in STRUCT_STEPS)
 

@@ -53,7 +53,12 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              words in 11 group-78 DTPs = silent / wrong body sounds), data +4 {u8 priority, u8, u16} = u8u8u16 of the
              Xbox word (pipeline 1011: DTP 22707 x9 u32-swapped); base proof 750 pairs / 4718 leaves, 0 contradicting
              (Q4 2026-11-11, docs Befund-Doppelgaenger-Wellen-1111.md); UNEXPECTED leaves are left and fail the check
-  fadecard  tools/typed_family_fix.py      fade-record DTPs of the cine cards / flash / key-glow objects: header +0x44 and
+  objfield   tools/object_id_field_fix.py   object ids (u16) the converter left as the Xbox id, by record class: unit
+             default gear lists (level env +0x2b4 -> list DTPs {u16* weapons, n, u16* gear, n}) and the chunkdoll data
+             D+8 creature id; := PC id of the Xbox object name (base proof: 1466 gear entries / 81 units, 3 chunkdolls,
+             0 contradicting; Q110 2026-11-12: DLC 2 list DTP 25270 gear 51 = Xbox g_pda was PC g_tanks -> 48, in 11
+             units, + yeti chunkdolls 363 -> 705); a PC value that is neither the Xbox id nor the PC id fails the check
+  fadecard tools/typed_family_fix.py      fade-record DTPs of the cine cards / flash / key-glow objects: header +0x44 and
              records {s16, s16, raw} (17h-B 2026-11-08: co_dlc_black_card 22651 / co_dlc_white_card 26832)
   uberanim   tools/typed_family_fix.py      uber play-anim words (action kind 2 argument, transition +0x28) = u16 pair
              of the Xbox word (17h-C crash 2026-11-08 00:27, goo cannonball DTP 25328 +0x6d4)
@@ -127,8 +132,8 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              by the id-based statechart_cond_fix; = tree dlc_test50a_chart)
 Order in the pipeline (tools/dlc_fixes_build.py, after `statechart`): twins, childids, translist, actlist, condlist,
 eventlist, reclist, fadeslots, animfx, markup, objtex, objrec, objid, chunkrec, exttuning, thrallext, meleelink, genintro,
-costumedtp, dspkind, playerblock, waveid, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy, fxrecread,
-seqrepeat, navraw, vmliteral (objtex / objrec / objid
+costumedtp, dspkind, playerblock, waveid, objfield, fadecard, uberanim, fxrec, sgmesh, introtyped, leveltwin, basecopy,
+fxrecread, seqrepeat, navraw, vmliteral (objtex / objrec / objid
 since 2026-11-04, agent N11: they touch only the object data DTP / its player data block, no other step does; the trees
 dlc_test51c_objfx / dlc_test51e_dgids were built with the stand-alone tools on finished DRMs and are reproduced by these
 steps, docs Befund-Pipeline-Integration-0411.md; seqrepeat since 2026-11-05, WINDOWS_REBUILD finding 49: it touches
@@ -155,10 +160,14 @@ waveid since 2026-11-11 (Q4) after playerblock (and after twins; pipeline 1011 s
 22707 there): it writes only the two data
 words of SoundPlex Wave leaves; no later step writes them (seqrepeat: Sequence +0xc only; basecopy's PC base copy holds
 the same words by the base proof). It reproduces work/q4_waves_1111/tree on top of the installed file word for word.
+objfield since 2026-11-12 (Q110) after waveid: it writes only u16 object id fields of the unit gear-list DTPs and the
+chunkdoll data D+8 (DLC-only DTPs: basecopy does not cover them); the new value is no byte order of the Xbox word, so the
+later byte-order steps (typed families, fpkeys) leave it alone; on pipeline_check_1111c DLC 2 13 words (11 x DTP 25270
++0x28 51 -> 48, yeti chunkdolls 24572 +0x118 / 26190 +0x128 363 -> 705), DLC 1 0 (its gear lists are PC base copies).
 Diagnostic builds (e.g. 48i_tex MaterialParams[1] = 0 of material 25521) are never steps.
 Check mode (objtex / objrec / objid / chunkrec / exttuning / thrallext / meleelink / genintro / costumedtp / dspkind /
-playerblock / waveid / fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread / idpair /
-fxrelayout / lv90dtp / odtwin / fpkeys / unitcurve / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after
+playerblock / waveid / objfield / fadecard / uberanim / fxrec / sgmesh / introtyped / leveltwin / basecopy / fxrecread /
+idpair / fxrelayout / lv90dtp / odtwin / fpkeys / unitcurve / seqrepeat / navraw by default; tools/Invoke-TruPipeline.ps1 after
 Fixes and per costume pack):
   ../bin/pyt -t 3600 tools/dlc_struct_fixes.py check TREE [--steps objtex,objrec,objid,seqrepeat,navraw] [--skip unitcurve] [--pack pack11] [--report R.json]
         nothing is written; exit 1 when any DRM would still change (counts of DRMs / words per step), 0 = ok;
@@ -185,10 +194,11 @@ import drm_write as DW, drm_reloc as R
 W = os.path.join(HERE, '..', 'work')
 ALL = ('twins', 'translist', 'actlist', 'condlist', 'eventlist', 'reclist', 'animfx', 'childids', 'fadeslots', 'markup',
        'objtex', 'objrec', 'objid', 'chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
-       'playerblock', 'waveid', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
-       'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
+       'playerblock', 'waveid', 'objfield', 'fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin',
+       'basecopy', 'fxrecread', 'seqrepeat', 'navraw', 'vmliteral')
 DATAFIX_STEPS = ('chunkrec', 'exttuning', 'thrallext', 'meleelink', 'genintro', 'costumedtp', 'dspkind',
-                 'playerblock', 'waveid')   # 2026-11-08; playerblock 2026-11-10 (K-5b); waveid 2026-11-11 (Q4)
+                 'playerblock', 'waveid', 'objfield')   # 2026-11-08; playerblock 2026-11-10 (K-5b); waveid 2026-11-11
+                                                        # (Q4); objfield 2026-11-12 (Q110)
 TYPED_STEPS = ('fadecard', 'uberanim', 'fxrec', 'sgmesh', 'introtyped', 'leveltwin', 'basecopy',
                'fxrecread')   # 2026-11-08 (17n; fxrecread 18e)
 TWIN_FILES = ('doppelganger_casual.drm', 'player_tru_dlc2_extension.drm')
@@ -688,6 +698,29 @@ class Steps:
         return new, 'waveid %s: %d words (%s: %s)%s; %s' % (
             rel, len(changes), ', '.join('%s %d' % kv for kv in sorted(cl.items())), self._wlist(
                 'DTP %d +0x%x %s -> %s' % (sid, q, a.hex(), b.hex()) for k, q, a, b, sid, c in changes), tail, self.PROOF_NOTE)
+
+    def s_objfield(self, rel, xf, XD, cur):
+        """object ids (u16) left as the Xbox id in typed record fields: unit default gear lists (level env +0x2b4) and
+        the chunkdoll data D+8 (tools/object_id_field_fix.fix_drm, Q110 2026-11-12: DLC 2 gear list DTP 25270 Xbox 51
+        g_pda = PC g_tanks -> 48). The base proof (1466 gear entries, 3 chunkdolls, 0 contradicting) runs once per
+        process; a failed proof stops the step (SystemExit). UNEXPECTED / unmapped fields and fields that cannot be
+        paired are logged as NOT PAIRED, so the check fails on them."""
+        import object_id_field_fix as OF
+        ok, lines = OF.proven()
+        if not ok:
+            raise SystemExit('objfield: base proof FAILED - %s' % ' / '.join(lines[-3:]))
+        if not OF.fields(OF.Img(DW.read(cur, 'le'), 'le')): return None, None
+        try:
+            new, changes, info = OF.fix_drm(XD, cur, self.xpack)
+        except AssertionError as e:
+            return None, 'objfield %s: proof failed (%s) - nothing changed' % (rel, e)
+        odd = [r for r in info['rows'] if r[7] in ('UNEXPECTED', 'unmapped')]
+        tail = ('; NOT PAIRED (%s)' % '; '.join(['%s DTP %d +0x%x Xbox %d PC %d %s' % (
+            r[0], r[3], r[2], r[4], r[5], r[7]) for r in odd[:6]] + info['miss'][:3])) if (odd or info['miss']) else ''
+        if new is None:
+            return None, ('objfield %s: 0 words%s' % (rel, tail)) if tail else None
+        return new, 'objfield %s: %d words (%s)%s; %s' % (rel, len(changes), self._wlist(
+            '%s DTP %d +0x%x %d -> %d' % (cl, sid, o, a, b) for k, o, a, b, sid, cl, w in changes), tail, self.PROOF_NOTE)
 
     # ---- typed families of the night 07./08.11. (steps since 2026-11-08, 17n): tools/typed_family_fix.fix_drm proves
     # the rule on the base pairs once per process (SystemExit when it fails), changes only words whose PC bytes are
