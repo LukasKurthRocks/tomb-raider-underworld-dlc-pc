@@ -52,7 +52,10 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
              ids(6, Xbox id) (the converter wrote the DTP-id map ids(7, x) or kept the Xbox id: doppelganger_casual 164
              words in 11 group-78 DTPs = silent / wrong body sounds), data +4 {u8 priority, u8, u16} = u8u8u16 of the
              Xbox word (pipeline 1011: DTP 22707 x9 u32-swapped); base proof 750 pairs / 4718 leaves, 0 contradicting
-             (Q4 2026-11-11, docs Befund-Doppelgaenger-Wellen-1111.md); UNEXPECTED leaves are left and fail the check
+             (Q4 2026-11-11, docs Befund-Doppelgaenger-Wellen-1111.md); UNEXPECTED leaves are left and fail the check;
+             since 2026-11-12 (E2, E1-1) also the trees EMBEDDED in anim event-list DTPs (root = kind-0 sound record
+             payload +4, not DTP +0; base proof 4 leaves, 0 contradicting): pipeline_check_1111c DLC 2 13 words in 6
+             DRMs (goo cannon / goo converter, viking / yeti thrall anim sounds unresolved), DLC 1 0
   objfield   tools/object_id_field_fix.py   object ids (u16) the converter left as the Xbox id, by record class: unit
              default gear lists (level env +0x2b4 -> list DTPs {u16* weapons, n, u16* gear, n}) and the chunkdoll data
              D+8 creature id; := PC id of the Xbox object name (base proof: 1466 gear entries / 81 units, 3 chunkdolls,

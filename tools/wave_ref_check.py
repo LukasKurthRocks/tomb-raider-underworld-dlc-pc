@@ -3,7 +3,8 @@
 The leaf handler 0x591220 looks its wave id (data +0, no relocation) up among the loaded wave sections (type 6) - an id
 that no loaded DRM holds is a silent leaf (no crash, no log). Leaves are found as in tools/soundplex_wave_id_fix.py
 (SoundPlex DTPs: root node at DTP +0, nodes reachable over the child pointers, type 2; on the PC side without the value
-filter, so byte-swapped ids are seen too).
+filter, so byte-swapped ids are seen too). Since E1-1 (2026-11-12) also the trees EMBEDDED in anim event-list DTPs
+(root pointed at by the kind-0 sound records, soundplex_wave_id_fix.event_roots), counted as 'embedded'.
 
 Per DRM: Wave leaves, null ids (0 / -1), refs that resolve to a wave section of the same DRM, refs that resolve only
 through --also (other DRMs, e.g. a resident bank or the level), unresolved refs (listed per DTP). With --xbox the Xbox
@@ -31,9 +32,11 @@ def check_drm(path, also_ids, xbox=False, pack=None):
     wrong = []
     for s in D.sections:
         if s.type != 7: continue
-        for tg in WF.wave_leaves(bytes(s.data), bytes(s.reloc), 'le', max_id=None):
+        lv, kind = WF.wave_leaves(bytes(s.data), bytes(s.reloc), 'le', max_id=None, embedded=True, which=True)
+        for tg in lv:
             v = struct.unpack_from('<I', s.data, tg)[0]
             r['leaves'] += 1
+            if kind == 'embedded': r['embedded_leaves'] += 1
             if v in WF.NULLS: r['null'] += 1
             elif v in own: r['resolved_own'] += 1
             elif v in also_ids:
@@ -44,7 +47,7 @@ def check_drm(path, also_ids, xbox=False, pack=None):
         XD, pk = WF.xbox_of(path, pack)
         if XD is None: r['no_xbox_source'] = 1
         else:
-            info = WF.plan(XD, D)
+            info = WF.plan(XD, D, embedded=True)
             for k, sid, tg, f, xw, pw, ww, cls in info['rows']:
                 if f != 0 or cls == 'ok': continue
                 pv = struct.unpack('<I', pw)[0]
@@ -75,8 +78,9 @@ def main(a):
         c = res['counts']; out.append(res)
         n_un = c.get('unresolved', 0); n_wr = c.get('wrong_target', 0)
         bad += n_un + n_wr
-        print('%s: %d wave sections; leaves %d, null %d, resolved in the DRM %d, via --also %d, UNRESOLVED %d%s' % (
-            p, res['waves'], c.get('leaves', 0), c.get('null', 0), c.get('resolved_own', 0), c.get('resolved_also', 0), n_un,
+        print('%s: %d wave sections; leaves %d (embedded %d), null %d, resolved in the DRM %d, via --also %d, UNRESOLVED %d%s' % (
+            p, res['waves'], c.get('leaves', 0), c.get('embedded_leaves', 0), c.get('null', 0), c.get('resolved_own', 0),
+            c.get('resolved_also', 0), n_un,
             (', wrong target %d (rule rows not ok %d)' % (n_wr, c.get('rule_rows_not_ok', 0))) if xbox else ''))
         for sid, lst in sorted(res['unresolved'].items()):
             print('   unresolved DTP %d: %d leaves, ids %s' % (sid, len(lst), sorted({v for _, v in lst})))

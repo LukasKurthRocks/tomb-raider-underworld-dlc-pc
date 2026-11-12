@@ -1237,6 +1237,14 @@ file must not be copied over it (31 type-9 libs incl. 2943 / 2944 and 25 materia
   0 (inherit) 3107, 34 493, 38 273, 43 115, 79 82, 78 39. Lara for comparison (PC base trees): `lara_jungle_a` 5333
   starts 54 % / 25 % / 19 % / 2 %, `lara_casual` 5433 34 % / 41 % / 20 % / 5 % - the doppelganger's data is not quieter
   (`work/e1_data_1211/trace_plex_map.py`). ✅ data / ⬜ live volumes after the Q4 wave fix
+* Embedded SoundPlex trees (E2, 2026-11-12): the root of an anim event-list tree is the target of a kind-0 record's
+  payload +4 (record +12, internal relocation) with payload byte 0 = 0 (`soundplex_wave_id_fix.event_roots`). Base Xbox:
+  2398 event lists, 1624 with sound roots (15061 kind-0 sound records, 14899 point at an Assign); their trees reach
+  waves almost only through Indirect nodes (DTPs with their own root at +0) - only 4 Wave leaves sit in an embedded tree,
+  all = the waveid rule (ids(6, x), +4 u8u8u16). DLC 2 had 13 such leaves wrong (ids(7, x) or the Xbox id kept:
+  `dlc2_uo_goo_cannon` 25322 / 25323, `dlc2_uo_gooconverter` 25155, viking thrall 24470, yeti thrall 22884 / 24651 -
+  ids that no DLC 2 DRM and no generalbank holds = silent anim sounds 🔶); `waveid`, its scan and `wave_ref_check` walk
+  them since E2. ✅ data
 
 ### 18.3 Sound groups (FMOD channel groups)
 

@@ -26,10 +26,17 @@ left alone); +0 is written only when the new id is a wave section of the same DR
 word is a known wrong form (ids(7, x), the Xbox id unmapped, or a byte order of the Xbox word); +4 only when the old PC
 word is a byte order of the Xbox word. Anything else is UNEXPECTED (reported; the check fails, nothing is guessed).
 
+Embedded trees (E1-1, 2026-11-12): anim event-list DTPs hold SoundPlex trees whose root is NOT at DTP +0 (the kind-0
+sound records point at them, event_roots). `proof --embedded` proves the same rule on the embedded trees of the base
+pairs (4 leaves: the base trees reach their waves almost only through Indirect nodes); `scan`, tools/wave_ref_check.py
+and the step (fix_drm, since E2: pipeline_check_1111c DLC 2 had 5 wrong embedded wave ids, goo cannon / goo converter)
+walk them too; plan(embedded=False) / `scan --root0` = the old scope.
+
 Modes (from the repository root):
-  ../bin/pyt -t 1800 tools/soundplex_wave_id_fix.py proof
-  ../bin/pyt -t 900 tools/soundplex_wave_id_fix.py scan DRM_OR_DIR[,..] [--pack PACK] [--report R.json]
-        every Wave leaf whose words differ from the rule; exit 1 when any is wrong or unexpected
+  ../bin/pyt -t 1800 tools/soundplex_wave_id_fix.py proof [--embedded]
+  ../bin/pyt -t 900 tools/soundplex_wave_id_fix.py scan DRM_OR_DIR[,..] [--pack PACK] [--report R.json] [--root0]
+        every Wave leaf whose words differ from the rule (embedded trees included unless --root0); exit 1 when any is
+        wrong or unexpected
   ../bin/pyt -t 900 tools/soundplex_wave_id_fix.py fix SRC.drm OUT.drm [--pack PACK]
         one DRM, only the planned words, proven (decoded bytes differ only there, headers / relocations identical,
         re-plan 0)
@@ -48,6 +55,12 @@ MAX_WAVE_ID = 0x10000
 # swap would differ in all 4718 -> u32 ruled out; u8u8u16 against raw is decided by the reader 0x591220: u16 at +6)
 PROOF_EXPECT = {'pairs': 750, 'leaves': 4718, 'contra0': 0, 'contra4': 0, 'mapped_id': 4655, 'mapped_identity': 62,
                 'plus4_raw_or_u8u8u16': 4718}
+# the same rule on the trees EMBEDDED in base anim event-list DTPs (E1-1, 2026-11-12, `proof --embedded`; measured
+# work/e2_pipeline_1211/proof_embedded.txt): 2398 Xbox base event lists, 1624 with sound roots (15061 kind-0 sound
+# records, 14899 point at an Assign), 1623 paired - but their trees reach the waves almost only through Indirect nodes
+# (DTPs with their own root at +0, walked above): only 4 Wave leaves sit in an embedded tree itself, all = the rule
+PROOF_EXPECT_EMBEDDED = {'pairs': 4, 'leaves': 4, 'contra0': 0, 'contra4': 0, 'mapped_id': 4, 'mapped_identity': 0,
+                         'plus4_raw_or_u8u8u16': 4}
 
 
 # ---------------------------------------------------------------- tree walk (both byte orders)
@@ -85,14 +98,37 @@ def _children(d, E, it, nd, off):
     return out
 
 
-def wave_leaves(d, reloc, e, max_id=MAX_WAVE_ID):
+def event_roots(d, e, nd, it):
+    """roots of the SoundPlex trees EMBEDDED in an anim event-list DTP (E1-1, 2026-11-12; ENGINE.md 18.2): the list
+    (tools/animfx.walk: u32 0 head, records {u16 h, s16 frame, u8 b4 + 3, payload}) holds kind-0 records whose payload
+    {u8 0 = sound emitter, u8 flags, s16 segment, ptr root} points at the root node with payload +4 = record +12
+    (internal relocation; 0x5b99c0 -> 0x5935d0). The DTP's root is not at +0, so the walk from +0 never sees them."""
+    import animfx as AF
+    w = AF.walk(d, '<' if e == 'le' else '>')
+    if w is None: return []
+    out = set()
+    for a, h, fr, sz in w[0]:
+        if h & 3 or sz < 16 or d[a + 8] != 0: continue
+        p = it.get(a + 12)
+        if p is not None and p in nd and 1 <= nd[p][0] <= 13: out.add(p)
+    return sorted(out)
+
+
+def wave_leaves(d, reloc, e, max_id=MAX_WAVE_ID, embedded=False, which=False):
     """data offsets of the Wave leaves reachable from the SoundPlex root at DTP +0 (none when word 0 is no root node);
-    max_id None = no value filter (a checker of converted files must see byte-swapped ids too)"""
+    max_id None = no value filter (a checker of converted files must see byte-swapped ids too);
+    embedded True = also the trees embedded in an anim event-list DTP (event_roots; only when +0 is no root);
+    which True -> (leaves, 'root0' | 'embedded' | None)"""
     E = '<' if e == 'le' else '>'
     d = bytes(d)
     nd, it, slots = plex_nodes(d, reloc, e)
-    if len(d) < 8 or 0 in slots or 0 not in nd or not 1 <= nd[0][0] <= 13: return []
-    seen = set(); stack = [0]; out = []
+    roots, kind = [], None
+    if len(d) >= 8 and 0 not in slots and 0 in nd and 1 <= nd[0][0] <= 13: roots, kind = [0], 'root0'
+    elif embedded and len(d) >= 8:
+        roots = event_roots(d, e, nd, it)
+        if roots: kind = 'embedded'
+    if not roots: return ([], None) if which else []
+    seen = set(); stack = list(roots); out = []
     while stack:
         off = stack.pop()
         if off in seen: continue
@@ -106,7 +142,7 @@ def wave_leaves(d, reloc, e, max_id=MAX_WAVE_ID):
                 if max_id is None or v in NULLS or v < max_id: out.append(tg)
             continue
         stack += _children(d, E, it, nd, off)
-    return sorted(set(out))
+    return (sorted(set(out)), kind) if which else sorted(set(out))
 
 
 def word_class(xw, pw):
@@ -114,7 +150,9 @@ def word_class(xw, pw):
 
 
 # ---------------------------------------------------------------- base proof
-def base_stats():
+def base_stats(embedded=False):
+    """embedded False: the trees rooted at DTP +0 (PROOF_EXPECT); True: only the trees embedded in anim event-list DTPs
+    (event_roots; PROOF_EXPECT_EMBEDDED, E1-1)"""
     import dtpid_sweep as DS
     st, ids = DS.ctx()
     b6 = ids.base[6]
@@ -124,7 +162,11 @@ def base_stats():
         p = ids.base[7].get(x); pc = st['pc_store'].get((7, p)) if p is not None else None
         if pc is None or len(pc['data']) != len(xb['data']): continue
         if dict(R.parse(pc['reloc'], 'le').internal) != dict(R.parse(xb['reloc'], 'be').internal): continue
-        lv = wave_leaves(xb['data'], xb['reloc'], 'be')
+        if embedded:
+            lv, kind = wave_leaves(xb['data'], xb['reloc'], 'be', embedded=True, which=True)
+            if kind != 'embedded': continue
+        else:
+            lv = wave_leaves(xb['data'], xb['reloc'], 'be')
         if not lv: continue
         npairs += 1
         xd, pd = xb['data'], pc['data']
@@ -143,8 +185,10 @@ def base_stats():
     return dict(pairs=npairs, leaves=sum(c0.values()), c0=c0, c4=c4, contra0=contra0, contra4=contra4)
 
 
-def proof(strict=True):
-    b = base_stats()
+def proof(strict=True, embedded=False):
+    b = base_stats(embedded)
+    expect = PROOF_EXPECT_EMBEDDED if embedded else PROOF_EXPECT
+    if embedded: print('trees embedded in anim event-list DTPs (event_roots):')
     print('base DTP pairs with Wave leaves %d, leaves %d' % (b['pairs'], b['leaves']))
     print('data +0 (wave id):', dict(b['c0'].most_common()))
     print('data +4 (u8 prio, u8, u16):', dict(b['c4'].most_common()))
@@ -154,20 +198,20 @@ def proof(strict=True):
     got = dict(pairs=b['pairs'], leaves=b['leaves'], contra0=len(b['contra0']), contra4=len(b['contra4']),
                mapped_id=b['c0'].get('mapped_id', 0), mapped_identity=b['c0'].get('mapped_identity', 0),
                plus4_raw_or_u8u8u16=b['c4'].get('classes raw+u8u8u16', 0))
-    ok = got['contra0'] == 0 and got['contra4'] == 0 and got == PROOF_EXPECT
-    print('rule +0 = ids(6, Xbox), +4 = u8u8u16: %s  %s (expected %s)' % ('PROVEN' if ok else 'FAILED', got, PROOF_EXPECT))
+    ok = got['contra0'] == 0 and got['contra4'] == 0 and got == expect
+    print('rule +0 = ids(6, Xbox), +4 = u8u8u16: %s  %s (expected %s)' % ('PROVEN' if ok else 'FAILED', got, expect))
     return 0 if ok or not strict else 1
 
 
 _PROVEN = None
 def proven():
-    """base proof once per process (quiet) -> (ok, lines)"""
+    """base proof once per process (quiet), trees at DTP +0 and embedded trees (E1-1) -> (ok, lines)"""
     global _PROVEN
     if _PROVEN is None:
         import io, contextlib
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            rc = proof()
+            rc = proof() or proof(embedded=True)
         _PROVEN = (rc == 0, buf.getvalue().splitlines())
     return _PROVEN
 
@@ -191,26 +235,31 @@ def u16p(v):
     return struct.unpack('<I', b[1::-1] + b[:1:-1])[0]
 
 
-def plan(XD, PD, ids=None):
+def plan(XD, PD, ids=None, embedded=False):
     """XD / PD: drm_write.Drm (Xbox BE / PC LE) -> dict(rows=[(PC section index, DTP id, leaf data off, field, Xbox
     word bytes, PC word bytes, wanted bytes, class)], wavemap {Xbox wave id: PC wave id} of the file's own wave sections
-    (paired by position), mismatch [(x, file id, ids(6, x))], base_mapped, layout, sections)
-    class: ok | fix:<old form> | UNEXPECTED:<why>"""
+    (paired by position), mismatch [(x, file id, ids(6, x))], base_mapped, layout, sections, emb {(PC section index,
+    leaf data off)} of the leaves found only through embedded=True)
+    class: ok | fix:<old form> | UNEXPECTED:<why>
+    embedded False (the step waveid / fix_drm): trees rooted at DTP +0 only; True (scan, wave_ref_check): also the trees
+    embedded in anim event-list DTPs (E1-1) - the gate sees them, the step does not write them"""
     import converter_faults_fix as CF
     ids = ids or dlc_ids()
     pairs = CF.pairs_by_position(XD, PD)
     wavemap = {x.id: p.id for k, x, p in pairs if x.type == 6 and p.type == 6}
     pc_waves = {s.id for s in PD.sections if s.type == 6}
     base_pc_waves = set(ids.base.get(6, {}).values())
-    res = dict(rows=[], wavemap=wavemap, mismatch=[], base_mapped=0, layout=[], sections=0)
+    res = dict(rows=[], wavemap=wavemap, mismatch=[], base_mapped=0, layout=[], sections=0, emb=set(), emb_sections=0)
     for x, f in sorted(wavemap.items()):
         if ids(6, x) != f: res['mismatch'].append((x, f, ids(6, x)))
     for k, x, p in pairs:
         if x.type != 7: continue
         xd = bytes(x.data)
-        lv = wave_leaves(xd, bytes(x.reloc), 'be')
+        lv, kind = wave_leaves(xd, bytes(x.reloc), 'be', embedded=embedded, which=True)
         if not lv: continue
         res['sections'] += 1
+        if kind == 'embedded':
+            res['emb_sections'] += 1; res['emb'] |= {(k, tg) for tg in lv}
         if x.id != p.id and x.id in ids.base.get(7, {}):
             res['base_mapped'] += 1; continue                 # renumbered base DTP: the PC game's own section
         pd = bytes(p.data)
@@ -241,12 +290,15 @@ def plan(XD, PD, ids=None):
     return res
 
 
-def fix_drm(XD, raw, ids=None):
+def fix_drm(XD, raw, ids=None, embedded=True):
     """-> (new raw or None, changes [(section index, offset, old, new, DTP id, class)], plan info). UNEXPECTED rows are
     left (reported in info, the check fails on them). The written bytes are proven: only the planned bytes differ,
-    file / section headers and relocations identical, re-plan 0 fix rows."""
+    file / section headers and relocations identical, re-plan 0 fix rows.
+    embedded True (since E2 2026-11-12): the Wave leaves of the trees embedded in anim event-list DTPs too - the same
+    leaf reader 0x591220, the same rule (base: 4718 leaves at +0 and 4 embedded, 0 contradicting); pipeline_check_1111c
+    DLC 2: 5 words (dlc2_uo_goo_cannon DTP 25322 / 25323, dlc2_uo_gooconverter DTP 25155), DLC 1: 0"""
     PD = DW.read(raw, 'le')
-    info = plan(XD, PD, ids)
+    info = plan(XD, PD, ids, embedded=embedded)
     todo = [r for r in info['rows'] if r[7].startswith('fix:')]
     if not todo: return None, [], info
     changes = []
@@ -257,11 +309,11 @@ def fix_drm(XD, raw, ids=None):
         changes.append((k, q, pw, ww, sid, cls))
     new = PD.write('le')
     if raw[:4] == b'CDRM': new = DW.cdrm_encode(new, 'le')
-    verify(raw, new, changes, XD, ids)
+    verify(raw, new, changes, XD, ids, embedded)
     return new, changes, info
 
 
-def verify(raw, new, changes, XD, ids=None):
+def verify(raw, new, changes, XD, ids=None, embedded=True):
     A, B = DW.read(raw, 'le'), DW.read(new, 'le')
     assert len(A.sections) == len(B.sections) and A.names == B.names and A.pad == B.pad, 'file layout changed'
     planned = {(k, q + j) for k, q, a, b, sid, c in changes for j in range(4) if a[j] != b[j]}
@@ -271,7 +323,7 @@ def verify(raw, new, changes, XD, ids=None):
                (b.type, b.id, b.flags, b.ver, b.spec, b.pad, bytes(b.reloc), len(b.data)), 'section %d header changed' % k
         if a.data != b.data: got |= {(k, i) for i in range(len(a.data)) if a.data[i] != b.data[i]}
     assert got == planned, '%d bytes differ, %d planned' % (len(got), len(planned))
-    again = [r for r in plan(XD, B, ids)['rows'] if r[7].startswith('fix:')]
+    again = [r for r in plan(XD, B, ids, embedded=embedded)['rows'] if r[7].startswith('fix:')]
     assert not again, 're-plan finds %d words' % len(again)
     return len(got)
 
@@ -294,25 +346,32 @@ def opt(a, key):
     return None
 
 
-def scan(paths, pack=None, report=None):
+def scan(paths, pack=None, report=None, embedded=True):
+    """embedded True (default since E1-1, 2026-11-12): the trees embedded in anim event-list DTPs are checked too
+    (counted as emb_*; --root0 = the old scope, only trees rooted at DTP +0)"""
     import soundplex_sequence_fix as SQ
     tot = collections.Counter(); rep = []
     for path in SQ.file_list(paths):
         XD, pk = xbox_of(path, pack)
         tot['files'] += 1
         if XD is None: tot['no_xbox_source'] += 1; continue
-        info = plan(XD, DW.read(open(path, 'rb').read(), 'le'))
+        info = plan(XD, DW.read(open(path, 'rb').read(), 'le'), embedded=embedded)
         cl = collections.Counter(r[7].split(':')[0] if not r[7].startswith('fix:') else r[7] for r in info['rows'])
         bad = [r for r in info['rows'] if r[7] != 'ok']
         tot['leaves'] += sum(1 for r in info['rows'] if r[3] == 0)
+        tot['emb_sections'] += info['emb_sections']
+        tot['emb_leaves'] += sum(1 for r in info['rows'] if r[3] == 0 and (r[0], r[2]) in info['emb'])
+        tot['emb_not_ok'] += sum(1 for r in bad if (r[0], r[2]) in info['emb'])
         for c, n in cl.items(): tot[c] += n
         if bad or info['mismatch'] or info['layout']:
             print('%s (Xbox %s): %d leaves, %s; layout differs %s; wave-map mismatch %s' % (
                 path, pk, sum(1 for r in info['rows'] if r[3] == 0), dict(cl), info['layout'], info['mismatch'][:5]))
             for r in bad[:60]:
-                print('   DTP %d leaf +%#x +%d: Xbox %s PC %s -> %s  %s' % (r[1], r[2], r[3], r[4].hex(), r[5].hex(), r[6].hex(), r[7]))
+                print('   DTP %d leaf +%#x +%d: Xbox %s PC %s -> %s  %s%s' % (r[1], r[2], r[3], r[4].hex(), r[5].hex(), r[6].hex(),
+                      r[7], ' (embedded)' if (r[0], r[2]) in info['emb'] else ''))
         rep.append(dict(file=path, pack=pk, classes=dict(cl), layout=info['layout'], mismatch=info['mismatch'],
-                        rows=[(r[1], r[2], r[3], r[4].hex(), r[5].hex(), r[6].hex(), r[7]) for r in bad]))
+                        emb_sections=info['emb_sections'],
+                        rows=[(r[1], r[2], r[3], r[4].hex(), r[5].hex(), r[6].hex(), r[7], (r[0], r[2]) in info['emb']) for r in bad]))
     nbad = sum(n for c, n in tot.items() if c.startswith('fix:') or c == 'UNEXPECTED')
     print('scan: %s -> %s' % (dict(tot), 'FAIL (%d word(s) wrong or unexpected)' % nbad if nbad else 'ok'))
     if report:
@@ -342,8 +401,10 @@ def fix_one(src, out, pack=None):
 def main(a):
     a = list(a)
     pack = opt(a, '--pack'); report = opt(a, '--report')
-    if a[:1] == ['proof']: return proof()
-    if a[:1] == ['scan'] and len(a) == 2: return scan(a[1], pack, report)
+    emb = '--embedded' in a; root0 = '--root0' in a
+    a = [x for x in a if x not in ('--embedded', '--root0')]
+    if a[:1] == ['proof']: return proof(embedded=emb)
+    if a[:1] == ['scan'] and len(a) == 2: return scan(a[1], pack, report, embedded=not root0)
     if a[:1] == ['fix'] and len(a) == 3: return fix_one(a[1], a[2], pack)
     sys.exit(__doc__)
 
