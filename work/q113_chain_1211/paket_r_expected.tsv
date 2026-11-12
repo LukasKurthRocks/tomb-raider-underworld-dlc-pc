@@ -1,0 +1,21 @@
+# Q113 Paket R: expected unit visits (TruTrace MOVE / HIT / SAVE) - written by q113_chain.py
+# step	unit	unit_id	from	from_id	hit_index_in_from	checkpoints_walking_order	cinematics	chapter	sure	note
+1	l1_norse_hallway_a	40	l1_seafloor	39	0	779,780			✅	
+2	l1_kraken_entrance	38	l1_norse_hallway_a	40	0		40	1.2	✅	Szene 40 (Intro 696, Eingangstor) 26 m vor dem Portal zu krakenstairs_a = Titelkarte 1.2 (Skript 5321 f1 -> 5273 f2)
+3	l1_krakenstairs_a	37	l1_kraken_entrance	38	0	633,634			✅	
+4	l1_krakenstairs_b	36	l1_krakenstairs_a	37	1	593,594			✅	
+5	l1_kraken_room	4	l1_krakenstairs_b	36	0	75,76,56,58,77,78,74,73,46	45,49		🔶	Ring aufgelöst: Szene 45 an der Seite von krakenstairs_b (Ankunft), Szene 49 + Grabtür ms_ani_tombdoor 29 m am Portal baldrsstairs_a -> Tür öffnet erst nach dem Kraken-Rätsel; danach 50 / 51 im Grab
+6	l1_baldrsstairs_a	35	l1_kraken_room	4	0	270,271			🔶	Ring-Richtung wie oben
+7	l1_baldrsstairs_b	34	l1_baldrsstairs_a	35	0	239,240			🔶	Ring-Richtung wie oben
+8	l1_baldrs_tomb	5	l1_baldrsstairs_b	34	1	140,72,141	50,51	1.3	🔶	Szene 50 = Titelkarte 1.3 (Panzerhandschuh), Ebene 224 -> Szene 51 + Sticky 43 (Q73); Ausgang = zweites Portal
+9	l1_baldrs_sideroom	33	l1_baldrs_tomb	5	0	91,92			🔶	Ring-Richtung wie oben
+10	l1_baldrs_hall	32	l1_baldrs_sideroom	33	1	5,6			🔶	Ring schließt sich: Halle -> obere Ebene des Kraken-Raums (Portal z 5827)
+11	l1_kraken_room	4	l1_baldrs_hall	32	1				🔶	Rückweg (einziger Weg zum nächsten Ziel), Checkpoints s. Hinweg (Boot nur über seafloor -> seatop)
+12	l1_krakenstairs_b	36	l1_kraken_room	4	2				🔶	Rückweg (einziger Weg zum nächsten Ziel), Checkpoints s. Hinweg
+13	l1_krakenstairs_a	37	l1_krakenstairs_b	36	1				🔶	Rückweg (einziger Weg zum nächsten Ziel), Checkpoints s. Hinweg
+14	l1_kraken_entrance	38	l1_krakenstairs_a	37	0				🔶	Rückweg (einziger Weg zum nächsten Ziel), Checkpoints s. Hinweg
+15	l1_norse_hallway_a	40	l1_kraken_entrance	38	1				🔶	Rückweg (einziger Weg zum nächsten Ziel), Checkpoints s. Hinweg
+16	l1_seafloor	39	l1_norse_hallway_a	40	1				🔶	Rückweg (einziger Weg zum nächsten Ziel), Checkpoints s. Hinweg
+17	l1_seatop	3	l1_seafloor	39	1				🔶	Boot-Volumen 1840 (OnIn, nur mit Sticky 43 aus dem Grab) spielt Szene 52 in l1_cineseatop (Q73); Wechsel in die Szenen-Unit: Portal oder Szene - Live-Log klärt
+18	l1_cineseatop	6	l1_seatop	3	0		52	1.4	✅	Szene 52 (Intro 1780, Skript 8003) = Titelkarte 1.4
+19	l1_ship_exterior	8	l1_cineseatop	6	1	1554,1555,1556,1557,1558,1560,1559,1561,1562			✅	

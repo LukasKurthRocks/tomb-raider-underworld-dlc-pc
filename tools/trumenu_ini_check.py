@@ -4186,6 +4186,50 @@ def check_02234(ini_path, switches_path):
                       % (counts.get('kAchChecks', 0), counts.get('kPpChecks', 0)))
 
 
+Q113_CP_02235 = os.path.join(ROOT, 'work', 'q113_chain_1211', 'q113_cp_order.txt')
+
+
+def check_02235():
+    """0.22.35 (Q113, 12.11.; workspace docs/Befund-Q113-Levelkette-1211.md): only kChapOrder changes - the base rows stay
+    the B generator output (check_02234) and their checkpoint ids are now in WALKING order = work/q113_chain_1211/
+    q113_cp_order.txt (written by q113_chain.py, the proven level chain); same 84 units / 303 ids as the +0x52 order;
+    loop headings with direction (l1, l2) and the l4_temple side trip; kVersion holds the 0.22.35 part; Set-TruMenu.ps1
+    knows the 0.22.34 hash"""
+    problems = []
+    src = read_cpp()
+    if '0.22.35 (level chain, Q113' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.35 part "0.22.35 (level chain, Q113"')
+    raw = open(CPP, encoding='utf-8').read()
+    order = raw[raw.index('const ChapOrder kChapOrder[] = {'):]
+    order = order[:order.index('\n};')]
+    have = re.findall(r'\{"(Base game l\d)", "(\w+)", false, "([0-9 ]*)",\s*((?:"[^"]*"\s*)+|nullptr)\}', order)
+    walk = {}
+    if os.path.exists(Q113_CP_02235):
+        for line in open(Q113_CP_02235, encoding='utf-8'):
+            if line.startswith('#') or not line.strip(): continue
+            u, _, ids = line.rstrip('\n').partition('\t')
+            walk[u] = ids.split()
+    else:
+        problems.append('work/q113_chain_1211/q113_cp_order.txt is missing')
+    n_ids = 0
+    for g, u, c, h in have:
+        n_ids += len(c.split())
+        if walk and walk.get(u) != c.split():
+            problems.append('TruMenu.cpp: kChapOrder %s checkpoints "%s" != walking order %s' % (u, c, walk.get(u)))
+    if len(have) != 84 or n_ids != 303:
+        problems.append('TruMenu.cpp: kChapOrder base rows %d / ids %d (want 84 / 303)' % (len(have), n_ids))
+    heads = {u: ''.join(re.findall(r'"([^"]*)"', h)) for g, u, c, h in have if h != 'nullptr'}
+    for u, want in (('l1_baldrsstairs_a', 'Rundweg ab l1_kraken_room: Treppen -> Grab'),
+                    ('l2_norsehall', 'Rundweg ab l2_puzzleroom: norsehall'), ('l4_templepath', 'Abstecher in 4.2: Tempel')):
+        if not heads.get(u, '').startswith(want): problems.append('TruMenu.cpp: kChapOrder %s heading must start "%s"' % (u, want))
+    if 'Richtung nicht in den Daten)|Loop from l1_kraken_room' in order:
+        problems.append('TruMenu.cpp: the old l1 loop heading (direction not in the data) is still there')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '646c4b3e9b9e7dc3fae507b8254ebd3d73332f8978e4f001e1ce91ff96a0883b' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.34 build hash (work/asi/menu0257) is missing')
+    return problems, 'level chain Q113 (84 base rows, %d checkpoint ids in walking order, loop / side-trip headings)' % n_ids
+
+
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
 SV_ITEMS = ('save.pending', 'save.inv', 'save.waiting', 'save.find')
 
@@ -4754,6 +4798,10 @@ def main(argv):
     for p in cproblems34: print('Q02234 %s' % p)
     if not cproblems34: print('ok: 0.22.34 %s' % csummary34)
     problems += cproblems34
+    cproblems35, csummary35 = check_02235()   # 0.22.35 (Q113)
+    for p in cproblems35: print('Q02235 %s' % p)
+    if not cproblems35: print('ok: 0.22.35 %s' % csummary35)
+    problems += cproblems35
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

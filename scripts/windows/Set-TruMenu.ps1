@@ -154,7 +154,8 @@ $earlierBuilds = @{
                       '0753f83050ff70a2274f2ddcf65252607f2edbd33b6a91037ba4e37367244a90',   # 0.22.30 log dates, device glyphs (work\asi\menu0253)
                       '502f5805137f21bec0e8128c68f87066350dd9d4c7910189845780f39743ebcc',   # 0.22.31 level navigation, puzzles (work\asi\menu0254)
                       '5f7ba420c25f717ede72b60c30d87665174807f0a8fd2f73bc30c0781a33750e',   # 0.22.32 arena, group A (work\asi\menu0255)
-                      '8dabebd42c9e5b0991c73f89dbd485b4f5a14ea834abe4c474d64704a5c66236')   # 0.22.33 photo mode, arena.load, group K (work\asi\menu0256)
+                      '8dabebd42c9e5b0991c73f89dbd485b4f5a14ea834abe4c474d64704a5c66236',   # 0.22.33 photo mode, arena.load, group K (work\asi\menu0256)
+                      '646c4b3e9b9e7dc3fae507b8254ebd3d73332f8978e4f001e1ce91ff96a0883b')   # 0.22.34 achievements, photo.pose, group M (work\asi\menu0257)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

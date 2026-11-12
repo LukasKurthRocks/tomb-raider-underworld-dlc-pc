@@ -12,8 +12,11 @@ listed before it in the same level - except the first unit of a level and a unit
 caller (script 72) sits in that unit (a cutscene start), and (c) every extracted unit of the level is listed (nothing
 lost). It then prints the kChapOrder rows for TruMenu (checkpoint intros of object 'checkpoint' per unit, ordered by
 their +0x52 index, then id) and a markdown table.
+Q113 (2026-11-12, TruMenu 0.22.35): with CP_ORDER (work/q113_chain_1211/q113_cp_order.txt, 'unit TAB ids' from
+q113_chain.py) the checkpoints of each unit come in WALKING order (entry portal -> exit portal) instead of +0x52 (group J:
++0x52 is no walking order); the script proves that every unit's id set is the same as before (nothing lost / added).
 
-Usage (from trudlcport): ../bin/pyt -t 300 work/b_nav_1211/q105_order_table.py PORTALS INTROS CALLS OUT_CPP OUT_MD
+Usage (from trudlcport): ../bin/pyt -t 300 work/b_nav_1211/q105_order_table.py PORTALS INTROS CALLS OUT_CPP OUT_MD [CP_ORDER]
 """
 import sys, re, collections
 
@@ -29,7 +32,14 @@ TITLE = {(1, 1): ('Der Weg nach Avalon', 'The Path to Avalon'), (1, 2): ('Niflhe
          (5, 1): ('Tor der Toten', 'Gate of the Dead'), (5, 2): ('Walhall', 'Valhalla'), (6, 1): ('Alte Rituale', 'Rituals Old'),
          (7, 1): ('Helheim', 'Helheim'), (7, 2): ('Yggdrasil', 'Yggdrasil'), (7, 3): ('Keine Zeit', 'Out of Time')}
 # play order: (unit, heading) - heading = None, a chapter key (level, chapter), or ('text', DE, EN)
-LOOP = ('text', 'Rundweg ab l1_kraken_room (Richtung nicht in den Daten)', 'Loop from l1_kraken_room (direction not in the data)')
+# Q113 (docs/Befund-Q113-Levelkette-1211.md): loop directions from the cutscene numbers (45 / 49 at the tomb door, then
+# 50 / 51; puzzleroom 91 -> 92), the l4_temple side trip (group J: headdress key in 4.2), the prologue units come again
+LOOP = ('text', 'Rundweg ab l1_kraken_room: Treppen -> Grab -> Seitenraum -> Halle -> zurück (Szenen 45 / 49 / 50, gefolgert)',
+        'Loop from l1_kraken_room: stairs -> tomb -> side room -> hall -> back (cutscenes 45 / 49 / 50, inferred)')
+LOOP2 = ('text', 'Rundweg ab l2_puzzleroom: norsehall -> Türme -> upperhallway -> zurück; zwei Türen = alternativ (gefolgert)',
+         'Loop from l2_puzzleroom: norsehall -> towers -> upperhallway -> back; two doors = alternatives (inferred)')
+TEMPLE = ('text', 'Abstecher in 4.2: Tempel (Kopfschmuck-Schlüssel), dann zurück zum Ballspielplatz',
+          'Side trip in 4.2: temple (headdress key), then back to the ball court')
 ORDER = {
     'Base game l1': [('l1_seatop', (1, 1)), ('l1_seafloor', None), ('l1_norse_hallway_a', None), ('l1_kraken_entrance', (1, 2)),
                      ('l1_krakenstairs_a', None), ('l1_krakenstairs_b', None), ('l1_kraken_room', None),
@@ -40,18 +50,19 @@ ORDER = {
                      ('l1_ship_lower_hallway', None), ('l1_ship_sinking_hall', None), ('l1_cine_ship_sinking', None),
                      ('l1_rutlands_ship_m1', None)],
     'Base game l2': [('l2_cliffclimb', (2, 1)), ('l2_cliffhall', None), ('l2_cliffhall_b', None), ('l2_junglehub', None),
-                     ('l2_hubhall', None), ('l2_puzzleroom', (2, 2)), ('l2_norsehall', None), ('l2_norsehub', None),
+                     ('l2_hubhall', None), ('l2_puzzleroom', (2, 2)), ('l2_norsehall', LOOP2), ('l2_norsehub', None),
                      ('l2_towerconnector', None), ('l2_towerroom', None), ('l2_upperhallway', None),
                      ('l2_shrineroom', (2, 3)), ('l2_maproom', (2, 4)), ('l2_flushtunnel', None),
                      ('l2_mapconnector', None), ('l2_puzzleconnector', None)],
-    'Base game l3': [('l3_main_bedroom', ('text', 'Prolog (Croft Manor brennt)', 'Prologue (Croft Manor burning)')),
+    'Base game l3': [('l3_main_bedroom', ('text', 'Prolog (Croft Manor brennt; nach 3.1 dieselben 3 Units erneut)',
+                                          'Prologue (Croft Manor burning; the same 3 units again after 3.1)')),
                      ('l3_bedroom_hall', None), ('l3_main_hall', None), ('l3_mansion_exterior_afterburn', None),
                      ('l3_caverns_start', (3, 1)), ('l3_chapel', None), ('l3_stairhall', None), ('l3_secretchamber', None),
                      ('l3_chamberrockhall', None)],
     'Base game l4': [('l4_trailstart', (4, 1)), ('l4_trailtube', None),
                      ('l4_ballcourt', ('text', 'Kapitel 4.2 Xibalbá + 4.3 Die Midgardschlange (beide in l4_ballcourt)',
                                        'Chapter 4.2 Xibalba + 4.3 The Midgard Serpent (both in l4_ballcourt)')),
-                     ('l4_templepath', None),
+                     ('l4_templepath', TEMPLE),
                      ('l4_temple', None), ('l4_staircase_upper', None), ('l4_staircase_xibalba', None), ('l4_traprooms', None),
                      ('l4_staircase_mictlan', None), ('l4_ragnarok_room', None), ('l4_pool', (4, 4))],
     'Base game l5': [('l5_startsnow', (5, 1)), ('l5_valgrind_tunnel', None), ('l5_valgrind', (5, 2)),
@@ -85,7 +96,13 @@ def esc(s):
     return ''.join(out)
 
 
-def main(portals, intros, calls, out_cpp, out_md):
+def main(portals, intros, calls, out_cpp, out_md, cp_order=None):
+    walk = {}
+    if cp_order:            # Q113: unit TAB checkpoint ids in walking order
+        for line in open(cp_order, encoding='utf-8'):
+            if line.startswith('#') or not line.strip(): continue
+            u, _, ids = line.rstrip('\n').partition('\t')
+            walk[u] = [int(x) for x in ids.split()]
     adj = collections.defaultdict(set)
     units = set()
     unit = None
@@ -113,7 +130,8 @@ def main(portals, intros, calls, out_cpp, out_md):
         if chap_unit.get(k) is None: chap_unit[k] = v
     problems = []
     listed = set()
-    rows, md = [], ['| Gruppe | # | Unit | Kapitel-Start (Skript 72) | CP | Checkpoint-Intros (+0x52-Reihenfolge) |',
+    rows, md = [], ['| Gruppe | # | Unit | Kapitel-Start (Skript 72) | CP | Checkpoint-Intros (%s) |' % (
+                        'Laufrichtung, Q113' if cp_order else '+0x52-Reihenfolge'),
                     '|---|---|---|---|---|---|']
     for group, order in ORDER.items():
         before = []
@@ -129,6 +147,10 @@ def main(portals, intros, calls, out_cpp, out_md):
                 problems.append('%s: chapter %d.%d heading at %s, title card caller in %s' % (group, chap[0], chap[1], u, caller[0]))
             before.append(u)
             ids = [i for _, i in sorted(cps.get(u, []))]
+            if cp_order:
+                if u not in walk: problems.append('%s: %s missing in %s' % (group, u, cp_order))
+                elif sorted(walk[u]) != sorted(ids): problems.append('%s: %s walking order %s is not the id set %s' % (group, u, walk[u], ids))
+                else: ids = walk[u]
             if head is None: hd = ''
             elif head[0] == 'text': hd = '%s|%s' % (head[1], head[2])
             else:
@@ -159,4 +181,4 @@ def main(portals, intros, calls, out_cpp, out_md):
 
 
 if __name__ == '__main__':
-    sys.exit(main(*sys.argv[1:6]))
+    sys.exit(main(*sys.argv[1:7]))

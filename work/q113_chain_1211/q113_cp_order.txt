@@ -1,0 +1,85 @@
+# Q113 (work/q113_chain_1211/q113_chain.py): unit TAB checkpoint intro ids in walking order
+l3_main_bedroom	4453 4454 4455
+l3_bedroom_hall	4342 4343 4344
+l3_main_hall	4082 4084 4085 4083
+l1_seatop	1000
+l1_seafloor	234
+l1_norse_hallway_a	779 780
+l1_kraken_entrance	
+l1_krakenstairs_a	633 634
+l1_krakenstairs_b	593 594
+l1_kraken_room	75 76 56 58 77 78 74 73 46
+l1_baldrsstairs_a	270 271
+l1_baldrsstairs_b	239 240
+l1_baldrs_tomb	140 72 141
+l1_baldrs_sideroom	91 92
+l1_baldrs_hall	5 6
+l1_cineseatop	
+l1_ship_exterior	1554 1555 1556 1557 1558 1560 1559 1561 1562
+l1_ship_upper_hallway_a	1524 1525
+l1_ship_upper_hallway_b	1488 1489
+l1_ship_upper_hallway	1447 1448
+l1_ship_engine_hall	1412 1411
+l1_ship_natla_room	1292 1354
+l1_ship_lower_hallway	1295 1294
+l1_ship_sinking_hall	1054 1055
+l1_cine_ship_sinking	
+l2_cliffclimb	3835 3832 3834 3833 3831 2569
+l2_cliffhall	3755 3754 3756
+l2_cliffhall_b	3680 3679 3681
+l2_junglehub	3219 3214 3218 3215 3217 3216 3220
+l2_hubhall	3098 3096 3097 3099 3100
+l2_puzzleroom	2817 2818 2824 2821 2827 2826 2820 2825 2819 2064 2068 2822 2067 2074 2823
+l2_norsehall	2454 2453 2451 2452 2455
+l2_norsehub	2085 2089 2091 2087 2088 2083 2082 2081 2080 2084 2090 2086 2092
+l2_towerconnector	2002 2001 2003
+l2_towerroom	1892 1901 1903 1890 1902 1891 1904
+l2_upperhallway	1866 1865 1867
+l2_shrineroom	2769
+l2_maproom	2592 2590 2591 2589 2593
+l2_flushtunnel	2505 2506
+l3_caverns_start	4302 4303
+l3_chapel	4735 4737 4738 4736 4739
+l3_stairhall	4698 4699
+l3_secretchamber	4621 4622 4598
+l3_chamberrockhall	4599 4600
+l3_mansion_exterior_afterburn	
+l4_trailstart	5486 6622 6620 5485 6621 6619
+l4_trailtube	6562 6563 6561
+l4_ballcourt	6120 6124 6121 5478 6125 6126 6123 6127 6128 6129 6130 5479 6122
+l4_templepath	5326 5327
+l4_temple	4974 4973 4971 4976 4975 4972
+l4_staircase_upper	6059 6057 6058
+l4_staircase_xibalba	6023 6021 6020 6022
+l4_traprooms	5704 5785 5786 5736 5733 5722 5790 5788 5791 5789 5784 5787 5735 5734 5792
+l4_staircase_mictlan	5737 5738
+l4_ragnarok_room	5668 5669
+l4_pool	5502 5508 5498 5499 5505 5497 5503 5507 5506 5504 5501 5500
+l5_startsnow	7527
+l5_valgrind_tunnel	7369
+l5_valgrind	7353 7436 7321 7435 7325 7437 7328 7329
+l5_valaskjalf_entry	7281 7282 7283
+l5_valaskjalf_entryb	7172 7173
+l5_valaskjalf	7066 7068 7074 7078 7065 7075 7064 7073 7069 7077 7076 7070 7079 7067 7071 7072
+l6_ship_exterior	7655 7666 7667 7669 7668 7670 7671 7672
+l6_ship_upper_hallway_a	7636 7637
+l6_ship_upper_hallway_b	7618 7619
+l6_ship_upper_hallway	7583 7584
+l6_ship_engine_hall	7557 7556
+l6_ship_natla_room	
+l7_thin_ice	9069
+l7_arctic_sea	9094 9109 9110 9124 9111 9223 9225 9221 9222 9112 9224
+l7_helheim_hall01	9170
+l7_helheim_hall02	
+l7_helheim01	8939 8940
+l7_helheim02	8884
+l7_helheim03	8844
+l7_yggdrasil	8792
+l7_yggdrasil_hall01	8775
+l7_yggdrasil_hall02	
+l7_yggdrasil_end	8176 8154 8242 8244 8155 8157 8243 8158 8245 8179 8248 8177 8178 8159 8156 8180
+l7_monastery	
+l7_himalaya_end	
+l1_rutlands_ship_m1	
+l2_mapconnector	
+l2_puzzleconnector	

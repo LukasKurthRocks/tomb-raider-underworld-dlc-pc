@@ -2928,6 +2928,30 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.35 - base-game checkpoints in walking order, loop directions (2026-11-12)
+
+Built into `work\asi\menu0258`, not installed, no live test (Q113; finding in the workspace
+`docs\Befund-Q113-Levelkette-1211.md`, scripts in `work\q113_chain_1211\`). Only the table `kChapOrder` changes (no new
+INI key, no byte check, no new item):
+- **Checkpoints in walking order:** on the page Kapitel each base-game unit lists its checkpoints by their place
+  between the entry and the exit portal of the proven level chain (`q113_chain.py` -> `q113_cp_order.txt` -> the B
+  generator `work\b_nav_1211\q105_order_table.py`), not by the +0x52 editor number (group J: no walking order). Same 84
+  units and 303 ids as before. A unit walked twice (way back) keeps its checkpoints with the first visit.
+- **Headings:** the l1 loop with its direction (kraken_room -> Baldr stairs -> tomb -> side room -> hall -> back,
+  from the cutscene numbers 45 / 49 / 50; inferred), the l2 loop (puzzleroom -> norsehall -> towers -> upperhallway ->
+  back; the two doors to norsehall are alternatives), the l4 temple side trip in 4.2, the prologue units come again
+  after 3.1.
+- **Checks:** `trumenu_ini_check` new `check_02235` (kVersion part, rows = walking order of `q113_cp_order.txt`, 84 /
+  303, the three headings, the 0.22.34 hash in `Set-TruMenu.ps1`).
+
+### TO TEST 0.22.35
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | headings | page Kapitel (debug), Base game l1 / l2 / l4 / l3 | l1: "Rundweg ab l1_kraken_room: Treppen -> Grab ..." above `l1_baldrsstairs_a`; l2: "Rundweg ab l2_puzzleroom ..." above `l2_norsehall`; l4: "Abstecher in 4.2: Tempel ..." above `l4_templepath`; l3: prologue heading mentions the second pass |
+| 2 | order | open `l1_ship_engine_hall`, `l1_baldrs_tomb`, `l2_puzzleroom` | engine_hall `1412 1411`; tomb `140 72 141`; puzzleroom starts `2817 2818 2824` |
+| 3 | jump | right twice on the first and the last checkpoint of `l1_baldrs_tomb` | Lara at 140 near the stairs portal, at 141 near the side-room portal (5 m) |
+
 ## 0.22.34 - achievements, photo.pose, chapter 1.2, spawn child warning (2026-11-12)
 
 Built into `work\asi\menu0257`, not installed, no live test (group M; finding in the workspace
