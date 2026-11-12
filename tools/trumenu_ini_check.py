@@ -4071,8 +4071,8 @@ def check_02230():
     the counters reset at the open; kOpts 259 keys; Set-TruMenu.ps1 knows the 0.22.29 hash"""
     problems = []
     src = read_cpp()
-    if 'const char *const kVersion = "TruMenu 0.22.30 (log dates, device glyphs, drawn guards' not in src:
-        problems.append('TruMenu.cpp: kVersion must start with TruMenu 0.22.30 (log dates, device glyphs, drawn guards')
+    if '0.22.30 (log dates, device glyphs, drawn guards' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.31: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.30 part "0.22.30 (log dates, device glyphs, drawn guards"')
     log = fn_body(src, 'void Log(')
     if 'TruLogStamp(line, sizeof(line))' not in log or 'TruLogSessionStart(f, "TruMenu", kVersion);' not in log:
         problems.append('TruMenu.cpp: Log must stamp with TruLogStamp and write the session header (Q107)')
@@ -4135,6 +4135,46 @@ def check_02230():
         problems.append('Set-TruMenu.ps1: the 0.22.29 build hash (work\\asi\\menu0252) is missing')
     return problems, 'log dates + session header, device glyphs (%d byte checks, 23-byte patch), quick bar / menu drawn ' \
                      'guards, %d INI keys' % (n_checks, len(opt_rows))
+
+
+def check_02231():
+    """0.22.31 (group B 12.11.; workspace docs/Befund-Gruppe-B-1211.md): Q105 - kUnitsNoArchive (9 names in no PC archive)
+    + kUnitsNoData = the 15 names of work/q97_q105_1111/q105_units.tsv, UnitNameNoDrm also for names outside the level
+    list, unit.go refuses them; kChapOrder carries the base game (84 rows, head column) and checkpoint rows of the base
+    game run cp.jump ... force; Q106 - kJtChecks (27 rows), JtCheck after UberCheck, JtTick in the PadHook frame block,
+    joint.set on the game thread + danger row, uber.dump joint lines, QbPzRows on page Kapitel; no new INI key;
+    Set-TruMenu.ps1 knows the 0.22.30 hash. The full table / byte check is work/b_nav_1211/check_0254.py."""
+    problems = []
+    src = read_cpp()
+    ver = src[:src.find('\n', src.find('kVersion = '))]
+    if '0.22.31 (level navigation + puzzles, group B' not in ver:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.31 part "0.22.31 (level navigation + puzzles, group B"')
+    block = src[src.index('const char *const kUnitsNoArchive[] = {'):]
+    names = re.findall(r'"(\w+)"', block[:block.index('};')])
+    if len(names) != 9 or 'l1_rutlands_ship_m1' not in names:
+        problems.append('TruMenu.cpp: kUnitsNoArchive must hold the 9 Q105 names (has %d)' % len(names))
+    if 'UnitNameInNoArchive(unit) && UnitModsDrmMissing(unit)' not in fn_body(src, 'bool UnitNameNoDrm('):
+        problems.append('TruMenu.cpp: UnitNameNoDrm must test names outside the level list')
+    if 'UnitRefusal(unit, o, n); return false; }   // 0.22.31' not in fn_body(src, 'bool RunUnitGo('):
+        problems.append('TruMenu.cpp: unit.go must refuse a unit without data')
+    order = src[src.index('const ChapOrder kChapOrder[] = {'):]
+    order = order[:order.index('\n};')]
+    if order.count('{"Base game l') != 84:
+        problems.append('TruMenu.cpp: kChapOrder must hold 84 base-game rows (has %d)' % order.count('{"Base game l'))
+    if 'ChapBaseGroup(kUnits[i].group) ? " force" : ""' not in fn_body(src, 'int QbChapRows('):
+        problems.append('TruMenu.cpp: base-game checkpoint rows must run cp.jump ... force')
+    jt = src[src.index('const NavCheckBytes kJtChecks[] = {'):]
+    n_jt = len(re.findall(r'\{0x[0-9a-fA-F]{8},', jt[:jt.index('\n};')]))
+    if n_jt != 27: problems.append('TruMenu.cpp: kJtChecks has %d rows (0.22.31: 27)' % n_jt)
+    for s, why in (('    JtCheck();', 'JtCheck at the start'), ('        JtTick();', 'JtTick in PadHook'),
+                   ('true, ValJointSet,', 'joint.set on the game thread'), ('"puzzle cheat (moves a joint)"},   // 0.22.31 (Q106)', 'joint.set danger row'),
+                   ('JtDumpLines(cand[i].state, name', 'uber.dump joint lines'), ('n += QbPzRows(v, d, max, de);', 'page Kapitel puzzles')):
+        if s not in src: problems.append('TruMenu.cpp: %s missing' % why)
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '0753f83050ff70a2274f2ddcf65252607f2edbd33b6a91037ba4e37367244a90' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.30 build hash (work\\asi\\menu0253) is missing')
+    return problems, 'units without data (%d + 6 names), base-game chapter table (84 rows), joint puzzles (%d byte ' \
+                     'checks, joint.set, page Kapitel Raetsel)' % (len(names), n_jt)
 
 
 def table(src):
@@ -4331,6 +4371,10 @@ def main(argv):
     for p in cproblems30: print('Q02230 %s' % p)
     if not cproblems30: print('ok: 0.22.30 %s' % csummary30)
     problems += cproblems30
+    cproblems31, csummary31 = check_02231()   # 0.22.31
+    for p in cproblems31: print('Q02231 %s' % p)
+    if not cproblems31: print('ok: 0.22.31 %s' % csummary31)
+    problems += cproblems31
     have =open(ini_path, encoding='utf-8', newline='').read().replace('\r\n', '\n')
     if have == want:
         print('ok: TruMenu.ini = defaults table (%d keys)' % len(rows))

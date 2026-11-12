@@ -1,0 +1,86 @@
+script  3863  in 1 unit(s): l1_baldrs_tomb
+    owner: l1_baldrs_tomb intro 160 cinematic_object +0x52 50
+    call (8,72)+0x6a54 fNone [1 3]
+    call (8,72)+0x6a00 fNone []
+script  5273  in 14 unit(s): l1_cine_ship_sinking, l1_cineseatop, l1_kraken_entrance, l1_krakenstairs_a, l1_norse_hallway_a, l1_seafloor, l1_seatop, l1_ship_exterior, l1_ship_upper_hallway, l1_ship_upper_hallway_a, l7_himalaya_end, l7_monastery, l7_yggdrasil_end, l7_yggdrasil_hall02
+    owner: (no checkpoint / cinematic intro owns it)
+    call (8,72)+0x6a54 fNone [1 2]
+    call (8,72)+0x6a00 fNone []
+script  5790  in 11 unit(s): l1_cine_ship_sinking, l1_cineseatop, l1_seafloor, l1_seatop, l1_ship_exterior, l1_ship_upper_hallway, l1_ship_upper_hallway_a, l7_himalaya_end, l7_monastery, l7_yggdrasil_end, l7_yggdrasil_hall02
+    owner: l1_seatop intro 997 cinematic_object +0x52 30
+    call (8,72)+0x6a54 fNone [1 1]
+    call (8,72)+0x6a00 fNone []
+script  6556  in 4 unit(s): l1_ship_engine_hall, l1_ship_lower_hallway, l1_ship_natla_room, l1_ship_sinking_hall
+    owner: l1_ship_natla_room intro 1288 cinematic_object +0x52 60
+    call (8,72)+0x6a54 fNone [1 5]
+    call (8,72)+0x6a00 fNone []
+script  8003  in 2 unit(s): l1_cineseatop, l1_seatop
+    owner: l1_cineseatop intro 1780 cinematic_object +0x52 52
+    call (8,72)+0x6a54 fNone [1 4]
+    call (8,72)+0x6a00 fNone []
+script  9512  in 4 unit(s): l2_cliffclimb, l2_flushtunnel, l2_maproom, l2_shrineroom
+    owner: l2_cliffclimb intro 2562 cinematic_object +0x52 80
+    call (8,72)+0x6a00 fNone []
+    call (8,72)+0x6a54 fNone [2 1]
+script  9624  in 2 unit(s): l2_maproom, l2_shrineroom
+    owner: l2_maproom intro 2626 cinematic_object +0x52 105
+    call (8,72)+0x6a54 fNone [2 4]
+    call (8,72)+0x6a00 fNone []
+script  9934  in 1 unit(s): l2_shrineroom
+    owner: (no checkpoint / cinematic intro owns it)
+    call (8,72)+0x6a54 fNone [2 3]
+    call (8,72)+0x6a00 fNone []
+script 10091  in 2 unit(s): l2_hubhall, l2_puzzleroom
+    owner: l2_puzzleroom intro 2936 cinematic_object +0x52 90
+    call (8,72)+0x6a54 fNone [2 2]
+    call (8,72)+0x6a00 fNone []
+script 11751  in 1 unit(s): l3_caverns_start
+    owner: l3_caverns_start intro 4318 cinematic_object +0x52 120
+    call (8,72)+0x6a54 fNone [3 1]
+    call (8,72)+0x6a00 fNone []
+script 13926  in 5 unit(s): l4_ballcourt, l4_staircase_upper, l4_templepath, l4_trailstart, l4_trailtube
+    owner: l4_trailstart intro 5484 cinematic_object +0x52 180
+    call (8,72)+0x6a54 fNone [4 1]
+    call (8,72)+0x6a00 fNone []
+script 14032  in 1 unit(s): l4_pool
+    owner: l4_pool intro 5548 cinematic_object +0x52 210
+    call (8,72)+0x6a54 fNone [4 4]
+    call (8,72)+0x6a00 fNone []
+script 15530  in 1 unit(s): l4_ballcourt
+    owner: l4_ballcourt intro 6388 cinematic_object +0x52 185
+    call (8,72)+0x6a54 fNone [4 2]
+    call (8,72)+0x6a54 fNone [4 2]
+    call (8,72)+0x6a00 fNone []
+script 15531  in 1 unit(s): l4_ballcourt
+    owner: l4_ballcourt intro 6389 cinematic_object +0x52 190
+    call (8,72)+0x6a54 fNone [4 3]
+    call (8,72)+0x6a00 fNone []
+script 15535  in 1 unit(s): l4_ballcourt
+    owner: l4_ballcourt intro 6400 cinematic_object +0x52 186
+    call (8,72)+0x6a54 fNone [4 2]
+    call (8,72)+0x6a54 fNone [4 2]
+    call (8,72)+0x6a00 fNone []
+script 17329  in 3 unit(s): l5_valaskjalf_entry, l5_valgrind, l5_valgrind_tunnel
+    owner: (no checkpoint / cinematic intro owns it)
+    call (8,72)+0x6a54 fNone [5 2]
+    call (8,72)+0x6a00 fNone []
+script 17780  in 1 unit(s): l5_startsnow
+    owner: l5_startsnow intro 7530 cinematic_object +0x52 230
+    call (8,72)+0x6a54 fNone [5 1]
+    call (8,72)+0x6a00 fNone []
+script 17951  in 2 unit(s): l6_ship_exterior, l6_ship_upper_hallway_a
+    owner: l6_ship_exterior intro 7652 cinematic_object +0x52 260
+    call (8,72)+0x6a54 fNone [6 1]
+    call (8,72)+0x6a00 fNone []
+script 18667  in 2 unit(s): l7_yggdrasil_end, l7_yggdrasil_hall02
+    owner: l7_yggdrasil_end intro 8261 cinematic_object +0x52 320
+    call (8,72)+0x6a54 fNone [7 3]
+    call (8,72)+0x6a00 fNone []
+script 19516  in 1 unit(s): l7_helheim01
+    owner: l7_helheim01 intro 8951 cinematic_object +0x52 290
+    call (8,72)+0x6a54 fNone [7 2]
+    call (8,72)+0x6a00 fNone []
+script 19599  in 4 unit(s): l7_arctic_sea, l7_helheim_hall01, l7_helheim_hall02, l7_thin_ice
+    owner: l7_thin_ice intro 9071 cinematic_object +0x52 275
+    call (8,72)+0x6a54 fNone [7 1]
+    call (8,72)+0x6a00 fNone []

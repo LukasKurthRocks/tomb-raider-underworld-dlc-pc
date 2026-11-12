@@ -2928,6 +2928,74 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.31 - level navigation (Q105) and room puzzles (Q106) (2026-11-12)
+
+Built into `work\asi\menu0254`, not installed, no live test (group B; finding in the workspace
+`docs\Befund-Gruppe-B-1211.md`, data / proofs in `work\b_nav_1211\`).
+
+- **Q105 - units without data are grey and refused.** The 15 names of the unit lists that no PC archive holds
+  (`work\q97_q105_1111\q105_units.tsv`, column `loadable_pc = NO`): the six DLC slots of 0.21.10 plus `kUnitsNoArchive` =
+  `l1_rutlands_ship_m1`, `l2_mapconnector`, `l2_puzzleconnector` (in the level list) and `cinefx`, `container_dvd`,
+  `container_all_weapons`, `dlc_costumes1`, `dlc_costumes2`, `dlc_costume1` (only a typed name could hit them). Each is
+  file-tested against `<tru.exe folder>\mods\<unit>.drm` (ModLoader would load such a file). Without it: grey on page
+  Kapitel ("kein PC-Archiv") and in the long menu's level list, command-line value `in no PC archive (Q105)`, and
+  `level.load`, `level.start`, **`unit.go`** (new) and `cp.jump` refuse it: `refused: l1_rutlands_ship_m1 is in no PC
+  archive (bigfile / patch) and not in mods (Q105) - live 2026-11-11 a load of l1_rutlands_ship_m1 hung in the loading
+  screen`. Start-up line `0.22.31 units: 9 names in no PC archive (Q105 TSV), 9 of them without a mods\<unit>.drm ...`.
+  A built-in table (from the TSV), not the game's FileExists 0x5bf7b0: that call runs the file system on the calling
+  thread, the page is drawn on the render thread.
+- **Q105 - base game in play order with chapters and checkpoints (page Kapitel).** The groups "Abschnitte 1 Mittelmeer"
+  .. "7 Arktisches Meer" now list their units in play order with headings: the chapter starts (generalbank script 72
+  `SetChapterUIData(level, chapter)` - 20 callers, owner intro + the constant arguments, e.g. `l1_seatop` intro 997 = 1.1
+  "Der Weg nach Avalon", `l4_ballcourt` = 4.2 + 4.3, `l7_thin_ice` = 7.1 Helheim; 1.2 Niflheim's caller is a class script
+  without a unit, so its heading says "Start unklar"), the Croft Manor prologue, and the one loop whose direction the
+  data do not give (`l1_kraken_room` -> Baldr's halls). The order comes from the stream portals of the 81 base unit DRMs
+  (`tools/stream_unit_graph.py`); `work\b_nav_1211\q105_order_table.py` proves every row (each unit has a portal to an
+  earlier unit of its level, except a level's first unit and a unit that starts a chapter with its own title card) and
+  that no unit is lost. Each unit shows `[+] n CP`: left opens its checkpoint rows (object `checkpoint`, 303 intros, in
+  the order of their +0x52 index), right twice on a checkpoint row runs **`cp.jump <unit> <cp> force`** = `save.backup
+  kapitel; unit.go; wait.unit; cheat.flight 1; player.goto <cp> force`. The group head says "Debug, ohne Story"; the
+  unit / checkpoint help lines say "Debug-Laden ohne Story-Stand". `cp.jump` takes the optional third word `force`; the
+  0.21.9 two-word form (DLC rows, page Tests) is unchanged.
+- **Q106 - joint values in `uber.dump`.** After each instance line, one line per joint-range transition (condition 14
+  enter / 15 leave, any node) of its graph: `uber.dump   joint <object> <intro>: node 3 prism_locked_high (current) -> 9
+  SOLVED on enter [-64.00, -57.00) watch kind 0 | joint 0 hinge value 30.12 limits [0.5236, 0.5236] limit on motor off`.
+  The value is the engine's own getter (hinge 0x4e1ef0 -> 0x4da930 radians x 57.29577951 = degrees, rail 0x4e1ea0 ->
+  0x4da460 = units; the watcher 0x4937a0 compares exactly these, `min <= v < max`), limits are J+0xd8 / +0xdc (radians
+  for a hinge). The joint index is the position in the multibody object's list (`[b+0x7c]`, magic 0xFEA51B1E, list
+  +0x74), found by the transition's joint record pointer as the engine does.
+- **Q106 - `joint.set <intro> <joint index> <value>` | `joint.set stop`** (cheat, game thread, in `kCmdDanger`): drives a
+  hinge (degrees) or rail (units) joint with the engine's own action-12 setters - SetLimits 0x4d9fc0 with lo = hi =
+  target, limit on 0x4d9f50, motor off 0x4da0c0, wake both bodies 0x4d8fd0 - once per game frame. It ends when the uber
+  starts a transition / changes the node (`joint.set ...: node 3 prism_locked_high -> 9 SOLVED after 0.8 s ... - solved
+  step`; nothing is put back, the new node's actions own the joint), after 6 s, or when the value stood 1.5 s in the
+  target without a node change (then the saved limits and the limit / motor bits come back). A transition running at
+  the start is refused (the engine drops events then, 0x4d5a54).
+- **Q106 - page Kapitel group "Rätsel in der Nähe (Q106)"** (first group of the page): the uber instances of the loaded
+  units, puzzles first (graphs with joint-range transitions, at most 16, nearest first), then other uber objects within
+  `[Debug] UberRadius` (at most 8, "(Ereignis)", list only). Per puzzle: object, intro, current node, distance ("+Knoten"
+  = more joint targets in other nodes); per joint-range transition of the current node: `G<index> Scharnier 30.1 rein
+  [-64.0, -57.0) -> SOLVED` with "drin" when the value is inside. An "enter" row of a hinge / rail: right twice = `joint.set
+  <intro> <index> <middle of the range>`; left on any puzzle row stops a running drive. Refreshed every 300 ms while open.
+- 27 new byte checks (`kJtChecks`, all read from the PC tru.exe by `work\b_nav_1211\check_0254.py`), no hook, no new INI
+  key, no new switches row. `Set-TruMenu.ps1` knows the 0.22.30 build hash. Checks: `trumenu_ini_check` `check_02231`
+  (+ `check_02230` reads its kVersion part), `work\b_nav_1211\check_0254.py` (bytes, the 84 table rows against the
+  generator output, the 15 names against the TSV, source rules).
+
+### TO TEST 0.22.31
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start | game start | `TruMenu.log`: `0.22.31 joint puzzles: checks ok (27 rows)`, `0.22.31 units: 9 names in no PC archive (Q105 TSV), 9 of them without a mods\<unit>.drm` |
+| 2 | refusal | `menu level.load l1_rutlands_ship_m1`, `menu unit.go l2_puzzleconnector`, `menu level.load cinefx` | each `refused: ... in no PC archive ... (Q105)`, nothing loads |
+| 3 | page Kapitel, l1 | open "Abschnitte 1 Mittelmeer" | headings "Kapitel 1.1 Der Weg nach Avalon" (above l1_seatop) .. "1.5 Reich der Toten", the loop note, `l1_rutlands_ship_m1` grey "kein PC-Archiv" at the end |
+| 4 | base checkpoint | l2 group, left on `l2_puzzleroom [+] 15 CP`, right twice on "CP 2826" | backup, load (or portal), Lara at CP 2826 with flight on; log `cp.jump l2_puzzleroom 2826: ... player.goto 2826 force` |
+| 5 | uber.dump | in `l2_puzzleroom` near the mirror pillars: `menu uber.dump` | per mirror `uber.dump   joint sa_uo_mirror_left 2072: node ...` lines with `joint 0 hinge value ...` / `joint 1 rail value ...` (note the indices / values) |
+| 6 | Rätsel group | page Kapitel, "Rätsel in der Nähe" right | the two mirrors (yellow) with node and `G..` rows, "drin" where the value is inside; gates / scales below |
+| 7 | solve, one step | on a mirror's "rein [...]" row right twice | the mirror turns / slides; `joint.set ...: node A -> B ... - solved step`, the row list shows the next node; if the value reaches the target but the node stays: `stood 1.5 s ... node unchanged` (note which row) |
+| 8 | stop | start a drive, left on a puzzle row | `joint.set ... stopped`, the joint keeps its pose, limits back |
+| 9 | calendar | `l4_*` calendar (ca_uo_calendar, one-joint cases) | the solve row moves the dial, node "solved" |
+
 ## 0.22.30 - log dates, device glyphs, drawn guards for bar and menu (2026-11-12)
 
 Built into `work\asi\menu0253`, not installed, no live test (group D1: Q107, Q95, Q103 rest; finding in the workspace
