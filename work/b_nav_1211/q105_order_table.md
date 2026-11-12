@@ -2,8 +2,8 @@
 |---|---|---|---|---|---|
 | l1 | 1 | `l1_seatop` | 1.1 Der Weg nach Avalon (Intro 997 in l1_seatop) | 1 | 1000 |
 | l1 | 2 | `l1_seafloor` |  | 1 | 234 |
-| l1 | 3 | `l1_norse_hallway_a` | 1.2 Niflheim (Klassen-Skript 5273, Unit offen) | 2 | 779 780 |
-| l1 | 4 | `l1_kraken_entrance` |  | 0 | - |
+| l1 | 3 | `l1_norse_hallway_a` |  | 2 | 779 780 |
+| l1 | 4 | `l1_kraken_entrance` | 1.2 Niflheim (Intro 696 in l1_kraken_entrance) | 0 | - |
 | l1 | 5 | `l1_krakenstairs_a` |  | 2 | 633 634 |
 | l1 | 6 | `l1_krakenstairs_b` |  | 2 | 593 594 |
 | l1 | 7 | `l1_kraken_room` |  | 9 | 46 56 58 73 74 75 76 77 78 |

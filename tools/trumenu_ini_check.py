@@ -4043,6 +4043,149 @@ def check_02233(ini_path):
                       % (counts.get('kPmChecks', 0), len(kinds), counts.get('kQlChecks', 0)))
 
 
+M_CHECKS_02234 = os.path.join(ROOT, 'work', 'm_menu_1211', 'm_checks.txt')
+B_ROWS_02234 = os.path.join(ROOT, 'work', 'b_nav_1211', 'q105_chaporder_rows.txt')
+# Q20 / I-2 (docs/Befund-Gruppe-I-1211.md 2b): native f0 .. f15 -> Xbox achievement id (Xbox stubs `li r4, id`), unsure =
+# f12 - f15 (shared script 5 not read)
+ACH_IDS_02234 = [1, 40, 41, 42, 43, 44, 45, 46, 2, 23, 24, 25, 27, 14, 17, 18]
+
+
+def check_02234(ini_path, switches_path):
+    """0.22.34 (group M 12.11.; workspace docs/Befund-Gruppe-M-1211.md): Q20 achievements - kAchChecks (23) and the
+    photo.pose kPpChecks (13) = rows of the offline-checked work/m_menu_1211/m_checks.txt; kAchDefs = the 16 Xbox ids of
+    I-2 with f12 - f15 (only) unsure; AchStart patches the 16 push immediates from 0x7abb8e (14 bytes apart) only after the
+    byte checks and with [Achievements] Enabled, is called after SaveFolderInit in Start, g_achLock initialised in
+    DllMain; AchCall / AchAppend / AchLoad write no game memory; [Achievements] Enabled=1 in kOpts / TruMenu.ini, a
+    restart switch row; items ach.list / ach.status (info), photo.pose (action, game thread); RunPhotoPose refuses outside
+    the photo mode and requests mode 0 only after the section / resident tests, PpUndo requests mode 1 only for the same
+    instance / processor, outside cutscenes and below the slot count, PmLeave undoes the pose first, PmShutdown makes no
+    game call; ai.spawn warns through QlChildWarn (QlWalk) and does not refuse; kChapOrder base rows = the B generator
+    output (1.2 before l1_kraken_entrance); bar rows / page / group; Set-TruMenu.ps1 knows the 0.22.33 hash"""
+    problems = []
+    src = read_cpp()
+    if '0.22.34 (achievements, photo.pose, group M' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.34 part "0.22.34 (achievements, photo.pose, group M"')
+    offline = {}
+    if os.path.exists(M_CHECKS_02234):
+        for line in open(M_CHECKS_02234, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline[int(addr, 16)] = hexs.replace(' ', '').lower()
+    else:
+        problems.append('work/m_menu_1211/m_checks.txt (the offline byte list) is missing')
+    counts = {}
+    for tname in ('kAchChecks', 'kPpChecks'):
+        rows = sv_rows(src, tname)
+        counts[tname] = len(rows)
+        for a, b in rows:
+            if offline.get(int(a, 16)) != b.lower():
+                problems.append('TruMenu.cpp: %s row 0x%s is not the offline-checked bytes of m_checks.txt' % (tname, a))
+    if counts.get('kAchChecks') != 23 or counts.get('kPpChecks') != 13:
+        problems.append('TruMenu.cpp: kAchChecks / kPpChecks must hold 23 / 13 rows (got %s)' % counts)
+    for k in range(16):
+        want = '6820667900 6a%02x 8bce' % k
+        if offline.get(0x7abb8d + 14 * k, '')[:len(want.replace(' ', ''))] != want.replace(' ', ''):
+            problems.append('m_checks.txt: binder row %d (0x%08x) must start with push 0x796620 / push %d' % (k, 0x7abb8d + 14 * k, k))
+    m = re.search(r'const AchDef kAchDefs\[16\] = \{(.*?)\};', src, re.S)
+    defs = re.findall(r'\{(\d+), (\d+), "([^"]+)", (true|false)\}', m.group(1) if m else '')
+    if [int(i) for i, s, nm, u in defs] != ACH_IDS_02234:
+        problems.append('TruMenu.cpp: kAchDefs ids must be %s (I-2)' % ACH_IDS_02234)
+    if [u == 'true' for i, s, nm, u in defs] != [k >= 12 for k in range(16)]:
+        problems.append('TruMenu.cpp: kAchDefs must mark exactly f12 - f15 unsure')
+    if 'const DWORD kAchPush = 0x007abb8e;' not in src: problems.append('TruMenu.cpp: kAchPush must be 0x007abb8e')
+    st = fn_body(src, 'void AchStart(')
+    chk, en, wr = st.find('DvChecks(kAchChecks'), st.find('!g_achEnabled'), st.find('WriteBytes(kAchPush + 14 * static_cast<DWORD>(k), &stub, 4)')
+    if not (0 <= chk < en < wr): problems.append('TruMenu.cpp: AchStart = byte checks, Enabled test, then the 16 push writes')
+    start = fn_body(src, 'void Start(')
+    if not 0 <= start.find('SaveFolderInit();') < start.find('AchStart();'):
+        problems.append('TruMenu.cpp: Start must call AchStart after SaveFolderInit')
+    if 'InitializeCriticalSection(&g_achLock);' not in src[src.find('DLL_PROCESS_ATTACH'):]:
+        problems.append('TruMenu.cpp: DllMain must initialise g_achLock')
+    for fn in ('void AchCall(', 'bool AchAppend(', 'void AchLoad(', 'void ValAchList(', 'void ValAchStatus(',
+               'void PageAchievements(', 'void QlChildWarn(', 'void PpTarget(', 'bool PpEntry('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('('))
+        if any(w in body for w in ('WriteByte(', 'WriteBytes(', 'WriteDword(', 'reinterpret_cast<volatile', 'Fn>(')):
+            problems.append('TruMenu.cpp: %s must not write game memory or call the game' % fn.strip('('))
+    if 'AchCall(K, argc, args)' not in src: problems.append('TruMenu.cpp: AchStub<K> must call AchCall')
+    if not re.search(r'\{"Achievements", "Enabled", "1",', src):
+        problems.append('TruMenu.cpp: kOpts [Achievements] Enabled default must be 1')
+    if [(k, v) for l, k, v in ini_section(ini_path, 'Achievements')] != [('Enabled', '1')]:
+        problems.append('TruMenu.ini: [Achievements] must hold Enabled=1 only')
+    header, opt_rows = table(src)
+    if len(opt_rows) != 260: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.34 adds [Achievements] Enabled (260)' % len(opt_rows))
+    sw = open(switches_path, encoding='utf-8').read()
+    if not re.search(r'^TruMenu \| Achievements \| Enabled \| bool \|[^|]+\|[^|]+\| restart \| 1 \|', sw, re.M):
+        problems.append('TruMenu.switches.txt: row TruMenu | Achievements | Enabled | bool | ... | restart | 1 missing')
+    items = item_types(src)
+    for item, kind in (('ach.list', 'info'), ('ach.status', 'info'), ('photo.pose', 'action')):
+        if items.get(item) != kind: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, kind))
+    if not re.search(r'\{"photo.pose", "action", (?:"[^"]*"\s*)+,\s*true,\s*ValPhoto,\s*RunPhotoPose\}', src):
+        problems.append('TruMenu.cpp: photo.pose = ValPhoto / RunPhotoPose on the game thread')
+    if 'const int kPpLastIndex = 1604;' not in src or 'const WORD kPpLastSection = 1551;' not in src:
+        problems.append('TruMenu.cpp: kPpLastIndex / kPpLastSection must be 1604 / 1551 (screen_capture_01, group F)')
+    pose = fn_body(src, 'bool RunPhotoPose(')
+    req = pose.find('reinterpret_cast<PpRequestFn>(kPpRequest)(proc, 0, rec, 0)')
+    for want in ('!g_pmActive', 'PpCheck()', 'g_experimental', 'section != kPpLastSection + 1 - pose', 'slot == 0xffff',
+                 'const WORD rec[2] = {0, static_cast<WORD>(k)};', 'ReadDword(proc + 0x44, &before)'):
+        pos = pose.find(want)
+        if pos < 0 or req < 0 or pos > req: problems.append('TruMenu.cpp: RunPhotoPose must test / note %s before 0x444ba0' % want)
+    undo = fn_body(src, 'void PpUndo(')
+    req = undo.find('reinterpret_cast<PpRequestFn>(kPpRequest)(proc, 0, rec, 0)')
+    for want in ('player != g_ppPlayer', 'proc != g_ppProc', 'CinematicNow()', 'LevelChangePending(', 'g_ppSlot >= count',
+                 'const WORD rec[2] = {1, static_cast<WORD>(g_ppSlot)};'):
+        pos = undo.find(want)
+        if pos < 0 or req < 0 or pos > req: problems.append('TruMenu.cpp: PpUndo must test %s before 0x444ba0 mode 1' % want)
+    leave = fn_body(src, 'void PmLeave(')
+    if not 0 <= leave.find('PpUndo(reason') < leave.find('PmSetModeFn'):
+        problems.append('TruMenu.cpp: PmLeave must undo the pose before the camera switch')
+    if 'PpUndo' in fn_body(src, 'void PmShutdown('): problems.append('TruMenu.cpp: PmShutdown must not call PpUndo (DllMain)')
+    spawn = fn_body(src, 'bool RunAiSpawn(')
+    kid = spawn.find('QlChildWarn(id, kidWarn, sizeof(kidWarn));')
+    if not (0 <= spawn.find('QlSpawnBlock(id, qlWhy, sizeof(qlWhy));') < kid < spawn.find('kBirthObject')):
+        problems.append('TruMenu.cpp: RunAiSpawn must ask QlChildWarn after QlSpawnBlock, before the birth')
+    if 'return false' in spawn[kid:spawn.find('\n', spawn.find('if (kidWarn[0])', kid))]:
+        problems.append('TruMenu.cpp: the child warning must not refuse the spawn')
+    if 'QlWalk(id, 0, &total, &ready, &animMissing, stuck, sizeof(stuck));' not in fn_body(src, 'void QlChildWarn('):
+        problems.append('TruMenu.cpp: QlChildWarn must use the ready walk QlWalk')
+    raw = open(CPP, encoding='utf-8').read()  # the octal escapes as written (read_cpp replaces the umlaut escapes)
+    order = raw[raw.index('const ChapOrder kChapOrder[] = {'):]
+    order = order[:order.index('\n};')]
+    have = re.findall(r'\{"(Base game l\d)", "(\w+)", false, "([0-9 ]*)",\s*((?:"[^"]*"\s*)+|nullptr)\}', order)
+    have = [(g, u, c, ''.join(re.findall(r'"([^"]*)"', h)) if h != 'nullptr' else None) for g, u, c, h in have]
+    want = []
+    for line in open(B_ROWS_02234, encoding='utf-8'):
+        m = re.match(r'\s*\{"(Base game l\d)", "(\w+)", false, "([0-9 ]*)", (?:"(.*)"|nullptr)\},$', line.rstrip())
+        if m: want.append((m.group(1), m.group(2), m.group(3), m.group(4)))
+    if have != want or len(want) != 84:
+        problems.append('TruMenu.cpp: kChapOrder base rows != work/b_nav_1211/q105_chaporder_rows.txt (%d / %d)' % (len(have), len(want)))
+    if ('Base game l1', 'l1_kraken_entrance', '', 'Kapitel 1.2 Niflheim|Chapter 1.2 Niflheim') not in want:
+        problems.append('q105_chaporder_rows.txt: chapter 1.2 must head l1_kraken_entrance (J-5)')
+    bar = qb_rows(src, True)
+    lara = [(i, a, k) for t, de, i, a, k, layer, tail in bar if t == 'kQbLara']
+    for i, a in (('photo.pose', 'next'), ('photo.pose', 'off')):
+        if (i, a, 'kQbAction') not in lara: problems.append('TruMenu.cpp: kQbLara lacks the row %s %s' % (i, a))
+    for hid, harg in (('photo.pose', 'next'), ('photo.pose', 'off')):
+        if not re.search(r'\{"%s", "%s", "' % (re.escape(hid), harg), src):
+            problems.append('TruMenu.cpp: kQbHelp lacks %s %s' % (hid, harg))
+    fig = fn_body(src, 'int QbFigRows(')
+    if 'QbGroupClosed("fig_ach")' not in fig or 'q.intro = 2;' not in fig:
+        problems.append('TruMenu.cpp: QbFigRows must hold the group fig_ach (intro 2)')
+    if '"fig_ach"' not in src[src.index('const char *const kQbStartClosed[] = {'):][:2000]:
+        problems.append('TruMenu.cpp: fig_ach must start closed (kQbStartClosed)')
+    if 'q.intro == 2 ? "fig_ach"' not in fn_body(src, 'void QbFigAct('):
+        problems.append('TruMenu.cpp: QbFigAct must open / close fig_ach')
+    if 'MenuPage("Achievements / Erfolge (0.22.34)###achpage", "achievements")) PageAchievements();' not in src:
+        problems.append('TruMenu.cpp: big window page Achievements (key achievements) missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '8dabebd42c9e5b0991c73f89dbd485b4f5a14ea834abe4c474d64704a5c66236' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.33 build hash (work/asi/menu0256) is missing')
+    return problems, ('achievements (16 natives -> stubs, %d byte checks, [Achievements] Enabled=1 restart), photo.pose '
+                      '(mode 0 / mode 1 back, %d byte checks), ai.spawn child warning, chapter 1.2 at l1_kraken_entrance'
+                      % (counts.get('kAchChecks', 0), counts.get('kPpChecks', 0)))
+
+
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
 SV_ITEMS = ('save.pending', 'save.inv', 'save.waiting', 'save.find')
 
@@ -4372,7 +4515,8 @@ def check_02230():
     for line in ('quick: buttons 0x%04x ignored - not drawn (%ld frames)', 'menu: input ignored - not drawn (%ld frames)'):
         if line not in src: problems.append('TruMenu.cpp: log line "%s" missing' % line)
     header, opt_rows = table(src)
-    if len(opt_rows) != 259: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.30 adds [Input] DeviceGlyphs (259)' % len(opt_rows))
+    if len(opt_rows) < 259:   # 0.22.34 adds [Achievements] Enabled (check_02234): at least the 259 keys of 0.22.30
+        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.30 adds [Input] DeviceGlyphs (259)' % len(opt_rows))
     ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
     if '7c8acbb34540547c2ec2893072c0e8d3e941517a57b2a17b92bcf1c5444f2ab1' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.29 build hash (work\\asi\\menu0252) is missing')
@@ -4606,6 +4750,10 @@ def main(argv):
     for p in cproblems33: print('Q02233 %s' % p)
     if not cproblems33: print('ok: 0.22.33 %s' % csummary33)
     problems += cproblems33
+    cproblems34, csummary34 = check_02234(ini_path, opt.get('--switches', SWITCHES))   # 0.22.34 (group M)
+    for p in cproblems34: print('Q02234 %s' % p)
+    if not cproblems34: print('ok: 0.22.34 %s' % csummary34)
+    problems += cproblems34
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

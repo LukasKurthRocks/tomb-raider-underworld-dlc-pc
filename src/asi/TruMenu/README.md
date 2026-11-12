@@ -2928,6 +2928,69 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.34 - achievements, photo.pose, chapter 1.2, spawn child warning (2026-11-12)
+
+Built into `work\asi\menu0257`, not installed, no live test (group M; finding in the workspace
+`docs\Befund-Gruppe-M-1211.md`, scripts and byte lists in `work\m_menu_1211\`). New INI key `[Achievements] Enabled`
+(default 1, read at the start), 36 new byte checks (23 achievements `kAchChecks`, 13 pose `kPpChecks`), all 36 lines of
+`work\m_menu_1211\m_checks.txt` ok on `data\pc\tru.exe` and on the installed `tru.exe` (the same file, md5
+`5560abac...`).
+
+- **Achievements (Q20):** the PC keeps the script type `achievement` (generalbank script 66) and the scripts call its
+  16 natives f0 - f15, but the binder 0x7abb80 binds every one to the empty 0x796620 (`jmp 0x6457a0` = `ret`). With
+  `[Achievements] Enabled=1` TruMenu writes its own stub into each of the 16 `push 0x796620` (0x7abb8e + 14 k) **at the
+  start** - before the generalbank binds the script, so the game's own bind 0x5768f0 stores the stubs. A stub records
+  `achievement <id> <name> unlocked (native fN, G, args)` **once per profile** in `TruMenu.log` and as a line in
+  `TruMenu.achievements.txt` next to `tru.exe` (profile, native, Xbox id, date / time, name); later calls are counted, the
+  first repeat of a session is logged. Profile = the save folder the game uses (`CSIDL_PERSONAL\Eidos\Tomb Raider -
+  Underworld` or `[Saves] Folder`; the PC has one save set per Windows user). No game data, no save written. Index ->
+  achievement from the Xbox native stubs (`li r4, id`): f0 1 Prologue, f1 40 Mediterranean Sea, f2 41 Coastal
+  Thailand, f3 42 Croft Manor, f4 43 Southern Mexico, f5 44 Jan Mayen Island, f6 45 Andaman Sea, f7 46 Arctic Sea, f8 2
+  Master Survivalist, f9 - f11 23 - 25 Speed Demon I - III, f12 27 Master Speed Demon, f13 14 / f14 17 / f15 18 Swan
+  Diver I / II / Master Swan Diver - **f12 - f15 unsure** (called from the shared script 5, not read yet). Items
+  `ach.list` / `ach.status`; bar page Figur, group "Erfolge (Skripte, Q20)" (closed at the start: one row per
+  achievement with the unlock time or "gesperrt"); big window page "Achievements / Erfolge"; switch row on page Fixes
+  (Diagnose (TruMenu), restart). The executable's own achievements of the Xbox (treasures, chimney jump, motorbike,
+  grenade, adrenaline headshot) have no PC code and are not in the list.
+- **`photo.pose 1..7|next|off` (F2):** Lara's poses `screen_capture_01` .. `_07` = entries 1604 .. 1598 of her object's
+  anim table (sections 1551 .. 1545, in `lara.drm`); no chart slot points to them. The game's own way to play a table
+  entry by index on an instance is the anim request **0x444ba0 in mode 0** (the uber action "play anim" 0x4d86d9 and the
+  script instance helper 0x4abb10 use it): it builds a one-entry slot record (0x4321d0: the index, speed 1.0) and starts
+  it (0x4428a0) on processor 0 `[[inst+0x280]+0x14]`. Only in the photo mode (the world is paused there: Lara's own
+  process - her chart - is skipped, her processors still get their per-frame update 0x443690); refused when the entry
+  does not hold the expected section (another costume object) or is not resident. Before the first pose the processor's
+  `+0x44` (the slot of the last mode-1 request) is noted; **`photo.pose off`**, `photo.off` and every automatic leave of
+  the photo mode request that slot again in mode 1 (bounded by the object's slot count) - the anim Lara had, from its
+  start; nothing is requested when the instance changed, a cutscene plays or a level change waits. Bar: page Figur,
+  group Fotos: "Foto-Modus: naechste Pose", "Foto-Modus: Pose aus".
+- **Chapter 1.2 (J-5):** page Kapitel shows "Kapitel 1.2 Niflheim" before `l1_kraken_entrance` (its title card runs
+  from intro 696, the gate cutscene 40; group J) instead of "1.2?" at `l1_norse_hallway_a`; regenerated with
+  `work\b_nav_1211\q105_order_table.py` (owner of chapter 1.2 added there).
+- **`ai.spawn` child warning (K follow-up):** for a kind the game loaded itself, the same walk as arena.load's ready
+  test (object + children at tracker status 2, anims resolved) - a missing child or anim gives a `WARNING` in the answer
+  and the log; the spawn goes on.
+- **Checks:** `trumenu_ini_check` new `check_02234` (byte lists, ids, order of tests and requests, INI key / switch row,
+  rows, chapter table = generator output, the 0.22.33 hash in `Set-TruMenu.ps1`); `check_02230` accepts more INI keys.
+
+### TO TEST 0.22.34
+
+Main-game session; `[Cheats] Enabled=1`, `[Cheat] Experimental=1`, `[Achievements] Enabled=1` (default). Logs only
+after the session header line.
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | achievements start | start the game, TruLink `menu ach.status` | `16 natives bound to TruMenu's stubs`; profile = the save folder; log line `0.22.34: achievements ...` |
+| 2 | Prologue | finish the prologue (`l3_main_hall`, Croft Manor burning) | log `achievement 1 Prologue unlocked (native f0, 25 G ...)`; page Figur / Erfolge: f0 with date / time |
+| 3 | persist | quit, start again, `menu ach.list` | f0 still unlocked with the first time; no second "unlocked" line when the script calls f0 again (`called again` once) |
+| 4 | f13 swan dive | a swan dive from one of the three highest points over water | `achievement 14 Swan Diver I unlocked (native f13 ...)` - confirms f13 (else note what triggered f12 - f15) |
+| 5 | Enabled=0 | `[Achievements] Enabled=0`, restart | `ach.status`: `Enabled=0 - the game's empty natives stay`; no achievement lines |
+| 6 | pose | photo mode on, "Foto-Modus: naechste Pose" 7 times | Lara takes poses 1 .. 7 (screen_capture_01 .. 07) although the world is paused; log `photo.pose ... entry 1604 ...`; note whether she moves or freezes in the pose |
+| 7 | pose off | "Foto-Modus: Pose aus", then "Foto-Modus aus" | Lara back in her anim from before (`her slot requested again`); after photo off she moves normally |
+| 8 | pose + leave | pose 3, then Start (pause menu) | log `photo.pose: pose 3 off (the game's pause menu opened) ...`, then `photo: off ...`; normal after resume |
+| 9 | pose guards | "Foto-Modus: naechste Pose" outside the photo mode; in a DLC costume | grey `only in the photo mode`; costume: refused with `holds section ...` or works (note which) |
+| 10 | chapter 1.2 | page Kapitel (debug), Base game l1 | heading "Kapitel 1.2 Niflheim" above `l1_kraken_entrance`, none above `l1_norse_hallway_a` |
+| 11 | spawn warning | arena 1a: `ai.spawn viking_thrall 1` | normal spawn, no `WARNING` (children resident); a `WARNING children not loaded` only where a child is missing |
+
 ## 0.22.33 - photo mode, arena.load, glyphs.status (2026-11-12)
 
 Built into `work\asi\menu0256`, not installed, no live test (group K; finding in the workspace

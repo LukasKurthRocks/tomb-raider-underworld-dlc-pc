@@ -1,0 +1,10 @@
+# group M negative tests of check_02234 (2026-11-12): mutated copies of TruMenu.cpp (work/m_menu_1211/neg_copies.py), checker exit code + Q02234 lines
+neg_1_pose_outside_photo: exit 1, 1 Q02234 line(s): Q02234 TruMenu.cpp: RunPhotoPose must test / note !g_pmActive before 0x444ba0
+neg_2_pose_no_section_test: exit 1, 1 Q02234 line(s): Q02234 TruMenu.cpp: RunPhotoPose must test / note section != kPpLastSection + 1 - pose before 0x444ba0
+neg_3_undo_in_cutscene: exit 1, 2 Q02234 line(s): Q02234 TruMenu.cpp: PpUndo must test CinematicNow() before 0x444ba0 mode 1
+neg_4_leave_without_undo: exit 1, 1 Q02234 line(s): Q02234 TruMenu.cpp: PmLeave must undo the pose before the camera switch
+neg_5_ach_id_changed: exit 1, 1 Q02234 line(s): Q02234 TruMenu.cpp: kAchDefs ids must be [1, 40, 41, 42, 43, 44, 45, 46, 2, 23, 24, 25, 27, 14, 17, 18] (I-2)
+neg_6_ach_byte_row_changed: exit 1, 1 Q02234 line(s): Q02234 TruMenu.cpp: kAchChecks row 0x007abc5f is not the offline-checked bytes of m_checks.txt
+neg_7_ach_patch_without_checks: exit 1, 1 Q02234 line(s): Q02234 TruMenu.cpp: AchStart = byte checks, Enabled test, then the 16 push writes
+neg_8_spawn_warn_refuses: exit 1, 1 Q02234 line(s): Q02234 TruMenu.cpp: the child warning must not refuse the spawn
+neg_9_chapter_back_to_norse: exit 1, 1 Q02234 line(s): Q02234 TruMenu.cpp: kChapOrder base rows != work/b_nav_1211/q105_chaporder_rows.txt (84 / 84)

@@ -232,3 +232,5 @@ TruMenu | Rescue | FallNet | bool | Fallnetz (Sturz aus der Welt) | Fall net (fa
 # 2026-11-11 (Q79): TruMenu 0.22.27 - its own [Log] Save in TruMenu.ini (re-read about once a second = live)
 group | tmdiag | Diagnose (TruMenu) | Diagnosis (TruMenu)
 TruMenu | Log | Save | bool | Speicher-Log (Checkpoint / Tod-Laden) | Save log (checkpoint / death reload) | live | 0 | Zwei Zeilen je Speichern / Laden in TruMenu.log // Two lines per save / restore in TruMenu.log | TruMenu 0.22.27
+# 2026-11-12 (Q20, group M): TruMenu 0.22.34 - its own [Achievements] Enabled in TruMenu.ini (patched at the start = restart)
+TruMenu | Achievements | Enabled | bool | Erfolge aufzeichnen (Q20) | Record achievements (Q20) | restart | 1 | 16 Skript-Erfolge ins Log + Liste; wirkt nach Neustart // 16 script achievements to log + list; after a restart | TruMenu 0.22.34

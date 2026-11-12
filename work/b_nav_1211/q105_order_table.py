@@ -31,7 +31,7 @@ TITLE = {(1, 1): ('Der Weg nach Avalon', 'The Path to Avalon'), (1, 2): ('Niflhe
 # play order: (unit, heading) - heading = None, a chapter key (level, chapter), or ('text', DE, EN)
 LOOP = ('text', 'Rundweg ab l1_kraken_room (Richtung nicht in den Daten)', 'Loop from l1_kraken_room (direction not in the data)')
 ORDER = {
-    'Base game l1': [('l1_seatop', (1, 1)), ('l1_seafloor', None), ('l1_norse_hallway_a', (1, 2)), ('l1_kraken_entrance', None),
+    'Base game l1': [('l1_seatop', (1, 1)), ('l1_seafloor', None), ('l1_norse_hallway_a', None), ('l1_kraken_entrance', (1, 2)),
                      ('l1_krakenstairs_a', None), ('l1_krakenstairs_b', None), ('l1_kraken_room', None),
                      ('l1_baldrsstairs_a', LOOP), ('l1_baldrsstairs_b', None), ('l1_baldrs_tomb', (1, 3)),
                      ('l1_baldrs_sideroom', None), ('l1_baldrs_hall', None), ('l1_cineseatop', (1, 4)),
@@ -64,12 +64,14 @@ ORDER = {
                      ('l7_monastery', None), ('l7_himalaya_end', None)],
 }
 # where a chapter heading sits although its title-card caller is elsewhere (none; 4.2 / 4.3 share one heading text at
-# l4_ballcourt, 1.2 has no unit-bound caller)
+# l4_ballcourt)
 HEAD_AT_OTHER = {}
 # callers owned by an intro that is neither a checkpoint nor a cinematic object (tools/manor_gate_scan.py intros without
 # --grep, 2026-11-12): script 9934 = l2_shrineroom intro 2794 sa_uo_naga_statue, script 17329 = l5_valgrind intro 7332
-# reveal_object. Script 5273 (1.2) is carried by 14 units and owned by no intro of them (a class script).
-OWNER_EXTRA = {(2, 3): ('l2_shrineroom', 2794), (5, 2): ('l5_valgrind', 7332)}
+# reveal_object. Script 5273 (1.2) is carried by 14 units and owned by no intro of them: it is the level script of
+# l1_kraken_entrance, its title-card function f2 is called by script 5321 f1 = l1_kraken_entrance intro 696
+# cinematic_object +0x52 40 (gate cutscene; group J, docs/Befund-Gruppe-J-1211.md 2.1, work/j_data_1211/script_owner_refs.py).
+OWNER_EXTRA = {(1, 2): ('l1_kraken_entrance', 696), (2, 3): ('l2_shrineroom', 2794), (5, 2): ('l5_valgrind', 7332)}
 
 
 def esc(s):
