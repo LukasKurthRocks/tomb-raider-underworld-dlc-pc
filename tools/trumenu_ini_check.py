@@ -1819,6 +1819,8 @@ SW_LIVE = {
     ('TruQoL', 'Camera', 'ShakeScale'): 'void LiveReadOptions(',
     ('TruQoL', 'Fixes', 'FrontEndPauseBit'): 'void LiveReadOptions(',   # TruQoL 0.1.4 (2026-11-11)
     ('TruMenu', 'Rescue', 'FallNet'): 'void FnReadSwitch(',             # TruMenu 0.22.24 (Q36, about once a second)
+    ('TruMenu', 'Debug', 'LabelCollected'): 'void LgReadSwitch(',       # TruMenu 0.22.36 (labels, about once a second)
+    ('TruMenu', 'Debug', 'LabelLaraGear'): 'void LgReadSwitch(',
     ('TruMenu', 'Log', 'Save'): 'void SvReadSwitch(',                   # TruMenu 0.22.27 (Q79, TruSaveProbe.h)
 }
 # Q75 (2026-11-11): keys the plugin re-reads at run time only when they were 1 at the game start (the code is patched
@@ -4114,7 +4116,8 @@ def check_02234(ini_path, switches_path):
     if [(k, v) for l, k, v in ini_section(ini_path, 'Achievements')] != [('Enabled', '1')]:
         problems.append('TruMenu.ini: [Achievements] must hold Enabled=1 only')
     header, opt_rows = table(src)
-    if len(opt_rows) != 260: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.34 adds [Achievements] Enabled (260)' % len(opt_rows))
+    if len(opt_rows) < 260:   # 0.22.36 adds [Debug] LabelCollected / LabelLaraGear (check_02236): at least the 260 keys
+        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.34 adds [Achievements] Enabled (260)' % len(opt_rows))
     sw = open(switches_path, encoding='utf-8').read()
     if not re.search(r'^TruMenu \| Achievements \| Enabled \| bool \|[^|]+\|[^|]+\| restart \| 1 \|', sw, re.M):
         problems.append('TruMenu.switches.txt: row TruMenu | Achievements | Enabled | bool | ... | restart | 1 missing')
@@ -4228,6 +4231,98 @@ def check_02235():
     if '646c4b3e9b9e7dc3fae507b8254ebd3d73332f8978e4f001e1ce91ff96a0883b' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.34 build hash (work/asi/menu0257) is missing')
     return problems, 'level chain Q113 (84 base rows, %d checkpoint ids in walking order, loop / side-trip headings)' % n_ids
+
+
+LG_CHECKS_02236 = os.path.join(ROOT, 'work', 'labels_1211', 'precheck_02236.txt')
+
+
+def check_02236(ini_path, switches_path):
+    """0.22.36 (labels, live 2026-11-12; workspace docs/Befund-Labels-1211.md): the name labels dbg.labels (DrawLabels) and
+    dbg.names (DvDrawNames) both ask LabelFilter, which asks the ONE 0.21 check LfNotDrawn (no second implementation) and
+    LgIsLaraGear (game data: parent +0x54 = player, weapon-manager handles of LgCollect - no object-name test); kLgChecks
+    = the rows of the offline-checked work/labels_1211/precheck_02236.txt (11), g_lgOk = g_lfOk && DvChecks(kLgChecks);
+    the filter functions write no game memory and call no game function; [Debug] LabelCollected / LabelLaraGear default
+    0 in kOpts and TruMenu.ini, read by ReadOptions and about once a second by LgReadSwitch (FallWatchTick), switches
+    rows live 0; items dbg.labelcollected / dbg.labelgear (bool), bar rows on page Render next to Objektnamen, menu
+    checkboxes, bar help; README 0.22.36 with TO TEST; Set-TruMenu.ps1 knows the 0.22.35 hash"""
+    problems = []
+    src = read_cpp()
+    if '0.22.36 (label filter' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.36 part "0.22.36 (label filter"')
+    offline = []
+    if os.path.exists(LG_CHECKS_02236):
+        for line in open(LG_CHECKS_02236, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/labels_1211/precheck_02236.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kLgChecks')]
+    if rows != offline or len(rows) != 11:
+        problems.append('TruMenu.cpp: kLgChecks (%d rows) must be the 11 rows of precheck_02236.txt in order' % len(rows))
+    if src.count('\nint LfNotDrawn(DWORD inst) {') != 1:
+        problems.append('TruMenu.cpp: exactly one LfNotDrawn implementation wanted')
+    lf = fn_body(src, 'int LabelFilter(')
+    for need in ('LgIsLaraGear(inst, player)', 'LfNotDrawn(inst)', 'g_lblCollected', 'g_lblGear'):
+        if need not in lf: problems.append('TruMenu.cpp: LabelFilter lacks %s' % need)
+    for fn, layer in (('void DrawLabels(', '"dbg.labels"'), ('void DvDrawNames(', '"dbg.names"')):
+        body = fn_body(src, fn)
+        if 'LabelFilter(%s' % layer not in body or 'LgCollect();' not in body:
+            problems.append('TruMenu.cpp: %s must call LgCollect and LabelFilter(%s, ...)' % (fn.strip('('), layer))
+        if 'LabelCollectedText()' not in body: problems.append('TruMenu.cpp: %s must add the grey suffix' % fn.strip('('))
+    gear = fn_body(src, 'bool LgIsLaraGear(')
+    if 'ReadDword(inst + 0x54, &parent) && parent == player' not in gear or 'g_lgSet[i] == inst' not in gear:
+        problems.append('TruMenu.cpp: LgIsLaraGear = parent +0x54 == player or a weapon-manager handle')
+    col = fn_body(src, 'void LgCollect(')
+    for need in ('tracker + 0x500', 'wm + (hand ? 0xc : 0x4) + 0x10 * slot', 'wm + 0xf4 + 8 * i', 'slot < 15', 'i < 8'):
+        if need not in col: problems.append('TruMenu.cpp: LgCollect lacks %s' % need)
+    for fn in ('int LabelFilter(', 'bool LgIsLaraGear(', 'void LgCollect(', 'void LgNote(', 'void LgReadSwitch('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('('))
+        if any(w in body for w in ('WriteByte(', 'WriteBytes(', 'WriteDword(', 'reinterpret_cast<volatile', 'Fn>(')):
+            problems.append('TruMenu.cpp: %s must not write game memory or call the game' % fn.strip('('))
+        if fn in ('bool LgIsLaraGear(', 'void LgCollect(') and ('ObjectName(' in body or 'strstr(' in body):
+            problems.append('TruMenu.cpp: %s must tell gear by data, not by names' % fn.strip('('))
+    if 'g_lgOk = g_lfOk && DvChecks(kLgChecks,' not in src:
+        problems.append('TruMenu.cpp: g_lgOk must be g_lfOk && DvChecks(kLgChecks, ...)')
+    rd = fn_body(src, 'void LgReadSwitch(')
+    for key in ('"LabelCollected"', '"LabelLaraGear"', '"Debug"'):
+        if key not in rd: problems.append('TruMenu.cpp: LgReadSwitch must read %s' % key)
+    if 'if (now - g_lgReadTick >= 1000) { g_lgReadTick = now; LgReadSwitch(); }' not in fn_body(src, 'void FallWatchTick('):
+        problems.append('TruMenu.cpp: FallWatchTick must call LgReadSwitch about once a second')
+    if 'LgReadSwitch();' not in fn_body(src, 'void ReadOptions('):
+        problems.append('TruMenu.cpp: ReadOptions must call LgReadSwitch')
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    for k in ('LabelCollected', 'LabelLaraGear'):
+        if keys.get(('Debug', k)) != '0': problems.append('TruMenu.cpp: kOpts [Debug] %s must default to 0' % k)
+    ini = open(ini_path, encoding='utf-8').read()
+    for k in ('LabelCollected', 'LabelLaraGear'):
+        if '\n%s=0\n' % k not in ini.replace('\r\n', '\n'): problems.append('%s: [Debug] %s=0 missing' % (ini_path, k))
+    for item, val, run in (('dbg.labelcollected', 'ValLblCollected', 'RunLblCollected'),
+                           ('dbg.labelgear', 'ValLblGear', 'RunLblGear')):
+        if not re.search(r'\{"%s", "bool", .*?, false, %s, %s\}' % (re.escape(item), val, run), src, re.S):
+            problems.append('TruMenu.cpp: item %s (bool, %s / %s) missing' % (item, val, run))
+        if not re.search(r'\{"[^"]+", "[^"]+", "%s", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0\}' % re.escape(item), src):
+            problems.append('TruMenu.cpp: bar row %s missing' % item)
+        if '{"%s", "", "' % item not in src: problems.append('TruMenu.cpp: bar help row %s missing' % item)
+    for need in ('[dbg.labelcollected]###dvlcol', '[dbg.labelgear]###dvlgear'):
+        if need not in src: problems.append('TruMenu.cpp: menu checkbox %s missing (page Debug view)' % need)
+    sw = [l.rstrip('\r\n') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Debug | Label')]
+    want = {'LabelCollected', 'LabelLaraGear'}
+    got = {l.split(' | ')[2] for l in sw if ' | bool | ' in l and ' | live | 0 | ' in l and l.endswith('| TruMenu 0.22.36')}
+    if got != want or len(sw) != 2:
+        problems.append('%s: rows TruMenu | Debug | LabelCollected / LabelLaraGear | bool | ... | live | 0 | ... | TruMenu '
+                        '0.22.36 wanted (got %s)' % (os.path.basename(switches_path), sorted(got)))
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.36 - ' not in readme or '\n### TO TEST 0.22.36' not in readme:
+        problems.append('README.md: section "## 0.22.36 - ..." with "### TO TEST 0.22.36" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if 'dcb5a5a1d570ab00f213e19dca404f6594dbe8e5459cf12fd5d4f39e99268ee9' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.35 build hash (work/asi/menu0258) is missing')
+    return problems, ('label filter (dbg.labels + dbg.names -> LabelFilter -> the one LfNotDrawn; Lara\'s gear by parent '
+                      '+0x54 / weapon manager, %d byte checks = precheck_02236; LabelCollected / LabelLaraGear 0, live)' % len(rows))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -4802,6 +4897,10 @@ def main(argv):
     for p in cproblems35: print('Q02235 %s' % p)
     if not cproblems35: print('ok: 0.22.35 %s' % csummary35)
     problems += cproblems35
+    cproblems36, csummary36 = check_02236(ini_path, opt.get('--switches', SWITCHES))   # 0.22.36 (labels)
+    for p in cproblems36: print('Q02236 %s' % p)
+    if not cproblems36: print('ok: 0.22.36 %s' % csummary36)
+    problems += cproblems36
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

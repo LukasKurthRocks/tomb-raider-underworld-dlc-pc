@@ -234,3 +234,6 @@ group | tmdiag | Diagnose (TruMenu) | Diagnosis (TruMenu)
 TruMenu | Log | Save | bool | Speicher-Log (Checkpoint / Tod-Laden) | Save log (checkpoint / death reload) | live | 0 | Zwei Zeilen je Speichern / Laden in TruMenu.log // Two lines per save / restore in TruMenu.log | TruMenu 0.22.27
 # 2026-11-12 (Q20, group M): TruMenu 0.22.34 - its own [Achievements] Enabled in TruMenu.ini (patched at the start = restart)
 TruMenu | Achievements | Enabled | bool | Erfolge aufzeichnen (Q20) | Record achievements (Q20) | restart | 1 | 16 Skript-Erfolge ins Log + Liste; wirkt nach Neustart // 16 script achievements to log + list; after a restart | TruMenu 0.22.34
+# 2026-11-12 (labels): TruMenu 0.22.36 - [Debug] LabelCollected / LabelLaraGear in TruMenu.ini (LgReadSwitch, about once a second = live)
+TruMenu | Debug | LabelCollected | bool | Namen: Eingesammeltes grau zeigen | Labels: show collected in grey | live | 0 | Aufgehobenes / Verstecktes: 0 kein Name, 1 grau // Picked up / hidden: 0 no label, 1 grey label | TruMenu 0.22.36
+TruMenu | Debug | LabelLaraGear | bool | Namen an Laras Ausrüstung | Labels on Lara's gear | live | 0 | Waffen / Geräte an Lara (aus den Spieldaten) // Weapons / tools on Lara (from the game data) | TruMenu 0.22.36

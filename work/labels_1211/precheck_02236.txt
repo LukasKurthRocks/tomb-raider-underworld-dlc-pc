@@ -1,0 +1,13 @@
+# TruMenu 0.22.36 (labels): kLgChecks = Lara's own gear by game data, in the order of the table in TruMenu.cpp
+# (checked offline: ../bin/pyt -t 120 tools/pe_bytes_check.py <Steam tru.exe> --file work/labels_1211/precheck_02236.txt)
+0x00716174 8b4608 8b0d94f0e700 6a01 6a00 50 51 e8e870eaff
+0x005bd2ab 8b7d08
+0x005bd37b 8996e4000000 897e54
+0x00715eb2 a158dbfa00 8b8800050000
+0x005b39d0 8b4c2404 85c9 740e 8b01 85c0 7408 8b5044 3b5104
+0x006e7b98 83fe0e
+0x006e7bb9 8b543e10 8b4c3e0c
+0x006e7bde 8b443e04 8b4c3e08
+0x006e7dcb 8dbdf4000000 57 e8f9bbecff
+0x006e7deb 83fe08
+0x006e7e19 8db1f4000000

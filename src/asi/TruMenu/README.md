@@ -2928,6 +2928,61 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.36 - label filter: collected items and Lara's gear (2026-11-12)
+
+Built into `work\asi\menu0259`, not installed, no live test (finding in the workspace `docs\Befund-Labels-1211.md`,
+offline files in `work\labels_1211\`). Live bug of 2026-11-12: the white name labels kept collected artifacts
+(`ar_rw_artifact` 678) and picked-up medipacks, while the 0.20 collectibles layer (`dbg.collect`) dropped them - only
+`M20Draw` asked the 0.21 check (`TruMenu.log` "0.21: <n> hidden / collected instance(s) ... (label checks ok)").
+- **One check for every name label:** `dbg.labels` (0.13, `DrawLabels`) and `dbg.names` (0.14 object names,
+  `DvDrawNames`) now ask `LabelFilter`, which asks the same `LfNotDrawn` of 0.21 (no second implementation): an
+  instance the game no longer draws - hide bit `+0x14 & 0x800`, kill flag `0x20`, scene entity off, draw masks
+  `+0x23c | +0x240 == -1`. That covers every kind the game hides or removes after a pickup (artifacts, treasures,
+  relics, shards, medipacks, ammo, keys, any other instance), not only names with `_rw_`. **`[Debug] LabelCollected`**
+  (default 0, item `dbg.labelcollected`): 0 = no label, 1 = a grey label with ` | eingesammelt` / ` | collected` (bar
+  language `[Quick] Language`).
+- **Lara's own gear by game data** (no name list): an instance whose parent `+0x54` is the player (INSTANCE_BirthObject
+  0x5bd270 stores its parent there at 0x5bd381; the give-gear path 0x716174 passes `[0xe7f094]` - `larabase` f37 and
+  the default gear per unit) or one held by her weapon manager `[[0xfadb58]+0x500]` (15 slots x 2 hands, handles
+  `+4 / +0xc + 16 * slot`, reader 0x6e7b90; gear list `+0xf4`, 8 handles). **`[Debug] LabelLaraGear`** (default 0, item
+  `dbg.labelgear`): 0 = no label, 1 = labelled as before. Offline (`work\labels_1211\gear_dump_scan.py`, 3 full DLC 2
+  dumps): `g_tanks`, 2 x `wp_dlc_handgun` (parent = player and weapon-manager slots 13 / 0) and `grenade_reticule`
+  (parent = player, hidden) - no other instance has Lara as parent.
+- **Byte checks** `kLgChecks` (11, = `work\labels_1211\precheck_02236.txt`, `tools/pe_bytes_check.py` on the Steam exe:
+  11 / 11 ok); `g_lgOk` needs the 0.21 label checks too. Failed: gear is labelled as before, `dbg.labelgear` refuses.
+- **Live switch:** both keys are read at the start and about once a second (`LgReadSwitch`, applied only when the INI
+  value changed - an item switch without `[Debug] Persist` is not undone); `TruMenu.switches.txt` rows (page Fixes,
+  group Diagnose (TruMenu)) write them.
+- **Places:** menu page Debug view, group Object names (two checkboxes + last-frame counts); bar page Render, group
+  Markup, after Objektnamen: "Namen: Eingesammeltes grau", "Namen: Laras Ausrüstung" (with help lines).
+- **Log:** one line per instance that loses its label (at most 20 per 10 s), with the reason - the evidence for which
+  flag a pickup sets:
+
+```text
+0.22.36 labels: collected / hidden check ok (8 checks, LfNotDrawn), Lara's gear ok (11 checks: parent +0x54 = player, weapon manager slots + gear list); [Debug] LabelCollected 0, LabelLaraGear 0
+labels: dbg.names ar_rw_artifact 678 (0x........, parent 0x00000000) no label - hide bit 0x800
+labels: dbg.labels g_tanks 1073741831 (0x........, parent 0x........) no label - Lara's gear ([Debug] LabelLaraGear 0)
+labels: [Debug] LabelCollected 0 -> 1 (TruMenu.ini, live)
+```
+
+- `dbg.labels` value / `dbg.status`: `... n grey ..., m collected / hidden + g gear without label`.
+- **Not covered:** an item whose pickup leaves the instance drawn (only a script value changes) keeps its label; a
+  reward pot stays labelled after it was opened (the pot is still drawn - "contains artifact" is the 0.20 layer's
+  text); the 0.21 runtime-copy rule (one label per pot) stays in the collectibles layer only. Gear the game gives
+  without Lara as parent and outside the weapon manager would still be labelled (none seen in the dumps).
+- **Checks:** `trumenu_ini_check` new `check_02236` (one `LfNotDrawn`, both layers through `LabelFilter`, gear by data
+  only, `kLgChecks` = `precheck_02236.txt`, no game writes in the filter, keys / items / bar / menu / switches rows,
+  the 0.22.35 hash in `Set-TruMenu.ps1`).
+
+### TO TEST 0.22.36
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start | start, `TruMenu.log` | `0.22.36 labels: collected / hidden check ok ..., Lara's gear ok (11 checks ...)` |
+| 2 | collected | `dbg.names 1` (filter `*`) or `dbg.labels` with `LabelMatch=*`, pick up an artifact and a medipack | label gone at the pickup; log `labels: ... no label - <reason>` names the flag (hide bit / kill flag / scene entity / masks) |
+| 3 | grey | bar Render "Namen: Eingesammeltes grau" on | the picked-up items get a grey label ` | eingesammelt`; off = gone again |
+| 4 | gear | `dbg.names 1` near Lara, bar "Namen: Laras Ausrüstung" off / on | off: no `g_*` / `wp_*` / `grenade_reticule` labels on Lara; on: back; Lara's own name stays in both |
+
 ## 0.22.35 - base-game checkpoints in walking order, loop directions (2026-11-12)
 
 Built into `work\asi\menu0258`, not installed, no live test (Q113; finding in the workspace

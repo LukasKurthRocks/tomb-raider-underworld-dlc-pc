@@ -1,0 +1,9 @@
+player 0x00cdd330, tracker 0x0dd33040, WM 0x03cc5150: 3 slot handle(s), 0 gear-list handle(s)
+0x00ce9510 g_tanks                      id 1073741832 parent 0x00cdd330 (PLAYER) f14 0x02014202 hide 0 kill 0  slot 13 hand 0 
+0x00ce9220 wp_dlc_handgun               id 1073741831 parent 0x00cdd330 (PLAYER) f14 0x12114202 hide 0 kill 0  slot 0 hand 1 
+0x00ce8f30 wp_dlc_handgun               id 1073741830 parent 0x00cdd330 (PLAYER) f14 0x12114202 hide 0 kill 0  slot 0 hand 0 
+0x00ce42d0 g_tanks                      id 1073741827 parent 0x00000000 f14 0x00114802 hide 1 kill 0   
+0x00cdcd50 wp_dlc_handgun               id 1073741825 parent 0x00000000 f14 0x10114802 hide 1 kill 0   
+0x00cdd620 grenade_reticule             id 1073741829 parent 0x00cdd330 (PLAYER) f14 0x02014802 hide 1 kill 0   
+0x00cdd330 doppelganger_casual          id 4294967295 parent 0x00000000 f14 0x08114680 hide 0 kill 0   
+71 instance(s) walked, 7 printed; gear: parent = player and WM 3, parent only 1, WM only 0; gear-like name without either 2
