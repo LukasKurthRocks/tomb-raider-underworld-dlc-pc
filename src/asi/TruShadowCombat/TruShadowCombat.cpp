@@ -73,6 +73,11 @@
 //    ("ThrallFatalityEnd") - the finisher's target in CM+0x48 still valid -> death switch kind 0 (LP 0, Death state)
 //    with v = Lara - target, z = 0, then the retail clear (PC slot 2 tru+0x35e0f0) - [States] Translate1015Exit,
 //    default off, live.
+// 19. 0.6.13 (group C, PC-side only): Q108 read-only adrenaline log ([Adrenaline] Log, default on: poll thread + lines at
+//    the Vaulted Enter, the 1014 enter and the strike shot); Q109 pointer assist (call 0x70d863, [Adrenaline]
+//    AssistPointer, default off, live); Q68 lock-on switch input (calls 0x71cd07 / 0x71cd20, [Lock] MouseSwitch /
+//    RightKey / LeftKey, the game's by default, live); Q99 option A (byte 0x696f69, [Chunk] RemoveLastPiece, default
+//    off, live). PC options, not TU translations (section "group C").
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -90,7 +95,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.12 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.13 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -132,6 +137,11 @@ const char kVersion[] = "TruShadowCombat 0.6.12 (TU target list 7 -> 10, conditi
                         "0x8245fa40 - steer onto the target of targeter TU 7 every tick, PC slot 4 tru+0x36d9a0 not run "
                         "([States] Translate1008, off by default); 0.6.12: state 1015 exit as the TU 0x8245fe58 - death "
                         "switch kind 0 on the finisher's target before the PC clear ([States] Translate1015Exit, off by "
+                        "default); 0.6.13: group C - Q108 read-only adrenaline log (poll of CM+0x1fc bits 21 / 22 / 27, "
+                        "reticle bits 6 / 7, pointer / radius, world / player time scale; lines at the Vaulted Enter, the "
+                        "1014 enter and the strike shot; [Adrenaline] Log, on by default), Q109 pointer assist "
+                        "([Adrenaline] AssistPointer, off by default), Q68 lock-on switch input ([Lock] MouseSwitch / "
+                        "RightKey / LeftKey, the game's by default), Q99 option A ([Chunk] RemoveLastPiece, off by "
                         "default))";
 const DWORD kImageBase = 0x00400000;
 
@@ -2475,6 +2485,7 @@ void StrikeEnd(const TruShadowPowerMeter *m) {
     Log(1, "shadow strike end: message 0x3f %s, meter flags 0x%03lx", t ? "sent" : "not sent", *m->flags);
 }
 
+void Q108Run1014(int k, void *agent, StateFn orig);   // 0.6.13 (section "group C" below)
 void State1014(int k, void *agent) {
     ReadSwitches();
     if (Doppelganger()) {
@@ -2496,7 +2507,7 @@ void State1014(int k, void *agent) {
             return;
         }
     }
-    if (g_orig1014[k]) g_orig1014[k](agent);
+    Q108Run1014(k, agent, g_orig1014[k]);   // 0.6.13: the PC handler, with the Q108 log lines around slots 0 / 3
 }
 void __cdecl State1014Slot0(void *agent) { State1014(0, agent); }
 void __cdecl State1014Slot2(void *agent) { State1014(1, agent); }
@@ -5297,7 +5308,9 @@ __declspec(naked) void ClockEndStub() {
 
 // C: called from VaultedAnimStub (tru+0x24fdb9) with the Enter's inst, data and state data (ebx); 0xffffffff = the PC
 // choice (step 0, switch off or unfixed data), else the TU 0x8232b3f8 result for step != 0 (0 = no animation)
+void Q108Vault(const BYTE *inst);   // 0.6.13 (section "group C" below)
 DWORD __cdecl VaultedAnim(BYTE *inst, const BYTE *data, BYTE *sd) {
+    Q108Vault(inst);                   // 0.6.13: one read-only line per Vaulted Enter, independent of the switches
     P1dReadSwitches();
     if (!g_translateVaulted || !g_vaultChain) return 0xffffffff;
     const DWORD step = Rd(data + 0x44);
@@ -5423,7 +5436,9 @@ __declspec(naked) void VaultCopyStub() {
 }
 
 // F: the retail strike's record tru+0x245e40 from tru+0x31d5cc, +0x34 = 0 as the TU 0x823e0294
+void Q108StrikeRecord(const BYTE *target);   // 0.6.13 (section "group C" below)
 BYTE *__cdecl StrikeRecordHook(BYTE *target, BYTE *player, const float *pos, const float *rot, float frames) {
+    Q108StrikeRecord(target);                    // 0.6.13: read-only line (the 0xbe record of the vault-off strike)
     BYTE *rec = reinterpret_cast<RecordFn>(kRecord)(target, player, pos, rot, frames);
     if (rec && g_translateVaulted && g_vaultChain) *reinterpret_cast<DWORD *>(rec + 0x34) = 0;
     return rec;
@@ -6445,6 +6460,430 @@ void __cdecl State1015Slot2(void *agent) {
     if (g_orig1015Slot2) g_orig1015Slot2(agent);
 }
 
+// ---------------------------------------------------------------- 0.6.13: group C (Q108 log, Q109 assist, Q68, Q99 A)
+// Main workspace docs\Befund-Gruppe-C-1211.md (static, PC tru.exe = retail logic; VAs):
+//  * adrenaline mode = CM+0x1fc bit 27 (start 0x7189c0 / end 0x718ad0 from the tick 0x718bd0, which needs action 37:
+//    generalbank DTP 47 binding #105, set 17 <- source 9 = pad code 9 = XINPUT_GAMEPAD_RIGHT_THUMB = R3; keyboard = the
+//    key in registry value "9" of HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld\Input);
+//  * vault-off strike = state 1014 slot 0 0x71d3c0: target of targeter 5, enemy query 0x165 (answered by the enemy query
+//    0x632200 from its tune chain brain+0x168, record +0x54 - in every enemy state), message 0xbe, meter empty, bit 21.
+//    Entered by {500,518,1} = message 0x1c9 at most 100 ms old (Lara's handler 0x76fe27 stamps machine 1 +0x90; sender
+//    the movement collision 0x5dce20 at 0x5dd8a4) with {200,201,1} = the record's animation ended (0x783840) or
+//    {1000,20,354} = time in the record >= chart parameter 354 (0x783b70 -> 0x782b40 mode 1);
+//  * circle = reticle [CM+0] word +0x40 bit 6 (set at the strike look 0x70db20), pointer +0x20 / +0x24 (start 0x6e6a70:
+//    random point at distance 256 - radius), radius +0x30 = [0xfae8d0] (script native setter 0x77a7d0); bit 7 =
+//    |pointer| < radius, computed in 0x6f2f20 every frame before the stick (actions 2 / 3 x tuning +0x454 x frame ms /
+//    1000) and mouse (actions 0x10 / 0x11 x 5.0) move it;
+//  * shot = RT edge (action 33, +0x630 & 0x10) in the 1014 tick 0x718d00 -> message 0x19b; success = bit 7 when the
+//    bullet hit 0x7198d0 runs (0x719ce8: event 0x36 + reticle reset 0x6e6ca0, else event 0x37 + strike end 0x718fd0);
+//  * lock-on target switch 0x71cb10 (hard lock, bit 10, not bit 21): right stick (actions 2 / 3) + an accumulator of the
+//    MOUSE axes (0x71cd07 / 0x71cd20, actions 0x10 / 0x11, CM+0x20c / +0x210, clamp +-1.5, decay 2.0 x [0xe7f194]);
+//    |v| >= tuning +0x2a0 (0.2) -> search in that direction 0x71a740 + switch 0x714e80;
+//  * permanent chunk piece: 0x696f69 `75 0f` (record bit 0 -> body release 0x48ea80, the piece stays) - Q99 option A.
+const DWORD kQ108Tune = 0x00fad764, kQ108Radius = 0x00fae8d0, kQ108HudCircle = 0x00fae8ae, kQ108World = 0x00e7f1a0,
+            kQ108Player = 0x00e7f1d4, kQ108Actions = 0x00a02b68;
+const DWORD kQ108ReticleCall = 0x0070d863, kQ108ReticleFn = 0x006f2f20;
+const DWORD kQ108LockCallX = 0x0071cd07, kQ108LockCallY = 0x0071cd20, kQ108Analog = 0x00480e50;
+const DWORD kQ108ChunkJcc = 0x00696f69;
+const DWORD kQ108BitWindow = 0x00200000, kQ108BitFull = 0x00400000, kQ108BitMode = 0x08000000, kQ108BitLock = 0x400;
+
+int g_adrLog = 1;                         // [Adrenaline] Log (read-only lines; start only)
+volatile LONG g_adrAssist = 0;            // [Adrenaline] AssistPointer (Q109; read again at run time)
+volatile LONG g_lockMouse = 1;            // [Lock] MouseSwitch (Q68; 1 = the game: mouse moves switch targets)
+volatile LONG g_lockKeyRight = 0, g_lockKeyLeft = 0;   // [Lock] RightKey / LeftKey (virtual-key code, 0 = off)
+volatile LONG g_chunkRemoveLast = 0;      // [Chunk] RemoveLastPiece (Q99 option A; read again at run time)
+bool g_q108ReadOk = false, g_assistHooked = false, g_lockHooked = false, g_chunkJccOk = false;
+BYTE g_chunkJccNow = 0x75;                // the byte at 0x696f69 as this plugin left it
+typedef SHORT(WINAPI *KeyStateFn)(int);
+typedef HWND(WINAPI *ForegroundFn)();
+typedef DWORD(WINAPI *WindowPidFn)(HWND, DWORD *);
+KeyStateFn g_keyState = nullptr;          // user32 resolved at run time (the plugin imports only kernel32)
+ForegroundFn g_foreground = nullptr;
+WindowPidFn g_windowPid = nullptr;
+
+struct Q108State {
+    bool ok;
+    DWORD flags;                          // CM+0x1fc
+    float meter, max;                     // CM+0x3c, [[0xfad764]+0x2d0]
+    DWORD ret;                            // reticle [CM+0] word +0x40
+    float px, py, pz, radius;             // reticle +0x20 / +0x24 / +0x28 pointer, +0x30 radius
+    DWORD hud;                            // byte 0xfae8ae (circle highlight, 0x718e23 / 0x718e57)
+    float world, player;                  // [0xe7f1a0] world time scale, [0xe7f1d4] player time scale
+    DWORD dopp;                           // byte [gameTracker+0x1244]
+};
+
+void Q108Read(Q108State *s) {
+    memset(s, 0, sizeof(*s));
+    const BYTE *gt = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kGameTrackerPtr)));
+    const BYTE *cm = gt ? reinterpret_cast<const BYTE *>(Rd(gt + 0x504)) : nullptr;
+    if (!cm) return;
+    s->ok = true;
+    s->flags = Rd(cm + 0x1fc);
+    s->meter = RdFloat(cm + 0x3c);
+    const BYTE *tune = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kQ108Tune)));
+    s->max = tune ? RdFloat(tune + 0x2d0) : 0.0f;
+    const BYTE *r = reinterpret_cast<const BYTE *>(Rd(cm));
+    if (r) {
+        s->ret = Rd(r + 0x40) & 0xffff;
+        s->px = RdFloat(r + 0x20);
+        s->py = RdFloat(r + 0x24);
+        s->pz = RdFloat(r + 0x28);
+        s->radius = RdFloat(r + 0x30);
+    }
+    s->hud = Rd(reinterpret_cast<const void *>(kQ108HudCircle)) & 0xff;
+    s->world = RdFloat(reinterpret_cast<const void *>(kQ108World));
+    s->player = RdFloat(reinterpret_cast<const void *>(kQ108Player));
+    s->dopp = Rd(gt + 0x1244) & 0xff;
+}
+
+double Q108Dist(const Q108State &s) {
+    return sqrt(static_cast<double>(s.px) * s.px + static_cast<double>(s.py) * s.py + static_cast<double>(s.pz) * s.pz);
+}
+
+void Q108Text(const Q108State &s, char *out, size_t size) {
+    _snprintf_s(out, size, _TRUNCATE,
+                "meter %.1f / %.0f, CM+0x1fc 0x%08lx (full %d, mode %d, window %d, hard lock %d), reticle 0x%04lx (circle "
+                "%d, in zone %d), pointer %.1f %.1f |%.1f| radius %.1f, HUD 0xfae8ae %lu, world %.3f, player %.3f, "
+                "doppelganger %lu, Lara record %d",
+                s.meter, s.max, s.flags, (s.flags & kQ108BitFull) ? 1 : 0, (s.flags & kQ108BitMode) ? 1 : 0,
+                (s.flags & kQ108BitWindow) ? 1 : 0, (s.flags & kQ108BitLock) ? 1 : 0, s.ret, (s.ret & 0x40) ? 1 : 0,
+                (s.ret & 0x80) ? 1 : 0, s.px, s.py, Q108Dist(s), s.radius, s.hud, s.world, s.player, s.dopp, LaraRecord());
+}
+
+// game thread: Vaulted Enter of an enemy (VaultedAnim, the 0.6.6 stub at 0x64fdb9)
+void Q108Vault(const BYTE *inst) {
+    if (!g_adrLog || !g_q108ReadOk) return;
+    Q108State s;
+    Q108Read(&s);
+    char who[96], text[420];
+    Describe(inst, who, sizeof(who));
+    Q108Text(s, text, sizeof(text));
+    Log(1, "0.6.13 Q108 vault: %s enters Vaulted (5 s enemy window) - %s", who, text);
+}
+
+// game thread: the 0xbe record of the vault-off strike (state 1014 slot 0, call 0x71d5cc): the strike reached its
+// message - next 0x6e6670 empties the meter and bit 21 is set (0x71d5e2 / 0x71d5e7)
+void Q108StrikeRecord(const BYTE *target) {
+    if (!g_adrLog || !g_q108ReadOk) return;
+    char who[96];
+    Describe(target, who, sizeof(who));
+    Log(1, "0.6.13 Q108 strike 1014: message 0xbe record for %s (0x71d5cc) - the meter is emptied and bit 21 set next",
+        who);
+}
+
+// game thread: state 1014 slots 0 / 2 / 3 (k = 0 / 1 / 2) outside the TU strike - the PC handler with lines around it
+void Q108Run1014(int k, void *agent, StateFn orig) {
+    if (!g_adrLog || !g_q108ReadOk) {
+        if (orig) orig(agent);
+        return;
+    }
+    Q108State a;
+    Q108Read(&a);
+    bool shot = false;
+    if (k == 2 && a.ok) {   // the shot conditions of 0x718d00 (0x718d03..0x718d69): bit 21, reticle bit 6, gates, RT edge
+        const BYTE *dev = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kQ108Actions)));
+        const BYTE *list = dev ? reinterpret_cast<const BYTE *>(Rd(dev + 0x18)) : nullptr;
+        const BYTE *act = list ? reinterpret_cast<const BYTE *>(Rd(list)) : nullptr;
+        const DWORD rt = act ? Rd(act + 0x630) : 0;
+        const bool gates = (Rd(reinterpret_cast<const void *>(0x008ab4e6)) & 0xff) != 0 &&
+                           !(Rd(reinterpret_cast<const void *>(0x00e7f144)) & 1) &&
+                           (Rd(reinterpret_cast<const void *>(0x00e7f143)) & 0xff) != 4;
+        shot = (a.flags & kQ108BitWindow) && (a.ret & 0x40) && (rt & 0x10) && gates;
+    }
+    if (orig) orig(agent);
+    if (k == 0) {
+        Q108State b;
+        Q108Read(&b);
+        char before[420], after[420];
+        Q108Text(a, before, sizeof(before));
+        Q108Text(b, after, sizeof(after));
+        const bool started = !(a.flags & kQ108BitWindow) && (b.flags & kQ108BitWindow);
+        Log(1, "0.6.13 Q108 state 1014 enter (vault-off strike 0x71d3c0): %s - before: %s; after: %s", started
+            ? "STARTED (0xbe sent, meter emptied, bit 21 set)"
+            : (a.flags & kQ108BitWindow) ? "nothing - bit 21 was already set (one strike per meter filling)"
+                                         : "nothing - no target of targeter 5, target flag 0x400000, query 0x165 = 0 or "
+                                           "[[0xe7f094]+0x280]+0x14 = 0 (not told apart)",
+            before, after);
+    } else if (shot) {
+        const double d = Q108Dist(a);
+        Log(1, "0.6.13 Q108 headshot SHOT (RT edge in the 1014 tick 0x718d00 -> message 0x19b): pointer %.1f %.1f |%.1f| "
+               "radius %.1f -> %s; meter %.1f, world %.3f, player %.3f",
+            a.px, a.py, d, a.radius, (a.ret & 0x80) ? "IN the zone (bit 7) - success when the hit lands with bit 7"
+                                                   : "OUT of the zone (bit 7 clear) - the hit ends the strike (event 0x37)",
+            a.meter, a.world, a.player);
+    }
+}
+
+// game thread, Q109: 0x70d863 calls 0x6f2f20 (thiscall, reticle) only while reticle bit 6 is set; with
+// [Adrenaline] AssistPointer=1 the pointer is pulled to at most half the radius before the game's bit-7 test
+typedef void(__fastcall *ReticleFn)(BYTE *reticle, int);
+DWORD g_assistLastTick = 0;
+LONG g_assistPulls = 0;
+void __fastcall AssistReticle(BYTE *r, int edx) {
+    if (g_adrAssist && r) {
+        __try {
+            const WORD f = *reinterpret_cast<const WORD *>(r + 0x40);
+            float *p = reinterpret_cast<float *>(r + 0x20);
+            const float rad = *reinterpret_cast<const float *>(r + 0x30);
+            const DWORD now = GetTickCount();
+            const bool fresh = now - g_assistLastTick > 500;   // the call runs every frame while the circle is up
+            g_assistLastTick = now;
+            if (fresh) g_assistPulls = 0;
+            if ((f & 0x40) && rad > 0.0f) {
+                const double d = sqrt(static_cast<double>(p[0]) * p[0] + static_cast<double>(p[1]) * p[1] +
+                                      static_cast<double>(p[2]) * p[2]);
+                const double keep = 0.5 * rad;
+                if (d > keep) {
+                    const double s = d > 0.0 ? keep / d : 0.0;
+                    if (++g_assistPulls == 1)
+                        Log(1, "0.6.13 Q109 assist: pointer %.1f %.1f |%.1f| pulled to |%.1f| (radius %.1f) - bit 7 stays "
+                               "set ([Adrenaline] AssistPointer=1)", p[0], p[1], d, keep, rad);
+                    p[0] = static_cast<float>(p[0] * s);
+                    p[1] = static_cast<float>(p[1] * s);
+                    p[2] = static_cast<float>(p[2] * s);
+                }
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {
+        }
+    }
+    reinterpret_cast<ReticleFn>(kQ108ReticleFn)(r, edx);
+}
+
+// game thread, Q68: the two analog reads of the lock-on target switch 0x71cb10 (0x71cd07 action 0x10 / 0x71cd20 action
+// 0x11 = mouse x / y). MouseSwitch=0 -> 0 (the mouse no longer switches targets; the camera keeps its own mouse read);
+// RightKey / LeftKey pressed -> one frame +1.0 / -1.0 on x, the game's own threshold / search / switch / sound
+typedef float(__fastcall *AnalogFn)(void *input, int, int action);
+bool GameInForeground() {
+    if (!g_foreground || !g_windowPid) return false;
+    HWND w = g_foreground();
+    DWORD pid = 0;
+    if (w) g_windowPid(w, &pid);
+    return pid == GetCurrentProcessId();
+}
+float __fastcall LockAxis(void *input, int edx, int action) {
+    float v = reinterpret_cast<AnalogFn>(kQ108Analog)(input, edx, action);
+    if (!g_lockMouse) v = 0.0f;
+    if (action == 0x10 && g_keyState) {
+        static bool rightWas = false, leftWas = false;
+        const int kr = static_cast<int>(g_lockKeyRight), kl = static_cast<int>(g_lockKeyLeft);
+        const bool fg = (kr || kl) && GameInForeground();
+        const bool right = kr && fg && (g_keyState(kr) & 0x8000);
+        const bool left = kl && fg && (g_keyState(kl) & 0x8000);
+        if (right && !rightWas) {
+            v = 1.0f;
+            Log(1, "0.6.13 Q68 lock: key 0x%02x -> target switch to the right (mouse x +1.0 for one frame)", kr);
+        } else if (left && !leftWas) {
+            v = -1.0f;
+            Log(1, "0.6.13 Q68 lock: key 0x%02x -> target switch to the left (mouse x -1.0 for one frame)", kl);
+        }
+        rightWas = right;
+        leftWas = left;
+    }
+    return v;
+}
+
+// Q99 option A: 0x696f69 jne (keep the permanent piece) <-> jmp (remove it like every other piece)
+void Q108ChunkApply(const char *why) {
+    if (!g_chunkJccOk) return;
+    const BYTE want = g_chunkRemoveLast ? 0xeb : 0x75;
+    if (want == g_chunkJccNow) return;
+    const BYTE cur = *reinterpret_cast<const volatile BYTE *>(kQ108ChunkJcc);
+    if (cur != g_chunkJccNow) {
+        Log(0, "0.6.13 Q99 chunk: byte at 0x%08lx is 0x%02x, not 0x%02x as left by this plugin - [Chunk] RemoveLastPiece "
+               "off for this run", kQ108ChunkJcc, cur, g_chunkJccNow);
+        g_chunkJccOk = false;
+        return;
+    }
+    if (WriteCode(kQ108ChunkJcc, &want, 1)) {
+        g_chunkJccNow = want;
+        Log(1, "0.6.13 Q99 chunk (%s): 0x%08lx = %02x 0f - %s", why, kQ108ChunkJcc, want,
+            want == 0xeb ? "the permanent piece (record bit 0) is removed after its lifetime like the others (PC option, "
+                           "not TU)"
+                         : "the game's jne: the permanent piece stays (retail / TU)");
+    }
+}
+
+void Q108ReadSwitches(bool report) {
+    const char *ini = g_iniPath;
+    const LONG assist = GetPrivateProfileIntA("Adrenaline", "AssistPointer", 0, ini) ? 1 : 0;
+    const LONG mouse = GetPrivateProfileIntA("Lock", "MouseSwitch", 1, ini) ? 1 : 0;
+    const LONG right = GetPrivateProfileIntA("Lock", "RightKey", 0, ini) & 0xff;
+    const LONG left = GetPrivateProfileIntA("Lock", "LeftKey", 0, ini) & 0xff;
+    const LONG chunk = GetPrivateProfileIntA("Chunk", "RemoveLastPiece", 0, ini) ? 1 : 0;
+    if (report && (assist != g_adrAssist || mouse != g_lockMouse || right != g_lockKeyRight || left != g_lockKeyLeft ||
+                   chunk != g_chunkRemoveLast))
+        Log(1, "0.6.13 switches (run time): [Adrenaline] AssistPointer %ld, [Lock] MouseSwitch %ld RightKey 0x%02lx "
+               "LeftKey 0x%02lx, [Chunk] RemoveLastPiece %ld", assist, mouse, right, left, chunk);
+    InterlockedExchange(&g_adrAssist, assist);
+    InterlockedExchange(&g_lockMouse, mouse);
+    InterlockedExchange(&g_lockKeyRight, right);
+    InterlockedExchange(&g_lockKeyLeft, left);
+    InterlockedExchange(&g_chunkRemoveLast, chunk);
+}
+
+// poll thread (every 10 ms, reads only, faults caught by Rd): one line per change of adrenaline mode / window / full,
+// circle / zone and every world or player slow motion with its factor; the switches again at most once per second
+void Q108Scale(const char *what, float before, float now, DWORD tick, DWORD *since, float *lowest, float *logged,
+               int *lines) {
+    const bool wasSlow = fabs(before - 1.0f) > 0.001f, isSlow = fabs(now - 1.0f) > 0.001f;
+    if (!wasSlow && isSlow) {
+        *since = tick;
+        *lowest = now;
+        *logged = now;
+        *lines = 0;
+        Log(1, "0.6.13 Q108 slow motion START: %s time scale %.3f -> %.3f (Lara record %d)", what, before, now,
+            LaraRecord());
+    } else if (wasSlow && !isSlow) {
+        Log(1, "0.6.13 Q108 slow motion END: %s time scale %.3f -> %.3f after %lu ms (lowest %.3f)", what, before, now,
+            tick - *since, *lowest);
+    } else if (isSlow) {
+        if (now < *lowest) *lowest = now;
+        if (fabs(now - *logged) >= 0.05f && *lines < 12) {
+            ++*lines;
+            *logged = now;
+            Log(1, "0.6.13 Q108 slow motion: %s time scale now %.3f (%lu ms since the start)", what, now, tick - *since);
+        }
+    }
+}
+
+DWORD WINAPI Q108Thread(LPVOID) {
+    Q108State prev;
+    memset(&prev, 0, sizeof(prev));
+    bool have = false;
+    DWORD lastIni = GetTickCount(), tMode = 0, tWindow = 0, tCircle = 0, tFull = 0, sW = 0, sP = 0;
+    float lowW = 1.0f, lowP = 1.0f, logW = 1.0f, logP = 1.0f;
+    int linesW = 0, linesP = 0, zoneLines = 0;
+    for (;;) {
+        Sleep(10);
+        const DWORD now = GetTickCount();
+        if (now - lastIni >= 1000) {
+            lastIni = now;
+            Q108ReadSwitches(true);
+            Q108ChunkApply("run time");
+        }
+        if (!g_adrLog || !g_q108ReadOk) continue;
+        Q108State s;
+        Q108Read(&s);
+        if (!s.ok) {
+            if (have) Log(2, "0.6.13 Q108: no combat manager ([[0xfadb58]+0x504] = 0) - level change / menu");
+            have = false;
+            continue;
+        }
+        if (!have) {
+            prev = s;
+            have = true;
+            continue;
+        }
+        char text[420];
+        text[0] = 0;
+        const DWORD ch = s.flags ^ prev.flags;
+        if (ch & (kQ108BitMode | kQ108BitWindow | kQ108BitFull) || ((s.ret ^ prev.ret) & 0x40)) Q108Text(s, text, sizeof(text));
+        if (ch & kQ108BitFull) {
+            if (s.flags & kQ108BitFull) { tFull = now; Log(1, "0.6.13 Q108 meter FULL (bit 22) - %s", text); }
+            else Log(1, "0.6.13 Q108 meter full OFF after %lu ms - %s", now - tFull, text);
+        }
+        if (ch & kQ108BitMode) {
+            if (s.flags & kQ108BitMode) { tMode = now; Log(1, "0.6.13 Q108 adrenaline mode ON (bit 27, R3 = action 37) - %s", text); }
+            else Log(1, "0.6.13 Q108 adrenaline mode OFF after %lu ms - %s", now - tMode, text);
+        }
+        if (ch & kQ108BitWindow) {
+            if (s.flags & kQ108BitWindow) { tWindow = now; Log(1, "0.6.13 Q108 headshot window ON (bit 21, vault-off strike 1014) - %s", text); }
+            else Log(1, "0.6.13 Q108 headshot window OFF after %lu ms (reticle bit 9 0x200 = %d: set by the hit "
+                        "0x719d4e on a success) - %s", now - tWindow, (s.ret & 0x200) ? 1 : 0, text);
+        }
+        if ((s.ret ^ prev.ret) & 0x40) {
+            if (s.ret & 0x40) { tCircle = now; zoneLines = 0; Log(1, "0.6.13 Q108 circle ON (reticle bit 6) - %s", text); }
+            else Log(1, "0.6.13 Q108 circle OFF after %lu ms - %s", now - tCircle, text);
+        }
+        if (((s.ret ^ prev.ret) & 0x80) && (s.ret & 0x40) && zoneLines < 40) {
+            ++zoneLines;
+            Log(1, "0.6.13 Q108 pointer %s the zone (bit 7): %.1f %.1f |%.1f| radius %.1f, HUD 0xfae8ae %lu",
+                (s.ret & 0x80) ? "IN" : "OUT of", s.px, s.py, Q108Dist(s), s.radius, s.hud);
+        }
+        Q108Scale("world", prev.world, s.world, now, &sW, &lowW, &logW, &linesW);
+        Q108Scale("player", prev.player, s.player, now, &sP, &lowP, &logP, &linesP);
+        prev = s;
+    }
+}
+
+void SetupQ108() {
+    HMODULE user32 = GetModuleHandleA("user32.dll");
+    if (user32) {
+        g_keyState = reinterpret_cast<KeyStateFn>(GetProcAddress(user32, "GetAsyncKeyState"));
+        g_foreground = reinterpret_cast<ForegroundFn>(GetProcAddress(user32, "GetForegroundWindow"));
+        g_windowPid = reinterpret_cast<WindowPidFn>(GetProcAddress(user32, "GetWindowThreadProcessId"));
+    }
+    struct Check { DWORD at; const char *hex; const char *what; };
+    const Check logFacts[] = {
+        {0x00718d03, "8b87fc010000 c1e815 a801 0f847b010000 8b0f 8a5140 c0ea06 f6c201",
+         "1014 tick 0x718d00: CM+0x1fc bit 21, reticle [CM] +0x40 bit 6"},
+        {0x00718d4c, "a1682ba000 8b4818 8b11 8b8230060000 2410", "1014 tick: RT = action 33 record +0x630 & 0x10"},
+        {0x006f2f67, "d94630 ded9 dfe0 f6c441 7508 81c980000000", "0x6f2f20: bit 7 = |pointer| < reticle +0x30"},
+        {0x0077a7c0, "d905d0e8fa00 c3", "radius getter 0x77a7c0 = [0xfae8d0]"},
+        {0x006e6a80, "e83b3d0900 d95c2414 d9442414 d95730", "strike start 0x6e6a70: reticle +0x30 = radius"},
+        {0x0071d5e2, "e88990fcff 818ffc01000000002000", "1014 0x71d3c0: meter empty 0x6e6670, bit 21 set"},
+        {0x00719ce8, "0fb74240 8ac8 c0e906 f6c101 0f848a000000 c0e807", "hit 0x7198d0: success = reticle bit 7"},
+        {0x007189ea, "818efc01000000000008", "adrenaline start 0x7189c0: bit 27 set"},
+        {0x005da595, "d91da0f1e700", "world time scale [0xe7f1a0] written by 0x5da595"},
+        {0x007760b2, "d905d4f1e700", "player time scale [0xe7f1d4] read by 0x7760b2"},
+    };
+    bool ok = true;
+    for (const auto &c : logFacts)
+        if (!HexAt(c.at, c.hex)) {
+            Log(0, "0.6.13 Q108: %s at 0x%08lx does not match - adrenaline log off", c.what, c.at);
+            ok = false;
+            break;
+        }
+    g_q108ReadOk = ok;
+    const Check assistFacts[] = {
+        {0x0070d85a, "c0e806 a801 7407 8bce e8b856feff", "0x70d810: bit 6 -> call 0x6f2f20 at 0x70d863"},
+        {kQ108ReticleFn, "55 8bec 83e4f0 83ec2c 56 8bf1 0fb74e40 8ac1 c0e806 a801", "0x6f2f20 head (thiscall reticle)"},
+        {0x006f2f3d, "0f284620 0f59c0", "0x6f2f20: pointer = reticle +0x20 (16 bytes)"},
+        {0x006f2f67, "d94630 ded9 dfe0 f6c441 7508 81c980000000", "0x6f2f20: bit 7 = |pointer| < reticle +0x30"},
+        {0x006f30f5, "5e 8be5 5d c3", "0x6f2f20: plain ret (no stack arguments)"},
+    };
+    ok = true;
+    for (const auto &c : assistFacts)
+        if (!HexAt(c.at, c.hex)) {
+            Log(0, "0.6.13 Q109: %s at 0x%08lx does not match - pointer assist not placed", c.what, c.at);
+            ok = false;
+            break;
+        }
+    if (ok) g_assistHooked = WriteCall(kQ108ReticleCall, reinterpret_cast<const void *>(&AssistReticle));
+    const Check lockFacts[] = {
+        {0x0071ccff, "8b0d682ba000 6a10 e84441d6ff d8860c020000 6a11 d99e0c020000 8b0d682ba000 e82b41d6ff d88610020000",
+         "target switch 0x71cb10: mouse actions 0x10 / 0x11 into CM+0x20c / +0x210"},
+        {kQ108Analog, "8b442404 8b4914 8d0440 c1e004 d90408 c20400", "analog getter 0x480e50 (thiscall action, ret 4)"},
+        {0x0071ceaa, "d982a0020000 dcc8 ded9", "switch threshold tuning +0x2a0 squared"},
+    };
+    ok = true;
+    for (const auto &c : lockFacts)
+        if (!HexAt(c.at, c.hex)) {
+            Log(0, "0.6.13 Q68: %s at 0x%08lx does not match - lock switch input not placed", c.what, c.at);
+            ok = false;
+            break;
+        }
+    if (ok) {
+        const bool x = WriteCall(kQ108LockCallX, reinterpret_cast<const void *>(&LockAxis));
+        const bool y = x && WriteCall(kQ108LockCallY, reinterpret_cast<const void *>(&LockAxis));
+        if (x && !y) WriteCall(kQ108LockCallX, reinterpret_cast<const void *>(kQ108Analog));
+        g_lockHooked = x && y;
+    }
+    g_chunkJccOk = HexAt(0x00696f63, "83e101 80f901 750f 56 e80f7bdfff 83c404");
+    if (!g_chunkJccOk) Log(0, "0.6.13 Q99: 0x696f63 does not match `83 e1 01 80 f9 01 75 0f` - [Chunk] RemoveLastPiece off");
+    Q108ReadSwitches(false);
+    Q108ChunkApply("start");
+    HANDLE t = CreateThread(nullptr, 0, &Q108Thread, nullptr, 0, nullptr);
+    if (t) CloseHandle(t);
+    Log(1, "0.6.13 group C: Q108 adrenaline log %s ([Adrenaline] Log %d; poll every 10 ms%s); Q109 pointer assist %s "
+           "(AssistPointer %ld, call 0x70d863); Q68 lock switch input %s (MouseSwitch %ld, RightKey 0x%02lx, LeftKey "
+           "0x%02lx, calls 0x71cd07 / 0x71cd20%s); Q99 RemoveLastPiece %ld (%s); switches read again at run time (<= 1 / s)",
+        g_q108ReadOk ? "on" : "OFF (byte checks)", g_adrLog, t ? "" : ", thread NOT started",
+        g_assistHooked ? "placed" : "NOT placed", g_adrAssist, g_lockHooked ? "placed" : "NOT placed", g_lockMouse,
+        g_lockKeyRight, g_lockKeyLeft, g_keyState ? "" : ", no GetAsyncKeyState", g_chunkRemoveLast,
+        g_chunkJccOk ? "byte checked" : "byte check failed");
+}
+
 // ---------------------------------------------------------------- start
 void ReadOptions(const char *dir) {
     char *ini = g_iniPath;
@@ -6494,6 +6933,7 @@ void ReadOptions(const char *dir) {
     g_chunkLimit8 = GetPrivateProfileIntA("Chunk", "Limit8", 1, ini) ? 1 : 0;       // 0.6.7 (start only)
     if (g_splashMax < 0) g_splashMax = 0;
     if (g_diagMax < 0) g_diagMax = 0;
+    g_adrLog = GetPrivateProfileIntA("Adrenaline", "Log", 1, ini) ? 1 : 0;   // 0.6.13 (the run-time switches: Q108ReadSwitches)
 }
 
 void Start(HMODULE self) {
@@ -6561,6 +7001,7 @@ void Start(HMODULE self) {
     SetupImpulseGate();               // 0.6.8: K-1b impulse 0x91 gate of Lara's contact hit (independent)
     SetupK8Log();                     // 0.6.9: log points (last: the death switch facts are checked by 0.6.1 / 0.6.5 too)
     SetupHitSpeed();                  // 0.6.10: K-8b msg+0x44 / +0x48 of Lara's contact hit (independent)
+    SetupQ108();                      // 0.6.13: group C - Q108 log, Q109 assist, Q68 lock input, Q99 option A
 }
 
 }  // namespace

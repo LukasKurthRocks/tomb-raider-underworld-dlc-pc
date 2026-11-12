@@ -1,4 +1,51 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.12)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.13)
+
+0.6.13 (2026-11-12, **offline, not yet seen in game**; group C: Q108 / Q109 / Q68 / Q99, main workspace
+`docs\Befund-Gruppe-C-1211.md`, ENGINE.md 13.7 / 21): build `work\asi\combat0613`, byte pre-checks
+`work\asi\combat0613\precheck_0613.txt` (32 checks: the 19 of `SetupQ108`, 13 proof facts of the static findings;
+0 mismatches against `data\pc\tru.exe` and the installed tru.exe). **PC options, not TU translations** (the TU changes
+the adrenaline only in doppelganger mode, Q60).
+* **Q108 adrenaline log** (`[Adrenaline] Log`, new, start only, default **1**, read only): a poll thread (every 10 ms,
+  faults caught) writes `0.6.13 Q108 ...` lines on every change of: meter full (CM+0x1fc bit 22), adrenaline mode
+  (bit 27; started by **R3** = action 37, generalbank DTP 47 binding #105 set 17 <- source 9 = pad code 9 =
+  XINPUT_GAMEPAD_RIGHT_THUMB, with a hard lock and meter > 0), headshot window (bit 21, set only by the vault-off strike
+  = state 1014 slot 0 0x71d3c0), circle (reticle `[CM+0]` +0x40 bit 6), pointer in / out of the zone (bit 7 = |pointer|
+  < radius, 0x6f2f67), and every slow motion start / end of the world (`[0xe7f1a0]`) or player (`[0xe7f1d4]`) time
+  scale with its factor (not only the first one per session). Game-thread lines: each **Vaulted Enter** of an enemy
+  (in the 0.6.6 stub at 0x64fdb9, independent of `TranslateVaultedClock`), each **state 1014 enter** (STARTED / why
+  not), the **0xbe record** of the strike, and each **strike shot** (RT edge in the 1014 tick 0x718d00, with pointer,
+  radius and in / out of the zone). Every line carries meter / max, CM+0x1fc, reticle, pointer, radius, HUD byte
+  0xfae8ae, world / player scale, the doppelganger byte and Lara's chart record.
+* **Q109 pointer assist** (`[Adrenaline] AssistPointer`, new, live, default **0**, accessibility): the call 0x70d863 ->
+  0x6f2f20 (runs only while the circle is up) goes through the plugin; with 1 the pointer is pulled to at most half the
+  radius before the game's zone test, so bit 7 stays set and a shot succeeds (success = bit 7 when the bullet hit
+  0x7198d0 runs, 0x719ce8). One line per circle: `0.6.13 Q109 assist: pointer ... pulled to ...`. A "skip the second
+  condition" cheat is **not built**: the second condition of the transitions into 1014 is a timing gate (animation end,
+  condition 201, or time in record >= chart parameter 354, condition 20), not a player test (Befund section 2).
+* **Q68 lock-on switch input** (`[Lock] MouseSwitch` live default **1** = the game's; `[Lock] RightKey` / `LeftKey`
+  live default **0**): the target switch 0x71cb10 adds the **mouse axes** (actions 0x10 / 0x11, calls 0x71cd07 /
+  0x71cd20) to the right stick and switches at |v| >= 0.2 (player tuning +0x2a0) - so on the PC every mouse movement
+  while locked on can jump to another target. `MouseSwitch=0` returns 0 for those two reads (the camera keeps its own
+  mouse read 0x5ed4a0). RightKey / LeftKey (virtual-key codes) give one frame of +1.0 / -1.0 on the x read, so the
+  game's own threshold, direction search 0x71a740, switch 0x714e80, repeat timers (+0x29c / +0x29e: 3 / 12) and sound
+  run. Only while the game window has the focus. Log `0.6.13 Q68 lock: key 0x.. -> target switch to the right`.
+* **Q99 option A** (`[Chunk] RemoveLastPiece`, new, live, default **0**): byte 0x696f69 `75 0f` -> `eb 0f` after the
+  check of `83 e1 01 80 f9 01 75 0f 56 e8 ..` at 0x696f63; the permanent chunk piece #6 is then removed after its
+  lifetime (20 s) like the others. Written back to `75` with 0 (only if the byte is still the plugin's).
+* **TO TEST** (main game, e.g. `l7_helheim03` with `arena.go 1a`, **from a main-game session** - doppelganger byte 0,
+  see Q100; TruMenu `adren.fill` for a full meter):
+
+| # | what | expected |
+|---|---|---|
+| 1 | game start | `TruShadowCombat 0.6.13 ... loaded`; `0.6.13 group C: Q108 adrenaline log on ...; Q109 pointer assist placed (AssistPointer 0 ...); Q68 lock switch input placed (MouseSwitch 1, RightKey 0x00, LeftKey 0x00 ...); Q99 RemoveLastPiece 0 (byte checked)`; no `0.6.13 ... does not match` line |
+| 2 | `adren.fill`, lock on (LT), press **R3** | `Q108 meter FULL (bit 22)`, then `Q108 adrenaline mode ON (bit 27 ...)` + `Q108 slow motion START: player time scale 1.000 -> ...` (ramp to 0.5); R3 again / release lock: `mode OFF after n ms`, `slow motion END ... (lowest 0.500)`; the meter drains faster (225 instead of 20) |
+| 3 | full meter, a thrall / Viking charges, jump off it (vault) | `Q108 vault: <enemy> enters Vaulted ...`; `Q108 state 1014 enter (vault-off strike 0x71d3c0): STARTED` (+ `strike 1014: message 0xbe record for <enemy>`), `headshot window ON (bit 21 ...)`, `circle ON (reticle bit 6) ... radius r`; if 1014 is entered but nothing starts, the line says why (bit 21 already set / no target ...) |
+| 4 | move the pointer into the grey zone, shoot (RT) | `pointer IN the zone (bit 7) ...`, `headshot SHOT ... -> IN the zone`; the enemy dies (the 762-type hit, `[Damage] Log`); `headshot window OFF ... (reticle bit 9 0x200 = 1)`; a shot outside: `-> OUT of the zone`, window OFF with 0x200 = 0 |
+| 5 | slow motions | every one has a START / END line with its factor (kill camera, scripted adrenaline moments; world 0.133 at the yggdrasil grapple scene) - not only the first of the session |
+| 6 | `AssistPointer=1` (TruMenu row "Adrenalin: Zeiger im Ziel (Hilfe)"), repeat 3 / 4 | `0.6.13 switches (run time): [Adrenaline] AssistPointer 1 ...`; at the circle `Q109 assist: pointer ... pulled to ...`; the pointer sits in the grey zone and only moves within it; RT always succeeds |
+| 7 | locked on (LT) with several enemies, move the mouse | `MouseSwitch=1`: the target jumps (Q68 as reported); `MouseSwitch=0`: no jump from the mouse, the right stick of the pad still switches; `RightKey=88` (X) / `LeftKey=67` (C): one switch per key press (`Q68 lock: key 0x58 -> target switch to the right`) - say whether the direction is right |
+| 8 | `[Chunk] RemoveLastPiece=1`, kill a Viking (chunkdoll), wait 25 s | `0.6.13 Q99 chunk (run time): 0x00696f69 = eb 0f ...`; the last piece (torso) vanishes too; with 0 it stays; checkpoint + reload: old pieces reappear and vanish 20 s later |
+| 9 | trouble | `[Adrenaline] Log=0`, `AssistPointer=0`, `MouseSwitch=1`, `RemoveLastPiece=0`; send the log |
 
 0.6.12 (2026-11-11, **offline, not yet seen in game**; Q37 "the thrall got up again after the finisher Y", live
 2026-11-10 22:12; main workspace `docs\Befund-Translate1015Exit-1111.md`, ENGINE.md 12): build `work\asi\combat0612`,
@@ -773,6 +820,11 @@ instead of 6 in records #764 / #765 / #770 (#773: 5 -> 0).
 | `[States] Translate1008` | 0 | 0.6.11 (Q19): state 1008 (finisher Y move) as the TU 0x8245f7b0 / 0x8245fa40 - steer Lara onto the target of targeter TU 7 every tick, PC slot 4 tru+0x36d9a0 not run; 0 = PC + "off (would)" lines; every level; live |
 | `[Probe] State1008` | 1 | 0.6.11: wrap record 1008 (slots 0 / 2 / 3 / 4) at all; 0 = PC record untouched (start only) |
 | `[States] Translate1015Exit` | 0 | 0.6.12 (Q37): exit of state 1015 as the TU 0x8245fe58 - death switch kind 0 on the finisher Y's target (CM+0x48) before the PC clear; 0 = PC + "off (would)" lines; every level; live. Slot 2 is wrapped whenever `[States] Enabled=1` and the 10 byte checks pass (no own probe key) |
+| `[Adrenaline] Log` | 1 | 0.6.13 (Q108): read-only `0.6.13 Q108` lines - poll every 10 ms (meter full, adrenaline mode, headshot window, circle, pointer zone, every world / player slow motion with its factor) + Vaulted Enter / 1014 enter / 0xbe record / strike shot; start only |
+| `[Adrenaline] AssistPointer` | 0 | 0.6.13 (Q109, PC option): the strike pointer is kept within half the radius before the zone test (call 0x70d863 -> 0x6f2f20), so every shot hits the zone; live |
+| `[Lock] MouseSwitch` | 1 | 0.6.13 (Q68, PC option): 0 = the mouse axes no longer feed the lock-on target switch 0x71cb10 (calls 0x71cd07 / 0x71cd20); 1 = the game's; live |
+| `[Lock] RightKey` / `LeftKey` | 0 | 0.6.13 (Q68): virtual-key codes that switch the locked target right / left (one frame of +-1.0 on the switch's mouse x read); 0 = off; live |
+| `[Chunk] RemoveLastPiece` | 0 | 0.6.13 (Q99 option A, PC option): 0x696f69 `75` -> `eb`, the permanent chunk piece is removed after its lifetime; live |
 
 Log: `TruShadowCombat.log` next to tru.exe.
 
