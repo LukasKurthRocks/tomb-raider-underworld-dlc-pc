@@ -1,0 +1,138 @@
+pack1   xenon-w\dlc_costume_k.drm                               n  24  diff min 0.001 med 0.692 max 0.692  ours {'pcbase': 23, 'own': 1}
+pack1   xenon-w\dlc_costume_p.drm                               n  24  diff min 0.001 med 0.692 max 0.692  ours {'pcbase': 23, 'own': 1}
+pack10  xenon-w\cine_dlc1_start_spangs.drm                      n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\cinstream\pdlc1_010_intro.drm                   n   1  diff min 0.611 med 0.611 max 0.611  ours {'pcbase': 1}
+pack10  xenon-w\co_dlc_knight_thrall.drm                        n   3  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 3}
+pack10  xenon-w\dlc1_health_pack.drm                            n  13  diff min 0.499 med 0.748 max 0.844  ours {'pcbase': 13}
+pack10  xenon-w\dlc1_uo_adren_trap.drm                          n   4  diff min 0.518 med 0.518 max 0.518  ours {'pcbase': 4}
+pack10  xenon-w\dlc1_uo_pillar_of_doom_a.drm                    n   1  diff min 0.408 med 0.408 max 0.408  ours {'own': 1}
+pack10  xenon-w\dlc1_uo_pillar_of_doom_b.drm                    n   1  diff min 0.408 med 0.408 max 0.408  ours {'own': 1}
+pack10  xenon-w\dlc1_uo_pillory.drm                             n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc1_uo_raft_bridge.drm                         n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc1_uo_sluice_falls.drm                        n   2  diff min 0.093 med 0.408 max 0.408  ours {'own': 1, 'pcbase': 1}
+pack10  xenon-w\dlc1_uo_sluice_gate.drm                         n   2  diff min 0.093 med 0.408 max 0.408  ours {'own': 1, 'pcbase': 1}
+pack10  xenon-w\dlc1_uo_wall_switch_b.drm                       n  14  diff min 0.332 med 0.748 max 0.844  ours {'pcbase': 14}
+pack10  xenon-w\dlc1_uo_water_wheel.drm                         n   1  diff min 0.408 med 0.408 max 0.408  ours {'own': 1}
+pack10  xenon-w\dlc_caverns.drm                                 n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc_caverns_hall.drm                            n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc_costume_b.drm                               n  25  diff min 0.001 med 0.500 max 0.844  ours {'pcbase': 23, 'own': 2}
+pack10  xenon-w\dlc_costume_c.drm                               n  25  diff min 0.001 med 0.500 max 0.844  ours {'pcbase': 23, 'own': 2}
+pack10  xenon-w\dlc_costume_e.drm                               n  25  diff min 0.001 med 0.500 max 0.844  ours {'pcbase': 23, 'own': 2}
+pack10  xenon-w\dlc_costume_f.drm                               n  26  diff min 0.001 med 0.500 max 0.844  ours {'pcbase': 24, 'own': 2}
+pack10  xenon-w\dlc_costume_j.drm                               n  25  diff min 0.001 med 0.500 max 0.844  ours {'pcbase': 23, 'own': 2}
+pack10  xenon-w\dlc_costume_o.drm                               n  26  diff min 0.001 med 0.500 max 0.844  ours {'pcbase': 24, 'own': 2}
+pack10  xenon-w\dlc_fx_cine_thrall_death.drm                    n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_fall_base.drm                            n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_glare_simple_cvn_ist.drm                 n   1  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_glare_simple_dun_ist.drm                 n   1  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_glare_simple_dunhall_ist.drm             n   1  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_glare_simple_dunhall_sml_ist.drm         n   1  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_glare_simple_hallb_ist.drm               n   1  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_glare_simple_scav_hall_ist.drm           n   1  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_glare_simple_waterwhl_ist.drm            n   1  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_goo_dun_ist.drm                          n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack10  xenon-w\dlc_fx_goo_sml_fall.drm                         n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_goo_tres_ist.drm                         n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack10  xenon-w\dlc_fx_goo_tres_line_ist.drm                    n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack10  xenon-w\dlc_fx_haze.drm                                 n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_haze_grey.drm                            n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_rain_sheet_med_ist.drm                   n   1  diff min 0.408 med 0.408 max 0.408  ours {'own': 1}
+pack10  xenon-w\dlc_fx_rain_sheet_no_em_ist.drm                 n   1  diff min 0.408 med 0.408 max 0.408  ours {'own': 1}
+pack10  xenon-w\dlc_fx_rain_sheet_short_ist.drm                 n   1  diff min 0.408 med 0.408 max 0.408  ours {'own': 1}
+pack10  xenon-w\dlc_fx_splash_base.drm                          n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\dlc_fx_water_ripples_ist.drm                    n   1  diff min 0.408 med 0.408 max 0.408  ours {'own': 1}
+pack10  xenon-w\dlc_fx_water_ripples_thin_ist.drm               n   1  diff min 0.408 med 0.408 max 0.408  ours {'own': 1}
+pack10  xenon-w\dlc_fx_water_spout_simple_ist.drm               n   2  diff min 0.408 med 0.499 max 0.499  ours {'own': 2}
+pack10  xenon-w\dlc_fx_waterfalledge.drm                        n   2  diff min 0.408 med 0.500 max 0.500  ours {'own': 1, 'pcbase': 1}
+pack10  xenon-w\dlc_fx_waterfalledge_simple.drm                 n   2  diff min 0.408 med 0.500 max 0.500  ours {'own': 1, 'pcbase': 1}
+pack10  xenon-w\dlc_level1_start.drm                            n   2  diff min 0.466 med 0.466 max 0.466  ours {'pcbase': 2}
+pack10  xenon-w\doppelganger.drm                                n   8  diff min 0.001 med 0.480 max 0.500  ours {'pcbase': 8}
+pack10  xenon-w\fx_dlc_haze.drm                                 n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\fx_dlc_water_spout_man_dungn_ist.drm            n   2  diff min 0.408 med 0.499 max 0.499  ours {'own': 2}
+pack10  xenon-w\fx_dlc_water_spout_man_dungn_less_ist.drm       n   2  diff min 0.408 med 0.499 max 0.499  ours {'own': 2}
+pack10  xenon-w\fx_dlc_water_spout_man_dungn_short_ist.drm      n   2  diff min 0.408 med 0.499 max 0.499  ours {'own': 2}
+pack10  xenon-w\fx_dlc_water_spout_man_dungn_short_less_ist.drm n   2  diff min 0.408 med 0.499 max 0.499  ours {'own': 2}
+pack10  xenon-w\fx_mex_puddle_ist.drm                           n   2  diff min 0.408 med 0.499 max 0.499  ours {'own': 2}
+pack10  xenon-w\fx_waterwheel_fsfx.drm                          n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\g_pda.drm                                       n  13  diff min 0.499 med 0.748 max 0.844  ours {'pcbase': 13}
+pack10  xenon-w\knight_thrall.drm                               n  14  diff min 0.499 med 0.748 max 0.844  ours {'pcbase': 13, 'own': 1}
+pack10  xenon-w\ma_ani_adren_trap.drm                           n   4  diff min 0.518 med 0.518 max 0.518  ours {'pcbase': 4}
+pack10  xenon-w\streamgroups\dlc_dungeon_dungeon_main.drm       n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\streamgroups\dlc_dungeonhalla_dungeonhalla_a.drm n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\streamgroups\dlc_dungeonhalla_dungeonhalla_b.drm n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\streamgroups\dlc_dungeonhallb_dungeonhallb_a.drm n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\streamgroups\dlc_dungeonhallb_dungeonhallb_b.drm n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\streamgroups\dlc_dungeonhallb_dungeonhallb_dungeoncorner.drm n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\streamgroups\dlc_pillory_pillorymain.drm        n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\streamgroups\dlc_treasureroom_treasureroom_main.drm n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\streamgroups\dlc_water_wheel_waterwheel_main.drm n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack10  xenon-w\wp_dlc_gold_shotgun.drm                         n  17  diff min 0.427 med 0.747 max 0.844  ours {'pcbase': 17}
+pack11  xenon-w\cinstream\pdlc2_000_fight.drm                   n   1  diff min 0.611 med 0.611 max 0.611  ours {'pcbase': 1}
+pack11  xenon-w\co_dlc_knight_thrall.drm                        n   1  diff min 0.093 med 0.093 max 0.093  ours {'pcbase': 1}
+pack11  xenon-w\co_dlc_lara.drm                                 n   7  diff min 0.001 med 0.227 max 0.500  ours {'pcbase': 6, 'own': 1}
+pack11  xenon-w\co_dlc_lara_f.drm                               n  10  diff min 0.001 med 0.227 max 0.500  ours {'pcbase': 9, 'own': 1}
+pack11  xenon-w\co_dlc_white_card.drm                           n   1  diff min 0.499 med 0.499 max 0.499  ours {'pcbase': 1}
+pack11  xenon-w\dlc2_costumes.drm                               n   1  diff min 0.498 med 0.498 max 0.498  ours {'pcbase': 1}
+pack11  xenon-w\dlc2_uo_energy_ball.drm                         n   1  diff min 0.692 med 0.692 max 0.692  ours {'pcbase': 1}
+pack11  xenon-w\dlc2_uo_energy_pillar.drm                       n   9  diff min 0.723 med 0.723 max 0.726  ours {'pcbase': 9}
+pack11  xenon-w\dlc2_uo_energy_pillar_machine.drm               n   9  diff min 0.723 med 0.723 max 0.726  ours {'pcbase': 9}
+pack11  xenon-w\dlc2_uo_goo_converter_drip.drm                  n   1  diff min 0.498 med 0.498 max 0.498  ours {'pcbase': 1}
+pack11  xenon-w\dlc2_uo_goo_drips_spawned.drm                   n   1  diff min 0.499 med 0.499 max 0.499  ours {'pcbase': 1}
+pack11  xenon-w\dlc2_uo_machine_column.drm                      n   9  diff min 0.499 med 0.837 max 0.844  ours {'pcbase': 8, 'own': 1}
+pack11  xenon-w\dlc2_uo_machine_debris.drm                      n   1  diff min 0.499 med 0.499 max 0.499  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_bloom.drm                                n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_cine_object.drm                          n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_cine_snow.drm                            n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_cine_thrall_death.drm                    n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_dummy.drm                                n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_amb_sml.drm                          n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_ceremony.drm                         n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_ceremony_b_ist.drm                   n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_ceremony_c_ist.drm                   n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_ceremony_d_ist.drm                   n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_converter_ball_death.drm             n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_dun_float_ist.drm                    n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack11  xenon-w\dlc_fx_goo_dun_ist.drm                          n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack11  xenon-w\dlc_fx_goo_dun_less_ist.drm                     n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack11  xenon-w\dlc_fx_goo_dun_lrg_ist.drm                      n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack11  xenon-w\dlc_fx_goo_machine.drm                          n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_machine_a_ist.drm                    n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_machine_b_ist.drm                    n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_machine_c_ist.drm                    n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_machine_obstacle.drm                 n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_room_platformreveal.drm              n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_tres_ist.drm                         n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack11  xenon-w\dlc_fx_goo_tres_line_ist.drm                    n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack11  xenon-w\dlc_fx_goo_tube_amb_med_ist.drm                 n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_tube_amb_short_ist.drm               n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_tube_base.drm                        n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_tube_base_sml.drm                    n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_tube_end.drm                         n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_tube_short.drm                       n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_tube_upper.drm                       n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_upcolumn_ball.drm                    n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_goo_upcolumn_pit.drm                     n   2  diff min 0.500 med 0.749 max 0.749  ours {'pcbase': 1, 'own': 1}
+pack11  xenon-w\dlc_fx_lightray_machine.drm                     n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\dlc_fx_torch_sml_ist.drm                        n   1  diff min 0.500 med 0.500 max 0.500  ours {'own': 1}
+pack11  xenon-w\dlc_fx_torch_tiny_ist.drm                       n   1  diff min 0.500 med 0.500 max 0.500  ours {'own': 1}
+pack11  xenon-w\dlc_fx_torch_tongue_ist.drm                     n   1  diff min 0.500 med 0.500 max 0.500  ours {'own': 1}
+pack11  xenon-w\dlc_yggdrasil_hall01.drm                        n   1  diff min 0.426 med 0.426 max 0.426  ours {'pcbase': 1}
+pack11  xenon-w\doppelganger_casual.drm                         n  25  diff min 0.001 med 0.500 max 0.844  ours {'pcbase': 24, 'own': 1}
+pack11  xenon-w\g_pda.drm                                       n  13  diff min 0.499 med 0.748 max 0.844  ours {'pcbase': 13}
+pack11  xenon-w\lara_doppelganger.drm                           n  24  diff min 0.001 med 0.692 max 0.844  ours {'pcbase': 23, 'own': 1}
+pack11  xenon-w\natla_thrall.drm                                n   5  diff min 0.268 med 0.466 max 0.821  ours {'pcbase': 4, 'own': 1}
+pack11  xenon-w\streamgroups\dlc2_goo_room_goo_room_all.drm     n   1  diff min 0.498 med 0.498 max 0.498  ours {'pcbase': 1}
+pack11  xenon-w\streamgroups\dlc2_machine_room_machine_room_all.drm n   1  diff min 0.498 med 0.498 max 0.498  ours {'pcbase': 1}
+pack11  xenon-w\streamgroups\dlc2_treasure_room_cine_treasure_room_all.drm n   1  diff min 0.500 med 0.500 max 0.500  ours {'pcbase': 1}
+pack11  xenon-w\viking_thrall_chunkdoll_dlc2_.drm               n   1  diff min 0.499 med 0.499 max 0.499  ours {'pcbase': 1}
+pack11  xenon-w\viking_thrall_dlc2_.drm                         n  14  diff min 0.499 med 0.748 max 0.844  ours {'pcbase': 13, 'own': 1}
+pack11  xenon-w\viking_thrall_tutorial_dlc2_.drm                n  14  diff min 0.499 med 0.748 max 0.844  ours {'pcbase': 13, 'own': 1}
+pack11  xenon-w\wp_dlc_handgun.drm                              n  16  diff min 0.418 med 0.748 max 0.844  ours {'pcbase': 16}
+pack11  xenon-w\yeti_thrall_armored_chunkdoll_dlc_2_.drm        n   1  diff min 0.499 med 0.499 max 0.499  ours {'pcbase': 1}
+pack11  xenon-w\yeti_thrall_armored_dlc2_.drm                   n  14  diff min 0.499 med 0.748 max 0.844  ours {'pcbase': 13, 'own': 1}
+pack11  xenon-w\yeti_thrall_chunkdoll_dlc2_.drm                 n   1  diff min 0.499 med 0.499 max 0.499  ours {'pcbase': 1}
+pack11  xenon-w\yeti_thrall_dlc2_.drm                           n  14  diff min 0.499 med 0.748 max 0.844  ours {'pcbase': 13, 'own': 1}
+pack2   xenon-w\dlc_costume_a.drm                               n  22  diff min 0.001 med 0.692 max 0.692  ours {'pcbase': 21, 'own': 1}
+pack2   xenon-w\dlc_costume_h.drm                               n  23  diff min 0.001 med 0.692 max 0.692  ours {'pcbase': 22, 'own': 1}
+pack20  xenon-w\dlc_costume_l.drm                               n  27  diff min 0.000 med 0.500 max 0.748  ours {'pcbase': 26, 'own': 1}
+pack20  xenon-w\dlc_costume_m.drm                               n  28  diff min 0.000 med 0.500 max 0.748  ours {'pcbase': 27, 'own': 1}

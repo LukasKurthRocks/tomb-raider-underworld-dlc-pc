@@ -1,0 +1,82 @@
+l1_seatop                      cps 1  entry None                        (no test)  +0x52 [24465]
+l1_seafloor                    cps 1  entry l1_seatop                   (no test)  +0x52 [24465]
+l1_norse_hallway_a             cps 2  entry l1_seafloor                 ok        con   1 dis   0 dup 0   24465@10m 24466@42m
+l1_kraken_entrance             cps 0  entry l1_norse_hallway_a          (no test)  +0x52 []
+l1_krakenstairs_a              cps 2  entry l1_kraken_entrance          ok        con   1 dis   0 dup 0   24465@14m 24466@103m
+l1_krakenstairs_b              cps 2  entry l1_krakenstairs_a           ok        con   1 dis   0 dup 0   24465@17m 24466@89m
+l1_kraken_room                 cps 9  entry l1_krakenstairs_b           mixed     con   9 dis  12 dup 5   24465@232m 24465@247m 24465@241m 24465@202m 24465@200m 24465@22m 24466@170m 24467@221m 24468@221m
+l1_baldrsstairs_a              cps 2  entry l1_kraken_room              ok        con   1 dis   0 dup 0   24465@15m 24466@112m
+l1_baldrsstairs_b              cps 2  entry l1_baldrsstairs_a           ok        con   1 dis   0 dup 0   24465@13m 24466@108m
+l1_baldrs_tomb                 cps 3  entry l1_baldrsstairs_b           mixed     con   2 dis   1 dup 0   24466@61m 24467@41m 24468@82m
+l1_baldrs_sideroom             cps 2  entry l1_baldrs_tomb              ok        con   1 dis   0 dup 0   24465@10m 24466@128m
+l1_baldrs_hall                 cps 2  entry l1_baldrs_sideroom          ok        con   1 dis   0 dup 0   24465@11m 24466@100m
+l1_cineseatop                  cps 0  entry l1_seatop                   (no test)  +0x52 []
+l1_ship_exterior               cps 9  entry l1_cineseatop               mixed     con  14 dis  22 dup 0   24465@667m 24466@681m 24467@722m 24468@762m 24469@680m 24470@652m 24471@607m 24472@701m 24473@660m
+l1_ship_upper_hallway_a        cps 2  entry l1_ship_exterior            ok        con   1 dis   0 dup 0   24465@11m 24466@59m
+l1_ship_upper_hallway_b        cps 2  entry l1_ship_upper_hallway_a     ok        con   1 dis   0 dup 0   24465@7m 24466@50m
+l1_ship_upper_hallway          cps 2  entry l1_ship_upper_hallway_b     ok        con   1 dis   0 dup 0   24465@7m 24466@66m
+l1_ship_engine_hall            cps 2  entry l1_ship_upper_hallway       reversed  con   0 dis   1 dup 0   24465@82m 24466@7m
+l1_ship_natla_room             cps 2  entry l1_ship_engine_hall         ok        con   1 dis   0 dup 0   24465@9m 24466@67m
+l1_ship_lower_hallway          cps 2  entry l1_ship_natla_room          reversed  con   0 dis   1 dup 0   24465@80m 24466@6m
+l1_ship_sinking_hall           cps 2  entry l1_ship_lower_hallway       ok        con   1 dis   0 dup 0   24465@15m 24466@118m
+l1_cine_ship_sinking           cps 0  entry l1_ship_sinking_hall        (no test)  +0x52 []
+l2_cliffclimb                  cps 6  entry None                        (no test)  +0x52 [24465, 24466, 24467, 24468, 24469, 24470]
+l2_cliffhall                   cps 3  entry l2_cliffclimb               mixed     con   2 dis   1 dup 0   24465@83m 24466@25m 24467@165m
+l2_cliffhall_b                 cps 3  entry l2_cliffhall                ok        con   3 dis   0 dup 0   24465@54m 24466@74m 24467@144m
+l2_junglehub                   cps 7  entry l2_cliffhall_b              mixed     con  13 dis   8 dup 0   24465@106m 24466@189m 24467@161m 24468@171m 24469@218m 24470@47m 24472@192m
+l2_hubhall                     cps 5  entry l2_junglehub                mixed     con   7 dis   3 dup 0   24465@44m 24466@122m 24467@11m 24468@180m 24469@171m
+l2_puzzleroom                  cps 15  entry l2_hubhall                  mixed     con  74 dis  31 dup 0   24465@16m 24466@86m 24467@88m 24468@108m 24469@107m 24470@108m 24471@188m 24472@187m 24473@68m 24474@81m 24477@153m 24478@110m 24479@110m 24480@125m 24481@124m
+l2_norsehall                   cps 5  entry l2_puzzleroom               mixed     con   5 dis   5 dup 0   24465@136m 24466@190m 24467@87m 24468@29m 24469@308m
+l2_norsehub                    cps 13  entry l2_norsehall                mixed     con  43 dis  35 dup 0   24465@64m 24467@115m 24468@114m 24469@92m 24470@70m 24471@14m 24472@106m 24473@120m 24474@121m 24475@70m 24476@120m 24479@79m 24480@79m
+l2_towerconnector              cps 3  entry l2_norsehub                 mixed     con   2 dis   1 dup 0   24465@119m 24467@15m 24468@191m
+l2_towerroom                   cps 7  entry l2_towerconnector           mixed     con   8 dis  10 dup 3   24465@113m 24465@74m 24466@119m 24466@74m 24467@10m 24467@85m 24468@106m
+l2_upperhallway                cps 3  entry l2_towerroom                mixed     con   2 dis   1 dup 0   24465@43m 24466@10m 24467@127m
+l2_shrineroom                  cps 1  entry l2_puzzleroom               (no test)  +0x52 [24468]
+l2_maproom                     cps 5  entry l2_shrineroom               mixed     con   5 dis   5 dup 0   24465@316m 24466@151m 24467@219m 24470@61m 24472@349m
+l2_flushtunnel                 cps 2  entry l2_maproom                  ok        con   1 dis   0 dup 0   24465@10m 24466@269m
+l3_main_bedroom                cps 3  entry None                        (no test)  +0x52 [24465, 24466, 24467]
+l3_bedroom_hall                cps 3  entry l3_main_bedroom             ok        con   3 dis   0 dup 0   24465@10m 24466@41m 24467@85m
+l3_main_hall                   cps 4  entry l3_bedroom_hall             mixed     con   4 dis   2 dup 0   24465@9m 24466@78m 24467@45m 24468@66m
+l3_mansion_exterior_afterburn  cps 0  entry l3_main_hall                (no test)  +0x52 []
+l3_caverns_start               cps 2  entry None                        (no test)  +0x52 [24465, 24466]
+l3_chapel                      cps 5  entry l3_caverns_start            mixed     con   4 dis   5 dup 1   24465@12m 24465@159m 24466@137m 24467@92m 24469@102m
+l3_stairhall                   cps 2  entry l3_chapel                   ok        con   1 dis   0 dup 0   24465@29m 24466@75m
+l3_secretchamber               cps 3  entry l3_stairhall                ok        con   2 dis   0 dup 1   24465@7m 24465@94m 24466@113m
+l3_chamberrockhall             cps 2  entry l3_secretchamber            ok        con   1 dis   0 dup 0   24465@11m 24466@213m
+l4_trailstart                  cps 6  entry None                        (no test)  +0x52 [24477, 24478, 24479, 24480, 24481, 24482]
+l4_trailtube                   cps 3  entry l4_trailstart               mixed     con   1 dis   2 dup 0   24465@542m 24466@25m 24467@429m
+l4_ballcourt                   cps 13  entry l4_trailtube                mixed     con  57 dis  21 dup 0   24465@21m 24466@229m 24467@359m 24468@480m 24469@533m 24470@199m 24471@383m 24472@457m 24473@644m 24474@799m 24475@648m 24476@250m 24477@491m
+l4_templepath                  cps 2  entry l4_ballcourt                ok        con   1 dis   0 dup 0   24466@32m 24467@426m
+l4_temple                      cps 6  entry l4_templepath               mixed     con   7 dis   8 dup 0   24465@328m 24466@368m 24467@288m 24468@53m 24469@364m 24470@362m
+l4_staircase_upper             cps 3  entry l4_ballcourt                mixed     con   1 dis   2 dup 0   24477@226m 24478@299m 24480@19m
+l4_staircase_xibalba           cps 4  entry l4_staircase_upper          mixed     con   2 dis   4 dup 0   24465@111m 24466@54m 24467@230m 24468@36m
+l4_traprooms                   cps 15  entry l4_staircase_xibalba        mixed     con  68 dis  27 dup 4   0@54m 0@55m 0@108m 0@105m 0@54m 24476@171m 24477@75m 24478@94m 24479@170m 24480@24m 24481@167m 24482@221m 24483@168m 24484@221m 24485@128m
+l4_staircase_mictlan           cps 2  entry l4_traprooms                ok        con   1 dis   0 dup 0   24466@18m 24467@386m
+l4_ragnarok_room               cps 2  entry l4_staircase_mictlan        ok        con   1 dis   0 dup 0   24465@22m 24466@534m
+l4_pool                        cps 12  entry l4_ragnarok_room            mixed     con  23 dis  28 dup 5   0@171m 0@200m 0@148m 0@181m 0@179m 0@110m 24466@167m 24467@125m 24468@140m 24469@223m 24471@220m 24473@24m
+l5_startsnow                   cps 1  entry None                        (no test)  +0x52 [24465]
+l5_valgrind_tunnel             cps 1  entry l5_startsnow                (no test)  +0x52 [24465]
+l5_valgrind                    cps 8  entry l5_valgrind_tunnel          mixed     con  13 dis  15 dup 0   24465@54m 24466@293m 24467@185m 24468@249m 24469@200m 24470@156m 24471@132m 24472@235m
+l5_valaskjalf_entry            cps 3  entry l5_valgrind                 mixed     con   2 dis   1 dup 0   24465@18m 24466@420m 24467@363m
+l5_valaskjalf_entryb           cps 2  entry l5_valaskjalf_entry         ok        con   1 dis   0 dup 0   24465@36m 24466@283m
+l5_valaskjalf                  cps 16  entry l5_valaskjalf_entryb        mixed     con  69 dis  51 dup 0   24465@19m 24466@315m 24467@89m 24468@174m 24469@226m 24470@281m 24471@291m 24473@178m 24474@166m 24475@215m 24476@214m 24477@214m 24478@191m 24479@290m 44465@243m 44466@199m
+l6_ship_exterior               cps 8  entry None                        (no test)  +0x52 [24465, 24472, 24473, 24474, 24475, 24476, 24477, 24478]
+l6_ship_upper_hallway_a        cps 2  entry l6_ship_exterior            ok        con   1 dis   0 dup 0   24465@11m 24466@59m
+l6_ship_upper_hallway_b        cps 2  entry l6_ship_upper_hallway_a     ok        con   1 dis   0 dup 0   24465@7m 24466@50m
+l6_ship_upper_hallway          cps 2  entry l6_ship_upper_hallway_b     ok        con   1 dis   0 dup 0   24465@7m 24466@66m
+l6_ship_engine_hall            cps 2  entry l6_ship_upper_hallway       reversed  con   0 dis   1 dup 0   24465@82m 24466@7m
+l6_ship_natla_room             cps 0  entry l6_ship_engine_hall         (no test)  +0x52 []
+l7_thin_ice                    cps 1  entry None                        (no test)  +0x52 [24465]
+l7_arctic_sea                  cps 11  entry l7_thin_ice                 mixed     con  37 dis  18 dup 0   14465@407m 14466@483m 14468@576m 24465@14m 24469@780m 24470@784m 24471@696m 24472@765m 24473@735m 24474@770m 24475@626m
+l7_helheim_hall01              cps 1  entry l7_arctic_sea               (no test)  +0x52 [24465]
+l7_helheim_hall02              cps 0  entry l7_helheim_hall01           (no test)  +0x52 []
+l7_helheim01                   cps 2  entry l7_helheim_hall02           ok        con   1 dis   0 dup 0   24465@120m 24466@328m
+l7_helheim02                   cps 1  entry l7_helheim01                (no test)  +0x52 [24465]
+l7_helheim03                   cps 1  entry l7_helheim02                (no test)  +0x52 [24465]
+l7_yggdrasil                   cps 1  entry l7_helheim03                (no test)  +0x52 [24465]
+l7_yggdrasil_hall01            cps 1  entry l7_yggdrasil                (no test)  +0x52 [24465]
+l7_yggdrasil_hall02            cps 0  entry l7_yggdrasil_hall01         (no test)  +0x52 []
+l7_yggdrasil_end               cps 16  entry l7_yggdrasil_hall02         mixed     con  62 dis  58 dup 0   0@323m 24465@18m 24466@223m 24467@228m 24468@344m 24469@347m 24470@259m 24471@351m 24472@250m 24473@256m 24474@390m 24475@370m 30001@256m 30002@220m 30003@220m 30004@254m
+l7_monastery                   cps 0  entry l7_yggdrasil_end            (no test)  +0x52 []
+l7_himalaya_end                cps 0  entry l7_monastery                (no test)  +0x52 []
+TOTAL {'untested': 25, 'ok': 26, 'pairs_con': 567, 'pairs_dis': 380, 'units_dup': 6, 'mixed': 27, 'reversed': 3}

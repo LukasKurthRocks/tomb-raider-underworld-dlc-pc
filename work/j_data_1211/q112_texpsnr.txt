@@ -1,0 +1,11 @@
+('pack1', 'identical', 'own') 2
+('pack1', 'identical', 'pcbase') 46
+('pack10', 'identical', 'own') 40
+('pack10', 'identical', 'pcbase') 268
+('pack11', 'identical', 'own') 20
+('pack11', 'identical', 'pcbase') 221
+('pack2', 'identical', 'own') 2
+('pack2', 'identical', 'pcbase') 43
+('pack20', 'identical', 'own') 2
+('pack20', 'identical', 'pcbase') 53
+unique (id, DLC content): 110 {'identical': 110}

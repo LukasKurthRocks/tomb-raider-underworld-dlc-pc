@@ -1,0 +1,33 @@
+== DRM records with a base-game name
+  pack10  xenon-w\g_pda.drm            pack md5 bcebd2d5  base retail 0d007238
+  pack11  xenon-w\camerashakes.drm     pack md5 a9646e8f  base retail f054261a
+  pack11  xenon-w\g_pda.drm            pack md5 50ed4695  base retail 0d007238
+== section 6:10  Xbox base contents: 872833e3 (retail-old, 2 DRMs)
+   pack11  50a05bb9   8300 B  14 DRMs  e.g. xenon-w\dlc2_ceremony_room.drm
+== section 7:906  Xbox base contents: eedf8a2a (retail, 98 DRMs)
+   pack10  6ed50f47    308 B  10 DRMs  e.g. xenon-w\dlc_caverns.drm
+   pack11  eedf8a2a    308 B  15 DRMs  e.g. xenon-w\dlc2_ceremony_room.drm
+== section 7:2552  Xbox base contents: b1200e00 (retail, 14 DRMs)
+   pack1   80b8a8de    200 B  2 DRMs  e.g. xenon-w\dlc_costume_k.drm
+   pack10  798ec497    140 B  10 DRMs  e.g. xenon-w\dlc1_health_pack.drm
+   pack11  798ec497    140 B  8 DRMs  e.g. xenon-w\doppelganger_casual.drm
+   pack2   80b8a8de    200 B  2 DRMs  e.g. xenon-w\dlc_costume_a.drm
+   pack20  f956db84     88 B  2 DRMs  e.g. xenon-w\dlc_costume_l.drm
+== section 7:1155  Xbox base contents: 85611132 (retail, 81 DRMs)
+   pack1   27b90722    556 B  2 DRMs  e.g. xenon-w\dlc_costume_k.drm
+   pack10  85611132    312 B  6 DRMs  e.g. xenon-w\dlc_costume_b.drm
+   pack11  85611132    312 B  2 DRMs  e.g. xenon-w\doppelganger_casual.drm
+   pack2   27b90722    556 B  2 DRMs  e.g. xenon-w\dlc_costume_a.drm
+   pack20  27b90722    556 B  2 DRMs  e.g. xenon-w\dlc_costume_l.drm
+== section 8:8453  Xbox base contents: 1adacc69 (retail, 20 DRMs)
+   pack10  1adacc69   3300 B  6 DRMs  e.g. xenon-w\dlc_dungeon.drm
+   pack11  1a88d11c    152 B  16 DRMs  e.g. xenon-w\dlc2_ceremony_room.drm
+== section 7:2743  Xbox base contents: 50739282 (retail, 2 DRMs)
+   pack11  024aef93    528 B  1 DRMs  e.g. xenon-w\camerashakes.drm
+== section 7:10994  Xbox base contents: 4aefcceb (retail, 2 DRMs)
+   pack11  9a7666fb  12772 B  2 DRMs  e.g. xenon-w\dlc_yggdrasil_end.drm
+== section 7:8369  Xbox base contents: 4101809a (retail, 13 DRMs)
+   pack10  4101809a    408 B  5 DRMs  e.g. xenon-w\dlc_dungeon.drm
+   pack11  bdddd33b    408 B  10 DRMs  e.g. xenon-w\dlc2_ceremony_room.drm
+== section 6:761  Xbox base contents: 0cb7e1ae (retail, 2 DRMs)
+   pack11  ec194b75   8300 B  1 DRMs  e.g. xenon-w\doppelganger_casual.drm

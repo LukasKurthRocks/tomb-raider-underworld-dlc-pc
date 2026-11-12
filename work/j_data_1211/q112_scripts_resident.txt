@@ -1,0 +1,85 @@
+######## script 878
+xtu:l1_baldrs_hall.drm script 878: 436 B, 1 functions, vtable 72 slots, native type None
+   arrays: states 1, members 1, sfi 1, protos 1, funcs 1, locals 5, code 18, deps 4
+pack11:dlc2_ceremony_room.drm script 878: 436 B, 1 functions, vtable 72 slots, native type None
+   arrays: states 1, members 1, sfi 1, protos 1, funcs 1, locals 5, code 18, deps 4
+
+-- function pairing (by name Symbol)
+  totals: {'equal': 1}
+
+-- strings only in B (0)
+-- strings only in A (0)
+
+-- id references only in B: []
+-- id references only in A: []
+
+-- native calls only in B / more often in B: []
+-- native calls only in A / more often in A: []
+######## script 941
+xtu:ar_pt_thor_gear.drm script 941: 11164 B, 14 functions, vtable 65 slots, native type None
+   arrays: states 3, members 64, sfi 6, protos 12, args 2, args 1, args 1, args 1, args 1, funcs 14, locals 1, code 41, locals 1, code 30, locals 3, code 27, code 3, locals 3, code 27, code 3, locals 3, code 96, code 71, locals 1, code 50, locals 1, code 26, locals 29, code 640, code 4, locals 1, code 71, locals 3, code 47, vtable 65, deps 23
+pack10:dlc_level1_start.drm script 941: 11164 B, 14 functions, vtable 65 slots, native type None
+   arrays: states 3, members 64, sfi 6, protos 12, args 2, args 1, args 1, args 1, args 1, funcs 14, locals 1, code 41, locals 1, code 30, locals 3, code 27, code 3, locals 3, code 27, code 3, locals 3, code 96, code 71, locals 1, code 50, locals 1, code 26, locals 29, code 640, code 4, locals 1, code 71, locals 3, code 47, vtable 65, deps 23
+
+-- function pairing (by name Symbol)
+  totals: {'equal': 14}
+
+-- strings only in B (0)
+-- strings only in A (0)
+
+-- id references only in B: []
+-- id references only in A: []
+
+-- native calls only in B / more often in B: []
+-- native calls only in A / more often in A: []
+######## script 999
+xtu:ar_pt_thor_gear.drm script 999: 3804 B, 9 functions, vtable 66 slots, native type None
+   arrays: states 3, members 16, sfi 4, protos 7, args 2, args 1, funcs 9, code 9, locals 1, code 16, code 3, code 3, locals 2, code 36, code 24, code 19, locals 2, code 73, locals 3, code 79, vtable 66, deps 10
+pack10:dlc_caverns.drm script 999: 3804 B, 9 functions, vtable 66 slots, native type None
+   arrays: states 3, members 16, sfi 4, protos 7, args 2, args 1, funcs 9, code 9, locals 1, code 16, code 3, code 3, locals 2, code 36, code 24, code 19, locals 2, code 73, locals 3, code 79, vtable 66, deps 10
+
+-- function pairing (by name Symbol)
+  totals: {'equal': 9}
+
+-- strings only in B (0)
+-- strings only in A (0)
+
+-- id references only in B: []
+-- id references only in A: []
+
+-- native calls only in B / more often in B: []
+-- native calls only in A / more often in A: []
+######## script 1015
+xtu:ar_pt_thor_gear.drm script 1015: 3956 B, 5 functions, vtable 31 slots, native type None
+   arrays: states 1, members 10, sfi 8, protos 5, args 2, args 1, funcs 5, code 16, code 14, code 14, locals 6, code 71, locals 2, code 31, vtable 31, deps 8
+pack11:dlc2_ceremony_room.drm script 1015: 3956 B, 5 functions, vtable 31 slots, native type None
+   arrays: states 1, members 10, sfi 8, protos 5, args 2, args 1, funcs 5, code 16, code 14, code 14, locals 6, code 71, locals 2, code 31, vtable 31, deps 8
+
+-- function pairing (by name Symbol)
+  totals: {'equal': 5}
+
+-- strings only in B (0)
+-- strings only in A (0)
+
+-- id references only in B: []
+-- id references only in A: []
+
+-- native calls only in B / more often in B: []
+-- native calls only in A / more often in A: []
+######## script 1044
+xtu:ar_ei_switch_oneway.drm script 1044: 3048 B, 10 functions, vtable 62 slots, native type None
+   arrays: states 1, members 8, sfi 1, protos 10, args 1, args 1, funcs 10, code 18, code 22, code 9, code 9, code 9, code 9, code 22, code 22, code 17, code 7, vtable 62, deps 2
+pack10:dlc1_uo_wall_switch_b.drm script 1044: 3048 B, 10 functions, vtable 62 slots, native type None
+   arrays: states 1, members 8, sfi 1, protos 10, args 1, args 1, funcs 10, code 18, code 22, code 9, code 9, code 9, code 9, code 22, code 22, code 17, code 7, vtable 62, deps 2
+
+-- function pairing (by name Symbol)
+  totals: {'equal': 10}
+
+-- strings only in B (0)
+-- strings only in A (0)
+
+-- id references only in B: []
+-- id references only in A: []
+
+-- native calls only in B / more often in B: []
+-- native calls only in A / more often in A: []
