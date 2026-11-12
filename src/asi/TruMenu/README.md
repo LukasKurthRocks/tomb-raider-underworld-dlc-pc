@@ -2928,6 +2928,58 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.32 - arena: spawn health note, game mode check, three new spots (2026-11-12)
+
+Built into `work\asi\menu0255`, not installed, no live test (group A; finding in the workspace
+`docs\Befund-Gruppe-A-1211.md`, scripts in `work\a_arena_1211\`). Read only: no new write, hook, byte check or INI key.
+
+- **`ai.spawn` (Q86):** the live case of 2026-11-11 21:02 ("the spawned thrall just stood and fell apart, LP 0 / state
+  none") was the **one-hit-kill cheat**, switched on at 20:37:57 in the same session (`[0xe91ffd] = 1`; the enemy health
+  component 0x62e370 then stores LP 0 on every hit, 0x62e39f): TruShadowCombat logged `LP 350 -> 0` from a 23.4 hit, the
+  thrall had LP 350 like the placed ones and its AI ran (CombatStepIdle 0.1 s after the birth, RegenerateDeath, Regenerate,
+  MoveNav, Vaulted, Death). The birth already runs the game's whole enemy init (0x63c190: brain, tune 0x637730, LP from
+  the tune's health record by the EnemyHP step `[[0xc59264]+0x3ef98]` through 0x620cc0 / 0x6e77b0, senses, AI query
+  0x632200) - the same path as placed and generator enemies. So nothing is set by hand; the answer now **names what the
+  game gave**: `1 x viking_thrall at Lara: 0x... LP 350; EnemyHP step 1` and **warns while one-hit kill is on**. No name /
+  a name that is not an exact loaded AI enemy object = the reason (no such object / not loaded here / no AI enemy) and
+  **the list of the loaded kinds** (plus those containing the typed part: `ai.spawn thrall` lists `viking_thrall,
+  yeti_thrall`). Syntax: `ai.spawn <exact object name> [1..5] [lara|front]`.
+- **`arena.mode [spot]` (Q100):** the game mode now - the player object, the doppelganger byte `[[0xfadb58]+0x1244]`
+  (cleared only by a new game tracker, TruDlc2Player `FlagReset`) and the TruDlc2Player flag -> "main-game mode
+  (adrenaline runs)" / "DLC 2 doppelganger mode" / "MIXED"; with a spot it says whether that fits (main game: 0, DLC 2:
+  1) and logs one line. **`arena.go`** reads the mode first: a main-game spot while the flag is set loads its unit with
+  **`level.load`** instead of `unit.go` (a portal walk would keep the old tracker; the load makes a new one = flag 0,
+  TruDlc2Player CostumeReset gives the unit's costume back), a DLC 2 spot without the flag warns (TruMenu never writes
+  the flag); the shortcut ends with `arena.mode <spot>` (the mode after the arrival in `TruMenu.log`). The 2026-11-11
+  "hanging flag" was not one: `arena.go 1a` from a DLC 2 session made tracker 7, "doppelganger flag 1 -> 0" at
+  19:35:55, adrenaline ran in Helheim; the quoted 19:36 / 19:38 lines are from an earlier day of the multi-day logs.
+- **Spots 1d / 1e / 1f (Q98):** the largest open flat floors of the unit navmeshes with a resident AI enemy kind and a
+  checkpoint on the floor (`work\a_arena_1211\q98_flat_areas.py`, "r" = the largest free circle):
+  **1d `l5_valgrind` CP 7329** (r 2950, 14350 x 17550, z -26105, `viking_thrall`), **1e `l2_puzzleroom` CP 2074** (Kali
+  hall, r 3050, z -15275, `naga_green` / `naga_red`; the puzzle pillars are still there), **1f `l4_traprooms` CP 5722**
+  (r 2851, 7776 x 8819, z -2785, `giant_albino_tarantula` / `small_albino_spider`). For comparison 1a r 803 (a loop),
+  1b r 767, 1c r 733. Page Tests, group "Arena 1 - Kampf (Q76)": the three rows and "Modus prüfen".
+- **Checks:** `trumenu_ini_check` new `check_02232` (LP / EnemyHP / one-hit-kill note read only, kind list, `arena.mode`
+  item and its reads, `arena.go` mode step and `level.load` choice, the 6 spots with their modes, rows, help lines, no
+  INI key; `check_02226` accepts the later spots) - exit 0; negative tests on copies 4 of 4 caught (no SpHealthNote,
+  always `unit.go`, a wrong checkpoint, a write in SpBornLp). Byte checks of the quoted code sites
+  (`work\a_arena_1211\precheck_02232_evidence.txt`): 8 / 8 on `data\pc\tru.exe` and the installed `tru.exe`.
+
+### TO TEST 0.22.32
+
+Main-game session (no DLC 2 before it in the same run); `[Cheats] Enabled=1`, `[Cheat] Experimental=1`; one-hit kill off.
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | mode | page Tests, "Arena 1": "Modus prüfen" | `player lara_... , doppelganger byte 0, TruDlc2Player flag 0 -> main-game mode` |
+| 2 | spot 1d | "1d: Valgrind (l5, CP 7329)" (right twice) | `l5_valgrind` loads, Lara at CP 7329 (flight on); last log line `arena.mode 1d ... fits the main-game spot` |
+| 3 | spawn names | command line `ai.spawn` (no name), then `ai.spawn thrall` | the answers list the loaded kinds (`viking_thrall`), `thrall` = "no object is named 'thrall'" + the matching kinds |
+| 4 | spawn LP | `ai.spawn viking_thrall 1` | `... at Lara: 0x... LP 350; EnemyHP step n`; he attacks; a few hits do not kill him |
+| 5 | one-hit kill | cheat "Ein Treffer" on, spawn again, off | the answer carries `WARNING one-hit kill is ON`; one hit = RegenerateDeath |
+| 6 | spots 1e / 1f | "1e: Kali-Halle", spawn `naga_green`; "1f: Fallenräume", spawn `giant_albino_tarantula` | Lara on the hall floor; the kinds spawn and fight; note pillars / traps in the way |
+| 7 | DLC 2 flag | after a DLC 2 start: "1a: Helheim-Halle" | log `arena.go 1a ... level.load l7_helheim03 ... doppelganger flag set ...`, after the arrival `arena.mode 1a ... byte 0 ... fits` |
+| 8 | DLC 2 spot | from the main game: "1c: hall02 DLC 2" | answer / log `WARNING ... DLC 2 spot without the doppelganger` |
+
 ## 0.22.31 - level navigation (Q105) and room puzzles (Q106) (2026-11-12)
 
 Built into `work\asi\menu0254`, not installed, no live test (group B; finding in the workspace

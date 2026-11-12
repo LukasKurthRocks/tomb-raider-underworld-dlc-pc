@@ -151,7 +151,8 @@ $earlierBuilds = @{
                       'ebd75bd759135f76a26bcf867310d394033c48467e1e64e93431ab337388159d',   # 0.22.27 save probe (work\asi\menu0250)
                       'e284247a58914abc4c856343d52f067fe83ad1a37fb4fa16a16e5cf01bf554fd',   # 0.22.28 test packages (work\asi\menu0251)
                       '7c8acbb34540547c2ec2893072c0e8d3e941517a57b2a17b92bcf1c5444f2ab1',   # 0.22.29 radial lock Q103 (work\asi\menu0252)
-                      '0753f83050ff70a2274f2ddcf65252607f2edbd33b6a91037ba4e37367244a90')   # 0.22.30 log dates, device glyphs (work\asi\menu0253)
+                      '0753f83050ff70a2274f2ddcf65252607f2edbd33b6a91037ba4e37367244a90',   # 0.22.30 log dates, device glyphs (work\asi\menu0253)
+                      '502f5805137f21bec0e8128c68f87066350dd9d4c7910189845780f39743ebcc')   # 0.22.31 level navigation, puzzles (work\asi\menu0254)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

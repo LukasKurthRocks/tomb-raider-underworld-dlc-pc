@@ -3775,16 +3775,18 @@ def check_02226(ini_path):
     if '"ts_arena1", kQbGroup' not in src: problems.append('TruMenu.cpp: kQbTests lacks the group ts_arena1')
     m = re.search(r'const TarArena kArenas\[\] = \{(.*?)\n\};', src, re.S)
     arenas = re.findall(r'\{(\d+), "([0-9][a-z])", "([a-z0-9_]+)", (\d+), ', m.group(1)) if m else []
-    if arenas != ARENA_TABLE: problems.append('TruMenu.cpp: kArenas must be the 3 spots of arena 1 (1a / 1b / 1c)')
+    if arenas[:3] != ARENA_TABLE:   # 0.22.32: 1d .. follow (check_02232)
+        problems.append('TruMenu.cpp: kArenas must start with the 3 spots of arena 1 (1a / 1b / 1c)')
     if any(not k.startswith(a) for a, k, u, i in arenas):
         problems.append('TruMenu.cpp: a kArenas spot key must start with its arena number')
     if 'const char *const kArenaNames[][2] = {{"", ""}, {"Kampf", "combat"}};' not in src:
         problems.append('TruMenu.cpp: kArenaNames must name arena 1 "Kampf" (owner 2026-11-11 13:05)')
     go = fn_body(src, 'bool RunArenaGo(')
-    if '"save.backup kapitel;unit.go %s;wait.unit %s;cheat.flight 1;player.goto %ld force"' not in go:
+    if '"save.backup kapitel;unit.go %s;wait.unit %s;cheat.flight 1;player.goto %ld force"' not in go and \
+            '"save.backup kapitel;%s %s;wait.unit %s;cheat.flight 1;player.goto %ld force;arena.mode %s"' not in go:
         problems.append('TruMenu.cpp: arena.go must run backup, unit.go, wait.unit, flight, player.goto force')
     for want in ('UnitIndexOf(a->unit) < 0', 'UnitNameNoDrm(a->unit)', 'LevelChangePending(why, sizeof(why))',
-                 'return ShortcutStart(steps, title, o, n);'):
+                 'ShortcutStart(steps, title, o, n)'):   # 0.22.32: if (!ShortcutStart(...)) return false;
         if want not in go: problems.append('TruMenu.cpp: RunArenaGo must hold %s' % want)
     if items.get('arena.go') != 'action' or items.get('arena.list') != 'info':
         problems.append('TruMenu.cpp: items arena.go (action) / arena.list (info) missing in kItems')
@@ -3798,6 +3800,89 @@ def check_02226(ini_path):
     return problems, ('test arena: %d kAdmChecks rows (0x6e6646 patch left out), meter-full once in __try, CheatGate on '
                       'fill / keep, AdmTick per frame, ai.remove spawned by address + stamp, page Tests %d arena rows, no '
                       'new INI key' % (len(rows), len(ARENA_ROWS)))
+
+
+ARENA_TABLE_02232 = ARENA_TABLE + [('1', '1d', 'l5_valgrind', '7329'), ('1', '1e', 'l2_puzzleroom', '2074'),
+                                   ('1', '1f', 'l4_traprooms', '5722')]   # Q98 (workspace docs/Befund-Gruppe-A-1211.md)
+ARENA_MODES_02232 = {'1a': '0', '1b': '0', '1c': '2', '1d': '0', '1e': '0', '1f': '0'}   # 2 = DLC 2 doppelganger spot
+
+
+def check_02232(ini_path):
+    """0.22.32 (group A 12.11.; workspace docs/Befund-Gruppe-A-1211.md): Q86 - RunAiSpawn reads the LP of each born enemy
+    through SpBornLp (AiBrainOf, brain+0x2c64), names the EnemyHP step [[0xc59264]+0x3ef98] and warns while the one-hit
+    kill byte 0xe91ffd is set (SpHealthNote, read only), lists the loaded kinds (SpLoadedKinds) on no / a wrong name;
+    Q100 - item arena.mode (action, ValArenaMode / RunArenaMode, never err after the spot test), ArenaModeRead reads the
+    player tracker byte +0x1244 and calls TruDlc2PlayerDoppelganger inside __try, RunArenaGo reads the mode first,
+    takes level.load for a main-game spot with the flag set and ends its shortcut with arena.mode <spot>; Q98 - kArenas
+    = 1a .. 1f with their modes, page Tests rows arena.go 1d / 1e / 1f (kQfConfirm) + arena.mode, help lines for them;
+    no new INI key ([Arena] absent); Set-TruMenu.ps1 knows the 0.22.31 hash"""
+    problems = []
+    src = read_cpp()
+    if '0.22.32 (arena, group A' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.32 part "0.22.32 (arena, group A"')
+    if 'const DWORD kSpGameBlock = 0x00c59264, kSpEnemyHp = 0x0003ef98;' not in src:
+        problems.append('TruMenu.cpp: kSpGameBlock / kSpEnemyHp must be 0x00c59264 / 0x0003ef98 (EnemyHP, 0x6e7710)')
+    born = fn_body(src, 'float SpBornLp(')
+    if 'AiBrainOf(inst)' not in born or 'brain + 0x2c64' not in born:
+        problems.append('TruMenu.cpp: SpBornLp must read brain+0x2c64 through AiBrainOf')
+    note = fn_body(src, 'void SpHealthNote(')
+    if 'ByteAt(kOneHitKill)' not in note or 'gb + kSpEnemyHp' not in note:
+        problems.append('TruMenu.cpp: SpHealthNote must read the EnemyHP step and the one-hit kill byte')
+    spawn = fn_body(src, 'bool RunAiSpawn(')
+    for want in ('SpBornLp(inst)', 'SpHealthNote(note, sizeof(note));', 'SpLoadedKinds(kinds, sizeof(kinds), nullptr);',
+                 'SpLoadedKinds(like, sizeof(like), name);', 'usage: ai.spawn <exact object name>'):
+        if want not in spawn: problems.append('TruMenu.cpp: RunAiSpawn must hold %s' % want)
+    if not 0 <= spawn.find('SpRemember(inst);') < spawn.find('SpBornLp(inst)'):
+        problems.append('TruMenu.cpp: RunAiSpawn reads the LP after SpRemember (after the birth)')
+    for fn in ('float SpBornLp(', 'void SpHealthNote(', 'int SpLoadedKinds(', 'void ArenaModeRead(', 'bool RunArenaMode('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('('))
+        if any(w in body for w in ('WriteByte(', 'WriteDword(', 'WriteFloat', 'WriteCode(', 'memcpy(reinterpret_cast')):
+            problems.append('TruMenu.cpp: %s must only read' % fn.strip('('))
+    items = item_types(src)
+    if items.get('arena.mode') != 'action': problems.append('TruMenu.cpp: item arena.mode (action) missing in kItems')
+    m = re.search(r'\{"arena\.mode", "action", (?:"[^"]*"\s*)+,\s*(true|false),\s*ValArenaMode, RunArenaMode\}', src)
+    if not m or m.group(1) != 'false': problems.append('TruMenu.cpp: arena.mode = ValArenaMode / RunArenaMode, not queued')
+    mode = fn_body(src, 'void ArenaModeRead(')
+    if 'tracker + 0x1244' not in mode or 'ReadDword(0x00fadb58, &tracker)' not in mode or \
+            not 0 <= mode.find('__try') < mode.find('g_ftDg()') < mode.find('__except'):
+        problems.append('TruMenu.cpp: ArenaModeRead must read [[0xfadb58]+0x1244] and call g_ftDg inside __try')
+    run = fn_body(src, 'bool RunArenaMode(')
+    if run.count('return false;') != 1 or 'Log(1, "arena.mode' not in run:
+        problems.append('TruMenu.cpp: RunArenaMode must log and answer err only for an unknown spot')
+    go = fn_body(src, 'bool RunArenaGo(')
+    for want in ('"save.backup kapitel;%s %s;wait.unit %s;cheat.flight 1;player.goto %ld force;arena.mode %s"',
+                 'reload ? "level.load" : "unit.go"', 'reload = a->mode != 2 && dg', 'ArenaModeRead(m);',
+                 'if (!ShortcutStart(steps, title, o, n)) return false;'):
+        if want not in go: problems.append('TruMenu.cpp: RunArenaGo must hold %s' % want)
+    if not 0 <= go.find('ArenaModeRead(m);') < go.find('ShortcutStart('):
+        problems.append('TruMenu.cpp: RunArenaGo must read the mode before the shortcut starts')
+    m = re.search(r'const TarArena kArenas\[\] = \{(.*?)\n\};', src, re.S)
+    table = m.group(1) if m else ''
+    arenas = re.findall(r'\{(\d+), "([0-9][a-z])", "([a-z0-9_]+)", (\d+), ', table)
+    if arenas != ARENA_TABLE_02232: problems.append('TruMenu.cpp: kArenas must be the 6 spots 1a .. 1f (Q98)')
+    modes = dict(re.findall(r'\{\d+, "([0-9][a-z])", .*?,\s*(\d)\},', table, re.S))
+    if modes != ARENA_MODES_02232: problems.append('TruMenu.cpp: kArenas modes must be %s (got %s)' % (ARENA_MODES_02232, modes))
+    if 'struct TarArena { int arena; const char *key, *unit; long intro; const char *what; int mode; };' not in src:
+        problems.append('TruMenu.cpp: TarArena must carry the mode')
+    bar = qb_rows(src, True)
+    tests = [(i, a, k, tail) for t, de, i, a, k, layer, tail in bar if t == 'kQbTests']
+    for arg in ('1d', '1e', '1f'):
+        if not any(i == 'arena.go' and a == arg and k == 'kQbAction' and 'kQfConfirm' in tail for i, a, k, tail in tests):
+            problems.append('TruMenu.cpp: kQbTests lacks the arena row arena.go %s (action, kQfConfirm)' % arg)
+    if not any(i == 'arena.mode' and k == 'kQbAction' for i, a, k, tail in tests):
+        problems.append('TruMenu.cpp: kQbTests lacks the action row arena.mode')
+    for hid, harg in (('arena.go', '1d'), ('arena.go', '1e'), ('arena.go', '1f'), ('arena.mode', '')):
+        if not re.search(r'\{"%s", "%s", "' % (re.escape(hid), harg), src):
+            problems.append('TruMenu.cpp: kQbHelp lacks %s %s' % (hid, harg))
+    for line, key, value in ini_section(ini_path, 'Arena'):
+        problems.append('TruMenu.ini:%d: [Arena] %s - 0.22.32 adds no INI key' % (line, key))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '502f5805137f21bec0e8128c68f87066350dd9d4c7910189845780f39743ebcc' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.31 build hash (work/asi/menu0254) is missing')
+    return problems, ('arena: ai.spawn LP / EnemyHP / one-hit-kill note and kind list (read only), arena.mode + mode-aware '
+                      'arena.go (level.load for a main-game spot with the doppelganger flag), %d spots (%s), no INI key'
+                      % (len(arenas), ' '.join(k for a, k, u, i in arenas)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -4355,6 +4440,10 @@ def main(argv):
     for p in cproblems26: print('Q02226 %s' % p)
     if not cproblems26: print('ok: 0.22.26 %s' % csummary26)
     problems += cproblems26
+    cproblems32, csummary32 = check_02232(ini_path)   # 0.22.32 (group A; next to its 0.22.26 arena check)
+    for p in cproblems32: print('Q02232 %s' % p)
+    if not cproblems32: print('ok: 0.22.32 %s' % csummary32)
+    problems += cproblems32
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)
