@@ -1,0 +1,5 @@
+neg_1_no_spawn_block exit 1: 1 non-ok
+neg_2_pause_not_ours exit 1: 1 non-ok
+neg_3_pool_no_reserve exit 1: 1 non-ok
+neg_4_byte_row_changed exit 1: 1 non-ok
+neg_5_shutdown_game_call exit 1: 1 non-ok

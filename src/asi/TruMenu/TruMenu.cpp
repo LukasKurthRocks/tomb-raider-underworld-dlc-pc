@@ -63,7 +63,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.32 (arena, group A; Q86: ai.spawn names the LP each spawned enemy got from the game's enemy init (brain+0x2c64; tune health record by the EnemyHP step [[0xc59264]+0x3ef98]), the EnemyHP step and warns while one-hit kill [0xe91ffd] is on - the 2026-11-11 21:02 thrall 'LP 0' was that cheat, its AI ran; no name / an inexact or unloaded name = the list of the loaded AI enemy kinds with the reason; Q100: arena.mode [spot] = player object, doppelganger byte [[0xfadb58]+0x1244] and TruDlc2Player flag, fits / WARNING per spot, logged; arena.go reads the mode first - a main-game spot with the flag set loads with level.load (new game tracker clears it), a DLC 2 spot without it warns - and ends with arena.mode <spot>; Q98: spots 1d l5_valgrind CP 7329, 1e l2_puzzleroom CP 2074, 1f l4_traprooms CP 5722 - the largest open navmesh floors with a resident enemy kind; read only, no new INI key, no hook); " "0.22.31 (level navigation + puzzles, group B; Q105: the 15 unit names in no PC archive (q105_units.tsv: three base units of the level list, six container / costume / cine names, the six known DLC slots) grey and refused by level.load / level.start / unit.go / cp.jump unless a mods\\<unit>.drm exists, one 'units:' log line; page Kapitel base game in play order from the stream portals with chapter headings (callers of generalbank script 72 SetChapterUIData) and the checkpoint intros per unit - right 2x = backup + load, a checkpoint row = cp.jump <unit> <cp> force (new optional third word: cheat.flight 1;player.goto <cp> force); Q106: uber.dump prints every joint-range transition (condition 14 / 15) with the joint's live value (the engine's getter 0x4e1ef0 / 0x4e1ea0), joint.set <intro> <joint> <value>|stop drives a hinge / rail joint with the engine's limit setters 0x4d9fc0 / 0x4d9f50 / 0x4da0c0 + wake 0x4d8fd0 until the uber leaves its node or 6 s (game thread, a cheat), page Kapitel group 'Raetsel in der Naehe' lists the uber objects with their current node and joint targets, 'solve' rows run joint.set; 27 byte checks); " "0.22.30 (log dates, device glyphs, drawn guards; Q107: every TruMenu.log line starts with 'YYYY-MM-DD HH:MM:SS.mmm' and the first line of a process is the session header '=== <date time> TruMenu <version> session start (pid n) ===' (src/asi/TruLog.h, shared with the other plugins); the log page / overlay take a stamp with or without the date and show the time; Q95: [Input] DeviceGlyphs=1 (default 0) - the last used device (pad: a button, a trigger or a stick past its dead zone in the game's poll; keyboard / mouse: a key, a click, the wheel, a mouse move away from the client centre) decides the button prompts of UIText: 23 bytes of 0x5a7c20 at 0x5a7d75 call GlName - pad = the symbol of the first XInput binding (Start / Back U+1810 / U+1811 too), keyboard / mouse = the name of the first other binding, else the game's own name; 12 byte checks, 'glyphs:' log lines; Q103 rest: the quick bar's presses and every widget of the big menu (ImGuiItemFlags_Disabled) act only after 3 drawn frames since the open, else 'quick: buttons 0x.... ignored - not drawn (n frames)' / 'menu: input ignored - not drawn (n frames)'); " "0.22.29 (radial lock, Q103:[Radial] Enabled=0 also closes a ring that is still open (settings.reset) and drops its pending release / open / close requests; a release, confirm, A / click or R3 runs a ring entry only when DrawRadial drew the ring in at least 3 frames since the open, else 'radial: <what> ignored - not drawn (n frames)'; the close line names the drawn frames; no new INI key); " "0.22.28 (test packages, Q90: page Tests group 'Testpakete 11.11. (Q90)' with one closed sub-group per package A, 1 .. 9 of docs\\Testpakete-1111.md - a hint line, jump / load rows of existing items (level.start, level.load, arena.go), the existing switch rows of TruMenu.switches.txt the package toggles (kQbSwitch = the page Fixes row: TruShadowPower ShakeTuTimeStep / [Player] TuTimeStep / DoppelgangerSettings / CameraTuTimeStep, TruQoL [FrameLimit] Enabled / MaxFps, TruRockVein JumpTarget / LedgeProbe, TruMenu [Log] Save), probe rows (save.inv / save.find 5240 / 5695 / save.pending / save.waiting, adren.meter / adren.fill, phys.status, log.script / log.scriptfile) and TO TEST checks (kQbCheck tp<package>.<name>: right ok, left fail, X skip, again = open; added with test.add at the first mark, TruMenu.log 'tests: test.mark <id> <state>'); every row flagged kQfTp (test-package content: a real row of its page or deleted after the tests); no new INI key, no hook); " "0.22.27 (save probe, Q79:save.pending / save.inv / save.waiting / save.find read the save arenas - live [0xc59258] and checkpoint snapshot [0xc5925c], the restore buffer 0xc57258 with the reason a block waits (unit / object / link parent, as 0x555640 / 0x5bb160 / 0x5bb640), the inventory area +0x34c of both game blocks (15 + 8 intro ids, 6 counts), the 64-slot waiting table 0xc592a8, dead bits; read only, 32 byte checks (TruSaveProbe.h); [Log] Save=1 (default 0, live) = two TruMenu.log lines per SAVE_SaveGame / SAVE_RestoreGame through their memcpy calls 0x557127 / 0x5571a3, 5 more byte checks); " "0.22.26 (test arena, Q76:page Tests group 'Arena 1 - Kampf (Q76)' - three flat floors with resident AI enemy kinds, arena.go 1a|1b|1c = one shortcut as cp.jump (backup, unit.go, wait.unit, flight, player.goto <intro> force; 1a l7_helheim03 generator 8785, 1b l7_yggdrasil_hall02 generator 8762, 1c dlc_yggdrasil_hall02 checkpoint 10644), arena.list (one list of arenas / spots: arena 2 Museum later), flight / god mode, the ai.spawn rows, ai.remove spawned (only the instances ai.spawn made, by address + allocation stamp +0x44), fight diagnosis rows; adrenaline meter: adren.meter (CM+0x3c / max [[0xfad764]+0x2d0], CM+0x1fc bits 22 / 27, doppelganger byte [[0xfadb58]+0x1244]; read only), adren.fill (the game's meter-full 0x6e6630, body of the script native 0x777a50; cheat), adren.keep 1|0 (refill once per game frame while below the maximum and bits 22 / 27 clear; not kept); 6 byte checks); " "0.22.25 (settings.reset writes the whole TruMenu.ini: the default text is measured and built in a buffer of its size - 0.10 .. 0.22.24 kept it in a static 16384-byte buffer and wrote only the first 16383 of the 42 KB, a truncated INI; text built before the backup, write and close checked, the answer names bytes and keys; other table texts: TruMenu.log lines up to 2047 characters (was 511, light.cut lines were cut), [Quick] Closed 1023 characters (was 383, too short for every group) and like [Debug] CheckpointHide only whole keys / ids, settings.show ends with the count of the keys it could not hold); " "0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.33 (photo mode, arena.load, glyphs.status, group K; F1 / Q78: photo.on = the game's own FreeCamera (camera manager mode 5 through its switch 0x5edd70(mgr, 5, 0) - CAMERA_SetMode knows only 6 / 11 / 12; its own stick / mouse input and generalbank DTP 16 values) + the world pause bit 0x1000 (the camera update still runs) + the UI byte 0xcdc9a0 (the game's screenshot task hides the HUD the same way); photo.off / leaving by itself on a level change, a new player / unit, main state != 1, a cutscene, the game's pause menu or a camera the game took = mode, Lara's control, pause bit and HUD as before; refused in cutscenes / loading / pause / flight / cine.pause / another camera layer; photo.shot = shot.save clean photo_<n>; Q83: arena.load <kind> requests one of the 26 enemy kinds with the game's object request with reference 0x5c1760 (checks tracker 204 / anim pool 3000 / 3D navgraph / DRMs, at most 2 kinds), ready = object + children at status 2 and anim slots resolved (log line), ai.spawn refuses it before; arena.unload <kind>|all = STREAM_DumpObject 0x5c1790 once for its own requests; arena.enemies lists the states; Q95: glyphs.status = DeviceGlyphs, device now (pad / keyboard / mouse), last switch time, prompt counters; 37 byte checks, no new INI key); " "0.22.32 (arena, group A; Q86: ai.spawn names the LP each spawned enemy got from the game's enemy init (brain+0x2c64; tune health record by the EnemyHP step [[0xc59264]+0x3ef98]), the EnemyHP step and warns while one-hit kill [0xe91ffd] is on - the 2026-11-11 21:02 thrall 'LP 0' was that cheat, its AI ran; no name / an inexact or unloaded name = the list of the loaded AI enemy kinds with the reason; Q100: arena.mode [spot] = player object, doppelganger byte [[0xfadb58]+0x1244] and TruDlc2Player flag, fits / WARNING per spot, logged; arena.go reads the mode first - a main-game spot with the flag set loads with level.load (new game tracker clears it), a DLC 2 spot without it warns - and ends with arena.mode <spot>; Q98: spots 1d l5_valgrind CP 7329, 1e l2_puzzleroom CP 2074, 1f l4_traprooms CP 5722 - the largest open navmesh floors with a resident enemy kind; read only, no new INI key, no hook); " "0.22.31 (level navigation + puzzles, group B; Q105: the 15 unit names in no PC archive (q105_units.tsv: three base units of the level list, six container / costume / cine names, the six known DLC slots) grey and refused by level.load / level.start / unit.go / cp.jump unless a mods\\<unit>.drm exists, one 'units:' log line; page Kapitel base game in play order from the stream portals with chapter headings (callers of generalbank script 72 SetChapterUIData) and the checkpoint intros per unit - right 2x = backup + load, a checkpoint row = cp.jump <unit> <cp> force (new optional third word: cheat.flight 1;player.goto <cp> force); Q106: uber.dump prints every joint-range transition (condition 14 / 15) with the joint's live value (the engine's getter 0x4e1ef0 / 0x4e1ea0), joint.set <intro> <joint> <value>|stop drives a hinge / rail joint with the engine's limit setters 0x4d9fc0 / 0x4d9f50 / 0x4da0c0 + wake 0x4d8fd0 until the uber leaves its node or 6 s (game thread, a cheat), page Kapitel group 'Raetsel in der Naehe' lists the uber objects with their current node and joint targets, 'solve' rows run joint.set; 27 byte checks); " "0.22.30 (log dates, device glyphs, drawn guards; Q107: every TruMenu.log line starts with 'YYYY-MM-DD HH:MM:SS.mmm' and the first line of a process is the session header '=== <date time> TruMenu <version> session start (pid n) ===' (src/asi/TruLog.h, shared with the other plugins); the log page / overlay take a stamp with or without the date and show the time; Q95: [Input] DeviceGlyphs=1 (default 0) - the last used device (pad: a button, a trigger or a stick past its dead zone in the game's poll; keyboard / mouse: a key, a click, the wheel, a mouse move away from the client centre) decides the button prompts of UIText: 23 bytes of 0x5a7c20 at 0x5a7d75 call GlName - pad = the symbol of the first XInput binding (Start / Back U+1810 / U+1811 too), keyboard / mouse = the name of the first other binding, else the game's own name; 12 byte checks, 'glyphs:' log lines; Q103 rest: the quick bar's presses and every widget of the big menu (ImGuiItemFlags_Disabled) act only after 3 drawn frames since the open, else 'quick: buttons 0x.... ignored - not drawn (n frames)' / 'menu: input ignored - not drawn (n frames)'); " "0.22.29 (radial lock, Q103:[Radial] Enabled=0 also closes a ring that is still open (settings.reset) and drops its pending release / open / close requests; a release, confirm, A / click or R3 runs a ring entry only when DrawRadial drew the ring in at least 3 frames since the open, else 'radial: <what> ignored - not drawn (n frames)'; the close line names the drawn frames; no new INI key); " "0.22.28 (test packages, Q90: page Tests group 'Testpakete 11.11. (Q90)' with one closed sub-group per package A, 1 .. 9 of docs\\Testpakete-1111.md - a hint line, jump / load rows of existing items (level.start, level.load, arena.go), the existing switch rows of TruMenu.switches.txt the package toggles (kQbSwitch = the page Fixes row: TruShadowPower ShakeTuTimeStep / [Player] TuTimeStep / DoppelgangerSettings / CameraTuTimeStep, TruQoL [FrameLimit] Enabled / MaxFps, TruRockVein JumpTarget / LedgeProbe, TruMenu [Log] Save), probe rows (save.inv / save.find 5240 / 5695 / save.pending / save.waiting, adren.meter / adren.fill, phys.status, log.script / log.scriptfile) and TO TEST checks (kQbCheck tp<package>.<name>: right ok, left fail, X skip, again = open; added with test.add at the first mark, TruMenu.log 'tests: test.mark <id> <state>'); every row flagged kQfTp (test-package content: a real row of its page or deleted after the tests); no new INI key, no hook); " "0.22.27 (save probe, Q79:save.pending / save.inv / save.waiting / save.find read the save arenas - live [0xc59258] and checkpoint snapshot [0xc5925c], the restore buffer 0xc57258 with the reason a block waits (unit / object / link parent, as 0x555640 / 0x5bb160 / 0x5bb640), the inventory area +0x34c of both game blocks (15 + 8 intro ids, 6 counts), the 64-slot waiting table 0xc592a8, dead bits; read only, 32 byte checks (TruSaveProbe.h); [Log] Save=1 (default 0, live) = two TruMenu.log lines per SAVE_SaveGame / SAVE_RestoreGame through their memcpy calls 0x557127 / 0x5571a3, 5 more byte checks); " "0.22.26 (test arena, Q76:page Tests group 'Arena 1 - Kampf (Q76)' - three flat floors with resident AI enemy kinds, arena.go 1a|1b|1c = one shortcut as cp.jump (backup, unit.go, wait.unit, flight, player.goto <intro> force; 1a l7_helheim03 generator 8785, 1b l7_yggdrasil_hall02 generator 8762, 1c dlc_yggdrasil_hall02 checkpoint 10644), arena.list (one list of arenas / spots: arena 2 Museum later), flight / god mode, the ai.spawn rows, ai.remove spawned (only the instances ai.spawn made, by address + allocation stamp +0x44), fight diagnosis rows; adrenaline meter: adren.meter (CM+0x3c / max [[0xfad764]+0x2d0], CM+0x1fc bits 22 / 27, doppelganger byte [[0xfadb58]+0x1244]; read only), adren.fill (the game's meter-full 0x6e6630, body of the script native 0x777a50; cheat), adren.keep 1|0 (refill once per game frame while below the maximum and bits 22 / 27 clear; not kept); 6 byte checks); " "0.22.25 (settings.reset writes the whole TruMenu.ini: the default text is measured and built in a buffer of its size - 0.10 .. 0.22.24 kept it in a static 16384-byte buffer and wrote only the first 16383 of the 42 KB, a truncated INI; text built before the backup, write and close checked, the answer names bytes and keys; other table texts: TruMenu.log lines up to 2047 characters (was 511, light.cut lines were cut), [Quick] Closed 1023 characters (was 383, too short for every group) and like [Debug] CheckpointHide only whole keys / ids, settings.show ends with the count of the keys it could not hold); " "0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -1471,11 +1471,23 @@ void DeferPending(const void *ret) {
 int g_glDevGlyphs = 0;                        // [Input] DeviceGlyphs (read at the start and by settings.reset)
 volatile LONG g_glDevice = 0;                 // 0 none seen yet, 1 pad, 2 keyboard / mouse
 volatile LONG g_glSwitches = 0;
+// 0.22.33 glyphs.status (group K): the last input (1 pad, 2 keyboard, 3 mouse), its kind and the last switch's time
+volatile LONG g_glSub = 0;
+const char *volatile g_glLastWhy = "-";
+DWORD g_glLastTick = 0;
+char g_glLastAt[24] = "";
 const char *GlDeviceName(LONG d) { return d == 1 ? "pad" : d == 2 ? "keyboard / mouse" : "none"; }
 void GlDevice(LONG dev, const char *why, DWORD detail) {
+    InterlockedExchange(&g_glSub, dev == 1 ? 1 : why && !strncmp(why, "mouse", 5) ? 3 : 2);   // 0.22.33
+    g_glLastWhy = why;
     if (g_glDevice == dev) return;
     const LONG before = InterlockedExchange(&g_glDevice, dev);
     if (before == dev) return;
+    SYSTEMTIME t;                             // 0.22.33 glyphs.status: when the device last switched
+    GetLocalTime(&t);
+    _snprintf_s(g_glLastAt, sizeof(g_glLastAt), _TRUNCATE, "%04u-%02u-%02u %02u:%02u:%02u", t.wYear, t.wMonth, t.wDay,
+                t.wHour, t.wMinute, t.wSecond);
+    g_glLastTick = GetTickCount();
     const LONG n = InterlockedIncrement(&g_glSwitches);
     Log(n <= 20 ? 1 : 2, "glyphs: last device %s -> %s (%s 0x%lx; switch %ld)", GlDeviceName(before), GlDeviceName(dev),
         why, detail, n);
@@ -23581,6 +23593,7 @@ void SpHealthNote(char *o, size_t n) {
     Out(o, n, "; EnemyHP step %s%s", step, ByteAt(kOneHitKill) ? "; WARNING one-hit kill is ON ([0xe91ffd] = 1, "
         "cheat.onehitkill 0): every hit sets LP 0 - main-game thralls then lie in RegenerateDeath and stand up again" : "");
 }
+void QlSpawnBlock(int id, char *o, size_t n);   // 0.22.33 arena.load (section after the light cut)
 // ai.spawn <exact object name> [count] [lara|front] (game thread)
 bool RunAiSpawn(const char *arg, char *o, size_t n) {
     if (!g_spOk) { Out(o, n, "disabled: pre-check failed (%s)", g_spWhy); return false; }
@@ -23611,6 +23624,13 @@ bool RunAiSpawn(const char *arg, char *o, size_t n) {
     char why[160];
     if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: %s", why); return false; }
     const int id = ObjectId(name);
+    char qlWhy[240];                         // 0.22.33 (Q83): a kind of arena.load is placed only once it is ready
+    QlSpawnBlock(id, qlWhy, sizeof(qlWhy));
+    if (qlWhy[0]) {
+        Out(o, n, "refused: %s", qlWhy);
+        Log(1, "ai.spawn %s refused (src=%s): %s", name, ShotSource("ai.spawn"), o);
+        return false;
+    }
     int freeCount = 0;
     const int entry = id ? TrackerScan(id, &freeCount) : -1;
     DWORD object = 0, family = 0;
@@ -23626,7 +23646,7 @@ bool RunAiSpawn(const char *arg, char *o, size_t n) {
                 "containing '%s': %s; all loaded: %s", name, name, like, kinds);
         else if (!e || status != 2)
             Out(o, n, "refused: %s (object %d) is not loaded in this level - ai.spawn places only kinds loaded here "
-                "(loading other kinds = Q83 arena.load, not built); loaded now: %s", name, id, kinds);
+                "(0.22.33: arena.load %s loads a kind of the Q83 table first); loaded now: %s", name, id, name, kinds);
         else
             Out(o, n, "refused: %s (object %d) is loaded but no AI enemy to place (family %lu%s); loaded AI enemy "
                 "kinds: %s", name, id, family, SpKindName(name) ? "" : ", generator / chunkdoll / doppelganger / Lara",
@@ -28534,6 +28554,683 @@ bool RunLcStable(const char *arg, char *o, size_t n) {
 }
 // ---- end of 0.22.10 light cut
 
+// ======================================================================================================================
+// 0.22.33 photo mode (group K, F1 / Q78; workspace docs\Befund-Gruppe-F-1211.md section 3, docs\Befund-Gruppe-K-1211.md):
+// the game's own free camera, not one of TruMenu's. FreeCamera = the camera manager's slot of mode 5 ([0xe804f0+0x18] =
+// 0xe8e9a0 from the ctor 0x5f3bc2, vtable 0x855e54): activate vf+0x1c 0x5f91b0 takes position / rotation / transform of
+// the camera it replaces, pad 0 (+0xf0) and Lara's control off (0x5d5f60); update 0x5f9770 reads the left stick (fly),
+// right stick + mouse (look) and actions 19 - 22 (speed / up-down) with the generalbank DTP 16 values (FOV 50, speeds);
+// deactivate vf+0x20 0x5f91a0 gives the control back (0x5d5f40). CAMERA_SetMode 0x5f39f0 knows only 6 / 11 / 12
+// (camera.mode 5 does nothing), so the switch is the manager's own 0x5edd70(mgr, mode, 0) (thiscall, ret 8: layer +0x4c
+// = 0, mode +0x60, slot [mgr+4+mode*4], 0x5e8630 = old vf+0x20(new), [mgr+0x44] = new, new vf+0x1c(old); a set byte
+// +0x7c only stores the mode; slot 11 +0x30 is put back to the game camera mgr+0x3370 first).
+// photo.on: refused in a cutscene, while loading / a level change waits, in the game's pause, with flight or cine.pause,
+// on another camera layer / a held mode / a current camera that is not its mode's slot; else remember mode, control
+// byte 0x8ab4e6, pause bit, UI byte -> streamFlags 0xe7f0b8 |= 0x1000 (time.pause: the world stands, the camera update
+// 0x5f3df0 at 0x5dff14 still runs - the world block skips from 0x5dfeb2 to 0x5dff0f) -> UI byte 0xcdc9a0 = 1 (ui.hide;
+// the game's own screenshot task 0x774aa0 sets the same byte around its frame redraw 0x5da1c0) -> 0x5edd70(mgr, 5, 0)
+// and the FreeCamera must be current. photo.off: 0x5edd70(mgr, <remembered mode>, 0) while the FreeCamera is still
+// current on layer 0 in mode 5 (the same function back), 0x5edf50 (the game's restore = mode 11) when mode / layer
+// changed meanwhile, nothing when the game took the camera itself; control byte as before (0x5d5f60 again if it was 0);
+// the pause bit / UI byte only if photo.on set them. Left by itself (Present hook = game thread, PmTick) on a level
+// change request, a new player instance / stream unit, main state != 1, a cinematic, the game's pause ([0xe7f0b4] &
+// 0x10000000 = pause menu) or a camera the game switched to. TruMenu's own bar / menu leave it on (they are the way to
+// photo.shot / photo.off). Plugin unload: only the pause bit / UI byte (no game call from DllMain).
+// photo.shot = shot.save clean photo_<n>[_<name>]. No new INI key, 23 byte checks (kPmChecks).
+const DWORD kPmFreeCam = 0x00e8e9a0, kPmFreeCamVt = 0x00855e54, kPmSetMode = 0x005edd70, kPmCtlOff = 0x005d5f60;
+const DWORD kPmGamePause = 0x00e7f0b4;       // bit 0x10000000: the game's own pause (0x5d4780 / 0x5d4810; frame time 0.5)
+const DvCheck kPmChecks[] = {
+    {0x005edd70, "56 8bf1 837e4c00 57 8b7c240c 7509 3b7e60 0f8488000000"},      // mode switch: layer +0x4c, mode +0x60
+    {0x005edd87, "8d8670330000 85c0 740e 394630 7409 8986800b0000 894630"},    // slot 11 +0x30 = game camera +0x3370
+    {0x005edd9f, "807e7c00 7567 807c241000"},                                   // +0x7c held: mode only stored; blend
+    {0x005eddb8, "83ff0d c7464c00000000 897e60"},                               // layer 0, mode stored
+    {0x005eddfb, "8b54be04 52 8bce e829a8ffff 5f 5e c20800"},                   // slot [mgr+4+mode*4] -> 0x5e8630, ret 8
+    {0x005e8630, "53 56 8bd9 8b7344 8b06 8b5020 57 8b7c2410 57 8bce ffd2 897b44 8b07 8b501c 56 8bcf ffd2"},   // switch
+    {0x005edf50, "d90530118400 56 8bf1 33c9 d95e78 394e4c"},                   // restore (camera.restore's function)
+    {0x005edf7f, "8d510b 7505 395660 7429"},                                    // restore = mode 11
+    {0x005f3bc2, "8d86b0e40000 894618"},                                        // ctor: slot 5 [mgr+0x18] = mgr+0xe4b0
+    {0x00855e54, "c0365e00 70975f00 30915f00"},                                 // FreeCamera vtable: +4 update 0x5f9770
+    {0x00855e70, "b0915f00 a0915f00"},                                          // vf+0x1c activate, vf+0x20 deactivate
+    {0x005f91b0, "55 8bec 83e4f0 83ec18 56 8bf1 83bed0000000ff"},               // activate 0x5f91b0
+    {0x005f92bc, "c786f000000000000000 e895ccfdff"},                            // pad 0, control off 0x5d5f60
+    {0x005f91a0, "e89bcdfdff c20400"},                                          // deactivate: control on 0x5d5f40
+    {0x005d5f40, "e85bcaeaff c605e6b48a0001"},                                  // control on: byte 0x8ab4e6 = 1
+    {0x005d5f60, "c605e6b48a0000 e834caeaff e92ff80600"},                       // control off: byte 0x8ab4e6 = 0
+    {0x005dfeb2, "8535b8f0e700 7555"},                                          // pause bit 0x1000 skips the world ...
+    {0x005dff0f, "e83c32fdff e8d73e0100"},                                      // ... not the camera update 0x5f3df0
+    {0x005f3e0c, "b9f004e800 e85afeffff 8b0d3405e800"},                         // camera update: manager 0xe804f0
+    {0x005da233, "f705b4f0e70000000010"},                                       // game pause bit 0x10000000
+    {0x005d47a7, "c60543f1e70006"},                                             // the pause sets game mode 6
+    {0x005a434c, "803da0c9cd0000 56 0f85f8040000"},                             // HUD draw reads the UI byte 0xcdc9a0
+    {0x00774ac5, "c605a0c9cd0001 e8ef56e6ff"},                                  // the game's screenshot task hides it
+};
+typedef void(__fastcall *PmSetModeFn)(DWORD mgr, DWORD edx, int mode, int blend);   // thiscall, ret 8
+bool g_pmChecked = false, g_pmOk = false;
+char g_pmWhy[96] = "not checked";
+volatile LONG g_pmActive = 0;
+int g_pmMode = 11;                           // camera mode before photo.on
+BYTE g_pmCtl = 1;                            // control byte 0x8ab4e6 before photo.on
+bool g_pmPauseOurs = false, g_pmUiOurs = false;
+DWORD g_pmPlayer = 0, g_pmUnit = 0, g_pmStart = 0;
+LONG g_pmShots = 0, g_pmOns = 0;
+char g_pmLast[200] = "-";                    // the last leave (or refusal) with its reason
+bool PmCheck() {
+    if (g_pmChecked) return g_pmOk;
+    g_pmChecked = true;
+    DWORD at = 0;
+    g_pmOk = g_cameraOk && DvChecks(kPmChecks, sizeof(kPmChecks) / sizeof(kPmChecks[0]), &at);
+    if (g_pmOk) Out(g_pmWhy, sizeof(g_pmWhy), "ok");
+    else if (!g_cameraOk) Out(g_pmWhy, sizeof(g_pmWhy), "camera code (0.1 checks) differs");
+    else Out(g_pmWhy, sizeof(g_pmWhy), "free camera code differs at 0x%08lx", at);
+    Log(g_pmOk ? 1 : 0, "0.22.33: photo mode %s (%d checks)", g_pmWhy, static_cast<int>(sizeof(kPmChecks) / sizeof(kPmChecks[0])));
+    return g_pmOk;
+}
+// why photo.on may not start now ("" = it may); any thread, read only
+void PmRefusal(char *o, size_t n) {
+    o[0] = 0;
+    DWORD state = 0, v = 0, layer = 0, mode = 0, cur = 0, slot = 0, slot11 = 0, freeCam = 0, vt = 0;
+    BYTE hold = 0;
+    char why[160];
+    if (!PmCheck()) { Out(o, n, "disabled: %s", g_pmWhy); return; }
+    if (!g_experimental) { Out(o, n, "experimental actions off ([Cheat] Experimental=0)"); return; }
+    if (!InLevel()) { Out(o, n, "needs a level"); return; }
+    if (g_mainStateOk && ReadDword(kMainState, &state) && state != 1) { Out(o, n, "main state %lu (needs 1: play game)", state); return; }
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "%s", why); return; }
+    if (CinematicNow()) { Out(o, n, "a cutscene plays"); return; }
+    if (g_cnPause) { Out(o, n, "cine.pause holds a cutscene"); return; }
+    if (ReadDword(kPmGamePause, &v) && (v & 0x10000000)) { Out(o, n, "the game is paused (pause menu)"); return; }
+    if (g_flight) { Out(o, n, "flight is on (cheat.flight 0 first)"); return; }
+    if (!ReadDword(kCameraManager + 0x4c, &layer) || !ReadDword(kCameraManager + 0x60, &mode) ||
+        !ReadByte(kCameraManager + 0x7c, &hold) || !ReadDword(kCurrentCamera, &cur) ||
+        !ReadDword(kCameraManager + 0x30, &slot11) || !ReadDword(kCameraManager + 0x18, &freeCam) ||
+        !ReadDword(kPmFreeCam, &vt)) { Out(o, n, "camera manager not readable"); return; }
+    if (layer) { Out(o, n, "camera layer %lu (a script / cutscene camera)", layer); return; }
+    if (hold) { Out(o, n, "the camera manager holds its mode (+0x7c)"); return; }
+    if (mode == 5) { Out(o, n, "the free camera is current already (camera mode 5)"); return; }
+    if (mode > 15 || !ReadDword(kCameraManager + 4 + mode * 4, &slot) || cur != slot) {
+        Out(o, n, "current camera 0x%08lx is not the slot of mode %lu", cur, mode);
+        return;
+    }
+    if (slot11 != kCameraManager + 0x3370) { Out(o, n, "slot 11 holds another camera (0x%08lx)", slot11); return; }
+    if (freeCam != kPmFreeCam || vt != kPmFreeCamVt) {
+        Out(o, n, "FreeCamera slot differs ([mgr+0x18] 0x%08lx, vtable 0x%08lx)", freeCam, vt);
+        return;
+    }
+}
+const char *PmWhy() {                        // bar grey reason for photo.on (render thread), at most 60 characters
+    static char why[160];
+    if (g_pmActive) return "";
+    PmRefusal(why, sizeof(why));
+    if (strlen(why) > 60) why[60] = 0;
+    return why;
+}
+void ValPhoto(char *o, size_t n) {
+    DWORD cam = 0;
+    ReadDword(kCurrentCamera, &cam);
+    if (g_pmActive)
+        Out(o, n, "on %lu s (camera 0x%08lx, mode before %d, control before %u, pause %s, UI %s); %ld shots; last: %s",
+            (GetTickCount() - g_pmStart) / 1000, cam, g_pmMode, g_pmCtl, g_pmPauseOurs ? "by photo mode" : "was set",
+            g_pmUiOurs ? "hidden by photo mode" : "was hidden", g_pmShots, g_pmLast);
+    else
+        Out(o, n, "off (checks %s; %ld times on, %ld shots; camera 0x%08lx); last: %s", g_pmChecked ? g_pmWhy :
+            "not run yet", g_pmOns, g_pmShots, cam, g_pmLast);
+}
+// game thread: back from the photo mode (reason for the log); the camera first, then control, pause bit, UI byte
+void PmLeave(const char *reason, char *o, size_t n) {
+    DWORD cur = 0, layer = 0, mode = 0, flags = 0;
+    BYTE ctl = 1;
+    ReadDword(kCurrentCamera, &cur);
+    ReadDword(kCameraManager + 0x4c, &layer);
+    ReadDword(kCameraManager + 0x60, &mode);
+    const bool ours = cur == kPmFreeCam;
+    const char *cam = "";
+    char ctlText[80] = "control as the game set it";
+    __try {
+        if (ours && !layer && mode == 5) {
+            reinterpret_cast<PmSetModeFn>(kPmSetMode)(kCameraManager, 0, g_pmMode, 0);
+            cam = "camera mode back (0x5edd70)";
+        } else if (ours) {
+            reinterpret_cast<CameraRestoreFn>(kCameraRestore)(reinterpret_cast<void *>(kCameraManager), 0);
+            cam = "camera restored (0x5edf50: mode / layer had changed)";
+        } else {
+            cam = "the game had switched the camera itself - left as it is";
+        }
+        if (ours) {
+            ReadByte(kPlayerControl, &ctl);
+            if (!g_pmCtl && ctl) {
+                reinterpret_cast<VoidFn>(kPmCtlOff)();
+                Out(ctlText, sizeof(ctlText), "control off again as before (0x5d5f60)");
+            } else {
+                Out(ctlText, sizeof(ctlText), "control %u (before %u)", ctl, g_pmCtl);
+            }
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        cam = "EXCEPTION in the camera switch";
+    }
+    volatile LONG *f = reinterpret_cast<volatile LONG *>(kStreamFlags);
+    const bool pauseBack = g_pmPauseOurs && ReadDword(kStreamFlags, &flags) && (flags & 0x1000);
+    if (pauseBack) InterlockedAnd(f, ~0x1000L);
+    const bool uiBack = g_pmUiOurs && ByteAt(kUiHidden);
+    if (uiBack) *reinterpret_cast<volatile BYTE *>(kUiHidden) = 0;
+    InterlockedExchange(&g_pmActive, 0);
+    DWORD now = 0;
+    ReadDword(kCurrentCamera, &now);
+    Out(g_pmLast, sizeof(g_pmLast), "off (%s) after %lu s: %s, camera now 0x%08lx, %s, %s, %s", reason,
+        (GetTickCount() - g_pmStart) / 1000, cam, now, ctlText, pauseBack ? "world runs again" : "pause bit left",
+        uiBack ? "HUD back" : "UI byte left");
+    Log(1, "photo: %s", g_pmLast);
+    Out(o, n, "photo mode %s", g_pmLast);
+}
+bool RunPhotoOn(const char *, char *o, size_t n) {
+    if (g_pmActive) { Out(o, n, "photo mode is on already (photo.off, photo.shot)"); return true; }
+    char why[200];
+    PmRefusal(why, sizeof(why));
+    if (why[0]) {
+        Out(o, n, "refused: %s", why);
+        Out(g_pmLast, sizeof(g_pmLast), "refused: %s", why);
+        Log(1, "photo.on refused (src=%s): %s", ShotSource("photo.on"), why);
+        return false;
+    }
+    DWORD mode = 11, cur = 0;
+    BYTE ctl = 1, ui = 0;
+    ReadDword(kCameraManager + 0x60, &mode);
+    ReadByte(kPlayerControl, &ctl);
+    ReadByte(kUiHidden, &ui);
+    ReadDword(kPlayerPtr, &g_pmPlayer);
+    ReadDword(kUnitId, &g_pmUnit);
+    g_pmMode = static_cast<int>(mode);
+    g_pmCtl = ctl;
+    volatile LONG *f = reinterpret_cast<volatile LONG *>(kStreamFlags);
+    const LONG before = InterlockedOr(f, 0x1000);
+    // as time.pause: a pause the open menu / ring set becomes ours (their close would clear it under the free camera)
+    const LONG menuHeld = InterlockedExchange(&g_menuPaused, 0), ringHeld = InterlockedExchange(&g_radPaused, 0);
+    g_pmPauseOurs = !(before & 0x1000) || menuHeld || ringHeld;
+    g_pmUiOurs = !ui;
+    if (!ui) *reinterpret_cast<volatile BYTE *>(kUiHidden) = 1;
+    bool fault = false;
+    __try {
+        reinterpret_cast<PmSetModeFn>(kPmSetMode)(kCameraManager, 0, 5, 0);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        fault = true;
+    }
+    ReadDword(kCurrentCamera, &cur);
+    if (fault || cur != kPmFreeCam) {
+        if (g_pmPauseOurs) InterlockedAnd(f, ~0x1000L);
+        if (g_pmUiOurs) *reinterpret_cast<volatile BYTE *>(kUiHidden) = 0;
+        Out(o, n, "refused: %s (current camera 0x%08lx) - pause bit / UI byte put back", fault ? "exception in 0x5edd70"
+            : "the game did not switch to the FreeCamera", cur);
+        Out(g_pmLast, sizeof(g_pmLast), "%s", o);
+        Log(0, "photo.on: %s", o);
+        return false;
+    }
+    g_pmStart = GetTickCount();
+    InterlockedIncrement(&g_pmOns);
+    InterlockedExchange(&g_pmActive, 1);
+    Out(g_pmLast, sizeof(g_pmLast), "on (mode before %d, control before %u, pause %s, UI %s)", g_pmMode, g_pmCtl,
+        g_pmPauseOurs ? "set" : "was set", g_pmUiOurs ? "hidden" : "was hidden");
+    Log(1, "photo.on (src=%s): FreeCamera 0x%08lx current, %s; left stick = fly, right stick / mouse = look, the game's "
+        "keys of actions 19 - 22 = speed / up-down; photo.shot, photo.off", ShotSource("photo.on"), cur, g_pmLast);
+    Out(o, n, "photo mode on: the game's FreeCamera (left stick fly, right stick / mouse look), world paused, HUD hidden "
+        "- photo.shot = clean shot, photo.off = back");
+    return true;
+}
+bool RunPhotoOff(const char *, char *o, size_t n) {
+    if (!g_pmActive) { Out(o, n, "photo mode is off (last: %s)", g_pmLast); return true; }
+    PmLeave("photo.off", o, n);
+    return true;
+}
+bool RunPhotoShot(const char *arg, char *o, size_t n) {
+    char name[48] = "";
+    if (arg) strncpy_s(name, sizeof(name), arg, _TRUNCATE);
+    DvTrim(name);
+    char a[96];
+    const LONG k = InterlockedIncrement(&g_pmShots);
+    Out(a, sizeof(a), "clean photo_%03ld%s%s", k, name[0] ? "_" : "", name);
+    const bool ok = RunShotSave(a, o, n);
+    if (ok && !g_pmActive) strncat_s(o, n, " (photo mode is off - a clean shot all the same)", _TRUNCATE);
+    return ok;
+}
+// Present hook (game thread), every frame: leave by itself when the level / state / camera changes under it
+void PmTick() {
+    if (!g_pmActive) return;
+    DWORD player = 0, unit = 0, state = 1, v = 0, cur = 0;
+    char why[160] = "";
+    ReadDword(kPlayerPtr, &player);
+    ReadDword(kUnitId, &unit);
+    ReadDword(kCurrentCamera, &cur);
+    if (LevelChangePending(why, sizeof(why))) {
+        // why holds the reason
+    } else if (!player || player != g_pmPlayer) {
+        Out(why, sizeof(why), "player instance 0x%08lx -> 0x%08lx (level change)", g_pmPlayer, player);
+    } else if (unit != g_pmUnit) {
+        Out(why, sizeof(why), "stream unit %lu -> %lu", g_pmUnit, unit);
+    } else if (g_mainStateOk && ReadDword(kMainState, &state) && state != 1) {
+        Out(why, sizeof(why), "main state %lu", state);
+    } else if (CinematicNow()) {
+        Out(why, sizeof(why), "a cutscene started");
+    } else if (ReadDword(kPmGamePause, &v) && (v & 0x10000000)) {
+        Out(why, sizeof(why), "the game's pause menu opened");
+    } else if (cur != kPmFreeCam) {
+        Out(why, sizeof(why), "the game switched the camera to 0x%08lx", cur);
+    }
+    if (!why[0]) return;
+    char o[400];
+    PmLeave(why, o, sizeof(o));
+}
+// DllMain detach: only TruMenu's own data writes back (no game call under the loader lock)
+void PmShutdown() {
+    if (!g_pmActive) return;
+    if (g_pmPauseOurs) InterlockedAnd(reinterpret_cast<volatile LONG *>(kStreamFlags), ~0x1000L);
+    if (g_pmUiOurs) *reinterpret_cast<volatile BYTE *>(kUiHidden) = 0;
+    InterlockedExchange(&g_pmActive, 0);
+}
+// ---- end of 0.22.33 photo mode ----
+
+// ======================================================================================================================
+// 0.22.33 arena.load (group K, Q83; workspace docs\Befund-Arena-Alle-Gegner-Q83-1111.md sections 2 / 3, ENGINE.md
+// "Object references, dump, unit intros (Q83)", docs\Befund-Gruppe-K-1211.md): an AI enemy kind no intro of the loaded
+// units names, loaded with the game's own object request 0x5c1760(id) = 0x5c1550(id, 1) - an existing tracker entry
+// gets a reference (0x54f010: handle +0x18), a new one goes to the loader 0x551470 (status 1, the handle's own
+// reference) - the way a unit load requests the object of every intro (0x5c1820). No poll loop (unlike
+// instance.spawn): the loader runs on by itself. At the load end (status 2 at 0x54e756) the engine requests every child
+// of the object's list +0x2c with 0x5c1760 (chunkdoll, weapon, DLC 2 extension) and resolves the anim table +0x3c /
+// +0x44 (12 B {u16 id, s16 slot}) against the pool 0x8c1240 once (0x434090). Ready = the object and every child
+// (recursive) at status 2 with an object and every anim entry with an id has a slot; ai.spawn refuses a kind of
+// arena.load before that. arena.unload = STREAM_DumpObject 0x5c1790(id) once for TruMenu's own request while the
+// tracker entry still carries the id (spawned instances hold their own references 0x5ba847 / 0x5bcb90; the object
+// unload dumps the children). Before a request (Q83 2.4): the group's DRMs + 2 tracker entries free (204, full =
+// "Out of objecttracker space!" fatal), the group's anim entries + 100 free in the pool (3000, no overflow test at
+// 0x433fb0), at most 2 kinds of TruMenu at a time (~70 MB; heap size unknown), a volumetric kind (tree 2: bat, sharks)
+// only with a loaded unit that has a 3D navigation image ([[Level+0x68]] = 1), every DRM present (the game's FileExists
+// 0x5bf7b0). A level change forgets the list (nothing dumped; what the engine does with the extra reference: open).
+// kQlKinds = work\k_menu_1211\ar_kinds_table.py from the Q83 catalog (enemy_catalog.tsv / enemy_deps.txt).
+struct QlKind { int id; const char *name; int part, tree, drms, anims, mb; const char *children; };
+const QlKind kQlKinds[] = {                  // part 0 base, 1 DLC 1, 2 DLC 2; tree 0 soldier, 1 creature, 2 volumetric, 3 thrall
+    {217, "shark_blueshark", 0, 2, 1, 28, 8, ""},
+    {311, "merc", 0, 0, 6, 221, 29, "wp_akrifle pr_akriflebullet bullet_hit bullet_hit_underwater pr_akriflebullet_concentrated"},
+    {312, "merc_deux", 0, 0, 6, 221, 29, "wp_akrifle pr_akriflebullet bullet_hit bullet_hit_underwater pr_akriflebullet_concentrated"},
+    {336, "bat_enemy", 0, 2, 1, 13, 3, ""},
+    {337, "tiger", 0, 1, 1, 93, 14, ""},
+    {367, "naga_green", 0, 1, 1, 112, 17, ""},
+    {368, "naga_red", 0, 1, 1, 112, 18, ""},
+    {370, "small_albino_spider", 0, 1, 1, 59, 4, ""},
+    {419, "small_brown_spider", 0, 1, 1, 59, 4, ""},
+    {448, "small_brown_spider_no_jump", 0, 1, 1, 59, 4, ""},
+    {516, "panther_thrall", 0, 3, 2, 106, 33, "panther_thrall_chunkdoll"},
+    {564, "cat_panther", 0, 1, 1, 93, 12, ""},
+    {565, "poacher", 0, 0, 6, 221, 31, "wp_akrifle pr_akriflebullet bullet_hit bullet_hit_underwater pr_akriflebullet_concentrated"},
+    {566, "poacher_long_range", 0, 0, 6, 221, 31, "wp_akrifle pr_akriflebullet bullet_hit bullet_hit_underwater pr_akriflebullet_concentrated"},
+    {600, "mayan_thrall", 0, 3, 2, 95, 28, "viking_thrall_chunkdoll"},
+    {603, "viking_thrall", 0, 3, 2, 95, 27, "viking_thrall_chunkdoll"},
+    {604, "giant_albino_tarantula", 0, 1, 1, 82, 13, ""},
+    {703, "giant_albino_tarantula_blind", 0, 1, 1, 82, 13, ""},
+    {705, "yeti_thrall", 0, 3, 2, 95, 27, "yeti_thrall_chunkdoll"},
+    {791, "yeti_thrall_yggdrasil", 0, 3, 2, 95, 27, "yeti_thrall_chunkdoll"},
+    {821, "shark_greenland", 0, 2, 1, 28, 8, ""},
+    {855, "knight_thrall", 1, 3, 2, 95, 25, "knight_thrall_chunkdoll"},
+    {927, "viking_thrall_dlc2_", 2, 3, 3, 115, 33, "viking_thrall_chunkdoll_dlc2_ viking_thrall_dlc2_extension"},
+    {931, "yeti_thrall_dlc2_", 2, 3, 4, 122, 35, "yeti_thrall_chunkdoll_dlc2_ yeti_thrall_dlc2_extension yeti_thrall_armored_dlc2_extension"},
+    {943, "yeti_thrall_armored_dlc2_", 2, 3, 3, 122, 35, "yeti_thrall_armored_chunkdoll_dlc_2_ yeti_thrall_armored_dlc2_extension"},
+    {1004, "viking_thrall_tutorial_dlc2_", 2, 3, 3, 115, 33, "viking_thrall_chunkdoll_dlc2_ viking_thrall_dlc2_extension"},
+};
+const int kQlKindCount = static_cast<int>(sizeof(kQlKinds) / sizeof(kQlKinds[0]));
+const char *const kQlNoBrain[] = {"jellyfish_a", "amanda", "natla_end", "natla_thrall"};   // objects without enemy data
+const char *const kQlPartNames[] = {"base", "DLC 1", "DLC 2"};
+const DvCheck kQlChecks[] = {
+    {0x005c1760, "8b442404 6a01 50 e8e4fdffff 83c408 83f8ff 7503 33c0 c3 8d04c0 8d04850074db00 c3"},   // request + ref
+    {0x005c159f, "80bc241801000000 7409 50 e861daf8ff"},                        // flag 1: existing entry ref + 1
+    {0x0054f010, "8b442404 8b00 85c0 7404 83401801 c3"},                        // ref = [[entry]+0x18] + 1
+    {0x005c1790, "56 8b742408 85f6 7e0a a1d094db00 8b04f0"},                    // STREAM_DumpObject(id)
+    {0x005c17be, "8bce 5e e90affffff"},                                         // -> 0x5c16d0 (ecx = id)
+    {0x005c16d0, "56 be0074db00 33c0 66837e0e00 7408 0fbf560c 3bd1 740f"},      // the entry of the id
+    {0x005c16f6, "833e00 7427 66837e0e01 56 7517 e8b8eef8ff"},                  // status 1 cancel / else release
+    {0x0054e756, "66c7450e0200"},                                               // load end: status 2
+    {0x0054e84b, "8b7e2c 85ff 7449"},                                           // children list +0x2c
+    {0x0054e873, "0fb7d0 52 e8e42e0700"},                                       // child id (u16) -> 0x5c1760
+    {0x0054e263, "894644"},                                                     // anim table +0x44
+    {0x0054e243, "6689563c"},                                                   // anim count +0x3c
+    {0x00433fb0, "a110128c00 3db80b0000"},                                      // anim pool add: 3000 entries
+    {0x004340b0, "66833cc540128c0000 740a 663b0cc542128c00"},                   // pool 0x8c1240 {refs, id, ptr}
+};
+const int kQlMax = 2;                        // kinds of arena.load at a time
+const DWORD kQlAnimPool = 0x008c1240, kQlAnimPoolCount = 3000, kQlDump = 0x005c1790, kQlRequest = 0x005c1760;
+typedef DWORD(__cdecl *QlRequestFn)(int id);
+typedef void(__cdecl *QlDumpFn)(int id);
+struct QlReq { int kind, entry; DWORD start, readyAt; bool stalled; int total, ready, animMissing; char stuck[48]; };
+QlReq g_ql[kQlMax];
+volatile LONG g_qlN = 0;
+DWORD g_qlPlayer = 0, g_qlUnit = 0;          // the level of the requests (a change forgets the list)
+bool g_qlChecked = false, g_qlOk = false;
+char g_qlWhy[96] = "not checked";
+LONG g_qlLoads = 0, g_qlUnloads = 0;
+bool QlCheck() {
+    if (g_qlChecked) return g_qlOk;
+    g_qlChecked = true;
+    DWORD at = 0;
+    g_qlOk = DvChecks(kQlChecks, sizeof(kQlChecks) / sizeof(kQlChecks[0]), &at);
+    if (g_qlOk) Out(g_qlWhy, sizeof(g_qlWhy), "ok");
+    else Out(g_qlWhy, sizeof(g_qlWhy), "object load code differs at 0x%08lx", at);
+    Log(g_qlOk ? 1 : 0, "0.22.33: arena.load %s (%d checks)", g_qlWhy, static_cast<int>(sizeof(kQlChecks) / sizeof(kQlChecks[0])));
+    return g_qlOk;
+}
+int QlFind(const char *name) {
+    for (int i = 0; i < kQlKindCount; ++i)
+        if (name && !_stricmp(kQlKinds[i].name, name)) return i;
+    return -1;
+}
+int QlOwn(int kind) {                        // index in g_ql or -1
+    for (int i = 0; i < g_qlN && i < kQlMax; ++i)
+        if (g_ql[i].kind == kind) return i;
+    return -1;
+}
+int QlAnimFree() {                           // free anim pool entries (refs 0)
+    int f = 0;
+    for (DWORD i = 0; i < kQlAnimPoolCount; ++i) {
+        WORD refs = 1;
+        if (ReadWord(kQlAnimPool + i * 8, &refs) && !refs) ++f;
+    }
+    return f;
+}
+bool QlHas3dNav() {                          // a loaded unit with a 3D navigation image ([[Level+0x68]] = 1)
+    for (DWORD e = kStreamUnits; e < kStreamUnitsEnd; e += kStreamUnitSize) {
+        DWORD state = 0, level = 0, img = 0, first = 0;
+        if (ReadDword(e + 4, &state) && (state & 0xff) == 2 && ReadDword(e + 8, &level) && level &&
+            ReadDword(level + 0x68, &img) && img && ReadDword(img, &first) && first == 1)
+            return true;
+    }
+    return false;
+}
+int QlLive(int id) {                         // live instances of the object
+    int live = 0;
+    ForInstances([&](const InstInfo &inst) { if (inst.objectId == id) ++live; return true; });
+    return live;
+}
+// one object and its children (recursive, depth <= 4): entries, ready ones, unresolved anim entries, the first stuck one
+void QlWalk(int id, int depth, int *total, int *ready, int *animMissing, char *stuck, size_t n) {
+    ++*total;
+    int freeCount = 0;
+    const int i = TrackerScan(id, &freeCount);
+    const DWORD e = i >= 0 ? kObjectTable + static_cast<DWORD>(i) * 0x24 : 0;
+    WORD status = 0, count = 0;
+    DWORD object = 0, table = 0, list = 0;
+    if (!e || !ReadWord(e + 0xe, &status) || status != 2 || !ReadDword(e + 8, &object) || !object) {
+        if (!stuck[0]) Out(stuck, n, "object %d %s", id, e ? (status == 1 ? "loading" : "no object") : "not requested yet");
+        return;
+    }
+    ++*ready;
+    if (ReadWord(object + 0x3c, &count) && ReadDword(object + 0x44, &table) && table)
+        for (DWORD k = 0; k < count && k < 1024; ++k) {
+            WORD aid = 0, slot = 0;
+            if (ReadWord(table + k * 12, &aid) && aid && ReadWord(table + k * 12 + 2, &slot) && slot == 0xffff) ++*animMissing;
+        }
+    if (depth >= 4 || !ReadDword(object + 0x2c, &list) || !list) return;
+    for (DWORD k = 0; k < 16; ++k) {
+        WORD child = 0;
+        if (!ReadWord(list + k * 2, &child) || !child) break;
+        QlWalk(child, depth + 1, total, ready, animMissing, stuck, n);
+    }
+}
+// one kind's state for arena.enemies (any thread, read only)
+void QlKindState(int k, char *o, size_t n) {
+    const QlKind &q = kQlKinds[k];
+    const int own = QlOwn(k);
+    int freeCount = 0;
+    const int entry = TrackerScan(q.id, &freeCount);
+    WORD status = 0;
+    if (entry >= 0) ReadWord(kObjectTable + static_cast<DWORD>(entry) * 0x24 + 0xe, &status);
+    if (own >= 0) {
+        const QlReq &r = g_ql[own];
+        if (r.readyAt) Out(o, n, "ready (arena.load, %lu ms)", r.readyAt - r.start);
+        else Out(o, n, "loading %d/%d%s%s%s", r.ready, r.total, r.animMissing ? " (anims missing)" : "",
+                 r.stuck[0] ? " - " : "", r.stuck);
+        return;
+    }
+    if (entry >= 0 && status == 2) { Out(o, n, "resident"); return; }
+    if (entry >= 0) { Out(o, n, "loading (the game, status %u)", status); return; }
+    if (q.tree == 2 && !QlHas3dNav()) { Out(o, n, "refused: needs 3D navgraph (no loaded unit has one)"); return; }
+    if (freeCount < q.drms + 2) { Out(o, n, "refused: tracker full (%d free, needs %d)", freeCount, q.drms + 2); return; }
+    Out(o, n, "loadable");
+}
+// ai.spawn: "" = may spawn, else why not (a kind of arena.load that is not ready)
+void QlSpawnBlock(int id, char *o, size_t n) {
+    o[0] = 0;
+    for (int i = 0; i < g_qlN && i < kQlMax; ++i) {
+        const QlReq &r = g_ql[i];
+        if (kQlKinds[r.kind].id != id || r.readyAt) continue;
+        Out(o, n, "arena.load %s is not ready yet (%d/%d objects%s%s%s) - wait for TruMenu.log 'arena.load %s: ready'",
+            kQlKinds[r.kind].name, r.ready, r.total, r.animMissing ? ", anims missing" : "", r.stuck[0] ? ", " : "",
+            r.stuck, kQlKinds[r.kind].name);
+        return;
+    }
+}
+void ValArenaEnemies(char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    LabelAdd(o, n, &used, "%s; %ld of %d kinds by arena.load\n", QlCheck() ? "checks ok" : g_qlWhy,
+             static_cast<LONG>(g_qlN), kQlMax);
+    for (int k = 0; k < kQlKindCount; ++k) {
+        char s[160];
+        QlKindState(k, s, sizeof(s));
+        LabelAdd(o, n, &used, "%s (%s) %s\n", kQlKinds[k].name, kQlPartNames[kQlKinds[k].part], s);
+    }
+    for (const char *nb : kQlNoBrain) LabelAdd(o, n, &used, "%s refused: no enemy data\n", nb);
+}
+bool RunArenaLoad(const char *arg, char *o, size_t n) {
+    if (!g_spOk) { Out(o, n, "disabled: ai.spawn pre-check failed (%s)", g_spWhy); return false; }
+    if (!g_spawnOk) { Out(o, n, "disabled: object load pre-check failed (%s)", g_spawnWhy); return false; }
+    if (!QlCheck()) { Out(o, n, "disabled: %s", g_qlWhy); return false; }
+    if (!g_experimental) { Out(o, n, "experimental actions off ([Cheat] Experimental=0)"); return false; }
+    char a[64] = "";
+    if (arg) strncpy_s(a, sizeof(a), arg, _TRUNCATE);
+    DvTrim(a);
+    _strlwr_s(a, sizeof(a));
+    if (!a[0]) { Out(o, n, "usage: arena.load <enemy kind> (arena.enemies lists the 26 kinds and their state)"); return false; }
+    DWORD state = 0, player = 0;
+    ReadDword(kMainState, &state);
+    if (!InLevel() || state != 1 || !ReadDword(kPlayerPtr, &player) || !player) {
+        Out(o, n, "in a level only (main state %lu, needs 1)", state);
+        return false;
+    }
+    char why[200];
+    if (LevelChangePending(why, sizeof(why))) { Out(o, n, "refused: %s", why); return false; }
+    const int k = QlFind(a);
+    bool noBrain = false;
+    for (const char *nb : kQlNoBrain) noBrain = noBrain || !strcmp(nb, a);
+    if (k < 0) {
+        Out(o, n, "refused: %s %s", a, noBrain ? "has no enemy data (no brain) - nothing to fight" :
+            "is not one of the 26 enemy kinds (arena.enemies)");
+        Log(1, "arena.load %s refused (src=%s): %s", a, ShotSource("arena.load"), o);
+        return false;
+    }
+    const QlKind &q = kQlKinds[k];
+    if (QlOwn(k) >= 0) { QlKindState(k, why, sizeof(why)); Out(o, n, "%s: already by arena.load - %s", q.name, why); return true; }
+    const int listed = ObjectId(q.name);
+    if (listed != q.id) {
+        Out(o, n, "refused: the object list names %s id %d, the Q83 table %d", q.name, listed, q.id);
+        Log(1, "arena.load %s refused: %s", q.name, o);
+        return false;
+    }
+    int freeCount = 0;
+    const int entry = TrackerScan(q.id, &freeCount);
+    WORD status = 0;
+    if (entry >= 0) {
+        ReadWord(kObjectTable + static_cast<DWORD>(entry) * 0x24 + 0xe, &status);
+        Out(o, n, "%s is %s - %s", q.name, status == 2 ? "resident already" : "being loaded by the game",
+            status == 2 ? "ai.spawn it directly" : "wait, then ai.spawn");
+        return true;
+    }
+    char reason[160] = "";
+    const int animFree = QlAnimFree();
+    if (g_qlN >= kQlMax) Out(reason, sizeof(reason), "%d kinds by arena.load already (arena.unload first)", kQlMax);
+    else if (q.tree == 2 && !QlHas3dNav())
+        Out(reason, sizeof(reason), "needs 3D navgraph - no loaded unit has a 3D navigation image ([[Level+0x68]] = 1)");
+    else if (freeCount < q.drms + 2)
+        Out(reason, sizeof(reason), "tracker full (%d free, the group needs %d + 2)", freeCount, q.drms);
+    else if (animFree < q.anims + 100)
+        Out(reason, sizeof(reason), "anim pool (%d free, the group needs %d + 100)", animFree, q.anims);
+    if (reason[0]) {
+        Out(o, n, "refused: %s", reason);
+        Log(1, "arena.load %s refused (src=%s): %s", q.name, ShotSource("arena.load"), reason);
+        return false;
+    }
+    char names[200], mix[160] = "";
+    strncpy_s(names, sizeof(names), q.name, _TRUNCATE);
+    if (q.children[0]) {
+        strncat_s(names, sizeof(names), " ", _TRUNCATE);
+        strncat_s(names, sizeof(names), q.children, _TRUNCATE);
+    }
+    for (int j = 0; j < kQlKindCount; ++j) {    // base <-> DLC mix: the first loaded copy of a shared id serves both
+        int f2 = 0;
+        if ((kQlKinds[j].part == 0) == (q.part == 0) || TrackerScan(kQlKinds[j].id, &f2) < 0) continue;
+        Out(mix, sizeof(mix), "; mix: %s (%s) is loaded - the first loaded copy of shared ids (sounds / textures) serves "
+            "both", kQlKinds[j].name, kQlPartNames[kQlKinds[j].part]);
+        break;
+    }
+    if (!g_spBackedUp) {                     // once per session, as ai.spawn (shared flag)
+        char b[300];
+        if (!RunSaveBackup("spawn", b, sizeof(b))) { Out(o, n, "refused: save.backup before the first load failed (%s)", b); return false; }
+        g_spBackedUp = true;
+        Log(1, "arena.load: save.backup before the first spawn / load of this session: %s", b);
+    }
+    DWORD got = 0;
+    char missing[64] = "";
+    __try {
+        char *context = nullptr;
+        for (char *t = strtok_s(names, " ", &context); t; t = strtok_s(nullptr, " ", &context))
+            if (!reinterpret_cast<DrmExistsFn>(kDrmExists)(t)) { strncpy_s(missing, sizeof(missing), t, _TRUNCATE); break; }
+        if (!missing[0]) got = reinterpret_cast<QlRequestFn>(kQlRequest)(q.id);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        Out(o, n, "exception in the DRM check / request of %s", q.name);
+        Log(0, "arena.load: %s", o);
+        return false;
+    }
+    if (missing[0]) {
+        Out(o, n, "refused: drm missing: %s.drm (the game's FileExists 0x5bf7b0)", missing);
+        Log(1, "arena.load %s refused: %s", q.name, o);
+        return false;
+    }
+    if (!got) { Out(o, n, "0x5c1760(%d) returned 0 - nothing requested", q.id); Log(0, "arena.load %s: %s", q.name, o); return false; }
+    QlReq &r = g_ql[g_qlN];
+    memset(&r, 0, sizeof(r));
+    r.kind = k;
+    r.entry = static_cast<int>((got - kObjectTable) / 0x24);
+    r.start = GetTickCount();
+    if (!g_qlN) { g_qlPlayer = player; ReadDword(kUnitId, &g_qlUnit); }
+    InterlockedIncrement(&g_qlN);
+    InterlockedIncrement(&g_qlLoads);
+    Out(o, n, "requested %s (object %d, %s, %d DRMs, %d anim entries, ~%d MB; tracker entry %d, %d entries / %d anim "
+        "slots were free)%s - ai.spawn %s once TruMenu.log says 'arena.load %s: ready'", q.name, q.id,
+        kQlPartNames[q.part], q.drms, q.anims, q.mb, r.entry, freeCount, animFree, mix, q.name, q.name);
+    Log(1, "arena.load (src=%s): %s", ShotSource("arena.load"), o);
+    return true;
+}
+void QlForget(const char *why) {
+    char list[200] = "";
+    for (int i = 0; i < g_qlN && i < kQlMax; ++i) {
+        strncat_s(list, sizeof(list), i ? ", " : "", _TRUNCATE);
+        strncat_s(list, sizeof(list), kQlKinds[g_ql[i].kind].name, _TRUNCATE);
+    }
+    Log(1, "arena.load: %s - list forgotten (%s; nothing dumped, the references stay with the engine)", why, list);
+    InterlockedExchange(&g_qlN, 0);
+}
+bool QlDumpOne(int id) {                     // game thread: STREAM_DumpObject(id) inside __try
+    __try {
+        reinterpret_cast<QlDumpFn>(kQlDump)(id);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        InterlockedIncrement(&g_ownExceptions);
+        return false;
+    }
+}
+bool RunArenaUnload(const char *arg, char *o, size_t n) {
+    if (!QlCheck()) { Out(o, n, "disabled: %s", g_qlWhy); return false; }
+    if (!g_experimental) { Out(o, n, "experimental actions off ([Cheat] Experimental=0)"); return false; }
+    char a[64] = "";
+    if (arg) strncpy_s(a, sizeof(a), arg, _TRUNCATE);
+    DvTrim(a);
+    if (!a[0]) { Out(o, n, "usage: arena.unload <kind>|all (only kinds of arena.load: %ld now)", static_cast<LONG>(g_qlN)); return false; }
+    const bool all = !_stricmp(a, "all");
+    size_t used = 0;
+    int done = 0;
+    o[0] = 0;
+    for (int i = 0; i < g_qlN && i < kQlMax;) {
+        const QlKind &q = kQlKinds[g_ql[i].kind];
+        if (!all && _stricmp(a, q.name)) { ++i; continue; }
+        const DWORD e = kObjectTable + static_cast<DWORD>(g_ql[i].entry) * 0x24;
+        WORD id = 0, status = 0;
+        const int live = QlLive(q.id);
+        const bool held = ReadWord(e + 0xc, &id) && static_cast<SHORT>(id) == q.id && ReadWord(e + 0xe, &status) && status;
+        const bool dumped = held && QlDumpOne(q.id);
+        LabelAdd(o, n, &used, "%s%s %s%s", done ? "; " : "", q.name, dumped ? "dumped (0x5c1790)" : held ?
+                 "EXCEPTION in 0x5c1790" : "not dumped (its tracker entry no longer holds it)", live ? " - live instances "
+                 "keep it (ai.remove spawned)" : "");
+        ++done;
+        InterlockedIncrement(&g_qlUnloads);
+        g_ql[i] = g_ql[g_qlN - 1];
+        InterlockedDecrement(&g_qlN);
+    }
+    if (!done) { Out(o, n, "nothing of arena.load named '%s' (arena.enemies)", a); return false; }
+    Log(1, "arena.unload %s (src=%s): %s", a, ShotSource("arena.unload"), o);
+    return true;
+}
+// Present hook (game thread): progress of the requests, ready / stalled lines, a level change forgets the list
+void QlTick() {
+    if (!g_qlN) return;
+    static DWORD last = 0;
+    const DWORD now = GetTickCount();
+    if (last && now - last < 100) return;
+    last = now ? now : 1;
+    DWORD player = 0, unit = 0;
+    char why[160];
+    ReadDword(kPlayerPtr, &player);
+    ReadDword(kUnitId, &unit);
+    if (LevelChangePending(why, sizeof(why))) { QlForget(why); return; }
+    if (player != g_qlPlayer || unit != g_qlUnit) {
+        Out(why, sizeof(why), "level change (player 0x%08lx -> 0x%08lx, unit %lu -> %lu)", g_qlPlayer, player, g_qlUnit, unit);
+        QlForget(why);
+        return;
+    }
+    for (int i = 0; i < g_qlN && i < kQlMax; ++i) {
+        QlReq &r = g_ql[i];
+        if (r.readyAt) continue;
+        int total = 0, ready = 0, animMissing = 0;
+        char stuck[48] = "";
+        QlWalk(kQlKinds[r.kind].id, 0, &total, &ready, &animMissing, stuck, sizeof(stuck));
+        r.total = total;
+        r.ready = ready;
+        r.animMissing = animMissing;
+        strncpy_s(r.stuck, sizeof(r.stuck), stuck, _TRUNCATE);
+        if (ready == total && !animMissing && total) {
+            r.readyAt = now ? now : 1;
+            Log(1, "arena.load %s: ready after %lu ms (%d objects at status 2, anim slots ok) - ai.spawn %s",
+                kQlKinds[r.kind].name, r.readyAt - r.start, total, kQlKinds[r.kind].name);
+        } else if (!r.stalled && now - r.start > 30000) {
+            r.stalled = true;
+            Log(1, "arena.load %s: stalled after 30 s - %d/%d objects, %d anim entries without a slot%s%s",
+                kQlKinds[r.kind].name, ready, total, animMissing, stuck[0] ? ", first: " : "", stuck);
+        }
+    }
+}
+// ---- end of 0.22.33 arena.load ----
+
+// 0.22.33 glyphs.status (group K, Q95 follow-up; the device glyphs of 0.22.30): device, switch, last switch time
+void ValGlyphStatus(char *o, size_t n) {
+    if (!g_glDevGlyphs) {
+        Out(o, n, "[Input] DeviceGlyphs=0: device not tracked, the game's own prompts (pad names while a pad is connected)");
+        return;
+    }
+    const LONG sub = g_glSub;
+    Out(o, n, "[Input] DeviceGlyphs=1, patch %s (%s); device now %s (last input %s); last switch %s (%lu s ago, %ld "
+        "switches); prompts: %ld pad symbols, %ld key names, %ld game names, %ld faults", g_glOn ? "on" : "off", g_glWhy,
+        sub == 1 ? "pad" : sub == 2 ? "keyboard" : sub == 3 ? "mouse" : "none seen yet", g_glLastWhy,
+        g_glLastAt[0] ? g_glLastAt : "-", g_glLastTick ? (GetTickCount() - g_glLastTick) / 1000 : 0,
+        static_cast<LONG>(g_glSwitches), static_cast<LONG>(g_glPadNames), static_cast<LONG>(g_glKeyNames),
+        static_cast<LONG>(g_glGameNames), static_cast<LONG>(g_glFaults));
+}
+
 #include "TruSaveProbe.h"                    // 0.22.27 save probe (Q79): save.pending / inv / waiting / find, [Log] Save
 struct Item {
     const char *id, *type, *label;
@@ -28574,6 +29271,18 @@ const Item kItems[] = {
     {"camera.restore", "action", "restore the game camera, needs a level", true, ValCamera, RunCameraRestore},
     {"camera.free", "todo", "own free camera - todo: offsets of Camera transform / invTransform not verified", false, ValTodo,
      RunTodo},
+    // 0.22.33 (group K, F1 / Q78): photo mode = the game's FreeCamera (mode 5) + time.pause + ui.hide
+    {"photo.on", "action", "0.22.33: photo mode - the game's FreeCamera (0x5edd70 mode 5: left stick fly, right stick / "
+                           "mouse look), world paused, HUD hidden; refused in cutscenes / loading / pause", true, ValPhoto,
+     RunPhotoOn},
+    {"photo.off", "action", "0.22.33: back - camera mode, Lara's control, pause bit and HUD as before photo.on", true,
+     ValPhoto, RunPhotoOff},
+    {"photo.shot", "action", "0.22.33 [name]: shot.save clean photo_<n>[_name]", false, ValPhoto, RunPhotoShot},
+    {"photo.status", "info", "0.22.33: photo mode on / off, what it remembered, shots, the last leave and its reason",
+     false, ValPhoto, nullptr},
+    // 0.22.33 (group K, Q95 follow-up)
+    {"glyphs.status", "info", "0.22.33: [Input] DeviceGlyphs, the device now (pad / keyboard / mouse), the last switch time "
+                              "and the prompt counters", false, ValGlyphStatus, nullptr},
     {"cheat.flight", "bool", "cheatMode + message 12 (flight), needs a level", true, ValCheat, RunCheat},
     {"cheat.speed", "float", "flight speed per 30 fps frame (RT up / LT down)", false, ValSpeed, RunSpeed},
     {"draw.markup", "bool", "markup boxes / poly lines projected with the game camera (experimental)", false,
@@ -28987,6 +29696,14 @@ const Item kItems[] = {
     {"arena.mode", "action", "0.22.32 [spot]: game mode now - player object, doppelganger byte [[0xfadb58]+0x1244], "
                              "TruDlc2Player flag; with a spot whether it fits (main game: flag 0, DLC 2: 1), logged (Q100)",
      false, ValArenaMode, RunArenaMode},
+    // 0.22.33 (group K, Q83): foreign enemy kinds through the game's object request with reference
+    {"arena.load", "action", "0.22.33 <kind>: load one of the 26 enemy kinds that no loaded unit has (0x5c1760 = request "
+                             "with reference; checks tracker / anim pool / 3D navgraph / DRMs, at most 2); ai.spawn after "
+                             "the log line 'arena.load <kind>: ready' (Q83)", true, ValArenaEnemies, RunArenaLoad},
+    {"arena.unload", "action", "0.22.33 <kind>|all: STREAM_DumpObject 0x5c1790 once for a kind of arena.load (Q83)", true,
+     ValArenaEnemies, RunArenaUnload},
+    {"arena.enemies", "info", "0.22.33: the 26 enemy kinds - resident / ready / loading a/b / loadable / refused with the "
+                              "reason (Q83)", false, ValArenaEnemies, nullptr},
     {"pos.save", "action", "0.17 [name]: Lara's unit, live position, yaw, the unit's shift and origin into "
                            "TruMenu.positions.txt next to tru.exe", false, ValPos, RunPosSave},
     {"pos.list", "info", "0.17: the saved positions (TruMenu.positions.txt)", false, ValPosList, nullptr},
@@ -31222,6 +31939,11 @@ const char *RadialWhy(const RadItem &e) {
     }
     if (!_strnicmp(id, "sticky.", 7) && !g_stOk) return g_stWhy;     // 0.21.1
     if (!_strnicmp(id, "phys.", 5) && !g_phOk) return g_phWhy;
+    if (!_stricmp(id, "photo.on")) {         // 0.22.33 photo mode: checks, cutscene / loading / pause / camera state
+        const char *pmWhy = PmWhy();
+        if (pmWhy[0]) return pmWhy;
+    }
+    if ((!_stricmp(id, "arena.load") || !_stricmp(id, "arena.unload")) && !QlCheck()) return g_qlWhy;   // 0.22.33
     if ((!_stricmp(id, "fix.hall02") || !_stricmp(id, "thrall.scriptval")) && !g_h2Ok) return g_h2Why;   // 0.21.4
     if (!_strnicmp(id, "arachno.", 8) || !_strnicmp(id, "cam.", 4)) {   // 0.21: byte checks of the part
         const char *m21Why = M21RadWhy(id);
@@ -31232,7 +31954,8 @@ const char *RadialWhy(const RadItem &e) {
         return "experimental off ([Cheat] Experimental=0)";
     static const char *const kNeedLevel[] = {"cheat.", "player.", "weapon.give", "ammo.", "gear.", "instance.bring",
                                              "instance.spawn", "instance.remove", "instance.unhide", "camera.mode",
-                                             "camera.restore", "camera.fov", "costume.next", "costume.set"};
+                                             "camera.restore", "camera.fov", "costume.next", "costume.set",
+                                             "arena.load"};   // 0.22.33
     bool needs = false;
     for (const char *p : kNeedLevel)
         if (!_strnicmp(id, p, strlen(p))) needs = true;
@@ -33142,6 +33865,11 @@ const QbRow kQbLara[] = {                    // + the saved positions and the tw
     {"Fotos", "Shots", "-", "fig_shots", kQbGroup, -1, kQcNone, 0, kQbGrey, 0},
     {"Foto mit UI", "Shot with UI", "shot.save", "ui", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     {"Foto sauber", "Clean shot", "shot.save", "clean", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
+    // 0.22.33 (group K, F1 / Q78): photo mode = the game's FreeCamera + world pause + HUD off
+    {"Foto-Modus an (Freikamera)", "Photo mode on (free camera)", "photo.on", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Foto-Modus: Foto", "Photo mode: shot", "photo.shot", "", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
+    {"Foto-Modus aus", "Photo mode off", "photo.off", "", kQbAction, -1, kQcNone, 0, kQbPlayer, 0},
+    {"Foto-Modus (Status)", "Photo mode (status)", "photo.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
     {"Foto (wie im Rad)", "Shot (as in the ring)", "shot.save", "ring", kQbAction, -1, kQcNone, 0, kQbGrey, 0},
     {"Kost\303\274m", "Costume", "-", "fig_costume", kQbGroup, -1, kQcNone, 0, kQbPlayer, 0},
@@ -33776,6 +34504,25 @@ const QbRow kQbTests[] = {
     {"  Anzahl", "  Count", "ai.spawncount", "", kQbValue, -1, kQcNone, kQvSpawnCount, kQbAi, 0},
     {"  Ort", "  Place", "ai.spawnat", "", kQbValue, -1, kQcNone, kQvSpawnAt, kQbAi, 0},
     {"Gespawnte entfernen", "Remove the spawned", "ai.remove", "spawned", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    // 0.22.33 (group K, Q83): foreign enemy kinds - test order T19 of docs\Befund-Arena-Alle-Gegner-Q83-1111.md
+    {"Gegnerarten (arena.enemies)", "Enemy kinds (arena.enemies)", "arena.enemies", "", kQbInfo, -1, kQcNone, 0, kQbGrey,
+     0},
+    {"Laden: mayan_thrall", "Load: mayan_thrall", "arena.load", "mayan_thrall", kQbAction, -1, kQcNone, 0, kQbRed,
+     kQfConfirm},
+    {"Laden: yeti_thrall_yggdrasil", "Load: yeti_thrall_yggdrasil", "arena.load", "yeti_thrall_yggdrasil", kQbAction, -1,
+     kQcNone, 0, kQbRed, kQfConfirm},
+    {"Laden: panther_thrall", "Load: panther_thrall", "arena.load", "panther_thrall", kQbAction, -1, kQcNone, 0, kQbRed,
+     kQfConfirm},
+    {"Laden: tiger", "Load: tiger", "arena.load", "tiger", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Laden: giant_albino_tarantula", "Load: giant_albino_tarantula", "arena.load", "giant_albino_tarantula", kQbAction,
+     -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Laden: merc", "Load: merc", "arena.load", "merc", kQbAction, -1, kQcNone, 0, kQbRed, kQfConfirm},
+    {"Laden: knight_thrall (DLC 1)", "Load: knight_thrall (DLC 1)", "arena.load", "knight_thrall", kQbAction, -1, kQcNone,
+     0, kQbRed, kQfConfirm},
+    {"Laden: viking_thrall_dlc2_", "Load: viking_thrall_dlc2_", "arena.load", "viking_thrall_dlc2_", kQbAction, -1,
+     kQcNone, 0, kQbRed, kQfConfirm},
+    {"Geladene Arten freigeben", "Release loaded kinds", "arena.unload", "all", kQbAction, -1, kQcNone, 0, kQbRed,
+     kQfConfirm},
     {"Adrenalin (live)", "Adrenaline (live)", "adren.meter", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Adrenalin voll", "Adrenaline full", "adren.fill", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
     {"Adrenalin voll halten", "Keep adrenaline full", "adren.keep", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
@@ -33980,6 +34727,14 @@ const QbHelp kQbHelp[] = {
     {"arena.go", "1f", "Boden r 2851, z -2785: Vogelspinne, Spinnen|Floor r 2851, z -2785: tarantula, spiders"},
     {"arena.mode", "", "Doppel-Flag 1 = DLC 2: kein Adrenalin|Doppelganger flag 1 = DLC 2: no adrenaline"},
     {"ai.remove", "spawned", "Nur Gegner, die ai.spawn gemacht hat|Only enemies ai.spawn made"},
+    // 0.22.33 (group K)
+    {"arena.enemies", "", "26 Arten: resident / bereit / l\303\244dt / ladbar|26 kinds: resident / ready / loading / "
+                          "loadable"},
+    {"arena.load", "*", "Fremde Art laden, nach 'ready' ai.spawn (Q83)|Load a foreign kind, ai.spawn after 'ready' (Q83)"},
+    {"arena.unload", "all", "Nur Arten von arena.load freigeben|Release only kinds of arena.load"},
+    {"photo.on", "", "Spiel-Freikamera, Welt steht, ohne HUD|The game's free camera, world paused, no HUD"},
+    {"photo.shot", "", "Sauberes Foto photo_<n> (shot.save clean)|Clean shot photo_<n> (shot.save clean)"},
+    {"photo.off", "", "Kamera, Steuerung, Pause, HUD wie vorher|Camera, control, pause, HUD as before"},
     {"adren.meter", "", "Wert / Maximum, Bit 22 = voll gehalten|Value / maximum, bit 22 = held full"},
     {"adren.fill", "", "Meter voll wie das Spiel (0x6e6630) - Cheat|Meter full the game's way (0x6e6630) - cheat"},
     {"adren.keep", "", "F\303\274llt jedes Bild nach, au\303\237er Bit 22 / 27|Refills every frame unless bit 22 / 27"},
@@ -35974,7 +36729,8 @@ bool OcSignal(char *what, size_t n) {
     if (LevelChangePending(why, sizeof(why))) return false;
     const bool cine = (g_ocSignal & 1) && g_ocCineOk && CinematicNow();
     DWORD cam = 0, game = 0;
-    const bool other = (g_ocSignal & 2) && g_ocCamOk && ReadDword(kCurrentCamera, &cam) &&
+    // 0.22.33: the photo mode's FreeCamera is no cutscene camera
+    const bool other = (g_ocSignal & 2) && g_ocCamOk && !g_pmActive && ReadDword(kCurrentCamera, &cam) &&
                        ReadDword(kCameraManager + 0xb80, &game) && cam && game && cam != game;
     if (!cine && !other) return false;
     Out(what, n, "%s%s%s", cine ? "cinematic test" : "", cine && other ? " + " : "", other ? "camera left [manager+0xb80]" : "");
@@ -40402,6 +41158,8 @@ void Render(IDirect3DDevice9 *device) {
     }
     // 0.21.2: also an item PadHook left here because another pad hook sat outside it (DeferPending)
     if ((InterlockedExchange(&g_reqDeferred, 0) || padIdle) && g_reqPending) RunPending();
+    PmTick();                                    // 0.22.33 photo mode: leaves by itself on a level / state / camera change
+    QlTick();                                    // 0.22.33 arena.load: progress, ready / stalled lines (every 100 ms)
     if (padIdle) WeaponsTick();
     if (padIdle) NaTick();                       // 0.22.20 menu.noattract: also while the game polls no pad
     GlTick();                                    // 0.22.30 Q95 device glyphs: byte checks + patch once (cheap after)
@@ -41480,6 +42238,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
         AiShutdown();                                 // 0.19: the gate patches back (only those still ours)
         M21Shutdown();                                // 0.21: slot 7, sound gates, shake stub, rumble back
         GsShutdown();                                 // 0.22.16: the subtitle look sites back (only those still ours)
+        PmShutdown();                                 // 0.22.33: photo mode's pause bit / UI byte back (no game call)
     }
     return TRUE;
 }

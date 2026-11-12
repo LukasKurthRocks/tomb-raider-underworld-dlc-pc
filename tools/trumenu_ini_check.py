@@ -3141,7 +3141,8 @@ def check_02219(ini_path, switches_path):
     if not re.search(r'^TruShadowPower \| Meter \| Infinite \| bool \|', sw, re.M):
         problems.append('TruMenu.switches.txt: the TruShadowPower [Meter] Infinite row is missing')
     tsp = open(os.path.join(PLUGINS, 'TruShadowPower', 'TruShadowPower.cpp'), encoding='utf-8').read()
-    vm = re.search(r'return "TruShadowPower 0\.(\d+) \(', tsp)   # 0.22.21: 0.23 or later (TruShadowPower 0.24 of 4222070)
+    # 0.22.21: 0.23 or later (TruShadowPower 0.24 of 4222070); 0.22.33: a patch number may follow (0.27.1, group I)
+    vm = re.search(r'return "TruShadowPower 0\.(\d+)(?:\.\d+)? \(', tsp)
     if not vm or int(vm.group(1)) < 23 or 'GetPrivateProfileIntA("Meter", "Infinite"' not in tsp:
         problems.append('TruShadowPower.cpp: version export 0.23+ / [Meter] Infinite read not found (kPiMinVersion 23)')
     ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
@@ -3885,6 +3886,159 @@ def check_02232(ini_path):
                       % (len(arenas), ' '.join(k for a, k, u, i in arenas)))
 
 
+K_CHECKS_02233 = os.path.join(ROOT, 'work', 'k_menu_1211', 'k_checks.txt')
+QL_TABLE_02233 = [('217', 'shark_blueshark'), ('311', 'merc'), ('312', 'merc_deux'), ('336', 'bat_enemy'), ('337', 'tiger'),
+                  ('367', 'naga_green'), ('368', 'naga_red'), ('370', 'small_albino_spider'),
+                  ('419', 'small_brown_spider'), ('448', 'small_brown_spider_no_jump'), ('516', 'panther_thrall'),
+                  ('564', 'cat_panther'), ('565', 'poacher'), ('566', 'poacher_long_range'), ('600', 'mayan_thrall'),
+                  ('603', 'viking_thrall'), ('604', 'giant_albino_tarantula'), ('703', 'giant_albino_tarantula_blind'),
+                  ('705', 'yeti_thrall'), ('791', 'yeti_thrall_yggdrasil'), ('821', 'shark_greenland'),
+                  ('855', 'knight_thrall'), ('927', 'viking_thrall_dlc2_'), ('931', 'yeti_thrall_dlc2_'),
+                  ('943', 'yeti_thrall_armored_dlc2_'), ('1004', 'viking_thrall_tutorial_dlc2_')]
+
+
+def check_02233(ini_path):
+    """0.22.33 (group K 12.11.; workspace docs/Befund-Gruppe-K-1211.md): F1 photo mode - items photo.on / photo.off
+    (queued) / photo.shot / photo.status, kPmChecks = rows of the offline-checked list work/k_menu_1211/k_checks.txt,
+    PmRefusal refuses cutscene / loading / game pause / flight / cine.pause / camera layer, RunPhotoOn switches with
+    0x5edd70(mgr, 5, 0) after the pause bit / UI byte and undoes them when the FreeCamera is not current, PmLeave goes
+    back with the remembered mode (0x5edf50 only when mode / layer changed) and clears the pause bit / UI byte only when
+    photo.on set them, PmTick (Present hook) leaves on level change / state / cutscene / pause / camera, PmShutdown in
+    DllMain makes no game call; Q83 arena.load / arena.unload (queued) / arena.enemies, kQlChecks also from k_checks.txt,
+    the 26 kinds of the Q83 catalog, request 0x5c1760 only after the tracker / anim pool / 3D navgraph / DRM checks,
+    ai.spawn asks QlSpawnBlock, unload only own requests whose entry still holds the id; glyphs.status; bar rows / help
+    lines; no new INI key; Set-TruMenu.ps1 knows the 0.22.32 hash"""
+    problems = []
+    src = read_cpp()
+    if '0.22.33 (photo mode, arena.load, glyphs.status, group K' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.33 part "0.22.33 (photo mode, arena.load, glyphs.status, '
+                        'group K"')
+    offline = {}
+    if os.path.exists(K_CHECKS_02233):
+        for line in open(K_CHECKS_02233, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline[int(addr, 16)] = hexs.replace(' ', '').lower()
+    else:
+        problems.append('work/k_menu_1211/k_checks.txt (the offline byte list) is missing')
+    counts = {}
+    for table in ('kPmChecks', 'kQlChecks'):
+        rows = sv_rows(src, table)
+        counts[table] = len(rows)
+        if not rows: problems.append('TruMenu.cpp: DvCheck table %s missing' % table)
+        for a, b in rows:
+            if offline.get(int(a, 16)) != b.lower():
+                problems.append('TruMenu.cpp: %s row 0x%s is not the offline-checked bytes of k_checks.txt' % (table, a))
+    if counts.get('kPmChecks') != 23 or counts.get('kQlChecks') != 14:
+        problems.append('TruMenu.cpp: kPmChecks / kQlChecks must hold 23 / 14 rows (got %s)' % counts)
+    items = item_types(src)
+    for item, kind in (('photo.on', 'action'), ('photo.off', 'action'), ('photo.shot', 'action'), ('photo.status', 'info'),
+                       ('arena.load', 'action'), ('arena.unload', 'action'), ('arena.enemies', 'info'),
+                       ('glyphs.status', 'info')):
+        if items.get(item) != kind: problems.append('TruMenu.cpp: item %s (%s) missing in kItems' % (item, kind))
+    for item, queued, val, run in (('photo.on', 'true', 'ValPhoto', 'RunPhotoOn'), ('photo.off', 'true', 'ValPhoto', 'RunPhotoOff'),
+                                   ('photo.shot', 'false', 'ValPhoto', 'RunPhotoShot'),
+                                   ('arena.load', 'true', 'ValArenaEnemies', 'RunArenaLoad'),
+                                   ('arena.unload', 'true', 'ValArenaEnemies', 'RunArenaUnload')):
+        m = re.search(r'\{"%s", "action", (?:"[^"]*"\s*)+,\s*(true|false),\s*%s,\s*%s\}' % (re.escape(item), val, run), src)
+        if not m or m.group(1) != queued:
+            problems.append('TruMenu.cpp: %s = %s / %s, game thread %s' % (item, val, run, queued))
+    ref = fn_body(src, 'void PmRefusal(')
+    for want in ('CinematicNow()', 'LevelChangePending(', 'g_cnPause', 'kPmGamePause', 'g_flight', 'kCameraManager + 0x4c',
+                 'kCameraManager + 0x7c', 'kCameraManager + 4 + mode * 4', 'kCameraManager + 0x3370', 'kPmFreeCamVt',
+                 'PmCheck()'):
+        if want not in ref: problems.append('TruMenu.cpp: PmRefusal must test %s' % want)
+    on = fn_body(src, 'bool RunPhotoOn(')
+    sw = on.find('(kCameraManager, 0, 5, 0)')
+    if not (0 <= on.find('PmRefusal(why, sizeof(why));') < on.find('InterlockedOr(f, 0x1000)') < sw <
+            on.find('cur != kPmFreeCam')):
+        problems.append('TruMenu.cpp: RunPhotoOn = refusal test, pause bit, then 0x5edd70(mgr, 5, 0), then the camera test')
+    for want in ('g_pmPauseOurs = !(before & 0x1000) || menuHeld || ringHeld;', 'g_pmUiOurs = !ui;',
+                 'InterlockedExchange(&g_menuPaused, 0)', 'if (g_pmPauseOurs) InterlockedAnd(f, ~0x1000L);'):
+        if want not in on: problems.append('TruMenu.cpp: RunPhotoOn must hold %s' % want)
+    leave = fn_body(src, 'void PmLeave(')
+    for want in ('(kCameraManager, 0, g_pmMode, 0)', 'ours && !layer && mode == 5', 'kCameraRestore', 'kPmCtlOff',
+                 'g_pmPauseOurs && ReadDword(kStreamFlags, &flags) && (flags & 0x1000)', 'g_pmUiOurs && ByteAt(kUiHidden)',
+                 '__try', '__except'):
+        if want not in leave: problems.append('TruMenu.cpp: PmLeave must hold %s' % want)
+    tick = fn_body(src, 'void PmTick(')
+    for want in ('LevelChangePending(', 'player != g_pmPlayer', 'unit != g_pmUnit', 'CinematicNow()', 'kPmGamePause',
+                 'cur != kPmFreeCam', 'PmLeave(why'):
+        if want not in tick: problems.append('TruMenu.cpp: PmTick must test %s' % want)
+    shut = fn_body(src, 'void PmShutdown(')
+    if 'reinterpret_cast<PmSetModeFn>' in shut or 'kCameraRestore' in shut or 'kPmCtlOff' in shut:
+        problems.append('TruMenu.cpp: PmShutdown must not call the game (DllMain)')
+    render = fn_body(src, 'void Render(')
+    if 'PmTick();' not in render or 'QlTick();' not in render:
+        problems.append('TruMenu.cpp: Render (Present hook) must call PmTick / QlTick')
+    if 'PmShutdown();' not in src[src.find('DLL_PROCESS_DETACH'):]:
+        problems.append('TruMenu.cpp: DllMain detach must call PmShutdown')
+    shot = fn_body(src, 'bool RunPhotoShot(')
+    if '"clean photo_%03ld%s%s"' not in shot or 'RunShotSave(a, o, n)' not in shot:
+        problems.append('TruMenu.cpp: photo.shot = shot.save clean photo_<n>')
+    m = re.search(r'const QlKind kQlKinds\[\] = \{(.*?)\n\};', src, re.S)
+    kinds = re.findall(r'\{(\d+), "([a-z0-9_]+)", \d, \d, \d+, \d+, \d+, "[^"]*"\}', m.group(1) if m else '')
+    if kinds != QL_TABLE_02233: problems.append('TruMenu.cpp: kQlKinds must be the 26 enemy kinds of the Q83 catalog')
+    load = fn_body(src, 'bool RunArenaLoad(')
+    req = load.find('reinterpret_cast<QlRequestFn>(kQlRequest)(q.id)')
+    for want in ('g_qlN >= kQlMax', 'QlHas3dNav()', 'freeCount < q.drms + 2', 'animFree < q.anims + 100',
+                 'reinterpret_cast<DrmExistsFn>(kDrmExists)(t)', 'RunSaveBackup("spawn"', 'TrackerScan(q.id, &freeCount)',
+                 'LevelChangePending('):
+        pos = load.find(want)
+        if pos < 0 or req < 0 or pos > req: problems.append('TruMenu.cpp: RunArenaLoad must test %s before 0x5c1760' % want)
+    if 'const int kQlMax = 2;' not in src: problems.append('TruMenu.cpp: kQlMax must be 2 (Q83: at most 2 foreign kinds)')
+    walk = fn_body(src, 'void QlWalk(')
+    for want in ('e + 0xe', 'status != 2', 'object + 0x3c', 'object + 0x44', 'slot == 0xffff', 'object + 0x2c',
+                 'depth >= 4'):
+        if want not in walk: problems.append('TruMenu.cpp: QlWalk must read %s' % want)
+    spawn = fn_body(src, 'bool RunAiSpawn(')
+    if not 0 <= spawn.find('QlSpawnBlock(id, qlWhy, sizeof(qlWhy));') < spawn.find('TrackerScan(id, &freeCount)'):
+        problems.append('TruMenu.cpp: RunAiSpawn must ask QlSpawnBlock before the tracker test')
+    unload = fn_body(src, 'bool RunArenaUnload(')
+    if 'static_cast<SHORT>(id) == q.id' not in unload or 'held && QlDumpOne(q.id)' not in unload:
+        problems.append('TruMenu.cpp: RunArenaUnload dumps only an entry that still holds the id')
+    if 'reinterpret_cast<QlDumpFn>(kQlDump)(id)' not in fn_body(src, 'bool QlDumpOne('):
+        problems.append('TruMenu.cpp: QlDumpOne must call 0x5c1790')
+    for fn in ('void PmRefusal(', 'void QlWalk(', 'void QlKindState(', 'void ValArenaEnemies(', 'void ValGlyphStatus(',
+               'int QlAnimFree(', 'bool QlHas3dNav('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('('))
+        if any(w in body for w in ('WriteByte(', 'WriteDword(', 'WriteCode(', 'reinterpret_cast<volatile', 'Interlocked',
+                                   'Fn>(')):
+            problems.append('TruMenu.cpp: %s must only read' % fn.strip('('))
+    gl = fn_body(src, 'void GlDevice(')
+    if 'g_glLastTick = GetTickCount();' not in gl or 'GetLocalTime(&t);' not in gl or 'g_glSub' not in gl:
+        problems.append('TruMenu.cpp: GlDevice must note the input kind and the switch time (glyphs.status)')
+    bar = qb_rows(src, True)
+    lara = [(i, a, k) for t, de, i, a, k, layer, tail in bar if t == 'kQbLara']
+    for i, k in (('photo.on', 'kQbAction'), ('photo.shot', 'kQbAction'), ('photo.off', 'kQbAction'),
+                 ('photo.status', 'kQbInfo')):
+        if (i, '', k) not in lara: problems.append('TruMenu.cpp: kQbLara lacks the row %s (%s)' % (i, k))
+    tests = [(i, a, k, tail) for t, de, i, a, k, layer, tail in bar if t == 'kQbTests']
+    loads = [a for i, a, k, tail in tests if i == 'arena.load' and k == 'kQbAction' and 'kQfConfirm' in tail]
+    if loads != ['mayan_thrall', 'yeti_thrall_yggdrasil', 'panther_thrall', 'tiger', 'giant_albino_tarantula', 'merc',
+                 'knight_thrall', 'viking_thrall_dlc2_']:
+        problems.append('TruMenu.cpp: kQbTests arena.load rows must follow the T19 order (got %s)' % loads)
+    if not any(i == 'arena.unload' and a == 'all' and 'kQfConfirm' in tail for i, a, k, tail in tests):
+        problems.append('TruMenu.cpp: kQbTests lacks arena.unload all (kQfConfirm)')
+    if not any(i == 'arena.enemies' and k == 'kQbInfo' for i, a, k, tail in tests):
+        problems.append('TruMenu.cpp: kQbTests lacks the info row arena.enemies')
+    for hid, harg in (('arena.enemies', ''), ('arena.load', r'\*'), ('arena.unload', 'all'), ('photo.on', ''),
+                      ('photo.shot', ''), ('photo.off', '')):
+        if not re.search(r'\{"%s", "%s", "' % (re.escape(hid), harg), src):
+            problems.append('TruMenu.cpp: kQbHelp lacks %s %s' % (hid, harg))
+    for section in ('Photo', 'ArenaLoad'):
+        for line, key, value in ini_section(ini_path, section):
+            problems.append('TruMenu.ini:%d: [%s] %s - 0.22.33 adds no INI key' % (line, section, key))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '5f7ba420c25f717ede72b60c30d87665174807f0a8fd2f73bc30c0781a33750e' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.32 build hash (work/asi/menu0255) is missing')
+    return problems, ('photo mode (FreeCamera mode 5, pause bit, UI byte, way back, auto-leave; %d byte checks), arena.load '
+                      '(%d kinds, %d byte checks, ready before ai.spawn), glyphs.status, no INI key'
+                      % (counts.get('kPmChecks', 0), len(kinds), counts.get('kQlChecks', 0)))
+
+
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
 SV_ITEMS = ('save.pending', 'save.inv', 'save.waiting', 'save.find')
 
@@ -4444,6 +4598,10 @@ def main(argv):
     for p in cproblems32: print('Q02232 %s' % p)
     if not cproblems32: print('ok: 0.22.32 %s' % csummary32)
     problems += cproblems32
+    cproblems33, csummary33 = check_02233(ini_path)   # 0.22.33 (group K)
+    for p in cproblems33: print('Q02233 %s' % p)
+    if not cproblems33: print('ok: 0.22.33 %s' % csummary33)
+    problems += cproblems33
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

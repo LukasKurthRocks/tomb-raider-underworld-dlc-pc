@@ -2928,6 +2928,74 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.33 - photo mode, arena.load, glyphs.status (2026-11-12)
+
+Built into `work\asi\menu0256`, not installed, no live test (group K; finding in the workspace
+`docs\Befund-Gruppe-K-1211.md`, scripts and byte lists in `work\k_menu_1211\`). No new INI key, 37 new byte checks
+(23 photo mode `kPmChecks`, 14 object load `kQlChecks`), all 38 lines of `work\k_menu_1211\k_checks.txt` ok on
+`data\pc\tru.exe` and on the installed `tru.exe` (the same file, md5 `5560abac...`).
+
+- **Photo mode (F1 / Q78): `photo.on` / `photo.off` / `photo.shot` / `photo.status`** - the game's own free camera, not
+  one of ours: the camera manager's slot of **mode 5** (FreeCamera `0xe8e9a0`, vtable `0x855e54`) through the manager's
+  own switch **`0x5edd70(mgr, 5, 0)`** (`CAMERA_SetMode` 0x5f39f0 knows only 6 / 11 / 12, so `camera.mode 5` does
+  nothing). The FreeCamera brings its own controls (left stick = fly, right stick / mouse = look, the game's actions 19 -
+  22 = speed / up-down) and data (generalbank DTP 16: FOV 50, speeds); its activate turns Lara's control off itself
+  (0x5d5f60). With it: the world pause bit `0xe7f0b8 | 0x1000` (as `time.pause`; the camera update 0x5f3df0 still runs
+  - the world block jumps from 0x5dfeb2 to 0x5dff0f, the camera call is at 0x5dff14) and the UI byte `0xcdc9a0 = 1` (as
+  `ui.hide`; the game's own screenshot task 0x774aa0 hides the HUD with the same byte around its frame redraw).
+  **Refused** while a cutscene plays, a level change / level start waits, the main state is not 1, the game is paused
+  (pause menu, `[0xe7f0b4] & 0x10000000`), flight or `cine.pause` is on, the camera manager runs another layer
+  (`+0x4c`), holds its mode (`+0x7c`), or the current camera is not the slot of its mode. **`photo.off`** goes back with
+  the same switch to the remembered mode (0x5edf50 restore only if mode / layer changed meanwhile, nothing if the game
+  took the camera itself), puts the control byte back as before (0x5d5f60 again if it was off) and clears the pause bit /
+  UI byte **only if `photo.on` set them** (an open menu's or the ring's pause becomes the photo mode's, as with
+  `time.pause`). **Left by itself** (Present hook, game thread) on a level change request, a new player instance or
+  stream unit, main state != 1, a cutscene start, the game's pause menu, or a camera the game switched to. TruMenu's
+  own bar / big menu do not end it (they are the way to `photo.shot` / `photo.off`). Plugin unload: only the pause bit /
+  UI byte back (no game call from DllMain). `photo.shot [name]` = `shot.save clean photo_<n>[_name]`. `shot.oncine`'s
+  camera signal ignores the photo mode's camera. Bar: page Figur, group Fotos (four rows).
+- **`arena.load <kind>` / `arena.unload <kind>|all` / `arena.enemies` (Q83):** loads one of the 26 enemy kinds of the
+  Q83 table (`kQlKinds`, made by `work\k_menu_1211\ar_kinds_table.py` from the Q83 catalog) with the game's own **object
+  request with reference 0x5c1760** (= 0x5c1550(id, 1), what a unit load does for every intro); no poll loop - the loader
+  runs on by itself and the engine requests the children (chunkdoll, weapon, DLC 2 extension) at the load end. Before
+  the request: not resident / not loading already, at most **2** kinds of arena.load, a volumetric kind (bat, sharks)
+  only while a loaded unit has a 3D navigation image, the group's DRMs + 2 **tracker** entries free (204), the group's
+  anim entries + 100 free in the **anim pool** (3000, no overflow test in the game), every DRM present (the game's
+  FileExists 0x5bf7b0), `save.backup spawn` once per session (shared with `ai.spawn`). **Ready** = the object and every
+  child (recursive) at status 2 with an object and every anim entry with an id resolved -> one log line `arena.load
+  <kind>: ready after n ms`; `stalled after 30 s` names the first object that waits. **`ai.spawn` refuses a kind of
+  arena.load until it is ready.** `arena.unload` calls STREAM_DumpObject 0x5c1790 once per own request while the tracker
+  entry still holds the id (spawned instances keep their own reference - remove them first). A level change forgets the
+  list (nothing dumped). `arena.enemies` lists each kind: resident / ready / loading a/b / loadable / refused with the
+  reason; the 4 objects without enemy data are refused. Base and DLC kinds together: the answer warns (the first loaded
+  copy of shared ids serves both). Bar: page Tests, group "Arena 1 - Kampf (Q76)": status row, eight load rows in the T19
+  order, "release".
+- **`glyphs.status` (Q95 follow-up):** `[Input] DeviceGlyphs`, the patch state, the device now (pad / keyboard / mouse -
+  the last input), the last switch time (date + time) and the prompt counters; with `DeviceGlyphs=0` it says that no
+  device is tracked.
+- **Checks:** `trumenu_ini_check` new `check_02233` (byte lists, refusals, the way back, ticks, rows, help lines, no
+  INI key, the 0.22.32 hash in `Set-TruMenu.ps1`); `check_02219` accepts a TruShadowPower patch version (`0.27.1`).
+
+### TO TEST 0.22.33
+
+Main-game session; `[Cheats] Enabled=1`, `[Cheat] Experimental=1`. Logs only after the session header line.
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | photo on | in free play: page Figur, Fotos: "Foto-Modus an (Freikamera)" | answer `photo mode on ...`; world stands, HUD gone, left stick flies, right stick / mouse looks, Lara does not move; log `photo.on ... FreeCamera 0x00e8e9a0 current` |
+| 2 | photo keys | hold / press the game's keys of actions 19 - 22 (pad: try LB / RB / LT / RT) | slower / faster / up / down - note which button does what |
+| 3 | photo shot | "Foto-Modus: Foto" (or F11) | PNG `photo_001` without HUD and TruMenu |
+| 4 | photo off | "Foto-Modus aus" | camera back behind Lara exactly as before, world runs, HUD back, Lara moves; log `photo: off (photo.off) ... camera mode back (0x5edd70) ... world runs again, HUD back` |
+| 5 | photo guards | try "Foto-Modus an" in a cutscene, in the pause menu, with flight on | refused with the reason (grey row with the reason in the bar) |
+| 6 | photo auto-off | photo on, then Start (pause menu) | log `photo: off (the game's pause menu opened) ...`; after resume: normal camera, HUD, control |
+| 7 | photo + time.pause / ui.hide before | `time.pause 1`, `ui.hide 1`, photo on, photo off | the pause bit and HUD stay as they were before photo on (`pause bit left`, `UI byte left`) |
+| 8 | arena.enemies | arena 1a: "Gegnerarten (arena.enemies)" | `viking_thrall`, `yeti_thrall` resident; bat / sharks `refused: needs 3D navgraph`; the rest `loadable`; 4 `no enemy data` |
+| 9 | arena.load | "Laden: mayan_thrall", immediately `ai.spawn mayan_thrall` | first `requested mayan_thrall ...`; the early spawn is refused `not ready yet`; log `arena.load mayan_thrall: ready after n ms`; then `ai.spawn mayan_thrall 1` fights, falls apart at death |
+| 10 | limit | load `panther_thrall`, then `tiger` | the third is refused `2 kinds by arena.load already` |
+| 11 | unload | `ai.remove spawned`, "Geladene Arten freigeben" | `mayan_thrall dumped (0x5c1790); panther_thrall dumped (0x5c1790)`; no crash; arena.enemies shows them `loadable` again |
+| 12 | merc | "Laden: merc" (6 DRMs) | ready line; `ai.spawn merc 1` shoots? note memory (Watch-TruMemory) |
+| 13 | glyphs.status | `[Input] DeviceGlyphs=1`, pad then keyboard then mouse; TruLink `menu glyphs.status` each time | `device now pad / keyboard / mouse`, the last switch time moves with each switch |
+
 ## 0.22.32 - arena: spawn health note, game mode check, three new spots (2026-11-12)
 
 Built into `work\asi\menu0255`, not installed, no live test (group A; finding in the workspace

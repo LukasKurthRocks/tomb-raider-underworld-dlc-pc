@@ -1,0 +1,51 @@
+# group K (TruMenu 0.22.33) byte checks - photo mode (F1) and arena.load (Q83); one "ADDR HEX" per line
+# photo: camera manager mode switch 0x5edd70 (thiscall mgr, mode, blend; ret 8)
+0x005edd70 56 8bf1 837e4c00 57 8b7c240c 7509 3b7e60 0f8488000000
+0x005edd87 8d8670330000 85c0 740e 394630 7409 8986800b0000 894630
+0x005edd9f 807e7c00 7567 807c241000
+0x005eddb8 83ff0d c7464c00000000 897e60
+0x005eddfb 8b54be04 52 8bce e829a8ffff 5f 5e c20800
+# camera switch 0x5e8630: old vf+0x20(new), [mgr+0x44] = new, new vf+0x1c(old)
+0x005e8630 53 56 8bd9 8b7344 8b06 8b5020 57 8b7c2410 57 8bce ffd2 897b44 8b07 8b501c 56 8bcf ffd2
+# restore 0x5edf50 (mode 11, slot +0x30)
+0x005edf50 d90530118400 56 8bf1 33c9 d95e78 394e4c
+0x005edf7f 8d510b 7505 395660 7429
+# FreeCamera: slot [mgr+0x18] = mgr+0xe4b0 (ctor), vtable 0x855e54 slots +0x1c / +0x20
+0x005f3bc2 8d86b0e40000 894618
+0x00855e54 c0365e00 70975f00 30915f00
+0x00855e70 b0915f00 a0915f00
+0x005f91b0 55 8bec 83e4f0 83ec18 56 8bf1 83bed0000000ff
+0x005f92bc c786f000000000000000 e895ccfdff
+0x005f91a0 e89bcdfdff c20400
+# player control on / off (byte 0x8ab4e6)
+0x005d5f40 e85bcaeaff c605e6b48a0001
+0x005d5f60 c605e6b48a0000 e834caeaff e92ff80600
+# game loop: the camera update 0x5f3df0 runs while streamFlags bit 0x1000 skips the world (time.pause)
+0x005dfeb2 8535b8f0e700 7555
+0x005dff0f e83c32fdff e8d73e0100
+0x005f3e0c b9f004e800 e85afeffff 8b0d3405e800
+# in-game pause bit [0xe7f0b4] & 0x10000000 (frame time, set by the pause 0x5d4780)
+0x005da233 f705b4f0e70000000010
+0x005d47a7 c60543f1e70006
+# arena.load (Q83): request with reference 0x5c1760 -> 0x5c1550(id, 1)
+0x005c1760 8b442404 6a01 50 e8e4fdffff 83c408 83f8ff 7503 33c0 c3 8d04c0 8d04850074db00 c3
+0x005c159f 80bc241801000000 7409 50 e861daf8ff
+0x0054f010 8b442404 8b00 85c0 7404 83401801 c3
+# STREAM_DumpObject 0x5c1790 -> 0x5c16d0 (ecx = id)
+0x005c1790 56 8b742408 85f6 7e0a a1d094db00 8b04f0
+0x005c17be 8bce 5e e90affffff
+0x005c16d0 56 be0074db00 33c0 66837e0e00 7408 0fbf560c 3bd1 740f
+0x005c16f6 833e00 7427 66837e0e01 56 7517 e8b8eef8ff
+# object load end: status 2, children +0x2c requested with 0x5c1760, anim table +0x3c / +0x44
+0x0054e756 66c7450e0200
+0x0054e84b 8b7e2c 85ff 7449
+0x0054e873 0fb7d0 52 e8e42e0700
+0x0054e263 894644
+0x0054e243 6689563c
+# anim pool 0x8c1240: 3000 x 8 {u16 refs, u16 id, ptr}
+0x00433fb0 a110128c00 3db80b0000
+0x004340b0 66833cc540128c0000 740a 663b0cc542128c00
+# UI byte 0xcdc9a0: the HUD draw reads it; the game's own screenshot task 0x774aa0 sets it around its frame redraw
+0x005a434c 803da0c9cd0000 56 0f85f8040000
+0x00774ac5 c605a0c9cd0001 e8ef56e6ff
+0x00774adf 881da0c9cd00
