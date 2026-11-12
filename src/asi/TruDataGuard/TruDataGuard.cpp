@@ -445,7 +445,7 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDataGuard.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDataGuard 0.2 loaded (enabled %d, log level %d, section lookup %d, section exists %d, unchecked callers "
+    Log(1, "TruDataGuard 0.2.1 loaded (enabled %d, log level %d, section lookup %d, section exists %d, unchecked callers "
         "%d, log first %d, log unit %d)", g_enabled, g_logLevel, g_sectionLookup, g_sectionExists, g_uncheckedCallers,
         g_logFirst, g_logUnit);
     if (!g_enabled) { Log(1, "disabled by TruDataGuard.ini - nothing patched"); return; }
@@ -692,4 +692,4 @@ extern "C" __declspec(dllexport) int __cdecl TruDataGuardSelfTest(char *report, 
 }
 
 // exported so the loader / tools can identify the plugin
-extern "C" __declspec(dllexport) const char *TruDataGuardVersion() { return "TruDataGuard 0.2 (section lookup / exists test: invalid ids -> not found)"; }
+extern "C" __declspec(dllexport) const char *TruDataGuardVersion() { return "TruDataGuard 0.2.1 (section lookup / exists test: invalid ids -> not found; 0.2.1: dated log lines)"; }

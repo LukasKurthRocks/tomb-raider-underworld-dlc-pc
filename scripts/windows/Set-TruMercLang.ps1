@@ -49,8 +49,9 @@ $built   = if ($SourceDir) { $SourceDir } else { $asiRoot }
 $names   = 'TruMercLang.asi', 'TruMercLang.ini'
 # released builds of ours (SHA-256), recognised even when their output folder below work\asi is gone
 $earlierBuilds = @{
-    'TruMercLang.asi' = @()   # 0.1 (work\asi\merclang01) is found below work\asi
-    'TruMercLang.ini' = @()
+    'TruMercLang.asi' = @('30c69d0483dc005e51c7a63851bb34e9e95b74e74e16c3c9a56e83736f7b4b1b',   # 0.1 (work\asi\merclang01)
+                          'e5c45ac8024561dc3f205742ad6694502a77656f5c64a2132ae21e6f09408f30')   # 0.1.1 dated log lines (work\asi\i_1211\TruMercLang, current)
+    'TruMercLang.ini' = @('d7f478424ea11bba65e5164119e7374e83cb074a869674f066e60975ea90d4d8')   # sample .ini of 0.1 / 0.1.1
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

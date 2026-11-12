@@ -57,7 +57,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowHud 0.2";
+const char kVersion[] = "TruShadowHud 0.2.1";     // 0.2.1: dated log lines (Q107)
 const DWORD kImageBase = 0x00400000;
 
 // ---- larabase binder (TU 0x824a7d28 / PC tru+0x3b5490) ----
@@ -578,8 +578,9 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 extern "C" __declspec(dllexport) const char *TruShadowHudVersion() {
-    return "TruShadowHud 0.2 (TU larabase natives f70-f73 and dlc2data f0 for the TU HUD script, bodies from "
-           "TruShadowPowerMeterApi v2 / TruDlc2PlayerDoppelganger; dlc2data f1 = the TU's hint-box byte 0x829ca67c)";
+    return "TruShadowHud 0.2.1 (TU larabase natives f70-f73 and dlc2data f0 for the TU HUD script, bodies from "
+           "TruShadowPowerMeterApi v2 / TruDlc2PlayerDoppelganger; dlc2data f1 = the TU's hint-box byte 0x829ca67c; "
+           "0.2.1: dated log lines)";
 }
 
 // 0.2: the value dlc2data f1 last stored (TU byte 0x829ca67c: 1 while the TU hint-box script's modal DLC 2 box is

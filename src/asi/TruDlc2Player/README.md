@@ -5,6 +5,18 @@ DLC 2 *Lara's Shadow*: the doppelganger as the player object, as the Xbox title 
 addresses; the findings are in docs/WINDOWS_REBUILD.md (finding 43) and the workspace notes (Befund-Felsrinne,
 Befund-TU-Funktionen L4, Befund-Kostuem-Reset-DLC1).
 
+## 0.8.1: dated log lines (Q107, 2026-11-12)
+
+Built 2026-11-12 into `work\asi\i_1211\TruDlc2Player`, not installed, not played. Only the log format changed (shared
+helper `src\asi\TruLog.h`): every line of `TruDlc2Player.log` starts with `YYYY-MM-DD HH:MM:SS.mmm`, and each game
+process writes one header line `=== <date time> TruDlc2Player 0.8.1 session start (pid n) ===` before its first line.
+Everything else is 0.8 (same sample .ini). Install:
+`scripts\windows\Set-TruDlc2Player.ps1 -Install -SourceDir work\asi\i_1211\TruDlc2Player`.
+
+| # | TO TEST 0.8.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.8.1 installed, read `TruDlc2Player.log` from its last `session start` line on | header and `loaded` line name 0.8.1; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
+
 ## What it does
 
 | Part (ini key) | TU | PC |

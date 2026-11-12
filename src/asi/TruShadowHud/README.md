@@ -11,6 +11,18 @@ generalbank **must not be used without this plugin**: its HUD script calls f71-f
 which are null natives without it. The plugin alone (with the normal generalbank) only logs that the `larabase`
 script has 70 entries and binds nothing there.
 
+## 0.2.1: dated log lines (Q107, 2026-11-12)
+
+Built 2026-11-12 into `work\asi\i_1211\TruShadowHud`, not installed, not played. Only the log format changed (shared
+helper `src\asi\TruLog.h`): every line of `TruShadowHud.log` starts with `YYYY-MM-DD HH:MM:SS.mmm`, and each game
+process writes one header line `=== <date time> TruShadowHud 0.2.1 session start (pid n) ===` before its first line.
+Natives and options are as in 0.2 (same sample .ini). Install:
+`scripts\windows\Set-TruShadowHud.ps1 -Install -SourceDir work\asi\i_1211\TruShadowHud`.
+
+| # | TO TEST 0.2.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.2.1 installed, read `TruShadowHud.log` from its last `session start` line on | header and `loaded` line name 0.2.1; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
+
 ## Translation
 
 | TU | what it does | PC (this plugin) |

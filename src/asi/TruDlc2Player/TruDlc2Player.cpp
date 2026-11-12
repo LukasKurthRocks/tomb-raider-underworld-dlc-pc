@@ -1119,7 +1119,7 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDlc2Player.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDlc2Player 0.8 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
+    Log(1, "TruDlc2Player 0.8.1 loaded (enabled %d, log level %d, costume %d, type record %d, flag reset %d, costume "
            "reset %d, tracker flag %d, [Costume] TU mapping %d, [Mission] dialog start %d, dialog difficulty %d, dialog "
            "hold clear %d)",
         g_enabled, g_logLevel, g_costume, g_typeRecord, g_flagReset, g_costumeReset, g_trackerFlag, g_tuMapping,
@@ -1180,11 +1180,11 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported: plugin identification, and the TU's gameTracker+0x1244 for other plugins (1 after DoppelgangerInit)
 extern "C" __declspec(dllexport) const char *TruDlc2PlayerVersion() {
-    return "TruDlc2Player 0.8 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
+    return "TruDlc2Player 0.8.1 (DLC 2 doppelganger player object, flag reset with every new game tracker, chosen-costume "
            "reset outside DLC 2, game tracker +0x1244 as the TU, [Costume] TuMapping 857 <-> 11 in save / load / "
            "spawns, [Mission] DialogStart: DLC 2 from the game without the outfit selection as the TU, [Mission] "
            "DialogDifficulty: that start also resets the player tailoring to Medium as the TU, [Mission] "
-           "DialogHoldClear: dialog cases 4 / 6 clear the render hold as the TU)";
+           "DialogHoldClear: dialog cases 4 / 6 clear the render hold as the TU; 0.8.1: dated log lines)";
 }
 
 extern "C" __declspec(dllexport) int TruDlc2PlayerDoppelganger() {

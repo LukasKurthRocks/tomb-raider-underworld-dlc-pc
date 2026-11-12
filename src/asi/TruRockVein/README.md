@@ -6,6 +6,19 @@ finding 43). 0.1 played 2026-10-30 (patched, never asked - see 0.2); 0.2 built 2
 also the title update's SweepAndPrune limits of the markup manager (section 0.10), since 0.11 its ledge-corner nudge,
 since 0.12 its jump targets on vertical segments (pillar jumps) - base-game fixes the PC never got.
 
+## 0.13.1: dated log lines (Q107, 2026-11-12)
+
+Built 2026-11-12 into `work\asi\i_1211\TruRockVein`, not installed, not played. Only the log format changed (shared
+helper `src\asi\TruLog.h`): every line of `TruRockVein.log` starts with `YYYY-MM-DD HH:MM:SS.mmm`, and each game
+process writes one header line `=== <date time> TruRockVein 0.13.1 session start (pid n) ===` before its first line.
+Everything else is 0.13 (same sample .ini). Install:
+`scripts\windows\Set-TruRockVein.ps1 -Install -SourceDir work\asi\i_1211\TruRockVein` (the installed 0.13 from
+`work\asi\rv13` is now in the script's list of our builds - before, an update over it stopped with "not a build of ours").
+
+| # | TO TEST 0.13.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.13.1 installed, read `TruRockVein.log` from its last `session start` line on | header and `loaded` line name 0.13.1; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
+
 ## What it does
 
 Lara's moves run through a data-driven state machine whose transitions test numbered conditions. The Xbox title

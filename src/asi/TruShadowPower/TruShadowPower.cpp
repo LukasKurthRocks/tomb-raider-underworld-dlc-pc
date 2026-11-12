@@ -5652,7 +5652,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.27 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.27.1 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
@@ -5666,7 +5666,7 @@ extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
            "0x822c39c8 / 0x822c79d0, doppelganger camera settings 0x822bc198 / 0x822c61d8 (DTP 21237 / 21238, mode 2 "
            "with a stand-in: TU delay / ramp + 21237's per-mode tables), camera shake TU time step 0x822af4d8, player "
            "TU time step 0x8240cf88 / 0x8240e3a0 / 0x82411850 / 0x82411c30 / 0x82419c98, infinite meter [Meter] Infinite (live, not a TU feature), camera trace TruCam.log "
-           "(read only))";
+           "(read only); 0.27.1: dated log lines)";
 }
 
 // 0.11: the TU meter object for other plugins (TruShadowCombat: condition 538, the shadow strike) - interface version

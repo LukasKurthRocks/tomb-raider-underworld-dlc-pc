@@ -50,8 +50,11 @@ $names   = 'TruShadowHud.asi', 'TruShadowHud.ini'
 # released builds of ours (SHA-256), recognised even when their output folder below work\asi is gone
 # (the current build 0.2, dlc2data f1, work\asi\hud02, 2026-11-07, is found below work\asi like every other build)
 $earlierBuilds = @{
-    'TruShadowHud.asi' = @('8d664b7fbec2df33d67b6f9f89a0835de7e070c52469d8312b398901b2d2e1cb')   # 0.1 (work\asi\hud01, md5 a31308dd4b4be496e54e0d0b3fb646a7)
-    'TruShadowHud.ini' = @('316082b8bf6018a110cdcb8b85fc95aff46c138e6de21ac88de896202ed6eaa7')   # 0.1 sample .ini
+    'TruShadowHud.asi' = @('8d664b7fbec2df33d67b6f9f89a0835de7e070c52469d8312b398901b2d2e1cb',   # 0.1 (work\asi\hud01, md5 a31308dd4b4be496e54e0d0b3fb646a7)
+                           'e742db730e32daa95ceeec1b5adbae60915ca60d1d2649c2ce8d2fb2f5436a11',   # 0.2 (work\asi\hud02, installed 2026-11-07)
+                           '347bec990347b57d65e4062bfcc80888f17b63741d5effa06fc1fb0c39c5e513')   # 0.2.1 dated log lines (work\asi\i_1211\TruShadowHud, current)
+    'TruShadowHud.ini' = @('316082b8bf6018a110cdcb8b85fc95aff46c138e6de21ac88de896202ed6eaa7',   # 0.1 sample .ini
+                           'd8e64f47db9cecdf8f71211e4be3893c7e66651c076bfb0951f223c670068bb8')   # sample .ini of 0.2 / 0.2.1
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

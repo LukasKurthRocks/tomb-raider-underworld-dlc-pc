@@ -81,7 +81,7 @@
 
 namespace {
 
-const char kVersion[] = "TruTrace 0.3";
+const char kVersion[] = "TruTrace 0.3.1";            // 0.3.1: dated log lines (Q107)
 const DWORD kImageBase = 0x00400000;
 
 // ---- game data (read only) ----
@@ -2679,7 +2679,8 @@ extern "C" __declspec(dllexport) int __cdecl TruTraceSelfTest(char *report, int 
 }
 
 extern "C" __declspec(dllexport) const char *TruTraceVersion() {
-    return "TruTrace 0.2 (log only: sound start / end F5, teleport + chart state F6, 0x1f4 / 0x1f5 receivers, spawn "
+    return "TruTrace 0.3.1 (log only: sound start / end F5, teleport + chart state F6, 0x1f4 / 0x1f5 receivers, spawn "
            "requests, object 858 entry, TimeVector; 0.2: level change requests, unit loads, player placement + checkpoint "
-           "id, stream unit moves / portals / table, save / restore, progress instances, messages, game data changes)";
+           "id, stream unit moves / portals / table, save / restore, progress instances, messages, game data changes; "
+           "0.3: [Sound] SoundSlots object sound-slot play; 0.3.1: dated log lines, this export said 0.2 until 0.3.1)";
 }

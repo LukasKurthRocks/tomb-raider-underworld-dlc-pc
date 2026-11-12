@@ -1,7 +1,16 @@
 # TruMercLang.asi - the mercenaries speak another language (fun option)
 
-Version 0.1 (2026-11-06). **Default off** (`TruMercLang.ini` `Enabled=0`). Built, byte checks run offline against the
+Version 0.1.1 (2026-11-12, `work\asi\i_1211\TruMercLang`: dated log lines only, see below; 0.1 of 2026-11-06 in
+`work\asi\merclang01`). **Default off** (`TruMercLang.ini` `Enabled=0`). Built, byte checks run offline against the
 installed `tru.exe`; not yet played.
+
+**0.1.1 (Q107):** every line of `TruMercLang.log` starts with `YYYY-MM-DD HH:MM:SS.mmm`, and each game process writes
+one header line `=== <date time> TruMercLang 0.1.1 session start (pid n) ===` before its first line (the log is
+written with `Enabled=0` too). Install: `scripts\windows\Set-TruMercLang.ps1 -Install -SourceDir work\asi\i_1211\TruMercLang`.
+
+| # | TO TEST 0.1.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.1.1 installed (`Enabled=0` is enough), read `TruMercLang.log` from its last `session start` line on | header and `---- ... loaded` line name 0.1.1; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
 
 With `Enabled=1` and `Language=es` the mercenaries on the ship levels (Mediterranean end `l1_ship_*`, Andaman Sea
 `l6_ship_*`) shout their barks in Spanish while Lara, the story, the subtitles and the menus keep the game language.

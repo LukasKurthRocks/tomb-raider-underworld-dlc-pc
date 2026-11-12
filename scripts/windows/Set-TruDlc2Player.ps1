@@ -47,7 +47,8 @@ $earlierBuilds = @{
                             '9979fdc43b6f80946efc160ffe55bd6dbedfc485e58bc6ac6558afddcc422877',   # 0.5 [Costume] TuMapping (work\asi\dlc2p05)
                             '90b80293502921be34d45ff0e3f855644aef413f4379ba8373a8d4c1a403f7ac',   # 0.6 [Mission] DialogStart (work\asi\dlc2p06)
                             'cc15b9fdda2681ebe3f86b20a12fd1da35cfbb1b0c374bfe011268d9524518f7',   # 0.7 [Mission] DialogDifficulty (work\asi\dlc2p07)
-                            '62a0417e7cf74d761f3ba95ffa50681a87bb765a5e9ab30bfd79e470090fd78b')   # 0.8 [Mission] DialogHoldClear (work\asi\dlc2p08)
+                            '62a0417e7cf74d761f3ba95ffa50681a87bb765a5e9ab30bfd79e470090fd78b',   # 0.8 [Mission] DialogHoldClear (work\asi\dlc2p08)
+                            'c99c0e0b2f20f8c831189c265249b4720130924e3413652ef27a93c3735cb4f7')   # 0.8.1 dated log lines (work\asi\i_1211\TruDlc2Player, current; sample .ini as 0.8)
     'TruDlc2Player.ini' = @('eeb2fd036a03e4b97c73b46d9a3ed18a17ceab727f9cb058b66cb3246637f8b5',   # 0.1 sample .ini
                             'a5af71389086eb5221f82720826c84c66995d0eee3fade3917a1a701e9d79dc7',   # 0.2 (+ FlagReset; work\asi\dlc2p02)
                             '1c9ade1b1b53ed98b0811238e99ac81fa48b5024fe913072f76fe341b0755679',   # 0.3 (+ CostumeReset; work\asi\dlc2p03)

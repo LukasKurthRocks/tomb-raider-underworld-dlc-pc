@@ -32,7 +32,7 @@
 
 namespace {
 
-const char kVersion[] = "0.3";
+const char kVersion[] = "0.3.1";           // 0.3.1: dated log lines (Q107)
 
 typedef DWORD(WINAPI *XInputGetStateFn)(DWORD, void *);
 typedef void(__cdecl *CameraSetModeFn)(int mode);
@@ -1757,5 +1757,5 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so TruLink's own "modules" command and other tools can identify the plugin
 extern "C" __declspec(dllexport) const char *TruLinkVersion() {
-    return "TruLink 0.3 (127.0.0.1 text channel: read / write / camera / post / objects / modules / menu / scan / watch / snapshot)";
+    return "TruLink 0.3.1 (127.0.0.1 text channel: read / write / camera / post / objects / modules / menu / scan / watch / snapshot; 0.3.1: dated log lines)";
 }

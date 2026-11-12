@@ -47,8 +47,10 @@ $built   = if ($SourceDir) { $SourceDir } else { $asiRoot }
 $names   = 'TruDataGuard.asi', 'TruDataGuard.ini'
 # released builds of ours (SHA-256), recognised even when their output folder below work\asi is gone
 $earlierBuilds = @{
-    'TruDataGuard.asi' = @('40e29d094a56074473380a45a27b5f8d71e76c6a19f26170a7ca4a6e56c3a0d0')   # 0.1 (work\asi\dataguard01)
-    'TruDataGuard.ini' = @('0c48da5dd8e9c3bd2d78067bd1336edb23bbd2eb75a0d4befc1d70047976c28f')   # 0.1 / 0.2 sample .ini
+    'TruDataGuard.asi' = @('40e29d094a56074473380a45a27b5f8d71e76c6a19f26170a7ca4a6e56c3a0d0',   # 0.1 (work\asi\dataguard01)
+                           'a8d06b9cc6128451e1aa1e86d170002611653fe0c8cc5e2a02bf22d13c9da810',   # 0.2 (work\asi\dataguard02, installed 2026-11-02)
+                           '58ee5f9660e1cd20deb64d62772a14b448bb10b8d89ae28782408cc7306b7511')   # 0.2.1 dated log lines (work\asi\i_1211\TruDataGuard, current)
+    'TruDataGuard.ini' = @('0c48da5dd8e9c3bd2d78067bd1336edb23bbd2eb75a0d4befc1d70047976c28f')   # 0.1 / 0.2 / 0.2.1 sample .ini
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

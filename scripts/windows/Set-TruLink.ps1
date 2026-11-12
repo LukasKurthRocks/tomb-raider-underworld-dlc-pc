@@ -41,10 +41,11 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruLink.asi', 'TruLink.ini'
-# SHA-256 of earlier builds of ours (none yet) - recognised as ours for update / removal
+# SHA-256 of earlier builds of ours - recognised as ours for update / removal
 $earlierBuilds = @{
-    'TruLink.asi' = @()
-    'TruLink.ini' = @()
+    'TruLink.asi' = @('1b4651857e8b6c6e6d912cd91211269c35a465075df98206edc2502652adc185',   # 0.3 (work\asi\link03, installed since 2026-10-31)
+                      '411fa8575f619cbda27617022e0f89bfbf504fa71c36749c6abc2d1a7a457151')   # 0.3.1 dated log lines (work\asi\i_1211\TruLink, current)
+    'TruLink.ini' = @('e02d6799db2a778e9f25137b9da1fab13d87834c45246e322322856c60480e78')   # sample .ini of 0.3 / 0.3.1
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

@@ -93,7 +93,8 @@ $earlierBuilds = @{
                              '5ca2d7adfa45aec86ec6a1b4651aa10ae099735fbba7c13afa183bde24b1efdf',   # 0.24 N6 [Camera] TuTimeStep (work\asi\power024, md5 3f1d37f5dd003d090bee745bf6121c87, not installed)
                              '89d15879f6f32b7eb8402c95668fefeb4ea999c5f571c32e3d5d2157a88c9114',   # 0.25 camera trace / doppelganger settings (work\asi\power025, md5 ea3c85aa0b6c283f358a408add8faa6b, installed on 2026-11-10 22:21)
                              '8b89599bf6dae64bb8825935893bbd5ea1930dacb0c64a815821b42b16ec0891',   # 0.26 trace next to TruDataGuard / 21237 mode tables (work\asi\power026, md5 44466496213915f2baf9e66e7de2ab1f, not installed)
-                             '09e84202e4821c0c0b1f446f941cc22bf1a35167ce07007660012ce9049bd540')   # 0.27 Q50 shake / player TU time step (work\asi\power027, md5 3cf7221657a229d114a4a1f4ee4199fc, current, not installed)
+                             '09e84202e4821c0c0b1f446f941cc22bf1a35167ce07007660012ce9049bd540',   # 0.27 Q50 shake / player TU time step (work\asi\power027, md5 3cf7221657a229d114a4a1f4ee4199fc, installed 2026-11-11)
+                             'd0a91e1ba7d67525082b52093ab1b607cfe9f789825fbab4a39c430b660a097c')   # 0.27.1 dated log lines (work\asi\i_1211\TruShadowPower, current, not installed; sample .ini as 0.27)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',

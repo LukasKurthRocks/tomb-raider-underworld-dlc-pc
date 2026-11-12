@@ -10,6 +10,18 @@ Version 0.3 - built and checked with `dumpbin` only, not yet tried in the game (
 `diff`) to find unknown values (health, ammo, walking speed) live without a debugger - see
 [Memory search](#memory-search-03).
 
+## 0.3.1: dated log lines (Q107, 2026-11-12)
+
+Built 2026-11-12 into `work\asi\i_1211\TruLink`, not installed, not played. Only the log format and the version
+changed (shared helper `src\asi\TruLog.h`): every line of `TruLink.log` starts with `YYYY-MM-DD HH:MM:SS.mmm`, and each
+game process writes one header line `=== <date time> TruLink 0.3.1 session start (pid n) ===` before its first line;
+`ping` answers `pong TruLink 0.3.1`. Commands are as in 0.3. Install:
+`scripts\windows\Set-TruLink.ps1 -Install -SourceDir work\asi\i_1211\TruLink`.
+
+| # | TO TEST 0.3.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.3.1 installed, `Invoke-TruLink.ps1 ping`, then read `TruLink.log` from its last `session start` line on | `pong TruLink 0.3.1`; header and `loaded` line name 0.3.1; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
+
 ## Safety
 
 - The server binds **127.0.0.1 only** (`INADDR_LOOPBACK`, never `0.0.0.0`) with `SO_EXCLUSIVEADDRUSE`; accepted peers

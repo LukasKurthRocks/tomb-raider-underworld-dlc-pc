@@ -302,5 +302,5 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruDoppelgangerVersion() {
-    return "TruDoppelganger 0.1 (title-update state-machine ids)";
+    return "TruDoppelganger 0.1.1 (title-update state-machine ids; 0.1.1: dated log lines)";
 }

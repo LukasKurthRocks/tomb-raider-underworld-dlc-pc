@@ -28,6 +28,19 @@ Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\qol014` (c
 ModLoader.asi is just another plugin of that loader. Log: `TruQoL.log` next to `tru.exe`, one line per feature (on /
 off / why).
 
+## 0.1.7: dated log lines (Q107, 2026-11-12)
+
+Built 2026-11-12 into `work\asi\i_1211\TruQoL`, not installed, not played. Only the log format changed (shared helper
+`src\asi\TruLog.h`): every line of `TruQoL.log` starts with `YYYY-MM-DD HH:MM:SS.mmm`, each game process writes one
+header line `=== <date time> TruQoL 0.1.7 session start (pid n) ===` before its first line, and the two line kinds of
+`TruQoL.exit.log` that had only the time (`[Diag] ExitTrace=1`) now carry the date as well. Options and patches are as
+in 0.1.6 (same sample .ini). Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\i_1211\TruQoL`
+(dry run first: add `-Check`).
+
+| # | TO TEST 0.1.7 | expected |
+|---|---|---|
+| 1 | start the game once with 0.1.7 installed, read `TruQoL.log` from its last `session start` line on | header and `loaded` line name 0.1.7; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
+
 ## INI reference (`TruQoL.ini`)
 
 | Section | Key | Default | Range | When (0.1.1) | Meaning |

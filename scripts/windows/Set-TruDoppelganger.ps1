@@ -38,10 +38,11 @@ $paths   = Get-TruWorkspacePath -ScriptRoot $PSScriptRoot
 $repo    = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $built   = if ($SourceDir) { $SourceDir } else { Join-Path $repo 'work\asi' }
 $names   = 'TruDoppelganger.asi', 'TruDoppelganger.ini'
-# SHA-256 of earlier builds of ours (none yet) - recognised as ours for update / removal
+# SHA-256 of earlier builds of ours - recognised as ours for update / removal
 $earlierBuilds = @{
-    'TruDoppelganger.asi' = @()
-    'TruDoppelganger.ini' = @()
+    'TruDoppelganger.asi' = @('192a03c1241534a12fadec63cff3e5193c74e9d31b197bef7ded58fa4087dacc',   # 0.1 (work\asi, installed since 2026-10-30)
+                              'c5591ca783a2d71a57b81a5bbc170e30bf5d02741963ad3df2e2eadd5201df6e')   # 0.1.1 dated log lines (work\asi\i_1211\TruDoppelganger, current)
+    'TruDoppelganger.ini' = @('303965afdedad2231f57b06079168a87f2428ea719eb7437247f64b30b6c73f1')   # sample .ini of 0.1 / 0.1.1
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

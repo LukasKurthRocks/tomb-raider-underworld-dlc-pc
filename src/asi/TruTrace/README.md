@@ -9,6 +9,19 @@ were. It answers "where do we have to change it?" for open points of the DLC por
 runs in the game), byte checks 0.1 51 / 51 + 0.2 55 / 55 + 0.3 8 / 8, not played.** 0.2: built 2026-11-05
 (`work\asi\trace02`), self test 17 / 17. 0.1: built 2026-11-04 (`work\asi\trace01`), self test 11 / 11.
 
+## 0.3.1: dated log lines (Q107, 2026-11-12)
+
+Built 2026-11-12 into `work\asi\i_1211\TruTrace`, not installed, not played (0.3 is installed since 2026-11-05).
+Only the log format and the version text changed (shared helper `src\asi\TruLog.h`): every line of `TruTrace.log`
+starts with `YYYY-MM-DD HH:MM:SS.mmm`, and each game process writes one header line
+`=== <date time> TruTrace 0.3.1 session start (pid n) ===` (at the first buffer flush). The exported
+`TruTraceVersion()` (TruLink `modules`) said 0.2 up to 0.3 - it now says 0.3.1. Hooks and options are as in 0.3 (same
+sample .ini). Install: `scripts\windows\Set-TruTrace.ps1 -Install -SourceDir work\asi\i_1211\TruTrace`.
+
+| # | TO TEST 0.3.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.3.1 installed, read `TruTrace.log` from its last `session start` line on | header and `loaded` line name 0.3.1; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start; TruLink `modules` shows `TruTrace 0.3.1` |
+
 ## Categories
 
 | INI key | Question | Source of the lines |

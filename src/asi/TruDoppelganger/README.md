@@ -4,6 +4,18 @@ DLC 2 *Lara's Shadow*: the state-machine ids the Xbox title update added for the
 the PC `tru.exe` - see docs/PLUGINS.md, "How the Xbox title update is brought to PC", and
 docs/WINDOWS_REBUILD.md finding 43. **Not yet played** - first build 2026-10-30.
 
+## 0.1.1: dated log lines (Q107, 2026-11-12)
+
+Built 2026-11-12 into `work\asi\i_1211\TruDoppelganger`, not installed, not played. Only the log format changed
+(shared helper `src\asi\TruLog.h`): every line of `TruDoppelganger.log` starts with `YYYY-MM-DD HH:MM:SS.mmm`, and
+each game process writes one header line `=== <date time> TruDoppelganger 0.1.1 session start (pid n) ===` before its
+first line. Tables and options are as in 0.1. Install:
+`scripts\windows\Set-TruDoppelganger.ps1 -Install -SourceDir work\asi\i_1211\TruDoppelganger`.
+
+| # | TO TEST 0.1.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.1.1 installed, read `TruDoppelganger.log` from its last `session start` line on | the header names 0.1.1; every newer line (incl. `TruDoppelganger loaded ...`) starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
+
 ## What it does
 
 Lara's moves run through a data-driven state machine. Its builder (Xbox TU 0x82489500, PC tru+0x3872f0) registers

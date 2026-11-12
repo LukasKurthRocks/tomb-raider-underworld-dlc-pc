@@ -3,7 +3,19 @@
 A safety net and detector for converter data faults: an invalid section id becomes a logged "not found" instead of a
 crash - at known lookup points only, using the engine's own not-found path. The real fix stays in the converter.
 Brief: `docs\Plan-TruDataGuard.md` (workspace). 0.1 built 2026-11-02 into `work\asi\dataguard01` (live runs 50j /
-50k), 0.2 built 2026-11-02 into `work\asi\dataguard02` (not loaded yet).
+50k), 0.2 built 2026-11-02 into `work\asi\dataguard02` (installed 2026-11-02), 0.2.1 built 2026-11-12 into
+`work\asi\i_1211\TruDataGuard` (not installed, not played).
+
+## 0.2.1: dated log lines (Q107, 2026-11-12)
+
+Only the log format changed (shared helper `src\asi\TruLog.h`): every line of `TruDataGuard.log` starts with
+`YYYY-MM-DD HH:MM:SS.mmm`, and each game process writes one header line
+`=== <date time> TruDataGuard 0.2.1 session start (pid n) ===` before its first line. Hooks, options and checks are as
+in 0.2. Install: `scripts\windows\Set-TruDataGuard.ps1 -Install -SourceDir work\asi\i_1211\TruDataGuard`.
+
+| # | TO TEST 0.2.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.2.1 installed, read `TruDataGuard.log` from its last `session start` line on | header and `loaded` line name 0.2.1; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
 
 ## 0.2: no false positives in the unload callback (refs 0 is legitimate)
 

@@ -37,7 +37,7 @@
 
 namespace {
 
-const char kVersion[] = "TruMercLang 0.1 (merc barks in another language)";
+const char kVersion[] = "TruMercLang 0.1.1 (merc barks in another language; 0.1.1: dated log lines)";
 const DWORD kImageBase = 0x00400000;
 const DWORD kFindEntry = 0x004726e0;        // ArchiveFileSystem::FindEntry
 const DWORD kFindEntryEnd = 0x00472872;     // end of its last ret 4

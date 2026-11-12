@@ -2218,7 +2218,7 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruRockVein.log", dir);
     strncpy_s(g_dir, sizeof(g_dir), dir, _TRUNCATE);
     ReadOptions(dir);
-    Log(1, "TruRockVein 0.13 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
+    Log(1, "TruRockVein 0.13.1 loaded (enabled %d, log level %d, log unhandled %d, bad values %d, default conditions %d, "
         "markup types %d, markup slots %d, null-box guard %d, markup action 608 %d, attach geometry %d, state 420 slot 1 %d, "
         "chart log %d, jump geometry %d, skip geometry %d, SweepAndPrune translate %d, ledge corner translate %d, "
         "jump target translate %d)",
@@ -2270,4 +2270,4 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 }
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
-extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.13 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update, ledge-corner nudge as the title update, jump targets on vertical segments as the title update, edge probe as the title update)"; }
+extern "C" __declspec(dllexport) const char *TruRockVeinVersion() { return "TruRockVein 0.13.1 (markup conditions 607 / 608, chart probes, markup types 22 / 23, TU slot type checks, markup action 608, type-22 facing / wall movement, state 420 slot 1, chart log, type-22 jump geometry, type-22 fifth geometry function, SweepAndPrune limits as the title update, ledge-corner nudge as the title update, jump targets on vertical segments as the title update, edge probe as the title update; 0.13.1: dated log lines)"; }

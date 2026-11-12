@@ -43,6 +43,19 @@ Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
 
+## 0.27.1: dated log lines (Q107, 2026-11-12)
+
+Built 2026-11-12 into `work\asi\i_1211\TruShadowPower`, not installed, not played (0.27 is installed since
+2026-11-11). Only the log format changed (shared helper `src\asi\TruLog.h`): every line of `TruShadowPower.log`
+starts with `YYYY-MM-DD HH:MM:SS.mmm`, and each game process writes one header line
+`=== <date time> TruShadowPower 0.27.1 session start (pid n) ===` before its first line; the TSV trace keeps its own
+time column. Everything else is 0.27 (same sample .ini). Install:
+`scripts\windows\Set-TruShadowPower.ps1 -Install -SourceDir work\asi\i_1211\TruShadowPower`.
+
+| # | TO TEST 0.27.1 | expected |
+|---|---|---|
+| 1 | start the game once with 0.27.1 installed, read `TruShadowPower.log` from its last `session start` line on | the header names 0.27.1; every newer line starts with the date (`2026-11-..`); the time matches the other plugin logs of the same start |
+
 ## 0.27: the TU's other world-time divisions - `[Camera] ShakeTuTimeStep`, `[Player] TuTimeStep` (Q50, 2026-11-11)
 
 Build `work\asi\power027`. The workspace survey Befund-TU-Prioritaeten-Q17-1111.md found six more TU places (ranks 7

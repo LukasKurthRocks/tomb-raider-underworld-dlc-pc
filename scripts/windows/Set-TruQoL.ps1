@@ -63,8 +63,9 @@ $removing = $Remove -or $Restore
 # released builds of ours (SHA-256), recognised even when their output folder below work\asi is gone; the first build
 # (0.1, work\asi\qol01, 2026-11-08) is found below work\asi like every other build
 $earlierBuilds = @{
-    'TruQoL.asi' = @()
-    'TruQoL.ini' = @()
+    'TruQoL.asi' = @('f4cc77e825cca8831bdde49e32f56f36a70d8ed2cecdbf97ae7e1d2f3defa7bf',   # 0.1.6 [Save] RetryOnLock (work\asi\qol016, installed 2026-11-11)
+                     'de2a25e4484bc76ac29817710a6a559984d356b5c3ff0232e890972ad75026b8')   # 0.1.7 dated log lines (work\asi\i_1211\TruQoL, current)
+    'TruQoL.ini' = @('c02cebfa259a6564e3ebb84b32b65360c8b0b67e25b183597d7d68d76145d94c')   # sample .ini of 0.1.6 / 0.1.7
 }
 $logDir  = $paths.Logs
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

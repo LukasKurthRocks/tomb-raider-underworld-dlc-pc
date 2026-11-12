@@ -159,7 +159,7 @@
 
 namespace {
 
-const char kVersion[] = "TruQoL 0.1.6";
+const char kVersion[] = "TruQoL 0.1.7";             // 0.1.7: dated log lines (Q107)
 const DWORD kImageBase = 0x00400000;
 
 // ---- 1. frame limiter: the frame-time function 0x5da230 and its two clock reads ----
@@ -1663,10 +1663,11 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved) {
 }
 
 extern "C" __declspec(dllexport) const char *TruQoLVersion() {
-    return "TruQoL 0.1.6 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
+    return "TruQoL 0.1.7 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
            "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0, start-up "
            "intro skip at the script's PlayMovie call 0x77bc7b, stale front-end pause bit at the paused-branch clock "
            "call 0x5da684; live INI re-read once a second for TruMenu page Fixes; [Diag] ExitTrace (default off): "
            "first-chance exceptions + tru.exe's ExitProcess / TerminateProcess -> TruQoL.exit.log; [Save] RetryOnLock "
-           "(default off): retry of the save / load CreateFileW 0x6db6d0 on a sharing / lock / access error)";
+           "(default off): retry of the save / load CreateFileW 0x6db6d0 on a sharing / lock / access error; 0.1.7: "
+           "dated log lines)";
 }
