@@ -4493,6 +4493,19 @@ def check_02237(ini_path, switches_path):
     filt = 'checkpoint,breakwall,trigger,door,gate,lever,plate,switch,spawner,_rw_,weightbreak,ping_map,grapple'
     if 'const char kVersion[] = "TruTrace 0.3.2";' not in tt or '\nProgressFilter=%s\n' % filt not in tini.replace('\r\n', '\n'):
         problems.append('TruTrace: 0.3.2 with the ProgressFilter default %s (source + sample .ini) wanted' % filt)
+    # TruTrace 0.3.2 [Ground]: the kCatGround facts = work/p5_menu_1311/precheck_trace032.txt, Ground=1 in the sample .ini
+    gpath = os.path.join(ROOT, 'work', 'p5_menu_1311', 'precheck_trace032.txt')
+    gwant = []
+    if os.path.exists(gpath):
+        for line in open(gpath, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                gwant.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    ghave = [(a.lower(), ''.join(LIT.findall(b)).replace(' ', '').lower()) for a, b in
+             re.findall(r'\{kCatGround, 0x([0-9a-fA-F]{8}), ((?:"[0-9a-f ]+"\s*)+)\}', tt)]
+    if ghave != gwant or len(gwant) != 6 or '\nGround=1\n' not in tini.replace('\r\n', '\n'):
+        problems.append('TruTrace: kCatGround facts (%d) must be the 6 rows of precheck_trace032.txt, Ground=1 in the .ini' % len(ghave))
     tf = re.search(r'#define TRUTRACE_PROG_FILTER ((?:"[^"]*"\s*\\?\s*)+)', tt)
     if not tf or ''.join(re.findall(r'"([^"]*)"', tf.group(1))) != filt:
         problems.append('TruTrace.cpp: TRUTRACE_PROG_FILTER must be %s' % filt)

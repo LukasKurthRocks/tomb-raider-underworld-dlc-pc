@@ -141,9 +141,10 @@ const char *const kSlotFacts[][2] = {
 
 // ---- facts (read-only byte checks; same strings as work\asi\trace01\precheck_trace01.txt) ----
 enum Cat { kCatTrace, kCatSound, kCatTele, kCatChart, kCatPower, kCatSpawn, kCatObj, kCatTime, kCatLevel, kCatPortal,
-            kCatStream, kCatSave, kCatProg, kCatMsg, kCatData, kCatCount };
+            kCatStream, kCatSave, kCatProg, kCatMsg, kCatData, kCatGround, kCatCount };   // 0.3.2: + ground
 const char *const kCatName[kCatCount] = {"trace", "sound", "teleport", "chart", "power", "spawn", "obj", "timevec",
-                                         "level", "portal", "stream", "save", "progress", "message", "gamedata"};
+                                         "level", "portal", "stream", "save", "progress", "message", "gamedata",
+                                         "ground"};
 struct Fact { int cat; DWORD at; const char *hex; };
 const Fact kFacts[] = {
     {kCatSound, 0x005b99d7, "0fbe06 85c0 0f8559010000 d9ee 8b4604 51 d91c24 50 8d4c2420 51 8b0d00818a00 e8d49bfdff"},
@@ -253,11 +254,22 @@ const Fact kFacts[] = {
     // [GameData]: the active buffer and its size (the guard at +0x140000)
     {kCatData, 0x005571c6, "81bf00001400efbeadde"},
     {kCatData, 0x00557174, "8b3d5892c500"},
+    // 0.3.2 [Ground] (P5, live 13.11. dlc_dungeon): the player movement collision 0x5dce20 posts its contact record edi
+    // to the player (esi) with INSTANCE_Post: 0x1c7 (other contact), 0x1c9 (facing up but steeper than player data
+    // +0x100e = 52 deg), 0x1ca (walkable); the record: +0x10 / +0x14 / +0x18 a scaled vector (fstp), +0x1c ebx,
+    // +0x20 [esp+0x50], +0x24 ecx, +0x28 [esp+0x58], +0x2c [esp+0x5c]; the instance pool [0xd98f60] stride 0x2f0
+    {kCatGround, 0x005dd811, "d95f10 d94004 d8c9 d95f14 d84808 8b442450 894720 8b442458 894f24 d95f18 8b4c245c 894728 "
+                             "895f1c 894f2c"},
+    {kCatGround, 0x005dd877, "68c7010000 56 e8ce5efdff"},
+    {kCatGround, 0x005dd89e, "68c9010000 56 e8a75efdff"},
+    {kCatGround, 0x005dd8c5, "68ca010000 56 e8805efdff"},
+    {kCatGround, 0x005dd4f4, "0fbf930e100000"},
+    {kCatGround, 0x005b3969, "8b0d608fd900 0fbfc0 69c0f0020000"},
 };
 
 // ---- options (TruTrace.ini, section [Trace]) ----
 int g_enabled = 1, g_logLevel = 1, g_maxPerSec = 40, g_maxPerCat = 50000, g_pollMs = 5;
-int g_catOn[kCatCount] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+int g_catOn[kCatCount] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 int g_gameDataMs = 250;
 // 0.3.2 (P5, docs Befund-P1-Mittelmeer-Objekte-1311.md): + _rw_ (rewards: appear / collected), weightbreak (jars:
 // hit 0x2b / damage 0x11c, removal), ping_map (sonar pings destroyed on solve), grapple (grapple walls) - 13 of 16 tokens
@@ -1829,11 +1841,54 @@ void RestoreLeave(Regs *r, const DWORD *ctx) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// [Ground] 0.3.2: what Lara stands on - the contact messages 0x1c7 / 0x1c9 / 0x1ca of the movement collision 0x5dce20
+// to the player (game thread, inside INSTANCE_Post's hook); one line when the message, the contact instance (a record
+// word that is an instance of the pool [0xd98f60], stride 0x2f0) or the direction of the record vector +0x10 changes,
+// or Lara's z moves more than 100 units with the same contact (the 13.11. pillar: 3.4 m down on "safe ground")
+const DWORD kInstPool = 0x00d98f60;
+struct GroundLast { DWORD msg, owner; float n[3], z; bool have; };
+GroundLast g_ground = {};
+bool LooksInstance(DWORD v) {
+    const DWORD pool = D(kInstPool);
+    return pool && v >= pool && (v - pool) % 0x2f0 == 0 && (v - pool) / 0x2f0 < 0x1000;
+}
+void GroundNote(DWORD player, DWORD msg, DWORD rec) {
+    if (!rec) return;
+    float n[3] = {F(rec + 0x10), F(rec + 0x14), F(rec + 0x18)};
+    const float len = sqrtf(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+    float u[3] = {0.0f, 0.0f, 0.0f};
+    if (len > 1.0e-6f && len < 1.0e9f) for (int k = 0; k < 3; ++k) u[k] = n[k] / len;
+    DWORD w[5], owner = 0;
+    for (int k = 0; k < 5; ++k) {
+        w[k] = D(rec + 0x1c + 4 * k);
+        if (!owner && w[k] != player && LooksInstance(w[k])) owner = w[k];
+    }
+    const float z = F(player + 0x28);
+    bool turned = false;
+    for (int k = 0; k < 3; ++k) turned = turned || fabsf(u[k] - g_ground.n[k]) > 0.05f;
+    const bool sank = g_ground.have && fabsf(z - g_ground.z) > 100.0f;
+    if (g_ground.have && msg == g_ground.msg && owner == g_ground.owner && !turned && !sank) return;
+    char on[160] = "terrain / no instance in the record";
+    if (owner) DescInst(owner, on, sizeof(on));
+    Log(kCatGround, 1, "ground: %s (message 0x%lx) on %s; record 0x%08lx vector +0x10 %.3f %.3f %.3f (unit %.3f %.3f "
+        "%.3f), +0x1c..+0x2c %08lx %08lx %08lx %08lx %08lx; Lara z %.1f%s", msg == 0x1ca ? "walkable" : msg == 0x1c9 ?
+        "too steep (> player data +0x100e)" : "other contact", msg, on, rec, n[0], n[1], n[2], u[0], u[1], u[2], w[0],
+        w[1], w[2], w[3], w[4], z, sank ? " - z moved > 100 with the same contact" : "");
+    g_ground.msg = msg;
+    g_ground.owner = owner;
+    for (int k = 0; k < 3; ++k) g_ground.n[k] = u[k];
+    g_ground.z = z;
+    g_ground.have = true;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // [Messages]
 bool PostEnter(Regs *r, DWORD *) {
     const DWORD *E = &r->ret;
     DWORD inst = E[1];
-    if (!ObjMatches(InstObjectId(inst))) return false;
+    if (g_catOn[kCatGround] && (E[2] == 0x1c7 || E[2] == 0x1c9 || E[2] == 0x1ca) && inst && inst == D(kPlayerPtr))
+        GroundNote(inst, E[2], E[3]);           // 0.3.2 [Ground]
+    if (!g_catOn[kCatMsg] || !ObjMatches(InstObjectId(inst))) return false;
     char d[160];
     DescInst(inst, d, sizeof(d));
     Log(kCatMsg, 1, "POST message 0x%lx (%lu) data 0x%08lx to %s, handler +0x120 0x%08lx (caller 0x%08lx)", E[2], E[2],
@@ -2237,6 +2292,7 @@ void ReadOptions(const char *dir) {
     g_catOn[kCatProg] = GetPrivateProfileIntA("Trace", "Progress", 1, ini);
     g_catOn[kCatMsg] = GetPrivateProfileIntA("Trace", "Messages", 1, ini);
     g_catOn[kCatData] = GetPrivateProfileIntA("Trace", "GameData", 1, ini);
+    g_catOn[kCatGround] = GetPrivateProfileIntA("Trace", "Ground", 1, ini);   // 0.3.2
     g_gameDataMs = GetPrivateProfileIntA("Trace", "GameDataMs", 250, ini);
     if (g_gameDataMs < 50) g_gameDataMs = 50;
     GetPrivateProfileStringA("Trace", "ProgressFilter", kProgFilterDefault, g_progFilterText, sizeof(g_progFilterText), ini);
@@ -2276,6 +2332,8 @@ void StartInner(HMODULE self) {
         "tokens), game data %d (%d ms)", g_catOn[kCatLevel], g_catOn[kCatPortal], g_catOn[kCatStream], g_catOn[kCatSave],
         g_catOn[kCatProg], g_catOn[kCatMsg], g_progFilterText, g_progFilterN, g_catOn[kCatData], g_gameDataMs);
     Log(kCatTrace, 0, "0.3: sound slots %d (object sound-slot play tru+0x193d50, needs sound)", g_soundSlots);
+    Log(kCatTrace, 0, "0.3.2: ground %d (the player's contact messages 0x1c7 / 0x1c9 / 0x1ca of 0x5dce20, on change)",
+        g_catOn[kCatGround]);
     if (!g_enabled) { Log(kCatTrace, 0, "disabled by TruTrace.ini - nothing hooked, no poll thread"); return; }
     DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(kCatTrace, 0, "image base 0x%08lx, expected 0x%08lx - nothing hooked", base, kImageBase); return; }
@@ -2331,7 +2389,8 @@ void StartInner(HMODULE self) {
         }
     bool want[kRealHooks], ok[kRealHooks];
     for (int i = 0; i < kRealHooks; ++i) {
-        want[i] = g_catOn[g_hooks[i].cat] != 0 && (i != kHSlotPlay || (g_soundSlots && g_slotFactsOk));
+        want[i] = (g_catOn[g_hooks[i].cat] != 0 || (i == kHPost && g_catOn[kCatGround])) &&   // 0.3.2: Post for [Ground]
+                  (i != kHSlotPlay || (g_soundSlots && g_slotFactsOk));
         ok[i] = want[i] && Install(i);            // stub + trampoline at idx * 48 (Patch finds it there)
     }
     DWORD old = 0;
@@ -2703,5 +2762,6 @@ extern "C" __declspec(dllexport) const char *TruTraceVersion() {
            "requests, object 858 entry, TimeVector; 0.2: level change requests, unit loads, player placement + checkpoint "
            "id, stream unit moves / portals / table, save / restore, progress instances, messages, game data changes; "
            "0.3: [Sound] SoundSlots object sound-slot play; 0.3.1: dated log lines, this export said 0.2 until 0.3.1; "
-           "0.3.2: ProgressFilter default + _rw_, weightbreak, ping_map, grapple; stale player machines cleared)";
+           "0.3.2: ProgressFilter default + _rw_, weightbreak, ping_map, grapple; stale player machines cleared; [Ground] "
+           "the player's contact messages 0x1c7 / 0x1c9 / 0x1ca)";
 }

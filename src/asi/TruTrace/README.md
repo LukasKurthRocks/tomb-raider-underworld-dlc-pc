@@ -22,8 +22,20 @@ says so). **Stale player machines** (P1-crash follow-up 5, workspace `docs\Befun
 1 190 caught access violations in 11 min in the poll thread's `RD` / `W` after a level change, and nonsense lines
 `record -1 [...]`): the teleport snapshot forgets every remembered machine when the player instance changes (level
 change, reload) and drops a machine whose owner `+8` is no longer the player; a real level load
-(`STREAM_LevelLoadAndInit` from 0x5de02a) clears them too. Install: `scripts\windows\Set-TruTrace.ps1 -Install
--SourceDir work\asi\trace032`.
+(`STREAM_LevelLoadAndInit` from 0x5de02a) clears them too. **New category `ground`** (`[Trace] Ground=1`, owner live
+13.11. `dlc_dungeon`: Lara sank 3.4 m into a slanted pillar while TruMenu's fall watch still called it "safe ground"):
+what Lara stands on, from the game's own contact result - the player movement collision 0x5dce20 posts its contact
+record to the player with `INSTANCE_Post` as **0x1ca** (walkable), **0x1c9** (facing up but steeper than player data
+`+0x100e` = 52 deg, 0x5dd4f4) or **0x1c7** (other contact). One line on change (message, contact instance, direction of
+the record vector) or when Lara's z moves more than 100 units with the same contact: `ground: walkable (message 0x1ca)
+on inst 0x... obj n <name> intro m; record 0x... vector +0x10 x y z (unit ...), +0x1c..+0x2c <5 words>; Lara z ...`.
+Field sources (byte checks, a mismatch switches only `ground` off): the record build 0x5dd811 (`+0x10 / +0x14 / +0x18`
+scaled vector, `+0x1c` ebx, `+0x20` [esp+0x50], `+0x24` ecx, `+0x28` [esp+0x58], `+0x2c` [esp+0x5c]), the three post
+sites 0x5dd877 / 0x5dd89e / 0x5dd8c5, the 52-degree limit 0x5dd4f4, the instance pool `[0xd98f60]` stride 0x2f0
+(INSTANCE_Find 0x5b3969) - a record word that is an instance of the pool is named as the contact instance; otherwise
+"terrain / no instance in the record". The meaning of the vector and the five words is **not proven** (logged raw so the
+next run shows it). Uses the INSTANCE_Post hook also when `Messages=0`. Install: `scripts\windows\Set-TruTrace.ps1
+-Install -SourceDir work\asi\trace032`.
 
 | # | TO TEST 0.3.2 | expected |
 |---|---|---|
@@ -32,6 +44,8 @@ change, reload) and drops a machine whose owner `+8` is no longer the player; a 
 | 3 | negative: `ProgressFilter=checkpoint` in the .ini | only checkpoint instances again (the .ini wins over the default) |
 | 4 | `Sound=0` | no `sound` lines, `hooks:` line without the sound hooks |
 | 5 | level change (e.g. DLC 1 start or a chapter load), then 10 min play; TruQoL `exit.log` at the end | no burst of first-chance AVs in the TruTrace worker thread; no `machine 0x... record -1 [...]` lines after the change |
+| 6 | `ground`: walk on flat floor, onto a steep slope, onto a moving / object platform; DLC 1 `dlc_dungeon` slanted pillar | `ground: walkable (message 0x1ca)` / `too steep` lines only at a change; on an object the contact instance is named; the pillar: a line `z moved > 100 with the same contact` shows what Lara stood on while sinking |
+| 7 | negative: `Ground=0` | no `ground` lines; with `Messages=0` too the `hooks:` line has no INSTANCE_Post |
 
 ## 0.3.1: dated log lines (Q107, 2026-11-12)
 
@@ -68,6 +82,7 @@ sample .ini). Install: `scripts\windows\Set-TruTrace.ps1 -Install -SourceDir wor
 | `Save` | When is a checkpoint written, with which unit / checkpoint id; what does a restore bring back | `SAVE_SaveGame` `tru+0x1570f0` (callers: checkpoint message handler `0x6a1a70` - logs the checkpoint instance -, gameloop `0x5dfba0`, the placement's tail jump), `SAVE_RestoreGame` `tru+0x157130` with the result; poll of +0x10 / +0x90 / +0x114 / +0x1f4 in the active block and the checkpoint copy `[0xc59268]` |
 | `Progress`, `ProgressFilter` | Which checkpoint / trigger / wall instances appear, go or change flags | poll of the active instance list `0xd98d54` (+8 next): births, removals, +0x14 / +0x18 changes of objects whose name contains a filter token |
 | `Messages` | Which messages reach those instances | `INSTANCE_Post` `tru+0x1b3750` (instance, message, data) to ProgressFilter objects |
+| `Ground` (0.3.2) | What Lara stands on | the contact messages 0x1ca / 0x1c9 / 0x1c7 of the movement collision 0x5dce20 to the player (same INSTANCE_Post hook), on change |
 | `GameData`, `GameDataMs` | Which game data bytes change (progress flags) | diff of the active save buffer `[0xc59258]` (0x140000 bytes) every `GameDataMs`; a word changing in 8 polls in a row is muted |
 
 0.3 (F5 follow-up: which fixed sound slot plays "sound 20212"?):

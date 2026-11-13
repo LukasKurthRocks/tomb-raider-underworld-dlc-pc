@@ -14,7 +14,7 @@ ok: 0.21 arachnophobia / camera / ai.remove: 12 items, [Arachno] 17 + [Camera] 2
 ok: 0.21.1 ai.kill / sticky / room check / physics / spawn / bar: 11 items, [Quick] 3 keys, pages 0 / Tests, 60 groups, 0 ring entries, tables kAkChecks / kStChecks / kRkChecks / kPhChecks / kSpChecks / kHpChecks, kill path, sticky, room check, pot rule, Prepare
 ok: 0.21.3 quick bar X / Y, sound list width: kQbOwn 0xC30F, Y > X > left / right, X / Y rules, footer + confirm texts, TruMenuPadBlock, sound list width
 ok: 0.21.4 hall02 counter: 2 items, page Tests rows, fix.hall02 help / guards / order / 18509 rule / reply, alive rule, +8 address, read-only scriptval, no E3 safety net, kH2Checks
-ok: 0.21.5 Fixes + frozen ring: 195 switches (63 live / live-if) in 12 groups, 10 plugins; items sw.*, page Fixes, RunSwSet order, Y refused, menu sections; ring 172 entries all bar rows
+ok: 0.21.5 Fixes + frozen ring: 196 switches (63 live / live-if) in 12 groups, 10 plugins; items sw.*, page Fixes, RunSwSet order, Y refused, menu sections; ring 172 entries all bar rows
 ok: 0.21.6 costumes / flight line / quick command line: FlightHint key, page Kostueme after Lara (17 pages), settle 500 ms, 16 slot names, flight line rule, one command path, 31 toggle rows all bool
 ok: 0.21.7 footer / help / umlauts / costumes / chapters / label layers: 140 help rows, umlauts, costume check on the game thread, 10 chapter groups / 111 units, uber / shader / navmesh layers read only with 13 keys
 ok: 0.21.8 checks / command line / favourites / story / sound groups: byte check 0x6203e9, 0 checks on the 0.6.5 sites, SAP both forms, 33 danger ids, one keyboard, favourites with arguments, 6 story values, 8 sound sliders
@@ -29,7 +29,7 @@ ok: 0.22.19 29 menu pages, 17 bar page names, power.infinite row / item / greyin
 ok: 0.22.20 menu.noattract: [Menu] NoAttract=0, item / row / help / greying, capture + hold, 13 byte checks
 ok: 0.22.21 menu.attracttimer: [Menu] AttractTimerShow=0 / AttractTimerPosition=tr, item / row / help / greying, read-only shadow + flash, front end only, 45 byte checks unchanged
 ok: 0.22.22 teaser timer line in the bar language, game clock / wall clock, pause bit marker (0.5 + bit), 4 byte checks read only, precheck_02222 = 45 + 4 rows
-ok: 0.22.23 switches limit 512 / 24 groups (file 195 rows in 12 groups, 317 free), lines over it logged, page Fixes at most 54 rows (group dlc2kampf open) <= 128, no new byte checks
+ok: 0.22.23 switches limit 512 / 24 groups (file 196 rows in 12 groups, 316 free), lines over it logged, page Fixes at most 54 rows (group dlc2kampf open) <= 128, no new byte checks
 ok: 0.22.24 fall watch (records 742/743/1068/1080, states 1008 / 1015, watchdog, safe ground, 40 lines / 10 s), [Rescue] FallNet default 0 live, net after 3 s / 3000 units through UnstuckPlace, 2 + 1 byte checks, switch row
 ok: 0.22.25 settings.reset: default text 46404 bytes (275 keys) built in a measured buffer, no fixed array; table texts fit: Log line 2048 (light.cut 1400), [Quick] Closed 547 of 1024, OpenPages 220 of 400, Cheats 69 of 256, NavDraw 120 of 256, settings.show 8927 of 16384
 ok: 0.22.26 test arena: 6 kAdmChecks rows (0x6e6646 patch left out), meter-full once in __try, CheatGate on fill / keep, AdmTick per frame, ai.remove spawned by address + stamp, page Tests 3 arena rows, no new INI key

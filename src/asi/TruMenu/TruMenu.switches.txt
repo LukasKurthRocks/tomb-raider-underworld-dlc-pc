@@ -193,6 +193,7 @@ TruTrace | Trace | Save | bool | Kanal Speichern | Channel save | restart | 1 | 
 TruTrace | Trace | Progress | bool | Kanal Fortschritt | Channel progress | restart | 1 | Geburten / Entfernen / Flags der ProgressFilter-Objekte // Births / removals / flags of ProgressFilter objects
 TruTrace | Trace | Messages | bool | Kanal Meldungen | Channel messages | restart | 1 | INSTANCE_Post an solche Instanzen // INSTANCE_Post to such instances
 TruTrace | Trace | GameData | bool | Kanal Spieldaten | Channel game data | restart | 1 | Geänderte Byte-Bereiche des Spielstand-Puffers // Changed byte ranges of the save buffer
+TruTrace | Trace | Ground | bool | Kanal Boden | Channel ground | restart | 1 | Worauf Lara steht (Kontakt 0x1ca / 0x1c9 / 0x1c7) // What Lara stands on (contacts 0x1ca / 0x1c9 / 0x1c7) | TruTrace 0.3.2
 TruTrace | Trace | LogLevel | int:0..2 | Log-Stufe | Log level | restart | 1 | 2 = jeder Ton-Start / -Ende und Chart-Wechsel // 2 = every sound start / end and chart change
 TruTrace | Trace | MaxLinesPerSecond | int:0..1000:10 | Zeilen je Sekunde | Lines per second | restart | 40 | Grenze je Kategorie und Sekunde // Rate limit per category
 TruTrace | Trace | MaxLinesPerCategory | int:0..500000:10000 | Zeilen je Kategorie | Lines per category | restart | 50000 | Obergrenze je Kategorie insgesamt // Total cap per category

@@ -1,0 +1,8 @@
+# TruTrace 0.3.2 [Ground]: the kCatGround facts of kFacts in TruTrace.cpp, in order
+# (checked offline: ../bin/pyt -t 120 tools/pe_bytes_check.py <Steam tru.exe> --file work/p5_menu_1311/precheck_trace032.txt)
+0x005dd811 d95f10 d94004 d8c9 d95f14 d84808 8b442450 894720 8b442458 894f24 d95f18 8b4c245c 894728 895f1c 894f2c
+0x005dd877 68c7010000 56 e8ce5efdff
+0x005dd89e 68c9010000 56 e8a75efdff
+0x005dd8c5 68ca010000 56 e8805efdff
+0x005dd4f4 0fbf930e100000
+0x005b3969 8b0d608fd900 0fbfc0 69c0f0020000
