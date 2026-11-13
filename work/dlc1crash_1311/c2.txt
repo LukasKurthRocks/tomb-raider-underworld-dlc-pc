@@ -1,0 +1,6 @@
+.symopt+ 0x80000
+.ecxr
+r
+kv 20
+dps esp L40
+q

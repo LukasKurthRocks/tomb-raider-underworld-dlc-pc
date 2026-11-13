@@ -1,0 +1,9 @@
+learned offsets 93 ambiguous 0 {'records': 450, 'no_pc': 5}
+id32:7 offsets ['0x8c', '0xa4', '0xbc', '0xd4', '0xec', '0x14c', '0x164', '0x194', '0x1ac', '0x1c4', '0x1dc', '0x1f4', '0x20c', '0x224', '0x23c', '0x254', '0x26c', '0x284', '0x29c', '0x2b4', '0x2cc', '0x2e4', '0x314', '0x32c', '0x344', '0x35c', '0x374']
+dlc_caverns.drm DTP 20872: 11 records, fix changes 29 words, bad id/count slots after fix 0, words differing from old tree after fix 0
+dlc_caverns_hall.drm DTP 20810: 6 records, fix changes 40 words, bad id/count slots after fix 0, words differing from old tree after fix 0
+dlc_dungeonhallb.drm DTP 20133: 15 records, fix changes 9 words, bad id/count slots after fix 0, words differing from old tree after fix 0
+dlc_level1_start.drm DTP 26889: 14 records, fix changes 16 words, bad id/count slots after fix 0, words differing from old tree after fix 0
+dlc2_machine_room.drm DTP 25392: 31 records, fix changes 31 words, bad id/count slots after fix 0, words differing from old tree after fix None
+dlc2_ceremony_room.drm DTP 25698: 29 records, fix changes 18 words, bad id/count slots after fix 0, words differing from old tree after fix 18
+total {'words': 143, 'bad_after': 0} {'records': 106, 'words': 143}

@@ -1,0 +1,6 @@
+.symopt+ 0x80000
+u TruDataGuard+0x1640 L40
+uf 00594ea0
+u 005b9910 L30
+u 00584df0 L30
+q

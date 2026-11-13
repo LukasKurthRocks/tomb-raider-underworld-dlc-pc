@@ -1,0 +1,9 @@
+.symopt+ 0x80000
+da 00857fb0
+da 00857fa8
+u 0065c9b0 L24
+u TruShadowCombat+0x1f3f L6
+u 006722e0 L8
+u 006723a8 L8
+dd 00cfb7e0 L8
+q

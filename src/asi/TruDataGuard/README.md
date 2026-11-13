@@ -4,7 +4,38 @@ A safety net and detector for converter data faults: an invalid section id becom
 crash - at known lookup points only, using the engine's own not-found path. The real fix stays in the converter.
 Brief: `docs\Plan-TruDataGuard.md` (workspace). 0.1 built 2026-11-02 into `work\asi\dataguard01` (live runs 50j /
 50k), 0.2 built 2026-11-02 into `work\asi\dataguard02` (installed 2026-11-02), 0.2.1 built 2026-11-12 into
-`work\asi\i_1211\TruDataGuard` (not installed, not played).
+`work\asi\i_1211\TruDataGuard` (installed 2026-11-12, Paket I), 0.2.2 built 2026-11-13 into `work\asi\dg0222` (not
+installed, not played).
+
+## 0.2.2: ids outside the table -> "not found" for every caller (2026-11-13)
+
+**Crash 2026-11-13 12:05:40** (DLC 1 `dlc_caverns`, Q94 own tree, full dump `tru.exe.20684.dmp`; workspace
+`docs\Befund-DLC1-Absturz-Spinne-1311.md`): the small albino spider (instance 0x00cfb7e0, object 370) entered its
+MeleeAttack state; tru+0x218ee0 (mode 0 "melee") -> tru+0x218bc0 -> tru+0x194ff0 (AI attack sound) looked up the DTP id
+of its AI combat record (DTP 20872 +0x5530 +0x1f4) = **0x24910000** (Xbox id 0x2491 written as a u16 pair: the
+converter's `aidata_fix` ran without its table). Caller tru+0x19500f is not in the list of callers that test for 0,
+so 0.2.1 logged the hit (`... does not test for 0 -> original lookup runs - a crash may follow`) and ran the original
+lookup, which read `[0xc36f28 + 0x24910000*4]` = 0x93076f28 -> access violation at TruDataGuard+0x16b8 (the copy of
+the original lookup).
+
+**Rule 0.2.2**: an id outside the table (>= 0x8000; -1 still answers 0 without a hit) is answered "not found" for
+**every** caller (lookup: 0, exists test: al 0), whatever `UncheckedCallers` says - the original lookup would read
+beyond the 0x8000-entry table, so it never has a valid answer. Implausible entries inside the table keep the 0.2 rule
+(unguarded callers: logged, original lookup). The hit line of such a caller ends with `(0.2.2: id outside the table,
+the original would read beyond it)`. The crash caller is NULL-safe (static): tru+0x194ea0 uses the section only as a
+hash key (tru+0x18d4a0) and as the emitter's sound data; the emitter tru+0x1935d0 tests it for 0 (handle 0, no sound),
+tru+0x194350 skips a 0 handle. So with 0.2.2 the spider attacks without that sound instead of crashing.
+
+- Self test `work\asi\dg0222\selftest.txt`: **36 passed, 0 failed** (new: unguarded caller with 0x24910000 / 0x8000
+  -> 0 with a hit, -1 -> 0 without a hit, exists test 0x8000 -> missing, caller list: tru+0x19500f not guarded). The
+  0.2.1 stub would fault on the first new case (it reads the test table at id*4).
+- Install (game closed): `scripts\windows\Set-TruDataGuard.ps1 -Install -SourceDir work\asi\dg0222` (0.2.2 sha256
+  `9a5ffc0f...` listed in `$earlierBuilds`; the sample .ini is unchanged).
+
+| # | TO TEST 0.2.2 | expected |
+|---|---|---|
+| 1 | game start with 0.2.2: `TruDataGuard.log` from the last `session start` | `loaded` line names 0.2.2, `guard on` line: `ids >= 0x8000 -> not found for every caller` |
+| 2 | Q94 tree, `level.load dlc_level1_start`, `dlc_caverns`: let a small albino spider attack (only while the tree still has the unfixed AI records) | no crash; log line `invalid id 0x24910000 ... caller 0x0059500f ... returned 0 (not found) (0.2.2: ...)`; the attack without its sound |
 
 ## 0.2.1: dated log lines (Q107, 2026-11-12)
 

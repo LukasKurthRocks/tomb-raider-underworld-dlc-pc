@@ -1,0 +1,8 @@
+.symopt+ 0x80000
+r
+lm
+kv 30
+dps esp L60
+ub 0059500f L30
+u 0059500f L30
+q

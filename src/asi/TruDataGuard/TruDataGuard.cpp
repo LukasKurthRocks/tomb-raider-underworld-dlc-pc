@@ -26,6 +26,14 @@
 // test the result for 0 (static list kGuardedCallers, built by tools/dataguard_check.py callers; every entry is
 // byte-checked at load: an E8 call to the lookup right before the return address). For any other caller the original
 // lookup runs unchanged (option UncheckedCallers=0) after the log line, or returns 0 anyway (UncheckedCallers=1).
+// 0.2.2: an id OUTSIDE the table (>= 0x8000, not -1) returns "not found" to every caller, also to callers that do not
+//   test for 0: the original would read [0xc36f28 + id*4] beyond the 0x8000 entries (other globals or unmapped memory),
+//   so it has no valid answer to give. Crash 2026-11-13 12:05:40 (docs Befund-DLC1-Absturz-Spinne-1311.md): id
+//   0x24910000 (Xbox DTP 0x2491 as a u16 pair, AI record of DTP 20872 +0x5530 +0x1f4, small albino spider "melee")
+//   from caller tru+0x19500f (tru+0x194ff0, AI attack sound, does not test for 0) ran the original and faulted at
+//   0x93076f28. That path is NULL-safe: tru+0x194ea0 uses the section only as a hash key (tru+0x18d4a0) and as sound
+//   data for the emitter tru+0x1935d0, which tests it for 0 (handle 0, no sound). Implausible ENTRIES inside the table
+//   keep the 0.2 rule (unchecked callers: logged, original lookup).
 // The fast path touches only eax and the flags, like the original. No exception is caught after a fault.
 
 #define WIN32_LEAN_AND_MEAN
@@ -210,11 +218,13 @@ bool FirstFromCaller(DWORD ret) {
 }
 
 // Called by the stubs on a rejected id / entry (game thread). Returns 0 = answer "not found", 1 = run the original
-// lookup (caller does not test for 0 and UncheckedCallers=0). Logs first, so a following crash has its line.
+// lookup (implausible entry, caller does not test for 0 and UncheckedCallers=0). An id outside the table is always
+// answered 0 (0.2.2: the original would read beyond the table). Logs first, so a following crash has its line.
 DWORD __stdcall OnBad(DWORD kind, DWORD id, DWORD entry, DWORD ret) {
     bool exists = kind == kKindExistsId || kind == kKindExistsEntry;
+    bool outside = kind == kKindId || kind == kKindExistsId;
     bool guarded = g_testMode ? !g_testUnguarded : (exists ? (ret == kExistsCaller && g_existsCallerOk) : IsGuarded(ret));
-    DWORD answer = (guarded || g_uncheckedCallers) ? 0 : 1;
+    DWORD answer = (guarded || g_uncheckedCallers || outside) ? 0 : 1;
     LONG n = InterlockedIncrement(&g_hits);
     if (kind < 5) InterlockedIncrement(&g_hitsByKind[kind]);
     g_lastId = id;
@@ -239,11 +249,13 @@ DWORD __stdcall OnBad(DWORD kind, DWORD id, DWORD entry, DWORD ret) {
         else
             _snprintf_s(what, sizeof(what), _TRUNCATE, "table entry 0x%08lx is not a section record", entry);
     }
-    Log(1, "invalid id 0x%08lx (%s) in %s tru+0x%lx, caller 0x%08lx (tru+0x%lx, %s) -> %s; unit %s; hit %ld%s", id,
+    Log(1, "invalid id 0x%08lx (%s) in %s tru+0x%lx, caller 0x%08lx (tru+0x%lx, %s) -> %s%s; unit %s; hit %ld%s", id,
         what, exists ? "section exists test" : "section lookup", (exists ? kExists : kLookup) - kImageBase, ret,
         ret - kImageBase, guarded ? "tests for 0" : "does not test for 0",
         answer == 0 ? (exists ? "answered 'missing'" : "returned 0 (not found)")
                     : "original lookup runs (UncheckedCallers=0) - a crash may follow",
+        (answer == 0 && !guarded && !g_uncheckedCallers) ? " (0.2.2: id outside the table, the original would read "
+                                                           "beyond it)" : "",
         unit, n, (n == g_logFirst && g_logLevel < 3) ? " (further hits: first per caller, then counted)" : "");
     return answer;
 }
@@ -445,7 +457,7 @@ void Start(HMODULE self) {
     dir[len] = 0;
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruDataGuard.log", dir);
     ReadOptions(dir);
-    Log(1, "TruDataGuard 0.2.1 loaded (enabled %d, log level %d, section lookup %d, section exists %d, unchecked callers "
+    Log(1, "TruDataGuard 0.2.2 loaded (enabled %d, log level %d, section lookup %d, section exists %d, unchecked callers "
         "%d, log first %d, log unit %d)", g_enabled, g_logLevel, g_sectionLookup, g_sectionExists, g_uncheckedCallers,
         g_logFirst, g_logUnit);
     if (!g_enabled) { Log(1, "disabled by TruDataGuard.ini - nothing patched"); return; }
@@ -472,9 +484,9 @@ void Start(HMODULE self) {
             Log(0, "section lookup tru+0x%lx does not match - guard off", kLookup - kImageBase);
         else if (WriteJump(kLookup, &LookupStub)) {
             g_installed = true;
-            Log(1, "guard on: section lookup tru+0x%lx (ids >= 0x%lx and implausible records -> not found for %d of %d "
-                "checked callers that test for 0; other callers: %s)", kLookup - kImageBase, kTableCount, ok,
-                kGuardedCount, g_uncheckedCallers ? "also 0" : "logged, original lookup");
+            Log(1, "guard on: section lookup tru+0x%lx (ids >= 0x%lx -> not found for every caller; implausible records "
+                "-> not found for %d of %d checked callers that test for 0; other callers: %s)", kLookup - kImageBase,
+                kTableCount, ok, kGuardedCount, g_uncheckedCallers ? "also 0" : "logged, original lookup");
         } else
             Log(0, "section lookup tru+0x%lx not written (VirtualProtect %lu)", kLookup - kImageBase, GetLastError());
     }
@@ -669,6 +681,11 @@ extern "C" __declspec(dllexport) int __cdecl TruDataGuardSelfTest(char *report, 
                 kKindEntry);
     CheckLookup(&o, "unguarded caller, refs 0 -> no hit", 0x0101, reinterpret_cast<DWORD>(norefs) + 0x10, 0, 0);
     CheckExists(&o, "unguarded caller, misaligned -> original", 0x0104, 1, 1);
+    // 0.2.2: an id outside the table never runs the original (it would read beyond the table; crash 2026-11-13)
+    CheckLookup(&o, "unguarded caller, 1311 spider id 0x24910000", 0x24910000, 0, 1, kKindId);
+    CheckLookup(&o, "unguarded caller, first id past the table", 0x8000, 0, 1, kKindId);
+    CheckLookup(&o, "unguarded caller, none id -1 (no hit)", 0xffffffff, 0, 0, 0);
+    CheckExists(&o, "unguarded caller, id 0x8000 -> missing", 0x8000, 0, 1);
     g_testUnguarded = false;
     g_testMode = false;
     // the static caller list: the four crash callers of 2026-11-02 (50d / 50e / 50h test for 0, 50f does not)
@@ -679,6 +696,7 @@ extern "C" __declspec(dllexport) int __cdecl TruDataGuardSelfTest(char *report, 
     Report(&o, IsGuarded(0x00594cad), "caller list: 50k tru+0x194cad tests for 0");
     Report(&o, !IsGuarded(0x0058bd3a), "caller list: unload callback tru+0x18bd3a does not test for 0 (tail jmp)");
     Report(&o, !IsGuarded(0x0075eefe), "caller list: 50f tru+0x35eefe does not test for 0 (tail jmp to tru+0x1ee890)");
+    Report(&o, !IsGuarded(0x0059500f), "caller list: 1311 tru+0x19500f does not test for 0 (ids outside -> 0, 0.2.2)");
     bool sorted = true;
     for (int i = 1; i < kGuardedCount; ++i) if (kGuardedCallers[i] <= kGuardedCallers[i - 1]) sorted = false;
     Report(&o, sorted, "caller list sorted, %d entries", kGuardedCount);
@@ -692,4 +710,4 @@ extern "C" __declspec(dllexport) int __cdecl TruDataGuardSelfTest(char *report, 
 }
 
 // exported so the loader / tools can identify the plugin
-extern "C" __declspec(dllexport) const char *TruDataGuardVersion() { return "TruDataGuard 0.2.1 (section lookup / exists test: invalid ids -> not found; 0.2.1: dated log lines)"; }
+extern "C" __declspec(dllexport) const char *TruDataGuardVersion() { return "TruDataGuard 0.2.2 (section lookup / exists test: invalid ids -> not found; 0.2.1: dated log lines; 0.2.2: ids outside the table -> not found for every caller)"; }
