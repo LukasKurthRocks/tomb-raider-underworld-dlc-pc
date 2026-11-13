@@ -158,7 +158,7 @@ Usage (from the repository root):
   options (negative tests on copies): --ini FILE, --radial FILE, --tour FILE check that file instead of the shipped one;
   since 0.19 also --cpp FILE (a copy of TruMenu.cpp: the table rules of the bar, kItems, kAiPresets, the precheck tables)
 """
-import os, re, sys
+import glob, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CPP = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruMenu.cpp')
@@ -4514,6 +4514,127 @@ def check_02237(ini_path, switches_path):
                       'filter)' % (len(rows), len(want), len(ret), len(rooms_want), len(P5_KEYS_02237), len(P5_ITEMS_02237)))
 
 
+PD_KEYS_02238 = {('Debug', 'TriggerNearest'): '0', ('Debug', 'TriggerCornerId'): '1', ('Input', 'DeviceGlyphs'): '1'}
+PD_ITEMS_02238 = (('dbg.trignear', 'action', 'ValDvTrigNear', 'RunDvTrigNear'),
+                  ('dbg.trigcorner', 'bool', 'ValDvTrigCorner', 'RunDvTrigCorner'))
+PD_LISTS_02238 = os.path.join(ROOT, 'work', 'generic', 'lists')
+
+
+def pd_prefix_kind(low):
+    """Python copy of P5PrefixKind (0.22.38): 1 co_, 2 fx_, 3 neither / an exception"""
+    m = re.match(r'dlc[0-9]*_', low)
+    s = low[m.end():] if m else low
+    if s.startswith('co_') and not s.startswith('co_rock'): return 1
+    if s.startswith('fx_') and '_grab_prompt' not in s: return 2
+    return 3
+
+
+def check_02238(ini_path, switches_path):
+    """0.22.38 (PD, 13.11.; workspace docs/Befund-TruMenu-02238-1311.md): [Input] DeviceGlyphs default 1 (kOpts, INI,
+    switches row restart 1); P5PrefixKind skips "dlc_" / "dlc<digits>_" before the co_ / fx_ rule (exceptions co_rock*,
+    *_grab_prompt) and P5PrefixHidden uses it - the Python copy run over the real object lists of work/generic/lists
+    (dlc_fx_* / dlc1_fx_* hidden, co_rock* / fx_saving_grab_prompt kept); trigger edges: DpLine.edge from DvEdgeBegin /
+    DvLine, the trigger loop keys both passes, a sphere circle is one key, DpDrawBuffer draws PdEdgeHow 1 whole without
+    the depth test (g_dpAlways) and issues the query pairs before sb->Apply, PdEdgeHow is 0 with Occlusion 0, DpOnReset
+    releases the pairs, the PD functions read only; [Debug] TriggerNearest / TriggerCornerId (kOpts, INI, switches rows
+    restart), items + bar rows + help rows, ReadOptions / load call PdReadOptions / PdCheck; README 0.22.38 with TO TEST;
+    Set-TruMenu.ps1 knows the 0.22.37 hash"""
+    problems = []
+    src = read_cpp()
+    if '0.22.38 (PD' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.38 part "0.22.38 (PD"')
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
+    for (sec, k), d in PD_KEYS_02238.items():
+        if keys.get((sec, k)) != d: problems.append('TruMenu.cpp: kOpts [%s] %s must default to %s' % (sec, k, d))
+        if '\n%s=%s\n' % (k, d) not in ini: problems.append('%s: [%s] %s=%s missing' % (os.path.basename(ini_path), sec, k, d))
+    sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | ')]
+    got = {(f[1], f[2]): f for f in sw if len(f) >= 10 and f[9] == 'TruMenu 0.22.38'}
+    for (sec, k), d in PD_KEYS_02238.items():
+        f = got.get((sec, k))
+        if not f or f[6] != 'restart' or f[7] != d:
+            problems.append('%s: row TruMenu | %s | %s | ... | restart | %s | ... | TruMenu 0.22.38 missing'
+                            % (os.path.basename(switches_path), sec, k, d))
+    # co_ / fx_ after dlc_ / dlc<n>_
+    pk = fn_body(src, 'int P5PrefixKind(')
+    for need in ('if (!strncmp(s, "dlc", 3)) {', "while (*p >= '0' && *p <= '9') ++p;", "if (*p == '_') s = p + 1;",
+                 'if (!strncmp(s, "co_", 3) && strncmp(s, "co_rock", 7)) return 1;',
+                 'if (!strncmp(s, "fx_", 3) && !strstr(s, "_grab_prompt")) return 2;'):
+        if need not in pk: problems.append('TruMenu.cpp: P5PrefixKind lacks %s' % need)
+    if 'k = P5PrefixKind(low);' not in fn_body(src, 'bool P5PrefixHidden('):
+        problems.append('TruMenu.cpp: P5PrefixHidden must use P5PrefixKind')
+    names = set()
+    for path in glob.glob(os.path.join(PD_LISTS_02238, '*objectlist.txt')):
+        for line in open(path, encoding='latin1').read().splitlines()[1:]:
+            if ',' in line: names.add(line.split(',', 1)[1].strip().lower())
+    dlcfx = [n for n in names if re.match(r'dlc[0-9]*_fx_', n)]
+    if names and (len(names) < 1000 or len(dlcfx) < 70):   # work/generic is gitignored: no lists = this part skipped
+        problems.append('work/generic/lists: object names not readable (%d names, %d dlc*_fx_*)' % (len(names), len(dlcfx)))
+    if any(pd_prefix_kind(n) != 2 for n in dlcfx): problems.append('prefix rule: a dlc*_fx_* name is not hidden')
+    for keep in ('co_rock', 'co_rock_b', 'fx_saving_grab_prompt', 'dlc1_uo_sewer_gate', 'dlc_dispatcher'):
+        if pd_prefix_kind(keep) != 3: problems.append('prefix rule: %s must stay labelled' % keep)
+    # trigger edges: keys, both passes, sphere circles, the faded batch, query pairs, reset
+    if 'float thick; int dashed; DWORD edge; };' not in src or 'l.edge = g_dvEdgeKey;' not in fn_body(src, 'void DpPushLine('):
+        problems.append('TruMenu.cpp: DpLine.edge / DpPushLine must carry the edge key')
+    if 'if (g_dvEdgeBase) g_dvEdgeKey = DvEdgeKeyOf(g_dvEdgeBase, g_dvEdgeSeg++ / g_dvEdgeRun);' not in fn_body(src, 'bool DvLine('):
+        problems.append('TruMenu.cpp: DvLine must number the edges (also behind the camera)')
+    dv = fn_body(src, 'void DrawDebugView(')
+    i0, i1 = dv.find('DvEdgeBegin(t.inst, 0);'), dv.find('DvEdgeBegin(t.inst, 1);')
+    i2 = dv.find('DvDrawTrig(dl, c, t, colour, thick, fill, &at, &seen);')
+    if not (0 <= i0 < i1 < i2) or dv.count('DvEdgeEnd();') < 2:
+        problems.append('TruMenu.cpp: DrawDebugView must key both trigger passes (DvEdgeBegin 0 / 1 ... DvEdgeEnd)')
+    if 'if (g_pdTrigNear > 0 && !t.laraIn) {' not in dv or 'PdCornerDraw(dl, c, t.inst, colour);' not in dv:
+        problems.append('TruMenu.cpp: DrawDebugView lacks TriggerNearest / the corner id')
+    dt = fn_body(src, 'void DvDrawTrig(')
+    if 'g_dvEdgeRun = 24;' not in dt or 'g_dvEdgeRun = 1;' not in dt:
+        problems.append('TruMenu.cpp: a sphere circle (24 segments) must be one edge key')
+    db = fn_body(src, 'void DpDrawBuffer(')
+    i_how, i_alw, i_iss, i_app = (db.find('PdEdgeHow(b.line[i].edge)'), db.find('g_dpAlways = true;'),
+                                  db.find('PdEdgeIssue(dev, c, b, fw, fh);'), db.find('sb->Apply();'))
+    if not (0 <= i_how < i_alw < i_iss < i_app) or 'l.colour = PdEdgeFaded(l.colour);' not in db or \
+            'g_dpAlways = false;' not in db:
+        problems.append('TruMenu.cpp: DpDrawBuffer must draw PdEdgeHow 1 faded without the depth test, then issue the pairs '
+                        'before sb->Apply')
+    fl = fn_body(src, 'void DpFlush(')
+    if 'if (g_dpAlways) {' not in fl or 'D3DCMP_ALWAYS' not in fl:
+        problems.append('TruMenu.cpp: DpFlush lacks the g_dpAlways branch (ZFUNC ALWAYS)')
+    how = fn_body(src, 'int PdEdgeHow(')
+    if 'if (!key || !g_p5Occl || g_pdQFailed) return 0;' not in how or 'return g_p5Occl == 2 ? 2 : 1;' not in how:
+        problems.append('TruMenu.cpp: PdEdgeHow must be 0 without a key / with Occlusion 0 and drop only with Occlusion 2')
+    if 'PdEdgeRelease();' not in fn_body(src, 'void DpOnReset('):
+        problems.append('TruMenu.cpp: DpOnReset must release the edge query pairs')
+    iss = fn_body(src, 'void PdEdgeIssue(')
+    if 'D3DRS_COLORWRITEENABLE, 0' not in iss or 'vis + 2 + all / 32 >= all' not in iss:
+        problems.append('TruMenu.cpp: PdEdgeIssue must ask without colour and compare all / visible pixels')
+    for fn in ('void PdEdgeIssue(', 'int PdEdgeHow(', 'void PdCornerDraw(', 'int PdLookup(', 'void PdStore(',
+               'int P5PrefixKind('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('('))
+        if any(w in body for w in ('WriteByte(', 'WriteBytes(', 'WriteDword(', 'reinterpret_cast<volatile', 'Fn>(')):
+            problems.append('TruMenu.cpp: %s must not write game memory or call the game' % fn.strip('('))
+    # items, bar, options, load
+    for item, typ, val, run in PD_ITEMS_02238:
+        if not re.search(r'\{"%s", "%s", .*?,\s+false,\s+%s,\s+%s\}' % (re.escape(item), typ, val, run), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, %s / %s) missing' % (item, typ, val, run))
+        if not re.search(r'\{"%s", "[*]?", "' % re.escape(item), src): problems.append('TruMenu.cpp: bar help row %s missing' % item)
+        if not re.search(r'"%s", "[^"]*", kQb(Bool|Action), -1' % re.escape(item), src):
+            problems.append('TruMenu.cpp: bar row %s missing' % item)
+    if 'PdReadOptions(ini);' not in src or not re.search(r'\n    P5Check\(\);[^\n]*\n[^\n]*\n    PdCheck\(\);', src):
+        problems.append('TruMenu.cpp: ReadOptions must call PdReadOptions and the load PdCheck after P5Check')
+    if 'PdMenuControls(o, sizeof(o));' not in src: problems.append('TruMenu.cpp: menu controls 0.22.38 missing')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.38 - ' not in readme or '\n### TO TEST 0.22.38' not in readme:
+        problems.append('README.md: section "## 0.22.38 - ..." with "### TO TEST 0.22.38" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '8f2f6b2a99e172c624ca56258e8d973e0cb3cb0ddcf16addc5bd7388779f5c3f' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.37 build hash (work/asi/menu0260) is missing')
+    lists = ('%d object names, %d dlc*_fx_* hidden' % (len(names), len(dlcfx)) if names
+             else 'object lists not present - name test skipped')
+    return problems, ('PD (DeviceGlyphs 1; co_ / fx_ after dlc_ / dlc<n>_: %s; trigger edges whole + faded by query '
+                      'pairs; %d keys, %d items)' % (lists, len(PD_KEYS_02238), len(PD_ITEMS_02238)))
+
+
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
 SV_ITEMS = ('save.pending', 'save.inv', 'save.waiting', 'save.find')
 
@@ -4798,7 +4919,8 @@ def check_02230():
     if "t[4] == '-'" not in st or 'StampLengthTime(t + date)' not in st:
         problems.append('TruMenu.cpp: StampLength must take an optional "YYYY-MM-DD " before the time')
     # Q95 device glyphs
-    if '"Input", "DeviceGlyphs", "0"' not in src: problems.append('TruMenu.cpp: kOpts lacks [Input] DeviceGlyphs=0')
+    if '"Input", "DeviceGlyphs", "' not in src:   # 0.22.38: default 1 (owner decision 13.11.) - check_02238 checks it
+        problems.append('TruMenu.cpp: kOpts lacks [Input] DeviceGlyphs')
     if 'g_glDevGlyphs = OptInt(ini, "Input", "DeviceGlyphs") != 0 ? 1 : 0;' not in src:
         problems.append('TruMenu.cpp: ReadOptions must read [Input] DeviceGlyphs')
     if 'if (connected) GlPadSeen(copy);' not in fn_body(src, 'DWORD WINAPI PadHook('):
@@ -5096,6 +5218,10 @@ def main(argv):
     for p in cproblems37: print('Q02237 %s' % p)
     if not cproblems37: print('ok: 0.22.37 %s' % csummary37)
     problems += cproblems37
+    cproblems38, csummary38 = check_02238(ini_path, opt.get('--switches', SWITCHES))   # 0.22.38 (PD)
+    for p in cproblems38: print('Q02238 %s' % p)
+    if not cproblems38: print('ok: 0.22.38 %s' % csummary38)
+    problems += cproblems38
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

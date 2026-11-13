@@ -63,7 +63,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.37 (debug view P5, Paket R / Q119: labels as name / symbol / both per layer ([Debug] Style*, dbg.labelstyle; ImGui symbols + legend), room always + readable (kRoomNames, LabelRoom) and metres (DistMetres), key items layer dbg.keyitems (parts, switches, doors, grapple points, P1 part -> target lines, state from link parent +0x228 / uber node), the game's reward bit +0x3ed90 as 'collected' (LabelCollected semantics), DrawDistance + TruMenu.debugview.txt per unit, labels behind walls faded / hidden by D3D9 occlusion queries in the depth pass (Occlusion), co_ / fx_ hidden (HideCo / HideFx), live wishes: uber labels + key items of Lara's room only (RoomOnly, dbg.roomonly; then every _uo_ / _ei_ / _pt_ object of the room, readable name + node 'Kanaltor, verschlossen'), uber labels fade behind walls, readable names (kP5Readable: 'Wandschalter (einmalig)'), grey 'versteckt' for hidden non-collectibles, kChapOrder after Paket R (CP 76 return visit, 160 / 42, going_in / going_out, 7 return rows), arena.load references released at a level change; 6 byte checks) - 0.22.36 (label filter, live 2026-11-12: the name labels dbg.labels / dbg.names ask the 0.21 collected / hidden check LfNotDrawn as the collectibles layer - [Debug] LabelCollected 0 none / 1 grey 'eingesammelt'; Lara's own gear by game data (parent +0x54 = player from BirthObject, weapon-manager slots + gear list) - [Debug] LabelLaraGear 0 none / 1 shown; both live, items dbg.labelcollected / dbg.labelgear, 11 byte checks) - 0.22.35 (level chain, Q113: base-game checkpoints of the Kapitel page in walking order, loop directions + l4_temple side trip as headings) - 0.22.34 (achievements, photo.pose, group M; Q20 / I-2: [Achievements] Enabled=1 (default, read at the start) bends the 16 push immediates of the achievement binder 0x7abb80 (script 66, all bound to the empty 0x796620) to TruMenu's stubs before the generalbank binds them - 'achievement <id> <name> unlocked' once per profile (= the save folder) in TruMenu.log and TruMenu.achievements.txt, names / gamerscore of the Xbox ids f0 1 .. f15 18 (f12 - f15 unsure), repeats counted; ach.list / ach.status, page Figur group Erfolge, big window page Achievements; F2: photo.pose 1..7|next|off = Lara's screen_capture_0n (anim table 1605 - n, section checked, resident) through the game's anim request 0x444ba0 mode 0 (the uber / script play-anim path) - photo mode only; off / photo.off = the slot noted from processor +0x44 again in mode 1; J-5: chapter 1.2 heading before l1_kraken_entrance (title card from intro 696); K follow-up: ai.spawn warns when a resident kind's children are not loaded; 36 byte checks); " "0.22.33 (photo mode, arena.load, glyphs.status, group K; F1 / Q78: photo.on = the game's own FreeCamera (camera manager mode 5 through its switch 0x5edd70(mgr, 5, 0) - CAMERA_SetMode knows only 6 / 11 / 12; its own stick / mouse input and generalbank DTP 16 values) + the world pause bit 0x1000 (the camera update still runs) + the UI byte 0xcdc9a0 (the game's screenshot task hides the HUD the same way); photo.off / leaving by itself on a level change, a new player / unit, main state != 1, a cutscene, the game's pause menu or a camera the game took = mode, Lara's control, pause bit and HUD as before; refused in cutscenes / loading / pause / flight / cine.pause / another camera layer; photo.shot = shot.save clean photo_<n>; Q83: arena.load <kind> requests one of the 26 enemy kinds with the game's object request with reference 0x5c1760 (checks tracker 204 / anim pool 3000 / 3D navgraph / DRMs, at most 2 kinds), ready = object + children at status 2 and anim slots resolved (log line), ai.spawn refuses it before; arena.unload <kind>|all = STREAM_DumpObject 0x5c1790 once for its own requests; arena.enemies lists the states; Q95: glyphs.status = DeviceGlyphs, device now (pad / keyboard / mouse), last switch time, prompt counters; 37 byte checks, no new INI key); " "0.22.32 (arena, group A; Q86: ai.spawn names the LP each spawned enemy got from the game's enemy init (brain+0x2c64; tune health record by the EnemyHP step [[0xc59264]+0x3ef98]), the EnemyHP step and warns while one-hit kill [0xe91ffd] is on - the 2026-11-11 21:02 thrall 'LP 0' was that cheat, its AI ran; no name / an inexact or unloaded name = the list of the loaded AI enemy kinds with the reason; Q100: arena.mode [spot] = player object, doppelganger byte [[0xfadb58]+0x1244] and TruDlc2Player flag, fits / WARNING per spot, logged; arena.go reads the mode first - a main-game spot with the flag set loads with level.load (new game tracker clears it), a DLC 2 spot without it warns - and ends with arena.mode <spot>; Q98: spots 1d l5_valgrind CP 7329, 1e l2_puzzleroom CP 2074, 1f l4_traprooms CP 5722 - the largest open navmesh floors with a resident enemy kind; read only, no new INI key, no hook); " "0.22.31 (level navigation + puzzles, group B; Q105: the 15 unit names in no PC archive (q105_units.tsv: three base units of the level list, six container / costume / cine names, the six known DLC slots) grey and refused by level.load / level.start / unit.go / cp.jump unless a mods\\<unit>.drm exists, one 'units:' log line; page Kapitel base game in play order from the stream portals with chapter headings (callers of generalbank script 72 SetChapterUIData) and the checkpoint intros per unit - right 2x = backup + load, a checkpoint row = cp.jump <unit> <cp> force (new optional third word: cheat.flight 1;player.goto <cp> force); Q106: uber.dump prints every joint-range transition (condition 14 / 15) with the joint's live value (the engine's getter 0x4e1ef0 / 0x4e1ea0), joint.set <intro> <joint> <value>|stop drives a hinge / rail joint with the engine's limit setters 0x4d9fc0 / 0x4d9f50 / 0x4da0c0 + wake 0x4d8fd0 until the uber leaves its node or 6 s (game thread, a cheat), page Kapitel group 'Raetsel in der Naehe' lists the uber objects with their current node and joint targets, 'solve' rows run joint.set; 27 byte checks); " "0.22.30 (log dates, device glyphs, drawn guards; Q107: every TruMenu.log line starts with 'YYYY-MM-DD HH:MM:SS.mmm' and the first line of a process is the session header '=== <date time> TruMenu <version> session start (pid n) ===' (src/asi/TruLog.h, shared with the other plugins); the log page / overlay take a stamp with or without the date and show the time; Q95: [Input] DeviceGlyphs=1 (default 0) - the last used device (pad: a button, a trigger or a stick past its dead zone in the game's poll; keyboard / mouse: a key, a click, the wheel, a mouse move away from the client centre) decides the button prompts of UIText: 23 bytes of 0x5a7c20 at 0x5a7d75 call GlName - pad = the symbol of the first XInput binding (Start / Back U+1810 / U+1811 too), keyboard / mouse = the name of the first other binding, else the game's own name; 12 byte checks, 'glyphs:' log lines; Q103 rest: the quick bar's presses and every widget of the big menu (ImGuiItemFlags_Disabled) act only after 3 drawn frames since the open, else 'quick: buttons 0x.... ignored - not drawn (n frames)' / 'menu: input ignored - not drawn (n frames)'); " "0.22.29 (radial lock, Q103:[Radial] Enabled=0 also closes a ring that is still open (settings.reset) and drops its pending release / open / close requests; a release, confirm, A / click or R3 runs a ring entry only when DrawRadial drew the ring in at least 3 frames since the open, else 'radial: <what> ignored - not drawn (n frames)'; the close line names the drawn frames; no new INI key); " "0.22.28 (test packages, Q90: page Tests group 'Testpakete 11.11. (Q90)' with one closed sub-group per package A, 1 .. 9 of docs\\Testpakete-1111.md - a hint line, jump / load rows of existing items (level.start, level.load, arena.go), the existing switch rows of TruMenu.switches.txt the package toggles (kQbSwitch = the page Fixes row: TruShadowPower ShakeTuTimeStep / [Player] TuTimeStep / DoppelgangerSettings / CameraTuTimeStep, TruQoL [FrameLimit] Enabled / MaxFps, TruRockVein JumpTarget / LedgeProbe, TruMenu [Log] Save), probe rows (save.inv / save.find 5240 / 5695 / save.pending / save.waiting, adren.meter / adren.fill, phys.status, log.script / log.scriptfile) and TO TEST checks (kQbCheck tp<package>.<name>: right ok, left fail, X skip, again = open; added with test.add at the first mark, TruMenu.log 'tests: test.mark <id> <state>'); every row flagged kQfTp (test-package content: a real row of its page or deleted after the tests); no new INI key, no hook); " "0.22.27 (save probe, Q79:save.pending / save.inv / save.waiting / save.find read the save arenas - live [0xc59258] and checkpoint snapshot [0xc5925c], the restore buffer 0xc57258 with the reason a block waits (unit / object / link parent, as 0x555640 / 0x5bb160 / 0x5bb640), the inventory area +0x34c of both game blocks (15 + 8 intro ids, 6 counts), the 64-slot waiting table 0xc592a8, dead bits; read only, 32 byte checks (TruSaveProbe.h); [Log] Save=1 (default 0, live) = two TruMenu.log lines per SAVE_SaveGame / SAVE_RestoreGame through their memcpy calls 0x557127 / 0x5571a3, 5 more byte checks); " "0.22.26 (test arena, Q76:page Tests group 'Arena 1 - Kampf (Q76)' - three flat floors with resident AI enemy kinds, arena.go 1a|1b|1c = one shortcut as cp.jump (backup, unit.go, wait.unit, flight, player.goto <intro> force; 1a l7_helheim03 generator 8785, 1b l7_yggdrasil_hall02 generator 8762, 1c dlc_yggdrasil_hall02 checkpoint 10644), arena.list (one list of arenas / spots: arena 2 Museum later), flight / god mode, the ai.spawn rows, ai.remove spawned (only the instances ai.spawn made, by address + allocation stamp +0x44), fight diagnosis rows; adrenaline meter: adren.meter (CM+0x3c / max [[0xfad764]+0x2d0], CM+0x1fc bits 22 / 27, doppelganger byte [[0xfadb58]+0x1244]; read only), adren.fill (the game's meter-full 0x6e6630, body of the script native 0x777a50; cheat), adren.keep 1|0 (refill once per game frame while below the maximum and bits 22 / 27 clear; not kept); 6 byte checks); " "0.22.25 (settings.reset writes the whole TruMenu.ini: the default text is measured and built in a buffer of its size - 0.10 .. 0.22.24 kept it in a static 16384-byte buffer and wrote only the first 16383 of the 42 KB, a truncated INI; text built before the backup, write and close checked, the answer names bytes and keys; other table texts: TruMenu.log lines up to 2047 characters (was 511, light.cut lines were cut), [Quick] Closed 1023 characters (was 383, too short for every group) and like [Debug] CheckpointHide only whole keys / ids, settings.show ends with the count of the keys it could not hold); " "0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.38 (PD, owner decisions 2026-11-13: [Input] DeviceGlyphs default 1 (pad / keyboard prompts by the last used device); the co_ / fx_ filter also takes dlc_ / dlc1_ / dlc2_ in front (dlc_fx_*, dlc1_fx_*; exceptions co_rock*, *_grab_prompt kept); trigger edges with occlusion on are drawn whole and faded instead of cut by the depth test (one occlusion query pair per edge / circle, Occlusion 2 drops hidden edges), [Debug] TriggerNearest (dbg.trignear: only triggers with Lara + the n nearest) and TriggerCornerId (dbg.trigcorner: the intro id at one box corner)) - 0.22.37 (debug view P5, Paket R / Q119:labels as name / symbol / both per layer ([Debug] Style*, dbg.labelstyle; ImGui symbols + legend), room always + readable (kRoomNames, LabelRoom) and metres (DistMetres), key items layer dbg.keyitems (parts, switches, doors, grapple points, P1 part -> target lines, state from link parent +0x228 / uber node), the game's reward bit +0x3ed90 as 'collected' (LabelCollected semantics), DrawDistance + TruMenu.debugview.txt per unit, labels behind walls faded / hidden by D3D9 occlusion queries in the depth pass (Occlusion), co_ / fx_ hidden (HideCo / HideFx), live wishes: uber labels + key items of Lara's room only (RoomOnly, dbg.roomonly; then every _uo_ / _ei_ / _pt_ object of the room, readable name + node 'Kanaltor, verschlossen'), uber labels fade behind walls, readable names (kP5Readable: 'Wandschalter (einmalig)'), grey 'versteckt' for hidden non-collectibles, kChapOrder after Paket R (CP 76 return visit, 160 / 42, going_in / going_out, 7 return rows), arena.load references released at a level change; 6 byte checks) - 0.22.36 (label filter, live 2026-11-12: the name labels dbg.labels / dbg.names ask the 0.21 collected / hidden check LfNotDrawn as the collectibles layer - [Debug] LabelCollected 0 none / 1 grey 'eingesammelt'; Lara's own gear by game data (parent +0x54 = player from BirthObject, weapon-manager slots + gear list) - [Debug] LabelLaraGear 0 none / 1 shown; both live, items dbg.labelcollected / dbg.labelgear, 11 byte checks) - 0.22.35 (level chain, Q113: base-game checkpoints of the Kapitel page in walking order, loop directions + l4_temple side trip as headings) - 0.22.34 (achievements, photo.pose, group M; Q20 / I-2: [Achievements] Enabled=1 (default, read at the start) bends the 16 push immediates of the achievement binder 0x7abb80 (script 66, all bound to the empty 0x796620) to TruMenu's stubs before the generalbank binds them - 'achievement <id> <name> unlocked' once per profile (= the save folder) in TruMenu.log and TruMenu.achievements.txt, names / gamerscore of the Xbox ids f0 1 .. f15 18 (f12 - f15 unsure), repeats counted; ach.list / ach.status, page Figur group Erfolge, big window page Achievements; F2: photo.pose 1..7|next|off = Lara's screen_capture_0n (anim table 1605 - n, section checked, resident) through the game's anim request 0x444ba0 mode 0 (the uber / script play-anim path) - photo mode only; off / photo.off = the slot noted from processor +0x44 again in mode 1; J-5: chapter 1.2 heading before l1_kraken_entrance (title card from intro 696); K follow-up: ai.spawn warns when a resident kind's children are not loaded; 36 byte checks); " "0.22.33 (photo mode, arena.load, glyphs.status, group K; F1 / Q78: photo.on = the game's own FreeCamera (camera manager mode 5 through its switch 0x5edd70(mgr, 5, 0) - CAMERA_SetMode knows only 6 / 11 / 12; its own stick / mouse input and generalbank DTP 16 values) + the world pause bit 0x1000 (the camera update still runs) + the UI byte 0xcdc9a0 (the game's screenshot task hides the HUD the same way); photo.off / leaving by itself on a level change, a new player / unit, main state != 1, a cutscene, the game's pause menu or a camera the game took = mode, Lara's control, pause bit and HUD as before; refused in cutscenes / loading / pause / flight / cine.pause / another camera layer; photo.shot = shot.save clean photo_<n>; Q83: arena.load <kind> requests one of the 26 enemy kinds with the game's object request with reference 0x5c1760 (checks tracker 204 / anim pool 3000 / 3D navgraph / DRMs, at most 2 kinds), ready = object + children at status 2 and anim slots resolved (log line), ai.spawn refuses it before; arena.unload <kind>|all = STREAM_DumpObject 0x5c1790 once for its own requests; arena.enemies lists the states; Q95: glyphs.status = DeviceGlyphs, device now (pad / keyboard / mouse), last switch time, prompt counters; 37 byte checks, no new INI key); " "0.22.32 (arena, group A; Q86: ai.spawn names the LP each spawned enemy got from the game's enemy init (brain+0x2c64; tune health record by the EnemyHP step [[0xc59264]+0x3ef98]), the EnemyHP step and warns while one-hit kill [0xe91ffd] is on - the 2026-11-11 21:02 thrall 'LP 0' was that cheat, its AI ran; no name / an inexact or unloaded name = the list of the loaded AI enemy kinds with the reason; Q100: arena.mode [spot] = player object, doppelganger byte [[0xfadb58]+0x1244] and TruDlc2Player flag, fits / WARNING per spot, logged; arena.go reads the mode first - a main-game spot with the flag set loads with level.load (new game tracker clears it), a DLC 2 spot without it warns - and ends with arena.mode <spot>; Q98: spots 1d l5_valgrind CP 7329, 1e l2_puzzleroom CP 2074, 1f l4_traprooms CP 5722 - the largest open navmesh floors with a resident enemy kind; read only, no new INI key, no hook); " "0.22.31 (level navigation + puzzles, group B; Q105: the 15 unit names in no PC archive (q105_units.tsv: three base units of the level list, six container / costume / cine names, the six known DLC slots) grey and refused by level.load / level.start / unit.go / cp.jump unless a mods\\<unit>.drm exists, one 'units:' log line; page Kapitel base game in play order from the stream portals with chapter headings (callers of generalbank script 72 SetChapterUIData) and the checkpoint intros per unit - right 2x = backup + load, a checkpoint row = cp.jump <unit> <cp> force (new optional third word: cheat.flight 1;player.goto <cp> force); Q106: uber.dump prints every joint-range transition (condition 14 / 15) with the joint's live value (the engine's getter 0x4e1ef0 / 0x4e1ea0), joint.set <intro> <joint> <value>|stop drives a hinge / rail joint with the engine's limit setters 0x4d9fc0 / 0x4d9f50 / 0x4da0c0 + wake 0x4d8fd0 until the uber leaves its node or 6 s (game thread, a cheat), page Kapitel group 'Raetsel in der Naehe' lists the uber objects with their current node and joint targets, 'solve' rows run joint.set; 27 byte checks); " "0.22.30 (log dates, device glyphs, drawn guards; Q107: every TruMenu.log line starts with 'YYYY-MM-DD HH:MM:SS.mmm' and the first line of a process is the session header '=== <date time> TruMenu <version> session start (pid n) ===' (src/asi/TruLog.h, shared with the other plugins); the log page / overlay take a stamp with or without the date and show the time; Q95: [Input] DeviceGlyphs=1 (default 0) - the last used device (pad: a button, a trigger or a stick past its dead zone in the game's poll; keyboard / mouse: a key, a click, the wheel, a mouse move away from the client centre) decides the button prompts of UIText: 23 bytes of 0x5a7c20 at 0x5a7d75 call GlName - pad = the symbol of the first XInput binding (Start / Back U+1810 / U+1811 too), keyboard / mouse = the name of the first other binding, else the game's own name; 12 byte checks, 'glyphs:' log lines; Q103 rest: the quick bar's presses and every widget of the big menu (ImGuiItemFlags_Disabled) act only after 3 drawn frames since the open, else 'quick: buttons 0x.... ignored - not drawn (n frames)' / 'menu: input ignored - not drawn (n frames)'); " "0.22.29 (radial lock, Q103:[Radial] Enabled=0 also closes a ring that is still open (settings.reset) and drops its pending release / open / close requests; a release, confirm, A / click or R3 runs a ring entry only when DrawRadial drew the ring in at least 3 frames since the open, else 'radial: <what> ignored - not drawn (n frames)'; the close line names the drawn frames; no new INI key); " "0.22.28 (test packages, Q90: page Tests group 'Testpakete 11.11. (Q90)' with one closed sub-group per package A, 1 .. 9 of docs\\Testpakete-1111.md - a hint line, jump / load rows of existing items (level.start, level.load, arena.go), the existing switch rows of TruMenu.switches.txt the package toggles (kQbSwitch = the page Fixes row: TruShadowPower ShakeTuTimeStep / [Player] TuTimeStep / DoppelgangerSettings / CameraTuTimeStep, TruQoL [FrameLimit] Enabled / MaxFps, TruRockVein JumpTarget / LedgeProbe, TruMenu [Log] Save), probe rows (save.inv / save.find 5240 / 5695 / save.pending / save.waiting, adren.meter / adren.fill, phys.status, log.script / log.scriptfile) and TO TEST checks (kQbCheck tp<package>.<name>: right ok, left fail, X skip, again = open; added with test.add at the first mark, TruMenu.log 'tests: test.mark <id> <state>'); every row flagged kQfTp (test-package content: a real row of its page or deleted after the tests); no new INI key, no hook); " "0.22.27 (save probe, Q79:save.pending / save.inv / save.waiting / save.find read the save arenas - live [0xc59258] and checkpoint snapshot [0xc5925c], the restore buffer 0xc57258 with the reason a block waits (unit / object / link parent, as 0x555640 / 0x5bb160 / 0x5bb640), the inventory area +0x34c of both game blocks (15 + 8 intro ids, 6 counts), the 64-slot waiting table 0xc592a8, dead bits; read only, 32 byte checks (TruSaveProbe.h); [Log] Save=1 (default 0, live) = two TruMenu.log lines per SAVE_SaveGame / SAVE_RestoreGame through their memcpy calls 0x557127 / 0x5571a3, 5 more byte checks); " "0.22.26 (test arena, Q76:page Tests group 'Arena 1 - Kampf (Q76)' - three flat floors with resident AI enemy kinds, arena.go 1a|1b|1c = one shortcut as cp.jump (backup, unit.go, wait.unit, flight, player.goto <intro> force; 1a l7_helheim03 generator 8785, 1b l7_yggdrasil_hall02 generator 8762, 1c dlc_yggdrasil_hall02 checkpoint 10644), arena.list (one list of arenas / spots: arena 2 Museum later), flight / god mode, the ai.spawn rows, ai.remove spawned (only the instances ai.spawn made, by address + allocation stamp +0x44), fight diagnosis rows; adrenaline meter: adren.meter (CM+0x3c / max [[0xfad764]+0x2d0], CM+0x1fc bits 22 / 27, doppelganger byte [[0xfadb58]+0x1244]; read only), adren.fill (the game's meter-full 0x6e6630, body of the script native 0x777a50; cheat), adren.keep 1|0 (refill once per game frame while below the maximum and bits 22 / 27 clear; not kept); 6 byte checks); " "0.22.25 (settings.reset writes the whole TruMenu.ini: the default text is measured and built in a buffer of its size - 0.10 .. 0.22.24 kept it in a static 16384-byte buffer and wrote only the first 16383 of the 42 KB, a truncated INI; text built before the backup, write and close checked, the answer names bytes and keys; other table texts: TruMenu.log lines up to 2047 characters (was 511, light.cut lines were cut), [Quick] Closed 1023 characters (was 383, too short for every group) and like [Debug] CheckpointHide only whole keys / ids, settings.show ends with the count of the keys it could not hold); " "0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -608,11 +608,19 @@ const OptDef kOpts[] = {
                                    "rows in TruMenu.debugview.txt next to tru.exe\n('<unit> <units>' or '<prefix>* "
                                    "<units>'; dbg.drawdist here <units> writes the row of Lara's unit)"},
     {"Debug", "Occlusion", "1", "0.22.37 (dbg.occlusion): labels behind walls - 0 = drawn as before, 1 = faded, 2 = hidden; "
-                                "tested against the\nscene depth (needs Depth 1 / 2)"},
+                                "tested against the\nscene depth (needs Depth 1 / 2). 0.22.38: trigger edges too - an "
+                                "edge partly or wholly behind\ngeometry is drawn whole and faded (2: a wholly hidden "
+                                "edge is left out), not cut by the depth test"},
     {"Debug", "HideCo", "1", "0.22.37 (dbg.hideco): 1 = no name labels / key items at co_* objects (cutscene objects; "
-                             "co_rock* stays); 0 = labelled"},
+                             "co_rock* stays); 0 = labelled.\n0.22.38: also with dlc_ / dlc1_ / dlc2_ in front "
+                             "(dlc*_co_*)"},
     {"Debug", "HideFx", "1", "0.22.37 (dbg.hidefx): 1 = no name labels / key items at fx_* objects (effects; "
-                             "*_grab_prompt stays); 0 = labelled"},
+                             "*_grab_prompt stays); 0 = labelled.\n0.22.38: also with dlc_ / dlc1_ / dlc2_ in front "
+                             "(dlc_fx_*, dlc1_fx_*)"},
+    {"Debug", "TriggerNearest", "0", "0.22.38 (dbg.trignear): 0 = every trigger in the radius (as before); n = only the "
+                                     "triggers Lara stands in\nplus the n nearest others (nearest to the camera, 1 .. 64)"},
+    {"Debug", "TriggerCornerId", "1", "0.22.38 (dbg.trigcorner): 1 = the trigger's intro id at one corner of its box / "
+                                      "plane (the upper +x +y corner,\nat most 64, faded with its edges); 0 = none"},
     {"Debug", "RoomOnly", "0", "0.22.37 (dbg.roomonly): 1 = uber labels (dbg.uber: gates, platforms, switches) and key "
                                "items only in Lara's room (her\nstream unit); 0 = every room in the radius"},
     {"Debug", "UberLabels", "0", "0.21.7: 1 = uber labels on from the start (dbg.uber): gates / platforms / switches near "
@@ -907,12 +915,13 @@ const OptDef kOpts[] = {
                                "back on that sample, at most\n3 times per fall, never with the menu open or in a "
                                "cinematic; 0 = off (one 'would' line per fall).\nLive (read about once a second). The "
                                "'fall watch' log lines come at LogLevel 1 either way"},
-    // 0.22.30 device glyphs (Q95: button prompts as in modern games)
-    {"Input", "DeviceGlyphs", "0", "0.22.30: 1 = the button prompts in the game's texts follow the last used device: "
+    // 0.22.30 device glyphs (Q95: button prompts as in modern games); 0.22.38: default 1 (owner decision 2026-11-13)
+    {"Input", "DeviceGlyphs", "1", "0.22.30: 1 = the button prompts in the game's texts follow the last used device: "
                                    "pad (button, trigger, stick) -> the pad\nsymbols of the buttons bound, Start / Back "
                                    "as symbols too (as on the Xbox); keyboard / mouse (key, click, wheel,\nmouse move) "
                                    "-> the names of the keys bound (the font has no key symbols); 0 = the PC's own rule "
-                                   "(the\nfirst pad binding, Start / Back as words). Patches 23 bytes of 0x5a7c20"},
+                                   "(the\nfirst pad binding, Start / Back as words). Patches 23 bytes of 0x5a7c20. "
+                                   "0.22.38: default 1 (was 0)"},
     // 0.22.34 achievements (Q20: the PC binds the 16 achievement natives of script 66 to an empty function)
     {"Achievements", "Enabled", "1", "0.22.34: 1 = the 16 achievement natives (f0 - f15) the scripts call go to TruMenu: "
                                      "'achievement <id> <name>\nunlocked' in TruMenu.log once per profile (the save "
@@ -9107,6 +9116,11 @@ int P5SymOfName(const char *name);           // object name -> symbol (-1 none)
 int P5SymOfCollect(int kind, DWORD rewardIndex);   // 0.20 collectible kind (+ reward table) -> symbol
 int P5Collected(DWORD inst);                 // 1 = the game's reward bit of the instance's reward index is set
 void P5FrameBegin();                         // DrawDebugView: cap, probes of the last frame into the depth buffer
+// 0.22.38 PD (section "0.22.38 PD"): fewer triggers, the intro id at a corner, trigger edges faded whole
+extern int g_pdTrigNear, g_pdTrigCorner, g_pdNearSkipped, g_pdCornerN;
+extern LONG g_pdIssued, g_pdAnswered, g_pdFadedN, g_pdHiddenN;
+void PdCornerDraw(ImDrawList *dl, const DvCam &c, DWORD inst, ImU32 colour);
+void PdMenuControls(char *o, size_t n);
 void P5KeyDraw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used);   // dbg.keyitems
 void P5KeyLabels(ImDrawList *dl);
 int P5LegendRows(char (*lines)[112], char (*counts)[24], ImU32 *colours, bool *square, int *sym, int n, int max);
@@ -9176,7 +9190,8 @@ ImU32 DvFillTint(ImU32 colour, float dist2, float extra) {
 }
 
 // the depth sink: one world-space buffer per Present (three, so the scene hook never reads the one being filled)
-struct DpLine { float a[3], b[3]; ImU32 colour; float thick; int dashed; };
+// 0.22.38 (PD): edge = the occlusion key of a trigger edge / circle (DvEdgeBegin .. DvEdgeEnd around DvDrawTrig), 0 = none
+struct DpLine { float a[3], b[3]; ImU32 colour; float thick; int dashed; DWORD edge; };
 struct DpTri { float v[3][3]; ImU32 colour; };
 const int kDpLineMax = 16384, kDpTriMax = 16384;
 // 0.22.37 (P5 occlusion): label anchors tested against the scene depth with D3D9 occlusion queries (section P5)
@@ -9189,6 +9204,26 @@ volatile LONG g_dpPub = -1, g_dpRead = -1;   // published buffer / the one the s
 DpBuf *g_dpFill = nullptr;                   // Present: the buffer DrawDebugView fills now (nullptr = ImGui path)
 LONG g_dpFillIndex = -1;
 volatile LONG g_dpFrame = 0;                 // Present counter (RenderModeTick)
+// 0.22.38 (PD) trigger edge keys: DvEdgeBegin(inst, pass) before DvDrawTrig, DvEdgeEnd after; every DvLine call in
+// between takes the next edge number (also one that is behind the camera, so the numbers stay put), g_dvEdgeRun
+// segments share one key (a sphere circle = 24 segments = one "edge")
+DWORD g_dvEdgeBase = 0, g_dvEdgeKey = 0;
+int g_dvEdgeSeg = 0, g_dvEdgeRun = 1;
+DWORD DvEdgeKeyOf(DWORD base, int edge) {
+    DWORD k = (base ^ (static_cast<DWORD>(edge + 1) * 0x9e3779b1u)) * 0x85ebca6bu;
+    k ^= k >> 13;
+    return k ? k : 1;
+}
+DWORD DvEdgeBaseOf(DWORD inst, int pass) {  // pass 0 = the "Lara in" outline, 1 = the trigger itself
+    const DWORD b = (inst * 2654435761u) ^ (static_cast<DWORD>(pass + 1) * 0x7f4a7c15u);
+    return b ? b : 1;
+}
+void DvEdgeBegin(DWORD inst, int pass) {
+    g_dvEdgeBase = DvEdgeBaseOf(inst, pass);
+    g_dvEdgeSeg = 0;
+    g_dvEdgeRun = 1;
+}
+void DvEdgeEnd() { g_dvEdgeBase = g_dvEdgeKey = 0; g_dvEdgeSeg = 0; g_dvEdgeRun = 1; }
 void DpPushLine(const float *a, const float *b, ImU32 colour, float thick) {
     DpBuf &d = *g_dpFill;
     if (d.lines >= kDpLineMax) { ++d.dropped; return; }
@@ -9197,6 +9232,7 @@ void DpPushLine(const float *a, const float *b, ImU32 colour, float thick) {
     l.colour = colour;
     l.thick = thick;
     l.dashed = g_dvDashed ? 1 : 0;
+    l.edge = g_dvEdgeKey;                     // 0.22.38: 0 outside a trigger
 }
 void DpPushTri(const float *a, const float *b, const float *c, ImU32 colour) {
     DpBuf &d = *g_dpFill;
@@ -9242,6 +9278,7 @@ void DvDash(ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 colour, float thick) {
 // a world line, clipped at the near plane; false = nothing of it in front of the camera. 0.16: into the depth buffer
 // when the depth path fills one this frame, dashed while g_dvDashed
 bool DvLine(ImDrawList *dl, const DvCam &c, const float *a, const float *b, ImU32 colour, float thick) {
+    if (g_dvEdgeBase) g_dvEdgeKey = DvEdgeKeyOf(g_dvEdgeBase, g_dvEdgeSeg++ / g_dvEdgeRun);   // 0.22.38: edge number
     float ca[3], cb[3];
     DvToCam(c, a, ca);
     DvToCam(c, b, cb);
@@ -9494,10 +9531,17 @@ void OvLaraInScan() {
 // one trigger: box 12 lines, sphere 3 circles, plane quad + diagonals (+ normal arrow when one-sided), unknown a cross
 // 0.16: colour / thickness / face fill come from the caller (DvTint, Lara in, enclosing); fill 0 = no faces; the label
 // anchor is the top centre (box: +h along row 2, plane: the upper edge's centre, sphere: the top)
+// 0.22.38 (PD): the corner for the intro id ([Debug] TriggerCornerId) - box corner 7 (+x +y +z, edges 3 / 7 / 11),
+// plane corner q[1] (edges 0 / 1); none for a sphere / unknown
+float g_dvCorner[3];
+bool g_dvCornerOk = false;
+int g_dvCornerEdge[3], g_dvCornerEdgeN = 0;
 void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImU32 colour, float thick, ImU32 fill, ImVec2 *labelAt,
                 bool *labelSeen) {
     const float (*rows)[3] = t.rows;
     float top[3] = {t.pos[0], t.pos[1], t.pos[2]};
+    g_dvCornerOk = false;
+    g_dvCornerEdgeN = 0;
     if (t.kind == kDvUnknown && !(t.plane || t.shape == 1 || t.shape == 2)) {
         for (int a = 0; a < 3; ++a) {
             float p0[3] = {t.pos[0], t.pos[1], t.pos[2]}, p1[3] = {t.pos[0], t.pos[1], t.pos[2]};
@@ -9521,6 +9565,11 @@ void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImU32 colour, f
             DvLine(dl, c, t.pos, tip, colour, thick);
         }
         DvPoint(t.pos, rows, 0.0f, 0.0f, t.ext[2], top);   // 0.16: the upper edge's centre (0.14: the centre)
+        for (int k = 0; k < 3; ++k) g_dvCorner[k] = q[1][k];   // 0.22.38: corner +x +z, edges 0 (q0-q1) / 1 (q1-q2)
+        g_dvCornerEdge[0] = 0;
+        g_dvCornerEdge[1] = 1;
+        g_dvCornerEdgeN = 2;
+        g_dvCornerOk = true;
     } else if (t.shape == 1) {
         float q[8][3];
         for (int i = 0; i < 8; ++i)
@@ -9539,8 +9588,15 @@ void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImU32 colour, f
                                            {0, 4}, {1, 5}, {2, 6}, {3, 7}};
         for (const auto &e : kEdges) DvLine(dl, c, q[e[0]], q[e[1]], colour, thick);
         DvPoint(t.pos, rows, 0.0f, 0.0f, t.ext[2], top);
+        for (int k = 0; k < 3; ++k) g_dvCorner[k] = q[7][k];   // 0.22.38: corner 7 (+x +y +z), edges 3 / 7 / 11
+        g_dvCornerEdge[0] = 3;
+        g_dvCornerEdge[1] = 7;
+        g_dvCornerEdge[2] = 11;
+        g_dvCornerEdgeN = 3;
+        g_dvCornerOk = true;
     } else {                                  // sphere: world-axis great circles, 24 segments each
         const float r = fabsf(t.radius);
+        g_dvEdgeRun = 24;                     // 0.22.38: one occlusion key per circle
         for (int plane = 0; plane < 3; ++plane) {
             int a = plane == 2 ? 1 : 0, b = plane == 0 ? 1 : 2;
             float prev[3] = {t.pos[0], t.pos[1], t.pos[2]};
@@ -9553,6 +9609,7 @@ void DvDrawTrig(ImDrawList *dl, const DvCam &c, const DvTrig &t, ImU32 colour, f
                 prev[0] = p[0]; prev[1] = p[1]; prev[2] = p[2];
             }
         }
+        g_dvEdgeRun = 1;
         top[2] += r;
     }
     float q[3];
@@ -10034,6 +10091,8 @@ void DrawDebugView() {
         DvCollect(c, false, &k);
         // 0.16 Lara in: pulsing white outline (0.55 .. 1)
         const float pulse = 0.775f + 0.225f * sinf(static_cast<float>(GetTickCount() % 100000u) * 0.006f);
+        g_pdNearSkipped = g_pdCornerN = 0;
+        int nearN = 0;
         for (int i = 0; i < g_dvTrigCount; ++i) {
             const DvTrig &t = g_dvTrig[i];
             ImVec2 at;
@@ -10041,6 +10100,11 @@ void DrawDebugView() {
             // 0.16: enclosing = the camera inside, or Lara inside a big one (sound volumes over a whole corridor)
             bool encl = t.camIn || (t.laraIn == 1 && t.big);
             if (encl && g_dvEncl == 2) { ++hiddenEncl; continue; }
+            // 0.22.38 [Debug] TriggerNearest: the triggers Lara is in + the n nearest others (g_dvTrig is nearest first)
+            if (g_pdTrigNear > 0 && !t.laraIn) {
+                if (nearN >= g_pdTrigNear) { ++g_pdNearSkipped; continue; }
+                ++nearN;
+            }
             float extra = t.enabled ? 1.0f : 0.35f;   // the game skips a disabled entry
             g_dvDashed = encl && g_dvEncl == 1;
             if (g_dvDashed) { extra *= 0.35f; ++g_dvEnclN; }
@@ -10048,12 +10112,17 @@ void DrawDebugView() {
             ImU32 colour = DvTint(kDvLayers[t.kind].colour, t.dist2, extra);
             ImU32 fill = g_dvFill ? DvFillTint(kDvLayers[t.kind].colour, t.dist2, extra) : 0;
             if (g_dvLaraIn && g_dvLaraOk && t.laraIn && !encl) {
+                DvEdgeBegin(t.inst, 0);       // 0.22.38: occlusion keys of the outline's edges
                 DvDrawTrig(dl, c, t, IM_COL32(255, 255, 255, static_cast<int>(220.0f * pulse)), thick + 3.0f, 0, &at, &seen);
+                DvEdgeEnd();
                 colour = DvRgba((kDvLayers[t.kind].colour & 0xff) * 1.0f, ((kDvLayers[t.kind].colour >> 8) & 0xff) * 1.0f,
                                 ((kDvLayers[t.kind].colour >> 16) & 0xff) * 1.0f, 255.0f);
                 thick += 1.2f;
             }
+            DvEdgeBegin(t.inst, 1);           // 0.22.38: occlusion keys of the trigger's edges
             DvDrawTrig(dl, c, t, colour, thick, fill, &at, &seen);
+            DvEdgeEnd();
+            if (g_pdTrigCorner && g_dvCornerOk) PdCornerDraw(dl, c, t.inst, colour);   // 0.22.38: intro id at a corner
             g_dvDashed = false;
             ++g_dvDrawn[t.kind];
             if (t.plane) ++quads;
@@ -10087,10 +10156,11 @@ void DrawDebugView() {
         g_dvEnclN += hiddenEncl;
         LabelAdd(g_dvState, sizeof(g_dvState), &used, "triggers %d drawn (box %d, sphere %d, plane %d) of %d listed, "
                  "%d off-screen, %d beyond %.0f, %d capped at %d, %d disabled (dim), %d without data, %d enclosing (%s), "
-                 "Lara in %d%s; ", g_dvTrigCount, boxes, spheres, quads, k.listed, k.behind, k.far_, g_dvRadius,
+                 "Lara in %d%s; 0.22.38: %d beyond the nearest %d (TriggerNearest), %d corner id(s); ", g_dvTrigCount,
+                 boxes, spheres, quads, k.listed, k.behind, k.far_, g_dvRadius,
                  g_dvCapped, g_dvTrgMax, k.disabled, k.noData, g_dvEnclN,
                  g_dvEncl == 2 ? "hidden" : g_dvEncl == 1 ? "dim + dashed" : "normal", g_dvInN + g_dvInMore,
-                 g_dvLaraOk ? "" : " (result code check failed - off)");
+                 g_dvLaraOk ? "" : " (result code check failed - off)", g_pdNearSkipped, g_pdTrigNear, g_pdCornerN);
     }
     // portals of every loaded stream unit
     if (g_dvPortalOk && g_dvOn[kDvPortals]) {
@@ -11904,6 +11974,13 @@ bool DpMapping(DWORD scene, const DvCam &c, char *why, size_t n) {
 }
 void P5OcclIssue(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b);   // 0.22.37 occlusion (section P5)
 void P5OcclRelease();
+// 0.22.38 PD (section "0.22.38 PD"): trigger edges - how to draw one (0 depth-tested as before, 1 whole + faded, 2 not),
+// the query pairs per edge (after the lines, before sb->Apply), released with the vertex buffer
+int PdEdgeHow(DWORD key);
+void PdEdgeIssue(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b, float w, float h);
+void PdEdgeRelease();
+ImU32 PdEdgeFaded(ImU32 colour);             // the colour's alpha times the Occlusion dim factor
+bool g_dpAlways = false;                     // 0.22.38: DpFlush draws the batch without the depth test (faded edges)
 bool DpVbReady(IDirect3DDevice9 *dev) {
     if (g_dpVb && g_dpVbDevice == dev) return true;
     if (g_dpVb) {
@@ -11927,6 +12004,7 @@ bool DpVbReady(IDirect3DDevice9 *dev) {
 // Reset hook (before the game's Reset): the vertex buffer goes, the next depth frame creates it again
 void DpOnReset() {
     P5OcclRelease();                          // 0.22.37: the occlusion queries go with the vertex buffer
+    PdEdgeRelease();                          // 0.22.38: the trigger edge queries too
     if (g_dpVb) {
         g_dpVb->Release();
         g_dpVb = nullptr;
@@ -11943,6 +12021,13 @@ void DpFlush(IDirect3DDevice9 *dev) {
     if (FAILED(g_dpVb->Lock(0, n * sizeof(DpVtx), &p, D3DLOCK_DISCARD)) || !p) return;
     memcpy(p, g_dpVtx, n * sizeof(DpVtx));
     g_dpVb->Unlock();
+    if (g_dpAlways) {                         // 0.22.38: faded trigger edges, whole (no depth test, alpha in the colour)
+        dev->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
+        dev->SetRenderState(D3DRS_TEXTUREFACTOR, 0xffffffff);
+        dev->DrawPrimitive(D3DPT_TRIANGLELIST, 0, n / 3);
+        g_dpNow.verts += n;
+        return;
+    }
     if (g_dpMode == 2) {
         const DWORD dim = static_cast<DWORD>(g_dpDim * 255 / 100);
         dev->SetRenderState(D3DRS_ZFUNC, g_dpLess ? D3DCMP_GREATER : D3DCMP_LESS);
@@ -12088,8 +12173,30 @@ void DpDrawBuffer(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b, UINT w,
     g_dpVtxN = 0;
     const float fw = static_cast<float>(w), fh = static_cast<float>(h);
     for (int i = 0; i < b.tris; ++i) DpTriDraw(dev, c, b.tri[i]);       // faces first, the lines over them
-    for (int i = 0; i < b.lines; ++i) DpLineDraw(dev, c, b.line[i], fw, fh);
+    // 0.22.38: a trigger edge partly / wholly behind geometry (its query pair of an earlier frame) is not cut by the depth
+    // test - it is drawn whole and faded in a second batch without the depth test (Occlusion 2: a hidden one not at all)
+    int faded = 0, dropped = 0;
+    for (int i = 0; i < b.lines; ++i) {
+        const int how = PdEdgeHow(b.line[i].edge);
+        if (!how) DpLineDraw(dev, c, b.line[i], fw, fh);
+        else if (how == 1) ++faded;
+        else ++dropped;
+    }
     DpFlush(dev);
+    g_pdFadedN = faded;
+    g_pdHiddenN = dropped;
+    if (faded) {
+        g_dpAlways = true;
+        for (int i = 0; i < b.lines; ++i) {
+            if (PdEdgeHow(b.line[i].edge) != 1) continue;
+            DpLine l = b.line[i];
+            l.colour = PdEdgeFaded(l.colour);
+            DpLineDraw(dev, c, l, fw, fh);
+        }
+        DpFlush(dev);
+        g_dpAlways = false;
+    }
+    PdEdgeIssue(dev, c, b, fw, fh);           // 0.22.38: query pairs of the trigger edges (no colour), before sb->Apply
     P5OcclIssue(dev, c, b);                   // 0.22.37: label anchors against the depth (no colour), states put back below
     sb->Apply();
     sb->Release();
@@ -12647,6 +12754,7 @@ void PageDebugView() {
                                 "label; gear check %s)", g_lblGreyN, g_lblShown, g_lblHidden, g_lblGearN, g_lgWhy);
         }
         P5MenuControls(o, sizeof(o));        // 0.22.37: key items, styles, room, metres, draw distance, occlusion, co_ / fx_
+        PdMenuControls(o, sizeof(o));        // 0.22.38: nearest triggers, corner ids, faded edges
         static char filter[sizeof(g_dvNameMatch)] = "";
         static bool filterInit = false;
         if (!filterInit) { strncpy_s(filter, sizeof(filter), g_dvNameMatch[0] ? g_dvNameMatch : "*", _TRUNCATE); filterInit = true; }
@@ -22961,6 +23069,21 @@ bool P5RoomOnlyDrops(DWORD inst) {
 }
 
 // ---- co_ / fx_ filter ----
+// 0.22.38 (live 2026-11-13, P5 test in DLC 1: dlc_fx_* / dlc1_fx_* kept their labels - only the name start was tested):
+// a "dlc_" / "dlc<digits>_" in front is skipped first, then the 0.22.37 rule. The merged object list (PC 1 .. 821 +
+// Xbox TU / DLC 822 .. 1045, work/generic/lists; 1045 distinct names) has 74 dlc_fx_* and 2 dlc1_fx_* (76 names more
+// than 0.22.37), no dlc2_fx_* and no dlc*_co_*; co_fx_* stays a co_ object (counts: work/menu38_1311/prefix_names.py)
+int P5PrefixKind(const char *low) {          // low = lower-case object name; 1 co_, 2 fx_, 3 neither / an exception
+    const char *s = low;
+    if (!strncmp(s, "dlc", 3)) {
+        const char *p = s + 3;
+        while (*p >= '0' && *p <= '9') ++p;
+        if (*p == '_') s = p + 1;
+    }
+    if (!strncmp(s, "co_", 3) && strncmp(s, "co_rock", 7)) return 1;
+    if (!strncmp(s, "fx_", 3) && !strstr(s, "_grab_prompt")) return 2;
+    return 3;
+}
 signed char g_p5Prefix[4096];                // per object id: 0 unknown, 1 co_, 2 fx_, 3 neither / an exception
 bool P5PrefixHidden(DWORD inst) {
     if (!g_p5HideCo && !g_p5HideFx) return false;
@@ -22973,8 +23096,7 @@ bool P5PrefixHidden(DWORD inst) {
         k = 3;
         if (ObjectName(id, low, sizeof(low))) {
             _strlwr_s(low, sizeof(low));
-            if (!strncmp(low, "co_", 3) && strncmp(low, "co_rock", 7)) k = 1;
-            else if (!strncmp(low, "fx_", 3) && !strstr(low, "_grab_prompt")) k = 2;
+            k = P5PrefixKind(low);           // 0.22.38: dlc_ / dlc1_ / dlc2_ in front skipped first
         }
         if (id > 0 && id < 4096) g_p5Prefix[id] = static_cast<signed char>(k);
     }
@@ -23571,9 +23693,9 @@ void ValDvRoom(char *o, size_t n) { Out(o, n, "%d (%s)", g_p5Room, g_p5Room ? "r
 bool RunDvRoom(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5Room, "dbg.room", "LabelRoom", arg, o, n); }
 void ValDvMetres(char *o, size_t n) { Out(o, n, "%d (%s)", g_p5Metres, g_p5Metres ? "metres" : "game units"); }
 bool RunDvMetres(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5Metres, "dbg.metres", "DistMetres", arg, o, n); }
-void ValDvHideCo(char *o, size_t n) { Out(o, n, "%d (co_* %s, co_rock* stays)", g_p5HideCo, g_p5HideCo ? "hidden" : "labelled"); }
+void ValDvHideCo(char *o, size_t n) { Out(o, n, "%d (co_* / dlc*_co_* %s, co_rock* stays)", g_p5HideCo, g_p5HideCo ? "hidden" : "labelled"); }
 bool RunDvHideCo(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5HideCo, "dbg.hideco", "HideCo", arg, o, n); }
-void ValDvHideFx(char *o, size_t n) { Out(o, n, "%d (fx_* %s, *_grab_prompt stays)", g_p5HideFx, g_p5HideFx ? "hidden" : "labelled"); }
+void ValDvHideFx(char *o, size_t n) { Out(o, n, "%d (fx_* / dlc*_fx_* %s, *_grab_prompt stays)", g_p5HideFx, g_p5HideFx ? "hidden" : "labelled"); }
 bool RunDvHideFx(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5HideFx, "dbg.hidefx", "HideFx", arg, o, n); }
 void ValDvRoomOnly(char *o, size_t n) {
     Out(o, n, "%d (%s; Lara's unit '%s')", g_p5RoomOnly, g_p5RoomOnly ? "uber labels + key items of Lara's room only" :
@@ -23581,9 +23703,11 @@ void ValDvRoomOnly(char *o, size_t n) {
 }
 bool RunDvRoomOnly(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5RoomOnly, "dbg.roomonly", "RoomOnly", arg, o, n); }
 void ValDvOcclusion(char *o, size_t n) {
-    Out(o, n, "%s (%s; last frame %ld faded, %ld hidden, %ld unknown; queries issued %ld, answered %ld)",
+    Out(o, n, "%s (%s; last frame %ld faded, %ld hidden, %ld unknown; queries issued %ld, answered %ld; 0.22.38 trigger "
+        "edges: %ld pieces faded whole, %ld left out, pairs issued %ld, answered %ld)",
         kP5OcclNames[g_p5Occl], g_p5QFailed ? "queries not available" : DpUsable() ? "depth usable" : "waits for the depth "
-        "mapping ([Debug] Depth 1 / 2)", g_p5Faded, g_p5Hidden, g_p5Unknown, g_p5Issued, g_p5Answered);
+        "mapping ([Debug] Depth 1 / 2)", g_p5Faded, g_p5Hidden, g_p5Unknown, g_p5Issued, g_p5Answered, g_pdFadedN,
+        g_pdHiddenN, g_pdIssued, g_pdAnswered);
 }
 // dbg.occlusion off|faded|hidden (0 / 1 / 2)
 bool RunDvOcclusion(const char *arg, char *o, size_t n) {
@@ -23727,13 +23851,248 @@ void P5MenuControls(char *o, size_t n) {
     if (TmButton("remove the row / Zeile entfernen###dvddclr")) RunDvDrawDist("here clear", o, n);
     ImGui::SameLine();
     if (TmButton("read the file again / Datei neu lesen###dvddrl")) RunDvDrawDist("reload", o, n);
-    char v[200];
+    char v[320];                             // 0.22.38: the occlusion value got the edge numbers
     ValDvDrawDist(v, sizeof(v));
     ImGui::TextDisabled("%s", v);
     ValDvOcclusion(v, sizeof(v));
     ImGui::TextDisabled("occlusion: %s", v);
 }
 // ---- end of 0.22.37 debug view P5 ----
+
+// ======================================================================================================================
+// 0.22.38 PD (owner decisions 2026-11-13; the finding docs\Befund-TruMenu-02238-1311.md is in the workspace)
+// * Trigger edges with [Debug] Occlusion 1 / 2 (live 13.11.: "zerschnitten"): the 0.16 depth pass tests every pixel of
+//   a line against the scene depth, so an edge partly behind a wall became loose pieces. Now each edge of a trigger
+//   carries a key (DvEdgeBegin / DvLine: box 12 edges, plane 4 + 2 diagonals + the normal, sphere one key per circle of
+//   24 segments, the "Lara in" outline keys of its own) and gets a PAIR of D3D9 occlusion queries in the depth pass on
+//   the same screen quads (3 px, solid, no colour): all pixels (depth test off) and the visible ones (the 0.16 test).
+//   The answer of an earlier frame decides (PdEdgeHow): all visible (within 3 %) or no answer yet = drawn as before;
+//   partly or wholly hidden = drawn WHOLE and faded (kP5OcclDim, no depth test, DpFlush g_dpAlways); wholly hidden
+//   with Occlusion 2 = not drawn. kPdQPairs pairs, at most kPdIssueMax edges per frame in turn, an answer counts
+//   kPdResAge frames. Occlusion 0 (or no depth mapping) = as before.
+// * [Debug] TriggerNearest (dbg.trignear, 0 = all): only the triggers Lara stands in plus the n nearest others (camera
+//   distance = the order of g_dvTrig; capped / enclosing rules first).
+// * [Debug] TriggerCornerId (dbg.trigcorner, default 1): the intro id (+0x58, as the trigger labels) at box corner 7
+//   (+x +y +z) or plane corner q[1], faded / dropped with that corner's edges, at most kPdCornerMax per frame.
+// * The co_ / fx_ prefix rule (P5PrefixKind) and [Input] DeviceGlyphs default 1 live in their own sections.
+// Render thread (Present / the scene hook of the same thread), read only - nothing is written into tru.exe memory.
+// ======================================================================================================================
+int g_pdTrigNear = 0, g_pdTrigCorner = 1, g_pdNearSkipped = 0, g_pdCornerN = 0;
+const int kPdQPairs = 192, kPdIssueMax = 96, kPdResN = 8192, kPdCornerMax = 64;
+const LONG kPdResAge = 90;                   // frames an edge answer counts (all edges are asked in turn)
+struct PdQuery { IDirect3DQuery9 *all, *vis; DWORD key; LONG frame; bool busy; };
+PdQuery g_pdQ[kPdQPairs];
+IDirect3DDevice9 *g_pdQDevice = nullptr;
+bool g_pdQFailed = false;
+struct PdRes { DWORD key; LONG frame; BYTE state; };   // state 1 visible, 2 partly hidden, 3 wholly hidden
+PdRes g_pdRes[kPdResN];
+LONG g_pdIssued = 0, g_pdAnswered = 0, g_pdFadedN = 0, g_pdHiddenN = 0;   // faded / left-out line pieces of the last pass
+int g_pdCursor = 0;
+int g_pdGroup[kDpLineMax];                   // first line of each edge of the buffer (PdEdgeIssue)
+void PdEdgeRelease() {
+    for (PdQuery &x : g_pdQ) {
+        if (x.all) x.all->Release();
+        if (x.vis) x.vis->Release();
+        x.all = x.vis = nullptr;
+        x.busy = false;
+    }
+    g_pdQDevice = nullptr;
+}
+void PdStore(DWORD key, BYTE state) {
+    const int h = static_cast<int>((key * 2654435761u) >> 19);   // 8192 slots
+    for (int k = 0; k < 8; ++k) {
+        PdRes &r = g_pdRes[(h + k) & (kPdResN - 1)];
+        if (r.key == key || !r.key || g_dpFrame - r.frame > kPdResAge) { r.key = key; r.frame = g_dpFrame; r.state = state; return; }
+    }
+    PdRes &r = g_pdRes[h & (kPdResN - 1)];
+    r.key = key;
+    r.frame = g_dpFrame;
+    r.state = state;
+}
+int PdLookup(DWORD key) {                    // 1 / 2 / 3, -1 = no answer or too old
+    const int h = static_cast<int>((key * 2654435761u) >> 19);
+    for (int k = 0; k < 8; ++k) {
+        const PdRes &r = g_pdRes[(h + k) & (kPdResN - 1)];
+        if (r.key == key) return g_dpFrame - r.frame <= kPdResAge ? r.state : -1;
+    }
+    return -1;
+}
+// DpDrawBuffer: 0 = depth-tested as before (no key, Occlusion 0, visible, no answer), 1 = whole + faded, 2 = left out
+int PdEdgeHow(DWORD key) {
+    if (!key || !g_p5Occl || g_pdQFailed) return 0;
+    const int s = PdLookup(key);
+    if (s == 2) return 1;
+    if (s == 3) return g_p5Occl == 2 ? 2 : 1;
+    return 0;
+}
+ImU32 PdEdgeFaded(ImU32 colour) { return P5Fade(colour, kP5OcclDim); }
+// DpDrawBuffer (render thread, inside the frame, device states captured; after the lines, before sb->Apply): poll the
+// pairs of earlier frames, then ask up to kPdIssueMax edges of this buffer in turn (all pixels / visible pixels)
+void PdEdgeIssue(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b, float w, float h) {
+    if (!g_p5Occl || g_pdQFailed) return;
+    if (g_pdQDevice != dev) { PdEdgeRelease(); g_pdQDevice = dev; }
+    for (PdQuery &x : g_pdQ) {
+        if (!x.busy || !x.all || !x.vis) continue;
+        DWORD all = 0, vis = 0;
+        const HRESULT ha = x.all->GetData(&all, sizeof(all), 0), hv = x.vis->GetData(&vis, sizeof(vis), 0);
+        if (ha == S_OK && hv == S_OK) {
+            if (all) PdStore(x.key, static_cast<BYTE>(!vis ? 3 : vis + 2 + all / 32 >= all ? 1 : 2));
+            x.busy = false;
+            ++g_pdAnswered;
+        } else if (FAILED(ha) || FAILED(hv) || g_dpFrame - x.frame > 30) {
+            x.busy = false;                   // lost / too old: asked again
+        }
+    }
+    int gn = 0;
+    for (int i = 0; i < b.lines; ++i)
+        if (b.line[i].edge && (i == 0 || b.line[i - 1].edge != b.line[i].edge)) g_pdGroup[gn++] = i;
+    if (!gn) return;
+    dev->SetRenderState(D3DRS_COLORWRITEENABLE, 0);
+    dev->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    int issued = 0, n = 0;
+    for (; n < gn && issued < kPdIssueMax; ++n) {
+        const int g = g_pdGroup[(g_pdCursor + n) % gn];
+        const DWORD key = b.line[g].edge;
+        bool inFlight = false;
+        int free = -1;
+        for (int k = 0; k < kPdQPairs; ++k) {
+            if (g_pdQ[k].busy && g_pdQ[k].key == key) inFlight = true;
+            if (!g_pdQ[k].busy && free < 0) free = k;
+        }
+        if (inFlight) continue;
+        if (free < 0) break;
+        PdQuery &x = g_pdQ[free];
+        if ((!x.all && (FAILED(dev->CreateQuery(D3DQUERYTYPE_OCCLUSION, &x.all)) || !x.all)) ||
+            (!x.vis && (FAILED(dev->CreateQuery(D3DQUERYTYPE_OCCLUSION, &x.vis)) || !x.vis))) {
+            g_pdQFailed = true;
+            PdEdgeRelease();
+            Log(1, "0.22.38 trigger edges: CreateQuery(D3DQUERYTYPE_OCCLUSION) failed - edges are cut by the depth test as "
+                "before");
+            return;
+        }
+        g_dpVtxN = 0;                         // the edge's quads (3 px, solid) - 6 vertices per piece, never a flush
+        for (int i = g; i < b.lines && b.line[i].edge == key && g_dpVtxN + 6 <= kDpBatch; ++i) {
+            DpLine l = b.line[i];
+            l.thick = 3.0f;
+            l.dashed = 0;
+            DpLineDraw(dev, c, l, w, h);
+        }
+        const int verts = g_dpVtxN - g_dpVtxN % 3;
+        g_dpVtxN = 0;
+        if (verts < 3) continue;              // behind the camera / off the screen: nothing to ask
+        dev->SetRenderState(D3DRS_ZFUNC, D3DCMP_ALWAYS);
+        x.all->Issue(D3DISSUE_BEGIN);
+        dev->DrawPrimitiveUP(D3DPT_TRIANGLELIST, verts / 3, g_dpVtx, sizeof(DpVtx));
+        x.all->Issue(D3DISSUE_END);
+        dev->SetRenderState(D3DRS_ZFUNC, g_dpLess ? D3DCMP_LESSEQUAL : D3DCMP_GREATEREQUAL);
+        x.vis->Issue(D3DISSUE_BEGIN);
+        dev->DrawPrimitiveUP(D3DPT_TRIANGLELIST, verts / 3, g_dpVtx, sizeof(DpVtx));
+        x.vis->Issue(D3DISSUE_END);
+        x.busy = true;
+        x.key = key;
+        x.frame = g_dpFrame;
+        ++issued;
+        ++g_pdIssued;
+    }
+    g_pdCursor = (g_pdCursor + n) % gn;
+}
+// DrawDebugView, after DvDrawTrig (pass 1) of a box / plane: "#<intro>" at g_dvCorner
+void PdCornerDraw(ImDrawList *dl, const DvCam &c, DWORD inst, ImU32 colour) {
+    if (g_pdCornerN >= kPdCornerMax) return;
+    float q[3];
+    ImVec2 s;
+    DvToCam(c, g_dvCorner, q);
+    if (q[2] < kDvNear || !DvCamToScreen(c, q, &s)) return;
+    float a = 1.0f;
+    if (g_p5Occl && !g_pdQFailed && DpUsable()) {   // with the corner's edges: any shown / unknown = full
+        const DWORD base = DvEdgeBaseOf(inst, 1);
+        bool shown = false, allHidden = true;
+        for (int k = 0; k < g_dvCornerEdgeN; ++k) {
+            const int st = PdLookup(DvEdgeKeyOf(base, g_dvCornerEdge[k]));
+            if (st != 3) allHidden = false;
+            if (st < 0 || st == 1) shown = true;
+        }
+        if (allHidden && g_p5Occl == 2) return;
+        if (!shown) a = kP5OcclDim;
+    }
+    DWORD intro = 0;
+    if (!ReadDword(inst + 0x58, &intro)) return;
+    char text[16];
+    Out(text, sizeof(text), "#%lu", intro);
+    const ImU32 col = (colour & 0x00ffffffu) | (static_cast<ImU32>(235.0f * a) << 24);
+    const ImU32 shadow = static_cast<ImU32>(170.0f * a) << 24;
+    const ImVec2 at(s.x + 4.0f, s.y - ImGui::GetFontSize() - 1.0f);
+    dl->AddText(ImVec2(at.x + 1.0f, at.y + 1.0f), shadow, text);
+    dl->AddText(at, col, text);
+    ++g_pdCornerN;
+}
+// ---- items ----
+void ValDvTrigNear(char *o, size_t n) {
+    if (g_pdTrigNear > 0) Out(o, n, "%d (the triggers Lara is in + the %d nearest; last frame %d left out)", g_pdTrigNear,
+                              g_pdTrigNear, g_pdNearSkipped);
+    else Out(o, n, "0 (every trigger in the radius)");
+}
+// dbg.trignear <0 .. 64>|off
+bool RunDvTrigNear(const char *arg, char *o, size_t n) {
+    char a[16] = "";
+    strncpy_s(a, sizeof(a), arg ? arg : "", _TRUNCATE);
+    DvTrim(a);
+    int v = -1;
+    if (!_stricmp(a, "off") || !_stricmp(a, "aus") || !_stricmp(a, "all") || !_stricmp(a, "alle")) {
+        v = 0;
+    } else if (a[0]) {
+        char *end = nullptr;
+        const long x = strtol(a, &end, 10);
+        if (end && !*end && x >= 0 && x <= 64) v = static_cast<int>(x);
+    }
+    if (v < 0) { Out(o, n, "usage: dbg.trignear <0 .. 64>|off; now %d", g_pdTrigNear); return false; }
+    if (!DvGate("dbg.trignear", o, n)) return false;
+    g_pdTrigNear = v;
+    DvPersistInt("TriggerNearest", v);
+    Log(1, "dbg.trignear %d (src=%s)", v, ShotSource("dbg.trignear"));
+    ValDvTrigNear(o, n);
+    return true;
+}
+void ValDvTrigCorner(char *o, size_t n) {
+    Out(o, n, "%d (%s; last frame %d drawn)", g_pdTrigCorner, g_pdTrigCorner ? "intro id at a box / plane corner" : "none",
+        g_pdCornerN);
+}
+bool RunDvTrigCorner(const char *arg, char *o, size_t n) {
+    return DvRunFlag(&g_pdTrigCorner, "dbg.trigcorner", "TriggerCornerId", arg, o, n);
+}
+// ReadOptions (after P5ReadOptions)
+void PdReadOptions(const char *ini) {
+    const int nearN = OptInt(ini, "Debug", "TriggerNearest");
+    g_pdTrigNear = nearN >= 0 && nearN <= 64 ? nearN : atoi(OptDefault("Debug", "TriggerNearest"));
+    g_pdTrigCorner = OptInt(ini, "Debug", "TriggerCornerId") != 0 ? 1 : 0;
+}
+// load (after P5Check): one line
+void PdCheck() {
+    Log(1, "0.22.38 PD: [Input] DeviceGlyphs %d (default 1 since 0.22.38); co_ / fx_ filter also after dlc_ / dlc<n>_; "
+        "trigger edges faded whole with Occlusion %s (%d query pairs, %d edges per frame); TriggerNearest %d, "
+        "TriggerCornerId %d", g_glDevGlyphs, kP5OcclNames[g_p5Occl], kPdQPairs, kPdIssueMax, g_pdTrigNear, g_pdTrigCorner);
+}
+// menu page Debug view, group Object names (after the P5 switches)
+void PdMenuControls(char *o, size_t n) {
+    ImGui::Separator();
+    ImGui::TextUnformatted("0.22.38 triggers / Trigger");
+    static int nearN = 0;
+    static bool editing = false;
+    if (!editing) nearN = g_pdTrigNear;      // follows dbg.trignear / the bar while not dragged
+    ImGui::SliderInt("only Lara's + n nearest / nur Laras + n n\303\244chste (0 = all)  [dbg.trignear]###pdnear", &nearN, 0, 64);
+    editing = ImGui::IsItemActive();
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        char a[16];
+        Out(a, sizeof(a), "%d", nearN);
+        RunDvTrigNear(a, o, n);
+    }
+    bool corner = g_pdTrigCorner != 0;
+    if (TmCheckbox("intro id at a box corner / Intro-Id an der Kastenecke  [dbg.trigcorner]###pdcorner", &corner))
+        RunDvTrigCorner(corner ? "1" : "0", o, n);
+    ImGui::TextDisabled("edges: %ld faded / %ld left out (pieces), queries %ld issued / %ld answered%s", g_pdFadedN,
+                        g_pdHiddenN, g_pdIssued, g_pdAnswered, g_pdQFailed ? ", queries not available" : "");
+}
+// ---- end of 0.22.38 PD ----
 
 // ---- ai.remove (game thread, queued) ----
 const DWORD kAdSenseMgr = 0x00fadfac, kAdSenseRemove = 0x0071dcb0, kAdHandle = 0x005b39d0, kAdGenRecord = 0x00616f50,
@@ -31486,12 +31845,19 @@ const Item kItems[] = {
      RunDvMetres},
     {"dbg.drawdist", "action", "0.22.37 <units>|off | here <units>|clear | reload: draw distance cap ([Debug] "
                                "DrawDistance, TruMenu.debugview.txt per unit)", false, ValDvDrawDist, RunDvDrawDist},
-    {"dbg.occlusion", "action", "0.22.37 off|faded|hidden: labels behind walls (scene depth, occlusion queries)", false,
-     ValDvOcclusion, RunDvOcclusion},
-    {"dbg.hideco", "bool", "0.22.37: no labels at co_* cutscene objects (co_rock* stays)", false, ValDvHideCo, RunDvHideCo},
-    {"dbg.hidefx", "bool", "0.22.37: no labels at fx_* effects (*_grab_prompt stays)", false, ValDvHideFx, RunDvHideFx},
+    {"dbg.occlusion", "action", "0.22.37 off|faded|hidden: labels behind walls (scene depth, occlusion queries); 0.22.38: "
+                                "trigger edges whole and faded", false, ValDvOcclusion, RunDvOcclusion},
+    {"dbg.hideco", "bool", "0.22.37: no labels at co_* cutscene objects (co_rock* stays); 0.22.38: also dlc*_co_*", false,
+     ValDvHideCo, RunDvHideCo},
+    {"dbg.hidefx", "bool", "0.22.37: no labels at fx_* effects (*_grab_prompt stays); 0.22.38: also dlc_fx_* / dlc1_fx_*",
+     false, ValDvHideFx, RunDvHideFx},
     {"dbg.roomonly", "bool", "0.22.37: uber labels (dbg.uber) and key items only in Lara's room (her stream unit)", false,
      ValDvRoomOnly, RunDvRoomOnly},
+    // 0.22.38 PD (section "0.22.38 PD"; render thread, read only)
+    {"dbg.trignear", "action", "0.22.38 <0 .. 64>|off: only the triggers Lara stands in + the n nearest ([Debug] "
+                               "TriggerNearest; 0 / off = all)", false, ValDvTrigNear, RunDvTrigNear},
+    {"dbg.trigcorner", "bool", "0.22.38: the trigger's intro id at one corner of its box / plane ([Debug] TriggerCornerId)",
+     false, ValDvTrigCorner, RunDvTrigCorner},
     // 0.21.7 uber labels (section "0.21.7 uber labels"; read only, drawn at Present in a loaded level)
     {"dbg.uber", "bool", "0.21.7: uber labels - gates / platforms / switches near Lara with their state-graph node and the "
                          "time left ('Tor: oben, noch 12 s'; [Debug] UberRadius / UberMax / UberMatch)", false, ValUber,
@@ -35831,6 +36197,11 @@ const QbRow kQbDebug[] = {                   // 0.17 Debug + Darstellung
     {"Kurze Namen", "Short labels", "dbg.short", "", kQbBool, -1, kQcNone, 0, kQbBlue},
     {"Lara drin", "Lara in", "dbg.larain", "", kQbBool, -1, kQcLaraIn, 0, kQbWhite},
     {"Umh\303\274llende", "Enclosing", "dbg.enclosing", "", kQbValue, -1, kQcEncl, kQvEncl, kQbBlue},
+    // 0.22.38 PD: fewer triggers, the intro id at a corner
+    {"Trigger: Lara + 8 n\303\244chste", "Triggers: Lara + 8 nearest", "dbg.trignear", "8", kQbAction, -1, kQcNone, 0,
+     kQbWhite, 0},
+    {"Trigger: alle", "Triggers: all", "dbg.trignear", "off", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Trigger-Nummer an der Ecke", "Trigger id at a corner", "dbg.trigcorner", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
     // 0.21.5 (ring frozen): ring-only entries of TruMenu.radial.txt as bar rows
     {"Darstellung: Stand", "Display state", "dbg.style", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
     {"Debug: Stand", "Debug state", "dbg.status", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
@@ -36599,8 +36970,12 @@ const QbHelp kQbHelp[] = {
     {"dbg.keyitems", "", "Teile, Schalter, T\303\274ren, Greifpunkte, Linie Teil -> Ziel|Parts, switches, doors, grapple "
                          "points, part -> target"},
     {"dbg.hideco", "", "Keine Namen an co_-Objekten (Szenen), co_rock bleibt|No labels at co_ objects (cutscenes)"},
-    {"dbg.hidefx", "", "Keine Namen an fx_-Effekten, Greif-Hinweise bleiben|No labels at fx_ effects, grab prompts stay"},
+    {"dbg.hidefx", "", "Keine Namen an fx_ / dlc_fx_-Effekten, Greifhinweise bleiben|No labels at fx_ / dlc_fx_ effects, "
+                       "grab prompts stay"},
     {"dbg.roomonly", "", "Schalter / Tore / Teile nur in Laras Raum|Switches / gates / parts in Lara's room only"},
+    // 0.22.38 PD
+    {"dbg.trignear", "*", "Nur Trigger mit Lara + die n n\303\244chsten|Only triggers with Lara + the n nearest"},
+    {"dbg.trigcorner", "", "Intro-Id an einer Ecke des Trigger-Kastens|Intro id at one corner of the trigger box"},
     {"dbg.room", "", "Raum immer am Etikett (Kraken-Raum)|Room always on the label (Kraken room)"},
     {"dbg.metres", "", "Entfernung und H\303\266he in Metern|Distance and height in metres"},
     {"dbg.occlusion", "*", "Etiketten hinter W\303\244nden: zeigen / blass / weg|Labels behind walls: shown / faded / hidden"},
@@ -43741,6 +44116,7 @@ void ReadOptions(const char *dir) {
     g_dvTrgAtStart = OptInt(ini, "Debug", "Triggers") != 0 ? 1 : 0;
     for (int i = 0; i < kDvCount; ++i) g_dvAtStart[i] = OptInt(ini, "Debug", kDvLayers[i].key) != 0 ? 1 : 0;
     P5ReadOptions(ini);                      // 0.22.37 styles, room, metres, occlusion, co_ / fx_, draw distance
+    PdReadOptions(ini);                      // 0.22.38 TriggerNearest, TriggerCornerId
     {                                        // 0.20 collectibles / enemies
         char radius[32];
         OptString(ini, "Debug", "MarkRadius", radius, sizeof(radius));
@@ -44207,6 +44583,7 @@ void Start(HMODULE self) {
     M21Check();                               // 0.21 arachnophobia / camera / labels / ai.remove (precheck_021.txt)
     P5Check();                                // 0.22.37 debug view P5 (precheck_02237.txt; after M20Check / M21Check:
                                               // needs the intro data and label checks)
+    PdCheck();                                // 0.22.38 PD: one log line (no byte checks of its own)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
     M211Check();                              // 0.21.1 ai.kill / sticky / room check / physics / spawn (precheck_0211.txt;

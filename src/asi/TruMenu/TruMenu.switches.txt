@@ -250,5 +250,13 @@ TruMenu | Debug | DistMetres | bool | Entfernung in Metern | Distance in metres 
 TruMenu | Debug | DrawDistance | int:0..50000:1000 | Sichtweite (0 = aus) | Draw distance (0 = off) | restart | 0 | Je Gebiet: TruMenu.debugview.txt // Per area: TruMenu.debugview.txt | TruMenu 0.22.37
 TruMenu | Debug | Occlusion | int:0..2 | Hinter Wänden: 0 zeigen 1 blass 2 weg | Behind walls: 0 shown 1 faded 2 hidden | restart | 1 | Braucht Tiefe (Depth 1 / 2) // Needs depth (Depth 1 / 2) | TruMenu 0.22.37
 TruMenu | Debug | HideCo | bool | co_-Objekte ausblenden | Hide co_ objects | restart | 1 | Szenen-Objekte; co_rock bleibt // Cutscene objects; co_rock stays | TruMenu 0.22.37
-TruMenu | Debug | HideFx | bool | fx_-Effekte ausblenden | Hide fx_ effects | restart | 1 | Effekte; Greif-Hinweise bleiben // Effects; grab prompts stay | TruMenu 0.22.37
+TruMenu | Debug | HideFx | bool | fx_-Effekte ausblenden | Hide fx_ effects | restart | 1 | Effekte (auch dlc_fx_); Greif-Hinweise bleiben // Effects (dlc_fx_ too); grab prompts stay | TruMenu 0.22.37
 TruMenu | Debug | RoomOnly | bool | Nur aktueller Raum (Schalter, Teile) | Current room only (switches, parts) | restart | 0 | Tore / Schalter / Teile nur in Laras Raum // Gates / switches / parts in Lara's room only | TruMenu 0.22.37
+# 2026-11-13 (PD): TruMenu 0.22.38 - fewer triggers, the intro id at a box corner; read at the start (dbg.trignear /
+# dbg.trigcorner switch them at once)
+TruMenu | Debug | TriggerNearest | int:0..64:1 | Trigger: nur mit Lara + n nächste (0 = alle) | Triggers: Lara's + n nearest (0 = all) | restart | 0 | Weniger Kästen: Laras Trigger + die n nächsten // Fewer boxes: Lara's triggers + the n nearest | TruMenu 0.22.38
+TruMenu | Debug | TriggerCornerId | bool | Trigger-Nummer an der Kastenecke | Trigger id at a box corner | restart | 1 | Intro-Id an einer Ecke, blass wie die Kanten // Intro id at one corner, faded like the edges | TruMenu 0.22.38
+
+# 2026-11-13 (PD, owner decision): TruMenu 0.22.38 - [Input] DeviceGlyphs default 1 (patched once at the start = restart)
+group | tmeingabe | Eingabe (TruMenu) | Input (TruMenu)
+TruMenu | Input | DeviceGlyphs | bool | Tasten-Hinweise nach Gerät (Pad / Tastatur) | Button prompts by device (pad / keyboard) | restart | 1 | Zuletzt benutztes Gerät: Pad-Symbole oder Tastennamen // Last used device: pad symbols or key names | TruMenu 0.22.38

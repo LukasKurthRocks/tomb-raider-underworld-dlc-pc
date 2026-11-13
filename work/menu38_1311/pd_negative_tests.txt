@@ -1,0 +1,21 @@
+ok   0 unchanged sources                           problems   0 
+ok   1 DeviceGlyphs default back to 0              problems   1 - TruMenu.cpp: kOpts [Input] DeviceGlyphs must default to 1
+ok   2 prefix rule without the dlc skip            problems   1 - TruMenu.cpp: P5PrefixKind lacks if (*p == '_') s = p + 1;
+ok   3 P5PrefixHidden with the old inline rule     problems   1 - TruMenu.cpp: P5PrefixHidden must use P5PrefixKind
+ok   4 edge queries after sb->Apply                problems   1 - TruMenu.cpp: DpDrawBuffer must draw PdEdgeHow 1 faded without the depth test, then issue the pairs before sb->
+ok   5 PdEdgeHow ignores Occlusion 0               problems   1 - TruMenu.cpp: PdEdgeHow must be 0 without a key / with Occlusion 0 and drop only with Occlusion 2
+ok   6 DvLine numbers only lines in front          problems   1 - TruMenu.cpp: DvLine must number the edges (also behind the camera)
+ok   7 sphere circle not one key                   problems   1 - TruMenu.cpp: a sphere circle (24 segments) must be one edge key
+ok   8 DpFlush without the ALWAYS branch           problems   1 - TruMenu.cpp: DpFlush lacks the g_dpAlways branch (ZFUNC ALWAYS)
+ok   9 DpOnReset keeps the edge queries            problems   1 - TruMenu.cpp: DpOnReset must release the edge query pairs
+ok   10 PdCornerDraw writes the game               problems   1 - TruMenu.cpp: void PdCornerDraw must not write game memory or call the game
+ok   11 Lara-in outline pass without keys          problems   1 - TruMenu.cpp: DrawDebugView must key both trigger passes (DvEdgeBegin 0 / 1 ... DvEdgeEnd)
+ok   12 no TriggerNearest filter                   problems   1 - TruMenu.cpp: DrawDebugView lacks TriggerNearest / the corner id
+ok   13 item dbg.trigcorner missing                problems   1 - TruMenu.cpp: item dbg.trigcorner (bool, ValDvTrigCorner / RunDvTrigCorner) missing
+ok   14 kOpts TriggerCornerId default 0            problems   1 - TruMenu.cpp: kOpts [Debug] TriggerCornerId must default to 1
+ok   15 PdCheck not called                         problems   1 - TruMenu.cpp: ReadOptions must call PdReadOptions and the load PdCheck after P5Check
+ok   16 INI with DeviceGlyphs=0                    problems   1 - TruMenu_neg.ini: [Input] DeviceGlyphs=1 missing
+ok   17 switches row TriggerNearest live           problems   1 - TruMenu_neg.switches.txt: row TruMenu | Debug | TriggerNearest | ... | restart | 0 | ... | TruMenu 0.22.38 mis
+ok   18 switches row DeviceGlyphs missing          problems   1 - TruMenu_neg.switches.txt: row TruMenu | Input | DeviceGlyphs | ... | restart | 1 | ... | TruMenu 0.22.38 missi
+ok   19 prefix rule on 13 names                    problems   0 
+20 cases, 20 as expected, 0 not

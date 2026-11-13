@@ -2928,6 +2928,60 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.38 - PD: device glyphs on, dlc_fx_ filter, trigger edges faded whole, nearest triggers, corner ids (2026-11-13)
+
+Built into `work\asi\menu0261`, not installed, no live test (finding in the workspace `docs\Befund-TruMenu-02238-1311.md`;
+owner decisions of 13.11., live findings of the 0.22.37 run in DLC 1). Section "0.22.38 PD" in `TruMenu.cpp`; render
+thread, read only - nothing new is written into tru.exe memory (the device glyph patch is the 0.22.30 one).
+- **`[Input] DeviceGlyphs` default 1** (owner decision): the button prompts follow the last used device (pad symbols /
+  key names, section 0.22.30) without editing the INI. An installed `TruMenu.ini` keeps its own value (`DeviceGlyphs=0`
+  in an old INI stays 0) - the new switches row "Eingabe (TruMenu)" on page Fixes sets it (restart).
+- **co_ / fx_ filter after a DLC prefix** (live 13.11.: `dlc_fx_*` / `dlc1_fx_*` kept their labels - only the name start
+  was tested): `P5PrefixKind` skips `dlc_` / `dlc<digits>_` first, then the 0.22.37 rule with its exceptions
+  (`co_rock*`, `*_grab_prompt`). Against the merged object lists (PC + Xbox TU / DLC, 1045 distinct names;
+  `work/menu38_1311/prefix_names.py`): fx_ hidden 222 -> 298 (+74 `dlc_fx_*`, +2 `dlc1_fx_*`); there is no `dlc2_fx_*`
+  and no `dlc*_co_*` (the rule takes them anyway); `co_fx_*` stays a co_ object; `rainfx*` / `fxt_rain_four` are no
+  fx_ names and stay labelled.
+- **Trigger edges faded whole** (`[Debug] Occlusion` 1 / 2; live 13.11.: edges cut into loose pieces by the depth test):
+  every edge of a trigger carries a key (box 12 edges, plane 4 + 2 diagonals + the normal, sphere one key per circle of
+  24 segments, the "Lara in" outline its own keys). In the 0.16 depth pass each edge gets a **pair of D3D9 occlusion
+  queries** on the same screen quads (3 px, no colour): all pixels with the depth test off and the visible ones with the
+  0.16 test. The answer of an earlier frame decides: all visible (within 3 %) or no answer yet = drawn as before
+  (depth-tested); partly or wholly behind geometry = **drawn whole and faded** (30 %, no depth test); wholly hidden with
+  Occlusion 2 = left out. 192 pairs, at most 96 edges asked per frame in turn, an answer counts 90 frames; released at
+  Reset. `[Debug] Occlusion 0` or no depth mapping = as before. The `dbg.occlusion` value counts the faded / left-out
+  line pieces and the pairs. Note: the floating yellow strokes of the live pictures 7 - 12 turned out to be the game's
+  climbing **markup** (switch "Markup"), not trigger edges - this change does not touch the markup drawing.
+- **Fewer triggers:** `[Debug] TriggerNearest` (default 0 = all, item `dbg.trignear <0 .. 64>|off`, bar Darstellung
+  "Trigger: Lara + 8 nächste" / "Trigger: alle", menu slider): only the triggers Lara stands in plus the n nearest
+  others (nearest to the camera = the list order; enclosing / cap rules first). The state line names how many were left
+  out.
+- **Trigger number at a corner:** `[Debug] TriggerCornerId` (default 1, item `dbg.trigcorner`, bar "Trigger-Nummer an der
+  Ecke"): `#<intro id>` (the id of the trigger labels) at box corner +x +y +z / plane corner +x +z in the trigger's
+  colour, faded (or left out with Occlusion 2) when all edges of that corner are behind geometry; at most 64 per frame.
+- New INI keys 2 (277), switches rows 3 (`TriggerNearest`, `TriggerCornerId`, `[Input] DeviceGlyphs`), items 2, bar rows
+  3. Check: `trumenu_ini_check` `check_02238`; `check_02230` accepts the new DeviceGlyphs default. Build: 0 warnings in
+  TruMenu.cpp.
+
+```text
+0.22.38 PD: [Input] DeviceGlyphs 1 (default 1 since 0.22.38); co_ / fx_ filter also after dlc_ / dlc<n>_; trigger edges faded whole with Occlusion faded (192 query pairs, 96 edges per frame); TriggerNearest 0, TriggerCornerId 1
+0.14 debug view drawn: triggers 37 drawn (...) ... Lara in 1; 0.22.38: 0 beyond the nearest 0 (TriggerNearest), 31 corner id(s); ...
+```
+
+### TO TEST 0.22.38
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start | start, `TruMenu.log` | `0.22.38 PD: [Input] DeviceGlyphs ...` line; with an old INI `DeviceGlyphs 0` |
+| 2 | glyphs | page Fixes, group "Eingabe (TruMenu)": `DeviceGlyphs` on, restart; pad, then keyboard | pad symbols / key names switch with the last device (0.22.30 TO TEST 4 - 6) |
+| 3 | dlc_fx_ | DLC 1 (`dlc_watertunnel` / `dlc_dungeon`), object names `*` | no `dlc_fx_*` / `dlc1_fx_*` labels; `dbg.hidefx 0` = back |
+| 4 | edges faded | triggers on, a box partly behind a wall, `dbg.occlusion faded` | the hidden edges are drawn whole and faded, no loose pieces; the free edges as before |
+| 5 | edges hidden | same place, `dbg.occlusion hidden` | wholly hidden edges gone, partly hidden ones whole + faded |
+| 6 | negative | `dbg.occlusion off` (or `[Debug] Depth=0`) | edges as in 0.22.37 (cut by the depth test / on top) |
+| 7 | nearest | bar "Trigger: Lara + 8 nächste" | only the boxes Lara is in + 8 others; "Trigger: alle" = all again; state line `n beyond the nearest 8` |
+| 8 | corner id | `dbg.trigcorner 1` | `#<intro>` at one upper corner of each box / plane, same number as the trigger label; behind a wall faded |
+| 9 | load | look around fast for a minute with many triggers | no stutter compared to 0.22.37; `dbg.occlusion` value: pairs issued / answered grow |
+
 ## 0.22.37 - debug view P5: symbols, rooms, key items, draw distance, occlusion, chain after Paket R (2026-11-13)
 
 Built into `work\asi\menu0260`, not installed, no live test (finding in the workspace `docs\Befund-P5-Debugansicht-1311.md`;
@@ -3385,7 +3439,7 @@ Built into `work\asi\menu0253`, not installed, no live test (group D1: Q107, Q95
   `HH:MM:SS.mmm`. Readers accept both forms: `Invoke-TruTestRun.ps1` (marks, flow lines), `combat_log_compare.py`,
   `combo_hitlist_trace.py`, `hitch_scan.py`, `trace_sound_life.py`, `hall02_tutorial_episodes.py`,
   `light_frame_report.py`. TSV traces (TruFight.log, TruAim.log, TruShadowPower's TSV) keep their time column.
-- **Q95 - button prompts by the last used device** (`[Input] DeviceGlyphs`, default 0): the PC replaces every pad
+- **Q95 - button prompts by the last used device** (`[Input] DeviceGlyphs`, default 0; **0.22.38: default 1**): the PC replaces every pad
   character U+1800..U+182E of a UIText by the name of the bound key (0x5a7c20; Q9). With 1, TruMenu notes the last used
   device - pad: a button, a trigger past 30 or a stick past XInput's dead zone in the game's poll (PadHook); keyboard /
   mouse: a key, a mouse button, the wheel or a mouse move away from the client centre (WndProcHook; the game puts the
@@ -3412,7 +3466,7 @@ Built into `work\asi\menu0253`, not installed, no live test (group D1: Q107, Q95
 |---|---|---|---|
 | 1 | log date | start the game once | every new line of `TruMenu.log` (and of every other `Tru*.log`) starts with today's date; one `=== ... session start (pid n) ===` line per plugin and start |
 | 2 | log page | open the log page / overlay | lines show `HH:MM:SS.mmm` as before (no date in the overlay) |
-| 3 | glyphs off | `[Input] DeviceGlyphs=0` (default), DLC 2 banner "ZIEL FREIGESCHALTET" | as before: `BACK` as a word (pad) |
+| 3 | glyphs off | `[Input] DeviceGlyphs=0` (default until 0.22.37), DLC 2 banner "ZIEL FREIGESCHALTET" | as before: `BACK` as a word (pad) |
 | 4 | glyphs, pad | `DeviceGlyphs=1`, restart, play with the pad, banner / any hint with Start or Back | the Back / Start symbol instead of the word; `glyphs: first pad prompt` line |
 | 5 | glyphs, keyboard | same session: press a key or move the mouse, look at a hint | the key name (e.g. Tab for Back); `glyphs: last device pad -> keyboard / mouse` |
 | 6 | glyphs, switch back | touch the pad again | symbols again; no flicker while only the mouse camera turns |
