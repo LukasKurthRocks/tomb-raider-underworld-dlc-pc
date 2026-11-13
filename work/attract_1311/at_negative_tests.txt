@@ -1,0 +1,35 @@
+ok   0 unchanged sources                           problems   0 
+ok   1 kOpts AttractIcon default 0                 problems   1 - TruMenu.cpp: kOpts [Menu] AttractIcon default must be "1"
+ok   2 kOpts AttractIconText default 0             problems   1 - TruMenu.cpp: kOpts [Menu] AttractIconText default must be "1"
+ok   3 ReadOptions does not read AttractIcon       problems   1 - TruMenu.cpp: ReadOptions must read [Menu] AttractIcon into g_atWant
+ok   4 NtPost without AtOnLimit                    problems   1 - TruMenu.cpp: NtPost must call AtOnLimit(held) before the timer line return
+ok   5 NaTick slot not for the icon                problems   1 - TruMenu.cpp: NaTick must call AtTick and patch the slot for the icon too
+ok   6 NaTick without AtTick                       problems   1 - TruMenu.cpp: NaTick must call AtTick and patch the slot for the icon too
+ok   7 AtTick reads the INI every poll             problems   1 - TruMenu.cpp: AtTick must read the INI at most once a second
+ok   8 AtReadSwitch keeps the old value            problems   1 - TruMenu.cpp: AtReadSwitch must hold if (on != g_atIniOn) {
+ok   9 icon also drawn in levels                   problems   1 - TruMenu.cpp: AtWantsDraw must be g_atWant && NaFrontEnd (front end only)
+ok   10 Render does not draw the icon              problems   1 - TruMenu.cpp: Render must compute atDraw, keep ImGui on for it and draw DrawAt after DrawNt
+ok   11 Render returns early without the icon      problems   1 - TruMenu.cpp: Render must compute atDraw, keep ImGui on for it and draw DrawAt after DrawNt
+ok   12 own counting instead of the shadow modulo  problems   1 - TruMenu.cpp: AtFraction must hold g_naRepeat ? fmodf(e, alarm)
+ok   13 fraction from an own constant limit        problems   1 - TruMenu.cpp: AtFraction must hold const float alarm = g_naAlarm;
+ok   14 AtOnLimit writes the clock                 problems   1 - TruMenu.cpp: void AtOnLimit must read only TruMenu's own values (no game memory, no game call)
+ok   15 AtOnLimit without the counts               problems   1 - TruMenu.cpp: AtOnLimit must hold InterlockedIncrement(held ? &g_atSkipped : &g_atStarted);
+ok   16 DrawAt text only English                   problems   1 - TruMenu.cpp: DrawAt texts without a de / en pair: Teaser: no clock yet
+ok   17 DrawAt without the blink                   problems   1 - TruMenu.cpp: DrawAt must hold const bool blinking = blinkAt && now - blinkAt < kAtBlinkMs;
+ok   18 DrawAt not below the timer box             problems   1 - TruMenu.cpp: DrawAt must hold g_ntPos == 2 && g_ntBoxH > 0.0f
+ok   19 DrawAt fills one concave sector            problems   1 - TruMenu.cpp: DrawAt must hold AtSector(dl, c, r, a, a + kPi * 0.5f < a1 ? a + kPi * 0.5f : a1, fill);
+ok   20 RunAt flips without an argument            problems   1 - TruMenu.cpp: RunAt must hold if (!arg || !arg[0]) { ValAt(o, n); return true; }
+ok   21 RunAt does not keep the INI                problems   1 - TruMenu.cpp: RunAt must hold IniKeep("Menu", "AttractIcon", on ? "1" : "0");
+ok   22 RadialWhy does not grey the icon           problems   1 - TruMenu.cpp: RadialWhy must grey menu.attracticon with NaWhy
+ok   23 item menu.attracticon missing              problems   1 - TruMenu.cpp: item menu.attracticon (bool, ValAt / RunAt) missing
+ok   24 bar row missing                            problems   1 - TruMenu.cpp: row menu.attracticon (bool) must follow menu.attracttimer in group set_main
+ok   25 help line over 60 characters               problems   1 - TruMenu.cpp: menu.attracticon help over 60 characters
+ok   26 kVersion not 0.22.39                       problems   1 - TruMenu.cpp: kVersion must start with "TruMenu 0.22.39 (Q126 attract icon"
+ok   27 a 14th byte check row                      problems   1 - TruMenu.cpp: kNaChecks must stay 13 rows (no new byte checks for the icon)
+ok   28 DrawNt keeps no box height                 problems   1 - TruMenu.cpp: DrawNt must note its box height (the icon goes below it)
+ok   29 INI with AttractIcon=0                     problems   1 - TruMenu_neg.ini: [Menu] AttractIcon=1 missing
+ok   30 switches row AttractIcon restart           problems   2 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | bool | ... | live | 1 | ... | TruMenu 0.22.39 mis
+ok   31 switches row AttractIconText missing       problems   4 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIconText | bool | ... | live | 1 | ... | TruMenu 0.22.39
+ok   32 switches row AttractIcon default 0         problems   2 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | bool | ... | live | 1 | ... | TruMenu 0.22.39 mis
+ok   33 switches group tmhauptmenue missing        problems   1 - TruMenu_neg.switches.txt: group tmhauptmenue missing
+34 cases, 34 as expected, 0 not

@@ -2928,6 +2928,58 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.39 - Q126: attract icon in the main menu (2026-11-13)
+
+Built into `work\asi\menu0262`, not installed, no live test (finding in the workspace `docs\Befund-AttractIcon-1311.md`;
+owner idea Q126 of 13.11.). Section "0.22.39 menu.attracticon" in `TruMenu.cpp`; read only - nothing new is written into
+tru.exe memory, no new byte checks (the 13 `kNaChecks` rows of 0.22.20 pin the clock layout and the update slot).
+
+**What it shows** (top right, only in the front end = main state 6 / 10, never in a level; below the teaser timer box
+when `menu.attracttimer` is on in the same corner):
+
+| Part | Meaning |
+|---|---|
+| circle | fills clockwise from 12 o'clock with the way to the teaser limit: the game's AttractTimer clock (generalbank script 60 member 4, captured at the clock f11 native as in 0.22.20) - elapsed `+0x10` / alarm `+0x14` (init block 40.0 s, repeat 1). With `menu.noattract` holding the clock (real elapsed kept at 0): the 0.22.21 shadow count (the dt the game handed the clock since its last (re)start) modulo the alarm - after each skipped teaser the circle starts empty again |
+| icon in the middle | a play triangle (the teaser video); crossed out in red while NoAttract holds |
+| colour | amber = the game's teaser will start, light blue = NoAttract holds, grey = no clock yet / code differs |
+| text left of the circle (`[Menu] AttractIconText`, default 1) | `12 / 40 s` (whole seconds passed / limit; `(Pause)` / `(steht)` when the clock is paused / stopped), then `übersprungen 3` / `skipped 3` (NoAttract holds) or `Teaser gestartet 1` / `teaser started 1` (the game's teaser) - counts since the game start; `Teaser: noch keine Uhr` until the timer's next START / RESTART (an input in the menu); the NaWhy reason when the 0.22.20 checks failed |
+| blink | each time the limit is reached the box flashes orange three times in 1.2 s (the timer box: 1 s orange) and one `TruMenu.log` line: `menu.attracticon: limit 40.0 s reached - teaser skipped (NoAttract holds the clock) (3 this session; skipped 3, game's teaser 0)` |
+
+- `menu.attracticon 1|0` (no argument = report, never a flip; a bad value = usage), `[Menu] AttractIcon` (**default 1**,
+  written back at once), `[Menu] AttractIconText` (default 1). Both keys are re-read about once a second (`AtReadSwitch`
+  from `NaTick`), so the new switches rows (page Fixes, group "Hauptmenü (TruMenu)") are `live`. Bar: Spiel-Einstellungen
+  / Hauptmenü "Teaser-Symbol (Kreis)" after "Teaser-Uhr anzeigen"; help "Kreis oben rechts füllt sich bis zum Teaser +
+  Zähler"; greyed with the reason of `menu.noattract` (checks differ / patch refused).
+- Mechanism: `NaTick` patches the update slot 0x84584c for hold || timer line || icon (0.22.21 did it for the line);
+  with the icon alone `NaUpdate` writes nothing (its hold branch needs `g_naWant`). `NtPost` calls `AtOnLimit(held)` when
+  it sees the limit (held: the shadow passes alarm x n; not held: the game's clock fired in this update) - counted also
+  while the icon is off, logged only while it is on. "Teaser gestartet" counts the clock firing; the clock event (f2)
+  still checks front-end state != 4 and two `stdscreenmgr` tests before it starts the teaser, so a count with no video
+  is possible in theory (not seen yet).
+- Because the default is 1, the update slot is now patched (read only) in every start and ImGui draws in the main menu
+  without any other overlay. `menu.attracticon 0` (or the INI / switches row) puts the slot back when neither NoAttract
+  nor the timer line wants it.
+- `menu.attracticon` without an argument reports e.g. `1 (text 1; NoAttract holds - shadow modulo the alarm; clock read,
+  12.40 / 40.00 s = 31 %, skipped 3, game's teaser 0, 3 blink(s))`.
+- New INI keys 2 (279), switches rows 2 (+ group), items 1, bar rows 1. Check: `trumenu_ini_check` `check_02239`
+  (`check_02221` accepts the NaTick condition with the icon). Build: 0 warnings in TruMenu.cpp.
+
+### TO TEST 0.22.39
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start | start the game, main menu, touch nothing | icon top right: `Teaser: noch keine Uhr` until the first input in the menu (or at once when the timer started at the menu entry); `TruMenu.log`: `menu.noattract / attracttimer on: update slot 0x84584c -> NaUpdate (teaser timer line / attract icon only ...)` |
+| 2 | fill | one input in the menu, then wait | the circle fills clockwise, text counts `1 / 40 s` ... `39 / 40 s` at the game clock (half speed after "back to the main menu" from the pause screen unless TruQoL `FrontEndPauseBit` is on) |
+| 3 | input resets | press a direction at ~20 s | circle and seconds back to 0 (script 7 -> RESTART) |
+| 4 | teaser | NoAttract off, wait for the limit | 3 orange blinks, log line `... the game's teaser starts (1 this session ...)`, the teaser video plays; `Teaser gestartet 1` |
+| 5 | skipped | `menu.noattract 1`, wait 40 s, then 80 s | at 40 s and 80 s: blinks, log line `teaser skipped`, `übersprungen 1` / `2`, the menu stays; the circle starts empty after each skip; the play icon is crossed out, the colour light blue |
+| 6 | timer box | `menu.attracttimer 1` (corner tr) | the icon sits below the timer box; both blink at the same limit |
+| 7 | text off | page Fixes, group "Hauptmenü (TruMenu)": "Teaser-Symbol: Sekunden + Zähler" off | within a second only the circle remains |
+| 8 | language | bar language EN (`quick.lang en`) | `skipped 2`, `teaser started 1`, `Teaser: no clock yet` |
+| 9 | negative: level | start a level | no icon in the level (front end only) |
+| 10 | negative: off | `menu.attracticon 0` (with NoAttract 0 and the timer line 0) | icon gone; log `menu.noattract off ...` (slot put back); `menu.attracticon` -> `0 (...)` |
+| 11 | negative: argument | `menu.attracticon 2`, `menu.attracticon` | usage line for 2 (nothing changed); no argument = report only, no flip |
+
 ## 0.22.38 - PD: device glyphs on, dlc_fx_ filter, trigger edges faded whole, nearest triggers, corner ids (2026-11-13)
 
 Built into `work\asi\menu0261`, not installed, no live test (finding in the workspace `docs\Befund-TruMenu-02238-1311.md`;

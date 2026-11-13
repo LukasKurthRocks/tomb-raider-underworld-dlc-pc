@@ -1828,6 +1828,8 @@ SW_LIVE = {
     ('TruMenu', 'Debug', 'LabelCollected'): 'void LgReadSwitch(',       # TruMenu 0.22.36 (labels, about once a second)
     ('TruMenu', 'Debug', 'LabelLaraGear'): 'void LgReadSwitch(',
     ('TruMenu', 'Log', 'Save'): 'void SvReadSwitch(',                   # TruMenu 0.22.27 (Q79, TruSaveProbe.h)
+    ('TruMenu', 'Menu', 'AttractIcon'): 'void AtReadSwitch(',           # TruMenu 0.22.39 (Q126, about once a second)
+    ('TruMenu', 'Menu', 'AttractIconText'): 'void AtReadSwitch(',
 }
 # Q75 (2026-11-11): keys the plugin re-reads at run time only when they were 1 at the game start (the code is patched
 # only then; a 1 after a start with 0 needs a restart). No "when" form of TruMenu says that: live-if:<Key> asks the key's
@@ -3280,7 +3282,8 @@ def check_02221(ini_path):
     if 'BoolArg(' in run: problems.append('TruMenu.cpp: RunNt must not use BoolArg (an empty argument would flip)')
     # read only: the slot follows hold || line; NaUpdate writes the clock only in the hold branch; NtPre / NtPost read
     tick = fn_body(src, 'void NaTick(')
-    if 'want = hold || g_ntWant != 0;' not in tick: problems.append('TruMenu.cpp: NaTick must patch the slot for hold || line')
+    if 'want = hold || g_ntWant != 0;' not in tick and 'want = hold || g_ntWant != 0 || g_atWant != 0;' not in tick:
+        problems.append('TruMenu.cpp: NaTick must patch the slot for hold || line (0.22.39: || icon)')
     upd = fn_body(src, 'void __fastcall NaUpdate(')
     if upd.count('= 0.0f;') != 2 or upd.count('*elapsed = 0.0f;') != 1:   # `float game = 0.0f;` + the hold's write
         problems.append('TruMenu.cpp: NaUpdate may write the clock only in the hold branch (*elapsed = 0.0f)')
@@ -4635,6 +4638,123 @@ def check_02238(ini_path, switches_path):
                       'pairs; %d keys, %d items)' % (lists, len(PD_KEYS_02238), len(PD_ITEMS_02238)))
 
 
+AT_KEYS_02239 = (('AttractIcon', '1'), ('AttractIconText', '1'))
+
+
+def check_02239(ini_path, switches_path):
+    """0.22.39 (Q126, owner idea 13.11.; workspace docs/Befund-AttractIcon-1311.md): menu.attracticon ([Menu] AttractIcon
+    default 1, [Menu] AttractIconText default 1, both re-read about once a second by AtReadSwitch from NaTick = live
+    switches rows in group "Hauptmenue (TruMenu)"): the game's AttractTimer values - elapsed / alarm of the clock captured
+    at the f11 native, with NoAttract holding the shadow modulo the alarm - read through the 0.22.20 update slot (NaTick
+    patches it for hold || line || icon; nothing new is written), AtOnLimit from NtPost counts skipped / started and sets
+    the blink; drawn only in the front end, below the timer box when that is top right; item / bar row / help / greying;
+    the icon functions read only TruMenu's own variables; README 0.22.39 with TO TEST; Set-TruMenu knows the 0.22.38 hash"""
+    problems = []
+    src = read_cpp()
+    if '"TruMenu 0.22.39 (Q126 attract icon' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.39 (Q126 attract icon"')
+    ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
+    block = re.search(r'^\[Menu\]\n(.*?)(?=^\[|\Z)', ini, re.M | re.S)
+    for key, val in AT_KEYS_02239:
+        if not re.search(r'\{"Menu", "%s", "%s",' % (key, val), src):
+            problems.append('TruMenu.cpp: kOpts [Menu] %s default must be "%s"' % (key, val))
+        if not block or not re.search(r'^%s=%s$' % (key, val), block.group(1), re.M):
+            problems.append('%s: [Menu] %s=%s missing' % (os.path.basename(ini_path), key, val))
+    sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Menu | ')]
+    for key, val in AT_KEYS_02239:
+        f = [x for x in sw if len(x) >= 10 and x[2] == key]
+        if not f or f[0][3] != 'bool' or f[0][6] != 'live' or f[0][7] != val or f[0][9] != 'TruMenu 0.22.39':
+            problems.append('%s: row TruMenu | Menu | %s | bool | ... | live | %s | ... | TruMenu 0.22.39 missing'
+                            % (os.path.basename(switches_path), key, val))
+    groups = [l.rstrip('\r\n') for l in open(switches_path, encoding='utf-8') if l.startswith('group | tmhauptmenue | ')]
+    if len(groups) != 1: problems.append('%s: group tmhauptmenue missing' % os.path.basename(switches_path))
+    ro = fn_body(src, 'void ReadOptions(')
+    for key, var in (('AttractIcon', 'g_atWant'), ('AttractIconText', 'g_atText')):
+        if 'InterlockedExchange(&%s, OptInt(ini, "Menu", "%s") != 0 ? 1 : 0);' % (var, key) not in ro:
+            problems.append('TruMenu.cpp: ReadOptions must read [Menu] %s into %s' % (key, var))
+    rd = fn_body(src, 'void AtReadSwitch(')
+    for want in ('GetPrivateProfileIntA("Menu", "AttractIcon", atoi(OptDefault("Menu", "AttractIcon")), g_iniPath)',
+                 'GetPrivateProfileIntA("Menu", "AttractIconText", atoi(OptDefault("Menu", "AttractIconText")),',
+                 'if (on != g_atIniOn) {', 'if (text != g_atIniText) {'):
+        if want not in rd: problems.append('TruMenu.cpp: AtReadSwitch must hold %s' % want)
+    if 'if (g_atReadTick && now - g_atReadTick < 1000) return;' not in fn_body(src, 'void AtTick('):
+        problems.append('TruMenu.cpp: AtTick must read the INI at most once a second')
+    tick = fn_body(src, 'void NaTick(')
+    i_ai, i_want = tick.find('AtTick();'), tick.find('want = hold || g_ntWant != 0 || g_atWant != 0;')
+    if not (0 <= i_ai < i_want): problems.append('TruMenu.cpp: NaTick must call AtTick and patch the slot for the icon too')
+    post = fn_body(src, 'void NtPost(')
+    i_lim, i_ret = post.find('if (flash) AtOnLimit(held);'), post.find('if (!flash || !g_ntWant) return;')
+    if not (0 <= i_lim < i_ret): problems.append('TruMenu.cpp: NtPost must call AtOnLimit(held) before the timer line return')
+    lim = fn_body(src, 'void AtOnLimit(')
+    for want in ('InterlockedIncrement(held ? &g_atSkipped : &g_atStarted);', 'g_atBlinkTick = GetTickCount() | 1;',
+                 'Log(1, "menu.attracticon: limit '):
+        if want not in lim: problems.append('TruMenu.cpp: AtOnLimit must hold %s' % want)
+    fr = fn_body(src, 'float AtFraction(')
+    for want in ('const float alarm = g_naAlarm;', 'if (!g_naClock || !g_ntClock || !(alarm > 0.0f)) return -1.0f;',
+                 'float e = held ? g_ntShadow : g_ntReal;', 'g_naRepeat ? fmodf(e, alarm)'):
+        if want not in fr: problems.append('TruMenu.cpp: AtFraction must hold %s' % want)
+    if 'bool AtWantsDraw() { return g_atWant != 0 && NaFrontEnd(); }' not in src:
+        problems.append('TruMenu.cpp: AtWantsDraw must be g_atWant && NaFrontEnd (front end only)')
+    rnd = fn_body(src, 'void Render(')
+    i_nt, i_ai2 = rnd.find('if (ntDraw) DrawNt();'), rnd.find('if (atDraw) DrawAt(ntDraw);')
+    if 'const bool atDraw = AtWantsDraw();' not in rnd or '!atDraw && !cnBadge && !ntDraw)' not in rnd or not (0 <= i_nt < i_ai2):
+        problems.append('TruMenu.cpp: Render must compute atDraw, keep ImGui on for it and draw DrawAt after DrawNt')
+    if 'g_ntBoxH = ImGui::GetWindowSize().y;' not in fn_body(src, 'void DrawNt('):
+        problems.append('TruMenu.cpp: DrawNt must note its box height (the icon goes below it)')
+    draw = fn_body(src, 'void DrawAt(')
+    if not draw.split('\n')[2:3] == ['    const bool de = g_qbLang == 0;']:
+        problems.append('TruMenu.cpp: DrawAt must start with const bool de = g_qbLang == 0; (the bar language)')
+    rest = re.sub(r'de\s*\?\s*' + NT_LITSEQ + r'\s*:\s*' + NT_LITSEQ, '', draw)
+    left = [unescape(x) for x in re.findall(r'"((?:[^"\\]|\\.)*)"', rest)]
+    single = [t for t in left if re.search(r'[A-Za-z]{2}', re.sub(r'%[-.0-9]*[a-z]+', '', t)) and t != '##TruAttractIcon']
+    if single: problems.append('TruMenu.cpp: DrawAt texts without a de / en pair: %s' % ', '.join(single))
+    for want in ('const bool blinking = blinkAt && now - blinkAt < kAtBlinkMs;', 'g_ntPos == 2 && g_ntBoxH > 0.0f',
+                 'AtSector(dl, c, r, a, a + kPi * 0.5f < a1 ? a + kPi * 0.5f : a1, fill);', 'if (g_atText) {',
+                 'bersprungen %ld" : "skipped %ld"', 'NaWhy();'):   # read_cpp turns the umlaut escape into ue
+        if want not in draw: problems.append('TruMenu.cpp: DrawAt must hold %s' % want)
+    if 'const DWORD kAtBlinkMs = 1200, kAtBlinkPhaseMs = 200;' not in src:
+        problems.append('TruMenu.cpp: kAtBlinkMs 1200 / kAtBlinkPhaseMs 200 missing')
+    for fn in ('void AtOnLimit(', 'void AtReadSwitch(', 'void AtTick(', 'float AtFraction(', 'void AtSector(',
+               'void DrawAt(', 'void ValAt('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('(')); continue
+        if any(w in body for w in ('reinterpret_cast<', 'WriteByte(', 'WriteBytes(', 'WriteDword(', 'LcPatch(', 'Fn>(')):
+            problems.append('TruMenu.cpp: %s must read only TruMenu\'s own values (no game memory, no game call)'
+                            % fn.strip('('))
+    # item: bool, explicit value, no argument = report (never a flip), written at once
+    if not re.search(r'\{"menu\.attracticon", "bool", ".*?,\s+false, ValAt, RunAt\}', src, re.S):
+        problems.append('TruMenu.cpp: item menu.attracticon (bool, ValAt / RunAt) missing')
+    run = fn_body(src, 'bool RunAt(')
+    for want in ('if (!arg || !arg[0]) { ValAt(o, n); return true; }', 'IniKeep("Menu", "AttractIcon", on ? "1" : "0");',
+                 'usage: menu.attracticon 1|0'):
+        if want not in run: problems.append('TruMenu.cpp: RunAt must hold %s' % want)
+    if 'BoolArg(' in run: problems.append('TruMenu.cpp: RunAt must not use BoolArg (an empty argument would flip)')
+    if 'if (!_stricmp(id, "menu.attracticon")) return NaWhy();' not in fn_body(src, 'const char *RadialWhy('):
+        problems.append('TruMenu.cpp: RadialWhy must grey menu.attracticon with NaWhy')
+    tables = src[src.find('const QbRow kQbSettings[] = {'):]
+    tables = tables[:tables.find('\n};')]
+    a, r, t = (tables.find('"menu.attracttimer", "", kQbBool'), tables.find('"menu.attracticon", "", kQbBool'),
+               tables.find('"set_tm", kQbGroup'))
+    if not (0 <= a < r < t):
+        problems.append('TruMenu.cpp: row menu.attracticon (bool) must follow menu.attracttimer in group set_main')
+    hm = re.search(r'\{"menu\.attracticon", "", "((?:[^"\\]|\\.)*)"\s*"((?:[^"\\]|\\.)*)"\}', src)
+    if not hm: problems.append('TruMenu.cpp: kQbHelp row menu.attracticon missing')
+    else:
+        de, en = unescape(hm.group(1) + hm.group(2)).split('|')
+        if len(de) > 60 or len(en) > 60: problems.append('TruMenu.cpp: menu.attracticon help over 60 characters')
+    m = re.search(r'const DvCheck kNaChecks\[\] = \{(.*?)\n\};', src, re.S)
+    if not m or len(re.findall(r'\{0x[0-9a-f]{8}, "[0-9a-f ]+"\}', m.group(1))) != 13:
+        problems.append('TruMenu.cpp: kNaChecks must stay 13 rows (no new byte checks for the icon)')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.39 - ' not in readme or '\n### TO TEST 0.22.39' not in readme:
+        problems.append('README.md: section "## 0.22.39 - ..." with "### TO TEST 0.22.39" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '0246bd14f4c26d0bbc370587e44d8398c646138fafab85d325109e6a0eed758e' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.38 build hash (work/asi/menu0261) is missing')
+    return problems, ('attract icon (Q126): [Menu] AttractIcon=1 / AttractIconText=1 live, the game\'s clock values '
+                      'through the 0.22.20 slot, AtOnLimit counts + blink, front end only, item / row / help / greying')
+
+
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
 SV_ITEMS = ('save.pending', 'save.inv', 'save.waiting', 'save.find')
 
@@ -5222,6 +5342,10 @@ def main(argv):
     for p in cproblems38: print('Q02238 %s' % p)
     if not cproblems38: print('ok: 0.22.38 %s' % csummary38)
     problems += cproblems38
+    cproblems39, csummary39 = check_02239(ini_path, opt.get('--switches', SWITCHES))   # 0.22.39 (Q126 attract icon)
+    for p in cproblems39: print('Q02239 %s' % p)
+    if not cproblems39: print('ok: 0.22.39 %s' % csummary39)
+    problems += cproblems39
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)
